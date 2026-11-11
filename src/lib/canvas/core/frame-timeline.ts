@@ -24,8 +24,20 @@ export enum Step {
 
 export type FrameSteps = { id: string; steps: { step: Step; at: number; group: string }[] };
 
+const ONCE_PER_GROUP = new Set([Step.Put, Step.Patched, Step.Pictured, Step.Drawn, Step.Thumb]);
+const marked = new Set<string>();
+
 export function markFrame(group: string, step: Step) {
-  performance.mark(`${PREFIX}${step}${SEPARATOR}${group}`);
+  const name = `${PREFIX}${step}${SEPARATOR}${group}`;
+  if (!ONCE_PER_GROUP.has(step)) {
+    performance.mark(name);
+    return;
+  }
+  if (marked.has(name)) {
+    return;
+  }
+  marked.add(name);
+  performance.mark(name);
 }
 
 export function timeline(marks: readonly { name: string; startTime: number }[]): FrameSteps[] {

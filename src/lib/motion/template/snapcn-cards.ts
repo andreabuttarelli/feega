@@ -14,7 +14,10 @@ const CATEGORY_CARD: Record<SnapcnCategory, CategoryCard> = {
   [SnapcnCategory.Caption]: { roles: [SectionRole.Feature], energy: Energy.Medium, text: TextAmount.Lines, goodFor: 'spoken captions over a clip' },
   [SnapcnCategory.Cursor]: { roles: [SectionRole.Product], energy: Energy.Medium, text: TextAmount.Word, goodFor: 'a cursor clicking or typing in a UI' },
   [SnapcnCategory.Social]: { roles: [SectionRole.Proof, SectionRole.Stat], energy: Energy.Fast, text: TextAmount.Word, goodFor: 'social proof and growth' },
-  [SnapcnCategory.Transition]: { roles: [SectionRole.Transition], energy: Energy.Fast, text: TextAmount.None, goodFor: 'a bridge between two sections' }
+  [SnapcnCategory.Transition]: { roles: [SectionRole.Transition], energy: Energy.Fast, text: TextAmount.None, goodFor: 'a bridge between two sections' },
+  [SnapcnCategory.Background]: { roles: [SectionRole.Opener, SectionRole.Feature, SectionRole.Closer], energy: Energy.Calm, text: TextAmount.None, goodFor: 'a moving backdrop behind titles and UI' },
+  [SnapcnCategory.Effect]: { roles: [SectionRole.Feature, SectionRole.Product], energy: Energy.Medium, text: TextAmount.Word, goodFor: 'a glow, border or motion accent on a card or button' },
+  [SnapcnCategory.Icon]: { roles: [SectionRole.Feature, SectionRole.Proof], energy: Energy.Medium, text: TextAmount.None, goodFor: 'an animated icon beside a feature or a stat' }
 };
 
 const LIGHT_LUMA = 0.5;
@@ -26,7 +29,7 @@ const toneOf = (hex: string): EdgeTone => {
 
 const formatOf = (port: SnapcnPort) => (port.height > port.width ? MotionFormat.Vertical : MotionFormat.Landscape);
 
-const cardOf = (port: SnapcnPort): TemplateCard => {
+export const cardOf = (port: SnapcnPort): TemplateCard => {
   const c = CATEGORY_CARD[port.category];
   const tone = toneOf(port.background);
   return {

@@ -5,7 +5,7 @@ import Page from './+page.svelte';
 
 const canvas = { id: 'c1', name: 'Spring teaser', projectName: 'Launch', updatedAt: '2026-10-03', href: '/p/p1/c/c1', thumbs: ['https://signed/poster.jpg'] };
 const project = { id: 'p1', name: 'Launch', href: '/p/p1', updatedAt: '2026-10-03', canvases: [], thumbs: [], videoCount: 1, posters: ['https://signed/poster.jpg'] };
-const PLACEHOLDER = 'Describe what you want to make, or paste your website…';
+const PLACEHOLDER = 'Describe a launch video, or paste your website…';
 
 function page(canvases: (typeof canvas)[] = [canvas], projects: { id: string; name: string }[] = []) {
   const data = { projects, dashboard: { canvases, projects: [project], batches: [], motions: [], moreVideos: null }, templates: [{ id: 't', name: 'A poster series', brief: 'A poster series' }], tools: [], attachProjectId: 'p1' };
@@ -36,9 +36,12 @@ describe('the /app home: the recents, one prompt', () => {
     expect(body.indexOf('<h1')).toBeLessThan(body.indexOf('data-testid="video-brief"'));
   });
 
-  it('one chip per kind above the prompt, motion picked, the pick sent with the form', () => {
+  it('one tab per kind at the top of the composer card, motion picked, the pick sent with the form', () => {
     const body = page();
     const kinds = body.slice(body.indexOf('data-testid="prompt-kinds"'), body.indexOf('data-testid="video-brief"'));
+
+    expect(body.indexOf('action="?/video"')).toBeLessThan(body.indexOf('data-testid="prompt-kinds"'));
+    expect(kinds.match(/<svg/g)?.length).toBe(2);
 
     expect(kinds).toMatch(/data-kind="motion"[^>]*aria-pressed="true"/);
     expect(kinds).toMatch(/data-kind="website"[^>]*aria-pressed="false"/);
@@ -110,9 +113,23 @@ describe('the /app home: the recents, one prompt', () => {
     const body = page();
     const sources = body.slice(body.indexOf('data-testid="prompt-sources"'));
 
-    expect(sources).toMatch(/data-source="github"[^>]*>GitHub</);
-    expect(sources).toMatch(/data-source="folder"[^>]*>Local folder</);
-    expect(sources).toMatch(/data-source="figma"[^>]*>Import from Figma</);
+    expect(sources).toMatch(/data-source="github"[^>]*>[\s\S]*?<svg[\s\S]*?GitHub<\/span>/);
+    expect(sources).toMatch(/data-source="upload"[^>]*>[\s\S]*?<svg[\s\S]*?Local folder<\/span>/);
+    expect(sources).toMatch(/data-source="figma"[^>]*>[\s\S]*?<svg[\s\S]*?Import from Figma<\/span>/);
     expect(sources).toContain('webkitdirectory');
+  });
+
+  it('small screens get one Import menu instead of three source buttons', () => {
+    const body = page();
+
+    expect(body).toMatch(/data-testid="source-menu"[^>]*aria-haspopup="menu"[\s\S]*?Import/);
+  });
+
+  it('the bottom row names the model next to the round send button', () => {
+    const body = page();
+    const row = body.slice(body.indexOf('data-testid="chat-attach"'), body.indexOf('data-testid="brief-send"'));
+
+    expect(row).toContain('data-testid="composer-model"');
+    expect(row).toContain('Opus 5.5');
   });
 });

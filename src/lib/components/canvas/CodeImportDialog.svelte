@@ -2,11 +2,13 @@
   import { onMount } from 'svelte';
   import { env as publicEnv } from '$env/dynamic/public';
   import { isLocalMode } from '$lib/local-user';
-  import { githubBranches, githubConnect, githubDisconnect, githubRepos, githubStatus, importCode, repoLink, type CodeLanded, type CodeTarget, type RenderCondition, type GithubRepo, type GithubStatus } from '$lib/canvas/code-import-client';
+  import { canPickDirectory, listedFolder, pickDirectory } from '$lib/code-upload/pick-folder';
+  import { SNAPSHOT_MESSAGES, type Snapshot } from '$lib/code-upload/snapshot';
+  import { githubBranches, githubConnect, githubDisconnect, githubRepos, githubStatus, importCode, repoLink, tokensFound, uploadFolder, type CodeLanded, type CodeTarget, type RenderCondition, type GithubRepo, type GithubStatus } from '$lib/canvas/code-import-client';
 
   let { projectId, canvasId, at, onimported, onclose }: { projectId: string; canvasId: string; at: { x: number; y: number }; onimported: (landed: CodeLanded) => void; onclose: () => void } = $props();
 
-  const Source = { Repo: 'repo', Folder: 'folder', Storybook: 'storybook' } as const;
+  const Source = { Repo: 'repo', Folder: 'folder', Upload: 'upload', Storybook: 'storybook' } as const;
   const localMode = isLocalMode(publicEnv);
   type Source = (typeof Source)[keyof typeof Source];
 
@@ -27,6 +29,9 @@
   let routes = $state('/');
   let storybook = $state('');
   let folder = $state('');
+  let uploaded = $state<{ path: string; name: string } | null>(null);
+  let uploading = $state(false);
+  let folderInput = $state<HTMLInputElement | null>(null);
   let busy = $state(false);
   let message = $state<string | null>(null);
   let detail = $state<string | null>(null);
@@ -54,13 +59,38 @@
 
   const linked = (raw: string) => (HTTP.test(raw.trim()) ? raw.trim() : `https://${raw.trim()}`);
 
+  const LOOKUP_DELAY_MS = 400;
+  let designSystem = $state(true);
+  let designTouched = $state(false);
+  let found = $state<number | null>(null);
+
+  const lookup = $derived(source === Source.Repo && repo.trim() ? { repo: linked(repo) } : source === Source.Folder && folder.trim() ? { folder: folder.trim() } : source === Source.Upload && uploaded ? { upload: uploaded.path } : null);
+
+  $effect(() => {
+    const where = lookup;
+    found = null;
+    if (!where) {
+      return;
+    }
+    const timer = setTimeout(async () => {
+      const count = await tokensFound(projectId, where);
+      if (lookup === where) {
+        found = count;
+        designSystem = designTouched ? designSystem : count > 0;
+      }
+    }, LOOKUP_DELAY_MS);
+    return () => clearTimeout(timer);
+  });
+
+
   const TARGETS: Record<Source, () => CodeTarget> = {
-    [Source.Repo]: () => ({ repo: linked(repo), routes: routes.split(/[\s,]+/).filter(Boolean), conditions }),
-    [Source.Folder]: () => ({ folder: folder.trim(), routes: routes.split(/[\s,]+/).filter(Boolean), conditions }),
+    [Source.Repo]: () => ({ repo: linked(repo), routes: routes.split(/[\s,]+/).filter(Boolean), conditions, designSystem }),
+    [Source.Folder]: () => ({ folder: folder.trim(), routes: routes.split(/[\s,]+/).filter(Boolean), conditions, designSystem }),
+    [Source.Upload]: () => ({ upload: uploaded?.path ?? '', routes: routes.split(/[\s,]+/).filter(Boolean), conditions, designSystem }),
     [Source.Storybook]: () => ({ storybook: linked(storybook) })
   };
 
-  const READY: Record<Source, () => boolean> = { [Source.Repo]: () => Boolean(repo.trim()), [Source.Folder]: () => Boolean(folder.trim()), [Source.Storybook]: () => Boolean(storybook.trim()) };
+  const READY: Record<Source, () => boolean> = { [Source.Repo]: () => Boolean(repo.trim()), [Source.Folder]: () => Boolean(folder.trim()), [Source.Upload]: () => uploaded !== null, [Source.Storybook]: () => Boolean(storybook.trim()) };
   const ready = $derived(READY[source]() && conditions.length > 0);
 
   async function refresh() {
@@ -111,6 +141,29 @@
     return () => window.removeEventListener('focus', again);
   });
 
+  async function pickUpload() {
+    message = null;
+    if (!canPickDirectory()) {
+      folderInput?.click();
+      return;
+    }
+    await upload(await pickDirectory());
+  }
+
+  async function upload(snapshot: Snapshot | null) {
+    if (!snapshot) {
+      return;
+    }
+    if (!snapshot.ok) {
+      message = SNAPSHOT_MESSAGES[snapshot.refusal];
+      return;
+    }
+    uploading = true;
+    const done = await uploadFolder(projectId, snapshot.name, snapshot.archive).finally(() => (uploading = false));
+    uploaded = done.ok ? { path: done.value, name: snapshot.name } : null;
+    message = done.ok ? null : 'The folder could not be uploaded. Try again.';
+  }
+
   async function bring() {
     busy = true;
     message = null;
@@ -132,7 +185,7 @@
     <h3>Import from code</h3>
     <div class="ui-tabs rounded-sm" role="tablist">
       <button class="rounded-sm" role="tab" aria-selected={source === Source.Repo} onclick={() => (source = Source.Repo)} data-testid="code-import-tab-repo">GitHub</button>
-      {#if localMode}<button class="rounded-sm" role="tab" aria-selected={source === Source.Folder} onclick={() => (source = Source.Folder)} data-testid="code-import-tab-folder">Folder</button>{/if}
+      {#if localMode}<button class="rounded-sm" role="tab" aria-selected={source === Source.Folder} onclick={() => (source = Source.Folder)} data-testid="code-import-tab-folder">Folder</button>{:else}<button class="rounded-sm" role="tab" aria-selected={source === Source.Upload} onclick={() => (source = Source.Upload)} data-testid="code-import-tab-upload">Folder</button>{/if}
       <button class="rounded-sm" role="tab" aria-selected={source === Source.Storybook} onclick={() => (source = Source.Storybook)} data-testid="code-import-tab-storybook">Storybook</button>
     </div>
     <form
@@ -176,6 +229,14 @@
         <p class="ui-note">A project folder on this computer: its dev server runs here, edits on the canvas are written back to its files, and changes to the files show up on the canvas.</p>
         <input class="rounded-sm" type="text" placeholder="/Users/you/code/my-app" aria-label="Folder" bind:value={folder} data-testid="code-import-folder" />
         <input class="rounded-sm" type="text" placeholder="/  /settings  /users" aria-label="Pages" bind:value={routes} data-testid="code-import-folder-route" />
+      {:else if source === Source.Upload}
+        <p class="ui-note">A project folder on this computer is uploaded once and runs in a sandbox, like a GitHub repo. Imported once, no sync: edits stay on the canvas. node_modules, build output and what .gitignore leaves out are skipped.</p>
+        <div class="ui-row">
+          <button type="button" class="ui-btn rounded-sm" disabled={uploading || busy} onclick={pickUpload} data-testid="code-import-pick-folder">{uploading ? 'Uploading…' : uploaded ? 'Pick another folder' : 'Pick folder'}</button>
+          {#if uploaded}<span class="ui-note" data-testid="code-import-uploaded">{uploaded.name}</span>{/if}
+        </div>
+        <input bind:this={folderInput} class="sr-only" type="file" webkitdirectory tabindex="-1" aria-hidden="true" onchange={async (e) => upload(await listedFolder(e.currentTarget.files))} />
+        <input class="rounded-sm" type="text" placeholder="/  /settings  /users" aria-label="Pages" bind:value={routes} data-testid="code-import-upload-route" />
       {:else}
         <p class="ui-note">A public Storybook: each story is read without running the app, its components become main components, their args variants.</p>
         <input class="rounded-sm" type="text" inputmode="url" placeholder="https://storybook.example.com" aria-label="Storybook" bind:value={storybook} data-testid="code-import-storybook" />
@@ -191,6 +252,20 @@
           {/each}
           <p class="ui-note">Each page lands once per theme and width, side by side. Language, login, flags and loading or error states are not switched.</p>
         </fieldset>
+        {#if lookup}
+        <fieldset class="ui-conditions" data-testid="code-import-design">
+          <label><input type="checkbox" bind:checked={designSystem} onchange={() => (designTouched = true)} data-testid="code-import-design-system" /> Design system</label>
+          <p class="ui-note" data-testid="code-import-design-count">
+            {#if found === null}
+              Looks for CSS tokens: @theme, :root, .dark.
+            {:else if found > 0}
+              {found} tokens found. They become variables with Light and Dark modes, bound to the layers, and a Design system board.
+            {:else}
+              No CSS tokens found in this project.
+            {/if}
+          </p>
+        </fieldset>
+        {/if}
       {/if}
       <div class="ui-row ui-end">
         <button class="ui-btn primary rounded-sm" type="submit" disabled={busy || !ready} data-testid="code-import-run">{busy ? (source !== Source.Storybook ? 'Starting the app…' : 'Reading the stories…') : 'Import'}</button>

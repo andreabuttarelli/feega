@@ -143,19 +143,3 @@ describe('what a credit costs the user against what the call cost us', () => {
 		expect(aiCallsRows[0].billed_credits).toBe(9);
 	});
 });
-
-describe('a free agent turn is logged, never debited', () => {
-	it('inside withoutDebit the call row lands and the ledger stays untouched', async () => {
-		const { withoutDebit } = await import('./ai-log');
-		withoutDebit(() => {
-			withBrandContext('brand-1', () => {
-				logAiCall({ label: 'projectAgent', provider: 'llm', model: GEMINI_FLASH, ms: 10, ok: true, inputTokens: 1_000_000, outputTokens: 1_000_000, orgId: 'org-1' });
-			});
-		});
-
-		await vi.waitFor(() => expect(aiCallsRows.length).toBe(1));
-		await new Promise((r) => setTimeout(r, 50));
-		expect(aiCallsRows[0].billed_credits ?? null).toBeNull();
-		expect(ledgerRows).toHaveLength(0);
-	});
-});

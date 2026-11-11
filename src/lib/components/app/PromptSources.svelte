@@ -1,15 +1,46 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { Connect, PROMPT_SOURCES, PROMPT_SOURCE_ORDER, PromptSource, sourceName, type SourcePick } from '$lib/home/prompt-sources';
-  import { githubConnect, githubStatus } from '$lib/canvas/code-import-client';
+  import { onMount, type Component, type Snippet } from 'svelte';
+  import { env as publicEnv } from '$env/dynamic/public';
+  import GitBranch from '@lucide/svelte/icons/git-branch';
+  import Folder from '@lucide/svelte/icons/folder';
+  import Hash from '@lucide/svelte/icons/hash';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+  import { isLocalMode } from '$lib/local-user';
+  import { AppMode, Connect, PROMPT_SOURCES, PromptSource, sourceName, sourcesFor, type SourcePick } from '$lib/home/prompt-sources';
+  import { githubConnect, githubStatus, uploadFolder } from '$lib/canvas/code-import-client';
+  import { canPickDirectory, listedFolder, pickDirectory } from '$lib/code-upload/pick-folder';
+  import { SNAPSHOT_MESSAGES, type Snapshot } from '$lib/code-upload/snapshot';
 
-  let { pick = $bindable(null), projectId = null, pickAgain = null }: { pick: SourcePick | null; projectId?: string | null; pickAgain?: PromptSource | null } = $props();
+  let {
+    pick = $bindable(null),
+    projectId = null,
+    pickAgain = null,
+    before,
+    after
+  }: { pick: SourcePick | null; projectId?: string | null; pickAgain?: PromptSource | null; before?: Snippet; after?: Snippet } = $props();
+
+  const SOURCE_ICONS: Record<PromptSource, Component<{ size?: number }>> = {
+    [PromptSource.Github]: GitBranch,
+    [PromptSource.Folder]: Folder,
+    [PromptSource.Upload]: Folder,
+    [PromptSource.Figma]: Hash
+  };
+
+  const MENU_EMPTY = 'Import';
 
   let editing = $state<PromptSource | null>(null);
+  const chosen = $derived(pick?.source ?? editing);
   let draft = $state('');
   let folderName = $state('');
   let githubConnected = $state(true);
   let folderInput = $state<HTMLInputElement | null>(null);
+  let uploading = $state<string | null>(null);
+  let uploadNote = $state<string | null>(null);
+
+  const mode = isLocalMode(publicEnv) ? AppMode.Local : AppMode.Cloud;
+  const order = sourcesFor(mode);
+  const UPLOAD_FAILED = 'The folder could not be uploaded. Try again.';
 
   onMount(() => {
     if (pickAgain) {
@@ -38,12 +69,48 @@
     }
   }
 
-  function folderFromInput(e: Event) {
-    const first = (e.currentTarget as HTMLInputElement).files?.[0];
-    const name = first?.webkitRelativePath.split('/')[0];
+  async function pickUpload() {
+    uploadNote = null;
+    if (!canPickDirectory()) {
+      folderInput?.click();
+      return;
+    }
+    await uploaded(await pickDirectory());
+  }
+
+  async function folderFromInput(e: Event) {
+    const list = (e.currentTarget as HTMLInputElement).files;
+    if (mode === AppMode.Cloud) {
+      await uploaded(await listedFolder(list));
+      return;
+    }
+    const name = list?.[0]?.webkitRelativePath.split('/')[0];
     if (name) {
       folderPicked(name);
     }
+  }
+
+  async function uploaded(snapshot: Snapshot | null) {
+    if (!snapshot) {
+      return;
+    }
+    if (!snapshot.ok) {
+      uploadNote = SNAPSHOT_MESSAGES[snapshot.refusal];
+      return;
+    }
+    if (!projectId) {
+      pick = { source: PromptSource.Upload, value: snapshot.name };
+      return;
+    }
+    uploading = snapshot.name;
+    const done = await uploadFolder(projectId, snapshot.name, snapshot.archive).finally(() => (uploading = null));
+    if (!done.ok) {
+      uploadNote = UPLOAD_FAILED;
+      return;
+    }
+    editing = null;
+    pick = { source: PromptSource.Upload, value: done.value };
+    uploadNote = snapshot.skipped.length ? `Left out ${snapshot.skipped.length} file${snapshot.skipped.length === 1 ? '' : 's'} over 1 MB.` : null;
   }
 
   function folderPicked(name: string) {
@@ -55,7 +122,8 @@
   const START: Record<PromptSource, () => void> = {
     [PromptSource.Github]: () => open(PromptSource.Github),
     [PromptSource.Figma]: () => open(PromptSource.Figma),
-    [PromptSource.Folder]: () => void pickFolder()
+    [PromptSource.Folder]: () => void pickFolder(),
+    [PromptSource.Upload]: () => void pickUpload()
   };
 
   function open(source: PromptSource) {
@@ -96,14 +164,16 @@
   };
 </script>
 
-<div class="sources" data-testid="prompt-sources">
-  {#each PROMPT_SOURCE_ORDER as source (source)}
-    <button type="button" class="source" data-source={source} aria-pressed={pick?.source === source || editing === source} onclick={START[source]}>{PROMPT_SOURCES[source].label}</button>
-  {/each}
-  <input bind:this={folderInput} class="sr-only" type="file" webkitdirectory tabindex="-1" aria-hidden="true" onchange={folderFromInput} />
-</div>
+{#if uploading}<p class="note" data-testid="upload-progress">Uploading {uploading}…</p>{/if}
+{#if uploadNote}<p class="note" data-testid="upload-note">{uploadNote}</p>{/if}
 
-{#if editing}
+{#if editing === PromptSource.Upload}
+  <div class="entry" data-testid="source-entry">
+    <p class="note">A folder can't be kept through sign-in: pick it again. It is imported once, with no sync back to your files.</p>
+    <button type="button" onclick={pickUpload}>pick folder</button>
+    <button type="button" onclick={() => (editing = null)} aria-label="Cancel">×</button>
+  </div>
+{:else if editing}
   <div class="entry" data-testid="source-entry">
     {#if editing === PromptSource.Folder}
       <p class="note">
@@ -120,6 +190,7 @@
   <div class="chip" data-testid="source-chip" data-source={pick.source}>
     <span class="kind">{PROMPT_SOURCES[pick.source].label}</span>
     <span class="name">{sourceName(pick.source, pick.value)}</span>
+    {#if pick.source === PromptSource.Upload}<span class="kind" data-testid="source-once">imported once, no sync</span>{/if}
     {#if pick.source === PromptSource.Github && projectId && !githubConnected}
       <button type="button" class="link" onclick={connectGithub}>connect GitHub</button>
     {/if}
@@ -130,11 +201,96 @@
   </div>
 {/if}
 
+<div class="bar">
+  {@render before?.()}
+  <div class="sources" data-testid="prompt-sources">
+    {#each order as source (source)}
+      {@const Icon = SOURCE_ICONS[source]}
+      <button type="button" class="source" data-source={source} aria-pressed={chosen === source} title={PROMPT_SOURCES[source].label} onclick={START[source]}>
+        <Icon size={14} />
+        <span>{PROMPT_SOURCES[source].label}</span>
+      </button>
+    {/each}
+    <input bind:this={folderInput} class="sr-only" type="file" webkitdirectory tabindex="-1" aria-hidden="true" onchange={folderFromInput} />
+  </div>
+  <div class="compact">
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger class="source source-menu" data-testid="source-menu" aria-pressed={chosen !== null}>
+        {#if chosen}
+          {@const Icon = SOURCE_ICONS[chosen]}
+          <Icon size={14} />
+        {/if}
+        <span>{chosen ? PROMPT_SOURCES[chosen].label : MENU_EMPTY}</span>
+        <ChevronDown size={14} />
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Content align="start" side="top" collisionPadding={8} class="w-[200px]">
+        {#each order as source (source)}
+          {@const Icon = SOURCE_ICONS[source]}
+          <DropdownMenu.Item data-testid="source-menu-{source}" onSelect={START[source]}>
+            <Icon size={14} />
+            {PROMPT_SOURCES[source].label}
+          </DropdownMenu.Item>
+        {/each}
+      </DropdownMenu.Content>
+    </DropdownMenu.Root>
+  </div>
+  {@render after?.()}
+</div>
+
 <style>
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-1);
+  }
+
   .sources {
     display: flex;
-    flex-wrap: wrap;
+    flex: 1 1 auto;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .compact {
+    display: none;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .source,
+  :global(.source-menu) {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
     gap: var(--ui-space-1);
+    white-space: nowrap;
+  }
+
+  :global(.source-menu) {
+    height: var(--ui-row);
+    padding: 0 var(--ui-space-2);
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: transparent;
+    color: var(--ui-text-secondary);
+    font: inherit;
+    font-size: var(--ui-type-label);
+    cursor: pointer;
+  }
+
+  :global(.source-menu[aria-pressed='true']) {
+    background: var(--ui-accent-wash);
+    color: var(--ui-text);
+  }
+
+  @media (max-width: 640px) {
+    .sources {
+      display: none;
+    }
+
+    .compact {
+      display: block;
+    }
   }
 
   .source,
@@ -151,9 +307,13 @@
     cursor: pointer;
   }
 
-  .source:hover,
-  .source[aria-pressed='true'] {
+  .source:hover {
     background: var(--ui-input);
+    color: var(--ui-text);
+  }
+
+  .source[aria-pressed='true'] {
+    background: var(--ui-accent-wash);
     color: var(--ui-text);
   }
 

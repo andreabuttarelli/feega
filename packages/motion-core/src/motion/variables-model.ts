@@ -36,6 +36,10 @@ export const variablesSchema = z
 
 export const bindSchema = z.record(z.string().min(1).max(40), z.string().min(3).max(81)).optional();
 
+export const layerModesSchema = z.record(name, name).optional();
+
+export type LayerModes = NonNullable<z.infer<typeof layerModesSchema>>;
+
 export type Variable = z.infer<typeof variableSchema>;
 export type Collection = z.infer<typeof collectionSchema>;
 export type Variables = NonNullable<z.infer<typeof variablesSchema>>;

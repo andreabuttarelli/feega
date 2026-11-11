@@ -4,6 +4,7 @@
   import { onMount } from 'svelte';
   import { _ } from 'svelte-i18n';
   import { preloadCode } from '$app/navigation';
+  import { tick } from 'svelte';
   import { BriefPhase, briefPhaseAfter, briefProgress } from '$lib/motion/brief-progress';
   import AgentCard from '$lib/components/app/AgentCard.svelte';
   import CanvasRows from '$lib/components/app/CanvasRows.svelte';
@@ -14,20 +15,21 @@
   import { CHAT_ATTACH_ACCEPT } from '$lib/chat-attachments';
   import { ChatUploads } from '$lib/components/brand-agent/chat-uploads.svelte';
   import ChatAttachments from '$lib/components/brand-agent/ChatAttachments.svelte';
-  import IconButton from '$lib/components/motion/IconButton.svelte';
-  import { Tool } from '$lib/motion/actions';
+  import Plus from '@lucide/svelte/icons/plus';
+  import ArrowUp from '@lucide/svelte/icons/arrow-up';
   import FeegaFile from '$lib/components/canvas/FeegaFile.svelte';
   import { isFeegaFile } from '$lib/canvas/feega-file';
   import { DashboardPage, EDITOR_PRELOAD, PAGE_PATH } from '$lib/dashboard/pages';
   import PromptKinds from '$lib/components/app/PromptKinds.svelte';
   import PromptSources from '$lib/components/app/PromptSources.svelte';
   import type { PromptSource, SourcePick } from '$lib/home/prompt-sources';
-  import { DEFAULT_KIND } from '$lib/home/prompt-kinds';
-  import { takeDraft } from '$lib/home/home-draft';
+  import { DEFAULT_KIND, PROMPT_KINDS } from '$lib/home/prompt-kinds';
+  import { page } from '$app/state';
+  import { HANDOFF_PARAMS, HandoffStart, handoffOf } from '$lib/home/handoff';
 
   let { data, form } = $props();
 
-  const PLACEHOLDER = 'Describe what you want to make, or paste your website…';
+  const MODEL = 'Opus 5.5';
   const EXAMPLES_SHOWN = 3;
   const EXAMPLE_TURN_MS = 6000;
 
@@ -35,7 +37,6 @@
   const sending = $derived(phase !== BriefPhase.Idle);
   let brief = $state('');
   let kind = $state(DEFAULT_KIND);
-  let resuming = $state(false);
   let pick = $state<SourcePick | null>(null);
   let pickAgain = $state<PromptSource | null>(null);
   let turn = $state(0);
@@ -44,6 +45,7 @@
   let composer = $state<HTMLFormElement | null>(null);
   let picker = $state<HTMLInputElement | null>(null);
   let feegaFile = $state<FeegaFile | null>(null);
+  const placeholder = $derived(PROMPT_KINDS[kind].placeholder);
   const recents = $derived(data.dashboard.canvases);
 
   const uploads = $derived(data.attachProjectId ? new ChatUploads(data.attachProjectId) : null);
@@ -56,30 +58,33 @@
       field?.focus();
     }
     const timer = setInterval(() => (turn += 1), EXAMPLE_TURN_MS);
-    void resumeDraft();
+    void prefillHandoff();
     return () => clearInterval(timer);
   });
 
-  async function resumeDraft() {
-    const draft = await takeDraft(sessionStorage).catch(() => null);
-    if (!draft) {
+  async function prefillHandoff() {
+    const handoff = handoffOf(page.url.searchParams);
+    if (!handoff) {
       return;
     }
-    brief = draft.text;
-    kind = draft.kind;
-    pick = draft.pick;
-    pickAgain = draft.pickAgain;
-    uploads?.add(draft.files);
-    resuming = !draft.pickAgain;
+    const send = data.handoffStart === HandoffStart.Send;
+    forgetHandoff();
+
+    brief = handoff.text;
+    kind = handoff.kind;
+    pickAgain = handoff.source;
+    if (!send) {
+      return;
+    }
+    await tick();
+    composer?.requestSubmit();
   }
 
-  $effect(() => {
-    if (!resuming || !canSend || !composer) {
-      return;
-    }
-    resuming = false;
-    composer.requestSubmit();
-  });
+  function forgetHandoff() {
+    const url = new URL(page.url);
+    HANDOFF_PARAMS.forEach((name) => url.searchParams.delete(name));
+    history.replaceState(history.state, '', url);
+  }
 
   $effect(() => {
     void brief;
@@ -179,8 +184,6 @@
     <div class="column">
       <section class="prompt" aria-labelledby="prompt-heading">
         <h1 id="prompt-heading">what do you want to make?</h1>
-        <PromptKinds bind:kind />
-
         <form
           method="POST"
           action="?/video"
@@ -193,41 +196,50 @@
           ondragleave={() => (dragging = false)}
           ondrop={dropped}
         >
-          {#if uploads?.items.length}
-            <ChatAttachments items={uploads.items} onremove={(id) => uploads?.remove(id)} />
-          {/if}
-          {#if dragging}
-            <p class="drop-hint" aria-hidden="true">{$_('chat.panel.attach.drop')}</p>
-          {/if}
-          <textarea
-            name="brief"
-            id="video-brief"
-            data-testid="video-brief"
-            placeholder={PLACEHOLDER}
-            aria-label={PLACEHOLDER}
-            maxlength={BRIEF_MAX}
-            rows="3"
-            enterkeyhint="send"
-            bind:value={brief}
-            bind:this={field}
-            onkeydown={keyed}
-            onpaste={pasted}
-            onfocus={preloadEditor}
-            readonly={sending}
-          ></textarea>
-          <input type="hidden" name="kind" value={kind} />
-          {#if pick}<input type="hidden" name="source" value={pick.source} /><input type="hidden" name="sourceValue" value={pick.value} />{/if}
-          <PromptSources bind:pick projectId={data.attachProjectId} {pickAgain} />
-          {#if data.attachProjectId}<input type="hidden" name="projectId" value={data.attachProjectId} />{/if}
-          {#each ready as attachment (attachment.assetId)}<input type="hidden" name="attachment" value={attachment.assetId} />{/each}
-          <div class="row">
-            {#if uploads}
-              <IconButton action={Tool.Attach} label={$_('chat.panel.attach.button')} data-testid="chat-attach" onclick={() => picker?.click()} />
+          <PromptKinds bind:kind />
+          <div class="field">
+            {#if uploads?.items.length}
+              <ChatAttachments items={uploads.items} onremove={(id) => uploads?.remove(id)} />
             {/if}
-            {#if sending}<span class="progress" role="status" data-testid="brief-progress">{briefProgress(phase)}</span>{/if}
-            <button type="submit" class="send" class:busy={sending} data-testid="brief-send" disabled={!canSend} aria-label="Start" title="Start">
-              <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" /></svg>
-            </button>
+            {#if dragging}
+              <p class="drop-hint" aria-hidden="true">{$_('chat.panel.attach.drop')}</p>
+            {/if}
+            <textarea
+              name="brief"
+              id="video-brief"
+              data-testid="video-brief"
+              {placeholder}
+              aria-label={placeholder}
+              maxlength={BRIEF_MAX}
+              rows="3"
+              enterkeyhint="send"
+              bind:value={brief}
+              bind:this={field}
+              onkeydown={keyed}
+              onpaste={pasted}
+              onfocus={preloadEditor}
+              readonly={sending}
+            ></textarea>
+            <input type="hidden" name="kind" value={kind} />
+            {#if pick}<input type="hidden" name="source" value={pick.source} /><input type="hidden" name="sourceValue" value={pick.value} />{/if}
+            {#if data.attachProjectId}<input type="hidden" name="projectId" value={data.attachProjectId} />{/if}
+            {#each ready as attachment (attachment.assetId)}<input type="hidden" name="attachment" value={attachment.assetId} />{/each}
+            <PromptSources bind:pick projectId={data.attachProjectId} {pickAgain}>
+              {#snippet before()}
+                {#if uploads}
+                  <button type="button" class="tool" aria-label={$_('chat.panel.attach.button')} title={$_('chat.panel.attach.button')} data-testid="chat-attach" onclick={() => picker?.click()}>
+                    <Plus size={16} />
+                  </button>
+                {/if}
+              {/snippet}
+              {#snippet after()}
+                {#if sending}<span class="progress" role="status" data-testid="brief-progress">{briefProgress(phase)}</span>{/if}
+                <span class="model" data-testid="composer-model">{MODEL}</span>
+                <button type="submit" class="send" class:busy={sending} data-testid="brief-send" disabled={!canSend} aria-label="Start" title="Start">
+                  <ArrowUp size={16} />
+                </button>
+              {/snippet}
+            </PromptSources>
           </div>
         </form>
         {#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
@@ -296,6 +308,7 @@
     width: 100%;
     max-width: 720px;
     margin: var(--ui-space-8) auto 0;
+    padding-bottom: var(--ui-space-8);
     animation: rise var(--ui-dur-slow) var(--ui-ease) both;
   }
 
@@ -387,6 +400,7 @@
   }
 
   .examples button:focus-visible,
+  .tool:focus-visible,
   .send:focus-visible {
     outline: none;
     box-shadow: var(--ui-ring);
@@ -396,14 +410,30 @@
     display: flex;
     flex-direction: column;
     gap: var(--ui-space-2);
-    padding: var(--ui-space-3) var(--ui-space-3) var(--ui-space-2) var(--ui-space-4);
+    padding: var(--ui-space-2);
+    border: 1px solid var(--ui-divider);
     border-radius: var(--ui-radius-lg);
     background: var(--ui-panel-raised);
     box-shadow: var(--ui-shadow-float);
   }
 
-  .composer.dragging {
-    box-shadow: var(--ui-shadow-float), inset 0 0 0 2px var(--ui-accent);
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-2);
+    padding: var(--ui-space-3);
+    border: 1px solid transparent;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-panel-sunken);
+    transition: border-color var(--ui-dur-fast) var(--ui-ease), background var(--ui-dur-fast) var(--ui-ease);
+  }
+
+  .field:focus-within {
+    border-color: color-mix(in srgb, var(--ui-accent) 45%, transparent);
+  }
+
+  .composer.dragging .field {
+    border-color: var(--ui-accent);
     background: var(--ui-selected);
   }
 
@@ -417,7 +447,7 @@
     width: 100%;
     min-height: 72px;
     max-height: 240px;
-    padding: var(--ui-space-1) 0 0;
+    padding: 0;
     border: 0;
     resize: none;
     background: transparent;
@@ -435,19 +465,40 @@
     color: var(--ui-text-tertiary);
   }
 
-  .row {
-    display: flex;
+  .tool {
+    display: inline-flex;
+    flex: none;
     align-items: center;
-    gap: var(--ui-space-2);
+    justify-content: center;
+    width: var(--ui-row);
+    height: var(--ui-row);
+    padding: 0;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: transparent;
+    color: var(--ui-text-secondary);
+    cursor: pointer;
+  }
+
+  .tool:hover {
+    background: var(--ui-input);
+    color: var(--ui-text);
+  }
+
+  .model {
+    flex: none;
+    margin: 0 var(--ui-space-1) 0 auto;
+    font-size: var(--ui-type-label);
+    color: var(--ui-text-tertiary);
   }
 
   .send {
     display: inline-flex;
+    flex: none;
     align-items: center;
     justify-content: center;
     width: var(--ui-row-lg);
     height: var(--ui-row-lg);
-    margin-left: auto;
     border: 0;
     border-radius: var(--ui-radius-full);
     background: var(--ui-accent-solid);
@@ -463,13 +514,14 @@
   }
 
   .progress {
+    flex: none;
     margin-left: auto;
     font-size: var(--ui-type-label);
     color: var(--ui-text-secondary);
   }
 
-  .progress + .send {
-    margin-left: 0;
+  .progress + .model {
+    margin-left: var(--ui-space-2);
   }
 
   .send.busy:disabled {

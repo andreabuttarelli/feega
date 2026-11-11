@@ -141,6 +141,8 @@ jobs:
           npm version --no-git-tag-version --allow-same-version "$V"
           node scripts/stage-server.cjs --arch=${{ matrix.arch }}
           npx electron-builder --mac --${{ matrix.arch }} --publish never
+          test ! -e dist/mac*/Feega.app/Contents/Resources/app.asar.unpacked/native
+          codesign --verify --deep --strict dist/mac*/Feega.app
 
       - uses: actions/upload-artifact@v4
         with:

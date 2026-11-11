@@ -17,6 +17,27 @@ describe('frame timeline', () => {
   });
 });
 
+describe('frame marks', () => {
+  it('un passo si segna una volta per gruppo, anche se una gesture lo ripete a ogni frame', () => {
+    performance.clearMarks();
+
+    markFrame('swap:full', Step.Drawn);
+    markFrame('swap:thumb', Step.Drawn);
+    markFrame('swap:full', Step.Drawn);
+
+    expect(performance.getEntriesByType('mark').map((m) => m.name)).toEqual(['frame|drawn|swap:full', 'frame|drawn|swap:thumb']);
+  });
+
+  it('una richiesta ripetuta si segna ogni volta: il bench conta i rebuild', () => {
+    performance.clearMarks();
+
+    markFrame('again', Step.Asked);
+    markFrame('again', Step.Asked);
+
+    expect(performance.getEntriesByType('mark')).toHaveLength(2);
+  });
+});
+
 describe('shown late', () => {
   const drawn = (group: string, at: number) => ({ step: Step.Drawn, at, group });
 

@@ -42,10 +42,26 @@ describe('write-back', () => {
     expect(diff).toBe('--- a/a.svelte\n+++ b/a.svelte\n@@ -1,3 +1,3 @@\n a\n-b\n+B\n c\n');
   });
 
+  it('due modifiche lontane fanno due blocchi, e le righe in mezzo non compaiono', () => {
+    const before = Array.from({ length: 30 }, (_, i) => `line ${i + 1}`).join('\n') + '\n';
+    const after = before.replace('line 3\n', 'LINE 3\n').replace('line 25\n', 'LINE 25\nadded\n');
+    expect(unifiedDiff('a.css', before, after)).toBe(
+      '--- a/a.css\n+++ b/a.css\n' +
+        '@@ -1,6 +1,6 @@\n line 1\n line 2\n-line 3\n+LINE 3\n line 4\n line 5\n line 6\n' +
+        '@@ -22,7 +22,8 @@\n line 22\n line 23\n line 24\n-line 25\n+LINE 25\n+added\n line 26\n line 27\n line 28\n'
+    );
+  });
+
   it('legge le modifiche dai clip che portano una sorgente', () => {
     const clip = (id: string, text: string, was: string) => ({ id, component: 'Text', props: { text }, source: { at: 'src/x.svelte:3:4', was: { text: was } } });
     const doc = { width: 100, height: 100, tracks: [{ clips: [clip('a', 'new', 'old'), clip('b', 'same', 'same')] }], comps: {} } as unknown as MotionDoc;
     expect(editsOf(doc)).toEqual([{ at: { file: 'src/x.svelte', line: 3, column: 4 }, look: { text: 'new' }, was: { text: 'old' } }]);
+  });
+
+  it('un livello legato a una variabile non scrive il suo colore nel template: lo scrive il token', () => {
+    const clip = { id: 'a', component: 'Text', props: { text: 'new', color: '#f0f0f0' }, bind: { color: 'app Colors/primary' }, source: { at: 'src/x.svelte:3:4', was: { text: 'old', color: '#111111' } } };
+    const doc = { width: 100, height: 100, tracks: [{ clips: [clip] }], comps: {} } as unknown as MotionDoc;
+    expect(editsOf(doc).map((e) => e.look)).toEqual([{ text: 'new' }]);
   });
 
   it('un colore scelto dal picker vive nella pila di fill del testo, e conta come colore', () => {

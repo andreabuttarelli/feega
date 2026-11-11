@@ -59,6 +59,9 @@ vi.mock('$lib/server/figma/canvas-import', () => ({ importFigmaInto }));
 const moveAssets = vi.fn(async () => {});
 vi.mock('$lib/server/repos/assets', async (original) => ({ ...(await original<object>()), moveAssets }));
 
+const tracked = vi.fn(async (..._args: unknown[]) => {});
+vi.mock('$lib/server/product-events/track', async (original) => ({ ...(await original<object>()), track: tracked }));
+
 const { load, actions } = await import('$lib/server/dashboard/pages/home');
 
 const locals = { safeGetSession: async () => ({ session: {}, user: { id: 'u1' } }), db: async () => ({}) };
@@ -323,5 +326,55 @@ describe('/app is the dashboard for a returning user', () => {
     const refused = (await actions.workspace({ locals, cookies: stranger, request: form({ orgId: 'org-x' }) } as never)) as { status: number };
     expect(refused.status).toBe(404);
     expect(stranger.set).not.toHaveBeenCalled();
+  });
+});
+
+describe('a landing prompt starts the agent without a second click', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const parent = async () => ({ org: { id: 'org-a' }, projects: [{ id: 'p1', name: 'Launch' }] });
+  const loadAt = (query: string, jar = cookieJar()) => load({ locals, cookies: jar, url: new URL(`http://x/app?${query}`), parent } as never) as Promise<{ handoffStart: string }>;
+
+  it('a fresh handoff sends, and the resume is recorded without the prompt text', async () => {
+    const data = await loadAt('prompt=secret+launch&kind=motion&go=n1&resumed=1');
+
+    expect(data.handoffStart).toBe('send');
+    expect(tracked).toHaveBeenCalledWith('handoff_resumed', { userId: 'u1', anonymousId: 'n1' }, { autostart: true, viaLogin: true });
+    expect(JSON.stringify(tracked.mock.calls)).not.toContain('secret');
+  });
+
+  it('the same handoff loaded again only prefills', async () => {
+    const values: Record<string, string> = {};
+    const jar = { get: (name: string) => values[name], set: (name: string, value: string) => void (values[name] = value), delete: vi.fn() };
+
+    await loadAt('prompt=launch&kind=motion&go=n1', jar as never);
+    const again = await loadAt('prompt=launch&kind=motion&go=n1', jar as never);
+
+    expect(again.handoffStart).toBe('prefill');
+  });
+
+  it('a plain visit to the home starts nothing and records nothing', async () => {
+    expect((await loadAt('')).handoffStart).toBe('none');
+    expect(tracked).not.toHaveBeenCalled();
+  });
+
+  it('the new canvas is recorded with kind and source', async () => {
+    await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'A logo reveal' }) } as never));
+
+    expect(tracked).toHaveBeenCalledWith('canvas_created', { userId: 'u1', orgId: 'org-a' }, { kind: 'motion', source: null });
+  });
+
+  it('a failed source import is recorded with the source and the error', async () => {
+    importFigmaInto.mockResolvedValueOnce({ outcome: 'no_token' } as never);
+    await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'Make it move', source: 'figma', sourceValue: 'https://www.figma.com/design/abc/Landing' }) } as never));
+
+    expect(tracked).toHaveBeenCalledWith('import_failed', { userId: 'u1', orgId: 'org-a' }, { source: 'figma', error: 'no_token' });
+  });
+
+  it('a failed URL import is recorded too', async () => {
+    importUrlInto.mockResolvedValueOnce({ outcome: 'failed' } as never);
+    await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'https://acme.com' }) } as never));
+
+    expect(tracked).toHaveBeenCalledWith('import_failed', { userId: 'u1', orgId: 'org-a' }, { source: 'url', error: 'failed' });
   });
 });

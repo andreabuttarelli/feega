@@ -94,6 +94,7 @@ import { importCodeInto } from '$lib/server/code-import/canvas-import';
 import { codeChanges, codePublish, codePull } from '$lib/server/code-import/code-sync';
 import { askedRoutes, MAX_ROUTES, repoOf } from '$lib/server/code-import/repo';
 import { conditionsOf, MAX_CONDITIONS } from '$lib/server/code-import/render-conditions';
+import { designSystemOf } from '$lib/server/code-import/design-system';
 import { githubFor } from '$lib/server/code-import/github-runtime';
 import { libsOrigin } from '$lib/server/motion/libs-origin';
 import { GithubRefusal } from '$lib/server/code-import/github-http';
@@ -275,7 +276,7 @@ const importFigmaInput = z
   })
   .strict();
 
-const importCodeInput = z.object({ canvasId: z.string(), repo: z.string().max(300).optional().describe('a https://github.com/<owner>/<repo> link, optionally /tree/<ref>; private repos need GitHub connected (github_connect)'), folder: z.string().max(1000).optional().describe('local mode only: an absolute path to a project folder on this computer; its dev server runs here and code_publish writes back to its files'), storybook: z.string().max(500).optional().describe('instead of repo: a public Storybook link; its stories become boards, no app to run'), stories: z.array(z.string().max(200)).max(MAX_STORIES).optional().describe('Storybook story ids to import, default the first stories across components'), route: z.string().max(300).optional().describe('the page of the app to import, default /'), routes: z.array(z.string().max(300)).max(MAX_ROUTES).optional().describe('several pages in one run: one frame, a board per page, components shared'), conditions: z.array(z.object({ scheme: z.enum(['light', 'dark']), width: z.number().int().min(240).max(3840) })).max(MAX_CONDITIONS).optional().describe('render each page under these conditions, side by side: {scheme: light|dark, width in px}, e.g. dark at 390; default light at 1280'), x: z.number().finite(), y: z.number().finite() }).strict();
+const importCodeInput = z.object({ canvasId: z.string(), repo: z.string().max(300).optional().describe('a https://github.com/<owner>/<repo> link, optionally /tree/<ref>; private repos need GitHub connected (github_connect)'), folder: z.string().max(1000).optional().describe('local mode only: an absolute path to a project folder on this computer; its dev server runs here and code_publish writes back to its files'), storybook: z.string().max(500).optional().describe('instead of repo: a public Storybook link; its stories become boards, no app to run'), stories: z.array(z.string().max(200)).max(MAX_STORIES).optional().describe('Storybook story ids to import, default the first stories across components'), route: z.string().max(300).optional().describe('the page of the app to import, default /'), routes: z.array(z.string().max(300)).max(MAX_ROUTES).optional().describe('several pages in one run: one frame, a board per page, components shared'), conditions: z.array(z.object({ scheme: z.enum(['light', 'dark']), width: z.number().int().min(240).max(3840) })).max(MAX_CONDITIONS).optional().describe('render each page under these conditions, side by side: {scheme: light|dark, width in px}, e.g. dark at 390; default light at 1280'), designSystem: z.boolean().optional().describe('default true: the CSS tokens the repo declares (@theme, :root, .dark, [data-theme]) become variables with Light/Dark modes, bound to the layers by class, var() rule or unique value, plus a Design system board; edits write back to the token declarations'), x: z.number().finite(), y: z.number().finite() }).strict();
 
 const codeFrameInput = z.object({ nodeId: z.string().describe('a frame made by import_code') }).strict();
 
@@ -1069,7 +1070,7 @@ export const CANVAS_OPS = {
   import_code: op({
     access: Access.Write,
     input: importCodeInput,
-    run: async (ctx, input) => importCodeInto(figmaScope(ctx), input.canvasId, { repo: input.repo, folder: input.folder, routes: askedRoutes(input.route, input.routes), conditions: input.conditions ? conditionsOf(input.conditions) : undefined, storybook: input.storybook, stories: input.stories, at: { x: input.x, y: input.y } })
+    run: async (ctx, input) => importCodeInto(figmaScope(ctx), input.canvasId, { repo: input.repo, folder: input.folder, routes: askedRoutes(input.route, input.routes), conditions: input.conditions ? conditionsOf(input.conditions) : undefined, designSystem: designSystemOf(input.designSystem), storybook: input.storybook, stories: input.stories, at: { x: input.x, y: input.y } })
   }),
 
   code_changes: op({

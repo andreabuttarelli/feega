@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AxisSupport, BASE_CONDITIONS, CONDITION_AXES, conditionKey, conditionsOf, labelOf, parseKey, Scheme, variantsOf } from './render-conditions';
+import { AxisSupport, BASE_CONDITIONS, CONDITION_AXES, TOKEN_SOURCES, TokenSupport, conditionKey, conditionsOf, labelOf, parseKey, Scheme, variantsOf } from './render-conditions';
 
 describe('render conditions', () => {
   it('la condizione di base non lascia traccia sulla sorgente', () => {
@@ -30,5 +30,17 @@ describe('render conditions', () => {
     }
     expect(CONDITION_AXES.find((a) => a.id === 'theme')?.support).toBe(AxisSupport.Switchable);
     expect(CONDITION_AXES.filter((a) => a.support === AxisSupport.Unsupported).length).toBeGreaterThan(0);
+  });
+
+  it('i token CSS ora diventano variabili legate, non solo valori risolti', () => {
+    expect(CONDITION_AXES.find((a) => a.id === 'tokens')?.reason).not.toMatch(/not linked/);
+  });
+
+  it('ogni sorgente di token dice se è letta e, se no, perché', () => {
+    for (const row of TOKEN_SOURCES) {
+      expect(row.reason.length).toBeGreaterThan(0);
+    }
+    expect(TOKEN_SOURCES.find((r) => r.id === 'tailwind4')?.support).toBe(TokenSupport.Supported);
+    expect(TOKEN_SOURCES.find((r) => r.id === 'tailwind3')?.support).toBe(TokenSupport.Unsupported);
   });
 });

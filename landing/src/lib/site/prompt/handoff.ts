@@ -26,15 +26,15 @@ export const HANDOFF_PROMPT_MAX = 1500;
 
 export type Handoff = { text: string; kind: PromptKind; source: PromptSource | null; images: number };
 
-export function handoffLink(handoff: Handoff): string {
-  const params = new URLSearchParams({ prompt: handoff.text.trim().slice(0, HANDOFF_PROMPT_MAX), kind: handoff.kind });
+export function handoffLink(handoff: Handoff, nonce: string): string {
+  const params = new URLSearchParams({ prompt: handoff.text.trim().slice(0, HANDOFF_PROMPT_MAX), kind: handoff.kind, go: nonce });
   if (handoff.source) {
     params.set('source', handoff.source);
   }
   if (handoff.images > 0) {
     params.set('attach', '1');
   }
-  return `${APP_URL}/new?${params}`;
+  return `${APP_URL}/app?${params}`;
 }
 
 export const SOURCE_TRIGGER_EMPTY = 'Import';

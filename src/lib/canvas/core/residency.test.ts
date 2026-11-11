@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CACHE_SHARE, cached, Offscreen, resident, heldWhileEdited, heldWhileMoving, uncached } from './residency';
+import { ItemKind, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
+import { CACHE_SHARE, cached, Offscreen, pictureBytes, resident, heldWhileEdited, heldWhileMoving, uncached } from './residency';
 
 const view = { x: 0, y: 0, zoom: 1 };
 const screen = { width: 1000, height: 1000 };
@@ -78,5 +79,25 @@ describe('a frame being dragged', () => {
   it('holds nothing while nothing moves', () => {
     const shown = cached([frame('a', 0, 0)], view, screen, 1e9);
     expect(heldWhileMoving(shown, new Set())[0].hold).toBeUndefined();
+  });
+});
+
+describe('picture bytes', () => {
+  const counted = () => {
+    const reads = { n: 0 };
+    const image = { size: { width: 10, height: 10 } } as Item;
+    Object.defineProperty(image, 'kind', { get: () => (reads.n++, ItemKind.Image) });
+    return { items: [image] as readonly Item[], reads };
+  };
+
+  it('counts four bytes per image pixel', () => {
+    expect(pictureBytes(counted().items)).toBe(400);
+  });
+
+  it('walks a list once, however many frames ask for it during a gesture', () => {
+    const { items, reads } = counted();
+    pictureBytes(items);
+    pictureBytes(items);
+    expect(reads.n).toBe(1);
   });
 });

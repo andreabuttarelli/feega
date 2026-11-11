@@ -24,6 +24,11 @@ export type ServiceRoleUse = {
 
 export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
   {
+    path: 'src/lib/server/product-events/track.ts — track',
+    why: "Il funnel nasce prima del login (un visitatore anonimo che arriva dalla landing) e la tabella non concede nulla ad anon/authenticated: solo il server scrive. Inserisce una riga con evento, id e props senza testo dei prompt; non legge nulla.",
+    tables: ['product_events']
+  },
+  {
     path: 'src/lib/server/core-usage.ts — profileIsInternal',
     why: "Un evento di prodotto nasce anche fuori da una richiesta con sessione (un render che finisce, una chiave API): per escludere il team come fa il browser serve l'email dell'utente che ha agito. Legge solo profiles.email per quell'id, e fuori esce solo il booleano interno/no, mai l'email.",
     tables: ['profiles']

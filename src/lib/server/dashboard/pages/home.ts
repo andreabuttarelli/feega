@@ -26,6 +26,11 @@ import { assertPublicUrl } from '$lib/server/tool-guard';
 import type { ToolScope } from '$lib/server/dashboard/tool-scope';
 import { FeegaImport, importStoredCanvasFile, signCanvasFileUpload } from '$lib/server/canvas/feega-file';
 import { FEEGA_REFUSAL_MESSAGE } from '$lib/canvas/feega-file';
+import { startHandoff } from '$lib/server/home/handoff-start';
+import { HANDOFF_NONCE, HANDOFF_RESUMED, HandoffStart } from '$lib/home/handoff';
+import { ProductEvent, track } from '$lib/server/product-events/track';
+
+const URL_SOURCE = 'url';
 
 const HTTP_SEE_OTHER = 303;
 const HTTP_BAD_REQUEST = 400;
@@ -48,8 +53,19 @@ export const load = async (event: Parameters<PageServerLoad>[0]) => {
   }
 
   const attachProjectId = await attachTarget(event, recentProjectId);
-  return { templates: BRIEF_TEMPLATES, tools: SUPPORT_TOOLS, attachProjectId };
+  const handoffStart = await resumeHandoff(event.url.searchParams, cookies, user.id);
+  return { templates: BRIEF_TEMPLATES, tools: SUPPORT_TOOLS, attachProjectId, handoffStart };
 };
+
+async function resumeHandoff(params: URLSearchParams, cookies: Parameters<typeof startHandoff>[1], userId: string): Promise<HandoffStart> {
+  const start = startHandoff(params, cookies);
+  if (start === HandoffStart.None) {
+    return start;
+  }
+
+  await track(ProductEvent.HandoffResumed, { userId, anonymousId: params.get(HANDOFF_NONCE) }, { autostart: start === HandoffStart.Send, viaLogin: params.has(HANDOFF_RESUMED) });
+  return start;
+}
 
 async function attachTarget(event: Parameters<PageServerLoad>[0], recentProjectId: string | null): Promise<string | null> {
   if (recentProjectId && !event.url.searchParams.has(PROJECT_PARAM)) {
@@ -81,7 +97,12 @@ async function importBriefUrl(scope: Pick<ToolScope, 'db' | 'orgId' | 'userId' |
   }
 
   const done = await importUrlInto({ ...scope, actor: { kind: 'user', id: scope.userId } }, canvasId, { url, at: { x: 0, y: 0 }, guard: assertPublicUrl });
-  return done.outcome === UrlImportOutcome.Ok ? { what: url, frameIds: [done.frameId] } : null;
+  if (done.outcome === UrlImportOutcome.Ok) {
+    return { what: url, frameIds: [done.frameId] };
+  }
+
+  await track(ProductEvent.ImportFailed, { userId: scope.userId, orgId: scope.orgId }, { source: URL_SOURCE, error: done.outcome });
+  return null;
 }
 
 function projectSlug(): string {
@@ -118,7 +139,12 @@ export const actions: Actions = {
 
     const scope = { db: workspace.db, orgId: workspace.orgId, userId: workspace.userId, projectId: project.id };
     const canvas = await createCanvas(scope.db, { orgId: scope.orgId, projectId: project.id, name });
+    const actor = { userId: scope.userId, orgId: scope.orgId };
+    await track(ProductEvent.CanvasCreated, actor, { kind, source: pick?.source ?? null });
     const imported = pick ? await importSource(scope, canvas.id, pick) : await importBriefUrl(scope, canvas.id, brief);
+    if (pick && imported && 'refusal' in imported) {
+      await track(ProductEvent.ImportFailed, actor, { source: pick.source, error: imported.refusal });
+    }
 
     throw redirect(HTTP_SEE_OTHER, handoffPath({ projectId: project.id, canvasId: canvas.id }, kindBrief(kind, brief, imported), assetIds));
   },

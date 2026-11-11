@@ -3462,6 +3462,36 @@ export type Database = {
           },
         ]
       }
+      product_events: {
+        Row: {
+          anonymous_id: string | null
+          created_at: string
+          event: string
+          id: string
+          org_id: string | null
+          props: Json
+          user_id: string | null
+        }
+        Insert: {
+          anonymous_id?: string | null
+          created_at?: string
+          event: string
+          id?: string
+          org_id?: string | null
+          props?: Json
+          user_id?: string | null
+        }
+        Update: {
+          anonymous_id?: string | null
+          created_at?: string
+          event?: string
+          id?: string
+          org_id?: string | null
+          props?: Json
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           available: boolean | null

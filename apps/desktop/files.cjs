@@ -1,4 +1,4 @@
-const { existsSync, readFileSync, writeFileSync } = require('node:fs');
+const { readFileSync, writeFileSync } = require('node:fs');
 
 const EXTENSION = '.feega';
 
@@ -6,19 +6,14 @@ const fileIn = (argv) => argv.find((arg) => arg.endsWith(EXTENSION) && !arg.star
 
 const withExtension = (path) => (path.endsWith(EXTENSION) ? path : `${path}${EXTENSION}`);
 
-function lastFile(state) {
+function savedBounds(state) {
   try {
-    return JSON.parse(readFileSync(state, 'utf8')).file ?? null;
+    return JSON.parse(readFileSync(state, 'utf8')).bounds ?? null;
   } catch {
     return null;
   }
 }
 
-function startFile(state, fresh) {
-  const last = lastFile(state);
-  return last && existsSync(last) ? last : fresh;
-}
+const saveBounds = (state, bounds) => writeFileSync(state, JSON.stringify({ bounds }));
 
-const remember = (state, file) => writeFileSync(state, JSON.stringify({ file }));
-
-module.exports = { EXTENSION, fileIn, withExtension, startFile, remember };
+module.exports = { EXTENSION, fileIn, withExtension, savedBounds, saveBounds };

@@ -1,0 +1,21 @@
+:root {
+  --brand: #ff5500;
+  --brand-ink: var(--brand);
+  --gap-md: 16px;
+  --header-height: 64px;
+}
+
+[data-theme="ocean"] {
+  --brand: #0055ff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --brand: #ffaa77;
+  }
+}
+
+.card {
+  color: var(--brand-ink);
+  padding: var(--gap-md);
+}

@@ -73,3 +73,13 @@ test('a failed check does not crash the app', async () => {
   await settle();
   assert.equal(f.asked.length, 0);
 });
+
+test('with only 0.1.27 carrying a dmg, lower builds are offered it and 0.1.27 or higher are not', () => {
+  const bundleOnly = (n) => ({ tag_name: `app-v0.1.${n}`, html_url: `u${n}`, assets: [{ name: 'feega-app.tar.gz' }] });
+  const releases = [{ tag_name: 'app-v0.1.27', html_url: 'u27', assets: [{ name: 'feega-0.1.27-mac-arm64.dmg' }] }, bundleOnly(26), bundleOnly(30)];
+  const best = latestRelease(releases);
+  assert.equal(best.version, '0.1.27');
+  assert.ok(newer(best.version, '0.1.0'));
+  assert.ok(!newer(best.version, '0.1.27'));
+  assert.ok(!newer(best.version, '0.2.0'));
+});
