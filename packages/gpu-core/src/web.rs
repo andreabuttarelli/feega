@@ -77,6 +77,7 @@ pub struct WebCore {
     reprojector: Reprojector,
     lost: Arc<AtomicBool>,
     in_flight: Arc<AtomicU32>,
+    warming: bool,
     scratch: Option<wgpu::Texture>,
     motion: CoreMotion,
     rastered_at: f64,
@@ -320,7 +321,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, snapshots: HashMap::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new() })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, snapshots: HashMap::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new() })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -770,9 +771,8 @@ impl WebCore {
         let idle = self.warmup.due_when(js_sys::Date::now(), building);
         if self.tiled && !frame.pending && idle {
             self.warm_tiles()?;
-        } else if self.tiled && building == Building::Nothing {
-            self.pending |= !idle;
         }
+        self.warming = self.tiled && building == Building::Nothing && !idle;
         Ok(frame.report())
     }
 
@@ -817,6 +817,10 @@ impl WebCore {
         }
         self.pending |= self.fill_reserve()?;
         Ok(())
+    }
+
+    pub fn warming(&self) -> bool {
+        self.warming
     }
 
     pub fn cache_pending(&self) -> bool {
