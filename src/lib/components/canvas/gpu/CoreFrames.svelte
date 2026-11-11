@@ -3,6 +3,7 @@
   import { sharedFrames } from '$lib/motion/gpu/shared-frames';
   import { drawFrame, prepare, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
   import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
   import { CoreMotion, createCore, createCoreGl, dropCore, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
   import { createCoreNative, nativeCanvasOffered } from '@feega/motion-core/motion/gpu-full/core-native';
@@ -30,13 +31,15 @@
   import { listed } from '$lib/canvas/core/frame-lists';
   import { frameBuilder, type FrameDoc } from '$lib/canvas/core/frame-build';
   import { liveGenerations } from '$lib/canvas/core/live-generations';
+  import { latestOnly } from '$lib/canvas/core/latest-only';
+  import { heldBuilds } from '$lib/canvas/core/held-build';
   import { frameSources } from '$lib/canvas/core/frame-sources';
   import { tieredAssets } from '$lib/canvas/core/tiered-assets';
   import { Reach, assetTier, keptTier, reachOf } from '$lib/canvas/core/asset-tier';
   import type { AssetSize } from '$lib/canvas/asset-url';
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
   import { debugActive, debugStart, gestureLog, renderLog, tierLog } from '$lib/canvas/core/debug-log';
-  import { readClips, type CustomFrame } from '@feega/motion-core/motion/gpu-full/dom/custom';
+  import { readClips, type CustomFrame, type CustomReads } from '@feega/motion-core/motion/gpu-full/dom/custom';
   import type { Picture, Pictures } from '@feega/motion-core/motion/gpu-full/raster';
   import { Stand, drawable, fillOrder, firstDrawn, layersOf, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { OnScreen, VectorGate, showStaged, shownBefore } from '$lib/canvas/core/staged-show';
@@ -101,15 +104,19 @@
   const VECTORS = ':vectors';
   const pictures: Pictures = (item) => thumbPictures.get(item.clip) ?? [...customPictures.values()].reduce<ReturnType<Pictures>>((found, of) => found ?? of(item), null) ?? media.pictures(item);
 
+  async function mountReads(host: HTMLElement, source: FrameDoc, prepared: Prepared): Promise<CustomReads> {
+    const [{ mountCustomReads }, { composeHtml, Target }, { Liveness }] = await Promise.all([import('@feega/motion-core/motion/gpu-full/dom/custom'), import('@feega/motion-core/motion/hyperframes/compose'), import('@feega/motion-core/motion/interactive/settings')]);
+    return mountCustomReads(host, (only) => composeHtml({ doc: source.doc, tokens: source.tokens, assets: source.assets, liveness: Liveness.Baked, target: Target.Screen, only }), prepared);
+  }
+
   async function readDom(f: FrameAt, source: FrameDoc, prepared: Prepared, frame: number): Promise<CustomFrame | null> {
     const host = readsHost;
     if (!host || !readClips(source.doc).read.length) {
       return null;
     }
-    const [{ mountCustomReads }, { composeHtml, Target }, { Liveness }] = await Promise.all([import('@feega/motion-core/motion/gpu-full/dom/custom'), import('@feega/motion-core/motion/hyperframes/compose'), import('@feega/motion-core/motion/interactive/settings')]);
     await whenQuiet(() => gesture.active() || edited.size > 0);
     return domRead(fromView(f), async (signal) => {
-      const mounting = mountCustomReads(host, (only) => composeHtml({ doc: source.doc, tokens: source.tokens, assets: source.assets, liveness: Liveness.Baked, target: Target.Screen, only }), prepared);
+      const mounting = mountReads(host, source, prepared);
       signal.addEventListener('abort', () => void mounting.then((r) => r.dispose(), () => undefined));
       return (await mounting).readAt(frame);
     });
@@ -145,6 +152,34 @@
     const list = drawFrame(prepared, still, custom?.reads);
     markFrame(f.id, Step.MainBuilt);
     return { list, custom };
+  }
+
+  type HeldMain = { prepared: Prepared; reads: CustomReads | null };
+
+  async function prepareMain({ f, source: given }: { f: FrameAt; source: FrameDoc }): Promise<HeldMain> {
+    const source = await withScenes(given, sceneSource(f.scenes ?? ''));
+    const fonts = await loadFonts(source.doc, source.assets, source.tokens);
+    const prepared = prepare(source.doc, source.tokens, source.assets, { fonts, smoothing });
+    const host = readsHost;
+    if (!host || !readClips(source.doc).read.length) {
+      return { prepared, reads: null };
+    }
+    return { prepared, reads: await mountReads(host, source, prepared) };
+  }
+
+  const mainOnly = new WeakSet<MotionDoc>();
+  const heldMain = heldBuilds(prepareMain, (held) => held.reads?.dispose());
+
+  async function liveOff(f: FrameAt, source: FrameDoc): Promise<DisplayList | null> {
+    const away = f.scenes || mainOnly.has(source.doc) ? null : await buildAway(source, smoothing).catch(() => null);
+    if (away) {
+      return away;
+    }
+    mainOnly.add(source.doc);
+    const held = await heldMain.of(f.id, [source.doc, source.tokens, source.assets, f.scenes], { f, source });
+    const frame = frameOfLive(source);
+    const custom = await held.reads?.readAt(frame).catch((e: unknown) => (console.warn('[canvas] core DOM read failed', f.id, e), null));
+    return drawFrame(held.prepared, frame, custom?.reads);
   }
 
   const RUNS_EVERY = 5;
@@ -366,7 +401,8 @@
 
   async function rebuildLive(f: FrameAt, source: LiveDoc) {
     const generation = liveGeneration.ask(f.id);
-    const built = await builtOff(f, { revision: f.revision, ...source }).catch((e: unknown) => (console.warn('[canvas] core live frame failed', f.id, e), null));
+    const list = await liveOff(f, { revision: f.revision, ...source }).catch((e: unknown) => (console.warn('[canvas] core live frame failed', f.id, e), null));
+    const built = list ? { list } : null;
     if (!built || !liveGeneration.newer(f.id, generation)) {
       return;
     }
@@ -381,6 +417,8 @@
     liveAtRevision.set(f.id, f.revision);
   }
 
+  const rebuildLatest = latestOnly<string, { f: FrameAt; source: LiveDoc }>((_id, { f, source }) => rebuildLive(f, source));
+
   $effect(() => {
     for (const f of frames) {
       const source = live.get(f.id);
@@ -390,11 +428,12 @@
       if (source && (!sameLive(liveBuilt.get(f.id), source) || liveStamp.get(f.id) !== f.scenes)) {
         liveBuilt.set(f.id, source);
         liveStamp.set(f.id, f.scenes);
-        void rebuildLive(f, source);
+        rebuildLatest(f.id, { f, source });
       }
     }
     for (const id of [...liveGroup.keys()].filter((id) => !live.has(id))) {
       liveBuilt.delete(id);
+      heldMain.drop(id);
       const saved = frames.find((f) => f.id === id);
       if (saved && saved.revision === liveAtRevision.get(id)) {
         continue;

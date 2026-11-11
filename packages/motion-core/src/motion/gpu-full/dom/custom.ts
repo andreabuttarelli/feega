@@ -23,18 +23,19 @@ const PICTURED: Record<string, (props: Props, logo: string | null) => boolean> =
 
 const readsDom = (clip: { component: string; props: Props }, logo: string | null) => READ.has(clip.component) || PICTURED[clip.component]?.(clip.props, logo) === false;
 
-export function readClips(doc: MotionDoc, logo: string | null = null): { read: string[]; composed: ReadonlySet<string> } {
+export function readClips(doc: MotionDoc, logo: string | null = null): { read: string[]; moving: string[]; composed: ReadonlySet<string> } {
   const clips = flattenComps(doc).tracks.flatMap((t) => t.clips);
   const screens = screenFrames(doc).map((s) => s.prefix);
   const read = clips.filter((c) => readsDom(c, logo)).map((c) => c.id);
+  const moving = clips.filter((c) => READ.has(c.component)).map((c) => c.id);
   const onScreen = clips.filter((c) => screens.some((prefix) => c.id.startsWith(prefix))).map((c) => c.id);
-  return { read, composed: new Set([...read, ...onScreen]) };
+  return { read, moving, composed: new Set([...read, ...onScreen]) };
 }
 const NO_FRAME: CustomFrame = { reads: new Map(), picture: () => null };
 
 export async function mountCustomReads(host: HTMLElement, compose: Compose, prepared: Prepared): Promise<CustomReads> {
   const { doc } = prepared;
-  const { read: clips, composed } = readClips(doc, prepared.tokens.logoUrl);
+  const { read: clips, moving, composed } = readClips(doc, prepared.tokens.logoUrl);
   if (!clips.length) {
     return { readAt: async () => NO_FRAME, dispose: () => {} };
   }
@@ -49,15 +50,31 @@ export async function mountCustomReads(host: HTMLElement, compose: Compose, prep
     return canvas;
   };
 
-  const readAt = async (frame: number): Promise<CustomFrame> => {
-    const reply = await reader.readAt(frame / doc.fps);
+  type Read = { reads: DomReads; pictures: Map<string, Picture> };
+  let still: Read | null = null;
+
+  const readOnce = async (frame: number, only: string[]): Promise<Read> => {
+    if (!only.length) {
+      return { reads: new Map(), pictures: new Map() };
+    }
+    const reply = await reader.readAt(frame / doc.fps, only);
     const reads = new Map(Object.entries(reply.trees).map(([clip, tree]) => [clip, readTree(tree, prepared.typeset)]));
     const owners = Object.entries(reply.trees).flatMap(([clip, tree]) => tree.nodes.flatMap((n) => [n.layer, n.raster?.layer ?? NO_INDEX]).filter((layer) => layer !== NO_INDEX).map((layer) => [`${clip}:${layer}` as string, reply.layers[layer]] as const));
     const pictureOf = (key: string, bitmap: ImageBitmap) => {
       const canvas = surface(key, bitmap);
       return { source: canvas, size: { width: canvas.width, height: canvas.height } };
     };
-    const pictures = new Map(owners.map(([key, bitmap]) => [key, pictureOf(key, bitmap)]));
+    return { reads, pictures: new Map(owners.map(([key, bitmap]) => [key, pictureOf(key, bitmap)])) };
+  };
+
+  const isStill = (clip: string) => !moving.includes(clip);
+  const stillPart = ({ reads, pictures }: Read): Read => ({ reads: new Map([...reads].filter(([clip]) => isStill(clip))), pictures: new Map([...pictures].filter(([key]) => isStill(key.slice(0, key.lastIndexOf(':'))))) });
+
+  const readAt = async (frame: number): Promise<CustomFrame> => {
+    const fresh = await readOnce(frame, still ? moving : clips);
+    still ??= stillPart(fresh);
+    const reads = new Map([...still.reads, ...fresh.reads]);
+    const pictures = new Map([...still.pictures, ...fresh.pictures]);
     return { reads, picture: (item) => ('source' in item ? (pictures.get(item.source) ?? null) : null) };
   };
 

@@ -60,6 +60,12 @@ Signal: with the pointer still over a frame, a wheel zoom makes its hover outlin
 
 ## Motion editor
 
+### A playing frame's picture trails the playhead by seconds
+**Signal:** the timeline time is right, the frame on the canvas lags further the longer it plays; the worker answers in a few ms. **Move:** the frame is one the worker refuses (empty media placeholder, Custom/Device3D/Composition clip) and goes through the main-thread path. Measure from `rebuildLive` start to landing, not the worker round trip; anything time-invariant done per tick there (prepare, mounting a DOM reader) is the cause.
+
+### Local mode serves 500 on a motion frame without a service-role key
+**Signal:** `vite dev` with the local-mode env and no `.env` answers `SUPABASE_SERVICE_ROLE_KEY not configured` from `createAssetSigningDb` on canvas and `add_template`. **Move:** for a probe, export a dummy `SUPABASE_SERVICE_ROLE_KEY=local`; never borrow the main checkout's `.env`, it points at the hosted project.
+
 ### A PR that adds or changes a tool fails the tool surface pins
 
 **Signal:** `tool-surface-pin.test.ts` or `cli/mcp/tool-list-pin.test.ts` red with a snapshot mismatch on a PR that changed a tool on purpose. **Move:** `npx vitest run -u src/lib/server/edit/tool-surface-pin.test.ts cli/mcp/tool-list-pin.test.ts`, read the snapshot diff (only your tool changes), commit it. The src pin stores one fingerprint per tool/op, one entry each: PRs touching different tools do not conflict; a real conflict means the same tool changed twice. Keep the second `exports[...]` block without the `>` in the cli snapshot (the `bun test` key): vitest `-u` drops it as obsolete. On a rebase conflict in a `.snap`, skip your pin commit and regenerate.
