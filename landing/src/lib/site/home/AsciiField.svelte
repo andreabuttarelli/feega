@@ -1,0 +1,155 @@
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { fieldAt, glyphFor, gridSize, tint } from '../ascii-field';
+
+  const LOOP_MS = 24000;
+  const FRAME_MS = 1000 / 30;
+  const MAX_DPR = 2;
+  const DESKTOP_CELL = 14;
+  const MOBILE_CELL = 11;
+  const MOBILE_MAX = 810;
+  const SCALE = 0.55;
+
+  let canvas: HTMLCanvasElement;
+
+  onMount(() => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return;
+    }
+
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let grid = { cols: 0, rows: 0, cell: DESKTOP_CELL };
+    let visible = true;
+    let raf = 0;
+    let last = 0;
+
+    const size = () => {
+      const dpr = Math.min(devicePixelRatio || 1, MAX_DPR);
+      const { width, height } = canvas.getBoundingClientRect();
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      grid = gridSize(width, height, width < MOBILE_MAX ? MOBILE_CELL : DESKTOP_CELL);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.font = `${grid.cell}px ui-monospace, Menlo, monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+    };
+
+    const draw = (phase: number) => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const { cols, rows, cell } = grid;
+
+      for (let c = 0; c < cols; c++) {
+        const [r, g, b] = tint(c / Math.max(1, cols - 1));
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+
+        for (let row = 0; row < rows; row++) {
+          const d = fieldAt(c * SCALE * 2, row * SCALE * 3.4, phase);
+          const glyph = glyphFor(d * d);
+          if (glyph === ' ') {
+            continue;
+          }
+
+          ctx.globalAlpha = 0.12 + d * 0.38;
+          ctx.fillText(glyph, c * cell + cell / 2, row * cell + cell / 2);
+        }
+      }
+    };
+
+    const tick = (now: number) => {
+      raf = requestAnimationFrame(tick);
+      if (now - last < FRAME_MS) {
+        return;
+      }
+
+      last = now;
+      draw((now % LOOP_MS) / LOOP_MS);
+    };
+
+    const sync = () => {
+      cancelAnimationFrame(raf);
+      if (still || !visible || document.hidden) {
+        return;
+      }
+
+      raf = requestAnimationFrame(tick);
+    };
+
+    const io = new IntersectionObserver(([e]) => {
+      visible = e.isIntersecting;
+      sync();
+    });
+
+    const ro = new ResizeObserver(() => {
+      size();
+      draw((performance.now() % LOOP_MS) / LOOP_MS);
+    });
+
+    const start = () => {
+      size();
+      draw(0);
+      canvas.classList.add('on');
+      ro.observe(canvas);
+      io.observe(canvas);
+      document.addEventListener('visibilitychange', sync);
+    };
+
+    if (document.readyState === 'complete') {
+      start();
+    } else {
+      addEventListener('load', start, { once: true });
+    }
+
+    return () => {
+      cancelAnimationFrame(raf);
+      io.disconnect();
+      ro.disconnect();
+      removeEventListener('load', start);
+      document.removeEventListener('visibilitychange', sync);
+    };
+  });
+</script>
+
+<div class="field" aria-hidden="true">
+  <canvas bind:this={canvas}></canvas>
+  <div class="fade"></div>
+</div>
+
+<style>
+  .field {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    z-index: 0;
+    width: 100vw;
+    height: 760px;
+    overflow: hidden;
+    transform: translateX(-50%);
+    pointer-events: none;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transition: opacity 1.6s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  canvas:global(.on) {
+    opacity: 1;
+  }
+
+  .fade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 0.55) 55%, #000 100%);
+  }
+
+  @media (max-width: 809.98px) {
+    .field {
+      height: 640px;
+    }
+  }
+</style>
