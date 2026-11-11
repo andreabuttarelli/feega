@@ -452,14 +452,14 @@ impl WebCore {
     pub fn set_live_overlay(&mut self, items_json: &[u8]) -> Result<(), JsValue> {
         self.compositor.set_overlay(OverlayPart::Live, parse_overlay(utf8(items_json)?).map_err(failed)?, &mut self.library);
         self.changed_at = js_sys::Date::now();
-        self.warmup.stirred(self.changed_at);
+        self.warmup.moved(self.changed_at);
         Ok(())
     }
 
     pub fn set_motion(&mut self, motion: CoreMotion) {
         if matches!(motion, CoreMotion::Gesture) {
             self.changed_at = js_sys::Date::now();
-            self.warmup.stirred(self.changed_at);
+            self.warmup.moved(self.changed_at);
         }
         self.motion = motion;
         self.library.set_motion(motion.into());
@@ -482,6 +482,19 @@ impl WebCore {
 
     pub fn set_tiles(&mut self, on: bool) {
         self.tiled = on;
+    }
+
+    fn fill_coarse(&mut self) -> Result<bool, JsValue> {
+        let started = js_sys::Date::now();
+        let screen = (self.target.width(), self.target.height());
+        let wanted = self.tiles.coarse_ahead(self.camera, screen);
+        for batch in bake_batches(&wanted) {
+            if js_sys::Date::now() - started > TILE_BUDGET_GESTURE_MS || input_pending() {
+                return Ok(true);
+            }
+            self.raster_batch(&batch)?;
+        }
+        Ok(false)
     }
 
     fn fill_reserve(&mut self) -> Result<bool, JsValue> {
@@ -765,14 +778,18 @@ impl WebCore {
             }
         });
         if moving {
-            self.warmup.stirred(js_sys::Date::now());
+            self.warmup.moved(js_sys::Date::now());
         }
         let building = if self.library.is_building() { Building::Frames } else { Building::Nothing };
         let idle = self.warmup.due_when(js_sys::Date::now(), building);
+        let coarse = building == Building::Nothing && self.warmup.coarse_due(js_sys::Date::now());
+        let mut coarse_left = false;
         if self.tiled && !frame.pending && idle {
             self.warm_tiles()?;
+        } else if self.tiled && !frame.pending && coarse {
+            coarse_left = self.fill_coarse()?;
         }
-        self.warming = self.tiled && building == Building::Nothing && !idle;
+        self.warming = self.tiled && building == Building::Nothing && (!idle || coarse_left);
         Ok(frame.report())
     }
 
