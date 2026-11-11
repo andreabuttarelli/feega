@@ -382,6 +382,19 @@ fn a_frame_held_in_place_for_an_edit_counts_as_held() {
 }
 
 #[test]
+fn every_plan_counts_itself_and_the_uses_it_walked() {
+    let (mut c, mut lib) = scene();
+    let limits = Limits { side: 4096, rasters: 1, items: 1000 };
+    c.plan_at(&mut lib, at(0.0, 0.0, 1.0), (256, 256), limits);
+    c.overlay_at(&mut lib, at(0.0, 0.0, 1.0), (256, 256), limits);
+
+    let planned = c.take_planned();
+
+    assert_eq!((planned.plans, planned.walked), (2, 2));
+    assert_eq!(c.take_planned().plans, 0);
+}
+
+#[test]
 fn damage_the_tiles_took_repaints_the_held_texture_on_the_next_exact_frame() {
     let (mut c, mut lib) = scene();
     let mut fake = Fake::default();

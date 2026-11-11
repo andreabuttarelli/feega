@@ -22,7 +22,7 @@ const SERVED = join(tmpdir(), `feega-${FIXTURE_KIND}-served.feega`);
 
 export default defineConfig({
   testDir: '.',
-  testMatch: spec,
+  testMatch: process.env.BENCH_SPEC ? new RegExp(process.env.BENCH_SPEC) : spec,
   timeout: 1_800_000,
   workers: 1,
   reporter: 'list',
