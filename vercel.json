@@ -66,6 +66,16 @@
     },
     {
       "source": "/gpu-core/(.*)",
+      "has": [{ "type": "query", "key": "v" }],
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/gpu-core/(.*)",
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
