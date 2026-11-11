@@ -1,3 +1,5 @@
+import { PromptKind } from '$lib/home/prompt-kinds';
+
 export enum PromptSource {
   Github = 'github',
   Folder = 'folder',
@@ -36,3 +38,16 @@ export function sourceName(source: PromptSource, value: string): string {
 }
 
 export type SourcePick = { source: PromptSource; value: string };
+
+const FROM_SOURCE: Record<PromptKind, string> = {
+  [PromptKind.Motion]: 'Make a motion video from',
+  [PromptKind.Website]: 'Design a website from'
+};
+
+export function briefFor(kind: PromptKind, text: string, pick: SourcePick | null): string {
+  const words = text.trim();
+  if (words || !pick) {
+    return words;
+  }
+  return `${FROM_SOURCE[kind]} ${sourceName(pick.source, pick.value)}`;
+}
