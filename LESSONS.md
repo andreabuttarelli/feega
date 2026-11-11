@@ -3818,3 +3818,12 @@ Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start
 ## A dialog that closes itself before reading its props throws in silence
 
 **Signal:** clicking the action in a dialog closes it and nothing happens; `pageerror` says `Cannot read properties of null (reading 'history')`, no network request, no notice. **Move:** the handler called `onclose()` and then read props derived from the dialog's own state (`session`, `doc`); closing unmounts the component and the props turn null. Read and compute everything first, close last (`insertThenClose`); capture what a later `await` needs before closing.
+
+
+## A camera tick that reruns work over every frame
+
+**Signal:** pan or zoom costs more JS per tick as the canvas grows; a CPU profile shows `fillOrder`, `resident`, `new SpatialIndex` or `pictureBytes` under a paint while no frame changed. **Move:** count, don't time: `tests/perf/camera-tick-bench.spec.ts` reports Svelte reruns and calls per function per wheel tick. Anything that reads `view` inside a `$derived` or `$effect` reruns on every tick; derive from `sight` (`core/sight.ts`, changes only when the frames on or near the screen change) instead. `untrack(() => view)` inside a `$derived` did not stop it rerunning on a pan; carrying the camera inside the state you depend on (`sight.view`) did. Guard: `core-frames-camera.svelte.test.ts` spies the per-frame helpers and expects none of them on a pan.
+
+## A perf fixture that never opens
+
+**Signal:** `scripts/local.mjs` (or a dev server pointed at a `.feega`) logs `This .feega file is larger than 200 MB` and the page waits forever. **Move:** the limit is on the unpacked size; landings docs are 0.7–4.5 MB each, so `replicate-fixture.mjs` stays under ~250 frames. A fresh worktree's dev server can also take over three minutes to compile the canvas route on a loaded machine: give the first `waitFor` minutes, not the default.

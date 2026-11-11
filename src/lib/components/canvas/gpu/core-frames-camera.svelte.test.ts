@@ -35,7 +35,35 @@ vi.mock('@feega/motion-core/motion/gpu-full/core-web', () => ({
   createCoreGl: () => new Promise(() => undefined)
 }));
 
-vi.mock('$lib/canvas/core/frame-source', async (real) => ({ ...(await real<object>()), drawsAny: () => true, onStage: (l: unknown) => l, stillFrame: () => 0 }));
+const walks = vi.hoisted(() => ({} as Record<string, number>));
+const walked = <F extends (...args: never[]) => unknown>(name: string, fn: F) => ((...args: Parameters<F>) => ((walks[name] = (walks[name] ?? 0) + 1), fn(...args))) as F;
+
+vi.mock('$lib/canvas/core/frame-source', async (real) => {
+  const actual = await real<typeof import('$lib/canvas/core/frame-source')>();
+  return { ...actual, drawsAny: () => true, onStage: (l: unknown) => l, stillFrame: () => 0, toBuild: walked('toBuild', actual.toBuild), toWarm: walked('toWarm', actual.toWarm) };
+});
+vi.mock('$lib/canvas/core/placeholders', async (real) => {
+  const actual = await real<typeof import('$lib/canvas/core/placeholders')>();
+  return { ...actual, fillOrder: walked('fillOrder', actual.fillOrder), onScreenFirst: walked('onScreenFirst', actual.onScreenFirst) };
+});
+vi.mock('$lib/canvas/core/residency', async (real) => {
+  const actual = await real<typeof import('$lib/canvas/core/residency')>();
+  return { ...actual, resident: walked('resident', actual.resident), cached: walked('cached', actual.cached), uncached: walked('uncached', actual.uncached) };
+});
+vi.mock('$lib/canvas/core/screen-uses', async (real) => {
+  const actual = await real<typeof import('$lib/canvas/core/screen-uses')>();
+  return { ...actual, worldUses: walked('worldUses', actual.worldUses) };
+});
+vi.mock('$lib/canvas/core/spatial-index', async (real) => {
+  const actual = await real<typeof import('$lib/canvas/core/spatial-index')>();
+  class SpatialIndex extends actual.SpatialIndex {
+    constructor(items: ConstructorParameters<typeof actual.SpatialIndex>[0]) {
+      super(items);
+      walks.index = (walks.index ?? 0) + 1;
+    }
+  }
+  return { ...actual, SpatialIndex };
+});
 
 const { default: CoreFrames } = await import('./CoreFrames.svelte');
 const dir = dirname(fileURLToPath(import.meta.url));
@@ -152,5 +180,55 @@ describe('CoreFrames camera', () => {
     await new Promise((r) => setTimeout(r, 20));
 
     expect(calls.overlapped).toBe(0);
+  });
+
+  const manyCards = () => Array.from({ length: 200 }, (_, i) => ({ key: `k${i}`, frame: { id: `k${i}`, box: { x: i * 120, y: 0, w: 100, h: 50 }, list: { width: 100, height: 50, background: null, items: [], unsupported: [] } } }));
+  const QUIET_MS = 100;
+  const SETTLE_MS = 5000;
+  const forget = () => {
+    for (const name of Object.keys(walks)) {
+      delete walks[name];
+    }
+  };
+  const settled = () =>
+    vi.waitFor(
+      async () => {
+        forget();
+        await new Promise((r) => setTimeout(r, QUIET_MS));
+        expect(walks).toEqual({});
+      },
+      { timeout: SETTLE_MS }
+    );
+
+  it('a pan that shows the same frames walks none of them, however many there are', async () => {
+    const props = $state({ frames: [], cards: manyCards(), view: { x: 0, y: 0, zoom: 1 }, area: { width: 400, height: 300 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
+    app = mount(CoreFrames, { target: document.body, props });
+    flushSync();
+    await vi.waitFor(() => expect(calls.patches.length).toBeGreaterThan(0));
+    await settled();
+
+    props.view = { x: -1, y: 0, zoom: 1 };
+    flushSync();
+
+    await vi.waitFor(() => expect(calls.cameras.at(-1)).toEqual([-1, 0, 1]));
+    expect(walks).toEqual({});
+  });
+
+  it('a zoom that stays in one cache step walks none of them after its first tick', async () => {
+    const props = $state({ frames: [], cards: manyCards(), view: { x: 0, y: 0, zoom: 1 }, area: { width: 400, height: 300 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
+    app = mount(CoreFrames, { target: document.body, props });
+    flushSync();
+    await vi.waitFor(() => expect(calls.patches.length).toBeGreaterThan(0));
+    await settled();
+    props.view = { x: 0, y: 0, zoom: 1.001 };
+    flushSync();
+    await vi.waitFor(() => expect(calls.cameras.at(-1)).toEqual([0, 0, 1.001]));
+    forget();
+
+    props.view = { x: 0, y: 0, zoom: 1.002 };
+    flushSync();
+
+    await vi.waitFor(() => expect(calls.cameras.at(-1)).toEqual([0, 0, 1.002]));
+    expect(walks).toEqual({});
   });
 });
