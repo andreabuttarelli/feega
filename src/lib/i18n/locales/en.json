@@ -460,6 +460,11 @@
       },
       "placeholder": "Ask the agent…",
       "hint": "Enter to send · Shift+Enter for a new line",
+      "selection": {
+        "list": "Selected on the canvas",
+        "remove": "Do not send {name}",
+        "more": "+{count}"
+      },
       "attach": {
         "button": "Attach files or images",
         "drop": "Drop files to attach",

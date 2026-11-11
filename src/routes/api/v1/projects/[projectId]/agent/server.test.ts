@@ -10,7 +10,7 @@ const streamed = vi.fn();
 const { screenModelInput } = vi.hoisted(() => ({ screenModelInput: vi.fn() }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput }));
 
-const saveTurn = vi.fn(async (_db: unknown, _turn: { role: string; content?: string; attachments?: unknown[] }) => undefined);
+const saveTurn = vi.fn(async (_db: unknown, _turn: { role: string; content?: string; attachments?: unknown[]; selection?: unknown[] }) => undefined);
 
 let releaseTail: () => void = () => {};
 const world = { stepped: false, fails: false, usdPerToken: 0, db: fakeDb({ chat_messages: [] }) };
@@ -128,7 +128,7 @@ vi.mock('$lib/server/repos/chat', () => ({
   loadTurns: async () => [],
   promptHistory: () => [],
   turnRunning: async () => true,
-  saveTurn: (db: unknown, turn: { role: string; attachments?: unknown[] }) => saveTurn(db, turn)
+  saveTurn: (db: unknown, turn: { role: string; attachments?: unknown[]; selection?: unknown[] }) => saveTurn(db, turn)
 }));
 vi.mock('$lib/server/project-agent/project-tools', () => ({ createProjectTools: () => ({}) }));
 const offeredProjectTools = vi.hoisted(() => ({ names: [] as string[] }));
@@ -210,6 +210,19 @@ describe('POST /api/v1/projects/[projectId]/agent', () => {
     expect(user.content[2].text).toMatch(/project asset a-img.*create_node type "image"/);
     expect(user.content[3].mediaType).toBe('image/png');
     expect(saveTurn.mock.calls[0][1]).toMatchObject({ role: 'user', content: 'summarize and place', attachments: [{ assetId: 'a-doc', name: 'brief.pdf' }, { assetId: 'a-img', name: 'logo.png' }] });
+  });
+
+  it('a selection reaches the model by name and is saved with the message', async () => {
+    const chips = [{ id: 'f1', kind: 'node', type: 'motion', name: 'Launch video' }, { id: 'l1', kind: 'layer', type: 'Text', name: 'Headline', frameId: 'f1' }];
+
+    const res = await POST(postEvent({ message: 'make this bolder', selection: chips }));
+    releaseTail();
+    await res.text();
+
+    const system = (streamed.mock.calls[0][0] as { prompt: { role: string; content: unknown }[] }).prompt.find((m) => m.role === 'system')!.content as string;
+    expect(system).toContain('node "Launch video" (motion, id f1)');
+    expect(system).toContain('layer "Headline" (Text, id l1, in frame f1)');
+    expect(saveTurn.mock.calls[0][1]).toMatchObject({ role: 'user', selection: chips });
   });
 
   it('refuses attachments that are not assets of this project', async () => {

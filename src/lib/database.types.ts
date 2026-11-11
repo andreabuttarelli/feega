@@ -1352,6 +1352,7 @@ export type Database = {
           id: string
           org_id: string
           role: string
+          selection: Json | null
           seq: number
           status: string
           thread_id: string
@@ -1370,6 +1371,7 @@ export type Database = {
           id?: string
           org_id: string
           role: string
+          selection: Json | null
           seq: number
           status?: string
           thread_id: string
@@ -1388,6 +1390,7 @@ export type Database = {
           id?: string
           org_id?: string
           role?: string
+          selection?: Json | null
           seq?: number
           status?: string
           thread_id?: string
