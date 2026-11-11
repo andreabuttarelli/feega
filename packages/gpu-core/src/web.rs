@@ -19,12 +19,14 @@ use crate::retained::{Camera, Damage, Lookup, Quality};
 use crate::tiles::{Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_zoom, Batch, Rest, TileKey, Tiles, TILE_PX};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
+use crate::tally::now_ms;
 use crate::Skipped;
 
 const CACHE_SIDE: u32 = 4096;
 const RASTERS_PER_DRAW: usize = 1;
 const POSTER_RASTERS: usize = 64;
 const POSTER_BYTES: u32 = 4;
+const RGBA_BYTES: f64 = 4.0;
 const POSTER_ROW_ALIGN: u32 = 256;
 const ITEMS_PER_RASTER: usize = 48;
 const FRAMES_IN_FLIGHT: u32 = 1;
@@ -97,6 +99,14 @@ pub struct WebCore {
     changed_at: f64,
     rest_shown: Vec<(Rect, wgpu::Texture)>,
     rest_spare: HashMap<(u32, u32), Vec<wgpu::Texture>>,
+    baked: Baked,
+}
+
+#[derive(Default)]
+struct Baked {
+    bakes: u32,
+    ms: f64,
+    upload_bytes: f64,
 }
 
 struct GpuPainter<'a> {
@@ -321,7 +331,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, snapshots: HashMap::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new() })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, snapshots: HashMap::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new(), baked: Baked::default() })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -335,6 +345,7 @@ impl WebCore {
             self.textures.insert(clip.into(), texture);
         }
         copy_rows(&self.queue, source, &self.textures[clip], 0, height);
+        self.baked.upload_bytes += f64::from(width) * f64::from(height) * RGBA_BYTES;
         self.engine.vello.mark_override_image_dirty(&self.pictures[clip]);
         self.compositor.touch_picture(clip, &self.library);
         Ok(())
@@ -349,6 +360,7 @@ impl WebCore {
         let texture = self.arriving.get(clip).filter(|t| t.width() == width && t.height() == height && top < height).ok_or_else(|| failed("picture rows out of order"))?;
         let rows = rows.min(height - top);
         copy_rows(&self.queue, source, texture, top, rows);
+        self.baked.upload_bytes += f64::from(width) * f64::from(rows) * RGBA_BYTES;
         if top + rows < height {
             return Ok(false);
         }
@@ -527,6 +539,7 @@ impl WebCore {
     }
 
     fn raster_batch(&mut self, batch: &Batch) -> Result<(), JsValue> {
+        let began = now_ms();
         let zoom = step_zoom(batch.step);
         let world = batch.world();
         let gutter = TILE_GUTTER_PX as f64;
@@ -560,6 +573,7 @@ impl WebCore {
         }
         self.queue.submit([encoder.finish()]);
         self.atlases.insert(size, atlas);
+        self.count_bake(began);
         Ok(())
     }
 
@@ -611,10 +625,12 @@ impl WebCore {
         if plan.screen.items.is_empty() {
             return Ok(None);
         }
+        let began = now_ms();
         let (list, _) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
         let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
         let texture = self.overlay_tex.take().filter(|t| t.width() == size.0 && t.height() == size.1).unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
         self.engine.draw(&self.device, &self.queue, &list, &pictures, &texture.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
+        self.count_bake(began);
         Ok(Some(texture))
     }
 
@@ -730,6 +746,7 @@ impl WebCore {
                 return Ok(false);
             }
             let Some(block) = self.rest.as_mut().and_then(Rest::next) else { return Ok(self.rest.as_ref().is_some_and(Rest::adoptable)) };
+            let began = now_ms();
             let size = (block.width() as u32, block.height() as u32);
             let c = Camera { x: self.camera.x.round(), y: self.camera.y.round(), zoom: self.camera.zoom };
             let plan = self.compositor.plan_at(&mut self.library, Camera { x: c.x - block.x0, y: c.y - block.y0, zoom: c.zoom }, size, self.limits);
@@ -741,6 +758,7 @@ impl WebCore {
             let texture = self.rest_spare.get_mut(&size).and_then(Vec::pop).unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
             self.engine.draw(&self.device, &self.queue, &list, &pictures, &texture.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
             self.rest_shown.push((block, texture));
+            self.count_bake(began);
             spent = true;
         }
     }
@@ -771,6 +789,7 @@ impl WebCore {
         if frame.rastered > 0 {
             self.rastered_at = now_ms;
         }
+        self.baked.bakes += frame.rastered as u32;
         self.pending = frame.pending;
         self.in_flight.fetch_add(1, Ordering::Relaxed);
         let done = self.in_flight.clone();
@@ -857,6 +876,17 @@ impl WebCore {
             self.raster_batch(&batch)?;
         }
         Ok(false)
+    }
+
+    fn count_bake(&mut self, began: f64) {
+        self.baked.bakes += 1;
+        self.baked.ms += now_ms() - began;
+    }
+
+    pub fn frame_counts(&mut self) -> Vec<f64> {
+        let planned = self.compositor.take_planned();
+        let baked = std::mem::take(&mut self.baked);
+        vec![f64::from(planned.plans), f64::from(planned.walked), planned.ms, f64::from(baked.bakes), baked.ms, baked.upload_bytes]
     }
 
     pub fn warming(&self) -> bool {
