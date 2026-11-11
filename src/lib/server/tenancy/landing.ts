@@ -28,12 +28,14 @@ async function recordFirstAcceptance(db: Db, deps: LandingDeps, userId: string, 
   await deps.recordTermsAcceptance(db, userId, CURRENT_TERMS_VERSION);
 }
 
-function takeHomeDraft(cookies: Cookies): boolean {
-  const pending = !!cookies.get(HOME_DRAFT_COOKIE);
-  if (pending) {
-    cookies.delete(HOME_DRAFT_COOKIE, { path: '/' });
+function takeHomeDraft(cookies: Cookies): string | null {
+  const pending = cookies.get(HOME_DRAFT_COOKIE);
+  if (!pending) {
+    return null;
   }
-  return pending;
+
+  cookies.delete(HOME_DRAFT_COOKIE, { path: '/' });
+  return pending.startsWith('?') ? `${DASHBOARD_PATH}${pending}` : DASHBOARD_PATH;
 }
 
 export function inviteTokenIn(params: URLSearchParams | FormData): string | null {
@@ -58,7 +60,7 @@ export async function landingPath(
 
   if (!inviteToken) {
     const path = await deps.homePathFor(db, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null, cookies.get(LAST_PROJECT_COOKIE) ?? null, takeCampaign(cookies));
-    return takeHomeDraft(cookies) ? DASHBOARD_PATH : path;
+    return takeHomeDraft(cookies) ?? path;
   }
 
   const result = await deps.acceptInvite({ token: inviteToken, userId: user.id, email: user.email ?? '' });

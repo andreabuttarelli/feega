@@ -202,10 +202,10 @@ describe('la radice manda dove dice la regola di ingresso', () => {
 		}
 	};
 
-	it('senza sessione va al prompt senza account', async () => {
+	it('senza sessione va al login', async () => {
 		mockSession = { session: null, user: null };
 		const redirected = await rootRequestTo();
-		expect(redirected?.location).toBe('/new');
+		expect(redirected?.location).toBe('/login');
 	});
 
 	it('con sessione va dove homePathFor decide', async () => {
@@ -220,20 +220,21 @@ describe('la radice manda dove dice la regola di ingresso', () => {
 		mockSession = { session: null, user: null };
 		const redirected = await rootRequestTo('https://www.feega.app');
 		Object.assign(env, { VERCEL_ENV: 'production' });
-		expect(redirected?.location).toBe('/new');
+		expect(redirected?.location).toBe('/login');
 	});
 });
 
-describe('a signed-out /app opens the prompt, deeper pages the login', () => {
-	const requestTo = async (path: string) => {
+describe('a signed-out /app goes to the login, keeping a handoff', () => {
+	const requestTo = async (path: string, set = vi.fn()) => {
+		const url = new URL(`http://localhost${path}`);
 		try {
 			await handle({
 				event: {
-					request: new Request(`http://localhost${path}`),
-					url: new URL(`http://localhost${path}`),
-					route: { id: path },
+					request: new Request(url.href),
+					url,
+					route: { id: url.pathname },
 					params: {},
-					cookies: { getAll: () => [], get: () => undefined, set: vi.fn() },
+					cookies: { getAll: () => [], get: () => undefined, set },
 					locals: {}
 				},
 				resolve: async () => new Response('never')
@@ -244,14 +245,22 @@ describe('a signed-out /app opens the prompt, deeper pages the login', () => {
 		}
 	};
 
-	it('/app goes to /new', async () => {
+	it('/app goes to the login', async () => {
 		mockSession = { session: null, user: null };
-		expect((await requestTo('/app'))?.location).toBe('/new');
+		expect((await requestTo('/app'))?.location).toBe('/login');
 	});
 
 	it('/app/credits goes to the login', async () => {
 		mockSession = { session: null, user: null };
 		expect((await requestTo('/app/credits'))?.location).toBe('/login');
+	});
+
+	it('/app with a handoff keeps its query in the draft cookie', async () => {
+		mockSession = { session: null, user: null };
+		const set = vi.fn();
+		const redirected = await requestTo('/app?prompt=launch%20video&kind=motion&source=github', set);
+		expect(redirected?.location).toBe('/login');
+		expect(set).toHaveBeenCalledWith('feega_home_draft', '?prompt=launch%20video&kind=motion&source=github', expect.objectContaining({ path: '/' }));
 	});
 });
 
