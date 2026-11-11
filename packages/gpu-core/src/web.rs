@@ -770,7 +770,7 @@ impl WebCore {
         let idle = self.warmup.due_when(js_sys::Date::now(), building);
         if self.tiled && !frame.pending && idle {
             self.warm_tiles()?;
-        } else if self.tiled {
+        } else if self.tiled && building == Building::Nothing {
             self.pending |= !idle;
         }
         Ok(frame.report())
