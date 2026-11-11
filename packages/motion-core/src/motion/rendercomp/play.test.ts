@@ -32,6 +32,10 @@ function play(port: RendercompPort, props: Record<string, unknown>): string[] {
 
 const defaults = (port: RendercompPort) => Object.fromEntries(Object.entries(propsOf(port)).map(([key, spec]) => [key, spec.default]));
 
+const SNAPSHOT_DECIMALS = 4;
+const LONG_DECIMAL = /-?\d+\.\d{7,}/g;
+const platformStable = (frames: string[]) => frames.map((html) => html.replace(LONG_DECIMAL, (n) => String(Number(Number(n).toFixed(SNAPSHOT_DECIMALS)))));
+
 const PORTS = RENDERCOMP_PORTS.map((p) => [p.id, p] as const);
 
 describe('every rendercomp port plays from the source the player runs', () => {
@@ -44,7 +48,7 @@ describe('every rendercomp port plays from the source the player runs', () => {
   });
 
   it.each(PORTS)('%s keeps its frames at fixed samples', (_, port) => {
-    expect(play(port, defaults(port))).toMatchSnapshot();
+    expect(platformStable(play(port, defaults(port)))).toMatchSnapshot();
   });
 
   it.each(PORTS)('%s draws no empty picture', (_, port) => {
