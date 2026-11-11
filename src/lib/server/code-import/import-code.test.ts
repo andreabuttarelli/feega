@@ -67,7 +67,7 @@ function storeOf() {
 function askOf(over: Partial<Parameters<typeof importCodeAt>[0]> = {}) {
   const tab = tabOf();
   const stop = vi.fn(async () => undefined);
-  const runner = vi.fn(async () => ({ ok: true as const, app: { url: APP, names: ['Button'], stop } }));
+  const runner = vi.fn(async () => ({ ok: true as const, app: { url: APP, names: ['Button'], sha: null, stop } }));
   const { store, docs } = storeOf();
   let n = 0;
   return {

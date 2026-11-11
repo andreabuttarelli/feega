@@ -3,14 +3,14 @@ import type { Picture, Pictures, Raster } from './raster';
 import type { Affine } from '../affine';
 import type { Outcome } from './core-outcome';
 import { OverlayPart } from './core-overlay';
-import { listWire, spliceWire, type Splice } from './wire';
+import { listPack, listWire, spliceWire, type Splice } from './wire';
 import { inlineCore, unzipBase64 } from './inline-core';
 import { releaseOnDispose, type GpuSurface } from './gpu-release';
 
 const CORE_URL = '/gpu-core/gpu_core.js';
 
 type Size = { width: number; height: number };
-export type Attached = { draw: (list: string) => string; set_camera: (x: number, y: number, zoom: number) => void; patch_uses: (patch: string) => void; set_overlay: (items: string) => void; set_live_overlay: (items: string) => void; frame: (now: number) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; picture_rows?: (clip: string, source: unknown, width: number, height: number, top: number, rows: number) => boolean; put_group: (key: string, list: string) => void; patch_group: (from: string, to: string, splice: string) => boolean; drop_group: (key: string) => void; append_group: (key: string, list: string) => void; cache_pending: () => boolean; cache_bytes: () => number; scratch_bytes?: () => number; forget_picture: (clip: string) => void; picture_bytes: () => number; lost: () => boolean; busy?: () => boolean; set_motion?: (motion: CoreMotion) => void; set_budget?: (bytes: number) => void; free: () => void };
+export type Attached = { draw: (list: string) => string; set_camera: (x: number, y: number, zoom: number) => void; patch_uses: (patch: string) => void; set_overlay: (items: string) => void; set_live_overlay: (items: string) => void; frame: (now: number) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; picture_rows?: (clip: string, source: unknown, width: number, height: number, top: number, rows: number) => boolean; put_group: (key: string, list: string) => void; patch_group: (from: string, to: string, splice: string) => boolean; drop_group: (key: string) => void; append_group: (key: string, list: string) => void; put_group_packed?: (key: string, list: string, floats: Float64Array, ends: Uint32Array) => void; append_group_packed?: (key: string, list: string, floats: Float64Array, ends: Uint32Array) => void; cache_pending: () => boolean; cache_bytes: () => number; render_tally?: () => string; warming?: () => boolean; scratch_bytes?: () => number; forget_picture: (clip: string) => void; picture_bytes: () => number; lost: () => boolean; busy?: () => boolean; set_motion?: (motion: CoreMotion) => void; set_budget?: (bytes: number) => void; set_tiles?: (on: boolean) => void; set_tile_budget?: (bytes: number) => void; poster?: (group: string, width: number, height: number, scale: number) => Promise<Uint8Array>; free: () => void };
 
 export enum CoreMotion {
   Still = 0,
@@ -20,9 +20,9 @@ export enum CoreMotion {
 export type Use = { kind: 'use'; clip: string; group: string; matrix: Affine; cache?: boolean; hold?: boolean };
 export type UsePatch = { put: Use[]; drop: string[]; order?: string[] };
 export type Painted = { outcome: Outcome; pending: boolean; skipped: string[] };
-export type CoreRaster = Omit<Raster, 'draw'> & { draw: (list: DisplayList, pictures?: Pictures) => string[]; putGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; appendGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; patchGroup: (from: string, to: string, splice: Splice, pictures?: Pictures) => boolean; dropGroup: (key: string) => void; setCamera: (x: number, y: number, zoom: number) => void; patchUses: (patch: UsePatch) => void; setOverlay: (part: OverlayPart, items: readonly Item[]) => void; frame: (now: number) => Painted; upload: (list: DisplayList, pictures: Pictures, most: number) => boolean; cacheBytes: () => number; pictureBytes: () => number; scratchBytes?: () => number; wasmBytes?: () => number; lost: () => boolean; busy?: () => boolean; setMotion?: (motion: CoreMotion) => void; setBudget?: (bytes: number) => void; behindPage?: boolean };
+export type CoreRaster = Omit<Raster, 'draw'> & { draw: (list: DisplayList, pictures?: Pictures) => string[]; putGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; appendGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; patchGroup: (from: string, to: string, splice: Splice, pictures?: Pictures) => boolean; dropGroup: (key: string) => void; setCamera: (x: number, y: number, zoom: number) => void; patchUses: (patch: UsePatch) => void; setOverlay: (part: OverlayPart, items: readonly Item[]) => void; frame: (now: number) => Painted; upload: (list: DisplayList, pictures: Pictures, most: number) => boolean; cacheBytes: () => number; renderTally?: () => string; warming?: () => boolean; pictureBytes: () => number; scratchBytes?: () => number; wasmBytes?: () => number; lost: () => boolean; busy?: () => boolean; setMotion?: (motion: CoreMotion) => void; setBudget?: (bytes: number) => void; setTiles?: (on: boolean) => void; setTileBudget?: (bytes: number) => void; poster?: (group: string, size: { width: number; height: number }, scale: number) => Promise<ImageData>; behindPage?: boolean };
 type Attach<T> = (canvas: HTMLCanvasElement, width: number, height: number) => T;
-type CoreModule = { default: () => Promise<unknown>; WebCore: { attach: Attach<Promise<Attached>> }; WebGlCore: { attach: Attach<Attached> } };
+type CoreModule = { default: () => Promise<unknown>; WebCore: { attach: Attach<Promise<object>> }; WebGlCore: { attach: Attach<object> } };
 
 type PictureItem = ImageItem | LayerItem;
 
@@ -94,6 +94,28 @@ export function warmCore(): Promise<CoreModule> {
     throw e;
   });
   return loading;
+}
+
+const utf8 = new TextEncoder();
+const WIRED_PACKED = new Set(['put_group_packed', 'append_group_packed']);
+const WIRED_LAST = new Set(['draw', 'patch_uses', 'set_overlay', 'set_live_overlay', 'put_group', 'append_group', 'patch_group']);
+
+export function overBytes(core: object): Attached {
+  return new Proxy(core, {
+    get(target, name) {
+      const member = Reflect.get(target, name) as unknown;
+      if (typeof member !== 'function') {
+        return member;
+      }
+      if (typeof name === 'string' && WIRED_PACKED.has(name)) {
+        return (key: string, list: string, floats: Float64Array, ends: Uint32Array) => member.apply(target, [key, utf8.encode(list), floats, ends]);
+      }
+      if (typeof name !== 'string' || !WIRED_LAST.has(name)) {
+        return member.bind(target);
+      }
+      return (...args: unknown[]) => member.apply(target, [...args.slice(0, -1), utf8.encode(args.at(-1) as string)]);
+    }
+  }) as Attached;
 }
 
 type Fit = (size: Size) => Size;
@@ -197,6 +219,24 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
     return null;
   }
 
+  const putList = (key: string, list: DisplayList) => {
+    if (!attached.put_group_packed) {
+      attached.put_group(key, listWire(list));
+      return;
+    }
+    const pack = listPack(list);
+    attached.put_group_packed(key, pack.json, pack.floats, pack.ends);
+  };
+
+  const appendList = (key: string, list: DisplayList) => {
+    if (!attached.append_group_packed) {
+      attached.append_group(key, listWire(list));
+      return;
+    }
+    const pack = listPack(list);
+    attached.append_group_packed(key, pack.json, pack.floats, pack.ends);
+  };
+
   return {
     draw: (list: DisplayList, pictures = NO_PICTURES) => {
       wantedPictures(list.items).forEach((item) => upload(item, pictures));
@@ -205,12 +245,12 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
     putGroup: (key: string, list: DisplayList, pictures = NO_PICTURES) => {
       wantedPictures(list.items).forEach((item) => upload(item, pictures));
       show(key, list.items, '');
-      attached.put_group(key, listWire(list));
+      putList(key, list);
     },
     appendGroup: (key: string, list: DisplayList, pictures = NO_PICTURES) => {
       wantedPictures(list.items).forEach((item) => upload(item, pictures));
       show(key, list.items);
-      attached.append_group(key, listWire(list));
+      appendList(key, list);
     },
     patchGroup: (from: string, to: string, splice: Splice, pictures = NO_PICTURES) => {
       wantedPictures(splice.items).forEach((item) => upload(item, pictures));
@@ -255,13 +295,18 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
       const [outcome, ...skipped] = attached.frame(now).split('\n');
       return { outcome: outcome as Outcome, pending: attached.cache_pending(), skipped: skipped.filter(Boolean) };
     },
+    ...(attached.poster ? { poster: (group: string, size: { width: number; height: number }, scale: number) => attached.poster!(group, size.width, size.height, scale).then((bytes) => new ImageData(Uint8ClampedArray.from(bytes), size.width, size.height)) } : {}),
     cacheBytes: () => attached.cache_bytes(),
+    renderTally: () => attached.render_tally?.() ?? '{}',
+    warming: () => attached.warming?.() ?? false,
     pictureBytes: () => attached.picture_bytes(),
     scratchBytes: () => attached.scratch_bytes?.() ?? 0,
     wasmBytes: () => wasmMemory?.buffer.byteLength ?? 0,
     lost: () => attached.lost(),
     busy: () => attached.busy?.() ?? false,
     setMotion: (motion: CoreMotion) => attached.set_motion?.(motion),
+    setTiles: (on: boolean) => attached.set_tiles?.(on),
+    setTileBudget: (bytes: number) => attached.set_tile_budget?.(bytes),
     setBudget: (bytes: number) => attached.set_budget?.(bytes),
     dispose: () => attached.free()
   };
@@ -304,7 +349,7 @@ export async function createCore(canvas: HTMLCanvasElement, width: number, heigh
     throw new Error('webgpu unavailable');
   }
   const core = await warmCore();
-  const raster = fitting(await core.WebCore.attach(canvas, width, height), pictureSize(side));
+  const raster = fitting(overBytes(await core.WebCore.attach(canvas, width, height)), pictureSize(side));
   return releaseOnDispose(raster, canvas.getContext('webgpu') as GpuSurface | null);
 }
 
@@ -315,5 +360,5 @@ export async function createCoreGl(canvas: HTMLCanvasElement, width: number, hei
     throw new Error('webgl2 unavailable');
   }
   const core = await warmCore();
-  return fitting(core.WebGlCore.attach(canvas, width, height), pictureSize(Math.min(side, GL_PICTURE_SIDE)));
+  return fitting(overBytes(core.WebGlCore.attach(canvas, width, height)), pictureSize(Math.min(side, GL_PICTURE_SIDE)));
 }

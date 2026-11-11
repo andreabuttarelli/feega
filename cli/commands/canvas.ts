@@ -63,7 +63,8 @@ export async function cmdCanvasImportUrl(project: string, url: string, opts: { c
 }
 
 export async function cmdCanvasImportCode(project: string, repo: string, opts: { canvas: string; route: string[]; x: number; y: number; org?: string }) {
-  const input = { canvasId: opts.canvas, repo, routes: opts.route, x: opts.x, y: opts.y };
+  const source = repo.startsWith('/') ? { folder: repo } : { repo };
+  const input = { canvasId: opts.canvas, ...source, routes: opts.route, x: opts.x, y: opts.y };
   const result = await canvasApi.run(await token(), { project, op: 'import_code', input }, opts.org);
   console.log(JSON.stringify(result, null, 2));
 }
@@ -84,6 +85,18 @@ export async function cmdCanvasGithub(project: string, action: string, repo: str
   }
   const result = await canvasApi.run(await token(), { project, op, input: repo ? { repo } : {} }, opts.org);
   console.log(JSON.stringify(result, null, 2));
+}
+
+const CODE_SYNC_OPS: Record<string, string> = { changes: 'code_changes', publish: 'code_publish', pull: 'code_pull' };
+
+export async function cmdCanvasCodeSync(project: string, action: string, nodeId: string, opts: { branch?: string; org?: string }) {
+  const op = CODE_SYNC_OPS[action];
+  if (!op) {
+    console.error(`Unknown action ${action}: ${Object.keys(CODE_SYNC_OPS).join(', ')}`);
+    process.exit(1);
+  }
+  const result = (await canvasApi.run(await token(), { project, op, input: { nodeId, ...(opts.branch ? { branch: opts.branch } : {}) } }, opts.org)) as { patch?: string };
+  console.log(action === 'changes' && result.patch !== undefined ? result.patch : JSON.stringify(result, null, 2));
 }
 
 type FrameOpts = { canvas: string; x: number; y: number; w: number; h?: number; format?: string; org?: string };

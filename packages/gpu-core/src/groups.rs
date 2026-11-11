@@ -317,7 +317,7 @@ fn chunk_of(u: &UseItem, group: &DisplayList, at: Building, items: usize) -> Chu
     let placed = UseItem { matrix: [at.scale, 0.0, 0.0, at.scale, 0.0, 0.0], ..u.clone() };
     let all = used(&placed, group, 0);
     let whole = all.iter().any(|i| matches!(i, Item::Lens(_)));
-    let end = if whole { all.len() } else { (at.next + items).min(all.len()) };
+    let end = if whole { all.len() } else { at.next.saturating_add(items).min(all.len()) };
     let done = end == all.len();
     let base = (at.next > 0).then(|| partial(&u.group, size));
     let list = DisplayList { width: size.0, height: size.1, background: None, items: base.into_iter().chain(all[at.next..end].iter().cloned()).collect(), faces: group.faces.clone(), fragments: Default::default() };
@@ -519,7 +519,11 @@ impl Laying<'_> {
                     if !self.keeps(&items[*at], *own) {
                         continue;
                     }
-                    let kids = self.lay(inside, &g.items);
+                    let kids = match shade_reach(&g.look, *own, self.scale) {
+                        Some(0.0) => self.lay(inside, &g.items),
+                        Some(margin) => Laying { u: self.u, frame: self.frame, scale: self.scale, view: self.view.inflate(margin, margin), encoded: &mut *self.encoded }.lay(inside, &g.items),
+                        None => Laying { u: self.u, frame: self.frame, scale: self.scale, view: Rect::new(f64::MIN, f64::MIN, f64::MAX, f64::MAX), encoded: &mut *self.encoded }.lay(inside, &g.items),
+                    };
                     let look = placed_look(&g.look, self.u.matrix, self.frame, self.scale);
                     out.push(softened(Item::Group(Box::new(GroupItem { clip: g.clip.clone(), items: kids, look }))));
                 }
@@ -527,6 +531,15 @@ impl Laying<'_> {
         }
         out
     }
+}
+
+fn shade_reach(look: &Look, own: Option<Rect>, scale: f64) -> Option<f64> {
+    let feather = look.masks.iter().flatten().map(|l| l.feather).fold(0.0, f64::max);
+    let soft = (look.blur + feather) * BLUR_REACH;
+    let Some(filters) = &look.filters else { return Some(soft * scale) };
+    let reach = crate::filters::reach(filters, look.space.unwrap_or([1.0, 0.0, 0.0, 1.0]))?;
+    let side = own.map_or(0.0, |o| o.width().max(o.height()));
+    Some((soft + reach.px + side * reach.share) * scale)
 }
 
 fn laid(u: &UseItem, group: &DisplayList, cast: &Cast, view: Rect) -> (Vec<Item>, HashMap<String, Arc<Encoded>>) {
@@ -550,6 +563,12 @@ pub struct Library {
     budget: Option<u64>,
     #[cfg(not(target_arch = "wasm32"))]
     fonts: Fonts,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Sweep {
+    Evict,
+    Keep,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -791,6 +810,10 @@ impl Library {
     }
 
     pub fn plan(&mut self, list: &DisplayList, limits: Limits) -> Plan {
+        self.plan_with(list, limits, Sweep::Evict)
+    }
+
+    pub fn plan_with(&mut self, list: &DisplayList, limits: Limits, sweep: Sweep) -> Plan {
         let mut missing = Vec::new();
         let mut rasters = Vec::new();
         let mut seen = FxHashSet::default();
@@ -815,7 +838,8 @@ impl Library {
             let on_screen = at_screen.overlaps(view);
             let cast = self.encoding(&u.group);
             let Some(group) = self.groups.get(&u.group) else { continue };
-            if let Some(whole) = cast.as_deref().filter(|c| c.whole().is_some()) {
+            let moved_as_texture = u.cache && u.hold;
+            if let Some(whole) = cast.as_deref().filter(|c| c.whole().is_some() && !moved_as_texture) {
                 if on_screen {
                     let (laid, spans) = laid(u, group, whole, view);
                     items.extend(laid);
@@ -848,10 +872,11 @@ impl Library {
             }
             let shown = match held {
                 Some(h) if sharp_enough(self.motion, want, h.scale) => Some(h.scale),
-                _ if rasters.len() < limits.rasters && self.may_raster(&u.group, &first) => {
+                _ if moved_as_texture || (rasters.len() < limits.rasters && self.may_raster(&u.group, &first)) => {
                     let at = self.building.get(&u.group).copied().filter(|b| sharp_enough(self.motion, want, b.scale)).unwrap_or(Building { scale: want, next: 0 });
-                    let chunk = chunk_of(u, group, at, limits.items);
-                    let next = at.next + limits.items;
+                    let per_chunk = if moved_as_texture { usize::MAX } else { limits.items };
+                    let chunk = chunk_of(u, group, at, per_chunk);
+                    let next = at.next.saturating_add(per_chunk);
                     rasters.push(chunk.raster);
                     if chunk.done {
                         self.building.remove(&u.group);
@@ -883,8 +908,9 @@ impl Library {
                 None => self.live(u, group, cast.as_deref(), view, &mut items, &mut encoded),
             }
         }
-        let gone: Vec<String> = self.held.keys().filter(|k| !seen.contains(*k)).cloned().collect();
-        let abandoned: Vec<String> = self.building.keys().filter(|k| !seen.contains(*k)).cloned().collect();
+        let swept = |k: &String| sweep == Sweep::Evict && !seen.contains(k);
+        let gone: Vec<String> = self.held.keys().filter(|k| swept(k)).cloned().collect();
+        let abandoned: Vec<String> = self.building.keys().filter(|k| swept(k)).cloned().collect();
         for key in &gone {
             self.held.remove(key);
         }

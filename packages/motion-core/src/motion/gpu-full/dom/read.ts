@@ -18,7 +18,6 @@ import {
   isNone,
   lengthOf,
   linearGradient,
-  matrix4Of,
   mul4,
   perspectiveOf,
   projectBy,
@@ -26,6 +25,8 @@ import {
   splitTop,
   tileOf,
   translate4,
+  transform4Of,
+  transformed,
   viewOf,
   type Gradient,
   type Matrix4,
@@ -1680,7 +1681,7 @@ const PAINTERS: Record<string, Painter> = {
   text: groupPainter,
   tspan: groupPainter,
   img: layerPainter,
-  video: mediaPainter,
+  video: layerPainter,
   picture: mediaPainter,
   iframe: mediaPainter,
   object: mediaPainter,
@@ -1694,7 +1695,7 @@ const painterOf = (node: RawNode): Painter =>
 
 const layered = (node: RawNode) =>
   !STATIC.has(node.style.position ?? "") ||
-  !isNone(node.style.transform) ||
+  transformed(node.style) ||
   opacityOf(node.style) < 1;
 
 function viewportOf(
@@ -1861,12 +1862,9 @@ export function readTree(
     );
     const view = viewportOf(node, outer.viewport);
     const [x, y] = (node.at ?? [0, 0]).map((v) =>
-      isNone(node.style.transform) ? v : Math.round(v),
+      transformed(node.style) ? Math.round(v) : v,
     );
-    const own4 = matrix4Of(
-      node.style.transform,
-      node.style["transform-origin"],
-    );
+    const own4 = transform4Of(node.style, node.size);
     const local = own4 && mul4(translate4(x, y), own4);
     const chain =
       local &&

@@ -31,7 +31,7 @@ import { shapeLayers, type ShapeLook } from '../shape/render';
 import { lookAt } from '../hyperframes/shapes';
 import { modifierFilter } from '../shape/modifiers';
 import { ShapeKind, modifierOfKey, modifierValues } from '../shape/schema';
-import { flatten, rectOutline, type Outline } from '../shape/geometry';
+import { flatten, flattenPixels, rectOutline, type Outline } from '../shape/geometry';
 import { rgbaOf, type Rgba } from './rgba';
 import { FillRule, PaintKind, type Paint, type Stop } from './paint';
 import { DrawnKind, type DomRead, type Drawn } from './dom/read';
@@ -139,7 +139,7 @@ const REMAPPED: ReadonlySet<ComponentId> = new Set(['Video']);
 const DEG = Math.PI / 180;
 const CSS_TURN = 90;
 
-const flat = (outline: Outline): number[][] => outline.map((c) => flatten(c).flatMap(([x, y]) => [x, y]));
+const flat = (outline: Outline): number[][] => outline.map((c) => flattenPixels(c).flatMap(([x, y]) => [x, y]));
 
 const scaleAbout = (cx: number, cy: number, rotation: number, scale: number): Affine => {
   const c = Math.cos(rotation * DEG) * scale;
@@ -180,7 +180,7 @@ const withinOf = (align: StrokeAlign, contours: number[][]): Within | undefined 
 function strokeBands(s: Stroke, outline: Outline, unit: number): number[][] {
   const width = s.width * unit * STRETCH[s.align];
   const runs = outline.flatMap((c) => {
-    const pts = flatten(c).flatMap(([x, y]) => [x, y]);
+    const pts = flattenPixels(c).flatMap(([x, y]) => [x, y]);
     const pattern = dashOf(s);
     return pattern.length ? dashes(pts, c.closed, pattern.map((d) => d * unit)).map((d) => ({ pts: d, closed: false })) : [{ pts, closed: c.closed }];
   });
@@ -322,7 +322,7 @@ const boxed: Placement = (props, frame) => {
 
 const CONTENT_OF: Record<DrawnKind, (d: never, clip: string) => Content> = {
   [DrawnKind.Path]: (d: Extract<Drawn, { kind: DrawnKind.Path }>) => ({ ...d, kind: ItemKind.Path }),
-  [DrawnKind.Layer]: (d: Extract<Drawn, { kind: DrawnKind.Layer }>, clip) => ({ kind: ItemKind.Layer, source: `${clip}:${d.layer}`, size: { width: d.width, height: d.height }, opacity: d.opacity, matrix: d.matrix }),
+  [DrawnKind.Layer]: (d: Extract<Drawn, { kind: DrawnKind.Layer }>, clip) => ({ kind: ItemKind.Layer, source: `${clip}:${d.layer}`, size: { width: d.width, height: d.height }, opacity: d.opacity, matrix: d.matrix, ...(d.masks ? { masks: d.masks } : {}) }),
   [DrawnKind.Group]: (d: Extract<Drawn, { kind: DrawnKind.Group }>, clip) => ({ ...d, kind: ItemKind.Group, items: d.items.map((x) => contentOf(x, clip)) })
 };
 

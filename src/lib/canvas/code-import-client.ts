@@ -2,7 +2,7 @@ const UNAVAILABLE = 'unavailable';
 
 export type CodeLanded = { nodes: unknown[]; undo: unknown[]; skipped: string[]; truncated: boolean; pages: string[]; components: number; variants: number; instances: number };
 
-export type CodeTarget = { repo: string; routes: string[] } | { storybook: string };
+export type CodeTarget = { repo: string; routes: string[] } | { folder: string; routes: string[] } | { storybook: string };
 
 export type CodeAsk = { projectId: string; canvasId: string; target: CodeTarget; at: { x: number; y: number } };
 
@@ -41,3 +41,21 @@ export const githubRepos = (projectId: string, fetchFn: typeof fetch = fetch) =>
 export const githubBranches = (projectId: string, repo: string, fetchFn: typeof fetch = fetch) => asked<{ branches: string[] }>(githubPath(projectId, `/branches?repo=${encodeURIComponent(repo)}`), {}, fetchFn);
 
 export const repoLink = (fullName: string, branch: string | null) => `https://github.com/${fullName}${branch ? `/tree/${branch}` : ''}`;
+
+export type RepoChanges = { kind: 'github' | 'folder'; repo: string; sha: string; patch: string; files: string[]; skipped: string[] };
+
+export type RepoPublished = { url: string | null; branch: string | null; files: string[]; skipped: string[] };
+
+export type RepoHead = { kind: 'github' | 'folder'; sha: string | null; head: string | null };
+
+export type RepoPulled = { outcome: 'ok' | 'up_to_date'; sha: string; carried: number; conflicts: string[]; skipped: string[] };
+
+const syncPath = (projectId: string, nodeId: string, rest: string) => `/api/v1/projects/${projectId}/code-import/${nodeId}/${rest}`;
+
+export const repoChanges = (projectId: string, nodeId: string, fetchFn: typeof fetch = fetch) => asked<RepoChanges>(syncPath(projectId, nodeId, 'changes'), {}, fetchFn);
+
+export const repoPublish = (projectId: string, nodeId: string, fetchFn: typeof fetch = fetch) => asked<RepoPublished>(syncPath(projectId, nodeId, 'publish'), JSON_POST({}), fetchFn);
+
+export const repoHead = (projectId: string, nodeId: string, fetchFn: typeof fetch = fetch) => asked<RepoHead>(syncPath(projectId, nodeId, 'head'), {}, fetchFn);
+
+export const repoPull = (projectId: string, nodeId: string, branch: string, fetchFn: typeof fetch = fetch) => asked<RepoPulled>(syncPath(projectId, nodeId, 'pull'), JSON_POST(branch ? { branch } : {}), fetchFn);

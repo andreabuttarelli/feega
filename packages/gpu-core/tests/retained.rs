@@ -292,3 +292,15 @@ fn a_zoom_from_fit_to_four_hundred_percent_never_shows_the_retained_texture_stre
         assert!(shown <= std::f64::consts::SQRT_2 + 1e-9, "stretched {shown} at zoom {}", camera.zoom);
     }
 }
+
+#[test]
+fn a_picture_built_elsewhere_is_adopted_so_the_next_change_rasters_only_its_damage() {
+    let mut r = Retained::new(W, H);
+    let camera = at(10.0, 20.0, 1.0);
+
+    r.adopt(camera, 0.0);
+
+    assert!(matches!(r.step(camera, Damage::none(), 1000.0), Step::Present));
+    let damaged = r.step(camera, Damage::Rects(vec![Rect::new(0.0, 0.0, 10.0, 10.0)]), 1016.0);
+    assert_eq!(outcome(&damaged), Some(Outcome::Partial));
+}

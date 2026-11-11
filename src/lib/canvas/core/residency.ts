@@ -26,3 +26,5 @@ export function cached(frames: readonly HeldFrame[], view: Viewport, screen: Scr
 export const uncached = (frames: readonly HeldFrame[]): HeldFrame[] => frames.map((f) => ({ ...f, cache: false }));
 
 export const heldWhileEdited = (frames: readonly HeldFrame[], edited: ReadonlySet<string>): HeldFrame[] => frames.map((f) => (edited.has(f.id) ? { ...f, cache: true, hold: true } : f));
+
+export const heldWhileMoving = (frames: readonly HeldFrame[], moving: ReadonlySet<string>): HeldFrame[] => heldWhileEdited(frames, moving.size ? new Set(frames.map((f) => f.id)) : moving);

@@ -15,6 +15,12 @@ pub struct Patch {
     pub order: Option<Vec<String>>,
 }
 
+impl Patch {
+    pub fn for_tiles(self) -> Patch {
+        Patch { put: self.put.into_iter().map(|u| UseItem { cache: u.hold, ..u }).collect(), ..self }
+    }
+}
+
 pub fn parse_patch(json: &str) -> Result<Patch, serde_json::Error> {
     serde_json::from_str(json)
 }
@@ -52,15 +58,23 @@ struct Overlay {
     at: Option<UseItem>,
 }
 
+pub struct Lift {
+    pub clip: String,
+    pub rest: Rect,
+    pub by: (f64, f64),
+}
+
 pub struct World {
     uses: Vec<UseItem>,
     overlays: [Overlay; 2],
     damage: Damage,
+    scene_damage: Damage,
+    rest: std::collections::HashMap<String, (String, Affine)>,
 }
 
 impl Default for World {
     fn default() -> Self {
-        World { uses: Vec::new(), overlays: Default::default(), damage: Damage::none() }
+        World { uses: Vec::new(), overlays: Default::default(), damage: Damage::none(), scene_damage: Damage::none(), rest: Default::default() }
     }
 }
 
@@ -127,8 +141,43 @@ impl World {
     }
 
     fn mark_if_sized(&mut self, rect: Option<Rect>) {
+        self.mark_use(rect, true);
+    }
+
+    fn mark_use(&mut self, rect: Option<Rect>, in_scene: bool) {
+        let Some(r) = rect else { return };
+        self.damage.add(r);
+        if in_scene {
+            self.scene_damage.add(r);
+        }
+    }
+
+    fn shifted_from_rest(&self, u: &UseItem) -> Option<(f64, f64)> {
+        let (_, at) = self.rest.get(&u.clip)?;
+        let same_shape = at[..4] == u.matrix[..4];
+        (u.hold && same_shape && at != &u.matrix).then(|| (u.matrix[4] - at[4], u.matrix[5] - at[5]))
+    }
+
+    pub fn lifts(&self, sizes: impl Fn(&str) -> Option<(f64, f64)>) -> Vec<Lift> {
+        self.uses.iter().filter_map(|u| {
+            let by = self.shifted_from_rest(u)?;
+            let (_, at) = &self.rest[&u.clip];
+            let rest = reach(&UseItem { matrix: *at, ..u.clone() }, sizes(&u.group))?;
+            Some(Lift { clip: u.clip.clone(), rest, by })
+        }).collect()
+    }
+
+    pub fn holding(&self) -> bool {
+        self.uses.iter().any(|u| u.hold)
+    }
+
+    fn lifted(&self, u: &UseItem) -> bool {
+        u.hold && self.rest.get(&u.clip).is_none_or(|(_, matrix)| *matrix != u.matrix)
+    }
+
+    fn mark_scene(&mut self, rect: Option<Rect>) {
         if let Some(r) = rect {
-            self.damage.add(r);
+            self.scene_damage.add(r);
         }
     }
 
@@ -136,22 +185,38 @@ impl World {
         for gone in &patch.drop {
             let Some(at) = self.uses.iter().position(|u| &u.clip == gone) else { continue };
             let old = self.uses.remove(at);
-            self.mark_if_sized(reach(&old, sizes(&old.group)));
+            let was_scene = !self.lifted(&old);
+            self.rest.remove(gone);
+            self.mark_use(reach(&old, sizes(&old.group)), was_scene);
         }
         for u in patch.put {
             let fresh = reach(&u, sizes(&u.group));
-            match self.uses.iter().position(|o| o.clip == u.clip) {
-                Some(at) => {
-                    let looks_alike = self.uses[at].group == u.group && self.uses[at].matrix == u.matrix;
-                    let old = std::mem::replace(&mut self.uses[at], u);
-                    if looks_alike {
-                        continue;
-                    }
-                    self.mark_if_sized(reach(&old, sizes(&old.group)));
-                }
+            let at = self.uses.iter().position(|o| o.clip == u.clip);
+            let old = at.map(|i| self.uses[i].clone());
+            let was_scene = old.as_ref().map(|o| !self.lifted(o));
+            if !u.hold {
+                self.rest.insert(u.clip.clone(), (u.group.clone(), u.matrix));
+            }
+            let now_scene = !self.lifted(&u);
+            let moved = old.as_ref().is_some_and(|o| o.group != u.group || o.matrix != u.matrix);
+            match at {
+                Some(i) => self.uses[i] = u,
                 None => self.uses.push(u),
             }
-            self.mark_if_sized(fresh);
+            let Some((old, was_scene)) = old.zip(was_scene) else {
+                self.mark_use(fresh, now_scene);
+                continue;
+            };
+            let stale = reach(&old, sizes(&old.group));
+            if moved {
+                self.damage.join(Damage::Rects(stale.into_iter().chain(fresh).collect()));
+            }
+            if was_scene && (moved || !now_scene) {
+                self.mark_scene(stale);
+            }
+            if now_scene && (moved || !was_scene) {
+                self.mark_scene(fresh);
+            }
         }
         if let Some(order) = patch.order {
             let rank = |clip: &str| order.iter().position(|c| c == clip).unwrap_or(usize::MAX);
@@ -204,6 +269,27 @@ impl World {
 
     pub fn take_damage(&mut self) -> Damage {
         std::mem::replace(&mut self.damage, Damage::none())
+    }
+
+    pub fn take_scene_damage(&mut self) -> Damage {
+        std::mem::replace(&mut self.scene_damage, Damage::none())
+    }
+
+    pub fn scene(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
+        let uses = self.uses.iter().filter(|u| !self.lifted(u)).map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), cache: false, hold: false, ..u.clone() }));
+        DisplayList { width, height, background: None, items: uses.collect(), faces: Vec::new(), fragments: Default::default() }
+    }
+
+    pub fn overlay(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
+        let held = self.uses.iter().filter(|u| self.lifted(u) && self.shifted_from_rest(u).is_none()).map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
+        let items = held.chain(OVERLAY_PARTS.iter().flat_map(|p| {
+            let part = &self.overlays[p.index()];
+            match &part.at {
+                Some(at) => vec![Item::Use(UseItem { matrix: times(camera, at.matrix), ..at.clone() })],
+                None => part.items.iter().map(|i| through(i, camera)).collect(),
+            }
+        }));
+        DisplayList { width, height, background: None, items: items.collect(), faces: Vec::new(), fragments: Default::default() }
     }
 
     pub fn screen(&self, camera: Affine, width: u32, height: u32) -> DisplayList {

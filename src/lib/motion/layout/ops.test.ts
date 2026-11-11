@@ -388,6 +388,10 @@ describe('a stack child as a flex item', () => {
     expect(Number(clip(hugAgain, 'box').props.height) * stacked.height).toBeCloseTo(600, 5);
   });
 
+  it('lays a doc out once for every field the inspector reads from it', () => {
+    expect(laidClip(stacked, 'a')).toBe(laidClip(stacked, 'a'));
+  });
+
   it('steps earlier and later among its siblings, never past the ends', () => {
     const later = must(stepInStack(stacked, 'a', 1));
     expect(clip(later, 'box').autoLayout?.order).toEqual(['b', 'a']);

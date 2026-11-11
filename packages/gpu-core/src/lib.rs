@@ -2,6 +2,7 @@ pub mod canvas;
 pub mod colour;
 pub mod compositor;
 pub mod display_list;
+pub mod packed;
 pub mod engine;
 pub mod filter_passes;
 #[cfg(not(target_arch = "wasm32"))]
@@ -25,11 +26,13 @@ pub mod retained;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod render;
 pub mod scene;
+pub mod tally;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod stroke;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod text;
 pub mod texture_budget;
+pub mod tiles;
 pub mod turbulence;
 #[cfg(target_arch = "wasm32")]
 pub mod web;

@@ -7,6 +7,7 @@ type Env = Record<string, string | undefined>;
 type Resolve = (event: RequestEvent, opts?: ResolveOptions) => Response | Promise<Response>;
 
 export const LOCAL_FILE_ENV = 'FEEGA_LOCAL_FILE';
+export const LOCAL_LATENCY_ENV = 'FEEGA_LOCAL_LATENCY_MS';
 export const LOCAL_TOKEN = 'local';
 export const LOCAL_AI_MESSAGE = 'AI generation runs on feega cloud. Import this .feega file at feega.app to generate.';
 
@@ -29,7 +30,7 @@ const ROUTES: { route: LocalRoute; matches: (path: string, canvas: string) => bo
   { route: LocalRoute.Canvas, matches: (path, canvas) => path === canvas || path.startsWith(`${canvas}/`) },
   { route: LocalRoute.Api, matches: (path) => path.startsWith('/api/v1/') },
   { route: LocalRoute.Local, matches: (path) => path.startsWith('/local/') },
-  { route: LocalRoute.Runtime, matches: (path) => ['/motion-runtime', '/motion-libs', '/motion-env', '/render', '/embed.js'].some((p) => path === p || path.startsWith(`${p}/`)) },
+  { route: LocalRoute.Runtime, matches: (path) => ['/motion-runtime', '/motion-libs', '/motion-env', '/render', '/embed.js', '/motion-player.js'].some((p) => path === p || path.startsWith(`${p}/`)) },
   { route: LocalRoute.Home, matches: (path) => path === '/' || path.startsWith('/p/') || path.startsWith('/app') || path === '/login' }
 ];
 
@@ -93,7 +94,7 @@ export function localStore(env: Env = process.env): FeegaStore | null {
   if (refusal) {
     throw new Error(refusal);
   }
-  const opened = openFeegaStore(path, { origin: env.PUBLIC_APP_URL ?? 'http://localhost:5173' });
+  const opened = openFeegaStore(path, { origin: env.PUBLIC_APP_URL ?? 'http://localhost:5173', latencyMs: Number(env[LOCAL_LATENCY_ENV] ?? 0) });
   process.once('exit', () => opened.flushNow());
   store = opened;
   if (hasAiKey(env)) {

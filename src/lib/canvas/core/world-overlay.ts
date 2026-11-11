@@ -2,7 +2,7 @@ import { mul2d } from '@feega/motion-core/motion/affine';
 import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import type { Box, Curve } from '$lib/canvas/gpu/geometry';
 import type { SnapGuide } from '$lib/canvas/snap';
-import { EdgeLook, edgeItems, ghostItems, guideItems, hoverItems, marqueeItems, runningItems, peerItems, type CorePeer, type CoreTheme } from './overlay';
+import { EdgeLook, edgeItems, ghostItems, guideItems, marqueeItems, runningItems, peerItems, type CorePeer, type CoreTheme } from './overlay';
 import { ports, stateChrome, tileChrome, type Glyphs, type StateTile } from './chrome';
 import { turned, type Turn } from './screen-uses';
 import { line, rect, solid } from './shapes';
@@ -15,7 +15,7 @@ export type PeerOutline = { key: string; box: Box; color: string };
 
 export type Wire = { id: string; source: string; target: string; mode?: string };
 
-export type WorldOverlay = { curves: readonly { edge: Wire; curve: Curve }[]; selected: readonly string[]; selectedEdge: string | null; marquee: Box | null; guides: readonly SnapGuide[]; zoom: number; theme: CoreTheme; glyphs: Glyphs; peers: readonly CorePeer[]; outlines: readonly PeerOutline[]; ghost: { curve: Curve; ok: boolean } | null; hovered: Box | null; running: readonly (Box & { id: string })[]; chrome: readonly ChromeOnCanvas[] };
+export type WorldOverlay = { curves: readonly { edge: Wire; curve: Curve }[]; selected: readonly string[]; selectedEdge: string | null; marquee: Box | null; guides: readonly SnapGuide[]; zoom: number; theme: CoreTheme; glyphs: Glyphs; peers: readonly CorePeer[]; outlines: readonly PeerOutline[]; ghost: { curve: Curve; ok: boolean } | null; running: readonly (Box & { id: string })[]; chrome: readonly ChromeOnCanvas[] };
 
 export enum ChromeLayers {
   State = 'state',
@@ -90,7 +90,6 @@ export function overlayOf(o: WorldOverlay): CoreOverlay {
 function liveItems(o: WorldOverlay): PathItem[] {
   return [
     ...o.running.flatMap((b) => runningItems(b, o.zoom, o.theme)),
-    ...(o.hovered ? hoverItems(o.hovered, o.zoom, o.theme) : []),
     ...(o.marquee ? marqueeItems(o.marquee, o.zoom, o.theme) : []),
     ...guideItems(o.guides, o.zoom, o.theme),
     ...o.outlines.map((p) => solid(`${p.key}:${PEER_OUTLINE}`, line(rect(p.box.x, p.box.y, p.box.w, p.box.h), PEER_OUTLINE_PX / o.zoom, true), p.color)),

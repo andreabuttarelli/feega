@@ -6,6 +6,8 @@ export type Size = { w: number; h: number };
 
 const UNIT: Size = { w: 1, h: 1 };
 const CURVE_SAMPLES = 16;
+const FLATNESS_PX = 0.03;
+const WANG = 0.75;
 const KAPPA = 0.5522847498;
 const DIGITS = 10000;
 const PATH_CHARS = /^[\sMmLlHhVvCcSsQqTtAaZz0-9eE.,+-]*$/;
@@ -33,7 +35,16 @@ export function segmentsOf(contour: Contour): [Vertex, Vertex][] {
 
 const straight = ([a, b]: [Vertex, Vertex]) => same(a.out, a.p) && same(b.in, b.p);
 
-export function flatten(contour: Contour): Pt[] {
+function samplesOf(a: Pt, b: Pt, c: Pt, d: Pt): number {
+  const bend = Math.max(distance(add(a, c), times(b, 2)), distance(add(b, d), times(c, 2)));
+  return Math.min(CURVE_SAMPLES, Math.max(1, Math.ceil(Math.sqrt((WANG * bend) / FLATNESS_PX))));
+}
+
+export const flatten = (contour: Contour): Pt[] => flattenWith(contour, () => CURVE_SAMPLES);
+
+export const flattenPixels = (contour: Contour): Pt[] => flattenWith(contour, samplesOf);
+
+function flattenWith(contour: Contour, sampling: (a: Pt, b: Pt, c: Pt, d: Pt) => number): Pt[] {
   const points: Pt[] = [];
   for (const segment of segmentsOf(contour)) {
     const [a, b] = segment;
@@ -41,8 +52,9 @@ export function flatten(contour: Contour): Pt[] {
       points.push(a.p);
       continue;
     }
-    for (let i = 0; i < CURVE_SAMPLES; i++) {
-      points.push(cubicAt(a.p, a.out, b.in, b.p, i / CURVE_SAMPLES));
+    const samples = sampling(a.p, a.out, b.in, b.p);
+    for (let i = 0; i < samples; i++) {
+      points.push(cubicAt(a.p, a.out, b.in, b.p, i / samples));
     }
   }
   const last = contour.vertices[contour.vertices.length - 1];

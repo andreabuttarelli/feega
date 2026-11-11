@@ -1,11 +1,12 @@
 <script lang="ts">
+  import { addTally } from '$lib/canvas/gpu/frame-stats';
   import { sharedFrames } from '$lib/motion/gpu/shared-frames';
   import { drawFrame, prepare, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
   import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
   import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
   import { CoreMotion, createCore, createCoreGl, dropCore, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
   import { createCoreNative, nativeCanvasOffered } from '@feega/motion-core/motion/gpu-full/core-native';
-  import { createMedia, VideoPreload, videoUses } from '@feega/motion-core/motion/gpu-full/media';
+  import { createMedia, Readiness, VideoPreload, videoUses } from '@feega/motion-core/motion/gpu-full/media';
   import { createRamPreview, type FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { Outcome } from '@feega/motion-core/motion/gpu-full/core-outcome';
@@ -14,34 +15,50 @@
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
   import { PART_ITEMS, parts } from '$lib/canvas/core/group-parts';
   import { spliceOf } from '@feega/motion-core/canvas/core/group-diff';
-  import { cached, uncached, pictureBytes, resident, heldWhileEdited, type HeldFrame } from '$lib/canvas/core/residency';
+  import { storedTiles, tilesOn } from '$lib/canvas/core/tiles-switch';
+  import { cached, uncached, pictureBytes, resident, heldWhileMoving, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, currentDevice, textureBudget } from '$lib/canvas/gpu/memory-budget';
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { SentParts, SentUses } from '$lib/canvas/core/use-diff';
   import { NO_OVERLAY, type CoreOverlay } from '$lib/canvas/core/world-overlay';
-  import { drawsAny, frameOfLive, logGaps, onStage, sameLive, shownGroup, stagedBox, toFetch, untilFound, type FrameAt } from '$lib/canvas/core/frame-source';
+  import { drawsAny, frameOfLive, logGaps, onStage, sameLive, shownGroup, stagedBox, toFetch, toWarm, untilFound, frameSourceUrl, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
-  import { postersFor } from '$lib/canvas/core/frame-poster';
+  import { postersFor, showsPoster } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
+  import { grabThumb, posterBlob, posterSize, thumbClip, thumbList, thumbRect, thumbSize, thumbStore, thumbsDue } from '$lib/canvas/core/frame-thumbs';
   import { listed } from '$lib/canvas/core/frame-lists';
   import { frameBuilder, type FrameDoc } from '$lib/canvas/core/frame-build';
+  import { liveGenerations } from '$lib/canvas/core/live-generations';
   import { frameSources } from '$lib/canvas/core/frame-sources';
+  import { tieredAssets } from '$lib/canvas/core/tiered-assets';
+  import { Reach, assetTier, keptTier, reachOf } from '$lib/canvas/core/asset-tier';
+  import type { AssetSize } from '$lib/canvas/asset-url';
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
+  import { debugActive, debugStart, gestureLog, renderLog, tierLog } from '$lib/canvas/core/debug-log';
   import { readClips, type CustomFrame } from '@feega/motion-core/motion/gpu-full/dom/custom';
-  import type { Pictures } from '@feega/motion-core/motion/gpu-full/raster';
-  import { Stand, drawable, fillOrder, firstDrawn, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
+  import type { Picture, Pictures } from '@feega/motion-core/motion/gpu-full/raster';
+  import { Stand, drawable, fillOrder, firstDrawn, layersOf, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Device } from '$lib/canvas/gpu/memory-budget';
+  import { OnScreen, VectorGate, showStaged, shownBefore } from '$lib/canvas/core/staged-show';
+  import { uploadWithin } from '$lib/canvas/core/picture-uploads';
+  import { Step, markFrame, noteImages } from '$lib/canvas/core/frame-timeline';
+  import { StartupStep, markStartup, reportFramesShown } from '$lib/canvas/core/startup-marks';
+  import LoadTimeline from './LoadTimeline.svelte';
   import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
-  import { withoutViews } from '$lib/canvas/breakpoint-views';
+  import { baseNodeId, withoutViews } from '$lib/canvas/breakpoint-views';
   import { loadOnce, withScenes, type LoadScene } from '$lib/canvas/scene-sources';
   import { describe, factsOf, signatureOf, undrawn, type NodeFacts } from '$lib/canvas/core/core-debug';
   import { Motion, hudLine, watchCrashes } from '$lib/canvas/gpu/crash-watch';
+  import { liftOut, liftedPut, movingGroup, restGroup, type Lift, type Lifted } from '$lib/canvas/core/lifted-drag';
   import { AttachStep, afterAttachFailure, backendAfterLoss, isTrap } from '$lib/canvas/gpu/gpu-loss';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
 
-  let { frames, edited = new Set(), order = [], live = new Map(), known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onsource = () => {}, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onfallback: (why: string) => void } = $props();
+  let { frames, edited = new Set(), order = [], live = new Map(), known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, lift = null, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, place = null, sourceUrl, onready, onsource = () => {}, onthumb = () => {}, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; lift?: Lift | null; look?: Look; view: Viewport; area: { width: number; height: number }; place?: { projectId: string; canvasId: string; orgId?: string } | null; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onthumb?: (id: string, revision: number, blob: Blob, size: { width: number; height: number }) => void; onfallback: (why: string) => void } = $props();
+
+  markStartup(StartupStep.Mounted);
+  debugStart();
 
   const IN_FLIGHT: Record<Device, number> = { [Device.Desktop]: 6, [Device.Phone]: 3 };
   const BACKENDS = nativeCanvasOffered() ? [createCoreNative, createCore, createCoreGl] : [createCore, createCoreGl];
@@ -59,7 +76,14 @@
   const putting = new Map<string, { parts: DisplayList[]; next: number }>();
   const media = createMedia({ videoPreload: VideoPreload.Metadata, frames: sharedFrames() });
   const widened = (v: Viewport, a: { width: number; height: number }) => ({ view: { x: v.x + a.width * AHEAD_REACH, y: v.y + a.height * AHEAD_REACH, zoom: v.zoom }, area: { width: a.width * (1 + 2 * AHEAD_REACH), height: a.height * (1 + 2 * AHEAD_REACH) } });
-  const keyOf = (f: FrameAt) => `${f.id}:${f.revision}${f.linked ? `:${f.linked}` : ''}${f.scenes ? `:${f.scenes}` : ''}`;
+  const tier = $derived(assetTier(view.zoom));
+  $effect(() => tierLog(tier, view.zoom));
+  const imaged = new Set<string>();
+  const baseKey = (f: FrameAt) => `${f.id}:${f.revision}${f.linked ? `:${f.linked}` : ''}${f.scenes ? `:${f.scenes}` : ''}`;
+  const tieredKey = (f: FrameAt, at: AssetSize) => (imaged.has(f.id) ? `${baseKey(f)}:${at}` : baseKey(f));
+  const bestTier = new Map<string, AssetSize>();
+  const tierOf = (f: FrameAt) => keptTier(tier, bestTier.get(f.id), reachOf(f.box, view, area));
+  const keyOf = (f: FrameAt) => tieredKey(f, tierOf(f));
   const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, budget.resolution);
   const crashes = watchCrashes({ device: currentDevice(), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, resolution });
   const RASTERED = new Set<Outcome>([Outcome.Full, Outcome.Partial]);
@@ -70,7 +94,13 @@
   const domRead = readPool({ lanes: READ_LANES, timeoutMs: READ_TIMEOUT_MS });
   const fromView = (f: FrameAt) => () => Math.hypot(view.x + (f.box.x + f.box.w / 2) * view.zoom - area.width / 2, view.y + (f.box.y + f.box.h / 2) * view.zoom - area.height / 2);
   const customPictures = new Map<string, CustomFrame['picture']>();
-  const pictures: Pictures = (item) => [...customPictures.values()].reduce<ReturnType<Pictures>>((found, of) => found ?? of(item), null) ?? media.pictures(item);
+  const thumbs = thumbStore();
+  const thumbPictures = new Map<string, Picture>();
+  const thumbAsked = new Set<string>();
+  const thumbTaken = new Set<string>();
+  const THUMB = ':thumb';
+  const VECTORS = ':vectors';
+  const pictures: Pictures = (item) => thumbPictures.get(item.clip) ?? [...customPictures.values()].reduce<ReturnType<Pictures>>((found, of) => found ?? of(item), null) ?? media.pictures(item);
 
   async function readDom(f: FrameAt, source: FrameDoc, prepared: Prepared, frame: number): Promise<CustomFrame | null> {
     const host = readsHost;
@@ -87,7 +117,9 @@
   }
 
   const smoothing = smoothingOf(navigator.userAgent);
-  const buildAway = frameBuilder(() => (typeof Worker === 'function' ? new Worker(new URL('../../../canvas/core/frame-build.worker.ts', import.meta.url), { type: 'module' }) : null));
+  const BUILD_LANES_MAX = 4;
+  const buildLanes = Math.max(1, Math.min(BUILD_LANES_MAX, (typeof navigator === 'object' ? navigator.hardwareConcurrency : 2) - 1));
+  const buildAway = frameBuilder(() => (typeof Worker === 'function' ? (markStartup(StartupStep.WorkerSpawned), new Worker(new URL('../../../canvas/core/frame-build.worker.ts', import.meta.url), { type: 'module' })) : null), buildLanes);
 
   async function fetchScene(id: string): Promise<FrameDoc | null> {
     const res = await fetch(new URL(sourceUrl(id), location.href).href);
@@ -105,12 +137,16 @@
     };
 
   async function buildSource(f: FrameAt, given: FrameDoc): Promise<{ list: DisplayList; custom: CustomFrame | null }> {
+    markFrame(f.id, Step.MainAsked);
     const source = await withScenes(given, sceneSource(f.scenes ?? ''));
     const fonts = await loadFonts(source.doc, source.assets, source.tokens);
     const prepared = prepare(source.doc, source.tokens, source.assets, { fonts, smoothing });
     const still = frameOfLive(source);
     const custom = await readDom(f, source, prepared, still).catch((e: unknown) => (console.warn('[canvas] core DOM read failed', f.id, e), null));
-    return { list: drawFrame(prepared, still, custom?.reads), custom };
+    markFrame(f.id, Step.MainBuild);
+    const list = drawFrame(prepared, still, custom?.reads);
+    markFrame(f.id, Step.MainBuilt);
+    return { list, custom };
   }
 
   const RUNS_EVERY = 5;
@@ -128,14 +164,26 @@
     onRuns(ram.runs(range));
   }
 
-  async function fetchAndBuild(f: FrameAt) {
-    const source = await frameSources(`${sourceUrl(f.id)}?${new URLSearchParams({ revision: String(f.revision), ...(f.linked ? { linked: f.linked } : {}) })}`);
-    if (!source) {
+  const sourceOf = (f: FrameAt) => frameSourceUrl(sourceUrl, f, place?.orgId);
+
+  async function fetchAndBuild(f: FrameAt, at: AssetSize) {
+    const fetched = await frameSources(sourceOf(f));
+    if (!fetched) {
       return null;
     }
+    markFrame(f.id, Step.Source);
+    const source = place ? tieredAssets(fetched, place, at) : fetched;
+    if (source !== fetched && !imaged.has(f.id)) {
+      imaged.add(f.id);
+      asked.add(tieredKey(f, at));
+    }
 
+    return { ...(await builtOff(f, source)), source };
+  }
+
+  async function builtOff(f: FrameAt, source: FrameDoc): Promise<{ list: DisplayList; custom: CustomFrame | null }> {
     const away = f.scenes ? null : await buildAway(source, smoothing).catch(() => null);
-    return { ...(away ? { list: away, custom: null } : await buildSource(f, source)), source };
+    return away ? { list: away, custom: null } : buildSource(f, source);
   }
 
   const HTTP_NO_CONTENT = 204;
@@ -155,42 +203,175 @@
   }
 
   async function load(f: FrameAt) {
-    const given = known(f) ?? (loaded.has(f.id) ? await awaitKnown(f) : null);
-    const read = given ? null : await untilFound(() => fetchAndBuild(f), UNSAVED_SOURCE);
+    const at = tierOf(f);
+    markFrame(f.id, Step.Asked);
+    const given = known(f) ?? (loaded.get(f.id)?.endsWith(THUMB) === false ? await awaitKnown(f) : null);
+    const read = given ? null : await untilFound(() => fetchAndBuild(f, at), UNSAVED_SOURCE);
     const built = given ? await buildSource(f, given) : read;
     if (!built) {
       return;
     }
+    markFrame(f.id, Step.Built);
+    markStartup(StartupStep.FirstBuilt);
     if (read) {
       onsource(f.id, { ...read.source, revision: f.revision });
     }
-    const ready = await media.ready(built.list);
+    const key = tieredKey(f, at);
+    const held = shownBefore({ thumb: thumbShown.has(f.id), drawn: presented.has(f.id) });
     if (built.custom) {
-      customPictures.set(keyOf(f), built.custom.picture);
+      customPictures.set(key, built.custom.picture);
     }
     logGaps(f.id, built.list);
-    loaded.set(f.id, keyOf(f));
-    lists = listed(lists, f.id, keyOf(f), onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), drawnLast.get(f.id)?.group]);
+    asking.set(f.id, key);
+
+    noteImages(f.id, built.list);
+    const present = (ready: Readiness) => {
+      if (asking.get(f.id) !== key) {
+        return;
+      }
+      if (ready === Readiness.Whole) {
+        bestTier.set(f.id, keptTier(at, bestTier.get(f.id), Reach.Near));
+      }
+      const group = ready === Readiness.Whole || held === OnScreen.Thumb ? key : `${key}${VECTORS}`;
+      const shown = loaded.get(f.id);
+      loaded.set(f.id, group);
+      markFrame(f.id, ready === Readiness.Whole ? Step.Whole : Step.Vectors);
+      lists = listed(lists, f.id, group, onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), shown, drawnLast.get(f.id)?.group]);
+    };
+    void showStaged(media.ready(built.list), held, (ready) => (ready === Readiness.Whole ? vectorsFirst.after(() => present(ready)) : present(ready)));
   }
+
+  const thumbLists = new Map<string, DisplayList>();
+  let thumbShown = $state(new Map<string, HeldFrame>());
+  const presented = new Set<string>();
+
+  async function showThumb(f: FrameAt) {
+    const key = baseKey(f);
+    const blob = await thumbs.get(key);
+    if (!blob || presented.has(f.id) || liveGroup.has(f.id)) {
+      return;
+    }
+    const bitmap = await createImageBitmap(blob).catch(() => null);
+    if (!bitmap || presented.has(f.id) || liveGroup.has(f.id)) {
+      return;
+    }
+    thumbPictures.set(thumbClip(key), { source: bitmap, size: { width: bitmap.width, height: bitmap.height } });
+    const group = `${key}${THUMB}`;
+    markFrame(group, Step.Thumb);
+    thumbTaken.add(key);
+    thumbLists.set(group, thumbList(key, { width: f.box.w, height: f.box.h }));
+    thumbShown = new Map(thumbShown).set(f.id, { id: f.id, group, box: f.box, size: { width: f.box.w, height: f.box.h }, bytes: 0, ...(f.turn ? { turn: f.turn } : {}) });
+  }
+
+  type PosterJob = { id: string; key: string; group: string; box: FrameAt['box']; revision: number; saved: boolean };
+  const posterQueue: PosterJob[] = [];
+  let posterRunning = false;
+
+  function keepThumb(f: PosterJob, blob: Blob, size: { width: number; height: number }) {
+    thumbs.put(f.key, blob);
+    if (f.saved) {
+      onthumb(f.id, f.revision, blob, size);
+    }
+  }
+
+  function nextPoster() {
+    const into = raster;
+    const f = posterQueue[0];
+    if (!into?.poster || !f) {
+      posterRunning = false;
+      return;
+    }
+    if (gesture.active()) {
+      idle(nextPoster);
+      return;
+    }
+    posterQueue.shift();
+    const size = posterSize(f.box);
+    void into
+      .poster(f.group, size, size.scale)
+      .then(posterBlob)
+      .then((blob) => blob && keepThumb(f, blob, size))
+      .catch((e: unknown) => console.warn('[canvas] poster not drawn', f.id, e))
+      .finally(() => idle(nextPoster));
+  }
+
+  function startPosters() {
+    if (posterRunning || !posterQueue.length) {
+      return;
+    }
+    posterRunning = true;
+    idle(nextPoster);
+  }
+
+  function takeThumbs(into: HTMLCanvasElement | null, shown: readonly HeldFrame[]) {
+    if (!into) {
+      return;
+    }
+    const drawn = frames.map((f) => ({ id: f.id, key: baseKey(f), group: groupOf(f), box: f.box, revision: f.revision, saved: !liveGroup.has(f.id) }));
+    const offscreen = raster?.poster;
+    for (const f of thumbsDue(shown, drawn, thumbTaken)) {
+      if (offscreen) {
+        thumbTaken.add(f.key);
+        posterQueue.push(f);
+        startPosters();
+        continue;
+      }
+      const rect = thumbRect(f.box, view, area, resolution);
+      if (!rect) {
+        continue;
+      }
+      thumbTaken.add(f.key);
+      void grabThumb(into, rect).then((blob) => {
+        if (!blob) {
+          return;
+        }
+        thumbs.put(f.key, blob);
+        if (f.saved) {
+          onthumb(f.id, f.revision, blob, thumbSize(rect));
+        }
+      });
+    }
+  }
+
+  $effect(() => {
+    for (const f of fillOrder(frames, view, area)) {
+      if (!thumbAsked.has(baseKey(f))) {
+        thumbAsked.add(baseKey(f));
+        void showThumb(f);
+      }
+    }
+  });
 
   let liveGroup = $state(new Map<string, string>());
   const liveBuilt = new Map<string, LiveDoc>();
   const liveStamp = new Map<string, string | undefined>();
-  const liveGeneration = new Map<string, number>();
+  const liveGeneration = liveGenerations();
   const liveAtRevision = new Map<string, number>();
   const groupOf = (f: FrameAt) => liveGroup.get(f.id) ?? keyOf(f);
   const loaded = new Map<string, string>();
+  const asking = new Map<string, string>();
+  const VECTORS_FIRST_MAX_MS = 8000;
+  const vectorsFirst = new VectorGate();
+  let lastShown = '';
+  function reportShownOnce(shown: number, total: number) {
+    const key = `${shown}/${total}`;
+    if (key === lastShown) {
+      return;
+    }
+    lastShown = key;
+    reportFramesShown(shown, total);
+  }
+  setTimeout(() => vectorsFirst.settle([]), VECTORS_FIRST_MAX_MS);
   const shownOf = (f: FrameAt) => shownGroup(groupOf(f), loaded.get(f.id), (g) => lists.has(g));
 
   async function rebuildLive(f: FrameAt, source: LiveDoc) {
-    const generation = (liveGeneration.get(f.id) ?? 0) + 1;
-    liveGeneration.set(f.id, generation);
-    const built = await buildSource(f, { revision: f.revision, ...source }).catch((e: unknown) => (console.warn('[canvas] core live frame failed', f.id, e), null));
-    if (!built || liveGeneration.get(f.id) !== generation) {
+    const generation = liveGeneration.ask(f.id);
+    const built = await builtOff(f, { revision: f.revision, ...source }).catch((e: unknown) => (console.warn('[canvas] core live frame failed', f.id, e), null));
+    if (!built || !liveGeneration.newer(f.id, generation)) {
       return;
     }
     const ready = await media.ready(built.list);
-    if (liveGeneration.get(f.id) !== generation) {
+    if (!liveGeneration.land(f.id, generation)) {
       return;
     }
     const key = `${f.id}:live${generation}`;
@@ -203,6 +384,9 @@
   $effect(() => {
     for (const f of frames) {
       const source = live.get(f.id);
+      if (lift && !lift.landing && lift.id === baseNodeId(f.id)) {
+        continue;
+      }
       if (source && (!sameLive(liveBuilt.get(f.id), source) || liveStamp.get(f.id) !== f.scenes)) {
         liveBuilt.set(f.id, source);
         liveStamp.set(f.id, f.scenes);
@@ -225,11 +409,17 @@
   let settledFrames = $state(new Set<string>());
 
   $effect(() => {
+    frameSources.warm(toWarm(withoutViews(frames), view, area, keyOf, asked, liveGroup).filter((f) => !known(f)).map(sourceOf));
+  });
+
+  $effect(() => {
+    const waiting = toFetch(fillOrder(withoutViews(frames), view, area), keyOf, asked, liveGroup);
+
     const room = IN_FLIGHT[currentDevice()] - inFlight;
     if (room <= 0) {
       return;
     }
-    const next = toFetch(fillOrder(withoutViews(frames), view, area), keyOf, asked, liveGroup).slice(0, room);
+    const next = waiting.slice(0, room);
     for (const f of next) {
       asked.add(keyOf(f));
       inFlight++;
@@ -314,8 +504,8 @@
     return [...placeholders.values()].map((p) => {
       const before = holding.has(p.id) ? drawnLast.get(p.id) : undefined;
       const turned = p.turn ? { turn: p.turn } : {};
-      const layers = [ready.get(p.id), before && before.group !== ready.get(p.id)?.group && { ...before, box: bledBox(p.box, before.group), ...turned }, blocksById.get(p.id), { id: p.id, group: p.group, box: p.box, size: { width: p.box.w, height: p.box.h }, bytes: 0, ...turned }];
-      return layers.filter((l): l is HeldFrame => l != null);
+      const head = ready.get(p.id);
+      return layersOf<HeldFrame>({ ready: head && lists.has(head.group) ? head : null, poster: head && !lists.has(head.group) ? head : null, before: before && { ...before, box: bledBox(p.box, before.group), ...turned }, thumb: thumbShown.get(p.id), blocks: blocksById.get(p.id), placeholder: { id: p.id, group: p.group, box: p.box, size: { width: p.box.w, height: p.box.h }, bytes: 0, ...turned } });
     });
   });
   const held = $derived(chains.map((c) => c[0]));
@@ -324,7 +514,7 @@
     const near = standIndex.visible(view, area);
     return chains.filter((c) => near.has(c[0].id)).map((c) => c[c.length - 1]);
   };
-  const listOf = (group: string) => cardLists.get(group) ?? lists.get(group) ?? cardBlocks.get(group)?.list ?? [...placeholders.values()].find((p) => p.group === group)!.list;
+  const listOf = (group: string) => cardLists.get(group) ?? lists.get(group) ?? thumbLists.get(group) ?? cardBlocks.get(group)?.list ?? [...placeholders.values()].find((p) => p.group === group)!.list;
 
   const waiting = $derived.by(() => {
     const ready = new Set(real.map((f) => f.id));
@@ -345,6 +535,7 @@
     let gone = false;
     let made: CoreRaster | null = null;
     const tried = backend;
+    markStartup(StartupStep.GpuAsked);
     void BACKENDS[tried](target, width, height, budget.pictureSide).then(
       (r) => {
         made = r;
@@ -358,7 +549,10 @@
         sent = new SentUses();
         sentOverlay = new SentParts();
         r.setBudget?.(textureBudget(budget.textureBytes, { width, height }));
+        r.setTileBudget?.(budget.tileBytes);
+        r.setTiles?.(TILED);
         raster = r;
+        markStartup(StartupStep.GpuReady);
       },
       (e: unknown) => {
         if (gone) {
@@ -390,13 +584,65 @@
   let cacheBytes = $state(0);
   const IDLE_MS = 50;
   const PICTURES_PER_FRAME = 4;
+  const UPLOAD_BUDGET_MS = 8;
+  const PUT_BUDGET_MS = 8;
   const ITEMS_PER_FRAME = 2 * PART_ITEMS;
   let sent = new SentUses();
   let sentOverlay = new SentParts();
   const painted: Record<Outcome, number> = { [Outcome.Idle]: 0, [Outcome.Reused]: 0, [Outcome.Partial]: 0, [Outcome.Full]: 0 };
   let paintedLabel = $state('');
 
-  const listIfKnown = (group: string) => cardLists.get(group) ?? lists.get(group) ?? cardBlocks.get(group)?.list;
+  let lifting: { key: number; group: string; lifted: Lifted | null } | null = null;
+  const liftLists = new Map<string, DisplayList>();
+
+  function dropLift(into: CoreRaster) {
+    for (const group of liftLists.keys()) {
+      into.dropGroup(group);
+      put.delete(group);
+      pictured.delete(group);
+    }
+    liftLists.clear();
+    lifting = null;
+  }
+
+  function startLift(into: CoreRaster, now: Lift, group: string): Lifted | null {
+    const list = listIfKnown(group);
+    const lifted = list && put.has(group) ? liftOut(list, now.clips) : null;
+    const [rest, moving] = [restGroup(group), movingGroup(group)];
+    const patched = lifted !== null && into.patchGroup(group, rest, lifted.splice, pictures);
+    lifting = { key: now.key, group, lifted: patched ? lifted : null };
+    if (!patched) {
+      return null;
+    }
+    into.putGroup(moving, lifted.moving, pictures);
+    liftLists.set(rest, lifted.rest).set(moving, lifted.moving);
+    for (const g of [rest, moving]) {
+      put.add(g);
+      pictured.add(g);
+    }
+    return lifted;
+  }
+
+  const liftHeld = (drawn: HeldFrame[]): ReadonlySet<string> => (liftLists.size && lift ? new Set([...edited, ...drawn.filter((l) => liftLists.has(l.group)).map((l) => l.id)]) : edited);
+
+  function withLift(into: CoreRaster, shown: HeldFrame[]): HeldFrame[] {
+    const at = lift ? shown.findIndex((l) => l.id === lift.id) : -1;
+    const layer = shown[at];
+    const stale = lifting && (!lift || lift.key !== lifting.key || layer?.group !== lifting.group);
+    if (stale) {
+      dropLift(into);
+    }
+    if (!lift || !layer || (lift.landing && !lifting)) {
+      return shown;
+    }
+    const lifted = lifting ? lifting.lifted : startLift(into, lift, layer.group);
+    if (!lifted) {
+      return shown;
+    }
+    return [...shown.slice(0, at), { ...layer, group: restGroup(layer.group) }, liftedPut(layer, movingGroup(layer.group), lift.by), ...shown.slice(at + 1)];
+  }
+
+  const listIfKnown = (group: string) => liftLists.get(group) ?? cardLists.get(group) ?? lists.get(group) ?? thumbLists.get(group) ?? cardBlocks.get(group)?.list;
 
   function patchedFromSent(into: CoreRaster, group: string): number {
     const layers = chains.flat();
@@ -408,6 +654,7 @@
       return 0;
     }
     put.add(group);
+    markFrame(group, Step.Patched);
     return splice.items.length + 1;
   }
 
@@ -430,10 +677,13 @@
     }
     putting.delete(group);
     put.add(group);
+    markFrame(group, Step.Put);
     return part.items.length + 1;
   }
 
   const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.search).has('coreDebug');
+  const TIMELINE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('loadTimeline');
+  const TILED = typeof location !== 'undefined' && tilesOn(location.search, storedTiles());
   const MAX_LISTED = 12;
   const OVERSCAN_SHARE = 8;
   const OVERSCAN_MAX = 128;
@@ -565,30 +815,36 @@
     }
   }
 
+  let sharpMarked = false;
+
   function paintOn(into: CoreRaster): boolean {
     const tails = nearTails();
-    const keep = new Set([...whole, ...chains.flat(), ...tails].map((f) => f.group));
+    const keep = new Set([...whole, ...chains.flat(), ...tails].map((f) => f.group).concat([...liftLists.keys()]));
     for (const group of [...put, ...putting.keys()].filter((g) => !keep.has(g))) {
       into.dropGroup(group);
       put.delete(group);
       putting.delete(group);
       pictured.delete(group);
     }
-    for (const f of tails) {
+    const stopgaps = chains.flatMap((c) => (pictured.has(c[0].group) ? [] : c.filter((l) => thumbLists.has(l.group))));
+    for (const f of [...tails, ...stopgaps]) {
       while (!put.has(f.group)) {
         putPart(into, f.group);
       }
     }
     let room = gesture.active() ? 0 : ITEMS_PER_FRAME;
-    for (const f of held) {
-      while (room > 0 && !put.has(f.group)) {
+    const putUntil = performance.now() + PUT_BUDGET_MS;
+    const roomLeft = () => room > 0 || (!gesture.active() && performance.now() < putUntil);
+    for (const f of onScreenFirst(held, view, area)) {
+      while (roomLeft() && !put.has(f.group)) {
         room -= putPart(into, f.group);
       }
     }
-    for (const f of [...tails, ...held].filter((f) => put.has(f.group) && !pictured.has(f.group)).slice(0, PICTURES_PER_FRAME)) {
-      if (into.upload(listOf(f.group), pictures, 1)) {
-        pictured.add(f.group);
-      }
+    const unpictured = [...new Set([...tails, ...stopgaps, ...onScreenFirst(held, view, area)].filter((f) => put.has(f.group) && !pictured.has(f.group)).map((f) => f.group))];
+    const quietUploads = !gesture.active();
+    for (const group of uploadWithin(quietUploads ? unpictured : unpictured.slice(0, PICTURES_PER_FRAME), (g) => into.upload(listOf(g), pictures, 1), () => performance.now(), quietUploads ? UPLOAD_BUDGET_MS : 0)) {
+      pictured.add(group);
+      markFrame(group, Step.Pictured);
     }
     const shown = chains.flatMap((c) => {
       const layer = firstDrawn(c, pictured);
@@ -596,13 +852,29 @@
     });
     for (const layer of shown) {
       if (!layer.group.startsWith('placeholder') && !layer.group.endsWith(BLOCKS)) {
+        if (lists.has(layer.group) || thumbLists.has(layer.group) || (posterIds.has(layer.id) && showsPoster(listOf(layer.group)))) {
+          vectorsFirst.presented(layer.id);
+        }
+        if (lists.has(layer.group)) {
+          presented.add(layer.id);
+        }
+        if (lists.has(layer.group) && thumbShown.has(layer.id)) {
+          const next = new Map(thumbShown);
+          next.delete(layer.id);
+          thumbShown = next;
+        }
+        if (drawnLast.get(layer.id)?.group !== layer.group) {
+          markFrame(layer.group, Step.Drawn);
+          markStartup(StartupStep.FirstDrawn);
+        }
         drawnLast.set(layer.id, layer);
       }
     }
+    const drawn = withLift(into, shown);
     const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
     const device = { width: area.width * resolution, height: area.height * resolution };
     const wide = widened(at, device);
-    const patch = sent.patch(worldUses(heldWhileEdited(zooming.active() ? cached(shown, wide.view, wide.area, textureBytes) : uncached(shown), edited)));
+    const patch = sent.patch(worldUses(heldWhileMoving(zooming.active() || edited.size ? cached(drawn, wide.view, wide.area, textureBytes) : uncached(drawn), liftHeld(drawn))));
     if (patch) {
       into.patchUses(patch);
     }
@@ -613,15 +885,34 @@
     into.setMotion?.(gesture.active() ? CoreMotion.Gesture : CoreMotion.Still);
     into.setCamera(at.x, at.y, at.zoom);
     const { outcome, pending, skipped } = into.frame(performance.now());
+    if (!pending && !gesture.active()) {
+      takeThumbs(canvas, shown);
+    }
+    const onScreenIds = fillOrder(frames, view, area).map((f) => f.id);
+    if (frames.length) {
+      reportShownOnce(vectorsFirst.shownOf(onScreenIds), onScreenIds.length);
+    }
+    if (frames.length && vectorsFirst.settle(onScreenIds)) {
+      markFrame('all', Step.AllVectors);
+    }
+    if (!pending && !sharpMarked && held.length && held.every((f) => pictured.has(f.group) && lists.has(f.group) && !f.group.startsWith('placeholder') && !f.group.endsWith(THUMB) && !f.group.endsWith(VECTORS))) {
+      sharpMarked = true;
+      markFrame('all', Step.Sharp);
+    }
     painted[outcome]++;
     paintedLabel = `${painted[Outcome.Reused]},${painted[Outcome.Partial]},${painted[Outcome.Full]}`;
     cacheBytes = into.cacheBytes();
+    const tally = into.renderTally?.() ?? '{}';
+    addTally(tally);
+    if (debugActive()) {
+      renderLog({ at: performance.now(), outcome, tally, cacheBytes, pending, moving: gesture.active() });
+    }
     crashes.tick({ x: view.x, y: view.y, zoom: view.zoom, now: performance.now(), motion: gesture.active() ? Motion.Moving : Motion.Still, rastered: RASTERED.has(outcome) }, { cacheBytes, pictureBytes: into.pictureBytes(), scratchBytes: into.scratchBytes?.() ?? 0, wasmBytes: into.wasmBytes?.() ?? 0, width: canvas?.width ?? 0, height: canvas?.height ?? 0 });
     if (DEBUG) {
       (window as Window & { __gpuMem?: object }).__gpuMem = { ...crashes.sample, put: put.size, pictured: pictured.size };
       debugFrame(outcome, skipped, shown);
     }
-    return pending || zooming.active() || (!quiet && sentOverlay.waiting(overlay)) || held.some((f) => !pictured.has(f.group));
+    return pending || (into.warming?.() ?? false) || zooming.active() || (!quiet && sentOverlay.waiting(overlay)) || held.some((f) => !pictured.has(f.group));
   }
 
   let ahead = false;
@@ -634,6 +925,7 @@
     const now = `${view.x},${view.y},${view.zoom}`;
     if (lastView && now !== lastView) {
       gesture.moved();
+      gestureLog(view.zoom !== lastZoom ? 'zoom' : 'pan');
     }
     if (lastZoom && view.zoom !== lastZoom) {
       zooming.moved();
@@ -668,7 +960,7 @@
   const pacer = new FramePacer(paint, (frame) => requestAnimationFrame(frame), () => raster?.busy?.() ?? false);
 
   $effect(() => {
-    void [raster, held, edited, overlay, view.x, view.y, view.zoom, area.width, area.height];
+    void [raster, held, edited, overlay, lift, view.x, view.y, view.zoom, area.width, area.height];
     pacer.invalidate();
   });
 
@@ -679,6 +971,9 @@
 
 {#if DEBUG}
   <pre class="core-hud">{hud}</pre>
+{/if}
+{#if TIMELINE}
+  <LoadTimeline />
 {/if}
 <div class="core-reads" bind:this={readsHost} aria-hidden="true"></div>
 {#if !raster?.behindPage}

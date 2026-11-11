@@ -38,4 +38,25 @@ describe('readTree', () => {
     expect(contours.length).toBeGreaterThan(0);
     expect(contours.flat().every(Number.isFinite)).toBe(true);
   });
+
+  it('a video a component draws itself paints its current frame, like a picture', () => {
+    const tree = { width: 100, height: 60, defs: {}, nodes: [node({ size: [100, 60] }), node({ parent: 0, tag: 'video', size: [100, 60], layer: 0 })] };
+
+    const drawn = JSON.stringify(readTree(tree, { fonts: () => ({ face: SQUARE, skew: 0 }), smoothing: Smoothing.Plain }).drawn);
+
+    expect(drawn).toContain(`"kind":"${DrawnKind.Layer}"`);
+  });
+
+  it('the translate, rotate and scale properties move an element like transform does', () => {
+    const box = (style: Record<string, string>) => {
+      const tree = { width: 200, height: 200, defs: {}, nodes: [node({ size: [200, 200] }), node({ parent: 0, size: [100, 40], style: { 'background-color': 'rgb(255, 0, 0)', 'transform-origin': '0px 0px', ...style } })] };
+      const drawn = readTree(tree, { fonts: () => ({ face: SQUARE, skew: 0 }), smoothing: Smoothing.Plain }).drawn;
+      return drawn[drawn.length - 1].matrix.map((v) => Math.round(v * 100) / 100);
+    };
+
+    expect(box({ scale: '2' })).toEqual([2, 0, 0, 2, 0, 0]);
+    expect(box({ translate: '-50% 10px' })).toEqual([1, 0, 0, 1, -50, 10]);
+    expect(box({ rotate: '90deg' })).toEqual([0, 1, -1, 0, 0, 0]);
+    expect(box({ translate: '10px 0px', scale: '2', transform: 'matrix(1, 0, 0, 1, 5, 0)' })).toEqual([2, 0, 0, 2, 20, 0]);
+  });
 });

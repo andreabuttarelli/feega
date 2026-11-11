@@ -3,6 +3,10 @@ import { LANDING_PAGES } from './landing';
 import { UPSCALER } from './landing/upscaler';
 import { LEGAL_DOCS } from './legal';
 import { BLOG_INDEX, COMPARISONS } from './compare';
+import { GUIDES, GUIDES_INDEX } from './guides';
+import { competitorFaq } from './compare/faq';
+import { AI_CRAWLERS } from './crawlers';
+import { GET as robots } from '../../routes/robots.txt/+server';
 import { FAQ } from './home';
 import { HOME_META } from './seo';
 import { breadcrumbJsonLd, faqJsonLd, HOME_JSON_LD } from './structured-data';
@@ -18,6 +22,8 @@ const metas = [
   ...Object.entries(LANDING_PAGES),
   ...Object.entries(LEGAL_DOCS),
   ['blog', BLOG_INDEX],
+  ['guides', GUIDES_INDEX],
+  ...Object.entries(GUIDES),
   ...Object.entries(COMPARISONS)
 ] as const;
 
@@ -74,5 +80,44 @@ describe('llms.txt', () => {
   it('the full file repeats the FAQ answers', () => {
     expect(llmsFullTxt()).toContain(FAQ[0].q);
     expect(llmsFullTxt()).not.toMatch(/<a |<\/a>/);
+  });
+});
+
+const wordCount = (text: string) => text.trim().split(/\s+/).length;
+
+describe('answer-first pages', () => {
+  it.each(Object.entries(GUIDES))('%s answers in 40 to 60 words', (_, g) => {
+    expect(wordCount(g.answer)).toBeGreaterThanOrEqual(40);
+    expect(wordCount(g.answer)).toBeLessThanOrEqual(60);
+  });
+
+  it.each(Object.entries(GUIDES))('%s has a FAQ', (_, g) => {
+    expect(g.faq.length).toBeGreaterThan(0);
+  });
+
+  it.each(Object.entries(COMPARISONS))('%s opens with a 40 to 70 word answer and a FAQ', (_, c) => {
+    expect(wordCount(c.intro)).toBeGreaterThanOrEqual(40);
+    expect(wordCount(c.intro)).toBeLessThanOrEqual(70);
+    expect(competitorFaq(c).length).toBeGreaterThan(0);
+  });
+
+  it('llms-full lists only MCP tools the server defines', () => {
+    expect(llmsFullTxt()).toContain('claude mcp add --transport http feega');
+  });
+});
+
+describe('robots.txt', () => {
+  it('allows the AI crawlers by name', async () => {
+    const body = await robots().text();
+    for (const bot of ['GPTBot', 'ClaudeBot', 'PerplexityBot', 'Google-Extended']) {
+      expect(AI_CRAWLERS).toContain(bot);
+      expect(body).toContain(`User-agent: ${bot}\nAllow: /`);
+    }
+  });
+});
+
+describe('organization markup', () => {
+  it('links the organization to its profiles', () => {
+    expect(HOME_JSON_LD).toContain('"sameAs":["https://github.com/andreabuttarelli/feega"');
   });
 });

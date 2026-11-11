@@ -7,6 +7,7 @@ import { SectionRole } from './card';
 import { ComponentKind, FORMATS_OF_MODE, POSTER_FORMATS, byShape, catalogue, libraryFormat, componentKind, matching, metaLine, posterShelf, previewOf, rolesIn, starterDoc, starterFormatOf, STARTER_FORMATS } from './catalogue';
 import { DocMode } from '@feega/motion-core/motion/still';
 import PREVIEWED from './previews.json';
+import { addedOn } from './added';
 
 const entry = (id: string) => {
   const found = builtinTemplate(id);
@@ -24,13 +25,12 @@ describe('the component library lists whatever is registered', () => {
     expect(items.find((i) => i.id === PROMPT_TEMPLATE_ID)?.kind).toBe(ComponentKind.Component);
   });
 
-  it('leads with components, then media layouts, then scenes', () => {
-    const kinds = catalogue(BUILTIN_TEMPLATES).map((i) => i.kind);
-    const firstOf = (k: ComponentKind) => kinds.indexOf(k);
-    const lastOf = (k: ComponentKind) => kinds.lastIndexOf(k);
+  it('within one day, leads with components, then media layouts, then scenes', () => {
+    const order = Object.values(ComponentKind);
+    const items = catalogue(BUILTIN_TEMPLATES);
+    const regressions = items.filter((item, n) => n > 0 && addedOn(items[n - 1].id) === addedOn(item.id) && order.indexOf(items[n - 1].kind) > order.indexOf(item.kind));
 
-    expect(lastOf(ComponentKind.Component)).toBeLessThan(firstOf(ComponentKind.Layout));
-    expect(lastOf(ComponentKind.Layout)).toBeLessThan(firstOf(ComponentKind.Scene));
+    expect(regressions).toEqual([]);
   });
 
   it('sorts a custom component, a media layout and a plain scene into their kinds', () => {
@@ -50,14 +50,12 @@ describe('the component library lists whatever is registered', () => {
 });
 
 describe('the posters row', () => {
-  it('holds only stills, each with its picture, ordered by name', () => {
+  it('holds only stills, each with its picture', () => {
     const items = catalogue(BUILTIN_TEMPLATES);
     const shelf = posterShelf(items);
-    const names = shelf.map((i) => i.name);
 
     expect(shelf.length).toBe(items.filter((i) => i.mode === DocMode.Still).length);
     expect(shelf.every((i) => i.mode === DocMode.Still && i.preview?.poster.endsWith('.jpg'))).toBe(true);
-    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
     expect(shelf.map((i) => i.id)).toEqual(expect.arrayContaining(['builtin:poster-iso-blocks', 'builtin:poster-photo-grid', 'builtin:poster-white-shapes', 'builtin:poster-vertical-type']));
   });
 
@@ -75,6 +73,34 @@ describe('previews are stored files, never rendered per view', () => {
     });
 
     expect(missing).toEqual([]);
+  });
+
+  it('every built-in template has a preview', () => {
+    const bare = BUILTIN_TEMPLATES.filter((e) => !previewOf(e.id)).map((e) => e.id);
+
+    expect(bare).toEqual([]);
+  });
+});
+
+describe('the newest templates lead every catalogue', () => {
+  it('every built-in template has an added date', () => {
+    const undated = BUILTIN_TEMPLATES.filter((e) => !addedOn(e.id)).map((e) => e.id);
+
+    expect(undated).toEqual([]);
+  });
+
+  it('lists snapcn first, then older ones by date', () => {
+    const items = catalogue(BUILTIN_TEMPLATES);
+    const dates = items.map((i) => addedOn(i.id));
+
+    expect(dates).toEqual([...dates].sort((a, b) => b.localeCompare(a)));
+    expect(items[0].id.startsWith('builtin:snapcn-')).toBe(true);
+  });
+
+  it('puts the newest poster first on the poster shelf', () => {
+    const dates = posterShelf(catalogue(BUILTIN_TEMPLATES)).map((i) => addedOn(i.id));
+
+    expect(dates).toEqual([...dates].sort((a, b) => b.localeCompare(a)));
   });
 });
 

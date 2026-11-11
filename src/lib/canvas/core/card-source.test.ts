@@ -4,6 +4,8 @@ import { SELECT_BLUE } from '$lib/canvas/highlight';
 import { CHROME_REACH, CardLayer, cardKey, cardOnCanvas, cardsOnCanvas, portMarks, ringColour, type CardTile } from './card-source';
 import { PortState, type Glyphs } from './chrome';
 import type { CoreTheme } from './overlay';
+import type { CardIcons } from './card-kit';
+import type { GenTileView } from '$lib/canvas/gen-tile-view';
 
 const theme: CoreTheme = { paper: '#ffffff', panel: '#ffffff', paper2: '#f9f9f9', line: '#e5e5e5', line2: '#d2d2d7', chip: '#f2f2f2', chipInk: '#141414', ink: '#1d1d1f', inkSoft: '#6e6e73', accent: '#7c5cff', wire: '#b3b3b6', iterate: '#d97706' };
 const glyphs: Glyphs = (text, size) => ({ contours: [[0, 0, text.length * size, 0, text.length * size, size, 0, size]], width: text.length * size, height: size });
@@ -129,5 +131,71 @@ describe('cards while another node is dragged', () => {
   it('a card whose look changed is drawn again', () => {
     const cards = cardsOnCanvas(theme, glyphs);
     expect(cards({ ...tile, label: 'Other' }).list).not.toBe(cards(tile).list);
+  });
+});
+
+describe('cards while the camera zooms', () => {
+  const icons: CardIcons = { references: [[0, 0, 14, 0, 14, 14]], credit: [], chevron: [], voicePlay: [], head: new Map(), badge: new Map(), layers: [], play: [], person: [], ui: { open: [], left: [], right: [], help: [], plus: [], image: [], camera: [] } };
+  const gen: GenTileView = { medium: 'image', state: 'empty', hasBody: true, hint: '', placeholder: 'Describe', prompt: 'a red fox in the snow at dusk', output: null, error: null, warn: null, run: { label: 'Generate', credits: '~0.04', variable: false, enabled: true }, loop: null, runs: 1, shown: 0, form: [] };
+  const faces = [
+    tile,
+    { ...tile, id: 'g', face: faceOf({ id: 'g', kind: 'image' }, { prompt: 'a red fox', refId: 'a' }, (id) => id, null, gen) },
+    { ...tile, id: 'v', face: faceOf({ id: 'v', kind: 'video' }, { prompt: 'waves' }, (id) => id, null, { ...gen, medium: 'video', state: 'running' }) }
+  ];
+  const ZOOM_STEPS = [1, 0.84, 0.5, 0.21, 0.05];
+
+  it('a zoom step lays out the label again, never the card body', () => {
+    const bodyText = 'fox';
+    let bodyShaped = 0;
+    const counting: Glyphs = (text, size) => (text.includes(bodyText) && bodyShaped++, glyphs(text, size));
+    const cards = cardsOnCanvas(theme, counting, counting, icons);
+    cards({ ...faces[1], zoom: 1 });
+    const once = bodyShaped;
+
+    for (const zoom of ZOOM_STEPS) {
+      cards({ ...faces[1], zoom });
+    }
+
+    expect(once).toBeGreaterThan(0);
+    expect(bodyShaped).toBe(once);
+  });
+
+  it('zoom steps within one octave keep the card body and ports, laying out only the label', () => {
+    const cards = cardsOnCanvas(theme, glyphs, glyphs, icons);
+    const near = cards({ ...faces[1], zoom: 0.84 }).list.items;
+    const nearer = cards({ ...faces[1], zoom: 0.71 }).list.items;
+    const kept = near.filter((i) => !['label', 'icon', 'tag'].includes(i.clip.split(':')[1]));
+
+    expect(kept.length).toBeGreaterThan(0);
+    kept.forEach((item, i) => expect(nearer[i]).toBe(item));
+  });
+
+  it('a zoom step seen before reuses the body it moved there', () => {
+    const cards = cardsOnCanvas(theme, glyphs, glyphs, icons);
+    const first = cards({ ...faces[1], zoom: 0.21 }).list.items[0];
+    cards({ ...faces[1], zoom: 1 });
+
+    expect(cards({ ...faces[1], zoom: 0.21 }).list.items[0]).toBe(first);
+  });
+
+  it('a face that flips to another asset tier and back reuses the body moved before', () => {
+    const near = { ...tile, id: 'm', face: faceOf({ id: 'm', kind: 'image' }, { assetId: 'a' }, (id) => `${id}?w=1024`), zoom: 0.84 };
+    const far = { ...near, face: faceOf({ id: 'm', kind: 'image' }, { assetId: 'a' }, (id) => `${id}?w=256`) };
+    const cards = cardsOnCanvas(theme, glyphs, glyphs, icons);
+    const first = cards(near).list.items[0];
+    cards(far);
+
+    expect(cards(near).list.items[0]).toBe(first);
+  });
+
+  it('a card drawn at one zoom step and reused at another matches one drawn fresh there', () => {
+    for (const layer of [CardLayer.Whole, CardLayer.Face]) {
+      const cards = cardsOnCanvas(theme, glyphs, glyphs, icons);
+      for (const face of faces) {
+        for (const zoom of ZOOM_STEPS) {
+          expect(cards({ ...face, zoom }, layer)).toEqual(cardOnCanvas({ ...face, zoom }, theme, glyphs, glyphs, icons, layer));
+        }
+      }
+    }
   });
 });

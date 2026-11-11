@@ -7,8 +7,9 @@ use web_sys::{HtmlCanvasElement, HtmlImageElement, HtmlVideoElement, ImageBitmap
 
 use crate::canvas::{brush, Canvas};
 use crate::compositor::{Compositor, Painter};
-use crate::display_list::{parse, parse_splice, DisplayList, Paint, Rgba, Size};
+use crate::display_list::{parse, parse_packed, parse_splice, DisplayList, Paint, Rgba, Size};
 use crate::groups::{report, Library, Limits, Plan};
+use crate::tally::Reason;
 use crate::gl_passes::{texture, GlRunner, Tex};
 use crate::gl_reproject::{held, smooth, GlReprojector, Held, Target};
 use crate::retained::{Camera, Lookup, Quality};
@@ -67,6 +68,10 @@ impl Canvas for GlCanvas {
     }
 }
 
+fn utf8(bytes: &[u8]) -> Result<&str, JsValue> {
+    std::str::from_utf8(bytes).map_err(failed)
+}
+
 fn failed<E: std::fmt::Debug>(e: E) -> JsValue {
     JsValue::from_str(&format!("{e:?}"))
 }
@@ -103,7 +108,7 @@ impl Surface for GlSurface<'_> {
         Rect::new(0.0, 0.0, self.width as f64, self.height as f64)
     }
 
-    fn paint(&mut self, region: Rect, base: Option<Rgba>, draw: &dyn Fn(&mut GlCanvas)) -> Result<Tex, JsValue> {
+    fn paint(&mut self, _reason: crate::tally::Reason, region: Rect, base: Option<Rgba>, draw: &dyn Fn(&mut GlCanvas)) -> Result<Tex, JsValue> {
         self.render(base, Affine::translate((-region.x0, -region.y0)), draw)?;
         let (w, h) = (region.width() as u32, region.height() as u32);
         let gl = self.renderer.gl_context().clone();
@@ -273,22 +278,35 @@ impl WebGlCore {
         self.renderer.gl_context().is_context_lost()
     }
 
-    pub fn put_group(&mut self, key: &str, list_json: &str) -> Result<(), JsValue> {
+    pub fn put_group(&mut self, key: &str, list_json: &[u8]) -> Result<(), JsValue> {
         self.compositor.touch(key, &self.library);
-        self.library.put_group(key, &parse(list_json).map_err(failed)?);
-        self.compositor.touch(key, &self.library);
-        Ok(())
-    }
-
-    pub fn append_group(&mut self, key: &str, list_json: &str) -> Result<(), JsValue> {
-        self.library.append_group(key, &parse(list_json).map_err(failed)?);
+        self.library.put_group(key, &parse(utf8(list_json)?).map_err(failed)?);
         self.compositor.touch(key, &self.library);
         Ok(())
     }
 
-    pub fn patch_group(&mut self, from: &str, to: &str, splice_json: &str) -> Result<bool, JsValue> {
+    pub fn append_group(&mut self, key: &str, list_json: &[u8]) -> Result<(), JsValue> {
+        self.library.append_group(key, &parse(utf8(list_json)?).map_err(failed)?);
+        self.compositor.touch(key, &self.library);
+        Ok(())
+    }
+
+    pub fn put_group_packed(&mut self, key: &str, list_json: &[u8], floats: Vec<f64>, ends: Vec<u32>) -> Result<(), JsValue> {
+        self.compositor.touch(key, &self.library);
+        self.library.put_group(key, &parse_packed(utf8(list_json)?, floats, ends).map_err(failed)?);
+        self.compositor.touch(key, &self.library);
+        Ok(())
+    }
+
+    pub fn append_group_packed(&mut self, key: &str, list_json: &[u8], floats: Vec<f64>, ends: Vec<u32>) -> Result<(), JsValue> {
+        self.library.append_group(key, &parse_packed(utf8(list_json)?, floats, ends).map_err(failed)?);
+        self.compositor.touch(key, &self.library);
+        Ok(())
+    }
+
+    pub fn patch_group(&mut self, from: &str, to: &str, splice_json: &[u8]) -> Result<bool, JsValue> {
         self.compositor.touch(to, &self.library);
-        let patched = self.library.patch_group(from, to, &parse_splice(splice_json).map_err(failed)?);
+        let patched = self.library.patch_group(from, to, &parse_splice(utf8(splice_json)?).map_err(failed)?);
         self.compositor.touch(to, &self.library);
         Ok(patched)
     }
@@ -302,18 +320,18 @@ impl WebGlCore {
         self.camera = Camera { x, y, zoom };
     }
 
-    pub fn patch_uses(&mut self, patch_json: &str) -> Result<(), JsValue> {
-        self.compositor.patch(parse_patch(patch_json).map_err(failed)?, &self.library);
+    pub fn patch_uses(&mut self, patch_json: &[u8]) -> Result<(), JsValue> {
+        self.compositor.patch(parse_patch(utf8(patch_json)?).map_err(failed)?, &self.library);
         Ok(())
     }
 
-    pub fn set_overlay(&mut self, items_json: &str) -> Result<(), JsValue> {
-        self.compositor.set_overlay(OverlayPart::Fixed, parse_overlay(items_json).map_err(failed)?, &mut self.library);
+    pub fn set_overlay(&mut self, items_json: &[u8]) -> Result<(), JsValue> {
+        self.compositor.set_overlay(OverlayPart::Fixed, parse_overlay(utf8(items_json)?).map_err(failed)?, &mut self.library);
         Ok(())
     }
 
-    pub fn set_live_overlay(&mut self, items_json: &str) -> Result<(), JsValue> {
-        self.compositor.set_overlay(OverlayPart::Live, parse_overlay(items_json).map_err(failed)?, &mut self.library);
+    pub fn set_live_overlay(&mut self, items_json: &[u8]) -> Result<(), JsValue> {
+        self.compositor.set_overlay(OverlayPart::Live, parse_overlay(utf8(items_json)?).map_err(failed)?, &mut self.library);
         Ok(())
     }
 
@@ -347,7 +365,7 @@ impl WebGlCore {
         let layers = prepare(&mut surface, list, &pictures, Blending::Composited)?;
         let skipped = std::cell::RefCell::new(Vec::new());
         let region = Rect::new(0.0, 0.0, list.width as f64, list.height as f64);
-        let tex = surface.paint(region, list.background, &|c| skipped.borrow_mut().extend(build_into(c, list, &pictures, &layers)))?;
+        let tex = surface.paint(Reason::Screen, region, list.background, &|c| skipped.borrow_mut().extend(build_into(c, list, &pictures, &layers)))?;
         for id in std::mem::take(&mut surface.placed) {
             surface.renderer.destroy_image(surface.resources, id);
         }
@@ -372,8 +390,8 @@ impl WebGlCore {
         Ok((plan.screen, skipped))
     }
 
-    pub fn draw(&mut self, list_json: &str) -> Result<String, JsValue> {
-        let plan = self.library.plan(&parse(list_json).map_err(failed)?, self.limits());
+    pub fn draw(&mut self, list_json: &[u8]) -> Result<String, JsValue> {
+        let plan = self.library.plan(&parse(utf8(list_json)?).map_err(failed)?, self.limits());
         self.pending = plan.pending;
         let (list, missing) = self.hold(plan)?;
         let pictures: Shelf<GlPicture> = self.pictures.iter().chain(&self.cached).map(|(k, v)| (k.clone(), *v)).collect();

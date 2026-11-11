@@ -22,6 +22,13 @@ export const baseNodeId = (id: string) => viewOf(id)?.nodeId ?? id;
 
 export const withoutViews = <T extends { id: string }>(frames: readonly T[]): T[] => frames.filter((f) => !viewOf(f.id));
 
+const resolved = new WeakMap<MotionDoc, Map<string, MotionDoc>>();
+
+function resolvedOnce(doc: MotionDoc, breakpointId: string): MotionDoc {
+  const byView = resolved.get(doc) ?? resolved.set(doc, new Map()).get(doc)!;
+  return byView.get(breakpointId) ?? byView.set(breakpointId, resolveView(doc, breakpointId)).get(breakpointId)!;
+}
+
 function viewsOfFrame(frame: FrameAt, doc: MotionDoc): BreakpointView[] {
   const scale = frame.box.w / doc.width;
   let x = frame.box.x + frame.box.w + VIEW_GAP;
@@ -29,7 +36,7 @@ function viewsOfFrame(frame: FrameAt, doc: MotionDoc): BreakpointView[] {
   return viewsOf(doc)
     .slice(1)
     .map((bp) => {
-      const view = resolveView(doc, bp.id);
+      const view = resolvedOnce(doc, bp.id);
       const box = { x, y: frame.box.y, w: bp.width * scale, h: view.height * scale };
       x += box.w + VIEW_GAP;
       return { frame: { id: viewId(frame.id, bp.id), kind: frame.kind, revision: frame.revision, box }, nodeId: frame.id, breakpointId: bp.id, name: bp.name, width: bp.width, doc: view };

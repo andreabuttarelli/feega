@@ -323,3 +323,60 @@ fn a_full_render_cheap_to_encode_but_slow_on_the_gpu_is_only_reprojected_while_z
     assert_eq!(frame.outcome, Some(Outcome::Reused));
     assert_eq!(fake.painted.len(), 1);
 }
+
+#[test]
+fn a_tile_plan_of_a_group_still_building_its_cache_damages_no_tile() {
+    let mut library = Library::new();
+    library.put_group("g", &parse(&busy_group()).unwrap());
+    let mut c = Compositor::new(800, 600);
+    c.patch(parse_patch(r#"{ "put": [{ "kind": "use", "clip": "a", "group": "g", "matrix": [1, 0, 0, 1, 0, 0], "cache": true }], "drop": [] }"#).unwrap(), &library);
+    c.take_damage();
+
+    let limits = Limits { side: 4096, rasters: 1, items: 1 };
+    for _ in 0..3 {
+        c.plan_at(&mut library, Camera { x: 0.0, y: 0.0, zoom: 1.0 }, (256, 256), limits);
+    }
+
+    assert_eq!(c.take_damage(), gpu_core::retained::Damage::none());
+}
+
+#[test]
+fn a_dragged_frame_stirs_the_screen_so_the_rest_picture_waits_though_no_tile_changes() {
+    let mut library = Library::new();
+    library.put_group("g", &parse(&busy_group()).unwrap());
+    let mut c = Compositor::new(800, 600);
+    let at = |x: f64, hold: bool| parse_patch(&format!(r#"{{ "put": [{{ "kind": "use", "clip": "a", "group": "g", "matrix": [1, 0, 0, 1, {x}, 0], "cache": {hold}, "hold": {hold} }}], "drop": [] }}"#)).unwrap();
+    c.patch(at(0.0, false), &library);
+    c.patch(at(50.0, true), &library);
+    c.stirred();
+    c.take_damage();
+
+    c.patch(at(90.0, true), &library);
+
+    assert!(c.stirred());
+    assert_eq!(c.take_damage(), gpu_core::retained::Damage::none());
+    assert!(!c.stirred());
+}
+
+#[test]
+fn warming_tiles_leaves_the_edit_for_the_exact_screen_to_repaint() {
+    let (mut c, mut lib) = scene();
+    let mut fake = Fake::default();
+    c.frame(&mut fake, &mut lib, at(0.0, 0.0, 1.0), 0.0, &mut || 0.0).unwrap();
+
+    c.patch(parse_patch(r#"{ "put": [{ "kind": "use", "clip": "a", "group": "g", "matrix": [1, 0, 0, 1, 10, 0] }], "drop": [] }"#).unwrap(), &lib);
+    assert_ne!(c.take_tile_damage(), gpu_core::retained::Damage::none());
+    let frame = c.frame(&mut fake, &mut lib, at(0.0, 0.0, 1.0), 16.0, &mut || 0.0).unwrap();
+
+    assert_eq!(frame.outcome, Some(Outcome::Partial));
+}
+
+#[test]
+fn a_frame_held_in_place_for_an_edit_counts_as_held() {
+    let (mut c, lib) = scene();
+    assert!(!c.holding());
+
+    c.patch(parse_patch(r#"{ "put": [{ "kind": "use", "clip": "a", "group": "g", "matrix": [1, 0, 0, 1, 0, 0], "cache": true, "hold": true }], "drop": [] }"#).unwrap(), &lib);
+
+    assert!(c.holding());
+}

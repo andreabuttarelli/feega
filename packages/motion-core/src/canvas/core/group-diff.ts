@@ -1,5 +1,5 @@
 import type { DisplayList } from '../../motion/gpu-full/display-list';
-import { itemWire, type Splice } from '../../motion/gpu-full/wire';
+import { itemKey, type Splice } from '../../motion/gpu-full/wire';
 
 type Hashed = { frame: string; items: string[] };
 
@@ -14,7 +14,7 @@ function hashOf(list: DisplayList): Hashed {
   if (known) {
     return known;
   }
-  const made = { frame: `${list.width}|${list.height}|${list.background?.join(',') ?? ''}|${facesWire(list.faces)}`, items: list.items.map(itemWire) };
+  const made = { frame: `${list.width}|${list.height}|${list.background?.join(',') ?? ''}|${facesWire(list.faces)}`, items: list.items.map(itemKey) };
   hashed.set(list, made);
   return made;
 }

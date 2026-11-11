@@ -25,14 +25,34 @@ export class WebCore {
     }
     /**
      * @param {string} key
-     * @param {string} list_json
+     * @param {Uint8Array} list_json
      */
     append_group(key, list_json) {
         const ptr0 = passStringToWasm0(key, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passStringToWasm0(list_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const ptr1 = passArray8ToWasm0(list_json, wasm.__wbindgen_malloc);
         const len1 = WASM_VECTOR_LEN;
         const ret = wasm.webcore_append_group(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * @param {string} key
+     * @param {Uint8Array} list_json
+     * @param {Float64Array} floats
+     * @param {Uint32Array} ends
+     */
+    append_group_packed(key, list_json, floats, ends) {
+        const ptr0 = passStringToWasm0(key, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArray8ToWasm0(list_json, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passArrayF64ToWasm0(floats, wasm.__wbindgen_malloc);
+        const len2 = WASM_VECTOR_LEN;
+        const ptr3 = passArray32ToWasm0(ends, wasm.__wbindgen_malloc);
+        const len3 = WASM_VECTOR_LEN;
+        const ret = wasm.webcore_append_group_packed(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3);
         if (ret[1]) {
             throw takeFromExternrefTable0(ret[0]);
         }
@@ -69,14 +89,14 @@ export class WebCore {
         return ret !== 0;
     }
     /**
-     * @param {string} list_json
+     * @param {Uint8Array} list_json
      * @returns {string}
      */
     draw(list_json) {
         let deferred3_0;
         let deferred3_1;
         try {
-            const ptr0 = passStringToWasm0(list_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const ptr0 = passArray8ToWasm0(list_json, wasm.__wbindgen_malloc);
             const len0 = WASM_VECTOR_LEN;
             const ret = wasm.webcore_draw(this.__wbg_ptr, ptr0, len0);
             var ptr2 = ret[0];
@@ -140,7 +160,7 @@ export class WebCore {
     /**
      * @param {string} from
      * @param {string} to
-     * @param {string} splice_json
+     * @param {Uint8Array} splice_json
      * @returns {boolean}
      */
     patch_group(from, to, splice_json) {
@@ -148,7 +168,7 @@ export class WebCore {
         const len0 = WASM_VECTOR_LEN;
         const ptr1 = passStringToWasm0(to, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len1 = WASM_VECTOR_LEN;
-        const ptr2 = passStringToWasm0(splice_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const ptr2 = passArray8ToWasm0(splice_json, wasm.__wbindgen_malloc);
         const len2 = WASM_VECTOR_LEN;
         const ret = wasm.webcore_patch_group(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2);
         if (ret[2]) {
@@ -157,10 +177,10 @@ export class WebCore {
         return ret[0] !== 0;
     }
     /**
-     * @param {string} patch_json
+     * @param {Uint8Array} patch_json
      */
     patch_uses(patch_json) {
-        const ptr0 = passStringToWasm0(patch_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const ptr0 = passArray8ToWasm0(patch_json, wasm.__wbindgen_malloc);
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.webcore_patch_uses(this.__wbg_ptr, ptr0, len0);
         if (ret[1]) {
@@ -207,17 +227,68 @@ export class WebCore {
         return ret[0] !== 0;
     }
     /**
+     * @param {string} group
+     * @param {number} width
+     * @param {number} height
+     * @param {number} scale
+     * @returns {Promise<any>}
+     */
+    poster(group, width, height, scale) {
+        const ptr0 = passStringToWasm0(group, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.webcore_poster(this.__wbg_ptr, ptr0, len0, width, height, scale);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
      * @param {string} key
-     * @param {string} list_json
+     * @param {Uint8Array} list_json
      */
     put_group(key, list_json) {
         const ptr0 = passStringToWasm0(key, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passStringToWasm0(list_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const ptr1 = passArray8ToWasm0(list_json, wasm.__wbindgen_malloc);
         const len1 = WASM_VECTOR_LEN;
         const ret = wasm.webcore_put_group(this.__wbg_ptr, ptr0, len0, ptr1, len1);
         if (ret[1]) {
             throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * @param {string} key
+     * @param {Uint8Array} list_json
+     * @param {Float64Array} floats
+     * @param {Uint32Array} ends
+     */
+    put_group_packed(key, list_json, floats, ends) {
+        const ptr0 = passStringToWasm0(key, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArray8ToWasm0(list_json, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passArrayF64ToWasm0(floats, wasm.__wbindgen_malloc);
+        const len2 = WASM_VECTOR_LEN;
+        const ptr3 = passArray32ToWasm0(ends, wasm.__wbindgen_malloc);
+        const len3 = WASM_VECTOR_LEN;
+        const ret = wasm.webcore_put_group_packed(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * @returns {string}
+     */
+    render_tally() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.webcore_render_tally(this.__wbg_ptr);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
         }
     }
     /**
@@ -242,10 +313,10 @@ export class WebCore {
         wasm.webcore_set_camera(this.__wbg_ptr, x, y, zoom);
     }
     /**
-     * @param {string} items_json
+     * @param {Uint8Array} items_json
      */
     set_live_overlay(items_json) {
-        const ptr0 = passStringToWasm0(items_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const ptr0 = passArray8ToWasm0(items_json, wasm.__wbindgen_malloc);
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.webcore_set_live_overlay(this.__wbg_ptr, ptr0, len0);
         if (ret[1]) {
@@ -259,15 +330,34 @@ export class WebCore {
         wasm.webcore_set_motion(this.__wbg_ptr, motion);
     }
     /**
-     * @param {string} items_json
+     * @param {Uint8Array} items_json
      */
     set_overlay(items_json) {
-        const ptr0 = passStringToWasm0(items_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const ptr0 = passArray8ToWasm0(items_json, wasm.__wbindgen_malloc);
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.webcore_set_overlay(this.__wbg_ptr, ptr0, len0);
         if (ret[1]) {
             throw takeFromExternrefTable0(ret[0]);
         }
+    }
+    /**
+     * @param {number} bytes
+     */
+    set_tile_budget(bytes) {
+        wasm.webcore_set_tile_budget(this.__wbg_ptr, bytes);
+    }
+    /**
+     * @param {boolean} on
+     */
+    set_tiles(on) {
+        wasm.webcore_set_tiles(this.__wbg_ptr, on);
+    }
+    /**
+     * @returns {boolean}
+     */
+    warming() {
+        const ret = wasm.webcore_warming(this.__wbg_ptr);
+        return ret !== 0;
     }
 }
 if (Symbol.dispose) WebCore.prototype[Symbol.dispose] = WebCore.prototype.free;
@@ -291,14 +381,34 @@ export class WebGlCore {
     }
     /**
      * @param {string} key
-     * @param {string} list_json
+     * @param {Uint8Array} list_json
      */
     append_group(key, list_json) {
         const ptr0 = passStringToWasm0(key, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passStringToWasm0(list_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const ptr1 = passArray8ToWasm0(list_json, wasm.__wbindgen_malloc);
         const len1 = WASM_VECTOR_LEN;
         const ret = wasm.webglcore_append_group(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * @param {string} key
+     * @param {Uint8Array} list_json
+     * @param {Float64Array} floats
+     * @param {Uint32Array} ends
+     */
+    append_group_packed(key, list_json, floats, ends) {
+        const ptr0 = passStringToWasm0(key, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArray8ToWasm0(list_json, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passArrayF64ToWasm0(floats, wasm.__wbindgen_malloc);
+        const len2 = WASM_VECTOR_LEN;
+        const ptr3 = passArray32ToWasm0(ends, wasm.__wbindgen_malloc);
+        const len3 = WASM_VECTOR_LEN;
+        const ret = wasm.webglcore_append_group_packed(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3);
         if (ret[1]) {
             throw takeFromExternrefTable0(ret[0]);
         }
@@ -328,14 +438,14 @@ export class WebGlCore {
         return ret !== 0;
     }
     /**
-     * @param {string} list_json
+     * @param {Uint8Array} list_json
      * @returns {string}
      */
     draw(list_json) {
         let deferred3_0;
         let deferred3_1;
         try {
-            const ptr0 = passStringToWasm0(list_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const ptr0 = passArray8ToWasm0(list_json, wasm.__wbindgen_malloc);
             const len0 = WASM_VECTOR_LEN;
             const ret = wasm.webglcore_draw(this.__wbg_ptr, ptr0, len0);
             var ptr2 = ret[0];
@@ -399,7 +509,7 @@ export class WebGlCore {
     /**
      * @param {string} from
      * @param {string} to
-     * @param {string} splice_json
+     * @param {Uint8Array} splice_json
      * @returns {boolean}
      */
     patch_group(from, to, splice_json) {
@@ -407,7 +517,7 @@ export class WebGlCore {
         const len0 = WASM_VECTOR_LEN;
         const ptr1 = passStringToWasm0(to, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len1 = WASM_VECTOR_LEN;
-        const ptr2 = passStringToWasm0(splice_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const ptr2 = passArray8ToWasm0(splice_json, wasm.__wbindgen_malloc);
         const len2 = WASM_VECTOR_LEN;
         const ret = wasm.webglcore_patch_group(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2);
         if (ret[2]) {
@@ -416,10 +526,10 @@ export class WebGlCore {
         return ret[0] !== 0;
     }
     /**
-     * @param {string} patch_json
+     * @param {Uint8Array} patch_json
      */
     patch_uses(patch_json) {
-        const ptr0 = passStringToWasm0(patch_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const ptr0 = passArray8ToWasm0(patch_json, wasm.__wbindgen_malloc);
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.webglcore_patch_uses(this.__wbg_ptr, ptr0, len0);
         if (ret[1]) {
@@ -449,14 +559,34 @@ export class WebGlCore {
     }
     /**
      * @param {string} key
-     * @param {string} list_json
+     * @param {Uint8Array} list_json
      */
     put_group(key, list_json) {
         const ptr0 = passStringToWasm0(key, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passStringToWasm0(list_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const ptr1 = passArray8ToWasm0(list_json, wasm.__wbindgen_malloc);
         const len1 = WASM_VECTOR_LEN;
         const ret = wasm.webglcore_put_group(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * @param {string} key
+     * @param {Uint8Array} list_json
+     * @param {Float64Array} floats
+     * @param {Uint32Array} ends
+     */
+    put_group_packed(key, list_json, floats, ends) {
+        const ptr0 = passStringToWasm0(key, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArray8ToWasm0(list_json, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passArrayF64ToWasm0(floats, wasm.__wbindgen_malloc);
+        const len2 = WASM_VECTOR_LEN;
+        const ptr3 = passArray32ToWasm0(ends, wasm.__wbindgen_malloc);
+        const len3 = WASM_VECTOR_LEN;
+        const ret = wasm.webglcore_put_group_packed(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3);
         if (ret[1]) {
             throw takeFromExternrefTable0(ret[0]);
         }
@@ -470,10 +600,10 @@ export class WebGlCore {
         wasm.webglcore_set_camera(this.__wbg_ptr, x, y, zoom);
     }
     /**
-     * @param {string} items_json
+     * @param {Uint8Array} items_json
      */
     set_live_overlay(items_json) {
-        const ptr0 = passStringToWasm0(items_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const ptr0 = passArray8ToWasm0(items_json, wasm.__wbindgen_malloc);
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.webglcore_set_live_overlay(this.__wbg_ptr, ptr0, len0);
         if (ret[1]) {
@@ -481,10 +611,10 @@ export class WebGlCore {
         }
     }
     /**
-     * @param {string} items_json
+     * @param {Uint8Array} items_json
      */
     set_overlay(items_json) {
-        const ptr0 = passStringToWasm0(items_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const ptr0 = passArray8ToWasm0(items_json, wasm.__wbindgen_malloc);
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.webglcore_set_overlay(this.__wbg_ptr, ptr0, len0);
         if (ret[1]) {
@@ -592,6 +722,10 @@ function __wbg_get_imports() {
             const ret = arg0.call(arg1, arg2);
             return ret;
         }, arguments); },
+        __wbg_call_6137034ef55c9d0f: function() { return handleError(function (arg0, arg1) {
+            const ret = arg0.call(arg1);
+            return ret;
+        }, arguments); },
         __wbg_clearBuffer_3d5a3057c3c8a9bf: function(arg0, arg1, arg2, arg3) {
             arg0.clearBuffer(arg1, arg2, arg3);
         },
@@ -631,6 +765,9 @@ function __wbg_get_imports() {
         __wbg_copyTexSubImage3D_717cd6c97934f2e6: function(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9) {
             arg0.copyTexSubImage3D(arg1 >>> 0, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
         },
+        __wbg_copyTextureToBuffer_1234b3210431ad05: function() { return handleError(function (arg0, arg1, arg2, arg3) {
+            arg0.copyTextureToBuffer(arg1, arg2, arg3);
+        }, arguments); },
         __wbg_copyTextureToTexture_d2e6a1eb3254b828: function() { return handleError(function (arg0, arg1, arg2, arg3) {
             arg0.copyTextureToTexture(arg1, arg2, arg3);
         }, arguments); },
@@ -783,10 +920,6 @@ function __wbg_get_imports() {
         __wbg_framebufferTextureLayer_1d5c0f0e3234e521: function(arg0, arg1, arg2, arg3, arg4, arg5) {
             arg0.framebufferTextureLayer(arg1 >>> 0, arg2 >>> 0, arg3, arg4, arg5);
         },
-        __wbg_getBindGroupLayout_fb40c3b93d37f466: function(arg0, arg1) {
-            const ret = arg0.getBindGroupLayout(arg1 >>> 0);
-            return ret;
-        },
         __wbg_getContext_051324720aa5b7e8: function() { return handleError(function (arg0, arg1, arg2, arg3) {
             const ret = arg0.getContext(getStringFromWasm0(arg1, arg2), arg3);
             return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
@@ -845,6 +978,10 @@ function __wbg_get_imports() {
             const ret = arg0.getUniformLocation(arg1, getStringFromWasm0(arg2, arg3));
             return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
         },
+        __wbg_get_31af05bd4842a84f: function() { return handleError(function (arg0, arg1) {
+            const ret = Reflect.get(arg0, arg1);
+            return ret;
+        }, arguments); },
         __wbg_get_fd12a9100976c296: function(arg0, arg1) {
             const ret = arg0[arg1 >>> 0];
             return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
@@ -1133,6 +1270,24 @@ function __wbg_get_imports() {
             const ret = arg0.navigator;
             return ret;
         },
+        __wbg_new_5502aad30c185fc8: function(arg0, arg1) {
+            try {
+                var state0 = {a: arg0, b: arg1};
+                var cb0 = (arg0, arg1) => {
+                    const a = state0.a;
+                    state0.a = 0;
+                    try {
+                        return wasm_bindgen_f6b9a5bf70c531e6___convert__closures_____invoke___js_sys_cc68ed82a483c3bc___Function_fn_wasm_bindgen_f6b9a5bf70c531e6___JsValue_____wasm_bindgen_f6b9a5bf70c531e6___sys__Undefined___js_sys_cc68ed82a483c3bc___Function_fn_wasm_bindgen_f6b9a5bf70c531e6___JsValue_____wasm_bindgen_f6b9a5bf70c531e6___sys__Undefined_______true_(a, state0.b, arg0, arg1);
+                    } finally {
+                        state0.a = a;
+                    }
+                };
+                const ret = new Promise(cb0);
+                return ret;
+            } finally {
+                state0.a = 0;
+            }
+        },
         __wbg_new_617a8cdb8bb1130e: function() {
             const ret = new Object();
             return ret;
@@ -1143,6 +1298,10 @@ function __wbg_get_imports() {
         }, arguments); },
         __wbg_new_from_slice_37a3c3a194266cb8: function(arg0, arg1) {
             const ret = new Uint32Array(getArrayU32FromWasm0(arg0, arg1));
+            return ret;
+        },
+        __wbg_new_from_slice_9a868026ffa4208a: function(arg0, arg1) {
+            const ret = new Uint8Array(getArrayU8FromWasm0(arg0, arg1));
             return ret;
         },
         __wbg_new_from_slice_ca6ad97db1f4779a: function(arg0, arg1) {
@@ -1177,6 +1336,10 @@ function __wbg_get_imports() {
         },
         __wbg_now_aa4ccb83129e9e55: function() {
             const ret = Date.now();
+            return ret;
+        },
+        __wbg_now_cef5b816f9b0deda: function() {
+            const ret = performance.now();
             return ret;
         },
         __wbg_of_d5dbecdc59e02e34: function(arg0) {
@@ -1333,8 +1496,14 @@ function __wbg_get_imports() {
         __wbg_set_buffer_8d0ac64ad20dfc84: function(arg0, arg1) {
             arg0.buffer = arg1;
         },
+        __wbg_set_buffer_910a40a90f97cfca: function(arg0, arg1) {
+            arg0.buffer = arg1;
+        },
         __wbg_set_buffers_5d0e0c50791f710e: function(arg0, arg1, arg2) {
             arg0.buffers = getArrayJsValueViewFromWasm0(arg1, arg2);
+        },
+        __wbg_set_bytes_per_row_1e824a5502b54b3d: function(arg0, arg1) {
+            arg0.bytesPerRow = arg1 >>> 0;
         },
         __wbg_set_bytes_per_row_c28583f0063160f1: function(arg0, arg1) {
             arg0.bytesPerRow = arg1 >>> 0;
@@ -1618,6 +1787,9 @@ function __wbg_get_imports() {
         __wbg_set_offset_f64_a903425d5a8e5815: function(arg0, arg1) {
             arg0.offset = arg1;
         },
+        __wbg_set_offset_f64_d1d115dd438165b5: function(arg0, arg1) {
+            arg0.offset = arg1;
+        },
         __wbg_set_operation_00a77386523b88f9: function(arg0, arg1) {
             arg0.operation = __wbindgen_enum_GpuBlendOperation[arg1];
         },
@@ -1670,6 +1842,9 @@ function __wbg_get_imports() {
             arg0.resource = arg1;
         },
         __wbg_set_rows_per_image_c6d50d227e634379: function(arg0, arg1) {
+            arg0.rowsPerImage = arg1 >>> 0;
+        },
+        __wbg_set_rows_per_image_deb456502f23c260: function(arg0, arg1) {
             arg0.rowsPerImage = arg1 >>> 0;
         },
         __wbg_set_sample_count_481c255a12054e1d: function(arg0, arg1) {
@@ -1951,28 +2126,28 @@ function __wbg_get_imports() {
             arg0.writeTexture(arg1, getArrayU8FromWasm0(arg2, arg3), arg4, arg5);
         }, arguments); },
         __wbindgen_generic_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 498, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 525, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_f6b9a5bf70c531e6___convert__closures_____invoke___wasm_bindgen_f6b9a5bf70c531e6___JsValue__core_608f92abc48d28da___result__Result_____wasm_bindgen_f6b9a5bf70c531e6___JsError___true_);
             return ret;
         },
         __wbindgen_generic_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDevice")], shim_idx: 468, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDevice")], shim_idx: 495, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_f6b9a5bf70c531e6___convert__closures_____invoke___wasm_bindgen_f6b9a5bf70c531e6___sys__JsNullable_wgpu_34da951af1c6d3a2___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_f6b9a5bf70c531e6___JsError___true_);
             return ret;
         },
         __wbindgen_generic_0000000000000003: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDeviceLostInfo")], shim_idx: 469, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDeviceLostInfo")], shim_idx: 496, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_f6b9a5bf70c531e6___convert__closures_____invoke___wgpu_34da951af1c6d3a2___backend__webgpu__webgpu_sys__gen_GpuDeviceLostInfo__GpuDeviceLostInfo______true_);
             return ret;
         },
         __wbindgen_generic_0000000000000004: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("any")], shim_idx: 468, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_f6b9a5bf70c531e6___convert__closures_____invoke___wasm_bindgen_f6b9a5bf70c531e6___sys__JsNullable_wgpu_34da951af1c6d3a2___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_f6b9a5bf70c531e6___JsError___true__43);
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("any")], shim_idx: 495, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_f6b9a5bf70c531e6___convert__closures_____invoke___wasm_bindgen_f6b9a5bf70c531e6___sys__JsNullable_wgpu_34da951af1c6d3a2___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_f6b9a5bf70c531e6___JsError___true__52);
             return ret;
         },
         __wbindgen_generic_0000000000000005: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("undefined")], shim_idx: 468, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_f6b9a5bf70c531e6___convert__closures_____invoke___wasm_bindgen_f6b9a5bf70c531e6___sys__JsNullable_wgpu_34da951af1c6d3a2___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_f6b9a5bf70c531e6___JsError___true__44);
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("undefined")], shim_idx: 495, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, wasm_bindgen_f6b9a5bf70c531e6___convert__closures_____invoke___wasm_bindgen_f6b9a5bf70c531e6___sys__JsNullable_wgpu_34da951af1c6d3a2___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_f6b9a5bf70c531e6___JsError___true__53);
             return ret;
         },
         __wbindgen_generic_0000000000000006: function(arg0) {
@@ -2029,15 +2204,15 @@ function wasm_bindgen_f6b9a5bf70c531e6___convert__closures_____invoke___wasm_bin
     }
 }
 
-function wasm_bindgen_f6b9a5bf70c531e6___convert__closures_____invoke___wasm_bindgen_f6b9a5bf70c531e6___sys__JsNullable_wgpu_34da951af1c6d3a2___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_f6b9a5bf70c531e6___JsError___true__43(arg0, arg1, arg2) {
-    const ret = wasm.wasm_bindgen_f6b9a5bf70c531e6___convert__closures_____invoke___wasm_bindgen_f6b9a5bf70c531e6___sys__JsNullable_wgpu_34da951af1c6d3a2___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_f6b9a5bf70c531e6___JsError___true__43(arg0, arg1, arg2);
+function wasm_bindgen_f6b9a5bf70c531e6___convert__closures_____invoke___wasm_bindgen_f6b9a5bf70c531e6___sys__JsNullable_wgpu_34da951af1c6d3a2___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_f6b9a5bf70c531e6___JsError___true__52(arg0, arg1, arg2) {
+    const ret = wasm.wasm_bindgen_f6b9a5bf70c531e6___convert__closures_____invoke___wasm_bindgen_f6b9a5bf70c531e6___sys__JsNullable_wgpu_34da951af1c6d3a2___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_f6b9a5bf70c531e6___JsError___true__52(arg0, arg1, arg2);
     if (ret[1]) {
         throw takeFromExternrefTable0(ret[0]);
     }
 }
 
-function wasm_bindgen_f6b9a5bf70c531e6___convert__closures_____invoke___wasm_bindgen_f6b9a5bf70c531e6___sys__JsNullable_wgpu_34da951af1c6d3a2___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_f6b9a5bf70c531e6___JsError___true__44(arg0, arg1, arg2) {
-    const ret = wasm.wasm_bindgen_f6b9a5bf70c531e6___convert__closures_____invoke___wasm_bindgen_f6b9a5bf70c531e6___sys__JsNullable_wgpu_34da951af1c6d3a2___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_f6b9a5bf70c531e6___JsError___true__44(arg0, arg1, arg2);
+function wasm_bindgen_f6b9a5bf70c531e6___convert__closures_____invoke___wasm_bindgen_f6b9a5bf70c531e6___sys__JsNullable_wgpu_34da951af1c6d3a2___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_f6b9a5bf70c531e6___JsError___true__53(arg0, arg1, arg2) {
+    const ret = wasm.wasm_bindgen_f6b9a5bf70c531e6___convert__closures_____invoke___wasm_bindgen_f6b9a5bf70c531e6___sys__JsNullable_wgpu_34da951af1c6d3a2___backend__webgpu__webgpu_sys__gen_GpuError__GpuError___core_608f92abc48d28da___result__Result_____wasm_bindgen_f6b9a5bf70c531e6___JsError___true__53(arg0, arg1, arg2);
     if (ret[1]) {
         throw takeFromExternrefTable0(ret[0]);
     }
@@ -2258,6 +2433,14 @@ function getFloat32ArrayMemory0() {
     return cachedFloat32ArrayMemory0;
 }
 
+let cachedFloat64ArrayMemory0 = null;
+function getFloat64ArrayMemory0() {
+    if (cachedFloat64ArrayMemory0 === null || cachedFloat64ArrayMemory0.byteLength === 0) {
+        cachedFloat64ArrayMemory0 = new Float64Array(wasm.memory.buffer);
+    }
+    return cachedFloat64ArrayMemory0;
+}
+
 let cachedInt32ArrayMemory0 = null;
 function getInt32ArrayMemory0() {
     if (cachedInt32ArrayMemory0 === null || cachedInt32ArrayMemory0.byteLength === 0) {
@@ -2325,6 +2508,27 @@ function makeMutClosure(arg0, arg1, f) {
     };
     CLOSURE_DTORS.register(real, state, state);
     return real;
+}
+
+function passArray32ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 4, 4) >>> 0;
+    getUint32ArrayMemory0().set(arg, ptr / 4);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
+}
+
+function passArray8ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 1, 1) >>> 0;
+    getUint8ArrayMemory0().set(arg, ptr / 1);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
+}
+
+function passArrayF64ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 8, 8) >>> 0;
+    getFloat64ArrayMemory0().set(arg, ptr / 8);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
 }
 
 function passStringToWasm0(arg, malloc, realloc) {
@@ -2406,6 +2610,7 @@ function __wbg_finalize_init(instance, module) {
     wasmModule = module;
     cachedDataViewMemory0 = null;
     cachedFloat32ArrayMemory0 = null;
+    cachedFloat64ArrayMemory0 = null;
     cachedInt32ArrayMemory0 = null;
     cachedUint32ArrayMemory0 = null;
     cachedUint8ArrayMemory0 = null;

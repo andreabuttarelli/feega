@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,7 +12,11 @@ import { sequenceScenes } from '$lib/motion/scenes';
 import { keepLocalFiles, forgetLocalFiles } from '@feega/motion-core/motion/fonts/local-files';
 import { itemWire } from '@feega/motion-core/motion/gpu-full/wire';
 import type { DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
-import { builtAnswer, buildFrame, frameBuilder, type BuildAsk, type BuildWorker } from './frame-build';
+import { builtAnswer, buildFrame, frameBuilder, playingBuilder, transfers, type BuildAsk, type BuildWorker } from './frame-build';
+import { itemPack, listPack } from '@feega/motion-core/motion/gpu-full/wire';
+import { onStage } from './frame-source';
+import { withoutPictures } from './placeholders';
+import { FrameKind } from '$lib/canvas/motion-node';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -72,9 +76,33 @@ describe('the builder', () => {
     const worker = echo();
     const build = frameBuilder(() => worker);
     const [a, b] = await Promise.all([build(source(shapeDoc), Smoothing.Plain), build(source(customDoc), Smoothing.Plain)]);
-    expect(worker.asked.map((a) => a.source.doc)).toEqual([shapeDoc, customDoc]);
+    expect(worker.asked.map((a) => (JSON.parse(a.source) as { doc: unknown }).doc)).toEqual([shapeDoc, customDoc]);
+    expect(worker.asked.every((a) => typeof a.source === 'string')).toBe(true);
     expect(a?.width).toBe(1);
     expect(b?.width).toBe(1);
+  });
+
+  it('writes a doc out once, not again when the frame rebuilds with sharper assets', async () => {
+    const worker = echo();
+    const build = frameBuilder(() => worker);
+    const written = vi.spyOn(JSON, 'stringify');
+    const doc = structuredClone(shapeDoc);
+
+    await build({ ...source(doc), assets: { a: 'small' } }, Smoothing.Plain);
+    await build({ ...source(doc), assets: { a: 'large' } }, Smoothing.Plain);
+    const docWrites = written.mock.calls.filter(([value]) => value === doc || (value as { doc?: unknown })?.doc === doc).length;
+    written.mockRestore();
+
+    expect(docWrites).toBe(1);
+    expect(worker.asked.map((a) => JSON.parse(a.source))).toEqual([{ ...source(doc), assets: { a: 'small' } }, { ...source(doc), assets: { a: 'large' } }].map((x) => JSON.parse(JSON.stringify(x))));
+  });
+
+  it('spreads builds over its workers, so frames build side by side instead of in one queue', async () => {
+    const workers = [echo(), echo(), echo()];
+    let spawned = 0;
+    const build = frameBuilder(() => workers[spawned++], 3);
+    await Promise.all([1, 2, 3].map(() => build(source(shapeDoc), Smoothing.Plain)));
+    expect(workers.map((w) => w.asked.length)).toEqual([1, 1, 1]);
   });
 
   it('hands the worker the local font files it cannot see from its own thread', async () => {
@@ -95,29 +123,61 @@ describe('the builder', () => {
     expect(spawned).toBe(1);
   });
 
-  it('the worker sends each item already wired, so the main thread never serialises it', async () => {
+  it('sends contours in transferred buffers, not as nested arrays (copying them cost 0.7 s at 4x on open)', async () => {
     const list = (await buildFrame(source(shapeDoc), Smoothing.Plain, fonts)) as DisplayList;
     const answer = builtAnswer(7, list);
+    const sent = JSON.stringify((answer as { list: DisplayList }).list.items, (key, value) => (key === 'contours' && Array.isArray(value) ? 'NESTED' : value));
 
-    expect(answer).toEqual({ id: 7, list, wires: list.items.map((i) => JSON.stringify(i)) });
+    expect(sent).not.toContain('NESTED');
+    expect(transfers(answer).length).toBeGreaterThan(0);
   });
 
-  it('the main thread keeps the wires the worker sent with the list', async () => {
-    const item = { kind: 'path', clip: 'card' };
-    const worker = {
-      onerror: null,
-      onmessage: null as BuildWorker['onmessage'],
-      postMessage: (ask: BuildAsk) => queueMicrotask(() => worker.onmessage?.({ data: { id: ask.id, list: { width: 1, height: 1, background: null, items: [item], unsupported: [] }, wires: ['"from the worker"'] } } as never))
-    };
+  it('a staged or placeholder-rebuilt item still draws its shapes after the trip', async () => {
+    const list = (await buildFrame(source(shapeDoc), Smoothing.Plain, fonts)) as DisplayList;
+    const whole = listPack(structuredClone(list));
+    const answer = builtAnswer(7, list);
+    const arrived = structuredClone(answer, { transfer: transfers(answer) }) as { list: DisplayList };
+    const rebuilt = onStage(withoutPictures({ ...arrived.list, bleed: 3 }, { paper: '#fff', line: '#eee' }), FrameKind.Frame);
 
-    const list = await frameBuilder(() => worker)(source(shapeDoc), Smoothing.Plain);
-
-    expect(itemWire(list!.items[0])).toBe('"from the worker"');
+    expect([...listPack(rebuilt).floats].length).toBe([...whole.floats].length);
+    expect([...listPack(arrived.list).floats]).toEqual([...whole.floats]);
+    expect(itemWire(arrived.list.items[0])).toBe(itemWire(structuredClone(list).items[0]));
   });
 
   it('says it cannot build when no worker can start', async () => {
     const build = frameBuilder(() => null);
     await expect(build(source(shapeDoc), Smoothing.Plain)).rejects.toThrow();
+  });
+});
+
+describe('playing a frame', () => {
+  const ask = (playhead: number) => ({ id: playhead, source: JSON.stringify(source(shapeDoc)), playhead, smoothing: Smoothing.Plain, locals: [] });
+
+  it('prepares a doc once and only draws each new playhead', async () => {
+    const faces = vi.fn(fonts);
+    const build = playingBuilder(faces);
+
+    await build(ask(0));
+    await build(ask(10));
+    await build(ask(20));
+
+    expect(faces).toHaveBeenCalledTimes(1);
+  });
+
+  it('prepares again when the doc changes', async () => {
+    const faces = vi.fn(fonts);
+    const build = playingBuilder(faces);
+
+    await build(ask(0));
+    await build({ ...ask(0), source: JSON.stringify(source(blank)) });
+
+    expect(faces).toHaveBeenCalledTimes(2);
+  });
+
+  it('draws the playhead it is asked for', async () => {
+    const build = playingBuilder(fonts);
+
+    expect(await build(ask(5))).toEqual(await buildFrame({ ...source(shapeDoc), playhead: 5 }, Smoothing.Plain, fonts));
   });
 });
 

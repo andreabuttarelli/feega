@@ -5,7 +5,7 @@ import { registerFont } from '$lib/motion/fonts/ops';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { declareVar, VarKind, type VarDecl } from '@feega/motion-core/motion/interactive/vars';
 import { interactiveOf, type Interactive } from '@feega/motion-core/motion/interactive/settings';
-import { addClip, setCanvas, type OpResult } from '@feega/motion-core/motion/timeline';
+import { addClip, setCanvas, type CanvasSize, type OpResult } from '@feega/motion-core/motion/timeline';
 import { exposeField, FieldType, type FieldInput } from './fields';
 
 export type CustomTemplateSpec = {
@@ -21,13 +21,14 @@ export type CustomTemplateSpec = {
   fps: MotionDoc['fps'];
   playback?: Pick<Interactive, 'playback' | 'scrollLength'>;
   groups?: Readonly<Record<string, string>>;
+  size?: CanvasSize;
 };
 
 const GROUP: Record<NonNullable<PropSpec['group']>, string> = { Content: 'Text', Style: 'Style', Layout: 'Style', Motion: 'Motion', Camera: 'Motion' };
 
 const MEDIA_GROUP = 'Media';
 
-const MEDIA_FORMATS: ReadonlySet<string | undefined> = new Set([PropFormat.Media, PropFormat.MediaItem]);
+const MEDIA_FORMATS: ReadonlySet<string | undefined> = new Set([PropFormat.Media, PropFormat.MediaItem, PropFormat.Asset]);
 
 const groupOf = (spec: PropSpec) => (MEDIA_FORMATS.has(spec.format) ? MEDIA_GROUP : GROUP[spec.group ?? 'Style']);
 
@@ -40,7 +41,7 @@ function fieldShape(spec: PropSpec, fonts: readonly string[]): FieldShape {
   if (spec.format === PropFormat.Media) {
     return { type: FieldType.MediaList };
   }
-  if (spec.format === PropFormat.MediaItem) {
+  if (spec.format === PropFormat.MediaItem || spec.format === PropFormat.Asset) {
     return { type: FieldType.Asset };
   }
   if (spec.enum) {
@@ -82,8 +83,8 @@ export function customTemplateDoc(spec: CustomTemplateSpec): MotionDoc {
     }
     return result.doc;
   };
-  const frames = spec.seconds * spec.fps;
-  let doc = must(setCanvas({ ...newMotionDoc(MotionFormat.Landscape), fps: spec.fps }, { durationInFrames: frames }));
+  const frames = Math.round(spec.seconds * spec.fps);
+  let doc = must(setCanvas({ ...newMotionDoc(MotionFormat.Landscape), fps: spec.fps }, { durationInFrames: frames, size: spec.size }));
   for (const font of spec.fonts) {
     doc = must(registerFont(doc, font, GOOGLE_FONTS));
   }

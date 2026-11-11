@@ -604,7 +604,7 @@ canvas
 
 canvas
   .command('import-code <projectId> <repo>')
-  .description('Run a GitHub React, Vue or Svelte app in a sandbox (private repos once `canvas github connect` is done) and draw its pages as boards of one frame: components become main components, usages instances, props variants')
+  .description('Run a GitHub React, Vue or Svelte app in a sandbox (private repos once `canvas github connect` is done), or a local project folder (an absolute path, local mode), and draw its pages as boards of one frame: components become main components, usages instances, props variants')
   .requiredOption('--canvas <id>', 'The canvas')
   .option('--route <paths...>', 'The pages of the app to import (up to 8): one frame, a board per page, components shared', ['/'])
   .option('--x <n>', 'Canvas position of the frame centre', Number, 0)
@@ -613,6 +613,16 @@ canvas
   .action(async (projectId: string, repo: string, opts) => {
     const { cmdCanvasImportCode } = await import('./commands/canvas.ts');
     await cmdCanvasImportCode(projectId, repo, opts);
+  });
+
+canvas
+  .command('code-sync <projectId> <action> <nodeId>')
+  .description('Sync a frame imported from code with its source: changes (print the patch) | publish (GitHub pull request, or write the local folder) | pull (bring new commits or file changes into the frame)')
+  .option('--branch <name>', 'For pull: the GitHub branch to bring in')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (projectId: string, action: string, nodeId: string, opts) => {
+    const { cmdCanvasCodeSync } = await import('./commands/canvas.ts');
+    await cmdCanvasCodeSync(projectId, action, nodeId, opts);
   });
 
 canvas

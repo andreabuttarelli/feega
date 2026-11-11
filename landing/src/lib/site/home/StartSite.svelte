@@ -6,14 +6,14 @@
 
 <section class="start site-wide">
   <div class="text">
-    <h2>Start from any site</h2>
-    <p>Every layer, colour and font comes in editable - colours become variables, type becomes styles, all bound.</p>
+    <h2 data-agent-id="start-title">Start from any site</h2>
+    <p data-agent-id="start-lead">Every layer, colour and font comes in editable - colours become variables, type becomes styles, all bound.</p>
     <div class="field">
       <UrlField id="start-url" />
     </div>
   </div>
 
-  <video data-src={CANVAS_VIDEO} poster="/site/home/canvas-poster.webp" muted loop playsinline preload="none" width="1920" height="1080" aria-label="A website rebuilt as editable layers on the Feega canvas" use:lazyPlay></video>
+  <video data-agent-id="start-video" data-src={CANVAS_VIDEO} poster="/site/home/canvas-poster.webp" muted loop playsinline preload="none" width="1920" height="1080" aria-label="A website rebuilt as editable layers on the Feega canvas" use:lazyPlay></video>
 </section>
 
 <style>

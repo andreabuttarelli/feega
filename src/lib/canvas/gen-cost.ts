@@ -106,6 +106,9 @@ export function creditsForRun(raw: RunCostInput): number | null {
   if (input.model?.pricedInputs) {
     return pricedCredits(input);
   }
+  if (typeof input.model?.creditsPerCharacter === 'number') {
+    return Math.ceil((input.prompt?.length ?? 0) * input.model.creditsPerCharacter);
+  }
   if (input.medium === 'text') {
     return textCredits(input);
   }

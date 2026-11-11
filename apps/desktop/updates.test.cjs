@@ -1,47 +1,75 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { EventEmitter } = require('node:events');
-const { watchUpdates, CHECK_EVERY_MS, RESTART } = require('./updates.cjs');
+const { latestRelease, newer, watchUpdates, CHECK_EVERY_MS, DOWNLOAD } = require('./updates.cjs');
 
-function fakes(choice) {
-  const updater = new EventEmitter();
-  updater.checks = 0;
-  updater.installed = false;
-  updater.checkForUpdates = async () => { updater.checks += 1; };
-  updater.quitAndInstall = () => { updater.installed = true; };
+const release = (tag, extra = {}) => ({ tag_name: tag, html_url: `https://github.com/r/${tag}`, draft: false, prerelease: false, assets: [{ name: 'feega-1-mac-arm64.dmg' }], ...extra });
+
+test('versions compare by number, not by text', () => {
+  assert.ok(newer('0.10.0', '0.9.1'));
+  assert.ok(!newer('0.9.1', '0.10.0'));
+  assert.ok(!newer('1.0.0', '1.0.0'));
+});
+
+test('the latest release is the highest app tag that carries a mac build', () => {
+  const releases = [release('app-v0.3.0', { draft: true }), release('app-v0.2.0'), release('cli-v9.0.0'), release('app-v0.10.0', { prerelease: true }), release('app-v0.9.0', { assets: [{ name: 'feega-app.tar.gz' }] }), release('app-v0.1.5')];
+  assert.deepEqual(latestRelease(releases), { version: '0.2.0', url: 'https://github.com/r/app-v0.2.0' });
+  assert.equal(latestRelease([]), null);
+});
+
+function fakes({ releases, choice = DOWNLOAD, fails = false }) {
+  const opened = [];
+  const asked = [];
   const timers = [];
-  const ask = async () => ({ response: choice });
-  return { updater, timers, ask, every: (fn, ms) => timers.push({ fn, ms }) };
+  return {
+    opened,
+    asked,
+    timers,
+    current: '0.1.0',
+    fetch: async () => {
+      if (fails) {
+        throw new Error('offline');
+      }
+      return { ok: true, json: async () => releases };
+    },
+    ask: async (options) => {
+      asked.push(options);
+      return { response: choice };
+    },
+    open: (url) => opened.push(url),
+    every: (fn, ms) => timers.push({ fn, ms })
+  };
 }
 
-test('checks on launch and then periodically', () => {
-  const f = fakes(RESTART);
+const settle = () => new Promise(setImmediate);
+
+test('a newer release opens its download page when the user agrees', async () => {
+  const f = fakes({ releases: [release('app-v0.2.0')] });
   watchUpdates(f);
-  assert.equal(f.updater.checks, 1);
+  await settle();
+  assert.deepEqual(f.opened, ['https://github.com/r/app-v0.2.0']);
   assert.equal(f.timers[0].ms, CHECK_EVERY_MS);
-  f.timers[0].fn();
-  assert.equal(f.updater.checks, 2);
 });
 
-test('a downloaded update installs when the user restarts', async () => {
-  const f = fakes(RESTART);
+test('the same release is offered once per run', async () => {
+  const f = fakes({ releases: [release('app-v0.2.0')], choice: DOWNLOAD + 1 });
   watchUpdates(f);
-  f.updater.emit('update-downloaded', { version: '0.2.0' });
-  await new Promise(setImmediate);
-  assert.ok(f.updater.installed);
+  await settle();
+  await f.timers[0].fn();
+  await settle();
+  assert.equal(f.asked.length, 1);
+  assert.deepEqual(f.opened, []);
 });
 
-test('a downloaded update waits when the user says later', async () => {
-  const f = fakes(RESTART + 1);
+test('no prompt when the app is current', async () => {
+  const f = fakes({ releases: [release('app-v0.1.0')] });
   watchUpdates(f);
-  f.updater.emit('update-downloaded', { version: '0.2.0' });
-  await new Promise(setImmediate);
-  assert.ok(!f.updater.installed);
+  await settle();
+  assert.equal(f.asked.length, 0);
 });
 
 test('a failed check does not crash the app', async () => {
-  const f = fakes(RESTART);
-  f.updater.checkForUpdates = async () => { throw new Error('offline'); };
+  const f = fakes({ releases: [], fails: true });
   watchUpdates(f);
-  await new Promise(setImmediate);
+  await settle();
+  assert.equal(f.asked.length, 0);
 });

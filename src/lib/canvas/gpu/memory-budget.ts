@@ -5,11 +5,11 @@ export enum Device {
   Phone = 'phone'
 }
 
-type Budget = { textureBytes: number; pictureSide: number; resolution: number };
+type Budget = { textureBytes: number; tileBytes: number; pictureSide: number; resolution: number };
 
 export const BUDGET: Record<Device, Budget> = {
-  [Device.Desktop]: { textureBytes: 256 * MB, pictureSide: 4096, resolution: 2 },
-  [Device.Phone]: { textureBytes: 128 * MB, pictureSide: 2048, resolution: 2 }
+  [Device.Desktop]: { textureBytes: 256 * MB, tileBytes: 384 * MB, pictureSide: 4096, resolution: 2 },
+  [Device.Phone]: { textureBytes: 128 * MB, tileBytes: 128 * MB, pictureSide: 2048, resolution: 2 }
 };
 
 const RGBA_BYTES = 4;

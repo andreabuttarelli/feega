@@ -87,9 +87,16 @@ const paintedProps = (clip: MotionClip) => Object.fromEntries(Object.entries(cli
 
 export type ColourUse = { colour: string; count: number };
 
+const coloursByProps = new WeakMap<MotionClip['props'], Map<string, string[]>>();
+
+function clipColoursOf(clip: MotionClip): string[] {
+  const byComponent = coloursByProps.get(clip.props) ?? coloursByProps.set(clip.props, new Map()).get(clip.props)!;
+  return byComponent.get(clip.component) ?? byComponent.set(clip.component, coloursIn(paintedProps(clip), [])).get(clip.component)!;
+}
+
 export function selectionColours(doc: MotionDoc, ids: readonly string[]): ColourUse[] {
   const counts = new Map<string, number>();
-  for (const colour of scopeOf(doc, ids).clips.flatMap((clip) => coloursIn(paintedProps(clip), []))) {
+  for (const colour of scopeOf(doc, ids).clips.flatMap(clipColoursOf)) {
     counts.set(colour, (counts.get(colour) ?? 0) + 1);
   }
   return [...counts].map(([colour, count]) => ({ colour, count })).sort((a, b) => b.count - a.count);
@@ -115,10 +122,15 @@ export const frameColours = (doc: MotionDoc) => selectionColours(doc, topIds(doc
 export const recolourFrame = (doc: MotionDoc, from: string, to: string) => recolour(doc, topIds(doc), from, to);
 
 function heldIds(doc: MotionDoc, id: string): string[] {
-  const clips = clipsOf(doc);
+  const children = new Map<string, string[]>();
+  for (const c of clipsOf(doc)) {
+    if (c.parent) {
+      children.set(c.parent, [...(children.get(c.parent) ?? []), c.id]);
+    }
+  }
   const held = [id];
   for (let i = 0; i < held.length; i++) {
-    held.push(...clips.filter((c) => c.parent === held[i]).map((c) => c.id));
+    held.push(...(children.get(held[i]) ?? []));
   }
   return held;
 }

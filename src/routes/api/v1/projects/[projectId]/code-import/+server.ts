@@ -11,8 +11,8 @@ import type { RequestHandler } from './$types';
 export const config = { maxDuration: 300 };
 
 const askSchema = z
-  .object({ canvasId: z.string().min(1), repo: z.string().min(1).max(300).optional(), route: z.string().max(300).optional(), routes: z.array(z.string().max(300)).max(MAX_ROUTES).optional(), storybook: z.string().min(1).max(500).optional(), stories: z.array(z.string().max(200)).max(MAX_STORIES).optional(), x: z.number().finite(), y: z.number().finite() })
-  .refine((a) => Boolean(a.repo) !== Boolean(a.storybook));
+  .object({ canvasId: z.string().min(1), repo: z.string().min(1).max(300).optional(), folder: z.string().min(1).max(1000).optional(), route: z.string().max(300).optional(), routes: z.array(z.string().max(300)).max(MAX_ROUTES).optional(), storybook: z.string().min(1).max(500).optional(), stories: z.array(z.string().max(200)).max(MAX_STORIES).optional(), x: z.number().finite(), y: z.number().finite() })
+  .refine((a) => [a.repo, a.storybook, a.folder].filter(Boolean).length === 1);
 
 export const POST: RequestHandler = async (event) => {
   const scope = await projectScopeOf(event);
@@ -25,8 +25,8 @@ export const POST: RequestHandler = async (event) => {
     return json({ error: CodeImportOutcome.Invalid }, { status: CODE_IMPORT_STATUS[CodeImportOutcome.Invalid] });
   }
 
-  const { canvasId, repo, route, routes, storybook, stories, x, y } = ask.data;
-  const done = await importCodeInto({ ...scope, actor: { kind: 'user', id: scope.userId } }, canvasId, { repo, routes: askedRoutes(route, routes), storybook, stories, at: { x, y } });
+  const { canvasId, repo, folder, route, routes, storybook, stories, x, y } = ask.data;
+  const done = await importCodeInto({ ...scope, actor: { kind: 'user', id: scope.userId } }, canvasId, { repo, folder, routes: askedRoutes(route, routes), storybook, stories, at: { x, y } });
   if (done.outcome !== CodeImportOutcome.Ok) {
     return json({ error: done.outcome, ...(done.error ? { detail: done.error } : {}) }, { status: CODE_IMPORT_STATUS[done.outcome] });
   }

@@ -232,7 +232,16 @@ export function audioModelsOf(id: AudioOperationId): string[] {
   return Object.keys(operationSpec(id).usdPerUnit);
 }
 
+const WIRO_MODEL_PREFIX = 'wiro/';
+
+export function isWiroAudioModel(model: string | null | undefined): model is string {
+  return Boolean(model?.startsWith(WIRO_MODEL_PREFIX));
+}
+
 export function audioModelFor(id: AudioOperationId, requested: string | null | undefined): string {
+  if (isWiroAudioModel(requested)) {
+    return requested;
+  }
   return requested && audioModelsOf(id).includes(requested) ? requested : defaultAudioModel(id);
 }
 

@@ -1,3 +1,6 @@
+import type { ImageTransform } from '$lib/server/media-thumbnails';
+import { transformQuery } from './transform-query';
+
 export type Row = Record<string, unknown>;
 export type Tables = Map<string, Row[]>;
 
@@ -17,6 +20,7 @@ export type MemoryDbOptions = {
   user: { id: string; email: string; created_at: string };
   storageUrl: (bucket: string, path: string) => string;
   onChange: (change: Change) => void;
+  latencyMs?: number;
 };
 
 type DbError = { message: string; code: string; details: string | null; hint: string | null };
@@ -186,6 +190,8 @@ function singular(table: string): string {
 }
 
 export function createMemoryDb(options: MemoryDbOptions) {
+  const roundTrip = (): Promise<void> => (options.latencyMs ? new Promise((done) => setTimeout(done, options.latencyMs)) : Promise.resolve());
+
   const { tables, blobs } = options;
   const now = () => new Date().toISOString();
   const rows = (table: string): Row[] => {
@@ -426,7 +432,7 @@ export function createMemoryDb(options: MemoryDbOptions) {
       setHeader: () => builder,
       then<A, B>(resolve: (r: Result) => A, reject?: (e: unknown) => B) {
         try {
-          return Promise.resolve(run()).then(resolve, reject);
+          return roundTrip().then(run).then(resolve, reject);
         } catch (error) {
           return Promise.reject(error).then(resolve, reject);
         }
@@ -489,8 +495,8 @@ export function createMemoryDb(options: MemoryDbOptions) {
         const names = [...blobs.keys()].filter((k) => k.startsWith(base)).map((k) => k.slice(base.length).split('/')[0]);
         return { data: [...new Set(names)].map((n) => ({ name: n, id: n, metadata: {} })), error: null };
       },
-      async createSignedUrl(path: string) {
-        return { data: { signedUrl: signed(path) }, error: null };
+      async createSignedUrl(path: string, _ttl?: number, opts?: { transform?: ImageTransform }) {
+        return { data: { signedUrl: `${signed(path)}${opts?.transform ? transformQuery(opts.transform) : ''}` }, error: null };
       },
       async createSignedUrls(paths: string[]) {
         return { data: paths.map((p) => ({ path: p, signedUrl: signed(p), error: null })), error: null };

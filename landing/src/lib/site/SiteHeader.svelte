@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { APP_URL, GITHUB_URL, HEADER_LINKS, MENU_LINKS, SOCIAL_LINKS } from './links';
+  import DownloadMac from './DownloadMac.svelte';
+  import { APP_URL, HEADER_LINKS, MENU_LINKS, SOCIAL_LINKS } from './links';
 
   let open = $state(false);
 </script>
@@ -14,7 +15,7 @@
   </nav>
 
   <div class="actions">
-    <a class="chip star" href={GITHUB_URL}><span>Star us</span></a>
+    <DownloadMac class="chip star" />
     <a class="chip cta" href={APP_URL}><span>Let’s start</span></a>
   </div>
 
@@ -46,7 +47,7 @@
   .bar {
     position: fixed;
     inset: 0 0 auto;
-    z-index: 10;
+    z-index: var(--site-z-header);
     display: flex;
     justify-content: space-between;
     align-items: start;
@@ -59,6 +60,13 @@
     line-height: 19.2px;
     letter-spacing: -0.03em;
     font-weight: 500;
+  }
+
+  :global(.star svg) {
+    width: 14px;
+    height: 14px;
+    margin-right: 4px;
+    vertical-align: -2px;
   }
 
   .chip {
@@ -94,7 +102,7 @@
   .drawer {
     position: fixed;
     inset: 0;
-    z-index: 9;
+    z-index: var(--site-z-drawer);
     display: flex;
     flex-direction: column;
     max-width: 430px;
@@ -152,7 +160,7 @@
       justify-self: start;
     }
 
-    .star {
+    :global(.star) {
       background: #4f4f4f;
       color: #fff;
     }
@@ -194,7 +202,7 @@
       justify-self: start;
     }
 
-    .star {
+    :global(.star) {
       background: #4f4f4f;
       color: #fff;
     }

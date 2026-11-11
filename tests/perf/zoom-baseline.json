@@ -1,0 +1,92 @@
+{
+  "cpuThrottle": 4,
+  "runs": [
+    {
+      "fps": 26,
+      "p95": 114.8,
+      "worst": 183.3,
+      "frames": 107,
+      "cpuMs": 4362,
+      "sharpMs": 294
+    },
+    {
+      "fps": 29,
+      "p95": 118.2,
+      "worst": 134.6,
+      "frames": 116,
+      "cpuMs": 4203,
+      "sharpMs": 261
+    },
+    {
+      "fps": 27,
+      "p95": 102,
+      "worst": 183.5,
+      "frames": 109,
+      "cpuMs": 4277,
+      "sharpMs": 297
+    },
+    {
+      "fps": 23,
+      "p95": 131.7,
+      "worst": 185.2,
+      "frames": 94,
+      "cpuMs": 4197,
+      "sharpMs": 325
+    },
+    {
+      "fps": 27,
+      "p95": 118.4,
+      "worst": 150,
+      "frames": 110,
+      "cpuMs": 4348,
+      "sharpMs": 247
+    },
+    {
+      "fps": 29,
+      "p95": 115.1,
+      "worst": 151.7,
+      "frames": 120,
+      "cpuMs": 4353,
+      "sharpMs": 261
+    },
+    {
+      "fps": 28,
+      "p95": 116.7,
+      "worst": 198,
+      "frames": 112,
+      "cpuMs": 4320,
+      "sharpMs": 263
+    },
+    {
+      "fps": 27,
+      "p95": 117.4,
+      "worst": 182.7,
+      "frames": 110,
+      "cpuMs": 4398,
+      "sharpMs": 312
+    },
+    {
+      "fps": 27,
+      "p95": 116.6,
+      "worst": 151.1,
+      "frames": 113,
+      "cpuMs": 4422,
+      "sharpMs": 244
+    },
+    {
+      "fps": 24,
+      "p95": 133,
+      "worst": 135.1,
+      "frames": 98,
+      "cpuMs": 4219,
+      "sharpMs": 501
+    }
+  ],
+  "median": {
+    "fps": 27,
+    "p95": 117.05000000000001,
+    "worst": 167.2,
+    "cpuMs": 4334,
+    "sharpMs": 278.5
+  }
+}

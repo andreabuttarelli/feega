@@ -1,4 +1,5 @@
 import { motionKeyframes } from './captured-motion';
+import { lookOf, minSideOf } from '$lib/canvas/code-look';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { compOf, findClip, MotionFormat, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { blankElement, canvasReady, drawClip, drawnFrame, penClip } from '$lib/motion/draw-create';
@@ -364,7 +365,7 @@ function layersOf(doc: MotionDoc, layer: FrameLayer, p: Place, need = Background
   for (const child of layer.children) {
     const made = build[child.kind](built.doc, child, p);
     const shown = { ...made, doc: blended(child.hidden ? hiddenAll(made.doc, made.roots) : made.doc, made.roots, child.blend) };
-    const acting = { ...shown, doc: moving(ownsBehaviour(child) ? behaved(shown.doc, shown.roots, child) : shown.doc, shown.roots, child, p) };
+    const acting = { ...shown, doc: sourced(moving(ownsBehaviour(child) ? behaved(shown.doc, shown.roots, child) : shown.doc, shown.roots, child, p), shown.roots, child) };
     const next = masked(acting, child, p);
     if (child.ref && next.roots[0] && !p.keys.has(child.ref)) {
       p.keys.set(child.ref, next.roots[0].id);
@@ -438,6 +439,15 @@ function moving(doc: MotionDoc, roots: Root[], layer: Layer, p: Place): MotionDo
   }
 
   const set = editClip(doc, roots[0].id, (clip) => ({ ...clip, keyframes: { ...clip.keyframes, ...motionKeyframes(layer.motion!, { x: clip.transform.x ?? 0, y: clip.transform.y ?? 0 }, p.scale, doc) } }));
+  return set.ok ? set.doc : doc;
+}
+
+function sourced(doc: MotionDoc, roots: Root[], layer: Layer): MotionDoc {
+  if (!layer.source || roots.length !== 1) {
+    return doc;
+  }
+  const side = minSideOf(doc);
+  const set = editClip(doc, roots[0].id, (clip) => ({ ...clip, source: { ...layer.source!, was: lookOf(clip, side) } }));
   return set.ok ? set.doc : doc;
 }
 

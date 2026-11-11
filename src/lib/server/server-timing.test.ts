@@ -12,4 +12,12 @@ describe('serverTiming', () => {
 
     expect(phases.header()).toBe('read;dur=5, write;dur=5');
   });
+
+  it('times synchronous work too', () => {
+    let t = 0;
+    const phases = serverTiming(() => (t += 3));
+
+    expect(phases.span('stringify', () => 'x')).toBe('x');
+    expect(phases.header()).toBe('stringify;dur=3');
+  });
 });

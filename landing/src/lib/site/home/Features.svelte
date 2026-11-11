@@ -7,24 +7,24 @@
 <section class="features site-wide" id="features">
   <div class="cards">
     <article class="card gen" use:tilt>
-      <img src="/site/home/tool-gen.webp" alt="" width="920" height="1269" loading="lazy" decoding="async" />
+      <img data-agent-id="feature-gen" src="/site/home/tool-gen.webp" alt="" width="920" height="1269" loading="lazy" decoding="async" />
       <span class="focus" aria-hidden="true"></span>
-      <h3>Text, image, video, 3D generation</h3>
+      <h3 data-agent-id="feature-gen-title">Text, image, video, 3D generation</h3>
     </article>
 
     <article class="card tpl" use:tilt>
       <div class="shots">
-        <img class="a" src="/site/home/tool-tpl-a.webp" alt="" width="420" height="525" loading="lazy" decoding="async" />
+        <img data-agent-id="feature-tpl-a" class="a" src="/site/home/tool-tpl-a.webp" alt="" width="420" height="525" loading="lazy" decoding="async" />
         <img class="b" src="/site/home/tool-tpl-b.webp" alt="" width="320" height="400" loading="lazy" decoding="async" />
       </div>
       <div class="text">
         <h3>Graphic &amp; motion design</h3>
-        <p>Hundreds of ready-to-use templates</p>
+        <p data-agent-id="feature-tpl-lead">Hundreds of ready-to-use templates</p>
       </div>
     </article>
 
     <article class="card agents" use:tilt>
-      <h3>Made for humans and agents</h3>
+      <h3 data-agent-id="feature-agents-title">Made for humans and agents</h3>
       <div class="dots" aria-hidden="true">
         {#each DOT_ROWS as n (n)}
           <div class="row">

@@ -34,6 +34,9 @@
   --site-bg: #000;
   --site-ink: #f0eee9;
   --site-accent: #ff4000;
+  --site-z-agents: 8;
+  --site-z-drawer: 9;
+  --site-z-header: 10;
   --site-line: #4f4f4f;
   --site-gutter: 12px;
   --site-text: 14px;

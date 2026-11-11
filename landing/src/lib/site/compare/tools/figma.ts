@@ -3,11 +3,11 @@ import type { Competitor } from '../tool';
 
 export const FIGMA: Competitor = {
   name: 'Figma',
-  title: 'Feega vs Figma: design that animates in the same file (2026)',
-  description: 'Figma designs stop at export. In Feega the same frame animates and exports to MP4, GIF or Lottie. Features, pricing, and when Figma still wins.',
+  title: 'Figma alternative for AI agents: Feega vs Figma',
+  description: 'Best Figma alternative for LLMs and AI agents? Feega is open source, animates in the same file and is edited by Claude Code over MCP. Where Figma wins.',
   heading: 'Feega vs Figma',
   intro:
-    'Your Figma designs stop at the export. In Feega, the same frame animates: paste your frames, add keyframes, export MP4, GIF or Lottie. No handoff to After Effects or Jitter.',
+    'Feega is a Figma alternative for LLMs and AI agents: an open-source canvas that Claude Code edits over MCP, where the same frame animates and exports to MP4, GIF or Lottie. Paste your Figma frames to start. Figma is still ahead for large-team product design, handoff and plugins.',
   pricing: 'Starter free; Professional $16 per Full seat per month; Organization $55 and Enterprise $90, billed annually.',
   features: {
     [Feature.DesignCanvas]: { has: true },

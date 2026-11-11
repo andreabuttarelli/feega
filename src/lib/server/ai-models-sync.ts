@@ -33,7 +33,9 @@ import { fetchHiggsfieldModels, withDiscovered } from './higgsfield-docs';
 import { higgsfieldConfig } from './higgsfield';
 import { configuredIn, TaskProviderName } from './generation/task-providers';
 
-export type AiModelCatalogue = 'chat' | 'image' | 'video' | 'model3d';
+export type AiModelCatalogue = 'chat' | 'image' | 'video' | 'model3d' | 'audio';
+
+const CATALOGUES_AWAITING_MIGRATION: ReadonlySet<AiModelCatalogue> = new Set(['audio']);
 
 type RawReleaseFacts = {
   created?: number;
@@ -428,7 +430,9 @@ export async function syncAiModels(
     higgsfieldRows(admin, doFetch, syncedAt)
   ]);
 
-  const rows = await keepImagePricing(admin, results.flatMap((result) => result.rows));
+  const synced = results.flatMap((result) => result.rows);
+  const pending = synced.filter((row) => CATALOGUES_AWAITING_MIGRATION.has(row.catalogue));
+  const rows = await keepImagePricing(admin, synced.filter((row) => !CATALOGUES_AWAITING_MIGRATION.has(row.catalogue)));
   if (!rows.length) {
     const reason = results.find((r) => !r.ok)?.reason ?? 'gateway returned no models';
     return { ok: false, reason };
@@ -439,7 +443,13 @@ export async function syncAiModels(
     return { ok: false, reason: failure };
   }
 
-  return { ok: true, synced: rows.length };
+  const pendingFailure = pending.length ? await upsertTolerant(admin, pending) : null;
+  if (pendingFailure) {
+    console.warn('[ai-models-sync] audio rows refused, migration 20261107120000 not applied?', pendingFailure);
+    return { ok: true, synced: rows.length };
+  }
+
+  return { ok: true, synced: rows.length + pending.length };
 }
 
 export type ModelModalities = {

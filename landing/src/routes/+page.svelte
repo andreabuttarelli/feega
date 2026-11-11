@@ -1,4 +1,5 @@
 <script lang="ts">
+  import LiveAgents from '$lib/site/LiveAgents.svelte';
   import Hero from '$lib/site/home/Hero.svelte';
   import OpenSource from '$lib/site/home/OpenSource.svelte';
   import StartSite from '$lib/site/home/StartSite.svelte';
@@ -40,6 +41,8 @@
 <Story />
 <Faq />
 </div>
+
+<LiveAgents />
 
 <style>
   .site-home {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ItemKind, type DisplayList, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import { BlendMode } from '@feega/motion-core/motion/blend';
-import { Stand, drawable, fillOrder, firstDrawn, placeholder, standIn, withoutPictures, type Look } from './placeholders';
+import { Stand, drawable, fillOrder, firstDrawn, layersOf, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from './placeholders';
 import { Readiness } from '@feega/motion-core/motion/gpu-full/media';
 
 const LOOK: Look = { paper: '#ffffff', line: '#e5e5e5' };
@@ -44,6 +44,11 @@ describe('fill order', () => {
     const items = [{ id: 'far', box: box(5000) }, { id: 'edge', box: box(700) }, { id: 'centre', box: box(300) }];
     expect(fillOrder(items, { x: 0, y: 0, zoom: 1 }, { width: 800, height: 600 }).map((i) => i.id)).toEqual(['centre', 'edge']);
   });
+
+  it('sends the frames on screen to the GPU before the ones off screen, keeping every frame', () => {
+    const items = [{ id: 'far', box: box(5000) }, { id: 'edge', box: box(700) }, { id: 'centre', box: box(300) }];
+    expect(onScreenFirst(items, { x: 0, y: 0, zoom: 1 }, { width: 800, height: 600 }).map((i) => i.id)).toEqual(['centre', 'edge', 'far']);
+  });
 });
 
 const picture = (clip: string): Item => ({ kind: ItemKind.Image, clip, src: `https://x/${clip}.png`, video: false, mediaTime: 0, size: { width: 40, height: 30 }, fit: 'cover', focus: [0.5, 0.5], zoom: 1, clipped: true, inner: [1, 0, 0, 1, 0, 0], opacity: 1, matrix: [1, 0, 0, 1, 5, 6], blur: 0, blend: BlendMode.Normal });
@@ -80,5 +85,39 @@ describe('what is drawn while a better layer is not in the raster yet', () => {
 
   it('draws nothing only when no layer is in the raster', () => {
     expect(firstDrawn([layer('real')], new Set())).toBeNull();
+  });
+});
+
+describe('layersOf', () => {
+  const layer = (group: string) => ({ group });
+
+  it('la miniatura resta finché la versione vettoriale non è sulla GPU', () => {
+    const chain = layersOf({ ready: layer('f:1:256:vectors'), before: null, thumb: layer('f:1:thumb'), blocks: null, placeholder: layer('placeholder') });
+
+    expect(firstDrawn(chain, new Set(['f:1:thumb', 'placeholder']))?.group).toBe('f:1:thumb');
+    expect(firstDrawn(chain, new Set(['f:1:256:vectors', 'f:1:thumb', 'placeholder']))?.group).toBe('f:1:256:vectors');
+  });
+
+  it('senza miniatura cade sul segnaposto', () => {
+    const chain = layersOf({ ready: layer('f:1:256'), before: null, thumb: null, blocks: null, placeholder: layer('placeholder') });
+
+    expect(firstDrawn(chain, new Set(['placeholder']))?.group).toBe('placeholder');
+  });
+});
+
+describe('layersOf con un poster già disegnato', () => {
+  it('la miniatura vince sul poster disegnato prima', () => {
+    const chain = layersOf({ ready: { group: 'f:1:256' }, before: { group: 'f:[poster]' }, thumb: { group: 'f:1:thumb' }, blocks: null, placeholder: { group: 'placeholder' } });
+
+    expect(firstDrawn(chain, new Set(['f:[poster]', 'f:1:thumb', 'placeholder']))?.group).toBe('f:1:thumb');
+  });
+});
+
+describe('layersOf con un poster pronto', () => {
+  it('la miniatura vince sul poster della card', () => {
+    const chain = layersOf({ ready: null, poster: { group: 'f:[poster]' }, before: null, thumb: { group: 'f:1:thumb' }, blocks: null, placeholder: { group: 'placeholder' } });
+
+    expect(firstDrawn(chain, new Set(['f:[poster]', 'f:1:thumb', 'placeholder']))?.group).toBe('f:1:thumb');
+    expect(firstDrawn(chain, new Set(['f:[poster]', 'placeholder']))?.group).toBe('f:[poster]');
   });
 });

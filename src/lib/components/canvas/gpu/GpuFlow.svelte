@@ -1,5 +1,10 @@
 <script lang="ts">
+  import { heldFrames } from '$lib/canvas/core/held-frames';
   import { baseNodeId, heldViews, viewAt, viewOf } from '$lib/canvas/breakpoint-views';
+  import { posterUploads } from '$lib/canvas/core/poster-upload';
+  import { POSTER_DEBOUNCE_MS } from '$lib/motion/poster-capture';
+  import { postPageAction } from '$lib/api/page-action';
+  import { motionNodePath } from '$lib/canvas/motion-node';
   import { liftViewEdit } from '@feega/motion-core/motion/breakpoints/view';
   import { BASE_BREAKPOINT } from '@feega/motion-core/motion/breakpoints/model';
   import { ownsPress } from '$lib/canvas/press-owner';
@@ -9,7 +14,7 @@
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { frameDrill } from '$lib/canvas/frame-drill';
   import { Depth, Gesture } from '$lib/motion/drill';
-  import { FrameFit, FramePickers, Reuse, shaped, type WorldRect } from '$lib/canvas/frame-pick';
+  import { FrameFit, FramePickers, Reuse, shaped, type FrameSpace, type WorldRect } from '$lib/canvas/frame-pick';
   import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
   import { PickerSettle } from '$lib/canvas/picker-settle.svelte';
   import { onDestroy, onMount, untrack } from 'svelte';
@@ -92,10 +97,11 @@
   import { ImagesOutcome, figmaImageAssets, type ImagesAnswer } from '$lib/canvas/figma/fetch-images';
   import { imagesFilled, type FigmaJob } from '$lib/canvas/figma/images';
   import { quadBox, quadStyle } from '$lib/canvas/quad-box';
+  import { hoverRingStyle } from '$lib/canvas/hover-ring';
   import { DocAccess, FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import { nextDoc, stepOf, type PeerStep } from '$lib/motion/frame-step';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
-  import { GRIP_SUMMARY, SelectionKind, SnapMode, dragClips, measuredGaps, nudgeClips, selectionKindOf } from '$lib/canvas/frame-transform';
+  import { GRIP_SUMMARY, SelectionKind, SnapMode, dragClips, measuredGaps, clipsShift, nudgeClips, selectionKindOf } from '$lib/canvas/frame-transform';
   import { unionBounds } from '$lib/motion/multi-select';
   import { marqueeIds, primaryOf, spanOf, toggleId, type FrameStep } from '$lib/canvas/frame-multi';
   import { postFrameOps } from '$lib/canvas/frame-ops-send';
@@ -141,6 +147,7 @@
   import EdgePanel from '../EdgePanel.svelte';
   import GpuTileChrome from './GpuTileChrome.svelte';
   import CoreFrames from './CoreFrames.svelte';
+  import { subtreeOf, type Lift } from '$lib/canvas/core/lifted-drag';
   import type { FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { sceneRevision, sceneStamp } from '$lib/canvas/scene-sources';
   import { liveDocs, type LiveDoc } from '$lib/canvas/core/live-docs.svelte';
@@ -184,6 +191,7 @@
   import { DrawTool } from '$lib/motion/draw-tool';
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
   import { FitPurpose, fitView, restoreViewport } from '$lib/canvas/restore-viewport';
+  import { coreSourcePath } from '$lib/canvas/core/early-sources';
   import { loadViewport, rememberViewport } from '$lib/canvas/viewport-memory';
   import { FocusMode, Placement, centreIn, focusPlacement, focusSelects, inView, revealIn, frameIn, type Insets } from '$lib/canvas/free-area';
   import { ZoomStep, watchPinch, type CanvasZoom } from '$lib/canvas/page-zoom';
@@ -238,6 +246,7 @@
   import { faceOf } from '$lib/canvas/gpu/card-face';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { assetTier } from '$lib/canvas/core/asset-tier';
+  import { whenIdle } from '$lib/motion/hyperframes/warm-player';
   import { Fling, type Glide } from '$lib/canvas/core/inertia';
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
   import { themeOf } from '$lib/canvas/gpu/theme';
@@ -338,7 +347,7 @@
 
   const assetUrl = (id: string) => canvasAssetUrl(page.params.projectId ?? '', page.params.canvasId ?? '', id, AssetSize.Full);
   const tier = $derived(assetTier(view.zoom));
-  const tierUrl = (id: string) => canvasAssetUrl(page.params.projectId ?? '', page.params.canvasId ?? '', id, tier);
+  const tierUrl = (size: AssetSize) => (id: string) => canvasAssetUrl(page.params.projectId ?? '', page.params.canvasId ?? '', id, size);
 
   let turning = $state<ReadonlyMap<string, number>>(new Map());
   let spin = $state<{ box: Box; degrees: number } | null>(null);
@@ -416,25 +425,40 @@
   const drawCard = $derived(coreType && coreLook ? cardsOnCanvas({ ...coreLook, panel: coreLook.paper }, coreType.glyphs, coreType.bold, coreType.gen) : null);
   const labelZoom = $derived(labelZoomStep(view.zoom));
   const strokeZoom = $derived(strokeZoomStep(view.zoom));
-  const coreCards = $derived.by(() => {
+  const basesAt = (size: AssetSize) => {
     const text = coreType;
-    const draw = drawCard;
-    if (!text || !draw) {
+    if (!text) {
       return [];
     }
-    return placed.filter(drawsCard).flatMap((t) => {
-      const card: CardTile = {
+    return placed.filter(drawsCard).map((t) => ({
+      card: {
         id: t.id,
         box: { x: t.x, y: t.y, w: t.w, h: t.h },
-        face: faceOf(t, summaries.get(t.id)?.data ?? {}, tierUrl, props.viewOf?.(t.id) ?? null, props.genViewFor?.(t.id) ?? null),
+        face: faceOf(t, summaries.get(t.id)?.data ?? {}, tierUrl(size), props.viewOf?.(t.id) ?? null, props.genViewFor?.(t.id) ?? null),
         ...portMarks(t),
         label: labelOf(t),
         icon: text.icons.get(t.kind as NodeType) ?? null,
-        tag: tagHexOf(t.id),
-        zoom: labelZoom
-      };
-      const poster = holdsDoc(t.kind ?? '');
-      return [{ key: cardKey(card), frame: draw(card, poster ? CardLayer.Face : CardLayer.Whole), turn: turnOf(t), poster }];
+        tag: tagHexOf(t.id)
+      },
+      turn: turnOf(t),
+      poster: holdsDoc(t.kind ?? '')
+    }));
+  };
+  const nearBases = $derived.by(() => basesAt(AssetSize.Px1024));
+  const farBases = $derived.by(() => basesAt(AssetSize.Px256));
+  const cardBases = $derived(tier === AssetSize.Px1024 ? nearBases : farBases);
+  $effect(() => {
+    void cardBases;
+    whenIdle(() => void (tier === AssetSize.Px1024 ? farBases : nearBases));
+  });
+  const coreCards = $derived.by(() => {
+    const draw = drawCard;
+    if (!draw) {
+      return [];
+    }
+    return cardBases.map(({ card: base, turn, poster }) => {
+      const card: CardTile = { ...base, zoom: labelZoom };
+      return { key: cardKey(card), frame: draw(card, poster ? CardLayer.Face : CardLayer.Whole), turn, poster };
     });
   });
   const addsBeside = (t: Tile) => holdsDoc(t.kind ?? '') && kindOfNode(t.id) === FrameKind.Frame;
@@ -453,7 +477,7 @@
       const on = savers.get(v.nodeId)?.breakpoint === v.breakpointId && selected.includes(t.id);
       const chrome = nodeChrome(t.id, on, layersSource.video, typedFreeText());
       const { x, y, w, h } = v.frame.box;
-      return [{ id: v.frame.id, x, y, width: w, height: h, ...portMarks({ ...t, connectable: false }), label: `${v.name} ${v.width}`, icon: text.icons.get(t.kind as NodeType) ?? null, tag: null, zoom: labelZoom, ring: on ? chrome.ring : NodeChrome.None, handles: false, hovered: false, ringColor: ringColour(), names: false, strokeZoom, addBeside: false, radius: cardRadiusOf(t.kind ?? ''), turn: undefined, layers: ChromeLayers.Whole }];
+      return [{ id: v.frame.id, x, y, width: w, height: h, ...portMarks({ ...t, connectable: false }), label: `${v.name} ${v.width}`, icon: text.icons.get(t.kind as NodeType) ?? null, tag: null, zoom: labelZoom, ring: on ? chrome.ring : NodeChrome.None, handles: false, ringColor: ringColour(), names: false, strokeZoom, addBeside: false, radius: cardRadiusOf(t.kind ?? ''), turn: undefined, layers: ChromeLayers.Whole }];
     });
     const tiles = placed.flatMap((t) => {
       const handed = handedOver(t) && !holdsDoc(t.kind ?? '');
@@ -462,21 +486,46 @@
       }
       const on = selected.includes(t.id);
       const chrome = nodeChrome(t.id, on, layersSource.video, typedFreeText());
-      const openId = layersSource.video?.nodeId ?? null;
-      const ringed = (!on && frameRinged(layersSource.hovered, t.id, openId, hovered)) || emptyAreaRinged(layersSource.hovered, t.id, openId, hovered);
       const layers = holdsDoc(t.kind ?? '') ? ChromeLayers.Whole : handed ? ChromeLayers.Ports : ChromeLayers.State;
-      if (layers === ChromeLayers.State && chrome.ring === NodeChrome.None && !ringed) {
+      if (layers === ChromeLayers.State && chrome.ring === NodeChrome.None) {
         return [];
       }
       const marks = portMarks(t);
       const own = layers === ChromeLayers.Whole ? { label: labelOf(t), icon: text.icons.get(t.kind as NodeType) ?? null, tag: tagHexOf(t.id), zoom: labelZoom } : { label: null, icon: null };
-      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, hovered: ringed, ringColor: ringColour(), names: on, strokeZoom, addBeside: addsBeside(t) && (on || hovered === t.id || addLinger === t.id), radius: cardRadiusOf(t.kind ?? ''), turn: turnOf(t), layers }];
+      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, ringColor: ringColour(), names: on, strokeZoom, addBeside: addsBeside(t) && (on || hovered === t.id || addLinger === t.id), radius: cardRadiusOf(t.kind ?? ''), turn: turnOf(t), layers }];
     });
     return [...tiles, ...views];
   });
+  const hoverRings = $derived.by(() => {
+    const openId = layersSource.video?.nodeId ?? null;
+    const ringed = (t: Tile) => {
+      const on = selected.includes(t.id);
+      const outlined = (!on && frameRinged(layersSource.hovered, t.id, openId, hovered)) || emptyAreaRinged(layersSource.hovered, t.id, openId, hovered);
+      const solo = hovered === t.id && !on && layersSource.hovered?.nodeId !== t.id;
+      return (outlined || solo) && nodeChrome(t.id, on, layersSource.video, typedFreeText()).ring !== NodeChrome.Selected;
+    };
+    return placed.filter(ringed).map((t) => ({ id: t.id, x: t.x, y: t.y, w: t.w, h: t.h, rotation: t.rotation, radius: cardRadiusOf(t.kind ?? '') }));
+  });
   const posterCards = $derived(coreCards.filter((c) => c.poster));
   const nodeCards = $derived(coreCards.filter((c) => !c.poster));
-  const coreSource = (id: string) => `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${baseNodeId(id)}/source`;
+  const offerPoster = posterUploads(async (shot) => {
+    const form = new FormData();
+    form.set('file', new File([shot.blob], 'poster.webp', { type: shot.blob.type }));
+    form.set('width', String(shot.width));
+    form.set('height', String(shot.height));
+    form.set('revision', String(shot.revision));
+    await postPageAction(motionNodePath({ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', nodeId: shot.id }), 'poster', form);
+  }, POSTER_DEBOUNCE_MS);
+
+  function postThumb(id: string, revision: number, blob: Blob, size: { width: number; height: number }) {
+    if (baseNodeId(id) !== id) {
+      return;
+    }
+    const posterRevision = summaries.get(id)?.data?.posterRevision;
+    offerPoster({ id, revision, posterRevision: typeof posterRevision === 'number' ? posterRevision : undefined, blob, ...size });
+  }
+
+  const coreSource = (id: string) => coreSourcePath({ projectId: page.params.projectId!, canvasId: page.params.canvasId! }, id);
   let domShows = $state(new Set<string>());
   const handedOver = (t: Tile) => domIds.has(t.id) && (!holdsDoc(t.kind ?? '') || domShows.has(t.id));
   $effect(() => {
@@ -1345,7 +1394,8 @@
   let inside = $state<Inside | null>(null);
   const savers = new Map<string, FrameEditSession>();
   const settle = new PickerSettle();
-  const reuseOf = (nodeId: string) => (savers.get(nodeId)?.live.active() || settle.settling(nodeId) ? Reuse.Held : Reuse.Changed);
+  const liftedNow = (id: string) => elementLift?.id === id && !elementLift.landing;
+  const reuseOf = (nodeId: string) => (savers.get(nodeId)?.live.active() || settle.settling(nodeId) || liftedNow(nodeId) ? Reuse.Held : Reuse.Changed);
 
   $effect(() => {
     const warnUnsaved = (event: BeforeUnloadEvent) => {
@@ -1381,7 +1431,7 @@
   };
   const resolveViews = heldViews();
   const bpViews = $derived(resolveViews(coreFrames, viewDocOf));
-  const heldInResize = $derived(new Set([...resizing].filter((id) => frameChrome(kindOfNode(id)).resize === ResizePaint.Held)));
+  const heldInGesture = $derived(heldFrames({ resizing, heldOnResize: (id) => frameChrome(kindOfNode(id)).resize === ResizePaint.Held, moving: [...overrides.keys()].filter((id) => !resizing.has(id)), shown: bpViews.map((v) => v.frame.id), base: baseNodeId }));
   const drawnFrames = $derived(coreFrames.map((f) => {
     const doc = liveOf(f.id)?.doc;
     const scenes = doc ? sceneStamp(doc, (id) => sceneRevision(revisionOfFrame(id), liveDocs.edits.get(id))) : '';
@@ -2116,13 +2166,22 @@
     [TimelineAccess.Edit]: (nodeId) => (doc, summary) => commit(nodeId, { ok: true, doc }, summary)
   };
 
+  function liftShift(nodeId: string, space: FrameSpace): Point {
+    if (!liftedNow(nodeId) || !elementLift) {
+      return { x: 0, y: 0 };
+    }
+    const [from, to] = [space.pointToWorld([0, 0]), space.pointToWorld(elementLift.by)];
+    return { x: to.x - from.x, y: to.y - from.y };
+  }
+
   function selectionMarks(nodeId: string) {
     const at = inside?.nodeId === nodeId ? editPickerOf(nodeId) : null;
     if (!at) {
       return [];
     }
     const kind = selectionKindOf(picks.length, picks.length === 1 ? findClip(at.live.doc, picks[0])?.clip : null);
-    const onScreen = (p: Point): [number, number] => [(p.x - at.frame.box.x) * view.zoom, (p.y - at.frame.box.y) * view.zoom];
+    const shift = liftShift(nodeId, at.space);
+    const onScreen = (p: Point): [number, number] => [(p.x + shift.x - at.frame.box.x) * view.zoom, (p.y + shift.y - at.frame.box.y) * view.zoom];
     return picks.flatMap((clip) => {
       const quad = at.picker.outlineQuad(clip, at.space);
       const own = findClip(at.live.doc, clip)?.clip;
@@ -2245,7 +2304,7 @@
 
   function textMeasureOf(nodeId: string): TextMeasure | undefined {
     const live = liveOf(nodeId);
-    return live ? pickers.of(nodeId, live, () => liveOf(nodeId)?.playhead).textMeasure() : undefined;
+    return live ? pickers.of(nodeId, live, () => liveOf(nodeId)?.playhead, reuseOf(nodeId)).textMeasure() : undefined;
   }
 
   function toolsOf(nodeId: string) {
@@ -2539,6 +2598,8 @@
     applyTextFit(fit, { amend: (fitted) => saver.amendRoot(fitted, 'Fitted text'), show: (fitted) => liveDocs.set(nodeId, { ...live, doc: fitted }), place: (node) => props.onPlace?.(nodeId, node.w, node.h) });
   }
 
+  let elementLift = $state<Lift | null>(null);
+  let liftKey = 0;
   let frameGuides = $state<{ nodeId: string; guides: Guide[]; gaps: Gap[]; drop?: DropLine | null } | null>(null);
 
   function frameReach(at: NonNullable<ReturnType<typeof pickerOf>>): number {
@@ -2690,6 +2751,8 @@
     const carry = (ev: PointerEvent): Carry => carryOf({ down, now: local(ev), started, frame: edited, world: toWorld(view, local(ev)) });
     const stackChild = grip === Grip.Move && work.ids.length === 1 && stackPlaced(work.doc, work.ids[0]) ? work.ids[0] : null;
     const joinable = grip === Grip.Move && work.ids.length === 1 && !stackChild;
+    const liftable = grip === Grip.Move && !stackChild && !shownView && work.doc === inScope.view && inScope.view === start;
+    const lift = liftable ? { id: nodeId, key: ++liftKey, clips: subtreeOf(work.doc, work.ids), landing: false } : null;
 
     const leaving = (ev: PointerEvent, now: Carry): ElementOut | null => {
       const [clipId] = work.ids;
@@ -2731,11 +2794,15 @@
       if (shown.ok) {
         liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? at.live), doc: shown.doc });
       }
+      if (shown.ok && lift) {
+        elementLift = { ...lift, by: clipsShift(work.doc, shown.doc, work.ids, inScope.frame, boxes) };
+      }
     };
     const up = (ev: PointerEvent) => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       frameGuides = null;
+      elementLift = elementLift && result?.ok ? { ...elementLift, landing: true } : null;
       if (!started) {
         pickOnRelease(nodeId, grip, ev);
         return;
@@ -3396,7 +3463,6 @@
           peers: corePeers.flatMap((p) => (p.cursor ? [{ id: p.sessionId, name: displayName(p.name), color: p.colour, at: p.cursor }] : [])),
           outlines: corePeers.length ? peerOutlines(props.peers ?? [], (id) => byId.get(id) ?? null).map((o) => ({ key: o.key, box: o.rect, color: o.colour })) : [],
           ghost: ghost ? { curve: ghost.from.side === PortSide.Out ? wireCurve(ghost.from, ghost.at) : wireCurve(ghost.at, ghost.from), ok: ghost.ok } : null,
-          hovered: hovered && !selected.includes(hovered) && layersSource.hovered?.nodeId !== hovered ? (byId.get(hovered) ?? null) : null,
           running: placed.filter((t) => !handedOver(t) && isRunning(summaries.get(t.id)?.data ?? {})).map((t) => ({ ...t, radius: cardRadiusOf(t.kind ?? '') })),
           chrome: coreChrome
         })
@@ -4285,9 +4351,14 @@
   >
     {#if !failed}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInResize} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onfallback={coreOff} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
+    <div class="hover-rings" data-testid="node-hover-rings">
+      {#each hoverRings as ring (ring.id)}
+        <div class="hover-ring" data-testid="node-hover-ring" data-node={ring.id} style={highlightStyle(HighlightKind.Node) + ';' + hoverRingStyle(view, ring)}></div>
+      {/each}
+    </div>
     <FrameOverlays {view} frames={overlayFrames}>
       {#snippet children(frame)}
         {@const edit = typingMark(frame.id)}
@@ -4711,6 +4782,21 @@
     z-index: 1;
     left: 0;
     top: 0;
+  }
+
+  .hover-rings {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 2;
+  }
+
+  .hover-ring {
+    position: absolute;
+    box-sizing: border-box;
+    border-style: solid;
+    border-color: var(--highlight);
   }
 
   .pick-outline {

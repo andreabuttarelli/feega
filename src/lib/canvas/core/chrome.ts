@@ -1,14 +1,12 @@
-import { HIGHLIGHT, HighlightKind } from '../highlight';
 import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { CONNECTOR_STYLE, type ConnectorType } from '$lib/canvas/connectors';
 import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import { dashes } from '@feega/motion-core/motion/gpu-full/stroke';
 import { FillRule } from '@feega/motion-core/motion/gpu-full/paint';
-import { HANDLE_SCREEN_PX, HOVER_SCREEN_PX, SELECT_SCREEN_PX, labelScale, labelShown, strokeWorld } from './label-size';
+import { HANDLE_SCREEN_PX, SELECT_SCREEN_PX, labelScale, labelShown, strokeWorld } from './label-size';
 import { circle, line, rect, reverse, roundRect, solid } from './shapes';
 
 export enum ChromePart {
-  Hover = 'hover',
   Ring = 'ring',
   PortIn = 'port-in',
   PortOut = 'port-out',
@@ -50,7 +48,7 @@ export type ChromeTile = {
   strokeZoom?: number;
 };
 
-export type ChromeState = { ring: NodeChrome; handles: boolean; hovered: boolean; ringColor: string; names: boolean };
+export type ChromeState = { ring: NodeChrome; handles: boolean; ringColor: string; names: boolean };
 
 export type StateTile = ChromeTile & ChromeState;
 
@@ -65,7 +63,6 @@ const LABEL_GAP = 4;
 const LABEL_PAD = 2;
 const LABEL_LEADING = 1.3;
 const NAME_LEADING = 1;
-const HOVER_COLOR = HIGHLIGHT[HighlightKind.Node];
 const HANDLE_FILL = '#ffffff';
 const LABEL_COLOR = '#6e6e73';
 const ICON_SIZE = 12;
@@ -107,13 +104,6 @@ function roundBand(t: ChromeTile, width: number, radius: number): number[][] {
 }
 
 const band = (t: ChromeTile, width: number) => (t.radius ? roundBand(t, width, t.radius) : line(outline(t, width), width, true));
-
-function hover(t: StateTile): PathItem[] {
-  if (!t.hovered || t.ring === NodeChrome.Selected) {
-    return [];
-  }
-  return [item(t, ChromePart.Hover, band(t, widthOf(t, HOVER_SCREEN_PX)), HOVER_COLOR)];
-}
 
 const RINGS: Record<NodeChrome, (t: StateTile) => PathItem[]> = {
   [NodeChrome.None]: () => [],
@@ -242,6 +232,10 @@ function names(t: ChromeTile, glyphs: Glyphs, shown: (m: PortMark) => boolean): 
 
 const lit = (m: PortMark) => PORT_LOOK[m.state].named;
 
-export const tileChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...ports(t), ...names(t, glyphs, lit), ...label(t, glyphs), ...tag(t)];
+export const portChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...ports(t), ...names(t, glyphs, lit)];
 
-export const stateChrome = (t: StateTile, glyphs: Glyphs): PathItem[] => [...hover(t), ...RINGS[t.ring](t), ...(t.names ? names(t, glyphs, (m) => !lit(m)) : []), ...handles(t)];
+export const labelChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...label(t, glyphs), ...tag(t)];
+
+export const tileChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...portChrome(t, glyphs), ...labelChrome(t, glyphs)];
+
+export const stateChrome = (t: StateTile, glyphs: Glyphs): PathItem[] => [...RINGS[t.ring](t), ...(t.names ? names(t, glyphs, (m) => !lit(m)) : []), ...handles(t)];

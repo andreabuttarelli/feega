@@ -1,3 +1,4 @@
+import type { CodeSpot } from '$lib/canvas/code-look';
 import type { CapturedMotion } from './captured-motion';
 import { BLEND_MODES, BlendMode } from '@feega/motion-core/motion/blend';
 import { TextSizing } from '@feega/motion-core/motion/text-sizing';
@@ -93,7 +94,7 @@ export enum MaskBand {
 
 export type LayerMask = { band: MaskBand; x: number; y: number; length: number; span: number; rotation: number; opacity: number };
 
-type Common = { name: string; box: Box; rotation: number; opacity: number; effects: LayerEffect[]; item: ChildItem; hidden: boolean; blend: BlendMode; masks: LayerMask[]; ref?: string; behaviour?: ClipBehaviour; motion?: CapturedMotion };
+type Common = { name: string; box: Box; rotation: number; opacity: number; effects: LayerEffect[]; item: ChildItem; hidden: boolean; blend: BlendMode; masks: LayerMask[]; ref?: string; behaviour?: ClipBehaviour; motion?: CapturedMotion; source?: CodeSpot };
 
 export type ComponentRef = { key: string; name: string; inPaste: boolean; variant?: Record<string, string>; texts?: Record<string, string> };
 
@@ -597,7 +598,7 @@ function masksOf(gradient: FigmaRawNode['maskGradient'], box: Box): LayerMask[] 
 }
 
 function common(n: FigmaRawNode, m: Matrix, ctx: Ctx): Common {
-  return { name: n.name ?? n.type ?? '', box: boxOf(m, n.size ?? { x: 0, y: 0 }), rotation: rotationOf(m), opacity: round(n.opacity ?? 1), effects: effectsOf(n, ctx.report), item: itemOf(n), hidden: n.collapsed === true, blend: blendOf(n.blendMode), masks: masksOf(n.maskGradient, boxOf(m, n.size ?? { x: 0, y: 0 })), ...(n.ref ? { ref: n.ref } : {}), ...(n.behaviour ? { behaviour: n.behaviour } : {}), ...(n.motion ? { motion: n.motion } : {}) };
+  return { name: n.name ?? n.type ?? '', box: boxOf(m, n.size ?? { x: 0, y: 0 }), rotation: rotationOf(m), opacity: round(n.opacity ?? 1), effects: effectsOf(n, ctx.report), item: itemOf(n), hidden: n.collapsed === true, blend: blendOf(n.blendMode), masks: masksOf(n.maskGradient, boxOf(m, n.size ?? { x: 0, y: 0 })), ...(n.ref ? { ref: n.ref } : {}), ...(n.behaviour ? { behaviour: n.behaviour } : {}), ...(n.motion ? { motion: n.motion } : {}), ...(n.source ? { source: n.source } : {}) };
 }
 
 const DEFAULT_TEXT_SIZE = 12;

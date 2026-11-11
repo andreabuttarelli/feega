@@ -12,6 +12,10 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 **Signal:** a fresh database applies every file and the app still answers `PGRST205` for `orgs`. **Move:** the new schema was never a migration; `supabase/baseline` is generated from production catalogs and `db:migrate` applies it, then only files dated after its cutoff. Never delete or rename the legacy files.
 
+### Local mode through `vite dev` ends on "something broke" with a redirect loop
+
+**Signal:** the canvas page answers 500 in the browser, console `Error: Redirect loop` from `hooks.client.ts`, while `curl` of every `/api/v1/...` route answers 200. **Move:** `FEEGA_LOCAL_FILE` alone switches the server only; the browser client still asks Supabase for a session, gets none, and bounces to `/login`. Start the dev server with the whole `localEnv` of `scripts/local.mjs` (`PUBLIC_FEEGA_LOCAL=1`, `PUBLIC_SUPABASE_URL=http://supabase.invalid`, `PUBLIC_SUPABASE_ANON_KEY=local`, `ORIGIN`, `PUBLIC_APP_URL`), or run `npm run local`.
+
 ## Canvas performance
 
 ### Perf numbers swing 6 to 57 fps on the same build: the machine is loaded
@@ -19,6 +23,18 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ### A sibling worktree turns unreadable mid-session
 **Signal:** `ls` in `../dazero-<task>` answers `Operation not permitted`, and the preview served from it dies with `ERR_CONNECTION_REFUSED`. The agent sandbox only allows the session's own checkout. **Move:** put the task worktree inside the allowed checkout (`.claude/worktrees/<name>`, gitignored), or work on a branch in the checkout itself.
+
+### A perf run from a worktree measures the main checkout's packages
+**Signal:** a change under `packages/` (gpu-core glue, motion-core) leaves the probe numbers identical, or `build:node` / vitest fail with `X is not a function` / `is not exported` for a symbol that exists in the worktree's `packages/`; `realpath node_modules/@feega/motion-core` points into the main checkout, which is behind `dev`. **Move:** give the worktree its own `node_modules`: a real folder of symlinks to every entry of the main one, except `@feega/*`, which point to `../../packages/<name>` of the worktree. Check with `realpath` before the first run.
+
+### The zoom probe reports 0 zoom frames in headless Chromium
+**Signal:** `tests/e2e/canvas-zoom-profile-probe.spec.ts` prints `zoom frames 0` and fps from an empty list when launched headless. **Move:** headless Chromium does not run the WebGPU canvas frames the probe counts; launch headed (the spec does; never add `headless: true` to compare quicker), and keep the windows on screen while it runs.
+
+### GitHub-hosted runners cannot benchmark the WebGPU canvas
+**Signal:** the perf job on `ubuntu-latest` counts 0 zoom frames, or with SwiftShader (`--use-webgpu-adapter=swiftshader`) gets an adapter only in some runs and zooms at 1-2 fps with 3-15 s frames. **Move:** no GPU there, so the numbers measure software rasterization. Keep that job advisory; gate on a machine with a GPU (self-hosted runner), and never refresh the baseline from a GPU-less run.
+
+### Playwright `webServer` never sees the local app as ready
+**Signal:** `DEBUG=pw:webserver` loops on `Parse Error: Header overflow` for `/login` while `curl` answers 303. **Move:** the app's response headers exceed Node's client limit; point `webServer.url` at a static file (`/favicon-16.png`).
 
 ### Panning zoomed in stalls on `submit` and the wasm encoder: count layers per frame
 
@@ -33,6 +49,9 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 ### A fresh core raster per still costs seconds, whatever its size
 **Signal:** a batch of small stills (component thumbnails, posters) takes 1–2 s each; timings show `raster.draw` in a few ms and the first `createImageBitmap(canvas)` eating the rest, the same at 1920×1080 and at 192×50. **Move:** the cost is the new GL context compiling its shaders on first readback, not pixels. Create one raster (`stillRaster` in `core-export.ts`) and reuse it for the whole batch; dispose it when idle.
 
+### A hover outline drawn by the core grows and shrinks during a zoom
+Signal: with the pointer still over a frame, a wheel zoom makes its hover outline 2px, 4px, 6px thick and its gap wider than the node, then snaps back when the gesture ends; the DOM pick box of an element stays right. Cause: core overlay items are world-space strokes built at the zoom of the last quiet moment, and `CoreFrames` only re-sends overlay parts when no gesture is active, so the retained screen scales them with the camera. Move: anything that must keep a screen-space size through a gesture (hover outlines, 1px gaps) is a DOM element placed from `view` (`hover-ring.ts`), not a core overlay item. Measure it with the colour run at a fixed column in screenshots taken mid-zoom, not at rest.
+
 ## Providers
 
 ### Kie publishes its price list and its request schemas, you just have to find them
@@ -44,6 +63,22 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 ### A PR that adds or changes a tool fails the tool surface pins
 
 **Signal:** `tool-surface-pin.test.ts` or `cli/mcp/tool-list-pin.test.ts` red with a snapshot mismatch on a PR that changed a tool on purpose. **Move:** `npx vitest run -u src/lib/server/edit/tool-surface-pin.test.ts cli/mcp/tool-list-pin.test.ts`, read the snapshot diff (only your tool changes), commit it. The src pin stores one fingerprint per tool/op, one entry each: PRs touching different tools do not conflict; a real conflict means the same tool changed twice. Keep the second `exports[...]` block without the `>` in the cli snapshot (the `bun test` key): vitest `-u` drops it as obsolete. On a rebase conflict in a `.snap`, skip your pin commit and regenerate.
+
+### A worktree dev server runs the main checkout's `packages/`
+
+**Signal:** a fix in `packages/motion-core` passes its test but the browser on the worktree's dev server still shows the old behaviour. **Move:** the worktree has no `node_modules`, so `@feega/*` resolves to the main checkout's symlinks. Create `node_modules/@feega/*` in the worktree pointing at its own `packages/`, link the other top-level entries from the main `node_modules`, and start Vite with `server.fs.strict: false` (the Kit client lives outside the worktree's allow list).
+
+### A snapcn port that works in tests throws in the player
+
+**Signal:** a port renders in a unit test of `port.draw` but the frame is empty in the browser, with `ReferenceError` in the player. **Move:** the player runs `draw.toString()`, so module-scope constants are gone. Keep every value inside `draw`; `sweep.test.ts` executes `snapcnSource` and catches it.
+
+### A GPU export is black or empty while the HTML render is right
+
+**Signal:** `npm run bench:gpu-parity -- --doc=<doc.json>` shows SSIM ≈ 0 with the core side black, no gaps reported; worse at higher resolution. **Move:** vello dropped the frame for lack of tile buffer. Dump the display list (`listWire`) and render it with `packages/gpu-core/target/release/gpu-core-render` to reproduce natively, then look for many large paths or repeated full-frame clips. Rebuild the wasm with `npm run build:gpu-core` after changing the core.
+
+### Parity's HTML side is not the truth for Google fonts
+
+**Signal:** parity SSIM 0.3–0.9 with the HTML frames in a serif fallback while the core frames look right. **Move:** the headless harness does not load the template's Google fonts; compare the sheets by eye before calling the core wrong.
 
 ### A Playwright spec cannot import motion-core: build the page with vite-node first
 
@@ -3739,3 +3774,21 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 ### Effects that each submit block the main thread
 **Signal:** a CPU profile of a heavy canvas shows `queue.submit` as the top self-time entry under `FilterPasses::run`; textures created per session in the thousands. **Move:** record passes into one encoder and submit once before the render that reads them; size the pool so one screen-sized layer fits, or every pass allocates.
+
+### Many reprojector draws in one encoder draw nothing
+Signal: the core reports tiles drawn, the canvas stays empty, no WebGPU error. Cause: `Reprojector::draw` writes its uniforms with `queue.write_buffer` into a 4-slot ring; writes happen at once, passes run at submit, so every pass in one encoder reads the last values. Move: one uniform buffer with a slot per draw and dynamic offsets (`Reprojector::draw_tiles`); never share a ring slot inside one encoder.
+
+### The perf bench measures the wasm of its first run
+Signal: a gpu-core change rebuilt with `npm run build:gpu-core` leaves the landings bench numbers and screenshots identical, or a debug log never appears. Cause: `scripts/local.mjs` builds the app only when `build/handler.js` is missing, so `static/gpu-core` changes never reach the served copy. Move: `rm -rf build` after every `build:gpu-core`, before the bench; check with a string from the change in the served wasm.
+
+### A layer drawn last over composited tiles erases them
+Signal: with `?coreTiles` the canvas is blank only when a selection or handle exists; the core reports every tile drawn and live. Cause: reprojector pipelines had no blending, so the screen-sized overlay replaced the tiles. Move: draw anything layered with `Output::Over`; test a transparent texel over an opaque target.
+
+### A slow "download" in Resource Timing is a busy main thread
+Signal: a fetch shows `responseStart → responseEnd` of ~1 s on localhost, curl gets the same body in 5 ms, and the same fetch on a blank page takes 12 ms. Cause: the page's renderer stamps `responseEnd` only when its main thread is free; a ~1 s long task during canvas start covers the window. Not the harness (plain Chromium without CDP or interception shows it), not connection limits. Move: before blaming the network or server, list `longtask` entries overlapping the request; moving the fetch to a worker does not help if the result is consumed on the main thread.
+
+### A wasm copied into build/ is served from its stale .br
+Signal: swapping `build/client/gpu-core/gpu_core_bg.wasm` by hand to try a gpu-core variant changes nothing in the load bench screenshots. Cause: the node server serves the precompressed `.br`/`.gz` next to it, written at build time. Move: after the copy, rewrite both (`gzip -kf9`, `brotli -f -o x.br x`), or rebuild.
+
+### The load bench draws on a software GPU
+Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start (CPU profile: `(program)`, `useProgram`), and fetches look slow because `responseEnd` waits behind it. Cause: headless Chromium renders WebGL with SwiftShader (`UNMASKED_RENDERER_WEBGL` says SwiftShader); shader compiles and draws run on the CPU. Headed Chrome on the Mac's GPU (ANGLE Metal) shows no long task over 200 ms on the same canvas. Move: read bench times as CPU-GL numbers; check the renderer string before chasing a long task, and confirm a startup cost in headed Chrome before fixing it.

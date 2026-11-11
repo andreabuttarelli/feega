@@ -101,6 +101,24 @@ vec4 run(ivec2 xy) {
   return vec4(min(o.rgb, vec3(o.a)), o.a);
 }";
 
+const SHADOW: &str = "
+vec4 run(ivec2 xy) {
+  vec2 q = centre(xy) - vec2(p(0), p(1));
+  float cover = inside(q) ? bilinear(b, q).a : 0.0;
+  vec4 ink = vec4(p(2) * p(5), p(3) * p(5), p(4) * p(5), p(5)) * cover;
+  vec4 x = texel(a, xy);
+  return x + ink * (1.0 - x.a);
+}";
+
+const INNER_SHADOW: &str = "
+vec4 run(ivec2 xy) {
+  vec2 q = centre(xy) - vec2(p(0), p(1));
+  float soft = inside(q) ? bilinear(b, q).a : 0.0;
+  vec4 x = texel(a, xy);
+  vec4 ink = vec4(p(2) * p(5), p(3) * p(5), p(4) * p(5), p(5)) * (x.a * (1.0 - soft));
+  return ink + x * (1.0 - ink.a);
+}";
+
 const MORPH: &str = "
 vec4 run(ivec2 xy) {
   ivec2 dir = ivec2(int(p(0)), int(p(1)));
@@ -479,7 +497,7 @@ vec4 run(ivec2 xy) {
   return sum / total;
 }";
 
-const SOURCES: [(Op, &str); 15] = [
+const SOURCES: [(Op, &str); 17] = [
     (Op::Matrix, MATRIX),
     (Op::Table, TABLE),
     (Op::Offset, OFFSET),
@@ -495,6 +513,8 @@ const SOURCES: [(Op, &str); 15] = [
     (Op::Fold, FOLD),
     (Op::Lens, LENS),
     (Op::Warp, WARP),
+    (Op::Shadow, SHADOW),
+    (Op::InnerShadow, INNER_SHADOW),
 ];
 
 pub struct GlTex {

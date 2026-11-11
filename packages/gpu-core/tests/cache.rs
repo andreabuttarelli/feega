@@ -318,3 +318,53 @@ fn a_cached_group_is_never_shown_blurrier_than_its_screen_scale() {
         assert!(image.size.width >= (100.0 * want).floor(), "texture {} under {} wide at zoom {want}", image.size.width, 100.0 * want);
     }
 }
+
+fn dragged_use(group: &str, x: f64) -> DisplayList {
+    parse(&format!(r#"{{ "width": 800, "height": 600, "background": null, "items": [{{ "kind": "use", "clip": "{group}", "group": "{group}", "matrix": [1, 0, 0, 1, {x}, 0], "cache": true, "hold": true }}] }}"#)).unwrap()
+}
+
+#[test]
+fn a_held_use_is_moved_as_one_texture_even_when_its_group_composes_from_an_encoding() {
+    let mut lib = library(&["a"]);
+    lib.compose_encodings();
+
+    let first = lib.plan(&dragged_use("a", 10.0), LIMITS);
+    assert_eq!(first.rasters.len(), 1);
+
+    let dragged = lib.plan(&dragged_use("a", 90.0), LIMITS);
+    assert!(dragged.rasters.is_empty());
+    assert_eq!(kinds(&dragged.screen), vec!["image"]);
+}
+
+const TWO_ITEMS: &str = r#"{ "width": 100, "height": 50, "background": null, "items": [
+  { "kind": "path", "clip": "a", "contours": [[10, 10, 20, 10, 20, 20, 10, 20]], "rule": "nonzero", "paint": { "kind": "solid", "color": [1, 0, 0, 1] }, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blend": "normal" },
+  { "kind": "path", "clip": "b", "contours": [[30, 10, 40, 10, 40, 20, 30, 20]], "rule": "nonzero", "paint": { "kind": "solid", "color": [0, 1, 0, 1] }, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blend": "normal" } ] }"#;
+
+#[test]
+fn a_held_use_is_rastered_whole_in_one_plan_so_a_drag_is_live_for_one_frame_only() {
+    let mut lib = Library::new();
+    lib.put_group("a", &parse(TWO_ITEMS).unwrap());
+    lib.put_group("b", &parse(TWO_ITEMS).unwrap());
+    let both = parse(r#"{ "width": 800, "height": 600, "background": null, "items": [
+      { "kind": "use", "clip": "a", "group": "a", "matrix": [1, 0, 0, 1, 0, 0], "cache": true, "hold": true },
+      { "kind": "use", "clip": "b", "group": "b", "matrix": [1, 0, 0, 1, 200, 0], "cache": true, "hold": true } ] }"#).unwrap();
+
+    let first = lib.plan(&both, ONE_ITEM);
+    assert_eq!(first.rasters.len(), 2);
+    assert!(first.rasters.iter().all(|r| r.list.items.len() == 2));
+
+    let next = lib.plan(&both, ONE_ITEM);
+    assert!(next.rasters.is_empty());
+    assert_eq!(kinds(&next.screen), vec!["image", "image"]);
+}
+
+#[test]
+fn a_tile_planned_beside_a_held_texture_leaves_that_texture_alone() {
+    let mut lib = library(&["a"]);
+    lib.plan(&screen(&[("a", 1.0, 0.0)]), LIMITS);
+
+    let tile = lib.plan_with(&screen(&[]), LIMITS, gpu_core::groups::Sweep::Keep);
+
+    assert!(tile.evicted.is_empty());
+    assert!(lib.cache_bytes() > 0);
+}

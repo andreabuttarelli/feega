@@ -5,12 +5,14 @@
   import { BLOG_PATH, COMPARISONS, comparisonPath } from '$lib/site/compare';
   import { FEEGA_FEATURES, FEEGA_PRICING } from '$lib/site/compare/feega';
   import { FEATURE_LABELS, Feature, type Verdict } from '$lib/site/compare/features';
-  import { articleJsonLd } from '$lib/site/structured-data';
+  import { competitorFaq } from '$lib/site/compare/faq';
+  import { articleJsonLd, faqJsonLd } from '$lib/site/structured-data';
 
   let { data } = $props();
 
   const page = $derived(data.page);
   const others = $derived(Object.entries(COMPARISONS).filter(([slug]) => slug !== data.slug));
+  const faq = $derived(competitorFaq(page));
   const mark = (v: Verdict) => (v.has ? 'Yes' : 'No');
 </script>
 
@@ -22,6 +24,7 @@
   <meta name="twitter:title" content={page.title} />
   <meta name="twitter:description" content={page.description} />
   {@html articleJsonLd({ title: page.title, description: page.description, path: comparisonPath(data.slug), checked: page.checked })}
+  {@html faqJsonLd(faq)}
 </svelte:head>
 
 <article class="landing compare">
@@ -86,6 +89,14 @@
       <p><strong>{page.name}:</strong> {page.pricing}</p>
       <p><strong>Feega:</strong> {FEEGA_PRICING}</p>
     </div>
+  </section>
+
+  <section>
+    <h2>FAQ</h2>
+    {#each faq as item (item.q)}
+      <h3>{item.q}</h3>
+      <p>{item.a}</p>
+    {/each}
   </section>
 
   <section>

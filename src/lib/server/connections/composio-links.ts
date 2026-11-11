@@ -44,7 +44,7 @@ export function composioLinks(source: Record<string, string | undefined>, fetchF
     status: async (accountId) => STATUS[(await send<{ status?: string }>('GET', `/connected_accounts/${encodeURIComponent(accountId)}`))?.status ?? ''] ?? LinkStatus.Gone,
     call: async (owner, accountId, request) => {
       const parameters = Object.entries(request.query ?? {}).map(([name, value]) => ({ name, value, type: 'query' }));
-      const answer = await send<ProxyAnswer>('POST', '/tools/execute/proxy', { endpoint: request.endpoint, method: 'GET', connected_account_id: accountId, user_id: owner, parameters });
+      const answer = await send<ProxyAnswer>('POST', '/tools/execute/proxy', { endpoint: request.endpoint, method: request.method ?? 'GET', ...(request.body === undefined ? {} : { body: request.body }), connected_account_id: accountId, user_id: owner, parameters });
       return { status: answer?.status ?? 0, data: answer?.data ?? null, headers: answer?.headers ?? {}, file: answer?.binary_data?.url ?? null };
     },
     forget: async (accountId) => {
