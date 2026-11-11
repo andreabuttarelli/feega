@@ -27,6 +27,10 @@ describe('media without a picture, and compositions', () => {
     expect(readClips(grid).read.sort()).toEqual(['grid', 'photo']);
   });
 
+  it('reads an empty media placeholder once and only a composition on every frame', () => {
+    expect(readClips(grid).moving).toEqual(['grid']);
+  });
+
   it('marks the placeholder and the composition as the roots the reader looks for', () => {
     const html = composeHtml({ doc: grid, tokens: FEEGA_TOKENS, assets: {} });
 
