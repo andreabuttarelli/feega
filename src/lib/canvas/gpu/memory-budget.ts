@@ -1,3 +1,5 @@
+import { Offscreen } from '$lib/canvas/core/residency';
+
 const MB = 1024 * 1024;
 
 export enum Device {
@@ -5,11 +7,11 @@ export enum Device {
   Phone = 'phone'
 }
 
-type Budget = { textureBytes: number; tileBytes: number; pictureSide: number; resolution: number; framesInFlight: number; retainMs: number; buildLanes: number };
+type Budget = { textureBytes: number; tileBytes: number; pictureSide: number; resolution: number; framesInFlight: number; retainMs: number; buildLanes: number; canvasTiles: number; offscreen: Offscreen };
 
 export const BUDGET: Record<Device, Budget> = {
-  [Device.Desktop]: { textureBytes: 256 * MB, tileBytes: 384 * MB, pictureSide: 4096, resolution: 2, framesInFlight: 6, retainMs: 15_000, buildLanes: 4 },
-  [Device.Phone]: { textureBytes: 128 * MB, tileBytes: 128 * MB, pictureSide: 2048, resolution: 2, framesInFlight: 3, retainMs: 0, buildLanes: 1 }
+  [Device.Desktop]: { textureBytes: 256 * MB, tileBytes: 384 * MB, pictureSide: 4096, resolution: 2, framesInFlight: 6, retainMs: 15_000, buildLanes: 4, canvasTiles: 320, offscreen: Offscreen.Resident },
+  [Device.Phone]: { textureBytes: 128 * MB, tileBytes: 128 * MB, pictureSide: 2048, resolution: 2, framesInFlight: 3, retainMs: 0, buildLanes: 1, canvasTiles: 0, offscreen: Offscreen.Dropped }
 };
 
 export const buildLanes = (device: Device, cores: number): number => Math.max(1, Math.min(BUDGET[device].buildLanes, cores - 1));
