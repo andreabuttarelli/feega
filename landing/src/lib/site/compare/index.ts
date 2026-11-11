@@ -7,6 +7,7 @@ import { FIGMA } from './tools/figma';
 import { PENCIL_DEV } from './tools/pencil-dev';
 import { FLORA } from './tools/flora';
 import { CANVA } from './tools/canva';
+import { GUI } from './tools/gui';
 
 export const BLOG_PATH = '/blog';
 
@@ -26,7 +27,8 @@ export const COMPARISONS: Readonly<Record<string, Competitor>> = {
   'feega-vs-pencil-dev': PENCIL_DEV,
   'feega-vs-flora': FLORA,
   'feega-vs-rive': RIVE,
-  'feega-vs-canva': CANVA
+  'feega-vs-canva': CANVA,
+  'feega-vs-gui': GUI
 };
 
 export const comparisonPath = (slug: string) => `${BLOG_PATH}/${slug}`;
