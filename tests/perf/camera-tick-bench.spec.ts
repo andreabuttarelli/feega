@@ -56,8 +56,11 @@ async function play(cdp: CDPSession, gesture: Gesture) {
 async function settle(page: Page): Promise<boolean> {
   const started = Date.now();
   while (Date.now() - started < SETTLE_GIVE_UP_MS) {
-    const waiting = await page.locator('[data-testid="core-canvas"]').getAttribute('data-waiting').catch(() => null);
-    if (waiting === '0') {
+    const drawn = await page
+      .locator('[data-testid="core-canvas"]')
+      .evaluate((c) => ({ waiting: Number(c.dataset.waiting), held: Number(c.dataset.held), shown: Number(c.dataset.frames) + Number(c.dataset.cards) }))
+      .catch(() => null);
+    if (drawn && drawn.held > 0 && drawn.waiting === 0 && drawn.shown === drawn.held) {
       await page.waitForTimeout(QUIET_MS);
       return true;
     }
