@@ -37,16 +37,21 @@ function isOnlyUrl(text: string, url: string): boolean {
   return trimmed === url || `https://${trimmed}` === url;
 }
 
-export type Imported = { url: string; frameId: string };
+export type Landed = { what: string; frameIds: string[] } | { what: string; refusal: string };
 
-export function kindBrief(kind: PromptKind, text: string, imported: Imported | null = null): string {
+const LANDED_LINE = (landed: Landed) =>
+  'frameIds' in landed
+    ? `${landed.what} is already imported on this canvas as frame${landed.frameIds.length > 1 ? 's' : ''} ${landed.frameIds.join(', ')}: work from ${landed.frameIds.length > 1 ? 'those frames' : 'that frame'}, do not recreate it.`
+    : `Importing ${landed.what} failed (${landed.refusal}). Tell me what to connect or fix, then carry on with the brief.`;
+
+export function kindBrief(kind: PromptKind, text: string, landed: Landed | null = null): string {
   const row = PROMPT_KINDS[kind];
   const url = urlIn(text);
   const words = url && isOnlyUrl(text, url) ? row.fromUrl(url) : text.trim();
   const size = PRESET_SIZE[row.format];
   const lines = [words, `${row.hint} Start from a ${PRESET_LABEL[row.format]} frame (${size.width}×${size.height}).`];
-  if (imported) {
-    lines.push(`${imported.url} is already imported on this canvas as frame ${imported.frameId}: work from that frame, do not recreate it.`);
+  if (landed) {
+    lines.push(LANDED_LINE(landed));
   }
   return lines.join('\n\n');
 }

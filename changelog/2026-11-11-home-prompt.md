@@ -30,3 +30,16 @@ Follow-ups in the same PR: every home send creates a new project and canvas
 (home uploads are moved into it with `moveAssets`), which also removes the 404
 for a user with no project; signed-out `/` and `/app` redirect to `/new`
 instead of `/login` (deeper `/app/*` still go to `/login`).
+
+**Sources on the prompt** (GitHub, local folder, Figma): one table,
+`PROMPT_SOURCES` in `src/lib/home/prompt-sources.ts` (label, placeholder,
+connect flow, what survives sign-in); the server half is `IMPORTERS` in
+`src/lib/server/dashboard/home-sources.ts`, calling the existing importers
+directly (`importCodeInto` for repo/folder, `importFigmaInto` — the server side
+of `figma/import-client.ts`, since the home send is a form action). A refused
+import still opens the canvas; the brief tells the agent what failed
+(e.g. `no_token`) so it asks for the connection. Connect reuses GitHub OAuth
+(`githubConnect`) and the Figma token in profile settings. The folder picker
+(`showDirectoryPicker`, `webkitdirectory` fallback) only yields a name: the
+folder importer needs an absolute path and a server that can read it (local
+mode), so the chip asks for the path, and a folder is re-picked after sign-in.

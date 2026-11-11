@@ -51,6 +51,11 @@ const importUrlInto = vi.fn(async (_scope: unknown, _canvasId: string, _ask: { u
 vi.mock('$lib/server/url-import/canvas-import', () => ({ importUrlInto }));
 vi.mock('$lib/server/tool-guard', () => ({ assertPublicUrl: vi.fn(async () => {}) }));
 
+const importCodeInto = vi.fn(async (_scope: unknown, _canvasId: string, _ask: { repo?: string; folder?: string }) => ({ outcome: 'ok', frameId: 'f-code', name: 'acme/web' }));
+vi.mock('$lib/server/code-import/canvas-import', () => ({ importCodeInto }));
+const importFigmaInto = vi.fn(async (_scope: unknown, _canvasId: string, _ask: { url: string }) => ({ outcome: 'ok', frameIds: ['f-fig1', 'f-fig2'], undo: [], skipped: [] }));
+vi.mock('$lib/server/figma/canvas-import', () => ({ importFigmaInto }));
+
 const moveAssets = vi.fn(async () => {});
 vi.mock('$lib/server/repos/assets', async (original) => ({ ...(await original<object>()), moveAssets }));
 
@@ -184,6 +189,46 @@ describe('/app is the dashboard for a returning user', () => {
 
     expect(redirected.location).toMatch(/^\/p\/p-new\/c\/c-new\?/);
     expect(listProjects).not.toHaveBeenCalled();
+  });
+
+  it('a GitHub source is imported onto the new canvas and the agent works from its frame', async () => {
+    const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'Polish the pricing page', kind: 'website', source: 'github', sourceValue: 'https://github.com/acme/web' }) } as never));
+
+    expect(importCodeInto).toHaveBeenCalledWith(expect.objectContaining({ projectId: 'p-new' }), 'c-new', expect.objectContaining({ repo: 'https://github.com/acme/web' }));
+    const prompt = new URL(redirected.location ?? '', 'http://x').searchParams.get('prompt') ?? '';
+    expect(prompt).toContain('f-code');
+    expect(importUrlInto).not.toHaveBeenCalled();
+  });
+
+  it('a folder source runs the folder importer', async () => {
+    await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'Animate the onboarding', source: 'folder', sourceValue: '/Users/me/code/app' }) } as never));
+
+    expect(importCodeInto).toHaveBeenCalledWith(expect.anything(), 'c-new', expect.objectContaining({ folder: '/Users/me/code/app' }));
+  });
+
+  it('a Figma source imports its frames and names all of them to the agent', async () => {
+    const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'Make it move', source: 'figma', sourceValue: 'https://www.figma.com/design/abc/Landing' }) } as never));
+
+    expect(importFigmaInto).toHaveBeenCalledWith(expect.anything(), 'c-new', expect.objectContaining({ url: 'https://www.figma.com/design/abc/Landing' }));
+    const prompt = new URL(redirected.location ?? '', 'http://x').searchParams.get('prompt') ?? '';
+    expect(prompt).toContain('f-fig1');
+    expect(prompt).toContain('f-fig2');
+  });
+
+  it('Figma without a token still opens the canvas and tells the agent to ask for the connection', async () => {
+    importFigmaInto.mockResolvedValueOnce({ outcome: 'no_token' } as never);
+    const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'Make it move', source: 'figma', sourceValue: 'https://www.figma.com/design/abc/Landing' }) } as never));
+
+    const prompt = new URL(redirected.location ?? '', 'http://x').searchParams.get('prompt') ?? '';
+    expect(prompt).toContain('Figma');
+    expect(prompt).toContain('no_token');
+  });
+
+  it('a source outside the table is refused before anything is created', async () => {
+    const refused = (await actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'x', source: 'dropbox', sourceValue: 'y' }) } as never)) as { status: number };
+
+    expect(refused.status).toBe(400);
+    expect(createProject).not.toHaveBeenCalled();
   });
 
   it('a kind outside the chip table is refused before anything is created', async () => {

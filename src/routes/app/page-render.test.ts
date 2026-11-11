@@ -105,4 +105,14 @@ describe('the /app home: the recents, one prompt', () => {
     expect(body).toContain('data-testid="agent-copy"');
     expect(body).toContain('href="https://docs.feega.app/integrations/mcp/"');
   });
+
+  it('the composer offers GitHub, a local folder and Figma next to attach', () => {
+    const body = page();
+    const sources = body.slice(body.indexOf('data-testid="prompt-sources"'));
+
+    expect(sources).toMatch(/data-source="github"[^>]*>GitHub</);
+    expect(sources).toMatch(/data-source="folder"[^>]*>Local folder</);
+    expect(sources).toMatch(/data-source="figma"[^>]*>Import from Figma</);
+    expect(sources).toContain('webkitdirectory');
+  });
 });

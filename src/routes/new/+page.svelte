@@ -2,6 +2,8 @@
   import { goto } from '$app/navigation';
   import PromptKinds from '$lib/components/app/PromptKinds.svelte';
   import { DEFAULT_KIND } from '$lib/home/prompt-kinds';
+  import PromptSources from '$lib/components/app/PromptSources.svelte';
+  import { OverLogin, PROMPT_SOURCES, type SourcePick } from '$lib/home/prompt-sources';
   import { saveDraft } from '$lib/home/home-draft';
   import { BRIEF_MAX } from '$lib/motion/video-brief';
   import { CHAT_ATTACH_ACCEPT } from '$lib/chat-attachments';
@@ -13,6 +15,8 @@
   let brief = $state('');
   let kind = $state(DEFAULT_KIND);
   let files = $state<File[]>([]);
+  let pick = $state<SourcePick | null>(null);
+  const repickFolder = $derived(pick !== null && PROMPT_SOURCES[pick.source].overLogin === OverLogin.PickAgain);
   let saving = $state(false);
   let picker = $state<HTMLInputElement | null>(null);
   const canSend = $derived(!saving && (!!brief.trim() || files.length > 0));
@@ -37,7 +41,7 @@
       return;
     }
     saving = true;
-    await saveDraft(sessionStorage, { text: brief, kind, files });
+    await saveDraft(sessionStorage, { text: brief, kind, files, pick });
     await goto(SIGN_IN);
   }
 </script>
@@ -62,6 +66,7 @@
       {/if}
       <textarea name="brief" data-testid="video-brief" placeholder={PLACEHOLDER} aria-label={PLACEHOLDER} maxlength={BRIEF_MAX} rows="3" bind:value={brief} onkeydown={keyed}></textarea>
       <input bind:this={picker} class="sr-only" type="file" multiple accept={CHAT_ATTACH_ACCEPT} tabindex="-1" aria-hidden="true" onchange={picked} />
+      <PromptSources bind:pick />
       <div class="row">
         <button type="button" class="attach" onclick={() => picker?.click()}>attach</button>
         <button type="submit" class="send" data-testid="brief-send" disabled={!canSend} aria-label="Start" title="Start">
@@ -70,6 +75,7 @@
       </div>
     </form>
     <p class="note">You sign in next; your prompt waits and starts as soon as you are in.</p>
+    {#if repickFolder}<p class="note" data-testid="folder-repick">A folder can't travel through sign-in: you'll pick it again once you're in.</p>{/if}
   </section>
 </main>
 

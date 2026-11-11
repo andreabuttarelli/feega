@@ -20,6 +20,8 @@
   import { isFeegaFile } from '$lib/canvas/feega-file';
   import { DashboardPage, EDITOR_PRELOAD, PAGE_PATH } from '$lib/dashboard/pages';
   import PromptKinds from '$lib/components/app/PromptKinds.svelte';
+  import PromptSources from '$lib/components/app/PromptSources.svelte';
+  import type { PromptSource, SourcePick } from '$lib/home/prompt-sources';
   import { DEFAULT_KIND } from '$lib/home/prompt-kinds';
   import { takeDraft } from '$lib/home/home-draft';
 
@@ -34,6 +36,8 @@
   let brief = $state('');
   let kind = $state(DEFAULT_KIND);
   let resuming = $state(false);
+  let pick = $state<SourcePick | null>(null);
+  let pickAgain = $state<PromptSource | null>(null);
   let turn = $state(0);
   let dragging = $state(false);
   let field = $state<HTMLTextAreaElement | null>(null);
@@ -63,8 +67,10 @@
     }
     brief = draft.text;
     kind = draft.kind;
+    pick = draft.pick;
+    pickAgain = draft.pickAgain;
     uploads?.add(draft.files);
-    resuming = true;
+    resuming = !draft.pickAgain;
   }
 
   $effect(() => {
@@ -210,6 +216,8 @@
             readonly={sending}
           ></textarea>
           <input type="hidden" name="kind" value={kind} />
+          {#if pick}<input type="hidden" name="source" value={pick.source} /><input type="hidden" name="sourceValue" value={pick.value} />{/if}
+          <PromptSources bind:pick projectId={data.attachProjectId} {pickAgain} />
           {#if data.attachProjectId}<input type="hidden" name="projectId" value={data.attachProjectId} />{/if}
           {#each ready as attachment (attachment.assetId)}<input type="hidden" name="attachment" value={attachment.assetId} />{/each}
           <div class="row">

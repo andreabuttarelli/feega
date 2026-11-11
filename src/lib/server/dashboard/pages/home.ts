@@ -17,7 +17,9 @@ import { parseAttachments } from '$lib/chat-attachments';
 import { FROM_TEMPLATE_DEPS, FROM_TEMPLATE_ERROR, FROM_TEMPLATE_STATUS, FromTemplate, fromTemplateBody, startFromTemplate } from '$lib/server/motion/from-template';
 import { motionEditorPath } from '$lib/canvas/motion-node';
 import { BRIEF_MAX, BRIEF_TEMPLATES, FILES_ONLY_BRIEF, briefName } from '$lib/motion/video-brief';
-import { kindBrief, kindOf, urlIn, type Imported } from '$lib/home/prompt-kinds';
+import { kindBrief, kindOf, urlIn, type Landed } from '$lib/home/prompt-kinds';
+import { sourceOf, type SourcePick } from '$lib/home/prompt-sources';
+import { importSource } from '$lib/server/dashboard/home-sources';
 import { importUrlInto } from '$lib/server/url-import/canvas-import';
 import { UrlImportOutcome } from '$lib/server/url-import/import-url';
 import { assertPublicUrl } from '$lib/server/tool-guard';
@@ -62,14 +64,24 @@ async function workspaceOf(event: Parameters<typeof signedInDb>[0] & { cookies: 
   return membership ? { db, userId: user.id, orgId: membership.org.id } : null;
 }
 
-async function importBriefUrl(scope: Pick<ToolScope, 'db' | 'orgId' | 'userId' | 'projectId'>, canvasId: string, brief: string): Promise<Imported | null> {
+function pickOf(form: FormData): SourcePick | null | undefined {
+  const raw = form.get('source');
+  const value = String(form.get('sourceValue') ?? '').trim();
+  if (!raw || !value) {
+    return null;
+  }
+  const source = sourceOf(raw);
+  return source ? { source, value } : undefined;
+}
+
+async function importBriefUrl(scope: Pick<ToolScope, 'db' | 'orgId' | 'userId' | 'projectId'>, canvasId: string, brief: string): Promise<Landed | null> {
   const url = urlIn(brief);
   if (!url) {
     return null;
   }
 
   const done = await importUrlInto({ ...scope, actor: { kind: 'user', id: scope.userId } }, canvasId, { url, at: { x: 0, y: 0 }, guard: assertPublicUrl });
-  return done.outcome === UrlImportOutcome.Ok ? { url, frameId: done.frameId } : null;
+  return done.outcome === UrlImportOutcome.Ok ? { what: url, frameIds: [done.frameId] } : null;
 }
 
 function projectSlug(): string {
@@ -83,7 +95,8 @@ export const actions: Actions = {
     const typed = String(form.get('brief') ?? '').trim().slice(0, BRIEF_MAX);
     const attachmentIds = parseAttachments(form.getAll('attachment'));
     const kind = kindOf(form.get('kind'));
-    if (!kind) {
+    const pick = pickOf(form);
+    if (!kind || pick === undefined) {
       return fail(HTTP_BAD_REQUEST, { error: 'Pick what to make' });
     }
     if (!typed && !attachmentIds.length) {
@@ -105,7 +118,7 @@ export const actions: Actions = {
 
     const scope = { db: workspace.db, orgId: workspace.orgId, userId: workspace.userId, projectId: project.id };
     const canvas = await createCanvas(scope.db, { orgId: scope.orgId, projectId: project.id, name });
-    const imported = await importBriefUrl(scope, canvas.id, brief);
+    const imported = pick ? await importSource(scope, canvas.id, pick) : await importBriefUrl(scope, canvas.id, brief);
 
     throw redirect(HTTP_SEE_OTHER, handoffPath({ projectId: project.id, canvasId: canvas.id }, kindBrief(kind, brief, imported), assetIds));
   },
