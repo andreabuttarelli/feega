@@ -15,7 +15,12 @@ import { loadAttachments } from '$lib/server/chat-attachments/register';
 import { parseAttachments } from '$lib/chat-attachments';
 import { FROM_TEMPLATE_DEPS, FROM_TEMPLATE_ERROR, FROM_TEMPLATE_STATUS, FromTemplate, fromTemplateBody, startFromTemplate } from '$lib/server/motion/from-template';
 import { motionEditorPath } from '$lib/canvas/motion-node';
-import { BRIEF_MAX, BRIEF_TEMPLATES, FILES_ONLY_BRIEF, briefMessage, briefName } from '$lib/motion/video-brief';
+import { BRIEF_MAX, BRIEF_TEMPLATES, FILES_ONLY_BRIEF, briefName } from '$lib/motion/video-brief';
+import { kindBrief, kindOf, urlIn, type Imported } from '$lib/home/prompt-kinds';
+import { importUrlInto } from '$lib/server/url-import/canvas-import';
+import { UrlImportOutcome } from '$lib/server/url-import/import-url';
+import { assertPublicUrl } from '$lib/server/tool-guard';
+import type { ToolScope } from '$lib/server/dashboard/tool-scope';
 import { FeegaImport, importStoredCanvasFile, signCanvasFileUpload } from '$lib/server/canvas/feega-file';
 import { FEEGA_REFUSAL_MESSAGE } from '$lib/canvas/feega-file';
 
@@ -56,6 +61,16 @@ async function workspaceOf(event: Parameters<typeof signedInDb>[0] & { cookies: 
   return membership ? { db, userId: user.id, orgId: membership.org.id } : null;
 }
 
+async function importBriefUrl(scope: ToolScope, canvasId: string, brief: string): Promise<Imported | null> {
+  const url = urlIn(brief);
+  if (!url) {
+    return null;
+  }
+
+  const done = await importUrlInto({ ...scope, actor: { kind: 'user', id: scope.userId } }, canvasId, { url, at: { x: 0, y: 0 }, guard: assertPublicUrl });
+  return done.outcome === UrlImportOutcome.Ok ? { url, frameId: done.frameId } : null;
+}
+
 function projectSlug(): string {
   const suffix = [...crypto.getRandomValues(new Uint8Array(SLUG_BYTES))].map((b) => b.toString(16).padStart(2, '0')).join('');
   return `project-${suffix}`;
@@ -66,16 +81,21 @@ export const actions: Actions = {
     const form = await event.request.formData();
     const typed = String(form.get('brief') ?? '').trim().slice(0, BRIEF_MAX);
     const attachmentIds = parseAttachments(form.getAll('attachment'));
+    const kind = kindOf(form.get('kind'));
+    if (!kind) {
+      return fail(HTTP_BAD_REQUEST, { error: 'Pick what to make' });
+    }
     if (!typed && !attachmentIds.length) {
-      return fail(HTTP_BAD_REQUEST, { error: 'Paste a URL or describe your video' });
+      return fail(HTTP_BAD_REQUEST, { error: 'Paste a URL or describe what to make' });
     }
 
     const brief = typed || FILES_ONLY_BRIEF;
     const scope = await toolScope(event, String(form.get('projectId') ?? '') || null);
     const attachments = attachmentIds.length ? await loadAttachments(scope.db, { orgId: scope.orgId, projectId: scope.projectId, ids: attachmentIds }) : [];
     const canvas = await createCanvas(scope.db, { orgId: scope.orgId, projectId: scope.projectId, name: briefName(brief) });
+    const imported = await importBriefUrl(scope, canvas.id, brief);
 
-    throw redirect(HTTP_SEE_OTHER, handoffPath({ projectId: scope.projectId, canvasId: canvas.id }, briefMessage(brief), attachments.map((a) => a.assetId)));
+    throw redirect(HTTP_SEE_OTHER, handoffPath({ projectId: scope.projectId, canvasId: canvas.id }, kindBrief(kind, brief, imported), attachments.map((a) => a.assetId)));
   },
 
   fromTemplate: async (event) => {

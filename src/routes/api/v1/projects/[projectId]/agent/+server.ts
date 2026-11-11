@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { Db } from '$lib/server/db/client';
-import { pickOf, turnModel } from '$lib/server/project-agent/model-route';
+import { pickOf } from '$lib/server/project-agent/model-route';
+import { AGENT_PLANS, capReached, planModel, tierOf } from '$lib/server/project-agent/agent-plan';
 import { startProjectTurn, type BriefBrand } from '$lib/server/project-agent/turn';
 import { offeredChatModels, resolveChoice } from '$lib/server/chat-model/catalogue';
 import { gateAiAction, gateOrgAiAction } from '$lib/server/cli-auth';
@@ -8,7 +9,7 @@ import { CAP_REACHED, capRefusal, liveCapReader } from '$lib/server/spend-caps/g
 import { listMemberships } from '$lib/server/repos/orgs';
 import { listCanvases } from '$lib/server/repos/canvas';
 import { findReachableProject } from '$lib/server/projects/lookup';
-import { openThread, loadTurns, promptHistory, turnRunning } from '$lib/server/repos/chat';
+import { countUserTurns, openThread, loadTurns, promptHistory, turnRunning } from '$lib/server/repos/chat';
 import { openFrameSchema, type OpenFrame } from '$lib/server/project-agent/frame-tools';
 import { AGENT_MAX_DURATION_S } from '$lib/server/project-agent/limits';
 import { screenModelInput } from '$lib/server/moderation/model-input';
@@ -68,7 +69,10 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   const brand = project.brandId ? await loadBriefBrand(db, { orgId, brandId: project.brandId }) : null;
 
   const gated = brand ? await gateAiAction(brand, undefined) : await gateOrgAiAction(orgId, undefined);
-  if (gated) return gated;
+  const plan = AGENT_PLANS[tierOf(gated)];
+  if (gated && capReached(plan, await countUserTurns(db, user.id))) {
+    return gated;
+  }
 
   const capped = await capRefusal(await liveCapReader(db), { orgId, userId: user.id, projectId: project.id });
   if (capped) {
@@ -91,7 +95,7 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   if (!resolved.ok) {
     return json({ error: resolved.error }, { status: 400 });
   }
-  const { model, reasoning } = turnModel(resolved.choice, pickOf(askedModel), text);
+  const { model, reasoning } = planModel(plan, resolved.choice, pickOf(askedModel), text);
 
   const screening = screenModelInput(db, {
     profile: ModerationProfile.Standard,
