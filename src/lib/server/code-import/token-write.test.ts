@@ -3,7 +3,8 @@ import type { Variables } from '@feega/motion-core/motion/variables-model';
 import { fixture } from '../../../../tests/fixtures/design-tokens/read';
 import { parseSheets, readSheets } from './css-tokens';
 import { tokenSetOf, variablesOf } from './design-tokens';
-import { writeTokens } from './token-write';
+import { frameEdits, writeTokens } from './token-write';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 
 async function imported(name: string, repo = 'app') {
   const read = fixture(name);
@@ -92,5 +93,28 @@ describe('writeTokens', () => {
 
     expect(done.files).toEqual([]);
     expect(done.skipped[0]).toMatch(/outside the repository/);
+  });
+});
+
+describe('frameEdits', () => {
+  it('una variabile cambiata sulla tela tocca il token, non i template dei livelli legati', async () => {
+    const { read, variables, map } = await imported('tailwind4');
+    const clip = { id: 'a', component: 'Text', props: { text: 'Ciao', color: '#ff0066' }, bind: { color: 'app Colors/primary' }, source: { at: 'src/routes/+page.svelte:1:0', tag: 'h1', cls: 'text-primary', was: { text: 'Ciao', color: '#111111' } } };
+    const doc = { width: 100, height: 100, tracks: [{ clips: [clip] }], comps: {}, variables: edited(variables, 'app Colors/primary', 'Light', '#ff0066') } as unknown as MotionDoc;
+    const page = async (path: string) => (path === 'src/routes/+page.svelte' ? '<h1 class="text-primary">Ciao</h1>\n' : read(path));
+
+    const done = await frameEdits(doc, map, page);
+
+    expect(done.files.map((f) => f.path)).toEqual(['src/app.css']);
+    expect(done.skipped).toEqual([]);
+  });
+
+  it('senza mappa dei token restano solo le modifiche dei livelli', async () => {
+    const clip = { id: 'a', component: 'Text', props: { text: 'Nuovo' }, source: { at: 'src/x.svelte:1:0', tag: 'h1', cls: '', was: { text: 'Vecchio' } } };
+    const doc = { width: 100, height: 100, tracks: [{ clips: [clip] }], comps: {} } as unknown as MotionDoc;
+
+    const done = await frameEdits(doc, undefined, async () => '<h1>Vecchio</h1>\n');
+
+    expect(done.files.map((f) => f.after)).toEqual(['<h1>Nuovo</h1>\n']);
   });
 });

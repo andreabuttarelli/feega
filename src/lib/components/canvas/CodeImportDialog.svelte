@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { env as publicEnv } from '$env/dynamic/public';
   import { isLocalMode } from '$lib/local-user';
-  import { githubBranches, githubConnect, githubDisconnect, githubRepos, githubStatus, importCode, repoLink, type CodeLanded, type CodeTarget, type RenderCondition, type GithubRepo, type GithubStatus } from '$lib/canvas/code-import-client';
+  import { githubBranches, githubConnect, githubDisconnect, githubRepos, githubStatus, importCode, repoLink, tokensFound, type CodeLanded, type CodeTarget, type RenderCondition, type GithubRepo, type GithubStatus } from '$lib/canvas/code-import-client';
 
   let { projectId, canvasId, at, onimported, onclose }: { projectId: string; canvasId: string; at: { x: number; y: number }; onimported: (landed: CodeLanded) => void; onclose: () => void } = $props();
 
@@ -54,9 +54,33 @@
 
   const linked = (raw: string) => (HTTP.test(raw.trim()) ? raw.trim() : `https://${raw.trim()}`);
 
+  const LOOKUP_DELAY_MS = 400;
+  let designSystem = $state(true);
+  let designTouched = $state(false);
+  let found = $state<number | null>(null);
+
+  const lookup = $derived(source === Source.Repo && repo.trim() ? { repo: linked(repo) } : source === Source.Folder && folder.trim() ? { folder: folder.trim() } : null);
+
+  $effect(() => {
+    const where = lookup;
+    found = null;
+    if (!where) {
+      return;
+    }
+    const timer = setTimeout(async () => {
+      const count = await tokensFound(projectId, where);
+      if (lookup === where) {
+        found = count;
+        designSystem = designTouched ? designSystem : count > 0;
+      }
+    }, LOOKUP_DELAY_MS);
+    return () => clearTimeout(timer);
+  });
+
+
   const TARGETS: Record<Source, () => CodeTarget> = {
-    [Source.Repo]: () => ({ repo: linked(repo), routes: routes.split(/[\s,]+/).filter(Boolean), conditions }),
-    [Source.Folder]: () => ({ folder: folder.trim(), routes: routes.split(/[\s,]+/).filter(Boolean), conditions }),
+    [Source.Repo]: () => ({ repo: linked(repo), routes: routes.split(/[\s,]+/).filter(Boolean), conditions, designSystem }),
+    [Source.Folder]: () => ({ folder: folder.trim(), routes: routes.split(/[\s,]+/).filter(Boolean), conditions, designSystem }),
     [Source.Storybook]: () => ({ storybook: linked(storybook) })
   };
 
@@ -190,6 +214,18 @@
             <label><input type="checkbox" value={w.id} bind:group={widths} data-testid={`code-import-width-${w.id}`} /> {w.label}</label>
           {/each}
           <p class="ui-note">Each page lands once per theme and width, side by side. Language, login, flags and loading or error states are not switched.</p>
+        </fieldset>
+        <fieldset class="ui-conditions" data-testid="code-import-design">
+          <label><input type="checkbox" bind:checked={designSystem} onchange={() => (designTouched = true)} data-testid="code-import-design-system" /> Design system</label>
+          <p class="ui-note" data-testid="code-import-design-count">
+            {#if found === null}
+              Looks for CSS tokens: @theme, :root, .dark.
+            {:else if found > 0}
+              {found} tokens found. They become variables with Light and Dark modes, bound to the layers, and a Design system board.
+            {:else}
+              No CSS tokens found in this project.
+            {/if}
+          </p>
         </fieldset>
       {/if}
       <div class="ui-row ui-end">

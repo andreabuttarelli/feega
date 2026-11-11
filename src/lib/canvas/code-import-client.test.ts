@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { githubBranches, githubConnect, githubStatus, importCode, repoLink } from './code-import-client';
+import { githubBranches, githubConnect, githubStatus, importCode, repoLink, tokensFound } from './code-import-client';
 
 const ASK = { projectId: 'p1', canvasId: 'c1', target: { repo: 'https://github.com/a/b', routes: ['/x', '/y'] }, at: { x: 1, y: 2 } };
 
@@ -28,6 +28,21 @@ describe('importCode', () => {
     const fetchFn = answering({ error: 'run_failed', detail: 'install_failed: x' }, 422);
 
     expect(await importCode(ASK, fetchFn as unknown as typeof fetch)).toEqual({ ok: false, error: 'run_failed', detail: 'install_failed: x' });
+  });
+});
+
+describe('tokensFound', () => {
+  it('chiede quanti token dichiara la cartella o il repo', async () => {
+    const fetchFn = answering({ tokens: 15 });
+
+    const got = await tokensFound('p1', { folder: '/code/app' }, fetchFn as unknown as typeof fetch);
+
+    expect(got).toBe(15);
+    expect(fetchFn).toHaveBeenCalledWith('/api/v1/projects/p1/code-import/tokens?folder=%2Fcode%2Fapp', {});
+  });
+
+  it('un errore conta zero', async () => {
+    expect(await tokensFound('p1', { repo: 'https://github.com/a/b' }, answering({}, 500) as unknown as typeof fetch)).toBe(0);
   });
 });
 

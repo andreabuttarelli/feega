@@ -609,6 +609,7 @@ canvas
   .option('--route <paths...>', 'The pages of the app to import (up to 8): one frame, a board per page, components shared', ['/'])
   .option('--scheme <schemes...>', 'Render each page under these themes: light, dark (default light)')
   .option('--width <px...>', 'Render each page at these widths in px (default 1280); with --scheme, one board per combination')
+  .option('--no-design-system', 'Skip the design system: no variables from the CSS tokens, no Design system board')
   .option('--x <n>', 'Canvas position of the frame centre', Number, 0)
   .option('--y <n>', 'Canvas position of the frame centre', Number, 0)
   .option('--org <id>', 'Which org, if you belong to more than one')

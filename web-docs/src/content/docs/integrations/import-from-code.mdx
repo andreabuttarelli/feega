@@ -38,12 +38,32 @@ Choose several and every page lands once per combination, side by side in the sa
 |---|---|
 | Locale, text direction | The browser language is fixed: the default catalog is shown. |
 | Login, feature flags, env vars, loading, empty and error states | The dev server renders what its own setup gives. |
-| Tokens as feega variables | Values are resolved, not linked: an edit writes the element, not the token. |
 | A component variant the route does not render | Only what appears on the page is imported. |
 
 ### Edits on a dark board
 
 Tailwind projects only: a change on a dark board is written as a `dark:` class (`dark:bg-[#101010]`) and replaces the earlier `dark:` class of the same kind. A change on a light board edits the plain class and leaves the `dark:` ones alone. Without Tailwind a dark edit is listed as not written back, and so is any edit made at a width other than desktop, because a plain rule would change every width.
+
+## Design system
+
+With **Design system** on (the default when the dialog finds CSS tokens, with their count), the tokens the project declares become feega variables instead of resolved values:
+
+- **Read from the CSS text**, never by running the app's code: Tailwind v4 `@theme` / `@theme inline`, custom properties in `:root`, `.dark`, `[data-theme=…]` and `@media (prefers-color-scheme: …)`, and the stylesheet that shadcn's `components.json` names. Each theme selector is a mode: `@theme` and `:root` are **Light**, `.dark` is **Dark**, `[data-theme=ocean]` is **Ocean**.
+- **Collections** are named after the repository: `traidue Colors` (`--color-*`), `Palette` (unprefixed colours such as shadcn's `--primary`), `Radius`, `Spacing` (numbers in px) and `Type` (font families, listed but not bound yet). Names drop `--` and the group prefix; `.` becomes `_` (`--spacing-0.5` → `0_5`). A token written as `var(--other)` stays an alias.
+- **Limits**: 8 collections × 64 variables × 8 modes. Over a limit, tokens used by a class on the page are kept first and the rest are listed as left out. Type scale, shadows, breakpoints, `calc()` values and tokens inside width media queries are listed as left out too.
+- **Layers are bound** (fills, strokes, text colours, gap, padding, radius) by the evidence that is certain, in order: the utility class on the element (`text-primary` → `--color-primary`), a CSS rule with a single selector that reads a token with `var()`, then a value that only one token holds in any mode. A value several tokens share stays a literal: in a repo where `primary`, `success` and `error` are all `#111111`, only the class can tell them apart.
+- A **Design system** board is placed before the pages: every colour with its value per mode, radii, spacing and font families. Its swatches are bound, so they follow every edit.
+- Switch the collection's mode in **Properties** to see the boards in Dark. Layers on a board captured in another theme stay literal for now: the mode is one per frame.
+
+**Write-back**: change a variable's value for a mode and open code mode. The declaration of that mode is rewritten in its own format (hex stays hex, `oklch()` stays `oklch()`, `rem` stays `rem`, an alias is written as `var(--…)`), and only that line changes: a Dark edit touches the `.dark` declaration and nothing else. A mode with no declaration in the code (a brand colour the `.dark` block does not override) is listed as not written. If the declaration changed in the code since the import, the code wins and the canvas value is listed. Bound layers do not write their colour into the template: the token does.
+
+| Token source | Read | Why not |
+|---|---|---|
+| Tailwind v4 `@theme`, CSS custom properties, shadcn | Yes | |
+| Tailwind v3 `tailwind.config.js` | No | The config is code and would have to run. |
+| SCSS / LESS variables | No | Compiled away: nothing ties a layer back to them. |
+| JS theme objects (styled-components, Emotion, MUI) | No | Values are computed at runtime by app code. |
+| W3C design-tokens JSON | No | Later. |
 
 ## Edit the code from the canvas
 
@@ -89,6 +109,7 @@ feega canvas github $PROJECT connect      # prints a link to open in the browser
 feega canvas github $PROJECT repos
 feega canvas github $PROJECT branches owner/repo
 feega canvas import-code $PROJECT /path/to/app --route / --canvas <canvas>   # local mode: a folder
+feega canvas import-code $PROJECT /path/to/app --route / --no-design-system --canvas <canvas>   # keep resolved values, no variables
 feega canvas code-sync $PROJECT changes <frameId>   # prints the patch
 feega canvas code-sync $PROJECT publish <frameId>   # pull request, or write the folder
 feega canvas code-sync $PROJECT pull <frameId> --branch my-branch
@@ -98,8 +119,8 @@ The import answers `frameId`, `pages` (the paths or stories that landed), `compo
 
 ## MCP and API
 
-Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, routes, conditions?: [{ scheme: "light" | "dark", width }], x, y } })`, or `{ canvasId, storybook, stories?, x, y }`. Folder (local mode): `{ canvasId, folder, routes, x, y }`. Sync: ops `code_changes`, `code_publish`, `code_pull` (`{ nodeId, branch? }`). REST: `GET /api/v1/projects/:id/code-import/:nodeId/changes`, `POST …/publish`, `POST …/pull`, `GET …/head`. GitHub: ops `github_status`, `github_connect`, `github_repos`, `github_branches` (`{ repo: "owner/name" }`), `github_disconnect`.
+Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, routes, conditions?: [{ scheme: "light" | "dark", width }], designSystem?, x, y } })` (`designSystem: false` skips the tokens), or `{ canvasId, storybook, stories?, x, y }`. Folder (local mode): `{ canvasId, folder, routes, x, y }`. Sync: ops `code_changes`, `code_publish`, `code_pull` (`{ nodeId, branch? }`). REST: `GET /api/v1/projects/:id/code-import/:nodeId/changes`, `POST …/publish`, `POST …/pull`, `GET …/head`. GitHub: ops `github_status`, `github_connect`, `github_repos`, `github_branches` (`{ repo: "owner/name" }`), `github_disconnect`.
 
-Over HTTP: `POST /api/v1/projects/{projectId}/code-import` with `{ canvasId, repo, routes?, conditions?, x, y }` (`conditions` up to 6, `routes` up to 8, default `["/"]`; the older single `route` still works) or `{ canvasId, storybook, stories?, x, y }`. Errors: `invalid` (400), `run_failed` (422, with `detail`: the install or dev server output), `unreadable` (422), `rate_limited` (429), `no_sandbox` / `no_browser` (503), `failed` (502).
+Over HTTP: `POST /api/v1/projects/{projectId}/code-import` with `{ canvasId, repo, routes?, conditions?, designSystem?, x, y }` (the answer adds `design: { tokens, byClass, byRule, byValue, unbound, otherMode }`; `GET …/code-import/tokens?repo=…` or `?folder=…` counts the tokens first) (`conditions` up to 6, `routes` up to 8, default `["/"]`; the older single `route` still works) or `{ canvasId, storybook, stories?, x, y }`. Errors: `invalid` (400), `run_failed` (422, with `detail`: the install or dev server output), `unreadable` (422), `rate_limited` (429), `no_sandbox` / `no_browser` (503), `failed` (502).
 
 GitHub: `GET /api/v1/projects/{projectId}/github` (`{ configured, connected, label }`), `POST …/github/connect` (`{ url }` to open), `GET …/github/repos`, `GET …/github/branches?repo=owner/name`, `DELETE …/github`. `not_configured` (501) when the server has no GitHub connection set up, `not_connected` (409) before you connect.

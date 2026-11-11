@@ -49,6 +49,18 @@ describe('POST /api/v1/projects/:id/code-import', () => {
     expect(importCodeAt.mock.calls.at(-1)![0]).toMatchObject({ routes: ['/', '/x'] });
   });
 
+  it('Design system è acceso se non lo si spegne, e la risposta conta token e livelli legati', async () => {
+    importCodeAt.mockResolvedValue({ outcome: 'ok', frameId: 'f1', name: 'app', undo: [], skipped: [], truncated: false, pages: ['/'], components: 0, variants: 0, instances: 0, design: { tokens: 15, byClass: 9, byRule: 0, byValue: 2, unbound: 4, otherMode: 0 }, tokenMap: {} });
+
+    const on = await call({ canvasId: 'c1', repo: 'https://github.com/a/b', x: 0, y: 0 }, 'u-ds-on');
+    expect(on.body).toMatchObject({ design: { tokens: 15, byClass: 9 } });
+    expect(on.body).not.toHaveProperty('tokenMap');
+    expect(importCodeAt.mock.calls.at(-1)![0]).toMatchObject({ designSystem: 'on' });
+
+    await call({ canvasId: 'c1', repo: 'https://github.com/a/b', designSystem: false, x: 0, y: 0 }, 'u-ds-off');
+    expect(importCodeAt.mock.calls.at(-1)![0]).toMatchObject({ designSystem: 'off' });
+  });
+
   it('un repo che non parte torna 422 col motivo', async () => {
     importCodeAt.mockResolvedValue({ outcome: 'run_failed', error: 'install_failed: x' });
 

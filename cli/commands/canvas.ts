@@ -72,10 +72,10 @@ export function conditionsOf(schemes: string[] | undefined, widths: string[] | u
   return (schemes?.length ? schemes : [BASE_SCHEME]).flatMap((scheme) => (widths?.length ? widths.map(Number) : [BASE_WIDTH]).map((width) => ({ scheme, width })));
 }
 
-export async function cmdCanvasImportCode(project: string, repo: string, opts: { canvas: string; route: string[]; scheme?: string[]; width?: string[]; x: number; y: number; org?: string }) {
+export async function cmdCanvasImportCode(project: string, repo: string, opts: { canvas: string; route: string[]; scheme?: string[]; width?: string[]; designSystem?: boolean; x: number; y: number; org?: string }) {
   const source = repo.startsWith('/') ? { folder: repo } : { repo };
   const conditions = conditionsOf(opts.scheme, opts.width);
-  const input = { canvasId: opts.canvas, ...source, routes: opts.route, ...(conditions ? { conditions } : {}), x: opts.x, y: opts.y };
+  const input = { canvasId: opts.canvas, ...source, routes: opts.route, ...(conditions ? { conditions } : {}), ...(opts.designSystem === false ? { designSystem: false } : {}), x: opts.x, y: opts.y };
   const result = await canvasApi.run(await token(), { project, op: 'import_code', input }, opts.org);
   console.log(JSON.stringify(result, null, 2));
 }

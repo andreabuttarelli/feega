@@ -2,7 +2,8 @@ import { isAbsolute, normalize } from 'node:path';
 import { VarType, splitKey, type VarAlias, type VarLiteral, type Variable, type Variables } from '@feega/motion-core/motion/variables-model';
 import { aliasOf, lengthPx, type TokenEntry, type TokenMap } from './design-tokens';
 import { colourOf, writtenLike } from './token-colour';
-import { atOf, type FileChange, type ReadFile } from './write-back';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { applyEdits, atOf, editsOf, type FileChange, type ReadFile } from './write-back';
 
 export type TokensWritten = { files: FileChange[]; skipped: string[]; map: TokenMap };
 
@@ -145,4 +146,16 @@ export async function writeTokens(variables: Variables | undefined, map: TokenMa
 
   const files = [...after].map(([path, text]) => ({ path, before: before.get(path) ?? '', after: text })).filter((f) => f.before !== f.after);
   return { files, skipped, map: next };
+}
+
+export async function frameEdits(doc: MotionDoc, tokens: TokenMap | undefined, read: ReadFile): Promise<TokensWritten> {
+  const layers = await applyEdits(editsOf(doc), read);
+  if (!tokens) {
+    return { ...layers, map: {} };
+  }
+  const layered = new Map(layers.files.map((f) => [f.path, f]));
+  const written = await writeTokens(doc.variables, tokens, async (path) => layered.get(path)?.after ?? read(path));
+  const touched = new Set(written.files.map((f) => f.path));
+  const files = [...layers.files.filter((f) => !touched.has(f.path)), ...written.files.map((f) => ({ ...f, before: layered.get(f.path)?.before ?? f.before }))];
+  return { files, skipped: [...layers.skipped, ...written.skipped], map: written.map };
 }
