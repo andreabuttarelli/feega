@@ -10,7 +10,9 @@ Now `Tiles::queue` puts every visible tile at the current level that no sharper 
 into the queue, and `Queue::order` gives one order for all of them: blank, then blurry
 centre-out, then stale. `tiled_frame` bakes that order under the frame budget, during a gesture
 one tile per batch (`gesture_batches`) so a frame never waits on a 2×2 block; at rest the 2×2
-blocks stay. `one_at_a_time` and `must` are gone.
+blocks stay. `one_at_a_time` and `must` are gone. A `RasterCredit` replaces "at least one batch
+per frame": each frame earns its budget (never banked beyond one frame), each tile spends what it
+took, so a 15 ms tile is followed by idle frames instead of by another 15 ms tile.
 
 The core reports its zoom step per frame, and the gesture bench reports, per level change, the
 time until nothing visible is unsharp (`levelSharpP50/P95`, plus levels left before they

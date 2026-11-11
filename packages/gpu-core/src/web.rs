@@ -16,7 +16,7 @@ use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, gesture_batches, step_of, step_zoom, Batch, Rest, TileKey, Tiles, TILE_PX};
+use crate::tiles::{Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, gesture_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
 use crate::tally::now_ms;
@@ -97,6 +97,7 @@ pub struct WebCore {
     tile_budget: u64,
     snapshots: HashMap<String, Snapshot>,
     changed_at: f64,
+    credit: RasterCredit,
     rest_shown: Vec<(Rect, wgpu::Texture)>,
     rest_spare: HashMap<(u32, u32), Vec<wgpu::Texture>>,
     counted: Counted,
@@ -333,7 +334,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, snapshots: HashMap::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new(), counted: Counted::default() })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, snapshots: HashMap::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new(), counted: Counted::default(), credit: RasterCredit::default() })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -666,11 +667,14 @@ impl WebCore {
         let left_blank = queue.blank.clone();
         let order = queue.order();
         let blocks = if matches!(self.motion, CoreMotion::Gesture) { gesture_batches(&order) } else { batches(&order) };
+        self.credit.earn(budget);
         for batch in blocks {
-            if rastered > 0 && js_sys::Date::now() - started > budget {
+            if !self.credit.allows() {
                 break;
             }
+            let began = js_sys::Date::now();
             self.raster_batch(&batch)?;
+            self.credit.spend(js_sys::Date::now() - began);
             rastered += batch.keys.len();
         }
         let tiles = self.tiles.frame(self.camera, screen);

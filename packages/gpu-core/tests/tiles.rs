@@ -591,3 +591,30 @@ fn during_a_gesture_tiles_raster_one_at_a_time_in_queue_order() {
 
     assert_eq!(one_by_one, order.iter().map(|k| vec![*k]).collect::<Vec<_>>());
 }
+
+#[test]
+fn an_expensive_tile_during_a_gesture_waits_for_the_frames_it_overspent() {
+    let mut credit = gpu_core::tiles::RasterCredit::default();
+    credit.earn(4.0);
+    assert!(credit.allows());
+    credit.spend(12.0);
+    assert!(!credit.allows());
+
+    credit.earn(4.0);
+    credit.earn(4.0);
+    assert!(!credit.allows());
+    credit.earn(4.0);
+    assert!(credit.allows());
+}
+
+#[test]
+fn cheap_tiles_fill_one_frame_budget_and_idle_frames_do_not_bank_more() {
+    let mut credit = gpu_core::tiles::RasterCredit::default();
+    credit.earn(4.0);
+    credit.earn(4.0);
+    credit.earn(4.0);
+    (0..7).for_each(|_| credit.spend(0.5));
+    assert!(credit.allows());
+    credit.spend(0.5);
+    assert!(!credit.allows());
+}

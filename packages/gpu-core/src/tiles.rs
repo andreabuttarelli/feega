@@ -128,6 +128,25 @@ fn batches_of(missing: &[TileKey], side: i64) -> Vec<Batch> {
     out
 }
 
+#[derive(Default)]
+pub struct RasterCredit {
+    ms: f64,
+}
+
+impl RasterCredit {
+    pub fn earn(&mut self, budget_ms: f64) {
+        self.ms = (self.ms + budget_ms).min(budget_ms);
+    }
+
+    pub fn spend(&mut self, ms: f64) {
+        self.ms -= ms;
+    }
+
+    pub fn allows(&self) -> bool {
+        self.ms > 0.0
+    }
+}
+
 pub struct Queue {
     pub blank: Vec<TileKey>,
     pub blurry: Vec<TileKey>,
