@@ -285,6 +285,7 @@
     width: 100%;
     max-width: 720px;
     margin: var(--ui-space-8) auto 0;
+    padding-bottom: var(--ui-space-8);
     animation: rise var(--ui-dur-slow) var(--ui-ease) both;
   }
 
