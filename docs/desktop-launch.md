@@ -1,26 +1,40 @@
 # macOS app launch checklist
 
-The app is the hosted app (`https://oh.feega.app`) in Electron, web renderer only, ad-hoc signed
-(no Apple Developer ID). Nothing below has been triggered. Do these in order.
+The app is the hosted app (`https://oh.feega.app`) in Electron, web renderer only (WebGPU, WebGL
+fallback), ad-hoc signed. Nothing below has been triggered by the PR.
 
-**Release trigger:** `.github/workflows/app-release.yml` runs on every push to `main` (there is no
-`app-v*` tag trigger). The version is the newest `app-v*` tag with its patch bumped; the app, the
-npm `feega` package and the GitHub release share it. Step 3 is therefore what publishes the app.
+**Release trigger:** `.github/workflows/app-release.yml` runs on every push to `main`; there is no
+`app-v*` tag trigger. The version is the newest `app-v*` tag with its patch bumped, shared by the
+GitHub release, the npm `feega` package and the app. Any merge to `main` publishes.
 
-1. **Merge PRs to `dev`** (done for the desktop work). Check: `gh pr list --base dev --state open`.
-2. **Docs deploy**, so https://docs.feega.app/desktop/install-macos/ resolves (the app's Help menu
-   and the release notes link to it). After: `curl -sI https://docs.feega.app/desktop/install-macos/ | head -1` is 200.
-3. **Release `dev` to `main`**: `gh pr create --base main --head dev --title "Release: macOS app"`;
-   merge when CI is green. This ships production (`oh.feega.app`) with everything the app needs
-   (the login/`feega://auth/callback` route already exists on `main`) and starts the workflow:
-   bundle, npm publish, `desktop` (arm64 on `macos-latest`, x64 on `macos-15-intel`),
-   `desktop-release`. After: `gh run watch`, then `gh release view app-v<version>` lists
-   `feega-<v>-mac-arm64.dmg`, `feega-<v>-mac-x64.dmg`, both `.zip`, `SHA256SUMS.txt`.
-4. **Release notes**: `gh release edit app-v<version> --notes-file docs/desktop-launch-release-notes.md`.
-5. **Landing deploy**, so the header/footer Download button picks the latest `app-v*` release.
-   After: open https://feega.app, the button starts the dmg for your arch (falls back to the guide if none).
-6. **Smoke test the downloaded dmg** on a Mac that did not build it: `shasum -a 256` against
-   `SHA256SUMS.txt`; drag to Applications; follow the install guide (Open Anyway); sign in with
-   email and with Google; open a `.feega` file; export an MP4 (save dialog); quit and reopen.
-   Intel build: needs an Intel Mac or Rosetta check; it was not verified before launch.
-7. **Announce** once 6 is green.
+**State before this PR:** `app-v0.1.27` is already public (dmg + zip for arm64 and x64,
+`SHA256SUMS.txt`). It predates the hosted-by-default change: it opens local mode and packages the
+native canvas addon. The next `main` merge auto-publishes `app-v0.1.28` from whatever is on `dev`,
+so #1935 must be on `dev` first.
+
+## Decision for you: app-v0.1.27
+
+Run none of these until you choose.
+
+- Leave it: the update check offers 0.1.28 to anyone who has it. No command.
+- Mark pre-release (the landing button and the update check both ignore pre-releases):
+  `gh release edit app-v0.1.27 --prerelease --repo andreabuttarelli/feega`
+- Delete the release, keep the tag: `gh release delete app-v0.1.27 --repo andreabuttarelli/feega`
+  (add `--cleanup-tag` to drop the tag; the next version is computed from the newest tag, so the
+  next release would be 0.1.27 again only if the tag is removed).
+
+## Order
+
+1. **#1935 on `dev`**, CI green. Check: `gh pr view 1935 --json state`.
+2. **Release `dev` to `main`** (#1981 or a new PR; this publishes the next `app-v`):
+   `gh pr merge <n> --merge`. Check: `gh run watch`, then `gh release view app-v<next>` lists both
+   dmgs, both zips and `SHA256SUMS.txt`; production `https://oh.feega.app` has the deploy.
+3. **Smoke test the downloaded dmg** on a Mac that did not build it: `shasum -a 256` against
+   `SHA256SUMS.txt`; install following the guide; reach the sign-in screen; sign in by email and
+   Google; open a `.feega` file; export an MP4; quit and reopen. Intel: needs an Intel Mac.
+4. **Deploy docs**, so https://docs.feega.app/desktop/install-macos/ resolves:
+   `curl -sI https://docs.feega.app/desktop/install-macos/ | head -1` is 200.
+5. **Deploy the landing**, so the Download button picks the latest `app-v*` release with a dmg.
+   Check https://feega.app: the button starts the dmg for your arch.
+6. **Release notes**: `gh release edit app-v<next> --notes-file docs/desktop-launch-release-notes.md`.
+7. **Announce.**
