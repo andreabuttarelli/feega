@@ -81,7 +81,6 @@ import { SHOWCASE_SCATTER_TEMPLATE } from './showcase-scatter/template';
 import { CARD_CASCADE_TEMPLATE } from './card-cascade/template';
 import { SNAPCN_TEMPLATES } from './snapcn';
 import { REMOCN_TEMPLATES } from './remocn';
-import { REMOCN_TEMPLATES } from './remocn';
 
 export { BUILTIN_PREFIX } from './design-kit';
 
