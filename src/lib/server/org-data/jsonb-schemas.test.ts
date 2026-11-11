@@ -17,6 +17,7 @@ describe('JSONB_COLUMN_SCHEMAS — un posto solo per le 20 colonne jsonb raggiun
         'canvas_events.before',
         'canvases.viewport',
         'chat_messages.attachments',
+        'chat_messages.selection',
         'chat_messages.tool_calls',
         'competitor_ads.media',
         'competitor_ads.raw',

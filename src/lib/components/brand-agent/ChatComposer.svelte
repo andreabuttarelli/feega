@@ -6,6 +6,8 @@
   import { Tool } from '$lib/motion/actions';
   import { CHAT_ATTACH_ACCEPT } from '$lib/chat-attachments';
   import ChatAttachments from './ChatAttachments.svelte';
+  import ChatSelectionChips from './ChatSelectionChips.svelte';
+  import type { SelectionChip } from '$lib/chat-selection';
   import type { Upload } from './chat-uploads.svelte';
 
   let {
@@ -19,7 +21,9 @@
     ready = 0,
     uploading = false,
     onfiles,
-    onremove
+    onremove,
+    selection = [],
+    onunselect
   }: {
     value: string;
     busy?: boolean;
@@ -32,6 +36,8 @@
     uploading?: boolean;
     onfiles?: (files: File[]) => void;
     onremove?: (id: string) => void;
+    selection?: SelectionChip[];
+    onunselect?: (id: string) => void;
   } = $props();
 
   let textarea = $state<HTMLTextAreaElement | null>(null);
@@ -116,6 +122,7 @@
     submit();
   }}
 >
+  <ChatSelectionChips chips={selection} onremove={onunselect} />
   {#if files.length}
     <ChatAttachments items={files} {onremove} />
   {/if}

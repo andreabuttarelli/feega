@@ -7,7 +7,11 @@
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
   import { get } from 'svelte/store';
-  import { canvasSelection } from '$lib/canvas/canvas-selection';
+  import { canvasSelectionChips } from '$lib/canvas/canvas-selection';
+  import { layerChips, liveChips, ChipKind } from '$lib/chat-selection';
+  import { chatSelection } from '$lib/components/brand-agent/chat-selection.svelte';
+  import { findClip } from '@feega/motion-core/motion/doc';
+  import { layerKind, layerLabel } from '$lib/motion/element-name';
   import { replaceState } from '$app/navigation';
   import { briefPrefill, type ChatPrefill } from '$lib/components/brand-agent/chat-prefill';
   import { handoffOf, withoutHandoff, type ChatHandoff } from '$lib/canvas/chat-handoff';
@@ -61,13 +65,33 @@
     replaceState(withoutHandoff($page.url), $page.state);
   });
 
+  const layers = $derived.by(() => {
+    const { nodeId, session } = frameProperties;
+    if (!nodeId || !session) {
+      return [];
+    }
+    const doc = session.history.present;
+    const named = session.selection.flatMap((id) => {
+      const found = findClip(doc, id);
+      return found ? [{ id, type: layerKind(found.clip, doc.comps), name: layerLabel(found.clip, doc.comps) }] : [];
+    });
+    return layerChips(nodeId, named);
+  });
+
+  $effect(() => {
+    chatSelection.publish(liveChips($canvasSelectionChips, layers));
+    return () => chatSelection.publish([]);
+  });
+
   let asked: AskedFrame | null = null;
 
   function context() {
     const frame = frameProperties.openFrame();
     const params = get(page).params;
     asked = frame && frameProperties.tokens ? { projectId: params.projectId ?? '', nodeId: frame.nodeId, tokens: frameProperties.tokens, assets: frameProperties.extras?.assetUrls ?? {}, analyses: frameProperties.extras?.analyses } : null;
-    return { canvasId: params.canvasId ?? null, selection: get(canvasSelection), ...(frame ? { frame } : {}) };
+    const chips = chatSelection.chips;
+    const kept = chips.filter((chip) => chip.kind === ChipKind.Layer).map((chip) => chip.id);
+    return { canvasId: params.canvasId ?? null, selection: chips, ...(frame ? { frame: { ...frame, selection: kept } } : {}) };
   }
 
   function answerFrameRequest(part: StreamData) {
