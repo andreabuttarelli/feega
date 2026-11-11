@@ -48,6 +48,12 @@ describe('write-back', () => {
     expect(editsOf(doc)).toEqual([{ at: { file: 'src/x.svelte', line: 3, column: 4 }, look: { text: 'new' }, was: { text: 'old' } }]);
   });
 
+  it('un livello legato a una variabile non scrive il suo colore nel template: lo scrive il token', () => {
+    const clip = { id: 'a', component: 'Text', props: { text: 'new', color: '#f0f0f0' }, bind: { color: 'app Colors/primary' }, source: { at: 'src/x.svelte:3:4', was: { text: 'old', color: '#111111' } } };
+    const doc = { width: 100, height: 100, tracks: [{ clips: [clip] }], comps: {} } as unknown as MotionDoc;
+    expect(editsOf(doc).map((e) => e.look)).toEqual([{ text: 'new' }]);
+  });
+
   it('un colore scelto dal picker vive nella pila di fill del testo, e conta come colore', () => {
     const clip = { id: 'a', component: 'Text', props: { text: 't', color: '#111111', fills: [{ type: 'solid', color: '#c2185b' }] }, source: { at: 'src/x.svelte:3:4', was: { text: 't', color: '#111111' } } };
     const doc = { width: 100, height: 100, tracks: [{ clips: [clip] }], comps: {} } as unknown as MotionDoc;
