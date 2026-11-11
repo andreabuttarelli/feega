@@ -32,15 +32,23 @@ export type SnapcnPort = {
   fonts: readonly string[];
   props: Record<string, PropSpec>;
   draw: SnapcnDraw;
+  extend?: SnapcnExtend;
 };
+
+export type SnapcnExtend = (S: SnapcnKit) => Record<string, unknown>;
+
+export type SnapcnBody = Pick<SnapcnPort, 'draw' | 'frames' | 'width' | 'height' | 'extend'>;
+
+export type SnapcnShape = SnapcnBody & Pick<SnapcnPort, 'props' | 'background'>;
 
 export const SNAPCN_NAME_PREFIX = 'Snapcn';
 
 export const componentName = (id: string) => `${SNAPCN_NAME_PREFIX}${id.replace(/(^|-)([a-z0-9])/g, (_, __, c: string) => c.toUpperCase())}`;
 
-export function snapcnSource(port: Pick<SnapcnPort, 'draw' | 'frames' | 'width' | 'height'>): string {
+export function snapcnSource(port: SnapcnBody): string {
   return [
     `const S = (${snapcnKit.toString()})();`,
+    ...(port.extend ? [`Object.assign(S, (${port.extend.toString()})(S));`] : []),
     'const P = Object.fromEntries(Object.entries(props).map(([key, value]) => [key, value ?? ""]));',
     'root.style.background = String(P.background);',
     `const render = (${port.draw.toString()})(S, { root, width: root.clientWidth || ${port.width}, height: root.clientHeight || ${port.height}, fps, frames: Math.round(duration * fps) || ${port.frames}, props: P });`,
@@ -49,9 +57,9 @@ export function snapcnSource(port: Pick<SnapcnPort, 'draw' | 'frames' | 'width' 
   ].join('\n');
 }
 
-export const propsOf = (port: SnapcnPort): Record<string, PropSpec> => ({ ...port.props, background: { type: 'string', title: 'Background', format: PropFormat.Color, default: port.background, group: 'Style' } });
+export const propsOf = (port: Pick<SnapcnPort, 'props' | 'background'>): Record<string, PropSpec> => ({ ...port.props, background: { type: 'string', title: 'Background', format: PropFormat.Color, default: port.background, group: 'Style' } });
 
-export function snapcnComponent(port: SnapcnPort): CustomComponent {
+export function snapcnComponent(port: SnapcnShape): CustomComponent {
   return {
     source: { html: '', css: '', js: snapcnSource(port) },
     propsSchema: { type: 'object', properties: propsOf(port) },

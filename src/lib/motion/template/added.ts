@@ -1,6 +1,8 @@
 export type AddedRow = { on: string; ids: readonly string[] };
 
+export const RENDERCOMP_ADDED_ON = '2026-11-11';
 export const SNAPCN_ADDED_ON = '2026-11-10';
+const RENDERCOMP_ID_PREFIX = 'builtin:rendercomp-';
 const SNAPCN_ID_PREFIX = 'builtin:snapcn-';
 
 export const ADDED: readonly AddedRow[] = [
@@ -150,6 +152,9 @@ export const ADDED: readonly AddedRow[] = [
 const addedById = new Map(ADDED.flatMap((row) => row.ids.map((id) => [id, row.on] as const)));
 
 export function addedOn(id: string): string {
+  if (id.startsWith(RENDERCOMP_ID_PREFIX)) {
+    return RENDERCOMP_ADDED_ON;
+  }
   if (id.startsWith(SNAPCN_ID_PREFIX)) {
     return SNAPCN_ADDED_ON;
   }
