@@ -5,7 +5,7 @@ use serde_json::{Map, Value};
 use crate::colour::rgba_of;
 use crate::display_list::{CssFunction, Filter, MaskMode, Rgba, SvgNode};
 use crate::filter_passes::Op;
-use crate::kernel::{gaussian, MAX_TAPS};
+use crate::kernel::gaussian;
 use crate::turbulence::{lattice_of, stitched_frequency, CHANNELS, LATTICE};
 
 const MAX_TABLE: usize = 32;
@@ -164,17 +164,21 @@ impl<R: Runner> Fx<'_, R> {
     }
 
     fn blur(&self, src: Img<R::Tex>, sx: f64, sy: f64) -> Img<R::Tex> {
-        let along = |img: Img<R::Tex>, sigma: f64, dir: (u32, u32)| {
+        if sx <= 0.0 && sy <= 0.0 {
+            return src;
+        }
+        let along = |img: Img<R::Tex>, sigma: f64, dir: (f32, f32), op: Op| {
             if sigma <= 0.0 {
                 return img;
             }
-            let k = gaussian(sigma);
-            let mut params = vec![(dir.0 * k.step) as f32, (dir.1 * k.step) as f32, k.weights.len() as f32];
-            params.extend(&k.weights);
-            params.resize(3 + MAX_TAPS, 0.0);
-            self.op(Op::Blur, &img.tex, &img.tex, &params)
+            let taps = gaussian(sigma);
+            let mut params = vec![dir.0, dir.1, taps.len() as f32];
+            params.extend(taps.iter().flat_map(|t| [t.offset, t.weight]));
+            self.op(op, &img.tex, &img.tex, &params)
         };
-        along(along(src, sx, (1, 0)), sy, (0, 1))
+        let across = if sy > 0.0 { Op::BlurPremultiplied } else { Op::Blur };
+        let premultiplied = self.op(Op::Premultiply, &src.tex, &src.tex, &[]);
+        along(along(premultiplied, sx, (1.0, 0.0), across), sy, (0.0, 1.0), Op::Blur)
     }
 
     fn offset(&self, src: &Img<R::Tex>, d: (f64, f64), alpha: bool) -> Img<R::Tex> {
