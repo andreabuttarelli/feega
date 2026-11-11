@@ -43,6 +43,9 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 ### Heap grows by hundreds of MB in a canvas session: diff snapshots, skip the source strings
 **Signal:** JS heap triples over a few minutes of editing on the dev server; a snapshot diff is led by `string` and `array`, and the biggest strings are `data:application/json;base64` source maps and module sources. **Move:** those are dev-mode code, not the leak. Group the new strings by retainer path and drop paths through `Script`/`SharedFunctionInfo`; what remains names the real holder (the 2026-11-03 one: `lists` in `CoreFrames`, one display list per live edit step). Take snapshots after `HeapProfiler.collectGarbage`, phase by phase, so the phase that grows is the one to read.
 
+### `stage` runs several times per wheel tick though nothing on screen changed
+**Signal:** the camera-tick bench shows `firstDrawn`, the stage keep-set or `onScreenFirst` at a few times the node count per tick. **Move:** count why `paintOn` restages (`staleScene`, `sceneBusy`, cache step, overlay) with a throwaway `window` counter and print it from the bench; a scene busy on a picture still decoding polled it with a full `stage` per paint.
+
 ### A harness run while the worktree rebases measures neither build
 **Signal:** an "after" run that mixes old and new numbers; `git rebase` ran while the dev server was serving the worktree. **Move:** the dev server serves the working tree, so a rebase or checkout swaps the code mid-run. Finish or stop the run first, then rebase, restart the server and measure again.
 

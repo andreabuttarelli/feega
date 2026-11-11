@@ -882,6 +882,19 @@
 
   const deviceView = (): Viewport => ({ x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution });
 
+  let owed: string[] = [];
+
+  function uploadOwed(into: CoreRaster, groups: readonly string[]): string[] {
+    const quiet = !gesture.active();
+    const done = uploadWithin(quiet ? groups : groups.slice(0, PICTURES_PER_FRAME), (g) => into.upload(listOf(g), pictures, 1), () => performance.now(), quiet ? UPLOAD_BUDGET_MS : 0);
+    for (const group of done) {
+      pictured.add(group);
+      markFrame(group, Step.Pictured);
+    }
+    owed = groups.filter((g) => !pictured.has(g));
+    return done;
+  }
+
   function stage(into: CoreRaster): HeldFrame[] {
     const tails = nearTails();
     const keep = new Set([...whole, ...chains.flat(), ...tails].map((f) => f.group).concat([...liftLists.keys()]));
@@ -906,11 +919,7 @@
       }
     }
     const unpictured = [...new Set([...tails, ...stopgaps, ...onScreenFirst(held, view, area)].filter((f) => put.has(f.group) && !pictured.has(f.group)).map((f) => f.group))];
-    const quietUploads = !gesture.active();
-    for (const group of uploadWithin(quietUploads ? unpictured : unpictured.slice(0, PICTURES_PER_FRAME), (g) => into.upload(listOf(g), pictures, 1), () => performance.now(), quietUploads ? UPLOAD_BUDGET_MS : 0)) {
-      pictured.add(group);
-      markFrame(group, Step.Pictured);
-    }
+    uploadOwed(into, unpictured);
     const shown = chains.flatMap((c) => {
       const layer = firstDrawn(c, pictured);
       return layer ? [layer] : [];
@@ -958,7 +967,7 @@
   let sharpOwed = false;
 
   const cacheAt = () => (zooming.active() || edited.size ? cacheZoom(view.zoom) : 0);
-  const sceneDue = (quiet: boolean) => staleScene || sceneBusy || cacheAt() !== stagedCache || (quiet && sentOverlay.waiting(overlay));
+  const sceneDue = (quiet: boolean) => staleScene || (sceneBusy && quiet) || cacheAt() !== stagedCache || (quiet && sentOverlay.waiting(overlay));
 
   function restage(into: CoreRaster) {
     staleScene = false;
@@ -978,7 +987,7 @@
 
   function paintOn(into: CoreRaster): boolean {
     const quiet = !gesture.active();
-    if (sceneDue(quiet)) {
+    if (sceneDue(quiet) || (sceneBusy && uploadOwed(into, owed).length)) {
       restage(into);
     }
     const at = deviceView();

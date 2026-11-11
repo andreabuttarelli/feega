@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Item } from '@feega/motion-core/motion/gpu-full/display-list';
 
-const calls = vi.hoisted(() => ({ cameras: [] as number[][], patches: [] as unknown[], overlays: 0, parts: [] as string[], frames: 0, puts: [] as string[], attached: 0, open: 0, overlapped: 0, lose: false, splices: [] as { from: string; to: string; items: number }[] }));
+const calls = vi.hoisted(() => ({ cameras: [] as number[][], patches: [] as unknown[], overlays: 0, parts: [] as string[], frames: 0, puts: [] as string[], attached: 0, open: 0, overlapped: 0, lose: false, decoding: false, splices: [] as { from: string; to: string; items: number }[] }));
 
 vi.mock('@feega/motion-core/motion/gpu-full/core-web', () => ({
   createCore: () => {
@@ -20,7 +20,7 @@ vi.mock('@feega/motion-core/motion/gpu-full/core-web', () => ({
       patchGroup: (from: string, to: string, splice: { items: unknown[] }) => (calls.splices.push({ from, to, items: splice.items.length }), true),
       appendGroup: () => undefined,
       dropGroup: () => undefined,
-      upload: () => true,
+      upload: () => !calls.decoding,
       cacheBytes: () => 0,
       dispose: () => undefined,
       setCamera: (x: number, y: number, zoom: number) => calls.cameras.push([x, y, zoom]),
@@ -72,6 +72,7 @@ const { flushSync, mount, unmount } = (await import(join(dir, '../../../../../no
 let app: Record<string, unknown> | null = null;
 
 afterEach(() => {
+  calls.decoding = false;
   if (app) {
     unmount(app);
   }
@@ -225,6 +226,24 @@ describe('CoreFrames camera', () => {
     flushSync();
 
     await vi.waitFor(() => expect(calls.cameras.at(-1)).toEqual([-90, 0, 1]));
+    expect(walks).toEqual({});
+  });
+
+  it('a pan while a picture is still decoding waits for it without walking the frames', async () => {
+    calls.decoding = true;
+    const started = calls.frames;
+    const props = $state({ frames: [], cards: manyCards(), view: { x: 0, y: 0, zoom: 1 }, area: { width: 400, height: 300 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
+    app = mount(CoreFrames, { target: document.body, props });
+    flushSync();
+    await vi.waitFor(() => expect(calls.frames).toBeGreaterThan(started));
+
+    props.view = { x: -1, y: 0, zoom: 1 };
+    flushSync();
+    await vi.waitFor(() => expect(calls.cameras.at(-1)).toEqual([-1, 0, 1]));
+    forget();
+    const frames = calls.frames;
+    await vi.waitFor(() => expect(calls.frames).toBeGreaterThan(frames + 2));
+
     expect(walks).toEqual({});
   });
 
