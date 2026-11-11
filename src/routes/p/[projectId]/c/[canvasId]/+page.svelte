@@ -1522,7 +1522,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (person) {
       return { source: personView(person.name, person.views) };
     }
-    const row = nodes.find((n) => n.id === id);
+    const row = nodeById.get(id);
     if (!row) {
       return null;
     }
@@ -1957,7 +1957,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   let commentThreads = $state<CommentThread[] | null>(null);
-  let viewCentre = $state({ cx: 0, cy: 0 });
+  let viewCentre = { cx: 0, cy: 0 };
 
   $effect(() => {
     if (commentsPanel.open) {
@@ -2032,17 +2032,17 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     };
   });
 
-  const pinTarget = $derived.by(() => {
+  const pinTarget = () => {
     const dropped = commentsPanel.pending;
     if (dropped) {
       return { ...dropped, label: dropped.timeMs === undefined ? 'the spot you clicked' : `the playhead, ${(dropped.timeMs / 1000).toFixed(2)}s` };
     }
     const picked = tiles.find((t) => t.id === selectedIds[0]);
     return picked ? { nodeId: picked.id, x: picked.w, y: 0, label: 'the selected node' } : { nodeId: null, x: viewCentre.cx, y: viewCentre.cy, label: 'the middle of the view' };
-  });
+  };
 
   async function addThread(body: string) {
-    const at = pinTarget;
+    const at = pinTarget();
     comment(CommentAction.Add, { id: crypto.randomUUID(), body, at: { nodeId: at.nodeId, x: at.x, y: at.y, timeMs: at.timeMs }, mentions: mentionedIds(body, commentTeam) });
     commentsPanel.settle();
   }
@@ -4540,7 +4540,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {/if}
 
   {#if commentsPanel.open}
-    <CanvasCommentsPanel threads={commentThreads} {me} team={commentTeam} pinsTo={pinTarget.label} onadd={addThread} onreply={replyTo} onedit={editCommentBody} ondelete={deleteCommentById} onresolve={resolveThread} onclose={() => commentsPanel.hide()} />
+    <CanvasCommentsPanel threads={commentThreads} {me} team={commentTeam} pinsTo={pinTarget().label} onadd={addThread} onreply={replyTo} onedit={editCommentBody} ondelete={deleteCommentById} onresolve={resolveThread} onclose={() => commentsPanel.hide()} />
   {/if}
 
   <RunsPanel runs={runListing} staleCount={staleNodeIds.length} onrunstale={() => runGraph(GraphScope.Stale, staleNodeIds)} />

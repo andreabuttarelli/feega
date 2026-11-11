@@ -369,7 +369,7 @@
     }
   });
   $effect(() => {
-    const seen = visibleIds(placed.filter((t) => sticky.has(t.id)), view, area);
+    const seen = visibleIds([...sticky.keys()].flatMap((id) => byId.get(id) ?? []), view, area);
     const keep = new Map([...sticky].filter(([id]) => seen.has(id)));
     if (keep.size !== untrack(() => sticky.size)) {
       sticky = keep;
@@ -377,7 +377,8 @@
   });
   const LIVE_CODE_CAP = 4;
   const IFRAME_TYPE = 'iframe';
-  const liveCode = $derived([...visibleIds(placed.filter((t) => t.kind === IFRAME_TYPE && isLiveCode(summaries.get(t.id)?.data)), view, area)].slice(0, LIVE_CODE_CAP));
+  const liveCodeTiles = $derived(placed.filter((t) => t.kind === IFRAME_TYPE && isLiveCode(summaries.get(t.id)?.data)));
+  const liveCode = $derived([...visibleIds(liveCodeTiles, view, area)].slice(0, LIVE_CODE_CAP));
   const domIds = $derived.by(() => {
     const next = new Set([...editIds, ...sticky.keys(), ...liveCode, ...(focusLive ? [focusLive] : [])]);
     return sameSet(lastDom, next) ? lastDom : (lastDom = next);
@@ -3449,6 +3450,7 @@
   const stackOrder = $derived(placed.map((t) => t.id));
   const viewZoom = $derived(view.zoom);
   const coreTheme = $derived(coreLook ? { ...coreLook, panel: coreLook.paper } : null);
+  const runningTiles = $derived(placed.filter((t) => !handedOver(t) && isRunning(summaries.get(t.id)?.data ?? {})).map((t) => ({ ...t, radius: cardRadiusOf(t.kind ?? '') })));
   const coreOverlay = $derived(
     coreTheme && coreType
       ? overlayOf({
@@ -3463,7 +3465,7 @@
           peers: corePeers.flatMap((p) => (p.cursor ? [{ id: p.sessionId, name: displayName(p.name), color: p.colour, at: p.cursor }] : [])),
           outlines: corePeers.length ? peerOutlines(props.peers ?? [], (id) => byId.get(id) ?? null).map((o) => ({ key: o.key, box: o.rect, color: o.colour })) : [],
           ghost: ghost ? { curve: ghost.from.side === PortSide.Out ? wireCurve(ghost.from, ghost.at) : wireCurve(ghost.at, ghost.from), ok: ghost.ok } : null,
-          running: placed.filter((t) => !handedOver(t) && isRunning(summaries.get(t.id)?.data ?? {})).map((t) => ({ ...t, radius: cardRadiusOf(t.kind ?? '') })),
+          running: runningTiles,
           chrome: coreChrome
         })
       : NO_OVERLAY
