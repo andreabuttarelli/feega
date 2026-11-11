@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
 import { rgbaOf } from '@feega/motion-core/motion/gpu-full/rgba';
@@ -8,11 +8,13 @@ import type { ConnectorType } from '$lib/canvas/connectors';
 
 const marks = (...types: ConnectorType[]) => types.map((type) => ({ type, state: PortState.Quiet }));
 
-const box = (contours: number[][]) => {
-  const xs = contours.flatMap((c) => c.filter((_, i) => i % 2 === 0));
-  const ys = contours.flatMap((c) => c.filter((_, i) => i % 2 === 1));
+const box = (contours: number[][], m: readonly number[] = [1, 0, 0, 1, 0, 0]) => {
+  const xs = contours.flatMap((c) => c.filter((_, i) => i % 2 === 0)).map((x) => x * m[0] + m[4]);
+  const ys = contours.flatMap((c) => c.filter((_, i) => i % 2 === 1)).map((y) => y * m[3] + m[5]);
   return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)].map((v) => Math.round(v));
 };
+
+const shown = (i: { contours: number[][]; matrix: readonly number[] }) => box(i.contours, i.matrix);
 
 const glyphs: Glyphs = (text, size) => ({ contours: [[0, 0, text.length * size, 0, text.length * size, size, 0, size]], width: text.length * size, height: size });
 
@@ -38,7 +40,7 @@ const ofPart = (t: StateTile, part: ChromePart) => parts(t).filter((i) => i.clip
 const clips = (items: { clip: string }[]) => [...new Set(items.map((i) => i.clip.split(':')[1]))];
 
 describe('label at a distance', () => {
-  const at = (zoom: number, over: Partial<StateTile> = {}) => box(ofPart(tile({ label: 'Image', zoom, width: 3000, ...over }), ChromePart.Label)[0].contours);
+  const at = (zoom: number, over: Partial<StateTile> = {}) => shown(ofPart(tile({ label: 'Image', zoom, width: 3000, ...over }), ChromePart.Label)[0]);
 
   it('grows in world units so the screen size shrinks only gently', () => {
     const [x0, , x1] = at(0.1);
@@ -54,7 +56,7 @@ describe('label at a distance', () => {
   });
 
   it('scales the icon with the label', () => {
-    const [i0, , i1] = box(ofPart(tile({ label: 'Image', icon: [[0, 0, 12, 0, 12, 12, 0, 12]], zoom: 0.1 }), ChromePart.Icon)[0].contours);
+    const [i0, , i1] = shown(ofPart(tile({ label: 'Image', icon: [[0, 0, 12, 0, 12, 12, 0, 12]], zoom: 0.1 }), ChromePart.Icon)[0]);
 
     expect((i1 - i0) * 0.1).toBeCloseTo(12 * 0.8, 0);
   });
@@ -145,7 +147,7 @@ describe('tileChrome', () => {
   it('writes the label in a 1.3 line box padded 2px, 4px above the tile, left-aligned', () => {
     const [label] = ofPart(tile({ label: 'Image' }), ChromePart.Label);
 
-    expect(box(label.contours)).toEqual([100, 178, 160, 190]);
+    expect(shown(label)).toEqual([100, 178, 160, 190]);
   });
 
   it('keeps ring, handles and port names out of the tile chrome, so selecting never changes a card group', () => {
@@ -187,8 +189,8 @@ describe('tileChrome', () => {
   it('puts the kind icon before the label and shifts the label past it', () => {
     const t = tile({ label: 'Image', icon: [[0, 0, 12, 0, 12, 12, 0, 12]] });
 
-    expect(box(ofPart(t, ChromePart.Icon)[0].contours)).toEqual([100, 180, 112, 192]);
-    expect(box(ofPart(t, ChromePart.Label)[0].contours)).toEqual([117, 178, 177, 190]);
+    expect(shown(ofPart(t, ChromePart.Icon)[0])).toEqual([100, 180, 112, 192]);
+    expect(shown(ofPart(t, ChromePart.Label)[0])).toEqual([117, 178, 177, 190]);
   });
 
   it('draws the colour tag as a dot at the right end of the label row, even with no label', () => {
@@ -229,7 +231,7 @@ describe('tileChrome', () => {
 
   it('truncates a long label with an ellipsis inside the tile width, with no scissor in world space', () => {
     const [label] = ofPart(tile({ label: 'A very long name for a node that never ends' }), ChromePart.Label);
-    const [, , right] = box(label.contours);
+    const [, , right] = shown(label);
 
     expect(label.scissor).toBeUndefined();
     expect(right).toBeLessThanOrEqual(400);
@@ -238,7 +240,7 @@ describe('tileChrome', () => {
 
   it('truncates the label after the icon, not under it', () => {
     const t = tile({ label: 'A very long name for a node that never ends', icon: [[0, 0, 12, 0, 12, 12, 0, 12]] });
-    const [, , right] = box(ofPart(t, ChromePart.Label)[0].contours);
+    const [, , right] = shown(ofPart(t, ChromePart.Label)[0]);
 
     expect(right).toBeLessThanOrEqual(400);
   });
@@ -277,5 +279,17 @@ describe('resize handles sit on the selection ring corners', () => {
     expect((handles[0][1] + handles[0][3]) / 2).toBe(centreline[1]);
     expect((handles[3][0] + handles[3][2]) / 2).toBe(centreline[2]);
     expect((handles[3][1] + handles[3][3]) / 2).toBe(centreline[3]);
+  });
+});
+
+describe('label during a zoom', () => {
+  it('shapes the label once and only rescales it as the zoom changes', () => {
+    const shaped = vi.fn(glyphs);
+    const zooms = [0.05, 0.08, 0.12, 0.2, 0.3];
+
+    const labels = zooms.map((zoom) => tileChrome(tile({ id: 'z1', label: 'Landing page', icon: [[0, 0, 1, 0, 1, 1]], zoom, width: 30000 }), shaped).filter((i) => i.clip === `z1:${ChromePart.Label}`)[0]);
+
+    expect(shaped).toHaveBeenCalledTimes(1);
+    expect(new Set(labels.map((l) => l.contours)).size).toBe(1);
   });
 });
