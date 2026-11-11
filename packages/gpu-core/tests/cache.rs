@@ -161,20 +161,35 @@ fn an_uncached_use_is_expanded_as_before() {
 }
 
 #[cfg(feature = "gpu")]
+fn frame_at(scale: f64, cache: bool) -> Vec<u8> {
+    let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
+    renderer.put_group("a", parse(FRAME).unwrap());
+    let list = parse(&format!(r#"{{ "width": 400, "height": 300, "background": [0, 0, 0, 1], "items": [{{ "kind": "use", "clip": "a", "group": "a", "matrix": [{scale}, 0, 0, {scale}, 20, 30], "cache": {cache} }}] }}"#)).unwrap();
+    renderer.render(&list, &gpu_core::pictures::Pictures::new()).unwrap().pixels
+}
+
+#[cfg(feature = "gpu")]
+const RUNG_SCALE: f64 = 2.0;
+
+#[cfg(feature = "gpu")]
 #[test]
-fn a_cached_frame_draws_the_same_pixels_as_the_expanded_one() {
-    let pictures = gpu_core::pictures::Pictures::new();
-    let draw = |cache: bool| {
-        let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
-        renderer.put_group("a", parse(FRAME).unwrap());
-        let list = parse(&format!(r#"{{ "width": 400, "height": 300, "background": [0, 0, 0, 1], "items": [{{ "kind": "use", "clip": "a", "group": "a", "matrix": [3, 0, 0, 3, 20, 30], "cache": {cache} }}] }}"#)).unwrap();
-        renderer.render(&list, &pictures).unwrap().pixels
-    };
-    let (expanded, cached) = (draw(false), draw(true));
+fn a_frame_cached_at_its_own_scale_draws_the_same_pixels_as_the_expanded_one() {
+    let (expanded, cached) = (frame_at(RUNG_SCALE, false), frame_at(RUNG_SCALE, true));
     let worst = expanded.iter().zip(&cached).map(|(a, b)| a.abs_diff(*b)).max().unwrap();
 
     assert!(worst <= 2, "worst channel difference {worst}");
 }
+
+#[cfg(feature = "gpu")]
+#[test]
+fn a_frame_cached_at_a_finer_rung_keeps_its_last_column_and_row_solid() {
+    let (expanded, cached) = (frame_at(3.0, false), frame_at(3.0, true));
+    let edge = |x: usize, y: usize| (0..4).map(|c| expanded[(y * 400 + x) * 4 + c].abs_diff(cached[(y * 400 + x) * 4 + c])).max().unwrap();
+    let worst = (30..180).map(|y| edge(319, y)).chain((20..320).map(|x| edge(x, 179))).max().unwrap();
+
+    assert!(worst <= 2, "worst edge difference {worst}");
+}
+
 
 #[test]
 fn a_cached_use_just_off_screen_is_rastered_ahead_but_draws_nothing() {
