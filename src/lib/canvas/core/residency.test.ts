@@ -10,8 +10,13 @@ describe('frame residency', () => {
     expect(resident([frame('v', 9000, 0)], view, screen, 0).map((f) => f.id)).toEqual(['v']);
   });
 
-  it('media frames are resident only on screen', () => {
-    expect(resident([frame('on', 0, 1), frame('off', 9000, 1)], view, screen, 1e9).map((f) => f.id)).toEqual(['on']);
+  it('media frames off screen stay resident while the budget allows, so a pan never reveals an empty frame', () => {
+    expect(resident([frame('on', 0, 1), frame('off', 9000, 1)], view, screen, 1e9).map((f) => f.id)).toEqual(['on', 'off']);
+  });
+
+  it('over budget, frames on screen and nearest to it keep their pictures first', () => {
+    const bytes = 100 * 100 * 4;
+    expect(resident([frame('far', 9000, 1), frame('near', 1500, 1), frame('on', 0, 1)], view, screen, 2 * bytes).map((f) => f.id)).toEqual(['near', 'on']);
   });
 
   it('counts the bytes of its pictures, not its whole doc once per picture', () => {

@@ -41,6 +41,14 @@ export function fillOrder<T extends { box: Box }>(items: readonly T[], view: Vie
   return items.filter((i) => seen(i.box)).sort((a, b) => distance(a.box) - distance(b.box));
 }
 
+export function nearestFirst<T extends { box: Box }>(items: readonly T[], view: Viewport, screen: Screen): T[] {
+  const first = fillOrder(items, view, screen);
+  const seen = new Set(first);
+  const centre = { x: (screen.width / 2 - view.x) / view.zoom, y: (screen.height / 2 - view.y) / view.zoom };
+  const distance = (b: Box) => Math.hypot(b.x + b.w / 2 - centre.x, b.y + b.h / 2 - centre.y);
+  return [...first, ...items.filter((i) => !seen.has(i)).sort((a, b) => distance(a.box) - distance(b.box))];
+}
+
 export function onScreenFirst<T extends { box: Box }>(items: readonly T[], view: Viewport, screen: Screen): T[] {
   const first = fillOrder(items, view, screen);
   const seen = new Set(first);

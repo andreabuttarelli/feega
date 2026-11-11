@@ -832,8 +832,27 @@ impl WebCore {
             }
             self.raster_batch(&batch)?;
         }
-        self.pending |= self.fill_reserve()?;
+        if self.fill_reserve()? {
+            self.pending = true;
+            return Ok(());
+        }
+        self.pending |= self.fill_canvas()?;
         Ok(())
+    }
+
+    fn fill_canvas(&mut self) -> Result<bool, JsValue> {
+        let Some(extent) = self.compositor.extent(&self.library) else { return Ok(false) };
+        self.tiles.set_canvas(extent);
+        let started = js_sys::Date::now();
+        let screen = (self.target.width(), self.target.height());
+        let wanted = self.tiles.canvas_ahead(extent, self.camera, screen);
+        for batch in bake_batches(&wanted) {
+            if js_sys::Date::now() - started > TILE_BUDGET_GESTURE_MS || input_pending() {
+                return Ok(true);
+            }
+            self.raster_batch(&batch)?;
+        }
+        Ok(false)
     }
 
     pub fn warming(&self) -> bool {

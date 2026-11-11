@@ -469,3 +469,33 @@ fn the_cheap_levels_are_only_the_far_coarse_ones() {
     assert!(!ahead.is_empty());
     assert!(ahead.iter().all(|k| k.step <= -8));
 }
+
+#[test]
+fn the_whole_canvas_is_baked_at_the_sharpest_step_its_tile_budget_allows() {
+    use gpu_core::tiles::CANVAS_TILES;
+    let canvas = Rect::new(0.0, 0.0, 12000.0, 9000.0);
+
+    let keys = Tiles::default().canvas_ahead(canvas, camera(0.4), SCREEN);
+
+    assert!(!keys.is_empty() && keys.len() <= CANVAS_TILES);
+    let step = keys[0].step;
+    assert!(keys.iter().all(|k| k.step == step));
+    let union = keys.iter().map(|k| k.world()).reduce(|a, b| a.union(b)).unwrap();
+    assert!(union.contains(canvas.origin()) && union.x1 >= canvas.x1 && union.y1 >= canvas.y1);
+    let finer = step + 1;
+    let side = 256.0 / step_zoom(finer);
+    assert!(((canvas.width() / side).ceil() * (canvas.height() / side).ceil()) as usize > CANVAS_TILES);
+}
+
+#[test]
+fn whole_canvas_tiles_survive_eviction() {
+    let canvas = Rect::new(0.0, 0.0, 12000.0, 9000.0);
+    let mut tiles = Tiles::default();
+    let keys = tiles.canvas_ahead(canvas, camera(0.4), SCREEN);
+    keys.iter().for_each(|k| tiles.hold(*k));
+    tiles.set_canvas(canvas);
+
+    let gone = tiles.evict_beyond(camera(0.4), SCREEN, 0);
+
+    assert!(keys.iter().all(|k| !gone.contains(k)));
+}

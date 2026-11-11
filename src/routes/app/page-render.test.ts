@@ -84,4 +84,14 @@ describe('the /app home: the recents, one prompt', () => {
     expect(chips).toMatch(/<button type="button"[^>]*data-brief="A poster series"/);
     expect(body.indexOf('data-testid="video-brief"')).toBeLessThan(body.indexOf('data-testid="brief-send"'));
   });
+
+  it('shows a connect-your-agent card with a copy button per command and a docs link', () => {
+    const body = page();
+
+    expect(body).toContain('data-testid="home-agent"');
+    expect(body).toContain('claude mcp add --transport http feega https://mcp.feega.app/mcp');
+    expect(body).not.toContain('feega-cli');
+    expect(body).toContain('data-testid="agent-copy"');
+    expect(body).toContain('href="https://docs.feega.app/integrations/mcp/"');
+  });
 });
