@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Device, BUDGET, deviceOf, previewHtml, textureBudget } from './memory-budget';
+import { Device, BUDGET, buildLanes, deviceOf, previewHtml, textureBudget } from './memory-budget';
 
 describe('memory budget', () => {
   it('the texture budget follows the canvas size, up to the device ceiling', () => {
@@ -48,5 +48,23 @@ describe('tile memory', () => {
     expect(BUDGET[deviceOf({ touch: false, memoryGb: 4 })].tileBytes).toBeLessThanOrEqual(128 * 1024 * 1024);
     expect(BUDGET[deviceOf({ touch: true })].tileBytes).toBeLessThanOrEqual(128 * 1024 * 1024);
     expect(BUDGET[deviceOf({ touch: false, memoryGb: 16 })].tileBytes).toBeGreaterThan(128 * 1024 * 1024);
+  });
+});
+
+describe('device profile', () => {
+  const MB = 1024 * 1024;
+
+  it('a desktop keeps the values it had before phones got their own profile', () => {
+    expect(BUDGET[Device.Desktop]).toEqual({ textureBytes: 256 * MB, tileBytes: 384 * MB, pictureSide: 4096, resolution: 2, framesInFlight: 6, retainMs: 15_000, buildLanes: 4 });
+  });
+
+  it('a desktop builds frames on one lane per spare core, up to four', () => {
+    expect(buildLanes(Device.Desktop, 16)).toBe(4);
+    expect(buildLanes(Device.Desktop, 3)).toBe(2);
+    expect(buildLanes(Device.Desktop, 1)).toBe(1);
+  });
+
+  it('a phone builds frames on a single worker, however many cores it reports', () => {
+    expect(buildLanes(Device.Phone, 8)).toBe(1);
   });
 });
