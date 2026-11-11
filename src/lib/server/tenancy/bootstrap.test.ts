@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { acceptInviteWith, createFirstOrgWith, orgSlugFrom } from '$lib/server/tenancy/bootstrap';
+import { describe, expect, it, vi } from 'vitest';
+import { acceptInviteWith, createFirstOrgWith, orgSlugFrom, SIGNUP_GRANT_NOTE } from '$lib/server/tenancy/bootstrap';
 import { hashInviteToken, LINK_INVITE_EMAIL } from '$lib/server/repos/invites';
 import { fakeDb, filtersOf, type Call } from '$lib/server/db/fake-db';
 import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
@@ -49,8 +49,27 @@ describe('la prima org di un utente nuovo', () => {
     expect(opsOn(calls, 'orgs_members')).toContain('insert');
   });
 
-  it('non scrive nessuna riga credit_ledger: il free tier è la quota mensile, non un grant', async () => {
+  it('a new user gets $1 of credits once, at signup', async () => {
     const { db, calls } = fakeDb({ orgs: [orgRow], orgs_members: [], credit_ledger: [] });
+
+    await createFirstOrgWith(db, { userId: USER, name: 'Acme' });
+
+    const grant = calls.find((c) => c.table === 'credit_ledger' && c.op === 'insert')?.payload;
+    expect(grant).toMatchObject({ org_id: ORG, kind: 'grant', source: 'promo', amount: 100, created_by: USER, note: SIGNUP_GRANT_NOTE });
+  });
+
+  it('a grant that cannot be written never blocks the signup', async () => {
+    const { db } = fakeDb({ orgs: [orgRow], orgs_members: [], credit_ledger: [] });
+    const broken = { ...db, from: (table: string) => (table === 'credit_ledger' ? { select: () => ({ eq: () => ({ eq: () => ({ limit: async () => ({ data: [], error: null }) }) }) }), insert: async () => ({ error: { code: '23514', message: 'check' } }) } : (db.from as (name: string) => unknown)(table)) } as never;
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(createFirstOrgWith(broken, { userId: USER, name: 'Acme' })).resolves.toMatchObject({ orgId: ORG });
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
+  });
+
+  it('a second organisation never grants the signup credits again', async () => {
+    const { db, calls } = fakeDb({ orgs: [orgRow], orgs_members: [], credit_ledger: [{ org_id: 'first', kind: 'grant', source: 'promo', amount: 100, created_by: USER, note: SIGNUP_GRANT_NOTE }] });
 
     await createFirstOrgWith(db, { userId: USER, name: 'Acme' });
 
