@@ -24,7 +24,7 @@ const APPLICATION = {
   url: 'https://oh.feega.app',
   applicationCategory: 'MultimediaApplication',
   operatingSystem: 'Web',
-  description: 'An AI infinite canvas: generate images, video, audio and documents, upscale video, and publish to social media and Meta ads.',
+  description: 'Design inside your code with your agents and team: an open-source canvas for website designs and motion videos, driven by prompts, Claude Code, Codex or Cursor.',
   offers: { '@type': 'Offer', category: 'subscription' },
   sameAs: SAME_AS,
   publisher: { '@type': 'Organization', name: 'Feega', sameAs: SAME_AS }
