@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { fieldAt, glyphFor, gridSize, tint } from '../ascii-field';
+  import { envelope, fieldAt, glyphFor, gridSize, tint } from '../ascii-field';
 
   const LOOP_MS = 24000;
   const FRAME_MS = 1000 / 30;
@@ -8,7 +8,8 @@
   const DESKTOP_CELL = 14;
   const MOBILE_CELL = 11;
   const MOBILE_MAX = 810;
-  const SCALE = 0.55;
+  const SCALE = 0.09;
+  const EDGE_FLOOR = 0.6;
 
   let canvas: HTMLCanvasElement;
 
@@ -41,17 +42,20 @@
       const { cols, rows, cell } = grid;
 
       for (let c = 0; c < cols; c++) {
-        const [r, g, b] = tint(c / Math.max(1, cols - 1));
-        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        const nx = (c + 0.5) / cols;
 
         for (let row = 0; row < rows; row++) {
-          const d = fieldAt(c * SCALE * 2, row * SCALE * 3.4, phase);
-          const glyph = glyphFor(d * d);
+          const ny = (row + 0.5) / rows;
+          const e = envelope(nx, ny);
+          const d = Math.sqrt(fieldAt(c * cell * SCALE, row * cell * SCALE, phase)) * (EDGE_FLOOR + (1 - EDGE_FLOOR) * e);
+          const glyph = glyphFor(d);
           if (glyph === ' ') {
             continue;
           }
 
-          ctx.globalAlpha = 0.12 + d * 0.38;
+          const [r, g, b] = tint(1 - e);
+          ctx.fillStyle = `rgb(${r},${g},${b})`;
+          ctx.globalAlpha = 0.3 + d * 0.45;
           ctx.fillText(glyph, c * cell + cell / 2, row * cell + cell / 2);
         }
       }
@@ -144,7 +148,9 @@
   .fade {
     position: absolute;
     inset: 0;
-    background: linear-gradient(to bottom, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 0.55) 55%, #000 100%);
+    background:
+      radial-gradient(ellipse 42% 22% at 50% 34%, rgb(0 0 0 / 0.6), rgb(0 0 0 / 0) 100%),
+      linear-gradient(to bottom, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 0) 55%, #000 100%);
   }
 
   @media (max-width: 809.98px) {

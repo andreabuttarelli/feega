@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RAMP, fieldAt, glyphFor, gridSize, tint } from './ascii-field';
+import { RAMP, envelope, fieldAt, glyphFor, gridSize, tint } from './ascii-field';
 
 describe('ascii field', () => {
   it('stays in 0..1', () => {
@@ -34,5 +34,22 @@ describe('ascii field', () => {
   it('starts from brand orange on the left', () => {
     expect(tint(0)).toEqual([255, 81, 0]);
     expect(tint(1)).not.toEqual([255, 81, 0]);
+  });
+});
+
+describe('envelope', () => {
+  it('peaks at the centre and fades evenly to the edges', () => {
+    expect(envelope(0.5, 0.5)).toBeCloseTo(1, 5);
+    expect(envelope(0, 0.5)).toBeCloseTo(envelope(1, 0.5), 9);
+    expect(envelope(0.5, 0)).toBeCloseTo(envelope(0.5, 1), 9);
+    expect(envelope(0, 0)).toBeLessThan(envelope(0.3, 0.3));
+  });
+});
+
+describe('tint', () => {
+  it('keeps every stop bright on black', () => {
+    for (let t = 0; t <= 1; t += 0.1) {
+      expect(Math.max(...tint(t))).toBeGreaterThanOrEqual(170);
+    }
   });
 });

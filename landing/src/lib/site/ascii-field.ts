@@ -7,8 +7,8 @@ type Rgb = [number, number, number];
 const STOPS: Rgb[] = [
   [255, 81, 0],
   [255, 140, 70],
-  [190, 90, 140],
-  [90, 90, 200]
+  [220, 120, 190],
+  [140, 150, 255]
 ];
 
 const WAVES = [
@@ -53,4 +53,11 @@ export function tint(t: number): Rgb {
   const f = p - i;
   const [a, b] = [STOPS[i], STOPS[i + 1]];
   return [0, 1, 2].map((k) => Math.round(a[k] + (b[k] - a[k]) * f)) as Rgb;
+}
+
+export function envelope(nx: number, ny: number): number {
+  const dx = (nx - 0.5) * 2;
+  const dy = (ny - 0.5) * 2;
+  const r = Math.min(1, Math.hypot(dx, dy) / Math.SQRT2);
+  return 1 - r * r * (3 - 2 * r);
 }
