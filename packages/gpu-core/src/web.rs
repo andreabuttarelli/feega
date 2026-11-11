@@ -16,7 +16,7 @@ use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_zoom, Batch, Rest, TileKey, Tiles, TILE_PX};
+use crate::tiles::{Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_of, step_zoom, Batch, Rest, TileKey, Tiles, TILE_PX};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
 use crate::tally::now_ms;
@@ -678,7 +678,7 @@ impl WebCore {
             rastered += batch.keys.len();
         }
         let tiles = self.tiles.frame(self.camera, screen);
-        self.counted.unsharp = tiles.missing.len() as u32;
+        self.counted.unsharp = self.tiles.unsharp(&tiles.missing) as u32;
         let underlaid = self.compositor.held_look(self.camera).is_some_and(|(_, stretch)| crate::tiles::underlay_shows(stretch));
         self.counted.uncovered = if underlaid { 0 } else { left_blank.iter().filter(|k| !self.tiles.holds(**k)).count() as u32 };
         let resting = matches!(self.motion, CoreMotion::Still) && tiles.missing.iter().all(|k| self.tiles.covered_within(*k, NEAR_STEPS)) && js_sys::Date::now() - self.changed_at >= REST_AFTER_MS;
@@ -892,7 +892,7 @@ impl WebCore {
     pub fn frame_counts(&mut self) -> Vec<f64> {
         let planned = self.compositor.take_planned();
         let counted = std::mem::take(&mut self.counted);
-        vec![f64::from(planned.plans), f64::from(planned.walked), planned.ms, f64::from(counted.bakes), counted.ms, counted.upload_bytes, f64::from(counted.unsharp), f64::from(counted.uncovered)]
+        vec![f64::from(planned.plans), f64::from(planned.walked), planned.ms, f64::from(counted.bakes), counted.ms, counted.upload_bytes, f64::from(counted.unsharp), f64::from(counted.uncovered), f64::from(step_of(self.camera.zoom))]
     }
 
     pub fn warming(&self) -> bool {

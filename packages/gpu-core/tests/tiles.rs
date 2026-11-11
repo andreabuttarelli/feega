@@ -543,3 +543,15 @@ fn evicting_thousands_of_tiles_zoomed_in_on_a_wide_canvas_takes_milliseconds() {
 
     assert!(started.elapsed().as_millis() < 200, "evicting took {:?}", started.elapsed());
 }
+
+#[test]
+fn a_missing_tile_shown_by_sharper_held_tiles_is_not_unsharp() {
+    let mut tiles = Tiles::default();
+    let coarse = tiles.frame(camera(1.0), SCREEN).missing;
+    tiles.frame(camera(step_zoom(2)), (SCREEN.0 * 2, SCREEN.1 * 2)).missing.iter().for_each(|k| tiles.hold(*k));
+    assert_eq!(tiles.unsharp(&coarse), 0);
+
+    let mut blurry = Tiles::default();
+    blurry.frame(camera(step_zoom(-2)), SCREEN).missing.iter().for_each(|k| blurry.hold(*k));
+    assert_eq!(blurry.unsharp(&coarse), coarse.len());
+}

@@ -206,6 +206,14 @@ impl Tiles {
         coarser.chain(finer).any(|step| keys_over(world, step).iter().all(|k| self.held.contains(k)))
     }
 
+    fn shown_sharper(&self, key: TileKey) -> bool {
+        (key.step + 1..=key.step + FINER_STEPS).any(|step| keys_over(key.world(), step).iter().all(|k| self.held.contains(k)))
+    }
+
+    pub fn unsharp(&self, missing: &[TileKey]) -> usize {
+        missing.iter().filter(|k| !self.shown_sharper(**k)).count()
+    }
+
     pub fn ahead(&self, camera: Camera, screen: (u32, u32)) -> Vec<TileKey> {
         let world = seen_world(camera, screen);
         let step = step_of(camera.zoom);
