@@ -3827,3 +3827,7 @@ Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start
 ## A perf fixture that never opens
 
 **Signal:** `scripts/local.mjs` (or a dev server pointed at a `.feega`) logs `This .feega file is larger than 200 MB` and the page waits forever. **Move:** the limit is on the unpacked size; landings docs are 0.7–4.5 MB each, so `replicate-fixture.mjs` stays under ~250 frames. A fresh worktree's dev server can also take over three minutes to compile the canvas route on a loaded machine: give the first `waitFor` minutes, not the default.
+
+## One live doc write re-placed every tile
+
+**Signal:** a plain pan rebuilds card faces (`basesAt`, `cardsOnCanvas`) and the page's `sourceView`/`genViewFor` show thousands of calls per tick in the camera bench. **Move:** `liveDocs.map` is one `$state` Map; any derived that calls `liveOf` for every tile reruns on every write, and frame sources land while a pan brings frames near. Read live docs only for the tiles that use them, through a memo that returns the previous map when nothing it covers changed (`elementDocs` in `free-image.ts`). To find which input moved, add a throwaway `$effect(() => { void x; console.log('CHG x') })` per candidate and count over five wheel ticks; `$inspect.trace` inside that derived stopped the canvas from loading.
