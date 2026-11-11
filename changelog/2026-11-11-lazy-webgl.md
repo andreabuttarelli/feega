@@ -9,9 +9,9 @@ section):
 
 | build | raw | brotli | gzip |
 |---|---|---|---|
-| both renderers | 1 980 123 | 440 069 | 603 834 |
-| WebGPU only | 1 591 093 | 357 191 | 491 834 |
-| GL share | 389 030 (19.6%) | 82 878 (18.8%) | 112 000 (18.5%) |
+| both renderers | 1 990 123 | 443 272 | 608 265 |
+| WebGPU only | 1 597 596 | 359 580 | 494 441 |
+| GL share | 392 527 (19.7%) | 83 692 (18.9%) | 113 824 (18.7%) |
 
 Now the cargo feature `webgl` gates those modules and the `vello_hybrid`/`vello_common` deps.
 `npm run build:gpu-core` writes two builds into `static/gpu-core/`: `gpu_core` (WebGPU only) and

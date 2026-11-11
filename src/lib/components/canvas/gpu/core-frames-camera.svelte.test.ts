@@ -44,7 +44,7 @@ vi.mock('$lib/canvas/core/frame-source', async (real) => {
 });
 vi.mock('$lib/canvas/core/placeholders', async (real) => {
   const actual = await real<typeof import('$lib/canvas/core/placeholders')>();
-  return { ...actual, fillOrder: walked('fillOrder', actual.fillOrder), onScreenFirst: walked('onScreenFirst', actual.onScreenFirst) };
+  return { ...actual, fillOrder: walked('fillOrder', actual.fillOrder), inView: walked('inView', actual.inView), onScreenFirst: walked('onScreenFirst', actual.onScreenFirst) };
 });
 vi.mock('$lib/canvas/core/residency', async (real) => {
   const actual = await real<typeof import('$lib/canvas/core/residency')>();

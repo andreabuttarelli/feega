@@ -54,17 +54,33 @@ fn plan(rasters: Vec<Raster>, evicted: Vec<String>) -> Plan {
 }
 
 #[cfg(feature = "gpu")]
+fn sized(side: u32) -> Raster {
+    Raster { clip: format!("r{side}"), list: parse(&SQUARE.replace("16", &side.to_string())).unwrap() }
+}
+
+#[cfg(feature = "gpu")]
 #[test]
-fn an_evicted_raster_frees_its_texture() {
+fn an_evicted_raster_waits_among_the_spares_and_is_freed_when_they_overflow() {
     let (device, queue) = device();
     let mut engine = Engine::new(&device).unwrap();
     let mut held = Pictures::new();
-    engine.hold(&mut held, plan(vec![Raster { clip: "a".into(), list: parse(SQUARE).unwrap() }], vec![]), &Pictures::new(), &device, &queue).unwrap();
-    let raw = engine.held("a").expect("a held raster").clone();
+    engine.hold(&mut held, plan(vec![sized(16)], vec![]), &Pictures::new(), &device, &queue).unwrap();
+    let raw = engine.held("r16").expect("a held raster").clone();
+    engine.hold(&mut held, plan(vec![], vec!["r16".into()]), &Pictures::new(), &device, &queue).unwrap();
+
+    assert!(engine.held("r16").is_none());
     assert!(usable(&device, &queue, &raw));
-    engine.hold(&mut held, plan(vec![], vec!["a".into()]), &Pictures::new(), &device, &queue).unwrap();
+
+    for side in 17..=OVERFLOWING_SIDE {
+        engine.hold(&mut held, plan(vec![sized(side)], vec![]), &Pictures::new(), &device, &queue).unwrap();
+        engine.hold(&mut held, plan(vec![], vec![format!("r{side}")]), &Pictures::new(), &device, &queue).unwrap();
+    }
+
     assert!(!usable(&device, &queue, &raw));
 }
+
+#[cfg(feature = "gpu")]
+const OVERFLOWING_SIDE: u32 = 48;
 
 #[cfg(feature = "gpu")]
 #[test]
@@ -74,9 +90,9 @@ fn a_chain_of_filter_passes_reaches_the_queue_in_one_submission() {
     let passes = FilterPasses::new(&device);
     let source = passes.texture(&device, 32, 32);
 
-    let once = passes.run(&device, Op::Blur, [&source, &source], &[1.0, 0.0]);
-    let twice = passes.run(&device, Op::Blur, [&once, &once], &[0.0, 1.0]);
-    let thrice = passes.run(&device, Op::Blur, [&twice, &twice], &[1.0, 0.0]);
+    let once = passes.run(&device, Op::Blur, [&source, &source], &[1.0, 0.0], (32, 32));
+    let twice = passes.run(&device, Op::Blur, [&once, &once], &[0.0, 1.0], (32, 32));
+    let thrice = passes.run(&device, Op::Blur, [&twice, &twice], &[1.0, 0.0], (32, 32));
     passes.flush(&queue);
 
     assert_eq!(passes.submits(), 1);
