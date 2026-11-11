@@ -69,7 +69,7 @@
     vertical-align: -2px;
   }
 
-  .chip {
+  .bar :global(.chip) {
     display: block;
     padding: 8px 4px 10px;
     background: #fff;
@@ -160,16 +160,16 @@
       justify-self: start;
     }
 
-    :global(.star) {
+    .bar :global(.star) {
       background: #4f4f4f;
       color: #fff;
     }
 
-    .cta {
+    .bar .cta {
       background: #ff5100;
     }
 
-    .actions span {
+    .actions :global(span) {
       border-bottom: 1px solid currentColor;
     }
 
@@ -202,16 +202,16 @@
       justify-self: start;
     }
 
-    :global(.star) {
+    .bar :global(.star) {
       background: #4f4f4f;
       color: #fff;
     }
 
-    .cta {
+    .bar .cta {
       background: #ff5100;
     }
 
-    .actions span {
+    .actions :global(span) {
       border-bottom: 1px solid currentColor;
     }
 
