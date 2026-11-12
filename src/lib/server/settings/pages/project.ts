@@ -8,7 +8,7 @@ import { modeOf, ProjectMode } from '$lib/project-mode';
 import { UNCENSORED_LOCK_TEXT, UncensoredLock, uncensoredSectionVisible } from '$lib/uncensored-lock';
 import { verifyUserAge } from '$lib/server/uncensored-workspace/workspace';
 import { SWITCH_REFUSAL_TEXT, switchProjectMode } from '$lib/server/uncensored-workspace/mode-switch';
-import { appAccountStore, readAppAccount } from '$lib/server/repos/app-accounts';
+import { appAccountStore, readAppAccount, setTestAccount } from '$lib/server/repos/app-accounts';
 
 const HTTP_BAD_REQUEST = 400;
 const HTTP_FORBIDDEN = 403;
@@ -121,6 +121,15 @@ export const actions: SettingsActions = {
       throw redirect(303, back);
     }
     return { linked: true };
+  },
+
+  saveAppAccount: async (event) => {
+    const { db, orgId, projectId } = await ownedProject(event);
+    const fd = await event.request.formData();
+    const given = { loginUrl: String(fd.get('loginUrl') ?? '').trim(), email: String(fd.get('email') ?? ''), password: String(fd.get('password') ?? '') };
+    const store = appAccountStore(db, { orgId, projectId, actor: { kind: 'user', id: await userIdOf(event) } });
+    const refused = await setTestAccount(store, given);
+    return refused ? fail(HTTP_BAD_REQUEST, { accountError: refused }) : { savedAccount: true };
   },
 
   forgetAppAccount: async (event) => {

@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
-import { NO_SESSION, type AppAccount, type AppAccountStore } from '$lib/server/web/app-browse';
+import { blockedPlatform, NO_SESSION, type AppAccount, type AppAccountStore } from '$lib/server/web/app-browse';
 import type { AppSession } from '$lib/server/web/browser';
 
 const TABLE = 'app_accounts';
@@ -62,4 +62,33 @@ export function appAccountStore(db: Db, scope: AppAccountScope): AppAccountStore
 export async function readAppAccount(db: Db, scope: Omit<AppAccountScope, 'actor'>): Promise<{ loginUrl: string; email: string; sessionUntil: number | null } | null> {
   const account = await appAccountStore(db, { ...scope, actor: { kind: 'user', id: null } }).read();
   return account ? { loginUrl: account.loginUrl, email: account.email, sessionUntil: account.sessionUntil } : null;
+}
+
+export type TestAccountInput = { loginUrl: string; email: string; password: string };
+
+const WEB_PROTOCOLS = ['https:', 'http:'];
+
+export enum AccountRefusal {
+  Incomplete = 'a login url (https://…), an email and a password are needed',
+  NoPassword = 'a password is needed: none is saved yet'
+}
+
+const complete = (given: TestAccountInput) => URL.canParse(given.loginUrl) && WEB_PROTOCOLS.includes(new URL(given.loginUrl).protocol) && given.email.trim().length > 0;
+
+export async function setTestAccount(store: AppAccountStore, given: TestAccountInput): Promise<string | null> {
+  if (!complete(given)) {
+    return AccountRefusal.Incomplete;
+  }
+  const blocked = blockedPlatform(given.loginUrl);
+  if (blocked) {
+    return `${blocked} is not your app: the test account is for signing in to your own app`;
+  }
+
+  const password = given.password || (await store.read())?.password;
+  if (!password) {
+    return AccountRefusal.NoPassword;
+  }
+
+  await store.save({ loginUrl: given.loginUrl, email: given.email.trim(), password, session: NO_SESSION, sessionUntil: null });
+  return null;
 }
