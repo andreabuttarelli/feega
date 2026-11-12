@@ -111,3 +111,20 @@ dormant.
   `core-version.ts` in the same commit, and steps rebase over the tiles/filters work in flight.
 - **Stop rule**: if a step does not cut main-thread ms on the heavy zoom beyond the run-to-run
   range, it stops there (as in 0035) and the ADR records the number.
+
+## Status 2026-11-12
+
+Step 1a (selection rings, handles and hover drawn by the engine in screen space, `hit`/`rect_of`)
+is built in draft #2034 and stopped by the stop rule. Heavy canvas, 4 s wheel zoom, CPU 4x, a frame
+selected and a node hovered, three runs each:
+
+| | main-thread ms per 4 s | style recalc ms |
+|---|---|---|
+| dev 4bf3b90 | 3947 / 3988 / 3965 (median 3965) | 344 / 360 / 357 |
+| 1a | 3915 / 3946 / 3987 (median 3946) | 345 / 376 / 363 |
+
+−19 ms median, inside the 41 ms run-to-run range; style recalc unchanged.
+
+Resume only after re-profiling once the JS fixes land (#2033 labels, `--zoom` on the pins, wheel
+coalescing): steps 2–3 go ahead only if the engine (wasm) or culling come out on top of that
+profile.
