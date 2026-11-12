@@ -16,7 +16,7 @@ const run = promisify(execFile);
 
 const SKIPPED_DIRS = new Set(['node_modules', '.git', '.svelte-kit', '.next', 'dist', 'build', '.vercel', '.turbo']);
 const WATCHED = /\.(svelte|vue|tsx|jsx|ts|js|html|css|json)$/;
-const COMPONENT_FILE = /\.(tsx|jsx)$/;
+const COMPONENT_FILE = /\.(tsx|jsx|js)$/;
 const MAX_FILES = 4_000;
 const READY_MS = 90_000;
 const POLL_MS = 500;

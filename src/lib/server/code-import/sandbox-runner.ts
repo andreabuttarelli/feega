@@ -46,7 +46,7 @@ const READ_SCRIPT = `const f=require("fs");const o={};for(const p of process.arg
 export const quoted = (arg: string) => `'${arg.replaceAll("'", `'\\''`)}'`;
 const line = (argv: string[]) => argv.map(quoted).join(' ');
 
-const NAMES = `find . -path ./node_modules -prune -o -type f \\( -name '*.tsx' -o -name '*.jsx' \\) -print | grep -v /node_modules/ | head -n ${RUN_LIMITS.files} | xargs cat 2>/dev/null`;
+const NAMES = `find . -path ./node_modules -prune -o -type f \\( -name '*.tsx' -o -name '*.jsx' -o -name '*.js' \\) -print | grep -v -E '/(node_modules|\\.svelte-kit|\\.next|dist|build)/' | head -n ${RUN_LIMITS.files} | xargs cat 2>/dev/null`;
 
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
