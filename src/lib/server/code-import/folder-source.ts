@@ -1,4 +1,4 @@
-import { spawn, execFile, type ChildProcess } from 'node:child_process';
+import { execFile, type ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, statSync } from 'node:fs';
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
@@ -12,6 +12,7 @@ import { planFile, runPlan, textsWanted, type PlanRefused, type RepoFacts, type 
 import type { FileChange, ReadFile } from './write-back';
 import type { CodeSource, Published } from './code-source';
 import { shimFiles, shimsFor, SHIM_CONFIG } from './folder-shims';
+import { spawnGroup, stopGroup } from './dev-children';
 
 const run = promisify(execFile);
 
@@ -112,9 +113,13 @@ async function freePort(): Promise<number> {
   });
 }
 
+export class DevServerFailed extends Error {}
+
 type Served = { url: string; child: ChildProcess };
 
-const serving = new Map<string, Promise<Served>>();
+type Shared = { served: Promise<Served>; users: number };
+
+const serving = new Map<string, Shared>();
 
 async function ready(url: string): Promise<boolean> {
   const until = Date.now() + READY_MS;
@@ -153,33 +158,39 @@ async function factsAt(root: string): Promise<RepoFacts> {
 async function started(dir: string, plan: RunPlan): Promise<Served> {
   const [cmd, ...args] = plan.dev;
   const shimmed = await shimmedArgs(dir);
-  const child = spawn(cmd, [...args, ...shimmed], { cwd: dir, env: { ...process.env, ...plan.env }, stdio: 'ignore' });
+  const child = spawnGroup(cmd, [...args, ...shimmed], { cwd: dir, env: { ...process.env, ...plan.env }, stdio: 'ignore' });
   const url = `http://${LOOPBACK}:${plan.port}`;
   if (!(await ready(url))) {
-    child.kill();
-    throw new Error(`the dev server in ${dir} did not answer on ${url}`);
+    stopGroup(child.pid!);
+    throw new DevServerFailed(`the dev server in ${dir} did not answer on ${url}`);
   }
-  child.once('exit', () => serving.delete(dir));
   return { url, child };
 }
 
-export async function devServerOf(root: string, app: string | null): Promise<Served | PlanRefused> {
+function release(dir: string, shared: Shared) {
+  shared.users -= 1;
+  if (shared.users > 0) {
+    return;
+  }
+  serving.delete(dir);
+  shared.served.then((s) => stopGroup(s.child.pid!), () => undefined);
+}
+
+export async function withDevServer<T>(root: string, app: string | null, use: (url: string) => Promise<T>): Promise<T | PlanRefused> {
   const plan = runPlan(await factsAt(root), app, { host: LOOPBACK, port: await freePort() });
   if (!plan.ok) {
     return plan;
   }
 
   const dir = join(root, plan.appDir);
-  const known = serving.get(dir);
-  if (known) {
-    return known;
+  const shared = serving.get(dir) ?? { served: started(dir, plan), users: 0 };
+  serving.set(dir, shared);
+  shared.users += 1;
+  try {
+    return await use((await shared.served).url);
+  } finally {
+    release(dir, shared);
   }
-  const next = started(dir, plan).catch((e: unknown) => {
-    serving.delete(dir);
-    throw e;
-  });
-  serving.set(dir, next);
-  return next;
 }
 
 export async function folderNames(root: string): Promise<string[]> {
