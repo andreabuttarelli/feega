@@ -60,7 +60,7 @@
         <li class="tool">{l.title}</li>
       {:else if l.line === Line.Error}
         <li class="error" role="alert">{l.text}</li>
-      {:else}
+      {:else if l.line === Line.Permission}
         <li class="permission" data-testid="acp-permission">
           <p>{agent ? ACP_AGENT_LABELS[agent] : 'The agent'} wants to run <strong>{l.title}</strong></p>
           <div class="options">
