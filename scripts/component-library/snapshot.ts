@@ -8,10 +8,12 @@ import { codeCapturedIn, type CapturedApp } from '../../src/lib/server/code-impo
 import { BASE_CONDITIONS } from '../../src/lib/server/code-import/render-conditions';
 import { compacted } from './compact';
 import { isDemo, itemFor } from './names';
-import { durableImages } from './images';
+import { durableImages, showsImagePlaceholder } from './images';
 import { imagesFilled } from '../../src/lib/canvas/figma/images';
 
-type Catalog = { publicBase?: string; items: { name: string; title: string; description: string }[] };
+type Catalog = { publicBase?: string; items: { name: string; title: string; description: string }[]; skipped?: { name: string; reason: string }[] };
+
+const IMAGE_LOST = 'not imported: an image would insert as a grey placeholder';
 
 const [library, NAME, given] = process.argv.slice(2);
 if (!library || !NAME) {
@@ -37,6 +39,7 @@ const plan = design ? designed(design, planned, { repo: NAME, base: BASE_CONDITI
 const catalog = JSON.parse(readFileSync(join(LIBRARY, 'catalog.json'), 'utf8')) as Catalog;
 const images = durableImages(plan.images, catalog.publicBase);
 const taken = new Set<string>();
+const lost: string[] = [];
 const ranked = [...plan.sets].sort((a, b) => Number(isDemo(a.name)) - Number(isDemo(b.name)));
 const sets = ranked.flatMap((s) => {
   const item = itemFor(catalog.items, s.name);
@@ -44,8 +47,18 @@ const sets = ranked.flatMap((s) => {
     return [];
   }
   taken.add(item.name);
-  return [{ name: item.title, slug: item.name, description: item.description, size: s.size, doc: compacted(imagesFilled(s.doc, s.images, images)) }];
+  const doc = imagesFilled(s.doc, s.images, images);
+  if (showsImagePlaceholder(doc)) {
+    lost.push(item.name);
+    return [];
+  }
+  return [{ name: item.title, slug: item.name, description: item.description, size: s.size, doc: compacted(doc) }];
 });
 writeFileSync(OUT, JSON.stringify(sets));
 writeFileSync(INDEX, `${JSON.stringify(sets.map(({ slug, name, description }) => ({ slug, name, description })), null, 2)}\n`);
-console.log(`${sets.length} component sets written to ${OUT}`);
+if (lost.length) {
+  const gone = new Set(lost);
+  const skipped = [...(catalog.skipped ?? []), ...lost.map((name) => ({ name, reason: IMAGE_LOST }))];
+  writeFileSync(join(LIBRARY, 'catalog.json'), `${JSON.stringify({ ...catalog, items: catalog.items.filter((i) => !gone.has(i.name)), skipped }, null, 2)}\n`);
+}
+console.log(`${sets.length} component sets written to ${OUT}; left out for lost images: ${lost.join(' ') || 'none'}`);

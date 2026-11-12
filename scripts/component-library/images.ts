@@ -17,3 +17,13 @@ export function durableImages(refs: Record<string, string>, publicBase: string |
     return kept ? [[key, kept]] : [];
   }));
 }
+
+const IMAGE_PLACEHOLDER = '#d9d9d9';
+
+type Painted = { props: { fills?: { type?: string; color?: string }[] } };
+
+type Tracked = { tracks: { clips: unknown[] }[] };
+
+const clipsOf = (doc: Tracked & { comps: Record<string, Tracked> }) => [doc, ...Object.values(doc.comps)].flatMap((d) => d.tracks.flatMap((t) => t.clips as Painted[]));
+
+export const showsImagePlaceholder = (doc: Tracked & { comps: Record<string, Tracked> }) => clipsOf(doc).some((c) => (c.props.fills ?? []).some((f) => f.type === 'solid' && f.color === IMAGE_PLACEHOLDER));
