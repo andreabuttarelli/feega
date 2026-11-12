@@ -68,3 +68,38 @@ describe('the folder snapshot', () => {
     expect(done).toEqual({ ok: false, refusal: SnapshotRefusal.TooBig });
   });
 });
+
+describe('secrets in a picked folder', () => {
+  const pathsOf = async (picked: PickedFile[]) => {
+    const snap = await snapshotOf('app', picked);
+    return snap.ok ? [...untarred(gunzipSync(snap.archive)).keys()] : [];
+  };
+
+  it('env files and key material never leave the browser, whatever .gitignore says', async () => {
+    const secrets = ['.env', '.env.local', 'web/.env.production', 'cert.pem', 'tls/server.key', 'id_rsa', '.ssh/id_rsa.pub'];
+    const kept = await pathsOf([file('package.json', '{}'), file('.gitignore', '!.env\n'), ...secrets.map((p) => file(p, 'SECRET=1'))]);
+
+    expect(kept.filter((p) => secrets.includes(p))).toEqual([]);
+  });
+
+  it('env templates stay', async () => {
+    const templates = ['.env.example', '.env.sample', '.env.template'];
+    const kept = await pathsOf([file('package.json', '{}'), ...templates.map((p) => file(p, 'KEY='))]);
+
+    expect(kept).toEqual(expect.arrayContaining(templates));
+  });
+
+  it('an .npmrc goes only without an auth token', async () => {
+    const withToken = await pathsOf([file('package.json', '{}'), file('.npmrc', '//registry.npmjs.org/:_authToken=npm_abc\n')]);
+    const plain = await pathsOf([file('package.json', '{}'), file('.npmrc', 'engine-strict=true\n')]);
+
+    expect(withToken).not.toContain('.npmrc');
+    expect(plain).toContain('.npmrc');
+  });
+
+  it('reports what it withheld', async () => {
+    const snap = await snapshotOf('app', [file('package.json', '{}'), file('.env', 'A=1')]);
+
+    expect(snap.ok && snap.withheld).toEqual(['.env']);
+  });
+});
