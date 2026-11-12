@@ -7,7 +7,9 @@ export type TextureReport = { count: number; bytes: number; largest: string[] };
 
 type Tally = Record<string, { n: number; ms: number }>;
 
-type Stats = { render: number[]; textures?: () => TextureReport; pending?: number; loseDevice?: () => void; counts?: Record<string, number>; tally?: Tally; reveal?: { ms: number; missing: string[] }; settled?: number; frames?: CoreFrameCount[] };
+type Stats = { render: number[]; textures?: () => TextureReport; pending?: number; loseDevice?: () => void; counts?: Record<string, number>; tally?: Tally; reveal?: { ms: number; missing: string[] }; settled?: number; frames?: CoreFrameCount[]; marks?: StatsMarks };
+
+export type StatsMarks = { hit: (x: number, y: number) => { id: string; part: number; n: number } | null; rectOf: (id: string) => { x: number; y: number; w: number; h: number } | null };
 
 declare global {
   interface Window {
@@ -36,6 +38,11 @@ export function exposeReveal(ms: number, missing: string[]) {
 export function exposeSettled(ms: number) {
   const stats = (window.__gpuCanvas ??= { render: [] });
   stats.settled = ms;
+}
+
+export function exposeMarks(marks: StatsMarks | undefined) {
+  const stats = (window.__gpuCanvas ??= { render: [] });
+  stats.marks = marks;
 }
 
 export function exposeLoss(lose: () => void) {

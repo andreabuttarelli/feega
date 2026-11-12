@@ -21,7 +21,7 @@ export const SELECT_SCREEN_PX = 2;
 export const HANDLE_SCREEN_PX = 8;
 export const FAR_ZOOM = 0.25;
 export const FAR_BOOST = 1.5;
-const FAR_BOOST_FULL_ZOOM = 0.05;
+export const FAR_BOOST_FULL_ZOOM = 0.05;
 const STROKE_STEPS_PER_OCTAVE = 16;
 
 const farBoost = (zoom: number): number => {

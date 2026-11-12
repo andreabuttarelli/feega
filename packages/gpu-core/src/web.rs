@@ -9,7 +9,8 @@ use web_sys::{HtmlCanvasElement, HtmlImageElement, HtmlVideoElement, ImageBitmap
 use vello::kurbo::Rect;
 
 use crate::compositor::{Compositor, Painter};
-use crate::display_list::{parse, parse_packed, parse_splice};
+use crate::display_list::{parse, parse_packed, parse_splice, DisplayList};
+use crate::marks::Marks;
 use crate::engine::Engine;
 use crate::filter_passes::layer_texture;
 use crate::groups::{report, Library, Limits, Motion, Plan};
@@ -86,6 +87,9 @@ pub struct WebCore {
     gpu_full_ms: Arc<AtomicU64>,
     tiled: bool,
     overlay_tex: Option<wgpu::Texture>,
+    marks: Marks,
+    marks_tex: Option<wgpu::Texture>,
+    marks_owed: bool,
     tiles: Tiles,
     tile_textures: HashMap<TileKey, wgpu::Texture>,
     spare_tiles: Vec<wgpu::Texture>,
@@ -125,6 +129,7 @@ struct GpuPainter<'a> {
     spare: &'a mut wgpu::Texture,
     reprojector: &'a mut Reprojector,
     scratch: &'a mut Option<wgpu::Texture>,
+    marks: Option<&'a wgpu::Texture>,
 }
 
 fn scratch_of<'s>(device: &wgpu::Device, kept: &'s mut Option<wgpu::Texture>, (width, height): (u32, u32)) -> &'s wgpu::Texture {
@@ -246,6 +251,9 @@ impl Painter for GpuPainter<'_> {
         let out = frame.texture.create_view(&wgpu::TextureViewDescriptor { format: Some(self.format), ..Default::default() });
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
         self.reprojector.draw(self.device, self.queue, &mut encoder, Draw { source: self.retained, target: &out, format: self.format, look, within: None, output: Output::Premultiplied });
+        if let Some(marks) = self.marks {
+            self.reprojector.draw(self.device, self.queue, &mut encoder, Draw { source: marks, target: &out, format: self.format, look: UNMOVED, within: None, output: Output::Over });
+        }
         self.queue.submit([encoder.finish()]);
         self.queue.present(frame);
         Ok(())
@@ -334,7 +342,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, snapshots: HashMap::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new(), counted: Counted::default(), credit: RasterCredit::default() })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, marks: Marks::default(), marks_tex: None, marks_owed: false, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, snapshots: HashMap::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new(), counted: Counted::default(), credit: RasterCredit::default() })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -473,6 +481,20 @@ impl WebCore {
         self.changed_at = js_sys::Date::now();
         self.warmup.moved(self.changed_at);
         Ok(())
+    }
+
+    pub fn set_marks(&mut self, marks_json: &[u8]) -> Result<(), JsValue> {
+        self.marks = Marks::parse(utf8(marks_json)?).map_err(failed)?;
+        self.marks_owed = true;
+        Ok(())
+    }
+
+    pub fn hit(&self, x: f64, y: f64) -> Vec<f64> {
+        self.marks.hit(self.camera.matrix(), x, y).map_or_else(Vec::new, |h| vec![h.index as f64, h.part as u8 as f64, h.n as f64])
+    }
+
+    pub fn rect_of(&self, index: usize) -> Vec<f64> {
+        self.marks.rect_of(self.camera.matrix(), index).map_or_else(Vec::new, |r| r.to_vec())
     }
 
     pub fn set_motion(&mut self, motion: CoreMotion) {
@@ -653,6 +675,11 @@ impl WebCore {
             self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source: &overlay, target: &out, format: self.format, look: UNMOVED, within: Some(screen), output: Output::Over });
             self.overlay_tex = Some(overlay);
         }
+        if let Some(marks) = self.marks_texture()? {
+            self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source: &marks, target: &out, format: self.format, look: UNMOVED, within: Some(screen), output: Output::Over });
+            self.marks_tex = Some(marks);
+        }
+        self.marks_owed = false;
         self.queue.submit([encoder.finish()]);
         self.queue.present(frame);
         Ok(())
@@ -670,6 +697,19 @@ impl WebCore {
         let texture = self.overlay_tex.take().filter(|t| t.width() == size.0 && t.height() == size.1).unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
         self.engine.draw(&self.device, &self.queue, &list, &pictures, &texture.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
         self.count_bake(began);
+        Ok(Some(texture))
+    }
+
+    fn marks_texture(&mut self) -> Result<Option<wgpu::Texture>, JsValue> {
+        if self.marks.is_empty() {
+            return Ok(None);
+        }
+        let size = (self.target.width(), self.target.height());
+        let list = DisplayList { width: size.0, height: size.1, background: None, items: self.marks.items(self.camera.matrix()), faces: Vec::new(), fragments: Default::default() };
+        let plan = self.library.plan(&list, self.limits);
+        let (list, _) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
+        let texture = self.marks_tex.take().filter(|t| t.width() == size.0 && t.height() == size.1).unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
+        self.engine.draw(&self.device, &self.queue, &list, &self.pictures, &texture.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
         Ok(Some(texture))
     }
 
@@ -822,12 +862,18 @@ impl WebCore {
         }
         self.drew_tiles = false;
         let limits = self.frame_limits(now_ms);
-        let mut painter = GpuPainter { device: &self.device, queue: &self.queue, surface: &self.surface, format: self.format, engine: &mut self.engine, pictures: &self.pictures, cached: &mut self.cached, limits, retained: &mut self.retained, spare: &mut self.spare, reprojector: &mut self.reprojector, scratch: &mut self.scratch };
+        let marks = self.marks_texture()?;
+        let owed = std::mem::take(&mut self.marks_owed);
+        let mut painter = GpuPainter { device: &self.device, queue: &self.queue, surface: &self.surface, format: self.format, engine: &mut self.engine, pictures: &self.pictures, cached: &mut self.cached, limits, retained: &mut self.retained, spare: &mut self.spare, reprojector: &mut self.reprojector, scratch: &mut self.scratch, marks: marks.as_ref() };
         let timed = self.gpu_full_ms.swap(NOT_TIMED, Ordering::Relaxed);
         if timed != NOT_TIMED {
             self.compositor.gpu_took(f64::from_bits(timed));
         }
         let frame = self.compositor.frame(&mut painter, &mut self.library, self.camera, now_ms, &mut js_sys::Date::now)?;
+        if frame.outcome.is_none() && owed {
+            painter.present(self.compositor.lookup(self.camera))?;
+        }
+        self.marks_tex = marks;
         if frame.rastered > 0 {
             self.rastered_at = now_ms;
         }
