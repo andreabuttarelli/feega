@@ -155,7 +155,9 @@ export class FrameEditSession {
     if (this.access === DocAccess.Read) {
       return;
     }
+    this.port.recorded();
     this.history = followHead(this.history, root);
+    this.port.show(this.history.present);
     this.scheduleSave(summary);
   }
 

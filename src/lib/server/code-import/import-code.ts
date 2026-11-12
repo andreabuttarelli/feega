@@ -193,7 +193,7 @@ const SURFACE = 'surface';
 function boardsLanded(doc: MotionDoc, pages: CodePage[], labels: string[]): LandedBoard[] {
   const clips = doc.tracks.flatMap((t) => t.clips as MotionClip[]).filter((c) => c.id !== SURFACE);
   const ground = clips.find((c) => !c.parent);
-  const named = (label: string) => (labels.length === 1 ? ground : clips.find((c) => c.parent === ground?.id && c.name === label));
+  const named = (label: string) => clips.find((c) => c.parent === ground?.id && c.name === label) ?? (labels.length === 1 ? ground : undefined);
   return pages.flatMap((page) => {
     const clip = labels.includes(page.label) ? named(page.label) : undefined;
     return clip ? [{ label: page.label, route: page.route ?? page.label, cond: condKey(page.conditions ?? BASE_CONDITIONS), clip: clip.id }] : [];

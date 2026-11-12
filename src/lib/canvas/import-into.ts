@@ -16,8 +16,7 @@ export type Landed = { outcome: LandOutcome.Landed; boards: string[] } | { outco
 export type LandSession = {
   history: { present: MotionDoc };
   showPending: (root: MotionDoc, summary: string) => void;
-  recordRoot: (root: MotionDoc, summary: string) => void;
-  select: (ids: string[]) => void;
+  edit: (next: MotionDoc, summary: string) => void;
 };
 
 export type LandAsk = { label: string; map: ImportMap | null; size: { width: number; height: number }; newId: NewId; fetch: () => Promise<Landing> };
@@ -52,8 +51,7 @@ export async function landImport(session: LandSession, ask: LandAsk): Promise<La
   if (!landed.ok) {
     return { outcome: LandOutcome.Full, error: FULL, detail: landed.detail };
   }
-  session.recordRoot(landed.doc, `Imported ${ask.label}`);
+  session.edit(landed.doc, `Imported ${ask.label}`);
   const boards = answer.boards.map((b) => landed.boards[b]);
-  session.select(boards);
   return { outcome: LandOutcome.Landed, boards };
 }

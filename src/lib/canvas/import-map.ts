@@ -63,6 +63,13 @@ export type ImportMap = z.infer<typeof importMapSchema>;
 export type MapPage = ImportMap['pages'][number];
 export type MapBoard = z.infer<typeof boardSchema>;
 
+export enum MapPhase {
+  Loading = 'loading',
+  Ready = 'ready',
+  Error = 'error',
+  None = 'none'
+}
+
 export enum Shown {
   OnCanvas = 'on_canvas',
   Removed = 'removed',

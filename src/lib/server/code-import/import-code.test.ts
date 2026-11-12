@@ -128,6 +128,17 @@ describe('importCodeAt', () => {
     expect(ok.missed?.map((m) => m.label)).toEqual(['/missing', '/missing · dark · 390px']);
   });
 
+  it('one page next to the Design system board reports its own board, not the ground holding both', async () => {
+    const { ask, docs } = askOf({ routes: ['/'], code: () => fixture('tailwind4') });
+
+    const done = await importCodeAt(ask);
+
+    const ok = done as Extract<typeof done, { outcome: CodeImportOutcome.Ok }>;
+    const doc = docs.get('frame-1')!.doc as { tracks: { clips: { id: string; name?: string }[] }[] };
+    const board = doc.tracks.flatMap((t) => t.clips).find((c) => c.id === ok.boards?.[0]?.clip);
+    expect(board?.name).toBe('/');
+  });
+
   it('ogni rotta si apre in una scheda nuova, chiusa subito dopo', async () => {
     const { ask, tab } = askOf({ routes: ['/', '/settings'] });
     const open = vi.fn(async () => tab);

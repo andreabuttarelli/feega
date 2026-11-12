@@ -542,16 +542,19 @@ describe('a pending change: shown and saved, never an undo step of its own', () 
     session.recordRoot(landed, 'Imported /pricing');
     session.undo();
 
+
     expect(session.history.present).toBe(base);
     expect(session.history.past).toHaveLength(0);
   });
 
-  it('is saved like any edit', async () => {
+  it('is shown, sized and saved like any edit', async () => {
     const { session, port } = open();
 
     session.showPending(longer(70), 'Importing /pricing');
     await vi.runAllTimersAsync();
 
+    expect(port.show).toHaveBeenCalledWith(longer(70));
+    expect(port.recorded).toHaveBeenCalled();
     expect(port.send).toHaveBeenCalled();
   });
 });

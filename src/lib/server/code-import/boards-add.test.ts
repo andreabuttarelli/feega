@@ -129,4 +129,27 @@ describe('adding pages to a frame imported from code', () => {
     expect(offsets(done.doc, done.boards.n17)).toEqual(offsets(piece, 'n17'));
     expect(boardsOf(done.doc, 'n1')).toHaveLength(4);
   });
+
+  it('merges variables by name: the frame keeps its own values, the new page brings only what is missing', async () => {
+    const colours = (vars: Record<string, string>) => ({ app: { modes: ['Light'], vars: Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, { type: 'colour', values: { Light: v } }])) } });
+    const local = { ...(await imported(['/', '/settings'])), variables: colours({ brand: '#ff0000' }) } as MotionDoc;
+    const piece = { ...(await imported(['/pricing'])), variables: colours({ brand: '#0000ff', muted: '#888888' }) } as MotionDoc;
+
+    const added = addBoards(local, piece, ['n1'], 'n1', counter());
+
+    const doc = (added as { doc: MotionDoc }).doc;
+    expect(parseMotionDoc(doc).ok).toBe(true);
+    expect(doc.variables).toEqual(colours({ brand: '#ff0000', muted: '#888888' }));
+  });
+
+  it('keeps the ground under every board when the frame is a pixel taller than the ground', async () => {
+    const base = await imported(['/', '/settings']);
+    const local = { ...base, height: base.height + 1, tracks: base.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'n1' ? { ...c, props: { ...c.props, height: base.height / (base.height + 1), y: 0.5 } } : c)) })) } as MotionDoc;
+    const piece = await imported(['/pricing']);
+
+    const added = addBoards(local, piece, ['n1'], 'n1', counter());
+
+    const ground = clipsOf((added as { doc: MotionDoc }).doc).find((c) => c.id === 'n1')!;
+    expect([ground.props.width, ground.props.height]).toEqual([1, 1]);
+  });
 });

@@ -11,7 +11,7 @@ import { baselined } from '$lib/canvas/code-look';
 import { patchOf, type FileChange } from './write-back';
 import { frameEdits } from './token-write';
 import { pulledTokens } from './token-pull';
-import type { TokenMap } from './design-tokens';
+import { readOnlyKeys, type TokenMap } from './design-tokens';
 import { CodeImportOutcome } from './import-code';
 import { importCodeInto, rememberOrigin, type CodeImportAsk, type CodeScope } from './canvas-import';
 import { githubSource, SourceKind, type CodeSource, type GithubCalls } from './code-source';
@@ -284,7 +284,7 @@ export async function codeAdd(scope: CodeScope, nodeId: string, ask: AddAsk): Pr
   return { outcome: SyncOutcome.Ok, skipped: [...fresh.skipped, ...merged.kept.map((k) => `${k}: renders differently on the new page, kept as its own main`)], map: mergedMap(origin.map, map), boards: boards.map((b) => merged.boards[b] ?? b), parent };
 }
 
-export type CodeMap = { kind: string; repo: string; sha: string | null; map: ImportMap | null; used: number; limit: number };
+export type CodeMap = { kind: string; repo: string; sha: string | null; map: ImportMap | null; used: number; limit: number; readOnly: number };
 
 export async function codeMap(scope: CodeScope, nodeId: string): Promise<CodeMap | null> {
   const linked = await linkedOf(scope, nodeId);
@@ -293,7 +293,7 @@ export async function codeMap(scope: CodeScope, nodeId: string): Promise<CodeMap
     return null;
   }
   const here = clipIds(frame.doc);
-  return { kind: linked.origin.kind, repo: linked.origin.repo, sha: linked.origin.sha, map: linked.origin.map ?? null, used: boardsUsed(linked.origin.map, (id) => here.has(id)), limit: MAX_FRAME_BOARDS };
+  return { kind: linked.origin.kind, repo: linked.origin.repo, sha: linked.origin.sha, map: linked.origin.map ?? null, used: boardsUsed(linked.origin.map, (id) => here.has(id)), limit: MAX_FRAME_BOARDS, readOnly: linked.origin.tokens ? readOnlyKeys(linked.origin.tokens as TokenMap).size : 0 };
 }
 
 export function pulledVariants(origin: CodeOriginData): Variant[] | undefined {

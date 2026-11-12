@@ -2,6 +2,8 @@ import { DESIGN_MAX_SIDE, MAX_TRACKS, compOf, newClip, type MotionClip, type Mot
 import { defaultProps } from '@feega/motion-core/motion/components';
 import { reframed, type Size } from '$lib/motion/comp-frame';
 import type { ImportMap } from './import-map';
+import { MAX_COLLECTIONS, MAX_VARIABLES } from '@feega/motion-core/motion/variables-model';
+import { MAX_STYLES } from '@feega/motion-core/motion/styles-model';
 import { freezeLayout } from '$lib/motion/layout/ops';
 import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import type { Stroke } from '@feega/motion-core/motion/stroke/model';
@@ -10,7 +12,7 @@ export const BOARD_GAP = 160;
 
 const FULL = 1;
 const CENTRE = 0.5;
-const FULL_EPSILON = 1e-4;
+const FULL_SLACK_PX = 2;
 const PLACEHOLDER_FILL = '#e4e4e7';
 const PLACEHOLDER_PREFIX = 'Importing ';
 
@@ -44,9 +46,9 @@ function unionOf(boxes: Box[]): Box | null {
   return { left: Math.min(...boxes.map((b) => b.left)), top: Math.min(...boxes.map((b) => b.top)), right: Math.max(...boxes.map((b) => b.right)), bottom: Math.max(...boxes.map((b) => b.bottom)) };
 }
 
-const near = (a: unknown, b: number) => Math.abs(Number(a) - b) < FULL_EPSILON;
+const near = (a: unknown, b: number, side: number) => Math.abs(Number(a) - b) * side < FULL_SLACK_PX;
 
-const fillsDoc = (clip: MotionClip) => !clip.parent && near(clip.props.width, FULL) && near(clip.props.height, FULL) && near(clip.props.x ?? CENTRE, CENTRE) && near(clip.props.y ?? CENTRE, CENTRE);
+const fillsDoc = (clip: MotionClip, size: Size) => !clip.parent && near(clip.props.width, FULL, size.width) && near(clip.props.height, FULL, size.height) && near(clip.props.x ?? CENTRE, CENTRE, size.width) && near(clip.props.y ?? CENTRE, CENTRE, size.height);
 
 const sizeOf = (doc: MotionDoc): Size => ({ width: doc.width, height: doc.height });
 
@@ -83,7 +85,7 @@ function grown(doc: MotionDoc, size: Size): MotionDoc {
   if (from.width === size.width && from.height === size.height) {
     return doc;
   }
-  const full = new Set(clipsOf(doc.tracks).filter(fillsDoc).map((c) => c.id));
+  const full = new Set(clipsOf(doc.tracks).filter((c) => fillsDoc(c, from)).map((c) => c.id));
   const refilled = (c: MotionClip): MotionClip => (full.has(c.id) ? { ...c, props: { ...c.props, x: CENTRE, y: CENTRE, width: FULL, height: FULL } } : c);
   const top = resized({ name: 'doc', durationInFrames: doc.durationInFrames, tracks: doc.tracks }, from, size);
   const comps = Object.fromEntries(Object.entries(doc.comps).map(([id, c]) => [id, resized(c, from, size)]));
@@ -187,21 +189,37 @@ function takenIds(doc: MotionDoc): Set<string> {
   return new Set([...clipsOf(doc.tracks), ...Object.values(doc.comps).flatMap((c) => clipsOf(c.tracks))].map((c) => c.id));
 }
 
+type Collections = NonNullable<MotionDoc['variables']>;
+
+function collectionsOf(local: Collections | undefined, piece: Collections | undefined): Collections {
+  const names = [...new Set([...Object.keys(local ?? {}), ...Object.keys(piece ?? {})])].slice(0, MAX_COLLECTIONS);
+  return Object.fromEntries(
+    names.map((name) => {
+      const mine = local?.[name];
+      const theirs = piece?.[name];
+      if (!mine || !theirs) {
+        return [name, (mine ?? theirs)!];
+      }
+      const vars = Object.fromEntries(Object.entries({ ...theirs.vars, ...mine.vars }).slice(0, MAX_VARIABLES));
+      return [name, { ...mine, vars }];
+    })
+  );
+}
+
 function libraryOf(local: MotionDoc, piece: MotionDoc): Pick<MotionDoc, 'assets' | 'fonts' | 'components' | 'variables' | 'styles'> {
-  const collections = { ...piece.variables, ...local.variables };
-  const variables = Object.fromEntries(Object.entries(collections).map(([name, c]) => [name, local.variables?.[name] && piece.variables?.[name] ? { ...c, variables: { ...piece.variables[name].variables, ...local.variables[name].variables } } : c]));
-  const styles = { ...piece.styles, ...local.styles };
+  const variables = collectionsOf(local.variables, piece.variables);
+  const styles = Object.fromEntries(Object.entries({ ...piece.styles, ...local.styles }).slice(0, MAX_STYLES));
   return {
     assets: [...local.assets, ...piece.assets.filter((a) => !local.assets.some((b) => b.id === a.id))],
     fonts: [...local.fonts, ...piece.fonts.filter((f) => !local.fonts.some((g) => g.family === f.family))],
     components: { ...piece.components, ...local.components },
-    ...(Object.keys(variables).length ? { variables: variables as MotionDoc['variables'] } : {}),
+    ...(Object.keys(variables).length ? { variables } : {}),
     ...(Object.keys(styles).length ? { styles } : {})
   };
 }
 
 function slotFor(local: MotionDoc, parent: string | null, extent: Box): { at: { x: number; y: number }; size: Size } {
-  const level = (c: MotionClip) => (c.parent ?? null) === parent || (!c.parent && !fillsDoc(c));
+  const level = (c: MotionClip) => (c.parent ?? null) === parent || (!c.parent && !fillsDoc(c, sizeOf(local)));
   const content = unionOf(clipsOf(withAutoLayout(local).tracks).filter(level).flatMap((c) => boxOf(c, sizeOf(local)) ?? []));
   const left = content ? Math.max(0, Math.round(content.left)) : 0;
   const bottom = content ? content.bottom : 0;

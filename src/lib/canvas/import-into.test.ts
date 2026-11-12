@@ -19,8 +19,7 @@ function sessionOf(doc: MotionDoc) {
   const session = {
     history: { present: doc },
     showPending: vi.fn((next: MotionDoc) => (shown.push(next), (session.history = { present: next }))),
-    recordRoot: vi.fn((next: MotionDoc) => (session.history = { present: next })),
-    select: vi.fn()
+    edit: vi.fn((next: MotionDoc) => (session.history = { present: next }))
   };
   return { session, shown };
 }
@@ -48,7 +47,7 @@ describe('landing an import into the open frame', () => {
     const out = await landImport(session, { label: '/pricing', map: MAP, size: { width: 1280, height: 800 }, newId: counter(), fetch: async () => ({ ok: true, piece: PIECE, boards: ['n1'], parent: 'n1' }) });
 
     expect(out.outcome).toBe(LandOutcome.Landed);
-    expect(session.recordRoot).toHaveBeenCalledTimes(1);
+    expect(session.edit).toHaveBeenCalledTimes(1);
     expect(session.showPending.mock.calls.at(-1)![0]).toBe(LOCAL);
     expect(clipsOf(session.history.present).some((c) => c.name?.startsWith('Importing'))).toBe(false);
     expect(clipsOf(session.history.present).filter((c) => c.parent === 'n1')).toHaveLength(3);
@@ -61,7 +60,7 @@ describe('landing an import into the open frame', () => {
 
     expect(out).toEqual({ outcome: LandOutcome.Failed, error: 'run_failed', detail: 'the dev server did not answer' });
     expect(session.history.present).toBe(LOCAL);
-    expect(session.recordRoot).not.toHaveBeenCalled();
+    expect(session.edit).not.toHaveBeenCalled();
   });
 
   it('keeps an edit made on another board while the import ran', async () => {
