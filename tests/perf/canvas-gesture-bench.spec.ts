@@ -23,6 +23,7 @@ enum Scenario {
   ZoomFarOut = 'zoom-far-out',
   ZoomFarIn = 'zoom-far-in',
   ZoomHunt = 'zoom-hunt',
+  ZoomDeep = 'zoom-deep',
   PanWheel = 'pan-wheel',
   PanDrag = 'pan-drag',
   PanWhileZooming = 'pan-zoom'
@@ -30,7 +31,9 @@ enum Scenario {
 
 type Settle = { sharpMs: number; settledMs: number; restBakes: number; asked: number; built: number };
 type Levels = { levels: number; levelSharpP50: number; levelSharpP95: number; superseded: number };
-type ScenarioRun = Frames & Settle & Levels & { cpuMs: number; fpsByThird: number[] | null };
+type Perceived = { centreSharpMs: number; screenSharpMs: number; restStartMs: number; finalMs: number; tilesDuring: number; tilesAfter: number; uploadAfterMb: number; lastUploadMs: number };
+type ScenarioRun = Frames & Settle & Levels & Perceived & { cpuMs: number; fpsByThird: number[] | null };
+type PerceivedFrame = LevelFrame & { at: number; moving: boolean; tiles: number; stillBlocks: number; unsharp: number; unsharpCentre: number; exact: boolean; uploadBytes: number };
 type Script = { wheel: Step[]; from?: number } | { drag: DragPoint[] };
 
 const FIXTURE = (process.env.BENCH_CASE ?? Fixture.Zoom) as Fixture;
@@ -84,6 +87,7 @@ const SCRIPTS: Record<Scenario, () => Script> = {
       legs: [{ to: 0.55, ms: ms(400) }, { to: 0.47, ms: ms(120) }, { to: 0.55, ms: ms(120) }, { to: 0.47, ms: ms(120) }, { to: 0.55, ms: ms(120) }, { to: START_ZOOM, ms: ms(200) }]
     })
   }),
+  [Scenario.ZoomDeep]: () => ({ from: START_ZOOM, wheel: zoomPath({ from: START_ZOOM, anchor: CENTRE, ease: EASE[SPEED], clamp: CAMERA_RANGE, legs: [{ to: CAMERA_RANGE.max, ms: ms(800) }] }) }),
   [Scenario.PanWheel]: () => ({
     wheel: panPath({ at: CENTRE, tailMs: ms(500), legs: [{ by: { x: 6000, y: 0 }, ms: ms(900) }, { by: { x: -8000, y: 0 }, ms: ms(1100) }, { by: { x: 3000, y: 2000 }, ms: ms(600) }] })
   }),
@@ -181,6 +185,36 @@ async function levels(page: Page, since: number, name: Scenario): Promise<Levels
   return { levels: times.length + superseded, levelSharpP50: percentile(times, 0.5), levelSharpP95: percentile(times, 0.95), superseded };
 }
 
+const MB = 1 << 20;
+
+function sharpAfter(frames: PerceivedFrame[], end: number, blurred: (f: PerceivedFrame) => boolean): number {
+  const last = frames.findLastIndex(blurred);
+  if (last < 0) {
+    return 0;
+  }
+  const next = frames[last + 1];
+  return next ? Math.max(0, Math.round(next.at - end)) : SHARP_GIVE_UP_MS;
+}
+
+async function perceived(page: Page, since: number): Promise<Perceived> {
+  const end = await page.evaluate(() => (window as unknown as { __lastInput: { last: number } }).__lastInput.last);
+  const all = await page.evaluate((after) => ((window as unknown as { __gpuCanvas?: { frames?: PerceivedFrame[] } }).__gpuCanvas?.frames ?? []).filter((f) => f.at > after), since);
+  const after = all.filter((f) => f.at > end);
+  const from = (f: PerceivedFrame | undefined) => (f ? Math.round(f.at - end) : SHARP_GIVE_UP_MS);
+  const uploads = after.filter((f) => f.uploadBytes > 0);
+  const final = after.find((f, i) => f.exact && after.slice(i).every((g) => g.unsharp === 0));
+  return {
+    centreSharpMs: sharpAfter(after, end, (f) => f.unsharpCentre > 0),
+    screenSharpMs: sharpAfter(after, end, (f) => f.unsharp > 0),
+    restStartMs: from(after.find((f) => f.stillBlocks > 0 || f.exact)),
+    finalMs: from(final),
+    tilesDuring: all.filter((f) => f.at <= end).reduce((s, f) => s + f.tiles, 0),
+    tilesAfter: after.reduce((s, f) => s + f.tiles, 0),
+    uploadAfterMb: Math.round((uploads.reduce((s, f) => s + f.uploadBytes, 0) / MB) * 10) / 10,
+    lastUploadMs: uploads.length ? from(uploads.at(-1)) : 0
+  };
+}
+
 async function scenario(page: Page, cdp: CDPSession, name: Scenario, profiled: boolean): Promise<ScenarioRun> {
   const script = SCRIPTS[name]();
   const since = await page.evaluate(() => performance.now());
@@ -196,7 +230,7 @@ async function scenario(page: Page, cdp: CDPSession, name: Scenario, profiled: b
   if (profiled) {
     writeFileSync(join(OUT, `${name}.cpuprofile`), JSON.stringify((await cdp.send('Profiler.stop')).profile));
   }
-  return { ...frames, cpuMs, fpsByThird: fpsByThird(script, frames.gapsInOrder), ...settled, ...(await levels(page, since, name)) };
+  return { ...frames, cpuMs, fpsByThird: fpsByThird(script, frames.gapsInOrder), ...settled, ...(await perceived(page, since)), ...(await levels(page, since, name)) };
 }
 
 async function run(index: number, base: string, browser: Awaited<ReturnType<typeof chromium.launch>>): Promise<Partial<Record<Scenario, ScenarioRun>>> {
@@ -229,7 +263,7 @@ test('gesture benchmark: gradual zoom and pan through real input', async ({ base
   const runs: Partial<Record<Scenario, ScenarioRun>>[] = [];
   for (let i = 0; i < RUNS; i++) {
     runs.push(await run(i, baseURL!, browser));
-    console.log(`run ${i + 1}/${RUNS} ${JSON.stringify(Object.fromEntries(Object.entries(runs.at(-1)!).map(([k, v]) => [k, { fps: v.fpsAvg, cpuMs: v.cpuMs, p50: v.p50, p95: v.p95, p99: v.p99, worst: v.max, over11: v.over11, thirds: v.fpsByThird, sharpMs: v.sharpMs, settledMs: v.settledMs, levels: v.levels, levelP50: v.levelSharpP50, levelP95: v.levelSharpP95, superseded: v.superseded, restBakes: v.restBakes, asked: v.asked, built: v.built }])))}`);
+    console.log(`run ${i + 1}/${RUNS} ${JSON.stringify(Object.fromEntries(Object.entries(runs.at(-1)!).map(([k, v]) => [k, { fps: v.fpsAvg, cpuMs: v.cpuMs, p50: v.p50, p95: v.p95, p99: v.p99, worst: v.max, over11: v.over11, thirds: v.fpsByThird, sharpMs: v.sharpMs, settledMs: v.settledMs, levels: v.levels, levelP50: v.levelSharpP50, levelP95: v.levelSharpP95, superseded: v.superseded, over11Pct: Math.round((v.over11 / Math.max(1, v.frames)) * 1000) / 10, centreSharpMs: v.centreSharpMs, screenSharpMs: v.screenSharpMs, restStartMs: v.restStartMs, finalMs: v.finalMs, tilesDuring: v.tilesDuring, tilesAfter: v.tilesAfter, uploadAfterMb: v.uploadAfterMb, lastUploadMs: v.lastUploadMs, restBakes: v.restBakes, asked: v.asked, built: v.built }])))}`);
   }
   await browser.close();
   const medians = Object.fromEntries(Object.values(Scenario).filter((s) => runs[0][s]).map((s) => [s, median(runs.map((r) => ({ fps: r[s]!.fpsAvg, p95: r[s]!.p95, worst: r[s]!.max, cpuMs: r[s]!.cpuMs, sharpMs: r[s]!.sharpMs })))]));

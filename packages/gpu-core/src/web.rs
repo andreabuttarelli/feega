@@ -113,6 +113,8 @@ struct Counted {
     uncovered: u32,
     tiles: u32,
     blocks: u32,
+    unsharp_centre: u32,
+    exact: bool,
 }
 
 struct GpuPainter<'a> {
@@ -148,6 +150,11 @@ fn held_texture(device: &wgpu::Device, (width, height): (u32, u32)) -> wgpu::Tex
         usage: wgpu::TextureUsages::COPY_SRC | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT,
         view_formats: &[],
     })
+}
+
+fn centre_of((w, h): (u32, u32)) -> Rect {
+    let (w, h) = (w as f64, h as f64);
+    Rect::new(w / 4.0, h / 4.0, w * 3.0 / 4.0, h * 3.0 / 4.0)
 }
 
 fn input_pending() -> bool {
@@ -653,6 +660,7 @@ impl WebCore {
         });
         let placed: Vec<Tile> = still.chain(lifted).collect();
         let complete = self.rest.as_ref().is_some_and(Rest::adoptable);
+        self.counted.exact = complete;
         let exact = self.rest_shown.iter().filter(|_| complete).map(|(block, source)| Tile { source, look: Lookup { scale: 1.0, x: -block.x0, y: -block.y0 }, within: *block });
         let placed: Vec<Tile> = placed.into_iter().chain(exact).collect();
         self.reprojector.draw_tiles(&self.device, &self.queue, &mut encoder, &out, self.format, Output::Premultiplied, &placed);
@@ -724,6 +732,9 @@ impl WebCore {
         }
         let tiles = self.tiles.frame(self.camera, screen);
         self.counted.unsharp = self.tiles.unsharp(&tiles.missing) as u32;
+        let centre = centre_of(screen);
+        let near: Vec<TileKey> = tiles.missing.iter().filter(|k| k.screen(self.camera).overlaps(centre)).copied().collect();
+        self.counted.unsharp_centre = self.tiles.unsharp(&near) as u32;
         let underlaid = self.compositor.held_look(self.camera).is_some_and(|(_, stretch)| crate::tiles::underlay_shows(stretch));
         self.counted.uncovered = if underlaid { 0 } else { left_blank.iter().filter(|k| !self.tiles.holds(**k)).count() as u32 };
         let resting = matches!(self.motion, CoreMotion::Still) && tiles.missing.iter().all(|k| self.tiles.covered_within(*k, NEAR_STEPS)) && js_sys::Date::now() - self.changed_at >= REST_AFTER_MS;
@@ -833,6 +844,7 @@ impl WebCore {
             return Ok(report);
         }
         self.drew_tiles = false;
+        self.counted.exact = self.adopted == Some(self.camera);
         let limits = self.frame_limits(now_ms);
         let mut painter = GpuPainter { device: &self.device, queue: &self.queue, surface: &self.surface, format: self.format, engine: &mut self.engine, pictures: &self.pictures, cached: &mut self.cached, limits, retained: &mut self.retained, spare: &mut self.spare, reprojector: &mut self.reprojector, scratch: &mut self.scratch };
         let timed = self.gpu_full_ms.swap(NOT_TIMED, Ordering::Relaxed);
@@ -931,7 +943,7 @@ impl WebCore {
     pub fn frame_counts(&mut self) -> Vec<f64> {
         let planned = self.compositor.take_planned();
         let counted = std::mem::take(&mut self.counted);
-        vec![f64::from(planned.plans), f64::from(planned.walked), planned.ms, f64::from(counted.bakes), counted.ms, counted.upload_bytes, f64::from(counted.unsharp), f64::from(counted.uncovered), f64::from(step_of(self.camera.zoom)), f64::from(counted.tiles), f64::from(counted.blocks), self.held_bytes()]
+        vec![f64::from(planned.plans), f64::from(planned.walked), planned.ms, f64::from(counted.bakes), counted.ms, counted.upload_bytes, f64::from(counted.unsharp), f64::from(counted.uncovered), f64::from(step_of(self.camera.zoom)), f64::from(counted.tiles), f64::from(counted.blocks), self.held_bytes(), f64::from(counted.unsharp_centre), f64::from(u8::from(counted.exact))]
     }
 
     fn held_bytes(&self) -> f64 {
