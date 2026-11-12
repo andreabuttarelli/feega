@@ -11,6 +11,7 @@ import { PlanRefusal } from './run-plan';
 import { fixture } from '../../../../tests/fixtures/design-tokens/read';
 import { DesignSystem } from './design-system';
 import { DESIGN_BOARD } from './design-board';
+import { discover } from './component-discovery';
 
 const APP = 'https://sb-1.vercel.run';
 const button = (id: string, use: number, x: number, label: string) => ({
@@ -87,6 +88,40 @@ function askOf(over: Partial<Parameters<typeof importCodeAt>[0]> = {}) {
     ask: { repo: 'https://github.com/acme/app', routes: ['/settings'], at: { x: 0, y: 0 }, store, place: { projectId: 'p', canvasId: 'c' }, open: async () => tab, runner: runner as RepoRunner, guard: async () => undefined, importImage: async () => null, newId: () => `n${++n}`, settleMs: 0, ...over }
   };
 }
+
+const LIBRARY = discover({
+  'src/components/Button.tsx': "export function Button({ type = 'button' }: { type?: 'button' | 'submit' | 'reset'; children?: React.ReactNode }) { return <button type={type} />; }",
+  'src/lib/components/Callout.svelte': "<script lang=\"ts\">let { tone = 'info' }: { tone?: 'info' | 'error' } = $props();</script><aside />"
+});
+
+describe('importCodeAt con la libreria letta dal codice', () => {
+  const withLibrary = () => vi.fn(async () => ({ ok: true as const, app: { url: APP, names: ['Button', 'Callout'], sha: null, stop: async () => undefined, library: LIBRARY } }));
+
+  it('il report dice quali componenti del codice nessuna rotta catturata ha reso', async () => {
+    const { ask } = askOf({ runner: withLibrary() });
+
+    const done = await importCodeAt(ask);
+
+    expect(done.outcome).toBe(CodeImportOutcome.Ok);
+    const library = 'library' in done ? done.library! : null;
+    expect(library?.uncaptured).toEqual(['Callout']);
+    expect(library?.components.map((c) => [c.name, c.captured, c.cells])).toEqual([
+      ['Button', true, 3],
+      ['Callout', false, 2]
+    ]);
+  });
+
+  it('una prop type dichiarata come unione diventa asse di variante', async () => {
+    const { ask, tab } = askOf({ runner: withLibrary() });
+    tab.marks.mockResolvedValue([
+      { component: 'Button', props: { type: 'submit', children: 'Save' } },
+      { component: 'Button', props: { type: 'reset', children: 'Cancel' } },
+      { component: 'Button', props: { type: 'button', children: 'Delete' } }
+    ]);
+
+    expect(await importCodeAt(ask)).toMatchObject({ outcome: CodeImportOutcome.Ok, components: 1, variants: 3 });
+  });
+});
 
 describe('importCodeAt', () => {
   it('avvia il repo, apre la rotta e segna i componenti coi nomi del codice', async () => {

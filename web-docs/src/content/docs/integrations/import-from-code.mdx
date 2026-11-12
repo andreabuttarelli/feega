@@ -12,6 +12,7 @@ Paste a GitHub repository and one or more page paths, or a Storybook link. Feega
 - Every component of the code rendered on the page becomes a **main component**, named as in the code.
 - Every other use of it is an **instance** linked to that main. Different labels become text overrides.
 - Props with a few short lowercase values (`variant="outline"`, `size="sm"`) and boolean props become **variants** of one component set. A prop the code leaves out is the variant `Default`.
+- A prop the source **declares** as a set of values (`type: 'info' | 'warning'`, `level: 1 | 2 | 3`, a `cva`/`tv` variant, an enum) is a variant even when it is named `type`, `name` or `value` or holds numbers.
 
 Several pages land in **one frame**, a board per page named after its path, side by side. The components are shared: a `Button` rendered on `/` and on `/settings` is one main, and the second page holds instances of it. The Components panel lists each component once, and every component set is laid out on the project's Components page.
 
@@ -25,6 +26,19 @@ Open the insert menu (**+**), go to **Import**, choose **From code…**.
 - **Monorepos**: when the repository holds several apps and the link names none, the dialog lists them; pick one and press **Import** again. Dependencies install at the workspace root and only the chosen app starts.
 - **Private repositories**: press **Connect GitHub**, sign in to GitHub in the tab that opens, come back. The dialog then lists your repositories and their branches. Feega downloads the code on its servers and copies it into the sandbox; your GitHub sign-in never reaches the sandbox.
 - **Storybook**: switch to the Storybook tab and paste the Storybook link. Up to 12 stories, spread across components, become boards; stories that do not fit in about two and a half minutes are listed as left out. Nothing is installed or started, so it is the fastest way to bring in a component library, including components no page renders.
+
+## Components read from the code
+
+Before the pages are captured, the component files are read as text, never run: shadcn's `components.json` `aliases.ui` folder when there is one, else every `components/` folder (`src/lib/components`, `src/components`, `components`, `app/components`), plus `*.stories.*` files.
+
+| Source | Read |
+|---|---|
+| React, Preact, Solid (`.tsx` `.jsx` `.ts` `.js`) | exported function, arrow, `forwardRef` and `memo` components; `cva(…, { variants, defaultVariants })`, `tv({ variants })`, `VariantProps<typeof …>`, union, enum and boolean props, defaults from the destructuring |
+| Svelte 5 / Svelte 4 | `$props()` typed inline or with `interface Props`; `export let x: 'a' \| 'b' = 'a'` |
+| Vue | `defineProps<{…}>()`, `withDefaults`, runtime `defineProps({ x: { type: String as PropType<…> } })` |
+| Storybook | `argTypes` options add values to an axis |
+
+Types are followed inside the file and one relative import away; a type from a package or an alias (`$lib/types`) is listed as not resolved, never guessed. Svelte keeps no props at runtime, so for Svelte this is the only place its variants are known; drawing every variant of every component is the next step.
 
 ## Theme and width
 
@@ -41,7 +55,7 @@ Choose several and every page lands once per combination, side by side in the sa
 |---|---|
 | Locale, text direction | The browser language is fixed: the default catalog is shown. |
 | Login, feature flags, env vars, loading, empty and error states | The dev server renders what its own setup gives. |
-| A component variant the route does not render | Only what appears on the page is imported. |
+| A component variant the route does not render | Only what appears on the page is drawn. The import response lists every component found in the code with its axes, and which no page rendered (`library.uncaptured`). |
 
 ### Edits on a dark board
 

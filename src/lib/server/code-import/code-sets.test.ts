@@ -56,6 +56,36 @@ describe('codeSets', () => {
   });
 });
 
+describe('codeSets con gli assi dichiarati nel codice', () => {
+  const declared = new Map<string, Record<string, string[]>>([['Callout', { type: ['info', 'warning', 'success', 'error'] }], ['Heading', { level: ['1', '2', '3'] }], ['Field', { name: ['email', 'phone'] }]]);
+
+  it('una prop type dichiarata come unione resta un asse anche se si chiama type', () => {
+    const sets = codeSets([{ component: 'Callout', props: { type: 'warning' } }, { component: 'Callout', props: { type: 'info' } }], declared);
+
+    expect(sets.map((s) => s?.variant)).toEqual([{ type: 'warning' }, { type: 'info' }]);
+  });
+
+  it('un numero dichiarato come unione di letterali è un asse', () => {
+    const [set] = codeSets([{ component: 'Heading', props: { level: 2 } }], declared);
+
+    expect(set!.variant).toEqual({ level: '2' });
+  });
+
+  it('name dichiarato resta asse, ma un valore fuori dalla dichiarazione no', () => {
+    const [kept] = codeSets([{ component: 'Field', props: { name: 'email' } }], declared);
+    const [dropped] = codeSets([{ component: 'Field', props: { name: 'address' } }], declared);
+
+    expect(kept!.variant).toEqual({ name: 'email' });
+    expect(dropped!.variant).toEqual({});
+  });
+
+  it('senza dichiarazione type, value e i numeri restano ignorati', () => {
+    const [set] = codeSets([{ component: 'Callout', props: { type: 'info', value: 'x', size: 3 } }]);
+
+    expect(set!.variant).toEqual({});
+  });
+});
+
 describe('withComponents con radici condivise', () => {
   it('una catena lunga sulla stessa radice tiene il più esterno e il più interno', () => {
     const uses = ['Layout', 'Provider', 'Tooltip', 'Button'].map((component, i) => ({ component, props: {}, ...(i ? { shares: i - 1 } : {}) }));

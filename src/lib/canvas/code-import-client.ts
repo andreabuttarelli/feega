@@ -2,7 +2,9 @@ const UNAVAILABLE = 'unavailable';
 
 export type DesignLanded = { tokens: number; byClass: number; byRule: number; byValue: number; unbound: number };
 
-export type CodeLanded = { nodes: unknown[]; undo: unknown[]; skipped: string[]; truncated: boolean; pages: string[]; components: number; variants: number; instances: number; design?: DesignLanded };
+export type LibraryLanded = { components: { name: string; file: string; axes: Record<string, { values: string[]; default: string | null }>; captured: boolean; cells: number }[]; uncaptured: string[] };
+
+export type CodeLanded = { nodes: unknown[]; undo: unknown[]; skipped: string[]; truncated: boolean; pages: string[]; components: number; variants: number; instances: number; design?: DesignLanded; library?: LibraryLanded };
 
 export type RenderCondition = { scheme: 'light' | 'dark'; width: number };
 

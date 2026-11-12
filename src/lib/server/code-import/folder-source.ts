@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, normalize, relative } from 'node:path';
 import { promisify } from 'node:util';
 import { namesIn } from './repo';
+import { discoverIn, type Discovery } from './component-discovery';
 import { planFile, runPlan, textsWanted, type PlanRefused, type RepoFacts, type RunPlan } from './run-plan';
 import type { FileChange, ReadFile } from './write-back';
 import type { CodeSource, Published } from './code-source';
@@ -16,7 +17,7 @@ const run = promisify(execFile);
 
 const SKIPPED_DIRS = new Set(['node_modules', '.git', '.svelte-kit', '.next', 'dist', 'build', '.vercel', '.turbo']);
 const WATCHED = /\.(svelte|vue|tsx|jsx|ts|js|html|css|json)$/;
-const COMPONENT_FILE = /\.(tsx|jsx)$/;
+const COMPONENT_FILE = /\.(tsx|jsx|js)$/;
 const MAX_FILES = 4_000;
 const READY_MS = 90_000;
 const POLL_MS = 500;
@@ -185,6 +186,11 @@ export async function folderNames(root: string): Promise<string[]> {
   const files = (await walk(root)).filter((f) => COMPONENT_FILE.test(f));
   const sources = await Promise.all(files.map((f) => readFile(join(root, f), 'utf8').catch(() => '')));
   return namesIn(sources.join('\n'));
+}
+
+export async function folderLibrary(root: string): Promise<Discovery> {
+  const read = async (paths: string[]) => Object.fromEntries(await Promise.all(paths.map(async (p) => [p, await readFile(join(root, p), 'utf8').catch(() => '')])));
+  return discoverIn(await walk(root), read);
 }
 
 export function folderSource(root: string): CodeSource {
