@@ -109,9 +109,22 @@ pub struct Engine {
     scenes: Vec<Scene>,
     tally: Tally,
     drawing: Reason,
+    overflowed: bool,
 }
 
 pub type EngineError = vello::Error;
+
+const LINES: u32 = 1 << 21;
+const SEG_COUNTS: u32 = 1 << 21;
+const SEGMENTS: u32 = 1 << 21;
+const TILES: u32 = 1 << 22;
+const PTCL: u32 = 1 << 23;
+const BINNING: u32 = 1 << 18;
+
+pub fn overflows(scene: &Scene) -> bool {
+    let used = scene.bump_estimate(None);
+    used.lines.len() > LINES || used.seg_counts.len() > SEG_COUNTS || used.segments.len() > SEGMENTS || used.tile.len() > TILES || used.ptcl.len() > PTCL || used.binning.len() > BINNING
+}
 
 struct Gpu<'a> {
     vello: &'a mut vello::Renderer,
@@ -247,7 +260,7 @@ impl Gpu<'_> {
 impl Engine {
     pub fn new(device: &wgpu::Device) -> Result<Self, EngineError> {
         let vello = vello::Renderer::new(device, RendererOptions { antialiasing_support: AaSupport::area_only(), ..Default::default() })?;
-        Ok(Self { vello, blending: Blending::Native, filters: FilterPasses::new(device), cache: LayerCache::default(), held: HashMap::new(), spare: Vec::new(), scenes: Vec::new(), tally: Tally::default(), drawing: Reason::Screen })
+        Ok(Self { vello, blending: Blending::Native, filters: FilterPasses::new(device), cache: LayerCache::default(), held: HashMap::new(), spare: Vec::new(), scenes: Vec::new(), tally: Tally::default(), drawing: Reason::Screen, overflowed: false })
     }
 
     pub fn set_budget(&mut self, pool: u64, layers: u64) {
@@ -268,6 +281,7 @@ impl Engine {
         let layers = prepare(&mut gpu, list, pictures, self.blending)?;
         let mut scene = borrowed(gpu.scenes);
         let skipped = build_into(&mut scene, list, pictures, &layers);
+        let overflowed = overflows(&scene);
         let drawn = gpu.render(self.drawing, &scene, base(list.background), target, (list.width, list.height));
         gpu.scenes.push(scene);
         for image in layers.into_images() {
@@ -276,7 +290,12 @@ impl Engine {
             }
         }
         gpu.cache.sweep(gpu.vello);
+        self.overflowed = overflowed;
         drawn.map(|_| skipped)
+    }
+
+    pub fn overflowed(&self) -> bool {
+        self.overflowed
     }
 
     fn raster(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures) -> Result<(ImageData, wgpu::Texture, Vec<Skipped>), EngineError> {

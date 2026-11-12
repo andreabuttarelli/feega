@@ -264,6 +264,24 @@ describe('CoreFrames camera', () => {
     expect(walks).toEqual({});
   });
 
+  it('a pan after a change that left the waiting count alone walks none of them', async () => {
+    const far = { id: 'f1', kind: 'frame', revision: 1, box: { x: 90_000, y: 0, w: 100, h: 50 } };
+    const props = $state({ frames: [far], cards: manyCards(), view: { x: 0, y: 0, zoom: 1 }, area: { width: 400, height: 300 }, sourceUrl: (id: string) => `http://frames.invalid/${id}`, onready: () => undefined, onfallback: () => undefined });
+    app = mount(CoreFrames, { target: document.body, props: props as never });
+    flushSync();
+    await vi.waitFor(() => expect(calls.patches.length).toBeGreaterThan(0));
+    await settled();
+    props.cards = [...manyCards(), { ...card, key: 'off', frame: { ...card.frame, id: 'off', box: { x: 80_000, y: 0, w: 100, h: 50 } } }];
+    flushSync();
+    await settled();
+
+    props.view = { x: -1, y: 0, zoom: 1 };
+    flushSync();
+
+    await vi.waitFor(() => expect(calls.cameras.at(-1)).toEqual([-1, 0, 1]));
+    expect(walks).toEqual({});
+  });
+
   it('a zoom that stays in one cache step walks none of them after its first tick', async () => {
     const props = $state({ frames: [], cards: manyCards(), view: { x: 0, y: 0, zoom: 1 }, area: { width: 400, height: 300 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
     app = mount(CoreFrames, { target: document.body, props });
