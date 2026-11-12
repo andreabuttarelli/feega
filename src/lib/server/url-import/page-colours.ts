@@ -1,6 +1,6 @@
 import type { MotionClip, MotionDoc, MotionTrack } from '@feega/motion-core/motion/doc';
 import { sameColour } from './page-tokens';
-import { viewOnly } from './page-views';
+import { shownOnlyIn } from '@feega/motion-core/motion/breakpoints/model';
 
 const HEX = /^#([0-9a-f]{6})([0-9a-f]{2})?$/i;
 
@@ -55,7 +55,7 @@ const snappedTracks = (tracks: MotionTrack[], canon: Map<string, string>): Motio
 export function coloursMerged(doc: MotionDoc): MotionDoc {
   const counts: Counts = new Map();
   clipsIn(doc)
-    .filter((c) => !viewOnly(c))
+    .filter((c) => !shownOnlyIn(c).length)
     .forEach((c) => counted(c.props, counts));
   const canon = canonOf(counts);
   return { ...doc, tracks: snappedTracks(doc.tracks, canon), comps: Object.fromEntries(Object.entries(doc.comps).map(([id, comp]) => [id, { ...comp, tracks: snappedTracks(comp.tracks, canon) }])) };
