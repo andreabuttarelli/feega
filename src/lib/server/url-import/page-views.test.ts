@@ -5,6 +5,7 @@ import type { RestNode } from '$lib/server/figma/rest-message';
 import type { PageTree } from './page-tree';
 import { Sectioning, urlPlan } from './url-doc';
 import { PAGE_VIEWS } from './page-views';
+import { samplesOf } from './token-bind';
 
 const WHITE = { r: 1, g: 1, b: 1, a: 1 };
 const BLUE = { r: 0, g: 0.4, b: 1, a: 1 };
@@ -223,6 +224,16 @@ describe('a page read at desktop and phone width', () => {
 
     expect(textClips(doc)).toHaveLength(1);
     expect(shownTexts(resolveView(doc, PAGE_VIEWS[1].id))).toEqual(['Deploy now']);
+  });
+
+  it('a block only the phone page paints is not sampled for the palette (stripe.com: view copies weighed in, so pairing them changed the colours)', () => {
+    const banner: RestNode = { ...card('banner', { x: 0, y: 700, width: 390, height: 400 }), fills: [{ type: 'SOLID', color: { r: 0.2, g: 0.8, b: 0.3, a: 1 } }] };
+    const coloursOf = (tree: PageTree) => {
+      const doc = planned(desktop, [{ view: PAGE_VIEWS[1], tree }]).plan.items[0].doc;
+      return samplesOf([doc], desktop.root, { docPerPx: doc.width / desktop.width, images: new Set() }).colours;
+    };
+
+    expect(coloursOf({ ...phone, root: { ...phone.root, children: [...phone.root.children!, banner] } })).toEqual(coloursOf(phone));
   });
 
   it('a phone page far longer than the desktop one fits its view whole (stripe: the phone page ran past the frame maximum and lost its last quarter)', () => {
