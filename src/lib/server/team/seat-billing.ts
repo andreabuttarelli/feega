@@ -48,6 +48,8 @@ type OrgSeats = {
   seats_paid_until?: string | null;
 };
 
+export const RECONCILE_BATCH = 40;
+
 const NONE = 'none' as SeatProration;
 const INVOICE = 'always_invoice' as SeatProration;
 const PAST_DUE = 'past_due';

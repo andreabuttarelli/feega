@@ -4,11 +4,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { cronAuthorized } from '$lib/server/cron-auth';
 import { createServiceRoleDb } from '$lib/server/db/client';
 import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
-import { SeatSync, syncSeats } from '$lib/server/team/seat-billing';
+import { RECONCILE_BATCH, SeatSync, syncSeats } from '$lib/server/team/seat-billing';
 
 export const config = { maxDuration: 60 };
-
-export const RECONCILE_BATCH = 40;
 
 const USE_PATH = 'src/routes/api/v1/billing/seats/reconcile';
 const HTTP_BAD_GATEWAY = 502;

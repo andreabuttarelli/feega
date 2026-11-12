@@ -14,7 +14,8 @@ vi.mock('$lib/server/stripe', () => ({
 }));
 vi.mock('$lib/server/db/client', () => ({ createServiceRoleDb: () => world.db }));
 
-import { GET, RECONCILE_BATCH } from './+server';
+import { GET } from './+server';
+import { RECONCILE_BATCH } from '$lib/server/team/seat-billing';
 
 const call = () => (GET as (e: unknown) => Promise<Response>)({ request: new Request('https://feega.test/api/v1/billing/seats/reconcile') });
 
