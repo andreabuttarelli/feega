@@ -4,7 +4,7 @@ import { loadavg } from 'node:os';
 import { test, expect, chromium, type Browser, type CDPSession, type Page } from '@playwright/test';
 import { instrument, wheelPan } from '../e2e/fixtures/frame-sweeps';
 import { LANDINGS_FIXTURE_PLACE } from '../../scripts/perf/landings-fixture.mjs';
-import { budgetOf, editBudgetOf, EDIT_BUDGET_MS, FRAME_BUDGET_MS } from '../../scripts/perf/frame-budget';
+import { budgetOf, editBudgetOf, EDIT_BUDGET_MS, FRAME_BUDGET_MS, Rate } from '../../scripts/perf/frame-budget';
 
 enum Gesture {
   Pan = 'pan',
@@ -221,16 +221,16 @@ for (const target of TARGETS) {
     const all = Object.fromEntries(Object.values(Gesture).map((g) => [g, { gaps: [], taskMs: 0 } as Seen])) as Record<Gesture, Seen>;
     for (let i = 0; i < RUNS; i++) {
       const seen = await run(browser, target);
-      console.log(`run ${i + 1}: ${Object.values(Gesture).map((g) => `${g} ${(100 * budgetOf(seen[g].gaps).overShare).toFixed(1)}%`).join(' ')}`);
+      console.log(`run ${i + 1}: ${Object.values(Gesture).map((g) => `${g} ${(100 * budgetOf(seen[g].gaps).overShare).toFixed(1)}%/${(100 * budgetOf(seen[g].gaps, Rate.ProMotion).overShare).toFixed(1)}%`).join(' ')}`);
       Object.values(Gesture).forEach((g) => {
         all[g].gaps.push(...seen[g].gaps);
         all[g].taskMs += seen[g].taskMs / RUNS;
       });
     }
     await browser.close();
-    const report = Object.fromEntries(Object.values(Gesture).map((g) => [g, { ...budgetOf(all[g].gaps), taskMs: Math.round(all[g].taskMs) }]));
+    const report = Object.fromEntries(Object.values(Gesture).map((g) => [g, { ...budgetOf(all[g].gaps), taskMs: Math.round(all[g].taskMs), at120: budgetOf(all[g].gaps, Rate.ProMotion) }]));
     writeFileSync(join(OUT, `frame-budget-${target}.json`), JSON.stringify(report, null, 2));
-    console.table(report);
+    console.table(Object.fromEntries(Object.entries(report).map(([g, { at120, ...at90 }]) => [g, { ...at90, p95at120: at120.p95, overAt120: at120.overShare, passedAt120: at120.passed }])));
     expect(Object.entries(report).filter(([, r]) => !r.passed).map(([g]) => g)).toEqual([]);
   });
 }

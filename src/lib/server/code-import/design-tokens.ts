@@ -1,29 +1,38 @@
 import { MAX_MODES, MAX_VARIABLES, VARIABLE_NAME, VarType, keyOf, type Collection, type VarAlias, type VarLiteral, type Variables } from '@feega/motion-core/motion/variables-model';
-import { DARK, LIGHT, type DeclAt, type Parsed } from './css-tokens';
+import { ACCENT, accentOf, DARK, LIGHT, fromPage, type DeclAt, type Parsed } from './css-tokens';
 import { colourOf } from './token-colour';
 
 export enum TokenKind {
   Colour = 'colour',
   Radius = 'radius',
   Spacing = 'spacing',
-  Font = 'font'
+  Font = 'font',
+  Breakpoint = 'breakpoint',
+  Border = 'border',
+  Easing = 'easing'
 }
 
 export type TokenValue = { raw: string; at: DeclAt };
 
-export type Token = { name: string; kind: TokenKind; values: Record<string, TokenValue> };
+export type Token = { name: string; kind: TokenKind; values: Record<string, TokenValue>; accent?: boolean };
 
 export type TokenSet = { tokens: Token[]; modes: string[]; skipped: string[] };
 
-export type TokenEntry = { name: string; origins: Record<string, string>; raw: Record<string, string>; scale?: number; orphan?: boolean; factor?: number };
+export type TokenEntry = { name: string; origins: Record<string, string>; raw: Record<string, string>; scale?: number; orphan?: boolean; factor?: number; style?: string; field?: string; rule?: string };
 
 export const SPACING_BASE = '--spacing';
 
-export const tokenId = (entry: TokenEntry) => (entry.factor ? `${entry.name}-${entry.factor}` : entry.name);
+export const tokenId = (entry: TokenEntry) => (entry.rule ? `${entry.rule} { ${entry.name} }` : entry.factor ? `${entry.name}-${entry.factor}` : entry.name);
 
 export type TokenMap = Record<string, TokenEntry>;
 
+export const readOnlyKeys = (map: TokenMap) => new Set(Object.entries(map).flatMap(([key, entry]) => (Object.values(entry.origins).every(fromPage) ? [key] : [])));
+
 type Row = { test: RegExp; strip: string; kind: TokenKind | null; group: string; reason?: string };
+
+export const OTHER_GROUP = 'Other';
+
+const AS_STYLE = 'a style';
 
 const PALETTE = 'Palette';
 const DEFAULT_STRIP = '--';
@@ -36,11 +45,16 @@ const TOKEN_ROWS: Row[] = [
   { test: /^--spacing-/, strip: '--spacing-', kind: TokenKind.Spacing, group: 'Spacing' },
   { test: /^--font-(weight|feature|variation)/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'font weights and features are not variables yet' },
   { test: /^--font-/, strip: '--font-', kind: TokenKind.Font, group: 'Type' },
-  { test: /^--(text|leading|tracking)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'the type scale lands as text styles in a later stage' },
-  { test: /^--(shadow|inset-shadow|drop-shadow|text-shadow)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'shadows land as effect styles in a later stage' },
-  { test: /^--(breakpoint|container|ease|animate|blur|perspective|aspect)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'not bindable to a layer in feega yet' },
-  { test: /radius/, strip: DEFAULT_STRIP, kind: TokenKind.Radius, group: 'Radius' },
-  { test: /gap|spacing|space/, strip: DEFAULT_STRIP, kind: TokenKind.Spacing, group: 'Spacing' },
+  { test: /^--(inset-shadow|drop-shadow|text-shadow)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'only box shadows become effect styles' },
+  { test: /^--(text|shadow)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: AS_STYLE },
+  { test: /^--(leading|tracking)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'a line-height or letter-spacing scale is not a variable; text styles carry it' },
+  { test: /^--breakpoint-/, strip: '--breakpoint-', kind: TokenKind.Breakpoint, group: OTHER_GROUP },
+  { test: /^--ease-/, strip: '--ease-', kind: TokenKind.Easing, group: OTHER_GROUP },
+  { test: /^--(container|animate|blur|perspective|aspect)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'not bindable to a layer in feega yet' },
+  { test: /^--border-width-/, strip: '--border-width-', kind: TokenKind.Border, group: 'Border' },
+  { test: /border-?width|stroke-?width/, strip: DEFAULT_STRIP, kind: TokenKind.Border, group: 'Border' },
+  { test: /radius/i, strip: DEFAULT_STRIP, kind: TokenKind.Radius, group: 'Radius' },
+  { test: /gap|spacing|space/i, strip: DEFAULT_STRIP, kind: TokenKind.Spacing, group: 'Spacing' },
   { test: /^--/, strip: DEFAULT_STRIP, kind: TokenKind.Colour, group: PALETTE }
 ];
 
@@ -48,7 +62,10 @@ const VAR_TYPE: Record<TokenKind, VarType> = {
   [TokenKind.Colour]: VarType.Colour,
   [TokenKind.Radius]: VarType.Number,
   [TokenKind.Spacing]: VarType.Number,
-  [TokenKind.Font]: VarType.String
+  [TokenKind.Font]: VarType.String,
+  [TokenKind.Breakpoint]: VarType.Number,
+  [TokenKind.Border]: VarType.Number,
+  [TokenKind.Easing]: VarType.String
 };
 
 const ALIAS = /^var\(\s*(--[\w.-]+)\s*\)$/;
@@ -70,6 +87,8 @@ export function collectionName(repo: string, group: string): string {
 
 export const groupOf = (name: string) => rowOf(name).group;
 
+const tokenGroup = (token: Token) => (token.accent ? ACCENT : groupOf(token.name));
+
 export const aliasOf = (raw: string) => ALIAS.exec(raw.trim())?.[1] ?? null;
 
 export function lengthPx(raw: string): number | null {
@@ -86,7 +105,10 @@ const LITERAL: Record<TokenKind, Literal> = {
   [TokenKind.Colour]: colourOf,
   [TokenKind.Radius]: lengthPx,
   [TokenKind.Spacing]: lengthPx,
-  [TokenKind.Font]: (raw) => raw
+  [TokenKind.Font]: (raw) => raw,
+  [TokenKind.Breakpoint]: lengthPx,
+  [TokenKind.Border]: lengthPx,
+  [TokenKind.Easing]: (raw) => raw
 };
 
 const NOT_A_TOKEN = 'not a colour, radius, spacing or font token';
@@ -121,8 +143,11 @@ const ordered = (modes: string[]) => [...MODE_ORDER.filter((m) => modes.includes
 
 export function tokenSetOf(parsed: Parsed): TokenSet {
   const byName = new Map<string, Record<string, TokenValue>>();
+  const byAccent = new Map<string, Record<string, TokenValue>>();
   for (const d of parsed.declared) {
-    byName.set(d.name, { ...byName.get(d.name), [d.mode]: { raw: d.raw, at: d.at } });
+    const accent = accentOf(d.mode);
+    const [into, mode] = accent ? [byAccent, accent] : [byName, d.mode];
+    into.set(d.name, { ...into.get(d.name), [mode]: { raw: d.raw, at: d.at } });
   }
   const raws = new Map([...byName].map(([name, values]) => [name, Object.values(values).map((v) => v.raw)]));
   const skipped = [...parsed.skipped];
@@ -131,7 +156,7 @@ export function tokenSetOf(parsed: Parsed): TokenSet {
   for (const [name, values] of byName) {
     const kind = kindOf(name, raws.get(name)!, raws);
     if (typeof kind === 'object') {
-      skipped.push(`${name}: ${kind.reason}`);
+      skipped.push(...(kind.reason === AS_STYLE ? [] : [`${name}: ${kind.reason}`]));
       continue;
     }
     tokens.push({ name, kind, values });
@@ -139,7 +164,9 @@ export function tokenSetOf(parsed: Parsed): TokenSet {
 
   const kept = new Set(tokens.map((t) => t.name));
   const valid = tokens.filter((t) => Object.values(t.values).every((v) => !aliasOf(v.raw) || kept.has(aliasOf(v.raw)!)));
-  return { tokens: valid, modes: ordered([...new Set(valid.flatMap((t) => Object.keys(t.values)))]), skipped };
+  const kinds = new Map(valid.map((t) => [t.name, t.kind]));
+  const accents = [...byAccent].flatMap(([name, values]) => (kinds.has(name) ? [{ name, kind: kinds.get(name)!, values, accent: true }] : []));
+  return { tokens: [...valid, ...accents], modes: ordered([...new Set(valid.flatMap((t) => Object.keys(t.values)))]), skipped };
 }
 
 export type Options = { scale?: number; used?: ReadonlySet<string>; active?: string; multiples?: readonly number[] };
@@ -155,7 +182,7 @@ function capped(tokens: Token[], used: ReadonlySet<string>): { kept: Token[]; ov
 }
 
 function survivors(tokens: Token[], repo: string, used: ReadonlySet<string>, dropped: string[]): Token[] {
-  const groups = Map.groupBy(tokens, (t) => groupOf(t.name));
+  const groups = Map.groupBy(tokens, tokenGroup);
   const kept: Token[] = [];
   for (const [group, list] of groups) {
     const { kept: inside, over } = capped(list, used);
@@ -184,7 +211,7 @@ export function variablesOf(set: TokenSet, repo: string, options: Options = {}):
   const variables: Variables = {};
   const map: TokenMap = {};
 
-  for (const [group, list] of Map.groupBy(kept, (t) => groupOf(t.name))) {
+  for (const [group, list] of Map.groupBy(kept, tokenGroup)) {
     const name = collectionName(repo, group);
     const allModes = ordered([...new Set(list.flatMap((t) => Object.keys(t.values)))]);
     const modes = allModes.slice(0, MAX_MODES);

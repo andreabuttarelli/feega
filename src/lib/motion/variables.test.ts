@@ -3,7 +3,7 @@ import { MotionFormat, newMotionDoc, parseMotionDoc, findClip, type MotionDoc } 
 import { addClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 import { setAutoLayout } from './layout/ops';
 import { VarType } from '@feega/motion-core/motion/variables-model';
-import { addMode, bindChip, bindVariable, bindableTargets, defineVariable, removeVariable, resolveVariables, setActiveMode, unbindVariable, variableValue, fillTarget } from './variables';
+import { addMode, bindChip, bindVariable, bindableTargets, defineVariable, removeVariable, resolveVariables, setActiveMode, unbindVariable, variableValue, fillTarget, BORDER_TARGET } from './variables';
 
 function ok(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -64,6 +64,27 @@ describe('variables', () => {
 
     expect(findClip(bound, 's1')!.clip.props.roundness).toBeCloseTo(40 / short, 5);
     expect(bindableTargets(findClip(bound, 's1')!.clip, VarType.Number)).toContain('radius');
+  });
+
+  it('a px variable binds the border width of a stroked shape through the frame size', () => {
+    const stroked = ok(setProps(docWith(), 's1', { strokes: [{ paint: { type: 'solid', color: '#000000' }, width: 0.001, align: 'inside' }] }));
+    const doc = ok(defineVariable(stroked, 'Border', 'thin', { type: VarType.Number, values: { Default: 2 } }));
+
+    const bound = ok(bindVariable(doc, 's1', BORDER_TARGET, 'Border/thin'));
+
+    const strokes = findClip(bound, 's1')!.clip.props.strokes as { width: number }[];
+    expect(strokes[0].width).toBeCloseTo(2 / Math.min(bound.width, bound.height), 6);
+    expect(bindableTargets(findClip(bound, 's1')!.clip, VarType.Number)).toContain(BORDER_TARGET);
+    expect(bindableTargets(findClip(docWith(), 's1')!.clip, VarType.Number)).not.toContain(BORDER_TARGET);
+  });
+
+  it('a string variable binds a text font, taking the first family of a CSS stack', () => {
+    const doc = ok(defineVariable(docWith(), 'Type', 'heading', { type: VarType.String, values: { Default: "'Inter', system-ui, sans-serif" } }));
+
+    const bound = ok(bindVariable(doc, 't1', 'font', 'Type/heading'));
+
+    expect(findClip(bound, 't1')!.clip.props.font).toBe('Inter');
+    expect(bindableTargets(findClip(bound, 't1')!.clip, VarType.String)).toContain('font');
   });
 
   it('a number variable binds auto layout gap and padding', () => {

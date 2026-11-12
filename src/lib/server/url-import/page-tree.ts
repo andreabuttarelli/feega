@@ -26,7 +26,9 @@ export type PageBox = { x: number; y: number; width: number; height: number };
 export type PageFont = { family: string; weight: string; style: string; url: string };
 export type PageSnap = { ref: string; box: PageBox; mode: SnapMode };
 
-export type PageTree = { title: string; url: string; width: number; height: number; root: RestNode; truncated: boolean; fonts?: PageFont[]; sheets?: string[]; snaps?: PageSnap[]; outline?: PageOutline; patterns?: PagePattern[] };
+export type PageSheet = { at?: string; text: string };
+
+export type PageTree = { title: string; url: string; width: number; height: number; root: RestNode; truncated: boolean; fonts?: PageFont[]; sheets?: string[]; styles?: PageSheet[]; rootVars?: Record<string, string>; snaps?: PageSnap[]; outline?: PageOutline; patterns?: PagePattern[] };
 
 export const treeScript = (limits: TreeLimits) =>
   `var __name = (f) => f; (${pageTreeOf.toString()})(${JSON.stringify(limits)}, (${pageKit.toString()})(), (${pagePatterns.toString()})(${JSON.stringify(PATTERN_LIMITS)}), (${pageHovers.toString()})(${JSON.stringify(HOVER_LIMITS)})).then((tree) => ({ ...tree, outline: (${pageOutlineOf.toString()})(${JSON.stringify(OUTLINE_LIMITS)}, tree.height) }))`;
@@ -1437,6 +1439,8 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     truncated,
     fonts,
     sheets,
+    styles: stylesOf(),
+    rootVars: rootVarsOf(),
     snaps: snaps.map((s) => ({ ...s, mode: s.mode as SnapMode })),
     ...(captured.length ? { patterns: captured } : {}),
     root: { id: id(), type: 'FRAME', name: document.title.trim() || location.hostname, absoluteBoundingBox: { x: 0, y: 0, width, height }, fills: ground.length ? ground : [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 1 } }], clipsContent: true, children }
@@ -1618,6 +1622,46 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
           })
       )
     );
+  }
+
+  function rootVarsOf(): Record<string, string> {
+    const MAX_ROOT_VARS = 512;
+    const MAX_VALUE = 200;
+    const css = getComputedStyle(document.documentElement);
+    const out: Record<string, string> = {};
+    for (const name of [...css].filter((p) => p.startsWith('--')).slice(0, MAX_ROOT_VARS)) {
+      const value = css.getPropertyValue(name).trim();
+      if (value && value.length <= MAX_VALUE) {
+        out[name] = value;
+      }
+    }
+    return out;
+  }
+
+  function stylesOf(): PageSheet[] {
+    const MAX_STYLES = 24;
+    const MAX_STYLE_TEXT = 512 * 1024;
+    const out: PageSheet[] = [];
+    const visit = (sheet: CSSStyleSheet) => {
+      const href = sheet.href ? new URL(sheet.href, location.href) : null;
+      if (out.length >= MAX_STYLES || (href && href.origin !== location.origin)) {
+        return;
+      }
+      let rules: CSSRule[];
+      try {
+        rules = [...sheet.cssRules];
+      } catch {
+        return;
+      }
+      const at = (sheet.ownerNode as HTMLElement | null)?.dataset?.viteDevId ?? href?.pathname;
+      const text = rules.map((r) => r.cssText).join('\n');
+      if (text.length <= MAX_STYLE_TEXT) {
+        out.push(at ? { at, text } : { text });
+      }
+      rules.forEach((r) => r instanceof CSSImportRule && r.styleSheet && visit(r.styleSheet));
+    };
+    [...document.styleSheets].forEach(visit);
+    return out;
   }
 
   function fontsOf(): { fonts: PageFont[]; sheets: string[] } {

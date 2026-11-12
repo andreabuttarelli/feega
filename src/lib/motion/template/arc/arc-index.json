@@ -1,0 +1,577 @@
+[
+  {
+    "slug": "button",
+    "name": "Button",
+    "description": "A clear, responsive action with quiet secondary states."
+  },
+  {
+    "slug": "action-button",
+    "name": "Action button",
+    "description": "A compact button for frequent toolbar actions."
+  },
+  {
+    "slug": "dropdown-menu",
+    "name": "Dropdown menu",
+    "description": "A focused list of actions anchored to a trigger."
+  },
+  {
+    "slug": "split-button",
+    "name": "Split button",
+    "description": "A primary action with a menu of nearby alternatives."
+  },
+  {
+    "slug": "button-group",
+    "name": "Button group",
+    "description": "Related actions joined into one surface with hairline dividers: a hover highlight glides between segments, the pressed one answers in place, and an attached menu can close the row."
+  },
+  {
+    "slug": "tooltip",
+    "name": "Tooltip",
+    "description": "Short supporting text for unfamiliar controls."
+  },
+  {
+    "slug": "floating-button-group",
+    "name": "Floating button group",
+    "description": "Separate soft buttons in a quiet tray, with one shared highlight that morphs from button to button as you move, and a pressed state that settles in place."
+  },
+  {
+    "slug": "expanding-button-group",
+    "name": "Expanding button group",
+    "description": "Icon buttons in a compact group: the one you point at or focus grows to reveal its label while its neighbours slide aside, and an action confirms in place."
+  },
+  {
+    "slug": "theme-switch",
+    "name": "Theme switcher",
+    "description": "Four smooth ways to move between light and dark appearance."
+  },
+  {
+    "slug": "popover",
+    "name": "Popover",
+    "description": "A small anchored surface for contextual information."
+  },
+  {
+    "slug": "reactions",
+    "name": "Reactions",
+    "description": "Acknowledge a post in one tap, with counts that roll."
+  },
+  {
+    "slug": "icon-morph",
+    "name": "Icon morph",
+    "description": "Icons that morph between states: menu to close, play to pause, copy to check, and more."
+  },
+  {
+    "slug": "confirm-morph",
+    "name": "Confirm morph",
+    "description": "A destructive button that morphs into an inline confirmation, a spinner, and a result with undo."
+  },
+  {
+    "slug": "swipe-actions",
+    "name": "Swipe actions",
+    "description": "Reveal row actions with a swipe, or from the same actions in a menu."
+  },
+  {
+    "slug": "input",
+    "name": "Input",
+    "description": "A single line field with clear labels and useful states."
+  },
+  {
+    "slug": "password-strength",
+    "name": "Password strength",
+    "description": "Show how strong a new password is while it is typed."
+  },
+  {
+    "slug": "money-input",
+    "name": "Money input",
+    "description": "A currency field with live grouping, stable width, rolling digits, and minor-unit output."
+  },
+  {
+    "slug": "otp-input",
+    "name": "OTP input",
+    "description": "A six digit verification flow with paste support and keyboard navigation."
+  },
+  {
+    "slug": "tag-input",
+    "name": "Tag input",
+    "description": "Turn short text values into removable tags."
+  },
+  {
+    "slug": "number-field",
+    "name": "Number field",
+    "description": "Enter a bounded number with clear increment controls."
+  },
+  {
+    "slug": "inline-edit",
+    "name": "Inline edit",
+    "description": "Rename in place: the text becomes a field without moving."
+  },
+  {
+    "slug": "phone-input",
+    "name": "Phone input",
+    "description": "A phone field with a country picker, formatting as you type, and E.164 output."
+  },
+  {
+    "slug": "select",
+    "name": "Select",
+    "description": "A compact choice field with a keyboard friendly menu."
+  },
+  {
+    "slug": "multi-select",
+    "name": "Multi-select",
+    "description": "Select several values while keeping the field readable."
+  },
+  {
+    "slug": "morph-select",
+    "name": "Morph select",
+    "description": "A select whose trigger grows into the list, with a gliding highlight and type-ahead."
+  },
+  {
+    "slug": "checkbox",
+    "name": "Checkbox",
+    "description": "A binary choice with a precise, legible state."
+  },
+  {
+    "slug": "switch",
+    "name": "Switch",
+    "description": "A tactile toggle for settings that take effect immediately."
+  },
+  {
+    "slug": "segmented-control",
+    "name": "Segmented control",
+    "description": "Switch between a small set of related views."
+  },
+  {
+    "slug": "toggle-group",
+    "name": "Toggle group",
+    "description": "A row of icon or text toggles, single or multiple: one pressed fill glides between options, or each fades in on its own and neighbours join, as in a formatting toolbar."
+  },
+  {
+    "slug": "chip-group",
+    "name": "Chip group",
+    "description": "Filter by a few facets with chips that morph as you pick them."
+  },
+  {
+    "slug": "billing-toggle",
+    "name": "Billing toggle",
+    "description": "A monthly and yearly switch with a savings badge and prices that roll to the new amount."
+  },
+  {
+    "slug": "animated-counter",
+    "name": "Animated counter",
+    "description": "Give changing totals a clear sense of movement."
+  },
+  {
+    "slug": "rating",
+    "name": "Rating",
+    "description": "A simple, accessible way to capture a numeric opinion."
+  },
+  {
+    "slug": "combobox",
+    "name": "Combobox",
+    "description": "Search and select from a list without leaving the field."
+  },
+  {
+    "slug": "radio-group",
+    "name": "Radio group",
+    "description": "Choose one option from a visible set."
+  },
+  {
+    "slug": "calendar",
+    "name": "Calendar",
+    "description": "Browse dates in a clear, compact month view."
+  },
+  {
+    "slug": "date-picker",
+    "name": "Date picker",
+    "description": "Choose a date without losing context."
+  },
+  {
+    "slug": "date-range-picker",
+    "name": "Date range picker",
+    "description": "A range picker that grows from its trigger into two months with presets and a stretching range highlight."
+  },
+  {
+    "slug": "time-picker",
+    "name": "Time picker",
+    "description": "Choose a time with sensible keyboard behavior."
+  },
+  {
+    "slug": "color-picker",
+    "name": "Color picker",
+    "description": "A swatch that grows into a picker with format morphing, eyedropper, saved swatches, and contrast readout."
+  },
+  {
+    "slug": "shortcut-recorder",
+    "name": "Shortcut recorder",
+    "description": "Record key combinations into key caps, with conflict warnings, Kbd, and a searchable cheatsheet."
+  },
+  {
+    "slug": "slider",
+    "name": "Slider",
+    "description": "Pick a value or a range on a track that follows your finger."
+  },
+  {
+    "slug": "elastic-slider",
+    "name": "Elastic slider",
+    "description": "A slider that stretches like rubber past its ends, with a swaying value tag and detents the thumb clicks into."
+  },
+  {
+    "slug": "range-histogram-slider",
+    "name": "Range histogram slider",
+    "description": "A price range over a live histogram of the data, lighting the bars inside the range and settling on bar edges."
+  },
+  {
+    "slug": "ruler-slider",
+    "name": "Ruler slider",
+    "description": "A tape of ticks that slides under a fixed needle, with momentum, snapping, and a rolling readout."
+  },
+  {
+    "slug": "signature-pad",
+    "name": "Signature pad",
+    "description": "Smooth ink that thins with speed, with undo, replay, and PNG or SVG export."
+  },
+  {
+    "slug": "file-dropzone",
+    "name": "File dropzone",
+    "description": "A generous target for dropping one or more files."
+  },
+  {
+    "slug": "file-upload",
+    "name": "File upload",
+    "description": "A complete file selection flow with constraints, progress, and error feedback."
+  },
+  {
+    "slug": "expanding-search",
+    "name": "Expanding search",
+    "description": "An icon that morphs into a search field with results beneath it."
+  },
+  {
+    "slug": "breadcrumb",
+    "name": "Breadcrumb",
+    "description": "Show where a page sits in a hierarchy."
+  },
+  {
+    "slug": "tabs",
+    "name": "Tabs",
+    "description": "Switch between related content in the same context."
+  },
+  {
+    "slug": "pagination",
+    "name": "Pagination",
+    "description": "Move through a long collection with clear bounds."
+  },
+  {
+    "slug": "accordion",
+    "name": "Accordion",
+    "description": "Progressively reveal supporting information in place."
+  },
+  {
+    "slug": "expandable-text",
+    "name": "Expandable text",
+    "description": "Long text clamped to a few lines with a soft fade that glides open with Read more and closes with Show less, shown only when the text overflows."
+  },
+  {
+    "slug": "expandable-card",
+    "name": "Expandable card",
+    "description": "Give a dense card more room when requested."
+  },
+  {
+    "slug": "filter-toolbar",
+    "name": "Filter toolbar",
+    "description": "Keep collection filters close and easy to reset."
+  },
+  {
+    "slug": "resizable-panels",
+    "name": "Resizable panels",
+    "description": "Trade space between panes by dragging the divider between them."
+  },
+  {
+    "slug": "alert",
+    "name": "Alert",
+    "description": "A persistent message that helps people recover or continue."
+  },
+  {
+    "slug": "progress",
+    "name": "Progress",
+    "description": "Show how much of a known task is complete."
+  },
+  {
+    "slug": "usage-meter",
+    "name": "Usage meter",
+    "description": "Show what fills an allowance and how close it is to the limit."
+  },
+  {
+    "slug": "skeleton",
+    "name": "Skeleton",
+    "description": "Reserve space while content is still loading."
+  },
+  {
+    "slug": "countdown",
+    "name": "Countdown",
+    "description": "A launch countdown with rolling digits that morphs into a live state at zero."
+  },
+  {
+    "slug": "onboarding-checklist",
+    "name": "Onboarding checklist",
+    "description": "Guide a new workspace through setup, one step at a time."
+  },
+  {
+    "slug": "stepper",
+    "name": "Stepper",
+    "description": "Show where a person is in a multi-step flow and what is done."
+  },
+  {
+    "slug": "badge",
+    "name": "Badge",
+    "description": "A small label for status, category, or metadata."
+  },
+  {
+    "slug": "metric-card",
+    "name": "Metric card",
+    "description": "A compact summary for a number that needs context."
+  },
+  {
+    "slug": "empty-state",
+    "name": "Empty state",
+    "description": "A useful next step when there is nothing to show yet."
+  },
+  {
+    "slug": "avatar",
+    "name": "Avatar",
+    "description": "A compact identity marker for people and accounts."
+  },
+  {
+    "slug": "card",
+    "name": "Card",
+    "description": "A contained group of related content and actions."
+  },
+  {
+    "slug": "reorderable-list",
+    "name": "Reorderable list",
+    "description": "Organize items with direct drag and drop."
+  },
+  {
+    "slug": "avatar-group",
+    "name": "Avatar group",
+    "description": "Show a team or set of contributors in a small space."
+  },
+  {
+    "slug": "image-compare",
+    "name": "Image compare",
+    "description": "Drag a divider across two images to see what changed."
+  },
+  {
+    "slug": "carousel",
+    "name": "Carousel",
+    "description": "Browse a row of slides by dragging, flicking, or arrowing through them."
+  },
+  {
+    "slug": "card-stack",
+    "name": "Card stack",
+    "description": "Review a deck one card at a time, with a throw and an undo."
+  },
+  {
+    "slug": "code-block",
+    "name": "Code block",
+    "description": "Present code with legible hierarchy and copy access."
+  },
+  {
+    "slug": "copy-button",
+    "name": "Copy button",
+    "description": "Copy a value with immediate confirmation."
+  },
+  {
+    "slug": "sortable-data-table",
+    "name": "Sortable data table",
+    "description": "Compare structured records with sortable columns."
+  },
+  {
+    "slug": "tree-view",
+    "name": "Tree view",
+    "description": "Navigate nested folders and structured content."
+  },
+  {
+    "slug": "tree-table",
+    "name": "Tree table",
+    "description": "A table with nested rows, tri-state selection, hierarchy-preserving sort, and lazy-loaded children."
+  },
+  {
+    "slug": "timeline",
+    "name": "Timeline",
+    "description": "Follow what happened, newest first, grouped by day."
+  },
+  {
+    "slug": "sparkline",
+    "name": "Sparkline",
+    "description": "Show a compact trend beside a value."
+  },
+  {
+    "slug": "bar-chart",
+    "name": "Bar chart",
+    "description": "Compare one measure across days and scrub any bar for its value."
+  },
+  {
+    "slug": "donut-chart",
+    "name": "Donut chart",
+    "description": "A donut whose arcs morph between datasets, with the active value rolling into the center."
+  },
+  {
+    "slug": "activity-heatmap",
+    "name": "Activity heatmap",
+    "description": "See a year of activity at a glance, one square per day."
+  },
+  {
+    "slug": "streamgraph",
+    "name": "Streamgraph",
+    "description": "Layered streams on a wiggle baseline that morph between ranges, with a layer you can isolate and read week by week."
+  },
+  {
+    "slug": "ridgeline",
+    "name": "Ridgeline",
+    "description": "Overlapping distributions, one ridge per group: hover to lift a ridge and read its quartiles, switch datasets and every curve morphs."
+  },
+  {
+    "slug": "brush-chart",
+    "name": "Brush chart",
+    "description": "A dense time series with an overview strip: drag a window to zoom, resize it by its handles, and read events in place."
+  },
+  {
+    "slug": "treemap",
+    "name": "Treemap",
+    "description": "A squarified treemap: click to drill and the tiles grow to fill the view, with a breadcrumb back and metrics that morph every tile."
+  },
+  {
+    "slug": "waffle-chart",
+    "name": "Waffle chart",
+    "description": "A ten by ten unit chart where every cell is one percent, and cells fly to their new group when the data changes."
+  },
+  {
+    "slug": "slope-chart",
+    "name": "Slope chart",
+    "description": "Before and after on two axes: lines draw in, rank moves sit beside each value, and switching datasets slides every line to its new slope."
+  },
+  {
+    "slug": "text-reveal",
+    "name": "Text reveal",
+    "description": "Reveal a short piece of content with restrained motion."
+  },
+  {
+    "slug": "in-view-title",
+    "name": "In-view title",
+    "description": "Bring a section title in as it scrolls into view."
+  },
+  {
+    "slug": "text-morph",
+    "name": "Text morph",
+    "description": "Morph a label into its next state, letter by letter."
+  },
+  {
+    "slug": "text-shimmer",
+    "name": "Text shimmer",
+    "description": "Show ongoing work with a calm light across the words."
+  },
+  {
+    "slug": "slot-text",
+    "name": "Slot text",
+    "description": "Text and numbers that spin into their new value on staggered slot machine reels."
+  },
+  {
+    "slug": "command-palette",
+    "name": "Command palette",
+    "description": "A complete keyboard driven action surface with search, grouped results, and shortcuts."
+  },
+  {
+    "slug": "toast",
+    "name": "Toast",
+    "description": "Brief confirmation for a completed background action."
+  },
+  {
+    "slug": "toast-stack",
+    "name": "Toast stack",
+    "description": "Stack short results at the edge until you reach for them."
+  },
+  {
+    "slug": "site-header",
+    "name": "Site header",
+    "description": "A sticky website header that turns solid on scroll, with a gliding active link, mega menu panels, and a mobile sheet."
+  },
+  {
+    "slug": "hero-section",
+    "name": "Hero section",
+    "description": "Three full screen SaaS heroes: a live dashboard rising from the bottom edge over a drifting mesh, a workflow graph that routes sample events node by node, and editorial type over a mesh gradient."
+  },
+  {
+    "slug": "cta-section",
+    "name": "CTA section",
+    "description": "A call to action as a centered closing section, a split beside a setup card that completes itself, or a dismissible banner."
+  },
+  {
+    "slug": "faq-section",
+    "name": "FAQ section",
+    "description": "FAQs as an accordion, a topic rail, or a searchable list that highlights matches."
+  },
+  {
+    "slug": "contact-section",
+    "name": "Contact section",
+    "description": "A validated contact form that morphs into a confirmation, support channels, and office cards with local times."
+  },
+  {
+    "slug": "newsletter-signup",
+    "name": "Newsletter signup",
+    "description": "An email signup framed by a stack of past issues; subscribing drops the next issue, addressed to you, onto the front."
+  },
+  {
+    "slug": "sign-in",
+    "name": "Sign in",
+    "description": "A sign in card that morphs from email to a six digit code to your account."
+  },
+  {
+    "slug": "stats-band",
+    "name": "Stats band",
+    "description": "Headline numbers that count up in view, each with a tiny visual that proves it and a context line on hover, plain or in a hairline grid."
+  },
+  {
+    "slug": "site-footer",
+    "name": "Site footer",
+    "description": "A website footer with link columns and newsletter, a minimal layout, and a large fading Arc mark."
+  },
+  {
+    "slug": "blog-grid",
+    "name": "Blog grid",
+    "description": "A blog index with a featured post, category filter, post cards, pagination and an in-place reader."
+  },
+  {
+    "slug": "changelog-feed",
+    "name": "Changelog feed",
+    "description": "Release notes you can filter, open in place, and scroll through month by month."
+  },
+  {
+    "slug": "comparison-table",
+    "name": "Comparison table",
+    "description": "An us versus them table with a sticky header, a highlighted column, and a stacked phone view."
+  },
+  {
+    "slug": "plan-comparison",
+    "name": "Plan comparison",
+    "description": "Compare meaningful differences between plans and billing periods."
+  },
+  {
+    "slug": "page-header",
+    "name": "Page header",
+    "description": "A project page header that folds into a compact bar as you scroll, with tabs whose counts roll."
+  },
+  {
+    "slug": "empty-states",
+    "name": "Empty states",
+    "description": "Four empty states in one illustration whose shapes morph between scenes as you switch tabs."
+  },
+  {
+    "slug": "signup-form",
+    "name": "Sign up form",
+    "description": "An account creation flow with field validation, password strength, and a clear completion state."
+  },
+  {
+    "slug": "login-centered",
+    "name": "Centered login",
+    "description": "A passkey-first login card on a quiet ring backdrop that morphs through email and code."
+  }
+]

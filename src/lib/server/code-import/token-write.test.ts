@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Variables } from '@feega/motion-core/motion/variables-model';
 import { fixture } from '../../../../tests/fixtures/design-tokens/read';
-import { parseSheets, readSheets } from './css-tokens';
+import { PAGE_SHEET, parseSheets, readSheets } from './css-tokens';
 import { tokenSetOf, variablesOf } from './design-tokens';
 import { frameEdits, writeTokens } from './token-write';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
@@ -146,6 +146,16 @@ describe('writeTokens', () => {
 
     expect(done.skipped).toEqual([]);
     expect(done.files[0].after).toBe(doubled.replace('--color-primary: #f0f0f0;', '--color-primary: #ff0066;'));
+  });
+
+  it('un token letto dalla pagina senza file nel repo è di sola lettura, e lo dice', async () => {
+    const read = fixture('plain');
+    const made = variablesOf(tokenSetOf(parseSheets([{ path: `${PAGE_SHEET}inline 1`, text: ':root{--ink:#123456}' }])), 'app');
+
+    const done = await writeTokens(edited(made.variables, 'app Palette/ink', 'Light', '#ff0000'), made.map, read);
+
+    expect(done.files).toEqual([]);
+    expect(done.skipped).toEqual(['--ink: read from the running page, no source file: read-only']);
   });
 
   it('un percorso fuori dal repo nella mappa non viene mai scritto', async () => {
