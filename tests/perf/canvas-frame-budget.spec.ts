@@ -1,4 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
+import sharp from 'sharp';
 import { join } from 'node:path';
 import { loadavg } from 'node:os';
 import { test, expect, chromium, type Browser, type CDPSession, type Page } from '@playwright/test';
@@ -58,6 +59,10 @@ const DRAG_SETTLE_MS = 1500;
 const PROFILED = process.env.BUDGET_PROFILE === '1';
 const PROFILE_SAMPLE_US = 100;
 const EDIT_KINDS = process.env.BUDGET_EDIT_KINDS?.split(',') ?? null;
+const SHOTS = process.env.BUDGET_SHOTS === '1';
+const SHOT_SETTLE_MS = 1500;
+const PIXEL_TOLERANCE = 8;
+const PERCENT = 100;
 const UNCAPPED = ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--disable-gpu-vsync', '--disable-frame-rate-limit'];
 
 const PLACES: Record<Target, { base: string; place: Place; login: boolean }> = {
@@ -366,9 +371,80 @@ const KEYS: Record<Exclude<Edit, Edit.Resize | Edit.Text>, [string, string]> = {
   [Edit.Hide]: ['ControlOrMeta+Shift+KeyH', 'ControlOrMeta+Shift+KeyH']
 };
 
-async function keyEdits(page: Page, keys: [string, string], count: number): Promise<(Stages | null)[]> {
+function holdBuilds() {
+  const probe = window as unknown as { __hold: boolean; __held: (() => void)[] };
+  probe.__hold = false;
+  probe.__held = [];
+  const Real = Worker;
+  window.Worker = class extends Real {
+    constructor(url: string | URL, options?: WorkerOptions) {
+      super(url, options);
+      if (!String(url).includes('frame-build')) {
+        return;
+      }
+      const set = Object.getOwnPropertyDescriptor(Worker.prototype, 'onmessage')!.set!;
+      Object.defineProperty(this, 'onmessage', {
+        set: (handler: ((e: MessageEvent) => void) | null) => set.call(this, handler && ((e: MessageEvent) => (probe.__hold ? probe.__held.push(() => handler(e)) : handler(e))))
+      });
+    }
+  };
+}
+
+const holding = (page: Page, on: boolean) =>
+  page.evaluate((hold) => {
+    const probe = window as unknown as { __hold: boolean; __held: (() => void)[] };
+    probe.__hold = hold;
+    if (!hold) {
+      probe.__held.splice(0).forEach((run) => run());
+    }
+  }, on);
+
+async function frameShot(page: Page): Promise<{ data: Buffer; size: number }> {
+  const box = await frameOnScreen(page);
+  const png = await page.screenshot({ clip: { x: box.x, y: box.y, width: Math.min(box.w, VIEWPORT.width - box.x), height: Math.min(box.h, VIEWPORT.height - box.y) } });
+  const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true });
+  return { data, size: info.width * info.height };
+}
+
+function differing(a: { data: Buffer; size: number }, b: { data: Buffer; size: number }): number {
+  if (a.size !== b.size) {
+    return PERCENT;
+  }
+  const channels = a.data.length / a.size;
+  let off = 0;
+  for (let p = 0; p < a.size; p++) {
+    for (let c = 0; c < channels; c++) {
+      if (Math.abs(a.data[p * channels + c] - b.data[p * channels + c]) > PIXEL_TOLERANCE) {
+        off++;
+        break;
+      }
+    }
+  }
+  return (PERCENT * off) / a.size;
+}
+
+const shotDiffs: Record<string, number[]> = {};
+
+async function shotEdit(page: Page, key: string, edit: string): Promise<Stages | null> {
+  await holding(page, true);
+  await page.keyboard.press(key);
+  const stages = await stagesAfter(page);
+  const patched = stages?.patched ? await frameShot(page) : null;
+  await holding(page, false);
+  await page.waitForTimeout(SHOT_SETTLE_MS);
+  if (patched) {
+    (shotDiffs[edit] ??= []).push(differing(patched, await frameShot(page)));
+  }
+  return stages;
+}
+
+async function keyEdits(page: Page, keys: [string, string], count: number, edit: string): Promise<(Stages | null)[]> {
   const seen: (Stages | null)[] = [];
   for (let i = 0; i < count; i++) {
+    if (SHOTS) {
+      seen.push(await shotEdit(page, keys[i % 2], edit));
+      continue;
+    }
     await page.keyboard.press(keys[i % 2]);
     seen.push(await stagesAfter(page));
     await page.waitForTimeout(EDIT_PAUSE_MS);
@@ -412,7 +488,7 @@ async function edits(page: Page, edit: Edit): Promise<(Stages | null)[]> {
   if (edit === Edit.Resize) {
     return resizeEdits(page, EDITS_EACH);
   }
-  return keyEdits(page, KEYS[edit], EDITS_EACH);
+  return keyEdits(page, KEYS[edit], EDITS_EACH, edit);
 }
 
 const mean = (xs: number[]) => (xs.length ? Math.round((10 * xs.reduce((a, b) => a + b, 0)) / xs.length) / 10 : 0);
@@ -436,6 +512,9 @@ async function editRun(browser: Browser, target: Target): Promise<Record<Edit, (
   const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 2, serviceWorkers: 'block' });
   const page = await context.newPage();
   await page.addInitScript(listenInput);
+  if (SHOTS) {
+    await page.addInitScript(holdBuilds);
+  }
   if (needsLogin) {
     await login(page, base);
   }
@@ -483,6 +562,10 @@ for (const target of TARGETS) {
       })
     );
     writeFileSync(join(OUT, `edit-latency-${target}.json`), JSON.stringify(report, null, 2));
+    if (SHOTS) {
+      writeFileSync(join(OUT, `edit-shots-${target}.json`), JSON.stringify(shotDiffs, null, 2));
+      console.table(Object.fromEntries(Object.entries(shotDiffs).map(([e, d]) => [e, { shots: d.length, maxPercent: Math.max(...d), meanPercent: d.reduce((x, y) => x + y, 0) / d.length }])));
+    }
     console.table(report);
     expect(Object.entries(report).filter(([, r]) => !r.passed).map(([e]) => e)).toEqual([]);
   });
