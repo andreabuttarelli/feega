@@ -110,6 +110,8 @@ struct Counted {
     upload_bytes: f64,
     unsharp: u32,
     uncovered: u32,
+    tiles: u32,
+    uploads: u32,
 }
 
 struct GpuPainter<'a> {
@@ -354,6 +356,7 @@ impl WebCore {
             self.textures.insert(clip.into(), texture);
         }
         copy_rows(&self.queue, source, &self.textures[clip], 0, height);
+        self.counted.uploads += 1;
         self.counted.upload_bytes += f64::from(width) * f64::from(height) * RGBA_BYTES;
         self.engine.vello.mark_override_image_dirty(&self.pictures[clip]);
         self.compositor.touch_picture(clip, &self.library);
@@ -369,6 +372,7 @@ impl WebCore {
         let texture = self.arriving.get(clip).filter(|t| t.width() == width && t.height() == height && top < height).ok_or_else(|| failed("picture rows out of order"))?;
         let rows = rows.min(height - top);
         copy_rows(&self.queue, source, texture, top, rows);
+        self.counted.uploads += 1;
         self.counted.upload_bytes += f64::from(width) * f64::from(rows) * RGBA_BYTES;
         if top + rows < height {
             return Ok(false);
@@ -617,6 +621,7 @@ impl WebCore {
         }
         self.queue.submit([encoder.finish()]);
         pieces.into_iter().for_each(|(piece, texture)| self.recycle(piece, size, texture));
+        self.counted.tiles += batch.keys.len() as u32;
         self.count_bake(began);
         Ok(())
     }
@@ -956,7 +961,7 @@ impl WebCore {
     pub fn frame_counts(&mut self) -> Vec<f64> {
         let planned = self.compositor.take_planned();
         let counted = std::mem::take(&mut self.counted);
-        vec![f64::from(planned.plans), f64::from(planned.walked), planned.ms, f64::from(counted.bakes), counted.ms, counted.upload_bytes, f64::from(counted.unsharp), f64::from(counted.uncovered), f64::from(step_of(self.camera.zoom))]
+        vec![f64::from(planned.plans), f64::from(planned.walked), planned.ms, f64::from(counted.bakes), counted.ms, counted.upload_bytes, f64::from(counted.unsharp), f64::from(counted.uncovered), f64::from(step_of(self.camera.zoom)), f64::from(counted.tiles), f64::from(self.engine.take_draws()), f64::from(counted.uploads)]
     }
     pub fn warming(&self) -> bool {
         self.warming

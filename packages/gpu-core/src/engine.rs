@@ -110,6 +110,7 @@ pub struct Engine {
     tally: Tally,
     drawing: Reason,
     fullness: f64,
+    draws: u32,
 }
 
 pub type EngineError = vello::Error;
@@ -256,7 +257,7 @@ impl Gpu<'_> {
 impl Engine {
     pub fn new(device: &wgpu::Device) -> Result<Self, EngineError> {
         let vello = vello::Renderer::new(device, RendererOptions { antialiasing_support: AaSupport::area_only(), ..Default::default() })?;
-        Ok(Self { vello, blending: Blending::Native, filters: FilterPasses::new(device), cache: LayerCache::default(), held: HashMap::new(), spare: Vec::new(), scenes: Vec::new(), tally: Tally::default(), drawing: Reason::Screen, fullness: 0.0 })
+        Ok(Self { vello, blending: Blending::Native, filters: FilterPasses::new(device), cache: LayerCache::default(), held: HashMap::new(), spare: Vec::new(), scenes: Vec::new(), tally: Tally::default(), drawing: Reason::Screen, fullness: 0.0, draws: 0 })
     }
 
     pub fn set_budget(&mut self, pool: u64, layers: u64) {
@@ -266,6 +267,10 @@ impl Engine {
 
     pub fn take_tally(&mut self) -> Tally {
         std::mem::take(&mut self.tally)
+    }
+
+    pub fn take_draws(&mut self) -> u32 {
+        std::mem::take(&mut self.draws)
     }
 
     pub fn cached_layers(&self) -> usize {
@@ -287,6 +292,7 @@ impl Engine {
         }
         gpu.cache.sweep(gpu.vello);
         self.fullness = fullness;
+        self.draws += 1;
         drawn.map(|_| skipped)
     }
 
