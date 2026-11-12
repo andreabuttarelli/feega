@@ -81,13 +81,18 @@ function resized<C extends Pick<MotionComp, 'tracks' | 'frame' | 'name' | 'durat
   return { ...comp, tracks: stroked(scaled, Math.min(from.width, from.height) / Math.min(to.width, to.height)) };
 }
 
-function grown(doc: MotionDoc, size: Size): MotionDoc {
+enum FullClips {
+  Refill = 'refill',
+  Keep = 'keep'
+}
+
+function grown(doc: MotionDoc, size: Size, full: FullClips): MotionDoc {
   const from = sizeOf(doc);
   if (from.width === size.width && from.height === size.height) {
     return doc;
   }
-  const full = new Set(clipsOf(doc.tracks).filter((c) => fillsDoc(c, from)).map((c) => c.id));
-  const refilled = (c: MotionClip): MotionClip => (full.has(c.id) ? { ...c, props: { ...c.props, x: CENTRE, y: CENTRE, width: FULL, height: FULL } } : c);
+  const filling = new Set(full === FullClips.Refill ? clipsOf(doc.tracks).filter((c) => fillsDoc(c, from)).map((c) => c.id) : []);
+  const refilled = (c: MotionClip): MotionClip => (filling.has(c.id) ? { ...c, props: { ...c.props, x: CENTRE, y: CENTRE, width: FULL, height: FULL } } : c);
   const top = resized({ name: 'doc', durationInFrames: doc.durationInFrames, tracks: doc.tracks }, from, size);
   const comps = Object.fromEntries(Object.entries(doc.comps).map(([id, c]) => [id, resized(c, from, size)]));
   const unit = Math.min(from.width, from.height) / Math.min(size.width, size.height);
@@ -259,8 +264,8 @@ export function addBoards(before: MotionDoc, piece: MotionDoc, boardIds: readonl
     return { ok: false, refusal: AddRefusal.NoRoom, detail: `no room: the frame would be ${size.width}×${size.height} px, at most ${DESIGN_MAX_SIDE} a side` };
   }
 
-  const wide = grown(local, size);
-  const sized = grown(piece, size);
+  const wide = grown(local, size, FullClips.Refill);
+  const sized = grown(piece, size, FullClips.Keep);
 
   const inTree = subtree(clipsOf(sized.tracks), boardIds);
   const moved = reframed({ name: 'boards', durationInFrames: sized.durationInFrames, tracks: sized.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).filter((c) => inTree.has(c.id)) })).filter((t) => t.clips.length) }, size, size, { x: at.x - extent.left, y: at.y - extent.top });

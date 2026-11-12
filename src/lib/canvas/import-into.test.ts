@@ -96,4 +96,17 @@ describe('landing an import into the open frame', () => {
     expect(resized.mock.calls[0][0]).toEqual({ width: LOCAL.width, height: LOCAL.height });
     expect(resized.mock.calls.at(-1)![1]).toEqual({ width: session.history.present.width, height: session.history.present.height });
   });
+
+  it('shows the placeholder at the size of one page, not stretched over the whole frame', async () => {
+    const { session, shown } = sessionOf(LOCAL);
+    let answer: (a: Landing) => void = () => {};
+    const pending = landImport(session, { label: '/pricing', map: MAP, size: { width: 1280, height: 800 }, newId: counter(), resized: vi.fn(), fetch: () => new Promise((resolve) => (answer = resolve)) });
+
+    const doc = shown[0];
+    const placeholder = clipsOf(doc).find((c) => c.name === 'Importing /pricing…')!;
+    expect(Math.round((placeholder.props.width as number) * doc.width)).toBe(1280);
+    expect(Math.round((placeholder.props.height as number) * doc.height)).toBe(800);
+    answer({ ok: false, error: 'failed' });
+    await pending;
+  });
 });
