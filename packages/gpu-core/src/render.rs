@@ -59,6 +59,10 @@ impl Renderer {
         self
     }
 
+    pub fn ramp_uploads(&self) -> u64 {
+        self.engine.vello.ramp_uploads()
+    }
+
     pub fn cached_layers(&self) -> usize {
         self.engine.cached_layers()
     }

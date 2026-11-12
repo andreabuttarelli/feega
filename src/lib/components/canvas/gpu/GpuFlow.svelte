@@ -171,12 +171,13 @@
   import { editableIds } from '$lib/canvas/frame-live';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { elementGlyph } from '$lib/canvas/layers';
-  import { imageSourceTile } from '$lib/canvas/free-image';
+  import { elementDocs, imageSourceTile } from '$lib/canvas/free-image';
   import { emptyAreaRinged, frameRinged } from '$lib/canvas/layers';
   import { fetchKey, framesOnCanvas, pickedToFetch, sameLive, toFetch, type FrameAt } from '$lib/canvas/core/frame-source';
   import { frameSources } from '$lib/canvas/core/frame-sources';
   import { ChromeLayers, NO_OVERLAY, overlayOf } from '$lib/canvas/core/world-overlay';
-  import { labelZoomStep, strokeZoomStep } from '$lib/canvas/core/label-size';
+  import { labelStepOf, labelZoomStep, strokeZoomStep } from '$lib/canvas/core/label-size';
+  import { SIGHT_SLACK, grown, stillHolds, type Taken } from '$lib/canvas/core/sight';
   import { nodeHitRects } from '$lib/canvas/core/node-hit';
   import type { ChromeTile, Glyphs } from '$lib/canvas/core/chrome';
   import { peerOutlines } from '$lib/canvas/peer-outlines';
@@ -264,6 +265,7 @@
   import { Flip, flipStage } from '$lib/motion/layer-props';
   import { scaledTo, selectionBox, turnedAbout, withField } from '$lib/canvas/selection-box';
   import { backToFront } from '$lib/canvas/paint-order';
+  import { GPU_FALLBACK_EVENT } from '$lib/canvas/gpu/gpu-loss';
 
   let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[], seconds?: number) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; canvasId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onExportElementRows?: (frameId: string, elementIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void; onFrameDraft?: (id: string, nodeId: string, draft: FrameDraft | null) => void } = $props();
 
@@ -346,12 +348,17 @@
   let known = new Set<string>();
 
   const assetUrl = (id: string) => canvasAssetUrl(page.params.projectId ?? '', page.params.canvasId ?? '', id, AssetSize.Full);
-  const tier = $derived(assetTier(view.zoom));
+  let tier = $state(assetTier(untrack(() => view.zoom)));
+  $effect(() => {
+    tier = assetTier(view.zoom);
+  });
   const tierUrl = (size: AssetSize) => (id: string) => canvasAssetUrl(page.params.projectId ?? '', page.params.canvasId ?? '', id, size);
 
   let turning = $state<ReadonlyMap<string, number>>(new Map());
   let spin = $state<{ box: Box; degrees: number } | null>(null);
-  const placed = $derived(backToFront(tiles).map((t) => imageSourceTile({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning.has(t.id) ? { rotation: turning.get(t.id) } : {}) }, liveOf(t.id)?.doc ?? null)));
+  let lastElementDocs: ReturnType<typeof elementDocs> = new Map();
+  const freeImageDocs = $derived.by(() => (lastElementDocs = elementDocs(tiles, (id) => liveOf(id)?.doc ?? null, lastElementDocs)));
+  const placed = $derived(backToFront(tiles).map((t) => imageSourceTile({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning.has(t.id) ? { rotation: turning.get(t.id) } : {}) }, freeImageDocs.get(t.id) ?? null)));
   const byId = $derived(new Map(placed.map((t) => [t.id, t])));
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
   const ports = $derived(placed.flatMap((t) => portsOf(t)));
@@ -369,7 +376,7 @@
     }
   });
   $effect(() => {
-    const seen = visibleIds(placed.filter((t) => sticky.has(t.id)), view, area);
+    const seen = visibleIds([...sticky.keys()].flatMap((id) => byId.get(id) ?? []), view, area);
     const keep = new Map([...sticky].filter(([id]) => seen.has(id)));
     if (keep.size !== untrack(() => sticky.size)) {
       sticky = keep;
@@ -377,7 +384,14 @@
   });
   const LIVE_CODE_CAP = 4;
   const IFRAME_TYPE = 'iframe';
-  const liveCode = $derived([...visibleIds(placed.filter((t) => t.kind === IFRAME_TYPE && isLiveCode(summaries.get(t.id)?.data)), view, area)].slice(0, LIVE_CODE_CAP));
+  const liveCodeTiles = $derived(placed.filter((t) => t.kind === IFRAME_TYPE && isLiveCode(summaries.get(t.id)?.data)));
+  let liveCode = $state.raw(new Set<string>());
+  $effect(() => {
+    const next = new Set([...visibleIds(liveCodeTiles, view, area)].slice(0, LIVE_CODE_CAP));
+    if (!sameSet(untrack(() => liveCode), next)) {
+      liveCode = next;
+    }
+  });
   const domIds = $derived.by(() => {
     const next = new Set([...editIds, ...sticky.keys(), ...liveCode, ...(focusLive ? [focusLive] : [])]);
     return sameSet(lastDom, next) ? lastDom : (lastDom = next);
@@ -398,8 +412,28 @@
   }
   let coreDrawn = $state(new Set<string>());
   const coreFrames = $derived(framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}));
+  const frameById = $derived(new Map(coreFrames.map((f) => [f.id, f])));
   const editIds = $derived(editableIds(selected, DOM_CAP, new Set([...coreFrames.map((f) => f.id), ...placed.filter((t) => t.kind === SECTION_TYPE).map((t) => t.id)])));
   const overlayFrames = $derived(coreFrames.map((f) => ({ id: f.id, ...f.box, rotation: byId.get(f.id)?.rotation ?? 0, bar: 0, doc: { width: f.box.w, height: f.box.h } })));
+  const OVERLAY_REACH = 0.5;
+  let seenIds = $state.raw(new Set<string>());
+  let seenTaken: Taken | null = null;
+  let seenFrom: SpatialIndex | null = null;
+  $effect(() => {
+    if (cullIndex === seenFrom && seenTaken && stillHolds(seenTaken, view, area)) {
+      return;
+    }
+
+    seenTaken = { view, area };
+    seenFrom = cullIndex;
+    const reach = grown(view, area, OVERLAY_REACH + SIGHT_SLACK);
+    const next = cullIndex.visible(reach.view, reach.area);
+    if (!sameSet(untrack(() => seenIds), next)) {
+      seenIds = next;
+    }
+  });
+  const keptOverlays = $derived.by(() => new Set([inside?.nodeId, typing?.nodeId, cropping?.nodeId].filter((id): id is string => !!id)));
+  const shownOverlays = $derived(overlayFrames.filter((f) => seenIds.has(f.id) || keptOverlays.has(f.id)));
   const prototypeDocs = $derived(new Map(coreFrames.flatMap((f) => (liveOf(f.id) ? [[f.id, liveOf(f.id)!.doc] as const] : []))));
   const arrowLinks = $derived(prototypeLinks(prototypeDocs));
   const playerFrames = $derived(coreFrames.filter((f) => kindOfNode(f.id) === FrameKind.Frame && liveOf(f.id)).map((f) => ({ id: f.id, name: tileLabel(byId.get(f.id)!), live: liveOf(f.id)! })));
@@ -423,7 +457,10 @@
   };
   const drawsCard = (t: Tile) => !!t.kind && isNodeType(t.kind) && !handedOver(t);
   const drawCard = $derived(coreType && coreLook ? cardsOnCanvas({ ...coreLook, panel: coreLook.paper }, coreType.glyphs, coreType.bold, coreType.gen) : null);
-  const labelZoom = $derived(labelZoomStep(view.zoom));
+  let labelZoom = $state(labelZoomStep(untrack(() => view.zoom)));
+  $effect(() => {
+    labelZoom = labelZoomStep(view.zoom);
+  });
   const strokeZoom = $derived(strokeZoomStep(view.zoom));
   const basesAt = (size: AssetSize) => {
     const text = coreType;
@@ -456,11 +493,17 @@
     if (!draw) {
       return [];
     }
-    return cardBases.map(({ card: base, turn, poster }) => {
-      const card: CardTile = { ...base, zoom: labelZoom };
+    const next = new Map<string, number>();
+    const cards = cardBases.map(({ card: base, turn, poster }) => {
+      const zoom = labelStepOf(base.id, labelZoom, seenIds, labelSteps);
+      next.set(base.id, zoom);
+      const card: CardTile = { ...base, zoom };
       return { key: cardKey(card), frame: draw(card, poster ? CardLayer.Face : CardLayer.Whole), turn, poster };
     });
+    labelSteps = next;
+    return cards;
   });
+  let labelSteps = new Map<string, number>();
   const addsBeside = (t: Tile) => holdsDoc(t.kind ?? '') && kindOfNode(t.id) === FrameKind.Frame;
   const turnOf = (t: Tile) => (t.rotation ? { degrees: t.rotation, about: { x: t.x + t.w / 2, y: t.y + t.h / 2 } } : undefined);
   const coreChrome = $derived.by(() => {
@@ -1673,7 +1716,7 @@
   function saverOf(nodeId: string) {
     const held = savers.get(nodeId);
     const live = liveOf(nodeId);
-    const frame = coreFrames.find((f) => f.id === nodeId);
+    const frame = frameById.get(nodeId);
     if (held || !live || !frame) {
       return held ?? null;
     }
@@ -2089,7 +2132,7 @@
 
   function pickerOf(nodeId: string) {
     typesetLanded;
-    const frame = coreFrames.find((f) => f.id === nodeId);
+    const frame = frameById.get(nodeId);
     const live = liveOf(nodeId);
     if (!frame || !live) {
       return null;
@@ -2349,7 +2392,7 @@
 
   function marqueeRect(nodeId: string) {
     const m = bandDrag?.nodeId === nodeId ? bandDrag : null;
-    const frame = coreFrames.find((f) => f.id === nodeId);
+    const frame = frameById.get(nodeId);
     if (!m || !frame) {
       return null;
     }
@@ -3449,6 +3492,7 @@
   const stackOrder = $derived(placed.map((t) => t.id));
   const viewZoom = $derived(view.zoom);
   const coreTheme = $derived(coreLook ? { ...coreLook, panel: coreLook.paper } : null);
+  const runningTiles = $derived(placed.filter((t) => !handedOver(t) && isRunning(summaries.get(t.id)?.data ?? {})).map((t) => ({ ...t, radius: cardRadiusOf(t.kind ?? '') })));
   const coreOverlay = $derived(
     coreTheme && coreType
       ? overlayOf({
@@ -3463,7 +3507,7 @@
           peers: corePeers.flatMap((p) => (p.cursor ? [{ id: p.sessionId, name: displayName(p.name), color: p.colour, at: p.cursor }] : [])),
           outlines: corePeers.length ? peerOutlines(props.peers ?? [], (id) => byId.get(id) ?? null).map((o) => ({ key: o.key, box: o.rect, color: o.colour })) : [],
           ghost: ghost ? { curve: ghost.from.side === PortSide.Out ? wireCurve(ghost.from, ghost.at) : wireCurve(ghost.at, ghost.from), ok: ghost.ok } : null,
-          running: placed.filter((t) => !handedOver(t) && isRunning(summaries.get(t.id)?.data ?? {})).map((t) => ({ ...t, radius: cardRadiusOf(t.kind ?? '') })),
+          running: runningTiles,
           chrome: coreChrome
         })
       : NO_OVERLAY
@@ -4351,7 +4395,7 @@
   >
     {#if !failed}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} onbackend={(change) => track(GPU_FALLBACK_EVENT, change)} />
       </svelte:boundary>
     {/if}
     <div class="hover-rings" data-testid="node-hover-rings">
@@ -4359,7 +4403,7 @@
         <div class="hover-ring" data-testid="node-hover-ring" data-node={ring.id} style={highlightStyle(HighlightKind.Node) + ';' + hoverRingStyle(view, ring)}></div>
       {/each}
     </div>
-    <FrameOverlays {view} frames={overlayFrames}>
+    <FrameOverlays {view} frames={shownOverlays}>
       {#snippet children(frame)}
         {@const edit = typingMark(frame.id)}
         {#if edit}

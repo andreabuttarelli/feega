@@ -3,12 +3,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const tried = vi.hoisted(() => ({ webgpu: [] as HTMLCanvasElement[], webgl: [] as HTMLCanvasElement[] }));
+const tried = vi.hoisted(() => ({ webgpu: [] as HTMLCanvasElement[], webgl: [] as HTMLCanvasElement[], webgpuAttach: (): Promise<unknown> => Promise.reject(new Error('no adapter')) }));
 
 vi.mock('@feega/motion-core/motion/gpu-full/core-web', () => ({
   createCore: (canvas: HTMLCanvasElement) => {
     tried.webgpu.push(canvas);
-    return Promise.reject(new Error('no adapter'));
+    return tried.webgpuAttach();
   },
   createCoreGl: (canvas: HTMLCanvasElement) => {
     tried.webgl.push(canvas);
@@ -19,6 +19,7 @@ vi.mock('@feega/motion-core/motion/gpu-full/core-web', () => ({
 vi.mock('$lib/canvas/core/frame-source', async (real) => ({ ...(await real<object>()), drawsAny: () => true, onStage: (l: unknown) => l, stillFrame: () => 0 }));
 
 const { default: CoreFrames } = await import('./CoreFrames.svelte');
+const { GpuBackend, LOSSES_PER_BACKEND } = await import('$lib/canvas/gpu/gpu-loss');
 const dir = dirname(fileURLToPath(import.meta.url));
 const { flushSync, mount, unmount } = (await import(join(dir, '../../../../../node_modules/svelte/src/index-client.js'))) as typeof import('svelte');
 
@@ -27,6 +28,7 @@ let app: Record<string, unknown> | null = null;
 afterEach(() => {
   tried.webgpu.length = 0;
   tried.webgl.length = 0;
+  tried.webgpuAttach = () => Promise.reject(new Error('no adapter'));
   if (app) {
     unmount(app);
   }
@@ -56,5 +58,22 @@ describe('CoreFrames backends', () => {
     expect(tried.webgpu).toHaveLength(1);
     expect(tried.webgl[0]).not.toBe(tried.webgpu[0]);
     expect(tried.webgl[0].isConnected).toBe(true);
+  });
+});
+
+const lostDevice = () => ({ lost: () => true, dispose: () => undefined, busy: () => false });
+
+describe('CoreFrames after WebGPU keeps losing its device', () => {
+  it('moves the live canvas to WebGL without a reload, and records the switch', async () => {
+    tried.webgpuAttach = () => Promise.resolve(lostDevice());
+    const switched: unknown[] = [];
+    app = mount(CoreFrames, { target: document.body, props: { frames: [], view: { x: 0, y: 0, zoom: 1 }, area: { width: 100, height: 80 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined, onbackend: (change: unknown) => switched.push(change) } });
+    flushSync();
+
+    await vi.waitFor(() => expect(tried.webgl).toHaveLength(1), { timeout: 3000 });
+
+    expect(tried.webgpu).toHaveLength(LOSSES_PER_BACKEND);
+    expect(tried.webgl[0].isConnected).toBe(true);
+    expect(switched).toEqual([{ from: GpuBackend.WebGpu, to: GpuBackend.WebGl, why: 'device lost' }]);
   });
 });

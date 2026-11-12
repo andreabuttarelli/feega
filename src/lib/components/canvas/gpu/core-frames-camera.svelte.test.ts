@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Item } from '@feega/motion-core/motion/gpu-full/display-list';
 
-const calls = vi.hoisted(() => ({ cameras: [] as number[][], patches: [] as unknown[], overlays: 0, parts: [] as string[], frames: 0, puts: [] as string[], attached: 0, open: 0, overlapped: 0, lose: false, splices: [] as { from: string; to: string; items: number }[] }));
+const calls = vi.hoisted(() => ({ cameras: [] as number[][], patches: [] as unknown[], overlays: 0, parts: [] as string[], frames: 0, puts: [] as string[], attached: 0, open: 0, overlapped: 0, lose: false, decoding: false, splices: [] as { from: string; to: string; items: number }[] }));
 
 vi.mock('@feega/motion-core/motion/gpu-full/core-web', () => ({
   createCore: () => {
@@ -20,7 +20,7 @@ vi.mock('@feega/motion-core/motion/gpu-full/core-web', () => ({
       patchGroup: (from: string, to: string, splice: { items: unknown[] }) => (calls.splices.push({ from, to, items: splice.items.length }), true),
       appendGroup: () => undefined,
       dropGroup: () => undefined,
-      upload: () => true,
+      upload: () => !calls.decoding,
       cacheBytes: () => 0,
       dispose: () => undefined,
       setCamera: (x: number, y: number, zoom: number) => calls.cameras.push([x, y, zoom]),
@@ -44,7 +44,7 @@ vi.mock('$lib/canvas/core/frame-source', async (real) => {
 });
 vi.mock('$lib/canvas/core/placeholders', async (real) => {
   const actual = await real<typeof import('$lib/canvas/core/placeholders')>();
-  return { ...actual, fillOrder: walked('fillOrder', actual.fillOrder), onScreenFirst: walked('onScreenFirst', actual.onScreenFirst) };
+  return { ...actual, fillOrder: walked('fillOrder', actual.fillOrder), inView: walked('inView', actual.inView), onScreenFirst: walked('onScreenFirst', actual.onScreenFirst) };
 });
 vi.mock('$lib/canvas/core/residency', async (real) => {
   const actual = await real<typeof import('$lib/canvas/core/residency')>();
@@ -72,6 +72,7 @@ const { flushSync, mount, unmount } = (await import(join(dir, '../../../../../no
 let app: Record<string, unknown> | null = null;
 
 afterEach(() => {
+  calls.decoding = false;
   if (app) {
     unmount(app);
   }
@@ -205,6 +206,73 @@ describe('CoreFrames camera', () => {
     app = mount(CoreFrames, { target: document.body, props });
     flushSync();
     await vi.waitFor(() => expect(calls.patches.length).toBeGreaterThan(0));
+    await settled();
+
+    props.view = { x: -1, y: 0, zoom: 1 };
+    flushSync();
+
+    await vi.waitFor(() => expect(calls.cameras.at(-1)).toEqual([-1, 0, 1]));
+    expect(walks).toEqual({});
+  });
+
+  it('a short pan that brings a card across the screen edge walks none of them', async () => {
+    const props = $state({ frames: [], cards: manyCards(), view: { x: 0, y: 0, zoom: 1 }, area: { width: 400, height: 300 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
+    app = mount(CoreFrames, { target: document.body, props });
+    flushSync();
+    await vi.waitFor(() => expect(calls.patches.length).toBeGreaterThan(0));
+    await settled();
+
+    props.view = { x: -90, y: 0, zoom: 1 };
+    flushSync();
+
+    await vi.waitFor(() => expect(calls.cameras.at(-1)).toEqual([-90, 0, 1]));
+    expect(walks).toEqual({});
+  });
+
+  it('a pan while a picture is still decoding waits for it without walking the frames', async () => {
+    calls.decoding = true;
+    const started = calls.frames;
+    const props = $state({ frames: [], cards: manyCards(), view: { x: 0, y: 0, zoom: 1 }, area: { width: 400, height: 300 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
+    app = mount(CoreFrames, { target: document.body, props });
+    flushSync();
+    await vi.waitFor(() => expect(calls.frames).toBeGreaterThan(started));
+
+    props.view = { x: -1, y: 0, zoom: 1 };
+    flushSync();
+    await vi.waitFor(() => expect(calls.cameras.at(-1)).toEqual([-1, 0, 1]));
+    forget();
+    const frames = calls.frames;
+    await vi.waitFor(() => expect(calls.frames).toBeGreaterThan(frames + 2));
+
+    expect(walks).toEqual({});
+  });
+
+  it('an overlay handed again with the same parts walks none of them', async () => {
+    const fixed: unknown[] = [];
+    const live: unknown[] = [];
+    const props = $state({ frames: [], cards: manyCards(), overlay: { fixed, live }, view: { x: 0, y: 0, zoom: 1 }, area: { width: 400, height: 300 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
+    app = mount(CoreFrames, { target: document.body, props: props as never });
+    flushSync();
+    await vi.waitFor(() => expect(calls.patches.length).toBeGreaterThan(0));
+    await settled();
+    const frames = calls.frames;
+
+    props.overlay = { fixed, live };
+    flushSync();
+
+    await vi.waitFor(() => expect(calls.frames).toBeGreaterThan(frames));
+    expect(walks).toEqual({});
+  });
+
+  it('a pan after a change that left the waiting count alone walks none of them', async () => {
+    const far = { id: 'f1', kind: 'frame', revision: 1, box: { x: 90_000, y: 0, w: 100, h: 50 } };
+    const props = $state({ frames: [far], cards: manyCards(), view: { x: 0, y: 0, zoom: 1 }, area: { width: 400, height: 300 }, sourceUrl: (id: string) => `http://frames.invalid/${id}`, onready: () => undefined, onfallback: () => undefined });
+    app = mount(CoreFrames, { target: document.body, props: props as never });
+    flushSync();
+    await vi.waitFor(() => expect(calls.patches.length).toBeGreaterThan(0));
+    await settled();
+    props.cards = [...manyCards(), { ...card, key: 'off', frame: { ...card.frame, id: 'off', box: { x: 80_000, y: 0, w: 100, h: 50 } } }];
+    flushSync();
     await settled();
 
     props.view = { x: -1, y: 0, zoom: 1 };

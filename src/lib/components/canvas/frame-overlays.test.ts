@@ -21,3 +21,12 @@ describe('frame overlays on a rotated frame', () => {
     expect(body).not.toContain('rotate:');
   });
 });
+
+describe('frame overlays under a moving camera', () => {
+  it('a pan moves the one container, every frame keeps its place inside it', () => {
+    const body = render(FrameOverlays, { props: { view: { x: 100, y: 50, zoom: 2 }, frames: [{ ...frame, x: 10, y: 20 }], children: nothing } }).body;
+
+    expect(body).toContain('transform: translate(100px, 50px)');
+    expect(body).toContain('left:20px;top:40px;width:400px;height:200px');
+  });
+});

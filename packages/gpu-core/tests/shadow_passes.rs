@@ -4,6 +4,8 @@ use gpu_core::display_list::{CssFunction, Filter};
 use gpu_core::filter_passes::Op;
 use gpu_core::filters::{Fx, Runner};
 
+const BLUR_OPS: [Op; 5] = [Op::Premultiply, Op::BlurPremultiplied, Op::Blur, Op::Down, Op::Up];
+
 #[derive(Default)]
 struct Recording {
     ops: RefCell<Vec<Op>>,
@@ -12,7 +14,7 @@ struct Recording {
 impl Runner for Recording {
     type Tex = (u32, u32);
 
-    fn run(&self, op: Op, inputs: [&(u32, u32); 2], _: &[f32]) -> (u32, u32) {
+    fn run(&self, op: Op, inputs: [&(u32, u32); 2], _: &[f32], _: (u32, u32)) -> (u32, u32) {
         self.ops.borrow_mut().push(op);
         *inputs[0]
     }
@@ -33,7 +35,7 @@ fn shadow_ops(blur: &str) -> Vec<Op> {
 fn a_blurred_drop_shadow_costs_the_blur_and_one_pass() {
     let ops = shadow_ops("35px");
 
-    assert_eq!(ops.iter().filter(|o| **o != Op::Blur).count(), 1, "{ops:?}");
+    assert_eq!(ops.iter().filter(|o| !BLUR_OPS.contains(*o)).count(), 1, "{ops:?}");
 }
 
 #[test]
@@ -66,14 +68,14 @@ fn ops_of(filter: Filter) -> Vec<Op> {
 fn an_svg_shadow_built_by_the_effects_costs_the_blur_and_one_pass() {
     let ops = ops_of(svg_shadow(false));
 
-    assert_eq!(ops.iter().filter(|o| **o != Op::Blur).count(), 1, "{ops:?}");
+    assert_eq!(ops.iter().filter(|o| !BLUR_OPS.contains(*o)).count(), 1, "{ops:?}");
 }
 
 #[test]
 fn an_svg_shadow_with_spread_adds_only_the_morphology() {
     let ops = ops_of(svg_shadow(true));
 
-    assert_eq!(ops.iter().filter(|o| **o != Op::Blur && **o != Op::Morph).count(), 1, "{ops:?}");
+    assert_eq!(ops.iter().filter(|o| !BLUR_OPS.contains(*o) && **o != Op::Morph).count(), 1, "{ops:?}");
 }
 
 fn svg_inner_shadow() -> Filter {
@@ -94,7 +96,7 @@ fn svg_inner_shadow() -> Filter {
 fn an_svg_inner_shadow_built_by_the_effects_costs_the_blur_and_one_pass() {
     let ops = ops_of(svg_inner_shadow());
 
-    assert_eq!(ops.iter().filter(|o| **o != Op::Blur).count(), 1, "{ops:?}");
+    assert_eq!(ops.iter().filter(|o| !BLUR_OPS.contains(*o)).count(), 1, "{ops:?}");
 }
 
 #[test]
@@ -107,5 +109,5 @@ fn a_shadow_filter_with_its_own_region_is_still_fused() {
 
     let ops = ops_of(filter);
 
-    assert_eq!(ops.iter().filter(|o| **o != Op::Blur).count(), 1, "{ops:?}");
+    assert_eq!(ops.iter().filter(|o| !BLUR_OPS.contains(*o)).count(), 1, "{ops:?}");
 }

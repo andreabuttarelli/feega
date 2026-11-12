@@ -332,7 +332,7 @@ pub struct Renderer {
     options: RendererOptions,
     engine: WgpuEngine,
     resolver: Resolver,
-    image_atlas: Option<recording::ImageProxy>,
+    persistent: render::Persistent,
     shaders: FullShaders,
     #[cfg(feature = "debug_layers")]
     debug: debug::DebugRenderer,
@@ -448,7 +448,7 @@ impl Renderer {
             options,
             engine,
             resolver: Resolver::new(),
-            image_atlas: None,
+            persistent: render::Persistent::default(),
             shaders,
             #[cfg(feature = "debug_layers")]
             debug,
@@ -473,6 +473,10 @@ impl Renderer {
     /// 2) Call `render_to_texture` directly on the [`SurfaceTexture`][wgpu::SurfaceTexture]'s texture, if
     ///    it has the right usages. This should generally be avoided, as some GPUs assume that you will not
     ///    be rendering to the surface using a compute pipeline, and optimise accordingly.
+    pub fn ramp_uploads(&self) -> u64 {
+        self.persistent.ramp_uploads
+    }
+
     pub fn render_to_texture(
         &mut self,
         device: &Device,
@@ -485,7 +489,7 @@ impl Renderer {
             scene,
             &mut self.resolver,
             &self.shaders,
-            &mut self.image_atlas,
+            &mut self.persistent,
             params,
         );
         let external_resources = [ExternalResource::Image(
@@ -619,7 +623,7 @@ impl Renderer {
             return Err(error.into());
         }
         self.engine = engine;
-        self.image_atlas = None;
+        self.persistent = render::Persistent::default();
         self.shaders = shaders;
         #[cfg(feature = "debug_layers")]
         {
@@ -734,7 +738,7 @@ impl Renderer {
             encoding,
             &mut self.resolver,
             &self.shaders,
-            &mut self.image_atlas,
+            &mut self.persistent,
             params,
             robust,
         );

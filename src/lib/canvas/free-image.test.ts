@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { freeImageAssetId, imageSourceTile } from './free-image';
+import { elementDocs, freeImageAssetId, imageSourceTile } from './free-image';
 
 const clipOf = (id: string, component: string, props: Record<string, unknown>) =>
   newClip({ id, from: 0, durationInFrames: 30, component: component as never, props });
@@ -48,5 +48,22 @@ describe('imageSourceTile', () => {
   it('leaves every other tile alone', () => {
     const frame = { id: 'f', kind: 'motion', connectable: true, connectors: [], output: 'motions' as const };
     expect(imageSourceTile(frame, holding)).toBe(frame);
+  });
+});
+
+describe('element docs', () => {
+  const image = docWith(clipOf('i', 'Image', { assetId: 'a' }));
+  const tiles = [{ id: 'el', kind: 'element' }, { id: 'frame', kind: 'motion' }];
+
+  it('keeps the same map while only a frame\'s doc changes, so tiles are not placed again', () => {
+    const before = elementDocs(tiles, () => image, new Map());
+
+    expect(elementDocs(tiles, (id) => (id === 'el' ? image : docWith()), before)).toBe(before);
+  });
+
+  it('gives a new map when an element\'s doc changes', () => {
+    const before = elementDocs(tiles, () => image, new Map());
+
+    expect(elementDocs(tiles, () => docWith(), before).get('el')).not.toBe(image);
   });
 });

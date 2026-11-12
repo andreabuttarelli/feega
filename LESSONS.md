@@ -27,6 +27,9 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 ### A perf run from a worktree measures the main checkout's packages
 **Signal:** a change under `packages/` (gpu-core glue, motion-core) leaves the probe numbers identical, or `build:node` / vitest fail with `X is not a function` / `is not exported` for a symbol that exists in the worktree's `packages/`; `realpath node_modules/@feega/motion-core` points into the main checkout, which is behind `dev`. **Move:** give the worktree its own `node_modules`: a real folder of symlinks to every entry of the main one, except `@feega/*`, which point to `../../packages/<name>` of the worktree. Check with `realpath` before the first run.
 
+### Two worktrees sharing one `CARGO_TARGET_DIR` build the same wasm
+**Signal:** a gpu-core change makes no difference in the browser, and `md5` of `static/gpu-core/gpu_core_bg.wasm` is identical in the before and after worktrees; `cargo build` says `Finished` in under a second. Cargo checks freshness against the source files of the last build in that target dir, so the other worktree's sources look unchanged. **Move:** one target dir per worktree (`cp -c -R` a warm one to start fast), or `touch` the changed sources before building; compare the wasm checksums before any A/B.
+
 ### The zoom probe reports 0 zoom frames in headless Chromium
 **Signal:** `tests/e2e/canvas-zoom-profile-probe.spec.ts` prints `zoom frames 0` and fps from an empty list when launched headless. **Move:** headless Chromium does not run the WebGPU canvas frames the probe counts; launch headed (the spec does; never add `headless: true` to compare quicker), and keep the windows on screen while it runs.
 
@@ -42,6 +45,9 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ### Heap grows by hundreds of MB in a canvas session: diff snapshots, skip the source strings
 **Signal:** JS heap triples over a few minutes of editing on the dev server; a snapshot diff is led by `string` and `array`, and the biggest strings are `data:application/json;base64` source maps and module sources. **Move:** those are dev-mode code, not the leak. Group the new strings by retainer path and drop paths through `Script`/`SharedFunctionInfo`; what remains names the real holder (the 2026-11-03 one: `lists` in `CoreFrames`, one display list per live edit step). Take snapshots after `HeapProfiler.collectGarbage`, phase by phase, so the phase that grows is the one to read.
+
+### `stage` runs several times per wheel tick though nothing on screen changed
+**Signal:** the camera-tick bench shows `firstDrawn`, the stage keep-set or `onScreenFirst` at a few times the node count per tick. **Move:** count why `paintOn` restages (`staleScene`, `sceneBusy`, cache step, overlay) with a throwaway `window` counter and print it from the bench; a scene busy on a picture still decoding polled it with a full `stage` per paint.
 
 ### A harness run while the worktree rebases measures neither build
 **Signal:** an "after" run that mixes old and new numbers; `git rebase` ran while the dev server was serving the worktree. **Move:** the dev server serves the working tree, so a rebase or checkout swaps the code mid-run. Finish or stop the run first, then rebase, restart the server and measure again.
@@ -3827,3 +3833,11 @@ Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start
 ## A perf fixture that never opens
 
 **Signal:** `scripts/local.mjs` (or a dev server pointed at a `.feega`) logs `This .feega file is larger than 200 MB` and the page waits forever. **Move:** the limit is on the unpacked size; landings docs are 0.7–4.5 MB each, so `replicate-fixture.mjs` stays under ~250 frames. A fresh worktree's dev server can also take over three minutes to compile the canvas route on a loaded machine: give the first `waitFor` minutes, not the default.
+
+## One live doc write re-placed every tile
+
+**Signal:** a plain pan rebuilds card faces (`basesAt`, `cardsOnCanvas`) and the page's `sourceView`/`genViewFor` show thousands of calls per tick in the camera bench. **Move:** `liveDocs.map` is one `$state` Map; any derived that calls `liveOf` for every tile reruns on every write, and frame sources land while a pan brings frames near. Read live docs only for the tiles that use them, through a memo that returns the previous map when nothing it covers changed (`elementDocs` in `free-image.ts`). To find which input moved, add a throwaway `$effect(() => { void x; console.log('CHG x') })` per candidate and count over five wheel ticks; `$inspect.trace` inside that derived stopped the canvas from loading.
+
+## A derived reruns on every tick although none of its inputs changed
+
+**Signal:** a `$derived` (or a template expression with a call) runs about once per camera tick while an `$effect` watching each of its inputs sees them change a handful of times. **Cause:** Svelte 5 (5.56 and 5.57) keeps a derived's write version when it recomputes to an equal value; once one input changed while its value did not, `is_dirty` finds that input newer on every later `MAYBE_DIRTY` mark and reruns it. Marks travel through deriveds: any derived that reads `view` (`tier`, `labelZoom`, `liveCode`) marked the whole card and frame graph on each tick. **Move:** a camera-driven value that feeds other state is plain `$state` written by `$effect` (it bumps only when the value changes), never a `$derived` of `view`. Not `$effect.pre`: it runs at its declaration, so a `const` declared further down the script is still in its TDZ and the component throws on mount. To find the source, hook `internal_set` in the prebundled Svelte chunk (`.vite-deps/deps/chunk-*.js`, restart the server) to record written sources, then walk `.reactions` from each to the rerunning derived. Guard: `a pan after a change that left the waiting count alone walks none of them` in `core-frames-camera.svelte.test.ts`.

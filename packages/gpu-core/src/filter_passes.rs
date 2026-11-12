@@ -14,6 +14,7 @@ const HEADER: &str = r#"
 @group(0) @binding(1) var b: texture_2d<f32>;
 @group(0) @binding(2) var dst: texture_storage_2d<rgba8unorm, write>;
 @group(0) @binding(3) var<storage, read> p: array<f32>;
+@group(0) @binding(4) var linear: sampler;
 
 fn size() -> vec2<i32> { return vec2<i32>(textureDimensions(dst)); }
 fn texel(t: texture_2d<f32>, xy: vec2<i32>) -> vec4<f32> {
@@ -36,9 +37,10 @@ fn inside(q: vec2<f32>) -> bool {
 fn straight(c: vec4<f32>) -> vec4<f32> { return select(vec4<f32>(0.0), vec4<f32>(c.rgb / c.a, c.a), c.a > 0.0); }
 fn premul(c: vec4<f32>) -> vec4<f32> { let d = clamp(c, vec4<f32>(0.0), vec4<f32>(1.0)); return vec4<f32>(d.rgb * d.a, d.a); }
 fn centre(xy: vec2<i32>) -> vec2<f32> { return vec2<f32>(xy) + 0.5; }
+fn filtered(q: vec2<f32>) -> vec4<f32> { return textureSampleLevel(a, linear, q / vec2<f32>(textureDimensions(a)), 0.0); }
 "#;
 
-const FOOTER: &str = r#"
+const STRAIGHT_FOOTER: &str = r#"
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   let xy = vec2<i32>(id.xy);
@@ -47,6 +49,28 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   textureStore(dst, xy, vec4<f32>(select(vec3<f32>(0.0), c.rgb / c.a, c.a > 0.0), c.a));
 }
 "#;
+
+const PREMULTIPLIED_FOOTER: &str = r#"
+@compute @workgroup_size(8, 8)
+fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+  let xy = vec2<i32>(id.xy);
+  if (xy.x >= size().x || xy.y >= size().y) { return; }
+  textureStore(dst, xy, clamp(run(xy), vec4<f32>(0.0), vec4<f32>(1.0)));
+}
+"#;
+
+#[derive(Clone, Copy)]
+enum Storage {
+    Straight,
+    Premultiplied,
+}
+
+fn footer(storage: Storage) -> &'static str {
+    match storage {
+        Storage::Straight => STRAIGHT_FOOTER,
+        Storage::Premultiplied => PREMULTIPLIED_FOOTER,
+    }
+}
 
 const MATRIX: &str = r#"
 fn run(xy: vec2<i32>) -> vec4<f32> {
@@ -242,15 +266,33 @@ fn run(xy: vec2<i32>) -> vec4<f32> {
 }
 "#;
 
+const PREMULTIPLY: &str = r#"
+fn run(xy: vec2<i32>) -> vec4<f32> { return texel(a, xy); }
+"#;
+
 const BLUR: &str = r#"
 fn run(xy: vec2<i32>) -> vec4<f32> {
-  let dir = vec2<i32>(i32(p[0]), i32(p[1]));
-  var sum = texel(a, xy) * p[3];
-  for (var i = 1; i < i32(p[2]); i++) {
-    sum += (texel(a, xy + dir * i) + texel(a, xy - dir * i)) * p[3u + u32(i)];
+  let dir = vec2<f32>(p[0], p[1]);
+  let at = centre(xy);
+  var sum = filtered(at) * p[4];
+  for (var i = 1u; i < u32(p[2]); i++) {
+    let o = dir * p[3u + 2u * i];
+    sum += (filtered(at + o) + filtered(at - o)) * p[4u + 2u * i];
   }
   return sum;
 }
+"#;
+
+const DOWN: &str = r#"
+fn run(xy: vec2<i32>) -> vec4<f32> {
+  let c = vec2<f32>(xy) * 2.0 + 1.0;
+  let d = 0.75;
+  return 0.25 * (filtered(c + vec2<f32>(-d, -d)) + filtered(c + vec2<f32>(d, -d)) + filtered(c + vec2<f32>(-d, d)) + filtered(c + vec2<f32>(d, d)));
+}
+"#;
+
+const UP: &str = r#"
+fn run(xy: vec2<i32>) -> vec4<f32> { return filtered(centre(xy) / p[0]); }
 "#;
 
 const FOLD: &str = r#"
@@ -528,7 +570,11 @@ pub enum Op {
     Turbulence,
     Tile,
     Displace,
+    Premultiply,
+    BlurPremultiplied,
     Blur,
+    Down,
+    Up,
     Blend,
     Fold,
     Lens,
@@ -537,24 +583,28 @@ pub enum Op {
     InnerShadow,
 }
 
-const SOURCES: [(Op, &str); 17] = [
-    (Op::Matrix, MATRIX),
-    (Op::Table, TABLE),
-    (Op::Offset, OFFSET),
-    (Op::Flood, FLOOD),
-    (Op::Composite, COMPOSITE),
-    (Op::Morph, MORPH),
-    (Op::Light, LIGHT),
-    (Op::Turbulence, TURBULENCE),
-    (Op::Tile, TILE),
-    (Op::Displace, DISPLACE),
-    (Op::Blur, BLUR),
-    (Op::Blend, BLEND),
-    (Op::Fold, FOLD),
-    (Op::Lens, LENS),
-    (Op::Warp, WARP),
-    (Op::Shadow, SHADOW),
-    (Op::InnerShadow, INNER_SHADOW),
+const SOURCES: [(Op, &str, Storage); 21] = [
+    (Op::Matrix, MATRIX, Storage::Straight),
+    (Op::Table, TABLE, Storage::Straight),
+    (Op::Offset, OFFSET, Storage::Straight),
+    (Op::Flood, FLOOD, Storage::Straight),
+    (Op::Composite, COMPOSITE, Storage::Straight),
+    (Op::Morph, MORPH, Storage::Straight),
+    (Op::Light, LIGHT, Storage::Straight),
+    (Op::Turbulence, TURBULENCE, Storage::Straight),
+    (Op::Tile, TILE, Storage::Straight),
+    (Op::Displace, DISPLACE, Storage::Straight),
+    (Op::Premultiply, PREMULTIPLY, Storage::Premultiplied),
+    (Op::BlurPremultiplied, BLUR, Storage::Premultiplied),
+    (Op::Blur, BLUR, Storage::Straight),
+    (Op::Down, DOWN, Storage::Premultiplied),
+    (Op::Up, UP, Storage::Straight),
+    (Op::Blend, BLEND, Storage::Straight),
+    (Op::Fold, FOLD, Storage::Straight),
+    (Op::Lens, LENS, Storage::Straight),
+    (Op::Warp, WARP, Storage::Straight),
+    (Op::Shadow, SHADOW, Storage::Straight),
+    (Op::InnerShadow, INNER_SHADOW, Storage::Straight),
 ];
 
 const POOL_BYTES: u64 = 32 * 1024 * 1024;
@@ -605,6 +655,7 @@ impl Deref for Pooled {
 
 pub struct FilterPasses {
     layout: wgpu::BindGroupLayout,
+    smooth: wgpu::Sampler,
     pipelines: Vec<(Op, wgpu::ComputePipeline)>,
     shelves: Rc<RefCell<Shelves>>,
     pending: Rc<RefCell<Pending>>,
@@ -633,8 +684,8 @@ pub struct WgpuRunner<'a> {
 impl Runner for WgpuRunner<'_> {
     type Tex = Pooled;
 
-    fn run(&self, op: Op, inputs: [&Pooled; 2], params: &[f32]) -> Pooled {
-        self.passes.run(self.device, op, inputs, params)
+    fn run(&self, op: Op, inputs: [&Pooled; 2], params: &[f32], size: (u32, u32)) -> Pooled {
+        self.passes.run(self.device, op, inputs, params, size)
     }
 
     fn size(tex: &Pooled) -> (u32, u32) {
@@ -647,7 +698,7 @@ fn entry(binding: u32, ty: wgpu::BindingType) -> wgpu::BindGroupLayoutEntry {
 }
 
 fn sampled() -> wgpu::BindingType {
-    wgpu::BindingType::Texture { sample_type: wgpu::TextureSampleType::Float { filterable: false }, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false }
+    wgpu::BindingType::Texture { sample_type: wgpu::TextureSampleType::Float { filterable: true }, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false }
 }
 
 impl FilterPasses {
@@ -659,17 +710,19 @@ impl FilterPasses {
                 entry(1, sampled()),
                 entry(2, wgpu::BindingType::StorageTexture { access: wgpu::StorageTextureAccess::WriteOnly, format: wgpu::TextureFormat::Rgba8Unorm, view_dimension: wgpu::TextureViewDimension::D2 }),
                 entry(3, wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: true }, has_dynamic_offset: false, min_binding_size: None }),
+                entry(4, wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering)),
             ],
         });
         let shared = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { label: None, bind_group_layouts: &[Some(&layout)], immediate_size: 0 });
         let pipelines = SOURCES
             .iter()
-            .map(|(op, body)| {
-                let module = device.create_shader_module(wgpu::ShaderModuleDescriptor { label: None, source: wgpu::ShaderSource::Wgsl(format!("{HEADER}{body}{FOOTER}").into()) });
+            .map(|(op, body, storage)| {
+                let module = device.create_shader_module(wgpu::ShaderModuleDescriptor { label: None, source: wgpu::ShaderSource::Wgsl(format!("{HEADER}{body}{}", footer(*storage)).into()) });
                 (*op, device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor { label: None, layout: Some(&shared), module: &module, entry_point: Some("main"), compilation_options: Default::default(), cache: None }))
             })
             .collect();
-        Self { layout, pipelines, shelves: Rc::new(RefCell::new(Shelves::new(POOL_BYTES))), pending: Rc::default(), submits: std::cell::Cell::new(0) }
+        let smooth = device.create_sampler(&wgpu::SamplerDescriptor { mag_filter: wgpu::FilterMode::Linear, min_filter: wgpu::FilterMode::Linear, ..Default::default() });
+        Self { layout, smooth, pipelines, shelves: Rc::new(RefCell::new(Shelves::new(POOL_BYTES))), pending: Rc::default(), submits: std::cell::Cell::new(0) }
     }
 
     pub fn texture(&self, device: &wgpu::Device, width: u32, height: u32) -> Pooled {
@@ -687,10 +740,10 @@ impl FilterPasses {
         self.shelves.borrow().bytes()
     }
 
-    pub fn run(&self, device: &wgpu::Device, op: Op, inputs: [&Pooled; 2], params: &[f32]) -> Pooled {
+    pub fn run(&self, device: &wgpu::Device, op: Op, inputs: [&Pooled; 2], params: &[f32], size: (u32, u32)) -> Pooled {
         let pipeline = &self.pipelines.iter().find(|(o, _)| *o == op).expect("every op has a pipeline").1;
         let [a, b] = inputs;
-        let out = self.texture(device, a.width(), a.height());
+        let out = self.texture(device, size.0, size.1);
         let padded: Vec<u8> = params.iter().chain(std::iter::once(&0.0)).flat_map(|v| v.to_le_bytes()).collect();
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor { label: None, contents: &padded, usage: wgpu::BufferUsages::STORAGE });
         let view = |t: &wgpu::Texture| t.create_view(&wgpu::TextureViewDescriptor::default());
@@ -702,6 +755,7 @@ impl FilterPasses {
                 wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&view(b)) },
                 wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&view(&out)) },
                 wgpu::BindGroupEntry { binding: 3, resource: buffer.as_entire_binding() },
+                wgpu::BindGroupEntry { binding: 4, resource: wgpu::BindingResource::Sampler(&self.smooth) },
             ],
         });
         let mut pending = self.pending.borrow_mut();
