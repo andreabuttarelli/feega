@@ -52,7 +52,7 @@
 
 <style>
   .pricing {
-    padding: 100px 12px;
+    padding: var(--site-section) 12px;
     color: var(--site-ink);
   }
 
@@ -196,7 +196,7 @@
 
   @media (min-width: 1200px) {
     .pricing {
-      padding: 200px 0;
+      padding: var(--site-section) 0;
     }
 
     h2 {
@@ -271,7 +271,7 @@
 
   @media (min-width: 810px) and (max-width: 1199.98px) {
     .pricing {
-      padding: 154px 0 150px;
+      padding: var(--site-section) 0;
     }
 
     h2 {

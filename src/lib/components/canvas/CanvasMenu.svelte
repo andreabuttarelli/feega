@@ -11,7 +11,8 @@
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import { _ } from 'svelte-i18n';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
-  import Menu from '@lucide/svelte/icons/menu';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import FeegaMark from '$lib/components/FeegaMark.svelte';
   import House from '@lucide/svelte/icons/house';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import Keyboard from '@lucide/svelte/icons/keyboard';
@@ -147,7 +148,8 @@
 
 <DropdownMenu.Root onOpenChange={(open) => open && syncTheme()}>
   <DropdownMenu.Trigger class="burger-btn" aria-label={$_('app.shell.menu.open')} title={$_('app.shell.menu.open')}>
-    <Menu size={16} strokeWidth={1.8} />
+    <FeegaMark size={18} />
+    <ChevronDown class="burger-chevron" size={12} strokeWidth={2} />
   </DropdownMenu.Trigger>
   <DropdownMenu.Content align="start" sideOffset={8} class="canvas-menu" style="--bits-dropdown-menu-anchor-width: 260px;">
     <div class="menu-header">
@@ -362,9 +364,11 @@
   }
 
   :global(.burger-btn) {
-    display: grid;
-    place-items: center;
-    width: var(--ui-control-h);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: calc(var(--ui-control-h) + 8px);
     height: var(--ui-control-h);
     appearance: none;
     border: 0;
@@ -378,9 +382,14 @@
     outline: none;
     box-shadow: var(--ui-ring);
   }
-  :global(.burger-btn:hover) {
+  :global(.burger-btn:hover),
+  :global(.burger-btn[data-state='open']) {
     background: var(--ui-wash);
     color: var(--ui-text);
+  }
+  :global(.burger-chevron) {
+    flex: none;
+    opacity: 0.7;
   }
 
   :global([data-slot='dropdown-menu-content'].canvas-menu) {

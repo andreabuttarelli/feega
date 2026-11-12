@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { LANDING_PAGES } from './landing';
 import { UPSCALER } from './landing/upscaler';
+import { CODEBASE } from './codebase';
 import { LEGAL_DOCS } from './legal';
-import { BLOG_INDEX, COMPARISONS } from './compare';
+import { COMPARE_INDEX, COMPARISONS } from './compare';
 import { GUIDES, GUIDES_INDEX } from './guides';
-import { POSTS } from './posts';
 import { competitorFaq } from './compare/faq';
 import { AI_CRAWLERS } from './crawlers';
 import { GET as robots } from '../../routes/robots.txt/+server';
@@ -20,12 +20,12 @@ const MAX_DESCRIPTION = 160;
 const metas = [
   ['home', HOME_META],
   ['upscaler', UPSCALER],
+  ['codebase', CODEBASE],
   ...Object.entries(LANDING_PAGES),
   ...Object.entries(LEGAL_DOCS),
-  ['blog', BLOG_INDEX],
+  ['compare', COMPARE_INDEX],
   ['guides', GUIDES_INDEX],
   ...Object.entries(GUIDES),
-  ...Object.entries(POSTS),
   ...Object.entries(COMPARISONS)
 ] as const;
 

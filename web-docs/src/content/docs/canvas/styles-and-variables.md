@@ -38,7 +38,9 @@ Every colour, number, text and on/off field in Properties has a small diamond ch
 5. Click the pill name to edit a colour variable in place or swap it for another variable of the same type. A colour change updates every layer bound to it.
 6. Click the cross on the pill to unbind. The field keeps its current value.
 
-The chip appears once a variable of that type exists in the frame or in the project library. A bound fill replaces the fill stack of that layer.
+The chip appears once a variable of that type exists in the frame or in the project library.
+
+A bound fill stays a normal fill row: the swatch, the variable name where the hex would be, and a link icon beside the value. Click the swatch to swap the variable or detach it. The broken-link button on the row detaches too: the layer keeps the colour the variable gives it in the current mode, as a plain solid fill, and the variable and the other layers bound to it do not change. Adding a fill with + or editing the bound fill detaches it the same way, in one step you can undo.
 
 <video src="/videos/variable-bind-chips.mp4" poster="/videos/variable-bind-chips-poster.jpg" controls muted loop playsinline width="100%"></video>
 

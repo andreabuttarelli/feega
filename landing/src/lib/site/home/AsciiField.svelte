@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { FLAG_COUNT, envelope, fieldAt, flagTint, glyphFor, gridSize } from '../ascii-field';
+  import { FLAG_COUNT, FieldFit, envelope, fieldAt, flagTint, glyphFor, gridSize } from '../ascii-field';
 
   const LOOP_MS = 24000;
   const FRAME_MS = 1000 / 30;
@@ -11,6 +11,8 @@
   const SCALE = 0.09;
   const TINT_STEPS = 64;
   const EDGE_FLOOR = 0.6;
+
+  let { fit = FieldFit.Hero }: { fit?: FieldFit } = $props();
 
   let canvas: HTMLCanvasElement;
 
@@ -125,9 +127,11 @@
   });
 </script>
 
-<div class="field" aria-hidden="true">
+<div class="field" data-fit={fit} aria-hidden="true">
   <canvas bind:this={canvas}></canvas>
-  <div class="fade"></div>
+  {#if fit === FieldFit.Hero}
+    <div class="fade"></div>
+  {/if}
 </div>
 
 <style>
@@ -141,6 +145,13 @@
     overflow: hidden;
     transform: translateX(-50%);
     pointer-events: none;
+  }
+
+  [data-fit='box'] {
+    inset: 0;
+    width: auto;
+    height: auto;
+    transform: none;
   }
 
   canvas {

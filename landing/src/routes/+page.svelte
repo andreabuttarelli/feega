@@ -2,10 +2,9 @@
   import LiveAgents from '$lib/site/LiveAgents.svelte';
   import Hero from '$lib/site/home/Hero.svelte';
   import OpenSource from '$lib/site/home/OpenSource.svelte';
-  import StartSite from '$lib/site/home/StartSite.svelte';
-  import Features from '$lib/site/home/Features.svelte';
-  import Remotion from '$lib/site/home/Remotion.svelte';
-  import Switch from '$lib/site/home/Switch.svelte';
+  import Codebase from '$lib/site/home/Codebase.svelte';
+  import Motion from '$lib/site/home/Motion.svelte';
+  import Generate from '$lib/site/home/Generate.svelte';
   import Pricing from '$lib/site/home/Pricing.svelte';
   import Agents from '$lib/site/home/Agents.svelte';
   import Story from '$lib/site/home/Story.svelte';
@@ -28,14 +27,15 @@
 <div class="site-home">
 <Hero />
 <OpenSource />
-<StartSite />
-<Features />
-<Remotion />
-<Switch />
+<div class="chapters">
+  <Codebase />
+  <Motion />
+  <Generate />
+</div>
 
 <div class="cool">
-  <Pricing />
   <Agents />
+  <Pricing />
 </div>
 
 <Story />

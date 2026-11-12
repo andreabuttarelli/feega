@@ -1,0 +1,10 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.andreabuttarelli/feega",
+  "title": "Feega",
+  "description": "Infinite canvas for motion video, UI and graphic design: agents draw frames, edit and render MP4s.",
+  "version": "1.0.0",
+  "websiteUrl": "https://docs.feega.app/integrations/mcp/",
+  "repository": { "url": "https://github.com/andreabuttarelli/feega", "source": "github", "subfolder": "cli/mcp" },
+  "remotes": [{ "type": "streamable-http", "url": "https://mcp.feega.app/mcp" }]
+}

@@ -8,7 +8,10 @@ import { apply2d, pivotBox, worldAt } from '@feega/motion-core/motion/parent';
 import type { RestNode } from '$lib/server/figma/rest-message';
 import type { PageTree } from '$lib/server/url-import/page-tree';
 import type { ComponentUse } from './component-marks';
+import { LOOK, LookKey, mapClips, minSideOf } from '$lib/canvas/code-look';
 import { codePlan } from './code-doc';
+import { rebased } from './repo-sync';
+import { editsOf } from './write-back';
 
 const BLUE = { r: 0.1, g: 0.2, b: 0.9, a: 1 };
 const WHITE = { r: 1, g: 1, b: 1, a: 1 };
@@ -200,5 +203,47 @@ describe('codePlan', () => {
 
     expect(mainsNamed(plan.plan.items[0].doc, 'Level0')).toHaveLength(1);
     expect(made).toBeLessThan(DEPTH * 20);
+  });
+});
+
+describe('a simplified import still syncs with its source', () => {
+  const FILE = 'src/routes/+page.svelte';
+  const spot = (line: number, tag: string) => ({ at: `${FILE}:${line}:2`, tag, cls: '' });
+  const ink = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0, a: 1 } }];
+  const stack = { layoutMode: 'VERTICAL', itemSpacing: 20, paddingTop: 20, paddingRight: 20, paddingBottom: 20, paddingLeft: 20, primaryAxisSizingMode: 'FIXED', counterAxisSizingMode: 'FIXED' };
+
+  const pageAt = (shift: number): PageTree => {
+    const title: RestNode = { id: nid(), type: 'TEXT', name: 'Ciao mondo', characters: 'Ciao mondo', absoluteBoundingBox: box(20, 20, 360, 40), fills: ink, textAutoResize: 'HEIGHT', style: { fontFamily: 'Inter', fontWeight: 700, fontSize: 32, lineHeightPx: 40 }, source: spot(6 + shift, 'h1') };
+    const intro: RestNode = { id: nid(), type: 'TEXT', name: 'Benvenuta', characters: 'Benvenuta', absoluteBoundingBox: box(30, 90, 340, 20), fills: ink, style: { fontFamily: 'Inter', fontWeight: 400, fontSize: 14, lineHeightPx: 20 }, source: spot(7 + shift, 'p') };
+    const card: RestNode = { id: nid(), type: 'FRAME', name: 'div', absoluteBoundingBox: box(20, 80, 360, 100), fills: [{ type: 'SOLID', color: GREY }], ...stack, paddingTop: 10, paddingLeft: 10, paddingRight: 10, paddingBottom: 70, children: [intro], source: spot(9 + shift, 'div') };
+    const wrapper: RestNode = { id: nid(), type: 'FRAME', name: 'div', absoluteBoundingBox: box(20, 80, 360, 100), fills: [], children: [card], source: spot(8 + shift, 'div') };
+    const section: RestNode = { id: nid(), type: 'FRAME', name: 'section', absoluteBoundingBox: box(0, 0, 400, 200), fills: [], ...stack, children: [title, wrapper], source: spot(5 + shift, 'section') };
+    return { title: 'Home', url: 'http://localhost:5174/', width: 400, height: 300, truncated: false, root: { id: nid(), type: 'FRAME', name: 'Home', absoluteBoundingBox: box(0, 0, 400, 300), fills: [{ type: 'SOLID', color: WHITE }], children: [section] } };
+  };
+
+  const imported = (shift: number) => codePlan(pageAt(shift), [], nid)!.plan.items[0].doc;
+  const at = (doc: MotionDoc, line: number) => allClips(doc).find((c) => c.source?.at === `${FILE}:${line}:2`);
+  const renamed = (doc: MotionDoc, line: number, text: string) => mapClips(doc, (c) => (c.source?.at === `${FILE}:${line}:2` ? LOOK[LookKey.Text].write(c, text, minSideOf(doc)) : c));
+
+  it('the wrapper around the card is gone, the card and the title keep their own lines', () => {
+    const doc = imported(0);
+
+    expect(at(doc, 8)).toBeUndefined();
+    expect(at(doc, 9)).toBeDefined();
+    expect(at(doc, 6)).toMatchObject({ component: 'Text' });
+  });
+
+  it('a text edited on the canvas is written back to its own element', () => {
+    const edits = editsOf(renamed(imported(0), 6, 'Ciao traidue'));
+
+    expect(edits.map((e) => [e.at.line, e.look])).toEqual([[6, { text: 'Ciao traidue' }]]);
+  });
+
+  it('Pull carries the edit to the same element after the lines moved', () => {
+    const done = rebased(renamed(imported(0), 6, 'Ciao traidue'), imported(1));
+
+    expect(done.carried).toBe(1);
+    expect(done.conflicts).toEqual([]);
+    expect(at(done.doc, 7)?.props.text).toBe('Ciao traidue');
   });
 });

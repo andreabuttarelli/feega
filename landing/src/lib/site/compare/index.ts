@@ -9,9 +9,9 @@ import { FLORA } from './tools/flora';
 import { CANVA } from './tools/canva';
 import { GUI } from './tools/gui';
 
-export const BLOG_PATH = '/blog';
+export const COMPARE_PATH = '/compare';
 
-export const BLOG_INDEX = {
+export const COMPARE_INDEX = {
   title: 'Feega compared: Figma, Jitter, After Effects, Canva and more',
   description: 'Honest comparisons of Feega, the open-source canvas for design, motion and AI, with Figma, Jitter, After Effects, Pencil.dev, Flora, Rive, Canva and Remotion.',
   heading: 'Motion design tools, compared honestly',
@@ -20,18 +20,18 @@ export const BLOG_INDEX = {
 } as const;
 
 export const COMPARISONS: Readonly<Record<string, Competitor>> = {
-  'feega-vs-figma': FIGMA,
-  'feega-vs-jitter': JITTER,
-  'feega-vs-remotion': REMOTION,
-  'feega-vs-after-effects': AFTER_EFFECTS,
-  'feega-vs-pencil-dev': PENCIL_DEV,
-  'feega-vs-flora': FLORA,
-  'feega-vs-rive': RIVE,
-  'feega-vs-canva': CANVA,
-  'feega-vs-gui': GUI
+  'figma': FIGMA,
+  'jitter': JITTER,
+  'remotion': REMOTION,
+  'after-effects': AFTER_EFFECTS,
+  'pencil-dev': PENCIL_DEV,
+  'flora': FLORA,
+  'rive': RIVE,
+  'canva': CANVA,
+  'gui': GUI
 };
 
-export const comparisonPath = (slug: string) => `${BLOG_PATH}/${slug}`;
+export const comparisonPath = (slug: string) => `${COMPARE_PATH}/${slug}`;
 
 export function isComparisonSlug(slug: string): boolean {
   return Object.hasOwn(COMPARISONS, slug);

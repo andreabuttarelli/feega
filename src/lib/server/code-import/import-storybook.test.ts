@@ -20,6 +20,9 @@ const story = (x: number): PageTree => ({
 function askOf(over: Record<string, unknown> = {}) {
   const tab = {
     goto: vi.fn(async () => 200),
+    waitFor: vi.fn(async () => {
+      throw new Error('no password field');
+    }),
     url: () => BASE,
     scroll: vi.fn(async () => undefined),
     reveal: vi.fn(async () => ({ height: 800, hidden: 0 })),

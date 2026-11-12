@@ -75,12 +75,13 @@ pub struct World {
     damage: Damage,
     scene_damage: Damage,
     rest: std::collections::HashMap<String, (String, Affine)>,
+    covering: std::collections::HashSet<String>,
     visited: Cell<usize>,
 }
 
 impl Default for World {
     fn default() -> Self {
-        World { uses: Uses::default(), overlays: Default::default(), damage: Damage::none(), scene_damage: Damage::none(), rest: Default::default(), visited: Cell::new(0) }
+        World { uses: Uses::default(), overlays: Default::default(), damage: Damage::none(), scene_damage: Damage::none(), rest: Default::default(), covering: Default::default(), visited: Cell::new(0) }
     }
 }
 
@@ -175,10 +176,12 @@ impl World {
     }
 
     pub fn lifts(&self, sizes: impl Fn(&str) -> Option<(f64, f64)>) -> Vec<Lift> {
-        self.uses.flagged().into_iter().filter_map(|u| {
-            let by = self.shifted_from_rest(u)?;
-            let (_, at) = &self.rest[&u.clip];
-            let rest = reach(&UseItem { matrix: *at, ..u.clone() }, sizes(&u.group))?;
+        let moved = self.uses.flagged().into_iter().filter(|u| self.shifted_from_rest(u).is_some()).map(|u| u.clip.as_str());
+        let lifted = self.uses.ranked(moved.chain(self.covering.iter().map(String::as_str)));
+        lifted.into_iter().filter_map(|u| {
+            let by = self.shifted_from_rest(u).unwrap_or((0.0, 0.0));
+            let at = self.rest.get(&u.clip).map_or(u.matrix, |(_, m)| *m);
+            let rest = reach(&UseItem { matrix: at, ..u.clone() }, sizes(&u.group))?;
             Some(Lift { clip: u.clip.clone(), rest, by })
         }).collect()
     }
@@ -195,6 +198,27 @@ impl World {
         u.hold && self.rest.get(&u.clip).is_none_or(|(_, matrix)| *matrix != u.matrix)
     }
 
+    fn in_scene(&self, u: &UseItem) -> bool {
+        !self.lifted(u) && !self.covering.contains(&u.clip)
+    }
+
+    fn cover(&mut self, sizes: impl Fn(&str) -> Option<(f64, f64)>) {
+        let mut next = std::collections::HashSet::new();
+        if self.holding() {
+            for u in self.uses.flagged().into_iter().filter(|u| self.shifted_from_rest(u).is_some()) {
+                let at = self.rest.get(&u.clip).map_or(u.matrix, |(_, m)| *m);
+                let areas = [reach(u, sizes(&u.group)), reach(&UseItem { matrix: at, ..u.clone() }, sizes(&u.group))];
+                for area in areas.into_iter().flatten() {
+                    next.extend(self.uses.above(&u.clip, area).into_iter().filter(|o| !self.lifted(o)).map(|o| o.clip.clone()));
+                }
+            }
+            next.extend(self.covering.iter().filter(|c| self.uses.get(c).is_some()).cloned());
+        }
+        let changed: Vec<Option<Rect>> = next.symmetric_difference(&self.covering).filter_map(|c| self.uses.get(c)).map(|u| reach(u, sizes(&u.group))).collect();
+        self.covering = next;
+        changed.into_iter().for_each(|r| self.mark_scene(r));
+    }
+
     fn mark_scene(&mut self, rect: Option<Rect>) {
         if let Some(r) = rect {
             self.scene_damage.add(r);
@@ -204,20 +228,21 @@ impl World {
     pub fn patch(&mut self, patch: Patch, sizes: impl Fn(&str) -> Option<(f64, f64)>) {
         for gone in &patch.drop {
             let Some(old) = self.uses.get(gone) else { continue };
-            let was_scene = !self.lifted(old);
+            let was_scene = self.in_scene(old);
             let old = self.uses.remove(gone).expect("listed");
             self.rest.remove(gone);
             self.mark_use(reach(&old, sizes(&old.group)), was_scene);
         }
         for u in patch.put {
             let fresh = reach(&u, sizes(&u.group));
-            let was_scene = self.uses.get(&u.clip).map(|o| !self.lifted(o));
+            let was_scene = self.uses.get(&u.clip).map(|o| self.in_scene(o));
             let moved = self.uses.get(&u.clip).is_some_and(|o| o.group != u.group || o.matrix != u.matrix);
             if !u.hold {
                 self.rest.insert(u.clip.clone(), (u.group.clone(), u.matrix));
             }
-            let now_scene = !self.lifted(&u);
+            let clip = u.clip.clone();
             let old = self.uses.put(u, fresh);
+            let now_scene = self.in_scene(self.uses.get(&clip).expect("just put"));
             let Some((old, was_scene)) = old.zip(was_scene) else {
                 self.mark_use(fresh, now_scene);
                 continue;
@@ -239,6 +264,7 @@ impl World {
             let moved: Vec<Option<Rect>> = self.uses.all().into_iter().enumerate().filter(|(i, _)| !stayed.contains(i)).map(|(_, u)| reach(u, sizes(&u.group))).collect();
             moved.into_iter().for_each(|r| self.mark_if_sized(r));
         }
+        self.cover(sizes);
     }
 
     pub fn touch(&mut self, group: &str, size: Option<(f64, f64)>) {
@@ -298,8 +324,15 @@ impl World {
     }
 
     pub fn scene(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
-        let uses = self.visit(self.uses.meeting(sighted(camera, width, height), Plus::Nothing)).into_iter().filter(|u| !self.lifted(u)).map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), cache: false, hold: false, ..u.clone() }));
+        let uses = self.visit(self.uses.meeting(sighted(camera, width, height), Plus::Nothing)).into_iter().filter(|u| self.in_scene(u)).map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), cache: false, hold: false, ..u.clone() }));
         DisplayList { width, height, background: None, items: uses.collect(), faces: Vec::new(), fragments: Default::default() }
+    }
+
+    pub fn alone(&self, clip: &str, camera: Affine, width: u32, height: u32) -> DisplayList {
+        let u = self.uses.get(clip);
+        let at = |u: &UseItem| self.rest.get(clip).filter(|_| self.shifted_from_rest(u).is_some()).map_or(u.matrix, |(_, m)| *m);
+        let items = u.map(|u| Item::Use(UseItem { matrix: times(camera, at(u)), cache: false, hold: false, ..u.clone() }));
+        DisplayList { width, height, background: None, items: items.into_iter().collect(), faces: Vec::new(), fragments: Default::default() }
     }
 
     pub fn overlay(&self, camera: Affine, width: u32, height: u32) -> DisplayList {

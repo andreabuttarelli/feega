@@ -2,12 +2,13 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { createWriteStream, existsSync, mkdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
+import { createInterface } from 'node:readline/promises';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
 import { sendTelemetry, telemetryEnv } from '../telemetry.mjs';
-import { MCP_ENTRY, USAGE, appDir, bundleSource, boundUrl, cachedVersions, freePort, isCached, latestAppVersion, markCached, mcpEnv, parseArgs, pickVersion } from '../launcher.mjs';
+import { ImportStep, MCP_ENTRY, USAGE, appDir, bundleSource, boundUrl, cachedVersions, folderApp, freePort, importAsk, importStep, isCached, latestAppVersion, markCached, mcpEnv, parseArgs, pickVersion, placeOf, readyProbe, served } from '../launcher.mjs';
 
 const MIN_NODE_MAJOR = 22;
 const WEBSTORAGE_NODE_MAJOR = 25;
@@ -76,11 +77,13 @@ async function install(dir, version) {
   markCached(dir);
 }
 
-async function openWhenReady(url) {
-  while (!(await fetch(url).then((r) => r.ok, () => false))) {
+async function whenReady(url) {
+  while (!(await fetch(url, readyProbe).then((r) => served(r.status), () => false))) {
     await new Promise((r) => setTimeout(r, READY_POLL_MS));
   }
+}
 
+function openBrowser(url) {
   const [cmd, ...args] = OPENERS[process.platform] ?? ['xdg-open'];
   spawn(cmd, [...args, url], { stdio: 'ignore', detached: true }).on('error', () => {}).unref();
 }
@@ -93,6 +96,37 @@ async function readyApp() {
   }
 
   return dir;
+}
+
+async function wantsImport(app, file, mode) {
+  const step = importStep({ mode, app, fileExists: existsSync(file), tty: Boolean(process.stdin.isTTY && process.stdout.isTTY) });
+  if (step !== ImportStep.Ask) {
+    return step === ImportStep.Import;
+  }
+
+  const prompt = createInterface({ input: process.stdin, output: process.stdout });
+  const answer = (await prompt.question(`feega: import the current folder (${basename(app)}) into the canvas? (Y/n) `)).trim().toLowerCase();
+  prompt.close();
+  return answer === '' || answer.startsWith('y');
+}
+
+async function importFolder(url, folder) {
+  const home = await fetch(url, readyProbe);
+  const place = placeOf(home.headers.get('location'));
+  if (!place) {
+    throw new Error('could not find the local canvas');
+  }
+
+  console.log(`feega: importing ${basename(folder)} (starts its dev server, can take a minute)…`);
+  const { path, body } = importAsk(place, folder);
+  const res = await fetch(new URL(path, url), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  if (!res.ok) {
+    const { error, detail } = await res.json().catch(() => ({}));
+    throw new Error(`folder import failed: ${detail ?? error ?? res.status}`);
+  }
+
+  const { pages = [] } = await res.json();
+  console.log(`feega: imported ${basename(folder)} (${pages.length} pages)`);
 }
 
 function forward(child) {
@@ -133,7 +167,9 @@ async function main() {
     return;
   }
 
-  const { file, browser } = args;
+  const { file, browser, folderImport } = args;
+  const app = folderApp(process.cwd());
+  const importing = await wantsImport(app, file, folderImport);
   const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   void sendTelemetry({
     home: homedir(),
@@ -152,8 +188,13 @@ async function main() {
   const server = spawn(process.execPath, [realpathSync(join(dir, 'scripts/local.mjs')), file, `--port=${port}`], { stdio: 'inherit', env });
   forward(server);
 
+  await whenReady(url);
   if (browser === 'open') {
-    await openWhenReady(url);
+    openBrowser(url);
+  }
+
+  if (importing) {
+    await importFolder(url, app).catch((error) => console.error(`feega: ${error.message}`));
   }
 }
 

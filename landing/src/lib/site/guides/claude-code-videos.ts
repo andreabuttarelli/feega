@@ -16,7 +16,7 @@ export const CLAUDE_CODE_VIDEOS: Guide = {
   sections: [
     {
       heading: 'Two ways Claude Code makes a video',
-      html: '<p><strong>Code.</strong> The agent writes a program that draws every frame, for example React components rendered by Remotion. Every fix is a code change.</p><p><strong>An editor.</strong> The agent sends typed edits to a video document on a canvas: add a clip, set a property, change an easing. A person can open the same file and edit it by hand. Feega works this way. See <a href="/blog/feega-vs-remotion">Feega vs Remotion</a>.</p>'
+      html: '<p><strong>Code.</strong> The agent writes a program that draws every frame, for example React components rendered by Remotion. Every fix is a code change.</p><p><strong>An editor.</strong> The agent sends typed edits to a video document on a canvas: add a clip, set a property, change an easing. A person can open the same file and edit it by hand. Feega works this way. See <a href="/compare/remotion">Feega vs Remotion</a>.</p>'
     },
     {
       heading: 'Connect Feega in one command',

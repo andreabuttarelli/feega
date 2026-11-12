@@ -6,6 +6,8 @@ const findNode = vi.fn();
 const importRepoAt = vi.fn();
 const patchNodeData = vi.fn();
 const download = vi.fn();
+const treeOf = vi.fn();
+const rawReader = vi.fn();
 
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: vi.fn(async () => []) }));
 vi.mock('$lib/server/projects/lookup', () => ({ findReachableProject: (...args: unknown[]) => findReachableProject(...args) }));
@@ -14,6 +16,8 @@ vi.mock('$lib/server/repos/canvas', async (actual) => ({ ...(await actual<object
 vi.mock('$lib/server/motion/move-element', () => ({ frameStore: () => ({}) }));
 vi.mock('$lib/server/canvas/upload', () => ({ importCanvasLink: vi.fn() }));
 vi.mock('$lib/server/web/live', () => ({ liveBrowser: () => null }));
+vi.mock('$lib/server/code-import/github', async (actual) => ({ ...(await actual<object>()), treeOf: (...args: unknown[]) => treeOf(...args) }));
+vi.mock('$lib/server/code-import/repo-sync', async (actual) => ({ ...(await actual<object>()), rawReader: (...args: unknown[]) => rawReader(...args) }));
 
 const route = await import('./+server');
 
@@ -32,14 +36,19 @@ async function call(body: unknown, user = 'u1') {
   return { res, body: await res.json() };
 }
 
+const KIT_FILES = { 'package.json': JSON.stringify({ scripts: { dev: 'vite dev' }, devDependencies: { '@sveltejs/kit': '2' } }) };
+const KIT_TREE = ['package.json', 'src/routes/+page.svelte', 'src/routes/about/+page.svelte', 'src/routes/pricing/+page.svelte', 'src/routes/blog/[slug]/+page.svelte'];
+
 beforeEach(() => {
+  treeOf.mockResolvedValue(KIT_TREE);
+  rawReader.mockReturnValue(async (path: string) => KIT_FILES[path as keyof typeof KIT_FILES] ?? null);
   findReachableProject.mockResolvedValue({ orgId: ORG, project: { id: 'p1' } });
   findNode.mockImplementation(async (_db, { nodeId }) => ({ id: nodeId }));
 });
 
 describe('POST /api/v1/projects/:id/code-import', () => {
   it('importa la rotta del repo e risponde col frame e i componenti trovati', async () => {
-    importCodeAt.mockResolvedValue({ outcome: 'ok', frameId: 'f1', name: 'Dashboard', undo: [], skipped: [], truncated: false, components: 3, variants: 5, instances: 9 });
+    importCodeAt.mockResolvedValue({ outcome: 'ok', frameId: 'f1', name: 'Dashboard', undo: [], skipped: [], truncated: false, pages: ['/x'], components: 3, variants: 5, instances: 9 });
 
     const { res, body } = await call({ canvasId: 'c1', repo: 'https://github.com/a/b', route: '/x', x: 0, y: 0 }, 'u-ok');
 
@@ -67,6 +76,15 @@ describe('POST /api/v1/projects/:id/code-import', () => {
 
     await call({ canvasId: 'c1', repo: 'https://github.com/a/b', designSystem: false, x: 0, y: 0 }, 'u-ds-off');
     expect(importCodeAt.mock.calls.at(-1)![0]).toMatchObject({ designSystem: 'off' });
+  });
+
+  it('la risposta porta la libreria letta dal codice, con i componenti che nessuna rotta ha reso', async () => {
+    const library = { components: [{ name: 'Callout', file: 'src/lib/components/Callout.svelte', exported: 'default', axes: { type: { values: ['info', 'error'], default: 'info', evidence: ['union'] } }, texts: [], states: [], unresolved: [], captured: false, cells: 2 }], uncaptured: ['Callout'] };
+    importCodeAt.mockResolvedValue({ outcome: 'ok', frameId: 'f1', name: 'app', undo: [], skipped: [], truncated: false, pages: ['/'], components: 0, variants: 0, instances: 0, library });
+
+    const { body } = await call({ canvasId: 'c1', repo: 'https://github.com/a/b', x: 0, y: 0 }, 'u-library');
+
+    expect(body).toMatchObject({ library: { uncaptured: ['Callout'] } });
   });
 
   it('un repo che non parte torna 422 col motivo', async () => {
@@ -123,5 +141,54 @@ describe('POST /api/v1/projects/:id/code-import', () => {
 
     expect(res.status).toBe(400);
     expect(download).not.toHaveBeenCalled();
+  });
+
+  it('l\'attesa arriva all\'import tagliata al massimo, quella della rotta resta', async () => {
+    importCodeAt.mockResolvedValue({ outcome: 'ok', frameId: 'f1', name: 'app', undo: [], skipped: [], truncated: false, pages: ['/'], components: 0, variants: 0, instances: 0 });
+
+    await call({ canvasId: 'c1', repo: 'https://github.com/a/b', routes: ['/', '/x'], captureDelayMs: 999_999, routeDelayMs: { '/x': 0 }, x: 0, y: 0 }, 'u-delay');
+
+    expect(importCodeAt.mock.calls.at(-1)![0].delay).toEqual({ ms: 10_000, routes: { '/x': 0 } });
+  });
+
+  it('rifiuta un\'attesa negativa', async () => {
+    const { res } = await call({ canvasId: 'c1', repo: 'https://github.com/a/b', captureDelayMs: -1, x: 0, y: 0 }, 'u-neg');
+
+    expect(res.status).toBe(400);
+  });
+  it('reports the discovered pages it did not import, and why, read from the tree without booting', async () => {
+    importCodeAt.mockResolvedValue({ outcome: 'ok', frameId: 'f1', name: 'app', undo: [], skipped: [], truncated: false, pages: ['/', '/blog/hello'], links: ['/blog/other'], components: 1, variants: 1, instances: 0 });
+
+    const { body } = await call({ canvasId: 'c1', repo: 'https://github.com/a/b', routes: ['/', '/blog/hello'], x: 0, y: 0 }, 'u-report');
+
+    expect(treeOf.mock.calls.at(-1)![1]).toEqual({ owner: 'a', repo: 'b', ref: null });
+    expect(body.routes).toEqual({
+      discovered: 4,
+      leftOut: [
+        { path: '/about', reason: 'not_selected', candidates: [] },
+        { path: '/pricing', reason: 'not_selected', candidates: [] }
+      ]
+    });
+  });
+
+  it('routes all imports every static page the file router lists', async () => {
+    importCodeAt.mockResolvedValue({ outcome: 'ok', frameId: 'f1', name: 'app', undo: [], skipped: [], truncated: false, pages: ['/', '/about', '/pricing'], components: 1, variants: 1, instances: 0 });
+
+    const { res, body } = await call({ canvasId: 'c1', repo: 'https://github.com/a/b', routes: 'all', x: 0, y: 0 }, 'u-all');
+
+    expect(res.status).toBe(200);
+    expect(importCodeAt.mock.calls.at(-1)![0]).toMatchObject({ routes: ['/', '/about', '/pricing'] });
+    expect(body.routes.leftOut).toEqual([{ path: '/blog/[slug]', reason: 'needs_value', candidates: [] }]);
+  });
+
+  it('more pages than the cap are refused with the count, nothing started', async () => {
+    importCodeAt.mockClear();
+    const routes = Array.from({ length: 23 }, (_, i) => `/p${i}`);
+
+    const { res, body } = await call({ canvasId: 'c1', repo: 'https://github.com/a/b', routes, x: 0, y: 0 }, 'u-cap');
+
+    expect(res.status).toBe(400);
+    expect(body).toEqual({ error: 'invalid', detail: '23 pages asked, at most 20 per import: pick fewer' });
+    expect(importCodeAt).not.toHaveBeenCalled();
   });
 });

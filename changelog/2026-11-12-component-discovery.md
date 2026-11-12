@@ -1,0 +1,13 @@
+# Import from code: components and their axes read from the source
+
+Spec `docs/specs/design-system-import.md`, "Components: the whole library", stage 3 part 4a.
+
+- Components were known only from the running page (`component-marks.ts`): Svelte keeps no props, so no Svelte variants; only values seen on captured routes became variants; components no route rendered were absent; `code-sets.ts` `IGNORED` dropped `type`/`name`/`value` and numbers (traidue `Callout.type` lost).
+- `component-discovery.ts` (pure, files in → definitions out, never executes repo code): TypeScript compiler API (`typescript` was already a dependency; no `svelte/compiler` on the server, the `<script>` block is parsed as TS). One row per reader in `READERS` (`.svelte`, `.vue`, `.tsx/.jsx/.ts/.js`). Output per component: name, file, export kind, axes with values, default and evidence (`cva`, `tv`, `union`, `enum`, `boolean`, `story`), text props, boolean states, unresolved props.
+- Which files: shadcn `components.json` `aliases.ui`, else any `components/` folder, plus `*.stories.*`; ≤ 400 files, ≤ 200 KB each. Types resolve within the file and one relative import; a type from a package or alias is `unresolved`, never guessed. Not read: `data-state` unions, Svelte `$$Props`, Vue `defineComponent({ props })` (options API), types two hops away.
+- Wiring: the sandbox lists the clone and reads the library files (`libraryIn` in `sandbox-runner.ts`), the folder source walks the folder (`folderLibrary`); `importBoards` passes `declaredAxes` to `codeSets` and returns `library` (each component with `captured` and `cells`, plus `uncaptured`), carried by the API response.
+- `codeSets`: a declared axis whose observed values are all declared is an axis regardless of `IGNORED` and type; undeclared props keep the old rule.
+- `cellsOf`: the matrix the gallery step will render — cartesian ≤ 64 cells, else one axis varied at a time from the defaults.
+- `.js` files now give component names too (sandbox `NAMES`, `folder-source` `COMPONENT_FILE`); the sandbox skips `.svelte-kit`, `.next`, `dist`, `build` so generated `.js` adds none.
+- Not done: the gallery route in the sandbox (draws uncaptured components and Svelte variants), and named placeholders on the Components page (`componentPages` builds from captured mains; a placeholder needs a model change).
+- traidue @ 4d20faf: 26 components from 29 files; `Badge.variant` default|category|tag, `Callout.type` info|warning|success|error, `SearchInput` size sm|base and variant default|filled, `ThemeToggle.variant` dropdown|segmented, booleans on `Logo`, `SEO`, `ServicesMap`, `ServicesCountries`, `ProcedureSteps`.

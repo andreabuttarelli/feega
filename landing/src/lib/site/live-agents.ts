@@ -69,15 +69,25 @@ export function initials(name: string): string {
     .toUpperCase();
 }
 
-export const BUILD_SELECTOR = [
-  '.bar > a',
+export function lockHeight(el: HTMLElement) {
+  el.style.height = `${el.offsetHeight}px`;
+}
+
+export const CHAPTER_SELECTOR = '.chapter';
+
+const outsideChapters = (selector: string) => `${selector}:not(${CHAPTER_SELECTOR} *)`;
+
+export const BUILD_TARGETS = [
+  '.bar > a:not(.brand)',
   '.bar .links > a',
   '.bar .actions > a',
   '.bar > button',
-  'main [data-agent-id]',
-  'main :is(h2, h3, p, li, img, video, pre, button, summary, input, label, [role="tablist"])',
+  outsideChapters('main [data-agent-id]'),
+  outsideChapters('main :is(h2, h3, p, li, img, video, pre, button, summary, input, label, [role="tablist"])'),
   '.site-foot :is(h2, p, a)'
-].join(', ');
+];
+
+export const BUILD_SELECTOR = BUILD_TARGETS.join(', ');
 
 export function outermost(els: HTMLElement[]): HTMLElement[] {
   const set = new Set(els);

@@ -1,6 +1,7 @@
 import puppeteer from 'puppeteer-core';
 import { sandboxRunner } from '../../src/lib/server/code-import/sandbox-runner';
 import { repoOf } from '../../src/lib/server/code-import/repo';
+import { importKeyCookie } from '../../src/lib/server/code-import/origin-proxy';
 
 const [repoUrl, route] = process.argv.slice(2);
 const run = await sandboxRunner({ token: process.env.VERCEL_TOKEN, teamId: process.env.VERCEL_TEAM_ID, projectId: process.env.VERCEL_PROJECT_ID })(repoOf(repoUrl)!, null, process.argv[4] ?? null);
@@ -13,6 +14,7 @@ const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PA
 try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 800 });
+  await browser.setCookie(importKeyCookie(run.app));
   page.on('console', (m) => (m.type() === 'error' || m.type() === 'warn') && console.log('console', m.type(), m.text().slice(0, 300)));
   page.on('requestfailed', (r) => console.log('reqfail', r.url().slice(0, 150), r.failure()?.errorText));
   page.on('response', (r) => r.status() >= 400 && console.log('http', r.status(), r.url().slice(0, 150)));

@@ -27,7 +27,7 @@ export const routeOf = (raw: string | undefined): string | null => {
   return ROUTE.test(path) && !path.includes('..') ? path : null;
 };
 
-export const MAX_ROUTES = 8;
+export const MAX_ROUTES = 20;
 
 export const askedRoutes = (route: string | undefined, routes: string[] | undefined): string[] => routes ?? (route ? [route] : []);
 

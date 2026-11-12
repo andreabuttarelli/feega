@@ -1,54 +1,69 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
+  import { Card } from './card';
   import { tilt } from '../tilt';
 
+  let { cards, children }: { cards: Card[]; children?: Snippet } = $props();
+
   const DOT_ROWS = [3, 4, 5, 6, 7];
+
+  const CARDS: Record<Card, Snippet> = { [Card.Generation]: generation, [Card.Templates]: templates, [Card.Agents]: agents };
 </script>
 
-<section class="features site-wide" id="features">
+{#snippet generation()}
+  <article class="card gen" use:tilt>
+    <img data-agent-id="feature-gen" src="/site/home/tool-gen.webp" alt="" width="920" height="1269" loading="lazy" decoding="async" />
+    <span class="focus" aria-hidden="true"></span>
+    <h3 data-agent-id="feature-gen-title">Text, image, video, 3D generation</h3>
+  </article>
+{/snippet}
+
+{#snippet templates()}
+  <article class="card tpl" use:tilt>
+    <div class="shots">
+      <img data-agent-id="feature-tpl-a" class="a" src="/site/home/tool-tpl-a.webp" alt="" width="420" height="525" loading="lazy" decoding="async" />
+      <img class="b" src="/site/home/tool-tpl-b.webp" alt="" width="320" height="400" loading="lazy" decoding="async" />
+    </div>
+    <div class="text">
+      <h3>Graphic &amp; motion design</h3>
+      <p data-agent-id="feature-tpl-lead">Hundreds of ready-to-use templates</p>
+    </div>
+  </article>
+{/snippet}
+
+{#snippet agents()}
+  <article class="card agents" use:tilt>
+    <h3 data-agent-id="feature-agents-title">Made for humans and agents</h3>
+    <div class="dots" aria-hidden="true">
+      {#each DOT_ROWS as n (n)}
+        <div class="row">
+          {#each { length: n } as _, i (i)}
+            <span></span>
+          {/each}
+        </div>
+      {/each}
+    </div>
+    <p>Ready for Claude &amp; Codex, even from your phone.</p>
+  </article>
+{/snippet}
+
+<section class="features">
   <div class="cards">
-    <article class="card gen" use:tilt>
-      <img data-agent-id="feature-gen" src="/site/home/tool-gen.webp" alt="" width="920" height="1269" loading="lazy" decoding="async" />
-      <span class="focus" aria-hidden="true"></span>
-      <h3 data-agent-id="feature-gen-title">Text, image, video, 3D generation</h3>
-    </article>
-
-    <article class="card tpl" use:tilt>
-      <div class="shots">
-        <img data-agent-id="feature-tpl-a" class="a" src="/site/home/tool-tpl-a.webp" alt="" width="420" height="525" loading="lazy" decoding="async" />
-        <img class="b" src="/site/home/tool-tpl-b.webp" alt="" width="320" height="400" loading="lazy" decoding="async" />
-      </div>
-      <div class="text">
-        <h3>Graphic &amp; motion design</h3>
-        <p data-agent-id="feature-tpl-lead">Hundreds of ready-to-use templates</p>
-      </div>
-    </article>
-
-    <article class="card agents" use:tilt>
-      <h3 data-agent-id="feature-agents-title">Made for humans and agents</h3>
-      <div class="dots" aria-hidden="true">
-        {#each DOT_ROWS as n (n)}
-          <div class="row">
-            {#each { length: n } as _, i (i)}
-              <span></span>
-            {/each}
-          </div>
-        {/each}
-      </div>
-      <p>Ready for Claude &amp; Codex, even from your phone.</p>
-    </article>
+    {#each cards as card (card)}
+      {@render CARDS[card]()}
+    {/each}
+    {@render children?.()}
   </div>
 </section>
 
 <style>
   .features {
-    padding: 0 20px;
     color: var(--site-ink);
   }
 
   .cards {
     display: grid;
     gap: 15px;
-    margin-top: 72px;
   }
 
   .card {
@@ -191,15 +206,15 @@
   }
 
   @media (min-width: 1200px) {
-    .features {
-      padding: 0;
+    .cards {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
     }
 
-    .cards {
-      grid-template-columns: repeat(3, 343px);
-      justify-content: space-between;
-      gap: 16px;
-      margin-top: 72px;
+    .cards:has(.tpl) {
+      grid-template-columns: 343px minmax(0, 1fr);
+      align-items: center;
+      gap: 64px;
     }
 
     .card {
@@ -217,7 +232,7 @@
     }
 
     .focus {
-      left: 39px;
+      left: calc(50% - 132.5px);
       top: 52px;
       width: 265px;
       height: 245px;
@@ -261,13 +276,8 @@
   }
 
   @media (min-width: 810px) and (max-width: 1199.98px) {
-    .features {
-      padding: 0;
-    }
-
     .cards {
       gap: 16px;
-      margin-top: 72px;
     }
 
     h3 {

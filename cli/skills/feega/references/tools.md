@@ -195,8 +195,9 @@ reads the batch. CLI: `feega studio quote|start|status`.
 CLI: `feega studio run|more|cancel|retry|regenerate|approve|reject <batchId>`.
 
 `get_app_account` (`{ project_id }`) shows the TEST login of the user's app the project chat remembers
-(login url, email, session expiry; never the password). `forget_app_account` (`{ project_id }`) deletes it
-and its session. Free.
+(login url, email, session expiry; never the password). `set_app_account` (`{ project_id, login_url, email,
+password }`) saves one (a TEST login: the AI sees it; empty password keeps the saved one); code import signs in
+with it before capturing routes. `forget_app_account` (`{ project_id }`) deletes it and its session. Free.
 
 `cloud` (`{ project_id, action, provider?, ... }`) works the Google Drive and Dropbox files of the signed-in
 person: `status` (connected or not), `files` (`folder`, `cursor` for the next page), `import` (`file_id`,

@@ -8,6 +8,7 @@
   import { splitKey } from '@feega/motion-core/motion/variables-model';
   import ColorField from './ColorField.svelte';
   import { ColourDisplay } from '$lib/motion/colour-field';
+  import { dismissible } from '$lib/components/ui/shell/dismiss';
 
   let { doc, clip, target, commit }: { doc: MotionDoc; clip: MotionClip; target: string; commit: (result: OpResult, summary: string) => void } = $props();
 
@@ -44,17 +45,12 @@
     }
   }
 
-  function closeOnEscape(e: KeyboardEvent) {
-    if (e.key === 'Escape') {
-      open = false;
-    }
-  }
 </script>
 
 <svelte:window onpointerdown={closeOutside} />
 
 {#if chip}
-  <span class="bind" bind:this={root} onkeydown={closeOnEscape} role="group" aria-label={`${target} variable`}>
+  <span class="bind" bind:this={root} role="group" aria-label={`${target} variable`}>
     {#if chip.bound}
       <span class="bound" data-testid={`bind-chip-${target}`} data-bound={chip.bound} title={chip.bound}>
         {#if chip.type === VarType.Colour}<i class="swatch" style={`--c: ${shownValue(chip.bound)};`}></i>{/if}
@@ -66,7 +62,7 @@
       </span>
       {#if open}
         {@const key = chip.bound}
-        <div class="pop" role="dialog" aria-label={`${key} variable`} data-testid={`bind-editor-${target}`}>
+        <div class="pop" {@attach dismissible(() => (open = false))} role="dialog" aria-label={`${key} variable`} data-testid={`bind-editor-${target}`}>
           {#if chip.type === VarType.Colour}
             <div class="value-row" data-testid={`bind-colour-${target}`}><ColorField name={key} display={ColourDisplay.Field} value={editable(key)} onchange={(c) => recoloured(key, c)} /></div>
           {/if}
@@ -82,7 +78,7 @@
     {:else}
       <button type="button" class="trigger" aria-label={`Bind ${target} to a variable`} aria-expanded={open} data-testid={`bind-chip-${target}`} onclick={() => (open = !open)}>◇</button>
       {#if open}
-        <div class="pop" role="listbox" aria-label={`${chip.type} variables`} data-testid={`bind-picker-${target}`}>
+        <div class="pop" {@attach dismissible(() => (open = false))} role="listbox" aria-label={`${chip.type} variables`} data-testid={`bind-picker-${target}`}>
           {#each chip.options as option (option.key)}
             <button type="button" role="option" aria-selected="false" data-testid={`bind-option-${option.key}`} onclick={() => pick(option.key)}>
               {#if chip.type === VarType.Colour}<i class="swatch" style={`--c: ${shownValue(option.key)};`}></i>{/if}

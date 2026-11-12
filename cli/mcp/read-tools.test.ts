@@ -44,6 +44,7 @@ const RESTANO = [
   'write_layout',
   'patch_layout',
   'get_app_account',
+  'set_app_account',
   'forget_app_account',
   'cloud',
   'figma_token_status',
