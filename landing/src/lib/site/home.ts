@@ -1,4 +1,4 @@
-import { PLAN, creditsAnswer } from './pricing/plan';
+import { AGENT_DOCS_URL, PLAN, agentAnswer, creditsAnswer } from './pricing/plan';
 
 const VIDEO_BASE = 'https://klnswzhhgrqvbfjzioul.supabase.co/storage/v1/object/public/website';
 
@@ -107,7 +107,7 @@ export const FAQ = [
   },
   {
     q: "Can AI agents use Feega?",
-    a: "Yes. Agents like Claude or Codex can work on your canvas through our MCP server and REST API, acting on your behalf with your permissions."
+    a: `${agentAnswer(PLAN)} Setup is in the <a href="${AGENT_DOCS_URL}">MCP guide</a>.`
   },
   {
     q: "Are generated files marked as AI-generated?",

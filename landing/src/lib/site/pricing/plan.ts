@@ -8,6 +8,7 @@ export type CloudPlan = {
   period: string;
   includedCredits: number;
   topUps: readonly TopUp[];
+  freeAgentLayersPerWeek: number;
 };
 
 export type Outcome = { label: string; usd: number };
@@ -27,8 +28,15 @@ export const PLAN: CloudPlan = {
     { price: 10, credits: 1000 },
     { price: 20, credits: 2000 },
     { price: 50, credits: 5000 }
-  ]
+  ],
+  freeAgentLayersPerWeek: 1000
 };
+
+export const AGENTS = ['Claude Code', 'Claude', 'Codex', 'Cursor'] as const;
+
+export const AGENT_DOCS_URL = 'https://docs.feega.app/integrations/mcp/';
+
+const agentList = (): string => `${AGENTS.slice(0, -1).join(', ')} or ${AGENTS[AGENTS.length - 1]}`;
 
 export const IMAGE: Outcome = { label: 'Images', usd: 0.0748 };
 
@@ -81,6 +89,7 @@ export const CLOUD_BENEFITS = [
   'The AI assistant inside the editor',
   'Real-time collaboration with your whole team',
   'Your agents connect through our hosted MCP',
+  'Unlimited agent edits',
   'Import your brand, products and social posts'
 ] as const;
 
@@ -94,6 +103,12 @@ export const getsYou = (plan: CloudPlan): string =>
 
 export const freeTier = (): string =>
   `Start free: one ${PLAN.per}, unlimited viewers and ${count(FREE_CREDITS)} credits to try AI, about ${outcomesIn(FREE_CREDITS, IMAGE)} images. No card needed.`;
+
+export const bringYourAgent = (plan: CloudPlan): string =>
+  `Bring the agent you already pay for: ${agentList()} edits your canvas through our MCP server or CLI, up to ${count(plan.freeAgentLayersPerWeek)} agent-made layers a week for free.`;
+
+export const agentAnswer = (plan: CloudPlan): string =>
+  `Yes. Connect ${agentList()} through our MCP server or CLI and it works on your canvas with your permissions, on the subscription you already have. Free accounts get up to ${count(plan.freeAgentLayersPerWeek)} agent-made layers a week; the paid plan has no limit. feega's built-in AI is separate and uses credits. Edits you make by hand are never limited.`;
 
 export const moreSeats = (plan: CloudPlan): string =>
   `Inviting more ${plan.per}s needs the plan: each adds ${money(plan, plan.price)} a ${plan.period} from the day they accept.`;
@@ -112,6 +127,10 @@ export const pricingFaq = (plan: CloudPlan) => [
   {
     q: `Who counts as an ${plan.per}?`,
     a: `Anyone in your workspace who edits. The free tier is one ${plan.per} with unlimited viewers. Inviting more ${plan.per}s needs the paid plan: each one adds ${money(plan, plan.price)} a ${plan.period} from the day they accept, and ${count(plan.includedCredits)} credits to the team's pool. Viewers, and AI agents working through MCP or the CLI, are always free.`
+  },
+  {
+    q: 'Can I use my own AI agent?',
+    a: agentAnswer(plan)
   },
   {
     q: 'What is a credit?',

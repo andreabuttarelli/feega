@@ -3,7 +3,7 @@
   import PriceTag from './PriceTag.svelte';
   import Estimator from './Estimator.svelte';
   import PricingFaq from './PricingFaq.svelte';
-  import { CLOUD_BENEFITS, CLOUD_FOR, CREDIT_RULES, SEAT_RULE, freeTier, getsYou, money, moreSeats, outOfCredits, priceUnit, type CloudPlan } from './plan';
+  import { CLOUD_BENEFITS, CLOUD_FOR, CREDIT_RULES, SEAT_RULE, AGENT_DOCS_URL, bringYourAgent, freeTier, getsYou, money, moreSeats, outOfCredits, priceUnit, type CloudPlan } from './plan';
 
   let { plan }: { plan: CloudPlan } = $props();
 </script>
@@ -18,6 +18,7 @@
       <PriceTag amount={money(plan, plan.price)} unit={priceUnit(plan)} cta="Start free" href={APP_URL} />
       <p class="seat">{SEAT_RULE}</p>
       <p class="trial">{freeTier()}</p>
+      <p class="trial">{bringYourAgent(plan)} <a class="link" href={AGENT_DOCS_URL}>Connect your agent →</a></p>
       <p class="trial">{moreSeats(plan)}</p>
     </div>
     <div class="what">
@@ -146,6 +147,18 @@
   .local strong {
     font-weight: inherit;
     color: #fff;
+  }
+
+  .link {
+    display: inline-block;
+    padding: 4px 0;
+    border-bottom: 1px solid currentColor;
+    color: #fff;
+  }
+
+  .link:focus-visible {
+    outline: 2px solid #ff5100;
+    outline-offset: 3px;
   }
 
   .local a {
