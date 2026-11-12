@@ -196,7 +196,7 @@
   import { loadViewport, rememberViewport } from '$lib/canvas/viewport-memory';
   import { FocusMode, Placement, centreIn, focusPlacement, focusSelects, inView, revealIn, frameIn, type Insets } from '$lib/canvas/free-area';
   import { ZoomStep, watchPinch, type CanvasZoom } from '$lib/canvas/page-zoom';
-  import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
+  import { Region, reachesCanvas, regionOf } from '$lib/canvas/key-region.svelte';
   import { shortcutHelp } from '$lib/canvas/shortcut-help.svelte';
   import { CANVAS_COMMAND_OF, CANVAS_TILE_ATTR, climbsUp, matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
   import type { Command } from '$lib/motion/shortcuts';
@@ -3714,11 +3714,7 @@
   };
 
   const pageZoom: CanvasZoom = {
-    step: (step) => {
-      if (keyRegion.current === Region.Canvas) {
-        ZOOM_RUN[step]();
-      }
-    },
+    step: (step) => ZOOM_RUN[step](),
     scaleBy: (factor) => zoomStep(factor)
   };
 
@@ -3882,7 +3878,7 @@
   }
 
   function onKeydown(e: KeyboardEvent) {
-    if (frameDialog) {
+    if (frameDialog || !reachesCanvas(regionOf(e.target), matchCanvasShortcut(e, frameMode))) {
       return;
     }
     if (!isTypingTarget(e.target) && typeAhead.take(e, performance.now())) {
@@ -3929,7 +3925,7 @@
       startCrop(inside!.nodeId, inside!.level.clip!);
       return;
     }
-    if (!spec.chrome || keyRegion.current !== Region.Canvas) {
+    if (!spec.chrome) {
       return;
     }
     const frameAction = picksOwnKeys(inside, picks) && !typing ? frameKeyAction(e) : null;
@@ -3951,8 +3947,8 @@
   const NATIVE_CLIPBOARD = new Set(['copy', 'paste']);
   let pointer: Point | null = null;
 
-  function clipboardTarget(e: ClipboardEvent): boolean {
-    return Boolean(spec.chrome && !frameDialog && !typing && keyRegion.current === Region.Canvas && e.clipboardData && !isTypingTarget(e.target));
+  function clipboardTarget(e: ClipboardEvent, id: 'copy' | 'paste'): boolean {
+    return Boolean(spec.chrome && !frameDialog && !typing && reachesCanvas(regionOf(e.target), { id }) && e.clipboardData && !isTypingTarget(e.target));
   }
 
   const framePicks = (): string[] => (inside && picks.length && frameChrome(kindOfNode(inside.nodeId)).root !== Root.Own ? picks : []);
@@ -3975,7 +3971,7 @@
   }
 
   function onCopy(e: ClipboardEvent, cut: boolean) {
-    const payload = clipboardTarget(e) ? clipOfSelection() : null;
+    const payload = clipboardTarget(e, 'copy') ? clipOfSelection() : null;
     if (!payload) {
       return;
     }
@@ -4110,7 +4106,7 @@
   }
 
   async function onPasteEvent(e: ClipboardEvent) {
-    if (!clipboardTarget(e)) {
+    if (!clipboardTarget(e, 'paste')) {
       return;
     }
     e.preventDefault();
@@ -4370,7 +4366,7 @@
 <div class="wrap svelte-flow" class:commenting={props.commenting} onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondragleave={onDragLeave} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={CORE} data-mode-chrome={editorMode.spec.chrome} data-timeline={timeline?.access ?? TimelineAccess.Hidden} data-revealed={revealed} data-view={`${view.x},${view.y},${view.zoom}`}>
   {#if timeline}
     {@const nodeId = timeline.nodeId}
-    <div style="display: contents" role="presentation" onpointerdown={(e) => e.stopPropagation()} onwheel={(e) => e.stopPropagation()}>
+    <div style="display: contents" role="presentation" data-key-region={Region.Layers} onpointerdown={(e) => e.stopPropagation()} onwheel={(e) => e.stopPropagation()}>
       <FrameTimeline
         doc={timeline.doc}
         frame={timeline.frame}
@@ -4393,6 +4389,7 @@
   {/if}
   <div
     class="surface svelte-flow__pane"
+    data-key-region={Region.Canvas}
     bind:this={surface}
     onpointerdown={onDown}
     onpointermove={onMove}
