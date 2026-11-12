@@ -1,0 +1,26 @@
+---
+title: The 15% upgrade offer
+description: A one-hour, 15% discount on your first month, shown once on the canvas.
+sidebar:
+  order: 6
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+<DemoVideo name="upgrade-offer" caption="Out of credits mid-turn: the canvas offers 15% off for the next hour." />
+
+A small bar can appear at the top of the canvas: **15% off if you upgrade in the next hour**, with a countdown and an **Upgrade** link.
+
+## When it shows
+
+- after the agent's first finished reply on a canvas, or
+- when a turn is refused because the org has run out of credits.
+
+Only the owner of an org without a subscription sees it. It never blocks the canvas, and it never opens checkout on its own. Close it with **×**.
+
+## How it works
+
+- The offer is personal: one promotion code per user, created the first time the bar appears.
+- It takes 15% off the first month and can be redeemed once.
+- It expires one hour after it was first shown. Reloading, switching canvas or signing in elsewhere does not reset the countdown, and no new code is made after it runs out.
+- **Upgrade** opens Stripe checkout for the monthly plan with the code already applied. If the offer has expired, it leads to the credits page instead.

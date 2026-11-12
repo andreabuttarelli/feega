@@ -15,3 +15,5 @@ first finished turn or when a turn is refused for credits. Never opens checkout 
 - Development refuses a non-test Stripe key.
 
 Discarded: a table for offers (Stripe already holds code and deadline).
+
+Migration renamed to `20261112200000_upgrade_offer_events.sql`: `20261112100000` collided with the `canvas_perf` migration (#2053), and its CHECK now lists every event including `canvas_perf`. Docs page `getting-started/upgrade-offer.mdx` and demo `upgrade-offer.demo.ts` added; the demo stubs the agent (402) and the offer route, so no model or Stripe call runs.

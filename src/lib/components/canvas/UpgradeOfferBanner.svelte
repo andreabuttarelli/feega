@@ -28,9 +28,9 @@
   .offer {
     position: fixed;
     left: 50%;
-    bottom: 16px;
+    top: 64px;
     transform: translateX(-50%);
-    z-index: 40;
+    z-index: 60;
     display: flex;
     align-items: center;
     gap: 12px;
