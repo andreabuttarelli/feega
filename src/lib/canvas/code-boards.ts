@@ -1,4 +1,4 @@
-import { DESIGN_MAX_SIDE, MAX_TRACKS, compOf, newClip, type MotionClip, type MotionComp, type MotionDoc, type MotionTrack } from '@feega/motion-core/motion/doc';
+import { DESIGN_MAX_SIDE, MAX_TRACKS, compOf, newClip, parseMotionDoc, type MotionClip, type MotionComp, type MotionDoc, type MotionTrack } from '@feega/motion-core/motion/doc';
 import { defaultProps } from '@feega/motion-core/motion/components';
 import { reframed, type Size } from '$lib/motion/comp-frame';
 import type { ImportMap } from './import-map';
@@ -15,6 +15,7 @@ const CENTRE = 0.5;
 const FULL_SLACK_PX = 2;
 const PLACEHOLDER_FILL = '#e4e4e7';
 const PLACEHOLDER_PREFIX = 'Importing ';
+const DETAIL_MAX = 200;
 
 export enum AddRefusal {
   NoRoom = 'no_room',
@@ -223,6 +224,8 @@ function libraryOf(local: MotionDoc, piece: MotionDoc): Pick<MotionDoc, 'assets'
 type Slot = { at: { x: number; y: number }; size: Size };
 
 const longest = (slot: Slot) => Math.max(slot.size.width, slot.size.height);
+const shortest = (slot: Slot) => Math.min(slot.size.width, slot.size.height);
+const better = (a: Slot, b: Slot) => (shortest(a) !== shortest(b) ? shortest(a) < shortest(b) : longest(a) < longest(b));
 
 function slotFor(local: MotionDoc, parent: string | null, extent: Box): Slot {
   const level = (c: MotionClip) => (c.parent ?? null) === parent || (!c.parent && !fillsDoc(c, sizeOf(local)));
@@ -235,7 +238,8 @@ function slotFor(local: MotionDoc, parent: string | null, extent: Box): Slot {
     { at: below, size: { width: Math.max(local.width, Math.ceil(below.x + w + margin.x)), height: Math.ceil(below.y + h + margin.y) } },
     { at: beside, size: { width: Math.ceil(beside.x + w + margin.x), height: Math.max(local.height, Math.ceil(beside.y + h + margin.y)) } }
   ];
-  return slots.reduce((best, slot) => (longest(slot) < longest(best) ? slot : best));
+  const fitting = slots.filter((slot) => longest(slot) <= DESIGN_MAX_SIDE);
+  return (fitting.length ? fitting : slots).reduce((best, slot) => (better(slot, best) ? slot : best));
 }
 
 export function addBoards(before: MotionDoc, piece: MotionDoc, boardIds: readonly string[], parent: string | null, newId: NewId): BoardsAdded {
@@ -282,6 +286,10 @@ export function addBoards(before: MotionDoc, piece: MotionDoc, boardIds: readonl
 
   const comps = Object.fromEntries(landing.map((id) => [map.comp.get(id)!, remappedComp(sized.comps[id], map)]));
   const doc = { ...wide, ...libraryOf(wide, sized), tracks: [...tracks, ...wide.tracks], comps: { ...wide.comps, ...comps }, durationInFrames: Math.max(wide.durationInFrames, sized.durationInFrames) };
+  const verdict = parseMotionDoc(doc);
+  if (!verdict.ok) {
+    return { ok: false, refusal: AddRefusal.NoRoom, detail: `the frame would be ${size.width}×${size.height} px and could not be saved: ${verdict.error.slice(0, DETAIL_MAX)}` };
+  }
   return { ok: true, doc, boards: Object.fromEntries(boardIds.map((id) => [id, map.clip.get(id) ?? id])), reused: reused.size, kept: [...new Set(kept)] };
 }
 

@@ -47,19 +47,22 @@ describe('adding pages to a frame imported from code', () => {
     expect(parseMotionDoc(doc).ok).toBe(true);
   });
 
-  it('places the new board below the others, under the same ground, and grows the frame to hold it', async () => {
+  it('places the new board clear of the others, under the same ground, and grows the frame to hold it', async () => {
     const local = await imported(['/', '/settings']);
     const piece = await imported(['/pricing']);
 
     const added = addBoards(local, piece, ['n1'], 'n1', counter());
 
-    const doc = (added as { doc: MotionDoc; boards: Record<string, string> }).doc;
-    const board = clipsOf(doc).find((c) => c.id === (added as { boards: Record<string, string> }).boards.n1)!;
+    const done = added as { doc: MotionDoc; boards: Record<string, string> };
+    const laid = withAutoLayout(done.doc);
+    const box = (c: MotionClip) => ({ left: ((c.props.x as number) - (c.props.width as number) / 2) * done.doc.width, top: ((c.props.y as number) - (c.props.height as number) / 2) * done.doc.height, right: ((c.props.x as number) + (c.props.width as number) / 2) * done.doc.width, bottom: ((c.props.y as number) + (c.props.height as number) / 2) * done.doc.height });
+    const board = clipsOf(laid).find((c) => c.id === done.boards.n1)!;
+    const others = clipsOf(laid).filter((c) => c.parent === 'n1' && c.id !== board.id).map(box);
+    const mine = box(board);
     expect(board.parent).toBe('n1');
-    const top = ((board.props.y as number) - (board.props.height as number) / 2) * doc.height;
-    expect(Math.round(top)).toBeGreaterThanOrEqual(local.height);
-    expect(doc.height).toBeGreaterThan(local.height);
-    expect(boardsOf(doc, 'n1')).toHaveLength(3);
+    expect(others.every((o) => mine.left >= o.right || mine.right <= o.left || mine.top >= o.bottom || mine.bottom <= o.top)).toBe(true);
+    expect(done.doc.width * done.doc.height).toBeGreaterThan(local.width * local.height);
+    expect(boardsOf(done.doc, 'n1')).toHaveLength(3);
   });
 
   it('reuses the mains already on the frame instead of adding a second Button', async () => {
@@ -153,10 +156,21 @@ describe('adding pages to a frame imported from code', () => {
     expect([ground.props.width, ground.props.height]).toEqual([1, 1]);
   });
 
-  it('opens a new column to the right when the frame is taller than wide, so tall pages do not run out of height first', async () => {
+  it('grows the long side while it has room, so the short side and every text size stay as they are', async () => {
     const base = await imported(['/', '/settings']);
-    const scale = 10;
-    const tall = { ...base, height: base.height * scale, tracks: base.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.parent === 'n1' ? { ...c, props: { ...c.props, height: (c.props.height as number) * 1, y: (c.props.y as number) / scale + 0.4 } } : c)) })) } as MotionDoc;
+    const wide = { ...base, width: base.width * 4 } as MotionDoc;
+    const piece = await imported(['/pricing']);
+
+    const added = addBoards(wide, piece, ['n1'], 'n1', counter());
+
+    const doc = (added as { doc: MotionDoc }).doc;
+    expect(doc.height).toBe(wide.height);
+    expect(doc.width).toBeGreaterThan(wide.width);
+  });
+
+  it('opens a column beside once the long side has no room left', async () => {
+    const base = await imported(['/', '/settings']);
+    const tall = { ...base, height: 16_300 } as MotionDoc;
     const piece = await imported(['/pricing']);
 
     const added = addBoards(tall, piece, ['n1'], 'n1', counter());
@@ -164,6 +178,16 @@ describe('adding pages to a frame imported from code', () => {
     const doc = (added as { doc: MotionDoc }).doc;
     expect(doc.height).toBe(tall.height);
     expect(doc.width).toBeGreaterThan(tall.width);
+  });
+
+  it('refuses when growing would push a small text under the engine minimum, instead of saving a frame that cannot be read back', async () => {
+    const base = await imported(['/', '/settings']);
+    const tiny = { ...base, width: 16_300, styles: { 'app Text/xs': { kind: 'text', size: 0.0011 } } } as MotionDoc;
+    const piece = await imported(['/pricing']);
+
+    const added = addBoards(tiny, piece, ['n1'], 'n1', counter());
+
+    expect(added).toMatchObject({ ok: false, refusal: AddRefusal.NoRoom });
   });
 
   it('keeps the pixel size of a text style when the frame grows, as it does for the text layers', async () => {
