@@ -1,6 +1,8 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { MAX_VARIABLES, VarType, variablesSchema } from '@feega/motion-core/motion/variables-model';
-import { parseSheets, readSheets } from './css-tokens';
+import { PAGE_SHEET, parseSheets, readSheets } from './css-tokens';
 import { fixture } from '../../../../tests/fixtures/design-tokens/read';
 import { TokenKind, collectionName, tokenSetOf, variableName, variablesOf } from './design-tokens';
 
@@ -111,6 +113,17 @@ describe('variablesOf', () => {
 
     expect(set.tokens).toEqual([]);
     expect(set.skipped).toContain('--a: alias to --missing, which is not a token here');
+  });
+
+  it('MUI CSS-vars: il tema scuro di MUI è il modo Dark, il raggio in camelCase è un raggio', async () => {
+    const text = await readFile(join(process.cwd(), 'tests/fixtures/design-tokens/mui/css-vars.css'), 'utf8');
+
+    const set = tokenSetOf(parseSheets([{ path: `${PAGE_SHEET}inline 1`, text }]));
+
+    const byName = Object.fromEntries(set.tokens.map((t) => [t.name, t]));
+    expect(Object.keys(byName['--mui-palette-primary-main'].values)).toEqual(['Light', 'Dark']);
+    expect(byName['--mui-shape-borderRadius'].kind).toBe(TokenKind.Radius);
+    expect(byName['--mui-spacing'].kind).toBe(TokenKind.Spacing);
   });
 });
 

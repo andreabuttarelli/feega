@@ -108,6 +108,7 @@ const TREE_SHAPE = z
     fonts: z.array(FONT_SHAPE).optional(),
     sheets: z.array(z.string()).optional(),
     styles: z.array(z.object({ at: z.string().optional(), text: z.string() }).strict()).optional(),
+    rootVars: z.record(z.string(), z.string()).optional(),
     snaps: z.array(SNAP_SHAPE).optional(),
     outline: z.custom<PageOutline>((v) => typeof v === 'object' && v !== null).optional(),
     patterns: z.array(PATTERN_SHAPE).optional()

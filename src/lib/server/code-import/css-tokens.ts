@@ -74,9 +74,16 @@ const MODE_SELECTORS: [RegExp, (m: RegExpExecArray) => string][] = [
   [/^(?::root|html|:host)$/, () => LIGHT],
   [/^(?::root|html)?\.light$/, () => LIGHT],
   [/^(?::root|html)?\.dark$/, () => DARK],
-  [/^(?::root|html)?\[data-(?:theme|mode)=["']?([\w-]+)["']?\]$/, (m) => title(m[1])],
+  [/^(?::root|html)?\[data-(?:theme|mode|mui-color-scheme|color-scheme)=["']?([\w-]+)["']?\]$/, (m) => title(m[1])],
   [/^(?::root|html)?\[data-accent=["']?([\w-]+)["']?\]$/, (m) => `${ACCENT_MARK}${title(m[1])}`]
 ];
+
+const MODE_SELECTOR: Record<string, string> = { [LIGHT]: ':root', [DARK]: '.dark' };
+
+export function computedSheet(vars: Record<string, string>, mode: string): LoadedSheet {
+  const selector = MODE_SELECTOR[mode] ?? `[data-theme="${mode.toLowerCase()}"]`;
+  return { text: `${selector} {\n${Object.entries(vars).map(([name, value]) => `  ${name}: ${value};`).join('\n')}\n}` };
+}
 
 const SCHEME_MEDIA = /^@media\s*\(\s*prefers-color-scheme\s*:\s*(light|dark)\s*\)$/i;
 const THEME_AT = /^@theme\b/;
