@@ -6,7 +6,7 @@ import { fillOrder } from './placeholders';
 import { nodeSize } from '$lib/canvas/node-size';
 
 type Row = { id: string; type: string; position: { x: number; y: number }; size: { width: number | null; height: number | null }; data: Record<string, unknown> };
-type Place = { projectId: string; canvasId: string; orgId?: string };
+type Place = { projectId: string; canvasId: string; orgId?: string; look?: string };
 type Screen = { width: number; height: number };
 
 export const coreSourcePath = (place: Place, id: string) => `/p/${place.projectId}/c/${place.canvasId}/motion/${baseNodeId(id)}/source`;
@@ -32,5 +32,5 @@ export function earlySourceUrls(rows: readonly Row[], place: Place, saved: Viewp
   const data = new Map(rows.map((r) => [r.id, r.data]));
   const view = restoreViewport(saved, boundsOf(tiles), screen);
   const frames = framesOnCanvas(tiles, (id) => data.get(id) ?? {});
-  return fillOrder(frames, view, screen).map((f) => frameSourceUrl((id) => coreSourcePath(place, id), f, place.orgId));
+  return fillOrder(frames, view, screen).map((f) => frameSourceUrl((id) => coreSourcePath(place, id), f, place));
 }
