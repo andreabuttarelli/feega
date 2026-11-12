@@ -68,7 +68,7 @@ fn a_patched_group_composes_like_the_whole_edited_list() {
     let (a, b) = (from_patch.get("v2").unwrap(), from_whole.get("v2").unwrap());
     assert_eq!(a.runs.len(), b.runs.len());
     for (x, y) in a.runs.iter().zip(&b.runs) {
-        assert_eq!((x.bounds, x.extent, x.end), (y.bounds, y.extent, y.end));
+        assert_eq!((x.bounds, x.extent, x.len), (y.bounds, y.extent, y.len));
     }
 }
 

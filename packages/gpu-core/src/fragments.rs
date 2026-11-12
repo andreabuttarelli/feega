@@ -15,7 +15,7 @@ pub struct Ink {
 }
 
 pub struct Run {
-    pub end: usize,
+    pub len: usize,
     pub bounds: Rect,
     pub extent: f64,
     pub ink: Option<Ink>,
@@ -85,8 +85,8 @@ impl Encoded {
     }
 
     pub fn reusing(kept: Option<Kept>, items: &[Item], frame: Rect, bounds: impl Fn(&Item) -> Option<Rect>, paint: impl Fn(&[Item]) -> Scene) -> Encoded {
-        let mut runs: Vec<Arc<Run>> = kept.map(|k| k.before.runs.iter().take_while(|r| r.end < k.stable.min(items.len())).cloned().collect()).unwrap_or_default();
-        let first = runs.last().map_or(0, |r| r.end);
+        let mut runs: Vec<Arc<Run>> = kept.map(|k| k.before.prefix(k.stable.min(items.len()))).unwrap_or_default();
+        let first = runs.iter().map(|r| r.len).sum();
         let measured: Vec<Rect> = items[first..].iter().map(|i| bounds(i).unwrap_or(frame)).collect();
         let tiers: Vec<i32> = measured.iter().map(|b| tier(extent_of(*b))).collect();
         let mut start = 0;
@@ -99,10 +99,18 @@ impl Encoded {
             let whole = members.iter().skip(1).fold(members[0], |acc, r| acc.union(*r));
             let extent = members.iter().map(|r| extent_of(*r)).fold(0.0, f64::max);
             let run = &items[first + start..first + end];
-            runs.push(Arc::new(Run { end: first + end, bounds: whole, extent, ink: ink_of(run, members, whole), scene: paint(run) }));
+            runs.push(Arc::new(Run { len: end - start, bounds: whole, extent, ink: ink_of(run, members, whole), scene: paint(run) }));
             start = end;
         }
         Encoded { runs }
+    }
+
+    fn prefix(&self, below: usize) -> Vec<Arc<Run>> {
+        let mut at = 0;
+        self.runs.iter().take_while(|r| {
+            at += r.len;
+            at < below
+        }).cloned().collect()
     }
 }
 
