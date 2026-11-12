@@ -1,9 +1,12 @@
+use std::cell::Cell;
+
 use serde::Deserialize;
 use vello::kurbo::{Affine as Matrix, Point, Rect};
 
 use crate::display_list::{Affine, DisplayList, Item, Look, PathItem, UseItem};
-use crate::lod::BLUR_REACH;
+use crate::lod::{BLUR_REACH, VIEW_SLACK_PX};
 use crate::retained::Damage;
+use crate::uses::{Plus, Uses};
 
 const OVERLAY_SLACK_PX: f64 = 2.0;
 
@@ -65,16 +68,17 @@ pub struct Lift {
 }
 
 pub struct World {
-    uses: Vec<UseItem>,
+    uses: Uses,
     overlays: [Overlay; 2],
     damage: Damage,
     scene_damage: Damage,
     rest: std::collections::HashMap<String, (String, Affine)>,
+    visited: Cell<usize>,
 }
 
 impl Default for World {
     fn default() -> Self {
-        World { uses: Vec::new(), overlays: Default::default(), damage: Damage::none(), scene_damage: Damage::none(), rest: Default::default() }
+        World { uses: Uses::default(), overlays: Default::default(), damage: Damage::none(), scene_damage: Damage::none(), rest: Default::default(), visited: Cell::new(0) }
     }
 }
 
@@ -97,6 +101,16 @@ fn extent(item: &Item) -> Option<Rect> {
         Item::Path(p) => hull(p.look.matrix, p.contours.iter().flat_map(|c| c.chunks_exact(2).map(|xy| (xy[0], xy[1])))),
         _ => None,
     }
+}
+
+fn sighted(camera: Affine, width: u32, height: u32) -> Option<Rect> {
+    let [a, b, c, d, _, _] = camera;
+    if b != 0.0 || c != 0.0 || a == 0.0 || d == 0.0 {
+        return None;
+    }
+    let view = Rect::new(0.0, 0.0, width as f64, height as f64);
+    let slack = VIEW_SLACK_PX / a.abs().min(d.abs());
+    Some(Matrix::new(camera).inverse().transform_rect_bbox(view).inflate(slack, slack))
 }
 
 fn same(a: &Item, b: &Item) -> bool {
@@ -159,7 +173,7 @@ impl World {
     }
 
     pub fn lifts(&self, sizes: impl Fn(&str) -> Option<(f64, f64)>) -> Vec<Lift> {
-        self.uses.iter().filter_map(|u| {
+        self.uses.flagged().into_iter().filter_map(|u| {
             let by = self.shifted_from_rest(u)?;
             let (_, at) = &self.rest[&u.clip];
             let rest = reach(&UseItem { matrix: *at, ..u.clone() }, sizes(&u.group))?;
@@ -167,12 +181,12 @@ impl World {
         }).collect()
     }
 
-    pub fn extent(&self, sizes: impl Fn(&str) -> Option<(f64, f64)>) -> Option<Rect> {
-        self.uses.iter().filter_map(|u| reach(u, sizes(&u.group))).reduce(|a, b| a.union(b))
+    pub fn extent(&self) -> Option<Rect> {
+        self.uses.extent()
     }
 
     pub fn holding(&self) -> bool {
-        self.uses.iter().any(|u| u.hold)
+        self.uses.flagged().iter().any(|u| u.hold)
     }
 
     fn lifted(&self, u: &UseItem) -> bool {
@@ -187,26 +201,21 @@ impl World {
 
     pub fn patch(&mut self, patch: Patch, sizes: impl Fn(&str) -> Option<(f64, f64)>) {
         for gone in &patch.drop {
-            let Some(at) = self.uses.iter().position(|u| &u.clip == gone) else { continue };
-            let old = self.uses.remove(at);
-            let was_scene = !self.lifted(&old);
+            let Some(old) = self.uses.get(gone) else { continue };
+            let was_scene = !self.lifted(old);
+            let old = self.uses.remove(gone).expect("listed");
             self.rest.remove(gone);
             self.mark_use(reach(&old, sizes(&old.group)), was_scene);
         }
         for u in patch.put {
             let fresh = reach(&u, sizes(&u.group));
-            let at = self.uses.iter().position(|o| o.clip == u.clip);
-            let old = at.map(|i| self.uses[i].clone());
-            let was_scene = old.as_ref().map(|o| !self.lifted(o));
+            let was_scene = self.uses.get(&u.clip).map(|o| !self.lifted(o));
+            let moved = self.uses.get(&u.clip).is_some_and(|o| o.group != u.group || o.matrix != u.matrix);
             if !u.hold {
                 self.rest.insert(u.clip.clone(), (u.group.clone(), u.matrix));
             }
             let now_scene = !self.lifted(&u);
-            let moved = old.as_ref().is_some_and(|o| o.group != u.group || o.matrix != u.matrix);
-            match at {
-                Some(i) => self.uses[i] = u,
-                None => self.uses.push(u),
-            }
+            let old = self.uses.put(u, fresh);
             let Some((old, was_scene)) = old.zip(was_scene) else {
                 self.mark_use(fresh, now_scene);
                 continue;
@@ -223,18 +232,16 @@ impl World {
             }
         }
         if let Some(order) = patch.order {
-            let rank = |clip: &str| order.iter().position(|c| c == clip).unwrap_or(usize::MAX);
-            let before: Vec<String> = self.uses.iter().map(|u| u.clip.clone()).collect();
-            self.uses.sort_by_key(|u| rank(&u.clip));
-            let was: Vec<usize> = self.uses.iter().map(|u| before.iter().position(|c| *c == u.clip).unwrap_or(usize::MAX)).collect();
+            let was = self.uses.restack(&order);
             let stayed = steady(&was);
-            let moved: Vec<Option<Rect>> = self.uses.iter().enumerate().filter(|(i, _)| !stayed.contains(i)).map(|(_, u)| reach(u, sizes(&u.group))).collect();
+            let moved: Vec<Option<Rect>> = self.uses.all().into_iter().enumerate().filter(|(i, _)| !stayed.contains(i)).map(|(_, u)| reach(u, sizes(&u.group))).collect();
             moved.into_iter().for_each(|r| self.mark_if_sized(r));
         }
     }
 
     pub fn touch(&mut self, group: &str, size: Option<(f64, f64)>) {
-        let reaches: Vec<Option<Rect>> = self.uses.iter().filter(|u| u.group == group).map(|u| reach(u, size)).collect();
+        self.uses.reach_group(group, |u| reach(u, size));
+        let reaches: Vec<Option<Rect>> = self.uses.of_group(group).into_iter().map(|u| reach(u, size)).collect();
         reaches.into_iter().for_each(|r| self.mark_if_sized(r));
     }
 
@@ -279,17 +286,22 @@ impl World {
         std::mem::replace(&mut self.scene_damage, Damage::none())
     }
 
-    pub fn use_count(&self) -> usize {
-        self.uses.len()
+    pub fn take_visited(&self) -> usize {
+        self.visited.replace(0)
+    }
+
+    fn visit<'a>(&self, uses: Vec<&'a UseItem>) -> Vec<&'a UseItem> {
+        self.visited.set(self.visited.get() + uses.len());
+        uses
     }
 
     pub fn scene(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
-        let uses = self.uses.iter().filter(|u| !self.lifted(u)).map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), cache: false, hold: false, ..u.clone() }));
+        let uses = self.visit(self.uses.meeting(sighted(camera, width, height), Plus::Nothing)).into_iter().filter(|u| !self.lifted(u)).map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), cache: false, hold: false, ..u.clone() }));
         DisplayList { width, height, background: None, items: uses.collect(), faces: Vec::new(), fragments: Default::default() }
     }
 
     pub fn overlay(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
-        let held = self.uses.iter().filter(|u| self.lifted(u) && self.shifted_from_rest(u).is_none()).map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
+        let held = self.visit(self.uses.flagged()).into_iter().filter(|u| self.lifted(u) && self.shifted_from_rest(u).is_none()).map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
         let items = held.chain(OVERLAY_PARTS.iter().flat_map(|p| {
             let part = &self.overlays[p.index()];
             match &part.at {
@@ -301,7 +313,7 @@ impl World {
     }
 
     pub fn screen(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
-        let uses = self.uses.iter().map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
+        let uses = self.visit(self.uses.meeting(sighted(camera, width, height), Plus::Flagged)).into_iter().map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
         let overlay = OVERLAY_PARTS.iter().flat_map(|p| {
             let part = &self.overlays[p.index()];
             match &part.at {
