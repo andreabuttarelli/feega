@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BlendMode } from '@feega/motion-core/motion/blend';
 import { ItemKind, type DisplayList, type GroupItem, type ImageItem, type Item, type LayerItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import type { Pictures } from '@feega/motion-core/motion/gpu-full/raster';
-import { GL_PICTURE_SIDE, glPictureSize, pictureKey, pictureSize, wantedPictures, warmCore, rasterOf, overBytes } from '@feega/motion-core/motion/gpu-full/core-web';
+import { GL_PICTURE_SIDE, glPictureSize, pictureKey, pictureSize, wantedPictures, warmCore, rasterOf, overBytes, dropCore, CoreBuild } from '@feega/motion-core/motion/gpu-full/core-web';
 
 describe('glPictureSize', () => {
   it('keeps a picture that fits the WebGL atlas as it is', () => {
@@ -35,6 +35,24 @@ describe('warming the core', () => {
     const first = warmCore();
     first.catch(() => undefined);
     expect(warmCore()).toBe(first);
+  });
+
+  it('keeps the WebGL renderer in a wasm of its own, so a WebGPU canvas never downloads it', () => {
+    const fetched: string[] = [];
+    vi.stubGlobal('fetch', (url: URL) => {
+      fetched.push(url.pathname);
+      return new Promise(() => undefined);
+    });
+    vi.stubGlobal('WebAssembly', { ...WebAssembly, compileStreaming: () => new Promise(() => undefined) });
+    dropCore();
+
+    warmCore(CoreBuild.WebGpu).catch(() => undefined);
+    const webGpuOnly = [...fetched];
+    warmCore(CoreBuild.WebGl).catch(() => undefined);
+    vi.unstubAllGlobals();
+
+    expect(webGpuOnly).toEqual(['/gpu-core/gpu_core_bg.wasm']);
+    expect(fetched).toEqual(['/gpu-core/gpu_core_bg.wasm', '/gpu-core/gpu_core_gl_bg.wasm']);
   });
 });
 

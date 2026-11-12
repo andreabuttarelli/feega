@@ -8,9 +8,9 @@ pub mod filter_passes;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod files;
 pub mod filters;
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", feature = "webgl"))]
 pub mod gl_passes;
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", feature = "webgl"))]
 pub mod gl_reproject;
 pub mod gl_state;
 #[cfg(not(target_arch = "wasm32"))]
@@ -38,7 +38,7 @@ pub mod turbulence;
 pub mod uses;
 #[cfg(target_arch = "wasm32")]
 pub mod web;
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", feature = "webgl"))]
 pub mod web_gl;
 pub mod world;
 

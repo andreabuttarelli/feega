@@ -142,6 +142,9 @@ export const EDITOR_OPS = {
       if (commit.outcome === OpsOutcome.Invalid) {
         return refused(HTTP_BAD_REQUEST, { error: commit.error });
       }
+      if (commit.outcome === OpsOutcome.Conflict) {
+        return refused(HTTP_CONFLICT, { error: 'conflict', head: { version: commit.head.version, doc: commit.head.doc } });
+      }
       if (commit.outcome === OpsOutcome.Busy) {
         return refused(HTTP_CONFLICT, { error: 'busy' });
       }

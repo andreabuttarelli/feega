@@ -60,6 +60,26 @@ fn a_huge_scene_overflows_vellos_buffers_and_a_small_one_does_not() {
     assert!(overflows(&dense(2_200_000)));
 }
 
+fn landing_batch_at_close_zoom() -> Scene {
+    let mut path = BezPath::new();
+    path.move_to(Point::new(0.0, 0.0));
+    for i in 0..14_000 {
+        path.line_to(Point::new(if i % 2 == 0 { 800.0 } else { 0.0 }, 0.0));
+    }
+    let mut scene = Scene::new();
+    scene.fill(Fill::NonZero, Affine::IDENTITY, Color::BLACK, None, &path);
+    scene
+}
+
+#[test]
+fn a_scene_within_the_segment_buffers_is_not_split() {
+    let scene = landing_batch_at_close_zoom();
+    let segments = scene.bump_estimate(None).segments.len();
+
+    assert!(segments > 1 << 18 && segments < 1 << 21, "{segments}");
+    assert!(!overflows(&scene));
+}
+
 #[test]
 fn a_tile_takes_from_each_piece_only_what_they_share() {
     let tile = Piece { x: 256, y: 0, w: 260, h: 260 };

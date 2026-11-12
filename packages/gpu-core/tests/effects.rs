@@ -69,6 +69,20 @@ mod gpu {
     }
 
     #[test]
+    fn a_no_op_filter_leaves_the_pixels_as_they_are() {
+        let plain = render(&square("").replace(r#", "filters": []"#, ""));
+        let noops = [
+            r#"{ "kind": "css", "fns": [{ "name": "blur", "args": ["0px"] }] }"#,
+            r#"{ "kind": "css", "fns": [{ "name": "drop-shadow", "args": ["rgba(0, 0, 0, 0)", "0px", "0px", "0px"] }] }"#,
+            r#"{ "kind": "css", "fns": [{ "name": "opacity", "args": ["1"] }, { "name": "brightness", "args": ["1"] }, { "name": "hue-rotate", "args": ["0deg"] }] }"#,
+        ];
+
+        for noop in noops {
+            assert_eq!(render(&square(noop)), plain, "{noop}");
+        }
+    }
+
+    #[test]
     fn brightness_scales_the_colour() {
         let pixels = render(&square(r#"{ "kind": "css", "fns": [{ "name": "brightness", "args": ["0.5"] }] }"#));
 

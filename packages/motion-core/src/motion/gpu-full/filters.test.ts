@@ -10,6 +10,29 @@ describe('cssFunctions', () => {
     ]);
     expect(cssFunctions('')).toEqual([]);
   });
+
+  it('drops every function that leaves the pixels as they are', () => {
+    const noops = ['blur(0)', 'blur(0px)', 'blur()', 'drop-shadow(0 0 0 transparent)', 'drop-shadow(rgba(0, 0, 0, 0) 0px 0px 0px)', 'drop-shadow(3px 4px 8px rgb(0 0 0 / 0))', 'drop-shadow(0px 0px 0px #0000)', 'opacity(1)', 'opacity(100%)', 'brightness(1)', 'contrast(100%)', 'saturate(1)', 'grayscale(0)', 'sepia(0%)', 'invert(0)', 'hue-rotate(0deg)', 'hue-rotate(0)'];
+
+    for (const noop of noops) {
+      expect(cssFunctions(noop), noop).toEqual([]);
+    }
+  });
+
+  it('keeps every function that changes the pixels', () => {
+    const live = ['blur(0.5px)', 'drop-shadow(0 0 0 rgb(0, 0, 0))', 'drop-shadow(rgba(0, 0, 0, 0.2) 0px 1px 2px)', 'opacity(0.5)', 'brightness(1.2)', 'grayscale()', 'sepia(1)', 'hue-rotate(90deg)'];
+
+    for (const fn of live) {
+      expect(cssFunctions(fn), fn).toHaveLength(1);
+    }
+  });
+
+  it('drops only the no-op parts of a chain', () => {
+    expect(cssFunctions('blur(0px) brightness(1.2) opacity(1) sepia(0.5)')).toEqual([
+      { name: 'brightness', args: ['1.2'] },
+      { name: 'sepia', args: ['0.5'] }
+    ]);
+  });
 });
 
 describe('cssMatrix', () => {

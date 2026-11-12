@@ -122,6 +122,32 @@ describe('writeTokens', () => {
     expect(done.skipped).toEqual(['--color-primary (Dark) changed in the code since the import: the code wins, the canvas value was #ff0066']);
   });
 
+  it('righe aggiunte o tolte sopra la dichiarazione non sono un cambiamento: si scrive la riga giusta', async () => {
+    const { variables, map } = await imported('tailwind4');
+    const original = (await fixture('tailwind4')('src/app.css'))!;
+    const lines = original.split('\n');
+    const shifted = [...lines.slice(0, 2), '/* a */', '/* b */', '/* c */', ...lines.slice(2)].join('\n');
+    const trimmed = [lines[0], ...lines.slice(2)].join('\n');
+
+    for (const text of [shifted, trimmed]) {
+      const done = await writeTokens(edited(variables, 'app Colors/primary', 'Dark', '#ff0066'), map, async (path) => (path === 'src/app.css' ? text : null));
+
+      expect(done.skipped).toEqual([]);
+      expect(done.files[0].after).toBe(text.replace('--color-primary: #f0f0f0;', '--color-primary: #ff0066;'));
+    }
+  });
+
+  it('una proprietà ripetuta nello stesso blocco: si scrive quella col valore importato più vicina alla riga registrata', async () => {
+    const { variables, map } = await imported('tailwind4');
+    const original = (await fixture('tailwind4')('src/app.css'))!;
+    const doubled = original.replace('\t--color-primary: #f0f0f0;', '\t--color-primary: #000000;\n\t--color-primary: #f0f0f0;');
+
+    const done = await writeTokens(edited(variables, 'app Colors/primary', 'Dark', '#ff0066'), map, async (path) => (path === 'src/app.css' ? doubled : null));
+
+    expect(done.skipped).toEqual([]);
+    expect(done.files[0].after).toBe(doubled.replace('--color-primary: #f0f0f0;', '--color-primary: #ff0066;'));
+  });
+
   it('un percorso fuori dal repo nella mappa non viene mai scritto', async () => {
     const { read, variables, map } = await imported('tailwind4');
     const evil = { ...map, 'app Colors/primary': { ...map['app Colors/primary'], origins: { Light: '../../etc/app.css:6:1', Dark: '/etc/app.css:22:1' } } };
