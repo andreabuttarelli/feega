@@ -1,7 +1,9 @@
 import { env } from '$env/dynamic/private';
+import { dev } from '$app/environment';
 import Stripe from 'stripe';
 import { createAdminClient } from './supabase-admin';
 import { CREDIT_LADDER, PLAN_CURRENCY, rungForLookupKey } from '$lib/credit-ladder';
+import { OFFER_PERCENT_OFF, type OfferStore, type PromoCode } from './upgrade-offer/offer';
 import { DISPLAY_UNITS_PER_CREDIT } from '$lib/components/credit-amount-format';
 
 let client: Stripe | null = null;
@@ -9,12 +11,17 @@ let client: Stripe | null = null;
 function stripe(): Stripe {
   if (!client) {
     if (!env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY is not set');
+    if (dev && !env.STRIPE_SECRET_KEY.startsWith(TEST_KEY_PREFIX)) throw new Error('development runs on a Stripe test key only');
     client = new Stripe(env.STRIPE_SECRET_KEY);
   }
   return client;
 }
 
 const APP_TAG = 'feega';
+const TEST_KEY_PREFIX = 'sk_test_';
+const MS_PER_S = 1000;
+const OFFER_COUPON_ID = 'feega_upgrade_15';
+const REDEMPTION_TRACKED = 'redemption_tracked';
 const CENTS_PER_UNIT = 100;
 
 let rungPriceIds: Promise<Map<number, string>> | null = null;
@@ -108,11 +115,13 @@ export async function createSubscriptionCheckout(opts: {
   credits: number;
   successUrl: string;
   cancelUrl: string;
+  promotionCodeId?: string;
 }): Promise<string> {
   const session = await stripe().checkout.sessions.create({
     mode: 'subscription',
     customer: opts.customerId,
     line_items: [{ price: opts.priceId, quantity: 1 }],
+    ...(opts.promotionCodeId ? { discounts: [{ promotion_code: opts.promotionCodeId }] } : {}),
     success_url: opts.successUrl,
     cancel_url: opts.cancelUrl,
     subscription_data: { metadata: { app: APP_TAG, org_id: opts.orgId, credits: String(opts.credits) } },
@@ -207,3 +216,43 @@ export async function ensureSubscriptionCanceled(subscriptionId: string): Promis
   if (SETTLED_STATUSES.has(sub.status) || sub.cancel_at_period_end) return;
   throw new Error('active_plan');
 }
+
+function promoOf(promo: Stripe.PromotionCode): PromoCode {
+  return {
+    id: promo.id,
+    code: promo.code,
+    expiresAt: (promo.expires_at ?? 0) * MS_PER_S,
+    redeemed: promo.times_redeemed > 0,
+    redemptionTracked: promo.metadata?.[REDEMPTION_TRACKED] === 'true'
+  };
+}
+
+async function ensureOfferCoupon(): Promise<void> {
+  try {
+    await stripe().coupons.retrieve(OFFER_COUPON_ID);
+  } catch (e) {
+    if ((e as Stripe.errors.StripeError)?.code !== 'resource_missing') throw e;
+    await stripe().coupons.create({ id: OFFER_COUPON_ID, percent_off: OFFER_PERCENT_OFF, duration: 'once', name: `${OFFER_PERCENT_OFF}% off the first month` });
+  }
+}
+
+export const stripeOfferStore: OfferStore = {
+  find: async (code) => {
+    const { data } = await stripe().promotionCodes.list({ code, limit: 1 });
+    return data[0] ? promoOf(data[0]) : null;
+  },
+  create: async ({ code, expiresAt, userId }) => {
+    await ensureOfferCoupon();
+    const promo = await stripe().promotionCodes.create({
+      promotion: { type: 'coupon', coupon: OFFER_COUPON_ID },
+      code,
+      expires_at: Math.floor(expiresAt / MS_PER_S),
+      max_redemptions: 1,
+      metadata: { app: APP_TAG, user_id: userId }
+    });
+    return promoOf(promo);
+  },
+  markTracked: async (id) => {
+    await stripe().promotionCodes.update(id, { metadata: { [REDEMPTION_TRACKED]: 'true' } });
+  }
+};

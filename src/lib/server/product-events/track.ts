@@ -12,7 +12,10 @@ export enum ProductEvent {
   AgentFirstOutput = 'agent_first_output',
   AgentFailed = 'agent_failed',
   CreditsExhausted = 'credits_exhausted',
-  ImportFailed = 'import_failed'
+  ImportFailed = 'import_failed',
+  UpgradeOfferShown = 'upgrade_offer_shown',
+  UpgradeOfferClicked = 'upgrade_offer_clicked',
+  UpgradeOfferRedeemed = 'upgrade_offer_redeemed'
 }
 
 type Nothing = Record<string, never>;
@@ -28,6 +31,9 @@ export type ProductProps = {
   [ProductEvent.AgentFailed]: { code: string };
   [ProductEvent.CreditsExhausted]: Nothing;
   [ProductEvent.ImportFailed]: { source: string; error: string };
+  [ProductEvent.UpgradeOfferShown]: { reason: string; created: boolean };
+  [ProductEvent.UpgradeOfferClicked]: Nothing;
+  [ProductEvent.UpgradeOfferRedeemed]: Nothing;
 };
 
 export type EventActor = { userId?: string | null; orgId?: string | null; anonymousId?: string | null };
