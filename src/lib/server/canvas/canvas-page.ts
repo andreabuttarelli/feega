@@ -101,7 +101,7 @@ import { canvasPath } from '$lib/server/tenancy/entry';
 import { renameProject } from '$lib/server/repos/projects';
 import { canvasRevision, recordsRevision } from '$lib/server/canvas/revision';
 import { motionTokens } from '$lib/server/motion/editor';
-import { lookOf } from '$lib/server/motion/look';
+import { lookOf } from '$lib/server/motion/brand-look';
 import { restackAskSchema, restackNodes } from '$lib/server/canvas/restack-nodes';
 import { frameAskSchema, frameElements, groupAskSchema, groupElements, stackAskSchema, stackElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';

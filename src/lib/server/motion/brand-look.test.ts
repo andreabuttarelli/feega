@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lookOf } from './look';
+import { lookOf } from './brand-look';
 
 describe('the brand look a cached frame was drawn with', () => {
   it('changes when the brand changes, so a frame kept under the old look is never drawn', () => {
