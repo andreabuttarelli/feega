@@ -102,14 +102,14 @@ describe('adding pages to a frame imported from code', () => {
     expect(settings(doc)).toEqual(settings(moved));
   });
 
-  it('refuses when the frame has no room left on its longest side', async () => {
+  it('refuses when the frame has no room left below or beside', async () => {
     const local = await imported(['/', '/settings']);
-    const tall = { ...local, height: 16_300 } as MotionDoc;
+    const tall = { ...local, width: 16_300, height: 16_300 } as MotionDoc;
     const piece = await imported(['/pricing']);
 
     const added = addBoards(tall, piece, ['n1'], 'n1', counter());
 
-    expect(added).toMatchObject({ ok: false, refusal: AddRefusal.Full });
+    expect(added).toMatchObject({ ok: false, refusal: AddRefusal.NoRoom });
   });
 
   it('moves the whole page with its board: each layer keeps its offset from the board', async () => {
@@ -151,5 +151,18 @@ describe('adding pages to a frame imported from code', () => {
 
     const ground = clipsOf((added as { doc: MotionDoc }).doc).find((c) => c.id === 'n1')!;
     expect([ground.props.width, ground.props.height]).toEqual([1, 1]);
+  });
+
+  it('opens a new column to the right when the frame is taller than wide, so tall pages do not run out of height first', async () => {
+    const base = await imported(['/', '/settings']);
+    const scale = 10;
+    const tall = { ...base, height: base.height * scale, tracks: base.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.parent === 'n1' ? { ...c, props: { ...c.props, height: (c.props.height as number) * 1, y: (c.props.y as number) / scale + 0.4 } } : c)) })) } as MotionDoc;
+    const piece = await imported(['/pricing']);
+
+    const added = addBoards(tall, piece, ['n1'], 'n1', counter());
+
+    const doc = (added as { doc: MotionDoc }).doc;
+    expect(doc.height).toBe(tall.height);
+    expect(doc.width).toBeGreaterThan(tall.width);
   });
 });

@@ -17,7 +17,7 @@ const PLACEHOLDER_FILL = '#e4e4e7';
 const PLACEHOLDER_PREFIX = 'Importing ';
 
 export enum AddRefusal {
-  Full = 'frame_full',
+  NoRoom = 'no_room',
   NoBoards = 'no_boards',
   Unsized = 'unsized'
 }
@@ -218,16 +218,22 @@ function libraryOf(local: MotionDoc, piece: MotionDoc): Pick<MotionDoc, 'assets'
   };
 }
 
-function slotFor(local: MotionDoc, parent: string | null, extent: Box): { at: { x: number; y: number }; size: Size } {
+type Slot = { at: { x: number; y: number }; size: Size };
+
+const longest = (slot: Slot) => Math.max(slot.size.width, slot.size.height);
+
+function slotFor(local: MotionDoc, parent: string | null, extent: Box): Slot {
   const level = (c: MotionClip) => (c.parent ?? null) === parent || (!c.parent && !fillsDoc(c, sizeOf(local)));
-  const content = unionOf(clipsOf(withAutoLayout(local).tracks).filter(level).flatMap((c) => boxOf(c, sizeOf(local)) ?? []));
-  const left = content ? Math.max(0, Math.round(content.left)) : 0;
-  const bottom = content ? content.bottom : 0;
-  const margin = Math.max(0, local.height - bottom);
-  const at = { x: left, y: Math.round(bottom + BOARD_GAP) };
-  const right = Math.max(0, local.width - (content?.right ?? local.width));
-  const size = { width: Math.max(local.width, Math.ceil(at.x + extent.right - extent.left + right)), height: Math.ceil(at.y + extent.bottom - extent.top + margin) };
-  return { at, size };
+  const content = unionOf(clipsOf(withAutoLayout(local).tracks).filter(level).flatMap((c) => boxOf(c, sizeOf(local)) ?? [])) ?? { left: 0, top: 0, right: 0, bottom: 0 };
+  const [w, h] = [extent.right - extent.left, extent.bottom - extent.top];
+  const margin = { x: Math.max(0, local.width - content.right), y: Math.max(0, local.height - content.bottom) };
+  const below = { x: Math.max(0, Math.round(content.left)), y: Math.round(content.bottom + BOARD_GAP) };
+  const beside = { x: Math.round(content.right + BOARD_GAP), y: Math.max(0, Math.round(content.top)) };
+  const slots: Slot[] = [
+    { at: below, size: { width: Math.max(local.width, Math.ceil(below.x + w + margin.x)), height: Math.ceil(below.y + h + margin.y) } },
+    { at: beside, size: { width: Math.ceil(beside.x + w + margin.x), height: Math.max(local.height, Math.ceil(beside.y + h + margin.y)) } }
+  ];
+  return slots.reduce((best, slot) => (longest(slot) < longest(best) ? slot : best));
 }
 
 export function addBoards(before: MotionDoc, piece: MotionDoc, boardIds: readonly string[], parent: string | null, newId: NewId): BoardsAdded {
@@ -244,7 +250,7 @@ export function addBoards(before: MotionDoc, piece: MotionDoc, boardIds: readonl
 
   const { at, size } = slotFor(local, parent, extent);
   if (size.width > DESIGN_MAX_SIDE || size.height > DESIGN_MAX_SIDE) {
-    return { ok: false, refusal: AddRefusal.Full, detail: `no room: the frame would be ${size.width}×${size.height} px, at most ${DESIGN_MAX_SIDE} a side` };
+    return { ok: false, refusal: AddRefusal.NoRoom, detail: `no room: the frame would be ${size.width}×${size.height} px, at most ${DESIGN_MAX_SIDE} a side` };
   }
 
   const wide = grown(local, size);
@@ -269,7 +275,7 @@ export function addBoards(before: MotionDoc, piece: MotionDoc, boardIds: readonl
   const trackTaken = new Set(wide.tracks.map((t) => t.id));
   const tracks = moved.tracks.map((t) => ({ ...t, id: freshOf(trackTaken, newId)(t.id), clips: (t.clips as MotionClip[]).map((c) => ({ ...remappedClip(c, map), ...(boardIds.includes(c.id) ? { parent } : {}) })) }));
   if (wide.tracks.length + tracks.length > MAX_TRACKS) {
-    return { ok: false, refusal: AddRefusal.Full, detail: `no room: a frame holds at most ${MAX_TRACKS} layers rows` };
+    return { ok: false, refusal: AddRefusal.NoRoom, detail: `no room: a frame holds at most ${MAX_TRACKS} layers rows` };
   }
 
   const comps = Object.fromEntries(landing.map((id) => [map.comp.get(id)!, remappedComp(sized.comps[id], map)]));

@@ -19,39 +19,51 @@ export type LandSession = {
   edit: (next: MotionDoc, summary: string) => void;
 };
 
-export type LandAsk = { label: string; map: ImportMap | null; size: { width: number; height: number }; newId: NewId; fetch: () => Promise<Landing> };
+type Size = { width: number; height: number };
 
-const FULL = 'frame_full';
+export type LandAsk = { label: string; map: ImportMap | null; size: Size; newId: NewId; fetch: () => Promise<Landing>; resized: (from: Size, to: Size) => void };
+
 
 function without(doc: MotionDoc, id: string): MotionDoc {
   const removed = removeClips(doc, [id]);
   return removed.ok ? removed.doc : doc;
 }
 
+const sizeOf = (doc: MotionDoc): Size => ({ width: doc.width, height: doc.height });
+
+function shown(session: LandSession, ask: LandAsk, next: MotionDoc, show: (doc: MotionDoc) => void) {
+  const from = sizeOf(session.history.present);
+  show(next);
+  if (from.width !== next.width || from.height !== next.height) {
+    ask.resized(from, sizeOf(next));
+  }
+}
+
 export async function landImport(session: LandSession, ask: LandAsk): Promise<Landed> {
   const clean = session.history.present;
   const parent = boardParent(clean, ask.map);
   const id = ask.newId();
-  const shown = addBoards(clean, placeholderOf(clean, ask.label, ask.size, id), [id], parent, ask.newId);
-  if (!shown.ok) {
-    return { outcome: LandOutcome.Full, error: FULL, detail: shown.detail };
+  const held = addBoards(clean, placeholderOf(clean, ask.label, ask.size, id), [id], parent, ask.newId);
+  if (!held.ok) {
+    return { outcome: LandOutcome.Full, error: held.refusal, detail: held.detail };
   }
   const pending = `Importing ${ask.label}`;
-  session.showPending(shown.doc, pending);
+  const hold = (doc: MotionDoc) => session.showPending(doc, pending);
+  shown(session, ask, held.doc, hold);
 
   const answer = await ask.fetch().catch((): Landing => ({ ok: false, error: 'unavailable' }));
   const now = session.history.present;
-  const base = now === shown.doc ? clean : without(now, shown.boards[id]);
-  session.showPending(base, pending);
+  const base = now === held.doc ? clean : without(now, held.boards[id]);
+  shown(session, ask, base, hold);
   if (!answer.ok) {
     return { outcome: LandOutcome.Failed, error: answer.error, ...(answer.detail ? { detail: answer.detail } : {}) };
   }
 
   const landed = addBoards(base, answer.piece, answer.boards, answer.parent ?? parent, ask.newId);
   if (!landed.ok) {
-    return { outcome: LandOutcome.Full, error: FULL, detail: landed.detail };
+    return { outcome: LandOutcome.Full, error: landed.refusal, detail: landed.detail };
   }
-  session.edit(landed.doc, `Imported ${ask.label}`);
+  shown(session, ask, landed.doc, (doc) => session.edit(doc, `Imported ${ask.label}`));
   const boards = answer.boards.map((b) => landed.boards[b]);
   return { outcome: LandOutcome.Landed, boards };
 }

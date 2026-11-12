@@ -33,7 +33,7 @@ describe('landing an import into the open frame', () => {
   it('shows a placeholder board at once, before the server answers', async () => {
     const { session, shown } = sessionOf(LOCAL);
     let answer: (a: Landing) => void = () => {};
-    const pending = landImport(session, { label: '/pricing', map: MAP, size: { width: 1280, height: 800 }, newId: counter(), fetch: () => new Promise((resolve) => (answer = resolve)) });
+    const pending = landImport(session, { label: '/pricing', map: MAP, size: { width: 1280, height: 800 }, newId: counter(), resized: vi.fn(), fetch: () => new Promise((resolve) => (answer = resolve)) });
 
     expect(shown).toHaveLength(1);
     expect(clipsOf(shown[0]).some((c) => c.name === 'Importing /pricing…')).toBe(true);
@@ -44,7 +44,7 @@ describe('landing an import into the open frame', () => {
   it('swaps the placeholder for the real board as one undo step whose before is the frame without it', async () => {
     const { session } = sessionOf(LOCAL);
 
-    const out = await landImport(session, { label: '/pricing', map: MAP, size: { width: 1280, height: 800 }, newId: counter(), fetch: async () => ({ ok: true, piece: PIECE, boards: ['n1'], parent: 'n1' }) });
+    const out = await landImport(session, { label: '/pricing', map: MAP, size: { width: 1280, height: 800 }, newId: counter(), resized: vi.fn(), fetch: async () => ({ ok: true, piece: PIECE, boards: ['n1'], parent: 'n1' }) });
 
     expect(out.outcome).toBe(LandOutcome.Landed);
     expect(session.edit).toHaveBeenCalledTimes(1);
@@ -56,7 +56,7 @@ describe('landing an import into the open frame', () => {
   it('takes the placeholder away and says why when the import fails, with no undo step', async () => {
     const { session } = sessionOf(LOCAL);
 
-    const out = await landImport(session, { label: '/pricing', map: MAP, size: { width: 1280, height: 800 }, newId: counter(), fetch: async () => ({ ok: false, error: 'run_failed', detail: 'the dev server did not answer' }) });
+    const out = await landImport(session, { label: '/pricing', map: MAP, size: { width: 1280, height: 800 }, newId: counter(), resized: vi.fn(), fetch: async () => ({ ok: false, error: 'run_failed', detail: 'the dev server did not answer' }) });
 
     expect(out).toEqual({ outcome: LandOutcome.Failed, error: 'run_failed', detail: 'the dev server did not answer' });
     expect(session.history.present).toBe(LOCAL);
@@ -71,19 +71,29 @@ describe('landing an import into the open frame', () => {
       return { ok: true as const, piece: PIECE, boards: ['n1'], parent: 'n1' };
     };
 
-    await landImport(session, { label: '/pricing', map: MAP, size: { width: 1280, height: 800 }, newId: counter(), fetch });
+    await landImport(session, { label: '/pricing', map: MAP, size: { width: 1280, height: 800 }, newId: counter(), resized: vi.fn(), fetch });
 
     expect(clipsOf(session.history.present).find((c) => c.id === 'n17')?.name).toBe('Settings (edited)');
     expect(clipsOf(session.history.present).some((c) => c.name?.startsWith('Importing'))).toBe(false);
   });
 
   it('refuses at once, with no request, when the frame has no room for the placeholder', async () => {
-    const { session } = sessionOf({ ...LOCAL, height: 16_300 });
+    const { session } = sessionOf({ ...LOCAL, width: 16_300, height: 16_300 });
     const fetch = vi.fn();
 
-    const out = await landImport(session, { label: '/pricing', map: MAP, size: { width: 1280, height: 800 }, newId: counter(), fetch });
+    const out = await landImport(session, { label: '/pricing', map: MAP, size: { width: 1280, height: 800 }, newId: counter(), resized: vi.fn(), fetch });
 
     expect(out.outcome).toBe(LandOutcome.Full);
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('tells the canvas each time the frame changes size, so the frame box grows with it', async () => {
+    const { session } = sessionOf(LOCAL);
+    const resized = vi.fn();
+
+    await landImport(session, { label: '/pricing', map: MAP, size: { width: 1280, height: 800 }, newId: counter(), resized, fetch: async () => ({ ok: true, piece: PIECE, boards: ['n1'], parent: 'n1' }) });
+
+    expect(resized.mock.calls[0][0]).toEqual({ width: LOCAL.width, height: LOCAL.height });
+    expect(resized.mock.calls.at(-1)![1]).toEqual({ width: session.history.present.width, height: session.history.present.height });
   });
 });

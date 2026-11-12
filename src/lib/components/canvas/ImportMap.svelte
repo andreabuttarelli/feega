@@ -13,6 +13,8 @@
   import { tick } from 'svelte';
   import { editorMode, EditorMode } from '$lib/canvas/editor-mode.svelte';
   import { importRuns } from '$lib/canvas/import-runs.svelte';
+  import { frameProperties } from './frame-properties.svelte';
+  import { Region } from '$lib/canvas/key-region.svelte';
 
   let { projectId, canvasId, nodeId, session, doc }: { projectId: string; canvasId: string; nodeId: string; session: FrameEditSession; doc: MotionDoc } = $props();
 
@@ -21,8 +23,10 @@
   const IMPORTING = 'Importing…';
   const SEARCH_FROM = 8;
   const RELOAD_MS = 800;
+  const SIZE_SLACK = 1;
   const FAILED: Record<string, string> = {
     frame_full: 'This frame is full: 20 pages, the most Pull refreshes in one run. Import into a new frame.',
+    no_room: 'No room left in this frame: a frame is at most 16384 px a side. Import into a new frame.',
     rate_limited: 'Two imports every ten minutes. Try again shortly.',
     sign_in_needed: 'The page went to a sign-in page. Add a TEST account in project settings.',
     run_failed: 'The app could not be started.',
@@ -64,6 +68,17 @@
     return () => clearTimeout(later);
   });
 
+  $effect(() => {
+    const place = frameProperties.place;
+    if (!place || !doc.width || phase !== MapPhase.Ready) {
+      return;
+    }
+    const height = (doc.height * place.w) / doc.width;
+    if (Math.abs(height - place.h) > SIZE_SLACK) {
+      place.grow(place.w, height);
+    }
+  });
+
   function zoomTo(row: MapRow) {
     session.select(row.boards.map((b) => b.clip));
     zoomRequest.ask(Command.PreviewSelection);
@@ -84,12 +99,13 @@
       map: read?.map ?? null,
       size: { width: conds[0]?.width ?? BASE_COND.width, height: PAGE_HEIGHT },
       newId: () => crypto.randomUUID().slice(0, 8),
+      resized: (from, to) => frameProperties.place?.grow((frameProperties.place.w * to.width) / from.width, (frameProperties.place.h * to.height) / from.height),
       fetch: async () => {
         const got = await importInto({ projectId, canvasId, nodeId, routes: [path], conditions });
         return got.ok ? { ok: true, piece: got.value.piece, boards: got.value.boards, parent: got.value.parent } : { ok: false, error: got.error, ...(got.detail ? { detail: got.detail } : {}) };
       }
     });
-    importRuns.finish(nodeId, key, done.outcome === LandOutcome.Landed ? `Imported ${label}.` : `${FAILED[done.error] ?? FALLBACK}${done.detail ? ` ${done.detail}` : ''}`);
+    importRuns.finish(nodeId, key, done.outcome === LandOutcome.Landed ? `Imported ${label}.` : (FAILED[done.error] ?? `${FALLBACK}${done.detail ? ` ${done.detail}` : ''}`));
     await load();
   }
 
@@ -135,7 +151,7 @@
 </script>
 
 {#if phase !== MapPhase.None}
-  <div class="map" data-testid="import-map" aria-label="Import map">
+  <div class="map" data-testid="import-map" role="region" aria-label="Import map" data-key-region={Region.Editor}>
     <Section title="Pages" fold={Fold.Open}>
       {#if phase === MapPhase.Loading}
         <p class="muted" data-testid="import-map-loading">Reading the import…</p>

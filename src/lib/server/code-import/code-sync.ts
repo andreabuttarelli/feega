@@ -35,7 +35,8 @@ export enum SyncOutcome {
   Unreachable = 'unreachable',
   Conflict = 'conflict',
   NoSync = 'no_sync',
-  FrameFull = 'frame_full'
+  FrameFull = 'frame_full',
+  NoRoom = 'no_room'
 }
 
 export type SyncRefusal = Exclude<SyncOutcome, SyncOutcome.Ok | SyncOutcome.UpToDate>;
@@ -48,7 +49,8 @@ export const SYNC_STATUS: Record<SyncRefusal, number> = {
   [SyncOutcome.Unreachable]: 502,
   [SyncOutcome.Conflict]: 409,
   [SyncOutcome.NoSync]: 409,
-  [SyncOutcome.FrameFull]: 409
+  [SyncOutcome.FrameFull]: 409,
+  [SyncOutcome.NoRoom]: 409
 };
 
 const UNPUBLISHED: Record<SourceKind, SyncRefusal> = {
@@ -214,7 +216,7 @@ export type CodeAdded = { outcome: SyncOutcome.Ok; skipped: string[]; map: Impor
 type AddRefused = { outcome: SyncRefusal | CodeImportOutcome; error?: string };
 
 const ADD_REFUSED: Record<AddRefusal, SyncRefusal> = {
-  [AddRefusal.Full]: SyncOutcome.FrameFull,
+  [AddRefusal.NoRoom]: SyncOutcome.NoRoom,
   [AddRefusal.NoBoards]: SyncOutcome.Unreachable,
   [AddRefusal.Unsized]: SyncOutcome.Unreachable
 };
