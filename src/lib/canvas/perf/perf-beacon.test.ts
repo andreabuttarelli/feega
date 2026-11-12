@@ -14,7 +14,7 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals());
 
-const MEMORY = { textureMb: 140, textures: 300, wasmMb: 96, cacheMb: 40, pictureMb: 20 };
+const MEMORY = { textureMb: 140, textures: 300, bufferMb: 224, wasmMb: 96, cacheMb: 40, pictureMb: 20 };
 
 const place = (over: Partial<PerfPlace> = {}): PerfPlace => ({
   canvasId: 'c1',

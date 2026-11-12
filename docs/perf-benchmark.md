@@ -184,7 +184,7 @@ A summary is cumulative per session (`sessionId`); the report keeps the latest o
   frame and node counts, source bytes (Resource Timing), `CORE_VERSION`, JS heap at 10 min;
 - health: `platform` (`iphone`, `ipad` even behind the Mac user agent, `android`, `desktop`),
   `visible` and the canvas `width`/`height` when sent, WebGPU adapter `limits`, `memory` (GPU
-  texture MB and count — WebGPU only —, wasm, zoom cache and picture MB), `lastError`, and
+  texture MB and count, GPU buffer MB — both WebGPU only —, wasm, zoom cache and picture MB), `lastError`, and
   `diedBefore`/`before`: the previous canvas session in this browser ended without `pagehide` and
   what it held at its last sample. iOS kills an over-budget tab without any event, so a death shows
   up only here, on the next load.
