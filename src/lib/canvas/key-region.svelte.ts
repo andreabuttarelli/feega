@@ -10,10 +10,10 @@ export const KEY_REGION_ATTR = 'data-key-region';
 
 const DECLARED = new Set<string>(Object.values(Region));
 
-const nowhere = (target: EventTarget | null): target is null => !(target instanceof Element) || target === target.ownerDocument.body || target === target.ownerDocument.documentElement;
+const focusedOn = (target: EventTarget | null): target is Element => target instanceof Element && target !== target.ownerDocument.body && target !== target.ownerDocument.documentElement;
 
 export function regionOf(target: EventTarget | null): Region {
-  if (nowhere(target)) {
+  if (!focusedOn(target)) {
     return Region.Canvas;
   }
   const value = target.closest(`[${KEY_REGION_ATTR}]`)?.getAttribute(KEY_REGION_ATTR) ?? '';
