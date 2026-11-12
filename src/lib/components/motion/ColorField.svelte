@@ -5,6 +5,7 @@
   import { parseColour } from '$lib/motion/colour-field';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import { sidePlacement, SideMode, type SidePlace } from '$lib/components/ui/shell/side-popover';
+  import { dismissible } from '$lib/components/ui/shell/dismiss';
   import { isBrandToken } from '$lib/motion/selection-colours';
   import ColorPicker from './ColorPicker.svelte';
 
@@ -99,12 +100,9 @@
     }
   }
 
-  function closeOnEscape(e: KeyboardEvent) {
-    if (e.key === 'Escape' && open) {
-      e.stopPropagation();
-      gesture?.cancel();
-      open = false;
-    }
+  function cancel() {
+    gesture?.cancel();
+    open = false;
   }
 
   const style = $derived(place?.mode === SideMode.Side ? `left:${place.left}px;top:${place.top}px;width:${place.width}px` : '');
@@ -112,7 +110,7 @@
 
 <svelte:window onpointerdown={closeOutside} onresize={measure} />
 
-<div class="colour" data-display={display} bind:this={root} data-colour={name} role="group" aria-label={name} onkeydown={closeOnEscape}>
+<div class="colour" data-display={display} bind:this={root} data-colour={name} role="group" aria-label={name}>
   {#if display === ColourDisplay.Row}
     <button type="button" class="row" aria-label={`Edit ${name}`} aria-expanded={open} onclick={() => (open = !open)}>
       <span class="swatch" style={`--c: ${shown};`}></span>
@@ -129,7 +127,7 @@
   {#if display === ColourDisplay.Field}<input {id} class="hex" type="text" spellcheck="false" aria-label={name} value={colourLabel(raw)} onchange={(e) => typed(e.currentTarget)} onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />{/if}
   {#if onalpha && display === ColourDisplay.Field}<input class="alpha" type="text" inputmode="decimal" aria-label={`${name} opacity`} value={`${Math.round((alpha ?? 1) * PERCENT)}%`} onchange={(e) => setAlpha(e.currentTarget.value)} />{/if}
   {#if open}
-    <div bind:this={pop} bind:offsetHeight={height} class="pop" data-mode={place?.mode ?? SideMode.Side} role="dialog" aria-label={`${name} colours`} data-testid="colour-popover" {style}>
+    <div bind:this={pop} bind:offsetHeight={height} {@attach dismissible(cancel)} class="pop" data-mode={place?.mode ?? SideMode.Side} role="dialog" aria-label={`${name} colours`} data-testid="colour-popover" {style}>
       <ColorPicker {name} value={raw} {tokens} alpha={hasAlpha ? (alpha ?? 1) : null} {swatches} {gesture} onchange={pick} />
     </div>
   {/if}

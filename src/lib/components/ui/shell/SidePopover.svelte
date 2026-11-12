@@ -3,6 +3,7 @@
   import { cn } from '$lib/utils.js';
   import { FOCUS_RING } from './styles';
   import { SideMode, sidePlacement, type SidePlace } from './side-popover';
+  import { dismissible } from './dismiss';
 
   let {
     anchor,
@@ -51,14 +52,6 @@
     onclose();
   }
 
-  function keydown(e: KeyboardEvent) {
-    if (e.key !== 'Escape') {
-      return;
-    }
-    e.stopPropagation();
-    onclose();
-  }
-
   function onBody(el: HTMLElement) {
     document.body.append(el);
     return () => el.remove();
@@ -67,7 +60,7 @@
   const style = $derived(place?.mode === SideMode.Side ? `left:${place.left}px;top:${place.top}px;width:${place.width}px` : '');
 </script>
 
-<svelte:window onkeydowncapture={keydown} onpointerdown={outside} onresize={measure} />
+<svelte:window onpointerdown={outside} onresize={measure} />
 
 <div
   bind:this={box}
@@ -76,6 +69,7 @@
   aria-label={label}
   data-testid="side-popover"
   {@attach onBody}
+  {@attach dismissible(() => onclose())}
   data-anchor={key}
   data-mode={place?.mode ?? SideMode.Side}
   class={cn('fixed z-[62] flex flex-col overflow-auto border border-ui-divider bg-ui-panel shadow-ui-float', place?.mode === SideMode.Sheet ? 'inset-x-0 bottom-0 max-h-[70vh] rounded-t-lg' : 'max-h-[calc(100vh-16px)] rounded-md')}
