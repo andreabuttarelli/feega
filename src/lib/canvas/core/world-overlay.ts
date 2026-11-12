@@ -24,7 +24,7 @@ export enum ChromeLayers {
   Ports = 'ports'
 }
 
-export type ChromeOnCanvas = StateTile & { turn?: Turn; layers?: ChromeLayers };
+export type ChromeOnCanvas = StateTile & { turn?: Turn; layers?: ChromeLayers; owner?: string };
 
 const CHROME_OF: Record<ChromeLayers, { tile: (t: ChromeOnCanvas, glyphs: Glyphs) => PathItem[]; state: boolean }> = {
   [ChromeLayers.State]: { tile: () => [], state: true },
@@ -98,7 +98,7 @@ function zoomFree(o: Fixed): Settled {
     parts[moving ? 'selected' : 'fixed'].push(once(`wire:${c.edge.id}`, { look, curve: c.curve }, () => edgeItems(c.edge.id, c.curve, look, o.theme)));
   }
   for (const t of o.chrome) {
-    const into = parts[picked.has(t.id) ? 'selected' : 'fixed'];
+    const into = parts[picked.has(t.owner ?? t.id) ? 'selected' : 'fixed'];
     into.push(once(`chrome:${t.id}`, tileFields(t), () => turnedBy(layersOf(t).tile(t, o.glyphs), t.turn)));
     into.push(drawsState(t) ? once(`state:${t.id}`, t, () => turnedBy(stateChrome(t, o.glyphs), t.turn)) : NO_ITEMS);
   }
