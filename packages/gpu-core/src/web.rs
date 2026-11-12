@@ -16,7 +16,7 @@ use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX};
+use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
 use crate::tally::now_ms;
@@ -110,6 +110,8 @@ struct Counted {
     upload_bytes: f64,
     unsharp: u32,
     uncovered: u32,
+    tiles: u32,
+    blocks: u32,
 }
 
 struct GpuPainter<'a> {
@@ -585,6 +587,7 @@ impl WebCore {
         }
         self.queue.submit([encoder.finish()]);
         pieces.into_iter().for_each(|(piece, texture)| self.recycle(piece, size, texture));
+        self.counted.tiles += batch.keys.len() as u32;
         self.count_bake(began);
         Ok(())
     }
@@ -795,6 +798,7 @@ impl WebCore {
             let texture = self.rest_spare.get_mut(&size).and_then(Vec::pop).unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
             self.engine.draw(&self.device, &self.queue, &list, &pictures, &texture.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
             self.rest_shown.push((block, texture));
+            self.counted.blocks += 1;
             self.count_bake(began);
             spent = true;
         }
@@ -904,7 +908,11 @@ impl WebCore {
     pub fn frame_counts(&mut self) -> Vec<f64> {
         let planned = self.compositor.take_planned();
         let counted = std::mem::take(&mut self.counted);
-        vec![f64::from(planned.plans), f64::from(planned.walked), planned.ms, f64::from(counted.bakes), counted.ms, counted.upload_bytes, f64::from(counted.unsharp), f64::from(counted.uncovered), f64::from(step_of(self.camera.zoom))]
+        vec![f64::from(planned.plans), f64::from(planned.walked), planned.ms, f64::from(counted.bakes), counted.ms, counted.upload_bytes, f64::from(counted.unsharp), f64::from(counted.uncovered), f64::from(step_of(self.camera.zoom)), f64::from(counted.tiles), f64::from(counted.blocks), self.held_bytes()]
+    }
+
+    fn held_bytes(&self) -> f64 {
+        (self.tile_textures.len() as u64 * TILE_BYTES) as f64
     }
     pub fn warming(&self) -> bool {
         self.warming
