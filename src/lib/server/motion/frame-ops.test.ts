@@ -5,6 +5,8 @@ import { diffDoc } from '$lib/motion/doc-ops';
 import { appendRevision, readHead } from '$lib/server/repos/motion-revisions';
 import { revisionsDb } from '$lib/server/repos/motion-revisions.test';
 import type { Db } from '$lib/server/db/client';
+import { VarType, type Variable } from '@feega/motion-core/motion/variables-model';
+import { createMemoryDb } from '$lib/server/local/memory-db';
 import { OpsOutcome, commitDoc, commitOnto, commitOps } from './frame-ops';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 
@@ -153,5 +155,64 @@ describe('commitOnto: a whole-doc write lands as ops on whatever head is current
     const out = await commitOnto(db, { orgId: ORG, nodeId: NODE, expectedVersion: 0, doc: start(), actor: ana, summary: null });
 
     expect(out).toMatchObject({ outcome: RevisionOutcome.Written, head: { version: 1 } });
+  });
+});
+
+type Vars = NonNullable<MotionDoc['variables']>[string]['vars'];
+const colour = (hex: string): Vars[string] => ({ type: 'colour' as Vars[string]['type'], values: { Default: hex } });
+const withVars = (doc: MotionDoc, vars: Vars): MotionDoc => ({ ...doc, variables: { Brand: { modes: ['Default'], vars } } });
+
+describe('a stale save never overwrites what landed after its base', () => {
+  const pulled = () => withVars(start(), { ink: colour('#111111'), 'brand-rose': colour('#ff3366'), accent: colour('#3366ff') });
+  const staleEdit = () => withVars(start(), { ink: colour('#222222') });
+
+  async function pulledOver() {
+    const store = await seeded();
+    await appendRevision(store.db, { orgId: ORG, nodeId: NODE, expectedVersion: 1, doc: withVars(start(), { ink: colour('#111111') }), actor: ana });
+    await appendRevision(store.db, { orgId: ORG, nodeId: NODE, expectedVersion: 2, doc: pulled(), actor: bo });
+    return store;
+  }
+
+  it('ops based on a version whose field changed since are a conflict, and the newer doc stays', async () => {
+    const { db, rows } = await pulledOver();
+    const base = withVars(start(), { ink: colour('#111111') });
+
+    const out = await commitOps(db, { ...scope, baseVersion: 2, ops: diffDoc(base, staleEdit()), actor: ana, summary: 'Stale tab' });
+
+    expect(out.outcome).toBe(OpsOutcome.Conflict);
+    expect(rows).toHaveLength(3);
+    expect((await readHead(db, scope))?.doc.variables).toEqual(pulled().variables);
+  });
+
+  it('a whole doc saved from that version is refused the same way', async () => {
+    const { db } = await pulledOver();
+
+    const out = await commitOnto(db, { orgId: ORG, nodeId: NODE, expectedVersion: 2, doc: staleEdit(), actor: ana, summary: 'Stale tab' });
+
+    expect(out.outcome).toBe(RevisionOutcome.Conflict);
+    expect((await readHead(db, scope))?.doc.variables).toEqual(pulled().variables);
+  });
+
+  it('a stale edit that touches nothing the newer head changed still rebases', async () => {
+    const { db } = await pulledOver();
+    const base = withVars(start(), { ink: colour('#111111') });
+
+    const out = await commitOps(db, { ...scope, baseVersion: 2, ops: diffDoc(base, retext(base, 'a', 'A')), actor: ana, summary: 'Text' });
+
+    expect(out).toMatchObject({ outcome: OpsOutcome.Written, rebased: true, head: { version: 4 } });
+    const head = await readHead(db, scope);
+    expect([textOf(head?.doc, 'a'), head?.doc.variables]).toEqual(['A', pulled().variables]);
+  });
+
+  it('local file mode refuses the same stale save', async () => {
+    const db = createMemoryDb({ tables: new Map(), blobs: new Map(), user: { id: 'ana', email: 'a@x', created_at: '2026-01-01' }, storageUrl: () => '', onChange: () => {} }) as unknown as Db;
+    const base = withVars(start(), { ink: colour('#111111') });
+    await appendRevision(db, { orgId: ORG, nodeId: NODE, expectedVersion: 0, doc: base, actor: ana });
+    await appendRevision(db, { orgId: ORG, nodeId: NODE, expectedVersion: 1, doc: pulled(), actor: bo });
+
+    const out = await commitOps(db, { ...scope, baseVersion: 1, ops: diffDoc(base, staleEdit()), actor: ana, summary: 'Stale tab' });
+
+    expect(out.outcome).toBe(OpsOutcome.Conflict);
+    expect((await readHead(db, scope))?.doc.variables).toEqual(pulled().variables);
   });
 });

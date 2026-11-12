@@ -499,27 +499,21 @@ impl WebCore {
         self.tiles.set_canvas_tiles(allowed as usize);
     }
 
+    pub fn set_pixel_ratio(&mut self, ratio: f64) {
+        self.tiles.set_pixel_ratio(ratio);
+    }
+
     pub fn set_tiles(&mut self, on: bool) {
         self.tiled = on;
     }
 
-    fn fill_coarse(&mut self) -> Result<bool, JsValue> {
-        let started = js_sys::Date::now();
-        let screen = (self.target.width(), self.target.height());
-        let wanted = self.tiles.coarse_ahead(self.camera, screen);
-        for batch in bake_batches(&wanted) {
-            if js_sys::Date::now() - started > TILE_BUDGET_GESTURE_MS || input_pending() {
-                return Ok(true);
-            }
-            self.raster_batch(&batch)?;
+    fn fill_pyramid(&mut self) -> Result<bool, JsValue> {
+        if let Some(extent) = self.compositor.extent(&self.library) {
+            self.tiles.set_canvas(extent);
         }
-        Ok(false)
-    }
-
-    fn fill_reserve(&mut self) -> Result<bool, JsValue> {
         let started = js_sys::Date::now();
         let screen = (self.target.width(), self.target.height());
-        let wanted: Vec<TileKey> = self.tiles.reserve(self.camera, screen).into_iter().chain(self.tiles.ahead(self.camera, screen)).collect();
+        let wanted = self.tiles.pyramid(self.camera, screen, tiles_kept(screen, self.tile_budget));
         for batch in bake_batches(&wanted) {
             if js_sys::Date::now() - started > TILE_BUDGET_GESTURE_MS || input_pending() {
                 return Ok(true);
@@ -635,7 +629,7 @@ impl WebCore {
             multiview_mask: None,
         }));
         let c = self.camera;
-        let step = crate::tiles::step_of(c.zoom);
+        let step = self.tiles.step_for(c);
         let tile_of = |key: &TileKey| placed(*key, self.tile_textures.get(key)?, c, screen);
         let painted = self.compositor.held_painted();
         let covered = |look: Lookup| Rect::new(((painted.x0 - look.x) / look.scale).ceil(), ((painted.y0 - look.y) / look.scale).ceil(), ((painted.x1 - look.x) / look.scale).floor(), ((painted.y1 - look.y) / look.scale).floor()).intersect(screen);
@@ -734,7 +728,7 @@ impl WebCore {
         let waiting_rest = matches!(self.motion, CoreMotion::Still) && !exact;
         self.pending = waiting_rest || self.compositor.pending_raster();
         if exact {
-            self.pending |= self.fill_reserve()?;
+            self.pending |= self.fill_pyramid()?;
         }
         Ok(if rastered > 0 { "partial".into() } else { "reused".into() })
     }
@@ -854,7 +848,7 @@ impl WebCore {
         if self.tiled && !frame.pending && idle {
             self.warm_tiles()?;
         } else if self.tiled && !frame.pending && coarse {
-            coarse_left = self.fill_coarse()?;
+            coarse_left = self.fill_pyramid()?;
         }
         self.warming = self.tiled && building == Building::Nothing && (!idle || coarse_left);
         Ok(frame.report())
@@ -899,27 +893,8 @@ impl WebCore {
             }
             self.raster_batch(&batch)?;
         }
-        if self.fill_reserve()? {
-            self.pending = true;
-            return Ok(());
-        }
-        self.pending |= self.fill_canvas()?;
+        self.pending |= self.fill_pyramid()?;
         Ok(())
-    }
-
-    fn fill_canvas(&mut self) -> Result<bool, JsValue> {
-        let Some(extent) = self.compositor.extent(&self.library) else { return Ok(false) };
-        self.tiles.set_canvas(extent);
-        let started = js_sys::Date::now();
-        let screen = (self.target.width(), self.target.height());
-        let wanted = self.tiles.canvas_ahead(extent, self.camera, screen);
-        for batch in bake_batches(&wanted) {
-            if js_sys::Date::now() - started > TILE_BUDGET_GESTURE_MS || input_pending() {
-                return Ok(true);
-            }
-            self.raster_batch(&batch)?;
-        }
-        Ok(false)
     }
 
     fn count_bake(&mut self, began: f64) {
@@ -932,7 +907,6 @@ impl WebCore {
         let counted = std::mem::take(&mut self.counted);
         vec![f64::from(planned.plans), f64::from(planned.walked), planned.ms, f64::from(counted.bakes), counted.ms, counted.upload_bytes, f64::from(counted.unsharp), f64::from(counted.uncovered), f64::from(step_of(self.camera.zoom))]
     }
-
     pub fn warming(&self) -> bool {
         self.warming
     }

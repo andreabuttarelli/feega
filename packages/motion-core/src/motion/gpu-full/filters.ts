@@ -1,4 +1,5 @@
 import type { SvgNode } from '../effects/registry';
+import { rgbaOf } from './rgba';
 
 export type CssFunction = { name: string; args: string[] };
 
@@ -19,8 +20,42 @@ const FUNCTION = /([a-z-]+)\(((?:[^()]|\([^()]*\))*)\)/g;
 const ARGS = /\s+(?![^(]*\))/;
 const DEG = Math.PI / 180;
 
+const PERCENT = 100;
+const LENGTH = /^-?[\d.]/;
+
+const amount = (arg: string | undefined, fallback: number): number => {
+  if (arg === undefined) {
+    return fallback;
+  }
+  return arg.endsWith('%') ? parseFloat(arg) / PERCENT : parseFloat(arg);
+};
+
+const amountIs = (identity: number, fallback: number) => (args: string[]) => amount(args[0], fallback) === identity;
+
+const shadowIsInvisible = (args: string[]): boolean => {
+  const colour = args.find((a) => !LENGTH.test(a));
+  return colour !== undefined && rgbaOf(colour)?.[3] === 0;
+};
+
+const NO_OP: Record<string, (args: string[]) => boolean> = {
+  blur: amountIs(0, 0),
+  'drop-shadow': shadowIsInvisible,
+  opacity: (args) => amount(args[0], 1) >= 1,
+  brightness: amountIs(1, 1),
+  contrast: amountIs(1, 1),
+  saturate: amountIs(1, 1),
+  grayscale: amountIs(0, 1),
+  sepia: amountIs(0, 1),
+  invert: amountIs(0, 1),
+  'hue-rotate': amountIs(0, 0)
+};
+
+const changesPixels = (fn: CssFunction): boolean => !NO_OP[fn.name]?.(fn.args);
+
+export const namesCssFunctions = (filter: string): boolean => new RegExp(FUNCTION.source).test(filter);
+
 export function cssFunctions(filter: string): CssFunction[] {
-  return [...filter.matchAll(FUNCTION)].map((m) => ({ name: m[1], args: m[2].trim().split(ARGS).filter(Boolean) }));
+  return [...filter.matchAll(FUNCTION)].map((m) => ({ name: m[1], args: m[2].trim().split(ARGS).filter(Boolean) })).filter(changesPixels);
 }
 
 const rows = (r: number[], g: number[], b: number[]) => [...r, 0, 0, ...g, 0, 0, ...b, 0, 0, 0, 0, 0, 1, 0];
