@@ -2,13 +2,13 @@ import { ItemKind, type DisplayList } from '@feega/motion-core/motion/gpu-full/d
 import { BlendMode } from '@feega/motion-core/motion/blend';
 import type { Viewport } from '$lib/canvas/dot-grid';
 import type { Box } from './canvas-scene';
+import { THUMBS_DB, cacheName, type CacheScope } from './frame-cache';
 
 type Size = { width: number; height: number };
 type Rect = { x: number; y: number; width: number; height: number };
 
 const MIN_SIDE_PX = 16;
 const MAX_SIDE_PX = 512;
-const DB_NAME = 'feega-frame-thumbs';
 const STORE = 'thumbs';
 const THUMB_TYPE = 'image/webp';
 const THUMB_QUALITY = 0.8;
@@ -53,15 +53,18 @@ const NO_STORE: ThumbStore = { get: async () => null, put: () => {} };
 
 const request = <T>(r: IDBRequest<T>) => new Promise<T>((resolve, reject) => Object.assign(r, { onsuccess: () => resolve(r.result), onerror: () => reject(r.error) }));
 
-export function thumbStore(): ThumbStore {
-  if (typeof indexedDB === 'undefined') {
+export function thumbStore(scope: CacheScope | null): ThumbStore {
+  if (!scope || typeof indexedDB === 'undefined') {
     return NO_STORE;
   }
   const opening = new Promise<IDBDatabase | null>((resolve) => {
     try {
-      const open = indexedDB.open(DB_NAME, 1);
+      const open = indexedDB.open(cacheName(scope, THUMBS_DB), 1);
       open.onupgradeneeded = () => open.result.createObjectStore(STORE);
-      open.onsuccess = () => resolve(open.result);
+      open.onsuccess = () => {
+        open.result.onversionchange = () => open.result.close();
+        resolve(open.result);
+      };
       open.onerror = () => resolve(null);
     } catch {
       resolve(null);
