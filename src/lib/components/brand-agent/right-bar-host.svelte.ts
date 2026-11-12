@@ -1,5 +1,3 @@
-import { env as publicEnv } from '$env/dynamic/public';
-import { LocalOff, localOff } from '$lib/local-user';
 import { CHAT_PANEL, readChatPanelPx, writeChatPanelPx } from '$lib/shell-prefs';
 import type { ChatPrefill } from './chat-prefill';
 import type { StreamData } from './chat-session.svelte';
@@ -107,7 +105,7 @@ export class RightBarHost {
   }
 }
 
-export const rightBar = new RightBarHost(localOff(LocalOff.Chat, publicEnv) ? [BarTab.Chat] : []);
+export const rightBar = new RightBarHost();
 
 export function portalInto(node: HTMLElement, target: HTMLElement) {
   target.appendChild(node);
