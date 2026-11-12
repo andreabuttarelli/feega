@@ -16,7 +16,8 @@ describe('the images a shipped component keeps', () => {
     expect(durableImages({ a: 'http://localhost:5391/logos/gong.svg' }, undefined)).toEqual({});
   });
 
-  it('drops an inline or unaddressable image', () => {
-    expect(durableImages({ a: 'data:image/png;base64,AAAA', b: 'blob:x' }, BASE)).toEqual({});
+  it('keeps a small inline image and drops a large or unaddressable one', () => {
+    const large = `data:image/png;base64,${'A'.repeat(70_000)}`;
+    expect(durableImages({ a: 'data:image/png;base64,AAAA', b: 'blob:x', c: large }, BASE)).toEqual({ a: 'data:image/png;base64,AAAA' });
   });
 });
