@@ -13,6 +13,7 @@ import type { RestNode } from '$lib/server/figma/rest-message';
 import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
 import { uniformRadius } from './corner-radius';
 import { ColourPaint, FULL_RADIUS, sameColour, textKey, type CtaUse, type Samples, type TextCase, type TextStyle, type Tokens } from './page-tokens';
+import { viewOnly } from './page-views';
 
 export type Units = { docPerPx: number; images: ReadonlySet<string> };
 
@@ -195,8 +196,6 @@ function ctasIn(root: RestNode): CtaUse[] {
   return found;
 }
 
-const breakpointOnly = (clip: MotionClip) => Boolean(clip.hidden) && Object.values(clip.overrides ?? {}).some((o) => o.hidden === false);
-
 export function samplesOf(docs: readonly MotionDoc[], root: RestNode, units: Units): Samples {
   const samples: Samples = { colours: [], texts: [], effects: [], gradients: [], radii: radiiIn(root).map((r) => Math.round(r * units.docPerPx)), spacing: [], ctas: ctasIn(root) };
   for (const doc of docs) {
@@ -204,7 +203,7 @@ export function samplesOf(docs: readonly MotionDoc[], root: RestNode, units: Uni
     for (const { view, compId } of scopesOf(doc)) {
       const names = ancestry(hosts, compId);
       const button = names.some((n) => BUTTON.test(n));
-      for (const clip of view.tracks.flatMap((t) => t.clips as MotionClip[]).filter((c) => !units.images.has(c.id) && !breakpointOnly(c))) {
+      for (const clip of view.tracks.flatMap((t) => t.clips as MotionClip[]).filter((c) => !units.images.has(c.id) && !viewOnly(c))) {
         const look = lookOf(clip, view, units);
         if (look.text) {
           samples.texts.push({ ...look.text, chars: look.chars, heading: headingOf(names), button });

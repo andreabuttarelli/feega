@@ -335,6 +335,8 @@ function placedTracks(doc: MotionDoc, settledClips: Map<string, MotionClip>, slo
 
 const shownOnlyAt = (clip: MotionClip, view: string): MotionClip => ({ ...clip, hidden: true, ...(clip.hidden ? {} : { overrides: { [view]: { hidden: false } } }) });
 
+export const viewOnly = (clip: MotionClip) => Boolean(clip.hidden) && Object.values(clip.overrides ?? {}).some((o) => o.hidden === false);
+
 type State = { doc: MotionDoc; images: FigmaImage[]; keys: Map<string, string>; page: string | null };
 
 const fontsJoined = (base: MotionDoc['fonts'], read: MotionDoc['fonts']): MotionDoc['fonts'] => [...base, ...read.filter((face) => !base.some((f) => f.family === face.family))];
