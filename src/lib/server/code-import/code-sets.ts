@@ -22,12 +22,19 @@ const ROLE_OF_TYPE: Record<string, (values: PropValue[]) => PropRole> = {
   string: (values) => (values.every((v) => SYMBOL.test(String(v))) && new Set(values).size <= MAX_AXIS_VALUES ? PropRole.Axis : PropRole.Text)
 };
 
-function rolesOf(uses: ComponentUse[]): Map<string, PropRole> {
+export type DeclaredAxes = ReadonlyMap<string, Record<string, readonly string[]>>;
+
+const isDeclared = (values: PropValue[], declared: readonly string[] | undefined) => !!declared && values.every((v) => declared.includes(String(v)));
+
+function rolesOf(uses: ComponentUse[], declared: Record<string, readonly string[]> = {}): Map<string, PropRole> {
   const keys = [...new Set(uses.flatMap((u) => Object.keys(u.props)))].filter((k) => k.length <= MAX_KEY);
   return new Map(
     keys.map((key) => {
       const values = uses.flatMap((u) => (key in u.props ? [u.props[key]] : []));
       const types = new Set(values.map((v) => typeof v));
+      if (isDeclared(values, Object.hasOwn(declared, key) ? declared[key] : undefined)) {
+        return [key, PropRole.Axis];
+      }
       if (IGNORED.test(key) || types.size !== 1) {
         return [key, PropRole.Ignored];
       }
@@ -45,9 +52,9 @@ function refOf(use: ComponentUse, roles: Map<string, PropRole>): CodeComponent {
   return { key: `${use.component}|${JSON.stringify(sortedEntries(variant))}`, name: use.component, variant, texts };
 }
 
-export function codeSets(uses: ComponentUse[]): (CodeComponent | null)[] {
+export function codeSets(uses: ComponentUse[], declared: DeclaredAxes = new Map()): (CodeComponent | null)[] {
   const byName = Map.groupBy(uses, (u) => u.component);
-  const roles = new Map([...byName].map(([name, own]) => [name, rolesOf(own)]));
+  const roles = new Map([...byName].map(([name, own]) => [name, rolesOf(own, declared.get(name))]));
   const keys = new Map<string, Set<string>>();
   return uses.map((use) => {
     const ref = refOf(use, roles.get(use.component)!);

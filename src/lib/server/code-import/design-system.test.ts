@@ -4,7 +4,8 @@ import type { RestNode } from '$lib/server/figma/rest-message';
 import type { PageTree } from '$lib/server/url-import/page-tree';
 import { fixture } from '../../../../tests/fixtures/design-tokens/read';
 import { codePlan } from './code-doc';
-import { designed, designOf } from './design-system';
+import { designed, designOf, withBoard } from './design-system';
+import { DESIGN_BOARD } from './design-board';
 import { BASE_CONDITIONS } from './render-conditions';
 
 let ids = 0;
@@ -25,5 +26,17 @@ describe('designed', () => {
     const mains = Object.values(set.doc.comps).flatMap((c) => c.tracks.flatMap((t) => t.clips as MotionClip[]));
     expect(mains.some((c) => c.bind?.fill === 'app Colors/muted')).toBe(true);
     expect(set.doc.variables?.['app Colors']).toBeDefined();
+  });
+});
+
+describe('withBoard', () => {
+  it('la tavola mostra gli stili di testo del repo, non solo le ombre', async () => {
+    const design = (await designOf(fixture('typescale')))!;
+
+    const [board] = withBoard(design, 'app', [{ label: '/', tree: { ...tree, width: 1280 }, uses: [] }]);
+
+    const names = (board.tree.root.children ?? []).map((n) => n.name);
+    expect(board.label).toBe(DESIGN_BOARD);
+    expect(names).toEqual(expect.arrayContaining(['Text', 'app Text/hero', 'Shadow', 'app Shadow/card']));
   });
 });

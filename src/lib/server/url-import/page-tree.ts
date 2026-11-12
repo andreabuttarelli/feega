@@ -28,7 +28,7 @@ export type PageSnap = { ref: string; box: PageBox; mode: SnapMode };
 
 export type PageSheet = { at?: string; text: string };
 
-export type PageTree = { title: string; url: string; width: number; height: number; root: RestNode; truncated: boolean; fonts?: PageFont[]; sheets?: string[]; styles?: PageSheet[]; snaps?: PageSnap[]; outline?: PageOutline; patterns?: PagePattern[] };
+export type PageTree = { title: string; url: string; width: number; height: number; root: RestNode; truncated: boolean; fonts?: PageFont[]; sheets?: string[]; styles?: PageSheet[]; rootVars?: Record<string, string>; snaps?: PageSnap[]; outline?: PageOutline; patterns?: PagePattern[] };
 
 export const treeScript = (limits: TreeLimits) =>
   `var __name = (f) => f; (${pageTreeOf.toString()})(${JSON.stringify(limits)}, (${pageKit.toString()})(), (${pagePatterns.toString()})(${JSON.stringify(PATTERN_LIMITS)}), (${pageHovers.toString()})(${JSON.stringify(HOVER_LIMITS)})).then((tree) => ({ ...tree, outline: (${pageOutlineOf.toString()})(${JSON.stringify(OUTLINE_LIMITS)}, tree.height) }))`;
@@ -1440,6 +1440,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     fonts,
     sheets,
     styles: stylesOf(),
+    rootVars: rootVarsOf(),
     snaps: snaps.map((s) => ({ ...s, mode: s.mode as SnapMode })),
     ...(captured.length ? { patterns: captured } : {}),
     root: { id: id(), type: 'FRAME', name: document.title.trim() || location.hostname, absoluteBoundingBox: { x: 0, y: 0, width, height }, fills: ground.length ? ground : [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 1 } }], clipsContent: true, children }
@@ -1621,6 +1622,20 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
           })
       )
     );
+  }
+
+  function rootVarsOf(): Record<string, string> {
+    const MAX_ROOT_VARS = 512;
+    const MAX_VALUE = 200;
+    const css = getComputedStyle(document.documentElement);
+    const out: Record<string, string> = {};
+    for (const name of [...css].filter((p) => p.startsWith('--')).slice(0, MAX_ROOT_VARS)) {
+      const value = css.getPropertyValue(name).trim();
+      if (value && value.length <= MAX_VALUE) {
+        out[name] = value;
+      }
+    }
+    return out;
   }
 
   function stylesOf(): PageSheet[] {

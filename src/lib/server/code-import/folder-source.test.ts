@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { devServerOf, shimmedArgs } from './folder-source';
+import { devServerOf, folderLibrary, folderNames, shimmedArgs } from './folder-source';
 import { SHIM_CONFIG } from './folder-shims';
 import { PlanRefusal } from './run-plan';
 
@@ -47,5 +47,29 @@ describe('the folder dev server', () => {
     const root = await folder({ 'package.json': { devDependencies: { vite: '^7.0.0' } } });
     await writeFile(join(root, 'button.tsx'), 'export const Button = () => null;');
     expect(await shimmedArgs(root)).toEqual([]);
+  });
+});
+
+describe('folderNames', () => {
+  it('un componente React scritto in .js entra nei nomi come uno in .jsx', async () => {
+    const root = await folder({ 'package.json': {} });
+    await mkdir(join(root, 'src'), { recursive: true });
+    await writeFile(join(root, 'src/Hero.js'), 'export function Hero() { return <h1>Hi</h1>; }');
+    await writeFile(join(root, 'src/Card.jsx'), 'export const Card = () => <div />;');
+
+    expect(await folderNames(root)).toEqual(['Card', 'Hero']);
+  });
+});
+
+describe('folderLibrary', () => {
+  it('legge i componenti della cartella senza eseguirli, con i loro assi', async () => {
+    const root = await folder({ 'package.json': {} });
+    await mkdir(join(root, 'src/lib/components'), { recursive: true });
+    await writeFile(join(root, 'src/lib/components/Badge.svelte'), "<script lang=\"ts\">let { variant = 'default' }: { variant?: 'default' | 'tag' } = $props();</script><span />");
+    await writeFile(join(root, 'src/routes/page.svelte'), '<h1>Home</h1>').catch(() => undefined);
+
+    const library = await folderLibrary(root);
+
+    expect(library.components.map((c) => [c.name, c.file, c.axes.variant?.values])).toEqual([['Badge', 'src/lib/components/Badge.svelte', ['default', 'tag']]]);
   });
 });

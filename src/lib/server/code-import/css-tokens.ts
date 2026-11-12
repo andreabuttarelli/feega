@@ -20,7 +20,9 @@ export type VarRule = { selector: string; property: string; token: string };
 
 export type ThemeBlock = { mode: string; close: DeclAt };
 
-export type Parsed = { declared: Declared[]; rules: VarRule[]; skipped: string[]; blocks: ThemeBlock[] };
+export type TypeDecl = { selector: string; property: string; raw: string; at: DeclAt };
+
+export type Parsed = { declared: Declared[]; rules: VarRule[]; skipped: string[]; blocks: ThemeBlock[]; typed: TypeDecl[] };
 
 export const LIGHT = 'Light';
 export const DARK = 'Dark';
@@ -62,7 +64,9 @@ const MAX_SOURCE_DEPTH = 12;
 const DEPENDENCIES = 'node_modules';
 const VAR_ONLY = /^var\(\s*(--[\w.-]+)\s*(?:,[^)]*)?\)$/;
 const CUSTOM_PROPERTY = /^--[\w.-]+$/;
-const BOUND_PROPERTIES = new Set(['color', 'background', 'background-color', 'border-color', 'gap', 'padding', 'border-radius']);
+const BOUND_PROPERTIES = new Set(['color', 'background', 'background-color', 'border-color', 'gap', 'padding', 'border-radius', 'border-width', 'font-family']);
+export const TYPE_PROPERTIES = new Set(['font-size', 'font-weight', 'line-height', 'letter-spacing', 'box-shadow']);
+const STATEFUL_SELECTOR = /:/;
 
 const title = (word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
 
@@ -70,9 +74,16 @@ const MODE_SELECTORS: [RegExp, (m: RegExpExecArray) => string][] = [
   [/^(?::root|html|:host)$/, () => LIGHT],
   [/^(?::root|html)?\.light$/, () => LIGHT],
   [/^(?::root|html)?\.dark$/, () => DARK],
-  [/^(?::root|html)?\[data-(?:theme|mode)=["']?([\w-]+)["']?\]$/, (m) => title(m[1])],
+  [/^(?::root|html)?\[data-(?:theme|mode|mui-color-scheme|color-scheme)=["']?([\w-]+)["']?\]$/, (m) => title(m[1])],
   [/^(?::root|html)?\[data-accent=["']?([\w-]+)["']?\]$/, (m) => `${ACCENT_MARK}${title(m[1])}`]
 ];
+
+const MODE_SELECTOR: Record<string, string> = { [LIGHT]: ':root', [DARK]: '.dark' };
+
+export function computedSheet(vars: Record<string, string>, mode: string): LoadedSheet {
+  const selector = MODE_SELECTOR[mode] ?? `[data-theme="${mode.toLowerCase()}"]`;
+  return { text: `${selector} {\n${Object.entries(vars).map(([name, value]) => `  ${name}: ${value};`).join('\n')}\n}` };
+}
 
 const SCHEME_MEDIA = /^@media\s*\(\s*prefers-color-scheme\s*:\s*(light|dark)\s*\)$/i;
 const THEME_AT = /^@theme\b/;
@@ -166,8 +177,12 @@ function declare(out: Collected, stack: Block[], text: string, start: number, en
 
   if (!CUSTOM_PROPERTY.test(name)) {
     const token = VAR_ONLY.exec(raw)?.[1];
-    if (token && context.rule && !context.rule.mode && !context.outside && BOUND_PROPERTIES.has(name)) {
-      out.rules.push({ selector: context.rule.label, property: name, token });
+    const plain = context.rule && !context.rule.mode && !context.outside;
+    if (token && plain && BOUND_PROPERTIES.has(name)) {
+      out.rules.push({ selector: context.rule!.label, property: name, token });
+    }
+    if (!token && plain && !raw.includes('var(') && TYPE_PROPERTIES.has(name) && !STATEFUL_SELECTOR.test(context.rule!.label) && !fromPage(place(start).file)) {
+      out.typed.push({ selector: context.rule!.label, property: name, raw, at: place(start + lead) });
     }
     return;
   }
@@ -230,7 +245,7 @@ function parseOne(sheet: Sheet, out: Collected): void {
 }
 
 export function parseSheets(sheets: Sheet[]): Parsed {
-  const out: Collected = { declared: [], rules: [], skipped: [], blocks: [] };
+  const out: Collected = { declared: [], rules: [], skipped: [], blocks: [], typed: [] };
   sheets.forEach((sheet) => parseOne(sheet, out));
   const inFiles = new Set(out.declared.filter((d) => !fromPage(d.at.file)).map((d) => d.name));
   return { ...out, declared: out.declared.filter((d) => !fromPage(d.at.file) || !inFiles.has(d.name)) };

@@ -26,7 +26,7 @@ change to the repo's build.
 
 | Framework | Read from | Component of the codebase | Props |
 |---|---|---|---|
-| React (client) | `__reactFiber$…`, composite fibers between a host element and the host above | name declared in a `.tsx`/`.jsx` of the repo, or annotated by react-docgen (`__docgenInfo`), or whose `displayName` ends in such a name (`HeroUI.Button` → `Button`) | `memoizedProps` |
+| React (client) | `__reactFiber$…`, composite fibers between a host element and the host above | name declared in a `.tsx`/`.jsx`/`.js` of the repo, or annotated by react-docgen (`__docgenInfo`), or whose `displayName` ends in such a name (`HeroUI.Button` → `Button`) | `memoizedProps` |
 | React server components | `_debugInfo` on the fibers a server component produced (React 19 dev) | name declared in the repo | `props` of the debug entry |
 | Vue 3 | `__vueParentComponent`, the instances whose `subTree.el` is the element | `__file` outside `node_modules`, or a known name, or docgen | `props` |
 | Svelte 5 | `__svelte_meta`, the `component` entries of the dev stack | definition file and tag site outside `node_modules` / `.svelte-kit` | none: Svelte keeps none, so no variants |
@@ -55,6 +55,7 @@ Per component, over all its usages on the route:
 | boolean, or string matching `^[a-z][\w-]{0,23}$` with at most 8 distinct values | variant axis; an absent prop is the value `Default` |
 | any other string, and `children` always | text property of the main, overridden per instance |
 | functions, objects, numbers, `className`, `style`, `id`, `key`, `ref`, `href`, `src`, `alt`, `on*`, `aria-*`, `data-*`, `asChild` | ignored |
+| any prop the source declares as a union, enum or `cva`/`tv` variant (`component-discovery.ts`), when every observed value is declared | variant axis, even `type`, `name`, `value` or a number |
 
 The first render of each variant combination is its main; mains of one component share the set
 (`component.set` = component name) and declare a text property per text prop found in their

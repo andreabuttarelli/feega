@@ -169,3 +169,18 @@ describe('boundToTokens', () => {
     expect(edited.ok && fills(edited.doc)).toEqual(['#aaaaaa', '#222222']);
   });
 });
+
+describe('boundToTokens font and border', () => {
+  const SHEET = ':root {\n  --font-heading: "Inter", system-ui, sans-serif;\n  --font-mono: "JetBrains Mono", monospace;\n  --border-width-hair: 2px;\n}\n.frame { border-width: var(--border-width-hair); }\n';
+
+  it('una classe font-* lega la famiglia; un bordo letto da var() lega il suo spessore', () => {
+    const parsed = parseSheets([{ path: 'src/app.css', text: SHEET }]);
+    const vars = variablesOf(tokenSetOf(parsed), 'app', { active: 'Light' });
+    const framed: RestNode = { ...block('Framed', '#ffffff', 'div', 'frame', 60), strokes: [{ type: 'SOLID', color: rgb('#111111') }], strokeWeight: 2 };
+
+    const { doc } = boundToTokens(docOf(page('/', '#ffffff', [text('Heading', '#111111', 'font-heading', 10), framed])), { ...vars, rules: parsed.rules, base: 'Light', boards: {} });
+
+    expect(clipNamed(doc, 'Heading').bind).toMatchObject({ font: 'app Type/heading' });
+    expect(clipWith(doc, 'frame').bind).toMatchObject({ border: 'app Border/hair' });
+  });
+});
