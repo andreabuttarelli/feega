@@ -35,8 +35,9 @@ const VM_LEAVES = {
   '(program)': Bucket.Native
 };
 
-const isWasm = (frame) => frame.url.startsWith('wasm://') || /\.wasm$/.test(frame.url);
-const isGlue = (frame) => /gpu_core(_gl)?\.js$/.test(frame.url);
+const path = (frame) => frame.url.split('?')[0];
+const isWasm = (frame) => frame.url.startsWith('wasm://') || /\.wasm$/.test(path(frame));
+const isGlue = (frame) => /gpu_core(_gl)?\.js$/.test(path(frame));
 
 function jsAboveWasm(stack) {
   const wasmAt = stack.findIndex(isWasm);

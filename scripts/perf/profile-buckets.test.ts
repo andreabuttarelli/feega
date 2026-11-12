@@ -66,6 +66,16 @@ describe('profile buckets', () => {
     expect(bucketOf([frameLoop, app('countFrame')])).toBe(Bucket.Js);
   });
 
+  it('recognises the engine and its glue when served with a version query', () => {
+    const versioned = (url: string) => (frame: Frame): Frame => ({ ...frame, url: `${url}?v=5741735e2faf` });
+    const wasmV = versioned('http://127.0.0.1:5288/gpu-core/gpu_core_bg.wasm');
+    const glueV = versioned(GLUE);
+
+    expect(bucketOf([frameLoop, wasmV(planAt)])).toBe(Bucket.Plan);
+    expect(bucketOf([frameLoop, wasmV(rasterBatch), glueV(glue('__wbg_writeBuffer_c4f1'))])).toBe(Bucket.GpuCalls);
+    expect(bucketOf([frameLoop, glueV(glue('frame'))])).toBe(Bucket.Glue);
+  });
+
   it('files engine code outside every named phase as wasm other', () => {
     expect(bucketOf([frameLoop, wasm('<hashbrown[aa11bb22cc33dd44]::raw::RawTable<u64>>::reserve_rehash')])).toBe(Bucket.WasmOther);
   });
