@@ -69,6 +69,10 @@ export function initials(name: string): string {
     .toUpperCase();
 }
 
+export function lockHeight(el: HTMLElement) {
+  el.style.height = `${el.offsetHeight}px`;
+}
+
 export const CHAPTER_SELECTOR = '.chapter';
 
 const outsideChapters = (selector: string) => `${selector}:not(${CHAPTER_SELECTOR} *)`;

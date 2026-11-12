@@ -77,3 +77,11 @@ describe('element rules', () => {
     expect(ELEMENT_RULES.at(-1)).toMatchObject({ selector: '*', build: BuildMode.Place });
   });
 });
+
+describe('size lock', () => {
+  it('locks the layout height, not the scaled one, so the page never shrinks under the reader', () => {
+    const el = { offsetHeight: 541, style: { height: '' }, getBoundingClientRect: () => ({ height: 483 }) };
+    live.lockHeight(el as unknown as HTMLElement);
+    expect(el.style.height).toBe('541px');
+  });
+});
