@@ -1,5 +1,5 @@
 use gpu_core::retained::Camera;
-use gpu_core::tiles::{NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, bake_batches, BAKE_BATCH_TILES, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
+use gpu_core::tiles::{lifted_keys, NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, bake_batches, BAKE_BATCH_TILES, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
 use vello::kurbo::{Point, Rect};
 
 const SCREEN: (u32, u32) = (1024, 768);
@@ -536,7 +536,8 @@ fn during_a_gesture_every_blurry_visible_tile_is_queued_centre_out_before_the_st
 
     let blurry: Vec<TileKey> = visible.iter().copied().filter(|k| *k != changed).collect();
     assert_eq!(order[..blurry.len()], blurry[..]);
-    assert_eq!(order[blurry.len()..], [changed]);
+    assert_eq!(order[blurry.len()], changed);
+    assert!(order[blurry.len() + 1..].iter().all(|k| k.step < changed.step && k.world().overlaps(changed.world())));
 }
 
 #[test]
@@ -630,4 +631,31 @@ fn a_level_covering_the_painted_screen_hides_the_coarser_ones_under_it() {
     assert!(!frame.missing.is_empty());
     let steps: std::collections::BTreeSet<i32> = frame.draw.iter().map(|k| k.step).collect();
     assert_eq!(steps.into_iter().collect::<Vec<_>>(), vec![coarsest]);
+}
+
+#[test]
+fn a_changed_tile_shown_from_a_sharper_step_is_queued_to_raster_again() {
+    let mut tiles = Tiles::default();
+    let sharp = tiles.frame(camera(step_zoom(1)), SCREEN).missing;
+    sharp.iter().for_each(|k| tiles.hold(*k));
+    tiles.frame(camera(step_zoom(1)), (SCREEN.0 * 2, SCREEN.1 * 2)).missing.iter().for_each(|k| tiles.hold(*k));
+    let shown = tiles.frame(camera(1.0), SCREEN).draw;
+    assert!(shown.iter().all(|k| k.step == 1));
+    tiles.invalidate(shown[0].world());
+
+    let frame = tiles.frame(camera(1.0), SCREEN);
+
+    assert!(frame.missing.contains(&shown[0]));
+    assert!(tiles.queue(frame.missing).stale.contains(&shown[0]));
+}
+
+#[test]
+fn a_lifted_use_needs_the_tiles_of_its_rest_that_its_move_brings_on_screen() {
+    let rest = Rect::new(-1000.0, 0.0, -500.0, 200.0);
+
+    let keys = lifted_keys(camera(1.0), SCREEN, rest, (1200.0, 0.0), 0);
+
+    assert!(!keys.is_empty());
+    assert!(keys.iter().all(|k| k.world().overlaps(rest) && k.step == 0));
+    assert!(lifted_keys(camera(1.0), SCREEN, rest, (0.0, 0.0), 0).is_empty());
 }

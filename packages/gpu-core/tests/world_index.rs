@@ -76,9 +76,38 @@ struct Kept {
 #[derive(Default)]
 struct Model {
     uses: Vec<Kept>,
+    covering: std::collections::HashSet<String>,
+}
+
+fn lifted(k: &Kept) -> bool {
+    k.u.hold && k.rest != Some(k.u.matrix)
+}
+
+fn translated(k: &Kept) -> bool {
+    lifted(k) && k.rest.is_some_and(|r| r[..4] == k.u.matrix[..4])
+}
+
+fn reach_at(k: &Kept, at: Affine, sizes: &HashMap<String, (f64, f64)>) -> Option<Rect> {
+    reach_of(&Kept { u: UseItem { matrix: at, ..k.u.clone() }, rest: k.rest }, sizes)
 }
 
 impl Model {
+    fn cover(&mut self, sizes: &HashMap<String, (f64, f64)>) {
+        if !self.uses.iter().any(|k| k.u.hold) {
+            self.covering.clear();
+            return;
+        }
+        let mut next: std::collections::HashSet<String> = self.covering.iter().filter(|c| self.uses.iter().any(|k| &k.u.clip == *c)).cloned().collect();
+        for (i, k) in self.uses.iter().enumerate().filter(|(_, k)| translated(k)) {
+            let areas = [reach_at(k, k.u.matrix, sizes), reach_at(k, k.rest.expect("translated"), sizes)];
+            for area in areas.into_iter().flatten() {
+                let over = self.uses[i + 1..].iter().filter(|o| !lifted(o) && reach_of(o, sizes).is_none_or(|r| r.overlaps(area)));
+                next.extend(over.map(|o| o.u.clip.clone()));
+            }
+        }
+        self.covering = next;
+    }
+
     fn apply(&mut self, patch: &Patch) {
         for gone in &patch.drop {
             self.uses.retain(|k| &k.u.clip != gone);
@@ -97,8 +126,7 @@ impl Model {
     }
 
     fn scene(&self, camera: Affine, w: u32, h: u32) -> DisplayList {
-        let lifted = |k: &Kept| k.u.hold && k.rest != Some(k.u.matrix);
-        let items = self.uses.iter().filter(|k| !lifted(k)).map(|k| Item::Use(UseItem { matrix: times(camera, k.u.matrix), cache: false, hold: false, ..k.u.clone() }));
+        let items = self.uses.iter().filter(|k| !lifted(k) && !self.covering.contains(&k.u.clip)).map(|k| Item::Use(UseItem { matrix: times(camera, k.u.matrix), cache: false, hold: false, ..k.u.clone() }));
         DisplayList { width: w, height: h, background: None, items: items.collect(), faces: Vec::new(), fragments: Default::default() }
     }
 
@@ -192,6 +220,7 @@ fn step(rng: &mut Seeded, world: &mut World, twin: &mut Twin, model: &mut Model,
     let patch = parse_patch(&patch).unwrap();
     let sizes = twin.sizes.clone();
     model.apply(&patch);
+    model.cover(&sizes);
     world.patch(patch, |g| sizes.get(g).copied());
 }
 
@@ -252,8 +281,7 @@ fn meets(model: &Model, twin: &Twin, camera: Affine, w: u32, h: u32) -> Vec<Stri
         let corners = [(0.0, 0.0), (gw, 0.0), (gw, gh), (0.0, gh)].map(|(x, y)| t * Point::new(x, y));
         corners.iter().fold(Rect::from_points(corners[0], corners[0]), |r, p| r.union_pt(*p)).overlaps(view)
     };
-    let lifted = |k: &Kept| k.u.hold && k.rest != Some(k.u.matrix);
-    model.uses.iter().filter(|k| !lifted(k) && on_screen(k)).map(|k| k.u.clip.clone()).collect()
+    model.uses.iter().filter(|k| !lifted(k) && !model.covering.contains(&k.u.clip) && on_screen(k)).map(|k| k.u.clip.clone()).collect()
 }
 
 fn reach_of(k: &Kept, sizes: &HashMap<String, (f64, f64)>) -> Option<Rect> {

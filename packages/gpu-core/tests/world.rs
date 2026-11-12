@@ -231,29 +231,79 @@ fn letting_go_of_a_held_use_puts_it_back_into_the_tiles() {
     assert_eq!(w.scene(IDENTITY, 1000, 100).items.len(), 1);
 }
 
-#[test]
-fn a_frame_dragged_from_the_tiles_is_drawn_from_them_shifted_not_rastered_again() {
-    let mut w = World::new();
-    w.patch(parse_patch(&put("a", 0.0)).unwrap(), sized);
-    w.patch(parse_patch(&held("a", 300.0)).unwrap(), sized);
-    w.patch(parse_patch(&held("fresh", 50.0)).unwrap(), sized);
+fn overlay_clips(w: &World) -> Vec<String> {
+    w.overlay(IDENTITY, 1000, 100).items.iter().map(|i| i.clip().to_string()).collect()
+}
 
-    let lifts = w.lifts(sized);
+fn scene_clips(w: &World) -> Vec<String> {
+    w.scene(IDENTITY, 1000, 100).items.iter().map(|i| i.clip().to_string()).collect()
+}
 
-    assert_eq!(lifts.len(), 1);
-    assert_eq!((lifts[0].clip.as_str(), lifts[0].rest, lifts[0].by), ("a", Rect::new(0.0, 0.0, 100.0, 50.0), (300.0, 0.0)));
-    assert_eq!(w.overlay(IDENTITY, 1000, 100).items.iter().map(|i| i.clip().to_string()).collect::<Vec<_>>(), vec!["fresh"]);
+fn lift_of(w: &World) -> Vec<(String, Rect, (f64, f64))> {
+    w.lifts(sized).into_iter().map(|l| (l.clip, l.rest, l.by)).collect()
+}
+
+fn alone_at(w: &World, clip: &str) -> Vec<(String, f64)> {
+    w.alone(clip, IDENTITY, 1000, 100).items.iter().map(|i| match i {
+        Item::Use(u) => (u.clip.clone(), u.matrix[4]),
+        other => (other.clip().to_string(), f64::NAN),
+    }).collect()
 }
 
 #[test]
-fn a_held_frame_swapping_its_picture_tier_still_drags_from_its_tiles() {
+fn a_dragged_use_is_lifted_from_its_rest_and_drawn_from_itself_alone() {
+    let mut w = World::new();
+    w.patch(parse_patch(&put("under", 0.0)).unwrap(), sized);
+    w.patch(parse_patch(&put("a", 0.0)).unwrap(), sized);
+    w.patch(parse_patch(&held("a", 300.0)).unwrap(), sized);
+    w.patch(parse_patch(&held("fresh", 600.0)).unwrap(), sized);
+
+    assert_eq!(lift_of(&w), vec![("a".into(), Rect::new(0.0, 0.0, 100.0, 50.0), (300.0, 0.0))]);
+    assert_eq!(alone_at(&w, "a"), vec![("a".into(), 0.0)]);
+    assert_eq!(scene_clips(&w), vec!["under"]);
+    assert_eq!(overlay_clips(&w), vec!["fresh"]);
+}
+
+#[test]
+fn a_use_over_a_dragged_one_is_lifted_above_it_where_it_stands() {
+    let mut w = World::new();
+    w.patch(parse_patch(&put("a", 0.0)).unwrap(), sized);
+    w.patch(parse_patch(&put("top", 50.0)).unwrap(), sized);
+    w.take_scene_damage();
+
+    w.patch(parse_patch(&held("a", 250.0)).unwrap(), sized);
+
+    assert_eq!(lift_of(&w), vec![("a".into(), Rect::new(0.0, 0.0, 100.0, 50.0), (250.0, 0.0)), ("top".into(), Rect::new(50.0, 0.0, 150.0, 50.0), (0.0, 0.0))]);
+    assert_eq!(scene_clips(&w), Vec::<String>::new());
+    assert!(rects(w.take_scene_damage()).contains(&Rect::new(50.0, 0.0, 150.0, 50.0)));
+}
+
+#[test]
+fn a_use_the_drag_passed_under_stays_lifted_until_the_drag_ends() {
+    let mut w = World::new();
+    w.patch(parse_patch(&put("a", 0.0)).unwrap(), sized);
+    w.patch(parse_patch(&put("top", 500.0)).unwrap(), sized);
+    w.patch(parse_patch(&held("a", 450.0)).unwrap(), sized);
+    w.patch(parse_patch(&held("a", 800.0)).unwrap(), sized);
+    assert_eq!(lift_of(&w).iter().map(|l| l.0.as_str()).collect::<Vec<_>>(), vec!["a", "top"]);
+    w.take_scene_damage();
+
+    w.patch(parse_patch(&put("a", 800.0)).unwrap(), sized);
+
+    assert!(lift_of(&w).is_empty());
+    assert_eq!(scene_clips(&w), vec!["a", "top"]);
+    assert!(rects(w.take_scene_damage()).contains(&Rect::new(500.0, 0.0, 600.0, 50.0)));
+}
+
+#[test]
+fn a_held_frame_swapping_its_picture_tier_still_lifts_from_its_rest() {
     let mut w = World::new();
     w.patch(parse_patch(&put("a", 0.0)).unwrap(), sized);
 
     w.patch(parse_patch(r#"{ "put": [{ "kind": "use", "clip": "a", "group": "g:a:sharp", "matrix": [1, 0, 0, 1, 300, 0], "cache": true, "hold": true }], "drop": [] }"#).unwrap(), sized);
 
-    assert_eq!(w.lifts(sized).len(), 1);
-    assert!(w.overlay(IDENTITY, 1000, 100).items.is_empty());
+    assert_eq!(lift_of(&w).len(), 1);
+    assert!(overlay_clips(&w).is_empty());
 }
 
 #[test]
