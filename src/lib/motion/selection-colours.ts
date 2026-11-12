@@ -61,7 +61,8 @@ function reachedComps(doc: MotionDoc, clips: readonly MotionClip[]): Set<string>
 }
 
 function scopeOf(doc: MotionDoc, ids: readonly string[]) {
-  const top = ids.flatMap((id) => findClip(doc, id)?.clip ?? []);
+  const byId = new Map(clipsOf(doc).map((c) => [c.id, c]));
+  const top = ids.flatMap((id) => byId.get(id) ?? []);
   const comps = reachedComps(doc, top);
   const nested = [...comps].flatMap((id) => doc.comps[id].tracks.flatMap((t) => t.clips as MotionClip[]));
   return { top, comps, clips: [...top, ...nested] };
