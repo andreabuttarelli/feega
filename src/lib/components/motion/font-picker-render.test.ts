@@ -67,6 +67,63 @@ describe('font picker', () => {
     expect(document.querySelector('input[type="search"]')!.className).toContain('placeholder:text-ui-text-3');
   });
 
+  it('every font row is at least the hit target tall', () => {
+    open();
+    const rows = document.querySelectorAll('li button');
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.className).toContain('min-h-(--ui-hit)');
+    }
+  });
+
+  it('opens with the search field focused, so typing searches', () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    open();
+    expect(document.activeElement).toBe(document.querySelector('input[type="search"]'));
+  });
+
+  it('Escape closes only the picker and gives focus back to the font field', () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    open();
+    const trigger = document.querySelector<HTMLButtonElement>('.font-picker > button')!;
+    const deselect = vi.fn();
+    window.addEventListener('keydown', deselect);
+
+    document.querySelector('input[type="search"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    flushSync();
+    window.removeEventListener('keydown', deselect);
+
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    expect(deselect).not.toHaveBeenCalled();
+  });
+
+  it('arrows walk the rows from the search field and scroll the active one into view', () => {
+    const scrolled = vi.fn();
+    Element.prototype.scrollIntoView = scrolled;
+    open();
+    const rows = [...document.querySelectorAll<HTMLButtonElement>('li button')];
+    const key = (k: string) => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+
+    key('ArrowDown');
+    expect(document.activeElement).toBe(rows[0]);
+    key('ArrowDown');
+    expect(document.activeElement).toBe(rows[1]);
+    key('ArrowUp');
+    expect(document.activeElement).toBe(rows[0]);
+    expect(scrolled.mock.instances.at(-1)).toBe(rows[0]);
+  });
+
+  it('picking a row closes the picker and leaves focus on the font field, not on the page', () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    open();
+    document.querySelector<HTMLButtonElement>('li button')!.click();
+    flushSync();
+
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(document.querySelector('.font-picker > button'));
+  });
+
   it('the trigger is a rounded-sm field with the input fill', () => {
     open();
     const trigger = document.querySelector('.font-picker > button')!;
