@@ -67,7 +67,10 @@ const START: Record<AppSource, (app: FidelityApp) => Promise<Started>> = {
   },
   [AppSource.Folder]: async (app) => {
     const root = resolve(app.at);
-    const served = await devServerOf(root);
+    const served = await devServerOf(root, null);
+    if (!('url' in served)) {
+      throw new Error(`the folder ${root} did not start: ${served.refusal}`);
+    }
     return { pages: app.pages.map((p) => ({ label: p, url: new URL(`/?s=${p}`, served.url).toString() })), names: await folderNames(root), stop: async () => void served.child.kill(), allowed: new URL(served.url).origin };
   }
 };
