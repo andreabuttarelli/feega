@@ -1,8 +1,9 @@
 <script lang="ts">
   import { APP_URL, DOCS_URL } from '../links';
   import PriceTag from './PriceTag.svelte';
+  import Estimator from './Estimator.svelte';
   import PricingFaq from './PricingFaq.svelte';
-  import { CLOUD_BENEFITS, CLOUD_FOR, OUT_OF_CREDITS, creditSteps, getsYou, money, trialLine, type CloudPlan } from './plan';
+  import { CLOUD_BENEFITS, CLOUD_FOR, CREDIT_RULES, getsYou, money, outOfCredits, trialLine, type CloudPlan } from './plan';
 
   let { plan }: { plan: CloudPlan } = $props();
 </script>
@@ -14,7 +15,7 @@
     <div class="buy">
       <h3>feega {plan.name}</h3>
       <p class="for">{CLOUD_FOR}</p>
-      <PriceTag amount={money(plan.price)} unit="/ {plan.period}" cta="Start free" href={APP_URL} size="huge" />
+      <PriceTag amount={money(plan, plan.price)} unit="/ {plan.period}" cta="Start free" href={APP_URL} />
       <p class="trial">{trialLine()}</p>
     </div>
     <div class="what">
@@ -28,18 +29,11 @@
 
   <p class="local">Prefer your own AI keys? feega is <strong>free on your machine, forever</strong>. <a href={DOCS_URL}>Run it locally →</a></p>
 
-  <div class="credits">
-    <h3>How credits work</h3>
-    <ol>
-      {#each creditSteps(plan) as step, i (step.title)}
-        <li>
-          <span class="n" aria-hidden="true">0{i + 1}</span>
-          <h4>{step.title}</h4>
-          <p>{step.body}</p>
-        </li>
-      {/each}
-    </ol>
-    <p class="out">{OUT_OF_CREDITS}</p>
+  <Estimator {plan} />
+
+  <div class="rules">
+    <p>{CREDIT_RULES}</p>
+    <p>{outOfCredits(plan)}</p>
   </div>
 
   <PricingFaq {plan} />
@@ -49,6 +43,12 @@
   .pricing {
     padding: var(--site-section) 16px;
     color: var(--site-ink);
+    font-size: 16px;
+    line-height: 1.45;
+  }
+
+  p {
+    margin: 0;
   }
 
   h2 {
@@ -76,26 +76,18 @@
 
   h3 {
     margin: 0;
-    font-size: 24px;
+    font-size: 26px;
     letter-spacing: -0.04em;
     font-weight: 400;
   }
 
   .for {
     margin: -8px 0 16px;
-    opacity: 0.6;
-  }
-
-  .trial,
-  .label,
-  .gets,
-  .local,
-  .out {
-    margin: 0;
+    opacity: 0.7;
   }
 
   .trial {
-    opacity: 0.7;
+    opacity: 0.75;
   }
 
   .what {
@@ -105,7 +97,7 @@
   }
 
   .label {
-    opacity: 0.5;
+    opacity: 0.55;
   }
 
   ul {
@@ -118,16 +110,15 @@
 
   li {
     position: relative;
-    padding-left: 22px;
-    line-height: 1.4;
+    padding-left: 24px;
   }
 
-  ul li::before {
+  li::before {
     content: '';
     position: absolute;
     top: 0.5em;
     left: 2px;
-    width: 8px;
+    width: 9px;
     height: 5px;
     border-bottom: 1.5px solid #ff5100;
     border-left: 1.5px solid #ff5100;
@@ -137,12 +128,12 @@
   .gets {
     padding-top: 16px;
     border-top: 1px solid rgba(240, 238, 233, 0.15);
-    opacity: 0.8;
+    opacity: 0.85;
   }
 
   .local {
     margin-top: 20px;
-    opacity: 0.75;
+    opacity: 0.8;
   }
 
   .local strong {
@@ -161,50 +152,17 @@
     outline-offset: 3px;
   }
 
-  .credits {
-    margin-top: 80px;
-  }
-
-  ol {
+  .rules {
     display: grid;
-    gap: 24px;
-    margin: 28px 0 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  ol li {
-    display: grid;
-    gap: 6px;
-    padding: 20px 0 0;
-    border-top: 1px solid rgba(240, 238, 233, 0.25);
-  }
-
-  .n {
-    color: #ff5100;
-  }
-
-  h4 {
-    margin: 0;
-    font-size: 20px;
-    letter-spacing: -0.03em;
-    font-weight: 400;
-  }
-
-  ol p {
-    margin: 0;
-    opacity: 0.65;
-    line-height: 1.4;
-  }
-
-  .out {
-    margin-top: 28px;
+    gap: 4px;
+    margin-top: 16px;
     opacity: 0.8;
   }
 
   @media (min-width: 810px) {
     .pricing {
       padding: var(--site-section) 0;
+      font-size: 18px;
     }
 
     h2 {
@@ -216,17 +174,16 @@
       grid-template-columns: 1.1fr 1fr;
       padding: 40px;
     }
-
-    ol {
-      grid-template-columns: repeat(3, 1fr);
-      gap: 32px;
-    }
   }
 
   @media (min-width: 1200px) {
     h2 {
       font-size: 48px;
       line-height: 50px;
+    }
+
+    h3 {
+      font-size: 30px;
     }
 
     .hero {

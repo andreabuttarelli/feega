@@ -1,35 +1,37 @@
 <script lang="ts">
-  import { CLIP, IMAGE, estimate, money, type CloudPlan } from './plan';
+  import { AI_MARKUP, CLIP, IMAGE, estimate, includedCredits, money, type CloudPlan } from './plan';
 
   let { plan }: { plan: CloudPlan } = $props();
 
-  let images = $state(100);
-  let clips = $state(5);
+  const SLIDERS = [
+    { id: 'est-images', outcome: IMAGE, max: 600, step: 10 },
+    { id: 'est-clips', outcome: CLIP, max: 60, step: 1 }
+  ];
 
-  const result = $derived(estimate(plan, images, clips));
+  let counts = $state([100, 5]);
+
+  const result = $derived(estimate(plan, counts[0], counts[1]));
 </script>
 
-<div class="estimator">
+<div class="estimator" role="group" aria-labelledby="estimator-title">
   <h3 id="estimator-title">What will I use?</h3>
-  <p class="hint">Move the sliders to your month. Prices are the models' own plus 20%.</p>
+  <p class="hint">Set your month. Each run costs the model's own price plus {AI_MARKUP * 100}%.</p>
 
   <div class="sliders">
-    <label>
-      <span class="row"><span>{IMAGE.label}</span><output>{images}</output></span>
-      <input type="range" min="0" max="600" step="10" bind:value={images} />
-    </label>
-    <label>
-      <span class="row"><span>{CLIP.label}</span><output>{clips}</output></span>
-      <input type="range" min="0" max="60" step="1" bind:value={clips} />
-    </label>
+    {#each SLIDERS as slider, i (slider.id)}
+      <div class="slider">
+        <label class="row" for={slider.id}><span>{slider.outcome.label}</span><output for={slider.id}>{counts[i]}</output></label>
+        <input id={slider.id} type="range" min="0" max={slider.max} step={slider.step} bind:value={counts[i]} />
+      </div>
+    {/each}
   </div>
 
   <p class="verdict" aria-live="polite">
-    About <strong>{result.credits} credits</strong>.
-    {#if result.extra === 0}
-      Fits in the {money(plan.price)} plan.
+    About <strong>{result.credits} credits</strong> a {plan.period}.
+    {#if result.topUp === 0}
+      Fits in the {money(plan, plan.price)} plan.
     {:else}
-      The plan covers {plan.credits}, so you'd top up about <strong>{result.extra} credits</strong>. Top-ups start at {money(plan.topUpFrom)}.
+      The plan includes {includedCredits(plan)}, so you'd top up about <strong>{result.topUp} credits</strong>.
     {/if}
   </p>
 </div>
@@ -37,8 +39,8 @@
 <style>
   .estimator {
     display: grid;
-    gap: 20px;
-    margin-top: 16px;
+    gap: 24px;
+    margin-top: 64px;
     padding: 28px 24px;
     border-radius: 10px;
     background: #000;
@@ -50,22 +52,22 @@
   }
 
   h3 {
-    font-size: 24px;
+    font-size: 26px;
     letter-spacing: -0.04em;
     font-weight: 400;
   }
 
   .hint {
-    margin-top: -12px;
-    opacity: 0.6;
+    margin-top: -14px;
+    opacity: 0.7;
   }
 
   .sliders {
     display: grid;
-    gap: 20px;
+    gap: 24px;
   }
 
-  label {
+  .slider {
     display: grid;
     gap: 8px;
   }
@@ -75,29 +77,30 @@
     justify-content: space-between;
   }
 
-  .row span::first-letter {
-    text-transform: uppercase;
-  }
-
-  .row span {
-    display: block;
-  }
-
   output {
+    min-width: 3ch;
+    text-align: right;
     font-variant-numeric: tabular-nums;
     color: #fff;
   }
 
   input[type='range'] {
+    -webkit-appearance: none;
+    appearance: none;
     width: 100%;
-    height: 28px;
+    height: 32px;
     margin: 0;
     background: transparent;
-    accent-color: #ff5100;
     cursor: pointer;
   }
 
   input[type='range']::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 2px;
+    background: #444;
+  }
+
+  input[type='range']::-moz-range-track {
     height: 4px;
     border-radius: 2px;
     background: #444;
@@ -120,21 +123,21 @@
     background: #ff5100;
   }
 
-  input[type='range'] {
-    -webkit-appearance: none;
-  }
-
   input[type='range']:focus-visible {
     outline: 2px solid #ff5100;
     outline-offset: 4px;
     border-radius: 4px;
   }
 
+  input[type='range']:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 4px rgba(255, 81, 0, 0.35);
+  }
+
   .verdict {
-    padding-top: 16px;
+    padding-top: 20px;
     border-top: 1px solid rgba(240, 238, 233, 0.15);
-    font-size: 18px;
-    line-height: 1.4;
+    font-size: 20px;
+    line-height: 1.35;
   }
 
   strong {
@@ -144,12 +147,26 @@
 
   @media (min-width: 810px) {
     .estimator {
-      padding: 32px;
+      padding: 40px;
     }
 
     .sliders {
       grid-template-columns: 1fr 1fr;
-      gap: 32px;
+      gap: 40px;
+    }
+  }
+
+  @media (min-width: 1200px) {
+    .estimator {
+      padding: 48px;
+    }
+
+    h3 {
+      font-size: 30px;
+    }
+
+    .verdict {
+      font-size: 22px;
     }
   }
 </style>
