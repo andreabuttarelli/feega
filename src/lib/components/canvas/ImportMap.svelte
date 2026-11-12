@@ -15,6 +15,8 @@
   import { importRuns } from '$lib/canvas/import-runs.svelte';
   import { frameProperties } from './frame-properties.svelte';
   import { Region } from '$lib/canvas/key-region.svelte';
+  import { layersSource } from '$lib/canvas/layers-source.svelte';
+  import { enterFrame } from '$lib/canvas/enter-frame';
 
   let { projectId, canvasId, nodeId, session, doc }: { projectId: string; canvasId: string; nodeId: string; session: FrameEditSession; doc: MotionDoc } = $props();
 
@@ -24,6 +26,7 @@
   const SEARCH_FROM = 8;
   const RELOAD_MS = 800;
   const SIZE_SLACK = 1;
+  const FRAME_TYPE = 'motion';
   const FAILED: Record<string, string> = {
     frame_full: 'This frame is full: 20 pages, the most Pull refreshes in one run. Import into a new frame.',
     no_room: 'No room left in this frame: a frame is at most 16384 px a side. Import into a new frame.',
@@ -81,8 +84,13 @@
     }
   });
 
-  function zoomTo(row: MapRow) {
-    session.select(row.boards.map((b) => b.clip));
+  async function zoomTo(row: MapRow) {
+    if (layersSource.video?.nodeId !== nodeId) {
+      enterFrame(nodeId, FRAME_TYPE);
+      await tick();
+    }
+    layersSource.video?.select(row.boards.map((b) => b.clip));
+    await tick();
     zoomRequest.ask(Command.PreviewSelection);
   }
 
@@ -113,7 +121,7 @@
 
   function act(row: MapRow) {
     const take: Record<PageAction, () => void> = {
-      [PageAction.Zoom]: () => zoomTo(row),
+      [PageAction.Zoom]: () => void zoomTo(row),
       [PageAction.Import]: () => void importPage(row.path, [BASE_COND], row.path),
       [PageAction.Retry]: () => void importPage(row.path, [BASE_COND], row.path),
       [PageAction.SetValue]: () => (editing = editing === row.path ? null : row.path),
@@ -153,7 +161,7 @@
 </script>
 
 {#if phase !== MapPhase.None}
-  <div class="map" data-testid="import-map" role="region" aria-label="Import map" data-key-region={Region.Editor}>
+  <div class="map" data-testid="import-map" role="region" aria-label="Import map" data-key-region={Region.Editor} onkeydown={(e) => e.stopPropagation()}>
     <Section title="Pages" fold={Fold.Open}>
       {#if phase === MapPhase.Loading}
         <p class="muted" data-testid="import-map-loading">Reading the import…</p>
@@ -174,7 +182,7 @@
             <li class="page" data-testid="import-map-page" data-path={row.path} data-shown={row.shown}>
               <div class="line">
                 {#if row.shown === Shown.OnCanvas}
-                  <button class="path link" onclick={() => zoomTo(row)} title="Select and zoom to {row.path}" data-testid="import-map-zoom">{row.path}</button>
+                  <button class="path link" onclick={() => void zoomTo(row)} title="Select and zoom to {row.path}" data-testid="import-map-zoom">{row.path}</button>
                 {:else}
                   <span class="path">{row.path}</span>
                 {/if}
