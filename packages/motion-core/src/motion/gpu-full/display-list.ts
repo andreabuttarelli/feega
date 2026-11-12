@@ -490,8 +490,9 @@ function filtersOf(clip: MotionClip, frame: number, fps: number, size: Size, css
       }
       filters.push({ kind: FilterKind.Svg, nodes: out.nodes });
     }
-    if (out.filter && !SVG_REF.test(out.filter)) {
-      filters.push({ kind: FilterKind.Css, fns: cssFunctions(out.filter) });
+    const fns = out.filter && !SVG_REF.test(out.filter) ? cssFunctions(out.filter) : [];
+    if (fns.length) {
+      filters.push({ kind: FilterKind.Css, fns });
     }
   }
   return { filters, backdrop };
