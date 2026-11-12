@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ProviderAnswer, ProviderCall } from '$lib/server/connections/account-links';
-import { archiveOf, branchesOf, MAX_ARCHIVE_BYTES, publicCall, reposOf, visibilityOf, Visibility } from './github';
+import { archiveOf, branchesOf, MAX_ARCHIVE_BYTES, publicCall, reposOf, treeOf, visibilityOf, Visibility } from './github';
 
 const answer = (status: number, data: unknown, extra: Partial<ProviderAnswer> = {}): ProviderAnswer => ({ status, data, headers: {}, file: null, ...extra });
 
@@ -75,5 +75,21 @@ describe('archiveOf', () => {
     const huge = vi.fn(async () => new Response(tarball, { headers: { 'content-length': String(MAX_ARCHIVE_BYTES + 1) } }));
     const call = calling({ '/repos/acme/app/tarball': answer(200, null, { file: 'https://files.example/t.tgz' }) });
     expect(await archiveOf(call, REPO, huge as unknown as typeof fetch)).toBeNull();
+  });
+});
+
+describe('treeOf', () => {
+  it('lists the files of a ref without cloning, folders left out', async () => {
+    const call = calling({ '/repos/acme/app/git/trees/main': answer(200, { truncated: false, tree: [{ path: 'src', type: 'tree' }, { path: 'src/routes/+page.svelte', type: 'blob' }, { path: 'package.json', type: 'blob' }] }) });
+
+    expect(await treeOf(call, { ...REPO, ref: 'main' })).toEqual(['src/routes/+page.svelte', 'package.json']);
+    expect(call.mock.calls[0][0].query).toEqual({ recursive: '1' });
+  });
+
+  it('no ref reads HEAD; an unreachable repo is null', async () => {
+    const call = calling({});
+
+    expect(await treeOf(call, REPO)).toBeNull();
+    expect(call.mock.calls[0][0].endpoint).toBe('/repos/acme/app/git/trees/HEAD');
   });
 });

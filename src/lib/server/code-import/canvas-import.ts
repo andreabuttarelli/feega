@@ -15,8 +15,8 @@ import { basename } from 'node:path';
 import { localModeRefusal } from '$lib/server/local/local-mode';
 import { localBrowser } from '$lib/server/web/browser';
 import { chromiumPage } from '$lib/server/motion/chromium-frames';
-import { DevServerFailed, withDevServer, folderHead, folderLibrary, folderNames, folderOf, folderSource } from './folder-source';
-import { repoOf, routesOf } from './repo';
+import { DevServerFailed, withDevServer, folderFiles, folderHead, folderLibrary, folderNames, folderOf, folderSource } from './folder-source';
+import { located, repoOf, routesOf, type RepoRef } from './repo';
 import { SourceKind } from './code-source';
 import { BASE_CONDITIONS, variantsOf, type RenderConditions } from './render-conditions';
 import type { CaptureDelay } from './capture-wait';
@@ -24,9 +24,10 @@ import { importStorybookAt } from './import-storybook';
 import { logAiCall } from '$lib/server/ai-log';
 import { sandboxRunner, sandboxUsd, type RepoRunner } from './sandbox-runner';
 import { githubFor } from './github-runtime';
-import { branchesOf, publicCall } from './github';
+import { branchesOf, publicCall, treeOf } from './github';
 import { appOf, PlanRefusal, type PlanRefused } from './run-plan';
-import { snapshotSha, uploadedArchive, uploadOf, uploadSource } from './upload-source';
+import { snapshotSha, uploadedArchive, uploadFiles, uploadOf, uploadSource } from './upload-source';
+import { allRoutes, leftOut, routesAt, tooManyRoutes, UNREADABLE, type LeftOut, type RouteSource, type RoutesFound } from './routes-found';
 import { DataCheck, patchNodeData } from '$lib/server/repos/canvas';
 import type { CodeOriginData } from '$lib/canvas/motion-node';
 import { appAccountStore } from '$lib/server/repos/app-accounts';
@@ -204,4 +205,84 @@ export async function tokensFound(scope: CodeScope, where: { repo?: string; fold
   }
   const code = await githubReader(scope, where.repo ?? '');
   return code ? tokenCount(code(null)).catch(() => null) : null;
+}
+
+export type RoutesWhere = { repo?: string; folder?: string; upload?: string; app?: string };
+
+const NO_SOURCE: RouteSource = { files: async () => null, read: async () => null };
+
+async function githubRoutes(scope: CodeScope, raw: string): Promise<{ source: RouteSource; path: string | null }> {
+  const linked = repoOf(raw);
+  if (!linked) {
+    return { source: NO_SOURCE, path: null };
+  }
+  const github = githubFor(scope.db, scope);
+  const call = await github.call().catch(() => null);
+  const branches = linked.ref?.includes('/') ? ((await github.branches(linked).catch(() => null)) ?? (await branchesOf(publicCall(), linked).catch(() => []))) : [];
+  const { ref, path } = located(linked.ref, branches);
+  const repo: RepoRef = { ...linked, ref };
+  return { source: { files: () => treeOf(call ?? publicCall(), repo), read: rawReader(repo, ref ?? 'HEAD', call) }, path };
+}
+
+async function routeSourceOf(scope: CodeScope, where: RoutesWhere): Promise<{ source: RouteSource; path: string | null }> {
+  if (where.upload !== undefined) {
+    const upload = uploadOf(scope.orgId, where.upload);
+    const archive = upload ? await uploadedArchive(scope.db, upload) : null;
+    return { source: archive ? { files: async () => uploadFiles(archive), read: uploadSource(archive).read('') } : NO_SOURCE, path: null };
+  }
+  if (where.folder !== undefined) {
+    const root = localModeRefusal(env) === null ? folderOf(where.folder) : null;
+    return { source: root ? { files: () => folderFiles(root), read: folderSource(root).read('') } : NO_SOURCE, path: null };
+  }
+  return githubRoutes(scope, where.repo ?? '');
+}
+
+export async function routesFound(scope: CodeScope, where: RoutesWhere): Promise<RoutesFound> {
+  const app = where.app === undefined ? undefined : appOf(where.app);
+  if (app === null) {
+    return { ok: false, error: UNREADABLE, detail: 'that app folder is not a path inside the repository', apps: [] };
+  }
+  const { source, path } = await routeSourceOf(scope, where);
+  return routesAt(source, app ?? path);
+}
+
+export const ALL_ROUTES = 'all';
+
+export type RoutesAsk = Omit<CodeImportAsk, 'routes'> & { routes: string[] | typeof ALL_ROUTES };
+
+export type RouteReport = { discovered: number; leftOut: LeftOut[] } | { unrun: string };
+
+export type RoutedImport = CodeImported & { routes?: RouteReport };
+
+const refusedRoutes = (error: string): RoutedImport => ({ outcome: CodeImportOutcome.Invalid, error });
+
+function reportOf(found: RoutesFound, asked: string[], done: CodeImported): RouteReport {
+  if (!found.ok) {
+    return { unrun: `${found.error}: ${found.detail}` };
+  }
+  if (done.outcome !== CodeImportOutcome.Ok) {
+    return { unrun: 'the import did not land' };
+  }
+  return { discovered: found.routes.length, leftOut: leftOut(found.routes, { asked: asked.length ? asked : ['/'], landed: done.pages, links: done.links ?? [] }) };
+}
+
+export async function importRoutesInto(scope: CodeScope, canvasId: string, ask: RoutesAsk): Promise<RoutedImport> {
+  if (ask.storybook) {
+    return importCodeInto(scope, canvasId, { ...ask, routes: [] });
+  }
+
+  const discovering = routesFound(scope, ask).catch((e: unknown): RoutesFound => ({ ok: false, error: UNREADABLE, detail: String(e), apps: [] }));
+  const found = ask.routes === ALL_ROUTES ? await discovering : null;
+  if (found && !found.ok) {
+    return { outcome: found.error === PlanRefusal.ChooseApp ? CodeImportOutcome.ChooseApp : CodeImportOutcome.Invalid, error: `${found.error}: ${found.detail}`, ...(found.apps.length ? { apps: found.apps } : {}) };
+  }
+
+  const routes = found?.ok ? allRoutes(found.routes) : (ask.routes as string[]);
+  const many = tooManyRoutes(routes);
+  if (many) {
+    return refusedRoutes(many);
+  }
+
+  const done = await importCodeInto(scope, canvasId, { ...ask, routes });
+  return done.outcome === CodeImportOutcome.Ok ? { ...done, routes: reportOf(await discovering, routes, done) } : done;
 }

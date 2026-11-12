@@ -97,7 +97,7 @@ describe.runIf(LABEL && process.env.CHROMIUM_PATH)('capture an app as code impor
         if (run.key) {
           await tab.restore({ cookies: [importKeyCookie(run.key)], storage: {} }, new URL(run.key.url).origin);
         }
-        const found = { uses: [] as ComponentUse[] };
+        const found = { uses: [] as ComponentUse[], links: [] as string[] };
         const refusal = await pagePrepared(tab, new URL(target.url), SETTLE_MS, marksPlanner(run.names, found));
         if (refusal) {
           await tab.close();

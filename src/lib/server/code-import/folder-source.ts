@@ -211,3 +211,5 @@ export function folderSource(root: string): CodeSource {
     publish: (_base, files, ask) => published(root, files, ask.branch, ask.title)
   };
 }
+
+export const folderFiles = (root: string) => walk(root, root, [], () => true);
