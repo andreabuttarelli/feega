@@ -53,8 +53,13 @@
       "statusCode": 301
     },
     {
-      "source": "/blog/feega-vs-:tool",
+      "source": "/blog/feega-vs-:tool(figma|jitter|remotion|after-effects|pencil-dev|flora|rive|canva|gui)",
       "destination": "/compare/:tool",
+      "statusCode": 301
+    },
+    {
+      "source": "/blog/feega-vs-:tool",
+      "destination": "/compare",
       "statusCode": 301
     },
     {

@@ -14,7 +14,14 @@ type Redirect = { source: string; destination: string; statusCode: number; has?:
 const rules = (vercel.redirects as Redirect[]).filter((r) => !r.has);
 
 const pattern = (source: string) =>
-  new RegExp('^' + source.replace(/:(\w+)\*/g, '(?<$1>.*)').replace(/:(\w+)/g, '(?<$1>[^/]+)') + '$');
+  new RegExp(
+    '^' +
+      source
+        .replace(/:(\w+)\*/g, '(?<$1>.*)')
+        .replace(/:(\w+)\(([^)]+)\)/g, '(?<$1>$2)')
+        .replace(/:(\w+)(?!\()/g, '(?<$1>[^/]+)') +
+      '$'
+  );
 
 function redirect(path: string): { to: string; status: number } | undefined {
   for (const rule of rules) {
@@ -32,6 +39,7 @@ const OLD_URLS: [string, string][] = [
   ['/blog', '/compare'],
   ['/blog/how-the-canvas-got-fast', `${BLOG_URL}posts/how-the-canvas-got-fast/`],
   ['/blog/an-unknown-post', BLOG_URL],
+  ['/blog/feega-vs-an-unknown-tool', '/compare'],
   ...Object.keys(COMPARISONS).map((slug): [string, string] => [`/blog/feega-vs-${slug}`, comparisonPath(slug)])
 ];
 
