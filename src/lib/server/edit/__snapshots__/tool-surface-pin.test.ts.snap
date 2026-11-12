@@ -354,7 +354,7 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op frame_elements 1`] = `"170e4e474a38fc3d6aac726037f3c96b5e8e93486da425fc79e7c486ac115759"`;
 
-exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op frame_list_templates 1`] = `"8af682451b24053930760bc053314bf25838cd9f359141627dfa1a5282ec67be"`;
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op frame_list_templates 1`] = `"693bd72851dc6032af7ed32ced3a5c904bb05b516dce4c4f9bfb1671bbe77b15"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op frame_read_video_reference 1`] = `"60135af604ad87baac712d5024c2fd9139d82395df6c26800fcadf036e6fae6c"`;
 
@@ -906,7 +906,7 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema frame_elements 1`] = `"96f8fda47133c3596fa0d8641c8375d9ccb5bb19d64346fb274bd7a50a9d6192"`;
 
-exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema frame_list_templates 1`] = `"53e9f9a15beb4119d0769fdcd285b43c5c70f0dc87cdfdb5fec2a754936b4f7d"`;
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema frame_list_templates 1`] = `"4f074682371dea513dbfd177b4908fbcd2729d55c8baa835969073d185b3c9ba"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema frame_read_video_reference 1`] = `"ab5dbeaa69e8d82e77e5e6467c6b346d31cacc99758de2bfb8a1464e5b6cb961"`;
 

@@ -3282,7 +3282,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     list_templates: tool({
-      description: `List the motion templates (built-in and saved by the team), each with its shape (width×height, video or still), its description (what it shows and when to pick it over look-alikes), its key_fields (the ones a user edits first; get_template lists all) and its card in one line: roles · energy · loops · edges start→end and suggested transition · media count and aspect · text amount · what is on screen, second by second · good for. role narrows to one section role: ${SECTION_ROLES.map((r) => `${r} (${ROLE_MEANING[r]})`).join(', ')}. get_template gives one in full with its typed fields.`,
+      description: `List the motion templates (built-in and saved by the team), each with its shape (width×height, video or still), its key_fields (the ones a user edits first; get_template lists all) and its card in one line: roles · energy · loops · edges start→end and suggested transition · media count and aspect · text amount · what is on screen, second by second · good for. role narrows to one section role: ${SECTION_ROLES.map((r) => `${r} (${ROLE_MEANING[r]})`).join(', ')}. get_template gives one in full with its typed fields.`,
       inputSchema: z.object({ role: z.enum(SECTION_ROLES).optional() }).strict(),
       execute: async (input) => {
         const entries = (await deps.templates?.list()) ?? [];
@@ -3291,8 +3291,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         return {
           templates: picked.map((e) => {
             const card = templateCard(e.id);
-            const line = card ? cardLine(card) : '';
-            return { id: e.id, name: e.template.name, shape: frameShape(e.template.doc), seconds: secondsAt(e.template.doc.durationInFrames, e.template.doc.fps), ...(line.includes(e.template.description) ? {} : { description: e.template.description }), ...(card ? { card: line } : {}), key_fields: splitFields(e.template.doc.fields, e.template.keyFields).key.map((f) => f.key) };
+            return { id: e.id, name: e.template.name, shape: frameShape(e.template.doc), seconds: secondsAt(e.template.doc.durationInFrames, e.template.doc.fps), ...(card ? {} : { description: e.template.description }), ...(card ? { card: cardLine(card) } : {}), key_fields: splitFields(e.template.doc.fields, e.template.keyFields).key.map((f) => f.key) };
           })
         };
       }

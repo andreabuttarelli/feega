@@ -4,7 +4,7 @@ The agent picked templates from names: `list_templates` sent each built-in's car
 
 - Arc text now lives in `arc/arc-shows.json`, written from each doc's layers; `arc.ts` prefixes the real size and "no motion".
 - Composition layouts, designs and canvas templates rewritten; 32 ports got a differentiator; 10 posters trimmed under 200.
-- `list_templates`/`get_template`/`list_components`/REST list send `shape` (`W×H video|still`); `list_templates` sends the description when the card doesn't already hold it.
+- `list_templates`/`get_template`/`list_components`/REST list send `shape` (`W×H video|still`); `list_templates` sends the description only for templates without a card (cards already carry onScreen and goodFor; the list budget is 420 chars per template).
 - `matching()` indexes kind, mode and aspect label.
 - Guard: `descriptions.test.ts` (60–320 chars, ends a sentence, unique, deny list).
 

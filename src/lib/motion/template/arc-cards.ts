@@ -6,7 +6,7 @@ const cardOf = (shows: string): TemplateCard => ({
   roles: [SectionRole.Product],
   energy: Energy.Calm,
   loops: false,
-  onScreen: [{ from: 0, what: `still, no animation: ${shows}` }],
+  onScreen: [{ from: 0, what: `still: ${shows}` }],
   needs: { media: null, text: TextAmount.Line },
   bestFormats: [MotionFormat.Landscape],
   edges: { start: EdgeTone.Light, end: EdgeTone.Light, transition: Joint.Cut },
