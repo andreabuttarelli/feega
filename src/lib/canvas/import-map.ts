@@ -25,7 +25,7 @@ export type Cond = { scheme: Scheme; width: number };
 
 const COND_SEPARATOR = '@';
 
-export const condKey = (c: Cond): string => `${c.scheme}${COND_SEPARATOR}${c.width}`;
+export const condKey = (c: { scheme: string; width: number }): string => `${c.scheme}${COND_SEPARATOR}${c.width}`;
 
 export function condOf(key: string): Cond {
   const [scheme, width] = key.split(COND_SEPARATOR);

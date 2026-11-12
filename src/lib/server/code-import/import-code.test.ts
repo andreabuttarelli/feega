@@ -113,6 +113,21 @@ describe('importCodeAt', () => {
     expect(done).toMatchObject({ outcome: CodeImportOutcome.Ok, pages: ['/', '/settings'], components: 1, variants: 2, instances: 4 });
   });
 
+  it('reports the board each page landed on, with its condition, and the pages it could not open', async () => {
+    const { ask, tab } = askOf({ routes: ['/', '/missing'], conditions: [BASE_CONDITIONS, { scheme: Scheme.Dark, width: 390 }] });
+    tab.goto.mockImplementation(async (url: string) => (url.endsWith('/missing') ? 404 : 200));
+
+    const done = await importCodeAt(ask);
+
+    const ok = done as Extract<typeof done, { outcome: CodeImportOutcome.Ok }>;
+    expect(ok.boards?.map((b) => [b.route, b.cond])).toEqual([
+      ['/', 'light@1280'],
+      ['/', 'dark@390']
+    ]);
+    expect(ok.boards?.every((b) => b.clip)).toBe(true);
+    expect(ok.missed?.map((m) => m.label)).toEqual(['/missing', '/missing · dark · 390px']);
+  });
+
   it('ogni rotta si apre in una scheda nuova, chiusa subito dopo', async () => {
     const { ask, tab } = askOf({ routes: ['/', '/settings'] });
     const open = vi.fn(async () => tab);

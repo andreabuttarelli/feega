@@ -1,4 +1,5 @@
 import { pathKey } from '$lib/canvas/route-pattern';
+import { condKey } from '$lib/canvas/import-map';
 import { compOf, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { fontsFor, landPlan, pageTreeAt, publicUrl, UrlImportOutcome, withSheetFonts, type PageAsk, type Planner } from '$lib/server/url-import/import-url';
 import { urlPlan } from '$lib/server/url-import/url-doc';
@@ -6,7 +7,7 @@ import type { OpenAppBrowser } from '$lib/server/web/browser';
 import type { ComponentUse } from './component-marks';
 import { codePlan } from './code-doc';
 import { boardsOf, conditioned, cropped, type Capture } from './boards';
-import { BASE_CONDITIONS, conditionKey, variantsOf, type RenderConditions } from './render-conditions';
+import { BASE_CONDITIONS, conditionKey, variantsOf, type RenderConditions, type Variant } from './render-conditions';
 import { CAPTURE_BUDGET_MS, delayFor, NO_DELAY, type CaptureDelay } from './capture-wait';
 import { ownImages } from './page-images';
 import { located, repoOf, routesOf, type RepoRef } from './repo';
@@ -76,7 +77,9 @@ type Refusal = { outcome: Exclude<CodeImportOutcome, CodeImportOutcome.Ok>; erro
 
 export type CodeOrigin = { repo: string; branch: string | null; sha: string | null; app: string | null };
 
-export type CodeImported = ({ outcome: CodeImportOutcome.Ok; frameId: string; origin?: CodeOrigin; name: string; undo: unknown[]; skipped: string[]; locked: LockedRoute[]; truncated: boolean; pages: string[]; links?: string[]; design?: DesignReport; tokenMap?: TokenMap; library?: LibraryReport } & ComponentCount) | Refusal;
+export type LandedBoard = { label: string; route: string; cond: string; clip: string };
+
+export type CodeImported = ({ outcome: CodeImportOutcome.Ok; frameId: string; origin?: CodeOrigin; name: string; undo: unknown[]; skipped: string[]; locked: LockedRoute[]; missed?: MissedPage[]; boards?: LandedBoard[]; truncated: boolean; pages: string[]; links?: string[]; design?: DesignReport; tokenMap?: TokenMap; library?: LibraryReport } & ComponentCount) | Refusal;
 
 export type CodePage = { label: string; url: string; route?: string; conditions?: RenderConditions };
 
@@ -92,7 +95,7 @@ export type BranchList = (repo: RepoRef) => Promise<string[]>;
 
 export type SignInAsk = { account?: TestAccount | null };
 
-export type CodeAsk = LandAsk & DesignOptions & SignInAsk & { repo: string; app?: string; routes: string[]; conditions?: RenderConditions[]; delay?: CaptureDelay; runner: RepoRunner | null; archive?: RepoArchive | null; branches?: BranchList | null };
+export type CodeAsk = LandAsk & DesignOptions & SignInAsk & { repo: string; app?: string; routes: string[]; conditions?: RenderConditions[]; variants?: Variant[]; delay?: CaptureDelay; runner: RepoRunner | null; archive?: RepoArchive | null; branches?: BranchList | null };
 
 const refused = (outcome: Refusal['outcome'], error?: string, apps?: string[]): Refusal => ({ outcome, ...(error ? { error } : {}), ...(apps?.length ? { apps } : {}) });
 
@@ -119,7 +122,7 @@ export function componentCount(doc: MotionDoc): ComponentCount {
   return { components: new Set(mains.map(([, c]) => c.component!.set ?? c.component!.name)).size, variants: mains.length, instances: hosts - mains.length };
 }
 
-enum Missed {
+export enum Missed {
   Unopened = 'could not be opened',
   OutOfTime = 'left out, the import ran out of time'
 }
@@ -131,7 +134,9 @@ function sameOriginPaths(links: string[], page: URL): string[] {
   return [...new Set(paths)];
 }
 
-type Captured = { captures: Capture[]; missed: string[]; locked: LockedRoute[]; links: string[]; last: Refusal | null };
+export type MissedPage = { label: string; reason: Missed };
+
+type Captured = { captures: Capture[]; missed: MissedPage[]; locked: LockedRoute[]; links: string[]; last: Refusal | null };
 
 const loginOf = (sign: SignIn) => (sign.gate === Gate.None ? null : sign.loginUrl);
 
@@ -148,14 +153,14 @@ function inSession(open: OpenAppBrowser, sign: SignIn): OpenAppBrowser {
 
 async function captured(open: OpenAppBrowser, pages: CodePage[], names: string[], window: Window, sign: SignIn): Promise<Captured> {
   const captures: Capture[] = [];
-  const missed: string[] = [];
+  const missed: MissedPage[] = [];
   const locked: LockedRoute[] = [];
   const links: string[] = [];
   const until = window.now() + window.budgetMs;
   let last: Refusal | null = null;
   for (const page of pages) {
     if (captures.length && window.now() > until) {
-      missed.push(`${page.label}: ${Missed.OutOfTime}`);
+      missed.push({ label: page.label, reason: Missed.OutOfTime });
       continue;
     }
     const found: Found = { uses: [], links: [] };
@@ -171,7 +176,7 @@ async function captured(open: OpenAppBrowser, pages: CodePage[], names: string[]
       continue;
     }
     if ('outcome' in read.tree) {
-      missed.push(`${page.label}: ${Missed.Unopened}`);
+      missed.push({ label: page.label, reason: Missed.Unopened });
       last = read.tree.outcome === UrlImportOutcome.Ok ? null : refused(FROM_URL_IMPORT[read.tree.outcome], read.tree.error);
       continue;
     }
@@ -182,6 +187,18 @@ async function captured(open: OpenAppBrowser, pages: CodePage[], names: string[]
 }
 
 export type Designer = (loaded: LoadedSheet[]) => Promise<Design | null>;
+
+const SURFACE = 'surface';
+
+function boardsLanded(doc: MotionDoc, pages: CodePage[], labels: string[]): LandedBoard[] {
+  const clips = doc.tracks.flatMap((t) => t.clips as MotionClip[]).filter((c) => c.id !== SURFACE);
+  const ground = clips.find((c) => !c.parent);
+  const named = (label: string) => (labels.length === 1 ? ground : clips.find((c) => c.parent === ground?.id && c.name === label));
+  return pages.flatMap((page) => {
+    const clip = labels.includes(page.label) ? named(page.label) : undefined;
+    return clip ? [{ label: page.label, route: page.route ?? page.label, cond: condKey(page.conditions ?? BASE_CONDITIONS), clip: clip.id }] : [];
+  });
+}
 
 const lockedLine = (route: LockedRoute) => `${route.label}: ${route.reason}${route.detail ? ` (${route.detail})` : ''}`;
 
@@ -232,13 +249,14 @@ export async function importBoards(ask: BoardsAsk): Promise<CodeImported> {
 
   const frame = await ask.store.read(done.frameId);
   const count = frame ? componentCount(frame.doc) : { components: 0, variants: 0, instances: 0 };
-  const skipped = [...done.skipped, ...missed, ...locked.map(lockedLine), ...(design?.skipped ?? [])];
+  const skipped = [...done.skipped, ...missed.map((m) => `${m.label}: ${m.reason}`), ...locked.map(lockedLine), ...(design?.skipped ?? [])];
   const report = design ? { design: design.report, tokenMap: design.map } : {};
   const library = ask.library ? { library: libraryReport(ask.library, new Set(uses.map((u) => u.component))) } : {};
-  return { ...done, outcome: CodeImportOutcome.Ok, skipped, locked, pages: captures.map((c) => c.label), links: sameOriginPaths(links, first), ...count, ...report, ...library };
+  const landed = frame ? boardsLanded(frame.doc, ask.pages, captures.map((c) => c.label)) : [];
+  return { ...done, outcome: CodeImportOutcome.Ok, skipped, locked, missed, boards: landed, pages: captures.map((c) => c.label), links: sameOriginPaths(links, first), ...count, ...report, ...library };
 }
 
-export type RunAsk = LandAsk & DesignOptions & SignInAsk & { repo: RepoRef; app: string | null; routes: string[]; conditions?: RenderConditions[]; delay?: CaptureDelay; runner: RepoRunner | null; archive: Uint8Array | null };
+export type RunAsk = LandAsk & DesignOptions & SignInAsk & { repo: RepoRef; app: string | null; routes: string[]; conditions?: RenderConditions[]; variants?: Variant[]; delay?: CaptureDelay; runner: RepoRunner | null; archive: Uint8Array | null };
 
 const AMBIGUOUS_REF = '/';
 
@@ -288,7 +306,7 @@ export async function importRepoAt(ask: RunAsk): Promise<CodeImported> {
     return refused(run.failure === PlanRefusal.ChooseApp ? CodeImportOutcome.ChooseApp : CodeImportOutcome.RunFailed, `${run.failure}: ${run.detail}`, run.apps);
   }
 
-  const pages = variantsOf(routes, ask.conditions ?? [BASE_CONDITIONS]).map((v) => ({ label: v.label, url: new URL(v.route, run.app.url).toString(), route: v.route, conditions: v.conditions }));
+  const pages = (ask.variants ?? variantsOf(routes, ask.conditions ?? [BASE_CONDITIONS])).map((v) => ({ label: v.label, url: new URL(v.route, run.app.url).toString(), route: v.route, conditions: v.conditions }));
   const origin = { repo: `${ask.repo.owner}/${ask.repo.repo}`, branch: ask.repo.ref, sha: run.app.sha, app: ask.app };
   const design = designFor(ask, run.app.sha);
   const done = await importBoards({ ...ask, open: keyed(ask.open, run.app), name: ask.repo.repo, pages, names: run.app.names, crop: Crop.Page, design, library: run.app.library }).finally(() => run.app.stop().catch(() => undefined));
