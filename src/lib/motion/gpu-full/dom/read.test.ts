@@ -348,6 +348,22 @@ describe("readTree", () => {
     ]);
   });
 
+  it("draws a subtree whose filter does nothing as if it had none", () => {
+    const style = { "background-color": "rgb(0, 0, 0)" };
+    const plain = el({ parent: 0, size: [50, 50], style });
+    const noop = el({
+      parent: 0,
+      size: [50, 50],
+      style: { ...style, filter: "blur(0px) opacity(1) drop-shadow(rgba(0, 0, 0, 0) 0px 0px 0px)" },
+    });
+
+    const read = readTree(tree(root(), noop));
+
+    expect(read.gaps).toEqual([]);
+    expect(read.drawn).toEqual(readTree(tree(root(), plain)).drawn);
+    expect(read.drawn.every((d) => d.filters === undefined && d.space === undefined)).toBe(true);
+  });
+
   it("composites a canvas as a layer over its css box", () => {
     const canvas = el({
       parent: 0,
