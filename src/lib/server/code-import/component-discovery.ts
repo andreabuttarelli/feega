@@ -1,5 +1,6 @@
 import ts from 'typescript';
 import { posix } from 'node:path';
+import type { DeclaredAxes } from './code-sets';
 
 export enum AxisSource {
   Cva = 'cva',
@@ -231,7 +232,7 @@ function unionShape(shapes: Shape[]): Shape {
     return { kind: Kind.Axis, values: [...new Set(axes.flatMap((s) => s.values))], source: axes[0].source };
   }
   const kinds = new Set(shapes.map((s) => s.kind));
-  const first = [Kind.Text, Kind.Unresolved].find((k) => kinds.has(k));
+  const first = ([Kind.Text, Kind.Unresolved] as const).find((k) => kinds.has(k));
   return first ? { kind: first } : kinds.size === 1 && kinds.has(Kind.Boolean) ? { kind: Kind.Boolean } : IGNORED;
 }
 
@@ -511,6 +512,17 @@ export function discover(files: Record<string, string>): Discovery {
   const components = [...sources].filter(([file]) => !STORY_FILE.test(file)).flatMap(([file, { reader, sf }]) => reader.components(file, sf, { ...scopes.get(file)!, hop: false }));
   const stories = [...sources].filter(([file]) => STORY_FILE.test(file)).flatMap(([, { sf }]) => storyAxes(sf) ?? []);
   return { components: components.map((c) => stories.filter((s) => s.component === c.name).reduce((acc, s) => withStory(acc, s.axes), c)) };
+}
+
+export type LibraryComponent = DiscoveredComponent & { captured: boolean; cells: number };
+
+export type LibraryReport = { components: LibraryComponent[]; uncaptured: string[] };
+
+export const declaredAxes = (library: Discovery): DeclaredAxes => new Map(library.components.map((c) => [c.name, Object.fromEntries(Object.entries(c.axes).map(([k, a]) => [k, a.values]))]));
+
+export function libraryReport(library: Discovery, captured: ReadonlySet<string>): LibraryReport {
+  const components = library.components.map((c) => ({ ...c, captured: captured.has(c.name), cells: cellsOf(c).length }));
+  return { components, uncaptured: components.filter((c) => !c.captured).map((c) => c.name) };
 }
 
 export function cellsOf(component: DiscoveredComponent): Record<string, string>[] {

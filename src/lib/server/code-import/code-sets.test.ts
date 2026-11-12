@@ -57,7 +57,7 @@ describe('codeSets', () => {
 });
 
 describe('codeSets con gli assi dichiarati nel codice', () => {
-  const declared = new Map([['Callout', { type: ['info', 'warning', 'success', 'error'] }], ['Heading', { level: ['1', '2', '3'] }], ['Field', { name: ['email', 'phone'] }]]);
+  const declared = new Map<string, Record<string, string[]>>([['Callout', { type: ['info', 'warning', 'success', 'error'] }], ['Heading', { level: ['1', '2', '3'] }], ['Field', { name: ['email', 'phone'] }]]);
 
   it('una prop type dichiarata come unione resta un asse anche se si chiama type', () => {
     const sets = codeSets([{ component: 'Callout', props: { type: 'warning' } }, { component: 'Callout', props: { type: 'info' } }], declared);

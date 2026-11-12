@@ -69,6 +69,15 @@ describe('POST /api/v1/projects/:id/code-import', () => {
     expect(importCodeAt.mock.calls.at(-1)![0]).toMatchObject({ designSystem: 'off' });
   });
 
+  it('la risposta porta la libreria letta dal codice, con i componenti che nessuna rotta ha reso', async () => {
+    const library = { components: [{ name: 'Callout', file: 'src/lib/components/Callout.svelte', exported: 'default', axes: { type: { values: ['info', 'error'], default: 'info', evidence: ['union'] } }, texts: [], states: [], unresolved: [], captured: false, cells: 2 }], uncaptured: ['Callout'] };
+    importCodeAt.mockResolvedValue({ outcome: 'ok', frameId: 'f1', name: 'app', undo: [], skipped: [], truncated: false, pages: ['/'], components: 0, variants: 0, instances: 0, library });
+
+    const { body } = await call({ canvasId: 'c1', repo: 'https://github.com/a/b', x: 0, y: 0 }, 'u-library');
+
+    expect(body).toMatchObject({ library: { uncaptured: ['Callout'] } });
+  });
+
   it('un repo che non parte torna 422 col motivo', async () => {
     importCodeAt.mockResolvedValue({ outcome: 'run_failed', error: 'install_failed: x' });
 

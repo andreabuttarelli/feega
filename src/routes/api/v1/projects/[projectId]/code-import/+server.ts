@@ -34,5 +34,5 @@ export const POST: RequestHandler = async (event) => {
   }
 
   const node = await findNode(scope.db, { orgId: scope.orgId, nodeId: done.frameId });
-  return json({ nodes: node ? [node] : [], undo: done.undo, skipped: done.skipped, truncated: done.truncated, pages: done.pages, components: done.components, variants: done.variants, instances: done.instances, ...(done.design ? { design: done.design } : {}) });
+  return json({ nodes: node ? [node] : [], undo: done.undo, skipped: done.skipped, truncated: done.truncated, pages: done.pages, components: done.components, variants: done.variants, instances: done.instances, ...(done.design ? { design: done.design } : {}), ...(done.library ? { library: done.library } : {}) });
 };

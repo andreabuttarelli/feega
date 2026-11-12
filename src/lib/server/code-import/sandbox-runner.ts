@@ -2,9 +2,10 @@ import { Sandbox } from '@vercel/sandbox';
 import type { FarmAccess } from '$lib/server/motion/vercel-farm';
 import { cloneUrl, namesIn, type RepoRef } from './repo';
 import { ORIGIN_PROXY } from './origin-proxy';
+import { discoverIn, type Discovery } from './component-discovery';
 import { NodeLine, planFile, PlanRefusal, runPlan, textsWanted, type Planned, type RepoFacts, type RunPlan } from './run-plan';
 
-export type RunningApp = { url: string; names: string[]; sha: string | null; stop: () => Promise<void> };
+export type RunningApp = { url: string; names: string[]; sha: string | null; stop: () => Promise<void>; library?: Discovery };
 
 export enum RunFailure {
   Clone = 'clone_failed',
@@ -84,6 +85,13 @@ async function factsIn(box: Box): Promise<RepoFacts> {
   return { files, texts };
 }
 
+const readIn = (box: Box) => async (paths: string[]) => JSON.parse((await shell(box, `node -e ${quoted(READ_SCRIPT)} ${line(paths)}`)).out || '{}') as Record<string, string>;
+
+async function libraryIn(box: Box): Promise<Discovery | undefined> {
+  const listed = (await shell(box, LIST)).out.split('\n').map((f) => f.trim()).filter(Boolean);
+  return discoverIn(listed, readIn(box)).catch(() => undefined);
+}
+
 async function started(box: Box, plan: RunPlan, limits: RunLimits): Promise<RunOutcome> {
   const install = await Promise.race([shell(within(box, plan.installDir), line(plan.install), plan.env), pause(limits.installMs).then(() => ({ ok: false, out: '', err: 'install timed out' }))]);
   if (!install.ok) {
@@ -104,7 +112,8 @@ async function started(box: Box, plan: RunPlan, limits: RunLimits): Promise<RunO
 
   const names = namesIn((await shell(box, NAMES)).out);
   const head = (await shell(box, 'git rev-parse HEAD')).out.trim();
-  return { ok: true, app: { url: box.sandbox.domain(limits.port), names, sha: SHA.test(head) ? head : null, stop: () => box.sandbox.stop().then(() => undefined) } };
+  const library = await libraryIn(box);
+  return { ok: true, app: { url: box.sandbox.domain(limits.port), names, sha: SHA.test(head) ? head : null, stop: () => box.sandbox.stop().then(() => undefined), library } };
 }
 
 const ARCHIVE_FILE = '/tmp/feega-repo.tgz';
