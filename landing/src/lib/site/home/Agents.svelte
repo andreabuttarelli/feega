@@ -31,7 +31,7 @@
 
 <style>
   .agents {
-    padding: 100px 12px;
+    padding: var(--site-section) 12px 0;
     color: var(--site-ink);
   }
 
@@ -115,7 +115,7 @@
       grid-template-columns: 518px 518px;
       justify-content: space-between;
       align-items: center;
-      padding: 160px 0 40px;
+      padding: var(--site-section) 0 0;
     }
 
     h2 {
@@ -130,7 +130,7 @@
 
   @media (min-width: 810px) and (max-width: 1199.98px) {
     .agents {
-      padding: 150px 0 40px;
+      padding: var(--site-section) 0 0;
     }
 
     h2 {

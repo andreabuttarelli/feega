@@ -42,6 +42,7 @@
   --site-gutter: 12px;
   --site-text: 14px;
   --site-text-line: 16.8px;
+  --site-section: 96px;
 
   min-height: 100vh;
   background: var(--site-bg);
@@ -341,8 +342,24 @@
   box-sizing: border-box;
 }
 
+@media (min-width: 810px) {
+  .site {
+    --site-section: 120px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .site {
+    --site-section: 160px;
+  }
+}
+
+.chapters {
+  padding-bottom: var(--site-section);
+}
+
 .chapter-block {
-  padding: 120px 20px 0;
+  padding: var(--site-section) 20px 0;
 }
 
 .chapter-block > .proof {
@@ -353,7 +370,7 @@
 
 @media (min-width: 810px) {
   .chapter-block {
-    padding: 200px 0 0;
+    padding: var(--site-section) 0 0;
   }
 
   .chapter-block > .proof {

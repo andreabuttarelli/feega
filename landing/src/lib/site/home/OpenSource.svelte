@@ -14,7 +14,7 @@
 
 <style>
   .open {
-    padding: 140px 20px 0;
+    padding: var(--site-section) 20px 0;
     color: var(--site-ink);
   }
 
@@ -42,7 +42,7 @@
 
   @media (min-width: 810px) {
     .open {
-      padding: 160px 0 0;
+      padding: var(--site-section) 0 0;
     }
 
     .wide {

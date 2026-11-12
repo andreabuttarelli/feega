@@ -27,9 +27,11 @@
 <div class="site-home">
 <Hero />
 <OpenSource />
-<Codebase />
-<Motion />
-<Generate />
+<div class="chapters">
+  <Codebase />
+  <Motion />
+  <Generate />
+</div>
 
 <div class="cool">
   <Agents />

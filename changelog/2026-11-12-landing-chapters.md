@@ -31,3 +31,15 @@ Rejected: a dedicated motion page (the guide already covers layout → keys → 
 the three cards into three components (one `Features` with a card list is enough).
 
 No public changelog entry: the product did not change.
+
+## Follow-up: section rhythm and a moving video strip
+
+- One spacing token, `--site-section` (96 / 120 / 160 px at 390 / 810 / 1200), now sets every
+  section break on the home: open-source strip, each chapter, the gap after the last chapter
+  (before, the generation cards touched the grey band), agents, pricing, story and FAQ tops.
+  Pricing was 200 / 154 px, chapters 200 px, open source 160 / 140 px.
+- The 20 motion videos are two rows that scroll on their own in opposite directions (CSS
+  transform over a doubled track, faded edges). They pause on hover, focus and off screen. A
+  touch, a horizontal wheel or keyboard focus hands the row to native scrolling with snap; with
+  reduced motion the rows never move and the duplicates are hidden. Videos keep `lazyPlay`:
+  only the ones visible inside the row load and play (8 of 40 at 1440).
