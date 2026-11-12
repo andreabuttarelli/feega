@@ -125,6 +125,16 @@ describe('world overlay, node by node', () => {
     expect(after.fixed.some((i) => i.clip.startsWith('b:'))).toBe(false);
   });
 
+  it('moving a selected node carries its breakpoint views in the selected part, leaving the fixed part as it was', () => {
+    const base = { curves: [], selected: ['b'], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none };
+    const view = (x: number) => ({ ...tile('b-view', x), owner: 'b' });
+    const before = parts({ ...base, chrome: [tile('a', 0), tile('b', 200), view(400)] });
+    const after = parts({ ...base, chrome: [tile('a', 0), tile('b', 300), view(500)] });
+
+    expect(after.fixed).toBe(before.fixed);
+    expect(after.selected.map((i) => i.clip.split(':')[0])).toContain('b-view');
+  });
+
   it('a zoom frame that rebuilds equal chrome compares it without serialising', () => {
     const base = { curves: [{ edge: edge(), curve }], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none };
     parts({ ...base, chrome: [tile('a', 0), tile('b', 200)] });

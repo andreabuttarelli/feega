@@ -524,7 +524,7 @@
       const on = savers.get(v.nodeId)?.breakpoint === v.breakpointId && selected.includes(t.id);
       const chrome = nodeChrome(t.id, on, layersSource.video, typedFreeText());
       const { x, y, w, h } = v.frame.box;
-      return [{ id: v.frame.id, x, y, width: w, height: h, ...portMarks({ ...t, connectable: false }), label: `${v.name} ${v.width}`, icon: text.icons.get(t.kind as NodeType) ?? null, tag: null, zoom: labelZoom, ring: on ? chrome.ring : NodeChrome.None, handles: false, ringColor: ringColour(), names: false, strokeZoom, addBeside: false, radius: cardRadiusOf(t.kind ?? ''), turn: undefined, layers: ChromeLayers.Whole }];
+      return [{ id: v.frame.id, owner: t.id, x, y, width: w, height: h, ...portMarks({ ...t, connectable: false }), label: `${v.name} ${v.width}`, icon: text.icons.get(t.kind as NodeType) ?? null, tag: null, zoom: labelZoom, ring: on ? chrome.ring : NodeChrome.None, handles: false, ringColor: ringColour(), names: false, strokeZoom, addBeside: false, radius: cardRadiusOf(t.kind ?? ''), turn: undefined, layers: ChromeLayers.Whole }];
     });
     const tiles = placed.flatMap((t) => {
       const handed = handedOver(t) && !holdsDoc(t.kind ?? '');
