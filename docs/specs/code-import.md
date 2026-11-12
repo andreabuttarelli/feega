@@ -105,6 +105,20 @@ Without booting: GitHub `git/trees/<ref>?recursive=1` (connected account, else p
 
 Cap 20: the capture budget is 150 s and a page costs about 7 s (16 Storybook stories in ~110 s), so 150 / 7 ≈ 21 pages; 20 leaves room. Conditions multiply pages; past the budget pages are left out and reported, as before.
 
+## Import map and pages added later
+
+The origin keeps the map of the import (`code.map`, `importMapSchema` in `src/lib/canvas/import-map.ts`): `rev`, one entry per route with its `state` (`imported` with `boards: [{ cond: "light@1280", clip }]`, `not_selected`, `needs_value` with link `values`, `failed` / `locked` with `reason`), `library: { captured, uncaptured }`, `design: { tokens, styles, bound, unbound }`, `unrun` when discovery could not read the routes. `mapOf` (`import-map-of.ts`) builds it from one import; `mergedMap` folds a later one in (a page with boards stays imported, boards merge by condition). Every import, incremental import and Pull writes it; `routes` takes up to 20 entries (it took 8, and a 9-route origin failed to parse). `PAGE_ROWS` is the one table of what each state shows and offers.
+
+`import_code` with `into` (API: `into` instead of a source; CLI `--into`) runs `codeAdd` (`code-sync.ts`): route × conditions pairs only, from the frame's revision, into a scratch frame that is removed after. `addBoards` (`src/lib/canvas/code-boards.ts`) lands the boards:
+
+- **Slot.** Below the boards or in a new column beside them, whichever keeps the frame's short side smaller (text sizes are fractions of it, with a floor), then its long side; a slot past 16384 px is skipped. Boards already there never move; a ground in auto layout is frozen first, so growing it cannot re-centre them.
+- **Growth.** Every clip, frameless comp, stroke and text style size is rescaled to keep its pixels; clips that filled the old frame fill the new one. The write-back scale of style size tokens follows (`styleSizesAfter`).
+- **Mains.** A piece main whose set + variant matches a frame main and whose layer skeleton (component and parent of each layer, in order) is equal is dropped; instances and override keys are remapped to the frame main's layers. Otherwise it is kept and listed. Variables merge by collection and name, styles by name: the frame's values win.
+- **Ids.** Colliding clip, comp and track ids get fresh ones.
+- **Refusals.** `frame_full`: the frame already holds 20 boards (Pull re-captures every board in one 150 s run, about 21 pages). `no_room`: no slot fits 16384 px, or the merged doc would not parse (a small text pushed under the size floor).
+
+`land: frame` writes a revision (CLI, MCP); `land: piece` answers the scratch doc and the editor lands it (`landImport`, `src/lib/canvas/import-into.ts`): a placeholder board at once (`showPending`, saved but not an undo step), the real boards as one undo step whose before is the frame without the placeholder; a failure removes the placeholder and the map shows the reason. Pull re-captures each page under its own conditions (`pulledVariants`) instead of routes × conditions.
+
 ## Private repositories
 
 The user connects GitHub through Composio (Platform, managed auth): `POST …/github/connect` opens a
