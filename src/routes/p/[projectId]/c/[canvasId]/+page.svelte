@@ -2446,8 +2446,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   let componentPickFor = $state<string | null>(null);
-  let arcTemplates = $state<TemplateEntry[]>([]);
-  const componentTemplates = $derived([...BUILTIN_TEMPLATES, ...arcTemplates, ...data.orgTemplates]);
+  let libraryTemplates = $state<TemplateEntry[]>([]);
+  const componentTemplates = $derived([...BUILTIN_TEMPLATES, ...libraryTemplates, ...data.orgTemplates]);
   const componentItems = $derived(componentCatalogue(componentTemplates));
   const componentPicking = $derived.by(() => {
     const row = componentPickFor ? nodes.find((n) => n.id === componentPickFor) : null;
@@ -2463,8 +2463,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   let frameLibraryAt = $state<{ x: number; y: number } | null>(null);
   const libraryOpen = $derived(Boolean(componentPickFor || frameLibraryAt));
   $effect(() => {
-    if (libraryOpen && !arcTemplates.length) {
-      void import('$lib/motion/template/arc').then((m) => (arcTemplates = m.ARC_TEMPLATES));
+    if (libraryOpen && !libraryTemplates.length) {
+      void import('$lib/motion/template/libraries').then((m) => (libraryTemplates = m.LIBRARY_TEMPLATES));
     }
   });
   const catalogPosters = new SvelteMap<string, string>();

@@ -6,6 +6,7 @@ import { exposeField, FieldType } from '$lib/motion/template/fields';
 import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
 import { templateLibrary } from './templates';
 import { ARC_TEMPLATES } from '$lib/motion/template/arc';
+import { RUIXEN_TEMPLATES } from '$lib/motion/template/ruixen';
 
 function withField(): MotionDoc {
   const added = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Title', from: 0, durationInFrames: 60, props: { text: 'Hello' } }, 't1');
@@ -22,13 +23,19 @@ describe('the motion template library of an org', () => {
   it('lists the built-in templates before anything is saved', async () => {
     const { db } = templatesDb();
 
-    expect((await templateLibrary(db, scope).list()).map((e) => e.id)).toEqual([...BUILTIN_TEMPLATES, ...ARC_TEMPLATES].map((e) => e.id));
+    expect((await templateLibrary(db, scope).list()).map((e) => e.id)).toEqual([...BUILTIN_TEMPLATES, ...ARC_TEMPLATES, ...RUIXEN_TEMPLATES].map((e) => e.id));
   });
 
   it('finds an Arc component the agent asks for by id', async () => {
     const { db } = templatesDb();
 
     expect(await templateLibrary(db, scope).find(ARC_TEMPLATES[0].id)).toBe(ARC_TEMPLATES[0]);
+  });
+
+  it('finds a Ruixen component the agent asks for by id', async () => {
+    const { db } = templatesDb();
+
+    expect(await templateLibrary(db, scope).find(RUIXEN_TEMPLATES[0].id)).toBe(RUIXEN_TEMPLATES[0]);
   });
 
   it('a saved template is stored for the org and listed after the built-ins', async () => {
@@ -56,7 +63,7 @@ describe('the motion template library of an org', () => {
     const { db } = templatesDb();
     await templateLibrary(db, scope).save({ doc: withField(), compId: null, meta: { name: 'Promo' }, posterFrame: 0 });
 
-    expect(await templateLibrary(db, { ...scope, orgId: 'org-b' }).list()).toHaveLength(BUILTIN_TEMPLATES.length + ARC_TEMPLATES.length);
+    expect(await templateLibrary(db, { ...scope, orgId: 'org-b' }).list()).toHaveLength(BUILTIN_TEMPLATES.length + ARC_TEMPLATES.length + RUIXEN_TEMPLATES.length);
   });
 
   it('a doc with no exposed field is refused before any write', async () => {
@@ -69,7 +76,7 @@ describe('the motion template library of an org', () => {
   it('a stored row whose doc no longer parses is skipped, not thrown', async () => {
     const { db } = templatesDb([{ id: 'bad', org_id: 'org-a', name: 'Old', description: '', doc: { version: 0 } }]);
 
-    expect(await templateLibrary(db, scope).list()).toHaveLength(BUILTIN_TEMPLATES.length + ARC_TEMPLATES.length);
+    expect(await templateLibrary(db, scope).list()).toHaveLength(BUILTIN_TEMPLATES.length + ARC_TEMPLATES.length + RUIXEN_TEMPLATES.length);
   });
 
   it('built-ins cannot be removed; an org template can', async () => {

@@ -1,0 +1,797 @@
+[
+  {
+    "slug": "arc-reveal-hero",
+    "name": "Arc Reveal Hero",
+    "description": "A multilingual greeting cycles on a calm white surface, then a curved black curtain rises from below to reveal the landing — the boundary stays a single smooth arc the whole way up, never a flat slide."
+  },
+  {
+    "slug": "grid-frame-hero",
+    "name": "Grid Frame Hero",
+    "description": "A bento-style hero with a framed grid layout and dual feature cards with illustrations."
+  },
+  {
+    "slug": "hero-title-animation",
+    "name": "Hero Title Animation",
+    "description": "An animated hero title with phased brand reveal, staggered word blur-in, and highlight box sweep effect."
+  },
+  {
+    "slug": "phone-scroll-hero",
+    "name": "Phone Scroll Hero",
+    "description": "A hero whose 3D-tilted phone mockup flattens and climbs up over the headline as the page scrolls. Theme-aware with a reduced-motion fallback."
+  },
+  {
+    "slug": "card-carousel-hero",
+    "name": "Card Carousel Hero",
+    "description": "An interactive hero section featuring a card carousel with smooth animations"
+  },
+  {
+    "slug": "preview-switch-hero",
+    "name": "Preview Switch Hero",
+    "description": "A split hero with an icon-rail that switches the product preview, a lead-capture column (badge, ratings, email form, CTAs, avatars), and a full-width logo strip. Responsive and theme-aware."
+  },
+  {
+    "slug": "pricing-landing-hero",
+    "name": "Pricing Landing Hero",
+    "description": "A service-style landing hero with scattered preview cards, price block with strike-through, scarcity line, dual CTAs, and trusted-by strip."
+  },
+  {
+    "slug": "product-card-hero",
+    "name": "Product Card Hero",
+    "description": "Two-column hero with floating account menu card, pricing bar, and a four-column feature grid with icons."
+  },
+  {
+    "slug": "product-feature-hero",
+    "name": "Product Feature Hero",
+    "description": "Two-column hero with decorative gradient card and a four-column feature highlights grid."
+  },
+  {
+    "slug": "sales-ai-hero",
+    "name": "Sales AI Hero",
+    "description": "A SaaS landing hero with floating announcement pill, oversized centered headline, paired square + landscape media tiles, and a divider-flanked trusted-by logo strip."
+  },
+  {
+    "slug": "scroll-over-hero",
+    "name": "Scroll Over Hero",
+    "description": "A hero with a pinned, centered title that a product panel rises up and overlaps on scroll. Theme-aware with a reduced-motion stacked fallback."
+  },
+  {
+    "slug": "split-hero-section",
+    "name": "Split Hero Section",
+    "description": "A split-layout hero section with left-aligned headline, key metrics, app screenshot showcase, and trusted-by logo strip."
+  },
+  {
+    "slug": "structured-hero-section",
+    "name": "Structured Hero Section",
+    "description": "A clean hero section with announcement pill, overlapping showcase cards, trusted-by logo strip, and dual CTAs."
+  },
+  {
+    "slug": "tabbed-hero-section",
+    "name": "Tabbed Hero Section",
+    "description": "A SaaS hero section with left-aligned headline, tabbed navigation, app screenshot showcase, and trusted-by logo strip."
+  },
+  {
+    "slug": "pricing-cards-tooltip",
+    "name": "Pricing Cards with Tooltips",
+    "description": "A clean two-column pricing comparison with feature tooltips and corner decorations. Inspired by ZippyStarter design."
+  },
+  {
+    "slug": "pricing-comparison",
+    "name": "Pricing Comparison",
+    "description": "A detailed pricing comparison table with features and plan differences."
+  },
+  {
+    "slug": "pricing-flow",
+    "name": "Pricing Flow",
+    "description": "An interactive pricing flow with billing toggles and plan selection."
+  },
+  {
+    "slug": "pricing-section-vertical",
+    "name": "Pricing Section Vertical",
+    "description": "A vertical pricing section component with feature comparisons, plan cards, and call-to-action buttons."
+  },
+  {
+    "slug": "pricing-feature-matrix",
+    "name": "Pricing Feature Matrix",
+    "description": "A comprehensive pricing comparison matrix with feature categories, plan columns, and tooltips."
+  },
+  {
+    "slug": "pricing-with-user-scaling",
+    "name": "Pricing with User Scaling",
+    "description": "A pricing component with user-based scaling and dynamic pricing calculations."
+  },
+  {
+    "slug": "staged-pricing",
+    "name": "Staged Pricing",
+    "description": "Four-tier pricing section framed by decorative grid lines and corner crosshairs, with an animated monthly/annual toggle and a slide-up price swap."
+  },
+  {
+    "slug": "subscription-plans",
+    "name": "Subscription Plans",
+    "description": "A subscription-focused pricing component with billing options and features."
+  },
+  {
+    "slug": "banner-announcement",
+    "name": "Banner Announcement",
+    "description": "A dismissible announcement banner with multiple variants and action links."
+  },
+  {
+    "slug": "banner-cookie",
+    "name": "Banner Cookie",
+    "description": "A frosted-glass cookie consent card with rise entrance and shrink-drop dismiss."
+  },
+  {
+    "slug": "banner-countdown",
+    "name": "Banner Countdown",
+    "description": "A countdown banner with Fluid Numerals — odometer-style rolling digits, colon heartbeat, and height-collapse dismiss."
+  },
+  {
+    "slug": "banner-newsletter",
+    "name": "Banner Newsletter",
+    "description": "A newsletter banner with Inline Morphing — one pill that reshapes across input, loading, and confirmation."
+  },
+  {
+    "slug": "corporate-footer",
+    "name": "Corporate Footer",
+    "description": "A card-based corporate footer with decorative watermark, column navigation, and whisper-quiet typography."
+  },
+  {
+    "slug": "footer-enterprise",
+    "name": "Footer Enterprise",
+    "description": "An enterprise-grade footer with three-tier layout, wide column grid, and whisper-quiet typography."
+  },
+  {
+    "slug": "footer-pro",
+    "name": "Footer Pro",
+    "description": "A minimal, typographic footer with brand wordmark, link columns, and quiet social icons."
+  },
+  {
+    "slug": "ruixen-gradient-footer",
+    "name": "Ruixen Gradient Footer",
+    "description": "A normal-height footer with a blurred rainbow pinned to the bottom of the viewport, stretching up from the floor over the last stretch of scroll. Gradient inspired by Dia Browser. One inline SVG, no dependencies."
+  },
+  {
+    "slug": "wordmark-footer",
+    "name": "Wordmark Footer",
+    "description": "A Rauno-craft half-cut wordmark footer — giant brand text on a full-width dark surface with luminance gradient and hairline divider."
+  },
+  {
+    "slug": "account-menu",
+    "name": "Account Menu",
+    "description": "User account dropdown menu with profile options, settings, and logout functionality."
+  },
+  {
+    "slug": "action-toolbar",
+    "name": "Action Toolbar",
+    "description": "Versatile toolbar component with action buttons and dropdown menus for common operations."
+  },
+  {
+    "slug": "app-menu-bar",
+    "name": "App Menu Bar",
+    "description": "Desktop-style application menu bar with File, Edit, View, and Help menus."
+  },
+  {
+    "slug": "breadcrumb-dropdown",
+    "name": "Breadcrumb Dropdown",
+    "description": "Inline-expanding collapsible breadcrumb with staggered path reveal."
+  },
+  {
+    "slug": "breadcrumb-separator",
+    "name": "Breadcrumb Separator",
+    "description": "Breadcrumb navigation with customizable separators (chevron, slash, dot, arrow, dash)."
+  },
+  {
+    "slug": "breadcrumb-icon",
+    "name": "Breadcrumb Icon",
+    "description": "Breadcrumb navigation with icons for each item."
+  },
+  {
+    "slug": "case-study-tabs",
+    "name": "Case Study Tabs",
+    "description": "A tabbed customer-testimonial block with embossed stars, brand-logo tabs, an animated underline indicator that adopts each brand's accent color, a featured case-study paragraph with CTA, and a pull-quote with author."
+  },
+  {
+    "slug": "chapter-scrubber",
+    "name": "Chapter Scrubber",
+    "description": "A vertical rail of uniform ticks that magnify toward the cursor like a dock — the lines nearest the pointer rise on a spring-driven wave and a preview card describes the crest chapter, inspired by the OpenAI Codex chapters minimap."
+  },
+  {
+    "slug": "drilldown-menu",
+    "name": "Drilldown Menu",
+    "description": "A list that drills into itself. The row you click stays put, fades to a grey breadcrumb with a return arrow, and its children arrive one indent deeper — one layout animation, no sliding panels."
+  },
+  {
+    "slug": "expandable-menu-navbar",
+    "name": "Expandable Menu Navbar",
+    "description": "A monochrome floating navbar that springs open into a stacked menu of grouped, metadata-rich nav items with a status footer and keyboard shortcut."
+  },
+  {
+    "slug": "drag-and-drop-tabs",
+    "name": "Drag And Drop Tabs",
+    "description": "Reorderable tabs with spring physics on drop, staggered cascade, velocity-aware snap, and audio tick."
+  },
+  {
+    "slug": "gooey-dock",
+    "name": "Gooey Dock",
+    "description": "Horizontal dock with proximity-based magnification — items grow as the cursor approaches, spring physics."
+  },
+  {
+    "slug": "gooey-pagination",
+    "name": "Gooey Pagination",
+    "description": "Liquid metaball pagination with SVG gooey filter, sliding active indicator, and spring physics."
+  },
+  {
+    "slug": "icon-pagination",
+    "name": "Icon Pagination",
+    "description": "Colorful dot pagination with mouse proximity wave effect, cosine falloff lift, and spring physics."
+  },
+  {
+    "slug": "invert-tabs",
+    "name": "Invert Tabs",
+    "description": "mix-blend-mode exclusion on a white pill — text auto-inverts in both light and dark themes. Spring physics. Audio tick."
+  },
+  {
+    "slug": "floating-toolbar",
+    "name": "Floating Toolbar",
+    "description": "A floating toolbar with animated tab switching, cursor glow, and morphing search input."
+  },
+  {
+    "slug": "morphing-expandable-menu",
+    "name": "Morphing Expandable Menu",
+    "description": "A spring-animated pill that morphs into a dock, then expands into search, music player, timer, or note panels."
+  },
+  {
+    "slug": "morphing-page-dots",
+    "name": "Morphing Page Dots",
+    "description": "Morphing pill dots with spring width animation, horizontal drag scrub, and audio ticks."
+  },
+  {
+    "slug": "navbar-breadcrumb",
+    "name": "Navbar Breadcrumb",
+    "description": "A navigation bar with breadcrumb navigation for multi-level hierarchy."
+  },
+  {
+    "slug": "navbar-centered",
+    "name": "Navbar Centered",
+    "description": "A navigation bar with centered navigation links between logo and actions."
+  },
+  {
+    "slug": "navbar-floating",
+    "name": "Navbar Floating",
+    "description": "A floating pill-shaped navigation bar with rounded corners and backdrop blur."
+  },
+  {
+    "slug": "magnetic-tabs",
+    "name": "Magnetic Tabs",
+    "description": "Glass pill indicator that springs between hovered tabs with magnetic attraction and snappier overshoot on selection."
+  },
+  {
+    "slug": "navbar-icon-links",
+    "name": "Navbar Icon Links",
+    "description": "A navigation bar with social media icon links and primary CTA."
+  },
+  {
+    "slug": "navbar-minimal",
+    "name": "Navbar Minimal",
+    "description": "An ultra-minimal navigation bar with just logo, few links, and single CTA."
+  },
+  {
+    "slug": "navbar-simple",
+    "name": "Navbar Simple",
+    "description": "A clean, simple navigation bar with logo, links, and action buttons."
+  },
+  {
+    "slug": "navbar-split",
+    "name": "Navbar Split",
+    "description": "A navigation bar with links split between left and right sections."
+  },
+  {
+    "slug": "navbar-status",
+    "name": "Navbar Status",
+    "description": "A navigation bar with status indicator and real-time metrics display."
+  },
+  {
+    "slug": "navbar-tabs",
+    "name": "Navbar Tabs",
+    "description": "A two-tier navigation bar with main header and tabbed navigation below."
+  },
+  {
+    "slug": "navbar-user-menu",
+    "name": "Navbar User Menu",
+    "description": "A navigation bar with user avatar, dropdown menu, and notification bell."
+  },
+  {
+    "slug": "navbar-with-search",
+    "name": "Navbar With Search",
+    "description": "A navigation bar with integrated search input and keyboard shortcut indicator."
+  },
+  {
+    "slug": "nested-dashboard-menu",
+    "name": "Nested Dashboard Menu",
+    "description": "A nested navigation menu component for dashboard layouts."
+  },
+  {
+    "slug": "particle-text-dots",
+    "name": "Particle Text Dots",
+    "description": "Text rendered as interactive particle dots that react to cursor movement, similar to Gemini's background effect."
+  },
+  {
+    "slug": "scroll-pagination",
+    "name": "Scroll Pagination",
+    "description": "Minimal flip-counter pagination with direction-aware vertical flip, progress bar, and spring physics."
+  },
+  {
+    "slug": "sliding-pagination",
+    "name": "Sliding Pagination",
+    "description": "Page numbers with sliding pill indicator, proximity brightness, wheel navigation, and spring physics."
+  },
+  {
+    "slug": "smart-breadcrumb",
+    "name": "Smart Breadcrumb",
+    "description": "Intelligent breadcrumb navigation with ellipsis for long paths and responsive design."
+  },
+  {
+    "slug": "wheel-pagination",
+    "name": "Wheel Pagination",
+    "description": "Vertical drum pagination with scroll wheel navigation, proximity brightness, and spring physics."
+  },
+  {
+    "slug": "stack-pagination",
+    "name": "Stack Pagination",
+    "description": "Physical card stack pagination with depth compression, diminishing scale, and spring physics."
+  },
+  {
+    "slug": "toolbar-dock",
+    "name": "Toolbar Dock",
+    "description": "A Vercel-style floating icon dock with a single tooltip rail that slides and clip-path reveals each label above the hovered button. Spring-driven movement, an options bar that wipes open from a trigger, keyboard shortcut chips, notification dots, and fully configurable items."
+  },
+  {
+    "slug": "social-preview-dock",
+    "name": "Social Preview Dock",
+    "description": "A row of social links sharing one preview card. One panel owns the card surface and resizes itself between profiles while the contents cross-fade inside, so moving between icons reads as a single card growing and travelling. The GitHub card pulls a live contribution graph."
+  },
+  {
+    "slug": "accordion-editorial",
+    "name": "Editorial Accordion",
+    "description": "A typographic accordion with oversized uppercase titles, numbered items, and a faded-to-primary color transition on expand."
+  },
+  {
+    "slug": "calendar-crest",
+    "name": "Calendar Crest",
+    "description": "Dual-month range picker with physical depth — selected band rises off the surface, endpoints crest highest, proportional shadows."
+  },
+  {
+    "slug": "calendar-lume",
+    "name": "Calendar Lume",
+    "description": "A depth-zoom calendar — drill from years to months to days with scale-based transitions and staggered grids."
+  },
+  {
+    "slug": "calendar-planner",
+    "name": "Calendar Planner",
+    "description": "Vertical day stream — past fades, today glows, events live inline. Select a day, type, press Enter."
+  },
+  {
+    "slug": "calendar-scheduler",
+    "name": "Calendar Scheduler",
+    "description": "Week-strip scheduler — horizontal day ribbon, vertical time ruler, one-tap booking with spring physics."
+  },
+  {
+    "slug": "calendar-twin",
+    "name": "Calendar Twin",
+    "description": "Dual-month range picker — click start, hover to preview, click end. Continuous band with smart rounding."
+  },
+  {
+    "slug": "calendar-wave",
+    "name": "Calendar Wave",
+    "description": "A calendar where days rise toward your cursor like water — cosine wave ripple, spring physics, shadow depth."
+  },
+  {
+    "slug": "event-scheduler",
+    "name": "Event Scheduler",
+    "description": "Inline timeline scheduler — tap a time, type a title, press Enter. Spring animations, sorted list, sound feedback."
+  },
+  {
+    "slug": "range-calendar",
+    "name": "Range Calendar",
+    "description": "A compact calendar grid for date range selection — continuous capsule highlight, hover preview, spring-animated month transitions, today dot."
+  },
+  {
+    "slug": "scrub-datetime",
+    "name": "Scrub Datetime",
+    "description": "An inline date-time picker where the text IS the interface — drag any segment horizontally to scrub, scroll to increment, click AM/PM to toggle."
+  },
+  {
+    "slug": "drum-picker",
+    "name": "Drum Picker",
+    "description": "A 3D cylindrical drum picker — vertical drag or scroll to cycle, perspective-projected curvature, proximity-scaled brightness, spring snap."
+  },
+  {
+    "slug": "service-ledger",
+    "name": "Service Ledger",
+    "description": "A scroll-spy services section with a sticky tab strip at the top. As the reader scrolls past each long-form panel (title, description, deliverables, optional image, inline CTA), the matching tab highlights; clicking a tab smooth-scrolls to that entry."
+  },
+  {
+    "slug": "ai-chat-input",
+    "name": "AI Chat Input",
+    "description": "Vanishing chat input with rotating placeholders, pixel-scatter submit, and spring-timed interactions."
+  },
+  {
+    "slug": "checkbox-colored",
+    "name": "Checkbox Colored",
+    "description": "A checkbox with customizable color themes including blue, green, red, and more."
+  },
+  {
+    "slug": "checkbox-group",
+    "name": "Checkbox Group",
+    "description": "A group of checkboxes for multi-selection with horizontal or vertical layout."
+  },
+  {
+    "slug": "checkbox-indeterminate",
+    "name": "Checkbox Indeterminate",
+    "description": "A checkbox with three states: checked, unchecked, and indeterminate."
+  },
+  {
+    "slug": "checkbox-simple",
+    "name": "Checkbox Simple",
+    "description": "A simple checkbox component with label and optional description."
+  },
+  {
+    "slug": "checkbox-terms",
+    "name": "Checkbox Terms",
+    "description": "A checkbox for accepting terms of service and privacy policy with linked text."
+  },
+  {
+    "slug": "checkbox-todo",
+    "name": "Checkbox Todo",
+    "description": "A todo-style checkbox with animated strikethrough effect when checked."
+  },
+  {
+    "slug": "checkbox-tree",
+    "name": "Checkbox Tree",
+    "description": "A hierarchical tree checkbox for nested selections with expand/collapse."
+  },
+  {
+    "slug": "chrono-select",
+    "name": "Chrono Select",
+    "description": "Inline date picker — click to expand, spring-animated calendar grid, today shortcut, click-outside dismiss."
+  },
+  {
+    "slug": "claude-chat-input",
+    "name": "Claude Chat Input",
+    "description": "Multi-modal chat input with file uploads, model selector, extended thinking toggle, and spring-timed interactions."
+  },
+  {
+    "slug": "color-emotion-select",
+    "name": "Color Emotion Select",
+    "description": "A select component that displays options with color indicators and optional emojis for emotional context."
+  },
+  {
+    "slug": "gradient-chat-input",
+    "name": "Gradient Chat Input",
+    "description": "Minimal chat input that streams animated message bubbles, plays synthesized send/receive sounds, and reveals a blurred spectrum glow once a conversation starts."
+  },
+  {
+    "slug": "fine-tune-slider",
+    "name": "Fine Tune Slider",
+    "description": "A slider with pull-away precision mode — drag normally, pull away from the track to fine-tune values."
+  },
+  {
+    "slug": "live-waveform",
+    "name": "Live Waveform",
+    "description": "Canvas-based real-time waveform visualizer with processing animation, microphone input, and stop controls."
+  },
+  {
+    "slug": "notifications-filter",
+    "name": "Notifications Filter",
+    "description": "Spring pill bar with layoutId sliding indicator and staggered item transitions."
+  },
+  {
+    "slug": "smart-paste-input",
+    "name": "Smart Paste Input",
+    "description": "A chat composer that catches long pastes and turns them into an attachment card instead of flooding the input — click the card to open a full-screen editor with a live character count, edit the text in place, then Save or Remove."
+  },
+  {
+    "slug": "tag-cloud-select",
+    "name": "Tag Cloud Select",
+    "description": "Interactive tag selection component with cloud-style layout and multi-select functionality."
+  },
+  {
+    "slug": "add-to-cart-button",
+    "name": "Add To Cart Button",
+    "description": "A morphing add-to-cart button with spring physics, slot-machine quantity flip, and live price updates."
+  },
+  {
+    "slug": "animated-link",
+    "name": "Animated Link",
+    "description": "A zero-dependency animated link whose underline reveals from the left, the right, or grows from the center on hover, with an optional diagonal arrow that lifts into view. Pure CSS and fully theme-aware."
+  },
+  {
+    "slug": "badge-morph",
+    "name": "Badge Morph",
+    "description": "A morphing status badge that transitions between states with spring-physics micro-interactions."
+  },
+  {
+    "slug": "share-button",
+    "name": "Share Button",
+    "description": "A morphing share button with four-phase choreography, staggered cascade transitions, and cursor glow."
+  },
+  {
+    "slug": "avatar-hover-card",
+    "name": "Avatar Hover Card",
+    "description": "An interactive avatar that reveals a profile card on hover with spring physics, staggered content, and delayed open/close."
+  },
+  {
+    "slug": "bordered-clients-grid",
+    "name": "Bordered Clients Grid",
+    "description": "Five-column logo grid with subtle dividers, hover-tinted cells, and decorative cross markers at the four corners."
+  },
+  {
+    "slug": "avatar-spring-stack",
+    "name": "Avatar Spring Stack",
+    "description": "An overlapping avatar stack with spring-animated tooltips that reveal labels on hover, plus a +N overflow counter."
+  },
+  {
+    "slug": "card-stack",
+    "name": "Card Stack",
+    "description": "An interactive 3D card stack carousel with fan-out animation, drag gestures, and auto-advance support."
+  },
+  {
+    "slug": "coverflow-carousel",
+    "name": "Coverflow Carousel",
+    "description": "A rack of square covers with the perspective reversed. The centre card sits square to the viewer while the ones beside it swing their outer edges forward, so the rack opens toward you instead of folding away. Drag, throw, snap and infinite looping are all hand-rolled in the one file — no carousel library — and an optional caption underneath follows whichever card is centred."
+  },
+  {
+    "slug": "credit-card-dialog",
+    "name": "Credit Card Dialog",
+    "description": "Inline payment form — four zones separated by hairlines. Auto-format, auto-advance, brand detection."
+  },
+  {
+    "slug": "customer-story-stack",
+    "name": "Customer Story Stack",
+    "description": "A card-stack customer testimonial carousel with vertical prev/next nav, touch-swipe support, two ghost cards layered behind the active story, and a framed metrics panel with corner crosshair marks that updates per case."
+  },
+  {
+    "slug": "featured-portrait-testimonial",
+    "name": "Featured Portrait Testimonial",
+    "description": "An expanding-portrait testimonial carousel. Inactive cards show a grayscale portrait with a name strip; the active card morphs into a full quote card with author, dashed divider, and a row of favorite-feature tags. Width transitions and content crossfade are choreographed for clean, premium movement."
+  },
+  {
+    "slug": "halo-reel",
+    "name": "Halo Reel",
+    "description": "Image cards riding an ellipse — cos θ places each card, sizes it and stacks it, so the near side of the ring is large and the far side small. It turns on its own, pauses under the pointer, and you can drag it round."
+  },
+  {
+    "slug": "multi-media-testimonial",
+    "name": "Multi-Media Testimonial",
+    "description": "A masonry grid of testimonial cards that mix text-only quotes, image thumbnails, and video clips that open in a mobile-framed lightbox powered by Video Player Pro — with author avatar, title, and role under each card."
+  },
+  {
+    "slug": "music-player-card",
+    "name": "Music Player Card",
+    "description": "A rich music player card with album art, action pills, seekable progress, shuffle, repeat, and full transport controls."
+  },
+  {
+    "slug": "notifications-carousel",
+    "name": "Notifications Carousel",
+    "description": "Vertical drum carousel with 3D cylinder rotation, proximity brightness, and spring snap."
+  },
+  {
+    "slug": "phone-mockup-card",
+    "name": "Phone Mockup Card",
+    "description": "A minimal phone frame card with pixel-perfect status bar, dynamic island, and typography metrics display."
+  },
+  {
+    "slug": "image-card-fan",
+    "name": "Image Card Fan",
+    "description": "A fanned hand of large image cards. Click one and it lifts out of the hand while its title and description settle in on either side — one card out at a time."
+  },
+  {
+    "slug": "profile-card",
+    "name": "Profile Card",
+    "description": "A glassmorphic profile card with two variants — full-bleed image overlay and split half layout. Includes follow button, favorite toggle, and verified badge."
+  },
+  {
+    "slug": "trusted-clients-showcase",
+    "name": "Trusted Clients Showcase",
+    "description": "Spotlight logo grid with staggered blur-up entrance and collective dim hover."
+  },
+  {
+    "slug": "scroll-portrait-wall",
+    "name": "Scroll Portrait Wall",
+    "description": "A scroll-driven portrait wall with a sticky mix-blend-exclusion title; GSAP ScrollTrigger scrubs each portrait from scale 0 to 1 and back as its row crosses the viewport."
+  },
+  {
+    "slug": "animated-highlight-text",
+    "name": "Animated Highlight Text",
+    "description": "Typographic block that mixes plain copy with inline highlights carrying bespoke animated SVG icons — a heart that beats a real lub-dub, twinkling sparkles, a clicking cursor, a launching rocket — that come alive on hover or focus."
+  },
+  {
+    "slug": "animated-number-flip",
+    "name": "Animated Number Flip",
+    "description": "A card component that displays numbers with smooth flip animations."
+  },
+  {
+    "slug": "container-text-scroll",
+    "name": "Container Text Scroll",
+    "description": "Scroll-triggered text animation component with smooth parallax effects using Framer Motion."
+  },
+  {
+    "slug": "perspective-text",
+    "name": "Perspective Text",
+    "description": "A display headline projected onto the ground plane. Letters read wide at the cap line and taper to the baseline, fanning out from a vanishing point below — painted-on-the-road lettering, in plain CSS transforms."
+  },
+  {
+    "slug": "receding-text-plane",
+    "name": "Receding Text Plane",
+    "description": "A slab of copy raked away from the viewer on a short lens. Near lines swell past the frame edges, far lines fold toward a horizon that was never drawn — no scroll, no animation, one CSS transform."
+  },
+  {
+    "slug": "scramble-text",
+    "name": "Scramble Text",
+    "description": "Hover triggers a decode sequence — characters dissolve into random glyphs then resolve in a directional wave that follows your entry point, each locking in with a spring pop."
+  },
+  {
+    "slug": "trusted-clients-showcase",
+    "name": "Trusted Clients Showcase",
+    "description": "Spotlight logo grid with staggered blur-up entrance and collective dim hover."
+  },
+  {
+    "slug": "scroll-burn-text",
+    "name": "Scroll Burn Text",
+    "description": "A manifesto that comes at the reader and burns off. Each block grows toward the lens, splits into red and cyan at the edges and is eaten away glyph by glyph from the middle out, uncovering the next block standing behind it. Film grain over the whole frame, no animation library."
+  },
+  {
+    "slug": "scroll-text-rise",
+    "name": "Scroll Text Rise",
+    "description": "A scroll-driven text reveal — each word fades up from below as you scroll, with staggered opacity and y-translate transforms powered by Framer Motion's useScroll and useTransform hooks."
+  },
+  {
+    "slug": "variable-text",
+    "name": "Variable Text",
+    "description": "Cursor acts as a focal plane — characters near the pointer sharpen (heavier weight, slight lift, full opacity) while distant characters soften. Depth-of-field for typography."
+  },
+  {
+    "slug": "automated-tasks-panel",
+    "name": "Automated Tasks Panel",
+    "description": "Animated task panel with scrolling automation features"
+  },
+  {
+    "slug": "avatar-quick-actions",
+    "name": "Avatar Quick Actions",
+    "description": "An orbital action ring that blooms outward from the avatar with staggered spring emergence — hover any action and the rest dim, drawing the eye."
+  },
+  {
+    "slug": "cloud-background",
+    "name": "Cloud Background",
+    "description": "A flowing cloud background with WebGL shaders and theme support."
+  },
+  {
+    "slug": "comment-thread",
+    "name": "Comment Thread",
+    "description": "Threaded comment component with nested replies, colored avatars, and collapsible reply chains."
+  },
+  {
+    "slug": "comment-thread",
+    "name": "Comment Thread",
+    "description": "Threaded comment component with nested replies, colored avatars, and collapsible reply chains."
+  },
+  {
+    "slug": "comment-thread",
+    "name": "Comment Thread",
+    "description": "Threaded comment component with nested replies, colored avatars, and collapsible reply chains."
+  },
+  {
+    "slug": "deploy-region-globe",
+    "name": "Region Globe",
+    "description": "A card with an interactive globe over a region list. Pick a region, the camera flies to it and the latency caption updates, then confirm."
+  },
+  {
+    "slug": "feature-highlights",
+    "name": "Feature Highlights",
+    "description": "Progressive reveal feature list with sliding accent indicator, grid-template-rows expand, and staggered entrance."
+  },
+  {
+    "slug": "dual-tone-rain-background",
+    "name": "Dual Tone Rain Background",
+    "description": "A sophisticated rain effect with dual-tone teal-cyan colors and grid overlay."
+  },
+  {
+    "slug": "integration-and-stats-section",
+    "name": "Integration And Stats Section",
+    "description": "Three-column feature cards with chat, analytics, and polling illustrations"
+  },
+  {
+    "slug": "luma-bar",
+    "name": "Luma Bar",
+    "description": "A sleek navigation bar with Luma-inspired design and interactions."
+  },
+  {
+    "slug": "load-ripple",
+    "name": "Load Ripple",
+    "description": "A simple ripple loader with 5 animated circles and staggered timing."
+  },
+  {
+    "slug": "loading-circle",
+    "name": "Loading Circle",
+    "description": "A ripple loading animation with multiple concentric circles and gradient effects."
+  },
+  {
+    "slug": "magic-tree",
+    "name": "Magic Tree",
+    "description": "A magical file tree with sparkle effects and interactive animations."
+  },
+  {
+    "slug": "milestone-stepper",
+    "name": "Milestone Stepper",
+    "description": "A vertical timeline-style stepper for showing milestones, order tracking, or project phases. Supports custom icons and multiple variants."
+  },
+  {
+    "slug": "motion-file-tree",
+    "name": "Motion File Tree",
+    "description": "An animated file tree component with smooth expand/collapse transitions."
+  },
+  {
+    "slug": "mouse-spark",
+    "name": "Mouse Spark",
+    "description": "Interactive mouse-following particle effect with customizable colors and themes."
+  },
+  {
+    "slug": "notification-inbox-popover",
+    "name": "Notification Inbox Popover",
+    "description": "Wave-hover inbox with cosine proximity effect, mark all read, and glass morphism."
+  },
+  {
+    "slug": "notification",
+    "name": "Notification",
+    "description": "Spring toast stack with drag-to-dismiss, rubber-band physics, and glass morphism."
+  },
+  {
+    "slug": "progressive-flux-loader",
+    "name": "Progressive Flux Loader",
+    "description": "A glowing progress bar with phase labels that fly in along the Z-axis and reveal letter by letter."
+  },
+  {
+    "slug": "ripple-distortion",
+    "name": "Ripple Distortion",
+    "description": "An interactive image distortion effect with mouse-driven ripples using Three.js."
+  },
+  {
+    "slug": "rotating-gradient-right",
+    "name": "Rotating Gradient Right",
+    "description": "Rotating conic gradient animation with centered card content"
+  },
+  {
+    "slug": "scroll-image-tunnel",
+    "name": "Scroll Image Tunnel",
+    "description": "A pinned photo stage where each image grows from a small point in the center, developing from an oversaturated, high-contrast state into the true image as it settles, cycling through the set as the page scrolls."
+  },
+  {
+    "slug": "ripple-circles",
+    "name": "Ripple Circles",
+    "description": "Animated ripple circles loader with gradient backgrounds and backdrop blur."
+  },
+  {
+    "slug": "solar-loader",
+    "name": "Solar Loader",
+    "description": "Animated solar system loading spinner with orbiting planets and customizable speed."
+  },
+  {
+    "slug": "spark-chart",
+    "name": "Spark Chart",
+    "description": "An interactive sparkline with path-following indicator, dual-path color reveal, gradient fill, and draw-in animation. Pixel-perfect cursor tracking via binary search on SVG path length."
+  },
+  {
+    "slug": "tree-node-tooltip",
+    "name": "Tree Node Tooltip",
+    "description": "A file tree component with tooltip support for each node."
+  },
+  {
+    "slug": "wizard-stepper",
+    "name": "Wizard Stepper",
+    "description": "A full-featured wizard stepper with titles and descriptions. Perfect for multi-step forms, checkout flows, and onboarding sequences."
+  },
+  {
+    "slug": "scroll-ruler",
+    "name": "Scroll Ruler",
+    "description": "A ruler-style input for fractional values — scroll or drag to scrub, spring-animated snapping, gradient-masked edges."
+  }
+]
