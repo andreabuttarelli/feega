@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Offscreen } from '$lib/canvas/core/residency';
+import { Offscreen, ZoomPicture } from '$lib/canvas/core/residency';
 import { Device, BUDGET, buildLanes, deviceOf, previewHtml, textureBudget } from './memory-budget';
 
 describe('memory budget', () => {
@@ -19,6 +19,11 @@ describe('memory budget', () => {
   it('a phone decodes pictures smaller than a desktop, and neither backs the canvas past 2x', () => {
     expect(BUDGET[Device.Phone].pictureSide).toBeLessThan(BUDGET[Device.Desktop].pictureSide);
     expect(Math.max(BUDGET[Device.Phone].resolution, BUDGET[Device.Desktop].resolution)).toBeLessThanOrEqual(2);
+  });
+
+  it('a phone zooms held pictures and a desktop keeps zooming the exact page', () => {
+    expect(BUDGET[Device.Phone].zoomPicture).toBe(ZoomPicture.Held);
+    expect(BUDGET[Device.Desktop].zoomPicture).toBe(ZoomPicture.Exact);
   });
 
   it('a desktop browser with little memory gets the phone budget', () => {
@@ -56,7 +61,7 @@ describe('device profile', () => {
   const MB = 1024 * 1024;
 
   it('a desktop keeps the values it had before phones got their own profile', () => {
-    expect(BUDGET[Device.Desktop]).toEqual({ textureBytes: 256 * MB, tileBytes: 384 * MB, pictureSide: 4096, resolution: 2, framesInFlight: 6, retainMs: 15_000, buildLanes: 4, canvasTiles: 320, offscreen: Offscreen.Resident });
+    expect(BUDGET[Device.Desktop]).toEqual({ textureBytes: 256 * MB, tileBytes: 384 * MB, pictureSide: 4096, resolution: 2, framesInFlight: 6, retainMs: 15_000, buildLanes: 4, canvasTiles: 320, offscreen: Offscreen.Resident, zoomPicture: ZoomPicture.Exact });
   });
 
   it('a desktop builds frames on one lane per spare core, up to four', () => {
