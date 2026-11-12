@@ -111,6 +111,24 @@ doc. In-page helpers (`page-kit.ts`) are self-contained so they survive being se
 | a word split into one inline-block span per letter | one TEXT (`lettersJoined`), a space where the gap is over 0.2 em | text |
 | an element partly off the page | box cut at the edge, picture focused on the part that was showing | — |
 
+## Layers
+
+`page-flatten.ts` drops what draws nothing and changes no layout (rule tables `CHILD_RULES`,
+`PARENT_RULES`), then names what is left. `url-layers.browser.test.ts` is the guard: the same captures
+planned before and after a change must paint the same pixels (images replaced by solid colours, every
+breakpoint view, the frame resized to 768 and 390), else the rule stays out.
+
+- Names, in order: component name; tag or ARIA role (`Nav`, `Header`, `Button`, `Link`, `Item`…, a
+  section by its first words); `id` or `aria-label` unless generated (`__next`, `:r3:`); class word
+  (`Card`, `Badge`); `Icon` / `Image`; `Row` / `Column`; `Frame`. A text's words name only the text:
+  a block holding one text is not named after it.
+- Code import: a wrapper whose own `source` differs from the survivor's is never folded, grown or
+  merged into it (its padding, gap or layout would be written back to the wrong element); a survivor
+  without a `source` inherits the wrapper's. Unwrapping a wrapper that adds nothing stays allowed.
+- Kept, each proven by the guard: a text boxed for a stack (as a flow item the engine sets it up to
+  1 px off), a clipping svg frame in a narrower wrapper (its clip shaves the stroke edges), the
+  original layers of instances whose flattened shapes diverge.
+
 ## Sections
 
 On by default (`sections: false` / `--no-sections` / the dialog checkbox turn it off), and off with

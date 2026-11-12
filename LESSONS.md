@@ -3863,3 +3863,11 @@ Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start
 ## A dragged element moves with what lies on top of it
 
 **Signal:** on the tiled canvas a dragged element carries the element above it, leaves a ghost where it was, or does not move while its selection ring does; `?coreTiles=0` draws it right. **Cause:** three at once — a drag layer built from copies of screen tiles holds every pixel in that area; `Tiles::frame` showed a sharper level but queued only the current one, so stale tiles of the shown level were never redrawn; `stirred()` swallowed the damage that let go of the held picture. **Move:** log per `tiled_frame` the damage rects, `queued`, `rastered` and `missing` (a temporary `#[wasm_bindgen] extern { #[wasm_bindgen(js_namespace = console)] fn log(s: &str); }`, captured with `page.on('console')`): damage with `queued=0` is a stale level nobody redraws. A drag layer is rastered from the element alone; uses above it are lifted with it. Bisect with `npm run perf:free-drag`.
+
+## A pixel diff of two imports that is not the import
+
+**Signal:** the same doc rendered twice with `drawStill` differs by thousands of pixels in picture regions, or by a few channel steps across one gradient (linear.app's testimonial card: 18 652 px, max 4). **Move:** for a structural before/after, swap every image asset for a solid colour (`url-layers.browser.test.ts` does) and render the baseline twice: pixels that differ between two baseline runs are renderer noise, compare against them, not against zero.
+
+## A text lifted out of its frame into a stack moves
+
+**Signal:** after removing a text's same-box wrapper inside a stack, glyphs sit up to 1 px off (Supabase checklist, Vercel buttons) while the layer box is identical. **Move:** page-tree boxes every text in a flex flow on purpose; the engine lays out a text flow item differently from a text inside a frame. Keep the box; only `label` (one line, fixed, aligned) may replace it.
