@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import puppeteer, { type Page } from 'puppeteer-core';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
@@ -15,6 +15,7 @@ import { marksPlanner } from './import-code';
 import { repoOf } from './repo';
 import { sandboxRunner } from './sandbox-runner';
 import { storybookPages } from './storybook';
+import { devServerOf, folderNames } from './folder-source';
 
 const LABEL = process.env.CODE_IMPORT_CAPTURE ?? '';
 const ONLY = process.env.CODE_IMPORT_ONLY?.split(',');
@@ -50,7 +51,7 @@ async function fullShot(page: Page): Promise<Buffer> {
   return sharp({ create: { width, height, channels: 3, background: { r: 255, g: 255, b: 255 } } }).composite(bands).png().toBuffer();
 }
 
-type Started = { pages: { label: string; url: string }[]; names: string[]; stop: () => Promise<void> };
+type Started = { pages: { label: string; url: string }[]; names: string[]; stop: () => Promise<void>; allowed?: string };
 
 const START: Record<AppSource, (app: FidelityApp) => Promise<Started>> = {
   [AppSource.Repo]: async (app) => {
@@ -63,6 +64,14 @@ const START: Record<AppSource, (app: FidelityApp) => Promise<Started>> = {
   [AppSource.Storybook]: async (app) => {
     const stories = await storybookPages(app.at, fetch, STORIES);
     return { pages: stories?.pages ?? [], names: stories?.names ?? [], stop: async () => undefined };
+  },
+  [AppSource.Folder]: async (app) => {
+    const root = resolve(app.at);
+    const served = await devServerOf(root, null);
+    if (!('url' in served)) {
+      throw new Error(`the folder ${root} did not start: ${served.refusal}`);
+    }
+    return { pages: app.pages.map((p) => ({ label: p, url: new URL(`/?s=${p}`, served.url).toString() })), names: await folderNames(root), stop: async () => void served.child.kill(), allowed: new URL(served.url).origin };
   }
 };
 
@@ -79,7 +88,7 @@ describe.runIf(LABEL && process.env.CHROMIUM_PATH)('capture an app as code impor
     try {
       for (const [i, target] of run.pages.entries()) {
         let page: Page | null = null;
-        const tab = await localBrowser(async () => (page = await browser.newPage()))();
+        const tab = await localBrowser(async () => (page = await browser.newPage()), run.allowed ?? null)();
         const found = { uses: [] as ComponentUse[] };
         const refusal = await pagePrepared(tab, new URL(target.url), SETTLE_MS, marksPlanner(run.names, found));
         if (refusal) {

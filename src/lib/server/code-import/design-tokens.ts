@@ -1,5 +1,5 @@
 import { MAX_MODES, MAX_VARIABLES, VARIABLE_NAME, VarType, keyOf, type Collection, type VarAlias, type VarLiteral, type Variables } from '@feega/motion-core/motion/variables-model';
-import { DARK, LIGHT, type DeclAt, type Parsed } from './css-tokens';
+import { ACCENT, accentOf, DARK, LIGHT, type DeclAt, type Parsed } from './css-tokens';
 import { colourOf } from './token-colour';
 
 export enum TokenKind {
@@ -11,7 +11,7 @@ export enum TokenKind {
 
 export type TokenValue = { raw: string; at: DeclAt };
 
-export type Token = { name: string; kind: TokenKind; values: Record<string, TokenValue> };
+export type Token = { name: string; kind: TokenKind; values: Record<string, TokenValue>; accent?: boolean };
 
 export type TokenSet = { tokens: Token[]; modes: string[]; skipped: string[] };
 
@@ -70,6 +70,8 @@ export function collectionName(repo: string, group: string): string {
 
 export const groupOf = (name: string) => rowOf(name).group;
 
+const tokenGroup = (token: Token) => (token.accent ? ACCENT : groupOf(token.name));
+
 export const aliasOf = (raw: string) => ALIAS.exec(raw.trim())?.[1] ?? null;
 
 export function lengthPx(raw: string): number | null {
@@ -121,8 +123,11 @@ const ordered = (modes: string[]) => [...MODE_ORDER.filter((m) => modes.includes
 
 export function tokenSetOf(parsed: Parsed): TokenSet {
   const byName = new Map<string, Record<string, TokenValue>>();
+  const byAccent = new Map<string, Record<string, TokenValue>>();
   for (const d of parsed.declared) {
-    byName.set(d.name, { ...byName.get(d.name), [d.mode]: { raw: d.raw, at: d.at } });
+    const accent = accentOf(d.mode);
+    const [into, mode] = accent ? [byAccent, accent] : [byName, d.mode];
+    into.set(d.name, { ...into.get(d.name), [mode]: { raw: d.raw, at: d.at } });
   }
   const raws = new Map([...byName].map(([name, values]) => [name, Object.values(values).map((v) => v.raw)]));
   const skipped = [...parsed.skipped];
@@ -139,7 +144,9 @@ export function tokenSetOf(parsed: Parsed): TokenSet {
 
   const kept = new Set(tokens.map((t) => t.name));
   const valid = tokens.filter((t) => Object.values(t.values).every((v) => !aliasOf(v.raw) || kept.has(aliasOf(v.raw)!)));
-  return { tokens: valid, modes: ordered([...new Set(valid.flatMap((t) => Object.keys(t.values)))]), skipped };
+  const kinds = new Map(valid.map((t) => [t.name, t.kind]));
+  const accents = [...byAccent].flatMap(([name, values]) => (kinds.has(name) ? [{ name, kind: kinds.get(name)!, values, accent: true }] : []));
+  return { tokens: [...valid, ...accents], modes: ordered([...new Set(valid.flatMap((t) => Object.keys(t.values)))]), skipped };
 }
 
 export type Options = { scale?: number; used?: ReadonlySet<string>; active?: string; multiples?: readonly number[] };
@@ -155,7 +162,7 @@ function capped(tokens: Token[], used: ReadonlySet<string>): { kept: Token[]; ov
 }
 
 function survivors(tokens: Token[], repo: string, used: ReadonlySet<string>, dropped: string[]): Token[] {
-  const groups = Map.groupBy(tokens, (t) => groupOf(t.name));
+  const groups = Map.groupBy(tokens, tokenGroup);
   const kept: Token[] = [];
   for (const [group, list] of groups) {
     const { kept: inside, over } = capped(list, used);
@@ -184,7 +191,7 @@ export function variablesOf(set: TokenSet, repo: string, options: Options = {}):
   const variables: Variables = {};
   const map: TokenMap = {};
 
-  for (const [group, list] of Map.groupBy(kept, (t) => groupOf(t.name))) {
+  for (const [group, list] of Map.groupBy(kept, tokenGroup)) {
     const name = collectionName(repo, group);
     const allModes = ordered([...new Set(list.flatMap((t) => Object.keys(t.values)))]);
     const modes = allModes.slice(0, MAX_MODES);

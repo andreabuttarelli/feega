@@ -220,3 +220,13 @@ describe('frame templates filter by role', () => {
     expect(matching(items, 'opener', null).map((i) => i.id)).toContain('builtin:launch-word-burst');
   });
 });
+
+describe('a component library template of its own size', () => {
+  it('starts a frame at that size, whatever format is asked', async () => {
+    const { ARC_TEMPLATES } = await import('./arc');
+    const button = ARC_TEMPLATES.find((e) => e.template.name === 'Arc · Button')!;
+    const started = starterDoc(button, MotionFormat.Landscape, (() => { let n = 0; return () => `id${++n}`; })());
+
+    expect(started.ok && [started.doc.width, started.doc.height]).toEqual([button.template.doc.width, button.template.doc.height]);
+  });
+});

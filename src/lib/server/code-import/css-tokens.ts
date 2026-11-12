@@ -15,6 +15,11 @@ export type Parsed = { declared: Declared[]; rules: VarRule[]; skipped: string[]
 
 export const LIGHT = 'Light';
 export const DARK = 'Dark';
+export const ACCENT = 'Accent';
+
+const ACCENT_MARK = `${ACCENT}:`;
+
+export const accentOf = (mode: string) => (mode.startsWith(ACCENT_MARK) ? mode.slice(ACCENT_MARK.length) : null);
 
 const SHADCN_CONFIG = 'components.json';
 const MAX_SHEETS = 24;
@@ -48,7 +53,8 @@ const MODE_SELECTORS: [RegExp, (m: RegExpExecArray) => string][] = [
   [/^(?::root|html|:host)$/, () => LIGHT],
   [/^(?::root|html)?\.light$/, () => LIGHT],
   [/^(?::root|html)?\.dark$/, () => DARK],
-  [/^(?::root|html)?\[data-(?:theme|mode)=["']?([\w-]+)["']?\]$/, (m) => title(m[1])]
+  [/^(?::root|html)?\[data-(?:theme|mode)=["']?([\w-]+)["']?\]$/, (m) => title(m[1])],
+  [/^(?::root|html)?\[data-accent=["']?([\w-]+)["']?\]$/, (m) => `${ACCENT_MARK}${title(m[1])}`]
 ];
 
 const SCHEME_MEDIA = /^@media\s*\(\s*prefers-color-scheme\s*:\s*(light|dark)\s*\)$/i;
