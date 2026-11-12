@@ -210,3 +210,15 @@ Per frame, `window.__gpuCanvas.frames` also counts what the core did: `tiles` ra
 (display lists drawn, one per split piece), `uploads` (image uploads) and `uploadBytes`, beside
 `bakes`, `bakeMs`, `plans` and `planMs`. Counts do not move with machine load; compare them before
 milliseconds.
+
+## Gesture bench on a 60 Hz display
+
+`tests/perf/canvas-gesture-bench.spec.ts` runs with vsync on, so its frame gaps are display
+intervals: on a 60 Hz screen every frame is at least 16.7 ms and "frames over 11 ms" is meaningless.
+Check the refresh (`system_profiler SPDisplaysDataType`) and, below 120 Hz, add `BENCH_UNCAPPED=1`
+to time real frame cost with vsync and the frame-rate cap off, as `perf:budget` does. Report which
+of the two a number came from.
+
+```bash
+BENCH_SPEC=canvas-gesture-bench BENCH_CASE=landings BENCH_UNCAPPED=1 npx playwright test -c tests/perf/playwright.config.ts
+```
