@@ -20,6 +20,9 @@ enum Edit {
   Resize = 'resize',
   Opacity = 'opacity',
   Hide = 'hide',
+  NudgeLeaf = 'nudge-leaf',
+  HideLeaf = 'hide-leaf',
+  HideTextLeaf = 'hide-text-leaf',
   Text = 'text'
 }
 
@@ -345,9 +348,32 @@ async function stagesAfter(page: Page): Promise<Stages | null> {
   }, EDIT_GIVE_UP_MS);
 }
 
-async function selectChild(page: Page) {
+enum Depth {
+  Top = 'top',
+  Leaf = 'leaf'
+}
+
+type Pick = { at: { x: number; y: number }; depth: Depth };
+
+const PICKS: Record<Exclude<Edit, Edit.Resize | Edit.Text>, Pick> = {
+  [Edit.Nudge]: { at: CHILD_AT, depth: Depth.Top },
+  [Edit.Opacity]: { at: CHILD_AT, depth: Depth.Top },
+  [Edit.Hide]: { at: CHILD_AT, depth: Depth.Top },
+  [Edit.NudgeLeaf]: { at: CHILD_AT, depth: Depth.Leaf },
+  [Edit.HideLeaf]: { at: CHILD_AT, depth: Depth.Leaf },
+  [Edit.HideTextLeaf]: { at: TEXT_AT, depth: Depth.Leaf }
+};
+
+async function selectChild(page: Page, { at, depth }: Pick = PICKS[Edit.Nudge]) {
   const box = await frameOnScreen(page);
-  await page.mouse.click(box.x + box.w * CHILD_AT.x, box.y + box.w * CHILD_AT.y);
+  const deep = depth === Depth.Leaf;
+  if (deep) {
+    await page.keyboard.down('ControlOrMeta');
+  }
+  await page.mouse.click(box.x + box.w * at.x, box.y + box.w * at.y);
+  if (deep) {
+    await page.keyboard.up('ControlOrMeta');
+  }
   await page.getByTestId('frame-selection').first().waitFor({ timeout: 10_000 });
 }
 
@@ -368,26 +394,24 @@ async function resizeEdits(page: Page, count: number): Promise<(Stages | null)[]
 const KEYS: Record<Exclude<Edit, Edit.Resize | Edit.Text>, [string, string]> = {
   [Edit.Nudge]: ['ArrowRight', 'ArrowLeft'],
   [Edit.Opacity]: ['Digit5', 'Digit0'],
-  [Edit.Hide]: ['ControlOrMeta+Shift+KeyH', 'ControlOrMeta+Shift+KeyH']
+  [Edit.Hide]: ['ControlOrMeta+Shift+KeyH', 'ControlOrMeta+Shift+KeyH'],
+  [Edit.NudgeLeaf]: ['ArrowRight', 'ArrowLeft'],
+  [Edit.HideLeaf]: ['ControlOrMeta+Shift+KeyH', 'ControlOrMeta+Shift+KeyH'],
+  [Edit.HideTextLeaf]: ['ControlOrMeta+Shift+KeyH', 'ControlOrMeta+Shift+KeyH']
 };
 
 function holdBuilds() {
   const probe = window as unknown as { __hold: boolean; __held: (() => void)[] };
   probe.__hold = false;
   probe.__held = [];
-  const Real = Worker;
-  window.Worker = class extends Real {
-    constructor(url: string | URL, options?: WorkerOptions) {
-      super(url, options);
-      if (!String(url).includes('frame-build')) {
-        return;
-      }
-      const set = Object.getOwnPropertyDescriptor(Worker.prototype, 'onmessage')!.set!;
-      Object.defineProperty(this, 'onmessage', {
-        set: (handler: ((e: MessageEvent) => void) | null) => set.call(this, handler && ((e: MessageEvent) => (probe.__hold ? probe.__held.push(() => handler(e)) : handler(e))))
-      });
+  const own = Object.getOwnPropertyDescriptor(Worker.prototype, 'onmessage')!;
+  Object.defineProperty(Worker.prototype, 'onmessage', {
+    configurable: true,
+    get: own.get,
+    set(this: Worker, handler: ((e: MessageEvent) => void) | null) {
+      own.set!.call(this, handler && ((e: MessageEvent) => (probe.__hold ? probe.__held.push(() => handler(e)) : handler(e))));
     }
-  };
+  });
 }
 
 const holding = (page: Page, on: boolean) =>
@@ -423,9 +447,10 @@ function differing(a: { data: Buffer; size: number }, b: { data: Buffer; size: n
   return (PERCENT * off) / a.size;
 }
 
-const shotDiffs: Record<string, number[]> = {};
+const shotDiffs: Record<string, { patched: number[]; edited: number[] }> = {};
 
 async function shotEdit(page: Page, key: string, edit: string): Promise<Stages | null> {
+  const before = await frameShot(page);
   await holding(page, true);
   await page.keyboard.press(key);
   const stages = await stagesAfter(page);
@@ -433,7 +458,10 @@ async function shotEdit(page: Page, key: string, edit: string): Promise<Stages |
   await holding(page, false);
   await page.waitForTimeout(SHOT_SETTLE_MS);
   if (patched) {
-    (shotDiffs[edit] ??= []).push(differing(patched, await frameShot(page)));
+    const settled = await frameShot(page);
+    const seen = (shotDiffs[edit] ??= { patched: [], edited: [] });
+    seen.patched.push(differing(patched, settled));
+    seen.edited.push(differing(before, settled));
   }
   return stages;
 }
@@ -484,10 +512,11 @@ async function edits(page: Page, edit: Edit): Promise<(Stages | null)[]> {
   if (edit === Edit.Text) {
     return textEdits(page, EDITS_EACH);
   }
-  await selectChild(page);
   if (edit === Edit.Resize) {
+    await selectChild(page);
     return resizeEdits(page, EDITS_EACH);
   }
+  await selectChild(page, PICKS[edit]);
   return keyEdits(page, KEYS[edit], EDITS_EACH, edit);
 }
 
@@ -564,7 +593,7 @@ for (const target of TARGETS) {
     writeFileSync(join(OUT, `edit-latency-${target}.json`), JSON.stringify(report, null, 2));
     if (SHOTS) {
       writeFileSync(join(OUT, `edit-shots-${target}.json`), JSON.stringify(shotDiffs, null, 2));
-      console.table(Object.fromEntries(Object.entries(shotDiffs).map(([e, d]) => [e, { shots: d.length, maxPercent: Math.max(...d), meanPercent: d.reduce((x, y) => x + y, 0) / d.length }])));
+      console.table(Object.fromEntries(Object.entries(shotDiffs).map(([e, d]) => [e, { shots: d.patched.length, patchedVsSettledMax: Math.max(...d.patched), beforeVsSettledMin: Math.min(...d.edited) }])));
     }
     console.table(report);
     expect(Object.entries(report).filter(([, r]) => !r.passed).map(([e]) => e)).toEqual([]);
