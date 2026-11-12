@@ -1,13 +1,13 @@
 <script lang="ts">
   import type { CommentThread } from '$lib/canvas/comment-threads';
 
-  type Props = { thread: CommentThread; active: boolean; onpick: (id: string) => void; ghost?: undefined } | { ghost: true; at: { x: number; y: number } };
+  type Props = ({ thread: CommentThread; active: boolean; onpick: (id: string) => void; ghost?: undefined } | { ghost: true; at: { x: number; y: number } }) & { zoom: number };
 
   let props: Props = $props();
 </script>
 
 {#if props.ghost}
-  <span class="pin active ghost" data-testid="comment-pin-pending" style={`left:${props.at.x}px;top:${props.at.y}px`}>+</span>
+  <span class="pin active ghost" data-testid="comment-pin-pending" style={`left:${props.at.x}px;top:${props.at.y}px;--zoom:${props.zoom}`}>+</span>
 {:else}
   {@const { thread, active, onpick } = props}
 <button
@@ -17,7 +17,7 @@
   data-testid="comment-pin"
   data-thread={thread.id}
   aria-label={`Comment ${thread.number}`}
-  style={`left:${thread.x}px;top:${thread.y}px`}
+  style={`left:${thread.x}px;top:${thread.y}px;--zoom:${props.zoom}`}
   onpointerdown={(e) => e.stopPropagation()}
   onclick={(e) => {
     e.stopPropagation();

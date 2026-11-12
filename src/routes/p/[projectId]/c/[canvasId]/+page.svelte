@@ -4732,23 +4732,23 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onPinAtPlayhead={(nodeId, timeMs) => commentsPanel.drop({ nodeId, x: 0, y: 0, timeMs })}
     follow={followView}
   >
-    {#snippet canvasOver()}
+    {#snippet canvasOver({ zoom })}
       {#if feedImageHover.over && feedImageHover.size}
         <div class="feed-drop" data-testid="feed-drop" style={`transform: translate(${feedImageHover.over.x - feedImageHover.size.w / 2}px, ${feedImageHover.over.y - feedImageHover.size.h / 2}px);width:${feedImageHover.size.w}px;height:${feedImageHover.size.h}px`}></div>
       {/if}
       {#if commentsPanel.pending && !commentsPanel.pending.nodeId}
-        <CommentPin ghost at={commentsPanel.pending} />
+        <CommentPin ghost at={commentsPanel.pending} {zoom} />
       {/if}
       {#each livePins(null) as thread (thread.id)}
-        <CommentPin {thread} active={commentsPanel.active === thread.id} onpick={(id) => commentsPanel.focus(id)} />
+        <CommentPin {thread} {zoom} active={commentsPanel.active === thread.id} onpick={(id) => commentsPanel.focus(id)} />
       {/each}
     {/snippet}
-    {#snippet tileOver({ id, body })}
+    {#snippet tileOver({ id, body, zoom })}
       {#if commentsPanel.pending?.nodeId === id}
-        <CommentPin ghost at={commentsPanel.pending} />
+        <CommentPin ghost at={commentsPanel.pending} {zoom} />
       {/if}
       {#each livePins(id) as thread (thread.id)}
-        <CommentPin {thread} active={commentsPanel.active === thread.id} onpick={(picked) => commentsPanel.focus(picked)} />
+        <CommentPin {thread} {zoom} active={commentsPanel.active === thread.id} onpick={(picked) => commentsPanel.focus(picked)} />
       {/each}
       {@const hoverNode = nodeById.get(id)}
       {@const over = liveHost === LiveHost.Canvas ? hoverNode : null}
