@@ -3855,3 +3855,7 @@ Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start
 ## A dev server spawned by feega outlives it
 
 **Signal:** `ps` shows `npm exec vite dev --port <n>` with parent pid 1 after the feega server stopped; the desktop app needs its SIGKILL fallback to close the local server. **Move:** a non-detached child keeps the parent's event loop alive and does not die with it, and `child.kill()` reaches only the npm wrapper. Spawn through `spawnGroup` (`code-import/dev-children.ts`): own process group, `kill(-pid)` on release, exit and signals, pid file for the next start. Test with a fake `npm run dev` that spawns a grandchild, and assert the grandchild's pid is gone.
+
+## A field added to the token map vanishes when the node is read back
+
+**Signal:** a feature works when a test hands its map to the server function, and the UI shows nothing (code changes: "No edits to send yet") after a real import. **Move:** whatever is stored in `nodes.data` is read through a zod schema (`codeOriginSchema` in `motion-node.ts`); a plain `z.object` drops unknown keys without a word. A new field on `TokenEntry` goes into that schema in the same change, and the test goes through the read (`codeChanges` with a mocked `findNode`), not around it.
