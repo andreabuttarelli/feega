@@ -85,9 +85,14 @@
         "rank": "Owner"
       }
     ],
-    "afterPack": "scripts/after-pack.cjs"
+    "afterPack": "scripts/after-pack.cjs",
+    "compression": "maximum",
+    "electronLanguages": [
+      "en"
+    ]
   },
   "devDependencies": {
+    "@vercel/nft": "^0.30.4",
     "electron": "38.2.0",
     "electron-builder": "26.0.12"
   },

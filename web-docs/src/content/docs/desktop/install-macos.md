@@ -21,7 +21,7 @@ and download the file for your Mac:
 | Intel | `feega-<version>-mac-x64.dmg` |
 
 Not sure? Apple menu → **About This Mac**: "Chip Apple M…" is Apple silicon, "Processor Intel" is Intel.
-A `.zip` of the same app sits next to each `.dmg` if you prefer it.
+A `.zip` of the same app sits next to each `.dmg` if you prefer it. The download is about 170 MB.
 
 ## 2. Check the download (optional, recommended)
 
