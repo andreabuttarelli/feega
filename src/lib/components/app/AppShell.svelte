@@ -77,7 +77,7 @@
 <style>
   .app-shell {
     min-height: 100dvh;
-    background: var(--ui-panel);
+    background: var(--paper);
     color: var(--ui-text);
   }
 
@@ -94,7 +94,7 @@
     gap: var(--ui-space-2);
     height: var(--ui-bar-h);
     padding: 0 var(--ui-space-2);
-    background: var(--ui-panel);
+    background: var(--paper);
   }
 
   .app-bar :global(.burger) {
