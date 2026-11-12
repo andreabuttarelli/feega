@@ -61,6 +61,9 @@ Signal: with the pointer still over a frame, a wheel zoom makes its hover outlin
 ### Zoom drops to 13 fps with 20 s frames after an engine change, the profile is all `(program)` and one wasm function
 **Signal:** the gesture bench's zoom-sweep falls from ~95 to under 20 fps, settle takes a minute, a CPU profile shows nothing nameable. **Move:** count `Engine::draw` calls per tile batch (a temporary `web_sys::console::log_1` in `raster_batch`, captured with `page.on('console')`; swap the rebuilt `gpu_core.js`/`gpu_core_bg.wasm` into `build/client/gpu-core/` and delete the `.br`/`.gz` next to them, no app rebuild needed). One batch drawn thousands of times is `split_render` fanning out on a false overflow. vello's `bump_estimate` measures lines and segments only: `tile`/`ptcl` are 0 and `binning` is a copy of segments, so compare nothing else with a buffer size.
 
+### Tiles turn sharp slowly after a zoom-in: count paints per tile, not ms per tile
+**Signal:** zoomed far in, every tile costs ~3 ms whatever its size (one tile or a 2×2 block cost the same), almost all in `layers::prepare_items`, and the layer cache never hits. **Move:** log, per `raster_batch`, the number of `Surface::paint` calls by `Reason` and the clip of each layer-worthy item. A tile paying for layers it does not show is the defect: on the landings fixture ten of twelve were groups emptied by `Laying::lay` that still carried an SVG effect filter (no bounds, so never culled, so a full-tile body, mask and filter). A cost fixed per draw also means bigger batches are nearly free on the CPU; measure the GPU side by frames over 11 ms before growing them.
+
 ## Providers
 
 ### Kie publishes its price list and its request schemas, you just have to find them
