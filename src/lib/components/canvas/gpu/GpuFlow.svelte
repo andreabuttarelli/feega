@@ -881,7 +881,7 @@
 
   const heldCanvas = $derived(props.canvasId ?? page.params.canvasId ?? '');
 
-  $effect(() => {
+  $effect.pre(() => {
     const incoming = tiles;
     const canvasId = heldCanvas;
     untrack(() => adoptNew(incoming, canvasId));

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
-import { drawsAny, framesOnCanvas, logGaps, onStage, pickedToFetch, sameLive, shownGroup, stagedBox, stillFrame, toBuild, toFetch, toWarm, untilFound } from './frame-source';
+import { drawsAny, framesOnCanvas, legible, logGaps, onStage, pickedToFetch, sameLive, shownGroup, stagedBox, stillFrame, toBuild, toFetch, toWarm, untilFound } from './frame-source';
 import { ItemKind, type DisplayList, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import { FillRule, PaintKind } from '@feega/motion-core/motion/gpu-full/paint';
 import { BlendMode } from '@feega/motion-core/motion/blend';
@@ -165,6 +165,14 @@ describe('frames to build', () => {
     const frames = [{ id: 'far', box: box(5000) }, { id: 'seen', box: box(50) }, { id: 'near', box: box(600) }];
 
     expect(toBuild(frames, view, screen, keyOf, new Set(), new Set()).map((f) => f.id)).toEqual(['seen', 'near', 'far']);
+  });
+
+  it('leaves a frame drawn narrower than the readable width to its thumbnail', () => {
+    const frames = [{ id: 'landing', box: { x: 0, y: 0, w: 1280, h: 9000 } }, { id: 'card', box: { x: 0, y: 0, w: 400, h: 400 } }];
+
+    expect(legible(frames, 0.05, 160).map((f) => f.id)).toEqual([]);
+    expect(legible(frames, 0.2, 160).map((f) => f.id)).toEqual(['landing']);
+    expect(legible(frames, 0.05, 0).map((f) => f.id)).toEqual(['landing', 'card']);
   });
 });
 

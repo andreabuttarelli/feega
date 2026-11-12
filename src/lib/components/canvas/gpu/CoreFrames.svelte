@@ -26,7 +26,7 @@
   import { NO_OVERLAY, type CoreOverlay } from '$lib/canvas/core/world-overlay';
   import { memoSources } from '$lib/canvas/core/source-memo';
   import { retiered, retiers } from '$lib/canvas/core/retier';
-  import { drawsAny, frameOfLive, logGaps, onStage, sameLive, shownGroup, stagedBox, toBuild, toWarm, untilFound, frameSourceUrl, type FrameAt } from '$lib/canvas/core/frame-source';
+  import { drawsAny, frameOfLive, legible, logGaps, onStage, sameLive, shownGroup, stagedBox, toBuild, toWarm, untilFound, frameSourceUrl, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor, showsPoster } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
@@ -532,15 +532,16 @@
     }
   });
 
+  const zoomStep = $derived(cacheZoom(view.zoom));
   let inFlight = $state(0);
   let settledFrames = $state(new Set<string>());
 
   $effect(() => {
-    frameSources.warm(toWarm(withoutViews(frames), sight.view, area, keyOf, asked, liveGroup).filter((f) => !known(f)).map(sourceOf));
+    frameSources.warm(toWarm(legible(withoutViews(frames), zoomStep, budget.readableWidth), sight.view, area, keyOf, asked, liveGroup).filter((f) => !known(f)).map(sourceOf));
   });
 
   $effect(() => {
-    const waiting = toBuild(withoutViews(frames), sight.view, area, keyOf, asked, liveGroup);
+    const waiting = toBuild(legible(withoutViews(frames), zoomStep, budget.readableWidth), sight.view, area, keyOf, asked, liveGroup);
 
     const room = budget.framesInFlight - inFlight;
     if (room <= 0) {

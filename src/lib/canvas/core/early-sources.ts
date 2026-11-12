@@ -1,7 +1,7 @@
 import type { Viewport } from '$lib/canvas/dot-grid';
 import { restoreViewport } from '$lib/canvas/restore-viewport';
 import { baseNodeId } from '$lib/canvas/breakpoint-views';
-import { frameSourceUrl, framesOnCanvas, type FrameTile } from './frame-source';
+import { frameSourceUrl, framesOnCanvas, legible, type FrameTile } from './frame-source';
 import { fillOrder } from './placeholders';
 import { nodeSize } from '$lib/canvas/node-size';
 
@@ -27,10 +27,10 @@ function boundsOf(tiles: FrameTile[]) {
   return { x, y, width: Math.max(...tiles.map((t) => t.x + t.w)) - x, height: Math.max(...tiles.map((t) => t.y + t.h)) - y };
 }
 
-export function earlySourceUrls(rows: readonly Row[], place: Place, saved: Viewport | null, screen: Screen): string[] {
+export function earlySourceUrls(rows: readonly Row[], place: Place, saved: Viewport | null, screen: Screen, readableWidth = 0): string[] {
   const tiles = rows.flatMap(tileOf);
   const data = new Map(rows.map((r) => [r.id, r.data]));
   const view = restoreViewport(saved, boundsOf(tiles), screen);
   const frames = framesOnCanvas(tiles, (id) => data.get(id) ?? {});
-  return fillOrder(frames, view, screen).map((f) => frameSourceUrl((id) => coreSourcePath(place, id), f, place));
+  return fillOrder(legible(frames, view.zoom, readableWidth), view, screen).map((f) => frameSourceUrl((id) => coreSourcePath(place, id), f, place));
 }
