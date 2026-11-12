@@ -259,6 +259,16 @@ describe('a page read at desktop and phone width', () => {
     expect(xAt(onDesktop.ok ? onDesktop.doc : doc, PAGE_VIEWS[1].id)).toBe(xAt(doc, PAGE_VIEWS[1].id));
   });
 
+  it('two keyless boxes the phone page stacks in the other order keep their own texts as one layer each (stripe.com: a panel box paired with its neighbour and every text inside came in again)', () => {
+    const GREY = { r: 0.9, g: 0.9, b: 0.9, a: 1 };
+    const boxAt = (name: string, box: Box): RestNode => ({ id: `${name}${box.x}${box.y}`, type: 'FRAME', name: 'div', absoluteBoundingBox: box, fills: [{ type: 'SOLID', color: GREY }], children: [textOf(`${name}/title`, { x: box.x + 10, y: box.y + 10, width: box.width - 20, height: 30 }, `${name} title`), textOf(`${name}/body`, { x: box.x + 10, y: box.y + 260, width: box.width - 20, height: 30 }, `${name} body`)] });
+    const wide = pageOf(1280, 800, [boxAt('plans', { x: 40, y: 100, width: 580, height: 300 }), boxAt('teams', { x: 660, y: 100, width: 580, height: 300 })]);
+    const narrow = pageOf(390, 1200, [boxAt('teams', { x: 20, y: 80, width: 350, height: 300 }), boxAt('plans', { x: 20, y: 400, width: 350, height: 300 })]);
+    const doc = planned(wide, [{ view: PAGE_VIEWS[1], tree: narrow }]).plan.items[0].doc;
+
+    expect(textClips(doc)).toHaveLength(4);
+  });
+
   it('a path the phone page paints in another colour stays the phone colour on the phone view (an icon that turns white on the phone menu)', () => {
     const wide = pageOf(1280, 800, [iconAt(40, 20)]);
     const narrow = pageOf(390, 800, [iconAt(350, 12, RED)]);

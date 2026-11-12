@@ -144,12 +144,27 @@ type Scope = { byId: Map<string, MotionClip>; order: Map<string, number>; kids: 
 
 const BELOW = '>';
 
+type Keyed = { key: string; depth: number };
+
 function identitiesOf(kids: Map<string | null, MotionClip[]>, keys: Map<string, string>, surface: string | null): Map<string, string> {
   const identities = new Map(keys);
+  const firstKeyed = (id: string, depth: number): Keyed | null => {
+    for (const kid of kids.get(id) ?? []) {
+      const found = keys.has(kid.id) ? { key: keys.get(kid.id)!, depth } : firstKeyed(kid.id, depth + 1);
+      if (found) {
+        return found;
+      }
+    }
+    return null;
+  };
   const visit = (parent: string | null, above: string) => {
     const seen = new Map<string, number>();
     const trailOf = (clip: MotionClip) => {
       const kind = `${clip.component}:${clip.name}`;
+      const wrapped = firstKeyed(clip.id, 1);
+      if (wrapped) {
+        return `${wrapped.key}${BELOW}${kind}^${wrapped.depth}`;
+      }
       const nth = seen.get(kind) ?? 0;
       seen.set(kind, nth + 1);
       return `${above}${BELOW}${kind}#${nth}`;
