@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" fill="#FF5100">
+  <path id="lobe" d="M61.87 142.25A57 57 0 1 1 136.13 142.25A69.5 69.5 0 0 0 61.87 142.25Z"/>
+  <use href="#lobe" transform="rotate(90 150 150)"/>
+  <use href="#lobe" transform="rotate(180 150 150)"/>
+  <use href="#lobe" transform="rotate(270 150 150)"/>
+</svg>
