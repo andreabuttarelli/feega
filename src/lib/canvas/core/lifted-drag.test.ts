@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DisplayList, Item } from '@feega/motion-core/motion/gpu-full/display-list';
-import { liftOut, liftedPut } from './lifted-drag';
+import type { HeldFrame } from './residency';
+import { LiftSend as Sent, liftOut, liftedPut, movingGroup, restedFirst, restGroup } from './lifted-drag';
 
 const bar = (clip: string) => ({ kind: 'path', clip, contours: [[0, 0, 5, 0, 5, 5]] }) as unknown as Item;
 const group = (clip: string, items: Item[]) => ({ kind: 'group', clip, items }) as unknown as Item;
@@ -36,5 +37,23 @@ describe('lifting a dragged element out of its frame', () => {
     const put = liftedPut(frame, 'g:moving', [40, -10]);
 
     expect(put).toEqual({ id: 'f:moving', group: 'g:moving', box: { x: 30, y: 15, w: 50, h: 25 }, size: { width: 100, height: 50 }, bytes: 0 });
+  });
+});
+
+describe('holding the lifted element', () => {
+  const layer = (id: string, group: string) => ({ id, group, cache: true, hold: true }) as unknown as HeldFrame;
+  const sent = [layer('f', restGroup('g')), layer('f:moving', movingGroup('g')), layer('other', 'h')];
+  const holds = (frames: HeldFrame[]) => frames.map((f) => [f.id, f.hold]);
+
+  it('sends the moving layer unheld first, so the core gives it a rest to lift from', () => {
+    expect(holds(restedFirst(sent, Sent.First))).toEqual([
+      ['f', true],
+      ['f:moving', false],
+      ['other', true]
+    ]);
+  });
+
+  it('holds the moving layer once it has a rest, so the core moves its raster instead of redrawing it', () => {
+    expect(holds(restedFirst(sent, Sent.Again))).toEqual(holds(sent));
   });
 });

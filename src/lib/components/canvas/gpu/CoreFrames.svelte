@@ -60,7 +60,7 @@
   import { Motion, hudLine, watchCrashes } from '$lib/canvas/gpu/crash-watch';
   import { startCanvasPerf } from '$lib/canvas/perf/perf-beacon';
   import { Camera } from '$lib/canvas/perf/session-perf';
-  import { liftOut, liftedPut, movingGroup, restGroup, type Lift, type Lifted } from '$lib/canvas/core/lifted-drag';
+  import { LiftSend, liftOut, liftedPut, movingGroup, restedFirst, restGroup, type Lift, type Lifted } from '$lib/canvas/core/lifted-drag';
   import { AttachStep, GpuBackend, afterAttachFailure, backendAfterLoss, isTrap, type BackendSwitch } from '$lib/canvas/gpu/gpu-loss';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
@@ -716,7 +716,7 @@
   let sentOverlay = new SentParts();
   const painted: Record<Outcome, number> = { [Outcome.Idle]: 0, [Outcome.Reused]: 0, [Outcome.Partial]: 0, [Outcome.Full]: 0 };
 
-  let lifting: { key: number; group: string; lifted: Lifted | null } | null = null;
+  let lifting: { key: number; group: string; lifted: Lifted | null; send: LiftSend } | null = null;
   const liftLists = new Map<string, DisplayList>();
 
   function dropLift(into: CoreRaster) {
@@ -734,7 +734,7 @@
     const lifted = list && put.has(group) ? liftOut(list, now.clips) : null;
     const [rest, moving] = [restGroup(group), movingGroup(group)];
     const patched = lifted !== null && into.patchGroup(group, rest, lifted.splice, pictures);
-    lifting = { key: now.key, group, lifted: patched ? lifted : null };
+    lifting = { key: now.key, group, lifted: patched ? lifted : null, send: LiftSend.First };
     if (!patched) {
       return null;
     }
@@ -1018,9 +1018,12 @@
     const at = deviceView();
     const device = { width: area.width * resolution, height: area.height * resolution };
     const wide = widened(at, device);
-    const patch = sent.patch(worldUses(heldWhileMoving(zooming.active() || edited.size ? cached(drawn, wide.view, wide.area, textureBytes, cacheZoom(view.zoom) * resolution) : uncached(drawn), liftHeld(drawn))));
+    const patch = sent.patch(worldUses(restedFirst(heldWhileMoving(zooming.active() || edited.size ? cached(drawn, wide.view, wide.area, textureBytes, cacheZoom(view.zoom) * resolution) : uncached(drawn), liftHeld(drawn)), lifting?.send ?? LiftSend.Again)));
     if (patch) {
       into.patchUses(patch);
+    }
+    if (lifting?.lifted) {
+      lifting.send = LiftSend.Again;
     }
     return shown;
   }
