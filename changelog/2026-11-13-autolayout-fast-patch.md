@@ -22,10 +22,10 @@ hugging container that shrinks, text that rewraps), any change besides position,
 instance, animated position, a move under a rotated or scaled ancestor, hiding a parent (its
 children are orphaned, not hidden), and an absolute item in the re-laid container (the
 container laid alone places it differently from the full layout). Items decline too when their
-clip has its own mask, a scissor, or a cut from a clipping frame that slid, or when they belong
+clip has its own mask, a scissor, or a cut from a clipping frame whose box slid (a cut follows props, not transform, so a moved clipping frame keeps it), or when they belong
 to an instance whose host slid. The rebuild still runs and replaces the patch.
 
 Gate: `fast-patch.landings.test.ts` hides and moves (three offsets) every visible clip of the
 landings fixture and compares with the full build within 0.01 px; it is skipped where the
-fixture is absent, so not in CI. Result: 1,767 of 3,789 hides and 10,452 of 11,349 moves
+fixture is absent, so not in CI. Result: 1,767 of 3,789 hides and 11,175 of 11,349 moves
 patched, zero mismatches. Main-thread cost of a patch in node: hide p50 1.3 ms, move p50 1.9 ms.

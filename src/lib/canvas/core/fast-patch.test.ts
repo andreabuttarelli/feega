@@ -136,6 +136,13 @@ describe('fastPatch draws a simple edit without rebuilding the frame', () => {
     expect(fastPatch(drawn(before), before, after, estimatedText)).toEqual(drawn(after));
   });
 
+  it('a nudged clipping frame carries its children as the full build does', () => {
+    const before = edit(stack(Sizing.Fixed), 'card', (c) => ({ ...c, clipContent: true }));
+    const after = moved(before, 'card');
+
+    expect(fastPatch(drawn(before), before, after, estimatedText)).toEqual(drawn(after));
+  });
+
   it('a nudged layer drawn as one group shifts what the group holds, as the full build does', () => {
     const before = edit(built(['a']), 'a', (c) => ({ ...faded(0.8)(c), props: { ...c.props, fills: [{ type: 'solid', color: '#ff6a3d' }, { type: 'solid', color: '#0000ff80' }] } }));
     const after = moved(before, 'a');

@@ -193,7 +193,7 @@ function planOf(after: MotionDoc, { laying, was, now, touched }: Pairing): Plan 
       slides.set(id, { by, carried: along });
     }
   }
-  const cut = new Set([...slides.keys()].filter((id) => now(id)?.clipContent));
+  const cut = new Set([...own.keys()].filter((id) => moves(own.get(id)!) && now(id)?.clipContent));
   return { gone, slides, cut };
 }
 
