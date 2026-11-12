@@ -51,13 +51,18 @@ vi.mock('./canvas-import', async (real) => ({
   ...(await real<object>()),
   importCodeInto: async (_scope: unknown, _canvas: string, ask: unknown) => {
     asked.push(ask);
+    await new Promise((resolve) => setTimeout(resolve, (ask as { routes: string[] }).routes[0] === '/slow' ? 30 : 1));
     if (refuse) {
       return { outcome: 'failed', error: 'the page answered 404' };
     }
-    return { outcome: 'ok', frameId: 'fresh', name: 'app', undo: [], skipped: [], locked: [], truncated: false, pages: ['/pricing'], boards: [{ label: '/pricing', route: '/pricing', cond: 'light@1280', clip: 'n1' }], components: 1, variants: 2, instances: 2 };
+    const route = (ask as { routes: string[] }).routes[0];
+    return { outcome: 'ok', frameId: 'fresh', name: 'app', undo: [], skipped: [], locked: [], truncated: false, pages: [route], boards: [{ label: route, route, cond: 'light@1280', clip: 'n1' }], components: 1, variants: 2, instances: 2 };
   },
   routesFound: async () => ({ ok: false, error: 'unreadable', detail: 'test', apps: [] }),
-  rememberOrigin: async (_scope: unknown, _id: string, code: { map: ImportMap; routes: string[]; tokens?: Record<string, { scale?: number }> }) => void remembered.push({ code })
+  rememberOrigin: async (_scope: unknown, _id: string, code: { map: ImportMap; routes: string[]; tokens?: Record<string, { scale?: number }> }) => {
+    remembered.push({ code });
+    node = { ...node, data: { ...node.data, code: code as never } };
+  }
 }));
 
 const { codeAdd, Land, SyncOutcome } = await import('./code-sync');
@@ -132,5 +137,12 @@ describe('importing one more page into a code frame', () => {
 
     const unit = Math.min(writes[0].doc.width, writes[0].doc.height);
     expect(remembered[0].code.tokens!['app Text/body#size'].scale).toBeCloseTo((1 / 520) * (520 / unit), 9);
+  });
+
+  it('two pages imported at once into one frame both stay on its map', async () => {
+    await Promise.all([codeAdd(SCOPE, 'node-1', { routes: ['/slow'], land: Land.Piece }), codeAdd(SCOPE, 'node-1', { routes: ['/pricing'], land: Land.Piece })]);
+
+    const imported = ((node.data.code as unknown as { map: ImportMap }).map.pages ?? []).filter((p) => p.state === PageState.Imported).map((p) => p.path);
+    expect(imported).toEqual(expect.arrayContaining(['/slow', '/pricing']));
   });
 });

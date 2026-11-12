@@ -258,7 +258,7 @@ export async function codeAdd(scope: CodeScope, nodeId: string, ask: AddAsk): Pr
   const [fresh, listed] = await Promise.all([importCodeInto(scope, local.canvasId, { ...where, app: origin.app, routes: ask.routes, variants, delay: origin.delay, at: local.at ?? { x: 0, y: 0 } }), routesFound(scope, { ...WHERE[origin.kind as SourceKind](origin), app: origin.app }).catch(() => null)]);
   if (fresh.outcome !== CodeImportOutcome.Ok) {
     const reason = fresh.error ?? fresh.outcome;
-    await rememberOrigin(scope, nodeId, { ...origin, map: mergedMap(origin.map, { pages: ask.routes.map((path) => ({ path, state: PageState.Failed, reason: reason.slice(0, REASON_MAX) })) }) });
+    await rememberLatest(scope, nodeId, origin, (now) => ({ ...now, map: mergedMap(now.map, { pages: ask.routes.map((path) => ({ path, state: PageState.Failed, reason: reason.slice(0, REASON_MAX) })) }) }));
     return { outcome: fresh.outcome, error: reason };
   }
   const upstream = await store.read(fresh.frameId);
@@ -274,8 +274,8 @@ export async function codeAdd(scope: CodeScope, nodeId: string, ask: AddAsk): Pr
   if (!merged.ok) {
     return { outcome: ADD_REFUSED[merged.refusal], error: merged.detail };
   }
-  const tokens = origin.tokens ? { tokens: styleSizesAfter({ ...fresh.tokenMap, ...origin.tokens }, local.doc, merged.doc) } : {};
-  const remember = async (map: ImportMap) => rememberOrigin(scope, nodeId, { ...origin, routes: [...new Set([...origin.routes, ...ask.routes])].slice(0, MAX_FRAME_BOARDS), ...tokens, map: mergedMap(origin.map, map) });
+  const remember = (map: ImportMap) =>
+    rememberLatest(scope, nodeId, origin, (now) => ({ ...now, routes: [...new Set([...now.routes, ...ask.routes])].slice(0, MAX_FRAME_BOARDS), ...(now.tokens ? { tokens: styleSizesAfter({ ...fresh.tokenMap, ...now.tokens }, local.doc, merged.doc) } : {}), map: mergedMap(now.map, map) }));
 
   if (ask.land === Land.Piece) {
     await remember(added);
@@ -289,6 +289,11 @@ export async function codeAdd(scope: CodeScope, nodeId: string, ask: AddAsk): Pr
   const map = relabelled(added, merged.boards);
   await remember(map);
   return { outcome: SyncOutcome.Ok, skipped: [...fresh.skipped, ...merged.kept.map((k) => `${k}: renders differently on the new page, kept as its own main`)], map: mergedMap(origin.map, map), boards: boards.map((b) => merged.boards[b] ?? b), parent };
+}
+
+async function rememberLatest(scope: CodeScope, nodeId: string, read: CodeOriginData, next: (now: CodeOriginData) => CodeOriginData): Promise<void> {
+  const latest = await linkedOf(scope, nodeId);
+  await rememberOrigin(scope, nodeId, next(latest?.origin ?? read));
 }
 
 const unitOf = (doc: MotionDoc) => Math.min(doc.width, doc.height);
