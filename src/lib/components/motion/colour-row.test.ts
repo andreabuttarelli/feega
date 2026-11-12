@@ -67,6 +67,13 @@ describe('colour row', () => {
     expect(query('[data-testid="colour-popover"]')).not.toBeNull();
   });
 
+  it('lays the colour picker over the page, out of the panel that would stack it under the canvas bars', () => {
+    show('#00ff00');
+    query<HTMLButtonElement>('button.row')!.click();
+    flushSync();
+    expect(query('[data-testid="colour-popover"]')!.parentElement).toBe(document.body);
+  });
+
   it('offers to select the layers only when it can', () => {
     show('#00ff00');
     expect(query('[data-testid="select-layers"]')).toBeNull();

@@ -6,6 +6,8 @@
 
   let { ref = $bindable(null), class: className, sideOffset = 6, align = 'start', ...rest }: DropdownMenu.ContentProps = $props();
 
+  const VIEWPORT_MARGIN = 8;
+
   $effect(() => {
     if (ref) {
       return openLayer(() => {}, Closes.ItsOwner);
@@ -14,5 +16,5 @@
 </script>
 
 <DropdownMenu.Portal>
-  <DropdownMenu.Content bind:ref {...rest} {sideOffset} {align} data-slot="menu" class={cn(MENU_CONTENT, className)} />
+  <DropdownMenu.Content bind:ref {...rest} {sideOffset} {align} collisionPadding={VIEWPORT_MARGIN} data-slot="menu" class={cn(MENU_CONTENT, 'max-h-(--bits-floating-available-height) overflow-y-auto', className)} />
 </DropdownMenu.Portal>

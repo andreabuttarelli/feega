@@ -5,6 +5,7 @@
   import { SideMode, sidePlacement, type SidePlace } from './side-popover';
   import { dismissible } from './dismiss';
   import { Input, lastInput } from './last-input';
+  import { onBody } from './on-body';
 
   let {
     anchor,
@@ -53,11 +54,6 @@
     onclose();
   }
 
-  function onBody(el: HTMLElement) {
-    document.body.append(el);
-    return () => el.remove();
-  }
-
   const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 
   function openedByKeyboard() {
@@ -100,7 +96,7 @@
   {@attach scopeFocus}
   data-anchor={key}
   data-mode={place?.mode ?? SideMode.Side}
-  class={cn('fixed z-[62] flex flex-col overflow-auto border border-ui-divider bg-ui-panel shadow-ui-float', place?.mode === SideMode.Sheet ? 'inset-x-0 bottom-0 max-h-[70vh] rounded-t-lg' : 'max-h-[calc(100vh-16px)] rounded-md')}
+  class={cn('fixed z-[62] flex flex-col overflow-auto [scrollbar-width:thin] border border-ui-divider bg-ui-panel shadow-ui-float', place?.mode === SideMode.Sheet ? 'inset-x-0 bottom-0 max-h-[70vh] rounded-t-lg' : 'max-h-[calc(100vh-16px)] rounded-md')}
   {style}
 >
   <div class="flex h-(--ui-row) shrink-0 items-center gap-2 border-b border-ui-divider px-2">
