@@ -34,7 +34,10 @@
   --site-bg: #000;
   --site-ink: #f0eee9;
   --site-accent: #ff4000;
+  --site-z-canvas: 6;
+  --site-z-frame: 7;
   --site-z-agents: 8;
+  --site-z-canvas-chrome: 9;
   --site-z-chapter: 9;
   --site-z-drawer: 10;
   --site-z-header: 11;
