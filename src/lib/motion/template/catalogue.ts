@@ -171,6 +171,7 @@ export function posterShelf(items: readonly CatalogueItem[]): CatalogueItem[] {
 
 export function starterDoc(entry: TemplateEntry, format: MotionFormat, newId: () => string): Inserted {
   const source = entry.template.doc;
-  const blank = { ...newMotionDoc(format), fps: source.fps, durationInFrames: source.durationInFrames, ...(source.still ? { still: source.still } : {}) };
+  const own = formatOf(source) === MotionFormat.Custom ? { width: source.width, height: source.height } : {};
+  const blank = { ...newMotionDoc(format), ...own, fps: source.fps, durationInFrames: source.durationInFrames, ...(source.still ? { still: source.still } : {}) };
   return insertTemplate(blank, entry, { from: 0, newId });
 }
