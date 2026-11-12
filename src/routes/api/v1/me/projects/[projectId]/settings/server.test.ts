@@ -128,6 +128,8 @@ const ACTIONS: Array<[SettingsSection, string, Record<string, string>]> = [
   [SettingsSection.Project, 'linkBrand', { brandId: 'nope' }],
   [SettingsSection.Project, 'unlinkBrand', {}],
   [SettingsSection.Project, 'forgetAppAccount', {}],
+  [SettingsSection.Project, 'saveAppAccount', { loginUrl: 'https://app.acme.example/login', email: 'qa@acme.example', password: 'fake-test-password' }],
+  [SettingsSection.Project, 'saveAppAccount', { loginUrl: 'https://x.com/login', email: 'qa@acme.example', password: 'x' }],
   [SettingsSection.Project, 'setMode', { mode: 'uncensored' }],
   [SettingsSection.Project, 'delete', { confirmName: 'wrong' }],
   [SettingsSection.Brand, 'update', { name: 'Acme 2', website: 'acme.example' }],
