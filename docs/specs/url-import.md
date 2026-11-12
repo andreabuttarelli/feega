@@ -227,10 +227,30 @@ width:
     leaves the flow at its captured box with fixed sizing; it takes the view read's visibility.
   - a layer pairs only when its nearest named ancestor paired with the view layer's nearest named
     ancestor, so a shared layer is drawn inside the box the view puts it in.
+  - a layer without a DOM key (an svg path, a border or inline-background strip, a stack box) is
+    named by its position: the nearest keyed ancestor's key, then component, name and rank among
+    unkeyed siblings of that kind (`identitiesOf`, `BELOW`). How each identity pairs is one table,
+    `PAIRS`: an element key as above; a position also needs the same look outside the layout keys
+    (`lookOf`: overrides can carry only layout, so any other difference would draw the desktop
+    look in the view) and, for a rounded box, the same size (`drawsAlike`: token binding turns it
+    into a rect whose roundness is a share of its box, so another size changes the corners). The
+    frame surface never pairs: the view copies placed before it landed in its track, under the
+    page. Stripe, vercel, linear, supabase: 1 132 / 72 / 395 / 342 view-only layers → 591 / 37 /
+    213 / 166, every guard shot 0 pixels apart.
+  - colours are merged (`coloursMerged`) and sampled for tokens (`samplesOf`) from what the desktop
+    draws: view-only layers (`viewOnly`) are skipped, so pairing more of them does not move a
+    colour. Before, stripe's view copies outvoted the navy the page paints (#101d51 won over
+    #122054).
   - unnamed wrappers (stacks) span their paired children; the page root spans the view.
   - every other view clip comes in as a view-only layer (`<view>:<id>`), its subtree,
     compositions and pictures with it, hidden at base, shown in its view, placed below the next
     paired clip of the view's paint order. Base clips with no partner are hidden there.
+  - what still comes in view-only, measured on stripe (591 layers, both views): elements the
+    desktop read does not have (191: the rotating product demo and the stories carousel show
+    another panel in each read, since each width is a separate page load; the phone menu), keyless
+    layers whose look or rounded size differs or whose desktop twin sits elsewhere (282), the same
+    content under another DOM path (42: markup swapped per width), snapshots that differ (26),
+    compositions (20), wrappers flattened away on one side only (11), live numbers (7).
   - the breakpoint is as wide and as tall as the view plan; its height may exceed the frame
     maximum.
 - Each read brings up to 200 pictures of its own.

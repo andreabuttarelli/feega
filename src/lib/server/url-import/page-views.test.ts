@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { parseMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { resolveView } from '@feega/motion-core/motion/breakpoints/view';
+import { OverrideKey, setOverride } from '@feega/motion-core/motion/breakpoints/model';
+import { setProps } from '@feega/motion-core/motion/timeline';
 import type { RestNode } from '$lib/server/figma/rest-message';
 import type { PageTree } from './page-tree';
 import { Sectioning, urlPlan } from './url-doc';
@@ -224,6 +226,68 @@ describe('a page read at desktop and phone width', () => {
 
     expect(textClips(doc)).toHaveLength(1);
     expect(shownTexts(resolveView(doc, PAGE_VIEWS[1].id))).toEqual(['Deploy now']);
+  });
+
+  const RED = { r: 1, g: 0, b: 0, a: 1 };
+  const vector = (box: Box, path: string, color = BLUE): RestNode => ({ id: `${path}${box.x}`, type: 'VECTOR', name: 'path', absoluteBoundingBox: box, fills: [{ type: 'SOLID', color }], fillGeometry: [{ path, windingRule: 'NONZERO' }] });
+  const iconAt = (x: number, y: number, color = BLUE): RestNode => ({ id: `icon${x}`, key: 'nav/svg', type: 'FRAME', name: 'svg', absoluteBoundingBox: { x, y, width: 24, height: 24 }, children: [vector({ x, y, width: 24, height: 24 }, 'M0 0L24 24Z', color), vector({ x: x + 6, y: y + 6, width: 12, height: 12 }, 'M0 0L12 0L12 12Z', color)] });
+  const ruled = (box: Box): RestNode => ({ ...card('cta', box), children: [{ id: `rule${box.x}`, type: 'RECTANGLE', name: 'Rectangle', absoluteBoundingBox: { x: box.x, y: box.y + box.height - 2, width: box.width, height: 2 }, fills: [{ type: 'SOLID', color: RED }] }] });
+  const shownIds = (d: MotionDoc) => (d.tracks.flatMap((t) => t.clips) as MotionClip[]).filter((c) => !c.hidden).map((c) => c.id);
+
+  it('the paths of an svg and the border strips of a box are the same layers in every view, not copies shown only on the phone (stripe.com: 1 132 of 2 838 layers were view copies)', () => {
+    const wide = pageOf(1280, 800, [iconAt(40, 20), ruled({ x: 40, y: 100, width: 580, height: 300 })]);
+    const narrow = pageOf(390, 800, [iconAt(350, 12), ruled({ x: 20, y: 80, width: 350, height: 300 })]);
+    const doc = planned(wide, [{ view: PAGE_VIEWS[1], tree: narrow }]).plan.items[0].doc;
+    const alone = planned(wide, []).plan.items[0].doc;
+    const phoneView = resolveView(doc, PAGE_VIEWS[1].id);
+    const shownAtBase = new Set(shownIds(doc));
+
+    expect(doc.tracks.flatMap((t) => t.clips)).toHaveLength(alone.tracks.flatMap((t) => t.clips).length);
+    expect(shownIds(phoneView).every((id) => shownAtBase.has(id))).toBe(true);
+  });
+
+  it('moving a paired path on the phone view moves it there only, and moving it on desktop leaves the phone place as the phone page had it', () => {
+    const doc = planned(pageOf(1280, 800, [iconAt(40, 20)]), [{ view: PAGE_VIEWS[1], tree: pageOf(390, 800, [iconAt(350, 12)]) }]).plan.items[0].doc;
+    const path = (doc.tracks.flatMap((t) => t.clips) as MotionClip[]).find((c) => /#0066FF/i.test(JSON.stringify(c.props.fills)))!;
+    const xAt = (d: MotionDoc, view?: string) => Number(((view ? resolveView(d, view) : d).tracks.flatMap((t) => t.clips) as MotionClip[]).find((c) => c.id === path.id)!.props.x);
+    const onPhone = setOverride(doc, PAGE_VIEWS[1].id, path.id, OverrideKey.X, 0.5);
+    const onDesktop = setProps(doc, path.id, { x: 0.25 });
+
+    expect(onPhone.ok && onDesktop.ok).toBe(true);
+    expect(xAt(onPhone.ok ? onPhone.doc : doc)).toBe(xAt(doc));
+    expect(xAt(onPhone.ok ? onPhone.doc : doc, PAGE_VIEWS[1].id)).toBeCloseTo(0.5);
+    expect(xAt(onDesktop.ok ? onDesktop.doc : doc, PAGE_VIEWS[1].id)).toBe(xAt(doc, PAGE_VIEWS[1].id));
+  });
+
+  it('a path the phone page paints in another colour stays the phone colour on the phone view (an icon that turns white on the phone menu)', () => {
+    const wide = pageOf(1280, 800, [iconAt(40, 20)]);
+    const narrow = pageOf(390, 800, [iconAt(350, 12, RED)]);
+    const doc = planned(wide, [{ view: PAGE_VIEWS[1], tree: narrow }]).plan.items[0].doc;
+    const paints = (d: MotionDoc) => (d.tracks.flatMap((t) => t.clips) as MotionClip[]).filter((c) => !c.hidden && /#(FF0000|0066FF)/.test(JSON.stringify(c.props.fills).toUpperCase())).map((c) => JSON.stringify(c.props.fills).toUpperCase().includes('#FF0000'));
+
+    expect(paints(resolveView(doc, PAGE_VIEWS[1].id))).toEqual([true, true]);
+    expect(paints(doc)).toEqual([false, false]);
+  });
+
+  it('a path the phone page draws at another size stays the phone layer it was, since its corners scale with its box (stripe.com: the corners of the logo tiles)', () => {
+    const [r, k] = [8, 8 * (1 - 0.5523)];
+    const roundedSquare = (side: number) => `M${r} 0L${side - r} 0C${side - k} 0 ${side} ${k} ${side} ${r}L${side} ${side - r}C${side} ${side - k} ${side - k} ${side} ${side - r} ${side}L${r} ${side}C${k} ${side} 0 ${side - k} 0 ${side - r}L0 ${r}C0 ${k} ${k} 0 ${r} 0Z`;
+    const tileAt = (x: number, side: number): RestNode => ({ id: `tile${x}`, key: 'tile', type: 'FRAME', name: 'svg', absoluteBoundingBox: { x, y: 100, width: side, height: side }, children: [vector({ x, y: 100, width: side, height: side }, roundedSquare(side)), vector({ x: x + 16, y: 116, width: 24, height: 24 }, 'M0 0L24 12L0 24Z', RED)] });
+    const doc = planned(pageOf(1280, 800, [tileAt(40, 72)]), [{ view: PAGE_VIEWS[1], tree: pageOf(390, 800, [tileAt(20, 64)]) }]).plan.items[0].doc;
+
+    expect((doc.tracks.flatMap((t) => t.clips) as MotionClip[]).filter((c) => c.id.startsWith('phone:'))).toHaveLength(1);
+  });
+
+  it('a phone-only icon is drawn above the page, not in the track of its surface (vercel.com: the phone menu icon went missing once the surface paired)', () => {
+    const navAt = (width: number, kids: RestNode[]): RestNode => ({ ...card('nav', { x: 0, y: 0, width, height: 64 }), fills: [], children: kids });
+    const wide = pageOf(1280, 800, [navAt(1280, [ruled({ x: 1100, y: 16, width: 100, height: 32 })])]);
+    const narrow = pageOf(390, 800, [navAt(390, [{ ...iconAt(342, 20), key: 'nav/menu' }])]);
+    const doc = planned(wide, [{ view: PAGE_VIEWS[1], tree: narrow }]).plan.items[0].doc;
+    const trackOf = (id: string) => doc.tracks.findIndex((t) => t.clips.some((c) => c.id === id));
+    const copies = doc.tracks.flatMap((t) => t.clips).filter((c) => c.id.startsWith('phone:'));
+
+    expect(copies.length).toBeGreaterThan(0);
+    expect(copies.map((c) => trackOf(c.id))).not.toContain(trackOf(doc.surface!));
   });
 
   it('a block only the phone page paints is not sampled for the palette (stripe.com: view copies weighed in, so pairing them changed the colours)', () => {

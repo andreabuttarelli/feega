@@ -6,6 +6,7 @@ import type { FigmaImage, PlanItem } from '$lib/canvas/figma/figma-doc';
 import { PictureFit } from '$lib/canvas/figma/scene';
 import type { RestNode } from '$lib/server/figma/rest-message';
 import type { PageTree } from './page-tree';
+import { uniformRadius } from './corner-radius';
 
 export type PageView = { id: string; name: string; width: number };
 
@@ -139,13 +140,37 @@ const snapshotsIn = (images: FigmaImage[]): Snapshots => {
   return (id) => (grouped.get(id) ?? []).map((i) => i.hash);
 };
 
-type Scope = { byId: Map<string, MotionClip>; order: Map<string, number>; kids: Map<string | null, MotionClip[]>; keys: Map<string, string>; snapshots: Snapshots; page: string | null; surface: string | null };
+type Scope = { byId: Map<string, MotionClip>; order: Map<string, number>; kids: Map<string | null, MotionClip[]>; keys: Map<string, string>; identities: Map<string, string>; snapshots: Snapshots; page: string | null; surface: string | null; size: { width: number; height: number } };
+
+const BELOW = '>';
+
+function identitiesOf(kids: Map<string | null, MotionClip[]>, keys: Map<string, string>, surface: string | null): Map<string, string> {
+  const identities = new Map(keys);
+  const visit = (parent: string | null, above: string) => {
+    const seen = new Map<string, number>();
+    const trailOf = (clip: MotionClip) => {
+      const kind = `${clip.component}:${clip.name}`;
+      const nth = seen.get(kind) ?? 0;
+      seen.set(kind, nth + 1);
+      return `${above}${BELOW}${kind}#${nth}`;
+    };
+    for (const clip of kids.get(parent) ?? []) {
+      const trail = keys.get(clip.id) ?? trailOf(clip);
+      if (clip.id !== surface) {
+        identities.set(clip.id, trail);
+      }
+      visit(clip.id, trail);
+    }
+  };
+  visit(null, '');
+  return identities;
+}
 
 function scopeOf(doc: MotionDoc, keys: Map<string, string>, images: FigmaImage[], page: string | null): Scope {
   const clips = doc.tracks.flatMap((t) => t.clips) as MotionClip[];
   const byId = new Map(clips.map((c) => [c.id, c]));
   const kids = Map.groupBy(clips, (c) => (c.parent && byId.has(c.parent) ? c.parent : null));
-  return { byId, order: new Map(clips.map((c, i) => [c.id, i])), kids, keys, snapshots: snapshotsIn(images), page, surface: doc.surface ?? null };
+  return { byId, order: new Map(clips.map((c, i) => [c.id, i])), kids, keys, identities: identitiesOf(kids, keys, doc.surface ?? null), snapshots: snapshotsIn(images), page, surface: doc.surface ?? null, size: { width: doc.width, height: doc.height } };
 }
 
 const kidsOf = (scope: Scope, id: string | null) => scope.kids.get(id) ?? [];
@@ -173,7 +198,7 @@ function within(scope: Scope, id: string, ancestor: string | null): boolean {
 }
 
 function pairsOf(base: Scope, read: Scope): Map<string, string> {
-  const byKey = Map.groupBy([...read.keys].map(([id, key]) => ({ id, key })), (e) => e.key);
+  const byKey = Map.groupBy([...read.identities].map(([id, key]) => ({ id, key })), (e) => e.key);
   const used = new Set<string>();
   const pairs = new Map<string, string>();
   const pair = (b: string, r: string) => {
@@ -184,10 +209,10 @@ function pairsOf(base: Scope, read: Scope): Map<string, string> {
     pair(base.page, read.page);
   }
   const walk = (clip: MotionClip) => {
-    const key = base.keys.get(clip.id);
+    const key = base.identities.get(clip.id);
     const above = pairedAbove(base, clip.id, (id) => pairs.has(id));
     const host = above === null ? null : pairs.get(above)!;
-    const partner = key && !pairs.has(clip.id) ? (byKey.get(key) ?? []).find((e) => !used.has(e.id) && within(read, e.id, host) && sameLayer(base, clip, read, read.byId.get(e.id)!)) : undefined;
+    const partner = key && !pairs.has(clip.id) ? (byKey.get(key) ?? []).find((e) => !used.has(e.id) && within(read, e.id, host) && PAIRS[identityOf(key)](base, clip, read, read.byId.get(e.id)!)) : undefined;
     if (partner) {
       pair(clip.id, partner.id);
     }
@@ -203,6 +228,33 @@ const fixedItem = (clip: MotionClip, flowing: boolean): Partial<MotionClip> =>
   flowing || clip.autoLayout ? { layoutItem: { ...(clip.layoutItem ?? DEFAULT_LAYOUT_ITEM), ...(flowing ? { absolute: true } : {}), width: Sizing.Fixed, height: Sizing.Fixed } } : {};
 
 const layoutOf = (from: MotionClip) => Object.fromEntries(Object.entries(from.props).filter(([k]) => LAYOUT_PROPS.has(k)));
+
+const lookOf = ({ id: _id, parent: _parent, hidden: _hidden, layoutItem: _item, props, ...rest }: MotionClip) => JSON.stringify({ ...rest, props: Object.fromEntries(Object.entries(props).filter(([k]) => !LAYOUT_PROPS.has(k))) });
+
+enum Identity {
+  Element = 'element',
+  Position = 'position'
+}
+
+const identityOf = (key: string) => (key.includes(BELOW) ? Identity.Position : Identity.Element);
+
+const SAME_PX = 0.01;
+
+const sizeOf = (scope: Scope, clip: MotionClip) => [Number(clip.props.width) * scope.size.width, Number(clip.props.height) * scope.size.height];
+
+const sameSize = (base: Scope, a: MotionClip, read: Scope, b: MotionClip) => sizeOf(base, a).every((side, i) => Math.abs(side - sizeOf(read, b)[i]) <= SAME_PX);
+
+const roundedBox = (scope: Scope, clip: MotionClip) => {
+  const [width, height] = sizeOf(scope, clip);
+  return uniformRadius(String(clip.props.path ?? ''), { width, height }) !== null;
+};
+
+const drawsAlike = (base: Scope, a: MotionClip, read: Scope, b: MotionClip) => sameSize(base, a, read, b) || !(roundedBox(base, a) || roundedBox(read, b));
+
+const PAIRS: Record<Identity, (base: Scope, a: MotionClip, read: Scope, b: MotionClip) => boolean> = {
+  [Identity.Element]: sameLayer,
+  [Identity.Position]: (base, a, read, b) => sameLayer(base, a, read, b) && lookOf(a) === lookOf(b) && drawsAlike(base, a, read, b)
+};
 
 const boxOf = (clip: MotionClip): Box => {
   const p = clip.props as { x: number; y: number; width: number; height: number };
