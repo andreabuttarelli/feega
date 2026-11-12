@@ -33,9 +33,12 @@ describe('the bind chip', () => {
     expect(body).toContain('data-testid="bind-chip-fill"');
   });
 
-  it('a bound fill shows the variable instead of the stack', () => {
+  it('a bound fill is a fill row named for the variable, not a chip', () => {
     const body = inspect(bound);
-    expect(body).toContain('data-bound="Theme/surface"');
+    expect(body).toContain('data-testid="fill-row"');
+    expect(body).toContain('title="Theme/surface"');
+    expect(body).toContain('data-testid="fill-detach"');
+    expect(body).not.toContain('data-testid="bind-chip-fill"');
   });
 
   it('sits next to a number field when the doc has a number variable', () => {

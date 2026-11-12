@@ -1,6 +1,7 @@
 import { createServiceRoleDb } from '$lib/server/db/client';
 import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
 import type { Json } from '$lib/database.types';
+import type { CanvasPerfProps } from '$lib/server/canvas-perf';
 
 export enum ProductEvent {
   LandingPromptSent = 'landing_prompt_sent',
@@ -12,7 +13,8 @@ export enum ProductEvent {
   AgentFirstOutput = 'agent_first_output',
   AgentFailed = 'agent_failed',
   CreditsExhausted = 'credits_exhausted',
-  ImportFailed = 'import_failed'
+  ImportFailed = 'import_failed',
+  CanvasPerf = 'canvas_perf'
 }
 
 type Nothing = Record<string, never>;
@@ -28,6 +30,7 @@ export type ProductProps = {
   [ProductEvent.AgentFailed]: { code: string };
   [ProductEvent.CreditsExhausted]: Nothing;
   [ProductEvent.ImportFailed]: { source: string; error: string };
+  [ProductEvent.CanvasPerf]: CanvasPerfProps;
 };
 
 export type EventActor = { userId?: string | null; orgId?: string | null; anonymousId?: string | null };

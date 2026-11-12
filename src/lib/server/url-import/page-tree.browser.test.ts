@@ -624,3 +624,22 @@ describe.runIf(process.env.CHROMIUM_PATH)('a block a CSS animation moves', () =>
     }
   }, 30_000);
 });
+
+const SMALL_SUFFIX = `<body style="margin:0"><p style="margin:0;font:40px sans-serif">$0<span style="font-size:16px">/mo</span></p></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('a block whose smaller span holds more letters than its own text', () => {
+  it('keeps the block size as the text size, the span as the run (acme: "$0/mo" pushed the Choose Starter button out of its card)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 400, height: 200 });
+      await page.setContent(SMALL_SUFFIX);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+
+      expect(all(tree.root).find((n) => n.type === 'TEXT')?.style?.fontSize).toBe(40);
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});

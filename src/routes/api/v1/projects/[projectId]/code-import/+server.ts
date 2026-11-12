@@ -1,8 +1,10 @@
 import { json } from '@sveltejs/kit';
 import { z } from 'zod';
-import { importCodeInto } from '$lib/server/code-import/canvas-import';
+import { ALL_ROUTES, importRoutesInto } from '$lib/server/code-import/canvas-import';
 import { CODE_IMPORT_STATUS, CodeImportOutcome } from '$lib/server/code-import/import-code';
-import { askedRoutes, MAX_ROUTES } from '$lib/server/code-import/repo';
+import { askedRoutes } from '$lib/server/code-import/repo';
+import { MAX_LISTED_ROUTES } from '$lib/server/code-import/routes-discover';
+import { delayOf } from '$lib/server/code-import/capture-wait';
 import { conditionsOf, MAX_CONDITIONS } from '$lib/server/code-import/render-conditions';
 import { MAX_STORIES } from '$lib/server/code-import/storybook';
 import { designSystemOf } from '$lib/server/code-import/design-system';
@@ -13,7 +15,7 @@ import type { RequestHandler } from './$types';
 export const config = { maxDuration: 300 };
 
 const askSchema = z
-  .object({ canvasId: z.string().min(1), repo: z.string().min(1).max(300).optional(), folder: z.string().min(1).max(1000).optional(), upload: z.string().min(1).max(300).optional(), route: z.string().max(300).optional(), routes: z.array(z.string().max(300)).max(MAX_ROUTES).optional(), storybook: z.string().min(1).max(500).optional(), stories: z.array(z.string().max(200)).max(MAX_STORIES).optional(), conditions: z.array(z.object({ scheme: z.enum(['light', 'dark']), width: z.number().int().min(240).max(3840) })).max(MAX_CONDITIONS).optional(), designSystem: z.boolean().optional(), x: z.number().finite(), y: z.number().finite() })
+  .object({ canvasId: z.string().min(1), repo: z.string().min(1).max(300).optional(), folder: z.string().min(1).max(1000).optional(), upload: z.string().min(1).max(300).optional(), app: z.string().min(1).max(200).optional(), route: z.string().max(300).optional(), routes: z.union([z.array(z.string().max(300)).max(MAX_LISTED_ROUTES), z.literal(ALL_ROUTES)]).optional(), storybook: z.string().min(1).max(500).optional(), stories: z.array(z.string().max(200)).max(MAX_STORIES).optional(), conditions: z.array(z.object({ scheme: z.enum(['light', 'dark']), width: z.number().int().min(240).max(3840) })).max(MAX_CONDITIONS).optional(), designSystem: z.boolean().optional(), captureDelayMs: z.number().int().min(0).optional(), routeDelayMs: z.record(z.string().max(300), z.number().int().min(0)).optional(), x: z.number().finite(), y: z.number().finite() })
   .refine((a) => [a.repo, a.storybook, a.folder, a.upload].filter(Boolean).length === 1);
 
 export const POST: RequestHandler = async (event) => {
@@ -27,12 +29,12 @@ export const POST: RequestHandler = async (event) => {
     return json({ error: CodeImportOutcome.Invalid }, { status: CODE_IMPORT_STATUS[CodeImportOutcome.Invalid] });
   }
 
-  const { canvasId, repo, folder, upload, route, routes, storybook, stories, conditions, designSystem, x, y } = ask.data;
-  const done = await importCodeInto({ ...scope, actor: { kind: 'user', id: scope.userId } }, canvasId, { repo, folder, upload, routes: askedRoutes(route, routes), conditions: conditions ? conditionsOf(conditions) : undefined, designSystem: designSystemOf(designSystem), storybook, stories, at: { x, y } });
+  const { canvasId, repo, folder, upload, app, route, routes, storybook, stories, conditions, designSystem, captureDelayMs, routeDelayMs, x, y } = ask.data;
+  const done = await importRoutesInto({ ...scope, actor: { kind: 'user', id: scope.userId } }, canvasId, { repo, folder, upload, app, routes: routes === ALL_ROUTES ? ALL_ROUTES : askedRoutes(route, routes), conditions: conditions ? conditionsOf(conditions) : undefined, delay: delayOf({ ms: captureDelayMs, routes: routeDelayMs }), designSystem: designSystemOf(designSystem), storybook, stories, at: { x, y } });
   if (done.outcome !== CodeImportOutcome.Ok) {
-    return json({ error: done.outcome, ...(done.error ? { detail: done.error } : {}) }, { status: CODE_IMPORT_STATUS[done.outcome] });
+    return json({ error: done.outcome, ...(done.error ? { detail: done.error } : {}), ...(done.locked ? { locked: done.locked } : {}), ...(done.apps ? { apps: done.apps } : {}) }, { status: CODE_IMPORT_STATUS[done.outcome] });
   }
 
   const node = await findNode(scope.db, { orgId: scope.orgId, nodeId: done.frameId });
-  return json({ nodes: node ? [node] : [], undo: done.undo, skipped: done.skipped, truncated: done.truncated, pages: done.pages, components: done.components, variants: done.variants, instances: done.instances, ...(done.design ? { design: done.design } : {}) });
+  return json({ nodes: node ? [node] : [], undo: done.undo, skipped: done.skipped, truncated: done.truncated, pages: done.pages, locked: done.locked, components: done.components, variants: done.variants, instances: done.instances, ...(done.design ? { design: done.design } : {}), ...(done.library ? { library: done.library } : {}), ...(done.routes ? { routes: done.routes } : {}) });
 };

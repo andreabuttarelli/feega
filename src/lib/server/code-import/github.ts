@@ -19,6 +19,18 @@ const HTTP_REDIRECT_MIN = 300;
 const HTTP_REDIRECT_MAX = 399;
 const ARCHIVE_TIMEOUT_MS = 120_000;
 
+const GITHUB_API = 'https://api.github.com';
+const PUBLIC_TIMEOUT_MS = 15_000;
+
+export function publicCall(fetchFn: typeof fetch = fetch): GithubCall {
+  return async (request) => {
+    const url = new URL(`${GITHUB_API}${request.endpoint}`);
+    Object.entries(request.query ?? {}).forEach(([k, v]) => url.searchParams.set(k, v));
+    const res = await fetchFn(url, { headers: { accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(PUBLIC_TIMEOUT_MS) });
+    return { status: res.status, data: await res.json().catch(() => null), headers: {}, file: null };
+  };
+}
+
 const listOf = (answer: ProviderAnswer): Record<string, unknown>[] => (answer.status === HTTP_OK && Array.isArray(answer.data) ? (answer.data as Record<string, unknown>[]) : []);
 
 export async function reposOf(call: GithubCall): Promise<GithubRepo[]> {
@@ -53,4 +65,14 @@ export async function archiveOf(call: GithubCall, repo: RepoRef, fetchFn: typeof
   }
   const bytes = new Uint8Array(await res.arrayBuffer());
   return bytes.byteLength <= MAX_ARCHIVE_BYTES ? bytes : null;
+}
+
+type TreeEntry = { path?: unknown; type?: unknown };
+
+const BLOB = 'blob';
+
+export async function treeOf(call: GithubCall, repo: RepoRef): Promise<string[] | null> {
+  const answer = await call({ endpoint: `/repos/${repo.owner}/${repo.repo}/git/trees/${repo.ref ?? 'HEAD'}`, query: { recursive: '1' } });
+  const tree = answer.status === HTTP_OK ? (answer.data as { tree?: TreeEntry[] } | null)?.tree : null;
+  return Array.isArray(tree) ? tree.filter((e) => e.type === BLOB && typeof e.path === 'string').map((e) => e.path as string) : null;
 }

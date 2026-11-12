@@ -34,13 +34,18 @@
   --site-bg: #000;
   --site-ink: #f0eee9;
   --site-accent: #ff4000;
+  --site-z-canvas: 6;
+  --site-z-frame: 7;
   --site-z-agents: 8;
-  --site-z-drawer: 9;
-  --site-z-header: 10;
+  --site-z-canvas-chrome: 9;
+  --site-z-chapter: 9;
+  --site-z-drawer: 10;
+  --site-z-header: 11;
   --site-line: #4f4f4f;
   --site-gutter: 12px;
   --site-text: 14px;
   --site-text-line: 16.8px;
+  --site-section: 96px;
 
   min-height: 100vh;
   background: var(--site-bg);
@@ -338,4 +343,41 @@
 .drawer,
 .site-foot {
   box-sizing: border-box;
+}
+
+@media (min-width: 810px) {
+  .site {
+    --site-section: 120px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .site {
+    --site-section: 160px;
+  }
+}
+
+.chapters {
+  padding-bottom: var(--site-section);
+}
+
+.chapter-block {
+  padding: var(--site-section) 20px 0;
+}
+
+.chapter-block > .proof {
+  display: grid;
+  gap: 72px;
+  margin-top: 96px;
+}
+
+@media (min-width: 810px) {
+  .chapter-block {
+    padding: var(--site-section) 0 0;
+  }
+
+  .chapter-block > .proof {
+    gap: 96px;
+    margin-top: 120px;
+  }
 }

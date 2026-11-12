@@ -65,7 +65,28 @@ describe('element rules', () => {
     expect('BUILD_HEAD' in live).toBe(false);
   });
 
+  it('leaves the chapters alone, so no cursor covers their copy or buttons', () => {
+    const inMain = live.BUILD_TARGETS.filter((selector) => selector.startsWith('main'));
+    expect(inMain.length).toBeGreaterThan(0);
+    for (const selector of inMain) {
+      expect(selector.endsWith(`:not(${live.CHAPTER_SELECTOR} *)`)).toBe(true);
+    }
+  });
+
+  it('never takes the brand chip with the logo mark', () => {
+    expect(live.BUILD_TARGETS).not.toContain('.bar > a');
+    expect(live.BUILD_TARGETS).toContain('.bar > a:not(.brand)');
+  });
+
   it('places only the remaining visuals', () => {
     expect(ELEMENT_RULES.at(-1)).toMatchObject({ selector: '*', build: BuildMode.Place });
+  });
+});
+
+describe('size lock', () => {
+  it('locks the layout height, not the scaled one, so the page never shrinks under the reader', () => {
+    const el = { offsetHeight: 541, style: { height: '' }, getBoundingClientRect: () => ({ height: 483 }) };
+    live.lockHeight(el as unknown as HTMLElement);
+    expect(el.style.height).toBe('541px');
   });
 });

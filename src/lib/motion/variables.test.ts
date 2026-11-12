@@ -3,7 +3,9 @@ import { MotionFormat, newMotionDoc, parseMotionDoc, findClip, type MotionDoc } 
 import { addClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 import { setAutoLayout } from './layout/ops';
 import { VarType } from '@feega/motion-core/motion/variables-model';
-import { addMode, bindChip, bindVariable, bindableTargets, defineVariable, removeVariable, resolveVariables, setActiveMode, unbindVariable, variableValue, fillTarget } from './variables';
+import { addMode, bindChip, bindVariable, bindableTargets, defineVariable, removeVariable, resolveVariables, setActiveMode, unbindVariable, variableValue, fillTarget, freeFill, BORDER_TARGET } from './variables';
+import { elementFills } from '@feega/motion-core/motion/fill/elements';
+import { FillType, addFill } from '@feega/motion-core/motion/fill/model';
 
 function ok(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -64,6 +66,27 @@ describe('variables', () => {
 
     expect(findClip(bound, 's1')!.clip.props.roundness).toBeCloseTo(40 / short, 5);
     expect(bindableTargets(findClip(bound, 's1')!.clip, VarType.Number)).toContain('radius');
+  });
+
+  it('a px variable binds the border width of a stroked shape through the frame size', () => {
+    const stroked = ok(setProps(docWith(), 's1', { strokes: [{ paint: { type: 'solid', color: '#000000' }, width: 0.001, align: 'inside' }] }));
+    const doc = ok(defineVariable(stroked, 'Border', 'thin', { type: VarType.Number, values: { Default: 2 } }));
+
+    const bound = ok(bindVariable(doc, 's1', BORDER_TARGET, 'Border/thin'));
+
+    const strokes = findClip(bound, 's1')!.clip.props.strokes as { width: number }[];
+    expect(strokes[0].width).toBeCloseTo(2 / Math.min(bound.width, bound.height), 6);
+    expect(bindableTargets(findClip(bound, 's1')!.clip, VarType.Number)).toContain(BORDER_TARGET);
+    expect(bindableTargets(findClip(docWith(), 's1')!.clip, VarType.Number)).not.toContain(BORDER_TARGET);
+  });
+
+  it('a string variable binds a text font, taking the first family of a CSS stack', () => {
+    const doc = ok(defineVariable(docWith(), 'Type', 'heading', { type: VarType.String, values: { Default: "'Inter', system-ui, sans-serif" } }));
+
+    const bound = ok(bindVariable(doc, 't1', 'font', 'Type/heading'));
+
+    expect(findClip(bound, 't1')!.clip.props.font).toBe('Inter');
+    expect(bindableTargets(findClip(bound, 't1')!.clip, VarType.String)).toContain('font');
   });
 
   it('a number variable binds auto layout gap and padding', () => {
@@ -181,5 +204,32 @@ describe('variables', () => {
   it('the fill target is the colour key the fill stack replaces', () => {
     expect(fillTarget(findClip(docWith(), 's1')!.clip)).toBe('fill');
     expect(fillTarget(findClip(docWith(), 't1')!.clip)).toBe('color');
+  });
+
+  it('freeing a bound fill keeps the colour of the active mode on that layer only', () => {
+    const muted = ok(defineVariable(docWith(), 'Theme', 'muted', { type: VarType.Colour, values: { Light: '#50617a', Dark: '#ffffff80' } }, ['Light', 'Dark']));
+    const second = ok(addClip(muted, { component: 'Title', from: 0, props: {} }, 't2'));
+    const bound = ok(bindVariable(ok(bindVariable(second, 't1', 'color', 'Theme/muted')), 't2', 'color', 'Theme/muted'));
+    const dark = ok(setActiveMode(bound, 'Theme', 'Dark'));
+    const free = ok(freeFill(dark, 't1'));
+    const t1 = findClip(free, 't1')!.clip;
+    expect(t1.bind).toBeUndefined();
+    expect(elementFills(t1.component, t1.props)).toMatchObject([{ type: FillType.Solid, color: '#ffffff80' }]);
+    expect(findClip(free, 't2')!.clip.bind).toEqual({ color: 'Theme/muted' });
+    expect(free.variables).toEqual(dark.variables);
+  });
+
+  it('a fill added to a freed layer survives the next resolution', () => {
+    const bound = ok(bindVariable(themed(), 's1', 'fill', 'Theme/surface'));
+    const free = ok(freeFill(bound, 's1'));
+    const clip = findClip(free, 's1')!.clip;
+    const added = ok(setProps(free, 's1', { fills: addFill(elementFills(clip.component, clip.props), FillType.Linear) }));
+    const after = findClip(resolveVariables(added), 's1')!.clip;
+    expect(elementFills(after.component, after.props).map((f) => f.type)).toEqual([FillType.Solid, FillType.Linear]);
+  });
+
+  it('freeing a layer with no bound fill changes nothing', () => {
+    const doc = themed();
+    expect(ok(freeFill(doc, 's1'))).toEqual(doc);
   });
 });

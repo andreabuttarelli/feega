@@ -111,6 +111,24 @@ doc. In-page helpers (`page-kit.ts`) are self-contained so they survive being se
 | a word split into one inline-block span per letter | one TEXT (`lettersJoined`), a space where the gap is over 0.2 em | text |
 | an element partly off the page | box cut at the edge, picture focused on the part that was showing | — |
 
+## Layers
+
+`page-flatten.ts` drops what draws nothing and changes no layout (rule tables `CHILD_RULES`,
+`PARENT_RULES`), then names what is left. `url-layers.browser.test.ts` is the guard: the same captures
+planned before and after a change must paint the same pixels (images replaced by solid colours, every
+breakpoint view, the frame resized to 768 and 390), else the rule stays out.
+
+- Names, in order: component name; tag or ARIA role (`Nav`, `Header`, `Button`, `Link`, `Item`…, a
+  section by its first words); `id` or `aria-label` unless generated (`__next`, `:r3:`); class word
+  (`Card`, `Badge`); `Icon` / `Image`; `Row` / `Column`; `Frame`. A text's words name only the text:
+  a block holding one text is not named after it.
+- Code import: a wrapper whose own `source` differs from the survivor's is never folded, grown or
+  merged into it (its padding, gap or layout would be written back to the wrong element); a survivor
+  without a `source` inherits the wrapper's. Unwrapping a wrapper that adds nothing stays allowed.
+- Kept, each proven by the guard: a text boxed for a stack (as a flow item the engine sets it up to
+  1 px off), a clipping svg frame in a narrower wrapper (its clip shaves the stroke edges), the
+  original layers of instances whose flattened shapes diverge.
+
 ## Sections
 
 On by default (`sections: false` / `--no-sections` / the dialog checkbox turn it off), and off with
@@ -209,10 +227,33 @@ width:
     leaves the flow at its captured box with fixed sizing; it takes the view read's visibility.
   - a layer pairs only when its nearest named ancestor paired with the view layer's nearest named
     ancestor, so a shared layer is drawn inside the box the view puts it in.
+  - a layer without a DOM key (an svg path, a border or inline-background strip, a stack box) is
+    named by its position (`identitiesOf`, `BELOW`): a box by the first keyed element it wraps and
+    how deep, a leaf by its nearest named ancestor, then component, name and rank among keyless
+    siblings of that kind. How each identity pairs is one table,
+    `PAIRS`: an element key as above; a position also needs the same look outside the layout keys
+    (`lookOf`: overrides can carry only layout, so any other difference would draw the desktop
+    look in the view) and, for a rounded box, the same size (`drawsAlike`: token binding turns it
+    into a rect whose roundness is a share of its box, so another size changes the corners). The
+    frame surface never pairs: the view copies placed before it landed in its track, under the
+    page. Stripe, vercel, linear, supabase: 1 132 / 72 / 395 / 342 view-only layers → 598 / 37 /
+    213 / 161, every guard shot 0 pixels apart. A keyless box that wraps a keyed element is named
+    after it and its distance instead of its rank, so two boxes the phone stacks in the other order
+    do not swap partners (each would orphan every element inside).
+  - colours are merged (`coloursMerged`) and sampled for tokens (`samplesOf`) from what the desktop
+    draws: view-only layers (`viewOnly`) are skipped, so pairing more of them does not move a
+    colour. Before, stripe's view copies outvoted the navy the page paints (#101d51 won over
+    #122054).
   - unnamed wrappers (stacks) span their paired children; the page root spans the view.
   - every other view clip comes in as a view-only layer (`<view>:<id>`), its subtree,
     compositions and pictures with it, hidden at base, shown in its view, placed below the next
     paired clip of the view's paint order. Base clips with no partner are hidden there.
+  - what still comes in view-only, measured on stripe (598 layers, both views): elements the
+    desktop read does not have (191: the rotating product demo and the stories carousel show
+    another panel in each read, since each width is a separate page load; the phone menu), keyless
+    layers whose look or rounded size differs or whose desktop twin sits elsewhere (289), the same
+    content under another DOM path, snapshots that differ, compositions, wrappers flattened away
+    on one side only, live numbers (118 together).
   - the breakpoint is as wide and as tall as the view plan; its height may exceed the frame
     maximum.
 - Each read brings up to 200 pictures of its own.

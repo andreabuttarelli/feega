@@ -124,7 +124,7 @@
     set({ justify: layout.justify === Justify.SpaceBetween ? Justify.SpaceBetween : AS_JUSTIFY[main], align: cross }, 'Aligned the stack');
   }
 
-  const SPOT = cn('size-4 rounded-full bg-ui-input transition-colors duration-(--ui-dur-fast) hover:bg-ui-input-hover aria-pressed:bg-ui-accent-solid', FOCUS_RING);
+  const SPOT = cn('hit rounded-full [--glyph-fill:var(--ui-input)] [--glyph-radius:9999px] [--glyph:16px] hover:[--glyph-fill:var(--ui-input-hover)] aria-pressed:[--glyph-fill:var(--ui-accent-solid)]', FOCUS_RING);
   const TRAIL = cn('h-full max-w-16 shrink-0 cursor-pointer appearance-none rounded-sm bg-transparent pr-2 pl-1 text-right text-ui-label text-ui-text-2 outline-none hover:text-ui-text', FOCUS_RING);
   const SELECT_CHIP = 'flex h-7 min-w-0 items-center gap-1 rounded-md bg-ui-input pl-2 text-ui-label';
   const CHIP_SELECT = cn('h-full min-w-0 flex-1 cursor-pointer appearance-none rounded-sm bg-transparent pr-2 text-right text-ui-label outline-none', FOCUS_RING);
@@ -170,7 +170,7 @@
     {/if}
 
     <div class="flex items-start gap-1.5">
-      <div class="grid shrink-0 grid-cols-3 gap-1 rounded-md bg-ui-input p-2" role="group" aria-label="Alignment" data-testid="auto-layout-align">
+      <div class="grid shrink-0 grid-cols-3 rounded-md bg-ui-input" role="group" aria-label="Alignment" data-testid="auto-layout-align">
         {#each SPOTS as row (row)}
           {#each SPOTS as column (column)}
             <button type="button" class={SPOT} aria-label={`Align ${row} ${column}`} aria-pressed={spotPressed(layout, column, row)} onclick={() => pickSpot(layout, column, row)}></button>

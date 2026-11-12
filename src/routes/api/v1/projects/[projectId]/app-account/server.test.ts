@@ -9,16 +9,17 @@ vi.mock('$lib/server/org-data/auth', () => ({ resolveOrgCaller: (...args: unknow
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: vi.fn(async () => []) }));
 vi.mock('$lib/server/projects/lookup', () => ({ findReachableProject: (...args: unknown[]) => findReachableProject(...args) }));
 
-import { GET, DELETE } from './+server';
+import { GET, DELETE, PUT } from './+server';
 
 const ROW = { project_id: 'p1', org_id: 'o1', login_url: 'https://app.example/login', email: 't@app.example', test_password: 'pw', session: { cookies: [], storage: {} }, session_until: null };
 
 type Handler = (event: unknown) => Promise<Response>;
 
-async function call(handler: unknown, fake: FakeDb | null, headers: Record<string, string> = {}) {
+async function call(handler: unknown, fake: FakeDb | null, headers: Record<string, string> = {}, body?: unknown) {
   const locals = { safeGetSession: async () => ({ user: fake ? { id: 'u1' } : null }), db: async () => fake?.db ?? null };
   const url = new URL('https://feega.test/api/v1/projects/p1/app-account');
-  const res = await (handler as Handler)({ params: { projectId: 'p1' }, locals, request: new Request(url, { headers }), url });
+  const request = new Request(url, body === undefined ? { headers } : { method: 'PUT', headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const res = await (handler as Handler)({ params: { projectId: 'p1' }, locals, request, url });
   return { res, body: await res.json() };
 }
 
@@ -49,6 +50,25 @@ describe('/api/v1/projects/:id/app-account', () => {
 
     expect(res.status).toBe(200);
     expect(fake.calls.find((c) => c.op === 'delete')?.filters).toEqual(expect.arrayContaining([['org_id', 'o1'], ['project_id', 'p1']]));
+  });
+
+  it('sets the test account, answering it without the password', async () => {
+    const fake = fakeDb({ app_accounts: [] }, { filter: true });
+
+    const { res, body } = await call(PUT, fake, {}, { login_url: 'https://app.acme.example/login', email: 'qa@acme.example', password: 'fake-test-password' });
+
+    expect(res.status).toBe(200);
+    expect(JSON.stringify(body)).not.toContain('fake-test-password');
+    expect(fake.calls.find((c) => c.op === 'upsert')?.payload).toMatchObject({ project_id: 'p1', org_id: 'o1', email: 'qa@acme.example', test_password: 'fake-test-password', session_until: null });
+  });
+
+  it('refuses a login of a third-party platform', async () => {
+    const fake = fakeDb({ app_accounts: [] }, { filter: true });
+
+    const { res } = await call(PUT, fake, {}, { login_url: 'https://x.com/login', email: 'qa@acme.example', password: 'x' });
+
+    expect(res.status).toBe(400);
+    expect(fake.calls.find((c) => c.op === 'upsert')).toBeUndefined();
   });
 
   it('the CLI reaches it with a bearer token, scoped to its org', async () => {

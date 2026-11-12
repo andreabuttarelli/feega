@@ -441,10 +441,12 @@ describe('a save the network did not deliver', () => {
 describe('the draft the host keeps until the save lands', () => {
   const lastDraft = (port: SessionPort) => vi.mocked(port.draft).mock.calls.at(-1)?.[0];
 
-  it('an edit hands over the ops from the last saved revision', () => {
+  it('an edit hands over the ops from the last saved revision, after the frame, not inside the edit', async () => {
     const { session, port } = open();
 
     session.apply({ ok: true, doc: longer(60) }, 'Longer');
+    expect(port.draft).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(60);
 
     expect(lastDraft(port)).toEqual({ version: 1, ops: outgoing({ version: 1, doc: base }, longer(60)), summary: 'Longer' });
   });
@@ -476,14 +478,16 @@ describe('the draft the host keeps until the save lands', () => {
     expect(lastDraft(port)).toBeNull();
   });
 
-  it('an undo is a draft too, so the last undo before a reload is kept', () => {
+  it('an undo is a draft too, so the last undo before a reload is kept', async () => {
     const { session, port } = open();
     session.apply({ ok: true, doc: longer(60) }, 'Longer');
     session.undo();
+    await vi.advanceTimersByTimeAsync(60);
 
     expect(lastDraft(port)).toBeNull();
 
     session.redo();
+    await vi.advanceTimersByTimeAsync(60);
 
     expect(lastDraft(port)).toMatchObject({ version: 1, summary: 'Redo' });
   });

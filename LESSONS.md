@@ -3847,3 +3847,27 @@ Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start
 ## A derived reruns on every tick although none of its inputs changed
 
 **Signal:** a `$derived` (or a template expression with a call) runs about once per camera tick while an `$effect` watching each of its inputs sees them change a handful of times. **Cause:** Svelte 5 (5.56 and 5.57) keeps a derived's write version when it recomputes to an equal value; once one input changed while its value did not, `is_dirty` finds that input newer on every later `MAYBE_DIRTY` mark and reruns it. Marks travel through deriveds: any derived that reads `view` (`tier`, `labelZoom`, `liveCode`) marked the whole card and frame graph on each tick. **Move:** a camera-driven value that feeds other state is plain `$state` written by `$effect` (it bumps only when the value changes), never a `$derived` of `view`. Not `$effect.pre`: it runs at its declaration, so a `const` declared further down the script is still in its TDZ and the component throws on mount. To find the source, hook `internal_set` in the prebundled Svelte chunk (`.vite-deps/deps/chunk-*.js`, restart the server) to record written sources, then walk `.reactions` from each to the rerunning derived. Guard: `a pan after a change that left the waiting count alone walks none of them` in `core-frames-camera.svelte.test.ts`.
+
+### `svelte-check` dies in a worktree with an esbuild goroutine dump
+
+**Signal:** `npx svelte-check` in a `feega-wt/` worktree prints `Error while loading config at …/packages/feega-motion-react/example/vite.config.ts` and a Go stack, exit 0, no diagnostics. **Move:** it is the example's config failing to load, not your code; type-check the TypeScript with `npx tsc --noEmit -p tsconfig.json | grep <your paths>` and let a dev server compile the `.svelte` files you touched (open the page), then trust CI's check.
+
+## A dev server spawned by feega outlives it
+
+**Signal:** `ps` shows `npm exec vite dev --port <n>` with parent pid 1 after the feega server stopped; the desktop app needs its SIGKILL fallback to close the local server. **Move:** a non-detached child keeps the parent's event loop alive and does not die with it, and `child.kill()` reaches only the npm wrapper. Spawn through `spawnGroup` (`code-import/dev-children.ts`): own process group, `kill(-pid)` on release, exit and signals, pid file for the next start. Test with a fake `npm run dev` that spawns a grandchild, and assert the grandchild's pid is gone.
+
+## A field added to the token map vanishes when the node is read back
+
+**Signal:** a feature works when a test hands its map to the server function, and the UI shows nothing (code changes: "No edits to send yet") after a real import. **Move:** whatever is stored in `nodes.data` is read through a zod schema (`codeOriginSchema` in `motion-node.ts`); a plain `z.object` drops unknown keys without a word. A new field on `TokenEntry` goes into that schema in the same change, and the test goes through the read (`codeChanges` with a mocked `findNode`), not around it.
+
+## A dragged element moves with what lies on top of it
+
+**Signal:** on the tiled canvas a dragged element carries the element above it, leaves a ghost where it was, or does not move while its selection ring does; `?coreTiles=0` draws it right. **Cause:** three at once — a drag layer built from copies of screen tiles holds every pixel in that area; `Tiles::frame` showed a sharper level but queued only the current one, so stale tiles of the shown level were never redrawn; `stirred()` swallowed the damage that let go of the held picture. **Move:** log per `tiled_frame` the damage rects, `queued`, `rastered` and `missing` (a temporary `#[wasm_bindgen] extern { #[wasm_bindgen(js_namespace = console)] fn log(s: &str); }`, captured with `page.on('console')`): damage with `queued=0` is a stale level nobody redraws. A drag layer is rastered from the element alone; uses above it are lifted with it. Bisect with `npm run perf:free-drag`.
+
+## A pixel diff of two imports that is not the import
+
+**Signal:** the same doc rendered twice with `drawStill` differs by thousands of pixels in picture regions, or by a few channel steps across one gradient (linear.app's testimonial card: 18 652 px, max 4). **Move:** for a structural before/after, swap every image asset for a solid colour (`url-layers.browser.test.ts` does) and render the baseline twice: pixels that differ between two baseline runs are renderer noise, compare against them, not against zero.
+
+## A text lifted out of its frame into a stack moves
+
+**Signal:** after removing a text's same-box wrapper inside a stack, glyphs sit up to 1 px off (Supabase checklist, Vercel buttons) while the layer box is identical. **Move:** page-tree boxes every text in a flex flow on purpose; the engine lays out a text flow item differently from a text inside a frame. Keep the box; only `label` (one line, fixed, aligned) may replace it.

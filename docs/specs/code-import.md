@@ -26,7 +26,7 @@ change to the repo's build.
 
 | Framework | Read from | Component of the codebase | Props |
 |---|---|---|---|
-| React (client) | `__reactFiber$…`, composite fibers between a host element and the host above | name declared in a `.tsx`/`.jsx` of the repo, or annotated by react-docgen (`__docgenInfo`), or whose `displayName` ends in such a name (`HeroUI.Button` → `Button`) | `memoizedProps` |
+| React (client) | `__reactFiber$…`, composite fibers between a host element and the host above | name declared in a `.tsx`/`.jsx`/`.js` of the repo, or annotated by react-docgen (`__docgenInfo`), or whose `displayName` ends in such a name (`HeroUI.Button` → `Button`) | `memoizedProps` |
 | React server components | `_debugInfo` on the fibers a server component produced (React 19 dev) | name declared in the repo | `props` of the debug entry |
 | Vue 3 | `__vueParentComponent`, the instances whose `subTree.el` is the element | `__file` outside `node_modules`, or a known name, or docgen | `props` |
 | Svelte 5 | `__svelte_meta`, the `component` entries of the dev stack | definition file and tag site outside `node_modules` / `.svelte-kit` | none: Svelte keeps none, so no variants |
@@ -55,6 +55,7 @@ Per component, over all its usages on the route:
 | boolean, or string matching `^[a-z][\w-]{0,23}$` with at most 8 distinct values | variant axis; an absent prop is the value `Default` |
 | any other string, and `children` always | text property of the main, overridden per instance |
 | functions, objects, numbers, `className`, `style`, `id`, `key`, `ref`, `href`, `src`, `alt`, `on*`, `aria-*`, `data-*`, `asChild` | ignored |
+| any prop the source declares as a union, enum or `cva`/`tv` variant (`component-discovery.ts`), when every observed value is declared | variant axis, even `type`, `name`, `value` or a number |
 
 The first render of each variant combination is its main; mains of one component share the set
 (`component.set` = component name) and declare a text property per text prop found in their
@@ -69,7 +70,7 @@ its main instead of being linked to an older one. At most 64 variants per set.
 
 ## Several routes
 
-`routes` (up to 8, default `/`): one sandbox, one tab, the routes captured in turn, then one
+`routes` (up to 20, default `/`): one sandbox, one tab, the routes captured in turn, then one
 frame. Each route is a board named after its path (`boardsOf`: shelf rows under the 16 384 px
 side, 160 px gaps, ids prefixed, use indices shifted), and one code-sets pass covers every use,
 so a component rendered on two routes has one main and the Components panel lists it once. As
@@ -79,6 +80,30 @@ route that does not open is skipped and reported; the import fails only if none 
 route was discarded: an instance cannot point at another frame's main.
 
 Code import skips URL import's `repeatedOf`: identity comes from the code, not from look-alikes.
+
+## Route discovery
+
+`routes-discover.ts` is pure: file list + framework + app folder (from `runPlan`, not re-detected) → routes. `ROUTERS` has one row per file router: frameworks, when it applies, how a file becomes path segments, which files hold param values.
+
+| Router | Framework | Pages | Dropped |
+|---|---|---|---|
+| Next app | Next | `app/**/page.*`, `src/app/**` | `(group)`, `@slot`; `_private` and `(.)` intercepting segments leave the page out |
+| Next pages | Next | `pages/**`, `src/pages/**` | `_app`, `_document`, any `_x`, `api/` |
+| SvelteKit | SvelteKit | `src/routes/**/+page(@x).svelte` | `(group)`; `[x=matcher]` → `[x]` |
+| Nuxt | Nuxt | `app/pages/**/*.vue`, `pages/**` | `(group)`, `index` |
+| Vue pages | Vite with `.vue` in `src/pages` | `.vue`, `.md` minus README | `index` |
+| Astro | Astro | `src/pages/**` `.astro .md .mdx .html` | `_x`, endpoints (`.ts`/`.js`) |
+| Remix flat | React Router without `routes.ts`, or `flatRoutes()` | `app/routes/*.tsx`, `app/routes/x/route.tsx` | `_index`, `_pathless`, `x_`, resource routes (`.ts`) |
+| React Router config | `app/routes.ts` | only `index("f")` and `route("literal", "f")` | `layout(`, `prefix(`, children, computed paths → `routes_in_code` |
+| TanStack Router | Vite/generic with `__root.*` | `src/routes/**`, `app/routes/**`, dots as `/` | `index`, `route`, `(group)`, `_pathless`, `-ignored`, `.lazy` |
+
+Paths are written `[x]`, `[...x]`, `[[x]]`, `[[...x]]` for every router (TanStack `$x` → `[x]`, `$` → `[...splat]`; Remix `($x)` → `[[x]]`; React Router `:x?` → `[[x]]`). Order: `/`, static, then dynamic, shallow before deep. Static routes are selected. Same path from two files: the first file wins.
+
+Values for params: a literal `generateStaticParams`/`entries` array of objects with string values naming exactly the route's params; else, for `/<seg>/[slug]`, the md/mdx files directly in exactly one of `src/content/<seg>/`, `content/<seg>/` (a nested folder is ambiguous: none). After capture, same-origin `<a href>` paths in each page's fold (`tab.ui()`, 160 elements per page) that match a pattern; at most 8 values per route. No crawl of its own.
+
+Without booting: GitHub `git/trees/<ref>?recursive=1` (connected account, else public) plus raw reads of the manifests and of the files holding values; a folder walk (local mode); an upload's tar listing. `GET …/code-import/routes`, op `discover_routes`, CLI `--routes discover`. `routes: "all"` imports the selected routes; every import reports in `routes.leftOut` the discovered routes it did not bring: `not_selected`, `needs_value` (with link values), `not_opened`.
+
+Cap 20: the capture budget is 150 s and a page costs about 7 s (16 Storybook stories in ~110 s), so 150 / 7 ≈ 21 pages; 20 leaves room. Conditions multiply pages; past the budget pages are left out and reported, as before.
 
 ## Private repositories
 
@@ -100,6 +125,20 @@ Composio adapter is REST v3.1 over `fetch`, no SDK (the SDK pulls `openai`, `pus
 second `@types/json-schema` that breaks the `ai` package's types). Without `COMPOSIO_API_KEY` it
 is `null` and the UI says GitHub is not set up. Drive and Dropbox can move behind the same port.
 
+## Routes behind a login
+
+After each capture the tab's final URL is compared with the route asked (`lockedOut`,
+`code-import/sign-in.ts`). A different path that is the account's login path, a sign-in path
+(`/login`, `/sign-in`, `/signup`), or a page with a password field means the route is locked: it is
+not imported, it is returned in `locked` (`{ label, reason, detail? }`) and listed in `skipped`. All
+routes locked: `sign_in_needed`, 422.
+
+With a test account on the project (`app_accounts`, set in settings, chat, API `PUT`, CLI, MCP), the
+import signs in once before capturing: the login PATH of `login_url` on the sandbox origin, through
+`appBrowse` with an in-memory store (one login routine; the sandbox session never overwrites the
+saved one). Each capture tab restores that session. A failed sign-in is reported on each locked
+route; public routes import. Folder imports do not sign in.
+
 ## Storybook
 
 `storybook` instead of `repo`: `index.json` (Storybook 7+) or `stories.json` (6), stories only
@@ -114,7 +153,9 @@ Clone (or the archive of a private repo, unpacked with `tar --strip-components=1
 on port 4174, then `origin-proxy.ts` on the exposed 4173: it rewrites `Host`, `Origin` and
 `Referer` to `localhost:4174` for HTTP and websocket upgrades. Next.js 16 refuses `/_next/*`
 from any origin not localhost or in `allowedDevOrigins`; without the HMR socket the client never
-hydrates and there are no fibers to read. Vite's allowed hosts are satisfied the same way.
+hydrates and there are no fibers to read. Vite's allowed hosts are satisfied the same way. The proxy is public, so it answers only the import that started it: a random key per run, sent by
+the capture browser as the host-scoped cookie `feega_import_key` (it rides on websocket upgrades
+too); without it, 403. The cookie is stripped before the dev server.
 
 ## Round trip
 
@@ -163,14 +204,26 @@ Each clip drawn from a repo element carries `source = { at: "file:line:col", was
 
 ## Rules
 
-- `https://github.com/<owner>/<repo>`, `ref` optional (branch, tag, sha); up to 8 routes.
+- `https://github.com/<owner>/<repo>`, `ref` optional (branch, tag, sha); up to 20 routes, more refused with the count.
 - The repo's code never runs on our servers: clone, install and dev server run in a Vercel
   Sandbox, outside our network, with no environment variables of ours. The browser that reads
   the page is the hosted one (`liveBrowser`), fenced like URL import.
 - Caps: sandbox 6 min wall clock, 4 vCPU; install 4 min; dev server ready in 90 s; repo files
   scanned for names 4 000; then the URL import caps (1 500 nodes, 3 840 px, 60 images).
-- Package manager from the lockfile (`pnpm-lock.yaml`, `yarn.lock`, `bun.lock*`, else npm). Dev
-  script: `dev`. Port read from the dev server output, fallback 5173 / 3000.
+- How the repo boots is one pure plan, `runPlan` (`run-plan.ts`), shared by the sandbox and the
+  local folder: from the plan-relevant file list (manifests, lockfiles, configs, version files)
+  and the `package.json` texts it decides the app folder, the install folder, install and dev
+  argv, port/host flags, environment, Node line, or a typed refusal (`no_package`, `no_script`,
+  `choose_app` with the apps). Tables: `FRAMEWORKS` (one row per framework: detection, script
+  preference, flags, default port) and `MANAGERS` (lockfiles, binary, install args, Node pin).
+  Package manager from `packageManager` (pinned through `npx -y <pm>@<version>`; corepack is not
+  used because Node 25+ no longer ships it), else the lockfile. Node: `.nvmrc`/`.node-version`/
+  `engines.node` mapped to the sandbox images `node:22`, `universal` (Node 24), `node:26`; the
+  sandbox boots on `universal` to read the files and reboots once on another image when the plan
+  asks for it. The dev server is probed on our port, then the framework's default.
+- Monorepo: an app is a non-root package with a framework and a script; the workspace root runs
+  only when it holds no app. `tree/<ref>/<path>` is split against the repo's branch list
+  (`located`), so a branch with `/` works; the path, or `app`, picks the nearest package.
 - Cost: one sandbox (~$0.01–0.03 per import at Vercel Sandbox CPU pricing) + one Browserless
   session. No model call, so not `gateAiAction`; 2 imports per user per 10 minutes.
 
@@ -178,4 +231,5 @@ Each clip drawn from a repo element carries `source = { at: "file:line:col", was
 
 - Svelte props (Svelte 5 keeps none in the browser): Svelte components have no variants.
 - Storybook controls: only the args each story renders with.
-- Components not rendered on any imported route or story; environment variables the app needs.
+- Components not rendered on any imported route or story; environment variables the app needs (an
+  app whose auth needs a database or secrets cannot sign in in the sandbox).

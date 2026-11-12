@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+@theme {
+	--color-ink: #111111;
+	--text-hero: 3rem;
+	--text-hero--line-height: calc(3.5 / 3);
+	--text-hero--letter-spacing: -0.02em;
+	--text-hero--font-weight: 700;
+	--text-body: 1rem;
+	--text-body--line-height: 1.5;
+	--shadow-card: 0 4px 12px rgb(0 0 0 / 0.1);
+	--breakpoint-md: 48rem;
+	--ease-snappy: cubic-bezier(0.2, 0, 0, 1);
+}
+
+.dark {
+	--color-ink: #eeeeee;
+}
+
+article .prose h2 {
+	font-size: 1.5rem;
+	font-weight: 600;
+	line-height: 1.4;
+	letter-spacing: -0.025em;
+}
+
+@media (min-width: 640px) {
+	article .prose h2 {
+		font-size: 1.75rem;
+	}
+}
+
+.popover {
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}

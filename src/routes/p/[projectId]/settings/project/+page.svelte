@@ -67,18 +67,36 @@
 
 <Panel
   title="Test app account"
-  description="To show your app, the chat asks for a TEST login (url, email, password) and logs in to photograph its screens. The AI sees these credentials: never give a real account."
+  description="A TEST login of your app. The chat signs in with it to photograph screens, and code import signs in with it to capture pages behind a login. The AI sees these credentials: never give a real account."
 >
-  {#if data.appAccount}
-    <div class="flex flex-wrap items-center gap-2 text-sm" data-testid="app-account">
-      <span>{data.appAccount.email} on {data.appAccount.loginUrl}</span>
-      <form method="POST" action="?/forgetAppAccount" use:enhance>
-        <Button variant="ghost" type="submit" data-testid="app-account-forget">Forget account</Button>
-      </form>
-    </div>
-  {:else}
-    <p class="text-sm">{form?.forgotten ? 'Forgotten.' : 'None saved.'}</p>
-  {/if}
+  <div id="app-account" class="flex flex-col gap-3 text-sm">
+    {#if data.appAccount}
+      <div class="flex flex-wrap items-center gap-2" data-testid="app-account">
+        <span>{data.appAccount.email} on {data.appAccount.loginUrl}</span>
+        <form method="POST" action="?/forgetAppAccount" use:enhance>
+          <Button variant="ghost" type="submit" data-testid="app-account-forget">Forget account</Button>
+        </form>
+      </div>
+    {:else}
+      <p>{form?.forgotten ? 'Forgotten.' : 'None saved.'}</p>
+    {/if}
+
+    {#if form?.savedAccount}<Notice tone="success" class="mb-0">Test account saved.</Notice>{/if}
+    {#if form?.accountError}<Notice tone="error" class="mb-0">{form.accountError}</Notice>{/if}
+
+    <form method="POST" action="?/saveAppAccount" use:enhance class="flex flex-col gap-2" data-testid="app-account-form">
+      <Field label="Login page URL" for="app-account-url">
+        <Input id="app-account-url" name="loginUrl" type="url" required placeholder="https://app.example.com/login" value={data.appAccount?.loginUrl ?? ''} class="h-9" />
+      </Field>
+      <Field label="Test email" for="app-account-email">
+        <Input id="app-account-email" name="email" type="text" required autocomplete="off" value={data.appAccount?.email ?? ''} class="h-9" />
+      </Field>
+      <Field label="Test password" for="app-account-password">
+        <Input id="app-account-password" name="password" type="password" required={!data.appAccount} autocomplete="new-password" placeholder={data.appAccount ? 'Unchanged' : ''} class="h-9" />
+      </Field>
+      <div><Button variant="secondary" type="submit" data-testid="app-account-save">{data.appAccount ? 'Update test account' : 'Save test account'}</Button></div>
+    </form>
+  </div>
 </Panel>
 
 {#if data.uncensored.visible || inUncensored}

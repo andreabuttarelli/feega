@@ -3,6 +3,9 @@
   import { cn } from '$lib/utils.js';
   import { FOCUS_RING } from './styles';
   import { SideMode, sidePlacement, type SidePlace } from './side-popover';
+  import { dismissible } from './dismiss';
+  import { Input, lastInput } from './last-input';
+  import { onBody } from './on-body';
 
   let {
     anchor,
@@ -51,23 +54,35 @@
     onclose();
   }
 
-  function keydown(e: KeyboardEvent) {
-    if (e.key !== 'Escape') {
-      return;
-    }
-    e.stopPropagation();
-    onclose();
+  const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
+
+  function openedByKeyboard() {
+    const held = document.activeElement;
+    return lastInput() === Input.Keys && held instanceof HTMLElement && anchor.contains(held);
   }
 
-  function onBody(el: HTMLElement) {
-    document.body.append(el);
-    return () => el.remove();
+  function scopeFocus(el: HTMLElement) {
+    if (openedByKeyboard()) {
+      (el.querySelector<HTMLElement>('[data-popover-body]')?.querySelector<HTMLElement>(FOCUSABLE) ?? el).focus();
+    }
+
+    const cycle = (e: KeyboardEvent) => {
+      const all = [...el.querySelectorAll<HTMLElement>(FOCUSABLE)];
+      const edge = e.shiftKey ? all[0] : all.at(-1);
+      if (e.key !== 'Tab' || !edge || document.activeElement !== edge) {
+        return;
+      }
+      e.preventDefault();
+      (e.shiftKey ? all.at(-1) : all[0])?.focus();
+    };
+    el.addEventListener('keydown', cycle);
+    return () => el.removeEventListener('keydown', cycle);
   }
 
   const style = $derived(place?.mode === SideMode.Side ? `left:${place.left}px;top:${place.top}px;width:${place.width}px` : '');
 </script>
 
-<svelte:window onkeydowncapture={keydown} onpointerdown={outside} onresize={measure} />
+<svelte:window onpointerdown={outside} onresize={measure} />
 
 <div
   bind:this={box}
@@ -76,9 +91,12 @@
   aria-label={label}
   data-testid="side-popover"
   {@attach onBody}
+  tabindex="-1"
+  {@attach dismissible(() => onclose())}
+  {@attach scopeFocus}
   data-anchor={key}
   data-mode={place?.mode ?? SideMode.Side}
-  class={cn('fixed z-[62] flex flex-col overflow-auto border border-ui-divider bg-ui-panel shadow-ui-float', place?.mode === SideMode.Sheet ? 'inset-x-0 bottom-0 max-h-[70vh] rounded-t-lg' : 'max-h-[calc(100vh-16px)] rounded-md')}
+  class={cn('fixed z-[62] flex flex-col overflow-auto [scrollbar-width:thin] border border-ui-divider bg-ui-panel shadow-ui-float', place?.mode === SideMode.Sheet ? 'inset-x-0 bottom-0 max-h-[70vh] rounded-t-lg' : 'max-h-[calc(100vh-16px)] rounded-md')}
   {style}
 >
   <div class="flex h-(--ui-row) shrink-0 items-center gap-2 border-b border-ui-divider px-2">
@@ -86,5 +104,5 @@
     <span class="min-w-0 flex-1 truncate text-ui-label font-semibold text-ui-text" data-testid="side-popover-title">{title}</span>
     <button type="button" class={cn('inline-flex size-6 items-center justify-center rounded-sm text-ui-icon hover:bg-ui-wash hover:text-ui-text', FOCUS_RING)} data-testid="side-popover-close" aria-label="Close" onclick={onclose}>×</button>
   </div>
-  <div class="p-2">{@render children()}</div>
+  <div class="p-2" data-popover-body>{@render children()}</div>
 </div>

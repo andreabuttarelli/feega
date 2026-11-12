@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 import { fixture } from '../../../../tests/fixtures/design-tokens/read';
 import { codePlan } from './code-doc';
-import { parseSheets, readSheets } from './css-tokens';
-import { tokenSetOf, variablesOf } from './design-tokens';
+import { PAGE_SHEET, parseSheets, readSheets } from './css-tokens';
+import { readOnlyKeys, tokenSetOf, variablesOf } from './design-tokens';
 import { boardBound, designBoard, DESIGN_BOARD } from './design-board';
 import { setActiveMode, setCollection } from '$lib/motion/variables';
 
@@ -45,6 +45,20 @@ describe('designBoard', () => {
     const { doc } = await board('tailwind4');
 
     expect(clips(doc).some((c) => c.bind?.radius === 'traidue Radius/card')).toBe(true);
+  });
+
+  it('un token letto dalla pagina senza file nel repo dice che è di sola lettura', () => {
+    const made = variablesOf(tokenSetOf(parseSheets([{ path: `${PAGE_SHEET}inline 1`, text: ':root{--ink:#123456}' }])), 'app');
+    const doc = boardBound({ ...codePlan(designBoard(made.variables, 1, readOnlyKeys(made.map)), [], nid)!.plan.items[0].doc, variables: made.variables });
+
+    expect(texts(doc)).toContain('Light #123456 · read-only');
+  });
+
+  it('uno spessore di bordo ha la sua riga', () => {
+    const made = variablesOf(tokenSetOf(parseSheets([{ path: 'a.css', text: ':root{--border-width-hair:2px}' }])), 'app');
+    const doc = boardBound({ ...codePlan(designBoard(made.variables), [], nid)!.plan.items[0].doc, variables: made.variables });
+
+    expect(texts(doc)).toEqual(expect.arrayContaining(['Border', 'hair', '2px']));
   });
 
   it('un alias mostra il suo bersaglio', async () => {

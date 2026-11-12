@@ -188,6 +188,97 @@ describe('the fill stack in Properties', () => {
     expect(document.querySelectorAll('[data-colour]')).toHaveLength(1);
   });
 
+  it('Enter or Space on the swatch opens the editor once, as the browser presses it', () => {
+    show(TWO);
+    for (const key of ['Enter', ' ']) {
+      const swatch = inRow(0, 'fill-swatch');
+      swatch.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+      click(swatch);
+      expect(document.querySelectorAll('[data-testid="side-popover"]')).toHaveLength(1);
+      click(byId('side-popover-close'));
+    }
+  });
+
+  it('Enter or Space on the row itself opens the editor', () => {
+    show(TWO);
+    rows()[0].dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
+    flushSync();
+    expect(byId('side-popover')).not.toBeNull();
+  });
+
+  it('Enter in the opacity field, the eye or remove acts on that control only', () => {
+    show(TWO);
+    for (const id of ['fill-opacity', 'fill-eye', 'fill-remove']) {
+      inRow(0, id).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+      flushSync();
+      expect(document.querySelector('[data-testid="side-popover"]'), id).toBeNull();
+    }
+  });
+
+  it('the opacity on a row is named for the fill, not the layer', () => {
+    show(TWO);
+    expect(inRow(0, 'fill-opacity').getAttribute('aria-label')).toBe('Fill opacity');
+  });
+
+  describe('a gradient by keyboard', () => {
+    const RAMP = stack([{ type: 'linear-gradient', angle: 90, stops: [{ color: '#000000', pos: 0 }, { color: '#ff0000', pos: 0.5 }, { color: '#ffffff', pos: 1 }] }]);
+    const stopsSent = (onchange: ReturnType<typeof vi.fn>) => (sent(onchange)[0] as { stops: { color: string; pos: number }[] }).stops;
+    const stopEls = () => [...document.querySelectorAll<HTMLElement>('[data-testid="fill-stop"]')];
+    const key = (el: HTMLElement, k: string, shiftKey = false) => {
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: k, shiftKey, bubbles: true, cancelable: true }));
+      flushSync();
+    };
+
+    it('each stop is a slider named by its place, position and colour', () => {
+      show(RAMP);
+      click(rows()[0]);
+      const second = stopEls()[1];
+      expect(second.getAttribute('role')).toBe('slider');
+      expect(second.tabIndex).toBe(0);
+      expect(second.getAttribute('aria-valuenow')).toBe('50');
+      expect(second.getAttribute('aria-label')).toBe('Stop 2 of 3');
+      expect(second.getAttribute('aria-valuetext')).toBe('50%, FF0000');
+    });
+
+    it('arrows move a stop by one, Shift by ten, and select it', () => {
+      const onchange = show(RAMP);
+      click(rows()[0]);
+      key(stopEls()[1], 'ArrowRight');
+      expect(stopsSent(onchange)[1].pos).toBe(0.51);
+      key(stopEls()[1], 'ArrowLeft', true);
+      expect(stopsSent(onchange)[1].pos).toBe(0.4);
+      expect(byId('fill-editor').querySelector('[data-colour]')!.getAttribute('data-colour')).toBe('Stop 2 colour');
+    });
+
+    it('Delete removes the focused stop, never below two', () => {
+      const onchange = show(RAMP);
+      click(rows()[0]);
+      key(stopEls()[1], 'Delete');
+      expect(stopsSent(onchange).map((s) => s.color)).toEqual(['#000000', '#ffffff']);
+      onchange.mockClear();
+      app && unmount(app);
+      show(stack([{ type: 'linear-gradient', stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }] }]));
+      click(rows()[0]);
+      key(stopEls()[0], 'Backspace');
+      expect(onchange).not.toHaveBeenCalled();
+    });
+
+    it('Add stop puts one in the middle of the widest gap and selects it', () => {
+      const onchange = show(stack([{ type: 'linear-gradient', stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 0.2 }, { color: '#ff0000', pos: 1 }] }]));
+      click(rows()[0]);
+      click(byId('fill-add-stop'));
+      expect(stopsSent(onchange)).toHaveLength(4);
+      expect(stopsSent(onchange)[3].pos).toBe(0.6);
+    });
+
+    it('every field of the editor has its own name', () => {
+      show(RAMP);
+      click(rows()[0]);
+      expect(byId('fill-angle').getAttribute('aria-label')).toBe('Gradient angle');
+      expect(byId('fill-angle').closest('label')).toBeNull();
+    });
+  });
+
   it('a gradient shows its stops on a bar, each stop with its alpha, and its angle', () => {
     const onchange = show(stack([{ type: 'linear-gradient', angle: 45, stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }] }]));
     click(rows()[0]);
@@ -281,5 +372,48 @@ describe('the fill stack in Properties', () => {
     click(inRow(0, 'fill-swatch'));
     change(byId('fill-editor').querySelector<HTMLInputElement>('[data-testid="colour-channel"]')!, 'rgba(255, 0, 0, 0.5)');
     expect(sent(onchange)[0]).toMatchObject({ type: 'solid', color: '#ff000080' });
+  });
+
+  describe('a fill that comes from a colour variable', () => {
+    const NAME = 'Stripe/Text muted';
+    const MUTED = stack([{ type: 'solid', color: '#50617a' }]);
+
+    function showBound() {
+      const onchange = vi.fn();
+      const ondetach = vi.fn();
+      const onpick = vi.fn();
+      const bound = { name: NAME, options: [{ key: 'Stripe/Text', value: '#0a2540' }], ondetach, onpick };
+      app = mount(FillStack, { target: document.body, props: { fills: MUTED, assets: ASSETS, tokens: FEEGA_TOKENS, onchange, bound } });
+      flushSync();
+      return { onchange, ondetach, onpick };
+    }
+
+    it('is the same row as a solid fill, with the variable name where the hex would be', () => {
+      showBound();
+      expect(rows()).toHaveLength(1);
+      expect(inRow(0, 'fill-label').textContent).toBe(NAME);
+      expect(inRow(0, 'fill-label').title).toBe(NAME);
+      expect(inRow(0, 'fill-meta').textContent).toContain('50617A');
+      expect([...rows()[0].querySelectorAll('[data-testid]')].map((e) => (e as HTMLElement).dataset.testid)).toEqual(['fill-swatch', 'fill-label', 'fill-meta', 'fill-bound', 'fill-eye', 'fill-detach']);
+      expect(document.querySelector('[data-testid="bind-chip-color"]')).toBeNull();
+    });
+
+    it('detaches from the row instead of removing the fill', () => {
+      const { onchange, ondetach } = showBound();
+      expect(rows()[0].querySelector('[data-testid="fill-remove"]')).toBeNull();
+      click(inRow(0, 'fill-detach'));
+      expect(ondetach).toHaveBeenCalledOnce();
+      expect(onchange).not.toHaveBeenCalled();
+    });
+
+    it('opens the variable picker from the swatch, with a detach and the other variables', () => {
+      const { ondetach, onpick } = showBound();
+      click(inRow(0, 'fill-swatch'));
+      click(byId('fill-bound-option-Stripe/Text'));
+      expect(onpick).toHaveBeenCalledWith('Stripe/Text');
+      click(inRow(0, 'fill-swatch'));
+      click(byId('fill-bound-detach'));
+      expect(ondetach).toHaveBeenCalledOnce();
+    });
   });
 });

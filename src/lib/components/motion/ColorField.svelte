@@ -5,6 +5,8 @@
   import { parseColour } from '$lib/motion/colour-field';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import { sidePlacement, SideMode, type SidePlace } from '$lib/components/ui/shell/side-popover';
+  import { dismissible } from '$lib/components/ui/shell/dismiss';
+  import { onBody } from '$lib/components/ui/shell/on-body';
   import { isBrandToken } from '$lib/motion/selection-colours';
   import ColorPicker from './ColorPicker.svelte';
 
@@ -99,12 +101,9 @@
     }
   }
 
-  function closeOnEscape(e: KeyboardEvent) {
-    if (e.key === 'Escape' && open) {
-      e.stopPropagation();
-      gesture?.cancel();
-      open = false;
-    }
+  function cancel() {
+    gesture?.cancel();
+    open = false;
   }
 
   const style = $derived(place?.mode === SideMode.Side ? `left:${place.left}px;top:${place.top}px;width:${place.width}px` : '');
@@ -112,7 +111,7 @@
 
 <svelte:window onpointerdown={closeOutside} onresize={measure} />
 
-<div class="colour" data-display={display} bind:this={root} data-colour={name} role="group" aria-label={name} onkeydown={closeOnEscape}>
+<div class="colour" data-display={display} bind:this={root} data-colour={name} role="group" aria-label={name}>
   {#if display === ColourDisplay.Row}
     <button type="button" class="row" aria-label={`Edit ${name}`} aria-expanded={open} onclick={() => (open = !open)}>
       <span class="swatch" style={`--c: ${shown};`}></span>
@@ -124,12 +123,12 @@
       {/if}
     </button>
   {:else}
-  <button type="button" class="chip" style={`--c: ${shown};`} aria-label={`Pick ${name}`} aria-expanded={open} onclick={() => (open = !open)}></button>
+  <button type="button" class="chip hit" style={`--c: ${shown};`} aria-label={`Pick ${name}`} aria-expanded={open} onclick={() => (open = !open)}></button>
   {/if}
   {#if display === ColourDisplay.Field}<input {id} class="hex" type="text" spellcheck="false" aria-label={name} value={colourLabel(raw)} onchange={(e) => typed(e.currentTarget)} onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />{/if}
   {#if onalpha && display === ColourDisplay.Field}<input class="alpha" type="text" inputmode="decimal" aria-label={`${name} opacity`} value={`${Math.round((alpha ?? 1) * PERCENT)}%`} onchange={(e) => setAlpha(e.currentTarget.value)} />{/if}
   {#if open}
-    <div bind:this={pop} bind:offsetHeight={height} class="pop" data-mode={place?.mode ?? SideMode.Side} role="dialog" aria-label={`${name} colours`} data-testid="colour-popover" {style}>
+    <div bind:this={pop} bind:offsetHeight={height} {@attach onBody} {@attach dismissible(cancel)} class="pop" data-mode={place?.mode ?? SideMode.Side} role="dialog" aria-label={`${name} colours`} data-testid="colour-popover" {style}>
       <ColorPicker {name} value={raw} {tokens} alpha={hasAlpha ? (alpha ?? 1) : null} {swatches} {gesture} onchange={pick} />
     </div>
   {/if}
@@ -159,8 +158,7 @@
   }
 
   .colour[data-display='chip'] .chip {
-    width: 24px;
-    height: 24px;
+    --glyph: 24px;
   }
 
   .colour[data-display='row'] {
@@ -237,12 +235,11 @@
 
   .chip {
     flex-shrink: 0;
-    width: 16px;
-    height: 16px;
-    padding: 0;
-    border: 1px solid var(--ui-line-strong);
+    --glyph: 16px;
+    --glyph-radius: var(--ui-radius-sm);
+    --glyph-fill: var(--c);
+    --glyph-edge: inset 0 0 0 1px var(--ui-line-strong);
     border-radius: var(--ui-radius-sm);
-    background: var(--c);
     cursor: pointer;
   }
 
@@ -282,6 +279,7 @@
     box-sizing: border-box;
     max-height: calc(100vh - 16px);
     overflow: auto;
+    scrollbar-width: thin;
     padding: 8px;
     border-radius: var(--ui-radius-lg);
     background: var(--ui-panel-raised);
@@ -300,8 +298,7 @@
     }
 
     .chip {
-      width: 28px;
-      height: 28px;
+      --glyph: 28px;
     }
   }
 </style>

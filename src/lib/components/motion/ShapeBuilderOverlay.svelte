@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { keyOnCanvas } from '$lib/canvas/key-region.svelte';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { hostFraction } from '$lib/motion/overlay-point';
   import { pathData, polyline, type Pt } from '@feega/motion-core/motion/shape/geometry';
@@ -63,7 +64,7 @@
   }
 
   function key(e: KeyboardEvent) {
-    if (e.key !== 'Enter' && e.key !== 'Escape') {
+    if ((e.key !== 'Enter' && e.key !== 'Escape') || !keyOnCanvas(e)) {
       return;
     }
     e.preventDefault();

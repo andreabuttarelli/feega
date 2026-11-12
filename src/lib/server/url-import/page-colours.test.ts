@@ -38,4 +38,12 @@ describe('an imported page holds one colour where the page used several it canno
 
     expect(coloursIn(merged)).toEqual(['#ffffff', '#ffffff80']);
   });
+
+  it('counts only what the desktop page draws, so a layer only a breakpoint shows does not pick the colour (stripe.com: view copies outvoted the desktop navy)', () => {
+    const doc = docWith(['#fdfeff', '#fdfeff', '#ffffff', '#ffffff', '#ffffff'], '#fdfeff');
+    const phoneOnly = (c: MotionClip): MotionClip => (c.id === 's3' || c.id === 's4' ? { ...c, hidden: true, overrides: { phone: { hidden: false } } } : c);
+    const merged = coloursMerged({ ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map(phoneOnly) })) as MotionDoc['tracks'] });
+
+    expect(coloursIn(merged)).toEqual(['#fdfeff']);
+  });
 });

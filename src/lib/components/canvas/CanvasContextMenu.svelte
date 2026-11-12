@@ -4,6 +4,7 @@
   import { SELECTION_ACTION_ICON } from '$lib/canvas/selection-action-icons';
   import FloatingMenu from './FloatingMenu.svelte';
   import { Kbd, MENU_ITEM } from '$lib/components/ui/shell';
+  import { openLayer } from '$lib/components/ui/shell/dismiss';
 
   const MENU = '[data-testid="canvas-menu"]';
 
@@ -40,6 +41,8 @@
     onclose();
   }
 
+  $effect(() => openLayer(() => onclose()));
+
   function outside(e: PointerEvent) {
     if (!(e.target as HTMLElement).closest(MENU)) {
       onclose();
@@ -47,7 +50,7 @@
   }
 </script>
 
-<svelte:window onpointerdown={outside} onkeydown={(e) => e.key === 'Escape' && onclose()} />
+<svelte:window onpointerdown={outside} />
 
 {#if items.length || pickable.length}
   <FloatingMenu {at}>

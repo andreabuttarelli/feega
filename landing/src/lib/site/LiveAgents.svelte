@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ACTIONS_BY_TARGET, AGENTS, BUILD_SELECTOR, BuildMode, PEER_COLOURS, claimTweak, ruleFor, createLedger, mayTweak, releaseTweak, curve, initials, outermost, pick, type ActionKind, type Point, type TargetKind } from './live-agents';
+  import { ACTIONS_BY_TARGET, AGENTS, lockHeight, BUILD_SELECTOR, BuildMode, PEER_COLOURS, claimTweak, ruleFor, createLedger, mayTweak, releaseTweak, curve, initials, outermost, pick, type ActionKind, type Point, type TargetKind } from './live-agents';
 
   type Box = { x: number; y: number; w: number; h: number };
   type Menu = { items: string[]; active: number };
@@ -61,7 +61,7 @@
 
   function nearViewport(el: HTMLElement): boolean {
     const r = el.getBoundingClientRect();
-    return r.width > 0 && r.bottom > -NEAR_VIEWPORT_PX && r.top < innerHeight + NEAR_VIEWPORT_PX;
+    return r.width > 0 && r.bottom > -NEAR_VIEWPORT_PX && r.top < innerHeight + NEAR_VIEWPORT_PX && el.checkVisibility?.({ visibilityProperty: true }) !== false;
   }
 
   function underReader(el: HTMLElement): boolean {
@@ -145,11 +145,6 @@
     el.querySelectorAll<HTMLElement>('*').forEach((d) => (d.dataset.built = ''));
   }
 
-  function lockSize(el: HTMLElement) {
-    const r = el.getBoundingClientRect();
-    el.style.height = `${r.height}px`;
-  }
-
   function place(agent: Agent, el: HTMLElement): Step[] {
     const draw: Step = {
       ms: between(350, 650),
@@ -203,7 +198,7 @@
       ms: between(250, 350),
       start() {
         agent.view.menu = { items: FONTS, active: i };
-        lockSize(el);
+        lockHeight(el);
         el.style.fontFamily = i === current ? '' : `'${FONTS[i]}', serif`;
       }
     });
@@ -268,7 +263,7 @@
     const to = between(-0.08, 0.06);
     const drag = (from: number, end: number): Step => ({
       ms: between(350, 550),
-      start: () => lockSize(el),
+      start: () => lockHeight(el),
       tick(t) {
         const k = from + (end - from) * t;
         el.style.letterSpacing = `calc(${base === 'normal' ? '0px' : base} + ${k * to}em)`;

@@ -5,7 +5,6 @@ import { frameStore } from '$lib/server/motion/move-element';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { localModeRefusal } from '$lib/server/local/local-mode';
 import { githubFor } from './github-runtime';
-import type { GithubCall } from './github';
 import { repoOf } from './repo';
 import { rebased, tokenCall } from './repo-sync';
 import { baselined } from '$lib/canvas/code-look';
@@ -15,7 +14,7 @@ import { pulledTokens } from './token-pull';
 import type { TokenMap } from './design-tokens';
 import { CodeImportOutcome } from './import-code';
 import { importCodeInto, rememberOrigin, type CodeImportAsk, type CodeScope } from './canvas-import';
-import { githubSource, SourceKind, type CodeSource } from './code-source';
+import { githubSource, SourceKind, type CodeSource, type GithubCalls } from './code-source';
 import { folderOf, folderSource } from './folder-source';
 import { uploadedArchive, uploadOf, uploadSource } from './upload-source';
 import { conditionsOf } from './render-conditions';
@@ -55,9 +54,9 @@ type Linked = { origin: CodeOriginData; source: CodeSource; link: (rev: string) 
 const BRANCH_PREFIX = 'feega/';
 const TITLE = 'UI edits from feega';
 
-async function githubCall(scope: CodeScope): Promise<GithubCall | null> {
-  const linked = await githubFor(scope.db, scope).call().catch(() => null);
-  return linked ?? (env.GITHUB_TOKEN ? tokenCall(env.GITHUB_TOKEN) : null);
+async function githubCalls(scope: CodeScope): Promise<GithubCalls> {
+  const own = await githubFor(scope.db, scope).call().catch(() => null);
+  return { read: own ?? (env.GITHUB_TOKEN ? tokenCall(env.GITHUB_TOKEN) : null), write: own };
 }
 
 type SourceOf = (scope: CodeScope, origin: CodeOriginData) => Promise<Linked | null>;
@@ -65,7 +64,7 @@ type SourceOf = (scope: CodeScope, origin: CodeOriginData) => Promise<Linked | n
 const SOURCES: Record<SourceKind, SourceOf> = {
   [SourceKind.Github]: async (scope, origin) => {
     const ref = repoOf(`https://github.com/${origin.repo}`);
-    return ref ? { origin, source: githubSource(ref, await githubCall(scope)), link: (rev) => ({ repo: `https://github.com/${origin.repo}/tree/${rev}` }) } : null;
+    return ref ? { origin, source: githubSource(ref, await githubCalls(scope)), link: (rev) => ({ repo: `https://github.com/${origin.repo}/tree/${rev}` }) } : null;
   },
   [SourceKind.Folder]: async (_scope, origin) => {
     const root = localModeRefusal(env) === null ? folderOf(origin.repo) : null;
@@ -161,7 +160,7 @@ export async function codePull(scope: CodeScope, nodeId: string, branch?: string
     return { outcome: SyncOutcome.UpToDate, sha: rev, carried: 0, conflicts: [], skipped: [], tokens: [] };
   }
 
-  const fresh = await importCodeInto(scope, local.canvasId, { ...linked.link(rev), routes: linked.origin.routes, conditions: conditionsOf(linked.origin.conditions), at: local.at ?? { x: 0, y: 0 } });
+  const fresh = await importCodeInto(scope, local.canvasId, { ...linked.link(rev), app: linked.origin.app, routes: linked.origin.routes, conditions: conditionsOf(linked.origin.conditions), delay: linked.origin.delay, at: local.at ?? { x: 0, y: 0 } });
   if (fresh.outcome !== CodeImportOutcome.Ok) {
     return { outcome: SyncOutcome.Unreachable, error: fresh.error ?? fresh.outcome };
   }

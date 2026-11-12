@@ -4,20 +4,21 @@ export type CacheScope = { userId: string; orgId: string };
 export type Kept = { key: string; canvasId: string; nodeId: string; bytes: number; at: number };
 export type CacheLimits = { entries: number; bytes: number };
 
-export type CacheShelf = {
-  read: (key: string) => Promise<FrameDoc | null>;
-  write: (kept: Kept, source?: FrameDoc) => Promise<void>;
+export type CacheShelf<V = FrameDoc> = {
+  read: (key: string) => Promise<V | null>;
+  write: (kept: Kept, value?: V) => Promise<void>;
   listed: () => Promise<Kept[]>;
   drop: (keys: string[]) => Promise<void>;
 };
 
-export type FrameCache = {
-  take: (key: string) => Promise<FrameDoc | null>;
-  keep: (key: string, source: FrameDoc) => Promise<void>;
+export type FrameCache<V = FrameDoc> = {
+  take: (key: string) => Promise<V | null>;
+  keep: (key: string, value: V) => Promise<void>;
   forgetCanvas: (canvasId: string) => Promise<void>;
 };
 
 export const CACHE_LIMITS: CacheLimits = { entries: 800, bytes: 96 * 1024 * 1024 };
+export const THUMB_LIMITS: CacheLimits = { entries: 1500, bytes: 128 * 1024 * 1024 };
 
 const SOURCES_DB = 'feega-frame-cache';
 export const THUMBS_DB = 'feega-frame-thumbs';
@@ -29,7 +30,7 @@ export const keptKey = (k: { canvasId: string; nodeId: string; revision: number 
 
 function partsOf(key: string): { canvasId: string; nodeId: string } {
   const [canvasId, rest = ''] = key.split('/');
-  return { canvasId, nodeId: rest.slice(0, rest.indexOf('@')) };
+  return { canvasId, nodeId: rest.split(/[@:]/)[0] };
 }
 
 function overLimits(kept: Kept[], key: string, limits: CacheLimits): string[] {
@@ -44,7 +45,9 @@ function overLimits(kept: Kept[], key: string, limits: CacheLimits): string[] {
   return [...replaced, ...evicted.map((k) => k.key)];
 }
 
-export function frameCache(shelf: CacheShelf, limits: CacheLimits = CACHE_LIMITS, now: () => number = Date.now): FrameCache {
+const jsonSize = (value: unknown) => JSON.stringify(value).length;
+
+export function frameCache<V = FrameDoc>(shelf: CacheShelf<V>, limits: CacheLimits = CACHE_LIMITS, now: () => number = Date.now, sizeOf: (value: V) => number = jsonSize): FrameCache<V> {
   const metaOf = (key: string, bytes: number): Kept => ({ key, ...partsOf(key), bytes, at: now() });
   const sizes = new Map<string, number>();
 
@@ -52,16 +55,16 @@ export function frameCache(shelf: CacheShelf, limits: CacheLimits = CACHE_LIMITS
     take: async (key) => {
       const source = await shelf.read(key).catch(() => null);
       if (source) {
-        const bytes = sizes.get(key) ?? JSON.stringify(source).length;
+        const bytes = sizes.get(key) ?? sizeOf(source);
         sizes.set(key, bytes);
         await shelf.write(metaOf(key, bytes)).catch(() => undefined);
       }
       return source;
     },
-    keep: async (key, source) => {
-      const bytes = JSON.stringify(source).length;
+    keep: async (key, value) => {
+      const bytes = sizeOf(value);
       sizes.set(key, bytes);
-      await shelf.write(metaOf(key, bytes), source);
+      await shelf.write(metaOf(key, bytes), value);
       const dropped = overLimits(await shelf.listed(), key, limits);
       if (dropped.length) {
         await shelf.drop(dropped);
@@ -76,15 +79,15 @@ export function frameCache(shelf: CacheShelf, limits: CacheLimits = CACHE_LIMITS
   };
 }
 
-export function memoryShelf(): CacheShelf {
-  const sources = new Map<string, FrameDoc>();
+export function memoryShelf<V = FrameDoc>(): CacheShelf<V> {
+  const sources = new Map<string, V>();
   const metas = new Map<string, Kept>();
   return {
     read: async (key) => sources.get(key) ?? null,
-    write: async (kept, source) => {
+    write: async (kept, value) => {
       metas.set(kept.key, kept);
-      if (source) {
-        sources.set(kept.key, source);
+      if (value) {
+        sources.set(kept.key, value);
       }
     },
     listed: async () => [...metas.values()],
@@ -99,12 +102,15 @@ const request = <T>(r: IDBRequest<T>) => new Promise<T>((resolve, reject) => Obj
 
 const finished = (tx: IDBTransaction) => new Promise<void>((resolve, reject) => Object.assign(tx, { oncomplete: () => resolve(), onerror: () => reject(tx.error), onabort: () => reject(tx.error) }));
 
-export function idbShelf(name: string, factory: IDBFactory = indexedDB): CacheShelf {
+const SHELF_VERSION = 2;
+
+export function idbShelf<V = FrameDoc>(name: string, factory: IDBFactory = indexedDB): CacheShelf<V> {
   const opening = new Promise<IDBDatabase>((resolve, reject) => {
-    const open = factory.open(name, 1);
+    const open = factory.open(name, SHELF_VERSION);
     open.onupgradeneeded = () => {
-      open.result.createObjectStore(SOURCES);
-      open.result.createObjectStore(KEPT);
+      const db = open.result;
+      [...db.objectStoreNames].filter((s) => s !== SOURCES && s !== KEPT).forEach((s) => db.deleteObjectStore(s));
+      [SOURCES, KEPT].filter((s) => !db.objectStoreNames.contains(s)).forEach((s) => db.createObjectStore(s));
     };
     open.onsuccess = () => {
       open.result.onversionchange = () => open.result.close();
@@ -115,12 +121,12 @@ export function idbShelf(name: string, factory: IDBFactory = indexedDB): CacheSh
   const tx = async (mode: IDBTransactionMode) => (await opening).transaction([SOURCES, KEPT], mode);
 
   return {
-    read: async (key) => ((await request((await tx('readonly')).objectStore(SOURCES).get(key))) as FrameDoc | undefined) ?? null,
-    write: async (kept, source) => {
+    read: async (key) => ((await request((await tx('readonly')).objectStore(SOURCES).get(key))) as V | undefined) ?? null,
+    write: async (kept, value) => {
       const t = await tx('readwrite');
       t.objectStore(KEPT).put(kept, kept.key);
-      if (source) {
-        t.objectStore(SOURCES).put(source, kept.key);
+      if (value) {
+        t.objectStore(SOURCES).put(value, kept.key);
       }
       await finished(t);
     },

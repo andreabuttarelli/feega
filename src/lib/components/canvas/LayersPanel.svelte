@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Region } from '$lib/canvas/key-region.svelte';
   import { localStore } from '$lib/browser-storage';
   import Eye from '@lucide/svelte/icons/eye';
   import EyeOff from '@lucide/svelte/icons/eye-off';
@@ -363,7 +364,7 @@
 {/if}
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-<div class="layers" class:touch={density === Density.Touch} bind:this={list} role="tree" aria-label="Layers" aria-multiselectable="true" tabindex="0" data-testid="layers" data-key-region="editor" style:padding-top={`${span.start * rowStep}px`} style:padding-bottom={`${(shown.length - span.end) * rowStep}px`} onkeydown={onKey}>
+<div class="layers" class:touch={density === Density.Touch} bind:this={list} role="tree" aria-label="Layers" aria-multiselectable="true" tabindex="0" data-testid="layers" data-key-region={Region.Layers} style:padding-top={`${span.start * rowStep}px`} style:padding-bottom={`${(shown.length - span.end) * rowStep}px`} onkeydown={onKey}>
   {#each visible as row (`${row.nodeId}/${row.key}`)}
     {@const RowIcon = row.instance ? Diamond : (KIND_ICON[row.kind] ?? ROW_ICON[row.type] ?? Square)}
     <div
@@ -407,6 +408,9 @@
         <input class="name-input" value={row.label} {@attach takeFocus} aria-label="Layer name" data-testid="layer-rename" onblur={(e) => rename(row, e.currentTarget.value)} onkeydown={(e) => (e.stopPropagation(), e.key === 'Escape' ? ((e.currentTarget.value = row.label), e.currentTarget.blur()) : e.key === 'Enter' && e.currentTarget.blur())} onclick={(e) => e.stopPropagation()} />
       {:else}
         <span class="name">{row.label}</span>
+      {/if}
+      {#if row.only}
+        <span class="only" title={`Shown only on ${row.only}`} data-testid="layer-only">{row.only}</span>
       {/if}
       {#if density === Density.Touch && editable(row) && isPicked(row)}
         <IconButton size={IconSize.Sm} label="Bring forward" onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Up, SUMMARY[LayerAction.Up]))}><ChevronUp /></IconButton>
@@ -603,6 +607,15 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .only {
+    flex: none;
+    padding: 0 4px;
+    border-radius: var(--ui-radius-xs);
+    background: var(--ui-hover);
+    color: var(--ui-text-tertiary);
+    font-size: var(--ui-type-caption);
   }
 
   .name-input {

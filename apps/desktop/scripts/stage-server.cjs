@@ -1,6 +1,7 @@
 const { spawnSync } = require('node:child_process');
 const { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } = require('node:fs');
 const { join, resolve } = require('node:path');
+const { prune } = require('./prune.cjs');
 
 const REPO = resolve(__dirname, '..', '..', '..');
 const OUT = resolve(__dirname, '..', 'server');
@@ -15,7 +16,7 @@ function run(cmd, args, options) {
   }
 }
 
-function stage() {
+async function stage() {
   const arch = flag('arch') ?? process.arch;
 
   if (!process.argv.includes('--skip-build')) {
@@ -32,6 +33,8 @@ function stage() {
   writeFileSync(join(OUT, 'package.json'), JSON.stringify({ name, version, type, private: true, dependencies }, null, 2));
 
   run('npm', ['install', '--omit=dev', '--no-audit', '--no-fund', `--cpu=${arch}`, '--os=darwin'], { cwd: OUT, env: { ...process.env, npm_config_arch: arch } });
+
+  await prune(OUT);
 }
 
 stage();

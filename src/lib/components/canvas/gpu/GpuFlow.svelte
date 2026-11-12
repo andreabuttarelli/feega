@@ -153,6 +153,7 @@
   import { liveDocs, type LiveDoc } from '$lib/canvas/core/live-docs.svelte';
   import type { FrameDoc } from '$lib/canvas/core/frame-build';
   import { missingAssets } from '$lib/canvas/live-assets';
+  import { pointerMoves } from '$lib/canvas/core/pointer-moved';
   import { statePreview } from '$lib/canvas/state-preview.svelte';
   import { previewDoc } from '$lib/motion/states/preview';
   import { ComponentRole, roleOf } from '$lib/motion/main-component';
@@ -196,7 +197,7 @@
   import { loadViewport, rememberViewport } from '$lib/canvas/viewport-memory';
   import { FocusMode, Placement, centreIn, focusPlacement, focusSelects, inView, revealIn, frameIn, type Insets } from '$lib/canvas/free-area';
   import { ZoomStep, watchPinch, type CanvasZoom } from '$lib/canvas/page-zoom';
-  import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
+  import { Region, claimFocus, reachesCanvas, regionOf, releaseFocus } from '$lib/canvas/key-region.svelte';
   import { shortcutHelp } from '$lib/canvas/shortcut-help.svelte';
   import { CANVAS_COMMAND_OF, CANVAS_TILE_ATTR, climbsUp, matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
   import type { Command } from '$lib/motion/shortcuts';
@@ -267,6 +268,7 @@
   import { scaledTo, selectionBox, turnedAbout, withField } from '$lib/canvas/selection-box';
   import { backToFront } from '$lib/canvas/paint-order';
   import { GPU_FALLBACK_EVENT } from '$lib/canvas/gpu/gpu-loss';
+  import { perfFit, perfNodes } from '$lib/canvas/perf/perf-beacon';
 
   let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[], seconds?: number) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; canvasId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onExportElementRows?: (frameId: string, elementIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void; onFrameDraft?: (id: string, nodeId: string, draft: FrameDraft | null) => void } = $props();
 
@@ -281,6 +283,7 @@
   const INTERACTIVE = 'input, textarea, select, button, a, [contenteditable="true"], .nodrag, video, audio, iframe';
 
   const tiles = $derived(props.tiles ?? []);
+  $effect(() => perfNodes(tiles.length));
   const mode = $derived(props.mode ?? CanvasMode.Edit);
   const spec = $derived(CANVAS_MODES[mode]);
   const editable = $derived(spec.flow.nodesDraggable && editorMode.spec.access === DocAccess.Write);
@@ -959,6 +962,7 @@
     const s = screenSize();
     const target = fitView(b, { width: s.width, height: s.height }, purpose);
     if (target) {
+      perfFit();
       animateTo(target);
     }
   }
@@ -1462,12 +1466,19 @@
   const liveOf = (id: string) => liveDocs.map.get(id) ?? fetched.get(id)?.live ?? null;
   const revisionOfFrame = (id: string) => coreFrames.find((f) => f.id === id)?.revision ?? 0;
   const viewDocs = new Map<string, LiveDoc['doc']>();
+  let viewSources = $state(untrack(() => liveDocs.map));
+  let viewTurn = 0;
+  $effect(() => {
+    const next = liveDocs.map;
+    const turn = ++viewTurn;
+    whenIdle(() => turn === viewTurn && (viewSources = next));
+  });
   const viewDocOf = (id: string) => {
     const held = viewDocs.get(id);
     if (held && reuseOf(id) === Reuse.Held) {
       return held;
     }
-    const doc = liveOf(id)?.doc;
+    const doc = (viewSources.get(id) ?? fetched.get(id)?.live)?.doc;
     if (doc) {
       viewDocs.set(id, doc);
     }
@@ -3111,6 +3122,23 @@
     return { source: node, sourceHandle: port?.side === PortSide.Out ? port.handle : null, target: from.nodeId, targetHandle: from.handle };
   }
 
+  const pointerMoved = pointerMoves();
+  let hoverTurn = 0;
+
+  function hoverAt(w: Point, reach: Reach) {
+    hoverElement(w, reach);
+    hoverHandle(w);
+  }
+
+  function hoverWhenFree(p: Point, w: Point, reach: Reach) {
+    const turn = ++hoverTurn;
+    if (pointerMoved(p)) {
+      hoverAt(w, reach);
+      return;
+    }
+    whenIdle(() => turn === hoverTurn && hoverAt(w, reach));
+  }
+
   function onMove(e: PointerEvent) {
     if (active || e.buttons) {
       markBusy();
@@ -3132,8 +3160,7 @@
       hovered = e.pointerType === 'mouse' ? topNodeAt(w) : null;
       hoverChrome = e.pointerType === 'mouse' ? (hovered ?? portAt(ports, w, view.zoom)?.nodeId ?? null) : null;
       if (e.pointerType === 'mouse' && !e.buttons) {
-        hoverElement(w, reachOf(e));
-        hoverHandle(w);
+        hoverWhenFree(p, w, reachOf(e));
       }
       hoverPort = e.pointerType === 'mouse' && connectable ? portAt(ports, w, view.zoom) : null;
       bubbleTint = hoverPort ? bubbleColour(hoverPort) : bubbleTint;
@@ -3711,11 +3738,7 @@
   };
 
   const pageZoom: CanvasZoom = {
-    step: (step) => {
-      if (keyRegion.current === Region.Canvas) {
-        ZOOM_RUN[step]();
-      }
-    },
+    step: (step) => ZOOM_RUN[step](),
     scaleBy: (factor) => zoomStep(factor)
   };
 
@@ -3879,7 +3902,7 @@
   }
 
   function onKeydown(e: KeyboardEvent) {
-    if (frameDialog) {
+    if (frameDialog || !reachesCanvas(regionOf(e.target), matchCanvasShortcut(e, frameMode))) {
       return;
     }
     if (!isTypingTarget(e.target) && typeAhead.take(e, performance.now())) {
@@ -3926,7 +3949,7 @@
       startCrop(inside!.nodeId, inside!.level.clip!);
       return;
     }
-    if (!spec.chrome || keyRegion.current !== Region.Canvas) {
+    if (!spec.chrome) {
       return;
     }
     const frameAction = picksOwnKeys(inside, picks) && !typing ? frameKeyAction(e) : null;
@@ -3948,8 +3971,8 @@
   const NATIVE_CLIPBOARD = new Set(['copy', 'paste']);
   let pointer: Point | null = null;
 
-  function clipboardTarget(e: ClipboardEvent): boolean {
-    return Boolean(spec.chrome && !frameDialog && !typing && keyRegion.current === Region.Canvas && e.clipboardData && !isTypingTarget(e.target));
+  function clipboardTarget(e: ClipboardEvent, id: 'copy' | 'paste'): boolean {
+    return Boolean(spec.chrome && !frameDialog && !typing && reachesCanvas(regionOf(e.target), { id }) && e.clipboardData && !isTypingTarget(e.target));
   }
 
   const framePicks = (): string[] => (inside && picks.length && frameChrome(kindOfNode(inside.nodeId)).root !== Root.Own ? picks : []);
@@ -3972,7 +3995,7 @@
   }
 
   function onCopy(e: ClipboardEvent, cut: boolean) {
-    const payload = clipboardTarget(e) ? clipOfSelection() : null;
+    const payload = clipboardTarget(e, 'copy') ? clipOfSelection() : null;
     if (!payload) {
       return;
     }
@@ -4107,7 +4130,7 @@
   }
 
   async function onPasteEvent(e: ClipboardEvent) {
-    if (!clipboardTarget(e)) {
+    if (!clipboardTarget(e, 'paste')) {
       return;
     }
     e.preventDefault();
@@ -4356,7 +4379,7 @@
   const domTiles = $derived(placed.filter((t) => domIds.has(t.id)));
 </script>
 
-<svelte:window onkeydown={onKeydown} onblur={() => (altHeld = false)} onkeyup={(e) => {
+<svelte:window onkeydown={onKeydown} onpointerdowncapture={claimFocus} onclickcapture={releaseFocus} onblur={() => (altHeld = false)} onkeyup={(e) => {
   altHeld = e.altKey;
   if (e.key === ' ') {
     space = false;
@@ -4367,7 +4390,7 @@
 <div class="wrap svelte-flow" class:commenting={props.commenting} onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondragleave={onDragLeave} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={CORE} data-mode-chrome={editorMode.spec.chrome} data-timeline={timeline?.access ?? TimelineAccess.Hidden} data-revealed={revealed} data-view={`${view.x},${view.y},${view.zoom}`}>
   {#if timeline}
     {@const nodeId = timeline.nodeId}
-    <div style="display: contents" role="presentation" onpointerdown={(e) => e.stopPropagation()} onwheel={(e) => e.stopPropagation()}>
+    <div style="display: contents" role="presentation" data-key-region={Region.Layers} onpointerdown={(e) => e.stopPropagation()} onwheel={(e) => e.stopPropagation()}>
       <FrameTimeline
         doc={timeline.doc}
         frame={timeline.frame}
@@ -4390,6 +4413,7 @@
   {/if}
   <div
     class="surface svelte-flow__pane"
+    data-key-region={Region.Canvas}
     bind:this={surface}
     onpointerdown={onDown}
     onpointermove={onMove}
@@ -4410,7 +4434,7 @@
   >
     {#if !failed}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId, userId: (page.data as { session?: { user?: { id: string } } | null }).session?.user?.id, look: (page.data as { look?: string }).look }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} onbackend={(change) => track(GPU_FALLBACK_EVENT, change)} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} listenLive={(listener) => liveDocs.listen(listener)} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId, userId: (page.data as { session?: { user?: { id: string } } | null }).session?.user?.id, look: (page.data as { look?: string }).look }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} onbackend={(change) => track(GPU_FALLBACK_EVENT, change)} />
       </svelte:boundary>
     {/if}
     <div class="hover-rings" data-testid="node-hover-rings">

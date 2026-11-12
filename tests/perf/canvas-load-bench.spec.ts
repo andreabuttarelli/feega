@@ -228,7 +228,7 @@ async function runOnce(browser: Browser, build: Build, cache: Cache, profiled: b
 }
 
 const WATERFALL_MS_PER_CHAR = 200;
-const LETTER: Record<Step, string> = { [Step.Asked]: 'a', [Step.Source]: 's', [Step.Built]: 'b', [Step.Vectors]: 'v', [Step.Whole]: 'w', [Step.Put]: 'p', [Step.Patched]: 'x', [Step.Pictured]: 'P', [Step.Drawn]: 'd', [Step.MainAsked]: 'm', [Step.MainBuild]: 'M', [Step.MainBuilt]: 'B', [Step.Thumb]: 't', [Step.Images]: 'i', [Step.AllVectors]: 'V', [Step.Sharp]: 'S' };
+const LETTER: Record<Step, string> = { [Step.Asked]: 'a', [Step.Source]: 's', [Step.Built]: 'b', [Step.Vectors]: 'v', [Step.Whole]: 'w', [Step.Put]: 'p', [Step.Patched]: 'x', [Step.Pictured]: 'P', [Step.Drawn]: 'd', [Step.MainAsked]: 'm', [Step.MainBuild]: 'M', [Step.MainBuilt]: 'B', [Step.Thumb]: 't', [Step.Images]: 'i', [Step.AllVectors]: 'V', [Step.Sharp]: 'S', [Step.LiveAsked]: 'l', [Step.LiveBuilt]: 'L', [Step.LiveReady]: 'r' };
 
 function waterfall(title: string, frames: FrameLoad[]): string {
   const rows = [...frames].sort((a, b) => (a.contentMs ?? GIVE_UP_MS) - (b.contentMs ?? GIVE_UP_MS));

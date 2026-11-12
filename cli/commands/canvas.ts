@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { canvasApi } from '../lib/canvas.ts';
 import { exportAsk, type ExportFlags } from '../lib/export-ask.ts';
+import { routesPlan, RoutesStep } from '../lib/import-routes.ts';
 
 async function token(): Promise<string> {
   const session = await loadSession();
@@ -72,10 +73,24 @@ export function conditionsOf(schemes: string[] | undefined, widths: string[] | u
   return (schemes?.length ? schemes : [BASE_SCHEME]).flatMap((scheme) => (widths?.length ? widths.map(Number) : [BASE_WIDTH]).map((width) => ({ scheme, width })));
 }
 
-export async function cmdCanvasImportCode(project: string, repo: string, opts: { canvas: string; route: string[]; scheme?: string[]; width?: string[]; designSystem?: boolean; x: number; y: number; org?: string }) {
+export function routeDelaysOf(pairs: string[]): Record<string, number> {
+  return Object.fromEntries(pairs.map((pair) => [pair.slice(0, pair.lastIndexOf('=')), Number(pair.slice(pair.lastIndexOf('=') + 1))]));
+}
+
+export async function cmdCanvasImportCode(project: string, repo: string, opts: { canvas?: string; app?: string; route: string[]; routes?: string; scheme?: string[]; width?: string[]; designSystem?: boolean; delay?: number; routeDelay?: string[]; x: number; y: number; org?: string }) {
   const source = repo.startsWith('/') ? { folder: repo } : { repo };
+  const app = opts.app ? { app: opts.app } : {};
+  const plan = routesPlan(opts.routes, opts.route);
+  if (plan.step === RoutesStep.Discover) {
+    console.log(JSON.stringify(await canvasApi.run(await token(), { project, op: 'discover_routes', input: { ...source, ...app } }, opts.org), null, 2));
+    return;
+  }
+  if (!opts.canvas) {
+    console.error('--canvas <id> is required to import');
+    process.exit(1);
+  }
   const conditions = conditionsOf(opts.scheme, opts.width);
-  const input = { canvasId: opts.canvas, ...source, routes: opts.route, ...(conditions ? { conditions } : {}), ...(opts.designSystem === false ? { designSystem: false } : {}), x: opts.x, y: opts.y };
+  const input = { canvasId: opts.canvas, ...source, ...app, routes: plan.routes, ...(conditions ? { conditions } : {}), ...(opts.designSystem === false ? { designSystem: false } : {}), ...(opts.delay ? { captureDelayMs: opts.delay } : {}), ...(opts.routeDelay?.length ? { routeDelayMs: routeDelaysOf(opts.routeDelay) } : {}), x: opts.x, y: opts.y };
   const result = await canvasApi.run(await token(), { project, op: 'import_code', input }, opts.org);
   console.log(JSON.stringify(result, null, 2));
 }

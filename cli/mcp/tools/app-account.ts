@@ -18,6 +18,17 @@ export function registerAppAccountTools(server: McpServer) {
   );
 
   server.registerTool(
+    'set_app_account',
+    {
+      title: 'Set the test app account',
+      description: "Saves a TEST account of the user's own app (login url, email, password) that the project chat and code import sign in with. The AI sees it, so only a test login, never a real account. Replaces the saved one and its session; an empty password keeps the saved password. Spends nothing.",
+      inputSchema: z.object({ project_id: project, login_url: z.string().url().describe('Login page of the app.'), email: z.string().describe('Test account email.'), password: z.string().describe('Test account password; empty keeps the saved one.') }),
+      annotations: { readOnlyHint: false, destructiveHint: false }
+    },
+    async ({ project_id, login_url, email, password }) => withAuth((token) => appAccountApi.set(token, project_id, { login_url, email, password }))
+  );
+
+  server.registerTool(
     'forget_app_account',
     {
       title: 'Forget the test app account',

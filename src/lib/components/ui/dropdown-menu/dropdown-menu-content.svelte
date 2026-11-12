@@ -1,6 +1,10 @@
 <script lang="ts">
 	import { cn, type WithoutChildrenOrChild } from "$lib/utils.js";
 	import { materialPress } from "$lib/actions/material-press.js";
+	import { Closes, openLayer } from "$lib/components/ui/shell/dismiss";
+	import { lastInput } from "$lib/components/ui/shell/last-input";
+	import { openTrigger } from "$lib/components/ui/shell/open-trigger";
+	import { leaveMenu } from "$lib/canvas/key-region.svelte";
 	import DropdownMenuPortal from "./dropdown-menu-portal.svelte";
 	import { DropdownMenu as DropdownMenuPrimitive } from "bits-ui";
 	import type { ComponentProps } from "svelte";
@@ -16,6 +20,15 @@
 		portalProps?: WithoutChildrenOrChild<ComponentProps<typeof DropdownMenuPortal>>;
 	} = $props();
 
+	let trigger: Element | null = null;
+
+	$effect(() => {
+		if (!ref) return;
+		const content = ref;
+		requestAnimationFrame(() => (trigger = openTrigger(content)));
+		return openLayer(() => {}, Closes.ItsOwner);
+	});
+
 	$effect(() => {
 		const el = ref;
 		if (!el) return;
@@ -29,6 +42,7 @@
 	<DropdownMenuPrimitive.Content
 		bind:ref
 		data-slot="dropdown-menu-content"
+		onCloseAutoFocus={(e) => leaveMenu(trigger, lastInput(), e)}
 		{sideOffset}
 		{align}
 		class={cn(

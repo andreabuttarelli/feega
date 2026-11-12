@@ -10,6 +10,7 @@
   import HowFeegaWorks from '$lib/components/onboarding/HowFeegaWorks.svelte';
   import { TourState, tourShowsOn } from '$lib/onboarding/tour';
   import AppEntryShimmer from '$lib/components/AppEntryShimmer.svelte';
+  import SocialPreview from '$lib/components/SocialPreview.svelte';
   import CanvasEntryShimmer from '$lib/components/CanvasEntryShimmer.svelte';
   import MotionEntryShimmer from '$lib/components/MotionEntryShimmer.svelte';
   import { EntryShell, entryShell } from '$lib/entry-shell';
@@ -161,6 +162,8 @@
     else document.documentElement.removeAttribute('data-shell');
   });
 </script>
+
+<SocialPreview />
 
 {#if navBar}
   <div class="nav-progress" aria-hidden="true"></div>

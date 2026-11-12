@@ -605,11 +605,15 @@ canvas
 canvas
   .command('import-code <projectId> <repo>')
   .description('Run a GitHub React, Vue or Svelte app in a sandbox (private repos once `canvas github connect` is done), or a local project folder (an absolute path, local mode), and draw its pages as boards of one frame: components become main components, usages instances, props variants')
-  .requiredOption('--canvas <id>', 'The canvas')
-  .option('--route <paths...>', 'The pages of the app to import (up to 8): one frame, a board per page, components shared', ['/'])
+  .option('--canvas <id>', 'The canvas (required unless --routes discover)')
+  .option('--app <folder>', 'In a monorepo, the folder of the app to run (e.g. apps/web); asked for when several apps exist')
+  .option('--route <paths...>', 'The pages of the app to import (up to 20): one frame, a board per page, components shared', ['/'])
+  .option('--routes <spec>', 'discover = list the pages the file router declares, without running the app; all = import every static page found; or a list "/ /pricing /blog/hello"')
   .option('--scheme <schemes...>', 'Render each page under these themes: light, dark (default light)')
   .option('--width <px...>', 'Render each page at these widths in px (default 1280); with --scheme, one board per combination')
   .option('--no-design-system', 'Skip the design system: no variables from the CSS tokens, no Design system board')
+  .option('--delay <ms>', 'Extra wait in ms before each page is captured, for content that arrives late (default 0, at most 10000)', Number)
+  .option('--route-delay <route=ms...>', 'Extra wait for one route, wins over --delay, e.g. /blog/post=3000')
   .option('--x <n>', 'Canvas position of the frame centre', Number, 0)
   .option('--y <n>', 'Canvas position of the frame centre', Number, 0)
   .option('--org <id>', 'Which org, if you belong to more than one')
@@ -897,7 +901,10 @@ studio
 
 program
   .command('app-account <projectId>')
-  .description('Show the TEST account of your app the project chat logs in with, or --forget it')
+  .description('Show, set or --forget the TEST account of your app that the chat and code import sign in with')
+  .option('--login-url <url>', 'Login page of your app, to set the test account')
+  .option('--email <email>', 'Test account email')
+  .option('--password <password>', 'Test account password (omit to keep the saved one)')
   .option('--forget', 'Delete the test account and its session')
   .action(async (projectId: string, opts) => {
     const { cmdAppAccount } = await import('./commands/app-account.ts');

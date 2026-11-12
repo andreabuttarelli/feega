@@ -13,6 +13,7 @@ import type { RestNode } from '$lib/server/figma/rest-message';
 import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
 import { uniformRadius } from './corner-radius';
 import { ColourPaint, FULL_RADIUS, sameColour, textKey, type CtaUse, type Samples, type TextCase, type TextStyle, type Tokens } from './page-tokens';
+import { shownOnlyIn } from '@feega/motion-core/motion/breakpoints/model';
 
 export type Units = { docPerPx: number; images: ReadonlySet<string> };
 
@@ -202,7 +203,7 @@ export function samplesOf(docs: readonly MotionDoc[], root: RestNode, units: Uni
     for (const { view, compId } of scopesOf(doc)) {
       const names = ancestry(hosts, compId);
       const button = names.some((n) => BUTTON.test(n));
-      for (const clip of view.tracks.flatMap((t) => t.clips as MotionClip[]).filter((c) => !units.images.has(c.id))) {
+      for (const clip of view.tracks.flatMap((t) => t.clips as MotionClip[]).filter((c) => !units.images.has(c.id) && !shownOnlyIn(c).length)) {
         const look = lookOf(clip, view, units);
         if (look.text) {
           samples.texts.push({ ...look.text, chars: look.chars, heading: headingOf(names), button });

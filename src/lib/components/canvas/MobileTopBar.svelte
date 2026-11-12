@@ -113,7 +113,14 @@
     color: var(--ui-text);
     -webkit-tap-highlight-color: transparent;
   }
-  .mobile-topbar :global(.burger-btn svg),
+  .mobile-topbar :global(.burger-btn) {
+    display: flex;
+    justify-content: center;
+    width: auto;
+    min-width: var(--touch-target);
+    gap: 2px;
+  }
+  .mobile-topbar :global(.burger-btn .feega-mark),
   .mobile-topbar :global(.share-btn svg) {
     width: var(--mobile-icon);
     height: var(--mobile-icon);

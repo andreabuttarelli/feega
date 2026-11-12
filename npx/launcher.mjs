@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
 
@@ -7,8 +7,15 @@ const DEFAULT_PORT = 0;
 export const LOOPBACK = '127.0.0.1';
 export const MCP_PORT = 5173;
 export const MCP_ENTRY = 'mcp.mjs';
-export const USAGE = `usage: feega [file.feega] [--port <n>] [--no-open] [--help] [--version]
+export const USAGE = `usage: feega [file.feega] [--port <n>] [--no-open] [--import | --no-import] [--help] [--version]
        feega mcp [--port <n>]   MCP server (stdio) for the local feega on that port (default ${MCP_PORT})`;
+export const FolderImport = { Ask: 'ask', Yes: 'yes', No: 'no' };
+export const ImportStep = { Ask: 'ask', Import: 'import', Skip: 'skip' };
+
+const IMPORT_FLAGS = { '--import': FolderImport.Yes, '--no-import': FolderImport.No };
+const HOME_ROUTE = '/';
+const PLACE = /\/p\/([^/]+)\/c\/([^/?#]+)/;
+
 const CACHED_MARKER = '.complete';
 const APP_TAG = 'app-v';
 const RELEASES = 'https://github.com/andreabuttarelli/feega/releases/download';
@@ -61,6 +68,7 @@ export function parseArgs(argv, cwd) {
   const files = [];
   let port = DEFAULT_PORT;
   let browser = 'open';
+  let folderImport = FolderImport.Ask;
 
   while (rest.length) {
     const arg = rest.shift();
@@ -77,6 +85,11 @@ export function parseArgs(argv, cwd) {
       continue;
     }
 
+    if (IMPORT_FLAGS[arg]) {
+      folderImport = IMPORT_FLAGS[arg];
+      continue;
+    }
+
     const flagged = portFlag(arg, rest);
     if (flagged !== null) {
       port = flagged;
@@ -90,7 +103,7 @@ export function parseArgs(argv, cwd) {
     files.push(arg);
   }
 
-  return { command: 'run', file: resolve(cwd, files[0] ?? DEFAULT_FILE), port, browser };
+  return { command: 'run', file: resolve(cwd, files[0] ?? DEFAULT_FILE), port, browser, folderImport };
 }
 
 export const appDir = (home, version) => join(home, '.feega', 'app', version);
@@ -153,3 +166,46 @@ export const freePort = (port) =>
       probe.close(() => done(bound));
     });
   });
+
+export function folderApp(dir) {
+  const manifest = join(dir, 'package.json');
+  if (!existsSync(manifest)) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(readFileSync(manifest, 'utf8')).scripts?.dev ? dir : null;
+  } catch {
+    return null;
+  }
+}
+
+const STEPS = {
+  [FolderImport.No]: () => ImportStep.Skip,
+  [FolderImport.Yes]: () => ImportStep.Import,
+  [FolderImport.Ask]: ({ fileExists, tty }) => (!fileExists && tty ? ImportStep.Ask : ImportStep.Skip)
+};
+
+export function importStep({ mode, app, fileExists, tty }) {
+  if (!app) {
+    return ImportStep.Skip;
+  }
+
+  return STEPS[mode]({ fileExists, tty });
+}
+
+export function placeOf(location) {
+  const found = PLACE.exec(location ?? '');
+  return found ? { projectId: found[1], canvasId: found[2] } : null;
+}
+
+export const importAsk = (place, folder) => ({
+  path: `/api/v1/projects/${place.projectId}/code-import`,
+  body: { canvasId: place.canvasId, folder, routes: [HOME_ROUTE], x: 0, y: 0 }
+});
+
+const HTTP_ERROR_MIN = 400;
+
+export const readyProbe = { redirect: 'manual' };
+
+export const served = (status) => status < HTTP_ERROR_MIN;

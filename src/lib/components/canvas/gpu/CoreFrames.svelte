@@ -51,18 +51,22 @@
   import { Step, markFrame, noteImages } from '$lib/canvas/core/frame-timeline';
   import { StartupStep, markStartup, reportFramesShown } from '$lib/canvas/core/startup-marks';
   import LoadTimeline from './LoadTimeline.svelte';
-  import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
+  import { editedLayers } from '$lib/canvas/core/edited-layers';
+  import { fastPatch } from '$lib/canvas/core/fast-patch';
+  import type { LiveDoc, LiveListener } from '$lib/canvas/core/live-docs.svelte';
   import { baseNodeId, withoutViews } from '$lib/canvas/breakpoint-views';
   import { loadOnce, withScenes, type LoadScene } from '$lib/canvas/scene-sources';
   import { describe, factsOf, signatureOf, undrawn, type NodeFacts } from '$lib/canvas/core/core-debug';
   import { Motion, hudLine, watchCrashes } from '$lib/canvas/gpu/crash-watch';
+  import { startCanvasPerf } from '$lib/canvas/perf/perf-beacon';
+  import { Camera } from '$lib/canvas/perf/session-perf';
   import { liftOut, liftedPut, movingGroup, restGroup, type Lift, type Lifted } from '$lib/canvas/core/lifted-drag';
   import { AttachStep, GpuBackend, afterAttachFailure, backendAfterLoss, isTrap, type BackendSwitch } from '$lib/canvas/gpu/gpu-loss';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
 
-  let { frames, edited = new Set(), order = [], live = new Map(), known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, lift = null, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, place = null, sourceUrl, onready, onsource = () => {}, onthumb = () => {}, onfallback, onbackend = () => {} }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; lift?: Lift | null; look?: Look; view: Viewport; area: { width: number; height: number }; place?: { projectId: string; canvasId: string; orgId?: string; userId?: string; look?: string } | null; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onthumb?: (id: string, revision: number, blob: Blob, size: { width: number; height: number }) => void; onfallback: (why: string) => void; onbackend?: (change: BackendSwitch) => void } = $props();
+  let { frames, edited = new Set(), order = [], live = new Map(), listenLive = () => () => {}, known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, lift = null, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, place = null, sourceUrl, onready, onsource = () => {}, onthumb = () => {}, onfallback, onbackend = () => {} }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; listenLive?: (listener: LiveListener) => () => void; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; lift?: Lift | null; look?: Look; view: Viewport; area: { width: number; height: number }; place?: { projectId: string; canvasId: string; orgId?: string; userId?: string; look?: string } | null; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onthumb?: (id: string, revision: number, blob: Blob, size: { width: number; height: number }) => void; onfallback: (why: string) => void; onbackend?: (change: BackendSwitch) => void } = $props();
 
   markStartup(StartupStep.Mounted);
   debugStart();
@@ -99,6 +103,11 @@
   const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, budget.resolution);
   const crashes = watchCrashes({ device: currentDevice(), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, resolution });
   const RASTERED = new Set<Outcome>([Outcome.Full, Outcome.Partial]);
+  const perf = startCanvasPerf({ canvasId: untrack(() => place?.canvasId ?? ''), device: currentDevice(), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, frames: () => frames.length });
+  const EDIT_GIVE_UP_MS = 10_000;
+  const editSeen = new Map<string, string>();
+  const editsOwed = new Map<string, number>();
+  let camera = Camera.Still;
 
   let readsHost = $state<HTMLDivElement | null>(null);
   const READ_LANES = 2;
@@ -107,7 +116,7 @@
   const fromView = (f: FrameAt) => () => Math.hypot(view.x + (f.box.x + f.box.w / 2) * view.zoom - area.width / 2, view.y + (f.box.y + f.box.h / 2) * view.zoom - area.height / 2);
   const customPictures = customPicturesOf();
   const liveRead = (id: string) => `${id}:live`;
-  const thumbs = thumbStore(place?.userId && place.orgId ? { userId: place.userId, orgId: place.orgId } : null);
+  const thumbs = thumbStore(place?.userId && place.orgId ? { userId: place.userId, orgId: place.orgId } : null, place?.canvasId ?? '');
   const thumbPictures = new Map<string, Picture>();
   const thumbAsked = new Set<string>();
   const thumbTaken = new Set<string>();
@@ -428,38 +437,78 @@
 
   async function rebuildLive(f: FrameAt, source: LiveDoc) {
     const generation = liveGeneration.ask(f.id);
+    const key = `${f.id}:live${generation}`;
+    markFrame(key, Step.LiveAsked);
     const list = await liveOff(f, { revision: f.revision, ...source }).catch((e: unknown) => (console.warn('[canvas] core live frame failed', f.id, e), null));
     const built = list ? { list } : null;
     if (!built || !liveGeneration.newer(f.id, generation)) {
       return;
     }
+    markFrame(key, Step.LiveBuilt);
     const ready = await media.ready(built.list);
     if (!liveGeneration.land(f.id, generation)) {
       return;
     }
-    const key = `${f.id}:live${generation}`;
-    logGaps(f.id, built.list);
-    lists = listed(lists, f.id, key, onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), loaded.get(f.id), drawnLast.get(f.id)?.group]);
+    markFrame(key, Step.LiveReady);
+    showLive(f, key, { doc: source.doc, list: built.list, ready });
+  }
+
+  type ShownLive = { doc: MotionDoc; list: DisplayList; ready: Awaited<ReturnType<typeof media.ready>> };
+  const liveShown = new Map<string, ShownLive>();
+
+  function showLive(f: FrameAt, key: string, shown: ShownLive) {
+    logGaps(f.id, shown.list);
+    lists = listed(lists, f.id, key, onStage(drawable(shown.list, shown.ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), loaded.get(f.id), drawnLast.get(f.id)?.group]);
     liveGroup = new Map(liveGroup).set(f.id, key);
     liveAtRevision.set(f.id, f.revision);
+    liveShown.set(f.id, shown);
+  }
+
+  function patchLive(f: FrameAt, source: LiveDoc) {
+    const shown = liveShown.get(f.id);
+    const list = shown && fastPatch(shown.list, shown.doc, source.doc);
+    if (!shown || !list) {
+      return;
+    }
+    const generation = liveGeneration.ask(f.id);
+    if (!liveGeneration.land(f.id, generation)) {
+      return;
+    }
+    const key = `${f.id}:live${generation}`;
+    markFrame(key, Step.LiveAsked);
+    showLive(f, key, { ...shown, doc: source.doc, list });
   }
 
   const rebuildLatest = latestOnly<string, { f: FrameAt; source: LiveDoc }>((_id, { f, source }) => rebuildLive(f, source));
 
+  function rebuildIfEdited(f: FrameAt, source: LiveDoc | undefined) {
+    if (lift && !lift.landing && lift.id === baseNodeId(f.id)) {
+      return;
+    }
+    if (source && (!sameLive(liveBuilt.get(f.id), source) || liveStamp.get(f.id) !== f.scenes)) {
+      liveBuilt.set(f.id, source);
+      liveStamp.set(f.id, f.scenes);
+      patchLive(f, source);
+      rebuildLatest(f.id, { f, source });
+    }
+  }
+
+  $effect(() =>
+    listenLive((id, source) => {
+      const f = untrack(() => frames).find((x) => x.id === id);
+      if (f) {
+        untrack(() => rebuildIfEdited(f, source));
+      }
+    })
+  );
+
   $effect(() => {
     for (const f of frames) {
-      const source = live.get(f.id);
-      if (lift && !lift.landing && lift.id === baseNodeId(f.id)) {
-        continue;
-      }
-      if (source && (!sameLive(liveBuilt.get(f.id), source) || liveStamp.get(f.id) !== f.scenes)) {
-        liveBuilt.set(f.id, source);
-        liveStamp.set(f.id, f.scenes);
-        rebuildLatest(f.id, { f, source });
-      }
+      rebuildIfEdited(f, live.get(f.id));
     }
     for (const id of [...liveGroup.keys()].filter((id) => !live.has(id))) {
       liveBuilt.delete(id);
+      liveShown.delete(id);
       heldMain.drop(id);
       customPictures.drop(liveRead(id));
       const saved = frames.find((f) => f.id === id);
@@ -872,6 +921,7 @@
       dropCore();
     }
     losses++;
+    perf.deviceLost();
     const next = backendAfterLoss(backend, losses, BACKENDS.length);
     if (next !== backend) {
       losses = 0;
@@ -925,7 +975,7 @@
       pictured.delete(group);
     }
     const stopgaps = chains.flatMap((c) => (pictured.has(c[0].group) ? [] : c.filter((l) => thumbLists.has(l.group))));
-    for (const f of [...tails, ...stopgaps]) {
+    for (const f of [...tails, ...stopgaps, ...editedLayers(held, liveGroup)]) {
       while (!put.has(f.group)) {
         putPart(into, f.group);
       }
@@ -1001,6 +1051,29 @@
     }
   }
 
+  function settleEdits(now: number) {
+    for (const [group, since] of editsOwed) {
+      if (put.has(group)) {
+        perf.edit(now - since);
+      }
+      if (put.has(group) || now - since > EDIT_GIVE_UP_MS) {
+        editsOwed.delete(group);
+      }
+    }
+  }
+
+  $effect(() => {
+    const now = performance.now();
+    for (const f of frames) {
+      const seen = `${baseKey(f)}|${liveGroup.get(f.id) ?? ''}`;
+      const before = editSeen.get(f.id);
+      editSeen.set(f.id, seen);
+      if (before !== undefined && before !== seen) {
+        editsOwed.set(untrack(() => groupOf(f)), now);
+      }
+    }
+  });
+
   function paintOn(into: CoreRaster): boolean {
     const quiet = !gesture.active();
     if (sceneDue(quiet) || (sceneBusy && uploadOwed(into, owed).length)) {
@@ -1015,6 +1088,8 @@
     const began = performance.now();
     const { outcome, pending, skipped } = into.frame(began);
     countFrame(began, into.frameCounts?.(), gesture.active(), pending);
+    perf.frame(gesture.active() ? camera : Camera.Still, lift !== null, began);
+    settleEdits(began);
     if (thumbsOwed && !pending && quiet) {
       thumbsOwed = false;
       takeThumbs(canvas, shown);
@@ -1053,6 +1128,7 @@
     const now = `${view.x},${view.y},${view.zoom}`;
     if (lastView && now !== lastView) {
       gesture.moved();
+      camera = view.zoom !== lastZoom ? Camera.Zooming : Camera.Panning;
       gestureLog(view.zoom !== lastZoom ? 'zoom' : 'pan');
     }
     if (lastZoom && view.zoom !== lastZoom) {
@@ -1118,6 +1194,12 @@
 
   $effect(() => () => media.dispose());
   $effect(() => () => crashes.stop());
+  $effect(() => () => perf.stop());
+  $effect(() => {
+    if (raster) {
+      perf.backend(BACKENDS[backend].name);
+    }
+  });
 
 </script>
 

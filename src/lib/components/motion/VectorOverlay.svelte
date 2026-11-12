@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { keyOnCanvas } from '$lib/canvas/key-region.svelte';
   import { hostFraction, hostWidth } from '$lib/motion/overlay-point';
   import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
   import { pathData, type Pt } from '@feega/motion-core/motion/shape/geometry';
@@ -162,7 +163,7 @@
   }
 
   function key(e: KeyboardEvent) {
-    if (isTyping(e.target as HTMLElement | null)) {
+    if (!keyOnCanvas(e) || isTyping(e.target as HTMLElement | null)) {
       return;
     }
     if (e.key === 'Enter' && !pen) {

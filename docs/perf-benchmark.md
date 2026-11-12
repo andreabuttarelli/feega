@@ -123,13 +123,15 @@ the asked, source, built, put and drawn durations once it is drawn. `[images]` l
 switches; `[tiles]` logs gesture and rest render starts, raster passes per frame (from the render
 tally), cache evictions and settle. Nothing is subscribed or built when off.
 
-## Frame budget (90 fps)
+## Frame budget (90 and 120 fps)
 
 `npm run perf:budget` is a local pre-merge check, not a CI job: hosted runners have no GPU. It runs
 `tests/perf/canvas-frame-budget.spec.ts` in headed Chromium with vsync and the frame-rate cap off,
 so a frame gap is the real frame cost instead of the display interval. Per target it pans, zooms,
 toggles fit (Shift+1 / Shift+0) and drags a frame, `BUDGET_RUNS` (default 3) fresh contexts each,
 and fails a gesture when its p95 is over 11.1 ms (90 fps) or more than 2% of its frames are.
+The same frames are also judged against 8.3 ms (120 fps, high-refresh displays): reported as
+`at120` in the JSON and the `/` second figure in each run line, not yet a failure.
 
 Targets (`BUDGET_TARGETS`, comma list):
 
@@ -145,3 +147,83 @@ flock ~/Documents/feega-videos/perf/bench.lock npm run perf:budget
 
 Results land in `perf-results/frame-budget-<target>.json` (`BUDGET_OUT` overrides). The thresholds
 live in `scripts/perf/frame-budget.ts`.
+
+### Edit latency
+
+The same run also edits one element inside a frame: nudge (arrow key), resize (edge handle), opacity
+(digit key), hide (⇧⌘H) and text typing, `BUDGET_EDITS` (default 8) of each per run. Each edit is
+timed from the input event's `timeStamp` to the `frame|drawn|<frame>:live<n>` mark of the first
+rebuilt layer drawn after it, and split by the marks on the way: `effect` (input to
+`live-asked`, the main-thread work before the rebuild starts), `build` (to `live-built`, the
+worker display list), `media` (to `live-ready`), `upload` (to `put`/`patched` in the engine) and
+`draw` (to `drawn`). A gesture that never lands counts as `missed`.
+
+The gate fails an edit kind whose p95 is over 16.7 ms (one 60 Hz frame); `atGoal` says whether it
+is inside 8.3 ms, one 120 Hz frame, the target for direct manipulation. Results land in
+`perf-results/edit-latency-<target>.json`.
+
+Typing is timed from the key to the animation frame after the caret field's `input` event, since
+the field draws the text while it is open. `BUDGET_PROFILE=1` also writes a CPU profile per edit
+kind (`edit-<target>-<edit>.cpuprofile`) and the input and `live-asked` times
+(`.windows.json`) to cut it by edit.
+
+## Real-user telemetry
+
+Every open canvas (sampled by `PERF_SAMPLE_RATE` in `src/lib/canvas/perf/perf-beacon.ts`, 1 today)
+aggregates one summary in the browser and posts it to `/api/v1/telemetry/canvas-perf` every 5 min
+and on `pagehide` / tab hidden (`sendBeacon`). The endpoint keeps only known keys, numbers and ids,
+caps a user at 30 summaries an hour, and records a `canvas_perf` row in `product_events`.
+
+A summary is cumulative per session (`sessionId`); the report keeps the latest one. It carries:
+
+- load: `startup|first-drawn`, `startup|all-shown`, `frame|sharp|all` marks, ms from navigation;
+- per gesture (pan, zoom, fit, drag): frames, share over 11.1 ms, p95/p99 frame gap (rAF deltas
+  only while a gesture runs, 1 ms buckets), long tasks over 50 ms (`PerformanceObserver`);
+- edit latency p50/p95: a frame's revision or live doc changing until its new list is put;
+- backend, fallbacks, device losses, device class from `BUDGET`, DPR, cores, `deviceMemory`,
+  frame and node counts, source bytes (Resource Timing), `CORE_VERSION`, JS heap at 10 min.
+
+No content, no prompt text, no emails.
+
+```bash
+node scripts/canvas-perf-report.mjs --days=7
+```
+
+prints per device class and canvas size (frames: 1-10, 11-50, 51-200, 200+): sessions, p50/p95
+load, over-budget share per gesture, edit latency and webgl fallback rate. Internal accounts
+(`INTERNAL` in the script: `test@dazero.co`, team domains, members of `PERF_TEAM_ORG_IDS`) are
+left out. The view `canvas_perf_sessions` flattens the same rows for SQL.
+
+## Where a slow frame went
+
+The shipped wasm has no function names, so a CPU profile of it cannot be split. For a profile, build
+a copy that keeps them, build the app on it, and put the shipped wasm back before committing:
+
+```bash
+npm run build:gpu-core:profile   # names kept; overwrites static/gpu-core/gpu_core*
+npm run build:node
+BENCH_CASE=landings BENCH_GESTURES=zoom npx playwright test -c tests/perf/playwright.config.ts
+node scripts/perf/profile-buckets.mjs perf-results/landings-zoom.cpuprofile <frames>
+git checkout -- static/gpu-core
+```
+
+`profile-buckets.mjs` files each sample under the innermost engine phase on its stack (plan, lay
+out, `prepare_items`, encode, present, tiles), WebGPU calls and wasm-bindgen glue apart from both,
+and idle, GC and native time apart from main-thread JS.
+
+Per frame, `window.__gpuCanvas.frames` also counts what the core did: `tiles` rastered, `draws`
+(display lists drawn, one per split piece), `uploads` (image uploads) and `uploadBytes`, beside
+`bakes`, `bakeMs`, `plans` and `planMs`. Counts do not move with machine load; compare them before
+milliseconds.
+
+## Gesture bench on a 60 Hz display
+
+`tests/perf/canvas-gesture-bench.spec.ts` runs with vsync on, so its frame gaps are display
+intervals: on a 60 Hz screen every frame is at least 16.7 ms and "frames over 11 ms" is meaningless.
+Check the refresh (`system_profiler SPDisplaysDataType`) and, below 120 Hz, add `BENCH_UNCAPPED=1`
+to time real frame cost with vsync and the frame-rate cap off, as `perf:budget` does. Report which
+of the two a number came from.
+
+```bash
+BENCH_SPEC=canvas-gesture-bench BENCH_CASE=landings BENCH_UNCAPPED=1 npx playwright test -c tests/perf/playwright.config.ts
+```

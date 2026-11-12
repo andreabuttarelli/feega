@@ -1,4 +1,5 @@
 <script lang="ts">
+  const ROW_KEYS = new Set(['Enter', ' ']);
   import { cn } from '$lib/utils.js';
   import { FIELD_INPUT, FOCUS_RING, SECTION_LABEL } from '$lib/components/ui/shell/styles';
   import { resolveColor, type BrandTokens } from '@feega/motion-core/motion/brand';
@@ -115,7 +116,7 @@
       data-index={index}
       data-open={open === index ? 'true' : undefined}
       onclick={() => toggle(index)}
-      onkeydown={(e) => e.key === 'Enter' && toggle(index)}
+      onkeydown={(e) => e.target === e.currentTarget && ROW_KEYS.has(e.key) && (e.preventDefault(), toggle(index))}
       ondragstart={() => (dragged = index)}
       ondragover={(e) => e.preventDefault()}
       ondrop={(e) => {

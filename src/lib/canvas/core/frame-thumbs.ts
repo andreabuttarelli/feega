@@ -2,14 +2,13 @@ import { ItemKind, type DisplayList } from '@feega/motion-core/motion/gpu-full/d
 import { BlendMode } from '@feega/motion-core/motion/blend';
 import type { Viewport } from '$lib/canvas/dot-grid';
 import type { Box } from './canvas-scene';
-import { THUMBS_DB, cacheName, type CacheScope } from './frame-cache';
+import { THUMBS_DB, THUMB_LIMITS, cacheName, frameCache, idbShelf, type CacheScope } from './frame-cache';
 
 type Size = { width: number; height: number };
 type Rect = { x: number; y: number; width: number; height: number };
 
 const MIN_SIDE_PX = 16;
 const MAX_SIDE_PX = 512;
-const STORE = 'thumbs';
 const THUMB_TYPE = 'image/webp';
 const THUMB_QUALITY = 0.8;
 const IDENTITY: [number, number, number, number, number, number] = [1, 0, 0, 1, 0, 0];
@@ -51,32 +50,15 @@ export type ThumbStore = { get: (key: string) => Promise<Blob | null>; put: (key
 
 const NO_STORE: ThumbStore = { get: async () => null, put: () => {} };
 
-const request = <T>(r: IDBRequest<T>) => new Promise<T>((resolve, reject) => Object.assign(r, { onsuccess: () => resolve(r.result), onerror: () => reject(r.error) }));
-
-export function thumbStore(scope: CacheScope | null): ThumbStore {
+export function thumbStore(scope: CacheScope | null, canvasId: string): ThumbStore {
   if (!scope || typeof indexedDB === 'undefined') {
     return NO_STORE;
   }
-  const opening = new Promise<IDBDatabase | null>((resolve) => {
-    try {
-      const open = indexedDB.open(cacheName(scope, THUMBS_DB), 1);
-      open.onupgradeneeded = () => open.result.createObjectStore(STORE);
-      open.onsuccess = () => {
-        open.result.onversionchange = () => open.result.close();
-        resolve(open.result);
-      };
-      open.onerror = () => resolve(null);
-    } catch {
-      resolve(null);
-    }
-  });
-  const store = async (mode: IDBTransactionMode) => (await opening)?.transaction(STORE, mode).objectStore(STORE) ?? null;
+  const kept = frameCache<Blob>(idbShelf<Blob>(cacheName(scope, THUMBS_DB)), THUMB_LIMITS, Date.now, (blob) => blob.size);
+  const keyOf = (key: string) => `${canvasId}/${key}`;
   return {
-    get: async (key) => {
-      const s = await store('readonly').catch(() => null);
-      return s ? ((await request(s.get(key)).catch(() => null)) as Blob | null) ?? null : null;
-    },
-    put: (key, blob) => void store('readwrite').then((s) => s?.put(blob, key)).catch(() => undefined)
+    get: (key) => kept.take(keyOf(key)).catch(() => null),
+    put: (key, blob) => void kept.keep(keyOf(key), blob).catch(() => undefined)
   };
 }
 

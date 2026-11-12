@@ -1,0 +1,22 @@
+:root {
+  --neutral-0: oklch(100% 0 0);
+  --neutral-11: oklch(15% 0 0);
+  --background: var(--neutral-0);
+  --foreground: var(--neutral-11);
+  --accent: oklch(33% 0 0);
+  --font-display: var(--font-geist, "Geist Variable"), sans-serif;
+}
+:root[data-theme="dark"] {
+  --background: var(--neutral-11);
+  --foreground: var(--neutral-0);
+  --accent: oklch(80% 0 0);
+}
+:root[data-accent="neutral"] { --accent: oklch(33% 0 0); }
+:root[data-accent="violet"] { --accent: #7747ff; }
+:root[data-accent="blue"] { --accent: #0562ef; }
+:root[data-accent="green"] { --accent: #0db879; }
+:root[data-accent="amber"] { --accent: #f3ad20; }
+:root[data-accent="orange"] { --accent: #f48120; }
+:root[data-accent="coral"] { --accent: #f15f55; }
+:root[data-accent="rose"] { --accent: #ed4e9d; }
+:root[data-theme="dark"][data-accent="violet"] { --accent: #a78bff; }

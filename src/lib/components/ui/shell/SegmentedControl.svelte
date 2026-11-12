@@ -49,13 +49,13 @@
   const radii = $derived(RADII[shape]);
 
   const ITEM = $derived(cn(
-    'relative z-10 inline-flex h-7 min-w-7 items-center justify-center gap-1.5 px-2.5 text-ui-label font-medium text-ui-text-2 transition-[color] duration-(--ui-dur-fast) pointer-coarse:h-10 hover:text-ui-text aria-checked:text-ui-text [&_svg]:size-(--ui-icon-sm)',
+    'relative z-10 inline-flex h-7 min-w-0 items-center justify-center gap-1.5 px-2.5 text-ui-label font-medium text-ui-text-2 transition-[color] duration-(--ui-dur-fast) pointer-coarse:h-10 hover:text-ui-text aria-checked:text-ui-text [&_svg]:size-(--ui-icon-sm)',
     radii.inner,
     FOCUS_RING
   ));
 </script>
 
-<div role="radiogroup" aria-label={label} data-slot="segmented-control" data-shape={shape} class={cn('relative inline-grid min-w-0 auto-cols-fr grid-flow-col bg-ui-input p-0.5', radii.track, className)}>
+<div role="radiogroup" aria-label={label} data-slot="segmented-control" data-shape={shape} class={cn('relative inline-grid min-w-0 auto-cols-[minmax(0,1fr)] grid-flow-col bg-ui-input p-0.5', radii.track, className)}>
   {#if selected >= 0}
     <span
       aria-hidden="true"

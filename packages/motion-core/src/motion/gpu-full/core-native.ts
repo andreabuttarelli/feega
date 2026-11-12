@@ -48,8 +48,8 @@ export function attachedOf(bridge: NativeCanvasBridge, toRgba: ToRgba): Attached
   const known = new Set<string>();
   let wanted: NativeCamera | null = null;
   let sent: NativeCamera | null = null;
-  const overlay = { fixed: [] as unknown[], live: [] as unknown[] };
-  const sendOverlay = () => bridge.setOverlay(JSON.stringify([...overlay.fixed, ...overlay.live]));
+  const overlay = { fixed: [] as unknown[], selected: [] as unknown[], live: [] as unknown[] };
+  const sendOverlay = () => bridge.setOverlay(JSON.stringify([...overlay.fixed, ...overlay.selected, ...overlay.live]));
 
   return {
     draw: () => {
@@ -61,6 +61,10 @@ export function attachedOf(bridge: NativeCanvasBridge, toRgba: ToRgba): Attached
     patch_uses: (patch) => bridge.patchUses(patch),
     set_overlay: (items) => {
       overlay.fixed = JSON.parse(items);
+      sendOverlay();
+    },
+    set_selected_overlay: (items) => {
+      overlay.selected = JSON.parse(items);
       sendOverlay();
     },
     set_live_overlay: (items) => {

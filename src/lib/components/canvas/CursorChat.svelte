@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { keyOnCanvas } from '$lib/canvas/key-region.svelte';
   import { CHAT_MAX } from '$lib/realtime/canvas-presence';
   import { opensCursorChat } from '$lib/canvas/command-palette';
 
@@ -16,7 +17,7 @@
     target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
 
   function open(e: KeyboardEvent) {
-    if (!opensCursorChat(e) || at || editing(e.target)) {
+    if (!opensCursorChat(e) || at || !keyOnCanvas(e) || editing(e.target)) {
       return;
     }
     e.preventDefault();

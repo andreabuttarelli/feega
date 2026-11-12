@@ -1,0 +1,156 @@
+const vscode = require('vscode');
+const { spawn } = require('node:child_process');
+const { Launch, launchArgs, mcpServers, canvasFileFor, canvasPage, loadingPage, localUrl, freePort, readyProbe, served } = require('./canvas-run');
+
+const READY_POLL_MS = 400;
+const READY_TIMEOUT_MS = 180_000;
+const NEW_CANVAS = 'canvas.feega';
+
+const running = new Map();
+const mcpChanged = new vscode.EventEmitter();
+const cursorServers = new Map();
+const children = new Set();
+
+async function ready(url) {
+  const until = Date.now() + READY_TIMEOUT_MS;
+  while (Date.now() < until) {
+    if (await fetch(url, readyProbe).then((r) => served(r.status), () => false)) {
+      return true;
+    }
+    await new Promise((r) => setTimeout(r, READY_POLL_MS));
+  }
+  return false;
+}
+
+function publishMcp() {
+  mcpChanged.fire();
+  const cursor = vscode.cursor?.mcp;
+  if (!cursor) {
+    return;
+  }
+
+  const wanted = new Map(mcpServers(running).map((s) => [s.label, s]));
+  for (const label of cursorServers.keys()) {
+    if (!wanted.has(label)) {
+      cursor.unregisterServer(label);
+      cursorServers.delete(label);
+    }
+  }
+  for (const [label, s] of wanted) {
+    if (!cursorServers.has(label)) {
+      cursor.registerServer({ name: label, server: { command: s.command, args: s.args, env: {} } });
+      cursorServers.set(label, s);
+    }
+  }
+}
+
+async function openCanvas(panel, file, launch, output) {
+  panel.webview.options = { enableScripts: true };
+  panel.webview.html = loadingPage('Starting Feega… the first run downloads the app.');
+
+  const port = await freePort();
+  const child = spawn('npx', launchArgs(file, port, launch), { shell: process.platform === 'win32', env: process.env, detached: process.platform !== 'win32' });
+  children.add(child);
+  child.stdout.on('data', (d) => output.append(d.toString()));
+  child.stderr.on('data', (d) => output.append(d.toString()));
+  child.on('exit', (code) => {
+    children.delete(child);
+    running.delete(file);
+    publishMcp();
+    if (code) {
+      panel.webview.html = loadingPage(`Feega stopped (exit ${code}). See the Feega output panel.`);
+    }
+  });
+  panel.onDidDispose(() => stop(child));
+
+  const url = localUrl(port);
+  if (!(await ready(url))) {
+    panel.webview.html = loadingPage('Feega did not start. See the Feega output panel.');
+    return;
+  }
+
+  running.set(file, port);
+  publishMcp();
+  const external = (await vscode.env.asExternalUri(vscode.Uri.parse(url))).toString().replace(/\/$/, '');
+  panel.webview.html = canvasPage(external);
+}
+
+function canvasEditor(output) {
+  return {
+    openCustomDocument: (uri) => ({ uri, dispose: () => {} }),
+    resolveCustomEditor: (document, panel) => openCanvas(panel, document.uri.fsPath, Launch.Open, output)
+  };
+}
+
+function workspaceFolder() {
+  const folder = vscode.workspace.workspaceFolders?.[0];
+  if (!folder) {
+    vscode.window.showErrorMessage('Feega: open a folder first.');
+  }
+  return folder?.uri.fsPath ?? null;
+}
+
+function canvasPanel(file, launch, output) {
+  const panel = vscode.window.createWebviewPanel('feega.canvas', file.split(/[\\/]/).pop(), vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: true });
+  return openCanvas(panel, file, launch, output);
+}
+
+async function newCanvas(output) {
+  const folder = workspaceFolder();
+  if (!folder) {
+    return;
+  }
+
+  const target = await vscode.window.showSaveDialog({ defaultUri: vscode.Uri.file(`${folder}/${NEW_CANVAS}`), filters: { Feega: ['feega'] } });
+  if (!target) {
+    return;
+  }
+
+  return canvasPanel(target.fsPath, Launch.Open, output);
+}
+
+function importFolder(output) {
+  const folder = workspaceFolder();
+  if (!folder) {
+    return;
+  }
+
+  return canvasPanel(canvasFileFor(folder), Launch.ImportFolder, output);
+}
+
+function activate(context) {
+  const output = vscode.window.createOutputChannel('Feega');
+  context.subscriptions.push(
+    output,
+    vscode.window.registerCustomEditorProvider('feega.canvas', canvasEditor(output), { webviewOptions: { retainContextWhenHidden: true } }),
+    vscode.commands.registerCommand('feega.newCanvas', () => newCanvas(output)),
+    vscode.commands.registerCommand('feega.importFolder', () => importFolder(output))
+  );
+
+  if (vscode.lm?.registerMcpServerDefinitionProvider) {
+    context.subscriptions.push(
+      vscode.lm.registerMcpServerDefinitionProvider('feega.local', {
+        onDidChangeMcpServerDefinitions: mcpChanged.event,
+        provideMcpServerDefinitions: () => mcpServers(running).map((s) => new vscode.McpStdioServerDefinition(s.label, s.command, s.args))
+      })
+    );
+  }
+
+  return { runningCanvases, mcpServers: () => mcpServers(running) };
+}
+
+const runningCanvases = () => [...running].map(([file, port]) => ({ file, port }));
+
+function stop(child) {
+  try {
+    process.kill(process.platform === 'win32' ? child.pid : -child.pid, 'SIGTERM');
+  } catch {
+    child.kill();
+  }
+}
+
+function deactivate() {
+  children.forEach(stop);
+}
+
+module.exports = { activate, deactivate };

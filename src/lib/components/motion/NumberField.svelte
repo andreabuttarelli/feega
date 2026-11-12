@@ -417,7 +417,7 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 14px;
+    width: var(--ui-hit);
     height: 100%;
     border: 0;
     border-radius: var(--ui-radius-sm);

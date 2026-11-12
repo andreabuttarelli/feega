@@ -294,7 +294,16 @@ export function addStop(stops: readonly Stop[], pos: number): Stop[] {
   return [...stops, { color: before.color, pos }].slice(0, MAX_STOPS);
 }
 
-export const removeStop = (stops: readonly Stop[], i: number): Stop[] => (stops.length > MIN_STOPS ? stops.filter((_, at) => at !== i) : [...stops]);
+const STOP_PLACES = 100;
+
+export function widestGapMiddle(stops: readonly Stop[]): number {
+  const sorted = stops.map((s) => s.pos).sort((a, b) => a - b);
+  const gaps = sorted.slice(1).map((pos, i) => ({ from: sorted[i], width: pos - sorted[i] }));
+  const widest = gaps.reduce((best, gap) => (gap.width > best.width ? gap : best), gaps[0]);
+  return Math.round((widest.from + widest.width / 2) * STOP_PLACES) / STOP_PLACES;
+}
+
+export const removeStop =(stops: readonly Stop[], i: number): Stop[] => (stops.length > MIN_STOPS ? stops.filter((_, at) => at !== i) : [...stops]);
 
 export function retypeFill(fills: readonly Fill[], i: number, type: FillType): Fill[] {
   return fills.map((f, at) =>

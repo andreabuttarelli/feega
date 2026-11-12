@@ -7,7 +7,7 @@ import { match } from '../../../params/comparison';
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 describe('the comparison pages', () => {
-  it.each(Object.keys(COMPARISONS))('/blog/%s resolves to its page', (slug) => {
+  it.each(Object.keys(COMPARISONS))('/compare/%s resolves to its page', (slug) => {
     expect(match(slug)).toBe(true);
   });
 

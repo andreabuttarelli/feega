@@ -1,8 +1,15 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
 
 export const SITE_TITLE = 'Feega blog';
-export const SITE_DESCRIPTION = 'Notes from building Feega, one open-source canvas for design, motion and AI.';
-export const DEFAULT_OG = '/og-default.png';
+export const SITE_DESCRIPTION = 'Notes from building Feega, the open-source canvas to design, animate and generate inside your code.';
+
+export const SOCIAL_PREVIEW = {
+  image: 'https://feega.app/og.png',
+  video: 'https://feega.app/og.mp4',
+  alt: 'Feega: Design inside your code with your agents and team. An isometric canvas where code becomes a design, a layout gets a timeline and a prompt wires into image and video nodes.',
+  width: 1200,
+  height: 630
+} as const;
 const WORDS_PER_MINUTE = 220;
 
 export type Post = CollectionEntry<'posts'>;

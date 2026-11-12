@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Region } from '$lib/canvas/key-region.svelte';
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import ArrowUp from '@lucide/svelte/icons/arrow-up';
   import Maximize2 from '@lucide/svelte/icons/maximize-2';
@@ -171,6 +172,7 @@
     style={`left:${anchor.x}px; top:${anchor.y}px; --toolbar-scale:${scale}; --toolbar-gap:${TOOLBAR_GAP}px`}
     role="toolbar"
     aria-label="Selection actions"
+    data-key-region={Region.Commands}
   >
     <Tooltip.Provider delayDuration={200}>
       <div class="row" bind:offsetWidth={leadWidth}>

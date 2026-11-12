@@ -176,8 +176,9 @@ describe('the live overlay on the native engine', () => {
 
     core.set_overlay('[{"a":1}]');
     core.set_live_overlay('[{"b":2}]');
+    core.set_selected_overlay('[{"c":3}]');
 
-    expect(calls.filter(([name]) => name === 'setOverlay').at(-1)).toEqual(['setOverlay', '[{"a":1},{"b":2}]']);
+    expect(calls.filter(([name]) => name === 'setOverlay').at(-1)).toEqual(['setOverlay', '[{"a":1},{"c":3},{"b":2}]']);
   });
 });
 

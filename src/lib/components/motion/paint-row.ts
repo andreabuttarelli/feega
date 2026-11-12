@@ -12,4 +12,4 @@ export const PAINT_NAME = 'truncate text-ui-body font-medium text-ui-text';
 
 export const PAINT_META = 'flex min-w-0 items-center text-ui-caption text-ui-text-2';
 
-export const PAINT_INLINE_INPUT = `h-5 min-w-[2ch] [field-sizing:content] appearance-none rounded-xs bg-transparent p-0 text-ui-caption text-ui-text-2 [appearance:textfield] hover:bg-ui-input focus-visible:bg-ui-input [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${FOCUS_RING}`;
+export const PAINT_INLINE_INPUT = `-my-0.5 h-6 min-w-6 [field-sizing:content] text-right appearance-none rounded-xs bg-transparent p-0 text-ui-caption text-ui-text-2 [appearance:textfield] hover:bg-ui-input focus-visible:bg-ui-input [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${FOCUS_RING}`;

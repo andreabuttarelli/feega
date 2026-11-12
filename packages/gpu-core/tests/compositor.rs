@@ -417,3 +417,15 @@ fn a_dropped_group_leaves_the_canvas_extent() {
 
     assert_eq!(c.extent(), None);
 }
+
+#[test]
+fn a_change_the_tiles_take_lets_go_of_the_held_picture_under_them() {
+    let (mut c, library) = scene();
+    c.adopt(at(0.0, 0.0, 1.0), 0.0);
+    assert!(c.held_look(at(0.0, 0.0, 1.0)).is_some());
+
+    c.patch(parse_patch(r#"{ "put": [{ "kind": "use", "clip": "a", "group": "g", "matrix": [1, 0, 0, 1, 40, 0] }], "drop": [] }"#).unwrap(), &library);
+
+    assert!(c.stirred());
+    assert!(c.held_look(at(0.0, 0.0, 1.0)).is_none());
+}
