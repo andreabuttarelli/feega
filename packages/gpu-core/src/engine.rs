@@ -115,15 +115,11 @@ pub struct Engine {
 pub type EngineError = vello::Error;
 
 const LINES: u32 = 1 << 21;
-const SEG_COUNTS: u32 = 1 << 21;
 const SEGMENTS: u32 = 1 << 21;
-const TILES: u32 = 1 << 22;
-const PTCL: u32 = 1 << 23;
-const BINNING: u32 = 1 << 18;
 
 pub fn overflows(scene: &Scene) -> bool {
     let used = scene.bump_estimate(None);
-    used.lines.len() > LINES || used.seg_counts.len() > SEG_COUNTS || used.segments.len() > SEGMENTS || used.tile.len() > TILES || used.ptcl.len() > PTCL || used.binning.len() > BINNING
+    used.lines.len() > LINES || used.segments.len() > SEGMENTS
 }
 
 struct Gpu<'a> {
