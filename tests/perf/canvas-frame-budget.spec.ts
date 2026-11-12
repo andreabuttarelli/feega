@@ -418,7 +418,7 @@ async function edits(page: Page, edit: Edit): Promise<(Stages | null)[]> {
 const mean = (xs: number[]) => (xs.length ? Math.round((10 * xs.reduce((a, b) => a + b, 0)) / xs.length) / 10 : 0);
 
 function breakdown(seen: Stages[]) {
-  const stage = (k: keyof Stages) => mean(seen.map((s) => s[k]));
+  const stage = (k: Exclude<keyof Stages, 'patched'>) => mean(seen.map((s) => s[k]));
   return { effect: stage('effect'), build: stage('build'), media: stage('media'), upload: stage('upload'), draw: stage('draw'), patched: seen.filter((s) => s.patched).length };
 }
 
