@@ -86,3 +86,21 @@ describe('the frame cache kept on this device', () => {
     expect(deleted.sort()).toEqual([cacheName({ userId: 'u1', orgId: 'o1' }), 'feega-frame-thumbs:u2:o2'].sort());
   });
 });
+
+describe('the thumbnails kept on this device', () => {
+  it('are capped by size, least recently used first, and keep one revision per frame', async () => {
+    let clock = 0;
+    const blob = (bytes: number) => new Blob([new Uint8Array(bytes)]);
+    const thumbs = frameCache<Blob>(memoryShelf<Blob>(), { entries: Infinity, bytes: 3000 }, () => ++clock, (b) => b.size);
+
+    await thumbs.keep(`${C1}/${A}:1:look`, blob(2000));
+    await thumbs.keep(`${C1}/${A}:2:look`, blob(500));
+    await thumbs.keep(`${C1}/${B}:1:look`, blob(2000));
+    await thumbs.keep(`${C2}/${B}:1:look`, blob(2000));
+
+    expect(await thumbs.take(`${C1}/${A}:1:look`)).toBeNull();
+    expect(await thumbs.take(`${C1}/${A}:2:look`)).toBeNull();
+    expect(await thumbs.take(`${C1}/${B}:1:look`)).toBeNull();
+    expect((await thumbs.take(`${C2}/${B}:1:look`))?.size).toBe(2000);
+  });
+});
