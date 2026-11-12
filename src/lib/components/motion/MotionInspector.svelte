@@ -855,8 +855,9 @@
 {/snippet}
 
 {#snippet alignCell(field: Field)}
-  <div class="grid-cell" data-prop={field.key}>
-    <SegmentedField name={field.label} options={segmentsOf(field.key, field.options ?? [])} value={String(value(field))} onchange={(v) => setProp(field, v)} />
+  {@const options = segmentsOf(field.key, field.options ?? [])}
+  <div class="grid-cell" data-prop={field.key} style:flex={`${options.length} 1 0`}>
+    <SegmentedField name={field.label} {options} value={String(value(field))} onchange={(v) => setProp(field, v)} />
   </div>
 {/snippet}
 
@@ -1189,7 +1190,7 @@
         <ShellIconButton {...props} label="Add effect" data-testid="add-effect"><Plus /></ShellIconButton>
       {/snippet}
     </MenuTrigger>
-    <MenuContent align="end" class="max-h-[60vh] overflow-y-auto">
+    <MenuContent align="end">
       {#each EFFECT_KINDS as kind (kind)}<MenuItem label={EFFECTS[kind].label} onSelect={() => addEffectOf(kind)} />{/each}
     </MenuContent>
   </Menu>
@@ -1453,6 +1454,7 @@
   }
 
   .align-row > .grid2 {
+    display: flex;
     flex: 1;
     min-width: 0;
   }
@@ -1807,6 +1809,7 @@
 
   .managed a,
   .link {
+    min-height: var(--ui-hit);
     color: var(--ui-accent);
     text-decoration: none;
     background: none;
@@ -1936,6 +1939,7 @@
   }
   .effect-open {
     min-width: 0;
+    min-height: var(--ui-hit);
     border: 0;
     background: none;
     padding: 0;
@@ -2002,7 +2006,7 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 16px;
+    width: var(--ui-hit);
     height: 26px;
     border: 0;
     background: none;

@@ -313,6 +313,7 @@
   --ui-row-sm: 28px;
   --ui-row: 32px;
   --ui-row-lg: 36px;
+  --ui-hit: 24px;
   --ui-header-h: 48px;
   --ui-icon-xs: 12px;
   --ui-icon-lg: 20px;
@@ -413,6 +414,26 @@
 
 @layer base {
   * { margin: 0; padding: 0; box-sizing: border-box; }
+}
+
+.hit {
+  display: grid;
+  place-items: center;
+  min-width: var(--ui-hit);
+  min-height: var(--ui-hit);
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.hit::before {
+  content: '';
+  width: var(--glyph-w, var(--glyph));
+  height: var(--glyph-h, var(--glyph));
+  border-radius: var(--glyph-radius, 0);
+  background: var(--glyph-fill, currentColor);
+  box-shadow: var(--glyph-edge, none);
+  pointer-events: none;
 }
 
 .ui-app {

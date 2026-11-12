@@ -260,11 +260,11 @@
   <div class="sliders">
     {#if dropper}<IconButton action={Action.SampleColour} size={14} onclick={sample} data-testid="colour-eyedropper" />{/if}
     <div class="tracks">
-      <div class="track hue" role="slider" tabindex="0" aria-label="Hue" aria-valuemin="0" aria-valuemax={TURN} aria-valuenow={Math.round(hsb.h)} data-testid="colour-hue" onpointerdown={dragHue} onkeydown={keyHue}>
+      <div class="track hit hue" role="slider" tabindex="0" aria-label="Hue" aria-valuemin="0" aria-valuemax={TURN} aria-valuenow={Math.round(hsb.h)} data-testid="colour-hue" onpointerdown={dragHue} onkeydown={keyHue}>
         <span class="thumb small" style={`left: ${(hsb.h / TURN) * HUNDRED}%; --c: ${pure};`}></span>
       </div>
       {#if alpha !== null}
-        <div class="track level" role="slider" tabindex="0" aria-label="Opacity" aria-valuemin="0" aria-valuemax={HUNDRED} aria-valuenow={percentOfAlpha(level)} data-testid="colour-alpha" style={`--c: ${live};`} onpointerdown={dragLevel} onkeydown={keyLevel}>
+        <div class="track hit level" role="slider" tabindex="0" aria-label="Opacity" aria-valuemin="0" aria-valuemax={HUNDRED} aria-valuenow={percentOfAlpha(level)} data-testid="colour-alpha" style={`--c: ${live};`} onpointerdown={dragLevel} onkeydown={keyLevel}>
           <span class="thumb small" style={`left: ${level * HUNDRED}%; --c: ${live};`}></span>
         </div>
       {/if}
@@ -293,7 +293,7 @@
     <span class="row-head">{row.head}</span>
     <div class="row">
       {#each row.swatches as { colour, label }, at (at)}
-        <button type="button" class="swatch" class:on={value.toLowerCase() === colour.toLowerCase()} style={`--c: ${resolveColor(colour, tokens)};`} title={label} aria-label={label} onclick={() => commit(colour)}></button>
+        <button type="button" class="swatch hit" class:on={value.toLowerCase() === colour.toLowerCase()} style={`--c: ${resolveColor(colour, tokens)};`} title={label} aria-label={label} onclick={() => commit(colour)}></button>
       {/each}
     </div>
   {/each}
@@ -349,13 +349,14 @@
   .tracks {
     display: grid;
     flex: 1;
-    gap: 8px;
     min-width: 0;
   }
 
   .track {
     position: relative;
-    height: 10px;
+    --glyph-w: 100%;
+    --glyph-h: 10px;
+    --glyph-radius: var(--ui-radius-full, 9999px);
     border-radius: var(--ui-radius-full, 9999px);
     cursor: pointer;
     touch-action: none;
@@ -363,13 +364,11 @@
   }
 
   .hue {
-    background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+    --glyph-fill: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
   }
 
   .level {
-    background:
-      linear-gradient(to right, transparent, var(--c)),
-      conic-gradient(#d9d9d9 25%, #fff 0 50%, #d9d9d9 0 75%, #fff 0) 0 0 / 8px 8px;
+    --glyph-fill: linear-gradient(to right, transparent, var(--c)), conic-gradient(#d9d9d9 25%, #fff 0 50%, #d9d9d9 0 75%, #fff 0) 0 0 / 8px 8px;
   }
 
   .values {
@@ -426,22 +425,19 @@
   .row {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
   }
 
   .swatch {
-    width: 18px;
-    height: 18px;
-    padding: 0;
-    border: 1px solid var(--ui-line-strong);
+    --glyph: 18px;
+    --glyph-radius: var(--ui-radius-xs);
+    --glyph-fill: var(--c);
+    --glyph-edge: inset 0 0 0 1px var(--ui-line-strong);
     border-radius: var(--ui-radius-xs);
-    background: var(--c);
     cursor: pointer;
   }
 
   .swatch.on {
-    outline: 2px solid var(--ui-accent);
-    outline-offset: 1px;
+    --glyph-edge: inset 0 0 0 1px var(--ui-line-strong), 0 0 0 1px var(--ui-panel), 0 0 0 3px var(--ui-accent);
   }
 
   @media (pointer: coarse) {
@@ -452,12 +448,11 @@
     }
 
     .swatch {
-      width: 28px;
-      height: 28px;
+      --glyph: 28px;
     }
 
     .track {
-      height: 16px;
+      --glyph-h: 16px;
     }
   }
 </style>
