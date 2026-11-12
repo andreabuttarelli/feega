@@ -34,6 +34,13 @@ function mover(from: Size, to: Size, shift: Point) {
   return { scale, move };
 }
 
+const STROKE_LENGTHS = ['width', 'dash', 'gap'] as const;
+
+type StrokeLengths = Partial<Record<(typeof STROKE_LENGTHS)[number], unknown>>;
+
+const scaledStroke = (stroke: StrokeLengths, at: ReturnType<typeof mover>): StrokeLengths =>
+  Object.fromEntries(Object.entries(stroke).map(([key, value]) => [key, STROKE_LENGTHS.includes(key as never) && typeof value === 'number' ? at.scale('size', value) : value]));
+
 enum Carry {
   Own = 'own',
   ByParent = 'by-parent'
@@ -63,6 +70,10 @@ function reframedClip(clip: MotionClip, carry: Carry, at: ReturnType<typeof move
     if (typeof value === 'number' || moved) {
       transform[key as keyof Point] = moved ? at.move(key, value ?? 0) : at.scale(key, value ?? 0);
     }
+  }
+
+  if (Array.isArray(props.strokes)) {
+    props.strokes = (props.strokes as StrokeLengths[]).map((stroke) => scaledStroke(stroke, at));
   }
 
   return { ...clip, props, transform, keyframes };
