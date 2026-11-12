@@ -12,6 +12,7 @@ import type { OpResult } from '@feega/motion-core/motion/timeline';
 import { BASE_BREAKPOINT } from '@feega/motion-core/motion/breakpoints/model';
 
 const SAVE_DEBOUNCE_MS = 250;
+const DRAFT_AFTER_MS = 50;
 const COALESCE_MS = 800;
 const RETRY_FIRST_MS = 1000;
 const RETRY_CAP_MS = 30000;
@@ -66,6 +67,7 @@ export class FrameEditSession {
   private held: Promise<unknown> | null = null;
   private lastEdit = { summary: '', at: 0 };
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private draftTimer: ReturnType<typeof setTimeout> | null = null;
   private idlers: (() => void)[] = [];
   private unsavedSummary = '';
   private failures = 0;
@@ -179,7 +181,17 @@ export class FrameEditSession {
       clearTimeout(this.saveTimer);
     }
     this.saveTimer = setTimeout(() => void this.save(), SAVE_DEBOUNCE_MS);
-    this.keepDraft();
+    this.draftSoon();
+  }
+
+  private draftSoon() {
+    if (this.draftTimer) {
+      clearTimeout(this.draftTimer);
+    }
+    this.draftTimer = setTimeout(() => {
+      this.draftTimer = null;
+      this.keepDraft();
+    }, DRAFT_AFTER_MS);
   }
 
   private keepDraft() {

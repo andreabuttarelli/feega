@@ -52,6 +52,7 @@
   import { StartupStep, markStartup, reportFramesShown } from '$lib/canvas/core/startup-marks';
   import LoadTimeline from './LoadTimeline.svelte';
   import { editedLayers } from '$lib/canvas/core/edited-layers';
+  import { fastPatch } from '$lib/canvas/core/fast-patch';
   import type { LiveDoc, LiveListener } from '$lib/canvas/core/live-docs.svelte';
   import { baseNodeId, withoutViews } from '$lib/canvas/breakpoint-views';
   import { loadOnce, withScenes, type LoadScene } from '$lib/canvas/scene-sources';
@@ -449,10 +450,33 @@
       return;
     }
     markFrame(key, Step.LiveReady);
-    logGaps(f.id, built.list);
-    lists = listed(lists, f.id, key, onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), loaded.get(f.id), drawnLast.get(f.id)?.group]);
+    showLive(f, key, { doc: source.doc, list: built.list, ready });
+  }
+
+  type ShownLive = { doc: MotionDoc; list: DisplayList; ready: Awaited<ReturnType<typeof media.ready>> };
+  const liveShown = new Map<string, ShownLive>();
+
+  function showLive(f: FrameAt, key: string, shown: ShownLive) {
+    logGaps(f.id, shown.list);
+    lists = listed(lists, f.id, key, onStage(drawable(shown.list, shown.ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), loaded.get(f.id), drawnLast.get(f.id)?.group]);
     liveGroup = new Map(liveGroup).set(f.id, key);
     liveAtRevision.set(f.id, f.revision);
+    liveShown.set(f.id, shown);
+  }
+
+  function patchLive(f: FrameAt, source: LiveDoc) {
+    const shown = liveShown.get(f.id);
+    const list = shown && fastPatch(shown.list, shown.doc, source.doc);
+    if (!shown || !list) {
+      return;
+    }
+    const generation = liveGeneration.ask(f.id);
+    if (!liveGeneration.land(f.id, generation)) {
+      return;
+    }
+    const key = `${f.id}:live${generation}`;
+    markFrame(key, Step.LiveAsked);
+    showLive(f, key, { ...shown, doc: source.doc, list });
   }
 
   const rebuildLatest = latestOnly<string, { f: FrameAt; source: LiveDoc }>((_id, { f, source }) => rebuildLive(f, source));
@@ -464,6 +488,7 @@
     if (source && (!sameLive(liveBuilt.get(f.id), source) || liveStamp.get(f.id) !== f.scenes)) {
       liveBuilt.set(f.id, source);
       liveStamp.set(f.id, f.scenes);
+      patchLive(f, source);
       rebuildLatest(f.id, { f, source });
     }
   }
@@ -483,6 +508,7 @@
     }
     for (const id of [...liveGroup.keys()].filter((id) => !live.has(id))) {
       liveBuilt.delete(id);
+      liveShown.delete(id);
       heldMain.drop(id);
       customPictures.drop(liveRead(id));
       const saved = frames.find((f) => f.id === id);
