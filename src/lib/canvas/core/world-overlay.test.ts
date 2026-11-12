@@ -10,8 +10,8 @@ const edge = (over: Partial<{ id: string; source: string; target: string; mode: 
 const glyphs = ((text: string, size: number) => ({ contours: [[0, 0, size, 0, size, size]], width: text.length * size, height: size })) as never;
 const none = { peers: [], outlines: [], ghost: null, running: [], chrome: [], glyphs };
 const overlayOf = (o: WorldOverlay) => {
-  const { fixed, live } = parts(o);
-  return [...fixed, ...live];
+  const { fixed, selected, live } = parts(o);
+  return [...fixed, ...selected, ...live];
 };
 const curve = wireCurve({ x: 0, y: 0 }, { x: 100, y: 50 });
 
@@ -114,6 +114,17 @@ describe('world overlay, node by node', () => {
     expect(after.fixed.at(-1)).not.toBe(before.fixed.at(-1));
   });
 
+  it('moving a selected node hands back the same fixed part and a new selected part', () => {
+    const base = { curves: [{ edge: edge({ source: 'b', target: 'c' }), curve }, { edge: edge({ id: 'f', source: 'a', target: 'c' }), curve }], selected: ['b'], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none };
+    const before = parts({ ...base, chrome: [tile('a', 0), tile('b', 200)] });
+    const after = parts({ ...base, curves: [{ edge: edge({ source: 'b', target: 'c' }), curve: { ...curve } }, base.curves[1]], chrome: [tile('a', 0), tile('b', 300)] });
+
+    expect(after.fixed).toBe(before.fixed);
+    expect(after.selected).not.toBe(before.selected);
+    expect(after.selected.map((i) => i.clip.split(':')[0])).toContain('b');
+    expect(after.fixed.some((i) => i.clip.startsWith('b:'))).toBe(false);
+  });
+
   it('a zoom frame that rebuilds equal chrome compares it without serialising', () => {
     const base = { curves: [{ edge: edge(), curve }], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none };
     parts({ ...base, chrome: [tile('a', 0), tile('b', 200)] });
@@ -141,7 +152,7 @@ describe('world overlay across stroke zoom steps', () => {
   it('builds again only the ring and handles of a selected node, not its label and ports', () => {
     const before = parts({ ...base, selected: ['f'], chrome: [frame(1, NodeChrome.Selected)] });
     const after = parts({ ...base, selected: ['f'], chrome: [frame(1.04, NodeChrome.Selected)] });
-    const kept = (clip: string) => after.fixed.find((i) => i.clip === clip) === before.fixed.find((i) => i.clip === clip);
+    const kept = (clip: string) => after.selected.find((i) => i.clip === clip) === before.selected.find((i) => i.clip === clip);
 
     expect(kept('f:label')).toBe(true);
     expect(kept('f:port-out')).toBe(true);
