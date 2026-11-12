@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseSheets, readSheets } from './css-tokens';
+import { PAGE_SHEET, parseSheets, readSheets } from './css-tokens';
 import { fixture } from '../../../../tests/fixtures/design-tokens/read';
 
 const declared = async (name: string) => parseSheets(await readSheets(fixture(name)));
@@ -18,7 +18,45 @@ describe('readSheets', () => {
   });
 });
 
+describe('readSheets dai fogli che la pagina ha caricato', () => {
+  it('Nuxt 4: il foglio servito dal dev server porta al suo file nel repo, fuori dalla lista nota', async () => {
+    const sheets = await readSheets(fixture('nuxt4'), [{ at: '/vercel/sandbox/app/assets/css/main.css?direct', text: ':root{--ui-radius:.375rem}' }]);
+
+    expect(sheets.map((s) => s.path)).toEqual(['app/assets/css/main.css']);
+  });
+
+  it('monorepo: dal foglio della app segue un @import di un pacchetto del workspace fino al suo file', async () => {
+    const sheets = await readSheets(fixture('monorepo'), [{ at: '/Users/me/acme/apps/web/src/app.css', text: '' }]);
+
+    expect(sheets.map((s) => s.path)).toEqual(['apps/web/src/app.css', 'packages/ui/src/theme.css']);
+  });
+
+  it('un foglio senza file nel repo entra dal testo della pagina, segnato come letto dalla pagina', async () => {
+    const sheets = await readSheets(fixture('plain'), [{ at: '/_next/static/css/app/layout.css', text: ':root{--ink:#123456}' }, { text: ':root{--paper:#fefefe}' }]);
+
+    expect(sheets.map((s) => s.path)).toEqual(['src/index.css', `${PAGE_SHEET}/_next/static/css/app/layout.css`, `${PAGE_SHEET}inline 2`]);
+  });
+
+  it('un foglio che è sia nella lista nota sia caricato dalla pagina si legge una volta', async () => {
+    const sheets = await readSheets(fixture('plain'), [{ at: '/src/index.css', text: ':root{--brand:#000}' }]);
+
+    expect(sheets.map((s) => s.path)).toEqual(['src/index.css']);
+  });
+});
+
 describe('parseSheets', () => {
+  it('un token dichiarato in un file del repo vince sullo stesso nome letto dalla pagina', () => {
+    const parsed = parseSheets([
+      { path: 'src/app.css', text: ':root {\n  --brand: #ff5500;\n}\n' },
+      { path: `${PAGE_SHEET}inline 1`, text: ':root{--brand:#000000;--ink:#123456}' }
+    ]);
+
+    expect(parsed.declared.map((d) => [d.name, d.raw, d.at.file])).toEqual([
+      ['--brand', '#ff5500', 'src/app.css'],
+      ['--ink', '#123456', `${PAGE_SHEET}inline 1`]
+    ]);
+  });
+
   it('@theme è il modo Light, .dark il modo Dark, con file, riga e colonna di ogni dichiarazione', async () => {
     const { declared: found } = await declared('tailwind4');
     const primary = found.filter((d) => d.name === '--color-primary');

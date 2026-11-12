@@ -1,5 +1,5 @@
 import { MAX_MODES, MAX_VARIABLES, VARIABLE_NAME, VarType, keyOf, type Collection, type VarAlias, type VarLiteral, type Variables } from '@feega/motion-core/motion/variables-model';
-import { ACCENT, accentOf, DARK, LIGHT, type DeclAt, type Parsed } from './css-tokens';
+import { ACCENT, accentOf, DARK, LIGHT, fromPage, type DeclAt, type Parsed } from './css-tokens';
 import { colourOf } from './token-colour';
 
 export enum TokenKind {
@@ -22,6 +22,8 @@ export const SPACING_BASE = '--spacing';
 export const tokenId = (entry: TokenEntry) => (entry.factor ? `${entry.name}-${entry.factor}` : entry.name);
 
 export type TokenMap = Record<string, TokenEntry>;
+
+export const readOnlyKeys = (map: TokenMap) => new Set(Object.entries(map).flatMap(([key, entry]) => (Object.values(entry.origins).every(fromPage) ? [key] : [])));
 
 type Row = { test: RegExp; strip: string; kind: TokenKind | null; group: string; reason?: string };
 

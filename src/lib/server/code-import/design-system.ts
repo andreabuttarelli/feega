@@ -1,10 +1,10 @@
 import type { UrlPlan } from '$lib/server/url-import/url-doc';
 import type { RestNode } from '$lib/server/figma/rest-message';
 import type { Capture } from './boards';
-import { parseSheets, readSheets, type VarRule } from './css-tokens';
+import { parseSheets, READ_ONLY, readSheets, type LoadedSheet, type VarRule } from './css-tokens';
 import { boundToTokens, spacingMultiples, type BoundCount } from './design-bind';
 import { boardBound, designBoard, DESIGN_BOARD } from './design-board';
-import { tokenSetOf, variableName, variablesOf, type TokenMap, type TokenSet } from './design-tokens';
+import { readOnlyKeys, tokenSetOf, variableName, variablesOf, type TokenMap, type TokenSet } from './design-tokens';
 import type { RenderConditions } from './render-conditions';
 import type { ReadFile } from './write-back';
 
@@ -23,8 +23,8 @@ export type Designed = { plan: UrlPlan; map: TokenMap; report: DesignReport; ski
 
 const SKIPPED_PREFIX = 'Design system';
 
-export async function designOf(read: ReadFile): Promise<Design | null> {
-  const parsed = parseSheets(await readSheets(read));
+export async function designOf(read: ReadFile, loaded: LoadedSheet[] = []): Promise<Design | null> {
+  const parsed = parseSheets(await readSheets(read, loaded));
   const set = tokenSetOf(parsed);
   return set.tokens.length ? { set, rules: parsed.rules } : null;
 }
@@ -47,8 +47,8 @@ function usedTokens(design: Design, captures: Capture[]): Set<string> {
 }
 
 export function withBoard(design: Design, repo: string, captures: Capture[]): Capture[] {
-  const { variables } = variablesOf(design.set, repo, { used: usedTokens(design, captures), multiples: spacingMultiples(classesOf(captures)) });
-  return [{ label: DESIGN_BOARD, tree: designBoard(variables), uses: [] }, ...captures];
+  const { variables, map } = variablesOf(design.set, repo, { used: usedTokens(design, captures), multiples: spacingMultiples(classesOf(captures)) });
+  return [{ label: DESIGN_BOARD, tree: designBoard(variables, 1, readOnlyKeys(map)), uses: [] }, ...captures];
 }
 
 export type DesignAsk = { repo: string; base: RenderConditions; boards: Record<string, string>; captures: Capture[]; width: number };
@@ -67,6 +67,8 @@ export function designed(design: Design, plan: UrlPlan, ask: DesignAsk): Designe
   const items = plan.plan.items.map(bound(counted));
   const sets = plan.sets.map(bound({ ...counted }));
 
-  const skipped = [...design.set.skipped, ...made.dropped].map((s) => `${SKIPPED_PREFIX}: ${s}`);
+  const readOnly = readOnlyKeys(made.map).size;
+  const pageOnly = readOnly ? [`${readOnly} token${readOnly === 1 ? '' : 's'} ${READ_ONLY}`] : [];
+  const skipped = [...design.set.skipped, ...made.dropped, ...pageOnly].map((s) => `${SKIPPED_PREFIX}: ${s}`);
   return { plan: { ...plan, sets, plan: { ...plan.plan, items } }, map: made.map, report: { tokens: Object.keys(made.map).length, ...counted }, skipped };
 }

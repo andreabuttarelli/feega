@@ -69,7 +69,11 @@ function entriesOf(variables: Variables, type: VarType, group?: RegExp): Entry[]
     .flatMap(([collectionName, collection]) => Object.entries(collection.vars).filter(([, v]) => v.type === type).map(([name]) => ({ key: keyOf(collectionName, name), name, collection })));
 }
 
-type Sheet = { variables: Variables; scale: number };
+const READ_ONLY_LABEL = 'read-only';
+
+type Sheet = { variables: Variables; scale: number; readOnly: ReadonlySet<string> };
+
+const noted = (sheet: Sheet, entry: Entry, line: string) => (sheet.readOnly.has(entry.key) ? `${line} · ${READ_ONLY_LABEL}` : line);
 
 function modesLine(entry: Entry): string {
   const raw = entry.collection.vars[entry.name].values;
@@ -89,7 +93,7 @@ function colours(sheet: Sheet, top: number): Section {
     const x = MARGIN + (i % COLUMNS) * CELL_W;
     const y = top + Math.floor(i / COLUMNS) * COLOUR_ROW;
     const value = String(variableValue(variables, entry.key) ?? '#000000');
-    return [rect(entry.key, x, y, SWATCH, SWATCH, rgbOf(value), 6), text(entry.name, x + SWATCH + 12, y + 4, Size.Label, INK, FONT, 500), text(modesLine(entry), x + SWATCH + 12, y + 26, Size.Note, SOFT)];
+    return [rect(entry.key, x, y, SWATCH, SWATCH, rgbOf(value), 6), text(entry.name, x + SWATCH + 12, y + 4, Size.Label, INK, FONT, 500), text(noted(sheet, entry, modesLine(entry)), x + SWATCH + 12, y + 26, Size.Note, SOFT)];
   });
   return { nodes, height: Math.ceil(list.length / COLUMNS) * COLOUR_ROW };
 }
@@ -103,7 +107,7 @@ function radii(sheet: Sheet, top: number): Section {
     const x = MARGIN + (i % COLUMNS) * CELL_W;
     const y = top + Math.floor(i / COLUMNS) * RADIUS_ROW;
     const px = pxOf(variableValue(variables, entry.key), scale);
-    return [rect(entry.key, x, y, RADIUS_SQUARE, RADIUS_SQUARE, BAR, px), text(entry.name, x + RADIUS_SQUARE + 12, y + 12, Size.Label, INK, FONT, 500), text(`${px}px`, x + RADIUS_SQUARE + 12, y + 34, Size.Note, SOFT)];
+    return [rect(entry.key, x, y, RADIUS_SQUARE, RADIUS_SQUARE, BAR, px), text(entry.name, x + RADIUS_SQUARE + 12, y + 12, Size.Label, INK, FONT, 500), text(noted(sheet, entry, `${px}px`), x + RADIUS_SQUARE + 12, y + 34, Size.Note, SOFT)];
   });
   return { nodes, height: Math.ceil(list.length / COLUMNS) * RADIUS_ROW };
 }
@@ -114,7 +118,7 @@ function spacing(sheet: Sheet, top: number): Section {
   const nodes = list.flatMap((entry, i) => {
     const y = top + i * SPACING_ROW;
     const px = pxOf(variableValue(variables, entry.key), scale);
-    return [text(entry.name, MARGIN, y, Size.Label, INK, FONT, 500), text(`${px}px`, MARGIN + 120, y, Size.Note, SOFT), rect(`${entry.key} bar`, MARGIN + 200, y + 2, Math.max(1, Math.min(MAX_BAR, px)), BAR_HEIGHT, BAR)];
+    return [text(entry.name, MARGIN, y, Size.Label, INK, FONT, 500), text(noted(sheet, entry, `${px}px`), MARGIN + 120, y, Size.Note, SOFT), rect(`${entry.key} bar`, MARGIN + 200, y + 2, Math.max(1, Math.min(MAX_BAR, px)), BAR_HEIGHT, BAR)];
   });
   return { nodes, height: list.length * SPACING_ROW };
 }
@@ -127,7 +131,7 @@ function families(sheet: Sheet, top: number): Section {
   const nodes = list.flatMap((entry, i) => {
     const y = top + i * TYPE_ROW;
     const stack = String(variableValue(variables, entry.key) ?? '');
-    return [text(entry.name, MARGIN, y + 8, Size.Label, INK, FONT, 500), text('Aa Bb Cc 0123', MARGIN + 160, y, Size.Sample, INK, firstFamily(stack)), text(stack, MARGIN + 520, y + 10, Size.Note, SOFT)];
+    return [text(entry.name, MARGIN, y + 8, Size.Label, INK, FONT, 500), text('Aa Bb Cc 0123', MARGIN + 160, y, Size.Sample, INK, firstFamily(stack)), text(noted(sheet, entry, stack), MARGIN + 520, y + 10, Size.Note, SOFT)];
   });
   return { nodes, height: list.length * TYPE_ROW };
 }
@@ -141,11 +145,11 @@ const PARTS: Part[] = [
   { title: 'Type', build: families }
 ];
 
-export function designBoard(variables: Variables, scale = 1): PageTree {
+export function designBoard(variables: Variables, scale = 1, readOnly: ReadonlySet<string> = new Set()): PageTree {
   const children: RestNode[] = [text(DESIGN_BOARD, MARGIN, MARGIN, Size.Title, INK, FONT, 600)];
   let y = MARGIN + HEADING_GAP + LABEL_GAP;
   for (const part of PARTS) {
-    const section = part.build({ variables, scale }, y + Size.Section + LABEL_GAP * 2);
+    const section = part.build({ variables, scale, readOnly }, y + Size.Section + LABEL_GAP * 2);
     if (!section.nodes.length) {
       continue;
     }
