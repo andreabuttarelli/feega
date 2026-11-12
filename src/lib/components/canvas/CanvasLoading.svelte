@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { PRIDE_FLAGS, flagGradient, nextFlag } from '$lib/canvas/pride-flags';
   import Wordmark from '$lib/components/app/Wordmark.svelte';
+  import FeegaMark from '$lib/components/FeegaMark.svelte';
   import { FRAMES_SHOWN_EVENT, STARTUP_EVENT, StartupStep, startupMarks } from '$lib/canvas/core/startup-marks';
   import { CanvasContent, revealDue, startupProgress, type FramesShown } from '$lib/canvas/core/startup-progress';
 
@@ -17,6 +18,7 @@
   const progress = $derived(startupProgress(done, frames, content));
   const shown = $derived(progress < 1 && !gaveUp);
   const FADE_MS = 240;
+  const MARK_SIZE = 48;
   let removed = $state(false);
 
   $effect(() => {
@@ -61,6 +63,7 @@
 
 {#if !removed}
   <div class="loading" class:gone={!shown} role="progressbar" aria-label="Loading canvas" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)} data-testid="canvas-loading" style:--fade-ms={FADE_MS}>
+    <FeegaMark size={MARK_SIZE} />
     <span class="mark"><Wordmark /></span>
     <div class="track"><div class="bar" style:background={gradient} style:clip-path="inset(0 {(1 - progress) * 100}% 0 0)"></div></div>
   </div>
