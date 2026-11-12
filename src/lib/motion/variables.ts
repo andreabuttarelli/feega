@@ -32,6 +32,7 @@ type Frame = { width: number; height: number };
 
 const roundable = (clip: MotionClip) => clip.component === 'Shape' && clip.props.shape === 'rect';
 
+
 const CONTROL_TYPE: Partial<Record<Control, VarType>> = {
   [Control.Color]: VarType.Colour,
   [Control.Range]: VarType.Number,
@@ -168,6 +169,10 @@ function withRadius(clip: MotionClip, frame: Frame, value: VarLiteral): MotionCl
   return { ...clip, props: { ...clip.props, corners: [], roundness: Math.min(MAX_ROUNDNESS, Math.max(0, value / short)) } };
 }
 
+const SHAPED_TARGETS: Record<string, (clip: MotionClip, frame: Frame, value: VarLiteral) => MotionClip> = {
+  [RADIUS_TARGET]: withRadius
+};
+
 function resolvedClip(variables: Variables, clip: MotionClip, frame: Frame, modes: Modes): MotionClip {
   let next = clip;
   for (const [target, key] of Object.entries(clip.bind ?? {})) {
@@ -175,8 +180,8 @@ function resolvedClip(variables: Variables, clip: MotionClip, frame: Frame, mode
     if (value === undefined) {
       continue;
     }
-    if (target === RADIUS_TARGET) {
-      next = withRadius(next, frame, value);
+    if (SHAPED_TARGETS[target]) {
+      next = SHAPED_TARGETS[target](next, frame, value);
       continue;
     }
     next = target.startsWith(LAYOUT_PREFIX) ? withLayout(next, target, value) : { ...next, props: stacked({ ...ownedFill(next, target), [target]: clamped(next, target, value) }, target, value) };
