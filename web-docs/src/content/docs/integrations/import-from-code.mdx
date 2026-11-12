@@ -101,6 +101,12 @@ In local mode (`npx feega`), the **Folder** tab takes the absolute path of a pro
 - The app has 6 minutes to install and start; each page then follows the URL import limits (1280 px wide, 1500 layers).
 - Two imports every ten minutes per person.
 
+## Waiting for late content
+
+Before a page is captured it waits for the network to go quiet, and then for the DOM to stop changing (no mutations and no change in the page size for 300 ms, at most 3 s). A sidebar or table of contents that appears a moment after load is therefore captured without any setting.
+
+For content that arrives later still, add an extra wait: **Extra wait before capture (ms)** in the import dialog, one value for every page and an optional one per route (a route's value wins, `0` included). It defaults to 0 and is capped at 10 s per page; with many pages the cap shrinks so the waits together stay within 50 s of the import's 150 s capture budget. The value is stored with the frame, so Pull uses the same wait.
+
 ## CLI
 
 ```bash
@@ -112,6 +118,7 @@ feega canvas github $PROJECT repos
 feega canvas github $PROJECT branches owner/repo
 feega canvas import-code $PROJECT /path/to/app --route / --canvas <canvas>   # local mode: a folder
 feega canvas import-code $PROJECT /path/to/app --route / --no-design-system --canvas <canvas>   # keep resolved values, no variables
+feega canvas import-code $PROJECT https://github.com/owner/repo --route / /blog/post --delay 1000 --route-delay /blog/post=3000 --canvas <canvas>   # extra wait in ms before capture, per route wins
 feega canvas code-sync $PROJECT changes <frameId>   # prints the patch
 feega canvas code-sync $PROJECT publish <frameId>   # pull request, or write the folder
 feega canvas code-sync $PROJECT pull <frameId> --branch my-branch
@@ -121,8 +128,8 @@ The import answers `frameId`, `pages` (the paths or stories that landed), `compo
 
 ## MCP and API
 
-Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, routes, conditions?: [{ scheme: "light" | "dark", width }], designSystem?, x, y } })` (`designSystem: false` skips the tokens), or `{ canvasId, storybook, stories?, x, y }`. Folder (local mode): `{ canvasId, folder, routes, x, y }`. Uploaded folder (web): `POST /api/v1/projects/:id/code-uploads` `{ name }` returns `{ path, uploadUrl }`; PUT the gzipped tarball to `uploadUrl`, then `POST /api/v1/projects/:id/code-import` `{ canvasId, upload: path, routes, x, y }`. Sync: ops `code_changes`, `code_publish`, `code_pull` (`{ nodeId, branch? }`, its answer lists token changes in `tokens`). REST: `GET /api/v1/projects/:id/code-import/:nodeId/changes`, `POST …/publish`, `POST …/pull`, `GET …/head`. GitHub: ops `github_status`, `github_connect`, `github_repos`, `github_branches` (`{ repo: "owner/name" }`), `github_disconnect`.
+Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, routes, conditions?: [{ scheme: "light" | "dark", width }], captureDelayMs?, routeDelayMs?: { "/route": ms }, designSystem?, x, y } })` (`designSystem: false` skips the tokens), or `{ canvasId, storybook, stories?, x, y }`. Folder (local mode): `{ canvasId, folder, routes, x, y }`. Uploaded folder (web): `POST /api/v1/projects/:id/code-uploads` `{ name }` returns `{ path, uploadUrl }`; PUT the gzipped tarball to `uploadUrl`, then `POST /api/v1/projects/:id/code-import` `{ canvasId, upload: path, routes, x, y }`. Sync: ops `code_changes`, `code_publish`, `code_pull` (`{ nodeId, branch? }`, its answer lists token changes in `tokens`). REST: `GET /api/v1/projects/:id/code-import/:nodeId/changes`, `POST …/publish`, `POST …/pull`, `GET …/head`. GitHub: ops `github_status`, `github_connect`, `github_repos`, `github_branches` (`{ repo: "owner/name" }`), `github_disconnect`.
 
-Over HTTP: `POST /api/v1/projects/{projectId}/code-import` with `{ canvasId, repo, routes?, conditions?, designSystem?, x, y }` (the answer adds `design: { tokens, byClass, byRule, byValue, unbound }`; `GET …/code-import/tokens?repo=…`, `?folder=…` or `?upload=…` counts the tokens first) (`conditions` up to 6, `routes` up to 8, default `["/"]`; the older single `route` still works) or `{ canvasId, storybook, stories?, x, y }`. Errors: `invalid` (400), `run_failed` (422, with `detail`: the install or dev server output), `unreadable` (422), `rate_limited` (429), `no_sandbox` / `no_browser` (503), `failed` (502).
+Over HTTP: `POST /api/v1/projects/{projectId}/code-import` with `{ canvasId, repo, routes?, conditions?, captureDelayMs?, routeDelayMs?, designSystem?, x, y }` (the answer adds `design: { tokens, byClass, byRule, byValue, unbound }`; `GET …/code-import/tokens?repo=…`, `?folder=…` or `?upload=…` counts the tokens first) (`conditions` up to 6, `routes` up to 8, default `["/"]`; the older single `route` still works) or `{ canvasId, storybook, stories?, x, y }`. Errors: `invalid` (400), `run_failed` (422, with `detail`: the install or dev server output), `unreadable` (422), `rate_limited` (429), `no_sandbox` / `no_browser` (503), `failed` (502).
 
 GitHub: `GET /api/v1/projects/{projectId}/github` (`{ configured, connected, label }`), `POST …/github/connect` (`{ url }` to open), `GET …/github/repos`, `GET …/github/branches?repo=owner/name`, `DELETE …/github`. `not_configured` (501) when the server has no GitHub connection set up, `not_connected` (409) before you connect.

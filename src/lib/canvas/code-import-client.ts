@@ -6,7 +6,9 @@ export type CodeLanded = { nodes: unknown[]; undo: unknown[]; skipped: string[];
 
 export type RenderCondition = { scheme: 'light' | 'dark'; width: number };
 
-export type CodeTarget = { repo: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean } | { folder: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean } | { upload: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean } | { storybook: string };
+export type CaptureWait = { captureDelayMs?: number; routeDelayMs?: Record<string, number> };
+
+export type CodeTarget = ({ repo: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean } & CaptureWait) | ({ folder: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean } & CaptureWait) | ({ upload: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean } & CaptureWait) | { storybook: string };
 
 export type CodeAsk = { projectId: string; canvasId: string; target: CodeTarget; at: { x: number; y: number } };
 

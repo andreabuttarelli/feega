@@ -610,6 +610,8 @@ canvas
   .option('--scheme <schemes...>', 'Render each page under these themes: light, dark (default light)')
   .option('--width <px...>', 'Render each page at these widths in px (default 1280); with --scheme, one board per combination')
   .option('--no-design-system', 'Skip the design system: no variables from the CSS tokens, no Design system board')
+  .option('--delay <ms>', 'Extra wait in ms before each page is captured, for content that arrives late (default 0, at most 10000)', Number)
+  .option('--route-delay <route=ms...>', 'Extra wait for one route, wins over --delay, e.g. /blog/post=3000')
   .option('--x <n>', 'Canvas position of the frame centre', Number, 0)
   .option('--y <n>', 'Canvas position of the frame centre', Number, 0)
   .option('--org <id>', 'Which org, if you belong to more than one')

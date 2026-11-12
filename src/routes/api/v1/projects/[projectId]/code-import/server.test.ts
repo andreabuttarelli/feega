@@ -107,4 +107,18 @@ describe('POST /api/v1/projects/:id/code-import', () => {
     expect(res.status).toBe(400);
     expect(download).not.toHaveBeenCalled();
   });
+
+  it('l\'attesa arriva all\'import tagliata al massimo, quella della rotta resta', async () => {
+    importCodeAt.mockResolvedValue({ outcome: 'ok', frameId: 'f1', name: 'app', undo: [], skipped: [], truncated: false, pages: ['/'], components: 0, variants: 0, instances: 0 });
+
+    await call({ canvasId: 'c1', repo: 'https://github.com/a/b', routes: ['/', '/x'], captureDelayMs: 999_999, routeDelayMs: { '/x': 0 }, x: 0, y: 0 }, 'u-delay');
+
+    expect(importCodeAt.mock.calls.at(-1)![0].delay).toEqual({ ms: 10_000, routes: { '/x': 0 } });
+  });
+
+  it('rifiuta un\'attesa negativa', async () => {
+    const { res } = await call({ canvasId: 'c1', repo: 'https://github.com/a/b', captureDelayMs: -1, x: 0, y: 0 }, 'u-neg');
+
+    expect(res.status).toBe(400);
+  });
 });
