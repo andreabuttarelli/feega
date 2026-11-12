@@ -194,7 +194,7 @@
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
   import { FitPurpose, fitView, restoreViewport } from '$lib/canvas/restore-viewport';
   import { coreSourcePath } from '$lib/canvas/core/early-sources';
-  import { loadViewport, rememberViewport } from '$lib/canvas/viewport-memory';
+  import { loadViewport, pageDiedInView, rememberViewport } from '$lib/canvas/viewport-memory';
   import { FocusMode, Placement, centreIn, focusPlacement, focusSelects, inView, revealIn, frameIn, type Insets } from '$lib/canvas/free-area';
   import { ZoomStep, watchPinch, type CanvasZoom } from '$lib/canvas/page-zoom';
   import { Region, claimFocus, reachesCanvas, regionOf, releaseFocus } from '$lib/canvas/key-region.svelte';
@@ -907,7 +907,18 @@
     const saved = props.viewerId ? loadViewport(props.viewerId, canvasId) : null;
     const s = screenSize();
     view = restoreViewport(saved, boundsOf(incoming), { width: s.width, height: s.height });
+    reopenedFitted = Boolean(props.viewerId) && pageDiedInView();
   }
+
+  const REOPENED_NOTE_MS = 6000;
+  let reopenedFitted = $state(false);
+  $effect(() => {
+    if (!reopenedFitted) {
+      return;
+    }
+    const timer = setTimeout(() => (reopenedFitted = false), REOPENED_NOTE_MS);
+    return () => clearTimeout(timer);
+  });
 
   const REMEMBER_VIEW_MS = 400;
   $effect(() => {
@@ -4647,6 +4658,10 @@
 
   {#if targeting}
     <p class="edge-refusal" role="status">Pick the node to connect to — Esc to cancel</p>
+  {/if}
+
+  {#if reopenedFitted}
+    <p class="edge-refusal" role="status">The page reloaded, so the canvas opened zoomed out</p>
   {/if}
 
   {#if props.onDraw && frameBar.tool !== DrawTool.Select && frameBar.tool !== DrawTool.ShapeBuilder}
