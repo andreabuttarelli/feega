@@ -37,6 +37,14 @@ describe('readSheets dai fogli che la pagina ha caricato', () => {
     expect(sheets.map((s) => s.path)).toEqual(['src/index.css', `${PAGE_SHEET}/_next/static/css/app/layout.css`, `${PAGE_SHEET}inline 2`]);
   });
 
+  it('un foglio caricato da node_modules non si legge dal repo: entra dal testo della pagina', async () => {
+    const read = async (path: string) => (path === 'node_modules/leaflet/dist/leaflet.css' ? '.leaflet-bar{box-shadow:0 1px 5px rgba(0,0,0,.65)}' : null);
+
+    const sheets = await readSheets(read, [{ at: '/Users/me/app/node_modules/leaflet/dist/leaflet.css', text: '.x{}' }]);
+
+    expect(sheets.map((s) => s.path)).toEqual([`${PAGE_SHEET}/Users/me/app/node_modules/leaflet/dist/leaflet.css`]);
+  });
+
   it('un foglio che è sia nella lista nota sia caricato dalla pagina si legge una volta', async () => {
     const sheets = await readSheets(fixture('plain'), [{ at: '/src/index.css', text: ':root{--brand:#000}' }]);
 

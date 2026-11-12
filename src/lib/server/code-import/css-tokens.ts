@@ -59,6 +59,7 @@ const PNPM_WORKSPACE = 'pnpm-workspace.yaml';
 const PNPM_ENTRY = /^\s*-\s*["']?([^"'#\s]+)["']?/;
 const CSS_FILE = /\.css$/;
 const MAX_SOURCE_DEPTH = 12;
+const DEPENDENCIES = 'node_modules';
 const VAR_ONLY = /^var\(\s*(--[\w.-]+)\s*(?:,[^)]*)?\)$/;
 const CUSTOM_PROPERTY = /^--[\w.-]+$/;
 const BOUND_PROPERTIES = new Set(['color', 'background', 'background-color', 'border-color', 'gap', 'padding', 'border-radius']);
@@ -306,10 +307,10 @@ const insideRepo = (path: string) => !path.startsWith('..') && !path.startsWith(
 
 async function sourceOf(read: ReadFile, at: string | undefined): Promise<string | null> {
   const bare = (at ?? '').split(/[?#]/)[0].replace(/^\/@fs\//, '/');
-  if (!CSS_FILE.test(bare)) {
+  const parts = bare.split('/').filter(Boolean);
+  if (!CSS_FILE.test(bare) || parts.includes(DEPENDENCIES)) {
     return null;
   }
-  const parts = bare.split('/').filter(Boolean);
   for (let i = Math.max(0, parts.length - MAX_SOURCE_DEPTH); i < parts.length; i++) {
     const path = parts.slice(i).join('/');
     if ((await read(path).catch(() => null)) !== null) {
