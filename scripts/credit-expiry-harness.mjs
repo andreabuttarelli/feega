@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 
-const MIGRATIONS = ['20260924_credit_balance_service_role.sql', '20260929_feega_plan_grants.sql', '20261112_credits_never_expire.sql'].map((file) =>
+const MIGRATIONS = ['20260924_credit_balance_service_role.sql', '20260929_feega_plan_grants.sql', '20261112_credits_never_expire.sql', '20261113_seat_proration_grants.sql'].map((file) =>
   join(fileURLToPath(new URL('..', import.meta.url)), 'supabase/canvas-migrations', file)
 );
 const ORG = '11111111-1111-4111-8111-111111111111';
