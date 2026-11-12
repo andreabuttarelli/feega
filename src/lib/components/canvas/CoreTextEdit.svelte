@@ -5,11 +5,12 @@
   import { anchorShift, editCss, type EditBody, type EditLayout, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { TypingBurst, autoList, lineMove, rangeOf, select, selectionIn, textOf, type Span } from '$lib/canvas/editable-text';
   import { textRange } from '$lib/canvas/text-range.svelte';
+  import { openingSpan } from '$lib/canvas/core/text-caret';
   import GradientHandles from './GradientHandles.svelte';
   import { ListKind, type ListItem } from '@feega/motion-core/motion/text-lists';
   import { codeIndex, linkOf, MIXED, RunToggle, STYLE_KEYS, type GradientFill, type RunEdit, type RunStyle, type TextRun } from '@feega/motion-core/motion/text-runs';
 
-  let { layout, look, text, typedAhead = () => '', body, clipId = '', base = {}, runs: initialRuns = [], lists: initialLists = [], styled = false, oncommit }: { layout: EditLayout; look: TextEditStyle; text: string; typedAhead?: () => string; body: EditBody; clipId?: string; base?: RunStyle; runs?: TextRun[]; lists?: ListItem[]; styled?: boolean; oncommit: (text: string, runs: TextRun[], lists: ListItem[]) => void } = $props();
+  let { caretAt = null, layout, look, text, typedAhead = () => '', body, clipId = '', base = {}, runs: initialRuns = [], lists: initialLists = [], styled = false, oncommit }: { caretAt?: number | null; layout: EditLayout; look: TextEditStyle; text: string; typedAhead?: () => string; body: EditBody; clipId?: string; base?: RunStyle; runs?: TextRun[]; lists?: ListItem[]; styled?: boolean; oncommit: (text: string, runs: TextRun[], lists: ListItem[]) => void } = $props();
 
   type Box = { left: number; top: number; width: number; height: number };
   type Snapshot = { text: string; runs: TextRun[]; lists: ListItem[]; sel: Span };
@@ -394,7 +395,7 @@
         value = ahead;
         textRange.open({ clipId: styled ? clipId : '', text: ahead, runs: [], lists: [], base });
       }
-      sel = { start: ahead ? value.length : 0, end: value.length };
+      sel = openingSpan(value, ahead ? value.length : caretAt);
       paint();
       syncRange();
     });

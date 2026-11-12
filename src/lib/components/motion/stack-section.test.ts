@@ -66,6 +66,23 @@ describe('the stack section', () => {
     expect(body).not.toContain('auto-layout-gap');
   });
 
+  it('a lone child offers no reorder, since there is nowhere to move it', () => {
+    let doc = newMotionDoc(MotionFormat.Square);
+    doc = must(addClip(doc, { component: 'Shape', from: 0, props: { shape: 'rect' } }, 'only'));
+    const body = html(must(wrapInStack(doc, ['only'], 'box', 'lane')), 'only');
+
+    expect(body).toContain('data-testid="auto-layout-leave"');
+    expect(body).not.toContain('aria-label="Move earlier"');
+    expect(body).not.toContain('aria-label="Move later"');
+  });
+
+  it('a child among siblings offers both reorder buttons', () => {
+    const body = html(row, 'a');
+
+    expect(body).toContain('aria-label="Move earlier"');
+    expect(body).toContain('aria-label="Move later"');
+  });
+
   it('a child shows W and H chips with their mode beside the value', () => {
     const body = html(row, 'a');
     expect(body).toMatch(/data-testid="stack-unit-width"[^>]*>Fixed/);

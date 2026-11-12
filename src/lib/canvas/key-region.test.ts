@@ -77,6 +77,25 @@ describe('key region', () => {
     }
   });
 
+  it('zoom keys act from the layers list and the toolbar, never from a panel or a field', () => {
+    const $ = tree();
+    const zoomKeys: [string, KeyboardEventInit][] = [
+      ['!', { shiftKey: true, code: 'Digit1' }],
+      ['@', { shiftKey: true, code: 'Digit2' }],
+      [')', { shiftKey: true, code: 'Digit0' }],
+      ['+', {}],
+      ['-', {}]
+    ];
+
+    for (const [key, init] of zoomKeys) {
+      expect(press($('row'), key, init), `row ${key}`).toBe(true);
+      expect(press($('tool'), key, init), `tool ${key}`).toBe(true);
+      expect(press($('fill-eye'), key, init), `panel ${key}`).toBe(false);
+      expect(press($('rename'), key, init), `rename ${key}`).toBe(false);
+      expect(press($('field'), key, init), `field ${key}`).toBe(false);
+    }
+  });
+
   it('a press on the canvas takes key focus away from a panel or the layers list, even when the press is cancelled', () => {
     const $ = tree();
     const down = (target: Element) => {

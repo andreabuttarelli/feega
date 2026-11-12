@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
-  import ColourRow from './ColourRow.svelte';
+  import ColourRows from './ColourRows.svelte';
   import { documentColours, frameColours, recolourFrame } from '$lib/motion/selection-colours';
 
   let { doc, onchange }: { doc: MotionDoc; onchange: (result: OpResult, summary: string) => void } = $props();
@@ -14,9 +14,7 @@
 {#if colours.length}
   <section class="section ui-section" data-testid="frame-colours">
     <h3>Selection colours</h3>
-    {#each colours as { colour, count } (colour)}
-      <ColourRow {colour} {count} palette={() => documentColours(doc)} onchange={(to) => swap(colour, to)} />
-    {/each}
+    <ColourRows {colours} palette={() => documentColours(doc)} onswap={swap} />
   </section>
 {/if}
 
