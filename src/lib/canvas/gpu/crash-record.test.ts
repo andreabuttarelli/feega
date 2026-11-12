@@ -34,6 +34,28 @@ describe('the crash record', () => {
     expect(report?.zoom).toBe(2.5);
   });
 
+  it('knows the last session died even when it died before its first sample', () => {
+    const shelf = new MemoryShelf();
+    new CrashRecorder(shelf).begin();
+
+    const next = new CrashRecorder(shelf);
+
+    expect(next.begin()).toBeNull();
+    expect(next.diedBefore).toBe(true);
+  });
+
+  it('does not call a session that ended cleanly dead', () => {
+    const shelf = new MemoryShelf();
+    const left = new CrashRecorder(shelf);
+    left.begin();
+    left.endCleanly();
+
+    const next = new CrashRecorder(shelf);
+    next.begin();
+
+    expect(next.diedBefore).toBe(false);
+  });
+
   it('reports nothing after a session hidden cleanly', () => {
     const shelf = new MemoryShelf();
     const left = new CrashRecorder(shelf);

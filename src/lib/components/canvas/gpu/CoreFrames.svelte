@@ -57,7 +57,8 @@
   import { baseNodeId, withoutViews } from '$lib/canvas/breakpoint-views';
   import { loadOnce, withScenes, type LoadScene } from '$lib/canvas/scene-sources';
   import { describe, factsOf, signatureOf, undrawn, type NodeFacts } from '$lib/canvas/core/core-debug';
-  import { Motion, hudLine, watchCrashes } from '$lib/canvas/gpu/crash-watch';
+  import { Motion, heldBy, hudLine, watchCrashes } from '$lib/canvas/gpu/crash-watch';
+  import { platformOf } from '$lib/canvas/perf/platform';
   import { startCanvasPerf } from '$lib/canvas/perf/perf-beacon';
   import { Camera } from '$lib/canvas/perf/session-perf';
   import { liftOut, liftedPut, movingGroup, restGroup, type Lift, type Lifted } from '$lib/canvas/core/lifted-drag';
@@ -103,7 +104,7 @@
   const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, budget.resolution);
   const crashes = watchCrashes({ device: currentDevice(), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, resolution });
   const RASTERED = new Set<Outcome>([Outcome.Full, Outcome.Partial]);
-  const perf = startCanvasPerf({ canvasId: untrack(() => place?.canvasId ?? ''), device: currentDevice(), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, frames: () => frames.length });
+  const perf = startCanvasPerf({ canvasId: untrack(() => place?.canvasId ?? ''), device: currentDevice(), platform: platformOf(navigator.userAgent, navigator.maxTouchPoints), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, frames: () => frames.length, area: () => ({ width: Math.round(area.width), height: Math.round(area.height) }), memory: () => heldBy(crashes.sample), diedBefore: crashes.diedBefore, before: crashes.before });
   const EDIT_GIVE_UP_MS = 10_000;
   const editSeen = new Map<string, string>();
   const editsOwed = new Map<string, number>();
@@ -680,6 +681,7 @@
           return;
         }
         const next = afterAttachFailure(e, tried, freshCores, BACKENDS.length);
+        perf.error(e instanceof Error ? e.message : String(e));
         if (next.step === AttachStep.GiveUp) {
           onfallback(e instanceof Error ? e.message : String(e));
           return;
@@ -922,6 +924,7 @@
     }
     losses++;
     perf.deviceLost();
+    perf.error(why instanceof Error ? why.message : String(why));
     const next = backendAfterLoss(backend, losses, BACKENDS.length);
     if (next !== backend) {
       losses = 0;

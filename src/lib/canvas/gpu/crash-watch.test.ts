@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { blankSample, wasInGesture } from './crash-record';
-import { Motion, gauged, track, type Tick } from './crash-watch';
+import { Motion, gauged, heldBy, track, type Tick } from './crash-watch';
 
 const tick = (over: Partial<Tick>): Tick => ({ x: 0, y: 0, zoom: 1, now: 0, motion: Motion.Moving, rastered: false, ...over });
 
@@ -57,5 +57,13 @@ describe('gauged', () => {
     gauged(s, gpu, raster);
     expect(s.wasmBytes).toBe(8);
     expect(s.scratchBytes).toBe(4);
+  });
+});
+
+describe('what a session held', () => {
+  it('reads in megabytes to one decimal', () => {
+    const s = { ...blankSample(), textureBytes: 150 * 1024 * 1024 + 60_000, textures: 12, wasmBytes: 64 * 1024 * 1024 };
+
+    expect(heldBy(s)).toEqual({ textureMb: 150.1, textures: 12, wasmMb: 64, cacheMb: 0, pictureMb: 0 });
   });
 });

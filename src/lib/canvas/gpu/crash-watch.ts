@@ -63,7 +63,14 @@ function shelf(): Storage | null {
   }
 }
 
-export type CrashWatch = { tick: (t: Tick, raster: Gauges) => void; sample: CrashSample; stop: () => void };
+export type Held = { textureMb: number; textures: number; wasmMb: number; cacheMb: number; pictureMb: number };
+
+const MB_ROUND = 10;
+const megabytes = (bytes: number) => Math.round((bytes / MB) * MB_ROUND) / MB_ROUND;
+
+export const heldBy = (s: CrashSample): Held => ({ textureMb: megabytes(s.textureBytes), textures: s.textures, wasmMb: megabytes(s.wasmBytes), cacheMb: megabytes(s.cacheBytes), pictureMb: megabytes(s.pictureBytes) });
+
+export type CrashWatch = { tick: (t: Tick, raster: Gauges) => void; sample: CrashSample; diedBefore: boolean; before: (Held & { zoom: number; gestureFrames: number }) | null; stop: () => void };
 
 export function watchCrashes(sizes: Sizes): CrashWatch {
   const gpu = probeGpu(window as never);
@@ -84,6 +91,8 @@ export function watchCrashes(sizes: Sizes): CrashWatch {
 
   return {
     sample,
+    diedBefore: recorder?.diedBefore ?? false,
+    before: previous ? { ...heldBy(previous), zoom: previous.zoom, gestureFrames: previous.gestureFrames } : null,
     tick(t, raster) {
       track(sample, t);
       gauged(sample, gpu, raster);
