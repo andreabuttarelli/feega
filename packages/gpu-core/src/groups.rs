@@ -13,7 +13,7 @@ use crate::glyphs::{outline, Fonts};
 use crate::text::typeset;
 use crate::pictures::Pictures;
 use crate::fragments::{Encoded, Fragments, Kept};
-use crate::lod::{blur_px, detail, Detail, BLUR_REACH};
+use crate::lod::{blur_px, detail, Detail, BLUR_REACH, SPLIT_DESCENDANTS};
 use crate::scene::{bounds, build_items, needs_layer, Layers};
 use crate::Skipped;
 
@@ -341,6 +341,17 @@ fn vector_only(item: &Item) -> bool {
     }
 }
 
+fn descendants(item: &Item) -> usize {
+    match item {
+        Item::Group(g) => g.items.iter().map(|i| 1 + descendants(i)).sum(),
+        _ => 0,
+    }
+}
+
+fn spanned(item: &Item) -> bool {
+    vector_only(item) && descendants(item) <= SPLIT_DESCENDANTS
+}
+
 fn standalone(item: &Item) -> bool {
     let Some(look) = item.look() else { return false };
     let drawn_alone = matches!(item, Item::Path(_) | Item::Group(_));
@@ -457,8 +468,8 @@ fn pieces_of(row: &Row, path: &str, frame: Rect, seed: Option<&Seed>) -> Vec<Pie
     while at < row.len() {
         let here = format!("{path}.{at}");
         let item = row.at(at);
-        if vector_only(item) {
-            let end = (at..row.len()).find(|&i| !vector_only(row.at(i))).unwrap_or(row.len());
+        if spanned(item) {
+            let end = (at..row.len()).find(|&i| !spanned(row.at(i))).unwrap_or(row.len());
             let whole = at == 0 && end == row.len();
             out.push(Piece::Span(span_of(row, at..end, here, frame, seed.filter(|_| whole))));
             at = end;

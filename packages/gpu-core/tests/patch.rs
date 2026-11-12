@@ -193,3 +193,17 @@ fn hiding_near_the_top_re_encodes_a_few_runs_not_the_page() {
     let (rebuilt, total) = encoded_after(&edit, &edited);
     assert!(rebuilt <= 3, "{rebuilt} of {total} runs re-encoded");
 }
+
+fn section(items: &[String]) -> String {
+    format!(r#"{{ "kind": "group", "clip": "section", "items": [{}], "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blend": "normal" }}"#, items.join(","))
+}
+
+#[test]
+fn a_large_vector_group_is_encoded_as_its_children() {
+    let sections: Vec<String> = (0..3).map(|s| section(&(0..LONG / 4).map(|i| bar(s * 60 + i, 1.0)).collect::<Vec<_>>())).collect();
+    let mut lib = composing();
+    lib.put_group("v1", &group_of(&[section(&sections)]));
+    let fragments = lib.plan(&screen("v1"), LIMITS).screen.fragments;
+    assert!(fragments.get("v1").is_none());
+    assert!(fragments.len() >= 2);
+}
