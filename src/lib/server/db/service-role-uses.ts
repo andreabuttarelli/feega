@@ -29,6 +29,11 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['product_events']
   },
   {
+    path: 'src/lib/server/canvas-debug/debug-log-repo.ts — writeDebugRows (rotta /api/v1/telemetry/canvas-debug)',
+    why: "Il registratore di volo `?debug` scrive righe diagnostiche che nessun utente deve poter leggere né riscrivere: la tabella non concede nulla ad anon/authenticated. L'utente c'è ed è verificato dalla rotta; user_id è il suo, org_id e canvas_id si LEGGONO dalla tela con il SUO client (RLS), mai presi da chi chiama. Solo insert di contatori e id, mai contenuto del documento; non legge nulla.",
+    tables: ['canvas_debug_logs']
+  },
+  {
     path: 'src/lib/server/core-usage.ts — profileIsInternal',
     why: "Un evento di prodotto nasce anche fuori da una richiesta con sessione (un render che finisce, una chiave API): per escludere il team come fa il browser serve l'email dell'utente che ha agito. Legge solo profiles.email per quell'id, e fuori esce solo il booleano interno/no, mai l'email.",
     tables: ['profiles']

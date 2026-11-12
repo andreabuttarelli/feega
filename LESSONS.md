@@ -16,6 +16,14 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 **Signal:** the canvas page answers 500 in the browser, console `Error: Redirect loop` from `hooks.client.ts`, while `curl` of every `/api/v1/...` route answers 200. **Move:** `FEEGA_LOCAL_FILE` alone switches the server only; the browser client still asks Supabase for a session, gets none, and bounces to `/login`. Start the dev server with the whole `localEnv` of `scripts/local.mjs` (`PUBLIC_FEEGA_LOCAL=1`, `PUBLIC_SUPABASE_URL=http://supabase.invalid`, `PUBLIC_SUPABASE_ANON_KEY=local`, `ORIGIN`, `PUBLIC_APP_URL`), or run `npm run local`.
 
+### A local-mode API call answers 403 `outside_local_canvas` though it names the right canvas
+
+**Signal:** some requests to an `/api/v1/...` route land and others from the same client get 403, only in local mode. **Move:** `serveApi` in `local-mode.ts` walks the WHOLE JSON body, at any depth, and refuses any key named `canvas`, `canvasId`, `canvas_id`, `project`, `projectId` or `project_id` whose string value is not the local place. A nested `canvas: "780x1232"` (a size) is enough. Rename the nested key.
+
+### Telemetry sent with `keepalive` loses whole batches in a burst
+
+**Signal:** contiguous runs of missing sequence numbers (a multiple of the batch size) in lines posted with `fetch(…, { keepalive: true })`, no error on the server. **Move:** browsers cap keepalive request bodies at 64 KB in flight per page and reject the rest. Count the bytes in flight and send plain `fetch` past ~48 KB (`keepaliveBudget` in `src/lib/canvas/debug/flight-log.ts`).
+
 ## Canvas performance
 
 ### Perf numbers swing 6 to 57 fps on the same build: the machine is loaded
