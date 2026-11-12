@@ -123,13 +123,15 @@ the asked, source, built, put and drawn durations once it is drawn. `[images]` l
 switches; `[tiles]` logs gesture and rest render starts, raster passes per frame (from the render
 tally), cache evictions and settle. Nothing is subscribed or built when off.
 
-## Frame budget (90 fps)
+## Frame budget (90 and 120 fps)
 
 `npm run perf:budget` is a local pre-merge check, not a CI job: hosted runners have no GPU. It runs
 `tests/perf/canvas-frame-budget.spec.ts` in headed Chromium with vsync and the frame-rate cap off,
 so a frame gap is the real frame cost instead of the display interval. Per target it pans, zooms,
 toggles fit (Shift+1 / Shift+0) and drags a frame, `BUDGET_RUNS` (default 3) fresh contexts each,
 and fails a gesture when its p95 is over 11.1 ms (90 fps) or more than 2% of its frames are.
+The same frames are also judged against 8.3 ms (120 fps, high-refresh displays): reported as
+`at120` in the JSON and the `/` second figure in each run line, not yet a failure.
 
 Targets (`BUDGET_TARGETS`, comma list):
 
