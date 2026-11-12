@@ -2,16 +2,24 @@ use vello::kurbo::{Affine, BezPath, Point};
 use vello::peniko::{Color, Fill};
 use vello::Scene;
 
-use gpu_core::engine::overflows;
+use gpu_core::engine::fullness;
 use gpu_core::tiles::{split_render, Piece, Rendered, MAX_SPLITS};
 
 fn covered(pieces: &[Piece]) -> u64 {
     pieces.iter().map(|p| p.w as u64 * p.h as u64).sum()
 }
 
+fn area(p: Piece) -> f64 {
+    p.w as f64 * p.h as f64
+}
+
+fn disjoint(pieces: &[Piece]) -> bool {
+    pieces.iter().all(|a| pieces.iter().filter(|b| *b != a).all(|b| a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y))
+}
+
 #[test]
 fn a_render_that_fits_is_one_piece() {
-    let pieces = split_render((772, 772), |_| Rendered::Fit);
+    let pieces = split_render((772, 772), |_| Rendered { fullness: 0.5 });
 
     assert_eq!(pieces, vec![Piece { x: 0, y: 0, w: 772, h: 772 }]);
 }
@@ -21,13 +29,54 @@ fn an_overflowing_render_is_split_in_halves_until_each_fits() {
     let mut tried = Vec::new();
     let pieces = split_render((772, 516), |p| {
         tried.push(p);
-        if p.w as u64 * p.h as u64 > 100_000 { Rendered::Overflowed } else { Rendered::Fit }
+        Rendered { fullness: area(p) / 100_000.0 }
     });
 
     assert_eq!(covered(&pieces), 772 * 516);
     assert!(pieces.iter().all(|p| p.w as u64 * p.h as u64 <= 100_000));
     assert_eq!(tried[1], Piece { x: 0, y: 0, w: 386, h: 516 });
-    assert!(pieces.iter().all(|a| pieces.iter().filter(|b| *b != a).all(|b| a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y)));
+    assert!(disjoint(&pieces));
+}
+
+#[test]
+fn a_render_whose_halves_overflow_as_much_as_it_costs_three_draws() {
+    let mut draws = 0;
+    let pieces = split_render((516, 516), |_| {
+        draws += 1;
+        Rendered { fullness: 1.4 }
+    });
+
+    assert_eq!(draws, 3);
+    assert_eq!(covered(&pieces), 516 * 516);
+    assert!(disjoint(&pieces));
+}
+
+#[test]
+fn geometry_crowded_in_a_corner_is_still_split_until_it_fits() {
+    let corner = Piece { x: 0, y: 0, w: 64, h: 64 };
+    let load = |p: Piece| p.overlap(corner).map(|o| 3.0 * area(o) / area(corner)).unwrap_or(0.0);
+    let mut draws = 0;
+    let pieces = split_render((516, 516), |p| {
+        draws += 1;
+        Rendered { fullness: load(p) }
+    });
+
+    assert!(pieces.iter().all(|p| load(*p) <= 1.0));
+    assert_eq!(covered(&pieces), 516 * 516);
+    assert!(disjoint(&pieces));
+    assert!(draws <= 1 + 2 * MAX_SPLITS, "{draws}");
+}
+
+#[test]
+fn an_item_too_dense_to_split_costs_at_most_two_draws_per_halving() {
+    let mut draws = 0;
+    let pieces = split_render((516, 516), |p| {
+        draws += 1;
+        Rendered { fullness: if p.x == 0 && p.y == 0 { 3.0 } else { 0.0 } }
+    });
+
+    assert_eq!(draws, 1 + 2 * MAX_SPLITS);
+    assert_eq!(covered(&pieces), 516 * 516);
 }
 
 #[test]
@@ -35,7 +84,7 @@ fn splitting_stops_after_twelve_halvings() {
     let mut deepest = 0;
     let pieces = split_render((4096, 4096), |p| {
         deepest = deepest.max(4096 * 4096 / (p.w as u64 * p.h as u64));
-        Rendered::Overflowed
+        Rendered { fullness: 1e9 * area(p) / (4096.0 * 4096.0) }
     });
 
     assert_eq!(deepest, 1 << MAX_SPLITS);
@@ -56,8 +105,8 @@ fn dense(segments: usize) -> Scene {
 
 #[test]
 fn a_huge_scene_overflows_vellos_buffers_and_a_small_one_does_not() {
-    assert!(!overflows(&dense(1_000)));
-    assert!(overflows(&dense(2_200_000)));
+    assert!(fullness(&dense(1_000)) <= 1.0);
+    assert!(fullness(&dense(2_200_000)) > 1.0);
 }
 
 fn landing_batch_at_close_zoom() -> Scene {
@@ -77,7 +126,7 @@ fn a_scene_within_the_segment_buffers_is_not_split() {
     let segments = scene.bump_estimate(None).segments.len();
 
     assert!(segments > 1 << 18 && segments < 1 << 21, "{segments}");
-    assert!(!overflows(&scene));
+    assert!(fullness(&scene) <= 1.0);
 }
 
 #[test]

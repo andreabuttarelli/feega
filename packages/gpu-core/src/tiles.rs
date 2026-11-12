@@ -578,22 +578,34 @@ impl Piece {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Rendered {
-    Fit,
-    Overflowed,
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Rendered {
+    pub fullness: f64,
 }
 
+impl Rendered {
+    fn overflowed(self) -> bool {
+        self.fullness > 1.0
+    }
+}
+
+const SHARED_BY_HALVES: f64 = 1.75;
+
 pub fn split_render(size: (u32, u32), mut render: impl FnMut(Piece) -> Rendered) -> Vec<Piece> {
+    let whole = Piece { x: 0, y: 0, w: size.0, h: size.1 };
     let mut done = Vec::new();
-    let mut todo = vec![(Piece { x: 0, y: 0, w: size.0, h: size.1 }, 0)];
-    while let Some((piece, depth)) = todo.pop() {
-        let overflowed = render(piece) == Rendered::Overflowed;
-        let halves = piece.halves().filter(|_| overflowed && depth < MAX_SPLITS);
-        match halves {
-            Some([a, b]) => todo.extend([(b, depth + 1), (a, depth + 1)]),
-            None => done.push(piece),
+    let mut todo = vec![(whole, render(whole), 0)];
+    while let Some((piece, rendered, depth)) = todo.pop() {
+        let Some([a, b]) = piece.halves().filter(|_| rendered.overflowed() && depth < MAX_SPLITS) else {
+            done.push(piece);
+            continue;
+        };
+        let (ra, rb) = (render(a), render(b));
+        if ra.fullness + rb.fullness >= SHARED_BY_HALVES * rendered.fullness {
+            done.extend([a, b]);
+            continue;
         }
+        todo.extend([(b, rb, depth + 1), (a, ra, depth + 1)]);
     }
     done
 }

@@ -553,7 +553,7 @@ impl WebCore {
             }
             Err(e) => {
                 failure.get_or_insert(e);
-                Rendered::Fit
+                Rendered { fullness: 0.0 }
             }
         });
         let (pieces, dropped): (Vec<_>, Vec<_>) = drawn.into_iter().partition(|(piece, _)| kept.contains(piece));
@@ -599,7 +599,7 @@ impl WebCore {
         let pooled = if size == whole { self.atlases.remove(&size) } else { None };
         let texture = pooled.unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
         self.engine.draw(&self.device, &self.queue, &list, &pictures, &texture.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
-        let rendered = if self.engine.overflowed() { Rendered::Overflowed } else { Rendered::Fit };
+        let rendered = Rendered { fullness: self.engine.fullness() };
         Ok((rendered, building || !missing.is_empty(), texture))
     }
 
