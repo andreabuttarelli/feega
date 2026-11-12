@@ -224,7 +224,8 @@ describe('/app is the dashboard for a returning user', () => {
 
     const prompt = new URL(redirected.location ?? '', 'http://x').searchParams.get('prompt') ?? '';
     expect(prompt).toContain('Figma');
-    expect(prompt).toContain('no_token');
+    expect(prompt).toContain('Figma is not connected.');
+    expect(prompt).not.toContain('no_token');
   });
 
   it('a source outside the table is refused before anything is created', async () => {
