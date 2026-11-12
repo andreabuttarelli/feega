@@ -1,6 +1,7 @@
 import { FAQ } from './home';
 import { LANDING_PAGES } from './landing';
 import { UPSCALER } from './landing/upscaler';
+import { CODEBASE, CODEBASE_PATH } from './codebase';
 import { HOME_META } from './seo';
 import { APP_URL, GITHUB_URL, SITE_URL } from './links';
 import { SITE_PATHS } from './paths';
@@ -17,6 +18,7 @@ export const PAGE_TITLES: Record<string, string> = {
   '/': HOME_META.title,
   '/changelog': 'Changelog',
   '/ai-video-upscaler': UPSCALER.title,
+  [CODEBASE_PATH]: CODEBASE.title,
   [BLOG_PATH]: BLOG_INDEX.title,
   [GUIDES_PATH]: GUIDES_INDEX.title,
   ...Object.fromEntries(Object.entries(GUIDES).map(([slug, g]) => [guidePath(slug), g.title])),

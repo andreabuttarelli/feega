@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { LANDING_PAGES } from './landing';
 import { UPSCALER } from './landing/upscaler';
+import { CODEBASE } from './codebase';
 import { LEGAL_DOCS } from './legal';
 import { BLOG_INDEX, COMPARISONS } from './compare';
 import { GUIDES, GUIDES_INDEX } from './guides';
@@ -20,6 +21,7 @@ const MAX_DESCRIPTION = 160;
 const metas = [
   ['home', HOME_META],
   ['upscaler', UPSCALER],
+  ['codebase', CODEBASE],
   ...Object.entries(LANDING_PAGES),
   ...Object.entries(LEGAL_DOCS),
   ['blog', BLOG_INDEX],
