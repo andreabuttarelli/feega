@@ -9,8 +9,8 @@ The Feega extension opens `.feega` files as a canvas in an editor tab. It runs
 [local mode](/getting-started/local-mode/) for that file, so there is no account, and saves to the
 file as you work.
 
-Install it from the VS Code Marketplace or Open VSX (Cursor, Windsurf, VSCodium): search **Feega**.
-It needs Node 22 or later on your machine.
+Install it from the VS Code Marketplace or Open VSX (Cursor, Windsurf, VSCodium) once it is
+listed there: search **Feega**. It needs Node 22 or later on your machine.
 
 - **Open a `.feega` file**: it opens as a canvas. The first time, the app downloads once.
 - **Feega: New canvas** (command palette): picks where to save a new `.feega` file and opens it.
