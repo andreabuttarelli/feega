@@ -1,19 +1,20 @@
 ---
 import '../styles/blog.css';
-import { SITE_TITLE, SITE_DESCRIPTION, DEFAULT_OG } from '../site';
+import { SITE_TITLE, SITE_DESCRIPTION, SOCIAL_PREVIEW } from '../site';
 
 interface Props {
   title?: string;
   description?: string;
-  image?: string;
+  cover?: { src: string; alt: string };
   type?: 'website' | 'article';
   jsonLd?: object;
 }
 
-const { title, description = SITE_DESCRIPTION, image = DEFAULT_OG, type = 'website', jsonLd } = Astro.props;
+const { title, description = SITE_DESCRIPTION, cover, type = 'website', jsonLd } = Astro.props;
 const fullTitle = title ? `${title} · ${SITE_TITLE}` : SITE_TITLE;
 const canonical = new URL(Astro.url.pathname, Astro.site);
-const ogImage = new URL(image, Astro.site);
+const ogImage = cover ? new URL(cover.src, Astro.site).href : SOCIAL_PREVIEW.image;
+const ogAlt = cover?.alt ?? SOCIAL_PREVIEW.alt;
 ---
 
 <!doctype html>
@@ -35,10 +36,20 @@ const ogImage = new URL(image, Astro.site);
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
     <meta property="og:image" content={ogImage} />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content={String(SOCIAL_PREVIEW.width)} />
+    <meta property="og:image:height" content={String(SOCIAL_PREVIEW.height)} />
+    <meta property="og:image:alt" content={ogAlt} />
+    {!cover && <meta property="og:video" content={SOCIAL_PREVIEW.video} />}
+    {!cover && <meta property="og:video:secure_url" content={SOCIAL_PREVIEW.video} />}
+    {!cover && <meta property="og:video:type" content="video/mp4" />}
+    {!cover && <meta property="og:video:width" content={String(SOCIAL_PREVIEW.width)} />}
+    {!cover && <meta property="og:video:height" content={String(SOCIAL_PREVIEW.height)} />}
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title ?? SITE_TITLE} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:image:alt" content={ogAlt} />
     {jsonLd && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
   </head>
   <body>

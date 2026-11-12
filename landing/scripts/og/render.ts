@@ -4,66 +4,42 @@ import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
 import { MARK_LOBE, MARK_TURNS, MarkTone } from '../../src/lib/site/mark';
+import { HERO_HEADLINE } from '../../src/lib/site/home';
 import { LOOP_SECONDS, STILL_AT, TextBand, frame, type Frame, type Layout } from './scene';
 
 const HERE = import.meta.dirname;
 const STATIC_DIR = resolve(HERE, '../../static');
 const FONT = resolve(STATIC_DIR, 'site/fonts/bdo-grotesk-variable.woff2');
+const SERIF = resolve(STATIC_DIR, 'site/fonts/instrument-serif-latin.woff2');
 const OUT_DIR = process.argv[2] ?? resolve(homedir(), 'Documents/feega-videos/og');
 const ONLY = process.argv[3];
 const FPS = 30;
 const FFMPEG = '/opt/homebrew/bin/ffmpeg';
 
+const SUPERSAMPLE = 2;
+const HEADLINE = HERO_HEADLINE.join(' ');
+const breakBefore = (...words: string[]) => words.reduce((text, word) => text.replace(` ${word}`, `<br>${word}`), HEADLINE);
+const sized = (w: number, h: number) => ({ w, h, text: TextBand.On });
+
 const LAYOUTS = {
-  og: {
-    w: 1200,
-    h: 630,
-    text: TextBand.On,
-    lockup: { y: 44, h: 60 },
-    statement: { y: 128, size: 50, width: 640 },
-    heading: { y: 70, size: 54 },
-    scene: { x: 40, y: 262, w: 1120, h: 350 }
-  },
-  wide: {
-    w: 1200,
-    h: 675,
-    text: TextBand.On,
-    lockup: { y: 52, h: 62 },
-    statement: { y: 140, size: 52, width: 660 },
-    heading: { y: 80, size: 56 },
-    scene: { x: 40, y: 286, w: 1120, h: 370 }
-  },
-  square: {
-    w: 1200,
-    h: 1200,
-    text: TextBand.On,
-    lockup: { y: 210, h: 92 },
-    statement: { y: 350, size: 76, width: 860 },
-    heading: { y: 260, size: 80 },
-    scene: { x: 60, y: 640, w: 1080, h: 440 }
-  },
-  scene: {
-    w: 1200,
-    h: 675,
-    text: TextBand.Off,
-    lockup: { y: 0, h: 0 },
-    statement: { y: 0, size: 0, width: 0 },
-    heading: { y: 0, size: 0 },
-    scene: { x: 60, y: 60, w: 1080, h: 555 }
-  }
+  og: { ...sized(1200, 630), copy: { x: 56, y: 172, gap: 26 }, lockup: { h: 50 }, statement: { text: breakBefore('with', 'and team'), size: 62, width: 480 }, scene: { x: 560, y: 56, w: 590, h: 518 }, box: { x: 630, y: 120, w: 640, h: 560 } },
+  wide: { ...sized(1200, 675), copy: { x: 60, y: 186, gap: 28 }, lockup: { h: 54 }, statement: { text: breakBefore('with', 'and team'), size: 64, width: 490 }, scene: { x: 570, y: 60, w: 580, h: 555 }, box: { x: 640, y: 130, w: 640, h: 600 } },
+  square: { ...sized(1200, 1200), copy: { x: 96, y: 96, gap: 34 }, lockup: { h: 76 }, statement: { text: breakBefore('with'), size: 92, width: 1008 }, scene: { x: 96, y: 470, w: 1008, h: 634 }, box: { x: 250, y: 600, w: 1050, h: 700 } },
+  scene: { w: 1200, h: 675, text: TextBand.Off, copy: { x: 0, y: 0, gap: 0 }, lockup: { h: 0 }, statement: { text: '', size: 0, width: 0 }, scene: { x: 140, y: 40, w: 920, h: 595 }, box: { x: 300, y: 110, w: 700, h: 525 } }
 } as const satisfies Record<string, Layout>;
 
+type Size = { w: number; h: number };
 type Still = { kind: 'still'; file: string; layout: Layout; publish?: string };
-type Clip = { kind: 'clip'; file: string; layout: Layout; scale: number; from: number; seconds: number; crf: number; publish?: string };
+type Clip = { kind: 'clip'; file: string; layout: Layout; size: Size; from: number; seconds: number; crf: number; publish?: string };
 
 const OUTPUTS: (Still | Clip)[] = [
   { kind: 'still', file: 'og-1200x630.png', layout: LAYOUTS.og, publish: 'og.png' },
   { kind: 'still', file: 'og-1200x675.png', layout: LAYOUTS.wide },
   { kind: 'still', file: 'og-1200x1200.png', layout: LAYOUTS.square },
-  { kind: 'clip', file: 'og-1200x630.mp4', layout: LAYOUTS.og, scale: 1, from: 0, seconds: LOOP_SECONDS, crf: 24, publish: 'og.mp4' },
-  { kind: 'clip', file: 'og-1920x1080.mp4', layout: LAYOUTS.wide, scale: 1.6, from: 0, seconds: LOOP_SECONDS, crf: 20 },
-  { kind: 'clip', file: 'og-1080x1080.mp4', layout: LAYOUTS.square, scale: 0.9, from: 0, seconds: LOOP_SECONDS, crf: 20 },
-  { kind: 'clip', file: 'og-scene-1920x1080.mp4', layout: LAYOUTS.scene, scale: 1.6, from: 2, seconds: 8, crf: 20 }
+  { kind: 'clip', file: 'og-1200x630.mp4', layout: LAYOUTS.og, size: { w: 1200, h: 630 }, from: 0, seconds: LOOP_SECONDS, crf: 18, publish: 'og.mp4' },
+  { kind: 'clip', file: 'og-1920x1080.mp4', layout: LAYOUTS.wide, size: { w: 1920, h: 1080 }, from: 0, seconds: LOOP_SECONDS, crf: 18 },
+  { kind: 'clip', file: 'og-1080x1080.mp4', layout: LAYOUTS.square, size: { w: 1080, h: 1080 }, from: 0, seconds: LOOP_SECONDS, crf: 18 },
+  { kind: 'clip', file: 'og-scene-1920x1080.mp4', layout: LAYOUTS.scene, size: { w: 1920, h: 1080 }, from: 2, seconds: 8, crf: 18 }
 ];
 
 const MARK_BOX = 300;
@@ -73,19 +49,21 @@ const wordmark = readFileSync(resolve(HERE, 'wordmark.svg'), 'utf8');
 const lockup = wordmark.replace(/(<svg[^>]*>)/, `$1<svg x="${-MARK_INSET}" y="${-MARK_INSET}" width="${MARK_BOX}" height="${MARK_BOX}" viewBox="0 0 ${MARK_BOX} ${MARK_BOX}"><g fill="${MarkTone.Orange}">${markLobes}</g></svg>`);
 const mark = readFileSync(resolve(HERE, 'feega-mark-animated.svg'), 'utf8');
 const font = readFileSync(FONT).toString('base64');
+const serif = readFileSync(SERIF).toString('base64');
 
 const page = (layout: Layout) => `<!doctype html><html><head><meta charset="utf-8"><style>
+@font-face{font-family:'Instrument Serif';src:url(data:font/woff2;base64,${serif}) format('woff2')}
 @font-face{font-family:'BDO Grotesk';src:url(data:font/woff2;base64,${font}) format('woff2');font-weight:100 900}
 *{margin:0;box-sizing:border-box}
 body{background:#000;width:${layout.w}px;height:${layout.h}px;overflow:hidden;font-family:'BDO Grotesk',sans-serif;color:#f0eee9}
 #stage,#mark,#black{position:absolute;inset:0}
 .scene{position:absolute;inset:0}
-.chapter,.lockup,.statement{position:absolute;left:50%;transform:translateX(-50%);text-align:center}
-.chapter{width:100%}
-.eyebrow{color:#ff5100;font-weight:500;letter-spacing:.02em;margin-bottom:.5em}
-.heading{font-weight:500;letter-spacing:-.03em;line-height:1}
+.copy{position:absolute;display:flex;flex-direction:column;align-items:flex-start}
+.slot{position:relative;width:100%}
+.chapter{position:absolute;left:0;top:0;width:100%}
+.eyebrow{color:#ff5100;font-weight:500;letter-spacing:.02em;margin-bottom:.4em}
 .lockup svg{height:100%;width:auto;display:block}
-.statement{font-weight:500;letter-spacing:-.03em;line-height:1.04;text-wrap:balance}
+.statement{font-family:'Instrument Serif',serif;font-weight:400;color:#fff;letter-spacing:-.04em;line-height:.95;text-wrap:balance}
 #mark{display:flex;align-items:center;justify-content:center}
 #mark svg{width:${Math.round(layout.h * 0.34)}px;height:${Math.round(layout.h * 0.34)}px}
 #black{background:#000}
@@ -113,18 +91,19 @@ async function open(browser: Browser, layout: Layout, scale: number) {
   return tab;
 }
 
-const shrinkPng = (file: string) =>
-  execFileSync(FFMPEG, ['-y', '-loglevel', 'error', '-i', file, '-vf', 'split[a][b];[a]palettegen=max_colors=128:stats_mode=full[p];[b][p]paletteuse=dither=none', `${file}.tmp.png`]);
+const ffmpeg = (...args: string[]) => execFileSync(FFMPEG, ['-y', '-loglevel', 'error', ...args]);
+const LANCZOS = (size: Size) => `scale=${size.w}:${size.h}:flags=lanczos`;
 
 async function still(browser: Browser, out: Still) {
-  const tab = await open(browser, out.layout, 1);
-  await apply(tab, frame(out.layout, STILL_AT, lockup));
   const file = resolve(OUT_DIR, out.file);
-  await tab.screenshot({ path: file });
+  const raw = `${file}.raw.png`;
+  const tab = await open(browser, out.layout, SUPERSAMPLE);
+  await apply(tab, frame(out.layout, STILL_AT, lockup));
+  await tab.screenshot({ path: raw });
   await tab.context().close();
-  shrinkPng(file);
-  copyFileSync(`${file}.tmp.png`, file);
-  rmSync(`${file}.tmp.png`);
+
+  ffmpeg('-i', raw, '-vf', `${LANCZOS(out.layout)},split[a][b];[a]palettegen=max_colors=256:stats_mode=full[p];[b][p]paletteuse=dither=none`, file);
+  rmSync(raw);
   return file;
 }
 
@@ -133,7 +112,7 @@ async function clip(browser: Browser, out: Clip) {
   rmSync(frames, { recursive: true, force: true });
   mkdirSync(frames, { recursive: true });
 
-  const tab = await open(browser, out.layout, out.scale);
+  const tab = await open(browser, out.layout, (SUPERSAMPLE * out.size.w) / out.layout.w);
   const count = Math.round(out.seconds * FPS);
   for (let i = 0; i < count; i++) {
     await apply(tab, frame(out.layout, out.from + i / FPS, lockup));
@@ -142,7 +121,7 @@ async function clip(browser: Browser, out: Clip) {
   await tab.context().close();
 
   const file = resolve(OUT_DIR, out.file);
-  execFileSync(FFMPEG, ['-y', '-loglevel', 'error', '-framerate', String(FPS), '-i', resolve(frames, '%04d.png'), '-c:v', 'libx264', '-preset', 'slow', '-tune', 'animation', '-crf', String(out.crf), '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an', file]);
+  ffmpeg('-framerate', String(FPS), '-i', resolve(frames, '%04d.png'), '-vf', LANCZOS(out.size), '-c:v', 'libx264', '-profile:v', 'high', '-preset', 'slow', '-tune', 'animation', '-crf', String(out.crf), '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an', file);
   rmSync(frames, { recursive: true, force: true });
   return file;
 }

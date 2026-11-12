@@ -1,5 +1,7 @@
 const VIDEO_BASE = 'https://klnswzhhgrqvbfjzioul.supabase.co/storage/v1/object/public/website';
 
+export const HERO_HEADLINE = ['Design inside your code', 'with your agents and team.'] as const;
+
 export const CANVAS_VIDEO = `${VIDEO_BASE}/feega-canvas-hero.MP4`;
 export const CODE_VIDEO = `${VIDEO_BASE}/2026-10-29-export-code-final.mp4`;
 

@@ -59,6 +59,13 @@ describe('a gallery item page', () => {
     expect(page.item.doc.tracks.length).toBeGreaterThan(0);
   });
 
+  it('links to the item unfurl with its own poster', async () => {
+    state.world = fakeDb({ gallery_items: [{ ...item(), poster_url: `${PUBLIC}poster.jpg` }] }, { filter: true });
+    const page = (await load({ locals: {}, params: { id: 'item-1' }, cookies: cookies().api, setHeaders: () => {} } as never)) as { item: { posterUrl: string | null }; socialImage: string | null };
+    expect(page.socialImage).toBe(page.item.posterUrl);
+    expect(page.socialImage).toContain('poster.jpg');
+  });
+
   it('a withdrawn item is a 404', async () => {
     state.world = fakeDb({ gallery_items: [] }, { filter: true });
     await expect(load({ locals: {}, params: { id: 'item-1' }, cookies: cookies().api, setHeaders: () => {} } as never)).rejects.toMatchObject({ status: 404 });

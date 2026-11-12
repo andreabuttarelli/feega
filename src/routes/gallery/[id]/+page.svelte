@@ -17,7 +17,6 @@
 <svelte:head>
   <title>{item.title} · feega gallery</title>
   <meta name="description" content={item.description || `${KIND_LABEL[item.kind]} by ${item.authorName}, free to remix on feega.`} />
-  {#if item.posterUrl}<meta property="og:image" content={item.posterUrl} />{/if}
 </svelte:head>
 
 <article class="gx-item" data-testid="gallery-item">

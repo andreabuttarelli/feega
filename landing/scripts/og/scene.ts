@@ -1,5 +1,5 @@
 import { INK, PLANE, SHADES, onTop, project, slab, type Box, type Shade } from '../../src/lib/site/iso/iso';
-import { OG_STATEMENT } from '../../src/lib/site/seo';
+import { envelope, fieldAt, glyphFor } from '../../src/lib/site/ascii-field';
 
 export const TextBand = { On: 'on', Off: 'off' } as const;
 export type TextBand = (typeof TextBand)[keyof typeof TextBand];
@@ -10,10 +10,11 @@ export type Layout = {
   w: number;
   h: number;
   text: TextBand;
-  lockup: { y: number; h: number };
-  statement: { y: number; size: number; width: number };
-  heading: { y: number; size: number };
+  copy: { x: number; y: number; gap: number };
+  lockup: { h: number };
+  statement: { text: string; size: number; width: number };
   scene: Rect;
+  box?: Rect;
 };
 
 type Span = readonly [number, number];
@@ -46,14 +47,14 @@ const LIFT = 56;
 const DROP = 34;
 const NODE_T = 4;
 
-const CODE: Box = { x: -40, y: 150, w: 150, d: 110, t: 6 };
-const UI: Box = { x: -28, y: 162, w: 126, d: 86, t: NODE_T };
-const FRAME: Box = { x: 176, y: 40, w: 112, d: 84, t: NODE_T };
-const TIMELINE: Box = { x: 176, y: 138, w: 112, d: 28, t: 3 };
-const RENDER: Box = { x: 314, y: 66, w: 74, d: 58, t: NODE_T };
-const PROMPT: Box = { x: 320, y: -128, w: 92, d: 62, t: NODE_T };
-const IMAGE: Box = { x: 452, y: -186, w: 76, d: 60, t: NODE_T };
-const CLIP: Box = { x: 462, y: -92, w: 76, d: 60, t: NODE_T };
+const CODE: Box = { x: -101, y: 92, w: 150, d: 110, t: 6 };
+const UI: Box = { x: -89, y: 104, w: 126, d: 86, t: NODE_T };
+const FRAME: Box = { x: 135, y: 155, w: 112, d: 84, t: NODE_T };
+const TIMELINE: Box = { x: 135, y: 253, w: 112, d: 28, t: 3 };
+const RENDER: Box = { x: 273, y: 181, w: 74, d: 58, t: NODE_T };
+const PROMPT: Box = { x: 29, y: -77, w: 92, d: 62, t: NODE_T };
+const IMAGE: Box = { x: 161, y: -135, w: 76, d: 60, t: NODE_T };
+const CLIP: Box = { x: 171, y: -41, w: 76, d: 60, t: NODE_T };
 
 const BOXES = [CODE, FRAME, TIMELINE, RENDER, PROMPT, IMAGE, CLIP];
 
@@ -122,11 +123,13 @@ function wires(t: number, plane: number) {
   const design = progress(PHASES.design, t);
   const motion = progress(PHASES.motion, t);
   const generate = progress(PHASES.generate, t);
-  const codeOut = `M${CODE.x + CODE.w} ${CODE.y + 40}C${CODE.x + CODE.w + 40} ${CODE.y + 40} ${FRAME.x - 40} ${FRAME.y + 50} ${FRAME.x} ${FRAME.y + 50}`;
+  const codeOut = `M${CODE.x + CODE.w} ${CODE.y + 70}C${CODE.x + CODE.w + 40} ${CODE.y + 70} ${FRAME.x - 40} ${FRAME.y + 42} ${FRAME.x} ${FRAME.y + 42}`;
   const frameOut = `M${FRAME.x + FRAME.w} ${FRAME.y + 50}C${FRAME.x + FRAME.w + 14} ${FRAME.y + 50} ${RENDER.x - 14} ${RENDER.y + 26} ${RENDER.x} ${RENDER.y + 26}`;
   const toImage = `M${PROMPT.x + PROMPT.w} ${PROMPT.y + 20}C${PROMPT.x + PROMPT.w + 24} ${PROMPT.y + 20} ${IMAGE.x - 24} ${IMAGE.y + 30} ${IMAGE.x} ${IMAGE.y + 30}`;
   const toClip = `M${PROMPT.x + PROMPT.w} ${PROMPT.y + 44}C${PROMPT.x + PROMPT.w + 24} ${PROMPT.y + 44} ${CLIP.x - 24} ${CLIP.y + 30} ${CLIP.x} ${CLIP.y + 30}`;
+  const renderOut = `M${RENDER.x + RENDER.w / 2} ${RENDER.y}C${RENDER.x + RENDER.w / 2} ${RENDER.y - 30} ${PROMPT.x + PROMPT.w / 2} ${PROMPT.y + PROMPT.d + 30} ${PROMPT.x + PROMPT.w / 2} ${PROMPT.y + PROMPT.d}`;
   const paths = [
+    wire(renderOut, clamp(generate * 3), false),
     wire(codeOut, design, false),
     wire(frameOut, clamp(motion * 1.4 - 0.2), false),
     wire(toImage, clamp(generate * 2.2 - 0.5), generate > 0 && generate < 1),
@@ -205,6 +208,33 @@ function generateVignette(t: number) {
   return `${empty(IMAGE)}${image}${prompt}${empty(CLIP)}${clip}`;
 }
 
+const ASCII_CELL = 14;
+const ASCII_SCALE = 0.09;
+const ASCII_FLOOR = 0.6;
+const ASCII_ACCENT = [255, 81, 0];
+const ASCII_NEUTRAL = [120, 116, 110];
+
+function asciiBox(box: Rect) {
+  const cols = Math.ceil(box.w / ASCII_CELL);
+  const rows = Math.ceil(box.h / ASCII_CELL);
+  const cells = [];
+  for (let c = 0; c < cols; c++) {
+    for (let r = 0; r < rows; r++) {
+      const e = envelope((c + 0.5) / cols, (r + 0.5) / rows);
+      const d = Math.sqrt(fieldAt(c * ASCII_CELL * ASCII_SCALE, r * ASCII_CELL * ASCII_SCALE, 0)) * (ASCII_FLOOR + (1 - ASCII_FLOOR) * e);
+      const glyph = glyphFor(d);
+      if (glyph === ' ') {
+        continue;
+      }
+
+      const [red, green, blue] = ASCII_ACCENT.map((v, k) => v + (ASCII_NEUTRAL[k] - v) * (1 - e));
+      cells.push(`<text x="${c * ASCII_CELL + ASCII_CELL / 2}" y="${r * ASCII_CELL + ASCII_CELL / 2}" fill="rgb(${Math.round(red)},${Math.round(green)},${Math.round(blue)})" opacity="${fmt(0.3 + d * 0.45)}">${glyph.replace('&', '&amp;')}</text>`);
+    }
+  }
+
+  return `<svg x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}"><rect width="${box.w}" height="${box.h}" rx="12" fill="#0d0d0d"/><g opacity="0.7" font-family="ui-monospace, Menlo, monospace" font-size="${ASCII_CELL}" text-anchor="middle" dominant-baseline="middle">${cells.join('')}</g></svg>`;
+}
+
 function sceneSvg(layout: Layout, t: number) {
   const plane = progress(PHASES.plane, t);
   const fit = Math.min(layout.scene.w / BOUNDS.w, layout.scene.h / BOUNDS.h);
@@ -216,7 +246,7 @@ function sceneSvg(layout: Layout, t: number) {
   const fadeCenter = [((layout.scene.x + layout.scene.w / 2) / layout.w) * 100, ((layout.scene.y + layout.scene.h / 2) / layout.h) * 100];
   return `<svg class="scene" width="${layout.w}" height="${layout.h}" viewBox="0 0 ${layout.w} ${layout.h}">
 <defs><radialGradient id="fadeGradient" cx="${fmt(fadeCenter[0])}%" cy="${fmt(fadeCenter[1])}%" r="60%"><stop offset="0.25" stop-color="#fff"/><stop offset="1" stop-color="#000"/></radialGradient><mask id="fade" maskUnits="userSpaceOnUse" x="-5000" y="-5000" width="10000" height="10000"><rect x="-5000" y="-5000" width="10000" height="10000" fill="url(#fadeGradient)"/></mask></defs>
-<g transform="translate(${fmt(ox)} ${fmt(oy + rise)}) scale(${fmt(fit)})">${grid(plane)}${wires(t, plane)}<g opacity="${fmt(plane)}">${body}</g></g></svg>`;
+${layout.box ? `<g opacity="${fmt(plane)}">${asciiBox(layout.box)}</g>` : ''}<g transform="translate(${fmt(ox)} ${fmt(oy + rise)}) scale(${fmt(fit)})">${grid(plane)}${wires(t, plane)}<g opacity="${fmt(plane)}">${body}</g></g></svg>`;
 }
 
 function chapterOpacity(phase: Span, t: number) {
@@ -224,21 +254,25 @@ function chapterOpacity(phase: Span, t: number) {
   return clamp(Math.min((t - from) / CHAPTER_FADE, (to - t) / CHAPTER_FADE));
 }
 
+const EYEBROW_SCALE = 0.3;
+
 function band(layout: Layout, t: number, lockup: string) {
   if (layout.text === TextBand.Off) {
     return '';
   }
 
+  const { x, y, gap } = layout.copy;
+  const { text, size, width } = layout.statement;
   const outro = progress(PHASES.outro, t);
   const chapters = CHAPTERS.map(({ phase, eyebrow, heading }) => {
     const opacity = chapterOpacity(phase, t);
     return opacity > 0
-      ? `<div class="chapter" style="top:${layout.heading.y}px;opacity:${fmt(opacity)}"><p class="eyebrow" style="font-size:${fmt(layout.heading.size * 0.42)}px">${eyebrow}</p><p class="heading" style="font-size:${layout.heading.size}px">${heading}</p></div>`
+      ? `<div class="chapter" style="opacity:${fmt(opacity)}"><p class="eyebrow" style="font-size:${fmt(size * EYEBROW_SCALE)}px">${eyebrow}</p><p class="statement" style="font-size:${size}px">${heading}</p></div>`
       : '';
   }).join('');
-  const lift = lerp(10, 0, outro);
-  const end = `<div class="lockup" style="top:${fmt(layout.lockup.y + lift)}px;height:${layout.lockup.h}px;opacity:${fmt(outro)}">${lockup}</div><p class="statement" style="top:${fmt(layout.statement.y + lift)}px;font-size:${layout.statement.size}px;width:${layout.statement.width}px;opacity:${fmt(outro)}">${OG_STATEMENT}</p>`;
-  return chapters + end;
+  const brand = `<div class="lockup" style="height:${layout.lockup.h}px;opacity:${fmt(progress(PHASES.plane, t))}">${lockup}</div>`;
+  const statement = `<p class="statement" style="font-size:${size}px;transform:translateY(${fmt(lerp(10, 0, outro))}px);opacity:${fmt(outro)}">${text}</p>`;
+  return `<div class="copy" style="left:${x}px;top:${y}px;gap:${gap}px;width:${width}px">${brand}<div class="slot">${chapters}${statement}</div></div>`;
 }
 
 export type Frame = { html: string; mark: { opacity: number; scale: number; ms: number }; black: number };

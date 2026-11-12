@@ -13,7 +13,7 @@ export const COMPARE_PATH = '/compare';
 
 export const COMPARE_INDEX = {
   title: 'Feega compared: Figma, Jitter, After Effects, Canva and more',
-  description: 'Honest comparisons of Feega, the open-source canvas for design, motion and AI, with Figma, Jitter, After Effects, Pencil.dev, Flora, Rive, Canva and Remotion.',
+  description: 'Honest comparisons of Feega, the open-source canvas to design, animate and generate, vs Figma, Jitter, After Effects, Pencil.dev, Flora, Rive, Canva, Remotion.',
   heading: 'Motion design tools, compared honestly',
   intro:
     'Each page says where the other tool is better, not only where Feega is. Every claim about another product links to its source and carries the date we checked it. If something is wrong or out of date, write to <a href="mailto:hi@feega.app">hi@feega.app</a> and we will fix it.'

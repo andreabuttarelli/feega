@@ -10,7 +10,7 @@ import { GUIDES, GUIDES_INDEX } from './guides';
 import { competitorFaq } from './compare/faq';
 import { AI_CRAWLERS } from './crawlers';
 import { GET as robots } from '../../routes/robots.txt/+server';
-import { FAQ } from './home';
+import { FAQ, HERO_HEADLINE } from './home';
 import { HOME_META, OG } from './seo';
 import { breadcrumbJsonLd, faqJsonLd, HOME_JSON_LD } from './structured-data';
 import { llmsFullTxt, llmsTxt } from './llms';
@@ -168,7 +168,8 @@ describe('social preview', () => {
     expect(LAYOUT).toContain('content="summary_large_image"');
   });
 
-  it('the alt text says what Feega is', () => {
+  it('the alt text says what Feega is, in the hero headline', () => {
     expect(OG.image.alt).toMatch(/^Feega/);
+    expect(OG.image.alt).toContain(HERO_HEADLINE.join(' '));
   });
 });
