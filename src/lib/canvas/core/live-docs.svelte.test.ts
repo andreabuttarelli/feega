@@ -28,4 +28,15 @@ describe('live docs', () => {
     liveDocs.clear('c');
     expect(liveDocs.edits.has('c')).toBe(false);
   });
+
+  it('tells a listener about an edit in the same call, before any effect runs', () => {
+    const heard: string[] = [];
+    const stop = liveDocs.listen((id, doc) => heard.push(`${id}:${(doc.doc as unknown as { tag: string }).tag}`));
+    liveDocs.set('d', live('one'));
+    stop();
+    liveDocs.set('d', live('two'));
+
+    expect(heard).toEqual(['d:one']);
+    liveDocs.clear('d');
+  });
 });

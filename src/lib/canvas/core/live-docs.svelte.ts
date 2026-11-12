@@ -4,13 +4,24 @@ import type { BrandTokens } from '@feega/motion-core/motion/brand';
 
 export type LiveDoc = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; playhead?: number };
 
+export type LiveListener = (id: string, live: LiveDoc) => void;
+
 class LiveDocs {
   map = $state(new Map<string, LiveDoc>());
   edits = $state(new Map<string, number>());
+  #listeners = new Set<LiveListener>();
+
+  listen(listener: LiveListener): () => void {
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
+  }
 
   set(id: string, live: LiveDoc) {
     const before = untrack(() => this.map).get(id);
     this.map = new Map(untrack(() => this.map)).set(id, live);
+    for (const listener of this.#listeners) {
+      listener(id, live);
+    }
     if (before?.doc === live.doc) {
       return;
     }
