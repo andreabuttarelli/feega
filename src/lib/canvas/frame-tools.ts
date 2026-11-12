@@ -24,7 +24,12 @@ export enum FrameOverlay {
   LineEnds = 'line-ends'
 }
 
-type Context = { doc: MotionDoc; clip: MotionClip | null; picks: number; tool: DrawTool; pointEdit: string | null; active: boolean; views: FrameViews; mode: EditMode; onion: OnionSkin };
+export enum FrameGesture {
+  Idle = 'idle',
+  Dragging = 'dragging'
+}
+
+type Context = { doc: MotionDoc; clip: MotionClip | null; picks: number; tool: DrawTool; pointEdit: string | null; active: boolean; views: FrameViews; mode: EditMode; onion: OnionSkin; gesture: FrameGesture };
 
 const MIN_ALIGNED = 2;
 const POINT_OVERLAY: Record<string, FrameOverlay> = { path: FrameOverlay.Pen, vector: FrameOverlay.Vector };
@@ -37,7 +42,7 @@ const RULES: Record<FrameOverlay, (c: Context) => boolean> = {
   [FrameOverlay.Mask]: (c) => Boolean(c.clip?.mask) && c.active,
   [FrameOverlay.Pen]: (c) => pointsOf(c) === FrameOverlay.Pen,
   [FrameOverlay.Vector]: (c) => pointsOf(c) === FrameOverlay.Vector,
-  [FrameOverlay.AutoLayout]: (c) => Boolean(c.clip?.autoLayout) && c.picks === 1 && c.active,
+  [FrameOverlay.AutoLayout]: (c) => Boolean(c.clip?.autoLayout) && c.picks === 1 && c.active && c.gesture === FrameGesture.Idle,
   [FrameOverlay.TextPath]: (c) => Boolean(c.clip?.textPath),
   [FrameOverlay.Outlines]: (c) => shows(c.views, FrameView.Outlines),
   [FrameOverlay.Corners]: (c) => c.clip?.component === 'Shape' && c.clip.props.shape === 'rect' && c.picks === 1 && c.active,

@@ -4,11 +4,11 @@ import { DrawTool } from '$lib/motion/draw-tool';
 import { EditMode } from '$lib/motion/edit-mode';
 import { OnionSkin } from './onion-skin.svelte';
 import { FRAME_VIEW_DEFAULT, FrameView, flipView } from './frame-view';
-import { FrameOverlay, activeAt, shownOverlays } from './frame-tools';
+import { FrameGesture, FrameOverlay, activeAt, shownOverlays } from './frame-tools';
 
 const clip = (patch: Partial<MotionClip> & { props?: Record<string, unknown> }): MotionClip => ({ id: 'c', from: 10, durationInFrames: 20, component: 'Shape', props: { shape: 'rect' }, ...patch }) as MotionClip;
 const doc = { layoutGuides: [{ id: 'g' }] } as unknown as MotionDoc;
-const plain = { doc: { layoutGuides: [] } as unknown as MotionDoc, clip: null, picks: 0, tool: DrawTool.Select, pointEdit: null, active: false, views: FRAME_VIEW_DEFAULT, mode: EditMode.Design, onion: OnionSkin.Off };
+const plain = { doc: { layoutGuides: [] } as unknown as MotionDoc, clip: null, picks: 0, tool: DrawTool.Select, pointEdit: null, active: false, views: FRAME_VIEW_DEFAULT, mode: EditMode.Design, onion: OnionSkin.Off, gesture: FrameGesture.Idle };
 
 describe('shownOverlays', () => {
   it('shows nothing for an empty selection with the select tool', () => {
@@ -108,6 +108,11 @@ describe('shownOverlays', () => {
     const got = shownOverlays({ ...plain, clip: laid, picks: 1, active: true });
     expect(got.has(FrameOverlay.AutoLayout)).toBe(true);
     expect(got.has(FrameOverlay.TextPath)).toBe(true);
+  });
+
+  it('hides auto-layout strips while an element is being dragged', () => {
+    const laid = clip({ autoLayout: { direction: 'row' } as never });
+    expect(shownOverlays({ ...plain, clip: laid, picks: 1, active: true, gesture: FrameGesture.Dragging }).has(FrameOverlay.AutoLayout)).toBe(false);
   });
 });
 
