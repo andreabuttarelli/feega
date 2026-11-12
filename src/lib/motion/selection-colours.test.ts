@@ -26,6 +26,14 @@ describe('selection colours', () => {
     expect(selectionColours(doc(), ['a', 'b'])[0]).toEqual({ colour: '#ff0000', count: 2 });
   });
 
+  it('reads the tracks once for a selection, not once per selected clip', () => {
+    const d = doc();
+    let finds = 0;
+    const counted = { ...d, tracks: d.tracks.map((t) => ({ ...t, clips: Object.assign([...t.clips], { find: (...a: Parameters<typeof Array.prototype.find>) => (finds++, Array.prototype.find.apply(t.clips, a)) }) })) } as MotionDoc;
+    selectionColours(counted, ['a', 'b', 't']);
+    expect(finds).toBe(0);
+  });
+
   it('recolours every use of one colour across the selection, and nothing else', () => {
     const next = ok(recolour(doc(), ['a', 'b', 't'], '#ff0000', '#0000ff'));
 
