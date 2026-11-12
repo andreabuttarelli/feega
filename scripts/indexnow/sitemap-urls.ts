@@ -11,3 +11,11 @@ export function batches<T>(items: T[], size: number): T[][] {
   }
   return out;
 }
+
+export function isSitemapIndex(xml: string): boolean {
+  return xml.includes('<sitemapindex');
+}
+
+export function onHost(urls: string[], host: string): string[] {
+  return urls.filter((url) => URL.canParse(url) && new URL(url).host === host);
+}
