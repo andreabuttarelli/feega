@@ -12,6 +12,11 @@ const MOVING = ':moving';
 
 export const movingGroup = (group: string) => `${group}${MOVING}`;
 
+export enum LiftSend {
+  First = 'first',
+  Again = 'again'
+}
+
 export const restGroup = (group: string) => `${group}:rest`;
 
 const drawsAnyOf = (item: Item, clips: ReadonlySet<string>): boolean => clips.has(item.clip) || (item.kind === ItemKind.Group && item.items.some((i) => drawsAnyOf(i, clips)));
@@ -31,6 +36,14 @@ export function liftOut(list: DisplayList, clips: ReadonlySet<string>): Lifted |
   }
 
   return { rest: { ...list, items: rest }, moving: { ...list, items: moving, unsupported: [] }, splice: { head, tail: list.items.length - end, items: [] } };
+}
+
+export function restedFirst(frames: readonly HeldFrame[], send: LiftSend): HeldFrame[] {
+  if (send === LiftSend.Again) {
+    return [...frames];
+  }
+
+  return frames.map((f) => (f.group.endsWith(MOVING) ? { ...f, hold: false } : f));
 }
 
 export function liftedPut(frame: HeldFrame, group: string, by: [number, number]): HeldFrame {
