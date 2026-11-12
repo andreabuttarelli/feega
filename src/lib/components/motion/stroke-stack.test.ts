@@ -52,6 +52,17 @@ describe('the stroke stack in Properties', () => {
     document.body.innerHTML = '';
   });
 
+  it('a row opens its stroke from the keyboard with Enter or Space', () => {
+    for (const key of ['Enter', ' ']) {
+      show(TWO);
+      rows()[0].dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+      flushSync();
+      expect(rows()[0].dataset.open, key).toBe('true');
+      unmount(app!);
+      app = null;
+    }
+  });
+
   it('lists the top stroke first', () => {
     show(TWO);
     expect(rows().map((r) => r.dataset.index)).toEqual(['1', '0']);
