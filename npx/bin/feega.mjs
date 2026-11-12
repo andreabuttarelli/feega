@@ -8,7 +8,7 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
 import { sendTelemetry, telemetryEnv } from '../telemetry.mjs';
-import { ImportStep, MCP_ENTRY, USAGE, appDir, bundleSource, boundUrl, cachedVersions, folderApp, freePort, importAsk, importStep, isCached, latestAppVersion, markCached, mcpEnv, parseArgs, pickVersion, placeOf, readyProbe, served } from '../launcher.mjs';
+import { ImportStep, MCP_ENTRY, USAGE, appDir, bundleSource, boundUrl, cachedVersions, folderApp, freePort, importAsk, discoverAsk, importReport, routePlan, eventLine, importStep, isCached, latestAppVersion, markCached, mcpEnv, parseArgs, pickVersion, placeOf, readyProbe, served } from '../launcher.mjs';
 
 const MIN_NODE_MAJOR = 22;
 const WEBSTORAGE_NODE_MAJOR = 25;
@@ -17,6 +17,8 @@ const OPENERS = { darwin: ['open'], win32: ['cmd', '/c', 'start', ''] };
 const RELEASES_API = 'https://api.github.com/repos/andreabuttarelli/feega/releases?per_page=50';
 const CHECK_TIMEOUT_MS = 2000;
 const LOCAL_BUNDLE_VERSION = 'local';
+const HTTP_CONFLICT = 409;
+const CHOOSE_APP_TIMEOUT_MS = 120_000;
 const TO_STDERR = ['ignore', 2, 2];
 
 const nodeMajor = Number(process.versions.node.split('.')[0]);
@@ -110,23 +112,66 @@ async function wantsImport(app, file, mode) {
   return answer === '' || answer.startsWith('y');
 }
 
-async function importFolder(url, folder) {
+async function fetchJson(url, path, init) {
+  const res = await fetch(new URL(path, url), init);
+  return { res, body: await res.json().catch(() => ({})) };
+}
+
+async function pickApp(apps) {
+  const input = createInterface({ input: process.stdin, output: process.stdout });
+  const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+  if (interactive) {
+    apps.forEach((app, i) => console.log(`  ${i + 1}) ${app}`));
+  } else {
+    console.log(eventLine({ event: 'choose-app', apps }));
+  }
+
+  const question = interactive ? input.question('feega: which app to import? (number) ') : new Promise((done) => input.once('line', done));
+  const closed = new Promise((done) => input.once('close', () => done('')));
+  const timeout = new Promise((done) => setTimeout(() => done(''), CHOOSE_APP_TIMEOUT_MS).unref());
+  const answer = String(await Promise.race([question, closed, timeout])).trim();
+  input.close();
+  return apps.find((app, i) => answer === app || answer === String(i + 1));
+}
+
+async function discover(url, place, folder, app) {
+  const { res, body } = await fetchJson(url, discoverAsk(place, folder, app));
+  if (res.status === HTTP_CONFLICT && body.apps?.length && !app) {
+    const chosen = await pickApp(body.apps);
+    if (!chosen) {
+      throw new Error(`this folder holds several apps (${body.apps.join(', ')}): pass --app <path>`);
+    }
+
+    return discover(url, place, folder, chosen);
+  }
+
+  return { found: res.ok ? { ok: true, ...body } : { ok: false }, app: app ?? body.app };
+}
+
+async function importFolder(url, folder, { routes, app, file }) {
   const home = await fetch(url, readyProbe);
   const place = placeOf(home.headers.get('location'));
   if (!place) {
     throw new Error('could not find the local canvas');
   }
 
-  console.log(`feega: importing ${basename(folder)} (starts its dev server, can take a minute)…`);
-  const { path, body } = importAsk(place, folder);
-  const res = await fetch(new URL(path, url), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-  if (!res.ok) {
-    const { error, detail } = await res.json().catch(() => ({}));
-    throw new Error(`folder import failed: ${detail ?? error ?? res.status}`);
+  console.log(`feega: looking for the pages of ${basename(folder)}…`);
+  const discovered = await discover(url, place, folder, app);
+  const plan = routePlan(discovered.found, routes);
+  if (plan.fallback) {
+    console.log('feega: no router found, importing the home page only');
   }
 
-  const { pages = [] } = await res.json();
-  console.log(`feega: imported ${basename(folder)} (${pages.length} pages)`);
+  console.log(`feega: importing ${basename(folder)}: ${plan.routes.length} pages (starts its dev server, can take a minute)…`);
+  const { path, body } = importAsk(place, folder, { routes: plan.routes, app: discovered.app });
+  const { res, body: done } = await fetchJson(url, path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  if (!res.ok) {
+    throw new Error(`folder import failed: ${done.detail ?? done.error ?? res.status}`);
+  }
+
+  const report = importReport(plan, done);
+  report.lines.forEach((line) => console.log(line));
+  console.log(eventLine({ event: 'imported', pages: report.imported.length, needsValue: report.needsValue, leftOut: report.leftOut.length, file }));
 }
 
 function forward(child) {
@@ -167,7 +212,7 @@ async function main() {
     return;
   }
 
-  const { file, browser, folderImport } = args;
+  const { file, browser, folderImport, routes, app: chosenApp } = args;
   const app = folderApp(process.cwd());
   const importing = await wantsImport(app, file, folderImport);
   const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
@@ -194,7 +239,7 @@ async function main() {
   }
 
   if (importing) {
-    await importFolder(url, app).catch((error) => console.error(`feega: ${error.message}`));
+    await importFolder(url, app, { routes, app: chosenApp, file }).catch((error) => console.error(`feega: ${error.message}`));
   }
 }
 

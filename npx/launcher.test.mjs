@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { createServer } from 'node:net';
-import { FolderImport, ImportStep, appDir, readyProbe, served, boundUrl, freePort, bundleSource, cachedVersions, folderApp, importAsk, importStep, isCached, latestAppVersion, markCached, mcpEnv, parseArgs, pickVersion, placeOf } from './launcher.mjs';
+import { FolderImport, ImportStep, appDir, readyProbe, served, boundUrl, freePort, bundleSource, cachedVersions, folderApp, importAsk, discoverAsk, routePlan, importReport, importStep, isCached, latestAppVersion, markCached, mcpEnv, parseArgs, pickVersion, placeOf } from './launcher.mjs';
 
 describe('mcp', () => {
   it('mcp avvia il server MCP sulla porta 5173 di default', () => {
@@ -208,11 +208,74 @@ describe('import della cartella', () => {
     expect(placeOf('/login')).toBeNull();
   });
 
-  it('importa la home della cartella nella tela locale', () => {
-    expect(importAsk({ projectId: 'a', canvasId: 'b' }, '/code/my-app')).toEqual({
+  it('importa le rotte scelte della cartella nella tela locale', () => {
+    expect(importAsk({ projectId: 'a', canvasId: 'b' }, '/code/my-app', { routes: ['/', '/about'] })).toEqual({
       path: '/api/v1/projects/a/code-import',
-      body: { canvasId: 'b', folder: '/code/my-app', routes: ['/'], x: 0, y: 0 }
+      body: { canvasId: 'b', folder: '/code/my-app', routes: ['/', '/about'], x: 0, y: 0 }
     });
+  });
+
+  it('porta l’app scelta in un monorepo, nella scoperta e nell’import', () => {
+    expect(importAsk({ projectId: 'a', canvasId: 'b' }, '/m', { routes: ['/'], app: 'apps/web' }).body.app).toBe('apps/web');
+    expect(discoverAsk({ projectId: 'a' }, '/m', 'apps/web')).toBe('/api/v1/projects/a/code-import/routes?folder=%2Fm&app=apps%2Fweb');
+    expect(discoverAsk({ projectId: 'a' }, '/m')).toBe('/api/v1/projects/a/code-import/routes?folder=%2Fm');
+  });
+
+  it('--routes e --app, nelle due forme', () => {
+    expect(parseArgs(['--routes', 'all', '--app', 'apps/web'], '/')).toMatchObject({ routes: 'all', app: 'apps/web' });
+    expect(parseArgs(['--routes=/,/about', '--app=x'], '/')).toMatchObject({ routes: ['/', '/about'], app: 'x' });
+    expect(parseArgs([], '/')).toMatchObject({ routes: undefined, app: undefined });
+  });
+
+  it('--routes senza valore è un errore', () => {
+    expect(() => parseArgs(['--routes'], '/')).toThrow(/--routes/);
+    expect(() => parseArgs(['--app'], '/')).toThrow(/--app/);
+  });
+});
+
+describe('routePlan', () => {
+  const found = (routes, max = 20) => ({ ok: true, max, routes });
+  const page = (path, kind = 'static') => ({ path, kind, selected: kind === 'static' });
+
+  it('senza --routes importa tutte le statiche e lascia fuori le dinamiche dicendo perché', () => {
+    const plan = routePlan(found([page('/'), page('/about'), page('/blog/[slug]', 'dynamic')]), undefined);
+    expect(plan).toEqual({ routes: ['/', '/about'], leftOut: [{ path: '/blog/[slug]', reason: 'needs a value' }], fallback: false });
+  });
+
+  it('oltre il tetto importa le prime e riporta le altre', () => {
+    const plan = routePlan(found([page('/a'), page('/b'), page('/c')], 2), 'all');
+    expect(plan.routes).toEqual(['/a', '/b']);
+    expect(plan.leftOut).toEqual([{ path: '/c', reason: 'over the 2-page limit' }]);
+  });
+
+  it('una lista esplicita passa così com’è, anche con valori per le dinamiche', () => {
+    const plan = routePlan(found([page('/'), page('/blog/[slug]', 'dynamic')]), ['/blog/hello']);
+    expect(plan).toEqual({ routes: ['/blog/hello'], leftOut: [], fallback: false });
+  });
+
+  it('senza router trovato ricade sulla sola home', () => {
+    expect(routePlan({ ok: false }, undefined)).toEqual({ routes: ['/'], leftOut: [], fallback: true });
+    expect(routePlan({ ok: false }, ['/x']).routes).toEqual(['/x']);
+  });
+});
+
+describe('importReport', () => {
+  it('conta le pagine importate e quelle che servono di un valore', () => {
+    const plan = { routes: ['/', '/about'], leftOut: [{ path: '/blog/[slug]', reason: 'needs a value' }, { path: '/c', reason: 'over the 20-page limit' }], fallback: false };
+    const report = importReport(plan, { pages: ['/', '/about'], routes: { leftOut: [{ path: '/x', reason: 'not_opened' }] } });
+    expect(report.imported).toEqual(['/', '/about']);
+    expect(report.needsValue).toBe(1);
+    expect(report.leftOut).toEqual([
+      { path: '/blog/[slug]', reason: 'needs a value' },
+      { path: '/c', reason: 'over the 20-page limit' },
+      { path: '/x', reason: 'did not open' }
+    ]);
+    expect(report.lines).toEqual(['feega: imported 2 pages: /, /about', 'feega: left out 3: /blog/[slug] (needs a value), /c (over the 20-page limit), /x (did not open)']);
+  });
+
+  it('una pagina sola e niente di escluso', () => {
+    const report = importReport({ routes: ['/'], leftOut: [], fallback: true }, { pages: ['/'] });
+    expect(report.lines).toEqual(['feega: imported 1 page: /']);
   });
 });
 

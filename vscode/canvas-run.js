@@ -41,4 +41,44 @@ const freePort = () =>
     });
   });
 
-module.exports = { readyProbe, served, Launch, launchArgs, mcpServers, canvasFileFor, canvasPage, loadingPage, localUrl, freePort };
+const EVENT_PREFIX = 'feega:event ';
+
+const eventReader = (onEvent) => {
+  let pending = '';
+  return (chunk) => {
+    const lines = (pending + chunk).split('\n');
+    pending = lines.pop();
+    for (const line of lines.filter((l) => l.startsWith(EVENT_PREFIX))) {
+      try {
+        onEvent(JSON.parse(line.slice(EVENT_PREFIX.length)));
+      } catch {}
+    }
+  };
+};
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+const importMessage = ({ pages, needsValue, leftOut }, file) => {
+  const parts = [`Imported ${plural(pages, 'page')}`];
+  if (needsValue) {
+    parts.push(`${needsValue} need a value`);
+  } else if (leftOut) {
+    parts.push(`${leftOut} left out (see the Feega output)`);
+  }
+
+  return `${parts.join('; ')}. Canvas: ${file}`;
+};
+
+const GITIGNORE_ENTRY = '*.feega';
+
+const gitignoreWith = (content) => {
+  const lines = content.split('\n').map((l) => l.trim());
+  if (lines.includes(GITIGNORE_ENTRY)) {
+    return null;
+  }
+
+  const base = content === '' || content.endsWith('\n') ? content : `${content}\n`;
+  return `${base}${GITIGNORE_ENTRY}\n`;
+};
+
+module.exports = { eventReader, importMessage, gitignoreWith, readyProbe, served, Launch, launchArgs, mcpServers, canvasFileFor, canvasPage, loadingPage, localUrl, freePort };
