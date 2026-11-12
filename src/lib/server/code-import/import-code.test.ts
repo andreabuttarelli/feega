@@ -363,3 +363,50 @@ describe('importBoards images', () => {
     expect(Buffer.from(seen[0].split(',')[1], 'base64').equals(png)).toBe(true);
   });
 });
+
+
+describe('attesa prima della cattura', () => {
+  const SIDEBAR_AFTER_MS = 250;
+  const MARGIN_MS = 100;
+  const bar = button('9', 1, 300, 'Indice');
+
+  function slowTab() {
+    const tab = tabOf();
+    let opened = 0;
+    tab.goto.mockImplementation(async () => {
+      opened = Date.now();
+      return 200;
+    });
+    const tree = vi.fn(async (): Promise<PageTree> => {
+      const late = Date.now() - opened >= SIDEBAR_AFTER_MS;
+      return { ...TREE, root: { ...TREE.root, children: late ? [...(TREE.root.children ?? []), bar] : TREE.root.children } } as PageTree;
+    });
+    return Object.assign(tab, { tree });
+  }
+
+  async function firstCaptureHasBar(over: Partial<Parameters<typeof importCodeAt>[0]>) {
+    const tab = slowTab();
+    await importCodeAt(askOf({ open: async () => tab, ...over }).ask);
+    return JSON.stringify(await tab.tree.mock.results[0].value).includes('Indice');
+  }
+
+  it('senza attesa la barra che compare dopo manca', async () => {
+    expect(await firstCaptureHasBar({})).toBe(false);
+  });
+
+  it('con l\'attesa generale la barra c\'e', async () => {
+    expect(await firstCaptureHasBar({ delay: { ms: SIDEBAR_AFTER_MS + MARGIN_MS, routes: {} } })).toBe(true);
+  });
+
+  it('l\'attesa della rotta batte quella generale', async () => {
+    const over = { routes: ['/slow'], delay: { ms: 0, routes: { '/slow': SIDEBAR_AFTER_MS + MARGIN_MS } } };
+
+    expect(await firstCaptureHasBar(over)).toBe(true);
+  });
+
+  it('un\'attesa a zero sulla rotta batte quella generale', async () => {
+    const over = { routes: ['/fast'], delay: { ms: SIDEBAR_AFTER_MS + MARGIN_MS, routes: { '/fast': 0 } } };
+
+    expect(await firstCaptureHasBar(over)).toBe(false);
+  });
+});

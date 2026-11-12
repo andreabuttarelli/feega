@@ -63,6 +63,14 @@
   const linked = (raw: string) => (HTTP.test(raw.trim()) ? raw.trim() : `https://${raw.trim()}`);
 
   const LOOKUP_DELAY_MS = 400;
+  let waitMs = $state('');
+  let routeWaits = $state<Record<string, string>>({});
+  const routeList = $derived(routes.split(/[\s,]+/).filter(Boolean));
+  const msOf = (raw: string | undefined) => (raw?.trim() && Number.isFinite(Number(raw)) ? Math.max(0, Math.round(Number(raw))) : undefined);
+  const wait = $derived({
+    captureDelayMs: msOf(waitMs),
+    routeDelayMs: Object.fromEntries(routeList.flatMap((r) => (msOf(routeWaits[r]) === undefined ? [] : [[r, msOf(routeWaits[r])!]])))
+  });
   let designSystem = $state(true);
   let designTouched = $state(false);
   let found = $state<number | null>(null);
@@ -93,9 +101,9 @@
 
 
   const TARGETS: Record<Source, () => CodeTarget> = {
-    [Source.Repo]: () => ({ repo: linked(repo), routes: routes.split(/[\s,]+/).filter(Boolean), conditions, designSystem }),
-    [Source.Folder]: () => ({ folder: folder.trim(), routes: routes.split(/[\s,]+/).filter(Boolean), conditions, designSystem }),
-    [Source.Upload]: () => ({ upload: uploaded?.path ?? '', routes: routes.split(/[\s,]+/).filter(Boolean), conditions, designSystem }),
+    [Source.Repo]: () => ({ repo: linked(repo), routes: routeList, conditions, designSystem, ...wait }),
+    [Source.Folder]: () => ({ folder: folder.trim(), routes: routeList, conditions, designSystem, ...wait }),
+    [Source.Upload]: () => ({ upload: uploaded?.path ?? '', routes: routeList, conditions, designSystem, ...wait }),
     [Source.Storybook]: () => ({ storybook: linked(storybook) })
   };
 
@@ -262,6 +270,14 @@
             <label><input type="checkbox" value={w.id} bind:group={widths} data-testid={`code-import-width-${w.id}`} /> {w.label}</label>
           {/each}
           <p class="ui-note">Each page lands once per theme and width, side by side. Language, login, flags and loading or error states are not switched.</p>
+        </fieldset>
+        <fieldset class="ui-conditions" data-testid="code-import-wait">
+          <legend>Extra wait before capture (ms)</legend>
+          <input class="rounded-sm" type="number" min="0" step="100" placeholder="0" aria-label="Extra wait for every page" bind:value={waitMs} data-testid="code-import-wait-all" />
+          {#each routeList as r (r)}
+            <label>{r} <input class="rounded-sm" type="number" min="0" step="100" placeholder={waitMs || '0'} aria-label={`Extra wait for ${r}`} bind:value={routeWaits[r]} data-testid="code-import-wait-route" /></label>
+          {/each}
+          <p class="ui-note">Pages already wait for the page to stop changing. Add time only for content that arrives late, such as a table of contents after a fetch.</p>
         </fieldset>
         {#if lookup}
         <fieldset class="ui-conditions" data-testid="code-import-design">

@@ -6,6 +6,7 @@ import type { ComponentUse } from './component-marks';
 import { codePlan } from './code-doc';
 import { boardsOf, conditioned, cropped, type Capture } from './boards';
 import { BASE_CONDITIONS, conditionKey, variantsOf, type RenderConditions } from './render-conditions';
+import { CAPTURE_BUDGET_MS, delayFor, NO_DELAY, type CaptureDelay } from './capture-wait';
 import { ownImages } from './page-images';
 import { located, repoOf, routesOf, type RepoRef } from './repo';
 import { appOf, PlanRefusal } from './run-plan';
@@ -58,7 +59,6 @@ export enum Crop {
 
 const CONTENT_MARGIN = 24;
 const SETTLE_MS = 1_200;
-const CAPTURE_BUDGET_MS = 150_000;
 
 const CROPS: Record<Crop, (capture: Capture) => Capture> = {
   [Crop.Page]: (capture) => capture,
@@ -73,7 +73,7 @@ export type CodeOrigin = { repo: string; branch: string | null; sha: string | nu
 
 export type CodeImported = ({ outcome: CodeImportOutcome.Ok; frameId: string; origin?: CodeOrigin; name: string; undo: unknown[]; skipped: string[]; truncated: boolean; pages: string[]; design?: DesignReport; tokenMap?: TokenMap; library?: LibraryReport } & ComponentCount) | Refusal;
 
-export type CodePage = { label: string; url: string; conditions?: RenderConditions };
+export type CodePage = { label: string; url: string; route?: string; conditions?: RenderConditions };
 
 export type LandAsk = Omit<PageAsk, 'url' | 'planner'>;
 
@@ -85,13 +85,16 @@ export type DesignOptions = { code?: CodeReader | null; designSystem?: DesignSys
 
 export type BranchList = (repo: RepoRef) => Promise<string[]>;
 
-export type CodeAsk = LandAsk & DesignOptions & { repo: string; app?: string; routes: string[]; conditions?: RenderConditions[]; runner: RepoRunner | null; archive?: RepoArchive | null; branches?: BranchList | null };
+export type CodeAsk = LandAsk & DesignOptions & { repo: string; app?: string; routes: string[]; conditions?: RenderConditions[]; delay?: CaptureDelay; runner: RepoRunner | null; archive?: RepoArchive | null; branches?: BranchList | null };
 
 const refused = (outcome: Refusal['outcome'], error?: string, apps?: string[]): Refusal => ({ outcome, ...(error ? { error } : {}), ...(apps?.length ? { apps } : {}) });
 
-export function marksPlanner(names: string[], found: { uses: ComponentUse[] }): Planner {
+const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+export function marksPlanner(names: string[], found: { uses: ComponentUse[] }, delayMs = 0): Planner {
   return {
     prepare: async (tab) => {
+      await pause(delayMs);
       found.uses = await tab.marks(names);
     },
     plan: (tree, newId, fonts) => urlPlan(tree, newId, undefined, fonts)
@@ -111,7 +114,7 @@ enum Missed {
   OutOfTime = 'left out, the import ran out of time'
 }
 
-type Window = { settleMs: number; budgetMs: number; now: () => number };
+type Window = { settleMs: number; budgetMs: number; now: () => number; delay: CaptureDelay };
 
 async function captured(open: OpenAppBrowser, pages: CodePage[], names: string[], window: Window): Promise<{ captures: Capture[]; missed: string[]; last: Refusal | null }> {
   const captures: Capture[] = [];
@@ -128,7 +131,7 @@ async function captured(open: OpenAppBrowser, pages: CodePage[], names: string[]
     const tab = await open();
     await tab.scheme(conditions.scheme).catch(() => undefined);
     await tab.viewport(conditions.width).catch(() => undefined);
-    const tree = await pageTreeAt(tab, new URL(page.url), window.settleMs, marksPlanner(names, found)).finally(() => tab.close());
+    const tree = await pageTreeAt(tab, new URL(page.url), window.settleMs, marksPlanner(names, found, delayFor(window.delay, page.route ?? '', pages.length))).finally(() => tab.close());
     if ('outcome' in tree) {
       missed.push(`${page.label}: ${Missed.Unopened}`);
       last = tree.outcome === UrlImportOutcome.Ok ? null : refused(FROM_URL_IMPORT[tree.outcome], tree.error);
@@ -141,7 +144,7 @@ async function captured(open: OpenAppBrowser, pages: CodePage[], names: string[]
 
 export type Designer = (loaded: LoadedSheet[]) => Promise<Design | null>;
 
-export type BoardsAsk = LandAsk & { name: string; pages: CodePage[]; names: string[]; crop: Crop; budgetMs?: number; now?: () => number; design?: Designer | null; library?: Discovery };
+export type BoardsAsk = LandAsk & { name: string; pages: CodePage[]; names: string[]; crop: Crop; budgetMs?: number; now?: () => number; design?: Designer | null; library?: Discovery; delay?: CaptureDelay };
 
 export function designFor(ask: DesignOptions, rev: string | null): Designer | null {
   const code = ask.code;
@@ -163,7 +166,7 @@ export async function importBoards(ask: BoardsAsk): Promise<CodeImported> {
     return refused(CodeImportOutcome.NoBrowser);
   }
 
-  const window = { settleMs: ask.settleMs ?? SETTLE_MS, budgetMs: ask.budgetMs ?? CAPTURE_BUDGET_MS, now: ask.now ?? Date.now };
+  const window = { settleMs: ask.settleMs ?? SETTLE_MS, budgetMs: ask.budgetMs ?? CAPTURE_BUDGET_MS, now: ask.now ?? Date.now, delay: ask.delay ?? NO_DELAY };
   const { captures, missed, last } = await captured(ask.open, ask.pages, ask.names, window);
   if (!captures.length) {
     return last ?? refused(CodeImportOutcome.Unreadable);
@@ -190,7 +193,7 @@ export async function importBoards(ask: BoardsAsk): Promise<CodeImported> {
   return { ...done, outcome: CodeImportOutcome.Ok, skipped, pages: captures.map((c) => c.label), ...count, ...report, ...library };
 }
 
-export type RunAsk = LandAsk & DesignOptions & { repo: RepoRef; app: string | null; routes: string[]; conditions?: RenderConditions[]; runner: RepoRunner | null; archive: Uint8Array | null };
+export type RunAsk = LandAsk & DesignOptions & { repo: RepoRef; app: string | null; routes: string[]; conditions?: RenderConditions[]; delay?: CaptureDelay; runner: RepoRunner | null; archive: Uint8Array | null };
 
 const AMBIGUOUS_REF = '/';
 
@@ -229,7 +232,7 @@ export async function importRepoAt(ask: RunAsk): Promise<CodeImported> {
     return refused(run.failure === PlanRefusal.ChooseApp ? CodeImportOutcome.ChooseApp : CodeImportOutcome.RunFailed, `${run.failure}: ${run.detail}`, run.apps);
   }
 
-  const pages = variantsOf(routes, ask.conditions ?? [BASE_CONDITIONS]).map((v) => ({ label: v.label, url: new URL(v.route, run.app.url).toString(), conditions: v.conditions }));
+  const pages = variantsOf(routes, ask.conditions ?? [BASE_CONDITIONS]).map((v) => ({ label: v.label, url: new URL(v.route, run.app.url).toString(), route: v.route, conditions: v.conditions }));
   const origin = { repo: `${ask.repo.owner}/${ask.repo.repo}`, branch: ask.repo.ref, sha: run.app.sha, app: ask.app };
   const design = designFor(ask, run.app.sha);
   const done = await importBoards({ ...ask, name: ask.repo.repo, pages, names: run.app.names, crop: Crop.Page, design, library: run.app.library }).finally(() => run.app.stop().catch(() => undefined));
