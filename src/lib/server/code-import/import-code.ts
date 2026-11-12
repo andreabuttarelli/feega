@@ -12,6 +12,7 @@ import { appOf, PlanRefusal } from './run-plan';
 import type { RepoRunner } from './sandbox-runner';
 import { designed, designOf, DesignSystem, modeOfScheme, withBoard, type Design, type DesignReport } from './design-system';
 import type { TokenMap } from './design-tokens';
+import type { LoadedSheet } from './css-tokens';
 import type { ReadFile } from './write-back';
 
 export enum CodeImportOutcome {
@@ -137,11 +138,16 @@ async function captured(open: OpenAppBrowser, pages: CodePage[], names: string[]
   return { captures, missed, last };
 }
 
-export type BoardsAsk = LandAsk & { name: string; pages: CodePage[]; names: string[]; crop: Crop; budgetMs?: number; now?: () => number; design?: Design | null };
+export type Designer = (loaded: LoadedSheet[]) => Promise<Design | null>;
 
-export async function designFor(ask: DesignOptions, rev: string | null): Promise<Design | null> {
-  return ask.code && ask.designSystem !== DesignSystem.Off ? designOf(ask.code(rev)).catch(() => null) : null;
+export type BoardsAsk = LandAsk & { name: string; pages: CodePage[]; names: string[]; crop: Crop; budgetMs?: number; now?: () => number; design?: Designer | null };
+
+export function designFor(ask: DesignOptions, rev: string | null): Designer | null {
+  const code = ask.code;
+  return code && ask.designSystem !== DesignSystem.Off ? (loaded) => designOf(code(rev), loaded).catch(() => null) : null;
 }
+
+const loadedOf = (captures: Capture[]): LoadedSheet[] => [...new Map(captures.flatMap((c) => c.tree.styles ?? []).map((s) => [s.at ?? s.text, s])).values()];
 
 export async function importBoards(ask: BoardsAsk): Promise<CodeImported> {
   const first = ask.pages[0] ? await publicUrl(ask.pages[0].url, ask.guard) : null;
@@ -159,12 +165,13 @@ export async function importBoards(ask: BoardsAsk): Promise<CodeImported> {
   }
 
   const cropped = captures.map(CROPS[ask.crop]);
-  const boards = boardsOf(ask.name, ask.design ? withBoard(ask.design, ask.name, cropped) : cropped);
+  const tokens = ask.design ? await ask.design(loadedOf(captures)) : null;
+  const boards = boardsOf(ask.name, tokens ? withBoard(tokens, ask.name, cropped) : cropped);
   const [tree, uses] = [await withSheetFonts(ask, boards.tree), boards.uses];
   const planned = codePlan(tree, uses, ask.newId, await fontsFor(ask, tree));
   const base = ask.pages[0]?.conditions ?? BASE_CONDITIONS;
   const boardModes = Object.fromEntries(ask.pages.map((p) => [p.label, modeOfScheme(p.conditions ?? BASE_CONDITIONS)]));
-  const design = ask.design && planned ? designed(ask.design, planned, { repo: ask.name, base, boards: boardModes, captures: cropped, width: tree.root.absoluteBoundingBox?.width ?? tree.width }) : null;
+  const design = tokens && planned ? designed(tokens, planned, { repo: ask.name, base, boards: boardModes, captures: cropped, width: tree.root.absoluteBoundingBox?.width ?? tree.width }) : null;
   const done = await landPlan({ ...ask, importImage: ownImages(ask.importImage, ask.pages.map((p) => p.url)) }, design?.plan ?? planned, tree.truncated);
   if (done.outcome !== UrlImportOutcome.Ok) {
     return refused(FROM_URL_IMPORT[done.outcome], done.error);
@@ -173,8 +180,8 @@ export async function importBoards(ask: BoardsAsk): Promise<CodeImported> {
   const frame = await ask.store.read(done.frameId);
   const count = frame ? componentCount(frame.doc) : { components: 0, variants: 0, instances: 0 };
   const skipped = [...done.skipped, ...missed, ...(design?.skipped ?? [])];
-  const tokens = design ? { design: design.report, tokenMap: design.map } : {};
-  return { ...done, outcome: CodeImportOutcome.Ok, skipped, pages: captures.map((c) => c.label), ...count, ...tokens };
+  const report = design ? { design: design.report, tokenMap: design.map } : {};
+  return { ...done, outcome: CodeImportOutcome.Ok, skipped, pages: captures.map((c) => c.label), ...count, ...report };
 }
 
 export type RunAsk = LandAsk & DesignOptions & { repo: RepoRef; app: string | null; routes: string[]; conditions?: RenderConditions[]; runner: RepoRunner | null; archive: Uint8Array | null };
@@ -218,7 +225,7 @@ export async function importRepoAt(ask: RunAsk): Promise<CodeImported> {
 
   const pages = variantsOf(routes, ask.conditions ?? [BASE_CONDITIONS]).map((v) => ({ label: v.label, url: new URL(v.route, run.app.url).toString(), conditions: v.conditions }));
   const origin = { repo: `${ask.repo.owner}/${ask.repo.repo}`, branch: ask.repo.ref, sha: run.app.sha, app: ask.app };
-  const design = await designFor(ask, run.app.sha);
+  const design = designFor(ask, run.app.sha);
   const done = await importBoards({ ...ask, name: ask.repo.repo, pages, names: run.app.names, crop: Crop.Page, design }).finally(() => run.app.stop().catch(() => undefined));
   return done.outcome === CodeImportOutcome.Ok ? { ...done, origin } : done;
 }

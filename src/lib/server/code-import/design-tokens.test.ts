@@ -113,3 +113,19 @@ describe('variablesOf', () => {
     expect(set.skipped).toContain('--a: alias to --missing, which is not a token here');
   });
 });
+
+describe('Arc tokens', () => {
+  it('light and dark land as the modes of the palette, every accent as a mode of its own collection', async () => {
+    const { variables } = variablesOf(await setOf('arc'), 'arc');
+
+    expect(variables['arc Palette'].modes).toEqual(['Light', 'Dark']);
+    expect(variables['arc Palette'].vars.accent.values).toEqual({ Light: expect.anything(), Dark: expect.anything() });
+    expect(variables['arc Accent'].modes).toEqual(['Neutral', 'Violet', 'Blue', 'Green', 'Amber', 'Orange', 'Coral', 'Rose']);
+    expect(variables['arc Accent'].vars.accent.type).toBe(VarType.Colour);
+  });
+
+  it('an accent inside dark mode stays out and says so', async () => {
+    const set = await setOf('arc');
+    expect(set.skipped.some((s) => s.startsWith('--accent under :root[data-theme="dark"][data-accent="violet"]'))).toBe(true);
+  });
+});
