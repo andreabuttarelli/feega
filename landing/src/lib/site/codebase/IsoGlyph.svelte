@@ -1,8 +1,8 @@
 <script lang="ts">
-  import Slab from './Slab.svelte';
-  import { inView } from './in-view';
+  import Slab from '../iso/Slab.svelte';
+  import { inView } from '../iso/in-view';
   import { Glyph } from '.';
-  import { INK, SHADES, onTop } from './iso';
+  import { INK, SHADES, onTop } from '../iso/iso';
 
   let { glyph }: { glyph: Glyph } = $props();
 
