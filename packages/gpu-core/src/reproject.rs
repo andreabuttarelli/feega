@@ -63,6 +63,36 @@ fn tile_slots(looks: &[[f32; 8]]) -> Vec<u8> {
     bytes
 }
 
+struct FrameKept<K, V> {
+    last: std::collections::HashMap<K, V>,
+    this: std::collections::HashMap<K, V>,
+}
+
+impl<K, V> Default for FrameKept<K, V> {
+    fn default() -> Self {
+        FrameKept { last: std::collections::HashMap::new(), this: std::collections::HashMap::new() }
+    }
+}
+
+impl<K: std::hash::Hash + Eq, V> FrameKept<K, V> {
+    fn take(&mut self, key: &K) -> Option<V> {
+        self.this.remove(key).or_else(|| self.last.remove(key))
+    }
+
+    fn keep(&mut self, key: K, value: V) {
+        self.this.insert(key, value);
+    }
+
+    fn turn(&mut self) {
+        self.last = std::mem::take(&mut self.this);
+    }
+
+    fn clear(&mut self) {
+        self.last.clear();
+        self.this.clear();
+    }
+}
+
 pub struct Reprojector {
     pipelines: Vec<((wgpu::TextureFormat, Output), wgpu::RenderPipeline)>,
     sampler: wgpu::Sampler,
@@ -71,7 +101,7 @@ pub struct Reprojector {
     next: usize,
     tiles: Option<wgpu::Buffer>,
     layout: wgpu::BindGroupLayout,
-    bound: std::collections::HashMap<wgpu::Texture, wgpu::BindGroup>,
+    bound: FrameKept<wgpu::Texture, wgpu::BindGroup>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -177,8 +207,7 @@ impl Reprojector {
         }
         let buffer = self.tile_uniforms(device, queue, tiles);
         let pipeline = self.pipeline(device, format, output).clone();
-        let mut bound = std::mem::take(&mut self.bound);
-        let groups: Vec<wgpu::BindGroup> = tiles.iter().map(|t| bound.remove(t.source).unwrap_or_else(|| self.bind(device, t.source, &buffer))).collect();
+        let groups: Vec<wgpu::BindGroup> = tiles.iter().map(|t| self.bound.take(t.source).unwrap_or_else(|| self.bind(device, t.source, &buffer))).collect();
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
             color_attachments: &[Some(wgpu::RenderPassColorAttachment { view: target, depth_slice: None, resolve_target: None, ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store } })],
@@ -195,7 +224,13 @@ impl Reprojector {
             pass.draw(0..3, 0..1);
         }
         drop(pass);
-        self.bound = tiles.iter().zip(groups).map(|(t, g)| (t.source.clone(), g)).collect();
+        for (t, g) in tiles.iter().zip(groups) {
+            self.bound.keep(t.source.clone(), g);
+        }
+    }
+
+    pub fn end_frame(&mut self) {
+        self.bound.turn();
     }
 
     pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, encoder: &mut wgpu::CommandEncoder, d: Draw) {
@@ -226,6 +261,25 @@ impl Reprojector {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_binding_used_by_either_draw_of_a_frame_is_kept_for_the_next_frame() {
+        let mut kept = FrameKept::default();
+        kept.keep(1, "placed");
+        kept.keep(2, "lifted");
+        kept.turn();
+        assert_eq!(kept.take(&1), Some("placed"));
+        assert_eq!(kept.take(&2), Some("lifted"));
+    }
+
+    #[test]
+    fn a_binding_unused_for_a_whole_frame_is_dropped() {
+        let mut kept = FrameKept::default();
+        kept.keep(1, "placed");
+        kept.turn();
+        kept.turn();
+        assert_eq!(kept.take(&1), None);
+    }
 
     #[test]
     fn each_tile_look_lands_at_the_start_of_its_own_aligned_slot() {
