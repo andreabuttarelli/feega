@@ -331,16 +331,27 @@
     bottom: 0;
   }
 
-  .rotation {
-    min-width: 0;
-    display: flex;
-    align-items: center;
+  .turn {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: var(--ui-space-2);
   }
 
+  .rotation {
+    display: contents;
+  }
+
   .rotation .slot {
-    flex: 1;
+    grid-area: 1 / 1;
     min-width: 0;
+  }
+
+  .turn .segments {
+    grid-area: 2 / 1;
+  }
+
+  .pivot {
+    grid-area: 1 / 2 / span 2;
   }
 
   .pivot {
