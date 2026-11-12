@@ -1079,8 +1079,8 @@
     if (sceneDue(quiet) || (sceneBusy && uploadOwed(into, owed).length)) {
       restage(into);
     }
-    for (const part of quiet ? sentOverlay.changed(overlay) : []) {
-      into.setOverlay(part, overlay[part]);
+    for (const [part, json] of quiet ? sentOverlay.changed(overlay) : []) {
+      into.setOverlay(part, json);
     }
     const at = deviceView();
     into.setMotion?.(quiet ? CoreMotion.Still : CoreMotion.Gesture);

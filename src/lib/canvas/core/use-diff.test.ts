@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Use } from '@feega/motion-core/motion/gpu-full/core-web';
 import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
-import { SentOverlay, SentUses } from './use-diff';
+import { OverlayPart } from '@feega/motion-core/motion/gpu-full/core-overlay';
+import { SentOverlay, SentParts, SentUses } from './use-diff';
 
 describe('sent overlay', () => {
   it('counts a new array with the same items as unchanged', () => {
@@ -34,6 +35,23 @@ describe('sent overlay', () => {
     expect(sent.changed(items)).toBe(false);
     expect(read).not.toHaveBeenCalled();
     read.mockRestore();
+  });
+});
+
+describe('sent parts', () => {
+  it('hands the engine the JSON it compared, serialising only the items it has not seen', () => {
+    const sent = new SentParts();
+    const ring = { kind: 'path', clip: 'r', matrix: [1, 0, 0, 1, 0, 0] } as unknown as PathItem;
+    const tag = { kind: 'path', clip: 't', matrix: [1, 0, 0, 1, 0, 0] } as unknown as PathItem;
+    sent.changed({ fixed: [ring], selected: [], live: [] });
+    const read = vi.spyOn(JSON, 'stringify');
+
+    const changed = sent.changed({ fixed: [ring, tag], selected: [], live: [] });
+    const reads = read.mock.calls.length;
+    read.mockRestore();
+
+    expect(changed).toEqual([[OverlayPart.Fixed, JSON.stringify([ring, tag])]]);
+    expect(reads).toBe(1);
   });
 });
 
