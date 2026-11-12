@@ -4,7 +4,7 @@ Open `.feega` canvases in an editor tab: motion video, UI and graphic design on 
 
 - **Open a `.feega` file** to see it as a canvas.
 - **Feega: New canvas** creates one.
-- **Feega: Import this folder into a canvas** runs your project's dev server and draws its home page as an editable frame.
+- **Feega: Import this folder into a canvas** runs your project's dev server and draws its pages (up to 20) as editable frames.
 
 Needs Node 22+. No account: the canvas runs on your machine (`npx feega`). Import the file at [feega.app](https://feega.app) to work in the cloud with your team.
 
