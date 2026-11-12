@@ -5,6 +5,7 @@ import { colourOf, writtenLike } from './token-colour';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { applyEdits, atOf, editsOf, type FileChange, type ReadFile } from './write-back';
 import { LIGHT, READ_ONLY, fromPage, parseSheets } from './css-tokens';
+import { parseTokenFile } from './json-tokens';
 import { importedValue as importedStyleValue, sameStyleValue, styleText, styleValue, type StyleField } from './design-styles';
 import type { Style } from '@feega/motion-core/motion/styles-model';
 
@@ -88,9 +89,32 @@ function replaced(text: string, line: number, name: string, was: string, next: s
 
 type Declaration = { file: string; mode: string; name: string; was: string; hint: number };
 
+const JSON_VALUE = /("\$value"\s*:\s*)"([^"]*)"/;
+const CSS_TEXT_ONLY = /^var\(/;
+
+function replacedJson(text: string, line: number, _name: string, was: string, next: string): string | null {
+  const lines = text.split('\n');
+  const m = lines[line - 1] === undefined ? null : JSON_VALUE.exec(lines[line - 1]);
+  if (!m || m[2] !== was.trim() || CSS_TEXT_ONLY.test(next)) {
+    return null;
+  }
+  lines[line - 1] = lines[line - 1].replace(JSON_VALUE, `$1"${next}"`);
+  return lines.join('\n');
+}
+
+type Format = { declared: (text: string, file: string) => { name: string; mode: string; raw: string; at: { line: number } }[]; replace: typeof replaced };
+
+const FORMATS: { test: RegExp; format: Format }[] = [
+  { test: /\.json$/, format: { declared: (text, file) => parseTokenFile(file, text).declared, replace: replacedJson } },
+  { test: /$/, format: { declared: (text, file) => parseSheets([{ path: file, text }]).declared, replace: replaced } }
+];
+
+const formatOf = (file: string) => FORMATS.find((f) => f.test.test(file))!.format;
+
 function located(text: string, d: Declaration): number | null {
-  const lines = parseSheets([{ path: d.file, text }])
-    .declared.filter((found) => found.name === d.name && found.mode === d.mode && found.raw.trim() === d.was.trim())
+  const lines = formatOf(d.file)
+    .declared(text, d.file)
+    .filter((found) => found.name === d.name && found.mode === d.mode && found.raw.trim() === d.was.trim())
     .map((found) => found.at.line);
   const distance = (line: number) => Math.abs(line - d.hint);
   return lines.reduce<number | null>((best, line) => (best === null || distance(line) <= distance(best) ? line : best), null);
@@ -259,7 +283,7 @@ export async function writeTokens(variables: Variables | undefined, map: TokenMa
         continue;
       }
       const line = file === null ? null : located(file, { file: at.file, mode, name: entry.name, was: raw, hint: at.line });
-      const changed = text === null || file === null || line === null ? null : replaced(file, line, entry.name, raw, text);
+      const changed = text === null || file === null || line === null ? null : formatOf(at.file).replace(file, line, entry.name, raw, text);
       if (text === null) {
         skipped.push(`${entry.name} (${mode}): ${shown(now)} cannot be written as CSS`);
         continue;

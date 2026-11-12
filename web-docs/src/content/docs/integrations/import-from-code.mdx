@@ -68,7 +68,7 @@ With **Design system** on (the default when the dialog finds CSS tokens, with th
 | Tailwind v3 `tailwind.config.js` | No | The config is code and would have to run. |
 | SCSS / LESS variables | No | Compiled away: nothing ties a layer back to them. |
 | JS theme objects (styled-components, Emotion, MUI) | No | Values are computed at runtime by app code. |
-| W3C design-tokens JSON | No | Later. |
+| W3C design-tokens JSON / Style Dictionary | Yes | Files: `tokens.json`, `design-tokens.json`, `src/tokens.json`, `src/design-tokens.json`, `tokens/tokens.json`, `tokens/light.tokens.json`, `tokens/dark.tokens.json`, and the literal (non-glob) paths in a Style Dictionary `config.json` / `sd.config.json` `source`. The token path is the name (`color.primary` → `--color-primary`), `{color.blue.500}` is an alias, a file whose name contains `dark` is the Dark mode. Colours, dimensions and font-family lists become variables; shadow, typography and other composite tokens are listed as left out. Write-back replaces the string `$value` on its line; aliases and object values (`{ value, unit }`) are not written. Layers bind through the CSS the tokens generate. |
 
 ## Edit the code from the canvas
 
