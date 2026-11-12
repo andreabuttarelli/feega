@@ -4,7 +4,7 @@ import { aliasOf, lengthPx, type TokenEntry, type TokenMap } from './design-toke
 import { colourOf, writtenLike } from './token-colour';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { applyEdits, atOf, editsOf, type FileChange, type ReadFile } from './write-back';
-import { parseSheets } from './css-tokens';
+import { READ_ONLY, fromPage, parseSheets } from './css-tokens';
 
 export type TokensWritten = { files: FileChange[]; skipped: string[]; map: TokenMap };
 
@@ -191,6 +191,10 @@ export async function writeTokens(variables: Variables | undefined, map: TokenMa
         continue;
       }
       const origin = entry.origins[mode] ?? Object.values(entry.origins)[0];
+      if (fromPage(origin)) {
+        skipped.push(`${entry.name}: ${READ_ONLY}`);
+        break;
+      }
       const own = Boolean(entry.origins[mode]);
       const at = atOf(origin);
       if (!at || outside(origin)) {

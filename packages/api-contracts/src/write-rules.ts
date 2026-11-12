@@ -99,6 +99,7 @@ export const TABLE_CHECKS: Record<string, string> = {
   "posts_video_duration_check": "video_duration_seconds > 0 and video_duration_seconds <= 3600",
   "posts_video_render_status_check": "video_render_status in ('rendering', 'done', 'failed')",
   "posts_video_resolution_check": "video_resolution ~ '^[0-9]{3,4}p$'",
+  "product_events_event_check": "event in ( 'landing_prompt_sent', 'login_started', 'signup_completed', 'handoff_resumed', 'canvas_created', 'agent_started', 'agent_first_output', 'agent_failed', 'credits_exhausted', 'import_failed', 'canvas_perf' )",
   "products_images_shape": "jsonb_typeof(images) = 'array'",
   "products_text_len": "length(description) <= 50000 and length(pricing) <= 200 and length(external_id) <= 200 and length(kind) <= 200",
   "products_title_check": "btrim(title) <> '' and length(title) <= 500",

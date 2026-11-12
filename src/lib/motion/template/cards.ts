@@ -1,4 +1,5 @@
 import { MotionFormat } from '@feega/motion-core/motion/doc';
+import { ARC_CARDS } from './arc-cards';
 import type { LayoutId } from '@feega/motion-core/canvas/composition/types';
 import { BUILTIN_PREFIX } from './design-kit';
 import { SNAPCN_CARDS } from './snapcn-cards';
@@ -832,7 +833,7 @@ const POSTER_CARDS = Object.fromEntries(Object.entries(POSTERS).map(([key, p]) =
 const COMPOSITION_CARDS = Object.fromEntries((Object.keys(COMPOSITIONS) as LayoutId[]).map((layout) => [`composition-${layout}`, compositionCard(layout)]));
 
 export const TEMPLATE_CARDS: Record<string, TemplateCard> = Object.fromEntries(
-  Object.entries({ ...LAUNCH_CARDS, ...SCENE_CARDS, ...DESIGN_CARDS, ...COMPOSITION_CARDS, ...CUSTOM_CARDS, ...POSTER_CARDS, ...SNAPCN_CARDS, ...RENDERCOMP_CARDS, ...UI_LOOP_CARDS }).map(([id, c]) => [`${BUILTIN_PREFIX}${id}`, c])
+  Object.entries({ ...LAUNCH_CARDS, ...SCENE_CARDS, ...DESIGN_CARDS, ...COMPOSITION_CARDS, ...CUSTOM_CARDS, ...POSTER_CARDS, ...SNAPCN_CARDS, ...RENDERCOMP_CARDS, ...UI_LOOP_CARDS, ...ARC_CARDS }).map(([id, c]) => [`${BUILTIN_PREFIX}${id}`, c])
 );
 
 export const templateCard = (id: string): TemplateCard | null => TEMPLATE_CARDS[id] ?? null;

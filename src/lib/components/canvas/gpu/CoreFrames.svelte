@@ -57,6 +57,8 @@
   import { loadOnce, withScenes, type LoadScene } from '$lib/canvas/scene-sources';
   import { describe, factsOf, signatureOf, undrawn, type NodeFacts } from '$lib/canvas/core/core-debug';
   import { Motion, hudLine, watchCrashes } from '$lib/canvas/gpu/crash-watch';
+  import { startCanvasPerf } from '$lib/canvas/perf/perf-beacon';
+  import { Camera } from '$lib/canvas/perf/session-perf';
   import { liftOut, liftedPut, movingGroup, restGroup, type Lift, type Lifted } from '$lib/canvas/core/lifted-drag';
   import { AttachStep, GpuBackend, afterAttachFailure, backendAfterLoss, isTrap, type BackendSwitch } from '$lib/canvas/gpu/gpu-loss';
 
@@ -100,6 +102,11 @@
   const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, budget.resolution);
   const crashes = watchCrashes({ device: currentDevice(), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, resolution });
   const RASTERED = new Set<Outcome>([Outcome.Full, Outcome.Partial]);
+  const perf = startCanvasPerf({ canvasId: untrack(() => place?.canvasId ?? ''), device: currentDevice(), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, frames: () => frames.length });
+  const EDIT_GIVE_UP_MS = 10_000;
+  const editSeen = new Map<string, string>();
+  const editsOwed = new Map<string, number>();
+  let camera = Camera.Still;
 
   let readsHost = $state<HTMLDivElement | null>(null);
   const READ_LANES = 2;
@@ -888,6 +895,7 @@
       dropCore();
     }
     losses++;
+    perf.deviceLost();
     const next = backendAfterLoss(backend, losses, BACKENDS.length);
     if (next !== backend) {
       losses = 0;
@@ -1017,6 +1025,29 @@
     }
   }
 
+  function settleEdits(now: number) {
+    for (const [group, since] of editsOwed) {
+      if (put.has(group)) {
+        perf.edit(now - since);
+      }
+      if (put.has(group) || now - since > EDIT_GIVE_UP_MS) {
+        editsOwed.delete(group);
+      }
+    }
+  }
+
+  $effect(() => {
+    const now = performance.now();
+    for (const f of frames) {
+      const seen = `${baseKey(f)}|${liveGroup.get(f.id) ?? ''}`;
+      const before = editSeen.get(f.id);
+      editSeen.set(f.id, seen);
+      if (before !== undefined && before !== seen) {
+        editsOwed.set(untrack(() => groupOf(f)), now);
+      }
+    }
+  });
+
   function paintOn(into: CoreRaster): boolean {
     const quiet = !gesture.active();
     if (sceneDue(quiet) || (sceneBusy && uploadOwed(into, owed).length)) {
@@ -1031,6 +1062,8 @@
     const began = performance.now();
     const { outcome, pending, skipped } = into.frame(began);
     countFrame(began, into.frameCounts?.(), gesture.active(), pending);
+    perf.frame(gesture.active() ? camera : Camera.Still, lift !== null, began);
+    settleEdits(began);
     if (thumbsOwed && !pending && quiet) {
       thumbsOwed = false;
       takeThumbs(canvas, shown);
@@ -1069,6 +1102,7 @@
     const now = `${view.x},${view.y},${view.zoom}`;
     if (lastView && now !== lastView) {
       gesture.moved();
+      camera = view.zoom !== lastZoom ? Camera.Zooming : Camera.Panning;
       gestureLog(view.zoom !== lastZoom ? 'zoom' : 'pan');
     }
     if (lastZoom && view.zoom !== lastZoom) {
@@ -1134,6 +1168,12 @@
 
   $effect(() => () => media.dispose());
   $effect(() => () => crashes.stop());
+  $effect(() => () => perf.stop());
+  $effect(() => {
+    if (raster) {
+      perf.backend(BACKENDS[backend].name);
+    }
+  });
 
 </script>
 

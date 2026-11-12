@@ -1,7 +1,16 @@
 import { dirname, join, normalize } from 'node:path';
+import type { PageSheet } from '$lib/server/url-import/page-tree';
 import type { ReadFile } from './write-back';
 
 export type Sheet = { path: string; text: string };
+
+export type LoadedSheet = PageSheet;
+
+export const PAGE_SHEET = 'page:';
+
+export const READ_ONLY = 'read from the running page, no source file: read-only';
+
+export const fromPage = (file: string) => file.startsWith(PAGE_SHEET);
 
 export type DeclAt = { file: string; line: number; column: number };
 
@@ -15,6 +24,11 @@ export type Parsed = { declared: Declared[]; rules: VarRule[]; skipped: string[]
 
 export const LIGHT = 'Light';
 export const DARK = 'Dark';
+export const ACCENT = 'Accent';
+
+const ACCENT_MARK = `${ACCENT}:`;
+
+export const accentOf = (mode: string) => (mode.startsWith(ACCENT_MARK) ? mode.slice(ACCENT_MARK.length) : null);
 
 const SHADCN_CONFIG = 'components.json';
 const MAX_SHEETS = 24;
@@ -37,7 +51,15 @@ const CANDIDATE_SHEETS = [
   'assets/css/main.css'
 ];
 
-const RELATIVE_IMPORT = /@import\s+(?:url\(\s*)?["'](\.{1,2}\/[^"']+\.css)["']/g;
+const IMPORT = /@import\s+(?:url\(\s*)?["']([^"']+)["']/g;
+const RELATIVE = /^\.{1,2}\//;
+const PACKAGE_PATH = /^((?:@[\w.-]+\/)?[\w.-]+)\/(.+)$/;
+const ROOT_MANIFEST = 'package.json';
+const PNPM_WORKSPACE = 'pnpm-workspace.yaml';
+const PNPM_ENTRY = /^\s*-\s*["']?([^"'#\s]+)["']?/;
+const CSS_FILE = /\.css$/;
+const MAX_SOURCE_DEPTH = 12;
+const DEPENDENCIES = 'node_modules';
 const VAR_ONLY = /^var\(\s*(--[\w.-]+)\s*(?:,[^)]*)?\)$/;
 const CUSTOM_PROPERTY = /^--[\w.-]+$/;
 const BOUND_PROPERTIES = new Set(['color', 'background', 'background-color', 'border-color', 'gap', 'padding', 'border-radius']);
@@ -48,7 +70,8 @@ const MODE_SELECTORS: [RegExp, (m: RegExpExecArray) => string][] = [
   [/^(?::root|html|:host)$/, () => LIGHT],
   [/^(?::root|html)?\.light$/, () => LIGHT],
   [/^(?::root|html)?\.dark$/, () => DARK],
-  [/^(?::root|html)?\[data-(?:theme|mode)=["']?([\w-]+)["']?\]$/, (m) => title(m[1])]
+  [/^(?::root|html)?\[data-(?:theme|mode)=["']?([\w-]+)["']?\]$/, (m) => title(m[1])],
+  [/^(?::root|html)?\[data-accent=["']?([\w-]+)["']?\]$/, (m) => `${ACCENT_MARK}${title(m[1])}`]
 ];
 
 const SCHEME_MEDIA = /^@media\s*\(\s*prefers-color-scheme\s*:\s*(light|dark)\s*\)$/i;
@@ -209,7 +232,8 @@ function parseOne(sheet: Sheet, out: Collected): void {
 export function parseSheets(sheets: Sheet[]): Parsed {
   const out: Collected = { declared: [], rules: [], skipped: [], blocks: [] };
   sheets.forEach((sheet) => parseOne(sheet, out));
-  return out;
+  const inFiles = new Set(out.declared.filter((d) => !fromPage(d.at.file)).map((d) => d.name));
+  return { ...out, declared: out.declared.filter((d) => !fromPage(d.at.file) || !inFiles.has(d.name)) };
 }
 
 async function shadcnSheet(read: ReadFile): Promise<string | null> {
@@ -225,13 +249,82 @@ async function shadcnSheet(read: ReadFile): Promise<string | null> {
   }
 }
 
-const importsOf = (sheet: Sheet) => [...sheet.text.matchAll(RELATIVE_IMPORT)].map((m) => normalize(join(dirname(sheet.path), m[1])));
+type Manifest = { name?: unknown; exports?: unknown; workspaces?: unknown };
+
+async function manifestAt(read: ReadFile, path: string): Promise<Manifest | null> {
+  const raw = await read(path).catch(() => null);
+  try {
+    return raw ? (JSON.parse(raw) as Manifest) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function workspaceDirs(read: ReadFile): Promise<string[]> {
+  const root = await manifestAt(read, ROOT_MANIFEST);
+  const declared = Array.isArray(root?.workspaces) ? root.workspaces : ((root?.workspaces as { packages?: unknown } | undefined)?.packages ?? []);
+  const pnpm = ((await read(PNPM_WORKSPACE).catch(() => null)) ?? '').split('\n').flatMap((line) => PNPM_ENTRY.exec(line)?.[1] ?? []);
+  const globs = [...(Array.isArray(declared) ? declared : []), ...pnpm].filter((g): g is string => typeof g === 'string');
+  return [...new Set(globs.map((g) => g.replace(/\/\*{1,2}$/, '').replace(/^\.\//, '')))];
+}
+
+function exported(manifest: Manifest, rest: string): string {
+  const target = (manifest.exports as Record<string, unknown> | undefined)?.[`./${rest}`];
+  const picked = typeof target === 'string' ? target : ['style', 'import', 'default'].map((k) => (target as Record<string, unknown> | undefined)?.[k]).find((v) => typeof v === 'string');
+  return typeof picked === 'string' ? picked : rest;
+}
+
+type PackageResolver = (spec: string) => Promise<string | null>;
+
+function packageResolver(read: ReadFile): PackageResolver {
+  let dirs: Promise<string[]> | null = null;
+  return async (spec) => {
+    const m = PACKAGE_PATH.exec(spec);
+    if (!m) {
+      return null;
+    }
+    const [, name, rest] = m;
+    const leaf = name.split('/').pop()!;
+    dirs ??= workspaceDirs(read);
+    for (const dir of await dirs) {
+      const home = dir.endsWith(`/${leaf}`) || dir === leaf ? dir : `${dir}/${leaf}`;
+      const manifest = await manifestAt(read, `${home}/${ROOT_MANIFEST}`);
+      if (manifest?.name === name) {
+        return normalize(join(home, exported(manifest, rest)));
+      }
+    }
+    return null;
+  };
+}
+
+async function importsOf(sheet: Sheet, resolve: PackageResolver): Promise<string[]> {
+  const specs = [...sheet.text.matchAll(IMPORT)].map((m) => m[1]);
+  const paths = await Promise.all(specs.map((spec) => (RELATIVE.test(spec) ? normalize(join(dirname(sheet.path), spec)) : resolve(spec))));
+  return paths.filter((p): p is string => Boolean(p) && CSS_FILE.test(p!));
+}
 
 const insideRepo = (path: string) => !path.startsWith('..') && !path.startsWith('/');
 
-export async function readSheets(read: ReadFile): Promise<Sheet[]> {
+async function sourceOf(read: ReadFile, at: string | undefined): Promise<string | null> {
+  const bare = (at ?? '').split(/[?#]/)[0].replace(/^\/@fs\//, '/');
+  const parts = bare.split('/').filter(Boolean);
+  if (!CSS_FILE.test(bare) || parts.includes(DEPENDENCIES)) {
+    return null;
+  }
+  for (let i = Math.max(0, parts.length - MAX_SOURCE_DEPTH); i < parts.length; i++) {
+    const path = parts.slice(i).join('/');
+    if ((await read(path).catch(() => null)) !== null) {
+      return path;
+    }
+  }
+  return null;
+}
+
+export async function readSheets(read: ReadFile, loaded: LoadedSheet[] = []): Promise<Sheet[]> {
   const declaredSheet = await shadcnSheet(read);
-  const queue = declaredSheet ? [declaredSheet] : [...CANDIDATE_SHEETS];
+  const found = await Promise.all(loaded.map((l) => sourceOf(read, l.at)));
+  const queue = [...(declaredSheet ? [declaredSheet] : CANDIDATE_SHEETS), ...found.filter((p): p is string => Boolean(p))];
+  const resolve = packageResolver(read);
   const seen = new Set<string>();
   const sheets: Sheet[] = [];
 
@@ -247,7 +340,9 @@ export async function readSheets(read: ReadFile): Promise<Sheet[]> {
     }
     const sheet = { path, text };
     sheets.push(sheet);
-    queue.unshift(...importsOf(sheet).filter((p) => !seen.has(p)));
+    queue.unshift(...(await importsOf(sheet, resolve)).filter((p) => !seen.has(p)));
   }
-  return sheets;
+
+  const onPage = loaded.flatMap((l, i) => (found[i] || !l.text || l.text.length > MAX_SHEET_BYTES ? [] : [{ path: `${PAGE_SHEET}${l.at ?? `inline ${i + 1}`}`, text: l.text }]));
+  return [...sheets, ...onPage].slice(0, MAX_SHEETS);
 }
