@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { devServerOf, folderLibrary, folderNames, shimmedArgs } from './folder-source';
+import { withDevServer, folderLibrary, folderNames, shimmedArgs } from './folder-source';
 import { SHIM_CONFIG } from './folder-shims';
 import { PlanRefusal } from './run-plan';
 
@@ -22,7 +22,7 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((r) => rm(r, { recursive: true, force: true })));
 });
 
-describe('devServerOf', () => {
+describe('withDevServer', () => {
   it('a local monorepo with several apps asks which one before spawning anything', async () => {
     const root = await folder({
       'package.json': { workspaces: ['apps/*'], scripts: { dev: 'turbo run dev' } },
@@ -31,7 +31,7 @@ describe('devServerOf', () => {
       'node_modules/next/package.json': { scripts: { dev: 'x' }, dependencies: { next: '1' } }
     });
 
-    expect(await devServerOf(root, null)).toMatchObject({ ok: false, refusal: PlanRefusal.ChooseApp, apps: ['apps/docs', 'apps/web'] });
+    expect(await withDevServer(root, null, async () => null)).toMatchObject({ ok: false, refusal: PlanRefusal.ChooseApp, apps: ['apps/docs', 'apps/web'] });
   });
 });
 

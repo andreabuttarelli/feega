@@ -100,7 +100,7 @@ const LIBRARY = discover({
 });
 
 describe('importCodeAt con la libreria letta dal codice', () => {
-  const withLibrary = () => vi.fn(async () => ({ ok: true as const, app: { url: APP, names: ['Button', 'Callout'], sha: null, stop: async () => undefined, library: LIBRARY } }));
+  const withLibrary = () => vi.fn(async () => ({ ok: true as const, app: { url: APP, key: 'k3y', names: ['Button', 'Callout'], sha: null, stop: async () => undefined, library: LIBRARY } }));
 
   it('il report dice quali componenti del codice nessuna rotta catturata ha reso', async () => {
     const { ask } = askOf({ runner: withLibrary() });

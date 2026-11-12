@@ -15,7 +15,7 @@ import { basename } from 'node:path';
 import { localModeRefusal } from '$lib/server/local/local-mode';
 import { localBrowser } from '$lib/server/web/browser';
 import { chromiumPage } from '$lib/server/motion/chromium-frames';
-import { devServerOf, folderHead, folderLibrary, folderNames, folderOf, folderSource } from './folder-source';
+import { DevServerFailed, withDevServer, folderHead, folderLibrary, folderNames, folderOf, folderSource } from './folder-source';
 import { repoOf, routesOf } from './repo';
 import { SourceKind } from './code-source';
 import { BASE_CONDITIONS, variantsOf, type RenderConditions } from './render-conditions';
@@ -156,26 +156,36 @@ async function importFolderInto(scope: CodeScope, land: LandAsk, ask: CodeImport
   if (!root || !routes || app === undefined) {
     return { outcome: CodeImportOutcome.Invalid };
   }
-  const served = await devServerOf(root, app).catch((e: unknown) => e as Error);
-  if (served instanceof Error) {
-    return { outcome: CodeImportOutcome.RunFailed, error: served.message };
+  const done = await withDevServer(root, app, (url) => importServed(land, ask, { root, routes, url })).catch(unstarted);
+  if (done instanceof DevServerFailed) {
+    return { outcome: CodeImportOutcome.RunFailed, error: done.message };
   }
-  if ('refusal' in served) {
-    return unplanned(served);
+  if ('refusal' in done) {
+    return unplanned(done);
   }
-  const origin = new URL(served.url).origin;
-  const only = async (url: URL) => {
-    if (url.origin !== origin) {
-      throw new Error('outside the folder dev server');
-    }
-  };
-  const pages = variantsOf(routes, ask.conditions ?? [BASE_CONDITIONS]).map((v) => ({ label: v.label, url: new URL(v.route, served.url).toString(), route: v.route, conditions: v.conditions }));
-  const design = await designFor({ code: () => folderSource(root).read(''), designSystem: ask.designSystem }, null);
-  const done = await importBoards({ ...land, open: localBrowser(chromiumPage, origin), guard: only, name: basename(root), pages, names: await folderNames(root), crop: Crop.Page, design, library: await folderLibrary(root).catch(() => undefined), delay: ask.delay });
   if (done.outcome === CodeImportOutcome.Ok) {
     await rememberOrigin(scope, done.frameId, { kind: SourceKind.Folder, repo: root, branch: null, sha: await folderHead(root), ...(app ? { app } : {}), routes, ...(ask.conditions ? { conditions: ask.conditions } : {}), ...delayOf(ask), ...tokensOf(done) });
   }
   return done;
+}
+
+function unstarted(e: unknown): DevServerFailed {
+  if (e instanceof DevServerFailed) {
+    return e;
+  }
+  throw e;
+}
+
+async function importServed(land: LandAsk, ask: CodeImportAsk, { root, routes, url }: { root: string; routes: string[]; url: string }): Promise<CodeImported> {
+  const origin = new URL(url).origin;
+  const only = async (at: URL) => {
+    if (at.origin !== origin) {
+      throw new Error('outside the folder dev server');
+    }
+  };
+  const pages = variantsOf(routes, ask.conditions ?? [BASE_CONDITIONS]).map((v) => ({ label: v.label, url: new URL(v.route, url).toString(), route: v.route, conditions: v.conditions }));
+  const design = await designFor({ code: () => folderSource(root).read(''), designSystem: ask.designSystem }, null);
+  return importBoards({ ...land, open: localBrowser(chromiumPage, origin), guard: only, name: basename(root), pages, names: await folderNames(root), crop: Crop.Page, design, library: await folderLibrary(root).catch(() => undefined), delay: ask.delay });
 }
 
 export async function rememberOrigin(scope: CodeScope, nodeId: string, origin: CodeOriginData): Promise<void> {
