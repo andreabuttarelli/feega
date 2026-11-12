@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Region } from '$lib/canvas/key-region.svelte';
+  import { openLayer } from '$lib/components/ui/shell/dismiss';
   import { LocalOff, isOff } from '$lib/local-user';
   import { LiftMove, followDocks, liftMove } from '$lib/canvas/dock-lift';
   import type { Snippet } from 'svelte';
@@ -138,16 +140,11 @@
         menuOpen = false;
       }
     };
-    const closeOnEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        menuOpen = false;
-      }
-    };
     window.addEventListener('pointerdown', closeOutside, true);
-    window.addEventListener('keydown', closeOnEscape);
+    const closeLayer = openLayer(() => (menuOpen = false));
     return () => {
       window.removeEventListener('pointerdown', closeOutside, true);
-      window.removeEventListener('keydown', closeOnEscape);
+      closeLayer();
     };
   });
 
@@ -407,7 +404,7 @@
 
 <svelte:window onresize={fitMenu} />
 
-<div bind:this={barEl} class="add-bar" class:phone data-testid="add-bar" data-context={context} data-dock="timeline" data-lift={lifting} style:--lift={`${timelinePx}px`}>
+<div bind:this={barEl} class="add-bar" class:phone data-testid="add-bar" data-key-region={Region.Commands} data-context={context} data-dock="timeline" data-lift={lifting} style:--lift={`${timelinePx}px`}>
   <div class="group" data-testid={`bar-${context}`}>
     {#each slots as s, i (s)}
       <div class="slot" in:slotTransition={{ phase: SlotPhase.Enter, index: i }} out:slotTransition={{ phase: SlotPhase.Leave, index: i }}>{@render SLOT[s]()}</div>

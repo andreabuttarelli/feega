@@ -196,7 +196,7 @@
   import { loadViewport, rememberViewport } from '$lib/canvas/viewport-memory';
   import { FocusMode, Placement, centreIn, focusPlacement, focusSelects, inView, revealIn, frameIn, type Insets } from '$lib/canvas/free-area';
   import { ZoomStep, watchPinch, type CanvasZoom } from '$lib/canvas/page-zoom';
-  import { Region, claimFocus, reachesCanvas, regionOf } from '$lib/canvas/key-region.svelte';
+  import { Region, claimFocus, reachesCanvas, regionOf, releaseFocus } from '$lib/canvas/key-region.svelte';
   import { shortcutHelp } from '$lib/canvas/shortcut-help.svelte';
   import { CANVAS_COMMAND_OF, CANVAS_TILE_ATTR, climbsUp, matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
   import type { Command } from '$lib/motion/shortcuts';
@@ -4355,7 +4355,7 @@
   const domTiles = $derived(placed.filter((t) => domIds.has(t.id)));
 </script>
 
-<svelte:window onkeydown={onKeydown} onpointerdowncapture={claimFocus} onblur={() => (altHeld = false)} onkeyup={(e) => {
+<svelte:window onkeydown={onKeydown} onpointerdowncapture={claimFocus} onclickcapture={releaseFocus} onblur={() => (altHeld = false)} onkeyup={(e) => {
   altHeld = e.altKey;
   if (e.key === ' ') {
     space = false;
