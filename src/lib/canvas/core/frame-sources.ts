@@ -1,5 +1,6 @@
 import type { FrameDoc } from './frame-build';
 import { StartupStep, markStartup } from './startup-marks';
+import { keptKey, scopedCache, type CacheScope, type FrameCache } from './frame-cache';
 
 const SOURCES_KEPT = 8;
 const HTTP_NO_CONTENT = 204;
@@ -118,6 +119,55 @@ function frameBatcher(fetcher: Fetcher): Fetcher {
   };
 }
 
-export const batchedSources = (fetcher: Fetcher, kept = SOURCES_KEPT): ReadSource => sourceReader(frameBatcher(fetcher), kept);
+const NOTHING = { ok: false, status: HTTP_NO_CONTENT, json: async () => null } as unknown as Response;
 
-export const frameSources = batchedSources((url, init) => fetch(url, { cache: 'no-cache', ...init }));
+function cacheKeyOf(url: string): { key: string; revision: number } | null {
+  const match = FRAME_SOURCE.exec(url);
+  const revision = Number(paramOf(url, 'revision'));
+  const look = paramOf(url, 'look');
+  const canvasId = match?.[1].split('/')[4];
+  if (!match || !canvasId || !look || !Number.isInteger(revision) || revision <= 0) {
+    return null;
+  }
+  return { key: keptKey({ canvasId, nodeId: match[2], revision, look, linked: paramOf(url, 'linked') ?? '' }), revision };
+}
+
+const forCache = ({ addresses, ...source }: FrameDoc): FrameDoc => ({ ...source, assets: addresses ?? source.assets });
+
+function cached(fetcher: Fetcher, cacheOf: () => FrameCache | null): Fetcher {
+  return async (url, init) => {
+    const cache = cacheOf();
+    const asked = cache ? cacheKeyOf(url) : null;
+    if (!cache || !asked) {
+      return fetcher(url, init);
+    }
+
+    const held = await cache.take(asked.key).catch(() => null);
+    if (held) {
+      return answered(held);
+    }
+
+    const res = await fetcher(url, init);
+    const source = res.ok && res.status !== HTTP_NO_CONTENT ? ((await res.json().catch(() => null)) as FrameDoc | null) : null;
+    if (!source) {
+      return NOTHING;
+    }
+    if (source.revision === asked.revision) {
+      void cache.keep(asked.key, forCache(source)).catch(() => undefined);
+    }
+    return answered(source);
+  };
+}
+
+export const batchedSources = (fetcher: Fetcher, kept = SOURCES_KEPT, cacheOf: () => FrameCache | null = () => null): ReadSource => sourceReader(cached(frameBatcher(fetcher), cacheOf), kept);
+
+let scoped: FrameCache | null = null;
+
+export function scopeFrameCache(scope: CacheScope | null): FrameCache | null {
+  scoped = scopedCache(scope);
+  return scoped;
+}
+
+export const scopedFrames = (): FrameCache | null => scoped;
+
+export const frameSources = batchedSources((url, init) => fetch(url, { cache: 'no-cache', ...init }), SOURCES_KEPT, () => scoped);

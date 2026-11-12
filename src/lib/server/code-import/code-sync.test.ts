@@ -1,34 +1,32 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { ProviderCall } from '$lib/server/connections/account-links';
 
-const importCodeInto = vi.fn();
-const rememberOrigin = vi.fn();
-const read = vi.fn();
-const write = vi.fn();
-const findNode = vi.fn();
+const writes: ProviderCall[] = [];
 
-vi.mock('$env/dynamic/private', () => ({ env: {} }));
-vi.mock('./canvas-import', () => ({ importCodeInto: (...a: unknown[]) => importCodeInto(...a), rememberOrigin: (...a: unknown[]) => rememberOrigin(...a) }));
-vi.mock('$lib/server/repos/canvas', () => ({ findNode: (...a: unknown[]) => findNode(...a) }));
-vi.mock('$lib/server/motion/move-element', () => ({ frameStore: () => ({ read, write, remove: vi.fn() }) }));
+vi.mock('$env/dynamic/private', () => ({ env: { GITHUB_TOKEN: 'server-token' } }));
 vi.mock('./github-runtime', () => ({ githubFor: () => ({ call: async () => null }) }));
-vi.mock('./code-source', async (actual) => ({ ...(await actual<object>()), githubSource: () => ({ head: async () => 'newsha', read: vi.fn() }) }));
-vi.mock('./repo-sync', async (actual) => ({ ...(await actual<object>()), rebased: () => ({ doc: {}, carried: 0, conflicts: [] }) }));
+vi.mock('$lib/server/repos/canvas', () => ({
+  findNode: async () => ({ projectId: 'p1', data: { code: { kind: 'github', repo: 'victim/repo', branch: 'main', sha: 'abc1234', routes: ['/'] } } })
+}));
+vi.mock('$lib/server/motion/move-element', () => ({ frameStore: () => ({ read: async () => ({ doc: {}, version: 1 }) }) }));
+vi.mock('./token-write', () => ({ frameEdits: async () => ({ files: [{ path: 'a.css', before: 'a{}', after: 'b{}' }], skipped: [], map: {} }) }));
+vi.mock('./repo-sync', async (real) => ({
+  ...(await real<typeof import('./repo-sync')>()),
+  tokenCall: () => async (request: ProviderCall) => {
+    if (request.method && request.method !== 'GET') {
+      writes.push(request);
+    }
+    return { status: 200, data: { default_branch: 'main', sha: 'abc1234', object: { sha: 'abc1234' }, tree: { sha: 't' } } };
+  }
+}));
 
-const { codePull } = await import('./code-sync');
+const { codePublish, SyncOutcome } = await import('./code-sync');
 
-const DELAY = { ms: 1_500, routes: { '/blog/post': 4_000 } };
+describe('codePublish', () => {
+  it('never publishes with the server token when the user has no GitHub', async () => {
+    const out = await codePublish({ orgId: 'o1', userId: 'u1', projectId: 'p1', db: {} } as never, 'node-1');
 
-beforeEach(() => {
-  findNode.mockResolvedValue({ projectId: 'p', data: { code: { kind: 'github', repo: 'a/b', branch: null, sha: 'oldsha', routes: ['/', '/blog/post'], delay: DELAY } } });
-  read.mockResolvedValue({ doc: {}, version: 1, canvasId: 'c', at: { x: 0, y: 0 } });
-  write.mockResolvedValue({ outcome: 'written' });
-  importCodeInto.mockResolvedValue({ outcome: 'ok', frameId: 'f2', skipped: [] });
-});
-
-describe('codePull', () => {
-  it('rifa l\'import con l\'attesa salvata con il frame', async () => {
-    await codePull({ db: {}, orgId: 'o', userId: 'u', projectId: 'p', actor: { kind: 'user', id: 'u' } } as never, 'n1');
-
-    expect(importCodeInto.mock.calls[0][2]).toMatchObject({ delay: DELAY, routes: ['/', '/blog/post'] });
+    expect(writes).toEqual([]);
+    expect(out.outcome).toBe(SyncOutcome.NoGithub);
   });
 });

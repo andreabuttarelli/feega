@@ -37,15 +37,17 @@ pub type Sizes<'a> = &'a dyn Fn(&str) -> Option<(f64, f64)>;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OverlayPart {
     Fixed,
+    Selected,
     Live,
 }
 
-const OVERLAY_PARTS: [OverlayPart; 2] = [OverlayPart::Fixed, OverlayPart::Live];
+const OVERLAY_PARTS: [OverlayPart; 3] = [OverlayPart::Fixed, OverlayPart::Selected, OverlayPart::Live];
 
 impl OverlayPart {
     pub fn group(self) -> &'static str {
         match self {
             OverlayPart::Fixed => "overlay:fixed",
+            OverlayPart::Selected => "overlay:selected",
             OverlayPart::Live => "overlay:live",
         }
     }
@@ -69,7 +71,7 @@ pub struct Lift {
 
 pub struct World {
     uses: Uses,
-    overlays: [Overlay; 2],
+    overlays: [Overlay; 3],
     damage: Damage,
     scene_damage: Damage,
     rest: std::collections::HashMap<String, (String, Affine)>,

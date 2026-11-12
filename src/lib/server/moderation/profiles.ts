@@ -1,9 +1,16 @@
 import { ProjectMode } from '$lib/project-mode';
+import { isLocalMode } from '$lib/local-user';
 import { DOUBT, EXPLICIT_SEXUAL, MODERATION_CATEGORIES, REAL_PERSON, SAFE, type ModerationCategories } from './policy';
 
 export enum ModerationProfile {
   Standard = 'standard',
-  Uncensored = 'uncensored'
+  Uncensored = 'uncensored',
+  Local = 'local'
+}
+
+export enum Screening {
+  On = 'on',
+  Off = 'off'
 }
 
 export enum JevOutage {
@@ -21,6 +28,7 @@ export type ProfilePolicy = {
   onJevOutage: JevOutage;
   judgeTier: JudgeTier;
   judgeRefusal: string;
+  screening: Screening;
 };
 
 export const ADULT_SEXUAL = 'adult_sexual';
@@ -59,13 +67,22 @@ export const MODERATION_PROFILES: Readonly<Record<ModerationProfile, ProfilePoli
     categories: STANDARD_CATEGORIES,
     onJevOutage: JevOutage.Judge,
     judgeTier: JudgeTier.Cheapest,
-    judgeRefusal: blocked("this content isn't allowed")
+    judgeRefusal: blocked("this content isn't allowed"),
+    screening: Screening.On
   },
   [ModerationProfile.Uncensored]: {
     categories: MODERATION_CATEGORIES,
     onJevOutage: JevOutage.Refuse,
     judgeTier: JudgeTier.Best,
-    judgeRefusal: 'Refused by the safety review'
+    judgeRefusal: 'Refused by the safety review',
+    screening: Screening.On
+  },
+  [ModerationProfile.Local]: {
+    categories: MODERATION_CATEGORIES,
+    onJevOutage: JevOutage.Judge,
+    judgeTier: JudgeTier.Cheapest,
+    judgeRefusal: '',
+    screening: Screening.Off
   }
 };
 
@@ -80,4 +97,8 @@ export function profileOf(input: { uncensored: boolean; mode: ProjectMode }): Mo
 
 export function carriedProfile(carrier: { uncensored: boolean }): ModerationProfile {
   return carrier.uncensored ? ModerationProfile.Uncensored : ModerationProfile.Standard;
+}
+
+export function profileForEnv(carrier: { uncensored: boolean }, env: Record<string, string | undefined>): ModerationProfile {
+  return isLocalMode(env) ? ModerationProfile.Local : carriedProfile(carrier);
 }

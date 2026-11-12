@@ -4,6 +4,8 @@
   import { guideOpenRequest } from '$lib/canvas/guide-open';
   import { readChatTab, writeChatTab } from '$lib/shell-prefs';
   import CanvasGuideTab from '$lib/components/canvas/CanvasGuideTab.svelte';
+  import AcpChatPanel from '$lib/components/canvas/AcpChatPanel.svelte';
+  import { LocalOff, isOff } from '$lib/local-user';
   import { anyChatRunning } from './chat-session.svelte';
   import { BarTab, moveKeepingScroll, restoreScroll, rightBar } from './right-bar-host.svelte';
 
@@ -94,7 +96,9 @@
     </div>
     {#if rightBar.tabs.includes(BarTab.Chat)}
       <div class="pane" hidden={tab !== BarTab.Chat}>
-        {#if viewOnly}
+        {#if isOff(LocalOff.Chat)}
+          <AcpChatPanel />
+        {:else if viewOnly}
           <p class="chat-view-only" data-testid="chat-view-only">View only: the chat edits the canvas and spends credits. Ask an admin for edit access.</p>
         {:else}
           {#await CHROME_LOADERS.chat() then { default: ChatPanel }}
