@@ -3871,3 +3871,15 @@ Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start
 ## A text lifted out of its frame into a stack moves
 
 **Signal:** after removing a text's same-box wrapper inside a stack, glyphs sit up to 1 px off (Supabase checklist, Vercel buttons) while the layer box is identical. **Move:** page-tree boxes every text in a flex flow on purpose; the engine lays out a text flow item differently from a text inside a frame. Keep the box; only `label` (one line, fixed, aligned) may replace it.
+
+## A browser run on a worktree dev server goes strange the moment a file is saved
+
+**Signal:** mid-run the page loses state (a pending import shows nothing, a panel vanishes, a map entry is missing), and the dev server log shows `page reload .svelte-kit/generated/client/...` at the same second as an edit to any file in the worktree, docs and changelogs included. **Move:** never edit the worktree while a Playwright run drives its dev server; write notes and PR text in the scratchpad, edit after the run, and redo the run from a fresh canvas file.
+
+## Two agents in one scratchpad overwrite each other's files
+
+**Signal:** a launcher or driver script you wrote earlier suddenly imports another worktree's paths (`feega-wt/<other>/...`), or a canvas file changes under you. **Move:** the session scratchpad is shared by every agent of the session: put your run files in a subfolder named after the task (`scratchpad/<task>/`) and never use generic names (`dev-local.mjs`, `drv/`, `map.feega`) at its root.
+
+## An origin written at the end of a long server job drops a sibling's change
+
+**Signal:** two imports into one frame both land on the canvas, but the code map lists only the second. **Move:** `codeAdd` read the origin when it started and wrote it ~40 s later; anything written in between was lost. Merge into the origin as it is right before the write (`rememberLatest`), and test with two calls in `Promise.all`, the first one slower.
