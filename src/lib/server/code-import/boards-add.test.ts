@@ -85,8 +85,10 @@ describe('adding pages to a frame imported from code', () => {
 
     const added = addBoards(local, piece, ['n1'], 'n1', counter());
 
-    const doc = (added as { doc: MotionDoc }).doc;
-    const cancel = clipsOf(doc).filter((c) => c.name === 'Cancel').at(-1)!;
+    const { doc, boards } = added as { doc: MotionDoc; boards: Record<string, string> };
+    const all = clipsOf(doc);
+    const inside = (id: string): MotionClip[] => all.filter((c) => c.parent === id).flatMap((c) => [c, ...inside(c.id)]);
+    const cancel = inside(boards.n1).find((c) => compOf(c) && c.props.overrides)!;
     const main = doc.comps[compOf(cancel)!];
     const targets = new Set(main.tracks.flatMap((t) => t.clips.map((c) => c.id)));
     expect(Object.keys(cancel.props.overrides as object).every((id) => targets.has(id))).toBe(true);
