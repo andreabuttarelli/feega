@@ -78,7 +78,7 @@ export const CHAPTER_SELECTOR = '.chapter';
 const outsideChapters = (selector: string) => `${selector}:not(${CHAPTER_SELECTOR} *)`;
 
 export const BUILD_TARGETS = [
-  '.bar > a',
+  '.bar > a:not(.brand)',
   '.bar .links > a',
   '.bar .actions > a',
   '.bar > button',

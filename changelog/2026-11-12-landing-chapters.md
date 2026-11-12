@@ -43,3 +43,11 @@ No public changelog entry: the product did not change.
   touch, a horizontal wheel or keyboard focus hands the row to native scrolling with snap; with
   reduced motion the rows never move and the duplicates are hidden. Videos keep `lazyPlay`:
   only the ones visible inside the row load and play (8 of 40 at 1440).
+
+## Follow-up: the new logo mark in nav and footer
+
+`Mark.svelte` draws the four-lobe mark inline (`MarkTone.Orange` or `MarkTone.Mono`, a size
+prop). The nav's white "Feega" chip now leads with the orange mark; the footer puts a 28 px orange
+mark beside the copyright, under the orange wordmark. The live agents no longer take the brand
+chip (`.bar > a:not(.brand)`). Favicon, apple-touch icon and OG images still carry the old logo:
+not part of this change.

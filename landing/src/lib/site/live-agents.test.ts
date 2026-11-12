@@ -73,6 +73,11 @@ describe('element rules', () => {
     }
   });
 
+  it('never takes the brand chip with the logo mark', () => {
+    expect(live.BUILD_TARGETS).not.toContain('.bar > a');
+    expect(live.BUILD_TARGETS).toContain('.bar > a:not(.brand)');
+  });
+
   it('places only the remaining visuals', () => {
     expect(ELEMENT_RULES.at(-1)).toMatchObject({ selector: '*', build: BuildMode.Place });
   });
