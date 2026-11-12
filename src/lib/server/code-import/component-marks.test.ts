@@ -42,6 +42,16 @@ describe('componentMarksOf con React', () => {
     expect(el.getAttribute(ATTR)).toBe('0');
   });
 
+  it('un <style> accanto alla radice non toglie il componente dagli usi', () => {
+    const page = hostOf('main', null, document.body);
+    const button = composite('ButtonCopy', {}, page.fiber);
+    hostOf('style', button, page.el);
+    const { el } = hostOf('button', button, page.el);
+
+    expect(marks(['ButtonCopy'])).toEqual([{ component: 'ButtonCopy', props: {} }]);
+    expect(el.getAttribute(ATTR)).toBe('0');
+  });
+
   it('un componente con due elementi radice non è un uso', () => {
     const page = hostOf('main', null, document.body);
     const list = composite('Pair', {}, page.fiber);
