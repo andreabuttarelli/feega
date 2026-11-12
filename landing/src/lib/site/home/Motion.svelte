@@ -5,8 +5,6 @@
   import MotionLoop from '../motion/MotionLoop.svelte';
   import MotionStepGlyph from '../motion/MotionStepGlyph.svelte';
   import Ticker from './Ticker.svelte';
-  import Features from './Features.svelte';
-  import { Card } from './card';
 </script>
 
 <section class="chapter-block site-wide" id="motion">
@@ -17,7 +15,5 @@
 
   <div class="proof">
     <Ticker />
-
-    <Features cards={[Card.Templates]} />
   </div>
 </section>
