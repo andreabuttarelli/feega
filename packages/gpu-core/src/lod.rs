@@ -9,6 +9,7 @@ const LADDER: [(f64, Detail); 2] = [(0.5, Detail::Skip), (1.5, Detail::Bar)];
 
 pub const BLUR_FLOOR_PX: f64 = 0.5;
 pub const RUN_ITEMS: usize = 16;
+pub const SPLIT_DESCENDANTS: usize = 64;
 pub const TIER_LOG2_STEP: f64 = 2.0;
 pub const BAR_MIN_COVERAGE: f64 = 0.3;
 pub const INK_SHARE: f64 = 0.55;

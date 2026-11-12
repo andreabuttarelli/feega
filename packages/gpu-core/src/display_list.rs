@@ -30,7 +30,7 @@ pub enum Paint {
     Diamond { center: [f64; 2], half: [f64; 2], stops: Vec<Stop> },
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Within {
     #[serde(deserialize_with = "packed::contours")]
     pub contours: Vec<Vec<f64>>,
@@ -81,7 +81,7 @@ impl Cover {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct MaskLayer {
     pub mode: MaskMode,
     pub invert: bool,
@@ -90,20 +90,20 @@ pub struct MaskLayer {
     pub cover: Cover,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Matte {
     pub items: Vec<Item>,
     pub luma: bool,
     pub invert: bool,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct CssFunction {
     pub name: String,
     pub args: Vec<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct SvgNode {
     pub tag: String,
     #[serde(default)]
@@ -112,14 +112,14 @@ pub struct SvgNode {
     pub children: Vec<SvgNode>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum Filter {
     Css { fns: Vec<CssFunction> },
     Svg { nodes: Vec<SvgNode> },
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Look {
     pub opacity: f32,
     pub matrix: Affine,
@@ -143,7 +143,7 @@ pub struct Look {
     pub backdrop: Option<f64>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct PathItem {
     pub clip: String,
     #[serde(deserialize_with = "packed::contours")]
@@ -156,13 +156,13 @@ pub struct PathItem {
     pub look: Look,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
 pub struct Size {
     pub width: f64,
     pub height: f64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ImageItem {
     pub clip: String,
@@ -187,7 +187,7 @@ fn normal() -> String {
     "normal".into()
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct UseItem {
     pub clip: String,
     pub group: String,
@@ -200,7 +200,7 @@ pub struct UseItem {
     pub reach: Option<[f64; 4]>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct GlyphsItem {
     pub clip: String,
     pub font: String,
@@ -227,7 +227,7 @@ pub enum Spacing {
     Keep,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
 pub struct Flow {
     pub spaces: Spacing,
     pub wraps: bool,
@@ -240,7 +240,7 @@ pub enum Anchor {
     Top,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
 pub struct PlanFrame {
     pub left: f64,
     pub top: f64,
@@ -273,7 +273,7 @@ pub enum Smoothing {
     Plain,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct PlanRequest {
     pub family: String,
     pub weight: f32,
@@ -281,7 +281,7 @@ pub struct PlanRequest {
     pub axes: std::collections::BTreeMap<String, f32>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum FillPlan {
     Solid { color: Rgba },
@@ -289,20 +289,20 @@ pub enum FillPlan {
     Radial { center: [f64; 2], radius: f64, stops: Vec<Stop> },
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct TextOutline {
     pub width: f64,
     pub colour: Rgba,
     pub under: bool,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Tint {
     pub color: Rgba,
     pub amount: f32,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Tinted {
     pub opacity: f32,
     pub blur: f64,
@@ -310,13 +310,13 @@ pub struct Tinted {
     pub tint: Option<Tint>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct TextAnimation {
     pub finest: Unit,
     pub looks: Vec<Tinted>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct TextPlan {
     pub text: String,
     pub paragraphs: Vec<String>,
@@ -340,13 +340,13 @@ pub struct TextPlan {
     pub smoothing: Smoothing,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
 pub struct Turn {
     pub scale: f64,
     pub rotation: f64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct TextItem {
     pub clip: String,
     pub plan: TextPlan,
@@ -355,7 +355,7 @@ pub struct TextItem {
     pub look: Look,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Lens {
     pub center: [f32; 2],
@@ -384,7 +384,7 @@ impl Lens {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct LensItem {
     pub clip: String,
     pub lens: Lens,
@@ -392,7 +392,7 @@ pub struct LensItem {
     pub under: usize,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct LayerItem {
     pub clip: String,
     pub source: String,
@@ -401,7 +401,7 @@ pub struct LayerItem {
     pub look: Look,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct GroupItem {
     pub clip: String,
     pub items: Vec<Item>,
@@ -409,7 +409,7 @@ pub struct GroupItem {
     pub look: Look,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Item {
     Path(PathItem),
     Image(ImageItem),
@@ -480,7 +480,7 @@ impl<'de> Deserialize<'de> for Item {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct FaceSpec {
     pub family: String,
     pub italic: bool,
@@ -512,7 +512,7 @@ pub fn parse(json: &str) -> Result<DisplayList, serde_json::Error> {
     serde_json::from_str(json)
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Splice {
     pub head: usize,
     pub tail: usize,
