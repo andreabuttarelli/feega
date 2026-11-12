@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount, type Snippet } from 'svelte';
-  import { canvasEnding } from './canvas-ending-state.svelte';
   import { EndingDrive, OPEN_FROM, chromeFor, driveFor, endPose, openScroll, progressOf, type Chrome, type Pose } from './canvas-ending';
 
   let { children, pick: pickSelector }: { children: Snippet; pick: string } = $props();
@@ -8,7 +7,6 @@
   const REDUCED_QUERY = '(prefers-reduced-motion: reduce)';
   const TIMELINE_SUPPORT = 'animation-timeline: view()';
   const MOUNT_AHEAD = '0px 0px 100% 0px';
-  const NEAR = '0px 0px 50% 0px';
 
   let root: HTMLDivElement;
   let frame: HTMLDivElement;
@@ -129,7 +127,6 @@
 
     const stops = [
       watch(runway, MOUNT_AHEAD, (entry) => entry.isIntersecting && mountChrome()),
-      watch(runway, NEAR, (entry) => (canvasEnding.near = entry.isIntersecting)),
       watch(runway, '0px', (entry) => {
         active = entry.isIntersecting;
         zoomed = entry.intersectionRatio >= OPEN_FROM;
@@ -142,7 +139,6 @@
       removeEventListener('resize', measure);
       frame.removeEventListener('click', openOnClick);
       frame.removeEventListener('focusin', openOnFocus);
-      canvasEnding.near = false;
       stops.forEach((stop) => stop());
     };
   });

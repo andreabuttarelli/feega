@@ -90,20 +90,3 @@ describe('size lock', () => {
     expect(el.style.height).toBe('541px');
   });
 });
-
-describe('agents on the canvas ending', () => {
-  it('are few, so the frame stays readable', () => {
-    expect(live.ENDING_CREW).toBeLessThanOrEqual(3);
-  });
-
-  it('never open a menu or grab a corner, which would cover footer links', () => {
-    expect(live.ENDING_BEATS).not.toContain('font');
-    expect(live.ENDING_BEATS).not.toContain('resize');
-  });
-
-  it('stay inside the wordmark, away from its edges', () => {
-    const [lo, hi] = live.ENDING_SPOT.fy;
-    expect(lo).toBeGreaterThan(0.2);
-    expect(hi).toBeLessThan(0.8);
-  });
-});

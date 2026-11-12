@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { canvasEnding } from './canvas-ending-state.svelte';
-  import { ACTIONS_BY_TARGET, AGENTS, ENDING_BEATS, ENDING_CREW, ENDING_SPOT, ENDING_TARGET, lockHeight, BUILD_SELECTOR, BuildMode, PEER_COLOURS, claimTweak, ruleFor, createLedger, mayTweak, releaseTweak, curve, initials, outermost, pick, type ActionKind, type Point, type TargetKind } from './live-agents';
+  import { ACTIONS_BY_TARGET, AGENTS, lockHeight, BUILD_SELECTOR, BuildMode, PEER_COLOURS, claimTweak, ruleFor, createLedger, mayTweak, releaseTweak, curve, initials, outermost, pick, type ActionKind, type Point, type TargetKind } from './live-agents';
 
   type Box = { x: number; y: number; w: number; h: number };
   type Menu = { items: string[]; active: number };
@@ -312,32 +311,7 @@
     select: () => [wait(between(700, 1200))]
   };
 
-  function leave(agent: Agent): Step[] {
-    return agent.view.live ? [moveTo(agent, edgeOf(resolve(agent.anchor))), wait(1, () => (agent.view.live = false))] : [wait(between(300, 600))];
-  }
-
-  function onEnding(agent: Agent): Step[] {
-    const mark = document.querySelector<HTMLElement>(ENDING_TARGET);
-    if (!mark || running.indexOf(agent) >= ENDING_CREW) {
-      return leave(agent);
-    }
-
-    agent.view.live = true;
-    const spot = moveTo(agent, { el: mark, fx: between(...ENDING_SPOT.fx), fy: between(...ENDING_SPOT.fy) });
-    if (busy.has(mark)) {
-      return [spot, wait(between(600, 1200))];
-    }
-
-    busy.add(mark);
-    return [spot, select(agent, mark, false), ...ACTION_STEPS[pick(ENDING_BEATS, rand)](agent, mark), release(agent, mark)];
-  }
-
   function plan(agent: Agent, targets: HTMLElement[]) {
-    if (canvasEnding.near) {
-      agent.steps = onEnding(agent);
-      return;
-    }
-
     const unbuilt = targets.filter((el) => !('built' in el.dataset) && !busy.has(el) && nearViewport(el));
     if (unbuilt.length > 0) {
       const el = unbuilt[Math.floor(rand() * Math.min(PARALLEL_FRONT, unbuilt.length))];
@@ -359,7 +333,7 @@
     const free = targets.filter((el) => mayTweak(ledger, el, clock, TWEAK_GAP_MS) && 'built' in el.dataset && el.closest('main') && !underReader(el) && !busy.has(el) && ACTIONS_BY_TARGET[kindOf(el)].includes(kind) && nearViewport(el));
 
     if (free.length === 0) {
-      agent.steps = leave(agent);
+      agent.steps = agent.view.live ? [moveTo(agent, edgeOf(resolve(agent.anchor))), wait(1, () => (agent.view.live = false))] : [wait(between(300, 600))];
       return;
     }
 

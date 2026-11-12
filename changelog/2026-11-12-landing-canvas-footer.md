@@ -44,11 +44,10 @@ starts, so the footer is at 100% with the focused link in view (`openScroll`). T
 `zoom-in` over the frame. Links keep working directly at every scale; a mouse click on a link never
 triggers the scroll (only `:focus-visible` does), so it cannot cancel the click.
 
-**Agents.** From half a viewport before the zoom starts (`canvasEnding.near`, shared state written
-by `CanvasEnding`), and so also when the frame is opened at 100%, only two agents stay, on the wordmark, inside its middle band, with beats that
-open no menu and grab no corner (`ENDING_CREW`, `ENDING_BEATS`, `ENDING_SPOT`). The rest leave the
-screen. Before, about fifteen cursors covered the links and the heading. Agents also skip targets
-hidden by `visibility` (the site header hides during the ending).
+**Agents.** The live agent cursors keep working on the footer inside the frame, as busy as on the
+rest of the page; they are `pointer-events: none`, so they never take a click. They skip targets
+hidden by `visibility` (the site header hides during the ending, so they no longer park on it).
+A two-cursor version was tried and dropped: the busy canvas reads better.
 
 Rejected: scaling the whole page (a 12 000 px layer, fixed elements break under a transformed
 ancestor); a duplicate, already-zoomed footer (two footers for screen readers); changing the
