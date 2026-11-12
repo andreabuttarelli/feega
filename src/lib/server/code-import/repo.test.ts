@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DevServer, devServerOf, managerOf, MAX_ROUTES, namesIn, PackageManager, repoOf, routeOf, routesOf } from './repo';
+import { located, MAX_ROUTES, namesIn, repoOf, routeOf, routesOf } from './repo';
 
 describe('repoOf', () => {
   it('legge proprietario, repo e ref da un link GitHub', () => {
@@ -13,6 +13,22 @@ describe('repoOf', () => {
     expect(repoOf('http://github.com/a/b')).toBeNull();
     expect(repoOf('https://github.com.evil.test/a/b')).toBeNull();
     expect(repoOf('https://github.com/a/b;rm -rf')).toBeNull();
+  });
+});
+
+describe('located', () => {
+  it('a branch with / is told from the folder after it by the real branch list', () => {
+    const branches = ['main', 'feature/new-nav', 'feature'];
+
+    expect(located('feature/new-nav/apps/web', branches)).toEqual({ ref: 'feature/new-nav', path: 'apps/web' });
+    expect(located('feature/new-nav', branches)).toEqual({ ref: 'feature/new-nav', path: null });
+    expect(located('main/apps/v4', branches)).toEqual({ ref: 'main', path: 'apps/v4' });
+  });
+
+  it('a ref that is not a known branch (tag, sha) is the first segment', () => {
+    expect(located('v2', [])).toEqual({ ref: 'v2', path: null });
+    expect(located('v2/apps/web', [])).toEqual({ ref: 'v2', path: 'apps/web' });
+    expect(located(null, ['main'])).toEqual({ ref: null, path: null });
   });
 });
 
@@ -34,19 +50,6 @@ describe('routesOf', () => {
   it('una rotta non valida o troppe rotte rifiutano tutto', () => {
     expect(routesOf(['/', '/../x'])).toBeNull();
     expect(routesOf(Array.from({ length: MAX_ROUTES + 1 }, (_, i) => `/r${i}`))).toBeNull();
-  });
-});
-
-describe('managerOf e devServerOf', () => {
-  it('il lockfile sceglie il gestore, npm se manca', () => {
-    expect(managerOf(['package.json', 'pnpm-lock.yaml'])).toBe(PackageManager.Pnpm);
-    expect(managerOf(['package.json'])).toBe(PackageManager.Npm);
-  });
-
-  it('next vince su vite, vite sugli altri', () => {
-    expect(devServerOf({ dependencies: { next: '15', react: '19' } })).toBe(DevServer.Next);
-    expect(devServerOf({ devDependencies: { vite: '7' } })).toBe(DevServer.Vite);
-    expect(devServerOf({})).toBe(DevServer.Other);
   });
 });
 

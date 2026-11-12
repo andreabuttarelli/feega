@@ -9,6 +9,17 @@ export function repoOf(raw: string): RepoRef | null {
   return m ? { owner: m[1], repo: m[2], ref: m[3] ?? null } : null;
 }
 
+export type Located = { ref: string | null; path: string | null };
+
+export function located(tree: string | null, branches: readonly string[]): Located {
+  if (!tree) {
+    return { ref: null, path: null };
+  }
+  const segments = tree.split('/');
+  const cut = segments.map((_, i) => segments.length - i).find((n) => branches.includes(segments.slice(0, n).join('/'))) ?? 1;
+  return { ref: segments.slice(0, cut).join('/'), path: segments.slice(cut).join('/') || null };
+}
+
 export const cloneUrl = (repo: RepoRef) => `https://github.com/${repo.owner}/${repo.repo}.git`;
 
 export const routeOf = (raw: string | undefined): string | null => {
@@ -27,43 +38,6 @@ export function routesOf(raw: readonly string[]): string[] | null {
   }
   const unique = [...new Set(routes as string[])];
   return unique.length <= MAX_ROUTES ? unique : null;
-}
-
-export enum PackageManager {
-  Npm = 'npm',
-  Pnpm = 'pnpm',
-  Yarn = 'yarn',
-  Bun = 'bun'
-}
-
-export const LOCKFILES: [string, PackageManager][] = [
-  ['pnpm-lock.yaml', PackageManager.Pnpm],
-  ['yarn.lock', PackageManager.Yarn],
-  ['bun.lock', PackageManager.Bun],
-  ['bun.lockb', PackageManager.Bun],
-  ['package-lock.json', PackageManager.Npm]
-];
-
-export const managerOf = (files: readonly string[]): PackageManager => LOCKFILES.find(([file]) => files.includes(file))?.[1] ?? PackageManager.Npm;
-
-export enum DevServer {
-  Vite = 'vite',
-  Next = 'next',
-  Other = 'other'
-}
-
-export const DEV_ARGS: Record<DevServer, (port: number) => string[]> = {
-  [DevServer.Vite]: (port) => ['--host', '0.0.0.0', '--port', String(port), '--strictPort'],
-  [DevServer.Next]: (port) => ['-H', '0.0.0.0', '-p', String(port)],
-  [DevServer.Other]: () => []
-};
-
-export function devServerOf(pkg: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> }): DevServer {
-  const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-  if (deps.next) {
-    return DevServer.Next;
-  }
-  return deps.vite ? DevServer.Vite : DevServer.Other;
 }
 
 const DECLARED = /\b(?:function|const|let|class)\s+([A-Z][A-Za-z0-9_]{0,59})\b/g;

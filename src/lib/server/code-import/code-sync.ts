@@ -161,7 +161,7 @@ export async function codePull(scope: CodeScope, nodeId: string, branch?: string
     return { outcome: SyncOutcome.UpToDate, sha: rev, carried: 0, conflicts: [], skipped: [], tokens: [] };
   }
 
-  const fresh = await importCodeInto(scope, local.canvasId, { ...linked.link(rev), routes: linked.origin.routes, conditions: conditionsOf(linked.origin.conditions), at: local.at ?? { x: 0, y: 0 } });
+  const fresh = await importCodeInto(scope, local.canvasId, { ...linked.link(rev), app: linked.origin.app, routes: linked.origin.routes, conditions: conditionsOf(linked.origin.conditions), at: local.at ?? { x: 0, y: 0 } });
   if (fresh.outcome !== CodeImportOutcome.Ok) {
     return { outcome: SyncOutcome.Unreachable, error: fresh.error ?? fresh.outcome };
   }
