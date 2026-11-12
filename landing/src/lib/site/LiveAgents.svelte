@@ -61,7 +61,7 @@
 
   function nearViewport(el: HTMLElement): boolean {
     const r = el.getBoundingClientRect();
-    return r.width > 0 && r.bottom > -NEAR_VIEWPORT_PX && r.top < innerHeight + NEAR_VIEWPORT_PX;
+    return r.width > 0 && r.bottom > -NEAR_VIEWPORT_PX && r.top < innerHeight + NEAR_VIEWPORT_PX && el.checkVisibility?.({ visibilityProperty: true }) !== false;
   }
 
   function underReader(el: HTMLElement): boolean {
