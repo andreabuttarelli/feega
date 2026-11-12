@@ -69,5 +69,5 @@ jobs:
           npx --yes vercel@latest deploy --prebuilt --prod --archive=tgz --token="$VERCEL_TOKEN"
 
       - name: Notify IndexNow
-        if: steps.changed.outputs.deploy == 'true' && matrix.project == 'feega-landing'
-        run: node landing/scripts/indexnow.ts
+        if: steps.changed.outputs.deploy == 'true' && contains(fromJSON('["feega-landing","web-blog","web-docs"]'), matrix.project)
+        run: node scripts/indexnow/run.ts ${{ matrix.project }}
