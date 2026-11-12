@@ -69,7 +69,9 @@ function entriesOf(variables: Variables, type: VarType, group?: RegExp): Entry[]
     .flatMap(([collectionName, collection]) => Object.entries(collection.vars).filter(([, v]) => v.type === type).map(([name]) => ({ key: keyOf(collectionName, name), name, collection })));
 }
 
-function modesLine(variables: Variables, entry: Entry): string {
+type Sheet = { variables: Variables; scale: number };
+
+function modesLine(entry: Entry): string {
   const raw = entry.collection.vars[entry.name].values;
   const alias = Object.values(raw).find((v) => typeof v === 'object' && v !== null) as { alias: string } | undefined;
   if (alias) {
@@ -80,20 +82,22 @@ function modesLine(variables: Variables, entry: Entry): string {
 
 type Section = { nodes: RestNode[]; height: number };
 
-function colours(variables: Variables, top: number): Section {
+function colours(sheet: Sheet, top: number): Section {
+  const { variables } = sheet;
   const list = entriesOf(variables, VarType.Colour);
   const nodes = list.flatMap((entry, i) => {
     const x = MARGIN + (i % COLUMNS) * CELL_W;
     const y = top + Math.floor(i / COLUMNS) * COLOUR_ROW;
     const value = String(variableValue(variables, entry.key) ?? '#000000');
-    return [rect(entry.key, x, y, SWATCH, SWATCH, rgbOf(value), 6), text(entry.name, x + SWATCH + 12, y + 4, Size.Label, INK, FONT, 500), text(modesLine(variables, entry), x + SWATCH + 12, y + 26, Size.Note, SOFT)];
+    return [rect(entry.key, x, y, SWATCH, SWATCH, rgbOf(value), 6), text(entry.name, x + SWATCH + 12, y + 4, Size.Label, INK, FONT, 500), text(modesLine(entry), x + SWATCH + 12, y + 26, Size.Note, SOFT)];
   });
   return { nodes, height: Math.ceil(list.length / COLUMNS) * COLOUR_ROW };
 }
 
 const pxOf = (value: VarLiteral | undefined, scale: number) => Math.round((Number(value ?? 0) / scale) * 100) / 100;
 
-function radii(variables: Variables, top: number, scale: number): Section {
+function radii(sheet: Sheet, top: number): Section {
+  const { variables, scale } = sheet;
   const list = entriesOf(variables, VarType.Number, /Radius$/);
   const nodes = list.flatMap((entry, i) => {
     const x = MARGIN + (i % COLUMNS) * CELL_W;
@@ -104,7 +108,8 @@ function radii(variables: Variables, top: number, scale: number): Section {
   return { nodes, height: Math.ceil(list.length / COLUMNS) * RADIUS_ROW };
 }
 
-function spacing(variables: Variables, top: number, scale: number): Section {
+function spacing(sheet: Sheet, top: number): Section {
+  const { variables, scale } = sheet;
   const list = entriesOf(variables, VarType.Number, /Spacing$/);
   const nodes = list.flatMap((entry, i) => {
     const y = top + i * SPACING_ROW;
@@ -116,7 +121,8 @@ function spacing(variables: Variables, top: number, scale: number): Section {
 
 const firstFamily = (stack: string) => stack.split(',')[0].trim().replace(/^['"]|['"]$/g, '') || FONT;
 
-function families(variables: Variables, top: number): Section {
+function families(sheet: Sheet, top: number): Section {
+  const { variables } = sheet;
   const list = entriesOf(variables, VarType.String);
   const nodes = list.flatMap((entry, i) => {
     const y = top + i * TYPE_ROW;
@@ -126,7 +132,7 @@ function families(variables: Variables, top: number): Section {
   return { nodes, height: list.length * TYPE_ROW };
 }
 
-type Part = { title: string; build: (variables: Variables, top: number, scale: number) => Section };
+type Part = { title: string; build: (sheet: Sheet, top: number) => Section };
 
 const PARTS: Part[] = [
   { title: 'Colors', build: colours },
@@ -139,7 +145,7 @@ export function designBoard(variables: Variables, scale = 1): PageTree {
   const children: RestNode[] = [text(DESIGN_BOARD, MARGIN, MARGIN, Size.Title, INK, FONT, 600)];
   let y = MARGIN + HEADING_GAP + LABEL_GAP;
   for (const part of PARTS) {
-    const section = part.build(variables, y + Size.Section + LABEL_GAP * 2, scale);
+    const section = part.build({ variables, scale }, y + Size.Section + LABEL_GAP * 2);
     if (!section.nodes.length) {
       continue;
     }
