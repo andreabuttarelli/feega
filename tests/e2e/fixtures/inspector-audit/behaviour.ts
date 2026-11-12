@@ -14,6 +14,7 @@ const started = Date.now();
 const trace = (...parts: unknown[]) => process.env.INSPECTOR_AUDIT_TRACE && console.log(`  [${((Date.now() - started) / 1000).toFixed(1)}s]`, ...parts);
 const FOCUS_MS = 2_000;
 const SHORT_MS = 3_000;
+const PICK_MS = 1_500;
 
 async function focused(target: Locator): Promise<boolean> {
   return expect
@@ -88,6 +89,21 @@ async function mouseDo(page: Page, row: Row, target: Locator): Promise<void> {
     await target.selectOption({ label: value });
     return;
   }
+  if (row.op === Op.Pick) {
+    await focusByMouse(page, target);
+    await page.keyboard.type(value);
+    await page.waitForTimeout(PICK_MS);
+    await press(page, page.getByRole('button', { name: value, exact: true }).first());
+    return;
+  }
+  if (row.op === Op.Drag) {
+    const box = (await target.boundingBox())!;
+    await page.mouse.move(box.x + box.width * 0.85, box.y + box.height * 0.15);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.6, { steps: 10 });
+    await page.mouse.up();
+    return;
+  }
   if (row.op === Op.Scrub) {
     const label = target.locator('xpath=ancestor::*[@role="group"][1]').locator('.label');
     const box = (await label.boundingBox())!;
@@ -145,6 +161,19 @@ async function keyboardDo(page: Page, row: Row, target: Locator): Promise<void> 
       await page.keyboard.press('Enter');
     },
     [Op.Select]: () => page.keyboard.type(value.slice(0, 3)),
+    [Op.Pick]: async () => {
+      await page.keyboard.type(value);
+      await page.waitForTimeout(PICK_MS);
+      for (let i = 0; i < MAX_TABS; i++) {
+        const name = await page.evaluate(() => document.activeElement?.textContent?.trim() ?? '');
+        if (name === value) {
+          break;
+        }
+        await page.keyboard.press('Tab');
+      }
+      await page.keyboard.press('Enter');
+    },
+    [Op.Drag]: () => page.keyboard.press('ArrowLeft'),
     [Op.Scrub]: () => page.keyboard.press('ArrowUp'),
     [Op.Arrow]: () => page.keyboard.press('ArrowUp'),
     [Op.ShiftArrow]: () => page.keyboard.press('Shift+ArrowUp'),

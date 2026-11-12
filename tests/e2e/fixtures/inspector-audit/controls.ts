@@ -10,7 +10,9 @@ export enum Op {
   Scrub = 'scrub',
   Press = 'press',
   Select = 'select',
-  Menu = 'menu'
+  Menu = 'menu',
+  Pick = 'pick',
+  Drag = 'drag'
 }
 
 export enum State {
@@ -188,15 +190,38 @@ const styleRows: Base[] = [
   { section: 'style', control: 'Effect style', option: 'Soft shadow', target: anywhere('clip-effect-style'), op: Op.Select, value: 'Soft shadow', read: (c) => c.effectStyleRef, want: is('Soft shadow'), canvas: true }
 ];
 
-const boundStyleRows: Base[] = [
-  { section: 'style', control: 'Text style', option: 'None (detach)', target: anywhere('clip-style'), op: Op.Select, value: 'None', read: (c) => c.styleRef, want: gone, canvas: false },
-  { section: 'fill', control: 'Variable chip ×', option: 'unbind', target: anywhere('bind-unbind-color'), op: Op.Press, read: (c) => (c.bind as Record<string, unknown> | undefined)?.color, want: gone, canvas: false },
-  { section: 'fill', control: 'Variable chip', option: 'pick Theme/Ink', via: [anywhere('bind-edit-color')], target: (page) => page.getByTestId('bind-option-Theme/Ink'), op: Op.Press, read: (c) => (c.bind as Record<string, unknown> | undefined)?.color, want: is('Theme/Ink'), canvas: true }
+const bindOf = (c: Clip) => (c.bind as Record<string, unknown> | undefined)?.color;
+const paint = (c: Clip) => [c.props.color, c.props.fills, bindOf(c)];
+const fontPicker = (page: Page) => section('text')(page).getByTestId('font-picker').getByRole('button').first();
+const fontSearch = (page: Page) => page.getByRole('dialog', { name: 'Choose a font' }).getByRole('textbox', { name: 'Search fonts' });
+
+const boundFillRows = (other: string): Base[] => [
+  { section: 'fill', control: 'Bound fill detach', option: 'press', target: testid('fill', 'fill-detach'), op: Op.Press, read: bindOf, want: gone, canvas: false },
+  { section: 'fill', control: 'Bound fill editor', option: `pick ${other}`, via: [testid('fill', 'fill-swatch')], target: (page) => page.getByTestId(`fill-bound-option-${other}`), op: Op.Press, read: bindOf, want: is(other), canvas: true },
+  { section: 'fill', control: 'Bound fill editor', option: 'Detach', via: [testid('fill', 'fill-swatch')], target: popover('fill-bound-detach'), op: Op.Press, read: bindOf, want: gone, canvas: false },
+  { section: 'fill', control: '+ Add fill on a bound fill', option: 'Solid', target: testid('fill', 'fill-add'), op: Op.Menu, value: 'Solid', read: paint, want: changed, canvas: false },
+  { section: 'fill', control: 'Text colour hex after detach', option: '#ff0000', via: [testid('fill', 'fill-detach'), testid('fill', 'fill-swatch')], target: popover('colour-channel'), op: Op.Type, value: 'ff0000', read: paint, want: changed, canvas: true }
 ];
 
-const importedChipRows: Base[] = [
-  { section: 'fill', control: 'Variable chip ×', option: 'unbind', target: anywhere('bind-unbind-color'), op: Op.Press, read: (c) => (c.bind as Record<string, unknown> | undefined)?.color, want: gone, canvas: false },
-  { section: 'fill', control: 'Variable chip', option: 'pick Stripe/Primary', via: [anywhere('bind-edit-color')], target: (page) => page.getByTestId('bind-option-Stripe/Primary'), op: Op.Press, read: (c) => (c.bind as Record<string, unknown> | undefined)?.color, want: is('Stripe/Primary'), canvas: true }
+const colourRows: Base[] = [
+  { section: 'fill', control: 'Text colour hex', option: '#ff0000', via: [testid('fill', 'fill-swatch')], target: popover('colour-channel'), op: Op.Type, value: 'ff0000', read: paint, want: changed, canvas: true },
+  { section: 'fill', control: 'Text colour picker', option: 'drag the square', via: [testid('fill', 'fill-swatch')], target: popover('colour-square'), op: Op.Drag, read: paint, want: changed, canvas: true }
+];
+
+const textUseRows: Base[] = [
+  { section: 'text', control: 'Font family', option: 'search Inter + pick', via: [fontPicker], target: fontSearch, op: Op.Pick, value: 'Inter', read: prop('font'), want: is('Inter'), canvas: true },
+  { section: 'text', control: 'Size presets', option: '48', target: testid('text', 'size-presets'), op: Op.Select, value: '48', read: prop('size'), want: changed, canvas: true },
+  { section: 'text', control: 'Text align', option: 'Align centre', target: named('text', 'radio', 'Align centre'), op: Op.Press, read: prop('align'), want: is('center'), canvas: true },
+  { section: 'text', control: 'Text align', option: 'Align right', target: named('text', 'radio', 'Align right'), op: Op.Press, read: prop('align'), want: is('right'), canvas: true }
+];
+
+const styleDetachRows: Base[] = [
+  { section: 'style', control: 'Text style', option: 'None (detach)', target: anywhere('clip-style'), op: Op.Select, value: 'None', read: (c) => c.styleRef, want: gone, canvas: false }
+];
+
+const importedStackRows: Base[] = [
+  { section: 'stack', control: 'Direction', option: 'Horizontal', target: named('stack', 'radio', 'Horizontal'), op: Op.Press, read: layout('direction'), want: is('horizontal'), canvas: true },
+  { section: 'stack', control: 'Gap', option: 'type 12 + Enter', target: field('stack', 'Gap'), op: Op.Type, value: 12, read: layout('gap'), want: is(12), canvas: true }
 ];
 
 const instanceRows: Base[] = [
@@ -207,15 +232,13 @@ const instanceRows: Base[] = [
 export const ROWS: Row[] = [
   ...on(Layer.Rect, State.Single, [...fillRows, ...strokeRows, ...sizeRows(true), ...appearanceRows(true), ...radiusRows]),
   ...on(Layer.Line, State.Single, lineStrokeRows),
-  ...on(Layer.Text, State.Single, [...typeRows(true), ...fillRows.slice(0, 1)]),
-  ...on(Layer.Bound, State.Bound, typeRows(true).slice(0, 3)),
-  ...on(Layer.ImportedText, State.Imported, [...typeRows(true).slice(0, 4), ...fillRows.slice(0, 1), ...sizeRows(true).slice(0, 2)]),
-  ...on(Layer.ImportedPill, State.Imported, [...fillRows.slice(0, 1), ...radiusRows.slice(0, 1)]),
-  ...on(Layer.ImportedText, State.Imported, importedChipRows),
+  ...on(Layer.Text, State.Single, [...typeRows(true), ...colourRows, ...textUseRows]),
+  ...on(Layer.Bound, State.Bound, [...typeRows(true).slice(0, 3), ...boundFillRows('Theme/Ink'), ...styleDetachRows]),
+  ...on(Layer.ImportedText, State.Imported, [...typeRows(true).slice(0, 4), ...boundFillRows('Stripe/Primary'), ...textUseRows, ...styleDetachRows, ...sizeRows(true).slice(0, 2)]),
+  ...on(Layer.ImportedPill, State.Imported, [...fillRows.slice(0, 1), ...radiusRows.slice(0, 1), ...importedStackRows]),
   ...on(Layer.Shadowed, State.Single, effectRows),
   ...on(Layer.Stack, State.Single, stackRows),
   ...on(Layer.StackChild, State.Single, stackChildRows),
   ...on(Layer.Rect, State.Single, [...constraintRows, ...styleRows]),
-  ...on(Layer.Bound, State.Bound, boundStyleRows),
   ...on(Layer.Instance, State.Single, instanceRows)
 ];
