@@ -5,7 +5,7 @@ import { RendercompCategory, type RendercompPort } from '../model';
 export const PORT: RendercompPort = {
   id: 'four-tone-mono-titler',
   title: 'Four-tone mono titler',
-  about: 'A handheld four-tone lower third wipes in left to right over a dithered shading band, then a bright shimmer sweeps across the pixel title.',
+  about: 'A handheld four-tone lower third wipes in left to right over a dithered shading band, then a bright shimmer sweeps across the pixel title. Pixel title look.',
   category: RendercompCategory.Text,
   width: 1920,
   height: 1080,

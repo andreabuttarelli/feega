@@ -147,7 +147,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
     id: 'product-lifestyle',
     category: 'image',
     name: 'Product → lifestyle shots',
-    description: 'One product photo becomes three lifestyle scenes for a carousel.',
+    description: 'One square product photo feeds three 4:5 images that keep it identical: a kitchen, a café table and a flat lay. For a carousel; Brand moodboard starts from text instead.',
     nodes: [
       image('product', 0, 1, PRODUCT_SHOT, '1:1'),
       image('kitchen', 1, 0, 'Place the product from the reference in a bright Scandinavian kitchen, morning light, shallow depth of field. Keep the product identical.'),
@@ -164,7 +164,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
     id: 'product-3d',
     category: '3d',
     name: 'Product → 3D model',
-    description: 'One product photo becomes a 3D model you can spin, download as GLB and render from any side.',
+    description: 'A product photo node wired into a 3D model node: the model you can spin, download as GLB and render from any side. Pick Text → 3D model when there is no photo.',
     nodes: [image('product', 0, 0, PRODUCT_SHOT, '1:1'), model3d('model', 1, 0)],
     edges: [{ from: 'product', to: 'model', handle: 'images' }]
   },
@@ -172,7 +172,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
     id: 'text-3d',
     category: '3d',
     name: 'Text → 3D model',
-    description: 'Describe an object and get a 3D model: a product shot is drawn first, then turned into a GLB.',
+    description: 'A note describing an object, wired straight into a 3D model node that builds a GLB from the text. Pick Product → 3D model when you already have a photo.',
     nodes: [note('object', 0, 0, 'A silver bell with gilded leaves on top. Replace this with your own object.'), model3d('model', 1, 0)],
     edges: [{ from: 'object', to: 'model', handle: 'text' }]
   },
@@ -180,7 +180,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
     id: 'ugc-video-ad',
     category: 'video',
     name: 'UGC video ad',
-    description: 'A creator-style clip with the product, plus a voice-over script.',
+    description: 'A product photo becomes a creator holding it (9:16), animated as a handheld selfie clip, plus a 20 s script turned into a voice-over. Pick AI commercial for a polished 16:9 ad instead.',
     nodes: [
       image('product', 0, 0, PRODUCT_SHOT, '1:1'),
       image('creator', 1, 0, 'A friendly creator in their twenties holding the product from the reference to camera in a cosy bedroom, selfie angle, natural phone-camera look.', '9:16'),
@@ -198,7 +198,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
     id: 'start-end-video',
     category: 'video',
     name: 'Start → end frame video',
-    description: 'Two stills define where a clip begins and ends; the video fills the motion.',
+    description: 'Two 9:16 stills, start and end, wired into the first and last frame of one video node that animates between them. The only template that fixes both ends of the clip.',
     nodes: [
       image('start', 0, 0, 'A closed gift box with a satin ribbon on a marble table, soft studio light.', '9:16'),
       image('end', 0, 1, 'The same gift box open on a marble table, a glowing perfume bottle inside, soft studio light.', '9:16'),
@@ -213,7 +213,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
     id: 'brief-to-reel',
     category: 'video',
     name: 'Brief → image → reel',
-    description: 'A text brief writes the visual, the image becomes the first frame of a reel.',
+    description: 'A text node writes an image prompt, the 9:16 image it makes becomes the first frame of a vertical reel. Pick Text → video to skip the still and go straight to video.',
     nodes: [
       text('brief', 0, 0, 'Write one vivid image prompt (max 60 words) for a vertical Instagram reel opening shot about: sustainable sneakers made from recycled ocean plastic.'),
       image('frame', 1, 0, '', '9:16'),
@@ -228,7 +228,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
     id: 'style-transfer',
     category: 'image',
     name: 'Style transfer pack',
-    description: 'One photo redrawn as claymation, 80s VHS, anime and 3D render.',
+    description: 'One 4:5 photo redrawn as four stills: claymation, 80s VHS, 90s anime and a glossy 3D render. Stills only; the single-style video templates animate one look.',
     nodes: [
       image('photo', 0, 1, STYLE_SOURCE, '4:5'),
       image('clay', 1, 0, 'Recreate the reference image as stop-motion claymation: plasticine textures, fingerprints, soft studio lighting. Keep composition and subject.'),
@@ -247,7 +247,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
     id: 'voice-over',
     category: 'audio',
     name: 'Script → voice-over',
-    description: 'Write a script and turn it into a voice-over with a music bed.',
+    description: 'A text node writes a 30 s script that feeds a voice-over node, plus a separate 30 s instrumental music bed. Pick Podcast intro for a host intro with theme and a sting.',
     nodes: [
       text('script', 0, 0, 'Write a 30-second voice-over script announcing a weekend sale for an independent bookshop. Warm, conversational, no stage directions.'),
       voiceOver('voice', 1, 0),
@@ -259,7 +259,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
     id: 'podcast-intro',
     category: 'audio',
     name: 'Podcast intro',
-    description: 'Host intro, theme music and a transition sting for an episode.',
+    description: 'An episode topic note feeds a 15 s host intro script and its voice, a 15 s theme track and a 5 s whoosh sting. Audio only, three separate nodes to mix.',
     nodes: [
       note('topic', 0, 0, 'Episode topic: how small brands grow on TikTok without ads. Replace with your own.'),
       text('intro', 1, 0, 'Write a 15-second podcast host intro for the episode described in the input: greet listeners, name the topic, tease one insight. Spoken sentences only.'),
@@ -277,7 +277,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
     id: 'moodboard',
     category: 'image',
     name: 'Brand moodboard',
-    description: 'A brand description becomes four moodboard tiles.',
+    description: 'A three-line brand note feeds four square tiles: a texture, a colour still life, a lifestyle photo and a typographic poster. Starts from words; Product → lifestyle starts from a photo.',
     nodes: [
       note('brand', 0, 1, 'Describe the brand in 3 lines: a small-batch natural skincare label, earthy, calm, Mediterranean. Replace with your own brand.'),
       image('texture', 1, 0, 'Moodboard tile: close-up material texture that captures the brand described in the input.', '1:1', CHEAP_IMAGE_MODEL),
@@ -296,7 +296,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
     id: 'caption-pack',
     category: 'social',
     name: 'One idea, every platform',
-    description: 'A single idea rewritten for Instagram, TikTok, LinkedIn and X.',
+    description: 'One idea note feeds four text nodes: an Instagram caption with hashtags, a TikTok hook, a LinkedIn post and an X post. Text only, no images.',
     nodes: [
       note('idea', 0, 1, 'The idea: we switched our packaging to 100% compostable materials. Replace with your own.'),
       text('instagram', 1, 0, 'Write an Instagram caption for the idea in the input: hook line, 3 short lines, 5 relevant hashtags.'),
@@ -315,7 +315,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
     id: 'thumbnail-cover',
     category: 'social',
     name: 'Thumbnail + story cover',
-    description: 'One title becomes a YouTube thumbnail and a vertical story cover.',
+    description: 'A video title note makes a 16:9 YouTube thumbnail, which then feeds a 9:16 story cover in the same style. Stills only.',
     nodes: [
       note('title', 0, 0, 'Video title: I tried 5 viral TikTok recipes in one day. Replace with your own.'),
       image('thumbnail', 1, 0, 'High-contrast YouTube thumbnail for the video titled in the input: expressive face, bold 3-word text, bright background.', '16:9'),
@@ -330,7 +330,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
     id: 'product-teaser',
     category: 'video',
     name: 'Product teaser with sound',
-    description: 'A hero shot animated into a short teaser, with a matching sound effect.',
+    description: 'A 9:16 hero shot of the product animated into a slow-motion teaser, plus a separate 5 s whoosh sound effect. No voice; pick AI commercial when you need a voice-over.',
     nodes: [
       image('hero', 0, 0, 'Dramatic hero shot of a matte black wireless earbud case on wet black stone, rim light, mist. Replace with your own product.', '9:16'),
       video('teaser', 1, 0, 'The case slowly opens, the earbuds rise with a soft glow, mist swirls, slow motion, premium product teaser.'),
@@ -341,7 +341,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
   styledClip({
     id: 'anime-video',
     name: 'Anime video',
-    description: 'A subject drawn as a 90s anime cel, then animated into a vertical clip.',
+    description: 'A subject note becomes a 9:16 still in 90s anime cel style, then a vertical clip with fluttering hair and a slow push-in. One of five note → still → clip style templates.',
     subject: 'Subject: a girl with a red scarf on a Tokyo rooftop at dusk, wind in her hair.',
     look: '90s anime cel style: clean line art, flat shading, painted sky background, film grain.',
     motion: 'Anime-style animation: hair and scarf flutter in the wind, clouds drift, slow camera push-in, limited-animation feel.'
@@ -349,7 +349,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
   styledClip({
     id: 'claymation-video',
     name: 'Claymation video',
-    description: 'A subject sculpted in plasticine, then animated stop-motion style.',
+    description: 'A subject note becomes a 9:16 plasticine claymation still, then a vertical clip animated at a jittery 12 fps stop-motion. One of five note → still → clip style templates.',
     subject: 'Subject: a small fox baker pulling a loaf out of a wood oven in a cosy kitchen.',
     look: 'Stop-motion claymation: plasticine textures with fingerprints, miniature set, soft studio lighting.',
     motion: 'Stop-motion animation at 12 frames per second: the fox lifts the loaf and smiles, steam rises, slight jitter between frames.'
@@ -357,7 +357,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
   styledClip({
     id: 'paper-cutout',
     name: 'Paper cutout animation',
-    description: 'A layered paper-craft scene, then animated like a cutout puppet show.',
+    description: 'A subject note becomes a 9:16 layered paper diorama still, then a vertical clip where the layers slide with parallax. One of five note → still → clip style templates.',
     subject: 'Subject: a whale swimming over a sleeping seaside village under the moon.',
     look: 'Layered paper cutout diorama: visible paper texture, soft drop shadows between layers, muted pastel palette.',
     motion: 'Paper cutout animation: layers slide with parallax, the whale glides across, stars twinkle, slight stop-motion stutter.'
@@ -365,7 +365,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
   styledClip({
     id: 'retro-vhs',
     name: '80s retro VHS video',
-    description: 'A neon 80s still with VHS artefacts, then animated as a retro clip.',
+    description: 'A subject note becomes a 9:16 neon 80s still with VHS tracking lines, then a vertical clip with tape wobble. One of five note → still → clip style templates.',
     subject: 'Subject: a skater cruising down a neon-lit boulevard at night, palm trees, synthwave sunset.',
     look: '80s VHS still: neon magenta and cyan, tracking lines, colour bleed, grain, timestamp in the corner.',
     motion: 'Retro 80s footage: the skater rolls toward camera, neon signs flicker, VHS tracking glitches, slight tape wobble.'
@@ -373,7 +373,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
   styledClip({
     id: '3d-animation',
     name: '3D animation',
-    description: 'A glossy 3D character render, then animated like an animated-feature shot.',
+    description: 'A subject note becomes a 9:16 glossy 3D character render, then a vertical clip with a gentle camera orbit. One of five note → still → clip style templates.',
     subject: 'Subject: a curious little robot discovering a flower in a sunny meadow.',
     look: 'Glossy 3D animated-feature render: soft global illumination, subsurface materials, shallow depth of field.',
     motion: '3D animated-feature shot: the robot tilts its head, reaches for the flower, petals sway, gentle camera orbit.'
@@ -382,7 +382,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
     id: 'spotify-canvas',
     category: 'video',
     name: 'Spotify Canvas loop',
-    description: 'Album-art style still turned into a seamless vertical loop for Spotify Canvas.',
+    description: 'A track note feeds a 9:16 album-art still wired as both first and last frame of a video, so the clip loops seamlessly. For Spotify Canvas or any vertical loop.',
     nodes: [
       note('track', 0, 0, 'Track: a dreamy synth-pop song about driving at night. Replace with your own.'),
       image('art', 1, 0, 'Vertical visual for the track described in the input: album-art mood, one strong central subject, no text.', '9:16', CHEAP_IMAGE_MODEL),
@@ -398,7 +398,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
     id: 'ai-commercial',
     category: 'video',
     name: 'AI commercial',
-    description: 'Product photo to hero shot to a cinematic ad clip, with a voice-over.',
+    description: 'A product photo becomes a 16:9 hero shot, then a cinematic dolly-in ad clip, plus a 10 s script turned into a voice-over. Pick UGC video ad for a handheld 9:16 creator look.',
     nodes: [
       image('product', 0, 0, PRODUCT_SHOT, '1:1', CHEAP_IMAGE_MODEL),
       image('hero', 1, 0, 'Cinematic commercial hero shot of the product from the reference on a sunlit marble counter, dramatic light. Keep the product identical.', '16:9', CHEAP_IMAGE_MODEL),
@@ -416,7 +416,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
     id: 'text-to-video',
     category: 'video',
     name: 'Text → video',
-    description: 'Describe a scene in words; the brief writes the shot and the video renders it.',
+    description: 'A text node writes a video prompt that feeds one 9:16 video node directly, no still in between. Pick Brief → image → reel to control the first frame.',
     nodes: [
       text('brief', 0, 0, 'Write one cinematic video prompt (max 60 words) for a 5-second vertical shot of: a hot-air balloon rising over misty mountains at sunrise.'),
       video('clip', 1, 0, '', '9:16', CHEAP_VIDEO_MODEL)
@@ -427,7 +427,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
     id: 'hd-clip',
     category: 'video',
     name: 'Sharp HD clip',
-    description: 'A detailed still animated at 1080p. To upscale a clip you already have, use the Video upscaler template.',
+    description: 'A detailed 16:9 still animated into a new 1080p clip. Makes a new clip; to sharpen a clip you already have, pick Video upscaler.',
     nodes: [
       note('how', 0, 1, 'To upscale a clip you already have, use the Video upscaler template or the AI Video Upscaler tool. The nodes on the right make a new sharp clip instead.'),
       image('still', 1, 0, 'Ultra-detailed 16:9 landscape photo: a lighthouse on a cliff in a storm, crashing waves, crisp textures, 8k detail.', '16:9', CHEAP_IMAGE_MODEL),
@@ -445,7 +445,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
     id: 'video-upscale',
     category: 'video',
     name: 'Video upscaler',
-    description: 'Drop a clip, wire it into the upscaler and get it back at 2× or 4K.',
+    description: 'A sample 480p clip wired into an upscaler node that returns it at 2× or about 4K; replace the sample with your own MP4. Pick Sharp HD clip to make a new clip instead.',
     nodes: [
       note('how', 0, 1, 'Replace the sample clip: drop your own MP4 (up to 20 s, 1440p, 50 MB) and connect it to the upscaler. Factor 2 doubles each side; 3 takes 720p to about 4K. Creativity 0 keeps faces and text exact, 1 restores finer detail.'),
       { key: 'clip', type: 'video', col: 0, row: 0, data: { prompt: 'A red fox trotting through fresh snow in a pine forest, soft morning light, static wide shot.', model: CHEAP_VIDEO_MODEL, aspect_ratio: '16:9', resolution: '480p', audio: false } },

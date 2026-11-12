@@ -4,7 +4,7 @@ import { SnapcnCategory, type SnapcnPort } from '../model';
 export const PORT: SnapcnPort = {
   id: 'channel-thread',
   title: 'Channel thread',
-  about: 'A work chat filling itself in: avatars, bold names, typing dots, and a transcript that scrolls once per arrival.',
+  about: 'A work chat filling itself in: avatars, bold names, typing dots, and a transcript that scrolls once per arrival. Flat chat with no device.',
   category: SnapcnCategory.Text,
   width: 1280,
   height: 720,

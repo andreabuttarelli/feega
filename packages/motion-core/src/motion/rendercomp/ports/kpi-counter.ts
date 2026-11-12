@@ -4,7 +4,7 @@ import { RendercompCategory, type RendercompPort } from '../model';
 export const PORT: RendercompPort = {
   id: 'kpi-counter',
   title: 'KPI counter',
-  about: 'Metric cards slide in on a stagger while their figures count up on rolling odometer digit drums that lock in one column at a time.',
+  about: 'Metric cards slide in on a stagger while their figures count up on rolling odometer digit drums that lock in one column at a time. Several metrics at once.',
   category: RendercompCategory.Chart,
   width: 1920,
   height: 1080,

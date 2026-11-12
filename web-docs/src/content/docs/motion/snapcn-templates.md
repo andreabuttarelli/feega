@@ -22,7 +22,8 @@ file or drag it from the canvas. Leave a field empty to keep the template's plac
 
 ## From an agent, MCP or CLI
 
-The motion agent lists them with `list_templates`, reads every field with `get_template` and places one with
+The motion agent lists them with `list_templates` (each with its description, its shape, e.g. `1920×1080 video`, and
+its card), reads every field with `get_template` and places one with
 `add_template` (ids start with `builtin:snapcn-`, e.g. `builtin:snapcn-text-reveal`). `set_template_fields` fills
 media fields with asset ids from the project. From the CLI:
 

@@ -4,7 +4,7 @@ import { SnapcnCategory, type SnapcnPort } from '../model';
 export const PORT: SnapcnPort = {
   id: 'word-wheel',
   title: 'Word wheel',
-  about: 'A column of words spins like a reel beside a fixed lead-in and stops on one.',
+  about: 'A column of words spins like a reel beside a fixed lead-in and stops on one. A reel spin; Word rotate drops words in one at a time.',
   category: SnapcnCategory.Text,
   width: 1280,
   height: 720,

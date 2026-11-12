@@ -4,7 +4,7 @@ import { RendercompCategory, type RendercompPort } from '../model';
 export const PORT: RendercompPort = {
   id: 'gradient-text-sweep',
   title: 'Gradient text sweep',
-  about: 'A bold headline springs in while an accent-coloured highlight sweeps across the letters on a loop, with an underline and a spaced subline.',
+  about: 'A bold headline springs in while an accent-coloured highlight sweeps across the letters on a loop, with an underline and a spaced subline. Adds underline and subline to the sweep.',
   category: RendercompCategory.Text,
   width: 1920,
   height: 1080,

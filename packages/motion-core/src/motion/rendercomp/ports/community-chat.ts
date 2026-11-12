@@ -4,7 +4,7 @@ import { RendercompCategory, type RendercompPort } from '../model';
 export const PORT: RendercompPort = {
   id: 'community-chat',
   title: 'Community chat',
-  about: 'A team-chat window tilts through 3D while messages spring in one by one and reactions land under them.',
+  about: 'A team-chat window tilts through 3D while messages spring in one by one and reactions land under them. A desktop window; Phone chat is on a phone.',
   category: RendercompCategory.Social,
   width: 1080,
   height: 1920,

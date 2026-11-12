@@ -14,7 +14,7 @@ import { cardView, publishNode, remixInto } from '$lib/server/gallery/service';
 import { DurationBand, GalleryKind, gallerySearchSchema, itemPath } from '$lib/gallery/model';
 import { MOTION_FORMATS } from '@feega/motion-core/motion/doc';
 import { templateLibrary } from '$lib/server/motion/templates';
-import { componentKind } from '$lib/motion/template/catalogue';
+import { componentKind, frameShape } from '$lib/motion/template/catalogue';
 import { compositionOf } from '$lib/canvas-node-data';
 import { FORMAT_OF_ASPECT, composedTemplate, sequentialIds } from '$lib/canvas/composition-template';
 import { ToolAccess, ToolFamily, type ToolRow } from './tool-row';
@@ -65,7 +65,7 @@ export function projectRows(deps: CanvasDeps, { effects, components, actor }: Pr
       name: 'list_components',
       family: ToolFamily.Canvas,
       access: ToolAccess.Read,
-      summary: 'The motion component library a composition node can play (set_composition_component): id, name, kind, seconds and fields (key, type, label). Free, reads only.',
+      summary: 'The motion component library a composition node can play (set_composition_component): id, name, description (what it shows and when to pick it), kind, shape (width×height, video or still), seconds and fields (key, type, label). Free, reads only.',
       input: z.object({}).strict(),
       run: async () => ({
         components: (await components()).map((e) => ({
@@ -73,6 +73,7 @@ export function projectRows(deps: CanvasDeps, { effects, components, actor }: Pr
           name: e.template.name,
           description: e.template.description,
           kind: componentKind(e),
+          shape: frameShape(e.template.doc),
           seconds: e.template.doc.durationInFrames / e.template.doc.fps,
           fields: e.template.doc.fields.map((f) => ({ key: f.key, type: f.type, label: f.label }))
         }))

@@ -4,7 +4,7 @@ import { SnapcnCategory, type SnapcnPort } from '../../snapcn/model';
 export const PORT: SnapcnPort = {
   id: 'magicui-hyper-text',
   title: 'Hyper text',
-  about: 'Letters scramble through random capitals and lock into place one by one, over and over.',
+  about: 'Letters scramble through random capitals and lock into place one by one, over and over. Repeats; Scramble text decodes once.',
   category: SnapcnCategory.Text,
   width: 1280,
   height: 720,

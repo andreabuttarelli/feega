@@ -13,7 +13,7 @@ export const SLICED_PHOTO_POSTER_TEMPLATE: TemplateEntry = {
   id: SLICED_PHOTO_TEMPLATE_ID,
   template: lazyTemplate(() => posterTemplateDoc({ name: 'poster-sliced-photo', component: SLICED_PHOTO_COMPONENT, code: slicedPhotoComponent(), props: SLICED_PHOTO_PROPS, fonts: SLICED_PHOTO_FONTS, varPrefix: SLICED_PHOTO_VAR_PREFIX, vars: [], clip: SLICED_PHOTO_CLIP }, SLICED_PHOTO_GRAIN), {
     name: 'Poster sliced photo',
-    description: 'A grainy orange poster: a black and white photo cut into vertical strips shifted up and down, thin white lines between them, six caps phrases at the corners and the middle, a tiny code block and a numbered ring.',
+    description: 'A grainy orange poster: a black and white photo cut into vertical strips shifted up and down, white lines between them, six caps phrases around it, a code block and a ring.',
     keyFields: SLICED_PHOTO_KEY_FIELDS
   })
 };

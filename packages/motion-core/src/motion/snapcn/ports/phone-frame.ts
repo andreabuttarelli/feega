@@ -4,7 +4,7 @@ import { SnapcnCategory, type SnapcnPort } from '../model';
 export const PORT: SnapcnPort = {
   id: 'phone-frame',
   title: 'Phone frame',
-  about: 'A phone rises into frame and floats, its screen drawing a ride route with insight pills, or showing your own screenshot.',
+  about: 'A phone rises into frame and floats, its screen drawing a ride route with insight pills, or showing your own screenshot. One floating phone; Phone stack layers several.',
   category: SnapcnCategory.Screen,
   width: 1280,
   height: 720,

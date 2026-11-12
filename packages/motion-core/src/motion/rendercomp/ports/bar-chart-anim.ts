@@ -4,7 +4,7 @@ import { RendercompCategory, type RendercompPort } from '../model';
 export const PORT: RendercompPort = {
   id: 'bar-chart-anim',
   title: 'Bar chart',
-  about: 'A title fades in, then coloured bars spring up from the baseline one after another with their labels.',
+  about: 'A title fades in, then coloured bars spring up from the baseline one after another with their labels. Animated; Arc Bar chart is still.',
   category: RendercompCategory.Chart,
   width: 1920,
   height: 1080,

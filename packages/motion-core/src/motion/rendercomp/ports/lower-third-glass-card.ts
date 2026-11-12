@@ -4,7 +4,7 @@ import { RendercompCategory, type RendercompPort } from '../model';
 export const PORT: RendercompPort = {
   id: 'lower-third-glass-card',
   title: 'Glass lower third',
-  about: 'A frosted glass name card slides up from below with a glowing accent bar, then the name and title settle in and the card fades out.',
+  about: 'A frosted glass name card slides up from below with a glowing accent bar, then the name and title settle in and the card fades out. Frosted card; Lower third is a flat bar.',
   category: RendercompCategory.Social,
   width: 1920,
   height: 1080,

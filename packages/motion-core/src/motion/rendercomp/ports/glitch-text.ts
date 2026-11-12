@@ -4,7 +4,7 @@ import { RendercompCategory, type RendercompPort } from '../model';
 export const PORT: RendercompPort = {
   id: 'glitch-text',
   title: 'Glitch text',
-  about: 'Heavy text fades in with red and cyan channel splits, horizontal tearing bands and random bursts that settle to a calmer flicker.',
+  about: 'Heavy text fades in with red and cyan channel splits, horizontal tearing bands and random bursts that settle to a calmer flicker. Heavier and longer than the animata Glitch text burst.',
   category: RendercompCategory.Text,
   width: 1920,
   height: 1080,

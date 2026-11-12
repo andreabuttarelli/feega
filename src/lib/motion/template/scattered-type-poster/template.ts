@@ -13,7 +13,7 @@ export const SCATTERED_TYPE_POSTER_TEMPLATE: TemplateEntry = {
   id: SCATTERED_TYPE_TEMPLATE_ID,
   template: lazyTemplate(() => posterTemplateDoc({ name: 'poster-scattered-type', component: SCATTERED_TYPE_COMPONENT, code: scatteredTypeComponent(), props: SCATTERED_TYPE_PROPS, fonts: SCATTERED_TYPE_FONTS, varPrefix: SCATTERED_TYPE_VAR_PREFIX, vars: [], clip: SCATTERED_TYPE_CLIP }, SCATTERED_TYPE_GRAIN), {
     name: 'Poster scattered type',
-    description: 'An open studio poster on light grey: big dates top left, medium grotesk text blocks scattered and some turned on their side, photos of different sizes, black % tags, a huge time range overlapping the last photo and a black label at the foot.',
+    description: 'An open studio poster on light grey: big dates top left, grotesk text blocks scattered and some turned sideways, photos of mixed sizes, black % tags and a huge time range.',
     keyFields: SCATTERED_TYPE_KEY_FIELDS
   })
 };

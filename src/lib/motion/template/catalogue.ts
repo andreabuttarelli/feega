@@ -113,7 +113,9 @@ export function catalogue(entries: readonly TemplateEntry[]): CatalogueItem[] {
   return items.sort((a, b) => addedOn(b.id).localeCompare(addedOn(a.id)) || KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
 }
 
-const searchable = (i: CatalogueItem) => `${i.name} ${i.description} ${i.roles.join(' ')}`.toLowerCase();
+const searchable = (i: CatalogueItem) => `${i.name} ${i.description} ${i.roles.join(' ')} ${i.kind} ${i.mode} ${FORMATS[i.format].label}`.toLowerCase();
+
+export const frameShape = (doc: MotionDoc): string => `${doc.width}×${doc.height} ${docMode(doc)}`;
 
 export function matching(items: readonly CatalogueItem[], query: string, kind: ComponentKind | null, mode: DocMode | null = null, role: SectionRole | null = null): CatalogueItem[] {
   const words = query.trim().toLowerCase();
