@@ -23,10 +23,10 @@ enum Scenario {
   ZoomFarOut = 'zoom-far-out',
   ZoomFarIn = 'zoom-far-in',
   ZoomHunt = 'zoom-hunt',
-  ZoomDeep = 'zoom-deep',
   PanWheel = 'pan-wheel',
   PanDrag = 'pan-drag',
-  PanWhileZooming = 'pan-zoom'
+  PanWhileZooming = 'pan-zoom',
+  ZoomDeep = 'zoom-deep'
 }
 
 type Settle = { sharpMs: number; settledMs: number; restBakes: number; asked: number; built: number };
@@ -196,8 +196,25 @@ function sharpAfter(frames: PerceivedFrame[], end: number, blurred: (f: Perceive
   return next ? Math.max(0, Math.round(next.at - end)) : SHARP_GIVE_UP_MS;
 }
 
-async function perceived(page: Page, since: number): Promise<Perceived> {
-  const end = await page.evaluate(() => (window as unknown as { __lastInput: { last: number } }).__lastInput.last);
+function idleTailMs(script: Script): number {
+  if (!('wheel' in script)) {
+    return 0;
+  }
+  let zoom = script.from ?? START_ZOOM;
+  let movedAt = 0;
+  for (const step of script.wheel) {
+    const next = step.ctrl ? Math.min(CAMERA_RANGE.max, Math.max(CAMERA_RANGE.min, zoom * Math.exp(-step.dy * WHEEL_ZOOM))) : zoom;
+    if (next !== zoom || !step.ctrl) {
+      movedAt = step.at;
+    }
+    zoom = next;
+  }
+  return script.wheel.at(-1)!.at - movedAt;
+}
+
+async function perceived(page: Page, since: number, script: Script): Promise<Perceived> {
+  const lastInput = await page.evaluate(() => (window as unknown as { __lastInput: { last: number } }).__lastInput.last);
+  const end = lastInput - idleTailMs(script);
   const all = await page.evaluate((after) => ((window as unknown as { __gpuCanvas?: { frames?: PerceivedFrame[] } }).__gpuCanvas?.frames ?? []).filter((f) => f.at > after), since);
   const after = all.filter((f) => f.at > end);
   const from = (f: PerceivedFrame | undefined) => (f ? Math.round(f.at - end) : SHARP_GIVE_UP_MS);
@@ -230,7 +247,7 @@ async function scenario(page: Page, cdp: CDPSession, name: Scenario, profiled: b
   if (profiled) {
     writeFileSync(join(OUT, `${name}.cpuprofile`), JSON.stringify((await cdp.send('Profiler.stop')).profile));
   }
-  return { ...frames, cpuMs, fpsByThird: fpsByThird(script, frames.gapsInOrder), ...settled, ...(await perceived(page, since)), ...(await levels(page, since, name)) };
+  return { ...frames, cpuMs, fpsByThird: fpsByThird(script, frames.gapsInOrder), ...settled, ...(await perceived(page, since, script)), ...(await levels(page, since, name)) };
 }
 
 async function run(index: number, base: string, browser: Awaited<ReturnType<typeof chromium.launch>>): Promise<Partial<Record<Scenario, ScenarioRun>>> {

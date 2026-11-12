@@ -424,6 +424,11 @@ impl Tiles {
 }
 
 pub const REST_BLOCK_PX: u32 = 256;
+const REST_AFTER_MS: f64 = 24.0;
+
+pub fn rest_due(since_change_ms: f64) -> bool {
+    since_change_ms >= REST_AFTER_MS
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Drawn {
@@ -584,10 +589,11 @@ pub struct Moment {
     pub gesture: bool,
     pub lifting: bool,
     pub settling: bool,
+    pub adopted: bool,
 }
 
 pub fn path_for(m: Moment) -> Path {
-    if m.gesture || m.lifting || m.settling {
+    if (m.gesture && !m.adopted) || m.lifting || m.settling {
         return Path::Tiles;
     }
     Path::Exact

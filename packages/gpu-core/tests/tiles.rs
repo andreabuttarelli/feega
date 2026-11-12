@@ -270,7 +270,7 @@ fn tiles_warm_a_moment_after_the_last_gesture() {
 #[test]
 fn a_lift_without_a_camera_move_draws_from_tiles() {
     use gpu_core::tiles::{path_for, Moment, Path};
-    let still = Moment { gesture: false, lifting: false, settling: false };
+    let still = Moment { gesture: false, lifting: false, settling: false, adopted: false };
 
     assert_eq!(path_for(still), Path::Exact);
     assert_eq!(path_for(Moment { lifting: true, ..still }), Path::Tiles);
@@ -661,4 +661,22 @@ fn a_still_is_dropped_when_the_content_changes_and_the_oldest_when_too_many_are_
     assert_eq!(stills.bytes(), STILLS_KEPT as u64 * 400);
     assert_eq!(stills.clear().len(), STILLS_KEPT);
     assert!(Rest::resume(camera(2.0), SCREEN, &mut stills).is_none());
+}
+
+#[test]
+fn a_gesture_paused_where_its_rest_picture_was_adopted_draws_that_picture() {
+    use gpu_core::tiles::{path_for, Moment, Path};
+    let paused = Moment { gesture: true, lifting: false, settling: false, adopted: true };
+
+    assert_eq!(path_for(paused), Path::Exact);
+    assert_eq!(path_for(Moment { adopted: false, ..paused }), Path::Tiles);
+    assert_eq!(path_for(Moment { lifting: true, ..paused }), Path::Tiles);
+}
+
+#[test]
+fn the_rest_picture_starts_a_few_frames_after_the_camera_stops_not_after_the_gesture_ends() {
+    use gpu_core::tiles::rest_due;
+
+    assert!(!rest_due(8.0));
+    assert!(rest_due(40.0));
 }

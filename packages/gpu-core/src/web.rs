@@ -16,7 +16,7 @@ use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, Stills};
+use crate::tiles::{rest_due, split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, Stills};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
 use crate::tally::now_ms;
@@ -38,7 +38,6 @@ const NOT_TIMED: u64 = u64::MAX;
 const TILE_BUDGET_GESTURE_MS: f64 = 4.0;
 const TILE_BUDGET_STILL_MS: f64 = 12.0;
 const SPARE_TILES: usize = 32;
-const REST_AFTER_MS: f64 = 200.0;
 const EVICT_DOWN_TO_PERCENT: usize = 90;
 
 #[wasm_bindgen]
@@ -458,7 +457,11 @@ impl WebCore {
     }
 
     pub fn set_camera(&mut self, x: f64, y: f64, zoom: f64) {
-        self.camera = Camera { x, y, zoom };
+        let camera = Camera { x, y, zoom };
+        if camera != self.camera {
+            self.changed_at = js_sys::Date::now();
+        }
+        self.camera = camera;
     }
 
     pub fn patch_uses(&mut self, patch_json: &[u8]) -> Result<(), JsValue> {
@@ -482,8 +485,7 @@ impl WebCore {
 
     pub fn set_motion(&mut self, motion: CoreMotion) {
         if matches!(motion, CoreMotion::Gesture) {
-            self.changed_at = js_sys::Date::now();
-            self.warmup.moved(self.changed_at);
+            self.warmup.moved(js_sys::Date::now());
         }
         self.motion = motion;
         self.library.set_motion(motion.into());
@@ -712,7 +714,8 @@ impl WebCore {
             self.forget_rest();
         }
         self.snapshot_lifts(screen);
-        let budget = if matches!(self.motion, CoreMotion::Gesture) { TILE_BUDGET_GESTURE_MS } else { TILE_BUDGET_STILL_MS };
+        let moving = matches!(self.motion, CoreMotion::Gesture) && !rest_due(js_sys::Date::now() - self.changed_at);
+        let budget = if moving { TILE_BUDGET_GESTURE_MS } else { TILE_BUDGET_STILL_MS };
         let started = js_sys::Date::now();
         let mut rastered = 0;
         let mut queue = self.tiles.queue(self.tiles.frame(self.camera, screen).missing);
@@ -737,7 +740,7 @@ impl WebCore {
         self.counted.unsharp_centre = self.tiles.unsharp(&near) as u32;
         let underlaid = self.compositor.held_look(self.camera).is_some_and(|(_, stretch)| crate::tiles::underlay_shows(stretch));
         self.counted.uncovered = if underlaid { 0 } else { left_blank.iter().filter(|k| !self.tiles.holds(**k)).count() as u32 };
-        let resting = matches!(self.motion, CoreMotion::Still) && tiles.missing.iter().all(|k| self.tiles.covered_within(*k, NEAR_STEPS)) && js_sys::Date::now() - self.changed_at >= REST_AFTER_MS;
+        let resting = tiles.missing.iter().all(|k| self.tiles.covered_within(*k, NEAR_STEPS)) && rest_due(js_sys::Date::now() - self.changed_at);
         let mut exact = false;
         if resting {
             exact = self.raster_rest(started, budget, rastered > 0)?;
@@ -833,7 +836,7 @@ impl WebCore {
             self.adopted = None;
         }
         let moving = matches!(self.motion, CoreMotion::Gesture);
-        let moment = || Moment { gesture: moving, lifting: self.compositor.holding() || !self.compositor.lifts(&self.library).is_empty(), settling: self.adopted.is_none() && self.drew_tiles && self.tiles_show_all() };
+        let moment = || Moment { gesture: moving, lifting: self.compositor.holding() || !self.compositor.lifts(&self.library).is_empty(), settling: self.adopted.is_none() && self.drew_tiles && self.tiles_show_all(), adopted: self.adopted.is_some() };
         if self.tiled && path_for(moment()) == Path::Tiles {
             self.adopted = None;
             self.drew_tiles = true;
