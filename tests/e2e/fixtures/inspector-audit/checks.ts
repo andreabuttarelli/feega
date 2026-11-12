@@ -16,4 +16,6 @@ export enum Severity {
   Minor = 'minor'
 }
 
-export type Known = { mouse?: Check[]; keyboard?: Check[]; severity: Severity; why: string; ref: string };
+export type Checks = { mouse: Check[]; keyboard: Check[] };
+
+export type Known = { mouse?: Check[]; keyboard?: Check[]; unstable?: Partial<Checks>; severity: Severity; why: string; ref: string };

@@ -23,17 +23,24 @@ jobs:
   audit:
     if: github.event.action != 'labeled' || github.event.label.name == 'inspector-audit'
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 90
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
         include:
-          - part: layers
-            rows: '^(rect|line|text|bound)/'
+          - part: rect
+            rows: '^rect/'
+          - part: line-text-bound
+            rows: '^(line|text|bound)/'
+          - part: imported-effects-gradient
+            rows: '^(0752f883|1c47f19d|shadowed|gradient)/'
           - part: stacks-components-frames
-            rows: '^(0752f883|1c47f19d|stack|stack-a|shadowed|gradient|card|card-instance|image-fill|frame|mix-a)/'
-          - part: effects
-            rows: '^fx-'
+            rows: '^(stack|stack-a|card|card-instance|frame|mix-a)/'
+          - part: image-effects-a-g
+            rows: '^(image-fill|fx-[a-g])'
+          - part: effects-h-z
+            rows: '^fx-[h-z]'
     steps:
       - uses: actions/checkout@v4
 

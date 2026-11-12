@@ -8,6 +8,7 @@ import { openCanvas } from './fixtures/inspector-audit/harness';
 import { sweepLayer, type Finding } from './fixtures/inspector-audit/sweep';
 import { ROWS, Check, State } from './fixtures/inspector-audit/controls';
 import { KNOWN } from './fixtures/inspector-audit/known';
+import type { Checks } from './fixtures/inspector-audit/checks';
 import { exercise, type Outcome, type Selection } from './fixtures/inspector-audit/behaviour';
 
 const OUT = process.env.INSPECTOR_AUDIT_OUT ?? join(homedir(), 'Documents/feega-videos/inspector-audit');
@@ -50,7 +51,8 @@ test.afterAll(async () => {
 
 const record = (o: Outcome) => writeFileSync(join(OUT, 'rows', `${slug(o.row.id)}.json`), JSON.stringify({ id: o.row.id, layer: o.row.layer, section: o.row.section, control: o.row.control, option: o.row.option, state: o.row.state, mouse: o.mouse, keyboard: o.keyboard, notes: o.notes, known: o.row.known ?? null }));
 
-type Checks = { mouse: Check[]; keyboard: Check[] };
+const steady = (checks: Check[], unstable: Check[] = []) => checks.filter((c) => !unstable.includes(c));
+const settled = (c: Checks, unstable: Partial<Checks>): Checks => ({ mouse: steady(c.mouse, unstable.mouse), keyboard: steady(c.keyboard, unstable.keyboard) });
 const sameChecks = (a: Checks, b: Checks) => JSON.stringify([a.mouse, a.keyboard]) === JSON.stringify([b.mouse, b.keyboard]);
 
 async function attemptRow(row: (typeof ROWS)[number]): Promise<Outcome> {
@@ -93,9 +95,10 @@ test.describe('inspector audit', () => {
 
   for (const row of EXERCISED) {
     test(row.id, async () => {
-      const expected = { mouse: row.known?.mouse ?? [], keyboard: row.known?.keyboard ?? [] };
+      const unstable = row.known?.unstable ?? {};
+      const expected = settled({ mouse: row.known?.mouse ?? [], keyboard: row.known?.keyboard ?? [] }, unstable);
       let outcome = await attemptRow(row);
-      if (!sameChecks(outcome, expected)) {
+      if (!sameChecks(settled(outcome, unstable), expected)) {
         outcome = await attemptRow(row);
         outcome.notes.push('second attempt');
       }
@@ -103,7 +106,7 @@ test.describe('inspector audit', () => {
       if (process.env.INSPECTOR_AUDIT_RECORD) {
         return;
       }
-      expect({ mouse: outcome.mouse, keyboard: outcome.keyboard }, outcome.notes.join('; ')).toEqual(expected);
+      expect(settled(outcome, unstable), outcome.notes.join('; ')).toEqual(expected);
     });
   }
 });

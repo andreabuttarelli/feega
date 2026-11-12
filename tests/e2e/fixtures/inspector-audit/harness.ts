@@ -111,12 +111,7 @@ export async function reach(target: Locator): Promise<Reach> {
   return target.evaluate((el: HTMLElement) => {
     const inside = (b: DOMRect, area: { top: number; bottom: number; left: number; right: number }) => b.top >= area.top && b.bottom <= area.bottom && b.left >= area.left && b.right <= area.right;
     const view = { top: 0, left: 0, bottom: innerHeight, right: innerWidth };
-    let scroller = el.parentElement;
-    while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) {
-      scroller = scroller.parentElement;
-    }
-    const shown = el.getBoundingClientRect();
-    if (!inside(shown, view) || (scroller && !inside(shown, scroller.getBoundingClientRect()))) {
+    if (!inside(el.getBoundingClientRect(), view)) {
       el.scrollIntoView({ block: 'center', inline: 'nearest' });
     }
     const box = el.getBoundingClientRect();

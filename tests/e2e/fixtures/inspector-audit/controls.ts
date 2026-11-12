@@ -317,12 +317,28 @@ function effectRowsOf(kind: EffectKind): Base[] {
 const fxRows: Row[] = EFFECT_KINDS.flatMap((kind) => onNode(AREAS_NODE, effectLayer(kind) as Layer, State.Single, effectRowsOf(kind)));
 
 const strokeVia = [testid('stroke', 'stroke-row')];
+const perSide = async (page: Page) => {
+  const row = testid('stroke', 'stroke-row')(page);
+  if (!(await popover('stroke-editor')(page).isVisible())) {
+    await row.click();
+  }
+  if (!(await popover('stroke-side-top')(page).isVisible())) {
+    await popover('stroke-sides')(page).click();
+  }
+  await row.click();
+};
+const splitPadding = async (page: Page) => {
+  if (!(await field('stack', 'Top padding')(page).isVisible())) {
+    await testid('stack', 'auto-layout-padding-sides')(page).click();
+  }
+};
+
 const moreStrokeRows: Base[] = [
   { section: 'stroke', control: 'Stroke paint', option: 'Linear', via: strokeVia, target: popover('stroke-paint'), op: Op.Select, value: 'Linear', read: (c) => (stroke0('paint')(c) as { type?: string } | undefined)?.type, want: changed, canvas: true },
   { section: 'stroke', control: 'Stroke dash pattern', option: 'type 10, 5 + Enter', via: strokeVia, target: popover('stroke-pattern'), op: Op.Type, value: '10, 5', read: stroke0('pattern'), want: changed, canvas: true },
   { section: 'stroke', control: 'Stroke dash gap', option: 'type 4 + Enter', via: strokeVia, target: popover('stroke-gap'), op: Op.Type, value: 4, read: stroke0('gap'), want: changed, canvas: false },
   { section: 'stroke', control: 'Stroke miter limit', option: 'type 8 + Enter', via: strokeVia, target: popover('stroke-miter'), op: Op.Type, value: 8, read: stroke0('miter'), want: changed, canvas: false },
-  { section: 'stroke', control: 'Stroke side width', option: 'top 6 + Enter', via: [...strokeVia, popover('stroke-sides')], target: popover('stroke-side-top'), op: Op.Type, value: 6, read: stroke0('sides'), want: changed, canvas: true }
+  { section: 'stroke', control: 'Stroke side width', option: 'top 6 + Enter', prep: perSide, via: strokeVia, target: popover('stroke-side-top'), op: Op.Type, value: 6, read: stroke0('sides'), want: changed, canvas: true }
 ];
 
 const SPOT_NAMES = ['start', 'center', 'end'].flatMap((row) => ['start', 'center', 'end'].map((column) => `Align ${row} ${column}`)).filter((n) => n !== 'Align center start' && n !== 'Align end end');
@@ -331,7 +347,7 @@ const moreStackRows: Base[] = [
   { section: 'stack', control: 'Direction', option: 'Grid', target: named('stack', 'radio', 'Grid'), op: Op.Press, read: layout('direction'), want: is('grid'), canvas: true },
   { section: 'stack', control: 'Gap mode', option: 'Auto', target: testid('stack', 'auto-layout-gap-mode'), op: Op.Select, value: 'Auto', read: layout('justify'), want: changed, canvas: true },
   { section: 'stack', control: 'Vertical padding', option: 'type 4 + Enter', target: field('stack', 'Vertical padding'), op: Op.Type, value: 4, read: (c) => (layout('padding')(c) as { top: number }).top, want: is(4), canvas: true },
-  { section: 'stack', control: 'Top padding', option: 'per side, type 30 + Enter', via: [testid('stack', 'auto-layout-padding-sides')], target: field('stack', 'Top padding'), op: Op.Type, value: 30, read: (c) => (layout('padding')(c) as { top: number }).top, want: is(30), canvas: true },
+  { section: 'stack', control: 'Top padding', option: 'per side, type 30 + Enter', prep: splitPadding, target: field('stack', 'Top padding'), op: Op.Type, value: 30, read: (c) => (layout('padding')(c) as { top: number }).top, want: is(30), canvas: true },
   { section: 'stack', control: 'Clip content', option: 'toggle', target: testid('stack', 'stack-clip-content'), op: Op.Press, read: (c) => c.clipContent ?? false, want: is(true), canvas: false },
   ...SPOT_NAMES.map((name) => ({ section: 'stack', control: 'Alignment grid', option: name.replace('Align ', ''), target: named('stack', 'button', name), op: Op.Press, read: (c: Clip) => [layout('justify')(c), layout('align')(c)], want: changed, canvas: true }))
 ];
@@ -367,7 +383,7 @@ const styleUseRows: Base[] = [
 ];
 const paintStyleRows: Base[] = [
   { section: 'style', control: 'Colour style', option: 'Brand/Accent', target: anywhere('clip-paint-style'), op: Op.Select, value: 'Brand/Accent', read: whole, want: changed, canvas: true },
-  { section: 'style', control: 'Create style', option: 'named, press', prep: (page) => page.getByTestId('right-bar').getByTestId('clip-style-name').fill('Audit style'), target: anywhere('style-create'), op: Op.Press, read: () => null, whole: (d) => Object.keys((d.styles as object | undefined) ?? {}).length, want: grew, canvas: false }
+  { section: 'style', control: 'Create style', option: 'named, Colour style', prep: (page) => page.getByTestId('right-bar').getByTestId('clip-style-name').fill('Audit style'), target: anywhere('style-create'), op: Op.Menu, value: 'Colour style', read: () => null, whole: (d) => Object.keys((d.styles as object | undefined) ?? {}).length, want: grew, canvas: false }
 ];
 const variableRows: Base[] = [
   { section: 'variables', control: 'Theme mode', option: 'Dark', target: anywhere('layer-mode-Theme'), op: Op.Select, value: 'Dark', read: whole, want: changed, canvas: true },
@@ -388,8 +404,8 @@ const frameRows: Base[] = [
 const mixedRows: Base[] = [
   { section: 'constraints', control: 'Horizontal constraint', option: 'Left', target: bar('multi-horizontal'), op: Op.Select, value: 'Left', read: (c) => (c.constraints as Record<string, unknown> | undefined)?.horizontal ?? 'left', want: every('left'), canvas: false, mixed: true },
   { section: 'layer', control: 'Blend mode', option: 'Screen', target: bar('multi-blend'), op: Op.Select, value: 'Screen', read: (c) => c.blend, want: every('screen'), canvas: true, mixed: true },
-  { section: 'spacing', control: 'Vertical gap', option: 'type 20 + Enter', target: (page) => page.getByTestId('multi-inspector').getByRole('textbox', { name: 'Vertical gap', exact: true }), op: Op.Type, value: 20, read: prop('y'), want: changed, canvas: true, mixed: true },
-  { section: 'spacing', control: 'Horizontal gap', option: 'type 100 + Enter', target: (page) => page.getByTestId('multi-inspector').getByRole('textbox', { name: 'Horizontal gap', exact: true }), op: Op.Type, value: 100, read: prop('x'), want: changed, canvas: true },
+  { section: 'spacing', control: 'Vertical gap', option: 'type 20 + Enter', target: (page) => page.getByTestId('multi-inspector').getByRole('textbox', { name: 'Vertical gap', exact: true }), op: Op.Type, value: 20, read: whole, want: changed, canvas: true, mixed: true },
+  { section: 'spacing', control: 'Horizontal gap', option: 'type 100 + Enter', target: (page) => page.getByTestId('multi-inspector').getByRole('textbox', { name: 'Horizontal gap', exact: true }), op: Op.Type, value: 100, read: whole, want: changed, canvas: true },
   { section: 'layout', control: 'Opacity', option: 'type 50 + Enter', target: (page) => page.getByTestId('multi-inspector').getByRole('textbox', { name: 'Opacity', exact: true }), op: Op.Type, value: 50, read: (c) => (c.transform as Record<string, unknown>).opacity ?? c.props.opacity, want: every(0.5), canvas: true },
   { section: 'layout', control: 'Rotate Z', option: 'type 15 + Enter', target: (page) => page.getByTestId('multi-inspector').getByRole('textbox', { name: 'Rotate Z', exact: true }), op: Op.Type, value: 15, read: (c) => (c.transform as Record<string, unknown>).rotateZ ?? c.props.rotation, want: changed, canvas: true },
   { section: 'box', control: 'Width', option: 'type 400 + Enter', target: (page) => page.getByTestId('multi-inspector').getByRole('textbox', { name: 'Width', exact: true }), op: Op.Type, value: 400, read: prop('width'), want: changed, canvas: true },

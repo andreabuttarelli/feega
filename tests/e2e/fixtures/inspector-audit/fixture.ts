@@ -84,13 +84,13 @@ const solid = (color: string) => [{ type: 'solid', color }];
 
 function kindsDoc(): MotionDoc {
   let doc: MotionDoc = { ...newMotionDoc(MotionFormat.Square), still: { frame: 0 }, background: 'transparent' } as MotionDoc;
-  doc = { ...doc, styles: { 'Brand/Accent': { kind: 'colour', color: '#7c3aed' }, 'Soft shadow': { kind: 'effect', effects: [{ id: 'fx1', kind: EffectKind.DropShadow, enabled: true, params: defaultValues(EffectKind.DropShadow) }] }, Heading: { kind: 'text', size: 0.05, weight: 700 } } } as MotionDoc;
+  doc = { ...doc, styles: { 'Brand/Accent': { kind: 'colour', color: '#7c3aed' }, 'Soft shadow': { kind: 'effect', effects: [{ id: 'fx1', kind: EffectKind.DropShadow, enabled: true, params: { ...defaultValues(EffectKind.DropShadow), color: '#22c55e' } }] }, Heading: { kind: 'text', size: 0.05, weight: 700 } } } as MotionDoc;
   doc = { ...doc, variables: { Theme: { modes: ['Light', 'Dark'], vars: { Ink: { type: 'colour', values: { Light: '#111827', Dark: '#f9fafb' } }, Brand: { type: 'colour', values: { Light: '#2563eb', Dark: '#60a5fa' } } } } } } as MotionDoc;
   doc = { ...doc, assets: [{ id: IMAGE_ASSET, kind: 'image' }] } as MotionDoc;
 
   doc = add(doc, Layer.Rect, 'Shape', { x: 0.12, y: 0.1, width: 0.18, height: 0.14 }, { shape: 'rect', fills: solid('#ff5a1f'), roundness: 0 });
   doc = add(doc, Layer.Ellipse, 'Shape', { x: 0.35, y: 0.1, width: 0.16, height: 0.14 }, { shape: 'ellipse', fills: solid('#2563eb') });
-  doc = add(doc, Layer.Line, 'Shape', { x: 0.6, y: 0.1, width: 0.2, height: 0.004 }, { shape: 'line', strokes: [{ paint: { type: 'solid', color: '#111827' }, width: 0.006 }] });
+  doc = add(doc, Layer.Line, 'Shape', { x: 0.6, y: 0.1, width: 0.2, height: 0.004 }, { shape: 'line', strokes: [{ paint: { type: 'solid', color: '#f59e0b' }, width: 0.006 }] });
   doc = add(doc, Layer.Star, 'Shape', { x: 0.85, y: 0.1, width: 0.14, height: 0.14 }, { shape: 'star', fills: solid('#f59e0b') });
   doc = add(doc, Layer.Vector, 'Shape', { x: 0.12, y: 0.32, width: 0.16, height: 0.14 }, { shape: 'path', path: 'M0 1L0.5 0L1 1Z', fills: solid('#10b981') });
   doc = add(doc, Layer.Text, 'Text', { x: 0.45, y: 0.32, width: 0.4, height: 0.08 }, { text: 'Plain text layer', size: 0.04, color: '#111827' });
