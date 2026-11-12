@@ -24,7 +24,8 @@ export function regionOf(target: EventTarget | null): Region {
 }
 
 const EVERYWHERE: readonly CanvasCommandId[] = ['undo', 'redo'];
-const ON_SELECTION: readonly CanvasCommandId[] = [...EVERYWHERE, 'delete', 'delete-keep', 'deselect', 'select-all', 'duplicate', 'copy', 'paste', 'group', 'ungroup'];
+const VIEW: readonly CanvasCommandId[] = ['fit', 'zoom-actual', 'zoom-selection', 'zoom-in', 'zoom-out'];
+const ON_SELECTION: readonly CanvasCommandId[] = [...EVERYWHERE, ...VIEW, 'delete', 'delete-keep', 'deselect', 'select-all', 'duplicate', 'copy', 'paste', 'group', 'ungroup'];
 
 enum PointerFocus {
   Keeps = 'keeps',
@@ -36,7 +37,7 @@ type Rule = { canvas: ReadonlySet<CanvasCommandId> | 'every-key'; timeline: bool
 const REACH: Record<Region, Rule> = {
   [Region.Canvas]: { canvas: 'every-key', timeline: true, pointer: PointerFocus.Keeps },
   [Region.Layers]: { canvas: new Set(ON_SELECTION), timeline: true, pointer: PointerFocus.Keeps },
-  [Region.Commands]: { canvas: new Set(EVERYWHERE), timeline: false, pointer: PointerFocus.ReturnsToCanvas },
+  [Region.Commands]: { canvas: new Set([...EVERYWHERE, ...VIEW]), timeline: false, pointer: PointerFocus.ReturnsToCanvas },
   [Region.Panel]: { canvas: new Set(EVERYWHERE), timeline: false, pointer: PointerFocus.Keeps }
 };
 
