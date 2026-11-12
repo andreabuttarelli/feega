@@ -39,6 +39,47 @@ fn an_overflowing_render_is_split_in_halves_until_each_fits() {
 }
 
 #[test]
+fn a_render_whose_halves_overflow_as_much_as_it_costs_three_draws() {
+    let mut draws = 0;
+    let pieces = split_render((516, 516), |_| {
+        draws += 1;
+        Rendered { fullness: 1.4 }
+    });
+
+    assert_eq!(draws, 3);
+    assert_eq!(covered(&pieces), 516 * 516);
+    assert!(disjoint(&pieces));
+}
+
+#[test]
+fn geometry_crowded_in_a_corner_is_still_split_until_it_fits() {
+    let corner = Piece { x: 0, y: 0, w: 64, h: 64 };
+    let load = |p: Piece| p.overlap(corner).map(|o| 3.0 * area(o) / area(corner)).unwrap_or(0.0);
+    let mut draws = 0;
+    let pieces = split_render((516, 516), |p| {
+        draws += 1;
+        Rendered { fullness: load(p) }
+    });
+
+    assert!(pieces.iter().all(|p| load(*p) <= 1.0));
+    assert_eq!(covered(&pieces), 516 * 516);
+    assert!(disjoint(&pieces));
+    assert!(draws <= 1 + 2 * MAX_SPLITS, "{draws}");
+}
+
+#[test]
+fn an_item_too_dense_to_split_costs_at_most_two_draws_per_halving() {
+    let mut draws = 0;
+    let pieces = split_render((516, 516), |p| {
+        draws += 1;
+        Rendered { fullness: if p.x == 0 && p.y == 0 { 3.0 } else { 0.0 } }
+    });
+
+    assert_eq!(draws, 1 + 2 * MAX_SPLITS);
+    assert_eq!(covered(&pieces), 516 * 516);
+}
+
+#[test]
 fn splitting_stops_after_twelve_halvings() {
     let mut deepest = 0;
     let pieces = split_render((4096, 4096), |p| {
