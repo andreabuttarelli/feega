@@ -14,13 +14,13 @@
 
 <style>
   .open {
-    padding: 170px 20px 0;
+    padding: 140px 20px 0;
     color: var(--site-ink);
   }
 
   h2 {
-    font-size: 37px;
-    line-height: 37px;
+    font-size: 24px;
+    line-height: 28.8px;
     letter-spacing: -0.04em;
     font-weight: 400;
     text-align: center;
@@ -42,7 +42,7 @@
 
   @media (min-width: 810px) {
     .open {
-      padding: 170px 0 0;
+      padding: 160px 0 0;
     }
 
     .wide {
@@ -50,8 +50,8 @@
     }
 
     h2 {
-      font-size: 46px;
-      line-height: 46px;
+      font-size: 30px;
+      line-height: 36px;
     }
 
     .logos {
@@ -63,8 +63,8 @@
 
   @media (min-width: 1200px) {
     h2 {
-      font-size: 58px;
-      line-height: 58px;
+      font-size: 38px;
+      line-height: 45.6px;
     }
   }
 </style>

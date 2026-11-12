@@ -31,13 +31,13 @@
 
 <style>
   .agents {
-    padding: 0 12px 100px;
+    padding: 100px 12px;
     color: var(--site-ink);
   }
 
   h2 {
-    font-size: 50px;
-    line-height: 45px;
+    font-size: 34px;
+    line-height: 36px;
     letter-spacing: -0.04em;
     font-weight: 400;
   }
@@ -115,12 +115,12 @@
       grid-template-columns: 518px 518px;
       justify-content: space-between;
       align-items: center;
-      padding: 0 0 200px;
+      padding: 160px 0 40px;
     }
 
     h2 {
-      font-size: 78px;
-      line-height: 70.2px;
+      font-size: 46px;
+      line-height: 46px;
     }
 
     .box {
@@ -130,12 +130,12 @@
 
   @media (min-width: 810px) and (max-width: 1199.98px) {
     .agents {
-      padding: 0 0 149px;
+      padding: 150px 0 40px;
     }
 
     h2 {
-      font-size: 62px;
-      line-height: 55.8px;
+      font-size: 40px;
+      line-height: 42px;
     }
 
     .box {
