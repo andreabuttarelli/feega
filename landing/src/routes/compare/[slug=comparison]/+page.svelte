@@ -2,7 +2,7 @@
   import '$lib/site/landing/landing.css';
   import '$lib/site/compare/compare.css';
   import { APP_URL } from '$lib/site/links';
-  import { BLOG_PATH, COMPARISONS, comparisonPath } from '$lib/site/compare';
+  import { COMPARE_PATH, COMPARISONS, comparisonPath } from '$lib/site/compare';
   import { FEEGA_FEATURES, FEEGA_PRICING } from '$lib/site/compare/feega';
   import { FEATURE_LABELS, Feature, type Verdict } from '$lib/site/compare/features';
   import { competitorFaq } from '$lib/site/compare/faq';
@@ -28,7 +28,7 @@
 </svelte:head>
 
 <article class="landing compare">
-  <a class="back" href={BLOG_PATH}>← All comparisons</a>
+  <a class="back" href={COMPARE_PATH}>← All comparisons</a>
   <h1>{page.heading}</h1>
   <p class="intro">{page.intro}</p>
 
