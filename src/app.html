@@ -41,11 +41,11 @@
   <body data-sveltekit-preload-data="hover">
     <div id="canvas-splash" hidden>
       <style>
-        #canvas-splash { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: #ffffff; }
+        #canvas-splash { --stack-width: 2.72em; --mark-width: 3.775em; position: fixed; inset: 0; z-index: 1000; font-size: 25px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5em; background: #ffffff; }
         #canvas-splash[hidden] { display: none; }
-        #canvas-splash span { font-family: "BDO Grotesk", -apple-system, BlinkMacSystemFont, sans-serif; font-size: 40px; font-weight: 600; line-height: 1; letter-spacing: -0.02em; color: #141414; }
-        #canvas-splash svg { fill: #ff5100; }
-        #canvas-splash i { width: 180px; height: 4px; border-radius: 9999px; background: color-mix(in srgb, #1d1d1f 10%, transparent); }
+        #canvas-splash span { font-family: "BDO Grotesk", -apple-system, BlinkMacSystemFont, sans-serif; display: block; width: var(--stack-width); text-align: center; white-space: nowrap; font-weight: 600; line-height: 1; letter-spacing: -0.02em; color: #141414; }
+        #canvas-splash svg { width: var(--mark-width); height: var(--mark-width); margin-block: calc((var(--stack-width) - var(--mark-width)) / 2); fill: #ff5100; }
+        #canvas-splash i { width: var(--stack-width); height: 0.12em; border-radius: 9999px; background: color-mix(in srgb, #1d1d1f 10%, transparent); }
         [data-theme="dark"] #canvas-splash { background: #000000; }
         [data-theme="dark"] #canvas-splash span { color: #f2f2f2; }
         [data-theme="dark"] #canvas-splash i { background: color-mix(in srgb, #ededed 10%, transparent); }

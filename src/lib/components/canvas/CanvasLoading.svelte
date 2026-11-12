@@ -18,7 +18,7 @@
   const progress = $derived(startupProgress(done, frames, content));
   const shown = $derived(progress < 1 && !gaveUp);
   const FADE_MS = 240;
-  const MARK_SIZE = 48;
+  const MARK_VIEWBOX = 300;
   let removed = $state(false);
 
   $effect(() => {
@@ -63,22 +63,26 @@
 
 {#if !removed}
   <div class="loading" class:gone={!shown} role="progressbar" aria-label="Loading canvas" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)} data-testid="canvas-loading" style:--fade-ms={FADE_MS}>
-    <FeegaMark size={MARK_SIZE} />
-    <span class="mark"><Wordmark /></span>
+    <FeegaMark size={MARK_VIEWBOX} />
+    <span class="word"><Wordmark /></span>
     <div class="track"><div class="bar" style:background={gradient} style:clip-path="inset(0 {(1 - progress) * 100}% 0 0)"></div></div>
   </div>
 {/if}
 
 <style>
   .loading {
-    position: fixed;
+    --stack-width: 2.72em;
+    --mark-width: 3.775em;
+    --wordmark-size: 1em;
+    position: absolute;
     inset: 0;
     z-index: 1000;
+    font-size: 25px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 16px;
+    gap: 0.5em;
     background: var(--paper, #fff);
     transition: opacity calc(var(--fade-ms) * 1ms) ease-out;
   }
@@ -88,14 +92,22 @@
     pointer-events: none;
   }
 
-  .mark {
-    --wordmark-size: 40px;
+  .loading :global(.feega-mark) {
+    width: var(--mark-width);
+    height: var(--mark-width);
+    margin-block: calc((var(--stack-width) - var(--mark-width)) / 2);
+  }
+
+  .word {
+    width: var(--stack-width);
+    text-align: center;
     line-height: 1;
+    white-space: nowrap;
   }
 
   .track {
-    width: 180px;
-    height: 4px;
+    width: var(--stack-width);
+    height: 0.12em;
     border-radius: var(--ui-radius-full);
     overflow: hidden;
     background: color-mix(in srgb, var(--ink, #111) 10%, transparent);
