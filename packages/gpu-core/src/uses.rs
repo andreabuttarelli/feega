@@ -240,18 +240,15 @@ impl Uses {
         self.stacked(self.by_clip.values().copied().collect())
     }
 
-    pub fn over(&self, clip: &str) -> Vec<&UseItem> {
+    pub fn above(&self, clip: &str, area: Rect) -> Vec<&UseItem> {
         let Some(&slot) = self.by_clip.get(clip) else { return Vec::new() };
-        let (rank, reach) = (self.placed(slot).rank, self.placed(slot).reach);
-        let above = |s: &usize| {
-            let p = self.placed(*s);
-            p.rank > rank && p.reach.zip(reach).is_none_or(|(r, of)| r.overlaps(of))
-        };
-        let near = match reach {
-            Some(r) => self.grid.near(r),
-            None => self.by_clip.values().copied().collect(),
-        };
-        self.stacked(near.into_iter().filter(above).collect())
+        let rank = self.placed(slot).rank;
+        let over = |s: &usize| self.placed(*s).rank > rank && self.placed(*s).reach.is_none_or(|r| r.overlaps(area));
+        self.stacked(self.grid.near(area).into_iter().filter(over).collect())
+    }
+
+    pub fn ranked<'a>(&self, clips: impl Iterator<Item = &'a str>) -> Vec<&UseItem> {
+        self.stacked(clips.filter_map(|c| self.by_clip.get(c).copied()).collect())
     }
 
     pub fn meeting(&self, view: Option<Rect>, plus: Plus) -> Vec<&UseItem> {

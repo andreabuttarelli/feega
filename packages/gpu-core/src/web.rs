@@ -16,7 +16,7 @@ use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX};
+use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
 use crate::tally::now_ms;
@@ -95,6 +95,7 @@ pub struct WebCore {
     drew_tiles: bool,
     warmup: Warmup,
     tile_budget: u64,
+    lifted: Vec<(String, Lifted)>,
     changed_at: f64,
     credit: RasterCredit,
     rest_shown: Vec<(Rect, wgpu::Texture)>,
@@ -167,6 +168,18 @@ fn placed<'a>(key: TileKey, source: &'a wgpu::Texture, c: Camera, clip: Rect) ->
     let world = key.world();
     let gutter = TILE_GUTTER_PX as f64;
     Some(Tile { source, look: Lookup { scale: zoom / c.zoom, x: (-c.x / c.zoom - world.x0) * zoom + gutter, y: (-c.y / c.zoom - world.y0) * zoom + gutter }, within })
+}
+
+struct Lifted {
+    rest: Rect,
+    by: (f64, f64),
+    tiles: HashMap<TileKey, wgpu::Texture>,
+}
+
+#[derive(Clone, Copy)]
+enum Source<'a> {
+    Scene,
+    Alone(&'a str),
 }
 
 fn tile_texture(device: &wgpu::Device, side: u32) -> wgpu::Texture {
@@ -327,7 +340,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new(), counted: Counted::default(), credit: RasterCredit::default() })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new(), counted: Counted::default(), credit: RasterCredit::default() })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -518,17 +531,20 @@ impl WebCore {
     fn drop_tiles(&mut self, gone: Vec<TileKey>) {
         for key in gone {
             if let Some(texture) = self.tile_textures.remove(&key) {
-                if self.spare_tiles.len() < SPARE_TILES {
-                    self.spare_tiles.push(texture);
-                } else {
-                    texture.destroy();
-                }
+                self.spare(texture);
             }
         }
     }
 
-    fn raster_batch(&mut self, batch: &Batch) -> Result<(), JsValue> {
-        let began = now_ms();
+    fn spare(&mut self, texture: wgpu::Texture) {
+        if self.spare_tiles.len() < SPARE_TILES {
+            self.spare_tiles.push(texture);
+        } else {
+            texture.destroy();
+        }
+    }
+
+    fn render_batch(&mut self, batch: &Batch, source: Source) -> Result<(Vec<(Piece, wgpu::Texture)>, bool, (u32, u32)), JsValue> {
         let zoom = step_zoom(batch.step);
         let world = batch.world();
         let gutter = TILE_GUTTER_PX as f64;
@@ -538,7 +554,7 @@ impl WebCore {
         let mut drawn: Vec<(Piece, wgpu::Texture)> = Vec::new();
         let mut lacking = false;
         let mut failure = None;
-        let kept = split_render(size, |piece| match self.raster_piece(camera, piece, size) {
+        let kept = split_render(size, |piece| match self.raster_piece(camera, piece, size, source) {
             Ok((rendered, short, texture)) => {
                 lacking |= short;
                 drawn.push((piece, texture));
@@ -555,8 +571,27 @@ impl WebCore {
             pieces.into_iter().for_each(|(piece, texture)| self.recycle(piece, size, texture));
             return Err(e);
         }
+        Ok((pieces, lacking, size))
+    }
+
+    fn cut(&self, encoder: &mut wgpu::CommandEncoder, batch: &Batch, key: TileKey, pieces: &[(Piece, wgpu::Texture)], into: wgpu::Texture) -> wgpu::Texture {
         let corner = batch.corner();
         let side = TILE_PX + 2 * TILE_GUTTER_PX;
+        let tile = Piece { x: ((key.tx - corner.tx) as u32) * TILE_PX, y: ((key.ty - corner.ty) as u32) * TILE_PX, w: side, h: side };
+        for (piece, source) in pieces {
+            let Some(shared) = tile.overlap(*piece) else { continue };
+            encoder.copy_texture_to_texture(texel(source, shared.x - piece.x, shared.y - piece.y), texel(&into, shared.x - tile.x, shared.y - tile.y), wgpu::Extent3d { width: shared.w, height: shared.h, depth_or_array_layers: 1 });
+        }
+        into
+    }
+
+    fn fresh_tile(&mut self) -> wgpu::Texture {
+        self.spare_tiles.pop().unwrap_or_else(|| tile_texture(&self.device, TILE_PX + 2 * TILE_GUTTER_PX))
+    }
+
+    fn raster_batch(&mut self, batch: &Batch) -> Result<(), JsValue> {
+        let began = now_ms();
+        let (pieces, lacking, size) = self.render_batch(batch, Source::Scene)?;
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
         for key in &batch.keys {
             if lacking && self.tile_textures.contains_key(key) {
@@ -565,12 +600,11 @@ impl WebCore {
             if lacking && !self.tiles.hold_lacking(*key) {
                 continue;
             }
-            let texture = self.tile_textures.remove(key).or_else(|| self.spare_tiles.pop()).unwrap_or_else(|| tile_texture(&self.device, side));
-            let tile = Piece { x: ((key.tx - corner.tx) as u32) * TILE_PX, y: ((key.ty - corner.ty) as u32) * TILE_PX, w: side, h: side };
-            for (piece, source) in &pieces {
-                let Some(shared) = tile.overlap(*piece) else { continue };
-                encoder.copy_texture_to_texture(texel(source, shared.x - piece.x, shared.y - piece.y), texel(&texture, shared.x - tile.x, shared.y - tile.y), wgpu::Extent3d { width: shared.w, height: shared.h, depth_or_array_layers: 1 });
-            }
+            let into = match self.tile_textures.remove(key) {
+                Some(texture) => texture,
+                None => self.fresh_tile(),
+            };
+            let texture = self.cut(&mut encoder, batch, *key, &pieces, into);
             self.tile_textures.insert(*key, texture);
             if !lacking {
                 self.tiles.hold(*key);
@@ -582,10 +616,53 @@ impl WebCore {
         Ok(())
     }
 
-    fn raster_piece(&mut self, camera: Camera, piece: Piece, whole: (u32, u32)) -> Result<(Rendered, bool, wgpu::Texture), JsValue> {
+    fn raster_alone(&mut self, clip: &str, batch: &Batch) -> Result<Vec<(TileKey, wgpu::Texture)>, JsValue> {
+        let began = now_ms();
+        let (pieces, lacking, size) = self.render_batch(batch, Source::Alone(clip))?;
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+        let mut done = Vec::new();
+        for key in batch.keys.iter().filter(|_| !lacking) {
+            let into = self.fresh_tile();
+            done.push((*key, self.cut(&mut encoder, batch, *key, &pieces, into)));
+        }
+        self.queue.submit([encoder.finish()]);
+        pieces.into_iter().for_each(|(piece, texture)| self.recycle(piece, size, texture));
+        self.count_bake(began);
+        Ok(done)
+    }
+
+    fn lift_tiles(&mut self, screen: (u32, u32)) -> Result<(), JsValue> {
+        let lifts = self.compositor.lifts(&self.library);
+        let step = self.tiles.step_for(self.camera);
+        let mut was: HashMap<String, Lifted> = self.lifted.drain(..).collect();
+        let mut now = Vec::with_capacity(lifts.len());
+        for lift in lifts {
+            let mut layer = match was.remove(&lift.clip) {
+                Some(layer) if layer.rest == lift.rest => layer,
+                other => {
+                    other.into_iter().flat_map(|l| l.tiles.into_values()).for_each(|t| self.spare(t));
+                    Lifted { rest: lift.rest, by: lift.by, tiles: HashMap::new() }
+                }
+            };
+            layer.by = lift.by;
+            let missing: Vec<TileKey> = lifted_keys(self.camera, screen, lift.rest, lift.by, step).into_iter().filter(|k| !layer.tiles.contains_key(k)).collect();
+            for batch in batches(&missing) {
+                layer.tiles.extend(self.raster_alone(&lift.clip, &batch)?);
+            }
+            now.push((lift.clip, layer));
+        }
+        was.into_values().flat_map(|l| l.tiles.into_values()).for_each(|t| self.spare(t));
+        self.lifted = now;
+        Ok(())
+    }
+
+    fn raster_piece(&mut self, camera: Camera, piece: Piece, whole: (u32, u32), source: Source) -> Result<(Rendered, bool, wgpu::Texture), JsValue> {
         let size = (piece.w, piece.h);
         let shifted = Camera { x: camera.x - piece.x as f64, y: camera.y - piece.y as f64, zoom: camera.zoom };
-        let plan = self.compositor.plan_at(&mut self.library, shifted, size, self.limits);
+        let plan = match source {
+            Source::Scene => self.compositor.plan_at(&mut self.library, shifted, size, self.limits),
+            Source::Alone(clip) => self.compositor.plan_alone(&mut self.library, clip, shifted, size, self.limits),
+        };
         let building = plan.pending;
         let (list, missing) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
         let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
@@ -629,8 +706,21 @@ impl WebCore {
         let still = draw.iter().filter(|k| k.step != step).filter_map(tile_of).chain(underlay).chain(draw.iter().filter(|k| k.step == step).filter_map(tile_of));
         let complete = self.rest.as_ref().is_some_and(Rest::adoptable);
         let exact = self.rest_shown.iter().filter(|_| complete).map(|(block, source)| Tile { source, look: Lookup { scale: 1.0, x: -block.x0, y: -block.y0 }, within: *block });
+        let lifted = self.lifted.iter().flat_map(|(_, layer)| {
+            let moved = Camera { x: c.x + (layer.by.0 * c.zoom).round(), y: c.y + (layer.by.1 * c.zoom).round(), zoom: c.zoom };
+            let frame = Rect::new(layer.rest.x0 * c.zoom + moved.x, layer.rest.y0 * c.zoom + moved.y, layer.rest.x1 * c.zoom + moved.x, layer.rest.y1 * c.zoom + moved.y).intersect(screen);
+            let mut keys: Vec<&TileKey> = layer.tiles.keys().collect();
+            keys.sort_by_key(|k| k.step == step);
+            keys.into_iter().filter_map(move |k| placed(*k, &layer.tiles[k], moved, frame))
+        });
         let placed: Vec<Tile> = still.chain(exact).collect();
+        let lifted: Vec<Tile> = lifted.collect();
         self.reprojector.draw_tiles(&self.device, &self.queue, &mut encoder, &out, self.format, Output::Premultiplied, &placed);
+        if !lifted.is_empty() {
+            self.queue.submit([encoder.finish()]);
+            encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+            self.reprojector.draw_tiles(&self.device, &self.queue, &mut encoder, &out, self.format, Output::Over, &lifted);
+        }
         if let Some(overlay) = self.overlay_texture()? {
             self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source: &overlay, target: &out, format: self.format, look: UNMOVED, within: Some(screen), output: Output::Over });
             self.overlay_tex = Some(overlay);
@@ -679,7 +769,9 @@ impl WebCore {
         let budget = if matches!(self.motion, CoreMotion::Gesture) { TILE_BUDGET_GESTURE_MS } else { TILE_BUDGET_STILL_MS };
         let started = js_sys::Date::now();
         let mut rastered = 0;
-        let queue = self.tiles.queue(self.tiles.frame(self.camera, screen).missing);
+        self.lift_tiles(screen)?;
+        let mut queue = self.tiles.queue(self.tiles.frame(self.camera, screen).missing);
+        queue.stale.sort_by_key(|k| !self.lifted.iter().any(|(_, l)| k.world().overlaps(l.rest)));
         let left_blank = queue.blank.clone();
         let order = queue.order();
         let blocks = batches(&order);
