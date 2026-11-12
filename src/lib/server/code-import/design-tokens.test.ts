@@ -1,6 +1,8 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { MAX_VARIABLES, VarType, variablesSchema } from '@feega/motion-core/motion/variables-model';
-import { parseSheets, readSheets } from './css-tokens';
+import { PAGE_SHEET, parseSheets, readSheets } from './css-tokens';
 import { fixture } from '../../../../tests/fixtures/design-tokens/read';
 import { TokenKind, collectionName, tokenSetOf, variableName, variablesOf } from './design-tokens';
 
@@ -26,13 +28,13 @@ describe('variableName', () => {
 });
 
 describe('tokenSetOf', () => {
-  it('Tailwind 4: colori, raggi, spaziature e famiglie, ognuno col suo tipo; la scala del testo resta fuori e lo dice', async () => {
+  it('Tailwind 4: colori, raggi, spaziature e famiglie, ognuno col suo tipo; la scala del testo non è una variabile: diventa uno stile, senza finire tra i lasciati fuori', async () => {
     const set = await setOf('tailwind4');
     const kinds = Object.fromEntries(set.tokens.map((t) => [t.name, t.kind]));
 
     expect(kinds).toMatchObject({ '--color-primary': TokenKind.Colour, '--radius-card': TokenKind.Radius, '--spacing-gutter': TokenKind.Spacing, '--font-sans': TokenKind.Font, '--color-surface': TokenKind.Colour });
     expect(kinds['--text-hero']).toBeUndefined();
-    expect(set.skipped).toContain('--text-hero: the type scale lands as text styles in a later stage');
+    expect(set.skipped.some((s) => s.startsWith('--text-hero'))).toBe(false);
     expect(set.modes).toEqual(['Light', 'Dark']);
   });
 
@@ -111,6 +113,17 @@ describe('variablesOf', () => {
 
     expect(set.tokens).toEqual([]);
     expect(set.skipped).toContain('--a: alias to --missing, which is not a token here');
+  });
+
+  it('MUI CSS-vars: il tema scuro di MUI è il modo Dark, il raggio in camelCase è un raggio', async () => {
+    const text = await readFile(join(process.cwd(), 'tests/fixtures/design-tokens/mui/css-vars.css'), 'utf8');
+
+    const set = tokenSetOf(parseSheets([{ path: `${PAGE_SHEET}inline 1`, text }]));
+
+    const byName = Object.fromEntries(set.tokens.map((t) => [t.name, t]));
+    expect(Object.keys(byName['--mui-palette-primary-main'].values)).toEqual(['Light', 'Dark']);
+    expect(byName['--mui-shape-borderRadius'].kind).toBe(TokenKind.Radius);
+    expect(byName['--mui-spacing'].kind).toBe(TokenKind.Spacing);
   });
 });
 

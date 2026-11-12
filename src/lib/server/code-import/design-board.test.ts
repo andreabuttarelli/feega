@@ -54,6 +54,13 @@ describe('designBoard', () => {
     expect(texts(doc)).toContain('Light #123456 · read-only');
   });
 
+  it('uno spessore di bordo ha la sua riga', () => {
+    const made = variablesOf(tokenSetOf(parseSheets([{ path: 'a.css', text: ':root{--border-width-hair:2px}' }])), 'app');
+    const doc = boardBound({ ...codePlan(designBoard(made.variables), [], nid)!.plan.items[0].doc, variables: made.variables });
+
+    expect(texts(doc)).toEqual(expect.arrayContaining(['Border', 'hair', '2px']));
+  });
+
   it('un alias mostra il suo bersaglio', async () => {
     const { doc } = await board('shadcn');
 
