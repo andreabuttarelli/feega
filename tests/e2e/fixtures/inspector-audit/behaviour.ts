@@ -10,6 +10,28 @@ const MAX_TABS = 60;
 const SETTLE_MS = 350;
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+const started = Date.now();
+const trace = (...parts: unknown[]) => process.env.INSPECTOR_AUDIT_TRACE && console.log(`  [${((Date.now() - started) / 1000).toFixed(1)}s]`, ...parts);
+const FOCUS_MS = 2_000;
+const SHORT_MS = 3_000;
+
+async function focused(target: Locator): Promise<boolean> {
+  return expect
+    .poll(() => target.evaluate((n) => document.activeElement === n).catch(() => false), { timeout: FOCUS_MS })
+    .toBe(true)
+    .then(() => true)
+    .catch(() => false);
+}
+
+async function focusByMouse(page: Page, target: Locator): Promise<void> {
+  for (let tries = 0; tries < 2; tries++) {
+    await press(page, target);
+    if (await focused(target)) {
+      return;
+    }
+  }
+  throw new Error('a click on the field does not focus it');
+}
 
 async function readNow(page: Page, row: Row): Promise<unknown> {
   const clip = clipIn(await docOf(page, row.node), row.layer);
@@ -75,21 +97,35 @@ async function mouseDo(page: Page, row: Row, target: Locator): Promise<void> {
     await page.mouse.up();
     return;
   }
-  await press(page, target);
+  await focusByMouse(page, target);
   await page.keyboard.press('ControlOrMeta+a');
   await page.keyboard.type(value);
   await page.keyboard.press(row.op === Op.TypeTab ? 'Tab' : 'Enter');
 }
 
-async function tabTo(page: Page, from: Locator, target: Locator): Promise<boolean> {
-  await from.focus();
+export enum Reached {
+  Yes = 'yes',
+  LeftLayer = 'tab-selected-another-layer',
+  Never = 'never'
+}
+
+async function tabTo(page: Page, from: Locator, target: Locator, layer: string): Promise<Reached> {
+  const goal = await target.elementHandle({ timeout: SHORT_MS }).catch(() => null);
+  if (!goal) {
+    return Reached.Never;
+  }
+  await from.focus({ timeout: SHORT_MS }).catch(() => undefined);
   for (let i = 0; i < MAX_TABS; i++) {
-    if (await target.evaluate((n) => document.activeElement === n).catch(() => false)) {
-      return true;
+    if (await goal.evaluate((n) => document.activeElement === n).catch(() => false)) {
+      return Reached.Yes;
     }
     await page.keyboard.press('Tab');
+    const head = await inspector(page).getByTestId('selection-head').getAttribute('title', { timeout: SHORT_MS }).catch(() => null);
+    if (head !== layer) {
+      return Reached.LeftLayer;
+    }
   }
-  return false;
+  return Reached.Never;
 }
 
 async function keyboardDo(page: Page, row: Row, target: Locator): Promise<void> {
@@ -128,8 +164,17 @@ async function keyboardDo(page: Page, row: Row, target: Locator): Promise<void> 
 
 async function attempt(page: Page, row: Row, act: (target: Locator) => Promise<void>, failed: Check[], shoot: (tag: string) => Promise<void>): Promise<void> {
   const before = await readNow(page, row);
+  trace(row.id, 'before', JSON.stringify(before));
   const pixels = row.canvas ? await layerShot(page) : null;
-  await act(row.target(page));
+  try {
+    await act(row.target(page));
+  } catch (e) {
+    failed.push(Check.Commit);
+    trace(row.id, 'act threw', (e as Error).message.split('\n')[0]);
+    await shoot('act');
+    return;
+  }
+  trace(row.id, 'acted');
   if (!(await landed(page, row, before))) {
     failed.push(Check.Commit);
     await shoot('commit');
@@ -144,6 +189,7 @@ async function attempt(page: Page, row: Row, act: (target: Locator) => Promise<v
       await shoot('canvas');
     }
   }
+  trace(row.id, 'landed', JSON.stringify(await readNow(page, row)));
   await leaveField(page);
   await page.keyboard.press(UNDO);
   if (!(await restored(page, row, before))) {
@@ -154,7 +200,9 @@ async function attempt(page: Page, row: Row, act: (target: Locator) => Promise<v
 
 export async function exercise(page: Page, row: Row, shoot: (tag: string) => Promise<void>): Promise<Outcome> {
   const outcome: Outcome = { row, mouse: [], keyboard: [], notes: [] };
+  trace(row.id, 'open');
   await open(page, row);
+  trace(row.id, 'opened');
   const target = row.target(page);
   if (!(await target.isVisible().catch(() => false))) {
     outcome.mouse.push(Check.Missing);
@@ -179,12 +227,17 @@ export async function exercise(page: Page, row: Row, shoot: (tag: string) => Pro
 
   await pick(page, row.node, row.layer);
   await openSections(page);
+  trace(row.id, 'keyboard pass');
   let from = inspector(page).locator('section[data-section] .section-head').first();
   for (const step of [...(row.via ?? []), row.target]) {
-    if (!(await tabTo(page, from, step(page)))) {
+    const reached = await tabTo(page, from, step(page), row.layer);
+    if (reached !== Reached.Yes) {
       outcome.keyboard.push(Check.Reach);
+      outcome.notes.push(`keyboard: ${reached}`);
       await shoot('keyboard-reach');
-      return outcome;
+      await pick(page, row.node, row.layer);
+      await openSections(page);
+      await step(page).focus({ timeout: SHORT_MS }).catch(() => undefined);
     }
     if (step !== row.target) {
       await page.keyboard.press('Enter');

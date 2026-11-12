@@ -57,6 +57,9 @@ test.describe('inspector audit', () => {
         outcome.notes.push(...thrown);
       }
       record(outcome);
+      if (process.env.INSPECTOR_AUDIT_RECORD) {
+        return;
+      }
       expect({ mouse: outcome.mouse, keyboard: outcome.keyboard }, outcome.notes.join('; ')).toEqual({ mouse: row.known?.mouse ?? [], keyboard: row.known?.keyboard ?? [] });
     });
   }

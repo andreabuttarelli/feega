@@ -6,6 +6,7 @@ export const UNDO = process.platform === 'darwin' ? 'Meta+z' : 'Control+z';
 export const CANVAS_PATH = `/p/${PLACE.projectId}/c/${PLACE.canvasId}`;
 const SETTLE_MS = 400;
 const MAX_SECTIONS = 30;
+const ZOOM_MS = 700;
 
 export type Clip = { id: string; component: string; props: Record<string, unknown>; [k: string]: unknown };
 type Doc = { tracks: { clips: Clip[] }[]; comps: Record<string, { tracks: { clips: Clip[] }[] }>; [k: string]: unknown };
@@ -34,8 +35,13 @@ export async function pick(page: Page, nodeId: string, clipId: string): Promise<
     await expect(row).toBeVisible({ timeout: 30_000 });
   }
   await row.scrollIntoViewIfNeeded();
+  const fresh = (await row.getAttribute('aria-selected')) !== 'true';
   await row.click();
   await expect(row).toHaveAttribute('aria-selected', 'true');
+  if (fresh) {
+    await page.keyboard.press('Shift+Digit2');
+    await page.waitForTimeout(ZOOM_MS);
+  }
   await expect(inspector(page)).toBeVisible({ timeout: 15_000 });
   await page.waitForTimeout(SETTLE_MS);
 }
@@ -90,15 +96,8 @@ export async function press(page: Page, target: Locator): Promise<void> {
   await page.mouse.click(at.x, at.y);
 }
 
-export async function layerShot(page: Page): Promise<Buffer | null> {
-  const box = await page.getByTestId('selection-box').boundingBox().catch(() => null);
-  if (!box || box.width < 2 || box.height < 2) {
-    return null;
-  }
-  const view = page.viewportSize()!;
-  const x = Math.max(0, box.x - 4);
-  const y = Math.max(0, box.y - 4);
-  const width = Math.min(view.width - x, box.width + 8);
-  const height = Math.min(view.height - y, box.height + 8);
-  return width > 1 && height > 1 ? page.screenshot({ clip: { x, y, width, height } }) : null;
+const CANVAS_CLEAR = { x: 360, y: 70, width: 770, height: 760 };
+
+export async function layerShot(page: Page): Promise<Buffer> {
+  return page.screenshot({ clip: CANVAS_CLEAR });
 }
