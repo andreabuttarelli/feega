@@ -18,6 +18,10 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Canvas performance
 
+### A display-list patch "equal to the build" on a few hand-made docs is wrong on real pages
+
+**Signal:** `fastPatch` unit tests pass, but on the landings fixture 17 of 36 patched hides and 15 of 45 patched moves differed from the full build (filters origin left behind, a group's matrix moved instead of its items, a hidden parent's children losing their cut, comp instance items left in place). **Move:** run `fast-patch.landings.test.ts` (every visible clip, hide and three moves, compared with `drawFrame` within 0.01 px) before widening what the patch accepts. The tolerance is needed: the full build itself moves unrelated clips by up to 0.005 px on some hides.
+
 ### Perf numbers swing 6 to 57 fps on the same build: the machine is loaded
 **Signal:** zoom p5 at x4 reads 57, 29, 31, 56, 6 across five runs of one build; `uptime` load average is above 20 (other agents, Spotlight indexing a fresh build). **Move:** never compare a before batch with a later after batch. Serve both builds at once (two `vite preview` ports) and alternate before/after runs one at a time, so the load hits both alike; report the per-run values next to the median.
 
