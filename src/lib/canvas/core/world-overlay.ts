@@ -3,6 +3,7 @@ import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import type { Box, Curve } from '$lib/canvas/gpu/geometry';
 import type { SnapGuide } from '$lib/canvas/snap';
 import { EdgeLook, edgeItems, ghostItems, guideItems, marqueeItems, runningItems, peerItems, type CorePeer, type CoreTheme } from './overlay';
+import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { ports, stateChrome, tileChrome, type Glyphs, type StateTile } from './chrome';
 import { turned, type Turn } from './screen-uses';
 import { line, rect, solid } from './shapes';
@@ -25,13 +26,17 @@ export enum ChromeLayers {
 
 export type ChromeOnCanvas = StateTile & { turn?: Turn; layers?: ChromeLayers };
 
-const CHROME_OF: Record<ChromeLayers, (t: ChromeOnCanvas, glyphs: Glyphs) => PathItem[]> = {
-  [ChromeLayers.State]: (t, glyphs) => stateChrome(t, glyphs),
-  [ChromeLayers.Ports]: (t) => ports(t),
-  [ChromeLayers.Whole]: (t, glyphs) => [...tileChrome(t, glyphs), ...stateChrome(t, glyphs)]
+const CHROME_OF: Record<ChromeLayers, { tile: (t: ChromeOnCanvas, glyphs: Glyphs) => PathItem[]; state: boolean }> = {
+  [ChromeLayers.State]: { tile: () => [], state: true },
+  [ChromeLayers.Ports]: { tile: (t) => ports(t), state: false },
+  [ChromeLayers.Whole]: { tile: (t, glyphs) => tileChrome(t, glyphs), state: true }
 };
 
-const chromeOf = (t: ChromeOnCanvas, glyphs: Glyphs): PathItem[] => CHROME_OF[t.layers ?? ChromeLayers.State](t, glyphs);
+const layersOf = (t: ChromeOnCanvas) => CHROME_OF[t.layers ?? ChromeLayers.State];
+
+const tileFields = ({ ring: _ring, handles: _handles, ringColor: _ringColor, names: _names, strokeZoom: _strokeZoom, ...tile }: ChromeOnCanvas) => tile;
+
+const drawsState = (t: ChromeOnCanvas) => layersOf(t).state && (t.ring !== NodeChrome.None || t.handles || t.names);
 
 export function edgeLook(edge: Wire, selected: readonly string[], selectedEdge: string | null): EdgeLook {
   if (edge.mode === ITERATE) {
@@ -48,12 +53,25 @@ const FIXED_KEYS = ['curves', 'chrome', 'selected', 'selectedEdge', 'theme', 'gl
 
 let fixedFor: Fixed | null = null;
 let fixedItems: PathItem[] = [];
+let fixedParts: PathItem[][] = [];
+const NO_ITEMS: PathItem[] = [];
 let built = new Map<string, Built>();
 
 type Built = { from: Record<string, unknown>; items: PathItem[] };
 
-const alike = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JSON.stringify(b);
-const sameFields = (a: Record<string, unknown>, b: Record<string, unknown>) => Object.keys(a).length === Object.keys(b).length && Object.keys(a).every((k) => alike(a[k], b[k]));
+function alike(a: unknown, b: unknown): boolean {
+  if (a === b) {
+    return true;
+  }
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null || Array.isArray(a) !== Array.isArray(b)) {
+    return false;
+  }
+  return sameFields(a as Record<string, unknown>, b as Record<string, unknown>);
+}
+function sameFields(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((k) => alike(a[k], b[k]));
+}
 
 function zoomFree(o: Fixed): PathItem[] {
   if (fixedFor && FIXED_KEYS.every((k) => fixedFor![k] === o[k])) {
@@ -68,14 +86,21 @@ function zoomFree(o: Fixed): PathItem[] {
     return items;
   };
   fixedFor = o;
-  fixedItems = [
-    ...o.curves.flatMap((c) => {
+  const parts = [
+    ...o.curves.map((c) => {
       const look = edgeLook(c.edge, o.selected, o.selectedEdge);
       return once(`wire:${c.edge.id}`, { look, curve: c.curve }, () => edgeItems(c.edge.id, c.curve, look, o.theme));
     }),
-    ...o.chrome.flatMap((t) => once(`chrome:${t.id}`, t, () => turnedBy(chromeOf(t, o.glyphs), t.turn)))
+    ...o.chrome.flatMap((t) => [
+      once(`chrome:${t.id}`, tileFields(t), () => turnedBy(layersOf(t).tile(t, o.glyphs), t.turn)),
+      drawsState(t) ? once(`state:${t.id}`, t, () => turnedBy(stateChrome(t, o.glyphs), t.turn)) : NO_ITEMS
+    ])
   ];
   built = next;
+  if (parts.length !== fixedParts.length || parts.some((p, i) => p !== fixedParts[i])) {
+    fixedParts = parts;
+    fixedItems = parts.flat();
+  }
   return fixedItems;
 }
 

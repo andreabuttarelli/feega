@@ -73,6 +73,7 @@ impl TileKey {
 
 pub const BATCH_TILES: i64 = 2;
 pub const BAKE_BATCH_TILES: i64 = 3;
+pub const GESTURE_BATCH_TILES: i64 = 1;
 
 pub struct Batch {
     pub step: i32,
@@ -105,6 +106,10 @@ pub fn batches(missing: &[TileKey]) -> Vec<Batch> {
     batches_of(missing, BATCH_TILES)
 }
 
+pub fn gesture_batches(missing: &[TileKey]) -> Vec<Batch> {
+    batches_of(missing, GESTURE_BATCH_TILES)
+}
+
 pub fn bake_batches(missing: &[TileKey]) -> Vec<Batch> {
     batches_of(missing, BAKE_BATCH_TILES)
 }
@@ -123,10 +128,35 @@ fn batches_of(missing: &[TileKey], side: i64) -> Vec<Batch> {
     out
 }
 
+#[derive(Default)]
+pub struct RasterCredit {
+    ms: f64,
+}
+
+impl RasterCredit {
+    pub fn earn(&mut self, budget_ms: f64) {
+        self.ms = (self.ms + budget_ms).min(budget_ms);
+    }
+
+    pub fn spend(&mut self, ms: f64) {
+        self.ms -= ms;
+    }
+
+    pub fn allows(&self) -> bool {
+        self.ms > 0.0
+    }
+}
+
 pub struct Queue {
     pub blank: Vec<TileKey>,
     pub blurry: Vec<TileKey>,
     pub stale: Vec<TileKey>,
+}
+
+impl Queue {
+    pub fn order(self) -> Vec<TileKey> {
+        self.blank.into_iter().chain(self.blurry).chain(self.stale).collect()
+    }
 }
 
 pub struct TileFrame {
@@ -206,6 +236,14 @@ impl Tiles {
         coarser.chain(finer).any(|step| keys_over(world, step).iter().all(|k| self.held.contains(k)))
     }
 
+    fn shown_sharper(&self, key: TileKey) -> bool {
+        (key.step + 1..=key.step + FINER_STEPS).any(|step| keys_over(key.world(), step).iter().all(|k| self.held.contains(k)))
+    }
+
+    pub fn unsharp(&self, missing: &[TileKey]) -> usize {
+        missing.iter().filter(|k| !self.shown_sharper(**k)).count()
+    }
+
     pub fn ahead(&self, camera: Camera, screen: (u32, u32)) -> Vec<TileKey> {
         let world = seen_world(camera, screen);
         let step = step_of(camera.zoom);
@@ -282,8 +320,8 @@ impl Tiles {
             let list = match () {
                 _ if self.stale.contains(&key) => &mut queue.stale,
                 _ if !self.covered(key) => &mut queue.blank,
-                _ if !self.covered_within(key, NEAR_STEPS) => &mut queue.blurry,
-                _ => continue,
+                _ if self.shown_sharper(key) => continue,
+                _ => &mut queue.blurry,
             };
             list.push(key);
         }
@@ -464,4 +502,54 @@ pub fn path_for(m: Moment) -> Path {
         return Path::Tiles;
     }
     Path::Exact
+}
+
+pub const MAX_SPLITS: u32 = 12;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Piece {
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
+}
+
+impl Piece {
+    pub fn overlap(self, other: Piece) -> Option<Piece> {
+        let (x0, y0) = (self.x.max(other.x), self.y.max(other.y));
+        let (x1, y1) = ((self.x + self.w).min(other.x + other.w), (self.y + self.h).min(other.y + other.h));
+        (x1 > x0 && y1 > y0).then(|| Piece { x: x0, y: y0, w: x1 - x0, h: y1 - y0 })
+    }
+
+    fn halves(self) -> Option<[Piece; 2]> {
+        if self.w >= self.h && self.w > 1 {
+            let left = self.w / 2;
+            return Some([Piece { w: left, ..self }, Piece { x: self.x + left, w: self.w - left, ..self }]);
+        }
+        if self.h > 1 {
+            let top = self.h / 2;
+            return Some([Piece { h: top, ..self }, Piece { y: self.y + top, h: self.h - top, ..self }]);
+        }
+        None
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Rendered {
+    Fit,
+    Overflowed,
+}
+
+pub fn split_render(size: (u32, u32), mut render: impl FnMut(Piece) -> Rendered) -> Vec<Piece> {
+    let mut done = Vec::new();
+    let mut todo = vec![(Piece { x: 0, y: 0, w: size.0, h: size.1 }, 0)];
+    while let Some((piece, depth)) = todo.pop() {
+        let overflowed = render(piece) == Rendered::Overflowed;
+        let halves = piece.halves().filter(|_| overflowed && depth < MAX_SPLITS);
+        match halves {
+            Some([a, b]) => todo.extend([(b, depth + 1), (a, depth + 1)]),
+            None => done.push(piece),
+        }
+    }
+    done
 }

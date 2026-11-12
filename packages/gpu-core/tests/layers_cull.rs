@@ -27,6 +27,8 @@ impl Canvas for Nothing {
     fn push_clip(&mut self, _: Fill, _: Affine, _: &BezPath) {}
 
     fn pop(&mut self) {}
+
+    fn shade(&mut self, _: Affine, _: &gpu_core::shades::Shade) {}
 }
 
 struct Flat;
@@ -34,7 +36,7 @@ struct Flat;
 impl Runner for Flat {
     type Tex = (u32, u32);
 
-    fn run(&self, _: Op, inputs: [&(u32, u32); 2], _: &[f32]) -> (u32, u32) {
+    fn run(&self, _: Op, inputs: [&(u32, u32); 2], _: &[f32], _: (u32, u32)) -> (u32, u32) {
         *inputs[0]
     }
 

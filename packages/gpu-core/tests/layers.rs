@@ -40,18 +40,17 @@ fn render(json: &str) -> Vec<u8> {
 fn the_kernel_matches_the_ts_backend() {
     let k = gaussian(2.0);
 
-    assert_eq!(k.step, 1);
-    assert_eq!(k.weights.len(), 7);
-    assert!((k.weights[0] - 0.1997).abs() < 1e-3);
-    assert!((k.weights[0] + 2.0 * k.weights[1..].iter().sum::<f32>() - 1.0).abs() < 1e-5);
+    assert_eq!(k.len(), 4);
+    assert!((k[0].weight - 0.1997).abs() < 1e-3);
+    assert!((k[0].weight + 2.0 * k[1..].iter().map(|t| t.weight).sum::<f32>() - 1.0).abs() < 1e-5);
 }
 
 #[test]
 fn wide_kernels_stride_to_stay_within_the_tap_budget() {
     let k = gaussian(60.0);
 
-    assert_eq!(k.step, 3);
-    assert!(k.weights.len() <= 64);
+    assert!(k.len() <= 64);
+    assert!(k.last().unwrap().offset >= 178.0);
 }
 
 #[test]
