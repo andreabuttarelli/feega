@@ -4,16 +4,16 @@ const AUDIT = 'PR #2088 round 2';
 
 const STALE_CANVAS: Known = {
   unstable: { mouse: [Check.Canvas], keyboard: [Check.Canvas] },
-  severity: Severity.Major,
-  why: 'the value lands but the canvas keeps or brings back a stale picture: after an undo the picture flips back to the edited state about 3 s later, so the next change shows no pixel difference',
-  ref: `${AUDIT}; canvas renderer, not located`
+  severity: Severity.Minor,
+  why: 'the edit lands but draws nothing new: DM Sans is loaded at 400, 500 and 600 only, so 300 draws as 400; line height on one line, align right on an already right-aligned box and the gap of a one-child stack move no pixel. The first edit on a frame still shows a change because it swaps the saved picture for the live one (the imported frame background is white saved, light grey live); undo keeps the live picture, so the next attempt sees none',
+  ref: `${AUDIT}; round 3 probe: packages/motion-core/src/motion/gpu-full/text/load.ts:11 and hyperframes/compose.ts:91 (wght@400;500;600)`
 };
 
 const LINE_CANVAS: Known = {
   unstable: { keyboard: [Check.Canvas] },
   severity: Severity.Major,
-  why: 'a keyboard-driven change to the line stroke often shows no canvas change within 2 s while the same change by mouse repaints; not isolated from the stale picture above',
-  ref: `${AUDIT}; canvas renderer, not located`
+  why: 'the amber 6.5 px line draws no pixel on the canvas, before or after an edit: the display list marks a line shape unsupported and hands it to the picture fallback, which shows nothing here; only an arrow end cap appears. A width, hide or remove therefore changes nothing the probe can see',
+  ref: `${AUDIT}; round 3 probe, packages/motion-core/src/motion/gpu-full/display-list.ts:174 (UNDRAWN_SHAPES), :198`
 };
 
 export const KNOWN: Record<string, Known> = {
@@ -25,7 +25,6 @@ export const KNOWN: Record<string, Known> = {
     ref: 'src/lib/components/motion/FillStack.svelte:333'
   },
 
-  'bound/variables/Theme mode/Dark': STALE_CANVAS,
   'text/text/Weight/type 300 + Enter': STALE_CANVAS,
   '0752f883/text/Weight/type 300 + Enter': STALE_CANVAS,
   '0752f883/text/Line height/type 150 + Enter': STALE_CANVAS,
