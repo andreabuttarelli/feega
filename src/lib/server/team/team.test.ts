@@ -1,4 +1,16 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const setSeatQuantity = vi.fn();
+const scheduledEnd = vi.fn();
+vi.mock('$lib/server/stripe', () => ({
+  setSeatQuantity: (...args: unknown[]) => setSeatQuantity(...args),
+  scheduledEnd: (...args: unknown[]) => scheduledEnd(...args)
+}));
+
+beforeEach(() => {
+  setSeatQuantity.mockReset().mockResolvedValue(undefined);
+  scheduledEnd.mockReset().mockResolvedValue(null);
+});
 import { fakeDb, type Call } from '$lib/server/db/fake-db';
 import { listTeam, runTeamOp, TeamOp, TeamRefusal, type TeamCtx } from '$lib/server/team/team';
 import { LINK_INVITE_EMAIL } from '$lib/server/repos/invites';
@@ -36,7 +48,7 @@ function ctxFor(userId: string, extra: Record<string, unknown[]> = {}) {
       orgs: [{ id: ORG, name: 'Acme', slug: 'acme' }],
       ...extra
     },
-    { filter: true }
+    { filter: true, mutate: true }
   );
   const mail = vi.fn(async () => true);
   const rpc = vi.fn(async () => ({ data: null, error: null }));
@@ -129,9 +141,67 @@ describe('i posti da editor', () => {
   });
 
   it("un'org che ha pagato invita editor senza limite", async () => {
-    const { ctx } = ctxFor(OWNER, { credit_ledger: [{ org_id: ORG, source: 'one_time_purchase' }] });
+    const { ctx } = ctxFor(OWNER, { orgs: [{ id: ORG, name: 'Acme', slug: 'acme', stripe_subscription_id: 'sub_1' }] });
 
     expect((await runTeamOp(ctx, { op: TeamOp.Invite, email: 'new@x.it', role: 'member' })).ok).toBe(true);
+  });
+
+  it('a top-up alone does not make a team paid: seats come with the plan', async () => {
+    const { ctx } = ctxFor(OWNER, { credit_ledger: [{ org_id: ORG, source: 'one_time_purchase' }] });
+
+    expect(await runTeamOp(ctx, { op: TeamOp.Invite, email: 'new@x.it', role: 'member' })).toMatchObject({ ok: false, refusal: TeamRefusal.SeatLimit });
+  });
+
+  it('the seat refusal says what an editor costs, and that viewers are free', async () => {
+    const { ctx } = ctxFor(OWNER);
+
+    const result = await runTeamOp(ctx, { op: TeamOp.Invite, email: 'new@x.it', role: 'member' });
+
+    expect(result).toMatchObject({ detail: { limit: 1, message: expect.stringMatching(/€9 per editor.*viewers are free/i) } });
+  });
+});
+
+describe('the subscription follows the editors', () => {
+  const paid = { orgs: [{ id: ORG, name: 'Acme', slug: 'acme', stripe_subscription_id: 'sub_1' }] };
+
+  it('promoting a viewer to editor bills one more seat', async () => {
+    const { ctx } = ctxFor(OWNER, paid);
+
+    await runTeamOp(ctx, { op: TeamOp.SetRole, userId: VIEWER, role: 'member' });
+
+    expect(setSeatQuantity).toHaveBeenCalledWith('sub_1', 4);
+  });
+
+  it('removing an editor bills one seat less', async () => {
+    const { ctx } = ctxFor(OWNER, paid);
+
+    await runTeamOp(ctx, { op: TeamOp.RemoveMember, userId: MEMBER });
+
+    expect(setSeatQuantity).toHaveBeenCalledWith('sub_1', expect.any(Number));
+  });
+
+  it('changing a viewer does not touch the bill', async () => {
+    const { ctx } = ctxFor(OWNER, paid);
+
+    await runTeamOp(ctx, { op: TeamOp.RemoveMember, userId: VIEWER });
+
+    expect(setSeatQuantity).not.toHaveBeenCalled();
+  });
+
+  it('a pending invite costs nothing', async () => {
+    const { ctx } = ctxFor(OWNER, paid);
+
+    await runTeamOp(ctx, { op: TeamOp.Invite, email: 'new@x.it', role: 'member' });
+
+    expect(setSeatQuantity).not.toHaveBeenCalled();
+  });
+
+  it('a free team is never billed', async () => {
+    const { ctx } = ctxFor(OWNER);
+
+    await runTeamOp(ctx, { op: TeamOp.RemoveMember, userId: MEMBER });
+
+    expect(setSeatQuantity).not.toHaveBeenCalled();
   });
 });
 
@@ -208,5 +278,24 @@ describe('la squadra', () => {
     expect(team?.members).toHaveLength(4);
     expect(team?.invites.map((i) => i.email)).toEqual(['p@x.it']);
     expect(team?.linkActive).toBe(true);
+  });
+
+  it('says how many editors the team pays for, and whether it pays', async () => {
+    const { ctx } = ctxFor(OWNER);
+
+    expect((await listTeam(ctx))?.seats).toEqual({ editors: 3, paid: false, grandfathered: false, endsAt: null, pricePerEditor: 9 });
+  });
+
+  it('a grandfathered free team says so', async () => {
+    const { ctx } = ctxFor(OWNER, { orgs: [{ id: ORG, name: 'Acme', slug: 'acme', editor_seats_grandfathered_at: '2026-11-13T00:00:00Z' }] });
+
+    expect((await listTeam(ctx))?.seats.grandfathered).toBe(true);
+  });
+
+  it('a paid team that cancelled says when its editors become viewers', async () => {
+    scheduledEnd.mockResolvedValue('2026-12-13T00:00:00.000Z');
+    const { ctx } = ctxFor(OWNER, { orgs: [{ id: ORG, name: 'Acme', slug: 'acme', stripe_subscription_id: 'sub_1' }] });
+
+    expect((await listTeam(ctx))?.seats).toMatchObject({ paid: true, endsAt: '2026-12-13T00:00:00.000Z' });
   });
 });

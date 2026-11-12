@@ -1,7 +1,8 @@
 import type { Db } from '$lib/server/db/client';
 import { EDITOR_ROLES, type OrgRole } from '$lib/org-roles';
-import { isOrgFree } from '$lib/server/tenancy/free-org-limit';
+import { billingTierOf, BillingTier } from '$lib/server/billing-tier';
 import { BILLING_PATH } from '$lib/billing-path';
+import { FREE_EDITOR_SEATS, PLAN } from '$lib/credit-ladder';
 
 export enum SeatPlan {
   Free = 'free',
@@ -9,7 +10,7 @@ export enum SeatPlan {
 }
 
 export const SEAT_LIMITS: Record<SeatPlan, number> = {
-  [SeatPlan.Free]: 3,
+  [SeatPlan.Free]: FREE_EDITOR_SEATS,
   [SeatPlan.Paid]: Infinity
 };
 
@@ -23,14 +24,14 @@ export function editorSeatsLeft(plan: SeatPlan, use: SeatUse): number {
 }
 
 export async function seatPlanOf(db: Db, orgId: string): Promise<SeatPlan> {
-  return (await isOrgFree(db, orgId)) ? SeatPlan.Free : SeatPlan.Paid;
+  return (await billingTierOf(db, orgId)) === BillingTier.Paid ? SeatPlan.Paid : SeatPlan.Free;
 }
 
 export function seatLimitDetail(plan: SeatPlan) {
   return {
     limit: SEAT_LIMITS[plan],
     upgrade_path: BILLING_PATH,
-    message: `Free organisations have ${SEAT_LIMITS[plan]} editor seats. Buy credits on any plan (${BILLING_PATH}) for unlimited editors, or invite as a viewer: viewers are free.`
+    message: `Free teams have ${SEAT_LIMITS[plan]} editor. Subscribe (€${PLAN.price} per editor per month, ${BILLING_PATH}) to add editors, or invite as a viewer: viewers are free.`
   };
 }
 

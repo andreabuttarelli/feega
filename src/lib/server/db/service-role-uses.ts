@@ -89,6 +89,11 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['orgs_invites', 'orgs_members', 'credit_ledger']
   },
   {
+    path: 'src/routes/api/v1/billing/seats/reconcile — the hourly seat reconcile cron',
+    why: "A cron has no user. It lists the orgs that have a subscription and sets each Stripe item quantity to that org's count of editors; it reads only orgs.stripe_subscription_id and orgs_members.role and writes nothing to the database.",
+    tables: ['orgs', 'orgs_members']
+  },
+  {
     path: 'src/lib/server/org-data/auth.ts — resolveApiKey (MCP e CLI su /api/v1/org/**)',
     why: "Una chiave API `feega_…` va risolta in un utente e un'org PRIMA di sapere chi è: non esiste un JWT su cui far girare auth_org_ids(). Dopo la risoluzione l'org_id NON arriva più da chi chiama: è quello della riga trovata per key_hash, imposto su ogni lettura e scrittura successiva da org-data/query-tool.ts e write-tool.ts — mai un filtro facoltativo.",
     tables: ['api_keys']

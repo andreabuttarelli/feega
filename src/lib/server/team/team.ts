@@ -13,6 +13,7 @@ import {
 } from '$lib/server/repos/invites';
 import { editorSeatsLeft, needsSeat, seatLimitDetail, seatPlanOf } from '$lib/server/team/seats';
 import { INVITE_PARAM } from '$lib/server/tenancy/landing';
+import { seatStatus, syncSeats, type SeatStatus } from '$lib/server/team/seat-billing';
 
 export type InviteMail = { to: string; orgName: string; inviterId: string; acceptUrl: string };
 
@@ -54,7 +55,7 @@ export type TeamResult = { ok: true; data: Record<string, unknown> } | { ok: fal
 
 export type TeamMember = { userId: string; email: string; name: string | null; role: OrgRole };
 
-export type Team = { orgId: string; role: OrgRole; members: TeamMember[]; invites: Invite[]; linkActive: boolean };
+export type Team = { orgId: string; role: OrgRole; members: TeamMember[]; invites: Invite[]; linkActive: boolean; seats: SeatStatus };
 
 const OP_ACTION: Record<TeamOp, OrgAction> = {
   [TeamOp.Invite]: OrgAction.Invite,
@@ -92,7 +93,8 @@ export async function listTeam(ctx: TeamCtx): Promise<Team | null> {
     role,
     members,
     invites: pending.filter((i) => i.email !== LINK_INVITE_EMAIL),
-    linkActive: pending.some((i) => i.email === LINK_INVITE_EMAIL)
+    linkActive: pending.some((i) => i.email === LINK_INVITE_EMAIL),
+    seats: await seatStatus(ctx.db, ctx.orgId)
   };
 }
 
@@ -188,6 +190,9 @@ async function setRole(ctx: TeamCtx, actor: OrgRole, input: { userId: string; ro
   }
 
   await setMemberRole(ctx.db, { orgId: ctx.orgId, userId: input.userId, role: input.role });
+  if (needsSeat(current) !== needsSeat(input.role)) {
+    await syncSeats(ctx.db, ctx.orgId);
+  }
   return done({ user_id: input.userId, role: input.role });
 }
 
@@ -204,6 +209,9 @@ async function remove(ctx: TeamCtx, userId: string): Promise<TeamResult> {
   }
 
   await removeMember(ctx.db, { orgId: ctx.orgId, userId });
+  if (needsSeat(current)) {
+    await syncSeats(ctx.db, ctx.orgId);
+  }
   return done({ user_id: userId });
 }
 
@@ -247,6 +255,9 @@ export async function runTeamOp(ctx: TeamCtx, request: TeamRequest): Promise<Tea
       return remove(ctx, request.userId);
     case TeamOp.Leave:
       await removeMember(ctx.db, { orgId: ctx.orgId, userId: ctx.userId });
+      if (needsSeat(actor)) {
+        await syncSeats(ctx.db, ctx.orgId);
+      }
       return done();
     case TeamOp.TransferOwnership:
       return transfer(ctx, request.userId);

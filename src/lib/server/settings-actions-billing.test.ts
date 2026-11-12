@@ -30,7 +30,9 @@ import { buyOneTime, subscribe } from './settings-actions';
 
 function ownerSupabase() {
 	const memberships = [{ role: 'owner', orgs: { id: 'org-1', name: 'Acme', slug: 'acme' } }];
-	const q = { select: () => q, eq: () => q, then: (resolve: (v: unknown) => void) => resolve({ data: memberships, error: null }) };
+	const editors = [{ role: 'owner' }, { role: 'member' }];
+	const q = { select: () => q, eq: () => q, in: () => editorQuery, then: (resolve: (v: unknown) => void) => resolve({ data: memberships, error: null }) };
+	const editorQuery = { then: (resolve: (v: unknown) => void) => resolve({ data: editors, error: null }) };
 	return {
 		auth: { getUser: async () => ({ data: { user: { id: 'user-1' } } }) },
 		from: () => q
@@ -89,6 +91,7 @@ describe('subscribe — the one plan', () => {
 				orgId: 'org-1',
 				priceId: 'price_sub_9',
 				credits: 500,
+				quantity: 2,
 				successUrl: 'https://feega.test/app/credits?checkout=success&session_id={CHECKOUT_SESSION_ID}',
 				cancelUrl: 'https://feega.test/app/credits?checkout=canceled'
 			})

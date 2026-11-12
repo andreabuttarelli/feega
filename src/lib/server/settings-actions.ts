@@ -15,6 +15,7 @@ import { listMemberships } from '$lib/server/repos/orgs';
 import { chooseOrg, ORG_COOKIE } from '$lib/server/tenancy/context';
 import type { Db } from '$lib/server/db/client';
 import { appOrigin } from '$lib/server/app-url';
+import { editorCount } from '$lib/server/team/seat-billing';
 
 const stripeApi = () => import('$lib/server/stripe');
 
@@ -132,6 +133,7 @@ export async function subscribe(event: Ev) {
       orgId: billing.orgId,
       priceId,
       credits: PLAN.credits,
+      quantity: await editorCount(supabase as Db, orgId),
       ...checkoutReturnUrls(billingUrl(event))
     });
   } catch (e) {

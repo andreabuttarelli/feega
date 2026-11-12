@@ -291,6 +291,43 @@ describe('subscribedPlan', () => {
 	});
 });
 
+describe('scheduledEnd', () => {
+	it('names the day a cancelled subscription stops', async () => {
+		subscriptionsRetrieve.mockResolvedValue({ cancel_at: 1735689600, cancel_at_period_end: true });
+		const { scheduledEnd } = await import('./stripe');
+		expect(await scheduledEnd('sub_1')).toBe(new Date(1735689600 * 1000).toISOString());
+	});
+
+	it('is null while the subscription renews', async () => {
+		subscriptionsRetrieve.mockResolvedValue({ cancel_at: null, cancel_at_period_end: false });
+		const { scheduledEnd } = await import('./stripe');
+		expect(await scheduledEnd('sub_1')).toBeNull();
+	});
+});
+
+describe('setSeatQuantity', () => {
+	it('sets the item quantity and invoices the prorated difference at once', async () => {
+		subscriptionsRetrieve.mockResolvedValue({ items: { data: [{ id: 'si_1', quantity: 2 }] } });
+		const { setSeatQuantity } = await import('./stripe');
+
+		await setSeatQuantity('sub_1', 3);
+
+		expect(subscriptionsUpdate).toHaveBeenCalledWith('sub_1', {
+			items: [{ id: 'si_1', quantity: 3 }],
+			proration_behavior: 'always_invoice'
+		});
+	});
+
+	it('does nothing when Stripe already bills that many seats', async () => {
+		subscriptionsRetrieve.mockResolvedValue({ items: { data: [{ id: 'si_1', quantity: 3 }] } });
+		const { setSeatQuantity } = await import('./stripe');
+
+		await setSeatQuantity('sub_1', 3);
+
+		expect(subscriptionsUpdate).not.toHaveBeenCalled();
+	});
+});
+
 describe('createOneTimeCreditCheckout', () => {
 	it('creates a payment-mode session carrying org id and credits in metadata', async () => {
 		checkoutSessionsCreate.mockResolvedValue({ url: 'https://checkout/one-time' });
@@ -352,6 +389,7 @@ describe('createSubscriptionCheckout', () => {
 			orgId: 'org_1',
 			priceId: 'price_sub_5',
 			credits: 500,
+			quantity: 3,
 			successUrl: 'https://app/return?ok=1',
 			cancelUrl: 'https://app/return?cancel=1'
 		});
@@ -360,7 +398,7 @@ describe('createSubscriptionCheckout', () => {
 		expect(checkoutSessionsCreate).toHaveBeenCalledWith({
 			mode: 'subscription',
 			customer: 'cus_1',
-			line_items: [{ price: 'price_sub_5', quantity: 1 }],
+			line_items: [{ price: 'price_sub_5', quantity: 3 }],
 			success_url: 'https://app/return?ok=1',
 			cancel_url: 'https://app/return?cancel=1',
 			subscription_data: { metadata: { app: 'feega', org_id: 'org_1', credits: '500' } },
@@ -378,6 +416,7 @@ describe('createSubscriptionCheckout', () => {
 				orgId: 'org_1',
 				priceId: 'price_sub_5',
 				credits: 500,
+				quantity: 1,
 				successUrl: 'https://app/return',
 				cancelUrl: 'https://app/return'
 			})

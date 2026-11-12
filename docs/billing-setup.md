@@ -54,6 +54,18 @@ Once the `stripe` schema exists and is being written to, apply, in this order:
   `metadata.credits × line quantity` (per-seat ready), and the `org_credits_at_risk` view is
   dropped. Verified in-process by `npm run test:credit-expiry` (pglite, no database needed).
 
+- `supabase/canvas-migrations/20261113_editor_seats_grandfathered.sql` — adds
+  `orgs.editor_seats_grandfathered_at` and stamps every free org that has more than one editor
+  on the day it is applied. Those teams keep their editors; nobody else gets the flag later.
+- `supabase/canvas-migrations/20261113_seat_proration_grants.sql` — a paid
+  `subscription_update` invoice grants `round(net proration amount × metadata.credits /
+  unit_amount)` credits (the net of the credit and debit proration lines); a net ≤ 0 (seat
+  removed) writes nothing.
+- `supabase/canvas-migrations/20261113_viewers_after_cancel.sql` — when a subscription ends
+  (`canceled`, `incomplete_expired`, `unpaid`), every admin and member of its org becomes a
+  viewer; subscribing clears the grandfathered flag.
+  `npm run test:seat-billing` runs all three in pglite.
+
 Verify with a local Postgres: `DATABASE_URL=postgres://postgres@127.0.0.1:5432/postgres npm run
 test:stripe-grants`.
 
@@ -80,8 +92,12 @@ The six retired Prices (`feega_monthly_8` … `feega_monthly_256`): set them **i
 delete them**. A subscriber still on one keeps renewing — the trigger reads that Price's
 `metadata.credits` — and the credits page names their plan as current.
 
-Configure the customer portal **without plan switching**: invoices, payment method and
-cancellation only. There is one plan; the app never sends anyone to switch.
+Configure the customer portal **without plan switching and without quantity changes**:
+invoices, payment method and cancellation only. The quantity is the number of editors, and only
+the app sets it (`setSeatQuantity`, `proration_behavior: always_invoice`): on accepting an editor
+invite, promoting or demoting, removing an editor, and hourly from the Vercel cron
+`/api/v1/billing/seats/reconcile` (same `CRON_SECRET` as the other crons), which corrects any
+quantity a failed Stripe call left behind.
 
 ## Going live
 

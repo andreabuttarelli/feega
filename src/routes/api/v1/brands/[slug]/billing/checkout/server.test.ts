@@ -42,6 +42,7 @@ vi.mock('$lib/server/credits', () => ({
 vi.mock('$lib/server/billing-readiness', () => ({
 	billingGrantsReady: (...args: unknown[]) => billingGrantsReady(...args)
 }));
+vi.mock('$lib/server/team/seat-billing', () => ({ editorCount: async () => 2 }));
 vi.mock('$lib/server/research', () => ({ structured: (...args: unknown[]) => structured(...args) }));
 vi.mock('$lib/server/app-url', () => ({ appOrigin: () => 'https://feega.test' }));
 vi.mock('$lib/server/feature-flags', () => ({ isPlanGoEnabled: () => false }));
@@ -111,6 +112,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 			orgId: 'org-1',
 			priceId: 'price_sub_9',
 			credits: 500,
+			quantity: 2,
 			successUrl: 'https://feega.test/app/credits?checkout=success&session_id={CHECKOUT_SESSION_ID}',
 			cancelUrl: 'https://feega.test/app/credits?checkout=canceled'
 		});

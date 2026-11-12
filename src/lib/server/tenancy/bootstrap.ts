@@ -6,6 +6,9 @@ import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
 import { hashInviteToken, inviteStatus, LINK_INVITE_EMAIL } from '$lib/server/repos/invites';
 import type { OrgRole } from '$lib/server/repos/orgs';
 import { assertFreeOrgLimit } from '$lib/server/tenancy/free-org-limit';
+import { OrgRoleName } from '$lib/org-roles';
+import { needsSeat, SeatPlan, seatPlanOf } from '$lib/server/team/seats';
+import { syncSeats } from '$lib/server/team/seat-billing';
 
 /**
  * I DUE MOMENTI IN CUI L'APPARTENENZA STA NASCENDO.
@@ -183,9 +186,10 @@ export async function acceptInviteWith(
   // è mai bloccata da questo controllo (assertFreeOrgLimit lo verifica per prima cosa).
   await assertFreeOrgLimit(db, { userId: input.userId, joiningOrgId: invite.org_id });
 
+  const role = await seatedRole(db, invite.org_id, invite.role);
   const { error: insertError } = await db
     .from('orgs_members')
-    .insert({ org_id: invite.org_id, user_id: input.userId, role: invite.role })
+    .insert({ org_id: invite.org_id, user_id: input.userId, role })
     .select('id')
     .single();
 
@@ -193,8 +197,12 @@ export async function acceptInviteWith(
     throw insertError;
   }
 
+  if (needsSeat(role)) {
+    await syncSeats(db, invite.org_id);
+  }
+
   if (isLink) {
-    return { outcome: 'accepted', orgId: invite.org_id, role: invite.role as OrgRole };
+    return { outcome: 'accepted', orgId: invite.org_id, role: role as OrgRole };
   }
 
   const { error: markError } = await db
@@ -207,7 +215,14 @@ export async function acceptInviteWith(
     throw markError;
   }
 
-  return { outcome: 'accepted', orgId: invite.org_id, role: invite.role as OrgRole };
+  return { outcome: 'accepted', orgId: invite.org_id, role: role as OrgRole };
+}
+
+async function seatedRole(db: Db, orgId: string, role: string): Promise<string> {
+  if (!needsSeat(role) || (await seatPlanOf(db, orgId)) === SeatPlan.Paid) {
+    return role;
+  }
+  return OrgRoleName.Viewer;
 }
 
 export function acceptInvite(input: { token: string; userId: string; email: string }): Promise<AcceptOutcome> {

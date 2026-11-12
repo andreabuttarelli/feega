@@ -1,13 +1,14 @@
 <script lang="ts">
   import { goto, invalidateAll } from '$app/navigation';
   import { sendJson } from '$lib/dashboard/api';
-  import { assignableRoles, can, OrgAction, OrgRoleName, type OrgRole } from '$lib/org-roles';
+  import { assignableRoles, can, EDITOR_ROLES, OrgAction, OrgRoleName, type OrgRole } from '$lib/org-roles';
   import { Panel } from '$lib/components/ui/panel';
   import { Input } from '$lib/components/ui/input';
   import { Button } from '$lib/components/ui/button';
   import { Notice } from '$lib/components/ui/notice';
   import PageHead from '$lib/components/PageHead.svelte';
   import PageTitle from '$lib/components/PageTitle.svelte';
+  import { BILLING_PATH } from '$lib/billing-path';
 
   let { data } = $props();
 
@@ -16,6 +17,8 @@
   const mayManage = $derived(can(team.role, OrgAction.ManageMembers));
   const mayTransfer = $derived(can(team.role, OrgAction.TransferOwnership));
   const roles = $derived(assignableRoles(team.role));
+  const seats = $derived(team.seats);
+  const editorRole = (role: OrgRole) => EDITOR_ROLES.includes(role);
 
   let email = $state('');
   let inviteRole = $state<OrgRole>(OrgRoleName.Member);
@@ -64,6 +67,12 @@
 
 {#if notice}<Notice tone={notice.tone}>{notice.text}</Notice>{/if}
 
+{#if seats.endsAt}
+  <Notice data-testid="team-plan-ends">The plan ends on {new Date(seats.endsAt).toLocaleDateString()}. {seats.editors - 1} editors become viewers then; they keep access and become editors again when the team pays.</Notice>
+{:else if seats.grandfathered && !seats.paid}
+  <Notice data-testid="team-grandfathered">This team keeps its {seats.editors} editors from before editors became paid seats. Adding an editor needs the plan.</Notice>
+{/if}
+
 {#if mayInvite}
   <Panel title="Invite" description="Viewers see everything and change nothing. Editors (members, admins) work on canvases and spend credits.">
     <form class="flex gap-2" onsubmit={invite} data-testid="team-invite">
@@ -73,6 +82,15 @@
       </select>
       <Button type="submit">Send invite</Button>
     </form>
+    {#if editorRole(inviteRole)}
+      <p class="m-0 text-[0.8125rem] text-muted-foreground" data-testid="team-seat-cost">
+        {#if seats.paid}
+          Adds €{seats.pricePerEditor}/month when they accept, prorated for the rest of this month.
+        {:else}
+          Editors need the plan (€{seats.pricePerEditor} per editor per month). <a href={BILLING_PATH}>Subscribe</a>, or invite as a viewer: viewers are free.
+        {/if}
+      </p>
+    {/if}
 
     <div class="flex flex-wrap items-center gap-2">
       <Button variant="ghost" size="sm" onclick={makeLink} data-testid="team-link">{team.linkActive ? 'Reset invite link' : 'Create invite link'}</Button>
@@ -98,7 +116,7 @@
   </Panel>
 {/if}
 
-<Panel title="Members">
+<Panel title="Members" description={seats.paid ? `${seats.editors} editors · €${seats.pricePerEditor} × ${seats.editors} = €${seats.pricePerEditor * seats.editors} / month` : `${seats.editors} editors`}>
   {#each team.members as m (m.userId)}
     <div class="flex items-center justify-between gap-3" data-testid="team-member">
       <div class="min-w-0">

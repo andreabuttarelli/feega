@@ -38,6 +38,24 @@ export async function subscribedPlan(subscriptionId: string): Promise<Plan | nul
   return planForLookupKey(sub.items.data[0]?.price.lookup_key) ?? null;
 }
 
+export async function scheduledEnd(subscriptionId: string): Promise<string | null> {
+  const sub = await stripe().subscriptions.retrieve(subscriptionId);
+  return sub.cancel_at ? new Date(sub.cancel_at * 1000).toISOString() : null;
+}
+
+export async function setSeatQuantity(subscriptionId: string, quantity: number): Promise<void> {
+  const sub = await stripe().subscriptions.retrieve(subscriptionId);
+  const item = sub.items.data[0];
+  if (!item || item.quantity === quantity) {
+    return;
+  }
+
+  await stripe().subscriptions.update(subscriptionId, {
+    items: [{ id: item.id, quantity }],
+    proration_behavior: 'always_invoice'
+  });
+}
+
 /**
  * Billing is org-level (CLAUDE.md: `orgs.stripe_customer_id`, not a brand column) — every brand
  * under the org checks out against the same customer. Written with the service role: this id is a join
@@ -94,13 +112,14 @@ export async function createSubscriptionCheckout(opts: {
   orgId: string;
   priceId: string;
   credits: number;
+  quantity: number;
   successUrl: string;
   cancelUrl: string;
 }): Promise<string> {
   const session = await stripe().checkout.sessions.create({
     mode: 'subscription',
     customer: opts.customerId,
-    line_items: [{ price: opts.priceId, quantity: 1 }],
+    line_items: [{ price: opts.priceId, quantity: opts.quantity }],
     success_url: opts.successUrl,
     cancel_url: opts.cancelUrl,
     subscription_data: { metadata: { app: APP_TAG, org_id: opts.orgId, credits: String(opts.credits) } },

@@ -27,7 +27,10 @@ Every new account gets **100 free credits (€1)** once, at signup. A second org
 
 ### Plan and top-ups
 
-- **Plan**: €9 per editor per month, 500 credits each month.
+- **Plan**: €9 per editor per month; each editor brings 500 credits a month into the team's shared balance.
+- **Editors and viewers**: owners, admins and members are editors and need a seat; viewers are free and unlimited. A free team has one editor, its owner. Agents (the chat, MCP, CLI, API keys) never take a seat: they act for a person.
+- **Adding an editor** on a paid team adds €9/month when the invite is accepted, prorated for the rest of the month, and grants the prorated credits at once. Removing an editor lowers the bill from the next invoice; credits already granted stay.
+- **Cancelling**: when the plan ends, every editor except the owner becomes a viewer. They keep access and become editors again once the team pays.
 - **Top-ups**: €10 for 1,000 credits, €20 for 2,000, €50 for 5,000. One-time.
 - **Credits never expire.** Unspent monthly credits carry over; top-ups stay until spent.
 

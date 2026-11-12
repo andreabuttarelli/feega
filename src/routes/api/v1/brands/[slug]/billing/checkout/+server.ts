@@ -6,6 +6,8 @@ import { billingGrantsReady } from '$lib/server/billing-readiness';
 import { PLAN } from '$lib/credit-ladder';
 import { BILLING_PATH, checkoutReturnUrls } from '$lib/billing-path';
 import { appOrigin } from '$lib/server/app-url';
+import { editorCount } from '$lib/server/team/seat-billing';
+import type { Db } from '$lib/server/db/client';
 
 import { CHECKOUT_LINK, statusForFailure } from '@feega/api-contracts';
 
@@ -68,6 +70,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
       orgId: billing.orgId,
       priceId,
       credits: PLAN.credits,
+      quantity: await editorCount(supabase as unknown as Db, billing.orgId),
       ...checkoutReturnUrls(appBillingUrl)
     });
     return json({ ok: true, url: checkoutUrl, plans: PLANS });
