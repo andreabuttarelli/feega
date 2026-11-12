@@ -11,13 +11,20 @@ import { baselined } from '$lib/canvas/code-look';
 import { patchOf, type FileChange } from './write-back';
 import { frameEdits } from './token-write';
 import { pulledTokens } from './token-pull';
-import type { TokenMap } from './design-tokens';
+import { readOnlyKeys, type TokenMap } from './design-tokens';
+import { StyleField } from './design-styles';
 import { CodeImportOutcome } from './import-code';
 import { importCodeInto, rememberOrigin, type CodeImportAsk, type CodeScope } from './canvas-import';
 import { githubSource, SourceKind, type CodeSource, type GithubCalls } from './code-source';
 import { folderOf, folderSource } from './folder-source';
 import { uploadedArchive, uploadOf, uploadSource } from './upload-source';
-import { conditionsOf } from './render-conditions';
+import { BASE_CONDITIONS, conditionsOf, labelOf, type RenderConditions, type Variant } from './render-conditions';
+import { addBoards, AddRefusal, boardParent } from '$lib/canvas/code-boards';
+import { boardsUsed, condOf, MAX_FRAME_BOARDS, mergedMap, PageState, type ImportMap } from '$lib/canvas/import-map';
+import { routesFound } from './canvas-import';
+import { mapOf } from './import-map-of';
+import { UNREADABLE, type RoutesFound } from './routes-found';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 
 export enum SyncOutcome {
   Ok = 'ok',
@@ -28,7 +35,9 @@ export enum SyncOutcome {
   UpToDate = 'up_to_date',
   Unreachable = 'unreachable',
   Conflict = 'conflict',
-  NoSync = 'no_sync'
+  NoSync = 'no_sync',
+  FrameFull = 'frame_full',
+  NoRoom = 'no_room'
 }
 
 export type SyncRefusal = Exclude<SyncOutcome, SyncOutcome.Ok | SyncOutcome.UpToDate>;
@@ -40,7 +49,9 @@ export const SYNC_STATUS: Record<SyncRefusal, number> = {
   [SyncOutcome.PublishFailed]: 502,
   [SyncOutcome.Unreachable]: 502,
   [SyncOutcome.Conflict]: 409,
-  [SyncOutcome.NoSync]: 409
+  [SyncOutcome.NoSync]: 409,
+  [SyncOutcome.FrameFull]: 409,
+  [SyncOutcome.NoRoom]: 409
 };
 
 const UNPUBLISHED: Record<SourceKind, SyncRefusal> = {
@@ -160,7 +171,11 @@ export async function codePull(scope: CodeScope, nodeId: string, branch?: string
     return { outcome: SyncOutcome.UpToDate, sha: rev, carried: 0, conflicts: [], skipped: [], tokens: [] };
   }
 
-  const fresh = await importCodeInto(scope, local.canvasId, { ...linked.link(rev), app: linked.origin.app, routes: linked.origin.routes, conditions: conditionsOf(linked.origin.conditions), delay: linked.origin.delay, at: local.at ?? { x: 0, y: 0 } });
+  const origin = linked.origin;
+  const [fresh, listed] = await Promise.all([
+    importCodeInto(scope, local.canvasId, { ...linked.link(rev), app: origin.app, routes: origin.routes, conditions: conditionsOf(origin.conditions), variants: pulledVariants(origin), delay: origin.delay, at: local.at ?? { x: 0, y: 0 } }),
+    routesFound(scope, { ...WHERE[origin.kind as SourceKind](origin), app: origin.app }).catch(() => null)
+  ]);
   if (fresh.outcome !== CodeImportOutcome.Ok) {
     return { outcome: SyncOutcome.Unreachable, error: fresh.error ?? fresh.outcome };
   }
@@ -176,7 +191,8 @@ export async function codePull(scope: CodeScope, nodeId: string, branch?: string
   if (written.outcome !== RevisionOutcome.Written) {
     return { outcome: SyncOutcome.Conflict };
   }
-  await rememberOrigin(scope, nodeId, { ...linked.origin, branch: target, sha: rev, ...(tokens ? { tokens: tokens.map } : {}) });
+  const map = mapOf(listed ?? NOT_LISTED, fresh, { asked: origin.routes, rev });
+  await rememberOrigin(scope, nodeId, { ...origin, branch: target, sha: rev, ...(tokens ? { tokens: tokens.map } : {}), map });
   return { outcome: SyncOutcome.Ok, sha: rev, carried: merged.carried, conflicts: [...merged.conflicts, ...(tokens?.conflicts ?? [])], skipped: fresh.skipped, tokens: tokens?.report ?? [] };
 }
 
@@ -185,4 +201,121 @@ export type CodeHead = { kind: string; sha: string | null; head: string | null }
 export async function codeHead(scope: CodeScope, nodeId: string): Promise<CodeHead | null> {
   const linked = await linkedOf(scope, nodeId);
   return linked ? { kind: linked.origin.kind, sha: linked.origin.sha, head: await linked.source.head(linked.origin.branch) } : null;
+}
+
+const NOT_LISTED: RoutesFound = { ok: false, error: UNREADABLE, detail: 'route discovery failed', apps: [] };
+
+export enum Land {
+  Frame = 'frame',
+  Piece = 'piece'
+}
+
+export type AddAsk = { routes: string[]; conditions?: RenderConditions[]; land: Land };
+
+export type CodeAdded = { outcome: SyncOutcome.Ok; skipped: string[]; map: ImportMap; boards: string[]; parent: string | null; piece?: MotionDoc };
+
+type AddRefused = { outcome: SyncRefusal | CodeImportOutcome; error?: string };
+
+const ADD_REFUSED: Record<AddRefusal, SyncRefusal> = {
+  [AddRefusal.NoRoom]: SyncOutcome.NoRoom,
+  [AddRefusal.NoBoards]: SyncOutcome.Unreachable,
+  [AddRefusal.Unsized]: SyncOutcome.Unreachable
+};
+
+const newId = () => crypto.randomUUID().slice(0, 8);
+
+const REASON_MAX = 300;
+
+const clipIds = (doc: MotionDoc) => new Set([...doc.tracks, ...Object.values(doc.comps).flatMap((c) => c.tracks)].flatMap((t) => t.clips.map((c) => c.id)));
+
+const variantsOfAsk = (ask: AddAsk): Variant[] => ask.routes.flatMap((route) => (ask.conditions?.length ? ask.conditions : [BASE_CONDITIONS]).map((conditions) => ({ route, label: labelOf(route, conditions), conditions })));
+
+function relabelled(map: ImportMap, boards: Record<string, string>): ImportMap {
+  return { ...map, pages: map.pages.map((p) => (p.boards ? { ...p, boards: p.boards.map((b) => ({ ...b, clip: boards[b.clip] ?? b.clip })) } : p)) };
+}
+
+const WHERE: Record<SourceKind, (origin: CodeOriginData) => { repo?: string; folder?: string; upload?: string }> = {
+  [SourceKind.Github]: (o) => ({ repo: `https://github.com/${o.repo}` }),
+  [SourceKind.Folder]: (o) => ({ folder: o.repo }),
+  [SourceKind.Upload]: (o) => ({ upload: o.repo })
+};
+
+export async function codeAdd(scope: CodeScope, nodeId: string, ask: AddAsk): Promise<CodeAdded | AddRefused> {
+  const linked = await linkedOf(scope, nodeId);
+  const store = frameStore(scope.db, scope);
+  const local = linked ? await store.read(nodeId) : null;
+  if (!linked || !local) {
+    return { outcome: SyncOutcome.NotFromCode };
+  }
+  const variants = variantsOfAsk(ask);
+  const room = MAX_FRAME_BOARDS - boardsUsed(linked.origin.map, (id) => clipIds(local.doc).has(id));
+  if (variants.length > room) {
+    return { outcome: SyncOutcome.FrameFull, error: `this frame holds ${MAX_FRAME_BOARDS - room} of ${MAX_FRAME_BOARDS} pages, the most Pull refreshes in one run: ${room} left` };
+  }
+
+  const origin = linked.origin;
+  const where = origin.sha && origin.kind === SourceKind.Github ? linked.link(origin.sha) : linked.link('');
+  const [fresh, listed] = await Promise.all([importCodeInto(scope, local.canvasId, { ...where, app: origin.app, routes: ask.routes, variants, delay: origin.delay, at: local.at ?? { x: 0, y: 0 } }), routesFound(scope, { ...WHERE[origin.kind as SourceKind](origin), app: origin.app }).catch(() => null)]);
+  if (fresh.outcome !== CodeImportOutcome.Ok) {
+    const reason = fresh.error ?? fresh.outcome;
+    await rememberLatest(scope, nodeId, origin, (now) => ({ ...now, map: mergedMap(now.map, { pages: ask.routes.map((path) => ({ path, state: PageState.Failed, reason: reason.slice(0, REASON_MAX) })) }) }));
+    return { outcome: fresh.outcome, error: reason };
+  }
+  const upstream = await store.read(fresh.frameId);
+  await store.remove(fresh.frameId);
+  if (!upstream) {
+    return { outcome: SyncOutcome.Unreachable };
+  }
+
+  const boards = (fresh.boards ?? []).map((b) => b.clip);
+  const parent = boardParent(local.doc, origin.map);
+  const added = mapOf(listed ?? NOT_LISTED, fresh, { asked: ask.routes, rev: origin.sha });
+  const merged = addBoards(local.doc, upstream.doc, boards, parent, newId);
+  if (!merged.ok) {
+    return { outcome: ADD_REFUSED[merged.refusal], error: merged.detail };
+  }
+  const remember = (map: ImportMap) =>
+    rememberLatest(scope, nodeId, origin, (now) => ({ ...now, routes: [...new Set([...now.routes, ...ask.routes])].slice(0, MAX_FRAME_BOARDS), ...(now.tokens ? { tokens: styleSizesAfter({ ...fresh.tokenMap, ...now.tokens }, local.doc, merged.doc) } : {}), map: mergedMap(now.map, map) }));
+
+  if (ask.land === Land.Piece) {
+    await remember(added);
+    return { outcome: SyncOutcome.Ok, skipped: fresh.skipped, map: mergedMap(origin.map, added), boards, parent, piece: upstream.doc };
+  }
+
+  const written = await store.write(nodeId, local.version, merged.doc, `Imported ${ask.routes.join(', ')}`);
+  if (written.outcome !== RevisionOutcome.Written) {
+    return { outcome: SyncOutcome.Conflict };
+  }
+  const map = relabelled(added, merged.boards);
+  await remember(map);
+  return { outcome: SyncOutcome.Ok, skipped: [...fresh.skipped, ...merged.kept.map((k) => `${k}: renders differently on the new page, kept as its own main`)], map: mergedMap(origin.map, map), boards: boards.map((b) => merged.boards[b] ?? b), parent };
+}
+
+async function rememberLatest(scope: CodeScope, nodeId: string, read: CodeOriginData, next: (now: CodeOriginData) => CodeOriginData): Promise<void> {
+  const latest = await linkedOf(scope, nodeId);
+  await rememberOrigin(scope, nodeId, next(latest?.origin ?? read));
+}
+
+const unitOf = (doc: MotionDoc) => Math.min(doc.width, doc.height);
+
+function styleSizesAfter(map: TokenMap, before: MotionDoc, after: MotionDoc): TokenMap {
+  const ratio = unitOf(before) / unitOf(after);
+  return Object.fromEntries(Object.entries(map).map(([key, entry]) => [key, entry.style && entry.field === StyleField.Size && entry.scale ? { ...entry, scale: entry.scale * ratio } : entry]));
+}
+
+export type CodeMap = { kind: string; repo: string; sha: string | null; map: ImportMap | null; used: number; limit: number; readOnly: number };
+
+export async function codeMap(scope: CodeScope, nodeId: string): Promise<CodeMap | null> {
+  const linked = await linkedOf(scope, nodeId);
+  const frame = linked ? await frameStore(scope.db, scope).read(nodeId) : null;
+  if (!linked || !frame) {
+    return null;
+  }
+  const here = clipIds(frame.doc);
+  return { kind: linked.origin.kind, repo: linked.origin.repo, sha: linked.origin.sha, map: linked.origin.map ?? null, used: boardsUsed(linked.origin.map, (id) => here.has(id)), limit: MAX_FRAME_BOARDS, readOnly: linked.origin.tokens ? readOnlyKeys(linked.origin.tokens as TokenMap).size : 0 };
+}
+
+export function pulledVariants(origin: CodeOriginData): Variant[] | undefined {
+  const boards = (origin.map?.pages ?? []).flatMap((p) => (p.boards ?? []).map((b) => ({ route: p.path, conditions: condOf(b.cond) })));
+  return boards.length ? boards.map((b) => ({ ...b, label: labelOf(b.route, b.conditions as RenderConditions) })) : undefined;
 }

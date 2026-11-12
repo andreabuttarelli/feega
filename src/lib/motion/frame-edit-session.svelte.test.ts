@@ -534,3 +534,31 @@ describe('a save overtaken by a newer version', () => {
     expect(port.send).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('a pending change: shown and saved, never an undo step of its own', () => {
+  it('a placeholder shown while an import runs leaves one undo step for the import, back to the frame without it', () => {
+    const { session } = open();
+    const placeholder = longer(70);
+    const landed = longer(90);
+
+    session.showPending(placeholder, 'Importing /pricing');
+    session.showPending(base, 'Importing /pricing');
+    session.recordRoot(landed, 'Imported /pricing');
+    session.undo();
+
+
+    expect(session.history.present).toBe(base);
+    expect(session.history.past).toHaveLength(0);
+  });
+
+  it('is shown, sized and saved like any edit', async () => {
+    const { session, port } = open();
+
+    session.showPending(longer(70), 'Importing /pricing');
+    await vi.runAllTimersAsync();
+
+    expect(port.show).toHaveBeenCalledWith(longer(70));
+    expect(port.recorded).toHaveBeenCalled();
+    expect(port.send).toHaveBeenCalled();
+  });
+});

@@ -1,3 +1,5 @@
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import type { ImportMap } from './import-map';
 import type { ListedRoute } from './route-picks';
 
 const UNAVAILABLE = 'unavailable';
@@ -99,3 +101,14 @@ export async function testAccount(projectId: string, fetchFn: typeof fetch = fet
   const got = await asked<{ account: TestAccount | null }>(`/api/v1/projects/${encodeURIComponent(projectId)}/app-account`, {}, fetchFn);
   return got.ok ? got.value.account : null;
 }
+
+export type CodeMapRead = { kind: 'github' | 'folder' | 'upload'; repo: string; sha: string | null; map: ImportMap | null; used: number; limit: number; readOnly: number };
+
+export const codeMapOf = (projectId: string, nodeId: string, fetchFn: typeof fetch = fetch) => asked<CodeMapRead>(syncPath(projectId, nodeId, 'map'), {}, fetchFn);
+
+export type PieceLanded = { piece: MotionDoc; boards: string[]; parent: string | null; map: ImportMap; skipped: string[] };
+
+export type IntoAsk = { projectId: string; canvasId: string; nodeId: string; routes: string[]; conditions?: RenderCondition[] };
+
+export const importInto = (ask: IntoAsk, fetchFn: typeof fetch = fetch) =>
+  asked<PieceLanded>(`/api/v1/projects/${ask.projectId}/code-import`, JSON_POST({ canvasId: ask.canvasId, into: ask.nodeId, routes: ask.routes, ...(ask.conditions ? { conditions: ask.conditions } : {}), land: 'piece', x: 0, y: 0 }), fetchFn);

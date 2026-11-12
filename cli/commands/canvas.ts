@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { canvasApi } from '../lib/canvas.ts';
 import { exportAsk, type ExportFlags } from '../lib/export-ask.ts';
-import { routesPlan, RoutesStep } from '../lib/import-routes.ts';
+import { codeSource, routesPlan, RoutesStep } from '../lib/import-routes.ts';
 
 async function token(): Promise<string> {
   const session = await loadSession();
@@ -77,16 +77,21 @@ export function routeDelaysOf(pairs: string[]): Record<string, number> {
   return Object.fromEntries(pairs.map((pair) => [pair.slice(0, pair.lastIndexOf('=')), Number(pair.slice(pair.lastIndexOf('=') + 1))]));
 }
 
-export async function cmdCanvasImportCode(project: string, repo: string, opts: { canvas?: string; app?: string; route: string[]; routes?: string; scheme?: string[]; width?: string[]; designSystem?: boolean; delay?: number; routeDelay?: string[]; x: number; y: number; org?: string }) {
-  const source = repo.startsWith('/') ? { folder: repo } : { repo };
+export async function cmdCanvasImportCode(project: string, repo: string | undefined, opts: { canvas?: string; into?: string; app?: string; route: string[]; routes?: string; scheme?: string[]; width?: string[]; designSystem?: boolean; delay?: number; routeDelay?: string[]; x: number; y: number; org?: string }) {
+  const source = codeSource(repo, opts.into);
+  if (!source) {
+    console.error('Give a repository link or folder, or --into <frame> to add pages to a frame imported before');
+    process.exit(1);
+  }
   const app = opts.app ? { app: opts.app } : {};
   const plan = routesPlan(opts.routes, opts.route);
   if (plan.step === RoutesStep.Discover) {
-    console.log(JSON.stringify(await canvasApi.run(await token(), { project, op: 'discover_routes', input: { ...source, ...app } }, opts.org), null, 2));
+    const read = 'into' in source ? { op: 'code_map', input: { nodeId: source.into } } : { op: 'discover_routes', input: { ...source, ...app } };
+    console.log(JSON.stringify(await canvasApi.run(await token(), { project, ...read }, opts.org), null, 2));
     return;
   }
   if (!opts.canvas) {
-    console.error('--canvas <id> is required to import');
+    console.error('--canvas <id> is required to import (the canvas of the frame, with --into)');
     process.exit(1);
   }
   const conditions = conditionsOf(opts.scheme, opts.width);
@@ -113,7 +118,7 @@ export async function cmdCanvasGithub(project: string, action: string, repo: str
   console.log(JSON.stringify(result, null, 2));
 }
 
-const CODE_SYNC_OPS: Record<string, string> = { changes: 'code_changes', publish: 'code_publish', pull: 'code_pull' };
+const CODE_SYNC_OPS: Record<string, string> = { changes: 'code_changes', publish: 'code_publish', pull: 'code_pull', map: 'code_map' };
 
 export async function cmdCanvasCodeSync(project: string, action: string, nodeId: string, opts: { branch?: string; org?: string }) {
   const op = CODE_SYNC_OPS[action];

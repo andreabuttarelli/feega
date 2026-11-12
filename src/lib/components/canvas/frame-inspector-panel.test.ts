@@ -42,7 +42,7 @@ function elementSession() {
   );
 }
 
-const placeOf = (box: { x: number; y: number; w: number; h: number }): NodePlace => ({ ...box, rotation: 0, set: () => undefined, resize: () => undefined, turn: () => undefined, flip: () => undefined, align: null });
+const placeOf = (box: { x: number; y: number; w: number; h: number }): NodePlace => ({ ...box, rotation: 0, set: () => undefined, resize: () => undefined, grow: () => undefined, turn: () => undefined, flip: () => undefined, align: null });
 
 const hosted = (box = { x: 30, y: 40, w: 200, h: 120, rotation: 90 }) => {
   frameProperties.place = placeOf(box);

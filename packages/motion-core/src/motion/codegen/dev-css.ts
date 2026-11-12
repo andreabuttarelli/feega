@@ -128,7 +128,7 @@ export function devLayer(doc: MotionDoc, clipId: string, brand: BrandTokens | nu
     component: clip.component,
     box,
     declarations: [...boxDeclarations(box), ...painted, ...effectDeclarations(clip.props)],
-    tokens: [...tokens, ...referenceTokens(clip)]
+    tokens: [...new Map([...tokens, ...referenceTokens(clip)].map((t) => [`${t.role}${t.name}`, t])).values()]
   };
 }
 
