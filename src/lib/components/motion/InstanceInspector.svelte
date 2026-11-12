@@ -87,7 +87,7 @@
       </button>{/if}
     </header>
     {#each properties as p (p.key)}
-      <label class="field" data-testid="instance-property" data-key={p.key}>
+      <label class="field reach" data-testid="instance-property" data-key={p.key}>
         <span class:overridden={p.overridden}>{p.key}</span>
         {#if p.control === PropertyKind.Boolean}
           <input type="checkbox" checked={p.value === true} data-testid="instance-property-boolean" onchange={(e) => setProp(p.key, e.currentTarget.checked)} />
@@ -105,7 +105,7 @@
         {:else}
           <input {@attach fieldKeys} type="text" value={String(p.value)} data-testid="instance-property-text" onchange={(e) => setProp(p.key, e.currentTarget.value)} />
         {/if}
-        {#if p.overridden}<button type="button" class="reset" data-testid="instance-property-reset" onclick={() => resetProp(p.key)}>Reset</button>{:else}<button type="button" class="reset" data-testid="instance-property-remove" onclick={() => dropProp(p.key)}>Remove</button>{/if}
+        {#if p.overridden}<button type="button" class="reset reach" data-testid="instance-property-reset" onclick={() => resetProp(p.key)}>Reset</button>{:else}<button type="button" class="reset reach" data-testid="instance-property-remove" onclick={() => dropProp(p.key)}>Remove</button>{/if}
       </label>
     {/each}
     {#each properties.filter((p) => p.control === PropertyKind.Swap) as p (p.key)}
@@ -121,53 +121,53 @@
     {/each}
     {#if parts.has(InstancePart.Overrides)}
     {#each texts as t (t.innerId)}
-      <label class="field">
+      <label class="field reach">
         <span class:overridden={t.overridden}>{t.main}</span>
         <input {@attach fieldKeys} type="text" value={t.value} data-testid="instance-text" onchange={(e) => retext(t.innerId, e.currentTarget.value)} />
-        {#if t.overridden}<button type="button" class="reset" data-testid="instance-reset-text" onclick={() => reset(t.innerId, 'text')}>Reset</button>{/if}
+        {#if t.overridden}<button type="button" class="reset reach" data-testid="instance-reset-text" onclick={() => reset(t.innerId, 'text')}>Reset</button>{/if}
       </label>
     {/each}
     {#each elements as el, i (el.innerId)}
       <div class="element" data-testid="instance-element" data-inner={el.innerId}>
         <span class="label">{el.component} {i + 1}</span>
         {#if el.fill}
-          <label class="field">
+          <label class="field reach">
             <span class:overridden={el.overridden.includes('fills')}>Fill</span>
             <span data-testid="instance-fill"><ColorField name="Fill" display={ColourDisplay.Chip} value={el.fill} onchange={(v) => recolor(el.innerId, Paint.Fill, v)} /></span>
-            {#if el.overridden.includes('fills')}<button type="button" class="reset" data-testid="instance-reset-fills" onclick={() => reset(el.innerId, 'fills')}>Reset</button>{/if}
+            {#if el.overridden.includes('fills')}<button type="button" class="reset reach" data-testid="instance-reset-fills" onclick={() => reset(el.innerId, 'fills')}>Reset</button>{/if}
           </label>
         {/if}
         {#if el.stroke}
-          <label class="field">
+          <label class="field reach">
             <span class:overridden={el.overridden.includes('strokes')}>Stroke</span>
             <span data-testid="instance-stroke"><ColorField name="Stroke" display={ColourDisplay.Chip} value={el.stroke} onchange={(v) => recolor(el.innerId, Paint.Stroke, v)} /></span>
-            {#if el.overridden.includes('strokes')}<button type="button" class="reset" data-testid="instance-reset-strokes" onclick={() => reset(el.innerId, 'strokes')}>Reset</button>{/if}
+            {#if el.overridden.includes('strokes')}<button type="button" class="reset reach" data-testid="instance-reset-strokes" onclick={() => reset(el.innerId, 'strokes')}>Reset</button>{/if}
           </label>
         {/if}
         {#if el.assetId !== null}
-          <label class="field">
+          <label class="field reach">
             <span class:overridden={el.overridden.includes('assetId')}>Image</span>
             <select value={el.assetId} data-testid="instance-image" onchange={(e) => override(el.innerId, { assetId: e.currentTarget.value })}>
               {#each images as a (a.id)}<option value={a.id}>{a.name || a.id}</option>{/each}
             </select>
-            {#if el.overridden.includes('assetId')}<button type="button" class="reset" data-testid="instance-reset-assetId" onclick={() => reset(el.innerId, 'assetId')}>Reset</button>{/if}
+            {#if el.overridden.includes('assetId')}<button type="button" class="reset reach" data-testid="instance-reset-assetId" onclick={() => reset(el.innerId, 'assetId')}>Reset</button>{/if}
           </label>
         {/if}
-        <label class="field">
+        <label class="field reach">
           <span class:overridden={el.overridden.includes('hidden')}>Visible</span>
           <input type="checkbox" checked={!el.hidden} data-testid="instance-visible" onchange={(e) => override(el.innerId, { hidden: !e.currentTarget.checked })} />
-          {#if el.overridden.includes('hidden')}<button type="button" class="reset" data-testid="instance-reset-hidden" onclick={() => reset(el.innerId, 'hidden')}>Reset</button>{/if}
+          {#if el.overridden.includes('hidden')}<button type="button" class="reset reach" data-testid="instance-reset-hidden" onclick={() => reset(el.innerId, 'hidden')}>Reset</button>{/if}
         </label>
         <div class="expose">
           {#each exposable(doc, instance.compId, el.innerId) as ex (ex.label)}
-            <button type="button" class="reset" data-testid="instance-expose" onclick={() => expose(el.innerId, `${el.component} ${i + 1} ${ex.label}`, ex)}>◇ {ex.label}</button>
+            <button type="button" class="reset reach" data-testid="instance-expose" onclick={() => expose(el.innerId, `${el.component} ${i + 1} ${ex.label}`, ex)}>◇ {ex.label}</button>
           {/each}
         </div>
         {#if el.effects > 0 || el.overridden.includes('effects')}
-          <label class="field">
+          <label class="field reach">
             <span class:overridden={el.overridden.includes('effects')}>Effects</span>
             <input type="checkbox" checked={el.effects > 0} data-testid="instance-effects" onchange={(e) => (e.currentTarget.checked ? reset(el.innerId, 'effects') : override(el.innerId, { effects: [] }))} />
-            {#if el.overridden.includes('effects')}<button type="button" class="reset" data-testid="instance-reset-effects" onclick={() => reset(el.innerId, 'effects')}>Reset</button>{/if}
+            {#if el.overridden.includes('effects')}<button type="button" class="reset reach" data-testid="instance-reset-effects" onclick={() => reset(el.innerId, 'effects')}>Reset</button>{/if}
           </label>
         {/if}
       </div>
@@ -181,7 +181,7 @@
       </div>
     {/if}
     {#each Object.entries(variantValues) as [key, values] (key)}
-      <label class="field">
+      <label class="field reach">
         <span>{key}</span>
         <select data-testid="instance-variant" value={instance.comp.component?.variant?.[key]} onchange={(e) => applied(pickVariant(doc, clipId, key, e.currentTarget.value), 'Changed variant')}>
           {#each values as v (v)}<option value={v}>{v}</option>{/each}
@@ -190,7 +190,7 @@
     {/each}
     <VariantMatrix {doc} {clipId} compId={instance.compId} {onchange} />
     {#if parts.has(InstancePart.Swap)}
-    <label class="field">
+    <label class="field reach">
       <span>Swap</span>
       <select data-testid="instance-swap" value={instance.compId} onchange={(e) => applied(swapInstance(doc, clipId, e.currentTarget.value), 'Swapped instance')}>
         {#each mains as [id, comp] (id)}<option value={id}>{comp.component?.name}{comp.component?.variant ? ` · ${Object.values(comp.component.variant).join(', ')}` : ''}</option>{/each}
@@ -275,7 +275,7 @@
   }
 
   .reset {
-    padding: 0 6px;
+    padding-inline: 6px;
     border: 0;
     background: transparent;
     color: #9747ff;

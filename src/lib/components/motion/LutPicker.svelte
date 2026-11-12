@@ -59,6 +59,10 @@
     font-size: var(--ui-text-sm);
   }
 
+  select {
+    height: var(--ui-row);
+  }
+
   .file {
     padding: var(--ui-space-1) var(--ui-space-2);
     border: 1px solid var(--ui-line-strong);

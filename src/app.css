@@ -426,6 +426,12 @@
   background: none;
 }
 
+.reach {
+  --reach: 4px;
+  padding-block: var(--reach);
+  margin-block: calc(-1 * var(--reach));
+}
+
 .hit::before {
   content: '';
   width: var(--glyph-w, var(--glyph));

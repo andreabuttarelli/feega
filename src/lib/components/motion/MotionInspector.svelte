@@ -1481,6 +1481,10 @@
     flex-wrap: wrap;
   }
 
+  .adv .grid2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .adv :global(.line > label),
   .adv :global(.line > .label) {
     width: 100%;

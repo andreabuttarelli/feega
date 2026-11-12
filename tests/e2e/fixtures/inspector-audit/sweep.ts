@@ -35,7 +35,7 @@ async function controlsIn(page: Page, scope: string, layer: string, within: stri
     const r = await reach(el);
     const control = within ? `${within} > ${key}` : key;
     const where = within ? 'popup' : section;
-    if (!r.hit) {
+    if (!r.hit && !r.disabled) {
       found.push({ layer, section: where, control, problem: Problem.Covered, detail: `centre lands on ${r.coveredBy}` });
     }
     if (r.clipped) {

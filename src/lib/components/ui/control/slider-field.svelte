@@ -16,7 +16,7 @@
 		{step}
 		{disabled}
 		value={shown}
-		class="h-1 min-w-0 flex-1 cursor-pointer appearance-none bg-line-2 outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-moz-range-thumb]:size-3.5 [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-foreground [&::-webkit-slider-thumb]:size-3.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:bg-foreground"
+		class="h-6 min-w-0 flex-1 cursor-pointer appearance-none bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-slider-runnable-track]:h-1 [&::-webkit-slider-runnable-track]:bg-line-2 [&::-moz-range-track]:h-1 [&::-moz-range-track]:bg-line-2 [&::-webkit-slider-thumb]:-mt-[5px] [&::-moz-range-thumb]:size-3.5 [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-foreground [&::-webkit-slider-thumb]:size-3.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:bg-foreground"
 		oninput={(e) => onchange(Number(e.currentTarget.value))}
 	/>
 	<input
