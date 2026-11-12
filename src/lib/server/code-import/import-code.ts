@@ -1,3 +1,4 @@
+import { pathKey } from '$lib/canvas/route-pattern';
 import { compOf, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { fontsFor, landPlan, pageTreeAt, publicUrl, UrlImportOutcome, withSheetFonts, type PageAsk, type Planner } from '$lib/server/url-import/import-url';
 import { urlPlan } from '$lib/server/url-import/url-doc';
@@ -75,7 +76,7 @@ type Refusal = { outcome: Exclude<CodeImportOutcome, CodeImportOutcome.Ok>; erro
 
 export type CodeOrigin = { repo: string; branch: string | null; sha: string | null; app: string | null };
 
-export type CodeImported = ({ outcome: CodeImportOutcome.Ok; frameId: string; origin?: CodeOrigin; name: string; undo: unknown[]; skipped: string[]; locked: LockedRoute[]; truncated: boolean; pages: string[]; design?: DesignReport; tokenMap?: TokenMap; library?: LibraryReport } & ComponentCount) | Refusal;
+export type CodeImported = ({ outcome: CodeImportOutcome.Ok; frameId: string; origin?: CodeOrigin; name: string; undo: unknown[]; skipped: string[]; locked: LockedRoute[]; truncated: boolean; pages: string[]; links?: string[]; design?: DesignReport; tokenMap?: TokenMap; library?: LibraryReport } & ComponentCount) | Refusal;
 
 export type CodePage = { label: string; url: string; route?: string; conditions?: RenderConditions };
 
@@ -97,11 +98,14 @@ const refused = (outcome: Refusal['outcome'], error?: string, apps?: string[]): 
 
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-export function marksPlanner(names: string[], found: { uses: ComponentUse[] }, delayMs = 0): Planner {
+type Found = { uses: ComponentUse[]; links: string[] };
+
+export function marksPlanner(names: string[], found: Found, delayMs = 0): Planner {
   return {
     prepare: async (tab) => {
       await pause(delayMs);
       found.uses = await tab.marks(names);
+      found.links = (await tab.ui()).elements.flatMap((e) => (e.href ? [e.href] : []));
     },
     plan: (tree, newId, fonts) => urlPlan(tree, newId, undefined, fonts)
   };
@@ -122,7 +126,12 @@ enum Missed {
 
 type Window = { settleMs: number; budgetMs: number; now: () => number; delay: CaptureDelay };
 
-type Captured = { captures: Capture[]; missed: string[]; locked: LockedRoute[]; last: Refusal | null };
+function sameOriginPaths(links: string[], page: URL): string[] {
+  const paths = links.filter((l) => URL.canParse(l)).map((l) => new URL(l)).filter((u) => u.origin === page.origin).map((u) => pathKey(u.pathname) || '/');
+  return [...new Set(paths)];
+}
+
+type Captured = { captures: Capture[]; missed: string[]; locked: LockedRoute[]; links: string[]; last: Refusal | null };
 
 const loginOf = (sign: SignIn) => (sign.gate === Gate.None ? null : sign.loginUrl);
 
@@ -141,6 +150,7 @@ async function captured(open: OpenAppBrowser, pages: CodePage[], names: string[]
   const captures: Capture[] = [];
   const missed: string[] = [];
   const locked: LockedRoute[] = [];
+  const links: string[] = [];
   const until = window.now() + window.budgetMs;
   let last: Refusal | null = null;
   for (const page of pages) {
@@ -148,7 +158,7 @@ async function captured(open: OpenAppBrowser, pages: CodePage[], names: string[]
       missed.push(`${page.label}: ${Missed.OutOfTime}`);
       continue;
     }
-    const found = { uses: [] as ComponentUse[] };
+    const found: Found = { uses: [], links: [] };
     const conditions = page.conditions ?? BASE_CONDITIONS;
     const tab = await open();
     await tab.scheme(conditions.scheme).catch(() => undefined);
@@ -166,8 +176,9 @@ async function captured(open: OpenAppBrowser, pages: CodePage[], names: string[]
       continue;
     }
     captures.push({ label: page.label, tree: conditioned(read.tree, conditionKey(conditions)), uses: found.uses });
+    links.push(...found.links);
   }
-  return { captures, missed, locked, last };
+  return { captures, missed, locked, links, last };
 }
 
 export type Designer = (loaded: LoadedSheet[]) => Promise<Design | null>;
@@ -198,7 +209,7 @@ export async function importBoards(ask: BoardsAsk): Promise<CodeImported> {
 
   const window = { settleMs: ask.settleMs ?? SETTLE_MS, budgetMs: ask.budgetMs ?? CAPTURE_BUDGET_MS, now: ask.now ?? Date.now, delay: ask.delay ?? NO_DELAY };
   const sign = await signedIn(ask.open, ask.account ?? null, first.href);
-  const { captures, missed, locked, last } = await captured(inSession(ask.open, sign), ask.pages, ask.names, window, sign);
+  const { captures, missed, locked, links, last } = await captured(inSession(ask.open, sign), ask.pages, ask.names, window, sign);
   if (!captures.length && locked.length) {
     return { ...refused(CodeImportOutcome.SignInNeeded, locked.map(lockedLine).join('\n')), locked };
   }
@@ -224,7 +235,7 @@ export async function importBoards(ask: BoardsAsk): Promise<CodeImported> {
   const skipped = [...done.skipped, ...missed, ...locked.map(lockedLine), ...(design?.skipped ?? [])];
   const report = design ? { design: design.report, tokenMap: design.map } : {};
   const library = ask.library ? { library: libraryReport(ask.library, new Set(uses.map((u) => u.component))) } : {};
-  return { ...done, outcome: CodeImportOutcome.Ok, skipped, locked, pages: captures.map((c) => c.label), ...count, ...report, ...library };
+  return { ...done, outcome: CodeImportOutcome.Ok, skipped, locked, pages: captures.map((c) => c.label), links: sameOriginPaths(links, first), ...count, ...report, ...library };
 }
 
 export type RunAsk = LandAsk & DesignOptions & SignInAsk & { repo: RepoRef; app: string | null; routes: string[]; conditions?: RenderConditions[]; delay?: CaptureDelay; runner: RepoRunner | null; archive: Uint8Array | null };

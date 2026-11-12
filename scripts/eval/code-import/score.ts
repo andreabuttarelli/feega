@@ -42,7 +42,7 @@ export type Measured = ({ value: number } | { unrun: string }) & Record<string, 
 
 export type Scorecard = { name: string; repo: string; sha: string; metrics: Record<Metric, Measured> };
 
-const NO_DISCOVERY = 'route discovery does not exist yet: routes are typed from the corpus';
+const NO_DISCOVERY = 'the route discovery endpoint did not answer for this repo';
 const NOT_BOOTED = 'app did not boot';
 
 const ratio = (part: number | null, whole: number | null | undefined, why: string): Measured => (part === null || !whole ? { unrun: why } : { value: part / whole });

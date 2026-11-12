@@ -1,4 +1,4 @@
-import { ParamKind, paramsOf, pathKey, routeMatches } from '$lib/canvas/route-pattern';
+import { ParamKind, paramsOf, routeMatches } from '$lib/canvas/route-pattern';
 import { Framework, type RepoFacts } from './run-plan';
 
 export enum Router {
@@ -367,17 +367,9 @@ export function discoverRoutes(facts: RepoFacts, framework: Framework, appDir: s
   return { ok: true, routes: [...routes.values()].sort(ordered).slice(0, MAX_LISTED_ROUTES) };
 }
 
-function sameOrigin(link: string, origin: string): string | null {
-  if (!URL.canParse(link, origin)) {
-    return null;
-  }
-  const url = new URL(link, origin);
-  return url.origin === origin ? pathKey(url.pathname) || '/' : null;
-}
-
-export function linkCandidates(routes: DiscoveredRoute[], links: readonly string[], origin: string): DiscoveredRoute[] {
+export function linkCandidates(routes: DiscoveredRoute[], links: readonly string[]): DiscoveredRoute[] {
   const statics = new Set(routes.filter((r) => r.kind === RouteKind.Static).map((r) => r.path));
-  const paths = [...new Set(links.map((l) => sameOrigin(l, origin)).filter((p): p is string => p !== null && !statics.has(p)))];
+  const paths = [...new Set(links.filter((p) => !statics.has(p)))];
   return routes.map((route) => {
     if (route.kind === RouteKind.Static) {
       return route;

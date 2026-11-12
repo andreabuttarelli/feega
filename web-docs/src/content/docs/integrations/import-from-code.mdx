@@ -22,7 +22,8 @@ Export the frame back to code (React or Svelte) and you get the same names and p
 
 Open the insert menu (**+**), go to **Import**, choose **From code…**.
 
-- **GitHub**: paste `https://github.com/owner/repo` (or `…/tree/<branch>`, or `…/tree/<branch>/<folder>` for one app of a monorepo; a branch name with `/` works), type the page paths separated by spaces (default `/`, up to 8) and press **Import**. Starting the app takes 15 to 60 seconds.
+- **GitHub**: paste `https://github.com/owner/repo` (or `…/tree/<branch>`, or `…/tree/<branch>/<folder>` for one app of a monorepo; a branch name with `/` works), pick the pages from the list the dialog reads from the app's file router (or type paths separated by spaces; default `/`, up to 20) and press **Import**. Starting the app takes 15 to 60 seconds.
+- **Pages**: the dialog lists the pages the code declares, read from the file tree without starting the app: Next.js (`app/` and `pages/`), SvelteKit, Nuxt, Vue with `src/pages`, Astro, Remix and React Router file routes, TanStack Router. Static pages are ticked, `/` first. A page with a parameter (`/blog/[slug]`) needs a value: type the full path, or pick one the code lists (`generateStaticParams`, SvelteKit `entries`, or a content folder whose files match the slugs one to one). Search, select all or none; the count shows against the cap of 20. Routes written in code (a React Router `routes.ts` with layouts or prefixes) are not listed: type the paths.
 - **Monorepos**: when the repository holds several apps and the link names none, the dialog lists them; pick one and press **Import** again. Dependencies install at the workspace root and only the chosen app starts.
 - **Private repositories**: press **Connect GitHub**, sign in to GitHub in the tab that opens, come back. The dialog then lists your repositories and their branches. Feega downloads the code on its servers and copies it into the sandbox; your GitHub sign-in never reaches the sandbox.
 - **Storybook**: switch to the Storybook tab and paste the Storybook link. Up to 12 stories, spread across components, become boards; stories that do not fit in about two and a half minutes are listed as left out. Nothing is installed or started, so it is the fastest way to bring in a component library, including components no page renders.
@@ -166,6 +167,8 @@ For content that arrives later still, add an extra wait: **Extra wait before cap
 
 ```bash
 feega canvas import-code $PROJECT https://github.com/owner/repo --route / /settings /users --canvas <canvas> --x 0 --y 0
+feega canvas import-code $PROJECT https://github.com/owner/repo --routes discover   # list the pages, nothing starts
+feega canvas import-code $PROJECT https://github.com/owner/repo --routes all --canvas <canvas>   # every static page, up to 20
 feega canvas import-code $PROJECT https://github.com/owner/monorepo --app apps/web --route / --canvas <canvas>   # one app of a monorepo
 feega canvas import-code $PROJECT https://github.com/owner/repo --route / --scheme light dark --width 1280 390 --canvas <canvas>   # one board per theme and width
 feega canvas import-storybook $PROJECT https://storybook.example.com --canvas <canvas> --x 0 --y 0
@@ -180,9 +183,11 @@ feega canvas code-sync $PROJECT publish <frameId>   # pull request, or write the
 feega canvas code-sync $PROJECT pull <frameId> --branch my-branch
 ```
 
-The import answers `frameId`, `pages` (the paths or stories that landed), `components`, `variants`, `instances` and `skipped` (what stayed plain layers, pages that could not be opened, and why).
+The import answers `frameId`, `pages` (the paths or stories that landed), `components`, `variants`, `instances` `skipped` (what stayed plain layers, pages that could not be opened, and why) and `routes`: how many pages the file router declares and, in `leftOut`, each one not imported with its reason (`not_selected`, `needs_value` with values seen in links on the captured pages, `not_opened`). More than 20 pages is refused with the count, never trimmed.
 
 ## MCP and API
+
+Pages: op `discover_routes` (`{ repo | folder, app? }`) or `GET /api/v1/projects/:id/code-import/routes?repo=|folder=|upload=&app=` answers `{ framework, app, max, routes: [{ path, file, router, kind, params, selected, candidates }] }`, or `choose_app` with `apps`, `no_router`, `routes_in_code`. `routes: "all"` on `import_code` imports every static page.
 
 Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, app?, routes, conditions?: [{ scheme: "light" | "dark", width }], captureDelayMs?, routeDelayMs?: { "/route": ms }, designSystem?, x, y } })` (`designSystem: false` skips the tokens; `app` is the folder of one app in a monorepo), or `{ canvasId, storybook, stories?, x, y }`. Folder (local mode): `{ canvasId, folder, routes, x, y }`. Uploaded folder (web): `POST /api/v1/projects/:id/code-uploads` `{ name }` returns `{ path, uploadUrl }`; PUT the gzipped tarball to `uploadUrl`, then `POST /api/v1/projects/:id/code-import` `{ canvasId, upload: path, routes, x, y }`. Sync: ops `code_changes`, `code_publish`, `code_pull` (`{ nodeId, branch? }`, its answer lists token changes in `tokens`). REST: `GET /api/v1/projects/:id/code-import/:nodeId/changes`, `POST …/publish`, `POST …/pull`, `GET …/head`. GitHub: ops `github_status`, `github_connect`, `github_repos`, `github_branches` (`{ repo: "owner/name" }`), `github_disconnect`.
 

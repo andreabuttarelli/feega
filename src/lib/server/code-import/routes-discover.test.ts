@@ -94,31 +94,29 @@ describe('values for dynamic params from the code: only literal, unambiguous one
     { name: 'Astro content collection that maps 1:1 to [slug]', framework: Framework.Astro, files: ASTRO, texts: {}, path: '/blog/[slug]', expected: ['/blog/first-post', '/blog/second'] },
     { name: 'traidue wiki: content nested by language and category is ambiguous', framework: Framework.SvelteKit, files: traidue, texts: {}, path: '/wiki/[slug]', expected: [] }
   ])('$name', ({ framework, files, texts, path, expected }) => {
-    const found = candidates(discoverRoutes(facts(files, texts), framework, ''), path);
+    const found = candidates(discoverRoutes(facts(files, texts as Record<string, string>), framework, ''), path);
     expect(found.map((c) => c.path)).toEqual(expected);
     expect(found.every((c) => c.from === CandidateFrom.Code)).toBe(true);
   });
 });
 
-describe('linkCandidates: same-origin links from captured pages fill dynamic routes', () => {
+describe('linkCandidates: same-origin link paths from captured pages fill dynamic routes', () => {
   const found = discoverRoutes(facts(ASTRO), Framework.Astro, '');
   const routes = found.ok ? found.routes : [];
-  const origin = 'https://app.test';
 
   it.each([
-    { name: 'a matching same-origin link, query and hash dropped', links: ['https://app.test/blog/hello?x=1#top'], path: '/blog/[slug]', expected: ['/blog/first-post', '/blog/second', '/blog/hello'] },
-    { name: 'another origin is ignored', links: ['https://elsewhere.test/blog/x'], path: '/blog/[slug]', expected: ['/blog/first-post', '/blog/second'] },
-    { name: 'a deeper path does not fill a single param', links: ['https://app.test/blog/a/b'], path: '/blog/[slug]', expected: ['/blog/first-post', '/blog/second'] },
-    { name: 'a rest param takes several segments', links: ['https://app.test/docs/guide/install', 'https://app.test/docs/guide/install'], path: '/docs/[...path]', expected: ['/docs/guide/install'] },
-    { name: 'a link to a static page is not a value', links: ['https://app.test/blog'], path: '/blog/[slug]', expected: ['/blog/first-post', '/blog/second'] }
+    { name: 'a matching path', links: ['/blog/hello'], path: '/blog/[slug]', expected: ['/blog/first-post', '/blog/second', '/blog/hello'] },
+    { name: 'a deeper path does not fill a single param', links: ['/blog/a/b'], path: '/blog/[slug]', expected: ['/blog/first-post', '/blog/second'] },
+    { name: 'a rest param takes several segments, once', links: ['/docs/guide/install', '/docs/guide/install'], path: '/docs/[...path]', expected: ['/docs/guide/install'] },
+    { name: 'a link to a static page is not a value', links: ['/blog'], path: '/blog/[slug]', expected: ['/blog/first-post', '/blog/second'] }
   ])('$name', ({ links, path, expected }) => {
-    const route = linkCandidates(routes, links, origin).find((r) => r.path === path);
+    const route = linkCandidates(routes, links).find((r) => r.path === path);
     expect(route?.candidates.map((c) => c.path)).toEqual(expected);
   });
 
   it('labels link values and keeps at most 8 per route', () => {
-    const links = Array.from({ length: 30 }, (_, i) => `${origin}/blog/post-${i}`);
-    const route = linkCandidates(routes, links, origin).find((r) => r.path === '/blog/[slug]')!;
+    const links = Array.from({ length: 30 }, (_, i) => `/blog/post-${i}`);
+    const route = linkCandidates(routes, links).find((r) => r.path === '/blog/[slug]')!;
     expect(route.candidates).toHaveLength(8);
     expect(route.candidates.at(-1)).toEqual({ path: '/blog/post-5', from: CandidateFrom.Links });
   });
