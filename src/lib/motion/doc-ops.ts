@@ -270,6 +270,35 @@ export function applyOps(doc: MotionDoc, ops: readonly DocOp[]): MotionDoc {
   return draft as unknown as MotionDoc;
 }
 
+const PLACE = '@place';
+
+const TARGET: { [K in OpKind]: (op: Extract<DocOp, { kind: K }>) => string[] } = {
+  [OpKind.DocSet]: (op) => ['doc', op.field],
+  [OpKind.DocEntry]: (op) => ['doc', op.field, op.key],
+  [OpKind.TrackAdd]: (op) => ['track', op.track.id],
+  [OpKind.TrackRemove]: (op) => ['track', op.trackId],
+  [OpKind.TrackMove]: (op) => ['track', op.trackId, PLACE],
+  [OpKind.TrackSet]: (op) => ['track', op.trackId, op.field],
+  [OpKind.ClipRemove]: (op) => ['clip', op.clipId],
+  [OpKind.ClipAdd]: (op) => ['clip', op.clip.id],
+  [OpKind.ClipMove]: (op) => ['clip', op.clipId, PLACE],
+  [OpKind.ClipSet]: (op) => ['clip', op.clipId, op.field],
+  [OpKind.ClipEntry]: (op) => ['clip', op.clipId, op.field, op.key]
+};
+
+const targetOf = (op: DocOp) => (TARGET[op.kind] as (op: DocOp) => string[])(op);
+
+const nested = (a: string[], b: string[]) => a.slice(0, b.length).every((part, i) => part === b[i]) || b.slice(0, a.length).every((part, i) => part === a[i]);
+
+export function clashes(mine: readonly DocOp[], theirs: readonly DocOp[]): boolean {
+  const landed = theirs.map((op) => ({ target: targetOf(op), same: JSON.stringify(op) }));
+  return mine.some((op) => {
+    const target = targetOf(op);
+    const same = JSON.stringify(op);
+    return landed.some((their) => their.same !== same && nested(target, their.target));
+  });
+}
+
 export function rebase(base: MotionDoc, mine: MotionDoc, theirs: MotionDoc): MotionDoc {
   return applyOps(theirs, diffDoc(base, mine));
 }

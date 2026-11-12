@@ -22,6 +22,13 @@ describe('frame ops: one answer reading for the session and the reload replay', 
     expect(frameSendOf({ type: 'failure', status: 400, data: { error: 'invalid_ops' } })).toEqual({ ok: false, error: 'Save failed', delivery: Delivery.Refused });
   });
 
+  it('a conflict that carries the newer head is not sent again: the session loads that head', () => {
+    const sent = frameSendOf({ type: 'failure', status: 409, data: { error: 'conflict', head: { version: 5, doc } } });
+
+    expect(sent).toMatchObject({ ok: false, delivery: Delivery.Conflict, head: { version: 5, doc } });
+    expect(queueResultOf(sent)).toBe(SendResult.Dropped);
+  });
+
   it('maps onto the queue result the outbox replay understands', () => {
     expect(queueResultOf({ ok: true, version: 2, doc })).toBe(SendResult.Saved);
     expect(queueResultOf({ ok: false, error: 'x', delivery: Delivery.Unreachable })).toBe(SendResult.Retry);
