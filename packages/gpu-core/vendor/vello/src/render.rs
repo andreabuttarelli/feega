@@ -48,6 +48,7 @@ struct FineResources {
     segments_buf: ResourceProxy,
     ptcl_buf: ResourceProxy,
     gradient_image: ResourceProxy,
+    ramps_kept: bool,
     info_bin_data_buf: ResourceProxy,
     image_atlas: ResourceProxy,
     blend_spill_buf: ResourceProxy,
@@ -80,15 +81,22 @@ impl CapturedBuffers {
     }
 }
 
+#[derive(Default)]
+pub(crate) struct Persistent {
+    pub(crate) atlas: Option<ImageProxy>,
+    pub(crate) ramps: Option<(ImageProxy, u64)>,
+    pub(crate) ramp_uploads: u64,
+}
+
 #[cfg(feature = "wgpu")]
 pub(crate) fn render_full(
     scene: &Scene,
     resolver: &mut Resolver,
     shaders: &FullShaders,
-    image_atlas: &mut Option<ImageProxy>,
+    persistent: &mut Persistent,
     params: &RenderParams,
 ) -> (Recording, ResourceProxy) {
-    render_encoding_full(scene.encoding(), resolver, shaders, image_atlas, params)
+    render_encoding_full(scene.encoding(), resolver, shaders, persistent, params)
 }
 
 #[cfg(feature = "wgpu")]
@@ -100,12 +108,12 @@ pub(crate) fn render_encoding_full(
     encoding: &Encoding,
     resolver: &mut Resolver,
     shaders: &FullShaders,
-    image_atlas: &mut Option<ImageProxy>,
+    persistent: &mut Persistent,
     params: &RenderParams,
 ) -> (Recording, ResourceProxy) {
     let mut render = Render::new();
     let mut recording =
-        render.render_encoding_coarse(encoding, resolver, shaders, image_atlas, params, false);
+        render.render_encoding_coarse(encoding, resolver, shaders, persistent, params, false);
     let out_image = render.out_image();
     render.record_fine(shaders, &mut recording);
     (recording, out_image.into())
@@ -137,7 +145,7 @@ impl Render {
         encoding: &Encoding,
         resolver: &mut Resolver,
         shaders: &FullShaders,
-        persistent_image_atlas: &mut Option<ImageProxy>,
+        persistent: &mut Persistent,
         params: &RenderParams,
         robust: bool,
     ) -> Recording {
@@ -146,19 +154,27 @@ impl Render {
         let mut packed = vec![];
 
         let (layout, ramps, images) = resolver.resolve(encoding, &mut packed);
-        let gradient_image = if ramps.height == 0 {
+        let ramps_kept = ramps.height != 0;
+        let gradient_image = if !ramps_kept {
             ResourceProxy::new_image(1, 1, ImageFormat::Rgba8)
         } else {
-            let data: &[u8] = bytemuck::cast_slice(ramps.data);
-            ResourceProxy::Image(recording.upload_image(
-                ramps.width,
-                ramps.height,
-                ImageFormat::Rgba8,
-                data,
-            ))
+            match persistent.ramps {
+                Some((proxy, revision)) if revision == ramps.revision && proxy.width == ramps.width && proxy.height == ramps.height => ResourceProxy::Image(proxy),
+                old => {
+                    if let Some((proxy, _)) = old {
+                        recording.free_image(proxy);
+                    }
+                    let data: &[u8] = bytemuck::cast_slice(ramps.data);
+                    let proxy = recording.upload_image(ramps.width, ramps.height, ImageFormat::Rgba8, data);
+                    persistent.ramps = Some((proxy, ramps.revision));
+                    persistent.ramp_uploads += 1;
+                    ResourceProxy::Image(proxy)
+                }
+            }
         };
         let atlas_width = images.width.max(1);
         let atlas_height = images.height.max(1);
+        let persistent_image_atlas = &mut persistent.atlas;
         let (image_atlas, atlas_proxy_action) = match persistent_image_atlas {
             Some(proxy) if proxy.width == atlas_width && proxy.height == atlas_height => {
                 (*proxy, AtlasProxyAction::Reused)
@@ -520,6 +536,7 @@ impl Render {
             segments_buf,
             ptcl_buf,
             gradient_image,
+            ramps_kept,
             info_bin_data_buf,
             blend_spill_buf: ResourceProxy::Buffer(blend_spill_buf),
             image_atlas: ResourceProxy::Image(image_atlas),
@@ -619,7 +636,9 @@ impl Render {
         recording.free_resource(fine.tile_buf);
         recording.free_resource(fine.segments_buf);
         recording.free_resource(fine.ptcl_buf);
-        recording.free_resource(fine.gradient_image);
+        if !fine.ramps_kept {
+            recording.free_resource(fine.gradient_image);
+        }
         recording.free_resource(fine.info_bin_data_buf);
         recording.free_resource(fine.blend_spill_buf);
         // TODO: make mask buf persistent

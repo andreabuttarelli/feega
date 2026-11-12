@@ -16,6 +16,7 @@ const RETAINED_COUNT: usize = 64;
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Ramps<'a> {
     pub data: &'a [u32],
+    pub revision: u64,
     pub width: u32,
     pub height: u32,
 }
@@ -46,6 +47,7 @@ impl BitEq for GradientCacheKey {
 #[derive(Default)]
 pub(crate) struct RampCache {
     epoch: u64,
+    revision: u64,
     map: HashMap<CacheKey<GradientCacheKey>, (u32, u64)>,
     data: Vec<u32>,
 }
@@ -57,6 +59,7 @@ impl RampCache {
             self.map
                 .retain(|_key, value| value.0 < RETAINED_COUNT as u32);
             self.data.truncate(RETAINED_COUNT * N_SAMPLES);
+            self.revision += 1;
         }
     }
 
@@ -76,6 +79,7 @@ impl RampCache {
             let id = (self.data.len() / N_SAMPLES) as u32;
             self.data
                 .extend(make_ramp(stops, interpolation_alpha_space));
+            self.revision += 1;
             self.map.insert(key, (id, self.epoch));
             id
         } else {
@@ -95,12 +99,14 @@ impl RampCache {
                 {
                     *dst = src;
                 }
+                self.revision += 1;
                 self.map.insert(key, (id, self.epoch));
                 id
             } else {
                 let id = (self.data.len() / N_SAMPLES) as u32;
                 self.data
                     .extend(make_ramp(stops, interpolation_alpha_space));
+                self.revision += 1;
                 self.map.insert(key, (id, self.epoch));
                 id
             }
@@ -110,6 +116,7 @@ impl RampCache {
     pub(crate) fn ramps(&self) -> Ramps<'_> {
         Ramps {
             data: &self.data,
+            revision: self.revision,
             width: N_SAMPLES as u32,
             height: (self.data.len() / N_SAMPLES) as u32,
         }
