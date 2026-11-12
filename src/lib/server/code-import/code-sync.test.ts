@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ProviderCall } from './github';
+import type { ProviderCall } from '$lib/server/connections/account-links';
 
 const writes: ProviderCall[] = [];
 
