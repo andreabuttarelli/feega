@@ -12,7 +12,7 @@ import { appOf, PlanRefusal } from './run-plan';
 import type { RepoRunner } from './sandbox-runner';
 import { designed, designOf, DesignSystem, modeOfScheme, withBoard, type Design, type DesignReport } from './design-system';
 import type { TokenMap } from './design-tokens';
-import type { LoadedSheet } from './css-tokens';
+import { computedSheet, type LoadedSheet } from './css-tokens';
 import type { ReadFile } from './write-back';
 
 export enum CodeImportOutcome {
@@ -147,7 +147,11 @@ export function designFor(ask: DesignOptions, rev: string | null): Designer | nu
   return code && ask.designSystem !== DesignSystem.Off ? (loaded) => designOf(code(rev), loaded).catch(() => null) : null;
 }
 
-const loadedOf = (captures: Capture[]): LoadedSheet[] => [...new Map(captures.flatMap((c) => c.tree.styles ?? []).map((s) => [s.at ?? s.text, s])).values()];
+function loadedOf(captures: Capture[], pages: CodePage[]): LoadedSheet[] {
+  const modeOf = new Map(pages.map((p) => [p.label, modeOfScheme(p.conditions ?? BASE_CONDITIONS)]));
+  const computed = captures.flatMap((c) => (c.tree.rootVars ? [computedSheet(c.tree.rootVars, modeOf.get(c.label) ?? modeOfScheme(BASE_CONDITIONS))] : []));
+  return [...new Map([...captures.flatMap((c) => c.tree.styles ?? []), ...computed].map((s) => [s.at ?? s.text, s])).values()];
+}
 
 export async function importBoards(ask: BoardsAsk): Promise<CodeImported> {
   const first = ask.pages[0] ? await publicUrl(ask.pages[0].url, ask.guard) : null;
@@ -165,7 +169,7 @@ export async function importBoards(ask: BoardsAsk): Promise<CodeImported> {
   }
 
   const cropped = captures.map(CROPS[ask.crop]);
-  const tokens = ask.design ? await ask.design(loadedOf(captures)) : null;
+  const tokens = ask.design ? await ask.design(loadedOf(captures, ask.pages)) : null;
   const boards = boardsOf(ask.name, tokens ? withBoard(tokens, ask.name, cropped) : cropped);
   const [tree, uses] = [await withSheetFonts(ask, boards.tree), boards.uses];
   const planned = codePlan(tree, uses, ask.newId, await fontsFor(ask, tree));

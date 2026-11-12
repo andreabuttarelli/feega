@@ -282,6 +282,19 @@ describe('importCodeAt design system', () => {
     expect(done.outcome === CodeImportOutcome.Ok && done.tokenMap!['app Text/hero#size'].origins).toEqual({ Light: 'src/app.css:5:1' });
   });
 
+  it('le variabili che esistono solo nella pagina, lette dal :root calcolato, entrano di sola lettura con i modi delle catture', async () => {
+    const { ask, tab } = askOf({ routes: ['/'], code: () => fixture('plain'), conditions: [BASE_CONDITIONS, { scheme: Scheme.Dark, width: 1280 }] });
+    let shot = 0;
+    tab.tree.mockImplementation(async () => ({ ...TREE, rootVars: { '--chakra-colors-brand': shot++ === 0 ? '#3182ce' : '#90cdf4', '--brand': '#000000' } }));
+
+    const done = await importCodeAt(ask);
+
+    const ok = done.outcome === CodeImportOutcome.Ok ? done : null;
+    expect(ok!.tokenMap!['app Palette/chakra-colors-brand'].raw).toEqual({ Light: '#3182ce', Dark: '#90cdf4' });
+    expect(Object.values(ok!.tokenMap!['app Palette/chakra-colors-brand'].origins).every((o) => o.startsWith('page:'))).toBe(true);
+    expect(ok!.tokenMap!['app Palette/brand'].raw.Light).toBe('#ff5500');
+  });
+
   it('un repo senza token importa come prima', async () => {
     const { ask, docs } = askOf({ routes: ['/'], code: () => async () => null });
 

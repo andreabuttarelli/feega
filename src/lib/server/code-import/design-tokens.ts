@@ -53,8 +53,8 @@ const TOKEN_ROWS: Row[] = [
   { test: /^--(container|animate|blur|perspective|aspect)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'not bindable to a layer in feega yet' },
   { test: /^--border-width-/, strip: '--border-width-', kind: TokenKind.Border, group: 'Border' },
   { test: /border-?width|stroke-?width/, strip: DEFAULT_STRIP, kind: TokenKind.Border, group: 'Border' },
-  { test: /radius/, strip: DEFAULT_STRIP, kind: TokenKind.Radius, group: 'Radius' },
-  { test: /gap|spacing|space/, strip: DEFAULT_STRIP, kind: TokenKind.Spacing, group: 'Spacing' },
+  { test: /radius/i, strip: DEFAULT_STRIP, kind: TokenKind.Radius, group: 'Radius' },
+  { test: /gap|spacing|space/i, strip: DEFAULT_STRIP, kind: TokenKind.Spacing, group: 'Spacing' },
   { test: /^--/, strip: DEFAULT_STRIP, kind: TokenKind.Colour, group: PALETTE }
 ];
 
