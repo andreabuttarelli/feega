@@ -7,6 +7,7 @@ import type { PageTree } from '$lib/server/url-import/page-tree';
 import { CodeImportOutcome, Crop, importBoards, importCodeAt } from './import-code';
 import { BASE_CONDITIONS, Scheme } from './render-conditions';
 import { RunFailure, type RepoRunner } from './sandbox-runner';
+import { PlanRefusal } from './run-plan';
 import { fixture } from '../../../../tests/fixtures/design-tokens/read';
 import { DesignSystem } from './design-system';
 import { DESIGN_BOARD } from './design-board';
@@ -94,7 +95,7 @@ describe('importCodeAt', () => {
     const done = await importCodeAt(ask);
 
     expect(done.outcome).toBe(CodeImportOutcome.Ok);
-    expect(runner).toHaveBeenCalledWith({ owner: 'acme', repo: 'app', ref: null }, null);
+    expect(runner).toHaveBeenCalledWith({ owner: 'acme', repo: 'app', ref: null }, null, null);
     expect(tab.goto).toHaveBeenCalledWith(`${APP}/settings`);
     expect(tab.marks).toHaveBeenCalledWith(['Button']);
   });
@@ -170,7 +171,41 @@ describe('importCodeAt', () => {
     await importCodeAt(ask);
 
     expect(archive).toHaveBeenCalledWith({ owner: 'acme', repo: 'app', ref: null });
-    expect(runner).toHaveBeenCalledWith({ owner: 'acme', repo: 'app', ref: null }, new Uint8Array([31, 139]));
+    expect(runner).toHaveBeenCalledWith({ owner: 'acme', repo: 'app', ref: null }, new Uint8Array([31, 139]), null);
+  });
+
+  it('a branch with / in tree/<ref>/<path> is resolved against the real branches, the rest is the app', async () => {
+    const branches = vi.fn(async () => ['main', 'feature/new-nav']);
+    const { ask, runner } = askOf({ repo: 'https://github.com/acme/app/tree/feature/new-nav/apps/web', branches });
+
+    await importCodeAt(ask);
+
+    expect(branches).toHaveBeenCalledWith({ owner: 'acme', repo: 'app', ref: 'feature/new-nav/apps/web' });
+    expect(runner).toHaveBeenCalledWith({ owner: 'acme', repo: 'app', ref: 'feature/new-nav' }, null, 'apps/web');
+  });
+
+  it('an explicit app wins over the folder in the link, and branches are not asked for a plain ref', async () => {
+    const branches = vi.fn(async () => ['main']);
+    const { ask, runner } = askOf({ repo: 'https://github.com/acme/app/tree/main', app: './apps/docs/', branches });
+
+    await importCodeAt(ask);
+
+    expect(branches).not.toHaveBeenCalled();
+    expect(runner).toHaveBeenCalledWith({ owner: 'acme', repo: 'app', ref: 'main' }, null, 'apps/docs');
+  });
+
+  it('an app path that escapes the repository is refused before anything runs', async () => {
+    const { ask, runner } = askOf({ app: '../secrets' });
+
+    expect((await importCodeAt(ask)).outcome).toBe(CodeImportOutcome.Invalid);
+    expect(runner).not.toHaveBeenCalled();
+  });
+
+  it('several apps and none chosen: the answer lists them', async () => {
+    const runner = vi.fn(async () => ({ ok: false as const, failure: PlanRefusal.ChooseApp, detail: 'this repository holds 2 apps: choose one', apps: ['apps/docs', 'apps/web'] }));
+    const { ask } = askOf({ runner });
+
+    expect(await importCodeAt(ask)).toEqual({ outcome: CodeImportOutcome.ChooseApp, error: 'choose_app: this repository holds 2 apps: choose one', apps: ['apps/docs', 'apps/web'] });
   });
 
   it('senza sandbox configurata lo dice', async () => {

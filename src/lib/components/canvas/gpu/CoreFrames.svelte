@@ -107,7 +107,7 @@
   const fromView = (f: FrameAt) => () => Math.hypot(view.x + (f.box.x + f.box.w / 2) * view.zoom - area.width / 2, view.y + (f.box.y + f.box.h / 2) * view.zoom - area.height / 2);
   const customPictures = customPicturesOf();
   const liveRead = (id: string) => `${id}:live`;
-  const thumbs = thumbStore(place?.userId && place.orgId ? { userId: place.userId, orgId: place.orgId } : null);
+  const thumbs = thumbStore(place?.userId && place.orgId ? { userId: place.userId, orgId: place.orgId } : null, place?.canvasId ?? '');
   const thumbPictures = new Map<string, Picture>();
   const thumbAsked = new Set<string>();
   const thumbTaken = new Set<string>();
@@ -428,16 +428,19 @@
 
   async function rebuildLive(f: FrameAt, source: LiveDoc) {
     const generation = liveGeneration.ask(f.id);
+    const key = `${f.id}:live${generation}`;
+    markFrame(key, Step.LiveAsked);
     const list = await liveOff(f, { revision: f.revision, ...source }).catch((e: unknown) => (console.warn('[canvas] core live frame failed', f.id, e), null));
     const built = list ? { list } : null;
     if (!built || !liveGeneration.newer(f.id, generation)) {
       return;
     }
+    markFrame(key, Step.LiveBuilt);
     const ready = await media.ready(built.list);
     if (!liveGeneration.land(f.id, generation)) {
       return;
     }
-    const key = `${f.id}:live${generation}`;
+    markFrame(key, Step.LiveReady);
     logGaps(f.id, built.list);
     lists = listed(lists, f.id, key, onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), loaded.get(f.id), drawnLast.get(f.id)?.group]);
     liveGroup = new Map(liveGroup).set(f.id, key);

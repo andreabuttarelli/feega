@@ -606,6 +606,7 @@ canvas
   .command('import-code <projectId> <repo>')
   .description('Run a GitHub React, Vue or Svelte app in a sandbox (private repos once `canvas github connect` is done), or a local project folder (an absolute path, local mode), and draw its pages as boards of one frame: components become main components, usages instances, props variants')
   .requiredOption('--canvas <id>', 'The canvas')
+  .option('--app <folder>', 'In a monorepo, the folder of the app to run (e.g. apps/web); asked for when several apps exist')
   .option('--route <paths...>', 'The pages of the app to import (up to 8): one frame, a board per page, components shared', ['/'])
   .option('--scheme <schemes...>', 'Render each page under these themes: light, dark (default light)')
   .option('--width <px...>', 'Render each page at these widths in px (default 1280); with --scheme, one board per combination')

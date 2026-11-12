@@ -8,7 +8,7 @@ export type RenderCondition = { scheme: 'light' | 'dark'; width: number };
 
 export type CaptureWait = { captureDelayMs?: number; routeDelayMs?: Record<string, number> };
 
-export type CodeTarget = ({ repo: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean } & CaptureWait) | ({ folder: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean } & CaptureWait) | ({ upload: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean } & CaptureWait) | { storybook: string };
+export type CodeTarget = ({ repo: string; app?: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean } & CaptureWait) | ({ folder: string; app?: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean } & CaptureWait) | ({ upload: string; app?: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean } & CaptureWait) | { storybook: string };
 
 export type CodeAsk = { projectId: string; canvasId: string; target: CodeTarget; at: { x: number; y: number } };
 
@@ -16,20 +16,20 @@ export type GithubStatus = { configured: boolean; connected: boolean; label: str
 
 export type GithubRepo = { fullName: string; private: boolean; branch: string };
 
-type Answer<T> = { ok: true; value: T } | { ok: false; error: string; detail?: string };
+type Answer<T> = { ok: true; value: T } | { ok: false; error: string; detail?: string; apps?: string[] };
 
 async function asked<T>(url: string, init: RequestInit, fetchFn: typeof fetch): Promise<Answer<T>> {
   const res = await fetchFn(url, init).catch(() => null);
   if (!res?.ok) {
-    const body = (await res?.json().catch(() => ({}))) as { error?: string; detail?: string } | undefined;
-    return { ok: false, error: body?.error ?? UNAVAILABLE, ...(body?.detail ? { detail: body.detail } : {}) };
+    const body = (await res?.json().catch(() => ({}))) as { error?: string; detail?: string; apps?: string[] } | undefined;
+    return { ok: false, error: body?.error ?? UNAVAILABLE, ...(body?.detail ? { detail: body.detail } : {}), ...(body?.apps ? { apps: body.apps } : {}) };
   }
   return { ok: true, value: (await res.json()) as T };
 }
 
 const JSON_POST = (body: unknown): RequestInit => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 
-export async function importCode(ask: CodeAsk, fetchFn: typeof fetch = fetch): Promise<{ ok: true; landed: CodeLanded } | { ok: false; error: string; detail?: string }> {
+export async function importCode(ask: CodeAsk, fetchFn: typeof fetch = fetch): Promise<{ ok: true; landed: CodeLanded } | { ok: false; error: string; detail?: string; apps?: string[] }> {
   const got = await asked<CodeLanded>(`/api/v1/projects/${ask.projectId}/code-import`, JSON_POST({ canvasId: ask.canvasId, ...ask.target, x: ask.at.x, y: ask.at.y }), fetchFn);
   return got.ok ? { ok: true, landed: got.value } : got;
 }

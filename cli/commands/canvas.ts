@@ -76,10 +76,10 @@ export function routeDelaysOf(pairs: string[]): Record<string, number> {
   return Object.fromEntries(pairs.map((pair) => [pair.slice(0, pair.lastIndexOf('=')), Number(pair.slice(pair.lastIndexOf('=') + 1))]));
 }
 
-export async function cmdCanvasImportCode(project: string, repo: string, opts: { canvas: string; route: string[]; scheme?: string[]; width?: string[]; designSystem?: boolean; delay?: number; routeDelay?: string[]; x: number; y: number; org?: string }) {
+export async function cmdCanvasImportCode(project: string, repo: string, opts: { canvas: string; app?: string; route: string[]; scheme?: string[]; width?: string[]; designSystem?: boolean; delay?: number; routeDelay?: string[]; x: number; y: number; org?: string }) {
   const source = repo.startsWith('/') ? { folder: repo } : { repo };
   const conditions = conditionsOf(opts.scheme, opts.width);
-  const input = { canvasId: opts.canvas, ...source, routes: opts.route, ...(conditions ? { conditions } : {}), ...(opts.designSystem === false ? { designSystem: false } : {}), ...(opts.delay ? { captureDelayMs: opts.delay } : {}), ...(opts.routeDelay?.length ? { routeDelayMs: routeDelaysOf(opts.routeDelay) } : {}), x: opts.x, y: opts.y };
+  const input = { canvasId: opts.canvas, ...source, ...(opts.app ? { app: opts.app } : {}), routes: opts.route, ...(conditions ? { conditions } : {}), ...(opts.designSystem === false ? { designSystem: false } : {}), ...(opts.delay ? { captureDelayMs: opts.delay } : {}), ...(opts.routeDelay?.length ? { routeDelayMs: routeDelaysOf(opts.routeDelay) } : {}), x: opts.x, y: opts.y };
   const result = await canvasApi.run(await token(), { project, op: 'import_code', input }, opts.org);
   console.log(JSON.stringify(result, null, 2));
 }

@@ -8,7 +8,8 @@ import { boardsOf, conditioned, cropped, type Capture } from './boards';
 import { BASE_CONDITIONS, conditionKey, variantsOf, type RenderConditions } from './render-conditions';
 import { CAPTURE_BUDGET_MS, delayFor, NO_DELAY, type CaptureDelay } from './capture-wait';
 import { ownImages } from './page-images';
-import { repoOf, routesOf, type RepoRef } from './repo';
+import { located, repoOf, routesOf, type RepoRef } from './repo';
+import { appOf, PlanRefusal } from './run-plan';
 import type { RepoRunner } from './sandbox-runner';
 import { designed, designOf, DesignSystem, modeOfScheme, withBoard, type Design, type DesignReport } from './design-system';
 import type { TokenMap } from './design-tokens';
@@ -22,7 +23,8 @@ export enum CodeImportOutcome {
   NoBrowser = 'no_browser',
   Failed = 'failed',
   Unreadable = 'unreadable',
-  RateLimited = 'rate_limited'
+  RateLimited = 'rate_limited',
+  ChooseApp = 'choose_app'
 }
 
 export const CODE_IMPORT_STATUS: Record<Exclude<CodeImportOutcome, CodeImportOutcome.Ok>, number> = {
@@ -32,7 +34,8 @@ export const CODE_IMPORT_STATUS: Record<Exclude<CodeImportOutcome, CodeImportOut
   [CodeImportOutcome.NoBrowser]: 503,
   [CodeImportOutcome.Failed]: 502,
   [CodeImportOutcome.Unreadable]: 422,
-  [CodeImportOutcome.RateLimited]: 429
+  [CodeImportOutcome.RateLimited]: 429,
+  [CodeImportOutcome.ChooseApp]: 409
 };
 
 const FROM_URL_IMPORT: Record<Exclude<UrlImportOutcome, UrlImportOutcome.Ok>, Exclude<CodeImportOutcome, CodeImportOutcome.Ok>> = {
@@ -62,9 +65,9 @@ const CROPS: Record<Crop, (capture: Capture) => Capture> = {
 
 export type ComponentCount = { components: number; variants: number; instances: number };
 
-type Refusal = { outcome: Exclude<CodeImportOutcome, CodeImportOutcome.Ok>; error?: string };
+type Refusal = { outcome: Exclude<CodeImportOutcome, CodeImportOutcome.Ok>; error?: string; apps?: string[] };
 
-export type CodeOrigin = { repo: string; branch: string | null; sha: string | null };
+export type CodeOrigin = { repo: string; branch: string | null; sha: string | null; app: string | null };
 
 export type CodeImported = ({ outcome: CodeImportOutcome.Ok; frameId: string; origin?: CodeOrigin; name: string; undo: unknown[]; skipped: string[]; truncated: boolean; pages: string[]; design?: DesignReport; tokenMap?: TokenMap } & ComponentCount) | Refusal;
 
@@ -78,9 +81,11 @@ export type CodeReader = (rev: string | null) => ReadFile;
 
 export type DesignOptions = { code?: CodeReader | null; designSystem?: DesignSystem };
 
-export type CodeAsk = LandAsk & DesignOptions & { repo: string; routes: string[]; conditions?: RenderConditions[]; delay?: CaptureDelay; runner: RepoRunner | null; archive?: RepoArchive | null };
+export type BranchList = (repo: RepoRef) => Promise<string[]>;
 
-const refused = (outcome: Refusal['outcome'], error?: string): Refusal => ({ outcome, ...(error ? { error } : {}) });
+export type CodeAsk = LandAsk & DesignOptions & { repo: string; app?: string; routes: string[]; conditions?: RenderConditions[]; delay?: CaptureDelay; runner: RepoRunner | null; archive?: RepoArchive | null; branches?: BranchList | null };
+
+const refused = (outcome: Refusal['outcome'], error?: string, apps?: string[]): Refusal => ({ outcome, ...(error ? { error } : {}), ...(apps?.length ? { apps } : {}) });
 
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -175,20 +180,29 @@ export async function importBoards(ask: BoardsAsk): Promise<CodeImported> {
   return { ...done, outcome: CodeImportOutcome.Ok, skipped, pages: captures.map((c) => c.label), ...count, ...tokens };
 }
 
-export type RunAsk = LandAsk & DesignOptions & { repo: RepoRef; routes: string[]; conditions?: RenderConditions[]; delay?: CaptureDelay; runner: RepoRunner | null; archive: Uint8Array | null };
+export type RunAsk = LandAsk & DesignOptions & { repo: RepoRef; app: string | null; routes: string[]; conditions?: RenderConditions[]; delay?: CaptureDelay; runner: RepoRunner | null; archive: Uint8Array | null };
+
+const AMBIGUOUS_REF = '/';
+
+async function branchesFor(ask: CodeAsk, repo: RepoRef): Promise<string[]> {
+  return repo.ref?.includes(AMBIGUOUS_REF) && ask.branches ? ask.branches(repo).catch(() => []) : [];
+}
 
 export async function importCodeAt(ask: CodeAsk): Promise<CodeImported> {
-  const repo = repoOf(ask.repo);
+  const linked = repoOf(ask.repo);
   const routes = routesOf(ask.routes);
-  if (!repo || !routes) {
+  const asked = ask.app === undefined ? undefined : appOf(ask.app);
+  if (!linked || !routes || asked === null) {
     return refused(CodeImportOutcome.Invalid);
   }
   if (!ask.runner) {
     return refused(CodeImportOutcome.NoSandbox);
   }
 
+  const { ref, path } = located(linked.ref, await branchesFor(ask, linked));
+  const repo = { ...linked, ref };
   const archive = ask.archive ? await ask.archive(repo).catch(() => null) : null;
-  return importRepoAt({ ...ask, repo, routes, archive });
+  return importRepoAt({ ...ask, repo, app: asked ?? path, routes, archive });
 }
 
 export async function importRepoAt(ask: RunAsk): Promise<CodeImported> {
@@ -200,13 +214,13 @@ export async function importRepoAt(ask: RunAsk): Promise<CodeImported> {
     return refused(CodeImportOutcome.NoSandbox);
   }
 
-  const run = await ask.runner(ask.repo, ask.archive);
+  const run = await ask.runner(ask.repo, ask.archive, ask.app);
   if (!run.ok) {
-    return refused(CodeImportOutcome.RunFailed, `${run.failure}: ${run.detail}`);
+    return refused(run.failure === PlanRefusal.ChooseApp ? CodeImportOutcome.ChooseApp : CodeImportOutcome.RunFailed, `${run.failure}: ${run.detail}`, run.apps);
   }
 
   const pages = variantsOf(routes, ask.conditions ?? [BASE_CONDITIONS]).map((v) => ({ label: v.label, url: new URL(v.route, run.app.url).toString(), route: v.route, conditions: v.conditions }));
-  const origin = { repo: `${ask.repo.owner}/${ask.repo.repo}`, branch: ask.repo.ref, sha: run.app.sha };
+  const origin = { repo: `${ask.repo.owner}/${ask.repo.repo}`, branch: ask.repo.ref, sha: run.app.sha, app: ask.app };
   const design = await designFor(ask, run.app.sha);
   const done = await importBoards({ ...ask, name: ask.repo.repo, pages, names: run.app.names, crop: Crop.Page, design }).finally(() => run.app.stop().catch(() => undefined));
   return done.outcome === CodeImportOutcome.Ok ? { ...done, origin } : done;

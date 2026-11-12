@@ -19,7 +19,8 @@
     no_browser: 'Code import is not available right now.',
     failed: 'The page could not be opened.',
     unreadable: 'Nothing on that page could be read.',
-    rate_limited: 'Two imports every ten minutes. Try again shortly.'
+    rate_limited: 'Two imports every ten minutes. Try again shortly.',
+    choose_app: 'This repository holds several apps. Pick one and import again.'
   };
   const FALLBACK_REFUSAL = 'Could not import that app.';
   const HTTP = /^https?:\/\//i;
@@ -40,6 +41,8 @@
   let picked = $state('');
   let branches = $state<string[]>([]);
   let branch = $state('');
+  let apps = $state<string[]>([]);
+  let app = $state('');
 
   const SCHEMES = [
     { id: 'light', label: 'Light' },
@@ -73,6 +76,12 @@
   let found = $state<number | null>(null);
 
   const lookup = $derived(source === Source.Repo && repo.trim() ? { repo: linked(repo) } : source === Source.Folder && folder.trim() ? { folder: folder.trim() } : source === Source.Upload && uploaded ? { upload: uploaded.path } : null);
+
+  $effect(() => {
+    void lookup;
+    apps = [];
+    app = '';
+  });
 
   $effect(() => {
     const where = lookup;
@@ -176,11 +185,13 @@
     busy = true;
     message = null;
     detail = null;
-    const got = await importCode({ projectId, canvasId, target: TARGETS[source](), at });
+    const got = await importCode({ projectId, canvasId, target: { ...TARGETS[source](), ...(app ? { app } : {}) }, at });
     busy = false;
     if (!got.ok) {
       message = REFUSALS[got.error] ?? FALLBACK_REFUSAL;
       detail = got.detail ?? null;
+      apps = got.apps ?? apps;
+      app = app || (apps[0] ?? '');
       return;
     }
     onimported(got.landed);
@@ -282,6 +293,13 @@
           </p>
         </fieldset>
         {/if}
+      {/if}
+      {#if apps.length > 1}
+        <select class="rounded-sm" aria-label="App" bind:value={app} data-testid="code-import-app">
+          {#each apps as a (a)}
+            <option value={a}>{a}</option>
+          {/each}
+        </select>
       {/if}
       <div class="ui-row ui-end">
         <button class="ui-btn primary rounded-sm" type="submit" disabled={busy || !ready} data-testid="code-import-run">{busy ? (source !== Source.Storybook ? 'Starting the app…' : 'Reading the stories…') : 'Import'}</button>

@@ -36,7 +36,7 @@ describe('reading a large doc against a large library', () => {
   const uuid = (i: number) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`;
   const library = Array.from({ length: 300 }, (_, i) => ({ id: uuid(i), kind: 'image' as const, name: `photo ${i}` }));
 
-  it('writes the doc out once, not once per call or per library asset', () => {
+  it('never writes the doc out to find asset ids, once per call or per library asset', () => {
     const doc = must(addClip(newMotionDoc(MotionFormat.Vertical), { component: 'Image', from: 0, durationInFrames: 90, props: { assetId: uuid(7) } }, 'p'));
     const written = vi.spyOn(JSON, 'stringify');
 
@@ -47,6 +47,26 @@ describe('reading a large doc against a large library', () => {
 
     expect(used).toEqual([uuid(7)]);
     expect(ids).toEqual([uuid(7)]);
-    expect(docWrites).toBe(1);
+    expect(docWrites).toBe(0);
+  });
+});
+
+describe('mentionedIds after an edit', () => {
+  const ID = '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d';
+
+  it('rereads only the clips the edit replaced, not the whole doc', () => {
+    let doc = newMotionDoc(MotionFormat.Vertical);
+    for (let i = 0; i < 50; i++) {
+      doc = must(addClip(doc, { component: 'Image', from: 0, durationInFrames: 90, props: { assetId: ID } }, `c${i}`));
+    }
+    mentionedIds(doc);
+    const [track, ...rest] = doc.tracks;
+    const [clip, ...others] = track.clips;
+    const nudged = { ...doc, tracks: [{ ...track, clips: [{ ...clip, from: 1 }, ...others] }, ...rest] };
+    const stringify = vi.spyOn(JSON, 'stringify');
+
+    expect(mentionedIds(nudged)).toEqual([ID]);
+    expect(stringify).not.toHaveBeenCalled();
+    stringify.mockRestore();
   });
 });

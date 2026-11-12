@@ -4,13 +4,21 @@ import { loadavg } from 'node:os';
 import { test, expect, chromium, type Browser, type CDPSession, type Page } from '@playwright/test';
 import { instrument, wheelPan } from '../e2e/fixtures/frame-sweeps';
 import { LANDINGS_FIXTURE_PLACE } from '../../scripts/perf/landings-fixture.mjs';
-import { budgetOf, FRAME_BUDGET_MS } from '../../scripts/perf/frame-budget';
+import { budgetOf, editBudgetOf, EDIT_BUDGET_MS, FRAME_BUDGET_MS } from '../../scripts/perf/frame-budget';
 
 enum Gesture {
   Pan = 'pan',
   Zoom = 'zoom',
   Fit = 'fit',
   Drag = 'drag'
+}
+
+enum Edit {
+  Nudge = 'nudge',
+  Resize = 'resize',
+  Opacity = 'opacity',
+  Hide = 'hide',
+  Text = 'text'
 }
 
 enum Target {
@@ -224,5 +232,154 @@ for (const target of TARGETS) {
     writeFileSync(join(OUT, `frame-budget-${target}.json`), JSON.stringify(report, null, 2));
     console.table(report);
     expect(Object.entries(report).filter(([, r]) => !r.passed).map(([g]) => g)).toEqual([]);
+  });
+}
+
+const EDITS_EACH = Number(process.env.BUDGET_EDITS ?? 8);
+const EDIT_GIVE_UP_MS = 3000;
+const EDIT_PAUSE_MS = 250;
+const RESIZE_STEP_PX = 6;
+const CHILD_AT = { x: 0.07, y: 0.032 };
+
+type Stages = { total: number; effect: number; build: number; media: number; upload: number; draw: number };
+
+function listenInput() {
+  const probe = window as unknown as { __editAt: number };
+  const seen = (e: Event) => {
+    probe.__editAt = e.timeStamp;
+  };
+  addEventListener('keydown', seen, true);
+  addEventListener('pointermove', seen, true);
+}
+
+async function stagesAfter(page: Page): Promise<Stages | null> {
+  return page.evaluate(async (giveUp) => {
+    const at = (window as unknown as { __editAt: number }).__editAt;
+    const started = performance.now();
+    const LIVE = /^frame\|drawn\|(.+:live\d+)$/;
+    while (performance.now() - started < giveUp) {
+      await new Promise((done) => requestAnimationFrame(done));
+      const marks = performance.getEntriesByType('mark').filter((m) => m.startTime >= at);
+      const drawn = marks.find((m) => LIVE.test(m.name));
+      if (!drawn) {
+        continue;
+      }
+      const group = drawn.name.match(LIVE)![1];
+      const of = (step: string) => marks.find((m) => m.name === `frame|${step}|${group}`)?.startTime ?? drawn.startTime;
+      const [asked, built, ready, put] = [of('live-asked'), of('live-built'), of('live-ready'), Math.min(of('put'), of('patched'))];
+      return { total: drawn.startTime - at, effect: asked - at, build: built - asked, media: ready - built, upload: put - ready, draw: drawn.startTime - put };
+    }
+    return null;
+  }, EDIT_GIVE_UP_MS);
+}
+
+async function selectChild(page: Page) {
+  const box = await frameOnScreen(page);
+  await page.mouse.click(box.x + box.w * CHILD_AT.x, box.y + box.w * CHILD_AT.y);
+  await page.getByTestId('frame-selection').first().waitFor({ timeout: 10_000 });
+}
+
+async function resizeEdits(page: Page, count: number): Promise<(Stages | null)[]> {
+  const edge = (await page.getByTestId('frame-selection-edge').nth(1).boundingBox())!;
+  const from = { x: edge.x + edge.width / 2, y: edge.y + edge.height / 2 };
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  const seen: (Stages | null)[] = [];
+  for (let i = 1; i <= count; i++) {
+    await page.mouse.move(from.x + i * RESIZE_STEP_PX, from.y);
+    seen.push(await stagesAfter(page));
+  }
+  await page.mouse.up();
+  return seen;
+}
+
+const KEYS: Record<Exclude<Edit, Edit.Resize | Edit.Text>, [string, string]> = {
+  [Edit.Nudge]: ['ArrowRight', 'ArrowLeft'],
+  [Edit.Opacity]: ['Digit5', 'Digit0'],
+  [Edit.Hide]: ['ControlOrMeta+Shift+KeyH', 'ControlOrMeta+Shift+KeyH']
+};
+
+async function keyEdits(page: Page, keys: [string, string], count: number): Promise<(Stages | null)[]> {
+  const seen: (Stages | null)[] = [];
+  for (let i = 0; i < count; i++) {
+    await page.keyboard.press(keys[i % 2]);
+    seen.push(await stagesAfter(page));
+    await page.waitForTimeout(EDIT_PAUSE_MS);
+  }
+  return seen;
+}
+
+async function textEdits(page: Page, count: number): Promise<(Stages | null)[]> {
+  await page.getByTestId('frame-selection-body').first().dblclick();
+  const seen: (Stages | null)[] = [];
+  for (let i = 0; i < count; i++) {
+    await page.keyboard.press('KeyA');
+    seen.push(await stagesAfter(page));
+  }
+  await page.keyboard.press('Escape');
+  return seen;
+}
+
+async function edits(page: Page, edit: Edit): Promise<(Stages | null)[]> {
+  await selectChild(page);
+  if (edit === Edit.Resize) {
+    return resizeEdits(page, EDITS_EACH);
+  }
+  if (edit === Edit.Text) {
+    return textEdits(page, EDITS_EACH);
+  }
+  return keyEdits(page, KEYS[edit], EDITS_EACH);
+}
+
+const mean = (xs: number[]) => (xs.length ? Math.round((10 * xs.reduce((a, b) => a + b, 0)) / xs.length) / 10 : 0);
+
+function breakdown(seen: Stages[]) {
+  const stage = (k: keyof Stages) => mean(seen.map((s) => s[k]));
+  return { effect: stage('effect'), build: stage('build'), media: stage('media'), upload: stage('upload'), draw: stage('draw') };
+}
+
+async function editRun(browser: Browser, target: Target): Promise<Record<Edit, (Stages | null)[]>> {
+  const { base, place, login: needsLogin } = PLACES[target];
+  const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 2, serviceWorkers: 'block' });
+  const page = await context.newPage();
+  await page.addInitScript(listenInput);
+  if (needsLogin) {
+    await login(page, base);
+  }
+  await page.goto(`${base}/p/${place.projectId}/c/${place.canvasId}`, { waitUntil: 'commit' });
+  await page.locator('[data-canvas-surface]').first().waitFor({ timeout: 120_000 });
+  await page.waitForTimeout(SETTLE_MS);
+  const seen = {} as Record<Edit, (Stages | null)[]>;
+  for (const edit of Object.values(Edit)) {
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Shift+Digit1');
+    await page.waitForTimeout(FIT_TOGGLE_MS);
+    await zoomOntoFrame(page);
+    seen[edit] = await edits(page, edit).catch((e: unknown) => (console.log(`${edit}: ${e}`), []));
+  }
+  await context.close();
+  return seen;
+}
+
+for (const target of TARGETS) {
+  test(`edits reach the screen inside ${EDIT_BUDGET_MS.toFixed(1)} ms on ${target}`, async () => {
+    mkdirSync(OUT, { recursive: true });
+    const browser = await chromium.launch({ headless: false, args: UNCAPPED });
+    const all = Object.fromEntries(Object.values(Edit).map((e) => [e, [] as (Stages | null)[]])) as Record<Edit, (Stages | null)[]>;
+    for (let i = 0; i < RUNS; i++) {
+      const seen = await editRun(browser, target);
+      Object.values(Edit).forEach((e) => all[e].push(...seen[e]));
+    }
+    await browser.close();
+    const report = Object.fromEntries(
+      Object.values(Edit).map((e) => {
+        const landed = all[e].filter((s): s is Stages => s !== null);
+        return [e, { ...editBudgetOf(landed.map((s) => s.total)), missed: all[e].length - landed.length, ...breakdown(landed) }];
+      })
+    );
+    writeFileSync(join(OUT, `edit-latency-${target}.json`), JSON.stringify(report, null, 2));
+    console.table(report);
+    expect(Object.entries(report).filter(([, r]) => !r.passed).map(([e]) => e)).toEqual([]);
   });
 }

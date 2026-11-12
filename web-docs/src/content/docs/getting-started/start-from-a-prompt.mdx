@@ -1,0 +1,39 @@
+---
+title: Start from a prompt
+description: Describe what you want on the home or on feega.app; a canvas opens and the agent starts on it.
+sidebar:
+  order: 2
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+<DemoVideo name="home-prompt" caption="Pick website design, attach a photo, describe the page: a new canvas opens with the agent on it." />
+
+The home asks *what do you want to make?*
+
+1. **Pick a kind.** **motion video** starts from a Presentation frame (1920×1080), **website design** from a Desktop frame. The agent is told which one.
+2. **Describe it.** A URL in the prompt is imported first as an editable frame, and the agent works from that frame instead of redrawing the page. A prompt that is only a URL becomes *Make a launch film of …* or *Redesign …*.
+3. **Attach files.** The `+` button, paste or drag and drop. Images, videos and documents go to the agent with the brief.
+4. **Bring existing work (optional).** Next to `+`:
+   - **GitHub**: a repository URL. Connect GitHub for a private one.
+   - **Local folder**: on feega.app the folder is uploaded once and run in a sandbox, with no sync back to your files. See [Import a local folder](/integrations/import-from-code/#import-a-local-folder). In local mode it stays linked to the folder.
+   - **Import from Figma**: a file URL. Needs your Figma token in profile settings.
+
+   The source shows as a chip in the composer. On send it is imported onto the new canvas first, and the agent gets the brief together with the imported frames. If the import fails, the agent is told why and asks you what to fix.
+5. **Send.** A new project and canvas open, and the agent starts in the side chat with your brief.
+
+The agent runs on Claude Opus 5.5 and spends credits. See [Credits](/ai/generate-and-credits/).
+
+## From feega.app, before signing in
+
+<DemoVideo name="landing-handoff" caption="A prompt typed on feega.app survives sign-in and starts the agent on a new canvas." />
+
+The same composer is on [feega.app](https://feega.app). Type a prompt and send. If you are not signed in, the prompt waits through sign-in or sign-up (for an hour). Then a new canvas opens and the agent starts on it by itself, with no second click. Reloading or going back never sends it twice.
+
+A prompt that needs more from you fills the composer and waits for you to press send:
+
+- a GitHub repository or Figma file: the source is selected, you paste its URL;
+- images attached on feega.app: you attach them again in the app;
+- a local folder: a browser can't keep it through sign-in, so you pick it again.
+
+**Start from a website.** Paste a site on feega.app, or open `https://oh.feega.app/app?start_url=stripe.com`. After sign-in a new project and canvas open, and the page is imported there as an editable frame.
