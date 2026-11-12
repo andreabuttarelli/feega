@@ -30,6 +30,8 @@
     rate_limited: 'Two imports every ten minutes. Try again shortly.',
     sign_in_needed: 'The page went to a sign-in page. Add a TEST account in project settings.',
     run_failed: 'The app could not be started.',
+    failed: 'The page could not be opened.',
+    unreadable: 'Nothing on that page could be read.',
     unavailable: 'The import did not answer. Try again.'
   };
   const FALLBACK = 'Could not import that page.';

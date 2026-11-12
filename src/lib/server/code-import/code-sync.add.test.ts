@@ -43,10 +43,15 @@ vi.mock('$lib/server/motion/move-element', async (real) => ({
     remove: async (id: string) => void removed.push(id)
   })
 }));
+let refuse = false;
+
 vi.mock('./canvas-import', async (real) => ({
   ...(await real<object>()),
   importCodeInto: async (_scope: unknown, _canvas: string, ask: unknown) => {
     asked.push(ask);
+    if (refuse) {
+      return { outcome: 'failed', error: 'the page answered 404' };
+    }
     return { outcome: 'ok', frameId: 'fresh', name: 'app', undo: [], skipped: [], locked: [], truncated: false, pages: ['/pricing'], boards: [{ label: '/pricing', route: '/pricing', cond: 'light@1280', clip: 'n1' }], components: 1, variants: 2, instances: 2 };
   },
   routesFound: async () => ({ ok: false, error: 'unreadable', detail: 'test', apps: [] }),
@@ -60,6 +65,7 @@ const SCOPE = { orgId: 'o1', userId: 'u1', projectId: 'p1', db: {}, actor: { kin
 beforeEach(() => {
   node = { projectId: 'p1', data: { code: origin(MAP) } };
   localDoc = LOCAL;
+  refuse = false;
   [writes, removed, remembered, asked].forEach((list) => list.splice(0));
 });
 
@@ -108,5 +114,14 @@ describe('importing one more page into a code frame', () => {
 
     expect(out.outcome).toBe(SyncOutcome.FrameFull);
     expect(asked).toHaveLength(0);
+  });
+
+  it('a page that could not be imported lands on the map as failed, with the reason, so it can be retried', async () => {
+    refuse = true;
+
+    const out = await codeAdd(SCOPE, 'node-1', { routes: ['/quiz/nope'], land: Land.Piece });
+
+    expect(out.outcome).toBe('failed');
+    expect(remembered[0].code.map.pages.find((p) => p.path === '/quiz/nope')).toEqual({ path: '/quiz/nope', state: PageState.Failed, reason: 'the page answered 404' });
   });
 });

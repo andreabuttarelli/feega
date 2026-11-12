@@ -19,7 +19,7 @@ import { folderOf, folderSource } from './folder-source';
 import { uploadedArchive, uploadOf, uploadSource } from './upload-source';
 import { BASE_CONDITIONS, conditionsOf, labelOf, type RenderConditions, type Variant } from './render-conditions';
 import { addBoards, AddRefusal, boardParent } from '$lib/canvas/code-boards';
-import { boardsUsed, condOf, MAX_FRAME_BOARDS, mergedMap, type ImportMap } from '$lib/canvas/import-map';
+import { boardsUsed, condOf, MAX_FRAME_BOARDS, mergedMap, PageState, type ImportMap } from '$lib/canvas/import-map';
 import { routesFound } from './canvas-import';
 import { mapOf } from './import-map-of';
 import { UNREADABLE, type RoutesFound } from './routes-found';
@@ -223,6 +223,8 @@ const ADD_REFUSED: Record<AddRefusal, SyncRefusal> = {
 
 const newId = () => crypto.randomUUID().slice(0, 8);
 
+const REASON_MAX = 300;
+
 const clipIds = (doc: MotionDoc) => new Set([...doc.tracks, ...Object.values(doc.comps).flatMap((c) => c.tracks)].flatMap((t) => t.clips.map((c) => c.id)));
 
 const variantsOfAsk = (ask: AddAsk): Variant[] => ask.routes.flatMap((route) => (ask.conditions?.length ? ask.conditions : [BASE_CONDITIONS]).map((conditions) => ({ route, label: labelOf(route, conditions), conditions })));
@@ -254,7 +256,9 @@ export async function codeAdd(scope: CodeScope, nodeId: string, ask: AddAsk): Pr
   const where = origin.sha && origin.kind === SourceKind.Github ? linked.link(origin.sha) : linked.link('');
   const [fresh, listed] = await Promise.all([importCodeInto(scope, local.canvasId, { ...where, app: origin.app, routes: ask.routes, variants, delay: origin.delay, at: local.at ?? { x: 0, y: 0 } }), routesFound(scope, { ...WHERE[origin.kind as SourceKind](origin), app: origin.app }).catch(() => null)]);
   if (fresh.outcome !== CodeImportOutcome.Ok) {
-    return { outcome: fresh.outcome, ...(fresh.error ? { error: fresh.error } : {}) };
+    const reason = fresh.error ?? fresh.outcome;
+    await rememberOrigin(scope, nodeId, { ...origin, map: mergedMap(origin.map, { pages: ask.routes.map((path) => ({ path, state: PageState.Failed, reason: reason.slice(0, REASON_MAX) })) }) });
+    return { outcome: fresh.outcome, error: reason };
   }
   const upstream = await store.read(fresh.frameId);
   await store.remove(fresh.frameId);
