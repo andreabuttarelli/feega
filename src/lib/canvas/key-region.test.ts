@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { KEY_REGION_ATTR, Region, regionOf, reachesCanvas } from './key-region.svelte';
+import { KEY_REGION_ATTR, Region, claimFocus, regionOf, reachesCanvas } from './key-region.svelte';
 import { matchCanvasShortcut } from './shortcuts';
 
 function tree() {
@@ -73,5 +73,23 @@ describe('key region', () => {
     for (const key of ['v', 'r', '6', 'ArrowRight', 'Tab']) {
       expect(press($('row'), key), key).toBe(false);
     }
+  });
+
+  it('a press on the canvas takes key focus away from a panel or the layers list, even when the press is cancelled', () => {
+    const $ = tree();
+    const down = (target: Element) => {
+      const e = new Event('pointerdown', { bubbles: true, cancelable: true });
+      e.preventDefault();
+      target.dispatchEvent(e);
+      claimFocus(e);
+    };
+
+    $('row').focus();
+    down($('node'));
+    expect(document.activeElement).toBe(document.body);
+
+    $('fill-eye').focus();
+    down($('row'));
+    expect(document.activeElement).toBe($('fill-eye'));
   });
 });

@@ -33,3 +33,10 @@ export function reachesCanvas(region: Region, command: CanvasCommand | null): bo
   const reach = REACH[region];
   return reach === 'every-key' || (command !== null && reach.has(command.id));
 }
+
+export function claimFocus(e: Event) {
+  const held = document.activeElement;
+  if (regionOf(e.target) === Region.Canvas && held instanceof HTMLElement && regionOf(held) !== Region.Canvas) {
+    held.blur();
+  }
+}

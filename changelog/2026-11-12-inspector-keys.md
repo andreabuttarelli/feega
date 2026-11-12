@@ -18,6 +18,10 @@ lets through:
 | layers | layers panel, frame timeline | undo, redo, delete, delete-keep, deselect (Escape), select-all, duplicate, copy, paste, group, ungroup |
 | panel | everything else: inspector, toolbars, popovers, menus, chat, dialogs | undo, redo |
 
+A press on the canvas takes key focus back: `claimFocus` (window pointerdown, capture) blurs a
+focused element outside the canvas. Without it the canvas grips, which cancel pointerdown, left
+focus on the inspector button or layers row that held it, and the canvas keys stayed off.
+
 Undo/redo stay global because they act on the document, not on the focused control, and a text
 field still keeps its own undo (the matcher skips typing targets). The command palette (⌘K) and
 page zoom have their own window listeners and were already global. The stateful `keyRegion` (last
