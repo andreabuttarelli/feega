@@ -6,11 +6,10 @@
   import { SITE_URL } from '$lib/site/links';
   import { pageTitle } from '$lib/site/llms';
   import { breadcrumbJsonLd } from '$lib/site/structured-data';
+  import { OG } from '$lib/site/seo';
 
   let { children } = $props();
 
-  const OG_IMAGE = `${SITE_URL}/og.gif`;
-  const OG_VIDEO = `${SITE_URL}/og.mp4`;
   const canonical = $derived(SITE_URL + page.url.pathname);
   const crumb = $derived(page.url.pathname === '/' ? undefined : pageTitle(page.url.pathname));
 </script>
@@ -24,16 +23,19 @@
   <meta property="og:site_name" content="Feega" />
   {#if crumb}{@html breadcrumbJsonLd(crumb, page.url.pathname)}{/if}
   <meta property="og:url" content={canonical} />
-  <meta property="og:image" content={OG_IMAGE} />
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />
-  <meta property="og:image:type" content="image/gif" />
-  <meta property="og:video" content={OG_VIDEO} />
-  <meta property="og:video:type" content="video/mp4" />
-  <meta property="og:video:width" content="1200" />
-  <meta property="og:video:height" content="630" />
+  <meta property="og:image" content={OG.image.url} />
+  <meta property="og:image:width" content={String(OG.image.width)} />
+  <meta property="og:image:height" content={String(OG.image.height)} />
+  <meta property="og:image:type" content={OG.image.type} />
+  <meta property="og:image:alt" content={OG.image.alt} />
+  <meta property="og:video" content={OG.video.url} />
+  <meta property="og:video:secure_url" content={OG.video.url} />
+  <meta property="og:video:type" content={OG.video.type} />
+  <meta property="og:video:width" content={String(OG.video.width)} />
+  <meta property="og:video:height" content={String(OG.video.height)} />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:image" content={OG_IMAGE} />
+  <meta name="twitter:image" content={OG.image.url} />
+  <meta name="twitter:image:alt" content={OG.image.alt} />
   <meta name="robots" content="max-image-preview:large" />
 </svelte:head>
 

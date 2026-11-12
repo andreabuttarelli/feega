@@ -17,7 +17,7 @@
   <meta property="og:image" content={ogImage} />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="feega — An AI that runs your social media" />
+  <meta property="og:image:alt" content="Feega: An open-source canvas to design, animate and generate." />
 
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:image" content={ogImage} />
