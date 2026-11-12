@@ -1,6 +1,9 @@
 import type { Db } from '$lib/server/db/client';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { BUILTIN_PREFIX, BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
+import { ARC_TEMPLATES } from '$lib/motion/template/arc';
+
+const SHIPPED = [...BUILTIN_TEMPLATES, ...ARC_TEMPLATES];
 import { templateFromComp, templateFromDoc, type TemplateEntry, type TemplateMeta } from '$lib/motion/template/library';
 import { deleteOrgTemplate, insertOrgTemplate, listOrgTemplates } from '$lib/server/repos/motion-templates';
 import type { Actor } from '$lib/server/repos/actor';
@@ -18,9 +21,9 @@ export type TemplateLibrary = {
 
 export function templateLibrary(db: Db, scope: { orgId: string; actor: Actor }): TemplateLibrary {
   return {
-    list: async () => [...BUILTIN_TEMPLATES, ...(await listOrgTemplates(db, scope.orgId))],
+    list: async () => [...SHIPPED, ...(await listOrgTemplates(db, scope.orgId))],
     find: async (id) => {
-      const builtin = BUILTIN_TEMPLATES.find((e) => e.id === id);
+      const builtin = SHIPPED.find((e) => e.id === id);
       return builtin ?? (id.startsWith(BUILTIN_PREFIX) ? null : ((await listOrgTemplates(db, scope.orgId)).find((e) => e.id === id) ?? null));
     },
     own: () => listOrgTemplates(db, scope.orgId),
