@@ -1472,7 +1472,7 @@
   $effect(() => {
     const next = liveDocs.map;
     const turn = ++viewTurn;
-    whenIdle(() => turn === viewTurn && (viewSources = next));
+    afterPaint(() => whenIdle(() => turn === viewTurn && (viewSources = next)));
   });
   const viewDocOf = (id: string) => {
     const held = viewDocs.get(id);
