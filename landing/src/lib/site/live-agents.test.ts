@@ -65,6 +65,14 @@ describe('element rules', () => {
     expect('BUILD_HEAD' in live).toBe(false);
   });
 
+  it('leaves the chapters alone, so no cursor covers their copy or buttons', () => {
+    const inMain = live.BUILD_TARGETS.filter((selector) => selector.startsWith('main'));
+    expect(inMain.length).toBeGreaterThan(0);
+    for (const selector of inMain) {
+      expect(selector.endsWith(`:not(${live.CHAPTER_SELECTOR} *)`)).toBe(true);
+    }
+  });
+
   it('places only the remaining visuals', () => {
     expect(ELEMENT_RULES.at(-1)).toMatchObject({ selector: '*', build: BuildMode.Place });
   });
