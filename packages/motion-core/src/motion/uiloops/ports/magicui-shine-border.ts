@@ -4,7 +4,7 @@ import { SnapcnCategory, type SnapcnPort } from '../../snapcn/model';
 export const PORT: SnapcnPort = {
   id: 'magicui-shine-border',
   title: 'Shine border',
-  about: 'A soft gradient glow slides around the border of a card.',
+  about: 'A soft gradient glow slides around the border of a card. A soft glow; Border beam is a sharp comet.',
   category: SnapcnCategory.Effect,
   width: 1280,
   height: 720,

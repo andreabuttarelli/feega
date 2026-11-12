@@ -4,7 +4,7 @@ import { SnapcnCategory, type SnapcnPort } from '../../snapcn/model';
 export const PORT: SnapcnPort = {
   id: 'animata-glitch-text',
   title: 'Glitch text',
-  about: 'Text with magenta and cyan ghosts that jolt apart in a short glitch burst, then settle.',
+  about: 'Text with magenta and cyan ghosts that jolt apart in a short glitch burst, then settle. A quick RGB jolt that settles; RenderComp Glitch text keeps tearing longer.',
   category: SnapcnCategory.Text,
   width: 1280,
   height: 720,

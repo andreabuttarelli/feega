@@ -4,7 +4,7 @@ import { SnapcnCategory, type SnapcnPort } from '../../snapcn/model';
 export const PORT: SnapcnPort = {
   id: 'magicui-border-beam',
   title: 'Border beam',
-  about: 'A comet of light travels around the rounded border of a card.',
+  about: 'A comet of light travels around the rounded border of a card. A single comet; Shine border is a soft glow.',
   category: SnapcnCategory.Effect,
   width: 1280,
   height: 720,

@@ -100,7 +100,7 @@ const DESIGNS: Design[] = [
   {
     id: 'lower-third',
     name: 'Lower third',
-    description: 'Name and role on an accent bar, bottom left.',
+    description: 'A name and role over an orange bar that wipes in at the bottom left, over your footage, 5 s. Plain and editable; pick Glass lower third for a frosted card that slides up.',
     seconds: 5,
     beats: [
       { id: 'bar', track: 'back', component: 'Shape', at: 0, len: 5, props: { shape: 'rect', fill: ORANGE, x: 0.25, y: 0.83, width: 0.4, height: 0.15 }, enter: WIPE, exit: FADE_OUT },
@@ -112,7 +112,7 @@ const DESIGNS: Design[] = [
   {
     id: 'title-card',
     name: 'Title card',
-    description: 'A full-frame title with a kicker above it.',
+    description: 'A two-line white title on black with a small orange kicker rising above it, 4 s, then fades. Plain chapter card; pick Scene · Eyebrow and title for the Apple-minimal pacing.',
     seconds: 4,
     beats: [
       backdrop(INK, 4),
@@ -124,7 +124,7 @@ const DESIGNS: Design[] = [
   {
     id: 'product-reveal',
     name: 'Product reveal',
-    description: 'A product photo pops in, with its name and price.',
+    description: 'A product photo pops in on off-white paper, its name below and an orange price rising under it, 5 s. Pick it for a shop item with a price; Scene · Product reveal has no price and drifts.',
     seconds: 5,
     beats: [
       backdrop(PAPER, 5),
@@ -145,7 +145,7 @@ const DESIGNS: Design[] = [
   {
     id: 'end-card',
     name: 'End card',
-    description: 'Logo, call to action and link to close a video.',
+    description: 'Your logo pops in on black, a white call to action and an orange link under it, 4 s, no exit. Pick it to close with a CTA; Scene · Logo end card is logo and address only.',
     seconds: 4,
     beats: [
       backdrop(INK, 4),
@@ -163,7 +163,7 @@ const DESIGNS: Design[] = [
   {
     id: 'social-stat',
     name: 'Social stat',
-    description: 'One big number and what it measures.',
+    description: 'A huge white number pops in, an orange rule wipes under it and a line says what it measures, 4 s, transparent background. Scene · Big number is the Apple-minimal version on black.',
     seconds: 4,
     beats: [
       { id: 'stat', track: 'front', component: 'Title', at: 0, len: 4, props: { text: '87%', color: WHITE, size: 0.22, y: 0.42, height: 0.3 }, keys: POP, exit: FADE_OUT },
@@ -180,7 +180,7 @@ const DESIGNS: Design[] = [
   {
     id: 'quote',
     name: 'Quote',
-    description: 'A pull quote with its author.',
+    description: 'A large orange quote mark, a short pull quote in dark type and its author rising below, on off-white paper, 5 s. Pick it over Scene · Quote for a light, editorial look.',
     seconds: 5,
     beats: [
       backdrop(PAPER, 5),

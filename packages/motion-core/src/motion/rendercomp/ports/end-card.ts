@@ -4,7 +4,7 @@ import { RendercompCategory, type RendercompPort } from '../model';
 export const PORT: RendercompPort = {
   id: 'end-card',
   title: 'End card',
-  about: 'Rings expand behind a springing title, the subtitle fades up, and a call-to-action pill rises in with a sliding sheen.',
+  about: 'Rings expand behind a springing title, the subtitle fades up, and a call-to-action pill rises in with a sliding sheen. Title and CTA pill, no logo slot.',
   category: RendercompCategory.Social,
   width: 1920,
   height: 1080,

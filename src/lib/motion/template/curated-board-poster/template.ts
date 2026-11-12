@@ -13,7 +13,7 @@ export const CURATED_BOARD_POSTER_TEMPLATE: TemplateEntry = {
   id: CURATED_BOARD_TEMPLATE_ID,
   template: lazyTemplate(() => posterTemplateDoc({ name: 'poster-curated-board', component: CURATED_BOARD_COMPONENT, code: curatedBoardComponent(), props: CURATED_BOARD_PROPS, fonts: CURATED_BOARD_FONTS, varPrefix: CURATED_BOARD_VAR_PREFIX, vars: [], clip: CURATED_BOARD_CLIP }, CURATED_BOARD_GRAIN), {
     name: 'Poster curated board',
-    description: 'A curated board on light grey: a bold wordmark in the centre with outlined monospace tags, ringed by small poster thumbnails, each with a number and a name underneath, corner lines and a numbered circle.',
+    description: 'A curated board on light grey: a bold centred wordmark with outlined mono tags, ringed by small numbered poster thumbnails with names, corner lines and a numbered circle.',
     keyFields: CURATED_BOARD_KEY_FIELDS
   })
 };

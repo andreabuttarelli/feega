@@ -4,7 +4,7 @@ import { SnapcnCategory, type SnapcnPort } from '../model';
 export const PORT: SnapcnPort = {
   id: 'word-flip',
   title: 'Word flip',
-  about: 'A line types itself in, then the gradient word in the middle flips through a list of alternatives in a fixed slot.',
+  about: 'A line types itself in, then the gradient word in the middle flips through a list of alternatives in a fixed slot. The swapping word sits mid-sentence.',
   category: SnapcnCategory.Text,
   width: 1280,
   height: 720,

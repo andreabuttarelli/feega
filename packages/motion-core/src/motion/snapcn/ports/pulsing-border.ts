@@ -4,7 +4,7 @@ import { SnapcnCategory, type SnapcnPort } from '../model';
 export const PORT: SnapcnPort = {
   id: 'pulsing-border',
   title: 'Pulsing border',
-  about: 'A soft glowing border pulses around the edges of the scene, the "AI is working" frame.',
+  about: 'A soft glowing border pulses around the edges of the scene, the "AI is working" frame. Frames the whole scene, not a card.',
   category: SnapcnCategory.Ai,
   width: 1280,
   height: 720,

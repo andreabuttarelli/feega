@@ -4,7 +4,7 @@ import { SnapcnCategory, type SnapcnPort } from '../model';
 export const PORT: SnapcnPort = {
   id: 'karaoke-captions',
   title: 'Karaoke captions',
-  about: 'Captions that fill word by word as they are spoken: boxed, karaoke, highlight bar or clean pill looks.',
+  about: 'Captions that fill word by word as they are spoken: boxed, karaoke, highlight bar or clean pill looks. Fills a line; Word captions pages word by word.',
   category: SnapcnCategory.Caption,
   width: 1280,
   height: 720,

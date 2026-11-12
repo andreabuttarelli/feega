@@ -4,7 +4,7 @@ import { SnapcnCategory, type SnapcnPort } from '../../snapcn/model';
 export const PORT: SnapcnPort = {
   id: 'magicui-flickering-grid',
   title: 'Flickering grid',
-  about: 'A grid of small squares whose opacity flickers at random.',
+  about: 'A grid of small squares whose opacity flickers at random. All cells flicker; Animated grid pattern lights few.',
   category: SnapcnCategory.Background,
   width: 1280,
   height: 720,

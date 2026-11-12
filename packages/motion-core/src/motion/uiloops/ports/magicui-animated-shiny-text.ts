@@ -4,7 +4,7 @@ import { SnapcnCategory, type SnapcnPort } from '../../snapcn/model';
 export const PORT: SnapcnPort = {
   id: 'magicui-animated-shiny-text',
   title: 'Shiny text',
-  about: 'A band of light sweeps across the text, pauses, then sweeps back.',
+  about: 'A band of light sweeps across the text, pauses, then sweeps back. A light band, not a colour gradient.',
   category: SnapcnCategory.Text,
   width: 1280,
   height: 720,

@@ -260,6 +260,7 @@ import { FIELD_TYPES, MAX_LINKED, type ExposedField } from '@feega/motion-core/m
 import { detachTemplate, insertTemplate, isLockedComp, setTemplateValues, templateFields } from '$lib/motion/template/library';
 import type { TemplateLibrary } from './templates';
 import { ROLE_MEANING, SECTION_ROLES, cardDetail, cardLine } from '$lib/motion/template/card';
+import { frameShape } from '$lib/motion/template/catalogue';
 import { templateCard } from '$lib/motion/template/cards';
 import { splitFields } from '@feega/motion-core/motion/template/key-fields';
 import { templateCues } from './template-sounds';
@@ -3281,7 +3282,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     list_templates: tool({
-      description: `List the motion templates (built-in and saved by the team), each with its key_fields (the ones a user edits first; get_template lists all) and its card in one line: roles · energy · loops · edges start→end and suggested transition · media count and aspect · text amount · what is on screen, second by second · good for. role narrows to one section role: ${SECTION_ROLES.map((r) => `${r} (${ROLE_MEANING[r]})`).join(', ')}. get_template gives one in full with its typed fields.`,
+      description: `List the motion templates (built-in and saved by the team), each with its shape (width×height, video or still), its key_fields (the ones a user edits first; get_template lists all) and its card in one line: roles · energy · loops · edges start→end and suggested transition · media count and aspect · text amount · what is on screen, second by second · good for. role narrows to one section role: ${SECTION_ROLES.map((r) => `${r} (${ROLE_MEANING[r]})`).join(', ')}. get_template gives one in full with its typed fields.`,
       inputSchema: z.object({ role: z.enum(SECTION_ROLES).optional() }).strict(),
       execute: async (input) => {
         const entries = (await deps.templates?.list()) ?? [];
@@ -3290,7 +3291,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         return {
           templates: picked.map((e) => {
             const card = templateCard(e.id);
-            return { id: e.id, name: e.template.name, seconds: secondsAt(e.template.doc.durationInFrames, e.template.doc.fps), card: card ? cardLine(card) : e.template.description, key_fields: splitFields(e.template.doc.fields, e.template.keyFields).key.map((f) => f.key) };
+            return { id: e.id, name: e.template.name, shape: frameShape(e.template.doc), seconds: secondsAt(e.template.doc.durationInFrames, e.template.doc.fps), ...(card ? {} : { description: e.template.description }), ...(card ? { card: cardLine(card) } : {}), key_fields: splitFields(e.template.doc.fields, e.template.keyFields).key.map((f) => f.key) };
           })
         };
       }
@@ -3305,7 +3306,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           return { ok: false, error: `no template ${input.id}: call list_templates` };
         }
         const card = templateCard(entry.id);
-        return { id: entry.id, name: entry.template.name, description: entry.template.description, seconds: secondsAt(entry.template.doc.durationInFrames, entry.template.doc.fps), ...(card ? { card: cardDetail(card) } : {}), fields: entry.template.doc.fields.map(fieldSpec) };
+        return { id: entry.id, name: entry.template.name, description: entry.template.description, shape: frameShape(entry.template.doc), seconds: secondsAt(entry.template.doc.durationInFrames, entry.template.doc.fps), ...(card ? { card: cardDetail(card) } : {}), fields: entry.template.doc.fields.map(fieldSpec) };
       }
     }),
 

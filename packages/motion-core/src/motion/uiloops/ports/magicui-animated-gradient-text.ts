@@ -4,7 +4,7 @@ import { SnapcnCategory, type SnapcnPort } from '../../snapcn/model';
 export const PORT: SnapcnPort = {
   id: 'magicui-animated-gradient-text',
   title: 'Animated gradient text',
-  about: 'A two-colour gradient flows endlessly through the letters of a headline.',
+  about: 'A two-colour gradient flows endlessly through the letters of a headline. Colour flows in the letters; Shiny text sweeps a light band.',
   category: SnapcnCategory.Text,
   width: 1280,
   height: 720,

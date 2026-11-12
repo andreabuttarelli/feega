@@ -4,7 +4,7 @@ import { SnapcnCategory, type SnapcnPort } from '../model';
 export const PORT: SnapcnPort = {
   id: 'laptop-frame',
   title: 'Laptop frame',
-  about: 'A floating laptop rises in with a live notch and a landing page on screen, with an optional push into the screen.',
+  about: 'A floating laptop rises in with a live notch and a landing page on screen, with an optional push into the screen. A laptop; SaaS monitor uses a desktop screen.',
   category: SnapcnCategory.Screen,
   width: 1280,
   height: 720,

@@ -462,7 +462,7 @@ const detachTechniqueInput = z.object({ canvasId: z.string(), nodeId: z.string()
 const addFrameInput = z
   .object({
     canvasId: z.string(),
-    templateId: z.string().describe('a motion template id (list_motion_templates)'),
+    templateId: z.string().describe('a motion template id (frame_list_templates)'),
     format: z.enum(MOTION_FORMATS).default(MotionFormat.Landscape),
     values: z.record(z.string(), z.string().max(4000)).optional().describe('field key → value, as set_template_values takes them'),
     x: z.number(),

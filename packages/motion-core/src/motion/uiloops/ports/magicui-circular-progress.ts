@@ -4,7 +4,7 @@ import { SnapcnCategory, type SnapcnPort } from '../../snapcn/model';
 export const PORT: SnapcnPort = {
   id: 'magicui-circular-progress',
   title: 'Circular progress',
-  about: 'A round gauge fills to a value while its number fades in.',
+  about: 'A round gauge fills to a value while its number fades in, one gauge alone. Pick it for a single percentage; KPI counter shows several metric cards.',
   category: SnapcnCategory.Social,
   width: 1280,
   height: 720,

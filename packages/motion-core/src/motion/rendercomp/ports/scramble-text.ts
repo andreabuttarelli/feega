@@ -4,7 +4,7 @@ import { RendercompCategory, type RendercompPort } from '../model';
 export const PORT: RendercompPort = {
   id: 'scramble-text',
   title: 'Scramble text',
-  about: 'A terminal-style label appears, then the main text decodes left to right out of random characters and finally glows.',
+  about: 'A terminal-style label appears, then the main text decodes left to right out of random characters and finally glows. Decodes once; Hyper text repeats.',
   category: RendercompCategory.Text,
   width: 1920,
   height: 1080,

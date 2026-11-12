@@ -13,7 +13,7 @@ export const RED_NUMBER_POSTER_TEMPLATE: TemplateEntry = {
   id: RED_NUMBER_TEMPLATE_ID,
   template: lazyTemplate(() => posterTemplateDoc({ name: 'poster-red-number', component: RED_NUMBER_COMPONENT, code: redNumberComponent(), props: RED_NUMBER_PROPS, fonts: RED_NUMBER_FONTS, varPrefix: RED_NUMBER_VAR_PREFIX, vars: [], clip: RED_NUMBER_CLIP }, RED_NUMBER_GRAIN), {
     name: 'Poster red number',
-    description: 'An editorial poster on white: a small title top left with two justified text columns, a large red duotone photo square with white words at its corners and centre, small side words with dashes and a huge dark grey number overlapping the foot.',
+    description: 'An editorial poster on white: a small title with two justified columns, a large red duotone photo square with white words on it, and a huge dark grey number at the foot.',
     keyFields: RED_NUMBER_KEY_FIELDS
   })
 };

@@ -13,7 +13,7 @@ export const REPEAT_LINEUP_POSTER_TEMPLATE: TemplateEntry = {
   id: REPEAT_LINEUP_TEMPLATE_ID,
   template: lazyTemplate(() => posterTemplateDoc({ name: 'poster-repeat-lineup', component: REPEAT_LINEUP_COMPONENT, code: repeatLineupComponent(), props: REPEAT_LINEUP_PROPS, fonts: REPEAT_LINEUP_FONTS, varPrefix: REPEAT_LINEUP_VAR_PREFIX, vars: [], clip: REPEAT_LINEUP_CLIP }, REPEAT_LINEUP_GRAIN), {
     name: 'Poster repeat lineup',
-    description: 'A club night poster on off-white: a three-line bold line-up on grey highlight boxes repeated down the page over acid blocks, grey bars, thin construction lines, dashed circles and ellipses, with the date, venue and time row between repeats.',
+    description: 'A club night poster on off-white: a three-line bold line-up on grey boxes repeated down the page over acid blocks, construction lines and dashed circles, date and venue between.',
     keyFields: REPEAT_LINEUP_KEY_FIELDS
   })
 };

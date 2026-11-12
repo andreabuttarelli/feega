@@ -4,7 +4,7 @@ import { SnapcnCategory, type SnapcnPort } from '../../snapcn/model';
 export const PORT: SnapcnPort = {
   id: 'magicui-number-ticker',
   title: 'Number ticker',
-  about: 'A number springs from a start value to its target with thousands separators.',
+  about: 'A number springs from a start value to its target with thousands separators. A bare number; KPI counter shows cards.',
   category: SnapcnCategory.Text,
   width: 1280,
   height: 720,

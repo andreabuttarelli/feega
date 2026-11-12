@@ -4,7 +4,7 @@ import { SnapcnCategory, type SnapcnPort } from '../../snapcn/model';
 export const PORT: SnapcnPort = {
   id: 'magicui-aurora-text',
   title: 'Aurora text',
-  about: 'A shifting aurora gradient drifts, tilts and breathes inside the letters.',
+  about: 'A shifting aurora gradient drifts, tilts and breathes inside the letters. Softer and slower than Animated gradient text.',
   category: SnapcnCategory.Text,
   width: 1280,
   height: 720,

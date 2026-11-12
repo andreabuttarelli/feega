@@ -4,7 +4,7 @@ import { SnapcnCategory, type SnapcnPort } from '../../snapcn/model';
 export const PORT: SnapcnPort = {
   id: 'magicui-word-rotate',
   title: 'Word rotate',
-  about: 'A headline swaps through a list of words, each sliding out downward and the next dropping in.',
+  about: 'A headline swaps through a list of words, each sliding out downward and the next dropping in. One headline word swaps; Word wheel spins a reel.',
   category: SnapcnCategory.Text,
   width: 1280,
   height: 720,

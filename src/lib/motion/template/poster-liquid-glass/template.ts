@@ -19,7 +19,7 @@ export const POSTER_LIQUID_GLASS_TEMPLATE: TemplateEntry = {
   id: POSTER_GLASS_TEMPLATE_ID,
   template: lazyTemplate(() => customTemplateDoc({ name: 'poster-liquid-glass', component: POSTER_GLASS_COMPONENT, code: posterGlassComponent(), props: POSTER_GLASS_PROPS, fonts: POSTER_GLASS_FONTS, varPrefix: POSTER_GLASS_VAR_PREFIX, vars: POSTER_GLASS_VARS, clip: POSTER_GLASS_CLIP, seconds: 10, fps: 30, groups: POSTER_GLASS_GROUPS }), {
     name: 'Poster liquid glass',
-    description: 'A Swiss typographic poster on a grey wall: one huge word over an asymmetric grid of dates and places, with clear liquid glass flowing over it, drops breaking away and melting back, bending the type underneath.',
+    description: 'A Swiss type poster on a grey wall, 16:9 video: one huge word over a grid of dates, with clear liquid glass flowing over it and bending the type, drops breaking off and melting back.',
     keyFields: POSTER_GLASS_KEY_FIELDS
   })
 };

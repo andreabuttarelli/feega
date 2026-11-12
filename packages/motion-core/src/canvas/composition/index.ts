@@ -41,7 +41,7 @@ const DEFINED: Record<LayoutId, LayoutDefinition> = {
 	'tilted-grid': {
 		cards: '1:1',
 		label: 'Kinetic grid',
-		description: 'A tilted wall of cards that sways back and forth.',
+		description: 'A tilted 3D wall of square media cards (columns × rows) that sways back and forth and back again. Pick it over Perspective wall when the wall should rock rather than pan.',
 		motion: 'ping-pong',
 		camera: 'selected',
 		params: tiltedGrid.params,
@@ -51,7 +51,7 @@ const DEFINED: Record<LayoutId, LayoutDefinition> = {
 	'carousel-3d': {
 		cards: '1:1',
 		label: 'Orbital carousel',
-		description: 'Cards orbit a centre like a 3D carousel.',
+		description: 'Square media cards orbit a centre on one flat 3D ring, cycling seamlessly. Pick it over UI ring (curved cylinder for UI screens) or Synced rings (several rings that rock).',
 		motion: 'cycle',
 		camera: 'fixed',
 		params: carousel3d.params,
@@ -61,7 +61,7 @@ const DEFINED: Record<LayoutId, LayoutDefinition> = {
 	'media-cloud': {
 		cards: '1:1',
 		label: 'Cinematic cloud',
-		description: 'Cards drift through depth in a loose cloud.',
+		description: 'Square media cards drift through depth in a loose cloud, looping. A grid layout; the Media cloud scene is the fuller white fly-through with a title.',
 		motion: 'cycle',
 		camera: 'fixed',
 		params: mediaCloud.params,
@@ -71,7 +71,7 @@ const DEFINED: Record<LayoutId, LayoutDefinition> = {
 	'media-ring': {
 		cards: '1:1',
 		label: 'Synced rings',
-		description: 'Rings of cards turning in step.',
+		description: 'One or more rings of square media cards turning in step, then turning back (ping-pong). Pick it for many small items; Orbital carousel shows fewer, larger cards on one ring.',
 		motion: 'ping-pong',
 		camera: 'selected',
 		params: mediaRing.params,
@@ -82,7 +82,7 @@ const DEFINED: Record<LayoutId, LayoutDefinition> = {
 	helix: {
 		cards: '1:1',
 		label: 'Helix',
-		description: 'A spiral of cards turning around its axis.',
+		description: 'Square media cards on a vertical spiral that turns around its axis and back (ping-pong). The only layout with a helix; use it for a tall, rotating column of pictures.',
 		motion: 'ping-pong',
 		camera: 'selected',
 		params: helix.params,
@@ -92,7 +92,7 @@ const DEFINED: Record<LayoutId, LayoutDefinition> = {
 	'explorer-grid': {
 		cards: '1:1',
 		label: 'Explorer grid',
-		description: 'An endless grid that glides from card to card.',
+		description: 'An endless flat grid of square media cards; the camera glides from one card to the next and loops. Pick it to visit cards one by one; Kinetic grid shows the whole wall at once.',
 		motion: 'cycle',
 		camera: 'fixed',
 		params: explorerGrid.params,
@@ -103,7 +103,7 @@ const DEFINED: Record<LayoutId, LayoutDefinition> = {
 	'staggered-grid': {
 		cards: '1:1',
 		label: 'Staggered columns',
-		description: 'Columns scrolling at offset heights.',
+		description: 'Columns of square media cards at offset heights scrolling vertically in a loop. The plain layout version; the Staggered columns scene adds per-column start delays and fields.',
 		motion: 'cycle',
 		camera: 'fixed',
 		params: staggeredGrid.params,
@@ -114,7 +114,7 @@ const DEFINED: Record<LayoutId, LayoutDefinition> = {
 	'vertical-flow': {
 		cards: '1:1',
 		label: 'Vertical flow',
-		description: 'A stream of cards rising through the frame.',
+		description: 'A single stream of square media cards rising up through the frame, looping. Pick it for one vertical flow; Masonry scroll and Staggered columns fill the frame with several columns.',
 		motion: 'cycle',
 		camera: 'fixed',
 		params: verticalFlow.params,
@@ -124,7 +124,7 @@ const DEFINED: Record<LayoutId, LayoutDefinition> = {
 	coverflow: {
 		cards: '1:1',
 		label: 'Editorial coverflow',
-		description: 'A front card with its neighbours angled away.',
+		description: 'A centred front card with its neighbours angled away on both sides, stepping to the next card in a loop. Cover-flow look for album covers or product shots.',
 		motion: 'cycle',
 		camera: 'fixed',
 		params: coverflow.params,
@@ -133,7 +133,7 @@ const DEFINED: Record<LayoutId, LayoutDefinition> = {
 	},
 	ring: {
 		label: 'UI ring',
-		description: 'Cards curved on a tilted, turning cylinder; the ones behind show through.',
+		description: 'Cards bent onto a tilted, turning cylinder; the ones behind show through. Takes UI built as precomps; pick it over Orbital carousel when the cards are wide screens.',
 		motion: 'cycle',
 		camera: 'fixed',
 		params: ring.params,
@@ -142,7 +142,7 @@ const DEFINED: Record<LayoutId, LayoutDefinition> = {
 	},
 	bento: {
 		label: 'Bento',
-		description: 'A grid of rounded cells, some spanning rows or columns, each holding a picture, a video or a motion.',
+		description: 'A static bento grid of rounded cells, some spanning rows or columns, each holding a picture, a video or a motion. The only layout that holds still; for a feature overview.',
 		motion: 'cycle',
 		camera: 'fixed',
 		params: bento.params,
@@ -152,7 +152,7 @@ const DEFINED: Record<LayoutId, LayoutDefinition> = {
 	marquee: {
 		cards: '1:1',
 		label: 'Marquee',
-		description: 'Endless rows of cards gliding in alternate directions, each row at its own pace.',
+		description: 'Rows of square media cards gliding sideways at constant speed, alternate rows in opposite directions, each at its own pace. Media-only; the Marquee scene also takes logos and quotes.',
 		motion: 'linear',
 		camera: 'fixed',
 		params: marquee.params,
@@ -163,7 +163,7 @@ const DEFINED: Record<LayoutId, LayoutDefinition> = {
 	stack: {
 		cards: 'original',
 		label: 'Card stack',
-		description: 'A pile of cards; the front one slides away and the next comes forward.',
+		description: 'A pile of cards at their own aspect; the front one slides away and the next comes forward, one at a time. Pick it to show items in sequence; Polaroid pile builds the pile up instead.',
 		motion: 'linear',
 		camera: 'fixed',
 		params: stack.params,
@@ -173,7 +173,7 @@ const DEFINED: Record<LayoutId, LayoutDefinition> = {
 	'perspective-wall': {
 		cards: '1:1',
 		label: 'Perspective wall',
-		description: 'A wall of media receding in perspective, panning slowly.',
+		description: 'A flat wall of square media cards receding in perspective, panning slowly and steadily. Pick it for a calm backdrop; Kinetic grid rocks instead of panning.',
 		motion: 'linear',
 		camera: 'fixed',
 		params: perspectiveWall.params,
@@ -183,7 +183,7 @@ const DEFINED: Record<LayoutId, LayoutDefinition> = {
 	'film-strip': {
 		cards: '1:1',
 		label: 'Film strip',
-		description: 'A strip of cards that steps along, one card in focus at a time.',
+		description: 'A horizontal strip of square media cards that steps along one card at a time, the centred card in focus. A layout; the Photo strip scene adds the magnifier growth.',
 		motion: 'linear',
 		camera: 'fixed',
 		params: filmStrip.params,
@@ -193,7 +193,7 @@ const DEFINED: Record<LayoutId, LayoutDefinition> = {
 	'split-reveal': {
 		cards: '1:1',
 		label: 'Split reveal',
-		description: 'Panels side by side that part up and down to reveal the next set.',
+		description: 'Tall panels side by side that part up and down to reveal the next set of media. Pick it for a hard, rhythmic switch between sets of pictures.',
 		motion: 'linear',
 		camera: 'fixed',
 		params: splitReveal.params,
@@ -204,7 +204,7 @@ const DEFINED: Record<LayoutId, LayoutDefinition> = {
 	polaroid: {
 		cards: 'original',
 		label: 'Polaroid pile',
-		description: 'Slightly turned cards that settle on a pile one after another.',
+		description: 'Cards at their own aspect, each slightly turned, drop one after another onto a growing pile. Pick it for a photo-print feel; Card stack removes cards instead.',
 		motion: 'linear',
 		camera: 'fixed',
 		params: polaroid.params,
@@ -214,7 +214,7 @@ const DEFINED: Record<LayoutId, LayoutDefinition> = {
 	masonry: {
 		cards: '1:1',
 		label: 'Masonry scroll',
-		description: 'Masonry columns of different widths scrolling at different speeds.',
+		description: 'Masonry columns of square media cards with different widths scrolling vertically at different speeds. Pick it for a dense Pinterest-like wall.',
 		motion: 'linear',
 		camera: 'fixed',
 		params: masonry.params,
@@ -225,7 +225,7 @@ const DEFINED: Record<LayoutId, LayoutDefinition> = {
 	slider: {
 		cards: 'original',
 		label: 'Slider',
-		description: 'One media at a time in the centre, sliding, fading or pushing to the next; optional dots or progress bar.',
+		description: 'One media at its own aspect in the centre, sliding, fading or pushing to the next, with optional dots or a progress bar. The only layout that shows a single item at a time.',
 		motion: 'linear',
 		camera: 'fixed',
 		params: slider.params,

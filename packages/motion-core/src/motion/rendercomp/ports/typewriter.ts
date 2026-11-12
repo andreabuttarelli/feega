@@ -4,7 +4,7 @@ import { RendercompCategory, type RendercompPort } from '../model';
 export const PORT: RendercompPort = {
   id: 'typewriter',
   title: 'Typewriter',
-  about: 'A flat typewriter pops in, its carriage slides across while keys press and lines print on the paper, then the message lands below.',
+  about: 'A flat typewriter pops in, its carriage slides across while keys press and lines print on the paper, then the message lands below. Shows a drawn typewriter machine, not just text.',
   category: RendercompCategory.Text,
   width: 1080,
   height: 1080,

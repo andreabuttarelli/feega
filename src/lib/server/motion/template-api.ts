@@ -7,6 +7,7 @@ import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { motionOf } from '$lib/canvas/motion-node';
 import { cardDetail } from '$lib/motion/template/card';
 import { templateCard } from '$lib/motion/template/cards';
+import { frameShape } from '$lib/motion/template/catalogue';
 import { insertTemplate, setTemplateValues, templateFields } from '$lib/motion/template/library';
 import { headOrNew } from './editor';
 import { commitOnto } from './frame-ops';
@@ -45,6 +46,7 @@ export async function listTemplates(db: Db, scope: Scope): Promise<Record<string
       id: e.id,
       name: e.template.name,
       description: e.template.description,
+      shape: frameShape(e.template.doc),
       seconds: e.template.doc.durationInFrames / e.template.doc.fps,
       ...withCard(e.id),
       fields: e.template.doc.fields.map((f) => ({ key: f.key, label: f.label, type: f.type, group: f.group, min: f.min, max: f.max, options: f.options, default: f.default }))

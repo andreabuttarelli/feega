@@ -4,7 +4,7 @@ import { SnapcnCategory, type SnapcnPort } from '../../snapcn/model';
 export const PORT: SnapcnPort = {
   id: 'magicui-typing-animation',
   title: 'Typing animation',
-  about: 'Text types out character by character behind a blinking cursor, then optionally deletes and loops.',
+  about: 'Text types out character by character behind a blinking cursor, then optionally deletes and loops. Plain text with a cursor; Prompt input types inside a prompt box.',
   category: SnapcnCategory.Text,
   width: 1280,
   height: 720,

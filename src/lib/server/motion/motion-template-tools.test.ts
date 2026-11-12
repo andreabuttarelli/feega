@@ -7,7 +7,7 @@ import { createMotionTools, type MotionToolDeps, type MotionSession } from './mo
 import { TrackKind } from '@feega/motion-core/motion/components';
 import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
 
-const LIST_CHARS_PER_TEMPLATE = 400;
+const LIST_CHARS_PER_TEMPLATE = 420;
 
 type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<string, unknown>>;
 

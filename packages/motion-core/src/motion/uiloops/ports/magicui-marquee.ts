@@ -4,7 +4,7 @@ import { SnapcnCategory, type SnapcnPort } from '../../snapcn/model';
 export const PORT: SnapcnPort = {
   id: 'magicui-marquee',
   title: 'Marquee',
-  about: 'A row of chips scrolls endlessly, horizontally or vertically, in either direction.',
+  about: 'A row of chips scrolls endlessly, horizontally or vertically, in either direction. Text chips only; the Marquee scene takes logos and quotes.',
   category: SnapcnCategory.Effect,
   width: 1280,
   height: 720,
