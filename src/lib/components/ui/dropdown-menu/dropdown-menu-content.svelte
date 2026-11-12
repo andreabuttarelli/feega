@@ -3,6 +3,7 @@
 	import { materialPress } from "$lib/actions/material-press.js";
 	import { Closes, openLayer } from "$lib/components/ui/shell/dismiss";
 	import { lastInput } from "$lib/components/ui/shell/last-input";
+	import { openTrigger } from "$lib/components/ui/shell/open-trigger";
 	import { leaveMenu } from "$lib/canvas/key-region.svelte";
 	import DropdownMenuPortal from "./dropdown-menu-portal.svelte";
 	import { DropdownMenu as DropdownMenuPrimitive } from "bits-ui";
@@ -23,7 +24,8 @@
 
 	$effect(() => {
 		if (!ref) return;
-		trigger = document.querySelector(`[aria-controls="${ref.id}"]`);
+		const content = ref;
+		requestAnimationFrame(() => (trigger = openTrigger(content)));
 		return openLayer(() => {}, Closes.ItsOwner);
 	});
 

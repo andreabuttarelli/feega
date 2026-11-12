@@ -4,6 +4,7 @@
   import { MENU_CONTENT } from './styles';
   import { Closes, openLayer } from './dismiss';
   import { lastInput } from './last-input';
+  import { openTrigger } from './open-trigger';
   import { leaveMenu } from '$lib/canvas/key-region.svelte';
 
   let { ref = $bindable(null), class: className, sideOffset = 6, align = 'start', ...rest }: DropdownMenu.ContentProps = $props();
@@ -13,7 +14,8 @@
 
   $effect(() => {
     if (ref) {
-      trigger = document.querySelector(`[aria-controls="${ref.id}"]`);
+      const content = ref;
+      requestAnimationFrame(() => (trigger = openTrigger(content)));
       return openLayer(() => {}, Closes.ItsOwner);
     }
   });
