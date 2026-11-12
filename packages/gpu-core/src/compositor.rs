@@ -117,6 +117,10 @@ impl Compositor {
         self.retained.held_look(camera)
     }
 
+    pub fn lookup(&self, camera: Camera) -> Lookup {
+        self.retained.lookup(camera)
+    }
+
     pub fn held_painted(&self) -> Rect {
         self.retained.painted()
     }

@@ -6,9 +6,9 @@
   import { ROTATE_REACH_PX } from '$lib/canvas/gpu/geometry';
   import { quadBox, quadStyle, type ScreenQuad } from '$lib/canvas/quad-box';
 
-  let { clip, quad: drawn, kind = SelectionKind.Element, highlight = HighlightKind.Element, ongrab, turn = 0, pivot = null }: { clip: string; quad: ScreenQuad; kind?: SelectionKind; highlight?: HighlightKind; turn?: number; pivot?: Pt | null; ongrab: (grip: Grip, handle: number, e: PointerEvent) => void } = $props();
+  let { clip, quad: placed, kind = SelectionKind.Element, highlight = HighlightKind.Element, ongrab, turn = 0, pivot = null, drawn = false }: { clip: string; quad: ScreenQuad; drawn?: boolean; kind?: SelectionKind; highlight?: HighlightKind; turn?: number; pivot?: Pt | null; ongrab: (grip: Grip, handle: number, e: PointerEvent) => void } = $props();
 
-  const rect = $derived(quadBox(drawn));
+  const rect = $derived(quadBox(placed));
   const TESTID: Record<SelectionKind, string> = { [SelectionKind.Element]: 'frame-selection', [SelectionKind.Member]: 'frame-selection', [SelectionKind.Group]: 'frame-group-selection', [SelectionKind.Many]: 'frame-selection', [SelectionKind.Line]: 'frame-selection' };
   const PASSES_THROUGH: ReadonlySet<SelectionKind> = new Set([SelectionKind.Group, SelectionKind.Many]);
   const BOXLESS: ReadonlySet<SelectionKind> = new Set([SelectionKind.Member, SelectionKind.Line]);
@@ -35,18 +35,20 @@
     u === 0.5 ? `left:0;width:100%;top:${v * rect.height - EDGE_PX / 2}px;height:${EDGE_PX}px` : `top:0;height:100%;left:${u * rect.width - EDGE_PX / 2}px;width:${EDGE_PX}px`;
 </script>
 
-<div class="selection" class:group={kind === SelectionKind.Group} class:passes={PASSES_THROUGH.has(kind)} class:line={kind === SelectionKind.Line} data-testid={TESTID[kind]} data-clip={clip || undefined} style={`${quadStyle(drawn)};${highlightStyle(highlight)}`}>
-  <div class="body" data-testid="frame-selection-body" onpointerdown={(e) => ongrab(Grip.Move, 0, e)} role="presentation"></div>
-  {#each corners as h, i (i)}
-    <div class="rotate" data-testid="frame-selection-rotate" data-rotate={i} style={zoneStyle(h)} onpointerdown={(e) => ongrab(Grip.Rotate, i, e)} role="presentation"></div>
-  {/each}
-  {#each sides as s (s.index)}
-    <div class="edge" data-testid="frame-selection-edge" data-handle={s.index} style={`${edgeBox(s.unit)};cursor:${cursorOf(s.unit)}`} onpointerdown={(e) => ongrab(Grip.Scale, s.index, e)} role="presentation"></div>
-  {/each}
+<div class="selection" class:group={kind === SelectionKind.Group} class:passes={PASSES_THROUGH.has(kind)} class:line={kind === SelectionKind.Line} class:drawn data-testid={TESTID[kind]} data-clip={clip || undefined} style={`${quadStyle(placed)};${highlightStyle(highlight)}`}>
+  {#if !drawn}
+    <div class="body" data-testid="frame-selection-body" onpointerdown={(e) => ongrab(Grip.Move, 0, e)} role="presentation"></div>
+    {#each corners as h, i (i)}
+      <div class="rotate" data-testid="frame-selection-rotate" data-rotate={i} style={zoneStyle(h)} onpointerdown={(e) => ongrab(Grip.Rotate, i, e)} role="presentation"></div>
+    {/each}
+    {#each sides as s (s.index)}
+      <div class="edge" data-testid="frame-selection-edge" data-handle={s.index} style={`${edgeBox(s.unit)};cursor:${cursorOf(s.unit)}`} onpointerdown={(e) => ongrab(Grip.Scale, s.index, e)} role="presentation"></div>
+    {/each}
+  {/if}
   {#if pivot}
     <div class="pivot" data-testid="frame-selection-pivot" style={`left:${pivot[0] * rect.width}px;top:${pivot[1] * rect.height}px`} onpointerdown={(e) => ongrab(Grip.Anchor, 0, e)} role="presentation"></div>
   {/if}
-  {#each handles as h, i (i)}
+  {#each drawn ? [] : handles as h, i (i)}
     <div class="handle" data-testid="frame-selection-handle" data-handle={i} style={`left:${h.at[0]}px;top:${h.at[1]}px;cursor:${cursorOf(h.unit)}`} onpointerdown={(e) => ongrab(Grip.Scale, i, e)} role="presentation"></div>
   {/each}
 </div>
@@ -62,6 +64,10 @@
 
   .group {
     border-style: dashed;
+  }
+
+  .drawn {
+    border-color: transparent;
   }
 
   .line {

@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { barTool, pickBarTool } from './fixtures/canvas-bar';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import { SHOTS_DIR } from './fixtures/shots';
+import { selectionCount } from './fixtures/canvas-marks';
 
 const SETTLE_MS = 2500;
 
@@ -64,11 +65,11 @@ test.describe('shape builder @real', () => {
     await page.mouse.click(onlyA.x, onlyA.y);
     await page.waitForTimeout(SETTLE_MS);
     await page.mouse.click(onlyA.x, onlyA.y);
-    await expect(page.getByTestId('frame-selection')).toHaveCount(1, { timeout: 15_000 });
+    await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBe(1);
     await page.keyboard.down('Shift');
     await page.mouse.click(onlyB.x, onlyB.y);
     await page.keyboard.up('Shift');
-    await expect(page.getByTestId('frame-selection')).toHaveCount(2, { timeout: 15_000 });
+    await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBe(2);
 
     await barTool(page, 'shape-builder');
     await shot(page, 'selected');

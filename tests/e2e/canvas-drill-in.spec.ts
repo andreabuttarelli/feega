@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { hoveredClip, selectedClip, selectionCount } from './fixtures/canvas-marks';
 
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 const SHOTS = process.env.CANVAS_MOTION_SHOTS;
@@ -24,18 +25,12 @@ async function hoverAt(page: Page, at: { x: number; y: number }, mods: 'ControlO
   }
   await page.mouse.move(at.x - 3, at.y);
   await page.mouse.move(at.x, at.y);
-  const box = page.getByTestId('frame-pick-box');
-  const id = (await box.count()) ? await box.getAttribute('data-hovered') : null;
+  const id = await hoveredClip(page);
   if (mods) {
     await page.keyboard.up(mods);
   }
   return id;
 }
-
-const selectedClip = async (page: Page) => {
-  const marks = page.getByTestId('frame-selection');
-  return (await marks.count()) ? await marks.first().getAttribute('data-clip') : null;
-};
 
 test.use({ video: SHOTS ? 'on' : 'off' });
 
@@ -74,7 +69,7 @@ test.describe('drill into a frame @real', () => {
     await page.keyboard.press('Escape');
     await expect.poll(() => selectedClip(page), { message: 'Esc climbs one level' }).toBe(nested.section);
     await page.keyboard.press('Escape');
-    await expect(page.getByTestId('frame-selection'), 'Esc from the top-level child leaves the frame').toHaveCount(0);
+    await expect.poll(() => selectionCount(page), { message: 'Esc from the top-level child leaves the frame' }).toBe(0);
     await shoot(page, 'drill-4-esc-up');
 
     await page.keyboard.down('ControlOrMeta');

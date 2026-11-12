@@ -2,6 +2,7 @@ import sharp from 'sharp';
 import type { Page } from '@playwright/test';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import { landingDoc } from './fixtures/landing-frame-doc';
+import { handleCount, hoverBoxes, hoverCount, pickBox, pickCount } from './fixtures/canvas-marks';
 
 const SHOTS_DIR = `${process.env.HOME}/Documents/feega-videos/e2e`;
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
@@ -152,9 +153,8 @@ test.describe('a core-drawn frame stays itself through hover, select and deselec
       const c = centre(drawn);
       await page.mouse.move(c.x - 20, c.y - 20);
       await page.mouse.move(c.x, c.y, { steps: 6 });
-      const hover = page.getByTestId('frame-pick-box');
-      await expect(hover, `2. exactly one hover rect at zoom ${zoom}`).toHaveCount(1);
-      expectAligned((await hover.boundingBox())!, drawn, `2. hover at zoom ${zoom}`);
+      await expect.poll(() => hoverCount(page), { message: `2. exactly one hover rect at zoom ${zoom}` }).toBe(1);
+      expectAligned((await hoverBoxes(page))[0], drawn, `2. hover at zoom ${zoom}`);
       await snap(page, `2-hover-zoom-${zoom}`);
     }
     await zoomTo(page, 1);
@@ -175,10 +175,9 @@ test.describe('a core-drawn frame stays itself through hover, select and deselec
     const kept = await colourBounds(page, after, ORANGE);
     expect(kept, '3. the element is still drawn').not.toBeNull();
     expectSameBox(kept!, drawn, '3. element not resized');
-    const handles = page.getByTestId('frame-selection');
-    await expect(handles, '3. selection box').toHaveCount(1);
-    expectAligned((await handles.boundingBox())!, kept!, '3. selection box');
-    await expect(page.getByTestId('frame-selection-handle'), '3. eight handles').toHaveCount(HANDLE_COUNT);
+    await expect.poll(() => pickCount(page), { message: '3. selection box' }).toBe(1);
+    expectAligned((await pickBox(page))!, kept!, '3. selection box');
+    await expect.poll(() => handleCount(page), { message: '3. eight handles' }).toBe(HANDLE_COUNT);
 
     await page.mouse.click(after.x + TITLE_OFFSET_PX, after.y - TITLE_OFFSET_PX);
     await page.waitForTimeout(SETTLE_MS);
@@ -277,7 +276,7 @@ test.describe('a landing-page frame stays drawn when an element inside it is sel
       await page.waitForTimeout(SETTLE_MS);
       await page.mouse.move(EMPTY_SPOT.x, EMPTY_SPOT.y);
       await snap(page, `landing-2-${name}`);
-      await expect(page.getByTestId('frame-selection'), `${name} selected`).toHaveCount(1);
+      await expect.poll(() => pickCount(page), { message: `${name} selected` }).toBe(1);
       const after = (await tile.boundingBox())!;
       expectSameBox(after, start, `${name}: tile box`);
       const drawn = await darkArea(page, after);

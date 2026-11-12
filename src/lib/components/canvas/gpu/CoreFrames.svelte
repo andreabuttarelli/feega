@@ -24,6 +24,7 @@
   import { NO_SIGHT, sameSight, sightOf, slackened, stillHolds, widened, type Sight, type Taken } from '$lib/canvas/core/sight';
   import { SentParts, SentUses } from '$lib/canvas/core/use-diff';
   import { NO_OVERLAY, type CoreOverlay } from '$lib/canvas/core/world-overlay';
+  import { markHit, markRect as rectOfMark, marksJson, type CanvasMark, type MarkHit } from '$lib/canvas/core/canvas-marks';
   import { memoSources } from '$lib/canvas/core/source-memo';
   import { retiered, retiers } from '$lib/canvas/core/retier';
   import { drawsAny, frameOfLive, logGaps, onStage, sameLive, shownGroup, stagedBox, toBuild, toWarm, untilFound, frameSourceUrl, type FrameAt } from '$lib/canvas/core/frame-source';
@@ -64,7 +65,7 @@
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
 
-  let { frames, edited = new Set(), order = [], live = new Map(), known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, lift = null, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, place = null, sourceUrl, onready, onsource = () => {}, onthumb = () => {}, onfallback, onbackend = () => {} }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; lift?: Lift | null; look?: Look; view: Viewport; area: { width: number; height: number }; place?: { projectId: string; canvasId: string; orgId?: string; userId?: string; look?: string } | null; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onthumb?: (id: string, revision: number, blob: Blob, size: { width: number; height: number }) => void; onfallback: (why: string) => void; onbackend?: (change: BackendSwitch) => void } = $props();
+  let { frames, edited = new Set(), order = [], live = new Map(), known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, marks = [], markLook = { handleFill: '#ffffff', handleRadius: 2 }, onmarks = () => {}, onpresent = () => {}, lift = null, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, place = null, sourceUrl, onready, onsource = () => {}, onthumb = () => {}, onfallback, onbackend = () => {} }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; marks?: readonly CanvasMark[]; markLook?: { handleFill: string; handleRadius: number }; onmarks?: (drawn: boolean) => void; onpresent?: (shown: Viewport) => void; lift?: Lift | null; look?: Look; view: Viewport; area: { width: number; height: number }; place?: { projectId: string; canvasId: string; orgId?: string; userId?: string; look?: string } | null; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onthumb?: (id: string, revision: number, blob: Blob, size: { width: number; height: number }) => void; onfallback: (why: string) => void; onbackend?: (change: BackendSwitch) => void } = $props();
 
   markStartup(StartupStep.Mounted);
   debugStart();
@@ -628,6 +629,7 @@
         putting.clear();
         sent = new SentUses();
         sentOverlay = new SentParts();
+        sentMarks = null;
         r.setBudget?.(textureBudget(budget.textureBytes, { width, height }));
         r.setTileBudget?.(budget.tileBytes);
         r.setCanvasTiles?.(budget.canvasTiles);
@@ -675,6 +677,8 @@
   const ITEMS_PER_FRAME = 2 * PART_ITEMS;
   let sent = new SentUses();
   let sentOverlay = new SentParts();
+  let sentMarks: string | null = null;
+  const marksPayload = $derived(marksJson(marks, { ...markLook, dpr: resolution }));
   const painted: Record<Outcome, number> = { [Outcome.Idle]: 0, [Outcome.Reused]: 0, [Outcome.Partial]: 0, [Outcome.Full]: 0 };
 
   let lifting: { key: number; group: string; lifted: Lifted | null } | null = null;
@@ -1043,12 +1047,18 @@
     for (const part of quiet ? sentOverlay.changed(overlay) : []) {
       into.setOverlay(part, overlay[part]);
     }
+    if (into.setMarks && marksPayload !== sentMarks) {
+      into.setMarks(marksPayload);
+      sentMarks = marksPayload;
+    }
     const at = deviceView();
     into.setMotion?.(quiet ? CoreMotion.Still : CoreMotion.Gesture);
     into.setCamera(at.x, at.y, at.zoom);
     const began = performance.now();
     const { outcome, pending, skipped } = into.frame(began);
-    countFrame(began, into.frameCounts?.(), gesture.active(), pending);
+    const shownAt = { x: view.x, y: view.y, zoom: view.zoom };
+    countFrame(began, into.frameCounts?.(), gesture.active(), pending, shownAt);
+    onpresent(shownAt);
     perf.frame(gesture.active() ? camera : Camera.Still, lift !== null, began);
     settleEdits(began);
     if (thumbsOwed && !pending && quiet) {
@@ -1152,6 +1162,37 @@
     void overlay;
     pacer.invalidate();
   });
+
+  $effect(() => {
+    void marksPayload;
+    pacer.invalidate();
+  });
+
+  $effect(() => onmarks(!!raster?.setMarks));
+
+  function aimed(into: CoreRaster) {
+    const at = deviceView();
+    into.setCamera(at.x, at.y, at.zoom);
+  }
+
+  export function hitMark(x: number, y: number): MarkHit | null {
+    const into = raster;
+    if (!into?.hitMark) {
+      return null;
+    }
+    aimed(into);
+    return markHit(marks, into.hitMark(x * resolution, y * resolution));
+  }
+
+  export function markRect(id: string): { x: number; y: number; w: number; h: number } | null {
+    const into = raster;
+    const index = marks.findIndex((m) => m.id === id);
+    if (!into?.markRect || index < 0) {
+      return null;
+    }
+    aimed(into);
+    return rectOfMark(into.markRect(index), resolution);
+  }
 
   $effect(() => () => media.dispose());
   $effect(() => () => crashes.stop());

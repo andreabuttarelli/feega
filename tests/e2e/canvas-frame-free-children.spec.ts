@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { selectionCount, selectionBox } from './fixtures/canvas-marks';
 
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 const BOX_ID = 'box';
@@ -65,11 +66,11 @@ test.describe('children of a frame are free on the canvas @real', () => {
     const grab = await pointIn(stage, { x: BOX_AT.x - BOX_SIZE / 4, y: BOX_AT.y });
     await expect(async () => {
       await page.mouse.click(grab.x, grab.y);
-      await expect(page.getByTestId('frame-selection')).toBeVisible({ timeout: 1500 });
+      await expect.poll(() => selectionCount(page), { timeout: 1500 }).toBeGreaterThan(0);
     }).toPass({ timeout: 25_000 });
 
     const frameBefore = await framePosition(admin, node.id);
-    const selectedBox = (await page.getByTestId('frame-selection').boundingBox())!;
+    const selectedBox = (await selectionBox(page))!;
     await dragFrom(page, { x: selectedBox.x + selectedBox.width * GRAB_SHARE, y: selectedBox.y + selectedBox.height / 2 });
     await expect.poll(async () => (await boxAt(admin, node.id))?.x ?? 0, { timeout: 15_000, message: 'the child moved inside the frame' }).toBeGreaterThan(BOX_AT.x + MOVED_MIN);
     expect(await framePosition(admin, node.id), 'the frame stayed where it was').toEqual(frameBefore);
@@ -83,7 +84,7 @@ test.describe('children of a frame are free on the canvas @real', () => {
     const child = await boxAt(admin, node.id);
     const again = await pointIn(stage, { x: child!.x - BOX_SIZE / 4, y: child!.y });
     await page.mouse.click(again.x, again.y);
-    await expect(page.getByTestId('frame-selection')).toBeVisible({ timeout: 10_000 });
+    await expect.poll(() => selectionCount(page), { timeout: 10_000 }).toBeGreaterThan(0);
     await page.keyboard.press('Delete');
     await expect.poll(() => boxAt(admin, node.id), { timeout: 15_000, message: 'Delete removed the selected child' }).toBeNull();
   });

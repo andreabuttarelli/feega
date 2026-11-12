@@ -1,5 +1,6 @@
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { selectionCount } from './fixtures/canvas-marks';
 
 const SETTLE_MS = 2500;
 const ELEMENT_X = 0.3;
@@ -43,7 +44,7 @@ test.describe('copy and paste elements @real', () => {
     await page.mouse.click(element.x, element.y);
     await page.waitForTimeout(SETTLE_MS);
     await page.mouse.click(element.x, element.y);
-    await expect(page.getByTestId('frame-selection')).toHaveCount(1, { timeout: 15_000 });
+    await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBe(1);
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.press('ControlOrMeta+c');
     await page.keyboard.press('ControlOrMeta+v');

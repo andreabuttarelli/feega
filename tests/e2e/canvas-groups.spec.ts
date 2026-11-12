@@ -1,6 +1,7 @@
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import type { Page } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { selectedClip } from './fixtures/canvas-marks';
 
 const SHOTS = process.env.CANVAS_MOTION_SHOTS;
 const SLOW_SERVER_MS = 3_000;
@@ -66,10 +67,10 @@ test.describe('groups @real', () => {
     await shoot(page, '2-grouped');
     const groupTile = page.locator(`[data-motion-node="${group.id}"]`);
     await groupTile.click();
-    await expect(page.getByTestId('frame-selection'), 'a click selects the group, it does not enter it').toHaveCount(0);
+    await expect.poll(() => selectedClip(page), { message: 'a click selects the group, it does not enter it' }).toBeNull();
     const groupBox = (await groupTile.boundingBox())!;
     await page.mouse.dblclick(groupBox.x + groupBox.width * 0.15, groupBox.y + groupBox.height / 2);
-    await expect.poll(() => page.getByTestId('frame-selection').first().getAttribute('data-clip').catch(() => null), { message: 'a double-click enters the group', timeout: 15_000 }).toMatch(/^s[01]$/);
+    await expect.poll(() => selectedClip(page), { message: 'a double-click enters the group', timeout: 15_000 }).toMatch(/^s[01]$/);
     await shoot(page, '2b-inside-group');
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');

@@ -2,6 +2,7 @@ import sharp from 'sharp';
 import type { Locator, Page } from '@playwright/test';
 import { pickBarTool } from './fixtures/canvas-bar';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { handleBoxes, selectionCount, selectionBox } from './fixtures/canvas-marks';
 
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
@@ -53,7 +54,7 @@ async function drawBox(page: Page): Promise<void> {
   await page.mouse.down();
   await page.mouse.move(from.x + 160, from.y + 100, { steps: 3 });
   await page.mouse.up();
-  await expect(page.getByTestId('frame-selection')).toHaveCount(1, { timeout: 15_000 });
+  await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBe(1);
   await page.waitForTimeout(SETTLE_MS);
 }
 
@@ -90,8 +91,7 @@ test.describe('resize is live and handle-true on the GPU canvas @real', () => {
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     await drawBox(page);
 
-    const selection = page.getByTestId('frame-selection');
-    const before = (await selection.boundingBox())!;
+    const before = (await selectionBox(page))!;
     const corner = { x: before.x + before.width, y: before.y + before.height };
     await page.mouse.move(corner.x, corner.y);
     await page.mouse.down();
@@ -102,12 +102,12 @@ test.describe('resize is live and handle-true on the GPU canvas @real', () => {
     await page.waitForTimeout(FRAME_MS);
     await page.screenshot({ path: `${SHOTS}/resize-free-corner.png` });
     const shape = await shapeBounds(page, near);
-    expectRect((await selection.boundingBox())!, expected, 'selection mid-drag');
+    expectRect((await selectionBox(page))!, expected, 'selection mid-drag');
     expect(Math.abs(shape.x + shape.width - (expected.x + expected.width)), 'shape right edge mid-drag').toBeLessThan(UNDER_CHROME_PX);
     expect(Math.abs(shape.y + shape.height - (expected.y + expected.height)), 'shape bottom edge mid-drag').toBeLessThan(UNDER_CHROME_PX);
     await page.mouse.up();
     await page.waitForTimeout(SETTLE_MS);
-    expectRect((await selection.boundingBox())!, expected, 'selection after release');
+    expectRect((await selectionBox(page))!, expected, 'selection after release');
 
     await pullEdge(page, 0, 'free-edge');
   });
@@ -117,8 +117,8 @@ test.describe('resize is live and handle-true on the GPU canvas @real', () => {
     await page.setViewportSize({ width: 1200, height: 800 });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     await drawBox(page);
-    const middle = centre((await page.getByTestId('frame-selection').boundingBox())!);
-    const corner = centre((await page.getByTestId('frame-selection-handle').nth(CORNER_BOTTOM_RIGHT).boundingBox())!);
+    const middle = centre((await selectionBox(page))!);
+    const corner = centre((await handleBoxes(page))[CORNER_BOTTOM_RIGHT]);
     const grip = { x: corner.x + OUTSIDE_PX, y: corner.y + OUTSIDE_PX };
     const radius = Math.hypot(grip.x - middle.x, grip.y - middle.y);
     const start = Math.atan2(grip.y - middle.y, grip.x - middle.x);
@@ -160,17 +160,16 @@ test.describe('resize is live and handle-true on the GPU canvas @real', () => {
       await page.mouse.click(at.x, at.y);
       await page.waitForTimeout(SETTLE_MS);
       await page.mouse.click(at.x, at.y);
-      await expect(page.getByTestId('frame-selection')).toHaveCount(1, { timeout: 15_000 });
+      await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBe(1);
 
-      const handles = page.getByTestId('frame-selection-handle');
-      const grabbed = centre((await handles.nth(CORNER_BOTTOM_RIGHT).boundingBox())!);
-      const pinned = centre((await handles.nth(CORNER_TOP_LEFT).boundingBox())!);
+      const grabbed = centre((await handleBoxes(page))[CORNER_BOTTOM_RIGHT]);
+      const pinned = centre((await handleBoxes(page))[CORNER_TOP_LEFT]);
       await page.mouse.move(grabbed.x, grabbed.y);
       await page.mouse.down();
       await page.mouse.move(grabbed.x + DRAG.x, grabbed.y + DRAG.y, { steps: STEPS });
       await page.screenshot({ path: `${SHOTS}/resize-frame-${rotation}-corner.png` });
-      const dragged = centre((await handles.nth(CORNER_BOTTOM_RIGHT).boundingBox())!);
-      const kept = centre((await handles.nth(CORNER_TOP_LEFT).boundingBox())!);
+      const dragged = centre((await handleBoxes(page))[CORNER_BOTTOM_RIGHT]);
+      const kept = centre((await handleBoxes(page))[CORNER_TOP_LEFT]);
       await page.mouse.up();
       await page.waitForTimeout(SETTLE_MS);
       expect(Math.hypot(kept.x - pinned.x, kept.y - pinned.y), 'the opposite corner stays put').toBeLessThan(TOLERANCE_PX);

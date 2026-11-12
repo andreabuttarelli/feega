@@ -1,4 +1,5 @@
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { selectionCount } from './fixtures/canvas-marks';
 
 const SHOTS_DIR = `${process.env.HOME}/Documents/feega-videos/e2e`;
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
@@ -44,7 +45,7 @@ test.describe('nudging an element with the arrow keys @real', () => {
 
     const frame = (await tile.boundingBox())!;
     await page.mouse.click(frame.x + frame.width / 2, frame.y + frame.height / 2);
-    await expect(page.getByTestId('frame-selection')).toHaveCount(1);
+    await expect.poll(() => selectionCount(page)).toBe(1);
     await page.waitForTimeout(SHORT_SETTLE_MS);
 
     const offsetPx = async () => {

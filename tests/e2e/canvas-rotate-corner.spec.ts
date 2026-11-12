@@ -2,6 +2,7 @@ import type { Locator, Page } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { pickBarTool } from './fixtures/canvas-bar';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { selectionCount } from './fixtures/canvas-marks';
 
 type Point = { x: number; y: number };
 
@@ -111,7 +112,7 @@ async function drawBox(page: Page): Promise<string> {
   await page.mouse.down();
   await page.mouse.move(from.x + 160, from.y + 100, { steps: 3 });
   await page.mouse.up();
-  await expect(page.getByTestId('frame-selection')).toHaveCount(1, { timeout: 15_000 });
+  await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBe(1);
   await page.waitForTimeout(SETTLE_MS);
   return (await page.locator('[data-kind="element"][data-motion-node]').getAttribute('data-motion-node'))!;
 }

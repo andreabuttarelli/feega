@@ -1,5 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { selectionCount, selectionBox } from './fixtures/canvas-marks';
+import { pickCount } from './fixtures/canvas-marks';
 
 const SHOTS_DIR = `${process.env.HOME}/Documents/feega-videos/e2e`;
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
@@ -46,9 +48,9 @@ test.describe('cmd-drag marquee inside a frame @real', () => {
 
     const frame = (await tile.boundingBox())!;
     await page.mouse.click(frame.x + frame.width * 0.25, frame.y + frame.height * 0.5);
-    await expect(page.getByTestId('frame-selection')).toHaveCount(1);
+    await expect.poll(() => selectionCount(page)).toBe(1);
     await page.waitForTimeout(SETTLE_MS / 3);
-    const single = (await page.getByTestId('frame-selection').boundingBox())!;
+    const single = (await selectionBox(page))!;
     const shown = (await tile.boundingBox())!;
 
     await page.keyboard.down('ControlOrMeta');
@@ -61,6 +63,6 @@ test.describe('cmd-drag marquee inside a frame @real', () => {
     await page.waitForTimeout(SETTLE_MS / 3);
 
     await snap(page, 'r6-cmd-marquee-selected');
-    await expect(page.getByTestId('frame-selection'), 'both elements are selected').toHaveCount(2);
+    await expect.poll(() => pickCount(page), { message: 'both elements are selected' }).toBe(2);
   });
 });

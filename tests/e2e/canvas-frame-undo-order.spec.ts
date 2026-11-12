@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { pickBarTool } from './fixtures/canvas-bar';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import { SHOT_PREFIX } from './fixtures/shots';
+import { selectionCount } from './fixtures/canvas-marks';
 
 const SHOTS = SHOT_PREFIX;
 const SETTLE_MS = 2500;
@@ -72,7 +73,7 @@ test.describe('one undo history across the canvas and frames @real', () => {
     await page.mouse.click(shape.x, shape.y);
     await page.waitForTimeout(SETTLE_MS);
     await page.mouse.click(shape.x, shape.y);
-    await expect(page.getByTestId('frame-selection')).toHaveCount(1, { timeout: 15_000 });
+    await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBe(1);
     await page.keyboard.press('Delete');
     await expect.poll(clips, { timeout: SAVED_MS }).toBe(0);
 

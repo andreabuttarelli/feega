@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import { SHOT_PREFIX } from './fixtures/shots';
+import { selectionBox } from './fixtures/canvas-marks';
 
 const SHOTS = SHOT_PREFIX;
 const SETTLE_MS = 2500;
@@ -77,7 +78,7 @@ test.describe('corner, path, outline, grid and guides on a canvas frame @real', 
       await expect(page.getByTestId('layout-guides')).toHaveCount(1, { timeout: 15_000 });
       const corners = page.getByTestId('corner-overlay');
       await expect(corners).toHaveCount(1, { timeout: 15_000 });
-      const body = (await page.getByTestId('frame-selection-body').boundingBox())!;
+      const body = (await selectionBox(page))!;
       const knob = (await corners.locator('[data-corner="0"]').boundingBox())!;
       const knobAt = { x: knob.x + knob.width / 2, y: knob.y + knob.height / 2 };
       expect(knobAt.x).toBeGreaterThan(body.x - ALIGN_TOLERANCE_PX);

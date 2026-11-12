@@ -1,4 +1,5 @@
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { selectionCount } from './fixtures/canvas-marks';
 
 const SHOTS = process.env.STATES_SHOTS ?? 'test-results/states';
 const SETTLE_MS = 2500;
@@ -76,7 +77,7 @@ test.describe('element states and the variant plus @real', () => {
     await states.locator('[data-state="default"]').click();
 
     await page.mouse.click(box.x + box.width * 0.27, box.y + box.height * 0.5);
-    await expect(page.getByTestId('frame-selection').first()).toBeVisible({ timeout: 15_000 });
+    await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBeGreaterThan(0);
     await page.keyboard.press('Alt+Meta+k');
     await expect(page.getByTestId('instance-inspector')).toBeVisible({ timeout: 15_000 });
     const plus = page.getByTestId('variant-plus');

@@ -2,6 +2,7 @@ import sharp from 'sharp';
 import type { Page } from '@playwright/test';
 import { pickBarTool } from './fixtures/canvas-bar';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { selectionCount, selectionBox } from './fixtures/canvas-marks';
 
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
@@ -81,7 +82,7 @@ async function draw(page: Page, tool = 'rectangle', at = 0.3, size: Point = { x:
   if (tool === 'frame') {
     return;
   }
-  await expect(page.getByTestId('frame-selection')).toHaveCount(1, { timeout: 15_000 });
+  await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBe(1);
 }
 
 type Corner = { name: string; ux: 0 | 1; uy: 0 | 1 };
@@ -103,8 +104,7 @@ function expectEdges(label: string, got: Rect, want: Rect): void {
 }
 
 async function expectCornerResize(page: Page, shot: string, corner: Corner = CORNERS[0]): Promise<void> {
-  const selection = page.getByTestId('frame-selection');
-  const before = (await selection.boundingBox())!;
+  const before = (await selectionBox(page))!;
   const colour = await colourAt(page, { x: before.x + before.width / 2, y: before.y + before.height / 2 });
   const area = { x: before.x - DRAG.x - SEARCH_MARGIN, y: before.y - DRAG.y - SEARCH_MARGIN, width: before.width + 2 * (DRAG.x + SEARCH_MARGIN), height: before.height + 2 * (DRAG.y + SEARCH_MARGIN) };
   const start = await fillBox(page, colour, area, `${SHOTS}/resize3-${shot}-0.png`);
@@ -123,7 +123,7 @@ async function expectCornerResize(page: Page, shot: string, corner: Corner = COR
     const label = `${shot} frame ${step}`;
     expect(fill, `${label}: fill visible`).not.toBeNull();
     expectEdges(`${label} fill`, fill!, grownBy(start!));
-    expectEdges(`${label} selection`, (await selection.boundingBox())!, grownBy(before));
+    expectEdges(`${label} selection`, (await selectionBox(page))!, grownBy(before));
   }
   await page.mouse.up();
 }
@@ -155,7 +155,7 @@ test.describe('corner resize pins the opposite corner every frame @real', () => 
     await page.setViewportSize({ width: 1200, height: 800 });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     await draw(page);
-    const at = (await page.getByTestId('frame-selection').boundingBox())!;
+    const at = (await selectionBox(page))!;
     await page.mouse.dblclick(at.x + at.width / 2, at.y + at.height / 2);
     await page.waitForTimeout(SETTLE_MS);
     await expectCornerResize(page, `entered${tag}`);
@@ -167,7 +167,7 @@ test.describe('corner resize pins the opposite corner every frame @real', () => 
       await page.setViewportSize({ width: 1200, height: 800 });
       await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
       await draw(page);
-      const at = (await page.getByTestId('frame-selection').boundingBox())!;
+      const at = (await selectionBox(page))!;
       await page.mouse.move(at.x, at.y);
       await page.keyboard.down('Control');
       await page.mouse.wheel(0, wheel);
@@ -218,7 +218,7 @@ test.describe('corner resize pins the opposite corner every frame @real', () => 
     await page.mouse.click(at.x, at.y);
     await page.waitForTimeout(SETTLE_MS);
     await page.mouse.click(at.x, at.y);
-    await expect(page.getByTestId('frame-selection')).toHaveCount(1, { timeout: 15_000 });
+    await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBe(1);
     await page.waitForTimeout(SETTLE_MS);
     await expectCornerResize(page, `in-frame${tag}`);
   });

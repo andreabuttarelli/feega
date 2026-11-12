@@ -1,6 +1,7 @@
 import sharp from 'sharp';
 import type { Page } from '@playwright/test';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { pickBox, pickCount } from './fixtures/canvas-marks';
 
 const SHOTS_DIR = `${process.env.HOME}/Documents/feega-videos/e2e`;
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
@@ -73,15 +74,14 @@ test.describe('zoom to an element inside a frame @real', () => {
     const drawn = (await orangeBounds(page, (await tile.boundingBox())!))!;
     expect(drawn, 'the element is drawn').not.toBeNull();
     await page.mouse.click(drawn.x + drawn.width / 2, drawn.y + drawn.height / 2);
-    const handles = page.getByTestId('frame-selection');
-    await expect(handles).toHaveCount(1);
-    const before = (await handles.boundingBox())!;
+    await expect.poll(() => pickCount(page)).toBe(1);
+    const before = (await pickBox(page))!;
     await page.screenshot({ path: `${SHOTS_DIR}/r6-zoom-nested-before.png` });
 
     await page.keyboard.press('Shift+2');
     await page.waitForTimeout(SETTLE_MS);
 
-    const after = (await handles.boundingBox())!;
+    const after = (await pickBox(page))!;
     await page.screenshot({ path: `${SHOTS_DIR}/r6-zoom-nested-after.png` });
     expect(after.width, 'the view zoomed in on the element').toBeGreaterThan(before.width * GROWS_BY);
   });

@@ -1,13 +1,17 @@
 const KEEP = 600;
 const FRAMES_KEPT = 2400;
 
-export type CoreFrameCount = { at: number; ms: number; moving: boolean; plans: number; walked: number; planMs: number; bakes: number; bakeMs: number; uploadBytes: number; unsharp: number; uncovered: number; step: number; pending: boolean };
+export type CoreFrameCount = { at: number; ms: number; moving: boolean; plans: number; walked: number; planMs: number; bakes: number; bakeMs: number; uploadBytes: number; unsharp: number; uncovered: number; step: number; pending: boolean; camera?: FrameCamera };
+
+export type FrameCamera = { x: number; y: number; zoom: number };
 
 export type TextureReport = { count: number; bytes: number; largest: string[] };
 
 type Tally = Record<string, { n: number; ms: number }>;
 
-type Stats = { render: number[]; textures?: () => TextureReport; pending?: number; loseDevice?: () => void; counts?: Record<string, number>; tally?: Tally; reveal?: { ms: number; missing: string[] }; settled?: number; frames?: CoreFrameCount[] };
+type Stats = { render: number[]; textures?: () => TextureReport; pending?: number; loseDevice?: () => void; counts?: Record<string, number>; tally?: Tally; reveal?: { ms: number; missing: string[] }; settled?: number; frames?: CoreFrameCount[]; marks?: StatsMarks };
+
+export type StatsMarks = { hit: (x: number, y: number) => { id: string; part: number; n: number } | null; rectOf: (id: string) => { x: number; y: number; w: number; h: number } | null; ids: () => string[] };
 
 declare global {
   interface Window {
@@ -36,6 +40,11 @@ export function exposeReveal(ms: number, missing: string[]) {
 export function exposeSettled(ms: number) {
   const stats = (window.__gpuCanvas ??= { render: [] });
   stats.settled = ms;
+}
+
+export function exposeMarks(marks: StatsMarks | undefined) {
+  const stats = (window.__gpuCanvas ??= { render: [] });
+  stats.marks = marks;
 }
 
 export function exposeLoss(lose: () => void) {
@@ -72,11 +81,11 @@ export function addTally(json: string) {
   }
 }
 
-export function countFrame(began: number, counts: Float64Array | undefined, moving: boolean, pending: boolean) {
+export function countFrame(began: number, counts: Float64Array | undefined, moving: boolean, pending: boolean, camera?: FrameCamera) {
   const stats = (window.__gpuCanvas ??= { render: [] });
   const frames = (stats.frames ??= []);
   const [plans = 0, walked = 0, planMs = 0, bakes = 0, bakeMs = 0, uploadBytes = 0, unsharp = 0, uncovered = 0, step = 0] = counts ?? [];
-  frames.push({ at: began, ms: performance.now() - began, moving, plans, walked, planMs, bakes, bakeMs, uploadBytes, unsharp, uncovered, step, pending });
+  frames.push({ at: began, ms: performance.now() - began, moving, plans, walked, planMs, bakes, bakeMs, uploadBytes, unsharp, uncovered, step, pending, camera });
   if (frames.length > FRAMES_KEPT) {
     frames.shift();
   }

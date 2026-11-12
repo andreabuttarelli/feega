@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { test as base, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import { instrument, measure, wheelPan, type Frames } from './fixtures/frame-sweeps';
 import { landingDoc } from '../../packages/motion-core/src/motion/codegen/fixtures/landing';
+import { selectionCount } from './fixtures/canvas-marks';
 
 const LABEL = process.env.BENCH_LABEL ?? 'run';
 const NO_WEBGPU = process.env.BENCH_WEBGL === '1';
@@ -145,10 +146,9 @@ async function selectMs(page: Page): Promise<number | null> {
   }
   const started = Date.now();
   await page.mouse.click(box.x + Math.min(box.width / 2, 40), box.y + Math.min(box.height / 2, 40));
-  const shown = await page
-    .getByTestId('frame-selection')
-    .first()
-    .waitFor({ timeout: SELECT_DEADLINE_MS })
+  const shown = await expect
+    .poll(() => selectionCount(page), { timeout: SELECT_DEADLINE_MS })
+    .toBeGreaterThan(0)
     .then(() => true)
     .catch(() => false);
   return shown ? Date.now() - started : null;

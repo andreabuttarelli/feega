@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { selectionCount } from './fixtures/canvas-marks';
 
 const SLOW_SERVER_MS = Number(process.env.OPTIMISTIC_DELAY_MS ?? 2_000);
 const FRAME_BUDGET = 2;
@@ -154,7 +155,7 @@ async function pickBox(page: Page, host: string) {
   const at = { x: box.x + box.width * 0.3, y: box.y + box.height * 0.5 };
   await expect(async () => {
     await page.mouse.click(at.x, at.y);
-    await expect(page.getByTestId('frame-selection')).toBeVisible({ timeout: 1500 });
+    await expect.poll(() => selectionCount(page), { timeout: 1500 }).toBeGreaterThan(0);
   }).toPass({ timeout: 25_000 });
   return at;
 }

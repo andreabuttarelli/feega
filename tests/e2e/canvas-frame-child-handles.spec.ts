@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import { SHOT_PREFIX } from './fixtures/shots';
+import { selectionCount, selectionBox } from './fixtures/canvas-marks';
 
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 const BOX_ID = 'box';
@@ -62,16 +63,16 @@ test.describe('selection handles follow a frame child @real', () => {
     const grab = { x: stageBox.x + stageBox.width * (BOX_AT.x - BOX_SIZE / 4), y: stageBox.y + stageBox.height * BOX_AT.y };
     await expect(async () => {
       await page.mouse.click(grab.x, grab.y);
-      await expect(page.getByTestId('frame-selection')).toBeVisible({ timeout: 1500 });
+      await expect.poll(() => selectionCount(page), { timeout: 1500 }).toBeGreaterThan(0);
     }).toPass({ timeout: 25_000 });
 
-    const selected = (await page.getByTestId('frame-selection').boundingBox())!;
+    const selected = (await selectionBox(page))!;
     await shot(page, '0-selected');
     await drag(page, { x: selected.x + selected.width * GRAB_SHARE, y: selected.y + selected.height / 2 });
     await page.waitForTimeout(SETTLE_MS);
     await shot(page, '1-moved');
 
-    const moved = (await page.getByTestId('frame-selection').boundingBox())!;
+    const moved = (await selectionBox(page))!;
     expect(moved.x, 'the selection box moved').toBeGreaterThan(selected.x + EDGE_TOLERANCE_PX);
 
     const dots = await centres(page.getByTestId('frame-selection-handle'));

@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import { SHOT_PREFIX } from './fixtures/shots';
+import { selectionCount } from './fixtures/canvas-marks';
 
 const SHOTS = SHOT_PREFIX;
 const SETTLE_MS = 2500;
@@ -54,7 +55,7 @@ test.describe('multi-select, undo and rotated chrome inside a core frame @real',
       await page.mouse.click(first.x, first.y);
       await page.waitForTimeout(SETTLE_MS);
       await page.mouse.click(first.x, first.y);
-      await expect(page.getByTestId('frame-selection')).toHaveCount(1, { timeout: 15_000 });
+      await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBe(1);
       const size = (await frame.boundingBox())!;
       await shot(page, `${rotation}-one`);
 
@@ -62,7 +63,7 @@ test.describe('multi-select, undo and rotated chrome inside a core frame @real',
       await page.keyboard.down('Shift');
       await page.mouse.click(second.x, second.y);
       await page.keyboard.up('Shift');
-      await expect(page.getByTestId('frame-selection')).toHaveCount(2);
+      await expect.poll(() => selectionCount(page)).toBe(2);
       const multi = (await frame.boundingBox())!;
       expect(Math.abs(multi.width - size.width)).toBeLessThan(SIZE_TOLERANCE_PX);
       expect(Math.abs(multi.height - size.height)).toBeLessThan(SIZE_TOLERANCE_PX);

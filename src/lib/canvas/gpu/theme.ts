@@ -1,4 +1,4 @@
-export type Theme = { canvas: string; dot: string; paper: string; paper2: string; line: string; line2: string; chip: string; chipInk: string; ink: string; inkSoft: string; accent: string; iterate: string; wire: string; font: string };
+export type Theme = { canvas: string; dot: string; paper: string; paper2: string; line: string; line2: string; chip: string; chipInk: string; ink: string; inkSoft: string; accent: string; iterate: string; wire: string; font: string; handle: string; radiusXs: number };
 
 const WIRE_INK_SHARE = 0.45;
 const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
@@ -38,6 +38,8 @@ export function themeOf(el: HTMLElement): Theme {
     accent: v('--accent', '#7c5cff'),
     iterate: v('--ui-wire-iterate', '#d97706'),
     wire: mix(v('--ink-soft', '#6e6e73'), v('--paper', '#ffffff'), WIRE_INK_SHARE),
+    handle: v('--ui-bg', '#ffffff'),
+    radiusXs: parseFloat(v('--ui-radius-xs', '2px')),
     font: (v('--sans', 'DM Sans').split(',')[0] || 'DM Sans').replace(/['"]/g, '').trim()
   };
 }

@@ -2,7 +2,9 @@ import type { Locator, Page } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { pickBarTool } from './fixtures/canvas-bar';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { handleBoxes, selectionCount, selectionBox } from './fixtures/canvas-marks';
 
+const CORNER_BOTTOM_RIGHT = 2;
 const MOVES = 5;
 const STEP = 70;
 const QUICK_MS = 150;
@@ -92,9 +94,9 @@ async function headDoc(admin: SupabaseClient, nodeId: string) {
 }
 
 async function expectFilled(page: Page, tile: Locator) {
-  await expect(page.getByTestId('frame-selection')).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => selectionCount(page), { timeout: 10_000 }).toBeGreaterThan(0);
   const node = (await tile.boundingBox())!;
-  const shape = (await page.getByTestId('frame-selection').boundingBox())!;
+  const shape = (await selectionBox(page))!;
   for (const [a, b, what] of [
     [shape.x, node.x, 'left'],
     [shape.y, node.y, 'top'],
@@ -155,8 +157,7 @@ test.describe('a free box stays fluid @real', () => {
     await expectFilled(page, tile);
     const start = await admin.from('nodes').select('x, y, width, height').eq('id', nodeId).single();
     const before = (await tile.boundingBox())!;
-    const corner = page.getByTestId('frame-selection').locator('[data-handle="2"]');
-    const grip = (await corner.boundingBox())!;
+    const grip = (await handleBoxes(page))[CORNER_BOTTOM_RIGHT];
     await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
     await page.mouse.down();
     await page.mouse.move(grip.x + grip.width / 2 + STEP, grip.y + grip.height / 2 + STEP / 2, { steps: 8 });

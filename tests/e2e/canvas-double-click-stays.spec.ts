@@ -2,6 +2,7 @@ import type { Locator, Page } from '@playwright/test';
 import { withSurface } from '@feega/motion-core/motion/surface';
 import { landingDoc } from '@feega/motion-core/motion/codegen/fixtures/landing';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { hoveredClip, selectedClip } from './fixtures/canvas-marks';
 
 const SIZE = { width: 1440, height: 4480 };
 const DATA = { format: 'custom', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
@@ -54,11 +55,10 @@ async function shakyDouble(page: Page, at: At, jitter: At[]) {
   }
 }
 
-async function hoverAt(page: Page, at: At, outline: string) {
+async function hoverAt(page: Page, at: At) {
   await page.mouse.move(at.x - 3, at.y);
   await page.mouse.move(at.x, at.y);
-  const box = page.getByTestId(outline);
-  return (await box.count()) ? await box.getAttribute('data-hovered') : null;
+  return hoveredClip(page);
 }
 
 async function leave(page: Page) {
@@ -88,11 +88,6 @@ async function enterInstance(page: Page, at: At): Promise<boolean> {
   return false;
 }
 
-const selectedClip = async (page: Page) => {
-  const marks = page.getByTestId('frame-selection');
-  return (await marks.count()) ? await marks.first().getAttribute('data-clip') : null;
-};
-
 test.describe('a double-click inside a frame never moves anything out @real', () => {
   test.skip(!REAL_STACK, 'E2E_REAL_STACK=1');
 
@@ -115,7 +110,7 @@ test.describe('a double-click inside a frame never moves anything out @real', ()
     await expect(page.locator('[data-canvas-surface]')).toHaveAttribute('data-renderer', 'core', { timeout: 30_000 });
     const tile = page.locator(`[data-testid="gpu-node"][data-id="${node.id}"]`);
     await expect(tile).toBeVisible({ timeout: 30_000 });
-    await expect.poll(async () => hoverAt(page, await pointIn(tile, TARGETS.headline), 'frame-pick-box'), { timeout: 30_000 }).toBe('hero');
+    await expect.poll(async () => hoverAt(page, await pointIn(tile, TARGETS.headline)), { timeout: 30_000 }).toBe('hero');
 
     const stages: Locator[] = [tile];
     for (const view of VIEWS) {
@@ -167,11 +162,11 @@ test.describe('a double-click inside a frame never moves anything out @real', ()
     await expect(tile).toBeVisible({ timeout: 30_000 });
 
     const primary = await pointIn(tile, TARGETS.primary);
-    await expect.poll(() => hoverAt(page, primary, 'frame-pick-box'), { timeout: 30_000 }).toBe('hero');
+    await expect.poll(() => hoverAt(page, primary), { timeout: 30_000 }).toBe('hero');
     expect(await enterInstance(page, primary)).toBe(true);
     const inner = await selectedClip(page);
     await page.mouse.move(primary.x, primary.y - 80);
-    await expect.poll(() => hoverAt(page, primary, 'frame-pick-box')).toBe(inner);
+    await expect.poll(() => hoverAt(page, primary)).toBe(inner);
     await page.mouse.click(primary.x, primary.y);
     await expect.poll(() => selectedClip(page)).toBe(inner);
 
@@ -190,7 +185,7 @@ test.describe('a double-click inside a frame never moves anything out @real', ()
     const viewInner = await selectedClip(page);
     expect(viewInner).toContain(INSTANCE_CHILD);
     await page.mouse.move(x, y - 60);
-    await expect.poll(() => hoverAt(page, { x, y }, 'view-pick-box')).toBe(viewInner);
+    await expect.poll(() => hoverAt(page, { x, y })).toBe(viewInner);
     await page.mouse.click(x, y);
     await expect.poll(() => selectedClip(page)).toBe(viewInner);
 
@@ -218,7 +213,7 @@ test.describe('a double-click inside a frame never moves anything out @real', ()
     const tile = page.locator(`[data-testid="gpu-node"][data-id="${node.id}"]`);
     await expect(tile).toBeVisible({ timeout: 30_000 });
     const headline = await pointIn(tile, TARGETS.headline);
-    await expect.poll(() => hoverAt(page, headline, 'frame-pick-box'), { timeout: 30_000 }).toBe('hero');
+    await expect.poll(() => hoverAt(page, headline), { timeout: 30_000 }).toBe('hero');
 
     const live = async () => (await admin.from('nodes').select('id').eq('canvas_id', session.canvasId).is('deleted_at', null)).data?.length ?? 0;
     const head = async () => JSON.stringify((await admin.from('motion_revisions').select('doc').eq('node_id', node.id).order('version', { ascending: false }).limit(1).single()).data?.doc);

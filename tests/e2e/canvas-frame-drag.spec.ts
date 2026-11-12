@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import { landingDoc } from './fixtures/landing-frame-doc';
+import { selectionCount } from './fixtures/canvas-marks';
 
 const SHOTS_DIR = `${process.env.HOME}/Documents/feega-videos/e2e`;
 const VIEWPORT = { width: 1440, height: 900 };
@@ -84,7 +85,7 @@ test.describe('a selected frame moves whole when dragged from inside @real', () 
     await page.waitForTimeout(SETTLE_MS);
     await page.keyboard.press('Escape');
     await page.waitForTimeout(SETTLE_MS);
-    await expect(page.getByTestId('frame-selection'), 'Escape leaves the frame selected whole').toHaveCount(0);
+    await expect.poll(() => selectionCount(page), { message: 'Escape leaves the frame selected whole' }).toBe(0);
 
     for (const zoom of ZOOMS) {
       await zoomAround(page, visibleCentre((await tile.boundingBox())!), zoom);
@@ -93,7 +94,7 @@ test.describe('a selected frame moves whole when dragged from inside @real', () 
       await page.mouse.move(EMPTY_SPOT.x, EMPTY_SPOT.y);
       await snap(page, `zoom-${zoom}`);
       expectMoved((await tile.boundingBox())!, before, `zoom ${zoom}`);
-      await expect(page.getByTestId('frame-selection'), `zoom ${zoom}: no child picked`).toHaveCount(0);
+      await expect.poll(() => selectionCount(page), { message: `zoom ${zoom}: no child picked` }).toBe(0);
     }
 
     const { count } = await admin.from('motion_revisions').select('id', { count: 'exact', head: true }).eq('node_id', node.id);
@@ -102,6 +103,6 @@ test.describe('a selected frame moves whole when dragged from inside @real', () 
     const box = (await tile.boundingBox())!;
     await page.mouse.click(visibleCentre(box).x, visibleCentre(box).y);
     await page.waitForTimeout(SETTLE_MS);
-    await expect(page.getByTestId('frame-selection'), 'a plain click on a selected frame still picks the child').toHaveCount(1);
+    await expect.poll(() => selectionCount(page), { message: 'a plain click on a selected frame still picks the child' }).toBe(1);
   });
 });

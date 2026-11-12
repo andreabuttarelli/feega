@@ -1,11 +1,12 @@
 import type { Locator, Page } from '@playwright/test';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import { SHOT_PREFIX } from './fixtures/shots';
+import { groupBox, groupHandleBoxes, handleBoxes, pickBox, pickCount } from './fixtures/canvas-marks';
 
 const SHOTS = SHOT_PREFIX;
 const SETTLE_MS = 2500;
 const ROTATION = 20;
-const ROTATE_TARGETS = 4;
+const ROTATE_OFFSET_PX = 6;
 const HANDLES = 8;
 const CORNER_BOTTOM_RIGHT = 2;
 const BIG_NUDGES = 5;
@@ -29,6 +30,8 @@ async function shot(page: Page, name: string) {
     await page.screenshot({ path: `${SHOTS}-${name}.png` });
   }
 }
+
+const centreOfBox = (b: { x: number; y: number; width: number; height: number }): Point => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 });
 
 const centre = async (l: Locator): Promise<Point> => {
   const b = (await l.boundingBox())!;
@@ -64,13 +67,10 @@ test.describe('Figma transforms on elements inside a core frame @real', () => {
       await page.mouse.click(a.x, a.y);
       await page.waitForTimeout(SETTLE_MS);
       await page.mouse.click(a.x, a.y);
-      const selection = page.getByTestId('frame-selection');
-      await expect(selection).toHaveCount(1, { timeout: 15_000 });
-      await expect(page.getByTestId('frame-selection-rotate'), 'rotate targets').toHaveCount(ROTATE_TARGETS);
+      await expect.poll(() => pickCount(page), { timeout: 15_000 }).toBe(1);
       await shot(page, `${rotation}-0-selected`);
 
-      const body = page.getByTestId('frame-selection-body');
-      const start = await centre(body);
+      const start = centreOfBox((await pickBox(page))!);
       const towardB = await at(0.47);
       await page.mouse.move(start.x, start.y);
       await page.mouse.down();
@@ -89,40 +89,40 @@ test.describe('Figma transforms on elements inside a core frame @real', () => {
       await shot(page, `${rotation}-2-measure`);
       await page.keyboard.up('Alt');
 
-      const beforeNudge = (await body.boundingBox())!;
+      const beforeNudge = (await pickBox(page))!;
       for (let i = 0; i < BIG_NUDGES; i++) {
         await page.keyboard.press('Shift+ArrowRight');
       }
       await page.waitForTimeout(SETTLE_MS);
-      const afterNudge = (await body.boundingBox())!;
+      const afterNudge = (await pickBox(page))!;
       expect(Math.hypot(afterNudge.x - beforeNudge.x, afterNudge.y - beforeNudge.y), 'Shift+arrows nudge the element').toBeGreaterThan(5);
 
-      const box = (await selection.boundingBox())!;
-      const knob = await centre(page.getByTestId('frame-selection-rotate').nth(CORNER_BOTTOM_RIGHT));
+      const box = (await pickBox(page))!;
+      const corner0 = (await handleBoxes(page))[CORNER_BOTTOM_RIGHT];
+      const knob = { x: corner0.x + corner0.width / 2 + ROTATE_OFFSET_PX, y: corner0.y + corner0.height / 2 + ROTATE_OFFSET_PX };
       await page.mouse.move(knob.x, knob.y);
       await page.mouse.down();
       await page.mouse.move(knob.x - box.width / 2, knob.y + box.height / 2, { steps: 15 });
       await page.mouse.up();
       await page.waitForTimeout(SETTLE_MS);
-      const turned = (await selection.boundingBox())!;
+      const turned = (await pickBox(page))!;
       expect(Math.abs(turned.width - box.width) + Math.abs(turned.height - box.height), 'rotating changes the outline').toBeGreaterThan(4);
       await shot(page, `${rotation}-3-rotated`);
 
       await page.keyboard.down('Shift');
       await page.mouse.click(b.x, b.y);
       await page.keyboard.up('Shift');
-      await expect(selection).toHaveCount(2);
-      const group = page.getByTestId('frame-group-selection');
-      await expect(group.getByTestId('frame-selection-handle')).toHaveCount(HANDLES);
-      const groupBox = (await group.boundingBox())!;
-      const corner = await centre(group.getByTestId('frame-selection-handle').nth(CORNER_BOTTOM_RIGHT));
+      await expect.poll(() => pickCount(page)).toBe(2);
+      await expect.poll(async () => (await groupHandleBoxes(page)).length).toBe(HANDLES);
+      const groupBefore = (await groupBox(page))!;
+      const corner = centreOfBox((await groupHandleBoxes(page))[CORNER_BOTTOM_RIGHT]);
       await page.mouse.move(corner.x, corner.y);
       await page.mouse.down();
       await page.mouse.move(corner.x + 60, corner.y + 30, { steps: 15 });
       await page.mouse.up();
       await page.waitForTimeout(SETTLE_MS);
-      const grown = (await group.boundingBox())!;
-      expect(grown.width * grown.height, 'the group resizes as one').toBeGreaterThan(groupBox.width * groupBox.height);
+      const grown = (await groupBox(page))!;
+      expect(grown.width * grown.height, 'the group resizes as one').toBeGreaterThan(groupBefore.width * groupBefore.height);
       await shot(page, `${rotation}-4-group-resized`);
 
       const flip = page.getByRole('button', { name: 'Flip horizontal' });

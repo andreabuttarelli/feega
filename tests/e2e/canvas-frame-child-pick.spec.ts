@@ -4,6 +4,7 @@ import type { Locator, Page } from '@playwright/test';
 import { withSurface } from '@feega/motion-core/motion/surface';
 import { landingDoc } from '@feega/motion-core/motion/codegen/fixtures/landing';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { hoveredClip, selectedClip } from './fixtures/canvas-marks';
 
 const SHOTS = `${homedir()}/Documents/feega-videos/editor-modes`;
 const SIZE = { width: 1440, height: 4480 };
@@ -21,24 +22,18 @@ async function pointIn(stage: Locator, at: { x: number; y: number }) {
   return { x: box.x + at.x * scale, y: box.y + at.y * scale };
 }
 
-async function hoverAt(page: Page, at: { x: number; y: number }, mods: 'ControlOrMeta' | null = null, outline = 'frame-pick-box') {
+async function hoverAt(page: Page, at: { x: number; y: number }, mods: 'ControlOrMeta' | null = null) {
   if (mods) {
     await page.keyboard.down(mods);
   }
   await page.mouse.move(at.x - 3, at.y);
   await page.mouse.move(at.x, at.y);
-  const box = page.getByTestId(outline);
-  const id = (await box.count()) ? await box.getAttribute('data-hovered') : null;
+  const id = await hoveredClip(page);
   if (mods) {
     await page.keyboard.up(mods);
   }
   return id;
 }
-
-const selectedClip = async (page: Page) => {
-  const marks = page.getByTestId('frame-selection');
-  return (await marks.count()) ? await marks.first().getAttribute('data-clip') : null;
-};
 
 test.describe('a frame picks its children like Figma @real', () => {
   test.skip(!REAL_STACK, 'E2E_REAL_STACK=1');
@@ -80,7 +75,7 @@ test.describe('a frame picks its children like Figma @real', () => {
     await expect(tablet).toBeVisible();
     const box = (await tablet.boundingBox())!;
     const inView = { x: box.x + box.width / 2, y: box.y + box.width * (HEADLINE.y / SIZE.width) };
-    await expect.poll(() => hoverAt(page, inView, null, 'view-pick-box')).toBe('hero');
+    await expect.poll(() => hoverAt(page, inView)).toBe('hero');
     await page.mouse.click(inView.x, inView.y);
     await expect.poll(() => selectedClip(page)).toBe('hero');
     await page.screenshot({ path: `${SHOTS}/pick-regress-breakpoint-view.png` });

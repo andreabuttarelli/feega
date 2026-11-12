@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import { SHOTS_DIR } from './fixtures/shots';
+import { selectionCount } from './fixtures/canvas-marks';
 
 const SETTLE_MS = 2500;
 const NUDGES = 6;
@@ -64,11 +65,11 @@ test.describe('live boolean group @real', () => {
     await page.mouse.click(onlyA.x, onlyA.y);
     await page.waitForTimeout(SETTLE_MS);
     await page.mouse.click(onlyA.x, onlyA.y);
-    await expect(page.getByTestId('frame-selection')).toHaveCount(1, { timeout: 15_000 });
+    await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBe(1);
     await page.keyboard.down('Shift');
     await page.mouse.click(onlyB.x, onlyB.y);
     await page.keyboard.up('Shift');
-    await expect(page.getByTestId('frame-selection')).toHaveCount(2, { timeout: 15_000 });
+    await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBe(2);
 
     await page.keyboard.press('Alt+Shift+U');
     await expect.poll(async () => (await topClips()).some((c) => c.component === 'Precomp' && c.props.boolean === 'union'), { timeout: 30_000 }).toBe(true);
