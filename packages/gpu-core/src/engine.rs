@@ -109,7 +109,7 @@ pub struct Engine {
     scenes: Vec<Scene>,
     tally: Tally,
     drawing: Reason,
-    overflowed: bool,
+    fullness: f64,
 }
 
 pub type EngineError = vello::Error;
@@ -117,9 +117,9 @@ pub type EngineError = vello::Error;
 const LINES: u32 = 1 << 21;
 const SEGMENTS: u32 = 1 << 21;
 
-pub fn overflows(scene: &Scene) -> bool {
+pub fn fullness(scene: &Scene) -> f64 {
     let used = scene.bump_estimate(None);
-    used.lines.len() > LINES || used.segments.len() > SEGMENTS
+    (used.lines.len() as f64 / LINES as f64).max(used.segments.len() as f64 / SEGMENTS as f64)
 }
 
 struct Gpu<'a> {
@@ -256,7 +256,7 @@ impl Gpu<'_> {
 impl Engine {
     pub fn new(device: &wgpu::Device) -> Result<Self, EngineError> {
         let vello = vello::Renderer::new(device, RendererOptions { antialiasing_support: AaSupport::area_only(), ..Default::default() })?;
-        Ok(Self { vello, blending: Blending::Native, filters: FilterPasses::new(device), cache: LayerCache::default(), held: HashMap::new(), spare: Vec::new(), scenes: Vec::new(), tally: Tally::default(), drawing: Reason::Screen, overflowed: false })
+        Ok(Self { vello, blending: Blending::Native, filters: FilterPasses::new(device), cache: LayerCache::default(), held: HashMap::new(), spare: Vec::new(), scenes: Vec::new(), tally: Tally::default(), drawing: Reason::Screen, fullness: 0.0 })
     }
 
     pub fn set_budget(&mut self, pool: u64, layers: u64) {
@@ -277,7 +277,7 @@ impl Engine {
         let layers = prepare(&mut gpu, list, pictures, self.blending)?;
         let mut scene = borrowed(gpu.scenes);
         let skipped = build_into(&mut scene, list, pictures, &layers);
-        let overflowed = overflows(&scene);
+        let fullness = fullness(&scene);
         let drawn = gpu.render(self.drawing, &scene, base(list.background), target, (list.width, list.height));
         gpu.scenes.push(scene);
         for image in layers.into_images() {
@@ -286,12 +286,12 @@ impl Engine {
             }
         }
         gpu.cache.sweep(gpu.vello);
-        self.overflowed = overflowed;
+        self.fullness = fullness;
         drawn.map(|_| skipped)
     }
 
-    pub fn overflowed(&self) -> bool {
-        self.overflowed
+    pub fn fullness(&self) -> f64 {
+        self.fullness
     }
 
     fn raster(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures) -> Result<(ImageData, wgpu::Texture, Vec<Skipped>), EngineError> {
