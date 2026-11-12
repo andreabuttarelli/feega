@@ -91,7 +91,9 @@
   import StyleSection from './StyleSection.svelte';
   import VariablesSection from './VariablesSection.svelte';
   import BindChip from './BindChip.svelte';
-  import { fillTarget } from '$lib/motion/variables';
+  import { bindChip, fillTarget, freeFill, unbindVariable, variableValue } from '$lib/motion/variables';
+  import { bindFromLibrary } from '$lib/motion/variable-library';
+  import { variableLibrary } from '$lib/canvas/variable-library.svelte';
   import { registerFont, replaceFont, setFont } from '$lib/motion/fonts/ops';
   import { FontOrigin, withPicked } from '$lib/motion/fonts/local';
   import { isBuiltin } from '@feega/motion-core/motion/fonts/model';
@@ -502,9 +504,30 @@
   const fillsShown = $derived(applyFillKeys(elementFills(clip.component, clip.props), Object.fromEntries([...fillKeyed].map((key) => [key, shown(key) as KeyValue]))));
   const fillKeys = $derived(clip.component === 'Shape' ? { mark: (key: string) => MARK[keyState(key)], toggle } : null);
 
+  const fillBound = $derived.by(() => {
+    const target = fillTarget(clip);
+    const name = target ? clip.bind?.[target] : undefined;
+    if (!target || !name) {
+      return null;
+    }
+    const offered = { ...variableLibrary.collections, ...doc.variables };
+    const options = (bindChip(clip, target, offered)?.options ?? []).map((o) => ({ key: o.key, value: String(variableValue(offered, o.key) ?? '') }));
+    return {
+      name,
+      options,
+      ondetach: () => commit(unbindVariable(doc, clip.id, target), `Detached ${name}`),
+      onpick: (key: string) => commit(bindFromLibrary(doc, offered, clip.id, target, key), `Bound ${target} to ${key}`)
+    };
+  });
+
+  function withFreeFill(edit: (free: MotionDoc) => OpResult): OpResult {
+    const free = freeFill(doc, clip.id);
+    return free.ok ? edit(free.doc) : free;
+  }
+
   function commitFills(next: Fill[], summary: string) {
     const { fills, keyedValues } = splitFillEdit(elementFills(clip.component, clip.props), fillsShown, next, fillKeyed);
-    let result: OpResult = setProps(doc, clip.id, { fills });
+    let result: OpResult = withFreeFill((free) => setProps(free, clip.id, { fills }));
     for (const [key, value] of Object.entries(keyedValues)) {
       result = result.ok ? setKeyframe(result.doc, clip.id, key, frame - clip.from, value) : result;
     }
@@ -713,10 +736,8 @@
   {:else if field.control === Control.Fills}
     {@const fillBind = fillTarget(clip)}
     <div class="stack bindable" data-prop={field.key}>
-      {#if fillBind && clip.bind?.[fillBind]}<BindChip {doc} {clip} target={fillBind} {commit} />{:else}
-        <FillStack {gesture} {palette} keys={fillKeys} bind:open={fillOpen} fills={fillsShown} adder={Adder.Section} {assets} {tokens} {upload} oncrop={() => cropRequest.ask()} onchange={commitFills} />
-        {#if fillBind}<BindChip {doc} {clip} target={fillBind} {commit} />{/if}
-      {/if}
+      <FillStack {gesture} {palette} keys={fillKeys} bind:open={fillOpen} fills={fillsShown} bound={fillBound} adder={Adder.Section} {assets} {tokens} {upload} oncrop={() => cropRequest.ask()} onchange={commitFills} />
+      {#if fillBound}<span class="bind-slot" aria-hidden="true"></span>{:else if fillBind}<BindChip {doc} {clip} target={fillBind} {commit} />{/if}
     </div>
   {:else if field.control === Control.Strokes}
     <div class="stack" data-prop={field.key}><StrokeStack {gesture} {palette} strokes={elementStrokes(clip.component, clip.props)} adder={Adder.Section} sided={sidesShown(clip.props.shape as ShapeKind)} short={Math.min(space.width, space.height)} {tokens} onchange={(strokes, summary) => commit(setProps(doc, clip.id, { strokes }), summary)} /></div>
@@ -1143,7 +1164,7 @@
       {/snippet}
     </MenuTrigger>
     <MenuContent align="end">
-      {#each FILL_TYPES as type (type)}<MenuItem label={FILL_LABEL[type]} onSelect={() => commit(setProps(doc, clip.id, { fills: addFill(elementFills(clip.component, clip.props), type, clip.autoLayout || hasChildren ? FillHolder.Container : FillHolder.Layer) }), 'Add fill')} />{/each}
+      {#each FILL_TYPES as type (type)}<MenuItem label={FILL_LABEL[type]} onSelect={() => commit(withFreeFill((free) => setProps(free, clip.id, { fills: addFill(elementFills(clip.component, clip.props), type, clip.autoLayout || hasChildren ? FillHolder.Container : FillHolder.Layer) })), 'Add fill')} />{/each}
     </MenuContent>
   </Menu>
 {/snippet}
@@ -1500,6 +1521,11 @@
     display: flex;
     align-items: center;
     gap: var(--ui-space-2);
+  }
+
+  .bind-slot {
+    flex-shrink: 0;
+    width: 22px;
   }
 
   .bindable > :global(:first-child) {
