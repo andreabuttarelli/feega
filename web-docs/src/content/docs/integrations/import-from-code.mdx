@@ -5,6 +5,8 @@ sidebar:
   order: 5
 ---
 
+import DemoVideo from '../../../components/DemoVideo.astro';
+
 Paste a GitHub repository and one or more page paths, or a Storybook link. Feega reads the running app or the stories and draws them as an editable frame, like [Import from URL](/integrations/import-from-url/), with one difference: components keep their identity.
 
 - Every component of the code rendered on the page becomes a **main component**, named as in the code.
@@ -77,6 +79,8 @@ A frame imported from GitHub or a folder remembers where each layer comes from i
 **Pull** brings the code back: new commits on the imported branch (or the branch you type), or file changes in the folder, are re-read and drawn into the same frame. Your canvas edits are kept; where the code changed the same property of the same element, the code wins and the conflict is listed. Tokens are matched by their name in the code: a new token becomes a variable; a changed value reaches its variable and the bound layers; a variable you changed on the canvas keeps your value unless the code changed that mode too, then the code wins and your value is listed; a removed token that layers still use stays as an orphan variable with its layers bound (one nobody uses is removed); a token renamed with the same values in every mode and the same usages keeps your edits under the new name, anything less certain is listed as removed plus added. Variables made on the canvas and the chosen mode survive the pull. For a folder, code mode watches the files and pulls on its own while the frame is open.
 
 ## Import a local folder
+
+<DemoVideo name="folder-upload" caption="Pick a project folder on the home: it is uploaded once, with no sync back." />
 
 On feega.app, the **Folder** tab picks a project folder on your computer and uploads it once. node_modules, build output (`dist`, `build`, `.next`, …), what `.gitignore` leaves out and files over 1 MB are skipped; the rest may total 25 MB. It runs in the same sandbox as a GitHub repository, never on feega's servers. It is **imported once, no sync**: code mode shows the patch to download, with no write-back and no pull. Its CSS tokens are read like a repository's.
 
