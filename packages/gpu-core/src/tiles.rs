@@ -223,6 +223,15 @@ fn keys_over(world: Rect, step: i32) -> Vec<TileKey> {
     (y0..y1).flat_map(|ty| (x0..x1).map(move |tx| TileKey { step, tx, ty })).collect()
 }
 
+pub fn lifted_keys(camera: Camera, screen: (u32, u32), rest: Rect, (dx, dy): (f64, f64), step: i32) -> Vec<TileKey> {
+    let seen = seen_world(camera, screen);
+    let shown = Rect::new(seen.x0 - dx, seen.y0 - dy, seen.x1 - dx, seen.y1 - dy);
+    if !shown.overlaps(rest) {
+        return Vec::new();
+    }
+    keys_over(shown.intersect(rest), step)
+}
+
 impl Tiles {
     pub fn set_pixel_ratio(&mut self, ratio: f64) {
         self.pixel_ratio = Some(ratio);
@@ -252,10 +261,11 @@ impl Tiles {
         let fallback: Vec<i32> = if missing.is_empty() { vec![] } else { (step - COARSER_STEPS..step).chain((step + 1..=step + FINER_STEPS).rev()).collect() };
         let whole = |s: i32| keys_over(world, s).iter().filter(|k| self.paints(**k)).all(|k| self.held.contains(k));
         let shown = if missing.is_empty() { Some(step) } else { ((step + 1..=step + FINER_STEPS).chain((step - COARSER_STEPS..step).rev())).find(|s| whole(*s)) };
-        let draw = match shown {
+        let draw: Vec<TileKey> = match shown {
             Some(top) => self.held_over(world, top),
             None => fallback.into_iter().chain([step]).flat_map(|s| self.held_over(world, s)).collect(),
         };
+        missing.extend(draw.iter().filter(|k| k.step != step && self.stale.contains(k)));
         TileFrame { draw, missing }
     }
 

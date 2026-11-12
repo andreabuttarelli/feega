@@ -1,6 +1,6 @@
 use vello::kurbo::{Affine as Matrix, Rect};
 
-use crate::display_list::Item;
+use crate::display_list::{DisplayList, Item};
 use crate::groups::{Library, Limits, Plan, Sweep};
 use crate::retained::{tiles, Camera, Damage, Lookup, Outcome, Quality, Raster, Retained, Step};
 use crate::world::{Lift, OverlayPart, Patch, World};
@@ -150,7 +150,11 @@ impl Compositor {
     }
 
     pub fn stirred(&mut self) -> bool {
-        !matches!(self.world.take_damage(), Damage::Rects(r) if r.is_empty())
+        let stirred = !matches!(self.world.take_damage(), Damage::Rects(r) if r.is_empty());
+        if stirred {
+            self.retained.forget();
+        }
+        stirred
     }
 
     pub fn take_damage(&mut self) -> Damage {
@@ -169,8 +173,18 @@ impl Compositor {
     }
 
     pub fn plan_at(&mut self, library: &mut Library, camera: Camera, (w, h): (u32, u32), limits: Limits) -> Plan {
+        let scene = self.world.scene(camera.matrix(), w, h);
+        self.plan_kept(library, &scene, limits)
+    }
+
+    pub fn plan_alone(&mut self, library: &mut Library, clip: &str, camera: Camera, (w, h): (u32, u32), limits: Limits) -> Plan {
+        let alone = self.world.alone(clip, camera.matrix(), w, h);
+        self.plan_kept(library, &alone, limits)
+    }
+
+    fn plan_kept(&mut self, library: &mut Library, list: &DisplayList, limits: Limits) -> Plan {
         let started = now_ms();
-        let plan = library.plan_with(&self.world.scene(camera.matrix(), w, h), limits, Sweep::Keep);
+        let plan = library.plan_with(list, limits, Sweep::Keep);
         self.count_plan(started);
         self.pending |= plan.pending || !plan.finished.is_empty();
         for group in plan.finished.iter().chain(&plan.waiting) {
