@@ -11,6 +11,7 @@ import type { Catalog } from './registry';
 
 const LIBRARY = join(import.meta.dirname, '../../libraries/arc');
 const OUT = join(import.meta.dirname, '../../src/lib/motion/template/arc/arc-doc.json');
+const INDEX = join(import.meta.dirname, '../../src/lib/motion/template/arc/arc-index.json');
 const NAME = 'Arc';
 const label = process.argv[2] ?? 'arc-lib';
 
@@ -34,4 +35,5 @@ const sets = plan.sets.flatMap((s) => {
   return item ? [{ name: item.title, slug: item.name, description: item.description, size: s.size, doc: compacted(s.doc) }] : [];
 });
 writeFileSync(OUT, JSON.stringify(sets));
+writeFileSync(INDEX, `${JSON.stringify(sets.map(({ slug, name, description }) => ({ slug, name, description })), null, 2)}\n`);
 console.log(`${sets.length} component sets written to ${OUT}`);
