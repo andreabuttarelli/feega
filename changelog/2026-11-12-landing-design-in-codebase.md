@@ -2,7 +2,9 @@
 
 The hero said "Design inside your code" and nothing below showed it. The home now has a section
 after "Start from any site", and `/design-in-your-codebase` repeats it with a closing call to
-action: a headline, one line, two actions (import, read the docs), an isometric loop, three steps
+action: "Design directly in your codebase", one line, two actions (import, read the docs), an
+isometric loop over a box running the hero's ASCII field (`AsciiField` with `FieldFit.Box`, no
+hero fade; the scene breaks out of the box on the top, left and right), three steps
 with their own isometric glyphs, and one row of framework logos.
 
 The first version was a spec sheet (capability tables, React 18/19 caveats, route limits). It was

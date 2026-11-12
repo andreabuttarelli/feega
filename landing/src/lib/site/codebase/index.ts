@@ -4,12 +4,12 @@ import type { Logo } from './logos';
 export const CODEBASE_PATH = '/design-in-your-codebase';
 
 export const CODEBASE = {
-  title: 'Design in Your Codebase – Edit Your Real App | Feega',
+  title: 'Design Directly in Your Codebase | Feega',
   description:
     'Feega opens your GitHub repo or folder as an editable design: real pages, your components and colours. Change it on the canvas, ship a pull request.',
   eyebrow: 'Code → Design → Code',
-  heading: 'Your app, already designed.',
-  lead: 'Import the repo. Edit it on the canvas. Ship the pull request.',
+  heading: 'Design directly in your codebase',
+  lead: 'Open your real app as an editable design. Send the changes back as a pull request.',
   start: { href: `${APP_URL}/?utm_source=feega.app&utm_medium=site&utm_campaign=design-in-your-codebase`, label: 'Import your repo' },
   docs: { href: `${DOCS_URL}/integrations/import-from-code/`, label: 'Read the docs' }
 } as const;

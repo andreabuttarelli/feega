@@ -3,6 +3,8 @@
   import IsoLoop from './IsoLoop.svelte';
   import IsoGlyph from './IsoGlyph.svelte';
   import Frameworks from './Frameworks.svelte';
+  import AsciiField from '../home/AsciiField.svelte';
+  import { FieldFit } from '../ascii-field';
 
   let { level = 'h2' }: { level?: 'h1' | 'h2' } = $props();
 </script>
@@ -20,7 +22,8 @@
     </div>
 
     <div class="art">
-      <IsoLoop />
+      <div class="box"><AsciiField fit={FieldFit.Box} /></div>
+      <div class="scene"><IsoLoop /></div>
     </div>
   </div>
 
@@ -92,9 +95,29 @@
   }
 
   .art {
+    position: relative;
     width: 100%;
     max-width: 560px;
     margin: 0 auto;
+  }
+
+  .box {
+    position: absolute;
+    top: 30%;
+    right: 6%;
+    bottom: 0;
+    left: 22%;
+    overflow: hidden;
+    border-radius: 12px;
+    background: #0d0d0d;
+  }
+
+  .box > :global(.field) {
+    opacity: 0.7;
+  }
+
+  .scene {
+    position: relative;
   }
 
   .steps {
