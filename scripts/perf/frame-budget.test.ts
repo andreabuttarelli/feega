@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { budgetOf, FRAME_BUDGET_MS } from './frame-budget';
+import { budgetOf, budgetMs, FRAME_BUDGET_MS, Rate } from './frame-budget';
 
 const frames = (fast: number, slow: number) => [...Array(fast).fill(5), ...Array(slow).fill(20)];
 
@@ -23,6 +23,13 @@ describe('frame budget', () => {
   it('reports p99 from the slowest frames', () => {
     expect(budgetOf(frames(995, 5)).p99).toBe(5);
     expect(budgetOf(frames(980, 20)).p99).toBe(20);
+  });
+
+  it('a 120 fps frame is 8.3 ms, and a 10 ms frame is over it but inside 90 fps', () => {
+    const tens = [...Array(97).fill(5), ...Array(3).fill(10)];
+    expect(budgetMs(Rate.ProMotion)).toBeCloseTo(8.3, 1);
+    expect(budgetOf(tens, Rate.ProMotion)).toMatchObject({ over: 3, passed: false });
+    expect(budgetOf(tens).passed).toBe(true);
   });
 
   it('no frames is a failure, not a pass', () => {
