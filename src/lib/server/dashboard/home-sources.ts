@@ -10,7 +10,7 @@ export type SourceScope = { db: Db; orgId: string; userId: string; projectId: st
 
 const ORIGIN = { x: 0, y: 0 };
 
-type Importer = (scope: SourceScope, canvasId: string, value: string) => Promise<{ frameIds: string[] } | { refusal: string }>;
+type Importer = (scope: SourceScope, canvasId: string, value: string) => Promise<{ frameIds: string[] } | { refusal: string; reason: string }>;
 
 const UNAVAILABLE = 'Code import is not available right now.';
 
@@ -33,7 +33,7 @@ const IMPORT_REFUSAL_TEXT: Record<string, string> = {
 
 const FALLBACK_REFUSAL = 'The import could not be completed.';
 
-const refusalText = (outcome: string) => IMPORT_REFUSAL_TEXT[outcome] ?? FALLBACK_REFUSAL;
+const refused = (outcome: string) => ({ refusal: outcome, reason: IMPORT_REFUSAL_TEXT[outcome] ?? FALLBACK_REFUSAL });
 
 const SHOWS_VALUE: Record<PromptSource, boolean> = {
   [PromptSource.Github]: true,
@@ -46,7 +46,7 @@ const actorOf = (scope: SourceScope) => ({ ...scope, actor: { kind: 'user' as co
 
 const fromCode = async (done: ReturnType<typeof importCodeInto>) => {
   const out = await done;
-  return out.outcome === CodeImportOutcome.Ok ? { frameIds: [out.frameId] } : { refusal: refusalText(out.outcome) };
+  return out.outcome === CodeImportOutcome.Ok ? { frameIds: [out.frameId] } : refused(out.outcome);
 };
 
 const IMPORTERS: Record<PromptSource, Importer> = {
@@ -55,7 +55,7 @@ const IMPORTERS: Record<PromptSource, Importer> = {
   [PromptSource.Upload]: (scope, canvasId, value) => fromCode(importCodeInto(actorOf(scope), canvasId, { upload: value, routes: [], at: ORIGIN })),
   [PromptSource.Figma]: async (scope, canvasId, value) => {
     const out = await importFigmaInto(actorOf(scope), canvasId, { url: value, nodeIds: null, at: ORIGIN });
-    return out.outcome === FigmaOutcome.Ok ? { frameIds: out.frameIds } : { refusal: refusalText(out.outcome) };
+    return out.outcome === FigmaOutcome.Ok ? { frameIds: out.frameIds } : refused(out.outcome);
   }
 };
 

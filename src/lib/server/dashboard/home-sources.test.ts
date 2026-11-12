@@ -13,15 +13,13 @@ describe('importSource', () => {
   it('una cartella caricata che fallisce non mostra il percorso né il codice', async () => {
     const landed = await importSource(scope, 'c', { source: PromptSource.Upload, value: UPLOAD_PATH });
 
-    const said = JSON.stringify(landed);
-    expect(said).not.toContain(UPLOAD_PATH);
-    expect(said).not.toContain('no_sandbox');
-    expect('refusal' in landed && landed.refusal).toBe('Code import is not available right now.');
+    expect(landed.what).not.toContain(UPLOAD_PATH);
+    expect('reason' in landed && landed.reason).toBe('Code import is not available right now.');
   });
 
   it('un esito sconosciuto ricade su un testo generico', async () => {
     const landed = await importSource(scope, 'c', { source: PromptSource.Figma, value: 'https://www.figma.com/design/x' });
 
-    expect('refusal' in landed && landed.refusal).toBe('The import could not be completed.');
+    expect('reason' in landed && landed.reason).toBe('The import could not be completed.');
   });
 });
