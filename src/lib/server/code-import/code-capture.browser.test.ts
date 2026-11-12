@@ -16,7 +16,7 @@ import { repoOf } from './repo';
 import { sandboxRunner } from './sandbox-runner';
 import { importKeyCookie } from './origin-proxy';
 import { storybookPages } from './storybook';
-import { devServerOf, folderNames } from './folder-source';
+import { folderNames, withDevServer } from './folder-source';
 
 const LABEL = process.env.CODE_IMPORT_CAPTURE ?? '';
 const ONLY = process.env.CODE_IMPORT_ONLY?.split(',');
@@ -68,11 +68,15 @@ const START: Record<AppSource, (app: FidelityApp) => Promise<Started>> = {
   },
   [AppSource.Folder]: async (app) => {
     const root = resolve(app.at);
-    const served = await devServerOf(root, null);
-    if (!('url' in served)) {
-      throw new Error(`the folder ${root} did not start: ${served.refusal}`);
-    }
-    return { pages: app.pages.map((p) => ({ label: p, url: new URL(`/?s=${p}`, served.url).toString() })), names: await folderNames(root), stop: async () => void served.child.kill(), allowed: new URL(served.url).origin };
+    let stop = () => {};
+    const held = new Promise<void>((r) => (stop = r));
+    const url = await new Promise<string>((served, failed) => {
+      withDevServer(root, null, async (at) => {
+        served(at);
+        await held;
+      }).then((done) => done && failed(new Error(`the folder ${root} did not start: ${done.refusal}`)), failed);
+    });
+    return { pages: app.pages.map((p) => ({ label: p, url: new URL(`/?s=${p}`, url).toString() })), names: await folderNames(root), stop: async () => stop(), allowed: new URL(url).origin };
   }
 };
 

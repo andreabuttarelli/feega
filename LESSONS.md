@@ -3851,3 +3851,7 @@ Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start
 ### `svelte-check` dies in a worktree with an esbuild goroutine dump
 
 **Signal:** `npx svelte-check` in a `feega-wt/` worktree prints `Error while loading config at …/packages/feega-motion-react/example/vite.config.ts` and a Go stack, exit 0, no diagnostics. **Move:** it is the example's config failing to load, not your code; type-check the TypeScript with `npx tsc --noEmit -p tsconfig.json | grep <your paths>` and let a dev server compile the `.svelte` files you touched (open the page), then trust CI's check.
+
+## A dev server spawned by feega outlives it
+
+**Signal:** `ps` shows `npm exec vite dev --port <n>` with parent pid 1 after the feega server stopped; the desktop app needs its SIGKILL fallback to close the local server. **Move:** a non-detached child keeps the parent's event loop alive and does not die with it, and `child.kill()` reaches only the npm wrapper. Spawn through `spawnGroup` (`code-import/dev-children.ts`): own process group, `kill(-pid)` on release, exit and signals, pid file for the next start. Test with a fake `npm run dev` that spawns a grandchild, and assert the grandchild's pid is gone.

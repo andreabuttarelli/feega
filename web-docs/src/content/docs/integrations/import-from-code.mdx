@@ -117,7 +117,7 @@ A frame imported from GitHub or a folder remembers where each layer comes from i
 
 On feega.app, the **Folder** tab picks a project folder on your computer and uploads it once. node_modules, build output (`dist`, `build`, `.next`, …), what `.gitignore` leaves out and files over 1 MB are skipped. Secrets never leave your computer, whatever `.gitignore` says: `.env` and `.env.*` (except `.env.example`, `.env.sample`, `.env.template`), `*.pem`, `*.key`, `id_rsa*` and an `.npmrc` holding an auth token; the rest may total 25 MB. It runs in the same sandbox as a GitHub repository, never on feega's servers. It is **imported once, no sync**: code mode shows the patch to download, with no write-back and no pull. Its CSS tokens are read like a repository's.
 
-In local mode (`npx feega`), the **Folder** tab takes the absolute path of a project on your computer. Its `dev` script runs here, the pages are read with your local Chrome, and the frame stays linked to the folder as above. Images served by the dev server are not copied yet.
+In local mode (`npx feega`), the **Folder** tab takes the absolute path of a project on your computer. Its `dev` script runs here only for the import, stopped with every process it started when the import ends or feega quits; the pages are read with your local Chrome, and the frame stays linked to the folder as above. Images served by the dev server are not copied yet.
 
 ## What works
 
