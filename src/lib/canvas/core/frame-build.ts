@@ -64,13 +64,7 @@ export const transfers = (answer: BuildAnswer): ArrayBuffer[] => ('contours' in 
 
 type Lane = { worker: BuildWorker; busy: number };
 
-const docTexts = new WeakMap<MotionDoc, string>();
-
-function sourceText({ doc, playhead: _playhead, ...rest }: FrameDoc): string {
-  const text = docTexts.get(doc) ?? JSON.stringify(doc);
-  docTexts.set(doc, text);
-  return `{"doc":${text},${JSON.stringify(rest).slice(1)}`;
-}
+const sourceText = ({ playhead: _playhead, ...rest }: FrameDoc): string => JSON.stringify(rest);
 
 export function frameBuilder(spawn: () => BuildWorker | null, lanes = 1): (source: FrameDoc, smoothing: Smoothing) => Promise<DisplayList | null> {
   const pool: Lane[] = [];

@@ -82,7 +82,7 @@ describe('the builder', () => {
     expect(b?.width).toBe(1);
   });
 
-  it('writes a doc out once, not again when the frame rebuilds with sharper assets', async () => {
+  it('keeps no text of a doc once the worker has it, so a phone holds each doc once', async () => {
     const worker = echo();
     const build = frameBuilder(() => worker);
     const written = vi.spyOn(JSON, 'stringify');
@@ -93,7 +93,7 @@ describe('the builder', () => {
     const docWrites = written.mock.calls.filter(([value]) => value === doc || (value as { doc?: unknown })?.doc === doc).length;
     written.mockRestore();
 
-    expect(docWrites).toBe(1);
+    expect(docWrites).toBe(2);
     expect(worker.asked.map((a) => JSON.parse(a.source))).toEqual([{ ...source(doc), assets: { a: 'small' } }, { ...source(doc), assets: { a: 'large' } }].map((x) => JSON.parse(JSON.stringify(x))));
   });
 
