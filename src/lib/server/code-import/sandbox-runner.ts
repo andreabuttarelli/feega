@@ -1,11 +1,12 @@
 import { Sandbox } from '@vercel/sandbox';
 import type { FarmAccess } from '$lib/server/motion/vercel-farm';
 import { cloneUrl, namesIn, type RepoRef } from './repo';
-import { ORIGIN_PROXY } from './origin-proxy';
+import { randomBytes } from 'node:crypto';
+import { IMPORT_KEY_COOKIE, ORIGIN_PROXY } from './origin-proxy';
 import { discoverIn, type Discovery } from './component-discovery';
 import { NodeLine, planFile, PlanRefusal, runPlan, textsWanted, type Planned, type RepoFacts, type RunPlan } from './run-plan';
 
-export type RunningApp = { url: string; names: string[]; sha: string | null; stop: () => Promise<void>; library?: Discovery };
+export type RunningApp = { url: string; key: string; names: string[]; sha: string | null; stop: () => Promise<void>; library?: Discovery };
 
 export enum RunFailure {
   Clone = 'clone_failed',
@@ -64,11 +65,20 @@ async function shell({ sandbox, dir }: Box, script: string, env: Record<string, 
   return { ok: done.exitCode === 0, out: await done.stdout(), err: await done.stderr() };
 }
 
-async function ready(box: Box, ports: number[], limits: RunLimits): Promise<number | null> {
+const KEY_BYTES = 24;
+
+export const importKey = () => randomBytes(KEY_BYTES).toString('hex');
+
+export function curlProbe(port: number, key: string | null): string {
+  const cookie = key ? ` -H 'Cookie: ${IMPORT_KEY_COOKIE}=${key}'` : '';
+  return `curl -s -o /dev/null -w '%{http_code}'${cookie} http://127.0.0.1:${port}/`;
+}
+
+async function ready(box: Box, ports: number[], limits: RunLimits, key: string | null = null): Promise<number | null> {
   const until = Date.now() + limits.readyMs;
   while (Date.now() < until) {
     for (const port of new Set(ports)) {
-      const probe = await shell(box, `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:${port}/`);
+      const probe = await shell(box, curlProbe(port, key));
       if (probe.ok && /^[23]/.test(probe.out.trim())) {
         return port;
       }
@@ -104,16 +114,17 @@ async function started(box: Box, plan: RunPlan, limits: RunLimits): Promise<RunO
     return failed(RunFailure.NoDevServer, (await shell(box, 'tail -c 400 /tmp/dev.log')).out);
   }
 
+  const key = importKey();
   await box.sandbox.writeFiles([{ path: PROXY_FILE, content: ORIGIN_PROXY }]);
-  await box.sandbox.runCommand({ cmd: 'node', args: [PROXY_FILE, String(limits.port), String(port)], detached: true });
-  if ((await ready(box, [limits.port], limits)) === null) {
+  await box.sandbox.runCommand({ cmd: 'node', args: [PROXY_FILE, String(limits.port), String(port), key], detached: true });
+  if ((await ready(box, [limits.port], limits, key)) === null) {
     return failed(RunFailure.NoDevServer, 'the origin proxy did not start');
   }
 
   const names = namesIn((await shell(box, NAMES)).out);
   const head = (await shell(box, 'git rev-parse HEAD')).out.trim();
   const library = await libraryIn(box);
-  return { ok: true, app: { url: box.sandbox.domain(limits.port), names, sha: SHA.test(head) ? head : null, stop: () => box.sandbox.stop().then(() => undefined), library } };
+  return { ok: true, app: { url: box.sandbox.domain(limits.port), key, names, sha: SHA.test(head) ? head : null, stop: () => box.sandbox.stop().then(() => undefined), library } };
 }
 
 const ARCHIVE_FILE = '/tmp/feega-repo.tgz';
