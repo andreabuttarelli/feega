@@ -41,6 +41,7 @@
     "test:storage-policies": "node scripts/storage-policy-harness.mjs",
     "test:privileges": "node scripts/privilege-harness.mjs",
     "test:stripe-grants": "node scripts/stripe-grants-harness.mjs",
+    "test:credit-expiry": "node scripts/credit-expiry-harness.mjs",
     "test:gallery-rls": "node scripts/gallery-rls-harness.mjs",
     "seed:gallery": "vite-node --config scripts/vite-node.config.ts scripts/seed-gallery.ts",
     "import:showcase": "vite-node --config scripts/vite-node.config.ts scripts/import-showcase.ts",
@@ -73,6 +74,7 @@
     "eval:tool-loading": "vite-node --config scripts/vite-node.config.ts scripts/eval/tool-loading.ts --"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.16",
     "@internationalized/date": "^3.12.0",
     "@lucide/svelte": "^1.21.0",
     "@pixi/unsafe-eval": "7.4.3",
