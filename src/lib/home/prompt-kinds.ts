@@ -42,7 +42,7 @@ export type Landed = { what: string; frameIds: string[] } | { what: string; refu
 const LANDED_LINE = (landed: Landed) =>
   'frameIds' in landed
     ? `${landed.what} is already imported on this canvas as frame${landed.frameIds.length > 1 ? 's' : ''} ${landed.frameIds.join(', ')}: work from ${landed.frameIds.length > 1 ? 'those frames' : 'that frame'}, do not recreate it.`
-    : `Importing ${landed.what} failed (${landed.refusal}). Tell me what to connect or fix, then carry on with the brief.`;
+    : `Importing ${landed.what} failed: ${landed.refusal} Tell me what to connect or fix, then carry on with the brief.`;
 
 export function kindBrief(kind: PromptKind, text: string, landed: Landed | null = null): string {
   const row = PROMPT_KINDS[kind];
