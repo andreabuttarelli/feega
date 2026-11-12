@@ -409,6 +409,9 @@
       {:else}
         <span class="name">{row.label}</span>
       {/if}
+      {#if row.only}
+        <span class="only" title={`Shown only on ${row.only}`} data-testid="layer-only">{row.only}</span>
+      {/if}
       {#if density === Density.Touch && editable(row) && isPicked(row)}
         <IconButton size={IconSize.Sm} label="Bring forward" onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Up, SUMMARY[LayerAction.Up]))}><ChevronUp /></IconButton>
         <IconButton size={IconSize.Sm} label="Send backward" onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Down, SUMMARY[LayerAction.Down]))}><ChevronDown /></IconButton>
@@ -604,6 +607,15 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .only {
+    flex: none;
+    padding: 0 4px;
+    border-radius: var(--ui-radius-xs);
+    background: var(--ui-hover);
+    color: var(--ui-text-tertiary);
+    font-size: var(--ui-type-caption);
   }
 
   .name-input {

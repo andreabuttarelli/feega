@@ -24,6 +24,7 @@ import { placeInStack } from '$lib/motion/layout/stack-drag';
 import type { DrawTool, DrawBox } from '$lib/motion/draw-tool';
 import { frontToBack } from './paint-order';
 import { Place, type LayerSlot } from '$lib/motion/layer-place';
+import { shownOnlyIn, viewsOf } from '@feega/motion-core/motion/breakpoints/model';
 
 export const DROP_BOX: DrawBox = { x: 0.5, y: 0.5, width: 0.2, height: 0.2 };
 
@@ -88,6 +89,7 @@ export type LayerRow = {
   own?: string;
   instance?: boolean;
   scene?: string;
+  only?: string;
 };
 
 type Track = MotionDoc['tracks'][number];
@@ -169,6 +171,13 @@ function maskedRows(walk: Walk, maskId: string, depth: number): LayerRow[] {
   return (walk.masks.get(maskId) ?? []).flatMap((id) => layerTree(walk, findClip(walk.doc, id)!.clip, depth));
 }
 
+const VIEW_JOIN = ', ';
+
+function onlyIn(doc: MotionDoc, clip: Clip): { only?: string } {
+  const ids = shownOnlyIn(clip as MotionClip);
+  return ids.length ? { only: viewsOf(doc).filter((v) => ids.includes(v.id)).map((v) => v.name).join(VIEW_JOIN) } : {};
+}
+
 function layerTree(walk: Walk, clip: Clip, depth: number): LayerRow[] {
   const { doc, nodeId, nested, parts, path } = walk;
   const comp = clip.component === 'Precomp' ? String((clip.props as { comp?: string }).comp ?? '') : '';
@@ -187,7 +196,8 @@ function layerTree(walk: Walk, clip: Clip, depth: number): LayerRow[] {
     nested,
     ...(clip.clipContent ? { frame: true } : {}),
     ...(doc.comps[comp]?.component ? { instance: true } : {}),
-    ...(walk.scene ? { scene: `${walk.scene}${clip.id}` } : {})
+    ...(walk.scene ? { scene: `${walk.scene}${clip.id}` } : {}),
+    ...onlyIn(doc, clip)
   };
   const nests = comp !== '' && !template;
   const kids = kidsOf(walk, clip);

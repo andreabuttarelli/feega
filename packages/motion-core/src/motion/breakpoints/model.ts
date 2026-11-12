@@ -115,6 +115,8 @@ export function viewsOf(doc: MotionDoc): Breakpoint[] {
   return [base, ...[...(doc.breakpoints ?? [])].sort((a, b) => b.width - a.width)];
 }
 
+export const shownOnlyIn = (clip: Pick<MotionClip, 'hidden' | 'overrides'>): string[] => (clip.hidden ? Object.entries(clip.overrides ?? {}).flatMap(([id, at]) => (at.hidden === false ? [id] : [])) : []);
+
 export function addBreakpoint(doc: MotionDoc, spec: BreakpointPreset | Omit<Breakpoint, 'id'>, id: string): Result {
   const bp = { id, ...(typeof spec === 'string' ? PRESETS[spec] : spec) };
   const views = viewsOf(doc);
