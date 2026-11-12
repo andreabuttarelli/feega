@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { keyOnCanvas } from '$lib/canvas/key-region.svelte';
   import { DEFAULT_COLOUR } from '@feega/motion-core/motion/default-colours';
   import { hostFraction, hostWidth } from '$lib/motion/overlay-point';
   import { DRAGGED_TEXT_SIZING, NEW_TEXT_SIZING } from '@feega/motion-core/motion/text-sizing';
@@ -171,7 +172,7 @@
   }
 
   function key(e: KeyboardEvent) {
-    if (tool !== DrawTool.Pen || !outline.length || (e.key !== 'Enter' && e.key !== 'Escape')) {
+    if (tool !== DrawTool.Pen || !outline.length || (e.key !== 'Enter' && e.key !== 'Escape') || !keyOnCanvas(e)) {
       return;
     }
     e.preventDefault();

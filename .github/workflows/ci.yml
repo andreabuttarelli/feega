@@ -135,6 +135,9 @@ jobs:
       - name: Build the blog
         run: npm --prefix web-blog run build
 
+      - name: Check the built blog's social previews
+        run: npm --prefix web-blog test
+
   landing:
     runs-on: ubuntu-24.04
     steps:

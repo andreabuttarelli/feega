@@ -1,8 +1,10 @@
 import type { CanvasCommand, CanvasCommandId } from './shortcuts';
+import { isTypingTarget } from '$lib/shortcuts';
 
 export enum Region {
   Canvas = 'canvas',
   Layers = 'layers',
+  Commands = 'commands',
   Panel = 'panel'
 }
 
@@ -23,15 +25,34 @@ export function regionOf(target: EventTarget | null): Region {
 const EVERYWHERE: readonly CanvasCommandId[] = ['undo', 'redo'];
 const ON_SELECTION: readonly CanvasCommandId[] = [...EVERYWHERE, 'delete', 'delete-keep', 'deselect', 'select-all', 'duplicate', 'copy', 'paste', 'group', 'ungroup'];
 
-const REACH: Record<Region, ReadonlySet<CanvasCommandId> | 'every-key'> = {
-  [Region.Canvas]: 'every-key',
-  [Region.Layers]: new Set(ON_SELECTION),
-  [Region.Panel]: new Set(EVERYWHERE)
+enum PointerFocus {
+  Keeps = 'keeps',
+  ReturnsToCanvas = 'returns-to-canvas'
+}
+
+type Rule = { canvas: ReadonlySet<CanvasCommandId> | 'every-key'; timeline: boolean; pointer: PointerFocus };
+
+const REACH: Record<Region, Rule> = {
+  [Region.Canvas]: { canvas: 'every-key', timeline: true, pointer: PointerFocus.Keeps },
+  [Region.Layers]: { canvas: new Set(ON_SELECTION), timeline: true, pointer: PointerFocus.Keeps },
+  [Region.Commands]: { canvas: new Set(EVERYWHERE), timeline: false, pointer: PointerFocus.ReturnsToCanvas },
+  [Region.Panel]: { canvas: new Set(EVERYWHERE), timeline: false, pointer: PointerFocus.Keeps }
 };
 
 export function reachesCanvas(region: Region, command: CanvasCommand | null): boolean {
-  const reach = REACH[region];
+  const reach = REACH[region].canvas;
   return reach === 'every-key' || (command !== null && reach.has(command.id));
+}
+
+export const reachesTimeline = (region: Region): boolean => REACH[region].timeline;
+
+const POINTER_CLICK_MIN_DETAIL = 1;
+
+export function releaseFocus(e: MouseEvent) {
+  const held = document.activeElement;
+  if (e.detail >= POINTER_CLICK_MIN_DETAIL && held instanceof HTMLElement && !isTypingTarget(held) && REACH[regionOf(held)].pointer === PointerFocus.ReturnsToCanvas) {
+    held.blur();
+  }
 }
 
 export function claimFocus(e: Event) {
@@ -40,3 +61,5 @@ export function claimFocus(e: Event) {
     held.blur();
   }
 }
+
+export const keyOnCanvas = (e: Event): boolean => reachesCanvas(regionOf(e.target), null);

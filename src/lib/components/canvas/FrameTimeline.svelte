@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { reachesTimeline, regionOf } from '$lib/canvas/key-region.svelte';
   import GraphEditor from '$lib/components/motion/GraphEditor.svelte';
   import IconButton from '$lib/components/motion/IconButton.svelte';
   import MotionTimeline from '$lib/components/motion/MotionTimeline.svelte';
@@ -147,7 +148,7 @@
   }
 
   function onKey(e: KeyboardEvent) {
-    if (isTyping(e.target as Parameters<typeof isTyping>[0])) {
+    if (!reachesTimeline(regionOf(e.target)) || isTyping(e.target as Parameters<typeof isTyping>[0])) {
       return;
     }
     const command = commandFor({ key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, alt: e.altKey }, mode);

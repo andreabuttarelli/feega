@@ -27,7 +27,7 @@ export const load: PageServerLoad = async ({ locals, params, cookies, setHeaders
   }
   setHeaders({ 'cache-control': 'no-store' });
   const projects = userId ? await standardTargets(db, userId, cookies.get(ORG_COOKIE) ?? null) : [];
-  return { item, signedIn: userId !== null, projects };
+  return { item, signedIn: userId !== null, projects, socialImage: item.posterUrl };
 };
 
 export const actions: Actions = {
