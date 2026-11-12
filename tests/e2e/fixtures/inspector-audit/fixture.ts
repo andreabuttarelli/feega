@@ -1,10 +1,16 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { strToU8, zipSync } from 'fflate';
-import { MotionFormat, newClip, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { MotionFormat, newClip, newMotionDoc, parseMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
-import { EffectKind } from '@feega/motion-core/motion/effects/registry';
-import { createComponent } from '../../../../src/lib/motion/main-component';
+import { EFFECT_KINDS, EffectKind } from '@feega/motion-core/motion/effects/registry';
+import { PropertyKind } from '@feega/motion-core/motion/property-resolve';
+import { defineProperty } from '../../../../src/lib/motion/component-properties';
+import { defineVariantProp } from '../../../../src/lib/motion/variants';
+import { setConstraints } from '../../../../src/lib/motion/constraints/constraints';
+import { Horizontal } from '@feega/motion-core/motion/constraints/model';
+import { createComponent, overrideInstance } from '../../../../src/lib/motion/main-component';
+import { homed, placeInstance } from '../../../../src/lib/motion/canvas-components';
 import { groupClips } from '../../../../src/lib/motion/group';
 import { useAsMask } from '../../../../src/lib/motion/mask-group';
 import { addEffect } from '../../../../src/lib/motion/effects/ops';
@@ -14,6 +20,8 @@ import excerpt from './stripe-excerpt.json' with { type: 'json' };
 export const PLACE = { projectId: '00000000-0000-4000-8000-0000000a0d01', canvasId: '00000000-0000-4000-8000-0000000a0d02' };
 export const KINDS_NODE = '00000000-0000-4000-8000-0000000a0d10';
 export const IMPORTED_NODE = '00000000-0000-4000-8000-0000000a0d11';
+export const AREAS_NODE = '00000000-0000-4000-8000-0000000a0d12';
+export const MAINS_NODE = '00000000-0000-4000-8000-0000000a0d13';
 export const IMAGE_ASSET = '00000000-0000-4000-8000-0000000a0d20';
 
 const LOCAL_USER = '00000000-0000-4000-8000-00000000f001';
@@ -41,6 +49,13 @@ export enum Layer {
   Bound = 'bound',
   Null = 'null',
   Gradient = 'gradient',
+  Card = 'card',
+  CardInstance = 'card-instance',
+  CardComp = 'card-comp',
+  ImageFill = 'image-fill',
+  MixA = 'mix-a',
+  MixB = 'mix-b',
+  Frame = 'frame',
   ImportedText = '0752f883',
   ImportedPill = '1c47f19d',
   ImportedCard = '3dd72cde'
@@ -112,6 +127,50 @@ function kindsDoc(): MotionDoc {
   return doc;
 }
 
+export const effectLayer = (kind: EffectKind) => `fx-${kind}`;
+export const effectId = (kind: EffectKind) => `e-${kind}`;
+
+const EFFECT_COLUMNS = 6;
+
+function areasDoc(): MotionDoc {
+  let doc: MotionDoc = { ...newMotionDoc(MotionFormat.Square), still: { frame: 0 }, background: 'transparent' } as MotionDoc;
+  doc = { ...doc, assets: [{ id: IMAGE_ASSET, kind: 'image' }] } as MotionDoc;
+
+  doc = add(doc, Layer.ImageFill, 'Shape', { x: 0.65, y: 0.12, width: 0.2, height: 0.18 }, { shape: 'rect', fills: [{ ...newFill(FillType.Image), assetId: IMAGE_ASSET }] });
+
+  doc = add(doc, Layer.MixA, 'Shape', { x: 0.15, y: 0.4, width: 0.12, height: 0.1 }, { shape: 'rect', fills: solid('#f97316'), roundness: 0 });
+  doc = add(doc, Layer.MixB, 'Shape', { x: 0.35, y: 0.42, width: 0.16, height: 0.08 }, { shape: 'rect', fills: solid('#0ea5e9'), roundness: 0.3 });
+  doc = patched(doc, Layer.MixB, { blend: 'multiply' } as Partial<MotionClip>);
+  doc = must(setConstraints(doc, [Layer.MixB], { horizontal: Horizontal.Right }));
+
+  EFFECT_KINDS.forEach((kind, i) => {
+    const place = { x: 0.1 + (i % EFFECT_COLUMNS) * 0.15, y: 0.6 + Math.floor(i / EFFECT_COLUMNS) * 0.08, width: 0.1, height: 0.06 };
+    doc = add(doc, effectLayer(kind), 'Shape', place, { shape: 'rect', fills: solid('#6366f1') });
+    doc = must(addEffect(doc, effectLayer(kind), kind, effectId(kind)));
+  });
+
+  return doc;
+}
+
+function mainsDoc(): MotionDoc {
+  let doc: MotionDoc = { ...newMotionDoc(MotionFormat.Square), still: { frame: 0 }, background: 'transparent' } as MotionDoc;
+  doc = add(doc, 'card-bg', 'Shape', { x: 0.2, y: 0.12, width: 0.3, height: 0.18 }, { shape: 'rect', fills: solid('#f3f4f6'), roundness: 0.1 });
+  doc = add(doc, 'card-title', 'Text', { x: 0.17, y: 0.1, width: 0.2, height: 0.05 }, { text: 'Pro plan', size: 0.035, color: '#111827' });
+  doc = add(doc, 'card-badge', 'Text', { x: 0.3, y: 0.17, width: 0.08, height: 0.04 }, { text: 'New', size: 0.025, color: '#ffffff', fills: solid('#ef4444') });
+  const cardIds = [Layer.CardComp, Layer.Card];
+  doc = must(createComponent(doc, ['card-bg', 'card-title', 'card-badge'], () => cardIds.shift()!, 'Card'));
+  doc = must(defineProperty(doc, Layer.CardComp, 'Title', { kind: PropertyKind.Text, target: 'card-title', default: 'Pro plan' }));
+  doc = must(defineProperty(doc, Layer.CardComp, 'Show badge', { kind: PropertyKind.Boolean, target: 'card-badge', default: true }));
+  doc = must(defineVariantProp(doc, Layer.CardComp, 'Size', ['Small', 'Large'], newId));
+
+  return homed(doc, MAINS_NODE);
+}
+
+function withInstance(areas: MotionDoc, mains: MotionDoc): MotionDoc {
+  const doc = must(placeInstance(areas, mains, Layer.CardComp, () => Layer.CardInstance));
+  return must(overrideInstance(doc, Layer.CardInstance, 'card-bg', { fills: solid('#dbeafe') }));
+}
+
 function importedDoc(): MotionDoc {
   const base = newMotionDoc(MotionFormat.Custom);
   const clips = excerpt.clips.map((c) => newClip(c as unknown as MotionClip));
@@ -137,13 +196,22 @@ const node = (id: string, displayName: string, x: number, doc: MotionDoc) => ({
 
 export function auditDocs(): Record<string, MotionDoc> {
   made = 0;
-  return { [KINDS_NODE]: kindsDoc(), [IMPORTED_NODE]: importedDoc() };
+  const kinds = kindsDoc();
+  const imported = importedDoc();
+  const mains = mainsDoc();
+  return { [KINDS_NODE]: kinds, [IMPORTED_NODE]: imported, [AREAS_NODE]: withInstance(areasDoc(), mains), [MAINS_NODE]: mains };
 }
 
 export function writeAuditFile(file: string): void {
   const docs = auditDocs();
+  for (const [id, doc] of Object.entries(docs)) {
+    const verdict = parseMotionDoc(doc);
+    if (!verdict.ok) {
+      throw new Error(`fixture ${id}: ${verdict.error}`);
+    }
+  }
   const kinds = docs[KINDS_NODE];
-  const nodes = [node(KINDS_NODE, 'Every kind', 0, kinds), node(IMPORTED_NODE, 'Stripe excerpt (imported)', kinds.width + GAP, docs[IMPORTED_NODE])];
+  const nodes = [node(KINDS_NODE, 'Every kind', 0, kinds), node(IMPORTED_NODE, 'Stripe excerpt (imported)', kinds.width + GAP, docs[IMPORTED_NODE]), node(AREAS_NODE, 'More areas', -(docs[AREAS_NODE].width + GAP), docs[AREAS_NODE]), node(MAINS_NODE, 'Components', -2 * (docs[AREAS_NODE].width + GAP), docs[MAINS_NODE])];
   const heads = Object.fromEntries(Object.entries(docs).map(([id, doc]) => [id, { version: 1, doc }]));
   const assets = [{ id: IMAGE_ASSET, type: 'image', mimeType: 'image/png', width: 64, height: 64, durationS: null, content: null, url: null, file: IMAGE_FILE }];
   const manifest = { format: 'feega', version: 1, exportedAt: EXPORTED_AT, canvasName: 'inspector audit', source: PLACE };

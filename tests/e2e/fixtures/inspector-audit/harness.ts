@@ -7,10 +7,13 @@ export const CANVAS_PATH = `/p/${PLACE.projectId}/c/${PLACE.canvasId}`;
 const SETTLE_MS = 400;
 const MAX_SECTIONS = 30;
 const ZOOM_MS = 700;
+const LOAD_MS = 3_000;
+const MAX_SCROLLS = 40;
+const SCROLL_MS = 60;
 const CORNER = { x: 10, y: 890 };
 
 export type Clip = { id: string; component: string; props: Record<string, unknown>; [k: string]: unknown };
-type Doc = { tracks: { clips: Clip[] }[]; comps: Record<string, { tracks: { clips: Clip[] }[] }>; [k: string]: unknown };
+export type Doc = { tracks: { clips: Clip[] }[]; comps: Record<string, { tracks: { clips: Clip[] }[] }>; [k: string]: unknown };
 
 export const inspector = (page: Page) => page.getByTestId('motion-inspector');
 
@@ -28,11 +31,34 @@ export async function openCanvas(page: Page): Promise<void> {
   }).toPass({ timeout: 30_000 });
 }
 
+async function zoomToSelection(page: Page): Promise<void> {
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press('Shift+Digit2');
+  await page.waitForTimeout(ZOOM_MS);
+}
+
+export async function reveal(page: Page, id: string): Promise<void> {
+  const layers = page.getByTestId('layers');
+  const row = layers.locator(`[data-layer="${id}"]`);
+  const tree = page.locator('[data-testid="layers"][role="tree"], [data-testid="layers"] [role="tree"]').first();
+  await tree.evaluate((n) => (n.parentElement!.scrollTop = 0));
+  for (let step = 0; step < MAX_SCROLLS && (await row.count()) === 0; step++) {
+    await tree.evaluate((n) => (n.parentElement!.scrollTop += n.parentElement!.clientHeight / 2));
+    await page.waitForTimeout(SCROLL_MS);
+  }
+}
+
 export async function pick(page: Page, nodeId: string, clipId: string): Promise<void> {
   const layers = page.getByTestId('layers');
   const row = layers.locator(`[data-layer="${clipId}"]`);
+  await reveal(page, clipId);
   if (!(await row.isVisible())) {
+    await reveal(page, nodeId);
     await layers.locator(`[data-layer="${nodeId}"]`).click();
+    await reveal(page, clipId);
+    if (!(await row.isVisible({ timeout: LOAD_MS }).catch(() => false))) {
+      await zoomToSelection(page);
+    }
     await expect(row).toBeVisible({ timeout: 30_000 });
   }
   await row.scrollIntoViewIfNeeded();
@@ -45,8 +71,7 @@ export async function pick(page: Page, nodeId: string, clipId: string): Promise<
   });
   await expect(row).toHaveAttribute('aria-selected', 'true');
   if (fresh) {
-    await page.keyboard.press('Shift+Digit2');
-    await page.waitForTimeout(ZOOM_MS);
+    await zoomToSelection(page);
   }
   await expect(inspector(page)).toBeVisible({ timeout: 15_000 });
   await page.waitForTimeout(SETTLE_MS);
@@ -70,7 +95,7 @@ export function clipIn(doc: Doc, id: string): Clip | undefined {
   return all.find((c) => c.id === id);
 }
 
-export type Reach = { name: string; width: number; height: number; hit: boolean; coveredBy: string; tabbable: boolean; disabled: boolean };
+export type Reach = { name: string; width: number; height: number; hit: boolean; coveredBy: string; tabbable: boolean; disabled: boolean; clipped: boolean; box: string };
 
 export async function reach(target: Locator): Promise<Reach> {
   return target.evaluate((el: HTMLElement) => {
@@ -86,7 +111,8 @@ export async function reach(target: Locator): Promise<Reach> {
     const own = (el as HTMLInputElement).labels?.[0]?.textContent ?? '';
     const name = (el.getAttribute('aria-label') ?? (labelled ? document.getElementById(labelled)?.textContent : '') ?? '') || own || el.getAttribute('title') || el.textContent || (el as HTMLInputElement).placeholder || '';
     const disabled = (el as HTMLButtonElement).disabled === true || el.getAttribute('aria-disabled') === 'true';
-    return { name: name.trim().replace(/\s+/g, ' '), width: box.width, height: box.height, hit, coveredBy: hit ? '' : describe(top), tabbable: el.tabIndex >= 0 && !disabled, disabled };
+    const clipped = box.left < 0 || box.top < 0 || box.right > innerWidth || box.bottom > innerHeight;
+    return { name: name.trim().replace(/\s+/g, ' '), width: box.width, height: box.height, hit, coveredBy: hit ? '' : describe(top), tabbable: el.tabIndex >= 0 && !disabled, disabled, clipped, box: `${Math.round(box.left)},${Math.round(box.top)} ${Math.round(box.width)}×${Math.round(box.height)}` };
   });
 }
 

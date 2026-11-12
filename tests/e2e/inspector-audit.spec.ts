@@ -2,11 +2,12 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { test, expect, type Page } from '@playwright/test';
-import { IMPORTED_NODE, KINDS_NODE, Layer } from './fixtures/inspector-audit/fixture';
+import { AREAS_NODE, IMPORTED_NODE, KINDS_NODE, Layer, MAINS_NODE, effectLayer } from './fixtures/inspector-audit/fixture';
+import { EffectKind } from '@feega/motion-core/motion/effects/registry';
 import { openCanvas } from './fixtures/inspector-audit/harness';
 import { sweepLayer, type Finding } from './fixtures/inspector-audit/sweep';
-import { ROWS, Check } from './fixtures/inspector-audit/controls';
-import { exercise, type Outcome } from './fixtures/inspector-audit/behaviour';
+import { ROWS, Check, State } from './fixtures/inspector-audit/controls';
+import { exercise, type Outcome, type Selection } from './fixtures/inspector-audit/behaviour';
 
 const OUT = process.env.INSPECTOR_AUDIT_OUT ?? join(homedir(), 'Documents/feega-videos/inspector-audit');
 const ONLY = process.env.INSPECTOR_AUDIT_ONLY?.split(',') ?? null;
@@ -14,7 +15,19 @@ const PICKED = process.env.INSPECTOR_AUDIT_ROWS ? new RegExp(process.env.INSPECT
 
 const KINDS = [Layer.Rect, Layer.Ellipse, Layer.Line, Layer.Star, Layer.Vector, Layer.Text, Layer.Image, Layer.Stack, Layer.StackChild, Layer.Group, Layer.Instance, Layer.Mask, Layer.Masked, Layer.Shadowed, Layer.Styled, Layer.Bound, Layer.Null, Layer.Gradient];
 const IMPORTED = [Layer.ImportedText, Layer.ImportedPill, Layer.ImportedCard];
-const SWEPT = [...KINDS.map((layer) => ({ node: KINDS_NODE, layer })), ...IMPORTED.map((layer) => ({ node: IMPORTED_NODE, layer }))].filter((s) => !ONLY || ONLY.includes(s.layer));
+const single = (node: string, layer: Layer, state = State.Single): Selection => ({ node, layer, state });
+const SWEPT: Selection[] = [
+  ...KINDS.map((layer) => single(KINDS_NODE, layer)),
+  ...IMPORTED.map((layer) => single(IMPORTED_NODE, layer, State.Imported)),
+  single(AREAS_NODE, Layer.CardInstance, State.Instance),
+  single(MAINS_NODE, Layer.Card, State.Instance),
+  single(AREAS_NODE, Layer.ImageFill),
+  ...[EffectKind.DropShadow, EffectKind.ChromaKey, EffectKind.Levels, EffectKind.Lut].map((kind) => single(AREAS_NODE, effectLayer(kind) as Layer)),
+  single(AREAS_NODE, Layer.Frame, State.Frame),
+  { node: AREAS_NODE, layer: Layer.MixA, state: State.Mixed, with: [Layer.MixB] }
+].filter((s) => !ONLY || ONLY.includes(s.layer));
+const NARROW = { width: 800, height: 600 };
+const NARROWED = new Set<string>([Layer.Rect, Layer.Text, Layer.Stack, Layer.StackChild, Layer.CardInstance, Layer.ImageFill, Layer.MixA, effectLayer(EffectKind.DropShadow)]);
 const EXERCISED = ROWS.filter((r) => !PICKED || PICKED.test(r.id));
 
 const slug = (id: string) => id.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
@@ -40,10 +53,21 @@ test.describe('inspector audit', () => {
   test('sweep: every visible control on every layer kind can be hit, named and tabbed to', async () => {
     test.skip(!process.env.INSPECTOR_AUDIT_SWEEP, 'INSPECTOR_AUDIT_SWEEP=1 runs the reach sweep');
     const found: Finding[] = [];
-    for (const { node, layer } of SWEPT) {
-      found.push(...(await sweepLayer(page, node, layer)));
+    for (const at of SWEPT) {
+      found.push(...(await sweepLayer(page, at)));
       writeFileSync(join(OUT, 'sweep.json'), JSON.stringify(found, null, 1));
     }
+  });
+
+  test('narrow: at the smallest window every control can still be hit and stays inside it', async () => {
+    test.skip(!process.env.INSPECTOR_AUDIT_SWEEP, 'INSPECTOR_AUDIT_SWEEP=1 runs the narrow sweep');
+    await page.setViewportSize(NARROW);
+    const found: Finding[] = [];
+    for (const at of SWEPT.filter((s) => NARROWED.has(s.layer) || s.state === State.Frame)) {
+      found.push(...(await sweepLayer(page, at)));
+      writeFileSync(join(OUT, 'sweep-narrow.json'), JSON.stringify(found, null, 1));
+    }
+    await page.setViewportSize(test.info().project.use.viewport!);
   });
 
   for (const row of EXERCISED) {
