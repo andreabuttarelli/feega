@@ -64,6 +64,7 @@
     "bench:export": "vite-node --config scripts/vite-node.config.ts scripts/bench/export-bench.ts --",
     "export:native": "vite-node --config scripts/vite-node.config.ts scripts/native-export.ts --",
     "perf:budget": "BENCH_CASE=budget node --env-file-if-exists=.env node_modules/@playwright/test/cli.js test -c tests/perf/playwright.config.ts",
+    "perf:free-drag": "BENCH_CASE=free-drag node node_modules/@playwright/test/cli.js test -c tests/perf/playwright.config.ts",
     "build:gpu-core": "cd packages/gpu-core && cargo build --lib --release --target wasm32-unknown-unknown --features webgl && wasm-bindgen --target web --no-typescript --out-dir ../../static/gpu-core --out-name gpu_core_gl target/wasm32-unknown-unknown/release/gpu_core.wasm && cargo build --lib --release --target wasm32-unknown-unknown && wasm-bindgen --target web --no-typescript --out-dir ../../static/gpu-core target/wasm32-unknown-unknown/release/gpu_core.wasm && cd ../.. && node scripts/gpu-core-version.mjs",
     "build:gpu-text": "cd packages/gpu-text && cargo build --lib --release --target wasm32-unknown-unknown && wasm-bindgen --target web --out-dir ../../static/gpu-text target/wasm32-unknown-unknown/release/gpu_text.wasm",
     "bench:gpu-parity": "vite-node --config scripts/vite-node.config.ts scripts/gpu-parity/parity.ts --",
