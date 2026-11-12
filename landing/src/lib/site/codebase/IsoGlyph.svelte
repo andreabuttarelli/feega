@@ -1,6 +1,6 @@
 <script lang="ts">
   import Slab from '../iso/Slab.svelte';
-  import { inView } from '../iso/in-view';
+  import GlyphFrame from '../iso/GlyphFrame.svelte';
   import { Glyph } from '.';
   import { INK, SHADES, onTop } from '../iso/iso';
 
@@ -23,7 +23,7 @@
   </Slab>
 {/snippet}
 
-<svg class="glyph" data-glyph={glyph} viewBox="-62 -46 140 110" aria-hidden="true" use:inView>
+<GlyphFrame name={glyph}>
   {#if glyph === Glyph.Import}
     {@render code()}
     <g class="move" style:--to="translateY(-30px)">
@@ -61,69 +61,4 @@
       </g>
     </g>
   {/if}
-</svg>
-
-<style>
-  .glyph {
-    --cycle: 4s;
-    --ease: cubic-bezier(0.65, 0, 0.35, 1);
-
-    display: block;
-    width: 100%;
-    height: auto;
-    overflow: visible;
-  }
-
-  .move {
-    animation: move var(--cycle) var(--ease) infinite;
-  }
-
-  .select,
-  .show {
-    animation: show var(--cycle) var(--ease) infinite;
-  }
-
-  :global([data-paused]) :is(.move, .select, .show) {
-    animation-play-state: paused;
-  }
-
-  @keyframes move {
-    0%,
-    15% {
-      transform: none;
-    }
-    45%,
-    80% {
-      transform: var(--to);
-    }
-    100% {
-      transform: none;
-    }
-  }
-
-  @keyframes show {
-    0%,
-    20% {
-      opacity: 0;
-    }
-    40%,
-    85% {
-      opacity: 1;
-    }
-    100% {
-      opacity: 0;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .move {
-      animation: none;
-      transform: var(--to);
-    }
-
-    .select,
-    .show {
-      animation: none;
-    }
-  }
-</style>
+</GlyphFrame>

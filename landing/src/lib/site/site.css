@@ -35,8 +35,9 @@
   --site-ink: #f0eee9;
   --site-accent: #ff4000;
   --site-z-agents: 8;
-  --site-z-drawer: 9;
-  --site-z-header: 10;
+  --site-z-chapter: 9;
+  --site-z-drawer: 10;
+  --site-z-header: 11;
   --site-line: #4f4f4f;
   --site-gutter: 12px;
   --site-text: 14px;
@@ -338,4 +339,25 @@
 .drawer,
 .site-foot {
   box-sizing: border-box;
+}
+
+.chapter-block {
+  padding: 120px 20px 0;
+}
+
+.chapter-block > .proof {
+  display: grid;
+  gap: 72px;
+  margin-top: 96px;
+}
+
+@media (min-width: 810px) {
+  .chapter-block {
+    padding: 200px 0 0;
+  }
+
+  .chapter-block > .proof {
+    gap: 96px;
+    margin-top: 120px;
+  }
 }
