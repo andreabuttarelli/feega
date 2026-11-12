@@ -737,6 +737,7 @@ impl WebCore {
         }
         self.queue.submit([encoder.finish()]);
         self.queue.present(frame);
+        self.reprojector.end_frame();
         Ok(())
     }
 
