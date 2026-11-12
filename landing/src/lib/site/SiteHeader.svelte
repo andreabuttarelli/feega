@@ -1,12 +1,13 @@
 <script lang="ts">
   import DownloadMac from './DownloadMac.svelte';
+  import Mark from './Mark.svelte';
   import { APP_URL, HEADER_LINKS, MENU_LINKS, SOCIAL_LINKS } from './links';
 
   let open = $state(false);
 </script>
 
 <header class="bar">
-  <a class="chip brand" href="/">Feega</a>
+  <a class="chip brand" href="/" aria-label="Feega home"><Mark size={16} /><span>Feega</span></a>
 
   <nav class="links" aria-label="Main">
     {#each HEADER_LINKS as link (link.label)}
@@ -74,7 +75,10 @@
     color: #000;
   }
 
-  .brand {
+  .bar .brand {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     padding: 8px 10px 10px;
   }
 

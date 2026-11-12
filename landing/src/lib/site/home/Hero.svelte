@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CANVAS_VIDEO, TICKER_VIDEOS } from '../home';
+  import { CANVAS_VIDEO } from '../home';
   import { lazyPlay } from '../lazy-video';
   import NpxChip from './NpxChip.svelte';
   import HeroPrompt from './HeroPrompt.svelte';
@@ -18,7 +18,7 @@
 
   <h1><span data-agent-id="hero-title-a">Design inside your code</span> <span data-agent-id="hero-title-b">with your agents and team.</span></h1>
 
-  <p class="lead" data-agent-id="hero-lead">Start from your repo, a folder, Figma or any website. Your agents and team design and animate it together on one canvas.</p>
+  <p class="lead" data-agent-id="hero-lead">Feega is an open-source canvas to design, animate and generate. Start from your repo, Figma or any website.</p>
 
   <div class="start" data-agent-id="hero-start">
     <HeroPrompt />
@@ -27,12 +27,6 @@
   <p class="run"><span>or run it locally:</span> <NpxChip /></p>
 
   <video class="canvas" data-agent-id="hero-canvas" data-src={CANVAS_VIDEO} muted loop playsinline preload="none" poster={POSTER} width="1920" height="1080" aria-label="Feega canvas overview" use:lazyPlay></video>
-
-  <div class="ticker" data-agent-id="hero-ticker" aria-label="Videos made with Feega">
-    {#each TICKER_VIDEOS as src (src)}
-      <video data-src={src} muted loop playsinline preload="none" width="1920" height="1080" use:lazyPlay></video>
-    {/each}
-  </div>
 </section>
 
 <style>
@@ -106,14 +100,6 @@
     border-radius: 8px;
   }
 
-  .ticker {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-    width: 100%;
-    margin-top: 100px;
-  }
-
   @media (max-width: 809.98px) {
     .start {
       width: 100%;
@@ -136,10 +122,6 @@
       font-size: 16px;
       line-height: 19.2px;
     }
-
-    .ticker {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
   }
 
   @media (min-width: 810px) and (max-width: 1199.98px) {
@@ -155,10 +137,6 @@
 
     .lead {
       width: 550px;
-    }
-
-    .ticker {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
     }
   }
 </style>

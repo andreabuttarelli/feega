@@ -4,7 +4,7 @@
   import UrlField from './UrlField.svelte';
 </script>
 
-<section class="start site-wide">
+<section class="start">
   <div class="text">
     <h2 data-agent-id="start-title">Start from any site</h2>
     <p data-agent-id="start-lead">Every layer, colour and font comes in editable - colours become variables, type becomes styles, all bound.</p>
@@ -22,8 +22,6 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: center;
     gap: 40px;
-    margin-top: 85px;
-    padding: 0 20px;
     color: var(--site-ink);
   }
 
@@ -52,11 +50,6 @@
   }
 
   @media (min-width: 810px) {
-    .start {
-      margin-top: 86px;
-      padding: 0;
-    }
-
     h2 {
       font-size: 30px;
       line-height: 36px;
