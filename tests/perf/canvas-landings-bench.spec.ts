@@ -63,6 +63,7 @@ const EXTRA_QUERY = process.env.BENCH_QUERY ?? '';
 const INPUT_THRESHOLD_MS = 16;
 const ONLY = process.env.BENCH_GESTURES?.split(',') ?? null;
 const PROFILED = process.env.BENCH_PROFILE !== '0';
+const UNCAPPED = process.env.BENCH_UNCAPPED === '1';
 const benched = () => Object.values(Gesture).filter((g) => !ONLY || ONLY.includes(g));
 
 function watchMainThread(threshold: number) {
@@ -453,7 +454,7 @@ function medianOf(runs: BenchRun[]) {
 
 test('landings benchmark: imported pages with responsive views', async ({ baseURL }) => {
   mkdirSync(OUT, { recursive: true });
-  const browser = ENGINE === Engine.Webkit ? await webkit.launch({ headless: false }) : await chromium.launch({ headless: false, args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist'] });
+  const browser = ENGINE === Engine.Webkit ? await webkit.launch({ headless: false }) : await chromium.launch({ headless: false, args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', ...(UNCAPPED ? ['--disable-gpu-vsync', '--disable-frame-rate-limit'] : [])] });
   const runs: BenchRun[] = [];
   let spots: Partial<Record<Gesture, Hotspot[]>> = {};
   for (let i = 0; i < RUNS; i++) {
