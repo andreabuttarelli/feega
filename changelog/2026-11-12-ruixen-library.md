@@ -14,7 +14,7 @@ as the **Ruixen** group of the component library, the same way Arc was added.
 - Shared with Arc: `scripts/component-library/{compact,snapshot}.ts` (snapshot now takes
   `<library> <Group>`), `shipped-library.ts`/`shipped-cards.ts`, and `libraries.ts`, the one list
   the canvas lazy-loads and the server lists for agents and the API.
-- Snapshot: 197 of 207 installed items became component sets (6.3 MB raw, lazy). The first cut
+- Snapshot: 155 ship (5.6 MB raw, lazy). The first cut
   had 159; review found why 48 were missing and fixed three causes in shared code:
   - 34 render `<><style/><root/></>`: the `<style>` host counted as a second root, so
     `componentMarksOf` never marked them. `<style>`, `<script>`, `<template>`, `<link>` are now
@@ -46,6 +46,16 @@ images on both sides; with images loading the real gaps show. Lowest, and why:
 - heroes-1 0.904: a 3D receding-plane corridor flattened; a masked, tilted mockup becomes a grey
   placeholder.
 - heroes-2 0.904: near identical; one headline wraps differently and shifts what follows.
+
+Leaving out what inserts broken (after review): a built-in template must not insert a grey box or
+a flattened 3D scene.
+- `scripts/ruixen-library/audit.ts` reads the settled demo pages (`droppedConstruct` in
+  `scripts/component-library/dropped.ts`) and skips any component with a `matrix3d` transform
+  (11), a rotated or skewed box (7), a visible `<canvas>` (7) or a non-gradient mask (1). Rotation
+  is strict: a statically rotated chevron also counts.
+- The snapshot leaves out any set whose filled doc still has an image placeholder fill (16) and
+  records it in the catalog. Small rasterised images (data URLs ≤ 64 KB, mostly logos) are kept.
+- 212 free = 155 shipped + 57 skipped, each with its reason in `catalog.json`.
 
 Review inserts (composed as Add to canvas does, drawn with the still renderer, no database):
 `~/Documents/feega-videos/code-import/round2/runs/ruixen-lib/review/`. Light/Dark arrive as the

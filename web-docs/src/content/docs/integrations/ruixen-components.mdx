@@ -5,7 +5,7 @@ sidebar:
   order: 7
 ---
 
-[Ruixen UI](https://ruixen.com) is a React and Tailwind component library for shadcn projects. Its free, open-source components (MIT) ship with Feega as the **Ruixen** group of the component library: 197 components, from buttons, inputs and navbars to pricing tables, heroes and footers, each as editable layers.
+[Ruixen UI](https://ruixen.com) is a React and Tailwind component library for shadcn projects. Its free, open-source components (MIT) ship with Feega as the **Ruixen** group of the component library: 155 components, from buttons, inputs and navbars to pricing tables, heroes and footers, each as editable layers.
 
 ## Insert a component
 
@@ -14,13 +14,23 @@ sidebar:
 
 ## Animation
 
-Many Ruixen components move: marquees, counters, reveals, scroll effects, WebGL backgrounds. Feega imports each one in its settled state, as a still of editable layers: transitions are skipped to their end before the import reads the page. Animations drawn on a `<canvas>` or advanced by a timer are read at whatever frame they show. The animation itself is not carried over; animate the layers on the canvas timeline if you need motion.
+Many Ruixen components move: marquees, counters, reveals, scroll effects, WebGL backgrounds. Feega imports each one in its settled state, as a still of editable layers: transitions are skipped to their end before the import reads the page. Components drawn on a `<canvas>` are left out. The animation itself is not carried over; animate the layers on the canvas timeline if you need motion.
 
 ## What is and is not included
 
-Only the components of Ruixen's open-source repository are included, pinned to one commit in the Feega repository. Ruixen Pro (the paid templates and premium components on pro.ruixen.com) is not fetched or stored. Of the 212 free components, 197 are included. 5 are left out because they need the Next.js runtime or files the registry does not ship. 10 more do not come in as a component of their own yet: 2 only show after a click or a scroll, 8 are folded into the example around them.
+Only the components of Ruixen's open-source repository are included, pinned to one commit in the Feega repository. Ruixen Pro (the paid templates and premium components on pro.ruixen.com) is not fetched or stored. Of the 212 free components, 155 are included. The rest are listed with their reason in the pinned catalog:
 
-Images in the components (logos, avatars, photos) load from Ruixen's public repository and image hosts at the pinned commit, so they need a connection. Effects built on 3D perspective or CSS masks (coverflow carousels, tilted mockups) come in flat, and some appear as a grey placeholder.
+- 5 need the Next.js runtime or files the registry does not ship.
+- 10 do not come in as a component of their own: 2 only show after a click or a scroll, 8 are folded into the example around them.
+- 26 use something the import cannot reproduce yet: 3D perspective (11), rotation (7), a `<canvas>` drawing (7), an image mask (1).
+- 16 would insert an image as a grey placeholder.
+
+## Known limits
+
+- Animations arrive as a still frame.
+- Text that mixes sizes in one line (a price and its `/month`) comes in at one size.
+- Images load from raw.githubusercontent.com (Ruixen's repository) and third-party image hosts when you insert the component, so they need a connection.
+- Logos in the examples are third-party trademarks, shipped as Ruixen ships them in its MIT repository.
 
 ## Licence
 

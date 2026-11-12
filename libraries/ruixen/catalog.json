@@ -9,23 +9,9 @@
     {
       "name": "halo-reel",
       "title": "Halo Reel",
-      "description": "Image cards riding an ellipse \u2014 cos \u03b8 places each card, sizes it and stacks it, so the near side of the ring is large and the far side small. It turns on its own, pauses under the pointer, and you can drag it round.",
+      "description": "Image cards riding an ellipse — cos θ places each card, sizes it and stacks it, so the near side of the ring is large and the far side small. It turns on its own, pauses under the pointer, and you can drag it round.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/halo-reel.json"
-    },
-    {
-      "name": "scroll-burn-text",
-      "title": "Scroll Burn Text",
-      "description": "A manifesto that comes at the reader and burns off. Each block grows toward the lens, splits into red and cyan at the edges and is eaten away glyph by glyph from the middle out, uncovering the next block standing behind it. Film grain over the whole frame, no animation library.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/scroll-burn-text.json"
-    },
-    {
-      "name": "coverflow-carousel",
-      "title": "Coverflow Carousel",
-      "description": "A rack of square covers with the perspective reversed. The centre card sits square to the viewer while the ones beside it swing their outer edges forward, so the rack opens toward you instead of folding away. Drag, throw, snap and infinite looping are all hand-rolled in the one file \u2014 no carousel library \u2014 and an optional caption underneath follows whichever card is centred.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/coverflow-carousel.json"
     },
     {
       "name": "social-preview-dock",
@@ -35,39 +21,11 @@
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/social-preview-dock.json"
     },
     {
-      "name": "receding-text-plane",
-      "title": "Receding Text Plane",
-      "description": "A slab of copy raked away from the viewer on a short lens. Near lines swell past the frame edges, far lines fold toward a horizon that was never drawn \u2014 no scroll, no animation, one CSS transform.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/receding-text-plane.json"
-    },
-    {
       "name": "drilldown-menu",
       "title": "Drilldown Menu",
-      "description": "A list that drills into itself. The row you click stays put, fades to a grey breadcrumb with a return arrow, and its children arrive one indent deeper \u2014 one layout animation, no sliding panels.",
+      "description": "A list that drills into itself. The row you click stays put, fades to a grey breadcrumb with a return arrow, and its children arrive one indent deeper — one layout animation, no sliding panels.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/drilldown-menu.json"
-    },
-    {
-      "name": "perspective-text",
-      "title": "Perspective Text",
-      "description": "A display headline projected onto the ground plane. Letters read wide at the cap line and taper to the baseline, fanning out from a vanishing point below \u2014 painted-on-the-road lettering, in plain CSS transforms.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/perspective-text.json"
-    },
-    {
-      "name": "image-card-fan",
-      "title": "Image Card Fan",
-      "description": "A fanned hand of large image cards. Click one and it lifts out of the hand while its title and description settle in on either side \u2014 one card out at a time.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/image-card-fan.json"
-    },
-    {
-      "name": "deploy-region-globe",
-      "title": "Region Globe",
-      "description": "A card with an interactive globe over a region list. Pick a region, the camera flies to it and the latency caption updates, then confirm.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/deploy-region-globe.json"
     },
     {
       "name": "animated-link",
@@ -103,13 +61,6 @@
       "description": "An interactive sparkline with path-following indicator, dual-path color reveal, gradient fill, and draw-in animation. Pixel-perfect cursor tracking via binary search on SVG path length.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/spark-chart.json"
-    },
-    {
-      "name": "animated-theme-toggler",
-      "title": "Theme Toggler",
-      "description": "Sun\u2194moon morph toggle with spring physics, SVG mask crescent, and switch-click audio.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/animated-theme-toggler.json"
     },
     {
       "name": "feature-highlights",
@@ -156,7 +107,7 @@
     {
       "name": "avatar-quick-actions",
       "title": "Avatar Quick Actions",
-      "description": "An orbital action ring that blooms outward from the avatar with staggered spring emergence \u2014 hover any action and the rest dim, drawing the eye.",
+      "description": "An orbital action ring that blooms outward from the avatar with staggered spring emergence — hover any action and the rest dim, drawing the eye.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/avatar-quick-actions.json"
     },
@@ -170,14 +121,14 @@
     {
       "name": "variable-text",
       "title": "Variable Text",
-      "description": "Cursor acts as a focal plane \u2014 characters near the pointer sharpen (heavier weight, slight lift, full opacity) while distant characters soften. Depth-of-field for typography.",
+      "description": "Cursor acts as a focal plane — characters near the pointer sharpen (heavier weight, slight lift, full opacity) while distant characters soften. Depth-of-field for typography.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/variable-text.json"
     },
     {
       "name": "scramble-text",
       "title": "Scramble Text",
-      "description": "Hover triggers a decode sequence \u2014 characters dissolve into random glyphs then resolve in a directional wave that follows your entry point, each locking in with a spring pop.",
+      "description": "Hover triggers a decode sequence — characters dissolve into random glyphs then resolve in a directional wave that follows your entry point, each locking in with a spring pop.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/scramble-text.json"
     },
@@ -187,13 +138,6 @@
       "description": "An interactive hero section featuring a card carousel with smooth animations",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/card-carousel-hero.json"
-    },
-    {
-      "name": "scroll-portrait-wall",
-      "title": "Scroll Portrait Wall",
-      "description": "A scroll-driven portrait wall with a sticky mix-blend-exclusion title; GSAP ScrollTrigger scrubs each portrait from scale 0 to 1 and back as its row crosses the viewport.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/scroll-portrait-wall.json"
     },
     {
       "name": "product-feature-hero",
@@ -217,32 +161,11 @@
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/integration-and-stats-section.json"
     },
     {
-      "name": "rotating-gradient-right",
-      "title": "Rotating Gradient Right",
-      "description": "Rotating conic gradient animation with centered card content",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/rotating-gradient-right.json"
-    },
-    {
       "name": "automated-tasks-panel",
       "title": "Automated Tasks Panel",
       "description": "Animated task panel with scrolling automation features",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/automated-tasks-panel.json"
-    },
-    {
-      "name": "trusted-clients-showcase",
-      "title": "Trusted Clients Showcase",
-      "description": "Spotlight logo grid with staggered blur-up entrance and collective dim hover.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/trusted-clients-showcase.json"
-    },
-    {
-      "name": "bordered-clients-grid",
-      "title": "Bordered Clients Grid",
-      "description": "Five-column logo grid with subtle dividers, hover-tinted cells, and decorative cross markers at the four corners.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/bordered-clients-grid.json"
     },
     {
       "name": "footer-pro",
@@ -268,16 +191,9 @@
     {
       "name": "wordmark-footer",
       "title": "Wordmark Footer",
-      "description": "A Rauno-craft half-cut wordmark footer \u2014 giant brand text on a full-width dark surface with luminance gradient and hairline divider.",
+      "description": "A Rauno-craft half-cut wordmark footer — giant brand text on a full-width dark surface with luminance gradient and hairline divider.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/wordmark-footer.json"
-    },
-    {
-      "name": "hover-gradient-navbar",
-      "title": "Hover Gradient Navbar",
-      "description": "A navigation bar with gradient hover effects and smooth transitions.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/hover-gradient-navbar.json"
     },
     {
       "name": "expandable-menu-navbar",
@@ -350,27 +266,6 @@
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/staged-pricing.json"
     },
     {
-      "name": "case-study-tabs",
-      "title": "Case Study Tabs",
-      "description": "A tabbed customer-testimonial block with embossed stars, brand-logo tabs, an animated underline indicator that adopts each brand's accent color, a featured case-study paragraph with CTA, and a pull-quote with author.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/case-study-tabs.json"
-    },
-    {
-      "name": "customer-story-stack",
-      "title": "Customer Story Stack",
-      "description": "A card-stack customer testimonial carousel with vertical prev/next nav, touch-swipe support, two ghost cards layered behind the active story, and a framed metrics panel with corner crosshair marks that updates per case.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/customer-story-stack.json"
-    },
-    {
-      "name": "featured-portrait-testimonial",
-      "title": "Featured Portrait Testimonial",
-      "description": "An expanding-portrait testimonial carousel. Inactive cards show a grayscale portrait with a name strip; the active card morphs into a full quote card with author, dashed divider, and a row of favorite-feature tags. Width transitions and content crossfade are choreographed for clean, premium movement.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/featured-portrait-testimonial.json"
-    },
-    {
       "name": "slide-to-delete-button",
       "title": "Slide To Delete Button",
       "description": "iOS 26 liquid-glass slide-to-confirm track with spring-physics draggable thumb.",
@@ -383,20 +278,6 @@
       "description": "iOS 26 liquid-glass link pill with cursor-following radial glow and spring arrow.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/glow-link-button.json"
-    },
-    {
-      "name": "circular-stepper-input",
-      "title": "Circular Stepper Input",
-      "description": "iOS 26 liquid-glass circular stepper with draggable ring, spring-animated arc, and haptic sound feedback.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/circular-stepper-input.json"
-    },
-    {
-      "name": "color-picker-input",
-      "title": "Color Picker Input",
-      "description": "iOS 26 liquid-glass color picker with swatch grid, draggable opacity slider, and one-click copy.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/color-picker-input.json"
     },
     {
       "name": "gravatar-email-input",
@@ -443,21 +324,21 @@
     {
       "name": "drawer-inner-content",
       "title": "Drawer Inner Content",
-      "description": "Gesture-driven bottom sheet \u2014 drag to dismiss, spring physics, structured content sections with staggered cascade.",
+      "description": "Gesture-driven bottom sheet — drag to dismiss, spring physics, structured content sections with staggered cascade.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/drawer-inner-content.json"
     },
     {
       "name": "centered-feedback-drawer",
       "title": "Centered Feedback Drawer",
-      "description": "Centered feedback panel \u2014 three SVG faces, contextual comment, spring selection, auto-dismiss thank-you state.",
+      "description": "Centered feedback panel — three SVG faces, contextual comment, spring selection, auto-dismiss thank-you state.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/centered-feedback-drawer.json"
     },
     {
       "name": "bottom-drawers",
       "title": "Bottom Drawers",
-      "description": "Snap-point bottom sheet \u2014 three snap heights (peek, half, full), drag between them, velocity-aware, progressive content reveal.",
+      "description": "Snap-point bottom sheet — three snap heights (peek, half, full), drag between them, velocity-aware, progressive content reveal.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/bottom-drawers.json"
     },
@@ -506,7 +387,7 @@
     {
       "name": "glass-form",
       "title": "Glass Form",
-      "description": "iOS 26 liquid-glass form system \u2014 grouped fields, toggles, segmented controls, and action buttons with backdrop blur.",
+      "description": "iOS 26 liquid-glass form system — grouped fields, toggles, segmented controls, and action buttons with backdrop blur.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/glass-form.json"
     },
@@ -534,7 +415,7 @@
     {
       "name": "event-scheduler",
       "title": "Event Scheduler",
-      "description": "Inline timeline scheduler \u2014 tap a time, type a title, press Enter. Spring animations, sorted list, sound feedback.",
+      "description": "Inline timeline scheduler — tap a time, type a title, press Enter. Spring animations, sorted list, sound feedback.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/event-scheduler.json"
     },
@@ -553,39 +434,11 @@
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/glass-image-compare.json"
     },
     {
-      "name": "video-player-pro",
-      "title": "Video Player Pro",
-      "description": "Cinema-quality video player with glass control bar, spring physics, custom progress scrubber, inline volume slider, and speed pills with layout-animated indicator.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/video-player-pro.json"
-    },
-    {
-      "name": "cloud-background",
-      "title": "Cloud Background",
-      "description": "A flowing cloud background with WebGL shaders and theme support.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/cloud-background.json"
-    },
-    {
-      "name": "ripple-distortion",
-      "title": "Ripple Distortion",
-      "description": "An interactive image distortion effect with mouse-driven ripples using Three.js.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/ripple-distortion.json"
-    },
-    {
       "name": "particle-text-dots",
       "title": "Particle Text Dots",
       "description": "Text rendered as interactive particle dots that react to cursor movement, similar to Gemini's background effect.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/particle-text-dots.json"
-    },
-    {
-      "name": "dual-tone-rain-background",
-      "title": "Dual Tone Rain Background",
-      "description": "A sophisticated rain effect with dual-tone teal-cyan colors and grid overlay.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/dual-tone-rain-background.json"
     },
     {
       "name": "magnetic-tabs",
@@ -616,13 +469,6 @@
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/icon-pagination.json"
     },
     {
-      "name": "gooey-pagination",
-      "title": "Gooey Pagination",
-      "description": "Liquid metaball pagination with SVG gooey filter, sliding active indicator, and spring physics.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/gooey-pagination.json"
-    },
-    {
       "name": "stack-pagination",
       "title": "Stack Pagination",
       "description": "Physical card stack pagination with depth compression, diminishing scale, and spring physics.",
@@ -651,13 +497,6 @@
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/sliding-pagination.json"
     },
     {
-      "name": "ai-chat-input",
-      "title": "AI Chat Input",
-      "description": "Vanishing chat input with rotating placeholders, pixel-scatter submit, and spring-timed interactions.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/ai-chat-input.json"
-    },
-    {
       "name": "claude-chat-input",
       "title": "Claude Chat Input",
       "description": "Multi-modal chat input with file uploads, model selector, extended thinking toggle, and spring-timed interactions.",
@@ -667,7 +506,7 @@
     {
       "name": "animated-highlight-text",
       "title": "Animated Highlight Text",
-      "description": "Typographic block that mixes plain copy with inline highlights carrying bespoke animated SVG icons \u2014 a heart that beats a real lub-dub, twinkling sparkles, a clicking cursor, a launching rocket \u2014 that come alive on hover or focus.",
+      "description": "Typographic block that mixes plain copy with inline highlights carrying bespoke animated SVG icons — a heart that beats a real lub-dub, twinkling sparkles, a clicking cursor, a launching rocket — that come alive on hover or focus.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/animated-highlight-text.json"
     },
@@ -681,23 +520,16 @@
     {
       "name": "chapter-scrubber",
       "title": "Chapter Scrubber",
-      "description": "A vertical rail of uniform ticks that magnify toward the cursor like a dock \u2014 the lines nearest the pointer rise on a spring-driven wave and a preview card describes the crest chapter, inspired by the OpenAI Codex chapters minimap.",
+      "description": "A vertical rail of uniform ticks that magnify toward the cursor like a dock — the lines nearest the pointer rise on a spring-driven wave and a preview card describes the crest chapter, inspired by the OpenAI Codex chapters minimap.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/chapter-scrubber.json"
     },
     {
       "name": "smart-paste-input",
       "title": "Smart Paste Input",
-      "description": "A chat composer that catches long pastes and turns them into an attachment card instead of flooding the input \u2014 click the card to open a full-screen editor with a live character count, edit the text in place, then Save or Remove.",
+      "description": "A chat composer that catches long pastes and turns them into an attachment card instead of flooding the input — click the card to open a full-screen editor with a live character count, edit the text in place, then Save or Remove.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/smart-paste-input.json"
-    },
-    {
-      "name": "ruixen-gradient-footer",
-      "title": "Ruixen Gradient Footer",
-      "description": "A normal-height footer with a blurred rainbow pinned to the bottom of the viewport, stretching up from the floor over the last stretch of scroll. Gradient inspired by Dia Browser. One inline SVG, no dependencies.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/ruixen-gradient-footer.json"
     },
     {
       "name": "gradient-chat-input",
@@ -709,7 +541,7 @@
     {
       "name": "gooey-dock",
       "title": "Gooey Dock",
-      "description": "Horizontal dock with proximity-based magnification \u2014 items grow as the cursor approaches, spring physics.",
+      "description": "Horizontal dock with proximity-based magnification — items grow as the cursor approaches, spring physics.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/gooey-dock.json"
     },
@@ -719,27 +551,6 @@
       "description": "A spring-animated pill that morphs into a dock, then expands into search, music player, timer, or note panels.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/morphing-expandable-menu.json"
-    },
-    {
-      "name": "music-player-card",
-      "title": "Music Player Card",
-      "description": "A rich music player card with album art, action pills, seekable progress, shuffle, repeat, and full transport controls.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/music-player-card.json"
-    },
-    {
-      "name": "live-waveform",
-      "title": "Live Waveform",
-      "description": "Canvas-based real-time waveform visualizer with processing animation, microphone input, and stop controls.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/live-waveform.json"
-    },
-    {
-      "name": "visualizer-button",
-      "title": "Visualizer Button",
-      "description": "iOS 26 liquid-glass audio pill with canvas equalizer and Web Audio API integration.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/visualizer-button.json"
     },
     {
       "name": "hover-preview-button",
@@ -763,13 +574,6 @@
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/badge-button-combo.json"
     },
     {
-      "name": "badge-morph",
-      "title": "Badge Morph",
-      "description": "A morphing status badge that transitions between states with spring-physics micro-interactions.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/badge-morph.json"
-    },
-    {
       "name": "banner-announcement",
       "title": "Banner Announcement",
       "description": "A dismissible announcement banner with multiple variants and action links.",
@@ -784,16 +588,9 @@
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/banner-cookie.json"
     },
     {
-      "name": "banner-newsletter",
-      "title": "Banner Newsletter",
-      "description": "A newsletter banner with Inline Morphing \u2014 one pill that reshapes across input, loading, and confirmation.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/banner-newsletter.json"
-    },
-    {
       "name": "banner-countdown",
       "title": "Banner Countdown",
-      "description": "A countdown banner with Fluid Numerals \u2014 odometer-style rolling digits, colon heartbeat, and height-collapse dismiss.",
+      "description": "A countdown banner with Fluid Numerals — odometer-style rolling digits, colon heartbeat, and height-collapse dismiss.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/banner-countdown.json"
     },
@@ -812,16 +609,9 @@
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/breadcrumb-icon.json"
     },
     {
-      "name": "breadcrumb-dropdown",
-      "title": "Breadcrumb Dropdown",
-      "description": "Inline-expanding collapsible breadcrumb with staggered path reveal.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/breadcrumb-dropdown.json"
-    },
-    {
       "name": "progress-button",
       "title": "Progress Button",
-      "description": "iOS 26 liquid-glass pill that morphs through idle \u2192 loading \u2192 done phases.",
+      "description": "iOS 26 liquid-glass pill that morphs through idle → loading → done phases.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/progress-button.json"
     },
@@ -835,7 +625,7 @@
     {
       "name": "invert-tabs",
       "title": "Invert Tabs",
-      "description": "mix-blend-mode exclusion on a white pill \u2014 text auto-inverts in both light and dark themes. Spring physics. Audio tick.",
+      "description": "mix-blend-mode exclusion on a white pill — text auto-inverts in both light and dark themes. Spring physics. Audio tick.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/invert-tabs.json"
     },
@@ -849,42 +639,42 @@
     {
       "name": "three-dwall-calendar",
       "title": "Three D Wall Calendar",
-      "description": "Wall-mounted calendar with physical depth \u2014 paper stack layers, page-flip transitions, cells that lift on hover with shadow.",
+      "description": "Wall-mounted calendar with physical depth — paper stack layers, page-flip transitions, cells that lift on hover with shadow.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/three-dwall-calendar.json"
     },
     {
       "name": "calendar-planner",
       "title": "Calendar Planner",
-      "description": "Vertical day stream \u2014 past fades, today glows, events live inline. Select a day, type, press Enter.",
+      "description": "Vertical day stream — past fades, today glows, events live inline. Select a day, type, press Enter.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/calendar-planner.json"
     },
     {
       "name": "calendar-twin",
       "title": "Calendar Twin",
-      "description": "Dual-month range picker \u2014 click start, hover to preview, click end. Continuous band with smart rounding.",
+      "description": "Dual-month range picker — click start, hover to preview, click end. Continuous band with smart rounding.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/calendar-twin.json"
     },
     {
       "name": "chrono-select",
       "title": "Chrono Select",
-      "description": "Inline date picker \u2014 click to expand, spring-animated calendar grid, today shortcut, click-outside dismiss.",
+      "description": "Inline date picker — click to expand, spring-animated calendar grid, today shortcut, click-outside dismiss.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/chrono-select.json"
     },
     {
       "name": "calendar-lume",
       "title": "Calendar Lume",
-      "description": "A depth-zoom calendar \u2014 drill from years to months to days with scale-based transitions and staggered grids.",
+      "description": "A depth-zoom calendar — drill from years to months to days with scale-based transitions and staggered grids.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/calendar-lume.json"
     },
     {
       "name": "calendar-scheduler",
       "title": "Calendar Scheduler",
-      "description": "Week-strip scheduler \u2014 horizontal day ribbon, vertical time ruler, one-tap booking with spring physics.",
+      "description": "Week-strip scheduler — horizontal day ribbon, vertical time ruler, one-tap booking with spring physics.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/calendar-scheduler.json"
     },
@@ -898,14 +688,14 @@
     {
       "name": "credit-card-dialog",
       "title": "Credit Card Dialog",
-      "description": "Inline payment form \u2014 four zones separated by hairlines. Auto-format, auto-advance, brand detection.",
+      "description": "Inline payment form — four zones separated by hairlines. Auto-format, auto-advance, brand detection.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/credit-card-dialog.json"
     },
     {
       "name": "verification-input",
       "title": "Verification Input",
-      "description": "iOS 26 liquid-glass verification code input \u2014 dual-theme cells with spring-animated digit entry and haptic sound.",
+      "description": "iOS 26 liquid-glass verification code input — dual-theme cells with spring-animated digit entry and haptic sound.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/verification-input.json"
     },
@@ -931,13 +721,6 @@
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/ripple-circles.json"
     },
     {
-      "name": "mouse-spark",
-      "title": "Mouse Spark",
-      "description": "Interactive mouse-following particle effect with customizable colors and themes.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/mouse-spark.json"
-    },
-    {
       "name": "add-to-cart-button",
       "title": "Add To Cart Button",
       "description": "A morphing add-to-cart button with spring physics, slot-machine quantity flip, and live price updates.",
@@ -954,49 +737,42 @@
     {
       "name": "fine-tune-slider",
       "title": "Fine Tune Slider",
-      "description": "A slider with pull-away precision mode \u2014 drag normally, pull away from the track to fine-tune values.",
+      "description": "A slider with pull-away precision mode — drag normally, pull away from the track to fine-tune values.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/fine-tune-slider.json"
     },
     {
       "name": "scroll-ruler",
       "title": "Scroll Ruler",
-      "description": "A ruler-style input for fractional values \u2014 scroll or drag to scrub, spring-animated snapping, gradient-masked edges.",
+      "description": "A ruler-style input for fractional values — scroll or drag to scrub, spring-animated snapping, gradient-masked edges.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/scroll-ruler.json"
     },
     {
-      "name": "drum-picker",
-      "title": "Drum Picker",
-      "description": "A 3D cylindrical drum picker \u2014 vertical drag or scroll to cycle, perspective-projected curvature, proximity-scaled brightness, spring snap.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/drum-picker.json"
-    },
-    {
       "name": "scrub-datetime",
       "title": "Scrub Datetime",
-      "description": "An inline date-time picker where the text IS the interface \u2014 drag any segment horizontally to scrub, scroll to increment, click AM/PM to toggle.",
+      "description": "An inline date-time picker where the text IS the interface — drag any segment horizontally to scrub, scroll to increment, click AM/PM to toggle.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/scrub-datetime.json"
     },
     {
       "name": "range-calendar",
       "title": "Range Calendar",
-      "description": "A compact calendar grid for date range selection \u2014 continuous capsule highlight, hover preview, spring-animated month transitions, today dot.",
+      "description": "A compact calendar grid for date range selection — continuous capsule highlight, hover preview, spring-animated month transitions, today dot.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/range-calendar.json"
     },
     {
       "name": "calendar-wave",
       "title": "Calendar Wave",
-      "description": "A calendar where days rise toward your cursor like water \u2014 cosine wave ripple, spring physics, shadow depth.",
+      "description": "A calendar where days rise toward your cursor like water — cosine wave ripple, spring physics, shadow depth.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/calendar-wave.json"
     },
     {
       "name": "calendar-crest",
       "title": "Calendar Crest",
-      "description": "Dual-month range picker with physical depth \u2014 selected band rises off the surface, endpoints crest highest, proportional shadows.",
+      "description": "Dual-month range picker with physical depth — selected band rises off the surface, endpoints crest highest, proportional shadows.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/calendar-crest.json"
     },
@@ -1050,20 +826,6 @@
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/progressive-flux-loader.json"
     },
     {
-      "name": "solar-loader",
-      "title": "Solar Loader",
-      "description": "Animated solar system loading spinner with orbiting planets and customizable speed.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/solar-loader.json"
-    },
-    {
-      "name": "container-text-scroll",
-      "title": "Container Text Scroll",
-      "description": "Scroll-triggered text animation component with smooth parallax effects using Framer Motion.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/container-text-scroll.json"
-    },
-    {
       "name": "tag-cloud-select",
       "title": "Tag Cloud Select",
       "description": "Interactive tag selection component with cloud-style layout and multi-select functionality.",
@@ -1106,13 +868,6 @@
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/scroll-over-hero.json"
     },
     {
-      "name": "phone-scroll-hero",
-      "title": "Phone Scroll Hero",
-      "description": "A hero whose 3D-tilted phone mockup flattens and climbs up over the headline as the page scrolls. Theme-aware with a reduced-motion fallback.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/phone-scroll-hero.json"
-    },
-    {
       "name": "preview-switch-hero",
       "title": "Preview Switch Hero",
       "description": "A split hero with an icon-rail that switches the product preview, a lead-capture column (badge, ratings, email form, CTAs, avatars), and a full-width logo strip. Responsive and theme-aware.",
@@ -1122,7 +877,7 @@
     {
       "name": "arc-reveal-hero",
       "title": "Arc Reveal Hero",
-      "description": "A multilingual greeting cycles on a calm white surface, then a curved black curtain rises from below to reveal the landing \u2014 the boundary stays a single smooth arc the whole way up, never a flat slide.",
+      "description": "A multilingual greeting cycles on a calm white surface, then a curved black curtain rises from below to reveal the landing — the boundary stays a single smooth arc the whole way up, never a flat slide.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/arc-reveal-hero.json"
     },
@@ -1132,13 +887,6 @@
       "description": "A scroll-spy services section with a sticky tab strip at the top. As the reader scrolls past each long-form panel (title, description, deliverables, optional image, inline CTA), the matching tab highlights; clicking a tab smooth-scrolls to that entry.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/service-ledger.json"
-    },
-    {
-      "name": "multi-media-testimonial",
-      "title": "Multi-Media Testimonial",
-      "description": "A masonry grid of testimonial cards that mix text-only quotes, image thumbnails, and video clips that open in a mobile-framed lightbox powered by Video Player Pro \u2014 with author avatar, title, and role under each card.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/multi-media-testimonial.json"
     },
     {
       "name": "pricing-landing-hero",
@@ -1155,13 +903,6 @@
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/tabbed-hero-section.json"
     },
     {
-      "name": "split-hero-section",
-      "title": "Split Hero Section",
-      "description": "A split-layout hero section with left-aligned headline, key metrics, app screenshot showcase, and trusted-by logo strip.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/split-hero-section.json"
-    },
-    {
       "name": "hero-title-animation",
       "title": "Hero Title Animation",
       "description": "An animated hero title with phased brand reveal, staggered word blur-in, and highlight box sweep effect.",
@@ -1174,27 +915,6 @@
       "description": "A vertical pricing section component with feature comparisons, plan cards, and call-to-action buttons.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/pricing-section-vertical.json"
-    },
-    {
-      "name": "card-stack",
-      "title": "Card Stack",
-      "description": "An interactive 3D card stack carousel with fan-out animation, drag gestures, and auto-advance support.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/card-stack.json"
-    },
-    {
-      "name": "glass-ai-card",
-      "title": "Glass AI Card",
-      "description": "iOS 26 liquid-glass content card with animated skeleton lines and hue-rotating gradient AI action button.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/glass-ai-card.json"
-    },
-    {
-      "name": "glass-shipment-flow",
-      "title": "Glass Shipment Flow",
-      "description": "iOS 26 liquid-glass shipment flow diagram with animated travelling-light SVG paths connecting stacked order cards.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/glass-shipment-flow.json"
     },
     {
       "name": "phone-mockup-card",
@@ -1351,13 +1071,6 @@
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/checkbox-group.json"
     },
     {
-      "name": "checkbox-tree",
-      "title": "Checkbox Tree",
-      "description": "A hierarchical tree checkbox for nested selections with expand/collapse.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/checkbox-tree.json"
-    },
-    {
       "name": "comment-thread",
       "title": "Comment Thread",
       "description": "Threaded comment component with nested replies, colored avatars, and collapsible reply chains.",
@@ -1367,23 +1080,16 @@
     {
       "name": "profile-card",
       "title": "Profile Card",
-      "description": "A glassmorphic profile card with two variants \u2014 full-bleed image overlay and split half layout. Includes follow button, favorite toggle, and verified badge.",
+      "description": "A glassmorphic profile card with two variants — full-bleed image overlay and split half layout. Includes follow button, favorite toggle, and verified badge.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/profile-card.json"
     },
     {
       "name": "scroll-text-rise",
       "title": "Scroll Text Rise",
-      "description": "A scroll-driven text reveal \u2014 each word fades up from below as you scroll, with staggered opacity and y-translate transforms powered by Framer Motion's useScroll and useTransform hooks.",
+      "description": "A scroll-driven text reveal — each word fades up from below as you scroll, with staggered opacity and y-translate transforms powered by Framer Motion's useScroll and useTransform hooks.",
       "tier": "free",
       "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/scroll-text-rise.json"
-    },
-    {
-      "name": "scroll-tilted-grid",
-      "title": "Scroll Tilted Grid",
-      "description": "An editorial two-column image grid where pairs of stills rise from below tipped forward, settle into focus, then tilt away over the top edge as the page scrolls. Optional infinite loop appends more cycles via IntersectionObserver.",
-      "tier": "free",
-      "registry": "https://raw.githubusercontent.com/ruixenui/ruixen.com/f6b20860623fa39122ac2b5f0e5bd29a9eb10941/public/r/scroll-tilted-grid.json"
     }
   ],
   "skipped": [
@@ -1446,6 +1152,174 @@
     {
       "name": "image-stream-hero",
       "reason": "not imported: rendered, but the import folds it into the demo around it instead of giving it a component of its own"
+    },
+    {
+      "name": "coverflow-carousel",
+      "reason": "not imported: a 3D transform comes in flat"
+    },
+    {
+      "name": "receding-text-plane",
+      "reason": "not imported: a 3D transform comes in flat"
+    },
+    {
+      "name": "perspective-text",
+      "reason": "not imported: a 3D transform comes in flat"
+    },
+    {
+      "name": "image-card-fan",
+      "reason": "not imported: a rotation comes in unrotated"
+    },
+    {
+      "name": "deploy-region-globe",
+      "reason": "not imported: a <canvas> drawing comes in as one still frame"
+    },
+    {
+      "name": "animated-theme-toggler",
+      "reason": "not imported: an image mask is not imported"
+    },
+    {
+      "name": "rotating-gradient-right",
+      "reason": "not imported: a rotation comes in unrotated"
+    },
+    {
+      "name": "hover-gradient-navbar",
+      "reason": "not imported: a 3D transform comes in flat"
+    },
+    {
+      "name": "circular-stepper-input",
+      "reason": "not imported: a rotation comes in unrotated"
+    },
+    {
+      "name": "cloud-background",
+      "reason": "not imported: a <canvas> drawing comes in as one still frame"
+    },
+    {
+      "name": "ripple-distortion",
+      "reason": "not imported: a <canvas> drawing comes in as one still frame"
+    },
+    {
+      "name": "ai-chat-input",
+      "reason": "not imported: a <canvas> drawing comes in as one still frame"
+    },
+    {
+      "name": "live-waveform",
+      "reason": "not imported: a <canvas> drawing comes in as one still frame"
+    },
+    {
+      "name": "visualizer-button",
+      "reason": "not imported: a <canvas> drawing comes in as one still frame"
+    },
+    {
+      "name": "badge-morph",
+      "reason": "not imported: a rotation comes in unrotated"
+    },
+    {
+      "name": "banner-newsletter",
+      "reason": "not imported: a rotation comes in unrotated"
+    },
+    {
+      "name": "breadcrumb-dropdown",
+      "reason": "not imported: a rotation comes in unrotated"
+    },
+    {
+      "name": "mouse-spark",
+      "reason": "not imported: a <canvas> drawing comes in as one still frame"
+    },
+    {
+      "name": "drum-picker",
+      "reason": "not imported: a 3D transform comes in flat"
+    },
+    {
+      "name": "solar-loader",
+      "reason": "not imported: a 3D transform comes in flat"
+    },
+    {
+      "name": "container-text-scroll",
+      "reason": "not imported: a 3D transform comes in flat"
+    },
+    {
+      "name": "phone-scroll-hero",
+      "reason": "not imported: a 3D transform comes in flat"
+    },
+    {
+      "name": "split-hero-section",
+      "reason": "not imported: a 3D transform comes in flat"
+    },
+    {
+      "name": "card-stack",
+      "reason": "not imported: a 3D transform comes in flat"
+    },
+    {
+      "name": "checkbox-tree",
+      "reason": "not imported: a rotation comes in unrotated"
+    },
+    {
+      "name": "scroll-tilted-grid",
+      "reason": "not imported: a 3D transform comes in flat"
+    },
+    {
+      "name": "ruixen-gradient-footer",
+      "reason": "not imported: an image would insert as a grey placeholder"
+    },
+    {
+      "name": "case-study-tabs",
+      "reason": "not imported: an image would insert as a grey placeholder"
+    },
+    {
+      "name": "gooey-pagination",
+      "reason": "not imported: an image would insert as a grey placeholder"
+    },
+    {
+      "name": "color-picker-input",
+      "reason": "not imported: an image would insert as a grey placeholder"
+    },
+    {
+      "name": "bordered-clients-grid",
+      "reason": "not imported: an image would insert as a grey placeholder"
+    },
+    {
+      "name": "customer-story-stack",
+      "reason": "not imported: an image would insert as a grey placeholder"
+    },
+    {
+      "name": "featured-portrait-testimonial",
+      "reason": "not imported: an image would insert as a grey placeholder"
+    },
+    {
+      "name": "glass-ai-card",
+      "reason": "not imported: an image would insert as a grey placeholder"
+    },
+    {
+      "name": "multi-media-testimonial",
+      "reason": "not imported: an image would insert as a grey placeholder"
+    },
+    {
+      "name": "music-player-card",
+      "reason": "not imported: an image would insert as a grey placeholder"
+    },
+    {
+      "name": "trusted-clients-showcase",
+      "reason": "not imported: an image would insert as a grey placeholder"
+    },
+    {
+      "name": "scroll-portrait-wall",
+      "reason": "not imported: an image would insert as a grey placeholder"
+    },
+    {
+      "name": "scroll-burn-text",
+      "reason": "not imported: an image would insert as a grey placeholder"
+    },
+    {
+      "name": "dual-tone-rain-background",
+      "reason": "not imported: an image would insert as a grey placeholder"
+    },
+    {
+      "name": "glass-shipment-flow",
+      "reason": "not imported: an image would insert as a grey placeholder"
+    },
+    {
+      "name": "video-player-pro",
+      "reason": "not imported: an image would insert as a grey placeholder"
     }
   ]
 }
