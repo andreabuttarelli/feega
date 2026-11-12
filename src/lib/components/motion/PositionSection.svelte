@@ -132,10 +132,10 @@
         </label>
       </div>
       <div class="widget" role="group" aria-label="Constraints" data-testid="constraint-widget">
-        <button type="button" class="tick left" class:on={across.start} aria-label="Pin left" aria-pressed={across.start} onclick={(e) => tickH(Side.Start, e)}></button>
-        <button type="button" class="tick right" class:on={across.end} aria-label="Pin right" aria-pressed={across.end} onclick={(e) => tickH(Side.End, e)}></button>
-        <button type="button" class="tick top" class:on={down.start} aria-label="Pin top" aria-pressed={down.start} onclick={(e) => tickV(Side.Start, e)}></button>
-        <button type="button" class="tick bottom" class:on={down.end} aria-label="Pin bottom" aria-pressed={down.end} onclick={(e) => tickV(Side.End, e)}></button>
+        <button type="button" class="tick hit left" class:on={across.start} aria-label="Pin left" aria-pressed={across.start} onclick={(e) => tickH(Side.Start, e)}></button>
+        <button type="button" class="tick hit right" class:on={across.end} aria-label="Pin right" aria-pressed={across.end} onclick={(e) => tickH(Side.End, e)}></button>
+        <button type="button" class="tick hit top" class:on={down.start} aria-label="Pin top" aria-pressed={down.start} onclick={(e) => tickV(Side.Start, e)}></button>
+        <button type="button" class="tick hit bottom" class:on={down.end} aria-label="Pin bottom" aria-pressed={down.end} onclick={(e) => tickV(Side.End, e)}></button>
         <button type="button" class="inner" class:on={horizontal === Horizontal.Center && vertical === Vertical.Center} aria-label="Centre" title="Centre" onclick={centre}></button>
       </div>
     </div>
@@ -148,7 +148,7 @@
         <div class="pivot" role="group" aria-label="Pivot">
           {#each PIVOT_STOPS as py (py)}
             {#each PIVOT_STOPS as px (px)}
-              <button type="button" class:on={pivotX === px && pivotY === py} aria-label={`Pivot ${px} ${py}`} title="Pivot" onclick={() => onchange(setTransform(doc, clip.id, { anchorX: px, anchorY: py }), 'Moved the pivot')}></button>
+              <button type="button" class="hit" class:on={pivotX === px && pivotY === py} aria-label={`Pivot ${px} ${py}`} title="Pivot" onclick={() => onchange(setTransform(doc, clip.id, { anchorX: px, anchorY: py }), 'Moved the pivot')}></button>
             {/each}
           {/each}
         </div>
@@ -269,14 +269,14 @@
 
   .widget {
     position: relative;
-    min-height: 72px;
+    min-height: calc(3 * var(--ui-hit));
     border-radius: var(--ui-radius-md);
     background: var(--ui-input);
   }
 
   .inner {
     position: absolute;
-    inset: 16px 28px;
+    inset: var(--ui-hit) 28px;
     padding: 0;
     border: 1px solid var(--ui-divider-strong);
     border-radius: var(--ui-radius-xs);
@@ -290,80 +290,85 @@
 
   .tick {
     position: absolute;
-    padding: 0;
-    border: 0;
-    border-radius: var(--ui-radius-xs);
-    background: var(--ui-divider-strong);
+    --glyph-radius: var(--ui-radius-xs);
+    --glyph-fill: var(--ui-divider-strong);
     cursor: pointer;
   }
 
   .tick.on {
-    background: var(--ui-accent);
+    --glyph-fill: var(--ui-accent);
   }
 
   .tick.left,
   .tick.right {
     top: 50%;
-    width: 14px;
-    height: 3px;
+    --glyph-w: 14px;
+    --glyph-h: 3px;
     transform: translateY(-50%);
   }
 
   .tick.left {
-    left: 6px;
+    left: 2px;
   }
 
   .tick.right {
-    right: 6px;
+    right: 2px;
   }
 
   .tick.top,
   .tick.bottom {
     left: 50%;
-    width: 3px;
-    height: 12px;
+    --glyph-w: 3px;
+    --glyph-h: 12px;
     transform: translateX(-50%);
   }
 
   .tick.top {
-    top: 3px;
+    top: 0;
   }
 
   .tick.bottom {
-    bottom: 3px;
+    bottom: 0;
   }
 
-  .rotation {
-    min-width: 0;
-    display: flex;
-    align-items: center;
+  .turn {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: var(--ui-space-2);
   }
 
+  .rotation {
+    display: contents;
+  }
+
   .rotation .slot {
-    flex: 1;
+    grid-area: 1 / 1;
     min-width: 0;
+  }
+
+  .turn .segments {
+    grid-area: 2 / 1;
+  }
+
+  .pivot {
+    grid-area: 1 / 2 / span 2;
   }
 
   .pivot {
     display: grid;
-    grid-template-columns: repeat(3, 6px);
-    gap: 3px;
-    padding: 7px;
+    grid-template-columns: repeat(3, var(--ui-hit));
     background: var(--ui-input);
     border-radius: var(--ui-radius-md);
   }
 
   .pivot button {
-    width: 6px;
-    height: 6px;
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    background: var(--ui-divider-strong);
+    --glyph: 6px;
+    --glyph-radius: 50%;
+    --glyph-fill: var(--ui-divider-strong);
+    cursor: pointer;
   }
 
   .pivot button.on {
-    background: var(--ui-accent);
+    --glyph-fill: var(--ui-accent);
   }
 </style>

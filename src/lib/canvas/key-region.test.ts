@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { KEY_REGION_ATTR, Region, claimFocus, regionOf, reachesCanvas, reachesTimeline, releaseFocus, keyOnCanvas } from './key-region.svelte';
+import { KEY_REGION_ATTR, Region, claimFocus, regionOf, reachesCanvas, reachesTimeline, releaseFocus, keyOnCanvas, leaveMenu } from './key-region.svelte';
+import { Input } from '$lib/components/ui/shell/last-input';
 import { matchCanvasShortcut } from './shortcuts';
 
 function tree() {
@@ -123,6 +124,30 @@ describe('key region', () => {
     releaseFocus(new MouseEvent('click', { bubbles: true, detail: 1 }));
 
     expect(document.activeElement).toBe($('rename'));
+  });
+
+  it('a toolbar menu closed with the pointer hands focus to the canvas, not back to its button', () => {
+    const $ = tree();
+    $('menu').focus();
+    const close = new Event('closeautofocus', { cancelable: true });
+
+    leaveMenu($('tool'), Input.Pointer, close);
+
+    expect(close.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(document.body);
+    expect(press(document.body, 'v')).toBe(true);
+  });
+
+  it('a toolbar menu closed by keyboard, or an inspector menu, gives focus back to its button', () => {
+    const $ = tree();
+    for (const [trigger, input] of [['tool', Input.Keys], ['fill-eye', Input.Pointer]] as const) {
+      $('menu').focus();
+      const close = new Event('closeautofocus', { cancelable: true });
+
+      leaveMenu($(trigger), input, close);
+
+      expect(close.defaultPrevented, trigger).toBe(false);
+    }
   });
 
   it('a pointer click on an inspector control keeps its focus', () => {

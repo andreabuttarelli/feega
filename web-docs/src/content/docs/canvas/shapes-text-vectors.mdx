@@ -47,6 +47,8 @@ Every colour in the editor opens the same picker: fill (text included), stroke, 
 - Swatches list the colours already used in the document, the brand colours and the ones you picked recently.
 - New elements start in plain colours: shapes `#D9D9D9`, text and strokes `#000000`, frames `#FFFFFF`. Brand colours apply only when you pick one from the **Brand** swatches, which show the project's brand (or the workspace's first brand) with each name on hover.
 - A fill popover keeps the paint type (Solid, Linear, Radial, Angular, Diamond, Image) at the top. A gradient stop uses the same picker.
+- Gradient stops work from the keyboard: Tab to a stop, arrow keys move it by 1% (Shift by 10%), Home and End send it to the ends, Delete removes it while more than two remain. **+** next to Position adds a stop in the middle of the widest gap; a click on the bar adds one where you click.
+- Enter in a hex, channel or opacity field applies the value and keeps the field focused.
 - Dragging updates the canvas live and counts as one undo step.
 
 Colours are still stored as `#rrggbb` (or `#rrggbbaa`) or a brand token, so scripts, the CLI and agents read and write them as before.

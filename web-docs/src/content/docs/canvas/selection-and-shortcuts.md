@@ -87,7 +87,8 @@ timeline, Backspace/Delete, Esc, Cmd/Ctrl+A, copy, paste, duplicate and group st
 selection.
 
 Esc closes only the open menu, picker or popover, one level at a time, keeps the selection and
-puts focus back on the button that opened it.
+puts focus back on the button that opened it. A menu opened from a toolbar and closed with the
+pointer hands focus to the canvas instead, so the next shortcut acts at once.
 
 | Key | Action |
 |---|---|

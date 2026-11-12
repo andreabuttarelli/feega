@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FillHolder, FillType, ImageFit, addFill, cropOf, addStop, colourAlpha, removeStop, withAlpha, fillsOf, fillsSchema, moveFill, photoFills, removeFill, retypeFill, setFill, type Fill, type FillOf } from './model';
+import { FillHolder, FillType, ImageFit, addFill, cropOf, addStop, widestGapMiddle, colourAlpha, removeStop, withAlpha, fillsOf, fillsSchema, moveFill, photoFills, removeFill, retypeFill, setFill, type Fill, type FillOf } from './model';
 
 const solid = (color: string, extra: Record<string, unknown> = {}) => fillsSchema.parse([{ type: FillType.Solid, color, ...extra }])[0];
 const colors = (stack: Fill[]) => stack.map((f) => (f as { color: string }).color);
@@ -138,6 +138,16 @@ describe('fill stack model', () => {
       { color: '#ffffff', pos: 1 }
     ];
     expect(addStop(stops, 0.4)).toEqual([...stops, { color: '#000000', pos: 0.4 }]);
+  });
+
+  it('a stop added without a pointer lands in the middle of the widest gap', () => {
+    const stops = [
+      { color: '#000000', pos: 0 },
+      { color: '#ffffff', pos: 1 },
+      { color: '#ff0000', pos: 0.2 }
+    ];
+    expect(widestGapMiddle(stops)).toBe(0.6);
+    expect(widestGapMiddle([{ color: '#000000', pos: 0.3 }, { color: '#ffffff', pos: 0.5 }])).toBe(0.4);
   });
 
   it('a gradient keeps at least two stops', () => {

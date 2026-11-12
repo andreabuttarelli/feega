@@ -3,9 +3,9 @@
   import { FIELD_INPUT, FOCUS_RING, MENU_CONTENT, MENU_ITEM, SECTION_LABEL } from '$lib/components/ui/shell/styles';
   import { BLEND_MODES } from '@feega/motion-core/motion/blend';
   import { resolveColor, type BrandTokens } from '@feega/motion-core/motion/brand';
-  import { FILL_LABEL, FILL_TYPES, FillType, IMAGE_CONTROLS, IMAGE_FITS, IMAGE_FIT_LABEL, ImageControl, addFill, cropOf, addStop, colourAlpha, moveFill, removeFill, removeStop, retypeFill, setFill, withAlpha, type Fill, type FillOf, type FillPatch, type Stop } from '@feega/motion-core/motion/fill/model';
+  import { FILL_LABEL, FILL_TYPES, FillType, IMAGE_CONTROLS, IMAGE_FITS, IMAGE_FIT_LABEL, ImageControl, addFill, cropOf, addStop, widestGapMiddle, MAX_STOPS, colourAlpha, moveFill, removeFill, removeStop, retypeFill, setFill, withAlpha, type Fill, type FillOf, type FillPatch, type Stop } from '@feega/motion-core/motion/fill/model';
   import ColorPicker from './ColorPicker.svelte';
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { SliderField } from '$lib/components/ui/control';
   import { ADJUSTMENTS, ADJUSTMENT_LABEL, isNeutral, type Adjustment } from '@feega/motion-core/motion/fill/adjust';
   import type { LiveGesture } from '$lib/motion/live-edit';
@@ -19,6 +19,7 @@
   import { MediaKind, type MediaPick } from '$lib/motion/media/pick';
   import { PAINT_GRIP, PAINT_INLINE_INPUT, PAINT_META, PAINT_NAME, PAINT_ROW, PAINT_SWATCH, PAINT_TEXT } from './paint-row';
   import MinusGlyph from './MinusGlyph.svelte';
+  import { colourLabel } from '$lib/motion/colour-field';
 
   const NO_COLOURS = () => [];
 
@@ -72,6 +73,15 @@
   const patch = (i: number, p: FillPatch, summary: string) => onchange(setFill(fills, i, p), summary);
   const percentOf = (e: Event) => Math.max(0, Math.min(PERCENT, Number((e.currentTarget as HTMLInputElement).value))) / PERCENT;
   const toggle = (i: number) => (open = open === i ? null : i);
+  const PRESS_KEYS = new Set(['Enter', ' ']);
+
+  function rowKey(e: KeyboardEvent, i: number) {
+    if (e.target !== e.currentTarget || !PRESS_KEYS.has(e.key)) {
+      return;
+    }
+    e.preventDefault();
+    toggle(i);
+  }
 
   function add(type: FillType) {
     onchange(addFill(fills, type), 'Add fill');
@@ -101,9 +111,53 @@
     }
     const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const pos = box.width ? Math.max(0, Math.min(1, (e.clientX - box.left) / box.width)) : 0;
-    const stops = addStop(stopsOf(i), Math.round(pos * PERCENT) / PERCENT);
+    placeStop(i, Math.round(pos * PERCENT) / PERCENT);
+  }
+
+  function placeStop(i: number, pos: number) {
+    const stops = addStop(stopsOf(i), pos);
     patch(i, { stops }, 'Add gradient stop');
     stopAt = stops.length - 1;
+  }
+
+  function dropStop(i: number, s: number, bar: HTMLElement | null) {
+    const stops = removeStop(stopsOf(i), s);
+    if (stops.length === stopsOf(i).length) {
+      return;
+    }
+    patch(i, { stops }, 'Remove gradient stop');
+    stopAt = Math.min(s, stops.length - 1);
+    void tick().then(() => bar?.querySelectorAll<HTMLElement>('[data-testid="fill-stop"]')[stopAt]?.focus());
+  }
+
+  const STOP_STEP = 1 / PERCENT;
+  const STOP_BIG_STEP = 10 / PERCENT;
+  const STOP_MOVES: Record<string, (pos: number, step: number) => number> = {
+    ArrowLeft: (pos, step) => pos - step,
+    ArrowDown: (pos, step) => pos - step,
+    ArrowRight: (pos, step) => pos + step,
+    ArrowUp: (pos, step) => pos + step,
+    Home: () => 0,
+    End: () => 1
+  };
+  const DROP_KEYS = new Set(['Delete', 'Backspace']);
+  const STOP_EDGE = '[--glyph-edge:inset_0_0_0_2px_white,var(--ui-shadow-float)]';
+  const STOP_EDGE_PICKED = '[--glyph-edge:inset_0_0_0_2px_white,0_0_0_2px_var(--ui-accent-solid)]';
+
+  function keyStop(i: number, s: number, e: KeyboardEvent) {
+    stopAt = s;
+    if (DROP_KEYS.has(e.key)) {
+      e.preventDefault();
+      dropStop(i, s, (e.currentTarget as HTMLElement).parentElement);
+      return;
+    }
+    const move = STOP_MOVES[e.key];
+    if (!move) {
+      return;
+    }
+    e.preventDefault();
+    const pos = move(stopsOf(i)[s].pos, e.shiftKey ? STOP_BIG_STEP : STOP_STEP);
+    setStop(i, s, { pos: Math.round(Math.max(0, Math.min(1, pos)) * PERCENT) / PERCENT });
   }
 
   function dragStop(i: number, s: number, e: PointerEvent) {
@@ -143,7 +197,7 @@
 
 {#snippet diamond(key: string)}
   {#if keys}
-    <button type="button" class={cn('relative inline-flex h-6 w-4 shrink-0 items-center justify-center before:size-[5px] before:rotate-45 before:border before:border-ui-accent-solid before:content-[""]', FOCUS_RING, keys.mark(key) === KeyMark.None ? 'before:opacity-50 hover:before:opacity-100' : keys.mark(key) === KeyMark.Here ? 'before:bg-ui-accent-solid' : 'before:bg-ui-accent-solid/50')} data-testid="fill-key" data-key={key} data-mark={keys.mark(key)} title="Keyframe at playhead" aria-label={`Keyframe ${key}`} aria-pressed={keys.mark(key) === KeyMark.Here} onclick={() => keys.toggle(key)}></button>
+    <button type="button" class={cn('relative inline-flex size-6 shrink-0 items-center justify-center before:size-[5px] before:rotate-45 before:border before:border-ui-accent-solid before:content-[""]', FOCUS_RING, keys.mark(key) === KeyMark.None ? 'before:opacity-50 hover:before:opacity-100' : keys.mark(key) === KeyMark.Here ? 'before:bg-ui-accent-solid' : 'before:bg-ui-accent-solid/50')} data-testid="fill-key" data-key={key} data-mark={keys.mark(key)} title="Keyframe at playhead" aria-label={`Keyframe ${key}`} aria-pressed={keys.mark(key) === KeyMark.Here} onclick={() => keys.toggle(key)}></button>
   {/if}
 {/snippet}
 
@@ -183,7 +237,7 @@
       data-index={index}
       data-open={open === index ? 'true' : undefined}
       onclick={() => toggle(index)}
-      onkeydown={(e) => e.key === 'Enter' && toggle(index)}
+      onkeydown={(e) => rowKey(e, index)}
       ondragstart={() => (dragged = index)}
       ondragover={(e) => e.preventDefault()}
       ondrop={(e) => {
@@ -210,7 +264,7 @@
           {#if bound && fill.type === FillType.Solid}
           <span class="inline-flex min-w-0 items-center gap-1" data-testid="fill-bound">{@render link()}{solidName(fill.color)}</span>
           {:else}
-          <input class={PAINT_INLINE_INPUT} type="number" min="0" max="100" step="1" data-testid="fill-opacity" aria-label="Layer opacity" title="Layer opacity %" value={pct(fill.opacity)} onclick={(e) => e.stopPropagation()} onchange={(e) => patch(index, { opacity: percentOf(e) }, 'Fill opacity')} />% · {TYPE_LABEL[fill.type]}
+          <input class={PAINT_INLINE_INPUT} type="number" min="0" max="100" step="1" data-testid="fill-opacity" aria-label="Fill opacity" title="Fill opacity %" value={pct(fill.opacity)} onclick={(e) => e.stopPropagation()} onchange={(e) => patch(index, { opacity: percentOf(e) }, 'Fill opacity')} />% · {TYPE_LABEL[fill.type]}
           {/if}
         </span>
       </span>
@@ -280,15 +334,21 @@
             {#each fill.stops as s, si (si)}
               <button
                 type="button"
-                class={cn('absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border-2 border-white shadow-ui-float', si === at && 'ring-2 ring-ui-accent-solid')}
+                role="slider"
+                class={cn('hit absolute top-1/2 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full [--glyph-radius:9999px] [--glyph:14px]', FOCUS_RING, si === at ? STOP_EDGE_PICKED : STOP_EDGE)}
                 data-testid="fill-stop"
-                aria-label={`Stop ${si + 1}`}
-                style={`left:${pct(s.pos)}%;background:${color(s.color)}`}
+                aria-label={`Stop ${si + 1} of ${fill.stops.length}`}
+                aria-valuemin={0}
+                aria-valuemax={PERCENT}
+                aria-valuenow={pct(s.pos)}
+                aria-valuetext={`${pct(s.pos)}%, ${colourLabel(s.color)}`}
+                style={`left:${pct(s.pos)}%;--glyph-fill:${color(s.color)}`}
                 onclick={(e) => {
                   e.stopPropagation();
                   stopAt = si;
                 }}
                 onpointerdown={(e) => dragStop(index, si, e)}
+                onkeydown={(e) => keyStop(index, si, e)}
               ></button>
             {/each}
           </div>
@@ -298,28 +358,26 @@
             <span class="flex items-center gap-1">
               {@render diamond(fillKey(index, FillField.StopPos, at))}
               <input class={cn(FIELD_INPUT, 'w-14')} type="number" min="0" max="100" aria-label="Stop position" value={pct(fill.stops[at].pos)} onchange={(e) => setStop(index, at, { pos: percentOf(e) })} />
+              <button type="button" class={ICON} data-testid="fill-add-stop" aria-label="Add stop" disabled={fill.stops.length >= MAX_STOPS} onclick={() => placeStop(index, widestGapMiddle(fill.stops))}>+</button>
               <button
                 type="button"
                 class={ICON}
                 aria-label="Remove stop"
                 disabled={fill.stops.length <= 2}
-                onclick={() => {
-                  patch(index, { stops: removeStop(fill.stops, at) }, 'Remove gradient stop');
-                  stopAt = 0;
-                }}>−</button
+                onclick={() => dropStop(index, at, null)}>−</button
               >
             </span>
           </div>
           {#if fill.type === FillType.Linear}
-            <label class={FIELD_ROW}><span class={LABEL}>Angle</span><span class="flex items-center gap-1">{@render diamond(fillKey(index, FillField.Angle))}<input class={cn(FIELD_INPUT, 'w-16')} type="number" min="-360" max="360" step="1" data-testid="fill-angle" value={fill.angle} onchange={(e) => patch(index, { angle: Number(e.currentTarget.value) }, 'Gradient angle')} /></span></label>
+            <div class={FIELD_ROW}><span class={LABEL}>Angle</span><span class="flex items-center gap-1">{@render diamond(fillKey(index, FillField.Angle))}<input class={cn(FIELD_INPUT, 'w-16')} type="number" min="-360" max="360" step="1" data-testid="fill-angle" aria-label="Gradient angle" value={fill.angle} onchange={(e) => patch(index, { angle: Number(e.currentTarget.value) }, 'Gradient angle')} /></span></div>
           {:else if fill.type === FillType.Angular}
-            <label class={FIELD_ROW}><span class={LABEL}>Angle</span><span class="flex items-center gap-1">{@render diamond(fillKey(index, FillField.Angle))}<input class={cn(FIELD_INPUT, 'w-16')} type="number" min="-360" max="360" step="1" data-testid="fill-angle" value={fill.angle} onchange={(e) => patch(index, { angle: Number(e.currentTarget.value) }, 'Gradient angle')} /></span></label>
-            <label class={FIELD_ROW}><span class={LABEL}>Centre X</span><span class="flex items-center gap-1">{@render diamond(fillKey(index, FillField.CentreX))}<input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" value={pct(fill.center.x)} onchange={(e) => patch(index, { center: { ...fill.center, x: percentOf(e) } }, 'Gradient centre')} /></span></label>
-            <label class={FIELD_ROW}><span class={LABEL}>Centre Y</span><span class="flex items-center gap-1">{@render diamond(fillKey(index, FillField.CentreY))}<input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" value={pct(fill.center.y)} onchange={(e) => patch(index, { center: { ...fill.center, y: percentOf(e) } }, 'Gradient centre')} /></span></label>
+            <div class={FIELD_ROW}><span class={LABEL}>Angle</span><span class="flex items-center gap-1">{@render diamond(fillKey(index, FillField.Angle))}<input class={cn(FIELD_INPUT, 'w-16')} type="number" min="-360" max="360" step="1" data-testid="fill-angle" aria-label="Gradient angle" value={fill.angle} onchange={(e) => patch(index, { angle: Number(e.currentTarget.value) }, 'Gradient angle')} /></span></div>
+            <div class={FIELD_ROW}><span class={LABEL}>Centre X</span><span class="flex items-center gap-1">{@render diamond(fillKey(index, FillField.CentreX))}<input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" aria-label="Gradient centre X" value={pct(fill.center.x)} onchange={(e) => patch(index, { center: { ...fill.center, x: percentOf(e) } }, 'Gradient centre')} /></span></div>
+            <div class={FIELD_ROW}><span class={LABEL}>Centre Y</span><span class="flex items-center gap-1">{@render diamond(fillKey(index, FillField.CentreY))}<input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" aria-label="Gradient centre Y" value={pct(fill.center.y)} onchange={(e) => patch(index, { center: { ...fill.center, y: percentOf(e) } }, 'Gradient centre')} /></span></div>
           {:else if fill.type === FillType.Radial}
-            <label class={FIELD_ROW}><span class={LABEL}>Centre X</span><span class="flex items-center gap-1">{@render diamond(fillKey(index, FillField.CentreX))}<input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" value={pct(fill.center.x)} onchange={(e) => patch(index, { center: { ...fill.center, x: percentOf(e) } }, 'Gradient centre')} /></span></label>
-            <label class={FIELD_ROW}><span class={LABEL}>Centre Y</span><span class="flex items-center gap-1">{@render diamond(fillKey(index, FillField.CentreY))}<input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" value={pct(fill.center.y)} onchange={(e) => patch(index, { center: { ...fill.center, y: percentOf(e) } }, 'Gradient centre')} /></span></label>
-            <label class={FIELD_ROW}><span class={LABEL}>Radius</span><span class="flex items-center gap-1">{@render diamond(fillKey(index, FillField.Radius))}<input class={cn(FIELD_INPUT, 'w-16')} type="number" min="1" max="400" step="1" data-testid="fill-radius" value={pct(fill.radius)} onchange={(e) => patch(index, { radius: Math.max(1, Number(e.currentTarget.value)) / PERCENT }, 'Gradient radius')} /></span></label>
+            <div class={FIELD_ROW}><span class={LABEL}>Centre X</span><span class="flex items-center gap-1">{@render diamond(fillKey(index, FillField.CentreX))}<input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" aria-label="Gradient centre X" value={pct(fill.center.x)} onchange={(e) => patch(index, { center: { ...fill.center, x: percentOf(e) } }, 'Gradient centre')} /></span></div>
+            <div class={FIELD_ROW}><span class={LABEL}>Centre Y</span><span class="flex items-center gap-1">{@render diamond(fillKey(index, FillField.CentreY))}<input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" aria-label="Gradient centre Y" value={pct(fill.center.y)} onchange={(e) => patch(index, { center: { ...fill.center, y: percentOf(e) } }, 'Gradient centre')} /></span></div>
+            <div class={FIELD_ROW}><span class={LABEL}>Radius</span><span class="flex items-center gap-1">{@render diamond(fillKey(index, FillField.Radius))}<input class={cn(FIELD_INPUT, 'w-16')} type="number" min="1" max="400" step="1" data-testid="fill-radius" aria-label="Gradient radius" value={pct(fill.radius)} onchange={(e) => patch(index, { radius: Math.max(1, Number(e.currentTarget.value)) / PERCENT }, 'Gradient radius')} /></span></div>
           {/if}
         {:else}
           <MediaPicker label="Fill image" value={imagePick(fill)} {assets} uploader={upload} onpick={(pick) => patch(index, IMAGE_PATCH(pick), 'Fill image')} />

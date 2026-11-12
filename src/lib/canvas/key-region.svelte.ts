@@ -1,5 +1,6 @@
 import type { CanvasCommand, CanvasCommandId } from './shortcuts';
 import { isTypingTarget } from '$lib/shortcuts';
+import { Input } from '$lib/components/ui/shell/last-input';
 
 export enum Region {
   Canvas = 'canvas',
@@ -51,6 +52,17 @@ const POINTER_CLICK_MIN_DETAIL = 1;
 export function releaseFocus(e: MouseEvent) {
   const held = document.activeElement;
   if (e.detail >= POINTER_CLICK_MIN_DETAIL && held instanceof HTMLElement && !isTypingTarget(held) && REACH[regionOf(held)].pointer === PointerFocus.ReturnsToCanvas) {
+    held.blur();
+  }
+}
+
+export function leaveMenu(trigger: Element | null, closedBy: Input, close: Event) {
+  if (closedBy !== Input.Pointer || !trigger || REACH[regionOf(trigger)].pointer !== PointerFocus.ReturnsToCanvas) {
+    return;
+  }
+  close.preventDefault();
+  const held = document.activeElement;
+  if (held instanceof HTMLElement) {
     held.blur();
   }
 }

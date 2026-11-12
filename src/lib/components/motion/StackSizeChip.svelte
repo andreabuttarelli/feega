@@ -3,6 +3,7 @@
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import Check from '@lucide/svelte/icons/check';
   import { FOCUS_RING, MENU_CONTENT, MENU_ITEM } from '$lib/components/ui/shell';
+  import { dismissible } from '$lib/components/ui/shell/dismiss';
   import { cn } from '$lib/utils.js';
   import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
@@ -27,6 +28,8 @@
   const sizing = $derived(item[axis]);
   const laidPx = $derived(Math.round(Number((laidClip(doc, clip.id, measure) ?? clip).props[axis] ?? 0) * doc[axis]));
   const percented = $derived(sizing === Sizing.Percent);
+  const setPx = $derived(Math.round(Number(clip.props[axis] ?? 0) * doc[axis]));
+  const capped = $derived(sizing === Sizing.Fixed && setPx > laidPx);
   let open = $state(false);
   let root = $state<HTMLDivElement | null>(null);
 
@@ -71,8 +74,11 @@
 
 <div class="relative min-w-0" bind:this={root} data-testid={`stack-size-${axis}`} data-sizing={sizing}>
   <NumberField label={name.short} name={name.label} value={percented ? (item[PERCENT_KEY[axis]] ?? MAX_PERCENT) : laidPx} range={percented ? PERCENT_RANGE : PX_RANGE} unit={percented ? '%' : ''} trailing={mode} onchange={type} />
+  {#if capped}
+    <p class="mt-0.5 text-ui-caption text-ui-text-3" role="status" data-testid={`stack-capped-${axis}`}>Capped at {laidPx} px by the stack</p>
+  {/if}
   {#if open}
-    <div class={cn(MENU_CONTENT, 'absolute top-full right-0 mt-1 flex flex-col gap-0.5')} role="menu" aria-label={`${name.label} sizing`} data-testid={`stack-mode-menu-${axis}`}>
+    <div {@attach dismissible(() => (open = false))} class={cn(MENU_CONTENT, 'absolute top-full right-0 mt-1 flex flex-col gap-0.5')} role="menu" aria-label={`${name.label} sizing`} data-testid={`stack-mode-menu-${axis}`}>
       {#each sizings as option (option)}
         <button type="button" role="menuitemradio" aria-checked={option === sizing} class={MENU_ITEM} data-sizing={option} onclick={() => pick(option)}>
           <span class="grid w-3 place-items-center">{#if option === sizing}<Check size={12} />{/if}</span>{SIZING_LABEL[option]}
