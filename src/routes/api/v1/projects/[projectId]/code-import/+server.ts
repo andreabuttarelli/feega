@@ -31,9 +31,9 @@ export const POST: RequestHandler = async (event) => {
   const { canvasId, repo, folder, upload, app, route, routes, storybook, stories, conditions, designSystem, captureDelayMs, routeDelayMs, x, y } = ask.data;
   const done = await importCodeInto({ ...scope, actor: { kind: 'user', id: scope.userId } }, canvasId, { repo, folder, upload, app, routes: askedRoutes(route, routes), conditions: conditions ? conditionsOf(conditions) : undefined, delay: delayOf({ ms: captureDelayMs, routes: routeDelayMs }), designSystem: designSystemOf(designSystem), storybook, stories, at: { x, y } });
   if (done.outcome !== CodeImportOutcome.Ok) {
-    return json({ error: done.outcome, ...(done.error ? { detail: done.error } : {}), ...(done.apps ? { apps: done.apps } : {}) }, { status: CODE_IMPORT_STATUS[done.outcome] });
+    return json({ error: done.outcome, ...(done.error ? { detail: done.error } : {}), ...(done.locked ? { locked: done.locked } : {}), ...(done.apps ? { apps: done.apps } : {}) }, { status: CODE_IMPORT_STATUS[done.outcome] });
   }
 
   const node = await findNode(scope.db, { orgId: scope.orgId, nodeId: done.frameId });
-  return json({ nodes: node ? [node] : [], undo: done.undo, skipped: done.skipped, truncated: done.truncated, pages: done.pages, components: done.components, variants: done.variants, instances: done.instances, ...(done.design ? { design: done.design } : {}), ...(done.library ? { library: done.library } : {}) });
+  return json({ nodes: node ? [node] : [], undo: done.undo, skipped: done.skipped, truncated: done.truncated, pages: done.pages, locked: done.locked, components: done.components, variants: done.variants, instances: done.instances, ...(done.design ? { design: done.design } : {}), ...(done.library ? { library: done.library } : {}) });
 };

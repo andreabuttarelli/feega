@@ -101,6 +101,20 @@ Composio adapter is REST v3.1 over `fetch`, no SDK (the SDK pulls `openai`, `pus
 second `@types/json-schema` that breaks the `ai` package's types). Without `COMPOSIO_API_KEY` it
 is `null` and the UI says GitHub is not set up. Drive and Dropbox can move behind the same port.
 
+## Routes behind a login
+
+After each capture the tab's final URL is compared with the route asked (`lockedOut`,
+`code-import/sign-in.ts`). A different path that is the account's login path, a sign-in path
+(`/login`, `/sign-in`, `/signup`), or a page with a password field means the route is locked: it is
+not imported, it is returned in `locked` (`{ label, reason, detail? }`) and listed in `skipped`. All
+routes locked: `sign_in_needed`, 422.
+
+With a test account on the project (`app_accounts`, set in settings, chat, API `PUT`, CLI, MCP), the
+import signs in once before capturing: the login PATH of `login_url` on the sandbox origin, through
+`appBrowse` with an in-memory store (one login routine; the sandbox session never overwrites the
+saved one). Each capture tab restores that session. A failed sign-in is reported on each locked
+route; public routes import. Folder imports do not sign in.
+
 ## Storybook
 
 `storybook` instead of `repo`: `index.json` (Storybook 7+) or `stories.json` (6), stories only
@@ -191,4 +205,5 @@ Each clip drawn from a repo element carries `source = { at: "file:line:col", was
 
 - Svelte props (Svelte 5 keeps none in the browser): Svelte components have no variants.
 - Storybook controls: only the args each story renders with.
-- Components not rendered on any imported route or story; environment variables the app needs.
+- Components not rendered on any imported route or story; environment variables the app needs (an
+  app whose auth needs a database or secrets cannot sign in in the sandbox).
