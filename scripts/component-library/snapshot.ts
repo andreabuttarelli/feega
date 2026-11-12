@@ -7,22 +7,26 @@ import { folderSource } from '../../src/lib/server/code-import/folder-source';
 import { codeCapturedIn, type CapturedApp } from '../../src/lib/server/code-import/fidelity-apps';
 import { BASE_CONDITIONS } from '../../src/lib/server/code-import/render-conditions';
 import { compacted } from './compact';
-import type { Catalog } from '../arc-library/registry';
 
-const LIBRARY = join(import.meta.dirname, '../../libraries/arc');
-const OUT = join(import.meta.dirname, '../../src/lib/motion/template/arc/arc-doc.json');
-const INDEX = join(import.meta.dirname, '../../src/lib/motion/template/arc/arc-index.json');
-const NAME = 'Arc';
-const label = process.argv[2] ?? 'arc-lib';
+type Catalog = { items: { name: string; title: string; description: string }[] };
 
-const app = JSON.parse(readFileSync(join(codeCapturedIn(label), 'arc', 'capture.json'), 'utf8')) as CapturedApp;
+const [library, NAME, given] = process.argv.slice(2);
+if (!library || !NAME) {
+  throw new Error('usage: snapshot.ts <library> <Group> [capture label]');
+}
+const label = given ?? `${library}-lib`;
+const LIBRARY = join(import.meta.dirname, '../../libraries', library);
+const OUT = join(import.meta.dirname, `../../src/lib/motion/template/${library}/${library}-doc.json`);
+const INDEX = join(import.meta.dirname, `../../src/lib/motion/template/${library}/${library}-index.json`);
+
+const app = JSON.parse(readFileSync(join(codeCapturedIn(label), library, 'capture.json'), 'utf8')) as CapturedApp;
 const design = await designOf(folderSource(LIBRARY).read(''));
 const captures = app.pages.map((p) => ({ label: p.label, tree: p.tree, uses: p.uses }));
 const boards = boardsOf(NAME, design ? withBoard(design, NAME, captures) : captures);
 let n = 0;
 const planned = codePlan(boards.tree, boards.uses, () => `a${(++n).toString(36)}`);
 if (!planned) {
-  throw new Error('the Arc capture planned nothing');
+  throw new Error(`the ${NAME} capture planned nothing`);
 }
 
 const width = boards.tree.root.absoluteBoundingBox?.width ?? boards.tree.width;
