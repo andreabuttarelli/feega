@@ -28,7 +28,7 @@ describe('canvas context menu', () => {
     const canvas = vi.fn();
     const onclose = vi.fn();
     window.addEventListener('keydown', canvas);
-    app = mount(CanvasContextMenu, { target: document.body, props: { at: { x: 10, y: 10 }, summaries: [], available: new Set(), onpick: vi.fn(), onclose } });
+    app = mount(CanvasContextMenu, { target: document.body, props: { at: { x: 10, y: 10 }, summaries: [], available: new Set<never>(), onpick: vi.fn(), onclose } });
     flushSync();
 
     document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
