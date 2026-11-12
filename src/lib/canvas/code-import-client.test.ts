@@ -29,6 +29,15 @@ describe('importCode', () => {
 
     expect(await importCode(ASK, fetchFn as unknown as typeof fetch)).toEqual({ ok: false, error: 'run_failed', detail: 'install_failed: x' });
   });
+
+  it('a repository with several apps answers the list to pick from, and the pick goes back as app', async () => {
+    const refusal = answering({ error: 'choose_app', detail: 'choose_app: 2 apps', apps: ['apps/docs', 'apps/web'] }, 409);
+    expect(await importCode(ASK, refusal as unknown as typeof fetch)).toEqual({ ok: false, error: 'choose_app', detail: 'choose_app: 2 apps', apps: ['apps/docs', 'apps/web'] });
+
+    const fetchFn = answering({});
+    await importCode({ ...ASK, target: { ...ASK.target, app: 'apps/web' } }, fetchFn as unknown as typeof fetch);
+    expect(fetchFn).toHaveBeenCalledWith('/api/v1/projects/p1/code-import', expect.objectContaining({ body: JSON.stringify({ canvasId: 'c1', repo: 'https://github.com/a/b', routes: ['/x', '/y'], app: 'apps/web', x: 1, y: 2 }) }));
+  });
 });
 
 describe('tokensFound', () => {

@@ -8,7 +8,7 @@ import { assertPublicUrl } from '$lib/server/tool-guard';
 import { rateWindow } from '$lib/server/figma/rate-window';
 import { liveBrowser } from '$lib/server/web/live';
 import { pageAssets } from '$lib/server/url-import/canvas-import';
-import { CodeImportOutcome, Crop, designFor, importBoards, importCodeAt, importRepoAt, type CodeImported, type CodeReader, type LandAsk } from './import-code';
+import { CodeImportOutcome, Crop, designFor, importBoards, importCodeAt, importRepoAt, type BranchList, type CodeImported, type CodeReader, type LandAsk } from './import-code';
 import { DesignSystem, tokenCount } from './design-system';
 import { rawReader } from './repo-sync';
 import { basename } from 'node:path';
@@ -23,6 +23,8 @@ import { importStorybookAt } from './import-storybook';
 import { logAiCall } from '$lib/server/ai-log';
 import { sandboxRunner, sandboxUsd, type RepoRunner } from './sandbox-runner';
 import { githubFor } from './github-runtime';
+import { branchesOf, publicCall } from './github';
+import { appOf, PlanRefusal, type PlanRefused } from './run-plan';
 import { snapshotSha, uploadedArchive, uploadOf, uploadSource } from './upload-source';
 import { DataCheck, patchNodeData } from '$lib/server/repos/canvas';
 import type { CodeOriginData } from '$lib/canvas/motion-node';
@@ -36,7 +38,7 @@ const limiter = rateWindow({ limit: IMPORTS_PER_WINDOW, windowMs: IMPORT_WINDOW_
 
 export type CodeScope = { db: Db; orgId: string; userId: string; projectId: string; actor: Actor };
 
-export type CodeImportAsk = { repo?: string; folder?: string; upload?: string; routes: string[]; conditions?: RenderConditions[]; designSystem?: DesignSystem; storybook?: string; stories?: string[]; at: { x: number; y: number } };
+export type CodeImportAsk = { repo?: string; folder?: string; upload?: string; app?: string; routes: string[]; conditions?: RenderConditions[]; designSystem?: DesignSystem; storybook?: string; stories?: string[]; at: { x: number; y: number } };
 
 async function githubReader(scope: CodeScope, repo: string): Promise<CodeReader | null> {
   const ref = repoOf(repo);
@@ -47,13 +49,13 @@ async function githubReader(scope: CodeScope, repo: string): Promise<CodeReader 
 const tokensOf = (done: CodeImported) => (done.outcome === CodeImportOutcome.Ok && done.tokenMap ? { tokens: done.tokenMap } : {});
 
 function metered(runner: RepoRunner, scope: CodeScope): RepoRunner {
-  return async (repo, archive) => {
+  return async (repo, archive, app) => {
     const started = Date.now();
     const bill = () => {
       const ms = Date.now() - started;
       logAiCall({ label: SANDBOX_LABEL, provider: 'vercel-sandbox', ms, ok: true, flatCostUsd: sandboxUsd(ms), orgId: scope.orgId, userId: scope.userId, projectId: scope.projectId, actorKind: 'agent', actorId: scope.userId });
     };
-    const run = await runner(repo, archive);
+    const run = await runner(repo, archive, app);
     if (!run.ok) {
       bill();
       return run;
@@ -93,14 +95,21 @@ export async function importCodeInto(scope: CodeScope, canvasId: string, ask: Co
   }
 
   const code = await githubReader(scope, ask.repo ?? '');
-  const done = await importCodeAt({ ...land, repo: ask.repo ?? '', routes: ask.routes, conditions: ask.conditions, runner: sandboxOf(scope), archive: githubFor(scope.db, scope).archive, code, designSystem: ask.designSystem });
+  const github = githubFor(scope.db, scope);
+  const branches: BranchList = async (repo) => (await github.branches(repo)) ?? branchesOf(publicCall(), repo);
+  const done = await importCodeAt({ ...land, repo: ask.repo ?? '', app: ask.app, routes: ask.routes, conditions: ask.conditions, runner: sandboxOf(scope), archive: github.archive, branches, code, designSystem: ask.designSystem });
   if (done.outcome === CodeImportOutcome.Ok && done.origin) {
-    await rememberOrigin(scope, done.frameId, { kind: SourceKind.Github, ...done.origin, routes: ask.routes.length ? ask.routes : ['/'], ...(ask.conditions ? { conditions: ask.conditions } : {}), ...tokensOf(done) });
+    const { app, ...origin } = done.origin;
+    await rememberOrigin(scope, done.frameId, { kind: SourceKind.Github, ...origin, ...(app ? { app } : {}), routes: ask.routes.length ? ask.routes : ['/'], ...(ask.conditions ? { conditions: ask.conditions } : {}), ...tokensOf(done) });
   }
   return done;
 }
 
 const UPLOAD_OWNER = 'upload';
+
+const appAsked = (ask: CodeImportAsk): string | null | undefined => (ask.app === undefined ? null : (appOf(ask.app) ?? undefined));
+
+const unplanned = (plan: PlanRefused): CodeImported => ({ outcome: plan.refusal === PlanRefusal.ChooseApp ? CodeImportOutcome.ChooseApp : CodeImportOutcome.RunFailed, error: `${plan.refusal}: ${plan.reason}`, ...(plan.apps.length ? { apps: plan.apps } : {}) });
 
 function sandboxOf(scope: CodeScope): RepoRunner | null {
   const access = farmAccess(env);
@@ -110,7 +119,8 @@ function sandboxOf(scope: CodeScope): RepoRunner | null {
 async function importUploadInto(scope: CodeScope, land: LandAsk, ask: CodeImportAsk): Promise<CodeImported> {
   const upload = uploadOf(scope.orgId, ask.upload ?? '');
   const routes = routesOf(ask.routes);
-  if (!upload || !routes) {
+  const app = appAsked(ask);
+  if (!upload || !routes || app === undefined) {
     return { outcome: CodeImportOutcome.Invalid };
   }
   if (!limiter.allow(scope.userId)) {
@@ -122,9 +132,9 @@ async function importUploadInto(scope: CodeScope, land: LandAsk, ask: CodeImport
   }
 
   const code = () => uploadSource(archive).read('');
-  const done = await importRepoAt({ ...land, repo: { owner: UPLOAD_OWNER, repo: upload.name, ref: null }, routes, conditions: ask.conditions, runner: sandboxOf(scope), archive, code, designSystem: ask.designSystem });
+  const done = await importRepoAt({ ...land, repo: { owner: UPLOAD_OWNER, repo: upload.name, ref: null }, app, routes, conditions: ask.conditions, runner: sandboxOf(scope), archive, code, designSystem: ask.designSystem });
   if (done.outcome === CodeImportOutcome.Ok) {
-    await rememberOrigin(scope, done.frameId, { kind: SourceKind.Upload, repo: upload.path, branch: null, sha: snapshotSha(archive), routes, ...(ask.conditions ? { conditions: ask.conditions } : {}), ...tokensOf(done) });
+    await rememberOrigin(scope, done.frameId, { kind: SourceKind.Upload, repo: upload.path, branch: null, sha: snapshotSha(archive), ...(app ? { app } : {}), routes, ...(ask.conditions ? { conditions: ask.conditions } : {}), ...tokensOf(done) });
   }
   return done;
 }
@@ -132,12 +142,16 @@ async function importUploadInto(scope: CodeScope, land: LandAsk, ask: CodeImport
 async function importFolderInto(scope: CodeScope, land: LandAsk, ask: CodeImportAsk): Promise<CodeImported> {
   const root = localModeRefusal(env) === null ? folderOf(ask.folder ?? '') : null;
   const routes = routesOf(ask.routes);
-  if (!root || !routes) {
+  const app = appAsked(ask);
+  if (!root || !routes || app === undefined) {
     return { outcome: CodeImportOutcome.Invalid };
   }
-  const served = await devServerOf(root).catch((e: unknown) => e as Error);
+  const served = await devServerOf(root, app).catch((e: unknown) => e as Error);
   if (served instanceof Error) {
     return { outcome: CodeImportOutcome.RunFailed, error: served.message };
+  }
+  if ('refusal' in served) {
+    return unplanned(served);
   }
   const origin = new URL(served.url).origin;
   const only = async (url: URL) => {
@@ -149,7 +163,7 @@ async function importFolderInto(scope: CodeScope, land: LandAsk, ask: CodeImport
   const design = await designFor({ code: () => folderSource(root).read(''), designSystem: ask.designSystem }, null);
   const done = await importBoards({ ...land, open: localBrowser(chromiumPage, origin), guard: only, name: basename(root), pages, names: await folderNames(root), crop: Crop.Page, design });
   if (done.outcome === CodeImportOutcome.Ok) {
-    await rememberOrigin(scope, done.frameId, { kind: SourceKind.Folder, repo: root, branch: null, sha: await folderHead(root), routes, ...(ask.conditions ? { conditions: ask.conditions } : {}), ...tokensOf(done) });
+    await rememberOrigin(scope, done.frameId, { kind: SourceKind.Folder, repo: root, branch: null, sha: await folderHead(root), ...(app ? { app } : {}), routes, ...(ask.conditions ? { conditions: ask.conditions } : {}), ...tokensOf(done) });
   }
   return done;
 }

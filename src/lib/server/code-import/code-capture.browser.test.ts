@@ -54,7 +54,7 @@ type Started = { pages: { label: string; url: string }[]; names: string[]; stop:
 
 const START: Record<AppSource, (app: FidelityApp) => Promise<Started>> = {
   [AppSource.Repo]: async (app) => {
-    const run = await sandboxRunner(farmAccess(process.env)!)(repoOf(app.at)!, null);
+    const run = await sandboxRunner(farmAccess(process.env)!)(repoOf(app.at)!, null, null);
     if (!run.ok) {
       throw new Error(`${run.failure}: ${run.detail}`);
     }
