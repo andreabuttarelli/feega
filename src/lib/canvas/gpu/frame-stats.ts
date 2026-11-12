@@ -1,10 +1,13 @@
 const KEEP = 600;
+const FRAMES_KEPT = 2400;
+
+export type CoreFrameCount = { at: number; ms: number; moving: boolean; plans: number; walked: number; planMs: number; bakes: number; bakeMs: number; uploadBytes: number; unsharp: number; uncovered: number; step: number; pending: boolean };
 
 export type TextureReport = { count: number; bytes: number; largest: string[] };
 
 type Tally = Record<string, { n: number; ms: number }>;
 
-type Stats = { render: number[]; textures?: () => TextureReport; pending?: number; loseDevice?: () => void; counts?: Record<string, number>; tally?: Tally; reveal?: { ms: number; missing: string[] }; settled?: number };
+type Stats = { render: number[]; textures?: () => TextureReport; pending?: number; loseDevice?: () => void; counts?: Record<string, number>; tally?: Tally; reveal?: { ms: number; missing: string[] }; settled?: number; frames?: CoreFrameCount[] };
 
 declare global {
   interface Window {
@@ -66,5 +69,15 @@ export function addTally(json: string) {
     const sum = (tally[reason] ??= { n: 0, ms: 0 });
     sum.n += n;
     sum.ms += ms;
+  }
+}
+
+export function countFrame(began: number, counts: Float64Array | undefined, moving: boolean, pending: boolean) {
+  const stats = (window.__gpuCanvas ??= { render: [] });
+  const frames = (stats.frames ??= []);
+  const [plans = 0, walked = 0, planMs = 0, bakes = 0, bakeMs = 0, uploadBytes = 0, unsharp = 0, uncovered = 0, step = 0] = counts ?? [];
+  frames.push({ at: began, ms: performance.now() - began, moving, plans, walked, planMs, bakes, bakeMs, uploadBytes, unsharp, uncovered, step, pending });
+  if (frames.length > FRAMES_KEPT) {
+    frames.shift();
   }
 }

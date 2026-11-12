@@ -164,7 +164,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { DrawTool } from '$lib/motion/draw-tool';
   import { NEW_TEXT_SIZING } from '@feega/motion-core/motion/text-sizing';
   import { FrameKind, frameNodeSize, frameResize, tileFollowsDoc, FRAME_PARAM, motionNodePath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
-  import { NameTag } from '$lib/canvas/node-label';
+  import { NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
   import { NodeFlag, flagHeld, flagsOf, toggledFlags } from '$lib/canvas/node-flags';
   import type { HostBox } from '$lib/motion/element-host';
@@ -185,7 +185,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
   import type { SceneDrop } from '$lib/canvas/scene-drop';
   import { DragPhase, DropVerdict, frameUnderPointer, type ElementOut, type FrameTarget, type PointerPoint, type StageRect } from '$lib/canvas/canvas-drop';
-  import { canvasSelection } from '$lib/canvas/canvas-selection';
+  import { canvasSelection, canvasSelectionChips } from '$lib/canvas/canvas-selection';
+  import { canvasChips } from '$lib/chat-selection';
   import { propertiesRequest, propertiesTarget, targetOf } from '$lib/canvas/phone-properties';
   import { DropOn, type Drop } from '$lib/motion/move-element';
   import type { ComponentDrag } from '$lib/canvas/component-drag';
@@ -1521,7 +1522,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (person) {
       return { source: personView(person.name, person.views) };
     }
-    const row = nodes.find((n) => n.id === id);
+    const row = nodeById.get(id);
     if (!row) {
       return null;
     }
@@ -1932,6 +1933,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   });
 
   $effect(() => {
+    const rows = nodes.map((n) => ({ id: n.id, type: n.type, name: n.displayName || (isNodeType(n.type) ? NODE_KIND_LABEL[n.type] : n.type) }));
+    canvasSelectionChips.set(canvasChips([...new Set(selectedIds.map(baseNodeId))], rows));
+    return () => canvasSelectionChips.set([]);
+  });
+
+  $effect(() => {
     propertiesTarget.set(targetOf(selectedIds, nodes));
     return () => propertiesTarget.set(null);
   });
@@ -1950,7 +1957,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   let commentThreads = $state<CommentThread[] | null>(null);
-  let viewCentre = $state({ cx: 0, cy: 0 });
+  let viewCentre = { cx: 0, cy: 0 };
 
   $effect(() => {
     if (commentsPanel.open) {
@@ -2025,17 +2032,17 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     };
   });
 
-  const pinTarget = $derived.by(() => {
+  const pinTarget = () => {
     const dropped = commentsPanel.pending;
     if (dropped) {
       return { ...dropped, label: dropped.timeMs === undefined ? 'the spot you clicked' : `the playhead, ${(dropped.timeMs / 1000).toFixed(2)}s` };
     }
     const picked = tiles.find((t) => t.id === selectedIds[0]);
     return picked ? { nodeId: picked.id, x: picked.w, y: 0, label: 'the selected node' } : { nodeId: null, x: viewCentre.cx, y: viewCentre.cy, label: 'the middle of the view' };
-  });
+  };
 
   async function addThread(body: string) {
-    const at = pinTarget;
+    const at = pinTarget();
     comment(CommentAction.Add, { id: crypto.randomUUID(), body, at: { nodeId: at.nodeId, x: at.x, y: at.y, timeMs: at.timeMs }, mentions: mentionedIds(body, commentTeam) });
     commentsPanel.settle();
   }
@@ -4533,7 +4540,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {/if}
 
   {#if commentsPanel.open}
-    <CanvasCommentsPanel threads={commentThreads} {me} team={commentTeam} pinsTo={pinTarget.label} onadd={addThread} onreply={replyTo} onedit={editCommentBody} ondelete={deleteCommentById} onresolve={resolveThread} onclose={() => commentsPanel.hide()} />
+    <CanvasCommentsPanel threads={commentThreads} {me} team={commentTeam} pinsTo={pinTarget().label} onadd={addThread} onreply={replyTo} onedit={editCommentBody} ondelete={deleteCommentById} onresolve={resolveThread} onclose={() => commentsPanel.hide()} />
   {/if}
 
   <RunsPanel runs={runListing} staleCount={staleNodeIds.length} onrunstale={() => runGraph(GraphScope.Stale, staleNodeIds)} />

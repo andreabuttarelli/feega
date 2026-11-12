@@ -22,8 +22,15 @@ describe('effects as filters', () => {
     const item = card(withEffects([effect('brightness-contrast', { brightness: 1.5 }), effect('gaussian-blur', { radius: 4 })]));
 
     expect(item?.filters?.map((f) => f.kind)).toEqual([FilterKind.Css, FilterKind.Css]);
-    expect(item?.filters?.[0]).toMatchObject({ kind: FilterKind.Css, fns: [{ name: 'brightness', args: ['1.5'] }, { name: 'contrast', args: ['1'] }] });
+    expect(item?.filters?.[0]).toMatchObject({ kind: FilterKind.Css, fns: [{ name: 'brightness', args: ['1.5'] }] });
     expect(item?.blur).toBe(0);
+  });
+
+  it('hands nothing over for effects that are disabled or at zero strength', () => {
+    const item = card(withEffects([effect('gaussian-blur', { radius: 0 }), { ...effect('brightness-contrast', { brightness: 1.5 }), enabled: false }]));
+
+    expect(item?.filters).toBeUndefined();
+    expect(item?.space).toBeUndefined();
   });
 
   it('hands an SVG-filter effect over as its primitives', () => {

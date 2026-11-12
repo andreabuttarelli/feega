@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { wireCurve } from '$lib/canvas/gpu/geometry';
 import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { EdgeLook, type CoreTheme } from './overlay';
@@ -112,5 +112,39 @@ describe('world overlay, node by node', () => {
 
     expect(after.fixed[0]).toBe(before.fixed[0]);
     expect(after.fixed.at(-1)).not.toBe(before.fixed.at(-1));
+  });
+
+  it('a zoom frame that rebuilds equal chrome compares it without serialising', () => {
+    const base = { curves: [{ edge: edge(), curve }], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none };
+    parts({ ...base, chrome: [tile('a', 0), tile('b', 200)] });
+    const serialised = vi.spyOn(JSON, 'stringify');
+    const again = parts({ ...base, curves: [{ edge: edge(), curve: { ...curve } }], chrome: [tile('a', 0), tile('b', 200)] });
+    const calls = serialised.mock.calls.length;
+    serialised.mockRestore();
+
+    expect(again.fixed.length).toBeGreaterThan(0);
+    expect(calls).toBe(0);
+  });
+});
+
+describe('world overlay across stroke zoom steps', () => {
+  const frame = (strokeZoom: number, ring = NodeChrome.None) => ({ id: 'f', x: 0, y: 0, width: 400, height: 300, inputs: [], outputs: [{ type: 'text', state: PortState.Quiet }], label: 'Hero', icon: null, tag: '#ff0000', zoom: 1, ring, handles: ring === NodeChrome.Selected, ringColor: '#7c5cff', names: false, strokeZoom, layers: ChromeLayers.Whole }) as never;
+  const base = { curves: [], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none };
+
+  it('hands back the same fixed part when no node draws a ring', () => {
+    const before = parts({ ...base, chrome: [frame(1)] });
+    const after = parts({ ...base, chrome: [frame(1.04)] });
+
+    expect(after.fixed).toBe(before.fixed);
+  });
+
+  it('builds again only the ring and handles of a selected node, not its label and ports', () => {
+    const before = parts({ ...base, selected: ['f'], chrome: [frame(1, NodeChrome.Selected)] });
+    const after = parts({ ...base, selected: ['f'], chrome: [frame(1.04, NodeChrome.Selected)] });
+    const kept = (clip: string) => after.fixed.find((i) => i.clip === clip) === before.fixed.find((i) => i.clip === clip);
+
+    expect(kept('f:label')).toBe(true);
+    expect(kept('f:port-out')).toBe(true);
+    expect(kept('f:ring')).toBe(false);
   });
 });

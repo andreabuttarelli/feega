@@ -127,6 +127,10 @@ export const JSONB_COLUMN_SCHEMAS: Record<string, JsonbEntry> = {
     z.array(z.object({ assetId: z.string(), kind: z.enum(['image', 'document']), name: z.string(), mimeType: z.string(), bytes: z.number() }))
   ),
 
+  'chat_messages.selection': validated(
+    z.array(z.object({ id: z.string(), kind: z.enum(['node', 'layer']), type: z.string(), name: z.string(), frameId: z.string().optional() }))
+  ),
+
   'node_runs.params': freeForm(
     'parametri per-modello del giro (aspect ratio, durata, audio…): la stessa ragione per cui ' +
       '`gen-node.ts` non duplica i limiti del catalogo — un campo diverso per ogni provider, e ' +

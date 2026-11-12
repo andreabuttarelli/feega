@@ -1,9 +1,9 @@
 use vello::kurbo::Rect;
 
 use crate::canvas::Canvas;
-use crate::display_list::{Cover, DisplayList, Filter, Item, Lens, Look, MaskMode, Rgba};
+use crate::display_list::{Cover, DisplayList, Item, Lens, Look, MaskMode, Rgba};
 use crate::fragments::Fragments;
-use crate::filters::{reach as filter_reach, Fold, Fx, Reach, Runner};
+use crate::filters::{paints_from_nothing, reach as filter_reach, Fold, Fx, Reach, Runner};
 use crate::canvas::shader_only;
 use crate::tally::Reason;
 use crate::scene::{alone, bounds, build_items, cover, layer_worthy, plain, silhouette, unblended, Layers, Placed, Shelf};
@@ -163,8 +163,8 @@ fn off_frame<S: Surface>(surface: &S, item: &Item, pictures: &Shelf<Pic<S>>) -> 
 
 fn shades_nothing(item: &Item) -> bool {
     let Item::Group(group) = item else { return false };
-    let css_only = group.look.filters.iter().flatten().all(|f| matches!(f, Filter::Css { .. }));
-    group.items.is_empty() && css_only && group.look.backdrop.is_none()
+    let paints = group.look.filters.as_deref().is_some_and(paints_from_nothing);
+    group.items.is_empty() && !paints && group.look.backdrop.is_none()
 }
 
 fn body<S: Surface>(surface: &mut S, item: &Item, pictures: &Shelf<Pic<S>>, inner: Option<&Layers<Pic<S>>>) -> Result<Placed<Pic<S>>, S::Error> {

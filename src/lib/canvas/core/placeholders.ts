@@ -33,12 +33,27 @@ export const standIn = <T>(layers: readonly (T | null | undefined)[]): T | null 
 
 export const firstDrawn = <T extends { group: string }>(chain: readonly T[], drawn: ReadonlySet<string>): T | null => chain.find((l) => drawn.has(l.group)) ?? null;
 
-export function fillOrder<T extends { box: Box }>(items: readonly T[], view: Viewport, screen: Screen): T[] {
-  const centre = { x: (screen.width / 2 - view.x) / view.zoom, y: (screen.height / 2 - view.y) / view.zoom };
+const centreOf = (view: Viewport, screen: Screen) => ({ x: (screen.width / 2 - view.x) / view.zoom, y: (screen.height / 2 - view.y) / view.zoom });
+
+export function inView<T extends { box: Box }>(items: readonly T[], view: Viewport, screen: Screen): T[] {
+  const centre = centreOf(view, screen);
   const half = { w: screen.width / 2 / view.zoom, h: screen.height / 2 / view.zoom };
-  const distance = (b: Box) => Math.hypot(b.x + b.w / 2 - centre.x, b.y + b.h / 2 - centre.y);
   const seen = (b: Box) => b.x + b.w >= centre.x - half.w && b.x <= centre.x + half.w && b.y + b.h >= centre.y - half.h && b.y <= centre.y + half.h;
-  return items.filter((i) => seen(i.box)).sort((a, b) => distance(a.box) - distance(b.box));
+  return items.filter((i) => seen(i.box));
+}
+
+export function fillOrder<T extends { box: Box }>(items: readonly T[], view: Viewport, screen: Screen): T[] {
+  const centre = centreOf(view, screen);
+  const distance = (b: Box) => Math.hypot(b.x + b.w / 2 - centre.x, b.y + b.h / 2 - centre.y);
+  return inView(items, view, screen).sort((a, b) => distance(a.box) - distance(b.box));
+}
+
+export function nearestFirst<T extends { box: Box }>(items: readonly T[], view: Viewport, screen: Screen): T[] {
+  const first = fillOrder(items, view, screen);
+  const seen = new Set(first);
+  const centre = { x: (screen.width / 2 - view.x) / view.zoom, y: (screen.height / 2 - view.y) / view.zoom };
+  const distance = (b: Box) => Math.hypot(b.x + b.w / 2 - centre.x, b.y + b.h / 2 - centre.y);
+  return [...first, ...items.filter((i) => !seen.has(i)).sort((a, b) => distance(a.box) - distance(b.box))];
 }
 
 export function onScreenFirst<T extends { box: Box }>(items: readonly T[], view: Viewport, screen: Screen): T[] {

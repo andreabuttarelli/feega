@@ -1,3 +1,4 @@
+import { ProductEvent, track } from '$lib/server/product-events/track';
 import { SPAWN_AGENT } from '$lib/server/agents/spawn';
 import { PLATFORM_TIMING, landingWatch } from '$lib/server/agents/turn-core';
 import { spawnAgentTool, spawnAgents, spawnOffers } from '$lib/server/agents/spawn-agent';
@@ -22,7 +23,7 @@ import type { FrameBucket } from '$lib/server/motion/frame-store';
 import { openAgentTools } from './tool-surface';
 import { createWebTools } from '$lib/server/web/web-tools';
 import { liveWebDeps, productImport, productsNodePlacer, webImageImport } from '$lib/server/web/live';
-import { projectAgentPrompt, selectedNodes } from './system-prompt';
+import { projectAgentPrompt } from './system-prompt';
 import { AGENT_TURN_CAP_USD, agentStopWhen, overTurnCap } from './limits';
 import { spentUsd } from '$lib/server/motion/model-route';
 import { ensureGatewayModels, gatewayRate } from '$lib/server/openrouter-models';
@@ -31,6 +32,7 @@ import { canvasPlaceHint, userContent } from '$lib/server/chat-attachments/model
 import { breakdownReader } from '$lib/server/video-reference';
 import { ASK_REFERENCE_PICK, avoidedImages, choosesForUser, pickAwaits, rejectedRounds, shownRefs, type PickAnswer } from '$lib/reference-pick';
 import type { ChatAttachment } from '$lib/chat-attachments';
+import type { SelectionChip } from '$lib/chat-selection';
 import type { OpenProject } from '$lib/server/projects/lookup';
 
 export type ProjectTurnInput = {
@@ -46,7 +48,7 @@ export type ProjectTurnInput = {
   model: string;
   reasoning: string | null;
   frame: OpenFrame | null;
-  selection: unknown;
+  selection: SelectionChip[];
   canvases: { id: string; name: string }[];
   canvasId: string | null;
   threadId: string;
@@ -62,7 +64,7 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
   const sessionId = crypto.randomUUID();
   const actor = agentActor(userId, SIDEBAR_AGENT_KEY, sessionId);
   const userActor = { kind: 'user' as const, id: userId };
-  await saveTurn(db, { orgId, threadId, role: 'user', content: text, attachments, actor: userActor });
+  await saveTurn(db, { orgId, threadId, role: 'user', content: text, attachments, selection, actor: userActor });
   const opening = await userContent(db, { orgId, text, attachments, hint: canvasPlaceHint(project.id), breakdown: breakdownReader(db, { orgId, projectId: project.id, mode: project.mode }) });
   const reply = await openReply(db, { orgId, threadId, actor });
   const steps: Parameters<typeof finishedTurn>[0][number][] = [];
@@ -139,7 +141,7 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
       brand: brand ? { name: brand.name, slug: brand.slug } : null,
       openCanvasId: canvasId,
       frame,
-      selectedNodeIds: selectedNodes(selection),
+      selection,
       frameGuidance: frames.guidance
     }),
     allowSystemInMessages: true,
@@ -153,6 +155,9 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
     abortSignal: cut.signal,
     stopWhen: [agentStopWhen(t0), overTurnCap(() => spent), ({ steps }) => pickAwaits(steps)],
     onStepFinish: (step) => {
+      if (!steps.length) {
+        void track(ProductEvent.AgentFirstOutput, { userId, orgId }, {});
+      }
       spent += spentUsd([extractSdkUsage(step.usage)], [model], gatewayRate);
       steps.push(step);
       void reply.progress(finishedTurn(steps));
@@ -184,7 +189,12 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
 
   runInBackground(
     async () => {
-      await result.consumeStream({ onError: (e) => console.error('[project-agent] turn failed after client left', e) });
+      await result.consumeStream({
+        onError: (e) => {
+          console.error('[project-agent] turn failed after client left', e);
+          void track(ProductEvent.AgentFailed, { userId, orgId }, { code: 'turn_error' });
+        }
+      });
       watch.stop();
       await reply.finish(finishedTurn(steps), ReplyStatus.Failed);
     },

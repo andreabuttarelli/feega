@@ -29,6 +29,9 @@ import { landingPath } from '$lib/server/tenancy/landing';
 import { carriesStartUrl, startUrlRedirect } from '$lib/server/onboarding/start-url-entry';
 import type { RequestEvent } from '@sveltejs/kit';
 import { THEME_COOKIE, THEME_COOKIE_MAX_AGE_S, THEME_METADATA_KEY, ThemePref, htmlThemeAttrs, parseThemePref } from '$lib/theme';
+import { HANDOFF_NONCE, HANDOFF_RESUMED, handoffOf } from '$lib/home/handoff';
+import { ProductEvent, track } from '$lib/server/product-events/track';
+import { HOME_DRAFT_COOKIE, HOME_DRAFT_MAX_AGE_S } from '$lib/home/home-draft';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
@@ -158,13 +161,33 @@ const csrf: Handle = async ({ event, resolve }) => {
 
 const DASHBOARD_PREFIX = '/app';
 
+async function noteLandingPrompt(event: RequestEvent): Promise<void> {
+  const params = event.url.searchParams;
+  const handoff = event.url.pathname === DASHBOARD_PREFIX ? handoffOf(params) : null;
+  if (!handoff || params.has(HANDOFF_RESUMED)) {
+    return;
+  }
+  await track(ProductEvent.LandingPromptSent, { anonymousId: params.get(HANDOFF_NONCE) }, { kind: handoff.kind, source: handoff.source });
+}
+
+async function keepHandoff(event: RequestEvent): Promise<void> {
+  const params = event.url.searchParams;
+  if (event.url.pathname !== DASHBOARD_PREFIX || !handoffOf(params)) {
+    return;
+  }
+  await track(ProductEvent.LoginStarted, { anonymousId: params.get(HANDOFF_NONCE) }, {});
+  event.cookies.set(HOME_DRAFT_COOKIE, event.url.search, { path: '/', maxAge: HOME_DRAFT_MAX_AGE_S, sameSite: 'lax', httpOnly: true });
+}
+
 async function refuseSignedOutDashboard(event: RequestEvent): Promise<void> {
   const path = event.url.pathname;
   if (path !== DASHBOARD_PREFIX && !path.startsWith(`${DASHBOARD_PREFIX}/`)) {
     return;
   }
+  await noteLandingPrompt(event);
   const { session } = await event.locals.safeGetSession();
   if (!session) {
+    await keepHandoff(event);
     throw redirect(303, '/login');
   }
 }

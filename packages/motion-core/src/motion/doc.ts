@@ -16,7 +16,7 @@ import { PARENT_OPACITIES, ParentOpacity, parentProblem } from './parent';
 import { expressionsSchema, expressionsProblem } from './expression/schema';
 import { fontRefProblem, fontsSchema, usedFaces } from './fonts/model';
 import { stylesSchema } from './styles-model';
-import { bindSchema, variablesSchema } from './variables-model';
+import { bindSchema, layerModesSchema, variablesSchema } from './variables-model';
 import { effectsSchema, effectsProblem } from './effects/model';
 import { clipShadersSchema, clipShadersProblem, shadersSchema } from './shaders/model';
 import { BLEND_MODES, BlendMode } from './blend';
@@ -137,7 +137,8 @@ const clipSchema = z.object({
   paintStyleRef: z.string().min(1).optional(),
   effectStyleRef: z.string().min(1).optional(),
   bind: bindSchema,
-  source: z.object({ at: z.string().min(1).max(300), tag: z.string().max(40).optional(), cls: z.string().max(1000).optional(), was: z.record(z.string().max(20), z.union([z.string().max(2000), z.number()])) }).optional()
+  modes: layerModesSchema,
+  source: z.object({ at: z.string().min(1).max(300), tag: z.string().max(40).optional(), cls: z.string().max(1000).optional(), cond: z.string().max(20).optional(), was: z.record(z.string().max(20), z.union([z.string().max(2000), z.number()])) }).optional()
 });
 
 const trackSchema = z.object({

@@ -56,8 +56,9 @@ async function seeded() {
 const opsOf = (doc: MotionDoc) => JSON.stringify(diffDoc(start(), doc));
 
 describe('the editor sends its edits as ops', () => {
-  it('two editors on the same base both land, with no conflict', async () => {
-    const { db } = await seeded();
+  it('two editors on the same base both land when the base revision is still there', async () => {
+    const { db, rows } = await seeded();
+    rows[0].sealed = true;
 
     const first = (await actions.ops(event(db, { version: '1', ops: opsOf(retext(start(), 'a', 'from ana')), summary: 'Ana' }))) as Record<string, unknown>;
     const second = (await actions.ops(event(db, { version: '1', ops: opsOf(retext(start(), 'b', 'from bo')), summary: 'Bo' }))) as { version: number; doc: MotionDoc; rebased: boolean };
@@ -67,6 +68,16 @@ describe('the editor sends its edits as ops', () => {
     expect(findClip(second.doc, 'a')?.clip.props.text).toBe('from ana');
     const head = await readHead(db, SCOPE);
     expect([findClip(head!.doc, 'a')?.clip.props.text, findClip(head!.doc, 'b')?.clip.props.text]).toEqual(['from ana', 'from bo']);
+  });
+
+  it('ops on a base another save coalesced away are a conflict that hands back the head', async () => {
+    const { db } = await seeded();
+    await actions.ops(event(db, { version: '1', ops: opsOf(retext(start(), 'a', 'from ana')), summary: 'Ana' }));
+
+    const second = (await actions.ops(event(db, { version: '1', ops: opsOf(retext(start(), 'b', 'from bo')), summary: 'Bo' }))) as { status: number; data: { error: string; head: { version: number } } };
+
+    expect(second).toMatchObject({ status: 409, data: { error: 'conflict', head: { version: 2 } } });
+    expect(findClip((await readHead(db, SCOPE))!.doc, 'a')?.clip.props.text).toBe('from ana');
   });
 
   it('ops that are not a list are refused', async () => {

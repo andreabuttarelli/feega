@@ -6,6 +6,7 @@ import { homed, placeInstance } from './canvas-components';
 import { addVariant, setMembers } from './variants';
 import { linkedMains, mainHomesOf, mainsSignature } from './linked-mains';
 import { compBox, reframed } from './comp-frame';
+import { VarType } from '@feega/motion-core/motion/variables-model';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -161,5 +162,23 @@ describe('instances follow their main across frames', () => {
     expect(mainsSignature(moved, 'A')).toBe(mainsSignature(main, 'A'));
     expect(mainsSignature(relabel(main, compId, 'Order'), 'A')).not.toBe(mainsSignature(main, 'A'));
     expect(mainsSignature(newMotionDoc(MotionFormat.Landscape), 'A')).toBeNull();
+  });
+});
+
+describe('a followed main resolves in the variables of the frame that shows it', () => {
+  it('a main bound to a variable takes this frame’s value, not the one its home frame resolved', () => {
+    const { doc: main, compId } = mainFrame();
+    const bindLabel = (doc: MotionDoc, colour: string): MotionDoc => ({
+      ...doc,
+      variables: { Theme: { modes: ['Light'], vars: { ink: { type: VarType.Colour, values: { Light: colour } } } } },
+      comps: { ...doc.comps, [compId]: { ...doc.comps[compId], tracks: doc.comps[compId].tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => ({ ...c, bind: { color: 'Theme/ink' }, props: { ...c.props, color: colour } })) })) } }
+    });
+    const home = bindLabel(main, '#111111');
+    const { doc: frame } = instanceFrame(home, compId);
+    const mine = { ...frame, variables: { Theme: { modes: ['Light'], vars: { ink: { type: VarType.Colour, values: { Light: '#1565c0' } } } } } } as MotionDoc;
+
+    const followed = linkedMains(mine, 'B', new Map([['A', home]]));
+
+    expect((followed.comps[compId].tracks[0].clips[0] as MotionClip).props.color).toBe('#1565c0');
   });
 });

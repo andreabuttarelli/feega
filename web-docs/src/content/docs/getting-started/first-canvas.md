@@ -5,6 +5,14 @@ sidebar:
   order: 2
 ---
 
+**Start from a prompt.** The home asks *what do you want to make?* Pick a chip (**motion video** or **website design**), describe it, attach images if you have them, and send. A new canvas opens with a frame size that fits the chip (Presentation for motion, Desktop for websites) and the agent starts working in the side chat with your brief. A URL in the prompt is imported first as an editable frame, and the agent works from that frame instead of redrawing the page.
+
+Next to attach, three sources bring existing work in before the agent starts: **GitHub** (a repository URL; connect GitHub for a private one), **Local folder** (pick the folder: on feega.app it is uploaded once and run in a sandbox, with no sync back to your files; in local mode it stays linked to the folder) and **Import from Figma** (a file URL; needs your Figma token in profile settings). The source shows as a chip in the composer. On send it is imported onto the new canvas first, and the agent gets the brief together with the imported frames.
+
+Type your prompt on [feega.app](https://feega.app). If you are not signed in, it waits through sign-in or sign-up. Then a new canvas opens and the agent starts on it by itself, with no second click. Reloading or going back never sends it twice. A prompt that needs more from you (a GitHub repo or Figma file to pick, images to attach, a local folder) fills the composer and waits for you to finish and press send.
+
+On the free plan the agent runs on Claude Haiku for your first 20 messages; paid plans run Claude Opus 5.5. See [Credits](/ai/generate-and-credits/).
+
 **New canvas** on the home starts a canvas in a new project. The arrow beside it starts one in a project you already have, where it joins that project's Pages.
 
 1. **Add a frame.** Pick a size: Phone, Tablet, Desktop, Presentation, Watch, Paper or Social. A "+" beside a frame adds a blank frame of the same size.

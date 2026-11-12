@@ -5,7 +5,7 @@ use serde_json::{Map, Value};
 use crate::colour::rgba_of;
 use crate::display_list::{CssFunction, Filter, MaskMode, Rgba, SvgNode};
 use crate::filter_passes::Op;
-use crate::kernel::{gaussian, MAX_TAPS};
+use crate::kernel::{decimation, gaussian};
 use crate::turbulence::{lattice_of, stitched_frequency, CHANNELS, LATTICE};
 
 const MAX_TABLE: usize = 32;
@@ -95,7 +95,7 @@ fn lookup(table: &[(&str, f32)], key: &str, fallback: f32) -> f32 {
 pub trait Runner {
     type Tex: Clone;
 
-    fn run(&self, op: Op, inputs: [&Self::Tex; 2], params: &[f32]) -> Self::Tex;
+    fn run(&self, op: Op, inputs: [&Self::Tex; 2], params: &[f32], size: (u32, u32)) -> Self::Tex;
     fn size(tex: &Self::Tex) -> (u32, u32);
 }
 
@@ -120,7 +120,11 @@ pub struct Fx<'a, R: Runner> {
 
 impl<R: Runner> Fx<'_, R> {
     fn op(&self, op: Op, a: &R::Tex, b: &R::Tex, params: &[f32]) -> Img<R::Tex> {
-        Img { tex: self.runner.run(op, [a, b], params), region: None }
+        Img { tex: self.runner.run(op, [a, b], params, R::size(a)), region: None }
+    }
+
+    fn resized(&self, op: Op, a: &R::Tex, params: &[f32], size: (u32, u32)) -> Img<R::Tex> {
+        Img { tex: self.runner.run(op, [a, a], params, size), region: None }
     }
 
     fn size(t: &R::Tex) -> (f64, f64) {
@@ -164,17 +168,31 @@ impl<R: Runner> Fx<'_, R> {
     }
 
     fn blur(&self, src: Img<R::Tex>, sx: f64, sy: f64) -> Img<R::Tex> {
-        let along = |img: Img<R::Tex>, sigma: f64, dir: (u32, u32)| {
+        if sx <= 0.0 && sy <= 0.0 {
+            return src;
+        }
+        let along = |img: Img<R::Tex>, sigma: f64, dir: (f32, f32), op: Op| {
             if sigma <= 0.0 {
                 return img;
             }
-            let k = gaussian(sigma);
-            let mut params = vec![(dir.0 * k.step) as f32, (dir.1 * k.step) as f32, k.weights.len() as f32];
-            params.extend(&k.weights);
-            params.resize(3 + MAX_TAPS, 0.0);
-            self.op(Op::Blur, &img.tex, &img.tex, &params)
+            let taps = gaussian(sigma);
+            let mut params = vec![dir.0, dir.1, taps.len() as f32];
+            params.extend(taps.iter().flat_map(|t| [t.offset, t.weight]));
+            self.op(op, &img.tex, &img.tex, &params)
         };
-        along(along(src, sx, (1, 0)), sy, (0, 1))
+        let premultiplied = self.op(Op::Premultiply, &src.tex, &src.tex, &[]);
+        let plan = decimation(sx);
+        if sx != sy || plan.levels == 0 {
+            let across = if sy > 0.0 { Op::BlurPremultiplied } else { Op::Blur };
+            return along(along(premultiplied, sx, (1.0, 0.0), across), sy, (0.0, 1.0), Op::Blur);
+        }
+        let full = R::size(&src.tex);
+        let small = (0..plan.levels).fold(premultiplied, |img, _| {
+            let (w, h) = R::size(&img.tex);
+            self.resized(Op::Down, &img.tex, &[], (w.div_ceil(2), h.div_ceil(2)))
+        });
+        let soft = along(along(small, plan.sigma, (1.0, 0.0), Op::BlurPremultiplied), plan.sigma, (0.0, 1.0), Op::BlurPremultiplied);
+        self.resized(Op::Up, &soft.tex, &[(1u32 << plan.levels) as f32], full)
     }
 
     fn offset(&self, src: &Img<R::Tex>, d: (f64, f64), alpha: bool) -> Img<R::Tex> {
@@ -412,6 +430,7 @@ impl<R: Runner> Fx<'_, R> {
                     let r = px(f.args.first()) * s;
                     self.blur(src, r, r)
                 }
+                "drop-shadow" if !perceptible(px(f.args.get(2)) * HALF, 0.0, (px(f.args.first()), px(f.args.get(1))), space) => src,
                 "drop-shadow" => {
                     let colour = f.args.get(3..).map(|rest| rest.join(" ")).filter(|c| !c.is_empty()).and_then(|c| rgba_of(&c)).unwrap_or(BLACK);
                     self.shadow(&src, vector(space, px(f.args.first()), px(f.args.get(1))), px(f.args.get(2)) * HALF * s, colour)
@@ -426,6 +445,7 @@ impl<R: Runner> Fx<'_, R> {
         let out = filters.iter().fold(start, |img, f| match f {
             Filter::Css { fns } => self.css_graph(img, fns, space),
             Filter::Svg { nodes } => nodes.iter().fold(img, |i, node| match effect_shadow(node) {
+                Some(shadow) if !shadow.perceptible(space) => i,
                 Some(shadow) => self.effect_shadow(i, &shadow, space),
                 None => self.svg_graph(i, node, space, origin),
             }),
@@ -443,6 +463,12 @@ fn vector(space: Linear, dx: f64, dy: f64) -> (f64, f64) {
 }
 
 const SIGMAS: f64 = 3.0;
+const MIN_SHADOW_DEVICE_PX: f64 = 2.0;
+
+fn perceptible(sigma: f64, spread: f64, offset: (f64, f64), space: Linear) -> bool {
+    let (dx, dy) = vector(space, offset.0, offset.1);
+    sigma.max(spread) * scale(space) + dx.hypot(dy) >= MIN_SHADOW_DEVICE_PX
+}
 const SVG_REGION_SHARE: f64 = 0.1;
 const SUBREGION: [&str; 4] = ["x", "y", "width", "height"];
 const SVG_OWN_REGION: [&str; 5] = ["x", "y", "width", "height", "filterUnits"];
@@ -468,6 +494,7 @@ fn css_reach(f: &CssFunction, space: Linear) -> Option<f64> {
     }
     match f.name.as_str() {
         "blur" => Some(px(0) * s * SIGMAS),
+        "drop-shadow" if !perceptible(px(2) * HALF, 0.0, (px(0), px(1)), space) => Some(0.0),
         "drop-shadow" => {
             let (dx, dy) = vector(space, px(0), px(1));
             Some(dx.abs().max(dy.abs()) + px(2) * HALF * s * SIGMAS)
@@ -476,17 +503,140 @@ fn css_reach(f: &CssFunction, space: Linear) -> Option<f64> {
     }
 }
 
-fn svg_reach(filter: &SvgNode) -> Option<Reach> {
+fn svg_reach(filter: &SvgNode, space: Linear) -> Option<Reach> {
+    if effect_shadow(filter).is_some_and(|s| !s.perceptible(space)) {
+        return Some(Reach::default());
+    }
     let own_region = SVG_OWN_REGION.iter().any(|k| filter.attrs.contains_key(*k));
     let frame_space = filter.children.iter().any(|c| FRAME_SPACE_PRIMITIVES.contains(&c.tag.as_str()));
-    (!own_region && !frame_space).then_some(Reach { share: SVG_REGION_SHARE, px: 0.0 })
+    if !own_region && !frame_space {
+        return Some(Reach { share: SVG_REGION_SHARE, px: 0.0 });
+    }
+    match svg_ink(filter, space, Ink::Within(0.0)) {
+        Ink::Within(px) => Some(Reach { share: 0.0, px }),
+        Ink::Blank => Some(Reach::default()),
+        Ink::Anywhere => None,
+    }
+}
+
+const ALPHA_OFFSET: usize = 19;
+const IDENTITY_SPACE: Linear = [1.0, 0.0, 0.0, 1.0];
+
+fn lifts_alpha(attrs: &Map<String, Value>) -> bool {
+    let kind = text(attrs.get("type"));
+    let matrix = kind.is_empty() || kind == "matrix";
+    matrix && numbers(attrs.get("values")).get(ALPHA_OFFSET).is_some_and(|offset| *offset != 0.0)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Ink {
+    Blank,
+    Within(f64),
+    Anywhere,
+}
+
+impl Ink {
+    fn grown(self, by: f64) -> Ink {
+        match self {
+            Ink::Within(px) => Ink::Within(px + by),
+            other => other,
+        }
+    }
+
+    fn moved(self) -> Ink {
+        match self {
+            Ink::Blank => Ink::Blank,
+            _ => Ink::Anywhere,
+        }
+    }
+
+    fn or(self, other: Ink) -> Ink {
+        match (self, other) {
+            (Ink::Blank, ink) | (ink, Ink::Blank) => ink,
+            (Ink::Anywhere, _) | (_, Ink::Anywhere) => Ink::Anywhere,
+            (Ink::Within(a), Ink::Within(b)) => Ink::Within(a.max(b)),
+        }
+    }
+
+    fn and(self, other: Ink) -> Ink {
+        match (self, other) {
+            (Ink::Blank, _) | (_, Ink::Blank) => Ink::Blank,
+            (Ink::Anywhere, ink) | (ink, Ink::Anywhere) => ink,
+            (Ink::Within(a), Ink::Within(b)) => Ink::Within(a.min(b)),
+        }
+    }
+}
+
+fn ink_of(node: &SvgNode, space: Linear, input: impl Fn(Option<&Value>) -> Ink) -> Ink {
+    let a = |k: &str| node.attrs.get(k);
+    let s = scale(space);
+    let shift = |dx: f64, dy: f64| {
+        let (x, y) = vector(space, dx, dy);
+        x.abs().max(y.abs())
+    };
+    let sigmas = |k: &str| {
+        let (sx, sy) = pair(a(k));
+        sx.max(sy) * s * SIGMAS
+    };
+    match node.tag.as_str() {
+        "feGaussianBlur" => input(a("in")).grown(sigmas("stdDeviation")),
+        "feOffset" => input(a("in")).grown(shift(num(a("dx"), 0.0), num(a("dy"), 0.0))),
+        "feMorphology" if text(a("operator")) == "dilate" => {
+            let (rx, ry) = pair(a("radius"));
+            input(a("in")).grown(rx.max(ry).min(MAX_MORPH) * s)
+        }
+        "feMorphology" => input(a("in")),
+        "feDropShadow" => {
+            let source = input(a("in"));
+            source.or(source.grown(shift(num(a("dx"), 0.0), num(a("dy"), 0.0)) + sigmas("stdDeviation")))
+        }
+        "feTile" | "feWarp" | "feDisplacementMap" => input(a("in")).moved(),
+        "feColorMatrix" if lifts_alpha(&node.attrs) => Ink::Anywhere,
+        "feColorMatrix" => input(a("in")),
+        "feComposite" => match text(a("operator")).as_str() {
+            "in" => input(a("in")).and(input(a("in2"))),
+            "out" => input(a("in")),
+            "atop" => input(a("in2")),
+            "arithmetic" => Ink::Anywhere,
+            _ => input(a("in")).or(input(a("in2"))),
+        },
+        "feBlend" => input(a("in")).or(input(a("in2"))),
+        "feMerge" => node.children.iter().fold(Ink::Blank, |ink, c| ink.or(input(c.attrs.get("in")))),
+        _ => Ink::Anywhere,
+    }
+}
+
+fn svg_ink(filter: &SvgNode, space: Linear, source: Ink) -> Ink {
+    let mut results: HashMap<String, Ink> = HashMap::new();
+    let mut last = source;
+    for node in &filter.children {
+        let input = |name: Option<&Value>| match name.map(|v| text(Some(v))) {
+            Some(n) if n == SOURCE_GRAPHIC || n == SOURCE_ALPHA => source,
+            Some(n) => results.get(&n).copied().unwrap_or(last),
+            None => last,
+        };
+        let out = ink_of(node, space, input);
+        if let Some(name) = node.attrs.get("result") {
+            results.insert(text(Some(name)), out);
+        }
+        last = out;
+    }
+    last
+}
+
+pub fn paints_from_nothing(filters: &[Filter]) -> bool {
+    let ink = filters.iter().fold(Ink::Blank, |ink, f| match f {
+        Filter::Css { .. } => ink,
+        Filter::Svg { nodes } => nodes.iter().fold(ink, |ink, node| svg_ink(node, IDENTITY_SPACE, ink)),
+    });
+    ink != Ink::Blank
 }
 
 pub fn reach(filters: &[Filter], space: Linear) -> Option<Reach> {
     filters.iter().try_fold(Reach::default(), |acc, f| {
         let own = match f {
             Filter::Css { fns } => fns.iter().map(|f| css_reach(f, space)).sum::<Option<f64>>().map(|px| Reach { share: 0.0, px }),
-            Filter::Svg { nodes } => nodes.iter().map(svg_reach).try_fold(Reach::default(), |a, r| r.map(|r| a.plus(r))),
+            Filter::Svg { nodes } => nodes.iter().map(|n| svg_reach(n, space)).try_fold(Reach::default(), |a, r| r.map(|r| a.plus(r))),
         };
         own.map(|r| acc.plus(r))
     })
@@ -504,6 +654,12 @@ struct EffectShadow {
     offset: (f64, f64),
     sigma: f64,
     colour: Rgba,
+}
+
+impl EffectShadow {
+    fn perceptible(&self, space: Linear) -> bool {
+        perceptible(self.sigma, self.spread.map_or(0.0, |(r, _)| r), self.offset, space)
+    }
 }
 
 fn effect_shadow(filter: &SvgNode) -> Option<EffectShadow> {

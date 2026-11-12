@@ -1,11 +1,12 @@
 import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
-import { changedLook, LOOK, LookKey, minSideOf, type Look } from '$lib/canvas/code-look';
+import { changedLook, LOOK, LookKey, minSideOf, type Look, type LookValue } from '$lib/canvas/code-look';
+import { BASE_CONDITIONS, parseKey, Scheme } from './render-conditions';
 
 export type SourceAt = { file: string; line: number; column: number };
 
 export type Spot = { tag: string; cls: string };
 
-export type SourceEdit = { at: SourceAt; look: Look; was: Look; spot?: Spot };
+export type SourceEdit = { at: SourceAt; look: Look; was: Look; spot?: Spot; cond?: string };
 
 export type FileChange = { path: string; before: string; after: string };
 
@@ -26,6 +27,18 @@ export const atOf = (raw: string): SourceAt | null => {
 
 const label = (at: SourceAt) => `${at.file}:${at.line}`;
 
+const LOOK_OF_BINDING: Record<string, LookKey> = {
+  color: LookKey.Color,
+  fill: LookKey.Fill,
+  'autoLayout.gap': LookKey.Gap,
+  'autoLayout.padding': LookKey.Padding
+};
+
+export function unbound(clip: MotionClip, look: Look): Look {
+  const owned = new Set(Object.keys(clip.bind ?? {}).map((target) => LOOK_OF_BINDING[target]));
+  return Object.fromEntries(Object.entries(look).filter(([key]) => !owned.has(key as LookKey)));
+}
+
 const allClips = (doc: MotionDoc): MotionClip[] => [...doc.tracks, ...Object.values(doc.comps).flatMap((c) => c.tracks)].flatMap((t) => t.clips as MotionClip[]);
 
 export function editsOf(doc: MotionDoc): SourceEdit[] {
@@ -33,12 +46,13 @@ export function editsOf(doc: MotionDoc): SourceEdit[] {
   const byAt = new Map<string, SourceEdit>();
   for (const clip of allClips(doc)) {
     const at = clip.source ? atOf(clip.source.at) : null;
-    const look = at ? changedLook(clip, side) : {};
-    if (!at || !Object.keys(look).length || byAt.has(clip.source!.at)) {
+    const look = at ? unbound(clip, changedLook(clip, side)) : {};
+    const key = `${clip.source?.at}|${clip.source?.cond ?? ''}`;
+    if (!at || !Object.keys(look).length || byAt.has(key)) {
       continue;
     }
-    const { tag, cls } = clip.source!;
-    byAt.set(clip.source!.at, { at, look, was: clip.source!.was, ...(tag ? { spot: { tag, cls: cls ?? '' } } : {}) });
+    const { tag, cls, cond } = clip.source!;
+    byAt.set(key, { at, look, was: clip.source!.was, ...(tag ? { spot: { tag, cls: cls ?? '' } } : {}), ...(cond ? { cond } : {}) });
   }
   return [...byAt.values()];
 }
@@ -190,11 +204,103 @@ async function textInCatalogue(files: Files, from: string, to: string, key: stri
   return false;
 }
 
+type ClassRule = { make: (value: LookValue) => string; family: RegExp };
+
+const arbitrary = (value: LookValue) => String(value).replace(/\s+/g, '_');
+const TEXT_SIZES = /^text-(xs|sm|base|lg|[2-9]?xl|\[[\d.]+px\])$/;
+const TEXT_OTHER = /^text-(left|right|center|justify|start|end|wrap|nowrap|balance|pretty|ellipsis|clip)$/;
+
+const CLASS_OF: Partial<Record<LookKey, ClassRule>> = {
+  [LookKey.Fill]: { make: (v) => `bg-[${arbitrary(v)}]`, family: /^bg-(?!\[url|gradient)/ },
+  [LookKey.Color]: { make: (v) => `text-[${arbitrary(v)}]`, family: /^text-/ },
+  [LookKey.Size]: { make: (v) => `text-[${v}px]`, family: TEXT_SIZES },
+  [LookKey.Gap]: { make: (v) => `gap-[${v}px]`, family: /^gap-(?!x-|y-)/ },
+  [LookKey.Direction]: { make: (v) => (v === 'column' ? 'flex-col' : 'flex-row'), family: /^flex-(row|col)(-reverse)?$/ }
+};
+
+const VARIANT_PREFIX: Record<Scheme, string> = { [Scheme.Light]: '', [Scheme.Dark]: 'dark:' };
+
+const sameFamily = (token: string, key: LookKey, prefix: string) => {
+  if (!token.startsWith(prefix)) {
+    return false;
+  }
+  const bare = token.slice(prefix.length);
+  const rule = CLASS_OF[key]!;
+  const isColor = key === LookKey.Color && !TEXT_SIZES.test(bare) && !TEXT_OTHER.test(bare);
+  return !bare.includes(':') && (key === LookKey.Color ? isColor : rule.family.test(bare));
+};
+
+const CLASS_LITERAL = /(\s(?:class|className)=")([^"{}]*)"/;
+
+function classed(text: string, tag: Tag, look: Look, prefix: string): string | null {
+  const open = text.slice(tag.start, tag.end + 1);
+  const found = open.match(CLASS_LITERAL);
+  if (!found) {
+    return null;
+  }
+  let tokens = found[2].split(/\s+/).filter(Boolean);
+  for (const [key, value] of Object.entries(look)) {
+    tokens = [...tokens.filter((t) => !sameFamily(t, key as LookKey, prefix)), `${prefix}${CLASS_OF[key as LookKey]!.make(value)}`];
+  }
+  const next = open.replace(CLASS_LITERAL, `$1${tokens.join(' ')}"`);
+  return text.slice(0, tag.start) + next + text.slice(tag.end + 1);
+}
+
+const TAILWIND = /"tailwindcss"/;
+
+async function usesTailwind(files: Files): Promise<boolean> {
+  return TAILWIND.test((await current(files, 'package.json')) ?? '');
+}
+
 const cssOf = (look: Look): [string, string][] =>
   Object.entries(look).flatMap(([key, value]) => {
     const css = LOOK[key as LookKey]?.css;
     return css ? [css(value)] : [];
   });
+
+async function styledFor(files: Files, text: string, tag: Tag, edit: SourceEdit, skipped: string[]): Promise<string> {
+  const cond = parseKey(edit.cond);
+  const where = label(edit.at);
+  if (cond.width !== BASE_CONDITIONS.width) {
+    skipped.push(`${where}: edited at ${cond.width}px, a rule for one width is not written`);
+    return text;
+  }
+
+  const prefix = VARIANT_PREFIX[cond.scheme];
+  const tailwind = await usesTailwind(files);
+  if (prefix && !tailwind) {
+    skipped.push(`${where}: edited under ${cond.scheme}, which needs Tailwind to be written as a ${prefix} class`);
+    return text;
+  }
+
+  const visual = Object.fromEntries(Object.entries(edit.look).filter(([key]) => LOOK[key as LookKey]?.css)) as Look;
+  const onClass = tailwind ? Object.fromEntries(Object.entries(visual).filter(([key]) => CLASS_OF[key as LookKey])) : {};
+  const onStyle = Object.fromEntries(Object.entries(visual).filter(([key]) => !(key in onClass))) as Look;
+
+  let next = text;
+  const withClass = Object.keys(onClass).length ? classed(next, tag, onClass, prefix) : next;
+  if (withClass === null) {
+    skipped.push(`${where}: class is not a literal, ${Object.keys(onClass).join(', ')} not written`);
+  } else {
+    next = withClass;
+  }
+
+  const css = cssOf(onStyle);
+  if (!css.length) {
+    return next;
+  }
+  if (prefix) {
+    skipped.push(`${where}: ${Object.keys(onStyle).join(', ')} has no ${prefix} class, not written`);
+    return next;
+  }
+  const moved = tagFrom(next, tag.start)!;
+  const withStyle = styled(next, moved, css, JSX_FILE.test(edit.at.file));
+  if (withStyle) {
+    return withStyle;
+  }
+  skipped.push(`${where}: style already set in code, not merged`);
+  return next;
+}
 
 async function applyOne(files: Files, edit: SourceEdit, skipped: string[]): Promise<void> {
   const text = await current(files, edit.at.file);
@@ -204,16 +310,7 @@ async function applyOne(files: Files, edit: SourceEdit, skipped: string[]): Prom
     return;
   }
 
-  let next = text;
-  const css = cssOf(edit.look);
-  if (css.length) {
-    const withStyle = styled(next, tag, css, JSX_FILE.test(edit.at.file));
-    if (withStyle) {
-      next = withStyle;
-    } else {
-      skipped.push(`${label(edit.at)}: style already set in code, not merged`);
-    }
-  }
+  let next = await styledFor(files, text, tag, edit, skipped);
 
   const to = edit.look[LookKey.Text];
   const from = edit.was[LookKey.Text];
@@ -243,24 +340,94 @@ export async function applyEdits(edits: SourceEdit[], read: ReadFile): Promise<A
   return { files: changes.filter((c) => c.before !== c.after), skipped };
 }
 
+enum Line {
+  Same = ' ',
+  Gone = '-',
+  Added = '+'
+}
+
+type Step = { kind: Line; text: string; a: number; b: number };
+
+const MAX_EDITS = 4000;
+
+function stepsOf(a: string[], b: string[]): Step[] {
+  const trace: Map<number, number>[] = [];
+  const v = new Map<number, number>([[1, 0]]);
+  const limit = Math.min(a.length + b.length, MAX_EDITS);
+  let found = -1;
+  for (let d = 0; d <= limit && found < 0; d++) {
+    trace.push(new Map(v));
+    for (let k = -d; k <= d; k += 2) {
+      let x = k === -d || (k !== d && v.get(k - 1)! < v.get(k + 1)!) ? v.get(k + 1)! : v.get(k - 1)! + 1;
+      let y = x - k;
+      while (x < a.length && y < b.length && a[x] === b[y]) {
+        x++;
+        y++;
+      }
+      v.set(k, x);
+      if (x >= a.length && y >= b.length) {
+        found = d;
+        break;
+      }
+    }
+  }
+  if (found < 0) {
+    return [...a.map((text, i) => ({ kind: Line.Gone, text, a: i, b: 0 })), ...b.map((text, i) => ({ kind: Line.Added, text, a: a.length, b: i }))];
+  }
+  return backtracked(trace, a, b, found);
+}
+
+function backtracked(trace: Map<number, number>[], a: string[], b: string[], last: number): Step[] {
+  const steps: Step[] = [];
+  let [x, y] = [a.length, b.length];
+  for (let d = last; d >= 0; d--) {
+    const v = trace[d];
+    const k = x - y;
+    const prevK = k === -d || (k !== d && v.get(k - 1)! < v.get(k + 1)!) ? k + 1 : k - 1;
+    const prevX = d === 0 ? 0 : v.get(prevK)!;
+    const prevY = d === 0 ? 0 : prevX - prevK;
+    while (x > prevX && y > prevY) {
+      steps.push({ kind: Line.Same, text: a[x - 1], a: x - 1, b: y - 1 });
+      x--;
+      y--;
+    }
+    if (d === 0) {
+      break;
+    }
+    if (x === prevX) {
+      steps.push({ kind: Line.Added, text: b[y - 1], a: x, b: y - 1 });
+    } else {
+      steps.push({ kind: Line.Gone, text: a[x - 1], a: x - 1, b: y });
+    }
+    [x, y] = [prevX, prevY];
+  }
+  return steps.reverse();
+}
+
+const linesOf = (text: string) => (text.endsWith('\n') ? text.slice(0, -1) : text).split('\n');
+
+function hunkOf(steps: Step[]): string {
+  const [first] = steps;
+  const olds = steps.filter((s) => s.kind !== Line.Added).length;
+  const news = steps.filter((s) => s.kind !== Line.Gone).length;
+  const at = (start: number, count: number) => `${count ? start + 1 : start},${count}`;
+  return `@@ -${at(first.a, olds)} +${at(first.b, news)} @@\n${steps.map((s) => `${s.kind}${s.text}`).join('\n')}\n`;
+}
+
 export function unifiedDiff(path: string, before: string, after: string): string {
-  const a = before.split('\n');
-  const b = after.split('\n');
-  let head = 0;
-  while (head < a.length && head < b.length && a[head] === b[head]) {
-    head++;
+  const steps = stepsOf(linesOf(before), linesOf(after));
+  const changed = steps.flatMap((s, i) => (s.kind === Line.Same ? [] : [i]));
+  const hunks: [number, number][] = [];
+  for (const i of changed) {
+    const open = hunks[hunks.length - 1];
+    if (open && i - open[1] <= DIFF_CONTEXT * 2 + 1) {
+      open[1] = i;
+      continue;
+    }
+    hunks.push([i, i]);
   }
-  let tail = 0;
-  while (tail < a.length - head && tail < b.length - head && a[a.length - 1 - tail] === b[b.length - 1 - tail]) {
-    tail++;
-  }
-  const from = Math.max(0, head - DIFF_CONTEXT);
-  const lastA = a.length - (a[a.length - 1] === '' ? 1 : 0);
-  const lastB = b.length - (b[b.length - 1] === '' ? 1 : 0);
-  const untilA = Math.min(lastA, a.length - tail + DIFF_CONTEXT);
-  const untilB = Math.min(lastB, b.length - tail + DIFF_CONTEXT);
-  const lines = [...a.slice(from, head).map((l) => ` ${l}`), ...a.slice(head, a.length - tail).map((l) => `-${l}`), ...b.slice(head, b.length - tail).map((l) => `+${l}`), ...a.slice(a.length - tail, untilA).map((l) => ` ${l}`)];
-  return `--- a/${path}\n+++ b/${path}\n@@ -${from + 1},${untilA - from} +${from + 1},${untilB - from} @@\n${lines.join('\n')}\n`;
+  const body = hunks.map(([from, to]) => hunkOf(steps.slice(Math.max(0, from - DIFF_CONTEXT), Math.min(steps.length, to + DIFF_CONTEXT + 1)))).join('');
+  return `--- a/${path}\n+++ b/${path}\n${body}`;
 }
 
 export const patchOf = (files: FileChange[]) => files.map((f) => unifiedDiff(f.path, f.before, f.after)).join('');

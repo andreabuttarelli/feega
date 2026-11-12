@@ -1,0 +1,45 @@
+@import "tailwindcss";
+@import "./theme/extra.css";
+
+/* Brand colours */
+@theme {
+	--color-primary: #111111;
+	--color-bg: #ffffff;
+	--color-card: #ffffff;
+	--color-border: #e5e5e5;
+	--color-muted: #777777;
+	--color-success: #111111;
+	--color-error: #111111;
+	--color-brand-blue: #5bcefa;
+	--radius-card: 12px;
+	--spacing-gutter: 1.5rem;
+	--spacing-0.5: 2px;
+	--text-hero: 3rem;
+	--font-sans: 'Inter', system-ui, sans-serif;
+}
+
+.dark {
+	--color-primary: #f0f0f0;
+	--color-bg: #141414;
+	--color-card: #141414;
+	--color-border: #2a2a2a;
+	--color-muted: #888888;
+	--color-success: #f0f0f0;
+	--color-error: #f0f0f0;
+}
+
+article .prose h2 {
+	color: var(--color-primary);
+	font-size: 1.5rem;
+}
+
+.btn-cta {
+	background-color: var(--color-brand-blue);
+	border-radius: var(--radius-card);
+}
+
+@media (min-width: 640px) {
+	:root {
+		--color-muted: #666666;
+	}
+}

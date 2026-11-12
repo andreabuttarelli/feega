@@ -4,6 +4,7 @@ import { toolsForMirror } from '$lib/chat-stream-events';
 import { actorCols, type Actor } from './actor';
 import { AGENT_STALE_MS } from '$lib/server/brand-agent/limits';
 import { attachedNote, type ChatAttachment } from '$lib/chat-attachments';
+import type { SelectionChip } from '$lib/chat-selection';
 
 /**
  * I THREAD DELLA CHAT DI PROGETTO, SULLO SCHEMA NUOVO.
@@ -28,7 +29,7 @@ export type SavedTool = {
   errorText?: string;
 };
 
-export type Turn = { role: 'user' | 'assistant'; content: string; tools?: SavedTool[]; attachments?: ChatAttachment[]; streaming?: true };
+export type Turn = { role: 'user' | 'assistant'; content: string; tools?: SavedTool[]; attachments?: ChatAttachment[]; selection?: SelectionChip[]; streaming?: true };
 
 const STREAMING = 'streaming';
 
@@ -126,7 +127,7 @@ export async function loadTurns(
     .order('seq', { ascending: false })
     .limit(HISTORY_LIMIT);
 
-  const rows = (data ?? []) as Array<{ role?: string; content?: string | null; tool_calls?: SavedTool[] | null; attachments?: ChatAttachment[] | null; status?: string }>;
+  const rows = (data ?? []) as Array<{ role?: string; content?: string | null; tool_calls?: SavedTool[] | null; attachments?: ChatAttachment[] | null; selection?: SelectionChip[] | null; status?: string }>;
 
   return rows
     .filter((row) => row.role === 'user' || row.role === 'assistant')
@@ -136,6 +137,7 @@ export async function loadTurns(
       content: row.content ?? '',
       ...(row.tool_calls?.length ? { tools: row.tool_calls } : {}),
       ...(row.attachments?.length ? { attachments: row.attachments } : {}),
+      ...(row.selection?.length ? { selection: row.selection } : {}),
       ...(row.status === STREAMING ? { streaming: true as const } : {})
     }))
     .reverse();
@@ -160,6 +162,7 @@ export async function saveTurn(
     content: string;
     tools?: SavedTool[];
     attachments?: ChatAttachment[];
+    selection?: SelectionChip[];
     actor: Actor;
   }
 ): Promise<void> {
@@ -186,6 +189,7 @@ export async function saveTurn(
     content: input.content,
     tool_calls: input.tools?.length ? (toolsForMirror(input.tools) as Json) : null,
     attachments: input.attachments?.length ? (input.attachments as unknown as Json) : null,
+    ...(input.selection?.length ? { selection: input.selection as unknown as Json } : {}),
     seq,
     ...actorCols(input.actor)
   });

@@ -21,6 +21,10 @@ A blocked or failed run shows **Retry**: same prompt, same model, new attempt.
 
 The organisation's credit balance is always visible at the top of the canvas; click it to open billing. Each generation spends credits by medium and model, and the balance updates after every run.
 
+Every new account gets **100 free credits ($1)** once, at signup. A second organisation does not get them again.
+
+The canvas chat agent runs on Claude Opus 5.5 on every plan, and every turn spends credits. When the balance runs out, the chat stops before spending and shows the upgrade screen.
+
 ## Improve prompt
 
 On image and video nodes, the **Improve prompt** switch rewrites the text with the chosen model's best practices before generating. The node's own prompt is unchanged. Off by default. When on, the price on Generate and Loop includes the rewrite.

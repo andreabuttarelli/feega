@@ -51,8 +51,6 @@
     display: flex;
     justify-content: space-between;
     align-items: start;
-    max-width: 430px;
-    margin: 0 auto;
     padding: 12px;
     font-family: 'Inter', sans-serif;
     font-variation-settings: normal;
@@ -69,7 +67,7 @@
     vertical-align: -2px;
   }
 
-  .chip {
+  .bar :global(.chip) {
     display: block;
     padding: 8px 4px 10px;
     background: #fff;
@@ -141,7 +139,6 @@
     .bar {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
-      max-width: none;
       padding: 0 20px;
     }
 
@@ -160,16 +157,16 @@
       justify-self: start;
     }
 
-    :global(.star) {
+    .bar :global(.star) {
       background: #4f4f4f;
       color: #fff;
     }
 
-    .cta {
+    .bar .cta {
       background: #ff5100;
     }
 
-    .actions span {
+    .actions :global(span) {
       border-bottom: 1px solid currentColor;
     }
 
@@ -183,7 +180,6 @@
     .bar {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
-      max-width: 810px;
       padding: 16px 16px 0;
     }
 
@@ -202,16 +198,16 @@
       justify-self: start;
     }
 
-    :global(.star) {
+    .bar :global(.star) {
       background: #4f4f4f;
       color: #fff;
     }
 
-    .cta {
+    .bar .cta {
       background: #ff5100;
     }
 
-    .actions span {
+    .actions :global(span) {
       border-bottom: 1px solid currentColor;
     }
 

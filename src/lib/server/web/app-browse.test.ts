@@ -85,6 +85,7 @@ function fakeTab(opts: { loginWorks?: boolean; sessionAlive?: boolean; labels?: 
     seeAll: vi.fn(async () => undefined),
     sample: vi.fn(async () => 0),
     viewport: vi.fn(async () => {}),
+    scheme: vi.fn(async () => {}),
     marks: vi.fn(async () => []),
     beside: vi.fn(async () => tab)
   };

@@ -398,6 +398,11 @@ export function snapcnKit() {
 
   const clamp01 = (t: number) => clamp(t, 0, 1);
 
+  const cycle = (frame: number, fps: number, seconds: number, delay = 0) => {
+    const t = (frame / fps - delay) / seconds;
+    return t < 0 ? 0 : t - Math.floor(t);
+  };
+
   const stateTransition = (frame: number, steps: readonly Step[], fallback: string, speed = 1, defaultDuration = 8) => {
     const at = frame * speed;
     const started = steps
@@ -492,7 +497,7 @@ export function snapcnKit() {
   const MARK_INK = ['#c58af7', '#eeb6ea'];
   const markSrc = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${mark.width} ${mark.width}"><defs><linearGradient id="ink" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${MARK_INK[0]}"/><stop offset="1" stop-color="${MARK_INK[1]}"/></linearGradient></defs><path transform="translate(0 ${(mark.width - mark.height) / 2})" fill="url(#ink)" fill-rule="evenodd" d="${mark.d}"/></svg>`)}`;
 
-  return { media, videoOf, mark, markSrc, pick, clamp, interpolate, spring, measureSpring, Easing, random, parseColor, toCss, rgbToOklch: rgbToOklchColor, oklchToRgb: (l: number, c: number, hue: number) => toCss(oklchToRgb(l, c, hue)), mixOklch, withAlpha, interpolateColors, light, dark, themeOf, easings, springs, clamp01, stateTransition, css, h, fill };
+  return { media, videoOf, mark, markSrc, pick, clamp, interpolate, spring, measureSpring, Easing, random, parseColor, toCss, rgbToOklch: rgbToOklchColor, oklchToRgb: (l: number, c: number, hue: number) => toCss(oklchToRgb(l, c, hue)), mixOklch, withAlpha, interpolateColors, light, dark, themeOf, easings, springs, clamp01, cycle, stateTransition, css, h, fill };
 }
 
 export type SnapcnKit = ReturnType<typeof snapcnKit>;

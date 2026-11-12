@@ -33,6 +33,8 @@ impl Canvas for Counting {
     fn pop(&mut self) {
         self.pops += 1;
     }
+
+    fn shade(&mut self, _: Affine, _: &gpu_core::shades::Shade) {}
 }
 
 fn mask(mode: &str, extra: &str) -> String {

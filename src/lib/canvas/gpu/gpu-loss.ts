@@ -1,3 +1,13 @@
+export enum GpuBackend {
+  Native = 'native',
+  WebGpu = 'webgpu',
+  WebGl = 'webgl'
+}
+
+export const GPU_FALLBACK_EVENT = 'gpu_backend_fallback';
+
+export type BackendSwitch = { from: GpuBackend; to: GpuBackend; why: string };
+
 export const LOSSES_PER_BACKEND = 3;
 
 export const FRESH_CORES = 2;

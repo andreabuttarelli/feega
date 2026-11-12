@@ -100,6 +100,8 @@ import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib
 import { canvasPath } from '$lib/server/tenancy/entry';
 import { renameProject } from '$lib/server/repos/projects';
 import { canvasRevision, recordsRevision } from '$lib/server/canvas/revision';
+import { motionTokens } from '$lib/server/motion/editor';
+import { lookOf } from '$lib/server/motion/brand-look';
 import { restackAskSchema, restackNodes } from '$lib/server/canvas/restack-nodes';
 import { frameAskSchema, frameElements, groupAskSchema, groupElements, stackAskSchema, stackElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
@@ -261,7 +263,7 @@ function rowsRequest(fd: FormData) {
 export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams>) => {
   const { db, orgId, canvasId, canvas, mode, projectBrandId, userId, accountCreatedAt } = await scopeFor(locals, params.canvasId);
 
-  const [nodes, listed, catalogue, shareToken, references, orgTemplates, handoff, previews] = await Promise.all([
+  const [nodes, listed, catalogue, shareToken, references, orgTemplates, handoff, previews, look] = await Promise.all([
     listNodes(db, { orgId, canvasId }),
     listConnections(db, { orgId, canvasId }),
     projectCatalogue(db, { orgId, mode }),
@@ -269,7 +271,8 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
     referenceLibrary(db, { orgId, projectId: canvas.projectId }),
     templateLibrary(db, { orgId, actor: userActor({ userId }) }).own(),
     chatHandoff(db, { orgId, projectId: canvas.projectId }, url),
-    cardPreviews(db, { orgId, projectId: canvas.projectId }).catch(() => ({}))
+    cardPreviews(db, { orgId, projectId: canvas.projectId }).catch(() => ({})),
+    motionTokens(db, { orgId, brandId: projectBrandId }).then(lookOf).catch(() => '')
   ]);
 
   const [connections, runs, { products, socialPosts, influencers }, sources, onboarding] = await Promise.all([
@@ -289,6 +292,7 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
     nodes,
     connections,
     revision: recordsRevision(nodes, connections),
+    look,
     catalogue,
     runs,
     products,

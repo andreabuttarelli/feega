@@ -5,6 +5,7 @@ use vello::peniko::{color::AlphaColor, BlendMode, Brush, Color, ColorStop, Compo
 use vello::Scene;
 
 use crate::display_list::{Paint, Rgba, Size, Stop};
+use crate::shades::{Shade, Side};
 
 pub trait Canvas {
     type Picture: Clone;
@@ -15,6 +16,7 @@ pub trait Canvas {
     fn push_layer(&mut self, blend: Mix, opacity: f32, frame: Rect);
     fn push_clip(&mut self, rule: Fill, transform: Affine, shape: &BezPath);
     fn pop(&mut self);
+    fn shade(&mut self, transform: Affine, shade: &Shade);
 
     fn fragment(&mut self, _encoded: &Scene, _transform: Affine) -> bool {
         false
@@ -69,6 +71,8 @@ pub fn brush<I>(paint: &Paint) -> Brush<I> {
     }
 }
 
+const PIXEL_CENTRE: Affine = Affine::new([1.0, 0.0, 0.0, 1.0, -0.5, -0.5]);
+
 pub fn shader_only(name: &str) -> bool {
     matches!(name, "linear-burn" | "linear-dodge" | "vivid-light" | "linear-light" | "pin-light" | "hard-mix" | "subtract" | "divide" | "darker-color" | "lighter-color")
 }
@@ -120,6 +124,10 @@ impl Canvas for Scene {
 
     fn pop(&mut self) {
         self.pop_layer();
+    }
+
+    fn shade(&mut self, transform: Affine, shade: &Shade) {
+        self.draw_blurred_rounded_rect_in(&shade.extent, PIXEL_CENTRE * transform, shade.rect, colour(&shade.color), shade.radius, shade.erf_width(), shade.side == Side::Inner);
     }
 
     fn fragment(&mut self, encoded: &Scene, transform: Affine) -> bool {

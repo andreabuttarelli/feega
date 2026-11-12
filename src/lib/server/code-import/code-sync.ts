@@ -9,11 +9,16 @@ import type { GithubCall } from './github';
 import { repoOf } from './repo';
 import { rebased, tokenCall } from './repo-sync';
 import { baselined } from '$lib/canvas/code-look';
-import { applyEdits, editsOf, patchOf, type FileChange } from './write-back';
+import { patchOf, type FileChange } from './write-back';
+import { frameEdits } from './token-write';
+import { pulledTokens } from './token-pull';
+import type { TokenMap } from './design-tokens';
 import { CodeImportOutcome } from './import-code';
 import { importCodeInto, rememberOrigin, type CodeImportAsk, type CodeScope } from './canvas-import';
 import { githubSource, SourceKind, type CodeSource } from './code-source';
 import { folderOf, folderSource } from './folder-source';
+import { uploadedArchive, uploadOf, uploadSource } from './upload-source';
+import { conditionsOf } from './render-conditions';
 
 export enum SyncOutcome {
   Ok = 'ok',
@@ -23,7 +28,8 @@ export enum SyncOutcome {
   PublishFailed = 'publish_failed',
   UpToDate = 'up_to_date',
   Unreachable = 'unreachable',
-  Conflict = 'conflict'
+  Conflict = 'conflict',
+  NoSync = 'no_sync'
 }
 
 export type SyncRefusal = Exclude<SyncOutcome, SyncOutcome.Ok | SyncOutcome.UpToDate>;
@@ -34,10 +40,17 @@ export const SYNC_STATUS: Record<SyncRefusal, number> = {
   [SyncOutcome.NoGithub]: 412,
   [SyncOutcome.PublishFailed]: 502,
   [SyncOutcome.Unreachable]: 502,
-  [SyncOutcome.Conflict]: 409
+  [SyncOutcome.Conflict]: 409,
+  [SyncOutcome.NoSync]: 409
 };
 
-type Linked = { origin: CodeOriginData; source: CodeSource; link: (rev: string) => Pick<CodeImportAsk, 'repo' | 'folder'> };
+const UNPUBLISHED: Record<SourceKind, SyncRefusal> = {
+  [SourceKind.Github]: SyncOutcome.NoGithub,
+  [SourceKind.Folder]: SyncOutcome.PublishFailed,
+  [SourceKind.Upload]: SyncOutcome.NoSync
+};
+
+type Linked = { origin: CodeOriginData; source: CodeSource; link: (rev: string) => Pick<CodeImportAsk, 'repo' | 'folder' | 'upload'> };
 
 const BRANCH_PREFIX = 'feega/';
 const TITLE = 'UI edits from feega';
@@ -57,6 +70,11 @@ const SOURCES: Record<SourceKind, SourceOf> = {
   [SourceKind.Folder]: async (_scope, origin) => {
     const root = localModeRefusal(env) === null ? folderOf(origin.repo) : null;
     return root ? { origin, source: folderSource(root), link: () => ({ folder: root }) } : null;
+  },
+  [SourceKind.Upload]: async (scope, origin) => {
+    const upload = uploadOf(scope.orgId, origin.repo);
+    const archive = upload ? await uploadedArchive(scope.db, upload) : null;
+    return upload && archive ? { origin, source: uploadSource(archive), link: () => ({ upload: upload.path }) } : null;
   }
 };
 
@@ -66,7 +84,7 @@ async function linkedOf(scope: CodeScope, nodeId: string): Promise<Linked | null
   return parsed?.success ? SOURCES[parsed.data.kind as SourceKind](scope, parsed.data) : null;
 }
 
-type Changed = { linked: Linked; rev: string; files: FileChange[]; skipped: string[] };
+type Changed = { linked: Linked; rev: string; files: FileChange[]; skipped: string[]; tokens: TokenMap };
 
 async function changed(scope: CodeScope, nodeId: string): Promise<Changed | SyncRefusal> {
   const linked = await linkedOf(scope, nodeId);
@@ -78,8 +96,8 @@ async function changed(scope: CodeScope, nodeId: string): Promise<Changed | Sync
   if (!rev) {
     return SyncOutcome.Unreachable;
   }
-  const done = await applyEdits(editsOf(frame.doc), linked.source.read(rev));
-  return { linked, rev, ...done };
+  const done = await frameEdits(frame.doc, linked.origin.tokens, linked.source.read(rev));
+  return { linked, rev, files: done.files, skipped: done.skipped, tokens: done.map };
 }
 
 export type CodeChanges = { outcome: SyncOutcome.Ok; kind: string; repo: string; sha: string; patch: string; files: string[]; skipped: string[] };
@@ -107,24 +125,25 @@ export async function codePublish(scope: CodeScope, nodeId: string, now = Date.n
   const body = `Edited on the feega canvas, from ${done.linked.origin.repo}@${done.rev.slice(0, 7)}.${notes}`;
   const out = await done.linked.source.publish(done.rev, done.files, { branch, title: TITLE, body });
   if (!out) {
-    return { outcome: done.linked.origin.kind === SourceKind.Github ? SyncOutcome.NoGithub : SyncOutcome.PublishFailed };
+    return { outcome: UNPUBLISHED[done.linked.origin.kind as SourceKind] };
   }
   if (done.linked.origin.kind === SourceKind.Folder) {
-    await settle(scope, nodeId, done.linked);
+    await settle(scope, nodeId, done.linked, done.tokens);
   }
   return { outcome: SyncOutcome.Ok, ...out, skipped: done.skipped };
 }
 
-async function settle(scope: CodeScope, nodeId: string, linked: Linked): Promise<void> {
+async function settle(scope: CodeScope, nodeId: string, linked: Linked, tokens: TokenMap): Promise<void> {
   const store = frameStore(scope.db, scope);
   const frame = await store.read(nodeId);
   if (frame) {
     await store.write(nodeId, frame.version, baselined(frame.doc), 'Wrote edits to the folder');
   }
-  await rememberOrigin(scope, nodeId, { ...linked.origin, sha: await linked.source.head(null) });
+  const written = linked.origin.tokens ? { tokens } : {};
+  await rememberOrigin(scope, nodeId, { ...linked.origin, ...written, sha: await linked.source.head(null) });
 }
 
-export type CodePulled = { outcome: SyncOutcome.Ok | SyncOutcome.UpToDate; sha: string; carried: number; conflicts: string[]; skipped: string[] };
+export type CodePulled = { outcome: SyncOutcome.Ok | SyncOutcome.UpToDate; sha: string; carried: number; conflicts: string[]; skipped: string[]; tokens: string[] };
 
 export async function codePull(scope: CodeScope, nodeId: string, branch?: string): Promise<CodePulled | { outcome: SyncRefusal; error?: string }> {
   const linked = await linkedOf(scope, nodeId);
@@ -139,10 +158,10 @@ export async function codePull(scope: CodeScope, nodeId: string, branch?: string
     return { outcome: SyncOutcome.Unreachable };
   }
   if (rev === linked.origin.sha) {
-    return { outcome: SyncOutcome.UpToDate, sha: rev, carried: 0, conflicts: [], skipped: [] };
+    return { outcome: SyncOutcome.UpToDate, sha: rev, carried: 0, conflicts: [], skipped: [], tokens: [] };
   }
 
-  const fresh = await importCodeInto(scope, local.canvasId, { ...linked.link(rev), routes: linked.origin.routes, at: local.at ?? { x: 0, y: 0 } });
+  const fresh = await importCodeInto(scope, local.canvasId, { ...linked.link(rev), routes: linked.origin.routes, conditions: conditionsOf(linked.origin.conditions), at: local.at ?? { x: 0, y: 0 } });
   if (fresh.outcome !== CodeImportOutcome.Ok) {
     return { outcome: SyncOutcome.Unreachable, error: fresh.error ?? fresh.outcome };
   }
@@ -153,12 +172,13 @@ export async function codePull(scope: CodeScope, nodeId: string, branch?: string
   }
 
   const merged = rebased(local.doc, upstream.doc);
-  const written = await store.write(nodeId, local.version, merged.doc, `Pulled ${linked.origin.repo}@${rev.slice(0, 7)}`);
+  const tokens = linked.origin.tokens && fresh.tokenMap ? pulledTokens({ doc: local.doc, map: linked.origin.tokens }, { doc: merged.doc, map: fresh.tokenMap }) : null;
+  const written = await store.write(nodeId, local.version, tokens?.doc ?? merged.doc, `Pulled ${linked.origin.repo}@${rev.slice(0, 7)}`);
   if (written.outcome !== RevisionOutcome.Written) {
     return { outcome: SyncOutcome.Conflict };
   }
-  await rememberOrigin(scope, nodeId, { ...linked.origin, branch: target, sha: rev });
-  return { outcome: SyncOutcome.Ok, sha: rev, carried: merged.carried, conflicts: merged.conflicts, skipped: fresh.skipped };
+  await rememberOrigin(scope, nodeId, { ...linked.origin, branch: target, sha: rev, ...(tokens ? { tokens: tokens.map } : {}) });
+  return { outcome: SyncOutcome.Ok, sha: rev, carried: merged.carried, conflicts: [...merged.conflicts, ...(tokens?.conflicts ?? [])], skipped: fresh.skipped, tokens: tokens?.report ?? [] };
 }
 
 export type CodeHead = { kind: string; sha: string | null; head: string | null };

@@ -153,12 +153,28 @@ function handles(t: StateTile): PathItem[] {
 
 const shift = (contours: number[][], dx: number, dy: number) => contours.map((c) => c.map((v, i) => (i % 2 === 0 ? v + dx : v + dy)));
 
-const scaled = (contours: number[][], k: number) => contours.map((c) => c.map((v) => v * k));
+const placed = (item: PathItem, k: number, x: number, y: number): PathItem => ({ ...item, matrix: [k, 0, 0, k, x, y] });
 
 const LABEL_SET: TextSet = { leading: LABEL_LEADING, tracking: 0 };
 
-function fitted(text: string, room: number, glyphs: Glyphs, size: number) {
-  const whole = glyphs(text, size, LABEL_SET);
+type Shaped = ReturnType<Glyphs>;
+
+const shapedBy = new WeakMap<Glyphs, Map<string, Shaped>>();
+
+function shaped(text: string, glyphs: Glyphs): Shaped {
+  const known = shapedBy.get(glyphs) ?? new Map<string, Shaped>();
+  shapedBy.set(glyphs, known);
+  const hit = known.get(text);
+  if (hit) {
+    return hit;
+  }
+  const made = glyphs(text, LABEL_SIZE, LABEL_SET);
+  known.set(text, made);
+  return made;
+}
+
+function fitted(text: string, room: number, glyphs: Glyphs) {
+  const whole = shaped(text, glyphs);
   if (whole.width <= room) {
     return whole;
   }
@@ -166,7 +182,7 @@ function fitted(text: string, room: number, glyphs: Glyphs, size: number) {
   let cut = whole;
   while (kept > 0 && cut.width > room) {
     kept -= 1;
-    cut = glyphs(text.slice(0, kept).trimEnd() + ELLIPSIS, size, LABEL_SET);
+    cut = shaped(text.slice(0, kept).trimEnd() + ELLIPSIS, glyphs);
   }
   return cut;
 }
@@ -190,18 +206,18 @@ function labelLayout(t: ChromeTile, glyphs: Glyphs) {
   const line = LABEL_SIZE * LABEL_LEADING * k;
   const top = t.y - (LABEL_GAP + LABEL_PAD) * k - line;
   const left = t.icon ? t.x + (ICON_SIZE + ICON_GAP) * k : t.x;
-  const text = fitted(t.label ?? '', t.x + t.width - left, glyphs, LABEL_SIZE * k);
-  return { k, line, top, left, text };
+  const unitText = fitted(t.label ?? '', (t.x + t.width - left) / k, glyphs);
+  return { k, line, top, left, unitText, width: unitText.width * k };
 }
 
 function label(t: ChromeTile, glyphs: Glyphs): PathItem[] {
   if (!t.label || labelHidden(t)) {
     return [];
   }
-  const { k, line, top, left, text } = labelLayout(t, glyphs);
+  const { k, line, top, left, unitText } = labelLayout(t, glyphs);
   const iconSize = ICON_SIZE * k;
-  const icon = t.icon ? [{ ...item(t, ChromePart.Icon, shift(scaled(t.icon, k), t.x, top + (line - iconSize) / 2), LABEL_COLOR), rule: FillRule.Union }] : [];
-  return [...icon, item(t, ChromePart.Label, shift(text.contours, left, top), LABEL_COLOR)];
+  const icon = t.icon ? [{ ...placed(item(t, ChromePart.Icon, t.icon, LABEL_COLOR), k, t.x, top + (line - iconSize) / 2), rule: FillRule.Union }] : [];
+  return [...icon, placed(item(t, ChromePart.Label, unitText.contours, LABEL_COLOR), k, left, top)];
 }
 
 export type ChromeBox = { x: number; y: number; w: number; h: number };
@@ -210,8 +226,8 @@ export function labelBoxes(t: ChromeTile, glyphs: Glyphs): ChromeBox[] {
   if (labelHidden(t)) {
     return [];
   }
-  const { k, line, top, left, text } = labelLayout(t, glyphs);
-  const named = t.label ? [{ x: t.x, y: top, w: left + text.width - t.x, h: line }] : [];
+  const { k, line, top, left, width } = labelLayout(t, glyphs);
+  const named = t.label ? [{ x: t.x, y: top, w: left + width - t.x, h: line }] : [];
   const dot = t.tag ? [{ x: t.x + t.width - 2 * TAG_RADIUS * k, y: top, w: 2 * TAG_RADIUS * k, h: line }] : [];
   return [...named, ...dot];
 }

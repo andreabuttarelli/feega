@@ -380,3 +380,40 @@ fn a_frame_held_in_place_for_an_edit_counts_as_held() {
 
     assert!(c.holding());
 }
+
+#[test]
+fn every_plan_counts_itself_and_the_uses_it_walked() {
+    let (mut c, mut lib) = scene();
+    c.patch(parse_patch(r#"{ "put": [{ "kind": "use", "clip": "far", "group": "g", "matrix": [1, 0, 0, 1, 100000, 0] }], "drop": [] }"#).unwrap(), &lib);
+    let limits = Limits { side: 4096, rasters: 1, items: 1000 };
+    c.plan_at(&mut lib, at(0.0, 0.0, 1.0), (256, 256), limits);
+    c.overlay_at(&mut lib, at(0.0, 0.0, 1.0), (256, 256), limits);
+
+    let planned = c.take_planned();
+
+    assert_eq!((planned.plans, planned.walked), (2, 1));
+    assert_eq!(c.take_planned().plans, 0);
+}
+
+#[test]
+fn damage_the_tiles_took_repaints_the_held_texture_on_the_next_exact_frame() {
+    let (mut c, mut lib) = scene();
+    let mut fake = Fake::default();
+    c.frame(&mut fake, &mut lib, at(0.0, 0.0, 1.0), 0.0, &mut || 0.0).unwrap();
+    c.patch(parse_patch(r#"{ "put": [{ "kind": "use", "clip": "a", "group": "g", "matrix": [1, 0, 0, 1, 300, 0] }], "drop": [] }"#).unwrap(), &lib);
+
+    c.take_damage();
+    let frame = c.frame(&mut fake, &mut lib, at(30.0, 0.0, 1.0), 16.0, &mut || 0.0).unwrap();
+
+    assert_ne!(frame.outcome, Some(Outcome::Reused));
+}
+
+#[test]
+fn a_dropped_group_leaves_the_canvas_extent() {
+    let (mut c, mut lib) = scene();
+    assert!(c.extent().is_some());
+
+    c.drop_group("g", &mut lib);
+
+    assert_eq!(c.extent(), None);
+}

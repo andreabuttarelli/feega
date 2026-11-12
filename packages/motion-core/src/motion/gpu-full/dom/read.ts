@@ -49,6 +49,7 @@ import { CoverKind, RampKind, type MaskLayer } from "../mask-layers";
 import { PaintGap, svgFill, svgStroke, type Fill } from "./svg-paint";
 import {
   cssFunctions,
+  namesCssFunctions,
   FilterKind,
   unsupportedPrimitive,
   type Filter,
@@ -1323,10 +1324,12 @@ const textAttrs = (attrs: SvgNode["attrs"]) =>
     Object.entries(attrs).map(([k, v]) => [k, String(v)]),
   ) as RawNode["attrs"];
 
+const NO_FILTER = "no-filter";
+
 function filterOf(
   value: string,
   defs: Defs,
-): { filter: Filter; spreads: boolean } | null {
+): { filter: Filter; spreads: boolean } | typeof NO_FILTER | null {
   const node = referenced(value, defs);
   if (node) {
     const steps = (node.children ?? []).flatMap((c) => [
@@ -1343,13 +1346,17 @@ function filterOf(
         }
       : null;
   }
+  if (REFERENCE.test(value.trim()) || !namesCssFunctions(value)) {
+    return null;
+  }
   const fns = cssFunctions(value);
-  return fns.length && !REFERENCE.test(value.trim())
-    ? {
-        filter: { kind: FilterKind.Css, fns },
-        spreads: fns.every((f) => SPREADING_CSS.has(f.name)),
-      }
-    : null;
+  if (!fns.length) {
+    return NO_FILTER;
+  }
+  return {
+    filter: { kind: FilterKind.Css, fns },
+    spreads: fns.every((f) => SPREADING_CSS.has(f.name)),
+  };
 }
 
 const clipEffect: GroupEffect = ({ node, items, matrix, viewport, defs }) => {
@@ -1430,6 +1437,9 @@ const filterEffect: GroupEffect = ({ node, items, matrix, defs }) => {
     return items;
   }
   const found = filterOf(value ?? "", defs);
+  if (found === NO_FILTER) {
+    return items;
+  }
   if (!found) {
     return DomGap.Filter;
   }

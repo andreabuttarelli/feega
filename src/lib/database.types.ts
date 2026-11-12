@@ -1352,6 +1352,7 @@ export type Database = {
           id: string
           org_id: string
           role: string
+          selection: Json | null
           seq: number
           status: string
           thread_id: string
@@ -1370,6 +1371,7 @@ export type Database = {
           id?: string
           org_id: string
           role: string
+          selection?: Json | null
           seq: number
           status?: string
           thread_id: string
@@ -1388,6 +1390,7 @@ export type Database = {
           id?: string
           org_id?: string
           role?: string
+          selection?: Json | null
           seq?: number
           status?: string
           thread_id?: string
@@ -3458,6 +3461,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      product_events: {
+        Row: {
+          anonymous_id: string | null
+          created_at: string
+          event: string
+          id: string
+          org_id: string | null
+          props: Json
+          user_id: string | null
+        }
+        Insert: {
+          anonymous_id?: string | null
+          created_at?: string
+          event: string
+          id?: string
+          org_id?: string | null
+          props?: Json
+          user_id?: string | null
+        }
+        Update: {
+          anonymous_id?: string | null
+          created_at?: string
+          event?: string
+          id?: string
+          org_id?: string | null
+          props?: Json
+          user_id?: string | null
+        }
+        Relationships: []
       }
       products: {
         Row: {

@@ -1,6 +1,6 @@
 use gpu_core::retained::Camera;
 use gpu_core::tiles::{NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, bake_batches, BAKE_BATCH_TILES, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
-use vello::kurbo::Rect;
+use vello::kurbo::{Point, Rect};
 
 const SCREEN: (u32, u32) = (1024, 768);
 
@@ -94,37 +94,6 @@ fn a_missing_tile_under_a_coarser_one_is_covered_and_a_bare_one_is_not() {
 
     let elsewhere = TileKey { step: 2, tx: 1000, ty: 1000 };
     assert!(!tiles.covered(elsewhere));
-}
-
-#[test]
-fn the_reserve_is_a_coarse_level_around_the_screen_so_a_fast_zoom_never_shows_a_blank() {
-    let tiles = Tiles::default();
-    let reserve = tiles.reserve(camera(1.0), SCREEN);
-    assert!(!reserve.is_empty());
-    assert!(reserve.iter().all(|k| k.step < 0));
-    let screen_world = Rect::new(0.0, 0.0, SCREEN.0 as f64, SCREEN.1 as f64);
-    let reach = reserve.iter().map(|k| k.world()).reduce(|a, b| a.union(b)).unwrap();
-    assert!(reach.contains(screen_world.origin()) && reach.width() > screen_world.width() * 2.0);
-}
-
-#[test]
-fn a_deep_fast_zoom_from_rest_always_finds_a_covering_tile_in_the_idle_set() {
-    let mut tiles = Tiles::default();
-    let rest = Camera { x: -200.0, y: -100.0, zoom: 0.3 };
-    for key in tiles.frame(rest, SCREEN).missing {
-        tiles.hold(key);
-    }
-    for key in tiles.reserve(rest, SCREEN) {
-        tiles.hold(key);
-    }
-
-    for zoom in [0.6, 1.1, 2.0, 3.7, 6.7] {
-        let pointer = (300.0, 400.0);
-        let world = ((pointer.0 - rest.x) / rest.zoom, (pointer.1 - rest.y) / rest.zoom);
-        let deep = Camera { x: pointer.0 - world.0 * zoom, y: pointer.1 - world.1 * zoom, zoom };
-        let frame = tiles.frame(deep, SCREEN);
-        assert!(frame.missing.iter().all(|k| tiles.covered(*k)), "blank at zoom {zoom}");
-    }
 }
 
 #[test]
@@ -242,7 +211,7 @@ fn the_tile_budget_follows_the_screen_and_caps_at_the_memory_budget() {
 #[test]
 fn a_sharper_step_replaces_the_one_on_screen_only_once_it_covers_the_whole_screen() {
     let mut tiles = Tiles::default();
-    let coarse = tiles.frame(camera(step_zoom(-2)), SCREEN).missing;
+    let coarse = tiles.frame(camera(step_zoom(-4)), SCREEN).missing;
     coarse.iter().for_each(|k| tiles.hold(*k));
     let sharp = tiles.frame(camera(1.0), SCREEN).missing;
     sharp.iter().take(sharp.len() / 2).for_each(|k| tiles.hold(*k));
@@ -256,7 +225,7 @@ fn a_sharper_step_replaces_the_one_on_screen_only_once_it_covers_the_whole_scree
 }
 
 #[test]
-fn during_a_gesture_a_tile_within_twice_its_sharpness_is_good_enough() {
+fn a_tile_within_twice_its_sharpness_is_near_enough_to_start_the_rest_picture() {
     let mut tiles = Tiles::default();
     tiles.frame(camera(step_zoom(-4)), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
     let key = tiles.frame(camera(1.0), SCREEN).missing[0];
@@ -329,19 +298,18 @@ fn a_rest_picture_with_a_block_drawn_while_a_group_was_building_is_not_adopted()
 }
 
 #[test]
-fn idle_baking_rasters_bigger_blocks_than_a_gesture() {
+fn idle_baking_rasters_every_missing_tile_in_bounded_blocks() {
     let missing = Tiles::default().frame(camera(1.0), SCREEN).missing;
     let baked = bake_batches(&missing);
 
     assert_eq!(baked.iter().map(|b| b.keys.len()).sum::<usize>(), missing.len());
-    assert!(baked.len() < batches(&missing).len());
     assert!(baked.iter().all(|b| b.keys.len() <= (BAKE_BATCH_TILES * BAKE_BATCH_TILES) as usize));
 }
 
 #[test]
 fn a_tile_drawn_before_its_frame_was_ready_is_dropped_where_other_tiles_cover_it() {
     let mut tiles = Tiles::default();
-    tiles.frame(camera(step_zoom(-1)), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
+    tiles.frame(camera(step_zoom(-4)), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
     let key = tiles.frame(camera(1.0), SCREEN).missing[0];
 
     assert!(!tiles.hold_lacking(key));
@@ -358,53 +326,6 @@ fn a_tile_drawn_before_its_frame_was_ready_is_shown_where_nothing_covers_it_and_
     assert!(tiles.queue(tiles.frame(camera(1.0), SCREEN).missing).stale.contains(&key));
 }
 
-fn held_after_baking(tiles: &mut Tiles, at: Camera) {
-    tiles.frame(at, SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
-    tiles.ahead(at, SCREEN).iter().for_each(|k| tiles.hold(*k));
-}
-
-#[test]
-fn baked_ahead_a_zoom_in_to_twice_the_scale_draws_only_held_sharp_tiles() {
-    let mut tiles = Tiles::default();
-    held_after_baking(&mut tiles, camera(1.0));
-    let zoomed = Camera { x: -(SCREEN.0 as f64) / 2.0, y: -(SCREEN.1 as f64) / 2.0, zoom: 2.0 };
-
-    assert!(tiles.frame(zoomed, SCREEN).missing.is_empty());
-}
-
-#[test]
-fn baked_ahead_a_zoom_out_to_half_the_scale_never_falls_back_further_than_one_doubling() {
-    let mut tiles = Tiles::default();
-    held_after_baking(&mut tiles, camera(1.0));
-    let out = Camera { x: SCREEN.0 as f64 / 4.0, y: SCREEN.1 as f64 / 4.0, zoom: 0.5 };
-
-    let frame = tiles.frame(out, SCREEN);
-
-    assert!(frame.missing.is_empty(), "{} missing", frame.missing.len());
-}
-
-#[test]
-fn the_screen_ring_is_baked_before_the_sharper_and_coarser_levels() {
-    let ahead = Tiles::default().ahead(camera(1.0), SCREEN);
-    let first_other = ahead.iter().position(|k| k.step != 0).expect("other levels");
-
-    assert!(ahead[..first_other].iter().all(|k| k.step == 0));
-    assert!(ahead.iter().any(|k| k.step == 4));
-    assert!(ahead.iter().any(|k| k.step == -4));
-}
-
-#[test]
-fn baked_levels_on_screen_survive_eviction() {
-    let mut tiles = Tiles::default();
-    held_after_baking(&mut tiles, camera(1.0));
-    let baked: Vec<TileKey> = tiles.ahead(camera(1.0), SCREEN);
-    let wanted: Vec<TileKey> = Tiles::default().ahead(camera(1.0), SCREEN);
-
-    let gone = tiles.evict_beyond(camera(1.0), SCREEN, 0);
-
-    assert!(baked.is_empty());
-    assert!(wanted.iter().all(|k| !gone.contains(k)));
-}
 
 #[test]
 fn the_held_screen_shows_under_the_current_tiles_while_it_is_no_softer_than_a_quarter_stretch() {
@@ -414,18 +335,6 @@ fn the_held_screen_shows_under_the_current_tiles_while_it_is_no_softer_than_a_qu
     assert!(underlay_shows(1.2));
     assert!(!underlay_shows(1.3));
     assert!(underlay_shows(0.3));
-}
-
-#[test]
-fn baked_ahead_a_zoom_out_to_a_sixteenth_shows_no_blank_tile() {
-    let mut tiles = Tiles::default();
-    held_after_baking(&mut tiles, camera(1.0));
-    tiles.reserve(camera(1.0), SCREEN).iter().for_each(|k| tiles.hold(*k));
-    let far = Camera { x: SCREEN.0 as f64 * 15.0 / 32.0, y: SCREEN.1 as f64 * 15.0 / 32.0, zoom: 1.0 / 16.0 };
-
-    let queue = tiles.queue(tiles.frame(far, SCREEN).missing);
-
-    assert!(queue.blank.is_empty(), "{} blank", queue.blank.len());
 }
 
 #[test]
@@ -462,10 +371,263 @@ fn the_cheap_coarse_levels_warm_while_uploads_still_hold_the_rest() {
     assert!(!warm.due(600.0));
 }
 
-#[test]
-fn the_cheap_levels_are_only_the_far_coarse_ones() {
-    let ahead = Tiles::default().coarse_ahead(camera(1.0), SCREEN);
 
-    assert!(!ahead.is_empty());
-    assert!(ahead.iter().all(|k| k.step <= -8));
+const KEPT: usize = 1000;
+const WIDE: Rect = Rect::new(0.0, 0.0, 40000.0, 20000.0);
+
+fn baked(canvas: Rect, at: Camera) -> Tiles {
+    let mut tiles = Tiles::default();
+    tiles.set_canvas(canvas);
+    let keys = tiles.pyramid(at, SCREEN, KEPT);
+    keys.iter().for_each(|k| tiles.hold(*k));
+    tiles
+}
+
+fn union(keys: &[TileKey]) -> Rect {
+    keys.iter().map(|k| k.world()).reduce(|a, b| a.union(b)).unwrap()
+}
+
+#[test]
+fn the_pyramid_is_baked_coarse_to_sharp_from_a_sixteenth_to_one_pixel_ratio() {
+    let mut tiles = Tiles::default();
+    tiles.set_pixel_ratio(2.0);
+    tiles.set_canvas(WIDE);
+
+    let keys = tiles.pyramid(camera(0.3), SCREEN, KEPT);
+
+    let steps: Vec<i32> = keys.iter().map(|k| k.step).collect();
+    assert!(steps.windows(2).all(|w| w[0] <= w[1]));
+    let top = step_of(2.0);
+    assert_eq!(steps.first(), Some(&(top - 16)));
+    assert_eq!(steps.last(), Some(&top));
+}
+
+#[test]
+fn the_coarsest_level_covers_the_whole_canvas_and_the_sharpest_only_the_view() {
+    let mut tiles = Tiles::default();
+    tiles.set_canvas(WIDE);
+
+    let keys = tiles.pyramid(camera(0.05), SCREEN, KEPT);
+
+    let coarse: Vec<TileKey> = keys.iter().filter(|k| k.step == keys[0].step).copied().collect();
+    assert!(union(&coarse).contains(WIDE.origin()) && union(&coarse).x1 >= WIDE.x1 && union(&coarse).y1 >= WIDE.y1);
+    let sharp: Vec<TileKey> = keys.iter().filter(|k| k.step == 0).copied().collect();
+    assert!(!sharp.is_empty() && union(&sharp).area() < WIDE.area() / 4.0);
+}
+
+#[test]
+fn no_level_bakes_more_than_its_share_of_the_kept_tiles() {
+    use gpu_core::tiles::{PYRAMID, CANVAS_TILES};
+    let mut tiles = Tiles::default();
+    tiles.set_canvas(WIDE);
+
+    let keys = tiles.pyramid(camera(1.0), SCREEN, KEPT);
+
+    for (i, level) in PYRAMID.iter().enumerate() {
+        let count = keys.iter().filter(|k| k.step == -level.below_top).count();
+        let allowed = (KEPT as u64 * level.share_percent / 100) as usize;
+        let allowed = if i == 0 { allowed.max(CANVAS_TILES) } else { allowed };
+        assert!(count <= allowed, "level {} baked {count} > {allowed}", level.below_top);
+    }
+}
+
+#[test]
+fn a_zoom_out_between_levels_needs_no_raster_once_the_pyramid_is_baked() {
+    let tiles = baked(WIDE, Camera { x: -10000.0, y: -5000.0, zoom: 1.0 });
+
+    let at = |zoom: f64| Camera { x: -10000.0 * zoom + 512.0 * (1.0 - zoom), y: -5000.0 * zoom + 384.0 * (1.0 - zoom), zoom };
+    for zoom in [0.9, 0.7, 0.5, 0.3] {
+        let missing = tiles.frame(at(zoom), SCREEN).missing;
+        assert!(missing.is_empty(), "zoom {zoom}: {} missing", missing.len());
+    }
+    assert!(tiles.queue(tiles.frame(at(0.1), SCREEN).missing).blank.is_empty());
+}
+
+#[test]
+fn a_far_zoom_out_shows_no_blank_tile_on_the_canvas() {
+    let tiles = baked(WIDE, Camera { x: -10000.0, y: -5000.0, zoom: 1.0 });
+    let fit = Camera { x: 0.0, y: 0.0, zoom: SCREEN.0 as f64 / WIDE.width() };
+
+    let blank = tiles.queue(tiles.frame(fit, SCREEN).missing).blank;
+
+    assert!(blank.iter().all(|k| !k.world().overlaps(WIDE)), "{} blank on the canvas", blank.len());
+}
+
+#[test]
+fn between_levels_the_view_draws_the_nearest_level() {
+    let mut tiles = Tiles::default();
+    tiles.set_pixel_ratio(2.0);
+
+    assert_eq!(tiles.step_for(camera(2.0)), step_of(2.0));
+    assert_eq!(tiles.step_for(camera(1.5)), step_of(2.0));
+    assert_eq!(tiles.step_for(camera(0.9)), step_of(1.0));
+    assert_eq!(tiles.step_for(camera(1.2)), step_of(1.0));
+    assert_eq!(tiles.step_for(camera(3.0)), step_of(3.0));
+}
+
+#[test]
+fn above_the_pixel_ratio_the_view_is_rastered_on_demand() {
+    let tiles = baked(WIDE, camera(1.0));
+
+    assert!(!tiles.frame(camera(1.6), SCREEN).missing.is_empty());
+}
+
+#[test]
+fn pyramid_tiles_survive_eviction_during_a_zoom_away_from_where_they_were_planned() {
+    let mut tiles = baked(WIDE, Camera { x: -10000.0, y: -5000.0, zoom: 1.0 });
+    let planned = tiles.pyramid(Camera { x: -10000.0, y: -5000.0, zoom: 1.0 }, SCREEN, KEPT);
+    let held = tiles.len();
+    assert!(planned.is_empty());
+    let deep = Camera { x: -40000.0, y: -20000.0, zoom: 4.0 };
+    (0..200).for_each(|i| tiles.hold(TileKey { step: step_of(4.0), tx: i, ty: 0 }));
+
+    let gone = tiles.evict_beyond(deep, SCREEN, held);
+
+    assert_eq!(gone.len(), 200);
+    assert!(gone.iter().all(|k| k.step == step_of(4.0)));
+}
+
+#[test]
+fn without_a_whole_canvas_allowance_the_coarsest_level_stays_around_the_view() {
+    let mut tiles = Tiles::default();
+    tiles.set_canvas(WIDE);
+    tiles.set_canvas_tiles(0);
+
+    let keys = tiles.pyramid(camera(1.0), SCREEN, KEPT);
+
+    let coarse: Vec<TileKey> = keys.iter().filter(|k| k.step == keys[0].step).copied().collect();
+    assert!(union(&coarse).area() < WIDE.area());
+}
+
+#[test]
+fn evicting_thousands_of_tiles_zoomed_in_on_a_wide_canvas_takes_milliseconds() {
+    let mut tiles = baked(WIDE, camera(1.0));
+    let step = step_of(4.0);
+    (0..4000).for_each(|i| tiles.hold(TileKey { step, tx: i % 200, ty: i / 200 }));
+
+    let started = std::time::Instant::now();
+    tiles.evict_beyond(camera(4.0), SCREEN, 100);
+
+    assert!(started.elapsed().as_millis() < 200, "evicting took {:?}", started.elapsed());
+}
+
+#[test]
+fn a_missing_tile_shown_by_sharper_held_tiles_is_not_unsharp() {
+    let mut tiles = Tiles::default();
+    let coarse = tiles.frame(camera(1.0), SCREEN).missing;
+    tiles.frame(camera(step_zoom(2)), (SCREEN.0 * 2, SCREEN.1 * 2)).missing.iter().for_each(|k| tiles.hold(*k));
+    assert_eq!(tiles.unsharp(&coarse), 0);
+
+    let mut blurry = Tiles::default();
+    blurry.frame(camera(step_zoom(-2)), SCREEN).missing.iter().for_each(|k| blurry.hold(*k));
+    assert_eq!(blurry.unsharp(&coarse), coarse.len());
+}
+
+#[test]
+fn during_a_gesture_every_blurry_visible_tile_is_queued_centre_out_before_the_stale_ones() {
+    let mut tiles = Tiles::default();
+    tiles.frame(camera(step_zoom(-4)), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
+    let visible = tiles.frame(camera(1.0), SCREEN).missing;
+    let changed = visible[0];
+    tiles.hold(changed);
+    tiles.invalidate(changed.world());
+
+    let order = tiles.queue(tiles.frame(camera(1.0), SCREEN).missing).order();
+
+    let blurry: Vec<TileKey> = visible.iter().copied().filter(|k| *k != changed).collect();
+    assert_eq!(order[..blurry.len()], blurry[..]);
+    assert_eq!(order[blurry.len()..], [changed]);
+}
+
+#[test]
+fn during_a_gesture_tiles_shown_by_sharper_held_ones_are_not_queued() {
+    let mut tiles = Tiles::default();
+    tiles.frame(camera(step_zoom(2)), (SCREEN.0 * 2, SCREEN.1 * 2)).missing.iter().for_each(|k| tiles.hold(*k));
+
+    let order = tiles.queue(tiles.frame(camera(1.0), SCREEN).missing).order();
+
+    assert!(order.is_empty());
+}
+
+#[test]
+fn one_draw_rasters_a_block_of_up_to_four_by_four_tiles_nearest_first() {
+    let tiles = Tiles::default();
+    let order = tiles.queue(tiles.frame(camera(1.0), (SCREEN.0 * 2, SCREEN.1 * 2)).missing).order();
+
+    let blocks = batches(&order);
+
+    assert_eq!(blocks.iter().map(|b| b.keys.len()).sum::<usize>(), order.len());
+    assert!(blocks[0].keys.contains(&order[0]));
+    assert_eq!(blocks.iter().map(|b| b.span()).max(), Some((4, 4)));
+}
+
+#[test]
+fn an_expensive_tile_during_a_gesture_waits_for_the_frames_it_overspent() {
+    let mut credit = gpu_core::tiles::RasterCredit::default();
+    credit.earn(4.0);
+    assert!(credit.allows());
+    credit.spend(12.0);
+    assert!(!credit.allows());
+
+    credit.earn(4.0);
+    credit.earn(4.0);
+    assert!(!credit.allows());
+    credit.earn(4.0);
+    assert!(credit.allows());
+}
+
+#[test]
+fn cheap_tiles_fill_one_frame_budget_and_idle_frames_do_not_bank_more() {
+    let mut credit = gpu_core::tiles::RasterCredit::default();
+    credit.earn(4.0);
+    credit.earn(4.0);
+    credit.earn(4.0);
+    (0..7).for_each(|_| credit.spend(0.5));
+    assert!(credit.allows());
+    credit.spend(0.5);
+    assert!(!credit.allows());
+}
+
+#[test]
+fn the_level_the_view_draws_covers_the_screen_and_a_margin_around_it_whatever_its_share() {
+    let mut tiles = Tiles::default();
+    tiles.set_pixel_ratio(2.0);
+    tiles.set_canvas(WIDE);
+    let at = Camera { x: -2000.0, y: -1000.0, zoom: 0.2 };
+
+    let keys = tiles.pyramid(at, SCREEN, 200);
+
+    let step = tiles.step_for(at);
+    let world = Rect::new(2000.0 / 0.2, 1000.0 / 0.2, (2000.0 + SCREEN.0 as f64) / 0.2, (1000.0 + SCREEN.1 as f64) / 0.2);
+    let level = union(&keys.iter().filter(|k| k.step == step).copied().collect::<Vec<_>>());
+    assert!(level.contains(Point::new(world.x0 - world.width() / 4.0, world.y0 - world.height() / 4.0)));
+    assert!(level.contains(Point::new(world.x1 + world.width() / 4.0, world.y1 + world.height() / 4.0)));
+}
+
+#[test]
+fn panning_past_the_canvas_edge_rasters_nothing_for_the_empty_space() {
+    let mut tiles = baked(WIDE, camera(0.2));
+    tiles.set_pixel_ratio(1.0);
+    let past = Camera { x: 2000.0, y: 2000.0, zoom: 0.2 };
+
+    let missing = tiles.frame(past, SCREEN).missing;
+
+    assert!(missing.iter().all(|k| k.world().overlaps(WIDE)), "{} empty tiles missing", missing.iter().filter(|k| !k.world().overlaps(WIDE)).count());
+}
+
+#[test]
+fn a_level_covering_the_painted_screen_hides_the_coarser_ones_under_it() {
+    let mut tiles = Tiles::default();
+    tiles.set_canvas(WIDE);
+    let fit = Camera { x: 200.0, y: 200.0, zoom: 4.0 * SCREEN.0 as f64 / WIDE.width() };
+    let planned = tiles.pyramid(fit, SCREEN, KEPT);
+    let coarsest = planned[0].step;
+    planned.iter().filter(|k| k.step == coarsest).for_each(|k| tiles.hold(*k));
+    tiles.hold(TileKey { step: coarsest - 4, tx: 0, ty: 0 });
+
+    let frame = tiles.frame(fit, SCREEN);
+
+    assert!(!frame.missing.is_empty());
+    let steps: std::collections::BTreeSet<i32> = frame.draw.iter().map(|k| k.step).collect();
+    assert_eq!(steps.into_iter().collect::<Vec<_>>(), vec![coarsest]);
 }

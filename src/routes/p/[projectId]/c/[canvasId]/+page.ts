@@ -4,7 +4,7 @@ import type { CanvasPageData } from '$lib/server/canvas/canvas-page';
 import { openCanvasOutbox } from '$lib/canvas/outbox';
 import { StartupStep, markStartup } from '$lib/canvas/core/startup-marks';
 import { earlySourceUrls } from '$lib/canvas/core/early-sources';
-import { frameSources } from '$lib/canvas/core/frame-sources';
+import { frameSources, scopeFrameCache } from '$lib/canvas/core/frame-sources';
 import { loadViewport } from '$lib/canvas/viewport-memory';
 
 export const ssr = false;
@@ -27,9 +27,10 @@ function warmSources(page: CanvasPageData, params: { projectId: string; canvasId
   if (typeof window === 'undefined') {
     return;
   }
+  scopeFrameCache(userId ? { userId, orgId: page.orgId } : null);
   const saved = userId ? loadViewport(userId, params.canvasId) : null;
   const screen = { width: window.innerWidth, height: window.innerHeight };
-  frameSources.warm(earlySourceUrls(page.nodes, { ...params, orgId: page.orgId }, saved, screen));
+  frameSources.warm(earlySourceUrls(page.nodes, { ...params, orgId: page.orgId, look: page.look }, saved, screen));
 }
 
 export const load: PageLoad = async ({ url, params, parent }) => {

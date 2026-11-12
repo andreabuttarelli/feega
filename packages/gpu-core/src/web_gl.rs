@@ -6,6 +6,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::{HtmlCanvasElement, HtmlImageElement, HtmlVideoElement, ImageBitmap, WebGl2RenderingContext as Gl};
 
 use crate::canvas::{brush, Canvas};
+use crate::shades::{Shade, Side};
 use crate::compositor::{Compositor, Painter};
 use crate::display_list::{parse, parse_packed, parse_splice, DisplayList, Paint, Rgba, Size};
 use crate::groups::{report, Library, Limits, Plan};
@@ -66,7 +67,23 @@ impl Canvas for GlCanvas {
     fn pop(&mut self) {
         self.scene.pop_layer();
     }
+
+    fn shade(&mut self, transform: Affine, shade: &Shade) {
+        self.scene.set_transform(self.by * transform);
+        self.scene.reset_paint_transform();
+        self.scene.set_paint(brush::<Image>(&Paint::Solid { color: shade.color }));
+        if shade.side == Side::Inner {
+            let reach = SHADE_REACH * shade.erf_width();
+            let mut outside = shade.extent.to_path(0.1);
+            outside.extend(shade.rect.inflate(reach, reach).to_path(0.1));
+            self.scene.set_fill_rule(Fill::EvenOdd);
+            self.scene.fill_path(&outside);
+        }
+        self.scene.fill_blurred_rounded_rect(&shade.rect, shade.radius as f32, shade.erf_width() as f32, shade.side == Side::Inner);
+    }
 }
+
+const SHADE_REACH: f64 = 2.5;
 
 fn utf8(bytes: &[u8]) -> Result<&str, JsValue> {
     std::str::from_utf8(bytes).map_err(failed)
@@ -312,8 +329,7 @@ impl WebGlCore {
     }
 
     pub fn drop_group(&mut self, key: &str) {
-        self.compositor.touch(key, &self.library);
-        self.library.drop_group(key);
+        self.compositor.drop_group(key, &mut self.library);
     }
 
     pub fn set_camera(&mut self, x: f64, y: f64, zoom: f64) {

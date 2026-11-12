@@ -23,6 +23,48 @@ Open the insert menu (**+**), go to **Import**, choose **From code…**.
 - **Private repositories**: press **Connect GitHub**, sign in to GitHub in the tab that opens, come back. The dialog then lists your repositories and their branches. Feega downloads the code on its servers and copies it into the sandbox; your GitHub sign-in never reaches the sandbox.
 - **Storybook**: switch to the Storybook tab and paste the Storybook link. Up to 12 stories, spread across components, become boards; stories that do not fit in about two and a half minutes are listed as left out. Nothing is installed or started, so it is the fastest way to bring in a component library, including components no page renders.
 
+## Theme and width
+
+The import opens the app in a real browser, so everything the app does at render time (global styles, resets, fonts, layouts and providers around the route, CSS variables and design tokens resolved to their values) is already in the screen. Two conditions you can choose:
+
+| Condition | In the app | Notes |
+|---|---|---|
+| Theme | **Render under** in the import dialog: Light, Dark | The page is opened with `prefers-color-scheme`, `color-scheme` and the stored `theme` key set to the choice, so media-query, class and data-attribute themes follow. Named custom themes are not listed. |
+| Width | Desktop 1280, Tablet 768, Phone 390 | Media and container queries resolve at that width. |
+
+Choose several and every page lands once per combination, side by side in the same frame, named like `/ · dark · 390px`. Pull re-renders the same combinations.
+
+| Not switched | Why |
+|---|---|
+| Locale, text direction | The browser language is fixed: the default catalog is shown. |
+| Login, feature flags, env vars, loading, empty and error states | The dev server renders what its own setup gives. |
+| A component variant the route does not render | Only what appears on the page is imported. |
+
+### Edits on a dark board
+
+Tailwind projects only: a change on a dark board is written as a `dark:` class (`dark:bg-[#101010]`) and replaces the earlier `dark:` class of the same kind. A change on a light board edits the plain class and leaves the `dark:` ones alone. Without Tailwind a dark edit is listed as not written back, and so is any edit made at a width other than desktop, because a plain rule would change every width.
+
+## Design system
+
+With **Design system** on (the default when the dialog finds CSS tokens, with their count), the tokens the project declares become feega variables instead of resolved values:
+
+- **Read from the CSS text**, never by running the app's code: Tailwind v4 `@theme` / `@theme inline`, custom properties in `:root`, `.dark`, `[data-theme=…]` and `@media (prefers-color-scheme: …)`, and the stylesheet that shadcn's `components.json` names. Each theme selector is a mode: `@theme` and `:root` are **Light**, `.dark` is **Dark**, `[data-theme=ocean]` is **Ocean**.
+- **Collections** are named after the repository: `traidue Colors` (`--color-*`), `Palette` (unprefixed colours such as shadcn's `--primary`), `Radius`, `Spacing` (numbers in px) and `Type` (font families, listed but not bound yet). Names drop `--` and the group prefix; `.` becomes `_` (`--spacing-0.5` → `0_5`). A token written as `var(--other)` stays an alias.
+- **Limits**: 8 collections × 64 variables × 8 modes. Over a limit, tokens used by a class on the page are kept first and the rest are listed as left out. Type scale, shadows, breakpoints, `calc()` values and tokens inside width media queries are listed as left out too.
+- **Layers are bound** (fills, strokes, text colours, gap, padding, radius) by the evidence that is certain, in order: the utility class on the element (`text-primary` → `--color-primary`; `p-4` and `gap-2` → a `4` and `2` variable worth `--spacing` × n when the project declares `--spacing`), a CSS rule with a single selector that reads a token with `var()`, then a value that only one token holds in any mode. Rules with descendant selectors (`article .prose h2 { color: var(--…) }`) are not traced. A value several tokens share stays a literal: in a repo where `primary`, `success` and `error` are all `#111111`, only the class can tell them apart.
+- A **Design system** board is placed before the pages: every colour with its value per mode, radii, spacing and font families. Its swatches are bound, so they follow every edit.
+- **Boards keep their mode.** A board captured in Dark is bound like the Light one and set to the **Dark** mode of the collection, so a token edit reaches both boards, each in its own mode. Any layer can override the mode for itself and what it contains: select it and pick the mode under **Variables** in Properties (**Inherited** follows the nearest parent, else the frame). Component instances on a Dark board show their main in Dark. Over MCP and in the motion agent this is the `variable` tool's `layer_mode` action (`collection`, `clip_id`, `mode`; no mode clears it).
+
+**Write-back**: change a variable's value for a mode and open code mode. The declaration of that mode is rewritten in its own format (hex stays hex, `oklch()` stays `oklch()`, `rem` stays `rem`, an alias is written as `var(--…)`), and only that line changes: a Dark edit touches the `.dark` declaration and nothing else. A mode with no declaration in the code (a brand colour the `.dark` block does not override) is appended at the end of that mode's block in the same file; if the file has no block for that mode, it is listed as not written. A `--spacing` multiple writes the base divided by its factor, once. If the declaration changed in the code since the import, the code wins and the canvas value is listed. Bound layers do not write their colour into the template: the token does.
+
+| Token source | Read | Why not |
+|---|---|---|
+| Tailwind v4 `@theme`, CSS custom properties, shadcn | Yes | |
+| Tailwind v3 `tailwind.config.js` | No | The config is code and would have to run. |
+| SCSS / LESS variables | No | Compiled away: nothing ties a layer back to them. |
+| JS theme objects (styled-components, Emotion, MUI) | No | Values are computed at runtime by app code. |
+| W3C design-tokens JSON | No | Later. |
+
 ## Edit the code from the canvas
 
 A frame imported from GitHub or a folder remembers where each layer comes from in the code. Change a text, a text colour or size, a fill, or the gap, padding or direction of a stack, then open **code mode** (the `</>` button): the **GitHub** (or **Folder**) section lists the files the edits touch and shows the patch.
@@ -30,11 +72,13 @@ A frame imported from GitHub or a folder remembers where each layer comes from i
 - **Patch** downloads it as a `.patch` file (`git apply` it in your checkout).
 - **Open pull request** creates a new `feega/…` branch on the repository and a pull request against its default branch. Nothing is ever committed to the default branch. It needs GitHub connected.
 - **Write to folder** (folder imports) writes the files and, when the folder is a git repository, also commits them on a new `feega/…` branch, leaving your current branch as it was. The app's dev server reloads, so the page shows the edit.
-- Styles land as an inline `style` on the element (`style={{ … }}` in JSX). Texts are replaced where the element holds them; texts that come from an inlang/Paraglide message (`{m.home_title()}`) are changed in the message file of the language shown. A text built by other code is listed as not written back.
+- Styles land as an inline `style` on the element (`style={{ … }}` in JSX), or as Tailwind classes when the project uses Tailwind. Texts are replaced where the element holds them; texts that come from an inlang/Paraglide message (`{m.home_title()}`) are changed in the message file of the language shown. A text built by other code is listed as not written back.
 
-**Pull** brings the code back: new commits on the imported branch (or the branch you type), or file changes in the folder, are re-read and drawn into the same frame. Your canvas edits are kept; where the code changed the same property of the same element, the code wins and the conflict is listed. For a folder, code mode watches the files and pulls on its own while the frame is open.
+**Pull** brings the code back: new commits on the imported branch (or the branch you type), or file changes in the folder, are re-read and drawn into the same frame. Your canvas edits are kept; where the code changed the same property of the same element, the code wins and the conflict is listed. Tokens are matched by their name in the code: a new token becomes a variable; a changed value reaches its variable and the bound layers; a variable you changed on the canvas keeps your value unless the code changed that mode too, then the code wins and your value is listed; a removed token that layers still use stays as an orphan variable with its layers bound (one nobody uses is removed); a token renamed with the same values in every mode and the same usages keeps your edits under the new name, anything less certain is listed as removed plus added. Variables made on the canvas and the chosen mode survive the pull. For a folder, code mode watches the files and pulls on its own while the frame is open.
 
 ## Import a local folder
+
+On feega.app, the **Folder** tab picks a project folder on your computer and uploads it once. node_modules, build output (`dist`, `build`, `.next`, …), what `.gitignore` leaves out and files over 1 MB are skipped; the rest may total 25 MB. It runs in the same sandbox as a GitHub repository, never on feega's servers. It is **imported once, no sync**: code mode shows the patch to download, with no write-back and no pull. Its CSS tokens are read like a repository's.
 
 In local mode (`npx feega`), the **Folder** tab takes the absolute path of a project on your computer. Its `dev` script runs here, the pages are read with your local Chrome, and the frame stays linked to the folder as above. Images served by the dev server are not copied yet.
 
@@ -61,11 +105,13 @@ In local mode (`npx feega`), the **Folder** tab takes the absolute path of a pro
 
 ```bash
 feega canvas import-code $PROJECT https://github.com/owner/repo --route / /settings /users --canvas <canvas> --x 0 --y 0
+feega canvas import-code $PROJECT https://github.com/owner/repo --route / --scheme light dark --width 1280 390 --canvas <canvas>   # one board per theme and width
 feega canvas import-storybook $PROJECT https://storybook.example.com --canvas <canvas> --x 0 --y 0
 feega canvas github $PROJECT connect      # prints a link to open in the browser
 feega canvas github $PROJECT repos
 feega canvas github $PROJECT branches owner/repo
 feega canvas import-code $PROJECT /path/to/app --route / --canvas <canvas>   # local mode: a folder
+feega canvas import-code $PROJECT /path/to/app --route / --no-design-system --canvas <canvas>   # keep resolved values, no variables
 feega canvas code-sync $PROJECT changes <frameId>   # prints the patch
 feega canvas code-sync $PROJECT publish <frameId>   # pull request, or write the folder
 feega canvas code-sync $PROJECT pull <frameId> --branch my-branch
@@ -75,8 +121,8 @@ The import answers `frameId`, `pages` (the paths or stories that landed), `compo
 
 ## MCP and API
 
-Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, routes, x, y } })`, or `{ canvasId, storybook, stories?, x, y }`. Folder (local mode): `{ canvasId, folder, routes, x, y }`. Sync: ops `code_changes`, `code_publish`, `code_pull` (`{ nodeId, branch? }`). REST: `GET /api/v1/projects/:id/code-import/:nodeId/changes`, `POST …/publish`, `POST …/pull`, `GET …/head`. GitHub: ops `github_status`, `github_connect`, `github_repos`, `github_branches` (`{ repo: "owner/name" }`), `github_disconnect`.
+Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, routes, conditions?: [{ scheme: "light" | "dark", width }], designSystem?, x, y } })` (`designSystem: false` skips the tokens), or `{ canvasId, storybook, stories?, x, y }`. Folder (local mode): `{ canvasId, folder, routes, x, y }`. Uploaded folder (web): `POST /api/v1/projects/:id/code-uploads` `{ name }` returns `{ path, uploadUrl }`; PUT the gzipped tarball to `uploadUrl`, then `POST /api/v1/projects/:id/code-import` `{ canvasId, upload: path, routes, x, y }`. Sync: ops `code_changes`, `code_publish`, `code_pull` (`{ nodeId, branch? }`, its answer lists token changes in `tokens`). REST: `GET /api/v1/projects/:id/code-import/:nodeId/changes`, `POST …/publish`, `POST …/pull`, `GET …/head`. GitHub: ops `github_status`, `github_connect`, `github_repos`, `github_branches` (`{ repo: "owner/name" }`), `github_disconnect`.
 
-Over HTTP: `POST /api/v1/projects/{projectId}/code-import` with `{ canvasId, repo, routes?, x, y }` (`routes` up to 8, default `["/"]`; the older single `route` still works) or `{ canvasId, storybook, stories?, x, y }`. Errors: `invalid` (400), `run_failed` (422, with `detail`: the install or dev server output), `unreadable` (422), `rate_limited` (429), `no_sandbox` / `no_browser` (503), `failed` (502).
+Over HTTP: `POST /api/v1/projects/{projectId}/code-import` with `{ canvasId, repo, routes?, conditions?, designSystem?, x, y }` (the answer adds `design: { tokens, byClass, byRule, byValue, unbound }`; `GET …/code-import/tokens?repo=…`, `?folder=…` or `?upload=…` counts the tokens first) (`conditions` up to 6, `routes` up to 8, default `["/"]`; the older single `route` still works) or `{ canvasId, storybook, stories?, x, y }`. Errors: `invalid` (400), `run_failed` (422, with `detail`: the install or dev server output), `unreadable` (422), `rate_limited` (429), `no_sandbox` / `no_browser` (503), `failed` (502).
 
 GitHub: `GET /api/v1/projects/{projectId}/github` (`{ configured, connected, label }`), `POST …/github/connect` (`{ url }` to open), `GET …/github/repos`, `GET …/github/branches?repo=owner/name`, `DELETE …/github`. `not_configured` (501) when the server has no GitHub connection set up, `not_connected` (409) before you connect.

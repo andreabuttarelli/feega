@@ -9,7 +9,7 @@ use gpu_core::groups::{Library, Limits};
 use gpu_core::pictures::Pictures;
 use gpu_core::reproject::Reprojector;
 use gpu_core::retained::{Camera, Lookup};
-use gpu_core::world::{parse_overlay, parse_patch};
+use gpu_core::world::{parse_overlay, parse_patch, OverlayPart};
 use vello::wgpu;
 
 use crate::inbox::{Batch, Command, Inbox};
@@ -131,15 +131,14 @@ impl Core {
                 self.compositor.touch(&to, &self.library);
             }
             Command::DropGroup(key) => {
-                self.compositor.touch(&key, &self.library);
-                self.library.drop_group(&key);
+                self.compositor.drop_group(&key, &mut self.library);
             }
             Command::PatchUses(json) => self.compositor.patch(parse_patch(&json).map_err(failure)?, &self.library),
             Command::Snapshot(path) => {
                 let look = self.last_look.ok_or("nothing presented yet")?;
                 snapshot(&self.gpu.device, &self.gpu.queue, &mut self.reprojector, &self.retained, look, self.size, &path)?;
             }
-            Command::SetOverlay(json) => self.compositor.set_overlay(parse_overlay(&json).map_err(failure)?, &mut self.library),
+            Command::SetOverlay(json) => self.compositor.set_overlay(OverlayPart::Fixed, parse_overlay(&json).map_err(failure)?, &mut self.library),
         }
         Ok(())
     }

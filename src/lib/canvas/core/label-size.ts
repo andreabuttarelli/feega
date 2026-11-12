@@ -10,6 +10,8 @@ export const labelScreenPx = (zoom: number): number => LABEL_SCREEN_PX * clamp(z
 
 export const labelZoomStep = (zoom: number): number => Math.min(1, 2 ** (Math.round(Math.log2(zoom) * LABEL_STEPS_PER_OCTAVE) / LABEL_STEPS_PER_OCTAVE));
 
+export const labelStepOf = (id: string, step: number, seen: ReadonlySet<string>, kept: ReadonlyMap<string, number>): number => (seen.has(id) ? step : (kept.get(id) ?? step));
+
 export const labelScale = (zoomStep: number): number => labelScreenPx(zoomStep) / (LABEL_SCREEN_PX * zoomStep);
 
 export const labelShown = (zoomStep: number, frameWidth: number): boolean => frameWidth * zoomStep >= LABEL_HIDE_FRAME_PX;

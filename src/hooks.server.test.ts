@@ -28,6 +28,12 @@ vi.mock('@sveltejs/kit/hooks', () => ({
 		}
 }));
 
+const tracked = vi.hoisted(() => [] as Array<[string, unknown, unknown]>);
+vi.mock('$lib/server/product-events/track', async (orig) => ({
+	...(await orig<object>()),
+	track: async (event: string, actor: unknown, props: unknown) => void tracked.push([event, actor, props])
+}));
+
 let mockSession: { session: unknown; user: unknown } = { session: null, user: null };
 let refreshed: unknown = null;
 
@@ -221,6 +227,63 @@ describe('la radice manda dove dice la regola di ingresso', () => {
 		const redirected = await rootRequestTo('https://www.feega.app');
 		Object.assign(env, { VERCEL_ENV: 'production' });
 		expect(redirected?.location).toBe('/login');
+	});
+});
+
+describe('a signed-out /app goes to the login, keeping a handoff', () => {
+	const requestTo = async (path: string, set = vi.fn()) => {
+		const url = new URL(`http://localhost${path}`);
+		try {
+			await handle({
+				event: {
+					request: new Request(url.href),
+					url,
+					route: { id: url.pathname },
+					params: {},
+					cookies: { getAll: () => [], get: () => undefined, set },
+					locals: {}
+				},
+				resolve: async () => new Response('never')
+			} as any);
+			return null;
+		} catch (e) {
+			return e as Error & { location?: string };
+		}
+	};
+
+	it('/app goes to the login', async () => {
+		mockSession = { session: null, user: null };
+		expect((await requestTo('/app'))?.location).toBe('/login');
+	});
+
+	it('/app/credits goes to the login', async () => {
+		mockSession = { session: null, user: null };
+		expect((await requestTo('/app/credits'))?.location).toBe('/login');
+	});
+
+	it('/app with a handoff keeps its query in the draft cookie', async () => {
+		mockSession = { session: null, user: null };
+		const set = vi.fn();
+		const redirected = await requestTo('/app?prompt=launch%20video&kind=motion&source=github', set);
+		expect(redirected?.location).toBe('/login');
+		expect(set).toHaveBeenCalledWith('feega_home_draft', '?prompt=launch%20video&kind=motion&source=github', expect.objectContaining({ path: '/' }));
+	});
+
+	it('a landing prompt is recorded, and so is the trip to the login, without the prompt', async () => {
+		mockSession = { session: null, user: null };
+		tracked.length = 0;
+		await requestTo('/app?prompt=secret&kind=motion&source=github&go=n1');
+		expect(tracked).toEqual([
+			['landing_prompt_sent', { anonymousId: 'n1' }, { kind: 'motion', source: 'github' }],
+			['login_started', { anonymousId: 'n1' }, {}]
+		]);
+	});
+
+	it('the return from the login is not a second landing prompt', async () => {
+		mockSession = { session: null, user: null };
+		tracked.length = 0;
+		await requestTo('/app?prompt=x&kind=motion&go=n1&resumed=1');
+		expect(tracked.map(([event]) => event)).not.toContain('landing_prompt_sent');
 	});
 });
 

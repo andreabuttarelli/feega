@@ -40,7 +40,9 @@ jobs:
         run: npx vite build && rm -rf .vercel/output build
 
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        run: |
+          npx playwright install --with-deps chromium && exit 0
+          npx playwright install chromium
 
       - name: Unit tests
         run: npx vitest run
@@ -74,6 +76,9 @@ jobs:
 
       - name: Web build compiles
         run: cargo build --locked --lib --target wasm32-unknown-unknown
+
+      - name: WebGL fallback build compiles
+        run: cargo build --locked --lib --target wasm32-unknown-unknown --features webgl
 
   gpu-text:
     runs-on: ubuntu-24.04

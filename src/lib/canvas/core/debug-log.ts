@@ -212,6 +212,13 @@ export function tierLog(tier: string, zoom: number) {
   out.push(performance.now(), line('images', performance.now(), text));
 }
 
+export function backendLog(from: string, to: string, why: string) {
+  if (!out) {
+    return;
+  }
+  out.push(performance.now(), line('gpu', performance.now(), `backend ${from} -> ${to}: ${why}`));
+}
+
 type Gesture = { name: string; lastAt: number; timer: ReturnType<typeof setTimeout> | 0 };
 let gesture: Gesture | null = null;
 

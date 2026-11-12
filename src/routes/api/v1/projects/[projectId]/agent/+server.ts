@@ -1,6 +1,8 @@
 import { json } from '@sveltejs/kit';
 import type { Db } from '$lib/server/db/client';
-import { pickOf, turnModel } from '$lib/server/project-agent/model-route';
+import { pickOf } from '$lib/server/project-agent/model-route';
+import { planModel } from '$lib/server/project-agent/agent-plan';
+import { ProductEvent, track } from '$lib/server/product-events/track';
 import { startProjectTurn, type BriefBrand } from '$lib/server/project-agent/turn';
 import { offeredChatModels, resolveChoice } from '$lib/server/chat-model/catalogue';
 import { gateAiAction, gateOrgAiAction } from '$lib/server/cli-auth';
@@ -17,6 +19,7 @@ import { blockedPrompt } from '$lib/server/moderation/blocked-response';
 import { askedAttachments } from '$lib/server/chat-attachments/route-scope';
 import { latestAnswer, readAnswer } from '$lib/reference-pick';
 import { stopTurn } from '$lib/server/repos/chat-reply';
+import { readChips } from '$lib/chat-selection';
 import type { RequestHandler } from './$types';
 
 /**
@@ -68,14 +71,19 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   const brand = project.brandId ? await loadBriefBrand(db, { orgId, brandId: project.brandId }) : null;
 
   const gated = brand ? await gateAiAction(brand, undefined) : await gateOrgAiAction(orgId, undefined);
-  if (gated) return gated;
+  const actor = { userId: user.id, orgId };
+  if (gated) {
+    await track(ProductEvent.CreditsExhausted, actor, {});
+    return gated;
+  }
 
   const capped = await capRefusal(await liveCapReader(db), { orgId, userId: user.id, projectId: project.id });
   if (capped) {
     return json({ error: CAP_REACHED, message: capped }, { status: HTTP_FORBIDDEN });
   }
 
-  const { message, model: askedModel, reasoning: askedReasoning, canvasId: openCanvas, attachments: askedFiles, frame: askedFrame, selection } = (await request.json()) as { message?: string; model?: unknown; reasoning?: unknown; canvasId?: unknown; attachments?: unknown; frame?: unknown; selection?: unknown };
+  const { message, model: askedModel, reasoning: askedReasoning, canvasId: openCanvas, attachments: askedFiles, frame: askedFrame, selection: askedSelection } = (await request.json()) as { message?: string; model?: unknown; reasoning?: unknown; canvasId?: unknown; attachments?: unknown; frame?: unknown; selection?: unknown };
+  const selection = readChips(askedSelection);
   const parsedFrame = openFrameSchema.safeParse(askedFrame);
   const frame: OpenFrame | null = parsedFrame.success ? parsedFrame.data : null;
   const text = message?.trim() ?? '';
@@ -89,9 +97,10 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
 
   const resolved = resolveChoice(await offeredChatModels(), { model: askedModel, reasoning: askedReasoning });
   if (!resolved.ok) {
+    await track(ProductEvent.AgentFailed, actor, { code: resolved.error });
     return json({ error: resolved.error }, { status: 400 });
   }
-  const { model, reasoning } = turnModel(resolved.choice, pickOf(askedModel), text);
+  const { model, reasoning } = planModel(resolved.choice, pickOf(askedModel), text);
 
   const screening = screenModelInput(db, {
     profile: ModerationProfile.Standard,
@@ -113,9 +122,11 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
 
   const screened = await screening;
   if (!screened.ok) {
+    await track(ProductEvent.AgentFailed, actor, { code: 'prompt_blocked' });
     return blockedPrompt(screened.error);
   }
 
+  await track(ProductEvent.AgentStarted, actor, { model });
   return startProjectTurn({ db, userId: user.id, accessToken: session.access_token, origin: url.origin, orgId, project, brand, text, attachments, model, reasoning, frame, selection, canvases, canvasId, threadId, turns, history, pick });
 };
 

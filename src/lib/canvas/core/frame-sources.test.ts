@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { batchedSources, sourceReader } from './frame-sources';
+import { frameCache, memoryShelf } from './frame-cache';
+import { framesOnCanvas, frameSourceUrl } from './frame-source';
+import { adoptFrameHead } from '$lib/canvas/node-save';
 
 const answer = (body: unknown, ok = true) => ({ ok, json: async () => body }) as Response;
 
@@ -147,5 +150,84 @@ describe('naming the org and the revisions held', () => {
     await new Promise((done) => setTimeout(done, 1));
 
     expect(asked[0]).toBe(`/p/p1/c/c1/motion/sources?ids=${A},${B}`);
+  });
+});
+
+describe('a frame kept from an earlier open is drawn only at the revision the canvas confirms', () => {
+  const C = '00000000-0000-4000-8000-0000000000c1';
+  const A = '00000000-0000-4000-8000-00000000000a';
+  const urlAt = (revision: number, look = 'l1') => `/p/p1/c/${C}/motion/${A}/source?revision=${revision}&org=o1&look=${look}`;
+  const json = (body: unknown) => ({ ok: true, status: 200, json: async () => body }) as Response;
+  const doc = (revision: number, tag: string) => ({ revision, doc: { tag }, assets: {}, tokens: { t: 1 } });
+  const frames = (revision: number, tag: string) => json({ tokens: { t: 1 }, frames: { [A]: { revision, doc: { tag }, assets: {} } } });
+
+  it('draws a confirmed revision from the cache without the network', async () => {
+    const cache = frameCache(memoryShelf());
+    await cache.keep(`${C}/${A}@3@l1@`, doc(3, 'kept') as never);
+    let asked = 0;
+    const read = batchedSources(async () => (asked++, frames(3, 'net')), undefined, () => cache);
+
+    expect((await read(urlAt(3)))?.doc).toEqual({ tag: 'kept' });
+    expect(asked).toBe(0);
+  });
+
+  it('never draws a stale cached revision', async () => {
+    const cache = frameCache(memoryShelf());
+    await cache.keep(`${C}/${A}@3@l1@`, doc(3, 'old') as never);
+    const read = batchedSources(async () => frames(4, 'new'), undefined, () => cache);
+
+    expect((await read(urlAt(4)))?.doc).toEqual({ tag: 'new' });
+    expect(await cache.take(`${C}/${A}@3@l1@`)).toBeNull();
+    expect((await cache.take(`${C}/${A}@4@l1@`))?.doc).toEqual({ tag: 'new' });
+  });
+
+  it('never draws a frame cached under another brand look', async () => {
+    const cache = frameCache(memoryShelf());
+    await cache.keep(`${C}/${A}@3@l1@`, doc(3, 'old look') as never);
+    const read = batchedSources(async () => frames(3, 'new look'), undefined, () => cache);
+
+    expect((await read(urlAt(3, 'l2')))?.doc).toEqual({ tag: 'new look' });
+  });
+
+  it('a remote edit landing during load wins: an answer newer than asked is drawn, never kept under the asked revision', async () => {
+    const cache = frameCache(memoryShelf());
+    const read = batchedSources(async () => frames(5, 'remote'), undefined, () => cache);
+
+    expect((await read(urlAt(4)))?.doc).toEqual({ tag: 'remote' });
+    expect(await cache.take(`${C}/${A}@4@l1@`)).toBeNull();
+  });
+
+  it('an agent edit through the API moves the head over realtime, and the next read skips the cached revision', async () => {
+    const cache = frameCache(memoryShelf());
+    await cache.keep(`${C}/${A}@3@l1@`, doc(3, 'before agent') as never);
+    const tiles = [{ id: A, type: 'motion', x: 0, y: 0, displayName: null, data: { docHeadRevision: 3 }, saved: { docHeadRevision: 3 }, version: 1 }];
+    const moved = adoptFrameHead({ table: 'nodes', eventType: 'UPDATE', new: { id: A, data: { docHeadRevision: 4 }, version: 2, x: 0, y: 0, display_name: null, deleted_at: null } } as never, tiles as never, () => []);
+    const [frame] = framesOnCanvas([{ id: A, kind: 'motion', x: 0, y: 0, w: 100, h: 100 }], () => (moved as typeof tiles)[0].data);
+    const read = batchedSources(async () => frames(4, 'after agent'), undefined, () => cache);
+
+    expect(frame.revision).toBe(4);
+    expect((await read(frameSourceUrl(() => `/p/p1/c/${C}/motion/${A}/source`, frame, { orgId: 'o1', look: 'l1' })))?.doc).toEqual({ tag: 'after agent' });
+  });
+
+  it('keeps the stable addresses, never a signed link that expires', async () => {
+    const cache = frameCache(memoryShelf());
+    const P = '00000000-0000-4000-8000-0000000000f1';
+    const read = batchedSources(async () => json({ tokens: {}, signed: { [P]: 'https://signed/p' }, frames: { [A]: { revision: 3, doc: {}, assets: { [P]: `/a/${P}` } } } }), undefined, () => cache);
+
+    await read(urlAt(3));
+
+    expect((await cache.take(`${C}/${A}@3@l1@`))?.assets).toEqual({ [P]: `/a/${P}` });
+  });
+
+  it('caches nothing without a signed-in scope or a look', async () => {
+    const cache = frameCache(memoryShelf());
+    const read = batchedSources(async () => frames(3, 'net'), undefined, () => null);
+    const unlooked = batchedSources(async () => frames(3, 'net'), undefined, () => cache);
+
+    await read(urlAt(3));
+    await unlooked(`/p/p1/c/${C}/motion/${A}/source?revision=3&org=o1`);
+
+    expect(await cache.take(`${C}/${A}@3@l1@`)).toBeNull();
+    expect(await cache.take(`${C}/${A}@3@@`)).toBeNull();
   });
 });
