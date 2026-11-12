@@ -7,8 +7,11 @@ import { folderSource } from '../../src/lib/server/code-import/folder-source';
 import { codeCapturedIn, type CapturedApp } from '../../src/lib/server/code-import/fidelity-apps';
 import { BASE_CONDITIONS } from '../../src/lib/server/code-import/render-conditions';
 import { compacted } from './compact';
+import { isDemo, itemFor } from './names';
+import { durableImages } from './images';
+import { imagesFilled } from '../../src/lib/canvas/figma/images';
 
-type Catalog = { items: { name: string; title: string; description: string }[] };
+type Catalog = { publicBase?: string; items: { name: string; title: string; description: string }[] };
 
 const [library, NAME, given] = process.argv.slice(2);
 if (!library || !NAME) {
@@ -32,11 +35,16 @@ if (!planned) {
 const width = boards.tree.root.absoluteBoundingBox?.width ?? boards.tree.width;
 const plan = design ? designed(design, planned, { repo: NAME, base: BASE_CONDITIONS, boards: {}, captures, width }).plan : planned;
 const catalog = JSON.parse(readFileSync(join(LIBRARY, 'catalog.json'), 'utf8')) as Catalog;
-const pascal = (name: string) => name.replace(/(^|-)([a-z0-9])/g, (_, __, c: string) => c.toUpperCase());
-const described = new Map(catalog.items.map((i) => [pascal(i.name), i]));
-const sets = plan.sets.flatMap((s) => {
-  const item = described.get(s.name);
-  return item ? [{ name: item.title, slug: item.name, description: item.description, size: s.size, doc: compacted(s.doc) }] : [];
+const images = durableImages(plan.images, catalog.publicBase);
+const taken = new Set<string>();
+const ranked = [...plan.sets].sort((a, b) => Number(isDemo(a.name)) - Number(isDemo(b.name)));
+const sets = ranked.flatMap((s) => {
+  const item = itemFor(catalog.items, s.name);
+  if (!item || taken.has(item.name)) {
+    return [];
+  }
+  taken.add(item.name);
+  return [{ name: item.title, slug: item.name, description: item.description, size: s.size, doc: compacted(imagesFilled(s.doc, s.images, images)) }];
 });
 writeFileSync(OUT, JSON.stringify(sets));
 writeFileSync(INDEX, `${JSON.stringify(sets.map(({ slug, name, description }) => ({ slug, name, description })), null, 2)}\n`);
