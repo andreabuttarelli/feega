@@ -108,6 +108,12 @@ const invisible = (n: RestNode) => INVISIBLE.some((rule) => rule.when(n));
 
 const raw = (name: string | undefined) => !name || RAW_NAMES.has(name.toLowerCase());
 
+const spotOf = (n: RestNode) => (n.source ? `${n.source.at}|${n.source.cond ?? ''}` : null);
+
+const claims = (wrapper: RestNode, survivor: RestNode) => spotOf(wrapper) !== null && spotOf(survivor) !== null && spotOf(wrapper) !== spotOf(survivor);
+
+const heir = (survivor: RestNode, wrapper: RestNode): RestNode => (survivor.source || !wrapper.source ? survivor : { ...survivor, source: wrapper.source });
+
 function adopted(child: RestNode, wrapper: RestNode): RestNode {
   const { layoutAlign, layoutGrow, layoutPositioning } = wrapper;
   const keepsName = child.type === 'TEXT' || !raw(child.name) || raw(wrapper.name);
@@ -132,12 +138,12 @@ function grown(child: RestNode, wrapper: RestNode): RestNode {
         paddingRight: round((child.paddingRight ?? 0) + outer.x + outer.width - inner.x - inner.width)
       }
     : {};
-  return { ...adopted(child, wrapper), absoluteBoundingBox: outer, ...padding };
+  return heir({ ...adopted(child, wrapper), absoluteBoundingBox: outer, ...padding }, wrapper);
 }
 
 const growable = (k: RestNode) => {
   const c = only(k);
-  return Boolean(c) && bare(k) && c!.type === 'FRAME' && bare(c!) && within(boxOf(c!), boxOf(k));
+  return Boolean(c) && bare(k) && c!.type === 'FRAME' && bare(c!) && within(boxOf(c!), boxOf(k)) && !claims(k, c!);
 };
 
 const ONE_LINE_SHARE = 1.5;
@@ -195,7 +201,7 @@ const flowOf = (n: RestNode) => (n.children ?? []).filter(flowing);
 function foldable(n: RestNode): boolean {
   const [w] = flowOf(n);
   const c = w && only(w);
-  if (!n.layoutMode || flowOf(n).length !== 1 || !c || !bare(w) || !flowing(c) || pathBound(c)) {
+  if (!n.layoutMode || flowOf(n).length !== 1 || !c || !bare(w) || !flowing(c) || pathBound(c) || claims(w, n)) {
     return false;
   }
   return within(boxOf(c), boxOf(n));
@@ -206,7 +212,7 @@ function folded(n: RestNode): RestNode {
   const c = only(w)!;
   const [outer, inner] = [boxOf(n)!, boxOf(c)!];
   return {
-    ...n,
+    ...heir(n, w),
     paddingTop: round(inner.y - outer.y),
     paddingLeft: round(inner.x - outer.x),
     paddingBottom: round(outer.y + outer.height - inner.y - inner.height),
@@ -223,6 +229,8 @@ const crossSpan = (n: RestNode) => (n.layoutMode === 'VERTICAL' ? boxOf(n)!.widt
 
 const mergeable = (n: RestNode) => (w: RestNode) =>
   bare(w) &&
+  !claims(w, n) &&
+  (!w.source || Boolean(n.source)) &&
   flowing(w) &&
   w.layoutMode === n.layoutMode &&
   unpadded(w) &&
@@ -241,10 +249,10 @@ const HOSTS = new Set(['FRAME', 'INSTANCE', 'COMPONENT']);
 
 const hoistable = (n: RestNode) => {
   const w = only(n);
-  return HOSTS.has(n.type) && Boolean(w) && w!.type === 'FRAME' && bare(w!) && sameBox(boxOf(w!), boxOf(n));
+  return HOSTS.has(n.type) && Boolean(w) && w!.type === 'FRAME' && bare(w!) && sameBox(boxOf(w!), boxOf(n)) && !claims(w!, n);
 };
 
-const hoisted = (n: RestNode): RestNode => ({ ...n, ...layoutOf(only(n)!), children: only(n)!.children ?? [] });
+const hoisted = (n: RestNode): RestNode => ({ ...heir(n, only(n)!), ...layoutOf(only(n)!), children: only(n)!.children ?? [] });
 
 const mergeKey = (n: RestNode) => (n.type === 'VECTOR' && n.fillGeometry?.length && !n.strokeGeometry?.length ? JSON.stringify([n.absoluteBoundingBox, n.fills, n.strokes, n.opacity, n.effects, n.layoutPositioning, n.fillGeometry.map((g) => g.windingRule ?? '')[0], new Set(n.fillGeometry.map((g) => g.windingRule ?? '')).size]) : null);
 

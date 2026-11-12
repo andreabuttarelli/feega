@@ -147,6 +147,32 @@ describe('flattened', () => {
     expect(flattened(page([section])).children![0].name).toBe('Built for agents');
   });
 
+  it('a wrapped text boxed for a stack keeps its box: as a flow item the engine sets it half a pixel off (Supabase checklist)', () => {
+    const label = node('TEXT', 137, 742, 100.6, 40, { name: 'Built-in Auth', characters: 'Built-in Auth with Row Level Security', textAutoResize: 'HEIGHT', style: { fontSize: 14, lineHeightPx: 20 } });
+    const item = frame('li', [121, 742, 250, 40], [node('VECTOR', 121, 742, 16, 19.2, { fills: red, fillGeometry: [{ path: 'M0 0L16 19Z' }] }), frame('Text', [137, 742, 100.6, 40], [label])], stack('HORIZONTAL'));
+
+    expect(flattened(page([item])).children![0].children![1].type).toBe('FRAME');
+  });
+
+  it('an svg that clips keeps its own frame in a narrower wrapper: its clip shaves the stroke edges (Stripe arrows)', () => {
+    const arrow = node('VECTOR', 100, 6.5, 12, 9, { name: 'path', fills: red, fillGeometry: [{ path: 'M0 4L12 4' }] });
+    const icon = frame('span', [100, 0, 5, 14.5], [frame('svg', [100, 6.5, 12, 9], [arrow, node('VECTOR', 104, 6.5, 8, 9, { fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 1, a: 1 } }], fillGeometry: [{ path: 'M0 0L8 4L0 9' }] })], { clipsContent: true })], stack('VERTICAL', { paddingTop: 6.5 }));
+    const made = flattened(page([frame('a', [0, 0, 105, 14.5], [text('Learn more', [0, 0, 92, 14.5]), icon], stack('HORIZONTAL', { itemSpacing: 8 }))])).children![0].children![1];
+
+    expect(made.children![0]).toMatchObject({ type: 'FRAME', clipsContent: true, absoluteBoundingBox: { x: 100, y: 6.5, width: 12, height: 9 } });
+  });
+
+  it('code import: a wrapper drawn by its own line of code keeps its padding, not handed to a child the code writes elsewhere', () => {
+    const spot = (line: number) => ({ at: `src/Card.tsx:${line}:2`, tag: 'div', cls: '' });
+    const list = frame('div', [10, 10, 180, 80], [text('One', [10, 10, 40, 20]), text('Two', [10, 50, 40, 20])], { ...stack('VERTICAL', { itemSpacing: 20 }), source: spot(3) });
+    const card = frame('div', [0, 0, 200, 100], [frame('div', [0, 0, 200, 100], [list], { source: spot(2) })], { ...stack('VERTICAL'), source: spot(1) });
+    const made = flattened(frame('Page', [0, 0, 1000, 1000], [card, text('After', [0, 100, 40, 20])], stack('VERTICAL')));
+    const sources = (k: RestNode): string[] => [...(k.source ? [k.source.at] : []), ...(k.children ?? []).flatMap(sources)];
+
+    expect(sources(made)).toEqual(['src/Card.tsx:2:2', 'src/Card.tsx:3:2']);
+    expect(made.children![0].children![0]).toMatchObject({ absoluteBoundingBox: list.absoluteBoundingBox, paddingTop: 0, paddingLeft: 0 });
+  });
+
   it('la home di vercel ha molti meno livelli e meno profondità', () => {
     const tree = JSON.parse(readFileSync(new URL('./fixtures/vercel.json', import.meta.url), 'utf8')) as PageTree;
     const root = repeatedOf(stacksOf(tree.root)).root;
