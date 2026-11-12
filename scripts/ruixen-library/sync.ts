@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { freeCatalog, installable, registryUrl, sourceUrl, supportPaths, type Catalog, type LandedFile, type OssRegistry, type RegistryItem } from './registry';
+import { freeCatalog, installable, publicAssets, registryUrl, sourceUrl, supportPaths, type Catalog, type LandedFile, type OssRegistry, type RegistryItem } from './registry';
 
 const LIBRARY = join(import.meta.dirname, '../../libraries/ruixen');
 const CATALOG_FILE = join(LIBRARY, 'catalog.json');
@@ -70,6 +70,20 @@ async function support(commit: string, files: LandedFile[]): Promise<void> {
   }
 }
 
+async function assets(commit: string, files: LandedFile[]): Promise<string[]> {
+  const missing: string[] = [];
+  for (const path of new Set(files.flatMap((f) => publicAssets(f.content)))) {
+    const res = await fetch(sourceUrl(commit, `public/${path}`));
+    if (!res.ok) {
+      missing.push(path);
+      continue;
+    }
+    mkdirSync(dirname(join(LIBRARY, 'public', path)), { recursive: true });
+    writeFileSync(join(LIBRARY, 'public', path), Buffer.from(await res.arrayBuffer()));
+  }
+  return missing;
+}
+
 const catalog = await pinned();
 const oss = await json<OssRegistry>(sourceUrl(catalog.commit, 'registry.json'));
 const demos = new Set(oss.items.filter((i) => i.type === 'registry:example').map((i) => i.name));
@@ -94,5 +108,6 @@ for (const file of all) {
   writeFileSync(join(LIBRARY, file.path), file.content);
 }
 await support(catalog.commit, all);
+const missing = await assets(catalog.commit, all);
 writeFileSync(CATALOG_FILE, `${JSON.stringify({ ...catalog, items: kept, skipped }, null, 2)}\n`);
-console.log(`${kept.length} free items installed, ${skipped.length} skipped; npm dependencies: ${[...dependencies].sort().join(' ')}`);
+console.log(`${kept.length} free items installed, ${skipped.length} skipped, public files missing upstream: ${missing.join(' ') || 'none'}; npm dependencies: ${[...dependencies].sort().join(' ')}`);

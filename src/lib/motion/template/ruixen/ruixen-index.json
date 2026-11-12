@@ -95,6 +95,11 @@
     "description": "A comprehensive pricing comparison matrix with feature categories, plan columns, and tooltips."
   },
   {
+    "slug": "pricing-plans",
+    "name": "Pricing Plans",
+    "description": "A comprehensive pricing plans component with multiple tiers and features."
+  },
+  {
     "slug": "pricing-with-user-scaling",
     "name": "Pricing with User Scaling",
     "description": "A pricing component with user-based scaling and dynamic pricing calculations."
@@ -218,6 +223,11 @@
     "slug": "gooey-pagination",
     "name": "Gooey Pagination",
     "description": "Liquid metaball pagination with SVG gooey filter, sliding active indicator, and spring physics."
+  },
+  {
+    "slug": "hover-gradient-navbar",
+    "name": "Hover Gradient Navbar",
+    "description": "A navigation bar with gradient hover effects and smooth transitions."
   },
   {
     "slug": "icon-pagination",
@@ -355,6 +365,26 @@
     "description": "A typographic accordion with oversized uppercase titles, numbered items, and a faded-to-primary color transition on expand."
   },
   {
+    "slug": "faq-auto-accordion",
+    "name": "FAQ Auto Accordion",
+    "description": "Spring-driven FAQ with a traveling accent bar (layoutId), spring height animation, blur-deblur text reveal, and layout FLIP repositioning."
+  },
+  {
+    "slug": "faq-chat-accordion",
+    "name": "FAQ Chat Accordion",
+    "description": "Conversational FAQ with right/left message bubbles, typing indicator dots, spring message entrance, and layout FLIP repositioning."
+  },
+  {
+    "slug": "faq-scroll-accordion",
+    "name": "FAQ Scroll Accordion",
+    "description": "Scroll-aware FAQ with center-zone detection via IntersectionObserver, auto-cascading open, staggered entrance, and grid-template-rows expand."
+  },
+  {
+    "slug": "better-time-picker",
+    "name": "Better Time Picker",
+    "description": "iOS 26 liquid-glass time picker with column steppers, spring-animated values, and segmented AM/PM toggle."
+  },
+  {
     "slug": "calendar-crest",
     "name": "Calendar Crest",
     "description": "Dual-month range picker with physical depth — selected band rises off the surface, endpoints crest highest, proportional shadows."
@@ -385,6 +415,11 @@
     "description": "A calendar where days rise toward your cursor like water — cosine wave ripple, spring physics, shadow depth."
   },
   {
+    "slug": "color-picker-input",
+    "name": "Color Picker Input",
+    "description": "iOS 26 liquid-glass color picker with swatch grid, draggable opacity slider, and one-click copy."
+  },
+  {
     "slug": "event-scheduler",
     "name": "Event Scheduler",
     "description": "Inline timeline scheduler — tap a time, type a title, press Enter. Spring animations, sorted list, sound feedback."
@@ -403,6 +438,11 @@
     "slug": "drum-picker",
     "name": "Drum Picker",
     "description": "A 3D cylindrical drum picker — vertical drag or scroll to cycle, perspective-projected curvature, proximity-scaled brightness, spring snap."
+  },
+  {
+    "slug": "three-dwall-calendar",
+    "name": "Three D Wall Calendar",
+    "description": "Wall-mounted calendar with physical depth — paper stack layers, page-flip transitions, cells that lift on hover with shadow."
   },
   {
     "slug": "service-ledger",
@@ -455,6 +495,16 @@
     "description": "Inline date picker — click to expand, spring-animated calendar grid, today shortcut, click-outside dismiss."
   },
   {
+    "slug": "circular-stepper-input",
+    "name": "Circular Stepper Input",
+    "description": "iOS 26 liquid-glass circular stepper with draggable ring, spring-animated arc, and haptic sound feedback."
+  },
+  {
+    "slug": "clean-tag-input",
+    "name": "Clean Tag Input",
+    "description": "iOS 26 liquid-glass tag input with spring-animated pill chips and keyboard-driven add/remove."
+  },
+  {
     "slug": "claude-chat-input",
     "name": "Claude Chat Input",
     "description": "Multi-modal chat input with file uploads, model selector, extended thinking toggle, and spring-timed interactions."
@@ -465,14 +515,39 @@
     "description": "A select component that displays options with color indicators and optional emojis for emotional context."
   },
   {
+    "slug": "correct-number-input",
+    "name": "Correct Number Input",
+    "description": "iOS 26 liquid-glass number input with floating label, integrated stepper buttons, and haptic sound."
+  },
+  {
+    "slug": "glass-form",
+    "name": "Glass Form",
+    "description": "iOS 26 liquid-glass form system — grouped fields, toggles, segmented controls, and action buttons with backdrop blur."
+  },
+  {
     "slug": "gradient-chat-input",
     "name": "Gradient Chat Input",
     "description": "Minimal chat input that streams animated message bubbles, plays synthesized send/receive sounds, and reveals a blurred spectrum glow once a conversation starts."
   },
   {
+    "slug": "gravatar-email-input",
+    "name": "Gravatar Email Input",
+    "description": "iOS 26 liquid-glass email input with live Gravatar avatar preview and smooth fade-in."
+  },
+  {
     "slug": "fine-tune-slider",
     "name": "Fine Tune Slider",
     "description": "A slider with pull-away precision mode — drag normally, pull away from the track to fine-tune values."
+  },
+  {
+    "slug": "inline-copy-input",
+    "name": "Inline Copy Input",
+    "description": "iOS 26 liquid-glass copy input with animated clipboard/check icon swap and haptic sound."
+  },
+  {
+    "slug": "input-with-select",
+    "name": "Input With Select",
+    "description": "iOS 26 liquid-glass amount input with integrated segmented currency/unit selector and spring-animated knob."
   },
   {
     "slug": "live-waveform",
@@ -485,6 +560,11 @@
     "description": "Spring pill bar with layoutId sliding indicator and staggered item transitions."
   },
   {
+    "slug": "password-field",
+    "name": "Password Field",
+    "description": "iOS 26 liquid-glass password input with animated strength bar, validation checklist, and one-click generation."
+  },
+  {
     "slug": "smart-paste-input",
     "name": "Smart Paste Input",
     "description": "A chat composer that catches long pastes and turns them into an attachment card instead of flooding the input — click the card to open a full-screen editor with a live character count, edit the text in place, then Save or Remove."
@@ -493,6 +573,16 @@
     "slug": "tag-cloud-select",
     "name": "Tag Cloud Select",
     "description": "Interactive tag selection component with cloud-style layout and multi-select functionality."
+  },
+  {
+    "slug": "url-input",
+    "name": "URL Input",
+    "description": "iOS 26 liquid-glass URL input with live favicon preview, protocol hint, and globe fallback icon."
+  },
+  {
+    "slug": "verification-input",
+    "name": "Verification Input",
+    "description": "iOS 26 liquid-glass verification code input — dual-theme cells with spring-animated digit entry and haptic sound."
   },
   {
     "slug": "add-to-cart-button",
@@ -505,9 +595,74 @@
     "description": "A zero-dependency animated link whose underline reveals from the left, the right, or grows from the center on hover, with an optional diagonal arrow that lifts into view. Pure CSS and fully theme-aware."
   },
   {
+    "slug": "animated-theme-toggler",
+    "name": "Theme Toggler",
+    "description": "Sun↔moon morph toggle with spring physics, SVG mask crescent, and switch-click audio."
+  },
+  {
+    "slug": "badge-button-combo",
+    "name": "Badge Button Combo",
+    "description": "iOS 26 liquid-glass pill with inline chip badge for counts or status labels."
+  },
+  {
     "slug": "badge-morph",
     "name": "Badge Morph",
     "description": "A morphing status badge that transitions between states with spring-physics micro-interactions."
+  },
+  {
+    "slug": "button-badge",
+    "name": "Button Badge",
+    "description": "iOS 26 liquid-glass pill with floating spring-animated notification badge."
+  },
+  {
+    "slug": "button-copy",
+    "name": "Button Copy",
+    "description": "iOS 26 liquid-glass copy pill with AnimatePresence icon crossfade."
+  },
+  {
+    "slug": "button-dropdown",
+    "name": "Button Dropdown",
+    "description": "iOS 26 liquid-glass pill with spring chevron and staggered glass dropdown."
+  },
+  {
+    "slug": "button-split",
+    "name": "Button Split",
+    "description": "iOS 26 liquid-glass two-zone pill with primary action and dropdown options."
+  },
+  {
+    "slug": "confetti-button",
+    "name": "Confetti Button",
+    "description": "iOS 26 liquid-glass pill that erupts spring-physics confetti particles on click."
+  },
+  {
+    "slug": "glow-link-button",
+    "name": "Glow Link Button",
+    "description": "iOS 26 liquid-glass link pill with cursor-following radial glow and spring arrow."
+  },
+  {
+    "slug": "hover-preview-button",
+    "name": "Hover Preview Button",
+    "description": "iOS 26 liquid-glass pill with spring-animated hover preview panel."
+  },
+  {
+    "slug": "icon-label-subtext-button",
+    "name": "Icon Label Subtext Button",
+    "description": "iOS 26 liquid-glass card-button with icon circle, label, and subtext."
+  },
+  {
+    "slug": "progress-button",
+    "name": "Progress Button",
+    "description": "iOS 26 liquid-glass pill that morphs through idle → loading → done phases."
+  },
+  {
+    "slug": "slide-to-delete-button",
+    "name": "Slide To Delete Button",
+    "description": "iOS 26 liquid-glass slide-to-confirm track with spring-physics draggable thumb."
+  },
+  {
+    "slug": "visualizer-button",
+    "name": "Visualizer Button",
+    "description": "iOS 26 liquid-glass audio pill with canvas equalizer and Web Audio API integration."
   },
   {
     "slug": "share-button",
@@ -553,6 +708,11 @@
     "slug": "featured-portrait-testimonial",
     "name": "Featured Portrait Testimonial",
     "description": "An expanding-portrait testimonial carousel. Inactive cards show a grayscale portrait with a name strip; the active card morphs into a full quote card with author, dashed divider, and a row of favorite-feature tags. Width transitions and content crossfade are choreographed for clean, premium movement."
+  },
+  {
+    "slug": "glass-ai-card",
+    "name": "Glass AI Card",
+    "description": "iOS 26 liquid-glass content card with animated skeleton lines and hue-rotating gradient AI action button."
   },
   {
     "slug": "halo-reel",
@@ -630,11 +790,6 @@
     "description": "Hover triggers a decode sequence — characters dissolve into random glyphs then resolve in a directional wave that follows your entry point, each locking in with a spring pop."
   },
   {
-    "slug": "trusted-clients-showcase",
-    "name": "Trusted Clients Showcase",
-    "description": "Spotlight logo grid with staggered blur-up entrance and collective dim hover."
-  },
-  {
     "slug": "scroll-burn-text",
     "name": "Scroll Burn Text",
     "description": "A manifesto that comes at the reader and burns off. Each block grows toward the lens, splits into red and cyan at the edges and is eaten away glyph by glyph from the middle out, uncovering the next block standing behind it. Film grain over the whole frame, no animation library."
@@ -670,16 +825,6 @@
     "description": "Threaded comment component with nested replies, colored avatars, and collapsible reply chains."
   },
   {
-    "slug": "comment-thread",
-    "name": "Comment Thread",
-    "description": "Threaded comment component with nested replies, colored avatars, and collapsible reply chains."
-  },
-  {
-    "slug": "comment-thread",
-    "name": "Comment Thread",
-    "description": "Threaded comment component with nested replies, colored avatars, and collapsible reply chains."
-  },
-  {
     "slug": "deploy-region-globe",
     "name": "Region Globe",
     "description": "A card with an interactive globe over a region list. Pick a region, the camera flies to it and the latency caption updates, then confirm."
@@ -688,6 +833,11 @@
     "slug": "feature-highlights",
     "name": "Feature Highlights",
     "description": "Progressive reveal feature list with sliding accent indicator, grid-template-rows expand, and staggered entrance."
+  },
+  {
+    "slug": "glass-image-compare",
+    "name": "Glass Image Compare",
+    "description": "iOS 26 liquid-glass before/after image comparison slider with drag divider, floating labels, and drop-to-load support."
   },
   {
     "slug": "dual-tone-rain-background",
@@ -703,6 +853,11 @@
     "slug": "luma-bar",
     "name": "Luma Bar",
     "description": "A sleek navigation bar with Luma-inspired design and interactions."
+  },
+  {
+    "slug": "glass-shipment-flow",
+    "name": "Glass Shipment Flow",
+    "description": "iOS 26 liquid-glass shipment flow diagram with animated travelling-light SVG paths connecting stacked order cards."
   },
   {
     "slug": "load-ripple",
@@ -785,6 +940,11 @@
     "description": "A file tree component with tooltip support for each node."
   },
   {
+    "slug": "video-player-pro",
+    "name": "Video Player Pro",
+    "description": "Cinema-quality video player with glass control bar, spring physics, custom progress scrubber, inline volume slider, and speed pills with layout-animated indicator."
+  },
+  {
     "slug": "wizard-stepper",
     "name": "Wizard Stepper",
     "description": "A full-featured wizard stepper with titles and descriptions. Perfect for multi-step forms, checkout flows, and onboarding sequences."
@@ -793,5 +953,35 @@
     "slug": "scroll-ruler",
     "name": "Scroll Ruler",
     "description": "A ruler-style input for fractional values — scroll or drag to scrub, spring-animated snapping, gradient-masked edges."
+  },
+  {
+    "slug": "scroll-tilted-grid",
+    "name": "Scroll Tilted Grid",
+    "description": "An editorial two-column image grid where pairs of stills rise from below tipped forward, settle into focus, then tilt away over the top edge as the page scrolls. Optional infinite loop appends more cycles via IntersectionObserver."
+  },
+  {
+    "slug": "bottom-drawers",
+    "name": "Bottom Drawers",
+    "description": "Snap-point bottom sheet — three snap heights (peek, half, full), drag between them, velocity-aware, progressive content reveal."
+  },
+  {
+    "slug": "centered-feedback-drawer",
+    "name": "Centered Feedback Drawer",
+    "description": "Centered feedback panel — three SVG faces, contextual comment, spring selection, auto-dismiss thank-you state."
+  },
+  {
+    "slug": "drawer-inner-content",
+    "name": "Drawer Inner Content",
+    "description": "Gesture-driven bottom sheet — drag to dismiss, spring physics, structured content sections with staggered cascade."
+  },
+  {
+    "slug": "glass-image-editor",
+    "name": "Glass Image Editor",
+    "description": "iOS 26 liquid-glass image editor with drop zone, zoom/pan canvas, thumbnail strip, and toolbar."
+  },
+  {
+    "slug": "rising-glow",
+    "name": "Rising Glow",
+    "description": "Text wrapper with animated rising particles and soft glow effect."
   }
 ]

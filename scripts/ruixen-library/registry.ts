@@ -12,7 +12,7 @@ export type OssRegistry = { items: OssItem[] };
 
 export type CatalogItem = { name: string; title: string; description: string; tier: string; registry: string };
 
-export type Catalog = { name: string; homepage: string; source: string; commit: string; generatedAt: string; items: CatalogItem[]; skipped?: { name: string; reason: string }[] };
+export type Catalog = { name: string; homepage: string; source: string; commit: string; publicBase: string; generatedAt: string; items: CatalogItem[]; skipped?: { name: string; reason: string }[] };
 
 export type RegistryFile = { path: string; target: string; content: string };
 
@@ -41,7 +41,7 @@ const pinnedTo = (url: string) => /^https:\/\/raw\.githubusercontent\.com\/ruixe
 
 export function freeCatalog(registry: OssRegistry, commit: string, generatedAt: string): Catalog {
   const items = registry.items.filter((i) => i.type === COMPONENT_TYPE).map((i) => ({ name: i.name, title: i.title ?? i.name, description: i.description ?? '', tier: FREE_TIER, registry: registryUrl(commit, i.name) }));
-  return { name: 'ruixen', homepage: 'https://ruixen.com', source: 'https://github.com/ruixenui/ruixen.com', commit, generatedAt, items };
+  return { name: 'ruixen', homepage: 'https://ruixen.com', source: 'https://github.com/ruixenui/ruixen.com', commit, publicBase: sourceUrl(commit, 'public/'), generatedAt, items };
 }
 
 export function supportPaths(content: string): string[] {
@@ -81,4 +81,10 @@ export function installable(url: string, item: RegistryItem): Installable {
   }
 
   return { ok: true, files: files as LandedFile[], dependencies: item.dependencies ?? [] };
+}
+
+const PUBLIC_ASSET = /["'`]\/((?:[a-z0-9_-]+\/)*[a-z0-9_.-]+\.(?:svg|png|jpe?g|webp|gif|avif))["'`]/gi;
+
+export function publicAssets(content: string): string[] {
+  return [...new Set([...content.matchAll(PUBLIC_ASSET)].map((m) => m[1]).filter((p) => !p.split('/').includes('..')))];
 }

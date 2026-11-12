@@ -5,6 +5,8 @@ import { RUIXEN_GROUP, RUIXEN_TEMPLATES } from './ruixen';
 import { groupTitle } from './library-groups';
 import { catalogue } from './catalogue';
 import { templateCard } from './cards';
+import { MotionFormat } from '@feega/motion-core/motion/doc';
+import { composedTemplate, sequentialIds } from '$lib/canvas/composition-template';
 
 const pinned = JSON.parse(readFileSync('libraries/ruixen/catalog.json', 'utf8')) as { items: { name: string; tier: string }[] };
 const free = new Set(pinned.items.filter((i) => i.tier === 'free').map((i) => i.name));
@@ -25,5 +27,10 @@ describe('the built-in Ruixen library', () => {
 
   it('gives every component a card agents plan from', () => {
     expect(RUIXEN_TEMPLATES.filter((e) => !templateCard(e.id)).map((e) => e.id)).toEqual([]);
+  });
+
+  it('composes every component into a frame, as Add to canvas does', () => {
+    const refused = RUIXEN_TEMPLATES.filter((e) => !composedTemplate(e, { format: MotionFormat.Landscape, values: {} }, [], sequentialIds()).ok).map((e) => e.id);
+    expect(refused).toEqual([]);
   });
 });

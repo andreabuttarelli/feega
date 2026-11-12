@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { freeCatalog, installable, registryUrl, supportPaths, type OssRegistry, type RegistryItem } from './registry';
+import { freeCatalog, installable, publicAssets, registryUrl, supportPaths, type OssRegistry, type RegistryItem } from './registry';
 
 const SHA = 'f6b20860623fa39122ac2b5f0e5bd29a9eb10941';
 
@@ -14,6 +14,10 @@ const oss: OssRegistry = {
 const item = (target: string, content = 'import { cn } from "@/lib/utils";', type = 'registry:ui'): RegistryItem => ({ name: 'halo-reel', type, files: [{ path: 'registry/ruixenui/halo-reel.tsx', target, content }] });
 
 describe('the pinned Ruixen catalog', () => {
+  it('publishes the images its demos show from the same commit', () => {
+    expect(freeCatalog(oss, SHA, '2026-11-12T00:00:00.000Z').publicBase).toBe(`https://raw.githubusercontent.com/ruixenui/ruixen.com/${SHA}/public/`);
+  });
+
   it('keeps the components of the open-source registry, pinned to one commit', () => {
     expect(freeCatalog(oss, SHA, '2026-11-12T00:00:00.000Z').items).toEqual([{ name: 'halo-reel', title: 'Halo Reel', description: 'Image cards on a ring.', tier: 'free', registry: registryUrl(SHA, 'halo-reel') }]);
   });
@@ -54,5 +58,11 @@ describe('a Ruixen registry item', () => {
 describe('the support files a Ruixen component imports', () => {
   it('are the shadcn primitives and hooks it names, never the site utils', () => {
     expect(supportPaths('import { Button } from "@/components/ui/button";\nimport { cn } from "@/lib/utils";\nimport { x } from "@/hooks/use-mounted";')).toEqual(['components/ui/button.tsx', 'hooks/use-mounted.ts']);
+  });
+});
+
+describe('the public files a Ruixen demo shows', () => {
+  it('are the site-root images it names; videos and paths that climb out stay behind', () => {
+    expect(publicAssets('<img src="/logos/gong.svg" /> src: "/avatar-images/avatar-01.jpg" href="/docs" src="/../x.png" src="/demo.mp4"')).toEqual(['logos/gong.svg', 'avatar-images/avatar-01.jpg']);
   });
 });
