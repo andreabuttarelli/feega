@@ -191,8 +191,12 @@ impl World {
         self.uses.flagged().iter().any(|u| u.hold)
     }
 
-    fn lifted(&self, u: &UseItem) -> bool {
+    fn moving(&self, u: &UseItem) -> bool {
         u.hold && self.rest.get(&u.clip).is_none_or(|(_, matrix)| *matrix != u.matrix)
+    }
+
+    fn lifted(&self, u: &UseItem) -> bool {
+        self.moving(u) && !self.uses.over(&u.clip).into_iter().any(|o| !self.moving(o))
     }
 
     fn mark_scene(&mut self, rect: Option<Rect>) {
@@ -216,8 +220,9 @@ impl World {
             if !u.hold {
                 self.rest.insert(u.clip.clone(), (u.group.clone(), u.matrix));
             }
-            let now_scene = !self.lifted(&u);
+            let clip = u.clip.clone();
             let old = self.uses.put(u, fresh);
+            let now_scene = !self.lifted(self.uses.get(&clip).expect("just put"));
             let Some((old, was_scene)) = old.zip(was_scene) else {
                 self.mark_use(fresh, now_scene);
                 continue;
@@ -303,7 +308,7 @@ impl World {
     }
 
     pub fn overlay(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
-        let held = self.visit(self.uses.flagged()).into_iter().filter(|u| self.lifted(u) && self.shifted_from_rest(u).is_none()).map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
+        let held = self.visit(self.uses.flagged()).into_iter().filter(|u| self.lifted(u)).map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
         let items = held.chain(OVERLAY_PARTS.iter().flat_map(|p| {
             let part = &self.overlays[p.index()];
             match &part.at {

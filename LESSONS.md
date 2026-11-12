@@ -3859,3 +3859,7 @@ Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start
 ## A field added to the token map vanishes when the node is read back
 
 **Signal:** a feature works when a test hands its map to the server function, and the UI shows nothing (code changes: "No edits to send yet") after a real import. **Move:** whatever is stored in `nodes.data` is read through a zod schema (`codeOriginSchema` in `motion-node.ts`); a plain `z.object` drops unknown keys without a word. A new field on `TokenEntry` goes into that schema in the same change, and the test goes through the read (`codeChanges` with a mocked `findNode`), not around it.
+
+## A dragged element moves with what lies on top of it
+
+**Signal:** on the tiled canvas a dragged element carries the element above it, looks blurry, or vanishes while only its selection ring moves; `?coreTiles=0` draws it right. **Cause:** a drag layer built from copies of screen tiles holds every pixel in that area, not the element. **Move:** a drag layer is rastered from the element alone; when something above overlaps it, leave it in the tiles and damage old and new bounds. Bisect with `npm run perf:free-drag` (headed Chromium, local `.feega`, pixels sampled off selection-ring lines: a ring through the sample point reads as a miss).
