@@ -2,6 +2,7 @@
   import '$lib/site/site.css';
   import SiteHeader from '$lib/site/SiteHeader.svelte';
   import SiteFooter from '$lib/site/SiteFooter.svelte';
+  import CanvasEnding from '$lib/site/CanvasEnding.svelte';
   import { page } from '$app/state';
   import { SITE_URL } from '$lib/site/links';
   import { pageTitle } from '$lib/site/llms';
@@ -44,5 +45,9 @@
   <main>
     {@render children()}
   </main>
-  <SiteFooter />
+  {#if page.url.pathname === '/'}
+    <CanvasEnding pick=".mark"><SiteFooter /></CanvasEnding>
+  {:else}
+    <SiteFooter />
+  {/if}
 </div>
