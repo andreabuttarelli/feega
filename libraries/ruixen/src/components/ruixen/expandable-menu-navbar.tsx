@@ -50,7 +50,7 @@ const DEFAULT_SECTIONS: NavSection[] = [
       { label: "Contact" },
       { label: "Newsletter", meta: "monthly" },
       { label: "Twitter", meta: "↗", external: true },
-      { label: "GitHub", meta: "↗", external: true },
+      { label: "Brambleworks", meta: "↗", external: true },
     ],
   },
 ];

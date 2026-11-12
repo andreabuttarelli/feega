@@ -10,10 +10,10 @@ const cases: CaseStudy[] = [
   {
     brand: {
       id: "coinflect",
-      name: "Coinflect",
+      name: "Pennaro",
       logo: (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src="/logos/coinflect.svg" alt="Coinflect" className={LOGO_CLS} />
+        <img src="/marks/pennaro.svg" alt="Pennaro" className={LOGO_CLS} />
       ),
     },
     quote:
@@ -27,10 +27,10 @@ const cases: CaseStudy[] = [
   {
     brand: {
       id: "ternary",
-      name: "Ternary",
+      name: "Thrennic",
       logo: (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src="/logos/ternary.svg" alt="Ternary" className={LOGO_CLS} />
+        <img src="/marks/thrennic.svg" alt="Thrennic" className={LOGO_CLS} />
       ),
     },
     quote:
@@ -44,10 +44,10 @@ const cases: CaseStudy[] = [
   {
     brand: {
       id: "percy",
-      name: "Percy",
+      name: "Pellin",
       logo: (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src="/logos/percy.svg" alt="Percy" className={LOGO_CLS} />
+        <img src="/marks/pellin.svg" alt="Pellin" className={LOGO_CLS} />
       ),
     },
     quote:

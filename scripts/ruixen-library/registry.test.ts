@@ -38,6 +38,11 @@ describe('a Ruixen registry item', () => {
     expect(installable(registryUrl(SHA, 'halo-reel-demo'), demo)).toMatchObject({ ok: true, files: [{ content: 'import HaloReel from "@/components/ruixen/halo-reel";' }] });
   });
 
+  it('lands without the third-party logos it ships with', () => {
+    const cloud = item('components/ruixen/halo-reel.tsx', 'const logos = [{ name: "Vercel" }];');
+    expect(installable(registryUrl(SHA, 'halo-reel'), cloud)).toMatchObject({ ok: true, files: [{ content: 'const logos = [{ name: "Halcyon" }];' }] });
+  });
+
   it('an item served from Ruixen Pro never lands', () => {
     expect(installable('https://pro.ruixen.com/r/intellune.json', item('components/ruixen/halo-reel.tsx')).ok).toBe(false);
   });
@@ -63,6 +68,7 @@ describe('the support files a Ruixen component imports', () => {
 
 describe('the public files a Ruixen demo shows', () => {
   it('are the site-root images it names; videos and paths that climb out stay behind', () => {
+    expect(publicAssets('<img src="/marks/belltide.svg" />')).toEqual([]);
     expect(publicAssets('<img src="/logos/gong.svg" /> src: "/avatar-images/avatar-01.jpg" href="/docs" src="/../x.png" src="/demo.mp4"')).toEqual(['logos/gong.svg', 'avatar-images/avatar-01.jpg']);
   });
 });

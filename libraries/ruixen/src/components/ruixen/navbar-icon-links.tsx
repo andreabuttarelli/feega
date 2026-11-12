@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Github, Twitter } from "lucide-react";
+import { Code, AtSign } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -15,8 +15,8 @@ export interface NavbarIconLinksProps {
 }
 
 const iconMap = {
-  github: Github,
-  twitter: Twitter,
+  github: Code,
+  twitter: AtSign,
 };
 
 export default function NavbarIconLinks({
@@ -27,7 +27,7 @@ export default function NavbarIconLinks({
     { label: "Blog", href: "#" },
   ],
   socials = [
-    { icon: "github", href: "#", label: "GitHub" },
+    { icon: "github", href: "#", label: "Brambleworks" },
     { icon: "twitter", href: "#", label: "Twitter" },
   ],
   cta = { label: "Get Started", href: "#" },
