@@ -42,7 +42,7 @@
   import { Reach, assetTier, keptTier } from '$lib/canvas/core/asset-tier';
   import type { AssetSize } from '$lib/canvas/asset-url';
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
-  import { backendLog, debugActive, debugStart, gestureLog, renderLog, tierLog } from '$lib/canvas/core/debug-log';
+  import { backendLog, consoleSink, debugActive, debugStart, gestureLog, renderLog, teeSink, tierLog } from '$lib/canvas/core/debug-log';
   import { readClips, type CustomFrame, type CustomReads } from '@feega/motion-core/motion/gpu-full/dom/custom';
   import type { Picture, Pictures } from '@feega/motion-core/motion/gpu-full/raster';
   import { Stand, drawable, fillOrder, firstDrawn, inView, layersOf, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
@@ -71,7 +71,6 @@
   let { frames, edited = new Set(), order = [], live = new Map(), listenLive = () => () => {}, known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, lift = null, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, place = null, sourceUrl, onready, onsource = () => {}, onthumb = () => {}, onfallback, onbackend = () => {} }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; listenLive?: (listener: LiveListener) => () => void; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; lift?: Lift | null; look?: Look; view: Viewport; area: { width: number; height: number }; place?: { projectId: string; canvasId: string; orgId?: string; userId?: string; look?: string } | null; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onthumb?: (id: string, revision: number, blob: Blob, size: { width: number; height: number }) => void; onfallback: (why: string) => void; onbackend?: (change: BackendSwitch) => void } = $props();
 
   markStartup(StartupStep.Mounted);
-  debugStart();
 
   const NATIVE = { name: GpuBackend.Native, create: createCoreNative };
   const WEBGPU = { name: GpuBackend.WebGpu, create: createCore };
@@ -109,11 +108,13 @@
   const flight = startFlight({
     canvasId: untrack(() => place?.canvasId ?? ''),
     device: currentDevice(),
+    crash: { diedBefore: crashes.diedBefore, before: crashes.before },
     read: () => {
       const s = crashes.sample;
       return { x: view.x, y: view.y, zoom: view.zoom, camera, moving: gesture.active() ? 1 : 0, frames: frames.length, held: held.length, waiting, framePuts: framePuts.length, put: put.size, pictured: pictured.size, backend: BACKENDS[backend].name, backing: s.canvas, cacheBytes, textureBytes: s.textureBytes, textures: s.textures, texturesMade: s.texturesCreated, pictureBytes: s.pictureBytes, scratchBytes: s.scratchBytes, wasmBytes: s.wasmBytes, gpuLagMs: s.gpuLagMs };
     }
   });
+  debugStart(undefined, flight ? teeSink(consoleSink, flight.sink) : consoleSink);
   const EDIT_GIVE_UP_MS = 10_000;
   const editSeen = new Map<string, string>();
   const editsOwed = new Map<string, number>();

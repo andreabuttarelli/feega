@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FLIGHT_MAX_PENDING, Send, changed, closeMark, createFlightLog, finite, flightWanted, openMark, type FlightLine } from './flight-log';
+import { FLIGHT_MAX_PENDING, Send, changed, closeMark, createFlightLog, finite, flightWanted, keepaliveBudget, openMark, type FlightLine } from './flight-log';
 
 const shelf = () => {
   const kept = new Map<string, string>();
@@ -115,5 +115,16 @@ describe('a sample', () => {
     expect(changed({ zoom: 1, x: 2 }, { zoom: 1, x: 2 })).toBe(false);
     expect(changed({ zoom: 1, x: 2 }, { zoom: 1, x: 3 })).toBe(true);
     expect(changed(null, { zoom: 1 })).toBe(true);
+  });
+});
+
+describe('the keepalive budget', () => {
+  it('lends keepalive while the bytes in flight fit, and plain fetch past it', () => {
+    const budget = keepaliveBudget(100);
+
+    expect(budget.take(60)).toBe(true);
+    expect(budget.take(60)).toBe(false);
+    budget.give(60);
+    expect(budget.take(60)).toBe(true);
   });
 });

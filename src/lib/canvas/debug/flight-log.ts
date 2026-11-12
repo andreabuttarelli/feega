@@ -99,3 +99,19 @@ export function createFlightLog({ clock, send }: FlightDeps) {
 }
 
 export type FlightLog = ReturnType<typeof createFlightLog>;
+
+export function keepaliveBudget(bytes: number) {
+  let inFlight = 0;
+  return {
+    take(size: number): boolean {
+      if (inFlight + size > bytes) {
+        return false;
+      }
+      inFlight += size;
+      return true;
+    },
+    give(size: number): void {
+      inFlight -= size;
+    }
+  };
+}

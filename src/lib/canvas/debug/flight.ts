@@ -1,7 +1,8 @@
 import { version } from '$app/environment';
 import { CORE_VERSION } from '@feega/motion-core/motion/gpu-full/core-version';
 import { probeGpu } from '$lib/canvas/gpu/gpu-probe';
-import { Send, changed, closeMark, createFlightLog, finite, flightWanted, openMark, type FlightLine, type FlightLog, type Previous, type Props, type Shelf } from './flight-log';
+import { debugEnabled, type Sink } from '$lib/canvas/core/debug-log';
+import { Send, changed, closeMark, createFlightLog, finite, keepaliveBudget, openMark, type FlightLine, type FlightLog, type Previous, type Props, type Shelf } from './flight-log';
 
 const DEBUG_URL = '/api/v1/telemetry/canvas-debug';
 const BATCH_VERSION = 1;
@@ -14,15 +15,14 @@ const NOTABLE_LAG_MS = 50;
 const EVENTS_PER_KIND = 300;
 const BIG_TEXTURE_BYTES = 4 * 1024 * 1024;
 const BIG_RESOURCE_BYTES = 256 * 1024;
+const KEEPALIVE_BYTES = 48 * 1024;
 const SESSION_CHARS = 10;
-const SOURCES = /\/motion\/sources\?/;
-const FRAME_STEPS = new Set(['asked', 'built', 'drawn', 'sharp', 'images']);
-const UNCOUNTED = new Set(['sample', 'gesture']);
+const UNCOUNTED = new Set(['sample', 'gesture', 'log']);
 const WRAPPED = Symbol.for('feega.flight');
 
-export type FlightEnv = { search: string; tab: Shelf | null };
-export type FlightPlace = { canvasId: string; device: string; read: () => Props };
-export type Flight = { session: string; previous: Previous | null; stop: () => void };
+export type FlightEnv = { on: boolean; tab: Shelf | null };
+export type FlightPlace = { canvasId: string; device: string; crash: Props; read: () => Props };
+export type Flight = { session: string; previous: Previous | null; sink: Sink; stop: () => void };
 
 type Recorder = { log: FlightLog; counts: Map<string, number> };
 
@@ -46,7 +46,7 @@ const flushNow = () => active?.log.flush(Send.Fetch);
 
 function browserEnv(): FlightEnv {
   if (typeof window === 'undefined') {
-    return { search: '', tab: null };
+    return { on: false, tab: null };
   }
   let tab: Shelf | null = null;
   try {
@@ -54,17 +54,21 @@ function browserEnv(): FlightEnv {
   } catch {
     tab = null;
   }
-  return { search: location.search, tab };
+  return { on: debugEnabled(), tab };
 }
 
 function poster(session: string, canvas: string) {
+  const budget = keepaliveBudget(KEEPALIVE_BYTES);
   return (lines: FlightLine[], how: Send) => {
     const body = JSON.stringify({ v: BATCH_VERSION, session, canvas, lines });
     try {
       if (how === Send.Beacon && navigator.sendBeacon?.(DEBUG_URL, new Blob([body], { type: 'application/json' }))) {
         return;
       }
-      void fetch(DEBUG_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body, keepalive: true }).catch(() => undefined);
+      const keepalive = budget.take(body.length);
+      void fetch(DEBUG_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body, keepalive })
+        .catch(() => undefined)
+        .finally(() => keepalive && budget.give(body.length));
     } catch {
       return;
     }
@@ -196,23 +200,8 @@ function watchEntries(): () => void {
     const r = e as PerformanceResourceTiming & { responseStatus?: number };
     const bytes = r.transferSize || r.encodedBodySize;
     const ms = Math.round(r.responseEnd - r.startTime);
-    if (SOURCES.test(r.name)) {
-      flightNote('sources', { frames: new URL(r.name, location.href).searchParams.get('ids')?.split(',').length ?? 1, bytes, ms, status: r.responseStatus ?? null });
-      return;
-    }
     if (bytes >= BIG_RESOURCE_BYTES || (r.responseStatus ?? 0) >= 400) {
       flightNote('asset', { host: hostOf(r.name), initiator: r.initiatorType, bytes, decoded: r.decodedBodySize, ms, status: r.responseStatus ?? null });
-    }
-  });
-
-  observe('mark', (e) => {
-    const [kind, step, group = ''] = e.name.split('|');
-    if (kind === 'startup') {
-      flightNote('startup', { step, at: Math.round(e.startTime) });
-      return;
-    }
-    if (kind === 'frame' && FRAME_STEPS.has(step)) {
-      flightNote('frame', { step, id: group.split(':')[0], at: Math.round(e.startTime) });
     }
   });
 
@@ -253,7 +242,7 @@ function heapBytes(): number | null {
 const pinchDistance = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
 
 export function startFlight(place: FlightPlace, env: FlightEnv = browserEnv()): Flight | null {
-  if (!env.tab || active || !flightWanted(env.search, env.tab)) {
+  if (!env.tab || active || !env.on) {
     return null;
   }
   const tab = env.tab;
@@ -262,7 +251,7 @@ export function startFlight(place: FlightPlace, env: FlightEnv = browserEnv()): 
   const log = createFlightLog({ clock: () => performance.now(), send: poster(session, place.canvasId) });
   active = { log, counts: new Map() };
 
-  flightNote('start', { ...deviceFacts(), device: place.device, previous });
+  flightNote('start', { ...deviceFacts(), device: place.device, previous, crash: place.crash });
   watchAdapters();
   watchWebGl();
   probeGpu(window as never).watch = (bytes, change) => bytes >= BIG_TEXTURE_BYTES && flightNote('texture', { change, bytes });
@@ -396,6 +385,7 @@ export function startFlight(place: FlightPlace, env: FlightEnv = browserEnv()): 
   return {
     session,
     previous,
+    sink: { line: (text) => flightNote('log', { text }), group: (text, lines) => flightNote('log', { text, lines }) },
     stop() {
       flightNote('stop');
       log.flush(Send.Fetch);

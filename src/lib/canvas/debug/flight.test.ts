@@ -6,15 +6,15 @@ const tab = () => {
   return { getItem: (k: string) => kept.get(k) ?? null, setItem: (k: string, v: string) => void kept.set(k, v), removeItem: (k: string) => void kept.delete(k) };
 };
 
-const place = { canvasId: 'c1', device: 'phone', read: () => ({}) };
+const place = { canvasId: 'c1', device: 'phone', crash: {}, read: () => ({}) };
 
 describe('the flight recorder', () => {
   it('does not start for a canvas opened without ?debug', () => {
-    expect(startFlight(place, { search: '', tab: tab() })).toBeNull();
+    expect(startFlight(place, { on: false, tab: tab() })).toBeNull();
     expect(() => flightNote('error', { message: 'x' })).not.toThrow();
   });
 
   it('does not start where the tab has no storage', () => {
-    expect(startFlight(place, { search: '?debug', tab: null })).toBeNull();
+    expect(startFlight(place, { on: true, tab: null })).toBeNull();
   });
 });
