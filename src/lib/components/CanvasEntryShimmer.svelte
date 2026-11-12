@@ -47,12 +47,12 @@
     overflow: hidden;
   }
 
-  .entry-stage :global(.switcher-btn),
+  .entry-stage :global(.project-name),
   .entry-stage :global(.credits) {
     position: relative;
   }
 
-  .entry-stage :global(.switcher-btn) {
+  .entry-stage :global(.project-name) {
     width: 220px;
   }
 
@@ -60,12 +60,12 @@
     min-width: 101px;
   }
 
-  .entry-stage :global(.switcher-btn > *),
+  .entry-stage :global(.project-name > *),
   .entry-stage :global(.credits > *) {
     visibility: hidden;
   }
 
-  .entry-stage :global(.switcher-btn)::after,
+  .entry-stage :global(.project-name)::after,
   .entry-stage :global(.credits)::after {
     content: '';
     position: absolute;
@@ -112,7 +112,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .entry-stage :global(.switcher-btn)::after,
+    .entry-stage :global(.project-name)::after,
     .entry-stage :global(.credits)::after {
       animation: none;
     }
