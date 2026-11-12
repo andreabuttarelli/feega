@@ -12,7 +12,7 @@ export const NO_SIGHT: Sight = { onScreen: new Set(), near: new Set(), view: { x
 
 export const SIGHT_SLACK = 0.25;
 
-const grown = (v: Viewport, a: Screen, by: number) => ({ view: { x: v.x + a.width * by, y: v.y + a.height * by, zoom: v.zoom }, area: { width: a.width * (1 + 2 * by), height: a.height * (1 + 2 * by) } });
+export const grown = (v: Viewport, a: Screen, by: number) => ({ view: { x: v.x + a.width * by, y: v.y + a.height * by, zoom: v.zoom }, area: { width: a.width * (1 + 2 * by), height: a.height * (1 + 2 * by) } });
 
 export const widened = (v: Viewport, a: Screen) => grown(v, a, AHEAD_REACH);
 
