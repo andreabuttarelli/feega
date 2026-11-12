@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { KEY_REGION_ATTR, Region, claimFocus, regionOf, reachesCanvas } from './key-region.svelte';
+import { KEY_REGION_ATTR, Region, claimFocus, regionOf, reachesCanvas, reachesTimeline, releaseFocus, keyOnCanvas } from './key-region.svelte';
 import { matchCanvasShortcut } from './shortcuts';
 
 function tree() {
   document.body.innerHTML = `
     <div ${KEY_REGION_ATTR}="${Region.Canvas}"><div id="node"><button id="node-bar"></button></div></div>
     <div ${KEY_REGION_ATTR}="${Region.Layers}"><div id="row" tabindex="-1"></div></div>
-    <aside><button id="fill-eye"></button><button id="section-head"></button></aside>
+    <aside><button id="fill-eye"></button><button id="section-head"></button><input id="field" /><textarea id="chat"></textarea></aside>
+    <div ${KEY_REGION_ATTR}="${Region.Commands}"><button id="tool"></button><input id="rename" /></div>
     <div role="menu" id="menu" tabindex="-1"></div>`;
   return (id: string) => document.getElementById(id)!;
 }
@@ -91,5 +92,93 @@ describe('key region', () => {
     $('fill-eye').focus();
     down($('row'));
     expect(document.activeElement).toBe($('fill-eye'));
+  });
+
+  it('a toolbar button clicked with the pointer hands key focus back to the canvas', () => {
+    const $ = tree();
+    $('tool').focus();
+
+    releaseFocus(new MouseEvent('click', { bubbles: true, detail: 1 }));
+
+    expect(document.activeElement).toBe(document.body);
+    expect(press(document.body, 'v')).toBe(true);
+  });
+
+  it('a toolbar button activated by keyboard keeps focus, and canvas letters stay out of the toolbar', () => {
+    const $ = tree();
+    $('tool').focus();
+
+    releaseFocus(new MouseEvent('click', { bubbles: true, detail: 0 }));
+
+    expect(document.activeElement).toBe($('tool'));
+    for (const key of PANEL_KEYS) {
+      expect(press($('tool'), key), key).toBe(false);
+    }
+  });
+
+  it('a field inside a toolbar keeps focus after a pointer click, so it can be typed in', () => {
+    const $ = tree();
+    $('rename').focus();
+
+    releaseFocus(new MouseEvent('click', { bubbles: true, detail: 1 }));
+
+    expect(document.activeElement).toBe($('rename'));
+  });
+
+  it('a pointer click on an inspector control keeps its focus', () => {
+    const $ = tree();
+    $('fill-eye').focus();
+
+    releaseFocus(new MouseEvent('click', { bubbles: true, detail: 1 }));
+
+    expect(document.activeElement).toBe($('fill-eye'));
+  });
+
+  it('timeline keys act from the canvas and the timeline, never from a panel, field or toolbar', () => {
+    const $ = tree();
+
+    expect(reachesTimeline(regionOf(document.body))).toBe(true);
+    expect(reachesTimeline(regionOf($('row')))).toBe(true);
+    expect(reachesTimeline(regionOf($('field')))).toBe(false);
+    expect(reachesTimeline(regionOf($('fill-eye')))).toBe(false);
+    expect(reachesTimeline(regionOf($('tool')))).toBe(false);
+  });
+
+  it('typing in the chat, a rename field or an inspector field never reaches a canvas or timeline window listener', () => {
+    const $ = tree();
+    const keys = ['v', 'r', 'i', 'o', ' ', '5', 'ArrowLeft', 'ArrowRight', 'Delete', 'Backspace', 'Escape', 'Enter', 'F9', '/'];
+    const gates = {
+      canvasOnly: (e: KeyboardEvent) => keyOnCanvas(e),
+      timeline: (e: KeyboardEvent) => reachesTimeline(regionOf(e.target))
+    };
+
+    for (const id of ['chat', 'rename', 'field']) {
+      for (const [gate, reaches] of Object.entries(gates)) {
+        for (const key of keys) {
+          let heard = false;
+          const listen = (e: KeyboardEvent) => (heard = reaches(e));
+          window.addEventListener('keydown', listen);
+          $(id).dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+          window.removeEventListener('keydown', listen);
+          expect(heard, `${gate} ${id} ${key}`).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('canvas-only listeners hear keys with focus on the canvas, not from the layers list', () => {
+    const $ = tree();
+    const heard = (target: Element) => {
+      let ok = false;
+      const listen = (e: KeyboardEvent) => (ok = keyOnCanvas(e));
+      window.addEventListener('keydown', listen);
+      target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      window.removeEventListener('keydown', listen);
+      return ok;
+    };
+
+    expect(heard(document.body)).toBe(true);
+    expect(heard($('node-bar'))).toBe(true);
+    expect(heard($('row'))).toBe(false);
   });
 });

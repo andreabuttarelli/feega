@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { reachesTimeline, regionOf } from '$lib/canvas/key-region.svelte';
   import { pressMenu, type Point } from '$lib/motion/press-menu';
   import { haptic } from '$lib/native-actions';
   import { PickMode } from '$lib/motion/clip-bar';
@@ -633,7 +634,7 @@
   }
 
   function onKeys(e: KeyboardEvent) {
-    if (!(e.metaKey || e.ctrlKey) || e.altKey || isTypingTarget(e.target)) {
+    if (!(e.metaKey || e.ctrlKey) || e.altKey || !reachesTimeline(regionOf(e.target)) || isTypingTarget(e.target)) {
       return;
     }
     if (e.key === 'Enter') {

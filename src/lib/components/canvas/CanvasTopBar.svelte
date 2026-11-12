@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Region } from '$lib/canvas/key-region.svelte';
   import { _ } from 'svelte-i18n';
   import { cn } from '$lib/utils';
   import MessageSquare from '@lucide/svelte/icons/message-square';
@@ -61,7 +62,7 @@
 
 </script>
 
-<header class="canvas-topbar">
+<header class="canvas-topbar" data-key-region={Region.Commands}>
   <div class="top-box top-group left">
     <CanvasMenu {projectId} {profile} {org} {creditBalance} />
 

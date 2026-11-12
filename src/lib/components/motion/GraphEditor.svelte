@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { reachesTimeline, regionOf } from '$lib/canvas/key-region.svelte';
   import IconButton from './IconButton.svelte';
   import { Action } from '$lib/motion/actions';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
@@ -164,7 +165,7 @@
   }
 
   function onKey(e: KeyboardEvent) {
-    if (e.key !== 'F9' || (e.target as HTMLElement | null)?.closest('input, textarea, select')) {
+    if (e.key !== 'F9' || !reachesTimeline(regionOf(e.target)) || (e.target as HTMLElement | null)?.closest('input, textarea, select')) {
       return;
     }
     e.preventDefault();

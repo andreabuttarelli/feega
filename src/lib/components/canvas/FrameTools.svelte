@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { keyOnCanvas } from '$lib/canvas/key-region.svelte';
   import DrawOverlay from '$lib/components/motion/DrawOverlay.svelte';
   import ShapeBuilderOverlay from '$lib/components/motion/ShapeBuilderOverlay.svelte';
   import MaskOverlay from '$lib/components/motion/MaskOverlay.svelte';
@@ -97,7 +98,7 @@
   const editable = (e: Event) => (tool === DrawTool.Select && !pointEdit && only && editsPoints(doc, only) && !isTyping(e.target as HTMLElement | null) ? only : null);
 
   function enter(e: KeyboardEvent) {
-    const clip = e.key === 'Enter' && !e.shiftKey ? editable(e) : null;
+    const clip = e.key === 'Enter' && !e.shiftKey && keyOnCanvas(e) ? editable(e) : null;
     if (clip) {
       editPoints(e, clip);
     }
