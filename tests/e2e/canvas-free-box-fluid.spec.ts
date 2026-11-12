@@ -2,6 +2,7 @@ import type { Locator, Page } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { pickBarTool } from './fixtures/canvas-bar';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { selectionCount, selectionBox } from './fixtures/canvas-marks';
 
 const MOVES = 5;
 const STEP = 70;
@@ -92,9 +93,9 @@ async function headDoc(admin: SupabaseClient, nodeId: string) {
 }
 
 async function expectFilled(page: Page, tile: Locator) {
-  await expect(page.getByTestId('frame-selection')).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => selectionCount(page), { timeout: 10_000 }).toBeGreaterThan(0);
   const node = (await tile.boundingBox())!;
-  const shape = (await page.getByTestId('frame-selection').boundingBox())!;
+  const shape = (await selectionBox(page))!;
   for (const [a, b, what] of [
     [shape.x, node.x, 'left'],
     [shape.y, node.y, 'top'],

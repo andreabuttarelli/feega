@@ -1,5 +1,6 @@
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import type { Page } from '@playwright/test';
+import { selectionCount } from './fixtures/canvas-marks';
 
 const SETTLE_MS = 3000;
 const FAR = 1500;
@@ -93,6 +94,6 @@ test.describe('frame titles and picking on the core canvas @real', () => {
     await page.waitForTimeout(SETTLE_MS);
     await page.mouse.click(element.x, element.y);
     await page.screenshot({ path: `${SHOTS}/titles-picked-shadow.png` });
-    await expect(page.getByTestId('frame-selection')).toHaveCount(1, { timeout: 15_000 });
+    await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBe(1);
   });
 });

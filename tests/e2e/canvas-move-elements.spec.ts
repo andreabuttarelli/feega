@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { Page, Locator } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { selectionBox } from './fixtures/canvas-marks';
 
 const STAGE_W = 420;
 const canvasAction = (name: string) => (r: { url(): string }) => new URL(r.url()).searchParams.get('action') === name;
@@ -91,7 +92,7 @@ test.describe('moving elements between frames @real', () => {
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     const from = await openAndGrab(page, a);
-    const seen = (await page.getByTestId('frame-selection').boundingBox())!;
+    const seen = (await selectionBox(page))!;
     const stage = (await stageOf(page, a).boundingBox())!;
     const viewport = page.viewportSize()!;
     await dragTo(page, from, { x: viewport.width - 120, y: viewport.height - 120 });

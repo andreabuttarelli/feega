@@ -134,3 +134,13 @@ fn handles_on_the_ring_sit_on_its_centre_line() {
     let items = marks(RING).items([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]);
     assert_eq!(bounds(&items[1]), [-6.0, -6.0, 2.0, 2.0]);
 }
+
+#[test]
+fn a_mark_with_its_own_reach_is_hit_farther_out() {
+    let node = RING.replace("\"boosted\":true", "\"boosted\":true,\"edges\":true,\"hitReach\":8");
+    let m = marks(&node);
+    let id = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+    assert_eq!(m.hit(id, 5.0, 5.0).map(|h| (h.part, h.n)), Some((Part::Handle, 0)));
+    assert_eq!(m.hit(id, 50.0, 107.0).map(|h| (h.part, h.n)), Some((Part::Edge, 5)));
+    assert!(marks(RING).hit(id, 5.0, 5.0).is_none());
+}

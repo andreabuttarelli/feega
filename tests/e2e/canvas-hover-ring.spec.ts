@@ -1,6 +1,7 @@
 import { homedir } from 'node:os';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { selectionCount } from './fixtures/canvas-marks';
 
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 const BOX_ID = 'box';
@@ -71,7 +72,7 @@ test.describe('hover ring and resize cursors @real', () => {
     await expect(async () => {
       await page.mouse.move(grab.x - 2, grab.y);
       await page.mouse.click(grab.x, grab.y);
-      await expect(page.getByTestId('frame-selection')).toBeVisible({ timeout: 1500 });
+      await expect.poll(() => selectionCount(page), { timeout: 1500 }).toBeGreaterThan(0);
     }).toPass({ timeout: 25_000 });
     await page.mouse.move(grab.x + 1, grab.y);
     await expect(page.getByTestId('frame-pick-box')).toBeVisible();

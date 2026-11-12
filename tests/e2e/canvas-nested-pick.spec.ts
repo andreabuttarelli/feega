@@ -2,6 +2,7 @@ import { homedir } from 'node:os';
 import { mkdirSync, readFileSync } from 'node:fs';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { selectionCount } from './fixtures/canvas-marks';
 
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 const SHOTS = `${homedir()}/Documents/feega-videos/editor-modes`;
@@ -53,7 +54,7 @@ test.describe('nested pick like Figma @real', () => {
     await page.screenshot({ path: `${SHOTS}/pick-hover-deep.png` });
 
     await page.mouse.click(overText.x, overText.y);
-    await expect(page.getByTestId('frame-selection')).toBeVisible();
+    await expect.poll(() => selectionCount(page)).toBeGreaterThan(0);
     await page.mouse.dblclick(overText.x, overText.y);
     expect(await hoverAt(page, overOther)).toBe(nested.other);
     await page.screenshot({ path: `${SHOTS}/pick-inside-section.png` });

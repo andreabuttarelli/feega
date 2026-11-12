@@ -1,6 +1,7 @@
 import { homedir } from 'node:os';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import { setColour } from './fixtures/colour';
+import { selectionCount } from './fixtures/canvas-marks';
 
 const SHOTS = process.env.FIG_SHOTS ?? `${homedir()}/Documents/feega-videos/e2e`;
 const SETTLE_MS = 2500;
@@ -41,7 +42,7 @@ test.describe('components inside a canvas frame @real', () => {
     await page.mouse.click(box.x + 4, box.y + 4);
     await page.waitForTimeout(SETTLE_MS);
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    await expect(page.getByTestId('frame-selection').first()).toBeVisible({ timeout: 15_000 });
+    await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBeGreaterThan(0);
 
     await page.keyboard.press('Alt+Meta+k');
     const inspector = page.getByTestId('instance-inspector');
@@ -71,7 +72,7 @@ test.describe('components inside a canvas frame @real', () => {
     await page.mouse.click(box.x + 4, box.y + 4);
     await page.waitForTimeout(SETTLE_MS);
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    await expect(page.getByTestId('frame-selection').first()).toBeVisible({ timeout: 15_000 });
+    await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBeGreaterThan(0);
 
     await page.keyboard.press('Alt+Meta+k');
     await expect(page.getByTestId('instance-inspector')).toBeVisible({ timeout: 15_000 });
@@ -113,7 +114,7 @@ test.describe('components inside a canvas frame @real', () => {
     await page.waitForTimeout(SETTLE_MS);
     const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
     await page.mouse.click(centre.x, centre.y);
-    await expect(page.getByTestId('frame-selection').first()).toBeVisible({ timeout: 15_000 });
+    await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBeGreaterThan(0);
     await page.keyboard.press('Alt+Meta+k');
     await expect(page.getByTestId('instance-inspector')).toBeVisible({ timeout: 15_000 });
 
@@ -158,7 +159,7 @@ test.describe('components inside a canvas frame @real', () => {
     await page.mouse.click(box.x + 4, box.y + 4);
     await page.waitForTimeout(SETTLE_MS);
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    await expect(page.getByTestId('frame-selection').first()).toBeVisible({ timeout: 15_000 });
+    await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBeGreaterThan(0);
     await page.keyboard.press('Alt+Meta+k');
     await expect(page.getByTestId('instance-inspector')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId('instance-push')).toBeDisabled();
@@ -200,7 +201,7 @@ test.describe('components inside a canvas frame @real', () => {
     await page.mouse.click(box.x + 4, box.y + 4);
     await page.waitForTimeout(SETTLE_MS);
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    await expect(page.getByTestId('frame-selection').first()).toBeVisible({ timeout: 15_000 });
+    await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBeGreaterThan(0);
     await page.keyboard.press('Alt+Meta+k');
     await expect(page.getByTestId('instance-inspector')).toBeVisible({ timeout: 15_000 });
     await page.mouse.click(box.x + box.width / 2, 100);
@@ -239,7 +240,7 @@ test.describe('components inside a canvas frame @real', () => {
     await page.mouse.click(box.x + 4, box.y + 4);
     await page.waitForTimeout(SETTLE_MS);
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    await expect(page.getByTestId('frame-selection').first()).toBeVisible({ timeout: 15_000 });
+    await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBeGreaterThan(0);
 
     await page.keyboard.press('Alt+Meta+k');
     await expect(page.getByTestId('instance-inspector')).toBeVisible({ timeout: 15_000 });

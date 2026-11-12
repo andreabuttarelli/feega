@@ -2,6 +2,7 @@ import sharp from 'sharp';
 import type { Locator, Page } from '@playwright/test';
 import { pickBarTool } from './fixtures/canvas-bar';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { selectionCount, selectionBox } from './fixtures/canvas-marks';
 
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
@@ -53,7 +54,7 @@ async function drawBox(page: Page): Promise<void> {
   await page.mouse.down();
   await page.mouse.move(from.x + 160, from.y + 100, { steps: 3 });
   await page.mouse.up();
-  await expect(page.getByTestId('frame-selection')).toHaveCount(1, { timeout: 15_000 });
+  await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBe(1);
   await page.waitForTimeout(SETTLE_MS);
 }
 
@@ -117,7 +118,7 @@ test.describe('resize is live and handle-true on the GPU canvas @real', () => {
     await page.setViewportSize({ width: 1200, height: 800 });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     await drawBox(page);
-    const middle = centre((await page.getByTestId('frame-selection').boundingBox())!);
+    const middle = centre((await selectionBox(page))!);
     const corner = centre((await page.getByTestId('frame-selection-handle').nth(CORNER_BOTTOM_RIGHT).boundingBox())!);
     const grip = { x: corner.x + OUTSIDE_PX, y: corner.y + OUTSIDE_PX };
     const radius = Math.hypot(grip.x - middle.x, grip.y - middle.y);
@@ -160,7 +161,7 @@ test.describe('resize is live and handle-true on the GPU canvas @real', () => {
       await page.mouse.click(at.x, at.y);
       await page.waitForTimeout(SETTLE_MS);
       await page.mouse.click(at.x, at.y);
-      await expect(page.getByTestId('frame-selection')).toHaveCount(1, { timeout: 15_000 });
+      await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBe(1);
 
       const handles = page.getByTestId('frame-selection-handle');
       const grabbed = centre((await handles.nth(CORNER_BOTTOM_RIGHT).boundingBox())!);

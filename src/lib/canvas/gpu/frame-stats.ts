@@ -9,7 +9,7 @@ type Tally = Record<string, { n: number; ms: number }>;
 
 type Stats = { render: number[]; textures?: () => TextureReport; pending?: number; loseDevice?: () => void; counts?: Record<string, number>; tally?: Tally; reveal?: { ms: number; missing: string[] }; settled?: number; frames?: CoreFrameCount[]; marks?: StatsMarks };
 
-export type StatsMarks = { hit: (x: number, y: number) => { id: string; part: number; n: number } | null; rectOf: (id: string) => { x: number; y: number; w: number; h: number } | null };
+export type StatsMarks = { hit: (x: number, y: number) => { id: string; part: number; n: number } | null; rectOf: (id: string) => { x: number; y: number; w: number; h: number } | null; ids: () => string[] };
 
 declare global {
   interface Window {

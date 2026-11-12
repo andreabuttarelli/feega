@@ -668,7 +668,7 @@
     return e.cancelBubble;
   }
 
-  $effect(() => exposeMarks(engineMarks && core ? { hit: (x, y) => core?.hitMark(x, y) ?? null, rectOf: (id) => core?.markRect(id) ?? null } : undefined));
+  $effect(() => exposeMarks(engineMarks && core ? { hit: (x, y) => core?.hitMark(x, y) ?? null, rectOf: (id) => core?.markRect(id) ?? null, ids: () => engineDrawn.marks.map((m) => m.id) } : undefined));
 
   const posterCards = $derived(coreCards.filter((c) => c.poster));
   const nodeCards = $derived(coreCards.filter((c) => !c.poster));
@@ -1245,8 +1245,16 @@
 
   const topNodeAt = (w: Point): string | null => hitIndex.topAt(w);
 
+  function nodeGripAt(box: Box, w: Point): [number, number] | null {
+    if (!engineMarks) {
+      return resizeHandleAt(box, w, view.zoom);
+    }
+    const hit = core?.hitMark(view.x + w.x * view.zoom, view.y + w.y * view.zoom);
+    return hit && hit.id === box.id && hit.part !== MarkPart.Body ? handlesOf(UNIT_SQUARE)[hit.n].unit : null;
+  }
+
   function hitAt(w: Point): Hit {
-    const unit = resizable ? resizeHandleAt(selectedBoxes[0], w, view.zoom) : null;
+    const unit = resizable ? nodeGripAt(selectedBoxes[0], w) : null;
     if (unit) {
       return { kind: HitKind.Corner, nodeId: selectedBoxes[0].id, unit };
     }

@@ -1,8 +1,8 @@
-import { rgbaOf } from "@feega/motion-core/motion/gpu-full/rgba";
-import { SelectionKind } from "$lib/canvas/frame-transform";
-import { HIGHLIGHT, HighlightKind } from "$lib/canvas/highlight";
-import { NodeChrome } from "$lib/canvas/selection-chrome";
-import { ROTATE_REACH_PX } from "$lib/canvas/gpu/geometry";
+import { rgbaOf } from '@feega/motion-core/motion/gpu-full/rgba';
+import { SelectionKind } from '$lib/canvas/frame-transform';
+import { HIGHLIGHT, HighlightKind } from '$lib/canvas/highlight';
+import { NodeChrome } from '$lib/canvas/selection-chrome';
+import { CORNER_HIT_PX, ROTATE_REACH_PX } from '$lib/canvas/gpu/geometry';
 import {
   FAR_BOOST,
   FAR_BOOST_FULL_ZOOM,
@@ -10,7 +10,7 @@ import {
   HANDLE_SCREEN_PX,
   HOVER_SCREEN_PX,
   SELECT_SCREEN_PX,
-} from "./label-size";
+} from './label-size';
 
 export enum MarkPart {
   Body = 0,
@@ -20,15 +20,15 @@ export enum MarkPart {
 }
 
 export enum MarkLine {
-  Solid = "solid",
-  Dashed = "dashed",
-  None = "none",
+  Solid = 'solid',
+  Dashed = 'dashed',
+  None = 'none',
 }
 
 export enum MarkHandles {
-  None = "none",
-  Corners = "corners",
-  All = "all",
+  None = 'none',
+  Corners = 'corners',
+  All = 'all',
 }
 
 export type CanvasMark = {
@@ -43,6 +43,7 @@ export type CanvasMark = {
   handles: MarkHandles;
   onRing: boolean;
   boosted: boolean;
+  hitReach: number;
   body: boolean;
   edges: boolean;
   rotate: boolean;
@@ -108,13 +109,14 @@ const SELECTION_LINE: Record<SelectionKind, MarkLine> = {
 
 const QUIET: Omit<
   CanvasMark,
-  "id" | "quad" | "line" | "color" | "width" | "offset"
+  'id' | 'quad' | 'line' | 'color' | 'width' | 'offset'
 > = {
   opacity: 1,
   radius: 0,
   handles: MarkHandles.None,
   onRing: false,
   boosted: false,
+  hitReach: 0,
   body: false,
   edges: false,
   rotate: false,
@@ -125,14 +127,20 @@ export function boxCorners(b: Omit<MarkBox, 'id'>): [number, number][] {
     [b.x, b.y],
     [b.x + b.w, b.y],
     [b.x + b.w, b.y + b.h],
-    [b.x, b.y + b.h]
+    [b.x, b.y + b.h],
   ];
   if (!b.rotation) {
     return corners;
   }
   const [cx, cy] = [b.x + b.w / 2, b.y + b.h / 2];
-  const [cos, sin] = [Math.cos(b.rotation * DEGREES), Math.sin(b.rotation * DEGREES)];
-  return corners.map(([x, y]) => [cx + (x - cx) * cos - (y - cy) * sin, cy + (x - cx) * sin + (y - cy) * cos]);
+  const [cos, sin] = [
+    Math.cos(b.rotation * DEGREES),
+    Math.sin(b.rotation * DEGREES),
+  ];
+  return corners.map(([x, y]) => [
+    cx + (x - cx) * cos - (y - cy) * sin,
+    cy + (x - cx) * sin + (y - cy) * cos,
+  ]);
 }
 
 const boxQuad = (b: MarkBox): number[] => boxCorners(b).flat();
@@ -159,6 +167,8 @@ const NODE_RING: Record<
     boosted: true,
     handles: b.handles ? MarkHandles.Corners : MarkHandles.None,
     onRing: true,
+    edges: b.handles,
+    hitReach: CORNER_HIT_PX,
   }),
   [NodeChrome.Editing]: () => ({
     line: MarkLine.Dashed,
@@ -225,6 +235,7 @@ export function marksJson(
       handleRadius: px(look.handleRadius * HANDLE_ROUNDING[m.handles]),
       onRing: m.onRing,
       boosted: m.boosted,
+      hitReach: px(m.hitReach),
       body: m.body,
       edges: m.edges,
       rotate: m.rotate,

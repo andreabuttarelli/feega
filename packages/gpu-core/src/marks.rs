@@ -69,6 +69,8 @@ pub struct Mark {
     #[serde(default)]
     boosted: bool,
     #[serde(default)]
+    hit_reach: f64,
+    #[serde(default)]
     body: bool,
     #[serde(default)]
     edges: bool,
@@ -241,7 +243,7 @@ fn dashes(f: &Frame, mid: f64, width: f64, dash: f64) -> Vec<Vec<f64>> {
 
 fn hit_in(m: &Mark, look: &MarkLook, f: &Frame, p: Pt) -> Option<(Part, usize)> {
     let [lx, ly] = f.local(p);
-    let half = look.handle / 2.0;
+    let half = if m.hit_reach > 0.0 { m.hit_reach } else { look.handle / 2.0 };
     let out = Ring::of(m, look, f).handle_out(m);
     let handle = (0..m.handles.count()).find(|&i| {
         let [cx, cy] = f.local(f.unit_at(UNITS[i], out));
@@ -250,7 +252,7 @@ fn hit_in(m: &Mark, look: &MarkLook, f: &Frame, p: Pt) -> Option<(Part, usize)> 
     if let Some(n) = handle {
         return Some((Part::Handle, n));
     }
-    let band = look.edge / 2.0;
+    let band = if m.hit_reach > 0.0 { m.hit_reach } else { look.edge / 2.0 };
     let inside_x = (0.0..=f.w).contains(&lx);
     let inside_y = (0.0..=f.h).contains(&ly);
     let edge = [(ly.abs() <= band && inside_x, 4), ((ly - f.h).abs() <= band && inside_x, 5), (lx.abs() <= band && inside_y, 6), ((lx - f.w).abs() <= band && inside_y, 7)];
