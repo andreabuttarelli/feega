@@ -20,7 +20,9 @@ export type VarRule = { selector: string; property: string; token: string };
 
 export type ThemeBlock = { mode: string; close: DeclAt };
 
-export type Parsed = { declared: Declared[]; rules: VarRule[]; skipped: string[]; blocks: ThemeBlock[] };
+export type TypeDecl = { selector: string; property: string; raw: string; at: DeclAt };
+
+export type Parsed = { declared: Declared[]; rules: VarRule[]; skipped: string[]; blocks: ThemeBlock[]; typed: TypeDecl[] };
 
 export const LIGHT = 'Light';
 export const DARK = 'Dark';
@@ -63,6 +65,8 @@ const DEPENDENCIES = 'node_modules';
 const VAR_ONLY = /^var\(\s*(--[\w.-]+)\s*(?:,[^)]*)?\)$/;
 const CUSTOM_PROPERTY = /^--[\w.-]+$/;
 const BOUND_PROPERTIES = new Set(['color', 'background', 'background-color', 'border-color', 'gap', 'padding', 'border-radius']);
+export const TYPE_PROPERTIES = new Set(['font-size', 'font-weight', 'line-height', 'letter-spacing', 'box-shadow']);
+const STATEFUL_SELECTOR = /:/;
 
 const title = (word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
 
@@ -166,8 +170,12 @@ function declare(out: Collected, stack: Block[], text: string, start: number, en
 
   if (!CUSTOM_PROPERTY.test(name)) {
     const token = VAR_ONLY.exec(raw)?.[1];
-    if (token && context.rule && !context.rule.mode && !context.outside && BOUND_PROPERTIES.has(name)) {
-      out.rules.push({ selector: context.rule.label, property: name, token });
+    const plain = context.rule && !context.rule.mode && !context.outside;
+    if (token && plain && BOUND_PROPERTIES.has(name)) {
+      out.rules.push({ selector: context.rule!.label, property: name, token });
+    }
+    if (!token && plain && !raw.includes('var(') && TYPE_PROPERTIES.has(name) && !STATEFUL_SELECTOR.test(context.rule!.label) && !fromPage(place(start).file)) {
+      out.typed.push({ selector: context.rule!.label, property: name, raw, at: place(start + lead) });
     }
     return;
   }
@@ -230,7 +238,7 @@ function parseOne(sheet: Sheet, out: Collected): void {
 }
 
 export function parseSheets(sheets: Sheet[]): Parsed {
-  const out: Collected = { declared: [], rules: [], skipped: [], blocks: [] };
+  const out: Collected = { declared: [], rules: [], skipped: [], blocks: [], typed: [] };
   sheets.forEach((sheet) => parseOne(sheet, out));
   const inFiles = new Set(out.declared.filter((d) => !fromPage(d.at.file)).map((d) => d.name));
   return { ...out, declared: out.declared.filter((d) => !fromPage(d.at.file) || !inFiles.has(d.name)) };

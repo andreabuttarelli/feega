@@ -6,7 +6,9 @@ export enum TokenKind {
   Colour = 'colour',
   Radius = 'radius',
   Spacing = 'spacing',
-  Font = 'font'
+  Font = 'font',
+  Breakpoint = 'breakpoint',
+  Easing = 'easing'
 }
 
 export type TokenValue = { raw: string; at: DeclAt };
@@ -15,17 +17,21 @@ export type Token = { name: string; kind: TokenKind; values: Record<string, Toke
 
 export type TokenSet = { tokens: Token[]; modes: string[]; skipped: string[] };
 
-export type TokenEntry = { name: string; origins: Record<string, string>; raw: Record<string, string>; scale?: number; orphan?: boolean; factor?: number };
+export type TokenEntry = { name: string; origins: Record<string, string>; raw: Record<string, string>; scale?: number; orphan?: boolean; factor?: number; style?: string; field?: string; rule?: string };
 
 export const SPACING_BASE = '--spacing';
 
-export const tokenId = (entry: TokenEntry) => (entry.factor ? `${entry.name}-${entry.factor}` : entry.name);
+export const tokenId = (entry: TokenEntry) => (entry.rule ? `${entry.rule} { ${entry.name} }` : entry.factor ? `${entry.name}-${entry.factor}` : entry.name);
 
 export type TokenMap = Record<string, TokenEntry>;
 
 export const readOnlyKeys = (map: TokenMap) => new Set(Object.entries(map).flatMap(([key, entry]) => (Object.values(entry.origins).every(fromPage) ? [key] : [])));
 
 type Row = { test: RegExp; strip: string; kind: TokenKind | null; group: string; reason?: string };
+
+export const OTHER_GROUP = 'Other';
+
+const AS_STYLE = 'a style';
 
 const PALETTE = 'Palette';
 const DEFAULT_STRIP = '--';
@@ -38,9 +44,12 @@ const TOKEN_ROWS: Row[] = [
   { test: /^--spacing-/, strip: '--spacing-', kind: TokenKind.Spacing, group: 'Spacing' },
   { test: /^--font-(weight|feature|variation)/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'font weights and features are not variables yet' },
   { test: /^--font-/, strip: '--font-', kind: TokenKind.Font, group: 'Type' },
-  { test: /^--(text|leading|tracking)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'the type scale lands as text styles in a later stage' },
-  { test: /^--(shadow|inset-shadow|drop-shadow|text-shadow)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'shadows land as effect styles in a later stage' },
-  { test: /^--(breakpoint|container|ease|animate|blur|perspective|aspect)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'not bindable to a layer in feega yet' },
+  { test: /^--(inset-shadow|drop-shadow|text-shadow)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'only box shadows become effect styles' },
+  { test: /^--(text|shadow)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: AS_STYLE },
+  { test: /^--(leading|tracking)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'a line-height or letter-spacing scale is not a variable; text styles carry it' },
+  { test: /^--breakpoint-/, strip: '--breakpoint-', kind: TokenKind.Breakpoint, group: OTHER_GROUP },
+  { test: /^--ease-/, strip: '--ease-', kind: TokenKind.Easing, group: OTHER_GROUP },
+  { test: /^--(container|animate|blur|perspective|aspect)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'not bindable to a layer in feega yet' },
   { test: /radius/, strip: DEFAULT_STRIP, kind: TokenKind.Radius, group: 'Radius' },
   { test: /gap|spacing|space/, strip: DEFAULT_STRIP, kind: TokenKind.Spacing, group: 'Spacing' },
   { test: /^--/, strip: DEFAULT_STRIP, kind: TokenKind.Colour, group: PALETTE }
@@ -50,7 +59,9 @@ const VAR_TYPE: Record<TokenKind, VarType> = {
   [TokenKind.Colour]: VarType.Colour,
   [TokenKind.Radius]: VarType.Number,
   [TokenKind.Spacing]: VarType.Number,
-  [TokenKind.Font]: VarType.String
+  [TokenKind.Font]: VarType.String,
+  [TokenKind.Breakpoint]: VarType.Number,
+  [TokenKind.Easing]: VarType.String
 };
 
 const ALIAS = /^var\(\s*(--[\w.-]+)\s*\)$/;
@@ -90,7 +101,9 @@ const LITERAL: Record<TokenKind, Literal> = {
   [TokenKind.Colour]: colourOf,
   [TokenKind.Radius]: lengthPx,
   [TokenKind.Spacing]: lengthPx,
-  [TokenKind.Font]: (raw) => raw
+  [TokenKind.Font]: (raw) => raw,
+  [TokenKind.Breakpoint]: lengthPx,
+  [TokenKind.Easing]: (raw) => raw
 };
 
 const NOT_A_TOKEN = 'not a colour, radius, spacing or font token';
@@ -138,7 +151,7 @@ export function tokenSetOf(parsed: Parsed): TokenSet {
   for (const [name, values] of byName) {
     const kind = kindOf(name, raws.get(name)!, raws);
     if (typeof kind === 'object') {
-      skipped.push(`${name}: ${kind.reason}`);
+      skipped.push(...(kind.reason === AS_STYLE ? [] : [`${name}: ${kind.reason}`]));
       continue;
     }
     tokens.push({ name, kind, values });

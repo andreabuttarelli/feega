@@ -26,13 +26,13 @@ describe('variableName', () => {
 });
 
 describe('tokenSetOf', () => {
-  it('Tailwind 4: colori, raggi, spaziature e famiglie, ognuno col suo tipo; la scala del testo resta fuori e lo dice', async () => {
+  it('Tailwind 4: colori, raggi, spaziature e famiglie, ognuno col suo tipo; la scala del testo non è una variabile: diventa uno stile, senza finire tra i lasciati fuori', async () => {
     const set = await setOf('tailwind4');
     const kinds = Object.fromEntries(set.tokens.map((t) => [t.name, t.kind]));
 
     expect(kinds).toMatchObject({ '--color-primary': TokenKind.Colour, '--radius-card': TokenKind.Radius, '--spacing-gutter': TokenKind.Spacing, '--font-sans': TokenKind.Font, '--color-surface': TokenKind.Colour });
     expect(kinds['--text-hero']).toBeUndefined();
-    expect(set.skipped).toContain('--text-hero: the type scale lands as text styles in a later stage');
+    expect(set.skipped.some((s) => s.startsWith('--text-hero'))).toBe(false);
     expect(set.modes).toEqual(['Light', 'Dark']);
   });
 

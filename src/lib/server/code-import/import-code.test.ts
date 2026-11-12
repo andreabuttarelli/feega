@@ -271,6 +271,17 @@ describe('importCodeAt design system', () => {
     expect((docs.get('frame-1')!.doc as Doc).variables!['app Palette']).toMatchObject({ modes: ['Light', 'Dark'] });
   });
 
+  it('la scala del testo e le ombre arrivano come stili, contati nel resoconto e scritti nella mappa', async () => {
+    const { ask, docs } = askOf({ routes: ['/'], code: () => fixture('typescale') });
+
+    const done = await importCodeAt(ask);
+
+    const styles = (docs.get('frame-1')!.doc as { styles?: Record<string, unknown> }).styles ?? {};
+    expect(Object.keys(styles)).toEqual(expect.arrayContaining(['app Text/hero', 'app Text/article prose h2', 'app Shadow/card']));
+    expect(done).toMatchObject({ design: { styles: 5 } });
+    expect(done.outcome === CodeImportOutcome.Ok && done.tokenMap!['app Text/hero#size'].origins).toEqual({ Light: 'src/app.css:5:1' });
+  });
+
   it('un repo senza token importa come prima', async () => {
     const { ask, docs } = askOf({ routes: ['/'], code: () => async () => null });
 
