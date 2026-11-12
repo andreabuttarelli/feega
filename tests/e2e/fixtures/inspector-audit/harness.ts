@@ -7,6 +7,7 @@ export const CANVAS_PATH = `/p/${PLACE.projectId}/c/${PLACE.canvasId}`;
 const SETTLE_MS = 400;
 const MAX_SECTIONS = 30;
 const ZOOM_MS = 700;
+const CORNER = { x: 10, y: 890 };
 
 export type Clip = { id: string; component: string; props: Record<string, unknown>; [k: string]: unknown };
 type Doc = { tracks: { clips: Clip[] }[]; comps: Record<string, { tracks: { clips: Clip[] }[] }>; [k: string]: unknown };
@@ -36,7 +37,12 @@ export async function pick(page: Page, nodeId: string, clipId: string): Promise<
   }
   await row.scrollIntoViewIfNeeded();
   const fresh = (await row.getAttribute('aria-selected')) !== 'true';
-  await row.click();
+  await row.click({ timeout: 5_000 }).catch(async () => {
+    await page.mouse.click(CORNER.x, CORNER.y);
+    await page.keyboard.press('Shift+Digit1');
+    await page.waitForTimeout(ZOOM_MS);
+    await row.click();
+  });
   await expect(row).toHaveAttribute('aria-selected', 'true');
   if (fresh) {
     await page.keyboard.press('Shift+Digit2');
@@ -68,7 +74,7 @@ export type Reach = { name: string; width: number; height: number; hit: boolean;
 
 export async function reach(target: Locator): Promise<Reach> {
   return target.evaluate((el: HTMLElement) => {
-    el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    el.scrollIntoView({ block: 'center', inline: 'nearest' });
     const box = el.getBoundingClientRect();
     const x = box.left + box.width / 2;
     const y = box.top + box.height / 2;

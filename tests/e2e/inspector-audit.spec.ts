@@ -12,7 +12,7 @@ const OUT = process.env.INSPECTOR_AUDIT_OUT ?? join(homedir(), 'Documents/feega-
 const ONLY = process.env.INSPECTOR_AUDIT_ONLY?.split(',') ?? null;
 const PICKED = process.env.INSPECTOR_AUDIT_ROWS ? new RegExp(process.env.INSPECTOR_AUDIT_ROWS) : null;
 
-const KINDS = [Layer.Rect, Layer.Ellipse, Layer.Line, Layer.Star, Layer.Vector, Layer.Text, Layer.Image, Layer.Stack, Layer.StackChild, Layer.Group, Layer.Instance, Layer.Mask, Layer.Masked, Layer.Shadowed, Layer.Styled, Layer.Bound, Layer.Null];
+const KINDS = [Layer.Rect, Layer.Ellipse, Layer.Line, Layer.Star, Layer.Vector, Layer.Text, Layer.Image, Layer.Stack, Layer.StackChild, Layer.Group, Layer.Instance, Layer.Mask, Layer.Masked, Layer.Shadowed, Layer.Styled, Layer.Bound, Layer.Null, Layer.Gradient];
 const IMPORTED = [Layer.ImportedText, Layer.ImportedPill, Layer.ImportedCard];
 const SWEPT = [...KINDS.map((layer) => ({ node: KINDS_NODE, layer })), ...IMPORTED.map((layer) => ({ node: IMPORTED_NODE, layer }))].filter((s) => !ONLY || ONLY.includes(s.layer));
 const EXERCISED = ROWS.filter((r) => !PICKED || PICKED.test(r.id));

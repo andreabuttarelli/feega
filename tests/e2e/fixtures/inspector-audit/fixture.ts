@@ -8,6 +8,7 @@ import { createComponent } from '../../../../src/lib/motion/main-component';
 import { groupClips } from '../../../../src/lib/motion/group';
 import { useAsMask } from '../../../../src/lib/motion/mask-group';
 import { addEffect } from '../../../../src/lib/motion/effects/ops';
+import { FillType, newFill } from '@feega/motion-core/motion/fill/model';
 import excerpt from './stripe-excerpt.json' with { type: 'json' };
 
 export const PLACE = { projectId: '00000000-0000-4000-8000-0000000a0d01', canvasId: '00000000-0000-4000-8000-0000000a0d02' };
@@ -39,6 +40,7 @@ export enum Layer {
   Styled = 'styled',
   Bound = 'bound',
   Null = 'null',
+  Gradient = 'gradient',
   ImportedText = '0752f883',
   ImportedPill = '1c47f19d',
   ImportedCard = '3dd72cde'
@@ -105,6 +107,7 @@ function kindsDoc(): MotionDoc {
   doc = add(doc, Layer.Bound, 'Text', { x: 0.85, y: 0.8, width: 0.24, height: 0.06 }, { text: 'Bound heading', size: 0.05, weight: 700, color: '#2563eb' });
   doc = patched(doc, Layer.Bound, { bind: { color: 'Theme/Brand' }, styleRef: 'Heading' });
   doc = must(addClip(doc, { component: 'Null', from: 0, durationInFrames: 150, props: { x: 0.5, y: 0.95 } }, Layer.Null));
+  doc = add(doc, Layer.Gradient, 'Shape', { x: 0.85, y: 0.95, width: 0.14, height: 0.06 }, { shape: 'rect', fills: [newFill(FillType.Linear, '#ff0000')], strokes: [{ paint: { type: 'solid', color: '#111827' }, width: 0.004 }] });
 
   return doc;
 }

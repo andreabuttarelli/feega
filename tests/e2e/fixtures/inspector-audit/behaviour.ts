@@ -35,6 +35,9 @@ async function focusByMouse(page: Page, target: Locator): Promise<void> {
 }
 
 async function readNow(page: Page, row: Row): Promise<unknown> {
+  if (row.local) {
+    return row.local(page);
+  }
   const clip = clipIn(await docOf(page, row.node), row.layer);
   return clip ? row.read(clip as Clip) : undefined;
 }
@@ -59,7 +62,7 @@ async function restored(page: Page, row: Row, before: unknown): Promise<boolean>
 }
 
 async function leaveField(page: Page): Promise<void> {
-  await press(page, inspector(page).getByTestId('selection-head'));
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 }
 
 async function open(page: Page, row: Row): Promise<void> {
@@ -84,9 +87,12 @@ async function mouseDo(page: Page, row: Row, target: Locator): Promise<void> {
     return;
   }
   if (row.op === Op.Select) {
-    await press(page, target);
-    await page.keyboard.press('Escape');
     await target.selectOption({ label: value });
+    return;
+  }
+  if (row.op === Op.Arrow || row.op === Op.ShiftArrow) {
+    await focusByMouse(page, target);
+    await page.keyboard.press(row.op === Op.Arrow ? 'ArrowUp' : 'Shift+ArrowUp');
     return;
   }
   if (row.op === Op.Pick) {
@@ -220,6 +226,9 @@ async function attempt(page: Page, row: Row, act: (target: Locator) => Promise<v
   }
   trace(row.id, 'landed', JSON.stringify(await readNow(page, row)));
   await leaveField(page);
+  if (row.local) {
+    return;
+  }
   await page.keyboard.press(UNDO);
   if (!(await restored(page, row, before))) {
     failed.push(Check.Undo);
@@ -233,7 +242,7 @@ export async function exercise(page: Page, row: Row, shoot: (tag: string) => Pro
   await open(page, row);
   trace(row.id, 'opened');
   const target = row.target(page);
-  if (!(await target.isVisible().catch(() => false))) {
+  if (!(await target.waitFor({ state: 'visible', timeout: SHORT_MS }).then(() => true).catch(() => false))) {
     outcome.mouse.push(Check.Missing);
     outcome.keyboard.push(Check.Missing);
     await shoot('missing');
@@ -258,7 +267,8 @@ export async function exercise(page: Page, row: Row, shoot: (tag: string) => Pro
   await openSections(page);
   trace(row.id, 'keyboard pass');
   let from = inspector(page).locator('section[data-section] .section-head').first();
-  for (const step of [...(row.via ?? []), row.target]) {
+  const steps = [...(row.via ?? []), row.target];
+  for (const [at, step] of steps.entries()) {
     const reached = await tabTo(page, from, step(page), row.layer);
     if (reached !== Reached.Yes) {
       outcome.keyboard.push(Check.Reach);
@@ -266,10 +276,15 @@ export async function exercise(page: Page, row: Row, shoot: (tag: string) => Pro
       await shoot('keyboard-reach');
       await pick(page, row.node, row.layer);
       await openSections(page);
+      for (const before of steps.slice(0, at)) {
+        await before(page).focus({ timeout: SHORT_MS }).catch(() => undefined);
+        await page.keyboard.press('Space');
+        await page.waitForTimeout(SETTLE_MS);
+      }
       await step(page).focus({ timeout: SHORT_MS }).catch(() => undefined);
     }
     if (step !== row.target) {
-      await page.keyboard.press('Enter');
+      await page.keyboard.press('Space');
       await page.waitForTimeout(SETTLE_MS);
     }
     from = step(page);
