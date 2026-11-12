@@ -298,12 +298,11 @@ fn a_rest_picture_with_a_block_drawn_while_a_group_was_building_is_not_adopted()
 }
 
 #[test]
-fn idle_baking_rasters_bigger_blocks_than_a_gesture() {
+fn idle_baking_rasters_every_missing_tile_in_bounded_blocks() {
     let missing = Tiles::default().frame(camera(1.0), SCREEN).missing;
     let baked = bake_batches(&missing);
 
     assert_eq!(baked.iter().map(|b| b.keys.len()).sum::<usize>(), missing.len());
-    assert!(baked.len() < batches(&missing).len());
     assert!(baked.iter().all(|b| b.keys.len() <= (BAKE_BATCH_TILES * BAKE_BATCH_TILES) as usize));
 }
 
@@ -551,13 +550,15 @@ fn during_a_gesture_tiles_shown_by_sharper_held_ones_are_not_queued() {
 }
 
 #[test]
-fn during_a_gesture_tiles_raster_one_at_a_time_in_queue_order() {
+fn one_draw_rasters_a_block_of_up_to_four_by_four_tiles_nearest_first() {
     let tiles = Tiles::default();
-    let order = tiles.queue(tiles.frame(camera(1.0), SCREEN).missing).order();
+    let order = tiles.queue(tiles.frame(camera(1.0), (SCREEN.0 * 2, SCREEN.1 * 2)).missing).order();
 
-    let one_by_one: Vec<Vec<TileKey>> = gpu_core::tiles::gesture_batches(&order).into_iter().map(|b| b.keys).collect();
+    let blocks = batches(&order);
 
-    assert_eq!(one_by_one, order.iter().map(|k| vec![*k]).collect::<Vec<_>>());
+    assert_eq!(blocks.iter().map(|b| b.keys.len()).sum::<usize>(), order.len());
+    assert!(blocks[0].keys.contains(&order[0]));
+    assert_eq!(blocks.iter().map(|b| b.span()).max(), Some((4, 4)));
 }
 
 #[test]
