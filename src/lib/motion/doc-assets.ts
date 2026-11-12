@@ -6,26 +6,46 @@ const ASSET_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/;
 
 const WHOLE_ASSET_ID = new RegExp(`^${ASSET_ID.source}$`);
 
-type DocText = { text: string; ids: Set<string> };
+const ASSET_IDS = new RegExp(ASSET_ID.source, 'g');
 
-const read = new WeakMap<MotionDoc, DocText>();
+const usedParts = (doc: MotionDoc) => [doc.tracks, doc.comps, doc.fonts, doc.fields];
 
-function docText(doc: MotionDoc): DocText {
-  const known = read.get(doc);
+const texts = new WeakMap<MotionDoc, string>();
+
+function usedText(doc: MotionDoc): string {
+  const known = texts.get(doc);
+  if (known !== undefined) {
+    return known;
+  }
+  const text = JSON.stringify(usedParts(doc));
+  texts.set(doc, text);
+  return text;
+}
+
+const idsRead = new WeakMap<object, readonly string[]>();
+
+function idsIn(value: unknown): readonly string[] {
+  if (typeof value === 'string') {
+    return value.match(ASSET_IDS) ?? [];
+  }
+  if (!value || typeof value !== 'object') {
+    return [];
+  }
+  const known = idsRead.get(value);
   if (known) {
     return known;
   }
-  const text = JSON.stringify([doc.tracks, doc.comps, doc.fonts, doc.fields]);
-  const made = { text, ids: new Set(text.match(new RegExp(ASSET_ID.source, 'g')) ?? []) };
-  read.set(doc, made);
-  return made;
+  const keys = Array.isArray(value) ? [] : Object.keys(value).flatMap(idsIn);
+  const ids = [...new Set([...keys, ...Object.values(value).flatMap(idsIn)])];
+  idsRead.set(value, ids);
+  return ids;
 }
 
-const usedText = (doc: MotionDoc) => docText(doc).text;
+const docIds = (doc: MotionDoc) => new Set(usedParts(doc).flatMap(idsIn));
 
-const mentions = (doc: MotionDoc, id: string) => (WHOLE_ASSET_ID.test(id) ? docText(doc).ids.has(id) : usedText(doc).includes(id));
+const mentions = (doc: MotionDoc, id: string) => (WHOLE_ASSET_ID.test(id) ? docIds(doc).has(id) : usedText(doc).includes(id));
 
-export const mentionedIds = (doc: MotionDoc): string[] => [...docText(doc).ids];
+export const mentionedIds = (doc: MotionDoc): string[] => [...docIds(doc)];
 
 export const mayUseAssets = (doc: MotionDoc) => doc.assets.length > 0 || ASSET_ID.test(usedText(doc));
 
