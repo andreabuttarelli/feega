@@ -79,3 +79,11 @@ export function endPose(frame: Size, view: Size, chrome: Chrome): Pose {
 export function zoomLabel(scale: number): string {
   return `${Math.round(scale * PERCENT)}%`;
 }
+
+export const OPEN_FROM = 0.1;
+export const OPEN_MARGIN = 96;
+
+export function openScroll(at: { scrollY: number; runwayTop: number; view: number; stuckTop: number; frameY: number }): number {
+  const zoomStart = at.scrollY + at.runwayTop - at.view;
+  return zoomStart + Math.min(0, at.stuckTop + at.frameY - OPEN_MARGIN);
+}

@@ -1,12 +1,14 @@
 <script lang="ts">
   import { onMount, type Snippet } from 'svelte';
-  import { EndingDrive, chromeFor, driveFor, endPose, progressOf, type Chrome, type Pose } from './canvas-ending';
+  import { canvasEnding } from './canvas-ending-state.svelte';
+  import { EndingDrive, OPEN_FROM, chromeFor, driveFor, endPose, openScroll, progressOf, type Chrome, type Pose } from './canvas-ending';
 
   let { children, pick: pickSelector }: { children: Snippet; pick: string } = $props();
 
   const REDUCED_QUERY = '(prefers-reduced-motion: reduce)';
   const TIMELINE_SUPPORT = 'animation-timeline: view()';
   const MOUNT_AHEAD = '0px 0px 100% 0px';
+  const NEAR = '0px 0px 50% 0px';
 
   let root: HTMLDivElement;
   let frame: HTMLDivElement;
@@ -14,6 +16,7 @@
 
   let drive = $state(EndingDrive.Still);
   let active = $state(false);
+  let zoomed = $state(false);
   let chrome = $state<Chrome>(chromeFor(0));
   let pose = $state<Pose>({ x: 0, y: 0, scale: 1, zoom: 100 });
   let stuck = $state({ w: 0, h: 0, top: 0 });
@@ -78,10 +81,38 @@
     };
   }
 
-  function watch(target: Element, rootMargin: string, onChange: (inView: boolean) => void) {
-    const io = new IntersectionObserver(([entry]) => onChange(entry.isIntersecting), { rootMargin });
+  function watch(target: Element, rootMargin: string, onChange: (entry: IntersectionObserverEntry) => void) {
+    const io = new IntersectionObserver(([entry]) => onChange(entry), { rootMargin, threshold: [0, OPEN_FROM] });
     io.observe(target);
     return () => io.disconnect();
+  }
+
+  function openAt(frameY: number) {
+    const view = document.documentElement.clientHeight;
+    const r = runway.getBoundingClientRect();
+    if (progressOf(r.top, r.height, view) < OPEN_FROM) {
+      return;
+    }
+
+    scrollTo({ top: openScroll({ scrollY, runwayTop: r.top, view, stuckTop: stuck.top, frameY }), behavior: 'smooth' });
+  }
+
+  function openOnClick(e: MouseEvent) {
+    if ((e.target as Element).closest('a, button')) {
+      return;
+    }
+
+    const r = frame.getBoundingClientRect();
+    openAt((e.clientY - r.top) / (r.height / frame.offsetHeight));
+  }
+
+  function openOnFocus(e: FocusEvent) {
+    const el = e.target as HTMLElement;
+    if (!el.matches(':focus-visible')) {
+      return;
+    }
+
+    openAt(offsetWithin(el, frame).y);
   }
 
   onMount(() => {
@@ -93,16 +124,25 @@
     const resize = new ResizeObserver(measure);
     resize.observe(frame);
     addEventListener('resize', measure);
+    frame.addEventListener('click', openOnClick);
+    frame.addEventListener('focusin', openOnFocus);
 
     const stops = [
-      watch(runway, MOUNT_AHEAD, (inView) => inView && mountChrome()),
-      watch(runway, '0px', (inView) => (active = inView)),
+      watch(runway, MOUNT_AHEAD, (entry) => entry.isIntersecting && mountChrome()),
+      watch(runway, NEAR, (entry) => (canvasEnding.near = entry.isIntersecting)),
+      watch(runway, '0px', (entry) => {
+        active = entry.isIntersecting;
+        zoomed = entry.intersectionRatio >= OPEN_FROM;
+      }),
       drive === EndingDrive.Script ? follow() : () => {}
     ];
 
     return () => {
       resize.disconnect();
       removeEventListener('resize', measure);
+      frame.removeEventListener('click', openOnClick);
+      frame.removeEventListener('focusin', openOnFocus);
+      canvasEnding.near = false;
       stops.forEach((stop) => stop());
     };
   });
@@ -113,6 +153,7 @@
   bind:this={root}
   data-drive={drive}
   data-active={active || undefined}
+  data-zoomed={zoomed || undefined}
   style:--pose-x="{pose.x}px"
   style:--pose-y="{pose.y}px"
   style:--end-x="{pose.x}px"
@@ -170,6 +211,10 @@
     to {
       transform: translate(var(--end-x), var(--end-y)) scale(var(--end-s));
     }
+  }
+
+  .ending[data-zoomed] .frame {
+    cursor: zoom-in;
   }
 
   .ending :global(.scrub) {

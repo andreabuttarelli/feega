@@ -89,6 +89,11 @@ export const BUILD_TARGETS = [
 
 export const BUILD_SELECTOR = BUILD_TARGETS.join(', ');
 
+export const ENDING_TARGET = '.site-foot .mark';
+export const ENDING_CREW = 2;
+export const ENDING_BEATS: ActionKind[] = ['colour', 'tracking', 'select', 'nudge'];
+export const ENDING_SPOT = { fx: [0.2, 0.8], fy: [0.35, 0.65] } as const;
+
 export function outermost(els: HTMLElement[]): HTMLElement[] {
   const set = new Set(els);
   return els.filter((el) => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ChromeKind, EndingDrive, SCALE_LIMITS, chromeFor, driveFor, endPose, progressOf, zoomLabel } from './canvas-ending';
+import { ChromeKind, EndingDrive, OPEN_MARGIN, SCALE_LIMITS, chromeFor, driveFor, endPose, openScroll, progressOf, zoomLabel } from './canvas-ending';
 
 const DESKTOP = { w: 1440, h: 900 };
 const PHONE = { w: 390, h: 844 };
@@ -67,5 +67,17 @@ describe('drive', () => {
   it('lets CSS follow the scroll where scroll timelines exist, and a script elsewhere', () => {
     expect(driveFor({ reducedMotion: false, scrollTimeline: true })).toBe(EndingDrive.Timeline);
     expect(driveFor({ reducedMotion: false, scrollTimeline: false })).toBe(EndingDrive.Script);
+  });
+});
+
+describe('opening the frame at 100%', () => {
+  const at = { scrollY: 12485, runwayTop: 225, view: 900, stuckTop: -230 };
+
+  it('scrolls back to where the zoom starts, so the footer is full size', () => {
+    expect(openScroll({ ...at, frameY: 900 })).toBe(12485 - 675);
+  });
+
+  it('scrolls further up when the point would sit under the top of the viewport', () => {
+    expect(openScroll({ ...at, frameY: 100 })).toBe(12485 - 675 + (-230 + 100 - OPEN_MARGIN));
   });
 });

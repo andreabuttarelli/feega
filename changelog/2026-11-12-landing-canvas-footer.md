@@ -36,8 +36,19 @@ mark and a chevron, the look the app is moving to.
 The zoom readout lives next to the eye in the top bar; the product shows zoom only inside the View
 menu. That is the one invented detail.
 
-The live agent cursors keep working on the footer inside the frame, and skip targets hidden by
-`visibility` (the site header hides during the ending, so they no longer park on it).
+**Links at the end state.** At 52% the footer links are about 11 px tall: clickable, not readable.
+A second, readable footer was rejected (two footers for screen readers), and so was counter-scaling
+the link rows (they no longer fit the frame). Instead the frame opens like a frame in the editor:
+a click on it (anywhere but a link) or keyboard focus entering it scrolls back to where the zoom
+starts, so the footer is at 100% with the focused link in view (`openScroll`). The cursor reads
+`zoom-in` over the frame. Links keep working directly at every scale; a mouse click on a link never
+triggers the scroll (only `:focus-visible` does), so it cannot cancel the click.
+
+**Agents.** From half a viewport before the zoom starts (`canvasEnding.near`, shared state written
+by `CanvasEnding`), and so also when the frame is opened at 100%, only two agents stay, on the wordmark, inside its middle band, with beats that
+open no menu and grab no corner (`ENDING_CREW`, `ENDING_BEATS`, `ENDING_SPOT`). The rest leave the
+screen. Before, about fifteen cursors covered the links and the heading. Agents also skip targets
+hidden by `visibility` (the site header hides during the ending).
 
 Rejected: scaling the whole page (a 12 000 px layer, fixed elements break under a transformed
 ancestor); a duplicate, already-zoomed footer (two footers for screen readers); changing the
