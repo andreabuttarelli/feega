@@ -1,4 +1,10 @@
+import type { SessionCookie } from '$lib/server/web/browser';
+
 export const IMPORT_KEY_COOKIE = 'feega_import_key';
+
+export function importKeyCookie(app: { url: string; key: string }): SessionCookie {
+  return { name: IMPORT_KEY_COOKIE, value: app.key, domain: new URL(app.url).hostname, path: '/', expires: -1, httpOnly: true, secure: true };
+}
 
 export const ORIGIN_PROXY = String.raw`
 const http = require('http');

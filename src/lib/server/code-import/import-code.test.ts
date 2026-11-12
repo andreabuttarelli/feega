@@ -5,6 +5,7 @@ import type { AppTab } from '$lib/server/web/browser';
 import type { FrameStore } from '$lib/server/motion/move-element';
 import type { PageTree } from '$lib/server/url-import/page-tree';
 import { CodeImportOutcome, Crop, importBoards, importCodeAt } from './import-code';
+import { IMPORT_KEY_COOKIE } from './origin-proxy';
 import { BASE_CONDITIONS, Scheme } from './render-conditions';
 import { RunFailure, type RepoRunner } from './sandbox-runner';
 import { PlanRefusal } from './run-plan';
@@ -57,6 +58,7 @@ function tabOf() {
     press: vi.fn(async () => undefined),
     marks: vi.fn(async () => USES),
     tree: vi.fn(async (): Promise<PageTree> => TREE),
+    restore: vi.fn(async () => undefined),
     close: vi.fn(async () => 0.002)
   } as unknown as AppTab & { tree: ReturnType<typeof vi.fn>; marks: ReturnType<typeof vi.fn>; goto: ReturnType<typeof vi.fn>; scheme: ReturnType<typeof vi.fn>; viewport: ReturnType<typeof vi.fn> };
 }
@@ -80,7 +82,7 @@ function storeOf() {
 function askOf(over: Partial<Parameters<typeof importCodeAt>[0]> = {}) {
   const tab = tabOf();
   const stop = vi.fn(async () => undefined);
-  const runner = vi.fn(async () => ({ ok: true as const, app: { url: APP, names: ['Button'], sha: null, stop } }));
+  const runner = vi.fn(async () => ({ ok: true as const, app: { url: APP, key: 'k3y', names: ['Button'], sha: null, stop } }));
   const { store, docs } = storeOf();
   let n = 0;
   return {
@@ -190,6 +192,16 @@ describe('importCodeAt', () => {
 
     expect(open).toHaveBeenCalledTimes(2);
     expect(tab.close).toHaveBeenCalledTimes(2);
+  });
+
+  it('ogni scheda porta la chiave dell\'import al proxy della sandbox, solo per il suo host', async () => {
+    const { ask, tab } = askOf({ routes: ['/', '/settings'] });
+
+    await importCodeAt(ask);
+
+    const restore = tab.restore as unknown as ReturnType<typeof vi.fn>;
+    expect(restore).toHaveBeenCalledTimes(2);
+    expect(restore).toHaveBeenCalledWith({ cookies: [{ name: IMPORT_KEY_COOKIE, value: 'k3y', domain: 'sb-1.vercel.run', path: '/', expires: -1, httpOnly: true, secure: true }], storage: {} }, APP);
   });
 
   it('una rotta che non si apre resta fuori e lo dice, le altre arrivano', async () => {

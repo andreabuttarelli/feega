@@ -10,7 +10,8 @@ import { CAPTURE_BUDGET_MS, delayFor, NO_DELAY, type CaptureDelay } from './capt
 import { ownImages } from './page-images';
 import { located, repoOf, routesOf, type RepoRef } from './repo';
 import { appOf, PlanRefusal } from './run-plan';
-import type { RepoRunner } from './sandbox-runner';
+import type { RepoRunner, RunningApp } from './sandbox-runner';
+import { importKeyCookie } from './origin-proxy';
 import { designed, designOf, DesignSystem, modeOfScheme, withBoard, type Design, type DesignReport } from './design-system';
 import type { TokenMap } from './design-tokens';
 import { computedSheet, type LoadedSheet } from './css-tokens';
@@ -251,6 +252,17 @@ export async function importCodeAt(ask: CodeAsk): Promise<CodeImported> {
   return importRepoAt({ ...ask, repo, app: asked ?? path, routes, archive });
 }
 
+function keyed(open: OpenAppBrowser | null, app: RunningApp): OpenAppBrowser | null {
+  if (!open) {
+    return null;
+  }
+  return async () => {
+    const tab = await open();
+    await tab.restore({ cookies: [importKeyCookie(app)], storage: {} }, new URL(app.url).origin);
+    return tab;
+  };
+}
+
 export async function importRepoAt(ask: RunAsk): Promise<CodeImported> {
   const routes = routesOf(ask.routes);
   if (!routes) {
@@ -268,6 +280,6 @@ export async function importRepoAt(ask: RunAsk): Promise<CodeImported> {
   const pages = variantsOf(routes, ask.conditions ?? [BASE_CONDITIONS]).map((v) => ({ label: v.label, url: new URL(v.route, run.app.url).toString(), route: v.route, conditions: v.conditions }));
   const origin = { repo: `${ask.repo.owner}/${ask.repo.repo}`, branch: ask.repo.ref, sha: run.app.sha, app: ask.app };
   const design = designFor(ask, run.app.sha);
-  const done = await importBoards({ ...ask, name: ask.repo.repo, pages, names: run.app.names, crop: Crop.Page, design, library: run.app.library }).finally(() => run.app.stop().catch(() => undefined));
+  const done = await importBoards({ ...ask, open: keyed(ask.open, run.app), name: ask.repo.repo, pages, names: run.app.names, crop: Crop.Page, design, library: run.app.library }).finally(() => run.app.stop().catch(() => undefined));
   return done.outcome === CodeImportOutcome.Ok ? { ...done, origin } : done;
 }

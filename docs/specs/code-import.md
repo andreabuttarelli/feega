@@ -129,7 +129,9 @@ Clone (or the archive of a private repo, unpacked with `tar --strip-components=1
 on port 4174, then `origin-proxy.ts` on the exposed 4173: it rewrites `Host`, `Origin` and
 `Referer` to `localhost:4174` for HTTP and websocket upgrades. Next.js 16 refuses `/_next/*`
 from any origin not localhost or in `allowedDevOrigins`; without the HMR socket the client never
-hydrates and there are no fibers to read. Vite's allowed hosts are satisfied the same way.
+hydrates and there are no fibers to read. Vite's allowed hosts are satisfied the same way. The proxy is public, so it answers only the import that started it: a random key per run, sent by
+the capture browser as the host-scoped cookie `feega_import_key` (it rides on websocket upgrades
+too); without it, 403. The cookie is stripped before the dev server.
 
 ## Round trip
 
