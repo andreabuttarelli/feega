@@ -26,7 +26,8 @@ Lines (`seq`, `t_ms` from `performance.now()`, `kind`, `props`):
   size, tile cache, texture bytes and count, picture/scratch/wasm bytes, GPU lag, touches, pinch
   scale, wheel count, JS heap (Chromium only), frames painted since the last line with the worst
   frame, the longest gap between painted frames, tiles and draws, and `lag` (how late the timer
-  fired: a main-thread stall).
+  fired: a main-thread stall), and the recorder's own cost since the last sample (`selfMs`, of
+  which `readMs` for reading the engine counters).
 - `gesture` start/end (touch count, pinch scale, wheel, pointer), `texture` made/destroyed over
   4 MB, `frame` (asked/built/drawn/sharp/images per frame id), `startup` marks, `sources` (frames,
   bytes, ms, status), `asset` over 256 KB or failed (host, bytes, status — never the path),
@@ -46,7 +47,9 @@ its own timer: nothing is added to the frame loop. Events per kind are capped at
 (samples and gestures excepted).
 
 Measured in headed Chromium, iPhone 13 emulation with touch, the same pinch+pan gesture three
-times each way on the zoom fixture: see the PR for the numbers. Killing the renderer mid-gesture
+times each way on the zoom fixture: no difference at 1x (p50 8.3 ms, p95 16.6 ms both ways); at
+4x throttle the canvas is still loading and run order moves the numbers more than the flag does.
+The recorder's own time is 3.6 ms per second at 1x (p50 0.7 ms per tick, max 8.8 ms). Killing the renderer mid-gesture
 (`Page.crash`) left every line up to ~120 ms before the kill on the server, no seq missing.
 
 ## Server
