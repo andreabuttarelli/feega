@@ -2,8 +2,12 @@ import type { MotionClip, MotionDoc, MotionTrack } from '@feega/motion-core/moti
 import { MAX_COLLECTIONS, MAX_VARIABLES, splitKey, type Collection, type Variable, type Variables } from '@feega/motion-core/motion/variables-model';
 import { mapEveryTrack } from '$lib/motion/doc-scopes';
 import { resolveVariables } from '$lib/motion/variables';
+import { defineStyle } from '$lib/motion/styles';
 import { tokenId, type TokenEntry, type TokenMap } from './design-tokens';
 import { editedModes } from './token-write';
+import { LIGHT } from './css-tokens';
+import { StyleField, importedValue, sameStyleValue, styleValue } from './design-styles';
+import type { Style } from '@feega/motion-core/motion/styles-model';
 
 export type TokenSide = { doc: MotionDoc; map: TokenMap };
 
@@ -145,6 +149,40 @@ function canvasOnly(pull: Pull): void {
   }
 }
 
+type Styles = Record<string, Style>;
+
+function withField(style: Style, field: StyleField, value: unknown): Style {
+  return (field === StyleField.Shadow ? { ...style, effects: value } : { ...style, [field]: value }) as Style;
+}
+
+function pulledStyles(pull: Pull): Styles {
+  const styles: Styles = structuredClone(pull.upstream.doc.styles ?? {});
+  const mine = pull.local.doc.styles ?? {};
+  const theirs = new Map(Object.values(pull.upstream.map).map((e) => [tokenId(e), e]));
+  for (const entry of Object.values(pull.local.map).filter((e) => e.style)) {
+    const field = entry.field as StyleField;
+    const value = styleValue(mine[entry.style!], field);
+    const raw = entry.raw[LIGHT];
+    if (value === undefined || raw === undefined || sameStyleValue(entry, importedValue(entry, raw), value)) {
+      continue;
+    }
+    const now = theirs.get(tokenId(entry));
+    if (!now?.style || !styles[now.style]) {
+      continue;
+    }
+    if ((now.raw[LIGHT] ?? '').trim() !== raw.trim()) {
+      pull.conflicts.push(`${entry.name}: changed in the code too, the code wins; the canvas value was ${Array.isArray(value) ? JSON.stringify(value.map((e) => e.params)) : value}`);
+      continue;
+    }
+    styles[now.style] = withField(styles[now.style], field, value);
+  }
+  const imported = new Set(Object.values(pull.local.map).flatMap((e) => (e.style ? [e.style] : [])));
+  for (const [name, style] of Object.entries(mine).filter(([name]) => !imported.has(name) && !styles[name])) {
+    styles[name] = structuredClone(style);
+  }
+  return styles;
+}
+
 export function pulledTokens(local: TokenSide, upstream: TokenSide): PulledTokens {
   const pull: Pull = { local, upstream, variables: structuredClone(upstream.doc.variables ?? {}), map: structuredClone(upstream.map), report: [], conflicts: [] };
   const theirs = new Map(Object.entries(upstream.map).map(([key, e]) => [tokenId(e), key]));
@@ -179,5 +217,11 @@ export function pulledTokens(local: TokenSide, upstream: TokenSide): PulledToken
 
   pull.report.push(...added.filter((k) => !renamed.has(k)).map((k) => `${tokenId(upstream.map[k])}: added`));
   canvasOnly(pull);
-  return { doc: resolveVariables(withBoardModes({ ...doc, variables: pull.variables }, local.doc)), map: pull.map, report: pull.report, conflicts: pull.conflicts };
+  const styles = pulledStyles(pull);
+  let next: MotionDoc = withBoardModes({ ...doc, variables: pull.variables, ...(Object.keys(styles).length ? { styles } : {}) }, local.doc);
+  for (const [name, style] of Object.entries(styles).filter(([name, style]) => JSON.stringify(style) !== JSON.stringify(upstream.doc.styles?.[name]))) {
+    const painted = defineStyle(next, name, style);
+    next = painted.ok ? painted.doc : next;
+  }
+  return { doc: resolveVariables(next), map: pull.map, report: pull.report, conflicts: pull.conflicts };
 }
