@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { pickBarTool } from './fixtures/canvas-bar';
 import { hoverTile } from './fixtures/canvas-tile';
 import { test, expect, REAL_STACK, gotoHydrated, type E2eSession } from './fixtures/session';
+import { selectionBox, selectionCount } from './fixtures/canvas-marks';
 
 const SHOTS = process.env.CANVAS_ELEMENT_SHOTS;
 const DRAWN = ['rectangle', 'text', 'line'] as const;
@@ -119,15 +120,15 @@ test.describe('free elements are element nodes @real', () => {
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     const host = page.locator(`[data-testid="frame-overlays"] [data-frame="${a}"]`);
     await expect(host).toBeVisible({ timeout: 20_000 });
-    const selection = page.getByTestId('frame-selection');
     const frame = (await host.boundingBox())!;
     const at = { x: frame.x + frame.width * 0.225, y: frame.y + frame.height * 0.5 };
     await expect(async () => {
       await page.mouse.click(at.x, at.y);
-      await expect(selection).toBeVisible({ timeout: 1500 });
+      await expect.poll(() => selectionCount(page), { timeout: 1500 }).toBeGreaterThan(0);
     }).toPass({ timeout: 25_000 });
     const viewport = page.viewportSize()!;
-    await dragTo(page, await centre(selection), { x: viewport.width - 120, y: viewport.height - 120 });
+    const picked = (await selectionBox(page))!;
+    await dragTo(page, { x: picked.x + picked.width / 2, y: picked.y + picked.height / 2 }, { x: viewport.width - 120, y: viewport.height - 120 });
 
     await expect.poll(() => typesOf(admin, session, [a]), { timeout: 10_000 }).toEqual(['element']);
     await shoot(page, 'dragged-out');

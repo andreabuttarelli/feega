@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import { selectionCount } from './fixtures/canvas-marks';
+import { hoveredClip, hoverCount } from './fixtures/canvas-marks';
 
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 const SHOTS = `${homedir()}/Documents/feega-videos/editor-modes`;
@@ -15,16 +16,14 @@ async function pointIn(stage: Locator, share: { x: number; y: number }) {
   return { x: box.x + box.width * share.x, y: box.y + box.height * share.y };
 }
 
-const hoveredId = (page: Page) => page.getByTestId('frame-pick-box').getAttribute('data-hovered');
-
 async function hoverAt(page: Page, at: { x: number; y: number }, mods: 'ControlOrMeta' | null = null) {
   if (mods) {
     await page.keyboard.down(mods);
   }
   await page.mouse.move(at.x - 3, at.y);
   await page.mouse.move(at.x, at.y);
-  await expect(page.getByTestId('frame-pick-box')).toBeVisible();
-  const id = await hoveredId(page);
+  await expect.poll(() => hoverCount(page)).toBeGreaterThan(0);
+  const id = await hoveredClip(page);
   if (mods) {
     await page.keyboard.up(mods);
   }

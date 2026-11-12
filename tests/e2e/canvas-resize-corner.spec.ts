@@ -104,8 +104,7 @@ function expectEdges(label: string, got: Rect, want: Rect): void {
 }
 
 async function expectCornerResize(page: Page, shot: string, corner: Corner = CORNERS[0]): Promise<void> {
-  const selection = page.getByTestId('frame-selection');
-  const before = (await selection.boundingBox())!;
+  const before = (await selectionBox(page))!;
   const colour = await colourAt(page, { x: before.x + before.width / 2, y: before.y + before.height / 2 });
   const area = { x: before.x - DRAG.x - SEARCH_MARGIN, y: before.y - DRAG.y - SEARCH_MARGIN, width: before.width + 2 * (DRAG.x + SEARCH_MARGIN), height: before.height + 2 * (DRAG.y + SEARCH_MARGIN) };
   const start = await fillBox(page, colour, area, `${SHOTS}/resize3-${shot}-0.png`);
@@ -124,7 +123,7 @@ async function expectCornerResize(page: Page, shot: string, corner: Corner = COR
     const label = `${shot} frame ${step}`;
     expect(fill, `${label}: fill visible`).not.toBeNull();
     expectEdges(`${label} fill`, fill!, grownBy(start!));
-    expectEdges(`${label} selection`, (await selection.boundingBox())!, grownBy(before));
+    expectEdges(`${label} selection`, (await selectionBox(page))!, grownBy(before));
   }
   await page.mouse.up();
 }

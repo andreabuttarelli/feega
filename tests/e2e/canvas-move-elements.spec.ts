@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { Page, Locator } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
-import { selectionBox } from './fixtures/canvas-marks';
+import { selectionBox, selectionCount } from './fixtures/canvas-marks';
 
 const STAGE_W = 420;
 const canvasAction = (name: string) => (r: { url(): string }) => new URL(r.url()).searchParams.get('action') === name;
@@ -41,12 +41,12 @@ async function openAndGrab(page: Page, nodeId: string) {
   const host = page.locator(`[data-testid="frame-overlays"] [data-frame="${nodeId}"]`);
   await expect(host).toBeVisible({ timeout: 20_000 });
   const at = await centre(host);
-  const selection = page.getByTestId('frame-selection');
   await expect(async () => {
     await page.mouse.click(at.x, at.y);
-    await expect(selection).toBeVisible({ timeout: 1500 });
+    await expect.poll(() => selectionCount(page), { timeout: 1500 }).toBeGreaterThan(0);
   }, 'the text is picked once the frame has drawn it').toPass({ timeout: 25_000 });
-  return centre(selection);
+  const picked = (await selectionBox(page))!;
+  return { x: picked.x + picked.width / 2, y: picked.y + picked.height / 2 };
 }
 
 async function dragTo(page: Page, from: { x: number; y: number }, to: { x: number; y: number }) {

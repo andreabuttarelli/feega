@@ -213,6 +213,20 @@ export function selectionMark(
   };
 }
 
+export const pickOutlineMark = (
+  id: string,
+  quad: readonly ScreenPt[],
+  highlight: HighlightKind,
+): CanvasMark => ({
+  ...QUIET,
+  id,
+  quad: quad.flat(),
+  line: MarkLine.Solid,
+  color: HIGHLIGHT[highlight],
+  width: SELECTION_PX,
+  offset: -SELECTION_PX,
+});
+
 function colourOf(css: string, opacity: number): number[] {
   const [r, g, b, a] = rgbaOf(css) ?? BLACK;
   return [r, g, b, a * opacity];

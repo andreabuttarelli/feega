@@ -128,3 +128,11 @@ selected and a node hovered, three runs each:
 Resume only after re-profiling once the JS fixes land (#2033 labels, `--zoom` on the pins, wheel
 coalescing): steps 2–3 go ahead only if the engine (wasm) or culling come out on top of that
 profile.
+
+Update: step 1a merged for correctness, not perf. During a zoom the DOM rings lagged the element by
+up to 38 device px (`tests/perf/ring-drift.spec.ts`: paced wheel 0.5 → 1.1, rotated element selected,
+another hovered): the DOM followed `view`, the GPU frame presented an older camera when it skipped
+a beat. Engine rings measure 0 px; the element hover outline moved into the engine too. The DOM path
+(WebGL, `coreOff`) now positions from the camera the last GPU frame presented (`onpresent`) and
+measures 0.03 px. The perf finding above stands: no main-thread gain. Frame labels stay world-space
+overlay items drawn with the frame's camera; their size steps between rests by design.

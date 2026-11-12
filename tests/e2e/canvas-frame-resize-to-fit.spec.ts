@@ -1,5 +1,6 @@
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import { SHOT_PREFIX } from './fixtures/shots';
+import { selectedClip } from './fixtures/canvas-marks';
 
 const SETTLE_MS = 2500;
 const SAVED_MS = 20_000;
@@ -45,7 +46,7 @@ test.describe('resize to fit @real', () => {
     await page.mouse.click(edge.x, edge.y);
     await page.waitForTimeout(SETTLE_MS);
     await page.mouse.click(edge.x, edge.y);
-    await expect(page.getByTestId('frame-selection')).toHaveAttribute('data-clip', 'box', { timeout: 15_000 });
+    await expect.poll(() => selectedClip(page), { timeout: 15_000 }).toBe('box');
     await page.screenshot({ path: `${SHOT_PREFIX}-st06-before.png` });
 
     await page.keyboard.press('ControlOrMeta+Alt+Shift+r');

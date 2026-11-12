@@ -10,6 +10,7 @@ import {
   marksJson,
   nodeMark,
   selectionMark,
+  pickOutlineMark,
   type MarkLook,
 } from './canvas-marks';
 
@@ -66,6 +67,20 @@ describe('canvas marks', () => {
       ringColor: '#0099ff',
     });
     expect(m).toMatchObject({ line: 'dashed', handles: 'none', opacity: 0.5 });
+  });
+
+  it('an element under the pointer draws a thin inner outline with nothing to grab', () => {
+    const m = pickOutlineMark(
+      'hover',
+      [
+        [0, 0],
+        [10, 0],
+        [10, 10],
+        [0, 10],
+      ],
+      HighlightKind.Element,
+    );
+    expect(m).toMatchObject({ line: 'solid', width: 1, offset: -1, handles: 'none', body: false, edges: false, rotate: false });
   });
 
   it('an element selection has eight handles, a body, edges and rotate zones', () => {

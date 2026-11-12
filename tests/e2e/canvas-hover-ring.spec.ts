@@ -1,7 +1,7 @@
 import { homedir } from 'node:os';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
-import { selectionCount } from './fixtures/canvas-marks';
+import { hoverBoxes, hoverCount, pickBox, selectionCount } from './fixtures/canvas-marks';
 
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 const BOX_ID = 'box';
@@ -35,9 +35,7 @@ const cursorAt = (page: Page, x: number, y: number) =>
   }, [x, y]);
 
 async function staleRings(page: Page, old: Rect): Promise<number> {
-  const rings = await page.getByTestId('frame-pick-box').all();
-  const boxes = await Promise.all(rings.map((r) => r.boundingBox()));
-  return boxes.filter((b) => b && near(b, old)).length;
+  return (await hoverBoxes(page)).filter((b) => near(b, old)).length;
 }
 
 async function drag(page: Page, from: { x: number; y: number }, during?: () => Promise<void>) {
@@ -75,23 +73,22 @@ test.describe('hover ring and resize cursors @real', () => {
       await expect.poll(() => selectionCount(page), { timeout: 1500 }).toBeGreaterThan(0);
     }).toPass({ timeout: 25_000 });
     await page.mouse.move(grab.x + 1, grab.y);
-    await expect(page.getByTestId('frame-pick-box')).toBeVisible();
+    await expect.poll(() => hoverCount(page)).toBeGreaterThan(0);
 
-    const sel = page.getByTestId('frame-selection');
-    const before = (await sel.boundingBox())!;
+    const before = (await pickBox(page))!;
     let during = -1;
     await drag(page, { x: before.x + before.width / 3, y: before.y + before.height / 2 }, async () => {
-      during = await page.getByTestId('frame-pick-box').count();
+      during = await hoverCount(page);
       await page.screenshot({ path: `${SHOTS}/ring-element-during.png` });
     });
     expect(during, 'no hover ring while dragging').toBe(0);
-    await expect.poll(async () => near((await sel.boundingBox())!, before), { timeout: 10_000 }).toBe(false);
+    await expect.poll(async () => near((await pickBox(page))!, before), { timeout: 10_000 }).toBe(false);
     await page.mouse.move(before.x + before.width / 3 + DRAG_PX.x + 1, before.y + before.height / 2 + DRAG_PX.y);
     await page.waitForTimeout(300);
     await page.screenshot({ path: `${SHOTS}/ring-element-after.png` });
     expect(await staleRings(page, before), 'no ring at the old place').toBe(0);
 
-    const now = (await sel.boundingBox())!;
+    const now = (await pickBox(page))!;
     expect(await cursorAt(page, now.x + now.width, now.y + now.height / 2)).toBe('ew-resize');
     expect(await cursorAt(page, now.x + now.width / 2, now.y + now.height)).toBe('ns-resize');
     expect(await cursorAt(page, now.x + now.width / 3, now.y)).toBe('ns-resize');

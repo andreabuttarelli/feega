@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 import { pickBarTool } from './fixtures/canvas-bar';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import { SHOT_PREFIX } from './fixtures/shots';
-import { selectionCount } from './fixtures/canvas-marks';
+import { hoverBoxes, hoverCount, pickBoxes, selectionCount } from './fixtures/canvas-marks';
 
 const SHOTS = SHOT_PREFIX;
 const SETTLE_MS = 2500;
@@ -142,14 +142,13 @@ test.describe('draw, mask and align inside a core frame @real', () => {
       await page.locator('[data-layer="a"]').click();
       const b = await at(0.5, 0.7);
       await page.mouse.move(b.x, b.y);
-      const hover = page.getByTestId('frame-pick-box');
-      await expect(hover).toHaveCount(1, { timeout: 15_000 });
-      const ghost = (await hover.boundingBox())!;
+      await expect.poll(() => hoverCount(page), { timeout: 15_000 }).toBe(1);
+      const ghost = (await hoverBoxes(page))[0];
       await page.keyboard.down('Shift');
       await page.mouse.click(b.x, b.y);
       await page.keyboard.up('Shift');
       await expect.poll(() => selectionCount(page), { timeout: 15_000 }).toBe(2);
-      const bodies = await page.getByTestId('frame-selection-body').evaluateAll((els) => els.map((el) => el.getBoundingClientRect()).map((r) => ({ x: r.x, y: r.y, width: r.width, height: r.height })));
+      const bodies = await pickBoxes(page);
       const near = (u: number, v: number) => Math.abs(u - v) < HOVER_TOLERANCE_PX;
       expect(bodies.some((r) => near(r.x, ghost.x) && near(r.y, ghost.y) && near(r.width, ghost.width) && near(r.height, ghost.height)), JSON.stringify({ ghost, bodies })).toBe(true);
       await expect(page.getByTestId('frame-align')).toHaveCount(0);

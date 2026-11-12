@@ -253,7 +253,7 @@
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
   import { themeOf } from '$lib/canvas/gpu/theme';
   import { exposeMarks, exposeReveal, exposeSettled } from '$lib/canvas/gpu/frame-stats';
-  import { MarkPart, boxCorners, hoverMark as hoverRingMark, nodeMark, selectionMark, type CanvasMark } from '$lib/canvas/core/canvas-marks';
+  import { MarkPart, boxCorners, hoverMark as hoverRingMark, nodeMark, pickOutlineMark, selectionMark, type CanvasMark } from '$lib/canvas/core/canvas-marks';
   import type { OverlayFrame } from '../FrameOverlays.svelte';
   import { currentDevice } from '$lib/canvas/gpu/memory-budget';
   import type { GenTileView } from '$lib/canvas/gen-tile-view';
@@ -555,6 +555,8 @@
     return placed.filter(ringed).map((t) => ({ id: t.id, x: t.x, y: t.y, w: t.w, h: t.h, rotation: t.rotation, radius: cardRadiusOf(t.kind ?? '') }));
   });
   let engineMarks = $state(false);
+  let presented = $state<Viewport | null>(null);
+  const ringView = $derived(failed ? view : (presented ?? view));
   const drawnChrome = $derived(engineMarks ? coreChrome.map((t) => ({ ...t, ring: NodeChrome.None, handles: false })) : coreChrome);
   const markLook = $derived({ handleFill: coreLook?.handle ?? '#ffffff', handleRadius: coreLook?.radiusXs ?? 0 });
 
@@ -624,6 +626,12 @@
       }
       for (const m of pickedIn(frame.id)) {
         add(selectionMark(`pick:${frame.id}:${m.clip}`, placedIn(frame, m.quad), m.kind, m.highlight), (grip, handle, e) => grab(nodeId, m.clip, grip, handle, e));
+      }
+    }
+    for (const frame of [...shownOverlays, ...viewOverlays]) {
+      const outline = pickHover?.at === frame.id ? pickHover : shownOverlays.includes(frame) ? layerMark(frame.id) : null;
+      if (outline) {
+        marks.push(pickOutlineMark(`hover:${frame.id}:${outline.clip}`, placedIn(frame, outline.quad.map((p) => [p.x - frame.x, p.y - frame.y - frame.bar] as const)), outline.highlight));
       }
     }
     if (manyWorld) {
@@ -991,7 +999,7 @@
     ].map(([x, y]) => {
       const dx = x - centre.x;
       const dy = y - centre.y;
-      return [view.x + (centre.x + dx * Math.cos(r) - dy * Math.sin(r)) * view.zoom, view.y + (centre.y + dx * Math.sin(r) + dy * Math.cos(r)) * view.zoom] as const;
+      return [ringView.x + (centre.x + dx * Math.cos(r) - dy * Math.sin(r)) * ringView.zoom, ringView.y + (centre.y + dx * Math.sin(r) + dy * Math.cos(r)) * ringView.zoom] as const;
     });
   });
 
@@ -2359,7 +2367,7 @@
     return { x: to.x - from.x, y: to.y - from.y };
   }
 
-  const onZoom = <M extends { quad: [number, number][] }>(m: M): M => ({ ...m, quad: m.quad.map(([x, y]) => [x * view.zoom, y * view.zoom] as [number, number]) });
+  const onZoom = <M extends { quad: [number, number][] }>(m: M): M => ({ ...m, quad: m.quad.map(([x, y]) => [x * ringView.zoom, y * ringView.zoom] as [number, number]) });
 
   function selectionMarks(nodeId: string) {
     return pickedQuads(nodeId).map(onZoom);
@@ -4561,17 +4569,17 @@
   >
     {#if !failed}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} marks={engineDrawn.marks} {markLook} onmarks={(drawn) => (engineMarks = drawn)} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId, userId: (page.data as { session?: { user?: { id: string } } | null }).session?.user?.id, look: (page.data as { look?: string }).look }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} onbackend={(change) => track(GPU_FALLBACK_EVENT, change)} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} marks={engineDrawn.marks} {markLook} onmarks={(drawn) => (engineMarks = drawn)} onpresent={(shown) => (presented = shown)} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId, userId: (page.data as { session?: { user?: { id: string } } | null }).session?.user?.id, look: (page.data as { look?: string }).look }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} onbackend={(change) => track(GPU_FALLBACK_EVENT, change)} />
       </svelte:boundary>
     {/if}
     {#if !engineMarks}
       <div class="hover-rings" data-testid="node-hover-rings">
         {#each hoverRings as ring (ring.id)}
-          <div class="hover-ring" data-testid="node-hover-ring" data-node={ring.id} style={highlightStyle(HighlightKind.Node) + ';' + hoverRingStyle(view, ring)}></div>
+          <div class="hover-ring" data-testid="node-hover-ring" data-node={ring.id} style={highlightStyle(HighlightKind.Node) + ';' + hoverRingStyle(ringView, ring)}></div>
         {/each}
       </div>
     {/if}
-    <FrameOverlays {view} frames={shownOverlays}>
+    <FrameOverlays view={ringView} frames={shownOverlays}>
       {#snippet children(frame)}
         {@const edit = typingMark(frame.id)}
         {#if edit}
@@ -4607,12 +4615,12 @@
         {#if guideArea && ((frameGuides?.nodeId === frame.id && (frameGuides.guides.length || frameGuides.gaps.length || frameGuides.drop)) || measuredGapsIn.length)}
           <FrameGuides area={guideArea.rect} size={guideArea.size} guides={frameGuides?.nodeId === frame.id ? frameGuides.guides : []} gaps={frameGuides?.nodeId === frame.id ? frameGuides.gaps : []} drop={frameGuides?.nodeId === frame.id ? (frameGuides.drop ?? null) : null} measured={measuredGapsIn} />
         {/if}
-        {#if pickHover?.at === frame.id}
-          <div class="pick-outline" data-testid="frame-pick-box" data-hovered={pickHover.clip} style={highlightStyle(pickHover.highlight) + ';' + quadStyle(pickHover.quad.map((p) => [(p.x - frame.x) * view.zoom, (p.y - frame.y) * view.zoom] as const))}></div>
+        {#if !engineMarks && pickHover?.at === frame.id}
+          <div class="pick-outline" data-testid="frame-pick-box" data-hovered={pickHover.clip} style={highlightStyle(pickHover.highlight) + ';' + quadStyle(pickHover.quad.map((p) => [(p.x - frame.x) * ringView.zoom, (p.y - frame.y) * ringView.zoom] as const))}></div>
         {/if}
-        {@const layered = layerMark(frame.id)}
+        {@const layered = engineMarks ? null : layerMark(frame.id)}
         {#if layered}
-          <div class="pick-outline" data-testid="frame-layer-hover-box" data-hovered={layered.clip} style={highlightStyle(layered.highlight) + ';' + quadStyle(layered.quad.map((p) => [(p.x - frame.x) * view.zoom, (p.y - frame.y) * view.zoom] as const))}></div>
+          <div class="pick-outline" data-testid="frame-layer-hover-box" data-hovered={layered.clip} style={highlightStyle(layered.highlight) + ';' + quadStyle(layered.quad.map((p) => [(p.x - frame.x) * ringView.zoom, (p.y - frame.y) * ringView.zoom] as const))}></div>
         {/if}
         {@const live = peering ? liveOf(frame.id) : null}
         {@const peers = peering ? peering.peersOf(frame.id, onCanvas) : []}
@@ -4629,14 +4637,14 @@
         {/if}
       {/snippet}
     </FrameOverlays>
-    <FrameOverlays {view} frames={viewOverlays}>
+    <FrameOverlays view={ringView} frames={viewOverlays}>
       {#snippet children(frame)}
         {@const nodeId = baseNodeId(frame.id)}
         {#each engineMarks || typing || cropping?.nodeId === nodeId ? [] : marksIn(frame.id) as mark (mark.clip)}
           <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} highlight={mark.highlight} pivot={null} turn={0} ongrab={(grip, handle, e) => grab(nodeId, mark.clip, grip, handle, e)} />
         {/each}
-        {#if pickHover?.at === frame.id}
-          <div class="pick-outline" data-testid="view-pick-box" data-hovered={pickHover.clip} style={highlightStyle(pickHover.highlight) + ';' + quadStyle(pickHover.quad.map((p) => [(p.x - frame.x) * view.zoom, (p.y - frame.y) * view.zoom] as const))}></div>
+        {#if !engineMarks && pickHover?.at === frame.id}
+          <div class="pick-outline" data-testid="view-pick-box" data-hovered={pickHover.clip} style={highlightStyle(pickHover.highlight) + ';' + quadStyle(pickHover.quad.map((p) => [(p.x - frame.x) * ringView.zoom, (p.y - frame.y) * ringView.zoom] as const))}></div>
         {/if}
         {@const viewLive = inside?.nodeId === nodeId ? viewLives.get(frame.id) : null}
         {#if viewLive}
