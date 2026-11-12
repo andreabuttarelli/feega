@@ -5,7 +5,7 @@ import { LANDINGS_FIXTURE_CENTRE, LANDINGS_FIXTURE_PLACE } from '../../scripts/p
 import { Ease, playWheel, zoomPath, type Point } from '../../scripts/perf/gestures';
 
 type Frame = { at: number; moving: boolean; tiles: number; stillBlocks: number; bakeMs: number; unsharp: number; heldBytes: number };
-type Lap = { lap: number; tiles: number; stillBlocks: number; bakeMs: number; unsharpMs: number; heldMb: number };
+type Lap = { lap: number; tiles: number; movingTiles: number; stillBlocks: number; bakeMs: number; unsharpMs: number; heldMb: number };
 
 const LAPS = Number(process.env.BENCH_LAPS ?? 3);
 const LEG_MS = Number(process.env.BENCH_LEG_MS ?? 800);
@@ -46,6 +46,7 @@ function summary(lap: number, seen: Frame[]): Lap {
   return {
     lap,
     tiles: seen.reduce((s, f) => s + f.tiles, 0),
+    movingTiles: seen.reduce((s, f) => s + (f.moving ? f.tiles : 0), 0),
     stillBlocks: seen.reduce((s, f) => s + f.stillBlocks, 0),
     bakeMs: Math.round(seen.reduce((s, f) => s + f.bakeMs, 0)),
     unsharpMs: Math.round(unsharpMs),
@@ -59,7 +60,9 @@ async function lap(page: Page, cdp: CDPSession, n: number): Promise<Lap> {
     await playWheel(cdp, leg(from, to));
     await idle(page);
   }
-  return summary(n, (await frames(page)).filter((f) => f.at > since));
+  const seen = (await frames(page)).filter((f) => f.at > since);
+  writeFileSync(join(OUT, `roundtrip-frames-lap${n}.json`), JSON.stringify(seen));
+  return summary(n, seen);
 }
 
 test('zoom round trip: what each lap rasters again', async ({ baseURL }) => {

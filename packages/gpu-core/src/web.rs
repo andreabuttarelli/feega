@@ -16,7 +16,7 @@ use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX};
+use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, Stills};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
 use crate::tally::now_ms;
@@ -100,6 +100,7 @@ pub struct WebCore {
     credit: RasterCredit,
     rest_shown: Vec<(Rect, wgpu::Texture)>,
     rest_spare: HashMap<(u32, u32), Vec<wgpu::Texture>>,
+    stills: Stills<wgpu::Texture>,
     counted: Counted,
 }
 
@@ -336,7 +337,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, snapshots: HashMap::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new(), counted: Counted::default(), credit: RasterCredit::default() })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, snapshots: HashMap::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new(), stills: Stills::default(), counted: Counted::default(), credit: RasterCredit::default() })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -524,6 +525,14 @@ impl WebCore {
         Ok(false)
     }
 
+    fn kept(&self, screen: (u32, u32)) -> usize {
+        tiles_kept(screen, self.tile_budget).saturating_sub(self.stills.bytes().div_ceil(TILE_BYTES) as usize)
+    }
+
+    fn drop_stills(&mut self) {
+        self.stills.clear().iter().for_each(wgpu::Texture::destroy);
+    }
+
     fn drop_tiles(&mut self, gone: Vec<TileKey>) {
         for key in gone {
             if let Some(texture) = self.tile_textures.remove(&key) {
@@ -679,11 +688,13 @@ impl WebCore {
             Damage::Rects(rects) if rects.is_empty() => {}
             Damage::All => {
                 self.forget_rest();
+                self.drop_stills();
                 self.changed_at = js_sys::Date::now();
                 self.tiles.clear();
             }
             Damage::Rects(rects) => {
                 self.forget_rest();
+                self.drop_stills();
                 self.changed_at = js_sys::Date::now();
                 rects.iter().for_each(|r| self.tiles.invalidate(*r));
             }
@@ -722,7 +733,7 @@ impl WebCore {
         }
         self.present_tiles(&tiles.draw)?;
         self.tiles.drawn(&tiles.draw);
-        let kept = tiles_kept(screen, self.tile_budget);
+        let kept = self.kept(screen);
         if self.tiles.len() > kept {
             let evicted = self.tiles.evict_beyond(self.camera, screen, kept * EVICT_DOWN_TO_PERCENT / 100);
             self.drop_tiles(evicted);
@@ -778,7 +789,9 @@ impl WebCore {
             self.forget_rest();
         }
         if self.rest.is_none() {
-            self.rest = Some(Rest::new(self.camera, screen));
+            let (rest, shown) = Rest::resume(self.camera, screen, &mut self.stills).unwrap_or_else(|| (Rest::new(self.camera, screen), vec![]));
+            self.rest = Some(rest);
+            self.rest_shown = shown;
         }
         let mut spent = spent;
         loop {
@@ -877,13 +890,23 @@ impl WebCore {
         self.compositor.adopt(self.camera, now_ms);
         self.adopted = Some(self.camera);
         self.drew_tiles = false;
-        self.forget_rest();
+        self.rest = None;
+        let screen = (self.target.width(), self.target.height());
+        let shown = std::mem::take(&mut self.rest_shown);
+        self.stills.keep(self.camera, screen, shown).iter().for_each(wgpu::Texture::destroy);
     }
 
     fn warm_tiles(&mut self) -> Result<(), JsValue> {
         match self.compositor.take_tile_damage() {
-            Damage::All => self.tiles.clear(),
-            Damage::Rects(rects) => rects.iter().for_each(|r| self.tiles.invalidate(*r)),
+            Damage::Rects(rects) if rects.is_empty() => {}
+            Damage::All => {
+                self.drop_stills();
+                self.tiles.clear();
+            }
+            Damage::Rects(rects) => {
+                self.drop_stills();
+                rects.iter().for_each(|r| self.tiles.invalidate(*r));
+            }
         }
         let screen = (self.target.width(), self.target.height());
         let started = js_sys::Date::now();
@@ -912,7 +935,7 @@ impl WebCore {
     }
 
     fn held_bytes(&self) -> f64 {
-        (self.tile_textures.len() as u64 * TILE_BYTES) as f64
+        (self.tile_textures.len() as u64 * TILE_BYTES + self.stills.bytes()) as f64
     }
     pub fn warming(&self) -> bool {
         self.warming

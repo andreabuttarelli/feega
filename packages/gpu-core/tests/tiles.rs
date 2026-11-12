@@ -631,3 +631,34 @@ fn a_level_covering_the_painted_screen_hides_the_coarser_ones_under_it() {
     let steps: std::collections::BTreeSet<i32> = frame.draw.iter().map(|k| k.step).collect();
     assert_eq!(steps.into_iter().collect::<Vec<_>>(), vec![coarsest]);
 }
+
+#[test]
+fn returning_to_a_held_still_rasters_nothing() {
+    use gpu_core::tiles::Stills;
+    let at = Camera { x: 120.4, y: -33.0, zoom: 0.8 };
+    let rest = Rest::new(at, SCREEN);
+    let blocks: Vec<(Rect, u32)> = rest.todo().iter().enumerate().map(|(i, b)| (*b, i as u32)).collect();
+    let mut stills = Stills::default();
+    stills.keep(at, SCREEN, blocks.clone());
+
+    let back = Camera { x: 120.4 + 1e-9, y: -33.0, zoom: 0.8 * (1.0 + 1e-12) };
+    let (rest, shown) = Rest::resume(back, SCREEN, &mut stills).expect("held still");
+
+    assert!(rest.todo().is_empty() && rest.adoptable() && rest.shows(back, SCREEN));
+    assert_eq!(shown, blocks);
+    assert!(Rest::resume(Camera { zoom: 0.81, ..at }, SCREEN, &mut stills).is_none());
+}
+
+#[test]
+fn a_still_is_dropped_when_the_content_changes_and_the_oldest_when_too_many_are_held() {
+    use gpu_core::tiles::{Stills, STILLS_KEPT};
+    let mut stills = Stills::default();
+    let block = |i: u32| vec![(Rect::new(0.0, 0.0, 10.0, 10.0), i)];
+    let spilled: Vec<u32> = (0..=STILLS_KEPT as u32).flat_map(|i| stills.keep(camera(1.0 + i as f64), SCREEN, block(i))).collect();
+
+    assert_eq!(spilled, vec![0]);
+    assert!(Rest::resume(camera(1.0), SCREEN, &mut stills).is_none());
+    assert_eq!(stills.bytes(), STILLS_KEPT as u64 * 400);
+    assert_eq!(stills.clear().len(), STILLS_KEPT);
+    assert!(Rest::resume(camera(2.0), SCREEN, &mut stills).is_none());
+}

@@ -438,7 +438,57 @@ pub struct Rest {
     lacking: bool,
 }
 
+pub const STILLS_KEPT: usize = 2;
+const ZOOM_SAME: f64 = 1e-6;
+const RGBA_BYTES: u64 = 4;
+
+struct Still<T> {
+    camera: Camera,
+    screen: (u32, u32),
+    blocks: Vec<(Rect, T)>,
+}
+
+pub struct Stills<T> {
+    kept: std::collections::VecDeque<Still<T>>,
+}
+
+impl<T> Default for Stills<T> {
+    fn default() -> Self {
+        Stills { kept: Default::default() }
+    }
+}
+
+fn same_view(a: Camera, b: Camera) -> bool {
+    a.x.round() == b.x.round() && a.y.round() == b.y.round() && (a.zoom / b.zoom - 1.0).abs() < ZOOM_SAME
+}
+
+impl<T> Stills<T> {
+    pub fn keep(&mut self, camera: Camera, screen: (u32, u32), blocks: Vec<(Rect, T)>) -> Vec<T> {
+        self.kept.push_back(Still { camera, screen, blocks });
+        let over = self.kept.len().saturating_sub(STILLS_KEPT);
+        self.kept.drain(..over).flat_map(|s| s.blocks.into_iter().map(|(_, t)| t)).collect()
+    }
+
+    fn take(&mut self, camera: Camera, screen: (u32, u32)) -> Option<Vec<(Rect, T)>> {
+        let at = self.kept.iter().position(|s| s.screen == screen && same_view(s.camera, camera))?;
+        self.kept.remove(at).map(|s| s.blocks)
+    }
+
+    pub fn clear(&mut self) -> Vec<T> {
+        self.kept.drain(..).flat_map(|s| s.blocks.into_iter().map(|(_, t)| t)).collect()
+    }
+
+    pub fn bytes(&self) -> u64 {
+        self.kept.iter().flat_map(|s| &s.blocks).map(|(r, _)| r.area() as u64 * RGBA_BYTES).sum()
+    }
+}
+
 impl Rest {
+    pub fn resume<T>(camera: Camera, screen: (u32, u32), stills: &mut Stills<T>) -> Option<(Rest, Vec<(Rect, T)>)> {
+        let blocks = stills.take(camera, screen)?;
+        Some((Rest { camera, screen, todo: vec![], lacking: false }, blocks))
+    }
+
     pub fn new(camera: Camera, screen: (u32, u32)) -> Rest {
         let side = REST_BLOCK_PX as f64;
         let (w, h) = (screen.0 as f64, screen.1 as f64);

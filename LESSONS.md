@@ -64,6 +64,9 @@ Signal: with the pointer still over a frame, a wheel zoom makes its hover outlin
 ### Tiles turn sharp slowly after a zoom-in: count paints per tile, not ms per tile
 **Signal:** zoomed far in, every tile costs ~3 ms whatever its size (one tile or a 2×2 block cost the same), almost all in `layers::prepare_items`, and the layer cache never hits. **Move:** log, per `raster_batch`, the number of `Surface::paint` calls by `Reason` and the clip of each layer-worthy item. A tile paying for layers it does not show is the defect: on the landings fixture ten of twelve were groups emptied by `Laying::lay` that still carried an SVG effect filter (no bounds, so never culled, so a full-tile body, mask and filter). A cost fixed per draw also means bigger batches are nearly free on the CPU; measure the GPU side by frames over 11 ms before growing them.
 
+### A zoom round trip re-rasters every lap: print tiles per step per lap, not per lap
+**Signal:** `canvas-roundtrip-bench` shows laps 2 and 3 rastering as much as lap 1 though nothing changed. **Move:** group the dumped `roundtrip-frames-lap<n>.json` tiles by `step` (scratch script). On the landings fixture a flick (`Ease.Flick`) spends ~100–230 ms on each of its last five levels, slow enough to be worth baking, and the pyramid planned at a rest takes ~900 of the 1,152 kept tiles, so those levels and even the endpoint level are evicted before the next lap. Before changing eviction, add up pyramid + endpoints + tail levels against `tiles_kept`. Skipping "flown" levels and evicting passing tiles first both cut the count and both made zooms softer (a level bakes in ~30 ms, so most flown levels did turn sharp): measure time not sharp from the frame dumps, not tiles alone. A perf spec kept only in a worktree is gone with it, so commit the bench.
+
 ## Providers
 
 ### Kie publishes its price list and its request schemas, you just have to find them
