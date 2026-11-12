@@ -170,8 +170,8 @@ kind (`edit-<target>-<edit>.cpuprofile`) and the input and `live-asked` times
 ## Real-user telemetry
 
 Every open canvas (sampled by `PERF_SAMPLE_RATE` in `src/lib/canvas/perf/perf-beacon.ts`, 1 today)
-aggregates one summary in the browser and posts it to `/api/v1/telemetry/canvas-perf` every 5 min
-and on `pagehide` / tab hidden (`sendBeacon`). The endpoint keeps only known keys, numbers and ids,
+aggregates one summary in the browser and posts it to `/api/v1/telemetry/canvas-perf` as soon as
+the engine is up, every 5 min, and on `pagehide` / tab hidden (`sendBeacon`); `reason` says which. The endpoint keeps only known keys, numbers and ids,
 caps a user at 30 summaries an hour, and records a `canvas_perf` row in `product_events`.
 
 A summary is cumulative per session (`sessionId`); the report keeps the latest one. It carries:
@@ -181,7 +181,16 @@ A summary is cumulative per session (`sessionId`); the report keeps the latest o
   only while a gesture runs, 1 ms buckets), long tasks over 50 ms (`PerformanceObserver`);
 - edit latency p50/p95: a frame's revision or live doc changing until its new list is put;
 - backend, fallbacks, device losses, device class from `BUDGET`, DPR, cores, `deviceMemory`,
-  frame and node counts, source bytes (Resource Timing), `CORE_VERSION`, JS heap at 10 min.
+  frame and node counts, source bytes (Resource Timing), `CORE_VERSION`, JS heap at 10 min;
+- health: `platform` (`iphone`, `ipad` even behind the Mac user agent, `android`, `desktop`),
+  `visible` and the canvas `width`/`height` when sent, WebGPU adapter `limits`, `memory` (GPU
+  texture MB and count — WebGPU only —, wasm, zoom cache and picture MB), `lastError`, and
+  `diedBefore`/`before`: the previous canvas session in this browser ended without `pagehide` and
+  what it held at its last sample. iOS kills an over-budget tab without any event, so a death shows
+  up only here, on the next load.
+
+A row with `backend` null never had an engine attached in that page; `visible` 0 with a 0×0 size is
+a tab that was never drawn.
 
 No content, no prompt text, no emails.
 
