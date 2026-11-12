@@ -21,7 +21,7 @@
   import { documentColours, recolour, selectionColours } from '$lib/motion/selection-colours';
   import { Control } from '@feega/motion-core/motion/components';
   import { Axis, distributeSpace, gapOf, propBoxes } from '$lib/motion/space';
-  import ColourRow from './ColourRow.svelte';
+  import ColourRows from './ColourRows.svelte';
   import NumberField from './NumberField.svelte';
   import BoxFields from './BoxFields.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
@@ -190,9 +190,7 @@
     {#if colours.length}
       <section class="section ui-section" data-section="colours">
         <h3>Selection colours</h3>
-        {#each colours as { colour, count } (colour)}
-          <ColourRow {colour} {count} palette={() => documentColours(doc)} onchange={(to) => swapColour(colour, to)} />
-        {/each}
+        <ColourRows {colours} palette={() => documentColours(doc)} onswap={swapColour} />
       </section>
     {/if}
     <section class="section ui-section" data-section="constraints">

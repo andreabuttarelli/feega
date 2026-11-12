@@ -44,7 +44,7 @@
   import type { Edge as AlignEdge } from '$lib/motion/space';
   import ColorField from './ColorField.svelte';
   import { clipColours, documentColours, recolourClip } from '$lib/motion/selection-colours';
-  import ColourRow from './ColourRow.svelte';
+  import ColourRows from './ColourRows.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import Plus from '@lucide/svelte/icons/plus';
   import Settings2 from '@lucide/svelte/icons/settings-2';
@@ -996,9 +996,7 @@
 
 {#snippet coloursBody()}
   <div data-testid="clip-colours">
-    {#each colours as { colour, count } (colour)}
-      <ColourRow {colour} {count} {palette} onchange={(to) => commit(recolourClip(doc, clip.id, colour, to), `Recoloured ${colour} to ${to}`)} />
-    {/each}
+    <ColourRows {colours} {palette} onswap={(from, to) => commit(recolourClip(doc, clip.id, from, to), `Recoloured ${from} to ${to}`)} />
   </div>
 {/snippet}
 
