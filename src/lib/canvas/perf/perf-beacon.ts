@@ -82,8 +82,12 @@ export function startCanvasPerf(place: PerfPlace, random: () => number = Math.ra
       }
     }
     const body = JSON.stringify(perf.summary(context(), performance.now()));
-    if (!navigator.sendBeacon?.(PERF_URL, new Blob([body], { type: 'application/json' }))) {
-      void fetch(PERF_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body, keepalive: true }).catch(() => undefined);
+    try {
+      if (!navigator.sendBeacon?.(PERF_URL, new Blob([body], { type: 'application/json' }))) {
+        void fetch(PERF_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body, keepalive: true }).catch(() => undefined);
+      }
+    } catch {
+      return;
     }
   };
   const hidden = () => document.visibilityState === 'hidden' && flush();
