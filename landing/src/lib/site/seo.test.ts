@@ -4,6 +4,7 @@ import { UPSCALER } from './landing/upscaler';
 import { LEGAL_DOCS } from './legal';
 import { BLOG_INDEX, COMPARISONS } from './compare';
 import { GUIDES, GUIDES_INDEX } from './guides';
+import { POSTS } from './posts';
 import { competitorFaq } from './compare/faq';
 import { AI_CRAWLERS } from './crawlers';
 import { GET as robots } from '../../routes/robots.txt/+server';
@@ -24,6 +25,7 @@ const metas = [
   ['blog', BLOG_INDEX],
   ['guides', GUIDES_INDEX],
   ...Object.entries(GUIDES),
+  ...Object.entries(POSTS),
   ...Object.entries(COMPARISONS)
 ] as const;
 
