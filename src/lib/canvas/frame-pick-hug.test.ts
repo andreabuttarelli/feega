@@ -44,4 +44,17 @@ describe('clicking a text that hugs its words', () => {
 
     expect(rect.width).toBeCloseTo(STORED_WIDTH * STAGE.width, 1);
   });
+
+  it('a click in the empty part of a fixed right-aligned box picks the text, not the layer behind', () => {
+    const back = addClip({ ...newMotionDoc(MotionFormat.Landscape), ...STAGE }, { component: 'Shape', from: 0, durationInFrames: 150, props: { shape: 'rect', x: 0.25, y: 0.15, width: 0.5, height: 0.2 } }, 'back');
+    const both = back.ok ? addClip(back.doc, { component: 'Text', from: 0, durationInFrames: 150, props: { text: 'Ciao', size: 0.09, sizing: TextSizing.Fixed, align: 'right', x: 0.25, y: 0.15, width: STORED_WIDTH, height: 0.07 } }, 't') : back;
+    if (!both.ok) {
+      throw new Error(both.error);
+    }
+    const picker = framePicker({ doc: both.doc, tokens: FEEGA_TOKENS, assets: {} });
+    const rect = picker.frameRect('t')!;
+    const space = { toFrame: (w: { x: number; y: number }) => [w.x, w.y] } as Parameters<typeof picker.pick>[1];
+
+    expect(picker.pick({ x: rect.left + 2, y: rect.top + rect.height / 2 }, space)).toBe('t');
+  });
 });
