@@ -4,7 +4,9 @@ import { aliasOf, lengthPx, type TokenEntry, type TokenMap } from './design-toke
 import { colourOf, writtenLike } from './token-colour';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { applyEdits, atOf, editsOf, type FileChange, type ReadFile } from './write-back';
-import { parseSheets } from './css-tokens';
+import { LIGHT, READ_ONLY, fromPage, parseSheets } from './css-tokens';
+import { importedValue as importedStyleValue, sameStyleValue, styleText, styleValue, type StyleField } from './design-styles';
+import type { Style } from '@feega/motion-core/motion/styles-model';
 
 export type TokensWritten = { files: FileChange[]; skipped: string[]; map: TokenMap };
 
@@ -94,6 +96,14 @@ function located(text: string, d: Declaration): number | null {
   return lines.reduce<number | null>((best, line) => (best === null || distance(line) <= distance(best) ? line : best), null);
 }
 
+function locatedRule(text: string, d: Declaration & { rule: string }): number | null {
+  const lines = parseSheets([{ path: d.file, text }])
+    .typed.filter((found) => found.selector === d.rule && found.property === d.name && found.raw.trim() === d.was.trim())
+    .map((found) => found.at.line);
+  const distance = (line: number) => Math.abs(line - d.hint);
+  return lines.reduce<number | null>((best, line) => (best === null || distance(line) <= distance(best) ? line : best), null);
+}
+
 type Appended = { text: string; line: number; column: number; inserted: boolean };
 
 const INDENT = /^\s*/;
@@ -159,7 +169,7 @@ export function editedModes(variables: Variables | undefined, map: TokenMap): Ma
   return edited;
 }
 
-export async function writeTokens(variables: Variables | undefined, map: TokenMap, read: ReadFile): Promise<TokensWritten> {
+export async function writeTokens(variables: Variables | undefined, map: TokenMap, read: ReadFile, styles: Record<string, Style> = {}): Promise<TokensWritten> {
   const byName = aliasTargets(map);
   const before = new Map<string, string | null>();
   const after = new Map<string, string>();
@@ -177,6 +187,38 @@ export async function writeTokens(variables: Variables | undefined, map: TokenMa
   const missing: { key: string; entry: TokenEntry; mode: string; text: string; file: string }[] = [];
 
   for (const [key, entry] of Object.entries(map)) {
+    if (!entry.style || entry.orphan) {
+      continue;
+    }
+    const raw = entry.raw[LIGHT];
+    const now = styleValue(styles[entry.style], entry.field as StyleField);
+    if (raw === undefined || now === undefined || sameStyleValue(entry, importedStyleValue(entry, raw), now)) {
+      continue;
+    }
+    const origin = entry.origins[LIGHT];
+    const at = atOf(origin);
+    if (fromPage(origin)) {
+      skipped.push(`${entry.name}: ${READ_ONLY}`);
+      continue;
+    }
+    if (!at || outside(origin)) {
+      skipped.push(`${entry.name}: ${origin} is outside the repository`);
+      continue;
+    }
+    const text = styleText(entry, now, raw);
+    const file = await current(at.file);
+    const declaration = { file: at.file, mode: LIGHT, name: entry.name, was: raw, hint: at.line };
+    const line = file === null ? null : entry.rule ? locatedRule(file, { ...declaration, rule: entry.rule }) : located(file, declaration);
+    const changed = text === null || file === null || line === null ? null : replaced(file, line, entry.name, raw, text);
+    if (text === null || changed === null) {
+      skipped.push(`${entry.name} (${entry.style}): ${text === null ? 'cannot be written as CSS' : 'changed in the code since the import: the code wins'}`);
+      continue;
+    }
+    after.set(at.file, changed);
+    next[key].raw[LIGHT] = text;
+  }
+
+  for (const [key, entry] of Object.entries(map)) {
     const found = variableAt(variables, key);
     if (!found || entry.orphan) {
       continue;
@@ -191,6 +233,10 @@ export async function writeTokens(variables: Variables | undefined, map: TokenMa
         continue;
       }
       const origin = entry.origins[mode] ?? Object.values(entry.origins)[0];
+      if (fromPage(origin)) {
+        skipped.push(`${entry.name}: ${READ_ONLY}`);
+        break;
+      }
       const own = Boolean(entry.origins[mode]);
       const at = atOf(origin);
       if (!at || outside(origin)) {
@@ -254,7 +300,7 @@ export async function frameEdits(doc: MotionDoc, tokens: TokenMap | undefined, r
     return { ...layers, map: {} };
   }
   const layered = new Map(layers.files.map((f) => [f.path, f]));
-  const written = await writeTokens(doc.variables, tokens, async (path) => layered.get(path)?.after ?? read(path));
+  const written = await writeTokens(doc.variables, tokens, async (path) => layered.get(path)?.after ?? read(path), doc.styles ?? {});
   const touched = new Set(written.files.map((f) => f.path));
   const files = [...layers.files.filter((f) => !touched.has(f.path)), ...written.files.map((f) => ({ ...f, before: layered.get(f.path)?.before ?? f.before }))];
   return { files, skipped: [...layers.skipped, ...written.skipped], map: written.map };

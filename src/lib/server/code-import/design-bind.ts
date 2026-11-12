@@ -8,7 +8,10 @@ import { bindableTargets, resolveVariables } from '$lib/motion/variables';
 import { sameColour } from '$lib/server/url-import/page-tokens';
 import { uniformRadius } from '$lib/server/url-import/corner-radius';
 import type { VarRule } from './css-tokens';
-import { SPACING_BASE, tokenId, type TokenMap } from './design-tokens';
+import { OTHER_GROUP, SPACING_BASE, tokenId, type TokenMap } from './design-tokens';
+import { styleFits, type MadeStyles } from './design-styles';
+import { defineStyle, slotOf } from '$lib/motion/styles';
+import { StyleKind } from '@feega/motion-core/motion/styles-model';
 import { parseKey } from './render-conditions';
 
 export enum Evidence {
@@ -19,7 +22,7 @@ export enum Evidence {
 
 export type BoundCount = Record<Evidence, number> & { unbound: number };
 
-export type BindAsk = { variables: Variables; map: TokenMap; rules: VarRule[]; base: string; boards: Record<string, string> };
+export type BindAsk = { variables: Variables; map: TokenMap; rules: VarRule[]; base: string; boards: Record<string, string>; styles?: MadeStyles };
 
 type View = MotionDoc;
 
@@ -204,6 +207,55 @@ function boundClip(ctx: Context, clip: MotionClip, view: View, mode: string, cou
   return Object.keys(bind).length ? { ...next, bind } : next;
 }
 
+type StyleEvidence = { evidence: Evidence; find: (made: MadeStyles, clip: MotionClip, kind: StyleKind, fits: (name: string) => boolean) => string | undefined };
+
+const classesOf = (clip: MotionClip) => (clip.source?.cls ?? '').split(/\s+/).filter((c) => c && !VARIANT_OR_MODIFIER.test(c));
+
+const STYLE_EVIDENCE: StyleEvidence[] = [
+  { evidence: Evidence.Class, find: (made, clip, kind) => classesOf(clip).map((c) => made.utilities.get(c)).findLast((name) => name && made.styles[name].kind === kind) },
+  { evidence: Evidence.Rule, find: (made, clip, kind) => made.rules.findLast((r) => made.styles[r.style].kind === kind && r.selector.split(',').some((sel) => matches(sel, clip)))?.style },
+  {
+    evidence: Evidence.Value,
+    find: (made, _clip, kind, fits) => {
+      const hits = Object.keys(made.styles).filter((name) => made.styles[name].kind === kind && fits(name));
+      return hits.length === 1 ? hits[0] : undefined;
+    }
+  }
+];
+
+const STYLED: { kind: StyleKind; applies: (clip: MotionClip) => boolean }[] = [
+  { kind: StyleKind.Text, applies: isText },
+  { kind: StyleKind.Effect, applies: (clip) => clip.effects.length > 0 }
+];
+
+function styledClip(made: MadeStyles, clip: MotionClip, view: View, rootUnit: number, count: BoundCount): MotionClip {
+  let next = clip;
+  for (const { kind } of STYLED.filter((s) => s.applies(clip))) {
+    const slot = slotOf(kind);
+    if (clip[slot]) {
+      continue;
+    }
+    const fits = (name: string) => styleFits(made.styles[name], clip, Math.min(view.width, view.height), rootUnit);
+    const found = STYLE_EVIDENCE.map((e) => ({ e, name: e.find(made, clip, kind, fits) })).find(({ name }) => name && fits(name));
+    if (!found) {
+      count.unbound++;
+      continue;
+    }
+    count[found.e.evidence]++;
+    next = { ...next, [slot]: found.name };
+  }
+  return next;
+}
+
+function withStyles(doc: MotionDoc, made: MadeStyles): MotionDoc {
+  let next: MotionDoc = { ...doc, styles: { ...doc.styles, ...made.styles } };
+  for (const [name, style] of Object.entries(made.styles)) {
+    const painted = defineStyle(next, name, style);
+    next = painted.ok ? painted.doc : next;
+  }
+  return next;
+}
+
 function modesFor(variables: Variables, mode: string): Record<string, string> {
   return Object.fromEntries(Object.entries(variables).filter(([, c]) => c.modes.includes(mode)).map(([name]) => [name, mode]));
 }
@@ -265,17 +317,23 @@ function withoutModeLiterals(doc: MotionDoc): MotionDoc {
 
 export function boundToTokens(doc: MotionDoc, ask: BindAsk): { doc: MotionDoc; bound: BoundCount } {
   const byName = new Map(Object.entries(ask.map).map(([key, entry]) => [tokenId(entry), key]));
-  const keys = Object.entries(ask.variables).flatMap(([c, col]) => Object.keys(col.vars).map((v) => `${c}/${v}`));
+  const keys = Object.entries(ask.variables)
+    .filter(([c]) => !c.endsWith(` ${OTHER_GROUP}`))
+    .flatMap(([c, col]) => Object.keys(col.vars).map((v) => `${c}/${v}`));
   const ctx: Context = { ...ask, byName, allModes: modesOf(ask.variables), keys };
   const count: BoundCount = { [Evidence.Class]: 0, [Evidence.Rule]: 0, [Evidence.Value]: 0, unbound: 0 };
   const withVars = { ...doc, variables: { ...doc.variables, ...ask.variables } };
 
-  const done = inEveryScope(withVars, (view) => {
+  const styles = ask.styles;
+  const done = inEveryScope(withVars, (view, rootUnit) => {
     const clips = view.tracks.flatMap((t) => t.clips as MotionClip[]);
     const parents = new Map(clips.map((c) => [c.id, c]));
-    const tracks = view.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (c.source || !c.bind ? boundClip(ctx, c, view, modeOfClip(ctx, c, parents), count) : c)) }));
+    const bound = (c: MotionClip) => (c.source || !c.bind ? boundClip(ctx, c, view, modeOfClip(ctx, c, parents), count) : c);
+    const styled = (c: MotionClip) => (styles && c.source ? styledClip(styles, c, view, rootUnit, count) : c);
+    const tracks = view.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => styled(bound(c))) }));
     return { ok: true, doc: { ...view, tracks } as MotionDoc };
   });
-  const moded = resolveVariables(boardModes(done.ok ? done.doc : withVars, ctx));
+  const laid = done.ok ? done.doc : withVars;
+  const moded = resolveVariables(boardModes(styles ? withStyles(laid, styles) : laid, ctx));
   return { doc: withoutModeLiterals(moded), bound: count };
 }

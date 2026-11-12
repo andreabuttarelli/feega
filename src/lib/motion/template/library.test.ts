@@ -80,6 +80,21 @@ describe('inserting a template', () => {
     expect(parseMotionDoc(doc).ok).toBe(true);
   });
 
+  it('brings the variable collections its layers are bound to, keeping the ones the doc already has', () => {
+    const made = templateFromComp(card(), 'card', { name: 'Card' });
+    if (!made.ok) {
+      throw new Error(made.error);
+    }
+    const palette = { modes: ['Light'], vars: { ink: { type: 'colour', values: { Light: '#111111' } } } };
+    const own = { modes: ['Light'], vars: { ink: { type: 'colour', values: { Light: '#222222' } } } };
+    const template = { ...made.template, doc: { ...made.template.doc, variables: { 'Arc Palette': palette, Shared: palette } } } as MotionTemplate;
+    const target = { ...newMotionDoc(MotionFormat.Vertical), variables: { Shared: own } } as MotionDoc;
+
+    const out = insertTemplate(target, { id: 'builtin:arc-card', template }, { from: 0, newId: counter() });
+
+    expect(out.ok && out.doc.variables).toEqual({ 'Arc Palette': palette, Shared: own });
+  });
+
   it('three inserts are three independent instances, each with its own fields', () => {
     let { doc, clips } = inserted(3);
     doc = must(setTemplateValues(doc, clips[1], { headline: 'Second', photo: 'asset-2' }));

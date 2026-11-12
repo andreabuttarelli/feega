@@ -54,7 +54,7 @@ function tabOf() {
     marks: vi.fn(async () => USES),
     tree: vi.fn(async (): Promise<PageTree> => TREE),
     close: vi.fn(async () => 0.002)
-  } as unknown as AppTab & { marks: ReturnType<typeof vi.fn>; goto: ReturnType<typeof vi.fn>; scheme: ReturnType<typeof vi.fn>; viewport: ReturnType<typeof vi.fn> };
+  } as unknown as AppTab & { tree: ReturnType<typeof vi.fn>; marks: ReturnType<typeof vi.fn>; goto: ReturnType<typeof vi.fn>; scheme: ReturnType<typeof vi.fn>; viewport: ReturnType<typeof vi.fn> };
 }
 
 function storeOf() {
@@ -259,6 +259,27 @@ describe('importCodeAt design system', () => {
 
     expect((docs.get('frame-1')!.doc as Doc).variables).toBeUndefined();
     expect(done).not.toHaveProperty('design');
+  });
+
+  it('legge anche i fogli che la pagina ha caricato: il foglio di Nuxt 4 fuori dalla lista nota', async () => {
+    const { ask, tab, docs } = askOf({ routes: ['/'], code: () => fixture('nuxt4') });
+    tab.tree.mockImplementation(async () => ({ ...TREE, styles: [{ at: '/vercel/sandbox/app/assets/css/main.css', text: '' }] }));
+
+    const done = await importCodeAt(ask);
+
+    expect(done.outcome === CodeImportOutcome.Ok && done.tokenMap!['app Palette/ui-primary'].origins).toEqual({ Light: 'app/assets/css/main.css:12:2', Dark: 'app/assets/css/main.css:16:2' });
+    expect((docs.get('frame-1')!.doc as Doc).variables!['app Palette']).toMatchObject({ modes: ['Light', 'Dark'] });
+  });
+
+  it('la scala del testo e le ombre arrivano come stili, contati nel resoconto e scritti nella mappa', async () => {
+    const { ask, docs } = askOf({ routes: ['/'], code: () => fixture('typescale') });
+
+    const done = await importCodeAt(ask);
+
+    const styles = (docs.get('frame-1')!.doc as { styles?: Record<string, unknown> }).styles ?? {};
+    expect(Object.keys(styles)).toEqual(expect.arrayContaining(['app Text/hero', 'app Text/article prose h2', 'app Shadow/card']));
+    expect(done).toMatchObject({ design: { styles: 5 } });
+    expect(done.outcome === CodeImportOutcome.Ok && done.tokenMap!['app Text/hero#size'].origins).toEqual({ Light: 'src/app.css:5:1' });
   });
 
   it('un repo senza token importa come prima', async () => {

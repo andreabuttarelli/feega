@@ -1,0 +1,59 @@
+---
+title: Arc components
+description: The free Arc component library ships inside Feega as a built-in component library, ready to insert on the canvas.
+sidebar:
+  order: 6
+---
+
+[Arc](https://uiarc.dev) is a React component library. Its free tier (MIT) ships with Feega as the **Arc** group of the component library: 115 components, from buttons and inputs to charts, menus and full marketing blocks, each as editable layers with its variants.
+
+## Insert a component
+
+- **In the app**: on the canvas open **+** → **Components**, pick the **Arc** group, choose a component and press **Add to canvas**. Inside a composition, **Use in composition** places it there.
+- **Agents**: Arc components are templates with ids `builtin:arc-<name>` (for example `builtin:arc-button`). The motion and project agents list them with the other components and insert them by id; the API lists them at `GET /api/v1/motion/templates`.
+
+## Colours, light and dark, accents
+
+Arc's design tokens arrive as variable collections:
+
+| Collection | Modes |
+|---|---|
+| `Arc Palette` | Light, Dark |
+| `Arc Accent` | Neutral, Violet, Blue, Green, Amber, Orange, Coral, Rose |
+| `Arc Radius`, `Arc Spacing`, `Arc Type` | Light |
+
+Layers are bound to them, so switching the mode of a frame recolours the component. An accent inside dark mode (`[data-theme="dark"][data-accent=…]`) is not imported yet.
+
+The same mapping applies when you [import your own code](/integrations/import-from-code/) that uses Arc: `data-accent` selectors become the modes of an `Accent` collection.
+
+## Fonts and Next.js imports
+
+Arc asks for Geist and Inter through `--font-geist` and `--font-inter`, which a Next.js app fills with `next/font`. When a folder import sees those tokens and nothing declares them, Feega loads Geist and Inter from Google Fonts. Components that import `next/image` or `next/link` run in a Vite app too: Feega swaps them for a plain `<img>` and `<a>` while it reads the page.
+
+## What is and is not included
+
+Only items marked free in Arc's public catalog are included; the catalog snapshot is pinned in the Feega repository and no Arc Pro item is fetched or stored. 28 free items do not appear as their own component yet, because they render through parts with other names (dialogs, drawers, menus) or need interaction to show (theme switch variants, rich text editor).
+
+## Licence
+
+Arc's free components are © 2026 Elia Kuratli, under the MIT licence:
+
+```
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
