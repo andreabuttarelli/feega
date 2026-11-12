@@ -3883,3 +3883,13 @@ Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start
 ## An origin written at the end of a long server job drops a sibling's change
 
 **Signal:** two imports into one frame both land on the canvas, but the code map lists only the second. **Move:** `codeAdd` read the origin when it started and wrote it ~40 s later; anything written in between was lost. Merge into the origin as it is right before the write (`rememberLatest`), and test with two calls in `Promise.all`, the first one slower.
+
+## A two-finger pan on a phone costs 10x a wheel pan
+
+**Signal:** WebKit iPhone profile, a two-finger touch pan uploads ~110 MB of GL textures a frame
+and takes ~280 ms a frame; the same pan by wheel uploads 0.1 MB. **Move:** the two fingers'
+`pointermove` events arrive one at a time, so `next.dist / pinch.dist` is never 1 and every pan
+frame changes `view.zoom`; that puts the canvas on the zoom path (`zooming.active()` →
+`cached()`), which re-rasters frames per frame. Measure gestures with touch events, never only
+wheel, and compare at least four runs per side: the same gesture on the same fixture swings
+from 6 to 450 MB a frame between runs (`npm run perf:phone-guard`).

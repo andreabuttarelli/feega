@@ -18,7 +18,7 @@
   import { PART_ITEMS, parts } from '$lib/canvas/core/group-parts';
   import { spliceOf } from '@feega/motion-core/canvas/core/group-diff';
   import { storedTiles, tilesOn } from '$lib/canvas/core/tiles-switch';
-  import { cacheZoom, cached, uncached, pictureBytes, resident, heldWhileMoving, type HeldFrame } from '$lib/canvas/core/residency';
+  import { cacheZoom, cached, uncached, pictureBytes, resident, heldWhileMoving, movingWhileZooming, ZoomPicture, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, buildLanes, currentDevice, textureBudget } from '$lib/canvas/gpu/memory-budget';
   import { worldUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { NO_SIGHT, sameSight, sightOf, slackened, stillHolds, widened, type Sight, type Taken } from '$lib/canvas/core/sight';
@@ -1018,7 +1018,7 @@
     const at = deviceView();
     const device = { width: area.width * resolution, height: area.height * resolution };
     const wide = widened(at, device);
-    const patch = sent.patch(worldUses(heldWhileMoving(zooming.active() || edited.size ? cached(drawn, wide.view, wide.area, textureBytes, cacheZoom(view.zoom) * resolution) : uncached(drawn), liftHeld(drawn))));
+    const patch = sent.patch(worldUses(heldWhileMoving(zooming.active() || edited.size ? cached(drawn, wide.view, wide.area, textureBytes, cacheZoom(view.zoom) * resolution) : uncached(drawn), movingWhileZooming(drawn, liftHeld(drawn), zooming.active() ? budget.zoomPicture : ZoomPicture.Exact))));
     if (patch) {
       into.patchUses(patch);
     }
