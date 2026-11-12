@@ -10,7 +10,8 @@ enum Gesture {
   Pan = 'pan',
   Zoom = 'zoom',
   Fit = 'fit',
-  Drag = 'drag'
+  Drag = 'drag',
+  DragElement = 'drag-element'
 }
 
 enum Edit {
@@ -35,6 +36,8 @@ const RUNS = Number(process.env.BUDGET_RUNS ?? 3);
 const OUT = process.env.BUDGET_OUT ?? 'perf-results';
 const LANDINGS_BASE = process.env.BUDGET_LANDINGS_BASE ?? `http://127.0.0.1:${process.env.BENCH_PORT ?? 5288}`;
 const HEAVY_BASE = process.env.BUDGET_HEAVY_BASE ?? `http://127.0.0.1:${Number(process.env.BENCH_PORT ?? 5288) + 1}`;
+const GESTURES_RUN = (process.env.BUDGET_GESTURES?.split(',') ?? null) as string[] | null;
+const benched = () => Object.values(Gesture).filter((g) => !GESTURES_RUN || GESTURES_RUN.includes(g));
 const TARGETS = (process.env.BUDGET_TARGETS?.split(',') ?? Object.values(Target)) as Target[];
 const VIEWPORT = { width: 1440, height: 900 };
 const SETTLE_MS = 10_000;
@@ -138,34 +141,78 @@ async function fit(page: Page, until: number) {
   }
 }
 
-async function drag(page: Page, until: number, aim?: string) {
-  const box = (await tiles(page)).find((t) => t.id === aim) ?? (await frameOnScreen(page));
-  const from = labelAt(box);
+async function swing(page: Page, from: { x: number; y: number }, until: number): Promise<number> {
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
   let moves = 0;
   for (; Date.now() < until; moves++) {
     const t = moves / 10;
     await page.mouse.move(from.x + Math.sin(t) * DRAG_SWING.x, from.y + Math.sin(t * 0.7) * DRAG_SWING.y);
+    await nextFrame(page);
   }
-  const moved = (await placeOf(page, box.id)) !== box.at;
-  console.log(`drag: ${moves} moves on ${box.id}`);
+  return moves;
+}
+
+async function release(page: Page, from: { x: number; y: number }) {
   await page.mouse.move(from.x, from.y);
   await page.mouse.up();
   await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+}
+
+async function drag(page: Page, until: number, aim?: string) {
+  const box = (await tiles(page)).find((t) => t.id === aim) ?? (await frameOnScreen(page));
+  const from = labelAt(box);
+  const moves = await swing(page, from, until);
+  const moved = (await placeOf(page, box.id)) !== box.at;
+  console.log(`drag: ${moves} moves on ${box.id}`);
+  await release(page, from);
   if (!moved) {
     throw new Error(`drag: frame ${box.id} did not move`);
   }
+  return moves;
 }
 
-const GESTURES: Record<Gesture, (page: Page, until: number, aim?: string) => Promise<void>> = {
+const CONTAINER_TRIES = 12;
+const CONTAINER_STEP = 0.06;
+
+async function selectContainer(page: Page): Promise<string> {
+  const id = await zoomOntoFrame(page);
+  const strips = page.getByTestId('auto-layout-overlay');
+  for (let i = 0; i < CONTAINER_TRIES; i++) {
+    const box = (await tiles(page)).find((t) => t.id === id)!;
+    await page.mouse.click(box.x + box.w * 0.5, box.y + box.w * (CONTAINER_STEP * (i + 1)));
+    if (await strips.first().isVisible()) {
+      return id;
+    }
+    await page.keyboard.press('Escape');
+  }
+  throw new Error('drag-element: no auto-layout container to select');
+}
+
+async function dragElement(page: Page, until: number) {
+  const body = page.getByTestId('frame-selection-body').first();
+  const box = (await body.boundingBox())!;
+  const from = { x: box.x + box.width / 2, y: box.y + Math.min(box.height / 2, 20) };
+  const moves = await swing(page, from, until);
+  const after = (await body.boundingBox())!;
+  console.log(`drag-element: ${moves} moves`);
+  await release(page, from);
+  if (after.x === box.x && after.y === box.y) {
+    throw new Error('drag-element: the element did not move');
+  }
+  return moves;
+}
+
+const GESTURES: Record<Gesture, (page: Page, until: number, aim?: string) => Promise<number | void>> = {
   [Gesture.Pan]: wheelPan,
   [Gesture.Zoom]: zoom,
   [Gesture.Fit]: fit,
-  [Gesture.Drag]: drag
+  [Gesture.Drag]: drag,
+  [Gesture.DragElement]: dragElement
 };
 
-type Seen = { gaps: number[]; taskMs: number };
+type Seen = { gaps: number[]; taskMs: number; moves: number };
 
 async function taskSeconds(cdp: CDPSession): Promise<number> {
   const { metrics } = await cdp.send('Performance.getMetrics');
@@ -173,21 +220,22 @@ async function taskSeconds(cdp: CDPSession): Promise<number> {
 }
 
 const SETUP: Partial<Record<Gesture, (page: Page) => Promise<string>>> = {
-  [Gesture.Drag]: zoomOntoFrame
+  [Gesture.Drag]: zoomOntoFrame,
+  [Gesture.DragElement]: selectContainer
 };
 
 async function gaps(page: Page, cdp: CDPSession, gesture: Gesture): Promise<Seen> {
   const aim = await SETUP[gesture]?.(page);
   await page.evaluate(() => Object.assign((window as unknown as { __frames: object }).__frames, { gaps: [], work: [], counting: true }));
   const before = await taskSeconds(cdp);
-  await GESTURES[gesture](page, Date.now() + GESTURE_MS, aim);
+  const moves = (await GESTURES[gesture](page, Date.now() + GESTURE_MS, aim)) ?? 0;
   const after = await taskSeconds(cdp);
   const seen = await page.evaluate(() => {
     const probe = (window as unknown as { __frames: { gaps: number[]; counting: boolean } }).__frames;
     probe.counting = false;
     return probe.gaps;
   });
-  return { gaps: seen, taskMs: (after - before) * MS_PER_S };
+  return { gaps: seen, taskMs: (after - before) * MS_PER_S, moves };
 }
 
 async function run(browser: Browser, target: Target): Promise<Record<Gesture, Seen>> {
@@ -205,7 +253,7 @@ async function run(browser: Browser, target: Target): Promise<Record<Gesture, Se
   await page.locator('[data-canvas-surface]').first().waitFor({ timeout: 120_000 });
   await page.waitForTimeout(SETTLE_MS);
   const seen = {} as Record<Gesture, Seen>;
-  for (const gesture of Object.values(Gesture)) {
+  for (const gesture of benched()) {
     await page.keyboard.press('Shift+Digit1');
     await page.waitForTimeout(FIT_TOGGLE_MS);
     seen[gesture] = await gaps(page, cdp, gesture);
@@ -218,17 +266,18 @@ for (const target of TARGETS) {
   test(`frames stay inside ${FRAME_BUDGET_MS.toFixed(1)} ms on ${target}`, async () => {
     mkdirSync(OUT, { recursive: true });
     const browser = await chromium.launch({ headless: false, args: UNCAPPED });
-    const all = Object.fromEntries(Object.values(Gesture).map((g) => [g, { gaps: [], taskMs: 0 } as Seen])) as Record<Gesture, Seen>;
+    const all = Object.fromEntries(benched().map((g) => [g, { gaps: [], taskMs: 0, moves: 0 } as Seen])) as Record<Gesture, Seen>;
     for (let i = 0; i < RUNS; i++) {
       const seen = await run(browser, target);
-      console.log(`run ${i + 1}: ${Object.values(Gesture).map((g) => `${g} ${(100 * budgetOf(seen[g].gaps).overShare).toFixed(1)}%/${(100 * budgetOf(seen[g].gaps, Rate.ProMotion).overShare).toFixed(1)}%`).join(' ')}`);
-      Object.values(Gesture).forEach((g) => {
+      console.log(`run ${i + 1}: ${benched().map((g) => `${g} ${(100 * budgetOf(seen[g].gaps).overShare).toFixed(1)}%/${(100 * budgetOf(seen[g].gaps, Rate.ProMotion).overShare).toFixed(1)}%`).join(' ')}`);
+      benched().forEach((g) => {
         all[g].gaps.push(...seen[g].gaps);
         all[g].taskMs += seen[g].taskMs / RUNS;
+        all[g].moves += seen[g].moves / RUNS;
       });
     }
     await browser.close();
-    const report = Object.fromEntries(Object.values(Gesture).map((g) => [g, { ...budgetOf(all[g].gaps), taskMs: Math.round(all[g].taskMs), at120: budgetOf(all[g].gaps, Rate.ProMotion) }]));
+    const report = Object.fromEntries(benched().map((g) => [g, { ...budgetOf(all[g].gaps), taskMs: Math.round(all[g].taskMs), msPerMove: all[g].moves ? Math.round((10 * GESTURE_MS) / all[g].moves) / 10 : null, at120: budgetOf(all[g].gaps, Rate.ProMotion) }]));
     writeFileSync(join(OUT, `frame-budget-${target}.json`), JSON.stringify(report, null, 2));
     console.table(Object.fromEntries(Object.entries(report).map(([g, { at120, ...at90 }]) => [g, { ...at90, p95at120: at120.p95, overAt120: at120.overShare, passedAt120: at120.passed }])));
     expect(Object.entries(report).filter(([, r]) => !r.passed).map(([g]) => g)).toEqual([]);
