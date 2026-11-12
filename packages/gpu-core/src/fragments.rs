@@ -42,6 +42,10 @@ impl Fragments {
         self.0.len()
     }
 
+    pub fn keys(&self) -> impl Iterator<Item = &String> {
+        self.0.keys()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }

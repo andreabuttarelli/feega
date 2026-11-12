@@ -207,3 +207,68 @@ fn a_large_vector_group_is_encoded_as_its_children() {
     assert!(fragments.get("v1").is_none());
     assert!(fragments.len() >= 2);
 }
+
+const SECTIONS: usize = 3;
+const PER_SECTION: usize = 100;
+const DEEP: (usize, usize) = (0, 40);
+
+fn landing(edit: impl Fn(usize, usize) -> Option<String>) -> DisplayList {
+    let sections: Vec<String> = (0..SECTIONS).map(|s| section(&(0..PER_SECTION).filter_map(|i| edit(s, i)).collect::<Vec<_>>())).collect();
+    group_of(&[section(&sections)])
+}
+
+fn untouched(s: usize, i: usize) -> Option<String> {
+    Some(bar(s * PER_SECTION + i, 1.0))
+}
+
+fn moved(i: usize) -> String {
+    bar(i, 1.0).replace(r#""matrix": [1, 0, 0, 1, 0, 0] }"#, r#""matrix": [1, 0, 0, 1, 3, 0] }"#)
+}
+
+fn rebuilt_in_landing(edited: DisplayList) -> usize {
+    let mut lib = composing();
+    lib.put_group("v1", &landing(untouched));
+    let before = lib.plan(&screen("v1"), LIMITS).screen.fragments;
+    assert!(lib.patch_group("v1", "v2", &whole_item(&edited)));
+    let after = lib.plan(&screen("v2"), LIMITS).screen.fragments;
+
+    let mut fresh = composing();
+    fresh.put_group("v2", &edited);
+    let full = fresh.plan(&screen("v2"), LIMITS).screen.fragments;
+
+    let old: Vec<Arc<gpu_core::fragments::Run>> = before.keys().flat_map(|k| before.get(k).unwrap().runs.clone()).collect();
+    let mut rebuilt = 0;
+    assert_eq!(after.len(), full.len());
+    for key in full.keys() {
+        let (x, y) = (after.get(key).unwrap(), full.get(key).unwrap());
+        assert_eq!(x.runs.len(), y.runs.len());
+        for (a, b) in x.runs.iter().zip(&y.runs) {
+            assert_eq!((a.bounds, a.extent, a.len), (b.bounds, b.extent, b.len));
+            assert_eq!(bytes(&a.scene), bytes(&b.scene));
+        }
+        rebuilt += x.runs.iter().filter(|r| !old.iter().any(|o| Arc::ptr_eq(o, r))).count();
+    }
+    rebuilt
+}
+
+fn whole_item(list: &DisplayList) -> gpu_core::display_list::Splice {
+    gpu_core::display_list::Splice { head: 0, tail: 0, items: list.items.clone() }
+}
+
+#[test]
+fn recolouring_a_deep_child_re_encodes_only_its_run() {
+    let edited = landing(|s, i| Some(if (s, i) == DEEP { bar(s * PER_SECTION + i, 0.5) } else { bar(s * PER_SECTION + i, 1.0) }));
+    assert_eq!(rebuilt_in_landing(edited), 1);
+}
+
+#[test]
+fn hiding_a_deep_child_re_encodes_only_its_neighbourhood() {
+    let edited = landing(|s, i| ((s, i) != DEEP).then(|| bar(s * PER_SECTION + i, 1.0)));
+    assert!(rebuilt_in_landing(edited) <= 2);
+}
+
+#[test]
+fn moving_a_deep_child_re_encodes_only_its_neighbourhood() {
+    let edited = landing(|s, i| Some(if (s, i) == DEEP { moved(s * PER_SECTION + i) } else { bar(s * PER_SECTION + i, 1.0) }));
+    assert!(rebuilt_in_landing(edited) <= 2);
+}

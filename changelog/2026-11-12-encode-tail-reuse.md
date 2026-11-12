@@ -16,3 +16,18 @@ whole page (~9 ms of a 10–15 ms engine frame on the landings fixture).
 Discarded: reusing the tail with fixed-count runs (no reuse after any hide); re-basing old
 encodings by index (the greedy chunker depends only on items from a run's start, so a matching
 start is the correct and sufficient check).
+
+## Nested groups
+
+On the landings pages the tail reuse above did nothing: each page is one top-level group, so a
+patch changed that one item and the seed was dropped (`Cast::whole()` was None, nested rows got
+`seed: None`).
+
+- Display-list items derive `PartialEq`.
+- A vector-only group with more than 64 descendants (`SPLIT_DESCENDANTS`) is laid out as nested
+  pieces instead of one item in a span, so its children get their own spans. Pan, zoom, fit and
+  drag measured flat at 64.
+- A patch keeps the previous cast. Each new span takes the old span with equal items as is, or the
+  old span at the same relative path as the base for `Encoded::reusing`, with the common prefix
+  and suffix found by item equality. The splice's head and tail are no longer needed for this.
+- Spans keep their placed items to compare against (memory: one copy of the vector items).
