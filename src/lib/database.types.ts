@@ -1159,6 +1159,60 @@ export type Database = {
           },
         ]
       }
+      canvas_debug_logs: {
+        Row: {
+          canvas_id: string | null
+          created_at: string
+          id: number
+          kind: string
+          org_id: string | null
+          props: Json
+          seq: number
+          session: string
+          t_ms: number
+          user_id: string | null
+        }
+        Insert: {
+          canvas_id?: string | null
+          created_at?: string
+          id?: never
+          kind: string
+          org_id?: string | null
+          props?: Json
+          seq: number
+          session: string
+          t_ms: number
+          user_id?: string | null
+        }
+        Update: {
+          canvas_id?: string | null
+          created_at?: string
+          id?: never
+          kind?: string
+          org_id?: string | null
+          props?: Json
+          seq?: number
+          session?: string
+          t_ms?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "canvas_debug_logs_canvas_id_fkey"
+            columns: ["canvas_id"]
+            isOneToOne: false
+            referencedRelation: "canvases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canvas_debug_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       canvas_events: {
         Row: {
           actor_id: string | null

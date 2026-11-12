@@ -27,6 +27,13 @@ const CACHE_STEPS_PER_OCTAVE = 4;
 
 export const cacheZoom = (zoom: number): number => 2 ** (Math.ceil(Math.log2(zoom) * CACHE_STEPS_PER_OCTAVE) / CACHE_STEPS_PER_OCTAVE);
 
+export enum ZoomPicture {
+  Exact = 'exact',
+  Held = 'held'
+}
+
+export const movingWhileZooming = (frames: readonly HeldFrame[], moving: ReadonlySet<string>, picture: ZoomPicture): ReadonlySet<string> => (picture === ZoomPicture.Held ? new Set(frames.map((f) => f.id)) : moving);
+
 export enum Offscreen {
   Resident = 'resident',
   Dropped = 'dropped'

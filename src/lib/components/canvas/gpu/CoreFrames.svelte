@@ -18,7 +18,7 @@
   import { PART_ITEMS, parts } from '$lib/canvas/core/group-parts';
   import { spliceOf } from '@feega/motion-core/canvas/core/group-diff';
   import { storedTiles, tilesOn } from '$lib/canvas/core/tiles-switch';
-  import { cacheZoom, cached, uncached, pictureBytes, resident, heldWhileMoving, type HeldFrame } from '$lib/canvas/core/residency';
+  import { cacheZoom, cached, uncached, pictureBytes, resident, heldWhileMoving, movingWhileZooming, ZoomPicture, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, buildLanes, currentDevice, textureBudget } from '$lib/canvas/gpu/memory-budget';
   import { worldUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { NO_SIGHT, sameSight, sightOf, slackened, stillHolds, widened, type Sight, type Taken } from '$lib/canvas/core/sight';
@@ -42,7 +42,7 @@
   import { Reach, assetTier, keptTier } from '$lib/canvas/core/asset-tier';
   import type { AssetSize } from '$lib/canvas/asset-url';
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
-  import { backendLog, debugActive, debugStart, gestureLog, renderLog, tierLog } from '$lib/canvas/core/debug-log';
+  import { backendLog, consoleSink, debugActive, debugStart, gestureLog, renderLog, teeSink, tierLog } from '$lib/canvas/core/debug-log';
   import { readClips, type CustomFrame, type CustomReads } from '@feega/motion-core/motion/gpu-full/dom/custom';
   import type { Picture, Pictures } from '@feega/motion-core/motion/gpu-full/raster';
   import { Stand, drawable, fillOrder, firstDrawn, inView, layersOf, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
@@ -60,6 +60,7 @@
   import { Motion, heldBy, hudLine, watchCrashes } from '$lib/canvas/gpu/crash-watch';
   import { platformOf } from '$lib/canvas/perf/platform';
   import { startCanvasPerf } from '$lib/canvas/perf/perf-beacon';
+  import { flightNote, startFlight } from '$lib/canvas/debug/flight';
   import { Camera } from '$lib/canvas/perf/session-perf';
   import { liftOut, liftedPut, movingGroup, restGroup, type Lift, type Lifted } from '$lib/canvas/core/lifted-drag';
   import { AttachStep, GpuBackend, afterAttachFailure, backendAfterLoss, isTrap, type BackendSwitch } from '$lib/canvas/gpu/gpu-loss';
@@ -70,7 +71,6 @@
   let { frames, edited = new Set(), order = [], live = new Map(), listenLive = () => () => {}, known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, lift = null, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, place = null, sourceUrl, onready, onsource = () => {}, onthumb = () => {}, onfallback, onbackend = () => {} }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; listenLive?: (listener: LiveListener) => () => void; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; lift?: Lift | null; look?: Look; view: Viewport; area: { width: number; height: number }; place?: { projectId: string; canvasId: string; orgId?: string; userId?: string; look?: string } | null; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onthumb?: (id: string, revision: number, blob: Blob, size: { width: number; height: number }) => void; onfallback: (why: string) => void; onbackend?: (change: BackendSwitch) => void } = $props();
 
   markStartup(StartupStep.Mounted);
-  debugStart();
 
   const NATIVE = { name: GpuBackend.Native, create: createCoreNative };
   const WEBGPU = { name: GpuBackend.WebGpu, create: createCore };
@@ -105,6 +105,16 @@
   const crashes = watchCrashes({ device: currentDevice(), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, resolution });
   const RASTERED = new Set<Outcome>([Outcome.Full, Outcome.Partial]);
   const perf = startCanvasPerf({ canvasId: untrack(() => place?.canvasId ?? ''), device: currentDevice(), platform: platformOf(navigator.userAgent, navigator.maxTouchPoints), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, frames: () => frames.length, area: () => ({ width: Math.round(area.width), height: Math.round(area.height) }), memory: () => heldBy(crashes.sample), diedBefore: crashes.diedBefore, before: crashes.before });
+  const flight = startFlight({
+    canvasId: untrack(() => place?.canvasId ?? ''),
+    device: currentDevice(),
+    crash: { diedBefore: crashes.diedBefore, before: crashes.before },
+    read: () => {
+      const s = crashes.sample;
+      return { x: view.x, y: view.y, zoom: view.zoom, camera, moving: gesture.active() ? 1 : 0, frames: frames.length, held: held.length, waiting, framePuts: framePuts.length, put: put.size, pictured: pictured.size, backend: BACKENDS[backend].name, backing: s.canvas, cacheBytes, textureBytes: s.textureBytes, textures: s.textures, texturesMade: s.texturesCreated, pictureBytes: s.pictureBytes, scratchBytes: s.scratchBytes, wasmBytes: s.wasmBytes, gpuLagMs: s.gpuLagMs };
+    }
+  });
+  debugStart(undefined, flight ? teeSink(consoleSink, flight.sink) : consoleSink);
   const EDIT_GIVE_UP_MS = 10_000;
   const editSeen = new Map<string, string>();
   const editsOwed = new Map<string, number>();
@@ -905,6 +915,7 @@
     const from = BACKENDS[backend].name;
     const to = BACKENDS[next].name;
     backendLog(from, to, why);
+    flightNote('backend-switch', { from, to, why });
     onbackend({ from, to, why });
     backend = next;
   }
@@ -925,6 +936,7 @@
     losses++;
     perf.deviceLost();
     perf.error(why instanceof Error ? why.message : String(why));
+    flightNote('gpu-lost', { backend: BACKENDS[backend].name, why: why instanceof Error ? why.message : String(why) });
     const next = backendAfterLoss(backend, losses, BACKENDS.length);
     if (next !== backend) {
       losses = 0;
@@ -1021,7 +1033,7 @@
     const at = deviceView();
     const device = { width: area.width * resolution, height: area.height * resolution };
     const wide = widened(at, device);
-    const patch = sent.patch(worldUses(heldWhileMoving(zooming.active() || edited.size ? cached(drawn, wide.view, wide.area, textureBytes, cacheZoom(view.zoom) * resolution) : uncached(drawn), liftHeld(drawn))));
+    const patch = sent.patch(worldUses(heldWhileMoving(zooming.active() || edited.size ? cached(drawn, wide.view, wide.area, textureBytes, cacheZoom(view.zoom) * resolution) : uncached(drawn), movingWhileZooming(drawn, liftHeld(drawn), zooming.active() ? budget.zoomPicture : ZoomPicture.Exact))));
     if (patch) {
       into.patchUses(patch);
     }
@@ -1198,9 +1210,11 @@
   $effect(() => () => media.dispose());
   $effect(() => () => crashes.stop());
   $effect(() => () => perf.stop());
+  $effect(() => () => flight?.stop());
   $effect(() => {
     if (raster) {
       perf.backend(BACKENDS[backend].name);
+      flightNote('backend', { name: BACKENDS[backend].name });
     }
   });
 
@@ -1208,6 +1222,9 @@
 
 {#if DEBUG}
   <pre class="core-hud">{hud}</pre>
+{/if}
+{#if flight}
+  <div class="flight-badge" data-testid="flight-badge">debug recording · {flight.session}{flight.previous && !flight.previous.clean ? ` · ${flight.previous.session} crashed` : ''}</div>
 {/if}
 {#if TIMELINE}
   <LoadTimeline />
@@ -1241,6 +1258,20 @@
     background: rgb(0 0 0 / 0.7);
     pointer-events: none;
     white-space: pre-wrap;
+  }
+
+  .flight-badge {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    padding: 2px 6px;
+    border-radius: var(--ui-radius-xs);
+    font: 10px/1.4 ui-monospace, monospace;
+    color: #fff;
+    background: rgb(0 0 0 / 0.55);
+    pointer-events: none;
   }
 
   .core-grid {

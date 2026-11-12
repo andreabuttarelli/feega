@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { debugActive, debugOn, debugStart, debugStop, formatMark, frameSummary, gestureLog, ordered, renderEvents, renderLog, tierLog, type RenderSample, type Sink } from './debug-log';
+import { debugActive, debugOn, debugStart, debugStop, formatMark, frameSummary, gestureLog, ordered, renderEvents, renderLog, teeSink, tierLog, type RenderSample, type Sink } from './debug-log';
 
 const sink = (): Sink & { lines: string[] } => {
   const lines: string[] = [];
@@ -25,9 +25,33 @@ describe('debug switch', () => {
     expect(debugOn('', '0')).toBe(false);
   });
 
+  it('stays on for the tab after ?debug, so a reload after a crash keeps recording', () => {
+    const kept = new Map<string, string>();
+    const tab = { getItem: (k: string) => kept.get(k) ?? null, setItem: (k: string, v: string) => void kept.set(k, v), removeItem: (k: string) => void kept.delete(k) };
+
+    expect(debugOn('?debug=1', null, tab)).toBe(true);
+    expect(debugOn('', null, tab)).toBe(true);
+    expect(debugOn('?debug=0', null, tab)).toBe(false);
+    expect(debugOn('', null, tab)).toBe(false);
+  });
+
   it('reads storage safely when it throws', () => {
     vi.stubGlobal('localStorage', { getItem: () => { throw new Error('blocked'); } });
     expect(debugStart('', sink())).toBe(false);
+  });
+});
+
+describe('a tee of sinks', () => {
+  it('hands every line and group to each sink', () => {
+    const a = sink();
+    const b = sink();
+    const both = teeSink(a, b);
+
+    both.line('one');
+    both.group('title', ['x']);
+
+    expect(a.lines).toEqual(['one', '> title | x']);
+    expect(b.lines).toEqual(['one', '> title | x']);
   });
 });
 
