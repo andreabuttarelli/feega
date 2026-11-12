@@ -1,4 +1,5 @@
 import { normalize } from 'node:path';
+import { debranded } from './debrand';
 
 export const FREE_TIER = 'free';
 
@@ -57,7 +58,7 @@ function landedPath(type: string, target: string): string | null {
   return path.startsWith(landing.to) ? path : null;
 }
 
-const rewritten = (content: string) => content.replaceAll('@/registry/ruixenui/', '@/components/ruixen/').replaceAll('"../ruixenui/', '"@/components/ruixen/');
+const rewritten = (content: string) => debranded(content).replaceAll('@/registry/ruixenui/', '@/components/ruixen/').replaceAll('"../ruixenui/', '"@/components/ruixen/');
 
 export function installable(url: string, item: RegistryItem): Installable {
   if (!pinnedTo(url)) {
@@ -83,8 +84,10 @@ export function installable(url: string, item: RegistryItem): Installable {
   return { ok: true, files: files as LandedFile[], dependencies: item.dependencies ?? [] };
 }
 
+const FEEGA_MARKS = 'marks/';
+
 const PUBLIC_ASSET = /["'`]\/((?:[a-z0-9_-]+\/)*[a-z0-9_.-]+\.(?:svg|png|jpe?g|webp|gif|avif))["'`]/gi;
 
 export function publicAssets(content: string): string[] {
-  return [...new Set([...content.matchAll(PUBLIC_ASSET)].map((m) => m[1]).filter((p) => !p.split('/').includes('..')))];
+  return [...new Set([...content.matchAll(PUBLIC_ASSET)].map((m) => m[1]).filter((p) => !p.split('/').includes('..') && !p.startsWith(FEEGA_MARKS)))];
 }
