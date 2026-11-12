@@ -266,6 +266,11 @@ fn texels(group: &DisplayList, scale: f64) -> (u32, u32) {
     ((group.width as f64 * scale).ceil() as u32, (group.height as f64 * scale).ceil() as u32)
 }
 
+fn filling(group: &DisplayList, scale: f64) -> (f64, f64) {
+    let (w, h) = texels(group, scale);
+    (w as f64 / group.width.max(1) as f64, h as f64 / group.height.max(1) as f64)
+}
+
 fn held_within(u: &UseItem, group: &DisplayList, want: f64, side: u32) -> f64 {
     let longest = group.width.max(group.height) as f64;
     if !(u.cache && u.hold) || longest * want <= side as f64 {
@@ -300,7 +305,8 @@ fn cached_image(u: &UseItem, group: &DisplayList, scale: f64) -> Item {
 fn texture_image(u: &UseItem, group: &DisplayList, scale: f64, clip: String) -> Item {
     let (w, h) = texels(group, scale);
     let frame = screen_rect(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64));
-    let matrix = snapped(times(u.matrix, [1.0 / scale, 0.0, 0.0, 1.0 / scale, 0.0, 0.0]));
+    let (sx, sy) = filling(group, scale);
+    let matrix = snapped(times(u.matrix, [1.0 / sx, 0.0, 0.0, 1.0 / sy, 0.0, 0.0]));
     let look = Look { opacity: 1.0, matrix, blur: 0.0, blend: "normal".into(), scissor: Some(scissor_of(frame)), masks: None, matte: None, filters: None, space: None, origin: None, backdrop: None };
     let size = Size { width: w as f64, height: h as f64 };
     Item::Image(ImageItem { clip: clip.clone(), src: clip, video: false, media_time: 0.0, size, fit: "fill".into(), focus: [0.0, 0.0], zoom: 1.0, crop: None, tile_turn: 0.0, clipped: true, inner: IDENTITY, look })
@@ -314,7 +320,8 @@ fn partial(group: &str, (w, h): (u32, u32)) -> Item {
 
 fn chunk_of(u: &UseItem, group: &DisplayList, at: Building, items: usize) -> Chunk {
     let size = texels(group, at.scale);
-    let placed = UseItem { matrix: [at.scale, 0.0, 0.0, at.scale, 0.0, 0.0], ..u.clone() };
+    let (sx, sy) = filling(group, at.scale);
+    let placed = UseItem { matrix: [sx, 0.0, 0.0, sy, 0.0, 0.0], ..u.clone() };
     let all = used(&placed, group, 0);
     let whole = all.iter().any(|i| matches!(i, Item::Lens(_)));
     let end = if whole { all.len() } else { at.next.saturating_add(items).min(all.len()) };

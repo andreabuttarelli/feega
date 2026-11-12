@@ -503,3 +503,53 @@ pub fn path_for(m: Moment) -> Path {
     }
     Path::Exact
 }
+
+pub const MAX_SPLITS: u32 = 12;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Piece {
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
+}
+
+impl Piece {
+    pub fn overlap(self, other: Piece) -> Option<Piece> {
+        let (x0, y0) = (self.x.max(other.x), self.y.max(other.y));
+        let (x1, y1) = ((self.x + self.w).min(other.x + other.w), (self.y + self.h).min(other.y + other.h));
+        (x1 > x0 && y1 > y0).then(|| Piece { x: x0, y: y0, w: x1 - x0, h: y1 - y0 })
+    }
+
+    fn halves(self) -> Option<[Piece; 2]> {
+        if self.w >= self.h && self.w > 1 {
+            let left = self.w / 2;
+            return Some([Piece { w: left, ..self }, Piece { x: self.x + left, w: self.w - left, ..self }]);
+        }
+        if self.h > 1 {
+            let top = self.h / 2;
+            return Some([Piece { h: top, ..self }, Piece { y: self.y + top, h: self.h - top, ..self }]);
+        }
+        None
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Rendered {
+    Fit,
+    Overflowed,
+}
+
+pub fn split_render(size: (u32, u32), mut render: impl FnMut(Piece) -> Rendered) -> Vec<Piece> {
+    let mut done = Vec::new();
+    let mut todo = vec![(Piece { x: 0, y: 0, w: size.0, h: size.1 }, 0)];
+    while let Some((piece, depth)) = todo.pop() {
+        let overflowed = render(piece) == Rendered::Overflowed;
+        let halves = piece.halves().filter(|_| overflowed && depth < MAX_SPLITS);
+        match halves {
+            Some([a, b]) => todo.extend([(b, depth + 1), (a, depth + 1)]),
+            None => done.push(piece),
+        }
+    }
+    done
+}

@@ -16,7 +16,7 @@ use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, gesture_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX};
+use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, gesture_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
 use crate::tally::now_ms;
@@ -549,13 +549,26 @@ impl WebCore {
         let camera = Camera { x: -world.x0 * zoom + gutter, y: -world.y0 * zoom + gutter, zoom };
         let (cols, rows) = batch.span();
         let size = (cols * TILE_PX + 2 * TILE_GUTTER_PX, rows * TILE_PX + 2 * TILE_GUTTER_PX);
-        let plan = self.compositor.plan_at(&mut self.library, camera, size, self.limits);
-        let building = plan.pending;
-        let (list, missing) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
-        let lacking = building || !missing.is_empty();
-        let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
-        let atlas = self.atlases.remove(&size).unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
-        self.engine.draw(&self.device, &self.queue, &list, &pictures, &atlas.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
+        let mut drawn: Vec<(Piece, wgpu::Texture)> = Vec::new();
+        let mut lacking = false;
+        let mut failure = None;
+        let kept = split_render(size, |piece| match self.raster_piece(camera, piece, size) {
+            Ok((rendered, short, texture)) => {
+                lacking |= short;
+                drawn.push((piece, texture));
+                rendered
+            }
+            Err(e) => {
+                failure.get_or_insert(e);
+                Rendered::Fit
+            }
+        });
+        let (pieces, dropped): (Vec<_>, Vec<_>) = drawn.into_iter().partition(|(piece, _)| kept.contains(piece));
+        dropped.into_iter().for_each(|(piece, texture)| self.recycle(piece, size, texture));
+        if let Some(e) = failure {
+            pieces.into_iter().for_each(|(piece, texture)| self.recycle(piece, size, texture));
+            return Err(e);
+        }
         let corner = batch.corner();
         let side = TILE_PX + 2 * TILE_GUTTER_PX;
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
@@ -567,17 +580,42 @@ impl WebCore {
                 continue;
             }
             let texture = self.tile_textures.remove(key).or_else(|| self.spare_tiles.pop()).unwrap_or_else(|| tile_texture(&self.device, side));
-            let (x, y) = (((key.tx - corner.tx) as u32) * TILE_PX, ((key.ty - corner.ty) as u32) * TILE_PX);
-            encoder.copy_texture_to_texture(texel(&atlas, x, y), texel(&texture, 0, 0), wgpu::Extent3d { width: side, height: side, depth_or_array_layers: 1 });
+            let tile = Piece { x: ((key.tx - corner.tx) as u32) * TILE_PX, y: ((key.ty - corner.ty) as u32) * TILE_PX, w: side, h: side };
+            for (piece, source) in &pieces {
+                let Some(shared) = tile.overlap(*piece) else { continue };
+                encoder.copy_texture_to_texture(texel(source, shared.x - piece.x, shared.y - piece.y), texel(&texture, shared.x - tile.x, shared.y - tile.y), wgpu::Extent3d { width: shared.w, height: shared.h, depth_or_array_layers: 1 });
+            }
             self.tile_textures.insert(*key, texture);
             if !lacking {
                 self.tiles.hold(*key);
             }
         }
         self.queue.submit([encoder.finish()]);
-        self.atlases.insert(size, atlas);
+        pieces.into_iter().for_each(|(piece, texture)| self.recycle(piece, size, texture));
         self.count_bake(began);
         Ok(())
+    }
+
+    fn raster_piece(&mut self, camera: Camera, piece: Piece, whole: (u32, u32)) -> Result<(Rendered, bool, wgpu::Texture), JsValue> {
+        let size = (piece.w, piece.h);
+        let shifted = Camera { x: camera.x - piece.x as f64, y: camera.y - piece.y as f64, zoom: camera.zoom };
+        let plan = self.compositor.plan_at(&mut self.library, shifted, size, self.limits);
+        let building = plan.pending;
+        let (list, missing) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
+        let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
+        let pooled = if size == whole { self.atlases.remove(&size) } else { None };
+        let texture = pooled.unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
+        self.engine.draw(&self.device, &self.queue, &list, &pictures, &texture.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
+        let rendered = if self.engine.overflowed() { Rendered::Overflowed } else { Rendered::Fit };
+        Ok((rendered, building || !missing.is_empty(), texture))
+    }
+
+    fn recycle(&mut self, piece: Piece, whole: (u32, u32), texture: wgpu::Texture) {
+        if (piece.w, piece.h) == whole {
+            self.atlases.insert(whole, texture);
+        } else {
+            texture.destroy();
+        }
     }
 
     fn present_tiles(&mut self, draw: &[TileKey]) -> Result<(), JsValue> {

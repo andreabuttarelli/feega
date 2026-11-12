@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FAR_BOOST, HOVER_SCREEN_PX, SELECT_SCREEN_PX, strokeWorld, strokeZoomStep, LABEL_HIDE_FRAME_PX, LABEL_MIN_FACTOR, LABEL_SCREEN_PX, labelScale, labelScreenPx, labelShown, labelZoomStep } from './label-size';
+import { FAR_BOOST, HOVER_SCREEN_PX, SELECT_SCREEN_PX, strokeWorld, strokeZoomStep, LABEL_HIDE_FRAME_PX, LABEL_MIN_FACTOR, LABEL_SCREEN_PX, labelScale, labelScreenPx, labelShown, labelStepOf, labelZoomStep } from './label-size';
 
 describe('labelScreenPx', () => {
   it('stays at the normal size at 100% and above', () => {
@@ -90,5 +90,21 @@ describe('outline widths', () => {
       expect(Math.abs(strokeZoomStep(z) / z - 1)).toBeLessThan(0.03);
     }
     expect(strokeZoomStep(0.2)).toBe(strokeZoomStep(0.2001));
+  });
+});
+
+describe('labelStepOf', () => {
+  const kept = new Map([['far', 0.5]]);
+
+  it('moves a card in sight to the new step', () => {
+    expect(labelStepOf('far', 0.25, new Set(['far']), kept)).toBe(0.25);
+  });
+
+  it('keeps a card out of sight on the step it was drawn at', () => {
+    expect(labelStepOf('far', 0.25, new Set(), kept)).toBe(0.5);
+  });
+
+  it('draws a card never drawn before at the new step', () => {
+    expect(labelStepOf('new', 0.25, new Set(), kept)).toBe(0.25);
   });
 });
