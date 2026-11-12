@@ -3,7 +3,7 @@ import { defaultProps } from '@feega/motion-core/motion/components';
 import { reframed, type Size } from '$lib/motion/comp-frame';
 import type { ImportMap } from './import-map';
 import { MAX_COLLECTIONS, MAX_VARIABLES } from '@feega/motion-core/motion/variables-model';
-import { MAX_STYLES } from '@feega/motion-core/motion/styles-model';
+import { MAX_STYLES, StyleKind } from '@feega/motion-core/motion/styles-model';
 import { freezeLayout } from '$lib/motion/layout/ops';
 import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import type { Stroke } from '@feega/motion-core/motion/stroke/model';
@@ -89,7 +89,9 @@ function grown(doc: MotionDoc, size: Size): MotionDoc {
   const refilled = (c: MotionClip): MotionClip => (full.has(c.id) ? { ...c, props: { ...c.props, x: CENTRE, y: CENTRE, width: FULL, height: FULL } } : c);
   const top = resized({ name: 'doc', durationInFrames: doc.durationInFrames, tracks: doc.tracks }, from, size);
   const comps = Object.fromEntries(Object.entries(doc.comps).map(([id, c]) => [id, resized(c, from, size)]));
-  return { ...doc, width: size.width, height: size.height, comps, tracks: top.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map(refilled) })) };
+  const unit = Math.min(from.width, from.height) / Math.min(size.width, size.height);
+  const styles = doc.styles ? Object.fromEntries(Object.entries(doc.styles).map(([name, style]) => [name, style.kind === StyleKind.Text && style.size !== undefined ? { ...style, size: style.size * unit } : style])) : undefined;
+  return { ...doc, width: size.width, height: size.height, comps, ...(styles ? { styles } : {}), tracks: top.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map(refilled) })) };
 }
 
 function freed(doc: MotionDoc, parent: string | null): MotionDoc {

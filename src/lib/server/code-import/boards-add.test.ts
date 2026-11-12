@@ -165,4 +165,16 @@ describe('adding pages to a frame imported from code', () => {
     expect(doc.height).toBe(tall.height);
     expect(doc.width).toBeGreaterThan(tall.width);
   });
+
+  it('keeps the pixel size of a text style when the frame grows, as it does for the text layers', async () => {
+    const local = { ...(await imported(['/', '/settings'])), styles: { 'app Text/body': { kind: 'text', size: 0.05 } } } as MotionDoc;
+    const piece = await imported(['/pricing']);
+    const unit = (d: MotionDoc) => Math.min(d.width, d.height);
+
+    const added = addBoards(local, piece, ['n1'], 'n1', counter());
+
+    const doc = (added as { doc: MotionDoc }).doc;
+    const style = doc.styles!['app Text/body'] as { size: number };
+    expect(style.size * unit(doc)).toBeCloseTo(0.05 * unit(local), 6);
+  });
 });

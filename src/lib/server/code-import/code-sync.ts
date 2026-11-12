@@ -12,6 +12,7 @@ import { patchOf, type FileChange } from './write-back';
 import { frameEdits } from './token-write';
 import { pulledTokens } from './token-pull';
 import { readOnlyKeys, type TokenMap } from './design-tokens';
+import { StyleField } from './design-styles';
 import { CodeImportOutcome } from './import-code';
 import { importCodeInto, rememberOrigin, type CodeImportAsk, type CodeScope } from './canvas-import';
 import { githubSource, SourceKind, type CodeSource, type GithubCalls } from './code-source';
@@ -269,18 +270,18 @@ export async function codeAdd(scope: CodeScope, nodeId: string, ask: AddAsk): Pr
   const boards = (fresh.boards ?? []).map((b) => b.clip);
   const parent = boardParent(local.doc, origin.map);
   const added = mapOf(listed ?? NOT_LISTED, fresh, { asked: ask.routes, rev: origin.sha });
-  const remember = async (map: ImportMap) => rememberOrigin(scope, nodeId, { ...origin, routes: [...new Set([...origin.routes, ...ask.routes])].slice(0, MAX_FRAME_BOARDS), ...(origin.tokens && fresh.tokenMap ? { tokens: { ...fresh.tokenMap, ...origin.tokens } } : {}), map: mergedMap(origin.map, map) });
-
-  if (ask.land === Land.Piece) {
-    const map = mergedMap(origin.map, added);
-    await remember(added);
-    return { outcome: SyncOutcome.Ok, skipped: fresh.skipped, map, boards, parent, piece: upstream.doc };
-  }
-
   const merged = addBoards(local.doc, upstream.doc, boards, parent, newId);
   if (!merged.ok) {
     return { outcome: ADD_REFUSED[merged.refusal], error: merged.detail };
   }
+  const tokens = origin.tokens ? { tokens: styleSizesAfter({ ...fresh.tokenMap, ...origin.tokens }, local.doc, merged.doc) } : {};
+  const remember = async (map: ImportMap) => rememberOrigin(scope, nodeId, { ...origin, routes: [...new Set([...origin.routes, ...ask.routes])].slice(0, MAX_FRAME_BOARDS), ...tokens, map: mergedMap(origin.map, map) });
+
+  if (ask.land === Land.Piece) {
+    await remember(added);
+    return { outcome: SyncOutcome.Ok, skipped: fresh.skipped, map: mergedMap(origin.map, added), boards, parent, piece: upstream.doc };
+  }
+
   const written = await store.write(nodeId, local.version, merged.doc, `Imported ${ask.routes.join(', ')}`);
   if (written.outcome !== RevisionOutcome.Written) {
     return { outcome: SyncOutcome.Conflict };
@@ -288,6 +289,13 @@ export async function codeAdd(scope: CodeScope, nodeId: string, ask: AddAsk): Pr
   const map = relabelled(added, merged.boards);
   await remember(map);
   return { outcome: SyncOutcome.Ok, skipped: [...fresh.skipped, ...merged.kept.map((k) => `${k}: renders differently on the new page, kept as its own main`)], map: mergedMap(origin.map, map), boards: boards.map((b) => merged.boards[b] ?? b), parent };
+}
+
+const unitOf = (doc: MotionDoc) => Math.min(doc.width, doc.height);
+
+function styleSizesAfter(map: TokenMap, before: MotionDoc, after: MotionDoc): TokenMap {
+  const ratio = unitOf(before) / unitOf(after);
+  return Object.fromEntries(Object.entries(map).map(([key, entry]) => [key, entry.style && entry.field === StyleField.Size && entry.scale ? { ...entry, scale: entry.scale * ratio } : entry]));
 }
 
 export type CodeMap = { kind: string; repo: string; sha: string | null; map: ImportMap | null; used: number; limit: number; readOnly: number };

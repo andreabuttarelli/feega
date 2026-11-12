@@ -22,13 +22,15 @@ const MAP: ImportMap = {
   ]
 };
 
-const origin = (map: ImportMap) => ({ kind: 'folder', repo: '/tmp/app', branch: null, sha: 'abc1234', routes: ['/', '/settings'], map });
+const SIZE_TOKEN = { name: 'font-size', origins: { Light: 'src/app.css:2:1' }, raw: { Light: '1.5rem' }, scale: 1 / 520, style: 'app Text/body', field: 'size' };
+
+const origin = (map: ImportMap) => ({ kind: 'folder', repo: '/tmp/app', branch: null, sha: 'abc1234', routes: ['/', '/settings'], map, tokens: { 'app Text/body#size': SIZE_TOKEN } });
 
 let node = { projectId: 'p1', data: { code: origin(MAP) } };
 let localDoc: MotionDoc = LOCAL;
 const writes: { doc: MotionDoc; version: number }[] = [];
 const removed: string[] = [];
-const remembered: { code: { map: ImportMap; routes: string[] } }[] = [];
+const remembered: { code: { map: ImportMap; routes: string[]; tokens?: Record<string, { scale?: number }> } }[] = [];
 const asked: unknown[] = [];
 
 vi.mock('$env/dynamic/private', () => ({ env: {} }));
@@ -55,7 +57,7 @@ vi.mock('./canvas-import', async (real) => ({
     return { outcome: 'ok', frameId: 'fresh', name: 'app', undo: [], skipped: [], locked: [], truncated: false, pages: ['/pricing'], boards: [{ label: '/pricing', route: '/pricing', cond: 'light@1280', clip: 'n1' }], components: 1, variants: 2, instances: 2 };
   },
   routesFound: async () => ({ ok: false, error: 'unreadable', detail: 'test', apps: [] }),
-  rememberOrigin: async (_scope: unknown, _id: string, code: { map: ImportMap; routes: string[] }) => void remembered.push({ code })
+  rememberOrigin: async (_scope: unknown, _id: string, code: { map: ImportMap; routes: string[]; tokens?: Record<string, { scale?: number }> }) => void remembered.push({ code })
 }));
 
 const { codeAdd, Land, SyncOutcome } = await import('./code-sync');
@@ -123,5 +125,12 @@ describe('importing one more page into a code frame', () => {
 
     expect(out.outcome).toBe('failed');
     expect(remembered[0].code.map.pages.find((p) => p.path === '/quiz/nope')).toEqual({ path: '/quiz/nope', state: PageState.Failed, reason: 'the page answered 404' });
+  });
+
+  it('rescales the write-back of a text style size when the new page changes the frame\'s short side', async () => {
+    await codeAdd(SCOPE, 'node-1', { routes: ['/pricing'], land: Land.Frame });
+
+    const unit = Math.min(writes[0].doc.width, writes[0].doc.height);
+    expect(remembered[0].code.tokens!['app Text/body#size'].scale).toBeCloseTo((1 / 520) * (520 / unit), 9);
   });
 });
