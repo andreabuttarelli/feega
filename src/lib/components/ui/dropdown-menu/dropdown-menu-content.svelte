@@ -20,6 +20,7 @@
 		portalProps?: WithoutChildrenOrChild<ComponentProps<typeof DropdownMenuPortal>>;
 	} = $props();
 
+	const VIEWPORT_MARGIN = 8;
 	let trigger: Element | null = null;
 
 	$effect(() => {
@@ -45,8 +46,9 @@
 		onCloseAutoFocus={(e) => leaveMenu(trigger, lastInput(), e)}
 		{sideOffset}
 		{align}
+		collisionPadding={VIEWPORT_MARGIN}
 		class={cn(
-			"data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 bg-ui-raised text-ui-text min-w-40 rounded-md p-1 shadow-ui-float duration-100 data-[side=inline-start]:slide-in-from-right-2 data-[side=inline-end]:slide-in-from-left-2 z-50 w-(--bits-dropdown-menu-anchor-width) overflow-x-hidden overflow-y-auto outline-none data-closed:overflow-hidden",
+			"data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 bg-ui-raised text-ui-text min-w-40 rounded-md p-1 shadow-ui-float duration-100 data-[side=inline-start]:slide-in-from-right-2 data-[side=inline-end]:slide-in-from-left-2 z-50 w-(--bits-dropdown-menu-anchor-width) max-h-(--bits-floating-available-height) overflow-x-hidden overflow-y-auto outline-none data-closed:overflow-hidden",
 			className
 		)}
 		{...restProps}

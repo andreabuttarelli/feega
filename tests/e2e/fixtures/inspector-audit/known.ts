@@ -16,29 +16,6 @@ const LINE_CANVAS: Known = {
   ref: `${AUDIT}; canvas renderer, not located`
 };
 
-const HEX_COLLAPSED: Known = {
-  mouse: [Check.Missing],
-  keyboard: [Check.Missing],
-  severity: Severity.Blocker,
-  why: 'the hex field of an effect colour with opacity is 0 px wide: chip and 40 px opacity field fill the 94 px control, so the colour cannot be typed',
-  ref: 'src/lib/components/motion/ColorField.svelte:246 (.hex flex 1, min-width 0), :261 (.alpha 40 px), inside MotionInspector.svelte:1218'
-};
-
-const pickerOutOfTabOrder = (severity: Severity): Known => ({
-  mouse: [Check.Commit],
-  keyboard: [Check.Reach],
-  severity,
-  why: 'keyboard: Tab from the colour chip never enters the colour popover, rendered on body after the effect popover that traps Tab. mouse: harness mismatch, Playwright never sees the picker hex field settle inside the effect popover though a person can use it (audit probe "picker sequence")',
-  ref: 'src/lib/components/motion/ColorField.svelte:131 (onBody); src/lib/components/ui/shell/SidePopover.svelte:69'
-});
-
-const SIZE_PRESET_STUCK: Known = {
-  keyboard: [Check.Commit],
-  severity: Severity.Minor,
-  why: 'after a preset is picked the select keeps showing it, so picking the same preset again (after an undo or a typed size) fires no change',
-  ref: 'src/lib/components/motion/MotionInspector.svelte:874 (static value="")'
-};
-
 const LABEL_ROW_17PX: Known = {
   mouse: [Check.Size],
   severity: Severity.Minor,
@@ -47,17 +24,6 @@ const LABEL_ROW_17PX: Known = {
 };
 
 export const KNOWN: Record<string, Known> = {
-  'fx-drop-shadow/effects/Drop shadow Colour/#ff0000 in the hex field': HEX_COLLAPSED,
-  'fx-inner-shadow/effects/Inner shadow Colour/#ff0000 in the hex field': HEX_COLLAPSED,
-  'fx-glow/effects/Glow Colour/#ff0000 in the hex field': HEX_COLLAPSED,
-  'fx-drop-shadow/effects/Drop shadow Colour/#ff0000 in the picker': pickerOutOfTabOrder(Severity.Blocker),
-  'fx-inner-shadow/effects/Inner shadow Colour/#ff0000 in the picker': pickerOutOfTabOrder(Severity.Blocker),
-  'fx-glow/effects/Glow Colour/#ff0000 in the picker': pickerOutOfTabOrder(Severity.Blocker),
-  'fx-chroma-key/effects/Chroma key Key colour/#ff0000 in the picker': pickerOutOfTabOrder(Severity.Major),
-  'fx-stroke/effects/Stroke Colour/#ff0000 in the picker': pickerOutOfTabOrder(Severity.Major),
-  'fx-tint/effects/Tint Map black to/#ff0000 in the picker': pickerOutOfTabOrder(Severity.Major),
-  'fx-tint/effects/Tint Map white to/#ff0000 in the picker': pickerOutOfTabOrder(Severity.Major),
-
   '0752f883/stack/W/ArrowUp': {
     mouse: [Check.Commit],
     keyboard: [Check.Commit],
@@ -80,8 +46,6 @@ export const KNOWN: Record<string, Known> = {
     ref: 'src/lib/components/motion/FramePresetSection.svelte:43 (resize), cause not isolated'
   },
 
-  'text/text/Size presets/48': SIZE_PRESET_STUCK,
-  '0752f883/text/Size presets/48': SIZE_PRESET_STUCK,
   'text/text/Paragraph spacing/type 1 + Enter': {
     mouse: [Check.Size],
     severity: Severity.Minor,

@@ -446,6 +446,14 @@
     }
   }
 
+  function presetSize(size: Field, select: HTMLSelectElement) {
+    const px = select.value;
+    select.value = '';
+    if (px) {
+      setProp(size, fieldStored(size, Number(px)));
+    }
+  }
+
   function addMorphOf(select: HTMLSelectElement) {
     const kind = select.value as ShapeKind;
     select.value = '';
@@ -871,7 +879,7 @@
 {#snippet sizePresets()}
   {@const size = textField('size')}
   {#if size}
-    <select class="trail" aria-label="Size presets" data-testid="size-presets" value="" onchange={(e) => e.currentTarget.value && setProp(size, fieldStored(size, Number(e.currentTarget.value)))}>
+    <select class="trail" aria-label="Size presets" data-testid="size-presets" value="" onchange={(e) => presetSize(size, e.currentTarget)}>
       <option value="" disabled hidden></option>
       {#each SIZE_PRESETS as preset (preset)}<option value={String(preset)}>{preset}</option>{/each}
     </select>
@@ -1211,7 +1219,7 @@
               {#each effectRows(effect) as prop (prop.key)}
                 {#if prop.kind === ValueKind.Color}
                   {@const alphaKey = alphaKeyOf(effect)}
-                  <div class="line" data-prop={prop.key}>
+                  <div class="line stacked" data-prop={prop.key}>
                     <span class="label">{afterDot(prop)}</span>
                     <div class="control"><ColorField {gesture} {palette} name={prop.label} value={shown(prop.key)} {tokens} alpha={alphaKey ? Number(shown(alphaKey)) : null} onalpha={alphaKey ? (a) => animate(alphaKey, a) : undefined} onchange={(v) => animate(prop.key, resolve(v))} /></div>
                     {@render diamond(prop.key)}
@@ -1574,6 +1582,19 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .line.stacked {
+    flex-wrap: wrap;
+  }
+
+  .line.stacked > .label {
+    flex: 1;
+  }
+
+  .line.stacked .control {
+    order: 1;
+    flex-basis: 100%;
   }
 
   .line .control,
