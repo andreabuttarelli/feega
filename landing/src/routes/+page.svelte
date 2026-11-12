@@ -12,6 +12,7 @@
   import { HOME_JSON_LD } from '$lib/site/structured-data';
 
   import { HOME_META } from '$lib/site/seo';
+  import PillarRail from '$lib/site/chapters/PillarRail.svelte';
 </script>
 
 <svelte:head>
@@ -28,6 +29,7 @@
 <Hero />
 <OpenSource />
 <div class="chapters">
+  <PillarRail />
   <Codebase />
   <Motion />
   <Generate />
