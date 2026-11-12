@@ -25,6 +25,9 @@
   import { ChatUploads } from './chat-uploads.svelte';
   import type { ChatAttachment } from '$lib/chat-attachments';
   import { chatSelection } from './chat-selection.svelte';
+  import UpgradeOfferBanner from '$lib/components/canvas/UpgradeOfferBanner.svelte';
+  import { upgradeOffer } from '$lib/components/canvas/upgrade-offer.svelte';
+  import { OfferReason } from '$lib/upgrade-offer';
 
   let {
     projectId = '',
@@ -74,7 +77,7 @@
     }
     const shared = session;
     const before = { context: shared.context, onTurnEnd: shared.onTurnEnd, onData: shared.onData };
-    const mine = { context: () => ({ ...(context?.() ?? {}), ...models.turnFields() }), onTurnEnd: onturnend ?? null, onData: ondata ?? null };
+    const mine = { context: () => ({ ...(context?.() ?? {}), ...models.turnFields() }), onTurnEnd: () => { offerAfter(shared); onturnend?.(); }, onData: ondata ?? null };
     Object.assign(shared, mine);
     return () => {
       if (shared.context === mine.context) {
@@ -82,6 +85,14 @@
       }
     };
   });
+  function offerAfter(shared: ChatSession) {
+    const last = shared.messages.at(-1);
+    if (shared.failed || last?.role !== 'assistant' || !last.content) {
+      return;
+    }
+    void upgradeOffer.show(scopeProjectId, OfferReason.FirstResult);
+  }
+
   const messages = $derived(session?.messages ?? []);
   const sending = $derived(session?.sending ?? false);
   const reconnecting = $derived(session?.reconnecting ?? false);
@@ -92,6 +103,12 @@
     onbusy?.(busy);
   });
   const failed = $derived(session?.failed ?? '');
+
+  $effect(() => {
+    if (failed === 'credits') {
+      void upgradeOffer.show(scopeProjectId, OfferReason.CreditsOut);
+    }
+  });
   const failedDetail = $derived(session?.failedDetail ?? '');
   const starts = $derived(speakerStarts(messages));
   const failure = $derived(failed ? FAILURES[failed] : null);
@@ -369,6 +386,8 @@
     </div>
   {/if}
 </div>
+
+<UpgradeOfferBanner />
 
 <style>
   .panel {

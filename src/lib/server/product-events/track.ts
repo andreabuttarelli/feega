@@ -14,7 +14,10 @@ export enum ProductEvent {
   AgentFailed = 'agent_failed',
   CreditsExhausted = 'credits_exhausted',
   ImportFailed = 'import_failed',
-  CanvasPerf = 'canvas_perf'
+  CanvasPerf = 'canvas_perf',
+  UpgradeOfferShown = 'upgrade_offer_shown',
+  UpgradeOfferClicked = 'upgrade_offer_clicked',
+  UpgradeOfferRedeemed = 'upgrade_offer_redeemed'
 }
 
 type Nothing = Record<string, never>;
@@ -31,6 +34,9 @@ export type ProductProps = {
   [ProductEvent.CreditsExhausted]: Nothing;
   [ProductEvent.ImportFailed]: { source: string; error: string };
   [ProductEvent.CanvasPerf]: CanvasPerfProps;
+  [ProductEvent.UpgradeOfferShown]: { reason: string; created: boolean };
+  [ProductEvent.UpgradeOfferClicked]: Nothing;
+  [ProductEvent.UpgradeOfferRedeemed]: Nothing;
 };
 
 export type EventActor = { userId?: string | null; orgId?: string | null; anonymousId?: string | null };
