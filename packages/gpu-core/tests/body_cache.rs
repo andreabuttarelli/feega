@@ -98,15 +98,43 @@ fn a_blurred_body_moved_by_whole_pixels_is_recalled_not_rendered_again() {
 }
 
 #[test]
-fn a_body_moved_by_a_fraction_of_a_pixel_is_rendered_again() {
+fn a_blurred_body_moved_by_a_fraction_of_a_pixel_is_recalled_at_the_nearest_pixel() {
     let mut surface = Remembering::default();
     let pictures: Shelf<()> = Shelf::new();
 
     prepare(&mut surface, &blurred_square_at(10.0), &pictures, Blending::Native).unwrap();
     let first = surface.painted.len();
-    prepare(&mut surface, &blurred_square_at(10.5), &pictures, Blending::Native).unwrap();
+    let moved = prepare(&mut surface, &blurred_square_at(10.4), &pictures, Blending::Native).unwrap();
+
+    assert_eq!(surface.painted.len(), first);
+    assert_eq!(moved.bodies[&0].origin.x, surface.painted[0].x0);
+}
+
+#[test]
+fn a_crisp_filtered_body_moved_by_a_fraction_of_a_pixel_is_rendered_again() {
+    let mut surface = Remembering::default();
+    let pictures: Shelf<()> = Shelf::new();
+
+    prepare(&mut surface, &crisp_square_at(10.0), &pictures, Blending::Native).unwrap();
+    let first = surface.painted.len();
+    prepare(&mut surface, &crisp_square_at(10.5), &pictures, Blending::Native).unwrap();
 
     assert!(surface.painted.len() > first);
+}
+
+fn crisp_square_at(x: f64) -> gpu_core::display_list::DisplayList {
+    let mut list = parse(
+        r#"{ "width": 100, "height": 100, "background": null, "items": [
+  { "kind": "path", "clip": "sq", "contours": [[0, 0, 40, 0, 40, 40, 0, 40]], "rule": "nonzero",
+    "paint": { "kind": "solid", "color": [1, 1, 1, 1] }, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 20], "blend": "normal",
+    "filters": [{ "kind": "css", "fns": [{ "name": "brightness", "args": ["0.5"] }] }] } ] }"#,
+    )
+    .unwrap();
+    stamp(&mut list.items);
+    if let gpu_core::display_list::Item::Path(path) = &mut list.items[0] {
+        path.look.matrix[4] = x;
+    }
+    list
 }
 
 #[test]

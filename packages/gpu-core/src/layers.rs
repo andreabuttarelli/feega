@@ -39,6 +39,7 @@ pub trait Surface {
 }
 
 const BODY_MAX_PX: f64 = 2048.0;
+const SOFT_SPREAD_PX: f64 = 9.0;
 
 fn pictures_ready<P>(item: &Item, pictures: &Shelf<P>) -> bool {
     match item {
@@ -58,8 +59,15 @@ fn body_key<S: Surface>(item: &Item, pictures: &Shelf<Pic<S>>) -> Option<(String
     if spread.width() > BODY_MAX_PX || spread.height() > BODY_MAX_PX {
         return None;
     }
-    let region = Rect::new(spread.x0.floor(), spread.y0.floor(), spread.x1.ceil().max(spread.x0.floor() + 1.0), spread.y1.ceil().max(spread.y0.floor() + 1.0));
     let [a, b, c, d, _, _] = look.matrix;
+    let soft = bounds::<S::Canvas>(item, pictures).is_some_and(|own| spread.width() - own.width() >= SOFT_SPREAD_PX);
+    if soft {
+        let (x0, y0) = (spread.x0.round() - 1.0, spread.y0.round() - 1.0);
+        let region = Rect::new(x0, y0, x0 + spread.width().ceil() + 2.0, y0 + spread.height().ceil() + 2.0);
+        let key = format!("{content:x} {a:.6} {b:.6} {c:.6} {d:.6} soft {}x{}", region.width(), region.height());
+        return Some((key, region));
+    }
+    let region = Rect::new(spread.x0.floor(), spread.y0.floor(), spread.x1.ceil().max(spread.x0.floor() + 1.0), spread.y1.ceil().max(spread.y0.floor() + 1.0));
     let key = format!("{content:x} {a:.6} {b:.6} {c:.6} {d:.6} {:.3} {:.3} {}x{}", spread.x0 - region.x0, spread.y0 - region.y0, region.width(), region.height());
     Some((key, region))
 }
