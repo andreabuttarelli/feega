@@ -5,7 +5,8 @@
   import { canPickDirectory, listedFolder, pickDirectory } from '$lib/code-upload/pick-folder';
   import { SNAPSHOT_MESSAGES, type Snapshot } from '$lib/code-upload/snapshot';
   import CodeImportSignIn from './CodeImportSignIn.svelte';
-  import { githubBranches, githubConnect, githubDisconnect, githubRepos, githubStatus, importCode, repoLink, tokensFound, uploadFolder, type CodeLanded, type CodeTarget, type RenderCondition, type GithubRepo, type GithubStatus } from '$lib/canvas/code-import-client';
+  import { githubBranches, githubConnect, githubDisconnect, githubRepos, githubStatus, importCode, repoLink, routesListed, tokensFound, uploadFolder, type CodeLanded, type CodeTarget, type RenderCondition, type GithubRepo, type GithubStatus } from '$lib/canvas/code-import-client';
+  import { checkedCount, matching, picked as pickedRoutes, picksOf, PickProblem, problemOf, type Pick } from '$lib/canvas/route-picks';
 
   let { projectId, canvasId, at, onimported, onclose }: { projectId: string; canvasId: string; at: { x: number; y: number }; onimported: (landed: CodeLanded) => void; onclose: () => void } = $props();
 
@@ -14,7 +15,7 @@
   type Source = (typeof Source)[keyof typeof Source];
 
   const REFUSALS: Record<string, string> = {
-    invalid: 'Enter a GitHub repository link and up to 8 page paths starting with /, or a Storybook link.',
+    invalid: 'Enter a GitHub repository link and up to 20 page paths starting with /, or a Storybook link.',
     no_sandbox: 'Code import is not available right now.',
     run_failed: 'The app could not be started. A private repository needs GitHub connected.',
     no_browser: 'Code import is not available right now.',
@@ -25,6 +26,17 @@
     choose_app: 'This repository holds several apps. Pick one and import again.'
   };
   const FALLBACK_REFUSAL = 'Could not import that app.';
+  const LISTING_NOTES: Record<string, string> = {
+    no_router: 'No file router found: type the pages.',
+    routes_in_code: 'Routes are defined in code: type the pages.',
+    choose_app: 'Pick an app to list its pages.'
+  };
+  const LISTING_FALLBACK = 'Pages could not be listed: type them.';
+  const PROBLEMS: Record<PickProblem, (path: string | null, max: number) => string> = {
+    [PickProblem.NoneChecked]: () => 'Tick at least one page.',
+    [PickProblem.OverCap]: (_, max) => `At most ${max} pages per import.`,
+    [PickProblem.NeedsValue]: (path) => `${path} needs a value: type a path that fits it.`
+  };
   const HTTP = /^https?:\/\//i;
 
   let source = $state<Source>(Source.Repo);
@@ -45,6 +57,11 @@
   let branch = $state('');
   let apps = $state<string[]>([]);
   let app = $state('');
+  let rows = $state<Pick[]>([]);
+  let max = $state(0);
+  let query = $state('');
+  let listing = $state(false);
+  let listNote = $state<string | null>(null);
 
   const SCHEMES = [
     { id: 'light', label: 'Light' },
@@ -67,7 +84,7 @@
   const LOOKUP_DELAY_MS = 400;
   let waitMs = $state('');
   let routeWaits = $state<Record<string, string>>({});
-  const routeList = $derived(routes.split(/[\s,]+/).filter(Boolean));
+  const routeList = $derived(rows.length ? pickedRoutes(rows) : routes.split(/[\s,]+/).filter(Boolean));
   const msOf = (raw: string | undefined) => (raw?.trim() && Number.isFinite(Number(raw)) ? Math.max(0, Math.round(Number(raw))) : undefined);
   const wait = $derived({
     captureDelayMs: msOf(waitMs),
@@ -102,6 +119,40 @@
   });
 
 
+  $effect(() => {
+    const where = lookup;
+    const chosen = app;
+    rows = [];
+    listNote = null;
+    query = '';
+    if (!where) {
+      return;
+    }
+    const timer = setTimeout(async () => {
+      listing = true;
+      const got = await routesListed(projectId, where, chosen).finally(() => (listing = false));
+      if (lookup !== where || app !== chosen) {
+        return;
+      }
+      if (got.ok) {
+        rows = picksOf(got.value.routes);
+        max = got.value.max;
+        return;
+      }
+      listNote = LISTING_NOTES[got.error] ?? LISTING_FALLBACK;
+      apps = got.apps ?? apps;
+    }, LOOKUP_DELAY_MS);
+    return () => clearTimeout(timer);
+  });
+
+  const shown = $derived(matching(rows, query));
+  const problem = $derived(rows.length ? problemOf(rows, max) : null);
+
+  function tickAll(checked: boolean) {
+    const visible = new Set(shown.map((r) => r.path));
+    rows = rows.map((r) => (visible.has(r.path) && (!checked || r.kind !== 'dynamic' || r.value.trim()) ? { ...r, checked } : r));
+  }
+
   const TARGETS: Record<Source, () => CodeTarget> = {
     [Source.Repo]: () => ({ repo: linked(repo), routes: routeList, conditions, designSystem, ...wait }),
     [Source.Folder]: () => ({ folder: folder.trim(), routes: routeList, conditions, designSystem, ...wait }),
@@ -110,7 +161,7 @@
   };
 
   const READY: Record<Source, () => boolean> = { [Source.Repo]: () => Boolean(repo.trim()), [Source.Folder]: () => Boolean(folder.trim()), [Source.Upload]: () => uploaded !== null, [Source.Storybook]: () => Boolean(storybook.trim()) };
-  const ready = $derived(READY[source]() && conditions.length > 0);
+  const ready = $derived(READY[source]() && conditions.length > 0 && problem === null);
 
   async function refresh() {
     const status = await githubStatus(projectId);
@@ -201,6 +252,40 @@
   }
 </script>
 
+{#snippet pages(testid: string)}
+  {#if rows.length}
+    <fieldset class="ui-pages" data-testid="code-import-pages">
+      <div class="ui-row">
+        <input class="rounded-sm" type="search" placeholder="Search pages" aria-label="Search pages" bind:value={query} data-testid="code-import-pages-search" />
+        <button type="button" class="ui-btn rounded-sm" onclick={() => tickAll(true)} data-testid="code-import-pages-all">All</button>
+        <button type="button" class="ui-btn rounded-sm" onclick={() => tickAll(false)} data-testid="code-import-pages-none">None</button>
+      </div>
+      <ul class="ui-page-list">
+        {#each shown as row (row.path)}
+          <li>
+            <label title={row.file}>
+              <input type="checkbox" bind:checked={rows[rows.indexOf(row)].checked} data-testid="code-import-page" data-path={row.path} />
+              <span class="ui-path">{row.path}</span>
+            </label>
+            {#if row.kind === 'dynamic'}
+              <input class="rounded-sm ui-value" type="text" list={`code-import-values-${row.path}`} placeholder={`needs a value, e.g. ${row.candidates[0]?.path ?? row.path}`} aria-label={`Path for ${row.path}`} bind:value={rows[rows.indexOf(row)].value} oninput={() => (rows[rows.indexOf(row)].checked = true)} data-testid="code-import-page-value" />
+              <datalist id={`code-import-values-${row.path}`}>
+                {#each row.candidates as c (c.path)}
+                  <option value={c.path}>{c.from === 'code' ? 'from the code' : 'from a link'}</option>
+                {/each}
+              </datalist>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+      <p class="ui-note" data-testid="code-import-pages-count">{checkedCount(rows)} of {max} pages{problem ? ` · ${PROBLEMS[problem.problem](problem.path, max)}` : ''}</p>
+    </fieldset>
+  {:else}
+    <input class="rounded-sm" type="text" placeholder="/  /settings  /users" aria-label="Pages" bind:value={routes} data-testid={testid} />
+    {#if listing}<p class="ui-note" data-testid="code-import-pages-note">Listing pages…</p>{:else if listNote}<p class="ui-note" data-testid="code-import-pages-note">{listNote}</p>{/if}
+  {/if}
+{/snippet}
+
 <div class="ui-overlay" role="button" tabindex="-1" aria-label="Cancel" onclick={(e) => e.target === e.currentTarget && !busy && onclose()} onkeydown={(e) => e.key === 'Escape' && !busy && onclose()}>
   <div class="ui-card rounded-lg" role="dialog" aria-modal="true" aria-label="Import from code" data-testid="code-import-dialog">
     <h3>Import from code</h3>
@@ -236,7 +321,7 @@
           </div>
         {/if}
         <input class="rounded-sm" type="text" inputmode="url" placeholder="https://github.com/owner/repo" aria-label="Repository" bind:value={repo} data-testid="code-import-repo" />
-        <input class="rounded-sm" type="text" placeholder="/  /settings  /users" aria-label="Pages" bind:value={routes} data-testid="code-import-route" />
+        {@render pages('code-import-route')}
         <p class="ui-note ui-github" data-testid="code-import-github">
           {#if github?.connected}
             GitHub connected{github.label ? ` as ${github.label}` : ''}. <button type="button" class="ui-link" onclick={disconnect}>Disconnect</button>
@@ -249,7 +334,7 @@
       {:else if source === Source.Folder}
         <p class="ui-note">A project folder on this computer: its dev server runs here, edits on the canvas are written back to its files, and changes to the files show up on the canvas.</p>
         <input class="rounded-sm" type="text" placeholder="/Users/you/code/my-app" aria-label="Folder" bind:value={folder} data-testid="code-import-folder" />
-        <input class="rounded-sm" type="text" placeholder="/  /settings  /users" aria-label="Pages" bind:value={routes} data-testid="code-import-folder-route" />
+        {@render pages('code-import-folder-route')}
       {:else if source === Source.Upload}
         <p class="ui-note">A project folder on this computer is uploaded once and runs in a sandbox, like a GitHub repo. Imported once, no sync: edits stay on the canvas. node_modules, build output and what .gitignore leaves out are skipped.</p>
         <div class="ui-row">
@@ -257,7 +342,7 @@
           {#if uploaded}<span class="ui-note" data-testid="code-import-uploaded">{uploaded.name}{uploaded.withheld.length ? ` · ${uploaded.withheld.length} files withheld: ${uploaded.withheld.join(', ')}` : ''}</span>{/if}
         </div>
         <input bind:this={folderInput} class="sr-only" type="file" webkitdirectory tabindex="-1" aria-hidden="true" onchange={async (e) => upload(await listedFolder(e.currentTarget.files))} />
-        <input class="rounded-sm" type="text" placeholder="/  /settings  /users" aria-label="Pages" bind:value={routes} data-testid="code-import-upload-route" />
+        {@render pages('code-import-upload-route')}
       {:else}
         <p class="ui-note">A public Storybook: each story is read without running the app, its components become main components, their args variants.</p>
         <input class="rounded-sm" type="text" inputmode="url" placeholder="https://storybook.example.com" aria-label="Storybook" bind:value={storybook} data-testid="code-import-storybook" />
@@ -335,6 +420,14 @@
   .ui-conditions label { display: flex; align-items: center; gap: 4px; }
   .ui-conditions input { flex: none; padding: 0; }
   .ui-conditions .ui-note { flex-basis: 100%; }
+  .ui-pages { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
+  .ui-pages .ui-btn { font-size: 12.5px; font-weight: 500; padding: 4px 10px; }
+  .ui-page-list { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow: auto; border: 1px solid var(--line, #e3e3e6); }
+  .ui-page-list li { display: flex; align-items: center; gap: 8px; padding: 4px 8px; font-size: 13px; }
+  .ui-page-list label { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; }
+  .ui-page-list .ui-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, monospace; font-size: 12px; }
+  .ui-page-list input[type='checkbox'] { flex: none; }
+  .ui-form .ui-value { flex: 1; font-size: 12px; padding: 3px 6px; }
   .ui-note { margin: 0; font-size: 13px; color: var(--ink-soft, #6e6e73); }
   .ui-github { font-size: 12px; }
   .ui-link { font: inherit; padding: 0; border: 0; background: none; color: var(--ink, #1d1d1f); text-decoration: underline; cursor: pointer; }

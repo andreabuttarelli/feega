@@ -39,7 +39,7 @@ describe('GET /api/v1/projects/:id/code-import/routes', () => {
     const { res, body } = await call('repo=https%3A%2F%2Fgithub.com%2Facme%2Fsite%2Ftree%2Fmain');
 
     expect(res.status).toBe(200);
-    expect(body).toMatchObject({ framework: 'sveltekit', app: '' });
+    expect(body).toMatchObject({ framework: 'sveltekit', app: '', max: 20 });
     expect(body.routes.map((r: { path: string; kind: string; selected: boolean }) => [r.path, r.kind, r.selected])).toEqual([
       ['/', 'static', true],
       ['/wiki', 'static', true],

@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { routesFound } from '$lib/server/code-import/canvas-import';
+import { MAX_ROUTES } from '$lib/server/code-import/repo';
 import { ROUTES_STATUS } from '$lib/server/code-import/routes-found';
 import { projectScopeOf } from '$lib/server/projects/project-scope';
 import type { RequestHandler } from './$types';
@@ -25,5 +26,5 @@ export const GET: RequestHandler = async (event) => {
   if (!found.ok) {
     return json({ error: found.error, detail: found.detail, ...(found.apps.length ? { apps: found.apps } : {}) }, { status: ROUTES_STATUS[found.error] });
   }
-  return json({ framework: found.framework, app: found.app, routes: found.routes });
+  return json({ framework: found.framework, app: found.app, max: MAX_ROUTES, routes: found.routes });
 };

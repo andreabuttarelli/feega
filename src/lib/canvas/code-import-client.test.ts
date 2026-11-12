@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { githubBranches, githubConnect, githubStatus, importCode, repoLink, tokensFound } from './code-import-client';
+import { githubBranches, githubConnect, githubStatus, importCode, repoLink, routesListed, tokensFound } from './code-import-client';
 
 const ASK = { projectId: 'p1', canvasId: 'c1', target: { repo: 'https://github.com/a/b', routes: ['/x', '/y'] }, at: { x: 1, y: 2 } };
 
@@ -69,5 +69,22 @@ describe('GitHub', () => {
   it('il link del repo porta il ramo scelto', () => {
     expect(repoLink('acme/app', 'dev')).toBe('https://github.com/acme/app/tree/dev');
     expect(repoLink('acme/app', null)).toBe('https://github.com/acme/app');
+  });
+});
+
+describe('routesListed', () => {
+  it('asks the pages of a repo app, without booting it', async () => {
+    const fetchFn = answering({ framework: 'sveltekit', app: '', max: 20, routes: [{ path: '/' }] });
+
+    const got = await routesListed('p1', { repo: 'https://github.com/a/b' }, 'apps/web', fetchFn as unknown as typeof fetch);
+
+    expect(got).toEqual({ ok: true, value: { framework: 'sveltekit', app: '', max: 20, routes: [{ path: '/' }] } });
+    expect(fetchFn).toHaveBeenCalledWith('/api/v1/projects/p1/code-import/routes?repo=https%3A%2F%2Fgithub.com%2Fa%2Fb&app=apps%2Fweb', {});
+  });
+
+  it('a refusal carries its reason and the apps', async () => {
+    const fetchFn = answering({ error: 'choose_app', detail: 'pick one', apps: ['a', 'b'] }, 409);
+
+    expect(await routesListed('p1', { folder: '/code/app' }, '', fetchFn as unknown as typeof fetch)).toEqual({ ok: false, error: 'choose_app', detail: 'pick one', apps: ['a', 'b'] });
   });
 });
