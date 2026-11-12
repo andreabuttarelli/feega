@@ -158,6 +158,41 @@ fn batches_of(missing: &[TileKey], side: i64) -> Vec<Batch> {
     out
 }
 
+const SLOWEST_DISPLAY_MS: f64 = 1000.0 / 60.0;
+const FASTEST_DISPLAY_MS: f64 = 1000.0 / 240.0;
+const STILL_SHARE: f64 = 0.72;
+const GESTURE_SHARE: f64 = 0.24;
+const REFRESH_WINDOW: usize = 16;
+
+#[derive(Default)]
+pub struct Refresh {
+    last: Option<f64>,
+    gaps: std::collections::VecDeque<f64>,
+}
+
+impl Refresh {
+    pub fn observe(&mut self, now_ms: f64) {
+        if let Some(last) = self.last.replace(now_ms) {
+            self.gaps.push_back(now_ms - last);
+        }
+        if self.gaps.len() > REFRESH_WINDOW {
+            self.gaps.pop_front();
+        }
+    }
+
+    fn frame_ms(&self) -> f64 {
+        self.gaps.iter().copied().filter(|g| *g > 0.0).fold(SLOWEST_DISPLAY_MS, f64::min).max(FASTEST_DISPLAY_MS)
+    }
+
+    pub fn still_ms(&self) -> f64 {
+        self.frame_ms() * STILL_SHARE
+    }
+
+    pub fn gesture_ms(&self) -> f64 {
+        self.frame_ms() * GESTURE_SHARE
+    }
+}
+
 #[derive(Default)]
 pub struct RasterCredit {
     ms: f64,
