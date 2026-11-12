@@ -173,7 +173,7 @@ function maskedRows(walk: Walk, maskId: string, depth: number): LayerRow[] {
 
 const VIEW_JOIN = ', ';
 
-function onlyIn(doc: MotionDoc, clip: Clip): Pick<LayerRow, 'only'> {
+function onlyIn(doc: MotionDoc, clip: Clip): { only?: string } {
   const ids = shownOnlyIn(clip as MotionClip);
   return ids.length ? { only: viewsOf(doc).filter((v) => ids.includes(v.id)).map((v) => v.name).join(VIEW_JOIN) } : {};
 }
