@@ -68,9 +68,9 @@
 {#if notice}<Notice tone={notice.tone}>{notice.text}</Notice>{/if}
 
 {#if seats.endsAt}
-  <Notice data-testid="team-plan-ends">The plan ends on {new Date(seats.endsAt).toLocaleDateString()}. {seats.editors - 1} editors become viewers then; they keep access and become editors again when the team pays.</Notice>
+  <Notice>The plan ends on {new Date(seats.endsAt).toLocaleDateString()}. {seats.editors - 1} editors become viewers then; they keep access and become editors again when the team pays.</Notice>
 {:else if seats.grandfathered && !seats.paid}
-  <Notice data-testid="team-grandfathered">This team keeps its {seats.editors} editors from before editors became paid seats. Adding an editor needs the plan.</Notice>
+  <Notice>This team keeps its {seats.editors} editors from before editors became paid seats. Adding an editor needs the plan.</Notice>
 {/if}
 
 {#if mayInvite}

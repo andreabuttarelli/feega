@@ -50,7 +50,7 @@
 {/if}
 
 {#if data.seats.endsAt}
-  <Notice data-testid="credits-plan-ends">{$_('app.account.billing.planEnds', { values: { date: new Date(data.seats.endsAt).toLocaleDateString(), editors: data.seats.editors - 1 } })}</Notice>
+  <Notice>{$_('app.account.billing.planEnds', { values: { date: new Date(data.seats.endsAt).toLocaleDateString(), editors: data.seats.editors - 1 } })}</Notice>
 {/if}
 
 {#if data.isOwner}
