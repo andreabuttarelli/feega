@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { judgeDecision, SAFE } from './policy';
 import { ProjectMode } from '$lib/project-mode';
-import { ADULT_SEXUAL, JevOutage, MODERATION_PROFILES, ModerationProfile, profileOf } from './profiles';
+import { ADULT_SEXUAL, JevOutage, MODERATION_PROFILES, ModerationProfile, Screening, profileOf, profileForEnv } from './profiles';
 
 const decided = (profile: ModerationProfile, choice: string, overrides: Record<string, number> = {}) => {
   const zeros = Object.fromEntries(Object.keys(MODERATION_PROFILES[profile].categories).map((c) => [c, 0]));
@@ -48,5 +48,20 @@ describe('the moderation profile table', () => {
     [ProjectMode.Standard, false, ModerationProfile.Standard]
   ])('picks the profile from project mode %s and model uncensored=%s: %s', (mode, uncensored, profile) => {
     expect(profileOf({ uncensored, mode })).toBe(profile);
+  });
+});
+
+describe('the moderation profile of the deployment', () => {
+  it('is local on the user own machine, whatever the project asks for', () => {
+    expect(profileForEnv({ uncensored: false }, { PUBLIC_FEEGA_LOCAL: '1' })).toBe(ModerationProfile.Local);
+    expect(profileForEnv({ uncensored: true }, { PUBLIC_FEEGA_LOCAL: '1' })).toBe(ModerationProfile.Local);
+    expect(MODERATION_PROFILES[ModerationProfile.Local].screening).toBe(Screening.Off);
+  });
+
+  it('is the carried profile in the cloud, which keeps screening', () => {
+    expect(profileForEnv({ uncensored: false }, {})).toBe(ModerationProfile.Standard);
+    expect(profileForEnv({ uncensored: true }, {})).toBe(ModerationProfile.Uncensored);
+    expect(MODERATION_PROFILES[ModerationProfile.Standard].screening).toBe(Screening.On);
+    expect(MODERATION_PROFILES[ModerationProfile.Uncensored].screening).toBe(Screening.On);
   });
 });

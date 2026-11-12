@@ -18,7 +18,7 @@
 
   <h1><span data-agent-id="hero-title-a">Design inside your code</span> <span data-agent-id="hero-title-b">with your agents and team.</span></h1>
 
-  <p class="lead" data-agent-id="hero-lead">Paste any website. Claude rebuilds it as editable layers, animates it on a real timeline, and you ship it as video or code.</p>
+  <p class="lead" data-agent-id="hero-lead">Start from your repo, a folder, Figma or any website. Your agents and team design and animate it together on one canvas.</p>
 
   <div class="start" data-agent-id="hero-start">
     <HeroPrompt />

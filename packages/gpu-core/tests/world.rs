@@ -255,3 +255,16 @@ fn a_held_frame_swapping_its_picture_tier_still_drags_from_its_tiles() {
     assert_eq!(w.lifts(sized).len(), 1);
     assert!(w.overlay(IDENTITY, 1000, 100).items.is_empty());
 }
+
+#[test]
+fn the_selected_overlay_sits_between_the_fixed_and_the_live_one() {
+    let mut w = World::new();
+    let at = |clip: &str| parse_overlay(&format!(r#"[{{ "kind": "path", "clip": "{clip}", "contours": [[0, 0, 1, 0, 1, 1]], "rule": "nonzero", "paint": {{ "kind": "solid", "color": [0, 0, 1, 1] }}, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0] }}]"#)).unwrap();
+    w.set_overlay(OverlayPart::Live, at("live"));
+    w.set_overlay(OverlayPart::Selected, at("selected"));
+    w.set_overlay(OverlayPart::Fixed, at("fixed"));
+
+    let clips: Vec<String> = w.screen([1.0, 0.0, 0.0, 1.0, 0.0, 0.0], 64, 64).items.iter().map(|i| i.clip().to_string()).collect();
+
+    assert_eq!(clips, vec!["fixed", "selected", "live"]);
+}

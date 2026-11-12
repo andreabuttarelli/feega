@@ -180,7 +180,7 @@
     <FeegaFile bind:this={feegaFile} page={PAGE_PATH[DashboardPage.Home]} />
   </div>
 
-  <div class="scroll" data-testid="home-scroll">
+  <div data-testid="home-scroll">
     <div class="column">
       <section class="prompt" aria-labelledby="prompt-heading">
         <h1 id="prompt-heading">what do you want to make?</h1>
@@ -270,15 +270,7 @@
   .home {
     display: flex;
     flex-direction: column;
-    height: calc(100svh - var(--ui-bar-h) - var(--content-pad-top) - var(--content-pad-bottom));
     color: var(--ui-text);
-  }
-
-  .scroll {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    scrollbar-width: thin;
   }
 
   .create {
@@ -366,7 +358,7 @@
   h1 {
     margin: 0 0 var(--ui-space-2);
     text-align: center;
-    font-size: clamp(40px, 4.5vw, 72px);
+    font-size: clamp(32px, 3.2vw, 48px);
     font-weight: 600;
     line-height: 0.95;
     letter-spacing: -0.04em;
@@ -574,7 +566,7 @@
     }
 
     h1 {
-      font-size: clamp(36px, 10vw, 64px);
+      font-size: clamp(28px, 8vw, 36px);
     }
 
     textarea {

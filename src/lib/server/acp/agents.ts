@@ -1,27 +1,22 @@
-import { resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { AcpAgent, isAcpAgent } from '$lib/acp/agent-choices';
 import type { AgentCommand, McpServer } from './client';
 
-export enum AcpAgent {
-  Claude = 'claude',
-  Codex = 'codex',
-  Gemini = 'gemini'
-}
+export { AcpAgent, isAcpAgent };
 
-export type AcpAgentEntry = AgentCommand & { label: string };
-
-export const ACP_AGENTS: Readonly<Record<AcpAgent, AcpAgentEntry>> = {
-  [AcpAgent.Claude]: { label: 'Claude Code', command: 'npx', args: ['-y', '@zed-industries/claude-code-acp'] },
-  [AcpAgent.Codex]: { label: 'Codex', command: 'npx', args: ['-y', '@zed-industries/codex-acp'] },
-  [AcpAgent.Gemini]: { label: 'Gemini CLI', command: 'gemini', args: ['--experimental-acp'] }
+export const ACP_AGENTS: Readonly<Record<AcpAgent, AgentCommand>> = {
+  [AcpAgent.Claude]: { command: 'npx', args: ['-y', '@agentclientprotocol/claude-agent-acp'] },
+  [AcpAgent.Codex]: { command: 'npx', args: ['-y', '@agentclientprotocol/codex-acp'] },
+  [AcpAgent.Gemini]: { command: 'gemini', args: ['--experimental-acp'] }
 };
-
-export const isAcpAgent = (key: unknown): key is AcpAgent => Object.values(AcpAgent).includes(key as AcpAgent);
 
 const FEEGA_MCP_ENTRY = 'cli/mcp/stdio.ts';
 
+const npxBesideNode = () => join(dirname(process.execPath), 'npx');
+
 export const feegaMcp = (checkout: string, appUrl: string): McpServer => ({
   name: 'feega',
-  command: 'npx',
+  command: npxBesideNode(),
   args: ['-y', 'bun', 'run', resolve(checkout, FEEGA_MCP_ENTRY)],
   env: [{ name: 'PUBLIC_APP_URL', value: appUrl }]
 });

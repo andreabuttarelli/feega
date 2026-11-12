@@ -42,6 +42,28 @@ with the port filled in; all of them are in [Local MCP](/integrations/mcp/#local
 agent adds or changes appears live in your browser.
 `canvas_file` with `action: "save"` writes a copy of the file wherever you ask.
 
+## Chat with your own agent
+
+The **Chat** tab talks to an agent already installed on your computer, through the
+[Agent Client Protocol](https://agentclientprotocol.com). Pick one in the **Agent** menu at the
+top of the tab; the choice is remembered in this browser.
+
+| Agent | Needs |
+|---|---|
+| Claude Code | `claude` logged in; the adapter `@agentclientprotocol/claude-agent-acp` runs via `npx` |
+| Codex | `codex` logged in; the adapter `@agentclientprotocol/codex-acp` runs via `npx` |
+| Gemini CLI | `gemini` on your `PATH` |
+
+Each message starts the agent, hands it Feega's MCP server and streams its reply into the tab.
+The agent edits the canvas only through Feega's tools: it gets no file or terminal access from
+Feega. Before each tool call the tab shows what it wants to run with the agent's choices
+(**Allow**, **Reject**, ...); nothing runs until you pick one. Usage is billed to your agent's own
+account, never to Feega.
+
+The endpoint behind it is `POST /api/v1/local/acp`, local mode only: `{ agent, prompt }` answers
+with a `text/event-stream` of `update`, `permission`, `done` and `failed` events, and
+`{ permission: { id, optionId } }` answers a pending permission.
+
 ## AI generation with your own keys
 
 Put the keys in the process environment (`KIE_API_KEY=… npx feega`) or in a `.env` file in the
@@ -52,7 +74,7 @@ over `.env`, and the current folder's `.env` over the app's. Then start local mo
 |---|---|---|
 | Kie.ai | `KIE_API_KEY` | images, video, text |
 | OpenRouter | `OPENROUTER_API_KEY` | images, video |
-| Text LLM | `LLM_API_KEY` (`LLM_BASE_URL` for a gateway other than OpenRouter) | text, prompt safety check; also counts as the OpenRouter key |
+| Text LLM | `LLM_API_KEY` (`LLM_BASE_URL` for a gateway other than OpenRouter) | text, prompt enhancement; also counts as the OpenRouter key |
 | Higgsfield | `HIGGSFIELD_API_KEY_ID` + `HIGGSFIELD_API_KEY_SECRET` | images, video |
 | Wiro | `WIRO_API_KEY` (+ `WIRO_API_SECRET` if your Wiro project signs requests) | 3D models |
 | ElevenLabs | `ELEVENLABS_API_KEY` (`ELEVENLABS_BASE_URL` optional) | voice-over, sound effects, music, voices |
@@ -64,8 +86,8 @@ run is billed by the provider to your own account.
 Keys are read from the environment only. They are never written to the `.feega` file, sent to the
 browser or logged. Generated images and videos are stored inside the `.feega` file, so the canvas
 stays one portable file. Without a key the nodes stay hidden and generation answers with a message.
-Safety screening of image and video prompts runs on `LLM_API_KEY`: set it, or those generations
-are refused with a hint. At start the terminal prints, per provider, `key works`, `key rejected` or
+Local mode does not run feega's content moderation: prompts, text and references go straight to
+your provider, and what you generate is your responsibility. At start the terminal prints, per provider, `key works`, `key rejected` or
 `key unreachable`, from a free account call (never a generation).
 
 Wiro's image and video models are for uncensored projects, which local mode does not have, so
@@ -76,7 +98,7 @@ locally Wiro runs the 3D nodes only.
 Sharing, comments and saved versions answer with a message instead of running. Import the
 file at feega.app to use them: canvas menu or home page, **Import .feega**.
 
-Chat, Share, credits, comments, saved versions and Drive/Dropbox import are not shown.
+Share, credits, comments, saved versions and Drive/Dropbox import are not shown.
 
 To open a different file, stop the server and start it again with that file.
 

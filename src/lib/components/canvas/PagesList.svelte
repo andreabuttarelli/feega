@@ -1,6 +1,7 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+  import { scopedFrames } from '$lib/canvas/core/frame-sources';
   import Plus from '@lucide/svelte/icons/plus';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
@@ -93,8 +94,10 @@
       return;
     }
     onpick();
+    const deleted = current.id;
     void canvasPages.run(PageAction.Delete, { id: current.id }, canvases, current.href).then((outcome) => {
       if (outcome === OpOutcome.Landed) {
+        void scopedFrames()?.forgetCanvas(deleted).catch(() => undefined);
         void canvasPages.open(next.href);
       }
     });

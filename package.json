@@ -55,6 +55,7 @@
     "eval:gen-node": "vite-node --config scripts/vite-node.config.ts scripts/eval/gen-node.ts",
     "eval:bootstrap": "vite-node --config scripts/vite-node.config.ts scripts/eval/bootstrap.ts",
     "eval:moderation": "vite-node --config scripts/vite-node.config.ts scripts/eval/moderation-edges.ts",
+    "eval:code-import": "vite-node --config scripts/vite-node.config.ts scripts/eval/code-import/run.ts --",
     "eval:motion": "vite-node --config scripts/vite-node.config.ts scripts/eval/motion-quality/run.ts --",
     "eval:external-agent": "vite-node --config scripts/vite-node.config.ts scripts/eval/external-agent/run.ts",
     "eval:external-agent:static": "vite-node --config scripts/vite-node.config.ts scripts/eval/external-agent/run.ts -- --listing=static",

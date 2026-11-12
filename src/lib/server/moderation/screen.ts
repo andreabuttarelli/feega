@@ -11,7 +11,7 @@ import {
   type JudgeVerdict
 } from './policy';
 import { enableHint } from '$lib/server/enable-hints';
-import { JevOutage, MODERATION_PROFILES, carriedProfile, type ProfilePolicy } from './profiles';
+import { JevOutage, MODERATION_PROFILES, Screening, carriedProfile, type ModerationProfile, type ProfilePolicy } from './profiles';
 
 export type ModerationRecord = {
   stage: 'rules' | 'jev' | 'llm' | 'identifiability';
@@ -27,6 +27,7 @@ export type ScreenPorts = {
   decideIdentifiability(state: string): Promise<JevDecision>;
   judgeIdentifiability(state: string): Promise<JudgeVerdict>;
   record(entry: ModerationRecord): void;
+  profile?: ModerationProfile;
 };
 
 export type ScreenRequest = { text: string; references: string[]; uncensored: boolean; operation?: string };
@@ -170,7 +171,10 @@ const UNCENSORED_RULES: ReadonlyArray<readonly [string, (request: ScreenRequest)
 
 export async function screenGeneration(ports: ScreenPorts, request: ScreenRequest): Promise<ScreenOutcome> {
   const state = stateOf(request);
-  const policy = MODERATION_PROFILES[carriedProfile(request)];
+  const policy = MODERATION_PROFILES[ports.profile ?? carriedProfile(request)];
+  if (policy.screening === Screening.Off) {
+    return { ok: true };
+  }
 
   const refused = UNCENSORED_RULES.find(([, applies]) => request.uncensored && applies(request));
   if (refused) {

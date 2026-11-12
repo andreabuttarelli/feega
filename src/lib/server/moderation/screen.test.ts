@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { screenGeneration, type ScreenPorts } from './screen';
+import { ModerationProfile } from './profiles';
 
 const safe = { choice: 'safe', probabilities: { safe: 0.999 } };
 const doubtful = { choice: 'safe', probabilities: { safe: 0.9, hate: 0.05 } };
@@ -237,5 +238,29 @@ describe('a judge refusal stands only when the refused content was asked for', (
   ])('$text: $category, requested $requested, allowed $ok', async ({ text, category, requested, ok }) => {
     const out = await screenGeneration(ports({ decide: jevDown(), judge: judgeSays(category, requested) }), request(text));
     expect(out.ok).toBe(ok);
+  });
+});
+
+describe('screening on the local profile', () => {
+  it('clears a text without calling Jev, the judge or the network', async () => {
+    const p = ports({
+      profile: ModerationProfile.Local,
+      decide: vi.fn(async () => Promise.reject(new Error('Add LLM_API_KEY to .env'))),
+      judge: vi.fn(async () => Promise.reject(new Error('Add LLM_API_KEY to .env')))
+    });
+    expect(await screenGeneration(p, request('a title: hello'))).toEqual({ ok: true });
+    expect(p.decide).not.toHaveBeenCalled();
+    expect(p.judge).not.toHaveBeenCalled();
+  });
+
+  it('clears even an uncensored request with a reference, with no rule applied', async () => {
+    const p = ports({ profile: ModerationProfile.Local });
+    expect(await screenGeneration(p, { text: 'x', references: ['a.png'], uncensored: true })).toEqual({ ok: true });
+  });
+
+  it('keeps screening in the cloud profiles', async () => {
+    const p = ports({ profile: ModerationProfile.Standard });
+    await screenGeneration(p, request('a mountain lake'));
+    expect(p.decide).toHaveBeenCalledOnce();
   });
 });
