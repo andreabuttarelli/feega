@@ -8,6 +8,7 @@ export enum TokenKind {
   Spacing = 'spacing',
   Font = 'font',
   Breakpoint = 'breakpoint',
+  Border = 'border',
   Easing = 'easing'
 }
 
@@ -50,6 +51,8 @@ const TOKEN_ROWS: Row[] = [
   { test: /^--breakpoint-/, strip: '--breakpoint-', kind: TokenKind.Breakpoint, group: OTHER_GROUP },
   { test: /^--ease-/, strip: '--ease-', kind: TokenKind.Easing, group: OTHER_GROUP },
   { test: /^--(container|animate|blur|perspective|aspect)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'not bindable to a layer in feega yet' },
+  { test: /^--border-width-/, strip: '--border-width-', kind: TokenKind.Border, group: 'Border' },
+  { test: /border-?width|stroke-?width/, strip: DEFAULT_STRIP, kind: TokenKind.Border, group: 'Border' },
   { test: /radius/, strip: DEFAULT_STRIP, kind: TokenKind.Radius, group: 'Radius' },
   { test: /gap|spacing|space/, strip: DEFAULT_STRIP, kind: TokenKind.Spacing, group: 'Spacing' },
   { test: /^--/, strip: DEFAULT_STRIP, kind: TokenKind.Colour, group: PALETTE }
@@ -61,6 +64,7 @@ const VAR_TYPE: Record<TokenKind, VarType> = {
   [TokenKind.Spacing]: VarType.Number,
   [TokenKind.Font]: VarType.String,
   [TokenKind.Breakpoint]: VarType.Number,
+  [TokenKind.Border]: VarType.Number,
   [TokenKind.Easing]: VarType.String
 };
 
@@ -103,6 +107,7 @@ const LITERAL: Record<TokenKind, Literal> = {
   [TokenKind.Spacing]: lengthPx,
   [TokenKind.Font]: (raw) => raw,
   [TokenKind.Breakpoint]: lengthPx,
+  [TokenKind.Border]: lengthPx,
   [TokenKind.Easing]: (raw) => raw
 };
 

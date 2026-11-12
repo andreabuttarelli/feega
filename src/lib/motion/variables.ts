@@ -26,19 +26,24 @@ const PADDING_TARGET = 'autoLayout.padding';
 const PADDING_SIDES = ['top', 'right', 'bottom', 'left'] as const;
 const LAYOUT_PREFIX = 'autoLayout.';
 export const RADIUS_TARGET = 'radius';
+export const BORDER_TARGET = 'border';
 const MAX_ROUNDNESS = 0.5;
 
 type Frame = { width: number; height: number };
 
 const roundable = (clip: MotionClip) => clip.component === 'Shape' && clip.props.shape === 'rect';
 
+const stroked = (clip: MotionClip) => Array.isArray(clip.props.strokes) && clip.props.strokes.length > 0;
+
+const firstFamily = (stack: VarLiteral) => (typeof stack === 'string' ? stack.split(',')[0].trim().replace(/^['"]|['"]$/g, '') : stack);
 
 const CONTROL_TYPE: Partial<Record<Control, VarType>> = {
   [Control.Color]: VarType.Colour,
   [Control.Range]: VarType.Number,
   [Control.Text]: VarType.String,
   [Control.Textarea]: VarType.String,
-  [Control.Toggle]: VarType.Boolean
+  [Control.Toggle]: VarType.Boolean,
+  [Control.Font]: VarType.String
 };
 
 const isAlias = (value: unknown): value is VarAlias => typeof value === 'object' && value !== null;
@@ -50,6 +55,9 @@ function typeOfTarget(clip: MotionClip, target: string): VarType | undefined {
   if (target === RADIUS_TARGET) {
     return roundable(clip) ? VarType.Number : undefined;
   }
+  if (target === BORDER_TARGET) {
+    return stroked(clip) ? VarType.Number : undefined;
+  }
   const field = fieldsOf(clip.component).find((f) => f.key === target);
   return field ? CONTROL_TYPE[field.control] : undefined;
 }
@@ -58,7 +66,8 @@ export function bindableTargets(clip: MotionClip, type: VarType): string[] {
   const own = fieldsOf(clip.component).filter((f) => CONTROL_TYPE[f.control] === type).map((f) => f.key);
   const layout = type === VarType.Number && clip.autoLayout ? [...GAP_TARGETS, PADDING_TARGET] : [];
   const radius = type === VarType.Number && roundable(clip) ? [RADIUS_TARGET] : [];
-  return [...own, ...layout, ...radius];
+  const border = type === VarType.Number && stroked(clip) ? [BORDER_TARGET] : [];
+  return [...own, ...layout, ...radius, ...border];
 }
 
 function activeMode(collection: Collection): string {
@@ -169,17 +178,32 @@ function withRadius(clip: MotionClip, frame: Frame, value: VarLiteral): MotionCl
   return { ...clip, props: { ...clip.props, corners: [], roundness: Math.min(MAX_ROUNDNESS, Math.max(0, value / short)) } };
 }
 
+function withBorder(clip: MotionClip, frame: Frame, value: VarLiteral): MotionClip {
+  const side = Math.min(frame.width, frame.height);
+  if (typeof value !== 'number' || !(side > 0) || !stroked(clip)) {
+    return clip;
+  }
+  const width = Math.max(0, value / side);
+  return { ...clip, props: { ...clip.props, strokeWidth: width, strokes: (clip.props.strokes as Record<string, unknown>[]).map((s) => ({ ...s, width })) } };
+}
+
 const SHAPED_TARGETS: Record<string, (clip: MotionClip, frame: Frame, value: VarLiteral) => MotionClip> = {
-  [RADIUS_TARGET]: withRadius
+  [RADIUS_TARGET]: withRadius,
+  [BORDER_TARGET]: withBorder
+};
+
+const TARGET_VALUES: Record<string, (value: VarLiteral) => VarLiteral> = {
+  font: firstFamily
 };
 
 function resolvedClip(variables: Variables, clip: MotionClip, frame: Frame, modes: Modes): MotionClip {
   let next = clip;
   for (const [target, key] of Object.entries(clip.bind ?? {})) {
-    const value = valueOf(variables, key, [], modes);
-    if (value === undefined) {
+    const raw = valueOf(variables, key, [], modes);
+    if (raw === undefined) {
       continue;
     }
+    const value = TARGET_VALUES[target]?.(raw) ?? raw;
     if (SHAPED_TARGETS[target]) {
       next = SHAPED_TARGETS[target](next, frame, value);
       continue;

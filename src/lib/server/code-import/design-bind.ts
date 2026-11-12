@@ -4,7 +4,7 @@ import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
 import { VarType, splitKey, type VarAlias, type VarLiteral, type Variables } from '@feega/motion-core/motion/variables-model';
 import { LOOK, LookKey } from '$lib/canvas/code-look';
 import { inEveryScope } from '$lib/motion/doc-scopes';
-import { bindableTargets, resolveVariables } from '$lib/motion/variables';
+import { BORDER_TARGET, bindableTargets, resolveVariables } from '$lib/motion/variables';
 import { sameColour } from '$lib/server/url-import/page-tokens';
 import { uniformRadius } from '$lib/server/url-import/corner-radius';
 import type { VarRule } from './css-tokens';
@@ -33,9 +33,10 @@ type Target = {
   token: (name: string) => string;
   properties: string[];
   read: (clip: MotionClip, view: View) => VarLiteral | undefined;
+  evidence?: Evidence[];
 };
 
-type Stroke = { paint?: { type?: string; color?: string; opacity?: number }; visible?: boolean };
+type Stroke = { paint?: { type?: string; color?: string; opacity?: number }; visible?: boolean; width?: number };
 
 const SAME_NUMBER = 0.5;
 const MAX_ROUNDNESS = 0.5;
@@ -47,6 +48,14 @@ function strokeColour(clip: MotionClip): string | undefined {
   const [only] = strokes ?? [];
   return strokes?.length === 1 && only.paint?.type === 'solid' && only.visible !== false && only.paint.color ? only.paint.color.toLowerCase() : undefined;
 }
+
+function strokeWidth(clip: MotionClip, view: View): number | undefined {
+  const strokes = clip.props.strokes as Stroke[] | undefined;
+  const [only] = strokes ?? [];
+  return strokes?.length === 1 && only.visible !== false && typeof only.width === 'number' ? only.width * Math.min(view.width, view.height) : undefined;
+}
+
+const familyOf = (stack: unknown) => (typeof stack === 'string' ? stack.split(',')[0].trim().replace(/^['"]|['"]$/g, '').toLowerCase() : undefined);
 
 function boxOf(clip: MotionClip, view: View) {
   return { width: Number(clip.props.width) * view.width, height: Number(clip.props.height) * view.height };
@@ -76,7 +85,9 @@ const TARGETS: Target[] = [
   { key: 'stroke', type: VarType.Colour, utility: /^border-(.+)$/, token: (n) => `--color-${n}`, properties: ['border-color'], read: (c) => (isShape(c) ? strokeColour(c) : undefined) },
   { key: 'radius', type: VarType.Number, utility: /^rounded-(.+)$/, token: (n) => `--radius-${n}`, properties: ['border-radius'], read: radiusOf },
   { key: 'autoLayout.gap', type: VarType.Number, utility: /^gap-(.+)$/, token: (n) => `--spacing-${n}`, properties: ['gap'], read: (c) => c.autoLayout?.gap },
-  { key: 'autoLayout.padding', type: VarType.Number, utility: /^p-(.+)$/, token: (n) => `--spacing-${n}`, properties: ['padding'], read: evenPadding }
+  { key: 'autoLayout.padding', type: VarType.Number, utility: /^p-(.+)$/, token: (n) => `--spacing-${n}`, properties: ['padding'], read: evenPadding },
+  { key: 'font', type: VarType.String, utility: /^font-(.+)$/, token: (n) => `--font-${n}`, properties: ['font-family'], read: (c) => (isText(c) && typeof c.props.font === 'string' ? c.props.font : undefined), evidence: [Evidence.Class, Evidence.Rule] },
+  { key: BORDER_TARGET, type: VarType.Number, utility: /^border-(\d+)$/, token: (n) => `--border-width-${n}`, properties: ['border-width'], read: (c, v) => (isShape(c) ? strokeWidth(c, v) : undefined) }
 ];
 
 const MULTIPLE = /^\d+(?:\.\d+)?$/;
@@ -107,7 +118,13 @@ function resolveIn(variables: Variables, key: string, mode: string, seen: string
   return isAlias(raw) ? resolveIn(variables, raw.alias, mode, [...seen, key]) : { leaf: key, value: raw };
 }
 
-const same = (type: VarType, a: VarLiteral, b: VarLiteral) => (type === VarType.Colour ? typeof a === 'string' && typeof b === 'string' && sameColour(a, b) : typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) <= SAME_NUMBER);
+const SAME: Partial<Record<VarType, (a: VarLiteral, b: VarLiteral) => boolean>> = {
+  [VarType.Colour]: (a, b) => typeof a === 'string' && typeof b === 'string' && sameColour(a, b),
+  [VarType.Number]: (a, b) => typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) <= SAME_NUMBER,
+  [VarType.String]: (a, b) => familyOf(a) !== undefined && familyOf(a) === familyOf(b)
+};
+
+const same = (type: VarType, a: VarLiteral, b: VarLiteral) => SAME[type]?.(a, b) ?? false;
 
 function modesOf(variables: Variables): string[] {
   return [...new Set(Object.values(variables).flatMap((c) => c.modes))];
@@ -195,7 +212,8 @@ function boundClip(ctx: Context, clip: MotionClip, view: View, mode: string, cou
     if (value === undefined || !allowed || bind[target.key]) {
       continue;
     }
-    const found = EVIDENCE.map((e) => ({ e, key: e.find(ctx, target, clip, mode, value) })).find(({ key }) => key && typeOf(ctx.variables, key) === target.type && consistent(ctx, target, key, mode, value));
+    const found = EVIDENCE.filter((e) => !target.evidence || target.evidence.includes(e.evidence))
+      .map((e) => ({ e, key: e.find(ctx, target, clip, mode, value) })).find(({ key }) => key && typeOf(ctx.variables, key) === target.type && consistent(ctx, target, key, mode, value));
     if (!found) {
       count.unbound++;
       continue;
@@ -277,7 +295,7 @@ function boardModes(doc: MotionDoc, ctx: Context): MotionDoc {
 
 type Overrides = Record<string, Record<string, unknown>>;
 
-const OWNED_KEYS: Record<string, string[]> = { fill: ['fill', 'fills'], color: ['color', 'fills'], stroke: ['stroke', 'strokes'], radius: ['roundness', 'corners', 'shape', 'path'] };
+const OWNED_KEYS: Record<string, string[]> = { fill: ['fill', 'fills'], color: ['color', 'fills'], stroke: ['stroke', 'strokes'], radius: ['roundness', 'corners', 'shape', 'path'], [BORDER_TARGET]: ['strokes', 'strokeWidth'] };
 
 function keptOverride(inner: MotionClip, own: Record<string, unknown>, moded: Record<string, unknown>, view: View): Record<string, unknown> {
   let kept = own;

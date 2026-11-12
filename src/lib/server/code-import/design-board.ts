@@ -191,6 +191,7 @@ const PARTS: Part[] = [
   { title: 'Colors', build: colours },
   { title: 'Radius', build: radii },
   { title: 'Spacing', build: bars(/Spacing$/) },
+  { title: 'Border', build: bars(/Border$/) },
   { title: 'Type', build: families },
   { title: 'Text', build: textStyles },
   { title: 'Shadow', build: shadows },
