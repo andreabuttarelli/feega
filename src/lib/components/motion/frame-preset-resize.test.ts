@@ -19,7 +19,7 @@ afterEach(() => {
 
 function shown() {
   const resize = vi.fn();
-  app = mount(FramePresetSection, { target: document.body, props: { place: { x: 0, y: 0, w: 390, h: 844, rotation: 0, set: () => undefined, resize, turn: () => undefined, flip: () => undefined, align: null } } });
+  app = mount(FramePresetSection, { target: document.body, props: { place: { x: 0, y: 0, w: 390, h: 844, rotation: 0, set: () => undefined, resize, grow: () => undefined, turn: () => undefined, flip: () => undefined, align: null } } });
   flushSync();
   return { resize, field: (id: string) => document.querySelector<HTMLInputElement>(`[data-testid="${id}"]`)!, preset: document.querySelector<HTMLSelectElement>('[data-testid="frame-preset"]')! };
 }

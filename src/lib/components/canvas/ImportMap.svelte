@@ -14,7 +14,6 @@
   import { editorMode, EditorMode } from '$lib/canvas/editor-mode.svelte';
   import { importRuns } from '$lib/canvas/import-runs.svelte';
   import { frameProperties } from './frame-properties.svelte';
-  import { Region } from '$lib/canvas/key-region.svelte';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { enterFrame } from '$lib/canvas/enter-frame';
 
@@ -161,7 +160,7 @@
 </script>
 
 {#if phase !== MapPhase.None}
-  <div class="map" data-testid="import-map" role="region" aria-label="Import map" data-key-region={Region.Editor} onkeydown={(e) => e.stopPropagation()}>
+  <div class="map" data-testid="import-map" role="region" aria-label="Import map">
     <Section title="Pages" fold={Fold.Open}>
       {#if phase === MapPhase.Loading}
         <p class="muted" data-testid="import-map-loading">Reading the import…</p>
