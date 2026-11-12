@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { withDevServer, folderLibrary, folderNames, shimmedArgs } from './folder-source';
+import { withDevServer, folderFiles, folderLibrary, folderNames, shimmedArgs } from './folder-source';
 import { SHIM_CONFIG } from './folder-shims';
 import { PlanRefusal } from './run-plan';
 
@@ -71,5 +71,13 @@ describe('folderLibrary', () => {
     const library = await folderLibrary(root);
 
     expect(library.components.map((c) => [c.name, c.file, c.axes.variant?.values])).toEqual([['Badge', 'src/lib/components/Badge.svelte', ['default', 'tag']]]);
+  });
+});
+
+describe('folderFiles', () => {
+  it('lists every file of the folder, dependencies and build output left out', async () => {
+    const root = await folder({ 'package.json': {}, 'src/routes/+page.svelte': {}, 'src/routes/logo.png': {}, 'node_modules/x/package.json': {}, '.svelte-kit/out.json': {} });
+
+    expect((await folderFiles(root)).sort()).toEqual(['package.json', 'src/routes/+page.svelte', 'src/routes/logo.png']);
   });
 });

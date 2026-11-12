@@ -1,4 +1,4 @@
-import { COMPARISONS } from '../compare';
+import { COMPARISONS, comparisonPath } from '../compare';
 import { FEEGA_FEATURES } from '../compare/feega';
 import { Feature } from '../compare/features';
 import type { Guide } from './guide';
@@ -30,7 +30,7 @@ export const BEST_TOOLS: Guide = {
     {
       heading: 'How to choose',
       html: `<ul>${Object.entries(COMPARISONS)
-        .map(([slug, c]) => `<li><strong>${c.name}.</strong> ${c.pickThem} <a href="/blog/${slug}">Compare with Feega</a>.</li>`)
+        .map(([slug, c]) => `<li><strong>${c.name}.</strong> ${c.pickThem} <a href="${comparisonPath(slug)}">Compare with Feega</a>.</li>`)
         .join('')}</ul>`
     }
   ],

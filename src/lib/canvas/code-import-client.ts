@@ -1,3 +1,5 @@
+import type { ListedRoute } from './route-picks';
+
 const UNAVAILABLE = 'unavailable';
 
 export type DesignLanded = { tokens: number; byClass: number; byRule: number; byValue: number; unbound: number };
@@ -6,7 +8,7 @@ export type LibraryLanded = { components: { name: string; file: string; axes: Re
 
 export type LockedRoute = { label: string; reason: string; detail?: string };
 
-export type CodeLanded = { nodes: unknown[]; undo: unknown[]; skipped: string[]; locked?: LockedRoute[]; truncated: boolean; pages: string[]; components: number; variants: number; instances: number; design?: DesignLanded; library?: LibraryLanded };
+export type CodeLanded = { nodes: unknown[]; undo: unknown[]; skipped: string[]; locked?: LockedRoute[]; truncated: boolean; pages: string[]; components: number; variants: number; instances: number; design?: DesignLanded; library?: LibraryLanded; routes?: { discovered: number; leftOut: { path: string; reason: string }[] } | { unrun: string } };
 
 export type RenderCondition = { scheme: 'light' | 'dark'; width: number };
 
@@ -42,6 +44,11 @@ export async function tokensFound(projectId: string, where: { repo: string } | {
   const got = await asked<{ tokens: number }>(`/api/v1/projects/${projectId}/code-import/tokens?${new URLSearchParams(where)}`, {}, fetchFn);
   return got.ok ? got.value.tokens : 0;
 }
+
+export type RoutesListed = { framework: string; app: string; max: number; routes: ListedRoute[] };
+
+export const routesListed = (projectId: string, where: { repo: string } | { folder: string } | { upload: string }, app: string, fetchFn: typeof fetch = fetch) =>
+  asked<RoutesListed>(`/api/v1/projects/${projectId}/code-import/routes?${new URLSearchParams({ ...where, ...(app ? { app } : {}) })}`, {}, fetchFn);
 
 const githubPath = (projectId: string, rest = '') => `/api/v1/projects/${projectId}/github${rest}`;
 

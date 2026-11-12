@@ -22,7 +22,7 @@ export type CorpusEntry = {
 
 export const COMPONENT_RULE = 'files with extension .tsx/.jsx/.svelte/.vue under a components/ directory of the app, excluding index.*, *.test.*, *.spec.*, *.stories.*';
 
-export const ROUTE_RULE = 'file-router pages in the tree at the pinned sha: SvelteKit +page.svelte, Next app/**/page.*, Nuxt/Vite pages/**/*.vue, TanStack src/routes/**/*.tsx; (groups), @slots and _pathless segments dropped';
+export const ROUTE_RULE = 'file-router pages in the tree at the pinned sha: SvelteKit +page.svelte, Next app/**/page.*, Nuxt/Vite pages/**/*.vue, TanStack src/routes/**/*.tsx; (groups), @slots and _pathless segments dropped; params in [name] notation';
 
 const DARK_PHONE: RenderConditions = { scheme: Scheme.Dark, width: WIDTHS.Phone };
 
@@ -66,7 +66,7 @@ const PINNED: Pinned[] = [
     licence: 'MIT',
     framework: 'Vite React + TanStack Router',
     app: '',
-    expectedRoutes: ['/', '/401', '/403', '/404', '/500', '/503', '/apps', '/chats', '/clerk', '/clerk/sign-in', '/clerk/sign-up', '/clerk/user-management', '/errors/$error', '/forgot-password', '/help-center', '/otp', '/settings', '/settings/account', '/settings/appearance', '/settings/display', '/settings/notifications', '/sign-in', '/sign-in-2', '/sign-up', '/tasks', '/users'],
+    expectedRoutes: ['/', '/401', '/403', '/404', '/500', '/503', '/apps', '/chats', '/clerk', '/clerk/sign-in', '/clerk/sign-up', '/clerk/user-management', '/errors/[error]', '/forgot-password', '/help-center', '/otp', '/settings', '/settings/account', '/settings/appearance', '/settings/display', '/settings/notifications', '/sign-in', '/sign-in-2', '/sign-up', '/tasks', '/users'],
     routes: FIDELITY_APPS['shadcn-admin'].pages,
     componentFiles: 92
   },

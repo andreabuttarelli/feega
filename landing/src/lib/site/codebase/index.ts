@@ -1,5 +1,6 @@
 import { APP_URL, DOCS_URL } from '../links';
 import type { Logo } from './logos';
+import type { ChapterCopy, Step } from '../chapters';
 
 export const CODEBASE_PATH = '/design-in-your-codebase';
 
@@ -11,8 +12,8 @@ export const CODEBASE = {
   heading: 'Design directly in your codebase',
   lead: 'Open your real app as an editable design. Send the changes back as a pull request.',
   start: { href: `${APP_URL}/?utm_source=feega.app&utm_medium=site&utm_campaign=design-in-your-codebase`, label: 'Import your repo' },
-  docs: { href: `${DOCS_URL}/integrations/import-from-code/`, label: 'Read the docs' }
-} as const;
+  more: { href: `${DOCS_URL}/integrations/import-from-code/`, label: 'Read the docs' }
+} as const satisfies ChapterCopy & { title: string; description: string };
 
 export enum Glyph {
   Import = 'import',
@@ -20,9 +21,7 @@ export enum Glyph {
   Ship = 'ship'
 }
 
-export type Step = { glyph: Glyph; title: string; text: string };
-
-export const STEPS: readonly Step[] = [
+export const STEPS: readonly Step<Glyph>[] = [
   { glyph: Glyph.Import, title: 'Import your repo', text: 'GitHub or a local folder. Feega runs it.' },
   { glyph: Glyph.Edit, title: 'Design on the canvas', text: 'Real pages, your components, your colours.' },
   { glyph: Glyph.Ship, title: 'Ship a pull request', text: 'Or pull the latest code back in.' }

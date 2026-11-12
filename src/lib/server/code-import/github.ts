@@ -66,3 +66,13 @@ export async function archiveOf(call: GithubCall, repo: RepoRef, fetchFn: typeof
   const bytes = new Uint8Array(await res.arrayBuffer());
   return bytes.byteLength <= MAX_ARCHIVE_BYTES ? bytes : null;
 }
+
+type TreeEntry = { path?: unknown; type?: unknown };
+
+const BLOB = 'blob';
+
+export async function treeOf(call: GithubCall, repo: RepoRef): Promise<string[] | null> {
+  const answer = await call({ endpoint: `/repos/${repo.owner}/${repo.repo}/git/trees/${repo.ref ?? 'HEAD'}`, query: { recursive: '1' } });
+  const tree = answer.status === HTTP_OK ? (answer.data as { tree?: TreeEntry[] } | null)?.tree : null;
+  return Array.isArray(tree) ? tree.filter((e) => e.type === BLOB && typeof e.path === 'string').map((e) => e.path as string) : null;
+}

@@ -65,7 +65,7 @@ test.describe('comment edit, delete and mentions @real', () => {
 
     await page.reload();
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    await expect(page.getByTestId('project-switcher')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('project-name')).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId('comments-unseen')).toHaveCount(0);
   });
 });

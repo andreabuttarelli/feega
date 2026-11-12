@@ -90,7 +90,8 @@ import { viewsOf } from '$lib/server/url-import/page-views';
 import { insertComponentInto } from '$lib/server/registry-components/insert-component';
 import { findComponents } from '$lib/server/registry-components/find-components';
 import { sectioningOf, tokeningOf } from '$lib/server/url-import/url-doc';
-import { importCodeInto } from '$lib/server/code-import/canvas-import';
+import { ALL_ROUTES, importRoutesInto, routesFound } from '$lib/server/code-import/canvas-import';
+import { MAX_LISTED_ROUTES } from '$lib/server/code-import/routes-discover';
 import { codeChanges, codePublish, codePull } from '$lib/server/code-import/code-sync';
 import { askedRoutes, MAX_ROUTES, repoOf } from '$lib/server/code-import/repo';
 import { conditionsOf, MAX_CONDITIONS } from '$lib/server/code-import/render-conditions';
@@ -277,7 +278,9 @@ const importFigmaInput = z
   })
   .strict();
 
-const importCodeInput = z.object({ canvasId: z.string(), repo: z.string().max(300).optional().describe('a https://github.com/<owner>/<repo> link, optionally /tree/<ref>; private repos need GitHub connected (github_connect)'), folder: z.string().max(1000).optional().describe('local mode only: an absolute path to a project folder on this computer; its dev server runs here and code_publish writes back to its files'), storybook: z.string().max(500).optional().describe('instead of repo: a public Storybook link; its stories become boards, no app to run'), stories: z.array(z.string().max(200)).max(MAX_STORIES).optional().describe('Storybook story ids to import, default the first stories across components'), app: z.string().max(200).optional().describe('in a monorepo, the folder of the app to run, e.g. apps/web; a /tree/<branch>/<folder> link picks it too; when several apps exist and none is chosen the answer is choose_app with apps to pick from'), route: z.string().max(300).optional().describe('the page of the app to import, default /'), routes: z.array(z.string().max(300)).max(MAX_ROUTES).optional().describe('several pages in one run: one frame, a board per page, components shared'), conditions: z.array(z.object({ scheme: z.enum(['light', 'dark']), width: z.number().int().min(240).max(3840) })).max(MAX_CONDITIONS).optional().describe('render each page under these conditions, side by side: {scheme: light|dark, width in px}, e.g. dark at 390; default light at 1280'), captureDelayMs: z.number().int().min(0).optional().describe(`extra wait in ms before each page is captured, default 0, at most ${CAPTURE_DELAY_MAX_MS}; the page already waits for the DOM to stop changing`), routeDelayMs: z.record(z.string().max(300), z.number().int().min(0)).optional().describe('extra wait in ms per route, e.g. {"/blog/post": 3000}; wins over captureDelayMs for that route'), designSystem: z.boolean().optional().describe('default true: the CSS tokens the repo declares (@theme, :root, .dark, [data-theme]) become variables with Light/Dark modes, bound to the layers by class, var() rule or unique value, plus a Design system board; edits write back to the token declarations'), x: z.number().finite(), y: z.number().finite() }).strict();
+const importCodeInput = z.object({ canvasId: z.string(), repo: z.string().max(300).optional().describe('a https://github.com/<owner>/<repo> link, optionally /tree/<ref>; private repos need GitHub connected (github_connect)'), folder: z.string().max(1000).optional().describe('local mode only: an absolute path to a project folder on this computer; its dev server runs here and code_publish writes back to its files'), storybook: z.string().max(500).optional().describe('instead of repo: a public Storybook link; its stories become boards, no app to run'), stories: z.array(z.string().max(200)).max(MAX_STORIES).optional().describe('Storybook story ids to import, default the first stories across components'), app: z.string().max(200).optional().describe('in a monorepo, the folder of the app to run, e.g. apps/web; a /tree/<branch>/<folder> link picks it too; when several apps exist and none is chosen the answer is choose_app with apps to pick from'), route: z.string().max(300).optional().describe('the page of the app to import, default /'), routes: z.union([z.array(z.string().max(300)).max(MAX_LISTED_ROUTES), z.literal(ALL_ROUTES)]).optional().describe(`several pages in one run (at most ${MAX_ROUTES}, more is refused): one frame, a board per page, components shared; "all" = every static page discover_routes lists; a dynamic page is a concrete path, e.g. /blog/hello for /blog/[slug]`), conditions: z.array(z.object({ scheme: z.enum(['light', 'dark']), width: z.number().int().min(240).max(3840) })).max(MAX_CONDITIONS).optional().describe('render each page under these conditions, side by side: {scheme: light|dark, width in px}, e.g. dark at 390; default light at 1280'), captureDelayMs: z.number().int().min(0).optional().describe(`extra wait in ms before each page is captured, default 0, at most ${CAPTURE_DELAY_MAX_MS}; the page already waits for the DOM to stop changing`), routeDelayMs: z.record(z.string().max(300), z.number().int().min(0)).optional().describe('extra wait in ms per route, e.g. {"/blog/post": 3000}; wins over captureDelayMs for that route'), designSystem: z.boolean().optional().describe('default true: the CSS tokens the repo declares (@theme, :root, .dark, [data-theme]) become variables with Light/Dark modes, bound to the layers by class, var() rule or unique value, plus a Design system board; edits write back to the token declarations'), x: z.number().finite(), y: z.number().finite() }).strict();
+
+const discoverRoutesInput = z.object({ repo: z.string().max(300).optional().describe('a https://github.com/<owner>/<repo> link, optionally /tree/<ref>/<folder>'), folder: z.string().max(1000).optional().describe('local mode only: an absolute path to a project folder'), app: z.string().max(200).optional().describe('in a monorepo, the folder of the app') }).strict().refine((a) => Boolean(a.repo) !== Boolean(a.folder));
 
 const codeFrameInput = z.object({ nodeId: z.string().describe('a frame made by import_code') }).strict();
 
@@ -1071,7 +1074,16 @@ export const CANVAS_OPS = {
   import_code: op({
     access: Access.Write,
     input: importCodeInput,
-    run: async (ctx, input) => importCodeInto(figmaScope(ctx), input.canvasId, { repo: input.repo, folder: input.folder, app: input.app, routes: askedRoutes(input.route, input.routes), conditions: input.conditions ? conditionsOf(input.conditions) : undefined, delay: delayOf({ ms: input.captureDelayMs, routes: input.routeDelayMs }), designSystem: designSystemOf(input.designSystem), storybook: input.storybook, stories: input.stories, at: { x: input.x, y: input.y } })
+    run: async (ctx, input) => importRoutesInto(figmaScope(ctx), input.canvasId, { repo: input.repo, folder: input.folder, app: input.app, routes: input.routes === ALL_ROUTES ? ALL_ROUTES : askedRoutes(input.route, input.routes), conditions: input.conditions ? conditionsOf(input.conditions) : undefined, delay: delayOf({ ms: input.captureDelayMs, routes: input.routeDelayMs }), designSystem: designSystemOf(input.designSystem), storybook: input.storybook, stories: input.stories, at: { x: input.x, y: input.y } })
+  }),
+
+  discover_routes: op({
+    access: Access.Read,
+    input: discoverRoutesInput,
+    run: async (ctx, input) => {
+      const found = await routesFound(figmaScope(ctx), input);
+      return found.ok ? { framework: found.framework, app: found.app, routes: found.routes } : { error: found.error, detail: found.detail, ...(found.apps.length ? { apps: found.apps } : {}) };
+    }
   }),
 
   code_changes: op({

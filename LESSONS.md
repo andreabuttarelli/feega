@@ -3856,6 +3856,14 @@ Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start
 
 **Signal:** `ps` shows `npm exec vite dev --port <n>` with parent pid 1 after the feega server stopped; the desktop app needs its SIGKILL fallback to close the local server. **Move:** a non-detached child keeps the parent's event loop alive and does not die with it, and `child.kill()` reaches only the npm wrapper. Spawn through `spawnGroup` (`code-import/dev-children.ts`): own process group, `kill(-pid)` on release, exit and signals, pid file for the next start. Test with a fake `npm run dev` that spawns a grandchild, and assert the grandchild's pid is gone.
 
+## A field added to the token map vanishes when the node is read back
+
+**Signal:** a feature works when a test hands its map to the server function, and the UI shows nothing (code changes: "No edits to send yet") after a real import. **Move:** whatever is stored in `nodes.data` is read through a zod schema (`codeOriginSchema` in `motion-node.ts`); a plain `z.object` drops unknown keys without a word. A new field on `TokenEntry` goes into that schema in the same change, and the test goes through the read (`codeChanges` with a mocked `findNode`), not around it.
+
+## A dragged element moves with what lies on top of it
+
+**Signal:** on the tiled canvas a dragged element carries the element above it, leaves a ghost where it was, or does not move while its selection ring does; `?coreTiles=0` draws it right. **Cause:** three at once — a drag layer built from copies of screen tiles holds every pixel in that area; `Tiles::frame` showed a sharper level but queued only the current one, so stale tiles of the shown level were never redrawn; `stirred()` swallowed the damage that let go of the held picture. **Move:** log per `tiled_frame` the damage rects, `queued`, `rastered` and `missing` (a temporary `#[wasm_bindgen] extern { #[wasm_bindgen(js_namespace = console)] fn log(s: &str); }`, captured with `page.on('console')`): damage with `queued=0` is a stale level nobody redraws. A drag layer is rastered from the element alone; uses above it are lifted with it. Bisect with `npm run perf:free-drag`.
+
 ## A pixel diff of two imports that is not the import
 
 **Signal:** the same doc rendered twice with `drawStill` differs by thousands of pixels in picture regions, or by a few channel steps across one gradient (linear.app's testimonial card: 18 652 px, max 4). **Move:** for a structural before/after, swap every image asset for a solid colour (`url-layers.browser.test.ts` does) and render the baseline twice: pixels that differ between two baseline runs are renderer noise, compare against them, not against zero.

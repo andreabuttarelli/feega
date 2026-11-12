@@ -79,6 +79,16 @@ saving. If the server refuses one, the canvas puts it back and says so.
 
 ## Shortcuts
 
+Canvas shortcuts act when the canvas has focus: after a click on the canvas, or when nothing
+is focused. With focus on a control in the right bar, a toolbar, a menu or the chat, keys belong
+to that control: Tab and Shift+Tab move between controls, Enter and Space press them. Undo and
+redo, quick actions (Cmd/Ctrl+K) and zoom work from anywhere. In the Layers panel and the
+timeline, Backspace/Delete, Esc, Cmd/Ctrl+A, copy, paste, duplicate and group still act on the
+selection.
+
+Esc closes only the open menu, picker or popover, one level at a time, keeps the selection and
+puts focus back on the button that opened it.
+
 | Key | Action |
 |---|---|
 | Backspace / Delete | Delete the selection |

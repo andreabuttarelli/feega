@@ -21,7 +21,7 @@
 
 <div class="canvas-entry" aria-busy="true" aria-live="polite" data-testid="canvas-entry-skeleton" inert>
   <div class="entry-stage" style={dots}>
-    <CanvasTopBar projectId="" projectName="" projects={[]} canvasHref="" creditBalance={0} {chatOpen} onToggleChat={idle} shareToken={null} onShare={shared} profile={SKELETON_PROFILE} org={null} />
+    <CanvasTopBar projectId="" projectName="" canvasHref="" creditBalance={0} {chatOpen} onToggleChat={idle} shareToken={null} onShare={shared} profile={SKELETON_PROFILE} org={null} />
     <FloatingRail onPanel={idle} onSheet={idle} onRoute={idle} />
     <CanvasAddBar onpick={idle} onupload={idle} oncloud={idle} ontemplate={idle} onframes={idle} onfigma={idle} onurl={idle} oncode={idle} oncomment={idle} />
     <span class="entry-runs"><History size={16} /></span>
@@ -47,12 +47,12 @@
     overflow: hidden;
   }
 
-  .entry-stage :global(.switcher-btn),
+  .entry-stage :global(.project-name),
   .entry-stage :global(.credits) {
     position: relative;
   }
 
-  .entry-stage :global(.switcher-btn) {
+  .entry-stage :global(.project-name) {
     width: 220px;
   }
 
@@ -60,12 +60,12 @@
     min-width: 101px;
   }
 
-  .entry-stage :global(.switcher-btn > *),
+  .entry-stage :global(.project-name > *),
   .entry-stage :global(.credits > *) {
     visibility: hidden;
   }
 
-  .entry-stage :global(.switcher-btn)::after,
+  .entry-stage :global(.project-name)::after,
   .entry-stage :global(.credits)::after {
     content: '';
     position: absolute;
@@ -112,7 +112,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .entry-stage :global(.switcher-btn)::after,
+    .entry-stage :global(.project-name)::after,
     .entry-stage :global(.credits)::after {
       animation: none;
     }

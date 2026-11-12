@@ -25,7 +25,7 @@
 
 <style>
   .faq {
-    padding: 96px 16px 161px;
+    padding: var(--site-section) 16px 161px;
     color: var(--site-ink);
   }
 
@@ -95,7 +95,7 @@
 
   @media (min-width: 1200px) {
     .faq {
-      padding: 160px 0 160px;
+      padding: var(--site-section) 0 160px;
     }
 
     h2 {
@@ -117,7 +117,7 @@
 
   @media (min-width: 810px) and (max-width: 1199.98px) {
     .faq {
-      padding: 120px 16px 162px;
+      padding: var(--site-section) 16px 162px;
     }
 
     h2 {

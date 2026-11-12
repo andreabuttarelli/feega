@@ -17,8 +17,8 @@ const PROPS: ComponentProps<typeof AppSidebar> = {
 const html = (over: Partial<ComponentProps<typeof AppSidebar>> = {}) => render(AppSidebar, { props: { ...PROPS, ...over } }).body;
 
 describe('app sidebar', () => {
-  it('shows the wordmark as text', () => {
-    expect(html()).toMatch(/<a class="wordmark[^"]*" href="\/app"><span class="wordmark[^"]*">feega<\/span>(<!---->)?<\/a>/);
+  it('shows the mark and the wordmark, linking home', () => {
+    expect(html()).toMatch(/<a class="wordmark[^"]*" href="\/app" aria-label="feega"><svg class="feega-mark[^"]*"[^>]*>.*<span class="wordmark[^"]*">feega<\/span>/s);
   });
 
   it('is a simple nav: home, canvases, templates, tools, then New project; no tool rows, no badges', () => {

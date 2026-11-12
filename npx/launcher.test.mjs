@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { createServer } from 'node:net';
-import { appDir, boundUrl, freePort, bundleSource, cachedVersions, isCached, latestAppVersion, markCached, mcpEnv, parseArgs, pickVersion } from './launcher.mjs';
+import { FolderImport, ImportStep, appDir, readyProbe, served, boundUrl, freePort, bundleSource, cachedVersions, folderApp, importAsk, importStep, isCached, latestAppVersion, markCached, mcpEnv, parseArgs, pickVersion, placeOf } from './launcher.mjs';
 
 describe('mcp', () => {
   it('mcp avvia il server MCP sulla porta 5173 di default', () => {
@@ -161,5 +161,69 @@ describe('freePort', () => {
     expect(boundUrl(port)).toBe(`http://${address}:${bound}`);
     server.close();
     taken.close();
+  });
+});
+
+describe('import della cartella', () => {
+  const app = (scripts) => {
+    const dir = mkdtempSync(join(tmpdir(), 'feega-app-'));
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'my-app', scripts }));
+    return dir;
+  };
+
+  it('di default chiede, --import importa senza chiedere, --no-import salta', () => {
+    expect(parseArgs([], '/').folderImport).toBe(FolderImport.Ask);
+    expect(parseArgs(['--import'], '/').folderImport).toBe(FolderImport.Yes);
+    expect(parseArgs(['--no-import'], '/').folderImport).toBe(FolderImport.No);
+  });
+
+  it('una cartella con uno script dev è un progetto da importare', () => {
+    const dir = app({ dev: 'vite' });
+    expect(folderApp(dir)).toBe(dir);
+  });
+
+  it('senza script dev o senza package.json non c’è niente da importare', () => {
+    expect(folderApp(app({ build: 'vite build' }))).toBeNull();
+    expect(folderApp(mkdtempSync(join(tmpdir(), 'feega-empty-')))).toBeNull();
+  });
+
+  it('chiede solo la prima volta, in un terminale, dentro un progetto', () => {
+    const fresh = { mode: FolderImport.Ask, app: '/a', fileExists: false, tty: true };
+    expect(importStep(fresh)).toBe(ImportStep.Ask);
+    expect(importStep({ ...fresh, fileExists: true })).toBe(ImportStep.Skip);
+    expect(importStep({ ...fresh, tty: false })).toBe(ImportStep.Skip);
+    expect(importStep({ ...fresh, app: null })).toBe(ImportStep.Skip);
+  });
+
+  it('--import importa anche senza terminale e su un file esistente; --no-import mai', () => {
+    const forced = { mode: FolderImport.Yes, app: '/a', fileExists: true, tty: false };
+    expect(importStep(forced)).toBe(ImportStep.Import);
+    expect(importStep({ ...forced, app: null })).toBe(ImportStep.Skip);
+    expect(importStep({ ...forced, mode: FolderImport.No })).toBe(ImportStep.Skip);
+  });
+
+  it('legge progetto e tela dal redirect della home locale', () => {
+    expect(placeOf('/p/proj-1/c/canvas-2')).toEqual({ projectId: 'proj-1', canvasId: 'canvas-2' });
+    expect(placeOf('http://127.0.0.1:5173/p/a/c/b')).toEqual({ projectId: 'a', canvasId: 'b' });
+    expect(placeOf('/login')).toBeNull();
+  });
+
+  it('importa la home della cartella nella tela locale', () => {
+    expect(importAsk({ projectId: 'a', canvasId: 'b' }, '/code/my-app')).toEqual({
+      path: '/api/v1/projects/a/code-import',
+      body: { canvasId: 'b', folder: '/code/my-app', routes: ['/'], x: 0, y: 0 }
+    });
+  });
+});
+
+describe('server pronto', () => {
+  it('sonda la home senza seguire il redirect: la pagina della tela ha header troppo grandi per fetch', () => {
+    expect(readyProbe).toEqual({ redirect: 'manual' });
+  });
+
+  it('il redirect della home e una pagina servita contano come pronto, un errore no', () => {
+    expect(served(303)).toBe(true);
+    expect(served(200)).toBe(true);
+    expect(served(502)).toBe(false);
   });
 });

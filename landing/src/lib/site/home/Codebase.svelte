@@ -1,19 +1,11 @@
 <script lang="ts">
   import CodebaseStory from '../codebase/CodebaseStory.svelte';
+  import StartSite from './StartSite.svelte';
 </script>
 
-<section class="codebase site-wide" id="codebase">
-  <CodebaseStory />
+<section class="chapter-block site-wide" id="codebase">
+  <CodebaseStory number="01" />
+  <div class="proof">
+    <StartSite />
+  </div>
 </section>
-
-<style>
-  .codebase {
-    padding: 120px 20px 0;
-  }
-
-  @media (min-width: 810px) {
-    .codebase {
-      padding: 160px 0 0;
-    }
-  }
-</style>

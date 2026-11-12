@@ -140,6 +140,16 @@ describe('importCodeAt', () => {
     expect(tab.marks).toHaveBeenCalledWith(['Button']);
   });
 
+  it('reports the same-origin link paths seen on the captured pages, so dynamic routes get values', async () => {
+    const { ask, tab } = askOf();
+    const elements = [{ tag: 'a', text: 'Post', href: `${APP}/blog/hello?ref=nav#top` }, { tag: 'a', text: 'Out', href: 'https://elsewhere.test/blog/x' }, { tag: 'p', text: 'x' }];
+    Object.assign(tab, { ui: vi.fn(async () => ({ title: '', elements })) });
+
+    const done = await importCodeAt(ask);
+
+    expect(done).toMatchObject({ outcome: CodeImportOutcome.Ok, links: ['/blog/hello'] });
+  });
+
   it('riporta componenti, varianti e istanze trovati', async () => {
     const { ask } = askOf();
 

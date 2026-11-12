@@ -1,7 +1,7 @@
 <script lang="ts">
-  import Slab from './Slab.svelte';
-  import { inView } from './in-view';
-  import { INK, SHADES, onTop, type Shade } from './iso';
+  import Slab from '../iso/Slab.svelte';
+  import { inView } from '../iso/in-view';
+  import { INK, SHADES, onTop, type Shade } from '../iso/iso';
 
   type Theme = { page: Shade; card: Shade; ink: string; image: string; track: string };
 

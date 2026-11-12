@@ -1,7 +1,9 @@
 <script lang="ts">
   import { LEGAL_DOCS } from './legal';
   import DownloadMac from './DownloadMac.svelte';
-  import { APP_URL, MAC_GUIDE_URL, SOCIAL_LINKS } from './links';
+  import Mark from './Mark.svelte';
+  import { APP_URL, MAC_GUIDE_URL, SOCIAL_LINKS, STORY_URL } from './links';
+  import { COMPARE_PATH } from './compare';
   import { CODEBASE_PATH } from './codebase';
 
   const legal = Object.entries(LEGAL_DOCS).map(([slug, doc]) => ({ href: `/${slug}`, label: doc.label }));
@@ -20,7 +22,8 @@
       <a href="/">Product</a>
       <a href={CODEBASE_PATH}>Codebase</a>
       <a href={APP_URL}>Sign In</a>
-      <a href="/blog">Compare</a>
+      <a href={COMPARE_PATH}>Compare</a>
+      <a href={STORY_URL}>Blog</a>
       <DownloadMac class="dl" />
       <a class="dl-guide" href={MAC_GUIDE_URL}>Unsigned app: how to open it</a>
     </div>
@@ -38,10 +41,13 @@
   <div class="mark-box" aria-hidden="true"><p class="mark">feega</p></div>
 
   <div class="base">
-    <p class="copy">
-      <span class="rights"><span>© {year} Feega.</span> <span>All rights reserved.</span></span>
-      <span class="made"><span>Made in Italy,</span> <span>by Andrea Buttarelli.</span></span>
-    </p>
+    <div class="sign">
+      <Mark size={28} label="Feega" />
+      <p class="copy">
+        <span class="rights"><span>© {year} Feega.</span> <span>All rights reserved.</span></span>
+        <span class="made"><span>Made in Italy,</span> <span>by Andrea Buttarelli.</span></span>
+      </p>
+    </div>
     <a class="to-top" href="#top">Back to top ↑</a>
   </div>
 
@@ -170,6 +176,12 @@
     justify-content: space-between;
     align-items: flex-end;
     margin-top: 39px;
+  }
+
+  .sign {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
   }
 
   .copy {

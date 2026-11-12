@@ -70,7 +70,7 @@ its main instead of being linked to an older one. At most 64 variants per set.
 
 ## Several routes
 
-`routes` (up to 8, default `/`): one sandbox, one tab, the routes captured in turn, then one
+`routes` (up to 20, default `/`): one sandbox, one tab, the routes captured in turn, then one
 frame. Each route is a board named after its path (`boardsOf`: shelf rows under the 16 384 px
 side, 160 px gaps, ids prefixed, use indices shifted), and one code-sets pass covers every use,
 so a component rendered on two routes has one main and the Components panel lists it once. As
@@ -80,6 +80,30 @@ route that does not open is skipped and reported; the import fails only if none 
 route was discarded: an instance cannot point at another frame's main.
 
 Code import skips URL import's `repeatedOf`: identity comes from the code, not from look-alikes.
+
+## Route discovery
+
+`routes-discover.ts` is pure: file list + framework + app folder (from `runPlan`, not re-detected) → routes. `ROUTERS` has one row per file router: frameworks, when it applies, how a file becomes path segments, which files hold param values.
+
+| Router | Framework | Pages | Dropped |
+|---|---|---|---|
+| Next app | Next | `app/**/page.*`, `src/app/**` | `(group)`, `@slot`; `_private` and `(.)` intercepting segments leave the page out |
+| Next pages | Next | `pages/**`, `src/pages/**` | `_app`, `_document`, any `_x`, `api/` |
+| SvelteKit | SvelteKit | `src/routes/**/+page(@x).svelte` | `(group)`; `[x=matcher]` → `[x]` |
+| Nuxt | Nuxt | `app/pages/**/*.vue`, `pages/**` | `(group)`, `index` |
+| Vue pages | Vite with `.vue` in `src/pages` | `.vue`, `.md` minus README | `index` |
+| Astro | Astro | `src/pages/**` `.astro .md .mdx .html` | `_x`, endpoints (`.ts`/`.js`) |
+| Remix flat | React Router without `routes.ts`, or `flatRoutes()` | `app/routes/*.tsx`, `app/routes/x/route.tsx` | `_index`, `_pathless`, `x_`, resource routes (`.ts`) |
+| React Router config | `app/routes.ts` | only `index("f")` and `route("literal", "f")` | `layout(`, `prefix(`, children, computed paths → `routes_in_code` |
+| TanStack Router | Vite/generic with `__root.*` | `src/routes/**`, `app/routes/**`, dots as `/` | `index`, `route`, `(group)`, `_pathless`, `-ignored`, `.lazy` |
+
+Paths are written `[x]`, `[...x]`, `[[x]]`, `[[...x]]` for every router (TanStack `$x` → `[x]`, `$` → `[...splat]`; Remix `($x)` → `[[x]]`; React Router `:x?` → `[[x]]`). Order: `/`, static, then dynamic, shallow before deep. Static routes are selected. Same path from two files: the first file wins.
+
+Values for params: a literal `generateStaticParams`/`entries` array of objects with string values naming exactly the route's params; else, for `/<seg>/[slug]`, the md/mdx files directly in exactly one of `src/content/<seg>/`, `content/<seg>/` (a nested folder is ambiguous: none). After capture, same-origin `<a href>` paths in each page's fold (`tab.ui()`, 160 elements per page) that match a pattern; at most 8 values per route. No crawl of its own.
+
+Without booting: GitHub `git/trees/<ref>?recursive=1` (connected account, else public) plus raw reads of the manifests and of the files holding values; a folder walk (local mode); an upload's tar listing. `GET …/code-import/routes`, op `discover_routes`, CLI `--routes discover`. `routes: "all"` imports the selected routes; every import reports in `routes.leftOut` the discovered routes it did not bring: `not_selected`, `needs_value` (with link values), `not_opened`.
+
+Cap 20: the capture budget is 150 s and a page costs about 7 s (16 Storybook stories in ~110 s), so 150 / 7 ≈ 21 pages; 20 leaves room. Conditions multiply pages; past the budget pages are left out and reported, as before.
 
 ## Private repositories
 
@@ -180,7 +204,7 @@ Each clip drawn from a repo element carries `source = { at: "file:line:col", was
 
 ## Rules
 
-- `https://github.com/<owner>/<repo>`, `ref` optional (branch, tag, sha); up to 8 routes.
+- `https://github.com/<owner>/<repo>`, `ref` optional (branch, tag, sha); up to 20 routes, more refused with the count.
 - The repo's code never runs on our servers: clone, install and dev server run in a Vercel
   Sandbox, outside our network, with no environment variables of ours. The browser that reads
   the page is the hosted one (`liveBrowser`), fenced like URL import.
