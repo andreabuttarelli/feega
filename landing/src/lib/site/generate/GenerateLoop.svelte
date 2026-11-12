@@ -288,11 +288,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .line,
-    .caret,
-    .wire,
-    .run,
-    .drop {
+    .loop :is(.line, .caret, .wire, .run, .drop) {
       animation: none;
     }
   }
