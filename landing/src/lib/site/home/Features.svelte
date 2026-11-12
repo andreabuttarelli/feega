@@ -3,7 +3,7 @@
   import { Card } from './card';
   import { tilt } from '../tilt';
 
-  let { cards, children }: { cards: Card[]; children?: Snippet } = $props();
+  let { cards }: { cards: Card[] } = $props();
 
   const DOT_ROWS = [3, 4, 5, 6, 7];
 
@@ -52,7 +52,6 @@
     {#each cards as card (card)}
       {@render CARDS[card]()}
     {/each}
-    {@render children?.()}
   </div>
 </section>
 
@@ -76,8 +75,8 @@
   }
 
   h3 {
-    font-size: 28px;
-    line-height: 25.2px;
+    font-size: 22px;
+    line-height: 24px;
     letter-spacing: -0.04em;
     font-weight: 400;
   }
@@ -212,9 +211,8 @@
     }
 
     .cards:has(.tpl) {
-      grid-template-columns: 343px minmax(0, 1fr);
-      align-items: center;
-      gap: 64px;
+      grid-template-columns: 343px;
+      justify-content: center;
     }
 
     .card {
@@ -222,8 +220,8 @@
     }
 
     h3 {
-      font-size: 44px;
-      line-height: 39.6px;
+      font-size: 30px;
+      line-height: 33px;
     }
 
     p {
@@ -281,8 +279,8 @@
     }
 
     h3 {
-      font-size: 35px;
-      line-height: 31.5px;
+      font-size: 26px;
+      line-height: 28.6px;
     }
 
     .gen {

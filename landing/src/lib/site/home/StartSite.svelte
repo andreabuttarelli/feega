@@ -6,7 +6,7 @@
 
 <section class="start">
   <div class="text">
-    <h2 data-agent-id="start-title">Start from any site</h2>
+    <h3 data-agent-id="start-title">Start from any site</h3>
     <p data-agent-id="start-lead">Every layer, colour and font comes in editable - colours become variables, type becomes styles, all bound.</p>
     <div class="field">
       <UrlField id="start-url" />
@@ -19,15 +19,14 @@
 <style>
   .start {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: center;
-    gap: 40px;
+    gap: 32px;
     color: var(--site-ink);
   }
 
-  h2 {
-    font-size: 24px;
-    line-height: 28.8px;
+  h3 {
+    font-size: 22px;
+    line-height: 26px;
     letter-spacing: -0.04em;
     font-weight: 400;
     text-align: center;
@@ -50,9 +49,14 @@
   }
 
   @media (min-width: 810px) {
-    h2 {
-      font-size: 30px;
-      line-height: 36px;
+    .start {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 40px;
+    }
+
+    h3 {
+      font-size: 26px;
+      line-height: 30px;
       text-align: left;
     }
 
@@ -66,9 +70,9 @@
   }
 
   @media (min-width: 1200px) {
-    h2 {
-      font-size: 38px;
-      line-height: 45.6px;
+    h3 {
+      font-size: 30px;
+      line-height: 36px;
     }
   }
 </style>

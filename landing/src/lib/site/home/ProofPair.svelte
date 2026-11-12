@@ -1,10 +1,10 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
 
-  let { eyebrow, heading, text, media, flip = false }: { eyebrow: string; heading: string; text: string; media: Snippet; flip?: boolean } = $props();
+  let { eyebrow, heading, text, media }: { eyebrow: string; heading: string; text: string; media: Snippet } = $props();
 </script>
 
-<div class="pair" class:flip>
+<div class="pair">
   <div class="text">
     <p class="eyebrow">{eyebrow}</p>
     <h3>{heading}</h3>
@@ -31,8 +31,8 @@
 
   h3 {
     margin-top: 16px;
-    font-size: 24px;
-    line-height: 28.8px;
+    font-size: 22px;
+    line-height: 26px;
     letter-spacing: -0.04em;
     font-weight: 400;
   }
@@ -57,20 +57,16 @@
       gap: 40px;
     }
 
-    .flip .text {
-      order: 1;
-    }
-
     h3 {
-      font-size: 30px;
-      line-height: 36px;
+      font-size: 26px;
+      line-height: 30px;
     }
   }
 
   @media (min-width: 1200px) {
     h3 {
-      font-size: 38px;
-      line-height: 45.6px;
+      font-size: 30px;
+      line-height: 36px;
     }
   }
 </style>
