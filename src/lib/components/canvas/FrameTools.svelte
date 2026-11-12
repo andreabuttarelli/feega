@@ -30,7 +30,7 @@
   import type { Boxes } from '$lib/motion/scene-select';
   import { GridToggle } from '$lib/motion/pixel-grid';
   import { FRAME_VIEW_DEFAULT, FrameView, shows, type FrameViews } from '$lib/canvas/frame-view';
-  import { activeAt, shownOverlays, FrameOverlay } from '$lib/canvas/frame-tools';
+  import { activeAt, shownOverlays, FrameGesture, FrameOverlay } from '$lib/canvas/frame-tools';
 
   type Size = { width: number; height: number };
 
@@ -44,6 +44,7 @@
     views = FRAME_VIEW_DEFAULT,
     boxes = {},
     measure = estimatedText,
+    gesture = FrameGesture.Idle,
     apply,
     ondrawn,
     onleave
@@ -57,6 +58,7 @@
     views?: FrameViews;
     boxes?: Boxes;
     measure?: TextMeasure;
+    gesture?: FrameGesture;
     apply: (result: OpResult, summary: string) => void;
     ondrawn: (id: string) => void;
     onleave: () => void;
@@ -69,7 +71,7 @@
   const fit = $derived(containFit(size, { width: doc.width, height: doc.height }));
   const drafted = $derived(pointDraft(doc, pointEdit));
   const pointClip = $derived(pointEdit && only?.id === pointEdit ? (findClip(drafted, pointEdit)?.clip ?? only) : only);
-  const shown = $derived(shownOverlays({ doc, clip: pointClip, picks: picks.length, tool, pointEdit, active: only ? activeAt(only, frame) : false, views, mode, onion: onionSetting.skin }));
+  const shown = $derived(shownOverlays({ doc, clip: pointClip, picks: picks.length, tool, pointEdit, active: only ? activeAt(only, frame) : false, views, mode, onion: onionSetting.skin, gesture }));
   const laidOut = $derived(only && shown.has(FrameOverlay.Corners) ? (findClip(withAutoLayout(doc, measure), only.id)?.clip ?? only) : null);
 
   $effect(() => {

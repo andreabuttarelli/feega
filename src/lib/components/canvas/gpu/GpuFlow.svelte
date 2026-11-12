@@ -38,6 +38,7 @@
   import FrameSelection from '../FrameSelection.svelte';
   import FrameGuides from '../FrameGuides.svelte';
   import FrameTools from '../FrameTools.svelte';
+  import { FrameGesture } from '$lib/canvas/frame-tools';
   import { FrameView, contentViews } from '$lib/canvas/frame-view';
   import { frameViews, zoomLevel, zoomRequest } from '$lib/canvas/view-menu.svelte';
   import type { Boxes } from '$lib/motion/scene-select';
@@ -4489,7 +4490,7 @@
         {/if}
         {@const tools = toolsOf(frame.id)}
         {#if tools}
-          <FrameTools doc={tools.doc} frame={tools.frame} mode={frameMode} views={frameViews.all} boxes={outlineBoxes(frame.id, tools.doc)} measure={textMeasureOf(frame.id)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={(id) => drawnInside(frame.id, id)} onleave={leaveBuilder} />
+          <FrameTools doc={tools.doc} frame={tools.frame} mode={frameMode} views={frameViews.all} boxes={outlineBoxes(frame.id, tools.doc)} measure={textMeasureOf(frame.id)} gesture={frameGuides?.nodeId === frame.id ? FrameGesture.Dragging : FrameGesture.Idle} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={(id) => drawnInside(frame.id, id)} onleave={leaveBuilder} />
         {/if}
         {@const band = marqueeRect(frame.id)}
         {#if band}
