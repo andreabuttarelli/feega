@@ -16,7 +16,8 @@ export default defineConfig({
     actionTimeout: 10_000,
     viewport: { width: 1440, height: 900 },
     launchOptions: { args: ['--enable-unsafe-webgpu'] },
-    ...(process.env.CI ? {} : { channel: 'chrome', headless: false })
+    headless: false,
+    ...(process.env.CI ? {} : { channel: 'chrome' })
   },
   webServer: {
     command: `npx vite-node tests/e2e/fixtures/inspector-audit/serve.ts ${PORT}`,

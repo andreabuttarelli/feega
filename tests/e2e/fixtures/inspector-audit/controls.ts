@@ -4,6 +4,10 @@ import { ValueKind } from '@feega/motion-core/motion/keyframes';
 import { ADJUSTMENTS } from '@feega/motion-core/motion/fill/adjust';
 import { AREAS_NODE, IMPORTED_NODE, KINDS_NODE, Layer, MAINS_NODE, effectId, effectLayer } from './fixture';
 import type { Clip, Doc } from './harness';
+import { KNOWN } from './known';
+import type { Known } from './checks';
+
+export { Check, Severity } from './checks';
 
 export enum Op {
   Type = 'type',
@@ -29,26 +33,6 @@ export enum State {
   Instance = 'instance',
   Narrow = 'narrow window'
 }
-
-export enum Check {
-  Missing = 'missing',
-  Reach = 'reach',
-  Name = 'name',
-  Size = 'size',
-  Commit = 'commit',
-  Canvas = 'canvas',
-  Undo = 'undo',
-  Mixed = 'mixed',
-  Throws = 'throws'
-}
-
-export enum Severity {
-  Blocker = 'blocker',
-  Major = 'major',
-  Minor = 'minor'
-}
-
-export type Known = { mouse?: Check[]; keyboard?: Check[]; severity: Severity; why: string; ref: string };
 
 type Find = (page: Page) => Locator;
 
@@ -312,16 +296,19 @@ const fxParam = (key: string) => (c: Clip) => (c.effects as { params: Record<str
 
 function effectRowsOf(kind: EffectKind): Base[] {
   const open = [testid('effects', 'effect-open')];
-  return editedParams(kind, defaultValues(kind)).map((p) => {
+  return editedParams(kind, defaultValues(kind)).flatMap((p): Base[] => {
     const base = { section: 'effects', control: `${EFFECTS[kind].label} ${p.label}`, via: open, read: fxParam(p.key), want: changed, canvas: true };
     if (p.kind === ValueKind.Color) {
-      return { ...base, option: '#ff0000', target: (page: Page) => fxProp(kind, p.key)(page).getByRole('textbox').first(), op: Op.Type, value: 'ff0000' };
+      return [
+        { ...base, option: '#ff0000 in the hex field', target: (page: Page) => fxProp(kind, p.key)(page).getByRole('textbox').first(), op: Op.Type, value: 'ff0000' },
+        { ...base, option: '#ff0000 in the picker', via: [...open, (page: Page) => fxProp(kind, p.key)(page).getByRole('button', { name: `Pick ${EFFECTS[kind].label} · ${p.label}` })], target: colourPopover, op: Op.Type, value: 'ff0000' }
+      ];
     }
     if (isFlag(kind, p.key)) {
-      return { ...base, option: 'toggle', target: (page: Page) => fxProp(kind, p.key)(page).getByRole('checkbox'), op: Op.Press };
+      return [{ ...base, option: 'toggle', target: (page: Page) => fxProp(kind, p.key)(page).getByRole('checkbox'), op: Op.Press }];
     }
     const atTop = Number(p.fallback) >= p.max;
-    return { ...base, option: atTop ? 'ArrowDown' : 'ArrowUp', target: (page: Page) => fxProp(kind, p.key)(page).getByRole('textbox').first(), op: atTop ? Op.ArrowDown : Op.Arrow };
+    return [{ ...base, option: atTop ? 'ArrowDown' : 'ArrowUp', target: (page: Page) => fxProp(kind, p.key)(page).getByRole('textbox').first(), op: atTop ? Op.ArrowDown : Op.Arrow }];
   });
 }
 
@@ -409,7 +396,7 @@ const mixedRows: Base[] = [
 ];
 const multiRows: Base[] = mixedRows.map((r) => ({ ...r, with: [Layer.MixB] }));
 
-export const ROWS: Row[] = [
+const LISTED: Row[] = [
   ...on(Layer.Rect, State.Single, [...fillRows, ...strokeRows, ...sizeRows(true), ...appearanceRows(true), ...radiusRows]),
   ...on(Layer.Line, State.Single, lineStrokeRows),
   ...on(Layer.Text, State.Single, [...typeRows(true), ...colourRows, ...textUseRows]),
@@ -437,3 +424,5 @@ export const ROWS: Row[] = [
   ...onNode(AREAS_NODE, Layer.Frame, State.Frame, frameRows),
   ...onNode(AREAS_NODE, Layer.MixA, State.Mixed, multiRows)
 ];
+
+export const ROWS: Row[] = LISTED.map((r) => ({ ...r, known: KNOWN[r.id] }));

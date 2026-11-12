@@ -7,6 +7,7 @@ import { EffectKind } from '@feega/motion-core/motion/effects/registry';
 import { openCanvas } from './fixtures/inspector-audit/harness';
 import { sweepLayer, type Finding } from './fixtures/inspector-audit/sweep';
 import { ROWS, Check, State } from './fixtures/inspector-audit/controls';
+import { KNOWN } from './fixtures/inspector-audit/known';
 import { exercise, type Outcome, type Selection } from './fixtures/inspector-audit/behaviour';
 
 const OUT = process.env.INSPECTOR_AUDIT_OUT ?? join(homedir(), 'Documents/feega-videos/inspector-audit');
@@ -48,6 +49,11 @@ test.afterAll(async () => {
 });
 
 const record = (o: Outcome) => writeFileSync(join(OUT, 'rows', `${slug(o.row.id)}.json`), JSON.stringify({ id: o.row.id, layer: o.row.layer, section: o.row.section, control: o.row.control, option: o.row.option, state: o.row.state, mouse: o.mouse, keyboard: o.keyboard, notes: o.notes, known: o.row.known ?? null }));
+
+test('every known failure names a row that exists', () => {
+  const ids = new Set(ROWS.map((r) => r.id));
+  expect(Object.keys(KNOWN).filter((id) => !ids.has(id))).toEqual([]);
+});
 
 test.describe('inspector audit', () => {
   test('sweep: every visible control on every layer kind can be hit, named and tabbed to', async () => {

@@ -8,6 +8,7 @@ const SETTLE_MS = 400;
 const MAX_SECTIONS = 30;
 const ZOOM_MS = 700;
 const LOAD_MS = 3_000;
+const PICK_MS = 60_000;
 const MAX_SCROLLS = 40;
 const SCROLL_MS = 60;
 const CORNER = { x: 10, y: 890 };
@@ -48,28 +49,37 @@ export async function reveal(page: Page, id: string): Promise<void> {
   }
 }
 
-export async function pick(page: Page, nodeId: string, clipId: string): Promise<void> {
+async function locate(page: Page, nodeId: string, clipId: string): Promise<void> {
   const layers = page.getByTestId('layers');
   const row = layers.locator(`[data-layer="${clipId}"]`);
   await reveal(page, clipId);
-  if (!(await row.isVisible())) {
-    await reveal(page, nodeId);
-    await layers.locator(`[data-layer="${nodeId}"]`).click();
-    await reveal(page, clipId);
-    if (!(await row.isVisible({ timeout: LOAD_MS }).catch(() => false))) {
-      await zoomToSelection(page);
-    }
-    await expect(row).toBeVisible({ timeout: 30_000 });
+  if ((await row.count()) > 0) {
+    return;
   }
-  await row.scrollIntoViewIfNeeded();
-  const fresh = (await row.getAttribute('aria-selected')) !== 'true';
-  await row.click({ timeout: 5_000 }).catch(async () => {
-    await page.mouse.click(CORNER.x, CORNER.y);
-    await page.keyboard.press('Shift+Digit1');
-    await page.waitForTimeout(ZOOM_MS);
-    await row.click();
-  });
-  await expect(row).toHaveAttribute('aria-selected', 'true');
+  await reveal(page, nodeId);
+  await layers.locator(`[data-layer="${nodeId}"]`).click({ timeout: LOAD_MS });
+  await reveal(page, clipId);
+  if ((await row.count()) === 0) {
+    await zoomToSelection(page);
+    await reveal(page, clipId);
+  }
+}
+
+export async function pick(page: Page, nodeId: string, clipId: string): Promise<void> {
+  const row = page.getByTestId('layers').locator(`[data-layer="${clipId}"]`);
+  let fresh = false;
+  await expect(async () => {
+    await locate(page, nodeId, clipId);
+    await row.scrollIntoViewIfNeeded({ timeout: LOAD_MS });
+    fresh = fresh || (await row.getAttribute('aria-selected', { timeout: LOAD_MS })) !== 'true';
+    await row.click({ timeout: LOAD_MS }).catch(async (e) => {
+      await page.mouse.click(CORNER.x, CORNER.y);
+      await page.keyboard.press('Shift+Digit1');
+      await page.waitForTimeout(ZOOM_MS);
+      throw e;
+    });
+    await expect(row).toHaveAttribute('aria-selected', 'true', { timeout: LOAD_MS });
+  }).toPass({ timeout: PICK_MS });
   if (fresh) {
     await zoomToSelection(page);
   }

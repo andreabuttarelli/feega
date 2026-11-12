@@ -1,0 +1,60 @@
+name: Inspector audit
+
+on:
+  pull_request:
+    branches: [dev, main]
+    types: [opened, synchronize, reopened, labeled]
+    paths:
+      - 'src/lib/components/motion/**'
+      - 'src/lib/components/canvas/**'
+      - 'src/lib/components/ui/**'
+      - 'src/lib/motion/**'
+      - 'packages/motion-core/src/**'
+      - 'tests/e2e/inspector-audit.*'
+      - 'tests/e2e/fixtures/inspector-audit/**'
+      - '.github/workflows/inspector-audit.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: inspector-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    if: github.event.action != 'labeled' || github.event.label.name == 'inspector-audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - part: layers
+            rows: '^(rect|line|text|bound)/'
+          - part: stacks-components-frames
+            rows: '^(0752f883|1c47f19d|stack|stack-a|shadowed|gradient|card|card-instance|image-fill|frame|mix-a)/'
+          - part: effects
+            rows: '^fx-'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Audit the inspector by mouse and keyboard
+        env:
+          INSPECTOR_AUDIT_ROWS: ${{ matrix.rows }}
+          INSPECTOR_AUDIT_OUT: audit-results
+        run: xvfb-run -a -s "-screen 0 1600x1000x24" npx playwright test -c tests/e2e/inspector-audit.config.ts
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: inspector-audit-${{ matrix.part }}
+          path: audit-results

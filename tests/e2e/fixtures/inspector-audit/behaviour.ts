@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
-import { clipIn, docOf, inspector, layerShot, openSections, pick, press, reach, MIN_TARGET_PX, UNDO, type Clip } from './harness';
+import { clipIn, docOf, inspector, layerShot, openSections, pick, press, reach, reveal, MIN_TARGET_PX, UNDO, type Clip } from './harness';
 import { Layer } from './fixture';
 import { Check, Op, State, type Row } from './controls';
 
@@ -59,6 +59,7 @@ export async function select(page: Page, row: Selection): Promise<void> {
   const first = row.state === State.Frame ? Layer.MixA : row.layer;
   await pick(page, row.node, first);
   for (const other of row.with ?? []) {
+    await reveal(page, other);
     await page.getByTestId('layers').locator(`[data-layer="${other}"]`).click({ modifiers: ['Shift'] });
   }
   if (row.state === State.Frame) {
@@ -82,8 +83,7 @@ async function holds(page: Page, row: Row): Promise<boolean> {
   return head === row.layer;
 }
 
-const startOf = (page: Page, row: Row): Locator =>
-  row.with || row.state === State.Frame ? page.getByTestId('frame-inspector').locator('button, input, select').first() : inspector(page).locator('section[data-section] .section-head').first();
+const startOf = (page: Page): Locator => page.getByTestId('frame-inspector').locator('button, input, select, textarea, [tabindex="0"]').first();
 
 async function shownValue(target: Locator): Promise<string> {
   return target.evaluate((n) => {
@@ -353,7 +353,7 @@ export async function exercise(page: Page, row: Row, shoot: (tag: string) => Pro
   await select(page, row);
   await openSections(page);
   trace(row.id, 'keyboard pass');
-  let from: Locator | null = startOf(page, row);
+  let from: Locator | null = startOf(page);
   const steps = [...(row.via ?? []), row.target];
   for (const [at, step] of steps.entries()) {
     const reached = await tabTo(page, from, step(page), row);
