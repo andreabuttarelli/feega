@@ -1,15 +1,16 @@
 import { spawn, execFile, type ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, statSync } from 'node:fs';
-import { mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join, normalize, relative } from 'node:path';
+import { dirname, isAbsolute, join, normalize, relative } from 'node:path';
 import { promisify } from 'node:util';
 import { namesIn } from './repo';
 import { planFile, runPlan, textsWanted, type PlanRefused, type RepoFacts, type RunPlan } from './run-plan';
 import type { FileChange, ReadFile } from './write-back';
 import type { CodeSource, Published } from './code-source';
+import { shimFiles, shimsFor, SHIM_CONFIG } from './folder-shims';
 
 const run = promisify(execFile);
 
@@ -126,6 +127,22 @@ async function ready(url: string): Promise<boolean> {
   return false;
 }
 
+export async function shimmedArgs(root: string): Promise<string[]> {
+  const pkg = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')) as Parameters<typeof shimsFor>[1];
+  const paths = await walk(root);
+  const sources = await Promise.all(paths.map(async (path) => ({ path, text: await readFile(join(root, path), 'utf8').catch(() => '') })));
+  const shims = shimsFor(sources, pkg);
+  if (!shims.length) {
+    return [];
+  }
+
+  for (const file of shimFiles(shims)) {
+    await mkdir(dirname(join(root, file.path)), { recursive: true });
+    await writeFile(join(root, file.path), file.content, 'utf8');
+  }
+  return ['--config', join(root, SHIM_CONFIG)];
+}
+
 async function factsAt(root: string): Promise<RepoFacts> {
   const files = await walk(root, root, [], planFile);
   const texts = await Promise.all(textsWanted(files).map(async (f) => [f, await readFile(join(root, f), 'utf8').catch(() => '')] as const));
@@ -134,7 +151,8 @@ async function factsAt(root: string): Promise<RepoFacts> {
 
 async function started(dir: string, plan: RunPlan): Promise<Served> {
   const [cmd, ...args] = plan.dev;
-  const child = spawn(cmd, args, { cwd: dir, env: { ...process.env, ...plan.env }, stdio: 'ignore' });
+  const shimmed = await shimmedArgs(dir);
+  const child = spawn(cmd, [...args, ...shimmed], { cwd: dir, env: { ...process.env, ...plan.env }, stdio: 'ignore' });
   const url = `http://${LOOPBACK}:${plan.port}`;
   if (!(await ready(url))) {
     child.kill();

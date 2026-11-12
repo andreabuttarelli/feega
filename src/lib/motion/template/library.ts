@@ -207,7 +207,8 @@ export function insertTemplate(doc: MotionDoc, entry: TemplateEntry, at: Placeme
     fields: [...doc.fields, ...fields],
     assets: byName(doc.assets, source.assets, (a) => a.id),
     fonts: byName(doc.fonts, source.fonts, (f) => JSON.stringify(f)),
-    components: { ...source.components, ...doc.components }
+    components: { ...source.components, ...doc.components },
+    variables: { ...source.variables, ...doc.variables }
   };
 
   const trackId = at.newId();
