@@ -3851,3 +3851,11 @@ Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start
 ### `svelte-check` dies in a worktree with an esbuild goroutine dump
 
 **Signal:** `npx svelte-check` in a `feega-wt/` worktree prints `Error while loading config at …/packages/feega-motion-react/example/vite.config.ts` and a Go stack, exit 0, no diagnostics. **Move:** it is the example's config failing to load, not your code; type-check the TypeScript with `npx tsc --noEmit -p tsconfig.json | grep <your paths>` and let a dev server compile the `.svelte` files you touched (open the page), then trust CI's check.
+
+## A pixel diff of two imports that is not the import
+
+**Signal:** the same doc rendered twice with `drawStill` differs by thousands of pixels in picture regions, or by a few channel steps across one gradient (linear.app's testimonial card: 18 652 px, max 4). **Move:** for a structural before/after, swap every image asset for a solid colour (`url-layers.browser.test.ts` does) and render the baseline twice: pixels that differ between two baseline runs are renderer noise, compare against them, not against zero.
+
+## A text lifted out of its frame into a stack moves
+
+**Signal:** after removing a text's same-box wrapper inside a stack, glyphs sit up to 1 px off (Supabase checklist, Vercel buttons) while the layer box is identical. **Move:** page-tree boxes every text in a flex flow on purpose; the engine lays out a text flow item differently from a text inside a frame. Keep the box; only `label` (one line, fixed, aligned) may replace it.

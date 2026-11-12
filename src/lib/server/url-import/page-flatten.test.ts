@@ -162,6 +162,14 @@ describe('flattened', () => {
     expect(made.children![0]).toMatchObject({ type: 'FRAME', clipsContent: true, absoluteBoundingBox: { x: 100, y: 6.5, width: 12, height: 9 } });
   });
 
+  it('the frame that holds a text in a stack is not named after the text', () => {
+    const label = node('TEXT', 137, 742, 100.6, 40, { name: 'Built-in Auth', characters: 'Built-in Auth', textAutoResize: 'HEIGHT', style: { fontSize: 14, lineHeightPx: 20 } });
+    const item = frame('li', [121, 742, 250, 40], [node('VECTOR', 121, 742, 16, 19.2, { fills: red, fillGeometry: [{ path: 'M0 0L16 19Z' }] }), frame('Built-in Auth', [137, 742, 100.6, 40], [label])], stack('HORIZONTAL'));
+    const names = namesOf(flattened(page([item])));
+
+    expect(names.filter((x) => x === 'Built-in Auth')).toEqual(['Built-in Auth']);
+  });
+
   it('code import: a wrapper drawn by its own line of code keeps its padding, not handed to a child the code writes elsewhere', () => {
     const spot = (line: number) => ({ at: `src/Card.tsx:${line}:2`, tag: 'div', cls: '' });
     const list = frame('div', [10, 10, 180, 80], [text('One', [10, 10, 40, 20]), text('Two', [10, 50, 40, 20])], { ...stack('VERTICAL', { itemSpacing: 20 }), source: spot(3) });
@@ -171,6 +179,15 @@ describe('flattened', () => {
 
     expect(sources(made)).toEqual(['src/Card.tsx:2:2', 'src/Card.tsx:3:2']);
     expect(made.children![0].children![0]).toMatchObject({ absoluteBoundingBox: list.absoluteBoundingBox, paddingTop: 0, paddingLeft: 0 });
+  });
+
+  it('a container is named by what it is, not by the one text it holds (Stripe: five layers named USDB)', () => {
+    const chip = frame('div', [10, 10, 80, 24], [frame('div', [14, 14, 72, 16], [node('RECTANGLE', 14, 14, 16, 16, { fills: red }), text('USDB', [34, 14, 40, 16])], stack('HORIZONTAL', { itemSpacing: 4 }))], { fills: red, ...stack('VERTICAL', { paddingTop: 4, paddingLeft: 4 }) });
+    const card = frame('div', [0, 0, 200, 100], [frame('div', [0, 0, 200, 100], [chip], { clipsContent: true, cornerRadius: 5 }), node('RECTANGLE', 0, 60, 200, 40, { name: 'canvas', fills: red })], { fills: red, dom: { tag: 'div', hint: 'card' } });
+    const names = namesOf(flattened(page([card])));
+
+    expect(names.filter((x) => x === 'USDB')).toEqual(['USDB']);
+    expect(names).toContain('Card');
   });
 
   it('la home di vercel ha molti meno livelli e meno profondità', () => {

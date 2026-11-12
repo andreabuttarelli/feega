@@ -49,6 +49,31 @@ const ROLE_NAMES: Record<string, string> = {
 
 const RAW_NAMES = new Set(['feega-pseudo', 'div', 'span', 'stack', 'row', 'column', 'g', 'path', 'circle', 'rect', 'line', 'polygon', 'polyline', 'ellipse', 'use', 'i', 'b', 'em', 'strong', 'small', 'body', 'html', 'fieldset', 'clip', 'group', 'frame', 'vector', 'background', 'outline', 'border top', 'border right', 'border bottom', 'border left']);
 
+const ARIA_NAMES: Record<string, string> = {
+  navigation: 'Nav',
+  banner: 'Header',
+  contentinfo: 'Footer',
+  main: 'Main',
+  region: 'Section',
+  button: 'Button',
+  link: 'Link',
+  list: 'List',
+  listitem: 'Item',
+  menu: 'Menu',
+  menuitem: 'Item',
+  tab: 'Tab',
+  tablist: 'Tabs',
+  img: 'Image',
+  heading: 'Heading',
+  dialog: 'Dialog',
+  search: 'Search',
+  form: 'Form'
+};
+
+const HINT_NAMES: Record<string, string> = { btn: 'Button', cta: 'Button', faq: 'Accordion', tile: 'Card' };
+
+const GENERATED_ID = /^(__|:)/;
+
 const LAYOUT_NAMES: Record<string, string> = { HORIZONTAL: 'Row', VERTICAL: 'Column' };
 
 const TYPE_NAMES: Record<string, string> = { VECTOR: 'Vector', BOOLEAN_OPERATION: 'Vector', ELLIPSE: 'Vector', LINE: 'Line', RECTANGLE: 'Rectangle', GROUP: 'Group', FRAME: 'Frame' };
@@ -106,7 +131,7 @@ const INVISIBLE: { when: (n: RestNode) => boolean }[] = [
 
 const invisible = (n: RestNode) => INVISIBLE.some((rule) => rule.when(n));
 
-const raw = (name: string | undefined) => !name || RAW_NAMES.has(name.toLowerCase());
+const raw = (name: string | undefined) => !name || RAW_NAMES.has(name.toLowerCase()) || GENERATED_ID.test(name);
 
 const spotOf = (n: RestNode) => (n.source ? `${n.source.at}|${n.source.cond ?? ''}` : null);
 
@@ -301,7 +326,6 @@ const ICON_MAX_PX = 64;
 const small = (n: RestNode) => Boolean(boxOf(n)) && boxOf(n)!.width <= ICON_MAX_PX && boxOf(n)!.height <= ICON_MAX_PX;
 
 const CONTENT_NAMES: { name: (n: RestNode) => string; when: (n: RestNode) => boolean }[] = [
-  { name: (n) => textsIn(n)[0].characters!.trim().slice(0, MAX_NAME), when: (n) => textsIn(n).length === 1 },
   { name: () => 'Icon', when: (n) => Boolean(n.children?.length) && small(n) && leavesIn(n).every((l) => DRAWN.has(l.type)) },
   { name: () => 'Image', when: (n) => !n.children?.length && Boolean(n.fills?.some((p) => p.type === 'IMAGE')) },
   { name: (n) => LAYOUT_NAMES[n.layoutMode!], when: (n) => Boolean(LAYOUT_NAMES[n.layoutMode ?? '']) },
@@ -316,10 +340,14 @@ const TITLED_ROLES = new Set(['Section', 'Article']);
 
 const titled = (role: string, n: RestNode) => (TITLED_ROLES.has(role) ? textsIn(n)[0]?.characters?.trim().slice(0, MAX_NAME) || role : role);
 
+const hintName = (hint: string | undefined) => (hint ? (HINT_NAMES[hint] ?? hint[0].toUpperCase() + hint.slice(1)) : undefined);
+
+const echoes = (n: RestNode) => n.type !== 'TEXT' && textsIn(n).some((t) => t.name === n.name);
+
 function ownName(n: RestNode): string {
   const tag = (n.name ?? '').toLowerCase();
-  const role = ROLE_NAMES[tag];
-  return (role && titled(role, n)) ?? ROLE_PATTERNS.find(([re]) => re.test(tag))?.[1] ?? (raw(n.name) ? contentName(n) : n.name!);
+  const role = ROLE_NAMES[tag] ?? ARIA_NAMES[n.dom?.role ?? ''];
+  return (role && titled(role, n)) ?? ROLE_PATTERNS.find(([re]) => re.test(tag))?.[1] ?? (raw(n.name) || echoes(n) ? (hintName(n.dom?.hint) ?? contentName(n)) : n.name!);
 }
 
 const tagNamed = (n: RestNode) => raw(n.name) || Boolean(ROLE_NAMES[(n.name ?? '').toLowerCase()]);
