@@ -231,29 +231,62 @@ fn letting_go_of_a_held_use_puts_it_back_into_the_tiles() {
     assert_eq!(w.scene(IDENTITY, 1000, 100).items.len(), 1);
 }
 
-#[test]
-fn a_frame_dragged_from_the_tiles_is_drawn_from_them_shifted_not_rastered_again() {
-    let mut w = World::new();
-    w.patch(parse_patch(&put("a", 0.0)).unwrap(), sized);
-    w.patch(parse_patch(&held("a", 300.0)).unwrap(), sized);
-    w.patch(parse_patch(&held("fresh", 50.0)).unwrap(), sized);
+fn overlay_clips(w: &World) -> Vec<String> {
+    w.overlay(IDENTITY, 1000, 100).items.iter().map(|i| i.clip().to_string()).collect()
+}
 
-    let lifts = w.lifts(sized);
-
-    assert_eq!(lifts.len(), 1);
-    assert_eq!((lifts[0].clip.as_str(), lifts[0].rest, lifts[0].by), ("a", Rect::new(0.0, 0.0, 100.0, 50.0), (300.0, 0.0)));
-    assert_eq!(w.overlay(IDENTITY, 1000, 100).items.iter().map(|i| i.clip().to_string()).collect::<Vec<_>>(), vec!["fresh"]);
+fn scene_clips(w: &World) -> Vec<String> {
+    w.scene(IDENTITY, 1000, 100).items.iter().map(|i| i.clip().to_string()).collect()
 }
 
 #[test]
-fn a_held_frame_swapping_its_picture_tier_still_drags_from_its_tiles() {
+fn a_dragged_use_is_drawn_alone_over_the_tiles_never_cut_out_of_them() {
+    let mut w = World::new();
+    w.patch(parse_patch(&put("under", 0.0)).unwrap(), sized);
+    w.patch(parse_patch(&put("a", 0.0)).unwrap(), sized);
+    w.patch(parse_patch(&held("a", 300.0)).unwrap(), sized);
+    w.patch(parse_patch(&held("fresh", 600.0)).unwrap(), sized);
+
+    assert_eq!(overlay_clips(&w), vec!["a", "fresh"]);
+    assert_eq!(scene_clips(&w), vec!["under"]);
+}
+
+#[test]
+fn a_dragged_use_under_another_stays_in_the_tiles_at_its_place_in_the_stack() {
+    let mut w = World::new();
+    w.patch(parse_patch(&put("a", 0.0)).unwrap(), sized);
+    w.patch(parse_patch(&put("top", 300.0)).unwrap(), sized);
+    w.take_scene_damage();
+
+    w.patch(parse_patch(&held("a", 250.0)).unwrap(), sized);
+
+    assert_eq!(overlay_clips(&w), Vec::<String>::new());
+    assert_eq!(scene_clips(&w), vec!["a", "top"]);
+    assert_eq!(rects(w.take_scene_damage()), vec![Rect::new(0.0, 0.0, 100.0, 50.0), Rect::new(250.0, 0.0, 350.0, 50.0)]);
+}
+
+#[test]
+fn a_dragged_use_leaves_the_tiles_again_once_nothing_lies_over_it() {
+    let mut w = World::new();
+    w.patch(parse_patch(&put("a", 0.0)).unwrap(), sized);
+    w.patch(parse_patch(&put("top", 300.0)).unwrap(), sized);
+    w.patch(parse_patch(&held("a", 250.0)).unwrap(), sized);
+    w.take_scene_damage();
+
+    w.patch(parse_patch(&held("a", 600.0)).unwrap(), sized);
+
+    assert_eq!(overlay_clips(&w), vec!["a"]);
+    assert_eq!(rects(w.take_scene_damage()), vec![Rect::new(250.0, 0.0, 350.0, 50.0)]);
+}
+
+#[test]
+fn a_held_frame_swapping_its_picture_tier_while_dragged_is_drawn_alone() {
     let mut w = World::new();
     w.patch(parse_patch(&put("a", 0.0)).unwrap(), sized);
 
     w.patch(parse_patch(r#"{ "put": [{ "kind": "use", "clip": "a", "group": "g:a:sharp", "matrix": [1, 0, 0, 1, 300, 0], "cache": true, "hold": true }], "drop": [] }"#).unwrap(), sized);
 
-    assert_eq!(w.lifts(sized).len(), 1);
-    assert!(w.overlay(IDENTITY, 1000, 100).items.is_empty());
+    assert_eq!(overlay_clips(&w), vec!["a"]);
 }
 
 #[test]

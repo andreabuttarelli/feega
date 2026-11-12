@@ -8,7 +8,8 @@ enum BenchFixture {
   Landings = 'landings',
   Load = 'load',
   Budget = 'budget',
-  Camera = 'camera'
+  Camera = 'camera',
+  FreeDrag = 'free-drag'
 }
 
 const PORT = Number(process.env.BENCH_PORT ?? 5288);
@@ -19,7 +20,8 @@ const FIXTURE: Record<BenchFixture, { file: string; make: string | null; spec: R
   [BenchFixture.Landings]: { file: LANDINGS_FILE, make: existsSync(LANDINGS_FILE) ? null : 'node scripts/perf/landings-fixture.mjs', spec: /canvas-landings-bench/ },
   [BenchFixture.Load]: { file: LANDINGS_FILE, make: null, spec: /canvas-load-bench/ },
   [BenchFixture.Budget]: { file: LANDINGS_FILE, make: null, spec: /canvas-frame-budget/ },
-  [BenchFixture.Camera]: { file: LANDINGS_FILE, make: null, spec: /camera-tick-bench/ }
+  [BenchFixture.Camera]: { file: LANDINGS_FILE, make: null, spec: /camera-tick-bench/ },
+  [BenchFixture.FreeDrag]: { file: join(tmpdir(), 'feega-free-drag.feega'), make: 'node scripts/perf/free-drag-fixture.mjs', spec: /free-drag-ghost/ }
 };
 const { file, make, spec } = FIXTURE[FIXTURE_KIND];
 const SERVED = join(tmpdir(), `feega-${FIXTURE_KIND}-served.feega`);
