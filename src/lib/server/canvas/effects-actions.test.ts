@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import type { Db } from '$lib/server/db/client';
 
 const repo = vi.hoisted(() => ({
@@ -18,7 +19,7 @@ import { applyEffectsTo, makeEffectsPair } from './effects-actions';
 
 const db = {} as Db;
 const orgId = 'org-1';
-const actor = { kind: 'agent' as const, id: 'user-1' };
+const actor = agentActor('user-1', AgentKey.Mcp);
 const cutout = { id: 'shape-cutout', params: { side: 'shapes', seed: 3 }, enabled: true };
 
 const node = (id: string, type: string, data: Record<string, unknown>) => ({

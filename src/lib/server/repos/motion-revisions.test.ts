@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import type { Db } from '$lib/server/db/client';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { CHECKPOINT_IDLE_MS, Checkpoint, RevisionOutcome, appendRevision, headCache, listRevisionMarks, listRevisions, readCheckpoint, readHead, readRevision, sealRevision } from './motion-revisions';
@@ -88,7 +89,7 @@ export function revisionsDb(seed: Row[] = [], schema: { checkpoints: boolean } =
 const ORG = 'org-a';
 const NODE = 'node-1';
 const user = { kind: 'user' as const, id: 'u1' };
-const agent = { kind: 'agent' as const, id: 'u1', agentKey: 'motion' };
+const agent = agentActor('u1', AgentKey.Motion);
 
 describe('motion revisions', () => {
   it('lists every version newest first with its clip count, so a broken head can be told from a good one', async () => {

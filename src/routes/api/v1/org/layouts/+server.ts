@@ -1,4 +1,5 @@
 import { json } from '@sveltejs/kit';
+import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import type { RequestHandler } from './$types';
 import { listLayouts, writeLayout } from '$lib/server/repos/layouts';
 import { Outcome } from '$lib/server/repos/effects';
@@ -28,7 +29,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
     return forbidden();
   }
 
-  const actor = caller.apiKeyId ? { kind: 'agent' as const, id: caller.userId, agentKey: API_AGENT_KEY } : { kind: 'user' as const, id: caller.userId };
+  const actor = caller.apiKeyId ? agentActor(caller.userId, AgentKey.Api) : { kind: 'user' as const, id: caller.userId };
   const written = await writeLayout(caller.db, caller.orgId, actor, (await bodyOf(request)) as never);
   return written.outcome === Outcome.Ok ? json({ layout: written.layout }, { status: CREATED }) : refused(written.outcome, written.problems);
 };

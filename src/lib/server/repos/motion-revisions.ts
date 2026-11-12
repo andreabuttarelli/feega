@@ -355,6 +355,31 @@ export async function appendRevision(
   return { outcome: RevisionOutcome.Written, head: { version: input.expectedVersion + 1, doc: parsed.doc, summary, actorKind: input.actor.kind } };
 }
 
+export async function noteAgentLayers(db: Db, input: { orgId: string; nodeId: string; version: number; layers: number; actor: Actor }): Promise<void> {
+  if (input.actor.kind !== 'agent' || input.layers <= 0) {
+    return;
+  }
+  try {
+    const row = () => db.from('motion_revisions').select('layers_touched' as never).eq('org_id', input.orgId).eq('node_id', input.nodeId).eq('version', input.version);
+    const { data, error } = await row().maybeSingle();
+    if (error) {
+      throw error;
+    }
+    const before = (data as { layers_touched?: number | null } | null)?.layers_touched ?? 0;
+    const { error: written } = await db
+      .from('motion_revisions')
+      .update({ layers_touched: before + input.layers } as never)
+      .eq('org_id', input.orgId)
+      .eq('node_id', input.nodeId)
+      .eq('version', input.version);
+    if (written) {
+      throw written;
+    }
+  } catch (e) {
+    console.error('[agent-edits] layers not noted on the revision', input.nodeId, e);
+  }
+}
+
 export async function sealRevision(db: Db, input: { orgId: string; nodeId: string; version: number }): Promise<void> {
   await db.from('motion_revisions').update({ sealed: true } as never).eq('org_id', input.orgId).eq('node_id', input.nodeId).eq('version', input.version);
 }

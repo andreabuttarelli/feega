@@ -1,3 +1,5 @@
+alter table public.motion_revisions add column if not exists layers_touched integer;
+
 create index if not exists canvas_events_agent_week_idx
   on public.canvas_events (org_id, created_at)
   where actor_kind = 'agent';

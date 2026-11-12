@@ -3,7 +3,7 @@ import type { Db } from '$lib/server/db/client';
 import { createMemoryDb } from '$lib/server/local/memory-db';
 import { createConnection, createNode, deleteNode, findNode, moveNode, patchNodeData, DataCheck } from '$lib/server/repos/canvas';
 import { listCanvasEvents } from '$lib/server/repos/canvas-events';
-import type { Actor } from '$lib/server/repos/actor';
+import { type Actor, agentActor, AgentKey } from '$lib/server/repos/actor';
 import { Keep } from '$lib/canvas/reject-plan';
 import { undoGesture } from './undo';
 import { rejectChange } from './reject';
@@ -11,7 +11,7 @@ import { rejectChange } from './reject';
 const ORG = 'org';
 const CANVAS = 'canvas';
 const USER: Actor = { kind: 'user', id: 'u1' };
-const AGENT: Actor = { kind: 'agent', id: 'u1', agentKey: 'mcp' };
+const AGENT: Actor = agentActor('u1', AgentKey.Mcp);
 
 function memory(): Db {
   return createMemoryDb({
@@ -23,7 +23,7 @@ function memory(): Db {
   }) as unknown as Db;
 }
 
-const make = (db: Db, data: Record<string, unknown>, actor = USER) =>
+const make = (db: Db, data: Record<string, unknown>, actor: Actor = USER) =>
   createNode(db, { orgId: ORG, projectId: 'p', canvasId: CANVAS, type: 'text', x: 0, y: 0, data, actor });
 
 const patch = (db: Db, nodeId: string, data: Record<string, unknown>, actor: Actor) =>

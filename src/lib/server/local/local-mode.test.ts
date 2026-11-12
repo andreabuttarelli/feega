@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -98,7 +99,7 @@ describe('live: il browser vede le scritture di un agente', () => {
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
 
-    const node = await createNode(store.db, { orgId: LOCAL_ORG_ID, projectId: store.place.projectId, canvasId: store.place.canvasId, type: 'text', x: 0, y: 0, data: { text: 'from an agent' }, actor: { kind: 'agent', id: null } });
+    const node = await createNode(store.db, { orgId: LOCAL_ORG_ID, projectId: store.place.projectId, canvasId: store.place.canvasId, type: 'text', x: 0, y: 0, data: { text: 'from an agent' }, actor: agentActor('agent', AgentKey.Mcp) });
 
     let text = '';
     while (!text.includes(node.id)) {

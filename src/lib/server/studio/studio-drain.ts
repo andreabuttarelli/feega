@@ -1,4 +1,5 @@
 import type { Db } from '$lib/server/db/client';
+import { agentActor } from '$lib/server/repos/actor';
 import { findNode } from '$lib/server/repos/canvas';
 import { runGenNode, type StartRun } from '$lib/server/canvas/generate';
 import { afterFailure, ItemStatus, ORG_PARALLELISM, pickRunnable } from '$lib/studio/batch-state';
@@ -41,7 +42,7 @@ async function runItem(db: Db, item: BatchItem): Promise<ItemResult> {
     model: item.model,
     params: (node.data.params ?? {}) as StartRun['params'],
     expectedVersion: node.version,
-    actor: { kind: 'agent', id: userId, agentKey: STUDIO_AGENT_KEY },
+    actor: agentActor(userId, STUDIO_AGENT_KEY),
     iterateSelection: { [batch.productsNodeId]: item.productIndex }
   };
 

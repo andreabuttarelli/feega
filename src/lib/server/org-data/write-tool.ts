@@ -22,6 +22,7 @@ import type { OrgQueryAuthority } from './query-tool';
 import { announcePresence } from './presence';
 import { Detail, Surface, compactWrite, touchedOf } from '$lib/server/edit/compact-result';
 import type { Actor } from '$lib/server/repos/actor';
+import { recordEvent, type CanvasEventKind } from '$lib/server/repos/canvas-events';
 import { validateNewNodeData, validateNodeDataUpdate } from '$lib/canvas/node-data';
 import { mergeNodeData, type NodeData } from '$lib/canvas/node-patch';
 import { connectRefusal, nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPUTS_ERROR } from '$lib/server/canvas/node-model';
@@ -239,12 +240,18 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor,
    * Dopo la scrittura, mai prima: `canvas_id` lo si legge dalla riga scritta, ed è l'unico momento
    * in cui è garantito di averla — un `where` generico non lo porta per costruzione.
    */
-  const canvasAnnounce = async (table: string, rows: Array<Record<string, unknown>>) => {
+  const canvasAnnounce = async (table: string, rows: Array<Record<string, unknown>>, kind: CanvasEventKind) => {
     if (!CANVAS_WRITE_TABLES.has(table) || !actor) return;
     const canvasIds = new Set(rows.map((r) => r.canvas_id).filter((v): v is string => typeof v === 'string'));
     const nodeIds = rows.map((r) => r.id).filter((v): v is string => typeof v === 'string');
     await Promise.all(
       [...canvasIds].map((canvasId) => announcePresence({ canvasId, nodeIds, actor }).catch(() => {}))
+    );
+    if (table !== NODES_TABLE || actor.kind !== 'agent') return;
+    await Promise.all(
+      rows
+        .filter((r): r is Record<string, unknown> & { id: string; canvas_id: string } => typeof r.id === 'string' && typeof r.canvas_id === 'string')
+        .map((r) => recordEvent(supabase as unknown as Db, { orgId, canvasId: r.canvas_id, kind, nodeId: r.id, actor }).catch(() => {}))
     );
   };
 
@@ -319,7 +326,7 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor,
     if (error) return failed(table, error, `org_db_write:${table}:insert:err:${error.code ?? '?'}`, t0);
 
     const rows = (data ?? []) as Array<Record<string, unknown>>;
-    await canvasAnnounce(table, rows);
+    await canvasAnnounce(table, rows, 'node.create');
     return finish(
       shownAs(input.verbose, values, { table, row: rows[0], inserted: rows.length }),
       `org_db_write:${table}:insert:cols=${Object.keys(values).length}`,
@@ -373,7 +380,7 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor,
       rows.push(...landed);
     }
 
-    await canvasAnnounce(table, rows);
+    await canvasAnnounce(table, rows, 'node.update');
     return finish(
       shownAs(verbose, values, {
         table,
@@ -500,7 +507,7 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor,
     if (written.error) return failed(table, written.error, `org_db_write:${table}:update:err:${written.error.code ?? '?'}`, t0);
 
     const rows = (written.data ?? []) as Array<Record<string, unknown>>;
-    await canvasAnnounce(table, rows);
+    await canvasAnnounce(table, rows, 'node.update');
     return finish(
       shownAs(input.verbose, values, {
         table,
@@ -573,7 +580,7 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor,
     if (removed.error) return failed(table, removed.error, `org_db_write:${table}:delete:err:${removed.error.code ?? '?'}`, t0);
 
     const rows = (removed.data ?? []) as Array<Record<string, unknown>>;
-    await canvasAnnounce(table, rows);
+    await canvasAnnounce(table, rows, 'node.delete');
     return finish(
       { table, deleted: rows.length, matched, note: 'Gone. Nothing here restores them.' },
       `org_db_write:${table}:delete:rows=${rows.length}/${matched}`,

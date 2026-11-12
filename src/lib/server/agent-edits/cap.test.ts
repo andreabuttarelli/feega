@@ -9,8 +9,8 @@ const NOW = new Date('2026-11-13T12:00:00Z');
 const DAY_MS = 86_400_000;
 const daysAgo = (days: number) => new Date(NOW.getTime() - days * DAY_MS).toISOString();
 
-const event = (created_at: string, actor_kind = 'agent', kind = 'node.update', org_id = ORG) => ({ id: crypto.randomUUID(), org_id, kind, actor_kind, created_at });
-const revision = (created_at: string, actor_kind = 'agent') => ({ id: crypto.randomUUID(), org_id: ORG, actor_kind, created_at });
+const event = (created_at: string, actor_kind = 'agent', kind = 'node.update', org_id = ORG, agent_key = 'mcp') => ({ id: crypto.randomUUID(), org_id, kind, actor_kind, agent_key, created_at });
+const revision = (created_at: string, actor_kind = 'agent', layers_touched: number | null = 1, agent_key = 'sidebar') => ({ id: crypto.randomUUID(), org_id: ORG, actor_kind, agent_key, layers_touched, created_at });
 
 function world(opts: { paid?: boolean; events?: Row[]; revisions?: Row[] }): Db {
   return createMemoryDb({
@@ -46,7 +46,7 @@ describe('the weekly cap on agent edits, free teams only', () => {
       limit: 1000,
       resets_at: new Date(NOW.getTime() + DAY_MS).toISOString(),
       upgrade_path: '/app/credits',
-      message: expect.stringMatching(/1,000 agent edits.*week.*Subscribe/)
+      message: expect.stringMatching(/0 of its 1,000 weekly agent edits left.*Subscribe/)
     });
   });
 
@@ -64,6 +64,25 @@ describe('the weekly cap on agent edits, free teams only', () => {
 
     expect(await agentEditCap(broken, ORG, NOW)).toBeNull();
     expect(error).toHaveBeenCalled();
+  });
+
+  it('never counts what a person launched and an agent actor carried out: loops, workflows, studio batches, compose', async () => {
+    const launched = ['loop', 'workflow', 'studio', 'compose'].flatMap((key) => Array.from({ length: 300 }, () => event(daysAgo(1), 'agent', 'node.create', ORG, key)));
+
+    expect(await agentEditCap(world({ events: [...many(10, daysAgo(1)), ...launched] }), ORG, NOW)).toBeNull();
+  });
+
+  it('counts a frame revision by the layers it touched, not as one', async () => {
+    const db = world({ events: many(500, daysAgo(1)), revisions: [revision(daysAgo(1), 'agent', 500)] });
+
+    expect(await agentEditCap(db, ORG, NOW)).toMatchObject({ used: 1000 });
+  });
+
+  it('refuses a batch bigger than what is left, saying how many remain', async () => {
+    const db = world({ events: many(999, daysAgo(1)) });
+
+    expect(await agentEditCap(db, ORG, NOW, 500)).toMatchObject({ error: AGENT_EDIT_CAP, used: 999, message: expect.stringMatching(/has 1 of its 1,000 weekly agent edits left.*would change 500/) });
+    expect(await agentEditCap(db, ORG, NOW, 1)).toBeNull();
   });
 
   it('a paying team is never capped', async () => {

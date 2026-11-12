@@ -1,4 +1,5 @@
 import { Quality } from '$lib/motion/export-formats';
+import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LinkRefusal, RENDER_LINK_OPEN_MS } from '$lib/motion/render-link';
 
@@ -71,7 +72,7 @@ const runRow = (params: Record<string, unknown>) => ({ id: RUN, orgId: ORG, node
 async function mint(now = Date.now()) {
   const row = { id: RUN, org_id: ORG, node_id: NODE, params: {}, status: 'running' };
   const { db, calls } = fakeDb({ node_runs: [row] });
-  const link = await createRenderLink(db, { orgId: ORG, nodeId: NODE, version: 4, quality: Quality.High, actor: { kind: 'agent', id: 'user-1', agentKey: 'mcp' } }, now);
+  const link = await createRenderLink(db, { orgId: ORG, nodeId: NODE, version: 4, quality: Quality.High, actor: agentActor('user-1', AgentKey.Mcp) }, now);
   store.run = runRow((calls.find((c) => c.op === 'insert')!.payload as { params: Record<string, unknown> }).params);
   return link.token;
 }
@@ -132,7 +133,7 @@ describe('/render/[token]', () => {
     expect(slot.path).toBe(`${ORG}/project-1/motion/${NODE}/${RUN}.mp4`);
 
     expect(await actions.finish(actionEvent(token, cookies, { width: '1280', height: '720', seconds: '2' }))).toEqual({ assetId: 'asset-1' });
-    expect(store.saved[0]).toMatchObject({ orgId: ORG, nodeId: NODE, path: slot.path, width: 1280, actor: { kind: 'agent', id: 'user-1' } });
+    expect(store.saved[0]).toMatchObject({ orgId: ORG, nodeId: NODE, path: slot.path, width: 1280, actor: agentActor('user-1', AgentKey.Mcp) });
     expect(store.completed).toEqual([{ orgId: ORG, runId: RUN, assetId: 'asset-1', costUsd: 0 }]);
 
     expect(await load(pageEvent(token, cookies))).toMatchObject({ refused: LinkRefusal.Used });

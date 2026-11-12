@@ -36,7 +36,7 @@ import { layersToFrame, layersToFrameDeps } from '$lib/server/canvas/layers-to-f
 import { imageToolAskSchema } from '$lib/image-tools';
 import { videoReframeAskSchema } from '$lib/reframe';
 import { VIDEO_REFRAME_DEPS, startVideoReframe } from '$lib/server/canvas/video-reframe';
-import { agentActor, type Actor } from '$lib/server/repos/actor';
+import { AgentKey, agentActor, type Actor } from '$lib/server/repos/actor';
 import { withBrandContext, withOrgContext } from '$lib/server/ai-log';
 import { GEN_MEDIUMS, isGenMedium, type GenParams } from '$lib/canvas/gen-node';
 import { connectRefusal, nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPUTS_ERROR } from '$lib/server/canvas/node-model';
@@ -147,7 +147,7 @@ export type CanvasDeps = {
   projectId: string;
   userId: string;
   brandId?: string | null;
-  agentKey?: string;
+  agentKey?: AgentKey;
   sessionId?: string | null;
 };
 

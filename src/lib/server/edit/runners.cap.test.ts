@@ -27,6 +27,17 @@ describe('an agent at the free weekly cap', () => {
     expect(runMotionTool).not.toHaveBeenCalled();
   });
 
+  it('a frame batch is checked against what is left for the whole batch, before any op runs', async () => {
+    cap.mockResolvedValue(null);
+    const runMotionBatch = vi.spyOn(await import('$lib/server/motion/tool-run'), 'runMotionBatch');
+    cap.mockImplementation(async (_db: unknown, _org: unknown, _now: unknown, cost: number) => (cost > 1 ? REFUSAL : null));
+
+    const ops = Array.from({ length: 3 }, () => ({ tool: 'set_text', input: {} }));
+    expect(await runFrameTool(caller, { nodeId: 'n1', tool: 'batch', input: { ops } })).toEqual({ status: 402, body: REFUSAL });
+    expect(cap).toHaveBeenCalledWith(expect.anything(), 'org', expect.any(Date), 3);
+    expect(runMotionBatch).not.toHaveBeenCalled();
+  });
+
   it('gets the same refusal from an editor write', async () => {
     const write = Object.entries(EDITOR_OPS).find(([, op]) => op.access === EditorAccess.Write && op.input.safeParse({}).success);
     if (!write) {

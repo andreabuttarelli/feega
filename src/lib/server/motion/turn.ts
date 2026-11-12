@@ -20,7 +20,7 @@ import { loadTurns, openNodeThread, promptHistory, saveTurn } from '$lib/server/
 import { openReply, ReplyStatus } from '$lib/server/repos/chat-reply';
 import { referencedAssets } from '$lib/motion/doc-assets';
 import { finishedTurn } from '$lib/server/project-agent/finished-turn';
-import { agentActor, type Actor } from '$lib/server/repos/actor';
+import { type Actor, AgentKey, agentActor } from '$lib/server/repos/actor';
 import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { blockedPrompt } from '$lib/server/moderation/blocked-response';
@@ -88,7 +88,7 @@ import { CHECK_WAIT_MS, Browser, BROWSER_VISION, EDITOR_DRAWS, BROWSER_DRAWS, Ro
 export { Browser, MAX_DELIVERY_ATTEMPTS, RESEARCH_BRIEF, crewBrief, crewTools, type MotionTurn, type TurnOutcome } from './motion-session';
 export type { TurnTiming } from '$lib/server/agents/turn-core';
 
-export const MOTION_AGENT_KEY = 'motion';
+export const MOTION_AGENT_KEY = AgentKey.Motion;
 const readFontAdvance = fontAdvance();
 
 export type MotionTurnInput = {
@@ -195,7 +195,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     scale: docScaleOf(motion.record, head.doc),
     assets,
     newId: () => crypto.randomUUID().slice(0, 8),
-    templates: templateLibrary(db, { orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY } }),
+    templates: templateLibrary(db, { orgId, actor: agentActor(userId, MOTION_AGENT_KEY) }),
     revisions: { list: () => namedRevisions(db, nodeScope), read: async (version) => (await readRevision(db, { ...nodeScope, version }))?.doc ?? null, name: async (version, name) => (await nameVersion(db, { ...nodeScope, version, name, actor })).named },
     ...sources,
     videoBreakdown,
@@ -236,11 +236,11 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
       shown: shownRefs(turns),
       rejections: rejectedRounds([...turns, { role: 'user', content: message }])
     },
-    layouts: layoutStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY } }),
-    effects: effectStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY }, gl: serverFramesOpen() ? chromiumGl : null }),
+    layouts: layoutStore({ db, orgId, actor: agentActor(userId, MOTION_AGENT_KEY) }),
+    effects: effectStore({ db, orgId, actor: agentActor(userId, MOTION_AGENT_KEY), gl: serverFramesOpen() ? chromiumGl : null }),
     storyboard,
     exportStill: (doc, spec) => exportStill(db, { orgId, projectId: project.id, nodeId: motion.record.id }, doc, spec, { tokens, assets }),
-    moveOut: frameMover(db, { orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY }, projectId: project.id }, motion.record.id),
+    moveOut: frameMover(db, { orgId, actor: agentActor(userId, MOTION_AGENT_KEY), projectId: project.id }, motion.record.id),
     copywrite: async (script) => {
       const ask = async (prompt: string) => ({ answer: await llmStructured({ prompt, schema: COPY_SCHEMA, model: roleModel(StudioRole.Copywriter, model), temperature: 0.4, label: STUDIO_ROSTER[StudioRole.Copywriter].label }), usd: billedUsdInScope() ?? 0 });
       const out = await withOrgContext(orgId, () => copywrite({ ask }, script));

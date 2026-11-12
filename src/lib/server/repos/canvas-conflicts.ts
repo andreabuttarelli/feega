@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Db } from '$lib/server/db/client';
-import type { Actor } from './actor';
+import type { Actor, RecordedActor } from './actor';
 
 const TABLE = 'canvas_conflicts';
 const COLUMNS = 'id, canvas_id, node_id, expected_version, actual_version, attempt, attempted, winning_event_id, actor_kind, actor_id, agent_key, resolution, resolved_at, created_at';
@@ -38,7 +38,7 @@ export type CanvasConflict = {
   attempt: Attempt;
   attempted: Record<string, unknown>;
   winningEventId: number | null;
-  refused: Actor;
+  refused: RecordedActor;
   resolution: Resolution | null;
   resolvedAt: string | null;
   createdAt: string;

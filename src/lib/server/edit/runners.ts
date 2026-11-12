@@ -46,8 +46,8 @@ async function denial(caller: OrgCaller): Promise<Answer | undefined> {
   return denied ? { status: denied.status, body: await denied.json() } : undefined;
 }
 
-async function capped(caller: OrgCaller): Promise<Answer | undefined> {
-  const cap = await agentEditCap(caller.db, caller.orgId);
+async function capped(caller: OrgCaller, layers = 1): Promise<Answer | undefined> {
+  const cap = await agentEditCap(caller.db, caller.orgId, new Date(), layers);
   return cap ? { status: AGENT_EDIT_CAP_STATUS, body: cap } : undefined;
 }
 
@@ -101,7 +101,8 @@ export async function runFrameTool(caller: OrgCaller, ask: FrameToolAsk): Promis
     return READ_ONLY_KEY;
   }
 
-  const full = await capped(caller);
+  const batch = ask.tool === BATCH ? batchSchema.safeParse(ask.input) : null;
+  const full = await capped(caller, batch?.success ? batch.data.ops.length : 1);
   if (full) {
     return full;
   }
@@ -109,8 +110,8 @@ export async function runFrameTool(caller: OrgCaller, ask: FrameToolAsk): Promis
   const scope = { orgId: caller.orgId, userId: caller.userId, nodeId: ask.nodeId, sessionId: caller.sessionId };
   const gated = async (tools: string[]) => (tools.some((t) => SPENDING_TOOLS.has(t)) ? denial(caller) : undefined);
 
-  if (ask.tool === BATCH) {
-    const ops = batchSchema.safeParse(ask.input);
+  if (batch) {
+    const ops = batch;
     if (!ops.success) {
       return { status: HTTP_BAD_REQUEST, body: { error: ToolRun.Invalid, detail: ops.error.issues[0]?.message } };
     }

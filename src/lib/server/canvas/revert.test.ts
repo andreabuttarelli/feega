@@ -3,7 +3,7 @@ import type { Db } from '$lib/server/db/client';
 import { createMemoryDb } from '$lib/server/local/memory-db';
 import { createNode, findNode, patchNodeData, DataCheck } from '$lib/server/repos/canvas';
 import { listCanvasEvents } from '$lib/server/repos/canvas-events';
-import type { Actor } from '$lib/server/repos/actor';
+import { type Actor, agentActor, AgentKey } from '$lib/server/repos/actor';
 import { Keep } from '$lib/canvas/reject-plan';
 import { HistoryFilter } from '$lib/canvas/history/timeline';
 import { readHistory } from './history';
@@ -13,7 +13,7 @@ const ORG = 'org';
 const CANVAS = 'canvas';
 const MARCO: Actor = { kind: 'user', id: 'u1' };
 const ANNA: Actor = { kind: 'user', id: 'u2' };
-const CLAUDE: Actor = { kind: 'agent', id: 'u1', agentKey: 'claude-code', sessionId: '6f1c2a9e-1b7d-4c3e-9a51-2f0e8d7c6b5a' };
+const CLAUDE: Actor = agentActor('u1', AgentKey.Mcp, '6f1c2a9e-1b7d-4c3e-9a51-2f0e8d7c6b5a');
 
 function memory(): Db {
   return createMemoryDb({
