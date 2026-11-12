@@ -153,6 +153,7 @@
   import { liveDocs, type LiveDoc } from '$lib/canvas/core/live-docs.svelte';
   import type { FrameDoc } from '$lib/canvas/core/frame-build';
   import { missingAssets } from '$lib/canvas/live-assets';
+  import { pointerMoves } from '$lib/canvas/core/pointer-moved';
   import { statePreview } from '$lib/canvas/state-preview.svelte';
   import { previewDoc } from '$lib/motion/states/preview';
   import { ComponentRole, roleOf } from '$lib/motion/main-component';
@@ -1465,12 +1466,19 @@
   const liveOf = (id: string) => liveDocs.map.get(id) ?? fetched.get(id)?.live ?? null;
   const revisionOfFrame = (id: string) => coreFrames.find((f) => f.id === id)?.revision ?? 0;
   const viewDocs = new Map<string, LiveDoc['doc']>();
+  let viewSources = $state(untrack(() => liveDocs.map));
+  let viewTurn = 0;
+  $effect(() => {
+    const next = liveDocs.map;
+    const turn = ++viewTurn;
+    whenIdle(() => turn === viewTurn && (viewSources = next));
+  });
   const viewDocOf = (id: string) => {
     const held = viewDocs.get(id);
     if (held && reuseOf(id) === Reuse.Held) {
       return held;
     }
-    const doc = liveOf(id)?.doc;
+    const doc = (viewSources.get(id) ?? fetched.get(id)?.live)?.doc;
     if (doc) {
       viewDocs.set(id, doc);
     }
@@ -3114,6 +3122,23 @@
     return { source: node, sourceHandle: port?.side === PortSide.Out ? port.handle : null, target: from.nodeId, targetHandle: from.handle };
   }
 
+  const pointerMoved = pointerMoves();
+  let hoverTurn = 0;
+
+  function hoverAt(w: Point, reach: Reach) {
+    hoverElement(w, reach);
+    hoverHandle(w);
+  }
+
+  function hoverWhenFree(p: Point, w: Point, reach: Reach) {
+    const turn = ++hoverTurn;
+    if (pointerMoved(p)) {
+      hoverAt(w, reach);
+      return;
+    }
+    whenIdle(() => turn === hoverTurn && hoverAt(w, reach));
+  }
+
   function onMove(e: PointerEvent) {
     if (active || e.buttons) {
       markBusy();
@@ -3135,8 +3160,7 @@
       hovered = e.pointerType === 'mouse' ? topNodeAt(w) : null;
       hoverChrome = e.pointerType === 'mouse' ? (hovered ?? portAt(ports, w, view.zoom)?.nodeId ?? null) : null;
       if (e.pointerType === 'mouse' && !e.buttons) {
-        hoverElement(w, reachOf(e));
-        hoverHandle(w);
+        hoverWhenFree(p, w, reachOf(e));
       }
       hoverPort = e.pointerType === 'mouse' && connectable ? portAt(ports, w, view.zoom) : null;
       bubbleTint = hoverPort ? bubbleColour(hoverPort) : bubbleTint;
@@ -4410,7 +4434,7 @@
   >
     {#if !failed}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId, userId: (page.data as { session?: { user?: { id: string } } | null }).session?.user?.id, look: (page.data as { look?: string }).look }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} onbackend={(change) => track(GPU_FALLBACK_EVENT, change)} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} listenLive={(listener) => liveDocs.listen(listener)} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId, userId: (page.data as { session?: { user?: { id: string } } | null }).session?.user?.id, look: (page.data as { look?: string }).look }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} onbackend={(change) => track(GPU_FALLBACK_EVENT, change)} />
       </svelte:boundary>
     {/if}
     <div class="hover-rings" data-testid="node-hover-rings">

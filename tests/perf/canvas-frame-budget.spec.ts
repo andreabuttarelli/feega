@@ -240,13 +240,17 @@ const EDIT_GIVE_UP_MS = 3000;
 const EDIT_PAUSE_MS = 250;
 const RESIZE_STEP_PX = 6;
 const CHILD_AT = { x: 0.07, y: 0.032 };
+const TEXT_AT = { x: 0.51, y: 0.032 };
+const TEXT_DESCENTS = 4;
 
 type Stages = { total: number; effect: number; build: number; media: number; upload: number; draw: number };
 
 function listenInput() {
-  const probe = window as unknown as { __editAt: number };
+  const probe = window as unknown as { __editAt: number; __editInputs: number[] };
+  probe.__editInputs = [];
   const seen = (e: Event) => {
     probe.__editAt = e.timeStamp;
+    probe.__editInputs.push(e.timeStamp);
   };
   addEventListener('keydown', seen, true);
   addEventListener('pointermove', seen, true);
@@ -310,23 +314,42 @@ async function keyEdits(page: Page, keys: [string, string], count: number): Prom
 }
 
 async function textEdits(page: Page, count: number): Promise<(Stages | null)[]> {
-  await page.getByTestId('frame-selection-body').first().dblclick();
+  const box = await frameOnScreen(page);
+  const field = page.getByTestId('core-text-edit');
+  for (let i = 0; i < TEXT_DESCENTS && !(await field.isVisible()); i++) {
+    await page.mouse.dblclick(box.x + box.w * TEXT_AT.x, box.y + box.w * TEXT_AT.y);
+    await page.waitForTimeout(EDIT_PAUSE_MS);
+  }
+  await field.waitFor({ timeout: 10_000 });
+  await page.keyboard.press('End');
   const seen: (Stages | null)[] = [];
   for (let i = 0; i < count; i++) {
+    const typed = field.evaluate(
+      (el, giveUp) =>
+        new Promise<Stages | null>((done) => {
+          setTimeout(() => done(null), giveUp);
+          el.addEventListener('input', (e) => requestAnimationFrame(() => {
+            const at = (window as unknown as { __editAt: number }).__editAt;
+            done({ total: performance.now() - at, effect: e.timeStamp - at, build: 0, media: 0, upload: 0, draw: performance.now() - e.timeStamp });
+          }), { once: true });
+        }),
+      EDIT_GIVE_UP_MS
+    );
     await page.keyboard.press('KeyA');
-    seen.push(await stagesAfter(page));
+    seen.push(await typed);
+    await page.waitForTimeout(EDIT_PAUSE_MS);
   }
   await page.keyboard.press('Escape');
   return seen;
 }
 
 async function edits(page: Page, edit: Edit): Promise<(Stages | null)[]> {
+  if (edit === Edit.Text) {
+    return textEdits(page, EDITS_EACH);
+  }
   await selectChild(page);
   if (edit === Edit.Resize) {
     return resizeEdits(page, EDITS_EACH);
-  }
-  if (edit === Edit.Text) {
-    return textEdits(page, EDITS_EACH);
   }
   return keyEdits(page, KEYS[edit], EDITS_EACH);
 }
@@ -336,6 +359,17 @@ const mean = (xs: number[]) => (xs.length ? Math.round((10 * xs.reduce((a, b) =>
 function breakdown(seen: Stages[]) {
   const stage = (k: keyof Stages) => mean(seen.map((s) => s[k]));
   return { effect: stage('effect'), build: stage('build'), media: stage('media'), upload: stage('upload'), draw: stage('draw') };
+}
+
+const PROFILED = process.env.BUDGET_PROFILE === '1';
+const PROFILE_SAMPLE_US = 100;
+
+async function profiling(page: Page): Promise<CDPSession> {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Profiler.enable');
+  await cdp.send('Profiler.setSamplingInterval', { interval: PROFILE_SAMPLE_US });
+  await cdp.send('Profiler.start');
+  return cdp;
 }
 
 async function editRun(browser: Browser, target: Target): Promise<Record<Edit, (Stages | null)[]>> {
@@ -356,7 +390,18 @@ async function editRun(browser: Browser, target: Target): Promise<Record<Edit, (
     await page.keyboard.press('Shift+Digit1');
     await page.waitForTimeout(FIT_TOGGLE_MS);
     await zoomOntoFrame(page);
+    const cdp = PROFILED ? await profiling(page) : null;
+    const startedAt = await page.evaluate(() => performance.now());
     seen[edit] = await edits(page, edit).catch((e: unknown) => (console.log(`${edit}: ${e}`), []));
+    if (cdp) {
+      const { profile } = await cdp.send('Profiler.stop');
+      writeFileSync(join(OUT, `edit-${target}-${edit}.cpuprofile`), JSON.stringify(profile));
+      const windows = await page.evaluate(() => ({
+        inputs: (window as unknown as { __editInputs: number[] }).__editInputs,
+        asked: performance.getEntriesByType('mark').filter((m) => m.name.startsWith('frame|live-asked|')).map((m) => m.startTime)
+      }));
+      writeFileSync(join(OUT, `edit-${target}-${edit}.windows.json`), JSON.stringify({ startedAt, ...windows }));
+    }
   }
   await context.close();
   return seen;

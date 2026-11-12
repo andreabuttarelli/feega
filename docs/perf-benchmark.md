@@ -162,6 +162,11 @@ The gate fails an edit kind whose p95 is over 16.7 ms (one 60 Hz frame); `atGoal
 is inside 8.3 ms, one 120 Hz frame, the target for direct manipulation. Results land in
 `perf-results/edit-latency-<target>.json`.
 
+Typing is timed from the key to the animation frame after the caret field's `input` event, since
+the field draws the text while it is open. `BUDGET_PROFILE=1` also writes a CPU profile per edit
+kind (`edit-<target>-<edit>.cpuprofile`) and the input and `live-asked` times
+(`.windows.json`) to cut it by edit.
+
 ## Real-user telemetry
 
 Every open canvas (sampled by `PERF_SAMPLE_RATE` in `src/lib/canvas/perf/perf-beacon.ts`, 1 today)

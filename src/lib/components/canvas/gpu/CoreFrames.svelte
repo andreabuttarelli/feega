@@ -51,7 +51,8 @@
   import { Step, markFrame, noteImages } from '$lib/canvas/core/frame-timeline';
   import { StartupStep, markStartup, reportFramesShown } from '$lib/canvas/core/startup-marks';
   import LoadTimeline from './LoadTimeline.svelte';
-  import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
+  import { editedLayers } from '$lib/canvas/core/edited-layers';
+  import type { LiveDoc, LiveListener } from '$lib/canvas/core/live-docs.svelte';
   import { baseNodeId, withoutViews } from '$lib/canvas/breakpoint-views';
   import { loadOnce, withScenes, type LoadScene } from '$lib/canvas/scene-sources';
   import { describe, factsOf, signatureOf, undrawn, type NodeFacts } from '$lib/canvas/core/core-debug';
@@ -64,7 +65,7 @@
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
 
-  let { frames, edited = new Set(), order = [], live = new Map(), known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, lift = null, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, place = null, sourceUrl, onready, onsource = () => {}, onthumb = () => {}, onfallback, onbackend = () => {} }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; lift?: Lift | null; look?: Look; view: Viewport; area: { width: number; height: number }; place?: { projectId: string; canvasId: string; orgId?: string; userId?: string; look?: string } | null; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onthumb?: (id: string, revision: number, blob: Blob, size: { width: number; height: number }) => void; onfallback: (why: string) => void; onbackend?: (change: BackendSwitch) => void } = $props();
+  let { frames, edited = new Set(), order = [], live = new Map(), listenLive = () => () => {}, known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, lift = null, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, place = null, sourceUrl, onready, onsource = () => {}, onthumb = () => {}, onfallback, onbackend = () => {} }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; listenLive?: (listener: LiveListener) => () => void; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; lift?: Lift | null; look?: Look; view: Viewport; area: { width: number; height: number }; place?: { projectId: string; canvasId: string; orgId?: string; userId?: string; look?: string } | null; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onthumb?: (id: string, revision: number, blob: Blob, size: { width: number; height: number }) => void; onfallback: (why: string) => void; onbackend?: (change: BackendSwitch) => void } = $props();
 
   markStartup(StartupStep.Mounted);
   debugStart();
@@ -456,17 +457,29 @@
 
   const rebuildLatest = latestOnly<string, { f: FrameAt; source: LiveDoc }>((_id, { f, source }) => rebuildLive(f, source));
 
+  function rebuildIfEdited(f: FrameAt, source: LiveDoc | undefined) {
+    if (lift && !lift.landing && lift.id === baseNodeId(f.id)) {
+      return;
+    }
+    if (source && (!sameLive(liveBuilt.get(f.id), source) || liveStamp.get(f.id) !== f.scenes)) {
+      liveBuilt.set(f.id, source);
+      liveStamp.set(f.id, f.scenes);
+      rebuildLatest(f.id, { f, source });
+    }
+  }
+
+  $effect(() =>
+    listenLive((id, source) => {
+      const f = untrack(() => frames).find((x) => x.id === id);
+      if (f) {
+        untrack(() => rebuildIfEdited(f, source));
+      }
+    })
+  );
+
   $effect(() => {
     for (const f of frames) {
-      const source = live.get(f.id);
-      if (lift && !lift.landing && lift.id === baseNodeId(f.id)) {
-        continue;
-      }
-      if (source && (!sameLive(liveBuilt.get(f.id), source) || liveStamp.get(f.id) !== f.scenes)) {
-        liveBuilt.set(f.id, source);
-        liveStamp.set(f.id, f.scenes);
-        rebuildLatest(f.id, { f, source });
-      }
+      rebuildIfEdited(f, live.get(f.id));
     }
     for (const id of [...liveGroup.keys()].filter((id) => !live.has(id))) {
       liveBuilt.delete(id);
@@ -936,7 +949,7 @@
       pictured.delete(group);
     }
     const stopgaps = chains.flatMap((c) => (pictured.has(c[0].group) ? [] : c.filter((l) => thumbLists.has(l.group))));
-    for (const f of [...tails, ...stopgaps]) {
+    for (const f of [...tails, ...stopgaps, ...editedLayers(held, liveGroup)]) {
       while (!put.has(f.group)) {
         putPart(into, f.group);
       }
