@@ -444,8 +444,7 @@ impl WebCore {
     }
 
     pub fn drop_group(&mut self, key: &str) {
-        self.compositor.touch(key, &self.library);
-        self.library.drop_group(key);
+        self.compositor.drop_group(key, &mut self.library);
     }
 
     pub fn set_camera(&mut self, x: f64, y: f64, zoom: f64) {
@@ -508,7 +507,7 @@ impl WebCore {
     }
 
     fn fill_pyramid(&mut self) -> Result<bool, JsValue> {
-        if let Some(extent) = self.compositor.extent(&self.library) {
+        if let Some(extent) = self.compositor.extent() {
             self.tiles.set_canvas(extent);
         }
         let started = js_sys::Date::now();

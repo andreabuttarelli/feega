@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { loadavg } from 'node:os';
 import { test, expect, chromium, type Browser, type CDPSession, type Page } from '@playwright/test';
 import { instrument, wheelPan } from '../e2e/fixtures/frame-sweeps';
 import { LANDINGS_FIXTURE_PLACE } from '../../scripts/perf/landings-fixture.mjs';
@@ -108,11 +109,16 @@ async function placeOf(page: Page, id: string): Promise<string> {
   return (await tiles(page)).find((t) => t.id === id)?.at ?? '';
 }
 
+const FRAME_WAIT_MS = 50;
+
+const nextFrame = (page: Page) => page.evaluate((most) => new Promise((done) => { requestAnimationFrame(done); setTimeout(done, most); }), FRAME_WAIT_MS);
+
 async function zoom(page: Page, until: number) {
   await page.mouse.move(VIEWPORT.width / 2, VIEWPORT.height / 2);
   await page.keyboard.down('Control');
   for (let i = 0; Date.now() < until; i++) {
     await page.mouse.wheel(0, Math.floor(i / ZOOM_STEPS_EACH_WAY) % 2 ? ZOOM_WHEEL_PX : -ZOOM_WHEEL_PX);
+    await nextFrame(page);
   }
   await page.keyboard.up('Control');
 }
@@ -178,6 +184,7 @@ async function gaps(page: Page, cdp: CDPSession, gesture: Gesture): Promise<Seen
 
 async function run(browser: Browser, target: Target): Promise<Record<Gesture, Seen>> {
   const { base, place, login: needsLogin } = PLACES[target];
+  console.log(`load ${loadavg()[0].toFixed(1)} before a ${target} run`);
   const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 2, serviceWorkers: 'block' });
   const page = await context.newPage();
   const cdp = await context.newCDPSession(page);
@@ -206,6 +213,7 @@ for (const target of TARGETS) {
     const all = Object.fromEntries(Object.values(Gesture).map((g) => [g, { gaps: [], taskMs: 0 } as Seen])) as Record<Gesture, Seen>;
     for (let i = 0; i < RUNS; i++) {
       const seen = await run(browser, target);
+      console.log(`run ${i + 1}: ${Object.values(Gesture).map((g) => `${g} ${(100 * budgetOf(seen[g].gaps).overShare).toFixed(1)}%`).join(' ')}`);
       Object.values(Gesture).forEach((g) => {
         all[g].gaps.push(...seen[g].gaps);
         all[g].taskMs += seen[g].taskMs / RUNS;

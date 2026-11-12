@@ -1,0 +1,1 @@
+export declare function scaled<C extends { nodes: { id: string; position: { x: number; y: number }; size: { height: number } }[]; heads: Record<string, unknown> }>(canvas: C, nodes: number): { canvas: C; layers: number };

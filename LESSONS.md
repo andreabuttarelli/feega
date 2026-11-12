@@ -58,6 +58,9 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 ### A hover outline drawn by the core grows and shrinks during a zoom
 Signal: with the pointer still over a frame, a wheel zoom makes its hover outline 2px, 4px, 6px thick and its gap wider than the node, then snaps back when the gesture ends; the DOM pick box of an element stays right. Cause: core overlay items are world-space strokes built at the zoom of the last quiet moment, and `CoreFrames` only re-sends overlay parts when no gesture is active, so the retained screen scales them with the camera. Move: anything that must keep a screen-space size through a gesture (hover outlines, 1px gaps) is a DOM element placed from `view` (`hover-ring.ts`), not a core overlay item. Measure it with the colour run at a fixed column in screenshots taken mid-zoom, not at rest.
 
+### Zoom drops to 13 fps with 20 s frames after an engine change, the profile is all `(program)` and one wasm function
+**Signal:** the gesture bench's zoom-sweep falls from ~95 to under 20 fps, settle takes a minute, a CPU profile shows nothing nameable. **Move:** count `Engine::draw` calls per tile batch (a temporary `web_sys::console::log_1` in `raster_batch`, captured with `page.on('console')`; swap the rebuilt `gpu_core.js`/`gpu_core_bg.wasm` into `build/client/gpu-core/` and delete the `.br`/`.gz` next to them, no app rebuild needed). One batch drawn thousands of times is `split_render` fanning out on a false overflow. vello's `bump_estimate` measures lines and segments only: `tile`/`ptcl` are 0 and `binning` is a copy of segments, so compare nothing else with a buffer size.
+
 ## Providers
 
 ### Kie publishes its price list and its request schemas, you just have to find them

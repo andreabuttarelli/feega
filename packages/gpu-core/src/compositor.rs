@@ -85,6 +85,12 @@ impl Compositor {
         self.world.touch(group, library.size_of(group));
     }
 
+    pub fn drop_group(&mut self, group: &str, library: &mut Library) {
+        self.touch(group, library);
+        library.drop_group(group);
+        self.touch(group, library);
+    }
+
     pub fn touch_picture(&mut self, clip: &str, library: &Library) {
         for group in library.groups_drawing(clip) {
             self.touch(&group, library);
@@ -119,8 +125,8 @@ impl Compositor {
         self.world.holding()
     }
 
-    pub fn extent(&self, library: &Library) -> Option<Rect> {
-        self.world.extent(|g| library.size_of(g))
+    pub fn extent(&self) -> Option<Rect> {
+        self.world.extent()
     }
 
     pub fn lifts(&self, library: &Library) -> Vec<Lift> {
@@ -182,7 +188,7 @@ impl Compositor {
 
     fn count_plan(&mut self, started: f64) {
         self.planned.plans += 1;
-        self.planned.walked += self.world.use_count() as u32;
+        self.planned.walked += self.world.take_visited() as u32;
         self.planned.ms += now_ms() - started;
     }
 
