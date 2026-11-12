@@ -6,6 +6,7 @@
 <script lang="ts">
 	import { Popover as PopoverPrimitive } from "bits-ui";
 	import { cn } from "$lib/utils.js";
+	import { Closes, openLayer } from "$lib/components/ui/shell/dismiss";
 
 	let {
 		ref = $bindable(null),
@@ -14,6 +15,10 @@
 		class: className,
 		...restProps
 	}: PopoverPrimitive.ContentProps = $props();
+
+	$effect(() => {
+		if (ref) return openLayer(() => {}, Closes.ItsOwner);
+	});
 </script>
 
 <PopoverPrimitive.Portal>
