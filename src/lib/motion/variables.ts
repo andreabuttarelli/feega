@@ -400,6 +400,12 @@ export function unbindVariable(doc: MotionDoc, clipId: string, target: string): 
   return { ok: true, doc: withTarget(doc, clipId, ({ [target]: _gone, ...rest }) => rest) };
 }
 
+export function freeFill(doc: MotionDoc, clipId: string): OpResult {
+  const clip = findClip(doc, clipId)?.clip;
+  const target = clip ? fillTarget(clip) : undefined;
+  return target && clip?.bind?.[target] ? unbindVariable(doc, clipId, target) : { ok: true, doc };
+}
+
 function aliasing(variables: Variables, key: string): string[] {
   return Object.entries(variables).flatMap(([c, col]) =>
     Object.entries(col.vars)
