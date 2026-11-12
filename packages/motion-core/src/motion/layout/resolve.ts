@@ -212,15 +212,9 @@ function carriedAlong(clip: MotionClip, shift: Shift | undefined, size: Size): M
   return { ...clip, props: { ...clip.props, x: x + shift[0] / size.width, y: y + shift[1] / size.height } };
 }
 
-function laidOut(tracks: MotionTrack[], size: Size, measure: TextMeasure, content: Content = NO_CONTENT): MotionTrack[] {
-  const clips = visualClips(tracks);
-  const boxes = boxesOf(clips, size, content, measure);
-  if (!boxes.size) {
-    return tracks;
-  }
-
+function placer(clips: readonly MotionClip[], boxes: Map<string, Box>, size: Size, measure: TextMeasure, content: Content): (clip: MotionClip) => MotionClip {
   const carried = carriedShifts(clips, boxes, size);
-  const place = (clip: MotionClip): MotionClip => {
+  return (clip) => {
     const box = boxes.get(clip.id);
     if (!box) {
       return carriedAlong(clip, carried.get(clip.id), size);
@@ -231,6 +225,16 @@ function laidOut(tracks: MotionTrack[], size: Size, measure: TextMeasure, conten
     }
     return { ...clip, props: { ...clip.props, ...huggedText(clip, box, intrinsic(clip, size, content, measure).width), ...placedProps(box, size) } };
   };
+}
+
+function laidOut(tracks: MotionTrack[], size: Size, measure: TextMeasure, content: Content = NO_CONTENT): MotionTrack[] {
+  const clips = visualClips(tracks);
+  const boxes = boxesOf(clips, size, content, measure);
+  if (!boxes.size) {
+    return tracks;
+  }
+
+  const place = placer(clips, boxes, size, measure, content);
   return tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map(place) }));
 }
 
