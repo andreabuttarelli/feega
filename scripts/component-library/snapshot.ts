@@ -8,8 +8,10 @@ import { codeCapturedIn, type CapturedApp } from '../../src/lib/server/code-impo
 import { BASE_CONDITIONS } from '../../src/lib/server/code-import/render-conditions';
 import { compacted } from './compact';
 import { isDemo, itemFor } from './names';
+import { durableImages } from './images';
+import { imagesFilled } from '../../src/lib/canvas/figma/images';
 
-type Catalog = { items: { name: string; title: string; description: string }[] };
+type Catalog = { publicBase?: string; items: { name: string; title: string; description: string }[] };
 
 const [library, NAME, given] = process.argv.slice(2);
 if (!library || !NAME) {
@@ -33,6 +35,7 @@ if (!planned) {
 const width = boards.tree.root.absoluteBoundingBox?.width ?? boards.tree.width;
 const plan = design ? designed(design, planned, { repo: NAME, base: BASE_CONDITIONS, boards: {}, captures, width }).plan : planned;
 const catalog = JSON.parse(readFileSync(join(LIBRARY, 'catalog.json'), 'utf8')) as Catalog;
+const images = durableImages(plan.images, catalog.publicBase);
 const taken = new Set<string>();
 const ranked = [...plan.sets].sort((a, b) => Number(isDemo(a.name)) - Number(isDemo(b.name)));
 const sets = ranked.flatMap((s) => {
@@ -41,7 +44,7 @@ const sets = ranked.flatMap((s) => {
     return [];
   }
   taken.add(item.name);
-  return [{ name: item.title, slug: item.name, description: item.description, size: s.size, doc: compacted(s.doc) }];
+  return [{ name: item.title, slug: item.name, description: item.description, size: s.size, doc: compacted(imagesFilled(s.doc, s.images, images)) }];
 });
 writeFileSync(OUT, JSON.stringify(sets));
 writeFileSync(INDEX, `${JSON.stringify(sets.map(({ slug, name, description }) => ({ slug, name, description })), null, 2)}\n`);
