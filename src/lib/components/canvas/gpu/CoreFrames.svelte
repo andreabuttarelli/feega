@@ -621,6 +621,7 @@
         r.setBudget?.(textureBudget(budget.textureBytes, { width, height }));
         r.setTileBudget?.(budget.tileBytes);
         r.setCanvasTiles?.(budget.canvasTiles);
+        r.setPixelRatio?.(resolution);
         r.setTiles?.(TILED);
         raster = r;
         markStartup(StartupStep.GpuReady);
