@@ -246,8 +246,10 @@
   {#if parent}
     <div class="flex items-center gap-1.5">
       <div class="flex min-w-0 flex-1"><CheckRow label="Ignore auto layout" checked={!!item.absolute} testid="auto-layout-absolute" onchange={(on) => size({ absolute: on }, 'Changed absolute position')} /></div>
-      <IconButton label="Move earlier" size={IconSize.Sm} disabled={place <= 0} onclick={() => commit(reorderChild(doc, parent.id, clip.id, place - 1), 'Reordered in the stack')}><ChevronUp /></IconButton>
-      <IconButton label="Move later" size={IconSize.Sm} disabled={place < 0 || place >= siblings.length - 1} onclick={() => commit(reorderChild(doc, parent.id, clip.id, place + 1), 'Reordered in the stack')}><ChevronDown /></IconButton>
+      {#if siblings.length > 1}
+        <IconButton label="Move earlier" size={IconSize.Sm} disabled={place <= 0} onclick={() => commit(reorderChild(doc, parent.id, clip.id, place - 1), 'Reordered in the stack')}><ChevronUp /></IconButton>
+        <IconButton label="Move later" size={IconSize.Sm} disabled={place < 0 || place >= siblings.length - 1} onclick={() => commit(reorderChild(doc, parent.id, clip.id, place + 1), 'Reordered in the stack')}><ChevronDown /></IconButton>
+      {/if}
       <IconButton label="Take out of the stack" size={IconSize.Sm} data-testid="auto-layout-leave" onclick={() => commit(leaveStack(doc, clip.id), 'Took the clip out of the stack')}><LogOut /></IconButton>
     </div>
   {/if}
