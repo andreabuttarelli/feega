@@ -900,7 +900,10 @@ studio
 
 program
   .command('app-account <projectId>')
-  .description('Show the TEST account of your app the project chat logs in with, or --forget it')
+  .description('Show, set or --forget the TEST account of your app that the chat and code import sign in with')
+  .option('--login-url <url>', 'Login page of your app, to set the test account')
+  .option('--email <email>', 'Test account email')
+  .option('--password <password>', 'Test account password (omit to keep the saved one)')
   .option('--forget', 'Delete the test account and its session')
   .action(async (projectId: string, opts) => {
     const { cmdAppAccount } = await import('./commands/app-account.ts');

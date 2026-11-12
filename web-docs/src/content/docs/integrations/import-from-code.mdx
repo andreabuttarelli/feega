@@ -54,12 +54,28 @@ Choose several and every page lands once per combination, side by side in the sa
 | Not switched | Why |
 |---|---|
 | Locale, text direction | The browser language is fixed: the default catalog is shown. |
-| Login, feature flags, env vars, loading, empty and error states | The dev server renders what its own setup gives. |
+| Feature flags, env vars, loading, empty and error states | The dev server renders what its own setup gives. Login: see [Pages behind a login](#pages-behind-a-login). |
 | A component variant the route does not render | Only what appears on the page is drawn. The import response lists every component found in the code with its axes, and which no page rendered (`library.uncaptured`). |
 
 ### Edits on a dark board
 
 Tailwind projects only: a change on a dark board is written as a `dark:` class (`dark:bg-[#101010]`) and replaces the earlier `dark:` class of the same kind. A change on a light board edits the plain class and leaves the `dark:` ones alone. Without Tailwind a dark edit is listed as not written back, and so is any edit made at a width other than desktop, because a plain rule would change every width.
+
+## Pages behind a login
+
+A page that sends the import to a sign-in page (`/billing` redirected to `/login`) is not imported as the login form under its name: it is listed as **needs sign-in**, and the other pages import as usual. If every page needs sign-in, nothing is imported and the dialog says so.
+
+To capture those pages, save a **test account** of your app in **Project settings → Test app account** (login page URL, email, password), or with `feega app-account <projectId> --login-url … --email … --password …`, or the MCP tool `set_app_account`. The import dialog shows it under **Sign-in for protected pages**. Before capturing, the import opens the same login path on the app running in the sandbox, signs in, and captures every page in that session. The session stays inside that import: it never replaces the one the chat keeps.
+
+Use a TEST account: the AI can see these credentials, and the chat uses the same account to photograph your app.
+
+| Case | What happens |
+|---|---|
+| No test account | Protected pages are listed as needing sign-in; public pages import. |
+| Sign-in fails (wrong password, captcha, two-step login, no form on the login path) | Each protected page is listed with the reason; public pages import. |
+| The app's sign-in needs a database, an auth provider or secrets the sandbox does not have | Sign-in fails as above. Import from the deployed site with [Import from URL](/integrations/import-from-url/); passing env values to one import is planned. |
+| A login form shown without changing the URL | Not detected: the page imports as it renders. |
+| Folder imports on this computer | Do not sign in. |
 
 ## Design system
 

@@ -146,7 +146,7 @@ and spends credits only with that `quoteId` (a changed selection or price is a 4
 `studio_run`, `studio_more` (`variations`), `studio_cancel`, `studio_retry`, `studio_regenerate`,
 `studio_approve` and `studio_reject` act on a batch (`batch_id`, `item_ids`); run, more, retry and regenerate spend credits.
 
-Test app account: the project chat logs in to the user's own app with a TEST account the user gives it in chat, and photographs its screens. `get_app_account` shows that account (never the password), `forget_app_account` drops it and its session.
+Test app account: the project chat logs in to the user's own app with a TEST account, and photographs its screens; code import signs in with it to capture routes behind a login. The user gives it in chat, in project settings, or through `set_app_account`. `get_app_account` shows that account (never the password), `forget_app_account` drops it and its session.
 
 Cloud files: `cloud` lists, imports and exports Google Drive and Dropbox files and disconnects a provider; `figma_token_status` says whether a Figma token is saved. CLI: `feega cloud status|files|import|export|disconnect`, `feega figma-token`.
 

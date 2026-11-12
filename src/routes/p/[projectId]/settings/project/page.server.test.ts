@@ -59,6 +59,34 @@ describe('settings/project actions', () => {
     expect(calls.find((c) => c.table === 'app_accounts' && c.op === 'delete')?.filters).toEqual(expect.arrayContaining([['project_id', PROJECT], ['org_id', ORG]]));
   });
 
+  it('saveAppAccount salva l\'account di test del progetto nella sua org, senza sessione', async () => {
+    const { db, calls } = fakeDb({ ...seed(), app_accounts: [] }, { filter: true });
+
+    const result = (await run('saveAppAccount', { loginUrl: 'https://app.acme.example/login', email: 'qa@acme.example', password: 'fake-test-password' }, db)) as { savedAccount: boolean };
+
+    expect(result.savedAccount).toBe(true);
+    expect(calls.find((c) => c.table === 'app_accounts' && c.op === 'upsert')?.payload).toMatchObject({ project_id: PROJECT, org_id: ORG, login_url: 'https://app.acme.example/login', email: 'qa@acme.example', test_password: 'fake-test-password', session: { cookies: [], storage: {} }, session_until: null, actor_kind: 'user', actor_id: USER.id });
+  });
+
+  it('saveAppAccount senza password tiene quella già salvata', async () => {
+    const stored = { project_id: PROJECT, org_id: ORG, login_url: 'https://app.acme.example/login', email: 'old@acme.example', test_password: 'fake-stored-password', session: null, session_until: null };
+    const { db, calls } = fakeDb({ ...seed(), app_accounts: [stored] }, { filter: true });
+
+    await run('saveAppAccount', { loginUrl: stored.login_url, email: 'qa@acme.example', password: '' }, db);
+
+    expect(calls.find((c) => c.op === 'upsert')?.payload).toMatchObject({ email: 'qa@acme.example', test_password: 'fake-stored-password' });
+  });
+
+  it('saveAppAccount rifiuta un login di una piattaforma terza o senza password, senza scrivere', async () => {
+    const { db, calls } = fakeDb({ ...seed(), app_accounts: [] }, { filter: true });
+
+    const blocked = (await run('saveAppAccount', { loginUrl: 'https://www.instagram.com/accounts/login', email: 'qa@acme.example', password: 'x' }, db)) as { status: number };
+    const empty = (await run('saveAppAccount', { loginUrl: 'https://app.acme.example/login', email: 'qa@acme.example', password: '' }, db)) as { status: number };
+
+    expect([blocked.status, empty.status]).toEqual([400, 400]);
+    expect(calls.find((c) => c.op === 'upsert')).toBeUndefined();
+  });
+
   it('rename scrive il nome nuovo sul progetto della sua org', async () => {
     const { db, calls } = fakeDb(seed(), { filter: true });
 

@@ -4,6 +4,7 @@
   import { isLocalMode } from '$lib/local-user';
   import { canPickDirectory, listedFolder, pickDirectory } from '$lib/code-upload/pick-folder';
   import { SNAPSHOT_MESSAGES, type Snapshot } from '$lib/code-upload/snapshot';
+  import CodeImportSignIn from './CodeImportSignIn.svelte';
   import { githubBranches, githubConnect, githubDisconnect, githubRepos, githubStatus, importCode, repoLink, tokensFound, uploadFolder, type CodeLanded, type CodeTarget, type RenderCondition, type GithubRepo, type GithubStatus } from '$lib/canvas/code-import-client';
 
   let { projectId, canvasId, at, onimported, onclose }: { projectId: string; canvasId: string; at: { x: number; y: number }; onimported: (landed: CodeLanded) => void; onclose: () => void } = $props();
@@ -20,6 +21,7 @@
     failed: 'The page could not be opened.',
     unreadable: 'Nothing on that page could be read.',
     rate_limited: 'Two imports every ten minutes. Try again shortly.',
+    sign_in_needed: 'Every page asked for went to a sign-in page. Add a TEST account in project settings, or check it.',
     choose_app: 'This repository holds several apps. Pick one and import again.'
   };
   const FALLBACK_REFUSAL = 'Could not import that app.';
@@ -30,7 +32,7 @@
   let routes = $state('/');
   let storybook = $state('');
   let folder = $state('');
-  let uploaded = $state<{ path: string; name: string } | null>(null);
+  let uploaded = $state<{ path: string; name: string; withheld: string[] } | null>(null);
   let uploading = $state(false);
   let folderInput = $state<HTMLInputElement | null>(null);
   let busy = $state(false);
@@ -177,7 +179,7 @@
     }
     uploading = true;
     const done = await uploadFolder(projectId, snapshot.name, snapshot.archive).finally(() => (uploading = false));
-    uploaded = done.ok ? { path: done.value, name: snapshot.name } : null;
+    uploaded = done.ok ? { path: done.value, name: snapshot.name, withheld: snapshot.withheld } : null;
     message = done.ok ? null : 'The folder could not be uploaded. Try again.';
   }
 
@@ -252,7 +254,7 @@
         <p class="ui-note">A project folder on this computer is uploaded once and runs in a sandbox, like a GitHub repo. Imported once, no sync: edits stay on the canvas. node_modules, build output and what .gitignore leaves out are skipped.</p>
         <div class="ui-row">
           <button type="button" class="ui-btn rounded-sm" disabled={uploading || busy} onclick={pickUpload} data-testid="code-import-pick-folder">{uploading ? 'Uploading…' : uploaded ? 'Pick another folder' : 'Pick folder'}</button>
-          {#if uploaded}<span class="ui-note" data-testid="code-import-uploaded">{uploaded.name}</span>{/if}
+          {#if uploaded}<span class="ui-note" data-testid="code-import-uploaded">{uploaded.name}{uploaded.withheld.length ? ` · ${uploaded.withheld.length} files withheld: ${uploaded.withheld.join(', ')}` : ''}</span>{/if}
         </div>
         <input bind:this={folderInput} class="sr-only" type="file" webkitdirectory tabindex="-1" aria-hidden="true" onchange={async (e) => upload(await listedFolder(e.currentTarget.files))} />
         <input class="rounded-sm" type="text" placeholder="/  /settings  /users" aria-label="Pages" bind:value={routes} data-testid="code-import-upload-route" />
@@ -269,7 +271,7 @@
           {#each WIDTHS as w (w.id)}
             <label><input type="checkbox" value={w.id} bind:group={widths} data-testid={`code-import-width-${w.id}`} /> {w.label}</label>
           {/each}
-          <p class="ui-note">Each page lands once per theme and width, side by side. Language, login, flags and loading or error states are not switched.</p>
+          <p class="ui-note">Each page lands once per theme and width, side by side. Language, flags and loading or error states are not switched.</p>
         </fieldset>
         <fieldset class="ui-conditions" data-testid="code-import-wait">
           <legend>Extra wait before capture (ms)</legend>
@@ -279,6 +281,9 @@
           {/each}
           <p class="ui-note">Pages already wait for the page to stop changing. Add time only for content that arrives late, such as a table of contents after a fetch.</p>
         </fieldset>
+        {#if !localMode}
+          <CodeImportSignIn {projectId} />
+        {/if}
         {#if lookup}
         <fieldset class="ui-conditions" data-testid="code-import-design">
           <label><input type="checkbox" bind:checked={designSystem} onchange={() => (designTouched = true)} data-testid="code-import-design-system" /> Design system</label>

@@ -4,7 +4,9 @@ export type DesignLanded = { tokens: number; byClass: number; byRule: number; by
 
 export type LibraryLanded = { components: { name: string; file: string; axes: Record<string, { values: string[]; default: string | null }>; captured: boolean; cells: number }[]; uncaptured: string[] };
 
-export type CodeLanded = { nodes: unknown[]; undo: unknown[]; skipped: string[]; truncated: boolean; pages: string[]; components: number; variants: number; instances: number; design?: DesignLanded; library?: LibraryLanded };
+export type LockedRoute = { label: string; reason: string; detail?: string };
+
+export type CodeLanded = { nodes: unknown[]; undo: unknown[]; skipped: string[]; locked?: LockedRoute[]; truncated: boolean; pages: string[]; components: number; variants: number; instances: number; design?: DesignLanded; library?: LibraryLanded };
 
 export type RenderCondition = { scheme: 'light' | 'dark'; width: number };
 
@@ -82,4 +84,11 @@ export async function uploadFolder(projectId: string, name: string, archive: Uin
   }
   const put = await fetchFn(signed.value.uploadUrl, { method: 'PUT', headers: { 'content-type': signed.value.mimeType }, body: new Blob([archive as BlobPart]) }).catch(() => null);
   return put?.ok ? { ok: true, value: signed.value.path } : { ok: false, error: UNAVAILABLE };
+}
+
+export type TestAccount = { loginUrl: string; email: string; sessionUntil: number | null };
+
+export async function testAccount(projectId: string, fetchFn: typeof fetch = fetch): Promise<TestAccount | null> {
+  const got = await asked<{ account: TestAccount | null }>(`/api/v1/projects/${encodeURIComponent(projectId)}/app-account`, {}, fetchFn);
+  return got.ok ? got.value.account : null;
 }

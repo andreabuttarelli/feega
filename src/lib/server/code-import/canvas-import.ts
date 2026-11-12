@@ -29,11 +29,18 @@ import { appOf, PlanRefusal, type PlanRefused } from './run-plan';
 import { snapshotSha, uploadedArchive, uploadOf, uploadSource } from './upload-source';
 import { DataCheck, patchNodeData } from '$lib/server/repos/canvas';
 import type { CodeOriginData } from '$lib/canvas/motion-node';
+import { appAccountStore } from '$lib/server/repos/app-accounts';
+import type { TestAccount } from './sign-in';
 
 const IMPORT_WINDOW_MS = 10 * 60_000;
 const IMPORTS_PER_WINDOW = 2;
 
 const SANDBOX_LABEL = 'code-import-sandbox';
+
+async function testAccountOf(scope: CodeScope): Promise<TestAccount | null> {
+  const account = await appAccountStore(scope.db, scope).read().catch(() => null);
+  return account ? { loginUrl: account.loginUrl, email: account.email, password: account.password } : null;
+}
 
 const limiter = rateWindow({ limit: IMPORTS_PER_WINDOW, windowMs: IMPORT_WINDOW_MS });
 
@@ -100,7 +107,7 @@ export async function importCodeInto(scope: CodeScope, canvasId: string, ask: Co
   const code = await githubReader(scope, ask.repo ?? '');
   const github = githubFor(scope.db, scope);
   const branches: BranchList = async (repo) => (await github.branches(repo)) ?? branchesOf(publicCall(), repo);
-  const done = await importCodeAt({ ...land, repo: ask.repo ?? '', app: ask.app, routes: ask.routes, conditions: ask.conditions, delay: ask.delay, runner: sandboxOf(scope), archive: github.archive, branches, code, designSystem: ask.designSystem });
+  const done = await importCodeAt({ ...land, repo: ask.repo ?? '', app: ask.app, routes: ask.routes, conditions: ask.conditions, delay: ask.delay, runner: sandboxOf(scope), archive: github.archive, branches, code, designSystem: ask.designSystem, account: await testAccountOf(scope) });
   if (done.outcome === CodeImportOutcome.Ok && done.origin) {
     const { app, ...origin } = done.origin;
     await rememberOrigin(scope, done.frameId, { kind: SourceKind.Github, ...origin, ...(app ? { app } : {}), routes: ask.routes.length ? ask.routes : ['/'], ...(ask.conditions ? { conditions: ask.conditions } : {}), ...delayOf(ask), ...tokensOf(done) });
@@ -135,7 +142,7 @@ async function importUploadInto(scope: CodeScope, land: LandAsk, ask: CodeImport
   }
 
   const code = () => uploadSource(archive).read('');
-  const done = await importRepoAt({ ...land, repo: { owner: UPLOAD_OWNER, repo: upload.name, ref: null }, app, routes, conditions: ask.conditions, delay: ask.delay, runner: sandboxOf(scope), archive, code, designSystem: ask.designSystem });
+  const done = await importRepoAt({ ...land, repo: { owner: UPLOAD_OWNER, repo: upload.name, ref: null }, app, routes, conditions: ask.conditions, delay: ask.delay, runner: sandboxOf(scope), archive, code, designSystem: ask.designSystem, account: await testAccountOf(scope) });
   if (done.outcome === CodeImportOutcome.Ok) {
     await rememberOrigin(scope, done.frameId, { kind: SourceKind.Upload, repo: upload.path, branch: null, sha: snapshotSha(archive), ...(app ? { app } : {}), routes, ...(ask.conditions ? { conditions: ask.conditions } : {}), ...delayOf(ask), ...tokensOf(done) });
   }
