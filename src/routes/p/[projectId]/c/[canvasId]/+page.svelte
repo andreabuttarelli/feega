@@ -181,6 +181,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { idsFrom, planComponent, planCopy, planFree, planMove, type FrameSnap } from '$lib/motion/move-plan';
   import { frameHead } from '$lib/canvas/frame-outlines';
   import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
+  import type { TemplateEntry } from '$lib/motion/template/library';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
   import type { SceneDrop } from '$lib/canvas/scene-drop';
@@ -2445,7 +2446,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   let componentPickFor = $state<string | null>(null);
-  const componentTemplates = $derived([...BUILTIN_TEMPLATES, ...data.orgTemplates]);
+  let arcTemplates = $state<TemplateEntry[]>([]);
+  const componentTemplates = $derived([...BUILTIN_TEMPLATES, ...arcTemplates, ...data.orgTemplates]);
   const componentItems = $derived(componentCatalogue(componentTemplates));
   const componentPicking = $derived.by(() => {
     const row = componentPickFor ? nodes.find((n) => n.id === componentPickFor) : null;
@@ -2459,6 +2461,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   let frameLibraryAt = $state<{ x: number; y: number } | null>(null);
+  const libraryOpen = $derived(Boolean(componentPickFor || frameLibraryAt));
+  $effect(() => {
+    if (libraryOpen && !arcTemplates.length) {
+      void import('$lib/motion/template/arc').then((m) => (arcTemplates = m.ARC_TEMPLATES));
+    }
+  });
   const catalogPosters = new SvelteMap<string, string>();
   let frameMedia = $state<LibraryMedia[]>([]);
   const frameMediaUrls = $derived(Object.fromEntries(frameMedia.map((m) => [m.id, m.url ?? m.previewUrl])));
