@@ -30,6 +30,7 @@
   const percented = $derived(sizing === Sizing.Percent);
   const setPx = $derived(Math.round(Number(clip.props[axis] ?? 0) * doc[axis]));
   const capped = $derived(sizing === Sizing.Fixed && setPx > laidPx);
+  const shownPx = $derived(sizing === Sizing.Fixed ? setPx : laidPx);
   let open = $state(false);
   let root = $state<HTMLDivElement | null>(null);
 
@@ -73,7 +74,7 @@
 {/snippet}
 
 <div class="relative min-w-0" bind:this={root} data-testid={`stack-size-${axis}`} data-sizing={sizing}>
-  <NumberField label={name.short} name={name.label} value={percented ? (item[PERCENT_KEY[axis]] ?? MAX_PERCENT) : laidPx} range={percented ? PERCENT_RANGE : PX_RANGE} unit={percented ? '%' : ''} trailing={mode} onchange={type} />
+  <NumberField label={name.short} name={name.label} value={percented ? (item[PERCENT_KEY[axis]] ?? MAX_PERCENT) : shownPx} range={percented ? PERCENT_RANGE : PX_RANGE} unit={percented ? '%' : ''} trailing={mode} onchange={type} />
   {#if capped}
     <p class="mt-0.5 text-ui-caption text-ui-text-3" role="status" data-testid={`stack-capped-${axis}`}>Capped at {laidPx} px by the stack</p>
   {/if}

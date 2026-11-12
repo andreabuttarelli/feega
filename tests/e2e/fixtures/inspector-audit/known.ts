@@ -24,27 +24,6 @@ const LABEL_ROW_17PX: Known = {
 };
 
 export const KNOWN: Record<string, Known> = {
-  '0752f883/stack/W/ArrowUp': {
-    mouse: [Check.Commit],
-    keyboard: [Check.Commit],
-    severity: Severity.Major,
-    why: 'ArrowUp in W of a text that sits in an imported stack changes nothing',
-    ref: 'src/lib/components/motion/StackSizeChip.svelte:38 (type), cause not isolated'
-  },
-  '0752f883/stack/W/type 120 + Enter': {
-    keyboard: [Check.Commit],
-    unstable: { mouse: [Check.Commit] },
-    severity: Severity.Major,
-    why: 'a typed W on a text in an imported stack does not land when the field is reached by Tab, and only sometimes by click',
-    ref: 'src/lib/components/motion/StackSizeChip.svelte:38 (type), cause not isolated'
-  },
-  'frame/frame/Frame width/type 1200 + Enter': {
-    keyboard: [Check.Commit],
-    unstable: { mouse: [Check.Commit] },
-    severity: Severity.Major,
-    why: 'the field shows 1200 × 1200 but the frame doc keeps 1080 for more than 6 s',
-    ref: 'src/lib/components/motion/FramePresetSection.svelte:43 (resize), cause not isolated'
-  },
 
   'text/text/Paragraph spacing/type 1 + Enter': {
     mouse: [Check.Size],
