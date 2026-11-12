@@ -151,6 +151,14 @@ export class FrameEditSession {
     this.scheduleSave(summary);
   }
 
+  showPending(root: MotionDoc, summary: string) {
+    if (this.access === DocAccess.Read) {
+      return;
+    }
+    this.history = followHead(this.history, root);
+    this.scheduleSave(summary);
+  }
+
   undo() {
     if (this.access === DocAccess.Read) {
       return;

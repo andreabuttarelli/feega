@@ -1,6 +1,7 @@
 import { DESIGN_MAX_SIDE, MAX_TRACKS, compOf, newClip, type MotionClip, type MotionComp, type MotionDoc, type MotionTrack } from '@feega/motion-core/motion/doc';
 import { defaultProps } from '@feega/motion-core/motion/components';
 import { reframed, type Size } from '$lib/motion/comp-frame';
+import type { ImportMap } from './import-map';
 import { freezeLayout } from '$lib/motion/layout/ops';
 import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import type { Stroke } from '@feega/motion-core/motion/stroke/model';
@@ -258,7 +259,12 @@ export function addBoards(before: MotionDoc, piece: MotionDoc, boardIds: readonl
   return { ok: true, doc, boards: Object.fromEntries(boardIds.map((id) => [id, map.clip.get(id) ?? id])), reused: reused.size, kept: [...new Set(kept)] };
 }
 
-export const isPlaceholder = (clip: Pick<MotionClip, 'name'>, label: string) => clip.name === `${PLACEHOLDER_PREFIX}${label}…`;
+export function boardParent(doc: MotionDoc, map: ImportMap | undefined | null): string | null {
+  const clips = clipsOf(doc.tracks);
+  const first = (map?.pages ?? []).flatMap((p) => p.boards ?? []).map((b) => clips.find((c) => c.id === b.clip)).find(Boolean);
+  return first?.parent ?? null;
+}
+
 
 export function placeholderOf(doc: MotionDoc, label: string, size: Size, id: string): MotionDoc {
   const board = newClip({ id, from: 0, durationInFrames: doc.durationInFrames, component: 'Shape', name: `${PLACEHOLDER_PREFIX}${label}…`, props: { ...defaultProps('Shape'), shape: 'rect', x: CENTRE, y: CENTRE, width: FULL, height: FULL, fill: PLACEHOLDER_FILL } });

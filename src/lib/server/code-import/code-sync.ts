@@ -18,7 +18,7 @@ import { githubSource, SourceKind, type CodeSource, type GithubCalls } from './c
 import { folderOf, folderSource } from './folder-source';
 import { uploadedArchive, uploadOf, uploadSource } from './upload-source';
 import { BASE_CONDITIONS, conditionsOf, labelOf, type RenderConditions, type Variant } from './render-conditions';
-import { addBoards, AddRefusal } from '$lib/canvas/code-boards';
+import { addBoards, AddRefusal, boardParent } from '$lib/canvas/code-boards';
 import { boardsUsed, condOf, MAX_FRAME_BOARDS, mergedMap, type ImportMap } from '$lib/canvas/import-map';
 import { routesFound } from './canvas-import';
 import { mapOf } from './import-map-of';
@@ -222,11 +222,6 @@ const ADD_REFUSED: Record<AddRefusal, SyncRefusal> = {
 const newId = () => crypto.randomUUID().slice(0, 8);
 
 const clipIds = (doc: MotionDoc) => new Set([...doc.tracks, ...Object.values(doc.comps).flatMap((c) => c.tracks)].flatMap((t) => t.clips.map((c) => c.id)));
-
-function boardParent(doc: MotionDoc, map: ImportMap | undefined): string | null {
-  const first = (map?.pages ?? []).flatMap((p) => p.boards ?? []).map((b) => doc.tracks.flatMap((t) => t.clips).find((c) => c.id === b.clip)).find(Boolean);
-  return first?.parent ?? null;
-}
 
 const variantsOfAsk = (ask: AddAsk): Variant[] => ask.routes.flatMap((route) => (ask.conditions?.length ? ask.conditions : [BASE_CONDITIONS]).map((conditions) => ({ route, label: labelOf(route, conditions), conditions })));
 
