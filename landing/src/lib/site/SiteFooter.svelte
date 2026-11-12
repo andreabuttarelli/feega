@@ -2,7 +2,8 @@
   import { LEGAL_DOCS } from './legal';
   import DownloadMac from './DownloadMac.svelte';
   import Mark from './Mark.svelte';
-  import { APP_URL, MAC_GUIDE_URL, SOCIAL_LINKS } from './links';
+  import { APP_URL, MAC_GUIDE_URL, SOCIAL_LINKS, STORY_URL } from './links';
+  import { COMPARE_PATH } from './compare';
   import { CODEBASE_PATH } from './codebase';
 
   const legal = Object.entries(LEGAL_DOCS).map(([slug, doc]) => ({ href: `/${slug}`, label: doc.label }));
@@ -21,7 +22,8 @@
       <a href="/">Product</a>
       <a href={CODEBASE_PATH}>Codebase</a>
       <a href={APP_URL}>Sign In</a>
-      <a href="/blog">Compare</a>
+      <a href={COMPARE_PATH}>Compare</a>
+      <a href={STORY_URL}>Blog</a>
       <DownloadMac class="dl" />
       <a class="dl-guide" href={MAC_GUIDE_URL}>Unsigned app: how to open it</a>
     </div>
