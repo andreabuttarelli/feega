@@ -5,6 +5,7 @@ import { diffDoc } from '$lib/motion/doc-ops';
 import { appendRevision, readHead } from '$lib/server/repos/motion-revisions';
 import { revisionsDb } from '$lib/server/repos/motion-revisions.test';
 import type { Db } from '$lib/server/db/client';
+import { VarType, type Variable } from '@feega/motion-core/motion/variables-model';
 import { createMemoryDb } from '$lib/server/local/memory-db';
 import { OpsOutcome, commitDoc, commitOnto, commitOps } from './frame-ops';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
@@ -157,8 +158,9 @@ describe('commitOnto: a whole-doc write lands as ops on whatever head is current
   });
 });
 
-const colour = (hex: string) => ({ type: 'colour' as const, values: { Default: hex } });
-const withVars = (doc: MotionDoc, vars: Record<string, ReturnType<typeof colour>>): MotionDoc => ({ ...doc, variables: { Brand: { modes: ['Default'], vars } } });
+type Vars = NonNullable<MotionDoc['variables']>[string]['vars'];
+const colour = (hex: string): Vars[string] => ({ type: 'colour' as Vars[string]['type'], values: { Default: hex } });
+const withVars = (doc: MotionDoc, vars: Vars): MotionDoc => ({ ...doc, variables: { Brand: { modes: ['Default'], vars } } });
 
 describe('a stale save never overwrites what landed after its base', () => {
   const pulled = () => withVars(start(), { ink: colour('#111111'), 'brand-rose': colour('#ff3366'), accent: colour('#3366ff') });
