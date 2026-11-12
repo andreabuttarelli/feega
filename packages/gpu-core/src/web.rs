@@ -37,6 +37,7 @@ const UNMOVED: Lookup = Lookup { scale: 1.0, x: 0.0, y: 0.0 };
 const NOT_TIMED: u64 = u64::MAX;
 const TILE_BUDGET_GESTURE_MS: f64 = 4.0;
 const TILE_BUDGET_STILL_MS: f64 = 12.0;
+const TILE_BUDGET_PAUSED_MS: f64 = 6.0;
 const SPARE_TILES: usize = 32;
 const EVICT_DOWN_TO_PERCENT: usize = 90;
 
@@ -714,8 +715,11 @@ impl WebCore {
             self.forget_rest();
         }
         self.snapshot_lifts(screen);
-        let moving = matches!(self.motion, CoreMotion::Gesture) && !rest_due(js_sys::Date::now() - self.changed_at);
-        let budget = if moving { TILE_BUDGET_GESTURE_MS } else { TILE_BUDGET_STILL_MS };
+        let budget = match (self.motion, rest_due(js_sys::Date::now() - self.changed_at)) {
+            (CoreMotion::Still, _) => TILE_BUDGET_STILL_MS,
+            (CoreMotion::Gesture, true) => TILE_BUDGET_PAUSED_MS,
+            (CoreMotion::Gesture, false) => TILE_BUDGET_GESTURE_MS,
+        };
         let started = js_sys::Date::now();
         let mut rastered = 0;
         let mut queue = self.tiles.queue(self.tiles.frame(self.camera, screen).missing);
