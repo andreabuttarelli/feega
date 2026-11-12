@@ -169,8 +169,20 @@ Each clip drawn from a repo element carries `source = { at: "file:line:col", was
   the page is the hosted one (`liveBrowser`), fenced like URL import.
 - Caps: sandbox 6 min wall clock, 4 vCPU; install 4 min; dev server ready in 90 s; repo files
   scanned for names 4 000; then the URL import caps (1 500 nodes, 3 840 px, 60 images).
-- Package manager from the lockfile (`pnpm-lock.yaml`, `yarn.lock`, `bun.lock*`, else npm). Dev
-  script: `dev`. Port read from the dev server output, fallback 5173 / 3000.
+- How the repo boots is one pure plan, `runPlan` (`run-plan.ts`), shared by the sandbox and the
+  local folder: from the plan-relevant file list (manifests, lockfiles, configs, version files)
+  and the `package.json` texts it decides the app folder, the install folder, install and dev
+  argv, port/host flags, environment, Node line, or a typed refusal (`no_package`, `no_script`,
+  `choose_app` with the apps). Tables: `FRAMEWORKS` (one row per framework: detection, script
+  preference, flags, default port) and `MANAGERS` (lockfiles, binary, install args, Node pin).
+  Package manager from `packageManager` (pinned through `npx -y <pm>@<version>`; corepack is not
+  used because Node 25+ no longer ships it), else the lockfile. Node: `.nvmrc`/`.node-version`/
+  `engines.node` mapped to the sandbox images `node:22`, `universal` (Node 24), `node:26`; the
+  sandbox boots on `universal` to read the files and reboots once on another image when the plan
+  asks for it. The dev server is probed on our port, then the framework's default.
+- Monorepo: an app is a non-root package with a framework and a script; the workspace root runs
+  only when it holds no app. `tree/<ref>/<path>` is split against the repo's branch list
+  (`located`), so a branch with `/` works; the path, or `app`, picks the nearest package.
 - Cost: one sandbox (~$0.01–0.03 per import at Vercel Sandbox CPU pricing) + one Browserless
   session. No model call, so not `gateAiAction`; 2 imports per user per 10 minutes.
 
