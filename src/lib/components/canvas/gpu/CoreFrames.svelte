@@ -60,6 +60,7 @@
   import { Motion, heldBy, hudLine, watchCrashes } from '$lib/canvas/gpu/crash-watch';
   import { platformOf } from '$lib/canvas/perf/platform';
   import { startCanvasPerf } from '$lib/canvas/perf/perf-beacon';
+  import { flightNote, startFlight } from '$lib/canvas/debug/flight';
   import { Camera } from '$lib/canvas/perf/session-perf';
   import { liftOut, liftedPut, movingGroup, restGroup, type Lift, type Lifted } from '$lib/canvas/core/lifted-drag';
   import { AttachStep, GpuBackend, afterAttachFailure, backendAfterLoss, isTrap, type BackendSwitch } from '$lib/canvas/gpu/gpu-loss';
@@ -105,6 +106,14 @@
   const crashes = watchCrashes({ device: currentDevice(), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, resolution });
   const RASTERED = new Set<Outcome>([Outcome.Full, Outcome.Partial]);
   const perf = startCanvasPerf({ canvasId: untrack(() => place?.canvasId ?? ''), device: currentDevice(), platform: platformOf(navigator.userAgent, navigator.maxTouchPoints), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, frames: () => frames.length, area: () => ({ width: Math.round(area.width), height: Math.round(area.height) }), memory: () => heldBy(crashes.sample), diedBefore: crashes.diedBefore, before: crashes.before });
+  const flight = startFlight({
+    canvasId: untrack(() => place?.canvasId ?? ''),
+    device: currentDevice(),
+    read: () => {
+      const s = crashes.sample;
+      return { x: view.x, y: view.y, zoom: view.zoom, camera, moving: gesture.active() ? 1 : 0, frames: frames.length, held: held.length, waiting, framePuts: framePuts.length, put: put.size, pictured: pictured.size, backend: BACKENDS[backend].name, backing: s.canvas, cacheBytes, textureBytes: s.textureBytes, textures: s.textures, texturesMade: s.texturesCreated, pictureBytes: s.pictureBytes, scratchBytes: s.scratchBytes, wasmBytes: s.wasmBytes, gpuLagMs: s.gpuLagMs };
+    }
+  });
   const EDIT_GIVE_UP_MS = 10_000;
   const editSeen = new Map<string, string>();
   const editsOwed = new Map<string, number>();
@@ -905,6 +914,7 @@
     const from = BACKENDS[backend].name;
     const to = BACKENDS[next].name;
     backendLog(from, to, why);
+    flightNote('backend-switch', { from, to, why });
     onbackend({ from, to, why });
     backend = next;
   }
@@ -925,6 +935,7 @@
     losses++;
     perf.deviceLost();
     perf.error(why instanceof Error ? why.message : String(why));
+    flightNote('gpu-lost', { backend: BACKENDS[backend].name, why: why instanceof Error ? why.message : String(why) });
     const next = backendAfterLoss(backend, losses, BACKENDS.length);
     if (next !== backend) {
       losses = 0;
@@ -1198,9 +1209,11 @@
   $effect(() => () => media.dispose());
   $effect(() => () => crashes.stop());
   $effect(() => () => perf.stop());
+  $effect(() => () => flight?.stop());
   $effect(() => {
     if (raster) {
       perf.backend(BACKENDS[backend].name);
+      flightNote('backend', { name: BACKENDS[backend].name });
     }
   });
 
@@ -1208,6 +1221,9 @@
 
 {#if DEBUG}
   <pre class="core-hud">{hud}</pre>
+{/if}
+{#if flight}
+  <div class="flight-badge" data-testid="flight-badge">debug recording · {flight.session}{flight.previous && !flight.previous.clean ? ` · ${flight.previous.session} crashed` : ''}</div>
 {/if}
 {#if TIMELINE}
   <LoadTimeline />
@@ -1241,6 +1257,20 @@
     background: rgb(0 0 0 / 0.7);
     pointer-events: none;
     white-space: pre-wrap;
+  }
+
+  .flight-badge {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    padding: 2px 6px;
+    border-radius: var(--ui-radius-xs);
+    font: 10px/1.4 ui-monospace, monospace;
+    color: #fff;
+    background: rgb(0 0 0 / 0.55);
+    pointer-events: none;
   }
 
   .core-grid {
