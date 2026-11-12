@@ -82,6 +82,24 @@ describe('font picker', () => {
     expect(document.activeElement).toBe(document.querySelector('input[type="search"]'));
   });
 
+  it('reopening selects the last search, so typing replaces it', () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    open();
+    const typed = document.querySelector<HTMLInputElement>('input[type="search"]')!;
+    typed.value = 'Inter';
+    typed.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+    typed.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    flushSync();
+
+    document.querySelector<HTMLButtonElement>('.font-picker > button')!.click();
+    flushSync();
+    const search = document.querySelector<HTMLInputElement>('input[type="search"]')!;
+
+    expect(search.value).toBe('Inter');
+    expect([search.selectionStart, search.selectionEnd]).toEqual([0, 'Inter'.length]);
+  });
+
   it('Escape closes only the picker and gives focus back to the font field', () => {
     Element.prototype.scrollIntoView = vi.fn();
     open();

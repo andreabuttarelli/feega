@@ -104,6 +104,12 @@
     pick(family, FontOrigin.Local);
   }
 
+  function focusSearch(panel: HTMLElement) {
+    const search = panel.querySelector<HTMLInputElement>(SEARCH);
+    search?.focus();
+    search?.select();
+  }
+
   function close() {
     open = false;
     trigger?.focus();
@@ -183,7 +189,7 @@
   <button bind:this={trigger} type="button" class={`${TRIGGER} rounded-sm bg-ui-input text-ui-text hover:bg-ui-input-hover`} style={`font-family: ${fontStack(value, fonts)}`} aria-expanded={open} aria-label={`Font ${value}`} onclick={toggle}>{value}</button>
   {#if missing}<p class="m-0 mt-0.5 text-[11px] text-amber-700 dark:text-amber-400" role="status" data-testid="font-missing">The file of {value} is gone: a fallback font is showing.</p>{/if}
   {#if open}
-    <div class="absolute inset-x-0 top-[calc(100%+2px)] z-20 grid max-h-[420px] gap-1 overflow-auto rounded-md bg-ui-raised p-1.5 text-ui-text shadow-ui-float" role="dialog" aria-label="Choose a font" tabindex="-1" onkeydown={walk} {@attach (el) => el.scrollIntoView({ block: 'nearest' })} {@attach dismissible(close)} {@attach (el) => el.querySelector<HTMLInputElement>(SEARCH)?.focus()}>
+    <div class="absolute inset-x-0 top-[calc(100%+2px)] z-20 grid max-h-[420px] gap-1 overflow-auto rounded-md bg-ui-raised p-1.5 text-ui-text shadow-ui-float" role="dialog" aria-label="Choose a font" tabindex="-1" onkeydown={walk} {@attach (el) => el.scrollIntoView({ block: 'nearest' })} {@attach dismissible(close)} {@attach focusSearch}>
       <input type="search" class={`${FIELD_INPUT} w-full`} placeholder="Search Google Fonts…" aria-label="Search fonts" bind:value={query} onkeydown={pickFirst} />
       <p class={GROUP}>In this video</p>
       <ul class="m-0 list-none p-0">
