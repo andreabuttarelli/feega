@@ -188,3 +188,25 @@ prints per device class and canvas size (frames: 1-10, 11-50, 51-200, 200+): ses
 load, over-budget share per gesture, edit latency and webgl fallback rate. Internal accounts
 (`INTERNAL` in the script: `test@dazero.co`, team domains, members of `PERF_TEAM_ORG_IDS`) are
 left out. The view `canvas_perf_sessions` flattens the same rows for SQL.
+
+## Where a slow frame went
+
+The shipped wasm has no function names, so a CPU profile of it cannot be split. For a profile, build
+a copy that keeps them, build the app on it, and put the shipped wasm back before committing:
+
+```bash
+npm run build:gpu-core:profile   # names kept; overwrites static/gpu-core/gpu_core*
+npm run build:node
+BENCH_CASE=landings BENCH_GESTURES=zoom npx playwright test -c tests/perf/playwright.config.ts
+node scripts/perf/profile-buckets.mjs perf-results/landings-zoom.cpuprofile <frames>
+git checkout -- static/gpu-core
+```
+
+`profile-buckets.mjs` files each sample under the innermost engine phase on its stack (plan, lay
+out, `prepare_items`, encode, present, tiles), WebGPU calls and wasm-bindgen glue apart from both,
+and idle, GC and native time apart from main-thread JS.
+
+Per frame, `window.__gpuCanvas.frames` also counts what the core did: `tiles` rastered, `draws`
+(display lists drawn, one per split piece), `uploads` (image uploads) and `uploadBytes`, beside
+`bakes`, `bakeMs`, `plans` and `planMs`. Counts do not move with machine load; compare them before
+milliseconds.
