@@ -428,16 +428,19 @@
 
   async function rebuildLive(f: FrameAt, source: LiveDoc) {
     const generation = liveGeneration.ask(f.id);
+    const key = `${f.id}:live${generation}`;
+    markFrame(key, Step.LiveAsked);
     const list = await liveOff(f, { revision: f.revision, ...source }).catch((e: unknown) => (console.warn('[canvas] core live frame failed', f.id, e), null));
     const built = list ? { list } : null;
     if (!built || !liveGeneration.newer(f.id, generation)) {
       return;
     }
+    markFrame(key, Step.LiveBuilt);
     const ready = await media.ready(built.list);
     if (!liveGeneration.land(f.id, generation)) {
       return;
     }
-    const key = `${f.id}:live${generation}`;
+    markFrame(key, Step.LiveReady);
     logGaps(f.id, built.list);
     lists = listed(lists, f.id, key, onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), loaded.get(f.id), drawnLast.get(f.id)?.group]);
     liveGroup = new Map(liveGroup).set(f.id, key);
