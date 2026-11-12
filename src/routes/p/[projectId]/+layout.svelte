@@ -283,13 +283,6 @@
     <CanvasTopBar
       {projectId}
       projectName={data.project.name}
-      projects={data.projects.map((p: { id: string; name: string; href: string; updatedAt: string; mode: string }) => ({
-        id: p.id,
-        name: p.name,
-        href: p.href,
-        updatedAt: p.updatedAt,
-        mode: p.mode
-      }))}
       projectMode={data.project.mode}
       canvasHref={currentCanvas?.href ?? ''}
       creditBalance={data.creditBalance}

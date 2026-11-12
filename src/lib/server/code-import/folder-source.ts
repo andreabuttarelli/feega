@@ -1,4 +1,4 @@
-import { spawn, execFile, type ChildProcess } from 'node:child_process';
+import { execFile, type ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, statSync } from 'node:fs';
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
@@ -7,16 +7,18 @@ import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, normalize, relative } from 'node:path';
 import { promisify } from 'node:util';
 import { namesIn } from './repo';
+import { discoverIn, type Discovery } from './component-discovery';
 import { planFile, runPlan, textsWanted, type PlanRefused, type RepoFacts, type RunPlan } from './run-plan';
 import type { FileChange, ReadFile } from './write-back';
 import type { CodeSource, Published } from './code-source';
 import { shimFiles, shimsFor, SHIM_CONFIG } from './folder-shims';
+import { spawnGroup, stopGroup } from './dev-children';
 
 const run = promisify(execFile);
 
 const SKIPPED_DIRS = new Set(['node_modules', '.git', '.svelte-kit', '.next', 'dist', 'build', '.vercel', '.turbo']);
 const WATCHED = /\.(svelte|vue|tsx|jsx|ts|js|html|css|json)$/;
-const COMPONENT_FILE = /\.(tsx|jsx)$/;
+const COMPONENT_FILE = /\.(tsx|jsx|js)$/;
 const MAX_FILES = 4_000;
 const READY_MS = 90_000;
 const POLL_MS = 500;
@@ -111,9 +113,13 @@ async function freePort(): Promise<number> {
   });
 }
 
+export class DevServerFailed extends Error {}
+
 type Served = { url: string; child: ChildProcess };
 
-const serving = new Map<string, Promise<Served>>();
+type Shared = { served: Promise<Served>; users: number };
+
+const serving = new Map<string, Shared>();
 
 async function ready(url: string): Promise<boolean> {
   const until = Date.now() + READY_MS;
@@ -152,39 +158,50 @@ async function factsAt(root: string): Promise<RepoFacts> {
 async function started(dir: string, plan: RunPlan): Promise<Served> {
   const [cmd, ...args] = plan.dev;
   const shimmed = await shimmedArgs(dir);
-  const child = spawn(cmd, [...args, ...shimmed], { cwd: dir, env: { ...process.env, ...plan.env }, stdio: 'ignore' });
+  const child = spawnGroup(cmd, [...args, ...shimmed], { cwd: dir, env: { ...process.env, ...plan.env }, stdio: 'ignore' });
   const url = `http://${LOOPBACK}:${plan.port}`;
   if (!(await ready(url))) {
-    child.kill();
-    throw new Error(`the dev server in ${dir} did not answer on ${url}`);
+    stopGroup(child.pid!);
+    throw new DevServerFailed(`the dev server in ${dir} did not answer on ${url}`);
   }
-  child.once('exit', () => serving.delete(dir));
   return { url, child };
 }
 
-export async function devServerOf(root: string, app: string | null): Promise<Served | PlanRefused> {
+function release(dir: string, shared: Shared) {
+  shared.users -= 1;
+  if (shared.users > 0) {
+    return;
+  }
+  serving.delete(dir);
+  shared.served.then((s) => stopGroup(s.child.pid!), () => undefined);
+}
+
+export async function withDevServer<T>(root: string, app: string | null, use: (url: string) => Promise<T>): Promise<T | PlanRefused> {
   const plan = runPlan(await factsAt(root), app, { host: LOOPBACK, port: await freePort() });
   if (!plan.ok) {
     return plan;
   }
 
   const dir = join(root, plan.appDir);
-  const known = serving.get(dir);
-  if (known) {
-    return known;
+  const shared = serving.get(dir) ?? { served: started(dir, plan), users: 0 };
+  serving.set(dir, shared);
+  shared.users += 1;
+  try {
+    return await use((await shared.served).url);
+  } finally {
+    release(dir, shared);
   }
-  const next = started(dir, plan).catch((e: unknown) => {
-    serving.delete(dir);
-    throw e;
-  });
-  serving.set(dir, next);
-  return next;
 }
 
 export async function folderNames(root: string): Promise<string[]> {
   const files = (await walk(root)).filter((f) => COMPONENT_FILE.test(f));
   const sources = await Promise.all(files.map((f) => readFile(join(root, f), 'utf8').catch(() => '')));
   return namesIn(sources.join('\n'));
+}
+
+export async function folderLibrary(root: string): Promise<Discovery> {
+  const read = async (paths: string[]) => Object.fromEntries(await Promise.all(paths.map(async (p) => [p, await readFile(join(root, p), 'utf8').catch(() => '')])));
+  return discoverIn(await walk(root), read);
 }
 
 export function folderSource(root: string): CodeSource {
@@ -194,3 +211,5 @@ export function folderSource(root: string): CodeSource {
     publish: (_base, files, ask) => published(root, files, ask.branch, ask.title)
   };
 }
+
+export const folderFiles = (root: string) => walk(root, root, [], () => true);

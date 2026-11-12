@@ -37,6 +37,7 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   draw_frame: 'Draw an empty frame at x,y with a width and a preset format or a height.',
   import_lottie: 'Import a Lottie animation (JSON or an https URL of a .json or .lottie) as an editable frame at x,y; answers what it could not carry over.',
   list_figma_frames: 'List the frames of a Figma file from its link (needs the Figma token saved in Settings).',
+  discover_routes: 'List the pages of a GitHub repo or local folder from its file router, without running it: path, file, static or dynamic with its params, values found in the code, and which are selected by default.',
   code_changes: 'Read what a frame imported from code would change in its source files: a unified patch, the files, and edits that cannot be written back.',
   code_publish: 'Send the code edits of an imported frame back: a new branch and pull request on GitHub (never the default branch), or the files of a local folder, committed on a feega/ branch when it is a git repo.',
   code_pull: 'Bring new commits on GitHub (or file changes in a local folder) into an imported frame, keeping canvas edits; where both changed the same thing the code wins and the conflict is reported.',

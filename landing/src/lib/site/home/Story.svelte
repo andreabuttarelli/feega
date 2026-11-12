@@ -25,7 +25,7 @@
   }
 
   .inner {
-    padding: 96px 16px;
+    padding: var(--site-section) 16px;
   }
 
   h2 span {
@@ -89,7 +89,7 @@
 
   @media (min-width: 1200px) {
     .inner {
-      padding: 160px 0;
+      padding: var(--site-section) 0;
     }
 
     h2 span {
@@ -112,7 +112,7 @@
 
   @media (min-width: 810px) and (max-width: 1199.98px) {
     .inner {
-      padding: 120px 16px;
+      padding: var(--site-section) 16px;
     }
 
     h2 span {

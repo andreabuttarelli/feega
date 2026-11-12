@@ -51,3 +51,5 @@ export function uploadSource(archive: Uint8Array): CodeSource {
     publish: async () => null
   };
 }
+
+export const uploadFiles = (archive: Uint8Array) => [...untarred(gunzipSync(archive)).keys()];

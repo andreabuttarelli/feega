@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { cn, type WithoutChildrenOrChild } from "$lib/utils.js";
 	import { materialPress } from "$lib/actions/material-press.js";
+	import { Closes, openLayer } from "$lib/components/ui/shell/dismiss";
 	import DropdownMenuPortal from "./dropdown-menu-portal.svelte";
 	import { DropdownMenu as DropdownMenuPrimitive } from "bits-ui";
 	import type { ComponentProps } from "svelte";
@@ -15,6 +16,10 @@
 	}: DropdownMenuPrimitive.ContentProps & {
 		portalProps?: WithoutChildrenOrChild<ComponentProps<typeof DropdownMenuPortal>>;
 	} = $props();
+
+	$effect(() => {
+		if (ref) return openLayer(() => {}, Closes.ItsOwner);
+	});
 
 	$effect(() => {
 		const el = ref;

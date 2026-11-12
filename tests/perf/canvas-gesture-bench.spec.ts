@@ -43,6 +43,8 @@ const ONLY = process.env.BENCH_SCENARIOS?.split(',') ?? null;
 const PROFILED = process.env.BENCH_PROFILE === '1';
 const DUMPED = process.env.BENCH_DUMP === '1';
 const SPEED = (process.env.BENCH_SPEED ?? Speed.Fast) as Speed;
+const VSYNC_OFF = ['--disable-gpu-vsync', '--disable-frame-rate-limit'];
+const LAUNCH_ARGS = ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', ...(process.env.BENCH_UNCAPPED === '1' ? VSYNC_OFF : [])];
 const STRETCH: Record<Speed, number> = { [Speed.Fast]: 1, [Speed.Medium]: 2.5, [Speed.Slow]: 6 };
 const EASE: Record<Speed, Ease> = { [Speed.Fast]: Ease.Flick, [Speed.Medium]: Ease.Smooth, [Speed.Slow]: Ease.Smooth };
 const ms = (fast: number) => fast * STRETCH[SPEED];
@@ -225,7 +227,7 @@ async function run(index: number, base: string, browser: Awaited<ReturnType<type
 
 test('gesture benchmark: gradual zoom and pan through real input', async ({ baseURL }) => {
   mkdirSync(OUT, { recursive: true });
-  const browser = await chromium.launch({ headless: false, args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist'] });
+  const browser = await chromium.launch({ headless: false, args: LAUNCH_ARGS });
   const runs: Partial<Record<Scenario, ScenarioRun>>[] = [];
   for (let i = 0; i < RUNS; i++) {
     runs.push(await run(i, baseURL!, browser));

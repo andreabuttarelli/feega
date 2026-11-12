@@ -22,6 +22,13 @@ const picked = only ? CORPUS.filter((e) => e.name === only || e.repo === only) :
 
 const NOT_LANDED = 'not_landed';
 
+async function discovered(entry: CorpusEntry): Promise<string[] | null> {
+  const query = new URLSearchParams({ repo: repoUrl(entry), ...(entry.app ? { app: entry.app } : {}) });
+  const res = await fetch(`${process.env.FEEGA_URL}/api/v1/projects/${process.env.FEEGA_PROJECT_ID}/code-import/routes?${query}`, { headers: { authorization: `Bearer ${process.env.FEEGA_API_KEY}` } }).catch(() => null);
+  const body = res?.ok ? await res.json().catch(() => null) : null;
+  return Array.isArray(body?.routes) ? body.routes.map((r: { path: string }) => r.path) : null;
+}
+
 async function imported(entry: CorpusEntry): Promise<ImportRun> {
   const base = process.env.FEEGA_URL!;
   const started = Date.now();
@@ -32,7 +39,7 @@ async function imported(entry: CorpusEntry): Promise<ImportRun> {
   });
   const ms = Date.now() - started;
   const body = await res.json().catch(() => ({}));
-  const common = { discovered: null, uses: null, fidelity: null, phases: { request: ms }, sandboxMs: ms };
+  const common = { discovered: await discovered(entry), uses: null, fidelity: null, phases: { request: ms }, sandboxMs: ms };
 
   if (!res.ok) {
     return { ...common, boot: { ok: false, failure: body.error ?? `http_${res.status}`, detail: body.detail ?? '' }, routes: [], components: null, variants: null, instances: null, tokens: null, bound: null };

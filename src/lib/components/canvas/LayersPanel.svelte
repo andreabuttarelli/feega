@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Region } from '$lib/canvas/key-region.svelte';
   import { localStore } from '$lib/browser-storage';
   import Eye from '@lucide/svelte/icons/eye';
   import EyeOff from '@lucide/svelte/icons/eye-off';
@@ -363,7 +364,7 @@
 {/if}
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-<div class="layers" class:touch={density === Density.Touch} bind:this={list} role="tree" aria-label="Layers" aria-multiselectable="true" tabindex="0" data-testid="layers" data-key-region="editor" style:padding-top={`${span.start * rowStep}px`} style:padding-bottom={`${(shown.length - span.end) * rowStep}px`} onkeydown={onKey}>
+<div class="layers" class:touch={density === Density.Touch} bind:this={list} role="tree" aria-label="Layers" aria-multiselectable="true" tabindex="0" data-testid="layers" data-key-region={Region.Layers} style:padding-top={`${span.start * rowStep}px`} style:padding-bottom={`${(shown.length - span.end) * rowStep}px`} onkeydown={onKey}>
   {#each visible as row (`${row.nodeId}/${row.key}`)}
     {@const RowIcon = row.instance ? Diamond : (KIND_ICON[row.kind] ?? ROW_ICON[row.type] ?? Square)}
     <div

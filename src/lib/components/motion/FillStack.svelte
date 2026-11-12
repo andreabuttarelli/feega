@@ -24,8 +24,9 @@
 
   type Asset = { id: string; kind: string; label: string; previewUrl: string };
   type Keys = { mark: (key: string) => KeyMark; toggle: (key: string) => void };
+  type Bound = { name: string; options: { key: string; value: string }[]; ondetach: () => void; onpick: (key: string) => void };
 
-  let { fills, assets, tokens, title = '', adder = Adder.Own, upload = null, gesture = null, palette = NO_COLOURS, keys = null, oncrop = null, open = $bindable(null), onchange }: { open?: number | null; palette?: () => readonly string[]; oncrop?: (() => void) | null; keys?: Keys | null; gesture?: LiveGesture | null; fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; adder?: Adder; upload?: MediaUploader | null; onchange: (fills: Fill[], summary: string) => void } = $props();
+  let { fills, assets, tokens, title = '', adder = Adder.Own, upload = null, gesture = null, palette = NO_COLOURS, keys = null, oncrop = null, open = $bindable(null), bound = null, onchange }: { bound?: Bound | null; open?: number | null; palette?: () => readonly string[]; oncrop?: (() => void) | null; keys?: Keys | null; gesture?: LiveGesture | null; fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; adder?: Adder; upload?: MediaUploader | null; onchange: (fills: Fill[], summary: string) => void } = $props();
 
   const PERCENT = 100;
   const setAdjust = (i: number, current: FillOf<FillType.Image>, key: Adjustment, value: number) => patch(i, { adjust: { ...current.adjust, [key]: value / PERCENT } }, 'Image adjustment');
@@ -56,7 +57,17 @@
   const color = (value: string) => resolveColor(value, tokens);
   const swatch = (fill: Fill) => swatchOf(fill, { color, picture: (f) => assets.find((a) => a.id === f.assetId)?.previewUrl ?? f.src });
 
-  const rowLabel = (f: Fill) => (f.type === FillType.Solid ? solidName(f.color) : TYPE_LABEL[f.type]);
+  const rowLabel = (f: Fill) => bound?.name ?? (f.type === FillType.Solid ? solidName(f.color) : TYPE_LABEL[f.type]);
+
+  function pick(key: string) {
+    open = null;
+    bound?.onpick(key);
+  }
+
+  function detach() {
+    open = null;
+    bound?.ondetach();
+  }
 
   const patch = (i: number, p: FillPatch, summary: string) => onchange(setFill(fills, i, p), summary);
   const percentOf = (e: Event) => Math.max(0, Math.min(PERCENT, Number((e.currentTarget as HTMLInputElement).value))) / PERCENT;
@@ -120,6 +131,14 @@
     <circle cx="12" cy="12" r="3" />
     {#if !shown}<path d="M3 3l18 18" />{/if}
   </svg>
+{/snippet}
+
+{#snippet link()}
+  <svg class="size-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-label="From a variable"><path d="M9 17H7A5 5 0 0 1 7 7h2" /><path d="M15 7h2a5 5 0 1 1 0 10h-2" /><path d="M8 12h8" /></svg>
+{/snippet}
+
+{#snippet unlink()}
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m18.84 12.25 1.72-1.71a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="m5.17 11.75-1.71 1.71a5 5 0 0 0 7.07 7.07l1.71-1.71" /><path d="M8 2v3M2 8h3M16 19v3M19 16h3" /></svg>
 {/snippet}
 
 {#snippet diamond(key: string)}
@@ -186,9 +205,13 @@
         }}
       ></button>
       <span class={PAINT_TEXT}>
-        <span class={PAINT_NAME} data-testid="fill-label">{rowLabel(fill)}</span>
+        <span class={PAINT_NAME} data-testid="fill-label" title={rowLabel(fill)}>{rowLabel(fill)}</span>
         <span class={PAINT_META} data-testid="fill-meta">
+          {#if bound && fill.type === FillType.Solid}
+          <span class="inline-flex min-w-0 items-center gap-1" data-testid="fill-bound">{@render link()}{solidName(fill.color)}</span>
+          {:else}
           <input class={PAINT_INLINE_INPUT} type="number" min="0" max="100" step="1" data-testid="fill-opacity" aria-label="Layer opacity" title="Layer opacity %" value={pct(fill.opacity)} onclick={(e) => e.stopPropagation()} onchange={(e) => patch(index, { opacity: percentOf(e) }, 'Fill opacity')} />% · {TYPE_LABEL[fill.type]}
+          {/if}
         </span>
       </span>
       <button
@@ -201,6 +224,19 @@
           patch(index, { visible: !fill.visible }, fill.visible ? 'Hide fill' : 'Show fill');
         }}>{@render eye(fill.visible)}</button
       >
+      {#if bound}
+      <button
+        type="button"
+        class={ICON}
+        data-testid="fill-detach"
+        aria-label={`Detach ${bound.name}`}
+        title="Detach"
+        onclick={(e) => {
+          e.stopPropagation();
+          detach();
+        }}>{@render unlink()}</button
+      >
+      {:else}
       <button
         type="button"
         class={ICON}
@@ -211,9 +247,22 @@
           remove(index);
         }}><MinusGlyph /></button
       >
+      {/if}
     </div>
 
-    {#if open === index && rowEls[index]}
+    {#if open === index && rowEls[index] && bound}
+      <SidePopover anchor={rowEls[index]} within={root} key={String(index)} title={bound.name} label={`${bound.name} fill`} swatch={swatch(fill)} onclose={() => (open = null)}>
+        <div class="flex flex-col gap-0.5" data-testid="fill-bound-editor">
+          <button type="button" class={MENU_ITEM} data-testid="fill-bound-detach" onclick={detach}>{@render unlink()}Detach</button>
+          {#each bound.options.filter((o) => o.key !== bound.name) as option (option.key)}
+            <button type="button" class={MENU_ITEM} data-testid={`fill-bound-option-${option.key}`} title={option.key} onclick={() => pick(option.key)}>
+              <span class="size-4 shrink-0 rounded-xs border border-ui-divider" style={`background:${option.value}`}></span>
+              <span class="min-w-0 flex-1 truncate">{option.key}</span>
+            </button>
+          {/each}
+        </div>
+      </SidePopover>
+    {:else if open === index && rowEls[index]}
       <SidePopover anchor={rowEls[index]} within={root} key={String(index)} title={TYPE_LABEL[fill.type]} label={`${TYPE_LABEL[fill.type]} fill`} swatch={swatch(fill)} onclose={() => (open = null)}>
       <div class="flex flex-col gap-1.5" data-testid="fill-editor">
         <label class={FIELD_ROW}

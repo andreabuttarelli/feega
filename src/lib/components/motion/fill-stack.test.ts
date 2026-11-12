@@ -282,4 +282,47 @@ describe('the fill stack in Properties', () => {
     change(byId('fill-editor').querySelector<HTMLInputElement>('[data-testid="colour-channel"]')!, 'rgba(255, 0, 0, 0.5)');
     expect(sent(onchange)[0]).toMatchObject({ type: 'solid', color: '#ff000080' });
   });
+
+  describe('a fill that comes from a colour variable', () => {
+    const NAME = 'Stripe/Text muted';
+    const MUTED = stack([{ type: 'solid', color: '#50617a' }]);
+
+    function showBound() {
+      const onchange = vi.fn();
+      const ondetach = vi.fn();
+      const onpick = vi.fn();
+      const bound = { name: NAME, options: [{ key: 'Stripe/Text', value: '#0a2540' }], ondetach, onpick };
+      app = mount(FillStack, { target: document.body, props: { fills: MUTED, assets: ASSETS, tokens: FEEGA_TOKENS, onchange, bound } });
+      flushSync();
+      return { onchange, ondetach, onpick };
+    }
+
+    it('is the same row as a solid fill, with the variable name where the hex would be', () => {
+      showBound();
+      expect(rows()).toHaveLength(1);
+      expect(inRow(0, 'fill-label').textContent).toBe(NAME);
+      expect(inRow(0, 'fill-label').title).toBe(NAME);
+      expect(inRow(0, 'fill-meta').textContent).toContain('50617A');
+      expect([...rows()[0].querySelectorAll('[data-testid]')].map((e) => (e as HTMLElement).dataset.testid)).toEqual(['fill-swatch', 'fill-label', 'fill-meta', 'fill-bound', 'fill-eye', 'fill-detach']);
+      expect(document.querySelector('[data-testid="bind-chip-color"]')).toBeNull();
+    });
+
+    it('detaches from the row instead of removing the fill', () => {
+      const { onchange, ondetach } = showBound();
+      expect(rows()[0].querySelector('[data-testid="fill-remove"]')).toBeNull();
+      click(inRow(0, 'fill-detach'));
+      expect(ondetach).toHaveBeenCalledOnce();
+      expect(onchange).not.toHaveBeenCalled();
+    });
+
+    it('opens the variable picker from the swatch, with a detach and the other variables', () => {
+      const { ondetach, onpick } = showBound();
+      click(inRow(0, 'fill-swatch'));
+      click(byId('fill-bound-option-Stripe/Text'));
+      expect(onpick).toHaveBeenCalledWith('Stripe/Text');
+      click(inRow(0, 'fill-swatch'));
+      click(byId('fill-bound-detach'));
+      expect(ondetach).toHaveBeenCalledOnce();
+    });
+  });
 });

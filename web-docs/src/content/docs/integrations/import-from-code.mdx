@@ -12,6 +12,7 @@ Paste a GitHub repository and one or more page paths, or a Storybook link. Feega
 - Every component of the code rendered on the page becomes a **main component**, named as in the code.
 - Every other use of it is an **instance** linked to that main. Different labels become text overrides.
 - Props with a few short lowercase values (`variant="outline"`, `size="sm"`) and boolean props become **variants** of one component set. A prop the code leaves out is the variant `Default`.
+- A prop the source **declares** as a set of values (`type: 'info' | 'warning'`, `level: 1 | 2 | 3`, a `cva`/`tv` variant, an enum) is a variant even when it is named `type`, `name` or `value` or holds numbers.
 
 Several pages land in **one frame**, a board per page named after its path, side by side. The components are shared: a `Button` rendered on `/` and on `/settings` is one main, and the second page holds instances of it. The Components panel lists each component once, and every component set is laid out on the project's Components page.
 
@@ -21,10 +22,24 @@ Export the frame back to code (React or Svelte) and you get the same names and p
 
 Open the insert menu (**+**), go to **Import**, choose **From code…**.
 
-- **GitHub**: paste `https://github.com/owner/repo` (or `…/tree/<branch>`, or `…/tree/<branch>/<folder>` for one app of a monorepo; a branch name with `/` works), type the page paths separated by spaces (default `/`, up to 8) and press **Import**. Starting the app takes 15 to 60 seconds.
+- **GitHub**: paste `https://github.com/owner/repo` (or `…/tree/<branch>`, or `…/tree/<branch>/<folder>` for one app of a monorepo; a branch name with `/` works), pick the pages from the list the dialog reads from the app's file router (or type paths separated by spaces; default `/`, up to 20) and press **Import**. Starting the app takes 15 to 60 seconds.
+- **Pages**: the dialog lists the pages the code declares, read from the file tree without starting the app: Next.js (`app/` and `pages/`), SvelteKit, Nuxt, Vue with `src/pages`, Astro, Remix and React Router file routes, TanStack Router. Static pages are ticked, `/` first. A page with a parameter (`/blog/[slug]`) needs a value: type the full path, or pick one the code lists (`generateStaticParams`, SvelteKit `entries`, or a content folder whose files match the slugs one to one). Search, select all or none; the count shows against the cap of 20. Routes written in code (a React Router `routes.ts` with layouts or prefixes) are not listed: type the paths.
 - **Monorepos**: when the repository holds several apps and the link names none, the dialog lists them; pick one and press **Import** again. Dependencies install at the workspace root and only the chosen app starts.
 - **Private repositories**: press **Connect GitHub**, sign in to GitHub in the tab that opens, come back. The dialog then lists your repositories and their branches. Feega downloads the code on its servers and copies it into the sandbox; your GitHub sign-in never reaches the sandbox.
 - **Storybook**: switch to the Storybook tab and paste the Storybook link. Up to 12 stories, spread across components, become boards; stories that do not fit in about two and a half minutes are listed as left out. Nothing is installed or started, so it is the fastest way to bring in a component library, including components no page renders.
+
+## Components read from the code
+
+Before the pages are captured, the component files are read as text, never run: shadcn's `components.json` `aliases.ui` folder when there is one, else every `components/` folder (`src/lib/components`, `src/components`, `components`, `app/components`), plus `*.stories.*` files.
+
+| Source | Read |
+|---|---|
+| React, Preact, Solid (`.tsx` `.jsx` `.ts` `.js`) | exported function, arrow, `forwardRef` and `memo` components; `cva(…, { variants, defaultVariants })`, `tv({ variants })`, `VariantProps<typeof …>`, union, enum and boolean props, defaults from the destructuring |
+| Svelte 5 / Svelte 4 | `$props()` typed inline or with `interface Props`; `export let x: 'a' \| 'b' = 'a'` |
+| Vue | `defineProps<{…}>()`, `withDefaults`, runtime `defineProps({ x: { type: String as PropType<…> } })` |
+| Storybook | `argTypes` options add values to an axis |
+
+Types are followed inside the file and one relative import away; a type from a package or an alias (`$lib/types`) is listed as not resolved, never guessed. Svelte keeps no props at runtime, so for Svelte this is the only place its variants are known; drawing every variant of every component is the next step.
 
 ## Theme and width
 
@@ -40,12 +55,28 @@ Choose several and every page lands once per combination, side by side in the sa
 | Not switched | Why |
 |---|---|
 | Locale, text direction | The browser language is fixed: the default catalog is shown. |
-| Login, feature flags, env vars, loading, empty and error states | The dev server renders what its own setup gives. |
-| A component variant the route does not render | Only what appears on the page is imported. |
+| Feature flags, env vars, loading, empty and error states | The dev server renders what its own setup gives. Login: see [Pages behind a login](#pages-behind-a-login). |
+| A component variant the route does not render | Only what appears on the page is drawn. The import response lists every component found in the code with its axes, and which no page rendered (`library.uncaptured`). |
 
 ### Edits on a dark board
 
 Tailwind projects only: a change on a dark board is written as a `dark:` class (`dark:bg-[#101010]`) and replaces the earlier `dark:` class of the same kind. A change on a light board edits the plain class and leaves the `dark:` ones alone. Without Tailwind a dark edit is listed as not written back, and so is any edit made at a width other than desktop, because a plain rule would change every width.
+
+## Pages behind a login
+
+A page that sends the import to a sign-in page (`/billing` redirected to `/login`) is not imported as the login form under its name: it is listed as **needs sign-in**, and the other pages import as usual. If every page needs sign-in, nothing is imported and the dialog says so.
+
+To capture those pages, save a **test account** of your app in **Project settings → Test app account** (login page URL, email, password), or with `feega app-account <projectId> --login-url … --email … --password …`, or the MCP tool `set_app_account`. The import dialog shows it under **Sign-in for protected pages**. Before capturing, the import opens the same login path on the app running in the sandbox, signs in, and captures every page in that session. The session stays inside that import: it never replaces the one the chat keeps.
+
+Use a TEST account: the AI can see these credentials, and the chat uses the same account to photograph your app.
+
+| Case | What happens |
+|---|---|
+| No test account | Protected pages are listed as needing sign-in; public pages import. |
+| Sign-in fails (wrong password, captcha, two-step login, no form on the login path) | Each protected page is listed with the reason; public pages import. |
+| The app's sign-in needs a database, an auth provider or secrets the sandbox does not have | Sign-in fails as above. Import from the deployed site with [Import from URL](/integrations/import-from-url/); passing env values to one import is planned. |
+| A login form shown without changing the URL | Not detected: the page imports as it renders. |
+| Folder imports on this computer | Do not sign in. |
 
 ## Design system
 
@@ -87,7 +118,7 @@ A frame imported from GitHub or a folder remembers where each layer comes from i
 
 On feega.app, the **Folder** tab picks a project folder on your computer and uploads it once. node_modules, build output (`dist`, `build`, `.next`, …), what `.gitignore` leaves out and files over 1 MB are skipped. Secrets never leave your computer, whatever `.gitignore` says: `.env` and `.env.*` (except `.env.example`, `.env.sample`, `.env.template`), `*.pem`, `*.key`, `id_rsa*` and an `.npmrc` holding an auth token; the rest may total 25 MB. It runs in the same sandbox as a GitHub repository, never on feega's servers. It is **imported once, no sync**: code mode shows the patch to download, with no write-back and no pull. Its CSS tokens are read like a repository's.
 
-In local mode (`npx feega`), the **Folder** tab takes the absolute path of a project on your computer. Its `dev` script runs here, the pages are read with your local Chrome, and the frame stays linked to the folder as above. Images served by the dev server are not copied yet.
+In local mode (`npx feega`), the **Folder** tab takes the absolute path of a project on your computer. Its `dev` script runs here only for the import, stopped with every process it started when the import ends or feega quits; the pages are read with your local Chrome, and the frame stays linked to the folder as above. Images served by the dev server are not copied yet.
 
 ## What works
 
@@ -126,10 +157,18 @@ In local mode (`npx feega`), the **Folder** tab takes the absolute path of a pro
 - Two imports every ten minutes per person; an import refused because the repository holds several apps counts as one.
 - An nx workspace whose apps have no `package.json` of their own runs from the root. A dev script that ignores the port flags and listens on a port other than its framework's default is not reached.
 
+## Waiting for late content
+
+Before a page is captured it waits for the network to go quiet, and then for the DOM to stop changing (no mutations and no change in the page size for 300 ms, at most 3 s). A sidebar or table of contents that appears a moment after load is therefore captured without any setting.
+
+For content that arrives later still, add an extra wait: **Extra wait before capture (ms)** in the import dialog, one value for every page and an optional one per route (a route's value wins, `0` included). It defaults to 0 and is capped at 10 s per page; with many pages the cap shrinks so the waits together stay within 50 s of the import's 150 s capture budget. The value is stored with the frame, so Pull uses the same wait.
+
 ## CLI
 
 ```bash
 feega canvas import-code $PROJECT https://github.com/owner/repo --route / /settings /users --canvas <canvas> --x 0 --y 0
+feega canvas import-code $PROJECT https://github.com/owner/repo --routes discover   # list the pages, nothing starts
+feega canvas import-code $PROJECT https://github.com/owner/repo --routes all --canvas <canvas>   # every static page, up to 20
 feega canvas import-code $PROJECT https://github.com/owner/monorepo --app apps/web --route / --canvas <canvas>   # one app of a monorepo
 feega canvas import-code $PROJECT https://github.com/owner/repo --route / --scheme light dark --width 1280 390 --canvas <canvas>   # one board per theme and width
 feega canvas import-storybook $PROJECT https://storybook.example.com --canvas <canvas> --x 0 --y 0
@@ -138,17 +177,20 @@ feega canvas github $PROJECT repos
 feega canvas github $PROJECT branches owner/repo
 feega canvas import-code $PROJECT /path/to/app --route / --canvas <canvas>   # local mode: a folder
 feega canvas import-code $PROJECT /path/to/app --route / --no-design-system --canvas <canvas>   # keep resolved values, no variables
+feega canvas import-code $PROJECT https://github.com/owner/repo --route / /blog/post --delay 1000 --route-delay /blog/post=3000 --canvas <canvas>   # extra wait in ms before capture, per route wins
 feega canvas code-sync $PROJECT changes <frameId>   # prints the patch
 feega canvas code-sync $PROJECT publish <frameId>   # pull request, or write the folder
 feega canvas code-sync $PROJECT pull <frameId> --branch my-branch
 ```
 
-The import answers `frameId`, `pages` (the paths or stories that landed), `components`, `variants`, `instances` and `skipped` (what stayed plain layers, pages that could not be opened, and why).
+The import answers `frameId`, `pages` (the paths or stories that landed), `components`, `variants`, `instances` `skipped` (what stayed plain layers, pages that could not be opened, and why) and `routes`: how many pages the file router declares and, in `leftOut`, each one not imported with its reason (`not_selected`, `needs_value` with values seen in links on the captured pages, `not_opened`). More than 20 pages is refused with the count, never trimmed.
 
 ## MCP and API
 
-Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, app?, routes, conditions?: [{ scheme: "light" | "dark", width }], designSystem?, x, y } })` (`designSystem: false` skips the tokens; `app` is the folder of one app in a monorepo), or `{ canvasId, storybook, stories?, x, y }`. Folder (local mode): `{ canvasId, folder, routes, x, y }`. Uploaded folder (web): `POST /api/v1/projects/:id/code-uploads` `{ name }` returns `{ path, uploadUrl }`; PUT the gzipped tarball to `uploadUrl`, then `POST /api/v1/projects/:id/code-import` `{ canvasId, upload: path, routes, x, y }`. Sync: ops `code_changes`, `code_publish`, `code_pull` (`{ nodeId, branch? }`, its answer lists token changes in `tokens`). REST: `GET /api/v1/projects/:id/code-import/:nodeId/changes`, `POST …/publish`, `POST …/pull`, `GET …/head`. GitHub: ops `github_status`, `github_connect`, `github_repos`, `github_branches` (`{ repo: "owner/name" }`), `github_disconnect`.
+Pages: op `discover_routes` (`{ repo | folder, app? }`) or `GET /api/v1/projects/:id/code-import/routes?repo=|folder=|upload=&app=` answers `{ framework, app, max, routes: [{ path, file, router, kind, params, selected, candidates }] }`, or `choose_app` with `apps`, `no_router`, `routes_in_code`. `routes: "all"` on `import_code` imports every static page.
 
-Over HTTP: `POST /api/v1/projects/{projectId}/code-import` with `{ canvasId, repo, app?, routes?, conditions?, designSystem?, x, y }` (the answer adds `design: { tokens, styles, byClass, byRule, byValue, unbound }`; `GET …/code-import/tokens?repo=…`, `?folder=…` or `?upload=…` counts the tokens first) (`conditions` up to 6, `routes` up to 8, default `["/"]`; the older single `route` still works) or `{ canvasId, storybook, stories?, x, y }`. Errors: `invalid` (400), `run_failed` (422, with `detail`: the install or dev server output), `unreadable` (422), `rate_limited` (429), `choose_app` (409, with `apps`: the folders to pass back as `app`), `no_sandbox` / `no_browser` (503), `failed` (502).
+Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, app?, routes, conditions?: [{ scheme: "light" | "dark", width }], captureDelayMs?, routeDelayMs?: { "/route": ms }, designSystem?, x, y } })` (`designSystem: false` skips the tokens; `app` is the folder of one app in a monorepo), or `{ canvasId, storybook, stories?, x, y }`. Folder (local mode): `{ canvasId, folder, routes, x, y }`. Uploaded folder (web): `POST /api/v1/projects/:id/code-uploads` `{ name }` returns `{ path, uploadUrl }`; PUT the gzipped tarball to `uploadUrl`, then `POST /api/v1/projects/:id/code-import` `{ canvasId, upload: path, routes, x, y }`. Sync: ops `code_changes`, `code_publish`, `code_pull` (`{ nodeId, branch? }`, its answer lists token changes in `tokens`). REST: `GET /api/v1/projects/:id/code-import/:nodeId/changes`, `POST …/publish`, `POST …/pull`, `GET …/head`. GitHub: ops `github_status`, `github_connect`, `github_repos`, `github_branches` (`{ repo: "owner/name" }`), `github_disconnect`.
+
+Over HTTP: `POST /api/v1/projects/{projectId}/code-import` with `{ canvasId, repo, app?, routes?, conditions?, captureDelayMs?, routeDelayMs?, designSystem?, x, y }` (the answer adds `design: { tokens, styles, byClass, byRule, byValue, unbound }`; `GET …/code-import/tokens?repo=…`, `?folder=…` or `?upload=…` counts the tokens first) (`conditions` up to 6, `routes` up to 8, default `["/"]`; the older single `route` still works) or `{ canvasId, storybook, stories?, x, y }`. Errors: `invalid` (400), `run_failed` (422, with `detail`: the install or dev server output), `unreadable` (422), `rate_limited` (429), `choose_app` (409, with `apps`: the folders to pass back as `app`), `no_sandbox` / `no_browser` (503), `failed` (502).
 
 GitHub: `GET /api/v1/projects/{projectId}/github` (`{ configured, connected, label }`), `POST …/github/connect` (`{ url }` to open), `GET …/github/repos`, `GET …/github/branches?repo=owner/name`, `DELETE …/github`. `not_configured` (501) when the server has no GitHub connection set up, `not_connected` (409) before you connect.
