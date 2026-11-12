@@ -101,13 +101,14 @@ describe('CoreFrames camera', () => {
   it('a hover change sends the core only the live overlay', async () => {
     const wire = { kind: 'path', clip: 'e:wire', contours: [[0, 0, 10, 0]], rule: 'nonzero', paint: { kind: 'solid', color: [0, 0, 0, 1] }, opacity: 1, matrix: [1, 0, 0, 1, 0, 0] };
     const fixed = [wire];
-    const props = $state({ frames: [], cards: [card], overlay: { fixed, live: [] as unknown[] }, view: { x: 0, y: 0, zoom: 1 }, area: { width: 100, height: 80 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
+    const selected: unknown[] = [];
+    const props = $state({ frames: [], cards: [card], overlay: { fixed, selected, live: [] as unknown[] }, view: { x: 0, y: 0, zoom: 1 }, area: { width: 100, height: 80 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
     app = mount(CoreFrames, { target: document.body, props: props as never });
     flushSync();
     await vi.waitFor(() => expect(calls.parts).toContain('fixed'));
     calls.parts.length = 0;
 
-    props.overlay = { fixed, live: [{ ...wire, clip: 'n:hover' }] };
+    props.overlay = { fixed, selected, live: [{ ...wire, clip: 'n:hover' }] };
     flushSync();
 
     await vi.waitFor(() => expect(calls.parts).toEqual(['live']));
@@ -250,14 +251,15 @@ describe('CoreFrames camera', () => {
   it('an overlay handed again with the same parts walks none of them', async () => {
     const fixed: unknown[] = [];
     const live: unknown[] = [];
-    const props = $state({ frames: [], cards: manyCards(), overlay: { fixed, live }, view: { x: 0, y: 0, zoom: 1 }, area: { width: 400, height: 300 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
+    const selected: unknown[] = [];
+    const props = $state({ frames: [], cards: manyCards(), overlay: { fixed, selected, live }, view: { x: 0, y: 0, zoom: 1 }, area: { width: 400, height: 300 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
     app = mount(CoreFrames, { target: document.body, props: props as never });
     flushSync();
     await vi.waitFor(() => expect(calls.patches.length).toBeGreaterThan(0));
     await settled();
     const frames = calls.frames;
 
-    props.overlay = { fixed, live };
+    props.overlay = { fixed, selected, live };
     flushSync();
 
     await vi.waitFor(() => expect(calls.frames).toBeGreaterThan(frames));

@@ -19,6 +19,18 @@ const HTTP_REDIRECT_MIN = 300;
 const HTTP_REDIRECT_MAX = 399;
 const ARCHIVE_TIMEOUT_MS = 120_000;
 
+const GITHUB_API = 'https://api.github.com';
+const PUBLIC_TIMEOUT_MS = 15_000;
+
+export function publicCall(fetchFn: typeof fetch = fetch): GithubCall {
+  return async (request) => {
+    const url = new URL(`${GITHUB_API}${request.endpoint}`);
+    Object.entries(request.query ?? {}).forEach(([k, v]) => url.searchParams.set(k, v));
+    const res = await fetchFn(url, { headers: { accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(PUBLIC_TIMEOUT_MS) });
+    return { status: res.status, data: await res.json().catch(() => null), headers: {}, file: null };
+  };
+}
+
 const listOf = (answer: ProviderAnswer): Record<string, unknown>[] => (answer.status === HTTP_OK && Array.isArray(answer.data) ? (answer.data as Record<string, unknown>[]) : []);
 
 export async function reposOf(call: GithubCall): Promise<GithubRepo[]> {

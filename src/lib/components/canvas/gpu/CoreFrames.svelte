@@ -62,7 +62,7 @@
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
 
-  let { frames, edited = new Set(), order = [], live = new Map(), known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, lift = null, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, place = null, sourceUrl, onready, onsource = () => {}, onthumb = () => {}, onfallback, onbackend = () => {} }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; lift?: Lift | null; look?: Look; view: Viewport; area: { width: number; height: number }; place?: { projectId: string; canvasId: string; orgId?: string } | null; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onthumb?: (id: string, revision: number, blob: Blob, size: { width: number; height: number }) => void; onfallback: (why: string) => void; onbackend?: (change: BackendSwitch) => void } = $props();
+  let { frames, edited = new Set(), order = [], live = new Map(), known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, lift = null, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, place = null, sourceUrl, onready, onsource = () => {}, onthumb = () => {}, onfallback, onbackend = () => {} }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; lift?: Lift | null; look?: Look; view: Viewport; area: { width: number; height: number }; place?: { projectId: string; canvasId: string; orgId?: string; userId?: string; look?: string } | null; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onthumb?: (id: string, revision: number, blob: Blob, size: { width: number; height: number }) => void; onfallback: (why: string) => void; onbackend?: (change: BackendSwitch) => void } = $props();
 
   markStartup(StartupStep.Mounted);
   debugStart();
@@ -91,7 +91,7 @@
   $effect(() => tierLog(tier, untrack(() => view.zoom)));
   let sight = $state.raw<Sight>(NO_SIGHT);
   const imaged = new Set<string>();
-  const baseKey = (f: FrameAt) => `${f.id}:${f.revision}${f.linked ? `:${f.linked}` : ''}${f.scenes ? `:${f.scenes}` : ''}`;
+  const baseKey = (f: FrameAt) => `${f.id}:${f.revision}:${place?.look ?? ''}${f.linked ? `:${f.linked}` : ''}${f.scenes ? `:${f.scenes}` : ''}`;
   const tieredKey = (f: FrameAt, at: AssetSize) => (imaged.has(f.id) ? `${baseKey(f)}:${at}` : baseKey(f));
   const bestTier = new Map<string, AssetSize>();
   const tierOf = (f: FrameAt) => keptTier(tier, bestTier.get(f.id), sight.near.has(f.id) ? Reach.Near : Reach.Far);
@@ -107,7 +107,7 @@
   const fromView = (f: FrameAt) => () => Math.hypot(view.x + (f.box.x + f.box.w / 2) * view.zoom - area.width / 2, view.y + (f.box.y + f.box.h / 2) * view.zoom - area.height / 2);
   const customPictures = customPicturesOf();
   const liveRead = (id: string) => `${id}:live`;
-  const thumbs = thumbStore();
+  const thumbs = thumbStore(place?.userId && place.orgId ? { userId: place.userId, orgId: place.orgId } : null, place?.canvasId ?? '');
   const thumbPictures = new Map<string, Picture>();
   const thumbAsked = new Set<string>();
   const thumbTaken = new Set<string>();
@@ -211,7 +211,7 @@
     onRuns(ram.runs(range));
   }
 
-  const sourceOf = (f: FrameAt) => frameSourceUrl(sourceUrl, f, place?.orgId);
+  const sourceOf = (f: FrameAt) => frameSourceUrl(sourceUrl, f, place ?? {});
 
   const readSource = memoSources((f: FrameAt) => frameSources(sourceOf(f)));
 
@@ -428,16 +428,19 @@
 
   async function rebuildLive(f: FrameAt, source: LiveDoc) {
     const generation = liveGeneration.ask(f.id);
+    const key = `${f.id}:live${generation}`;
+    markFrame(key, Step.LiveAsked);
     const list = await liveOff(f, { revision: f.revision, ...source }).catch((e: unknown) => (console.warn('[canvas] core live frame failed', f.id, e), null));
     const built = list ? { list } : null;
     if (!built || !liveGeneration.newer(f.id, generation)) {
       return;
     }
+    markFrame(key, Step.LiveBuilt);
     const ready = await media.ready(built.list);
     if (!liveGeneration.land(f.id, generation)) {
       return;
     }
-    const key = `${f.id}:live${generation}`;
+    markFrame(key, Step.LiveReady);
     logGaps(f.id, built.list);
     lists = listed(lists, f.id, key, onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), loaded.get(f.id), drawnLast.get(f.id)?.group]);
     liveGroup = new Map(liveGroup).set(f.id, key);

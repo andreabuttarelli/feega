@@ -6,6 +6,7 @@ import { APP_URL, GITHUB_URL, SITE_URL } from './links';
 import { SITE_PATHS } from './paths';
 import { LEGAL_DOCS } from './legal';
 import { BLOG_INDEX, BLOG_PATH, COMPARISONS, comparisonPath } from './compare';
+import { POSTS, postPath } from './posts';
 import { GUIDES, GUIDES_INDEX, GUIDES_PATH, guidePath } from './guides';
 import { CONNECT_COMMAND, MCP_TOOLS, MCP_URL } from './guides/shared';
 import { plainText } from './text';
@@ -19,6 +20,7 @@ export const PAGE_TITLES: Record<string, string> = {
   [BLOG_PATH]: BLOG_INDEX.title,
   [GUIDES_PATH]: GUIDES_INDEX.title,
   ...Object.fromEntries(Object.entries(GUIDES).map(([slug, g]) => [guidePath(slug), g.title])),
+  ...Object.fromEntries(Object.entries(POSTS).map(([slug, p]) => [postPath(slug), p.title])),
   ...Object.fromEntries(Object.entries(COMPARISONS).map(([slug, c]) => [comparisonPath(slug), c.title])),
   ...Object.fromEntries(Object.entries(LANDING_PAGES).map(([slug, p]) => [`/${slug}`, p.title])),
   ...Object.fromEntries(Object.entries(LEGAL_DOCS).map(([slug, d]) => [`/${slug}`, d.title]))

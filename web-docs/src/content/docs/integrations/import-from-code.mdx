@@ -5,6 +5,8 @@ sidebar:
   order: 5
 ---
 
+import DemoVideo from '../../../components/DemoVideo.astro';
+
 Paste a GitHub repository and one or more page paths, or a Storybook link. Feega reads the running app or the stories and draws them as an editable frame, like [Import from URL](/integrations/import-from-url/), with one difference: components keep their identity.
 
 - Every component of the code rendered on the page becomes a **main component**, named as in the code.
@@ -19,7 +21,8 @@ Export the frame back to code (React or Svelte) and you get the same names and p
 
 Open the insert menu (**+**), go to **Import**, choose **From code…**.
 
-- **GitHub**: paste `https://github.com/owner/repo` (or `…/tree/<branch>`), type the page paths separated by spaces (default `/`, up to 8) and press **Import**. Starting the app takes 15 to 60 seconds.
+- **GitHub**: paste `https://github.com/owner/repo` (or `…/tree/<branch>`, or `…/tree/<branch>/<folder>` for one app of a monorepo; a branch name with `/` works), type the page paths separated by spaces (default `/`, up to 8) and press **Import**. Starting the app takes 15 to 60 seconds.
+- **Monorepos**: when the repository holds several apps and the link names none, the dialog lists them; pick one and press **Import** again. Dependencies install at the workspace root and only the chosen app starts.
 - **Private repositories**: press **Connect GitHub**, sign in to GitHub in the tab that opens, come back. The dialog then lists your repositories and their branches. Feega downloads the code on its servers and copies it into the sandbox; your GitHub sign-in never reaches the sandbox.
 - **Storybook**: switch to the Storybook tab and paste the Storybook link. Up to 12 stories, spread across components, become boards; stories that do not fit in about two and a half minutes are listed as left out. Nothing is installed or started, so it is the fastest way to bring in a component library, including components no page renders.
 
@@ -70,7 +73,7 @@ With **Design system** on (the default when the dialog finds CSS tokens, with th
 A frame imported from GitHub or a folder remembers where each layer comes from in the code. Change a text, a text colour or size, a fill, or the gap, padding or direction of a stack, then open **code mode** (the `</>` button): the **GitHub** (or **Folder**) section lists the files the edits touch and shows the patch.
 
 - **Patch** downloads it as a `.patch` file (`git apply` it in your checkout).
-- **Open pull request** creates a new `feega/…` branch on the repository and a pull request against its default branch. Nothing is ever committed to the default branch. It needs GitHub connected.
+- **Open pull request** creates a new `feega/…` branch on the repository and a pull request against its default branch. Nothing is ever committed to the default branch. It needs your own GitHub connected: a server-wide `GITHUB_TOKEN` is used only to read public repositories, never to write.
 - **Write to folder** (folder imports) writes the files and, when the folder is a git repository, also commits them on a new `feega/…` branch, leaving your current branch as it was. The app's dev server reloads, so the page shows the edit.
 - Styles land as an inline `style` on the element (`style={{ … }}` in JSX), or as Tailwind classes when the project uses Tailwind. Texts are replaced where the element holds them; texts that come from an inlang/Paraglide message (`{m.home_title()}`) are changed in the message file of the language shown. A text built by other code is listed as not written back.
 
@@ -78,7 +81,9 @@ A frame imported from GitHub or a folder remembers where each layer comes from i
 
 ## Import a local folder
 
-On feega.app, the **Folder** tab picks a project folder on your computer and uploads it once. node_modules, build output (`dist`, `build`, `.next`, …), what `.gitignore` leaves out and files over 1 MB are skipped; the rest may total 25 MB. It runs in the same sandbox as a GitHub repository, never on feega's servers. It is **imported once, no sync**: code mode shows the patch to download, with no write-back and no pull. Its CSS tokens are read like a repository's.
+<DemoVideo name="folder-upload" caption="Pick a project folder on the home: it is uploaded once, with no sync back." />
+
+On feega.app, the **Folder** tab picks a project folder on your computer and uploads it once. node_modules, build output (`dist`, `build`, `.next`, …), what `.gitignore` leaves out and files over 1 MB are skipped. Secrets never leave your computer, whatever `.gitignore` says: `.env` and `.env.*` (except `.env.example`, `.env.sample`, `.env.template`), `*.pem`, `*.key`, `id_rsa*` and an `.npmrc` holding an auth token; the rest may total 25 MB. It runs in the same sandbox as a GitHub repository, never on feega's servers. It is **imported once, no sync**: code mode shows the patch to download, with no write-back and no pull. Its CSS tokens are read like a repository's.
 
 In local mode (`npx feega`), the **Folder** tab takes the absolute path of a project on your computer. Its `dev` script runs here, the pages are read with your local Chrome, and the frame stays linked to the folder as above. Images served by the dev server are not copied yet.
 
@@ -86,7 +91,24 @@ In local mode (`npx feega`), the **Folder** tab takes the absolute path of a pro
 
 - **React** apps (Vite, Next.js), including **Next.js App Router server components**, read from the debug information React 19 keeps for them.
 - **Vue 3** and **Svelte 5** apps (SvelteKit or Vite). Vue props become variants; Svelte 5 does not expose props in the browser, so Svelte components come in as mains and instances without variants.
-- npm, pnpm, yarn and bun lockfiles; the `dev` script starts the app.
+- How the app starts is read from the repository, never asked:
+
+  | Framework | Detected by | Script | Port and host |
+  |---|---|---|---|
+  | Next.js | `next` | `dev` | `-H -p` |
+  | SvelteKit | `@sveltejs/kit` | `dev` | `--host --port --strictPort` |
+  | Nuxt | `nuxt` | `dev` | `--port --host` |
+  | Astro | `astro` | `dev`, `start` | `--port --host` |
+  | React Router 7 / Remix (Vite) | `@react-router/dev`, or `@remix-run/dev` with `vite` | `dev` | `--host --port --strictPort` |
+  | Gatsby | `gatsby` | `develop`, `dev`, `start` | `-H -p` |
+  | Angular | `@angular/cli` | `start`, `dev` | `--port --host` |
+  | Create React App | `react-scripts` | `start`, `dev` | `PORT`, `HOST` |
+  | Vite (React, Vue, Svelte, Solid, Preact, Qwik) | `vite` | `dev`, `start` | `--host --port --strictPort` |
+  | anything else | — | `dev`, `start`, `serve` | `PORT`, `HOST`, then the default port 3000 |
+
+- Package manager from the `packageManager` field (that exact version), else the lockfile: npm, pnpm, yarn 1, yarn Berry (`yarn@2+` or `.yarnrc.yml`), bun.
+- Node 22, 24 or 26, the closest to `.nvmrc`, `.node-version` or `engines.node`; Node 24 when none is set, and always for bun.
+- Monorepos with `workspaces`, `pnpm-workspace.yaml`, turbo, nx or lerna: an app is a package with a framework and a script from the table.
 - Components declared in the repository's own files. Components from packages (icons, Radix primitives, `bits-ui`) stay plain layers.
 - A component whose only element is another component (`<Tooltip><Button/></Tooltip>`) keeps both: the outer main holds an instance of the inner one. Longer chains keep the outermost and the innermost.
 - Components rendered as a single icon (`<svg>`) become components too.
@@ -99,12 +121,14 @@ In local mode (`npx feega`), the **Folder** tab takes the absolute path of a pro
 - Private repositories need GitHub connected; up to 200 MB of code.
 - A Storybook must be public; its stories are read as they render, without the controls panel.
 - The app has 6 minutes to install and start; each page then follows the URL import limits (1280 px wide, 1500 layers).
-- Two imports every ten minutes per person.
+- Two imports every ten minutes per person; an import refused because the repository holds several apps counts as one.
+- An nx workspace whose apps have no `package.json` of their own runs from the root. A dev script that ignores the port flags and listens on a port other than its framework's default is not reached.
 
 ## CLI
 
 ```bash
 feega canvas import-code $PROJECT https://github.com/owner/repo --route / /settings /users --canvas <canvas> --x 0 --y 0
+feega canvas import-code $PROJECT https://github.com/owner/monorepo --app apps/web --route / --canvas <canvas>   # one app of a monorepo
 feega canvas import-code $PROJECT https://github.com/owner/repo --route / --scheme light dark --width 1280 390 --canvas <canvas>   # one board per theme and width
 feega canvas import-storybook $PROJECT https://storybook.example.com --canvas <canvas> --x 0 --y 0
 feega canvas github $PROJECT connect      # prints a link to open in the browser
@@ -121,8 +145,8 @@ The import answers `frameId`, `pages` (the paths or stories that landed), `compo
 
 ## MCP and API
 
-Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, routes, conditions?: [{ scheme: "light" | "dark", width }], designSystem?, x, y } })` (`designSystem: false` skips the tokens), or `{ canvasId, storybook, stories?, x, y }`. Folder (local mode): `{ canvasId, folder, routes, x, y }`. Uploaded folder (web): `POST /api/v1/projects/:id/code-uploads` `{ name }` returns `{ path, uploadUrl }`; PUT the gzipped tarball to `uploadUrl`, then `POST /api/v1/projects/:id/code-import` `{ canvasId, upload: path, routes, x, y }`. Sync: ops `code_changes`, `code_publish`, `code_pull` (`{ nodeId, branch? }`, its answer lists token changes in `tokens`). REST: `GET /api/v1/projects/:id/code-import/:nodeId/changes`, `POST …/publish`, `POST …/pull`, `GET …/head`. GitHub: ops `github_status`, `github_connect`, `github_repos`, `github_branches` (`{ repo: "owner/name" }`), `github_disconnect`.
+Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, app?, routes, conditions?: [{ scheme: "light" | "dark", width }], designSystem?, x, y } })` (`designSystem: false` skips the tokens; `app` is the folder of one app in a monorepo), or `{ canvasId, storybook, stories?, x, y }`. Folder (local mode): `{ canvasId, folder, routes, x, y }`. Uploaded folder (web): `POST /api/v1/projects/:id/code-uploads` `{ name }` returns `{ path, uploadUrl }`; PUT the gzipped tarball to `uploadUrl`, then `POST /api/v1/projects/:id/code-import` `{ canvasId, upload: path, routes, x, y }`. Sync: ops `code_changes`, `code_publish`, `code_pull` (`{ nodeId, branch? }`, its answer lists token changes in `tokens`). REST: `GET /api/v1/projects/:id/code-import/:nodeId/changes`, `POST …/publish`, `POST …/pull`, `GET …/head`. GitHub: ops `github_status`, `github_connect`, `github_repos`, `github_branches` (`{ repo: "owner/name" }`), `github_disconnect`.
 
-Over HTTP: `POST /api/v1/projects/{projectId}/code-import` with `{ canvasId, repo, routes?, conditions?, designSystem?, x, y }` (the answer adds `design: { tokens, byClass, byRule, byValue, unbound }`; `GET …/code-import/tokens?repo=…`, `?folder=…` or `?upload=…` counts the tokens first) (`conditions` up to 6, `routes` up to 8, default `["/"]`; the older single `route` still works) or `{ canvasId, storybook, stories?, x, y }`. Errors: `invalid` (400), `run_failed` (422, with `detail`: the install or dev server output), `unreadable` (422), `rate_limited` (429), `no_sandbox` / `no_browser` (503), `failed` (502).
+Over HTTP: `POST /api/v1/projects/{projectId}/code-import` with `{ canvasId, repo, app?, routes?, conditions?, designSystem?, x, y }` (the answer adds `design: { tokens, byClass, byRule, byValue, unbound }`; `GET …/code-import/tokens?repo=…`, `?folder=…` or `?upload=…` counts the tokens first) (`conditions` up to 6, `routes` up to 8, default `["/"]`; the older single `route` still works) or `{ canvasId, storybook, stories?, x, y }`. Errors: `invalid` (400), `run_failed` (422, with `detail`: the install or dev server output), `unreadable` (422), `rate_limited` (429), `choose_app` (409, with `apps`: the folders to pass back as `app`), `no_sandbox` / `no_browser` (503), `failed` (502).
 
 GitHub: `GET /api/v1/projects/{projectId}/github` (`{ configured, connected, label }`), `POST …/github/connect` (`{ url }` to open), `GET …/github/repos`, `GET …/github/branches?repo=owner/name`, `DELETE …/github`. `not_configured` (501) when the server has no GitHub connection set up, `not_connected` (409) before you connect.

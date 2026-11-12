@@ -6,7 +6,8 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, normalize, relative } from 'node:path';
 import { promisify } from 'node:util';
-import { managerOf, namesIn, PackageManager } from './repo';
+import { namesIn } from './repo';
+import { planFile, runPlan, textsWanted, type PlanRefused, type RepoFacts, type RunPlan } from './run-plan';
 import type { FileChange, ReadFile } from './write-back';
 import type { CodeSource, Published } from './code-source';
 
@@ -21,13 +22,6 @@ const POLL_MS = 500;
 const HTTP_OK_MAX = 399;
 const LOOPBACK = '127.0.0.1';
 
-const DEV: Record<PackageManager, string[]> = {
-  [PackageManager.Npm]: ['npm', 'run', 'dev', '--'],
-  [PackageManager.Pnpm]: ['pnpm', 'run', 'dev'],
-  [PackageManager.Yarn]: ['yarn', 'run', 'dev'],
-  [PackageManager.Bun]: ['bun', 'run', 'dev']
-};
-
 export function folderOf(raw: string): string | null {
   const path = normalize(raw.trim());
   return isAbsolute(path) && existsSync(join(path, 'package.json')) && statSync(path).isDirectory() ? path : null;
@@ -39,14 +33,16 @@ const inside = (root: string, path: string) => {
   return rel && !rel.startsWith('..') && !isAbsolute(rel) ? full : null;
 };
 
-async function walk(root: string, dir = root, out: string[] = []): Promise<string[]> {
+const watched = (name: string) => WATCHED.test(name);
+
+async function walk(root: string, dir = root, out: string[] = [], keep = watched): Promise<string[]> {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     if (out.length >= MAX_FILES) {
       break;
     }
     if (entry.isDirectory() && !SKIPPED_DIRS.has(entry.name)) {
-      await walk(root, join(dir, entry.name), out);
-    } else if (entry.isFile() && WATCHED.test(entry.name)) {
+      await walk(root, join(dir, entry.name), out, keep);
+    } else if (entry.isFile() && keep(entry.name)) {
       out.push(relative(root, join(dir, entry.name)));
     }
   }
@@ -130,29 +126,40 @@ async function ready(url: string): Promise<boolean> {
   return false;
 }
 
-async function started(root: string): Promise<Served> {
-  const port = await freePort();
-  const [cmd, ...args] = DEV[managerOf(await readdir(root))];
-  const child = spawn(cmd, [...args, '--host', LOOPBACK, '--port', String(port), '--strictPort'], { cwd: root, env: { ...process.env, PORT: String(port), BROWSER: 'none' }, stdio: 'ignore' });
-  const url = `http://${LOOPBACK}:${port}`;
+async function factsAt(root: string): Promise<RepoFacts> {
+  const files = await walk(root, root, [], planFile);
+  const texts = await Promise.all(textsWanted(files).map(async (f) => [f, await readFile(join(root, f), 'utf8').catch(() => '')] as const));
+  return { files, texts: Object.fromEntries(texts) };
+}
+
+async function started(dir: string, plan: RunPlan): Promise<Served> {
+  const [cmd, ...args] = plan.dev;
+  const child = spawn(cmd, args, { cwd: dir, env: { ...process.env, ...plan.env }, stdio: 'ignore' });
+  const url = `http://${LOOPBACK}:${plan.port}`;
   if (!(await ready(url))) {
     child.kill();
-    throw new Error(`the dev server in ${root} did not answer on ${url}`);
+    throw new Error(`the dev server in ${dir} did not answer on ${url}`);
   }
-  child.once('exit', () => serving.delete(root));
+  child.once('exit', () => serving.delete(dir));
   return { url, child };
 }
 
-export function devServerOf(root: string): Promise<Served> {
-  const known = serving.get(root);
+export async function devServerOf(root: string, app: string | null): Promise<Served | PlanRefused> {
+  const plan = runPlan(await factsAt(root), app, { host: LOOPBACK, port: await freePort() });
+  if (!plan.ok) {
+    return plan;
+  }
+
+  const dir = join(root, plan.appDir);
+  const known = serving.get(dir);
   if (known) {
     return known;
   }
-  const next = started(root).catch((e: unknown) => {
-    serving.delete(root);
+  const next = started(dir, plan).catch((e: unknown) => {
+    serving.delete(dir);
     throw e;
   });
-  serving.set(root, next);
+  serving.set(dir, next);
   return next;
 }
 

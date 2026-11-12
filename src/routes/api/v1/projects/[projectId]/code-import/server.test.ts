@@ -78,6 +78,23 @@ describe('POST /api/v1/projects/:id/code-import', () => {
     expect(body).toEqual({ error: 'run_failed', detail: 'install_failed: x' });
   });
 
+  it('the app option reaches the import', async () => {
+    importCodeAt.mockResolvedValue({ outcome: 'ok', frameId: 'f1', name: 'v4', undo: [], skipped: [], truncated: false, pages: ['/'], components: 0, variants: 0, instances: 0 });
+
+    await call({ canvasId: 'c1', repo: 'https://github.com/shadcn-ui/ui', app: 'apps/v4', x: 0, y: 0 }, 'u-app');
+
+    expect(importCodeAt.mock.calls.at(-1)![0]).toMatchObject({ repo: 'https://github.com/shadcn-ui/ui', app: 'apps/v4' });
+  });
+
+  it('several apps and none chosen answer 409 with the list to pick from', async () => {
+    importCodeAt.mockResolvedValue({ outcome: 'choose_app', error: 'choose_app: this repository holds 2 apps: choose one', apps: ['apps/docs', 'apps/web'] });
+
+    const { res, body } = await call({ canvasId: 'c1', repo: 'https://github.com/a/mono', x: 0, y: 0 }, 'u-choose');
+
+    expect(res.status).toBe(409);
+    expect(body).toEqual({ error: 'choose_app', detail: 'choose_app: this repository holds 2 apps: choose one', apps: ['apps/docs', 'apps/web'] });
+  });
+
   it('una richiesta senza repo è invalida', async () => {
     const { res } = await call({ canvasId: 'c1', x: 0, y: 0 }, 'u-bad');
 

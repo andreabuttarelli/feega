@@ -145,3 +145,17 @@ flock ~/Documents/feega-videos/perf/bench.lock npm run perf:budget
 
 Results land in `perf-results/frame-budget-<target>.json` (`BUDGET_OUT` overrides). The thresholds
 live in `scripts/perf/frame-budget.ts`.
+
+### Edit latency
+
+The same run also edits one element inside a frame: nudge (arrow key), resize (edge handle), opacity
+(digit key), hide (⇧⌘H) and text typing, `BUDGET_EDITS` (default 8) of each per run. Each edit is
+timed from the input event's `timeStamp` to the `frame|drawn|<frame>:live<n>` mark of the first
+rebuilt layer drawn after it, and split by the marks on the way: `effect` (input to
+`live-asked`, the main-thread work before the rebuild starts), `build` (to `live-built`, the
+worker display list), `media` (to `live-ready`), `upload` (to `put`/`patched` in the engine) and
+`draw` (to `drawn`). A gesture that never lands counts as `missed`.
+
+The gate fails an edit kind whose p95 is over 16.7 ms (one 60 Hz frame); `atGoal` says whether it
+is inside 8.3 ms, one 120 Hz frame, the target for direct manipulation. Results land in
+`perf-results/edit-latency-<target>.json`.

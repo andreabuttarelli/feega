@@ -53,6 +53,16 @@ fn mode(output: Output) -> &'static Mode {
     &MODES.iter().find(|(o, _)| *o == output).expect("every output has a mode").1
 }
 
+fn tile_slots(looks: &[[f32; 8]]) -> Vec<u8> {
+    let mut bytes = vec![0u8; looks.len() * TILE_UNIFORM_STRIDE as usize];
+    for (slot, look) in bytes.chunks_exact_mut(TILE_UNIFORM_STRIDE as usize).zip(looks) {
+        for (at, value) in slot.chunks_exact_mut(4).zip(look) {
+            at.copy_from_slice(&value.to_le_bytes());
+        }
+    }
+    bytes
+}
+
 pub struct Reprojector {
     pipelines: Vec<((wgpu::TextureFormat, Output), wgpu::RenderPipeline)>,
     sampler: wgpu::Sampler,
@@ -149,12 +159,8 @@ impl Reprojector {
     }
 
     fn tile_uniforms(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, tiles: &[Tile]) -> wgpu::Buffer {
-        let bytes: Vec<u8> = tiles.iter().flat_map(|t| {
-            let values: [f32; 8] = [t.look.scale as f32, t.look.scale as f32, t.look.x as f32, t.look.y as f32, t.source.width() as f32, t.source.height() as f32, 0.0, 0.0];
-            let mut slot = vec![0u8; TILE_UNIFORM_STRIDE as usize];
-            slot[..UNIFORM_BYTES as usize].copy_from_slice(&values.iter().flat_map(|v| v.to_le_bytes()).collect::<Vec<u8>>());
-            slot
-        }).collect();
+        let looks: Vec<[f32; 8]> = tiles.iter().map(|t| [t.look.scale as f32, t.look.scale as f32, t.look.x as f32, t.look.y as f32, t.source.width() as f32, t.source.height() as f32, 0.0, 0.0]).collect();
+        let bytes = tile_slots(&looks);
         let fits = self.tiles.as_ref().is_some_and(|b| b.size() >= bytes.len() as u64);
         if !fits {
             self.bound.clear();
@@ -214,5 +220,23 @@ impl Reprojector {
             pass.set_scissor_rect(r.x0 as u32, r.y0 as u32, r.width() as u32, r.height() as u32);
         }
         pass.draw(0..3, 0..1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn each_tile_look_lands_at_the_start_of_its_own_aligned_slot() {
+        let looks = [[1.0, 1.0, 2.0, 3.0, 256.0, 256.0, 0.0, 0.0], [0.5, 0.5, -4.0, 8.0, 128.0, 64.0, 0.0, 0.0]];
+        let bytes = tile_slots(&looks);
+        assert_eq!(bytes.len(), 2 * TILE_UNIFORM_STRIDE as usize);
+        for (i, look) in looks.iter().enumerate() {
+            let at = i * TILE_UNIFORM_STRIDE as usize;
+            let floats: Vec<f32> = bytes[at..at + UNIFORM_BYTES as usize].chunks(4).map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect();
+            assert_eq!(floats, look.to_vec());
+            assert!(bytes[at + UNIFORM_BYTES as usize..at + TILE_UNIFORM_STRIDE as usize].iter().all(|&b| b == 0));
+        }
     }
 }

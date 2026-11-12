@@ -3,7 +3,7 @@ import { sandboxRunner } from '../../src/lib/server/code-import/sandbox-runner';
 import { repoOf } from '../../src/lib/server/code-import/repo';
 
 const [repoUrl, route] = process.argv.slice(2);
-const run = await sandboxRunner({ token: process.env.VERCEL_TOKEN, teamId: process.env.VERCEL_TEAM_ID, projectId: process.env.VERCEL_PROJECT_ID })(repoOf(repoUrl)!, null);
+const run = await sandboxRunner({ token: process.env.VERCEL_TOKEN, teamId: process.env.VERCEL_TEAM_ID, projectId: process.env.VERCEL_PROJECT_ID })(repoOf(repoUrl)!, null, process.argv[4] ?? null);
 if (!run.ok) {
   console.log('FAILED', run.failure, run.detail);
   process.exit(1);

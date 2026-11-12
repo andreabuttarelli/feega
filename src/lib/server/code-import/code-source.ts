@@ -19,15 +19,17 @@ export type CodeSource = {
   publish: (base: string, files: FileChange[], ask: PublishAsk) => Promise<Published | null>;
 };
 
-export function githubSource(repo: RepoRef, call: GithubCall | null): CodeSource {
+export type GithubCalls = { read: GithubCall | null; write: GithubCall | null };
+
+export function githubSource(repo: RepoRef, calls: GithubCalls): CodeSource {
   return {
-    read: (rev) => rawReader(repo, rev, call),
-    head: (branch) => headOf(call, repo, branch),
+    read: (rev) => rawReader(repo, rev, calls.read),
+    head: (branch) => headOf(calls.read, repo, branch),
     publish: async (base, files, ask) => {
-      if (!call) {
+      if (!calls.write) {
         return null;
       }
-      const pr = await openPullRequest(call, repo, { base, files, ...ask });
+      const pr = await openPullRequest(calls.write, repo, { base, files, ...ask });
       return pr ? { ...pr, files: files.map((f) => f.path) } : null;
     }
   };

@@ -129,4 +129,7 @@ export async function untilFound<T>(attempt: () => Promise<T | null>, { tries, w
   }
 }
 
-export const frameSourceUrl = (sourceUrl: (id: string) => string, f: FrameAt, orgId?: string): string => `${sourceUrl(f.id)}?${new URLSearchParams({ revision: String(f.revision), ...(f.linked ? { linked: f.linked } : {}), ...(orgId ? { org: orgId } : {}) })}`;
+export type SourceScope = { orgId?: string; look?: string };
+
+export const frameSourceUrl = (sourceUrl: (id: string) => string, f: FrameAt, scope: SourceScope = {}): string =>
+  `${sourceUrl(f.id)}?${new URLSearchParams({ revision: String(f.revision), ...(f.linked ? { linked: f.linked } : {}), ...(scope.orgId ? { org: scope.orgId } : {}), ...(scope.look ? { look: scope.look } : {}) })}`;

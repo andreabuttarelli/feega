@@ -510,14 +510,15 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     return Number.isFinite(limit) && limit - widest > 2 * LINE_SLACK ? (limit - widest) / 2 : LINE_SLACK;
   };
 
-  const textNode = (chars: Char[], segs: Seg[], lines: KitRect[], ctx: Ctx, align: string): RestNode | null => {
+  const textNode = (chars: Char[], segs: Seg[], lines: KitRect[], ctx: Ctx, align: string, block: CSSStyleDeclaration): RestNode | null => {
     const characters = chars.map((c) => c.c).join('').slice(0, limits.text);
     if (!characters.trim() || !take()) {
       return null;
     }
     const counts = new Map<number, number>();
     chars.forEach((c) => counts.set(c.seg, (counts.get(c.seg) ?? 0) + 1));
-    const main = [...counts].sort((a, b) => b[1] - a[1])[0][0];
+    const blockSized = (seg: number) => (segs[seg].css.fontSize === block.fontSize ? 1 : 0);
+    const main = [...counts].sort((a, b) => blockSized(b[0]) - blockSized(a[0]) || b[1] - a[1])[0][0];
     const base = segs[main];
     const baseStyle = styleOf(base, ctx.scale);
     const baseFills = segFills(base);
@@ -607,7 +608,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     const edge = (l: KitRect) => (align === 'CENTER' ? (l.left + l.right) / 2 : align === 'RIGHT' ? l.right : l.left);
     const clean = kept.length === lines.length && (lines.length === 1 || lines.every((l) => Math.abs(edge(l) - edge(lines[0])) <= LINE_SLACK || (align === 'JUSTIFIED' && Math.abs(l.left - lines[0].left) <= LINE_SLACK)));
     if (clean) {
-      const made = textNode(chars, segs, lines, ctx, align);
+      const made = textNode(chars, segs, lines, ctx, align, block);
       return made ? [{ ...made, key }] : [];
     }
     const perLine = kept.map(() => [] as Char[]);
@@ -630,7 +631,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
       while (trimmed.length && trimmed[trimmed.length - 1].c === ' ') {
         trimmed.pop();
       }
-      const made = trimmed.length ? textNode(trimmed, segs, [kept[i]], ctx, 'LEFT') : null;
+      const made = trimmed.length ? textNode(trimmed, segs, [kept[i]], ctx, 'LEFT', block) : null;
       return made ? [{ ...made, key: `${key}.${i}` }] : [];
     });
   };

@@ -17,7 +17,7 @@ export const SNAPSHOT_MESSAGES: Record<SnapshotRefusal, string> = {
   [SnapshotRefusal.TooMany]: `That folder holds more than ${SNAPSHOT_LIMITS.files} source files, even without node_modules, build output and what .gitignore leaves out.`
 };
 
-export type Snapshot = { ok: true; name: string; archive: Uint8Array; files: number; skipped: string[] } | { ok: false; refusal: SnapshotRefusal };
+export type Snapshot = { ok: true; name: string; archive: Uint8Array; files: number; skipped: string[]; withheld: string[] } | { ok: false; refusal: SnapshotRefusal };
 
 const SKIPPED_DIRS = new Set(['node_modules', '.git', '.svelte-kit', '.next', '.nuxt', '.output', '.vercel', '.turbo', '.cache', '.parcel-cache', 'dist', 'build', 'out', 'coverage']);
 
@@ -87,6 +87,18 @@ function keptFile(rules: Rule[], path: string): boolean {
   return !ignoredBy(rules, path, false) && fitsTar(path);
 }
 
+const SECRET_FILES = rulesOf('', ['.env', '.env.*', '!.env.example', '!.env.sample', '!.env.template', '*.pem', '*.key', 'id_rsa*'].join('\n'));
+
+const SECRET_CONTENT: Record<string, RegExp> = { '.npmrc': /_auth(Token)?\s*=/ };
+
+async function secret(file: PickedFile): Promise<boolean> {
+  if (ignoredBy(SECRET_FILES, file.path, false)) {
+    return true;
+  }
+  const leak = SECRET_CONTENT[file.path.split('/').at(-1)!];
+  return leak ? leak.test(new TextDecoder().decode(await file.bytes())) : false;
+}
+
 async function ignoreRules(files: PickedFile[]): Promise<Rule[]> {
   const ignores = files.filter((f) => f.path === GITIGNORE || f.path.endsWith(`/${GITIGNORE}`));
   const rules = await Promise.all(ignores.map(async (f) => rulesOf(f.path.slice(0, -GITIGNORE.length).replace(/\/$/, ''), new TextDecoder().decode(await f.bytes()))));
@@ -101,7 +113,10 @@ export async function snapshotOf(folder: string, picked: PickedFile[]): Promise<
   }
 
   const rules = await ignoreRules(picked);
-  const kept = picked.filter((f) => keptFile(rules, f.path));
+  const unignored = picked.filter((f) => keptFile(rules, f.path));
+  const secrets = await Promise.all(unignored.map(secret));
+  const withheld = unignored.filter((_, i) => secrets[i]).map((f) => f.path);
+  const kept = unignored.filter((_, i) => !secrets[i]);
   const skipped = kept.filter((f) => f.size > SNAPSHOT_LIMITS.fileBytes).map((f) => f.path);
   const packed = kept.filter((f) => f.size <= SNAPSHOT_LIMITS.fileBytes);
   if (packed.length > SNAPSHOT_LIMITS.files) {
@@ -113,5 +128,5 @@ export async function snapshotOf(folder: string, picked: PickedFile[]): Promise<
 
   const name = folderNameOf(folder);
   const files = await Promise.all(packed.map(async (f) => ({ path: `${name}/${f.path}`, bytes: await f.bytes() })));
-  return { ok: true, name, archive: gzipSync(tarOf(files)), files: files.length, skipped };
+  return { ok: true, name, archive: gzipSync(tarOf(files)), files: files.length, skipped, withheld };
 }
