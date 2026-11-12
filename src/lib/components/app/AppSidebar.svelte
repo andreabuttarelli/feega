@@ -1,5 +1,6 @@
 <script lang="ts">
   import Wordmark from './Wordmark.svelte';
+  import FeegaMark from '$lib/components/FeegaMark.svelte';
   import { signOutForm } from '$lib/auth/sign-out-form';
   import { apiEnhance } from '$lib/dashboard/api-enhance';
   import { chooseWorkspace, createWorkspace } from '$lib/dashboard/api';
@@ -147,7 +148,7 @@
 
 <nav class="app-sidebar" aria-label="App" data-testid="app-sidebar">
   <div class="scroll">
-    <a class="wordmark" href="/app"><Wordmark /></a>
+    <a class="wordmark" href="/app" aria-label="feega"><FeegaMark size={20} /><Wordmark /></a>
 
     <div class="group">
       {#each inSection(NavSection.Main) as item (item.id)}
@@ -235,6 +236,9 @@
   }
 
   .wordmark {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-2);
     padding: var(--ui-space-2) var(--ui-space-2) 0;
     text-decoration: none;
   }
