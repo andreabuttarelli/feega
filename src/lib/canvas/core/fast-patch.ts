@@ -1,4 +1,4 @@
-import { ItemKind, type DisplayList, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
+import { ItemKind, type DisplayList, type GroupItem, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import { clipsOf, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { ParentOpacity, ancestorsOf } from '@feega/motion-core/motion/parent';
 
@@ -13,6 +13,8 @@ const changedKeys = <T extends object>(a: T, b: T): string[] => [...new Set([...
 
 const OPAQUE = 1;
 
+const ownContent = (group: GroupItem): boolean => group.items.every((i) => i.clip === group.clip && (i.kind !== ItemKind.Group || ownContent(i)));
+
 function faded(items: Item[], owned: ReadonlySet<string>, ratio: number): Item[] | null {
   const out: Item[] = [];
   for (const item of items) {
@@ -24,7 +26,7 @@ function faded(items: Item[], owned: ReadonlySet<string>, ratio: number): Item[]
       out.push(inner && item.kind === ItemKind.Group ? { ...item, items: inner } : item);
       continue;
     }
-    if (item.kind === ItemKind.Group) {
+    if (item.kind === ItemKind.Group && !ownContent(item)) {
       return null;
     }
     out.push({ ...item, opacity: item.opacity * ratio });
