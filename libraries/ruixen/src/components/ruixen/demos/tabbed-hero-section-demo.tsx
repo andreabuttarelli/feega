@@ -36,31 +36,31 @@ export default function TabbedHeroSectionDemo() {
             key="vercel"
             className="text-[15px] font-semibold tracking-tight whitespace-nowrap"
           >
-            Vercel
+            Halcyon
           </span>,
           <span
             key="linear"
             className="text-[15px] font-semibold tracking-tight whitespace-nowrap"
           >
-            Linear
+            Kestrel
           </span>,
           <span
             key="notion"
             className="text-[15px] font-semibold tracking-tight whitespace-nowrap"
           >
-            Notion
+            Tidewell
           </span>,
           <span
             key="stripe"
             className="text-[15px] font-semibold tracking-tight whitespace-nowrap"
           >
-            Stripe
+            Ferrow
           </span>,
           <span
             key="figma"
             className="text-[15px] font-semibold tracking-tight whitespace-nowrap"
           >
-            Figma
+            Quillon
           </span>,
         ],
       }}

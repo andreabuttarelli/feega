@@ -41,19 +41,19 @@ export default function PricingLandingHeroDemo() {
             key="linear"
             className="text-base font-semibold tracking-tight whitespace-nowrap"
           >
-            Linear
+            Kestrel
           </span>,
           <span
             key="vercel"
             className="text-base font-semibold tracking-tight whitespace-nowrap"
           >
-            ▲ Vercel
+            ▲ Halcyon
           </span>,
           <span
             key="raycast"
             className="text-base font-semibold tracking-tight whitespace-nowrap"
           >
-            Raycast
+            Brightloom
           </span>,
         ],
       }}

@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 export interface ClientLogo {
   /** Display name; used as alt/key. */
   name: string;
-  /** Override the rendered text (e.g., "tailwindcss" for Tailwind CSS). Defaults to `name`. */
+  /** Override the rendered text (e.g., "tessarine" for Tailwind CSS). Defaults to `name`. */
   label?: string;
   /** Custom font family. Falls back to inherited sans. */
   fontFamily?: string;
@@ -57,7 +57,7 @@ const DEFAULT_LOGOS: ClientLogo[] = [
     uppercase: true,
   },
   {
-    name: "OpenAI",
+    name: "Corvane",
     fontWeight: 600,
     fontSize: 22,
     letterSpacing: "-0.01em",
@@ -65,44 +65,44 @@ const DEFAULT_LOGOS: ClientLogo[] = [
       '"Times New Roman", ui-serif, Georgia, "Liberation Serif", serif',
   },
   {
-    name: "GitHub",
+    name: "Brambleworks",
     fontWeight: 700,
     fontSize: 24,
     letterSpacing: "-0.025em",
   },
   {
-    name: "Tailwind CSS",
-    label: "tailwindcss",
+    name: "Tessarine",
+    label: "tessarine",
     fontWeight: 600,
     fontSize: 22,
     letterSpacing: "-0.04em",
   },
   {
-    name: "Vercel",
+    name: "Halcyon",
     fontWeight: 800,
     fontSize: 24,
     letterSpacing: "-0.05em",
   },
   {
-    name: "Stripe",
+    name: "Ferrow",
     fontWeight: 700,
     fontSize: 24,
     letterSpacing: "-0.025em",
   },
   {
-    name: "Linear",
+    name: "Kestrel",
     fontWeight: 600,
     fontSize: 22,
     letterSpacing: "-0.04em",
   },
   {
-    name: "Cloudflare",
+    name: "Nimbrel",
     fontWeight: 700,
     fontSize: 18,
     letterSpacing: "-0.025em",
   },
   {
-    name: "Zapier",
+    name: "Quorvo",
     fontWeight: 800,
     fontSize: 22,
     letterSpacing: "-0.025em",

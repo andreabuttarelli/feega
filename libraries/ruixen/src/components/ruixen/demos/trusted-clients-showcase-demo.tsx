@@ -8,71 +8,71 @@ const LOGO_CLS =
 
 const clients: LogoItem[] = [
   {
-    name: "Percy",
+    name: "Pellin",
     logo: (
-      <img src="/logos/percy.svg" alt="Percy" className={`h-5 ${LOGO_CLS}`} />
+      <img src="/marks/pellin.svg" alt="Pellin" className={`h-5 ${LOGO_CLS}`} />
     ),
   },
   {
-    name: "Bitbucket",
+    name: "Pailbrook",
     logo: (
       <img
-        src="/logos/bitbucket.svg"
-        alt="Bitbucket"
+        src="/marks/pailbrook.svg"
+        alt="Pailbrook"
         className={`h-4 ${LOGO_CLS}`}
       />
     ),
   },
   {
-    name: "Gumroad",
+    name: "Rovenna",
     logo: (
       <img
-        src="/logos/gumroad.svg"
-        alt="Gumroad"
+        src="/marks/rovenna.svg"
+        alt="Rovenna"
         className={`h-4 ${LOGO_CLS}`}
       />
     ),
   },
   {
-    name: "Gong",
+    name: "Belltide",
     logo: (
-      <img src="/logos/gong.svg" alt="Gong" className={`h-6 ${LOGO_CLS}`} />
+      <img src="/marks/belltide.svg" alt="Belltide" className={`h-6 ${LOGO_CLS}`} />
     ),
   },
   {
-    name: "Geckoboard",
+    name: "Saurio",
     logo: (
       <img
-        src="/logos/geckoboard.svg"
-        alt="Geckoboard"
+        src="/marks/saurio.svg"
+        alt="Saurio"
         className={`h-5 ${LOGO_CLS}`}
       />
     ),
   },
   {
-    name: "Coinflect",
+    name: "Pennaro",
     logo: (
       <img
-        src="/logos/coinflect.svg"
-        alt="Coinflect"
+        src="/marks/pennaro.svg"
+        alt="Pennaro"
         className={`h-5 ${LOGO_CLS}`}
       />
     ),
   },
   {
-    name: "Ternary",
+    name: "Thrennic",
     logo: (
       <img
-        src="/logos/ternary.svg"
-        alt="Ternary"
+        src="/marks/thrennic.svg"
+        alt="Thrennic"
         className={`h-5 ${LOGO_CLS}`}
       />
     ),
   },
   {
-    name: "Wyre",
+    name: "Wenlow",
     logo: (
-      <img src="/logos/wyre.svg" alt="Wyre" className={`h-5 ${LOGO_CLS}`} />
+      <img src="/marks/wenlow.svg" alt="Wenlow" className={`h-5 ${LOGO_CLS}`} />
     ),
   },
 ];

@@ -222,7 +222,9 @@ import (pinned in `libraries/ruixen/catalog.json`). Vendored in `libraries/ruixe
 `scripts/ruixen-library/sync.ts`, which only fetches from that commit of the MIT repository and
 refuses anything that writes outside the library, and imported into the built-in Ruixen component
 library. `libraries/ruixen/src/index.css` is adapted from the repository's `styles/globals.css`.
-No Ruixen Pro item (pro.ruixen.com) is included.
+No Ruixen Pro item (pro.ruixen.com) is included. Third-party company logos and wordmarks in the
+examples are replaced at sync time by invented names and marks drawn for Feega
+(`scripts/ruixen-library/debrand.ts`, `libraries/ruixen/public/marks/`).
 
 ```
 MIT License

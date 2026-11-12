@@ -32,14 +32,14 @@ export interface TrustedClientsShowcaseProps {
 }
 
 const defaultClients: LogoItem[] = [
-  { name: "Vercel" },
-  { name: "Linear" },
-  { name: "Stripe" },
-  { name: "Notion" },
-  { name: "Figma" },
-  { name: "Raycast" },
-  { name: "Loom" },
-  { name: "Pitch" },
+  { name: "Halcyon" },
+  { name: "Kestrel" },
+  { name: "Ferrow" },
+  { name: "Tidewell" },
+  { name: "Quillon" },
+  { name: "Brightloom" },
+  { name: "Ostrava Labs" },
+  { name: "Velmora" },
 ];
 
 export function TrustedClientsShowcase({

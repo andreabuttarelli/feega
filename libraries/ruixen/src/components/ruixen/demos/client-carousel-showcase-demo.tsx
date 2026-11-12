@@ -8,101 +8,101 @@ const LOGO_CLS =
 
 const clients: ClientCarouselItem[] = [
   {
-    name: "Getform",
+    name: "Formwick",
     logo: (
       <img
-        src="/logos/getform.svg"
-        alt="Getform"
+        src="/marks/formwick.svg"
+        alt="Formwick"
         className={`h-5 ${LOGO_CLS}`}
       />
     ),
   },
   {
-    name: "Bitbucket",
+    name: "Pailbrook",
     logo: (
       <img
-        src="/logos/bitbucket.svg"
-        alt="Bitbucket"
+        src="/marks/pailbrook.svg"
+        alt="Pailbrook"
         className={`h-5 ${LOGO_CLS}`}
       />
     ),
   },
   {
-    name: "Gumroad",
+    name: "Rovenna",
     logo: (
       <img
-        src="/logos/gumroad.svg"
-        alt="Gumroad"
+        src="/marks/rovenna.svg"
+        alt="Rovenna"
         className={`h-5 ${LOGO_CLS}`}
       />
     ),
   },
   {
-    name: "Gong",
+    name: "Belltide",
     logo: (
-      <img src="/logos/gong.svg" alt="Gong" className={`h-7 ${LOGO_CLS}`} />
+      <img src="/marks/belltide.svg" alt="Belltide" className={`h-7 ${LOGO_CLS}`} />
     ),
   },
   {
-    name: "Geckoboard",
+    name: "Saurio",
     logo: (
       <img
-        src="/logos/geckoboard.svg"
-        alt="Geckoboard"
+        src="/marks/saurio.svg"
+        alt="Saurio"
         className={`h-6 ${LOGO_CLS}`}
       />
     ),
   },
   {
-    name: "Reform Collective",
+    name: "Mosscourt Collective",
     logo: (
       <img
-        src="/logos/reform-collective.svg"
-        alt="Reform Collective"
+        src="/marks/mosscourt-collective.svg"
+        alt="Mosscourt Collective"
         className={`h-5 ${LOGO_CLS}`}
       />
     ),
   },
   {
-    name: "Ternary",
+    name: "Thrennic",
     logo: (
       <img
-        src="/logos/ternary.svg"
-        alt="Ternary"
+        src="/marks/thrennic.svg"
+        alt="Thrennic"
         className={`h-6 ${LOGO_CLS}`}
       />
     ),
   },
   {
-    name: "Wyre",
+    name: "Wenlow",
     logo: (
-      <img src="/logos/wyre.svg" alt="Wyre" className={`h-6 ${LOGO_CLS}`} />
+      <img src="/marks/wenlow.svg" alt="Wenlow" className={`h-6 ${LOGO_CLS}`} />
     ),
   },
   {
-    name: "Percy",
+    name: "Pellin",
     logo: (
-      <img src="/logos/percy.svg" alt="Percy" className={`h-6 ${LOGO_CLS}`} />
+      <img src="/marks/pellin.svg" alt="Pellin" className={`h-6 ${LOGO_CLS}`} />
     ),
   },
   {
-    name: "Urban",
+    name: "Kerbside",
     logo: (
-      <img src="/logos/urban.svg" alt="Urban" className={`h-6 ${LOGO_CLS}`} />
+      <img src="/marks/kerbside.svg" alt="Kerbside" className={`h-6 ${LOGO_CLS}`} />
     ),
   },
   {
-    name: "Cosmos",
+    name: "Starnook",
     logo: (
-      <img src="/logos/cosmos.svg" alt="Cosmos" className={`h-5 ${LOGO_CLS}`} />
+      <img src="/marks/starnook.svg" alt="Starnook" className={`h-5 ${LOGO_CLS}`} />
     ),
   },
   {
-    name: "Sleepy Cat",
+    name: "Drowsy Fox",
     logo: (
       <img
-        src="/logos/sleepy-cat.svg"
-        alt="Sleepy Cat"
+        src="/marks/drowsy-fox.svg"
+        alt="Drowsy Fox"
         className={`h-7 ${LOGO_CLS}`}
       />
     ),

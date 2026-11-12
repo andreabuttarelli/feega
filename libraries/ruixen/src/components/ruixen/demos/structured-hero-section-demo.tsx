@@ -41,7 +41,7 @@ export default function StructuredHeroSectionDemo() {
             key="tailwind"
             className="text-[15px] font-semibold tracking-tight whitespace-nowrap"
           >
-            Tailwind CSS
+            Tessarine
           </span>,
           <span
             key="typescript"

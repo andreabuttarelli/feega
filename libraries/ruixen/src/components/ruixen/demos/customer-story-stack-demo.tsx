@@ -19,7 +19,7 @@ const cases: CustomerStoryCase[] = [
     id: "bitbucket",
     logo: (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src="/logos/bitbucket.svg" alt="Bitbucket" className={LOGO_CLS} />
+      <img src="/marks/pailbrook.svg" alt="Pailbrook" className={LOGO_CLS} />
     ),
     quote:
       "Our pull-request templates and CI pipelines were duct-taped together for years. Migrating to a unified component system finally let us clear the review queue in days, not weeks.",
@@ -43,7 +43,7 @@ const cases: CustomerStoryCase[] = [
     id: "gumroad",
     logo: (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src="/logos/gumroad.svg" alt="Gumroad" className={LOGO_CLS} />
+      <img src="/marks/rovenna.svg" alt="Rovenna" className={LOGO_CLS} />
     ),
     quote:
       "Creators kept asking why checkout looked different from the dashboard. One library and a weekend later, every surface ships from the same primitives — and the same accessibility floor.",
@@ -67,7 +67,7 @@ const cases: CustomerStoryCase[] = [
     id: "gong",
     logo: (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src="/logos/gong.svg" alt="Gong" className={LOGO_CLS} />
+      <img src="/marks/belltide.svg" alt="Belltide" className={LOGO_CLS} />
     ),
     quote:
       "The cost of bespoke UI compounded — every team rebuilt their own tables, toasts and modals. We retired thousands of lines of legacy CSS and the designers got their afternoons back.",

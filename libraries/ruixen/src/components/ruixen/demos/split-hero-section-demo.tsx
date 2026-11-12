@@ -39,13 +39,13 @@ export default function SplitHeroSectionDemo() {
             key="vercel"
             className="text-[15px] font-semibold tracking-tight whitespace-nowrap"
           >
-            Vercel
+            Halcyon
           </span>,
           <span
             key="linear"
             className="text-[15px] font-semibold tracking-tight whitespace-nowrap"
           >
-            Linear
+            Kestrel
           </span>,
           <span
             key="stripe"
@@ -57,31 +57,31 @@ export default function SplitHeroSectionDemo() {
             key="notion"
             className="text-[15px] font-semibold tracking-tight whitespace-nowrap"
           >
-            Notion
+            Tidewell
           </span>,
           <span
             key="supabase"
             className="text-[14px] font-bold tracking-tight whitespace-nowrap"
           >
-            Supabase
+            Basalto
           </span>,
           <span
             key="figma"
             className="text-[15px] font-semibold tracking-tight whitespace-nowrap"
           >
-            Figma
+            Quillon
           </span>,
           <span
             key="raycast"
             className="text-[14px] font-semibold tracking-tight whitespace-nowrap"
           >
-            Raycast
+            Brightloom
           </span>,
           <span
             key="resend"
             className="text-[15px] font-semibold tracking-tight whitespace-nowrap"
           >
-            Resend
+            Postwick
           </span>,
         ],
       }}

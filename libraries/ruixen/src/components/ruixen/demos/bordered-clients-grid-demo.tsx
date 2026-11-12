@@ -10,101 +10,101 @@ export default function BorderedClientsGridDemo() {
     <BorderedClientsGrid
       logos={[
         {
-          name: "Cosmos",
+          name: "Starnook",
           node: (
             <img
-              src="/logos/cosmos.svg"
-              alt="Cosmos"
+              src="/marks/starnook.svg"
+              alt="Starnook"
               className={`h-4 ${LOGO_CLS}`}
             />
           ),
         },
         {
-          name: "Bitbucket",
+          name: "Pailbrook",
           node: (
             <img
-              src="/logos/bitbucket.svg"
-              alt="Bitbucket"
+              src="/marks/pailbrook.svg"
+              alt="Pailbrook"
               className={`h-4 ${LOGO_CLS}`}
             />
           ),
         },
         {
-          name: "Gumroad",
+          name: "Rovenna",
           node: (
             <img
-              src="/logos/gumroad.svg"
-              alt="Gumroad"
+              src="/marks/rovenna.svg"
+              alt="Rovenna"
               className={`h-4 ${LOGO_CLS}`}
             />
           ),
         },
         {
-          name: "Gong",
+          name: "Belltide",
           node: (
             <img
-              src="/logos/gong.svg"
-              alt="Gong"
+              src="/marks/belltide.svg"
+              alt="Belltide"
               className={`h-6 ${LOGO_CLS}`}
             />
           ),
         },
         {
-          name: "Geckoboard",
+          name: "Saurio",
           node: (
             <img
-              src="/logos/geckoboard.svg"
-              alt="Geckoboard"
+              src="/marks/saurio.svg"
+              alt="Saurio"
               className={`h-5 ${LOGO_CLS}`}
             />
           ),
         },
         {
-          name: "Coinflect",
+          name: "Pennaro",
           node: (
             <img
-              src="/logos/coinflect.svg"
-              alt="Coinflect"
+              src="/marks/pennaro.svg"
+              alt="Pennaro"
               className={`h-5 ${LOGO_CLS}`}
             />
           ),
         },
         {
-          name: "Ternary",
+          name: "Thrennic",
           node: (
             <img
-              src="/logos/ternary.svg"
-              alt="Ternary"
+              src="/marks/thrennic.svg"
+              alt="Thrennic"
               className={`h-5 ${LOGO_CLS}`}
             />
           ),
         },
         {
-          name: "Wyre",
+          name: "Wenlow",
           node: (
             <img
-              src="/logos/wyre.svg"
-              alt="Wyre"
+              src="/marks/wenlow.svg"
+              alt="Wenlow"
               className={`h-5 ${LOGO_CLS}`}
             />
           ),
         },
         {
-          name: "Percy",
+          name: "Pellin",
           node: (
             <img
-              src="/logos/percy.svg"
-              alt="Percy"
+              src="/marks/pellin.svg"
+              alt="Pellin"
               className={`h-5 ${LOGO_CLS}`}
             />
           ),
         },
         {
-          name: "Urban",
+          name: "Kerbside",
           node: (
             <img
-              src="/logos/urban.svg"
-              alt="Urban"
+              src="/marks/kerbside.svg"
+              alt="Kerbside"
               className={`h-5 ${LOGO_CLS}`}
             />
           ),

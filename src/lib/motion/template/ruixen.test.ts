@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parseMotionDoc } from '@feega/motion-core/motion/doc';
 import { RUIXEN_GROUP, RUIXEN_TEMPLATES } from './ruixen';
@@ -32,5 +32,12 @@ describe('the built-in Ruixen library', () => {
   it('composes every component into a frame, as Add to canvas does', () => {
     const refused = RUIXEN_TEMPLATES.filter((e) => !composedTemplate(e, { format: MotionFormat.Landscape, values: {} }, [], sequentialIds()).ok).map((e) => e.id);
     expect(refused).toEqual([]);
+  });
+
+  it('ships no third-party logo or wordmark', () => {
+    const brands = ['Vercel', 'Linear', 'Stripe', 'Notion', 'Figma', 'Raycast', 'Resend', 'Supabase', 'Loom', 'Pitch', 'OpenAI', 'GitHub', 'Tailwind CSS', 'tailwindcss', 'Cloudflare', 'Zapier', 'Salesforce', 'Hubspot', 'Bitbucket', 'Gumroad', 'Gong', 'Geckoboard', 'Ternary', 'Wyre', 'Percy', 'Reform Collective', 'Coinflect', 'Getform', 'Sleepy Cat', 'Cosmos', 'Urban'];
+    const shipped = readFileSync('src/lib/motion/template/ruixen/ruixen-doc.json', 'utf8');
+    const wordmarks = brands.filter((b) => shipped.includes(`"text":"${b}"`) || shipped.includes(`"text":"▲ ${b}"`));
+    expect({ wordmarks, logoFiles: existsSync('libraries/ruixen/public/logos'), logoUrls: shipped.includes('/logos/') }).toEqual({ wordmarks: [], logoFiles: false, logoUrls: false });
   });
 });
