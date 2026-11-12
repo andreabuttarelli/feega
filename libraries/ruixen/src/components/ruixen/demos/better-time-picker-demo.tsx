@@ -1,0 +1,9 @@
+import BetterTimePicker from "@/components/ruixen/better-time-picker";
+
+export default function Demo() {
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <BetterTimePicker />
+    </div>
+  );
+}

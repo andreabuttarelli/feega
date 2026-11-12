@@ -1,0 +1,9 @@
+import { AnimatedThemeToggler } from "@/components/ruixen/animated-theme-toggler";
+
+export default function AnimatedThemeTogglerDemo() {
+  return (
+    <div className="flex min-h-[200px] w-full items-center justify-center">
+      <AnimatedThemeToggler />
+    </div>
+  );
+}

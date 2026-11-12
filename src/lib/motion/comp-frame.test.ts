@@ -33,6 +33,15 @@ describe('a main keeps its pixels when it moves between frames of different size
     expect(rounded([pill.props.x, pill.props.y, pill.props.width, pill.props.height])).toEqual([0.5, 0.75, 0.2, 0.05]);
   });
 
+  it('keeps the pixel width of its strokes', () => {
+    const comp = buttonComp();
+    const pill = comp.tracks[0].clips[0] as MotionClip;
+    const stroked = { ...comp, tracks: [{ ...comp.tracks[0], clips: [{ ...pill, props: { ...pill.props, strokes: [{ paint: { type: 'solid', color: '#000000' }, width: 0.002, dash: 0.004, gap: 0.001 }] } }] }] } as MotionComp;
+    const moved = reframed(stroked, PAGE, SET).tracks[0].clips[0] as MotionClip;
+    const [stroke] = moved.props.strokes as { width: number; dash: number; gap: number }[];
+    expect(rounded([stroke.width * 200, stroke.dash * 200, stroke.gap * 200])).toEqual([2, 4, 1]);
+  });
+
   it('leaves a main alone when the frames match', () => {
     const comp = buttonComp();
     expect(reframed(comp, PAGE, PAGE)).toBe(comp);

@@ -13,6 +13,7 @@ export function componentMarksOf({ names, limits, attr }: MarkAsk): ComponentUse
   const HOSTS = new Set([5, 26, 27]);
   const COMPOSITE = new Set([0, 1, 11, 14, 15]);
   const VENDOR = /(^|\/)(node_modules|\.svelte-kit)\//;
+  const UNPAINTED = new Set(['STYLE', 'SCRIPT', 'TEMPLATE', 'LINK']);
   const uses: ComponentUse[] = [];
 
   type Owner = { id: object; name: string; props: Record<string, unknown> | null };
@@ -152,6 +153,9 @@ export function componentMarksOf({ names, limits, attr }: MarkAsk): ComponentUse
   const rooted = new Map<Element, Owner[]>();
   const roots = new Map<object, number>();
   for (const el of document.body?.querySelectorAll('*') ?? []) {
+    if (UNPAINTED.has(el.tagName)) {
+      continue;
+    }
     const owners = reactOwners(el) ?? vueOwners(el) ?? svelteOwners(el) ?? [];
     if (!owners.length) {
       continue;

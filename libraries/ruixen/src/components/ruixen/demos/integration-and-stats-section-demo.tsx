@@ -1,0 +1,11 @@
+"use client";
+
+import IntegrationAndStatsSection from "@/components/ruixen/integration-and-stats-section";
+
+export default function DemoIntegrationPage() {
+  return (
+    <main className="bg-background flex flex-col items-center justify-center w-full scale-[0.7] -mt-30">
+      <IntegrationAndStatsSection />
+    </main>
+  );
+}
