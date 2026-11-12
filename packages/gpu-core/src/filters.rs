@@ -512,6 +512,57 @@ fn svg_reach(filter: &SvgNode, space: Linear) -> Option<Reach> {
     (!own_region && !frame_space).then_some(Reach { share: SVG_REGION_SHARE, px: 0.0 })
 }
 
+const ALPHA_OFFSET: usize = 19;
+
+fn lifts_alpha(attrs: &Map<String, Value>) -> bool {
+    let kind = text(attrs.get("type"));
+    let matrix = kind.is_empty() || kind == "matrix";
+    matrix && numbers(attrs.get("values")).get(ALPHA_OFFSET).is_some_and(|offset| *offset != 0.0)
+}
+
+fn inked_by(node: &SvgNode, input: impl Fn(Option<&Value>) -> bool) -> bool {
+    let a = |k: &str| node.attrs.get(k);
+    match node.tag.as_str() {
+        "feGaussianBlur" | "feOffset" | "feMorphology" | "feDropShadow" | "feTile" | "feWarp" | "feDisplacementMap" => input(a("in")),
+        "feColorMatrix" => input(a("in")) || lifts_alpha(&node.attrs),
+        "feComposite" => match text(a("operator")).as_str() {
+            "in" => input(a("in")) && input(a("in2")),
+            "out" => input(a("in")),
+            "atop" => input(a("in2")),
+            "arithmetic" => true,
+            _ => input(a("in")) || input(a("in2")),
+        },
+        "feBlend" => input(a("in")) || input(a("in2")),
+        "feMerge" => node.children.iter().any(|c| input(c.attrs.get("in"))),
+        _ => true,
+    }
+}
+
+fn svg_inks(filter: &SvgNode, source: bool) -> bool {
+    let mut results: HashMap<String, bool> = HashMap::new();
+    let mut last = source;
+    for node in &filter.children {
+        let input = |name: Option<&Value>| match name.map(|v| text(Some(v))) {
+            Some(n) if n == SOURCE_GRAPHIC || n == SOURCE_ALPHA => source,
+            Some(n) => results.get(&n).copied().unwrap_or(last),
+            None => last,
+        };
+        let out = inked_by(node, input);
+        if let Some(name) = node.attrs.get("result") {
+            results.insert(text(Some(name)), out);
+        }
+        last = out;
+    }
+    last
+}
+
+pub fn paints_from_nothing(filters: &[Filter]) -> bool {
+    filters.iter().fold(false, |inked, f| match f {
+        Filter::Css { .. } => inked,
+        Filter::Svg { nodes } => nodes.iter().fold(inked, |inked, node| svg_inks(node, inked)),
+    })
+}
+
 pub fn reach(filters: &[Filter], space: Linear) -> Option<Reach> {
     filters.iter().try_fold(Reach::default(), |acc, f| {
         let own = match f {

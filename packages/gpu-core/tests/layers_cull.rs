@@ -140,3 +140,63 @@ fn an_empty_group_with_an_svg_filter_still_gets_a_layer() {
 
     assert_eq!(layers.bodies.len(), 1);
 }
+
+const STROKE: &str = r#"{ "kind": "svg", "nodes": [{ "tag": "filter", "attrs": {}, "children": [
+  { "tag": "feMorphology", "attrs": { "in": "SourceAlpha", "operator": "dilate", "radius": 4, "result": "grown" }, "children": [] },
+  { "tag": "feFlood", "attrs": { "flood-color": "white", "result": "ink" }, "children": [] },
+  { "tag": "feComposite", "attrs": { "in": "ink", "in2": "grown", "operator": "in", "result": "line" }, "children": [] },
+  { "tag": "feMerge", "attrs": {}, "children": [{ "tag": "feMergeNode", "attrs": { "in": "line" }, "children": [] }, { "tag": "feMergeNode", "attrs": { "in": "SourceGraphic" }, "children": [] }] }] }] }"#;
+
+const SHADOW: &str = r#"{ "kind": "svg", "nodes": [{ "tag": "filter", "attrs": {}, "children": [
+  { "tag": "feOffset", "attrs": { "in": "SourceAlpha", "dx": 0, "dy": 4, "result": "moved" }, "children": [] },
+  { "tag": "feGaussianBlur", "attrs": { "in": "moved", "stdDeviation": 6, "result": "soft" }, "children": [] },
+  { "tag": "feFlood", "attrs": { "flood-color": "black", "flood-opacity": 0.3, "result": "ink" }, "children": [] },
+  { "tag": "feComposite", "attrs": { "in": "ink", "in2": "soft", "operator": "in", "result": "shade" }, "children": [] },
+  { "tag": "feColorMatrix", "attrs": { "in": "SourceAlpha", "type": "matrix", "values": "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 255 0", "result": "solid" }, "children": [] },
+  { "tag": "feComposite", "attrs": { "in": "shade", "in2": "solid", "operator": "out", "result": "cut" }, "children": [] },
+  { "tag": "feMerge", "attrs": {}, "children": [{ "tag": "feMergeNode", "attrs": { "in": "cut" }, "children": [] }, { "tag": "feMergeNode", "attrs": { "in": "SourceGraphic" }, "children": [] }] }] }] }"#;
+
+const FLOOD_UNDER: &str = r#"{ "kind": "svg", "nodes": [{ "tag": "filter", "attrs": {}, "children": [
+  { "tag": "feFlood", "attrs": { "flood-color": "red", "result": "ink" }, "children": [] },
+  { "tag": "feComposite", "attrs": { "in": "SourceGraphic", "in2": "ink", "operator": "over" }, "children": [] }] }] }"#;
+
+const ALPHA_LIFT: &str = r#"{ "kind": "svg", "nodes": [{ "tag": "filter", "attrs": {}, "children": [
+  { "tag": "feColorMatrix", "attrs": { "type": "matrix", "values": "1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0.5" }, "children": [] }] }] }"#;
+
+#[test]
+fn an_empty_group_whose_svg_filter_strokes_its_content_costs_no_layer() {
+    let mut surface = Counting::default();
+
+    let layers = prepare(&mut surface, &empty_group(STROKE), &Shelf::new(), Blending::Native).unwrap();
+
+    assert!(surface.painted.is_empty());
+    assert!(layers.bodies.is_empty());
+}
+
+#[test]
+fn an_empty_group_whose_svg_filter_shadows_its_content_costs_no_layer() {
+    let mut surface = Counting::default();
+
+    let layers = prepare(&mut surface, &empty_group(SHADOW), &Shelf::new(), Blending::Native).unwrap();
+
+    assert!(surface.painted.is_empty());
+    assert!(layers.bodies.is_empty());
+}
+
+#[test]
+fn an_empty_group_whose_svg_filter_floods_under_it_still_gets_a_layer() {
+    let mut surface = Counting::default();
+
+    let layers = prepare(&mut surface, &empty_group(FLOOD_UNDER), &Shelf::new(), Blending::Native).unwrap();
+
+    assert_eq!(layers.bodies.len(), 1);
+}
+
+#[test]
+fn an_empty_group_whose_colour_matrix_lifts_alpha_still_gets_a_layer() {
+    let mut surface = Counting::default();
+
+    let layers = prepare(&mut surface, &empty_group(ALPHA_LIFT), &Shelf::new(), Blending::Native).unwrap();
+
+    assert_eq!(layers.bodies.len(), 1);
+}
