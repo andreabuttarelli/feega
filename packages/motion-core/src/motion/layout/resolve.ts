@@ -236,7 +236,14 @@ function laidOut(tracks: MotionTrack[], size: Size, measure: TextMeasure, conten
 
 const laidComps = (doc: MotionDoc, size: Size, measure: TextMeasure): MotionDoc['comps'] => Object.fromEntries(Object.entries(doc.comps).map(([id, comp]) => [id, { ...comp, tracks: laidOut(comp.tracks, comp.frame ?? size, measure, instanceContent(doc, comp.frame ?? size, measure)) }]));
 
+const laidDocs = new WeakMap<MotionDoc, Map<TextMeasure, MotionDoc>>();
+
 export function withAutoLayout(doc: MotionDoc, measure: TextMeasure = estimatedText): MotionDoc {
+  const byMeasure = laidDocs.get(doc) ?? laidDocs.set(doc, new Map()).get(doc)!;
+  return byMeasure.get(measure) ?? byMeasure.set(measure, layAll(doc, measure)).get(measure)!;
+}
+
+function layAll(doc: MotionDoc, measure: TextMeasure): MotionDoc {
   const all = [doc.tracks, ...Object.values(doc.comps).map((c) => c.tracks)];
   if (!all.some((tracks) => visualClips(tracks).some(isContainer))) {
     return doc;

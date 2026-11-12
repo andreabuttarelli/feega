@@ -22,6 +22,11 @@ const flow = (over: Partial<AutoLayout> = {}): AutoLayout => ({ ...DEFAULT_AUTO_
 const propsOf = (doc: MotionDoc, id: string) => doc.tracks.flatMap((t) => t.clips).find((c) => c.id === id)!.props;
 
 describe('withAutoLayout', () => {
+  it('lays the same doc out once, however many readers ask on one edit', () => {
+    const doc = docOf([shape('a', { x: 0.9, y: 0.9, width: 0.1, height: 0.1 }, { parent: 'c' }), shape('c', { x: 0.5, y: 0.5, width: 0.6, height: 0.2 }, { autoLayout: flow() })]);
+    expect(withAutoLayout(doc)).toBe(withAutoLayout(doc));
+  });
+
   it('leaves a doc without containers untouched', () => {
     const doc = docOf([shape('a', { x: 0.5, y: 0.5, width: 0.1, height: 0.1 })]);
     expect(withAutoLayout(doc)).toBe(doc);

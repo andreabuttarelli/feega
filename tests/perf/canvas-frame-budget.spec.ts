@@ -321,7 +321,7 @@ async function textEdits(page: Page, count: number): Promise<(Stages | null)[]> 
     await page.waitForTimeout(EDIT_PAUSE_MS);
   }
   await field.waitFor({ timeout: 10_000 });
-  await page.keyboard.press('End');
+  await field.press('End');
   const seen: (Stages | null)[] = [];
   for (let i = 0; i < count; i++) {
     const typed = field.evaluate(
@@ -335,7 +335,7 @@ async function textEdits(page: Page, count: number): Promise<(Stages | null)[]> 
         }),
       EDIT_GIVE_UP_MS
     );
-    await page.keyboard.press('KeyA');
+    await field.press('KeyA');
     seen.push(await typed);
     await page.waitForTimeout(EDIT_PAUSE_MS);
   }
