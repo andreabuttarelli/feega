@@ -7,4 +7,4 @@ JS in the element-drag profile (~0.7 s of 4 s, unthrottled).
 
 `FrameGesture` joins the frame-tools context; the auto-layout rule shows the strips only when
 the frame is idle. GpuFlow passes `Dragging` while `frameGuides` belongs to the frame. The
-strips come back on release. Figma hides them during a drag too.
+strips come back on release.
