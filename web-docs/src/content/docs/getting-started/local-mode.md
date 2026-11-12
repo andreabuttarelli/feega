@@ -74,7 +74,7 @@ over `.env`, and the current folder's `.env` over the app's. Then start local mo
 |---|---|---|
 | Kie.ai | `KIE_API_KEY` | images, video, text |
 | OpenRouter | `OPENROUTER_API_KEY` | images, video |
-| Text LLM | `LLM_API_KEY` (`LLM_BASE_URL` for a gateway other than OpenRouter) | text, prompt safety check; also counts as the OpenRouter key |
+| Text LLM | `LLM_API_KEY` (`LLM_BASE_URL` for a gateway other than OpenRouter) | text, prompt enhancement; also counts as the OpenRouter key |
 | Higgsfield | `HIGGSFIELD_API_KEY_ID` + `HIGGSFIELD_API_KEY_SECRET` | images, video |
 | Wiro | `WIRO_API_KEY` (+ `WIRO_API_SECRET` if your Wiro project signs requests) | 3D models |
 | ElevenLabs | `ELEVENLABS_API_KEY` (`ELEVENLABS_BASE_URL` optional) | voice-over, sound effects, music, voices |
@@ -86,8 +86,8 @@ run is billed by the provider to your own account.
 Keys are read from the environment only. They are never written to the `.feega` file, sent to the
 browser or logged. Generated images and videos are stored inside the `.feega` file, so the canvas
 stays one portable file. Without a key the nodes stay hidden and generation answers with a message.
-Safety screening of image and video prompts runs on `LLM_API_KEY`: set it, or those generations
-are refused with a hint. At start the terminal prints, per provider, `key works`, `key rejected` or
+Local mode does not run feega's content moderation: prompts, text and references go straight to
+your provider, and what you generate is your responsibility. At start the terminal prints, per provider, `key works`, `key rejected` or
 `key unreachable`, from a free account call (never a generation).
 
 Wiro's image and video models are for uncensored projects, which local mode does not have, so

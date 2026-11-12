@@ -12,7 +12,7 @@ your own keys, from the environment or a `.env` in the folder you run it from:
 |---|---|---|
 | Kie.ai | `KIE_API_KEY` | images, video, text |
 | OpenRouter | `OPENROUTER_API_KEY` | images, video |
-| Text LLM | `LLM_API_KEY` (`LLM_BASE_URL` for a gateway other than OpenRouter) | text, prompt safety check; also counts as the OpenRouter key |
+| Text LLM | `LLM_API_KEY` (`LLM_BASE_URL` for a gateway other than OpenRouter) | text, prompt enhancement; also counts as the OpenRouter key |
 | Higgsfield | `HIGGSFIELD_API_KEY_ID` + `HIGGSFIELD_API_KEY_SECRET` | images, video |
 | Wiro | `WIRO_API_KEY` (+ `WIRO_API_SECRET` if your Wiro project signs requests) | 3D models |
 | ElevenLabs | `ELEVENLABS_API_KEY` (`ELEVENLABS_BASE_URL` optional) | voice-over, sound effects, music, voices |

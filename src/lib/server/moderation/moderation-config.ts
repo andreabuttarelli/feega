@@ -1,10 +1,11 @@
 import { env } from '$env/dynamic/private';
+import { env as publicEnv } from '$env/dynamic/public';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
 import { jev, jevUsd } from './jev';
 import { IDENTIFIABILITY_CATEGORIES, IDENTIFIABILITY_JUDGE_SYSTEM, judgeSystem, parseJudgeVerdict, type ModerationCategories } from './policy';
-import { JudgeTier, MODERATION_PROFILES, carriedProfile } from './profiles';
+import { JudgeTier, MODERATION_PROFILES, carriedProfile, profileForEnv } from './profiles';
 import type { RecommendationTier } from '$lib/canvas/recommended-models';
 import type { ModerationRecord, ScreenPorts } from './screen';
 import { parsePeopleVerdict, PEOPLE_DETECTOR_SYSTEM, ReferenceMedium, type PeopleDetector, type Reference } from './people';
@@ -102,8 +103,10 @@ async function judgeWith(scope: ModerationScope, label: string, system: string, 
 }
 
 export function moderationPorts(db: Db, scope: ModerationScope): ScreenPorts {
-  const { categories } = MODERATION_PROFILES[carriedProfile(scope)];
+  const profile = profileForEnv(scope, publicEnv);
+  const { categories } = MODERATION_PROFILES[profile];
   return {
+    profile,
     decide: (state) => decideWith(scope, JEV_LABEL, categories, state),
     decideIdentifiability: (state) => decideWith(scope, IDENTIFIABILITY_JEV_LABEL, IDENTIFIABILITY_CATEGORIES, state),
     judge: (state) => judgeWith(scope, JUDGE_LABEL, judgeSystem(categories), state),
