@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { strToU8, zipSync } from 'fflate';
 import { MotionFormat, newClip, newMotionDoc, parseMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
-import { EFFECT_KINDS, EffectKind } from '@feega/motion-core/motion/effects/registry';
+import { EFFECT_KINDS, EffectKind, defaultValues } from '@feega/motion-core/motion/effects/registry';
 import { PropertyKind } from '@feega/motion-core/motion/property-resolve';
 import { defineProperty } from '../../../../src/lib/motion/component-properties';
 import { defineVariantProp } from '../../../../src/lib/motion/variants';
@@ -84,7 +84,7 @@ const solid = (color: string) => [{ type: 'solid', color }];
 
 function kindsDoc(): MotionDoc {
   let doc: MotionDoc = { ...newMotionDoc(MotionFormat.Square), still: { frame: 0 }, background: 'transparent' } as MotionDoc;
-  doc = { ...doc, styles: { 'Brand/Accent': { kind: 'colour', color: '#7c3aed' }, 'Soft shadow': { kind: 'effect', effects: [{ id: 'fx1', kind: EffectKind.DropShadow, enabled: true, params: {} }] }, Heading: { kind: 'text', size: 0.05, weight: 700 } } } as MotionDoc;
+  doc = { ...doc, styles: { 'Brand/Accent': { kind: 'colour', color: '#7c3aed' }, 'Soft shadow': { kind: 'effect', effects: [{ id: 'fx1', kind: EffectKind.DropShadow, enabled: true, params: defaultValues(EffectKind.DropShadow) }] }, Heading: { kind: 'text', size: 0.05, weight: 700 } } } as MotionDoc;
   doc = { ...doc, variables: { Theme: { modes: ['Light', 'Dark'], vars: { Ink: { type: 'colour', values: { Light: '#111827', Dark: '#f9fafb' } }, Brand: { type: 'colour', values: { Light: '#2563eb', Dark: '#60a5fa' } } } } } } as MotionDoc;
   doc = { ...doc, assets: [{ id: IMAGE_ASSET, kind: 'image' }] } as MotionDoc;
 

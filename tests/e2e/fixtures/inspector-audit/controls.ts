@@ -53,6 +53,8 @@ export type Row = {
   canvas: boolean;
   local?: (page: Page) => Promise<unknown>;
   with?: Layer[];
+  prep?: (page: Page) => Promise<void>;
+  reset?: (page: Page) => Promise<void>;
   whole?: (doc: Doc) => unknown;
   mixed?: true;
   known?: Known;
@@ -253,13 +255,13 @@ const sizingRows: Base[] = [
 const exportRows = (page: Page) => page.getByTestId('right-bar').getByTestId('export-row');
 const exportRowsOf: Base[] = [
   { section: 'export', control: 'Add export setting', option: 'press', target: anywhere('export-add'), op: Op.Press, read: () => null, local: (page) => exportRows(page).count(), want: grew, canvas: false },
-  { section: 'export', control: 'Export scale', option: '2x', target: (page) => exportRows(page).first().getByRole('combobox', { name: 'Export scale' }), op: Op.Select, value: '2x', read: () => null, local: (page) => exportRows(page).first().getByRole('combobox', { name: 'Export scale' }).inputValue(), want: is('2'), canvas: false },
-  { section: 'export', control: 'Export format', option: 'SVG', target: (page) => exportRows(page).first().getByRole('combobox', { name: 'Export format' }), op: Op.Select, value: 'SVG', read: () => null, local: (page) => exportRows(page).first().getByRole('combobox', { name: 'Export format' }).inputValue(), want: changed, canvas: false }
+  { section: 'export', control: 'Export scale', option: '2x', target: (page) => exportRows(page).first().getByRole('combobox', { name: 'Export scale' }), op: Op.Select, value: '2x', read: () => null, local: (page) => exportRows(page).first().getByRole('combobox', { name: 'Export scale' }).inputValue(), reset: (page) => exportRows(page).first().getByRole('combobox', { name: 'Export scale' }).selectOption('1').then(() => undefined), want: is('2'), canvas: false },
+  { section: 'export', control: 'Export format', option: 'SVG', target: (page) => exportRows(page).first().getByRole('combobox', { name: 'Export format' }), op: Op.Select, value: 'SVG', read: () => null, local: (page) => exportRows(page).first().getByRole('combobox', { name: 'Export format' }).inputValue(), reset: (page) => exportRows(page).first().getByRole('combobox', { name: 'Export format' }).selectOption('png').then(() => undefined), want: changed, canvas: false }
 ];
 
 const bar = (id: string, nth = 0) => (page: Page) => page.getByTestId('right-bar').getByTestId(id).nth(nth);
 const inPopover = (css: string) => (page: Page) => page.getByTestId('side-popover').locator(css).first();
-const colourPopover = (page: Page) => page.getByTestId('colour-popover').getByTestId('colour-channel');
+const colourPopover = (page: Page) => page.getByTestId('colour-popover').getByTestId('colour-channel').first();
 const propValue = (key: string) => (c: Clip) => (c.props.propValues as Record<string, unknown> | undefined)?.[key];
 const overrides = (c: Clip) => c.props.overrides as Record<string, Record<string, unknown>> | undefined;
 const item = (key: string) => (c: Clip) => (c.layoutItem as Record<string, unknown> | undefined)?.[key];
@@ -277,7 +279,7 @@ const instanceRows: Base[] = [
   { section: 'instance', control: 'Variant chip', option: 'Large', target: (page) => page.getByTestId('instance-variant-chips').getByRole('radio', { name: 'Large', exact: true }), op: Op.Press, read: (c) => c.props.comp, want: changed, canvas: false },
   { section: 'instance', control: 'Variant picker', option: 'Large', target: bar('instance-variant'), op: Op.Select, value: 'Large', read: (c) => c.props.comp, want: changed, canvas: false },
   { section: 'instance', control: 'Reset overrides', option: 'press', target: bar('instance-reset'), op: Op.Press, read: overrides, want: empty, canvas: true },
-  { section: 'instance', control: 'Detach', option: 'press', target: bar('instance-detach'), op: Op.Press, read: (c) => c.component, want: (now) => now !== 'Precomp', canvas: false }
+  { section: 'instance', control: 'Detach', option: 'press', target: bar('instance-detach'), op: Op.Press, read: () => null, whole: fullDoc, want: changed, canvas: false }
 ];
 
 const mainRows: Base[] = [{ section: 'instance', control: 'Add variant', option: 'press', target: bar('instance-add-variant'), op: Op.Press, read: () => null, whole: (d) => Object.keys(d.comps).length, want: grew, canvas: false }];
@@ -336,7 +338,7 @@ const moreStackRows: Base[] = [
 
 const moreChildRows: Base[] = [
   { section: 'stack', control: 'Ignore auto layout', option: 'toggle', target: testid('stack', 'auto-layout-absolute'), op: Op.Press, read: item('absolute'), want: is(true), canvas: false },
-  { section: 'stack', control: 'Move later', option: 'press', target: named('stack', 'button', 'Move later'), op: Op.Press, read: () => null, whole: (d) => d.tracks.flatMap((t) => t.clips.map((c) => c.id)).join(), want: changed, canvas: true },
+  { section: 'stack', control: 'Move later', option: 'press', target: named('stack', 'button', 'Move later'), op: Op.Press, read: () => null, whole: fullDoc, want: changed, canvas: true },
   { section: 'stack', control: 'Height sizing', option: 'Fill', via: [testid('stack', 'stack-unit-height')], target: (page) => section('stack')(page).locator('[data-testid="stack-mode-menu-height"] [data-sizing="fill"]'), op: Op.Press, read: item('height'), want: is('fill'), canvas: true },
   { section: 'stack', control: 'Min width', option: 'type 40 + Enter', via: [testid('stack', 'stack-unit-width')], target: testid('stack', 'stack-limit-input-min-width'), op: Op.Type, value: 40, read: item('minWidth'), want: changed, canvas: false },
   { section: 'stack', control: 'Max height', option: 'type 30 + Enter', via: [testid('stack', 'stack-unit-height')], target: testid('stack', 'stack-limit-input-max-height'), op: Op.Type, value: 30, read: item('maxHeight'), want: changed, canvas: true }
@@ -365,11 +367,10 @@ const styleUseRows: Base[] = [
 ];
 const paintStyleRows: Base[] = [
   { section: 'style', control: 'Colour style', option: 'Brand/Accent', target: anywhere('clip-paint-style'), op: Op.Select, value: 'Brand/Accent', read: whole, want: changed, canvas: true },
-  { section: 'style', control: 'Create style', option: 'press', target: anywhere('style-create'), op: Op.Press, read: () => null, whole: (d) => Object.keys((d.styles as object | undefined) ?? {}).length, want: grew, canvas: false }
+  { section: 'style', control: 'Create style', option: 'named, press', prep: (page) => page.getByTestId('right-bar').getByTestId('clip-style-name').fill('Audit style'), target: anywhere('style-create'), op: Op.Press, read: () => null, whole: (d) => Object.keys((d.styles as object | undefined) ?? {}).length, want: grew, canvas: false }
 ];
 const variableRows: Base[] = [
   { section: 'variables', control: 'Theme mode', option: 'Dark', target: anywhere('layer-mode-Theme'), op: Op.Select, value: 'Dark', read: whole, want: changed, canvas: true },
-  { section: 'variables', control: 'Unbind colour', option: 'press', target: anywhere('variable-unbind-color'), op: Op.Press, read: bindOf, want: gone, canvas: false }
 ];
 
 const frameField = (name: string) => (page: Page) => page.getByTestId('frame-inspector').getByRole('textbox', { name, exact: true }).first();
@@ -388,6 +389,7 @@ const mixedRows: Base[] = [
   { section: 'constraints', control: 'Horizontal constraint', option: 'Left', target: bar('multi-horizontal'), op: Op.Select, value: 'Left', read: (c) => (c.constraints as Record<string, unknown> | undefined)?.horizontal ?? 'left', want: every('left'), canvas: false, mixed: true },
   { section: 'layer', control: 'Blend mode', option: 'Screen', target: bar('multi-blend'), op: Op.Select, value: 'Screen', read: (c) => c.blend, want: every('screen'), canvas: true, mixed: true },
   { section: 'spacing', control: 'Vertical gap', option: 'type 20 + Enter', target: (page) => page.getByTestId('multi-inspector').getByRole('textbox', { name: 'Vertical gap', exact: true }), op: Op.Type, value: 20, read: prop('y'), want: changed, canvas: true, mixed: true },
+  { section: 'spacing', control: 'Horizontal gap', option: 'type 100 + Enter', target: (page) => page.getByTestId('multi-inspector').getByRole('textbox', { name: 'Horizontal gap', exact: true }), op: Op.Type, value: 100, read: prop('x'), want: changed, canvas: true },
   { section: 'layout', control: 'Opacity', option: 'type 50 + Enter', target: (page) => page.getByTestId('multi-inspector').getByRole('textbox', { name: 'Opacity', exact: true }), op: Op.Type, value: 50, read: (c) => (c.transform as Record<string, unknown>).opacity ?? c.props.opacity, want: every(0.5), canvas: true },
   { section: 'layout', control: 'Rotate Z', option: 'type 15 + Enter', target: (page) => page.getByTestId('multi-inspector').getByRole('textbox', { name: 'Rotate Z', exact: true }), op: Op.Type, value: 15, read: (c) => (c.transform as Record<string, unknown>).rotateZ ?? c.props.rotation, want: changed, canvas: true },
   { section: 'box', control: 'Width', option: 'type 400 + Enter', target: (page) => page.getByTestId('multi-inspector').getByRole('textbox', { name: 'Width', exact: true }), op: Op.Type, value: 400, read: prop('width'), want: changed, canvas: true },

@@ -9,6 +9,7 @@ const COMMIT_MS = 6_000;
 const POLL = { timeout: COMMIT_MS, intervals: [100, 200, 400] };
 const MAX_TABS = 200;
 const CANVAS_MS = 2_000;
+const SETTLE_SHOTS = 8;
 const TOGGLES = new Set(['checkbox', 'switch']);
 const SETTLE_MS = 350;
 
@@ -19,6 +20,7 @@ const FOCUS_MS = 2_000;
 const SHORT_MS = 3_000;
 const PICK_MS = 1_500;
 const MAX_RADIOS = 8;
+const PICK_RETRY_MS = 30_000;
 
 async function focused(target: Locator): Promise<boolean> {
   return expect
@@ -27,6 +29,8 @@ async function focused(target: Locator): Promise<boolean> {
     .then(() => true)
     .catch(() => false);
 }
+
+const isFocused = (target: Locator) => target.evaluate((n) => document.activeElement === n);
 
 async function focusByMouse(page: Page, target: Locator): Promise<void> {
   for (let tries = 0; tries < 2; tries++) {
@@ -59,8 +63,11 @@ export async function select(page: Page, row: Selection): Promise<void> {
   const first = row.state === State.Frame ? Layer.MixA : row.layer;
   await pick(page, row.node, first);
   for (const other of row.with ?? []) {
-    await reveal(page, other);
-    await page.getByTestId('layers').locator(`[data-layer="${other}"]`).click({ modifiers: ['Shift'] });
+    await expect(async () => {
+      await reveal(page, other);
+      await page.getByTestId('layers').locator(`[data-layer="${other}"]`).click({ modifiers: ['Shift'], timeout: SHORT_MS });
+      await expect(page.getByTestId('multi-inspector')).toBeVisible({ timeout: SHORT_MS });
+    }).toPass({ timeout: PICK_RETRY_MS });
   }
   if (row.state === State.Frame) {
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
@@ -121,6 +128,7 @@ async function leaveField(page: Page): Promise<void> {
 async function open(page: Page, row: Row): Promise<void> {
   await select(page, row);
   await openSections(page);
+  await row.prep?.(page);
   for (const step of row.via ?? []) {
     await press(page, step(page));
     await page.waitForTimeout(SETTLE_MS);
@@ -228,9 +236,16 @@ async function keyboardDo(page: Page, row: Row, target: Locator): Promise<void> 
         await page.keyboard.press('Enter');
         return;
       }
-      for (let i = 0; i < MAX_RADIOS && !(await target.evaluate((n) => document.activeElement === n)); i++) {
+      for (let i = 0; i < MAX_RADIOS && !(await isFocused(target)); i++) {
         await page.keyboard.press('ArrowRight');
       }
+      if (await isFocused(target)) {
+        return;
+      }
+      for (let i = 0; i < MAX_RADIOS && !(await isFocused(target)); i++) {
+        await page.keyboard.press('Tab');
+      }
+      await page.keyboard.press('Enter');
     },
     [Op.Menu]: async () => {
       await page.keyboard.press('Enter');
@@ -276,6 +291,19 @@ async function keyboardDo(page: Page, row: Row, target: Locator): Promise<void> 
   await keys[row.op]();
 }
 
+async function settledShot(page: Page): Promise<Buffer> {
+  let last = await layerShot(page);
+  for (let i = 0; i < SETTLE_SHOTS; i++) {
+    await page.waitForTimeout(SETTLE_MS);
+    const now = await layerShot(page);
+    if (now.equals(last)) {
+      return now;
+    }
+    last = now;
+  }
+  return last;
+}
+
 async function repainted(page: Page, before: Buffer | null): Promise<boolean> {
   return expect
     .poll(async () => !!before && !before.equals(await layerShot(page)), { timeout: CANVAS_MS })
@@ -287,7 +315,7 @@ async function repainted(page: Page, before: Buffer | null): Promise<boolean> {
 async function attempt(page: Page, row: Row, act: (target: Locator) => Promise<void>, failed: Check[], shoot: (tag: string) => Promise<void>): Promise<void> {
   const before = await readNow(page, row);
   trace(row.id, 'before', JSON.stringify(before));
-  const pixels = row.canvas ? await layerShot(page) : null;
+  const pixels = row.canvas ? await settledShot(page) : null;
   try {
     await act(row.target(page));
   } catch (e) {
@@ -310,6 +338,7 @@ async function attempt(page: Page, row: Row, act: (target: Locator) => Promise<v
   trace(row.id, 'landed', JSON.stringify(await readNow(page, row)));
   await leaveField(page);
   if (row.local) {
+    await row.reset?.(page);
     return;
   }
   await page.keyboard.press(UNDO);
@@ -352,6 +381,7 @@ export async function exercise(page: Page, row: Row, shoot: (tag: string) => Pro
 
   await select(page, row);
   await openSections(page);
+  await row.prep?.(page);
   trace(row.id, 'keyboard pass');
   let from: Locator | null = startOf(page);
   const steps = [...(row.via ?? []), row.target];

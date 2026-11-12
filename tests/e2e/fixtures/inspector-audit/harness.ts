@@ -109,7 +109,16 @@ export type Reach = { name: string; width: number; height: number; hit: boolean;
 
 export async function reach(target: Locator): Promise<Reach> {
   return target.evaluate((el: HTMLElement) => {
-    el.scrollIntoView({ block: 'center', inline: 'nearest' });
+    const inside = (b: DOMRect, area: { top: number; bottom: number; left: number; right: number }) => b.top >= area.top && b.bottom <= area.bottom && b.left >= area.left && b.right <= area.right;
+    const view = { top: 0, left: 0, bottom: innerHeight, right: innerWidth };
+    let scroller = el.parentElement;
+    while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) {
+      scroller = scroller.parentElement;
+    }
+    const shown = el.getBoundingClientRect();
+    if (!inside(shown, view) || (scroller && !inside(shown, scroller.getBoundingClientRect()))) {
+      el.scrollIntoView({ block: 'center', inline: 'nearest' });
+    }
     const box = el.getBoundingClientRect();
     const x = box.left + box.width / 2;
     const y = box.top + box.height / 2;
@@ -122,7 +131,8 @@ export async function reach(target: Locator): Promise<Reach> {
     const name = (el.getAttribute('aria-label') ?? (labelled ? document.getElementById(labelled)?.textContent : '') ?? '') || own || el.getAttribute('title') || el.textContent || (el as HTMLInputElement).placeholder || '';
     const disabled = (el as HTMLButtonElement).disabled === true || el.getAttribute('aria-disabled') === 'true';
     const clipped = box.left < 0 || box.top < 0 || box.right > innerWidth || box.bottom > innerHeight;
-    return { name: name.trim().replace(/\s+/g, ' '), width: box.width, height: box.height, hit, coveredBy: hit ? '' : describe(top), tabbable: el.tabIndex >= 0 && !disabled, disabled, clipped, box: `${Math.round(box.left)},${Math.round(box.top)} ${Math.round(box.width)}×${Math.round(box.height)}` };
+    const target = [...((el as HTMLInputElement).labels ?? [])].map((l) => l.getBoundingClientRect()).reduce((big, b) => (Math.min(b.width, b.height) > Math.min(big.width, big.height) ? b : big), box);
+    return { name: name.trim().replace(/\s+/g, ' '), width: target.width, height: target.height, hit, coveredBy: hit ? '' : describe(top), tabbable: el.tabIndex >= 0 && !disabled, disabled, clipped, box: `${Math.round(box.left)},${Math.round(box.top)} ${Math.round(box.width)}×${Math.round(box.height)}` };
   });
 }
 

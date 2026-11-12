@@ -24,6 +24,10 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 **Signal:** contiguous runs of missing sequence numbers (a multiple of the batch size) in lines posted with `fetch(…, { keepalive: true })`, no error on the server. **Move:** browsers cap keepalive request bodies at 64 KB in flight per page and reject the rest. Count the bytes in flight and send plain `fetch` past ~48 KB (`keepaliveBudget` in `src/lib/canvas/debug/flight-log.ts`).
 
+### A frame from a `.feega` file opens with no layers and no error
+
+**Signal:** local mode lists the frame in Layers, its row unfolds to nothing, and `GET /api/v1/projects/<p>/motion/<node>/agent` answers `head.version: 0` with an empty doc, while the file holds a full `heads[<node>]`. **Move:** the head failed `parseMotionDoc` and was replaced by a blank doc in silence (an inspector-audit fixture set `background: '#ffffff'`; only `brand` and `transparent` pass). Run `parseMotionDoc` on every doc you write into a fixture file and throw on `ok: false`, as `writeAuditFile` does.
+
 ## Canvas performance
 
 ### Perf numbers swing 6 to 57 fps on the same build: the machine is loaded
