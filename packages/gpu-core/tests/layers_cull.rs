@@ -200,3 +200,30 @@ fn an_empty_group_whose_colour_matrix_lifts_alpha_still_gets_a_layer() {
 
     assert_eq!(layers.bodies.len(), 1);
 }
+
+fn stroked_square(at: f64) -> gpu_core::display_list::DisplayList {
+    let (x0, x1) = (at, at + 20.0);
+    let stroke = r#"{ "kind": "svg", "nodes": [{ "tag": "filter", "attrs": { "x": "-25%", "y": "-25%", "width": "150%", "height": "150%" }, "children": [
+  { "tag": "feMorphology", "attrs": { "in": "SourceAlpha", "operator": "dilate", "radius": 4, "result": "grown" }, "children": [] },
+  { "tag": "feFlood", "attrs": { "flood-color": "white", "result": "ink" }, "children": [] },
+  { "tag": "feComposite", "attrs": { "in": "ink", "in2": "grown", "operator": "in", "result": "line" }, "children": [] },
+  { "tag": "feMerge", "attrs": {}, "children": [{ "tag": "feMergeNode", "attrs": { "in": "line" }, "children": [] }, { "tag": "feMergeNode", "attrs": { "in": "SourceGraphic" }, "children": [] }] }] }] }"#;
+    parse(&format!(
+        r#"{{ "width": {FRAME_SIDE}, "height": {FRAME_SIDE}, "background": null, "items": [{{ "kind": "path", "clip": "sq", "contours": [[{x0}, 10, {x1}, 10, {x1}, 30, {x0}, 30]], "rule": "nonzero",
+  "paint": {{ "kind": "solid", "color": [1, 1, 1, 1] }}, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blend": "normal", "blur": 0, "filters": [{stroke}] }}] }}"#
+    ))
+    .unwrap()
+}
+
+#[test]
+fn an_item_stroked_by_a_filter_with_its_own_region_costs_no_layer_off_the_frame() {
+    let mut off = Counting::default();
+    let mut on = Counting::default();
+
+    let culled = prepare(&mut off, &stroked_square(5000.0), &Shelf::new(), Blending::Native).unwrap();
+    prepare(&mut on, &stroked_square(10.0), &Shelf::new(), Blending::Native).unwrap();
+
+    assert_eq!(culled.culled.len(), 1);
+    assert!(off.painted.is_empty());
+    assert!(on.painted.iter().all(|r| r.width() < FRAME_SIDE as f64));
+}
