@@ -153,6 +153,28 @@ describe('colour picker', () => {
     expect(onchange).toHaveBeenCalledWith('#ff0000', 0.51);
   });
 
+  it('Enter commits a typed hex and keeps focus in the field', () => {
+    const { onchange } = show();
+    const hex = channels()[0];
+    hex.focus();
+    hex.value = '00ff00';
+    hex.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+
+    expect(onchange).toHaveBeenCalledWith('#00ff00', undefined);
+    expect(document.activeElement).toBe(hex);
+  });
+
+  it('Enter commits a typed opacity and keeps focus in the field', () => {
+    const { onchange } = show();
+    const level = byId<HTMLInputElement>('colour-opacity');
+    level.focus();
+    level.value = '40';
+    level.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+
+    expect(onchange).toHaveBeenCalledWith('#ff0000', 0.4);
+    expect(document.activeElement).toBe(level);
+  });
+
   it('a swatch applies its colour', () => {
     const { onchange } = show({ swatches: ['#00ff00'] });
 

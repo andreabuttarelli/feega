@@ -159,10 +159,18 @@
     }
   }
 
-  function keyChannel(e: KeyboardEvent, index: number) {
+  function enterInPlace(e: KeyboardEvent, apply: (input: HTMLInputElement) => void): boolean {
+    if (e.key !== 'Enter') {
+      return false;
+    }
     const input = e.currentTarget as HTMLInputElement;
-    if (e.key === 'Enter') {
-      input.blur();
+    apply(input);
+    input.select();
+    return true;
+  }
+
+  function keyChannel(e: KeyboardEvent, index: number) {
+    if (enterInPlace(e, (input) => setChannel(index, input.value))) {
       return;
     }
     const dir = ARROW[e.key];
@@ -196,10 +204,7 @@
 
   function keyLevelField(e: KeyboardEvent) {
     const dir = ARROW[e.key];
-    if (e.key === 'Enter') {
-      (e.currentTarget as HTMLInputElement).blur();
-    }
-    if (!dir || !dir[1]) {
+    if (enterInPlace(e, typedLevel) || !dir || !dir[1]) {
       return;
     }
     e.preventDefault();
@@ -277,7 +282,7 @@
     </select>
     <div class="channels" data-format={format}>
       {#if format === ColourFormat.Hex}
-        <input type="text" spellcheck="false" aria-label={`${name} hex`} data-testid="colour-channel" value={String(channels[0])} onchange={(e) => typedHex(e.currentTarget)} onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
+        <input type="text" spellcheck="false" aria-label={`${name} hex`} data-testid="colour-channel" value={String(channels[0])} onchange={(e) => typedHex(e.currentTarget)} onkeydown={(e) => enterInPlace(e, typedHex)} />
       {:else}
         {#each channels as channel, i (`${format}-${i}`)}
           <input type="text" inputmode="numeric" spellcheck="false" aria-label={`${name} ${CHANNEL_NAMES[format][i]}`} data-testid="colour-channel" value={String(channel)} onchange={(e) => setChannel(i, e.currentTarget.value)} onkeydown={(e) => keyChannel(e, i)} />
