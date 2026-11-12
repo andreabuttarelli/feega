@@ -1,3 +1,4 @@
+import { PLAN } from './pricing/plan';
 import { FAQ } from './home';
 import { plainText } from './text';
 import { DISCORD_URL, GITHUB_URL, SITE_URL, SOCIAL_LINKS } from './links';
@@ -25,7 +26,14 @@ const APPLICATION = {
   applicationCategory: 'MultimediaApplication',
   operatingSystem: 'Web',
   description: 'Design inside your code with your agents and team: an open-source canvas for website designs and motion videos, driven by prompts, Claude Code, Codex or Cursor.',
-  offers: { '@type': 'Offer', category: 'subscription' },
+  offers: {
+    '@type': 'Offer',
+    category: 'subscription',
+    price: PLAN.price,
+    priceCurrency: 'EUR',
+    description: `Per ${PLAN.per} per ${PLAN.period}. Viewers and AI agents are free.`,
+    priceSpecification: { '@type': 'UnitPriceSpecification', price: PLAN.price, priceCurrency: 'EUR', unitText: `${PLAN.per} / ${PLAN.period}` }
+  },
   sameAs: SAME_AS,
   publisher: { '@type': 'Organization', name: 'Feega', sameAs: SAME_AS }
 };

@@ -1,23 +1,34 @@
 import { describe, expect, it } from 'vitest';
-import { CLIP, FREE_UNITS, IMAGE, PLAN_LOW, PLAN_STANDARD, estimate, includedCredits, outcomesIn } from './plan';
+import { CLIP, FREE_CREDITS, IMAGE, PLAN, estimate, outcomesIn, topUpPrices } from './plan';
 
 describe('what credits get you', () => {
-  it('reads included credits from the plan, not from its price', () => {
-    expect(includedCredits(PLAN_LOW)).toBe(5);
-    expect(includedCredits(PLAN_STANDARD)).toBe(18);
+  it('charges 120 credits per provider dollar, rounding down', () => {
+    expect(outcomesIn(PLAN.includedCredits, IMAGE)).toBe(55);
+    expect(outcomesIn(PLAN.includedCredits, CLIP)).toBe(10);
+    expect(outcomesIn(FREE_CREDITS, IMAGE)).toBe(11);
   });
 
-  it('charges the model price plus the markup, rounding down', () => {
-    expect(outcomesIn(PLAN_STANDARD.includedUnits, IMAGE)).toBe(200);
-    expect(outcomesIn(PLAN_STANDARD.includedUnits, CLIP)).toBe(39);
-    expect(outcomesIn(PLAN_LOW.includedUnits, IMAGE)).toBe(55);
-    expect(outcomesIn(PLAN_LOW.includedUnits, CLIP)).toBe(10);
-    expect(outcomesIn(FREE_UNITS, IMAGE)).toBe(11);
+  it('fits in the plan until the included credits run out', () => {
+    expect(estimate(PLAN, 1, 50, 0)).toEqual({ cost: 9, included: 500, credits: 449, gap: 0, topUps: [] });
   });
 
-  it('asks for a top-up only past the included credits', () => {
-    expect(estimate(PLAN_LOW, 50, 0)).toEqual({ credits: 5, topUp: 0 });
-    expect(estimate(PLAN_LOW, 100, 5)).toEqual({ credits: 12, topUp: 7 });
-    expect(estimate(PLAN_STANDARD, 100, 5)).toEqual({ credits: 12, topUp: 0 });
+  it('picks the smallest top-up that covers the gap', () => {
+    expect(estimate(PLAN, 1, 100, 5).topUps.map((t) => t.price)).toEqual([10]);
+    expect(estimate(PLAN, 1, 150, 10).topUps.map((t) => t.price)).toEqual([20]);
+  });
+
+  it('adds the smallest top-up for what the largest leaves', () => {
+    expect(estimate(PLAN, 1, 600, 60).topUps.map((t) => t.price)).toEqual([50, 50]);
+    expect(estimate(PLAN, 1, 600, 3).topUps.map((t) => t.price)).toEqual([50, 10]);
+  });
+
+  it('pools each editor\'s credits and price', () => {
+    const three = estimate(PLAN, 3, 150, 10);
+    expect([three.cost, three.included, three.gap]).toEqual([27, 1500, 303]);
+    expect(three.topUps.map((t) => t.price)).toEqual([10]);
+  });
+
+  it('lists every top-up price', () => {
+    expect(topUpPrices(PLAN)).toBe('€10, €20 or €50');
   });
 });

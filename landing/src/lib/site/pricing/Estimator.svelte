@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { AI_MARKUP, CLIP, IMAGE, estimate, includedCredits, money, type CloudPlan } from './plan';
+  import { CLIP, IMAGE, MAX_SEATS, count, estimate, money, seatCost, type CloudPlan } from './plan';
 
   let { plan }: { plan: CloudPlan } = $props();
 
@@ -9,13 +9,39 @@
   ];
 
   let counts = $state([100, 5]);
+  let editors = $state(1);
 
-  const result = $derived(estimate(plan, counts[0], counts[1]));
+  const clampEditors = (n: number) => Math.min(MAX_SEATS, Math.max(1, Math.round(n) || 1));
+  const setEditors = (n: number) => {
+    editors = clampEditors(n);
+  };
+
+  const typed = (input: HTMLInputElement) => {
+    if (Number.isFinite(input.valueAsNumber)) {
+      setEditors(input.valueAsNumber);
+    }
+  };
+
+  const settle = (input: HTMLInputElement) => {
+    setEditors(input.valueAsNumber);
+    input.value = String(editors);
+  };
+
+  const result = $derived(estimate(plan, editors, counts[0], counts[1]));
 </script>
 
 <div class="estimator" role="group" aria-labelledby="estimator-title">
   <h3 id="estimator-title">What will I use?</h3>
-  <p class="hint">Set your month. Each run costs the model's own price plus {AI_MARKUP * 100}%.</p>
+  <p class="hint">Set your month. Estimates use the models' own prices plus 20%.</p>
+
+  <div class="seats">
+    <label for="est-seats">{plan.per}s</label>
+    <div class="stepper">
+      <button type="button" aria-label="One {plan.per} fewer" disabled={editors <= 1} onclick={() => setEditors(editors - 1)}>−</button>
+      <input id="est-seats" type="number" inputmode="numeric" min="1" max={MAX_SEATS} value={editors} oninput={(e) => typed(e.currentTarget)} onchange={(e) => settle(e.currentTarget)} />
+      <button type="button" aria-label="One {plan.per} more" disabled={editors >= MAX_SEATS} onclick={() => setEditors(editors + 1)}>+</button>
+    </div>
+  </div>
 
   <div class="sliders">
     {#each SLIDERS as slider, i (slider.id)}
@@ -27,11 +53,12 @@
   </div>
 
   <p class="verdict" aria-live="polite">
-    About <strong>{result.credits} credits</strong> a {plan.period}.
-    {#if result.topUp === 0}
-      Fits in the {money(plan, plan.price)} plan.
+    About <strong>{count(result.credits)} credits</strong> a {plan.period}.
+    {seatCost(plan, editors, result.cost, result.included)}
+    {#if result.topUps.length}
+      You'd top up about <strong>{count(result.gap)} credits</strong>: {result.topUps.map((t) => money(plan, t.price)).join(' + ')} covers it.
     {:else}
-      The plan includes {includedCredits(plan)}, so you'd top up about <strong>{result.topUp} credits</strong>.
+      That fits.
     {/if}
   </p>
 </div>
@@ -60,6 +87,73 @@
   .hint {
     margin-top: -14px;
     opacity: 0.7;
+  }
+
+  .seats {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .seats label::first-letter {
+    text-transform: uppercase;
+  }
+
+  .seats label {
+    display: block;
+  }
+
+  .stepper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .stepper button {
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: 50%;
+    background: #222;
+    color: #fff;
+    font: inherit;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .stepper button:hover:not(:disabled) {
+    background: #333;
+  }
+
+  .stepper button:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .stepper input {
+    width: 56px;
+    height: 36px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background: transparent;
+    color: #fff;
+    font: inherit;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    appearance: textfield;
+  }
+
+  .stepper input::-webkit-inner-spin-button,
+  .stepper input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .stepper :is(button, input):focus-visible {
+    outline: 2px solid #ff5100;
+    outline-offset: 3px;
   }
 
   .sliders {

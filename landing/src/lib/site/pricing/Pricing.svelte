@@ -3,20 +3,22 @@
   import PriceTag from './PriceTag.svelte';
   import Estimator from './Estimator.svelte';
   import PricingFaq from './PricingFaq.svelte';
-  import { CLOUD_BENEFITS, CLOUD_FOR, CREDIT_RULES, getsYou, money, outOfCredits, trialLine, type CloudPlan } from './plan';
+  import { CLOUD_BENEFITS, CLOUD_FOR, CREDIT_RULES, SEAT_RULE, freeTier, getsYou, money, moreSeats, outOfCredits, priceUnit, type CloudPlan } from './plan';
 
   let { plan }: { plan: CloudPlan } = $props();
 </script>
 
 <section class="pricing site-wide" id="pricing" aria-labelledby="pricing-title">
-  <h2 id="pricing-title">One plan. Everything in it.</h2>
+  <h2 id="pricing-title" data-agent-id="pricing-title">One plan. Everything in it.</h2>
 
   <article class="hero">
     <div class="buy">
       <h3>feega {plan.name}</h3>
       <p class="for">{CLOUD_FOR}</p>
-      <PriceTag amount={money(plan, plan.price)} unit="/ {plan.period}" cta="Start free" href={APP_URL} />
-      <p class="trial">{trialLine()}</p>
+      <PriceTag amount={money(plan, plan.price)} unit={priceUnit(plan)} cta="Start free" href={APP_URL} />
+      <p class="seat">{SEAT_RULE}</p>
+      <p class="trial">{freeTier()}</p>
+      <p class="trial">{moreSeats(plan)}</p>
     </div>
     <div class="what">
       <p class="label">What you get</p>
@@ -41,7 +43,7 @@
 
 <style>
   .pricing {
-    padding: var(--site-section) 16px;
+    padding: var(--site-section) 12px;
     color: var(--site-ink);
     font-size: 16px;
     line-height: 1.45;
@@ -53,6 +55,7 @@
 
   h2 {
     margin: 0;
+    text-wrap: balance;
     font-size: 34px;
     line-height: 36px;
     letter-spacing: -0.04em;
@@ -84,6 +87,10 @@
   .for {
     margin: -8px 0 16px;
     opacity: 0.7;
+  }
+
+  .seat {
+    color: #fff;
   }
 
   .trial {
