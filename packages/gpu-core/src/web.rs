@@ -463,6 +463,11 @@ impl WebCore {
         Ok(())
     }
 
+    pub fn set_selected_overlay(&mut self, items_json: &[u8]) -> Result<(), JsValue> {
+        self.compositor.set_overlay(OverlayPart::Selected, parse_overlay(utf8(items_json)?).map_err(failed)?, &mut self.library);
+        Ok(())
+    }
+
     pub fn set_live_overlay(&mut self, items_json: &[u8]) -> Result<(), JsValue> {
         self.compositor.set_overlay(OverlayPart::Live, parse_overlay(utf8(items_json)?).map_err(failed)?, &mut self.library);
         self.changed_at = js_sys::Date::now();
