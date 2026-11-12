@@ -5,6 +5,7 @@ import { parseSheets, READ_ONLY, readSheets, type LoadedSheet, type VarRule } fr
 import { boundToTokens, spacingMultiples, type BoundCount } from './design-bind';
 import { boardBound, designBoard, DESIGN_BOARD } from './design-board';
 import { readOnlyKeys, tokenSetOf, variableName, variablesOf, type TokenMap, type TokenSet } from './design-tokens';
+import { readTokenFiles } from './json-tokens';
 import { madeStyles, styleTokensOf, type StyleToken } from './design-styles';
 import type { RenderConditions } from './render-conditions';
 import type { ReadFile } from './write-back';
@@ -27,7 +28,9 @@ const SKIPPED_PREFIX = 'Design system';
 const DEFAULT_WIDTH = 1280;
 
 export async function designOf(read: ReadFile, loaded: LoadedSheet[] = []): Promise<Design | null> {
-  const parsed = parseSheets(await readSheets(read, loaded));
+  const sheets = parseSheets(await readSheets(read, loaded));
+  const files = await readTokenFiles(read);
+  const parsed = { ...sheets, declared: [...sheets.declared, ...files.declared], skipped: [...sheets.skipped, ...files.skipped] };
   const set = tokenSetOf(parsed);
   const styles = styleTokensOf(parsed);
   return set.tokens.length || styles.length ? { set, rules: parsed.rules, styles } : null;
