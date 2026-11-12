@@ -8,7 +8,7 @@ const cancelSubscriptionAtPeriodEnd = vi.fn();
 const ensureSubscriptionCanceled = vi.fn();
 const ensureOrgCustomer = vi.fn();
 const createSubscriptionCheckout = vi.fn();
-const subscriptionPriceIdFor = vi.fn();
+const subscriptionPriceId = vi.fn();
 const gateCredits = vi.fn();
 const structured = vi.fn();
 const billingGrantsReady = vi.fn();
@@ -33,7 +33,7 @@ vi.mock('$lib/server/stripe', () => ({
 	ensureSubscriptionCanceled: (...args: unknown[]) => ensureSubscriptionCanceled(...args),
 	ensureOrgCustomer: (...args: unknown[]) => ensureOrgCustomer(...args),
 	createSubscriptionCheckout: (...args: unknown[]) => createSubscriptionCheckout(...args),
-	subscriptionPriceIdFor: (...args: unknown[]) => subscriptionPriceIdFor(...args)
+	subscriptionPriceId: (...args: unknown[]) => subscriptionPriceId(...args)
 }));
 vi.mock('$lib/server/credits', () => ({
 	gateCredits: (...args: unknown[]) => gateCredits(...args),
@@ -49,7 +49,8 @@ vi.mock('$lib/server/feature-flags', () => ({ isPlanGoEnabled: () => false }));
 import { POST } from './+server';
 import { authenticate, loadBrandForUser, checkApiKeyWriteAccess, gateAiAction } from '$lib/server/cli-auth';
 
-const CHECKOUT_URL = 'https://billing.stripe.com/p/session/live_upgrade';
+const CHECKOUT_URL = 'https://checkout.stripe.com/c/pay/cs_live_plan';
+const PLANS = [{ credits: 500, label: '€9 / editor / month' }];
 
 const ORG_BILLING = {
 	orgId: 'org-1',
@@ -90,34 +91,57 @@ beforeEach(() => {
 	} as never);
 	vi.mocked(checkApiKeyWriteAccess).mockReturnValue(undefined);
 	isOrgOwner.mockResolvedValue(true);
-	orgBillingForBrand.mockResolvedValue(ORG_BILLING);
+	orgBillingForBrand.mockResolvedValue(ORG_BILLING_NO_SUBSCRIPTION);
 	createBillingPortalSession.mockResolvedValue(CHECKOUT_URL);
 	ensureOrgCustomer.mockResolvedValue('cus_org');
 	createSubscriptionCheckout.mockResolvedValue(CHECKOUT_URL);
-	subscriptionPriceIdFor.mockResolvedValue(undefined);
+	subscriptionPriceId.mockResolvedValue('price_sub_9');
 	billingGrantsReady.mockResolvedValue(true);
 });
 
 describe('POST /api/v1/brands/:slug/billing/checkout', () => {
-	it('hands back the checkout url and the subscription rungs the human will be offered', async () => {
+	it('starts a real first subscription on the one plan and names it', async () => {
 		const { res, body } = await call();
 
 		expect(res.status).toBe(200);
-		expect(res.headers.get('location')).toBeNull();
-		expect(body.ok).toBe(true);
-		expect(body.url).toBe(CHECKOUT_URL);
-		expect(body.plans).toContainEqual({ credits: 32, label: '€32/mo' });
+		expect(body).toEqual({ ok: true, url: CHECKOUT_URL, plans: PLANS });
+		expect(ensureOrgCustomer).toHaveBeenCalledWith({ id: 'org-1', name: 'Acme', stripe_customer_id: 'cus_org' });
+		expect(createSubscriptionCheckout).toHaveBeenCalledWith({
+			customerId: 'cus_org',
+			orgId: 'org-1',
+			priceId: 'price_sub_9',
+			credits: 500,
+			successUrl: 'https://feega.test/app/credits?checkout=success&session_id={CHECKOUT_SESSION_ID}',
+			cancelUrl: 'https://feega.test/app/credits?checkout=canceled'
+		});
 	});
 
-	it('sends the ORG subscription to the hosted plan picker, naming no price', async () => {
-		await call({ credits: 32 });
+	it('accepts the plan named by its credits', async () => {
+		const { res } = await call({ credits: 500 });
 
-		expect(createBillingPortalSession).toHaveBeenCalledWith({
-			customerId: 'cus_org',
-			returnUrl: 'https://feega.test/app/credits',
-			flow: 'upgrade',
-			subscriptionId: 'sub_org'
-		});
+		expect(res.status).toBe(200);
+		expect(createSubscriptionCheckout).toHaveBeenCalled();
+	});
+
+	it('refuses an old ladder step loudly, naming the one plan, before touching Stripe', async () => {
+		const { res, body } = await call({ credits: 32 });
+
+		expect(res.status).toBe(400);
+		expect(body.error).toBe('unknown_plan');
+		expect(body.plans).toEqual(PLANS);
+		expect(createSubscriptionCheckout).not.toHaveBeenCalled();
+	});
+
+	it('refuses a second subscription and points at the billing page, never a plan switch', async () => {
+		orgBillingForBrand.mockResolvedValue(ORG_BILLING);
+
+		const { res, body } = await call();
+
+		expect(res.status).toBe(409);
+		expect(body.error).toBe('already_subscribed');
+		expect(body.app_billing_url).toBe('https://feega.test/app/credits');
+		expect(createSubscriptionCheckout).not.toHaveBeenCalled();
+		expect(createBillingPortalSession).not.toHaveBeenCalled();
 	});
 
 	it('checks the owner against the org the brand belongs to', async () => {
@@ -126,8 +150,8 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 		expect(isOrgOwner).toHaveBeenCalledWith(expect.anything(), 'org-1', 'user-1');
 	});
 
-	it('never charges, never changes a plan, never cancels', async () => {
-		await call({ credits: 32 });
+	it('never cancels, never discounts', async () => {
+		await call();
 
 		expect(cancelSubscriptionAtPeriodEnd).not.toHaveBeenCalled();
 		expect(applyRetentionCoupon).not.toHaveBeenCalled();
@@ -142,15 +166,6 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 		expect(structured).not.toHaveBeenCalled();
 	});
 
-	it('refuses a rung that is not on the ladder, before touching Stripe', async () => {
-		const { res, body } = await call({ credits: 7 });
-
-		expect(res.status).toBe(400);
-		expect(body.error).toBe('unknown_plan');
-		expect(body.plans).toContainEqual({ credits: 32, label: '€32/mo' });
-		expect(createBillingPortalSession).not.toHaveBeenCalled();
-	});
-
 	it('refuses a caller who reaches the brand but does not own the org billing', async () => {
 		isOrgOwner.mockResolvedValue(false);
 
@@ -158,83 +173,22 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 
 		expect(res.status).toBe(403);
 		expect(body.error).toBe('not_org_owner');
-		expect(createBillingPortalSession).not.toHaveBeenCalled();
+		expect(createSubscriptionCheckout).not.toHaveBeenCalled();
 	});
 
-	it('says no_subscription when opening the plan picker with nothing to upgrade yet', async () => {
-		orgBillingForBrand.mockResolvedValue({ ...ORG_BILLING, subscriptionId: null });
+	it('says subscriptions_not_configured while the plan has no Stripe price, and never mints a broken session', async () => {
+		subscriptionPriceId.mockResolvedValue(undefined);
 
 		const { res, body } = await call();
 
 		expect(res.status).toBe(409);
-		expect(body.error).toBe('no_subscription');
+		expect(body.error).toBe('subscriptions_not_configured');
 		expect(body.app_billing_url).toBe('https://feega.test/app/credits');
-		expect(createBillingPortalSession).not.toHaveBeenCalled();
-	});
-
-	describe('a specific rung with no subscription yet — starts a real first subscription', () => {
-		beforeEach(() => {
-			orgBillingForBrand.mockResolvedValue(ORG_BILLING_NO_SUBSCRIPTION);
-			subscriptionPriceIdFor.mockResolvedValue('price_sub_32');
-		});
-
-		it('creates a Checkout Session on the configured price, not a portal link', async () => {
-			const { res, body } = await call({ credits: 32 });
-
-			expect(res.status).toBe(200);
-			expect(body.ok).toBe(true);
-			expect(body.url).toBe(CHECKOUT_URL);
-			expect(createBillingPortalSession).not.toHaveBeenCalled();
-			expect(ensureOrgCustomer).toHaveBeenCalledWith({
-				id: 'org-1',
-				name: 'Acme',
-				stripe_customer_id: 'cus_org'
-			});
-			expect(subscriptionPriceIdFor).toHaveBeenCalledWith(32);
-			expect(createSubscriptionCheckout).toHaveBeenCalledWith({
-				customerId: 'cus_org',
-				orgId: 'org-1',
-				priceId: 'price_sub_32',
-				credits: 3200,
-				successUrl: 'https://feega.test/app/credits?checkout=success&session_id={CHECKOUT_SESSION_ID}',
-				cancelUrl: 'https://feega.test/app/credits?checkout=canceled'
-			});
-		});
-
-		it('says subscriptions_not_configured when no price id exists for the rung, and never mints a broken session', async () => {
-			subscriptionPriceIdFor.mockResolvedValue(undefined);
-
-			const { res, body } = await call({ credits: 32 });
-
-			expect(res.status).toBe(409);
-			expect(body.error).toBe('subscriptions_not_configured');
-			expect(body.app_billing_url).toBe('https://feega.test/app/credits');
-			expect(createSubscriptionCheckout).not.toHaveBeenCalled();
-			expect(createBillingPortalSession).not.toHaveBeenCalled();
-		});
-
-		it('a Stripe outage while creating the subscription session is ours: 502', async () => {
-			createSubscriptionCheckout.mockRejectedValue(new Error('connection error'));
-
-			const { res, body } = await call({ credits: 32 });
-
-			expect(res.status).toBe(502);
-			expect(body.error).toBe('stripe_unavailable');
-		});
-	});
-
-	it('says no_customer when nobody ever paid', async () => {
-		orgBillingForBrand.mockResolvedValue({ ...ORG_BILLING, customerId: null, subscriptionId: null });
-
-		const { res, body } = await call();
-
-		expect(res.status).toBe(409);
-		expect(body.error).toBe('no_customer');
-		expect(body.app_billing_url).toBe('https://feega.test/app/credits');
+		expect(createSubscriptionCheckout).not.toHaveBeenCalled();
 	});
 
 	it('a Stripe outage is ours: 502, not a 4xx that accuses the caller', async () => {
-		createBillingPortalSession.mockRejectedValue(new Error('connection error'));
+		createSubscriptionCheckout.mockRejectedValue(new Error('connection error'));
 
 		const { res, body } = await call();
 
@@ -250,7 +204,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 		const { res } = await call();
 
 		expect(res.status).toBe(401);
-		expect(createBillingPortalSession).not.toHaveBeenCalled();
+		expect(createSubscriptionCheckout).not.toHaveBeenCalled();
 	});
 
 	it('rejects a brand the caller cannot reach', async () => {
@@ -286,7 +240,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 	it('refuses to sell when a grant could not land — the sync engine trigger is not there yet', async () => {
 		billingGrantsReady.mockResolvedValue(false);
 
-		const { res, body } = await call({ credits: 32 });
+		const { res, body } = await call();
 
 		expect(res.status).toBe(409);
 		expect(body.error).toBe('purchases_not_ready');

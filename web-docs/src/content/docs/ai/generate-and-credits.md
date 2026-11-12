@@ -21,9 +21,19 @@ A blocked or failed run shows **Retry**: same prompt, same model, new attempt.
 
 The organisation's credit balance is always visible at the top of the canvas; click it to open billing. Each generation spends credits by medium and model, and the balance updates after every run.
 
-Every new account gets **100 free credits ($1)** once, at signup. A second organisation does not get them again.
+**100 credits = €1.** Prices next to Generate are shown in euros; balances and costs in credits.
 
-The canvas chat agent runs on Claude Opus 5.5 on every plan, and every turn spends credits. When the balance runs out, the chat stops before spending and shows the upgrade screen.
+Every new account gets **100 free credits (€1)** once, at signup. A second organisation does not get them again.
+
+### Plan and top-ups
+
+- **Plan**: €9 per editor per month, 500 credits each month.
+- **Top-ups**: €10 for 1,000 credits, €20 for 2,000, €50 for 5,000. One-time.
+- **Credits never expire.** Unspent monthly credits carry over; top-ups stay until spent.
+
+Subscribe, manage the plan and buy top-ups on the **Credits** page. From the CLI: `feega upgrade <slug>` for the plan, `feega upgrade <slug> --top-up 1000` for a top-up.
+
+The canvas chat agent runs on Claude Opus 5.5, and every turn spends credits. When the balance runs out, the chat stops before spending and shows the upgrade screen.
 
 ## Improve prompt
 

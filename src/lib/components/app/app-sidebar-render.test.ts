@@ -108,6 +108,6 @@ describe('account menu at the foot of the sidebar', () => {
 
   it('billing in the menu shows the credit balance', () => {
     const inside = menu(html({ creditBalance: 995618 }));
-    expect(inside.slice(inside.indexOf('href="/app/credits"'), inside.indexOf('href="https://feega.app/changelog"'))).toMatch(/9[,.]?956/);
+    expect(inside.slice(inside.indexOf('href="/app/credits"'), inside.indexOf('href="https://feega.app/changelog"'))).toMatch(/995,618/);
   });
 });

@@ -12,7 +12,7 @@ feega products <slug>                     # Lista
 feega products <slug> sync                # Re-importa dallo store collegato
 
 # Account e billing
-feega upgrade <slug> --credits 16         # Checkout piano mensile (--top-up N: ricarica)
+feega upgrade <slug>                      # Checkout del piano (--top-up 1000|2000|5000: ricarica)
 feega update                              # Aggiorna la CLI
 ```
 

@@ -91,8 +91,7 @@ describe('POST /api/v1/brands/:slug/billing/portal', () => {
 		expect(createBillingPortalSession).toHaveBeenCalledWith({
 			customerId: 'cus_org',
 			returnUrl: 'https://feega.test/app/credits',
-			flow: undefined,
-			subscriptionId: 'sub_org'
+			flow: undefined
 		});
 	});
 

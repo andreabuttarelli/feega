@@ -1,28 +1,19 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { authenticate, checkApiKeyWriteAccess, loadBrandForUser } from '$lib/server/cli-auth';
-import { billingLink } from '$lib/server/billing-links';
 import { isOrgOwner, orgBillingForBrand } from '$lib/server/org-billing';
 import { billingGrantsReady } from '$lib/server/billing-readiness';
-import { CREDIT_LADDER, rungFor } from '$lib/credit-ladder';
+import { PLAN } from '$lib/credit-ladder';
 import { BILLING_PATH, checkoutReturnUrls } from '$lib/billing-path';
 import { appOrigin } from '$lib/server/app-url';
 
 import { CHECKOUT_LINK, statusForFailure } from '@feega/api-contracts';
 
-const SUBSCRIPTION_RUNGS = CREDIT_LADDER.map((rung) => ({
-  credits: rung.price,
-  label: `€${rung.price}/mo`
-}));
+const PLANS = [{ credits: PLAN.credits, label: `€${PLAN.price} / editor / month` }];
 
-/**
- * The subscription checkout has no plan names left — only the credit-ladder rungs (a monthly
- * price, and how many credits it grants: CREDIT_LADDER). Without a rung (opening the plan picker)
- * this still proxies to the hosted portal, which can only CHANGE an existing subscription — so
- * that path still refuses `no_subscription` when there is none. With a rung picked, a missing
- * subscription is no longer a refusal: this mints a real Checkout Session on that rung's Stripe
- * Price, resolved by lookup key, which is how a first subscription gets created at all.
- */
+const refuse = (error: string, extra: Record<string, unknown> = {}) =>
+  json({ error, ...extra }, { status: statusForFailure(CHECKOUT_LINK, error) });
+
 export const POST: RequestHandler = async ({ request, params, url }) => {
   const { supabase, user, apiKey, error } = await authenticate(request);
   if (error) return error;
@@ -34,10 +25,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
   if (readOnly) return readOnly;
 
   if (!(await billingGrantsReady(supabase))) {
-    return json(
-      { error: 'purchases_not_ready' },
-      { status: statusForFailure(CHECKOUT_LINK, 'purchases_not_ready') }
-    );
+    return refuse('purchases_not_ready');
   }
 
   const parsed = CHECKOUT_LINK.input.safeParse(await request.json().catch(() => ({})));
@@ -48,68 +36,42 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
   const appBillingUrl = `${appOrigin(url)}${BILLING_PATH}`;
 
   if (!(await isOrgOwner(supabase, brand.org_id, user.id))) {
-    return json(
-      { error: 'not_org_owner' },
-      { status: statusForFailure(CHECKOUT_LINK, 'not_org_owner') }
-    );
+    return refuse('not_org_owner');
   }
 
   const wanted = parsed.data.credits;
-  const rung = wanted != null ? rungFor(wanted) : undefined;
-  if (wanted != null && !rung) {
-    return json(
-      { error: 'unknown_plan', plans: SUBSCRIPTION_RUNGS },
-      { status: statusForFailure(CHECKOUT_LINK, 'unknown_plan') }
-    );
+  if (wanted != null && wanted !== PLAN.credits) {
+    return refuse('unknown_plan', { plans: PLANS });
   }
 
   const billing = await orgBillingForBrand(supabase, { slug: params.slug });
   if (!billing) {
-    return json({ error: 'no_org_billing' }, { status: statusForFailure(CHECKOUT_LINK, 'no_org_billing') });
+    return refuse('no_org_billing');
+  }
+  if (billing.subscriptionId) {
+    return refuse('already_subscribed', { app_billing_url: appBillingUrl });
   }
 
-  if (rung && !billing.subscriptionId) {
-    try {
-      const { subscriptionPriceIdFor, ensureOrgCustomer, createSubscriptionCheckout } = await import('$lib/server/stripe');
-      const priceId = await subscriptionPriceIdFor(rung.price);
-      if (!priceId) {
-        return json(
-          { error: 'subscriptions_not_configured', app_billing_url: appBillingUrl },
-          { status: statusForFailure(CHECKOUT_LINK, 'subscriptions_not_configured') }
-        );
-      }
-      const customerId = await ensureOrgCustomer({
-        id: billing.orgId,
-        name: billing.orgName,
-        stripe_customer_id: billing.customerId
-      });
-      const checkoutUrl = await createSubscriptionCheckout({
-        customerId,
-        orgId: billing.orgId,
-        priceId,
-        credits: rung.credits,
-        ...checkoutReturnUrls(appBillingUrl)
-      });
-      return json({ ok: true, url: checkoutUrl, plans: SUBSCRIPTION_RUNGS });
-    } catch (e) {
-      return json(
-        { error: 'stripe_unavailable', message: e instanceof Error ? e.message : undefined },
-        { status: statusForFailure(CHECKOUT_LINK, 'stripe_unavailable') }
-      );
+  try {
+    const { subscriptionPriceId, ensureOrgCustomer, createSubscriptionCheckout } = await import('$lib/server/stripe');
+    const priceId = await subscriptionPriceId();
+    if (!priceId) {
+      return refuse('subscriptions_not_configured', { app_billing_url: appBillingUrl });
     }
+    const customerId = await ensureOrgCustomer({
+      id: billing.orgId,
+      name: billing.orgName,
+      stripe_customer_id: billing.customerId
+    });
+    const checkoutUrl = await createSubscriptionCheckout({
+      customerId,
+      orgId: billing.orgId,
+      priceId,
+      credits: PLAN.credits,
+      ...checkoutReturnUrls(appBillingUrl)
+    });
+    return json({ ok: true, url: checkoutUrl, plans: PLANS });
+  } catch (e) {
+    return refuse('stripe_unavailable', { message: e instanceof Error ? e.message : undefined });
   }
-
-  const link = await billingLink(supabase, {
-    slug: params.slug,
-    returnUrl: appBillingUrl,
-    flow: 'upgrade'
-  });
-  if (link.refusal) {
-    return json(
-      { error: link.refusal, message: link.message || undefined, app_billing_url: appBillingUrl },
-      { status: statusForFailure(CHECKOUT_LINK, link.refusal) }
-    );
-  }
-
-  return json({ ok: true, url: link.url, plans: SUBSCRIPTION_RUNGS });
 };

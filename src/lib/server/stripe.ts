@@ -1,8 +1,8 @@
 import { env } from '$env/dynamic/private';
 import Stripe from 'stripe';
 import { createAdminClient } from './supabase-admin';
-import { CREDIT_LADDER, PLAN_CURRENCY, rungForLookupKey } from '$lib/credit-ladder';
-import { DISPLAY_UNITS_PER_CREDIT } from '$lib/components/credit-amount-format';
+import { PLAN, PLAN_CURRENCY, planForLookupKey, type Plan } from '$lib/credit-ladder';
+import { formatCredits } from '$lib/components/credit-amount-format';
 
 let client: Stripe | null = null;
 
@@ -17,37 +17,25 @@ function stripe(): Stripe {
 const APP_TAG = 'feega';
 const CENTS_PER_UNIT = 100;
 
-let rungPriceIds: Promise<Map<number, string>> | null = null;
+let planPriceId: Promise<string | undefined> | null = null;
 
-async function fetchRungPriceIds(): Promise<Map<number, string>> {
-  const { data } = await stripe().prices.list({
-    lookup_keys: CREDIT_LADDER.map((rung) => rung.lookupKey),
-    active: true,
-    limit: 100
-  });
+async function fetchPlanPriceId(): Promise<string | undefined> {
+  const { data } = await stripe().prices.list({ lookup_keys: [PLAN.lookupKey], active: true, limit: 1 });
 
-  const ids = new Map<number, string>();
-  for (const price of data) {
-    const rung = rungForLookupKey(price.lookup_key);
-    if (!rung || price.currency !== PLAN_CURRENCY || price.unit_amount !== rung.price * CENTS_PER_UNIT) {
-      continue;
-    }
-    ids.set(rung.price, price.id);
-  }
-  return ids;
+  return data.find((price) => price.currency === PLAN_CURRENCY && price.unit_amount === PLAN.price * CENTS_PER_UNIT)?.id;
 }
 
-export async function subscriptionPriceIdFor(rungPrice: number): Promise<string | undefined> {
-  rungPriceIds ??= fetchRungPriceIds().catch((e) => {
-    rungPriceIds = null;
+export async function subscriptionPriceId(): Promise<string | undefined> {
+  planPriceId ??= fetchPlanPriceId().catch((e) => {
+    planPriceId = null;
     throw e;
   });
-  return (await rungPriceIds).get(rungPrice);
+  return planPriceId;
 }
 
-export async function subscribedRungPrice(subscriptionId: string): Promise<number | null> {
+export async function subscribedPlan(subscriptionId: string): Promise<Plan | null> {
   const sub = await stripe().subscriptions.retrieve(subscriptionId);
-  return rungForLookupKey(sub.items.data[0]?.price.lookup_key)?.price ?? null;
+  return planForLookupKey(sub.items.data[0]?.price.lookup_key) ?? null;
 }
 
 /**
@@ -87,7 +75,7 @@ export async function createOneTimeCreditCheckout(opts: {
         price_data: {
           currency: PLAN_CURRENCY,
           unit_amount: Math.round(opts.price * CENTS_PER_UNIT),
-          product_data: { name: `${opts.credits / DISPLAY_UNITS_PER_CREDIT} feega credits` }
+          product_data: { name: `${formatCredits(opts.credits)} feega credits` }
         },
         quantity: 1
       }
@@ -123,33 +111,18 @@ export async function createSubscriptionCheckout(opts: {
   return session.url;
 }
 
-/**
- * Every plan CHANGE happens inside Stripe's hosted portal, on the prices configured there — the
- * app names a price only to open the first subscription.
- */
 export async function createBillingPortalSession(opts: {
   customerId: string;
   returnUrl: string;
-  flow?: 'payment_method' | 'upgrade';
-  subscriptionId: string | null;
+  flow?: 'payment_method';
 }): Promise<string> {
-  const flow_data =
-    opts.flow === 'payment_method'
-      ? { type: 'payment_method_update' as const }
-      : opts.flow === 'upgrade' && opts.subscriptionId
-        ? {
-            type: 'subscription_update' as const,
-            subscription_update: { subscription: opts.subscriptionId }
-          }
-        : undefined;
-
   const configuration = env.STRIPE_PORTAL_CONFIGURATION;
 
   const session = await stripe().billingPortal.sessions.create({
     customer: opts.customerId,
     return_url: opts.returnUrl,
     ...(configuration ? { configuration } : {}),
-    ...(flow_data ? { flow_data } : {})
+    ...(opts.flow ? { flow_data: { type: 'payment_method_update' as const } } : {})
   });
   return session.url;
 }

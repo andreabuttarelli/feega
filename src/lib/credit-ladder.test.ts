@@ -5,54 +5,48 @@ import { fileURLToPath } from 'node:url';
 import {
   AI_MARKUP,
   billedCreditsFor,
-  CREDIT_LADDER,
   MARGIN_FLOOR,
   marginForRung,
-  rungFor
+  PLAN,
+  planForLookupKey,
+  TOP_UPS,
+  topUpFor
 } from './credit-ladder';
-import { DISPLAY_UNITS_PER_CREDIT } from './components/credit-amount-format';
 import { estimateLoopCredits } from './server/canvas/loop-cost';
 import { IMAGE_CREDITS, videoCredits } from './server/content-cost';
 
-describe('credit ladder never falls below the margin floor', () => {
-  for (const rung of CREDIT_LADDER) {
-    it(`€${rung.price} clears the floor when every credit is spent`, () => {
-      expect(marginForRung(rung.price, rung.credits)).toBeGreaterThanOrEqual(MARGIN_FLOOR);
+describe('nothing feega sells falls below the margin floor', () => {
+  for (const offer of [PLAN, ...TOP_UPS]) {
+    it(`€${offer.price} for ${offer.credits} credits clears the floor when every credit is spent`, () => {
+      expect(marginForRung(offer.price, offer.credits)).toBeGreaterThanOrEqual(MARGIN_FLOOR);
     });
   }
-
-  it('every rung earns the markup share of its price, markup / (1 + markup)', () => {
-    for (const rung of CREDIT_LADDER) {
-      expect(marginForRung(rung.price, rung.credits)).toBeCloseTo(AI_MARKUP / (1 + AI_MARKUP), 5);
-    }
-  });
 });
 
-describe('the plans feega.app sells', () => {
-  it('are the six monthly tiers of the site, in order', () => {
-    expect(CREDIT_LADDER.map((r) => r.price)).toEqual([8, 16, 32, 64, 128, 256]);
+describe('what feega.app sells', () => {
+  it('is one monthly plan: €9 for 500 credits, on the feega_monthly_9 Stripe price', () => {
+    expect(PLAN).toEqual({ price: 9, credits: 500, lookupKey: 'feega_monthly_9' });
   });
 
-  it('grant one displayed credit per euro', () => {
-    for (const rung of CREDIT_LADDER) {
-      expect(rung.credits / DISPLAY_UNITS_PER_CREDIT).toBe(rung.price);
-    }
-  });
-
-  it('name the Stripe price by lookup key, never by id', () => {
-    expect(CREDIT_LADDER.map((r) => r.lookupKey)).toEqual([
-      'feega_monthly_8',
-      'feega_monthly_16',
-      'feega_monthly_32',
-      'feega_monthly_64',
-      'feega_monthly_128',
-      'feega_monthly_256'
+  it('and three top-ups at 100 credits per euro', () => {
+    expect(TOP_UPS).toEqual([
+      { price: 10, credits: 1_000 },
+      { price: 20, credits: 2_000 },
+      { price: 50, credits: 5_000 }
     ]);
   });
 
-  it('find a rung by its price and refuse any other', () => {
-    expect(rungFor(32)?.credits).toBe(3_200);
-    expect(rungFor(30)).toBeUndefined();
+  it('finds a top-up by its credits and refuses any other amount', () => {
+    expect(topUpFor(2_000)?.price).toBe(20);
+    expect(topUpFor(20)).toBeUndefined();
+    expect(topUpFor(500)).toBeUndefined();
+  });
+
+  it('still recognises a subscriber on a retired monthly price', () => {
+    expect(planForLookupKey('feega_monthly_9')).toEqual(PLAN);
+    expect(planForLookupKey('feega_monthly_32')).toEqual({ price: 32, credits: 3_200, lookupKey: 'feega_monthly_32' });
+    expect(planForLookupKey('feega_monthly_7')).toBeUndefined();
+    expect(planForLookupKey(null)).toBeUndefined();
   });
 });
 
@@ -60,10 +54,6 @@ describe('billedCreditsFor', () => {
   it('matches the anchor: $1 of provider cost bills 120 credits at 20% markup', () => {
     expect(AI_MARKUP).toBe(0.2);
     expect(billedCreditsFor(1)).toBe(120);
-  });
-
-  it('$8 of credits cost us $6.67 of provider spend', () => {
-    expect(rungFor(8)!.credits / 120).toBeCloseTo(6.667, 3);
   });
 });
 
