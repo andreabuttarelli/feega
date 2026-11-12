@@ -25,6 +25,10 @@ export class SentOverlay {
     return changed;
   }
 
+  json(): string {
+    return `[${this.#json.join(',')}]`;
+  }
+
   #jsonOf(item: PathItem): string {
     const known = this.#read.get(item);
     if (known !== undefined) {
@@ -43,8 +47,8 @@ export class SentParts {
     return [...this.#parts].some(([part, sent]) => sent.waiting(overlay[part]));
   }
 
-  changed(overlay: CoreOverlay): OverlayPart[] {
-    return [...this.#parts].filter(([part, sent]) => sent.changed(overlay[part])).map(([part]) => part);
+  changed(overlay: CoreOverlay): [OverlayPart, string][] {
+    return [...this.#parts].filter(([part, sent]) => sent.changed(overlay[part])).map(([part, sent]) => [part, sent.json()]);
   }
 }
 
