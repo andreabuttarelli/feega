@@ -9,6 +9,7 @@ import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
 import { DEFAULT_AUTO_LAYOUT } from '@feega/motion-core/motion/layout/model';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { findClip } from '@feega/motion-core/motion/doc';
+import { addBreakpoint, BreakpointPreset } from '@feega/motion-core/motion/breakpoints/model';
 import { dropTool, freeLanding, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, rowDrop, nodeIcon, elementGlyph, frameHover, frameRows, rowPicked, pickIdOf, rowsInside, searchRows, childIds, tileHovered, frameRinged, emptyAreaRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers, type LayerRow } from './layers';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, addTrack } from '@feega/motion-core/motion/timeline';
@@ -116,6 +117,16 @@ describe('layer rows', () => {
     const texted = ok(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: 0, props: { text: 'Hi', x: 0.5, y: 0.5, width: 0.2, height: 0.1 } }, 't'));
     const doc = ok(wrapInStack(texted, ['t'], 'st', 'lane'));
     expect(frameRows(doc, 'm1').find((r) => r.id === 'st')).toMatchObject({ type: LayoutKind.Stack, label: 'Stack' });
+  });
+
+  it('names the views that alone show a layer the desktop hides, so a phone-only layer does not read as a hidden duplicate', () => {
+    const texted = ok(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: 0, props: { text: 'Menu', x: 0.5, y: 0.5, width: 0.2, height: 0.1 } }, 't'));
+    const viewed = ok(addBreakpoint(ok(addBreakpoint(texted, BreakpointPreset.Tablet, 'tablet')), BreakpointPreset.Phone, 'phone'));
+    const phoneOnly = { ...viewed, tracks: viewed.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, hidden: true, overrides: { phone: { hidden: false } } })) })) } as MotionDoc;
+    const hidden = { ...viewed, tracks: viewed.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, hidden: true })) })) } as MotionDoc;
+
+    expect(frameRows(phoneOnly, 'm1').find((r) => r.id === 't')?.only).toBe('Phone');
+    expect(frameRows(hidden, 'm1').find((r) => r.id === 't')?.only).toBeUndefined();
   });
 
   const stackedText = () => ok(wrapInStack(ok(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: 0, props: { text: 'Hi', x: 0.5, y: 0.5, width: 0.2, height: 0.1 } }, 't')), ['t'], 'st', 'lane'));
