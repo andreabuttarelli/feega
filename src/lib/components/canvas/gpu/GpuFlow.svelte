@@ -267,6 +267,7 @@
   import { scaledTo, selectionBox, turnedAbout, withField } from '$lib/canvas/selection-box';
   import { backToFront } from '$lib/canvas/paint-order';
   import { GPU_FALLBACK_EVENT } from '$lib/canvas/gpu/gpu-loss';
+  import { perfFit, perfNodes } from '$lib/canvas/perf/perf-beacon';
 
   let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[], seconds?: number) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; canvasId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onExportElementRows?: (frameId: string, elementIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void; onFrameDraft?: (id: string, nodeId: string, draft: FrameDraft | null) => void } = $props();
 
@@ -281,6 +282,7 @@
   const INTERACTIVE = 'input, textarea, select, button, a, [contenteditable="true"], .nodrag, video, audio, iframe';
 
   const tiles = $derived(props.tiles ?? []);
+  $effect(() => perfNodes(tiles.length));
   const mode = $derived(props.mode ?? CanvasMode.Edit);
   const spec = $derived(CANVAS_MODES[mode]);
   const editable = $derived(spec.flow.nodesDraggable && editorMode.spec.access === DocAccess.Write);
@@ -959,6 +961,7 @@
     const s = screenSize();
     const target = fitView(b, { width: s.width, height: s.height }, purpose);
     if (target) {
+      perfFit();
       animateTo(target);
     }
   }
