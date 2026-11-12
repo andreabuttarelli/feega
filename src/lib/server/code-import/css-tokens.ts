@@ -64,7 +64,7 @@ const MAX_SOURCE_DEPTH = 12;
 const DEPENDENCIES = 'node_modules';
 const VAR_ONLY = /^var\(\s*(--[\w.-]+)\s*(?:,[^)]*)?\)$/;
 const CUSTOM_PROPERTY = /^--[\w.-]+$/;
-const BOUND_PROPERTIES = new Set(['color', 'background', 'background-color', 'border-color', 'gap', 'padding', 'border-radius']);
+const BOUND_PROPERTIES = new Set(['color', 'background', 'background-color', 'border-color', 'gap', 'padding', 'border-radius', 'border-width', 'font-family']);
 export const TYPE_PROPERTIES = new Set(['font-size', 'font-weight', 'line-height', 'letter-spacing', 'box-shadow']);
 const STATEFUL_SELECTOR = /:/;
 

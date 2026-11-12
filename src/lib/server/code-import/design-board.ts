@@ -116,16 +116,16 @@ function radii(sheet: Sheet, top: number): Section {
   return { nodes, height: Math.ceil(list.length / COLUMNS) * RADIUS_ROW };
 }
 
-function spacing(sheet: Sheet, top: number): Section {
+const bars = (group: RegExp) => (sheet: Sheet, top: number): Section => {
   const { variables, scale } = sheet;
-  const list = entriesOf(variables, VarType.Number, /Spacing$/);
+  const list = entriesOf(variables, VarType.Number, group);
   const nodes = list.flatMap((entry, i) => {
     const y = top + i * SPACING_ROW;
     const px = pxOf(variableValue(variables, entry.key), scale);
     return [text(entry.name, MARGIN, y, Size.Label, INK, FONT, 500), text(noted(sheet, entry, `${px}px`), MARGIN + 120, y, Size.Note, SOFT), rect(`${entry.key} bar`, MARGIN + 200, y + 2, Math.max(1, Math.min(MAX_BAR, px)), BAR_HEIGHT, BAR)];
   });
   return { nodes, height: list.length * SPACING_ROW };
-}
+};
 
 const firstFamily = (stack: string) => stack.split(',')[0].trim().replace(/^['"]|['"]$/g, '') || FONT;
 
@@ -190,7 +190,8 @@ type Part = { title: string; build: (sheet: Sheet, top: number) => Section };
 const PARTS: Part[] = [
   { title: 'Colors', build: colours },
   { title: 'Radius', build: radii },
-  { title: 'Spacing', build: spacing },
+  { title: 'Spacing', build: bars(/Spacing$/) },
+  { title: 'Border', build: bars(/Border$/) },
   { title: 'Type', build: families },
   { title: 'Text', build: textStyles },
   { title: 'Shadow', build: shadows },
