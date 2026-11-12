@@ -6,8 +6,8 @@ import { designed, designOf, withBoard } from '../../src/lib/server/code-import/
 import { folderSource } from '../../src/lib/server/code-import/folder-source';
 import { codeCapturedIn, type CapturedApp } from '../../src/lib/server/code-import/fidelity-apps';
 import { BASE_CONDITIONS } from '../../src/lib/server/code-import/render-conditions';
-import { compacted } from '../component-library/compact';
-import type { Catalog } from './registry';
+import { compacted } from './compact';
+import type { Catalog } from '../arc-library/registry';
 
 const LIBRARY = join(import.meta.dirname, '../../libraries/arc');
 const OUT = join(import.meta.dirname, '../../src/lib/motion/template/arc/arc-doc.json');
