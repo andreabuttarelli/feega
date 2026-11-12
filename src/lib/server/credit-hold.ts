@@ -7,8 +7,8 @@ type LedgerRow = { kind: string; amount: number; expires_at: string | null };
 const NEVER = Infinity;
 const expiryOf = (row: LedgerRow) => (row.expires_at ? new Date(row.expires_at).getTime() : NEVER);
 
-export function portionsOf(rows: LedgerRow[], amount: number, now: Date): Portion[] | null {
-  const live = rows.filter((r) => r.kind === 'grant' && expiryOf(r) > now.getTime()).sort((a, b) => expiryOf(a) - expiryOf(b));
+export function portionsOf(rows: LedgerRow[], amount: number): Portion[] | null {
+  const live = rows.filter((r) => r.kind === 'grant').sort((a, b) => expiryOf(a) - expiryOf(b));
   let spent = rows.filter((r) => r.kind === 'debit').reduce((sum, r) => sum + r.amount, 0);
   let wanted = amount;
   const portions: Portion[] = [];
@@ -44,13 +44,13 @@ export function splitPortions(portions: Portion[], amounts: number[]): Portion[]
   });
 }
 
-export async function holdCredits(orgId: string, amount: number, note: string, now = new Date()): Promise<Portion[] | null> {
+export async function holdCredits(orgId: string, amount: number, note: string): Promise<Portion[] | null> {
   const admin = createAdminClient();
   const { data, error } = await admin.from('credit_ledger').select('kind, amount, expires_at').eq('org_id', orgId);
   if (error) {
     throw new Error(`credit ledger read failed: ${error.message}`);
   }
-  const portions = portionsOf((data ?? []) as LedgerRow[], amount, now);
+  const portions = portionsOf((data ?? []) as LedgerRow[], amount);
   if (!portions) {
     return null;
   }

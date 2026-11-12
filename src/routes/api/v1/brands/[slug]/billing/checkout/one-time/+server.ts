@@ -3,18 +3,12 @@ import type { RequestHandler } from './$types';
 import { authenticate, checkApiKeyWriteAccess, loadBrandForUser } from '$lib/server/cli-auth';
 import { isOrgOwner, orgBillingForBrand } from '$lib/server/org-billing';
 import { billingGrantsReady } from '$lib/server/billing-readiness';
-import { rungFor } from '$lib/credit-ladder';
+import { topUpFor } from '$lib/credit-ladder';
 import { BILLING_PATH, checkoutReturnUrls } from '$lib/billing-path';
 import { appOrigin } from '$lib/server/app-url';
 
 import { ONE_TIME_CHECKOUT_LINK, statusForFailure } from '@feega/api-contracts';
 
-/**
- * The one-time side of CREDIT_LADDER: a fixed batch of credits bought once, at the same $1 per
- * credit as the plans, that never expires. Unlike the subscription checkout, this needs no Stripe
- * Price configured per rung — `createOneTimeCreditCheckout` inlines the amount — so it works the
- * moment an org exists, subscribed or not.
- */
 export const POST: RequestHandler = async ({ request, params, url }) => {
   const { supabase, user, apiKey, error } = await authenticate(request);
   if (error) return error;
@@ -44,8 +38,8 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
     );
   }
 
-  const rung = rungFor(parsed.data.credits);
-  if (!rung) {
+  const topUp = topUpFor(parsed.data.credits);
+  if (!topUp) {
     return json(
       { error: 'unknown_plan' },
       { status: statusForFailure(ONE_TIME_CHECKOUT_LINK, 'unknown_plan') }
@@ -72,11 +66,11 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
     const checkoutUrl = await createOneTimeCreditCheckout({
       customerId,
       orgId: billing.orgId,
-      price: rung.price,
-      credits: rung.credits,
+      price: topUp.price,
+      credits: topUp.credits,
       ...checkoutReturnUrls(appBillingUrl)
     });
-    return json({ ok: true, url: checkoutUrl, credits: rung.credits });
+    return json({ ok: true, url: checkoutUrl, credits: topUp.credits });
   } catch (e) {
     return json(
       { error: 'stripe_unavailable', message: e instanceof Error ? e.message : undefined },

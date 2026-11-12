@@ -40,38 +40,48 @@ Once the `stripe` schema exists and is being written to, apply, in this order:
   migrations run by filename, immediately followed by the next one.
 - `supabase/canvas-migrations/20260929_feega_plan_grants.sql` — the live triggers:
   - `stripe.invoices`: a paid invoice with `billing_reason` `subscription_create` or
-    `subscription_cycle` grants the month's credits, once per invoice id, expiring at the
-    period end. Credits come from the price's `metadata.credits` in `stripe.prices`, falling
-    back to the subscription's `metadata.credits`.
+    `subscription_cycle` grants the month's credits, once per invoice id. Credits come from the
+    price's `metadata.credits` in `stripe.prices`, falling back to the subscription's
+    `metadata.credits`.
   - `stripe.checkout_sessions`: a paid one-time checkout grants `metadata.credits`, never
     expiring.
   - `stripe.subscriptions`: links/unlinks `orgs.stripe_subscription_id`.
   - Every trigger ignores rows without `metadata.app = 'feega'` and a `metadata.org_id` of an
     existing org: the Stripe account is shared with other products.
 
+- `supabase/canvas-migrations/20261112_credits_never_expire.sql` — credits never expire: the
+  balance sums every grant, the invoice trigger writes no `expires_at` and grants
+  `metadata.credits × line quantity` (per-seat ready), and the `org_credits_at_risk` view is
+  dropped. Verified in-process by `npm run test:credit-expiry` (pglite, no database needed).
+
 Verify with a local Postgres: `DATABASE_URL=postgres://postgres@127.0.0.1:5432/postgres npm run
 test:stripe-grants`.
 
-## 2. Create the 6 subscription Prices
+## 2. Create the plan Price
 
-Plans (`src/lib/credit-ladder.ts`): €8 / €16 / €32 / €64 / €128 / €256 per month, 1 credit = €1.
-The app finds each Price by `lookup_key` — no env var, no price id in code. One-time top-ups need
-no Price (the amount is inlined).
-
-For each tier N, a recurring monthly EUR Price (a Price in any other currency is ignored):
+One plan (`PLAN` in `src/lib/credit-ladder.ts`): €9 per editor per month, 500 credits per
+editor, 100 credits = €1. The app finds the Price by `lookup_key` — no env var, no price id in
+code. Top-ups (€10 / €20 / €50 for 1,000 / 2,000 / 5,000 credits, `TOP_UPS`) need no Price: the
+amount is inlined in the Checkout Session.
 
 | field | value |
 |---|---|
-| product name | `feega N` |
-| `lookup_key` | `feega_monthly_N` |
-| `unit_amount` | `N * 100` (euro cents) |
-| `metadata` | `app=feega`, `credits=N*100` (ledger units: 100 = 1 displayed credit) |
+| product | `feega` |
+| recurring | monthly, per unit (licensed) |
+| currency | EUR (a Price in any other currency is ignored) |
+| `unit_amount` | `900` |
+| `lookup_key` | `feega_monthly_9` |
+| `metadata` | `app=feega`, `credits=500` (credits per seat; the trigger multiplies by quantity) |
 
-A Price whose `unit_amount` disagrees with its tier is ignored. A tier with no Price answers
+A Price whose `unit_amount` is not 900 is ignored, and the app answers
 `subscriptions_not_configured`; top-ups work regardless.
 
-Configure the customer portal to allow switching between these six Prices: the app sends existing
-subscribers there to upgrade or downgrade.
+The six retired Prices (`feega_monthly_8` … `feega_monthly_256`): set them **inactive, never
+delete them**. A subscriber still on one keeps renewing — the trigger reads that Price's
+`metadata.credits` — and the credits page names their plan as current.
+
+Configure the customer portal **without plan switching**: invoices, payment method and
+cancellation only. There is one plan; the app never sends anyone to switch.
 
 ## Going live
 

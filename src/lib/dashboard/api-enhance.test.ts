@@ -8,7 +8,7 @@ const { actionTarget } = await import('./api-enhance');
 
 describe('which page action a dashboard form posts to', () => {
   it('a relative action is on the current page', () => {
-    expect(actionTarget('?/upgrade', '/app/credits')).toEqual({ pathname: '/app/credits', action: 'upgrade' });
+    expect(actionTarget('?/subscribe', '/app/credits')).toEqual({ pathname: '/app/credits', action: 'subscribe' });
   });
 
   it('an absolute action names its page', () => {

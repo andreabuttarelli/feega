@@ -173,10 +173,10 @@ describe('il registry degli endpoint di brand', () => {
   it('un org senza cliente Stripe non è un errore di sintassi: 409', () => {
     expect(statusForFailure(byTool('create_billing_portal_link'), 'no_customer')).toBe(409);
     expect(statusForFailure(byTool('create_checkout_link'), 'no_customer')).toBe(409);
-    expect(statusForFailure(byTool('create_checkout_link'), 'no_subscription')).toBe(409);
+    expect(statusForFailure(byTool('create_checkout_link'), 'already_subscribed')).toBe(409);
   });
 
-  it('il checkout accetta un gradino della scala opzionale e rifiuta il resto', () => {
+  it('il checkout accetta i crediti del piano, opzionali, e rifiuta il resto', () => {
     const { input } = byTool('create_checkout_link');
     expect(input.safeParse({}).success).toBe(true);
     expect(input.safeParse({ credits: 30 }).success).toBe(true);

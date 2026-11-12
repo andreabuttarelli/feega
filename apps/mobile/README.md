@@ -50,8 +50,8 @@ Sign in with Apple and real in-app purchases need the paid Apple Developer Progr
 
 ## In-app purchases without App Store Connect
 
-`ios/App/App/Products.storekit` holds the 12 products (`feega_monthly_*` in one subscription
-group, `feega_pack_*` consumables; a vitest keeps it equal to `src/lib/store-products.ts`). The
+`ios/App/App/Products.storekit` holds the 4 products (`feega_monthly_9` in one subscription
+group, `feega_pack_10/20/50` consumables; a vitest keeps it equal to `src/lib/store-products.ts`). The
 shared `App` scheme runs with it, so ⌘R in Xcode buys from it: Debug → StoreKit → Manage
 Transactions refunds, expires or speeds up renewals.
 

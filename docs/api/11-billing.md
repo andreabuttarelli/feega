@@ -1,7 +1,7 @@
 # API — 10 · Billing (link di pagamento per gli agenti)
 
-Due endpoint che **mintano una URL Stripe e la restituiscono**. Sono i tool MCP
-`create_billing_portal_link` e `create_checkout_link`, e nascono da una richiesta precisa: un
+Tre endpoint che **mintano una URL Stripe e la restituiscono**. Sono i tool MCP
+`create_billing_portal_link`, `create_checkout_link` e `create_one_time_checkout_link`, e nascono da una richiesta precisa: un
 agente esterno deve poter *avviare* un pagamento e passare il link all'umano.
 
 Il confine di sicurezza è nel codice, non solo nella descrizione: **l'agente non paga e non
@@ -37,7 +37,7 @@ browser gli risponderebbe "Owner only".
 
 ## Niente gate sui crediti
 
-**Nessuno dei due chiama `gateAiAction` e nessuno guarda i crediti.** Sarebbe circolare: chi ha
+**Nessuno chiama `gateAiAction` e nessuno guarda i crediti.** Sarebbe circolare: chi ha
 finito i crediti è precisamente la persona che deve arrivare al checkout. Nessuno dei due chiama
 un modello.
 
@@ -48,7 +48,7 @@ disdetta.
 
 ## `POST /api/v1/brands/:slug/billing/portal`
 
-Portale di fatturazione Stripe dell'org: fatture, metodo di pagamento, cambio piano, disdetta.
+Portale di fatturazione Stripe dell'org: fatture, metodo di pagamento, disdetta. Nessun cambio piano: il piano è uno.
 
 **Body**: nessun campo. Un campo non dichiarato viene rifiutato (`invalid_input`, 400).
 
@@ -69,33 +69,35 @@ curl -sS -X POST https://feega.app/api/v1/brands/demo/billing/portal \
 
 ## `POST /api/v1/brands/:slug/billing/checkout`
 
-Pagina ospitata da Stripe dove la persona sceglie un piano a pagamento e paga. Il prezzo **non è
-nominato qui**: la scaletta dei prezzi vive su Stripe, e l'app non cita mai un price id.
+Checkout Session Stripe sull'unico piano: €9 / editor / mese, 500 crediti, 100 crediti = €1. Il
+price id non è nel codice: lo trova `subscriptionPriceId()` per `lookup_key` `feega_monthly_9`.
 
 **Body**:
 
 | Campo | Tipo | Note |
 |---|---|---|
-| `plan` | string, opzionale | Chiave del piano voluto (`starter`, `pro`, …). Rifiutato se l'org non può salirci |
+| `credits` | number, opzionale | Se presente deve essere `500`; ogni altro valore è `unknown_plan` |
 
 **Response** `200`:
 
 ```json
 {
   "ok": true,
-  "url": "https://billing.stripe.com/p/session/live_upgrade",
-  "plans": [{ "key": "pro", "label": "Pro" }]
+  "url": "https://checkout.stripe.com/c/pay/cs_live_xyz",
+  "plans": [{ "credits": 500, "label": "€9 / editor / month" }]
 }
 ```
-
-`plans` è la stessa scaletta del bottone di upgrade nel prodotto (`plansAbove`), Go incluso solo
-mentre `FEATURE_PLAN_GO` è acceso. Serve all'agente per dire in una riga cosa vedrà la persona.
 
 ```bash
 curl -sS -X POST https://feega.app/api/v1/brands/demo/billing/checkout \
   -H "Authorization: Bearer $FEEGA_TOKEN" \
-  -H 'content-type: application/json' -d '{"plan":"pro"}'
+  -H 'content-type: application/json' -d '{}'
 ```
+
+## `POST /api/v1/brands/:slug/billing/checkout/one-time`
+
+Ricarica una tantum, mai un abbonamento. **Body**: `{ "credits": 1000 | 2000 | 5000 }` (€10 /
+€20 / €50). I crediti non scadono. Funziona anche senza abbonamento.
 
 ## Errori
 
@@ -105,19 +107,18 @@ catena di `||`. Un guasto di Stripe è **502**: è nostro, non di chi chiama.
 | `error` | Status | Endpoint | Significato |
 |---|---|---|---|
 | `invalid_input` | 400 | entrambi | Il body non passa lo schema (campo sconosciuto incluso) |
-| `unknown_plan` | 400 | checkout | Il `plan` chiesto non è fra quelli sopra al piano attuale. La risposta porta `plans` |
+| `unknown_plan` | 400 | checkout, one-time | Crediti diversi dal piano o da una ricarica. Il checkout risponde con `plans` |
 | `not_org_owner` | 403 | entrambi | Il chiamante raggiunge il brand ma non possiede l'org che paga |
 | `API key is read-only` | 403 | entrambi | Chiave senza scope `write` |
 | `Brand not found` | 404 | entrambi | Slug inesistente o non del chiamante (`loadBrandForUser`) |
-| `no_customer` | 409 | entrambi | L'org non ha mai pagato: non esiste un cliente Stripe da aprire |
-| `no_subscription` | 409 | checkout | Non c'è un abbonamento da aggiornare |
+| `no_customer` | 409 | portal | L'org non ha mai pagato: non esiste un cliente Stripe da aprire |
+| `already_subscribed` | 409 | checkout | L'org è già abbonata. La risposta porta `app_billing_url` |
+| `subscriptions_not_configured` | 409 | checkout | Il Price `feega_monthly_9` non esiste ancora su Stripe |
 | `no_org_billing` | 500 | entrambi | Non siamo riusciti a risolvere l'org che fattura il brand — nostro |
 | `stripe_unavailable` | 502 | entrambi | Stripe ha risposto male — nostro, non di chi chiama |
 
-`no_customer` e `no_subscription` non sono errori di sintassi: descrivono un account che non si è
-ancora abbonato. La risposta porta `app_billing_url`, la pagina in-app da cui la persona parte —
-oggi l'abbonamento nasce lì, non da questi endpoint, perché il repo non crea Checkout Session e
-non nomina price id (scelta dichiarata in `src/lib/server/stripe.ts`).
+`no_customer` e `already_subscribed` non sono errori di sintassi: la risposta porta
+`app_billing_url`, la pagina in-app dove la persona gestisce il piano e compra ricariche.
 
 Errori di auth comuni (401, 403 accesso non ancora abilitato): vedi
 [01-overview](01-overview.md).
