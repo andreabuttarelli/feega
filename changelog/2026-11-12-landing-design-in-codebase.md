@@ -1,20 +1,23 @@
 # Landing: "Design in your codebase" section and page
 
-The hero said "Design inside your code" and nothing below explained it. The home now has a
-section after "Start from any site" with the loop as three steps (Code → Design → Code), the
-frameworks code import recognises, and the token sources it reads; `/design-in-your-codebase`
-spells out what comes across, where it comes from and what goes back. Linked from the home
-section and the footer, listed in the sitemap and llms.txt, covered by the SEO length test.
+The hero said "Design inside your code" and nothing below showed it. The home now has a section
+after "Start from any site", and `/design-in-your-codebase` repeats it with a closing call to
+action: a headline, one line, two actions (import, read the docs), an isometric loop, three steps
+with their own isometric glyphs, and one row of framework logos.
 
-Frameworks come in two tiers. "Tested" are the four measured on real apps in
-`docs/specs/code-import.md` (Next app router, React + Vite, SvelteKit, Vue + Vite); the rest of
-`FRAMEWORKS` in `run-plan.ts` are "Early support": detected and started, not measured. Every
-claim maps to code: write-back of text and style only where a source location exists (Svelte 5,
-React 18), tokens per mode everywhere, variants only for React and Vue, up to 8 routes.
+The first version was a spec sheet (capability tables, React 18/19 caveats, route limits). It was
+rejected as too technical: those details live in the docs page it now links to.
 
-Not advertised: `npx feega` in a project folder and the VS Code / Cursor extension (#1992 is not
-merged), automatic page discovery, the full component library, env vars and login-protected pages.
+The loop is inline SVG in true isometric projection (`codebase/iso.ts`, 30° axes, one light
+direction): a code plane, page layers lifting out of it, a theme switch that turns them dark, the
+layers folding back and a pull-request tile rising from the code. CSS transforms and opacity
+only, 10 s cycle, paused off screen by an IntersectionObserver; with reduced motion it shows the
+lifted, light composition. No animation library, no raster assets.
 
-Logos are simple-icons paths (CC0) inlined in `landing/src/lib/site/codebase/logos.ts`:
-`simple-icons` is a dependency of the app, not of `landing/`. No public changelog entry: the
-product did not change.
+Frameworks: the four measured on real apps in `docs/specs/code-import.md` (Next.js, SvelteKit,
+React + Vite, Vue + Vite) are named; the rest of `FRAMEWORKS` in `run-plan.ts` are quieter marks
+under "and more in early support". Not advertised: `npx feega` in a project folder and the
+VS Code / Cursor extension (#1992 is not merged).
+
+Logos are simple-icons paths (CC0) inlined in `codebase/logos.ts`: `simple-icons` is a
+dependency of the app, not of `landing/`. No public changelog entry: the product did not change.

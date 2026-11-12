@@ -1,8 +1,6 @@
 <script lang="ts">
-  import '$lib/site/landing/landing.css';
-  import { CARRIED, CODEBASE, COMPONENTS_NOTE, NOT_YET, RETURNS, SOURCES, type Fact } from '$lib/site/codebase';
-  import Steps from '$lib/site/codebase/Steps.svelte';
-  import Frameworks from '$lib/site/codebase/Frameworks.svelte';
+  import { CODEBASE } from '$lib/site/codebase';
+  import CodebaseStory from '$lib/site/codebase/CodebaseStory.svelte';
 </script>
 
 <svelte:head>
@@ -14,96 +12,50 @@
   <meta name="twitter:description" content={CODEBASE.description} />
 </svelte:head>
 
-{#snippet facts(list: readonly Fact[])}
-  <dl class="facts">
-    {#each list as fact (fact.title)}
-      <div>
-        <dt>{fact.title}</dt>
-        <dd>{fact.text}</dd>
-      </div>
-    {/each}
-  </dl>
-{/snippet}
+<article class="codebase site-wide">
+  <CodebaseStory level="h1" />
 
-<article class="landing codebase">
-  <p class="eyebrow">Code → Design → Code</p>
-  <h1>Design in your codebase</h1>
-  <p class="intro">Feega runs your app and turns its pages into editable boards on one canvas. Change the design, then send it back to the code as a pull request.</p>
-  <a class="landing-cta" href={CODEBASE.cta.href} target="_blank" rel="noopener">{CODEBASE.cta.label}</a>
-
-  <section>
-    <h2>How it works</h2>
-    <Steps />
-  </section>
-
-  <section>
-    <h2>Frameworks</h2>
-    <Frameworks />
-    <p class="note">{COMPONENTS_NOTE}</p>
-  </section>
-
-  <section>
-    <h2>What comes across</h2>
-    {@render facts(CARRIED)}
-  </section>
-
-  <section>
-    <h2>Where it comes from</h2>
-    {@render facts(SOURCES)}
-  </section>
-
-  <section>
-    <h2>Back to code</h2>
-    {@render facts(RETURNS)}
-    <p class="note">{NOT_YET}</p>
+  <section class="close">
+    <h2>Bring your codebase.</h2>
+    <a class="site-pill" href={CODEBASE.start.href}>{CODEBASE.start.label}</a>
   </section>
 </article>
 
 <style>
-  .eyebrow {
-    margin: 0 0 16px;
-    color: #ff5100;
+  .codebase {
+    padding: 140px 20px 120px;
   }
 
-  .codebase h2 + :global(*) {
-    margin-top: 32px;
+  .close {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+    margin-top: 140px;
+    text-align: center;
   }
 
-  .facts {
+  h2 {
     margin: 0;
+    font-size: 34px;
+    line-height: 36px;
+    letter-spacing: -0.04em;
+    font-weight: 400;
   }
 
-  .facts div {
-    display: grid;
-    gap: 4px;
-    padding: 16px 0;
-    border-top: 1px solid var(--site-line);
-  }
-
-  .facts div:last-child {
-    border-bottom: 1px solid var(--site-line);
-  }
-
-  dt {
-    color: #fff;
-  }
-
-  dd {
-    margin: 0;
-    opacity: 0.7;
-  }
-
-  .note {
-    margin-top: 24px;
-    font-size: 12px;
-    line-height: 16px;
-    opacity: 0.5;
+  .close a {
+    width: auto;
+    padding: 0 28px;
   }
 
   @media (min-width: 810px) {
-    .facts div {
-      grid-template-columns: 200px minmax(0, 1fr);
-      gap: 24px;
+    .codebase {
+      padding: 170px 0 160px;
+    }
+
+    h2 {
+      font-size: 46px;
+      line-height: 46px;
     }
   }
 </style>
