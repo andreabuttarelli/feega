@@ -8,6 +8,12 @@ function fakeGpu() {
     createTexture(_d: { size: { width: number; height?: number } | number[]; format: string }): Texture {
       return Object.create(Texture.prototype) as Texture;
     }
+    createBuffer(_d: { size: number }): Texture {
+      return Object.create(Buffer.prototype) as Texture;
+    }
+  }
+  class Buffer {
+    destroy() {}
   }
   class Texture {
     destroy() {}
@@ -18,7 +24,7 @@ function fakeGpu() {
       return Promise.resolve();
     }
   }
-  return { GPUDevice: Device, GPUTexture: Texture, GPUQueue: Queue } as unknown as GpuApi & { GPUDevice: typeof Device; GPUQueue: typeof Queue };
+  return { GPUDevice: Device, GPUTexture: Texture, GPUBuffer: Buffer, GPUQueue: Queue } as unknown as GpuApi & { GPUDevice: typeof Device; GPUQueue: typeof Queue };
 }
 
 describe('the GPU probe', () => {
@@ -35,6 +41,20 @@ describe('the GPU probe', () => {
     expect(gpu.textures).toBe(1);
     expect(gpu.textureBytes).toBe(10 * 10 * 8);
     expect(gpu.created).toBe(2);
+  });
+
+  it('counts live buffer bytes, which a phone pays for as much as textures', () => {
+    const api = fakeGpu();
+    const gpu = probeGpu(api);
+    const device = new api.GPUDevice();
+
+    const lines = device.createBuffer({ size: 50_331_648 });
+    device.createBuffer({ size: 4096 });
+    lines.destroy();
+    lines.destroy();
+
+    expect(gpu.buffers).toBe(1);
+    expect(gpu.bufferBytes).toBe(4096);
   });
 
   it('counts submits', () => {

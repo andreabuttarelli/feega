@@ -15,7 +15,7 @@ const LOAD_MARKS: Record<LoadStep, string> = {
   [LoadStep.Sharp]: 'frame|sharp|all'
 };
 
-export type Memory = { textureMb: number; textures: number; wasmMb: number; cacheMb: number; pictureMb: number };
+export type Memory = { textureMb: number; textures: number; bufferMb: number; wasmMb: number; cacheMb: number; pictureMb: number };
 
 export type Before = Memory & { zoom: number; gestureFrames: number };
 

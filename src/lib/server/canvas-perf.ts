@@ -16,7 +16,7 @@ type Shape = { [key: string]: Field | Shape };
 
 const GESTURE: Shape = { frames: Field.Number, over: Field.Number, p95: Field.Number, p99: Field.Number, longTasks: Field.Number };
 
-const MEMORY: Shape = { textureMb: Field.Number, textures: Field.Number, wasmMb: Field.Number, cacheMb: Field.Number, pictureMb: Field.Number };
+const MEMORY: Shape = { textureMb: Field.Number, textures: Field.Number, bufferMb: Field.Number, wasmMb: Field.Number, cacheMb: Field.Number, pictureMb: Field.Number };
 
 const SUMMARY: Shape = {
   v: Field.Number,

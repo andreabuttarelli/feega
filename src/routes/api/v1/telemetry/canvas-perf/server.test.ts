@@ -64,7 +64,7 @@ describe('a canvas perf summary', () => {
       diedBefore: 1,
       lastError: 'device lost: GPUDevice was destroyed (reason: unknown)',
       limits: { maxTexture: 8192, maxBuffer: 268435456 },
-      memory: { textureMb: 140.5, textures: 312, wasmMb: 96, cacheMb: 40, pictureMb: 22 },
+      memory: { textureMb: 140.5, textures: 312, bufferMb: 224, wasmMb: 96, cacheMb: 40, pictureMb: 22 },
       before: { textureMb: 610, textures: 900, wasmMb: 256, cacheMb: 120, pictureMb: 80, zoom: 0.2, gestureFrames: 12 }
     };
 

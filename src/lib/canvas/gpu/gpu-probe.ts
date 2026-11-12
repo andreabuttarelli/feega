@@ -2,11 +2,11 @@ type Size = { width: number; height?: number } | number[];
 type Descriptor = { size: Size; format: string };
 type Proto = Record<string, unknown>;
 
-export type GpuApi = { GPUDevice?: { prototype: Proto }; GPUTexture?: { prototype: Proto }; GPUQueue?: { prototype: Proto }; WebAssembly?: typeof WebAssembly };
+export type GpuApi = { GPUDevice?: { prototype: Proto }; GPUTexture?: { prototype: Proto }; GPUBuffer?: { prototype: Proto }; GPUQueue?: { prototype: Proto }; WebAssembly?: typeof WebAssembly };
 
 type Queue = { onSubmittedWorkDone: () => Promise<void> };
 
-export type GpuCounters = { textureBytes: number; textures: number; created: number; submits: number; lagMs: number; wasm: WebAssembly.Memory[]; queue: Queue | null; polling: boolean };
+export type GpuCounters = { textureBytes: number; textures: number; bufferBytes: number; buffers: number; created: number; submits: number; lagMs: number; wasm: WebAssembly.Memory[]; queue: Queue | null; polling: boolean };
 
 const BYTES_PER_TEXEL: [RegExp, number][] = [
   [/32float/, 16],
@@ -48,6 +48,28 @@ function released(texture: Proto, counters: GpuCounters, sizes: WeakMap<object, 
   };
 }
 
+function buffered(device: Proto, buffer: Proto, counters: GpuCounters) {
+  const sizes = new WeakMap<object, number>();
+  const create = device.createBuffer as (this: unknown, d: { size: number }) => object;
+  device.createBuffer = function (this: unknown, d: { size: number }) {
+    const made = create.call(this, d);
+    sizes.set(made, d.size);
+    counters.bufferBytes += d.size;
+    counters.buffers++;
+    return made;
+  };
+  const destroy = buffer.destroy as (this: object) => void;
+  buffer.destroy = function (this: object) {
+    const bytes = sizes.get(this);
+    if (bytes !== undefined) {
+      sizes.delete(this);
+      counters.bufferBytes -= bytes;
+      counters.buffers--;
+    }
+    return destroy.call(this);
+  };
+}
+
 function submitted(queue: Proto, counters: GpuCounters) {
   const submit = queue.submit as (this: Queue, b: unknown) => void;
   queue.submit = function (this: Queue, b: unknown) {
@@ -81,13 +103,16 @@ export function probeGpu(api: GpuApi): GpuCounters {
   if (host[PROBED]) {
     return host[PROBED];
   }
-  const counters: GpuCounters = { textureBytes: 0, textures: 0, created: 0, submits: 0, lagMs: 0, wasm: [], queue: null, polling: false };
+  const counters: GpuCounters = { textureBytes: 0, textures: 0, bufferBytes: 0, buffers: 0, created: 0, submits: 0, lagMs: 0, wasm: [], queue: null, polling: false };
   host[PROBED] = counters;
   const sizes = new WeakMap<object, number>();
   if (api.GPUDevice && api.GPUTexture && api.GPUQueue) {
     counted(api.GPUDevice.prototype, counters, sizes);
     released(api.GPUTexture.prototype, counters, sizes);
     submitted(api.GPUQueue.prototype, counters);
+  }
+  if (api.GPUDevice && api.GPUBuffer) {
+    buffered(api.GPUDevice.prototype, api.GPUBuffer.prototype, counters);
   }
   memories(api.WebAssembly, counters);
   return counters;
