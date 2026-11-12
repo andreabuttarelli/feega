@@ -1,4 +1,4 @@
-import type { MotionClip, MotionDoc } from '../doc';
+import type { MotionDoc } from '../doc';
 import { restretched, withContentHeight, withFittedInstances } from '../layout/resolve';
 import { withHiddenSubtrees } from '../organize';
 import { carryChanges, liftEdit, resolveAt } from './model';
