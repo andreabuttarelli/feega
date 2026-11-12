@@ -125,3 +125,71 @@ fn putting_the_group_again_forgets_the_runs_a_patch_would_reuse() {
 
     assert!(!Arc::ptr_eq(&before.get("v1").unwrap().runs[0], &after.get("v2").unwrap().runs[0]));
 }
+
+const LONG: usize = 200;
+
+fn bars(n: usize) -> Vec<String> {
+    (0..n).map(|i| bar(i, 1.0)).collect()
+}
+
+fn group_of(items: &[String]) -> DisplayList {
+    parse(&format!(r#"{{ "width": 2400, "height": 600, "background": [0, 0, 1, 1], "items": [{}] }}"#, items.join(","))).unwrap()
+}
+
+fn bytes(scene: &vello::Scene) -> String {
+    let e = scene.encoding();
+    let tags: Vec<u32> = e.path_tags.iter().map(|t| u32::from(t.0)).chain(e.draw_tags.iter().map(|t| t.0)).collect();
+    format!("{:?}", (tags, &e.path_data, &e.draw_data, &e.transforms, &e.styles))
+}
+
+fn encoded_after(edit: &gpu_core::display_list::Splice, edited: &[String]) -> (usize, usize) {
+    let mut lib = composing();
+    lib.put_group("v1", &group_of(&bars(LONG)));
+    let before = lib.plan(&screen("v1"), LIMITS).screen.fragments;
+    assert!(lib.patch_group("v1", "v2", edit));
+    let after = lib.plan(&screen("v2"), LIMITS).screen.fragments;
+
+    let mut whole = composing();
+    whole.put_group("v2", &group_of(edited));
+    let full = whole.plan(&screen("v2"), LIMITS).screen.fragments;
+
+    let (old, new, full) = (before.get("v1").unwrap(), after.get("v2").unwrap(), full.get("v2").unwrap());
+    assert_eq!(new.runs.len(), full.runs.len());
+    for (x, y) in new.runs.iter().zip(&full.runs) {
+        assert_eq!((x.bounds, x.extent, x.len), (y.bounds, y.extent, y.len));
+        assert_eq!(bytes(&x.scene), bytes(&y.scene));
+    }
+    let rebuilt = new.runs.iter().filter(|r| !old.runs.iter().any(|o| Arc::ptr_eq(o, r))).count();
+    (rebuilt, new.runs.len())
+}
+
+fn recoloured(at: usize) -> (gpu_core::display_list::Splice, Vec<String>) {
+    let mut edited = bars(LONG);
+    edited[at] = bar(at, 0.5);
+    (splice(at, LONG - at - 1, &[(at, 0.5)]), edited)
+}
+
+fn hidden(at: usize) -> (gpu_core::display_list::Splice, Vec<String>) {
+    let mut edited = bars(LONG);
+    edited.remove(at);
+    (splice(at, LONG - at - 1, &[]), edited)
+}
+
+#[test]
+fn an_edit_in_the_middle_re_encodes_only_its_run() {
+    let (edit, edited) = recoloured(LONG / 2);
+    assert_eq!(encoded_after(&edit, &edited).0, 1);
+}
+
+#[test]
+fn an_edit_at_the_start_re_encodes_only_its_run_and_the_one_before() {
+    let (edit, edited) = recoloured(0);
+    assert!(encoded_after(&edit, &edited).0 <= 2);
+}
+
+#[test]
+fn hiding_near_the_top_re_encodes_a_few_runs_not_the_page() {
+    let (edit, edited) = hidden(3);
+    let (rebuilt, total) = encoded_after(&edit, &edited);
+    assert!(rebuilt <= 3, "{rebuilt} of {total} runs re-encoded");
+}

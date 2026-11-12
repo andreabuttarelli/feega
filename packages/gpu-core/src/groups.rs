@@ -372,6 +372,7 @@ fn softened(item: Item) -> Item {
 struct Seed {
     before: Arc<Encoded>,
     stable: usize,
+    tail: usize,
 }
 
 struct Span {
@@ -440,7 +441,7 @@ fn span_of(row: &Row, range: std::ops::Range<usize>, key: String, frame: Rect, s
         build_items(&mut scene, items, frame, &Pictures::new(), &Layers::new());
         scene
     };
-    let kept = seed.map(|s| Kept { before: &s.before, stable: s.stable });
+    let kept = seed.map(|s| Kept { before: &s.before, stable: s.stable, tail: s.tail });
     let encoded = Arc::new(Encoded::reusing(kept, &local, frame, |i| bounds::<Scene>(i, &Pictures::new()), paint));
     let bounds = encoded.runs.iter().map(|r| r.bounds).reduce(|a, b| a.union(b)).unwrap_or(frame);
     Span { key, encoded, bounds }
@@ -684,7 +685,7 @@ impl Library {
         self.groups.splice(from, to, splice.head, splice.tail, drawn.items);
         self.forget(to);
         if let Some(before) = before {
-            self.seeds.insert(to.to_string(), Seed { before, stable });
+            self.seeds.insert(to.to_string(), Seed { before, stable, tail: splice.tail });
         }
         true
     }
