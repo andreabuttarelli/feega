@@ -3,13 +3,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const ensureOrgCustomer = vi.fn();
 const createOneTimeCreditCheckout = vi.fn();
 const subscribedPlan = vi.fn();
-const scheduledEnd = vi.fn();
+const seatSubscription = vi.fn();
 
 vi.mock('$lib/server/stripe', () => ({
 	ensureOrgCustomer: (...a: unknown[]) => ensureOrgCustomer(...a),
 	createOneTimeCreditCheckout: (...a: unknown[]) => createOneTimeCreditCheckout(...a),
 	subscribedPlan: (...a: unknown[]) => subscribedPlan(...a),
-	scheduledEnd: (...a: unknown[]) => scheduledEnd(...a)
+	seatSubscription: (...a: unknown[]) => seatSubscription(...a)
 }));
 
 const { privateEnv } = vi.hoisted(() => ({ privateEnv: {} as Record<string, string | undefined> }));
@@ -186,7 +186,7 @@ describe('/app/credits — the workspace credits page', () => {
 
 	it('says how many editors the plan bills and when a cancelled plan ends', async () => {
 		subscribedPlan.mockResolvedValue({ price: 9, credits: 500, lookupKey: 'feega_monthly_9' });
-		scheduledEnd.mockResolvedValue('2026-12-13T00:00:00.000Z');
+		seatSubscription.mockResolvedValue({ itemId: 'si_1', quantity: 1, perEditor: true, status: 'active', endsAt: '2026-12-13T00:00:00.000Z' });
 
 		const data = await run(fakeSupabase({ org: { stripe_subscription_id: 'sub_1' } }));
 

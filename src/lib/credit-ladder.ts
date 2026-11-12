@@ -23,7 +23,7 @@ export const FREE_EDITOR_SEATS = 1;
 
 export const TOP_UPS: readonly TopUp[] = [10, 20, 50].map((price) => ({ price, credits: price * CREDITS_PER_USD_GRANT }));
 
-const RETIRED_PLANS: readonly Plan[] = [8, 16, 32, 64, 128, 256].map((price) => ({
+export const RETIRED_PLANS: readonly Plan[] = [8, 16, 32, 64, 128, 256].map((price) => ({
   price,
   credits: price * CREDITS_PER_USD_GRANT,
   lookupKey: monthlyLookupKey(price)

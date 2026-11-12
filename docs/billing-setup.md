@@ -54,17 +54,19 @@ Once the `stripe` schema exists and is being written to, apply, in this order:
   `metadata.credits × line quantity` (per-seat ready), and the `org_credits_at_risk` view is
   dropped. Verified in-process by `npm run test:credit-expiry` (pglite, no database needed).
 
-- `supabase/canvas-migrations/20261113_editor_seats_grandfathered.sql` — adds
-  `orgs.editor_seats_grandfathered_at` and stamps every free org that has more than one editor
-  on the day it is applied. Those teams keep their editors; nobody else gets the flag later.
-- `supabase/canvas-migrations/20261113_seat_proration_grants.sql` — a paid
-  `subscription_update` invoice grants `round(net proration amount × metadata.credits /
-  unit_amount)` credits (the net of the credit and debit proration lines); a net ≤ 0 (seat
-  removed) writes nothing.
-- `supabase/canvas-migrations/20261113_viewers_after_cancel.sql` — when a subscription ends
-  (`canceled`, `incomplete_expired`, `unpaid`), every admin and member of its org becomes a
-  viewer; subscribing clears the grandfathered flag.
-  `npm run test:seat-billing` runs all three in pglite.
+- `supabase/canvas-migrations/20261113_editor_seats.sql` — one file, so no order to get wrong:
+  - adds `orgs.editor_seats_grandfathered_at` and stamps every free org with more than one editor
+    on the day it is applied (nothing sets it later; subscribing clears it);
+  - adds `orgs.seats_paid` / `seats_paid_until` (the seats paid for the current period, set by
+    each renewal and raised by each charged seat) and `seats_checked_at` (the reconcile cron's
+    cursor);
+  - a renewal grants `metadata.credits × quantity` summed over the plan lines, wherever they sit;
+  - a paid `subscription_update` grants only for seats above `seats_paid`, from the amount charged
+    after discounts (`least(net proration, invoice total)`), rounded to the nearest credit, and
+    only for invoices in euros;
+  - `canceled` / `incomplete_expired` unlink the org and turn every admin and member into a
+    viewer; `unpaid` / `paused` unlink it without demoting anyone; `past_due` keeps it linked.
+  `npm run test:seat-billing` runs it in pglite, and CI runs both pglite harnesses.
 
 Verify with a local Postgres: `DATABASE_URL=postgres://postgres@127.0.0.1:5432/postgres npm run
 test:stripe-grants`.
@@ -94,10 +96,12 @@ delete them**. A subscriber still on one keeps renewing — the trigger reads th
 
 Configure the customer portal **without plan switching and without quantity changes**:
 invoices, payment method and cancellation only. The quantity is the number of editors, and only
-the app sets it (`setSeatQuantity`, `proration_behavior: always_invoice`): on accepting an editor
-invite, promoting or demoting, removing an editor, and hourly from the Vercel cron
-`/api/v1/billing/seats/reconcile` (same `CRON_SECRET` as the other crons), which corrects any
-quantity a failed Stripe call left behind.
+the app sets it (`syncSeats`): an editor beyond the seats already paid this period is charged at
+once (`always_invoice`); a removed editor lowers the quantity with no proration (the seat stays
+paid until renewal, and re-adding within the period is free). It runs on an accepted editor
+invite, a role change across viewer/editor, a removal or a leave, and hourly from the Vercel cron
+`/api/v1/billing/seats/reconcile` (40 teams per run, oldest checked first, 502 when Stripe refuses
+one). A subscription on a retired price (`feega_monthly_8` …) is never touched.
 
 ## Going live
 

@@ -291,40 +291,47 @@ describe('subscribedPlan', () => {
 	});
 });
 
-describe('scheduledEnd', () => {
-	it('names the day a cancelled subscription stops', async () => {
-		subscriptionsRetrieve.mockResolvedValue({ cancel_at: 1735689600, cancel_at_period_end: true });
-		const { scheduledEnd } = await import('./stripe');
-		expect(await scheduledEnd('sub_1')).toBe(new Date(1735689600 * 1000).toISOString());
+describe('seatSubscription', () => {
+	it('reads the per-editor item, its quantity, the status and a scheduled end', async () => {
+		subscriptionsRetrieve.mockResolvedValue({
+			status: 'active',
+			cancel_at: 1735689600,
+			items: { data: [{ id: 'si_1', quantity: 3, price: { lookup_key: 'feega_monthly_9' } }] }
+		});
+		const { seatSubscription } = await import('./stripe');
+
+		expect(await seatSubscription('sub_1')).toEqual({
+			itemId: 'si_1',
+			quantity: 3,
+			perEditor: true,
+			status: 'active',
+			endsAt: new Date(1735689600 * 1000).toISOString()
+		});
 	});
 
-	it('is null while the subscription renews', async () => {
-		subscriptionsRetrieve.mockResolvedValue({ cancel_at: null, cancel_at_period_end: false });
-		const { scheduledEnd } = await import('./stripe');
-		expect(await scheduledEnd('sub_1')).toBeNull();
+	it('marks a subscription on a retired price as not per editor', async () => {
+		subscriptionsRetrieve.mockResolvedValue({ status: 'active', cancel_at: null, items: { data: [{ id: 'si_8', quantity: 1, price: { lookup_key: 'feega_monthly_8' } }] } });
+		const { seatSubscription } = await import('./stripe');
+
+		expect(await seatSubscription('sub_1')).toMatchObject({ perEditor: false, endsAt: null });
 	});
 });
 
 describe('setSeatQuantity', () => {
-	it('sets the item quantity and invoices the prorated difference at once', async () => {
-		subscriptionsRetrieve.mockResolvedValue({ items: { data: [{ id: 'si_1', quantity: 2 }] } });
-		const { setSeatQuantity } = await import('./stripe');
+	it('charges the prorated difference at once when asked to invoice', async () => {
+		const { setSeatQuantity, SeatProration } = await import('./stripe');
 
-		await setSeatQuantity('sub_1', 3);
+		await setSeatQuantity('sub_1', 'si_1', 3, SeatProration.Invoice);
 
-		expect(subscriptionsUpdate).toHaveBeenCalledWith('sub_1', {
-			items: [{ id: 'si_1', quantity: 3 }],
-			proration_behavior: 'always_invoice'
-		});
+		expect(subscriptionsUpdate).toHaveBeenCalledWith('sub_1', { items: [{ id: 'si_1', quantity: 3 }], proration_behavior: 'always_invoice' });
 	});
 
-	it('does nothing when Stripe already bills that many seats', async () => {
-		subscriptionsRetrieve.mockResolvedValue({ items: { data: [{ id: 'si_1', quantity: 3 }] } });
-		const { setSeatQuantity } = await import('./stripe');
+	it('changes the quantity without any proration otherwise', async () => {
+		const { setSeatQuantity, SeatProration } = await import('./stripe');
 
-		await setSeatQuantity('sub_1', 3);
+		await setSeatQuantity('sub_1', 'si_1', 2, SeatProration.None);
 
-		expect(subscriptionsUpdate).not.toHaveBeenCalled();
+		expect(subscriptionsUpdate).toHaveBeenCalledWith('sub_1', { items: [{ id: 'si_1', quantity: 2 }], proration_behavior: 'none' });
 	});
 });
 

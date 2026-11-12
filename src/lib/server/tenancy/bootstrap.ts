@@ -7,8 +7,9 @@ import { hashInviteToken, inviteStatus, LINK_INVITE_EMAIL } from '$lib/server/re
 import type { OrgRole } from '$lib/server/repos/orgs';
 import { assertFreeOrgLimit } from '$lib/server/tenancy/free-org-limit';
 import { OrgRoleName } from '$lib/org-roles';
-import { needsSeat, SeatPlan, seatPlanOf } from '$lib/server/team/seats';
-import { syncSeats } from '$lib/server/team/seat-billing';
+import { needsSeat } from '$lib/server/team/seats';
+import { editorSeatGate, SeatGate, SeatSync, syncSeats } from '$lib/server/team/seat-billing';
+import { tellOwnerOfSeat } from '$lib/server/team/seat-mail';
 
 /**
  * I DUE MOMENTI IN CUI L'APPARTENENZA STA NASCENDO.
@@ -197,8 +198,8 @@ export async function acceptInviteWith(
     throw insertError;
   }
 
-  if (needsSeat(role)) {
-    await syncSeats(db, invite.org_id);
+  if (needsSeat(role) && (await syncSeats(db, invite.org_id)) === SeatSync.Charged) {
+    await tellOwnerOfSeat(db, { orgId: invite.org_id, editorEmail: input.email });
   }
 
   if (isLink) {
@@ -218,8 +219,10 @@ export async function acceptInviteWith(
   return { outcome: 'accepted', orgId: invite.org_id, role: role as OrgRole };
 }
 
+const SEATED: ReadonlySet<SeatGate> = new Set([SeatGate.Charged, SeatGate.Included]);
+
 async function seatedRole(db: Db, orgId: string, role: string): Promise<string> {
-  if (!needsSeat(role) || (await seatPlanOf(db, orgId)) === SeatPlan.Paid) {
+  if (!needsSeat(role) || SEATED.has(await editorSeatGate(db, orgId))) {
     return role;
   }
   return OrgRoleName.Viewer;

@@ -85,8 +85,8 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
   },
   {
     path: 'src/lib/server/tenancy/bootstrap.ts — acceptInvite',
-    why: "Chi accetta non è ancora membro di quell'org: auth_org_ids() non la contiene, e la policy org_isolation su orgs_invites nasconderebbe l'invito proprio a chi lo sta usando. L'org_id non arriva da fuori, si LEGGE dalla riga trovata per impronta del token; il token in chiaro non è mai salvato e scaduto, inesistente o già speso rispondono tutti allo stesso modo. Legge anche credit_ledger (assertFreeOrgLimit): lo stesso limite di org gratuite di createFirstOrg si applica anche a un invito accettato.",
-    tables: ['orgs_invites', 'orgs_members', 'credit_ledger']
+    why: "Chi accetta non è ancora membro di quell'org: auth_org_ids() non la contiene, e la policy org_isolation su orgs_invites nasconderebbe l'invito proprio a chi lo sta usando. L'org_id non arriva da fuori, si LEGGE dalla riga trovata per impronta del token; il token in chiaro non è mai salvato e scaduto, inesistente o già speso rispondono tutti allo stesso modo. Legge anche credit_ledger (assertFreeOrgLimit): lo stesso limite di org gratuite di createFirstOrg si applica anche a un invito accettato. Accepting an editor reads orgs (the seat state) and, when a seat is charged, the owner's email in profiles to tell them.",
+    tables: ['orgs_invites', 'orgs_members', 'credit_ledger', 'orgs', 'profiles']
   },
   {
     path: 'src/routes/api/v1/billing/seats/reconcile — the hourly seat reconcile cron',

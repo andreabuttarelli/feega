@@ -22,3 +22,17 @@ Discarded: grandfathering every cancelled team (a team could add ten editors, ca
 them free); granting a new seat's credits only from the next renewal (paying for a seat that
 brings nothing reads as a bug); a lazy reconcile on page loads, since the Vercel cron already
 exists.
+
+Review fixes (same PR):
+- Add/remove loops minted credits: a decrease with `always_invoice` left a customer balance that
+  paid the next increase, and every increase granted again. Decreases now use no proration, the
+  ledger keeps `seats_paid` for the period, and only seats above it are charged and granted, from
+  the amount charged after discounts, in euros only.
+- A subscription on a retired price is never synced; its team adds editors at no charge.
+- `unpaid`/`paused` no longer demote; `past_due` blocks new editors.
+- One migration file instead of three; unreadable seat state now fails closed.
+- Only a role with Billing (the owner) can add a paid editor; the owner gets an email when an
+  accepted invite adds a seat.
+- The reconcile cron handles 40 teams per run, oldest first, and answers 502 on a failure.
+- Retired store products (`feega_monthly_8..256`, `feega_pack_8..256`) still resolve, so a store
+  renewal or refund on one is not dropped.

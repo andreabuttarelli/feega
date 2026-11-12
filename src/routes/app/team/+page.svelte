@@ -9,6 +9,7 @@
   import PageHead from '$lib/components/PageHead.svelte';
   import PageTitle from '$lib/components/PageTitle.svelte';
   import { BILLING_PATH } from '$lib/billing-path';
+  import { editorInviteHint, membersLine, planEndNotice } from '$lib/team-seat-copy';
 
   let { data } = $props();
 
@@ -67,9 +68,9 @@
 
 {#if notice}<Notice tone={notice.tone}>{notice.text}</Notice>{/if}
 
-{#if seats.endsAt}
-  <Notice>The plan ends on {new Date(seats.endsAt).toLocaleDateString()}. {seats.editors - 1} editors become viewers then; they keep access and become editors again when the team pays.</Notice>
-{:else if seats.grandfathered && !seats.paid}
+{#if planEndNotice(seats, (d) => new Date(d).toLocaleDateString())}
+  <Notice>{planEndNotice(seats, (d) => new Date(d).toLocaleDateString())}</Notice>
+{:else if seats?.grandfathered && !seats.paid}
   <Notice>This team keeps its {seats.editors} editors from before editors became paid seats. Adding an editor needs the plan.</Notice>
 {/if}
 
@@ -84,11 +85,8 @@
     </form>
     {#if editorRole(inviteRole)}
       <p class="m-0 text-[0.8125rem] text-muted-foreground" data-testid="team-seat-cost">
-        {#if seats.paid}
-          Adds €{seats.pricePerEditor}/month when they accept, prorated for the rest of this month.
-        {:else}
-          Editors need the plan (€{seats.pricePerEditor} per editor per month). <a href={BILLING_PATH}>Subscribe</a>, or invite as a viewer: viewers are free.
-        {/if}
+        {editorInviteHint(seats, can(team.role, OrgAction.Billing))}
+        {#if seats?.billing === 'free'}<a href={BILLING_PATH}>Subscribe</a>{/if}
       </p>
     {/if}
 
@@ -116,7 +114,7 @@
   </Panel>
 {/if}
 
-<Panel title="Members" description={seats.paid ? `${seats.editors} editors · €${seats.pricePerEditor} × ${seats.editors} = €${seats.pricePerEditor * seats.editors} / month` : `${seats.editors} editors`}>
+<Panel title="Members" description={membersLine(seats)}>
   {#each team.members as m (m.userId)}
     <div class="flex items-center justify-between gap-3" data-testid="team-member">
       <div class="min-w-0">

@@ -1,15 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const setSeatQuantity = vi.fn();
-const scheduledEnd = vi.fn();
+const seatSubscription = vi.fn();
 vi.mock('$lib/server/stripe', () => ({
+  SeatProration: { None: 'none', Invoice: 'always_invoice' },
   setSeatQuantity: (...args: unknown[]) => setSeatQuantity(...args),
-  scheduledEnd: (...args: unknown[]) => scheduledEnd(...args)
+  seatSubscription: (...args: unknown[]) => seatSubscription(...args)
 }));
+
+const perEditor = (extra: Record<string, unknown> = {}) => ({ itemId: 'si_1', quantity: 3, perEditor: true, status: 'active', endsAt: null, ...extra });
 
 beforeEach(() => {
   setSeatQuantity.mockReset().mockResolvedValue(undefined);
-  scheduledEnd.mockReset().mockResolvedValue(null);
+  seatSubscription.mockReset().mockResolvedValue(perEditor());
 });
 import { fakeDb, type Call } from '$lib/server/db/fake-db';
 import { listTeam, runTeamOp, TeamOp, TeamRefusal, type TeamCtx } from '$lib/server/team/team';
@@ -169,15 +172,55 @@ describe('the subscription follows the editors', () => {
 
     await runTeamOp(ctx, { op: TeamOp.SetRole, userId: VIEWER, role: 'member' });
 
-    expect(setSeatQuantity).toHaveBeenCalledWith('sub_1', 4);
+    expect(setSeatQuantity).toHaveBeenCalledWith('sub_1', 'si_1', 4, 'always_invoice');
   });
 
-  it('removing an editor bills one seat less', async () => {
+  it('removing an editor lowers the quantity without a credit: the seat stays paid this period', async () => {
+    seatSubscription.mockResolvedValue(perEditor({ quantity: 4 }));
     const { ctx } = ctxFor(OWNER, paid);
 
     await runTeamOp(ctx, { op: TeamOp.RemoveMember, userId: MEMBER });
 
-    expect(setSeatQuantity).toHaveBeenCalledWith('sub_1', expect.any(Number));
+    expect(setSeatQuantity).toHaveBeenCalledWith('sub_1', 'si_1', expect.any(Number), 'none');
+  });
+
+  it('an admin may invite a viewer to a paying team, but only the owner adds a paid editor', async () => {
+    const admin = ctxFor(ADMIN, paid).ctx;
+
+    expect((await runTeamOp(admin, { op: TeamOp.Invite, email: 'v@x.it', role: 'viewer' })).ok).toBe(true);
+    expect(await runTeamOp(admin, { op: TeamOp.Invite, email: 'e@x.it', role: 'member' })).toMatchObject({ ok: false, refusal: TeamRefusal.BillingOnly });
+    expect(await runTeamOp(admin, { op: TeamOp.SetRole, userId: VIEWER, role: 'member' })).toMatchObject({ ok: false, refusal: TeamRefusal.BillingOnly });
+    expect((await runTeamOp(ctxFor(OWNER, paid).ctx, { op: TeamOp.Invite, email: 'e@x.it', role: 'member' })).ok).toBe(true);
+  });
+
+  it('a past-due team adds no editor until it pays', async () => {
+    seatSubscription.mockResolvedValue(perEditor({ status: 'past_due' }));
+
+    expect(await runTeamOp(ctxFor(OWNER, paid).ctx, { op: TeamOp.Invite, email: 'e@x.it', role: 'member' })).toMatchObject({
+      ok: false,
+      refusal: TeamRefusal.SeatLimit,
+      detail: { message: expect.stringMatching(/past due/i) }
+    });
+  });
+
+  it('a team on a retired per-team price adds editors without any charge', async () => {
+    seatSubscription.mockResolvedValue(perEditor({ perEditor: false, quantity: 1 }));
+    const admin = ctxFor(ADMIN, paid).ctx;
+
+    expect((await runTeamOp(admin, { op: TeamOp.Invite, email: 'e@x.it', role: 'member' })).ok).toBe(true);
+    await runTeamOp(admin, { op: TeamOp.SetRole, userId: VIEWER, role: 'member' });
+    expect(setSeatQuantity).not.toHaveBeenCalled();
+  });
+
+  it('seat state that cannot be read adds no editor', async () => {
+    const { ctx } = ctxFor(OWNER, paid);
+    const realFrom = ctx.db.from.bind(ctx.db);
+    Object.assign(ctx.db, {
+      from: (table: string) =>
+        table === 'orgs' ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: { message: 'column orgs.seats_paid does not exist' } }) }) }) } : realFrom(table as never)
+    });
+
+    await expect(runTeamOp(ctx, { op: TeamOp.Invite, email: 'e@x.it', role: 'member' })).rejects.toThrow(/seat state unreadable/);
   });
 
   it('changing a viewer does not touch the bill', async () => {
@@ -283,19 +326,38 @@ describe('la squadra', () => {
   it('says how many editors the team pays for, and whether it pays', async () => {
     const { ctx } = ctxFor(OWNER);
 
-    expect((await listTeam(ctx))?.seats).toEqual({ editors: 3, paid: false, grandfathered: false, endsAt: null, pricePerEditor: 9 });
+    expect((await listTeam(ctx))?.seats).toEqual({ editors: 3, paid: false, billing: 'free', pastDue: false, grandfathered: false, endsAt: null, pricePerEditor: 9 });
   });
 
   it('a grandfathered free team says so', async () => {
     const { ctx } = ctxFor(OWNER, { orgs: [{ id: ORG, name: 'Acme', slug: 'acme', editor_seats_grandfathered_at: '2026-11-13T00:00:00Z' }] });
 
-    expect((await listTeam(ctx))?.seats.grandfathered).toBe(true);
+    expect((await listTeam(ctx))?.seats?.grandfathered).toBe(true);
   });
 
   it('a paid team that cancelled says when its editors become viewers', async () => {
-    scheduledEnd.mockResolvedValue('2026-12-13T00:00:00.000Z');
+    seatSubscription.mockResolvedValue(perEditor({ endsAt: '2026-12-13T00:00:00.000Z' }));
     const { ctx } = ctxFor(OWNER, { orgs: [{ id: ORG, name: 'Acme', slug: 'acme', stripe_subscription_id: 'sub_1' }] });
 
-    expect((await listTeam(ctx))?.seats).toMatchObject({ paid: true, endsAt: '2026-12-13T00:00:00.000Z' });
+    expect((await listTeam(ctx))?.seats).toMatchObject({ paid: true, billing: 'per_editor', endsAt: '2026-12-13T00:00:00.000Z' });
+  });
+
+  it('a legacy per-team subscriber is told nothing about a per-editor price', async () => {
+    seatSubscription.mockResolvedValue(perEditor({ perEditor: false }));
+    const { ctx } = ctxFor(OWNER, { orgs: [{ id: ORG, name: 'Acme', slug: 'acme', stripe_subscription_id: 'sub_legacy' }] });
+
+    expect((await listTeam(ctx))?.seats).toMatchObject({ paid: true, billing: 'legacy' });
+  });
+
+  it('the team still lists when seat state cannot be read, with seats unknown', async () => {
+    const { ctx } = ctxFor(OWNER);
+    const realFrom = ctx.db.from.bind(ctx.db);
+    Object.assign(ctx.db, {
+      from: (table: string) =>
+        table === 'orgs' ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: { message: 'missing column' } }) }) }) } : realFrom(table as never)
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect((await listTeam(ctx))?.seats).toBeNull();
   });
 });

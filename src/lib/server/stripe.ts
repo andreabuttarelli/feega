@@ -38,22 +38,32 @@ export async function subscribedPlan(subscriptionId: string): Promise<Plan | nul
   return planForLookupKey(sub.items.data[0]?.price.lookup_key) ?? null;
 }
 
-export async function scheduledEnd(subscriptionId: string): Promise<string | null> {
-  const sub = await stripe().subscriptions.retrieve(subscriptionId);
-  return sub.cancel_at ? new Date(sub.cancel_at * 1000).toISOString() : null;
+export enum SeatProration {
+  None = 'none',
+  Invoice = 'always_invoice'
 }
 
-export async function setSeatQuantity(subscriptionId: string, quantity: number): Promise<void> {
+export type SeatSubscription = { itemId: string; quantity: number; perEditor: boolean; status: string; endsAt: string | null };
+
+export async function seatSubscription(subscriptionId: string): Promise<SeatSubscription | null> {
   const sub = await stripe().subscriptions.retrieve(subscriptionId);
-  const item = sub.items.data[0];
-  if (!item || item.quantity === quantity) {
-    return;
+  const items = sub.items.data;
+  const item = items.find((i) => i.price.lookup_key === PLAN.lookupKey) ?? items[0];
+  if (!item) {
+    return null;
   }
 
-  await stripe().subscriptions.update(subscriptionId, {
-    items: [{ id: item.id, quantity }],
-    proration_behavior: 'always_invoice'
-  });
+  return {
+    itemId: item.id,
+    quantity: item.quantity ?? 1,
+    perEditor: item.price.lookup_key === PLAN.lookupKey,
+    status: sub.status,
+    endsAt: sub.cancel_at ? new Date(sub.cancel_at * 1000).toISOString() : null
+  };
+}
+
+export async function setSeatQuantity(subscriptionId: string, itemId: string, quantity: number, proration: SeatProration): Promise<void> {
+  await stripe().subscriptions.update(subscriptionId, { items: [{ id: itemId, quantity }], proration_behavior: proration });
 }
 
 /**

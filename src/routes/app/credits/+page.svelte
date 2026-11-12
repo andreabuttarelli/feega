@@ -49,7 +49,7 @@
   <Notice>{$_('app.account.billing.checkoutCanceled')}</Notice>
 {/if}
 
-{#if data.seats.endsAt}
+{#if data.seats?.endsAt}
   <Notice>{$_('app.account.billing.planEnds', { values: { date: new Date(data.seats.endsAt).toLocaleDateString(), editors: data.seats.editors - 1 } })}</Notice>
 {/if}
 
@@ -86,13 +86,13 @@
           <tbody>
             <tr>
               <td>
-                {#if data.currentPlan}
+                {#if data.currentPlan && data.seats?.billing === 'per_editor'}
                   {$_('app.account.billing.planTotal', { values: { price: plan.price, editors: data.seats.editors, total: plan.price * data.seats.editors } })}
                 {:else}
                   {$_('app.account.billing.planPrice', { values: { price: plan.price } })}
                 {/if}
               </td>
-              <td>{$_('app.account.billing.creditsIncluded', { values: { credits: formatCredits(plan.credits * (data.currentPlan ? data.seats.editors : 1)) } })}</td>
+              <td>{$_('app.account.billing.creditsIncluded', { values: { credits: formatCredits(plan.credits * (data.currentPlan && data.seats?.billing === 'per_editor' ? data.seats.editors : 1)) } })}</td>
               <td>
                 {#if data.currentPlan}
                   <span class="flex items-center gap-2">
@@ -101,7 +101,7 @@
                       <form method="POST" action={`?/billingPortal`} use:apiEnhance><Button variant="secondary" size="sm" type="submit">{$_('app.account.billing.manage')}</Button></form>
                     {/if}
                   </span>
-                  {#if data.seats.editors > 1 && !data.seats.endsAt}
+                  {#if data.seats && data.seats.editors > 1 && !data.seats.endsAt}
                     <span class="block text-[0.8125rem] text-muted-foreground" data-testid="credits-cancel-warning">{$_('app.account.billing.cancelWarning', { values: { editors: data.seats.editors - 1 } })}</span>
                   {/if}
                 {:else}

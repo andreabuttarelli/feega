@@ -2,16 +2,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeDb } from '$lib/server/db/fake-db';
 
 const setSeatQuantity = vi.fn();
-vi.mock('$lib/server/stripe', () => ({ setSeatQuantity: (...args: unknown[]) => setSeatQuantity(...args) }));
+const seatSubscription = vi.fn();
+vi.mock('$lib/server/stripe', () => ({
+  SeatProration: { None: 'none', Invoice: 'always_invoice' },
+  setSeatQuantity: (...args: unknown[]) => setSeatQuantity(...args),
+  seatSubscription: (...args: unknown[]) => seatSubscription(...args)
+}));
 
-import { syncSeats, SeatSync } from './seat-billing';
+import { editorSeatGate, SeatGate, seatSteps, syncSeats, SeatSync } from './seat-billing';
 
 const ORG = 'org-1';
+const LATER = '2099-01-01T00:00:00Z';
 
-const team = (subscription: string | null) =>
+const team = (org: Record<string, unknown>) =>
   fakeDb(
     {
-      orgs: [{ id: ORG, stripe_subscription_id: subscription }],
+      orgs: [{ id: ORG, ...org }],
       orgs_members: [
         { org_id: ORG, user_id: 'a', role: 'owner' },
         { org_id: ORG, user_id: 'b', role: 'admin' },
@@ -23,25 +29,80 @@ const team = (subscription: string | null) =>
     { filter: true }
   ).db;
 
+const perEditor = (quantity: number, extra: Record<string, unknown> = {}) => ({ itemId: 'si_1', quantity, perEditor: true, status: 'active', endsAt: null, ...extra });
+
+const unreadable = () => ({ from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: { message: 'column orgs.seats_paid does not exist' } }) }) }) }) }) as never;
+
 beforeEach(() => {
   setSeatQuantity.mockReset().mockResolvedValue(undefined);
+  seatSubscription.mockReset();
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
+describe('seatSteps — what Stripe is asked to change', () => {
+  it.each([
+    ['nothing when Stripe already bills the editors', { quantity: 3, paid: 3, editors: 3 }, []],
+    ['a removed editor lowers the quantity without any credit: the seat stays paid this period', { quantity: 3, paid: 3, editors: 2 }, [[2, 'none']]],
+    ['an editor re-added within the seats paid this period costs nothing', { quantity: 2, paid: 3, editors: 3 }, [[3, 'none']]],
+    ['an editor beyond the seats paid this period is charged', { quantity: 3, paid: 3, editors: 4 }, [[4, 'always_invoice']]],
+    ['first the paid seats come back free, then only the new one is charged', { quantity: 1, paid: 3, editors: 4 }, [[3, 'none'], [4, 'always_invoice']]]
+  ])('%s', (_name, now, steps) => {
+    expect(seatSteps(now).map((s) => [s.quantity, s.proration])).toEqual(steps);
+  });
+});
+
 describe('syncSeats', () => {
-  it('bills one seat per human editor of this team; viewers and other teams do not count', async () => {
-    expect(await syncSeats(team('sub_1'), ORG)).toBe(SeatSync.Synced);
-    expect(setSeatQuantity).toHaveBeenCalledWith('sub_1', 3);
+  it('charges one more seat when the editors exceed what this period paid for', async () => {
+    seatSubscription.mockResolvedValue(perEditor(2));
+
+    expect(await syncSeats(team({ stripe_subscription_id: 'sub_1', seats_paid: 2, seats_paid_until: LATER }), ORG)).toBe(SeatSync.Charged);
+    expect(setSeatQuantity).toHaveBeenCalledWith('sub_1', 'si_1', 3, 'always_invoice');
   });
 
-  it('never calls Stripe for a team without a subscription', async () => {
-    expect(await syncSeats(team(null), ORG)).toBe(SeatSync.Unbilled);
+  it('never touches a subscription on a retired price', async () => {
+    seatSubscription.mockResolvedValue(perEditor(1, { perEditor: false }));
+
+    expect(await syncSeats(team({ stripe_subscription_id: 'sub_legacy' }), ORG)).toBe(SeatSync.Legacy);
     expect(setSeatQuantity).not.toHaveBeenCalled();
   });
 
-  it('a Stripe failure never undoes the member change: it reports Failed for the reconcile cron', async () => {
-    setSeatQuantity.mockRejectedValue(new Error('down'));
+  it('never calls Stripe for a team without a subscription', async () => {
+    expect(await syncSeats(team({ stripe_subscription_id: null }), ORG)).toBe(SeatSync.Unbilled);
+    expect(seatSubscription).not.toHaveBeenCalled();
+  });
 
-    expect(await syncSeats(team('sub_1'), ORG)).toBe(SeatSync.Failed);
+  it('a Stripe failure never undoes the member change: it reports Failed for the reconcile cron', async () => {
+    seatSubscription.mockRejectedValue(new Error('down'));
+
+    expect(await syncSeats(team({ stripe_subscription_id: 'sub_1' }), ORG)).toBe(SeatSync.Failed);
+  });
+
+  it('seat state it cannot read is an error, never "no subscription"', async () => {
+    await expect(syncSeats(unreadable(), ORG)).rejects.toThrow(/seats_paid/);
+  });
+});
+
+describe('editorSeatGate — may one more editor be added, and is it charged?', () => {
+  it('a free team adds no editor', async () => {
+    expect(await editorSeatGate(team({ stripe_subscription_id: null }), ORG)).toBe(SeatGate.Free);
+  });
+
+  it('a per-editor team is charged', async () => {
+    seatSubscription.mockResolvedValue(perEditor(3));
+    expect(await editorSeatGate(team({ stripe_subscription_id: 'sub_1' }), ORG)).toBe(SeatGate.Charged);
+  });
+
+  it('a team on a retired per-team price adds editors at no charge', async () => {
+    seatSubscription.mockResolvedValue(perEditor(1, { perEditor: false }));
+    expect(await editorSeatGate(team({ stripe_subscription_id: 'sub_legacy' }), ORG)).toBe(SeatGate.Included);
+  });
+
+  it('a past-due team adds no editor until it pays', async () => {
+    seatSubscription.mockResolvedValue(perEditor(3, { status: 'past_due' }));
+    expect(await editorSeatGate(team({ stripe_subscription_id: 'sub_1' }), ORG)).toBe(SeatGate.PastDue);
+  });
+
+  it('seat state it cannot read refuses loudly', async () => {
+    await expect(editorSeatGate(unreadable(), ORG)).rejects.toThrow();
   });
 });
