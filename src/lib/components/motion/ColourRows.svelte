@@ -17,8 +17,9 @@
   }
 
   function swap(from: string, to: string) {
-    rowOf.set(to, keyOf(from));
+    const key = keyOf(from);
     rowOf.delete(from);
+    rowOf.set(to, key);
     onswap(from, to);
   }
 </script>

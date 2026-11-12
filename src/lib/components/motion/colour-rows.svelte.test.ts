@@ -73,6 +73,14 @@ describe('selection colour rows', () => {
     expect(focusedSwatch()).toBe(true);
   });
 
+  it('keep focus when the swatch picked is the colour the row already has', () => {
+    show([{ colour: TOKEN, count: 2 }]);
+
+    pickFrom(TOKEN, colourLabel(TOKEN));
+
+    expect(focusedSwatch()).toBe(true);
+  });
+
   it('give a colour that comes back after a swap a row of its own', () => {
     const props = show([{ colour: '#ff0000', count: 2 }]);
     pickFrom('#ff0000', colourLabel(TOKEN));
