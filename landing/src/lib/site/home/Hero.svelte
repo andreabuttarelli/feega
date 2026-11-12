@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CANVAS_VIDEO } from '../home';
+  import { CANVAS_VIDEO, HERO_HEADLINE } from '../home';
   import { lazyPlay } from '../lazy-video';
   import NpxChip from './NpxChip.svelte';
   import HeroPrompt from './HeroPrompt.svelte';
@@ -16,7 +16,7 @@
 <section class="hero" id="hero">
   <AsciiField />
 
-  <h1><span data-agent-id="hero-title-a">Design inside your code</span> <span data-agent-id="hero-title-b">with your agents and team.</span></h1>
+  <h1><span data-agent-id="hero-title-a">{HERO_HEADLINE[0]}</span> <span data-agent-id="hero-title-b">{HERO_HEADLINE[1]}</span></h1>
 
   <p class="lead" data-agent-id="hero-lead">Feega is an open-source canvas to design, animate and generate. Start from your repo, Figma or any website.</p>
 

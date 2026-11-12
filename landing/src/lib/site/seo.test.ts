@@ -1,3 +1,5 @@
+import { readFileSync, statSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { LANDING_PAGES } from './landing';
 import { UPSCALER } from './landing/upscaler';
@@ -8,8 +10,8 @@ import { GUIDES, GUIDES_INDEX } from './guides';
 import { competitorFaq } from './compare/faq';
 import { AI_CRAWLERS } from './crawlers';
 import { GET as robots } from '../../routes/robots.txt/+server';
-import { FAQ } from './home';
-import { HOME_META } from './seo';
+import { FAQ, HERO_HEADLINE } from './home';
+import { HOME_META, OG } from './seo';
 import { breadcrumbJsonLd, faqJsonLd, HOME_JSON_LD } from './structured-data';
 import { llmsFullTxt, llmsTxt } from './llms';
 import { SITE_PATHS } from './paths';
@@ -121,5 +123,53 @@ describe('robots.txt', () => {
 describe('organization markup', () => {
   it('links the organization to its profiles', () => {
     expect(HOME_JSON_LD).toContain('"sameAs":["https://github.com/andreabuttarelli/feega"');
+  });
+});
+
+const STATIC_DIR = resolve(import.meta.dirname, '../../../static');
+const LAYOUT = readFileSync(resolve(import.meta.dirname, '../../routes/+layout.svelte'), 'utf8');
+const KB = 1024;
+const PNG_WIDTH_AT = 16;
+const TKHD_WIDTH_AT = 80;
+const FIXED_POINT = 65536;
+
+const staticFile = (url: string) => resolve(STATIC_DIR, new URL(url).pathname.slice(1));
+
+function pngSize(file: string) {
+  const bytes = readFileSync(file);
+  return { width: bytes.readUInt32BE(PNG_WIDTH_AT), height: bytes.readUInt32BE(PNG_WIDTH_AT + 4) };
+}
+
+function mp4Size(file: string) {
+  const bytes = readFileSync(file);
+  const at = bytes.indexOf('tkhd') + TKHD_WIDTH_AT;
+  return { width: bytes.readUInt32BE(at) / FIXED_POINT, height: bytes.readUInt32BE(at + 4) / FIXED_POINT };
+}
+
+describe('social preview', () => {
+  it('the image is a PNG of the declared size, small enough for every crawler', () => {
+    expect(OG.image.type).toBe('image/png');
+    expect(pngSize(staticFile(OG.image.url))).toEqual({ width: OG.image.width, height: OG.image.height });
+    expect(statSync(staticFile(OG.image.url)).size).toBeLessThan(300 * KB);
+  });
+
+  it('the video is an MP4 of the declared size, under 4 MB', () => {
+    expect(OG.video.type).toBe('video/mp4');
+    expect(mp4Size(staticFile(OG.video.url))).toEqual({ width: OG.video.width, height: OG.video.height });
+    expect(statSync(staticFile(OG.video.url)).size).toBeLessThan(4 * KB * KB);
+  });
+
+  it('every page inherits absolute image and video urls from the layout', () => {
+    expect(OG.image.url).toMatch(/^https:\/\/feega\.app\//);
+    expect(OG.video.url).toMatch(/^https:\/\/feega\.app\//);
+    for (const tag of ['og:image', 'og:image:width', 'og:image:height', 'og:image:type', 'og:image:alt', 'og:video', 'og:video:secure_url', 'og:video:type', 'og:video:width', 'og:video:height', 'twitter:image', 'twitter:image:alt']) {
+      expect(LAYOUT).toContain(`"${tag}"`);
+    }
+    expect(LAYOUT).toContain('content="summary_large_image"');
+  });
+
+  it('the alt text says what Feega is, in the hero headline', () => {
+    expect(OG.image.alt).toMatch(/^Feega/);
+    expect(OG.image.alt).toContain(HERO_HEADLINE.join(' '));
   });
 });

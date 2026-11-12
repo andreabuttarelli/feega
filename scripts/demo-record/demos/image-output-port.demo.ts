@@ -4,7 +4,7 @@ import { test, expect, gotoHydrated } from '../../../tests/e2e/fixtures/session'
 import { newClip, newMotionDoc, MotionFormat } from '@feega/motion-core/motion/doc';
 import { installCursor, recordDemo } from '../record';
 
-const PICTURE = readFileSync('static/og.png');
+const PICTURE = readFileSync('landing/static/og.png');
 const ELEMENT_SIDE = 260;
 const OUTPUT_PORT = { x: 625, y: 400 };
 const IMAGES_INPUT = { x: 875, y: 510 };
