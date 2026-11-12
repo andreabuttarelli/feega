@@ -6,7 +6,12 @@ export type GpuApi = { GPUDevice?: { prototype: Proto }; GPUTexture?: { prototyp
 
 type Queue = { onSubmittedWorkDone: () => Promise<void> };
 
-export type GpuCounters = { textureBytes: number; textures: number; bufferBytes: number; buffers: number; created: number; submits: number; lagMs: number; wasm: WebAssembly.Memory[]; queue: Queue | null; polling: boolean };
+export enum TextureChange {
+  Created = 'created',
+  Destroyed = 'destroyed'
+}
+
+export type GpuCounters = { textureBytes: number; textures: number; bufferBytes: number; buffers: number; created: number; submits: number; lagMs: number; wasm: WebAssembly.Memory[]; queue: Queue | null; polling: boolean; watch?: (bytes: number, change: TextureChange) => void };
 
 const BYTES_PER_TEXEL: [RegExp, number][] = [
   [/32float/, 16],
@@ -31,6 +36,7 @@ function counted(device: Proto, counters: GpuCounters, sizes: WeakMap<object, nu
     counters.textureBytes += bytes;
     counters.textures++;
     counters.created++;
+    counters.watch?.(bytes, TextureChange.Created);
     return texture;
   };
 }
@@ -43,6 +49,7 @@ function released(texture: Proto, counters: GpuCounters, sizes: WeakMap<object, 
       sizes.delete(this);
       counters.textureBytes -= bytes;
       counters.textures--;
+      counters.watch?.(bytes, TextureChange.Destroyed);
     }
     return destroy.call(this);
   };

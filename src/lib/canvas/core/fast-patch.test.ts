@@ -45,6 +45,13 @@ describe('fastPatch draws a simple edit without rebuilding the frame', () => {
     expect(fastPatch(drawn(before), before, after)).toEqual(drawn(after));
   });
 
+  it('fading a layer already drawn as one group fades the group as the full build does', () => {
+    const before = edit(built(['a']), 'a', (c) => ({ ...faded(0.8)(c), props: { ...c.props, fills: [{ type: 'solid', color: '#ff6a3d' }, { type: 'solid', color: '#0000ff80' }] } }));
+    const after = edit(before, 'a', faded(0.4));
+
+    expect(fastPatch(drawn(before), before, after)).toEqual(drawn(after));
+  });
+
   it('hiding a layer drops its items as the full build does', () => {
     const before = nested();
     const after = edit(before, 'card', hidden);

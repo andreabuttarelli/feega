@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pollLag, probeGpu, type GpuApi } from './gpu-probe';
+import { TextureChange, pollLag, probeGpu, type GpuApi } from './gpu-probe';
 
 type Texture = { destroy: () => void };
 
@@ -55,6 +55,20 @@ describe('the GPU probe', () => {
 
     expect(gpu.buffers).toBe(1);
     expect(gpu.bufferBytes).toBe(4096);
+  });
+
+  it('tells a watcher each texture made and destroyed, with its bytes', () => {
+    const api = fakeGpu();
+    const gpu = probeGpu(api);
+    const seen: [number, TextureChange][] = [];
+    gpu.watch = (bytes, change) => seen.push([bytes, change]);
+
+    new api.GPUDevice().createTexture({ size: [8, 8], format: 'rgba8unorm' }).destroy();
+
+    expect(seen).toEqual([
+      [256, TextureChange.Created],
+      [256, TextureChange.Destroyed]
+    ]);
   });
 
   it('counts submits', () => {
