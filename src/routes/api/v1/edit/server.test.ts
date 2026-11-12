@@ -8,6 +8,7 @@ const NODE = 'node-1';
 
 const state = vi.hoisted(() => ({ writeAllowed: true, db: null as unknown, rows: [] as Record<string, unknown>[] }));
 
+vi.mock('$lib/server/agent-edits/cap', () => ({ agentEditCap: async () => null, AGENT_EDIT_CAP_STATUS: 402 }));
 vi.mock('$lib/server/org-data/auth', () => ({ resolveOrgCaller: async () => ({ caller: { db: state.db, orgId: ORG, userId: 'u-1', writeAllowed: state.writeAllowed } }) }));
 vi.mock('$lib/server/org-data/reach', () => ({ callerReach: async () => null }));
 vi.mock('$lib/server/cli-auth', () => ({ gateOrgAiAction: async () => undefined }));

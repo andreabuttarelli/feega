@@ -334,6 +334,8 @@ organisation gets the free monthly credits; past the free limit the answer says 
 `list_team` shows members, pending invites and the invite link; `team_op` also `invite` (email,
 role admin/member/viewer), `resend_invite`, `revoke_invite`, `invite_link` (anyone with it joins
 as viewer), `disable_invite_link`, `set_role`, `remove_member`, `leave`, `transfer_ownership`.
+On a free organisation agents may create or change 1,000 layers a week; past that every write answers
+`agent_edit_cap` (402) with `resets_at` and `upgrade_path`: tell the user in those words, never retry.
 Viewers see everything and change nothing and are free; a free organisation has one editor, and
 each more editor is a paid seat (€9/month from acceptance; a `seat_limit` answer carries `upgrade_path`). CLI: `feega orgs`, `feega orgs use <orgId>`,
 `feega orgs create <name>`, `feega team [invite|resend|revoke|link|link-off|role|remove|leave|transfer]`.

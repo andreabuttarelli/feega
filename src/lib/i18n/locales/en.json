@@ -394,6 +394,8 @@
         "planPrice": "€{price} / editor / month",
         "planTotal": "€{price} × {editors} editors = €{total} / month",
         "planEnds": "Your plan ends on {date}. Then {editors} editors become viewers. They keep their access, and the owner can make them editors again once the team pays.",
+        "agentEdits": "Agent edits this week",
+        "agentEditsValue": "{used} / {limit} · subscribe for unlimited",
         "cancelWarning": "Cancelling turns {editors} editors into viewers at the end of the period.",
         "creditsIncluded": "{credits} credits / mo",
         "subscribe": "Subscribe",
@@ -563,6 +565,7 @@
         "send": "The agent didn't answer.",
         "empty": "The agent returned an empty reply.",
         "credits": "You're out of credits.",
+        "agentCap": "This free team used its agent edits for the week. Subscribe for unlimited; your own edits are never capped.",
         "blocked": "This message was blocked by feega's content rules."
       }
     },

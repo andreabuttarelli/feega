@@ -1,4 +1,5 @@
 import { json } from '@sveltejs/kit';
+import { agentEditRefusal } from '$lib/server/agent-edits/cap';
 import { hiddenFor } from '$lib/server/uncensored-workspace/hidden-scope';
 import type { RequestHandler } from './$types';
 import { resolveOrgCaller } from '$lib/server/org-data/auth';
@@ -21,6 +22,10 @@ const write = async (request: Request, url: URL, op: 'insert' | 'update' | 'dele
   const { authority, orgId, userId, apiKeyId, writeAllowed, db } = resolved.caller;
   if (!writeAllowed) {
     return json({ error: 'api_key_read_only' }, { status: 403 });
+  }
+  const full = apiKeyId ? await agentEditRefusal(db, orgId) : null;
+  if (full) {
+    return full;
   }
 
   const actor = apiKeyId ? agentActor(userId, `api_key:${apiKeyId}`) : undefined;

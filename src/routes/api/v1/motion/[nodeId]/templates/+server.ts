@@ -1,4 +1,5 @@
 import { json } from '@sveltejs/kit';
+import { agentEditRefusal } from '$lib/server/agent-edits/cap';
 import { reachableCaller } from '$lib/server/org-data/reach';
 import { addTemplate } from '$lib/server/motion/template-api';
 import type { RequestHandler } from './$types';
@@ -13,6 +14,10 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
   const { db, orgId, userId, writeAllowed } = caller;
   if (!writeAllowed) {
     return json({ error: 'api_key_read_only' }, { status: HTTP_FORBIDDEN });
+  }
+  const full = await agentEditRefusal(db, orgId);
+  if (full) {
+    return full;
   }
   const out = await addTemplate(db, { orgId, userId, nodeId: params.nodeId ?? '' }, await request.json().catch(() => ({})));
   return out instanceof Response ? out : json(out);

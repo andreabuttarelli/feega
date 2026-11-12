@@ -12,6 +12,7 @@ import { MAX_BATCH_OPS, SPENDING_TOOLS, ToolRun, refusalOf, runMotionBatch, runM
 import { activeTool } from '$lib/server/ai-log';
 import { coreEvent } from '$lib/server/core-usage';
 import { AgentVia, CoreEvent, landed } from '$lib/core-usage';
+import { agentEditCap, AGENT_EDIT_CAP_STATUS } from '$lib/server/agent-edits/cap';
 
 export type Answer = { status: number; body: unknown };
 
@@ -45,10 +46,15 @@ async function denial(caller: OrgCaller): Promise<Answer | undefined> {
   return denied ? { status: denied.status, body: await denied.json() } : undefined;
 }
 
+async function capped(caller: OrgCaller): Promise<Answer | undefined> {
+  const cap = await agentEditCap(caller.db, caller.orgId);
+  return cap ? { status: AGENT_EDIT_CAP_STATUS, body: cap } : undefined;
+}
+
 const GATE_OF: Record<Access, (caller: OrgCaller) => Promise<Answer | undefined>> = {
   [Access.Read]: async () => undefined,
-  [Access.Write]: async (caller) => (caller.writeAllowed ? undefined : READ_ONLY_KEY),
-  [Access.Spend]: async (caller) => (caller.writeAllowed ? denial(caller) : READ_ONLY_KEY)
+  [Access.Write]: async (caller) => (caller.writeAllowed ? capped(caller) : READ_ONLY_KEY),
+  [Access.Spend]: async (caller) => (caller.writeAllowed ? ((await capped(caller)) ?? denial(caller)) : READ_ONLY_KEY)
 };
 
 export type CanvasAsk = { projectId: string; op: CanvasOpName; input: unknown };
@@ -95,6 +101,11 @@ export async function runFrameTool(caller: OrgCaller, ask: FrameToolAsk): Promis
     return READ_ONLY_KEY;
   }
 
+  const full = await capped(caller);
+  if (full) {
+    return full;
+  }
+
   const scope = { orgId: caller.orgId, userId: caller.userId, nodeId: ask.nodeId, sessionId: caller.sessionId };
   const gated = async (tools: string[]) => (tools.some((t) => SPENDING_TOOLS.has(t)) ? denial(caller) : undefined);
 
@@ -139,6 +150,10 @@ export async function runEditorAction(caller: OrgCaller, ask: EditorAsk): Promis
   }
   if (EDITOR_OPS[ask.op].access === EditorAccess.Write && !caller.writeAllowed) {
     return { status: HTTP_FORBIDDEN, body: { error: 'api_key_read_only' } };
+  }
+  const full = EDITOR_OPS[ask.op].access === EditorAccess.Write ? await capped(caller) : undefined;
+  if (full) {
+    return full as EditorAnswer;
   }
 
   const scope = await callerMotionScope(caller.db, { orgId: caller.orgId, userId: caller.userId, nodeId: ask.nodeId });
