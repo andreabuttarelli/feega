@@ -106,9 +106,8 @@ impl TileKey {
     }
 }
 
-pub const BATCH_TILES: i64 = 2;
+pub const BATCH_TILES: i64 = 4;
 pub const BAKE_BATCH_TILES: i64 = 3;
-pub const GESTURE_BATCH_TILES: i64 = 1;
 
 pub struct Batch {
     pub step: i32,
@@ -139,10 +138,6 @@ impl Batch {
 
 pub fn batches(missing: &[TileKey]) -> Vec<Batch> {
     batches_of(missing, BATCH_TILES)
-}
-
-pub fn gesture_batches(missing: &[TileKey]) -> Vec<Batch> {
-    batches_of(missing, GESTURE_BATCH_TILES)
 }
 
 pub fn bake_batches(missing: &[TileKey]) -> Vec<Batch> {
