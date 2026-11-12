@@ -240,6 +240,7 @@
   import type { Viewport } from '$lib/canvas/dot-grid';
   import { commentPlacement, type CommentPlacement } from '$lib/canvas/comment-placement';
   import { panBy, toWorld, wheelPan, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
+  import { WheelBatch } from '$lib/canvas/gpu/wheel-batch';
   import { isLiveCode } from '$lib/canvas/code-frame';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
   import { WIRE_CURSOR, Wiring, typesMeet, atRest, bubbleColour, bubbleRadius, magnetPort, springTo, wireAim, throughPoint, tieAcross, type Spring, type Tie } from '$lib/canvas/gpu/wire-magnet';
@@ -3472,17 +3473,31 @@
       return;
     }
     e.preventDefault();
+    landWheelsNextFrame();
     const p = local(e);
     if (e.ctrlKey || e.metaKey) {
       e.stopPropagation();
-      view = zoomAt(view, p, Math.exp(-e.deltaY * WHEEL_ZOOM));
+      wheels.zoom(p, Math.exp(-e.deltaY * WHEEL_ZOOM));
       return;
     }
     if (!spec.flow.panOnScroll) {
-      view = zoomAt(view, p, Math.exp(-e.deltaY * WHEEL_ZOOM));
+      wheels.zoom(p, Math.exp(-e.deltaY * WHEEL_ZOOM));
       return;
     }
-    view = panBy(view, wheelPan(e));
+    wheels.pan(wheelPan(e));
+  }
+
+  const wheels = new WheelBatch();
+  let wheelFrame = 0;
+
+  function landWheelsNextFrame() {
+    if (wheelFrame) {
+      return;
+    }
+    wheelFrame = requestAnimationFrame(() => {
+      wheelFrame = 0;
+      view = wheels.take(view);
+    });
   }
 
 
