@@ -6,7 +6,7 @@ import { designed, designOf, withBoard } from '../../src/lib/server/code-import/
 import { folderSource } from '../../src/lib/server/code-import/folder-source';
 import { codeCapturedIn, type CapturedApp } from '../../src/lib/server/code-import/fidelity-apps';
 import { BASE_CONDITIONS } from '../../src/lib/server/code-import/render-conditions';
-import { compacted } from './compact';
+import { compacted } from '../component-library/compact';
 import type { Catalog } from './registry';
 
 const LIBRARY = join(import.meta.dirname, '../../libraries/arc');
