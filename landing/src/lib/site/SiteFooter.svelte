@@ -2,6 +2,7 @@
   import { LEGAL_DOCS } from './legal';
   import DownloadMac from './DownloadMac.svelte';
   import { APP_URL, MAC_GUIDE_URL, SOCIAL_LINKS } from './links';
+  import { CODEBASE_PATH } from './codebase';
 
   const legal = Object.entries(LEGAL_DOCS).map(([slug, doc]) => ({ href: `/${slug}`, label: doc.label }));
   const year = new Date().getFullYear();
@@ -17,6 +18,7 @@
     <div class="col">
       <p>( Navigate )</p>
       <a href="/">Product</a>
+      <a href={CODEBASE_PATH}>Codebase</a>
       <a href={APP_URL}>Sign In</a>
       <a href="/blog">Compare</a>
       <DownloadMac class="dl" />

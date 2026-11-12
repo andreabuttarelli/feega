@@ -1,3 +1,8 @@
+export enum FieldFit {
+  Hero = 'hero',
+  Box = 'box'
+}
+
 export const RAMP = ' .:-=+*#%@';
 
 export const MAX_CELLS = 12000;

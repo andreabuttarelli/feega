@@ -3,6 +3,7 @@
   import Hero from '$lib/site/home/Hero.svelte';
   import OpenSource from '$lib/site/home/OpenSource.svelte';
   import StartSite from '$lib/site/home/StartSite.svelte';
+  import Codebase from '$lib/site/home/Codebase.svelte';
   import Features from '$lib/site/home/Features.svelte';
   import Remotion from '$lib/site/home/Remotion.svelte';
   import Switch from '$lib/site/home/Switch.svelte';
@@ -29,6 +30,7 @@
 <Hero />
 <OpenSource />
 <StartSite />
+<Codebase />
 <Features />
 <Remotion />
 <Switch />
