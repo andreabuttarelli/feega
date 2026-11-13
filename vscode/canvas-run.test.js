@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { Launch, launchArgs, mcpServers, canvasFileFor, canvasPage, eventReader, importMessage, gitignoreWith, readyProbe, served } = require('./canvas-run');
+const { Launch, launchArgs, mcpServers, canvasFileFor, canvasPage, eventReader, importMessage, gitignoreWith, readyProbe, served, spawnOptions, Step, stepOf, loadingPage, errorPage, logTail, RETRY } = require('./canvas-run');
 
 test('apre il file senza browser e senza flag di import: senza terminale il launcher non chiede, e i launcher vecchi non conoscono --no-import', () => {
   assert.deepEqual(launchArgs('/w/a.feega', 61000, Launch.Open), ['-y', 'feega@latest', '/w/a.feega', '--port', '61000', '--no-open']);
@@ -59,4 +59,43 @@ test('gitignore: aggiunge *.feega una volta sola, senza toccare il resto', () =>
   assert.equal(gitignoreWith('node_modules'), 'node_modules\n*.feega\n');
   assert.equal(gitignoreWith(''), '*.feega\n');
   assert.equal(gitignoreWith('a\n*.feega\n'), null);
+});
+
+test('npx parte dalla cartella della tela: da lì il launcher trova il package.json da importare', () => {
+  assert.equal(spawnOptions('/code/my-app/my-app.feega', 'darwin', {}).cwd, '/code/my-app');
+});
+
+test('i passi del launcher diventano il passo mostrato; un evento estraneo non cambia nulla', () => {
+  assert.equal(stepOf({ event: 'step', step: 'download' }), Step.Download);
+  assert.equal(stepOf({ event: 'step', step: 'install' }), Step.Install);
+  assert.equal(stepOf({ event: 'step', step: 'start' }), Step.Start);
+  assert.equal(stepOf({ event: 'imported', pages: 1 }), null);
+  assert.equal(stepOf({ event: 'step', step: 'boh' }), null);
+});
+
+test('la schermata di avvio ha il marchio, il nome, la barra e il passo, nei due temi', () => {
+  const html = loadingPage(Step.Download);
+  assert.match(html, /<svg/);
+  assert.match(html, />feega</);
+  assert.match(html, /Downloading the app/);
+  assert.match(html, /vscode-dark/);
+  assert.doesNotMatch(html, /https?:\/\//);
+});
+
+test("l'errore mostra il motivo e la coda del log, con un Retry, e non esegue l'HTML del log", () => {
+  const html = errorPage('Feega stopped (exit 1).', 'feega: <script>x</script>');
+  assert.match(html, /Feega stopped \(exit 1\)\./);
+  assert.match(html, /&lt;script&gt;x&lt;\/script&gt;/);
+  assert.match(html, new RegExp(`postMessage\\(\\{ type: '${RETRY}' \\}\\)`));
+});
+
+test('la coda del log tiene le ultime righe', () => {
+  const tail = logTail(40);
+  for (let i = 0; i < 100; i++) {
+    tail.push(`line ${i}\n`);
+  }
+  const text = tail.text();
+  assert.match(text, /line 99/);
+  assert.doesNotMatch(text, /line 10\n/);
+  assert.equal(text.trim().split('\n').length, 40);
 });

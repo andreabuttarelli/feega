@@ -10,7 +10,7 @@ export const MCP_ENTRY = 'mcp.mjs';
 export const USAGE = `usage: feega [file.feega] [--port <n>] [--no-open] [--import | --no-import] [--routes <list|all>] [--app <path>] [--help] [--version]
        feega mcp [--port <n>]   MCP server (stdio) for the local feega on that port (default ${MCP_PORT})`;
 export const FolderImport = { Ask: 'ask', Yes: 'yes', No: 'no' };
-export const ImportStep = { Ask: 'ask', Import: 'import', Skip: 'skip' };
+export const ImportStep = { Ask: 'ask', Import: 'import', Skip: 'skip', NoApp: 'no-app' };
 
 const IMPORT_FLAGS = { '--import': FolderImport.Yes, '--no-import': FolderImport.No };
 const HOME_ROUTE = '/';
@@ -218,7 +218,7 @@ const STEPS = {
 
 export function importStep({ mode, app, fileExists, tty }) {
   if (!app) {
-    return ImportStep.Skip;
+    return mode === FolderImport.Yes ? ImportStep.NoApp : ImportStep.Skip;
   }
 
   return STEPS[mode]({ fileExists, tty });

@@ -198,7 +198,7 @@ describe('import della cartella', () => {
   it('--import importa anche senza terminale e su un file esistente; --no-import mai', () => {
     const forced = { mode: FolderImport.Yes, app: '/a', fileExists: true, tty: false };
     expect(importStep(forced)).toBe(ImportStep.Import);
-    expect(importStep({ ...forced, app: null })).toBe(ImportStep.Skip);
+    expect(importStep({ ...forced, app: null })).toBe(ImportStep.NoApp);
     expect(importStep({ ...forced, mode: FolderImport.No })).toBe(ImportStep.Skip);
   });
 
