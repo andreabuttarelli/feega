@@ -1,6 +1,6 @@
 import type { Db } from '$lib/server/db/client';
 import { assignableRoles, can, isOrgRole, OrgAction, OrgRoleName, type OrgRole } from '$lib/org-roles';
-import { listMembers, memberRole, orgName, removeMember, setMemberRole, transferOwnership } from '$lib/server/repos/orgs';
+import { handOverOrg, listMembers, memberRole, orgName, removeMember, setMemberRole } from '$lib/server/repos/orgs';
 import {
   createInvite,
   deleteLinkInvite,
@@ -229,15 +229,21 @@ async function remove(ctx: TeamCtx, userId: string): Promise<TeamResult> {
   return done({ user_id: userId });
 }
 
-async function transfer(ctx: TeamCtx, userId: string): Promise<TeamResult> {
+async function transfer(ctx: TeamCtx, actor: OrgRole, userId: string): Promise<TeamResult> {
   if (userId === ctx.userId) {
     return refused(TeamRefusal.Self);
   }
-  if (!(await targetRole(ctx, userId))) {
+  const target = await targetRole(ctx, userId);
+  if (!target) {
     return refused(TeamRefusal.NotFound);
   }
 
-  await transferOwnership(ctx.db, { orgId: ctx.orgId, userId });
+  const addsEditor = !needsSeat(target);
+  const seated = !addsEditor || !(await seatRefusal(ctx, actor, OrgRoleName.Admin));
+  await handOverOrg(ctx.writer, { orgId: ctx.orgId, from: ctx.userId, to: userId, fromRole: seated ? OrgRoleName.Admin : target });
+  if (addsEditor && seated) {
+    await syncedOrLogged(ctx.db, ctx.orgId);
+  }
   return done({ owner: userId });
 }
 
@@ -274,6 +280,6 @@ export async function runTeamOp(ctx: TeamCtx, request: TeamRequest): Promise<Tea
       }
       return done();
     case TeamOp.TransferOwnership:
-      return transfer(ctx, request.userId);
+      return transfer(ctx, actor, request.userId);
   }
 }

@@ -57,9 +57,11 @@ const rows: Record<string, unknown[]> = {
   const { db: writer, calls: writes } = fakeDb(rows, { filter: true, mutate: true });
   const mail = vi.fn(async () => true);
   const rpc = vi.fn(async () => ({ data: null, error: null }));
+  const handOver = vi.fn(async () => ({ data: null, error: null }));
   Object.assign(db, { rpc });
+  Object.assign(writer, { rpc: handOver });
   const ctx: TeamCtx = { db, writer, userId, orgId: ORG, origin: 'https://feega.app', mail };
-  return { ctx, calls, writes, mail, rpc };
+  return { ctx, calls, writes, mail, rpc, handOver };
 }
 
 const written = (calls: Call[], table: string, op: string) => calls.filter((c) => c.table === table && c.op === op);
@@ -312,13 +314,30 @@ describe('i membri', () => {
     expect(await runTeamOp(ctx, { op: TeamOp.Leave })).toEqual({ ok: false, refusal: TeamRefusal.Forbidden });
   });
 
-  it("solo l'owner trasferisce, e lo fa in un colpo solo", async () => {
+  it("solo l'owner trasferisce, in un colpo solo e dal server", async () => {
     const owner = ctxFor(OWNER);
     expect((await runTeamOp(owner.ctx, { op: TeamOp.TransferOwnership, userId: ADMIN })).ok).toBe(true);
-    expect(owner.rpc).toHaveBeenCalledWith('transfer_org_ownership', { p_org: ORG, p_to: ADMIN });
+    expect(owner.handOver).toHaveBeenCalledWith('hand_over_org', { p_org: ORG, p_from: OWNER, p_to: ADMIN, p_from_role: 'admin' });
+    expect(owner.rpc).not.toHaveBeenCalled();
 
     const admin = ctxFor(ADMIN);
     expect(await runTeamOp(admin.ctx, { op: TeamOp.TransferOwnership, userId: MEMBER })).toEqual({ ok: false, refusal: TeamRefusal.Forbidden });
+  });
+});
+
+describe('trasferire la proprietà non regala un editor', () => {
+  it("a un viewer, in un'org che non ha un posto libero: il vecchio owner prende il suo ruolo", async () => {
+    const owner = ctxFor(OWNER, { credit_ledger: [] });
+
+    expect((await runTeamOp(owner.ctx, { op: TeamOp.TransferOwnership, userId: VIEWER })).ok).toBe(true);
+    expect(owner.handOver).toHaveBeenCalledWith('hand_over_org', { p_org: ORG, p_from: OWNER, p_to: VIEWER, p_from_role: 'viewer' });
+  });
+
+  it('a un editor: il vecchio owner resta editor, come admin', async () => {
+    const owner = ctxFor(OWNER, { credit_ledger: [] });
+
+    expect((await runTeamOp(owner.ctx, { op: TeamOp.TransferOwnership, userId: MEMBER })).ok).toBe(true);
+    expect(owner.handOver).toHaveBeenCalledWith('hand_over_org', { p_org: ORG, p_from: OWNER, p_to: MEMBER, p_from_role: 'admin' });
   });
 });
 

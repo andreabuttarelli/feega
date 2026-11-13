@@ -130,8 +130,8 @@ export async function removeMember(db: Db, input: { orgId: string; userId: strin
   }
 }
 
-export async function transferOwnership(db: Db, input: { orgId: string; userId: string }): Promise<void> {
-  const { error } = await db.rpc('transfer_org_ownership' as never, { p_org: input.orgId, p_to: input.userId } as never);
+export async function handOverOrg(db: Db, input: { orgId: string; from: string; to: string; fromRole: OrgRole }): Promise<void> {
+  const { error } = await db.rpc('hand_over_org' as never, { p_org: input.orgId, p_from: input.from, p_to: input.to, p_from_role: input.fromRole } as never);
 
   if (error) {
     throw error;
