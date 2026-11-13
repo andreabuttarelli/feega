@@ -56,11 +56,16 @@ describe('un URL dato a un fornitore scade presto', () => {
   });
 });
 
+function memberOf(orgs: string[], teammates: string[], buckets: Record<string, string[]> = {}): Db {
+  return Object.assign(storageWith(buckets), {
+    rpc: async () => ({ data: orgs, error: null }),
+    from: () => ({ select: async () => ({ data: teammates.map((user_id) => ({ user_id })), error: null }) })
+  }) as unknown as Db;
+}
+
 describe('un asset è visibile a chiunque legga la sua riga, non solo a chi lo ha generato', () => {
   it('firma un render con il client di servizio, non con quello dell\'utente', async () => {
-    const userDb = markRlsScoped(
-      storageWith({ 'canvas-assets': ['o/p/upload.png'] })
-    );
+    const userDb = markRlsScoped(memberOf(['o'], ['other-user'], { 'canvas-assets': ['o/p/upload.png'] }));
     const serviceDb = storageWith({
       'brand-knowledge': ['other-user/media/generated.png'],
       'canvas-assets': ['o/p/upload.png']
@@ -75,6 +80,15 @@ describe('un asset è visibile a chiunque legga la sua riga, non solo a chi lo h
       'https://signed/brand-knowledge/other-user/media/generated.png'
     );
     expect(urls.get('o/p/upload.png')).toBe('https://signed/canvas-assets/o/p/upload.png');
+  });
+
+  it("non firma mai un file che sta fuori dalle org di chi chiede, qualunque cosa dica la riga", async () => {
+    const userDb = markRlsScoped(memberOf(['o'], ['other-user']));
+    const serviceDb = storageWith({ 'brand-knowledge': ['stranger/media/x.png'], 'canvas-assets': ['their-org/p/x.png'] });
+
+    const urls = await signAssetPaths(userDb, serviceDb, { generated: ['stranger/media/x.png'], uploaded: ['their-org/p/x.png'] });
+
+    expect([...urls.keys()]).toEqual([]);
   });
 
   it('rifiuta un client utente non marchiato RLS, per non far passare un service client al posto suo', async () => {

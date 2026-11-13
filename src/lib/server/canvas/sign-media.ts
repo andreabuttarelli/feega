@@ -42,6 +42,23 @@ export async function signMediaPaths(db: Db, paths: string[], ttlSeconds: number
  * `userDb` deve essere marchiato `markRlsScoped` — altrimenti la chiamata rifiuta, perché
  * altrimenti un client di servizio passato per sbaglio come "userDb" salterebbe la prova.
  */
+const ownerOf = (path: string) => path.split('/')[0];
+
+async function reachOf(userDb: Db): Promise<{ orgs: Set<string>; teammates: Set<string> }> {
+  const client = userDb as unknown as {
+    rpc(fn: string): Promise<{ data: unknown; error: unknown }>;
+    from(table: string): { select(columns: string): Promise<{ data: unknown; error: unknown }> };
+  };
+  const [orgs, members] = await Promise.all([client.rpc('auth_org_ids'), client.from('orgs_members').select('user_id')]);
+  if (orgs.error || members.error) {
+    throw new Error('signAssetPaths: the caller org scope is unreadable');
+  }
+  return {
+    orgs: new Set(((orgs.data ?? []) as Array<string | { auth_org_ids: string }>).map((r) => (typeof r === 'string' ? r : r.auth_org_ids))),
+    teammates: new Set(((members.data ?? []) as Array<{ user_id: string }>).map((m) => m.user_id))
+  };
+}
+
 export async function signAssetPaths(
   userDb: Db,
   serviceDb: Db,
@@ -53,9 +70,10 @@ export async function signAssetPaths(
     throw new Error('signAssetPaths richiede un client utente scoped RLS come prova di appartenenza');
   }
 
+  const { orgs, teammates } = await reachOf(userDb);
   const [rendered, uploaded] = await Promise.all([
-    signKnowledgePaths(serviceDb as never, paths.generated, ttlSeconds ?? SIGNED_URL_TTL_S.canvas, preset),
-    signAssetFiles(serviceDb, paths.uploaded, ttlSeconds ?? SIGNED_URL_TTL_S.canvas, preset)
+    signKnowledgePaths(serviceDb as never, paths.generated.filter((p) => teammates.has(ownerOf(p))), ttlSeconds ?? SIGNED_URL_TTL_S.canvas, preset),
+    signAssetFiles(serviceDb, paths.uploaded.filter((p) => orgs.has(ownerOf(p))), ttlSeconds ?? SIGNED_URL_TTL_S.canvas, preset)
   ]);
 
   return new Map([...rendered, ...uploaded]);
