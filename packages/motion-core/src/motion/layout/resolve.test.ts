@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, newClip, newMotionDoc, parseMotionDoc, type MotionClip, type MotionDoc } from '../doc';
 import { Align, Direction, Justify, Sizing } from './auto-layout';
 import { DEFAULT_AUTO_LAYOUT, DEFAULT_LAYOUT_ITEM, type AutoLayout } from './model';
-import { withAutoLayout } from './resolve';
+import { relaidWithin, withAutoLayout } from './resolve';
 import { flattenComps } from '../precomp';
 import { TrackKind } from '../components';
 import { textBaseline, textExtent } from './text-extent';
@@ -306,5 +306,28 @@ describe('a percent max on a stack child', () => {
       shape('c', { x: 0.5, y: 0.5, width: 0.8, height: 0.2 }, { autoLayout: flow() })
     ]);
     expect(propsOf(withAutoLayout(doc), 'a').width * W).toBeCloseTo(200);
+  });
+});
+
+describe('relaidWithin', () => {
+  const laidClip = (doc: MotionDoc, id: string) => withAutoLayout(doc).tracks.flatMap((t) => t.clips).find((c) => c.id === id)!;
+
+  const nestedStack = () =>
+    docOf([
+      shape('page', { x: 0.5, y: 0.5, width: 0.8, height: 0.8 }, { autoLayout: flow({ direction: Direction.Vertical, gap: 10, padding: { top: 20, right: 20, bottom: 20, left: 20 } }) }),
+      shape('head', { x: 0, y: 0, width: 0.3, height: 0.1 }, { parent: 'page' }),
+      shape('row', { x: 0, y: 0, width: 0.6, height: 0.2 }, { parent: 'page', autoLayout: flow({ gap: 12 }), layoutItem: { ...DEFAULT_LAYOUT_ITEM, width: Sizing.Fill } }),
+      shape('a', { x: 0, y: 0, width: 0.1, height: 0.1 }, { parent: 'row' }),
+      shape('b', { x: 0, y: 0, width: 0.1, height: 0.1 }, { parent: 'row' }),
+      shape('c', { x: 0, y: 0, width: 0.1, height: 0.1 }, { parent: 'row' })
+    ]);
+
+  it('lays one container where the whole layout put it, as the whole layout does', () => {
+    const doc = nestedStack();
+    const hidden = { ...doc, tracks: doc.tracks.filter((t) => t.clips[0].id !== 'a') };
+
+    const alone = relaidWithin(hidden, laidClip(doc, 'row'));
+
+    expect(alone).toEqual(['row', 'b', 'c'].map((id) => laidClip(hidden, id)));
   });
 });

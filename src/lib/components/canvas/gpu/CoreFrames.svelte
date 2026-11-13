@@ -52,7 +52,9 @@
   import { StartupStep, markStartup, reportFramesShown } from '$lib/canvas/core/startup-marks';
   import LoadTimeline from './LoadTimeline.svelte';
   import { editedLayers } from '$lib/canvas/core/edited-layers';
-  import { fastPatch } from '$lib/canvas/core/fast-patch';
+  import { fastPatch, readyPatch } from '$lib/canvas/core/fast-patch';
+  import { shapedText } from '@feega/motion-core/motion/gpu-full/text/measure';
+  import type { TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
   import { paintFirst } from '$lib/canvas/core/paint-first';
   import type { LiveDoc, LiveListener } from '$lib/canvas/core/live-docs.svelte';
   import { baseNodeId, withoutViews } from '$lib/canvas/breakpoint-views';
@@ -463,6 +465,22 @@
     }
     markFrame(key, Step.LiveReady);
     showLive(f, key, { doc: source.doc, list: built.list, ready });
+    measureLive(f, source);
+  }
+
+  const liveMeasures = new Map<string, TextMeasure>();
+
+  function measureLive(f: FrameAt, source: LiveDoc) {
+    idle(() =>
+      loadFonts(source.doc, source.assets, source.tokens).then(
+        (fonts) => {
+          const measure = shapedText({ fonts, smoothing });
+          liveMeasures.set(f.id, measure);
+          readyPatch(source.doc, measure);
+        },
+        () => liveMeasures.delete(f.id)
+      )
+    );
   }
 
   type ShownLive = { doc: MotionDoc; list: DisplayList; ready: Awaited<ReturnType<typeof media.ready>> };
@@ -478,7 +496,8 @@
 
   function patchLive(f: FrameAt, source: LiveDoc): boolean {
     const shown = liveShown.get(f.id);
-    const list = shown && fastPatch(shown.list, shown.doc, source.doc);
+    const measure = liveMeasures.get(f.id);
+    const list = shown && measure && fastPatch(shown.list, shown.doc, source.doc, measure);
     if (!shown || !list) {
       return false;
     }
@@ -526,6 +545,7 @@
     for (const id of [...liveGroup.keys()].filter((id) => !live.has(id))) {
       liveBuilt.delete(id);
       liveShown.delete(id);
+      liveMeasures.delete(id);
       heldMain.drop(id);
       customPictures.drop(liveRead(id));
       const saved = frames.find((f) => f.id === id);

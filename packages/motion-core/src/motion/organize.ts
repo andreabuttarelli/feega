@@ -140,8 +140,18 @@ export function renameClip(doc: MotionDoc, clipId: string, name: string): OpResu
   return ok(withClip(doc, clipId, ({ name: _old, ...clip }) => (trimmed ? { ...clip, name: trimmed } : clip)));
 }
 
+export function withHiddenSubtrees(doc: MotionDoc): MotionDoc {
+  const byId = new Map(doc.tracks.flatMap((t) => t.clips as MotionClip[]).map((c) => [c.id, c]));
+  const hiddenUp = (id: string | null | undefined): boolean => {
+    const clip = id ? byId.get(id) : undefined;
+    return !!clip && (!!clip.hidden || hiddenUp(clip.parent));
+  };
+  return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (!c.hidden && hiddenUp(c.parent) ? { ...c, hidden: true } : c)) })) as MotionDoc['tracks'] };
+}
+
 export function withoutHidden(doc: MotionDoc): MotionDoc {
-  return { ...doc, tracks: doc.tracks.filter((t) => !t.hidden).map((t) => ({ ...t, clips: t.clips.filter((c) => !c.hidden) })) };
+  const { tracks } = withHiddenSubtrees(doc);
+  return { ...doc, tracks: tracks.filter((t) => !t.hidden).map((t) => ({ ...t, clips: t.clips.filter((c) => !c.hidden) })) };
 }
 
 export function isLocked(doc: MotionDoc, clipId: string): boolean {
