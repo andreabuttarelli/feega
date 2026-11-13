@@ -1384,7 +1384,7 @@ const JOB_TIMEOUTS_MS: Record<JobKind, number> = {
   browser_render: BROWSER_RENDER_DEADLINE_MS
 };
 
-const ON_EXPIRE: Partial<Record<JobKind, (run: NodeRun) => Promise<void>>> = {
+const ON_EXPIRE: Partial<Record<JobKind, (run: NodeRun) => Promise<unknown>>> = {
   motion_render: releaseHold
 };
 

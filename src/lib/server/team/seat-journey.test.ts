@@ -51,7 +51,7 @@ function world(subscription: string | null): Db {
   return shared.db as Db;
 }
 
-const ctx = (db: Db) => ({ db, userId: OWNER, orgId: ORG, origin: 'https://feega.test', mail: async () => true });
+const ctx = (db: Db) => ({ db, writer: db, userId: OWNER, orgId: ORG, origin: 'https://feega.test', mail: async () => true });
 
 const tokenOf = (url: unknown) => new URL(String(url)).searchParams.values().next().value as string;
 

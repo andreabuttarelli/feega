@@ -248,14 +248,14 @@ export async function startTaskRun(deps: TaskRunDeps, req: TaskRequest): Promise
   if (!(await slotFree(deps, provider, req.place ?? QueuePlace.New))) {
     return WAITING;
   }
-  const quoted = model.spec.quotedAtSubmit ? await submitQuote(gateway, ref, inputs) : {};
+  const quoted = model.spec.quotedAtSubmit ? await submitQuote(gateway, ref, inputs) : undefined;
   if (quoted === null) {
     return refused(TASK_REFUSALS.unpriced, RefusalStage.Provider);
   }
   const startedAt = Date.now();
   try {
     const { taskId } = await gateway.run(ref, inputs, req.idempotencyKey);
-    const quotedUsd = 'quotedUsd' in quoted ? quoted.quotedUsd : quoteOf(model, inputs);
+    const quotedUsd = quoted?.quotedUsd ?? quoteOf(model, inputs);
     return { kind: 'job', jobId: `${jobPrefixOf(provider)}${taskId}`, ...(quotedUsd ? { quotedUsd } : {}) };
   } catch (error) {
     if (error instanceof ProviderBusyError) {

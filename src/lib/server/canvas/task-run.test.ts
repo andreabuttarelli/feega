@@ -28,7 +28,8 @@ function depsFor(model: TaskModel | null): { deps: TaskRunDeps; gatewayRun: Retu
       record: () => {}
     }),
     refuseLikeness: vi.fn(),
-    bill: vi.fn()
+    bill: vi.fn(),
+    storeQuote: vi.fn(async () => {})
   };
   return { deps, gatewayRun };
 }
