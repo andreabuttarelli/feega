@@ -55,6 +55,10 @@ Follow-up in the same PR:
 - `hand_over_org` is created before the deploy (`20261114_hand_over_org.sql`), locks the two rows,
   checks each update, and a partial unique index keeps one owner per org.
 - A render hold is refunded when its run cannot be created.
+- A video proxy (`assets.proxy_url`) is signed from its row and bound like `url`.
+- Generation references are signed only when an asset row of the run's org holds them
+  (`signOrgMediaPaths`), and archived feed media only from the node's own folder. A `.feega` import
+  drops a relative path that arrives without its file.
 - `api_keys` deletes: the key's owner, or an org admin (`OrgAction.ManageMembers`). The Settings
   revoke answers 404 when nothing was deleted.
 - `commit_motion_revision` with `p_layers` (the overload #2138 adds) is defined here too, as a
