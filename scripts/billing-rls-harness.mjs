@@ -12,6 +12,9 @@ const CANVAS = '44444444-4444-4444-8444-444444444444';
 const NODE = '55555555-5555-4555-8555-555555555555';
 const INVITE = '66666666-6666-4666-8666-666666666666';
 const MEMBER_KEY = '77777777-7777-4777-8777-777777777777';
+const OWNER_KEY = '88888888-8888-4888-8888-888888888888';
+const RUN = '99999999-9999-4999-8999-999999999999';
+const SERVER_VALUE = '{"quotedUsd": 2}';
 
 const User = {
   Owner: 'a0000000-0000-4000-8000-000000000001',
@@ -19,8 +22,11 @@ const User = {
   Member: 'a0000000-0000-4000-8000-000000000003',
   Viewer: 'a0000000-0000-4000-8000-000000000004',
   Stranger: 'a0000000-0000-4000-8000-000000000005',
+  Service: 'service',
   Anon: null
 };
+
+const ROLE_OF = (user) => (user === User.Service ? 'service_role' : user ? 'authenticated' : 'anon');
 
 const Want = { Lands: 'lands', Refused: 'refused' };
 
@@ -69,7 +75,7 @@ const PGLITE_HAS_NO_PGVECTOR = [
 ];
 
 const SEED = `
-  insert into auth.users (id) values ${Object.values(User).filter(Boolean).map((id) => `('${id}')`).join(', ')};
+  insert into auth.users (id) values ${Object.values(User).filter((u) => u && u !== User.Service).map((id) => `('${id}')`).join(', ')};
   insert into public.profiles (id, email) select id, id || '@feega.test' from auth.users;
   insert into public.orgs (id, name, slug) values ('${ORG}', 'Acme', 'acme'), ('${OTHER_ORG}', 'Other', 'other');
   insert into public.orgs_members (org_id, user_id, role) values
@@ -83,6 +89,8 @@ const SEED = `
   insert into public.credit_ledger (org_id, kind, source, amount) values ('${ORG}', 'grant', 'promo', 100), ('${ORG}', 'debit', 'ai_usage', 40);
   insert into public.ai_calls (org_id, provider, operation, status, cost_usd) values ('${ORG}', 'openai', 'chat', 'ok', 1.5);
   insert into public.api_keys (id, org_id, user_id, name, key_hash, key_prefix) values ('${MEMBER_KEY}', '${ORG}', '${User.Member}', 'mine', 'h1', 'feega_m');
+  insert into public.api_keys (id, org_id, user_id, name, key_hash, key_prefix) values ('${OWNER_KEY}', '${ORG}', '${User.Owner}', 'owner', 'h0', 'feega_o');
+  insert into public.node_runs (id, org_id, node_id, params) values ('${RUN}', '${ORG}', '${NODE}', '${SERVER_VALUE}');
   insert into public.canvas_events (org_id, canvas_id, kind, actor_kind, agent_key) values ('${ORG}', '${CANVAS}', 'node.create', 'agent', 'mcp');
   insert into public.motion_revisions (org_id, node_id, version, doc, actor_kind, actor_id) values ('${ORG}', '${NODE}', 1, '{}', 'agent', '${User.Member}');
 `;
@@ -90,7 +98,7 @@ const SEED = `
 const commit = (expected, actorId = User.Member) =>
   `select public.commit_motion_revision('${ORG}', '${NODE}', ${expected}, '{"v":${expected + 1}}'::jsonb, 's', 'user', '${actorId}', null, 60000, null) as version`;
 
-const PROBES = [
+const PROBES_BY_TABLE = [
   ...[User.Owner, User.Admin, User.Member, User.Viewer].map((user) => ({
     name: `orgs: ${roleName(user)} cannot link a subscription`,
     user,
@@ -150,6 +158,8 @@ const PROBES = [
   { name: 'api_keys: a member cannot hand her key to the owner', user: User.Member, sql: `update public.api_keys set user_id = '${User.Owner}' where id = '${MEMBER_KEY}'`, want: Want.Refused },
   { name: 'api_keys: a member still creates her own key', user: User.Member, sql: `insert into public.api_keys (org_id, user_id, name, key_hash, key_prefix) values ('${ORG}', '${User.Member}', 'x', 'h3', 'feega_y')`, want: Want.Lands },
   { name: 'api_keys: a member still deletes her own key', user: User.Member, sql: `delete from public.api_keys where id = '${MEMBER_KEY}'`, want: Want.Lands },
+  { name: "api_keys: a member cannot delete someone else's key", user: User.Member, sql: `delete from public.api_keys where id = '${OWNER_KEY}'`, want: Want.Refused },
+  { name: "api_keys: an admin still revokes a member's key", user: User.Admin, sql: `delete from public.api_keys where id = '${MEMBER_KEY}'`, want: Want.Lands },
   { name: 'api_keys: a viewer cannot create a key', user: User.Viewer, sql: `insert into public.api_keys (org_id, user_id, name, key_hash, key_prefix) values ('${ORG}', '${User.Viewer}', 'x', 'h4', 'feega_z')`, want: Want.Refused },
 
   { name: 'canvas_events: a member cannot erase agent history', user: User.Member, sql: `delete from public.canvas_events where actor_kind = 'agent'`, want: Want.Refused },
@@ -171,6 +181,15 @@ const PROBES = [
     sql: `select 1 from (${commit(2)}) c where c.version = 3 and (select count(*) from public.motion_revisions where org_id = '${ORG}') = 2`,
     want: Want.Lands
   },
+  {
+    name: 'motion_revisions: an editor still folds an edit that counts its layers',
+    user: User.Member,
+    setup: `insert into public.motion_revisions (org_id, node_id, version, doc, actor_kind, actor_id) values ('${ORG}', '${NODE}', 2, '{}', 'user', '${User.Member}')`,
+    sql: `select 1 from (select public.commit_motion_revision('${ORG}', '${NODE}', 2, '{}'::jsonb, 's', 'user', '${User.Member}', null, 60000, null, 3) as version) c where c.version = 3 and (select layers_touched from public.motion_revisions where org_id = '${ORG}' and version = 3) = 3`,
+    want: Want.Lands
+  },
+  { name: 'motion_revisions: a member cannot rewrite a layer count', user: User.Member, sql: `update public.motion_revisions set layers_touched = 0`, want: Want.Refused },
+  { name: 'motion_revisions: a viewer cannot commit with a layer count', user: User.Viewer, sql: `select public.commit_motion_revision('${ORG}', '${NODE}', 1, '{}'::jsonb, 's', 'user', '${User.Viewer}', null, 60000, null, 3)`, want: Want.Refused },
   { name: 'motion_revisions: a viewer cannot commit', user: User.Viewer, sql: `select 1 from (${commit(1, User.Viewer)}) c where c.version = 2`, want: Want.Refused },
   { name: 'motion_revisions: another org cannot commit', user: User.Stranger, sql: `select 1 from (${commit(1, User.Stranger)}) c where c.version = 2`, want: Want.Refused }
 ];
@@ -192,6 +211,41 @@ const DEFINERS_A_SESSION_CALLS = {
   'uncensored_switch_refusal(uuid,uuid)': 'a refusal code for any org id: an oracle, no write',
   'voice_owned_elsewhere(text,uuid)': 'a boolean for any voice id: an oracle, no write'
 };
+
+const RUN_VALUE_PROBES = [
+  {
+    name: 'node_runs: a session cannot create a run carrying a server-written value',
+    user: User.Member,
+    sql: `with r as (insert into public.node_runs (org_id, node_id, params) values ('${ORG}', '${NODE}', '{"quotedUsd": 0.0001, "kept": 1}') returning params) select 1 from r where r.params ? 'quotedUsd'`,
+    want: Want.Refused
+  },
+  {
+    name: 'node_runs: a session cannot change a server-written value',
+    user: User.Member,
+    sql: `with r as (update public.node_runs set params = params || '{"quotedUsd": 0.0001}' where id = '${RUN}' returning params) select 1 from r where (r.params->>'quotedUsd')::numeric <> 2`,
+    want: Want.Refused
+  },
+  {
+    name: 'node_runs: a session cannot drop a server-written value',
+    user: User.Member,
+    sql: `with r as (update public.node_runs set params = '{}' where id = '${RUN}' returning params) select 1 from r where not (r.params ? 'quotedUsd')`,
+    want: Want.Refused
+  },
+  {
+    name: 'node_runs: an editor still writes the rest of a run',
+    user: User.Member,
+    sql: `with r as (update public.node_runs set params = params || '{"progress": 1}' where id = '${RUN}' returning params) select 1 from r where r.params->>'progress' = '1' and r.params->>'quotedUsd' = '2'`,
+    want: Want.Lands
+  },
+  {
+    name: 'node_runs: the server still writes its values',
+    user: User.Service,
+    sql: `with r as (update public.node_runs set params = params || '{"quotedUsd": 3}' where id = '${RUN}' returning params) select 1 from r where r.params->>'quotedUsd' = '3'`,
+    want: Want.Lands
+  }
+];
+
+const PROBES = [...PROBES_BY_TABLE, ...RUN_VALUE_PROBES];
 
 const REALTIME_TABLES = ['canvases', 'node_runs', 'nodes', 'nodes_connections'];
 
@@ -218,8 +272,8 @@ async function probe(db, { user, setup, sql }) {
     if (setup) {
       await db.exec(setup);
     }
-    await db.exec(`set local role ${user ? 'authenticated' : 'anon'}`);
-    await db.query(`select set_config('request.jwt.claim.sub', $1, true), set_config('request.jwt.claim.role', $2, true)`, [user ?? '', user ? 'authenticated' : 'anon']);
+    await db.exec(`set local role ${ROLE_OF(user)}`);
+    await db.query(`select set_config('request.jwt.claim.sub', $1, true), set_config('request.jwt.claim.role', $2, true)`, [user === User.Service ? '' : (user ?? ''), ROLE_OF(user)]);
     const result = await db.query(sql);
     const touched = result.affectedRows || result.rows.length;
     return { outcome: touched ? Want.Lands : Want.Refused, detail: `${touched} row(s)` };
