@@ -13,6 +13,7 @@ async function loaded() {
     components: { id: string; kind: string }[];
     posters: { id: string; mode: string }[];
     gallery: { id: string }[];
+    nodeTemplates: { id: string; family: string; description: string; thumbnail: string }[];
     attachProjectId: string | null;
   };
 }
@@ -36,5 +37,13 @@ describe('/app/templates holds the catalogue the home no longer carries', () => 
 
     expect(data.gallery.map((g) => g.id)).toEqual(['g1']);
     expect(data.attachProjectId).toBe('p1');
+  });
+
+  it('lists composition and effects templates from the canvas library, each with a family, a description and a preview', async () => {
+    const data = await loaded();
+
+    expect(data.nodeTemplates.find((t) => t.id === 'fx-word-field')?.family).toBe('effects');
+    expect(data.nodeTemplates.find((t) => t.id === 'composition-bento')?.family).toBe('composition');
+    expect(data.nodeTemplates.every((t) => t.description.length > 0 && t.thumbnail.endsWith('.webp'))).toBe(true);
   });
 });

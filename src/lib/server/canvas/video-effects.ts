@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { ensureFfmpegPath } from '$lib/server/ffmpeg-bin';
-import { applyStack, type EffectStep, type Pixels } from '$lib/canvas/effects';
+import { applyStack, type EffectStep, type Pixels, type StackMemory } from '$lib/canvas/effects';
 
 const FALLBACK_FPS = 30;
 
@@ -36,14 +36,15 @@ export async function renderVideoEffects(input: Buffer, steps: EffectStep[]): Pr
       throw new Error('video_has_no_frames');
     }
 
+    const memory: StackMemory = new Map();
     let width = 0;
     let height = 0;
-    for (const name of names) {
+    for (const [index, name] of names.entries()) {
       const path = join(dir, name);
       const decoded = await decode(await readFile(path));
       width = decoded.width;
       height = decoded.height;
-      await writeFile(path, await encode(applyStack(decoded, steps)));
+      await writeFile(path, await encode(applyStack(decoded, steps, undefined, index / fps, memory)));
     }
 
     const encodeArgs = [

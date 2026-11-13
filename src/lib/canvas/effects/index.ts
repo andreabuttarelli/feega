@@ -19,11 +19,16 @@ import { SHAPE_SET_OPTIONS } from './shapes';
 import { apply as applySwirl } from './swirl';
 import { CUSTOM, type BuiltinStep, type CustomPass, type CustomStep, type EffectId, type EffectParam, type EffectStep, type Pixels } from './types';
 import { apply as applyWave } from './wave';
+import { apply as applyWordWeave, WORD_WEAVE_PARAMS } from './typo/word-weave';
+import { apply as applyWordField, WORD_FIELD_PARAMS } from './typo/word-field';
+import { apply as applyGlyphTiles, GLYPH_TILES_PARAMS } from './typo/glyph-tiles';
+import { apply as applyWordSilhouette, WORD_SILHOUETTE_PARAMS } from './typo/word-silhouette';
 
 type EffectDefinition = {
 	label: string;
 	params: EffectParam[];
-	apply: (pixels: Pixels, params: Record<string, number | string>) => Pixels;
+	description?: string;
+	apply: (pixels: Pixels, params: Record<string, number | string>, time: number, state?: Record<string, unknown>) => Pixels;
 };
 
 export const EFFECTS: Record<EffectId, EffectDefinition> = {
@@ -228,6 +233,34 @@ export const EFFECTS: Record<EffectId, EffectDefinition> = {
 			{ name: 'background', label: 'Padding colour', kind: 'color', default: '#000000' }
 		],
 		apply: applyFitAspect
+	},
+	'word-weave': {
+		label: 'Word weave',
+		description:
+			'Keeps the picture and threads a repeating word over it, cut into random fragments that appear only on edges and strong local contrast; each glyph takes the colour under it, pushed lighter or darker to stay legible. Pick it to sign a photo or clip with a name or slogan while the image stays the hero. Text: the word to repeat.',
+		params: WORD_WEAVE_PARAMS,
+		apply: applyWordWeave
+	},
+	'word-field': {
+		label: 'Word field',
+		description:
+			'Replaces the picture with a dark, dense monospaced wall of words; each word is as bright as the image under it, so the subject appears through text opacity, and a few words become solid accent blocks (a drifting column or the brightest words). Pick it for a tech, data or security mood on a portrait or product. Text: the word list.',
+		params: WORD_FIELD_PARAMS,
+		apply: applyWordField
+	},
+	'glyph-tiles': {
+		label: 'Glyph tiles',
+		description:
+			'Rebuilds the picture as a grid of rounded square tiles in a small quantised palette, one random glyph centred on each in a contrasting colour; dark areas become empty tiles with faint glyphs, an accent line (column, row or diagonal) cuts through, and label chips sit on top. Pick it for a bold, poster-like pixel mosaic of a clear subject. Labels: the chip words.',
+		params: GLYPH_TILES_PARAMS,
+		apply: applyGlyphTiles
+	},
+	'word-silhouette': {
+		label: 'Word silhouette',
+		description:
+			'A flat colour field (from the source or chosen) covered in faint words, where the subject\'s silhouette, taken from luminance or transparency, is written in bright words and its brightest core in the accent colour. Pick it for a quiet, graphic poster of one recognisable shape; works best on a subject that stands out from its background. Text: the word list.',
+		params: WORD_SILHOUETTE_PARAMS,
+		apply: applyWordSilhouette
 	}
 };
 
@@ -248,10 +281,21 @@ function clampParams(id: EffectId, params: Record<string, number | string>): Rec
 
 const passthrough: CustomPass = (pixels) => pixels;
 
-export function applyStack(pixels: Pixels, steps: EffectStep[], custom: CustomPass = passthrough): Pixels {
+function stateOf(memory: StackMemory | undefined, index: number): Record<string, unknown> | undefined {
+	if (!memory) {
+		return undefined;
+	}
+	const known = memory.get(index) ?? {};
+	memory.set(index, known);
+	return known;
+}
+
+export type StackMemory = Map<number, Record<string, unknown>>;
+
+export function applyStack(pixels: Pixels, steps: EffectStep[], custom: CustomPass = passthrough, time = 0, memory?: StackMemory): Pixels {
 	let current = pixels;
 
-	for (const step of steps) {
+	for (const [index, step] of steps.entries()) {
 		if (!step.enabled) {
 			continue;
 		}
@@ -266,10 +310,16 @@ export function applyStack(pixels: Pixels, steps: EffectStep[], custom: CustomPa
 			continue;
 		}
 
-		current = definition.apply(current, clampParams(step.id, step.params));
+		current = definition.apply(current, clampParams(step.id, step.params), time, stateOf(memory, index));
 	}
 
 	return current;
+}
+
+const ANIMATED: ReadonlySet<EffectId> = new Set(['word-weave', 'word-field', 'glyph-tiles', 'word-silhouette']);
+
+export function animated(steps: EffectStep[]): boolean {
+	return steps.some((step) => step.enabled && step.id !== CUSTOM && ANIMATED.has(step.id));
 }
 
 export { CUSTOM };

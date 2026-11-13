@@ -6,7 +6,7 @@ test.setTimeout(60_000);
 
 const MAIN = [
   { name: 'Canvases', path: '/app/canvases' },
-  { name: 'Frame templates', path: '/app/templates' },
+  { name: 'Templates', path: '/app/templates' },
   { name: 'Tools', path: '/app/tools' }
 ];
 

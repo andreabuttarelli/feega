@@ -8,6 +8,8 @@ import { listMemberships, setActiveOrg } from '$lib/server/repos/orgs';
 import { createProject } from '$lib/server/repos/projects';
 import { moveAssets } from '$lib/server/repos/assets';
 import { createCanvas } from '$lib/server/repos/canvas';
+import { templateById } from '$lib/canvas/templates';
+import { insertTemplate } from '$lib/server/canvas/templates';
 import { SUPPORT_TOOLS } from '$lib/tools';
 import { PROJECT_PARAM, toolScope } from '$lib/server/dashboard/tool-scope';
 import { CanvasPick } from '$lib/server/motion/start';
@@ -163,6 +165,19 @@ export const actions: Actions = {
     }
 
     throw redirect(HTTP_SEE_OTHER, motionEditorPath(started.start));
+  },
+
+  fromCanvasTemplate: async (event) => {
+    const form = await event.request.formData();
+    const template = templateById(String(form.get('template') ?? ''));
+    if (!template) {
+      return fail(HTTP_NOT_FOUND, { error: 'Unknown template' });
+    }
+
+    const scope = await toolScope(event, String(form.get('projectId') ?? '') || null);
+    const canvas = await createCanvas(scope.db, { orgId: scope.orgId, projectId: scope.projectId, name: template.name });
+    await insertTemplate(scope.db, { orgId: scope.orgId, projectId: scope.projectId, canvasId: canvas.id, templateId: template.id, at: { x: 0, y: 0 } });
+    throw redirect(HTTP_SEE_OTHER, canvasPath(scope.projectId, canvas.id));
   },
 
   project: async (event) => {

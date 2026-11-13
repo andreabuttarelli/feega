@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import { applyStack, type EffectStep, type Pixels } from '$lib/canvas/effects';
+  import { animated, applyStack, type EffectStep, type StackMemory, type Pixels } from '$lib/canvas/effects';
   import { fitWithin } from '$lib/canvas/effects/editor';
   import { customPass } from '$lib/canvas/effects/custom';
   import { customEffectsOf } from '$lib/canvas/effects/custom-effects.svelte';
@@ -33,16 +33,36 @@
     const target = canvas;
     let stopped = false;
     let frame = 0;
+    const memory: StackMemory = new Map();
 
     if (kind === 'image') {
       void fetch(url)
         .then((response) => response.blob())
         .then(createImageBitmap)
         .then((bitmap) => {
-          if (!stopped) {
-            draw(target, bitmap, bitmap.width, bitmap.height, effects);
+          if (stopped) {
+            bitmap.close();
+            return;
           }
-          bitmap.close();
+          if (!animated(effects)) {
+            draw(target, bitmap, bitmap.width, bitmap.height, effects, 0);
+            bitmap.close();
+            return;
+          }
+          const started = performance.now();
+          let lastFrameAt = 0;
+          const render = (now: number) => {
+            if (stopped) {
+              bitmap.close();
+              return;
+            }
+            if (now - lastFrameAt >= FRAME_INTERVAL_MS) {
+              draw(target, bitmap, bitmap.width, bitmap.height, effects, (now - started) / 1000, memory);
+              lastFrameAt = now;
+            }
+            frame = requestAnimationFrame(render);
+          };
+          frame = requestAnimationFrame(render);
         })
         .catch(() => {});
     } else {
@@ -55,7 +75,7 @@
       let lastFrameAt = 0;
       const render = (now: number) => {
         if (now - lastFrameAt >= FRAME_INTERVAL_MS && video.readyState >= video.HAVE_CURRENT_DATA) {
-          draw(target, video, video.videoWidth, video.videoHeight, effects);
+          draw(target, video, video.videoWidth, video.videoHeight, effects, video.currentTime, memory);
           lastFrameAt = now;
         }
         frame = requestAnimationFrame(render);
@@ -85,7 +105,9 @@
     source: CanvasImageSource,
     width: number,
     height: number,
-    steps: EffectStep[]
+    steps: EffectStep[],
+    time: number,
+    memory?: StackMemory
   ) {
     const size = fitWithin(width, height, MAX_SIDE);
     const scratch = document.createElement('canvas');
@@ -98,7 +120,7 @@
     context.drawImage(source, 0, 0, size.width, size.height);
     const image = context.getImageData(0, 0, size.width, size.height);
     const pixels: Pixels = { width: size.width, height: size.height, data: image.data };
-    const rendered = applyStack(pixels, effects, pass);
+    const rendered = applyStack(pixels, steps, pass, time, memory);
     target.width = rendered.width;
     target.height = rendered.height;
     target.getContext('2d')?.putImageData(
