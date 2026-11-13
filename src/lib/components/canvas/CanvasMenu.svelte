@@ -1,6 +1,6 @@
 <script lang="ts">
   import { signOutForm } from '$lib/auth/sign-out-form';
-  import { THEME_CHOICES, PREFERENCE_ITEMS, preferenceShortcut } from '$lib/canvas/main-menu';
+  import { THEME_CHOICES } from '$lib/canvas/main-menu';
   import { THEME_LABEL, ThemePref, parseThemePref } from '$lib/theme';
   import { chooseTheme } from '$lib/theme-choice';
   import Sun from '@lucide/svelte/icons/sun';
@@ -28,8 +28,7 @@
   import { env as publicEnv } from '$env/dynamic/public';
   import { LocalOff, isLocalMode, isOff } from '$lib/local-user';
   import { NAV_ICONS } from './nav-icons';
-  import Ruler from '@lucide/svelte/icons/ruler';
-  import { flipRulers, rulersPref } from '$lib/canvas/rulers-pref.svelte';
+  import { VIEW_ITEMS, ZOOM_ITEMS, frameViews, zoomLevel, zoomRequest } from '$lib/canvas/view-menu.svelte';
   import Scale from '@lucide/svelte/icons/scale';
   import Flag from '@lucide/svelte/icons/flag';
   import { REPORT_PATH } from '$lib/reports/report-link';
@@ -223,12 +222,23 @@
         <ChevronRight size={14} class="menu-chevron" />
       </DropdownMenu.SubTrigger>
       <DropdownMenu.SubContent class="prefs-content">
-        {#each PREFERENCE_ITEMS as pref (pref.command)}
-          <DropdownMenu.CheckboxItem class="menu-row" checked={rulersPref.on} onCheckedChange={flipRulers}>
-            <Ruler size={16} />
-            <span>{$_(pref.labelKey)}</span>
-            <kbd class="menu-keys">{preferenceShortcut(pref.command)}</kbd>
+        <DropdownMenu.Label class="prefs-label">View</DropdownMenu.Label>
+        {#each VIEW_ITEMS as item (item.view)}
+          <DropdownMenu.CheckboxItem class="menu-row" data-testid="view-{item.view}" checked={frameViews.isOn(item.view)} onCheckedChange={() => frameViews.flip(item.view)}>
+            <span class="menu-grow">{item.label}</span>
+            <kbd class="menu-keys">{item.keys}</kbd>
           </DropdownMenu.CheckboxItem>
+        {/each}
+        <DropdownMenu.Separator />
+        <DropdownMenu.Label class="prefs-label" data-testid="zoom-readout">
+          <span class="menu-grow">Zoom</span>
+          <span class="menu-keys">{zoomLevel.label}</span>
+        </DropdownMenu.Label>
+        {#each ZOOM_ITEMS as item (item.command)}
+          <DropdownMenu.Item class="menu-row" data-testid="zoom-{item.command}" onSelect={() => zoomRequest.ask(item.command)}>
+            <span class="menu-grow">{item.label}</span>
+            <kbd class="menu-keys">{item.keys}</kbd>
+          </DropdownMenu.Item>
         {/each}
       </DropdownMenu.SubContent>
     </DropdownMenu.Sub>
@@ -336,8 +346,15 @@
     margin-left: auto;
     color: var(--ui-text-tertiary);
   }
+  :global(.prefs-label) {
+    display: flex;
+    align-items: center;
+  }
+  .menu-grow {
+    flex: 1;
+  }
   :global([data-slot='dropdown-menu-sub-content'].prefs-content) {
-    width: 220px;
+    width: 230px;
     padding: 6px;
     border: 0;
     border-radius: var(--ui-radius-md);
