@@ -14,7 +14,7 @@ import { codeVarsError } from '$lib/server/canvas/code-source';
  * da questo file.
  */
 import { exclusionsFor, inList, NOTHING_HIDDEN, touchesHidden, type HiddenScope } from '$lib/server/uncensored-workspace/hidden-scope';
-import { ORG_TABLES, CANVAS_WRITE_TABLES, SERVER_WRITTEN_TABLES, type OrgTable } from './tables';
+import { ORG_TABLES, CANVAS_WRITE_TABLES, SERVER_WRITTEN_COLUMNS, SERVER_WRITTEN_TABLES, type OrgTable } from './tables';
 import { ORG_TABLE_CHECKS } from './checks';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { logAiCall } from '$lib/server/ai-log';
@@ -165,6 +165,15 @@ function badIdentifier(table: string, values: Record<string, unknown>, where: Fi
       error: 'unknown_table',
       message: `"${table}" is not a table this surface can write.`,
       fix: 'Call `query` with no table to list every name you can write to.'
+    };
+  }
+
+  const serverColumn = (SERVER_WRITTEN_COLUMNS[table.trim()] ?? []).find((c) => c in values);
+  if (serverColumn) {
+    return {
+      error: 'server_written_column',
+      message: `"${table}.${serverColumn}" is a file path only feega's server sets.`,
+      fix: 'Upload a file with request_upload and register_upload, or import_link; then use the asset id it returns.'
     };
   }
 

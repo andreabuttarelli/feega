@@ -4,7 +4,7 @@
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
 **75 tool** — 29 in lettura, 37 in scrittura, 9 che distruggono.
-Una sessione nuova ne lista 10 (`query`, `view`, `edit`, `describe`, `render_video`, `get_render`, `list_orgs`, `find_tools`, `load_tools`, `unload_tools`): `tools/list` pesa **3774 caratteri**, circa **944 token**. Gli altri si caricano con `find_tools`/`load_tools` o si chiamano via `edit` {op, input}; tutti insieme peserebbero 80.537 caratteri.
+Una sessione nuova ne lista 10 (`query`, `view`, `edit`, `describe`, `render_video`, `get_render`, `list_orgs`, `find_tools`, `load_tools`, `unload_tools`): `tools/list` pesa **3774 caratteri**, circa **944 token**. Gli altri si caricano con `find_tools`/`load_tools` o si chiamano via `edit` {op, input}; tutti insieme peserebbero 80.687 caratteri.
 
 | gruppo | tool |
 |---|---:|
@@ -519,7 +519,7 @@ The items of a Photo studio batch and their state. Free, reads only.
 
 *Change organisations and teams*
 
-One organisation or team change, only when the user asks; `org_id` defaults to the active org. `switch_org` (org_id), `create_org` (name); `invite` (email, role admin|member|viewer), `resend_invite`/`revoke_invite` (invite_id), `invite_link` (new link, joins as viewer; old one stops) / `disable_invite_link`, `set_role` (user_id, role), `remove_member` (user_id), `leave`, `transfer_ownership` (user_id; owner only, you become admin). Agent edits on a free organisation are capped at 1,000 layers a week: a `402 agent_edit_cap` answer carries `used`, `limit`, `resets_at` and `upgrade_path`, and its `message` says it in words. A free organisation has one editor, its owner; each more editor is a paid seat (€9/month, billed when the invite is accepted). A `seat_limit` answer carries `upgrade_path`; viewers are free.
+One organisation or team change, only when the user asks; `org_id` defaults to the active org. `switch_org` (org_id), `create_org` (name); `invite` (email, role admin|member|viewer), `resend_invite`/`revoke_invite` (invite_id), `invite_link` (new link, joins as viewer; old one stops) / `disable_invite_link`, `set_role` (user_id, role), `remove_member` (user_id), `leave`, `transfer_ownership` (user_id; owner only, you become admin). A free organisation has one editor, its owner; each more editor is a paid seat (€9/month, billed when the invite is accepted). A `seat_limit` answer carries `upgrade_path`; viewers are free.
 
 | campo | tipo | |
 |---|---|---|
@@ -816,7 +816,7 @@ What `data` must look like on a `nodes` row, per `type` — the JSON Schema `ins
 
 *Insert a row*
 
-Add ONE row to a table in your org. `orgs`, `orgs_members`, `orgs_invites`, `api_keys`, `ai_calls`, `node_runs` and `canvas_events` are written by feega only: a write there, here or in `update_row`/`delete_row`, is refused as `server_written_table`. `org_id` is filled in for you; naming a different one is refused, not quietly corrected. Never replaces anything — a row that already exists comes back as a collision, and changing it is `update_row`. Several jsonb columns are checked against a real shape before writing (`nodes.data` by `type` — call `describe_node_types` first; `posts.media`, `ad_campaigns.targeting`/`placements`, `canvases.viewport` too); a rejection names the exact field. On `nodes_connections`, an edge into a node whose model is uncensored is refused — those nodes take no input of any kind. Others are deliberately free-form. Free.
+Add ONE row to a table in your org. `orgs`, `orgs_members`, `orgs_invites`, `api_keys`, `ai_calls`, `node_runs` and `canvas_events` are written by feega only: a write there, here or in `update_row`/`delete_row`, is refused as `server_written_table`; so is setting `assets.url` or `proxy_url` (`server_written_column`). `org_id` is filled in for you; naming a different one is refused, not quietly corrected. Never replaces anything — a row that already exists comes back as a collision, and changing it is `update_row`. Several jsonb columns are checked against a real shape before writing (`nodes.data` by `type` — call `describe_node_types` first; `posts.media`, `ad_campaigns.targeting`/`placements`, `canvases.viewport` too); a rejection names the exact field. On `nodes_connections`, an edge into a node whose model is uncensored is refused — those nodes take no input of any kind. Others are deliberately free-form. Free.
 
 | campo | tipo | |
 |---|---|---|
