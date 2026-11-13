@@ -777,8 +777,9 @@
     if (!bounded) {
       return;
     }
+    void sight;
     const kept = untrack(() => withoutViews(frames).filter((f) => weights.has(f.id) && !sight.onScreen.has(f.id) && !live.has(f.id) && !edited.has(f.id) && lift?.id !== f.id));
-    const gone = overBudget(kept.map((f) => ({ id: f.id, box: f.box, bytes: weightOf(f.id) })), untrack(() => sight.view), area, budget.builtBytes);
+    const gone = overBudget(kept.map((f) => ({ id: f.id, box: f.box, bytes: weightOf(f.id) })), sight.view, area, budget.builtBytes);
     for (const f of kept.filter((k) => gone.includes(k.id))) {
       untrack(() => keepShotThenSendBack(f));
     }
