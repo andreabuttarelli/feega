@@ -192,6 +192,7 @@ const PROBES_BY_TABLE = [
   },
   { name: 'motion_revisions: a member cannot rewrite a layer count', user: User.Member, sql: `update public.motion_revisions set layers_touched = 0`, want: Want.Refused },
   { name: 'motion_revisions: a viewer cannot commit with a layer count', user: User.Viewer, sql: `select public.commit_motion_revision('${ORG}', '${NODE}', 1, '{}'::jsonb, 's', 'user', '${User.Viewer}', null, 60000, null, 3)`, want: Want.Refused },
+  { name: 'motion_revisions: every commit_motion_revision overload checks its caller', user: User.Service, sql: `select 1 where not exists (select 1 from pg_proc where proname = 'commit_motion_revision' and not prosecdef) and (select count(*) from pg_proc where proname = 'commit_motion_revision') = 2`, want: Want.Lands },
   { name: 'motion_revisions: a viewer cannot commit', user: User.Viewer, sql: `select 1 from (${commit(1, User.Viewer)}) c where c.version = 2`, want: Want.Refused },
   { name: 'motion_revisions: another org cannot commit', user: User.Stranger, sql: `select 1 from (${commit(1, User.Stranger)}) c where c.version = 2`, want: Want.Refused }
 ];
