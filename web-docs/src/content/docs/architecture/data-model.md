@@ -33,13 +33,13 @@ Billing, membership and history are decided by the server, not by the signed-in 
 | Table | A session can |
 |---|---|
 | `orgs` | read its orgs; no column is writable, so a billing or seat column added later is closed by default |
-| `orgs_members` | read the team; an admin removes a member, anyone leaves. Role changes go through the team endpoint |
+| `orgs_members` | read the team; an admin removes a member, anyone leaves. Role changes and ownership hand-overs go through the team endpoint |
 | `orgs_invites` | admins list and revoke. Creating or renewing an invite goes through the team endpoint |
 | `credit_ledger`, `ai_calls` | read its org's rows |
 | `api_keys` | an editor creates keys in their own name and deletes their own; an admin deletes any. A key is never rewritten |
 | `canvas_events` | read; an editor appends. Nothing updates or deletes |
 | `motion_revisions` | read, append, seal. Folding an edit into the head (and its `layers_touched`) goes through `commit_motion_revision`, which refuses a non-editor |
-| `node_runs` | an editor writes runs, but the values the server prices a run with are kept out of a session's writes |
+| `node_runs` | read only; every run is written by the server |
 
 A render's credit hold is a `credit_ledger` row noted with the run's id; its refund and its charge cap are read from that row, never from the run.
 

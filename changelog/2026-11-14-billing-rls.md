@@ -36,8 +36,17 @@ Follow-up in the same PR:
   refund and the charge cap are read from it, once per run (`refundHold` in `credit-hold.ts`).
   Refunds no longer keep the held grants' expiry: credits do not expire since 2026-11-12.
 - A provider task is always quoted at submission (provider quote, else the model's pricing) and
-  the quote is written through a declared service-role writer. `node_runs_keep_server_values`
-  keeps that value out of any session insert or update without refusing the rest of the row.
+  the quote is written through a declared service-role writer.
+- `node_runs` is server-written: no session insert, update or delete, and `params` must be a JSON
+  object. `repos/node-runs.ts` writes through the service role after `auth_editor_org_ids()`
+  (asked with the caller's client) contains the run's org, and strips server-priced keys from
+  caller params.
+- Ownership moves through `hand_over_org` (service role only) from the Team endpoint: handing over
+  to a non-editor does not add an editor unless the seat gate allows it, and a per-editor team is
+  synced after. `transfer_org_ownership` is no longer callable by sessions.
+- A session cannot attribute a motion revision or canvas event to another user.
+- `ensureOrgForUser` creates a first org through `createFirstOrg`.
+- `signAssetPaths` signs only paths under the caller's orgs or teammates.
 - `api_keys` deletes: the key's owner, or an org admin (`OrgAction.ManageMembers`). The Settings
   revoke answers 404 when nothing was deleted.
 - `commit_motion_revision` with `p_layers` (the overload #2138 adds) is defined here too, as a
@@ -45,9 +54,9 @@ Follow-up in the same PR:
 - The tenancy migration is split in `20261114_orgs_read_only.sql` (safe before the deploy) and
   `20261114_team_writes_server_only.sql` (after it).
 
-Deploy order: only `20261114_team_writes_server_only.sql` waits for the app deploy; before it, the
-old Team page writes roles and invites with the session. The other five files are safe in either
-order. `20261113_agent_edit_counts.sql` (#2138, unapplied everywhere) no longer defines the
+Deploy order: `20261114_team_writes_server_only.sql` and `20261114_runs_server_written.sql` wait for
+the app deploy; before it, the old app writes roles, invites and runs with the session. The other
+four files are safe in either order. `20261113_agent_edit_counts.sql` (#2138, unapplied everywhere) no longer defines the
 eleven-argument `commit_motion_revision`: `20261114_history_append_only.sql` is its only
 definition, so the two apply in either order. The harness re-applies the unapplied siblings
 after the hardening and runs every probe again.
