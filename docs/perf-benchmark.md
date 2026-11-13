@@ -167,6 +167,15 @@ the field draws the text while it is open. `BUDGET_PROFILE=1` also writes a CPU 
 kind (`edit-<target>-<edit>.cpuprofile`) and the input and `live-asked` times
 (`.windows.json`) to cut it by edit.
 
+### Both sides of an A/B built the same way
+
+Build the base and the branch the same way: each a worktree with `node_modules` linked to the main
+checkout's and `@feega/*` linked to its own `packages/`, each built with `npm run build`. A base
+checkout with its own real `node_modules` ran the same dev commit (16172a940) about 15 ms slower
+per patched edit (2 alternated runs, landings, opacity p50 60.3 vs 41.1 ms, nudge 62.7 vs 50.5),
+enough to fake a gain. Measure dev against dev in the same setup first: that is the noise floor
+(p50 about ±2 ms, p90 ±10, worst ±35 on an M2 Pro at 60 Hz).
+
 ## Real-user telemetry
 
 Every open canvas (sampled by `PERF_SAMPLE_RATE` in `src/lib/canvas/perf/perf-beacon.ts`, 1 today)
