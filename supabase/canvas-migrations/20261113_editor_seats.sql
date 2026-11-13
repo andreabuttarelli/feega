@@ -4,7 +4,8 @@ alter table public.orgs
   add column if not exists editor_seats_grandfathered_at timestamptz,
   add column if not exists seats_paid integer,
   add column if not exists seats_paid_until timestamptz,
-  add column if not exists seats_checked_at timestamptz;
+  add column if not exists seats_checked_at timestamptz,
+  add column if not exists seats_sync_until timestamptz;
 
 update public.orgs o
 set editor_seats_grandfathered_at = now()
@@ -139,9 +140,13 @@ begin
     set stripe_subscription_id = NEW.id, editor_seats_grandfathered_at = null
     where id = _org_id;
   elsif _status = 'unpaid' then
-    update public.orgs set stripe_subscription_id = NEW.id where id = _org_id;
-    update public.orgs_members set role = 'viewer'
-    where org_id = _org_id and role in ('admin', 'member');
+    update public.orgs set stripe_subscription_id = NEW.id
+    where id = _org_id and (stripe_subscription_id is null or stripe_subscription_id = NEW.id);
+
+    if found then
+      update public.orgs_members set role = 'viewer'
+      where org_id = _org_id and role in ('admin', 'member');
+    end if;
   elsif _status in ('canceled', 'incomplete_expired') then
     update public.orgs set stripe_subscription_id = null, seats_paid = null, seats_paid_until = null
     where id = _org_id and stripe_subscription_id = NEW.id;
@@ -158,6 +163,34 @@ begin
   return NEW;
 end; $$;
 
+create or replace function public.record_paid_seats(p_org_id uuid, p_seats integer, p_until timestamptz) returns void
+  language sql security definer set search_path = '' as $$
+  update public.orgs
+  set seats_paid = case
+        when seats_paid_until is not distinct from p_until then greatest(coalesce(seats_paid, 0), p_seats)
+        else p_seats
+      end,
+      seats_paid_until = p_until
+  where id = p_org_id
+    and (seats_paid_until is null or p_until is null or seats_paid_until <= p_until);
+$$;
+
+create or replace function public.claim_seat_sync(p_org_id uuid, p_ms integer) returns boolean
+  language plpgsql security definer set search_path = '' as $$
+begin
+  update public.orgs set seats_sync_until = now() + make_interval(secs => p_ms / 1000.0)
+  where id = p_org_id and (seats_sync_until is null or seats_sync_until < now());
+  return found;
+end; $$;
+
+create or replace function public.release_seat_sync(p_org_id uuid) returns void
+  language sql security definer set search_path = '' as $$
+  update public.orgs set seats_sync_until = null where id = p_org_id;
+$$;
+
+revoke execute on function public.record_paid_seats(uuid, integer, timestamptz) from public, anon, authenticated;
+revoke execute on function public.claim_seat_sync(uuid, integer) from public, anon, authenticated;
+revoke execute on function public.release_seat_sync(uuid) from public, anon, authenticated;
 revoke execute on function public.feega_price_unit_amount(text) from public, anon, authenticated;
 revoke execute on function public.grant_credits_from_stripe_invoice() from public, anon, authenticated;
 revoke execute on function public.link_org_to_stripe_subscription() from public, anon, authenticated;

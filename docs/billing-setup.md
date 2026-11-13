@@ -98,6 +98,11 @@ The six retired Prices (`feega_monthly_8` … `feega_monthly_256`): set them **i
 delete them**. A subscriber still on one keeps renewing — the trigger reads that Price's
 `metadata.credits` — and the credits page names their plan as current.
 
+Configure Stripe **dunning (Billing → Revenue recovery → retries) to end by cancelling the
+subscription or marking it unpaid**, never by leaving it `past_due`: a team left `past_due`
+forever keeps its editors (it only cannot add more), while `unpaid` turns them into viewers and
+`canceled` ends the plan.
+
 Configure the customer portal **without plan switching and without quantity changes**:
 invoices, payment method and cancellation only. The quantity is the number of editors, and only
 the app sets it (`syncSeats`): an editor beyond the seats already paid this period is charged at
@@ -105,7 +110,10 @@ once (`always_invoice`); a removed editor lowers the quantity with no proration 
 paid until renewal, and re-adding within the period is free). It runs on an accepted editor
 invite, a role change across viewer/editor, a removal or a leave, and hourly from the Vercel cron
 `/api/v1/billing/seats/reconcile` (40 teams per run, oldest checked first, 502 when Stripe refuses
-one). A subscription on a retired price (`feega_monthly_8` …) is never touched.
+one). A subscription on a retired price (`feega_monthly_8` …) is never touched. Seat changes are
+serialised per team (`claim_seat_sync`, a 30-second lease on `orgs.seats_sync_until`): the target
+is computed from the member rows inside it, and a lower quantity is never sent with
+`always_invoice`.
 
 ## Going live
 

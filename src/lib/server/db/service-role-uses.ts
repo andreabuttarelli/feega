@@ -95,7 +95,7 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
   },
   {
     path: 'src/lib/server/team/seat-billing.ts — recordPaidSeats',
-    why: "orgs.seats_paid decides whether re-adding an editor this period is free, so no session may write it: a member who could set it would get free seats. Only syncSeats writes it, with the seats Stripe was already paid for and the subscription's current period end, right around the Stripe quantity change.",
+    why: "orgs.seats_paid decides whether re-adding an editor this period is free, and orgs.seats_sync_until serialises seat changes per team, so no session may write either: a member who could set them would get free seats or block billing. syncSeats calls only the service-role RPCs claim_seat_sync, record_paid_seats (raises seats_paid within a period, in SQL) and release_seat_sync.",
     tables: ['orgs']
   },
   {

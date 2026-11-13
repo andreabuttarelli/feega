@@ -4,9 +4,23 @@ import { fakeDb } from '$lib/server/db/fake-db';
 const setSeatQuantity = vi.fn();
 const seatSubscription = vi.fn();
 const recorded = vi.fn();
+const lock = vi.hoisted(() => ({ held: new Set<string>() }));
 vi.mock('$lib/server/db/client', () => ({
   createServiceRoleDb: () => ({
-    from: () => ({ update: (values: unknown) => ({ eq: async (_c: string, id: string) => (recorded(id, values), { error: null }) }) })
+    rpc: async (name: string, args: Record<string, unknown>) => {
+      const org = String(args.p_org_id);
+      if (name === 'claim_seat_sync') {
+        const free = !lock.held.has(org);
+        lock.held.add(org);
+        return { data: free, error: null };
+      }
+      if (name === 'release_seat_sync') {
+        lock.held.delete(org);
+        return { data: null, error: null };
+      }
+      recorded(org, { seats_paid: args.p_seats, seats_paid_until: args.p_until });
+      return { data: null, error: null };
+    }
   })
 }));
 vi.mock('$lib/server/stripe', () => ({
@@ -44,6 +58,7 @@ beforeEach(() => {
   setSeatQuantity.mockReset().mockResolvedValue(undefined);
   seatSubscription.mockReset();
   recorded.mockReset();
+  lock.held.clear();
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -89,6 +104,29 @@ describe('syncSeats', () => {
 
     expect(await syncSeats(team({ stripe_subscription_id: 'sub_1', seats_paid: 3, seats_paid_until: '2099-01-01T00:00:00.000Z' }), ORG)).toBe(SeatSync.Charged);
     expect(setSeatQuantity).toHaveBeenCalledWith('sub_1', 'si_1', 3, 'always_invoice');
+  });
+
+  it('two seat changes at the same moment are serialised: one charge for the seats added, never a decrease that invoices', async () => {
+    const billed = { quantity: 1 };
+    seatSubscription.mockImplementation(async () => perEditor(billed.quantity));
+    setSeatQuantity.mockImplementation(async (_sub: string, _item: string, quantity: number) => {
+      await new Promise((done) => setTimeout(done, 5));
+      billed.quantity = quantity;
+    });
+    const db = team({ stripe_subscription_id: 'sub_1' });
+
+    const outcomes = await Promise.all([syncSeats(db, ORG), syncSeats(db, ORG)]);
+
+    expect(setSeatQuantity.mock.calls).toEqual([['sub_1', 'si_1', 3, 'always_invoice']]);
+    expect(billed.quantity).toBe(3);
+    expect(outcomes.sort()).toEqual([SeatSync.Charged, SeatSync.Unchanged].sort());
+  });
+
+  it('with no period end from Stripe, a recorded count is still taken as paid, so a re-add never charges twice', async () => {
+    seatSubscription.mockResolvedValue(perEditor(2, { periodEnd: null }));
+
+    expect(await syncSeats(team({ stripe_subscription_id: 'sub_1', seats_paid: 3, seats_paid_until: null }), ORG)).toBe(SeatSync.Synced);
+    expect(setSeatQuantity).toHaveBeenCalledWith('sub_1', 'si_1', 3, 'none');
   });
 
   it('never touches a subscription on a retired price', async () => {

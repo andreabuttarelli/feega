@@ -48,3 +48,11 @@ Second review:
 - Seat state that cannot be read never fails an applied member change, never fails an invite
   acceptance (the editor joins as a viewer), and never takes the credits page down.
 - The cron emails the owner when it charges a seat.
+
+Third review:
+- Two seat changes at once could set a stale lower quantity with `always_invoice`. Seat changes
+  now run one per team under a lease (`claim_seat_sync`/`release_seat_sync`), read Stripe and the
+  member rows inside it, never invoice a decrease, and `record_paid_seats` raises `seats_paid` only
+  upward within a period in SQL.
+- A re-synced old `unpaid` subscription can no longer relink and demote a team paying on another.
+- Without a period end from Stripe, a recorded paid count is still honoured (no double charge).

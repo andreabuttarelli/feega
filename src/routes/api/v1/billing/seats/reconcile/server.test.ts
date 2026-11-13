@@ -12,7 +12,12 @@ vi.mock('$lib/server/stripe', () => ({
   setSeatQuantity: (...args: unknown[]) => setSeatQuantity(...args),
   seatSubscription: (...args: unknown[]) => seatSubscription(...args)
 }));
-vi.mock('$lib/server/db/client', () => ({ createServiceRoleDb: () => world.db }));
+vi.mock('$lib/server/db/client', () => ({
+  createServiceRoleDb: () =>
+    new Proxy(world.db as object, {
+      get: (target, key) => (key === 'rpc' ? async (name: string) => ({ data: name === 'claim_seat_sync' ? true : null, error: null }) : Reflect.get(target, key))
+    })
+}));
 const sendEmail = vi.fn();
 vi.mock('$lib/server/email', () => ({ sendEmail: (...a: unknown[]) => sendEmail(...a) }));
 

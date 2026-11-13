@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const setSeatQuantity = vi.fn();
 const seatSubscription = vi.fn();
 vi.mock('$lib/server/db/client', () => ({
-  createServiceRoleDb: () => ({ from: () => ({ update: () => ({ eq: async () => ({ error: null }) }) }) })
+  createServiceRoleDb: () => ({ rpc: async (name: string) => ({ data: name === 'claim_seat_sync' ? true : null, error: null }) })
 }));
 vi.mock('$lib/server/stripe', () => ({
   SeatProration: { None: 'none', Invoice: 'always_invoice' },

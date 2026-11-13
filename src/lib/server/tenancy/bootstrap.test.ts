@@ -11,7 +11,7 @@ vi.mock('$lib/server/stripe', () => ({
 vi.mock('$lib/server/email', () => ({ sendEmail: (...args: unknown[]) => sendEmail(...args) }));
 vi.mock('$lib/server/db/client', async (real) => ({
   ...(await real<object>()),
-  createServiceRoleDb: () => ({ from: () => ({ update: () => ({ eq: async () => ({ error: null }) }) }) })
+  createServiceRoleDb: () => ({ rpc: async (name: string) => ({ data: name === 'claim_seat_sync' ? true : null, error: null }) })
 }));
 
 beforeEach(() => {

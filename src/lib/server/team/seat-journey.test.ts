@@ -13,7 +13,17 @@ vi.mock('$lib/server/stripe', () => ({
   }
 }));
 const shared = vi.hoisted(() => ({ db: null as unknown }));
-vi.mock('$lib/server/db/client', () => ({ createServiceRoleDb: () => shared.db }));
+vi.mock('$lib/server/db/client', () => ({
+  createServiceRoleDb: () => ({
+    rpc: async (name: string, args: Record<string, unknown>) => {
+      const orgs = shared.db as unknown as { from: (t: string) => { update: (v: unknown) => { eq: (c: string, v: unknown) => Promise<unknown> } } };
+      if (name === 'record_paid_seats') {
+        await orgs.from('orgs').update({ seats_paid: args.p_seats, seats_paid_until: args.p_until }).eq('id', args.p_org_id);
+      }
+      return { data: name === 'claim_seat_sync' ? true : null, error: null };
+    }
+  })
+}));
 vi.mock('$lib/server/email', () => ({ sendEmail: async (...args: unknown[]) => stripeCalls.push(['email', (args[0] as { to: string }).to]) }));
 
 import { runTeamOp, TeamOp } from './team';

@@ -237,6 +237,34 @@ const journey = async (statuses) => {
 
 {
   const db = await world();
+  await subscribe(db, 'sub_paid', PAID, 'active');
+  await subscribe(db, 'sub_old', PAID, 'unpaid');
+  report((await linked(db, PAID)) === 'sub_paid' && (await roles(db, PAID))['p-admin'] === 'admin', 'an old unpaid subscription re-synced never takes over a team paying on another one');
+}
+
+{
+  const db = await world();
+  const until = new Date(PERIOD_END * 1000).toISOString();
+  const later = new Date((PERIOD_END + 2_592_000) * 1000).toISOString();
+  const paid = async () => (await db.query('select seats_paid from orgs where id = $1', [PAID])).rows[0].seats_paid;
+  await db.query('select public.record_paid_seats($1, 5, $2)', [PAID, until]);
+  await db.query('select public.record_paid_seats($1, 2, $2)', [PAID, until]);
+  const samePeriod = await paid();
+  await db.query('select public.record_paid_seats($1, 2, $2)', [PAID, later]);
+  report(samePeriod === 5 && (await paid()) === 2, `paid seats only go up within a period, and a new period starts over: got ${samePeriod} then ${await paid()}`);
+}
+
+{
+  const db = await world();
+  const claim = async () => (await db.query('select public.claim_seat_sync($1, 30000) as ok', [PAID])).rows[0].ok;
+  const first = await claim();
+  const second = await claim();
+  await db.query('select public.release_seat_sync($1)', [PAID]);
+  report(first === true && second === false && (await claim()) === true, 'one seat change per team at a time: a second claim waits until the first releases');
+}
+
+{
+  const db = await world();
   await subscribe(db, 'sub_crowded', CROWDED_FREE, 'active');
   const flagWhilePaying = await flagged(db, CROWDED_FREE);
   await setStatus(db, 'sub_crowded', 'canceled');

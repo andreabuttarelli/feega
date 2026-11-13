@@ -12,6 +12,7 @@ export enum SeatSync {
   Unchanged = 'unchanged',
   Synced = 'synced',
   Charged = 'charged',
+  Busy = 'busy',
   Failed = 'failed'
 }
 
@@ -87,16 +88,38 @@ const samePeriod = (org: OrgSeats, sub: SeatSubscription) =>
   !!org.seats_paid_until && !!sub.periodEnd && new Date(org.seats_paid_until).getTime() === new Date(sub.periodEnd).getTime();
 
 function paidThisPeriod(org: OrgSeats, sub: SeatSubscription): number {
-  return samePeriod(org, sub) && org.seats_paid != null ? Math.max(org.seats_paid, sub.quantity) : sub.quantity;
+  const recorded = org.seats_paid != null && (samePeriod(org, sub) || !sub.periodEnd);
+  return recorded ? Math.max(org.seats_paid ?? 0, sub.quantity) : sub.quantity;
 }
 
-async function recordPaidSeats(orgId: string, seats: number, until: string | null): Promise<void> {
-  const use = SERVICE_ROLE_USES.find((u) => u.path.startsWith(PAID_SEATS_USE))!;
-  const { error } = await (createServiceRoleDb(use) as unknown as SupabaseClient).from('orgs').update({ seats_paid: seats, seats_paid_until: until }).eq('id', orgId);
+const LOCK_MS = 30_000;
+const LOCK_TRIES = 20;
+const LOCK_WAIT_MS = 100;
+
+type SeatRpc = { rpc: (name: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message: string } | null }> };
+
+const seatRpc = (): SeatRpc => createServiceRoleDb(SERVICE_ROLE_USES.find((u) => u.path.startsWith(PAID_SEATS_USE))!) as unknown as SeatRpc;
+
+async function called(rpc: SeatRpc, name: string, args: Record<string, unknown>): Promise<unknown> {
+  const { data, error } = await rpc.rpc(name, args);
   if (error) {
-    throw error;
+    throw new Error(`${name}: ${error.message}`);
   }
+  return data;
 }
+
+async function claimed(rpc: SeatRpc, orgId: string): Promise<boolean> {
+  for (let i = 0; i < LOCK_TRIES; i++) {
+    if ((await called(rpc, 'claim_seat_sync', { p_org_id: orgId, p_ms: LOCK_MS })) === true) {
+      return true;
+    }
+    await new Promise((done) => setTimeout(done, LOCK_WAIT_MS));
+  }
+  return false;
+}
+
+const recordPaidSeats = (rpc: SeatRpc, orgId: string, seats: number, until: string | null) =>
+  called(rpc, 'record_paid_seats', { p_org_id: orgId, p_seats: seats, p_until: until });
 
 export function seatSteps({ quantity, paid, editors }: SeatCounts): SeatStep[] {
   if (editors === quantity) {
@@ -118,6 +141,23 @@ export function seatSteps({ quantity, paid, editors }: SeatCounts): SeatStep[] {
 }
 
 export async function syncSeats(db: Db, orgId: string): Promise<SeatSync> {
+  if (!(await orgSeats(db, orgId)).stripe_subscription_id) {
+    return SeatSync.Unbilled;
+  }
+
+  const rpc = seatRpc();
+  if (!(await claimed(rpc, orgId))) {
+    console.error('[seats] another seat change is still running, the reconcile cron retries', orgId);
+    return SeatSync.Busy;
+  }
+  try {
+    return await syncLocked(db, rpc, orgId);
+  } finally {
+    await called(rpc, 'release_seat_sync', { p_org_id: orgId }).catch((e) => console.error('[seats] lock not released, it expires on its own', orgId, e));
+  }
+}
+
+async function syncLocked(db: Db, rpc: SeatRpc, orgId: string): Promise<SeatSync> {
   const org = await orgSeats(db, orgId);
   const subscriptionId = org.stripe_subscription_id;
   if (!subscriptionId) {
@@ -141,11 +181,12 @@ export async function syncSeats(db: Db, orgId: string): Promise<SeatSync> {
       return SeatSync.Unchanged;
     }
 
-    await recordPaidSeats(orgId, paid, sub.periodEnd);
+    await recordPaidSeats(rpc, orgId, paid, sub.periodEnd);
     for (const step of steps) {
-      await setSeatQuantity(subscriptionId, sub.itemId, step.quantity, step.proration);
+      const charge = step.proration === INVOICE && step.quantity > sub.quantity;
+      await setSeatQuantity(subscriptionId, sub.itemId, step.quantity, charge ? INVOICE : NONE);
     }
-    await recordPaidSeats(orgId, Math.max(paid, ...steps.map((s) => s.quantity)), sub.periodEnd);
+    await recordPaidSeats(rpc, orgId, Math.max(paid, ...steps.map((s) => s.quantity)), sub.periodEnd);
     return steps.some((s) => s.proration === INVOICE) ? SeatSync.Charged : SeatSync.Synced;
   } catch (e) {
     console.error('[seats] quantity not synced, the reconcile cron retries', orgId, e);
