@@ -3901,3 +3901,16 @@ frame changes `view.zoom`; that puts the canvas on the zoom path (`zooming.activ
 `cached()`), which re-rasters frames per frame. Measure gestures with touch events, never only
 wheel, and compare at least four runs per side: the same gesture on the same fixture swings
 from 6 to 450 MB a frame between runs (`npm run perf:phone-guard`).
+
+## A phone tab that dies at rest: measure WebContent footprint in the iOS simulator
+
+**Signal:** the canvas dies on iPhone at the first gesture, whatever the gesture; texture and
+wasm counters look moderate. **Move:** boot the simulator, open the page with `xcrun simctl
+openurl`, and read `footprint <pid>` of the `com.apple.WebKit.WebContent` process under
+`CoreSimulator` — the figure jetsam limits, not RSS. Attribute by subtraction: a probe-only
+build with query switches (engine off, no media, no views, N frames) and one run each. Traps:
+a redirect drops the query string (open the canvas URL itself); after a rebuild Safari keeps
+the old HTML and asks for hashed chunks that no longer exist, which crashes the local-mode
+server (serve each build on a new port); the simulator's Safari runs the WebGL core, so vello's
+WebGPU buffers never show; terminating Safari counts as a death for the crash mark. JSC holds a
+parsed JSON doc at ~3.3x its text size, so parsed docs, not textures, filled most of the 950 MB.
