@@ -2632,12 +2632,20 @@
     props.onSettle?.(nodeId, settled.box);
   }
 
-  const autosizing = new Map<string, ReturnType<typeof setTimeout>>();
+  const autosizing = new Set<string>();
 
   function autosize(nodeId: string) {
-    clearTimeout(autosizing.get(nodeId));
-    autosizing.set(nodeId, setTimeout(() => void fitTextBoxes(nodeId), 0));
+    if (autosizing.has(nodeId)) {
+      return;
+    }
+    autosizing.add(nodeId);
+    afterPaint(() => {
+      autosizing.delete(nodeId);
+      void fitTextBoxes(nodeId);
+    });
   }
+
+  const afterPaint = (job: () => void) => (core ? core.afterPaint(job) : setTimeout(job));
 
   async function fitTextBoxes(nodeId: string) {
     const saver = saverOf(nodeId);

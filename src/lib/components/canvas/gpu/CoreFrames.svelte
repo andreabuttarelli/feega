@@ -1198,6 +1198,10 @@
 
   const pacer = new FramePacer(paint, (frame) => requestAnimationFrame(frame), () => raster?.busy?.() ?? false);
 
+  export function afterPaint(job: () => void) {
+    pacer.afterPaint(job);
+  }
+
   let taken: Taken | null = null;
   let takenFrom: SpatialIndex | null = null;
 

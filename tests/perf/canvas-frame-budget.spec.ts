@@ -591,6 +591,7 @@ for (const target of TARGETS) {
       })
     );
     writeFileSync(join(OUT, `edit-latency-${target}.json`), JSON.stringify(report, null, 2));
+    writeFileSync(join(OUT, `edit-stages-${target}.json`), JSON.stringify(all, null, 2));
     if (SHOTS) {
       writeFileSync(join(OUT, `edit-shots-${target}.json`), JSON.stringify(shotDiffs, null, 2));
       console.table(Object.fromEntries(Object.entries(shotDiffs).map(([e, d]) => [e, { shots: d.patched.length, patchedVsSettledMax: Math.max(...d.patched), beforeVsSettledMin: Math.min(...d.edited) }])));

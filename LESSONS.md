@@ -3912,3 +3912,9 @@ frame changes `view.zoom`; that puts the canvas on the zoom path (`zooming.activ
 `cached()`), which re-rasters frames per frame. Measure gestures with touch events, never only
 wheel, and compare at least four runs per side: the same gesture on the same fixture swings
 from 6 to 450 MB a frame between runs (`npm run perf:phone-guard`).
+
+## `npm ci` through a symlinked `node_modules` empties another checkout
+
+**Signal:** the main checkout's `node_modules` is suddenly empty and other worktrees' tools are
+missing. **Move:** a worktree's `node_modules` was a symlink and `npm ci` ran through it. Before any
+install, `[ -L node_modules ] && rm node_modules`; reinstall the checkout that was emptied.
