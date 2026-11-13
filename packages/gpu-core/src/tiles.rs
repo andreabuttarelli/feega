@@ -164,15 +164,19 @@ fn batches_of(missing: &[TileKey], side: i64) -> Vec<Batch> {
 #[derive(Default)]
 pub struct RasterCredit {
     ms: f64,
+    budget_ms: f64,
 }
+
+const DEBT_FRAMES: f64 = 3.0;
 
 impl RasterCredit {
     pub fn earn(&mut self, budget_ms: f64) {
+        self.budget_ms = budget_ms;
         self.ms = (self.ms + budget_ms).min(budget_ms);
     }
 
     pub fn spend(&mut self, ms: f64) {
-        self.ms -= ms;
+        self.ms = (self.ms - ms).max(-self.budget_ms * DEBT_FRAMES);
     }
 
     pub fn allows(&self) -> bool {

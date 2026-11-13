@@ -665,3 +665,18 @@ fn a_lifted_use_needs_the_tiles_of_its_rest_that_its_move_brings_on_screen() {
     assert!(keys.iter().all(|k| k.world().overlaps(rest) && k.step == 0));
     assert!(lifted_keys(camera(1.0), SCREEN, rest, (0.0, 0.0), 0).is_empty());
 }
+
+#[test]
+fn a_stall_long_past_does_not_starve_the_frames_after_it() {
+    let mut credit = gpu_core::tiles::RasterCredit::default();
+    credit.earn(4.0);
+    credit.spend(300.0);
+
+    let waited = (1..).find(|_| {
+        credit.earn(4.0);
+        credit.allows()
+    });
+
+    assert!(waited.unwrap() <= 4, "waited {waited:?} frames");
+}
+
