@@ -36,8 +36,11 @@ Billing, membership and history are decided by the server, not by the signed-in 
 | `orgs_members` | read the team; an admin removes a member, anyone leaves. Role changes go through the team endpoint |
 | `orgs_invites` | admins list and revoke. Creating or renewing an invite goes through the team endpoint |
 | `credit_ledger`, `ai_calls` | read its org's rows |
-| `api_keys` | an editor creates and deletes keys in their own name only; a key is never rewritten |
+| `api_keys` | an editor creates keys in their own name and deletes their own; an admin deletes any. A key is never rewritten |
 | `canvas_events` | read; an editor appends. Nothing updates or deletes |
-| `motion_revisions` | read, append, seal. Folding an edit into the head goes through `commit_motion_revision`, which refuses a non-editor |
+| `motion_revisions` | read, append, seal. Folding an edit into the head (and its `layers_touched`) goes through `commit_motion_revision`, which refuses a non-editor |
+| `node_runs` | an editor writes runs, but the values the server prices a run with are kept out of a session's writes |
+
+A render's credit hold is a `credit_ledger` row noted with the run's id; its refund and its charge cap are read from that row, never from the run.
 
 The MCP rows tools (`insert_row`, `update_row`, `delete_row`) refuse the same tables plus `node_runs` with `server_written_table`. `npm run test:billing-rls` proves each rule in pglite against `supabase/baseline` and every later migration.
