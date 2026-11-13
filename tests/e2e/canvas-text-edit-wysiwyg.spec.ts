@@ -52,6 +52,32 @@ function expectSame(a: Ink, b: Ink, what: string) {
   }
 }
 
+const MAX_DIFF_SHARE = 0.002;
+const CHANNEL_NOISE = 24;
+
+async function pixelsOf(page: Page, host: Locator, path: string): Promise<Buffer> {
+  const png = await page.screenshot({ path, clip: (await host.boundingBox())! });
+  return sharp(png).removeAlpha().raw().toBuffer();
+}
+
+function diffShare(a: Buffer, b: Buffer): number {
+  let off = 0;
+  for (let i = 0; i < a.length; i += 3) {
+    off += Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2])) > CHANNEL_NOISE ? 1 : 0;
+  }
+  return off / (a.length / 3);
+}
+
+const STYLES: { name: string; props: Record<string, unknown> }[] = [
+  { name: 'inter-bold-tight', props: { font: 'Inter', weight: 700, tracking: -0.04 } },
+  { name: 'playfair-loose', props: { font: 'Playfair Display', weight: 400, tracking: 0.08, leading: 1.6 } },
+  { name: 'mono-right', props: { font: 'JetBrains Mono', align: 'right' } },
+  { name: 'serif-centre-wrapped', props: { font: 'DM Serif Display', align: 'center', text: 'A long headline that wraps over several lines' } },
+  { name: 'upper-tight-leading', props: { textCase: 'upper', leading: 0.9 } },
+  { name: 'emoji-cjk-fallback', props: { text: 'Hello 😀 世界 $0/mo' } },
+  { name: 'rich-runs', props: { text: '$0/mo', runs: [{ start: 0, end: 2, weight: 800 }, { start: 2, end: 5, color: '#ff4d4d' }] } }
+];
+
 const CASES = ['fixed', 'auto', 'auto-height'].flatMap((sizing) => ['left', 'center', 'right'].map((align) => ({ sizing, align })));
 
 test.describe('the inline text editor draws what the canvas draws @real', () => {
@@ -68,7 +94,7 @@ test.describe('the inline text editor draws what the canvas draws @real', () => 
       const host = page.locator(`[data-testid="frame-overlays"] [data-frame="${frame.id}"]`);
       await expect(host).toBeVisible({ timeout: 30_000 });
       await page.waitForTimeout(SETTLE_MS);
-      await page.addStyleTag({ content: '[data-testid="core-text-edit"]{outline:none!important;caret-color:transparent!important}[data-testid="frame-overlays"] .selection{display:none!important}' });
+      await page.addStyleTag({ content: '[data-testid="core-text-marks"]{display:none!important}[data-testid="frame-overlays"] .selection{display:none!important}' });
       const name = `${SHOTS}/textedit-${sizing}-${align}`;
       const before = await inkOf(page, host, `${name}-before.png`);
       const box = (await host.boundingBox())!;
@@ -89,6 +115,33 @@ test.describe('the inline text editor draws what the canvas draws @real', () => 
 
       expectSame(before, during, 'during edit');
       expectSame(before, after, 'after commit');
+    });
+  }
+
+  for (const { name, props } of STYLES) {
+    test(`${name}: entering edit leaves the drawn pixels unchanged`, async ({ page, session, admin, seedNode }) => {
+      test.setTimeout(150_000);
+      const frame = await seedNode({ type: 'motion', x: 80, y: 80, data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } });
+      const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: frame.id, version: 1, doc: docOf(props), actor_kind: 'user', actor_id: session.userId });
+      expect(error).toBeNull();
+      await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+      const host = page.locator(`[data-testid="frame-overlays"] [data-frame="${frame.id}"]`);
+      await expect(host).toBeVisible({ timeout: 30_000 });
+      await page.waitForTimeout(SETTLE_MS);
+      await page.addStyleTag({ content: '[data-testid="core-text-marks"]{display:none!important}[data-testid="frame-overlays"] .selection{display:none!important}' });
+      const shot = `${SHOTS}/textedit-parity-${name}`;
+      const ink = await inkOf(page, host, `${shot}-ink.png`);
+      const box = (await host.boundingBox())!;
+      await page.mouse.click(box.x + 4, box.y + 4);
+      await page.waitForTimeout(SETTLE_MS);
+      const before = await pixelsOf(page, host, `${shot}-before.png`);
+
+      await page.mouse.dblclick(box.x + (ink.left + ink.right) / 2, box.y + (ink.top + ink.bottom) / 2);
+      await expect(page.getByTestId('core-text-edit')).toHaveCount(1, { timeout: 15_000 });
+      await page.waitForTimeout(SETTLE_MS);
+      const during = await pixelsOf(page, host, `${shot}-during.png`);
+
+      expect(diffShare(before, during), `${name} pixels changed on entering edit`).toBeLessThanOrEqual(MAX_DIFF_SHARE);
     });
   }
 
