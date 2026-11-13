@@ -35,7 +35,7 @@ function framedSession() {
   const doc = must(wrapInFrame(rect(rect(newMotionDoc(MotionFormat.Square), 'card', 0.3, 0.3, 0.4), 'dot', 0.2, 0.2, 0.05), ['card', 'dot'], 'box', 'lane'));
   return new FrameEditSession(
     { head: { version: 1, doc }, selection: ['dot'] },
-    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }), draft: () => {} }
+    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }), draft: () => {}, afterPaint: (job: () => void) => job() }
   );
 }
 

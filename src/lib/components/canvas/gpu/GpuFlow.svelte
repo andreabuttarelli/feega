@@ -1761,7 +1761,8 @@
         },
         pull: async () => {},
         send: (ops, version, summary) => postFrameOps(place, { ops, version, summary }),
-        draft: (draft) => props.onFrameDraft?.(draftId, nodeId, draft)
+        draft: (draft) => props.onFrameDraft?.(draftId, nodeId, draft),
+        afterPaint: (job) => afterPaint(job)
       }
     );
     session.access = editorMode.spec.access;
