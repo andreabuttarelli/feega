@@ -8,7 +8,8 @@ import { line, rect, solid } from './shapes';
 
 export enum Stand {
   Card = 'card',
-  Frame = 'frame'
+  Frame = 'frame',
+  Pending = 'pending'
 }
 
 export type Look = { paper: string; line: string };
@@ -19,7 +20,8 @@ const BORDER_PX = 1;
 
 const LISTS: Record<Stand, (size: Size, look: Look) => DisplayList> = {
   [Stand.Card]: (size, look) => ({ ...size, background: rgbaOf(look.paper) ?? [1, 1, 1, 1], items: [solid('placeholder:border', line(rect(0, 0, size.width, size.height), BORDER_PX, true), look.line)], unsupported: [] }),
-  [Stand.Frame]: (size) => ({ ...size, background: null, items: [], unsupported: [] })
+  [Stand.Frame]: (size) => ({ ...size, background: null, items: [], unsupported: [] }),
+  [Stand.Pending]: (size, look) => ({ ...size, background: rgbaOf(look.line) ?? null, items: [], unsupported: [] })
 };
 
 const wholePixels = (size: Size): Size => ({ width: Math.max(1, Math.round(size.width)), height: Math.max(1, Math.round(size.height)) });
