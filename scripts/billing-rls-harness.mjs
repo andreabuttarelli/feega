@@ -185,7 +185,10 @@ const PROBES_BY_TABLE = [
     name: 'motion_revisions: an editor still folds an edit that counts its layers',
     user: User.Member,
     setup: `insert into public.motion_revisions (org_id, node_id, version, doc, actor_kind, actor_id) values ('${ORG}', '${NODE}', 2, '{}', 'user', '${User.Member}')`,
-    sql: `select 1 from (select public.commit_motion_revision('${ORG}', '${NODE}', 2, '{}'::jsonb, 's', 'user', '${User.Member}', null, 60000, null, 3) as version) c where c.version = 3 and (select layers_touched from public.motion_revisions where org_id = '${ORG}' and version = 3) = 3`,
+    sql: [
+      `select public.commit_motion_revision('${ORG}', '${NODE}', 2, '{}'::jsonb, 's', 'user', '${User.Member}', null, 60000, null, 3)`,
+      `select 1 from public.motion_revisions where org_id = '${ORG}' and version = 3 and layers_touched = 3 and (select count(*) from public.motion_revisions where org_id = '${ORG}') = 2`
+    ],
     want: Want.Lands
   },
   { name: 'motion_revisions: a member cannot rewrite a layer count', user: User.Member, sql: `update public.motion_revisions set layers_touched = 0`, want: Want.Refused },
@@ -194,7 +197,14 @@ const PROBES_BY_TABLE = [
   { name: 'motion_revisions: another org cannot commit', user: User.Stranger, sql: `select 1 from (${commit(1, User.Stranger)}) c where c.version = 2`, want: Want.Refused }
 ];
 
-const HARDENING = ['20261114_tenancy_writes_server_only.sql', '20261114_money_rows_read_only.sql', '20261114_api_keys_own_user.sql', '20261114_history_append_only.sql'];
+const HARDENING = [
+  '20261114_orgs_read_only.sql',
+  '20261114_team_writes_server_only.sql',
+  '20261114_money_rows_read_only.sql',
+  '20261114_api_keys_own_user.sql',
+  '20261114_history_append_only.sql',
+  '20261114_run_values_server_written.sql'
+];
 
 const DEFINERS_A_SESSION_CALLS = {
   'auth_admin_org_ids()': 'reads only the caller rows',
@@ -203,6 +213,7 @@ const DEFINERS_A_SESSION_CALLS = {
   'auth_project_ids()': 'reads only the caller rows',
   'billing_grants_ready()': 'reads trigger names, no tenant data',
   'commit_motion_revision(uuid,uuid,integer,jsonb,text,text,uuid,text,integer,uuid)': 'motion_revision_writer refuses a non-editor',
+  'commit_motion_revision(uuid,uuid,integer,jsonb,text,text,uuid,text,integer,uuid,integer)': 'motion_revision_writer refuses a non-editor',
   'org_credit_balance(uuid)': 'sums only an org in auth_org_ids()',
   'transfer_org_ownership(uuid,uuid)': 'refuses anyone but the owner',
   'project_has_shares(uuid)': 'a boolean for any project id: an oracle, no write',
@@ -274,7 +285,11 @@ async function probe(db, { user, setup, sql }) {
     }
     await db.exec(`set local role ${ROLE_OF(user)}`);
     await db.query(`select set_config('request.jwt.claim.sub', $1, true), set_config('request.jwt.claim.role', $2, true)`, [user === User.Service ? '' : (user ?? ''), ROLE_OF(user)]);
-    const result = await db.query(sql);
+    const steps = [sql].flat();
+    for (const step of steps.slice(0, -1)) {
+      await db.query(step);
+    }
+    const result = await db.query(steps.at(-1));
     const touched = result.affectedRows || result.rows.length;
     return { outcome: touched ? Want.Lands : Want.Refused, detail: `${touched} row(s)` };
   } catch (e) {
