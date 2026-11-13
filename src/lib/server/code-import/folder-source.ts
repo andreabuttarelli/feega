@@ -24,6 +24,25 @@ const READY_MS = 90_000;
 const POLL_MS = 500;
 const HTTP_OK_MAX = 399;
 const LOOPBACK = '127.0.0.1';
+const INSTALL_MS = 5 * 60_000;
+const INSTALL_BUFFER = 64 * 1024 * 1024;
+const LOG_TAIL_CHARS = 2_000;
+const DEPENDENCIES = 'node_modules';
+
+export enum FolderStep {
+  Install = 'dependencies',
+  DevServer = 'dev-server'
+}
+
+export enum StepState {
+  Active = 'active',
+  Done = 'done',
+  Skipped = 'skipped'
+}
+
+export type FolderProgress = (step: FolderStep, state: StepState, manager: string) => void;
+
+const quiet: FolderProgress = () => undefined;
 
 export function folderOf(raw: string): string | null {
   const path = normalize(raw.trim());
@@ -155,15 +174,59 @@ async function factsAt(root: string): Promise<RepoFacts> {
   return { files, texts: Object.fromEntries(texts) };
 }
 
-async function started(dir: string, plan: RunPlan): Promise<Served> {
+const tailOf = (text: string) => text.trim().slice(-LOG_TAIL_CHARS);
+
+const failedOutput = (e: unknown) => {
+  const out = e as { stdout?: string; stderr?: string; message?: string };
+  return tailOf(`${out.stdout ?? ''}${out.stderr ?? ''}` || (out.message ?? ''));
+};
+
+async function installed(root: string, plan: RunPlan, progress: FolderProgress): Promise<void> {
+  const dir = join(root, plan.installDir);
+  if (existsSync(join(dir, DEPENDENCIES))) {
+    progress(FolderStep.Install, StepState.Skipped, plan.manager);
+    return;
+  }
+
+  progress(FolderStep.Install, StepState.Active, plan.manager);
+  const [cmd, ...args] = plan.install;
+  await run(cmd, args, { cwd: dir, env: { ...process.env, ...plan.env }, timeout: INSTALL_MS, maxBuffer: INSTALL_BUFFER }).catch((e: unknown) => {
+    throw new DevServerFailed(`installing the dependencies with ${plan.manager} failed in ${dir}\n${failedOutput(e)}`);
+  });
+  progress(FolderStep.Install, StepState.Done, plan.manager);
+}
+
+function captured(child: ChildProcess): () => string {
+  let log = '';
+  const keep = (chunk: Buffer) => {
+    log = (log + chunk.toString()).slice(-LOG_TAIL_CHARS);
+  };
+  child.stdout?.on('data', keep);
+  child.stderr?.on('data', keep);
+  return () => tailOf(log);
+}
+
+const exited = (child: ChildProcess) =>
+  new Promise<false>((resolve) => {
+    child.once('exit', () => resolve(false));
+    child.once('error', () => resolve(false));
+  });
+
+async function started(root: string, plan: RunPlan, progress: FolderProgress): Promise<Served> {
+  await installed(root, plan, progress);
+
+  progress(FolderStep.DevServer, StepState.Active, plan.manager);
+  const dir = join(root, plan.appDir);
   const [cmd, ...args] = plan.dev;
   const shimmed = await shimmedArgs(dir);
-  const child = spawnGroup(cmd, [...args, ...shimmed], { cwd: dir, env: { ...process.env, ...plan.env }, stdio: 'ignore' });
+  const child = spawnGroup(cmd, [...args, ...shimmed], { cwd: dir, env: { ...process.env, ...plan.env }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const log = captured(child);
   const url = `http://${LOOPBACK}:${plan.port}`;
-  if (!(await ready(url))) {
+  if (!(await Promise.race([ready(url), exited(child)]))) {
     stopGroup(child.pid!);
-    throw new DevServerFailed(`the dev server in ${dir} did not answer on ${url}`);
+    throw new DevServerFailed(`the dev server in ${dir} did not answer on ${url}\n${log()}`.trim());
   }
+  progress(FolderStep.DevServer, StepState.Done, plan.manager);
   return { url, child };
 }
 
@@ -176,14 +239,14 @@ function release(dir: string, shared: Shared) {
   shared.served.then((s) => stopGroup(s.child.pid!), () => undefined);
 }
 
-export async function withDevServer<T>(root: string, app: string | null, use: (url: string) => Promise<T>): Promise<T | PlanRefused> {
+export async function withDevServer<T>(root: string, app: string | null, use: (url: string) => Promise<T>, progress: FolderProgress = quiet): Promise<T | PlanRefused> {
   const plan = runPlan(await factsAt(root), app, { host: LOOPBACK, port: await freePort() });
   if (!plan.ok) {
     return plan;
   }
 
   const dir = join(root, plan.appDir);
-  const shared = serving.get(dir) ?? { served: started(dir, plan), users: 0 };
+  const shared = serving.get(dir) ?? { served: started(root, plan, progress), users: 0 };
   serving.set(dir, shared);
   shared.users += 1;
   try {

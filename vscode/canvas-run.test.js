@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { Launch, launchArgs, mcpServers, canvasFileFor, canvasPage, eventReader, importMessage, gitignoreWith, readyProbe, served, spawnOptions, Step, stepOf, loadingPage, errorPage, logTail, RETRY } = require('./canvas-run');
+const { Launch, launchArgs, mcpServers, canvasFileFor, canvasPage, eventReader, importMessage, gitignoreWith, readyProbe, served, spawnOptions, Step, progressOf, advance, failedAt, stepsPage, lineEvent, logTail, RETRY } = require('./canvas-run');
 
 test('apre il file senza browser e senza flag di import: senza terminale il launcher non chiede, e i launcher vecchi non conoscono --no-import', () => {
   assert.deepEqual(launchArgs('/w/a.feega', 61000, Launch.Open), ['-y', 'feega@latest', '/w/a.feega', '--port', '61000', '--no-open']);
@@ -65,28 +65,68 @@ test('npx parte dalla cartella della tela: da lì il launcher trova il package.j
   assert.equal(spawnOptions('/code/my-app/my-app.feega', 'darwin', {}).cwd, '/code/my-app');
 });
 
-test('i passi del launcher diventano il passo mostrato; un evento estraneo non cambia nulla', () => {
-  assert.equal(stepOf({ event: 'step', step: 'download' }), Step.Download);
-  assert.equal(stepOf({ event: 'step', step: 'install' }), Step.Install);
-  assert.equal(stepOf({ event: 'step', step: 'start' }), Step.Start);
-  assert.equal(stepOf({ event: 'imported', pages: 1 }), null);
-  assert.equal(stepOf({ event: 'step', step: 'boh' }), null);
+const states = (progress) => progress.steps.map((s) => `${s.id}:${s.state}`);
+
+test("aprire una tela mostra solo i passi dell'app; importare una cartella anche pagine, dipendenze, dev server e import", () => {
+  assert.deepEqual(progressOf(Launch.Open).steps.map((s) => s.id), [Step.App, Step.Start]);
+  assert.deepEqual(progressOf(Launch.ImportFolder).steps.map((s) => s.id), [Step.App, Step.Start, Step.Find, Step.Dependencies, Step.DevServer, Step.Pages]);
 });
 
-test('la schermata di avvio ha il marchio, il nome, la barra e il passo, nei due temi', () => {
-  const html = loadingPage(Step.Download);
-  assert.match(html, /<svg/);
-  assert.match(html, />feega</);
-  assert.match(html, /Downloading the app/);
-  assert.match(html, /vscode-dark/);
-  assert.doesNotMatch(html, /https?:\/\//);
+test('un passo che parte chiude quelli prima; il conteggio delle pagine e il gestore entrano nella riga', () => {
+  let p = progressOf(Launch.ImportFolder);
+  for (const e of [
+    { event: 'step', step: 'download' },
+    { event: 'step', step: 'start' },
+    { event: 'step', step: 'find', state: 'done', pages: 15 },
+    { event: 'step', step: 'dependencies', state: 'active', manager: 'bun' },
+    { event: 'step', step: 'page', index: 3, total: 15 }
+  ]) {
+    p = advance(p, e);
+  }
+  assert.deepEqual(states(p), ['app:done', 'start:done', 'find:done', 'dependencies:done', 'dev-server:done', 'pages:active']);
+  const html = stepsPage(p);
+  assert.match(html, /Find pages \(15\)/);
+  assert.match(html, /Install dependencies \(bun\)/);
+  assert.match(html, /Import page 3\/15/);
 });
 
-test("l'errore mostra il motivo e la coda del log, con un Retry, e non esegue l'HTML del log", () => {
-  const html = errorPage('Feega stopped (exit 1).', 'feega: <script>x</script>');
-  assert.match(html, /Feega stopped \(exit 1\)\./);
+test('un passo già chiuso non torna indietro quando arriva tardi la fine di quello prima', () => {
+  let p = advance(progressOf(Launch.ImportFolder), { event: 'step', step: 'find', state: 'done', pages: 2 });
+  p = advance(p, { event: 'step', step: 'start', state: 'done' });
+  assert.deepEqual(states(p).slice(1, 4), ['start:done', 'find:done', 'dependencies:active']);
+});
+
+test('le righe del launcher vecchio diventano gli stessi passi, e il suo errore diventa import-failed', () => {
+  assert.deepEqual(lineEvent('feega: looking for the pages of traidue.com…'), { event: 'step', step: 'find', state: 'active' });
+  assert.deepEqual(lineEvent('feega: importing traidue.com: 15 pages (starts its dev server, can take a minute)…'), { event: 'step', step: 'find', state: 'done', pages: 15 });
+  assert.deepEqual(lineEvent('feega: folder import failed: the dev server did not answer'), { event: 'import-failed', message: 'the dev server did not answer' });
+  assert.equal(lineEvent('feega: saving to /w/a.feega'), null);
+});
+
+test('una riga sola che arriva insieme a un evento non lo raddoppia', () => {
+  const seen = [];
+  const read = eventReader((e) => seen.push(e));
+  read('feega: looking for the pages of x…\nfeega:event {"event":"imported","pages":2}\n');
+  assert.deepEqual(seen, [{ event: 'step', step: 'find', state: 'active' }, { event: 'imported', pages: 2 }]);
+});
+
+test("un errore fa rosso il passo in corso, con il motivo, la coda del log e un Retry, senza eseguire l'HTML del log", () => {
+  let p = advance(progressOf(Launch.ImportFolder), { event: 'step', step: 'find', state: 'done', pages: 15 });
+  p = advance(p, { event: 'step', step: 'dev-server', state: 'active' });
+  p = failedAt(p, 'the dev server did not answer', 'Error: <script>x</script>');
+  assert.deepEqual(states(p).slice(-2), ['dev-server:error', 'pages:pending']);
+  const html = stepsPage(p);
+  assert.match(html, /the dev server did not answer/);
   assert.match(html, /&lt;script&gt;x&lt;\/script&gt;/);
   assert.match(html, new RegExp(`postMessage\\(\\{ type: '${RETRY}' \\}\\)`));
+});
+
+test('la schermata dei passi ha il marchio e il nome, nei due temi, senza risorse esterne', () => {
+  const html = stepsPage(progressOf(Launch.Open));
+  assert.match(html, /<svg/);
+  assert.match(html, />feega</);
+  assert.match(html, /vscode-dark/);
+  assert.doesNotMatch(html, /https?:\/\//);
 });
 
 test('la coda del log tiene le ultime righe', () => {

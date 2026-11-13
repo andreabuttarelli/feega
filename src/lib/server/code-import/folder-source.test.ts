@@ -33,6 +33,21 @@ describe('withDevServer', () => {
 
     expect(await withDevServer(root, null, async () => null)).toMatchObject({ ok: false, refusal: PlanRefusal.ChooseApp, apps: ['apps/docs', 'apps/web'] });
   });
+
+  it('una cartella senza node_modules installa le dipendenze prima di avviare il dev server', async () => {
+    const serve = "require('fs').statSync('node_modules/.installed');require('http').createServer((q,s)=>s.end('ok')).listen(process.env.PORT,process.env.HOST)";
+    const root = await folder({ 'package.json': { name: 'site', scripts: { postinstall: 'mkdir -p node_modules/.installed', dev: `node -e "${serve}"` } } });
+
+    expect(await withDevServer(root, null, async (url) => (await fetch(url)).text())).toBe('ok');
+  }, 60_000);
+
+  it('un dev server che muore porta nel messaggio la coda del suo stderr, senza aspettare il timeout', async () => {
+    const root = await folder({ 'package.json': { name: 'site', scripts: { dev: 'node -e "console.error(\'vite: Cannot find module mdsvex\');process.exit(1)"' } }, 'node_modules/.keep/package.json': {} });
+    const began = Date.now();
+
+    await expect(withDevServer(root, null, async () => null)).rejects.toThrow(/Cannot find module mdsvex/);
+    expect(Date.now() - began).toBeLessThan(15_000);
+  }, 120_000);
 });
 
 describe('the folder dev server', () => {

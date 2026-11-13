@@ -15,6 +15,7 @@ import { basename } from 'node:path';
 import { localModeRefusal } from '$lib/server/local/local-mode';
 import { localBrowser } from '$lib/server/web/browser';
 import { chromiumPage } from '$lib/server/motion/chromium-frames';
+import { pagesCounted, stepEvents } from './folder-events';
 import { DevServerFailed, withDevServer, folderFiles, folderHead, folderLibrary, folderNames, folderOf, folderSource } from './folder-source';
 import { located, repoOf, routesOf, type RepoRef } from './repo';
 import { SourceKind } from './code-source';
@@ -157,7 +158,7 @@ async function importFolderInto(scope: CodeScope, land: LandAsk, ask: CodeImport
   if (!root || !routes || app === undefined) {
     return { outcome: CodeImportOutcome.Invalid };
   }
-  const done = await withDevServer(root, app, (url) => importServed(land, ask, { root, routes, url })).catch(unstarted);
+  const done = await withDevServer(root, app, (url) => importServed(land, ask, { root, routes, url }), stepEvents()).catch(unstarted);
   if (done instanceof DevServerFailed) {
     return { outcome: CodeImportOutcome.RunFailed, error: done.message };
   }
@@ -183,7 +184,7 @@ async function importServed(land: LandAsk, ask: CodeImportAsk, { root, routes, u
   };
   const pages = (ask.variants ?? variantsOf(routes, ask.conditions ?? [BASE_CONDITIONS])).map((v) => ({ label: v.label, url: new URL(v.route, url).toString(), route: v.route, conditions: v.conditions }));
   const design = await designFor({ code: () => folderSource(root).read(''), designSystem: ask.designSystem }, null);
-  return importBoards({ ...land, open: localBrowser(chromiumPage, origin), guard: only, name: basename(root), pages, names: await folderNames(root), crop: Crop.Page, design, library: await folderLibrary(root).catch(() => undefined), delay: ask.delay });
+  return importBoards({ ...land, open: pagesCounted(localBrowser(chromiumPage, origin), pages.length), guard: only, name: basename(root), pages, names: await folderNames(root), crop: Crop.Page, design, library: await folderLibrary(root).catch(() => undefined), delay: ask.delay });
 }
 
 export async function rememberOrigin(scope: CodeScope, nodeId: string, origin: CodeOriginData): Promise<void> {
