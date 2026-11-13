@@ -14,7 +14,7 @@ import { codeVarsError } from '$lib/server/canvas/code-source';
  * da questo file.
  */
 import { exclusionsFor, inList, NOTHING_HIDDEN, touchesHidden, type HiddenScope } from '$lib/server/uncensored-workspace/hidden-scope';
-import { ORG_TABLES, CANVAS_WRITE_TABLES, type OrgTable } from './tables';
+import { ORG_TABLES, CANVAS_WRITE_TABLES, SERVER_WRITTEN_TABLES, type OrgTable } from './tables';
 import { ORG_TABLE_CHECKS } from './checks';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { logAiCall } from '$lib/server/ai-log';
@@ -165,6 +165,14 @@ function badIdentifier(table: string, values: Record<string, unknown>, where: Fi
       error: 'unknown_table',
       message: `"${table}" is not a table this surface can write.`,
       fix: 'Call `query` with no table to list every name you can write to.'
+    };
+  }
+
+  if (SERVER_WRITTEN_TABLES.has(table.trim())) {
+    return {
+      error: 'server_written_table',
+      message: `"${table}" holds membership, billing or history, and only feega's server writes it. You can read it with \`query\`.`,
+      fix: 'Change roles and invites from the Team page; keys, runs and history are written by the actions that cause them.'
     };
   }
 

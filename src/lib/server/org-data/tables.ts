@@ -48,5 +48,7 @@ export const ORG_TABLES = [
 
 export type OrgTable = (typeof ORG_TABLES)[number];
 
+export const SERVER_WRITTEN_TABLES = new Set<string>(['orgs', 'orgs_members', 'orgs_invites', 'api_keys', 'ai_calls', 'node_runs', 'canvas_events']);
+
 /** Le due tabelle su cui un agente MCP deve annunciarsi prima di scrivere — vedi §8bis. */
 export const CANVAS_WRITE_TABLES = new Set<string>(['nodes', 'nodes_connections']);

@@ -86,7 +86,9 @@ export function registerOrgDataTools(server: McpServer) {
     {
       title: 'Insert a row',
       description:
-        'Add ONE row to any table in your org. `org_id` is filled in for you; naming a different one ' +
+        'Add ONE row to a table in your org. `orgs`, `orgs_members`, `orgs_invites`, `api_keys`, ' +
+        '`ai_calls`, `node_runs` and `canvas_events` are written by feega only: a write there, here or in ' +
+        '`update_row`/`delete_row`, is refused as `server_written_table`. `org_id` is filled in for you; naming a different one ' +
         'is refused, not quietly corrected. Never replaces anything — a row that already exists comes ' +
         'back as a collision, and changing it is `update_row`. Several jsonb columns are checked ' +
         'against a real shape before writing (`nodes.data` by `type` — call `describe_node_types` ' +
