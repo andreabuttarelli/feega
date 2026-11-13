@@ -31,7 +31,7 @@
 <article class="landing">
   <h1>AI Video Upscaler</h1>
   <p class="intro">
-    feega upscales a video clip to 2× or 4K with FLUX Video Upscale. Upload an MP4 of up to 20 seconds, see the output size and
+    Feega upscales a video clip to 2× or 4K with FLUX Video Upscale. Upload an MP4 of up to 20 seconds, see the output size and
     the price before you run it, then compare before and after and download the sharper clip.
   </p>
   {@render button()}
@@ -122,7 +122,7 @@
   </section>
 
   <section>
-    <h2>More on feega</h2>
+    <h2>More on Feega</h2>
     <div class="body">
       {#each UPSCALER.more as [href, label] (href)}
         <p><a {href}>{label}</a></p>

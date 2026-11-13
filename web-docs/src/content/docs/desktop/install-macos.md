@@ -1,11 +1,11 @@
 ---
 title: Install on macOS
-description: Download the feega desktop app, open it the first time, and check the download.
+description: Download the Feega desktop app, open it the first time, and check the download.
 sidebar:
   order: 1
 ---
 
-The macOS app is feega itself: sign in and you get your orgs, projects, billing and AI, as on
+The macOS app is Feega itself: sign in and you get your orgs, projects, billing and AI, as on
 the web. It can also open a `.feega` file in [local mode](/getting-started/local-mode/), with no
 account. It is **not signed with an Apple Developer ID**, so macOS
 asks you to confirm it once. This page walks through that.
@@ -73,7 +73,7 @@ Management**, or use the Open Anyway steps above.
 ## "Feega is damaged and can't be opened"
 
 This message means macOS found the app's signature broken, usually because the download was cut
-short or the app was copied in a way that changed its files. It is not a feega account issue.
+short or the app was copied in a way that changed its files. It is not a Feega account issue.
 
 1. Move Feega to the Trash.
 2. Download the `.dmg` again and [check its hash](#2-check-the-download-optional-recommended).
@@ -100,7 +100,7 @@ If the hash matches and the message still appears, run the Terminal command abov
   `dev` script, with Node and Google Chrome installed). Edits on the canvas are written back to its files.
 - AI in local mode needs your own provider keys: put a `.env` with them, as in
   [local mode](/getting-started/local-mode/), in the same folder as the `.feega` file.
-- **File → Back to feega** returns to your account.
+- **File → Back to Feega** returns to your account.
 
 ## Updates
 

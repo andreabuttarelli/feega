@@ -1,11 +1,11 @@
 ---
 title: Apps
-description: feega on iPhone, iPad, Android and macOS.
+description: Feega on iPhone, iPad, Android and macOS.
 sidebar:
   order: 4
 ---
 
-The apps run the same feega you use in the browser: same canvas, same account, same files. Nothing to sync.
+The apps run the same Feega you use in the browser: same canvas, same account, same files. Nothing to sync.
 
 | Platform | Status |
 |---|---|
@@ -23,7 +23,7 @@ The apps run the same feega you use in the browser: same canvas, same account, s
 
 ## Desktop
 
-The macOS app runs feega in local mode: no account, one canvas per `.feega` file.
+The macOS app runs Feega in local mode: no account, one canvas per `.feega` file.
 Install it with the [macOS install guide](/desktop/install-macos/), which covers the
 first-open confirmation the unsigned app needs and how to check the download.
 

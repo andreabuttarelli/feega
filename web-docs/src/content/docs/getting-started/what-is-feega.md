@@ -1,11 +1,11 @@
 ---
-title: What is feega
+title: What is Feega
 description: The canvas, its nodes, and who works on it.
 sidebar:
   order: 1
 ---
 
-feega is an infinite canvas for motion video and images. Everything on it is a typed node. A person, the chat in the sidebar, or an outside agent over MCP can create and change nodes.
+Feega is an infinite canvas for motion video and images. Everything on it is a typed node. A person, the chat in the sidebar, or an outside agent over MCP can create and change nodes.
 
 Node types include `text`, `image`, `video`, `doc` and `iframe` for material and generation; frames (designs and videos) and free elements (shapes, text, vectors placed outside a frame) are nodes too. `describe_node_types` over MCP returns the exact schema per type.
 

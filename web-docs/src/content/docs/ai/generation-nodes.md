@@ -24,9 +24,9 @@ Node data shapes per type: MCP `describe_node_types`. Tool details: [MCP tools](
 
 ## Where the model list comes from
 
-The model menu of a node is a catalogue that feega refreshes on a schedule, so new models appear without a release. Kie.ai models come from Kie's own sources, Wiro models from its live tool list, and Higgsfield models from the public Higgsfield docs: each model page gives its endpoint and input schema, and a model is added only if feega can fill every input it requires (a prompt and image or video URLs). Prices come from the provider's own estimate call, so a new model arrives with a credit price.
+The model menu of a node is a catalogue that Feega refreshes on a schedule, so new models appear without a release. Kie.ai models come from Kie's own sources, Wiro models from its live tool list, and Higgsfield models from the public Higgsfield docs: each model page gives its endpoint and input schema, and a model is added only if Feega can fill every input it requires (a prompt and image or video URLs). Prices come from the provider's own estimate call, so a new model arrives with a credit price.
 
-- A model that feega wires by hand keeps priority over the same endpoint found in the docs: the hand entry carries what the docs do not say, such as reference limits.
+- A model that Feega wires by hand keeps priority over the same endpoint found in the docs: the hand entry carries what the docs do not say, such as reference limits.
 - **Wiro text and audio.** A short curated list, not the whole Wiro catalogue: LLMs (GPT-5 Nano and Mini, Gemini 3 Flash, DeepSeek V4.1 Flash, Grok 4.1 Fast, Claude Sonnet 5) in the text node, and speech, sound effects and music (Eleven v4 and v4 Turbo, Chatterbox Multilingual, ElevenLabs Sound Effects v3 and Music v2, Stable Audio 3 Small Music, Lyria 3) in the audio node, all under the Wiro heading. Text is estimated from Wiro's per-million-token rates, speech per character, music and effects per run or per duration; the credits charged follow Wiro's billed cost for the task. A model whose price Wiro does not publish is not offered. Wiro audio models use the model's default voice: the voice picker applies to ElevenLabs models only.
 - If the Higgsfield docs cannot be reached, the models already known stay as they are.
 - A model that leaves the docs is expired, never deleted.
