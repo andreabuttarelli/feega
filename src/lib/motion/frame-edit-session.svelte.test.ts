@@ -7,6 +7,9 @@ import { outgoing } from './frame-sync';
 import { OpKind } from './doc-ops';
 import { addClip } from '@feega/motion-core/motion/timeline';
 
+const SAVE_WAIT_MS = 300;
+const PAINT_WAIT_BOUND_MS = 1000;
+
 const base = newMotionDoc(MotionFormat.Landscape);
 const longer = (frames: number): MotionDoc => ({ ...base, durationInFrames: frames });
 
@@ -23,7 +26,8 @@ function open(send: SessionPort['send'] = accepted) {
     landed: vi.fn(),
     pull: vi.fn(async () => {}),
     send: vi.fn(send),
-    draft: vi.fn()
+    draft: vi.fn(),
+    afterPaint: vi.fn((job: () => void) => job())
   };
   return { port, session: new FrameEditSession({ head: { version: 1, doc: base }, selection: [] }, port) };
 }
@@ -560,5 +564,75 @@ describe('a pending change: shown and saved, never an undo step of its own', () 
     expect(port.show).toHaveBeenCalledWith(longer(70));
     expect(port.recorded).toHaveBeenCalled();
     expect(port.send).toHaveBeenCalled();
+  });
+});
+
+describe('a save reply handled after the frame that draws the edit', () => {
+  function unpainted() {
+    const opened = open();
+    const waiting: (() => void)[] = [];
+    opened.port.afterPaint = vi.fn((job: () => void) => void waiting.push(job));
+    return { ...opened, paint: () => waiting.splice(0).forEach((job) => job()) };
+  }
+
+  it('a reply that arrives before the paint is handled after it', async () => {
+    const { session, port, paint } = unpainted();
+
+    session.apply({ ok: true, doc: longer(60) }, 'Longer');
+    await vi.advanceTimersByTimeAsync(SAVE_WAIT_MS);
+
+    expect(port.send).toHaveBeenCalledTimes(1);
+    expect(port.landed).not.toHaveBeenCalled();
+    expect(session.version).toBe(1);
+
+    paint();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(port.landed).toHaveBeenCalledTimes(1);
+    expect(session.version).toBe(2);
+    expect(session.saveState).toBe(SaveState.Saved);
+  });
+
+  it('a reply is handled anyway when no frame is ever drawn', async () => {
+    const { session, port } = unpainted();
+
+    session.apply({ ok: true, doc: longer(60) }, 'Longer');
+    await vi.advanceTimersByTimeAsync(SAVE_WAIT_MS);
+    expect(session.version).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(PAINT_WAIT_BOUND_MS);
+
+    expect(port.landed).toHaveBeenCalledTimes(1);
+    expect(session.version).toBe(2);
+  });
+
+  it('leaving the page handles the reply now and sends the edits made meanwhile', async () => {
+    const { session, port } = unpainted();
+
+    session.apply({ ok: true, doc: longer(60) }, 'A');
+    await vi.advanceTimersByTimeAsync(SAVE_WAIT_MS);
+    session.apply({ ok: true, doc: longer(70) }, 'B');
+
+    await session.flushPending();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(session.version).toBe(2);
+    expect(port.send).toHaveBeenCalledTimes(2);
+  });
+
+  it('edits made while the reply waits are rebased, not dropped', async () => {
+    const { session, port, paint } = unpainted();
+
+    session.apply({ ok: true, doc: longer(60) }, 'A');
+    await vi.advanceTimersByTimeAsync(SAVE_WAIT_MS);
+    session.apply({ ok: true, doc: longer(70) }, 'B');
+    paint();
+    await vi.advanceTimersByTimeAsync(SAVE_WAIT_MS);
+    paint();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(port.send).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(port.send).mock.calls[1][0]).not.toEqual([]);
+    expect(session.saveState).toBe(SaveState.Saved);
   });
 });

@@ -13,6 +13,7 @@ import { BASE_BREAKPOINT } from '@feega/motion-core/motion/breakpoints/model';
 
 const SAVE_DEBOUNCE_MS = 250;
 const DRAFT_AFTER_MS = 50;
+const PAINT_WAIT_MS = 1000;
 const COALESCE_MS = 800;
 const RETRY_FIRST_MS = 1000;
 const RETRY_CAP_MS = 30000;
@@ -40,6 +41,7 @@ export type SessionPort = {
   pull: () => Promise<void>;
   send: (ops: DocOp[], version: number, summary: string) => Promise<SendResult>;
   draft: (draft: FrameDraft | null) => void;
+  afterPaint: (job: () => void) => void;
 };
 
 export enum DocAccess {
@@ -68,6 +70,7 @@ export class FrameEditSession {
   private lastEdit = { summary: '', at: 0 };
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private draftTimer: ReturnType<typeof setTimeout> | null = null;
+  private stopWaiting: (() => void) | null = null;
   private idlers: (() => void)[] = [];
   private unsavedSummary = '';
   private failures = 0;
@@ -221,7 +224,21 @@ export class FrameEditSession {
     return this.saveState === SaveState.Pending || this.saveState === SaveState.Saving;
   }
 
+  private painted(): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const done = () => {
+        clearTimeout(bound);
+        this.stopWaiting = null;
+        resolve();
+      };
+      const bound = setTimeout(done, PAINT_WAIT_MS);
+      this.stopWaiting = done;
+      this.port.afterPaint(done);
+    });
+  }
+
   async flushPending() {
+    this.stopWaiting?.();
     if (this.saveState !== SaveState.Pending) {
       return;
     }
@@ -317,6 +334,7 @@ export class FrameEditSession {
     const sent = this.history.present;
     const base = { version: this.version, doc: this.baseDoc };
     const result = await this.port.send(outgoing(base, sent), this.version, this.unsavedSummary).catch(() => UNREACHABLE);
+    await this.painted();
     this.saving = false;
 
     if (!result.ok && result.delivery === Delivery.Unreachable) {
