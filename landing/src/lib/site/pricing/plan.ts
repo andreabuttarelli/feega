@@ -110,7 +110,7 @@ export const bringYourAgent = (plan: CloudPlan): string =>
   `Bring the agent you already pay for: ${agentList()} edits your canvas through our MCP server or CLI, up to ${count(plan.freeAgentLayersPerWeek)} agent-made layers in any 7 days for free.`;
 
 export const agentAnswer = (plan: CloudPlan): string =>
-  `Yes. Connect ${agentList()} through our MCP server or CLI and it works on your canvas with your permissions, on the subscription you already have. Free teams get up to ${count(plan.freeAgentLayersPerWeek)} agent-made layers in any 7 days; the paid plan has no limit. feega's built-in AI is separate and uses credits. Edits you make by hand are never limited.`;
+  `Yes. Connect ${agentList()} through our MCP server or CLI and it works on your canvas with your permissions, on the subscription you already have. Free teams get up to ${count(plan.freeAgentLayersPerWeek)} agent-made layers in any 7 days; the paid plan has no limit. Feega's built-in AI is separate and uses credits. Edits you make by hand are never limited.`;
 
 export const moreSeats = (plan: CloudPlan): string =>
   `More ${plan.per}s need the plan, and only the team owner can add one. Each is charged ${money(plan, plan.price)} a ${plan.period} from the day they accept, prorated to your renewal.`;
@@ -123,7 +123,7 @@ export const creditsAnswer = (plan: CloudPlan): string =>
 
 export const pricingFaq = (plan: CloudPlan) => [
   {
-    q: 'Can I use feega for free?',
+    q: 'Can I use Feega for free?',
     a: `Yes. Run npx feega and the full editor is yours on your machine, free, with your own AI keys. In the cloud, a team with ${FREE_EDITORS} ${plan.per} is free, with unlimited viewers and ${count(FREE_CREDITS)} credits to try AI.`
   },
   {
