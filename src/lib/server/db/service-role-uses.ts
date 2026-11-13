@@ -84,6 +84,11 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['orgs', 'orgs_members', 'credit_ledger']
   },
   {
+    path: 'src/routes/api/v1/orgs/[orgId]/team/+server.ts — TeamCtx.writer (setRole, invite, resend, invite link)',
+    why: "A role change or an editor invite can add a paid seat, so no session may write orgs_members.role or orgs_invites: the database refuses both to authenticated (20261114_tenancy_writes_server_only.sql). The org_id comes from the URL, but runTeamOp reaches a write only after memberRole read the caller's role in that org with the caller's own client (RLS) and can() allowed the op, and after the seat check: the service role writes the one row that check approved, never a row chosen without it. Removing a member, leaving and revoking an invite stay on the caller's session.",
+    tables: ['orgs_members', 'orgs_invites']
+  },
+  {
     path: 'src/lib/server/tenancy/bootstrap.ts — acceptInvite',
     why: "Chi accetta non è ancora membro di quell'org: auth_org_ids() non la contiene, e la policy org_isolation su orgs_invites nasconderebbe l'invito proprio a chi lo sta usando. L'org_id non arriva da fuori, si LEGGE dalla riga trovata per impronta del token; il token in chiaro non è mai salvato e scaduto, inesistente o già speso rispondono tutti allo stesso modo. Legge anche credit_ledger (assertFreeOrgLimit): lo stesso limite di org gratuite di createFirstOrg si applica anche a un invito accettato. Accepting an editor reads orgs (the seat state) and, when a seat is charged, the owner's email in profiles to tell them.",
     tables: ['orgs_invites', 'orgs_members', 'credit_ledger', 'orgs', 'profiles']

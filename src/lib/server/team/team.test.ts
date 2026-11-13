@@ -47,32 +47,32 @@ const inviteRow = (id: string, email: string, role = 'member') => ({
 });
 
 function ctxFor(userId: string, extra: Record<string, unknown[]> = {}) {
-  const { db, calls } = fakeDb(
-    {
-      orgs_members: [memberRow(OWNER, 'owner'), memberRow(ADMIN, 'admin'), memberRow(MEMBER, 'member'), memberRow(VIEWER, 'viewer')],
-      orgs_invites: [],
-      orgs: [{ id: ORG, name: 'Acme', slug: 'acme' }],
-      ...extra
-    },
-    { filter: true, mutate: true }
-  );
+const rows: Record<string, unknown[]> = {
+    orgs_members: [memberRow(OWNER, 'owner'), memberRow(ADMIN, 'admin'), memberRow(MEMBER, 'member'), memberRow(VIEWER, 'viewer')],
+    orgs_invites: [],
+    orgs: [{ id: ORG, name: 'Acme', slug: 'acme' }],
+    ...extra
+  };
+  const { db, calls } = fakeDb(rows, { filter: true, mutate: true });
+  const { db: writer, calls: writes } = fakeDb(rows, { filter: true, mutate: true });
   const mail = vi.fn(async () => true);
   const rpc = vi.fn(async () => ({ data: null, error: null }));
   Object.assign(db, { rpc });
-  const ctx: TeamCtx = { db, userId, orgId: ORG, origin: 'https://feega.app', mail };
-  return { ctx, calls, mail, rpc };
+  const ctx: TeamCtx = { db, writer, userId, orgId: ORG, origin: 'https://feega.app', mail };
+  return { ctx, calls, writes, mail, rpc };
 }
 
 const written = (calls: Call[], table: string, op: string) => calls.filter((c) => c.table === table && c.op === op);
 
 describe('invitare', () => {
   it('un admin invita per email con un ruolo, e parte la mail con il link', async () => {
-    const { ctx, calls, mail } = ctxFor(ADMIN, { orgs_invites: [] });
+    const { ctx, calls, writes, mail } = ctxFor(ADMIN, { orgs_invites: [] });
 
     const result = await runTeamOp(ctx, { op: TeamOp.Invite, email: 'New@X.it', role: 'viewer' });
 
     expect(result.ok).toBe(true);
-    expect(written(calls, 'orgs_invites', 'insert')[0]).toMatchObject({ payload: expect.objectContaining({ email: 'new@x.it', role: 'viewer', org_id: ORG }) });
+    expect(written(writes, 'orgs_invites', 'insert')[0]).toMatchObject({ payload: expect.objectContaining({ email: 'new@x.it', role: 'viewer', org_id: ORG }) });
+    expect(written(calls, 'orgs_invites', 'insert')).toHaveLength(0);
     expect(mail).toHaveBeenCalledWith(expect.objectContaining({ to: 'new@x.it', orgName: 'Acme' }));
   });
 
@@ -102,12 +102,13 @@ describe('invitare', () => {
   });
 
   it('reinviare rinnova il token e rimanda la mail', async () => {
-    const { ctx, calls, mail } = ctxFor(ADMIN, { orgs_invites: [inviteRow('i1', 'p@x.it')] });
+    const { ctx, calls, writes, mail } = ctxFor(ADMIN, { orgs_invites: [inviteRow('i1', 'p@x.it')] });
 
     const result = await runTeamOp(ctx, { op: TeamOp.ResendInvite, inviteId: 'i1' });
 
     expect(result.ok).toBe(true);
-    expect(written(calls, 'orgs_invites', 'update')[0].payload).toEqual(expect.objectContaining({ token: expect.any(String), expires_at: expect.any(String) }));
+    expect(written(calls, 'orgs_invites', 'update')).toHaveLength(0);
+    expect(written(writes, 'orgs_invites', 'update')[0].payload).toEqual(expect.objectContaining({ token: expect.any(String), expires_at: expect.any(String) }));
     expect(mail).toHaveBeenCalledWith(expect.objectContaining({ to: 'p@x.it' }));
   });
 
@@ -120,24 +121,24 @@ describe('invitare', () => {
   });
 
   it('il link d invito entra come viewer, e rifarlo spegne il vecchio', async () => {
-    const { ctx, calls } = ctxFor(ADMIN, { orgs_invites: [inviteRow('old', LINK_INVITE_EMAIL, 'viewer')] });
+    const { ctx, calls, writes } = ctxFor(ADMIN, { orgs_invites: [inviteRow('old', LINK_INVITE_EMAIL, 'viewer')] });
 
     const result = await runTeamOp(ctx, { op: TeamOp.InviteLink });
 
     expect(result).toMatchObject({ ok: true, data: { url: expect.stringContaining('https://feega.app/login?invite_token=') } });
     expect(written(calls, 'orgs_invites', 'delete')[0].filters).toEqual(expect.arrayContaining([['email', LINK_INVITE_EMAIL], ['org_id', ORG]]));
-    expect(written(calls, 'orgs_invites', 'insert')[0].payload).toEqual(expect.objectContaining({ email: LINK_INVITE_EMAIL, role: 'viewer' }));
+    expect(written(writes, 'orgs_invites', 'insert')[0].payload).toEqual(expect.objectContaining({ email: LINK_INVITE_EMAIL, role: 'viewer' }));
   });
 });
 
 describe('i posti da editor', () => {
   it("un'org gratuita piena non accetta un altro editor, e dice come fare", async () => {
-    const { ctx, calls } = ctxFor(OWNER, { credit_ledger: [] });
+    const { ctx, writes } = ctxFor(OWNER, { credit_ledger: [] });
 
     const result = await runTeamOp(ctx, { op: TeamOp.Invite, email: 'new@x.it', role: 'member' });
 
     expect(result).toMatchObject({ ok: false, refusal: TeamRefusal.SeatLimit, detail: { upgrade_path: '/app/credits' } });
-    expect(written(calls, 'orgs_invites', 'insert')).toHaveLength(0);
+    expect(written(writes, 'orgs_invites', 'insert')).toHaveLength(0);
   });
 
   it('promuovere un viewer a editor in un org piena è rifiutato', async () => {
@@ -264,18 +265,19 @@ describe('the subscription follows the editors', () => {
 });
 
 describe('i membri', () => {
-  it('un admin cambia il ruolo di un member', async () => {
-    const { ctx, calls } = ctxFor(ADMIN);
+  it('un admin cambia il ruolo di un member, scritto dal server e mai con la sua sessione', async () => {
+    const { ctx, calls, writes } = ctxFor(ADMIN);
 
     expect((await runTeamOp(ctx, { op: TeamOp.SetRole, userId: MEMBER, role: 'viewer' })).ok).toBe(true);
-    expect(written(calls, 'orgs_members', 'update')[0]).toMatchObject({ payload: { role: 'viewer' } });
+    expect(written(writes, 'orgs_members', 'update')[0]).toMatchObject({ payload: { role: 'viewer' } });
+    expect(written(calls, 'orgs_members', 'update')).toHaveLength(0);
   });
 
   it("il ruolo dell'owner non si tocca", async () => {
-    const { ctx, calls } = ctxFor(ADMIN);
+    const { ctx, writes } = ctxFor(ADMIN);
 
     expect(await runTeamOp(ctx, { op: TeamOp.SetRole, userId: OWNER, role: 'member' })).toEqual({ ok: false, refusal: TeamRefusal.OwnerProtected });
-    expect(written(calls, 'orgs_members', 'update')).toHaveLength(0);
+    expect(written(writes, 'orgs_members', 'update')).toHaveLength(0);
   });
 
   it("l'owner non si rimuove", async () => {
