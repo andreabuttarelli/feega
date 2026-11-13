@@ -61,8 +61,8 @@
   </div>
 
   <p class="notice">
-    feega must never be used to create illegal content, such as CSAM, non-consensual intimate imagery (NCII) or sexual
-    deepfakes. feega does not use Google APIs or Google user data to generate content: Google and GitHub Sign-In data is
+    Feega must never be used to create illegal content, such as CSAM, non-consensual intimate imagery (NCII) or sexual
+    deepfakes. Feega does not use Google APIs or Google user data to generate content: Google and GitHub Sign-In data is
     used only to authenticate your account.
   </p>
 </footer>

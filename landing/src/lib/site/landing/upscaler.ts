@@ -35,7 +35,7 @@ export const UPSCALER = {
     ['Is my video private? Is the result labelled as AI?', 'Uploads and results stay in your private project storage, visible only to your workspace. The upscaled file carries AI-generated metadata.']
   ],
   more: [
-    ['/', 'feega home'],
+    ['/', 'Feega home'],
     ['/3d-animation-maker', '3D Animation Maker'],
     ['/ai-commercial-maker', 'AI Commercial Maker'],
     ['/paper-cutout-animation', 'Paper Cutout Animation'],
@@ -55,7 +55,7 @@ export function upscalerJsonLd(): string {
     '@graph': [
       {
         '@type': 'SoftwareApplication',
-        name: 'feega AI Video Upscaler',
+        name: 'Feega AI Video Upscaler',
         applicationCategory: 'MultimediaApplication',
         operatingSystem: 'Web',
         url: PAGE,
@@ -70,7 +70,7 @@ export function upscalerJsonLd(): string {
       {
         '@type': 'VideoObject',
         name: 'AI video upscale example: 480p to 2x',
-        description: 'Real FLUX Video Upscale output on feega: 854x480 to 1708x960. Big Buck Bunny (c) Blender Foundation, CC BY 3.0.',
+        description: 'Real FLUX Video Upscale output on Feega: 854x480 to 1708x960. Big Buck Bunny (c) Blender Foundation, CC BY 3.0.',
         thumbnailUrl: `https://feega.app${UPSCALER.media.poster}`,
         contentUrl: `https://feega.app${UPSCALER.media.after}`,
         uploadDate: '2026-10-04',

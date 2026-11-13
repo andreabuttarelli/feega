@@ -123,7 +123,7 @@ export const creditsAnswer = (plan: CloudPlan): string =>
 
 export const pricingFaq = (plan: CloudPlan) => [
   {
-    q: 'Can I use feega for free?',
+    q: 'Can I use Feega for free?',
     a: `Yes. Run npx feega and the full editor is yours on your machine, free, with your own AI keys. In the cloud, a team with ${FREE_EDITORS} ${plan.per} is free, with unlimited viewers and ${count(FREE_CREDITS)} credits to try AI.`
   },
   {

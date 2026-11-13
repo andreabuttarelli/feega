@@ -63,7 +63,7 @@ a:hover { color: var(--accent); }
   padding: 40px 0 0;
 }
 
-.wordmark { font-weight: 600; font-size: 20px; letter-spacing: -0.04em; }
+.wordmark { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 20px; letter-spacing: -0.04em; }
 
 .site-header nav { display: flex; gap: 20px; font-size: 15px; color: var(--text-2); }
 

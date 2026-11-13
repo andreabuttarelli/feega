@@ -20,6 +20,8 @@
   <link rel="canonical" href={canonical} />
   <link rel="icon" href="/site/favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="/site/favicon.ico" sizes="16x16 32x32 48x48" />
+  <link rel="icon" href="/site/favicon-16.png" sizes="16x16" type="image/png" />
+  <link rel="icon" href="/site/favicon-32.png" sizes="32x32" type="image/png" />
   <link rel="icon" href="/site/favicon.png" sizes="48x48" type="image/png" />
   <link rel="apple-touch-icon" href="/site/apple-touch-icon.png" />
   <meta property="og:type" content="website" />

@@ -1,6 +1,6 @@
 ---
 title: snapcn templates
-description: The free snapcn product-demo animations, ported to feega as motion templates.
+description: The free snapcn product-demo animations, ported to Feega as motion templates.
 sidebar:
   order: 12
 ---

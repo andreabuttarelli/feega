@@ -3,16 +3,16 @@
 </script>
 
 <svelte:head>
-  <title>Changelog — feega</title>
-  <meta name="description" content="All new features, improvements and fixes in feega. See what changed in the product." />
-  <meta property="og:title" content="Changelog — feega" />
-  <meta property="og:description" content="All new features, improvements and fixes in feega." />
+  <title>Changelog — Feega</title>
+  <meta name="description" content="All new features, improvements and fixes in Feega. See what changed in the product." />
+  <meta property="og:title" content="Changelog — Feega" />
+  <meta property="og:description" content="All new features, improvements and fixes in Feega." />
 </svelte:head>
 
 <section class="changelog">
   <header>
     <p class="eyebrow">Changelog</p>
-    <h1>What changed in feega</h1>
+    <h1>What changed in Feega</h1>
   </header>
 
   {#each entries as entry}

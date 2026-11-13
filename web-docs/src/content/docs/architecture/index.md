@@ -1,6 +1,6 @@
 ---
 title: Architecture overview
-description: How feega is built, for contributors.
+description: How Feega is built, for contributors.
 sidebar:
   order: 0
 ---
