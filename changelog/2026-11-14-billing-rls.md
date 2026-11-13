@@ -47,7 +47,14 @@ Follow-up in the same PR:
 - A session cannot attribute a motion revision or canvas event to another user. The nine-argument
   `commit_motion_revision` (invoker, reached only when the ten-argument one is missing) is dropped.
 - `ensureOrgForUser` creates a first org through `createFirstOrg`.
-- `signAssetPaths` signs only paths under the caller's orgs or teammates.
+- `signAssetPaths` signs a path only when an asset row the caller can read holds it, and picks the
+  bucket from where the path lives (under the row's org: `canvas-assets`; otherwise the maker's
+  folder in `brand-knowledge`). A departed member's media still loads. A session can store an
+  asset path only under the row's org, its own user folder, or a path the org already holds
+  (`20261114_asset_paths_bound.sql`); the rows tool refuses `assets.url`/`proxy_url`.
+- `hand_over_org` is created before the deploy (`20261114_hand_over_org.sql`), locks the two rows,
+  checks each update, and a partial unique index keeps one owner per org.
+- A render hold is refunded when its run cannot be created.
 - `api_keys` deletes: the key's owner, or an org admin (`OrgAction.ManageMembers`). The Settings
   revoke answers 404 when nothing was deleted.
 - `commit_motion_revision` with `p_layers` (the overload #2138 adds) is defined here too, as a
@@ -57,7 +64,8 @@ Follow-up in the same PR:
 
 Deploy order: `20261114_team_writes_server_only.sql` and `20261114_runs_server_written.sql` wait for
 the app deploy; before it, the old app writes roles, invites and runs with the session. The other
-four files are safe in either order. `20261113_agent_edit_counts.sql` (#2138, unapplied everywhere) no longer defines the
+six files are safe in either order, and `20261114_hand_over_org.sql` must be applied before the
+deploy, since the new Team page calls it. `20261113_agent_edit_counts.sql` (#2138, unapplied everywhere) no longer defines the
 eleven-argument `commit_motion_revision`: `20261114_history_append_only.sql` is its only
 definition, so the two apply in either order. The harness re-applies the unapplied siblings
 after the hardening and runs every probe again.
