@@ -6,10 +6,11 @@
   import { Input } from '$lib/components/ui/input';
   import { Button } from '$lib/components/ui/button';
   import { Notice } from '$lib/components/ui/notice';
+  import { Select } from '$lib/components/ui/select';
   import PageHead from '$lib/components/PageHead.svelte';
   import PageTitle from '$lib/components/PageTitle.svelte';
   import { BILLING_PATH } from '$lib/billing-path';
-  import { editorInviteHint, membersLine, planEndNotice, unpaidNotice } from '$lib/team-seat-copy';
+  import { editorInviteHint, membersLine, planEndNotice, refusalNotice, transferPrompt, unpaidNotice, type RefusalNotice } from '$lib/team-seat-copy';
 
   let { data } = $props();
 
@@ -23,18 +24,27 @@
 
   let email = $state('');
   let inviteRole = $state<OrgRole>(OrgRoleName.Member);
-  let notice = $state<{ tone: 'success' | 'error'; text: string } | null>(null);
+  let notice = $state<{ tone: 'success' | RefusalNotice['tone']; text: string } | null>(null);
   let link = $state<string | null>(null);
+  let busy = $state(false);
 
   async function op(body: Record<string, unknown>, success: string): Promise<Record<string, unknown> | null> {
-    const sent = await sendJson(`/api/v1/orgs/${data.orgId}/team`, 'POST', body);
-    if (!sent.ok) {
-      notice = { tone: 'error', text: String(sent.body.message ?? sent.body.error ?? 'Something went wrong') };
+    if (busy) {
       return null;
     }
-    notice = { tone: 'success', text: success };
-    await invalidateAll();
-    return sent.body;
+    busy = true;
+    try {
+      const sent = await sendJson(`/api/v1/orgs/${data.orgId}/team`, 'POST', body);
+      if (!sent.ok) {
+        notice = refusalNotice(sent.body, seats, can(team.role, OrgAction.Billing));
+        return null;
+      }
+      notice = { tone: 'success', text: success };
+      await invalidateAll();
+      return sent.body;
+    } finally {
+      busy = false;
+    }
   }
 
   async function invite(e: SubmitEvent) {
@@ -56,13 +66,14 @@
     }
   }
 
-  async function transfer(userId: string, who: string) {
-    if (confirm(`Make ${who} the owner? You become an admin.`)) {
+  async function transfer(userId: string, who: string, role: OrgRole) {
+    if (confirm(transferPrompt(seats, role, who))) {
       await op({ op: 'transfer_ownership', user_id: userId }, `${who} is now the owner.`);
     }
   }
 </script>
 
+<div class="team-page">
 <PageHead title="Team" subtitle={data.orgName} />
 <PageTitle text="Team" />
 
@@ -78,17 +89,17 @@
 
 {#if mayInvite}
   <Panel title="Invite" description="Viewers see everything and change nothing. Editors (members, admins) work on canvases and spend credits.">
-    <form class="flex gap-2" onsubmit={invite} data-testid="team-invite">
-      <Input type="email" required placeholder="name@company.com" bind:value={email} class="h-9" />
-      <select bind:value={inviteRole} class="h-9" aria-label="Role">
+    <form class="flex flex-wrap gap-2" onsubmit={invite} data-testid="team-invite">
+      <Input type="email" required placeholder="name@company.com" aria-label="Email" bind:value={email} class="min-w-48 flex-1" />
+      <Select bind:value={inviteRole} aria-label="Role" class="w-32">
         {#each roles as role (role)}<option value={role}>{role}</option>{/each}
-      </select>
-      <Button type="submit">Send invite</Button>
+      </Select>
+      <Button type="submit" disabled={busy}>Send invite</Button>
     </form>
     {#if editorRole(inviteRole)}
       <p class="m-0 text-[0.8125rem] text-muted-foreground" data-testid="team-seat-cost">
         {editorInviteHint(seats, can(team.role, OrgAction.Billing))}
-        {#if seats?.billing === 'free'}<a href={BILLING_PATH}>Subscribe</a>{/if}
+        {#if seats?.billing === 'free'}<a href={BILLING_PATH} class="underline underline-offset-4">Subscribe</a>{/if}
       </p>
     {/if}
 
@@ -118,22 +129,22 @@
 
 <Panel title="Members" description={membersLine(seats)}>
   {#each team.members as m (m.userId)}
-    <div class="flex items-center justify-between gap-3" data-testid="team-member">
-      <div class="min-w-0">
+    <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2" data-testid="team-member">
+      <div class="min-w-0 flex-1 basis-48">
         <p class="m-0 truncate text-sm font-semibold">{m.name ?? m.email}</p>
         <p class="m-0 text-[0.8125rem] text-muted-foreground">{m.email}</p>
       </div>
       <div class="flex items-center gap-1">
         {#if mayManage && m.role !== OrgRoleName.Owner}
-          <select value={m.role} aria-label="Role" onchange={(e) => op({ op: 'set_role', user_id: m.userId, role: e.currentTarget.value }, 'Role changed.')}>
+          <Select value={m.role} aria-label={`Role of ${m.name ?? m.email}`} class="w-28" disabled={busy} onchange={(e) => op({ op: 'set_role', user_id: m.userId, role: e.currentTarget.value }, 'Role changed.')}>
             {#each roles as role (role)}<option value={role}>{role}</option>{/each}
-          </select>
+          </Select>
           <Button variant="ghost" size="sm" onclick={() => op({ op: 'remove_member', user_id: m.userId }, `${m.email} removed.`)}>Remove</Button>
         {:else}
           <span class="text-[0.8125rem]">{m.role}</span>
         {/if}
         {#if mayTransfer && m.role !== OrgRoleName.Owner}
-          <Button variant="ghost" size="sm" onclick={() => transfer(m.userId, m.email)}>Make owner</Button>
+          <Button variant="ghost" size="sm" onclick={() => transfer(m.userId, m.email, m.role)}>Make owner</Button>
         {/if}
       </div>
     </div>
@@ -145,3 +156,16 @@
     <div><Button variant="ghost" onclick={leave} data-testid="team-leave">Leave {data.orgName}</Button></div>
   </Panel>
 {/if}
+</div>
+
+<style>
+  .team-page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    max-width: 56rem;
+    width: 100%;
+    margin: 0 auto;
+    padding: 2rem 1rem 3rem;
+  }
+</style>

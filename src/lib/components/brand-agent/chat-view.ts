@@ -68,13 +68,13 @@ export type Failure = 'load' | 'send' | 'empty' | 'credits' | 'blocked' | 'agent
 
 const HTTP_PAYMENT_REQUIRED = 402;
 
-export const FAILURES: Record<Failure, { messageKey: string; action: 'retry' | 'credits' | 'rephrase' }> = {
+export const FAILURES: Record<Failure, { messageKey: string; action: 'retry' | 'credits' | 'rephrase'; linkKey?: string }> = {
   load: { messageKey: 'chat.panel.failure.load', action: 'retry' },
   send: { messageKey: 'chat.panel.failure.send', action: 'retry' },
   empty: { messageKey: 'chat.panel.failure.empty', action: 'retry' },
-  credits: { messageKey: 'chat.panel.failure.credits', action: 'credits' },
+  credits: { messageKey: 'chat.panel.failure.credits', action: 'credits', linkKey: 'chat.panel.buyCredits' },
   blocked: { messageKey: 'chat.panel.failure.blocked', action: 'rephrase' },
-  agentCap: { messageKey: 'chat.panel.failure.agentCap', action: 'credits' }
+  agentCap: { messageKey: 'chat.panel.failure.agentCap', action: 'credits', linkKey: 'app.account.billing.subscribe' }
 };
 
 const FAILURE_OF_CODE: Readonly<Record<string, Failure>> = {
