@@ -166,6 +166,22 @@ describe('listNodeSocialPosts', () => {
     expect(out[0].media?.thumbnailUrl).toBe(`https://signed.example/canvas-assets/${path}`);
   });
 
+  it("un percorso fuori dall'archivio di quel nodo non si firma mai", async () => {
+    const { db } = fakeDb({
+      social_posts: [
+        {
+          id: 's1', node_id: NODE, project_id: PROJECT, platform: 'instagram', external_id: 'x', handle: 'brand', caption: '',
+          media: { items: [{ type: 'image', url: 'https://cdn.example.com/a.jpg', thumbnailUrl: 'https://cdn.example.com/a.jpg', thumbnailPath: 'another-org/node/secret.jpg' }] },
+          metrics: {}, permalink: null, posted_at: null, fetched_at: '2026-09-22T00:00:00Z'
+        }
+      ]
+    });
+
+    const out = await listNodeSocialPosts(db, { orgId: ORG, nodeId: NODE });
+    const items = out[0].media?.items as Array<Record<string, unknown>>;
+    expect(items[0].thumbnailUrl).toBe('https://cdn.example.com/a.jpg');
+  });
+
   it('un post senza thumbnailPath archiviato resta con l\'url originale, senza chiamare la firma', async () => {
     const { db, calls } = fakeDb({
       social_posts: [

@@ -119,7 +119,7 @@ export async function listNodeSocialPosts(
     return Array.isArray(items)
       ? items
           .flatMap((item) => ARCHIVED_PATH_KEYS.map((key) => (item as Record<string, unknown>)[key]))
-          .filter((p): p is string => typeof p === 'string')
+          .filter((p): p is string => typeof p === 'string' && p.startsWith(`${scope.orgId}/${scope.nodeId}/`))
       : [];
   });
   const signed = await signAssetFiles(db, paths);
