@@ -128,7 +128,6 @@ const PROBES_BY_TABLE = [
   { name: 'orgs_members: a member still leaves', user: User.Member, sql: `delete from public.orgs_members where user_id = '${User.Member}' and org_id = '${ORG}'`, want: Want.Lands },
   { name: 'orgs_members: the owner row cannot be removed', user: User.Admin, sql: `delete from public.orgs_members where user_id = '${User.Owner}'`, want: Want.Refused },
   { name: 'orgs_members: a viewer reads the team', user: User.Viewer, sql: `select user_id from public.orgs_members where org_id = '${ORG}'`, want: Want.Lands },
-  { name: 'orgs_members: ownership still transfers through its function', user: User.Owner, sql: `select public.transfer_org_ownership('${ORG}', '${User.Admin}')`, want: Want.Lands },
   { name: 'orgs_members: an admin cannot take ownership', user: User.Admin, sql: `select public.transfer_org_ownership('${ORG}', '${User.Admin}')`, want: Want.Refused },
 
   { name: 'orgs_invites: an admin cannot invite an editor directly', user: User.Admin, sql: `insert into public.orgs_invites (org_id, email, role, token, expires_at) values ('${ORG}', 'x@y.z', 'member', 't', now() + interval '1 day')`, want: Want.Refused },
@@ -203,7 +202,7 @@ const HARDENING = [
   '20261114_money_rows_read_only.sql',
   '20261114_api_keys_own_user.sql',
   '20261114_history_append_only.sql',
-  '20261114_run_values_server_written.sql'
+  '20261114_runs_server_written.sql'
 ];
 
 const UNAPPLIED_SIBLINGS = ['20261112_credits_never_expire.sql', '20261113_editor_seats.sql', '20261113_agent_edit_counts.sql'];
@@ -217,7 +216,6 @@ const DEFINERS_A_SESSION_CALLS = {
   'commit_motion_revision(uuid,uuid,integer,jsonb,text,text,uuid,text,integer,uuid)': 'motion_revision_writer refuses a non-editor',
   'commit_motion_revision(uuid,uuid,integer,jsonb,text,text,uuid,text,integer,uuid,integer)': 'motion_revision_writer refuses a non-editor',
   'org_credit_balance(uuid)': 'sums only an org in auth_org_ids()',
-  'transfer_org_ownership(uuid,uuid)': 'refuses anyone but the owner',
   'project_has_shares(uuid)': 'a boolean for any project id: an oracle, no write',
   'project_has_uncensored_outputs(uuid)': 'a boolean for any project id: an oracle, no write',
   'project_is_uncensored(uuid)': 'a boolean for any project id: an oracle, no write',
@@ -226,39 +224,40 @@ const DEFINERS_A_SESSION_CALLS = {
 };
 
 const RUN_VALUE_PROBES = [
-  {
-    name: 'node_runs: a session cannot create a run carrying a server-written value',
-    user: User.Member,
-    sql: `with r as (insert into public.node_runs (org_id, node_id, params) values ('${ORG}', '${NODE}', '{"quotedUsd": 0.0001, "kept": 1}') returning params) select 1 from r where r.params ? 'quotedUsd'`,
-    want: Want.Refused
-  },
-  {
-    name: 'node_runs: a session cannot change a server-written value',
-    user: User.Member,
-    sql: `with r as (update public.node_runs set params = params || '{"quotedUsd": 0.0001}' where id = '${RUN}' returning params) select 1 from r where (r.params->>'quotedUsd')::numeric <> 2`,
-    want: Want.Refused
-  },
-  {
-    name: 'node_runs: a session cannot drop a server-written value',
-    user: User.Member,
-    sql: `with r as (update public.node_runs set params = '{}' where id = '${RUN}' returning params) select 1 from r where not (r.params ? 'quotedUsd')`,
-    want: Want.Refused
-  },
-  {
-    name: 'node_runs: an editor still writes the rest of a run',
-    user: User.Member,
-    sql: `with r as (update public.node_runs set params = params || '{"progress": 1}' where id = '${RUN}' returning params) select 1 from r where r.params->>'progress' = '1' and r.params->>'quotedUsd' = '2'`,
-    want: Want.Lands
-  },
-  {
-    name: 'node_runs: the server still writes its values',
-    user: User.Service,
-    sql: `with r as (update public.node_runs set params = params || '{"quotedUsd": 3}' where id = '${RUN}' returning params) select 1 from r where r.params->>'quotedUsd' = '3'`,
-    want: Want.Lands
-  }
+  { name: 'node_runs: a session cannot create a run', user: User.Member, sql: `insert into public.node_runs (org_id, node_id, params) values ('${ORG}', '${NODE}', '{}') returning id`, want: Want.Refused },
+  { name: 'node_runs: a session cannot change what a run was quoted', user: User.Member, sql: `update public.node_runs set params = params || '{"quotedUsd": 0.0001}' where id = '${RUN}'`, want: Want.Refused },
+  { name: 'node_runs: a session cannot change what a run cost', user: User.Member, sql: `update public.node_runs set cost_usd = 0 where id = '${RUN}'`, want: Want.Refused },
+  { name: 'node_runs: a session cannot repoint a run at another job', user: User.Member, sql: `update public.node_runs set external_job_id = 'kie:another' where id = '${RUN}'`, want: Want.Refused },
+  { name: 'node_runs: a session cannot change a run status', user: User.Member, sql: `update public.node_runs set status = 'failed' where id = '${RUN}'`, want: Want.Refused },
+  { name: 'node_runs: a session cannot delete a run', user: User.Member, sql: `delete from public.node_runs where id = '${RUN}'`, want: Want.Refused },
+  { name: 'node_runs: a viewer still reads runs', user: User.Viewer, sql: `select id from public.node_runs where org_id = '${ORG}'`, want: Want.Lands },
+  { name: 'node_runs: the server still writes a run', user: User.Service, sql: `update public.node_runs set params = params || '{"quotedUsd": 3}', cost_usd = 1 where id = '${RUN}'`, want: Want.Lands },
+  { name: 'node_runs: run params are always an object', user: User.Service, sql: `update public.node_runs set params = '[1, 2]' where id = '${RUN}'`, want: Want.Refused }
 ];
 
-const PROBES = [...PROBES_BY_TABLE, ...RUN_VALUE_PROBES];
+const TEAM_FUNCTION_PROBES = [
+  { name: 'orgs_members: a session cannot move ownership around the server', user: User.Owner, sql: `select public.transfer_org_ownership('${ORG}', '${User.Viewer}')`, want: Want.Refused },
+  { name: 'orgs_members: a session cannot hand the org over directly', user: User.Owner, sql: `select public.hand_over_org('${ORG}', '${User.Owner}', '${User.Viewer}', 'viewer')`, want: Want.Refused },
+  {
+    name: 'orgs_members: the server hands the org over in one step',
+    user: User.Service,
+    sql: [
+      `select public.hand_over_org('${ORG}', '${User.Owner}', '${User.Viewer}', 'viewer')`,
+      `select 1 where (select role from public.orgs_members where user_id = '${User.Viewer}') = 'owner' and (select role from public.orgs_members where user_id = '${User.Owner}') = 'viewer'`
+    ],
+    want: Want.Lands
+  },
+  { name: 'orgs_members: a hand-over never makes two owners', user: User.Service, sql: `select public.hand_over_org('${ORG}', '${User.Owner}', '${User.Viewer}', 'owner')`, want: Want.Refused }
+];
+
+const ATTRIBUTION_PROBES = [
+  { name: 'motion_revisions: a session cannot credit a revision to a teammate', user: User.Member, sql: `select public.commit_motion_revision('${ORG}', '${NODE}', 1, '{}'::jsonb, 's', 'user', '${User.Owner}', null, 0, null)`, want: Want.Refused },
+  { name: 'motion_revisions: a session cannot credit a counted revision to a teammate', user: User.Member, sql: `select public.commit_motion_revision('${ORG}', '${NODE}', 1, '{}'::jsonb, 's', 'agent', '${User.Owner}', 'mcp', 0, null, 3)`, want: Want.Refused },
+  { name: 'motion_revisions: an agent acting for the caller is still the caller', user: User.Member, sql: `select 1 from (select public.commit_motion_revision('${ORG}', '${NODE}', 1, '{}'::jsonb, 's', 'agent', '${User.Member}', 'mcp', 0, null, 3) as v) c where c.v = 2`, want: Want.Lands },
+  { name: 'motion_revisions: the server still writes for whoever acted', user: User.Service, sql: `select 1 from (select public.commit_motion_revision('${ORG}', '${NODE}', 1, '{}'::jsonb, 's', 'agent', '${User.Owner}', 'mcp', 0, null, 3) as v) c where c.v = 2`, want: Want.Lands }
+];
+
+const PROBES = [...PROBES_BY_TABLE, ...RUN_VALUE_PROBES, ...TEAM_FUNCTION_PROBES, ...ATTRIBUTION_PROBES];
 
 const REALTIME_TABLES = ['canvases', 'node_runs', 'nodes', 'nodes_connections'];
 
