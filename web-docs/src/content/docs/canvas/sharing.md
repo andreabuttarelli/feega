@@ -5,6 +5,7 @@ sidebar:
   order: 10
 ---
 
+- **Canvas link.** Share a whole canvas with anyone who has the link. Visitors see every frame and element as it is now, drawn on the same GPU engine as the editor, published or not; they can pan and zoom, never edit. Turning the link off stops it at once.
 - **Frame viewer link.** Copy a viewer link for a single frame from the export dialog, `feega motion share <nodeId>`, or the MCP tool `share_motion_frame`. The viewer is full screen and loops; on a phone, tap to play and swipe between frames.
 - **Prototype play link.** Copy a link that plays a clickable prototype from the frame inspector (**Copy play link**), `feega motion play <nodeId>` or the MCP tool `get_play_link`. See [Prototype player](/canvas/prototype-player/).
 - **Duplicate.** A signed-in visitor can duplicate a shared frame into their own workspace from its link.
