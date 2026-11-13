@@ -1,11 +1,11 @@
-# Phones leave unreadable frames unbuilt
+# Phones draw far frames from snapshots and keep a bounded set built
 
 Signal: the owner's iPhone and iPad kill the canvas tab on the first pan or
 zoom. The crash record (#2121) showed a pure pan at zoom 0.05 with only 160 MB
-of tracked textures, so the gesture was the last straw, not the cause.
+of tracked textures: the gesture was the last straw, not the cause.
 
-Measured on the iOS 26.5 simulator (iPhone 17 Pro, Safari, `landings.feega` in
-local mode, `footprint` of the WebContent process at rest, MiB):
+Attribution (iOS 26.5 simulator, iPhone 17 Pro, Safari, `landings.feega` in
+local mode, `footprint` of the WebContent process, MiB):
 
 | state | footprint |
 |---|---|
@@ -16,39 +16,44 @@ local mode, `footprint` of the WebContent process at rest, MiB):
 | engine not attached (probe) | 796 |
 | no media decode (probe) | 932 |
 | no thumbnails / no DOM reads / worker killed (probes) | 967–973, innocent |
-| after this change, fit zoom, first open / reopen | 193 / 207 |
+| nothing built (probe) | 193 |
 
 Most of the 950 MB was JavaScript: every frame and every breakpoint view was
-built at open, whatever the zoom, and JSC holds a parsed doc at ~3.3x its JSON
-text (12.8 MB of docs became 42 MB of footprint in a calibration run).
+built at open whatever the zoom, and JSC holds a parsed doc at ~3.3x its JSON
+text. The frame worker kept the last doc it built (~260 MB in Playwright
+WebKit).
 
-Changes:
+Changes, all phone rows of `BUDGET` (desktop builds everything, as before):
 
-- `frameBuilder` no longer keeps each doc's JSON text (72 MB on the fixture).
-  It saved a re-stringify on an asset-tier rebuild, but tier changes swap image
-  URLs in the built list (`retier`) and no longer rebuild.
-- The device budget has `readableWidth`: on a phone a frame drawn narrower than
-  160 CSS px is neither warmed nor built; it shows its thumbnail or poster until
-  a zoom makes it readable (checked on the cache zoom step, so a pan costs
-  nothing). Desktop's width is 0.
-- The canvas fit runs in a pre effect declared at the end of `GpuFlow`'s
-  script, so CoreFrames' first build pass sees the fitted zoom, not the initial
-  1 (which built three frames and their views before the fit landed).
-- After a session that never reached `pagehide`, the saved viewport is ignored
-  and the canvas opens fitted, with one line saying why.
+- `frameBuilder` keeps no JSON text of the docs it sends (72 MB on the fixture).
+- `readableWidth` (160 CSS px): a frame drawn narrower is not built. It shows a
+  snapshot. Where none exists yet, a background pass makes one, one frame at a
+  time, nearest first, paused during gestures: the worker fetches the source,
+  builds the frame and its breakpoint views and hands back the lists; the page
+  draws each into a snapshot (the core's `poster` on WebGPU, a small GL core on
+  WebGL), stores it in the thumbnail store, and lets the lists, the decoded
+  pictures and the worker go. Breakpoint views keep their place beside the
+  frame (`view-shots.ts`), so they are drawn from their snapshots too.
+- Until a snapshot is ready a frame stands in as a tinted page with its title
+  (`Stand.Pending`), and a server poster without an image is not drawn: no more
+  white rectangles.
+- `builtBytes` (64 MB, estimated as display items × 64 KB): past it, frames off
+  screen go back to their snapshot — lists, doc, views, pickers, decoded
+  pictures and engine groups are released (`sendBack` → `onevict`). Phones
+  build only frames on screen.
+- Idle frame workers are terminated on phones.
+- The canvas fit runs before CoreFrames builds, so the first pass sees the
+  fitted zoom; after a session that died without `pagehide`, the canvas opens
+  fitted, with one line saying why.
 
-Cost: on a phone, a canvas zoomed out shows thumbnails, or white posters for
-frames never built on that device and without a server poster, and breakpoint
-views appear only once their frame is built. Zoomed in, a phone still holds
-every frame it has built: this does not bound memory while exploring.
+Results: see the PR. Cost: a frame far away or zoomed out is a snapshot, not
+vectors; panning to a frame shows its snapshot for the moment its build takes.
+Server posters are still written only by a client that drew the frame or by
+the editor; code- and URL-imported frames start without one.
 
-Not changed: vello's fixed WebGPU bump buffers (176 MB, `vello_encoding`
-`BufferSizes`) — the simulator runs the WebGL core, so they are absent from
-these numbers and present on a WebGPU iPhone.
+Not changed: vello's fixed WebGPU bump buffers (176 MB) — handoff note in
+`docs/specs/vello-bump-buffers-per-device.md`.
 
-Playwright WebKit (iPhone profile) agrees: 1126–1384 MB at rest before,
-234 after; zoomed in 6x so all 18 frames build, ~1 GB either way.
-
-Guard: `npm run perf:phone-guard` now fails when a phone profile holds more
-than 450 MB (iPad 600) at rest on the fitted canvas, and zooms in before the
-pan check so that check still measures built frames.
+Guard: `npm run perf:phone-guard` fails on the resting footprint, the peak of
+opening (snapshot pass included), and the footprint after a tour across every
+frame.

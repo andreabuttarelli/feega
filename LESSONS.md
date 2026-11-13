@@ -3910,7 +3910,16 @@ openurl`, and read `footprint <pid>` of the `com.apple.WebKit.WebContent` proces
 `CoreSimulator` — the figure jetsam limits, not RSS. Attribute by subtraction: a probe-only
 build with query switches (engine off, no media, no views, N frames) and one run each. Traps:
 a redirect drops the query string (open the canvas URL itself); after a rebuild Safari keeps
-the old HTML and asks for hashed chunks that no longer exist, which crashes the local-mode
-server (serve each build on a new port); the simulator's Safari runs the WebGL core, so vello's
+the old HTML and asks for hashed chunks that no longer exist, and a server whose `build/` was
+replaced under it dies on that request (`ENOENT` on a `.gz`): serve each build from its own copy,
+on a new port; the simulator's Safari runs the WebGL core, so vello's
 WebGPU buffers never show; terminating Safari counts as a death for the crash mark. JSC holds a
 parsed JSON doc at ~3.3x its text size, so parsed docs, not textures, filled most of the 950 MB.
+
+## A phone tab that grows after every frame build: the worker holds the last doc
+
+**Signal:** footprint stays hundreds of MB above what the page's JS heap explains (a Chrome heap
+snapshot of the page looks clean). **Move:** a Chrome snapshot of the page does not include its
+workers; in WebKit they count in the same WebContent process. Terminate the worker in Playwright
+WebKit (`Worker.terminate()` from an init-script registry) and read `footprint` again: the frame
+worker held ~260 MB (its last parsed doc and prepared frame). Phones release idle frame workers.

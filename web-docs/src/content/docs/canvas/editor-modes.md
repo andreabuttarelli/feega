@@ -45,4 +45,4 @@ Properties live in the right bar, actions in the right-click menu: Duplicate, Gr
 
 On a phone or tablet, press and hold a node or a layer to open the same menu a right click opens.
 
-On a phone or tablet, a frame zoomed out too small to read shows its thumbnail and is drawn in full once you zoom in on it, so a large canvas fits in the phone's memory. If the page reloads while a canvas is open, it reopens zoomed out to fit instead of where it was.
+On a phone or tablet, a frame zoomed out too small to read, or far from where you are looking, shows a snapshot and is drawn in full once you zoom in on it, so a large canvas fits in the phone's memory. Snapshots are made once in the background and kept on the device. If the page reloads while a canvas is open, it reopens zoomed out to fit instead of where it was.
