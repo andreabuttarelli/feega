@@ -1,4 +1,4 @@
-import type { DisplayList, Item } from './display-list';
+import { ItemKind, type DisplayList, type GroupItem, type Item } from './display-list';
 
 export type Splice = { head: number; tail: number; items: Item[] };
 
@@ -110,10 +110,19 @@ export function itemKey(item: Item): string {
   if (known !== undefined) {
     return known;
   }
-  const pack = packOf(item);
-  const made = `${pack.json}#${hashOf(pack.floats)}`;
+  const made = item.kind === ItemKind.Group ? groupKey(item) : leafKey(item);
   keys.set(item, made);
   return made;
+}
+
+function leafKey(item: Item): string {
+  const pack = packOf(item);
+  return `${pack.json}#${hashOf(pack.floats)}`;
+}
+
+function groupKey(group: GroupItem): string {
+  const shell = itemPack({ ...group, items: [] });
+  return `${shell.json}#${hashOf(shell.floats)}[${group.items.map(itemKey).join(',')}]`;
 }
 
 export function listPack(list: DisplayList): ListPack {

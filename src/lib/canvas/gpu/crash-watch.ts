@@ -41,6 +41,8 @@ export type Gauges = { cacheBytes: number; pictureBytes: number; scratchBytes: n
 export function gauged(sample: CrashSample, gpu: GpuCounters, raster: Gauges): void {
   sample.textureBytes = gpu.textureBytes;
   sample.textures = gpu.textures;
+  sample.bufferBytes = gpu.bufferBytes;
+  sample.buffers = gpu.buffers;
   sample.texturesCreated = gpu.created;
   sample.submits = gpu.submits;
   sample.gpuLagMs = gpu.lagMs;
@@ -63,7 +65,14 @@ function shelf(): Storage | null {
   }
 }
 
-export type CrashWatch = { tick: (t: Tick, raster: Gauges) => void; sample: CrashSample; stop: () => void };
+export type Held = { textureMb: number; textures: number; bufferMb: number; wasmMb: number; cacheMb: number; pictureMb: number };
+
+const MB_ROUND = 10;
+const megabytes = (bytes: number) => Math.round((bytes / MB) * MB_ROUND) / MB_ROUND;
+
+export const heldBy = (s: CrashSample): Held => ({ textureMb: megabytes(s.textureBytes), textures: s.textures, bufferMb: megabytes(s.bufferBytes ?? 0), wasmMb: megabytes(s.wasmBytes), cacheMb: megabytes(s.cacheBytes), pictureMb: megabytes(s.pictureBytes) });
+
+export type CrashWatch = { tick: (t: Tick, raster: Gauges) => void; sample: CrashSample; diedBefore: boolean; before: (Held & { zoom: number; gestureFrames: number }) | null; stop: () => void };
 
 export function watchCrashes(sizes: Sizes): CrashWatch {
   const gpu = probeGpu(window as never);
@@ -84,6 +93,8 @@ export function watchCrashes(sizes: Sizes): CrashWatch {
 
   return {
     sample,
+    diedBefore: recorder?.diedBefore ?? false,
+    before: previous ? { ...heldBy(previous), zoom: previous.zoom, gestureFrames: previous.gestureFrames } : null,
     tick(t, raster) {
       track(sample, t);
       gauged(sample, gpu, raster);
@@ -102,4 +113,4 @@ const MB = 1024 * 1024;
 const mb = (bytes: number) => (bytes / MB).toFixed(1);
 
 export const hudLine = (s: CrashSample) =>
-  `${s.device} dpr=${s.dpr} res=${s.resolution} canvas=${s.canvas} tex=${mb(s.textureBytes)}MB/${s.textures} made=${s.texturesCreated} submits=${s.submits} lag=${Math.round(s.gpuLagMs)}ms cache=${mb(s.cacheBytes)}MB scratch=${mb(s.scratchBytes)}MB pict=${mb(s.pictureBytes)}MB wasm=${mb(s.wasmBytes)}MB zoom/s=${s.zoomPerSecond.toFixed(2)} pan/s=${Math.round(s.panPerSecond)} gf=${s.gestureFrames} rasterZoom=${s.rasterZoom.toFixed(3)}`;
+  `${s.device} dpr=${s.dpr} res=${s.resolution} canvas=${s.canvas} tex=${mb(s.textureBytes)}MB/${s.textures} buf=${mb(s.bufferBytes)}MB/${s.buffers} made=${s.texturesCreated} submits=${s.submits} lag=${Math.round(s.gpuLagMs)}ms cache=${mb(s.cacheBytes)}MB scratch=${mb(s.scratchBytes)}MB pict=${mb(s.pictureBytes)}MB wasm=${mb(s.wasmBytes)}MB zoom/s=${s.zoomPerSecond.toFixed(2)} pan/s=${Math.round(s.panPerSecond)} gf=${s.gestureFrames} rasterZoom=${s.rasterZoom.toFixed(3)}`;

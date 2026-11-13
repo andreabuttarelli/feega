@@ -28,7 +28,8 @@ function depsFor(model: TaskModel | null): { deps: TaskRunDeps; gatewayRun: Retu
       record: () => {}
     }),
     refuseLikeness: vi.fn(),
-    bill: vi.fn()
+    bill: vi.fn(),
+    storeQuote: vi.fn(async () => {})
   };
   return { deps, gatewayRun };
 }
@@ -227,7 +228,7 @@ describe('startTaskRun — one port, several providers', () => {
       idempotencyKey: 'run-1'
     });
 
-    expect(out).toEqual({ kind: 'job', jobId: 'kie:task_42' });
+    expect(out).toEqual({ kind: 'job', jobId: 'kie:task_42', quotedUsd: 0.04 });
     expect(kieRun).toHaveBeenCalledWith(
       { model: 'nano-banana-2' },
       { prompt: 'a picture', resolution: '1K', image_input: ['https://example.com/a.png', 'https://example.com/b.png'] },

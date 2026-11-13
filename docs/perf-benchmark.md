@@ -167,11 +167,20 @@ the field draws the text while it is open. `BUDGET_PROFILE=1` also writes a CPU 
 kind (`edit-<target>-<edit>.cpuprofile`) and the input and `live-asked` times
 (`.windows.json`) to cut it by edit.
 
+### Both sides of an A/B built the same way
+
+Build the base and the branch the same way: each a worktree with `node_modules` linked to the main
+checkout's and `@feega/*` linked to its own `packages/`, each built with `npm run build`. A base
+checkout with its own real `node_modules` ran the same dev commit (16172a940) about 15 ms slower
+per patched edit (2 alternated runs, landings, opacity p50 60.3 vs 41.1 ms, nudge 62.7 vs 50.5),
+enough to fake a gain. Measure dev against dev in the same setup first: that is the noise floor
+(p50 about ±2 ms, p90 ±10, worst ±35 on an M2 Pro at 60 Hz).
+
 ## Real-user telemetry
 
 Every open canvas (sampled by `PERF_SAMPLE_RATE` in `src/lib/canvas/perf/perf-beacon.ts`, 1 today)
-aggregates one summary in the browser and posts it to `/api/v1/telemetry/canvas-perf` every 5 min
-and on `pagehide` / tab hidden (`sendBeacon`). The endpoint keeps only known keys, numbers and ids,
+aggregates one summary in the browser and posts it to `/api/v1/telemetry/canvas-perf` as soon as
+the engine is up, every 5 min, and on `pagehide` / tab hidden (`sendBeacon`); `reason` says which. The endpoint keeps only known keys, numbers and ids,
 caps a user at 30 summaries an hour, and records a `canvas_perf` row in `product_events`.
 
 A summary is cumulative per session (`sessionId`); the report keeps the latest one. It carries:
@@ -181,7 +190,16 @@ A summary is cumulative per session (`sessionId`); the report keeps the latest o
   only while a gesture runs, 1 ms buckets), long tasks over 50 ms (`PerformanceObserver`);
 - edit latency p50/p95: a frame's revision or live doc changing until its new list is put;
 - backend, fallbacks, device losses, device class from `BUDGET`, DPR, cores, `deviceMemory`,
-  frame and node counts, source bytes (Resource Timing), `CORE_VERSION`, JS heap at 10 min.
+  frame and node counts, source bytes (Resource Timing), `CORE_VERSION`, JS heap at 10 min;
+- health: `platform` (`iphone`, `ipad` even behind the Mac user agent, `android`, `desktop`),
+  `visible` and the canvas `width`/`height` when sent, WebGPU adapter `limits`, `memory` (GPU
+  texture MB and count, GPU buffer MB — both WebGPU only —, wasm, zoom cache and picture MB), `lastError`, and
+  `diedBefore`/`before`: the previous canvas session in this browser ended without `pagehide` and
+  what it held at its last sample. iOS kills an over-budget tab without any event, so a death shows
+  up only here, on the next load.
+
+A row with `backend` null never had an engine attached in that page; `visible` 0 with a 0×0 size is
+a tab that was never drawn.
 
 No content, no prompt text, no emails.
 

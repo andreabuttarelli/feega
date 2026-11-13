@@ -1,6 +1,8 @@
-import { test, expect } from '../../../tests/e2e/fixtures/session';
+import { test, expect, seedsRuns } from '../../../tests/e2e/fixtures/session';
 import { installCursor, recordDemo } from '../record';
 import { asset, openCanvas } from './seed';
+
+seedsRuns();
 
 const NODE_AT = { x: 200, y: 120 };
 

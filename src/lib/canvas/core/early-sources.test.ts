@@ -21,6 +21,12 @@ describe('earlySourceUrls', () => {
     expect(earlySourceUrls([unsized], place, { x: 0, y: 0, zoom: 0.1 }, screen)).toEqual(['/p/p/c/c/motion/sized-by-format/source?revision=3']);
   });
 
+  it('warms no source on a phone for a frame drawn too small to read, which shows its thumbnail instead', () => {
+    const saved = { x: 0, y: 0, zoom: 1 };
+    expect(earlySourceUrls([row('near', 150)], place, saved, screen, 160)).toEqual([]);
+    expect(earlySourceUrls([row('near', 150)], place, saved, screen, 100)).toEqual(['/p/p/c/c/motion/near/source?revision=3']);
+  });
+
   it('names the org, so the url is the one the canvas reads and the batch reads beside the canvas check', () => {
     expect(earlySourceUrls([row('a', 150)], { ...place, orgId: 'o' }, { x: 0, y: 0, zoom: 1 }, screen)).toEqual(['/p/p/c/c/motion/a/source?revision=3&org=o']);
   });

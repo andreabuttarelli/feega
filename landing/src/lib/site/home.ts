@@ -1,9 +1,10 @@
+import { AGENT_DOCS_URL, PLAN, agentAnswer, creditsAnswer } from './pricing/plan';
+
 const VIDEO_BASE = 'https://klnswzhhgrqvbfjzioul.supabase.co/storage/v1/object/public/website';
 
 export const HERO_HEADLINE = ['Design inside your code', 'with your agents and team.'] as const;
 
 export const CANVAS_VIDEO = `${VIDEO_BASE}/feega-canvas-hero.MP4`;
-export const CODE_VIDEO = `${VIDEO_BASE}/2026-10-29-export-code-final.mp4`;
 
 export const AGENT_LOGOS = [
   { file: 'mcp-0.svg', width: 32, name: 'Claude Code' },
@@ -33,32 +34,6 @@ export const TICKER_VIDEOS = [
   'ring-through-title-16x9.MP4',
   'media-cloud-white-16x9-720p.MP4'
 ].map((file) => `${VIDEO_BASE}/${file}`);
-
-export const LOCAL_FEATURES = [
-  'Design + Motion, infinite canvas',
-  'Text, image, video, audio, 3D generations',
-  'Bring your own keys for AI generations',
-  'Unlimited canvases & projects',
-  'Design & Motion templates library',
-  'Copy & paste from Figma',
-  'Coder mode for code export',
-  'Embed mode for interactive scenes'
-] as const;
-
-export const CLOUD_FEATURES = [
-  'All models from OpenRouter, Kie, Higgsfield, Wiro, Elevenlabs',
-  'Unlimited canvases & projects',
-  'AI assistant in-editor',
-  'Use with your agents via MCP',
-  'Unlimited team members',
-  'Real-time collaboration',
-  'Brand & products import',
-  'Social accounts & posts import',
-  'AI influencers',
-  'Embed mode for interactive scenes'
-] as const;
-
-export const CLOUD_PRICE = 18;
 
 const MCP_URL = 'https://mcp.feega.app/mcp';
 
@@ -132,7 +107,7 @@ export const FAQ = [
   },
   {
     q: "Can AI agents use Feega?",
-    a: "Yes. Agents like Claude or Codex can work on your canvas through our MCP server and REST API, acting on your behalf with your permissions."
+    a: `${agentAnswer(PLAN)} Setup is in the <a href="${AGENT_DOCS_URL}">MCP guide</a>.`
   },
   {
     q: "Are generated files marked as AI-generated?",
@@ -152,7 +127,7 @@ export const FAQ = [
   },
   {
     q: "How do credits and pricing work?",
-    a: "In the cloud, AI runs are paid in credits. Every \u20ac1 of your plan gives 100 credits (\u20ac8/mo = 800 credits). A run costs 120 credits for every $1 the AI provider charges. Running locally with your own keys needs no credits. See <a href=\"#pricing\">pricing</a>."
+    a: `${creditsAnswer(PLAN)} See <a href="#pricing">pricing</a>.`
   },
   {
     q: "Who is behind Feega?",

@@ -86,3 +86,13 @@ describe('the Tailwind classes of a layer', () => {
     expect(classes).toContain('text-[#112233]');
   });
 });
+
+describe('the variables of a layer', () => {
+  it('lists a variable once when it is bound to two fields, so the inspector never meets a duplicate', () => {
+    const bound = { ...withShape, tracks: withShape.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'card' ? { ...c, bind: { gap: 'app Spacing/space-4', padding: 'app Spacing/space-4' } } : c)) })) } as MotionDoc;
+
+    const tokens = devLayer(bound, 'card', null)!.tokens.filter((t) => t.role === TokenRole.Variable);
+
+    expect(tokens.map((t) => t.name)).toEqual(['app Spacing/space-4']);
+  });
+});

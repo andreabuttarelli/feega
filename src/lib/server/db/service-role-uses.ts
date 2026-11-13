@@ -29,6 +29,11 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['product_events']
   },
   {
+    path: 'src/lib/server/canvas-debug/debug-log-repo.ts — writeDebugRows (rotta /api/v1/telemetry/canvas-debug)',
+    why: "Il registratore di volo `?debug` scrive righe diagnostiche che nessun utente deve poter leggere né riscrivere: la tabella non concede nulla ad anon/authenticated. L'utente c'è ed è verificato dalla rotta; user_id è il suo, org_id e canvas_id si LEGGONO dalla tela con il SUO client (RLS), mai presi da chi chiama. Solo insert di contatori e id, mai contenuto del documento; non legge nulla.",
+    tables: ['canvas_debug_logs']
+  },
+  {
     path: 'src/lib/server/core-usage.ts — profileIsInternal',
     why: "Un evento di prodotto nasce anche fuori da una richiesta con sessione (un render che finisce, una chiave API): per escludere il team come fa il browser serve l'email dell'utente che ha agito. Legge solo profiles.email per quell'id, e fuori esce solo il booleano interno/no, mai l'email.",
     tables: ['profiles']
@@ -79,9 +84,24 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['orgs', 'orgs_members', 'credit_ledger']
   },
   {
+    path: 'src/routes/api/v1/orgs/[orgId]/team/+server.ts — TeamCtx.writer (setRole, invite, resend, invite link)',
+    why: "A role change or an editor invite can add a paid seat, so no session may write orgs_members.role or orgs_invites: the database refuses both to authenticated (20261114_tenancy_writes_server_only.sql). The org_id comes from the URL, but runTeamOp reaches a write only after memberRole read the caller's role in that org with the caller's own client (RLS) and can() allowed the op, and after the seat check: the service role writes the one row that check approved, never a row chosen without it. Removing a member, leaving and revoking an invite stay on the caller's session.",
+    tables: ['orgs_members', 'orgs_invites']
+  },
+  {
     path: 'src/lib/server/tenancy/bootstrap.ts — acceptInvite',
-    why: "Chi accetta non è ancora membro di quell'org: auth_org_ids() non la contiene, e la policy org_isolation su orgs_invites nasconderebbe l'invito proprio a chi lo sta usando. L'org_id non arriva da fuori, si LEGGE dalla riga trovata per impronta del token; il token in chiaro non è mai salvato e scaduto, inesistente o già speso rispondono tutti allo stesso modo. Legge anche credit_ledger (assertFreeOrgLimit): lo stesso limite di org gratuite di createFirstOrg si applica anche a un invito accettato.",
-    tables: ['orgs_invites', 'orgs_members', 'credit_ledger']
+    why: "Chi accetta non è ancora membro di quell'org: auth_org_ids() non la contiene, e la policy org_isolation su orgs_invites nasconderebbe l'invito proprio a chi lo sta usando. L'org_id non arriva da fuori, si LEGGE dalla riga trovata per impronta del token; il token in chiaro non è mai salvato e scaduto, inesistente o già speso rispondono tutti allo stesso modo. Legge anche credit_ledger (assertFreeOrgLimit): lo stesso limite di org gratuite di createFirstOrg si applica anche a un invito accettato. Accepting an editor reads orgs (the seat state) and, when a seat is charged, the owner's email in profiles to tell them.",
+    tables: ['orgs_invites', 'orgs_members', 'credit_ledger', 'orgs', 'profiles']
+  },
+  {
+    path: 'src/routes/api/v1/billing/seats/reconcile — the hourly seat reconcile cron',
+    why: "A cron has no user. It lists the orgs that have a subscription, oldest checked first, and sets each Stripe item quantity to that org's count of editors. It reads orgs.stripe_subscription_id and orgs_members.role, writes orgs.seats_checked_at (its cursor) and, through recordPaidSeats, orgs.seats_paid/seats_paid_until.",
+    tables: ['orgs', 'orgs_members']
+  },
+  {
+    path: 'src/lib/server/team/seat-billing.ts — recordPaidSeats',
+    why: "orgs.seats_paid decides whether re-adding an editor this period is free, and orgs.seats_sync_until serialises seat changes per team, so no session may write either: a member who could set them would get free seats or block billing. syncSeats calls only the service-role RPCs claim_seat_sync, record_paid_seats (raises seats_paid within a period, in SQL) and release_seat_sync.",
+    tables: ['orgs']
   },
   {
     path: 'src/lib/server/org-data/auth.ts — resolveApiKey (MCP e CLI su /api/v1/org/**)',
@@ -132,6 +152,16 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     path: 'src/lib/server/reports/report-deps.ts — segnalazioni DSA/DMCA (rotte /report, /report/counter/[id], /admin/reports, tick)',
     why: "Chi segnala da un link condiviso non ha sessione, e content_reports/account_strikes non hanno policy per nessun JWT: le legge e le scrive solo questo percorso. L'invio risolve org e autore dal token di condivisione o dall'id del nodo, senza restituire nulla a chi chiama. Le decisioni passano solo dopo isInternalEmail sulla sessione (/admin/reports) o dal cron (restauro dopo una contro-notifica); agiscono sulla riga del report, non su un org_id scelto da fuori. La sospensione usa auth.admin (ban) sull'utente letto dal report. La contro-notifica è autorizzata dall'impronta del token mandato all'autore. Una rimozione sposta i file del nodo (assets della sua org, letti da nodes.data e node_runs) nel bucket privato quarantine sotto <orgId>/<reportId>/, così gli URL già firmati muoiono subito; il ripristino li riporta indietro.",
     tables: ['content_reports', 'account_strikes', 'canvases', 'nodes', 'node_runs', 'assets', 'orgs_members', 'profiles', 'auth.users', 'storage.objects']
+  },
+  {
+    path: 'src/lib/server/repos/node-runs.ts — writerFor (every run write made during a request)',
+    why: "A run carries what the server decides: status, cost, the provider job it points at and the price it is billed at. The database refuses every node_runs write to a session (20261114_runs_server_written.sql). A write made for a signed-in caller goes through here only after auth_editor_org_ids(), asked with the caller's own client, contains the org of the run; every write filters on that org_id and the run id. Values the server prices a run with are stripped from the params a caller sends.",
+    tables: ['node_runs']
+  },
+  {
+    path: 'src/lib/server/task-providers-config.ts — storeQuote (the quote of a provider task, on its run)',
+    why: "The price a task is billed at is a value only the server decides, and the database keeps it out of reach of a session (20261114_run_values_server_written.sql). It is written right after the server submitted the task and got its price, on the run the server just created or claimed: org and run come from that row, never from the caller. It writes only that run's params.",
+    tables: ['node_runs']
   },
   {
     path: 'src/lib/server/task-providers-config.ts — loadOf (cap di concorrenza per account del fornitore)',

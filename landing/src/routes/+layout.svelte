@@ -18,8 +18,10 @@
 <svelte:head>
   <link rel="preload" href="/site/fonts/bdo-grotesk-variable.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
   <link rel="canonical" href={canonical} />
-  <link rel="icon" href="/site/favicon.png" />
-  <link rel="apple-touch-icon" href="/site/favicon.png" />
+  <link rel="icon" href="/site/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/site/favicon.ico" sizes="16x16 32x32 48x48" />
+  <link rel="icon" href="/site/favicon.png" sizes="48x48" type="image/png" />
+  <link rel="apple-touch-icon" href="/site/apple-touch-icon.png" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Feega" />
   {#if crumb}{@html breadcrumbJsonLd(crumb, page.url.pathname)}{/if}

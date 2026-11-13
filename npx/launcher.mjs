@@ -7,13 +7,14 @@ const DEFAULT_PORT = 0;
 export const LOOPBACK = '127.0.0.1';
 export const MCP_PORT = 5173;
 export const MCP_ENTRY = 'mcp.mjs';
-export const USAGE = `usage: feega [file.feega] [--port <n>] [--no-open] [--import | --no-import] [--help] [--version]
+export const USAGE = `usage: feega [file.feega] [--port <n>] [--no-open] [--import | --no-import] [--routes <list|all>] [--app <path>] [--help] [--version]
        feega mcp [--port <n>]   MCP server (stdio) for the local feega on that port (default ${MCP_PORT})`;
 export const FolderImport = { Ask: 'ask', Yes: 'yes', No: 'no' };
 export const ImportStep = { Ask: 'ask', Import: 'import', Skip: 'skip' };
 
 const IMPORT_FLAGS = { '--import': FolderImport.Yes, '--no-import': FolderImport.No };
 const HOME_ROUTE = '/';
+const ALL_ROUTES = 'all';
 const PLACE = /\/p\/([^/]+)\/c\/([^/?#]+)/;
 
 const CACHED_MARKER = '.complete';
@@ -42,6 +43,21 @@ const portFlag = (arg, rest) => {
   return null;
 };
 
+const valueFlag = (name, arg, rest) => {
+  if (arg === name) {
+    const value = rest.shift();
+    if (!value || value.startsWith('-')) {
+      throw new Error(`${name} needs a value\n${USAGE}`);
+    }
+
+    return value;
+  }
+
+  return arg.startsWith(`${name}=`) ? arg.slice(name.length + 1) : null;
+};
+
+const routesOf = (raw) => (raw === ALL_ROUTES ? ALL_ROUTES : raw.split(/[\s,]+/).filter(Boolean));
+
 function parseMcp(rest) {
   let port = MCP_PORT;
   while (rest.length) {
@@ -69,6 +85,8 @@ export function parseArgs(argv, cwd) {
   let port = DEFAULT_PORT;
   let browser = 'open';
   let folderImport = FolderImport.Ask;
+  let routes;
+  let app;
 
   while (rest.length) {
     const arg = rest.shift();
@@ -96,6 +114,18 @@ export function parseArgs(argv, cwd) {
       continue;
     }
 
+    const routesRaw = valueFlag('--routes', arg, rest);
+    if (routesRaw !== null) {
+      routes = routesOf(routesRaw);
+      continue;
+    }
+
+    const appRaw = valueFlag('--app', arg, rest);
+    if (appRaw !== null) {
+      app = appRaw;
+      continue;
+    }
+
     if (arg.startsWith('-')) {
       throw new Error(`unknown option: ${arg}\n${USAGE}`);
     }
@@ -103,7 +133,7 @@ export function parseArgs(argv, cwd) {
     files.push(arg);
   }
 
-  return { command: 'run', file: resolve(cwd, files[0] ?? DEFAULT_FILE), port, browser, folderImport };
+  return { command: 'run', file: resolve(cwd, files[0] ?? DEFAULT_FILE), port, browser, folderImport, routes, app };
 }
 
 export const appDir = (home, version) => join(home, '.feega', 'app', version);
@@ -199,10 +229,52 @@ export function placeOf(location) {
   return found ? { projectId: found[1], canvasId: found[2] } : null;
 }
 
-export const importAsk = (place, folder) => ({
-  path: `/api/v1/projects/${place.projectId}/code-import`,
-  body: { canvasId: place.canvasId, folder, routes: [HOME_ROUTE], x: 0, y: 0 }
+const CODE_IMPORT = (projectId) => `/api/v1/projects/${projectId}/code-import`;
+
+export const importAsk = (place, folder, { routes, app }) => ({
+  path: CODE_IMPORT(place.projectId),
+  body: { canvasId: place.canvasId, folder, routes, ...(app ? { app } : {}), x: 0, y: 0 }
 });
+
+export const discoverAsk = (place, folder, app) => `${CODE_IMPORT(place.projectId)}/routes?${new URLSearchParams({ folder, ...(app ? { app } : {}) })}`;
+
+const NEEDS_VALUE = 'needs a value';
+const DID_NOT_OPEN = 'did not open';
+const NOT_OPENED = 'not_opened';
+
+export function routePlan(found, spec) {
+  if (Array.isArray(spec)) {
+    return { routes: spec, leftOut: [], fallback: false };
+  }
+
+  if (!found.ok) {
+    return { routes: [HOME_ROUTE], leftOut: [], fallback: true };
+  }
+
+  const wanted = found.routes.filter((route) => route.selected);
+  const dynamic = found.routes.filter((route) => !route.selected).map(({ path }) => ({ path, reason: NEEDS_VALUE }));
+  const over = wanted.slice(found.max).map(({ path }) => ({ path, reason: `over the ${found.max}-page limit` }));
+  return { routes: wanted.slice(0, found.max).map(({ path }) => path), leftOut: [...dynamic, ...over], fallback: false };
+}
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+export function importReport(plan, done) {
+  const imported = done.pages ?? [];
+  const known = new Set(plan.leftOut.map(({ path }) => path));
+  const failed = (done.routes?.leftOut ?? []).filter((o) => o.reason === NOT_OPENED && !known.has(o.path)).map(({ path }) => ({ path, reason: DID_NOT_OPEN }));
+  const leftOut = [...plan.leftOut, ...failed];
+  const lines = [`feega: imported ${plural(imported.length, 'page')}: ${imported.join(', ')}`];
+  if (leftOut.length) {
+    lines.push(`feega: left out ${leftOut.length}: ${leftOut.map((o) => `${o.path} (${o.reason})`).join(', ')}`);
+  }
+
+  return { imported, leftOut, needsValue: leftOut.filter((o) => o.reason === NEEDS_VALUE).length, lines };
+}
+
+export const EVENT_PREFIX = 'feega:event ';
+
+export const eventLine = (event) => `${EVENT_PREFIX}${JSON.stringify(event)}`;
 
 const HTTP_ERROR_MIN = 400;
 

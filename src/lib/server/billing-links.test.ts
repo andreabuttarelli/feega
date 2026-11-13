@@ -40,19 +40,7 @@ describe('billingLink', () => {
 		expect(createBillingPortalSession).toHaveBeenCalledWith({
 			customerId: 'cus_1',
 			returnUrl: RETURN_URL,
-			flow: undefined,
-			subscriptionId: 'sub_1'
-		});
-	});
-
-	it('asks for the subscription_update flow when the caller wants to change plan', async () => {
-		await billingLink({} as never, { slug: 'demo', returnUrl: RETURN_URL, flow: 'upgrade' });
-
-		expect(createBillingPortalSession).toHaveBeenCalledWith({
-			customerId: 'cus_1',
-			returnUrl: RETURN_URL,
-			flow: 'upgrade',
-			subscriptionId: 'sub_1'
+			flow: undefined
 		});
 	});
 
@@ -74,19 +62,6 @@ describe('billingLink', () => {
 		expect(createBillingPortalSession).not.toHaveBeenCalled();
 	});
 
-	it('refuses no_subscription when an upgrade has nothing to update', async () => {
-		orgBillingForBrand.mockResolvedValue({ ...PAYING_ORG, subscriptionId: null });
-
-		const link = await billingLink({} as never, {
-			slug: 'demo',
-			returnUrl: RETURN_URL,
-			flow: 'upgrade'
-		});
-
-		expect(link).toEqual({ refusal: 'no_subscription', message: '' });
-		expect(createBillingPortalSession).not.toHaveBeenCalled();
-	});
-
 	it('turns a Stripe failure into stripe_unavailable, keeping what Stripe said', async () => {
 		createBillingPortalSession.mockRejectedValue(new Error('connection error'));
 
@@ -104,7 +79,7 @@ describe('billingLink', () => {
 	});
 
 	it('never cancels, never discounts, never edits the subscription', async () => {
-		await billingLink({} as never, { slug: 'demo', returnUrl: RETURN_URL, flow: 'upgrade' });
+		await billingLink({} as never, { slug: 'demo', returnUrl: RETURN_URL, flow: 'payment_method' });
 
 		expect(cancelSubscriptionAtPeriodEnd).not.toHaveBeenCalled();
 		expect(applyRetentionCoupon).not.toHaveBeenCalled();

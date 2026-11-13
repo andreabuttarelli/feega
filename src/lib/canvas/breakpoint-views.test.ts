@@ -18,6 +18,15 @@ describe('breakpoint views on the canvas', () => {
     expect(views[0].frame.revision).toBe(4);
   });
 
+  it('lets go of a frame it was told to forget, so its views hold no doc', () => {
+    const resolve = heldViews();
+    const first = resolve([frame], () => doc);
+    resolve.forget(frame.id);
+
+    expect(resolve([frame], () => doc)).not.toBe(first);
+    expect(resolve([frame], () => null)).toEqual([]);
+  });
+
   it('a view is as tall as the page it shows at that width', () => {
     const page = landingDoc();
     const [tablet, phone] = heldViews()([{ ...frame, box: { x: 0, y: 0, w: 720, h: 2240 } }], () => page);

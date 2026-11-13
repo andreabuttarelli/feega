@@ -105,6 +105,10 @@
     {
       "path": "/api/v1/canvas/runs/tick",
       "schedule": "*/1 * * * *"
+    },
+    {
+      "path": "/api/v1/billing/seats/reconcile",
+      "schedule": "17 * * * *"
     }
   ],
   "git": {

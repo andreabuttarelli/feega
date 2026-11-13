@@ -15,7 +15,12 @@ listed there: search **Feega**. It needs Node 22 or later on your machine.
 - **Open a `.feega` file**: it opens as a canvas. The first time, the app downloads once.
 - **Feega: New canvas** (command palette): picks where to save a new `.feega` file and opens it.
 - **Feega: Import this folder into a canvas**: creates `<folder>.feega` in the workspace and draws
-  the project's home page on it, as `npx feega --import` does.
+  the project's pages on it, as `npx feega --import` does: every static page the router finds, up
+  to 20. Pages that need a value (`/blog/[slug]`) are skipped and listed in the **Feega** output.
+  A project with no router found imports its home page only. In a monorepo a quick-pick asks which
+  app to import. When it finishes a notification says how many pages landed and where the canvas
+  file is. The file lives inside the folder, so the extension offers once to add `*.feega` to
+  `.gitignore`; it never writes it without asking.
 
 ## Your agent
 

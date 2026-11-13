@@ -173,4 +173,8 @@ export class FramePickers {
     this.#held.set(id, { doc: live.doc, assets: live.assets, picker });
     return picker;
   }
+
+  drop(id: string): void {
+    this.#held.delete(id);
+  }
 }

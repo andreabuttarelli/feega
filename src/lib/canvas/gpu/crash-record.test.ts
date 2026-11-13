@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CrashRecorder, SAMPLE_EVERY_MS, blankSample, type Shelf } from './crash-record';
+import { CrashRecorder, SAMPLE_EVERY_MS, blankSample, endedUncleanly, type Shelf } from './crash-record';
 
 class MemoryShelf implements Shelf {
   readonly items = new Map<string, string>();
@@ -23,6 +23,20 @@ describe('the crash record', () => {
     expect(new CrashRecorder(new MemoryShelf()).begin()).toBeNull();
   });
 
+  it('tells the next open that the last session never ended, before anything resets the mark', () => {
+    const shelf = new MemoryShelf();
+    expect(endedUncleanly(shelf)).toBe(false);
+
+    new CrashRecorder(shelf).begin();
+    expect(endedUncleanly(shelf)).toBe(true);
+    expect(endedUncleanly(shelf)).toBe(true);
+
+    const clean = new CrashRecorder(shelf);
+    clean.begin();
+    clean.endCleanly();
+    expect(endedUncleanly(shelf)).toBe(false);
+  });
+
   it('reports the last sample of a session that never ended cleanly', () => {
     const shelf = new MemoryShelf();
     const crashed = new CrashRecorder(shelf);
@@ -32,6 +46,28 @@ describe('the crash record', () => {
     const report = new CrashRecorder(shelf).begin();
 
     expect(report?.zoom).toBe(2.5);
+  });
+
+  it('knows the last session died even when it died before its first sample', () => {
+    const shelf = new MemoryShelf();
+    new CrashRecorder(shelf).begin();
+
+    const next = new CrashRecorder(shelf);
+
+    expect(next.begin()).toBeNull();
+    expect(next.diedBefore).toBe(true);
+  });
+
+  it('does not call a session that ended cleanly dead', () => {
+    const shelf = new MemoryShelf();
+    const left = new CrashRecorder(shelf);
+    left.begin();
+    left.endCleanly();
+
+    const next = new CrashRecorder(shelf);
+    next.begin();
+
+    expect(next.diedBefore).toBe(false);
   });
 
   it('reports nothing after a session hidden cleanly', () => {

@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const findReachableProject = vi.fn();
@@ -71,5 +74,19 @@ describe('GET /api/v1/projects/:id/code-import/routes', () => {
   it('without a source the request is wrong', async () => {
     const { res } = await call('');
     expect(res.status).toBe(400);
+  });
+
+  it('lists the pages of a local folder, the list the extension imports from', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'feega-folder-'));
+    writeFileSync(join(dir, 'package.json'), KIT);
+    for (const page of ['', 'about', 'blog/[slug]']) {
+      mkdirSync(join(dir, 'src/routes', page), { recursive: true });
+      writeFileSync(join(dir, 'src/routes', page, '+page.svelte'), '');
+    }
+
+    const { res, body } = await call(`folder=${encodeURIComponent(dir)}`);
+
+    expect(res.status).toBe(200);
+    expect(body.routes.map((r: { path: string; selected: boolean }) => [r.path, r.selected])).toEqual([['/', true], ['/about', true], ['/blog/[slug]', false]]);
   });
 });

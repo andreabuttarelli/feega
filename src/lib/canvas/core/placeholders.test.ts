@@ -17,6 +17,12 @@ describe('placeholders', () => {
     expect(frame.list.items).toEqual([]);
   });
 
+  it('a frame left to its snapshot stands in as a tinted page, never a white one', () => {
+    const pending = placeholder(Stand.Pending, { width: 200, height: 100 }, LOOK);
+    expect(pending.list.background).toEqual([229 / 255, 229 / 255, 229 / 255, 1]);
+    expect(pending.group).not.toBe(placeholder(Stand.Frame, { width: 200, height: 100 }, LOOK).group);
+  });
+
   it('a stand-in for a box resized to a fractional size is whole pixels, which the core requires', () => {
     for (const stand of [Stand.Card, Stand.Frame]) {
       const { list } = placeholder(stand, { width: 131.25, height: 98.4375 }, LOOK);

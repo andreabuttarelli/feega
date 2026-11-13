@@ -213,3 +213,39 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Ruixen UI free components (MIT)
+
+Source: https://github.com/ruixenui/ruixen.com, commit `f6b20860623fa39122ac2b5f0e5bd29a9eb10941`: the
+`registry:ui` items of its open-source `registry.json`, their demos and the shadcn primitives they
+import (pinned in `libraries/ruixen/catalog.json`). Vendored in `libraries/ruixen/src/` by
+`scripts/ruixen-library/sync.ts`, which only fetches from that commit of the MIT repository and
+refuses anything that writes outside the library, and imported into the built-in Ruixen component
+library. `libraries/ruixen/src/index.css` is adapted from the repository's `styles/globals.css`.
+No Ruixen Pro item (pro.ruixen.com) is included. Third-party company logos and wordmarks in the
+examples are replaced at sync time by invented names and marks drawn for Feega
+(`scripts/ruixen-library/debrand.ts`, `libraries/ruixen/public/marks/`).
+
+```
+MIT License
+
+Copyright (c) 2025 Ruixen UI
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```

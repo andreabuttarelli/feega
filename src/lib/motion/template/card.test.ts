@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ARC_TEMPLATES } from './arc';
+import { RUIXEN_TEMPLATES } from './ruixen';
 import { MotionFormat } from '@feega/motion-core/motion/doc';
 import { BUILTIN_TEMPLATES } from './builtins';
 import { TEMPLATE_CARDS, templateCard } from './cards';
@@ -30,7 +31,7 @@ describe('template cards', () => {
   });
 
   it('no card is left behind for a template that no longer exists', () => {
-    const ids = new Set([...BUILTIN_TEMPLATES, ...ARC_TEMPLATES].map((e) => e.id));
+    const ids = new Set([...BUILTIN_TEMPLATES, ...ARC_TEMPLATES, ...RUIXEN_TEMPLATES].map((e) => e.id));
 
     expect(Object.keys(TEMPLATE_CARDS).filter((id) => !ids.has(id))).toEqual([]);
   });

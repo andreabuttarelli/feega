@@ -12,6 +12,10 @@ import { MAX_BATCH_OPS, SPENDING_TOOLS, ToolRun, refusalOf, runMotionBatch, runM
 import { activeTool } from '$lib/server/ai-log';
 import { coreEvent } from '$lib/server/core-usage';
 import { AgentVia, CoreEvent, landed } from '$lib/core-usage';
+import { agentEditCap, AGENT_EDIT_CAP_STATUS } from '$lib/server/agent-edits/cap';
+import { readHead } from '$lib/server/repos/motion-revisions';
+import { layersChanged } from '$lib/motion/layers-changed';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 
 export type Answer = { status: number; body: unknown };
 
@@ -45,10 +49,15 @@ async function denial(caller: OrgCaller): Promise<Answer | undefined> {
   return denied ? { status: denied.status, body: await denied.json() } : undefined;
 }
 
+async function capped(caller: OrgCaller, layers = 1): Promise<Answer | undefined> {
+  const cap = await agentEditCap(caller.db, caller.orgId, new Date(), layers);
+  return cap ? { status: AGENT_EDIT_CAP_STATUS, body: cap } : undefined;
+}
+
 const GATE_OF: Record<Access, (caller: OrgCaller) => Promise<Answer | undefined>> = {
   [Access.Read]: async () => undefined,
-  [Access.Write]: async (caller) => (caller.writeAllowed ? undefined : READ_ONLY_KEY),
-  [Access.Spend]: async (caller) => (caller.writeAllowed ? denial(caller) : READ_ONLY_KEY)
+  [Access.Write]: async (caller) => (caller.writeAllowed ? capped(caller) : READ_ONLY_KEY),
+  [Access.Spend]: async (caller) => (caller.writeAllowed ? ((await capped(caller)) ?? denial(caller)) : READ_ONLY_KEY)
 };
 
 export type CanvasAsk = { projectId: string; op: CanvasOpName; input: unknown };
@@ -95,11 +104,17 @@ export async function runFrameTool(caller: OrgCaller, ask: FrameToolAsk): Promis
     return READ_ONLY_KEY;
   }
 
+  const batch = ask.tool === BATCH ? batchSchema.safeParse(ask.input) : null;
+  const full = await capped(caller, batch?.success ? batch.data.ops.length : 1);
+  if (full) {
+    return full;
+  }
+
   const scope = { orgId: caller.orgId, userId: caller.userId, nodeId: ask.nodeId, sessionId: caller.sessionId };
   const gated = async (tools: string[]) => (tools.some((t) => SPENDING_TOOLS.has(t)) ? denial(caller) : undefined);
 
-  if (ask.tool === BATCH) {
-    const ops = batchSchema.safeParse(ask.input);
+  if (batch) {
+    const ops = batch;
     if (!ops.success) {
       return { status: HTTP_BAD_REQUEST, body: { error: ToolRun.Invalid, detail: ops.error.issues[0]?.message } };
     }
@@ -132,6 +147,20 @@ export async function runFrameTool(caller: OrgCaller, ask: FrameToolAsk): Promis
 
 export type EditorAsk = { nodeId: string; op: EditorOpName; input: unknown };
 
+const EDITOR_LAYERS: Partial<Record<EditorOpName, (caller: OrgCaller, ask: EditorAsk) => Promise<number>>> = {
+  save_doc: async (caller, ask) => {
+    const doc = (ask.input as { doc?: unknown } | null)?.doc;
+    const head = await readHead(caller.db, { orgId: caller.orgId, nodeId: ask.nodeId });
+    return Math.max(1, layersChanged(head?.doc, doc as MotionDoc));
+  },
+  apply_ops: async (_caller, ask) => {
+    const ops = (ask.input as { ops?: unknown } | null)?.ops;
+    return Array.isArray(ops) ? Math.max(1, ops.length) : 1;
+  }
+};
+
+const editorLayers = (caller: OrgCaller, ask: EditorAsk): Promise<number> => EDITOR_LAYERS[ask.op]?.(caller, ask) ?? Promise.resolve(1);
+
 export async function runEditorAction(caller: OrgCaller, ask: EditorAsk): Promise<EditorAnswer> {
   const input = EDITOR_OPS[ask.op].input.safeParse(ask.input ?? {});
   if (!input.success) {
@@ -139,6 +168,10 @@ export async function runEditorAction(caller: OrgCaller, ask: EditorAsk): Promis
   }
   if (EDITOR_OPS[ask.op].access === EditorAccess.Write && !caller.writeAllowed) {
     return { status: HTTP_FORBIDDEN, body: { error: 'api_key_read_only' } };
+  }
+  const full = EDITOR_OPS[ask.op].access === EditorAccess.Write ? await capped(caller, await editorLayers(caller, ask)) : undefined;
+  if (full) {
+    return full as EditorAnswer;
   }
 
   const scope = await callerMotionScope(caller.db, { orgId: caller.orgId, userId: caller.userId, nodeId: ask.nodeId });

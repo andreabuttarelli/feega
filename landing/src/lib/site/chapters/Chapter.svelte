@@ -79,9 +79,12 @@
   }
 
   .number {
-    margin-right: 12px;
+    display: block;
+    margin-bottom: 20px;
     color: var(--site-ink);
-    opacity: 0.45;
+    font-size: 64px;
+    line-height: 0.85;
+    letter-spacing: -0.06em;
   }
 
   .heading {
@@ -148,7 +151,7 @@
   .steps {
     display: grid;
     gap: 28px;
-    margin: 72px 0 0;
+    margin: 48px 0 0;
     padding: 0;
     list-style: none;
   }
@@ -173,7 +176,7 @@
   }
 
   .footer {
-    margin-top: 72px;
+    margin-top: 48px;
     padding-top: 32px;
     border-top: 1px solid var(--site-line);
   }
@@ -184,10 +187,18 @@
       line-height: 42px;
     }
 
+    .number {
+      font-size: 80px;
+    }
+
     .steps {
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 32px;
-      margin-top: 88px;
+      margin-top: 64px;
+    }
+
+    .footer {
+      margin-top: 64px;
     }
 
     .steps li {

@@ -1,7 +1,8 @@
+import { flightWanted, type Shelf } from '$lib/canvas/debug/flight-log';
+
 export const DEBUG_STORAGE_KEY = 'feega:debug';
 
 const PREFIX = '[feega]';
-const PARAM = 'debug';
 const ON = '1';
 const LONG_FRAME_MS = 32;
 const GESTURE_END_MS = 150;
@@ -10,7 +11,7 @@ const GROUP_MAX = 40;
 export type Sink = { line: (text: string) => void; group: (title: string, lines: string[]) => void };
 type Mark = { name: string; startTime: number };
 
-const consoleSink: Sink = {
+export const consoleSink: Sink = {
   line: (t) => console.log(t),
   group: (title, lines) => {
     console.groupCollapsed(title);
@@ -18,6 +19,11 @@ const consoleSink: Sink = {
     console.groupEnd();
   }
 };
+
+export const teeSink = (...sinks: Sink[]): Sink => ({
+  line: (text) => sinks.forEach((s) => s.line(text)),
+  group: (title, lines) => sinks.forEach((s) => s.group(title, lines))
+});
 
 const FLUSH_MS = 100;
 
@@ -70,9 +76,19 @@ function readStored(): string | null {
   }
 }
 
-export const debugOn = (search: string, stored: string | null) => new URLSearchParams(search).has(PARAM) || stored === ON;
+const NO_TAB: Shelf = { getItem: () => null, setItem: () => undefined, removeItem: () => undefined };
 
-const enabled = () => debugOn(typeof location === 'undefined' ? '' : location.search, readStored());
+function tabShelf(): Shelf {
+  try {
+    return sessionStorage;
+  } catch {
+    return NO_TAB;
+  }
+}
+
+export const debugOn = (search: string, stored: string | null, tab: Shelf = NO_TAB) => flightWanted(search, tab) || stored === ON;
+
+export const debugEnabled = () => typeof location !== 'undefined' && debugOn(location.search, readStored(), tabShelf());
 
 export function formatMark({ name, startTime }: Mark): string | null {
   const [kind, step, group] = name.split('|');
@@ -167,7 +183,7 @@ function onMark(e: Mark) {
 }
 
 export function debugStart(search: string = typeof location === 'undefined' ? '' : location.search, sink: Sink = consoleSink): boolean {
-  if (!debugOn(search, readStored())) {
+  if (!debugOn(search, readStored(), tabShelf())) {
     return false;
   }
   if (out) {

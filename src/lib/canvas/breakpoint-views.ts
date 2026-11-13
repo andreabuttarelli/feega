@@ -29,7 +29,7 @@ function resolvedOnce(doc: MotionDoc, breakpointId: string): MotionDoc {
   return byView.get(breakpointId) ?? byView.set(breakpointId, resolveView(doc, breakpointId)).get(breakpointId)!;
 }
 
-function viewsOfFrame(frame: FrameAt, doc: MotionDoc): BreakpointView[] {
+export function viewsOfFrame(frame: FrameAt, doc: MotionDoc): BreakpointView[] {
   const scale = frame.box.w / doc.width;
   let x = frame.box.x + frame.box.w + VIEW_GAP;
 
@@ -50,7 +50,7 @@ const stampOf = ({ kind, revision, box }: FrameAt) => `${kind}|${revision}|${box
 export function heldViews() {
   const held = new Map<string, Held>();
 
-  return (frames: readonly FrameAt[], docOf: (id: string) => MotionDoc | null | undefined): BreakpointView[] =>
+  const resolve = (frames: readonly FrameAt[], docOf: (id: string) => MotionDoc | null | undefined): BreakpointView[] =>
     frames.flatMap((frame) => {
       const doc = docOf(frame.id);
       if (!doc?.breakpoints?.length) {
@@ -65,6 +65,8 @@ export function heldViews() {
       held.set(frame.id, { stamp, doc, views });
       return views;
     });
+
+  return Object.assign(resolve, { forget: (id: string) => held.delete(id) });
 }
 
 export function viewAt(views: readonly BreakpointView[], p: { x: number; y: number }): BreakpointView | null {

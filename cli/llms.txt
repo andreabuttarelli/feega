@@ -20,7 +20,7 @@ curl -sSL https://raw.githubusercontent.com/andreabuttarelli/feega/main/cli/scri
 - `feega products <slug> [list|sync]` — List catalog, or re-import from the connected store (Shopify/Woo)
 
 ### Account & billing
-- `feega upgrade <slug> [--credits N | --top-up N]` — Open Stripe checkout for a monthly plan (8–256 credits, 1 credit = €1) or a one-time top-up
+- `feega upgrade <slug> [--top-up 1000|2000|5000]` — Open Stripe checkout for the plan (€9 / editor / month, 500 credits, 100 credits = €1) or a one-time top-up
 
 ### System
 - `feega login [--email --password | --password-stdin]` — Authenticate

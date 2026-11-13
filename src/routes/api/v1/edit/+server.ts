@@ -1,10 +1,11 @@
+import { agentEditRefusal } from '$lib/server/agent-edits/cap';
 import { json } from '@sveltejs/kit';
 import { z } from 'zod';
 import type { RequestHandler } from './$types';
 import { resolveOrgCaller } from '$lib/server/org-data/auth';
 import { describeEdit, describeInput } from '$lib/server/edit/describe-edit';
 import { editPorts } from '$lib/server/edit/edit-ports';
-import { runEdit } from '$lib/server/edit/run-edit';
+import { runEdit, writeCount } from '$lib/server/edit/run-edit';
 import { RESERVED_OPS } from '$lib/server/edit/edit-catalogue';
 import { Detail } from '$lib/server/edit/compact-result';
 import { SESSION_HEADER, sessionFromHeader } from '@feega/api-contracts';
@@ -47,6 +48,12 @@ export const POST: RequestHandler = async ({ request, url }) => {
   }
 
   const caller = { ...resolved.caller, sessionId: sessionFromHeader(request.headers.get(SESSION_HEADER)) };
-  const answer = await runEdit(editPorts(caller), { projectId: ask.project_id, target: ask.op === BATCH_OP ? ask.target : undefined, steps, batch: ask.op === BATCH_OP, detail: ask.verbose ? Detail.Verbose : Detail.Compact });
+  const ports = editPorts(caller);
+  const writes = writeCount(ports, steps);
+  const full = writes > 1 ? await agentEditRefusal(caller.db, caller.orgId, writes) : null;
+  if (full) {
+    return full;
+  }
+  const answer = await runEdit(ports, { projectId: ask.project_id, target: ask.op === BATCH_OP ? ask.target : undefined, steps, batch: ask.op === BATCH_OP, detail: ask.verbose ? Detail.Verbose : Detail.Compact });
   return json(answer.body, { status: answer.status });
 };

@@ -8,6 +8,7 @@ import { DRAWN_TEXT } from '$lib/motion/draw-create';
 import { FramePress } from '$lib/motion/drill';
 import { Root, rootLayersOf } from './frame-select';
 import { grantedPath } from './asset-url';
+import { importMapSchema, MAX_FRAME_BOARDS } from './import-map';
 
 export enum FrameKind {
   Frame = 'frame',
@@ -106,7 +107,7 @@ const TOKEN_TEXT = 500;
 const modeRecord = z.record(z.string().max(40), z.string().max(TOKEN_TEXT));
 const codeTokensSchema = z.record(z.string().max(81), z.object({ name: z.string().max(200), origins: modeRecord, raw: modeRecord, scale: z.number().positive().optional(), orphan: z.boolean().optional(), factor: z.number().optional(), style: z.string().max(TOKEN_TEXT).optional(), field: z.string().max(40).optional(), rule: z.string().max(TOKEN_TEXT).optional() })).refine((m) => Object.keys(m).length <= 512);
 
-export const codeOriginSchema = z.object({ kind: z.enum(['github', 'folder', 'upload']).default('github'), repo: z.string().min(3).max(500), branch: z.string().max(200).nullable(), sha: z.string().max(64).nullable(), app: z.string().max(200).optional(), routes: z.array(z.string().max(300)).max(8), conditions: z.array(z.object({ scheme: z.enum(['light', 'dark']), width: z.number().int().min(240).max(3840) })).max(12).optional(), delay: z.object({ ms: z.number().int().min(0).max(10_000), routes: z.record(z.string().max(300), z.number().int().min(0).max(10_000)) }).optional(), tokens: codeTokensSchema.optional() });
+export const codeOriginSchema = z.object({ kind: z.enum(['github', 'folder', 'upload']).default('github'), repo: z.string().min(3).max(500), branch: z.string().max(200).nullable(), sha: z.string().max(64).nullable(), app: z.string().max(200).optional(), routes: z.array(z.string().max(300)).max(MAX_FRAME_BOARDS), conditions: z.array(z.object({ scheme: z.enum(['light', 'dark']), width: z.number().int().min(240).max(3840) })).max(12).optional(), delay: z.object({ ms: z.number().int().min(0).max(10_000), routes: z.record(z.string().max(300), z.number().int().min(0).max(10_000)) }).optional(), tokens: codeTokensSchema.optional(), map: importMapSchema.optional() });
 
 export type CodeOriginData = z.infer<typeof codeOriginSchema>;
 

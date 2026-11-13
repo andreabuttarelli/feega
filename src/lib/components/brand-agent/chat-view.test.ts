@@ -52,6 +52,7 @@ describe('canvasLinkOf', () => {
 describe('failureOfStatus', () => {
   it('names exhausted credits apart from a generic failure', () => {
     expect(failureOfStatus(402)).toBe('credits');
+    expect(failureOfStatus(402, 'agent_edit_cap')).toBe('agentCap');
     expect(failureOfStatus(500)).toBe('send');
   });
 });

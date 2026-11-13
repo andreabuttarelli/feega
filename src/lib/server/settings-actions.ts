@@ -1,7 +1,7 @@
 import { hasManyTenants } from '$lib/server/tenancy';
 import { fail, redirect } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
-import { rungFor } from '$lib/credit-ladder';
+import { PLAN, topUpFor } from '$lib/credit-ladder';
 import { generateApiKey } from '$lib/server/cli-auth';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { RequestEvent } from '@sveltejs/kit';
@@ -15,6 +15,7 @@ import { listMemberships } from '$lib/server/repos/orgs';
 import { chooseOrg, ORG_COOKIE } from '$lib/server/tenancy/context';
 import type { Db } from '$lib/server/db/client';
 import { appOrigin } from '$lib/server/app-url';
+import { editorCount } from '$lib/server/team/seat-billing';
 
 const stripeApi = () => import('$lib/server/stripe');
 
@@ -88,14 +89,14 @@ export async function billingPortal(event: Ev) {
   if (!orgId) return fail(403, { billingError: 'Owner only' });
   const data = await event.request.formData();
   const flowRaw = String(data.get('flow') ?? 'invoices');
-  const flow = flowRaw === 'payment_method' || flowRaw === 'upgrade' ? flowRaw : undefined;
+  const flow = flowRaw === 'payment_method' ? flowRaw : undefined;
 
   const link = await portalLink(await orgBillingById(event.locals.supabase, orgId), {
     returnUrl: billingUrl(event),
     flow
   });
   if (link.refusal === 'no_org_billing') return fail(404, { billingError: 'Organization not found' });
-  if (link.refusal === 'no_customer' || link.refusal === 'no_subscription') {
+  if (link.refusal === 'no_customer') {
     return fail(400, { billingError: 'No billing account yet' });
   }
   if (link.refusal) return fail(500, { billingError: link.message || 'Could not open billing' });
@@ -105,52 +106,40 @@ export async function billingPortal(event: Ev) {
 
 const PURCHASES_NOT_READY = 'Purchases open soon.';
 
-export async function upgrade(event: Ev) {
+export async function subscribe(event: Ev) {
   const orgId = await ownedOrgId(event);
   if (!orgId) return fail(403, { billingError: 'Owner only' });
   const { supabase } = event.locals;
   if (!(await billingGrantsReady(supabase))) return fail(409, { billingError: PURCHASES_NOT_READY });
-  const data = await event.request.formData();
-  const usd = Number(data.get('usd') ?? '');
-
-  const rung = rungFor(usd);
-  if (!rung) return fail(400, { billingError: 'Unknown subscription tier' });
 
   const billing = await orgBillingById(supabase, orgId);
   if (!billing) return fail(404, { billingError: 'Organization not found' });
+  if (billing.subscriptionId) return fail(409, { billingError: 'Already subscribed.' });
 
-  const returnUrl = billingUrl(event);
-
-  if (!billing.subscriptionId) {
-    const { subscriptionPriceIdFor, ensureOrgCustomer, createSubscriptionCheckout } = await stripeApi();
-    let checkoutUrl: string;
-    try {
-      const priceId = await subscriptionPriceIdFor(rung.price);
-      if (!priceId) {
-        return fail(400, { billingError: 'Subscriptions are not configured yet for this tier.' });
-      }
-      const customerId = await ensureOrgCustomer({
-        id: billing.orgId,
-        name: billing.orgName,
-        stripe_customer_id: billing.customerId
-      });
-      checkoutUrl = await createSubscriptionCheckout({
-        customerId,
-        orgId: billing.orgId,
-        priceId,
-        credits: rung.credits,
-        ...checkoutReturnUrls(returnUrl)
-      });
-    } catch (e) {
-      return fail(500, { billingError: e instanceof Error ? e.message : 'Could not start the upgrade' });
+  const { subscriptionPriceId, ensureOrgCustomer, createSubscriptionCheckout } = await stripeApi();
+  let checkoutUrl: string;
+  try {
+    const priceId = await subscriptionPriceId();
+    if (!priceId) {
+      return fail(400, { billingError: 'The plan is not configured yet.' });
     }
-    throw redirect(303, checkoutUrl);
+    const customerId = await ensureOrgCustomer({
+      id: billing.orgId,
+      name: billing.orgName,
+      stripe_customer_id: billing.customerId
+    });
+    checkoutUrl = await createSubscriptionCheckout({
+      customerId,
+      orgId: billing.orgId,
+      priceId,
+      credits: PLAN.credits,
+      quantity: await editorCount(supabase as Db, orgId),
+      ...checkoutReturnUrls(billingUrl(event))
+    });
+  } catch (e) {
+    return fail(500, { billingError: e instanceof Error ? e.message : 'Could not start the subscription' });
   }
-
-  const link = await portalLink(billing, { returnUrl, flow: 'upgrade' });
-  if (link.refusal) return fail(500, { billingError: link.message || 'Could not start the upgrade' });
-
-  throw redirect(303, link.url);
+  throw redirect(303, checkoutUrl);
 }
 
 export async function applyRetention(event: Ev) {
@@ -200,8 +189,8 @@ export async function buyOneTime(event: Ev) {
   const { supabase } = event.locals;
   if (!(await billingGrantsReady(supabase))) return fail(409, { billingError: PURCHASES_NOT_READY });
 
-  const rung = rungFor(Number((await event.request.formData()).get('usd') ?? ''));
-  if (!rung) return fail(400, { billingError: 'Unknown one-time pack' });
+  const topUp = topUpFor(Number((await event.request.formData()).get('credits') ?? ''));
+  if (!topUp) return fail(400, { billingError: 'Unknown top-up' });
 
   const billing = await orgBillingById(supabase, orgId);
   if (!billing) return fail(404, { billingError: 'Organization not found' });
@@ -217,8 +206,8 @@ export async function buyOneTime(event: Ev) {
     checkoutUrl = await createOneTimeCreditCheckout({
       customerId,
       orgId: billing.orgId,
-      price: rung.price,
-      credits: rung.credits,
+      price: topUp.price,
+      credits: topUp.credits,
       ...checkoutReturnUrls(billingUrl(event))
     });
   } catch (e) {
@@ -289,8 +278,9 @@ export async function revokeApiKey(event: Ev) {
   const scope = await scopeOf(event);
   if (!scope) return fail(404, { apiKeyError: 'Project not found' });
 
-  const { error } = await event.locals.supabase.from('api_keys').delete().eq('id', id).eq('org_id', scope.orgId);
+  const { data: revoked, error } = await event.locals.supabase.from('api_keys').delete().eq('id', id).eq('org_id', scope.orgId).select('id');
   if (error) return fail(500, { apiKeyError: error.message });
+  if (!revoked?.length) return fail(404, { apiKeyError: 'Key not found, or not yours to revoke' });
 
   return { apiKeyRevoked: true };
 }

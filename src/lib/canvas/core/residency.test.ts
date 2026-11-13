@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ItemKind, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
-import { CACHE_SHARE, cacheZoom, cached, Offscreen, pictureBytes, resident, heldWhileEdited, heldWhileMoving, uncached } from './residency';
+import { CACHE_SHARE, cacheZoom, cached, Offscreen, pictureBytes, resident, heldWhileEdited, heldWhileMoving, movingWhileZooming, uncached, ZoomPicture } from './residency';
 
 const view = { x: 0, y: 0, zoom: 1 };
 const screen = { width: 1000, height: 1000 };
@@ -90,6 +90,18 @@ describe('a frame being dragged', () => {
   it('holds nothing while nothing moves', () => {
     const shown = cached([frame('a', 0, 0)], view, screen, 1e9);
     expect(heldWhileMoving(shown, new Set())[0].hold).toBeUndefined();
+  });
+});
+
+describe('a zoom gesture', () => {
+  const shown = [frame('a', 0, 0), frame('b', 200, 0)];
+
+  it('holds every frame as a texture where pictures are held, so a pinch never re-rasters whole pages each frame', () => {
+    expect([...movingWhileZooming(shown, new Set(), ZoomPicture.Held)]).toEqual(['a', 'b']);
+  });
+
+  it('keeps the exact picture where it is exact, moving only what an edit or a drag moves', () => {
+    expect([...movingWhileZooming(shown, new Set(['b']), ZoomPicture.Exact)]).toEqual(['b']);
   });
 });
 

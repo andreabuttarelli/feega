@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const runMotionTool = vi.fn();
 const runEditorOp = vi.fn();
 
+vi.mock('$lib/server/agent-edits/cap', () => ({ agentEditCap: async () => null, AGENT_EDIT_CAP_STATUS: 402 }));
 vi.mock('$lib/server/motion/tool-run', async (real) => ({ ...(await real<object>()), runMotionTool: (...a: unknown[]) => runMotionTool(...a) }));
 vi.mock('$lib/server/frame-editor/editor-ops', async (real) => ({ ...(await real<object>()), runEditorOp: (...a: unknown[]) => runEditorOp(...a) }));
 vi.mock('$lib/server/motion/editor-scope', () => ({ callerMotionScope: async () => ({ orgId: 'org', userId: 'u1' }) }));

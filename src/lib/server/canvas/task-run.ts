@@ -120,6 +120,7 @@ export type TaskRunDeps = {
   screen(scope: TaskScope, model: TaskModel): ScreenPorts;
   refuseLikeness(scope: TaskScope, model: TaskModel, reason: string): void;
   bill(entry: TaskBill): void;
+  storeQuote(input: { orgId: string; runId: string; params: Record<string, unknown> }): Promise<void>;
 };
 
 export type TaskRequest = {
@@ -143,7 +144,8 @@ export enum RefusalStage {
   Provider = 'provider'
 }
 
-export const QUOTED_USD_PARAM = 'quotedUsd';
+export { QUOTED_USD_PARAM } from '$lib/server/repos/node-runs';
+import { QUOTED_USD_PARAM } from '$lib/server/repos/node-runs';
 
 export type TaskStart = { kind: 'job'; jobId: string; quotedUsd?: number } | { kind: 'waiting' } | { kind: 'refused'; error: string; stage: RefusalStage };
 
@@ -247,14 +249,15 @@ export async function startTaskRun(deps: TaskRunDeps, req: TaskRequest): Promise
   if (!(await slotFree(deps, provider, req.place ?? QueuePlace.New))) {
     return WAITING;
   }
-  const quoted = model.spec.quotedAtSubmit ? await submitQuote(gateway, ref, inputs) : {};
+  const quoted = model.spec.quotedAtSubmit ? await submitQuote(gateway, ref, inputs) : undefined;
   if (quoted === null) {
     return refused(TASK_REFUSALS.unpriced, RefusalStage.Provider);
   }
   const startedAt = Date.now();
   try {
     const { taskId } = await gateway.run(ref, inputs, req.idempotencyKey);
-    return { kind: 'job', jobId: `${jobPrefixOf(provider)}${taskId}`, ...quoted };
+    const quotedUsd = quoted?.quotedUsd ?? quoteOf(model, inputs);
+    return { kind: 'job', jobId: `${jobPrefixOf(provider)}${taskId}`, ...(quotedUsd ? { quotedUsd } : {}) };
   } catch (error) {
     if (error instanceof ProviderBusyError) {
       return WAITING;

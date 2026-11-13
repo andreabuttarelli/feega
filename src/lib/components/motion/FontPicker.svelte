@@ -3,6 +3,7 @@
   import { FIELD_INPUT } from '$lib/components/ui/shell';
   import { MAX_FONT_MB, type FontLibrary } from '$lib/motion/fonts/library';
   import { FontOrigin, LocalFonts, readLocalFonts, type LocalFontsRead } from '$lib/motion/fonts/local';
+  import { dismissible } from '$lib/components/ui/shell/dismiss';
 
   let {
     value,
@@ -22,7 +23,7 @@
   const GROUP = 'm-0 mt-1 text-[10px] uppercase text-ui-text-3';
   const MUTED = 'm-0 text-[11px] text-ui-text-3';
   const TAG = 'ml-1.5 font-mono text-[10px] text-ui-text-3';
-  const ROW = 'w-full cursor-pointer truncate rounded-sm px-2 py-1 text-left text-base text-ui-text hover:bg-ui-wash';
+  const ROW = 'min-h-(--ui-hit) w-full cursor-pointer truncate rounded-sm px-2 py-1 text-left text-base text-ui-text hover:bg-ui-wash';
   const rowClass = (selected: boolean) => (selected ? `${ROW} bg-ui-selected` : ROW);
 
   const RESULTS = 40;
@@ -31,7 +32,12 @@
   const REGULAR = 400;
   const ACCEPT = '.ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2';
 
+  const FONT_ROW = 'li > button[aria-current]';
+  const SEARCH = 'input[type="search"]';
+  const STEP: Record<string, number> = { ArrowDown: 1, ArrowUp: -1 };
+
   let open = $state(false);
+  let trigger = $state<HTMLButtonElement | null>(null);
   let query = $state('');
   let catalogue = $state<CatalogueFont[]>([]);
   let uploading = $state(false);
@@ -98,9 +104,45 @@
     pick(family, FontOrigin.Local);
   }
 
+  function focusSearch(panel: HTMLElement) {
+    const search = panel.querySelector<HTMLInputElement>(SEARCH);
+    search?.focus();
+    search?.select();
+  }
+
+  function close() {
+    open = false;
+    trigger?.focus();
+  }
+
   function pick(family: string, origin: FontOrigin = FontOrigin.Catalogue) {
     onpick(family, catalogue, origin);
-    open = false;
+    close();
+  }
+
+  function walk(e: KeyboardEvent) {
+    const step = STEP[e.key];
+    if (!step) {
+      return;
+    }
+    const panel = e.currentTarget as HTMLElement;
+    const rows = [...panel.querySelectorAll<HTMLElement>(`${SEARCH}, ${FONT_ROW}`)];
+    const at = rows.indexOf(document.activeElement as HTMLElement);
+    const row = rows[Math.min(Math.max(at + step, 0), rows.length - 1)];
+    if (!row) {
+      return;
+    }
+    e.preventDefault();
+    row.focus();
+    row.scrollIntoView({ block: 'nearest' });
+  }
+
+  function pickFirst(e: KeyboardEvent) {
+    if (e.key !== 'Enter' || !results.length) {
+      return;
+    }
+    e.preventDefault();
+    pick(results[0].f);
   }
 
   async function showInstalled() {
@@ -144,11 +186,11 @@
 </script>
 
 <div class="font-picker relative w-full" data-testid="font-picker">
-  <button type="button" class={`${TRIGGER} rounded-sm bg-ui-input text-ui-text hover:bg-ui-input-hover`} style={`font-family: ${fontStack(value, fonts)}`} aria-expanded={open} aria-label={`Font ${value}`} onclick={toggle}>{value}</button>
+  <button bind:this={trigger} type="button" class={`${TRIGGER} rounded-sm bg-ui-input text-ui-text hover:bg-ui-input-hover`} style={`font-family: ${fontStack(value, fonts)}`} aria-expanded={open} aria-label={`Font ${value}`} onclick={toggle}>{value}</button>
   {#if missing}<p class="m-0 mt-0.5 text-[11px] text-amber-700 dark:text-amber-400" role="status" data-testid="font-missing">The file of {value} is gone: a fallback font is showing.</p>{/if}
   {#if open}
-    <div class="absolute inset-x-0 top-[calc(100%+2px)] z-20 grid max-h-[420px] gap-1 overflow-auto rounded-md bg-ui-raised p-1.5 text-ui-text shadow-ui-float" role="dialog" aria-label="Choose a font" {@attach (el) => el.scrollIntoView({ block: 'nearest' })}>
-      <input type="search" class={`${FIELD_INPUT} w-full`} placeholder="Search Google Fonts…" aria-label="Search fonts" bind:value={query} />
+    <div class="absolute inset-x-0 top-[calc(100%+2px)] z-20 grid max-h-[420px] gap-1 overflow-auto rounded-md bg-ui-raised p-1.5 text-ui-text shadow-ui-float" role="dialog" aria-label="Choose a font" tabindex="-1" onkeydown={walk} {@attach (el) => el.scrollIntoView({ block: 'nearest' })} {@attach dismissible(close)} {@attach focusSearch}>
+      <input type="search" class={`${FIELD_INPUT} w-full`} placeholder="Search Google Fonts…" aria-label="Search fonts" bind:value={query} onkeydown={pickFirst} />
       <p class={GROUP}>In this video</p>
       <ul class="m-0 list-none p-0">
         {#each inVideo as family (family)}
@@ -183,7 +225,7 @@
           {/each}
         </ul>
       {:else if !installed}
-        <button type="button" class="rounded-sm px-1 text-left text-[10px] text-ui-text-3 hover:bg-ui-wash" data-testid="font-installed-show" disabled={reading} onclick={showInstalled}>{reading ? 'Reading installed fonts…' : 'Show installed fonts…'}</button>
+        <button type="button" class="reach rounded-sm px-1 text-left text-[10px] text-ui-text-3 hover:bg-ui-wash" data-testid="font-installed-show" disabled={reading} onclick={showInstalled}>{reading ? 'Reading installed fonts…' : 'Show installed fonts…'}</button>
       {/if}
       {#if installed}<p class={MUTED} data-testid="font-installed-note">{LOCAL_NOTE[installed.state]}</p>{/if}
       <p class={GROUP}>Google Fonts{brand.length ? ' · brand first' : ''}</p>

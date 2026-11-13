@@ -1,5 +1,7 @@
 # One entitlement ledger, fed by Stripe and by the app stores
 
+The expiry of subscription grants below is superseded by [ADR 0038](0038-credits-never-expire.md): credits never expire.
+
 Context: the native shell (ADR 0009) ships to the App Store, Mac App Store and Google Play. Apple
 (guideline 3.1.1) and Google require their own billing for digital goods bought inside the app;
 credits and plans are digital goods. The web keeps Stripe. Two payment rails must not become two

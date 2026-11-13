@@ -44,3 +44,5 @@ The right panel follows the selection, whatever is selected:
 Properties live in the right bar, actions in the right-click menu: Duplicate, Group, Export, the image tools and the frame entries (Components, Templates, History, Publish…) are there, each once, with its shortcut. Aligning is only in the right bar; the bar that used to float under a frame is gone.
 
 On a phone or tablet, press and hold a node or a layer to open the same menu a right click opens.
+
+On a phone or tablet, a frame zoomed out too small to read, or far from where you are looking, shows a snapshot and is drawn in full once you zoom in on it, so a large canvas fits in the phone's memory. Snapshots are made once in the background and kept on the device. If the page reloads while a canvas is open, it reopens zoomed out to fit instead of where it was.

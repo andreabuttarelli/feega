@@ -4,6 +4,8 @@ import { bearerOf } from '$lib/server/api/bearer-page';
 import { listTeam, runTeamOp, TeamOp, TeamRefusal, type TeamCtx } from '$lib/server/team/team';
 import { inviteMailer } from '$lib/server/team/invite-mail';
 import { appOrigin } from '$lib/server/app-url';
+import { createServiceRoleDb } from '$lib/server/db/client';
+import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
 import type { RequestHandler } from './$types';
 
 const HTTP_BAD_REQUEST = 400;
@@ -22,8 +24,11 @@ const REFUSAL_STATUS: Record<TeamRefusal, number> = {
   [TeamRefusal.NotFound]: HTTP_NOT_FOUND,
   [TeamRefusal.OwnerProtected]: HTTP_FORBIDDEN,
   [TeamRefusal.Self]: HTTP_BAD_REQUEST,
-  [TeamRefusal.SeatLimit]: HTTP_PAYMENT_REQUIRED
+  [TeamRefusal.SeatLimit]: HTTP_PAYMENT_REQUIRED,
+  [TeamRefusal.BillingOnly]: HTTP_FORBIDDEN
 };
+
+const TEAM_WRITES = SERVICE_ROLE_USES.find((u) => u.path.startsWith('src/routes/api/v1/orgs/[orgId]/team/+server.ts'))!;
 
 const id = z.string().min(1);
 
@@ -57,7 +62,7 @@ async function ctxOf(request: Request, url: URL, orgId: string): Promise<TeamCtx
     return bearer;
   }
   const origin = appOrigin(url);
-  return { db: bearer.db, userId: bearer.user.id, orgId, origin, mail: inviteMailer({ inviterEmail: bearer.user.email, origin }) };
+  return { db: bearer.db, writer: createServiceRoleDb(TEAM_WRITES), userId: bearer.user.id, orgId, origin, mail: inviteMailer({ inviterEmail: bearer.user.email, origin }) };
 }
 
 export const GET: RequestHandler = async ({ request, url, params }) => {

@@ -2,8 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 
 const routesFound = vi.fn();
 const importRoutesInto = vi.fn();
+const codeAdd = vi.fn();
+const codeMap = vi.fn();
 
 vi.mock('$lib/server/code-import/canvas-import', async (real) => ({ ...(await real<object>()), routesFound: (...a: unknown[]) => routesFound(...a), importRoutesInto: (...a: unknown[]) => importRoutesInto(...a) }));
+
+vi.mock('$lib/server/code-import/code-sync', async (real) => ({ ...(await real<object>()), codeAdd: (...a: unknown[]) => codeAdd(...a), codeMap: (...a: unknown[]) => codeMap(...a) }));
 
 const { CANVAS_OPS, canvasCtx } = await import('./canvas-ops');
 
@@ -34,5 +38,23 @@ describe('discover_routes and import_code: the pages of an app, for agents too',
 
     expect(importRoutesInto.mock.calls[0][2]).toMatchObject({ routes: 'all' });
     expect(many.success).toBe(true);
+  });
+
+  it('import_code with into adds the pages to that frame, written there, with no source of its own', async () => {
+    codeAdd.mockResolvedValue({ outcome: 'ok' });
+    const input = CANVAS_OPS.import_code.input.parse({ canvasId: 'c', into: 'f1', routes: ['/pricing'], conditions: [{ scheme: 'dark', width: 390 }], x: 0, y: 0 });
+
+    await CANVAS_OPS.import_code.run(ctx, input);
+
+    expect(codeAdd.mock.calls[0].slice(1)).toEqual(['f1', { routes: ['/pricing'], conditions: [{ scheme: 'dark', width: 390 }], land: 'frame' }]);
+    expect(importRoutesInto).toHaveBeenCalledTimes(1);
+  });
+
+  it('code_map reads the map of a frame and says when the frame did not come from code', async () => {
+    codeMap.mockResolvedValueOnce({ kind: 'github', map: { pages: [] }, used: 3, limit: 20 }).mockResolvedValueOnce(null);
+    const input = CANVAS_OPS.code_map.input.parse({ nodeId: 'f1' });
+
+    expect(await CANVAS_OPS.code_map.run(ctx, input)).toMatchObject({ used: 3, limit: 20 });
+    expect(await CANVAS_OPS.code_map.run(ctx, input)).toEqual({ error: 'not_from_code' });
   });
 });

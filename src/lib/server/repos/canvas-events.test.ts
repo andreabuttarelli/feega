@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import { fakeDb, filtersOf } from '$lib/server/db/fake-db';
 import { recordEvent, listCanvasEvents } from './canvas-events';
 import type { Actor } from './actor';
@@ -60,7 +61,7 @@ describe('recordEvent: ogni scrittura porta org_id e l attore', () => {
   it('the session of the turn lands on the event', async () => {
     const { db, calls } = fakeDb({ canvas_events: [eventRow] });
 
-    await recordEvent(db, { orgId: ORG, canvasId: CANVAS, kind: 'node.update', nodeId: NODE, actor: { kind: 'agent', id: USER, agentKey: 'claude-code', sessionId: 's-1' } });
+    await recordEvent(db, { orgId: ORG, canvasId: CANVAS, kind: 'node.update', nodeId: NODE, actor: agentActor(USER, AgentKey.Mcp, 's-1') });
 
     expect(calls.find((c) => c.op === 'insert')!.payload).toMatchObject({ session_id: 's-1' });
   });

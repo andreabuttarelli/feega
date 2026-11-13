@@ -7,6 +7,7 @@
   import DevInspector from '$lib/components/canvas/DevInspector.svelte';
   import DevCode from '$lib/components/canvas/DevCode.svelte';
   import RepoSync from '$lib/components/canvas/RepoSync.svelte';
+  import ImportMap from '$lib/components/canvas/ImportMap.svelte';
   import { page } from '$app/state';
   import { frameProperties } from './frame-properties.svelte';
   import HeaderActions from '$lib/components/motion/HeaderActions.svelte';
@@ -135,6 +136,7 @@
     {:else if !shown?.clip}
       <p class="empty" data-testid="dev-empty">Select one layer to read its CSS.</p>
     {/if}
+    {#if frameProperties.nodeId && page.params.projectId && page.params.canvasId && session && source}<ImportMap projectId={page.params.projectId} canvasId={page.params.canvasId} nodeId={frameProperties.nodeId} {session} doc={source} />{/if}
     {#if frameProperties.nodeId && page.params.projectId}<RepoSync projectId={page.params.projectId} nodeId={frameProperties.nodeId} revision={doc} />{/if}
   </aside>
 {:else if session && doc && frameProperties.panel === FramePanel.Group && !session.selection.length}
@@ -160,6 +162,7 @@
       <StyleLibrarySection {tokens} unit={Math.min(doc.width, doc.height) * scale} />
       <VariablesLibrarySection {doc} onchange={editGuides} />
     </details>
+    {#if frameProperties.nodeId && page.params.projectId && page.params.canvasId && source}<ImportMap projectId={page.params.projectId} canvasId={page.params.canvasId} nodeId={frameProperties.nodeId} {session} doc={source} />{/if}
   </aside>
 {:else if session && doc && tokens && shown}
   <aside class="frame-inspector" data-testid="frame-inspector" data-mode-chrome={editorMode.spec.chrome} aria-label="Properties">

@@ -1,4 +1,5 @@
 import { json } from '@sveltejs/kit';
+import { agentEditRefusal } from '$lib/server/agent-edits/cap';
 import type { Db } from '$lib/server/db/client';
 import { pickOf } from '$lib/server/project-agent/model-route';
 import { planModel } from '$lib/server/project-agent/agent-plan';
@@ -80,6 +81,11 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   const capped = await capRefusal(await liveCapReader(db), { orgId, userId: user.id, projectId: project.id });
   if (capped) {
     return json({ error: CAP_REACHED, message: capped }, { status: HTTP_FORBIDDEN });
+  }
+
+  const full = await agentEditRefusal(db, orgId);
+  if (full) {
+    return full;
   }
 
   const { message, model: askedModel, reasoning: askedReasoning, canvasId: openCanvas, attachments: askedFiles, frame: askedFrame, selection: askedSelection } = (await request.json()) as { message?: string; model?: unknown; reasoning?: unknown; canvasId?: unknown; attachments?: unknown; frame?: unknown; selection?: unknown };

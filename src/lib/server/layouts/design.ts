@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import type { Db } from '$lib/server/db/client';
 import { llmStructured } from '$lib/server/llm';
 import { withOrgContext } from '$lib/server/ai-log';
@@ -7,7 +8,7 @@ import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { Outcome } from '$lib/server/repos/effects';
 import { writeLayout, type LayoutWritten } from '$lib/server/repos/layouts';
 
-export const COMPOSE_AGENT_KEY = 'compose';
+export const COMPOSE_AGENT_KEY = AgentKey.Compose;
 const TRIES = 2;
 
 export const LAYOUT_SPEC_GUIDE = [
@@ -32,7 +33,7 @@ export async function designLayout(db: Db, scope: { orgId: string; userId: strin
     return { outcome: Outcome.Invalid, problems: [screened.error] };
   }
 
-  const actor = { kind: 'agent' as const, id: scope.userId, agentKey: COMPOSE_AGENT_KEY };
+  const actor = agentActor(scope.userId, COMPOSE_AGENT_KEY);
   let request = `Design this layout: ${prompt}`;
   let written: LayoutWritten = { outcome: Outcome.Invalid, problems: [] };
   for (let i = 0; i < TRIES; i++) {

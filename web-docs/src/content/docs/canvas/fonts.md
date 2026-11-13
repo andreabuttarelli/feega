@@ -10,6 +10,7 @@ A font uploaded to an organization is usable by every member, on every canvas: i
 | Where | How |
 |---|---|
 | App | **Settings → Fonts** lists, previews, uploads and deletes. The font picker of a text element shows them under **Uploaded**, each in its own face, with **Upload font…** at the bottom. |
+| Keyboard | Opening the font picker focuses its search: type to filter, arrows move through the results, Enter in the search picks the top match, Esc closes the picker and returns to the font field. |
 | CLI | `feega fonts` lists; `feega fonts upload <file>` uploads; `feega fonts delete <family>` deletes a family; `--org <id>` if you belong to several |
 | MCP | `org_fonts`: without arguments it lists; `upload` takes a local file path; `delete` takes a family name. The `query` tool also reads the `org_fonts` table |
 | API | `GET` `POST` `DELETE` `/api/v1/org/fonts` |

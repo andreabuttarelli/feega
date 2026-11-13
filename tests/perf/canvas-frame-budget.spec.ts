@@ -1,4 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
+import sharp from 'sharp';
 import { join } from 'node:path';
 import { loadavg } from 'node:os';
 import { test, expect, chromium, type Browser, type CDPSession, type Page } from '@playwright/test';
@@ -10,7 +11,8 @@ enum Gesture {
   Pan = 'pan',
   Zoom = 'zoom',
   Fit = 'fit',
-  Drag = 'drag'
+  Drag = 'drag',
+  DragElement = 'drag-element'
 }
 
 enum Edit {
@@ -18,6 +20,9 @@ enum Edit {
   Resize = 'resize',
   Opacity = 'opacity',
   Hide = 'hide',
+  NudgeLeaf = 'nudge-leaf',
+  HideLeaf = 'hide-leaf',
+  HideTextLeaf = 'hide-text-leaf',
   Text = 'text'
 }
 
@@ -35,6 +40,8 @@ const RUNS = Number(process.env.BUDGET_RUNS ?? 3);
 const OUT = process.env.BUDGET_OUT ?? 'perf-results';
 const LANDINGS_BASE = process.env.BUDGET_LANDINGS_BASE ?? `http://127.0.0.1:${process.env.BENCH_PORT ?? 5288}`;
 const HEAVY_BASE = process.env.BUDGET_HEAVY_BASE ?? `http://127.0.0.1:${Number(process.env.BENCH_PORT ?? 5288) + 1}`;
+const GESTURES_RUN = (process.env.BUDGET_GESTURES?.split(',') ?? null) as string[] | null;
+const benched = () => Object.values(Gesture).filter((g) => !GESTURES_RUN || GESTURES_RUN.includes(g));
 const TARGETS = (process.env.BUDGET_TARGETS?.split(',') ?? Object.values(Target)) as Target[];
 const VIEWPORT = { width: 1440, height: 900 };
 const SETTLE_MS = 10_000;
@@ -52,6 +59,13 @@ const DRAG_ZOOM_STEPS = 40;
 const DRAG_ZOOM_WHEEL_PX = 100;
 const DRAG_ZOOM_PAUSE_MS = 60;
 const DRAG_SETTLE_MS = 1500;
+const PROFILED = process.env.BUDGET_PROFILE === '1';
+const PROFILE_SAMPLE_US = 100;
+const EDIT_KINDS = process.env.BUDGET_EDIT_KINDS?.split(',') ?? null;
+const SHOTS = process.env.BUDGET_SHOTS === '1';
+const SHOT_SETTLE_MS = 1500;
+const PIXEL_TOLERANCE = 8;
+const PERCENT = 100;
 const UNCAPPED = ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--disable-gpu-vsync', '--disable-frame-rate-limit'];
 
 const PLACES: Record<Target, { base: string; place: Place; login: boolean }> = {
@@ -138,34 +152,78 @@ async function fit(page: Page, until: number) {
   }
 }
 
-async function drag(page: Page, until: number, aim?: string) {
-  const box = (await tiles(page)).find((t) => t.id === aim) ?? (await frameOnScreen(page));
-  const from = labelAt(box);
+async function swing(page: Page, from: { x: number; y: number }, until: number): Promise<number> {
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
   let moves = 0;
   for (; Date.now() < until; moves++) {
     const t = moves / 10;
     await page.mouse.move(from.x + Math.sin(t) * DRAG_SWING.x, from.y + Math.sin(t * 0.7) * DRAG_SWING.y);
+    await nextFrame(page);
   }
-  const moved = (await placeOf(page, box.id)) !== box.at;
-  console.log(`drag: ${moves} moves on ${box.id}`);
+  return moves;
+}
+
+async function release(page: Page, from: { x: number; y: number }) {
   await page.mouse.move(from.x, from.y);
   await page.mouse.up();
   await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+}
+
+async function drag(page: Page, until: number, aim?: string) {
+  const box = (await tiles(page)).find((t) => t.id === aim) ?? (await frameOnScreen(page));
+  const from = labelAt(box);
+  const moves = await swing(page, from, until);
+  const moved = (await placeOf(page, box.id)) !== box.at;
+  console.log(`drag: ${moves} moves on ${box.id}`);
+  await release(page, from);
   if (!moved) {
     throw new Error(`drag: frame ${box.id} did not move`);
   }
+  return moves;
 }
 
-const GESTURES: Record<Gesture, (page: Page, until: number, aim?: string) => Promise<void>> = {
+const CONTAINER_TRIES = 12;
+const CONTAINER_STEP = 0.06;
+
+async function selectContainer(page: Page): Promise<string> {
+  const id = await zoomOntoFrame(page);
+  const strips = page.getByTestId('auto-layout-overlay');
+  for (let i = 0; i < CONTAINER_TRIES; i++) {
+    const box = (await tiles(page)).find((t) => t.id === id)!;
+    await page.mouse.click(box.x + box.w * 0.5, box.y + box.w * (CONTAINER_STEP * (i + 1)));
+    if (await strips.first().isVisible()) {
+      return id;
+    }
+    await page.keyboard.press('Escape');
+  }
+  throw new Error('drag-element: no auto-layout container to select');
+}
+
+async function dragElement(page: Page, until: number) {
+  const body = page.getByTestId('frame-selection-body').first();
+  const box = (await body.boundingBox())!;
+  const from = { x: box.x + box.width / 2, y: box.y + Math.min(box.height / 2, 20) };
+  const moves = await swing(page, from, until);
+  const after = (await body.boundingBox())!;
+  console.log(`drag-element: ${moves} moves`);
+  await release(page, from);
+  if (after.x === box.x && after.y === box.y) {
+    throw new Error('drag-element: the element did not move');
+  }
+  return moves;
+}
+
+const GESTURES: Record<Gesture, (page: Page, until: number, aim?: string) => Promise<number | void>> = {
   [Gesture.Pan]: wheelPan,
   [Gesture.Zoom]: zoom,
   [Gesture.Fit]: fit,
-  [Gesture.Drag]: drag
+  [Gesture.Drag]: drag,
+  [Gesture.DragElement]: dragElement
 };
 
-type Seen = { gaps: number[]; taskMs: number };
+type Seen = { gaps: number[]; taskMs: number; moves: number };
 
 async function taskSeconds(cdp: CDPSession): Promise<number> {
   const { metrics } = await cdp.send('Performance.getMetrics');
@@ -173,21 +231,32 @@ async function taskSeconds(cdp: CDPSession): Promise<number> {
 }
 
 const SETUP: Partial<Record<Gesture, (page: Page) => Promise<string>>> = {
-  [Gesture.Drag]: zoomOntoFrame
+  [Gesture.Drag]: zoomOntoFrame,
+  [Gesture.DragElement]: selectContainer
 };
 
 async function gaps(page: Page, cdp: CDPSession, gesture: Gesture): Promise<Seen> {
   const aim = await SETUP[gesture]?.(page);
   await page.evaluate(() => Object.assign((window as unknown as { __frames: object }).__frames, { gaps: [], work: [], counting: true }));
+  const prof = PROFILED ? cdp : null;
+  if (prof) {
+    await prof.send('Profiler.enable');
+    await prof.send('Profiler.setSamplingInterval', { interval: PROFILE_SAMPLE_US });
+    await prof.send('Profiler.start');
+  }
   const before = await taskSeconds(cdp);
-  await GESTURES[gesture](page, Date.now() + GESTURE_MS, aim);
+  const moves = (await GESTURES[gesture](page, Date.now() + GESTURE_MS, aim)) ?? 0;
   const after = await taskSeconds(cdp);
+  if (prof) {
+    const { profile } = await prof.send('Profiler.stop');
+    writeFileSync(join(OUT, `gesture-${gesture}.cpuprofile`), JSON.stringify(profile));
+  }
   const seen = await page.evaluate(() => {
     const probe = (window as unknown as { __frames: { gaps: number[]; counting: boolean } }).__frames;
     probe.counting = false;
     return probe.gaps;
   });
-  return { gaps: seen, taskMs: (after - before) * MS_PER_S };
+  return { gaps: seen, taskMs: (after - before) * MS_PER_S, moves };
 }
 
 async function run(browser: Browser, target: Target): Promise<Record<Gesture, Seen>> {
@@ -205,7 +274,7 @@ async function run(browser: Browser, target: Target): Promise<Record<Gesture, Se
   await page.locator('[data-canvas-surface]').first().waitFor({ timeout: 120_000 });
   await page.waitForTimeout(SETTLE_MS);
   const seen = {} as Record<Gesture, Seen>;
-  for (const gesture of Object.values(Gesture)) {
+  for (const gesture of benched()) {
     await page.keyboard.press('Shift+Digit1');
     await page.waitForTimeout(FIT_TOGGLE_MS);
     seen[gesture] = await gaps(page, cdp, gesture);
@@ -218,17 +287,18 @@ for (const target of TARGETS) {
   test(`frames stay inside ${FRAME_BUDGET_MS.toFixed(1)} ms on ${target}`, async () => {
     mkdirSync(OUT, { recursive: true });
     const browser = await chromium.launch({ headless: false, args: UNCAPPED });
-    const all = Object.fromEntries(Object.values(Gesture).map((g) => [g, { gaps: [], taskMs: 0 } as Seen])) as Record<Gesture, Seen>;
+    const all = Object.fromEntries(benched().map((g) => [g, { gaps: [], taskMs: 0, moves: 0 } as Seen])) as Record<Gesture, Seen>;
     for (let i = 0; i < RUNS; i++) {
       const seen = await run(browser, target);
-      console.log(`run ${i + 1}: ${Object.values(Gesture).map((g) => `${g} ${(100 * budgetOf(seen[g].gaps).overShare).toFixed(1)}%/${(100 * budgetOf(seen[g].gaps, Rate.ProMotion).overShare).toFixed(1)}%`).join(' ')}`);
-      Object.values(Gesture).forEach((g) => {
+      console.log(`run ${i + 1}: ${benched().map((g) => `${g} ${(100 * budgetOf(seen[g].gaps).overShare).toFixed(1)}%/${(100 * budgetOf(seen[g].gaps, Rate.ProMotion).overShare).toFixed(1)}%`).join(' ')}`);
+      benched().forEach((g) => {
         all[g].gaps.push(...seen[g].gaps);
         all[g].taskMs += seen[g].taskMs / RUNS;
+        all[g].moves += seen[g].moves / RUNS;
       });
     }
     await browser.close();
-    const report = Object.fromEntries(Object.values(Gesture).map((g) => [g, { ...budgetOf(all[g].gaps), taskMs: Math.round(all[g].taskMs), at120: budgetOf(all[g].gaps, Rate.ProMotion) }]));
+    const report = Object.fromEntries(benched().map((g) => [g, { ...budgetOf(all[g].gaps), taskMs: Math.round(all[g].taskMs), msPerMove: all[g].moves ? Math.round((10 * GESTURE_MS) / all[g].moves) / 10 : null, at120: budgetOf(all[g].gaps, Rate.ProMotion) }]));
     writeFileSync(join(OUT, `frame-budget-${target}.json`), JSON.stringify(report, null, 2));
     console.table(Object.fromEntries(Object.entries(report).map(([g, { at120, ...at90 }]) => [g, { ...at90, p95at120: at120.p95, overAt120: at120.overShare, passedAt120: at120.passed }])));
     expect(Object.entries(report).filter(([, r]) => !r.passed).map(([g]) => g)).toEqual([]);
@@ -243,7 +313,7 @@ const CHILD_AT = { x: 0.07, y: 0.032 };
 const TEXT_AT = { x: 0.51, y: 0.032 };
 const TEXT_DESCENTS = 4;
 
-type Stages = { total: number; effect: number; build: number; media: number; upload: number; draw: number };
+type Stages = { total: number; effect: number; build: number; media: number; upload: number; draw: number; patched: boolean };
 
 function listenInput() {
   const probe = window as unknown as { __editAt: number; __editInputs: number[] };
@@ -271,15 +341,39 @@ async function stagesAfter(page: Page): Promise<Stages | null> {
       const group = drawn.name.match(LIVE)![1];
       const of = (step: string) => marks.find((m) => m.name === `frame|${step}|${group}`)?.startTime ?? drawn.startTime;
       const [asked, built, ready, put] = [of('live-asked'), of('live-built'), of('live-ready'), Math.min(of('put'), of('patched'))];
-      return { total: drawn.startTime - at, effect: asked - at, build: built - asked, media: ready - built, upload: put - ready, draw: drawn.startTime - put };
+      const patched = !marks.some((m) => m.name === `frame|live-built|${group}`);
+      return { total: drawn.startTime - at, effect: asked - at, build: built - asked, media: ready - built, upload: put - ready, draw: drawn.startTime - put, patched };
     }
     return null;
   }, EDIT_GIVE_UP_MS);
 }
 
-async function selectChild(page: Page) {
+enum Depth {
+  Top = 'top',
+  Leaf = 'leaf'
+}
+
+type Pick = { at: { x: number; y: number }; depth: Depth };
+
+const PICKS: Record<Exclude<Edit, Edit.Resize | Edit.Text>, Pick> = {
+  [Edit.Nudge]: { at: CHILD_AT, depth: Depth.Top },
+  [Edit.Opacity]: { at: CHILD_AT, depth: Depth.Top },
+  [Edit.Hide]: { at: CHILD_AT, depth: Depth.Top },
+  [Edit.NudgeLeaf]: { at: CHILD_AT, depth: Depth.Leaf },
+  [Edit.HideLeaf]: { at: CHILD_AT, depth: Depth.Leaf },
+  [Edit.HideTextLeaf]: { at: TEXT_AT, depth: Depth.Leaf }
+};
+
+async function selectChild(page: Page, { at, depth }: Pick = PICKS[Edit.Nudge]) {
   const box = await frameOnScreen(page);
-  await page.mouse.click(box.x + box.w * CHILD_AT.x, box.y + box.w * CHILD_AT.y);
+  const deep = depth === Depth.Leaf;
+  if (deep) {
+    await page.keyboard.down('ControlOrMeta');
+  }
+  await page.mouse.click(box.x + box.w * at.x, box.y + box.w * at.y);
+  if (deep) {
+    await page.keyboard.up('ControlOrMeta');
+  }
   await page.getByTestId('frame-selection').first().waitFor({ timeout: 10_000 });
 }
 
@@ -300,12 +394,85 @@ async function resizeEdits(page: Page, count: number): Promise<(Stages | null)[]
 const KEYS: Record<Exclude<Edit, Edit.Resize | Edit.Text>, [string, string]> = {
   [Edit.Nudge]: ['ArrowRight', 'ArrowLeft'],
   [Edit.Opacity]: ['Digit5', 'Digit0'],
-  [Edit.Hide]: ['ControlOrMeta+Shift+KeyH', 'ControlOrMeta+Shift+KeyH']
+  [Edit.Hide]: ['ControlOrMeta+Shift+KeyH', 'ControlOrMeta+Shift+KeyH'],
+  [Edit.NudgeLeaf]: ['ArrowRight', 'ArrowLeft'],
+  [Edit.HideLeaf]: ['ControlOrMeta+Shift+KeyH', 'ControlOrMeta+Shift+KeyH'],
+  [Edit.HideTextLeaf]: ['ControlOrMeta+Shift+KeyH', 'ControlOrMeta+Shift+KeyH']
 };
 
-async function keyEdits(page: Page, keys: [string, string], count: number): Promise<(Stages | null)[]> {
+function holdBuilds() {
+  const probe = window as unknown as { __hold: boolean; __held: (() => void)[] };
+  probe.__hold = false;
+  probe.__held = [];
+  const own = Object.getOwnPropertyDescriptor(Worker.prototype, 'onmessage')!;
+  Object.defineProperty(Worker.prototype, 'onmessage', {
+    configurable: true,
+    get: own.get,
+    set(this: Worker, handler: ((e: MessageEvent) => void) | null) {
+      own.set!.call(this, handler && ((e: MessageEvent) => (probe.__hold ? probe.__held.push(() => handler(e)) : handler(e))));
+    }
+  });
+}
+
+const holding = (page: Page, on: boolean) =>
+  page.evaluate((hold) => {
+    const probe = window as unknown as { __hold: boolean; __held: (() => void)[] };
+    probe.__hold = hold;
+    if (!hold) {
+      probe.__held.splice(0).forEach((run) => run());
+    }
+  }, on);
+
+async function frameShot(page: Page): Promise<{ data: Buffer; size: number }> {
+  const box = await frameOnScreen(page);
+  const png = await page.screenshot({ clip: { x: box.x, y: box.y, width: Math.min(box.w, VIEWPORT.width - box.x), height: Math.min(box.h, VIEWPORT.height - box.y) } });
+  const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true });
+  return { data, size: info.width * info.height };
+}
+
+function differing(a: { data: Buffer; size: number }, b: { data: Buffer; size: number }): number {
+  if (a.size !== b.size) {
+    return PERCENT;
+  }
+  const channels = a.data.length / a.size;
+  let off = 0;
+  for (let p = 0; p < a.size; p++) {
+    for (let c = 0; c < channels; c++) {
+      if (Math.abs(a.data[p * channels + c] - b.data[p * channels + c]) > PIXEL_TOLERANCE) {
+        off++;
+        break;
+      }
+    }
+  }
+  return (PERCENT * off) / a.size;
+}
+
+const shotDiffs: Record<string, { patched: number[]; edited: number[] }> = {};
+
+async function shotEdit(page: Page, key: string, edit: string): Promise<Stages | null> {
+  const before = await frameShot(page);
+  await holding(page, true);
+  await page.keyboard.press(key);
+  const stages = await stagesAfter(page);
+  const patched = stages?.patched ? await frameShot(page) : null;
+  await holding(page, false);
+  await page.waitForTimeout(SHOT_SETTLE_MS);
+  if (patched) {
+    const settled = await frameShot(page);
+    const seen = (shotDiffs[edit] ??= { patched: [], edited: [] });
+    seen.patched.push(differing(patched, settled));
+    seen.edited.push(differing(before, settled));
+  }
+  return stages;
+}
+
+async function keyEdits(page: Page, keys: [string, string], count: number, edit: string): Promise<(Stages | null)[]> {
   const seen: (Stages | null)[] = [];
   for (let i = 0; i < count; i++) {
+    if (SHOTS) {
+      seen.push(await shotEdit(page, keys[i % 2], edit));
+      continue;
+    }
     await page.keyboard.press(keys[i % 2]);
     seen.push(await stagesAfter(page));
     await page.waitForTimeout(EDIT_PAUSE_MS);
@@ -324,19 +491,17 @@ async function textEdits(page: Page, count: number): Promise<(Stages | null)[]> 
   await field.press('End');
   const seen: (Stages | null)[] = [];
   for (let i = 0; i < count; i++) {
-    const typed = field.evaluate(
-      (el, giveUp) =>
-        new Promise<Stages | null>((done) => {
-          setTimeout(() => done(null), giveUp);
-          el.addEventListener('input', (e) => requestAnimationFrame(() => {
-            const at = (window as unknown as { __editAt: number }).__editAt;
-            done({ total: performance.now() - at, effect: e.timeStamp - at, build: 0, media: 0, upload: 0, draw: performance.now() - e.timeStamp });
-          }), { once: true });
-        }),
-      EDIT_GIVE_UP_MS
-    );
+    await field.evaluate((el, giveUp) => {
+      (window as unknown as { __typed: Promise<Stages | null> }).__typed = new Promise<Stages | null>((done) => {
+        setTimeout(() => done(null), giveUp);
+        el.addEventListener('input', (e) => requestAnimationFrame(() => {
+          const at = (window as unknown as { __editAt: number }).__editAt;
+          done({ total: performance.now() - at, effect: e.timeStamp - at, build: 0, media: 0, upload: 0, draw: performance.now() - e.timeStamp, patched: false });
+        }), { once: true });
+      });
+    }, EDIT_GIVE_UP_MS);
     await field.press('KeyA');
-    seen.push(await typed);
+    seen.push(await page.evaluate(() => (window as unknown as { __typed: Promise<Stages | null> }).__typed));
     await page.waitForTimeout(EDIT_PAUSE_MS);
   }
   await page.keyboard.press('Escape');
@@ -347,22 +512,21 @@ async function edits(page: Page, edit: Edit): Promise<(Stages | null)[]> {
   if (edit === Edit.Text) {
     return textEdits(page, EDITS_EACH);
   }
-  await selectChild(page);
   if (edit === Edit.Resize) {
+    await selectChild(page);
     return resizeEdits(page, EDITS_EACH);
   }
-  return keyEdits(page, KEYS[edit], EDITS_EACH);
+  await selectChild(page, PICKS[edit]);
+  return keyEdits(page, KEYS[edit], EDITS_EACH, edit);
 }
 
 const mean = (xs: number[]) => (xs.length ? Math.round((10 * xs.reduce((a, b) => a + b, 0)) / xs.length) / 10 : 0);
 
 function breakdown(seen: Stages[]) {
-  const stage = (k: keyof Stages) => mean(seen.map((s) => s[k]));
-  return { effect: stage('effect'), build: stage('build'), media: stage('media'), upload: stage('upload'), draw: stage('draw') };
+  const stage = (k: Exclude<keyof Stages, 'patched'>) => mean(seen.map((s) => s[k]));
+  return { effect: stage('effect'), build: stage('build'), media: stage('media'), upload: stage('upload'), draw: stage('draw'), patched: seen.filter((s) => s.patched).length };
 }
 
-const PROFILED = process.env.BUDGET_PROFILE === '1';
-const PROFILE_SAMPLE_US = 100;
 
 async function profiling(page: Page): Promise<CDPSession> {
   const cdp = await page.context().newCDPSession(page);
@@ -377,6 +541,9 @@ async function editRun(browser: Browser, target: Target): Promise<Record<Edit, (
   const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 2, serviceWorkers: 'block' });
   const page = await context.newPage();
   await page.addInitScript(listenInput);
+  if (SHOTS) {
+    await page.addInitScript(holdBuilds);
+  }
   if (needsLogin) {
     await login(page, base);
   }
@@ -384,7 +551,7 @@ async function editRun(browser: Browser, target: Target): Promise<Record<Edit, (
   await page.locator('[data-canvas-surface]').first().waitFor({ timeout: 120_000 });
   await page.waitForTimeout(SETTLE_MS);
   const seen = {} as Record<Edit, (Stages | null)[]>;
-  for (const edit of Object.values(Edit)) {
+  for (const edit of Object.values(Edit).filter((e) => !EDIT_KINDS || EDIT_KINDS.includes(e))) {
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
     await page.keyboard.press('Shift+Digit1');
@@ -414,16 +581,21 @@ for (const target of TARGETS) {
     const all = Object.fromEntries(Object.values(Edit).map((e) => [e, [] as (Stages | null)[]])) as Record<Edit, (Stages | null)[]>;
     for (let i = 0; i < RUNS; i++) {
       const seen = await editRun(browser, target);
-      Object.values(Edit).forEach((e) => all[e].push(...seen[e]));
+      Object.values(Edit).forEach((e) => all[e].push(...(seen[e] ?? [])));
     }
     await browser.close();
     const report = Object.fromEntries(
-      Object.values(Edit).map((e) => {
+      Object.values(Edit).filter((e) => !EDIT_KINDS || EDIT_KINDS.includes(e)).map((e) => {
         const landed = all[e].filter((s): s is Stages => s !== null);
         return [e, { ...editBudgetOf(landed.map((s) => s.total)), missed: all[e].length - landed.length, ...breakdown(landed) }];
       })
     );
     writeFileSync(join(OUT, `edit-latency-${target}.json`), JSON.stringify(report, null, 2));
+    writeFileSync(join(OUT, `edit-stages-${target}.json`), JSON.stringify(all, null, 2));
+    if (SHOTS) {
+      writeFileSync(join(OUT, `edit-shots-${target}.json`), JSON.stringify(shotDiffs, null, 2));
+      console.table(Object.fromEntries(Object.entries(shotDiffs).map(([e, d]) => [e, { shots: d.patched.length, patchedVsSettledMax: Math.max(...d.patched), beforeVsSettledMin: Math.min(...d.edited) }])));
+    }
     console.table(report);
     expect(Object.entries(report).filter(([, r]) => !r.passed).map(([e]) => e)).toEqual([]);
   });

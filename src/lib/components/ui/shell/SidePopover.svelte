@@ -5,7 +5,7 @@
   import { SideMode, sidePlacement, type SidePlace } from './side-popover';
   import { dismissible } from './dismiss';
   import { Input, lastInput } from './last-input';
-  import { onBody } from './on-body';
+  import { FOCUS_TRAP, onBody } from './on-body';
 
   let {
     anchor,
@@ -69,7 +69,7 @@
     const cycle = (e: KeyboardEvent) => {
       const all = [...el.querySelectorAll<HTMLElement>(FOCUSABLE)];
       const edge = e.shiftKey ? all[0] : all.at(-1);
-      if (e.key !== 'Tab' || !edge || document.activeElement !== edge) {
+      if (e.key !== 'Tab' || e.defaultPrevented || !edge || document.activeElement !== edge) {
         return;
       }
       e.preventDefault();
@@ -90,6 +90,7 @@
   role="dialog"
   aria-label={label}
   data-testid="side-popover"
+  {...{ [FOCUS_TRAP]: '' }}
   {@attach onBody}
   tabindex="-1"
   {@attach dismissible(() => onclose())}

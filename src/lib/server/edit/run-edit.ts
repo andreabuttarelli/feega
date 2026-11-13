@@ -150,6 +150,8 @@ async function execute(ports: EditPorts, ask: EditAsk): Promise<Answer> {
   return { status: HTTP_OK, body: { applied: results.length, results } };
 }
 
+export const writeCount = (ports: EditPorts, steps: EditStep[]) => steps.filter((step) => ports.catalogue.get(step.op)?.access === WRITE_ACCESS).length;
+
 const writesOnly = (ports: EditPorts, steps: EditStep[]) => steps.every((step) => {
   return ports.catalogue.get(step.op)?.access === WRITE_ACCESS;
 });

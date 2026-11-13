@@ -40,6 +40,7 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   discover_routes: 'List the pages of a GitHub repo or local folder from its file router, without running it: path, file, static or dynamic with its params, values found in the code, and which are selected by default.',
   code_changes: 'Read what a frame imported from code would change in its source files: a unified patch, the files, and edits that cannot be written back.',
   code_publish: 'Send the code edits of an imported frame back: a new branch and pull request on GitHub (never the default branch), or the files of a local folder, committed on a feega/ branch when it is a git repo.',
+  code_map: 'The import map of a frame made by import_code: every page the code has, imported (with its themes and widths) or not and why, the components drawn and those in code only, token counts, the revision; import_code with into adds missing pages.',
   code_pull: 'Bring new commits on GitHub (or file changes in a local folder) into an imported frame, keeping canvas edits; where both changed the same thing the code wins and the conflict is reported.',
   import_code: 'Run a GitHub React, Vue or Svelte app in a sandbox (private repos once GitHub is connected), or read a public Storybook, and draw its pages or stories as one frame, a board each, where each code component is a main component shared across boards, each usage an instance and props become variants.',
   github_status: 'Whether GitHub is configured on this server and connected for you, and the GitHub login.',

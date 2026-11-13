@@ -4,9 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { Client } from 'pg';
 
 const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
-const MIGRATION = join(
-  fileURLToPath(new URL('..', import.meta.url)),
-  'supabase/canvas-migrations/20260929_feega_plan_grants.sql'
+const MIGRATIONS = ['20260929_feega_plan_grants.sql', '20261112_credits_never_expire.sql'].map((file) =>
+  join(fileURLToPath(new URL('..', import.meta.url)), 'supabase/canvas-migrations', file)
 );
 
 const ORG = '11111111-1111-4111-8111-111111111111';
@@ -209,7 +208,9 @@ async function main() {
   try {
     await client.query('begin');
     await client.query(LIVE_SHAPED_STUBS);
-    await client.query(readFileSync(MIGRATION, 'utf8').replace(/^begin;|commit;\s*$/gm, ''));
+    for (const migration of MIGRATIONS) {
+      await client.query(readFileSync(migration, 'utf8').replace(/^begin;|commit;\s*$/gm, ''));
+    }
     await client.query('insert into public.orgs (id) values ($1)', [ORG]);
 
     const results = [];

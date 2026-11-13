@@ -44,7 +44,7 @@
   import type { Edge as AlignEdge } from '$lib/motion/space';
   import ColorField from './ColorField.svelte';
   import { clipColours, documentColours, recolourClip } from '$lib/motion/selection-colours';
-  import ColourRow from './ColourRow.svelte';
+  import ColourRows from './ColourRows.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import Plus from '@lucide/svelte/icons/plus';
   import Settings2 from '@lucide/svelte/icons/settings-2';
@@ -443,6 +443,14 @@
     select.value = '';
     if (other) {
       commit(morphToClip(doc, clip.id, other, frame), `Morphed into ${clipName(other)}`);
+    }
+  }
+
+  function presetSize(size: Field, select: HTMLSelectElement) {
+    const px = select.value;
+    select.value = '';
+    if (px) {
+      setProp(size, fieldStored(size, Number(px)));
     }
   }
 
@@ -871,7 +879,7 @@
 {#snippet sizePresets()}
   {@const size = textField('size')}
   {#if size}
-    <select class="trail" aria-label="Size presets" data-testid="size-presets" value="" onchange={(e) => e.currentTarget.value && setProp(size, fieldStored(size, Number(e.currentTarget.value)))}>
+    <select class="trail" aria-label="Size presets" data-testid="size-presets" value="" onchange={(e) => presetSize(size, e.currentTarget)}>
       <option value="" disabled hidden></option>
       {#each SIZE_PRESETS as preset (preset)}<option value={String(preset)}>{preset}</option>{/each}
     </select>
@@ -996,9 +1004,7 @@
 
 {#snippet coloursBody()}
   <div data-testid="clip-colours">
-    {#each colours as { colour, count } (colour)}
-      <ColourRow {colour} {count} {palette} onchange={(to) => commit(recolourClip(doc, clip.id, colour, to), `Recoloured ${colour} to ${to}`)} />
-    {/each}
+    <ColourRows {colours} {palette} onswap={(from, to) => commit(recolourClip(doc, clip.id, from, to), `Recoloured ${from} to ${to}`)} />
   </div>
 {/snippet}
 
@@ -1213,7 +1219,7 @@
               {#each effectRows(effect) as prop (prop.key)}
                 {#if prop.kind === ValueKind.Color}
                   {@const alphaKey = alphaKeyOf(effect)}
-                  <div class="line" data-prop={prop.key}>
+                  <div class="line stacked" data-prop={prop.key}>
                     <span class="label">{afterDot(prop)}</span>
                     <div class="control"><ColorField {gesture} {palette} name={prop.label} value={shown(prop.key)} {tokens} alpha={alphaKey ? Number(shown(alphaKey)) : null} onalpha={alphaKey ? (a) => animate(alphaKey, a) : undefined} onchange={(v) => animate(prop.key, resolve(v))} /></div>
                     {@render diamond(prop.key)}
@@ -1475,6 +1481,10 @@
     flex-wrap: wrap;
   }
 
+  .adv .grid2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .adv :global(.line > label),
   .adv :global(.line > .label) {
     width: 100%;
@@ -1576,6 +1586,19 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .line.stacked {
+    flex-wrap: wrap;
+  }
+
+  .line.stacked > .label {
+    flex: 1;
+  }
+
+  .line.stacked .control {
+    order: 1;
+    flex-basis: 100%;
   }
 
   .line .control,

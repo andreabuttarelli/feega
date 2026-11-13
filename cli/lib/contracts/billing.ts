@@ -20,21 +20,16 @@ const CheckoutInputSchema = z
       .number()
       .positive()
       .optional()
-      .describe('Monthly credits the human wants: 8, 16, 32, 64, 128 or 256 (1 credit = €1)')
+      .describe('The one plan: 500 credits a month per editor for €9 (100 credits = €1). Any other amount is refused')
   })
   .strict();
 
 const CheckoutResultSchema = z.object({
   ok: z.literal(true),
   url: LinkSchema,
-  plans: z.array(PlanSchema).describe('The subscription rungs the hosted page will offer')
+  plans: z.array(PlanSchema).describe('The plan the hosted page sells')
 });
 
-/**
- * Reaching a brand is not authority over its organization's money, and a customer who cannot
- * pay is not a caller who typed something wrong: `no_customer` and `no_subscription` describe
- * an account that has not subscribed yet, and `stripe_unavailable` / `no_org_billing` are ours.
- */
 const BILLING_FAILURES: readonly EndpointFailure[] = [
   { error: 'not_org_owner', status: 403 },
   { error: 'no_customer', status: 409 },
@@ -52,7 +47,7 @@ export const BILLING_PORTAL_LINK = {
   title: 'Billing portal link',
   description:
     'Mint a one-time link to this organization\'s Stripe billing portal and hand it to the account ' +
-    'owner. On that page THEY can read invoices, change the card, switch plan and CANCEL the ' +
+    'owner. On that page THEY can read invoices, change the card and CANCEL the ' +
     'subscription — you never open it and never act inside it. Treat the URL as a credential: ' +
     'whoever holds it reaches that customer\'s billing, so give it to the owner once, in the ' +
     'reply, and never store or repeat it. Only the organization owner can mint one. Free: it ' +
@@ -69,14 +64,14 @@ export const CHECKOUT_LINK = {
   tool: 'create_checkout_link',
   title: 'Checkout link',
   description:
-    'Mint a one-time link where the human picks a paid plan and pays, on Stripe\'s own hosted ' +
-    'page. You never pay, never change a plan and never apply a discount: you return the URL, ' +
-    'they complete it. The same page can also CANCEL the subscription, so treat the URL as the ' +
-    'owner credential — whoever holds it reaches that customer\'s billing — and hand it over once, ' +
-    'never stored, never repeated. Only the organization owner can mint one. Free: it works ' +
-    'precisely when credits are gone. An organization that never subscribed has no Stripe ' +
-    'customer to check out against: the refusal carries app_billing_url, which is where the human ' +
-    'starts.',
+    'Mint a one-time link where the human subscribes to feega\'s one plan (€9 per editor a month, ' +
+    '500 credits per editor, credits never expire) and pays, on Stripe\'s own hosted page. You ' +
+    'never pay and never apply a discount: you return the URL, they complete it. Treat the URL as ' +
+    'the owner credential and hand it over once, never stored, never repeated. Only the ' +
+    'organization owner can mint one. Free: it works precisely when credits are gone. An ' +
+    'organization that already subscribes is refused with already_subscribed and app_billing_url, ' +
+    'where the human manages the plan and buys top-ups. To cancel, the owner uses the billing ' +
+    'portal link, never this one.',
   method: 'POST',
   pathUnderBrand: '/billing/checkout',
   input: CheckoutInputSchema,
@@ -84,7 +79,7 @@ export const CHECKOUT_LINK = {
   failures: [
     ...BILLING_FAILURES,
     { error: 'unknown_plan', status: 400 },
-    { error: 'no_subscription', status: 409 },
+    { error: 'already_subscribed', status: 409 },
     { error: 'subscriptions_not_configured', status: 409 }
   ],
   destructive: false
@@ -95,7 +90,7 @@ const OneTimeCheckoutInputSchema = z
     credits: z
       .number()
       .positive()
-      .describe('One-time top-up in credits (1 credit = €1): 8, 16, 32, 64, 128 or 256')
+      .describe('One-time top-up in credits: 1000 (€10), 2000 (€20) or 5000 (€50). Any other amount is refused')
   })
   .strict();
 
@@ -108,12 +103,6 @@ const OneTimeCheckoutResultSchema = z.object({
 export type OneTimeCheckoutLinkInput = z.infer<typeof OneTimeCheckoutInputSchema>;
 export type OneTimeCheckoutLinkResult = z.infer<typeof OneTimeCheckoutResultSchema>;
 
-/**
- * A separate tool from CHECKOUT_LINK on purpose: a one-time purchase never touches a subscription
- * and never needs one to exist first (unlike the subscription rungs, which need a Stripe Price
- * found by lookup key). It works for an
- * organization that has never subscribed and never will.
- */
 export const ONE_TIME_CHECKOUT_LINK = {
   tool: 'create_one_time_checkout_link',
   title: 'One-time credit purchase link',

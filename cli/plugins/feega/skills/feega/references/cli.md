@@ -24,8 +24,8 @@ bun run cli.ts --help
 feega brands                                    # List brands
 feega health                                     # Check Supabase / Gemini
 feega products <slug> [sync]                    # List, or re-import from the connected store
-feega upgrade <slug> --credits 16               # Checkout a monthly plan (8/16/32/64/128/256)
-feega upgrade <slug> --top-up 8                 # One-time top-up, credits never expire
+feega upgrade <slug>                            # Checkout the plan (€9 / editor / month, 500 credits)
+feega upgrade <slug> --top-up 1000              # One-time top-up (1000/2000/5000), never expires
 feega update                                    # Update the CLI itself
 ```
 

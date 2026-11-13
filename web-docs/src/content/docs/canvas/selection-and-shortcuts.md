@@ -18,8 +18,9 @@ sidebar:
 Picking inside a frame works like Figma, in the base frame and in every breakpoint view.
 
 - The hover outline shows exactly what a click would select.
+- A text is picked anywhere in its box, not only on its letters: the whole box for a fixed-width text, the words for an auto-width one. A part clipped away by its container picks nothing.
 - A click selects the frame's top-level element under the pointer. A container that fills the whole frame, like a landing's page, counts as the frame: the click selects the section under the pointer.
-- Double-click enters the selected container or component instance and selects its child under the pointer, one level at a time; on text it starts editing, on a shape without children it edits its points.
+- Double-click enters the selected container or component instance and selects its child under the pointer, one level at a time; on text it starts editing with the caret at the character nearest the pointer, on a shape without children it edits its points.
 - A drag starts only once the pointer has moved a few pixels, so clicks and double-clicks never move anything. An element leaves its frame only when you drag it past the edge of the frame or view you are editing.
 - Once inside a container, hover and click pick among its children. Clicking outside it goes back up.
 - Cmd-click (Ctrl-click on Windows) selects the deepest element directly; holding Cmd/Ctrl while hovering previews it. With elements already selected, Cmd-click adds or removes the deepest one.
@@ -82,9 +83,10 @@ saving. If the server refuses one, the canvas puts it back and says so.
 Canvas shortcuts act when the canvas has focus: after a click on the canvas, or when nothing
 is focused. With focus on a control in the right bar, a toolbar, a menu or the chat, keys belong
 to that control: Tab and Shift+Tab move between controls, Enter and Space press them. Undo and
-redo, quick actions (Cmd/Ctrl+K) and zoom work from anywhere. In the Layers panel and the
+redo and quick actions (Cmd/Ctrl+K) work from anywhere. In the Layers panel and the
 timeline, Backspace/Delete, Esc, Cmd/Ctrl+A, copy, paste, duplicate and group still act on the
-selection.
+selection. The zoom keys (Shift+0, Shift+1, Shift+2, + and -) also work from the Layers panel
+and a toolbar button, but not from a field or a right-bar control.
 
 Esc closes only the open menu, picker or popover, one level at a time, keeps the selection and
 puts focus back on the button that opened it. A menu opened from a toolbar and closed with the

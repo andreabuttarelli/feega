@@ -1198,7 +1198,7 @@ describe('upstreamInputsFor — a feed or catalogue wired straight into an image
     type: 'image',
     url: `https://scontent.cdninstagram.com/${id}.jpg?oe=expired`,
     thumbnailUrl: `https://scontent.cdninstagram.com/${id}_t.jpg`,
-    thumbnailPath: `u1/media/${id}.jpg`
+    thumbnailPath: `${ORG}/${FEED_NODE}/${id}.jpg`
   });
 
   const feedIntoImage = (posts: ReturnType<typeof feedPost>[]) =>
@@ -1225,9 +1225,9 @@ describe('upstreamInputsFor — a feed or catalogue wired straight into an image
     const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: 'qwen3-pro', medium: 'image' });
 
     expect(out.referenceImageUrls).toEqual([
-      'https://signed.example/canvas-assets/u1/media/p4.jpg',
-      'https://signed.example/canvas-assets/u1/media/p3.jpg',
-      'https://signed.example/canvas-assets/u1/media/p2.jpg'
+      `https://signed.example/canvas-assets/${ORG}/${FEED_NODE}/p4.jpg`,
+      `https://signed.example/canvas-assets/${ORG}/${FEED_NODE}/p3.jpg`,
+      `https://signed.example/canvas-assets/${ORG}/${FEED_NODE}/p2.jpg`
     ]);
   });
 

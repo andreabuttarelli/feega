@@ -75,6 +75,7 @@ const models: Record<string, TaskModel> = {
 
 const gateway = { run: vi.fn(), task: vi.fn(), purge: vi.fn(), quote: vi.fn() };
 const bill = vi.fn();
+const storeQuote = vi.fn(async () => {});
 const decide = vi.fn();
 const judge = vi.fn();
 const decideIdentifiability = vi.fn();
@@ -125,7 +126,8 @@ beforeEach(async () => {
     access: (orgId) => uncensoredAccess(db, orgId),
     screen: () => screen,
     refuseLikeness: (_scope, _model, reason) => record({ stage: 'rules', verdict: 'refuse', reason }),
-    bill
+    bill,
+    storeQuote
   });
   vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/png' } })));
 });
@@ -535,7 +537,7 @@ describe('a video node editing a wired video with Seedance 2.5', () => {
 });
 
 describe('a run quoted on submit', () => {
-  it('stores the provider quote on the run, so the finished task bills that price', async () => {
+  it('stores the provider quote on the run through the server, never with the session, so the finished task bills that price', async () => {
     models[VIDEO_EDIT].spec.quotedAtSubmit = true;
     gateway.quote.mockResolvedValue(8.2);
     upstreamMedia.current = { referenceVideoUrls: ['https://cdn.test/source.mp4'] };
@@ -547,8 +549,8 @@ describe('a run quoted on submit', () => {
     await runGenNode(db, { ...start(VIDEO_EDIT, 'restyle', { resolution: '720p' }), medium: 'video' });
     models[VIDEO_EDIT].spec.quotedAtSubmit = false;
 
-    const stored = calls.find((c) => c.table === 'node_runs' && c.op === 'update' && (c.payload as { params?: Record<string, unknown> }).params?.quotedUsd);
-    expect((stored?.payload as { params: Record<string, unknown> }).params).toEqual({ resolution: '720p', quotedUsd: 8.2 });
+    expect(storeQuote).toHaveBeenCalledWith(expect.objectContaining({ orgId: ORG, params: { resolution: '720p', quotedUsd: 8.2 } }));
+    expect(calls.some((c) => c.table === 'node_runs' && c.op === 'update' && (c.payload as { params?: Record<string, unknown> }).params?.quotedUsd)).toBe(false);
   });
 });
 

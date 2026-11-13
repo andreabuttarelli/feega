@@ -102,3 +102,51 @@ describe('telling items apart without spelling out their contours', () => {
     expect(itemKey(items[0])).toBe(itemKey(bar(4)));
   });
 });
+
+describe('keying a group from the keys of its children', () => {
+  const group = (items: Item[], clip = 'g') => ({ kind: 'group', clip, items, opacity: 1, matrix: [1, 0, 0, 1, 0, 0] }) as unknown as Item;
+  const wide = (from: number) => Array.from({ length: 200 }, (_, i) => bar(from + i));
+  const nested = (leaves: Item[], depth: number): Item => (depth === 0 ? group(leaves) : group([nested(leaves, depth - 1), bar(-depth)], `g${depth}`));
+
+  const charsWritten = (run: () => void): number => {
+    let chars = 0;
+    JSON.stringify = ((value: unknown, ...rest: unknown[]) => {
+      const out = (original as (...a: unknown[]) => string)(value, ...rest);
+      chars += out?.length ?? 0;
+      return out;
+    }) as typeof JSON.stringify;
+    run();
+    JSON.stringify = original;
+    return chars;
+  };
+
+  it('gives equal subtrees equal keys', () => {
+    expect(itemKey(nested(wide(0), 3))).toBe(itemKey(nested(wide(0), 3)));
+  });
+
+  it('changes the key of every ancestor when a descendant changes', () => {
+    const leaves = wide(0);
+    const before = nested(leaves, 3);
+    const after = nested([...leaves.slice(0, -1), bar(999)], 3);
+
+    let [a, b] = [before, after];
+    for (let depth = 3; depth >= 0; depth--) {
+      expect(itemKey(a)).not.toBe(itemKey(b));
+      [a, b] = [(a as unknown as { items: Item[] }).items[0], (b as unknown as { items: Item[] }).items[0]];
+    }
+  });
+
+  it('does work for one changed leaf in proportion to its depth, not to the subtree', () => {
+    const leaves = wide(0);
+    itemKey(nested(leaves, 3));
+    const changed = [...leaves.slice(0, -1), bar(999)];
+
+    const chars = charsWritten(() => itemKey(nested(changed, 3)));
+
+    expect(chars).toBeLessThan(original(leaves.slice(0, 20)).length);
+  });
+
+  it('tells a group apart from one with the same children in another order', () => {
+    expect(itemKey(group([bar(0), bar(1)]))).not.toBe(itemKey(group([bar(1), bar(0)])));
+  });
+});

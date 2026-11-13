@@ -1,5 +1,5 @@
 import type { Db } from '$lib/server/db/client';
-import type { Actor } from '$lib/server/repos/actor';
+import type { Actor, RecordedActor } from '$lib/server/repos/actor';
 import { deleteConnection, deleteNode, listConnections, listNodes, restoreConnection, restoreNode } from '$lib/server/repos/canvas';
 import { readHead } from '$lib/server/repos/motion-revisions';
 import { saveMotionDoc } from '$lib/server/motion/editor';
@@ -8,7 +8,7 @@ import { MAX_VERSION_NAME, planCanvasRestore, snapshotSchema, type CanvasSnapsho
 
 type Scope = { orgId: string; canvasId: string };
 
-export type CanvasVersion = { id: string; name: string; createdAt: string; nodes: number; author: Actor };
+export type CanvasVersion = { id: string; name: string; createdAt: string; nodes: number; author: RecordedActor };
 
 type Row = { id: string; name: string; created_at: string; snapshot: unknown; actor_kind?: Actor['kind']; actor_id?: string | null; agent_key?: string | null };
 

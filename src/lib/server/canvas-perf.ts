@@ -4,15 +4,19 @@ import { Gesture, LoadStep, SUMMARY_VERSION } from '$lib/canvas/perf/session-per
 const HOUR_MS = 60 * 60 * 1000;
 export const SUMMARIES_PER_USER_PER_HOUR = 30;
 const ID = /^[\w.-]{1,64}$/;
+const MAX_TEXT = 200;
 
 enum Field {
   Number = 'number',
-  Id = 'id'
+  Id = 'id',
+  Text = 'text'
 }
 
 type Shape = { [key: string]: Field | Shape };
 
 const GESTURE: Shape = { frames: Field.Number, over: Field.Number, p95: Field.Number, p99: Field.Number, longTasks: Field.Number };
+
+const MEMORY: Shape = { textureMb: Field.Number, textures: Field.Number, bufferMb: Field.Number, wasmMb: Field.Number, cacheMb: Field.Number, pictureMb: Field.Number };
 
 const SUMMARY: Shape = {
   v: Field.Number,
@@ -34,12 +38,23 @@ const SUMMARY: Shape = {
   load: Object.fromEntries(Object.values(LoadStep).map((step) => [step, Field.Number])),
   gestures: Object.fromEntries(Object.values(Gesture).map((kind) => [kind, GESTURE])),
   longTasks: { count: Field.Number, ms: Field.Number },
-  edit: { n: Field.Number, p50: Field.Number, p95: Field.Number }
+  edit: { n: Field.Number, p50: Field.Number, p95: Field.Number },
+  platform: Field.Id,
+  reason: Field.Id,
+  visible: Field.Number,
+  width: Field.Number,
+  height: Field.Number,
+  diedBefore: Field.Number,
+  lastError: Field.Text,
+  limits: { maxTexture: Field.Number, maxBuffer: Field.Number },
+  memory: MEMORY,
+  before: { ...MEMORY, zoom: Field.Number, gestureFrames: Field.Number }
 };
 
 const KEEPS: Record<Field, (value: unknown) => boolean> = {
   [Field.Number]: (value) => value === null || (typeof value === 'number' && Number.isFinite(value)),
-  [Field.Id]: (value) => value === null || (typeof value === 'string' && ID.test(value))
+  [Field.Id]: (value) => value === null || (typeof value === 'string' && ID.test(value)),
+  [Field.Text]: (value) => value === null || (typeof value === 'string' && value.length <= MAX_TEXT)
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);

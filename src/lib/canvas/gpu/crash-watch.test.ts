@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { blankSample, wasInGesture } from './crash-record';
-import { Motion, gauged, track, type Tick } from './crash-watch';
+import { Motion, gauged, heldBy, track, type Tick } from './crash-watch';
 
 const tick = (over: Partial<Tick>): Tick => ({ x: 0, y: 0, zoom: 1, now: 0, motion: Motion.Moving, rastered: false, ...over });
 
@@ -42,7 +42,7 @@ describe("which crash records are worth sending", () => {
 });
 
 describe('gauged', () => {
-  const gpu = { textureBytes: 5, textures: 1, created: 2, submits: 3, lagMs: 0, wasm: [], queue: null, polling: false };
+  const gpu = { textureBytes: 5, textures: 1, bufferBytes: 0, buffers: 0, created: 2, submits: 3, lagMs: 0, wasm: [], queue: null, polling: false };
   const raster = { cacheBytes: 1, pictureBytes: 2, scratchBytes: 4, wasmBytes: 8, width: 780, height: 1688 };
 
   it('reads the drawing buffer size every tick, not the area seen at mount', () => {
@@ -52,10 +52,25 @@ describe('gauged', () => {
     expect(s.canvas).toBe('780x1688');
   });
 
+  it('keeps the GPU buffer bytes, which the death on 2026-11-12 never reported', () => {
+    const s = blankSample();
+    gauged(s, { ...gpu, bufferBytes: 224 * 1024 * 1024, buffers: 40 }, raster);
+    expect(s.bufferBytes).toBe(224 * 1024 * 1024);
+    expect(s.buffers).toBe(40);
+  });
+
   it('takes the core memory and scratch textures from the raster when the probe missed the wasm load', () => {
     const s = blankSample();
     gauged(s, gpu, raster);
     expect(s.wasmBytes).toBe(8);
     expect(s.scratchBytes).toBe(4);
+  });
+});
+
+describe('what a session held', () => {
+  it('reads in megabytes to one decimal', () => {
+    const s = { ...blankSample(), textureBytes: 150 * 1024 * 1024 + 60_000, textures: 12, bufferBytes: 224 * 1024 * 1024, wasmBytes: 64 * 1024 * 1024 };
+
+    expect(heldBy(s)).toEqual({ textureMb: 150.1, textures: 12, bufferMb: 224, wasmMb: 64, cacheMb: 0, pictureMb: 0 });
   });
 });

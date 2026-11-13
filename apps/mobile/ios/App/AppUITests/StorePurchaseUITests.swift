@@ -28,8 +28,8 @@ final class StorePurchaseUITests: XCTestCase {
     }
 
     private static let creditsPath = "/app/credits"
-    private static let packId = "feega_pack_8"
-    private static let planId = "feega_monthly_8"
+    private static let packId = "feega_pack_10"
+    private static let planId = "feega_monthly_9"
     private static let wait: TimeInterval = 30
 
     private var rig: Rig!
@@ -52,7 +52,7 @@ final class StorePurchaseUITests: XCTestCase {
 
     func testBuyingAPackAndAPlanLandsInTheLedgerThroughTheWebhook() throws {
         app.launch()
-        let topUp = app.webViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Top up'")).firstMatch
+        let topUp = app.webViews.buttons.matching(NSPredicate(format: "label BEGINSWITH '€'")).firstMatch
         XCTAssertTrue(topUp.waitForExistence(timeout: Self.wait))
         shot("1-paywall")
 

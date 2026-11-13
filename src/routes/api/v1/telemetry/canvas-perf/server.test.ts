@@ -54,6 +54,31 @@ describe('a canvas perf summary', () => {
     expect(props.gestures).toEqual({ pan: { frames: 1 } });
   });
 
+  it('keeps the health a phone sends: platform, why it was sent, memory, the last error and the session before', async () => {
+    const health = {
+      platform: 'ipad',
+      reason: 'start',
+      visible: 1,
+      width: 1024,
+      height: 1366,
+      diedBefore: 1,
+      lastError: 'device lost: GPUDevice was destroyed (reason: unknown)',
+      limits: { maxTexture: 8192, maxBuffer: 268435456 },
+      memory: { textureMb: 140.5, textures: 312, bufferMb: 224, wasmMb: 96, cacheMb: 40, pictureMb: 22 },
+      before: { textureMb: 610, textures: 900, wasmMb: 256, cacheMb: 120, pictureMb: 80, zoom: 0.2, gestureFrames: 12 }
+    };
+
+    await post(JSON.stringify({ ...SUMMARY, ...health }));
+
+    expect(track.mock.calls[0][2]).toMatchObject(health);
+  });
+
+  it('drops an error message past its length bound', async () => {
+    await post(JSON.stringify({ ...SUMMARY, lastError: 'x'.repeat(1000) }));
+
+    expect(track.mock.calls[0][2]).not.toHaveProperty('lastError');
+  });
+
   it('refuses a summary of another version or not a record', async () => {
     expect((await post(JSON.stringify({ ...SUMMARY, v: 99 }))).status).toBe(400);
     expect((await post('[1]'))).toHaveProperty('status', 400);

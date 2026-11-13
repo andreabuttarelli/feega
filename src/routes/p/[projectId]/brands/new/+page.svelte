@@ -152,7 +152,7 @@
         stopAnalysisCycle();
         if (result.type === 'failure') {
           const data = result.data as { error?: string } | undefined;
-          error = data?.error === 'credits_exhausted' ? 'Out of AI credits for this billing period.' : (data?.error ?? 'Something went wrong.');
+          error = data?.error === 'credits_exhausted' ? 'Out of credits.' : (data?.error ?? 'Something went wrong.');
           return;
         }
         await update();

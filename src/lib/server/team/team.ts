@@ -1,6 +1,6 @@
 import type { Db } from '$lib/server/db/client';
 import { assignableRoles, can, isOrgRole, OrgAction, OrgRoleName, type OrgRole } from '$lib/org-roles';
-import { listMembers, memberRole, orgName, removeMember, setMemberRole, transferOwnership } from '$lib/server/repos/orgs';
+import { handOverOrg, listMembers, memberRole, orgName, removeMember, setMemberRole } from '$lib/server/repos/orgs';
 import {
   createInvite,
   deleteLinkInvite,
@@ -11,12 +11,13 @@ import {
   revokeInvite,
   type Invite
 } from '$lib/server/repos/invites';
-import { editorSeatsLeft, needsSeat, seatLimitDetail, seatPlanOf } from '$lib/server/team/seats';
+import { BILLING_ONLY_DETAIL, editorSeatsLeft, needsSeat, PAST_DUE_DETAIL, seatLimitDetail, SeatPlan } from '$lib/server/team/seats';
 import { INVITE_PARAM } from '$lib/server/tenancy/landing';
+import { editorSeatGate, SeatGate, seatStatus, syncedOrLogged, type SeatStatus } from '$lib/server/team/seat-billing';
 
 export type InviteMail = { to: string; orgName: string; inviterId: string; acceptUrl: string };
 
-export type TeamCtx = { db: Db; userId: string; orgId: string; origin: string; mail: (mail: InviteMail) => Promise<boolean> };
+export type TeamCtx = { db: Db; writer: Db; userId: string; orgId: string; origin: string; mail: (mail: InviteMail) => Promise<boolean> };
 
 export enum TeamOp {
   Invite = 'invite',
@@ -40,7 +41,8 @@ export enum TeamRefusal {
   NotFound = 'not_found',
   OwnerProtected = 'owner_protected',
   Self = 'self',
-  SeatLimit = 'seat_limit'
+  SeatLimit = 'seat_limit',
+  BillingOnly = 'billing_only'
 }
 
 export type TeamRequest =
@@ -54,7 +56,7 @@ export type TeamResult = { ok: true; data: Record<string, unknown> } | { ok: fal
 
 export type TeamMember = { userId: string; email: string; name: string | null; role: OrgRole };
 
-export type Team = { orgId: string; role: OrgRole; members: TeamMember[]; invites: Invite[]; linkActive: boolean };
+export type Team = { orgId: string; role: OrgRole; members: TeamMember[]; invites: Invite[]; linkActive: boolean; seats: SeatStatus | null };
 
 const OP_ACTION: Record<TeamOp, OrgAction> = {
   [TeamOp.Invite]: OrgAction.Invite,
@@ -92,21 +94,35 @@ export async function listTeam(ctx: TeamCtx): Promise<Team | null> {
     role,
     members,
     invites: pending.filter((i) => i.email !== LINK_INVITE_EMAIL),
-    linkActive: pending.some((i) => i.email === LINK_INVITE_EMAIL)
+    linkActive: pending.some((i) => i.email === LINK_INVITE_EMAIL),
+    seats: await seatStatus(ctx.db, ctx.orgId).catch((e) => {
+      console.error('[seats] seat state unreadable on the team page', ctx.orgId, e);
+      return null;
+    })
   };
 }
 
-async function seatRefusal(ctx: TeamCtx, role: string): Promise<TeamResult | null> {
+async function freeSeatRefusal(ctx: TeamCtx): Promise<TeamResult | null> {
+  const [members, invites] = await Promise.all([listMembers(ctx.db, ctx.orgId), listInvites(ctx.db, ctx.orgId)]);
+  const pendingInviteRoles = invites.filter((i) => i.status === 'pending' && i.email !== LINK_INVITE_EMAIL).map((i) => i.role);
+  if (editorSeatsLeft(SeatPlan.Free, { members: members.map((m) => m.role), pendingInviteRoles }) > 0) {
+    return null;
+  }
+  return { ok: false, refusal: TeamRefusal.SeatLimit, detail: seatLimitDetail(SeatPlan.Free) };
+}
+
+const SEAT_REFUSAL: Record<SeatGate, (ctx: TeamCtx, actor: OrgRole) => Promise<TeamResult | null>> = {
+  [SeatGate.Free]: freeSeatRefusal,
+  [SeatGate.PastDue]: async () => ({ ok: false, refusal: TeamRefusal.SeatLimit, detail: PAST_DUE_DETAIL }),
+  [SeatGate.Charged]: async (_ctx, actor) => (can(actor, OrgAction.Billing) ? null : { ok: false, refusal: TeamRefusal.BillingOnly, detail: BILLING_ONLY_DETAIL }),
+  [SeatGate.Included]: async () => null
+};
+
+async function seatRefusal(ctx: TeamCtx, actor: OrgRole, role: string): Promise<TeamResult | null> {
   if (!needsSeat(role)) {
     return null;
   }
-
-  const [plan, members, invites] = await Promise.all([seatPlanOf(ctx.db, ctx.orgId), listMembers(ctx.db, ctx.orgId), listInvites(ctx.db, ctx.orgId)]);
-  const pendingInviteRoles = invites.filter((i) => i.status === 'pending' && i.email !== LINK_INVITE_EMAIL).map((i) => i.role);
-  if (editorSeatsLeft(plan, { members: members.map((m) => m.role), pendingInviteRoles }) > 0) {
-    return null;
-  }
-  return { ok: false, refusal: TeamRefusal.SeatLimit, detail: seatLimitDetail(plan) };
+  return SEAT_REFUSAL[await editorSeatGate(ctx.db, ctx.orgId)](ctx, actor);
 }
 
 async function sendInvite(ctx: TeamCtx, to: string, token: string): Promise<Record<string, unknown>> {
@@ -130,13 +146,13 @@ async function invite(ctx: TeamCtx, actor: OrgRole, input: { email: string; role
     return refused(TeamRefusal.AlreadyMember);
   }
 
-  const noSeat = await seatRefusal(ctx, input.role);
+  const noSeat = await seatRefusal(ctx, actor, input.role);
   if (noSeat) {
     return noSeat;
   }
 
   try {
-    const { invite: created, token } = await createInvite(ctx.db, { orgId: ctx.orgId, email, role: input.role, invitedBy: ctx.userId });
+    const { invite: created, token } = await createInvite(ctx.writer, { orgId: ctx.orgId, email, role: input.role, invitedBy: ctx.userId });
     return done({ invite_id: created.id, ...(await sendInvite(ctx, email, token)) });
   } catch (e) {
     if ((e as { code?: string } | null)?.code === UNIQUE_VIOLATION) {
@@ -147,7 +163,7 @@ async function invite(ctx: TeamCtx, actor: OrgRole, input: { email: string; role
 }
 
 async function resend(ctx: TeamCtx, inviteId: string): Promise<TeamResult> {
-  const renewed = await renewInvite(ctx.db, { orgId: ctx.orgId, inviteId });
+  const renewed = await renewInvite(ctx.writer, { orgId: ctx.orgId, inviteId });
   if (!renewed) {
     return refused(TeamRefusal.NotFound);
   }
@@ -156,7 +172,7 @@ async function resend(ctx: TeamCtx, inviteId: string): Promise<TeamResult> {
 
 async function inviteLink(ctx: TeamCtx): Promise<TeamResult> {
   await deleteLinkInvite(ctx.db, ctx.orgId);
-  const { token } = await createInvite(ctx.db, {
+  const { token } = await createInvite(ctx.writer, {
     orgId: ctx.orgId,
     email: LINK_INVITE_EMAIL,
     role: LINK_ROLE,
@@ -182,12 +198,15 @@ async function setRole(ctx: TeamCtx, actor: OrgRole, input: { userId: string; ro
     return refused(TeamRefusal.InvalidRole);
   }
 
-  const noSeat = needsSeat(current) ? null : await seatRefusal(ctx, input.role);
+  const noSeat = needsSeat(current) ? null : await seatRefusal(ctx, actor, input.role);
   if (noSeat) {
     return noSeat;
   }
 
-  await setMemberRole(ctx.db, { orgId: ctx.orgId, userId: input.userId, role: input.role });
+  await setMemberRole(ctx.writer, { orgId: ctx.orgId, userId: input.userId, role: input.role });
+  if (needsSeat(current) !== needsSeat(input.role)) {
+    await syncedOrLogged(ctx.db, ctx.orgId);
+  }
   return done({ user_id: input.userId, role: input.role });
 }
 
@@ -204,18 +223,27 @@ async function remove(ctx: TeamCtx, userId: string): Promise<TeamResult> {
   }
 
   await removeMember(ctx.db, { orgId: ctx.orgId, userId });
+  if (needsSeat(current)) {
+    await syncedOrLogged(ctx.db, ctx.orgId);
+  }
   return done({ user_id: userId });
 }
 
-async function transfer(ctx: TeamCtx, userId: string): Promise<TeamResult> {
+async function transfer(ctx: TeamCtx, actor: OrgRole, userId: string): Promise<TeamResult> {
   if (userId === ctx.userId) {
     return refused(TeamRefusal.Self);
   }
-  if (!(await targetRole(ctx, userId))) {
+  const target = await targetRole(ctx, userId);
+  if (!target) {
     return refused(TeamRefusal.NotFound);
   }
 
-  await transferOwnership(ctx.db, { orgId: ctx.orgId, userId });
+  const addsEditor = !needsSeat(target);
+  const seated = !addsEditor || !(await seatRefusal(ctx, actor, OrgRoleName.Admin));
+  await handOverOrg(ctx.writer, { orgId: ctx.orgId, from: ctx.userId, to: userId, fromRole: seated ? OrgRoleName.Admin : target });
+  if (addsEditor && seated) {
+    await syncedOrLogged(ctx.db, ctx.orgId);
+  }
   return done({ owner: userId });
 }
 
@@ -247,8 +275,11 @@ export async function runTeamOp(ctx: TeamCtx, request: TeamRequest): Promise<Tea
       return remove(ctx, request.userId);
     case TeamOp.Leave:
       await removeMember(ctx.db, { orgId: ctx.orgId, userId: ctx.userId });
+      if (needsSeat(actor)) {
+        await syncedOrLogged(ctx.db, ctx.orgId);
+      }
       return done();
     case TeamOp.TransferOwnership:
-      return transfer(ctx, request.userId);
+      return transfer(ctx, actor, request.userId);
   }
 }

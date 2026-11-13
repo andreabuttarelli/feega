@@ -14,7 +14,7 @@ export enum VideoPreload {
   Metadata = 'metadata'
 }
 
-export type Media = { ready: (list: DisplayList) => Promise<Readiness>; pictures: Pictures; dispose: () => void };
+export type Media = { ready: (list: DisplayList) => Promise<Readiness>; pictures: Pictures; release: (gone: DisplayList, kept: readonly DisplayList[]) => void; dispose: () => void };
 
 function loadImage(src: string): Promise<Picture> {
   const img = new Image();
@@ -100,11 +100,23 @@ export function createMedia({ videoPreload = VideoPreload.Auto, frames }: Option
     return pictures.every((p) => loaded.has(p.clip)) ? Readiness.Whole : Readiness.Partial;
   }
 
+  function release(gone: DisplayList, kept: readonly DisplayList[]) {
+    const still = new Set(kept.flatMap((l) => needed(l.items).map((i) => i.src)));
+    for (const item of needed(gone.items).filter((i) => !i.video && !still.has(i.src))) {
+      const picture = loaded.get(item.clip);
+      loaded.delete(item.clip);
+      images.delete(item.src);
+      if (typeof ImageBitmap !== 'undefined' && picture?.source instanceof ImageBitmap) {
+        picture.source.close();
+      }
+    }
+  }
+
   function dispose() {
     for (const v of videos.values()) {
       void v.then((el) => el.removeAttribute('src'));
     }
   }
 
-  return { ready, pictures: (item) => loaded.get(item.clip) ?? null, dispose };
+  return { ready, pictures: (item) => loaded.get(item.clip) ?? null, release, dispose };
 }

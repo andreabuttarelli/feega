@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
 import { createCanvas, createConnection, createNode } from '$lib/server/repos/canvas';
@@ -25,7 +26,7 @@ import {
 } from '$lib/server/repos/product-batches';
 import { ProductOrigin, type StudioImageModel, type StudioModel, type StudioOptions, type StudioProduct } from './studio-options';
 
-export const STUDIO_AGENT_KEY = 'studio';
+export const STUDIO_AGENT_KEY = AgentKey.Studio;
 const ASPECT_RATIO = '3:4';
 const CELL_SPACING_X = 420;
 const CELL_SPACING_Y = 520;
@@ -45,7 +46,7 @@ export const selectionSchema = z.object({
 
 export type Selection = z.infer<typeof selectionSchema>;
 
-export type StudioCtx = { orgId: string; projectId: string; userId: string };
+export type StudioCtx = { orgId: string; projectId: string; userId: string; agentKey?: AgentKey };
 
 export type Quote = {
   plan: BatchPlan;
@@ -62,7 +63,7 @@ export type Shortfall = { needed: number; balance: number };
 export type StudioRefusal = { error: string; shortfall?: Shortfall };
 
 function actorOf(ctx: StudioCtx): Actor {
-  return { kind: 'agent', id: ctx.userId, agentKey: STUDIO_AGENT_KEY };
+  return agentActor(ctx.userId, ctx.agentKey ?? STUDIO_AGENT_KEY);
 }
 
 export function quoteSelection(selection: Selection, options: StudioOptions): Quote | StudioRefusal {

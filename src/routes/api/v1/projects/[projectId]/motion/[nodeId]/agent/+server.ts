@@ -1,4 +1,5 @@
 import { json } from '@sveltejs/kit';
+import { agentEditRefusal } from '$lib/server/agent-edits/cap';
 import { createUIMessageStreamResponse } from 'ai';
 import { z } from 'zod';
 import { offeredChatModels, resolveChoice } from '$lib/server/chat-model/catalogue';
@@ -31,6 +32,11 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
   const gated = await gateOrgAiAction(orgId, undefined);
   if (gated) {
     return gated;
+  }
+
+  const full = await agentEditRefusal(db, orgId);
+  if (full) {
+    return full;
   }
 
   const body = bodySchema.safeParse(await request.json().catch(() => ({})));

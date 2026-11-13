@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import { z } from 'zod';
 import type { Db } from '$lib/server/db/client';
 import { findNode } from '$lib/server/repos/canvas';
-import { agentActor } from '$lib/server/repos/actor';
+import { AgentKey, agentActor } from '$lib/server/repos/actor';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { motionOf } from '$lib/canvas/motion-node';
 import { cardDetail } from '$lib/motion/template/card';
@@ -17,7 +17,7 @@ import { laySfx } from './sfx';
 const HTTP_BAD_REQUEST = 400;
 const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
-const API_AGENT_KEY = 'mcp';
+const API_AGENT_KEY = AgentKey.Mcp;
 const ID_LENGTH = 8;
 
 export const addTemplateBody = z.object({

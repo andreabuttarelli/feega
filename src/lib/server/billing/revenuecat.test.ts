@@ -19,7 +19,7 @@ describe('readRevenueCatEvent', () => {
     expect(c.orgId).toBe(ORG);
     expect(c.eventId).toBe(samples.initialPurchase.event.id);
     expect(c.store).toBe('APP_STORE');
-    expect(c.grant).toEqual({ credits: 1600, source: 'subscription_renewal', expiresAt: '2025-11-19T08:00:00.000Z' });
+    expect(c.grant).toEqual({ credits: 500, source: 'subscription_renewal', expiresAt: '2025-11-19T08:00:00.000Z' });
     expect(c.revokeCredits).toBe(0);
     expect(c.plan).toBe(PlanChange.Set);
     expect(c.planExpiresAt).toBe('2025-11-19T08:00:00.000Z');
@@ -29,7 +29,7 @@ describe('readRevenueCatEvent', () => {
     const c = change(samples.renewal);
 
     expect(c.store).toBe('PLAY_STORE');
-    expect(c.grant?.credits).toBe(1600);
+    expect(c.grant?.credits).toBe(500);
     expect(c.grant?.expiresAt).toBe('2025-12-19T08:00:00.000Z');
     expect(c.plan).toBe(PlanChange.Set);
   });
@@ -37,7 +37,7 @@ describe('readRevenueCatEvent', () => {
   it('a credit pack grants permanent credits and leaves the plan alone', () => {
     const c = change(samples.creditPack);
 
-    expect(c.grant).toEqual({ credits: 3200, source: 'one_time_purchase', expiresAt: null });
+    expect(c.grant).toEqual({ credits: 2000, source: 'one_time_purchase', expiresAt: null });
     expect(c.plan).toBe(PlanChange.Keep);
   });
 
@@ -45,14 +45,14 @@ describe('readRevenueCatEvent', () => {
     const c = change(samples.packRefund);
 
     expect(c.grant).toBeNull();
-    expect(c.revokeCredits).toBe(3200);
+    expect(c.revokeCredits).toBe(2000);
     expect(c.plan).toBe(PlanChange.Keep);
   });
 
   it('a refunded subscription takes the period credits back and ends the plan now', () => {
     const c = change(samples.subscriptionRefund);
 
-    expect(c.revokeCredits).toBe(1600);
+    expect(c.revokeCredits).toBe(500);
     expect(c.plan).toBe(PlanChange.Clear);
   });
 

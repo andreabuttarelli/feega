@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import { fakeDb } from '$lib/server/db/fake-db';
 import { BROWSER_RENDER_PREFIX, type NodeRun } from '$lib/server/repos/node-runs';
 import { LinkRefusal, RENDER_LINK_OPEN_MS } from '$lib/motion/render-link';
@@ -42,7 +43,7 @@ describe('il token di render', () => {
     const row = { id: 'run-9', org_id: ORG, node_id: NODE, prompt: '', model: null, params: {}, status: 'running', error: null, output_asset_id: null, external_job_id: `${BROWSER_RENDER_PREFIX}4`, cost_usd: null, attempts: 0, actor_id: USER, started_at: '', finished_at: null };
     const { db, calls } = fakeDb({ node_runs: [row] });
 
-    const link = await createRenderLink(db, { orgId: ORG, nodeId: NODE, version: 4, quality: Quality.High, actor: { kind: 'agent', id: USER, agentKey: 'mcp' } }, NOW);
+    const link = await createRenderLink(db, { orgId: ORG, nodeId: NODE, version: 4, quality: Quality.High, actor: agentActor(USER, AgentKey.Mcp) }, NOW);
 
     const insert = calls.find((c) => c.op === 'insert')!.payload as { org_id: string; actor_id: string; external_job_id: string; params: { revision: number; link: { hash: string; claim: null } } };
     expect(insert).toMatchObject({ org_id: ORG, actor_id: USER, external_job_id: `${BROWSER_RENDER_PREFIX}4` });

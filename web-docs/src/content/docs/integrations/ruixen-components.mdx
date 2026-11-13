@@ -1,0 +1,60 @@
+---
+title: Ruixen components
+description: The free Ruixen UI components ship inside Feega as a built-in component library, ready to insert on the canvas.
+sidebar:
+  order: 7
+---
+
+[Ruixen UI](https://ruixen.com) is a React and Tailwind component library for shadcn projects. Its free, open-source components (MIT) ship with Feega as the **Ruixen** group of the component library: 155 components, from buttons, inputs and navbars to pricing tables, heroes and footers, each as editable layers.
+
+## Insert a component
+
+- **In the app**: on the canvas open **+** → **Components**, pick the **Ruixen** group, choose a component and press **Add to canvas**. Inside a composition, **Use in composition** places it there.
+- **Agents**: Ruixen components are templates with ids `builtin:ruixen-<name>` (for example `builtin:ruixen-pricing-plans`). The motion and project agents list them with the other components and insert them by id; the API lists them at `GET /api/v1/motion/templates`.
+
+## Animation
+
+Many Ruixen components move: marquees, counters, reveals, scroll effects, WebGL backgrounds. Feega imports each one in its settled state, as a still of editable layers: transitions are skipped to their end before the import reads the page. Components drawn on a `<canvas>` are left out. The animation itself is not carried over; animate the layers on the canvas timeline if you need motion.
+
+## What is and is not included
+
+Only the components of Ruixen's open-source repository are included, pinned to one commit in the Feega repository. Ruixen Pro (the paid templates and premium components on pro.ruixen.com) is not fetched or stored. Of the 212 free components, 155 are included. The rest are listed with their reason in the pinned catalog:
+
+- 5 need the Next.js runtime or files the registry does not ship.
+- 10 do not come in as a component of their own: 2 only show after a click or a scroll, 8 are folded into the example around them.
+- 26 use something the import cannot reproduce yet: 3D perspective (11), rotation (7), a `<canvas>` drawing (7), an image mask (1).
+- 16 would insert an image as a grey placeholder.
+
+## Logos
+
+Ruixen's examples show real companies' logos. Feega ships invented company names and simple marks in their place, so client logo rows look finished without carrying anyone's trademark.
+
+## Known limits
+
+- Animations arrive as a still frame.
+- Text that mixes sizes in one line (a price and its `/month`) comes in at one size.
+- Images load from raw.githubusercontent.com (Ruixen's repository) and third-party image hosts when you insert the component, so they need a connection.
+
+## Licence
+
+Ruixen's free components are © 2025 Ruixen UI, under the MIT licence:
+
+```
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```

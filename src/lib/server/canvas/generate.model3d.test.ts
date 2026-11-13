@@ -61,7 +61,8 @@ vi.mock('$lib/server/offerable-models', () => ({
   })
 }));
 vi.mock('./sign-media', () => ({
-  signMediaPaths: async (_db: unknown, paths: string[]) => paths.map((p) => (p.startsWith('https://') ? p : `https://signed.test/${p}`))
+  signOrgMediaPaths: async (_db: unknown, _org: string, paths: string[]) => paths.map((p) => (p.startsWith('https://') ? p : `https://signed.test/${p}`)),
+  unheldMediaPaths: async () => []
 }));
 vi.mock('$lib/server/task-providers-config', () => ({ taskRunDeps: (db: Db) => deps.current!(db) }));
 vi.mock('$env/dynamic/private', () => ({ env: {} }));
@@ -135,7 +136,8 @@ beforeEach(() => {
     access: async () => ({ allowed: true }),
     screen: () => screen,
     refuseLikeness: vi.fn(),
-    bill
+    bill,
+    storeQuote: async () => {}
   });
 });
 

@@ -18,7 +18,7 @@
   import { PART_ITEMS, parts } from '$lib/canvas/core/group-parts';
   import { spliceOf } from '@feega/motion-core/canvas/core/group-diff';
   import { storedTiles, tilesOn } from '$lib/canvas/core/tiles-switch';
-  import { cacheZoom, cached, uncached, pictureBytes, resident, heldWhileMoving, type HeldFrame } from '$lib/canvas/core/residency';
+  import { cacheZoom, cached, uncached, pictureBytes, resident, heldWhileMoving, movingWhileZooming, ZoomPicture, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, buildLanes, currentDevice, textureBudget } from '$lib/canvas/gpu/memory-budget';
   import { worldUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { NO_SIGHT, sameSight, sightOf, slackened, stillHolds, widened, type Sight, type Taken } from '$lib/canvas/core/sight';
@@ -26,13 +26,18 @@
   import { NO_OVERLAY, type CoreOverlay } from '$lib/canvas/core/world-overlay';
   import { memoSources } from '$lib/canvas/core/source-memo';
   import { retiered, retiers } from '$lib/canvas/core/retier';
-  import { drawsAny, frameOfLive, logGaps, onStage, sameLive, shownGroup, stagedBox, toBuild, toWarm, untilFound, frameSourceUrl, type FrameAt } from '$lib/canvas/core/frame-source';
+  import { drawsAny, frameOfLive, legible, logGaps, onStage, sameLive, shownGroup, stagedBox, toBuild, toWarm, untilFound, frameSourceUrl, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor, showsPoster } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
-  import { grabThumb, posterBlob, posterSize, thumbClip, thumbList, thumbRect, thumbSize, thumbStore, thumbsDue } from '$lib/canvas/core/frame-thumbs';
+  import { bitmapBlob, grabThumb, posterBlob, posterSize, shotSize, thumbClip, thumbList, thumbRect, thumbSize, thumbStore, thumbsDue } from '$lib/canvas/core/frame-thumbs';
+  import { shrunk } from '$lib/canvas/core/frame-shot';
+  import { heldBytes, overBudget } from '$lib/canvas/core/built-budget';
+  import { placedShots, shotsOf, type ViewShot } from '$lib/canvas/core/view-shots';
+  import type { ListShooter } from '$lib/motion/gpu-full/core-export';
+  import { FullBackend } from '@feega/motion-core/motion/gpu-full/backends';
   import { listed } from '$lib/canvas/core/frame-lists';
-  import { frameBuilder, type FrameDoc } from '$lib/canvas/core/frame-build';
+  import { frameBuilder, type FrameDoc, type Shot } from '$lib/canvas/core/frame-build';
   import { liveGenerations } from '$lib/canvas/core/live-generations';
   import { latestOnly } from '$lib/canvas/core/latest-only';
   import { heldBuilds } from '$lib/canvas/core/held-build';
@@ -40,25 +45,30 @@
   import { frameSources } from '$lib/canvas/core/frame-sources';
   import { tieredAssets } from '$lib/canvas/core/tiered-assets';
   import { Reach, assetTier, keptTier } from '$lib/canvas/core/asset-tier';
-  import type { AssetSize } from '$lib/canvas/asset-url';
+  import { AssetSize } from '$lib/canvas/asset-url';
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
-  import { backendLog, debugActive, debugStart, gestureLog, renderLog, tierLog } from '$lib/canvas/core/debug-log';
+  import { backendLog, consoleSink, debugActive, debugStart, gestureLog, renderLog, teeSink, tierLog } from '$lib/canvas/core/debug-log';
   import { readClips, type CustomFrame, type CustomReads } from '@feega/motion-core/motion/gpu-full/dom/custom';
   import type { Picture, Pictures } from '@feega/motion-core/motion/gpu-full/raster';
-  import { Stand, drawable, fillOrder, firstDrawn, inView, layersOf, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
+  import { Stand, drawable, fillOrder, firstDrawn, inView, layersOf, nearestFirst, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { OnScreen, VectorGate, showStaged, shownBefore } from '$lib/canvas/core/staged-show';
   import { uploadWithin } from '$lib/canvas/core/picture-uploads';
   import { Step, markFrame, noteImages } from '$lib/canvas/core/frame-timeline';
   import { StartupStep, markStartup, reportFramesShown } from '$lib/canvas/core/startup-marks';
   import LoadTimeline from './LoadTimeline.svelte';
   import { editedLayers } from '$lib/canvas/core/edited-layers';
-  import { fastPatch } from '$lib/canvas/core/fast-patch';
+  import { fastPatch, readyPatch } from '$lib/canvas/core/fast-patch';
+  import { shapedText } from '@feega/motion-core/motion/gpu-full/text/measure';
+  import type { TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
+  import { paintFirst } from '$lib/canvas/core/paint-first';
   import type { LiveDoc, LiveListener } from '$lib/canvas/core/live-docs.svelte';
-  import { baseNodeId, withoutViews } from '$lib/canvas/breakpoint-views';
+  import { baseNodeId, viewOf, viewsOfFrame, withoutViews } from '$lib/canvas/breakpoint-views';
   import { loadOnce, withScenes, type LoadScene } from '$lib/canvas/scene-sources';
   import { describe, factsOf, signatureOf, undrawn, type NodeFacts } from '$lib/canvas/core/core-debug';
-  import { Motion, hudLine, watchCrashes } from '$lib/canvas/gpu/crash-watch';
+  import { Motion, heldBy, hudLine, watchCrashes } from '$lib/canvas/gpu/crash-watch';
+  import { platformOf } from '$lib/canvas/perf/platform';
   import { startCanvasPerf } from '$lib/canvas/perf/perf-beacon';
+  import { flightNote, startFlight } from '$lib/canvas/debug/flight';
   import { Camera } from '$lib/canvas/perf/session-perf';
   import { liftOut, liftedPut, movingGroup, restGroup, type Lift, type Lifted } from '$lib/canvas/core/lifted-drag';
   import { AttachStep, GpuBackend, afterAttachFailure, backendAfterLoss, isTrap, type BackendSwitch } from '$lib/canvas/gpu/gpu-loss';
@@ -66,10 +76,9 @@
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
 
-  let { frames, edited = new Set(), order = [], live = new Map(), listenLive = () => () => {}, known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, lift = null, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, place = null, sourceUrl, onready, onsource = () => {}, onthumb = () => {}, onfallback, onbackend = () => {} }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; listenLive?: (listener: LiveListener) => () => void; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; lift?: Lift | null; look?: Look; view: Viewport; area: { width: number; height: number }; place?: { projectId: string; canvasId: string; orgId?: string; userId?: string; look?: string } | null; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onthumb?: (id: string, revision: number, blob: Blob, size: { width: number; height: number }) => void; onfallback: (why: string) => void; onbackend?: (change: BackendSwitch) => void } = $props();
+  let { frames, edited = new Set(), order = [], live = new Map(), listenLive = () => () => {}, known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, lift = null, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, place = null, sourceUrl, onready, onsource = () => {}, onthumb = () => {}, onfallback, onbackend = () => {}, onevict = () => {} }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; listenLive?: (listener: LiveListener) => () => void; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; lift?: Lift | null; look?: Look; view: Viewport; area: { width: number; height: number }; place?: { projectId: string; canvasId: string; orgId?: string; userId?: string; look?: string } | null; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onthumb?: (id: string, revision: number, blob: Blob, size: { width: number; height: number }) => void; onfallback: (why: string) => void; onbackend?: (change: BackendSwitch) => void; onevict?: (id: string) => void } = $props();
 
   markStartup(StartupStep.Mounted);
-  debugStart();
 
   const NATIVE = { name: GpuBackend.Native, create: createCoreNative };
   const WEBGPU = { name: GpuBackend.WebGpu, create: createCore };
@@ -103,7 +112,17 @@
   const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, budget.resolution);
   const crashes = watchCrashes({ device: currentDevice(), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, resolution });
   const RASTERED = new Set<Outcome>([Outcome.Full, Outcome.Partial]);
-  const perf = startCanvasPerf({ canvasId: untrack(() => place?.canvasId ?? ''), device: currentDevice(), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, frames: () => frames.length });
+  const perf = startCanvasPerf({ canvasId: untrack(() => place?.canvasId ?? ''), device: currentDevice(), platform: platformOf(navigator.userAgent, navigator.maxTouchPoints), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, frames: () => frames.length, area: () => ({ width: Math.round(area.width), height: Math.round(area.height) }), memory: () => heldBy(crashes.sample), diedBefore: crashes.diedBefore, before: crashes.before });
+  const flight = startFlight({
+    canvasId: untrack(() => place?.canvasId ?? ''),
+    device: currentDevice(),
+    crash: { diedBefore: crashes.diedBefore, before: crashes.before },
+    read: () => {
+      const s = crashes.sample;
+      return { x: view.x, y: view.y, zoom: view.zoom, camera, moving: gesture.active() ? 1 : 0, frames: frames.length, held: held.length, waiting, framePuts: framePuts.length, put: put.size, pictured: pictured.size, backend: BACKENDS[backend].name, backing: s.canvas, cacheBytes, textureBytes: s.textureBytes, textures: s.textures, texturesMade: s.texturesCreated, pictureBytes: s.pictureBytes, scratchBytes: s.scratchBytes, wasmBytes: s.wasmBytes, gpuLagMs: s.gpuLagMs };
+    }
+  });
+  debugStart(undefined, flight ? teeSink(consoleSink, flight.sink) : consoleSink);
   const EDIT_GIVE_UP_MS = 10_000;
   const editSeen = new Map<string, string>();
   const editsOwed = new Map<string, number>();
@@ -224,6 +243,8 @@
 
   const readSource = memoSources((f: FrameAt) => frameSources(sourceOf(f)));
 
+  const weights = new Map<string, number>();
+
   const builtTiers = new Map<string, { revision: number; at: AssetSize; list: DisplayList; custom: boolean }>();
 
   async function fetchAndBuild(f: FrameAt, at: AssetSize) {
@@ -305,6 +326,7 @@
       const group = ready === Readiness.Whole || held === OnScreen.Thumb ? key : `${key}${VECTORS}`;
       const shown = loaded.get(f.id);
       loaded.set(f.id, group);
+      weights.set(f.id, heldBytes(built.list));
       markFrame(f.id, ready === Readiness.Whole ? Step.Whole : Step.Vectors);
       lists = listed(lists, f.id, group, onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), shown, drawnLast.get(f.id)?.group]);
     };
@@ -315,10 +337,15 @@
   let thumbShown = $state(new Map<string, HeldFrame>());
   const presented = new Set<string>();
 
-  async function showThumb(f: FrameAt) {
+  async function showThumb(f: FrameAt, given: Blob | null = null) {
     const key = baseKey(f);
-    const blob = await thumbs.get(key);
+    const blob = given ?? (await thumbs.get(key));
+    shotChecked.add(f.id);
+    if (blob) {
+      shotDone.add(f.id);
+    }
     if (!blob || presented.has(f.id) || liveGroup.has(f.id)) {
+      nextShot();
       return;
     }
     const bitmap = await createImageBitmap(blob).catch(() => null);
@@ -405,13 +432,150 @@
 
   $effect(() => {
     const seen = slackened(sight.view, area);
-    for (const f of fillOrder(frames, seen.view, seen.area)) {
+    for (const f of fillOrder(drawnFrames, seen.view, seen.area)) {
       if (!thumbAsked.has(baseKey(f))) {
         thumbAsked.add(baseKey(f));
         void showThumb(f);
+        void showViewShots(f);
       }
     }
   });
+
+  const VIEWS = ':views';
+  let viewShots = $state(new Map<string, ViewShot[]>());
+  const viewed = $derived(new Set(frames.filter((f) => viewOf(f.id)).map((f) => baseNodeId(f.id))));
+  const ghostViews = $derived(withoutViews(frames).filter((f) => !viewed.has(f.id)).flatMap((f) => placedShots(f, viewShots.get(f.id) ?? []) as FrameAt[]));
+  const drawnFrames = $derived([...frames, ...ghostViews]);
+
+  async function showViewShots(f: FrameAt) {
+    if (viewOf(f.id) || viewShots.has(f.id)) {
+      return;
+    }
+    const blob = await thumbs.get(`${baseKey(f)}${VIEWS}`);
+    const shots = blob ? ((await blob.text().then(JSON.parse, () => null)) as ViewShot[] | null) : null;
+    if (shots?.length) {
+      viewShots = new Map(viewShots).set(f.id, shots);
+    }
+  }
+
+  const shotChecked = new Set<string>();
+  const shotDone = new Set<string>();
+  let shooting = false;
+  let shooter: Promise<ListShooter | null> | null = null;
+  const nextPaint = () => new Promise((resolve) => requestAnimationFrame(resolve));
+
+  function shotDue(): FrameAt | null {
+    if (!raster || budget.readableWidth === 0) {
+      return null;
+    }
+    const due = withoutViews(frames).filter((f) => !readable.has(f.id) && shotChecked.has(f.id) && !shotDone.has(f.id) && !loaded.has(f.id));
+    return nearestFirst(due, sight.view, area)[0] ?? null;
+  }
+
+  function nextShot() {
+    if (shooting) {
+      return;
+    }
+    const f = shotDue();
+    if (!f) {
+      void shooter?.then((s) => s?.dispose());
+      shooter = null;
+      releaseIdleBuilds();
+      return;
+    }
+    shooting = true;
+    idle(() =>
+      void whenQuiet(() => gesture.active() || edited.size > 0)
+        .then(() => shoot(f))
+        .catch((e: unknown) => console.warn('[canvas] snapshot not taken', f.id, e))
+        .finally(() => {
+          shotDone.add(f.id);
+          shooting = false;
+          nextShot();
+        })
+    );
+  }
+
+  $effect(() => {
+    void [frames, sight, raster, readable];
+    untrack(nextShot);
+  });
+
+  function releaseIdleBuilds() {
+    if (bounded && !shooting && inFlight === 0) {
+      buildAway.release();
+    }
+  }
+
+  $effect(() => {
+    if (inFlight === 0) {
+      untrack(releaseIdleBuilds);
+    }
+  });
+
+  async function shotBlob(list: DisplayList, size: { width: number; height: number; scale: number }): Promise<Blob | null> {
+    const into = raster;
+    if (into?.poster) {
+      const group = `shot:${crypto.randomUUID()}`;
+      into.putGroup(group, list, pictures);
+      await nextPaint();
+      const data = await into.poster(group, size, size.scale).finally(() => into.dropGroup(group));
+      return posterBlob(data);
+    }
+    shooter ??= import('$lib/motion/gpu-full/core-export').then((m) => m.listShooter(FullBackend.CoreGl, Math.ceil(budget.readableWidth * resolution), SHOT_SIDE));
+    const shot = await shooter;
+    return shot ? bitmapBlob(await shot.shoot(shrunk(list, size), pictures)) : null;
+  }
+
+  const SHOT_SIDE = 2048;
+
+  async function snap(frame: FrameAt, list: DisplayList, upload: boolean) {
+    const staged = onStage(list, frame.kind);
+    await media.ready(staged);
+    const size = shotSize(frame.box, budget.readableWidth * resolution);
+    const blob = await shotBlob(staged, size);
+    media.release(staged, [...lists.values()]);
+    if (!blob) {
+      return;
+    }
+    const key = baseKey(frame);
+    thumbs.put(key, blob);
+    thumbTaken.add(key);
+    if (upload) {
+      onthumb(frame.id, frame.revision, blob, size);
+    }
+    thumbAsked.add(key);
+    await showThumb(frame, blob);
+  }
+
+  async function shotsOnPage(f: FrameAt): Promise<Shot[] | null> {
+    const fetched = await frameSources(sourceOf(f));
+    frameSources.forget(sourceOf(f));
+    if (!fetched) {
+      return null;
+    }
+    const source = place ? tieredAssets(fetched, place, AssetSize.Px256) : fetched;
+    const views = source.doc.breakpoints?.length ? viewsOfFrame(f, source.doc) : [];
+    const shots: Shot[] = [];
+    for (const shown of [{ frame: f, doc: source.doc }, ...views]) {
+      shots.push({ frame: shown.frame, list: (await buildSource(shown.frame as FrameAt, { ...source, doc: shown.doc })).list });
+    }
+    return shots;
+  }
+
+  async function shoot(f: FrameAt) {
+    const started = performance.now();
+    const away = await buildAway.shoot({ url: new URL(sourceOf(f), location.href).href, frame: f, place: place ? { projectId: place.projectId, canvasId: place.canvasId } : null }, smoothing).catch(() => null);
+    buildAway.release();
+    const shots = away ?? (await shotsOnPage(f));
+    for (const shot of shots ?? []) {
+      await snap(shot.frame as FrameAt, shot.list, shot.frame.id === f.id);
+    }
+    const views = shotsOf(f.box, (shots ?? []).slice(1));
+    thumbs.put(`${baseKey(f)}${VIEWS}`, new Blob([JSON.stringify(views)], { type: 'application/json' }));
+    viewShots = new Map(viewShots).set(f.id, views);
+    flightNote('snapshot', { id: f.id, shots: shots?.length ?? 0, away: away !== null, ms: Math.round(performance.now() - started) });
+  }
 
   let liveGroup = $state(new Map<string, string>());
   const liveBuilt = new Map<string, LiveDoc>();
@@ -451,6 +615,22 @@
     }
     markFrame(key, Step.LiveReady);
     showLive(f, key, { doc: source.doc, list: built.list, ready });
+    measureLive(f, source);
+  }
+
+  const liveMeasures = new Map<string, TextMeasure>();
+
+  function measureLive(f: FrameAt, source: LiveDoc) {
+    idle(() =>
+      loadFonts(source.doc, source.assets, source.tokens).then(
+        (fonts) => {
+          const measure = shapedText({ fonts, smoothing });
+          liveMeasures.set(f.id, measure);
+          readyPatch(source.doc, measure);
+        },
+        () => liveMeasures.delete(f.id)
+      )
+    );
   }
 
   type ShownLive = { doc: MotionDoc; list: DisplayList; ready: Awaited<ReturnType<typeof media.ready>> };
@@ -458,38 +638,48 @@
 
   function showLive(f: FrameAt, key: string, shown: ShownLive) {
     logGaps(f.id, shown.list);
+    weights.set(f.id, heldBytes(shown.list));
     lists = listed(lists, f.id, key, onStage(drawable(shown.list, shown.ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), loaded.get(f.id), drawnLast.get(f.id)?.group]);
     liveGroup = new Map(liveGroup).set(f.id, key);
     liveAtRevision.set(f.id, f.revision);
     liveShown.set(f.id, shown);
   }
 
-  function patchLive(f: FrameAt, source: LiveDoc) {
+  function patchLive(f: FrameAt, source: LiveDoc): boolean {
     const shown = liveShown.get(f.id);
-    const list = shown && fastPatch(shown.list, shown.doc, source.doc);
+    const measure = liveMeasures.get(f.id);
+    const list = shown && measure && fastPatch(shown.list, shown.doc, source.doc, measure);
     if (!shown || !list) {
-      return;
+      return false;
     }
     const generation = liveGeneration.ask(f.id);
     if (!liveGeneration.land(f.id, generation)) {
-      return;
+      return false;
     }
     const key = `${f.id}:live${generation}`;
     markFrame(key, Step.LiveAsked);
     showLive(f, key, { ...shown, doc: source.doc, list });
+    return true;
   }
 
   const rebuildLatest = latestOnly<string, { f: FrameAt; source: LiveDoc }>((_id, { f, source }) => rebuildLive(f, source));
+  const rebuild = paintFirst<string, { f: FrameAt; source: LiveDoc }>((job) => pacer.afterPaint(job), rebuildLatest);
 
   function rebuildIfEdited(f: FrameAt, source: LiveDoc | undefined) {
     if (lift && !lift.landing && lift.id === baseNodeId(f.id)) {
       return;
     }
+    if (bounded && viewOf(f.id) && !sight.onScreen.has(f.id)) {
+      return;
+    }
     if (source && (!sameLive(liveBuilt.get(f.id), source) || liveStamp.get(f.id) !== f.scenes)) {
       liveBuilt.set(f.id, source);
       liveStamp.set(f.id, f.scenes);
-      patchLive(f, source);
-      rebuildLatest(f.id, { f, source });
+      if (patchLive(f, source)) {
+        rebuild.afterPaint(f.id, { f, source });
+      } else {
+        rebuild.now(f.id, { f, source });
+      }
     }
   }
 
@@ -509,6 +699,7 @@
     for (const id of [...liveGroup.keys()].filter((id) => !live.has(id))) {
       liveBuilt.delete(id);
       liveShown.delete(id);
+      liveMeasures.delete(id);
       heldMain.drop(id);
       customPictures.drop(liveRead(id));
       const saved = frames.find((f) => f.id === id);
@@ -521,15 +712,23 @@
     }
   });
 
+  const zoomStep = $derived(cacheZoom(view.zoom));
+  const readableAt = (zoom: number) => new Set(legible(frames, zoom, budget.readableWidth).map((f) => f.id));
+  let readable = $state.raw(untrack(() => readableAt(cacheZoom(view.zoom))));
+  $effect(() => {
+    readable = readableAt(zoomStep);
+  });
+  const bounded = Number.isFinite(budget.builtBytes);
+  const withinBudget = (f: FrameAt) => !bounded || sight.onScreen.has(f.id);
   let inFlight = $state(0);
   let settledFrames = $state(new Set<string>());
 
   $effect(() => {
-    frameSources.warm(toWarm(withoutViews(frames), sight.view, area, keyOf, asked, liveGroup).filter((f) => !known(f)).map(sourceOf));
+    frameSources.warm(toWarm(legible(withoutViews(frames), zoomStep, budget.readableWidth), sight.view, area, keyOf, asked, liveGroup).filter((f) => !known(f)).map(sourceOf));
   });
 
   $effect(() => {
-    const waiting = toBuild(withoutViews(frames), sight.view, area, keyOf, asked, liveGroup);
+    const waiting = toBuild(legible(withoutViews(frames), zoomStep, budget.readableWidth).filter(withinBudget), sight.view, area, keyOf, asked, liveGroup);
 
     const room = budget.framesInFlight - inFlight;
     if (room <= 0) {
@@ -558,8 +757,62 @@
       return group && list && drawsAny(list) ? [{ id: f.id, group, box: stagedBox(f.box, list), size: { width: list.width, height: list.height }, bytes: pictureBytes(list.items), ...(f.turn ? { turn: f.turn } : {}) }] : [];
     })
   );
+  const ownedBy = (id: string) => (key: string) => key === id || key.startsWith(`${id}:`) || key.startsWith(`${id}@`);
+
+  function sendBack(f: FrameAt) {
+    const owned = ownedBy(f.id);
+    const gone = [...lists].filter(([key]) => owned(key));
+    lists = new Map([...lists].filter(([key]) => !owned(key)));
+    for (const [, list] of gone) {
+      media.release(list, [...lists.values()]);
+    }
+    for (const held of [loaded, asking, builtTiers, bestTier, weights, drawnLast]) {
+      [...held.keys()].filter(owned).forEach((key) => held.delete(key));
+    }
+    for (const held of [asked, imaged, presented]) {
+      [...held].filter(owned).forEach((key) => held.delete(key));
+    }
+    readSource.forget(f.id);
+    frameSources.forget(sourceOf(f));
+    thumbAsked.delete(baseKey(f));
+    onevict(f.id);
+    flightNote('sent-back', { id: f.id });
+  }
+
+  function keepShotThenSendBack(f: FrameAt) {
+    const list = builtTiers.get(f.id)?.list;
+    weights.delete(f.id);
+    if (shotDone.has(f.id) || !list) {
+      sendBack(f);
+      return;
+    }
+    shotDone.add(f.id);
+    void snap(f, list, true)
+      .catch((e: unknown) => console.warn('[canvas] snapshot not taken', f.id, e))
+      .finally(() => sendBack(f));
+  }
+
+  const weightOf = (id: string) => [...weights].reduce((sum, [key, bytes]) => (ownedBy(id)(key) ? sum + bytes : sum), 0);
+
+  const MB = 1024 * 1024;
+  let builtMb = $state(0);
+
+  $effect(() => {
+    void lists;
+    builtMb = Math.round(untrack(() => [...weights.values()].reduce((sum, bytes) => sum + bytes, 0)) / MB);
+    if (!bounded) {
+      return;
+    }
+    void sight;
+    const kept = untrack(() => withoutViews(frames).filter((f) => weights.has(f.id) && !sight.onScreen.has(f.id) && !live.has(f.id) && !edited.has(f.id) && lift?.id !== f.id));
+    const gone = overBudget(kept.map((f) => ({ id: f.id, box: f.box, bytes: weightOf(f.id) })), sight.view, area, budget.builtBytes);
+    for (const f of kept.filter((k) => gone.includes(k.id))) {
+      untrack(() => keepShotThenSendBack(f));
+    }
+  });
+
   const posterIds = $derived(new Set(posters.map((p) => p.frame.id)));
-  const shownCards = $derived([...cards, ...postersFor(posters, new Set(framePuts.map((f) => f.id)))]);
+  const shownCards = $derived([...cards, ...postersFor(posters, new Set(framePuts.map((f) => f.id))).filter((p) => readable.has(p.frame.id) || showsPoster(p.frame.list))]);
 
   const cardIndex = $derived(new SpatialIndex(shownCards.map((c) => ({ id: c.key, ...c.frame.box }))));
 
@@ -581,7 +834,7 @@
 
   const rank = $derived(new Map(order.map((id, i) => [id, i])));
   const stacking = (id: string) => rank.get(id) ?? 0;
-  const standIns = $derived<{ id: string; box: FrameAt['box']; stand: Stand; turn?: Turn }[]>([...frames.map((f) => ({ id: f.id, box: f.box, stand: Stand.Frame, turn: f.turn })), ...cards.map((c) => ({ id: c.frame.id, box: c.frame.box, stand: Stand.Card, turn: c.turn }))].sort((a, b) => stacking(a.id) - stacking(b.id)));
+  const standIns = $derived<{ id: string; box: FrameAt['box']; stand: Stand; turn?: Turn }[]>([...drawnFrames.map((f) => ({ id: f.id, box: f.box, stand: readable.has(f.id) ? Stand.Frame : Stand.Pending, turn: f.turn })), ...cards.map((c) => ({ id: c.frame.id, box: c.frame.box, stand: Stand.Card, turn: c.turn }))].sort((a, b) => stacking(a.id) - stacking(b.id)));
   const placeholders = $derived(new Map(standIns.map((n) => [n.id, { ...n, ...placeholder(n.stand, { width: n.box.w, height: n.box.h }, look) }])));
   const BLOCKS = ':blocks';
   const blocksGroup = (key: string) => `${key}${BLOCKS}`;
@@ -629,7 +882,7 @@
 
   const waiting = $derived.by(() => {
     const ready = new Set(real.map((f) => f.id));
-    return inView([...placeholders.values()], sight.view, area).filter((p) => !ready.has(p.id) && !(p.stand === Stand.Frame && settledFrames.has(p.id) && !posterIds.has(p.id))).length;
+    return inView([...placeholders.values()], sight.view, area).filter((p) => !ready.has(p.id) && p.stand !== Stand.Pending && !(p.stand === Stand.Frame && settledFrames.has(p.id) && !posterIds.has(p.id))).length;
   });
 
   $effect(() => {
@@ -680,6 +933,7 @@
           return;
         }
         const next = afterAttachFailure(e, tried, freshCores, BACKENDS.length);
+        perf.error(e instanceof Error ? e.message : String(e));
         if (next.step === AttachStep.GiveUp) {
           onfallback(e instanceof Error ? e.message : String(e));
           return;
@@ -903,6 +1157,7 @@
     const from = BACKENDS[backend].name;
     const to = BACKENDS[next].name;
     backendLog(from, to, why);
+    flightNote('backend-switch', { from, to, why });
     onbackend({ from, to, why });
     backend = next;
   }
@@ -922,6 +1177,8 @@
     }
     losses++;
     perf.deviceLost();
+    perf.error(why instanceof Error ? why.message : String(why));
+    flightNote('gpu-lost', { backend: BACKENDS[backend].name, why: why instanceof Error ? why.message : String(why) });
     const next = backendAfterLoss(backend, losses, BACKENDS.length);
     if (next !== backend) {
       losses = 0;
@@ -1018,7 +1275,7 @@
     const at = deviceView();
     const device = { width: area.width * resolution, height: area.height * resolution };
     const wide = widened(at, device);
-    const patch = sent.patch(worldUses(heldWhileMoving(zooming.active() || edited.size ? cached(drawn, wide.view, wide.area, textureBytes, cacheZoom(view.zoom) * resolution) : uncached(drawn), liftHeld(drawn))));
+    const patch = sent.patch(worldUses(heldWhileMoving(zooming.active() || edited.size ? cached(drawn, wide.view, wide.area, textureBytes, cacheZoom(view.zoom) * resolution) : uncached(drawn), movingWhileZooming(drawn, liftHeld(drawn), zooming.active() ? budget.zoomPicture : ZoomPicture.Exact))));
     if (patch) {
       into.patchUses(patch);
     }
@@ -1163,6 +1420,10 @@
 
   const pacer = new FramePacer(paint, (frame) => requestAnimationFrame(frame), () => raster?.busy?.() ?? false);
 
+  export function afterPaint(job: () => void) {
+    pacer.afterPaint(job);
+  }
+
   let taken: Taken | null = null;
   let takenFrom: SpatialIndex | null = null;
 
@@ -1195,9 +1456,11 @@
   $effect(() => () => media.dispose());
   $effect(() => () => crashes.stop());
   $effect(() => () => perf.stop());
+  $effect(() => () => flight?.stop());
   $effect(() => {
     if (raster) {
       perf.backend(BACKENDS[backend].name);
+      flightNote('backend', { name: BACKENDS[backend].name });
     }
   });
 
@@ -1205,6 +1468,9 @@
 
 {#if DEBUG}
   <pre class="core-hud">{hud}</pre>
+{/if}
+{#if flight}
+  <div class="flight-badge" data-testid="flight-badge">debug recording · {flight.session}{flight.previous && !flight.previous.clean ? ` · ${flight.previous.session} crashed` : ''}</div>
 {/if}
 {#if TIMELINE}
   <LoadTimeline />
@@ -1214,7 +1480,7 @@
   <div class="core-grid" data-testid="core-grid" style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')}></div>
 {/if}
 {#key `${backend}:${attempt}`}
-  <canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-held={held.length} data-waiting={waiting} data-frames={framePuts.length} data-cards={cardPuts.length} data-posters={cardPuts.length - cards.filter((c) => cardLists.has(c.key)).length} data-partial={[...lists.values()].filter((l) => l.unsupported.length).length}></canvas>
+  <canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-held={held.length} data-waiting={waiting} data-frames={framePuts.length} data-built-mb={builtMb} data-cards={cardPuts.length} data-posters={cardPuts.length - cards.filter((c) => cardLists.has(c.key)).length} data-partial={[...lists.values()].filter((l) => l.unsupported.length).length}></canvas>
 {/key}
 
 <style>
@@ -1238,6 +1504,20 @@
     background: rgb(0 0 0 / 0.7);
     pointer-events: none;
     white-space: pre-wrap;
+  }
+
+  .flight-badge {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    padding: 2px 6px;
+    border-radius: var(--ui-radius-xs);
+    font: 10px/1.4 ui-monospace, monospace;
+    color: #fff;
+    background: rgb(0 0 0 / 0.55);
+    pointer-events: none;
   }
 
   .core-grid {

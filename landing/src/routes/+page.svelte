@@ -5,13 +5,15 @@
   import Codebase from '$lib/site/home/Codebase.svelte';
   import Motion from '$lib/site/home/Motion.svelte';
   import Generate from '$lib/site/home/Generate.svelte';
-  import Pricing from '$lib/site/home/Pricing.svelte';
+  import Pricing from '$lib/site/pricing/Pricing.svelte';
+  import { PLAN } from '$lib/site/pricing/plan';
   import Agents from '$lib/site/home/Agents.svelte';
   import Story from '$lib/site/home/Story.svelte';
   import Faq from '$lib/site/home/Faq.svelte';
   import { HOME_JSON_LD } from '$lib/site/structured-data';
 
   import { HOME_META } from '$lib/site/seo';
+  import PillarRail from '$lib/site/chapters/PillarRail.svelte';
 </script>
 
 <svelte:head>
@@ -28,6 +30,7 @@
 <Hero />
 <OpenSource />
 <div class="chapters">
+  <PillarRail />
   <Codebase />
   <Motion />
   <Generate />
@@ -35,7 +38,7 @@
 
 <div class="cool">
   <Agents />
-  <Pricing />
+  <Pricing plan={PLAN} />
 </div>
 
 <Story />

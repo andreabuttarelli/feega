@@ -11,7 +11,7 @@ import { composeHtml, HYPERFRAMES_VERSION, type ComposeInput } from '@feega/moti
 import { assetOrigins } from '@feega/motion-core/motion/hyperframes/csp';
 import { libsOrigin } from './libs-origin';
 import { audioPlan } from '$lib/motion/audio-plan';
-import { holdCredits, releaseCredits, splitPortions, type Portion } from '$lib/server/credit-hold';
+import { holdCredits, refundHold } from '$lib/server/credit-hold';
 import { checkTask, FarmTask, farmChunks, farmProblem, firstSlices, framesOf, halves, launchAssembly, launchPiece, MAX_ATTEMPTS, pieceFile, stopWorker, TaskState, WORKER_GONE, type FarmJob, type Slice, type TaskCheck } from './farm-render';
 import { costSpans } from '$lib/motion/render-cost';
 import { ExportFormat, FORMAT, exportProblem, gifOf, type RenderSettings } from '$lib/motion/export-formats';
@@ -41,11 +41,10 @@ export type BatchView = { id: string; credits: number; rows: BatchCell[] };
 export type ReconcileOutcome = { checked: number; done: number; failed: number; pending: number; reaped: number };
 
 type Piece = { worker: string; attempt: number; state: TaskState; slice: Slice; spent?: string[]; log?: string; logAt?: number };
-type Billing = { held: number; portions?: Portion[] };
 type Output = { width: number; height: number; seconds: number; format: ExportFormat };
 type FarmProgress = { pieces: Piece[]; assembly: { attempt: number } | null };
 type BatchTag = { id: string; row: number; name: string; rows: number };
-type RenderState = { scope: RenderScope; output: Output; quote: RenderQuote; farm: FarmProgress; progress: RenderProgress; batch?: BatchTag; billing?: Billing };
+type RenderState = { scope: RenderScope; output: Output; quote: RenderQuote; farm: FarmProgress; progress: RenderProgress; batch?: BatchTag };
 
 enum Step {
   Pending = 'pending',
@@ -164,17 +163,16 @@ async function cleanUp(db: Db, farm: RenderFarm, run: NodeRun, state: RenderStat
 const heldOf = (quote: RenderQuote) => Math.ceil(quote.credits * HOLD_BUFFER);
 const holdNote = (what: string) => `motion render hold ${what}`;
 
-export async function releaseHold(run: NodeRun): Promise<void> {
-  const billing = (run.params as Partial<RenderState>).billing;
-  const portions = billing?.portions ?? [{ amount: billing?.held ?? 0, expiresAt: null }];
-  await releaseCredits(run.orgId, portions, holdNote(run.id)).catch((e) => console.error('[motion render] hold not released', run.id, e));
+export async function releaseHold(run: NodeRun): Promise<number> {
+  return refundHold(run.orgId, holdNote(run.id)).catch((e) => {
+    console.error('[motion render] hold not released', run.id, e);
+    return 0;
+  });
 }
-
-const release = (run: NodeRun, state: RenderState) => releaseHold({ ...run, params: { ...run.params, billing: state.billing } });
 
 async function fail(db: Db, farm: RenderFarm, run: NodeRun, state: RenderState, error: string, job: FarmJob | null): Promise<Step> {
   await failRun(db, { orgId: run.orgId, runId: run.id, error });
-  await release(run, state);
+  await releaseHold(run);
   await saveState(db, run, state, { kind: 'failed' });
   await cleanUp(db, farm, run, state, job);
   return Step.Failed;
@@ -196,17 +194,17 @@ function refusal(farm: RenderFarm | null, runs: NodeRun[], plan: string | null, 
   return problem ? { error: RenderRefusal.Unsupported, detail: problem } : null;
 }
 
-async function enqueue(db: Db, scope: RenderScope, req: RenderRequest, portions: Portion[], extra: Record<string, unknown> = {}): Promise<NodeRun> {
+async function enqueue(db: Db, scope: RenderScope, req: RenderRequest, id: string, extra: Record<string, unknown> = {}): Promise<NodeRun> {
   const quote = renderQuote(req.doc, req.settings.resolution);
-  const billing: Billing = { held: heldOf(quote), portions };
   const count = farmChunks(req.job).count;
   const output: Output = { width: req.job.width, height: req.job.height, seconds: req.doc.durationInFrames / req.doc.fps, format: req.settings.format };
   const run = await createRun(db, {
+    id,
     orgId: scope.orgId,
     nodeId: scope.nodeId,
     prompt: `render v${req.version}`,
     model: RENDER_MODEL,
-    params: { revision: req.version, format: formatOf(req.doc), settings: req.settings, quote, scope, output, farm: { pieces: [], assembly: null }, progress: startProgress(req.doc.durationInFrames, count), billing, ...extra },
+    params: { revision: req.version, format: formatOf(req.doc), settings: req.settings, quote, scope, output, farm: { pieces: [], assembly: null }, progress: startProgress(req.doc.durationInFrames, count), ...extra },
     actorKind: 'user',
     actorId: scope.userId,
     externalJobId: `${RENDER_JOB_PREFIX}${req.version}`
@@ -239,11 +237,14 @@ export async function startRender(db: Db, farm: RenderFarm | null, scope: Render
     return { ok: false, ...(refused ?? { error: RenderRefusal.NotConfigured }) };
   }
 
-  const portions = await holdCredits(scope.orgId, heldOf(renderQuote(req.doc, req.settings.resolution)), holdNote(scope.nodeId));
-  if (!portions) {
+  const id = crypto.randomUUID();
+  if (!(await holdCredits(scope.orgId, [{ amount: heldOf(renderQuote(req.doc, req.settings.resolution)), note: holdNote(id) }]))) {
     return { ok: false, error: RenderRefusal.NoCredits };
   }
-  const run = await enqueue(db, scope, req, portions);
+  const run = await enqueue(db, scope, req, id).catch(async (e) => {
+    await refundHold(scope.orgId, holdNote(id)).catch(() => {});
+    throw e;
+  });
   const detail = await launch(db, farm, storage, run, req.job);
   if (detail) {
     return { ok: false, error: RenderRefusal.Unavailable, detail };
@@ -263,17 +264,20 @@ export async function startBatch(db: Db, farm: RenderFarm | null, scope: RenderS
     return { ok: false, error: RenderRefusal.NotConfigured };
   }
 
-  const helds = rows.map((row) => heldOf(renderQuote(row.req.doc, row.req.settings.resolution)));
-  const portions = await holdCredits(scope.orgId, helds.reduce((sum, h) => sum + h, 0), holdNote(scope.nodeId));
-  if (!portions) {
+  const runIds = rows.map(() => crypto.randomUUID());
+  const holds = rows.map((row, i) => ({ amount: heldOf(renderQuote(row.req.doc, row.req.settings.resolution)), note: holdNote(runIds[i]) }));
+  if (!(await holdCredits(scope.orgId, holds))) {
     return { ok: false, error: RenderRefusal.NoCredits };
   }
-  const perRow = splitPortions(portions, helds);
 
   const id = crypto.randomUUID();
   const queued: NodeRun[] = [];
   for (const [i, row] of rows.entries()) {
-    queued.push(await enqueue(db, scope, row.req, perRow[i], { batch: { id, row: i + 1, name: row.name, rows: rows.length } }));
+    const run = await enqueue(db, scope, row.req, runIds[i], { batch: { id, row: i + 1, name: row.name, rows: rows.length } }).catch(async (e) => {
+      await Promise.all(runIds.slice(i).map((runId) => refundHold(scope.orgId, holdNote(runId)).catch(() => {})));
+      throw e;
+    });
+    queued.push(run);
   }
   await Promise.all(queued.slice(0, BATCH_CONCURRENCY).map((run, i) => launch(db, farm, storage, run, rows[i].req.job)));
 
@@ -411,12 +415,12 @@ async function charge(farm: RenderFarm, run: NodeRun, state: RenderState): Promi
   const { scope } = state;
   const usages = await Promise.all(workersOf(state).map((name) => farm.usage(name).catch(() => null)));
   const usd = sandboxCostUsd(usages.filter((u) => u !== null));
-  await release(run, state);
-  if (creditsOfCost(usd) > (state.billing?.held ?? Infinity)) {
-    console.warn('[motion render] measured cost over the hold, charged the hold', { runId: run.id, usd, held: state.billing?.held });
+  const held = await releaseHold(run);
+  if (creditsOfCost(usd) > held) {
+    console.warn('[motion render] measured cost over the hold, charged the hold', { runId: run.id, usd, held });
   }
   const ms = Date.now() - new Date(run.startedAt).getTime();
-  logAiCall({ label: RENDER_CALL_LABEL, provider: 'vercel-sandbox', model: RENDER_MODEL, flatCostUsd: usd, creditCap: state.billing?.held, ms, ok: true, orgId: scope.orgId, projectId: scope.projectId, userId: scope.userId, actorKind: 'user', actorId: scope.userId });
+  logAiCall({ label: RENDER_CALL_LABEL, provider: 'vercel-sandbox', model: RENDER_MODEL, flatCostUsd: usd, creditCap: held, ms, ok: true, orgId: scope.orgId, projectId: scope.projectId, userId: scope.userId, actorKind: 'user', actorId: scope.userId });
   return usd;
 }
 

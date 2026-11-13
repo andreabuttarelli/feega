@@ -66,7 +66,7 @@
   import type { FillOf, FillType } from '@feega/motion-core/motion/fill/model';
   import type { Fill } from '@feega/motion-core/motion/fill/model';
   import { baseStyle, editBody, editLayout, editsText, hideText, listsOfClip, runsOfClip, styledKind, textEditStyle, type EditBody, type TextEditStyle } from '$lib/canvas/frame-text-edit';
-  import { caretSource } from '$lib/canvas/core/text-caret';
+  import { caretOffsetAt, caretSource } from '$lib/canvas/core/text-caret';
   import { applyTextFit, measuredTexts } from '$lib/canvas/text-autosize';
   import { layerHoverMark } from '$lib/canvas/layer-hover-mark';
   import { HostLedger, settleElement, type ElementHost, type HostBox } from '$lib/motion/element-host';
@@ -194,7 +194,7 @@
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
   import { FitPurpose, fitView, restoreViewport } from '$lib/canvas/restore-viewport';
   import { coreSourcePath } from '$lib/canvas/core/early-sources';
-  import { loadViewport, rememberViewport } from '$lib/canvas/viewport-memory';
+  import { loadViewport, pageDiedInView, rememberViewport } from '$lib/canvas/viewport-memory';
   import { FocusMode, Placement, centreIn, focusPlacement, focusSelects, inView, revealIn, frameIn, type Insets } from '$lib/canvas/free-area';
   import { ZoomStep, watchPinch, type CanvasZoom } from '$lib/canvas/page-zoom';
   import { Region, claimFocus, reachesCanvas, regionOf, releaseFocus } from '$lib/canvas/key-region.svelte';
@@ -269,6 +269,7 @@
   import { backToFront } from '$lib/canvas/paint-order';
   import { GPU_FALLBACK_EVENT } from '$lib/canvas/gpu/gpu-loss';
   import { perfFit, perfNodes } from '$lib/canvas/perf/perf-beacon';
+  import { flightNote } from '$lib/canvas/debug/flight';
 
   let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[], seconds?: number) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; canvasId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onExportElementRows?: (frameId: string, elementIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void; onFrameDraft?: (id: string, nodeId: string, draft: FrameDraft | null) => void } = $props();
 
@@ -880,12 +881,6 @@
 
   const heldCanvas = $derived(props.canvasId ?? page.params.canvasId ?? '');
 
-  $effect(() => {
-    const incoming = tiles;
-    const canvasId = heldCanvas;
-    untrack(() => adoptNew(incoming, canvasId));
-  });
-
   function adoptNew(incoming: Tile[], canvasId: string) {
     const added = incoming.filter((t) => !known.has(t.id));
     known = new Set(incoming.map((t) => t.id));
@@ -906,7 +901,18 @@
     const saved = props.viewerId ? loadViewport(props.viewerId, canvasId) : null;
     const s = screenSize();
     view = restoreViewport(saved, boundsOf(incoming), { width: s.width, height: s.height });
+    reopenedFitted = Boolean(props.viewerId) && pageDiedInView();
   }
+
+  const REOPENED_NOTE_MS = 6000;
+  let reopenedFitted = $state(false);
+  $effect(() => {
+    if (!reopenedFitted) {
+      return;
+    }
+    const timer = setTimeout(() => (reopenedFitted = false), REOPENED_NOTE_MS);
+    return () => clearTimeout(timer);
+  });
 
   const REMEMBER_VIEW_MS = 400;
   $effect(() => {
@@ -1229,7 +1235,7 @@
       select([id]);
       goInside(id, Gesture.Double, target);
       if (editable) {
-        void startTyping(id, target);
+        void startTyping(id, target, undefined, deeper.picker.framePoint(world, deeper.space));
         startCrop(id, target);
       }
       return;
@@ -1342,6 +1348,22 @@
       }
     }
   });
+
+  function sendBackFrame(id: string) {
+    if (selected.includes(id) || liveDocs.map.has(id)) {
+      return;
+    }
+    const next = new Map(fetched);
+    next.delete(id);
+    fetched = next;
+    viewDocs.delete(id);
+    resolveViews.forget(id);
+    pickers.drop(id);
+    for (const key of [...viewsShown.keys()].filter((k) => baseNodeId(k) === id)) {
+      viewsShown.delete(key);
+      pickers.drop(key);
+    }
+  }
 
   function adoptSource(id: string, source: FrameDoc) {
     if ((fetched.get(id)?.revision ?? 0) >= source.revision) {
@@ -2412,10 +2434,10 @@
     return { left: (r.left - frame.box.x) * view.zoom, top: (r.top - frame.box.y) * view.zoom, width: r.width * view.zoom, height: r.height * view.zoom };
   }
 
-  type Typing = { nodeId: string; clip: string; text: string; runs: TextRun[]; lists: ListItem[]; styled: boolean; base: RunStyle; caret: TextCaret; look: TextEditStyle; body: EditBody; typed: () => string };
+  type Typing = { nodeId: string; clip: string; text: string; runs: TextRun[]; lists: ListItem[]; styled: boolean; base: RunStyle; caret: TextCaret; look: TextEditStyle; body: EditBody; typed: () => string; at: number | null };
   let typing = $state<Typing | null>(null);
 
-  async function startTyping(nodeId: string, clip: string, ahead?: TypeAhead) {
+  async function startTyping(nodeId: string, clip: string, ahead?: TypeAhead, point?: [number, number]) {
     const saver = saverOf(nodeId);
     const at = pickerOf(nodeId);
     const doc = saver?.history.present;
@@ -2433,7 +2455,7 @@
     }
     const caret = { ...laid, matrix: mul2d(scope.place, laid.matrix) };
     const look = textEditStyle({ clip: found as MotionClip, doc: scope.view, tokens: at.live.tokens, frame: size, scale: 1 });
-    typing = { nodeId, clip, caret, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), lists: listsOfClip(found), styled: styledKind(found), base: baseStyle(found), body: editBody(found, scope.view, at.live.tokens), typed: () => ahead?.release() ?? '' };
+    typing = { nodeId, clip, caret, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), lists: listsOfClip(found), styled: styledKind(found), base: baseStyle(found), body: editBody(found, scope.view, at.live.tokens), typed: () => ahead?.release() ?? '', at: point ? caretOffsetAt(caret, point) : null };
     liveDocs.set(nodeId, { ...at.live, doc: scope.merge(hideText(scope.view, scope.id)) });
   }
 
@@ -2576,7 +2598,7 @@
     const z = view.zoom;
     const stage = at.space.toWorld({ left: 0, top: 0, width: 1, height: 1 });
     const screen: [number, number, number, number, number, number] = [stage.w * z, 0, 0, stage.w * z, (stage.x - at.frame.box.x) * z, (stage.y - at.frame.box.y) * z];
-    return { text: open.text, typed: open.typed, runs: open.runs, lists: open.lists, styled: open.styled, base: open.base, clip: open.clip, layout: editLayout(open.caret, screen), look: open.look, body: open.body };
+    return { at: open.at, text: open.text, typed: open.typed, runs: open.runs, lists: open.lists, styled: open.styled, base: open.base, clip: open.clip, layout: editLayout(open.caret, screen), look: open.look, body: open.body };
   }
 
   function nodePlaceOf(nodeId: string): NodePlace | null {
@@ -2584,7 +2606,7 @@
     if (!tile) {
       return null;
     }
-    return { x: tile.x, y: tile.y, w: tile.w, h: tile.h, rotation: tile.rotation ?? 0, set: (x, y) => props.onMove?.(nodeId, x, y), resize: (w, h) => props.onResize?.(nodeId, w, h), turn: (degrees) => props.onRotate?.(nodeId, degrees - (tile.rotation ?? 0)), flip: (flip) => flipNodes([nodeId], flip), align: alignInHolder(nodeId) };
+    return { x: tile.x, y: tile.y, w: tile.w, h: tile.h, rotation: tile.rotation ?? 0, set: (x, y) => props.onMove?.(nodeId, x, y), resize: (w, h) => props.onResizeEnd?.(nodeId, { x: tile.x, y: tile.y, w: tile.w, h: tile.h }, { x: tile.x, y: tile.y, w, h }), grow: (w, h) => props.onNodeSize?.(nodeId, w, h), turn: (degrees) => props.onRotate?.(nodeId, degrees - (tile.rotation ?? 0)), flip: (flip) => flipNodes([nodeId], flip), align: alignInHolder(nodeId) };
   }
 
   const hostLedger = new HostLedger();
@@ -2631,12 +2653,20 @@
     props.onSettle?.(nodeId, settled.box);
   }
 
-  const autosizing = new Map<string, ReturnType<typeof setTimeout>>();
+  const autosizing = new Set<string>();
 
   function autosize(nodeId: string) {
-    clearTimeout(autosizing.get(nodeId));
-    autosizing.set(nodeId, setTimeout(() => void fitTextBoxes(nodeId), 0));
+    if (autosizing.has(nodeId)) {
+      return;
+    }
+    autosizing.add(nodeId);
+    afterPaint(() => {
+      autosizing.delete(nodeId);
+      void fitTextBoxes(nodeId);
+    });
   }
+
+  const afterPaint = (job: () => void) => (core ? core.afterPaint(job) : setTimeout(job));
 
   async function fitTextBoxes(nodeId: string) {
     const saver = saverOf(nodeId);
@@ -4372,11 +4402,18 @@
 
   function coreOff(why: string) {
     console.warn(`[canvas] core off: ${why}`);
+    flightNote('core-off', { why });
     failed = why;
     coreDrawn = new Set();
   }
 
   const domTiles = $derived(placed.filter((t) => domIds.has(t.id)));
+
+  $effect.pre(() => {
+    const incoming = tiles;
+    const canvasId = heldCanvas;
+    untrack(() => adoptNew(incoming, canvasId));
+  });
 </script>
 
 <svelte:window onkeydown={onKeydown} onpointerdowncapture={claimFocus} onclickcapture={releaseFocus} onblur={() => (altHeld = false)} onkeyup={(e) => {
@@ -4434,7 +4471,7 @@
   >
     {#if !failed}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} listenLive={(listener) => liveDocs.listen(listener)} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId, userId: (page.data as { session?: { user?: { id: string } } | null }).session?.user?.id, look: (page.data as { look?: string }).look }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} onbackend={(change) => track(GPU_FALLBACK_EVENT, change)} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} listenLive={(listener) => liveDocs.listen(listener)} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId, userId: (page.data as { session?: { user?: { id: string } } | null }).session?.user?.id, look: (page.data as { look?: string }).look }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} onbackend={(change) => track(GPU_FALLBACK_EVENT, change)} onevict={sendBackFrame} />
       </svelte:boundary>
     {/if}
     <div class="hover-rings" data-testid="node-hover-rings">
@@ -4446,7 +4483,7 @@
       {#snippet children(frame)}
         {@const edit = typingMark(frame.id)}
         {#if edit}
-          <CoreTextEdit layout={edit.layout} look={edit.look} text={edit.text} typedAhead={edit.typed} runs={edit.runs} lists={edit.lists} styled={edit.styled} base={edit.base} body={edit.body} clipId={edit.clip} oncommit={stopTyping} />
+          <CoreTextEdit caretAt={edit.at} layout={edit.layout} look={edit.look} text={edit.text} typedAhead={edit.typed} runs={edit.runs} lists={edit.lists} styled={edit.styled} base={edit.base} body={edit.body} clipId={edit.clip} oncommit={stopTyping} />
         {/if}
         {#each typing?.nodeId === frame.id || cropping?.nodeId === frame.id ? [] : marksIn(frame.id) as mark (mark.clip)}
           <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} highlight={mark.highlight} pivot={frameViews.isOn(FrameView.Pivot) && picks.length === 1 ? mark.pivot : null} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
@@ -4645,6 +4682,10 @@
 
   {#if targeting}
     <p class="edge-refusal" role="status">Pick the node to connect to — Esc to cancel</p>
+  {/if}
+
+  {#if reopenedFitted}
+    <p class="edge-refusal" role="status">The page reloaded, so the canvas opened zoomed out</p>
   {/if}
 
   {#if props.onDraw && frameBar.tool !== DrawTool.Select && frameBar.tool !== DrawTool.ShapeBuilder}

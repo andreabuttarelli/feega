@@ -1,4 +1,5 @@
 import { json } from '@sveltejs/kit';
+import { agentEditRefusal } from '$lib/server/agent-edits/cap';
 import { z } from 'zod';
 import { resolveOrgCaller } from '$lib/server/org-data/auth';
 import { callerReach } from '$lib/server/org-data/reach';
@@ -23,6 +24,10 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
   const { db, orgId, userId, writeAllowed } = resolved.caller;
   if (!writeAllowed) {
     return json({ error: 'api_key_read_only' }, { status: HTTP_FORBIDDEN });
+  }
+  const full = await agentEditRefusal(db, orgId);
+  if (full) {
+    return full;
   }
 
   const body = bodySchema.safeParse(await request.json().catch(() => ({})));

@@ -4,7 +4,7 @@ import type { Db } from '$lib/server/db/client';
 import { findNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { findProjectById } from '$lib/server/repos/projects';
 import { createRun, failRun, runsByIds, settleRun, type NodeRun } from '$lib/server/repos/node-runs';
-import { agentActor } from '$lib/server/repos/actor';
+import { AgentKey, agentActor } from '$lib/server/repos/actor';
 import { motionAsk, offeredChatModels, resolveChoice } from '$lib/server/chat-model/catalogue';
 import { runInBackground } from '$lib/server/background-work';
 import { motionEditorPath, motionOf, type MotionNode } from '$lib/canvas/motion-node';
@@ -21,7 +21,7 @@ import { failed } from '$lib/server/chat-attachments/route-scope';
 import { loadTurns, openNodeThread } from '$lib/server/repos/chat';
 import { Mark, answerText, pickOf, rejectText, type PickAsk } from '$lib/reference-pick';
 
-export const MCP_AGENT_KEY = 'mcp';
+export const MCP_AGENT_KEY = AgentKey.Mcp;
 const HTTP_NOT_FOUND = 404;
 const HTTP_UNAVAILABLE = 503;
 const HTTP_CONFLICT = 409;
@@ -72,7 +72,7 @@ function markedText(ask: PickAsk, reply: PickReply): string {
 
 export type AskStarted = { runId: string; model: string; refusedModel: string | null };
 
-export async function askMotion(db: Db, input: { orgId: string; userId: string; nodeId: string; prompt: string; attachments?: AttachmentSource[]; agentKey?: string; choice?: { model?: unknown; reasoning?: unknown }; pick?: PickReply }): Promise<AskStarted | Response> {
+export async function askMotion(db: Db, input: { orgId: string; userId: string; nodeId: string; prompt: string; attachments?: AttachmentSource[]; agentKey?: AgentKey; choice?: { model?: unknown; reasoning?: unknown }; pick?: PickReply }): Promise<AskStarted | Response> {
   const { orgId, userId, nodeId, attachments: sources = [], agentKey = MCP_AGENT_KEY, choice: asked = {} } = input;
   const motion = await findMotion(db, { orgId, nodeId });
   const project = motion ? await findProjectById(db, { orgId, projectId: motion.record.projectId }) : null;

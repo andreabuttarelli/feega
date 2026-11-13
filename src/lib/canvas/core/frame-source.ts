@@ -47,6 +47,8 @@ export const toFetch = <F extends { id: string }>(frames: readonly F[], keyOf: (
 export const toWarm = <F extends { id: string; box: Box }>(frames: readonly F[], view: Viewport, screen: Screen, keyOf: (f: F) => string, asked: ReadonlySet<string>, drawnLive: { has: (id: string) => boolean }): F[] =>
   toFetch(onScreenFirst(frames, view, screen), keyOf, asked, drawnLive);
 
+export const legible = <F extends { box: Box }>(frames: readonly F[], zoom: number, readableWidth: number): F[] => frames.filter((f) => f.box.w * zoom >= readableWidth);
+
 export const toBuild = <F extends { id: string; box: Box }>(frames: readonly F[], view: Viewport, screen: Screen, keyOf: (f: F) => string, asked: ReadonlySet<string>, drawnLive: { has: (id: string) => boolean }): F[] =>
   toFetch(nearestFirst(frames, view, screen), keyOf, asked, drawnLive);
 

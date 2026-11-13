@@ -17,3 +17,20 @@ export function routesPlan(spec: string | undefined, route: string[]): RoutesPla
   }
   return { step: RoutesStep.Import, routes: spec === undefined ? route : spec.split(/[\s,]+/).filter(Boolean) };
 }
+
+export type CodeSource = { repo: string } | { folder: string } | { into: string };
+
+const LOCAL_PATH = '/';
+
+export function codeSource(repo: string | undefined, into: string | undefined): CodeSource | null {
+  if (repo && into) {
+    return null;
+  }
+  if (into) {
+    return { into };
+  }
+  if (!repo) {
+    return null;
+  }
+  return repo.startsWith(LOCAL_PATH) ? { folder: repo } : { repo };
+}

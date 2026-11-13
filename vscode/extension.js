@@ -1,6 +1,7 @@
 const vscode = require('vscode');
 const { spawn } = require('node:child_process');
-const { Launch, launchArgs, mcpServers, canvasFileFor, canvasPage, loadingPage, localUrl, freePort, readyProbe, served } = require('./canvas-run');
+const { readFile, writeFile } = require('node:fs/promises');
+const { Launch, launchArgs, mcpServers, canvasFileFor, canvasPage, eventReader, importMessage, gitignoreWith, loadingPage, localUrl, freePort, readyProbe, served } = require('./canvas-run');
 
 const READY_POLL_MS = 400;
 const READY_TIMEOUT_MS = 180_000;
@@ -10,6 +11,9 @@ const running = new Map();
 const mcpChanged = new vscode.EventEmitter();
 const cursorServers = new Map();
 const children = new Set();
+const GITIGNORE_ASKED = 'feega.gitignoreAsked';
+const ADD = 'Add to .gitignore';
+let state = null;
 
 async function ready(url) {
   const until = Date.now() + READY_TIMEOUT_MS;
@@ -44,6 +48,41 @@ function publishMcp() {
   }
 }
 
+async function chooseApp(apps, child) {
+  const picked = await vscode.window.showQuickPick(apps, { title: 'Feega: which app to import?', placeHolder: 'This folder holds several apps' });
+  child.stdin.write(`${picked ?? ''}\n`);
+}
+
+async function offerGitignore(folder) {
+  if (state.get(GITIGNORE_ASKED)) {
+    return;
+  }
+
+  await state.update(GITIGNORE_ASKED, true);
+  const path = `${folder}/.gitignore`;
+  const current = await readFile(path, 'utf8').catch(() => '');
+  const next = gitignoreWith(current);
+  if (next === null) {
+    return;
+  }
+
+  const answer = await vscode.window.showInformationMessage('The canvas file lives inside this folder. Add *.feega to .gitignore?', ADD, 'Not now');
+  if (answer === ADD) {
+    await writeFile(path, next);
+  }
+}
+
+async function onEvent(event, child, file) {
+  if (event.event === 'choose-app') {
+    return chooseApp(event.apps, child);
+  }
+
+  if (event.event === 'imported') {
+    await vscode.window.showInformationMessage(importMessage(event, file));
+    return offerGitignore(file.replace(/[\\/][^\\/]*$/, ''));
+  }
+}
+
 async function openCanvas(panel, file, launch, output) {
   panel.webview.options = { enableScripts: true };
   panel.webview.html = loadingPage('Starting Feega… the first run downloads the app.');
@@ -51,7 +90,11 @@ async function openCanvas(panel, file, launch, output) {
   const port = await freePort();
   const child = spawn('npx', launchArgs(file, port, launch), { shell: process.platform === 'win32', env: process.env, detached: process.platform !== 'win32' });
   children.add(child);
-  child.stdout.on('data', (d) => output.append(d.toString()));
+  const events = eventReader((event) => onEvent(event, child, file));
+  child.stdout.on('data', (d) => {
+    output.append(d.toString());
+    events(d.toString());
+  });
   child.stderr.on('data', (d) => output.append(d.toString()));
   child.on('exit', (code) => {
     children.delete(child);
@@ -119,6 +162,7 @@ function importFolder(output) {
 }
 
 function activate(context) {
+  state = context.workspaceState;
   const output = vscode.window.createOutputChannel('Feega');
   context.subscriptions.push(
     output,

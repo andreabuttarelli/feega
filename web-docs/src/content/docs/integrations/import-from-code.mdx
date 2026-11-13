@@ -112,6 +112,25 @@ A frame imported from GitHub or a folder remembers where each layer comes from i
 
 **Pull** brings the code back: new commits on the imported branch (or the branch you type), or file changes in the folder, are re-read and drawn into the same frame. Your canvas edits are kept; where the code changed the same property of the same element, the code wins and the conflict is listed. Tokens are matched by their name in the code: a new token becomes a variable; a changed value reaches its variable and the bound layers; a variable you changed on the canvas keeps your value unless the code changed that mode too, then the code wins and your value is listed; a removed token that layers still use stays as an orphan variable with its layers bound (one nobody uses is removed); a token renamed with the same values in every mode and the same usages keeps your edits under the new name, anything less certain is listed as removed plus added. Variables made on the canvas and the chosen mode survive the pull. Styles follow the same rule per field: your edit stays unless the code changed that declaration too, then the code wins and your value is listed; styles made on the canvas survive. For a folder, code mode watches the files and pulls on its own while the frame is open.
 
+## The import map: add pages later
+
+Select a frame imported from code (in Design or in code mode) and its **Pages** section lists every page the code declares, not only the ones you imported:
+
+| Chip | What it means | Action |
+|---|---|---|
+| On canvas | The page has a board on this frame. The themes and widths it was captured under are listed under it. | Click the path to select the board and zoom to it. **Add width/theme…** captures it again under another theme or width. |
+| Not on canvas | It was imported, but its board is no longer on the frame. | **Import** |
+| Not imported | The router declares it; it was not picked. | **Import** |
+| Needs a value | A dynamic route (`/blog/[slug]`). Values seen in links on the captured pages are suggested. | **Set value…**: type a path that fits the pattern. |
+| Failed | The page could not be opened; the reason is shown. | **Retry** |
+| Needs sign-in | The page went to a sign-in page. | **Sign in…** opens the test account settings. |
+
+**Import** captures only that page (under that theme and width) from the code the frame came from, and adds it to the **same frame**: a placeholder board appears at once, the real board replaces it when the capture lands, and one undo removes it. New boards go beside or below the others, never moving a board you arranged. Components, variables and styles already on the frame are reused, matched by name: a component is reused when its set, variant and layer structure match; your edits to it apply to the new page. A page that renders a component differently keeps its own main, listed after the import.
+
+The other sections: **Components** (on the canvas, and in the code but not rendered by any imported page), **Tokens & styles** (tokens, styles, layers bound and unbound, tokens that are read-only), **Code** (the revision, whether the code changed since, **Pull**).
+
+A frame holds at most **20 boards** (a page under one theme and width is one board): Pull captures every board again in one run, and the capture budget fits about that many. A frame is also at most 16384 px a side, and its smallest text must stay above the editor's minimum; past either limit the map says the frame is full: import into a new frame.
+
 ## Import a local folder
 
 <DemoVideo name="folder-upload" caption="Pick a project folder on the home: it is uploaded once, with no sync back." />
@@ -181,6 +200,9 @@ feega canvas import-code $PROJECT https://github.com/owner/repo --route / /blog/
 feega canvas code-sync $PROJECT changes <frameId>   # prints the patch
 feega canvas code-sync $PROJECT publish <frameId>   # pull request, or write the folder
 feega canvas code-sync $PROJECT pull <frameId> --branch my-branch
+feega canvas code-map $PROJECT <frameId>   # the import map: every page and its state, boards used of 20
+feega canvas import-code $PROJECT --into <frameId> --routes "/pricing /blog/hello" --canvas <canvas>   # add pages to that frame
+feega canvas import-code $PROJECT --into <frameId> --routes /pricing --scheme dark --canvas <canvas>   # add a dark board of a page
 ```
 
 The import answers `frameId`, `pages` (the paths or stories that landed), `components`, `variants`, `instances` `skipped` (what stayed plain layers, pages that could not be opened, and why) and `routes`: how many pages the file router declares and, in `leftOut`, each one not imported with its reason (`not_selected`, `needs_value` with values seen in links on the captured pages, `not_opened`). More than 20 pages is refused with the count, never trimmed.
@@ -189,7 +211,7 @@ The import answers `frameId`, `pages` (the paths or stories that landed), `compo
 
 Pages: op `discover_routes` (`{ repo | folder, app? }`) or `GET /api/v1/projects/:id/code-import/routes?repo=|folder=|upload=&app=` answers `{ framework, app, max, routes: [{ path, file, router, kind, params, selected, candidates }] }`, or `choose_app` with `apps`, `no_router`, `routes_in_code`. `routes: "all"` on `import_code` imports every static page.
 
-Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, app?, routes, conditions?: [{ scheme: "light" | "dark", width }], captureDelayMs?, routeDelayMs?: { "/route": ms }, designSystem?, x, y } })` (`designSystem: false` skips the tokens; `app` is the folder of one app in a monorepo), or `{ canvasId, storybook, stories?, x, y }`. Folder (local mode): `{ canvasId, folder, routes, x, y }`. Uploaded folder (web): `POST /api/v1/projects/:id/code-uploads` `{ name }` returns `{ path, uploadUrl }`; PUT the gzipped tarball to `uploadUrl`, then `POST /api/v1/projects/:id/code-import` `{ canvasId, upload: path, routes, x, y }`. Sync: ops `code_changes`, `code_publish`, `code_pull` (`{ nodeId, branch? }`, its answer lists token changes in `tokens`). REST: `GET /api/v1/projects/:id/code-import/:nodeId/changes`, `POST …/publish`, `POST …/pull`, `GET …/head`. GitHub: ops `github_status`, `github_connect`, `github_repos`, `github_branches` (`{ repo: "owner/name" }`), `github_disconnect`.
+Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, app?, routes, conditions?: [{ scheme: "light" | "dark", width }], captureDelayMs?, routeDelayMs?: { "/route": ms }, designSystem?, x, y } })` (`designSystem: false` skips the tokens; `app` is the folder of one app in a monorepo), or `{ canvasId, storybook, stories?, x, y }`. Folder (local mode): `{ canvasId, folder, routes, x, y }`. Uploaded folder (web): `POST /api/v1/projects/:id/code-uploads` `{ name }` returns `{ path, uploadUrl }`; PUT the gzipped tarball to `uploadUrl`, then `POST /api/v1/projects/:id/code-import` `{ canvasId, upload: path, routes, x, y }`. Sync: ops `code_changes`, `code_publish`, `code_pull` (`{ nodeId, branch? }`, its answer lists token changes in `tokens`). Map: op `code_map` (`{ nodeId }`) answers `{ kind, repo, sha, map: { rev, pages: [{ path, state, boards?: [{ cond, clip }], reason?, values? }], library?, design? }, used, limit, readOnly }`; `import_code` with `{ canvasId, into: frameId, routes, conditions?, x, y }` adds those pages to the frame (`frame_full` past 20 boards, `no_room` past the frame size). REST: `GET /api/v1/projects/:id/code-import/:nodeId/map`; `POST …/code-import` with `into` instead of a source. REST: `GET /api/v1/projects/:id/code-import/:nodeId/changes`, `POST …/publish`, `POST …/pull`, `GET …/head`. GitHub: ops `github_status`, `github_connect`, `github_repos`, `github_branches` (`{ repo: "owner/name" }`), `github_disconnect`.
 
 Over HTTP: `POST /api/v1/projects/{projectId}/code-import` with `{ canvasId, repo, app?, routes?, conditions?, captureDelayMs?, routeDelayMs?, designSystem?, x, y }` (the answer adds `design: { tokens, styles, byClass, byRule, byValue, unbound }`; `GET …/code-import/tokens?repo=…`, `?folder=…` or `?upload=…` counts the tokens first) (`conditions` up to 6, `routes` up to 8, default `["/"]`; the older single `route` still works) or `{ canvasId, storybook, stories?, x, y }`. Errors: `invalid` (400), `run_failed` (422, with `detail`: the install or dev server output), `unreadable` (422), `rate_limited` (429), `choose_app` (409, with `apps`: the folders to pass back as `app`), `no_sandbox` / `no_browser` (503), `failed` (502).
 

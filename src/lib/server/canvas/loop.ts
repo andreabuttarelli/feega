@@ -42,6 +42,7 @@
  * completati sopravvivono" del disegno originale.
  */
 import type { Db } from '$lib/server/db/client';
+import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import { runGenNode, type StartRun } from '$lib/server/canvas/generate';
 import { findNode, createNode, writeNodeData, listConnections, listNodes, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import {
@@ -526,7 +527,7 @@ export async function drainLoopQueue(db: Db, opts: { limit: number }): Promise<L
       canvasId: ticket.canvasId,
       nodeId: run.nodeId,
       userId: ticket.userId,
-      actor: { kind: 'agent' as const, id: ticket.userId, agentKey: 'loop' }
+      actor: agentActor(ticket.userId, AgentKey.Loop)
     };
 
     const result = await runOneCombination(db, ctx, node, combination);

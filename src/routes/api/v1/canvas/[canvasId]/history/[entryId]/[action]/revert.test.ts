@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import type { Db } from '$lib/server/db/client';
 import { createMemoryDb } from '$lib/server/local/memory-db';
 import { createNode, findNode, patchNodeData, DataCheck } from '$lib/server/repos/canvas';
@@ -22,7 +23,7 @@ async function seeded(): Promise<{ db: Db; nodeId: string; entryId: string }> {
   await db.from('projects').insert({ id: PROJECT, org_id: ORG, name: 'P', mode: 'standard', brand_id: null } as never);
   await db.from('canvases').insert({ id: CANVAS, org_id: ORG, project_id: PROJECT, name: 'C', deleted_at: null } as never);
   const node = await createNode(db, { orgId: ORG, projectId: PROJECT, canvasId: CANVAS, type: 'text', x: 0, y: 0, data: { prompt: 'first' }, actor: { kind: 'user', id: MARCO } });
-  await patchNodeData(db, { orgId: ORG, nodeId: node.id, patch: { prompt: 'claude' }, check: DataCheck.None, actor: { kind: 'agent', id: MARCO, agentKey: 'claude-code' } });
+  await patchNodeData(db, { orgId: ORG, nodeId: node.id, patch: { prompt: 'claude' }, check: DataCheck.None, actor: agentActor(MARCO, AgentKey.Mcp) });
   const [event] = await listCanvasEvents(db, { orgId: ORG, canvasId: CANVAS, limit: 1 });
   state.db = db;
   return { db, nodeId: node.id, entryId: `event:${event.id}` };

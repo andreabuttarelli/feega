@@ -1,12 +1,12 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { Actions, ServerLoad as PageServerLoad } from '@sveltejs/kit';
 import { orgCreditBalance } from '$lib/server/credits';
-import { billedCreditsFor, CREDIT_LADDER, rungForLookupKey } from '$lib/credit-ladder';
+import { billedCreditsFor, PLAN, planForLookupKey, TOP_UPS, type Plan } from '$lib/credit-ladder';
 import { orgBillingById } from '$lib/server/org-billing';
 import { billingGrantsReady } from '$lib/server/billing-readiness';
 import {
   billingPortal,
-  upgrade,
+  subscribe,
   applyRetention,
   cancelPlan,
   buyOneTime
@@ -14,6 +14,9 @@ import {
 import { checkoutOutcomeOf } from '$lib/billing-path';
 import { billingChannelOf, storeBillingOf } from '$lib/billing-channel';
 import { env } from '$env/dynamic/private';
+import { seatStatus } from '$lib/server/team/seat-billing';
+import { agentEditUsage } from '$lib/server/agent-edits/cap';
+import type { Db } from '$lib/server/db/client';
 
 const stripeApi = () => import('$lib/server/stripe');
 
@@ -28,32 +31,25 @@ export const load = async ({ parent, url, request, locals: { supabase } }: Param
 
   const orgId = (await parent()).org.id;
 
-  const [{ data: orgData }, { data: membership }, { data: brandRows }, { data: atRiskRows }, purchasesReady] =
-    await Promise.all([
-      supabase.from('orgs').select('id, name, stripe_customer_id').eq('id', orgId).maybeSingle(),
-      supabase.from('orgs_members').select('role').eq('org_id', orgId).eq('user_id', user.id).maybeSingle(),
-      supabase.from('brands').select('id, name, slug').eq('org_id', orgId),
-      supabase
-        .from('org_credits_at_risk')
-        .select('expiring_credits, next_expiry')
-        .eq('org_id', orgId)
-        .order('next_expiry'),
-      billingGrantsReady(supabase)
-    ]);
+  const [{ data: orgData }, { data: membership }, { data: brandRows }, purchasesReady] = await Promise.all([
+    supabase.from('orgs').select('id, name, stripe_customer_id').eq('id', orgId).maybeSingle(),
+    supabase.from('orgs_members').select('role').eq('org_id', orgId).eq('user_id', user.id).maybeSingle(),
+    supabase.from('brands').select('id, name, slug').eq('org_id', orgId),
+    billingGrantsReady(supabase)
+  ]);
   const org = orgData as OrgRow | null;
   if (!org) throw error(404, 'Organization not found');
 
   const brands = (brandRows ?? []) as BrandRow[];
-  const atRisk = ((atRiskRows ?? []) as { next_expiry: string | null; expiring_credits: number | null }[])
-    .filter((row): row is { next_expiry: string; expiring_credits: number } => row.next_expiry != null)
-    .map((row) => ({
-      expiresAt: row.next_expiry,
-      amount: row.expiring_credits
-    }));
 
-  const [balance, currentPlanUsd] = await Promise.all([
+  const [balance, currentPlan, seats, agentEdits] = await Promise.all([
     orgCreditBalance(supabase, orgId),
-    currentPlanOf(supabase, orgId)
+    currentPlanOf(supabase, orgId),
+    seatStatus(supabase as unknown as Db, orgId).catch((e) => {
+      console.error('[seats] seat state unreadable on the credits page', orgId, e);
+      return null;
+    }),
+    agentEditUsage(supabase as unknown as Db, orgId)
   ]);
 
   const spends = await Promise.all(
@@ -67,10 +63,14 @@ export const load = async ({ parent, url, request, locals: { supabase } }: Param
 
   return {
     org: { id: org.id, name: org.name },
-    credits: { balance, ladder: CREDIT_LADDER, atRisk },
+    credits: { balance },
+    plan: PLAN,
+    topUps: TOP_UPS,
     brands: spends,
     hasBilling: !!org.stripe_customer_id,
-    currentPlanUsd,
+    currentPlan,
+    seats,
+    agentEdits,
     checkoutOutcome: checkoutOutcomeOf(url),
     isOwner: (membership as { role?: string } | null)?.role === 'owner',
     purchasesReady,
@@ -80,7 +80,7 @@ export const load = async ({ parent, url, request, locals: { supabase } }: Param
 
 type StorePlanRow = { store_plan_product: string | null; store_plan_expires_at: string | null };
 
-async function storePlanOf(supabase: App.Locals['supabase'], orgId: string): Promise<number | null> {
+async function storePlanOf(supabase: App.Locals['supabase'], orgId: string): Promise<Plan | null> {
   const { data } = await supabase
     .from('orgs')
     .select('store_plan_product, store_plan_expires_at')
@@ -88,10 +88,10 @@ async function storePlanOf(supabase: App.Locals['supabase'], orgId: string): Pro
     .maybeSingle();
   const plan = data as StorePlanRow | null;
   const active = plan?.store_plan_expires_at && new Date(plan.store_plan_expires_at).getTime() > Date.now();
-  return active ? (rungForLookupKey(plan.store_plan_product)?.price ?? null) : null;
+  return active ? (planForLookupKey(plan.store_plan_product) ?? null) : null;
 }
 
-async function currentPlanOf(supabase: App.Locals['supabase'], orgId: string): Promise<number | null> {
+async function currentPlanOf(supabase: App.Locals['supabase'], orgId: string): Promise<Plan | null> {
   const storePlan = await storePlanOf(supabase, orgId);
   if (storePlan) {
     return storePlan;
@@ -103,8 +103,8 @@ async function currentPlanOf(supabase: App.Locals['supabase'], orgId: string): P
   }
 
   try {
-    const { subscribedRungPrice } = await stripeApi();
-    return await subscribedRungPrice(billing.subscriptionId);
+    const { subscribedPlan } = await stripeApi();
+    return await subscribedPlan(billing.subscriptionId);
   } catch {
     return null;
   }
@@ -127,7 +127,7 @@ async function sumBrandCostUsd(supabase: App.Locals['supabase'], brandId: string
 
 export const actions: Actions = {
   billingPortal,
-  upgrade,
+  subscribe,
   applyRetention,
   cancelPlan,
   buyOneTime
