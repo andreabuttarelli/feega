@@ -21,7 +21,7 @@ export async function sourceAssets(scope: SourceScope, doc: MotionDoc): Promise<
   return assetUrls([...library.filter((a) => used.has(a.id)), ...named]);
 }
 
-export async function motionSource(scope: MotionScope): Promise<MotionSource | null> {
+export async function motionSource(scope: MotionScope & { sign?: AssetSigner }): Promise<MotionSource | null> {
   const saved = await readHead(scope.db, { orgId: scope.orgId, nodeId: scope.nodeId });
   if (!saved) {
     return null;

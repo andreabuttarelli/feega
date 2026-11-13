@@ -123,3 +123,15 @@ describe('the project variables library', () => {
     expect(push).not.toHaveBeenCalled();
   });
 });
+
+describe('a canvas with no project, like a shared link', () => {
+  it('collections already known are not written again, or the frame effect loops', () => {
+    const library = new VariableLibrary();
+    library.found({ Theme: THEME });
+    const before = library.collections;
+
+    library.found({ Theme: THEME });
+
+    expect(library.collections).toBe(before);
+  });
+});

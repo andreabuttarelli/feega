@@ -72,16 +72,18 @@
     max-width: 100%;
     height: 26px;
     padding: 0 6px;
-    border: 1px solid var(--line, #ededef);
-    background: var(--paper-2, #f9f9f9);
-    color: var(--ink-soft, #6e6e73);
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: transparent;
+    color: var(--ui-text-tertiary);
     font: inherit;
     font-size: 11.5px;
     cursor: pointer;
     text-overflow: ellipsis;
   }
   .pick:hover {
-    color: var(--ink, #1d1d1f);
+    background: var(--ui-input);
+    color: var(--ui-text);
   }
   .pick:focus-visible {
     outline: 2px solid var(--accent, #c485fe);

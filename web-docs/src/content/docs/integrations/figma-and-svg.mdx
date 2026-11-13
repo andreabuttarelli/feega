@@ -40,7 +40,7 @@ Figma puts only an image id on the clipboard, never the picture, so without a to
 
 Bring whole frames in without copying anything.
 
-1. In Figma, create a personal access token (Settings, Security, Personal access tokens) with read access to files. In feega, paste it in Settings, Profile.
+1. In Figma, create a personal access token (Settings, Security, Personal access tokens) with read access to files. In Feega, paste it in Settings, Profile.
 2. On the canvas, open **+** in the bottom bar and, under **Import**, choose **Import from Figma**.
 3. Paste a figma.com design link and choose **Find frames**. If the link has a `node-id`, that frame is already ticked.
 4. Tick the frames you want (up to 20) and choose **Import**.
@@ -58,7 +58,7 @@ feega canvas $PROJECT import_figma --input '{"canvasId":"<canvas>","url":"https:
 
 Agents do the same with two canvas ops over MCP or the API: `list_figma_frames` with `{url}` returns the frames of the file, and `import_figma` with `{canvasId, url, frameIds, x, y}` draws them. The REST endpoints behind the dialog are `POST /api/v1/projects/{projectId}/figma/frames` and `POST /api/v1/projects/{projectId}/figma/import`.
 
-Not yet: signing in with a Figma account (OAuth). It needs a Figma app registered for feega, so for now the token is the only way to connect.
+Not yet: signing in with a Figma account (OAuth). It needs a Figma app registered for Feega, so for now the token is the only way to connect.
 
 ## SVG import
 

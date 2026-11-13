@@ -5,7 +5,7 @@ sidebar:
   order: 1
 ---
 
-feega generates audio with ElevenLabs. Every operation runs in one node type, **Generate audio**, and lands as an audio asset you can wire into other nodes or place on a motion timeline.
+Feega generates audio with ElevenLabs. Every operation runs in one node type, **Generate audio**, and lands as an audio asset you can wire into other nodes or place on a motion timeline.
 
 | Operation | Input | Output | Billed per |
 |---|---|---|---|

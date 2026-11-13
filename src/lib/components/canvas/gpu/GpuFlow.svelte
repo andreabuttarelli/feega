@@ -566,14 +566,14 @@
   }, POSTER_DEBOUNCE_MS);
 
   function postThumb(id: string, revision: number, blob: Blob, size: { width: number; height: number }) {
-    if (baseNodeId(id) !== id) {
+    if (baseNodeId(id) !== id || mode === CanvasMode.View) {
       return;
     }
     const posterRevision = summaries.get(id)?.data?.posterRevision;
     offerPoster({ id, revision, posterRevision: typeof posterRevision === 'number' ? posterRevision : undefined, blob, ...size });
   }
 
-  const coreSource = (id: string) => coreSourcePath({ projectId: page.params.projectId!, canvasId: page.params.canvasId! }, id);
+  const coreSource = (id: string) => props.sourceUrl?.(id) ?? coreSourcePath({ projectId: page.params.projectId!, canvasId: page.params.canvasId! }, id);
   let domShows = $state(new Set<string>());
   const handedOver = (t: Tile) => domIds.has(t.id) && (!holdsDoc(t.kind ?? '') || domShows.has(t.id));
   $effect(() => {
