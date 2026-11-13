@@ -44,7 +44,8 @@ Follow-up in the same PR:
 - Ownership moves through `hand_over_org` (service role only) from the Team endpoint: handing over
   to a non-editor does not add an editor unless the seat gate allows it, and a per-editor team is
   synced after. `transfer_org_ownership` is no longer callable by sessions.
-- A session cannot attribute a motion revision or canvas event to another user.
+- A session cannot attribute a motion revision or canvas event to another user. The nine-argument
+  `commit_motion_revision` (invoker, reached only when the ten-argument one is missing) is dropped.
 - `ensureOrgForUser` creates a first org through `createFirstOrg`.
 - `signAssetPaths` signs only paths under the caller's orgs or teammates.
 - `api_keys` deletes: the key's owner, or an org admin (`OrgAction.ManageMembers`). The Settings
