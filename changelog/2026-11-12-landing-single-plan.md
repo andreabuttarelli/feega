@@ -9,12 +9,14 @@ is one canvas per `.feega` file).
 
 The section is now one plan: Cloud at €9 per editor per month, each editor adding 500 credits to
 a pool the team shares; viewers and AI agents are free. The free tier is one editor with
-unlimited viewers; each invited editor needs the plan and adds €9 a month from the day they
-accept. The free tier's pitch is bringing your own agent subscription: Claude Code, Claude,
+unlimited viewers; more editors need the plan, only the owner adds them, each is charged from the
+day they accept (prorated), and removing one does not refund the seat before renewal. The free tier's pitch is bringing your own agent subscription: Claude Code, Claude,
 Codex and Cursor (the clients with a documented setup in `web-docs/.../integrations/mcp.mdx`)
-edit the canvas up to 1,000 agent-made layers a week (`freeAgentLayersPerWeek`); the plan lifts
+edit the canvas up to 1,000 agent-made layers in any 7 days (`freeAgentLayersPerWeek`); the plan lifts
 the cap. The home FAQ answer about agents now reads from the same text, so it is said once.
-The app enforces these rules in a later PR, so this one should not merge before it. The price sits beside its button, a quiet
+The app enforces these rules since #2132, #2137 and #2138. `plan-drift.test.ts` reads
+`src/lib/credit-ladder.ts` as text (importing it would pull the app's tsconfig into the landing's
+test run) and fails if price, credits, top-ups, free editors or the agent cap drift. The price sits beside its button, a quiet
 line points to the free local version, and an estimator takes editors (1–20), images and HD clips
 a month, and names the smallest top-up (€10, €20, €50) that covers the gap. Unused credits carry
 over; AI pauses when they run out until next month's credits arrive or a top-up.

@@ -33,6 +33,6 @@ describe('what credits get you', () => {
   });
 
   it('states the free agent cap from the plan', () => {
-    expect(bringYourAgent({ ...PLAN, freeAgentLayersPerWeek: 2500 })).toContain('2,500 agent-made layers a week');
+    expect(bringYourAgent({ ...PLAN, freeAgentLayersPerWeek: 2500 })).toContain('2,500 agent-made layers in any 7 days');
   });
 });
