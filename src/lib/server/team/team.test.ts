@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const setSeatQuantity = vi.fn();
 const seatSubscription = vi.fn();
+vi.mock('$lib/server/db/client', () => ({
+  createServiceRoleDb: () => ({ from: () => ({ update: () => ({ eq: async () => ({ error: null }) }) }) })
+}));
 vi.mock('$lib/server/stripe', () => ({
   SeatProration: { None: 'none', Invoice: 'always_invoice' },
   setSeatQuantity: (...args: unknown[]) => setSeatQuantity(...args),
@@ -212,6 +215,18 @@ describe('the subscription follows the editors', () => {
     expect(setSeatQuantity).not.toHaveBeenCalled();
   });
 
+  it('a removal already applied answers ok even when seat billing cannot be read afterwards', async () => {
+    const { ctx } = ctxFor(OWNER, paid);
+    const realFrom = ctx.db.from.bind(ctx.db);
+    Object.assign(ctx.db, {
+      from: (table: string) =>
+        table === 'orgs' ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: { message: 'missing column' } }) }) }) } : realFrom(table as never)
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect((await runTeamOp(ctx, { op: TeamOp.RemoveMember, userId: MEMBER })).ok).toBe(true);
+  });
+
   it('seat state that cannot be read adds no editor', async () => {
     const { ctx } = ctxFor(OWNER, paid);
     const realFrom = ctx.db.from.bind(ctx.db);
@@ -326,7 +341,7 @@ describe('la squadra', () => {
   it('says how many editors the team pays for, and whether it pays', async () => {
     const { ctx } = ctxFor(OWNER);
 
-    expect((await listTeam(ctx))?.seats).toEqual({ editors: 3, paid: false, billing: 'free', pastDue: false, grandfathered: false, endsAt: null, pricePerEditor: 9 });
+    expect((await listTeam(ctx))?.seats).toEqual({ editors: 3, paid: false, billing: 'free', pastDue: false, unpaid: false, grandfathered: false, endsAt: null, pricePerEditor: 9 });
   });
 
   it('a grandfathered free team says so', async () => {

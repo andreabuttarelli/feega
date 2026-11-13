@@ -13,7 +13,7 @@ import {
 } from '$lib/server/repos/invites';
 import { BILLING_ONLY_DETAIL, editorSeatsLeft, needsSeat, PAST_DUE_DETAIL, seatLimitDetail, SeatPlan } from '$lib/server/team/seats';
 import { INVITE_PARAM } from '$lib/server/tenancy/landing';
-import { editorSeatGate, SeatGate, seatStatus, syncSeats, type SeatStatus } from '$lib/server/team/seat-billing';
+import { editorSeatGate, SeatGate, seatStatus, syncedOrLogged, type SeatStatus } from '$lib/server/team/seat-billing';
 
 export type InviteMail = { to: string; orgName: string; inviterId: string; acceptUrl: string };
 
@@ -205,7 +205,7 @@ async function setRole(ctx: TeamCtx, actor: OrgRole, input: { userId: string; ro
 
   await setMemberRole(ctx.db, { orgId: ctx.orgId, userId: input.userId, role: input.role });
   if (needsSeat(current) !== needsSeat(input.role)) {
-    await syncSeats(ctx.db, ctx.orgId);
+    await syncedOrLogged(ctx.db, ctx.orgId);
   }
   return done({ user_id: input.userId, role: input.role });
 }
@@ -224,7 +224,7 @@ async function remove(ctx: TeamCtx, userId: string): Promise<TeamResult> {
 
   await removeMember(ctx.db, { orgId: ctx.orgId, userId });
   if (needsSeat(current)) {
-    await syncSeats(ctx.db, ctx.orgId);
+    await syncedOrLogged(ctx.db, ctx.orgId);
   }
   return done({ user_id: userId });
 }
@@ -270,7 +270,7 @@ export async function runTeamOp(ctx: TeamCtx, request: TeamRequest): Promise<Tea
     case TeamOp.Leave:
       await removeMember(ctx.db, { orgId: ctx.orgId, userId: ctx.userId });
       if (needsSeat(actor)) {
-        await syncSeats(ctx.db, ctx.orgId);
+        await syncedOrLogged(ctx.db, ctx.orgId);
       }
       return done();
     case TeamOp.TransferOwnership:

@@ -296,7 +296,7 @@ describe('seatSubscription', () => {
 		subscriptionsRetrieve.mockResolvedValue({
 			status: 'active',
 			cancel_at: 1735689600,
-			items: { data: [{ id: 'si_1', quantity: 3, price: { lookup_key: 'feega_monthly_9' } }] }
+			items: { data: [{ id: 'si_1', quantity: 3, current_period_end: 1738368000, price: { lookup_key: 'feega_monthly_9' } }] }
 		});
 		const { seatSubscription } = await import('./stripe');
 
@@ -305,7 +305,8 @@ describe('seatSubscription', () => {
 			quantity: 3,
 			perEditor: true,
 			status: 'active',
-			endsAt: new Date(1735689600 * 1000).toISOString()
+			endsAt: new Date(1735689600 * 1000).toISOString(),
+			periodEnd: new Date(1738368000 * 1000).toISOString()
 		});
 	});
 

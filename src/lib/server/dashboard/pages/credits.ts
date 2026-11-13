@@ -44,7 +44,10 @@ export const load = async ({ parent, url, request, locals: { supabase } }: Param
   const [balance, currentPlan, seats] = await Promise.all([
     orgCreditBalance(supabase, orgId),
     currentPlanOf(supabase, orgId),
-    seatStatus(supabase as unknown as Db, orgId)
+    seatStatus(supabase as unknown as Db, orgId).catch((e) => {
+      console.error('[seats] seat state unreadable on the credits page', orgId, e);
+      return null;
+    })
   ]);
 
   const spends = await Promise.all(

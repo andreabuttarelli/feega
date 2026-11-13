@@ -9,7 +9,7 @@
   import PageHead from '$lib/components/PageHead.svelte';
   import PageTitle from '$lib/components/PageTitle.svelte';
   import { BILLING_PATH } from '$lib/billing-path';
-  import { editorInviteHint, membersLine, planEndNotice } from '$lib/team-seat-copy';
+  import { editorInviteHint, membersLine, planEndNotice, unpaidNotice } from '$lib/team-seat-copy';
 
   let { data } = $props();
 
@@ -68,7 +68,9 @@
 
 {#if notice}<Notice tone={notice.tone}>{notice.text}</Notice>{/if}
 
-{#if planEndNotice(seats, (d) => new Date(d).toLocaleDateString())}
+{#if unpaidNotice(seats)}
+  <Notice tone="error">{unpaidNotice(seats)}</Notice>
+{:else if planEndNotice(seats, (d) => new Date(d).toLocaleDateString())}
   <Notice>{planEndNotice(seats, (d) => new Date(d).toLocaleDateString())}</Notice>
 {:else if seats?.grandfathered && !seats.paid}
   <Notice>This team keeps its {seats.editors} editors from before editors became paid seats. Adding an editor needs the plan.</Notice>

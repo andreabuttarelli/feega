@@ -15,6 +15,16 @@ where o.stripe_subscription_id is null
     where m.org_id = o.id and m.role in ('owner', 'admin', 'member')
   ) > 1;
 
+update public.orgs o
+set seats_paid = (s._raw_data->'items'->'data'->0->>'quantity')::integer,
+    seats_paid_until = to_timestamp((s._raw_data->'items'->'data'->0->>'current_period_end')::bigint)
+from stripe.subscriptions s
+where s.id = o.stripe_subscription_id
+  and o.seats_paid is null
+  and s._raw_data->'items'->'data'->0->'price'->>'lookup_key' = 'feega_monthly_9'
+  and s._raw_data->'items'->'data'->0->>'quantity' ~ '^[1-9][0-9]{0,3}$'
+  and s._raw_data->'items'->'data'->0->>'current_period_end' ~ '^[0-9]+$';
+
 create or replace function public.feega_price_unit_amount(price_id text) returns numeric
   language sql stable security definer set search_path = '' as $$
   select (p._raw_data->>'unit_amount')::numeric
@@ -52,12 +62,8 @@ declare
   _lines jsonb := coalesce(_raw->'lines'->'data', '[]'::jsonb);
   _org_id uuid;
   _credits integer;
-  _seats integer;
-  _period_end text;
   _net numeric;
   _charged numeric;
-  _new_seats integer;
-  _paid_seats integer;
   _price text;
   _unit numeric;
   _per_seat integer;
@@ -75,18 +81,15 @@ begin
   end if;
 
   if _reason in ('subscription_create', 'subscription_cycle') then
-    select
-      sum(public.credits_from_price_id(public.feega_line_price(l)) * public.feega_line_quantity(l)),
-      sum(public.feega_line_quantity(l)),
-      max(l->'period'->>'end')
-    into _credits, _seats, _period_end
+    select sum(public.credits_from_price_id(public.feega_line_price(l)) * public.feega_line_quantity(l))
+    into _credits
     from jsonb_array_elements(_lines) l
     where not public.feega_line_is_proration(l)
       and public.credits_from_price_id(public.feega_line_price(l)) is not null;
 
     if _credits is null then
-      select public.feega_credits(_subscription_metadata->>'credits') * public.feega_line_quantity(l), public.feega_line_quantity(l), l->'period'->>'end'
-      into _credits, _seats, _period_end
+      select public.feega_credits(_subscription_metadata->>'credits') * public.feega_line_quantity(l)
+      into _credits
       from jsonb_array_elements(_lines) l
       where not public.feega_line_is_proration(l)
       limit 1;
@@ -94,15 +97,9 @@ begin
     if _credits is null or _credits <= 0 then
       return NEW;
     end if;
-
-    _period_end := coalesce(_period_end, _raw->>'period_end');
-    update public.orgs
-    set seats_paid = _seats,
-        seats_paid_until = case when _period_end ~ '^[0-9]+$' then to_timestamp(_period_end::bigint) end
-    where id = _org_id;
   else
-    select sum((l->>'amount')::numeric), max(case when (l->>'amount')::numeric > 0 then public.feega_line_quantity(l) end), min(public.feega_line_price(l))
-    into _net, _new_seats, _price
+    select sum((l->>'amount')::numeric), min(public.feega_line_price(l))
+    into _net, _price
     from jsonb_array_elements(_lines) l
     where public.feega_line_is_proration(l)
       and l->>'amount' ~ '^-?[0-9]+$';
@@ -110,18 +107,10 @@ begin
     _charged := least(_net, coalesce(case when _raw->>'total' ~ '^-?[0-9]+$' then (_raw->>'total')::numeric end, _net));
     _unit := public.feega_price_unit_amount(_price);
     _per_seat := public.credits_from_price_id(_price);
-    if _charged is null or _charged <= 0 or _unit is null or _per_seat is null or _new_seats is null then
+    if _charged is null or _charged <= 0 or _unit is null or _per_seat is null then
       return NEW;
     end if;
 
-    select case when o.seats_paid_until > now() then coalesce(o.seats_paid, 0) else 0 end
-    into _paid_seats
-    from public.orgs o where o.id = _org_id;
-    if _new_seats <= coalesce(_paid_seats, 0) then
-      return NEW;
-    end if;
-
-    update public.orgs set seats_paid = _new_seats where id = _org_id;
     _credits := round(_charged * _per_seat / _unit)::integer;
     if _credits <= 0 then
       return NEW;
@@ -149,6 +138,10 @@ begin
     update public.orgs
     set stripe_subscription_id = NEW.id, editor_seats_grandfathered_at = null
     where id = _org_id;
+  elsif _status = 'unpaid' then
+    update public.orgs set stripe_subscription_id = NEW.id where id = _org_id;
+    update public.orgs_members set role = 'viewer'
+    where org_id = _org_id and role in ('admin', 'member');
   elsif _status in ('canceled', 'incomplete_expired') then
     update public.orgs set stripe_subscription_id = null, seats_paid = null, seats_paid_until = null
     where id = _org_id and stripe_subscription_id = NEW.id;
@@ -157,7 +150,7 @@ begin
       update public.orgs_members set role = 'viewer'
       where org_id = _org_id and role in ('admin', 'member');
     end if;
-  elsif _status in ('unpaid', 'paused') then
+  elsif _status = 'paused' then
     update public.orgs set stripe_subscription_id = null
     where id = _org_id and stripe_subscription_id = NEW.id;
   end if;

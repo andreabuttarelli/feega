@@ -5,6 +5,7 @@ import { cronAuthorized } from '$lib/server/cron-auth';
 import { createServiceRoleDb } from '$lib/server/db/client';
 import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
 import { RECONCILE_BATCH, SeatSync, syncSeats } from '$lib/server/team/seat-billing';
+import { tellOwnerOfSeat } from '$lib/server/team/seat-mail';
 
 const USE_PATH = 'src/routes/api/v1/billing/seats/reconcile';
 const HTTP_BAD_GATEWAY = 502;
@@ -31,6 +32,9 @@ export const GET: RequestHandler = async ({ request }) => {
   const failed: string[] = [];
   for (const { id } of (data ?? []) as { id: string }[]) {
     const outcome = await syncSeats(db, id).catch(() => SeatSync.Failed);
+    if (outcome === SeatSync.Charged) {
+      await tellOwnerOfSeat(db, { orgId: id });
+    }
     outcomes[outcome] = (outcomes[outcome] ?? 0) + 1;
     if (outcome === SeatSync.Failed) {
       failed.push(id);

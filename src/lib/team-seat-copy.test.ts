@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { editorInviteHint, membersLine, planEndNotice } from './team-seat-copy';
+import { editorInviteHint, membersLine, planEndNotice, unpaidNotice } from './team-seat-copy';
 
-const seats = (extra: Record<string, unknown> = {}) => ({ editors: 3, paid: true, billing: 'per_editor', pastDue: false, grandfathered: false, endsAt: null, pricePerEditor: 9, ...extra }) as never;
+const seats = (extra: Record<string, unknown> = {}) => ({ editors: 3, paid: true, billing: 'per_editor', pastDue: false, unpaid: false, grandfathered: false, endsAt: null, pricePerEditor: 9, ...extra }) as never;
 
 describe('what the team page says about editor seats', () => {
   it('tells the owner of a per-editor team what the new editor costs, and when', () => {
@@ -18,6 +18,14 @@ describe('what the team page says about editor seats', () => {
 
   it('says a past-due team adds no editor until it pays', () => {
     expect(editorInviteHint(seats({ pastDue: true }), true)).toMatch(/past due/i);
+  });
+
+  it('says an unpaid plan adds no editor, and says exactly what happened to the editors', () => {
+    expect(editorInviteHint(seats({ unpaid: true }), true)).toMatch(/unpaid/i);
+    expect(unpaidNotice(seats({ unpaid: true }))).toBe(
+      'The last payment failed and the plan is unpaid. Editors other than the owner are now viewers. The owner can make them editors again once the plan is paid.'
+    );
+    expect(unpaidNotice(seats())).toBeNull();
   });
 
   it('says editors cannot be added while seat state is unknown', () => {

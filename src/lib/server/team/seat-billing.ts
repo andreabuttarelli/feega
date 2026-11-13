@@ -3,6 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { EDITOR_ROLES } from '$lib/org-roles';
 import { PLAN } from '$lib/credit-ladder';
 import type { SeatProration, SeatSubscription } from '$lib/server/stripe';
+import { createServiceRoleDb } from '$lib/server/db/client';
+import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
 
 export enum SeatSync {
   Unbilled = 'unbilled',
@@ -32,6 +34,7 @@ export type SeatStatus = {
   paid: boolean;
   billing: SeatBilling;
   pastDue: boolean;
+  unpaid: boolean;
   grandfathered: boolean;
   endsAt: string | null;
   pricePerEditor: number;
@@ -52,7 +55,9 @@ export const RECONCILE_BATCH = 40;
 
 const NONE = 'none' as SeatProration;
 const INVOICE = 'always_invoice' as SeatProration;
-const PAST_DUE = 'past_due';
+const UNPAID_STATUSES: ReadonlySet<string> = new Set(['past_due', 'unpaid']);
+
+const PAID_SEATS_USE = 'src/lib/server/team/seat-billing.ts — recordPaidSeats';
 
 const client = (db: Db) => db as unknown as SupabaseClient;
 
@@ -78,9 +83,19 @@ async function orgSeats(db: Db, orgId: string): Promise<OrgSeats> {
   return (data as OrgSeats | null) ?? {};
 }
 
-function paidThisPeriod(org: OrgSeats, quantity: number, now: Date): number {
-  const until = org.seats_paid_until ? new Date(org.seats_paid_until).getTime() : 0;
-  return org.seats_paid != null && until > now.getTime() ? org.seats_paid : quantity;
+const samePeriod = (org: OrgSeats, sub: SeatSubscription) =>
+  !!org.seats_paid_until && !!sub.periodEnd && new Date(org.seats_paid_until).getTime() === new Date(sub.periodEnd).getTime();
+
+function paidThisPeriod(org: OrgSeats, sub: SeatSubscription): number {
+  return samePeriod(org, sub) && org.seats_paid != null ? Math.max(org.seats_paid, sub.quantity) : sub.quantity;
+}
+
+async function recordPaidSeats(orgId: string, seats: number, until: string | null): Promise<void> {
+  const use = SERVICE_ROLE_USES.find((u) => u.path.startsWith(PAID_SEATS_USE))!;
+  const { error } = await (createServiceRoleDb(use) as unknown as SupabaseClient).from('orgs').update({ seats_paid: seats, seats_paid_until: until }).eq('id', orgId);
+  if (error) {
+    throw error;
+  }
 }
 
 export function seatSteps({ quantity, paid, editors }: SeatCounts): SeatStep[] {
@@ -102,7 +117,7 @@ export function seatSteps({ quantity, paid, editors }: SeatCounts): SeatStep[] {
   return steps;
 }
 
-export async function syncSeats(db: Db, orgId: string, now = new Date()): Promise<SeatSync> {
+export async function syncSeats(db: Db, orgId: string): Promise<SeatSync> {
   const org = await orgSeats(db, orgId);
   const subscriptionId = org.stripe_subscription_id;
   if (!subscriptionId) {
@@ -120,13 +135,17 @@ export async function syncSeats(db: Db, orgId: string, now = new Date()): Promis
       return SeatSync.Legacy;
     }
 
-    const steps = seatSteps({ quantity: sub.quantity, paid: paidThisPeriod(org, sub.quantity, now), editors });
-    for (const step of steps) {
-      await setSeatQuantity(subscriptionId, sub.itemId, step.quantity, step.proration);
-    }
+    const paid = paidThisPeriod(org, sub);
+    const steps = seatSteps({ quantity: sub.quantity, paid, editors });
     if (!steps.length) {
       return SeatSync.Unchanged;
     }
+
+    await recordPaidSeats(orgId, paid, sub.periodEnd);
+    for (const step of steps) {
+      await setSeatQuantity(subscriptionId, sub.itemId, step.quantity, step.proration);
+    }
+    await recordPaidSeats(orgId, Math.max(paid, ...steps.map((s) => s.quantity)), sub.periodEnd);
     return steps.some((s) => s.proration === INVOICE) ? SeatSync.Charged : SeatSync.Synced;
   } catch (e) {
     console.error('[seats] quantity not synced, the reconcile cron retries', orgId, e);
@@ -135,7 +154,7 @@ export async function syncSeats(db: Db, orgId: string, now = new Date()): Promis
 }
 
 const GATE_OF = (sub: SeatSubscription): SeatGate => {
-  if (sub.status === PAST_DUE) {
+  if (UNPAID_STATUSES.has(sub.status)) {
     return SeatGate.PastDue;
   }
   return sub.perEditor ? SeatGate.Charged : SeatGate.Included;
@@ -174,9 +193,19 @@ export async function seatStatus(db: Db, orgId: string): Promise<SeatStatus> {
     editors,
     paid: !!subscriptionId,
     billing,
-    pastDue: sub?.status === PAST_DUE,
+    pastDue: sub?.status === 'past_due',
+    unpaid: sub?.status === 'unpaid',
     grandfathered: !!org.editor_seats_grandfathered_at,
     endsAt: sub?.endsAt ?? null,
     pricePerEditor: PLAN.price
   };
+}
+
+export async function syncedOrLogged(db: Db, orgId: string): Promise<SeatSync> {
+  try {
+    return await syncSeats(db, orgId);
+  } catch (e) {
+    console.error('[seats] seat state unreadable after a member change, the reconcile cron retries', orgId, e);
+    return SeatSync.Failed;
+  }
 }

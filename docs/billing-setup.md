@@ -57,15 +57,19 @@ Once the `stripe` schema exists and is being written to, apply, in this order:
 - `supabase/canvas-migrations/20261113_editor_seats.sql` — one file, so no order to get wrong:
   - adds `orgs.editor_seats_grandfathered_at` and stamps every free org with more than one editor
     on the day it is applied (nothing sets it later; subscribing clears it);
-  - adds `orgs.seats_paid` / `seats_paid_until` (the seats paid for the current period, set by
-    each renewal and raised by each charged seat) and `seats_checked_at` (the reconcile cron's
-    cursor);
+  - adds `orgs.seats_paid` / `seats_paid_until` (the seats Stripe was paid for in the
+    subscription's current period; written only by the app's `syncSeats`, through the service role,
+    around each quantity change; backfilled from `stripe.subscriptions` for existing per-editor
+    subscriptions) and `seats_checked_at` (the reconcile cron's cursor);
   - a renewal grants `metadata.credits × quantity` summed over the plan lines, wherever they sit;
-  - a paid `subscription_update` grants only for seats above `seats_paid`, from the amount charged
-    after discounts (`least(net proration, invoice total)`), rounded to the nearest credit, and
-    only for invoices in euros;
+  - a paid `subscription_update` grants what that invoice charged:
+    `round(least(Σ proration line amounts, invoice total) × credits / unit_amount)`, euro only,
+    once per invoice. It does not depend on how Stripe splits the lines (a credit/debit pair or one
+    line), nor on the order invoices arrive in;
   - `canceled` / `incomplete_expired` unlink the org and turn every admin and member into a
-    viewer; `unpaid` / `paused` unlink it without demoting anyone; `past_due` keeps it linked.
+    viewer; `unpaid` keeps it linked and turns them into viewers (they stay viewers when the plan is
+    paid again; the owner promotes them); `paused` unlinks without demoting; `past_due` keeps it
+    linked and blocks new editors.
   `npm run test:seat-billing` runs it in pglite, and CI runs both pglite harnesses.
 
 Verify with a local Postgres: `DATABASE_URL=postgres://postgres@127.0.0.1:5432/postgres npm run

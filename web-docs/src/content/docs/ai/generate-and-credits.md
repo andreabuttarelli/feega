@@ -31,7 +31,7 @@ Every new account gets **100 free credits (€1)** once, at signup. A second org
 - **Editors and viewers**: owners, admins and members are editors and need a seat; viewers are free and unlimited. A free team has one editor, its owner. Agents (the chat, MCP, CLI, API keys) never take a seat: they act for a person.
 - **Adding an editor** on a paid team adds €9/month when the invite is accepted, prorated for the rest of the period, and grants the prorated credits at once. Only the owner can add a paid editor; admins can invite viewers. While a payment is past due, no editor can be added.
 - **Removing an editor** lowers the bill from the next renewal; the seat stays paid until then, so re-adding someone in the same period costs nothing more. Credits already granted stay.
-- **Cancelling**: when the plan ends, every editor except the owner becomes a viewer. They keep their access, and the owner can make them editors again once the team pays. A failed payment never demotes anyone.
+- **Cancelling**: when the plan ends, every editor except the owner becomes a viewer. They keep their access, and the owner can make them editors again once the team pays. A payment that is late never demotes anyone; a plan that stays unpaid after the retries turns editors other than the owner into viewers, and the owner can make them editors again once it is paid.
 - **Top-ups**: €10 for 1,000 credits, €20 for 2,000, €50 for 5,000. One-time.
 - **Credits never expire.** Unspent monthly credits carry over; top-ups stay until spent.
 

@@ -8,7 +8,7 @@ import type { OrgRole } from '$lib/server/repos/orgs';
 import { assertFreeOrgLimit } from '$lib/server/tenancy/free-org-limit';
 import { OrgRoleName } from '$lib/org-roles';
 import { needsSeat } from '$lib/server/team/seats';
-import { editorSeatGate, SeatGate, SeatSync, syncSeats } from '$lib/server/team/seat-billing';
+import { editorSeatGate, SeatGate, SeatSync, syncedOrLogged } from '$lib/server/team/seat-billing';
 import { tellOwnerOfSeat } from '$lib/server/team/seat-mail';
 
 /**
@@ -198,7 +198,7 @@ export async function acceptInviteWith(
     throw insertError;
   }
 
-  if (needsSeat(role) && (await syncSeats(db, invite.org_id)) === SeatSync.Charged) {
+  if (needsSeat(role) && (await syncedOrLogged(db, invite.org_id)) === SeatSync.Charged) {
     await tellOwnerOfSeat(db, { orgId: invite.org_id, editorEmail: input.email });
   }
 
@@ -222,10 +222,14 @@ export async function acceptInviteWith(
 const SEATED: ReadonlySet<SeatGate> = new Set([SeatGate.Charged, SeatGate.Included]);
 
 async function seatedRole(db: Db, orgId: string, role: string): Promise<string> {
-  if (!needsSeat(role) || SEATED.has(await editorSeatGate(db, orgId))) {
+  if (!needsSeat(role)) {
     return role;
   }
-  return OrgRoleName.Viewer;
+  const gate = await editorSeatGate(db, orgId).catch((e) => {
+    console.error('[seats] seat state unreadable, the editor joins as a viewer', orgId, e);
+    return null;
+  });
+  return gate && SEATED.has(gate) ? role : OrgRoleName.Viewer;
 }
 
 export function acceptInvite(input: { token: string; userId: string; email: string }): Promise<AcceptOutcome> {

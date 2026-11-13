@@ -8,6 +8,9 @@ export function editorInviteHint(seats: SeatStatus | null, mayBill: boolean): st
   if (!seats || (seats.paid && seats.billing !== PER_EDITOR && seats.billing !== LEGACY)) {
     return 'Billing state is unavailable right now, so editors cannot be added. Viewers are free.';
   }
+  if (seats.unpaid) {
+    return 'The plan is unpaid: editors can be added again once it is paid. Viewers are free.';
+  }
   if (seats.pastDue) {
     return "The team's payment is past due: editors can be added again once it is paid. Viewers are free.";
   }
@@ -36,4 +39,10 @@ export function planEndNotice(seats: SeatStatus | null, date: (iso: string) => s
     return null;
   }
   return `The plan ends on ${date(seats.endsAt)}. Then ${seats.editors - 1} editors become viewers. They keep their access, and the owner can make them editors again once the team pays.`;
+}
+
+export function unpaidNotice(seats: SeatStatus | null): string | null {
+  return seats?.unpaid
+    ? 'The last payment failed and the plan is unpaid. Editors other than the owner are now viewers. The owner can make them editors again once the plan is paid.'
+    : null;
 }

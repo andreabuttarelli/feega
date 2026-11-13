@@ -90,8 +90,13 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
   },
   {
     path: 'src/routes/api/v1/billing/seats/reconcile — the hourly seat reconcile cron',
-    why: "A cron has no user. It lists the orgs that have a subscription and sets each Stripe item quantity to that org's count of editors; it reads only orgs.stripe_subscription_id and orgs_members.role and writes nothing to the database.",
+    why: "A cron has no user. It lists the orgs that have a subscription, oldest checked first, and sets each Stripe item quantity to that org's count of editors. It reads orgs.stripe_subscription_id and orgs_members.role, writes orgs.seats_checked_at (its cursor) and, through recordPaidSeats, orgs.seats_paid/seats_paid_until.",
     tables: ['orgs', 'orgs_members']
+  },
+  {
+    path: 'src/lib/server/team/seat-billing.ts — recordPaidSeats',
+    why: "orgs.seats_paid decides whether re-adding an editor this period is free, so no session may write it: a member who could set it would get free seats. Only syncSeats writes it, with the seats Stripe was already paid for and the subscription's current period end, right around the Stripe quantity change.",
+    tables: ['orgs']
   },
   {
     path: 'src/lib/server/org-data/auth.ts — resolveApiKey (MCP e CLI su /api/v1/org/**)',

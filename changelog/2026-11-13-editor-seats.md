@@ -36,3 +36,15 @@ Review fixes (same PR):
 - The reconcile cron handles 40 teams per run, oldest first, and answers 502 on a failure.
 - Retired store products (`feega_monthly_8..256`, `feega_pack_8..256`) still resolve, so a store
   renewal or refund on one is not dropped.
+
+Second review:
+- Grants no longer compare against `seats_paid`: each `subscription_update` grants what it charged,
+  so out-of-order invoices and either Stripe line shape grant correctly. Whether a re-add is free is
+  decided by the app before it calls Stripe, from `seats_paid` for the subscription's current period
+  (recorded by `syncSeats` around every change, only ever raised within a period, backfilled at
+  migration).
+- `unpaid` keeps the team linked and turns editors into viewers; nothing restores them
+  automatically.
+- Seat state that cannot be read never fails an applied member change, never fails an invite
+  acceptance (the editor joins as a viewer), and never takes the credits page down.
+- The cron emails the owner when it charges a seat.

@@ -9,6 +9,10 @@ vi.mock('$lib/server/stripe', () => ({
   seatSubscription: (...args: unknown[]) => seatSubscription(...args)
 }));
 vi.mock('$lib/server/email', () => ({ sendEmail: (...args: unknown[]) => sendEmail(...args) }));
+vi.mock('$lib/server/db/client', async (real) => ({
+  ...(await real<object>()),
+  createServiceRoleDb: () => ({ from: () => ({ update: () => ({ eq: async () => ({ error: null }) }) }) })
+}));
 
 beforeEach(() => {
   setSeatQuantity.mockReset().mockResolvedValue(undefined);
@@ -304,6 +308,21 @@ describe('accettare un invito è idempotente', () => {
 
     expect(setSeatQuantity).toHaveBeenCalledWith('sub_1', 'si_1', 2, 'always_invoice');
     expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'owner@acme.it', subject: expect.stringMatching(/editor/i) }));
+  });
+
+  it('an editor joins as a viewer, never an error, when seat state cannot be read', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { db, calls } = fakeDb({ orgs_invites: [inviteRow], orgs_members: [] });
+    const realFrom = db.from.bind(db);
+    Object.assign(db, {
+      from: (table: string) =>
+        table === 'orgs' ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: { message: 'missing column' } }) }) }) } : realFrom(table as never)
+    });
+
+    const result = await acceptInviteWith(db, { token: 'segreto', userId: USER, email: INVITED, now: NOW });
+
+    expect(result).toMatchObject({ outcome: 'accepted', role: 'viewer' });
+    expect(calls.find((c) => c.table === 'orgs_members' && c.op === 'insert')!.payload).toMatchObject({ role: 'viewer' });
   });
 
   it('an editor invite into a past-due team joins as a viewer', async () => {

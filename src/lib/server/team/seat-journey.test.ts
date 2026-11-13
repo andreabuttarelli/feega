@@ -6,12 +6,14 @@ const stripeCalls: unknown[][] = [];
 const billed = { quantity: 1 };
 vi.mock('$lib/server/stripe', () => ({
   SeatProration: { None: 'none', Invoice: 'always_invoice' },
-  seatSubscription: async () => ({ itemId: 'si_1', quantity: billed.quantity, perEditor: true, status: 'active', endsAt: null }),
+  seatSubscription: async () => ({ itemId: 'si_1', quantity: billed.quantity, perEditor: true, status: 'active', endsAt: null, periodEnd: '2099-01-01T00:00:00.000Z' }),
   setSeatQuantity: async (...args: unknown[]) => {
     stripeCalls.push(['setSeatQuantity', ...args]);
     billed.quantity = args[2] as number;
   }
 }));
+const shared = vi.hoisted(() => ({ db: null as unknown }));
+vi.mock('$lib/server/db/client', () => ({ createServiceRoleDb: () => shared.db }));
 vi.mock('$lib/server/email', () => ({ sendEmail: async (...args: unknown[]) => stripeCalls.push(['email', (args[0] as { to: string }).to]) }));
 
 import { runTeamOp, TeamOp } from './team';
@@ -29,13 +31,14 @@ function world(subscription: string | null): Db {
     ['orgs_invites', []],
     ['credit_ledger', []]
   ]);
-  return createMemoryDb({
+  shared.db = createMemoryDb({
     tables,
     blobs: new Map(),
     user: { id: OWNER, email: 'owner@acme.test', created_at: '2026-01-01' },
     storageUrl: () => '',
     onChange: () => {}
-  }) as unknown as Db;
+  });
+  return shared.db as Db;
 }
 
 const ctx = (db: Db) => ({ db, userId: OWNER, orgId: ORG, origin: 'https://feega.test', mail: async () => true });
@@ -75,7 +78,6 @@ describe('invite → accept → seat billed', () => {
     const db = world('sub_1');
     const first = await runTeamOp(ctx(db), { op: TeamOp.Invite, email: 'new@acme.test', role: 'member' });
     await acceptInviteWith(db, { token: tokenOf(first.ok && first.data.accept_url), userId: NEWCOMER, email: 'new@acme.test' });
-    await (db as unknown as { from: (t: string) => { update: (v: unknown) => { eq: (c: string, v: unknown) => Promise<unknown> } } }).from('orgs').update({ seats_paid: 2, seats_paid_until: '2099-01-01T00:00:00Z' }).eq('id', ORG);
     await runTeamOp(ctx(db), { op: TeamOp.RemoveMember, userId: NEWCOMER });
 
     const again = await runTeamOp(ctx(db), { op: TeamOp.Invite, email: 'new@acme.test', role: 'member' });

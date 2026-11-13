@@ -193,6 +193,21 @@ describe('/app/credits — the workspace credits page', () => {
 		expect(data.seats).toMatchObject({ editors: 1, paid: true, endsAt: '2026-12-13T00:00:00.000Z' });
 	});
 
+	it('loads with seats unknown when seat state cannot be read, so anyone can still subscribe or top up', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const supabase = fakeSupabase();
+		const realFrom = supabase.from;
+		supabase.from = ((table: string) => {
+			const q = realFrom(table) as Record<string, unknown>;
+			return table === 'orgs' ? { ...q, select: (cols: string) => (cols.includes('seats_paid') ? { eq: () => ({ maybeSingle: async () => ({ data: null, error: { message: 'missing column' } }) }) } : (q.select as (c: string) => unknown)(cols)) } : q;
+		}) as typeof supabase.from;
+
+		const data = await run(supabase);
+
+		expect(data.seats).toBeNull();
+		expect(data.plan.price).toBe(9);
+	});
+
 	it('never warns of expiring credits: credits do not expire', async () => {
 		const data = await run(fakeSupabase());
 		expect(data.credits).toEqual({ balance: 3600 });

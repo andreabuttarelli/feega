@@ -76,6 +76,9 @@ async function world() {
       ($3, 's-owner', 'owner'), ($3, 's-viewer', 'viewer')`,
     [PAID, CROWDED_FREE, SOLO_FREE]
   );
+  await db.query('insert into stripe.subscriptions (_raw_data) values ($1)', [
+    { id: 'sub_paid', status: 'active', metadata: meta(PAID), items: { data: [{ quantity: 3, current_period_end: PERIOD_END, price: { lookup_key: 'feega_monthly_9' } }] } }
+  ]);
   await db.exec(migration(SEATS));
   return db;
 }
@@ -84,9 +87,15 @@ const put = (db, raw) => db.query('insert into stripe.invoices (_raw_data) value
 const total = async (db, org = PAID) => (await db.query('select coalesce(sum(amount), 0)::int as sum, count(*)::int as n from credit_ledger where org_id = $1', [org])).rows[0];
 const roles = async (db, org) => Object.fromEntries((await db.query('select user_id, role from orgs_members where org_id = $1', [org])).rows.map((r) => [r.user_id, r.role]));
 const flagged = async (db, org) => (await db.query('select editor_seats_grandfathered_at is not null as on from orgs where id = $1', [org])).rows[0].on;
-const subscribe = (db, id, org, status) => db.query('insert into stripe.subscriptions (_raw_data) values ($1)', [{ id, status, metadata: meta(org) }]);
+const subscribe = (db, id, org, status) => db.query('insert into stripe.subscriptions (_raw_data) values ($1) on conflict (id) do update set _raw_data = excluded._raw_data', [{ id, status, metadata: meta(org) }]);
 const setStatus = (db, id, status) => db.query(`update stripe.subscriptions set _raw_data = jsonb_set(_raw_data, '{status}', to_jsonb($2::text)) where id = $1`, [id, status]);
 const linked = async (db, org) => (await db.query('select stripe_subscription_id from orgs where id = $1', [org])).rows[0].stripe_subscription_id;
+
+{
+  const db = await world();
+  const row = (await db.query('select seats_paid, extract(epoch from seats_paid_until)::bigint as until from orgs where id = $1', [PAID])).rows[0];
+  report(row.seats_paid === 3 && Number(row.until) === PERIOD_END, `a per-editor subscription that existed before the migration starts with its paid seats recorded: got ${JSON.stringify(row)}`);
+}
 
 {
   const db = await world();
@@ -105,13 +114,43 @@ const linked = async (db, org) => (await db.query('select stripe_subscription_id
 
 {
   const db = await world();
+  await put(db, invoice('in_rm', 'subscription_update', [proration(-900, 2), proration(450, 1)], PAID, { total: -450 }));
+  report((await total(db)).n === 0, 'a removed seat writes no ledger row');
+}
+
+{
+  const db = await world();
   await put(db, invoice('in_create', 'subscription_create', [seatLine(1)]));
-  for (let i = 0; i < 5; i++) {
-    await put(db, addSeat(`in_add_${i}`, 1, { amount_paid: i === 0 ? 450 : 0 }));
-    await put(db, invoice(`in_rm_${i}`, 'subscription_update', [proration(-900, 2), proration(450, 1)], PAID, { amount_paid: 0, total: -450 }));
-  }
+  await put(db, invoice('in_B', 'subscription_update', [proration(-900, 2), proration(1350, 3)]));
+  await put(db, invoice('in_A', 'subscription_update', [proration(-450, 1), proration(900, 2)]));
   const got = await total(db);
-  report(got.sum === 750 && got.n === 2, `add, remove, add again five times in one period: one charge, one grant (500 + 250): got ${JSON.stringify(got)}`);
+  report(got.sum === 1000 && got.n === 3, `two charged adds synced out of order each grant what they charged: got ${JSON.stringify(got)}`);
+}
+
+{
+  const db = await world();
+  await put(db, invoice('in_A', 'subscription_update', [proration(-450, 1), proration(900, 2)]));
+  await put(db, invoice('in_create', 'subscription_create', [seatLine(1)]));
+  const got = await total(db);
+  report(got.sum === 750 && got.n === 2, `an add synced before the create invoice still grants once each: got ${JSON.stringify(got)}`);
+}
+
+{
+  const db = await world();
+  await put(db, invoice('in_single', 'subscription_update', [proration(450, 1)]));
+  report((await total(db)).sum === 250, 'a seat add written by Stripe as one line for the added seat grants what it charged');
+}
+
+{
+  const db = await world();
+  await put(db, invoice('in_balance', 'subscription_update', [proration(-450, 1), proration(900, 2)], PAID, { amount_due: 0, amount_paid: 0, starting_balance: -450 }));
+  report((await total(db)).sum === 250, "a seat add paid from the customer's balance grants what the invoice charged");
+}
+
+{
+  const db = await world();
+  await put(db, invoice('in_tax', 'subscription_update', [proration(-450, 1), proration(900, 2)], PAID, { total: 545 }));
+  report((await total(db)).sum === 250, 'tax on top of the seat grants nothing extra');
 }
 
 {
@@ -158,23 +197,42 @@ const linked = async (db, org) => (await db.query('select stripe_subscription_id
   );
 }
 
-for (const status of ['unpaid', 'past_due', 'paused']) {
+const journey = async (statuses) => {
   const db = await world();
-  await subscribe(db, 'sub_paid', PAID, 'active');
-  await setStatus(db, 'sub_paid', status);
-  const during = await roles(db, PAID);
-  await setStatus(db, 'sub_paid', 'active');
-  report(
-    during['p-admin'] === 'admin' && during['p-member'] === 'member' && (await linked(db, PAID)) === 'sub_paid',
-    `a ${status} subscription demotes nobody, and paying again restores it: got ${JSON.stringify(during)}`
-  );
+  for (const status of statuses) {
+    await subscribe(db, 'sub_paid', PAID, status).catch(() => setStatus(db, 'sub_paid', status));
+  }
+  return { roles: await roles(db, PAID), linked: await linked(db, PAID) };
+};
+
+{
+  const got = await journey(['active', 'past_due', 'active']);
+  report(got.roles['p-admin'] === 'admin' && got.roles['p-member'] === 'member' && got.linked === 'sub_paid', `a past-due payment that recovers demotes nobody: got ${JSON.stringify(got)}`);
 }
 
 {
-  const db = await world();
-  await subscribe(db, 'sub_paid', PAID, 'active');
-  await setStatus(db, 'sub_paid', 'paused');
-  report((await linked(db, PAID)) === null, 'a paused subscription does not keep the team paid');
+  const got = await journey(['active', 'past_due', 'canceled']);
+  report(got.roles['p-owner'] === 'owner' && got.roles['p-admin'] === 'viewer' && got.linked === null, `past due then cancelled demotes at the end: got ${JSON.stringify(got)}`);
+}
+
+{
+  const got = await journey(['active', 'unpaid']);
+  report(got.roles['p-owner'] === 'owner' && got.roles['p-admin'] === 'viewer' && got.roles['p-member'] === 'viewer' && got.linked === 'sub_paid', `an unpaid subscription keeps the team linked and turns unpaid editors into viewers: got ${JSON.stringify(got)}`);
+}
+
+{
+  const got = await journey(['active', 'unpaid', 'canceled']);
+  report(got.roles['p-admin'] === 'viewer' && got.linked === null, `unpaid then cancelled ends the plan: got ${JSON.stringify(got)}`);
+}
+
+{
+  const got = await journey(['active', 'unpaid', 'active']);
+  report(got.roles['p-admin'] === 'viewer' && got.linked === 'sub_paid', `paying an unpaid plan again restores the plan, not the editor roles: got ${JSON.stringify(got)}`);
+}
+
+{
+  const got = await journey(['active', 'paused']);
+  report(got.roles['p-admin'] === 'admin' && got.linked === null, `a paused subscription demotes nobody and does not keep the team paid: got ${JSON.stringify(got)}`);
 }
 
 {

@@ -43,7 +43,7 @@ export enum SeatProration {
   Invoice = 'always_invoice'
 }
 
-export type SeatSubscription = { itemId: string; quantity: number; perEditor: boolean; status: string; endsAt: string | null };
+export type SeatSubscription = { itemId: string; quantity: number; perEditor: boolean; status: string; endsAt: string | null; periodEnd: string | null };
 
 export async function seatSubscription(subscriptionId: string): Promise<SeatSubscription | null> {
   const sub = await stripe().subscriptions.retrieve(subscriptionId);
@@ -58,7 +58,8 @@ export async function seatSubscription(subscriptionId: string): Promise<SeatSubs
     quantity: item.quantity ?? 1,
     perEditor: item.price.lookup_key === PLAN.lookupKey,
     status: sub.status,
-    endsAt: sub.cancel_at ? new Date(sub.cancel_at * 1000).toISOString() : null
+    endsAt: sub.cancel_at ? new Date(sub.cancel_at * 1000).toISOString() : null,
+    periodEnd: item.current_period_end ? new Date(item.current_period_end * 1000).toISOString() : null
   };
 }
 

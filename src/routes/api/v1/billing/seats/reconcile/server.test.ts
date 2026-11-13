@@ -13,6 +13,8 @@ vi.mock('$lib/server/stripe', () => ({
   seatSubscription: (...args: unknown[]) => seatSubscription(...args)
 }));
 vi.mock('$lib/server/db/client', () => ({ createServiceRoleDb: () => world.db }));
+const sendEmail = vi.fn();
+vi.mock('$lib/server/email', () => ({ sendEmail: (...a: unknown[]) => sendEmail(...a) }));
 
 import { GET } from './+server';
 import { RECONCILE_BATCH } from '$lib/server/team/seat-billing';
@@ -24,9 +26,10 @@ function seed(paidOrgs: number) {
   const members: Row[] = [{ org_id: 'free', role: 'owner' }];
   for (let i = 0; i < paidOrgs; i++) {
     orgs.push({ id: `org-${i}`, stripe_subscription_id: `sub_${i}`, seats_checked_at: new Date(Date.UTC(2026, 0, 1, 0, i)).toISOString() });
-    members.push({ org_id: `org-${i}`, role: 'owner' }, { org_id: `org-${i}`, role: 'member' });
+    members.push({ org_id: `org-${i}`, user_id: `owner-${i}`, role: 'owner' }, { org_id: `org-${i}`, user_id: `member-${i}`, role: 'member' });
   }
-  world.tables = new Map<string, Row[]>([['orgs', orgs], ['orgs_members', members]]);
+  const profiles: Row[] = members.filter((m) => m.role === 'owner').map((m) => ({ id: m.user_id, email: `${m.user_id}@acme.test` }));
+  world.tables = new Map<string, Row[]>([['orgs', orgs], ['orgs_members', members], ['profiles', profiles]]);
   world.db = createMemoryDb({ tables: world.tables, blobs: new Map(), user: { id: 'cron', email: 'c@x', created_at: '2026-01-01' }, storageUrl: () => '', onChange: () => {} });
 }
 
@@ -35,6 +38,7 @@ beforeEach(() => {
   setSeatQuantity.mockReset().mockResolvedValue(undefined);
   seatSubscription.mockReset().mockImplementation(async (sub: string) => ({ itemId: `si_${sub}`, quantity: 1, perEditor: true, status: 'active', endsAt: null }));
   vi.spyOn(console, 'error').mockImplementation(() => {});
+  sendEmail.mockReset().mockResolvedValue(undefined);
 });
 
 describe('GET /api/v1/billing/seats/reconcile', () => {
@@ -47,6 +51,8 @@ describe('GET /api/v1/billing/seats/reconcile', () => {
     expect(seatSubscription).toHaveBeenCalledTimes(RECONCILE_BATCH);
     expect(seatSubscription).toHaveBeenNthCalledWith(1, 'sub_0');
     expect(setSeatQuantity).toHaveBeenCalledWith('sub_0', 'si_sub_0', 2, 'always_invoice');
+
+    expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'owner-0@acme.test' }));
 
     seatSubscription.mockClear();
     await call();
