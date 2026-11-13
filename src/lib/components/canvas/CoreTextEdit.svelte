@@ -1,16 +1,19 @@
 <script lang="ts">
   import ColorField from '$lib/components/motion/ColorField.svelte';
   import { ColourDisplay } from '$lib/motion/colour-field';
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import { anchorShift, editCss, type EditBody, type EditLayout, type TextEditStyle } from '$lib/canvas/frame-text-edit';
-  import { TypingBurst, autoList, lineMove, rangeOf, select, selectionIn, textOf, type Span } from '$lib/canvas/editable-text';
+  import { TypingBurst, autoList, lineMove, rangeOf, select, selectionIn, textOf, type LineMove, type Span } from '$lib/canvas/editable-text';
   import { textRange } from '$lib/canvas/text-range.svelte';
   import { openingSpan } from '$lib/canvas/core/text-caret';
+  import { editMarks } from '$lib/canvas/core/text-marks';
+  import { apply2d, invert2d } from '@feega/motion-core/motion/parent';
+  import { caretRect, CLICK_GRAINS, codePointsOf, nextLine, dragged, hitTest, lineEdge, pressed, Step, unitsOf, type CaretLine, type Pick } from '@feega/motion-core/motion/gpu-full/text/caret';
   import GradientHandles from './GradientHandles.svelte';
   import { ListKind, type ListItem } from '@feega/motion-core/motion/text-lists';
   import { codeIndex, linkOf, MIXED, RunToggle, STYLE_KEYS, type GradientFill, type RunEdit, type RunStyle, type TextRun } from '@feega/motion-core/motion/text-runs';
 
-  let { caretAt = null, layout, look, text, typedAhead = () => '', body, clipId = '', base = {}, runs: initialRuns = [], lists: initialLists = [], styled = false, oncommit }: { caretAt?: number | null; layout: EditLayout; look: TextEditStyle; text: string; typedAhead?: () => string; body: EditBody; clipId?: string; base?: RunStyle; runs?: TextRun[]; lists?: ListItem[]; styled?: boolean; oncommit: (text: string, runs: TextRun[], lists: ListItem[]) => void } = $props();
+  let { caretAt = null, lines = [], ontype = () => {}, layout, look, text, typedAhead = () => '', body, clipId = '', base = {}, runs: initialRuns = [], lists: initialLists = [], styled = false, oncommit }: { caretAt?: number | null; lines?: CaretLine[]; ontype?: (text: string, runs: TextRun[], lists: ListItem[]) => void; layout: EditLayout; look: TextEditStyle; text: string; typedAhead?: () => string; body: EditBody; clipId?: string; base?: RunStyle; runs?: TextRun[]; lists?: ListItem[]; styled?: boolean; oncommit: (text: string, runs: TextRun[], lists: ListItem[]) => void } = $props();
 
   type Box = { left: number; top: number; width: number; height: number };
   type Snapshot = { text: string; runs: TextRun[]; lists: ListItem[]; sel: Span };
@@ -41,6 +44,11 @@
   let barAt = $state({ left: 0, top: 0 });
 
   const CARET_PX = 2;
+  const OUTLINE_PX = 1;
+  const scale = $derived(Math.hypot(layout.matrix[0], layout.matrix[1]) || 1);
+  let shownSel = $state<Span>({ start: 0, end: 0 });
+  const marks = $derived(editMarks(lines, value, shownSel, CARET_PX / scale));
+  let pressing: Pick | null = null;
   const BAR_GAP_PX = 32;
 
   function fit() {
@@ -73,6 +81,7 @@
   }
 
   function paint() {
+    shownSel = sel;
     if (!field) {
       return;
     }
@@ -101,6 +110,87 @@
     void textRange.lists;
     paint();
   });
+
+  let opened = $state(false);
+
+  $effect(() => {
+    const typedNow = { text: value, runs: textRange.runs, lists: textRange.lists };
+    if (opened) {
+      untrack(() => ontype(typedNow.text, typedNow.runs, typedNow.lists));
+    }
+  });
+
+  function engineOffset(e: MouseEvent): number | null {
+    const host = field?.offsetParent;
+    if (!host || !lines.length) {
+      return null;
+    }
+    const origin = host.getBoundingClientRect();
+    const [x, y] = apply2d(invert2d(layout.matrix), [e.clientX - origin.left, e.clientY - origin.top]);
+    return hitTest(lines, x, y);
+  }
+
+  function choose(pick: Pick) {
+    sel = { start: unitsOf(value, Math.min(pick.anchor, pick.focus)), end: unitsOf(value, Math.max(pick.anchor, pick.focus)) };
+    shownSel = sel;
+    if (field) {
+      select(field, sel);
+    }
+    syncRange();
+    rangeBox = measureRange();
+  }
+
+  const LINE_STEP: Record<LineMove['direction'], Step> = { forward: Step.Forward, backward: Step.Back };
+
+  function lineJump(line: LineMove) {
+    if (!lines.length) {
+      getSelection()?.modify(line.alter, line.direction, 'lineboundary');
+      return;
+    }
+    const at = lineEdge(lines, codePointsOf(value, sel.end), LINE_STEP[line.direction]);
+    choose(line.alter === 'extend' ? { anchor: codePointsOf(value, sel.start), focus: at } : { anchor: at, focus: at });
+  }
+
+  const VERTICAL_STEP: Record<string, Step> = { ArrowUp: Step.Back, ArrowDown: Step.Forward };
+
+  function verticalMove(e: KeyboardEvent): boolean {
+    const step = VERTICAL_STEP[e.key];
+    if (step === undefined || !lines.length || e.metaKey || e.ctrlKey || e.altKey) {
+      return false;
+    }
+    const focus = codePointsOf(value, sel.end);
+    const at = nextLine(lines, focus, step, caretRect(lines, focus).x);
+    choose(e.shiftKey ? { anchor: codePointsOf(value, sel.start), focus: at } : { anchor: at, focus: at });
+    return true;
+  }
+
+  const grainOf = (clicks: number) => CLICK_GRAINS[Math.min(Math.max(clicks, 1), CLICK_GRAINS.length) - 1];
+
+  function press(e: MouseEvent) {
+    const at = engineOffset(e);
+    if (at === null || composing) {
+      return;
+    }
+    e.preventDefault();
+    field?.focus();
+    const grain = grainOf(e.detail);
+    const base = e.shiftKey ? { anchor: codePointsOf(value, sel.start), focus: at } : pressed(grain, value, lines, at);
+    pressing = base;
+    choose(base);
+    const move = (m: MouseEvent) => {
+      const to = engineOffset(m);
+      if (to !== null && pressing) {
+        choose(dragged(grain, value, lines, pressing, to));
+      }
+    };
+    const release = () => {
+      pressing = null;
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', release);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', release);
+  }
 
   function end() {
     if (ended) {
@@ -147,6 +237,7 @@
       return;
     }
     sel = now;
+    shownSel = now;
     syncRange();
     rangeBox = measureRange();
   }
@@ -250,6 +341,10 @@
   }
 
   function typed() {
+    if (composing && field) {
+      ontype(textOf(field), textRange.runs, textRange.lists);
+      return;
+    }
     if (composing) {
       return;
     }
@@ -358,11 +453,16 @@
       restyle(shortcut);
       return;
     }
+    if (!composing && verticalMove(e)) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     const line = composing ? null : lineMove(e);
     if (line) {
       e.preventDefault();
       e.stopPropagation();
-      getSelection()?.modify(line.alter, line.direction, 'lineboundary');
+      lineJump(line);
       return;
     }
     if (e.key === 'Escape' && !composing) {
@@ -396,6 +496,7 @@
         textRange.open({ clipId: styled ? clipId : '', text: ahead, runs: [], lists: [], base });
       }
       sel = openingSpan(value, ahead ? value.length : caretAt);
+      opened = true;
       paint();
       syncRange();
     });
@@ -425,9 +526,21 @@
   oncompositionstart={compositionStarted}
   oncompositionend={compositionEnded}
   onblur={left}
+  onmousedown={press}
   onpointerdown={(e) => e.stopPropagation()}
   ondblclick={(e) => e.stopPropagation()}
 ></div>
+
+<div class="marks" data-testid="core-text-marks" aria-hidden="true" style="transform:{layout.transform};width:{layout.width}px;height:{layout.height}px;outline-width:{OUTLINE_PX / scale}px">
+  {#each marks.boxes as box, i (i)}
+    <div class="picked" data-testid="core-text-selection" style="left:{box.left}px;top:{box.top}px;width:{box.width}px;height:{box.height}px"></div>
+  {/each}
+  {#if marks.caret}
+    {#key value + shownSel.start}
+      <div class="caret" data-testid="core-text-caret" style="left:{marks.caret.left}px;top:{marks.caret.top}px;width:{marks.caret.width}px;height:{marks.caret.height}px;background:{look.color}"></div>
+    {/key}
+  {/if}
+</div>
 
 {#if rangeBox && textRange.values?.fill && textRange.values.fill !== MIXED}
   <div data-text-range-panel style="display:contents">
@@ -493,13 +606,38 @@
     background: var(--ui-hover, rgb(0 0 0 / 0.06));
   }
 
+  .marks {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform-origin: 0 0;
+    outline: solid var(--ui-accent, #3b82f6);
+    pointer-events: none;
+  }
+
+  .picked {
+    position: absolute;
+    background: color-mix(in srgb, var(--ui-accent, #3b82f6) 30%, transparent);
+  }
+
+  .caret {
+    position: absolute;
+    animation: blink 1s steps(1) 0.5s infinite;
+  }
+
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
+  }
+
   .edit {
     position: absolute;
     box-sizing: border-box;
     margin: 0;
     padding: 0;
     border: 0;
-    outline: 1px solid var(--ui-accent, #3b82f6);
+    outline: none;
     background: transparent;
     overflow: hidden;
     pointer-events: auto;

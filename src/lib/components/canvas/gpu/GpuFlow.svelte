@@ -65,7 +65,7 @@
   import { ImageTool } from '$lib/image-tools';
   import type { FillOf, FillType } from '@feega/motion-core/motion/fill/model';
   import type { Fill } from '@feega/motion-core/motion/fill/model';
-  import { baseStyle, editBody, editLayout, editsText, hideText, listsOfClip, runsOfClip, styledKind, textEditStyle, type EditBody, type TextEditStyle } from '$lib/canvas/frame-text-edit';
+  import { baseStyle, editBody, editLayout, editsText, listsOfClip, typedText, runsOfClip, styledKind, textEditStyle, type EditBody, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { caretOffsetAt, caretSource } from '$lib/canvas/core/text-caret';
   import { applyTextFit, measuredTexts } from '$lib/canvas/text-autosize';
   import { layerHoverMark } from '$lib/canvas/layer-hover-mark';
@@ -2456,7 +2456,34 @@
     const caret = { ...laid, matrix: mul2d(scope.place, laid.matrix) };
     const look = textEditStyle({ clip: found as MotionClip, doc: scope.view, tokens: at.live.tokens, frame: size, scale: 1 });
     typing = { nodeId, clip, caret, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), lists: listsOfClip(found), styled: styledKind(found), base: baseStyle(found), body: editBody(found, scope.view, at.live.tokens), typed: () => ahead?.release() ?? '', at: point ? caretOffsetAt(caret, point) : null };
-    liveDocs.set(nodeId, { ...at.live, doc: scope.merge(hideText(scope.view, scope.id)) });
+  }
+
+  let shownTyping = 0;
+
+  async function showTyping(text: string, runs: TextRun[], lists: ListItem[]) {
+    const open = typing;
+    const saver = open ? saverOf(open.nodeId) : null;
+    const at = open ? pickerOf(open.nodeId) : null;
+    const live = open ? liveOf(open.nodeId) : null;
+    if (!open || !saver || !at || !live) {
+      return;
+    }
+
+    const frame = frameOfLive({ doc: saver.history.present, playhead: live.playhead });
+    const scope = textScope(saver.history.present, open.clip, frame, open.nodeId);
+    if (!scope) {
+      return;
+    }
+
+    const view = typedText(scope.view, scope.id, text, runs, lists);
+    liveDocs.set(open.nodeId, { ...live, doc: scope.merge(view) });
+
+    const ticket = ++shownTyping;
+    const laid = await caretSource(() => at.live.tokens, () => at.live.assets)(view, scope.id);
+    if (!laid || ticket !== shownTyping || typing?.nodeId !== open.nodeId || typing.clip !== open.clip) {
+      return;
+    }
+    typing.caret = { ...laid, matrix: mul2d(scope.place, laid.matrix) };
   }
 
   let typeOnArrival = $state<{ nodeId: string; clip: string | null } | null>(null);
@@ -2598,7 +2625,7 @@
     const z = view.zoom;
     const stage = at.space.toWorld({ left: 0, top: 0, width: 1, height: 1 });
     const screen: [number, number, number, number, number, number] = [stage.w * z, 0, 0, stage.w * z, (stage.x - at.frame.box.x) * z, (stage.y - at.frame.box.y) * z];
-    return { at: open.at, text: open.text, typed: open.typed, runs: open.runs, lists: open.lists, styled: open.styled, base: open.base, clip: open.clip, layout: editLayout(open.caret, screen), look: open.look, body: open.body };
+    return { lines: open.caret.lines, at: open.at, text: open.text, typed: open.typed, runs: open.runs, lists: open.lists, styled: open.styled, base: open.base, clip: open.clip, layout: editLayout(open.caret, screen), look: open.look, body: open.body };
   }
 
   function nodePlaceOf(nodeId: string): NodePlace | null {
@@ -4483,7 +4510,7 @@
       {#snippet children(frame)}
         {@const edit = typingMark(frame.id)}
         {#if edit}
-          <CoreTextEdit caretAt={edit.at} layout={edit.layout} look={edit.look} text={edit.text} typedAhead={edit.typed} runs={edit.runs} lists={edit.lists} styled={edit.styled} base={edit.base} body={edit.body} clipId={edit.clip} oncommit={stopTyping} />
+          <CoreTextEdit lines={edit.lines} ontype={showTyping} caretAt={edit.at} layout={edit.layout} look={edit.look} text={edit.text} typedAhead={edit.typed} runs={edit.runs} lists={edit.lists} styled={edit.styled} base={edit.base} body={edit.body} clipId={edit.clip} oncommit={stopTyping} />
         {/if}
         {#each typing?.nodeId === frame.id || cropping?.nodeId === frame.id ? [] : marksIn(frame.id) as mark (mark.clip)}
           <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} highlight={mark.highlight} pivot={frameViews.isOn(FrameView.Pivot) && picks.length === 1 ? mark.pivot : null} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />

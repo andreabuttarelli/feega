@@ -40,9 +40,9 @@ export function editsText(doc: MotionDoc, clipId: string): boolean {
   return !!found && editablePart(doc, found.clip as MotionClip, CLIP_TEXT) === PartEdit.Text;
 }
 
-export const hideText = (doc: MotionDoc, clipId: string): MotionDoc => {
-  const hidden = setProps(doc, clipId, { opacity: 0 });
-  return hidden.ok ? hidden.doc : doc;
+export const typedText = (doc: MotionDoc, clipId: string, text: string, runs: TextRun[] = [], lists: ListItem[] = []): MotionDoc => {
+  const typed = commitText(doc, clipId, text, runs, lists);
+  return typed.ok ? typed.doc : doc;
 };
 
 export const styledKind = (clip: Pick<MotionClip, 'component'>) => styledComponent(clip.component);
@@ -82,11 +82,11 @@ export function textEditStyle(input: { clip: MotionClip; doc: MotionDoc; tokens:
   };
 }
 
-export type EditLayout = { transform: string; width: number; height: number; fontPx: number; wraps: boolean; vertical: number };
+export type EditLayout = { matrix: Affine; transform: string; width: number; height: number; fontPx: number; wraps: boolean; vertical: number };
 
 export function editLayout(caret: TextCaret, screen: Affine): EditLayout {
   const m = mul2d(screen, caret.matrix);
-  return { transform: `matrix(${m.join(',')})`, width: caret.width, height: caret.height, fontPx: caret.size, wraps: caret.flow.wraps, vertical: caret.vertical };
+  return { matrix: m, transform: `matrix(${m.join(',')})`, width: caret.width, height: caret.height, fontPx: caret.size, wraps: caret.flow.wraps, vertical: caret.vertical };
 }
 
 export const anchorShift = (layout: EditLayout, content: number): number => (layout.height - content) * layout.vertical;
@@ -99,7 +99,7 @@ const FLOW_CSS: Record<'wraps' | 'line', (layout: EditLayout) => string> = {
 export function editCss(look: TextEditStyle, layout: EditLayout): string {
   const flow = FLOW_CSS[layout.wraps ? 'wraps' : 'line'](layout);
   const font = `${look.italic ? 'italic ' : ''}${look.weight} ${layout.fontPx}px/${look.leading} ${look.family}`;
-  return `left:0;top:0;transform-origin:0 0;transform:${layout.transform};${flow}height:${layout.height}px;font:${font};letter-spacing:${look.trackingEm}em;color:${look.color};caret-color:${look.color};text-align:${look.align};text-transform:${look.textTransform};text-wrap-style:${look.wrap};text-box:${look.trim};${look.decoration}`;
+  return `opacity:0;left:0;top:0;transform-origin:0 0;transform:${layout.transform};${flow}height:${layout.height}px;font:${font};letter-spacing:${look.trackingEm}em;color:${look.color};caret-color:${look.color};text-align:${look.align};text-transform:${look.textTransform};text-wrap-style:${look.wrap};text-box:${look.trim};${look.decoration}`;
 }
 
 export type EditBody = (text: string, runs: readonly TextRun[], lists: readonly ListItem[]) => string;

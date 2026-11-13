@@ -3,7 +3,7 @@ import { findClip, MotionFormat, newClip, newMotionDoc, type MotionClip, type Mo
 import { addClip } from '@feega/motion-core/motion/timeline';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { ListKind } from '@feega/motion-core/motion/text-lists';
-import { anchorShift, commitText, editBody, editCss, editLayout, editsText, hideText, listsOfClip, runsOfClip, textEditStyle } from './frame-text-edit';
+import { anchorShift, commitText, editBody, editCss, editLayout, editsText, typedText, listsOfClip, runsOfClip, textEditStyle } from './frame-text-edit';
 import type { TextCaret } from '@feega/motion-core/motion/gpu-full/display-list';
 import { Direction, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
 import { DEFAULT_AUTO_LAYOUT, DEFAULT_LAYOUT_ITEM } from '@feega/motion-core/motion/layout/model';
@@ -31,12 +31,15 @@ describe('text editing inside a core frame', () => {
     expect(editsText(withText(), 'missing')).toBe(false);
   });
 
-  it('hides only the glyphs of the edited clip while the caret is open', () => {
-    expect(findClip(hideText(withText(), 'title'), 'title')!.clip.props.opacity).toBe(0);
+  it('shows the typed text drawn by the engine while the caret is open', () => {
+    const shown = typedText(withText(), 'title', 'Hello world');
+
+    expect(findClip(shown, 'title')!.clip.props.text).toBe('Hello world');
+    expect(findClip(shown, 'title')!.clip.props.opacity ?? 1).not.toBe(0);
     expect(textOf(withText())).toBe('Hello');
   });
 
-  it('a paragraph being edited keeps its height in the auto layout column', () => {
+  it('a paragraph opened for editing keeps its place in the auto layout column', () => {
     const base = newMotionDoc(MotionFormat.Square);
     const hug = { ...DEFAULT_LAYOUT_ITEM, width: Sizing.Fill, height: Sizing.Hug };
     const clips: MotionClip[] = [
@@ -47,7 +50,7 @@ describe('text editing inside a core frame', () => {
     const doc: MotionDoc = { ...base, tracks: clips.map((c, i) => ({ id: `t${i}`, kind: base.tracks[0].kind, name: '', clips: [c] })) };
     const buttonY = (d: MotionDoc) => findClip(withAutoLayout(d), 'button')!.clip.props.y;
 
-    expect(buttonY(hideText(doc, 'title'))).toBeCloseTo(Number(buttonY(doc)));
+    expect(buttonY(typedText(doc, 'title', String(findClip(doc, 'title')!.clip.props.text)))).toBeCloseTo(Number(buttonY(doc)));
   });
 
   it('commits the typed text as an op the history can take back', () => {
@@ -162,6 +165,12 @@ describe('the editing box follows the drawn text', () => {
 
   it('a top-anchored text only grows down', () => {
     expect(anchorShift(editLayout(caret({ vertical: 0 }), [1, 0, 0, 1, 0, 0]), 400)).toBeCloseTo(0);
+  });
+
+  it('paints no glyph, caret or selection of its own, so the engine pixels are the only ones', () => {
+    const css = editCss(look, editLayout(caret({}), [1, 0, 0, 1, 0, 0]));
+
+    expect(css).toContain('opacity:0');
   });
 
   it('title-cases and justifies the way the canvas draws', () => {
