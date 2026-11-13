@@ -35,3 +35,12 @@ Review fixes (same PR):
 - A frame revision counts the ops that wrote it (`motion_revisions.layers_touched`), not one.
 - A batch is refused up front when it would exceed what is left, naming how many remain.
   Parallel requests can overshoot slightly; accepted and documented.
+
+Second review:
+- Every agent frame write (frame tools, `save_doc`, `apply_ops`) now counts the layers it changed,
+  computed in `appendRevision` from the doc before and after (`layersChanged`). The commit RPC
+  adds them to the checkpoint row in the same statement that folds the edit, so a coalesced burst
+  counts every layer and no read-then-update race exists. `save_doc` and `apply_ops` are
+  pre-checked at that cost.
+- Studio batches and loops started with an API key count: `launchKey` picks the key from the caller,
+  not from the route.

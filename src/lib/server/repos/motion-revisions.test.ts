@@ -66,11 +66,12 @@ export function revisionsDb(seed: Row[] = [], schema: { checkpoints: boolean } =
     const fields = { version, doc: a.p_doc, summary: a.p_summary, created_at: new Date().toISOString() };
     const sameActor = head && head.actor_kind === a.p_actor_kind && (head.actor_id ?? null) === a.p_actor_id && (head.agent_key ?? null) === a.p_agent_key && (head.session_id ?? null) === (a.p_session_id ?? null);
     const recent = head && Date.parse(String(head.created_at)) > Date.now() - Number(a.p_coalesce_ms);
+    const layers = Number(a.p_layers ?? 0);
     if (Number(a.p_coalesce_ms) > 0 && sameActor && recent && !head.sealed) {
-      Object.assign(head, fields);
+      Object.assign(head, fields, { layers_touched: Number(head.layers_touched ?? 0) + layers });
       return { data: version, error: null };
     }
-    const error = insert({ org_id: a.p_org_id, node_id: a.p_node_id, actor_kind: a.p_actor_kind, actor_id: a.p_actor_id, agent_key: a.p_agent_key, session_id: a.p_session_id ?? null, ...fields });
+    const error = insert({ org_id: a.p_org_id, node_id: a.p_node_id, actor_kind: a.p_actor_kind, actor_id: a.p_actor_id, agent_key: a.p_agent_key, session_id: a.p_session_id ?? null, layers_touched: layers, ...fields });
     return { data: error ? null : version, error: null };
   };
 
@@ -196,6 +197,23 @@ describe('revisions are checkpoints, not one row per edit', () => {
     expect(third).toMatchObject({ outcome: RevisionOutcome.Written, head: { version: 3 } });
     expect(rows).toHaveLength(1);
     expect((await readHead(db, { orgId: ORG, nodeId: NODE }))?.doc.height).toBe(900);
+  });
+
+  it('an agent burst folded into one checkpoint still counts every layer it changed', async () => {
+    const { db, rows } = revisionsDb();
+    await write(db, 0, agent, Checkpoint.Coalesce, 1000);
+    await write(db, 1, agent, Checkpoint.Coalesce, 900);
+    await write(db, 2, agent, Checkpoint.Coalesce, 800);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].layers_touched).toBe(3);
+  });
+
+  it('a person editing counts no agent layers', async () => {
+    const { db, rows } = revisionsDb();
+    await write(db, 0, user);
+
+    expect(rows[0].layers_touched ?? 0).toBe(0);
   });
 
   it('an edit after the actor went idle cuts a new revision', async () => {

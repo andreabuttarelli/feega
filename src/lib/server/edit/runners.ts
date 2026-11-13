@@ -13,6 +13,9 @@ import { activeTool } from '$lib/server/ai-log';
 import { coreEvent } from '$lib/server/core-usage';
 import { AgentVia, CoreEvent, landed } from '$lib/core-usage';
 import { agentEditCap, AGENT_EDIT_CAP_STATUS } from '$lib/server/agent-edits/cap';
+import { readHead } from '$lib/server/repos/motion-revisions';
+import { layersChanged } from '$lib/motion/layers-changed';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 
 export type Answer = { status: number; body: unknown };
 
@@ -144,6 +147,20 @@ export async function runFrameTool(caller: OrgCaller, ask: FrameToolAsk): Promis
 
 export type EditorAsk = { nodeId: string; op: EditorOpName; input: unknown };
 
+const EDITOR_LAYERS: Partial<Record<EditorOpName, (caller: OrgCaller, ask: EditorAsk) => Promise<number>>> = {
+  save_doc: async (caller, ask) => {
+    const doc = (ask.input as { doc?: unknown } | null)?.doc;
+    const head = await readHead(caller.db, { orgId: caller.orgId, nodeId: ask.nodeId });
+    return Math.max(1, layersChanged(head?.doc, doc as MotionDoc));
+  },
+  apply_ops: async (_caller, ask) => {
+    const ops = (ask.input as { ops?: unknown } | null)?.ops;
+    return Array.isArray(ops) ? Math.max(1, ops.length) : 1;
+  }
+};
+
+const editorLayers = (caller: OrgCaller, ask: EditorAsk): Promise<number> => EDITOR_LAYERS[ask.op]?.(caller, ask) ?? Promise.resolve(1);
+
 export async function runEditorAction(caller: OrgCaller, ask: EditorAsk): Promise<EditorAnswer> {
   const input = EDITOR_OPS[ask.op].input.safeParse(ask.input ?? {});
   if (!input.success) {
@@ -152,7 +169,7 @@ export async function runEditorAction(caller: OrgCaller, ask: EditorAsk): Promis
   if (EDITOR_OPS[ask.op].access === EditorAccess.Write && !caller.writeAllowed) {
     return { status: HTTP_FORBIDDEN, body: { error: 'api_key_read_only' } };
   }
-  const full = EDITOR_OPS[ask.op].access === EditorAccess.Write ? await capped(caller) : undefined;
+  const full = EDITOR_OPS[ask.op].access === EditorAccess.Write ? await capped(caller, await editorLayers(caller, ask)) : undefined;
   if (full) {
     return full as EditorAnswer;
   }

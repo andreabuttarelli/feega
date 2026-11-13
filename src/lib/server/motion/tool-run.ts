@@ -6,7 +6,7 @@ import type { Db } from '$lib/server/db/client';
 import { showAgentAt } from '$lib/server/canvas/agent-cursor';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { AgentKey, agentActor } from '$lib/server/repos/actor';
-import { Checkpoint, noteAgentLayers, readRevision } from '$lib/server/repos/motion-revisions';
+import { Checkpoint, readRevision } from '$lib/server/repos/motion-revisions';
 import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { savedMotionWith } from './agent-embed';
@@ -226,7 +226,7 @@ async function screened(db: Db, scope: ToolRunScope, ready: Prepared, values: un
 
 const execute = async (ran: Checked, callId: string) => ran.found.execute(ran.value, { toolCallId: callId, messages: [], context: {} });
 
-async function commit(db: Db, ready: Prepared, summary: string, layers: number): Promise<{ version: number; saved: boolean } | Failure> {
+async function commit(db: Db, ready: Prepared, summary: string): Promise<{ version: number; saved: boolean } | Failure> {
   const { saved, session } = ready;
   if (session.doc === saved.doc) {
     return { version: saved.version, saved: false };
@@ -242,7 +242,6 @@ async function commit(db: Db, ready: Prepared, summary: string, layers: number):
   if (written.outcome !== OpsOutcome.Written) {
     return { outcome: ToolRun.Conflict };
   }
-  await noteAgentLayers(db, { orgId: ready.nodeScope.orgId, nodeId: ready.nodeScope.nodeId, version: written.head.version, layers, actor: ready.actor });
   if (!mainsGained(saved.doc, session.doc)) {
     return { version: written.head.version, saved: true };
   }
@@ -293,7 +292,7 @@ export async function runMotionBatch(db: Db, scope: ToolRunScope, ops: BatchOp[]
     }
     results.push(output);
   }
-  const written = await commit(db, ready, `batch of ${ops.length}`, ops.length);
+  const written = await commit(db, ready, `batch of ${ops.length}`);
   if ('outcome' in written) {
     return written;
   }
@@ -318,7 +317,7 @@ export async function runMotionTool(db: Db, scope: ToolRunScope, ask: ToolRunAsk
   const callId = ask.callId ?? `${TOOL_RUN_AGENT_KEY}-${newId()}`;
   const output = await execute(ran, callId);
   const seen = ready.session.frames.get(callId) ?? [];
-  const written = await commit(db, ready, ask.tool, 1);
+  const written = await commit(db, ready, ask.tool);
   if ('outcome' in written) {
     return written;
   }

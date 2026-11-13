@@ -1,5 +1,6 @@
 import type { Db } from '$lib/server/db/client';
 import { parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { layersChanged } from '$lib/motion/layers-changed';
 import { actorCols, type Actor } from './actor';
 import { Attempt, recordConflict } from './canvas-conflicts';
 import { coreEvent } from '$lib/server/core-usage';
@@ -259,11 +260,11 @@ const COALESCE_MS: Record<Checkpoint, number> = { [Checkpoint.Coalesce]: CHECKPO
 const FUNCTION_MISSING = 'PGRST202';
 const COLUMN_MISSING = 'PGRST204';
 
-type CommitArgs = { orgId: string; nodeId: string; expectedVersion: number; doc: MotionDoc; actor: Actor; summary: string | null; checkpoint: Checkpoint };
+type CommitArgs = { orgId: string; nodeId: string; expectedVersion: number; doc: MotionDoc; actor: Actor; summary: string | null; checkpoint: Checkpoint; layers: number };
 
 async function insertRevision(db: Db, input: CommitArgs): Promise<boolean> {
   const row = { node_id: input.nodeId, version: input.expectedVersion + 1, doc: input.doc, summary: input.summary, ...actorCols(input.actor) };
-  const tried = await db.from('motion_revisions').insert({ org_id: input.orgId, ...row, session_id: input.actor.sessionId ?? null } as never);
+  const tried = await db.from('motion_revisions').insert({ org_id: input.orgId, ...row, session_id: input.actor.sessionId ?? null, ...(input.layers ? { layers_touched: input.layers } : {}) } as never);
   const { error } = tried.error?.code === COLUMN_MISSING ? await db.from('motion_revisions').insert({ org_id: input.orgId, ...row } as never) : tried;
   if (error?.code === UNIQUE_VIOLATION) {
     return false;
@@ -305,7 +306,8 @@ async function commitRevision(db: Db, input: CommitArgs): Promise<boolean> {
     p_agent_key: input.actor.agentKey ?? null,
     p_coalesce_ms: COALESCE_MS[input.checkpoint]
   };
-  const tried = await patiently(() => rpc({ ...args, p_session_id: input.actor.sessionId ?? null }));
+  const counted = await patiently(() => rpc({ ...args, p_session_id: input.actor.sessionId ?? null, p_layers: input.layers }));
+  const tried = counted.error?.code === FUNCTION_MISSING ? await patiently(() => rpc({ ...args, p_session_id: input.actor.sessionId ?? null })) : counted;
   const { data, error } = tried.error?.code === FUNCTION_MISSING ? await patiently(() => rpc(args)) : tried;
   if (error?.code === FUNCTION_MISSING) {
     return insertRevision(db, input);
@@ -345,7 +347,8 @@ export async function appendRevision(
   }
 
   const summary = input.summary?.slice(0, SUMMARY_MAX) ?? null;
-  const written = await commitRevision(db, { ...input, doc: parsed.doc, summary, checkpoint: input.checkpoint ?? Checkpoint.Cut });
+  const layers = input.actor.kind === 'agent' ? layersChanged((await readHead(db, input))?.doc, parsed.doc) : 0;
+  const written = await commitRevision(db, { ...input, doc: parsed.doc, summary, checkpoint: input.checkpoint ?? Checkpoint.Cut, layers });
   if (!written) {
     await noteStaleHead(db, { ...input, doc: parsed.doc });
     return { outcome: RevisionOutcome.Conflict };
@@ -353,31 +356,6 @@ export async function appendRevision(
 
   coreEvent(input.actor.id, input.expectedVersion === 0 ? CoreEvent.FrameCreated : CoreEvent.FrameEdited, { frame_id: input.nodeId, actor: input.actor.kind as ActorKind });
   return { outcome: RevisionOutcome.Written, head: { version: input.expectedVersion + 1, doc: parsed.doc, summary, actorKind: input.actor.kind } };
-}
-
-export async function noteAgentLayers(db: Db, input: { orgId: string; nodeId: string; version: number; layers: number; actor: Actor }): Promise<void> {
-  if (input.actor.kind !== 'agent' || input.layers <= 0) {
-    return;
-  }
-  try {
-    const row = () => db.from('motion_revisions').select('layers_touched' as never).eq('org_id', input.orgId).eq('node_id', input.nodeId).eq('version', input.version);
-    const { data, error } = await row().maybeSingle();
-    if (error) {
-      throw error;
-    }
-    const before = (data as { layers_touched?: number | null } | null)?.layers_touched ?? 0;
-    const { error: written } = await db
-      .from('motion_revisions')
-      .update({ layers_touched: before + input.layers } as never)
-      .eq('org_id', input.orgId)
-      .eq('node_id', input.nodeId)
-      .eq('version', input.version);
-    if (written) {
-      throw written;
-    }
-  } catch (e) {
-    console.error('[agent-edits] layers not noted on the revision', input.nodeId, e);
-  }
 }
 
 export async function sealRevision(db: Db, input: { orgId: string; nodeId: string; version: number }): Promise<void> {

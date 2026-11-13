@@ -41,6 +41,8 @@ export const AGENT_INITIATOR: Record<AgentKey, Initiator> = {
 
 export const AGENT_DECIDED_KEYS: readonly AgentKey[] = Object.values(AgentKey).filter((key) => AGENT_INITIATOR[key] === Initiator.Agent);
 
+export const launchKey = (personKey: AgentKey, caller: { apiKeyId?: string | null }): AgentKey => (caller.apiKeyId ? AgentKey.ApiKey : personKey);
+
 export const SIDEBAR_AGENT_KEY = CHAT_AGENT_KEY as AgentKey.Sidebar;
 
 export type AgentActor = { kind: 'agent'; id: string; agentKey: AgentKey; sessionId?: string | null };

@@ -46,7 +46,7 @@ export const selectionSchema = z.object({
 
 export type Selection = z.infer<typeof selectionSchema>;
 
-export type StudioCtx = { orgId: string; projectId: string; userId: string };
+export type StudioCtx = { orgId: string; projectId: string; userId: string; agentKey?: AgentKey };
 
 export type Quote = {
   plan: BatchPlan;
@@ -63,7 +63,7 @@ export type Shortfall = { needed: number; balance: number };
 export type StudioRefusal = { error: string; shortfall?: Shortfall };
 
 function actorOf(ctx: StudioCtx): Actor {
-  return agentActor(ctx.userId, STUDIO_AGENT_KEY);
+  return agentActor(ctx.userId, ctx.agentKey ?? STUDIO_AGENT_KEY);
 }
 
 export function quoteSelection(selection: Selection, options: StudioOptions): Quote | StudioRefusal {

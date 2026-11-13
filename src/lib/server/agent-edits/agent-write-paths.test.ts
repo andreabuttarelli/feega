@@ -26,7 +26,9 @@ const GATED_ENTRIES = [
   'src/routes/api/v1/gallery/[id]/remix/+server.ts',
   'src/routes/api/v1/motion/[nodeId]/poster/+server.ts',
   'src/routes/api/v1/motion/elements/+server.ts',
-  'src/routes/api/v1/org/rows/+server.ts'
+  'src/routes/api/v1/org/rows/+server.ts',
+  'src/routes/api/v1/org/nodes/[id]/loop/+server.ts',
+  'src/routes/api/v1/studio/start/+server.ts'
 ];
 
 const NOT_AN_EDIT: Record<string, string> = {
