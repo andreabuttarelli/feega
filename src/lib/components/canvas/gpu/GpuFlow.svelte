@@ -1349,6 +1349,22 @@
     }
   });
 
+  function sendBackFrame(id: string) {
+    if (selected.includes(id) || liveDocs.map.has(id)) {
+      return;
+    }
+    const next = new Map(fetched);
+    next.delete(id);
+    fetched = next;
+    viewDocs.delete(id);
+    resolveViews.forget(id);
+    pickers.drop(id);
+    for (const key of [...viewsShown.keys()].filter((k) => baseNodeId(k) === id)) {
+      viewsShown.delete(key);
+      pickers.drop(key);
+    }
+  }
+
   function adoptSource(id: string, source: FrameDoc) {
     if ((fetched.get(id)?.revision ?? 0) >= source.revision) {
       return;
@@ -4447,7 +4463,7 @@
   >
     {#if !failed}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} listenLive={(listener) => liveDocs.listen(listener)} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId, userId: (page.data as { session?: { user?: { id: string } } | null }).session?.user?.id, look: (page.data as { look?: string }).look }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} onbackend={(change) => track(GPU_FALLBACK_EVENT, change)} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} listenLive={(listener) => liveDocs.listen(listener)} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId, userId: (page.data as { session?: { user?: { id: string } } | null }).session?.user?.id, look: (page.data as { look?: string }).look }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} onbackend={(change) => track(GPU_FALLBACK_EVENT, change)} onevict={sendBackFrame} />
       </svelte:boundary>
     {/if}
     <div class="hover-rings" data-testid="node-hover-rings">
