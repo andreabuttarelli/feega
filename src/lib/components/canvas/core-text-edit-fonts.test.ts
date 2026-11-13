@@ -8,7 +8,7 @@ const dir = dirname(fileURLToPath(import.meta.url));
 const { flushSync, mount, unmount } = (await import(join(dir, '../../../../node_modules/svelte/src/index-client.js'))) as typeof import('svelte');
 
 const LOOK = { fontPx: 54, family: "'Inter Tight', sans-serif", weight: 600, italic: false, trackingEm: 0, leading: 1.2, color: '#000', textTransform: 'none', align: 'left', wrap: 'pre', trim: 'none', decoration: 'none' };
-const LAYOUT = { transform: 'none', width: 300, height: 60, fontPx: 54, wraps: false, vertical: 0 };
+const LAYOUT = { matrix: [1, 0, 0, 1, 0, 0] as [number, number, number, number, number, number], transform: 'none', width: 300, height: 60, fontPx: 54, wraps: false, vertical: 0 };
 
 let app: Record<string, unknown> | null = null;
 let measured = 0;
