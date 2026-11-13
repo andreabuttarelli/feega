@@ -49,8 +49,8 @@
 <section class="prototype" data-testid="prototype-section" aria-label="Prototype">
   <header>
     <h3>Prototype</h3>
-    <button type="button" class="link" data-testid="prototype-add" onclick={add}>Add interaction</button>
-    <button type="button" class="link" data-testid="prototype-link" aria-pressed={aiming} onclick={() => (aiming ? prototypeLink.stop() : prototypeLink.aim({ clipId: clip.id, interactionId: null }))}>
+    <button type="button" class="link reach" data-testid="prototype-add" onclick={add}>Add interaction</button>
+    <button type="button" class="link reach" data-testid="prototype-link" aria-pressed={aiming} onclick={() => (aiming ? prototypeLink.stop() : prototypeLink.aim({ clipId: clip.id, interactionId: null }))}>
       {aiming ? 'Cancel' : 'Link to frame'}
     </button>
   </header>

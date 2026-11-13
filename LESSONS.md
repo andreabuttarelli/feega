@@ -496,6 +496,15 @@ dei frame di controllo: un rumore sotto soglia sposta un coefficiente quantizzat
 blocco cambia. Move: confrontare medie di blocco 8x8, non pixel; riprodurre con il doc dell'eval
 in `seekCheckDoc` (20 giri, Chromium basta), non con lo shot rifatto da `addShot`, che non falliva.
 
+### L'audit dell'inspector dice "canvas stale" ma la tela non è in ritardo
+Signal: una riga `canvas` passa al primo tentativo e fallisce al secondo, oppure "l'immagine modificata
+torna dopo l'undo". Tre cause, nessuna è un'invalidazione persa: la prima modifica su una frame
+scambia l'immagine salvata con quella live (che possono differire, es. lo sfondo della frame
+importata); molte modifiche non cambiano pixel (peso 300 con DM Sans caricato a 400/500/600, line
+height su una riga, gap di uno stack con un figlio); e un hash dello screenshot vede il bordo di
+selezione che sfarfalla di 1 px. Move: conta i pixel diversi (soglia di colore) base→modifica e
+modifica→undo per 5 s a 250 ms, salva i tre PNG e guardali, prima di cercare nel motore.
+
 ### Un dev server con `NO_HMR=1` serve i moduli vecchi dopo un edit
 Signal: un giro Playwright dopo una modifica si comporta come prima, o `window.x is not a function`
 su una funzione appena aggiunta. Move: riavviare il dev server dopo ogni edit prima di misurare.

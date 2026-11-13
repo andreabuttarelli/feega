@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import SidePopover from './SidePopover.svelte';
+import { onBody } from './on-body';
 
 const dir = dirname(fileURLToPath(import.meta.url));
 const { createRawSnippet, flushSync, mount, unmount } = (await import(join(dir, '../../../../../node_modules/svelte/src/index-client.js'))) as typeof import('svelte');
@@ -69,6 +70,26 @@ describe('side popover focus', () => {
     document.querySelectorAll<HTMLElement>('[data-testid="side-popover"]')[1].querySelector<HTMLElement>('[data-testid="colour-blend"]')!.focus();
     tab();
     expect(document.querySelectorAll('[data-testid="side-popover"]')[1].contains(document.activeElement)).toBe(true);
+  });
+
+  it('a popover lifted to the body from inside the trap stays in the trap: Tab reaches it, Tab past it wraps, a press in it keeps the trap open', () => {
+    const onclose = vi.fn();
+    const trigger = document.createElement('button');
+    document.body.append(trigger);
+    trigger.focus();
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    apps.push(mount(SidePopover, { target: document.body, props: { anchor: trigger, title: 'effect', onclose, children: createRawSnippet(() => ({ render: () => `<div>${FIELDS}<div data-testid="picker"><input data-testid="picker-hex" /></div></div>`, setup: (el) => onBody(el.querySelector<HTMLElement>('[data-testid="picker"]')!) })) } }));
+    flushSync();
+    const trap = $('side-popover');
+
+    expect(trap.contains($('picker-hex'))).toBe(true);
+
+    $('picker-hex').focus();
+    tab();
+    expect(document.activeElement).toBe($('side-popover-close'));
+
+    $('picker-hex').dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    expect(onclose).not.toHaveBeenCalled();
   });
 
   it('a trigger inside the anchored row (the fill swatch) counts as opening by keyboard', () => {

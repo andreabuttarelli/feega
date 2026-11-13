@@ -2585,7 +2585,7 @@
     if (!tile) {
       return null;
     }
-    return { x: tile.x, y: tile.y, w: tile.w, h: tile.h, rotation: tile.rotation ?? 0, set: (x, y) => props.onMove?.(nodeId, x, y), resize: (w, h) => props.onResize?.(nodeId, w, h), grow: (w, h) => props.onNodeSize?.(nodeId, w, h), turn: (degrees) => props.onRotate?.(nodeId, degrees - (tile.rotation ?? 0)), flip: (flip) => flipNodes([nodeId], flip), align: alignInHolder(nodeId) };
+    return { x: tile.x, y: tile.y, w: tile.w, h: tile.h, rotation: tile.rotation ?? 0, set: (x, y) => props.onMove?.(nodeId, x, y), resize: (w, h) => props.onResizeEnd?.(nodeId, { x: tile.x, y: tile.y, w: tile.w, h: tile.h }, { x: tile.x, y: tile.y, w, h }), grow: (w, h) => props.onNodeSize?.(nodeId, w, h), turn: (degrees) => props.onRotate?.(nodeId, degrees - (tile.rotation ?? 0)), flip: (flip) => flipNodes([nodeId], flip), align: alignInHolder(nodeId) };
   }
 
   const hostLedger = new HostLedger();

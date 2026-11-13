@@ -71,6 +71,19 @@ describe('the stack size chip', () => {
     expect(byId('stack-capped-width')?.textContent).toMatch(/^Capped at \d+ px by the stack$/);
   });
 
+  it('a capped fixed width shows the width set, so ArrowUp nudges it instead of writing the capped value back', () => {
+    const box = findClip(column, 'box')!.clip;
+    const wide = Math.round(Number(box.props.width) * column.width) + 200;
+    const commit = show(must(setChildSize(column, 'a', 'width', { sizing: Sizing.Fixed, value: wide })));
+    const field = document.querySelector<HTMLInputElement>('input[aria-label="Width"]')!;
+
+    expect(field.value).toBe(String(wide));
+
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
+    const [result] = commit.mock.calls[0] as [OpResult];
+    expect(result.ok && Math.round(Number(findClip(result.doc, 'a')!.clip.props.width) * column.width)).toBe(wide + 1);
+  });
+
   it('says nothing when the width fits', () => {
     show(column);
 

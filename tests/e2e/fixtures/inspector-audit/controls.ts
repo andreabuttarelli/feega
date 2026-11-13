@@ -68,6 +68,7 @@ const popover = (id: string) => (page: Page) => page.getByTestId('side-popover')
 const popoverField = (name: string) => (page: Page) => page.getByTestId('side-popover').getByRole('textbox', { name, exact: true });
 
 const prop = (key: string) => (c: Clip) => c.props[key];
+const ownWidth = (c: Clip) => ((c.layoutItem as { width?: string } | undefined)?.width === 'fixed' ? c.props.width : 0);
 const fill0 = (key: string) => (c: Clip) => (c.props.fills as Record<string, unknown>[] | undefined)?.[0]?.[key];
 const fillTypes = (c: Clip) => (c.props.fills as { type: string }[] | undefined)?.map((f) => f.type);
 const stroke0 = (key: string) => (c: Clip) => (c.props.strokes as Record<string, unknown>[] | undefined)?.[0]?.[key];
@@ -419,7 +420,7 @@ const LISTED: Row[] = [
   ...on(Layer.Line, State.Single, lineStrokeRows),
   ...on(Layer.Text, State.Single, [...typeRows(true), ...colourRows, ...textUseRows]),
   ...on(Layer.Bound, State.Bound, [...typeRows(true).slice(0, 3), ...boundFillRows('Theme/Ink'), ...styleDetachRows]),
-  ...on(Layer.ImportedText, State.Imported, [...typeRows(true).slice(0, 4), typeRows(true)[9], ...boundFillRows('Stripe/Primary'), ...textUseRows, ...styleDetachRows, ...sizeRows(true).slice(0, 2).map((r) => ({ ...r, section: 'stack', target: field('stack', 'Width') }))]),
+  ...on(Layer.ImportedText, State.Imported, [...typeRows(true).slice(0, 4), typeRows(true)[9], ...boundFillRows('Stripe/Primary'), ...textUseRows, ...styleDetachRows, ...sizeRows(true).slice(0, 2).map((r) => ({ ...r, section: 'stack', target: field('stack', 'Width'), read: ownWidth }))]),
   ...on(Layer.ImportedPill, State.Imported, [...fillRows.slice(0, 1), ...radiusRows.slice(0, 1), ...importedStackRows]),
   ...on(Layer.Shadowed, State.Single, effectRows),
   ...on(Layer.Stack, State.Single, stackRows),

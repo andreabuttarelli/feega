@@ -225,7 +225,7 @@
           {/each}
         </ul>
       {:else if !installed}
-        <button type="button" class="rounded-sm px-1 text-left text-[10px] text-ui-text-3 hover:bg-ui-wash" data-testid="font-installed-show" disabled={reading} onclick={showInstalled}>{reading ? 'Reading installed fonts…' : 'Show installed fonts…'}</button>
+        <button type="button" class="reach rounded-sm px-1 text-left text-[10px] text-ui-text-3 hover:bg-ui-wash" data-testid="font-installed-show" disabled={reading} onclick={showInstalled}>{reading ? 'Reading installed fonts…' : 'Show installed fonts…'}</button>
       {/if}
       {#if installed}<p class={MUTED} data-testid="font-installed-note">{LOCAL_NOTE[installed.state]}</p>{/if}
       <p class={GROUP}>Google Fonts{brand.length ? ' · brand first' : ''}</p>
