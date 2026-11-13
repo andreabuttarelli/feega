@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CrashRecorder, SAMPLE_EVERY_MS, blankSample, type Shelf } from './crash-record';
+import { CrashRecorder, SAMPLE_EVERY_MS, blankSample, endedUncleanly, type Shelf } from './crash-record';
 
 class MemoryShelf implements Shelf {
   readonly items = new Map<string, string>();
@@ -21,6 +21,20 @@ const sampled = (zoom: number) => ({ ...blankSample(), zoom });
 describe('the crash record', () => {
   it('finds nothing to report on a first visit', () => {
     expect(new CrashRecorder(new MemoryShelf()).begin()).toBeNull();
+  });
+
+  it('tells the next open that the last session never ended, before anything resets the mark', () => {
+    const shelf = new MemoryShelf();
+    expect(endedUncleanly(shelf)).toBe(false);
+
+    new CrashRecorder(shelf).begin();
+    expect(endedUncleanly(shelf)).toBe(true);
+    expect(endedUncleanly(shelf)).toBe(true);
+
+    const clean = new CrashRecorder(shelf);
+    clean.begin();
+    clean.endCleanly();
+    expect(endedUncleanly(shelf)).toBe(false);
   });
 
   it('reports the last sample of a session that never ended cleanly', () => {

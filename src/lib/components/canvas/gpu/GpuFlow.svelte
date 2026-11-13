@@ -194,7 +194,7 @@
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
   import { FitPurpose, fitView, restoreViewport } from '$lib/canvas/restore-viewport';
   import { coreSourcePath } from '$lib/canvas/core/early-sources';
-  import { loadViewport, rememberViewport } from '$lib/canvas/viewport-memory';
+  import { loadViewport, pageDiedInView, rememberViewport } from '$lib/canvas/viewport-memory';
   import { FocusMode, Placement, centreIn, focusPlacement, focusSelects, inView, revealIn, frameIn, type Insets } from '$lib/canvas/free-area';
   import { ZoomStep, watchPinch, type CanvasZoom } from '$lib/canvas/page-zoom';
   import { Region, claimFocus, reachesCanvas, regionOf, releaseFocus } from '$lib/canvas/key-region.svelte';
@@ -881,12 +881,6 @@
 
   const heldCanvas = $derived(props.canvasId ?? page.params.canvasId ?? '');
 
-  $effect(() => {
-    const incoming = tiles;
-    const canvasId = heldCanvas;
-    untrack(() => adoptNew(incoming, canvasId));
-  });
-
   function adoptNew(incoming: Tile[], canvasId: string) {
     const added = incoming.filter((t) => !known.has(t.id));
     known = new Set(incoming.map((t) => t.id));
@@ -907,7 +901,18 @@
     const saved = props.viewerId ? loadViewport(props.viewerId, canvasId) : null;
     const s = screenSize();
     view = restoreViewport(saved, boundsOf(incoming), { width: s.width, height: s.height });
+    reopenedFitted = Boolean(props.viewerId) && pageDiedInView();
   }
+
+  const REOPENED_NOTE_MS = 6000;
+  let reopenedFitted = $state(false);
+  $effect(() => {
+    if (!reopenedFitted) {
+      return;
+    }
+    const timer = setTimeout(() => (reopenedFitted = false), REOPENED_NOTE_MS);
+    return () => clearTimeout(timer);
+  });
 
   const REMEMBER_VIEW_MS = 400;
   $effect(() => {
@@ -1343,6 +1348,22 @@
       }
     }
   });
+
+  function sendBackFrame(id: string) {
+    if (selected.includes(id) || liveDocs.map.has(id)) {
+      return;
+    }
+    const next = new Map(fetched);
+    next.delete(id);
+    fetched = next;
+    viewDocs.delete(id);
+    resolveViews.forget(id);
+    pickers.drop(id);
+    for (const key of [...viewsShown.keys()].filter((k) => baseNodeId(k) === id)) {
+      viewsShown.delete(key);
+      pickers.drop(key);
+    }
+  }
 
   function adoptSource(id: string, source: FrameDoc) {
     if ((fetched.get(id)?.revision ?? 0) >= source.revision) {
@@ -4387,6 +4408,12 @@
   }
 
   const domTiles = $derived(placed.filter((t) => domIds.has(t.id)));
+
+  $effect.pre(() => {
+    const incoming = tiles;
+    const canvasId = heldCanvas;
+    untrack(() => adoptNew(incoming, canvasId));
+  });
 </script>
 
 <svelte:window onkeydown={onKeydown} onpointerdowncapture={claimFocus} onclickcapture={releaseFocus} onblur={() => (altHeld = false)} onkeyup={(e) => {
@@ -4444,7 +4471,7 @@
   >
     {#if !failed}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} listenLive={(listener) => liveDocs.listen(listener)} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId, userId: (page.data as { session?: { user?: { id: string } } | null }).session?.user?.id, look: (page.data as { look?: string }).look }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} onbackend={(change) => track(GPU_FALLBACK_EVENT, change)} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} listenLive={(listener) => liveDocs.listen(listener)} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId, userId: (page.data as { session?: { user?: { id: string } } | null }).session?.user?.id, look: (page.data as { look?: string }).look }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} onbackend={(change) => track(GPU_FALLBACK_EVENT, change)} onevict={sendBackFrame} />
       </svelte:boundary>
     {/if}
     <div class="hover-rings" data-testid="node-hover-rings">
@@ -4655,6 +4682,10 @@
 
   {#if targeting}
     <p class="edge-refusal" role="status">Pick the node to connect to — Esc to cancel</p>
+  {/if}
+
+  {#if reopenedFitted}
+    <p class="edge-refusal" role="status">The page reloaded, so the canvas opened zoomed out</p>
   {/if}
 
   {#if props.onDraw && frameBar.tool !== DrawTool.Select && frameBar.tool !== DrawTool.ShapeBuilder}

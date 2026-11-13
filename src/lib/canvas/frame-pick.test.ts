@@ -196,6 +196,16 @@ describe('an image inserted in a frame', () => {
     expect(pickers.of('frame', arrived).pick(centre, stage)).toBe('img');
   });
 
+  it('drops a frame it was told to forget, with the doc it held', () => {
+    const pickers = new FramePickers();
+    const live = { doc: placed.doc, tokens: FEEGA_TOKENS, assets: {} };
+    const held = pickers.of('frame', live);
+
+    pickers.drop('frame');
+
+    expect(pickers.of('frame', live, undefined, Reuse.Held)).not.toBe(held);
+  });
+
   it('keeps the held picker through a live gesture, so a scrub never recompiles the frame', () => {
     const pickers = new FramePickers();
     const live = { doc: placed.doc, tokens: FEEGA_TOKENS, assets: {} };

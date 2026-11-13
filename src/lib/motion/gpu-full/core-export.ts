@@ -1,5 +1,6 @@
 import { BACKENDS, type FullBackend } from '@feega/motion-core/motion/gpu-full/backends';
-import { drawFrame, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
+import { drawFrame, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
+import type { Pictures } from '@feega/motion-core/motion/gpu-full/raster';
 import { originalFrames } from '$lib/motion/gpu/shared-frames';
 import { createMedia } from '@feega/motion-core/motion/gpu-full/media';
 import { readClips, type CustomReads } from '@feega/motion-core/motion/gpu-full/dom/custom';
@@ -91,5 +92,21 @@ export async function stillRaster(backend: FullBackend, side: number): Promise<S
       raster.dispose();
       media.dispose();
     }
+  };
+}
+
+export type ListShooter = { shoot: (list: DisplayList, pictures: Pictures) => Promise<ImageBitmap>; dispose: () => void };
+
+export async function listShooter(backend: FullBackend, width: number, height: number): Promise<ListShooter | null> {
+  const owned = await ownRaster(backend, width, height);
+  if (!owned) {
+    return null;
+  }
+  return {
+    shoot: (list, pictures) => {
+      owned.raster.draw(list, pictures);
+      return createImageBitmap(owned.canvas, 0, 0, list.width, list.height);
+    },
+    dispose: () => owned.raster.dispose()
   };
 }

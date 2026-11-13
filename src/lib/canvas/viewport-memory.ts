@@ -1,4 +1,5 @@
 import type { Viewport } from './dot-grid';
+import { endedUncleanly } from './gpu/crash-record';
 
 const KEY_PREFIX = 'feega:viewport:';
 
@@ -10,9 +11,13 @@ function parse(raw: string | null): Viewport | null {
   return v && typeof v.x === 'number' && typeof v.y === 'number' && typeof v.zoom === 'number' ? { x: v.x, y: v.y, zoom: v.zoom } : null;
 }
 
+let diedInView: boolean | undefined;
+
+export const pageDiedInView = (): boolean => (diedInView ??= endedUncleanly(localStorage));
+
 export function loadViewport(userId: string, canvasId: string): Viewport | null {
   try {
-    return parse(localStorage.getItem(keyOf(userId, canvasId)));
+    return pageDiedInView() ? null : parse(localStorage.getItem(keyOf(userId, canvasId)));
   } catch {
     return null;
   }

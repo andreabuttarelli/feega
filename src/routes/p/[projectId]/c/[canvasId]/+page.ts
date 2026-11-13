@@ -6,6 +6,7 @@ import { StartupStep, markStartup } from '$lib/canvas/core/startup-marks';
 import { earlySourceUrls } from '$lib/canvas/core/early-sources';
 import { frameSources, scopeFrameCache } from '$lib/canvas/core/frame-sources';
 import { loadViewport } from '$lib/canvas/viewport-memory';
+import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
 
 export const ssr = false;
 
@@ -30,7 +31,7 @@ function warmSources(page: CanvasPageData, params: { projectId: string; canvasId
   scopeFrameCache(userId ? { userId, orgId: page.orgId } : null);
   const saved = userId ? loadViewport(userId, params.canvasId) : null;
   const screen = { width: window.innerWidth, height: window.innerHeight };
-  frameSources.warm(earlySourceUrls(page.nodes, { ...params, orgId: page.orgId, look: page.look }, saved, screen));
+  frameSources.warm(earlySourceUrls(page.nodes, { ...params, orgId: page.orgId, look: page.look }, saved, screen, BUDGET[currentDevice()].readableWidth));
 }
 
 export const load: PageLoad = async ({ url, params, parent }) => {

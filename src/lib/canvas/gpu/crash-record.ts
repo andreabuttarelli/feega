@@ -42,6 +42,8 @@ function quietly<T>(run: () => T, fallback: T): T {
   }
 }
 
+export const endedUncleanly = (shelf: Shelf): boolean => quietly(() => shelf.getItem(OPEN_KEY) === OPEN, false);
+
 export class CrashRecorder {
   private lastWrite = -Infinity;
   private died = false;
@@ -49,7 +51,7 @@ export class CrashRecorder {
   constructor(private readonly shelf: Shelf) {}
 
   begin(): CrashSample | null {
-    const crashed = quietly(() => this.shelf.getItem(OPEN_KEY) === OPEN, false);
+    const crashed = endedUncleanly(this.shelf);
     this.died = crashed;
     const record = crashed ? quietly(() => this.shelf.getItem(RECORD_KEY), null) : null;
     quietly(() => this.shelf.removeItem(RECORD_KEY), undefined);

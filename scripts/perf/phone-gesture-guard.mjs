@@ -1,3 +1,7 @@
+import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { webkit } from '@playwright/test';
 
 const BASE = process.env.BASE ?? 'http://127.0.0.1:5197/';
@@ -5,6 +9,7 @@ const MB = 1024 * 1024;
 const SETTLE_MS = 12_000;
 const STEPS = 60;
 const RECOVER_MS = 15_000;
+const SHOTS = process.env.SHOTS;
 
 const PROFILES = {
   iphone: { viewport: { width: 393, height: 852 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true },
@@ -15,6 +20,53 @@ const UPLOAD_MB_PER_FRAME = {
   iphone: 20,
   ipad: 120
 };
+
+const REST_MB = {
+  iphone: 500,
+  ipad: 700
+};
+
+const PEAK_MB = {
+  iphone: 1100,
+  ipad: 1100
+};
+
+const TOURED_MB = {
+  iphone: 750,
+  ipad: 800
+};
+
+const TOUR_STEPS = 12;
+const TOUR_SETTLE_MS = 3_000;
+const DRAG_SHARE = 0.8;
+
+const WEBCONTENT = /ms-playwright\/webkit.*WebContent/;
+
+const contentPids = () =>
+  execSync('ps -axo pid,command', { encoding: 'utf8' })
+    .split('\n')
+    .filter((line) => WEBCONTENT.test(line))
+    .map((line) => Number(line.trim().split(/\s+/)[0]));
+
+const footprintMb = (pid) => {
+  const out = execSync(`footprint ${pid} 2>/dev/null || true`, { encoding: 'utf8' });
+  const [, amount, unit] = out.match(/Footprint: ([\d.]+) (KB|MB|GB)/) ?? [];
+  return amount ? Number(amount) * { KB: 1 / 1024, MB: 1, GB: 1024 }[unit] : 0;
+};
+
+const peakOf = (pid) => {
+  const file = join(tmpdir(), `phone-guard-${pid}.json`);
+  try {
+    execSync(`footprint -j ${file} ${pid} 2>/dev/null`);
+    return (JSON.parse(readFileSync(file, 'utf8')).processes?.[0]?.auxiliary?.phys_footprint_peak ?? 0) / MB;
+  } catch {
+    return 0;
+  }
+};
+
+const peakMb = (before) => Math.max(0, ...contentPids().filter((pid) => !before.has(pid)).map(peakOf));
+
+const restingMb = (before) => Math.max(0, ...contentPids().filter((pid) => !before.has(pid)).map(footprintMb));
 
 function countUploads() {
   const seen = { bytes: 0, frames: 0 };
@@ -64,6 +116,78 @@ const twoFingerPan = (page, size) =>
     { size, steps: STEPS }
   );
 
+const pinchOpen = (page, size) =>
+  page.evaluate(
+    async ({ size, steps }) => {
+      const surface = document.querySelector('.surface');
+      const box = surface.getBoundingClientRect();
+      const fire = (type, id, x, y) => surface.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: 'touch', isPrimary: id === 1, clientX: box.left + x, clientY: box.top + y, bubbles: true, cancelable: true, buttons: type === 'pointerup' ? 0 : 1 }));
+      const centre = { x: size.width / 2, y: size.height * 0.3 };
+      const from = size.width * 0.1;
+      const to = size.width * 0.8;
+      const at = (k) => {
+        const gap = from + (to - from) * k;
+        return [
+          [centre.x - gap / 2, centre.y],
+          [centre.x + gap / 2, centre.y]
+        ];
+      };
+      let [a, b] = at(0);
+      fire('pointerdown', 1, ...a);
+      fire('pointerdown', 2, ...b);
+      for (let i = 1; i <= steps; i++) {
+        await new Promise((r) => requestAnimationFrame(r));
+        [a, b] = at(i / steps);
+        fire('pointermove', 1, ...a);
+        fire('pointermove', 2, ...b);
+      }
+      fire('pointerup', 1, ...a);
+      fire('pointerup', 2, ...b);
+    },
+    { size, steps: STEPS }
+  );
+
+const drag = (page, size, by) =>
+  page.evaluate(
+    async ({ size, by, steps }) => {
+      const surface = document.querySelector('.surface');
+      const box = surface.getBoundingClientRect();
+      const fire = (type, id, x, y) => surface.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: 'touch', isPrimary: id === 1, clientX: box.left + x, clientY: box.top + y, bubbles: true, cancelable: true, buttons: type === 'pointerup' ? 0 : 1 }));
+      const gap = size.width * 0.2;
+      const from = { x: size.width / 2 - (by * size.width) / 2, y: size.height / 2 };
+      const at = (k) => [
+        [from.x - gap / 2 + by * size.width * k, from.y],
+        [from.x + gap / 2 + by * size.width * k, from.y]
+      ];
+      let [a, b] = at(0);
+      fire('pointerdown', 1, ...a);
+      fire('pointerdown', 2, ...b);
+      for (let i = 1; i <= steps; i++) {
+        await new Promise((r) => requestAnimationFrame(r));
+        [a, b] = at(i / steps);
+        fire('pointermove', 1, ...a);
+        fire('pointermove', 2, ...b);
+      }
+      fire('pointerup', 1, ...a);
+      fire('pointerup', 2, ...b);
+    },
+    { size, by, steps: STEPS }
+  );
+
+const shot = (page, label) => (SHOTS ? page.screenshot({ path: `${SHOTS}/${label}.png` }) : Promise.resolve());
+
+async function tour(page, size) {
+  for (let i = 0; i < TOUR_STEPS / 2; i++) {
+    await drag(page, size, DRAG_SHARE);
+  }
+  for (let i = 0; i < TOUR_STEPS; i++) {
+    await drag(page, size, -DRAG_SHARE);
+    await page.waitForTimeout(TOUR_SETTLE_MS);
+  }
+}
+
+const builtMb = (page) => page.evaluate(() => Number(document.querySelector('[data-testid=core-canvas]')?.dataset.builtMb ?? 0));
+
 const loseContext = (page) =>
   page.evaluate(() => {
     const lose = document.querySelector('[data-testid=core-canvas]').getContext('webgl2')?.getExtension('WEBGL_lose_context');
@@ -72,6 +196,7 @@ const loseContext = (page) =>
   });
 
 async function guard(name) {
+  const before = new Set(contentPids());
   const browser = await webkit.launch();
   const page = await (await browser.newContext(PROFILES[name])).newPage();
   const failures = [];
@@ -82,19 +207,46 @@ async function guard(name) {
   await page.waitForSelector('[data-testid=core-canvas]', { state: 'attached', timeout: 120_000 });
   await page.waitForTimeout(SETTLE_MS);
 
-  const before = await page.evaluate(() => ({ ...window.__uploads }));
+  const resting = restingMb(before);
+  const opened = peakMb(before);
+  if (opened > PEAK_MB[name]) {
+    failures.push(`opening the canvas peaked at ${opened.toFixed(0)} MB, over ${PEAK_MB[name]}`);
+  }
+  await shot(page, `${name}-rest`);
+  if (resting > REST_MB[name]) {
+    failures.push(`the canvas holds ${resting.toFixed(0)} MB at rest, over ${REST_MB[name]}`);
+  }
+
+  await pinchOpen(page, PROFILES[name].viewport);
+  await page.waitForTimeout(SETTLE_MS);
+  const built = await builtMb(page);
+  const zoomedIn = restingMb(before);
+  if (!built) {
+    failures.push('no frame was built after zooming in, so the pan below measures nothing');
+  }
+
+  const start = await page.evaluate(() => ({ ...window.__uploads }));
   await twoFingerPan(page, PROFILES[name].viewport);
   const after = await page.evaluate(() => ({ ...window.__uploads }));
-  const perFrame = (after.bytes - before.bytes) / MB / Math.max(1, after.frames - before.frames);
+  const perFrame = (after.bytes - start.bytes) / MB / Math.max(1, after.frames - start.frames);
   if (perFrame > UPLOAD_MB_PER_FRAME[name]) {
     failures.push(`two-finger pan uploads ${perFrame.toFixed(1)} MB a frame, over ${UPLOAD_MB_PER_FRAME[name]}`);
+  }
+
+  await tour(page, PROFILES[name].viewport);
+  await page.waitForTimeout(SETTLE_MS);
+  const toured = restingMb(before);
+  await shot(page, `${name}-toured`);
+  const keptBuilt = await builtMb(page);
+  if (toured > TOURED_MB[name]) {
+    failures.push(`after a tour of every frame the canvas holds ${toured.toFixed(0)} MB, over ${TOURED_MB[name]}`);
   }
 
   const lost = await loseContext(page);
   await page.waitForFunction(() => Number(document.querySelector('[data-testid=core-canvas]')?.dataset.held ?? 0) > 0 && !document.querySelector('[data-testid=core-canvas]').getContext('webgl2')?.isContextLost(), null, { timeout: RECOVER_MS }).catch(() => failures.push('canvas did not come back after a lost GL context'));
 
   await browser.close();
-  console.log(JSON.stringify({ profile: name, uploadMbPerFrame: +perFrame.toFixed(1), contextLost: lost, failures }));
+  console.log(JSON.stringify({ profile: name, restingMb: Math.round(resting), openPeakMb: Math.round(opened), builtMbAfterZoom: built, zoomedInMb: Math.round(zoomedIn), touredMb: Math.round(toured), keptBuiltMb: keptBuilt, uploadMbPerFrame: +perFrame.toFixed(1), contextLost: lost, failures }));
   return failures;
 }
 

@@ -20,6 +20,17 @@ describe('reading a frame source once for the whole canvas', () => {
     expect(later).toBe(draw);
   });
 
+  it('lets go of a source the canvas sent back to its snapshot, so the doc can be collected', async () => {
+    const asked: string[] = [];
+    const read = sourceReader(async (url) => (asked.push(url), answer({ doc: {} })));
+
+    await read('/s?revision=2');
+    read.forget('/s?revision=2');
+    await read('/s?revision=2');
+
+    expect(asked).toEqual(['/s?revision=2', '/s?revision=2']);
+  });
+
   it('fetches a new revision again', async () => {
     const asked: string[] = [];
     const read = sourceReader(async (url) => (asked.push(url), answer({ doc: {} })));

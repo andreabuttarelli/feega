@@ -81,6 +81,20 @@ export function posterSize(box: Box): Size & { scale: number } {
   return { width: Math.max(1, Math.round(box.w * scale)), height: Math.max(1, Math.round(box.h * scale)), scale };
 }
 
+const SHOT_MAX_SIDE_PX = 2048;
+
+export function shotSize(box: Box, width: number): Size & { scale: number } {
+  const scale = Math.min(width / box.w, SHOT_MAX_SIDE_PX / box.h);
+  return { width: Math.max(1, Math.round(box.w * scale)), height: Math.max(1, Math.round(box.h * scale)), scale };
+}
+
+export async function bitmapBlob(bitmap: ImageBitmap): Promise<Blob | null> {
+  const out = new OffscreenCanvas(bitmap.width, bitmap.height);
+  out.getContext('2d')?.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  return out.convertToBlob({ type: THUMB_TYPE, quality: THUMB_QUALITY }).catch(() => null);
+}
+
 export async function posterBlob(pixels: ImageData): Promise<Blob | null> {
   const out = new OffscreenCanvas(pixels.width, pixels.height);
   out.getContext('2d')?.putImageData(pixels, 0, 0);

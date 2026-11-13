@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ItemKind } from '@feega/motion-core/motion/gpu-full/display-list';
-import { posterSize, thumbClip, thumbList, thumbRect, thumbsDue } from './frame-thumbs';
+import { posterSize, shotSize, thumbClip, thumbList, thumbRect, thumbsDue } from './frame-thumbs';
 
 const BOX = { x: 100, y: 50, w: 200, h: 400 };
 
@@ -43,5 +43,12 @@ describe('posterSize', () => {
 
   it('un frame piccolo non si ingrandisce', () => {
     expect(posterSize({ x: 0, y: 0, w: 200, h: 100 })).toEqual({ width: 200, height: 100, scale: 1 });
+  });
+});
+
+describe('shotSize', () => {
+  it('a phone snapshot is as wide as a readable frame in device pixels, and no taller than a texture a phone keeps cheaply', () => {
+    expect(shotSize({ x: 0, y: 0, w: 1280, h: 2560 }, 320)).toEqual({ width: 320, height: 640, scale: 0.25 });
+    expect(shotSize({ x: 0, y: 0, w: 1280, h: 15354 }, 320)).toEqual({ width: 171, height: 2048, scale: 2048 / 15354 });
   });
 });

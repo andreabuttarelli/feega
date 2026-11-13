@@ -5,7 +5,7 @@ import { keptKey, scopedCache, type CacheScope, type FrameCache } from './frame-
 const SOURCES_KEPT = 8;
 const HTTP_NO_CONTENT = 204;
 
-export type ReadSource = ((url: string) => Promise<FrameDoc | null>) & { warm: (urls: string[]) => void };
+export type ReadSource = ((url: string) => Promise<FrameDoc | null>) & { warm: (urls: string[]) => void; forget: (url: string) => void };
 
 export function sourceReader(fetcher: (url: string) => Promise<Response>, kept = SOURCES_KEPT): ReadSource {
   const held = new Map<string, Promise<FrameDoc | null>>();
@@ -51,7 +51,12 @@ export function sourceReader(fetcher: (url: string) => Promise<Response>, kept =
     }
   };
 
-  return Object.assign(read, { warm });
+  const forget = (url: string) => {
+    held.delete(url);
+    unread.delete(url);
+  };
+
+  return Object.assign(read, { warm, forget });
 }
 
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;

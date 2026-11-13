@@ -12,7 +12,7 @@ import { sequenceScenes } from '$lib/motion/scenes';
 import { keepLocalFiles, forgetLocalFiles } from '@feega/motion-core/motion/fonts/local-files';
 import { itemWire } from '@feega/motion-core/motion/gpu-full/wire';
 import type { DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
-import { builtAnswer, buildFrame, frameBuilder, playingBuilder, transfers, type BuildAsk, type BuildWorker } from './frame-build';
+import { builtAnswer, buildFrame, frameBuilder, playingBuilder, shotLists, transfers, type BuildAsk, type BuildWorker } from './frame-build';
 import { itemPack, listPack } from '@feega/motion-core/motion/gpu-full/wire';
 import { onStage } from './frame-source';
 import { withoutPictures } from './placeholders';
@@ -82,7 +82,7 @@ describe('the builder', () => {
     expect(b?.width).toBe(1);
   });
 
-  it('writes a doc out once, not again when the frame rebuilds with sharper assets', async () => {
+  it('keeps no text of a doc once the worker has it, so a phone holds each doc once', async () => {
     const worker = echo();
     const build = frameBuilder(() => worker);
     const written = vi.spyOn(JSON, 'stringify');
@@ -93,8 +93,24 @@ describe('the builder', () => {
     const docWrites = written.mock.calls.filter(([value]) => value === doc || (value as { doc?: unknown })?.doc === doc).length;
     written.mockRestore();
 
-    expect(docWrites).toBe(1);
+    expect(docWrites).toBe(2);
     expect(worker.asked.map((a) => JSON.parse(a.source))).toEqual([{ ...source(doc), assets: { a: 'small' } }, { ...source(doc), assets: { a: 'large' } }].map((x) => JSON.parse(JSON.stringify(x))));
+  });
+
+  it('lets its idle workers go, so a phone does not hold the last doc built, and starts a new one for the next build', async () => {
+    const ended: number[] = [];
+    let spawned = 0;
+    const build = frameBuilder(() => {
+      const n = spawned++;
+      return Object.assign(echo(), { terminate: () => ended.push(n) });
+    });
+    await build(source(shapeDoc), Smoothing.Plain);
+
+    build.release();
+    await build(source(shapeDoc), Smoothing.Plain);
+
+    expect(ended).toEqual([0]);
+    expect(spawned).toBe(2);
   });
 
   it('spreads builds over its workers, so frames build side by side instead of in one queue', async () => {
@@ -216,5 +232,41 @@ describe('the frame worker', () => {
 
   it('reaches no module that only runs inside the app page', () => {
     expect(appImports(resolve(LIB, 'canvas/core/frame-build.worker.ts'))).toEqual([]);
+  });
+});
+
+describe('snapshots built away from the page', () => {
+  const frame = { id: 'n1', kind: FrameKind.Frame, revision: 1, box: { x: 0, y: 0, w: 720, h: 450 } };
+
+  it('builds a frame and each of its breakpoint views in the worker, so the page never parses the doc', async () => {
+    const withViews = { ...shapeDoc, breakpoints: [{ id: 'ph', name: 'Phone', width: 390 }] } as MotionDoc;
+    const shots = await shotLists(source(withViews), frame, Smoothing.Plain, async () => boxBook());
+
+    expect(shots?.map((s) => s.frame.id)).toEqual(['n1', 'n1@bp:ph']);
+    expect(shots?.every((s) => s.list.items.length > 0)).toBe(true);
+    expect(shots?.[1].frame.box.x).toBeGreaterThan(frame.box.w);
+  });
+
+  it('asks the worker for the snapshot lists by url, and hands back what it built', async () => {
+    const shots = [{ frame, list: { width: 1, height: 1, background: null, items: [], unsupported: [] } }];
+    const worker: BuildWorker & { asked: BuildAsk[] } = {
+      onerror: null,
+      asked: [],
+      onmessage: null,
+      postMessage(ask: BuildAsk) {
+        worker.asked.push(ask);
+        queueMicrotask(() => worker.onmessage?.({ data: { id: ask.id, shots, buffers: [] } } as never));
+      }
+    };
+    const build = frameBuilder(() => worker);
+
+    const answered = await build.shoot({ url: '/s?revision=1', frame, place: null }, Smoothing.Plain);
+
+    expect(worker.asked[0].shot?.url).toBe('/s?revision=1');
+    expect(answered).toEqual(shots);
+  });
+
+  it('leaves a frame that reads the page DOM to the page', async () => {
+    expect(await shotLists(source(customDoc), frame, Smoothing.Plain, async () => boxBook())).toBeNull();
   });
 });
