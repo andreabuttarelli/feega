@@ -56,6 +56,7 @@ async function chooseVersion(home) {
 }
 
 async function install(dir, version) {
+  console.log(eventLine({ event: 'step', step: 'download' }));
   console.error(`feega: downloading the app ${version} (once per version)…`);
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
@@ -66,6 +67,7 @@ async function install(dir, version) {
     throw new Error('could not extract the app bundle');
   }
 
+  console.log(eventLine({ event: 'step', step: 'install' }));
   console.error('feega: installing its dependencies for this machine…');
   const deps = spawnSync('npm', ['ci', '--omit=dev', '--no-audit', '--no-fund', '--loglevel=error'], {
     cwd: dir,
@@ -102,6 +104,10 @@ async function readyApp() {
 
 async function wantsImport(app, file, mode) {
   const step = importStep({ mode, app, fileExists: existsSync(file), tty: Boolean(process.stdin.isTTY && process.stdout.isTTY) });
+  if (step === ImportStep.NoApp) {
+    throw new Error(`nothing to import: ${process.cwd()} has no package.json with a "dev" script`);
+  }
+
   if (step !== ImportStep.Ask) {
     return step === ImportStep.Import;
   }
@@ -225,6 +231,7 @@ async function main() {
   const port = await freePort(args.port);
 
   const url = boundUrl(port);
+  console.log(eventLine({ event: 'step', step: 'start' }));
   console.log(`feega: saving to ${file}`);
   console.log(`feega: open ${url}`);
 
@@ -239,7 +246,10 @@ async function main() {
   }
 
   if (importing) {
-    await importFolder(url, app, { routes, app: chosenApp, file }).catch((error) => console.error(`feega: ${error.message}`));
+    await importFolder(url, app, { routes, app: chosenApp, file }).catch((error) => {
+      console.error(`feega: ${error.message}`);
+      console.log(eventLine({ event: 'import-failed', message: error.message }));
+    });
   }
 }
 
