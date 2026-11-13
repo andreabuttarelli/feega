@@ -8,7 +8,6 @@
   import CanvasShare from './CanvasShare.svelte';
   import CanvasConnect from './CanvasConnect.svelte';
   import ConnectionDot from './ConnectionDot.svelte';
-  import ViewMenu from './ViewMenu.svelte';
   import { canvasLink } from '$lib/realtime/canvas-link';
   import type { ShareState } from '$lib/canvas/shared-view';
   import { LocalOff, isOff } from '$lib/local-user';
@@ -104,8 +103,6 @@
     {#if modeAllows(mode, Capability.Share) && !isOff(LocalOff.Share)}
       <CanvasShare {shareToken} {onShare} />
     {/if}
-
-    <ViewMenu />
 
     <button
       type="button"

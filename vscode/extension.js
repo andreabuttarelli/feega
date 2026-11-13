@@ -1,13 +1,15 @@
 const vscode = require('vscode');
 const { spawn } = require('node:child_process');
 const { readFile, writeFile } = require('node:fs/promises');
-const { Launch, launchArgs, mcpServers, canvasFileFor, canvasPage, eventReader, importMessage, gitignoreWith, loadingPage, localUrl, freePort, readyProbe, served } = require('./canvas-run');
+const { Launch, launchArgs, mcpServers, canvasFileFor, canvasPage, eventReader, importMessage, gitignoreWith, progressOf, advance, failedAt, finishedAll, stepsPage, logTail, spawnOptions, RETRY, localUrl, freePort, readyProbe, served } = require('./canvas-run');
 
 const READY_POLL_MS = 400;
-const READY_TIMEOUT_MS = 180_000;
+const QUIET_TIMEOUT_MS = 180_000;
+const LOG_TAIL_LINES = 40;
 const NEW_CANVAS = 'canvas.feega';
 
 const running = new Map();
+const attempts = new WeakMap();
 const mcpChanged = new vscode.EventEmitter();
 const cursorServers = new Map();
 const children = new Set();
@@ -15,9 +17,8 @@ const GITIGNORE_ASKED = 'feega.gitignoreAsked';
 const ADD = 'Add to .gitignore';
 let state = null;
 
-async function ready(url) {
-  const until = Date.now() + READY_TIMEOUT_MS;
-  while (Date.now() < until) {
+async function ready(url, launch) {
+  while (!launch.ended && Date.now() - launch.lastOutput < QUIET_TIMEOUT_MS) {
     if (await fetch(url, readyProbe).then((r) => served(r.status), () => false)) {
       return true;
     }
@@ -83,39 +84,121 @@ async function onEvent(event, child, file) {
   }
 }
 
-async function openCanvas(panel, file, launch, output) {
+function openCanvas(panel, file, launch, output) {
   panel.webview.options = { enableScripts: true };
-  panel.webview.html = loadingPage('Starting Feega… the first run downloads the app.');
+  let child = null;
+  const start = async () => {
+    child = await startCanvas(panel, file, launch, output);
+  };
+  panel.webview.onDidReceiveMessage((message) => {
+    if (message?.type !== RETRY) {
+      return;
+    }
 
+    stop(child);
+    start();
+  });
+  panel.onDidDispose(() => stop(child));
+  return start();
+}
+
+async function startCanvas(panel, file, launch, output) {
+  let progress = progressOf(launch);
+  const show = () => {
+    panel.webview.html = stepsPage(progress);
+  };
+  show();
   const port = await freePort();
-  const child = spawn('npx', launchArgs(file, port, launch), { shell: process.platform === 'win32', env: process.env, detached: process.platform !== 'win32' });
+  const tail = logTail(LOG_TAIL_LINES);
+  const attempt = { ended: false, lastOutput: Date.now(), failed: false, served: null, imported: launch !== Launch.ImportFolder };
+  attempts.set(panel, attempt);
+  const child = spawn('npx', launchArgs(file, port, launch), spawnOptions(file, process.platform, process.env));
   children.add(child);
-  const events = eventReader((event) => onEvent(event, child, file));
-  child.stdout.on('data', (d) => {
+
+  const current = () => attempts.get(panel) === attempt && !attempt.failed;
+  const fail = (message, log = tail.text()) => {
+    if (!current()) {
+      return;
+    }
+
+    attempt.failed = true;
+    output.appendLine(`feega: ${message}`);
+    progress = failedAt(progress, message, log);
+    show();
+  };
+  const reveal = () => {
+    if (current() && attempt.served && attempt.imported) {
+      panel.webview.html = canvasPage(attempt.served);
+    }
+  };
+  const onStep = (event) => {
+    if (!current()) {
+      return;
+    }
+
+    if (event.event === 'import-failed') {
+      return fail(`The folder import failed: ${event.message}`);
+    }
+    if (event.event === 'imported') {
+      progress = finishedAll(progress);
+      attempt.imported = true;
+      return reveal();
+    }
+    progress = advance(progress, event);
+    if (!attempt.served || !attempt.imported) {
+      show();
+    }
+  };
+  const events = eventReader((event) => {
+    onStep(event);
+    onEvent(event, child, file);
+  });
+  const log = (d) => {
+    attempt.lastOutput = Date.now();
     output.append(d.toString());
+    tail.push(d.toString());
+  };
+  const lines = eventReader(onStep);
+  child.stdout.on('data', (d) => {
+    log(d);
     events(d.toString());
   });
-  child.stderr.on('data', (d) => output.append(d.toString()));
-  child.on('exit', (code) => {
+  child.stderr.on('data', (d) => {
+    log(d);
+    lines(d.toString());
+  });
+  child.on('error', (error) => {
+    attempt.ended = true;
+    fail(`Could not run npx: ${error.message}. Is Node.js 22+ installed?`);
+  });
+  child.on('exit', (code, signal) => {
+    attempt.ended = true;
     children.delete(child);
     running.delete(file);
     publishMcp();
-    if (code) {
-      panel.webview.html = loadingPage(`Feega stopped (exit ${code}). See the Feega output panel.`);
+    if (!signal) {
+      fail(`Feega stopped (exit ${code}).`);
     }
   });
-  panel.onDidDispose(() => stop(child));
 
   const url = localUrl(port);
-  if (!(await ready(url))) {
-    panel.webview.html = loadingPage('Feega did not start. See the Feega output panel.');
-    return;
+  if (!(await ready(url, attempt))) {
+    if (!attempt.ended) {
+      stop(child);
+      fail(`Feega did not start: no output for ${QUIET_TIMEOUT_MS / 1000} s.`);
+    }
+    return child;
   }
 
   running.set(file, port);
   publishMcp();
-  const external = (await vscode.env.asExternalUri(vscode.Uri.parse(url))).toString().replace(/\/$/, '');
-  panel.webview.html = canvasPage(external);
+  attempt.served = (await vscode.env.asExternalUri(vscode.Uri.parse(url))).toString().replace(/\/$/, '');
+  progress = advance(progress, { event: 'step', step: 'start', state: 'done' });
+  if (!attempt.imported) {
+    show();
+  }
+  reveal();
+  return child;
 }
 
 function canvasEditor(output) {
@@ -135,6 +218,7 @@ function workspaceFolder() {
 
 function canvasPanel(file, launch, output) {
   const panel = vscode.window.createWebviewPanel('feega.canvas', file.split(/[\\/]/).pop(), vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: true });
+  panel.iconPath = vscode.Uri.joinPath(vscode.Uri.file(__dirname), 'icon.png');
   return openCanvas(panel, file, launch, output);
 }
 
@@ -186,6 +270,10 @@ function activate(context) {
 const runningCanvases = () => [...running].map(([file, port]) => ({ file, port }));
 
 function stop(child) {
+  if (!child) {
+    return;
+  }
+
   try {
     process.kill(process.platform === 'win32' ? child.pid : -child.pid, 'SIGTERM');
   } catch {

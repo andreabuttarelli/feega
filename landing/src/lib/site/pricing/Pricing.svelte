@@ -13,7 +13,7 @@
 
   <article class="hero">
     <div class="buy">
-      <h3>feega {plan.name}</h3>
+      <h3>Feega {plan.name}</h3>
       <p class="for">{CLOUD_FOR}</p>
       <PriceTag amount={money(plan, plan.price)} unit={priceUnit(plan)} cta="Start free" href={APP_URL} />
       <p class="seat">{SEAT_RULE}</p>
@@ -30,7 +30,7 @@
     </div>
   </article>
 
-  <p class="local">Prefer your own AI keys? feega is <strong>free on your machine, forever</strong>. <a href={DOCS_URL}>Run it locally →</a></p>
+  <p class="local">Prefer your own AI keys? Feega is <strong>free on your machine, forever</strong>. <a href={DOCS_URL}>Run it locally →</a></p>
 
   <Estimator {plan} />
 

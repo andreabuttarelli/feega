@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync } from 'node:fs';
+import { LAYOUTS } from '@feega/motion-core/canvas/composition';
 import { join } from 'node:path';
+import sharp from 'sharp';
 import {
   ALL_TEMPLATES,
   CANVAS_TEMPLATES,
@@ -29,6 +31,8 @@ import { MODEL3D_MODELS } from '$lib/model3d-models';
 const MIN_TEMPLATES = 8;
 
 const STATIC_DIR = join(process.cwd(), 'static');
+const MAX_CHANNEL = 255;
+const MIN_THUMBNAIL_BRIGHTNESS = 0.2;
 
 type Model = string | null | undefined;
 
@@ -52,7 +56,9 @@ const ACCEPTED_HANDLES: Record<string, (node: TemplateNode) => ConnectorType[]> 
     ...(videoRefCapacity(modelOf(node)).videos > 0 ? (['videos'] as const) : [])
   ],
   audio: (node) => audioInputPorts(audioOperation(node)),
-  model3d: () => ['images', 'text']
+  model3d: () => ['images', 'text'],
+  effects: () => NODE_PORTS.effects.inputs as ConnectorType[],
+  composition: () => NODE_PORTS.composition.inputs as ConnectorType[]
 };
 
 const everyNode = CANVAS_TEMPLATES.flatMap((t) => t.nodes.map((node) => ({ template: t.id, node })));
@@ -179,6 +185,11 @@ describe('la galleria dei template', () => {
     expect(existsSync(join(STATIC_DIR, path)), path).toBe(true);
   });
 
+  it.each(templatesIn('effects'))('$id: la miniatura si legge, non è un riquadro quasi nero', async (t) => {
+    const { channels } = await sharp(join(STATIC_DIR, templateThumbnail(t))).greyscale().stats();
+    expect(channels[0].mean / MAX_CHANNEL, t.id).toBeGreaterThan(MIN_THUMBNAIL_BRIGHTNESS);
+  });
+
   it('Product → 3D model turns a product image into a 3D node, under 3D', () => {
     const t = templateById('product-3d')!;
 
@@ -207,6 +218,19 @@ describe('la galleria dei template', () => {
 describe('the newest templates lead the gallery', () => {
   it('every template has an added date', () => {
     expect(CANVAS_TEMPLATES.filter((t) => !canvasAddedOn(t.id)).map((t) => t.id)).toEqual([]);
+  });
+
+  it('effects templates start from an image and apply one look the effects table knows, described for the agent', () => {
+    const looks = templatesIn('effects');
+    expect(looks.map((t) => t.id)).toEqual(expect.arrayContaining(['fx-word-weave', 'fx-word-field', 'fx-glyph-tiles', 'fx-word-silhouette']));
+    for (const t of looks) {
+      expect(t.nodes.map((n) => n.type).sort(), t.id).toEqual(['effects', 'image']);
+      expect(t.description.length, t.id).toBeGreaterThan(80);
+    }
+  });
+
+  it('composition templates offer every layout once', () => {
+    expect(templatesIn('composition').length).toBe(Object.keys(LAYOUTS).length);
   });
 
   it('lists templates newest first, in every filter', () => {

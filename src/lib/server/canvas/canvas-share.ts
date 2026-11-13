@@ -15,12 +15,13 @@ import { getInfluencer, listInfluencerViews, signInfluencerViewFiles } from '$li
 import { nodeSize } from '$lib/canvas/node-size';
 import type { NodeType } from '$lib/canvas/node-data';
 import { feedFiltersOf, filterPosts, filterProducts, mediaKindOf, productFiltersOf } from '$lib/canvas/source-filters';
-import { ShareState, type SharedCanvas, type SharedListItem, type SharedTile, type SharedView } from '$lib/canvas/shared-view';
+import { ShareState, type SharedCanvas, type SharedFrameData, type SharedListItem, type SharedTile, type SharedView } from '$lib/canvas/shared-view';
 import { calendarOf } from '$lib/canvas/calendar-node';
 import { saleLabel } from '$lib/canvas/product-discount';
 import { Capability, modeAllows, modeOf } from '$lib/project-mode';
 import { audioOutputIds } from '$lib/canvas/node-media';
 import { mintedOr } from '$lib/canvas/share-token';
+import { holdsDoc } from '$lib/canvas/motion-node';
 
 export { ShareState };
 
@@ -258,6 +259,14 @@ export const SHARED_VIEW_OF: Record<NodeType, (input: ViewInput) => SharedView |
   technique: () => EMPTY
 };
 
+function frameOf(node: CanvasNodeRecord): { frame?: SharedFrameData } {
+  if (!holdsDoc(node.type)) {
+    return {};
+  }
+  const { kind, docHeadRevision, linked } = node.data;
+  return { frame: { kind, docHeadRevision, ...(linked ? { linked } : {}) } };
+}
+
 async function viewOf(input: ViewInput): Promise<SharedView> {
   return (await SHARED_VIEW_OF[input.node.type as NodeType]?.(input)) ?? EMPTY;
 }
@@ -332,7 +341,8 @@ export async function readSharedCanvas(db: Db, token: string, sign: SignPaths): 
         y: node.position.y,
         w: node.size.width ?? fallback.w,
         h: node.size.height ?? fallback.h,
-        view: await viewOf({ db, orgId, node, assets, signed, sign, sourceType: sourceTypeOf(node.id) })
+        view: await viewOf({ db, orgId, node, assets, signed, sign, sourceType: sourceTypeOf(node.id) }),
+        ...frameOf(node)
       };
     })),
     edges: connections

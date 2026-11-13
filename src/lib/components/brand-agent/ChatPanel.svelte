@@ -456,6 +456,7 @@
     min-height: 44px;
     padding: 10px 12px;
     border: 0;
+    border-radius: var(--ui-radius-sm);
     background: var(--chat-field, transparent);
     font: inherit;
     font-size: 13.5px;
@@ -500,6 +501,7 @@
     height: 32px;
     padding: 0 12px;
     border: 1px solid var(--line-2, #d2d2d7);
+    border-radius: var(--ui-radius-full);
     background: var(--paper, #fff);
     color: var(--ink, #1d1d1f);
     font: inherit;

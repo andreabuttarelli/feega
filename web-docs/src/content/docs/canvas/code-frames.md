@@ -49,7 +49,7 @@ Shorthands work when no metadata is needed: `feega.text(name, default)`, `feega.
 
 ## Export
 
-**Export** on a code frame downloads a Vite project (React or Svelte) with no feega code in it: every variable becomes its current value, `MemoryRouter` becomes `BrowserRouter`, and npm imports become `package.json` dependencies. `npm install && npm run build` works as is. Choose **values in src/content.ts** to keep the values in one plain constants module instead.
+**Export** on a code frame downloads a Vite project (React or Svelte) with no Feega code in it: every variable becomes its current value, `MemoryRouter` becomes `BrowserRouter`, and npm imports become `package.json` dependencies. `npm install && npm run build` works as is. Choose **values in src/content.ts** to keep the values in one plain constants module instead.
 
 From the CLI: `feega canvas export-code <projectId> <nodeId> [--config] [--out <dir>]`. Over MCP: the `edit` op `export_code_frame` returns the file map.
 

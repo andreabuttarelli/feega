@@ -125,6 +125,7 @@
     padding: 9px 12px;
     background: var(--paper-3, #f4f4f4);
     border: 1px solid var(--line, #ededef);
+    border-radius: var(--ui-radius-md);
     color: var(--ink, #1d1d1f);
     font-size: var(--chat-font, 14px);
     line-height: 1.55;
@@ -143,6 +144,7 @@
   .mark {
     width: 10px;
     height: 10px;
+    border-radius: var(--ui-radius-full);
     background: var(--accent, #c485fe);
   }
   .who time {
@@ -154,7 +156,9 @@
     margin: 0;
     padding: 0;
     border: 1px solid var(--line, #ededef);
-    background: var(--paper, #fff);
+    border-radius: var(--ui-radius-md);
+    background: var(--paper-2, #fafafa);
+    overflow: hidden;
   }
 
   .trace {
@@ -260,6 +264,7 @@
     font-family: ui-monospace, 'SF Mono', Menlo, monospace;
     font-size: 0.88em;
     padding: 1px 4px;
+    border-radius: var(--ui-radius-xs);
     background: var(--paper-3, #f4f4f4);
   }
   .prose :global(pre) {
@@ -267,6 +272,7 @@
     overflow-x: auto;
     background: var(--paper-3, #f4f4f4);
     border: 1px solid var(--line, #ededef);
+    border-radius: var(--ui-radius-md);
   }
   .prose :global(pre code) {
     padding: 0;

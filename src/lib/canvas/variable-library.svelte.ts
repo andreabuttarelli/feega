@@ -21,6 +21,13 @@ export class VariableLibrary {
   private seen: Variables = {};
   private adopt = adoptBatch<Collection>((entries) => void this.store?.send({ op: LibraryOp.Adopt, entries }));
 
+  private keepUnknown(inDocs: Variables) {
+    const unknown = Object.fromEntries(Object.entries(inDocs).filter(([name]) => !this.collections[name]));
+    if (Object.keys(unknown).length) {
+      this.collections = { ...this.collections, ...unknown };
+    }
+  }
+
   connect(sink: VariableSink | null) {
     this.sink = sink;
   }
@@ -38,7 +45,7 @@ export class VariableLibrary {
   found(inDocs: Variables) {
     this.seen = inDocs;
     if (!this.store) {
-      this.collections = { ...inDocs, ...this.collections };
+      this.keepUnknown(inDocs);
       return;
     }
     const fresh = Object.fromEntries(Object.entries(inDocs).filter(([name]) => !this.collections[name]).map(([name, c]) => [name, shared(c)]));

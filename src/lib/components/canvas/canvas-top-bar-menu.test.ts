@@ -90,3 +90,19 @@ describe('CanvasTopBar passa profilo, org e saldo al menu', () => {
     expect(top).toMatch(/<CanvasMenu[\s\S]*?creditBalance[\s\S]*?\/>/);
   });
 });
+
+describe('the views live in Preferences, not on the right of the top bar', () => {
+  const menu = readFileSync(join(dir, 'CanvasMenu.svelte'), 'utf8');
+
+  it('the right side has no view menu', () => {
+    expect(top).not.toMatch(/ViewMenu/);
+    expect(top).not.toMatch(/data-testid="view-menu"/);
+  });
+
+  it('Preferences lists the views and the zoom from the one shared list', () => {
+    const prefs = menu.slice(menu.indexOf('prefs-trigger'), menu.indexOf('prefs-content', menu.indexOf('prefs-trigger')) + 2000);
+    expect(prefs).toMatch(/VIEW_ITEMS/);
+    expect(prefs).toMatch(/ZOOM_ITEMS/);
+    expect(prefs).toMatch(/frameViews\.flip/);
+  });
+});

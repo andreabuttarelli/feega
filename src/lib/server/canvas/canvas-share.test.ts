@@ -459,3 +459,21 @@ describe('readSharedCanvas — i nodi sorgente', () => {
     expect(shared?.nodes.map((n) => n.view)).toEqual([{ kind: 'empty' }, { kind: 'empty' }, { kind: 'empty' }, { kind: 'empty' }]);
   });
 });
+
+describe('readSharedCanvas: frames a visitor can draw', () => {
+  it('a motion frame carries only what finds its current doc, never its prompt', async () => {
+    const { db } = fakeDb({ canvases: [CANVAS], nodes: [node('f1', 'motion', { kind: 'frame', docHeadRevision: 4, prompt: 'private brief', linked: { main: 'm1' } })], assets: [] }, { filter: true });
+
+    const shared = await readSharedCanvas(db, 'tok-live', sign);
+
+    expect(shared?.nodes[0].frame).toEqual({ kind: 'frame', docHeadRevision: 4, linked: { main: 'm1' } });
+  });
+
+  it('a node that holds no doc carries no frame', async () => {
+    const { db } = sharedDb();
+
+    const shared = await readSharedCanvas(db, 'tok-live', sign);
+
+    expect(shared?.nodes[0].frame).toBeUndefined();
+  });
+});

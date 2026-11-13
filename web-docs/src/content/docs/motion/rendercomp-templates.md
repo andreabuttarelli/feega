@@ -1,6 +1,6 @@
 ---
 title: RenderComp templates
-description: Fifty free motion templates (logo stings, titles, transitions, charts, social scenes and loops) ported to feega.
+description: Fifty free motion templates (logo stings, titles, transitions, charts, social scenes and loops) ported to Feega.
 sidebar:
   order: 13
 ---

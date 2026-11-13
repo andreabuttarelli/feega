@@ -9,17 +9,19 @@
     OptionMenu,
     Segmented,
     SliderField,
+    TextField,
     type ControlProps
   } from '$lib/components/ui/control/index.js';
 
-  type StudioKind = 'slider' | 'segmented' | 'menu' | 'color' | 'seed';
+  type StudioKind = 'slider' | 'segmented' | 'menu' | 'color' | 'seed' | 'text';
 
   const CONTROL: Record<StudioKind, { component: Component<ControlProps>; layout: ControlLayout }> = {
     slider: { component: SliderField, layout: ControlLayout.Stack },
     segmented: { component: Segmented, layout: ControlLayout.Stack },
     menu: { component: OptionMenu, layout: ControlLayout.Stack },
     color: { component: ColorField, layout: ControlLayout.Inline },
-    seed: { component: NumberField, layout: ControlLayout.Stack }
+    seed: { component: NumberField, layout: ControlLayout.Stack },
+    text: { component: TextField, layout: ControlLayout.Stack }
   };
 
   function kindOf(control: Control): StudioKind {
@@ -54,6 +56,8 @@
         </Button>
       {/snippet}
     </NumberField>
+  {:else if control.kind === 'text'}
+    <TextField {label} value={control.value} maxLength={control.maxLength} onchange={(v) => onchange(String(v))} />
   {:else}
     <spec.component {label} value={control.value} {options} {...range} onchange={(v) => onchange(v as number | string)} />
   {/if}

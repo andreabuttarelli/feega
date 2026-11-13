@@ -38,13 +38,14 @@ export class StyleLibrary {
 
   found(inDocs: Library) {
     this.seen = inDocs;
-    if (!this.store) {
-      this.styles = { ...inDocs, ...this.styles };
-      return;
-    }
     const fresh = Object.fromEntries(Object.entries(inDocs).filter(([name]) => !this.styles[name]));
     if (Object.keys(fresh).length) {
       this.styles = { ...this.styles, ...fresh };
+    }
+    if (!this.store) {
+      return;
+    }
+    if (Object.keys(fresh).length) {
       this.adopt(fresh);
     }
     for (const [name, style] of Object.entries(inDocs)) {

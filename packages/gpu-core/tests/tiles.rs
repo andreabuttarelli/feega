@@ -209,6 +209,11 @@ fn the_tile_budget_follows_the_screen_and_caps_at_the_memory_budget() {
 }
 
 #[test]
+fn a_retina_desktop_keeps_as_many_tiles_as_the_memory_budget_holds() {
+    assert_eq!(tiles_kept((2880, 1800), TILE_BUDGET_BYTES) as u64, TILE_BUDGET_BYTES / TILE_BYTES);
+}
+
+#[test]
 fn a_sharper_step_replaces_the_one_on_screen_only_once_it_covers_the_whole_screen() {
     let mut tiles = Tiles::default();
     let coarse = tiles.frame(camera(step_zoom(-4)), SCREEN).missing;
@@ -454,14 +459,15 @@ fn a_far_zoom_out_shows_no_blank_tile_on_the_canvas() {
 }
 
 #[test]
-fn between_levels_the_view_draws_the_nearest_level() {
+fn a_zoom_out_draws_at_least_one_texel_per_device_pixel_and_at_most_a_root_two_more() {
     let mut tiles = Tiles::default();
     tiles.set_pixel_ratio(2.0);
 
-    assert_eq!(tiles.step_for(camera(2.0)), step_of(2.0));
-    assert_eq!(tiles.step_for(camera(1.5)), step_of(2.0));
-    assert_eq!(tiles.step_for(camera(0.9)), step_of(1.0));
-    assert_eq!(tiles.step_for(camera(1.2)), step_of(1.0));
+    for zoom in (5..=40).map(|i| i as f64 * 0.05) {
+        let density = step_zoom(tiles.step_for(camera(zoom)));
+        assert!(density >= zoom - 1e-9, "zoom {zoom}: {density} texels per pixel");
+        assert!(density <= zoom * 2f64.sqrt() + 1e-9, "zoom {zoom}: {density} oversampled");
+    }
     assert_eq!(tiles.step_for(camera(3.0)), step_of(3.0));
 }
 
@@ -658,4 +664,63 @@ fn a_lifted_use_needs_the_tiles_of_its_rest_that_its_move_brings_on_screen() {
     assert!(!keys.is_empty());
     assert!(keys.iter().all(|k| k.world().overlaps(rest) && k.step == 0));
     assert!(lifted_keys(camera(1.0), SCREEN, rest, (0.0, 0.0), 0).is_empty());
+}
+
+#[test]
+fn a_stall_long_past_does_not_starve_the_frames_after_it() {
+    let mut credit = gpu_core::tiles::RasterCredit::default();
+    credit.earn(4.0);
+    credit.spend(300.0);
+
+    let waited = (1..).find(|_| {
+        credit.earn(4.0);
+        credit.allows()
+    });
+
+    assert!(waited.unwrap() <= 4, "waited {waited:?} frames");
+}
+
+#[test]
+fn the_level_that_covers_the_whole_canvas_survives_eviction_without_a_plan() {
+    let mut tiles = Tiles::default();
+    tiles.set_canvas(WIDE);
+    let overview = tiles.pyramid(Camera { x: 0.0, y: 0.0, zoom: SCREEN.0 as f64 / WIDE.width() }, SCREEN, KEPT);
+    let canvas_step = overview[0].step;
+    overview.iter().for_each(|k| tiles.hold(*k));
+    let mut fresh = Tiles::default();
+    fresh.set_canvas(WIDE);
+    overview.iter().filter(|k| k.step == canvas_step).for_each(|k| fresh.hold(*k));
+    let deep = Camera { x: -20000.0, y: -10000.0, zoom: 2.0 };
+    (0..200).for_each(|i| fresh.hold(TileKey { step: step_of(2.0), tx: 10000 + i, ty: 5000 }));
+
+    let gone = fresh.evict_beyond(deep, SCREEN, 0);
+
+    assert!(gone.iter().all(|k| k.step != canvas_step), "evicted {} overview tiles", gone.iter().filter(|k| k.step == canvas_step).count());
+}
+
+#[test]
+fn zooming_in_bakes_ahead_the_sharper_tiles_around_the_anchor() {
+    let tiles = baked(WIDE, Camera { x: -10000.0, y: -5000.0, zoom: 0.25 });
+    let anchor = Point::new(12000.0, 6000.0);
+    let at = |zoom: f64| Camera { x: 512.0 - anchor.x * zoom, y: 384.0 - anchor.y * zoom, zoom };
+
+    let ahead = tiles.ahead(at(0.25), at(0.27), SCREEN);
+
+    let now = tiles.step_for(at(0.27));
+    assert!(!ahead.is_empty());
+    assert!(ahead.iter().all(|k| k.step > now), "{:?}", ahead.iter().map(|k| k.step).collect::<Vec<_>>());
+    let seen = Rect::new(anchor.x - 512.0 / 0.27, anchor.y - 384.0 / 0.27, anchor.x + 512.0 / 0.27, anchor.y + 384.0 / 0.27);
+    assert!(ahead.iter().all(|k| k.world().overlaps(seen)));
+}
+
+#[test]
+fn panning_bakes_ahead_the_tiles_the_motion_brings_on_screen() {
+    let tiles = baked(WIDE, Camera { x: -10000.0, y: -5000.0, zoom: 1.0 });
+    let from = Camera { x: -10000.0, y: -5000.0, zoom: 1.0 };
+    let to = Camera { x: -10300.0, y: -5000.0, zoom: 1.0 };
+
+    let ahead = tiles.ahead(from, to, SCREEN);
+
+    assert!(!ahead.is_empty());
+    assert!(ahead.iter().all(|k| k.world().x1 > 10300.0 + SCREEN.0 as f64), "behind: {:?}", ahead.iter().find(|k| k.world().x1 <= 10300.0 + SCREEN.0 as f64));
 }

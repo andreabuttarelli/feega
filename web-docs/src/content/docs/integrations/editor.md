@@ -18,7 +18,11 @@ listed there: search **Feega**. It needs Node 22 or later on your machine.
   the project's pages on it, as `npx feega --import` does: every static page the router finds, up
   to 20. Pages that need a value (`/blog/[slug]`) are skipped and listed in the **Feega** output.
   A project with no router found imports its home page only. In a monorepo a quick-pick asks which
-  app to import. When it finishes a notification says how many pages landed and where the canvas
+  app to import. While it runs, the tab lists each step: download the app, start Feega, find
+  pages, install the project's dependencies (when `node_modules` is missing, with the manager its
+  lockfile names), start its dev server, import page N of M. A failing step turns red with the
+  reason and the end of the dev server's log, and **Retry** starts over. When it finishes the canvas
+  replaces the list, and a notification says how many pages landed and where the canvas
   file is. The file lives inside the folder, so the extension offers once to add `*.feega` to
   `.gitignore`; it never writes it without asking.
 

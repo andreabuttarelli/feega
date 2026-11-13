@@ -123,7 +123,7 @@ pointer hands focus to the canvas instead, so the next shortcut acts at once.
 | 1 to 9, 0 | Opacity of the selection: 10 to 90%, 0 for 100% |
 | C | Comment mode; Esc leaves it and closes the comments panel it opened |
 
-The View menu (eye icon, top right) shows the current zoom and lists the same three zoom commands with their keys.
+The View section of **Preferences** in the main menu (top left) shows the current zoom and lists the same three zoom commands with their keys.
 
 None fire while typing in a text field: Cmd/Ctrl+V while editing a text pastes into the text only. The exception is Esc, which always closes an open menu or overlay. Deleting asks no confirmation.
 

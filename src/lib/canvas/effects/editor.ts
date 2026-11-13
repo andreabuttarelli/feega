@@ -9,7 +9,8 @@ export type Control =
 	| { kind: 'slider'; min: number; max: number; step: number; value: number }
 	| { kind: 'select'; options: { value: string; label: string }[]; value: string }
 	| { kind: 'color'; value: string }
-	| { kind: 'seed'; value: number };
+	| { kind: 'seed'; value: number }
+	| { kind: 'text'; value: string; maxLength: number };
 
 type ParamOfKind<K extends EffectParam['kind']> = Extract<EffectParam, { kind: K }>;
 
@@ -27,7 +28,8 @@ const CONTROLS: { [K in EffectParam['kind']]: (param: ParamOfKind<K>, value: unk
 		value: param.options.some((option) => option.value === value) ? (value as string) : param.default
 	}),
 	color: (param, value) => ({ kind: 'color', value: typeof value === 'string' ? value : param.default }),
-	seed: (param, value) => ({ kind: 'seed', value: typeof value === 'number' ? value : param.default })
+	seed: (param, value) => ({ kind: 'seed', value: typeof value === 'number' ? value : param.default }),
+	text: (param, value) => ({ kind: 'text', value: typeof value === 'string' ? value : param.default, maxLength: param.maxLength })
 };
 
 export function controlFor(param: EffectParam, value: unknown): Control {

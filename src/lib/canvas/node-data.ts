@@ -352,6 +352,9 @@ function paramFieldSchema(param: EffectParam) {
   if (param.kind === 'color') {
     return z.string().regex(HEX_COLOR, 'invalid colour, expected #rrggbb').default(param.default);
   }
+  if (param.kind === 'text') {
+    return z.string().max(param.maxLength).default(param.default);
+  }
   return z.int().default(param.default);
 }
 

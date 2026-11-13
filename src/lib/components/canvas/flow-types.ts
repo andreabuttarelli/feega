@@ -166,6 +166,7 @@ export type FlowProps = {
   onCompareOutputs?: (ids: string[]) => void;
   onCloud?: (provider: CloudProviderId, mode: CloudMode, nodeId: string | null, at: { x: number; y: number }) => void;
   nodeSummaries?: { id: string; type: string; data: Record<string, unknown> }[];
+  sourceUrl?: (id: string) => string;
   musicEnabled?: boolean;
   modelChoicesFor?: (type: GenPropertyType) => ModelChoice[];
   catalogueSyncedFor?: (type: GenPropertyType) => boolean;

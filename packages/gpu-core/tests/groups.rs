@@ -111,3 +111,14 @@ fn a_list_without_uses_is_left_as_it_is() {
 
     assert_eq!(list.items.len(), 1);
 }
+
+#[test]
+fn a_use_scales_the_backdrop_blur_with_its_group() {
+    let glass = FRAME.replace(r#""blur": 2,"#, r#""blur": 0, "backdrop": 4,"#);
+    let mut groups = Groups::new();
+    groups.put("frame-1", parse(&glass).unwrap());
+    let (list, _) = expand(&parse(SCREEN).unwrap(), &groups);
+    let Item::Path(card) = &list.items[1] else { panic!() };
+
+    assert_eq!(card.look.backdrop, Some(8.0));
+}
