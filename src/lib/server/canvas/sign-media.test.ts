@@ -119,9 +119,10 @@ describe('un asset è visibile a chiunque legga la sua riga, non solo a chi lo h
     const serviceDb = storageWith({ 'canvas-assets': ['o/p/a.png'] });
 
     await signAssetPaths(userDb, serviceDb, { generated: [], uploaded: ['o/p/a.png'] });
+    const first = (userDb as unknown as { asked: { rows: number } }).asked.rows;
     await signAssetPaths(userDb, serviceDb, { generated: [], uploaded: ['o/p/a.png'] });
 
-    expect((userDb as unknown as { asked: { rows: number } }).asked.rows).toBe(1);
+    expect((userDb as unknown as { asked: { rows: number } }).asked.rows).toBe(first);
   });
 
   it('rifiuta un client utente non marchiato RLS, per non far passare un service client al posto suo', async () => {

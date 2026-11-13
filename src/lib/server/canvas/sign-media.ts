@@ -47,18 +47,29 @@ const ownerOf = (path: string) => path.split('/')[0];
 type HeldBy = Map<string, string>;
 const heldByClient = new WeakMap<object, HeldBy>();
 
+const SIGNED_COLUMNS = ['url', 'proxy_url'] as const;
+
+type PathRow = { url: string | null; proxy_url: string | null; org_id: string };
+
 async function orgsHolding(userDb: Db, paths: string[]): Promise<HeldBy> {
   const known = heldByClient.get(userDb) ?? new Map<string, string>();
   heldByClient.set(userDb, known);
   const unknown = [...new Set(paths)].filter((p) => !known.has(p));
-  if (unknown.length) {
-    const client = userDb as unknown as { from(t: string): { select(c: string): { in(c: string, v: string[]): Promise<{ data: unknown; error: unknown }> } } };
-    const { data, error } = await client.from('assets').select('url, org_id').in('url', unknown);
-    if (error) {
-      throw new Error('signAssetPaths: the asset rows are unreadable');
-    }
-    for (const row of (data ?? []) as Array<{ url: string; org_id: string }>) {
-      known.set(row.url, row.org_id);
+  if (!unknown.length) {
+    return known;
+  }
+
+  const client = userDb as unknown as { from(t: string): { select(c: string): { in(c: string, v: string[]): Promise<{ data: unknown; error: unknown }> } } };
+  const found = await Promise.all(SIGNED_COLUMNS.map((column) => client.from('assets').select('url, proxy_url, org_id').in(column, unknown)));
+  if (found.some((r) => r.error)) {
+    throw new Error('signAssetPaths: the asset rows are unreadable');
+  }
+  for (const row of found.flatMap((r) => (r.data ?? []) as PathRow[])) {
+    for (const column of SIGNED_COLUMNS) {
+      const path = row[column];
+      if (path && unknown.includes(path)) {
+        known.set(path, row.org_id);
+      }
     }
   }
   return known;
