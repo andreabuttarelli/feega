@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
 import { uuid_ossp } from '@electric-sql/pglite/contrib/uuid_ossp';
@@ -255,7 +256,17 @@ const TEAM_FUNCTION_PROBES = [
   { name: 'orgs_members: a hand-over never makes two owners', user: User.Service, sql: `select public.hand_over_org('${ORG}', '${User.Owner}', '${User.Viewer}', 'owner')`, want: Want.Refused }
 ];
 
+const ASSET_PATHS_FILE = join(fileURLToPath(new URL('..', import.meta.url)), 'supabase/canvas-migrations/20261114_asset_paths_bound.sql');
+const withoutTransaction = (sql) => sql.replace(/^\s*(begin|commit);\s*$/gim, '');
+
 const ASSET_PATH_PROBES = [
+  {
+    name: 'assets: a session still writes a path where defaults grant nothing',
+    user: User.Member,
+    setup: `revoke execute on function public.asset_path_in_reach(uuid, text) from authenticated; ${withoutTransaction(readFileSync(ASSET_PATHS_FILE, 'utf8'))}`,
+    sql: `insert into public.assets (org_id, type, source, url) values ('${ORG}', 'image', 'upload', '${ORG}/${PROJECT}/granted.png')`,
+    want: Want.Lands
+  },
   { name: "assets: a session cannot point an asset at another org's files", user: User.Member, sql: `insert into public.assets (org_id, type, source, url) values ('${ORG}', 'image', 'upload', '${OTHER_ORG}/p/x.png')`, want: Want.Refused },
   { name: "assets: a session cannot point an asset at a stranger's files", user: User.Member, sql: `insert into public.assets (org_id, type, source, url) values ('${ORG}', 'image', 'generated', '${User.Stranger}/media/x.png')`, want: Want.Refused },
   { name: "assets: a session cannot move an asset onto someone else's files", user: User.Member, sql: `update public.assets set url = '${User.Stranger}/media/x.png' where org_id = '${ORG}'`, want: Want.Refused },
