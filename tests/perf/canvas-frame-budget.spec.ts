@@ -483,6 +483,7 @@ for (const target of TARGETS) {
       })
     );
     writeFileSync(join(OUT, `edit-latency-${target}.json`), JSON.stringify(report, null, 2));
+    writeFileSync(join(OUT, `edit-stages-${target}.json`), JSON.stringify(all, null, 2));
     console.table(report);
     expect(Object.entries(report).filter(([, r]) => !r.passed).map(([e]) => e)).toEqual([]);
   });
