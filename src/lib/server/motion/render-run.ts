@@ -241,7 +241,10 @@ export async function startRender(db: Db, farm: RenderFarm | null, scope: Render
   if (!(await holdCredits(scope.orgId, [{ amount: heldOf(renderQuote(req.doc, req.settings.resolution)), note: holdNote(id) }]))) {
     return { ok: false, error: RenderRefusal.NoCredits };
   }
-  const run = await enqueue(db, scope, req, id);
+  const run = await enqueue(db, scope, req, id).catch(async (e) => {
+    await refundHold(scope.orgId, holdNote(id)).catch(() => {});
+    throw e;
+  });
   const detail = await launch(db, farm, storage, run, req.job);
   if (detail) {
     return { ok: false, error: RenderRefusal.Unavailable, detail };
@@ -270,7 +273,11 @@ export async function startBatch(db: Db, farm: RenderFarm | null, scope: RenderS
   const id = crypto.randomUUID();
   const queued: NodeRun[] = [];
   for (const [i, row] of rows.entries()) {
-    queued.push(await enqueue(db, scope, row.req, runIds[i], { batch: { id, row: i + 1, name: row.name, rows: rows.length } }));
+    const run = await enqueue(db, scope, row.req, runIds[i], { batch: { id, row: i + 1, name: row.name, rows: rows.length } }).catch(async (e) => {
+      await Promise.all(runIds.slice(i).map((runId) => refundHold(scope.orgId, holdNote(runId)).catch(() => {})));
+      throw e;
+    });
+    queued.push(run);
   }
   await Promise.all(queued.slice(0, BATCH_CONCURRENCY).map((run, i) => launch(db, farm, storage, run, rows[i].req.job)));
 

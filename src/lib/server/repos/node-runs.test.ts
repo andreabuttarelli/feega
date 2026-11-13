@@ -207,6 +207,17 @@ describe('a run is written by the server, never with the caller session', () => 
     expect(writer.calls).toEqual([]);
   });
 
+  it('a failed check is asked again on the next write, not remembered', async () => {
+    const { db } = fakeDb({ node_runs: [row] }, { filter: true });
+    const rpc = vi.fn().mockResolvedValueOnce({ data: null, error: { message: 'timeout' } }).mockResolvedValue({ data: [ORG], error: null });
+    Object.assign(db, { rpc });
+    const caller = markRlsScoped(db);
+    server.current = fakeDb({ node_runs: [row] }, { filter: true }).db;
+
+    await expect(failRun(caller, { orgId: ORG, runId: RUN, error: 'x' })).rejects.toBeTruthy();
+    await expect(failRun(caller, { orgId: ORG, runId: RUN, error: 'x' })).resolves.toBeUndefined();
+  });
+
   it('values the server prices a run with never come from the caller', async () => {
     const { db, calls } = fakeDb({ node_runs: [] }, { filter: true });
 

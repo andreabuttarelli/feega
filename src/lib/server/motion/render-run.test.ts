@@ -444,6 +444,28 @@ describe('a render is paid by the sandbox time it really used', () => {
   });
 });
 
+describe('a hold never outlives a run that was not created', () => {
+  it('a render whose run cannot be created gives its hold back', async () => {
+    runs.createRun.mockRejectedValueOnce(new Error('run_write_refused'));
+    const { db } = fakeDb(request(sevenChunks()).job);
+
+    await expect(startRender(db, farm, longScope, request(sevenChunks()), storage)).rejects.toThrow();
+
+    const held = hold.holdCredits.mock.calls[0][1][0].note as string;
+    expect(hold.refundHold).toHaveBeenCalledWith('org', held);
+  });
+
+  it('a batch gives back the holds of the rows it could not create, and keeps the ones it did', async () => {
+    runs.createRun.mockImplementationOnce(async (_db, input) => ({ ...runOf(input.params), id: input.id })).mockRejectedValueOnce(new Error('run_write_refused'));
+    const { db } = fakeDb(request().job);
+
+    await expect(startBatch(db, farm, longScope, [{ name: 'a', req: request() }, { name: 'b', req: request() }, { name: 'c', req: request() }], storage)).rejects.toThrow();
+
+    const notes = (hold.holdCredits.mock.calls[0][1] as { note: string }[]).map((h) => h.note);
+    expect(hold.refundHold.mock.calls.map((c) => c[1])).toEqual([notes[1], notes[2]]);
+  });
+});
+
 describe('a refund is decided by the ledger', () => {
   it('pays back what the ledger held for the run, whatever the run row carries', async () => {
     await releaseHold({ ...runOf({ billing: { held: 1_000_000, portions: [{ amount: 1_000_000, expiresAt: null }] } }), id: 'run-7' });

@@ -101,6 +101,7 @@ function orgsEditedBy(db: Db): Promise<string[]> {
     return ((data ?? []) as Array<string | { auth_editor_org_ids: string }>).map((r) => (typeof r === 'string' ? r : r.auth_editor_org_ids));
   })();
   editedOrgs.set(db, asked);
+  asked.catch(() => editedOrgs.delete(db));
   return asked;
 }
 
