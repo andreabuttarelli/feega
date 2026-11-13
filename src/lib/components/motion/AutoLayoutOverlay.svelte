@@ -7,9 +7,10 @@
   import type { AutoLayout } from '@feega/motion-core/motion/layout/model';
   import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
   import { pastSlop, type PointerPoint } from '$lib/canvas/canvas-drop';
+  import { untrack } from 'svelte';
   import { estimatedText, type TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
 
-  let { doc, clip, measure = estimatedText, onchange }: { doc: MotionDoc; clip: MotionClip & { autoLayout: AutoLayout }; measure?: TextMeasure; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  let { doc, clip, measure = estimatedText, onchange, afterPaint = (job) => job() }: { doc: MotionDoc; clip: MotionClip & { autoLayout: AutoLayout }; measure?: TextMeasure; onchange: (doc: MotionDoc, summary: string) => void; afterPaint?: (job: () => void) => void } = $props();
 
   const SUMMARY: Record<StripKind, string> = {
     [StripKind.Padding]: 'Changed the padding',
@@ -19,10 +20,16 @@
   let host = $state<HTMLDivElement | null>(null);
   let grab = $state<{ strip: Strip; from: Pt; down: PointerPoint } | null>(null);
   let live = $state<Partial<AutoLayout> | null>(null);
+  let painted = $state.raw(untrack(() => doc));
+
+  $effect(() => {
+    const next = doc;
+    afterPaint(() => (painted = next));
+  });
 
   const shown = $derived.by(() => {
     const result = live ? setAutoLayout(doc, clip.id, live) : null;
-    return result?.ok ? result.doc : doc;
+    return result?.ok ? result.doc : painted;
   });
   const strips = $derived(layoutStrips(shown, clip.id, measure));
   const layout = $derived(live ? { ...clip.autoLayout, ...live } : clip.autoLayout);

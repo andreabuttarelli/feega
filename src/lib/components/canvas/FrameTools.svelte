@@ -46,7 +46,8 @@
     measure = estimatedText,
     apply,
     ondrawn,
-    onleave
+    onleave,
+    afterPaint
   }: {
     doc: MotionDoc;
     frame: number;
@@ -60,6 +61,7 @@
     apply: (result: OpResult, summary: string) => void;
     ondrawn: (id: string) => void;
     onleave: () => void;
+    afterPaint?: (job: () => void) => void;
   } = $props();
 
   let pointEdit = $state<string | null>(null);
@@ -128,7 +130,7 @@
   {#if pointClip && shown.has(FrameOverlay.Pen)}<PenOverlay doc={drafted} clip={pointClip} {frame} onchange={edit} onexit={() => (pointEdit = null)} />{/if}
   {#if only && shown.has(FrameOverlay.LineEnds)}<LineEndsOverlay {doc} clip={only} {frame} onchange={edit} />{/if}
   {#if pointClip && shown.has(FrameOverlay.Vector)}<VectorOverlay doc={drafted} clip={pointClip} {frame} onchange={edit} onexit={() => (pointEdit = null)} />{/if}
-  {#if only?.autoLayout && shown.has(FrameOverlay.AutoLayout)}<AutoLayoutOverlay {doc} {measure} clip={{ ...only, autoLayout: only.autoLayout }} onchange={edit} />{/if}
+  {#if only?.autoLayout && shown.has(FrameOverlay.AutoLayout)}<AutoLayoutOverlay {doc} {measure} clip={{ ...only, autoLayout: only.autoLayout }} onchange={edit} {afterPaint} />{/if}
   {#if only && shown.has(FrameOverlay.TextPath)}<TextPathOverlay {doc} clip={only} {frame} />{/if}
   {#if laidOut}<CornerOverlay {doc} {frame} clip={laidOut} onchange={edit} />{/if}
   {#if only && shown.has(FrameOverlay.Onion)}<OnionOverlay {doc} clip={only} {frame} {boxes} />{/if}
