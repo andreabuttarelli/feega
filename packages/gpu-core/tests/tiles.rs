@@ -454,14 +454,15 @@ fn a_far_zoom_out_shows_no_blank_tile_on_the_canvas() {
 }
 
 #[test]
-fn between_levels_the_view_draws_the_nearest_level() {
+fn a_zoom_out_draws_at_least_one_texel_per_device_pixel_and_at_most_a_root_two_more() {
     let mut tiles = Tiles::default();
     tiles.set_pixel_ratio(2.0);
 
-    assert_eq!(tiles.step_for(camera(2.0)), step_of(2.0));
-    assert_eq!(tiles.step_for(camera(1.5)), step_of(2.0));
-    assert_eq!(tiles.step_for(camera(0.9)), step_of(1.0));
-    assert_eq!(tiles.step_for(camera(1.2)), step_of(1.0));
+    for zoom in (5..=40).map(|i| i as f64 * 0.05) {
+        let density = step_zoom(tiles.step_for(camera(zoom)));
+        assert!(density >= zoom - 1e-9, "zoom {zoom}: {density} texels per pixel");
+        assert!(density <= zoom * 2f64.sqrt() + 1e-9, "zoom {zoom}: {density} oversampled");
+    }
     assert_eq!(tiles.step_for(camera(3.0)), step_of(3.0));
 }
 
