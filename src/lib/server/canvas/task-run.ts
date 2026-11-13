@@ -144,7 +144,8 @@ export enum RefusalStage {
   Provider = 'provider'
 }
 
-export const QUOTED_USD_PARAM = 'quotedUsd';
+export { QUOTED_USD_PARAM } from '$lib/server/repos/node-runs';
+import { QUOTED_USD_PARAM } from '$lib/server/repos/node-runs';
 
 export type TaskStart = { kind: 'job'; jobId: string; quotedUsd?: number } | { kind: 'waiting' } | { kind: 'refused'; error: string; stage: RefusalStage };
 

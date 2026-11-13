@@ -154,6 +154,11 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['content_reports', 'account_strikes', 'canvases', 'nodes', 'node_runs', 'assets', 'orgs_members', 'profiles', 'auth.users', 'storage.objects']
   },
   {
+    path: 'src/lib/server/repos/node-runs.ts — writerFor (every run write made during a request)',
+    why: "A run carries what the server decides: status, cost, the provider job it points at and the price it is billed at. The database refuses every node_runs write to a session (20261114_runs_server_written.sql). A write made for a signed-in caller goes through here only after auth_editor_org_ids(), asked with the caller's own client, contains the org of the run; every write filters on that org_id and the run id. Values the server prices a run with are stripped from the params a caller sends.",
+    tables: ['node_runs']
+  },
+  {
     path: 'src/lib/server/task-providers-config.ts — storeQuote (the quote of a provider task, on its run)',
     why: "The price a task is billed at is a value only the server decides, and the database keeps it out of reach of a session (20261114_run_values_server_written.sql). It is written right after the server submitted the task and got its price, on the run the server just created or claimed: org and run come from that row, never from the caller. It writes only that run's params.",
     tables: ['node_runs']
