@@ -91,6 +91,7 @@ const SEED = `
   insert into public.api_keys (id, org_id, user_id, name, key_hash, key_prefix) values ('${MEMBER_KEY}', '${ORG}', '${User.Member}', 'mine', 'h1', 'feega_m');
   insert into public.api_keys (id, org_id, user_id, name, key_hash, key_prefix) values ('${OWNER_KEY}', '${ORG}', '${User.Owner}', 'owner', 'h0', 'feega_o');
   insert into public.node_runs (id, org_id, node_id, params) values ('${RUN}', '${ORG}', '${NODE}', '${SERVER_VALUE}');
+  insert into public.assets (org_id, project_id, type, source, url) values ('${ORG}', '${PROJECT}', 'image', 'generated', '${User.Admin}/media/made.png');
   insert into public.canvas_events (org_id, canvas_id, kind, actor_kind, agent_key) values ('${ORG}', '${CANVAS}', 'node.create', 'agent', 'mcp');
   insert into public.motion_revisions (org_id, node_id, version, doc, actor_kind, actor_id) values ('${ORG}', '${NODE}', 1, '{}', 'agent', '${User.Member}');
 `;
@@ -199,6 +200,8 @@ const PROBES_BY_TABLE = [
 
 const HARDENING = [
   '20261114_orgs_read_only.sql',
+  '20261114_hand_over_org.sql',
+  '20261114_asset_paths_bound.sql',
   '20261114_team_writes_server_only.sql',
   '20261114_money_rows_read_only.sql',
   '20261114_api_keys_own_user.sql',
@@ -248,7 +251,17 @@ const TEAM_FUNCTION_PROBES = [
     ],
     want: Want.Lands
   },
+  { name: 'orgs_members: an org never has two owners, whoever writes', user: User.Service, sql: `update public.orgs_members set role = 'owner' where user_id = '${User.Admin}'`, want: Want.Refused },
   { name: 'orgs_members: a hand-over never makes two owners', user: User.Service, sql: `select public.hand_over_org('${ORG}', '${User.Owner}', '${User.Viewer}', 'owner')`, want: Want.Refused }
+];
+
+const ASSET_PATH_PROBES = [
+  { name: "assets: a session cannot point an asset at another org's files", user: User.Member, sql: `insert into public.assets (org_id, type, source, url) values ('${ORG}', 'image', 'upload', '${OTHER_ORG}/p/x.png')`, want: Want.Refused },
+  { name: "assets: a session cannot point an asset at a stranger's files", user: User.Member, sql: `insert into public.assets (org_id, type, source, url) values ('${ORG}', 'image', 'generated', '${User.Stranger}/media/x.png')`, want: Want.Refused },
+  { name: "assets: a session cannot move an asset onto someone else's files", user: User.Member, sql: `update public.assets set url = '${User.Stranger}/media/x.png' where org_id = '${ORG}'`, want: Want.Refused },
+  { name: 'assets: an upload still lands under its org', user: User.Member, sql: `insert into public.assets (org_id, type, source, url) values ('${ORG}', 'image', 'upload', '${ORG}/${PROJECT}/a.png')`, want: Want.Lands },
+  { name: 'assets: a generation still lands under its maker', user: User.Member, sql: `insert into public.assets (org_id, type, source, url) values ('${ORG}', 'image', 'generated', '${User.Member}/media/b.png')`, want: Want.Lands },
+  { name: "assets: a copy of a teammate's file in the same org still lands", user: User.Member, sql: `insert into public.assets (org_id, type, source, url) values ('${ORG}', 'image', 'generated', '${User.Admin}/media/made.png')`, want: Want.Lands }
 ];
 
 const ATTRIBUTION_PROBES = [
@@ -258,7 +271,7 @@ const ATTRIBUTION_PROBES = [
   { name: 'motion_revisions: the server still writes for whoever acted', user: User.Service, sql: `select 1 from (select public.commit_motion_revision('${ORG}', '${NODE}', 1, '{}'::jsonb, 's', 'agent', '${User.Owner}', 'mcp', 0, null, 3) as v) c where c.v = 2`, want: Want.Lands }
 ];
 
-const PROBES = [...PROBES_BY_TABLE, ...RUN_VALUE_PROBES, ...TEAM_FUNCTION_PROBES, ...ATTRIBUTION_PROBES];
+const PROBES = [...PROBES_BY_TABLE, ...RUN_VALUE_PROBES, ...TEAM_FUNCTION_PROBES, ...ASSET_PATH_PROBES, ...ATTRIBUTION_PROBES];
 
 const REALTIME_TABLES = ['canvases', 'node_runs', 'nodes', 'nodes_connections'];
 
