@@ -8,6 +8,7 @@ pub enum Detail {
 const LADDER: [(f64, Detail); 2] = [(0.5, Detail::Skip), (1.5, Detail::Bar)];
 
 pub const BLUR_FLOOR_PX: f64 = 0.5;
+pub const BACKDROP_FLOOR_PX: f64 = 2.0;
 pub const RUN_ITEMS: usize = 16;
 pub const SPLIT_DESCENDANTS: usize = 64;
 pub const TIER_LOG2_STEP: f64 = 2.0;
@@ -35,4 +36,8 @@ pub fn blur_px(blur: f64) -> f64 {
     } else {
         blur
     }
+}
+
+pub fn backdrop_px(backdrop: Option<f64>) -> Option<f64> {
+    backdrop.filter(|sigma| *sigma >= BACKDROP_FLOOR_PX)
 }

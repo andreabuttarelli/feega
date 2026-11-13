@@ -98,6 +98,7 @@ pub struct WebCore {
     lifted: Vec<(String, Lifted)>,
     changed_at: f64,
     credit: RasterCredit,
+    was: Camera,
     rest_shown: Vec<(Rect, wgpu::Texture)>,
     rest_spare: HashMap<(u32, u32), Vec<wgpu::Texture>>,
     counted: Counted,
@@ -342,7 +343,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new(), counted: Counted::default(), credit: RasterCredit::default() })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new(), counted: Counted::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 } })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -795,6 +796,10 @@ impl WebCore {
             self.credit.spend(js_sys::Date::now() - began);
             rastered += batch.keys.len();
         }
+        if matches!(self.motion, CoreMotion::Gesture) && self.credit.allows() {
+            rastered += self.bake_ahead()?;
+        }
+        self.was = self.camera;
         let tiles = self.tiles.frame(self.camera, screen);
         self.counted.unsharp = self.tiles.unsharp(&tiles.missing) as u32;
         let underlaid = self.compositor.held_look(self.camera).is_some_and(|(_, stretch)| crate::tiles::underlay_shows(stretch));
@@ -817,6 +822,21 @@ impl WebCore {
             self.pending |= self.fill_pyramid()?;
         }
         Ok(if rastered > 0 { "partial".into() } else { "reused".into() })
+    }
+
+    fn bake_ahead(&mut self) -> Result<usize, JsValue> {
+        let screen = (self.target.width(), self.target.height());
+        let mut rastered = 0;
+        for batch in bake_batches(&self.tiles.ahead(self.was, self.camera, screen)) {
+            if !self.credit.allows() {
+                break;
+            }
+            let began = js_sys::Date::now();
+            self.raster_batch(&batch)?;
+            self.credit.spend(js_sys::Date::now() - began);
+            rastered += batch.keys.len();
+        }
+        Ok(rastered)
     }
 
     fn forget_rest(&mut self) {

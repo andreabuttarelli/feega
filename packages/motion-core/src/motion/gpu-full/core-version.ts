@@ -1,2 +1,2 @@
-export const CORE_VERSION = '789b2bd4011a';
-export const CORE_GL_VERSION = 'dc7c76063aef';
+export const CORE_VERSION = 'cf2b87bf511b';
+export const CORE_GL_VERSION = '6c84b71d7d04';

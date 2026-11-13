@@ -28,6 +28,7 @@ const STEP_SLACK: f64 = 1e-9;
 const COARSER_STEPS: i32 = 40;
 const FINER_STEPS: i32 = 4;
 pub const NEAR_STEPS: i32 = 4;
+const AHEAD_FRAMES: f64 = 6.0;
 pub struct Level {
     pub below_top: i32,
     pub share_percent: u64,
@@ -164,15 +165,19 @@ fn batches_of(missing: &[TileKey], side: i64) -> Vec<Batch> {
 #[derive(Default)]
 pub struct RasterCredit {
     ms: f64,
+    budget_ms: f64,
 }
+
+const DEBT_FRAMES: f64 = 3.0;
 
 impl RasterCredit {
     pub fn earn(&mut self, budget_ms: f64) {
+        self.budget_ms = budget_ms;
         self.ms = (self.ms + budget_ms).min(budget_ms);
     }
 
     pub fn spend(&mut self, ms: f64) {
-        self.ms -= ms;
+        self.ms = (self.ms - ms).max(-self.budget_ms * DEBT_FRAMES);
     }
 
     pub fn allows(&self) -> bool {
@@ -284,6 +289,16 @@ impl Tiles {
         keys_over(world, step).into_iter().filter(|k| self.held.contains(k)).collect()
     }
 
+    pub fn ahead(&self, was: Camera, now: Camera, screen: (u32, u32)) -> Vec<TileKey> {
+        let (from, to) = (seen_world(was, screen).center(), seen_world(now, screen).center());
+        let zoom = now.zoom * (now.zoom / was.zoom).powf(AHEAD_FRAMES);
+        let centre = to + (to - from) * AHEAD_FRAMES;
+        let (w, h) = (screen.0 as f64, screen.1 as f64);
+        let predicted = Camera { x: w / 2.0 - centre.x * zoom, y: h / 2.0 - centre.y * zoom, zoom };
+        let current: FxHashSet<TileKey> = self.frame(now, screen).missing.into_iter().collect();
+        self.frame(predicted, screen).missing.into_iter().filter(|k| !current.contains(k)).collect()
+    }
+
     pub fn covered(&self, key: TileKey) -> bool {
         self.covered_within(key, COARSER_STEPS)
     }
@@ -349,6 +364,11 @@ impl Tiles {
         self.canvas_tiles = Some(allowed);
     }
 
+    fn overview(&self) -> Option<i32> {
+        let canvas = self.canvas.filter(|_| self.canvas_allowed() > 0)?;
+        Some(canvas_step(canvas, self.top() - PYRAMID[0].below_top, self.canvas_allowed()))
+    }
+
     fn canvas_allowed(&self) -> usize {
         self.canvas_tiles.unwrap_or(CANVAS_TILES)
     }
@@ -406,7 +426,7 @@ impl Tiles {
     }
 
     fn pinned(&self, step: i32, near: Rect, key: TileKey) -> bool {
-        if self.plan.iter().any(|level| level.holds(key)) {
+        if self.plan.iter().any(|level| level.holds(key)) || self.overview().is_some_and(|overview| key.step <= overview) {
             return true;
         }
         key.step == step && key.world().overlaps(near.inflate(key.side(), key.side()))

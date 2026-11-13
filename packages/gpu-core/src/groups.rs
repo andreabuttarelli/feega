@@ -13,7 +13,7 @@ use crate::glyphs::{outline, Fonts};
 use crate::text::typeset;
 use crate::pictures::Pictures;
 use crate::fragments::{Encoded, Fragments, Kept};
-use crate::lod::{blur_px, detail, Detail, BLUR_REACH, SPLIT_DESCENDANTS};
+use crate::lod::{backdrop_px, blur_px, detail, Detail, BLUR_REACH, SPLIT_DESCENDANTS};
 use crate::scene::{bounds, build_items, needs_layer, Layers};
 use crate::Skipped;
 
@@ -125,7 +125,7 @@ fn placed_look(look: &Look, m: Affine, frame: Rect, scale: f64) -> Look {
         [s[0], s[1], s[2], s[3]]
     });
     let origin = look.origin.map(|[x, y]| [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]]);
-    Look { matrix: times(m, look.matrix), blur: look.blur * scale, scissor: Some(scissor_of(clip)), masks, matte, space, origin, ..look.clone() }
+    Look { matrix: times(m, look.matrix), blur: look.blur * scale, backdrop: look.backdrop.map(|b| b * scale), scissor: Some(scissor_of(clip)), masks, matte, space, origin, ..look.clone() }
 }
 
 fn placed(item: &Item, m: Affine, frame: Rect, scale: f64) -> Item {
@@ -372,7 +372,7 @@ fn visible_bounds(item: &Item, own: Option<Rect>, blur: f64, view: Rect) -> bool
 }
 
 fn softened(item: Item) -> Item {
-    let soften = |look: &Look| Look { blur: blur_px(look.blur), ..look.clone() };
+    let soften = |look: &Look| Look { blur: blur_px(look.blur), backdrop: backdrop_px(look.backdrop), ..look.clone() };
     match item {
         Item::Path(p) => Item::Path(PathItem { look: soften(&p.look), ..p }),
         Item::Group(g) => Item::Group(Box::new(GroupItem { look: soften(&g.look), ..*g })),

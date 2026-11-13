@@ -150,3 +150,22 @@ fn a_blur_that_shrinks_under_half_a_pixel_on_screen_is_drawn_sharp() {
     assert_eq!(blurred_at(1.0), 3.0);
     assert_eq!(blurred_at(0.1), 0.0);
 }
+
+fn backdrop_at(scale: f64) -> Option<f64> {
+    let mut library = Library::new();
+    library.compose_encodings();
+    let glass = path("glass", 10.0, 10.0, 80.0, 80.0, r#", "backdrop": 20"#);
+    library.put_group("a", &parse(&format!(r#"{{ "width": 100, "height": 100, "background": null, "items": [{glass}] }}"#)).unwrap());
+    let screen = parse(&format!(
+        r#"{{ "width": 800, "height": 600, "background": null, "items": [{{ "kind": "use", "clip": "a", "group": "a", "matrix": [{scale}, 0, 0, {scale}, 0, 0], "cache": false }}] }}"#
+    ))
+    .unwrap();
+    let Item::Path(drawn) = &library.plan(&screen, LIMITS).screen.items[0] else { panic!("a path") };
+    drawn.look.backdrop
+}
+
+#[test]
+fn a_backdrop_blur_too_small_to_see_is_dropped_and_a_visible_one_scales() {
+    assert_eq!(backdrop_at(0.05), None);
+    assert_eq!(backdrop_at(0.5), Some(10.0));
+}
