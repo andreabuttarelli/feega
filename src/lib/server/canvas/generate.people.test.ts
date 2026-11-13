@@ -81,7 +81,8 @@ beforeEach(async () => {
     access: (orgId) => uncensoredAccess(db, orgId),
     screen: () => screen,
     refuseLikeness: (_scope, _model, reason) => record({ stage: 'rules', verdict: 'refuse', reason }),
-    bill
+    bill,
+    storeQuote: async () => {}
   });
   vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/png' } })));
 });

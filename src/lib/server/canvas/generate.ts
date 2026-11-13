@@ -447,7 +447,8 @@ async function resubmitWaiting(db: Db, shape: StartRun, run: NodeRun): Promise<v
 
 async function keepQuote(db: Db, run: NodeRun, params: Record<string, unknown>, quotedUsd: number | undefined): Promise<void> {
   if (quotedUsd) {
-    await setRunParams(db, { orgId: run.orgId, runId: run.id, params: { ...params, [QUOTED_USD_PARAM]: quotedUsd } });
+    const { taskRunDeps } = await import('$lib/server/task-providers-config');
+    await taskRunDeps(db).storeQuote({ orgId: run.orgId, runId: run.id, params: { ...params, [QUOTED_USD_PARAM]: quotedUsd } });
   }
 }
 

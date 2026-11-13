@@ -87,7 +87,8 @@ beforeEach(() => {
       record: () => {}
     }),
     refuseLikeness: vi.fn(),
-    bill
+    bill,
+    storeQuote: async () => {}
   });
 });
 

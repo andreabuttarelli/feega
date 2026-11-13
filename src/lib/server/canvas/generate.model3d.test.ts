@@ -135,7 +135,8 @@ beforeEach(() => {
     access: async () => ({ allowed: true }),
     screen: () => screen,
     refuseLikeness: vi.fn(),
-    bill
+    bill,
+    storeQuote: async () => {}
   });
 });
 

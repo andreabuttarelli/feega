@@ -120,6 +120,7 @@ export type TaskRunDeps = {
   screen(scope: TaskScope, model: TaskModel): ScreenPorts;
   refuseLikeness(scope: TaskScope, model: TaskModel, reason: string): void;
   bill(entry: TaskBill): void;
+  storeQuote(input: { orgId: string; runId: string; params: Record<string, unknown> }): Promise<void>;
 };
 
 export type TaskRequest = {
@@ -254,7 +255,8 @@ export async function startTaskRun(deps: TaskRunDeps, req: TaskRequest): Promise
   const startedAt = Date.now();
   try {
     const { taskId } = await gateway.run(ref, inputs, req.idempotencyKey);
-    return { kind: 'job', jobId: `${jobPrefixOf(provider)}${taskId}`, ...quoted };
+    const quotedUsd = 'quotedUsd' in quoted ? quoted.quotedUsd : quoteOf(model, inputs);
+    return { kind: 'job', jobId: `${jobPrefixOf(provider)}${taskId}`, ...(quotedUsd ? { quotedUsd } : {}) };
   } catch (error) {
     if (error instanceof ProviderBusyError) {
       return WAITING;
