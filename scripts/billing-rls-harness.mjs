@@ -206,6 +206,8 @@ const HARDENING = [
   '20261114_run_values_server_written.sql'
 ];
 
+const UNAPPLIED_SIBLINGS = ['20261112_credits_never_expire.sql', '20261113_editor_seats.sql', '20261113_agent_edit_counts.sql'];
+
 const DEFINERS_A_SESSION_CALLS = {
   'auth_admin_org_ids()': 'reads only the caller rows',
   'auth_editor_org_ids()': 'reads only the caller rows',
@@ -326,6 +328,22 @@ async function unreviewedDefiners(db) {
   return unknown.length ? `not reviewed: ${unknown.join(', ')}` : null;
 }
 
+async function applyLate(db) {
+  const plan = selfHostPlan();
+  for (const file of UNAPPLIED_SIBLINGS) {
+    const entry = plan.find((e) => e.file === file);
+    if (!entry) {
+      return `${file} is not in the self-host plan`;
+    }
+    try {
+      await db.exec(readFileSync(join(entry.dir, file), 'utf8'));
+    } catch (e) {
+      return `${file}: ${e.message}`;
+    }
+  }
+  return null;
+}
+
 async function realtimeIntact(db) {
   const { rows } = await db.query(
     `select c.relname, c.relreplident = 'f' as full, exists (select 1 from pg_publication_tables p where p.pubname = 'supabase_realtime' and p.tablename = c.relname) as published
@@ -341,12 +359,18 @@ const db = await PGlite.create({ extensions: { pgcrypto, uuid_ossp } });
 await load(db);
 
 let failures = 0;
-for (const p of PROBES) {
-  const { outcome, detail } = await probe(db, p);
-  const ok = outcome === p.want;
-  failures += ok ? 0 : 1;
-  console.log(`${ok ? 'ok  ' : 'FAIL'} ${p.name}${ok ? '' : ` — want ${p.want}, got ${outcome} (${detail})`}`);
+async function runProbes(order) {
+  let failed = 0;
+  for (const p of PROBES) {
+    const { outcome, detail } = await probe(db, p);
+    const ok = outcome === p.want;
+    failed += ok ? 0 : 1;
+    console.log(`${ok ? 'ok  ' : 'FAIL'} [${order}] ${p.name}${ok ? '' : ` — want ${p.want}, got ${outcome} (${detail})`}`);
+  }
+  return failed;
 }
+
+failures += await runProbes('in date order');
 
 const unreviewed = await unreviewedDefiners(db);
 failures += unreviewed ? 1 : 0;
@@ -356,9 +380,14 @@ const again = await reapplies(db);
 failures += again ? 1 : 0;
 console.log(`${again ? 'FAIL' : 'ok  '} the hardening migrations re-apply cleanly${again ? ` — ${again}` : ''}`);
 
+const late = await applyLate(db);
+failures += late ? 1 : 0;
+console.log(`${late ? 'FAIL' : 'ok  '} the unapplied sibling migrations re-apply after the hardening${late ? ` — ${late}` : ''}`);
+failures += await runProbes('siblings applied after the hardening');
+
 const realtime = await realtimeIntact(db);
 failures += realtime ? 1 : 0;
 console.log(`${realtime ? 'FAIL' : 'ok  '} realtime: ${REALTIME_TABLES.join(', ')} stay published with replica identity full${realtime ? ` — ${realtime}` : ''}`);
 
-console.log(`\n${PROBES.length + 3 - failures}/${PROBES.length + 3} passed`);
+console.log(`\n${2 * PROBES.length + 4 - failures}/${2 * PROBES.length + 4} passed`);
 process.exit(failures ? 1 : 0);
