@@ -60,6 +60,7 @@
   import { fastPatch, readyPatch } from '$lib/canvas/core/fast-patch';
   import { shapedText } from '@feega/motion-core/motion/gpu-full/text/measure';
   import type { TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
+  import { paintFirst } from '$lib/canvas/core/paint-first';
   import type { LiveDoc, LiveListener } from '$lib/canvas/core/live-docs.svelte';
   import { baseNodeId, viewOf, viewsOfFrame, withoutViews } from '$lib/canvas/breakpoint-views';
   import { loadOnce, withScenes, type LoadScene } from '$lib/canvas/scene-sources';
@@ -644,23 +645,25 @@
     liveShown.set(f.id, shown);
   }
 
-  function patchLive(f: FrameAt, source: LiveDoc) {
+  function patchLive(f: FrameAt, source: LiveDoc): boolean {
     const shown = liveShown.get(f.id);
     const measure = liveMeasures.get(f.id);
     const list = shown && measure && fastPatch(shown.list, shown.doc, source.doc, measure);
     if (!shown || !list) {
-      return;
+      return false;
     }
     const generation = liveGeneration.ask(f.id);
     if (!liveGeneration.land(f.id, generation)) {
-      return;
+      return false;
     }
     const key = `${f.id}:live${generation}`;
     markFrame(key, Step.LiveAsked);
     showLive(f, key, { ...shown, doc: source.doc, list });
+    return true;
   }
 
   const rebuildLatest = latestOnly<string, { f: FrameAt; source: LiveDoc }>((_id, { f, source }) => rebuildLive(f, source));
+  const rebuild = paintFirst<string, { f: FrameAt; source: LiveDoc }>((job) => pacer.afterPaint(job), rebuildLatest);
 
   function rebuildIfEdited(f: FrameAt, source: LiveDoc | undefined) {
     if (lift && !lift.landing && lift.id === baseNodeId(f.id)) {
@@ -672,8 +675,11 @@
     if (source && (!sameLive(liveBuilt.get(f.id), source) || liveStamp.get(f.id) !== f.scenes)) {
       liveBuilt.set(f.id, source);
       liveStamp.set(f.id, f.scenes);
-      patchLive(f, source);
-      rebuildLatest(f.id, { f, source });
+      if (patchLive(f, source)) {
+        rebuild.afterPaint(f.id, { f, source });
+      } else {
+        rebuild.now(f.id, { f, source });
+      }
     }
   }
 
