@@ -63,9 +63,23 @@ export async function request<T>(path: string, token: string, opts?: RequestInit
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`API ${res.status}: ${body.slice(0, 200)}`);
+    throw new Error(apiFailure(res.status, body));
   }
   return res.json() as Promise<T>;
+}
+
+export function apiFailure(status: number, body: string): string {
+  const words = wordsOf(body);
+  return words ? `API ${status}: ${words}\n${body.slice(0, 500)}` : `API ${status}: ${body.slice(0, 200)}`;
+}
+
+export function wordsOf(body: unknown): string | null {
+  try {
+    const parsed = typeof body === 'string' ? JSON.parse(body) : body;
+    return typeof parsed?.message === 'string' ? parsed.message : null;
+  } catch {
+    return null;
+  }
 }
 
 export type RawAnswer = { status: number; body: unknown };

@@ -1,4 +1,5 @@
 import { env } from '$env/dynamic/private';
+import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import type { Db } from '$lib/server/db/client';
 import { logAiCall, withBrandContext, withOrgContext } from '$lib/server/ai-log';
 import { SCRAPECREATORS_COST_USD, fetchProfileHistory, fetchSinglePost, scrapeCreatorsGet } from '$lib/server/scrapecreators';
@@ -180,12 +181,12 @@ export function liveBrowser(scope: Metered): OpenAppBrowser | null {
 
 export function uiCapture(db: Db, scope: Metered): UiCapture | undefined {
   const open = liveBrowser(scope);
-  const accounts = appAccountStore(db, { orgId: scope.orgId, projectId: scope.projectId, actor: { kind: 'agent', id: scope.userId } });
+  const accounts = appAccountStore(db, { orgId: scope.orgId, projectId: scope.projectId, actor: agentActor(scope.userId, AgentKey.Mcp) });
   return open ? vectorCapture(open, undefined, savedSession(accounts), uiFidelity) : undefined;
 }
 
 export function appAccountKept(db: Db, scope: Metered): () => Promise<boolean> {
-  const accounts = appAccountStore(db, { orgId: scope.orgId, projectId: scope.projectId, actor: { kind: 'agent', id: scope.userId } });
+  const accounts = appAccountStore(db, { orgId: scope.orgId, projectId: scope.projectId, actor: agentActor(scope.userId, AgentKey.Mcp) });
   return async () => (await accounts.read()) !== null;
 }
 
@@ -245,7 +246,7 @@ export function attachedShot(db: Db, scope: WebScope): KeepShot {
 }
 
 export function appPort(db: Db, scope: WebScope, open: OpenAppBrowser, keep: KeepShot): AppPort {
-  const accounts = appAccountStore(db, { orgId: scope.orgId, projectId: scope.projectId, actor: { kind: 'agent', id: scope.userId } });
+  const accounts = appAccountStore(db, { orgId: scope.orgId, projectId: scope.projectId, actor: agentActor(scope.userId, AgentKey.Mcp) });
   return {
     browse: async (input) => {
       const seen = await appBrowse(input, { open, accounts });

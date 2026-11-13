@@ -3,7 +3,7 @@ import { coreEvent } from '$lib/server/core-usage';
 import { CoreEvent, TemplateKind } from '$lib/core-usage';
 import { z } from 'zod';
 import type { Db } from '$lib/server/db/client';
-import { agentActor, type Actor } from '$lib/server/repos/actor';
+import { type Actor, AgentKey, agentActor } from '$lib/server/repos/actor';
 import { findProjectById, listProjects } from '$lib/server/repos/projects';
 import { ProjectMode } from '$lib/project-mode';
 import { FIRST_REVISION, motionEditorPath } from '$lib/canvas/motion-node';
@@ -19,7 +19,7 @@ import { MOTION_START_DEPS, placeMotion, type CanvasPick, type MotionStart, type
 import { templateLibrary } from './templates';
 
 const ID_LENGTH = 8;
-const API_AGENT_KEY = 'mcp';
+const API_AGENT_KEY = AgentKey.Mcp;
 const HTTP_BAD_REQUEST = 400;
 const HTTP_NOT_FOUND = 404;
 

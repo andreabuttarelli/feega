@@ -1,4 +1,5 @@
 import { isActionFailure, json } from '@sveltejs/kit';
+import { agentEditRefusal } from '$lib/server/agent-edits/cap';
 import { resolveOrgCaller } from '$lib/server/org-data/auth';
 import { agentActor } from '$lib/server/repos/actor';
 import { MCP_AGENT_KEY } from '$lib/server/motion/ask';
@@ -18,6 +19,10 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
   const { db, orgId, userId, writeAllowed } = resolved.caller;
   if (!writeAllowed) {
     return json({ error: 'api_key_read_only' }, { status: HTTP_FORBIDDEN });
+  }
+  const full = await agentEditRefusal(db, orgId);
+  if (full) {
+    return full;
   }
 
   const scope = await callerMotionScope(db, { orgId, userId, nodeId: params.nodeId ?? '' });

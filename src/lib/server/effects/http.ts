@@ -1,13 +1,14 @@
 import { json } from '@sveltejs/kit';
+import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import { resolveOrgCaller, type OrgCaller } from '$lib/server/org-data/auth';
 import { Outcome, type Written } from '$lib/server/repos/effects';
 import { chromiumGl, serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { effectStore, type EffectStore } from './store';
 
-const API_AGENT_KEY = 'api';
+
 
 export function storeOf(caller: OrgCaller): EffectStore {
-  const actor = caller.apiKeyId ? { kind: 'agent' as const, id: caller.userId, agentKey: API_AGENT_KEY } : { kind: 'user' as const, id: caller.userId };
+  const actor = caller.apiKeyId ? agentActor(caller.userId, AgentKey.Api) : { kind: 'user' as const, id: caller.userId };
   return effectStore({ db: caller.db, orgId: caller.orgId, actor, gl: serverFramesOpen() ? chromiumGl : null });
 }
 

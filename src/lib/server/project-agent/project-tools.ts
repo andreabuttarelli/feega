@@ -2,7 +2,7 @@ import { tool, type Tool } from 'ai';
 import { z } from 'zod';
 import { coreEvent } from '$lib/server/core-usage';
 import { AgentVia, CoreEvent, landed } from '$lib/core-usage';
-import { SIDEBAR_AGENT_KEY } from '$lib/server/repos/actor';
+import { SIDEBAR_AGENT_KEY, agentActor } from '$lib/server/repos/actor';
 import { Access, CANVAS_OPS, canvasCtx, chatSendsOp, runOp, type CanvasCtx, type CanvasDeps, type CanvasOpName } from '$lib/server/canvas/canvas-ops';
 import { effectStore } from '$lib/server/effects/store';
 import { chromiumGl, serverFramesOpen } from '$lib/server/motion/chromium-frames';
@@ -129,7 +129,7 @@ function canvasOpTools(ctx: CanvasCtx): Record<string, Tool> {
 export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> {
   const ctx = canvasCtx(deps);
   const actor = ctx.actor;
-  const effects = effectStore({ db: deps.db, orgId: deps.orgId, actor: { kind: 'agent', id: deps.userId, agentKey: SIDEBAR_AGENT_KEY }, gl: serverFramesOpen() ? chromiumGl : null });
+  const effects = effectStore({ db: deps.db, orgId: deps.orgId, actor: agentActor(deps.userId, SIDEBAR_AGENT_KEY), gl: serverFramesOpen() ? chromiumGl : null });
 
   const components = () => templateLibrary(deps.db, { orgId: deps.orgId, actor }).list();
 

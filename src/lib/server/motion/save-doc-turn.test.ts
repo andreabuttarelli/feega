@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 
@@ -17,7 +18,7 @@ vi.mock('$lib/server/repos/canvas', () => ({ patchNodeData, resizeNode, moveNode
 const { saveMotionDoc } = await import('./editor');
 
 const db = {} as never;
-const actor = { kind: 'agent' as const, id: 'u' };
+const actor = agentActor('u', AgentKey.Mcp);
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

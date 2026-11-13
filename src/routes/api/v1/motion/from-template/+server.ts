@@ -1,4 +1,5 @@
 import { json } from '@sveltejs/kit';
+import { agentEditRefusal } from '$lib/server/agent-edits/cap';
 import { resolveOrgCaller } from '$lib/server/org-data/auth';
 import { callerReach } from '$lib/server/org-data/reach';
 import { videoFromTemplate } from '$lib/server/motion/from-template';
@@ -15,6 +16,10 @@ export const POST: RequestHandler = async ({ request, url }) => {
   const { db, orgId, userId, writeAllowed } = resolved.caller;
   if (!writeAllowed) {
     return json({ error: 'api_key_read_only' }, { status: HTTP_FORBIDDEN });
+  }
+  const full = await agentEditRefusal(db, orgId);
+  if (full) {
+    return full;
   }
   const body = (await request.json().catch(() => ({}))) as { project?: unknown };
   const unreachable = await callerReach(resolved.caller, { project: typeof body.project === 'string' ? body.project : null });

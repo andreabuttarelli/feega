@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import { fakeDb } from '$lib/server/db/fake-db';
 
 const enqueueWorkflow = vi.fn();
@@ -10,7 +11,7 @@ const ORG = 'org-1';
 const PROJECT = 'proj-1';
 const CANVAS = 'canvas-1';
 const USER = 'user-1';
-const ACTOR = { kind: 'agent' as const, id: USER };
+const ACTOR = agentActor(USER, AgentKey.Mcp);
 
 const nodeRow = (id: string, type: string, x: number, data: Record<string, unknown>) => ({
   id, org_id: ORG, project_id: PROJECT, canvas_id: CANVAS, type, display_name: null, x, y: 0, z: 0, width: null, height: null, data, version: 1, deleted_at: null

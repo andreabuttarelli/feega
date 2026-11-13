@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import { z } from 'zod';
 import type { Db } from '$lib/server/db/client';
 import { findNode } from '$lib/server/repos/canvas';
-import { agentActor } from '$lib/server/repos/actor';
+import { AgentKey, agentActor } from '$lib/server/repos/actor';
 import { motionOf } from '$lib/canvas/motion-node';
 import { boardMedia, storyboardSchema } from '$lib/motion/storyboard';
 import { listProjectAssets } from '$lib/server/repos/assets';
@@ -10,7 +10,7 @@ import { storyboardStore } from './storyboard';
 
 const HTTP_BAD_REQUEST = 400;
 const HTTP_NOT_FOUND = 404;
-const API_AGENT_KEY = 'mcp';
+const API_AGENT_KEY = AgentKey.Mcp;
 
 type Scope = { orgId: string; userId: string; nodeId: string };
 

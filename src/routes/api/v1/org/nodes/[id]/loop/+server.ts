@@ -1,4 +1,6 @@
 import { json } from '@sveltejs/kit';
+import { agentActor, AgentKey, launchKey } from '$lib/server/repos/actor';
+import { agentEditRefusal } from '$lib/server/agent-edits/cap';
 import type { RequestHandler } from './$types';
 import { reachableCaller } from '$lib/server/org-data/reach';
 import { gateOrgAiAction } from '$lib/server/cli-auth';
@@ -56,13 +58,19 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
   const gate = await gateOrgAiAction(orgId, apiKeyId ? { id: apiKeyId, name: '', user_id: userId, org_id: orgId, scopes: ['write'] } : undefined);
   if (gate) return gate;
 
+  const full = apiKeyId ? await agentEditRefusal(db, orgId) : null;
+  if (full) {
+    return full;
+  }
+
   const outcome = await enqueueLoop(db, {
     orgId,
     projectId: node.projectId,
     canvasId: node.canvasId,
     nodeId,
     userId,
-    confirmed: body.confirm === true
+    confirmed: body.confirm === true,
+    actor: agentActor(userId, launchKey(AgentKey.Loop, caller))
   });
 
   if (outcome.kind === 'refused') return json({ error: outcome.error }, { status: 400 });

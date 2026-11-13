@@ -71,6 +71,12 @@
       <span class="text-base font-semibold"><CreditAmount amount={data.credits.balance} /></span>
     </Field>
 
+    {#if data.agentEdits}
+      <Field label={$_('app.account.billing.agentEdits')} layout={FieldLayout.Row}>
+        <span class="text-[0.8125rem]" data-testid="credits-agent-edits">{$_('app.account.billing.agentEditsValue', { values: { used: formatCredits(data.agentEdits.used), limit: formatCredits(data.agentEdits.limit) } })}</span>
+      </Field>
+    {/if}
+
     <Field
       label={$_('app.account.billing.ladderTitle')}
       hint={$_('app.account.billing.ladderDesc')}

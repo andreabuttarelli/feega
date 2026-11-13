@@ -64,7 +64,7 @@ export function canvasLinkOf(call: ToolCall, projectId: string): CanvasLink | nu
   return { href: `/p/${projectId}/c/${target.canvasId}`, label: target.label };
 }
 
-export type Failure = 'load' | 'send' | 'empty' | 'credits' | 'blocked';
+export type Failure = 'load' | 'send' | 'empty' | 'credits' | 'blocked' | 'agentCap';
 
 const HTTP_PAYMENT_REQUIRED = 402;
 
@@ -73,11 +73,13 @@ export const FAILURES: Record<Failure, { messageKey: string; action: 'retry' | '
   send: { messageKey: 'chat.panel.failure.send', action: 'retry' },
   empty: { messageKey: 'chat.panel.failure.empty', action: 'retry' },
   credits: { messageKey: 'chat.panel.failure.credits', action: 'credits' },
-  blocked: { messageKey: 'chat.panel.failure.blocked', action: 'rephrase' }
+  blocked: { messageKey: 'chat.panel.failure.blocked', action: 'rephrase' },
+  agentCap: { messageKey: 'chat.panel.failure.agentCap', action: 'credits' }
 };
 
 const FAILURE_OF_CODE: Readonly<Record<string, Failure>> = {
-  prompt_blocked: 'blocked'
+  prompt_blocked: 'blocked',
+  agent_edit_cap: 'agentCap'
 };
 
 export function failureOfStatus(status: number, code?: string): Failure {

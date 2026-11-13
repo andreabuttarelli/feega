@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import { fakeDb } from '$lib/server/db/fake-db';
 import { storyboardSchema, MediaKind } from '$lib/motion/storyboard';
 import { storyboardStore } from './storyboard';
 
-const scope = { orgId: 'org', projectId: 'project', motionNodeId: 'motion', title: 'Launch', actor: { kind: 'agent' as const, id: 'user', agentKey: 'motion' } };
+const scope = { orgId: 'org', projectId: 'project', motionNodeId: 'motion', title: 'Launch', actor: agentActor('user', AgentKey.Motion) };
 
 const row = (id: string, canvas: string, type: string, data: Record<string, unknown>, x = 0) => ({ id, org_id: 'org', canvas_id: canvas, project_id: 'project', type, display_name: null, x, y: 0, z: 0, width: null, height: null, data, version: 1, deleted_at: null });
 

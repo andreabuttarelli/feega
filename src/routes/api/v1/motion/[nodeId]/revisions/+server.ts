@@ -1,4 +1,5 @@
 import { json } from '@sveltejs/kit';
+import { agentEditRefusal } from '$lib/server/agent-edits/cap';
 import { z } from 'zod';
 import { reachableCaller } from '$lib/server/org-data/reach';
 import { motionRevisions, restoreMotion } from '$lib/server/motion/ask';
@@ -32,6 +33,10 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
   const { db, orgId, userId, writeAllowed } = caller;
   if (!writeAllowed) {
     return json({ error: 'api_key_read_only' }, { status: HTTP_FORBIDDEN });
+  }
+  const full = await agentEditRefusal(db, orgId);
+  if (full) {
+    return full;
   }
 
   const body = bodySchema.safeParse(await request.json().catch(() => ({})));

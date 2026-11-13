@@ -5,7 +5,7 @@ import { nameVersion, namedRevisions } from './version-names';
 import type { Db } from '$lib/server/db/client';
 import { showAgentAt } from '$lib/server/canvas/agent-cursor';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
-import { agentActor } from '$lib/server/repos/actor';
+import { AgentKey, agentActor } from '$lib/server/repos/actor';
 import { Checkpoint, readRevision } from '$lib/server/repos/motion-revisions';
 import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
@@ -44,7 +44,7 @@ export enum ToolRun {
 
 export type ToolRunAsk = { tool: string; input: unknown; version?: number; callId?: string };
 
-export type ToolRunScope = { orgId: string; userId: string; nodeId: string; projectId?: string; agentKey?: string; sessionId?: string | null };
+export type ToolRunScope = { orgId: string; userId: string; nodeId: string; projectId?: string; agentKey?: AgentKey; sessionId?: string | null };
 
 export type EditorFrames = (callId: string, times: number[], doc: MotionDoc) => Promise<Frame[] | null>;
 
@@ -52,7 +52,7 @@ export type ToolRunTurn = { sessions: Map<string, MotionSession>; selection: str
 
 export type ToolRunResult = { outcome: ToolRun.Done; output: unknown; version: number; saved: boolean; frames: Frame[] } | { outcome: Exclude<ToolRun, ToolRun.Done | ToolRun.Refused>; detail?: string; changed?: Contested[] };
 
-export const TOOL_RUN_AGENT_KEY = 'mcp';
+export const TOOL_RUN_AGENT_KEY = AgentKey.Mcp;
 export const SPENDING_TOOLS: ReadonlySet<string> = new Set(['generate_voiceover', 'add_music']);
 
 export enum FrameToolAccess {

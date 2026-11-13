@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { editApi } from '../../lib/edit.ts';
-import type { RawAnswer } from '../../lib/api.ts';
+import { wordsOf, type RawAnswer } from '../../lib/api.ts';
 import type { ToolSurface } from '../tool-surface.ts';
 import { DESCRIBE, TOOL_FAMILY } from '../surface.ts';
 import { requireAuth, fail, ok, okText, type ToolResult } from '../util.ts';
@@ -28,7 +28,9 @@ enum Shape {
 function shown(answer: RawAnswer, plain: Shape): ToolResult {
   const body = answer.body;
   if (answer.status >= HTTP_ERROR_FROM) {
-    return fail(typeof body === 'string' ? body : JSON.stringify(body));
+    const raw = typeof body === 'string' ? body : JSON.stringify(body);
+    const words = wordsOf(body);
+    return fail(words ? `${words}\n${raw}` : raw);
   }
   const frames = (body as { frames?: Frame[] } | null)?.frames;
   if (!Array.isArray(frames)) {

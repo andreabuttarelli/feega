@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
+import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import type { Db } from '$lib/server/db/client';
 import { appAccountStore } from './app-accounts';
 
-const SCOPE = { orgId: 'o1', projectId: 'p1', actor: { kind: 'agent' as const, id: 'u1', agentKey: 'project-agent' } };
+const SCOPE = { orgId: 'o1', projectId: 'p1', actor: agentActor('u1', AgentKey.Mcp) };
 const ROW = { login_url: 'https://app.example/login', email: 't@app.example', test_password: 'pw', session: { cookies: [{ name: 'sid' }], storage: { jwt: 't' } }, session_until: '1970-01-01T00:00:01.000Z' };
 
 function fakeDb(answer: { data?: unknown; error?: { code?: string } | null }) {
@@ -38,7 +39,7 @@ describe('app accounts: one test account per project', () => {
 
     await appAccountStore(db, SCOPE).save({ loginUrl: ROW.login_url, email: ROW.email, password: 'pw', session: { cookies: [], storage: {} }, sessionUntil: null });
 
-    expect(calls.find((c) => c.op === 'upsert')?.args[0]).toMatchObject({ project_id: 'p1', org_id: 'o1', test_password: 'pw', session_until: null, actor_kind: 'agent', actor_id: 'u1', agent_key: 'project-agent' });
+    expect(calls.find((c) => c.op === 'upsert')?.args[0]).toMatchObject({ project_id: 'p1', org_id: 'o1', test_password: 'pw', session_until: null, actor_kind: 'agent', actor_id: 'u1', agent_key: 'mcp' });
   });
 
   it('forgets the account of the project only', async () => {

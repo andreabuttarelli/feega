@@ -1,9 +1,10 @@
 import { json } from '@sveltejs/kit';
+import { agentEditRefusal } from '$lib/server/agent-edits/cap';
 import { hiddenFor } from '$lib/server/uncensored-workspace/hidden-scope';
 import type { RequestHandler } from './$types';
 import { resolveOrgCaller } from '$lib/server/org-data/auth';
 import { createOrgWriteTools } from '$lib/server/org-data/write-tool';
-import { agentActor } from '$lib/server/repos/actor';
+import { AgentKey, agentActor } from '$lib/server/repos/actor';
 import { INSERT_ROW, UPDATE_ROW, DELETE_ROW } from '@feega/api-contracts';
 
 /**
@@ -22,8 +23,12 @@ const write = async (request: Request, url: URL, op: 'insert' | 'update' | 'dele
   if (!writeAllowed) {
     return json({ error: 'api_key_read_only' }, { status: 403 });
   }
+  const full = apiKeyId ? await agentEditRefusal(db, orgId) : null;
+  if (full) {
+    return full;
+  }
 
-  const actor = apiKeyId ? agentActor(userId, `api_key:${apiKeyId}`) : undefined;
+  const actor = apiKeyId ? agentActor(userId, AgentKey.ApiKey) : undefined;
   const hidden = await hiddenFor(db, { orgId, userId });
   const tools = createOrgWriteTools({ authority, orgId, userId, actor, hidden });
   const contract = op === 'insert' ? INSERT_ROW : op === 'update' ? UPDATE_ROW : DELETE_ROW;

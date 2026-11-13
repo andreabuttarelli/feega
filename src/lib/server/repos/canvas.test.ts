@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import {
   createConnection,
   createNode,
@@ -505,11 +506,11 @@ describe('ogni gesto strutturale scrive canvas_events', () => {
       type: 'text',
       x: 0,
       y: 0,
-      actor: { kind: 'agent', id: 'user-1', agentKey: 'mcp:claude' }
+      actor: agentActor('user-1', AgentKey.Mcp)
     });
 
     const event = calls.find((c) => c.table === 'canvas_events' && c.op === 'insert')!;
-    expect(event.payload).toMatchObject({ actor_kind: 'agent', actor_id: 'user-1', agent_key: 'mcp:claude' });
+    expect(event.payload).toMatchObject({ actor_kind: 'agent', actor_id: 'user-1', agent_key: 'mcp' });
   });
 });
 

@@ -1,5 +1,5 @@
 import type { Db } from '$lib/server/db/client';
-import type { Actor } from '$lib/server/repos/actor';
+import type { RecordedActor } from '$lib/server/repos/actor';
 import { listBranchNodes, listNodes } from '$lib/server/repos/canvas';
 import { listCanvasEvents, type CanvasEvent, type CanvasEventKind } from '$lib/server/repos/canvas-events';
 import { listConflicts } from '$lib/server/repos/canvas-conflicts';
@@ -25,7 +25,7 @@ const FIRST_REVISION = 1;
 
 const authorOf = (kind: string, id: string | null, agentKey: string | null): HistoryAuthor => ({ kind: kind as HistoryAuthor['kind'], id, agentKey });
 
-const actorAuthor = (actor: Actor): HistoryAuthor => authorOf(actor.kind, actor.id, actor.agentKey ?? null);
+const actorAuthor = (actor: RecordedActor): HistoryAuthor => authorOf(actor.kind, actor.id, actor.agentKey ?? null);
 
 const typeLabel = (type: unknown) => NODE_KIND_LABEL[type as NodeType] ?? null;
 

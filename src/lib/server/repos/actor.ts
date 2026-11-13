@@ -10,14 +10,48 @@ import { CHAT_AGENT_KEY } from '$lib/canvas/history/timeline';
 export const ACTOR_KINDS = ['user', 'agent', 'system'] as const;
 export type ActorKind = (typeof ACTOR_KINDS)[number];
 
-export const SIDEBAR_AGENT_KEY = CHAT_AGENT_KEY;
+export enum AgentKey {
+  Sidebar = 'sidebar',
+  Mcp = 'mcp',
+  Motion = 'motion',
+  Api = 'api',
+  ApiKey = 'api_key',
+  Compose = 'compose',
+  Studio = 'studio',
+  Loop = 'loop',
+  Workflow = 'workflow'
+}
 
-export type Actor = {
-  kind: ActorKind;
-  id: string | null;
-  agentKey?: string | null;
-  sessionId?: string | null;
+export enum Initiator {
+  Agent = 'agent',
+  Person = 'person'
+}
+
+export const AGENT_INITIATOR: Record<AgentKey, Initiator> = {
+  [AgentKey.Sidebar]: Initiator.Agent,
+  [AgentKey.Mcp]: Initiator.Agent,
+  [AgentKey.Motion]: Initiator.Agent,
+  [AgentKey.Api]: Initiator.Agent,
+  [AgentKey.ApiKey]: Initiator.Agent,
+  [AgentKey.Compose]: Initiator.Person,
+  [AgentKey.Studio]: Initiator.Person,
+  [AgentKey.Loop]: Initiator.Person,
+  [AgentKey.Workflow]: Initiator.Person
 };
+
+export const AGENT_DECIDED_KEYS: readonly AgentKey[] = Object.values(AgentKey).filter((key) => AGENT_INITIATOR[key] === Initiator.Agent);
+
+export const launchKey = (personKey: AgentKey, caller: { apiKeyId?: string | null }): AgentKey => (caller.apiKeyId ? AgentKey.ApiKey : personKey);
+
+export const SIDEBAR_AGENT_KEY = CHAT_AGENT_KEY as AgentKey.Sidebar;
+
+export type AgentActor = { kind: 'agent'; id: string; agentKey: AgentKey; sessionId?: string | null };
+
+type PersonActor = { kind: 'user' | 'system'; id: string | null; agentKey?: null; sessionId?: string | null };
+
+export type Actor = AgentActor | PersonActor;
+
+export type RecordedActor = { kind: ActorKind; id: string | null; agentKey?: string | null };
 
 /** Colonne actor sulle tabelle che hanno anche `agent_key` (nodes, chat, ai_calls). */
 export function actorCols(actor: Actor | undefined): Record<string, unknown> {
@@ -39,6 +73,6 @@ export function edgeActorCols(actor: Actor | undefined): Record<string, unknown>
   return { actor_kind: actor.kind, actor_id: actor.id };
 }
 
-export function agentActor(userId: string, agentKey: string = SIDEBAR_AGENT_KEY, sessionId?: string | null): Actor {
+export function agentActor(userId: string, agentKey: AgentKey = SIDEBAR_AGENT_KEY, sessionId?: string | null): AgentActor {
   return { kind: 'agent', id: userId, agentKey, ...(sessionId ? { sessionId } : {}) };
 }

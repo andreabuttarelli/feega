@@ -1,4 +1,5 @@
 import type { Db } from '$lib/server/db/client';
+import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import { runGenNode, type StartRun } from '$lib/server/canvas/generate';
 import { DataCheck, findNode, patchNodeData, listConnections, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { createRun, claimRun, completeRun, failRun, runningRuns, runsByIds, type NodeRun } from '$lib/server/repos/node-runs';
@@ -181,7 +182,7 @@ async function runStep(
     model,
     params: (node.data.params ?? {}) as StartRun['params'],
     expectedVersion: node.version,
-    actor: { kind: 'agent', id: ticket.userId, agentKey: 'workflow' }
+    actor: agentActor(ticket.userId, AgentKey.Workflow)
   };
 
   const out = await runGenNode(db, startRun);

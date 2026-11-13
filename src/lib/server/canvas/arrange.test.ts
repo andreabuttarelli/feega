@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import { fakeDb } from '$lib/server/db/fake-db';
 import { Edge } from '$lib/motion/space';
 import { alignTiles } from '$lib/canvas/align';
 import { arrangeNodes } from './arrange';
 
 const ORG = 'org';
-const ACTOR = { kind: 'agent' as const, id: 'user', agentKey: 'mcp' };
+const ACTOR = agentActor('user', AgentKey.Mcp);
 
 const row = (id: string, x: number, y: number, width: number | null = 100, height: number | null = 50) => ({
   id, canvas_id: 'canvas', project_id: 'project', type: 'text', display_name: null, x, y, z: 0, width, height, data: {}, version: 1, org_id: ORG, deleted_at: null
