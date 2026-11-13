@@ -1,14 +1,14 @@
 <script lang="ts">
   import ColorField from '$lib/components/motion/ColorField.svelte';
   import { ColourDisplay } from '$lib/motion/colour-field';
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import { anchorShift, editCss, type EditBody, type EditLayout, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { TypingBurst, autoList, lineMove, rangeOf, select, selectionIn, textOf, type LineMove, type Span } from '$lib/canvas/editable-text';
   import { textRange } from '$lib/canvas/text-range.svelte';
   import { openingSpan } from '$lib/canvas/core/text-caret';
   import { editMarks } from '$lib/canvas/core/text-marks';
   import { apply2d, invert2d } from '@feega/motion-core/motion/parent';
-  import { CLICK_GRAINS, codePointsOf, dragged, hitTest, lineEdge, pressed, Step, unitsOf, type CaretLine, type Pick } from '@feega/motion-core/motion/gpu-full/text/caret';
+  import { caretRect, CLICK_GRAINS, codePointsOf, nextLine, dragged, hitTest, lineEdge, pressed, Step, unitsOf, type CaretLine, type Pick } from '@feega/motion-core/motion/gpu-full/text/caret';
   import GradientHandles from './GradientHandles.svelte';
   import { ListKind, type ListItem } from '@feega/motion-core/motion/text-lists';
   import { codeIndex, linkOf, MIXED, RunToggle, STYLE_KEYS, type GradientFill, type RunEdit, type RunStyle, type TextRun } from '@feega/motion-core/motion/text-runs';
@@ -114,8 +114,9 @@
   let opened = $state(false);
 
   $effect(() => {
+    const typedNow = { text: value, runs: textRange.runs, lists: textRange.lists };
     if (opened) {
-      ontype(value, textRange.runs, textRange.lists);
+      untrack(() => ontype(typedNow.text, typedNow.runs, typedNow.lists));
     }
   });
 
@@ -148,6 +149,19 @@
     }
     const at = lineEdge(lines, codePointsOf(value, sel.end), LINE_STEP[line.direction]);
     choose(line.alter === 'extend' ? { anchor: codePointsOf(value, sel.start), focus: at } : { anchor: at, focus: at });
+  }
+
+  const VERTICAL_STEP: Record<string, Step> = { ArrowUp: Step.Back, ArrowDown: Step.Forward };
+
+  function verticalMove(e: KeyboardEvent): boolean {
+    const step = VERTICAL_STEP[e.key];
+    if (step === undefined || !lines.length || e.metaKey || e.ctrlKey || e.altKey) {
+      return false;
+    }
+    const focus = codePointsOf(value, sel.end);
+    const at = nextLine(lines, focus, step, caretRect(lines, focus).x);
+    choose(e.shiftKey ? { anchor: codePointsOf(value, sel.start), focus: at } : { anchor: at, focus: at });
+    return true;
   }
 
   const grainOf = (clicks: number) => CLICK_GRAINS[Math.min(Math.max(clicks, 1), CLICK_GRAINS.length) - 1];
@@ -437,6 +451,11 @@
       e.stopPropagation();
       selected();
       restyle(shortcut);
+      return;
+    }
+    if (!composing && verticalMove(e)) {
+      e.preventDefault();
+      e.stopPropagation();
       return;
     }
     const line = composing ? null : lineMove(e);

@@ -6,4 +6,4 @@
 
 **Discarded:** (b) matching the DOM overlay to the engine — two shapers never agree for every font, fallback and wrap.
 
-**Known gaps:** Up/Down and Up/Down still move by the hidden DOM layout, which can differ at wrap points; IME composition has no underline.
+**Known gaps:** IME composition has no underline. Up/Down use `nextLine` on the engine lines, at the current caret x (no sticky goal column).
