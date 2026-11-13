@@ -680,3 +680,21 @@ fn a_stall_long_past_does_not_starve_the_frames_after_it() {
     assert!(waited.unwrap() <= 4, "waited {waited:?} frames");
 }
 
+#[test]
+fn the_level_that_covers_the_whole_canvas_survives_eviction_without_a_plan() {
+    let mut tiles = Tiles::default();
+    tiles.set_canvas(WIDE);
+    let overview = tiles.pyramid(Camera { x: 0.0, y: 0.0, zoom: SCREEN.0 as f64 / WIDE.width() }, SCREEN, KEPT);
+    let canvas_step = overview[0].step;
+    overview.iter().for_each(|k| tiles.hold(*k));
+    let mut fresh = Tiles::default();
+    fresh.set_canvas(WIDE);
+    overview.iter().filter(|k| k.step == canvas_step).for_each(|k| fresh.hold(*k));
+    let deep = Camera { x: -20000.0, y: -10000.0, zoom: 2.0 };
+    (0..200).for_each(|i| fresh.hold(TileKey { step: step_of(2.0), tx: 10000 + i, ty: 5000 }));
+
+    let gone = fresh.evict_beyond(deep, SCREEN, 0);
+
+    assert!(gone.iter().all(|k| k.step != canvas_step), "evicted {} overview tiles", gone.iter().filter(|k| k.step == canvas_step).count());
+}
+

@@ -353,6 +353,11 @@ impl Tiles {
         self.canvas_tiles = Some(allowed);
     }
 
+    fn overview(&self) -> Option<i32> {
+        let canvas = self.canvas.filter(|_| self.canvas_allowed() > 0)?;
+        Some(canvas_step(canvas, self.top() - PYRAMID[0].below_top, self.canvas_allowed()))
+    }
+
     fn canvas_allowed(&self) -> usize {
         self.canvas_tiles.unwrap_or(CANVAS_TILES)
     }
@@ -410,7 +415,7 @@ impl Tiles {
     }
 
     fn pinned(&self, step: i32, near: Rect, key: TileKey) -> bool {
-        if self.plan.iter().any(|level| level.holds(key)) {
+        if self.plan.iter().any(|level| level.holds(key)) || self.overview().is_some_and(|overview| key.step <= overview) {
             return true;
         }
         key.step == step && key.world().overlaps(near.inflate(key.side(), key.side()))
