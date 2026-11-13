@@ -5,7 +5,7 @@ sidebar:
   order: 4
 ---
 
-Local mode runs feega on your computer for one canvas. Everything you draw is saved in a single
+Local mode runs Feega on your computer for one canvas. Everything you draw is saved in a single
 `.feega` file, the same file feega.app imports.
 
 ```sh
@@ -120,7 +120,7 @@ To open a different file, stop the server and start it again with that file.
 ## Telemetry
 
 On start, `npx feega` sends one anonymous event to PostHog (EU): `npx_feega_started`, plus
-`npx_feega_active_day` on the first start of each day. Each carries the feega version, OS, CPU
+`npx_feega_active_day` on the first start of each day. Each carries the Feega version, OS, CPU
 architecture, Node version and a random install id stored in `~/.feega/telemetry-id`. No IP or
 location is kept, and no canvas content, file names, paths or project names are sent. The first
 run prints a one-line notice. A failed send is ignored and never delays startup.

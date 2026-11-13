@@ -1,6 +1,6 @@
 ---
 title: MCP setup
-description: Connect Claude Code, Claude, Codex, Cursor or Claude Desktop to feega, in the cloud or in local mode. The home page shows the cloud commands for Claude Code, Codex and Cursor under **connect your agent**.
+description: Connect Claude Code, Claude, Codex, Cursor or Claude Desktop to Feega, in the cloud or in local mode. The home page shows the cloud commands for Claude Code, Codex and Cursor under **connect your agent**.
 sidebar:
   order: 1
 ---
@@ -119,7 +119,7 @@ On a `409`, `view` the frame again and redo the edit on what is there now. Witho
 
 An agent that is told "make this darker" needs to know which node "this" is. `get_selection` reads it from the canvas you have open.
 
-1. Open the canvas in feega and select one or more nodes (click, `Shift`-click or drag a box).
+1. Open the canvas in Feega and select one or more nodes (click, `Shift`-click or drag a box).
 2. Call the op with the canvas id: from the CLI, `feega canvas $PROJECT get_selection --input '{"canvasId":"<canvas>"}'`; over MCP, `canvas_tool({ project_id, op: "get_selection", input: { canvasId } })`.
 3. The answer lists one entry per open session of yours: `sessionId`, `selection` (the node ids), `view` (centre and zoom of the viewport) and `at`.
 

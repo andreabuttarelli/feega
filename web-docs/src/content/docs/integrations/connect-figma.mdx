@@ -9,18 +9,18 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 
 <DemoVideo name="connect-figma" caption="Settings, Profile: paste a personal access token in the Figma panel and save it." />
 
-Pasting from Figma works without a token: layers and text land as they are. A token adds the images. Figma only puts an image's id on the clipboard, so feega needs your token to ask Figma for the picture.
+Pasting from Figma works without a token: layers and text land as they are. A token adds the images. Figma only puts an image's id on the clipboard, so Feega needs your token to ask Figma for the picture.
 
 ## Create the token in Figma
 
 1. In Figma, open your account menu, then **Settings**.
 2. Open the **Security** tab and find **Personal access tokens**.
 3. Choose **Generate new token**, give it a name such as `feega`, and set an expiry.
-4. Under scopes, turn on **File content: Read-only**. This is what feega calls to fetch a file's images.
+4. Under scopes, turn on **File content: Read-only**. This is what Feega calls to fetch a file's images.
 5. Optional: turn on **Current user: Read-only**. It only lets Test show your Figma handle. Without it, Test still passes and says the account name is hidden.
 6. Generate, then copy the token. Figma shows it once.
 
-## Add it to feega
+## Add it to Feega
 
 1. Open **Settings** in the left rail, then **Profile** under Account.
 2. In the **Figma** panel, paste the token into **Personal access token** and choose **Save token**.

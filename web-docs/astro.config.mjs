@@ -7,8 +7,9 @@ export default defineConfig({
   site: SITE,
   integrations: [
     starlight({
-      title: 'feega docs',
-      description: 'Guides, references and architecture notes for feega, the infinite canvas for design and motion.',
+      title: 'Feega docs',
+      description: 'Guides, references and architecture notes for Feega, the infinite canvas for design and motion.',
+      logo: { src: './src/assets/logo.svg', replacesTitle: false },
       favicon: '/favicon.svg',
       head: [
         { tag: 'link', attrs: { rel: 'icon', href: '/favicon.ico', sizes: '16x16 32x32 48x48' } },
