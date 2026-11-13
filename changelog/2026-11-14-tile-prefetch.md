@@ -16,3 +16,15 @@ overview coarse for >500 ms after returning, 100–300 ms stalls.
 
 Not done: the stalls themselves are single coarse bakes (50–300 ms) of
 thousands of layers; cutting their cost needs engine work.
+
+## Second pass: cost of coarse bakes
+
+- **Backdrop blur scales with zoom.** `backdrop` sigma was never scaled
+  by the use matrix (only `blur` was): at overview a 20 px glass blur ran
+  a full backdrop pass per item. Now scaled, and dropped under 2 device px.
+- **Batches sized by measured cost.** Per-step EMA of ms/tile picks the
+  batch side (1..4) that fits the frame budget. Max frame 300 → 100 ms,
+  frames over 100 ms 9 → 1; blur on overview legs got worse because small
+  batches pay the per-render overhead more often.
+- A single coarse tile still costs 50–90 ms. Next: build coarse levels by
+  downsampling finer tiles on the GPU instead of re-rendering.
