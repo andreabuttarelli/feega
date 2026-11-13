@@ -2606,7 +2606,7 @@
     if (!tile) {
       return null;
     }
-    return { x: tile.x, y: tile.y, w: tile.w, h: tile.h, rotation: tile.rotation ?? 0, set: (x, y) => props.onMove?.(nodeId, x, y), resize: (w, h) => props.onResize?.(nodeId, w, h), grow: (w, h) => props.onNodeSize?.(nodeId, w, h), turn: (degrees) => props.onRotate?.(nodeId, degrees - (tile.rotation ?? 0)), flip: (flip) => flipNodes([nodeId], flip), align: alignInHolder(nodeId) };
+    return { x: tile.x, y: tile.y, w: tile.w, h: tile.h, rotation: tile.rotation ?? 0, set: (x, y) => props.onMove?.(nodeId, x, y), resize: (w, h) => props.onResizeEnd?.(nodeId, { x: tile.x, y: tile.y, w: tile.w, h: tile.h }, { x: tile.x, y: tile.y, w, h }), grow: (w, h) => props.onNodeSize?.(nodeId, w, h), turn: (degrees) => props.onRotate?.(nodeId, degrees - (tile.rotation ?? 0)), flip: (flip) => flipNodes([nodeId], flip), align: alignInHolder(nodeId) };
   }
 
   const hostLedger = new HostLedger();
@@ -2653,12 +2653,20 @@
     props.onSettle?.(nodeId, settled.box);
   }
 
-  const autosizing = new Map<string, ReturnType<typeof setTimeout>>();
+  const autosizing = new Set<string>();
 
   function autosize(nodeId: string) {
-    clearTimeout(autosizing.get(nodeId));
-    autosizing.set(nodeId, setTimeout(() => void fitTextBoxes(nodeId), 0));
+    if (autosizing.has(nodeId)) {
+      return;
+    }
+    autosizing.add(nodeId);
+    afterPaint(() => {
+      autosizing.delete(nodeId);
+      void fitTextBoxes(nodeId);
+    });
   }
+
+  const afterPaint = (job: () => void) => (core ? core.afterPaint(job) : setTimeout(job));
 
   async function fitTextBoxes(nodeId: string) {
     const saver = saverOf(nodeId);

@@ -50,7 +50,7 @@ export function registerOrgTools(server: McpServer) {
         'One organisation or team change, only when the user asks; `org_id` defaults to the active org. `switch_org` (org_id), `create_org` (name); ' +
         '`invite` (email, role admin|member|viewer), `resend_invite`/`revoke_invite` (invite_id), `invite_link` (new link, joins as viewer; old one stops) / `disable_invite_link`, ' +
         '`set_role` (user_id, role), `remove_member` (user_id), `leave`, `transfer_ownership` (user_id; owner only, you become admin). ' +
-        'Free organisations have limited editor seats: a `seat_limit` answer carries `upgrade_path`; viewers are free.',
+        'A free organisation has one editor, its owner; each more editor is a paid seat (€9/month, billed when the invite is accepted). A `seat_limit` answer carries `upgrade_path`; viewers are free.',
       inputSchema: z.object({
         op: z.enum(OPS),
         org_id: z.string().optional(),

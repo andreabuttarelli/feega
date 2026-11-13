@@ -3,11 +3,11 @@
   import { Card } from './card';
   import { tilt } from '../tilt';
 
-  let { cards, children }: { cards: Card[]; children?: Snippet } = $props();
+  let { cards }: { cards: Card[] } = $props();
 
   const DOT_ROWS = [3, 4, 5, 6, 7];
 
-  const CARDS: Record<Card, Snippet> = { [Card.Generation]: generation, [Card.Templates]: templates, [Card.Agents]: agents };
+  const CARDS: Record<Card, Snippet> = { [Card.Generation]: generation, [Card.Agents]: agents };
 </script>
 
 {#snippet generation()}
@@ -15,19 +15,6 @@
     <img data-agent-id="feature-gen" src="/site/home/tool-gen.webp" alt="" width="920" height="1269" loading="lazy" decoding="async" />
     <span class="focus" aria-hidden="true"></span>
     <h3 data-agent-id="feature-gen-title">Text, image, video, 3D generation</h3>
-  </article>
-{/snippet}
-
-{#snippet templates()}
-  <article class="card tpl" use:tilt>
-    <div class="shots">
-      <img data-agent-id="feature-tpl-a" class="a" src="/site/home/tool-tpl-a.webp" alt="" width="420" height="525" loading="lazy" decoding="async" />
-      <img class="b" src="/site/home/tool-tpl-b.webp" alt="" width="320" height="400" loading="lazy" decoding="async" />
-    </div>
-    <div class="text">
-      <h3>Graphic &amp; motion design</h3>
-      <p data-agent-id="feature-tpl-lead">Hundreds of ready-to-use templates</p>
-    </div>
   </article>
 {/snippet}
 
@@ -52,7 +39,6 @@
     {#each cards as card (card)}
       {@render CARDS[card]()}
     {/each}
-    {@render children?.()}
   </div>
 </section>
 
@@ -76,8 +62,8 @@
   }
 
   h3 {
-    font-size: 28px;
-    line-height: 25.2px;
+    font-size: 22px;
+    line-height: 24px;
     letter-spacing: -0.04em;
     font-weight: 400;
   }
@@ -128,48 +114,6 @@
     bottom: 20px;
   }
 
-  .tpl {
-    container-type: inline-size;
-  }
-
-  .shots {
-    position: relative;
-    overflow: hidden;
-    height: calc(63cqw + 202.3px);
-    border-radius: 12px 12px 0 0;
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  .shots img {
-    position: absolute;
-    object-fit: cover;
-  }
-
-  .shots .a {
-    left: 26px;
-    top: 29px;
-    width: 207px;
-    height: 259px;
-  }
-
-  .shots .b {
-    left: 168px;
-    top: 171px;
-    width: calc(50.5cqw + 37.4px);
-    height: auto;
-    aspect-ratio: 4 / 5;
-  }
-
-  .text {
-    padding: 20px;
-    text-align: center;
-  }
-
-  .text p {
-    margin-top: 16.6px;
-    color: #fff;
-  }
-
   .agents {
     border-radius: 24px;
   }
@@ -211,19 +155,13 @@
       gap: 16px;
     }
 
-    .cards:has(.tpl) {
-      grid-template-columns: 343px minmax(0, 1fr);
-      align-items: center;
-      gap: 64px;
-    }
-
     .card {
       height: 557px;
     }
 
     h3 {
-      font-size: 44px;
-      line-height: 39.6px;
+      font-size: 30px;
+      line-height: 33px;
     }
 
     p {
@@ -240,24 +178,6 @@
 
     .gen h3 {
       right: 72px;
-    }
-
-    .shots {
-      height: 403px;
-    }
-
-    .shots .b {
-      width: 198px;
-      height: 248px;
-    }
-
-    .tpl .text {
-      text-align: center;
-    }
-
-    .text p {
-      margin-top: 16px;
-      color: var(--site-ink);
     }
 
     .agents h3,
@@ -281,8 +201,8 @@
     }
 
     h3 {
-      font-size: 35px;
-      line-height: 31.5px;
+      font-size: 26px;
+      line-height: 28.6px;
     }
 
     .gen {
@@ -298,26 +218,6 @@
 
     .gen h3 {
       right: 137px;
-    }
-
-    .shots {
-      height: 561px;
-    }
-
-    .shots .a {
-      width: 359px;
-      height: 449px;
-    }
-
-    .shots .b {
-      left: 399px;
-      width: 325px;
-      height: 406px;
-    }
-
-    .text p {
-      margin-top: 15px;
-      color: var(--site-ink);
     }
 
     .agents h3,

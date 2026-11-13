@@ -63,4 +63,45 @@ describe('frame pacer', () => {
     expect(painted).toBe(1);
     expect(c.pending()).toBe(0);
   });
+
+  it('work waiting for the paint runs after the frame that drew, not before', () => {
+    const c = clock();
+    const later: (() => void)[] = [];
+    const seen: string[] = [];
+    const pacer = new FramePacer(
+      () => {
+        seen.push('paint');
+        return false;
+      },
+      c.raf,
+      () => false,
+      (job) => later.push(job)
+    );
+    pacer.afterPaint(() => seen.push('fit text'));
+    expect(seen).toEqual([]);
+    c.tick(16);
+    later.splice(0).forEach((job) => job());
+    expect(seen).toEqual(['paint', 'fit text']);
+  });
+
+  it('work waiting for the paint waits out the frames a busy gpu skips', () => {
+    const c = clock();
+    const later: (() => void)[] = [];
+    let busy = true;
+    let fitted = 0;
+    const pacer = new FramePacer(
+      () => false,
+      c.raf,
+      () => busy,
+      (job) => later.push(job)
+    );
+    pacer.afterPaint(() => fitted++);
+    c.tick(16);
+    later.splice(0).forEach((job) => job());
+    expect(fitted).toBe(0);
+    busy = false;
+    c.tick(32);
+    later.splice(0).forEach((job) => job());
+    expect(fitted).toBe(1);
+  });
 });

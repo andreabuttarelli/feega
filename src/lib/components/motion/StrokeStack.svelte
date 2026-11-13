@@ -208,7 +208,7 @@
           <label class={FIELD_ROW}><span class={LABEL}>Miter limit</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="1" max="100" step="0.5" data-testid="stroke-miter" value={stroke.miter} onchange={(e) => patch(index, { miter: Number(e.currentTarget.value) }, 'Stroke miter limit')} /></label>
         {/if}
         {#if sided}
-          <label class={FIELD_ROW}><span class={LABEL}>Per side</span><input type="checkbox" data-testid="stroke-sides" checked={!!stroke.sides} onclick={() => toggleSides(index)} /></label>
+          <label class={cn(FIELD_ROW, 'reach')}><span class={LABEL}>Per side</span><input type="checkbox" data-testid="stroke-sides" checked={!!stroke.sides} onclick={() => toggleSides(index)} /></label>
           {#if stroke.sides}
             <div class="grid grid-cols-4 gap-1">
               {#each SIDE_NAMES as side, si (side)}

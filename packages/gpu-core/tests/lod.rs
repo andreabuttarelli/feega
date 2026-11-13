@@ -59,6 +59,14 @@ fn page() -> DisplayList {
     parse(&format!(r#"{{ "width": 400, "height": 300, "background": null, "items": [{items}] }}"#)).unwrap()
 }
 
+fn runs() -> usize {
+    let mut library = Library::new();
+    library.compose_encodings();
+    library.put_group("a", &page());
+    let screen = parse(r#"{ "width": 800, "height": 600, "background": null, "items": [{ "kind": "use", "clip": "a", "group": "a", "matrix": [1, 0, 0, 1, 0, 0], "cache": false }] }"#).unwrap();
+    library.plan(&screen, LIMITS).screen.fragments.get("a").unwrap().runs.len()
+}
+
 fn drawn_at(scale: f64) -> Recorder {
     let mut library = Library::new();
     library.compose_encodings();
@@ -104,7 +112,7 @@ fn a_blur_under_half_a_pixel_is_dropped() {
 fn at_full_size_every_run_is_drawn_from_its_encoding() {
     let drawn = drawn_at(1.0);
 
-    assert_eq!(drawn.fragments, 3);
+    assert_eq!(drawn.fragments, runs());
     assert!(drawn.fills.is_empty());
 }
 
@@ -113,7 +121,7 @@ fn tiny_text_runs_become_bars_and_the_big_shape_stays_vector() {
     let drawn = drawn_at(0.1);
 
     assert_eq!(drawn.fragments, 1);
-    assert_eq!(drawn.fills.len(), 2);
+    assert_eq!(drawn.fills.len(), runs() - 1);
 }
 
 #[test]

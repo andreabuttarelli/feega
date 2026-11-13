@@ -52,7 +52,7 @@
         <span class="head">{row}</span>
         {#each columns as column (column)}
           {@const cell = cellAt(row, column)}
-          <button type="button" class="cell" class:current={isCurrent(cell)} class:empty={!cell?.compId} disabled={!cell?.compId} data-testid="variant-cell" data-variant={JSON.stringify(cell?.variant ?? {})} onclick={() => pick(cell)}>
+          <button type="button" class="cell" aria-label={[row, column].filter(Boolean).join(SEPARATOR)} class:current={isCurrent(cell)} class:empty={!cell?.compId} disabled={!cell?.compId} data-testid="variant-cell" data-variant={JSON.stringify(cell?.variant ?? {})} onclick={() => pick(cell)}>
             {cell?.compId ? '' : '–'}
           </button>
         {/each}

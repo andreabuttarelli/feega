@@ -2,21 +2,23 @@
   import { _ } from 'svelte-i18n';
   import { Button } from '$lib/components/ui/button';
   import { Notice } from '$lib/components/ui/notice';
-  import { DISPLAY_UNITS_PER_CREDIT } from '$lib/components/credit-amount-format';
+  import { formatCredits } from '$lib/components/credit-amount-format';
   import { packProductId } from '$lib/store-products';
   import { nativeBridge, type StorePurchase } from '$lib/native-bridge';
   import { nativeKeys } from '$lib/native-keys';
-  import type { CreditRung } from '$lib/credit-ladder';
+  import type { Plan, TopUp } from '$lib/credit-ladder';
 
   let {
     orgId,
-    ladder,
-    currentPlanUsd,
+    plan,
+    topUps,
+    currentPlan,
     onPurchased
   }: {
     orgId: string;
-    ladder: readonly CreditRung[];
-    currentPlanUsd: number | null;
+    plan: Plan;
+    topUps: readonly TopUp[];
+    currentPlan: Plan | null;
     onPurchased: () => void;
   } = $props();
 
@@ -51,27 +53,28 @@
   {:else if outcome === Outcome.Purchased}
     <Notice tone="success">{$_('app.account.billing.storePurchased')}</Notice>
   {/if}
+  {@const shown = currentPlan ?? plan}
   <table class="ladder">
     <tbody>
-      {#each ladder as rung (rung.price)}
-        <tr>
-          <td>€{rung.price}/mo</td>
-          <td>{$_('app.account.billing.creditsIncluded', { values: { credits: rung.credits / DISPLAY_UNITS_PER_CREDIT } })}</td>
-          <td>
-            {#if currentPlanUsd === rung.price}
-              <span class="text-[0.8125rem] font-semibold">{$_('app.account.billing.currentPlan')}</span>
-            {:else}
-              <Button size="sm" disabled={busy} onclick={() => run(() => bridge.purchase(orgId, rung.lookupKey))}>{$_('app.account.billing.subscribe')}</Button>
-            {/if}
-          </td>
-          <td>
-            <Button variant="secondary" size="sm" disabled={busy} onclick={() => run(() => bridge.purchase(orgId, packProductId(rung.price)))}>
-              {$_('app.account.billing.topUp', { values: { credits: rung.credits / DISPLAY_UNITS_PER_CREDIT } })}
-            </Button>
-          </td>
-        </tr>
-      {/each}
+      <tr>
+        <td>{$_('app.account.billing.planPrice', { values: { price: shown.price } })}</td>
+        <td>{$_('app.account.billing.creditsIncluded', { values: { credits: formatCredits(shown.credits) } })}</td>
+        <td>
+          {#if currentPlan}
+            <span class="text-[0.8125rem] font-semibold">{$_('app.account.billing.currentPlan')}</span>
+          {:else}
+            <Button size="sm" disabled={busy} onclick={() => run(() => bridge.purchase(orgId, plan.lookupKey))}>{$_('app.account.billing.subscribe')}</Button>
+          {/if}
+        </td>
+      </tr>
     </tbody>
   </table>
+  <div class="flex flex-wrap gap-2">
+    {#each topUps as topUp (topUp.price)}
+      <Button variant="secondary" size="sm" disabled={busy} onclick={() => run(() => bridge.purchase(orgId, packProductId(topUp.price)))}>
+        {$_('app.account.billing.topUp', { values: { price: topUp.price, credits: formatCredits(topUp.credits) } })}
+      </Button>
+    {/each}
+  </div>
   <Button variant="secondary" size="sm" disabled={busy} onclick={() => run(() => bridge.restore(orgId))}>{$_('app.account.billing.restorePurchases')}</Button>
 {/if}

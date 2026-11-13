@@ -66,15 +66,15 @@ Re-importa il catalogo dallo store collegato (Shopify/Woo).
 
 ### POST /api/v1/brands/:slug/billing/checkout
 
-Checkout Stripe per un piano mensile (`{ "credits": 8|16|32|64|128|256 }`, 1 credito = €1). Con un abbonamento attivo apre il portale per cambiare piano.
+Checkout Stripe dell'unico piano: €9 / editor / mese, 500 crediti (100 crediti = €1). `{ "credits": 500 }` opzionale, ogni altro valore è `unknown_plan`. Con un abbonamento attivo risponde `already_subscribed` (409) con `app_billing_url`.
 
 ### POST /api/v1/brands/:slug/billing/checkout/one-time
 
-Ricarica una tantum (`{ "credits": 8|16|32|64|128|256 }`), crediti che non scadono.
+Ricarica una tantum (`{ "credits": 1000|2000|5000 }` = €10 / €20 / €50), crediti che non scadono.
 
 ### POST /api/v1/brands/:slug/billing/portal
 
-Apre il portale di billing Stripe (fatture, carta, cambio piano, cancellazione).
+Apre il portale di billing Stripe (fatture, carta, cancellazione).
 
 ## Errori
 

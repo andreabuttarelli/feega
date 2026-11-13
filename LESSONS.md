@@ -24,7 +24,15 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 **Signal:** contiguous runs of missing sequence numbers (a multiple of the batch size) in lines posted with `fetch(…, { keepalive: true })`, no error on the server. **Move:** browsers cap keepalive request bodies at 64 KB in flight per page and reject the rest. Count the bytes in flight and send plain `fetch` past ~48 KB (`keepaliveBudget` in `src/lib/canvas/debug/flight-log.ts`).
 
+### A frame from a `.feega` file opens with no layers and no error
+
+**Signal:** local mode lists the frame in Layers, its row unfolds to nothing, and `GET /api/v1/projects/<p>/motion/<node>/agent` answers `head.version: 0` with an empty doc, while the file holds a full `heads[<node>]`. **Move:** the head failed `parseMotionDoc` and was replaced by a blank doc in silence (an inspector-audit fixture set `background: '#ffffff'`; only `brand` and `transparent` pass). Run `parseMotionDoc` on every doc you write into a fixture file and throw on `ok: false`, as `writeAuditFile` does.
+
 ## Canvas performance
+
+### A display-list patch "equal to the build" on a few hand-made docs is wrong on real pages
+
+**Signal:** `fastPatch` unit tests pass, but on the landings fixture 17 of 36 patched hides and 15 of 45 patched moves differed from the full build (filters origin left behind, a group's matrix moved instead of its items, a hidden parent's children losing their cut, comp instance items left in place). **Move:** run `fast-patch.landings.test.ts` (every visible clip, hide and three moves, compared with `drawFrame` within 0.01 px) before widening what the patch accepts. The tolerance is needed: the full build itself moves unrelated clips by up to 0.005 px on some hides.
 
 ### Perf numbers swing 6 to 57 fps on the same build: the machine is loaded
 **Signal:** zoom p5 at x4 reads 57, 29, 31, 56, 6 across five runs of one build; `uptime` load average is above 20 (other agents, Spotlight indexing a fresh build). **Move:** never compare a before batch with a later after batch. Serve both builds at once (two `vite preview` ports) and alternate before/after runs one at a time, so the load hits both alike; report the per-run values next to the median.
@@ -488,6 +496,15 @@ dei frame di controllo: un rumore sotto soglia sposta un coefficiente quantizzat
 blocco cambia. Move: confrontare medie di blocco 8x8, non pixel; riprodurre con il doc dell'eval
 in `seekCheckDoc` (20 giri, Chromium basta), non con lo shot rifatto da `addShot`, che non falliva.
 
+### L'audit dell'inspector dice "canvas stale" ma la tela non è in ritardo
+Signal: una riga `canvas` passa al primo tentativo e fallisce al secondo, oppure "l'immagine modificata
+torna dopo l'undo". Tre cause, nessuna è un'invalidazione persa: la prima modifica su una frame
+scambia l'immagine salvata con quella live (che possono differire, es. lo sfondo della frame
+importata); molte modifiche non cambiano pixel (peso 300 con DM Sans caricato a 400/500/600, line
+height su una riga, gap di uno stack con un figlio); e un hash dello screenshot vede il bordo di
+selezione che sfarfalla di 1 px. Move: conta i pixel diversi (soglia di colore) base→modifica e
+modifica→undo per 5 s a 250 ms, salva i tre PNG e guardali, prima di cercare nel motore.
+
 ### Un dev server con `NO_HMR=1` serve i moduli vecchi dopo un edit
 Signal: un giro Playwright dopo una modifica si comporta come prima, o `window.x is not a function`
 su una funzione appena aggiunta. Move: riavviare il dev server dopo ogni edit prima di misurare.
@@ -594,6 +611,12 @@ worktree con `.env` copiato ma `PUBLIC_SUPABASE_URL` sul progetto remoto: il log
 
 ### Un test che sceglie un ramo in base all'env locale non è un test
 `queue-dm.test` girava o no il ramo kit secondo `AGENT_KIT` del `.env` locale: sul laptop di chi lo ha spento passava, su chi lo ha acceso il turno andava nel kit e `harnessCalls` restava vuoto (`expected +0 to be 1`). Segnale: un test che fallisce solo su un'altra macchina, senza cambiamento di codice. Mossa: chi fissa `$env/dynamic/private` nel test (`vi.mock('$env/dynamic/private', () => ({ env: { AGENT_KIT: 'off' } }))`), come già fa `queue-kit-heartbeat.test` — la scelta del ramo è parte del test, non del computer che lo esegue.
+
+### CI `Build` fails with `Invalid export 'X' in /api/...`, while vitest and svelte-check are green
+Signal: a `+server.ts` exports a constant (shared with its test). SvelteKit only allows handlers, `config`, `prerender`… or `_`-prefixed names, and only `vite build` checks it. Move: put the constant in the `$lib` module the route already imports, and run `npx vite build` before pushing a new route.
+
+### Un test di checkout rosso solo in locale: l'URL di ritorno è `https://www.dazero.co/...`
+Signal: `successUrl`/`cancelUrl` attesi su `example.test` o `feega.test`, ricevuti sull'host di `PUBLIC_APP_URL` del `.env`; in CI verde. `appOrigin` legge `$env/dynamic/public`. Move: nel test `vi.mock('$env/dynamic/public', () => ({ env: {} }))`, come in `settings-actions-billing.test.ts`.
 
 ### `@dazero/*` si risolve dal `node_modules` del checkout principale
 Un eval o un test lanciato da un worktree misura un ibrido: `$lib` punta alla copia del worktree, i pacchetti interni vengono dal checkout madre. Se hai toccato `packages/`, il worktree non lo vede. Per un confronto pulito: worktree di verifica con `node_modules` symlinkato a quello fresco.
@@ -3901,6 +3924,12 @@ frame changes `view.zoom`; that puts the canvas on the zoom path (`zooming.activ
 `cached()`), which re-rasters frames per frame. Measure gestures with touch events, never only
 wheel, and compare at least four runs per side: the same gesture on the same fixture swings
 from 6 to 450 MB a frame between runs (`npm run perf:phone-guard`).
+
+## `npm ci` through a symlinked `node_modules` empties another checkout
+
+**Signal:** the main checkout's `node_modules` is suddenly empty and other worktrees' tools are
+missing. **Move:** a worktree's `node_modules` was a symlink and `npm ci` ran through it. Before any
+install, `[ -L node_modules ] && rm node_modules`; reinstall the checkout that was emptied.
 
 ## A phone tab that dies at rest: measure WebContent footprint in the iOS simulator
 

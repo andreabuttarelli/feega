@@ -1,4 +1,24 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const setSeatQuantity = vi.fn();
+const seatSubscription = vi.fn();
+const sendEmail = vi.fn();
+vi.mock('$lib/server/stripe', () => ({
+  SeatProration: { None: 'none', Invoice: 'always_invoice' },
+  setSeatQuantity: (...args: unknown[]) => setSeatQuantity(...args),
+  seatSubscription: (...args: unknown[]) => seatSubscription(...args)
+}));
+vi.mock('$lib/server/email', () => ({ sendEmail: (...args: unknown[]) => sendEmail(...args) }));
+vi.mock('$lib/server/db/client', async (real) => ({
+  ...(await real<object>()),
+  createServiceRoleDb: () => ({ rpc: async (name: string) => ({ data: name === 'claim_seat_sync' ? true : null, error: null }) })
+}));
+
+beforeEach(() => {
+  setSeatQuantity.mockReset().mockResolvedValue(undefined);
+  seatSubscription.mockReset().mockResolvedValue({ itemId: 'si_1', quantity: 1, perEditor: true, status: 'active', endsAt: null });
+  sendEmail.mockReset().mockResolvedValue(undefined);
+});
 import { acceptInviteWith, createFirstOrgWith, orgSlugFrom, SIGNUP_GRANT_NOTE } from '$lib/server/tenancy/bootstrap';
 import { hashInviteToken, LINK_INVITE_EMAIL } from '$lib/server/repos/invites';
 import { fakeDb, filtersOf, type Call } from '$lib/server/db/fake-db';
@@ -191,6 +211,7 @@ describe('accettare un invito è idempotente', () => {
             select: () => ({
               eq: (col: string, val: string) => ({
                 eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }),
+                in: async () => ({ data: [{ role: 'owner' }, { role: 'member' }], error: null }),
                 then: (resolve: (v: { data: unknown; error: null }) => void) =>
                   resolve({
                     data:
@@ -206,6 +227,10 @@ describe('accettare un invito è idempotente', () => {
               return { select: () => ({ single: async () => ({ data: { id: 'm-new' }, error: null }) }) };
             }
           };
+        }
+        if (table === 'orgs') {
+          const org = { id: ORG, stripe_subscription_id: opts.joiningOrgIsPaid ? 'sub_1' : null };
+          return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: org, error: null }) }) }) };
         }
         if (table === 'credit_ledger') {
           const rows = opts.joiningOrgIsPaid ? [{ org_id: ORG, source: 'one_time_purchase' }] : [];
@@ -266,12 +291,58 @@ describe('accettare un invito è idempotente', () => {
   });
 
   it('un membro nasce col ruolo scritto sull invito', async () => {
-    const { db, calls } = fakeDb({ orgs_invites: [inviteRow], orgs_members: [] });
+    const { db, calls } = fakeDb({ orgs: [{ ...orgRow, stripe_subscription_id: 'sub_1' }], orgs_invites: [inviteRow], orgs_members: [] });
 
     await acceptInviteWith(db, { token: 'segreto', userId: USER, email: INVITED, now: NOW });
 
     const insert = calls.find((c) => c.table === 'orgs_members' && c.op === 'insert')!;
     expect(insert.payload).toMatchObject({ org_id: ORG, user_id: USER, role: 'member' });
+  });
+
+  it('an editor accepted into a paying team is billed as a seat at acceptance, and the owner is told by email', async () => {
+    const owner = { org_id: ORG, user_id: 'owner', role: 'owner', profiles: { email: 'owner@acme.it' } };
+    const invite = { ...inviteRow, token: hashInviteToken('segreto') };
+    const { db } = fakeDb({ orgs: [{ ...orgRow, stripe_subscription_id: 'sub_1' }], orgs_invites: [invite], orgs_members: [owner] }, { store: true, filter: true });
+
+    await acceptInviteWith(db, { token: 'segreto', userId: USER, email: INVITED, now: NOW });
+
+    expect(setSeatQuantity).toHaveBeenCalledWith('sub_1', 'si_1', 2, 'always_invoice');
+    expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'owner@acme.it', subject: expect.stringMatching(/editor/i) }));
+  });
+
+  it('an editor joins as a viewer, never an error, when seat state cannot be read', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { db, calls } = fakeDb({ orgs_invites: [inviteRow], orgs_members: [] });
+    const realFrom = db.from.bind(db);
+    Object.assign(db, {
+      from: (table: string) =>
+        table === 'orgs' ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: { message: 'missing column' } }) }) }) } : realFrom(table as never)
+    });
+
+    const result = await acceptInviteWith(db, { token: 'segreto', userId: USER, email: INVITED, now: NOW });
+
+    expect(result).toMatchObject({ outcome: 'accepted', role: 'viewer' });
+    expect(calls.find((c) => c.table === 'orgs_members' && c.op === 'insert')!.payload).toMatchObject({ role: 'viewer' });
+  });
+
+  it('an editor invite into a past-due team joins as a viewer', async () => {
+    seatSubscription.mockResolvedValue({ itemId: 'si_1', quantity: 1, perEditor: true, status: 'past_due', endsAt: null });
+    const { db, calls } = fakeDb({ orgs: [{ ...orgRow, stripe_subscription_id: 'sub_1' }], orgs_invites: [inviteRow], orgs_members: [] });
+
+    await acceptInviteWith(db, { token: 'segreto', userId: USER, email: INVITED, now: NOW });
+
+    expect(calls.find((c) => c.table === 'orgs_members' && c.op === 'insert')!.payload).toMatchObject({ role: 'viewer' });
+  });
+
+  it('an editor invite into a team that no longer pays joins as a viewer, and bills nothing', async () => {
+    const { db, calls } = fakeDb({ orgs: [orgRow], orgs_invites: [inviteRow], orgs_members: [] });
+
+    const result = await acceptInviteWith(db, { token: 'segreto', userId: USER, email: INVITED, now: NOW });
+
+    const insert = calls.find((c) => c.table === 'orgs_members' && c.op === 'insert')!;
+    expect(insert.payload).toMatchObject({ role: 'viewer' });
+    expect(result).toMatchObject({ outcome: 'accepted', role: 'viewer' });
+    expect(setSeatQuantity).not.toHaveBeenCalled();
   });
 
   it("chi entra con un'altra email non consuma l'invito", async () => {

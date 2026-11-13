@@ -22,7 +22,8 @@ const REFUSAL_STATUS: Record<TeamRefusal, number> = {
   [TeamRefusal.NotFound]: HTTP_NOT_FOUND,
   [TeamRefusal.OwnerProtected]: HTTP_FORBIDDEN,
   [TeamRefusal.Self]: HTTP_BAD_REQUEST,
-  [TeamRefusal.SeatLimit]: HTTP_PAYMENT_REQUIRED
+  [TeamRefusal.SeatLimit]: HTTP_PAYMENT_REQUIRED,
+  [TeamRefusal.BillingOnly]: HTTP_FORBIDDEN
 };
 
 const id = z.string().min(1);

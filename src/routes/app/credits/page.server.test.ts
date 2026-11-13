@@ -2,16 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const ensureOrgCustomer = vi.fn();
 const createOneTimeCreditCheckout = vi.fn();
-const subscribedRungPrice = vi.fn();
+const subscribedPlan = vi.fn();
+const seatSubscription = vi.fn();
 
 vi.mock('$lib/server/stripe', () => ({
 	ensureOrgCustomer: (...a: unknown[]) => ensureOrgCustomer(...a),
 	createOneTimeCreditCheckout: (...a: unknown[]) => createOneTimeCreditCheckout(...a),
-	subscribedRungPrice: (...a: unknown[]) => subscribedRungPrice(...a)
+	subscribedPlan: (...a: unknown[]) => subscribedPlan(...a),
+	seatSubscription: (...a: unknown[]) => seatSubscription(...a)
 }));
 
 const { privateEnv } = vi.hoisted(() => ({ privateEnv: {} as Record<string, string | undefined> }));
 vi.mock('$env/dynamic/private', () => ({ env: privateEnv }));
+vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 import { load, actions } from '$lib/server/dashboard/pages/credits';
 
@@ -29,7 +32,6 @@ type World = {
 	role?: string;
 	brands?: Row[];
 	aiCalls?: Row[];
-	atRisk?: Row[];
 	balance?: number;
 	ready?: boolean;
 };
@@ -41,8 +43,7 @@ function fakeSupabase(world: World = {}) {
 		orgs: [{ ...ORG, stripe_customer_id: 'cus_1', stripe_subscription_id: null, ...world.org }],
 		orgs_members: [{ org_id: ORG.id, user_id: 'u1', role: world.role ?? 'owner', orgs: ORG }],
 		brands: (world.brands ?? []).map((b) => ({ org_id: ORG.id, ...b })),
-		ai_calls: world.aiCalls ?? [],
-		org_credits_at_risk: (world.atRisk ?? []).map((r) => ({ org_id: ORG.id, ...r }))
+		ai_calls: world.aiCalls ?? []
 	};
 	const rpcs: Record<string, unknown> = {
 		org_credit_balance: world.balance ?? 3600,
@@ -62,6 +63,10 @@ function fakeSupabase(world: World = {}) {
 			limit: chain,
 			eq: (col: string, val: unknown) => {
 				rows = rows.filter((r) => !(col in r) || r[col] === val);
+				return q;
+			},
+			in: (col: string, vals: unknown[]) => {
+				rows = rows.filter((r) => !(col in r) || vals.includes(r[col]));
 				return q;
 			},
 			maybeSingle: async () => ({ data: rows[0] ?? null, error: null }),
@@ -97,9 +102,10 @@ beforeEach(() => {
 });
 
 describe('/app/credits — the workspace credits page', () => {
-	it('offers the six plans of feega.app', async () => {
+	it('offers the one plan and the three top-ups', async () => {
 		const data = await run(fakeSupabase());
-		expect(data.credits.ladder.map((r: { price: number }) => r.price)).toEqual([8, 16, 32, 64, 128, 256]);
+		expect(data.plan).toEqual({ price: 9, credits: 500, lookupKey: 'feega_monthly_9' });
+		expect(data.topUps.map((t: { price: number }) => t.price)).toEqual([10, 20, 50]);
 	});
 
 	it('renders for a workspace without brands', async () => {
@@ -112,19 +118,19 @@ describe('/app/credits — the workspace credits page', () => {
 		expect(data.isOwner).toBe(true);
 	});
 
-	it('names the tier the workspace is subscribed to', async () => {
-		subscribedRungPrice.mockResolvedValue(64);
+	it('names the plan the workspace is subscribed to, a retired price included', async () => {
+		subscribedPlan.mockResolvedValue({ price: 64, credits: 6400, lookupKey: 'feega_monthly_64' });
 
 		const data = await run(fakeSupabase({ org: { stripe_subscription_id: 'sub_1' } }));
 
-		expect(subscribedRungPrice).toHaveBeenCalledWith('sub_1');
-		expect(data.currentPlanUsd).toBe(64);
+		expect(subscribedPlan).toHaveBeenCalledWith('sub_1');
+		expect(data.currentPlan).toMatchObject({ price: 64, credits: 6400 });
 	});
 
 	it('has no current plan without a subscription, and never asks Stripe', async () => {
 		const data = await run(fakeSupabase());
-		expect(data.currentPlanUsd).toBeNull();
-		expect(subscribedRungPrice).not.toHaveBeenCalled();
+		expect(data.currentPlan).toBeNull();
+		expect(subscribedPlan).not.toHaveBeenCalled();
 	});
 
 	it('names the tier an app store subscription bought, while it has not expired', async () => {
@@ -132,8 +138,8 @@ describe('/app/credits — the workspace credits page', () => {
 
 		const data = await run(fakeSupabase({ org: { store_plan_product: 'feega_monthly_32', store_plan_expires_at: later } }));
 
-		expect(data.currentPlanUsd).toBe(32);
-		expect(subscribedRungPrice).not.toHaveBeenCalled();
+		expect(data.currentPlan).toMatchObject({ price: 32 });
+		expect(subscribedPlan).not.toHaveBeenCalled();
 	});
 
 	it('forgets an app store subscription once it expired', async () => {
@@ -141,12 +147,12 @@ describe('/app/credits — the workspace credits page', () => {
 
 		const data = await run(fakeSupabase({ org: { store_plan_product: 'feega_monthly_32', store_plan_expires_at: earlier } }));
 
-		expect(data.currentPlanUsd).toBeNull();
+		expect(data.currentPlan).toBeNull();
 	});
 
 	it('still renders when Stripe cannot say which tier is current', async () => {
-		subscribedRungPrice.mockRejectedValue(new Error('down'));
-		expect((await run(fakeSupabase({ org: { stripe_subscription_id: 'sub_1' } }))).currentPlanUsd).toBeNull();
+		subscribedPlan.mockRejectedValue(new Error('down'));
+		expect((await run(fakeSupabase({ org: { stripe_subscription_id: 'sub_1' } }))).currentPlan).toBeNull();
 	});
 
 	it('knows a checkout just came back paid', async () => {
@@ -178,17 +184,33 @@ describe('/app/credits — the workspace credits page', () => {
 		expect((await run(fakeSupabase({ role: 'member' }))).isOwner).toBe(false);
 	});
 
-	it('shows credits about to expire, dropping a row with no expiry', async () => {
-		const data = await run(
-			fakeSupabase({
-				atRisk: [
-					{ next_expiry: '2026-10-07T00:00:00Z', expiring_credits: 100 },
-					{ next_expiry: null, expiring_credits: null }
-				]
-			})
-		);
+	it('says how many editors the plan bills and when a cancelled plan ends', async () => {
+		subscribedPlan.mockResolvedValue({ price: 9, credits: 500, lookupKey: 'feega_monthly_9' });
+		seatSubscription.mockResolvedValue({ itemId: 'si_1', quantity: 1, perEditor: true, status: 'active', endsAt: '2026-12-13T00:00:00.000Z' });
 
-		expect(data.credits.atRisk).toEqual([{ expiresAt: '2026-10-07T00:00:00Z', amount: 100 }]);
+		const data = await run(fakeSupabase({ org: { stripe_subscription_id: 'sub_1' } }));
+
+		expect(data.seats).toMatchObject({ editors: 1, paid: true, endsAt: '2026-12-13T00:00:00.000Z' });
+	});
+
+	it('loads with seats unknown when seat state cannot be read, so anyone can still subscribe or top up', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const supabase = fakeSupabase();
+		const realFrom = supabase.from;
+		supabase.from = ((table: string) => {
+			const q = realFrom(table) as Record<string, unknown>;
+			return table === 'orgs' ? { ...q, select: (cols: string) => (cols.includes('seats_paid') ? { eq: () => ({ maybeSingle: async () => ({ data: null, error: { message: 'missing column' } }) }) } : (q.select as (c: string) => unknown)(cols)) } : q;
+		}) as typeof supabase.from;
+
+		const data = await run(supabase);
+
+		expect(data.seats).toBeNull();
+		expect(data.plan.price).toBe(9);
+	});
+
+	it('never warns of expiring credits: credits do not expire', async () => {
+		const data = await run(fakeSupabase());
+		expect(data.credits).toEqual({ balance: 3600 });
 	});
 
 	it('carries purchasesReady from the readiness gate', async () => {
@@ -208,9 +230,9 @@ describe('/app/credits — the workspace credits page', () => {
 	});
 
 	describe('actions.buyOneTime', () => {
-		function call(supabase: unknown, usd: string) {
+		function call(supabase: unknown, credits: string) {
 			const data = new FormData();
-			data.set('usd', usd);
+			data.set('credits', credits);
 			return (actions.buyOneTime as (e: unknown) => Promise<unknown>)({
 				request: { formData: async () => data },
 				url: new URL('https://example.test/app/credits'),
@@ -221,7 +243,7 @@ describe('/app/credits — the workspace credits page', () => {
 		}
 
 		it('opens a one-time Checkout Session for a workspace without brands', async () => {
-			await expect(call(fakeSupabase({ org: { stripe_customer_id: null } }), '32')).rejects.toMatchObject({
+			await expect(call(fakeSupabase({ org: { stripe_customer_id: null } }), '1000')).rejects.toMatchObject({
 				status: 303,
 				location: 'https://checkout.stripe.com/c/pay/cs_test_one_time'
 			});
@@ -229,28 +251,28 @@ describe('/app/credits — the workspace credits page', () => {
 			expect(createOneTimeCreditCheckout).toHaveBeenCalledWith(
 				expect.objectContaining({
 					orgId: 'org-1',
-					price: 32,
-					credits: 3200,
+					price: 10,
+					credits: 1000,
 					successUrl: 'https://example.test/app/credits?checkout=success&session_id={CHECKOUT_SESSION_ID}',
 					cancelUrl: 'https://example.test/app/credits?checkout=canceled'
 				})
 			);
 		});
 
-		it('rejects a rung that is not on the ladder before touching Stripe', async () => {
-			const result = await call(fakeSupabase(), '7');
-			expect(result).toMatchObject({ status: 400, data: { billingError: 'Unknown one-time pack' } });
+		it('rejects an amount that is not a top-up before touching Stripe', async () => {
+			const result = await call(fakeSupabase(), '32');
+			expect(result).toMatchObject({ status: 400, data: { billingError: 'Unknown top-up' } });
 			expect(createOneTimeCreditCheckout).not.toHaveBeenCalled();
 		});
 
 		it('refuses a non-owner', async () => {
-			const result = await call(fakeSupabase({ role: 'member' }), '32');
+			const result = await call(fakeSupabase({ role: 'member' }), '1000');
 			expect(result).toMatchObject({ status: 403 });
 			expect(createOneTimeCreditCheckout).not.toHaveBeenCalled();
 		});
 
 		it('refuses to sell when a grant could not land', async () => {
-			const result = await call(fakeSupabase({ ready: false }), '32');
+			const result = await call(fakeSupabase({ ready: false }), '1000');
 			expect(result).toMatchObject({ status: 409, data: { billingError: expect.stringMatching(/open soon/i) } });
 			expect(createOneTimeCreditCheckout).not.toHaveBeenCalled();
 		});

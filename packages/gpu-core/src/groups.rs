@@ -13,7 +13,7 @@ use crate::glyphs::{outline, Fonts};
 use crate::text::typeset;
 use crate::pictures::Pictures;
 use crate::fragments::{Encoded, Fragments, Kept};
-use crate::lod::{blur_px, detail, Detail, BLUR_REACH};
+use crate::lod::{blur_px, detail, Detail, BLUR_REACH, SPLIT_DESCENDANTS};
 use crate::scene::{bounds, build_items, needs_layer, Layers};
 use crate::Skipped;
 
@@ -341,6 +341,17 @@ fn vector_only(item: &Item) -> bool {
     }
 }
 
+fn descendants(item: &Item) -> usize {
+    match item {
+        Item::Group(g) => g.items.iter().map(|i| 1 + descendants(i)).sum(),
+        _ => 0,
+    }
+}
+
+fn spanned(item: &Item) -> bool {
+    vector_only(item) && descendants(item) <= SPLIT_DESCENDANTS
+}
+
 fn standalone(item: &Item) -> bool {
     let Some(look) = item.look() else { return false };
     let drawn_alone = matches!(item, Item::Path(_) | Item::Group(_));
@@ -370,14 +381,62 @@ fn softened(item: Item) -> Item {
 }
 
 struct Seed {
-    before: Arc<Encoded>,
-    stable: usize,
+    before: Arc<Cast>,
+    group: String,
 }
 
 struct Span {
     key: String,
     encoded: Arc<Encoded>,
     bounds: Rect,
+    local: Vec<Item>,
+    frame: Rect,
+}
+
+const WHOLE_SPAN: &str = ".0";
+
+fn relative<'a>(key: &'a str, group: &str) -> &'a str {
+    match key.strip_prefix(group) {
+        Some("") => WHOLE_SPAN,
+        Some(rest) => rest,
+        None => key,
+    }
+}
+
+struct Before<'a> {
+    spans: Vec<(&'a str, &'a Span)>,
+    group: &'a str,
+}
+
+impl<'a> Before<'a> {
+    fn of(seed: &'a Seed, group: &'a str) -> Before<'a> {
+        let mut spans = Vec::new();
+        collect(&seed.before.pieces, &seed.group, &mut spans);
+        Before { spans, group }
+    }
+
+    fn base(&self, key: &str, local: &[Item], frame: Rect) -> Option<&'a Span> {
+        let fits = |s: &&Span| s.frame == frame;
+        let same = self.spans.iter().map(|(_, s)| *s).filter(fits).find(|s| s.local.len() == local.len() && s.local == local);
+        same.or_else(|| self.spans.iter().find(|(k, _)| *k == relative(key, self.group)).map(|(_, s)| *s).filter(fits))
+    }
+}
+
+fn collect<'a>(pieces: &'a [Piece], group: &str, out: &mut Vec<(&'a str, &'a Span)>) {
+    for piece in pieces {
+        match piece {
+            Piece::Span(span) => out.push((relative(&span.key, group), span)),
+            Piece::Nested(_, _, inside) => collect(inside, group, out),
+            Piece::Loose(..) => {}
+        }
+    }
+}
+
+fn kept<'a>(old: &'a Span, local: &[Item]) -> Kept<'a> {
+    let stable = old.local.iter().zip(local).take_while(|(a, b)| a == b).count();
+    let room = old.local.len().min(local.len()) - stable;
+    let tail = old.local.iter().rev().zip(local.iter().rev()).take(room).take_while(|(a, b)| a == b).count();
+    Kept { before: &old.encoded, stable, tail }
 }
 
 enum Piece {
@@ -433,20 +492,23 @@ impl<'a> Row<'a> {
     }
 }
 
-fn span_of(row: &Row, range: std::ops::Range<usize>, key: String, frame: Rect, seed: Option<&Seed>) -> Span {
+fn span_of(row: &Row, range: std::ops::Range<usize>, key: String, frame: Rect, before: Option<&Before>) -> Span {
     let local: Vec<Item> = range.map(|i| placed(row.at(i), IDENTITY, frame, 1.0)).collect();
+    let base = before.and_then(|b| b.base(&key, &local, frame));
+    if let Some(old) = base.filter(|o| o.local == local) {
+        return Span { key, encoded: old.encoded.clone(), bounds: old.bounds, local, frame };
+    }
     let paint = |items: &[Item]| {
         let mut scene = Scene::new();
         build_items(&mut scene, items, frame, &Pictures::new(), &Layers::new());
         scene
     };
-    let kept = seed.map(|s| Kept { before: &s.before, stable: s.stable });
-    let encoded = Arc::new(Encoded::reusing(kept, &local, frame, |i| bounds::<Scene>(i, &Pictures::new()), paint));
+    let encoded = Arc::new(Encoded::reusing(base.map(|o| kept(o, &local)), &local, frame, |i| bounds::<Scene>(i, &Pictures::new()), paint));
     let bounds = encoded.runs.iter().map(|r| r.bounds).reduce(|a, b| a.union(b)).unwrap_or(frame);
-    Span { key, encoded, bounds }
+    Span { key, encoded, bounds, local, frame }
 }
 
-fn pieces_of(row: &Row, path: &str, frame: Rect, seed: Option<&Seed>) -> Vec<Piece> {
+fn pieces_of(row: &Row, path: &str, frame: Rect, before: Option<&Before>) -> Vec<Piece> {
     let shift = row.shift();
     if row.items.iter().any(|i| matches!(i, Item::Lens(_))) {
         return (0..row.items.len()).map(|i| Piece::Loose(i, None)).collect();
@@ -456,17 +518,16 @@ fn pieces_of(row: &Row, path: &str, frame: Rect, seed: Option<&Seed>) -> Vec<Pie
     while at < row.len() {
         let here = format!("{path}.{at}");
         let item = row.at(at);
-        if vector_only(item) {
-            let end = (at..row.len()).find(|&i| !vector_only(row.at(i))).unwrap_or(row.len());
-            let whole = at == 0 && end == row.len();
-            out.push(Piece::Span(span_of(row, at..end, here, frame, seed.filter(|_| whole))));
+        if spanned(item) {
+            let end = (at..row.len()).find(|&i| !spanned(row.at(i))).unwrap_or(row.len());
+            out.push(Piece::Span(span_of(row, at..end, here, frame, before)));
             at = end;
             continue;
         }
         let own = bounds::<Scene>(item, &Pictures::new());
         match item {
             Item::Group(g) if g.look.backdrop.is_none() => {
-                let inside = pieces_of(&Row::plain(&g.items), &here, frame, None);
+                let inside = pieces_of(&Row::plain(&g.items), &here, frame, before);
                 out.push(if has_span(&inside) { Piece::Nested(at - shift, own, inside) } else { Piece::Loose(at - shift, own) });
             }
             _ => out.push(Piece::Loose(at - shift, own)),
@@ -479,7 +540,8 @@ fn pieces_of(row: &Row, path: &str, frame: Rect, seed: Option<&Seed>) -> Vec<Pie
 fn cast_of(group: &DisplayList, key: &str, seed: Option<Seed>) -> Option<Arc<Cast>> {
     let size = Rect::new(0.0, 0.0, group.width as f64, group.height as f64);
     let lead = group.background.map(|c| background("", c, size, turned_corners(IDENTITY, size)));
-    let mut pieces = pieces_of(&Row { lead, items: &group.items }, key, size, seed.as_ref());
+    let before = seed.as_ref().map(|s| Before::of(s, key));
+    let mut pieces = pieces_of(&Row { lead, items: &group.items }, key, size, before.as_ref());
     if !has_span(&pieces) {
         return None;
     }
@@ -679,12 +741,11 @@ impl Library {
             return false;
         }
         let (drawn, _) = self.drawable(&DisplayList { items: splice.items.clone(), ..base.clone_empty() });
-        let before = self.encodings.get(from).cloned().flatten().and_then(|cast| cast.whole().map(|span| span.encoded.clone()));
-        let stable = splice.head + usize::from(base.background.is_some());
+        let before = self.encodings.get(from).cloned().flatten();
         self.groups.splice(from, to, splice.head, splice.tail, drawn.items);
         self.forget(to);
         if let Some(before) = before {
-            self.seeds.insert(to.to_string(), Seed { before, stable });
+            self.seeds.insert(to.to_string(), Seed { before, group: from.to_string() });
         }
         true
     }

@@ -21,7 +21,7 @@
   {#if split.groups.length}
     <DropdownMenu.Root>
       <DropdownMenu.Trigger class="more" aria-label={MORE_LABEL} title={MORE_LABEL} data-testid="header-more"><Ellipsis size={15} /></DropdownMenu.Trigger>
-      <DropdownMenu.Content align="end" class="header-menu">
+      <DropdownMenu.Content align="end" side="bottom" avoidCollisions={false} class="header-menu w-auto max-h-(--bits-floating-available-height)">
         {#each split.groups as group, g (g)}
           {#if g > 0}<DropdownMenu.Separator />{/if}
           {#each group as id (id)}

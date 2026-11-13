@@ -212,15 +212,9 @@ function carriedAlong(clip: MotionClip, shift: Shift | undefined, size: Size): M
   return { ...clip, props: { ...clip.props, x: x + shift[0] / size.width, y: y + shift[1] / size.height } };
 }
 
-function laidOut(tracks: MotionTrack[], size: Size, measure: TextMeasure, content: Content = NO_CONTENT): MotionTrack[] {
-  const clips = visualClips(tracks);
-  const boxes = boxesOf(clips, size, content, measure);
-  if (!boxes.size) {
-    return tracks;
-  }
-
+function placer(clips: readonly MotionClip[], boxes: Map<string, Box>, size: Size, measure: TextMeasure, content: Content): (clip: MotionClip) => MotionClip {
   const carried = carriedShifts(clips, boxes, size);
-  const place = (clip: MotionClip): MotionClip => {
+  return (clip) => {
     const box = boxes.get(clip.id);
     if (!box) {
       return carriedAlong(clip, carried.get(clip.id), size);
@@ -231,7 +225,38 @@ function laidOut(tracks: MotionTrack[], size: Size, measure: TextMeasure, conten
     }
     return { ...clip, props: { ...clip.props, ...huggedText(clip, box, intrinsic(clip, size, content, measure).width), ...placedProps(box, size) } };
   };
+}
+
+function laidOut(tracks: MotionTrack[], size: Size, measure: TextMeasure, content: Content = NO_CONTENT): MotionTrack[] {
+  const clips = visualClips(tracks);
+  const boxes = boxesOf(clips, size, content, measure);
+  if (!boxes.size) {
+    return tracks;
+  }
+
+  const place = placer(clips, boxes, size, measure, content);
   return tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map(place) }));
+}
+
+const AXES = ['width', 'height'] as const;
+
+function heldAt(laid: MotionClip): MotionClip {
+  const own = laid.layoutItem ?? DEFAULT_LAYOUT_ITEM;
+  const held = Object.fromEntries(AXES.map((axis) => [axis, own[axis] === Sizing.Hug ? Sizing.Hug : Sizing.Fixed]));
+  return { ...laid, layoutItem: { ...own, ...held } };
+}
+
+export function relaidWithin(doc: MotionDoc, laidContainer: MotionClip, measure: TextMeasure = estimatedText): MotionClip[] {
+  const size = { width: doc.width, height: doc.height };
+  const container = heldAt(laidContainer);
+  const clips = visualClips(doc.tracks).map((c) => (c.id === container.id ? container : c));
+  const kids = kidsIndex(clips);
+  const { left, top } = pivotBox(container.props, size);
+  const boxes = layoutTree(itemOf(container, kids, size, NO_CONTENT, measure), { left, top });
+  const below = (id: string): MotionClip[] => kids(id).flatMap((c) => [c, ...below(c.id)]);
+  const within = [container, ...below(container.id)];
+  const place = placer(within, boxes, size, measure, NO_CONTENT);
+  return within.map((c) => (c === container ? { ...place(c), layoutItem: laidContainer.layoutItem } : place(c)));
 }
 
 const laidComps = (doc: MotionDoc, size: Size, measure: TextMeasure): MotionDoc['comps'] => Object.fromEntries(Object.entries(doc.comps).map(([id, comp]) => [id, { ...comp, tracks: laidOut(comp.tracks, comp.frame ?? size, measure, instanceContent(doc, comp.frame ?? size, measure)) }]));

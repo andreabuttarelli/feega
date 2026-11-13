@@ -334,8 +334,8 @@ organisation gets the free monthly credits; past the free limit the answer says 
 `list_team` shows members, pending invites and the invite link; `team_op` also `invite` (email,
 role admin/member/viewer), `resend_invite`, `revoke_invite`, `invite_link` (anyone with it joins
 as viewer), `disable_invite_link`, `set_role`, `remove_member`, `leave`, `transfer_ownership`.
-Viewers see everything and change nothing; free organisations have limited editor seats (a
-`seat_limit` answer carries `upgrade_path`). CLI: `feega orgs`, `feega orgs use <orgId>`,
+Viewers see everything and change nothing and are free; a free organisation has one editor, and
+each more editor is a paid seat (€9/month from acceptance; a `seat_limit` answer carries `upgrade_path`). CLI: `feega orgs`, `feega orgs use <orgId>`,
 `feega orgs create <name>`, `feega team [invite|resend|revoke|link|link-off|role|remove|leave|transfer]`.
 `model_allowlist` reads which image, video and 3D models the org offers (an empty list means every
 model) and, for admins and only when the user asks, replaces one medium's list: `feega allowlist
