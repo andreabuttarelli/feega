@@ -18,6 +18,7 @@ create policy motion_revisions_own_actor on public.motion_revisions as restricti
   with check (actor_id is null or actor_id = auth.uid());
 
 drop function if exists public.motion_revision_writer(uuid, uuid);
+drop function if exists public.commit_motion_revision(uuid, uuid, integer, jsonb, text, text, uuid, text, integer);
 
 create or replace function public.motion_revision_writer(p_org_id uuid, p_node_id uuid, p_actor_id uuid) returns void
 language plpgsql
