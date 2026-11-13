@@ -3,11 +3,19 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 
-const migration = readFileSync(join(fileURLToPath(new URL('..', import.meta.url)), 'supabase/canvas-migrations/20261113_agent_edit_counts.sql'), 'utf8');
+const MIGRATIONS = ['20261113_agent_edit_counts.sql', '20261114_history_append_only.sql'].map((file) =>
+  readFileSync(join(fileURLToPath(new URL('..', import.meta.url)), 'supabase/canvas-migrations', file), 'utf8')
+);
 
 const STUBS = `
   create role anon; create role authenticated; create role service_role;
+  create schema auth;
+  create function auth.role() returns text language sql as $$ select 'service_role' $$;
+  create function public.auth_org_ids() returns setof uuid language sql as $$ select null::uuid where false $$;
+  create function public.auth_editor_org_ids() returns setof uuid language sql as $$ select null::uuid where false $$;
+  create table public.nodes (id uuid primary key, org_id uuid not null, type text not null);
   create table public.canvas_events (id bigserial primary key, org_id uuid, actor_kind text, created_at timestamptz default now());
+  insert into public.nodes values ('22222222-2222-4222-8222-222222222222', '11111111-1111-4111-8111-111111111111', 'motion');
   create table public.motion_revisions (
     id uuid primary key default gen_random_uuid(), org_id uuid not null, node_id uuid not null, version integer not null,
     doc jsonb not null, summary text, actor_kind text not null, actor_id uuid, agent_key text, session_id uuid,
@@ -27,7 +35,9 @@ const report = (ok, line) => {
 
 const db = new PGlite();
 await db.exec(STUBS);
-await db.exec(migration);
+for (const migration of MIGRATIONS) {
+  await db.exec(migration);
+}
 
 const commit = (expected, layers) =>
   db.query(`select public.commit_motion_revision($1, $2, $3, '{}'::jsonb, null, 'agent', $4, 'mcp', 3000, null, $5) as v`, [ORG, NODE, expected, USER, layers]);
