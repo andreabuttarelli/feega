@@ -1,6 +1,6 @@
 import type { Db } from '$lib/server/db/client';
 import { assignableRoles, can, isOrgRole, OrgAction, OrgRoleName, type OrgRole } from '$lib/org-roles';
-import { listMembers, memberRole, orgName, removeMember, setMemberRole, transferOwnership } from '$lib/server/repos/orgs';
+import { handOverOrg, listMembers, memberRole, orgName, removeMember, setMemberRole } from '$lib/server/repos/orgs';
 import {
   createInvite,
   deleteLinkInvite,
@@ -17,7 +17,7 @@ import { editorSeatGate, SeatGate, seatStatus, syncedOrLogged, type SeatStatus }
 
 export type InviteMail = { to: string; orgName: string; inviterId: string; acceptUrl: string };
 
-export type TeamCtx = { db: Db; userId: string; orgId: string; origin: string; mail: (mail: InviteMail) => Promise<boolean> };
+export type TeamCtx = { db: Db; writer: Db; userId: string; orgId: string; origin: string; mail: (mail: InviteMail) => Promise<boolean> };
 
 export enum TeamOp {
   Invite = 'invite',
@@ -152,7 +152,7 @@ async function invite(ctx: TeamCtx, actor: OrgRole, input: { email: string; role
   }
 
   try {
-    const { invite: created, token } = await createInvite(ctx.db, { orgId: ctx.orgId, email, role: input.role, invitedBy: ctx.userId });
+    const { invite: created, token } = await createInvite(ctx.writer, { orgId: ctx.orgId, email, role: input.role, invitedBy: ctx.userId });
     return done({ invite_id: created.id, ...(await sendInvite(ctx, email, token)) });
   } catch (e) {
     if ((e as { code?: string } | null)?.code === UNIQUE_VIOLATION) {
@@ -163,7 +163,7 @@ async function invite(ctx: TeamCtx, actor: OrgRole, input: { email: string; role
 }
 
 async function resend(ctx: TeamCtx, inviteId: string): Promise<TeamResult> {
-  const renewed = await renewInvite(ctx.db, { orgId: ctx.orgId, inviteId });
+  const renewed = await renewInvite(ctx.writer, { orgId: ctx.orgId, inviteId });
   if (!renewed) {
     return refused(TeamRefusal.NotFound);
   }
@@ -172,7 +172,7 @@ async function resend(ctx: TeamCtx, inviteId: string): Promise<TeamResult> {
 
 async function inviteLink(ctx: TeamCtx): Promise<TeamResult> {
   await deleteLinkInvite(ctx.db, ctx.orgId);
-  const { token } = await createInvite(ctx.db, {
+  const { token } = await createInvite(ctx.writer, {
     orgId: ctx.orgId,
     email: LINK_INVITE_EMAIL,
     role: LINK_ROLE,
@@ -203,7 +203,7 @@ async function setRole(ctx: TeamCtx, actor: OrgRole, input: { userId: string; ro
     return noSeat;
   }
 
-  await setMemberRole(ctx.db, { orgId: ctx.orgId, userId: input.userId, role: input.role });
+  await setMemberRole(ctx.writer, { orgId: ctx.orgId, userId: input.userId, role: input.role });
   if (needsSeat(current) !== needsSeat(input.role)) {
     await syncedOrLogged(ctx.db, ctx.orgId);
   }
@@ -229,15 +229,21 @@ async function remove(ctx: TeamCtx, userId: string): Promise<TeamResult> {
   return done({ user_id: userId });
 }
 
-async function transfer(ctx: TeamCtx, userId: string): Promise<TeamResult> {
+async function transfer(ctx: TeamCtx, actor: OrgRole, userId: string): Promise<TeamResult> {
   if (userId === ctx.userId) {
     return refused(TeamRefusal.Self);
   }
-  if (!(await targetRole(ctx, userId))) {
+  const target = await targetRole(ctx, userId);
+  if (!target) {
     return refused(TeamRefusal.NotFound);
   }
 
-  await transferOwnership(ctx.db, { orgId: ctx.orgId, userId });
+  const addsEditor = !needsSeat(target);
+  const seated = !addsEditor || !(await seatRefusal(ctx, actor, OrgRoleName.Admin));
+  await handOverOrg(ctx.writer, { orgId: ctx.orgId, from: ctx.userId, to: userId, fromRole: seated ? OrgRoleName.Admin : target });
+  if (addsEditor && seated) {
+    await syncedOrLogged(ctx.db, ctx.orgId);
+  }
   return done({ owner: userId });
 }
 
@@ -274,6 +280,6 @@ export async function runTeamOp(ctx: TeamCtx, request: TeamRequest): Promise<Tea
       }
       return done();
     case TeamOp.TransferOwnership:
-      return transfer(ctx, request.userId);
+      return transfer(ctx, actor, request.userId);
   }
 }

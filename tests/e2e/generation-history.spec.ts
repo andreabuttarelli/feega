@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { test, expect, REAL_STACK, gotoHydrated, seedsRuns } from './fixtures/session';
+
+seedsRuns();
 
 const SCREENSHOT = `${process.env.HOME}/Documents/feega-videos/e2e/f3-generation-history.png`;
 

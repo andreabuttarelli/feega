@@ -421,4 +421,10 @@ export const test = base.extend<{
 export { expect };
 
 export const REAL_STACK = process.env.E2E_REAL_STACK === '1';
+
+export const RUNS_ARE_SERVER_WRITTEN = 'node_runs is written by the server only: run history is seeded with the service role, on a disposable stack';
+
+export function seedsRuns(): void {
+  test.skip(({ session }) => session.target === E2eTarget.Production, RUNS_ARE_SERVER_WRITTEN);
+}
 export const ON_PRODUCTION = REAL_STACK && !!process.env.PUBLIC_SUPABASE_URL && e2eTarget() === E2eTarget.Production;

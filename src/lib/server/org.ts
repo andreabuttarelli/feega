@@ -28,23 +28,18 @@ async function oldestOrgId(supabase: SupabaseClient, userId: string): Promise<st
   return rows[0].id;
 }
 
-// Every user gets an org (their workspace) lazily on first need.
-// Brands hang off an org, so this must run before a brand can be created.
-export async function ensureOrgForUser(supabase: SupabaseClient, user: User): Promise<string | null> {
+export type FirstOrgDeps = { createFirstOrg: (input: { userId: string; name: string }) => Promise<{ orgId: string }> };
+
+const FIRST_ORG_DEPS: FirstOrgDeps = {
+  createFirstOrg: async (input) => (await import('$lib/server/tenancy/bootstrap')).createFirstOrg(input)
+};
+
+export async function ensureOrgForUser(supabase: SupabaseClient, user: User, deps: FirstOrgDeps = FIRST_ORG_DEPS): Promise<string | null> {
   const existing = await oldestOrgId(supabase, user.id);
   if (existing) return existing;
 
   const handle = user.email?.split('@')[0] ?? 'my';
-  const { data: org, error } = await supabase
-    .from('orgs')
-    .insert({ name: `${handle}'s workspace`, slug: `${handle}-${crypto.randomUUID().slice(0, 8)}` })
-    .select('id')
-    .single();
-  if (error || !org) return null;
+  const { orgId } = await deps.createFirstOrg({ userId: user.id, name: `${handle}'s workspace` });
 
-  await supabase.from('orgs_members').insert({ org_id: org.id, user_id: user.id, role: 'owner' });
-
-  // A concurrent first call may have inserted its own row a moment earlier: both answers
-  // converge on the oldest, so two tabs cannot walk away with two different orgs.
-  return (await oldestOrgId(supabase, user.id)) ?? org.id;
+  return (await oldestOrgId(supabase, user.id)) ?? orgId;
 }

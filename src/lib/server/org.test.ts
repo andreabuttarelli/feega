@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createTestSupabase } from '$lib/testkit/supabase';
-import { ensureOrgForUser } from './org';
+import { ensureOrgForUser, type FirstOrgDeps } from './org';
 
 // `orgs` on the new schema has no owner_id, no plan, no subscription: ownership is
 // `orgs_members.role = 'owner'`, and there is no "paying org" preference anymore — billing has
@@ -63,25 +63,21 @@ describe('ensureOrgForUser', () => {
     expect(await ensureOrgForUser(client, USER)).toBe('org-mid');
   });
 
-  it('creates the org on a first call and reuses it on the next', async () => {
+  it('a user with no org gets one made by the server, never by their own session, and keeps it', async () => {
     const { client, tables } = createTestSupabase({});
+    const deps: FirstOrgDeps = {
+      createFirstOrg: vi.fn(async ({ userId }) => {
+        tables.set('orgs', [{ id: 'org-made', created_at: '2026-11-14' }]);
+        tables.set('orgs_members', [{ org_id: 'org-made', user_id: userId, role: 'owner' }]);
+        return { orgId: 'org-made', slug: 'ana', role: 'owner' as const };
+      })
+    };
 
-    const first = await ensureOrgForUser(client, USER);
-    const second = await ensureOrgForUser(client, USER);
+    const first = await ensureOrgForUser(client, USER, deps);
+    const second = await ensureOrgForUser(client, USER, deps);
 
-    expect(first).toBe(second);
-    expect(tables.get('orgs')).toHaveLength(1);
-    expect(tables.get('orgs_members')).toEqual([
-      expect.objectContaining({ org_id: first, user_id: 'u1', role: 'owner' })
-    ]);
-  });
-
-  it('gives two concurrent first calls the same org id', async () => {
-    const { client } = createTestSupabase({});
-
-    const [a, b] = await Promise.all([ensureOrgForUser(client, USER), ensureOrgForUser(client, USER)]);
-
-    expect(a).not.toBeNull();
-    expect(a).toBe(b);
+    expect([first, second]).toEqual(['org-made', 'org-made']);
+    expect(deps.createFirstOrg).toHaveBeenCalledTimes(1);
+    expect(deps.createFirstOrg).toHaveBeenCalledWith({ userId: 'u1', name: "ana's workspace" });
   });
 });

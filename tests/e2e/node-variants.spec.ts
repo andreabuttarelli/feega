@@ -1,4 +1,6 @@
-import { test, expect, gotoHydrated } from './fixtures/session';
+import { test, expect, gotoHydrated, seedsRuns } from './fixtures/session';
+
+seedsRuns();
 
 const SHOTS_DIR = `${process.env.HOME}/Documents/feega-videos/e2e`;
 const SETTLE_MS = 2000;

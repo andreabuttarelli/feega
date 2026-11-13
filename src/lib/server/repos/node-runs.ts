@@ -1,5 +1,7 @@
 import { TASK_JOB_PREFIXES } from '$lib/server/generation/task-providers';
-import type { Db } from '$lib/server/db/client';
+import { createServiceRoleDb, type Db } from '$lib/server/db/client';
+import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
+import { isRlsScoped } from '$lib/server/rls-client';
 import type { Database, Json } from '$lib/database.types';
 
 /**
@@ -80,9 +82,46 @@ function toRun(row: RunColumns): NodeRun {
   };
 }
 
+export const QUOTED_USD_PARAM = 'quotedUsd';
+const SERVER_PARAM_KEYS: readonly string[] = [QUOTED_USD_PARAM];
+
+const RUN_WRITES = SERVICE_ROLE_USES.find((use) => use.path.startsWith('src/lib/server/repos/node-runs.ts'))!;
+const editedOrgs = new WeakMap<object, Promise<string[]>>();
+
+function orgsEditedBy(db: Db): Promise<string[]> {
+  const known = editedOrgs.get(db);
+  if (known) {
+    return known;
+  }
+  const asked = (async () => {
+    const { data, error } = await (db as unknown as { rpc(fn: string): Promise<{ data: unknown; error: unknown }> }).rpc('auth_editor_org_ids');
+    if (error) {
+      throw error;
+    }
+    return ((data ?? []) as Array<string | { auth_editor_org_ids: string }>).map((r) => (typeof r === 'string' ? r : r.auth_editor_org_ids));
+  })();
+  editedOrgs.set(db, asked);
+  asked.catch(() => editedOrgs.delete(db));
+  return asked;
+}
+
+async function writerFor(db: Db, orgId: string): Promise<Db> {
+  if (!isRlsScoped(db)) {
+    return db;
+  }
+  if (!(await orgsEditedBy(db)).includes(orgId)) {
+    throw new Error('run_write_refused: the caller does not edit this org');
+  }
+  return createServiceRoleDb(RUN_WRITES);
+}
+
+const withoutServerKeys = (params: Record<string, unknown>) =>
+  Object.fromEntries(Object.entries(params).filter(([key]) => !SERVER_PARAM_KEYS.includes(key)));
+
 export async function createRun(
   db: Db,
   input: {
+    id?: string;
     orgId: string;
     nodeId: string;
     prompt: string;
@@ -93,14 +132,15 @@ export async function createRun(
     externalJobId?: string | null;
   }
 ): Promise<NodeRun> {
-  const { data, error } = await db
+  const { data, error } = await (await writerFor(db, input.orgId))
     .from('node_runs')
     .insert({
+      ...(input.id ? { id: input.id } : {}),
       org_id: input.orgId,
       node_id: input.nodeId,
       prompt: input.prompt,
       model: input.model,
-      params: input.params as Json,
+      params: withoutServerKeys(input.params) as Json,
       status: 'running',
       external_job_id: input.externalJobId ?? null,
       actor_kind: input.actorKind,
@@ -144,7 +184,7 @@ export async function claimRun(
   db: Db,
   input: { orgId: string; runId: string }
 ): Promise<NodeRun | null> {
-  const { data, error } = await db
+  const { data, error } = await (await writerFor(db, input.orgId))
     .from('node_runs')
     .update({ status: 'finishing', claimed_at: new Date().toISOString() })
     .eq('id', input.runId)
@@ -167,7 +207,7 @@ export async function releaseClaim(
   db: Db,
   input: { orgId: string; runId: string }
 ): Promise<void> {
-  const { error } = await db
+  const { error } = await (await writerFor(db, input.orgId))
     .from('node_runs')
     .update({ status: 'running', claimed_at: null })
     .eq('id', input.runId)
@@ -188,7 +228,7 @@ export async function retryClaim(
   db: Db,
   input: { orgId: string; runId: string; attempts: number; error: string }
 ): Promise<void> {
-  const { error } = await db
+  const { error } = await (await writerFor(db, input.orgId))
     .from('node_runs')
     .update({ status: 'running', claimed_at: null, attempts: input.attempts, error: input.error })
     .eq('id', input.runId)
@@ -278,7 +318,7 @@ export async function completeRun(
   db: Db,
   input: { orgId: string; runId: string; assetId: string; costUsd?: number | null }
 ): Promise<void> {
-  const { error } = await db
+  const { error } = await (await writerFor(db, input.orgId))
     .from('node_runs')
     .update({
       status: 'done',
@@ -298,7 +338,7 @@ export async function settleRun(
   db: Db,
   input: { orgId: string; runId: string; params: Record<string, unknown>; costUsd: number }
 ): Promise<void> {
-  const { error } = await db
+  const { error } = await (await writerFor(db, input.orgId))
     .from('node_runs')
     .update({ status: 'done', params: input.params as never, cost_usd: input.costUsd, finished_at: new Date().toISOString() })
     .eq('id', input.runId)
@@ -313,7 +353,7 @@ export async function setRunPrompt(
   db: Db,
   input: { orgId: string; runId: string; prompt: string }
 ): Promise<void> {
-  const { error } = await db
+  const { error } = await (await writerFor(db, input.orgId))
     .from('node_runs')
     .update({ prompt: input.prompt })
     .eq('id', input.runId)
@@ -328,9 +368,9 @@ export async function setRunRoute(
   db: Db,
   input: { orgId: string; runId: string; model: string; params: Record<string, unknown> }
 ): Promise<void> {
-  const { error } = await db
+  const { error } = await (await writerFor(db, input.orgId))
     .from('node_runs')
-    .update({ model: input.model, params: input.params as never })
+    .update({ model: input.model, params: withoutServerKeys(input.params) as never })
     .eq('id', input.runId)
     .eq('org_id', input.orgId);
 
@@ -343,7 +383,7 @@ export async function failRun(
   db: Db,
   input: { orgId: string; runId: string; error: string }
 ): Promise<void> {
-  const { error } = await db
+  const { error } = await (await writerFor(db, input.orgId))
     .from('node_runs')
     .update({
       status: 'failed',
@@ -367,7 +407,7 @@ export async function expireRun(
   db: Db,
   input: { orgId: string; runId: string; error: string }
 ): Promise<void> {
-  const { error } = await db
+  const { error } = await (await writerFor(db, input.orgId))
     .from('node_runs')
     .update({
       status: 'expired',
@@ -386,7 +426,7 @@ export async function setRunParams(
   db: Db,
   input: { orgId: string; runId: string; params: Record<string, unknown> }
 ): Promise<void> {
-  const { error } = await db
+  const { error } = await (await writerFor(db, input.orgId))
     .from('node_runs')
     .update({ params: input.params as never })
     .eq('id', input.runId)
@@ -401,7 +441,7 @@ export async function setExternalJob(
   db: Db,
   input: { orgId: string; runId: string; externalJobId: string }
 ): Promise<void> {
-  const { error } = await db
+  const { error } = await (await writerFor(db, input.orgId))
     .from('node_runs')
     .update({ external_job_id: input.externalJobId })
     .eq('id', input.runId)
@@ -489,7 +529,7 @@ export async function unpurgedRuns(db: Db, input: { prefix: string; since: strin
 }
 
 export async function markProviderPurged(db: Db, input: { orgId: string; runId: string; at: string }): Promise<void> {
-  const { error } = await db
+  const { error } = await (await writerFor(db, input.orgId))
     .from('node_runs')
     .update({ provider_purged_at: input.at })
     .eq('id', input.runId)

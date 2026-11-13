@@ -65,6 +65,16 @@ describe('importing a .feega file', () => {
     expect(new Set(ids).size).toBe(4);
   });
 
+  it('a file path that came without its file is never stored as a path', async () => {
+    const fake = world();
+    const forged: FeegaFile = { ...file, canvas: { ...file.canvas, assets: [{ ...file.canvas.assets[0], url: 'another-org/p/secret.png', file: null }] } };
+
+    const out = await importCanvasFile(fake.db, { ...target, bytes: packFeega(forged, new Map()) });
+
+    expect(out.outcome).toBe(FeegaImport.Imported);
+    expect(fake.calls.filter((c) => c.table === 'assets' && c.op === 'insert')).toEqual([]);
+  });
+
   it('refuses a damaged file before creating anything', async () => {
     const fake = world();
     expect(await importCanvasFile(fake.db, { ...target, bytes: new Uint8Array([1, 2, 3]) })).toEqual({ outcome: FeegaImport.Refused, refusal: FeegaRefusal.NotFeega });

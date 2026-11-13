@@ -123,6 +123,36 @@ describe('insert_row: org_id si impone, non si corregge in silenzio', () => {
     expect(out.error).toBe('unknown_table');
     expect(calls).toHaveLength(0);
   });
+
+  it.each([['insert'], ['update']])('a file path on an asset is never set through rows (%s)', async (op) => {
+    const { calls, supabase } = fakeAuthority({});
+    const write = tools(supabase, 'org-mine');
+
+    const out =
+      op === 'insert'
+        ? await write.insertRow({ table: 'assets', values: { type: 'image', url: 'org-other/p/x.png' } })
+        : await write.updateRow({ table: 'assets', values: { proxy_url: 'org-other/p/x.mp4' }, where: [{ column: 'id', op: 'eq', value: 'a' }] });
+
+    expect(out.error).toBe('server_written_column');
+    expect(calls.filter((c) => c.op === 'insert' || c.op === 'update')).toHaveLength(0);
+  });
+
+  it.each(['orgs', 'orgs_members', 'orgs_invites', 'api_keys', 'ai_calls', 'node_runs', 'canvas_events'])(
+    "%s lo scrive solo il server: un agente con la service role non lo tocca",
+    async (table) => {
+      const { calls, supabase } = fakeAuthority({});
+      const write = tools(supabase, 'org-mine');
+
+      const outs = [
+        await write.insertRow({ table, values: { role: 'owner' } }),
+        await write.updateRow({ table, values: { role: 'owner' }, where: [{ column: 'id', op: 'eq', value: 'x' }] }),
+        await write.deleteRow({ table, where: [{ column: 'id', op: 'eq', value: 'x' }] })
+      ];
+
+      expect(outs.map((o) => o.error)).toEqual(['server_written_table', 'server_written_table', 'server_written_table']);
+      expect(calls).toHaveLength(0);
+    }
+  );
 });
 
 describe('insert_row su nodes_connections: rifiuta un arco verso un modello uncensored', () => {

@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { fakeDb, filtersOf } from '$lib/server/db/fake-db';
+import { markRlsScoped } from '$lib/server/rls-client';
+
+const server = vi.hoisted(() => ({ current: null as unknown }));
+vi.mock('$lib/server/db/client', () => ({ createServiceRoleDb: () => server.current }));
 import { providerLoad } from './node-runs';
 import { activeRenderRuns, claimRun, completeRun, createRun, failRun, listNodeRuns, queuedVideoRuns, RENDER_JOB_PREFIX, BROWSER_RENDER_PREFIX, runningRuns, setRunParams } from './node-runs';
 
@@ -174,3 +178,51 @@ describe('providerLoad', () => {
   });
 });
 
+
+describe('a run is written by the server, never with the caller session', () => {
+  function session(editable: string[]) {
+    const { db, calls } = fakeDb({ node_runs: [row] }, { filter: true });
+    Object.assign(db, { rpc: vi.fn(async () => ({ data: editable, error: null })) });
+    return { db: markRlsScoped(db), calls };
+  }
+
+  it('a session that edits the org writes through the server writer', async () => {
+    const caller = session([ORG]);
+    const writer = fakeDb({ node_runs: [row] }, { filter: true });
+    server.current = writer.db;
+
+    await failRun(caller.db, { orgId: ORG, runId: RUN, error: 'x' });
+    await createRun(caller.db, { orgId: ORG, nodeId: NODE, prompt: 'p', model: null, params: {}, actorKind: 'user', actorId: null });
+
+    expect(caller.calls.filter((c) => c.table === 'node_runs' && c.op !== 'select')).toEqual([]);
+    expect(writer.calls.filter((c) => c.table === 'node_runs').map((c) => c.op)).toEqual(['update', 'insert']);
+  });
+
+  it('a session that does not edit the org writes nothing', async () => {
+    const caller = session([]);
+    const writer = fakeDb({ node_runs: [row] }, { filter: true });
+    server.current = writer.db;
+
+    await expect(failRun(caller.db, { orgId: ORG, runId: RUN, error: 'x' })).rejects.toThrow();
+    expect(writer.calls).toEqual([]);
+  });
+
+  it('a failed check is asked again on the next write, not remembered', async () => {
+    const { db } = fakeDb({ node_runs: [row] }, { filter: true });
+    const rpc = vi.fn().mockResolvedValueOnce({ data: null, error: { message: 'timeout' } }).mockResolvedValue({ data: [ORG], error: null });
+    Object.assign(db, { rpc });
+    const caller = markRlsScoped(db);
+    server.current = fakeDb({ node_runs: [row] }, { filter: true }).db;
+
+    await expect(failRun(caller, { orgId: ORG, runId: RUN, error: 'x' })).rejects.toBeTruthy();
+    await expect(failRun(caller, { orgId: ORG, runId: RUN, error: 'x' })).resolves.toBeUndefined();
+  });
+
+  it('values the server prices a run with never come from the caller', async () => {
+    const { db, calls } = fakeDb({ node_runs: [] }, { filter: true });
+
+    await createRun(db, { orgId: ORG, nodeId: NODE, prompt: 'p', model: null, params: { quotedUsd: 0.0001, resolution: '1K' }, actorKind: 'user', actorId: null });
+
+    expect((calls.find((c) => c.op === 'insert')?.payload as { params: Record<string, unknown> }).params).toEqual({ resolution: '1K' });
+  });
+});

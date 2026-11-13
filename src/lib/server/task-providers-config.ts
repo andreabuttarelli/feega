@@ -12,7 +12,7 @@ import { taskLabelOf } from './canvas/task-run';
 import { configuredIn, jobPrefixOf, TASK_PROVIDERS, taskProviderOf, TaskProviderName, waitingJobOf } from './generation/task-providers';
 import { createServiceRoleDb } from './db/client';
 import { SERVICE_ROLE_USES } from './db/service-role-uses';
-import { providerLoad } from './repos/node-runs';
+import { providerLoad, setRunParams } from './repos/node-runs';
 import { uncensoredAccess } from './uncensored-access';
 import { moderationPorts, recordModeration } from './moderation/moderation-config';
 
@@ -104,7 +104,8 @@ export function concurrencyCapOf(provider: TaskProviderName, source: Env): numbe
   return Number.isInteger(configured) && configured > 0 ? configured : limit.fallback;
 }
 
-const LOAD_USE = SERVICE_ROLE_USES.find((use) => use.path.startsWith('src/lib/server/task-providers-config.ts'));
+const LOAD_USE = SERVICE_ROLE_USES.find((use) => use.path.startsWith('src/lib/server/task-providers-config.ts — loadOf'));
+const QUOTE_USE = SERVICE_ROLE_USES.find((use) => use.path.startsWith('src/lib/server/task-providers-config.ts — storeQuote'))!;
 
 async function loadOf(provider: TaskProviderName): Promise<ProviderLoad> {
   const cap = concurrencyCapOf(provider, env);
@@ -131,6 +132,7 @@ export function taskRunDeps(db: Db): TaskRunDeps {
     screen: (scope, model) => moderationPorts(db, moderationScope(scope, model)),
     refuseLikeness: (scope, model, reason) =>
       recordModeration(db, moderationScope(scope, model), { stage: 'rules', verdict: 'refuse', category: 'real_person_sexual', probabilities: {}, reason }),
-    bill
+    bill,
+    storeQuote: (input) => setRunParams(createServiceRoleDb(QUOTE_USE), input)
   };
 }

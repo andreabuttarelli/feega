@@ -29,7 +29,7 @@ jobs:
       - run: npm ci
 
       - name: Billing SQL harnesses (pglite)
-        run: npm run test:credit-expiry && npm run test:seat-billing && npm run test:agent-edits
+        run: npm run test:credit-expiry && npm run test:seat-billing && npm run test:agent-edits && npm run test:billing-rls
 
       - name: Runtime type gate
         run: node scripts/typecheck-runtime.mjs

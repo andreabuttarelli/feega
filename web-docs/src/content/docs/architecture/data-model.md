@@ -25,3 +25,22 @@ The canvas Brands panel reads `brands` (with `palette`, `voice` and `logos`), `b
 - `nodes_connections.target_handle`: a video with start and end frames has two inputs.
 - Realtime publishes `nodes`, `nodes_connections`, `canvases`, `node_runs` with `replica identity full`.
 - Types are generated (`npm run db:types`), never hand-written.
+
+## Rows a session reads but never writes
+
+Billing, membership and history are decided by the server, not by the signed-in user. With an ordinary session:
+
+| Table | A session can |
+|---|---|
+| `orgs` | read its orgs; no column is writable, so a billing or seat column added later is closed by default |
+| `orgs_members` | read the team; an admin removes a member, anyone leaves. Role changes and ownership hand-overs go through the team endpoint |
+| `orgs_invites` | admins list and revoke. Creating or renewing an invite goes through the team endpoint |
+| `credit_ledger`, `ai_calls` | read its org's rows |
+| `api_keys` | an editor creates keys in their own name and deletes their own; an admin deletes any. A key is never rewritten |
+| `canvas_events` | read; an editor appends. Nothing updates or deletes |
+| `motion_revisions` | read, append, seal. Folding an edit into the head (and its `layers_touched`) goes through `commit_motion_revision`, which refuses a non-editor |
+| `node_runs` | read only; every run is written by the server |
+
+A render's credit hold is a `credit_ledger` row noted with the run's id; its refund and its charge cap are read from that row, never from the run.
+
+The MCP rows tools (`insert_row`, `update_row`, `delete_row`) refuse the same tables plus `node_runs` with `server_written_table`. `npm run test:billing-rls` proves each rule in pglite against `supabase/baseline` and every later migration.

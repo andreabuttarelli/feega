@@ -45,6 +45,7 @@
     "test:seat-billing": "node scripts/seat-billing-harness.mjs",
     "test:agent-edits": "node scripts/agent-edit-harness.mjs",
     "test:gallery-rls": "node scripts/gallery-rls-harness.mjs",
+    "test:billing-rls": "node scripts/billing-rls-harness.mjs",
     "seed:gallery": "vite-node --config scripts/vite-node.config.ts scripts/seed-gallery.ts",
     "import:showcase": "vite-node --config scripts/vite-node.config.ts scripts/import-showcase.ts",
     "db:types": "supabase gen types typescript --project-id klnswzhhgrqvbfjzioul > src/lib/database.types.ts",

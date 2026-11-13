@@ -1,4 +1,6 @@
-import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { test, expect, REAL_STACK, gotoHydrated, seedsRuns } from './fixtures/session';
+
+seedsRuns();
 
 const NO_SUCH_MODEL = 'e2e/no-such-model';
 

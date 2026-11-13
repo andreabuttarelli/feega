@@ -48,8 +48,11 @@ vi.mock('$lib/server/task-providers-config', () => ({ taskRunDeps: (db: Db) => d
 vi.mock('$app/environment', () => ({ dev: true, browser: false, building: false }));
 vi.mock('$env/dynamic/private', () => ({ env: { UNCENSORED_DEV_MANUAL_VERIFICATION: 'true' } }));
 vi.mock('./node-model', () => ({ resolveModelIn: async (_mode: string, _m: string, model: string | null) => ({ ok: true, model }) }));
-const { refs, detect } = vi.hoisted(() => ({ refs: { images: [] as string[] }, detect: { verdict: (_r: { url: string }) => Promise.resolve('absent') } }));
-vi.mock('./sign-media', () => ({ signMediaPaths: async (_db: unknown, paths: string[]) => paths.map((p) => `https://signed/${p}`) }));
+const { refs, detect, unheld } = vi.hoisted(() => ({ refs: { images: [] as string[] }, detect: { verdict: (_r: { url: string }) => Promise.resolve('absent') }, unheld: { paths: [] as string[] } }));
+vi.mock('./sign-media', () => ({
+  signOrgMediaPaths: async (_db: unknown, _org: string, paths: string[]) => paths.map((p) => `https://signed/${p}`),
+  unheldMediaPaths: async () => unheld.paths
+}));
 vi.mock('$lib/server/moderation/moderation-config', () => ({ peopleDetector: () => (r: { url: string }) => detect.verdict(r) }));
 vi.mock('$lib/server/canvas/upstream', () => ({
   upstreamInputsFor: async () => ({
@@ -81,7 +84,8 @@ beforeEach(async () => {
     access: (orgId) => uncensoredAccess(db, orgId),
     screen: () => screen,
     refuseLikeness: (_scope, _model, reason) => record({ stage: 'rules', verdict: 'refuse', reason }),
-    bill
+    bill,
+    storeQuote: async () => {}
   });
   vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/png' } })));
 });
@@ -136,6 +140,22 @@ function canvas(extra: Record<string, unknown[]> = {}) {
   );
 }
 
+
+describe('a wired reference the org does not hold', () => {
+  it('refuses the run before anything is spent, and says which reference', async () => {
+    refs.images = ['another-org/p/secret.png'];
+    unheld.paths = ['another-org/p/secret.png'];
+    const { db } = canvas({ projects: [{ id: PROJECT, org_id: ORG, mode: 'standard' }] });
+
+    const out = await runGenNode(db, start(SAFE, 'make it moody'));
+    unheld.paths = [];
+    refs.images = [];
+
+    expect(out).toMatchObject({ kind: 'refused', error: expect.stringContaining('reference_out_of_reach') });
+    expect(gateway.run).not.toHaveBeenCalled();
+    expect(bill).not.toHaveBeenCalled();
+  });
+});
 
 describe('a reference with people in an uncensored project', () => {
   beforeEach(() => {

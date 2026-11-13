@@ -7,9 +7,11 @@ const { db, calls } = fakeDb(
   { orgs_members: [member('user-1', 'owner'), member('user-2', 'member')], orgs_invites: [], orgs: [{ id: 'org-1', name: 'Acme' }], credit_ledger: [] },
   { filter: true }
 );
+const { db: writer, calls: writes } = fakeDb({ orgs_invites: [], orgs_members: [] }, { filter: true });
 const mail = vi.fn(async () => true);
 
 vi.mock('$lib/server/api/bearer-page', () => ({ bearerOf: async () => ({ token: 't', db, user: { id: 'user-1', email: 'o@x.it' } }) }));
+vi.mock('$lib/server/db/client', () => ({ createServiceRoleDb: () => writer }));
 vi.mock('$lib/server/team/invite-mail', () => ({ inviteMailer: () => mail }));
 
 const { GET, POST } = await import('./+server');
@@ -34,7 +36,8 @@ describe('/api/v1/orgs/[orgId]/team', () => {
     const res = await POST(event('org-1', { op: 'invite', email: 'v@x.it', role: 'viewer' }));
 
     expect(res.status).toBe(200);
-    expect(calls.some((c) => c.table === 'orgs_invites' && c.op === 'insert')).toBe(true);
+    expect(writes.some((c) => c.table === 'orgs_invites' && c.op === 'insert')).toBe(true);
+    expect(calls.some((c) => c.table === 'orgs_invites' && c.op === 'insert')).toBe(false);
     expect(mail).toHaveBeenCalled();
   });
 
