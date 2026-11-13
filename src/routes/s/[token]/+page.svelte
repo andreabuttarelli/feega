@@ -30,6 +30,12 @@
     data.shared.nodes.map((n) => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h, kind: n.type, displayName: n.displayName }))
   );
 
+  const frameSummaries = $derived(
+    data.shared.nodes.flatMap((n) => (n.frame ? [{ id: n.id, type: n.type, data: n.frame }] : []))
+  );
+
+  const sourceUrl = (id: string) => `/s/${page.params.token}/source/${id}`;
+
   const edges = $derived(
     data.shared.edges.map((e) => ({ id: e.id, source: e.source, target: e.target, kind: DEFAULT_EDGE_KIND, markerEnd: { type: 'arrowclosed' as const } }))
   );
@@ -43,10 +49,10 @@
 <main class="shared-canvas">
   <h1 class="share-title">{data.shared.name}</h1>
   {#if Flow}
-  <Flow {tiles} {edges} mode={CanvasMode.View}>
+  <Flow {tiles} {edges} mode={CanvasMode.View} nodeSummaries={frameSummaries} {sourceUrl}>
     {#snippet tile({ id })}
       {@const node = byId.get(id)}
-      {#if node}
+      {#if node && !node.frame}
         <div class="view">
           {#if node.view.kind === 'image'}
             <img src={node.view.url} alt={node.displayName ?? ''} />

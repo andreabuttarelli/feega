@@ -40,7 +40,10 @@ export type SharedNode = {
   w: number;
   h: number;
   view: SharedView;
+  frame?: SharedFrameData;
 };
+
+export type SharedFrameData = { kind?: unknown; docHeadRevision?: unknown; linked?: unknown };
 
 export type SharedEdge = { id: string; source: string; target: string };
 
