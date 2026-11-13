@@ -148,10 +148,39 @@ pub fn bake_batches(missing: &[TileKey]) -> Vec<Batch> {
     batches_of(missing, BAKE_BATCH_TILES)
 }
 
+pub fn batches_within(missing: &[TileKey], cost: &BakeCost, budget_ms: f64) -> Vec<Batch> {
+    batches_sized(missing, |step| cost.side(step, budget_ms))
+}
+
+#[derive(Default)]
+pub struct BakeCost {
+    per_tile_ms: rustc_hash::FxHashMap<i32, f64>,
+}
+
+const COST_KEPT: f64 = 0.5;
+
+impl BakeCost {
+    pub fn record(&mut self, step: i32, tiles: usize, ms: f64) {
+        let fresh = ms / tiles.max(1) as f64;
+        let entry = self.per_tile_ms.entry(step).or_insert(fresh);
+        *entry = *entry * COST_KEPT + fresh * (1.0 - COST_KEPT);
+    }
+
+    pub fn side(&self, step: i32, budget_ms: f64) -> i64 {
+        let Some(per_tile) = self.per_tile_ms.get(&step) else { return BATCH_TILES };
+        ((budget_ms / per_tile.max(f64::EPSILON)).sqrt().floor() as i64).clamp(1, BATCH_TILES)
+    }
+}
+
 fn batches_of(missing: &[TileKey], side: i64) -> Vec<Batch> {
+    batches_sized(missing, |_| side)
+}
+
+fn batches_sized(missing: &[TileKey], side_of: impl Fn(i32) -> i64) -> Vec<Batch> {
     let mut out: Vec<Batch> = Vec::new();
     let mut at: rustc_hash::FxHashMap<(i32, i64, i64), usize> = Default::default();
     for key in missing {
+        let side = side_of(key.step);
         let block = (key.step, key.tx.div_euclid(side), key.ty.div_euclid(side));
         let index = *at.entry(block).or_insert_with(|| {
             out.push(Batch { step: key.step, keys: Vec::new() });
