@@ -1,5 +1,5 @@
 use gpu_core::retained::Camera;
-use gpu_core::tiles::{BakeCost, batches_within, lifted_keys, NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, bake_batches, BAKE_BATCH_TILES, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
+use gpu_core::tiles::{lifted_keys, NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, bake_batches, BAKE_BATCH_TILES, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
 use vello::kurbo::{Point, Rect};
 
 const SCREEN: (u32, u32) = (1024, 768);
@@ -723,18 +723,4 @@ fn panning_bakes_ahead_the_tiles_the_motion_brings_on_screen() {
 
     assert!(!ahead.is_empty());
     assert!(ahead.iter().all(|k| k.world().x1 > 10300.0 + SCREEN.0 as f64), "behind: {:?}", ahead.iter().find(|k| k.world().x1 <= 10300.0 + SCREEN.0 as f64));
-}
-
-#[test]
-fn an_expensive_level_bakes_one_tile_at_a_time_and_a_cheap_one_in_full_blocks() {
-    let mut cost = BakeCost::default();
-    assert_eq!(cost.side(-12, 12.0), BATCH_TILES);
-
-    cost.record(-12, 4, 400.0);
-    cost.record(0, 16, 2.0);
-
-    assert_eq!(cost.side(-12, 12.0), 1);
-    assert_eq!(cost.side(0, 12.0), BATCH_TILES);
-    let missing: Vec<TileKey> = (0..4).flat_map(|ty| (0..4).map(move |tx| TileKey { step: -12, tx, ty })).collect();
-    assert_eq!(batches_within(&missing, &cost, 12.0).len(), 16);
 }
