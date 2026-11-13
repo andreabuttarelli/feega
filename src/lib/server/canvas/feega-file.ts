@@ -93,7 +93,7 @@ const isAssetType = (type: string): type is AssetType => (ASSET_TYPES as readonl
 async function importAsset(db: Db, scope: { orgId: string; projectId: string }, asset: FeegaAsset, blobs: FeegaBlobs): Promise<string | null> {
   const type: AssetType = isAssetType(asset.type) ? asset.type : TEXT_ONLY;
   const blob = asset.file ? blobs.get(asset.file) : undefined;
-  let url = asset.url;
+  let url = asset.url && ABSOLUTE_URL.test(asset.url) ? asset.url : null;
   if (blob && asset.file) {
     url = `${canvasUploadPrefix(scope.orgId, scope.projectId)}${crypto.randomUUID()}-${asset.file.split('/').pop()}`;
     const stored = await db.storage.from(CANVAS_ASSET_BUCKET).upload(url, blob, { contentType: asset.mimeType ?? 'application/octet-stream' });
