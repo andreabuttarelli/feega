@@ -7,14 +7,19 @@ drop policy if exists canvas_events_insert on public.canvas_events;
 create policy canvas_events_read on public.canvas_events for select to authenticated
   using (org_id in (select public.auth_org_ids()));
 create policy canvas_events_insert on public.canvas_events for insert to authenticated
-  with check (org_id in (select public.auth_editor_org_ids()));
+  with check (org_id in (select public.auth_editor_org_ids()) and (actor_id is null or actor_id = auth.uid()));
 
 alter table public.motion_revisions add column if not exists layers_touched integer;
 
 revoke update, delete, truncate, references, trigger on public.motion_revisions from anon, authenticated;
 grant update (sealed) on public.motion_revisions to authenticated;
+drop policy if exists motion_revisions_own_actor on public.motion_revisions;
+create policy motion_revisions_own_actor on public.motion_revisions as restrictive for insert to authenticated
+  with check (actor_id is null or actor_id = auth.uid());
 
-create or replace function public.motion_revision_writer(p_org_id uuid, p_node_id uuid) returns void
+drop function if exists public.motion_revision_writer(uuid, uuid);
+
+create or replace function public.motion_revision_writer(p_org_id uuid, p_node_id uuid, p_actor_id uuid) returns void
 language plpgsql
 stable
 security definer
@@ -24,13 +29,16 @@ begin
   if auth.role() is distinct from 'service_role' and p_org_id not in (select public.auth_editor_org_ids()) then
     raise exception 'not_an_editor' using errcode = '42501';
   end if;
+  if auth.role() is distinct from 'service_role' and p_actor_id is distinct from auth.uid() then
+    raise exception 'not_the_caller' using errcode = '42501';
+  end if;
   if not exists (select 1 from public.nodes n where n.id = p_node_id and n.org_id = p_org_id and n.type in ('motion', 'element')) then
     raise exception 'not_a_motion_node' using errcode = '42501';
   end if;
 end;
 $$;
 
-revoke all on function public.motion_revision_writer(uuid, uuid) from public, anon, authenticated;
+revoke all on function public.motion_revision_writer(uuid, uuid, uuid) from public, anon, authenticated;
 
 create or replace function public.commit_motion_revision(
   p_org_id uuid,
@@ -52,7 +60,7 @@ as $$
 declare
   head public.motion_revisions%rowtype;
 begin
-  perform public.motion_revision_writer(p_org_id, p_node_id);
+  perform public.motion_revision_writer(p_org_id, p_node_id, p_actor_id);
 
   select * into head
   from public.motion_revisions
@@ -112,7 +120,7 @@ as $$
 declare
   head public.motion_revisions%rowtype;
 begin
-  perform public.motion_revision_writer(p_org_id, p_node_id);
+  perform public.motion_revision_writer(p_org_id, p_node_id, p_actor_id);
 
   select * into head
   from public.motion_revisions
