@@ -6,8 +6,6 @@ import { createServiceRoleDb } from '$lib/server/db/client';
 import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
 import { RECONCILE_BATCH, SeatSync, syncSeats } from '$lib/server/team/seat-billing';
 
-export const config = { maxDuration: 60 };
-
 const USE_PATH = 'src/routes/api/v1/billing/seats/reconcile';
 const HTTP_BAD_GATEWAY = 502;
 
