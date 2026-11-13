@@ -199,3 +199,15 @@ describe('a style changed right after it was made', () => {
     expect(Object.keys(library.styles)).toEqual(['Danger']);
   });
 });
+
+describe('a canvas with no project, like a shared link', () => {
+  it('styles already known are not written again, or the frame effect loops', () => {
+    const library = new StyleLibrary();
+    library.found({ Headline: HEADLINE });
+    const before = library.styles;
+
+    library.found({ Headline: HEADLINE });
+
+    expect(library.styles).toBe(before);
+  });
+});
