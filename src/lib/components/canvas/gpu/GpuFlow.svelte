@@ -881,12 +881,6 @@
 
   const heldCanvas = $derived(props.canvasId ?? page.params.canvasId ?? '');
 
-  $effect.pre(() => {
-    const incoming = tiles;
-    const canvasId = heldCanvas;
-    untrack(() => adoptNew(incoming, canvasId));
-  });
-
   function adoptNew(incoming: Tile[], canvasId: string) {
     const added = incoming.filter((t) => !known.has(t.id));
     known = new Set(incoming.map((t) => t.id));
@@ -4390,6 +4384,12 @@
   }
 
   const domTiles = $derived(placed.filter((t) => domIds.has(t.id)));
+
+  $effect.pre(() => {
+    const incoming = tiles;
+    const canvasId = heldCanvas;
+    untrack(() => adoptNew(incoming, canvasId));
+  });
 </script>
 
 <svelte:window onkeydown={onKeydown} onpointerdowncapture={claimFocus} onclickcapture={releaseFocus} onblur={() => (altHeld = false)} onkeyup={(e) => {
