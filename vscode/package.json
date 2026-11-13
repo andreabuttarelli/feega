@@ -2,7 +2,7 @@
   "name": "feega",
   "displayName": "Feega",
   "description": "Open .feega canvases in your editor: motion video, UI and graphic design that your agent edits over MCP.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "feega",
   "license": "Apache-2.0",
   "icon": "icon.png",

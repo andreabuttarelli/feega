@@ -135,6 +135,7 @@ function workspaceFolder() {
 
 function canvasPanel(file, launch, output) {
   const panel = vscode.window.createWebviewPanel('feega.canvas', file.split(/[\\/]/).pop(), vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: true });
+  panel.iconPath = vscode.Uri.joinPath(vscode.Uri.file(__dirname), 'icon.png');
   return openCanvas(panel, file, launch, output);
 }
 
