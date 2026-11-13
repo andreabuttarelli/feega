@@ -35,7 +35,7 @@ import {
 } from '$lib/server/repos/node-runs';
 import { DataCheck, findNode, patchNodeData, writeNodeData } from '$lib/server/repos/canvas';
 import type { Actor } from '$lib/server/repos/actor';
-import { signMediaPaths } from './sign-media';
+import { signOrgMediaPaths } from './sign-media';
 import { editInputsOf } from './edit-inputs';
 import { peopleScreened, ReferenceMedium } from '$lib/server/moderation/people';
 import { composePrompt } from '$lib/canvas/compose-prompt';
@@ -103,9 +103,9 @@ function signableAsReference(base: string, orgId: string): boolean {
 async function imageInputs(db: Db, orgId: string, upstream: UpstreamInputs): Promise<{ baseMediaId: string | undefined; referenceImageUrls: string[] }> {
   const base = upstream.referenceImageUrl;
   if (base && signableAsReference(base, orgId)) {
-    return { baseMediaId: undefined, referenceImageUrls: await signMediaPaths(db, upstream.referenceImageUrls) };
+    return { baseMediaId: undefined, referenceImageUrls: await signOrgMediaPaths(db, orgId, upstream.referenceImageUrls) };
   }
-  return { baseMediaId: base ?? undefined, referenceImageUrls: await signMediaPaths(db, upstream.pickedImageUrls) };
+  return { baseMediaId: base ?? undefined, referenceImageUrls: await signOrgMediaPaths(db, orgId, upstream.pickedImageUrls) };
 }
 
 async function depositText(db: Db, input: StartRun, text: string): Promise<Asset> {
@@ -350,8 +350,8 @@ async function runAudioNode(db: Db, input: StartRun, run: NodeRun, upstream: Ups
 
   try {
     const [audioUrls, videoUrls] = await Promise.all([
-      signMediaPaths(db, upstream.referenceAudioUrls),
-      signMediaPaths(db, upstream.referenceVideoUrls)
+      signOrgMediaPaths(db, input.orgId, upstream.referenceAudioUrls),
+      signOrgMediaPaths(db, input.orgId, upstream.referenceVideoUrls)
     ]);
     const out = await runAudio(db, provider, {
       scope: audioScopeOf(input),
@@ -404,11 +404,11 @@ async function startTask(db: Db, input: StartRun, run: NodeRun, upstream: Upstre
   const ttl = inputTtlOf(taskProviderOf(input.model));
   const edit = await editInputsOf(db, { orgId: input.orgId, data: node?.data, wiredImagePaths: TASK_IMAGE_PATHS[input.medium]?.(upstream) ?? [] });
   const [imageUrls, maskUrls, lastFrame, videoUrls, audioUrls, provenance] = await Promise.all([
-    signMediaPaths(db, edit.imagePaths, ttl),
-    signMediaPaths(db, edit.maskPath ? [edit.maskPath] : [], ttl),
-    signMediaPaths(db, upstream.endFrameUrl ? [upstream.endFrameUrl] : [], ttl),
-    signMediaPaths(db, upstream.referenceVideoUrls, ttl),
-    signMediaPaths(db, upstream.referenceAudioUrls, ttl),
+    signOrgMediaPaths(db, input.orgId, edit.imagePaths, ttl),
+    signOrgMediaPaths(db, input.orgId, edit.maskPath ? [edit.maskPath] : [], ttl),
+    signOrgMediaPaths(db, input.orgId, upstream.endFrameUrl ? [upstream.endFrameUrl] : [], ttl),
+    signOrgMediaPaths(db, input.orgId, upstream.referenceVideoUrls, ttl),
+    signOrgMediaPaths(db, input.orgId, upstream.referenceAudioUrls, ttl),
     upstreamProvenance(db, { orgId: input.orgId, canvasId: input.canvasId, nodeId: input.nodeId, data: node?.data ?? {} })
   ]);
 
@@ -625,7 +625,7 @@ async function screenRunReferences(db: Db, input: StartRun, upstream: UpstreamIn
   const { screenModelReferences } = await import('$lib/server/moderation/model-input');
 
   const signed = await Promise.all(
-    Object.values(ReferenceMedium).map(async (medium) => (await signMediaPaths(db, RUN_REFERENCES[medium](upstream))).map((url) => ({ medium, url })))
+    Object.values(ReferenceMedium).map(async (medium) => (await signOrgMediaPaths(db, input.orgId, RUN_REFERENCES[medium](upstream))).map((url) => ({ medium, url })))
   );
   return screenModelReferences({ orgId: input.orgId, mode, references: signed.flat() });
 }
@@ -789,9 +789,9 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
       const { llmText } = await import('$lib/server/llm');
       const { withOrgContext, billedUsdInScope } = await import('$lib/server/ai-log');
       const [imageUrls, videoUrls, audioUrls] = await Promise.all([
-        signMediaPaths(db, upstream.referenceImageUrls),
-        signMediaPaths(db, upstream.referenceVideoUrls),
-        signMediaPaths(db, upstream.referenceAudioUrls)
+        signOrgMediaPaths(db, input.orgId, upstream.referenceImageUrls),
+        signOrgMediaPaths(db, input.orgId, upstream.referenceVideoUrls),
+        signOrgMediaPaths(db, input.orgId, upstream.referenceAudioUrls)
       ]);
       const { text, costUsd } = await withOrgContext(input.orgId, async () => {
         const result = await llmText({
@@ -849,10 +849,10 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
     const { offerableModels } = await import('$lib/server/offerable-models');
     const { extraParamsOf } = await import('$lib/canvas/model-params');
     const [referenceImageUrls, referenceVideoUrls, referenceAudioUrls, lastFrame, videoChoice] = await Promise.all([
-      signMediaPaths(db, upstream.referenceImageUrls),
-      signMediaPaths(db, upstream.referenceVideoUrls),
-      signMediaPaths(db, upstream.referenceAudioUrls),
-      signMediaPaths(db, upstream.endFrameUrl ? [upstream.endFrameUrl] : []),
+      signOrgMediaPaths(db, input.orgId, upstream.referenceImageUrls),
+      signOrgMediaPaths(db, input.orgId, upstream.referenceVideoUrls),
+      signOrgMediaPaths(db, input.orgId, upstream.referenceAudioUrls),
+      signOrgMediaPaths(db, input.orgId, upstream.endFrameUrl ? [upstream.endFrameUrl] : []),
       input.model
         ? offerableModels(db, 'video').then((m) => m.choices.find((c) => c.id === input.model))
         : Promise.resolve(undefined)

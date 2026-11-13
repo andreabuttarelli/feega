@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Db } from '$lib/server/db/client';
 import { markRlsScoped } from '$lib/server/rls-client';
-import { signAssetPaths, signMediaPaths } from './sign-media';
+import { signAssetPaths, signMediaPaths, signOrgMediaPaths } from './sign-media';
 
 function storageWith(buckets: Record<string, string[]>): Db {
   return {
@@ -132,5 +132,25 @@ describe('un asset è visibile a chiunque legga la sua riga, non solo a chi lo h
     await expect(
       signAssetPaths(notRlsScoped, serviceDb, { generated: ['x/media/y.png'], uploaded: [] })
     ).rejects.toThrow();
+  });
+});
+
+describe('a run sends a provider only files its org holds', () => {
+  function orgRows(rows: { url: string; proxy_url?: string | null }[], buckets: Record<string, string[]>) {
+    const filters: Array<[string, unknown]> = [];
+    const query = {
+      eq: (c: string, v: unknown) => (filters.push([c, v]), query),
+      in: async (c: string, wanted: string[]) => ({ data: rows.filter((r) => wanted.includes((r as Record<string, string>)[c] ?? '')).map((r) => ({ url: r.url, proxy_url: r.proxy_url ?? null })), error: null })
+    };
+    return { db: Object.assign(storageWith(buckets), { from: () => ({ select: () => query }) }) as unknown as Db, filters };
+  }
+
+  it('signs a path a row of the org holds, keeps an absolute url, and drops any other path', async () => {
+    const { db, filters } = orgRows([{ url: 'o/p/mine.png' }], { 'canvas-assets': ['o/p/mine.png', 'their-org/p/secret.png'], 'brand-knowledge': ['stranger/media/x.png'] });
+
+    const urls = await signOrgMediaPaths(db, 'o', ['https://cdn.example/a.png', 'o/p/mine.png', 'their-org/p/secret.png', 'stranger/media/x.png']);
+
+    expect(urls).toEqual(['https://cdn.example/a.png', 'https://signed/canvas-assets/o/p/mine.png']);
+    expect(filters).toContainEqual(['org_id', 'o']);
   });
 });
