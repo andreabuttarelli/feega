@@ -291,6 +291,51 @@ describe('subscribedPlan', () => {
 	});
 });
 
+describe('seatSubscription', () => {
+	it('reads the per-editor item, its quantity, the status and a scheduled end', async () => {
+		subscriptionsRetrieve.mockResolvedValue({
+			status: 'active',
+			cancel_at: 1735689600,
+			items: { data: [{ id: 'si_1', quantity: 3, current_period_end: 1738368000, price: { lookup_key: 'feega_monthly_9' } }] }
+		});
+		const { seatSubscription } = await import('./stripe');
+
+		expect(await seatSubscription('sub_1')).toEqual({
+			itemId: 'si_1',
+			quantity: 3,
+			perEditor: true,
+			status: 'active',
+			endsAt: new Date(1735689600 * 1000).toISOString(),
+			periodEnd: new Date(1738368000 * 1000).toISOString()
+		});
+	});
+
+	it('marks a subscription on a retired price as not per editor', async () => {
+		subscriptionsRetrieve.mockResolvedValue({ status: 'active', cancel_at: null, items: { data: [{ id: 'si_8', quantity: 1, price: { lookup_key: 'feega_monthly_8' } }] } });
+		const { seatSubscription } = await import('./stripe');
+
+		expect(await seatSubscription('sub_1')).toMatchObject({ perEditor: false, endsAt: null });
+	});
+});
+
+describe('setSeatQuantity', () => {
+	it('charges the prorated difference at once when asked to invoice', async () => {
+		const { setSeatQuantity, SeatProration } = await import('./stripe');
+
+		await setSeatQuantity('sub_1', 'si_1', 3, SeatProration.Invoice);
+
+		expect(subscriptionsUpdate).toHaveBeenCalledWith('sub_1', { items: [{ id: 'si_1', quantity: 3 }], proration_behavior: 'always_invoice' });
+	});
+
+	it('changes the quantity without any proration otherwise', async () => {
+		const { setSeatQuantity, SeatProration } = await import('./stripe');
+
+		await setSeatQuantity('sub_1', 'si_1', 2, SeatProration.None);
+
+		expect(subscriptionsUpdate).toHaveBeenCalledWith('sub_1', { items: [{ id: 'si_1', quantity: 2 }], proration_behavior: 'none' });
+	});
+});
+
 describe('createOneTimeCreditCheckout', () => {
 	it('creates a payment-mode session carrying org id and credits in metadata', async () => {
 		checkoutSessionsCreate.mockResolvedValue({ url: 'https://checkout/one-time' });
@@ -352,6 +397,7 @@ describe('createSubscriptionCheckout', () => {
 			orgId: 'org_1',
 			priceId: 'price_sub_5',
 			credits: 500,
+			quantity: 3,
 			successUrl: 'https://app/return?ok=1',
 			cancelUrl: 'https://app/return?cancel=1'
 		});
@@ -360,7 +406,7 @@ describe('createSubscriptionCheckout', () => {
 		expect(checkoutSessionsCreate).toHaveBeenCalledWith({
 			mode: 'subscription',
 			customer: 'cus_1',
-			line_items: [{ price: 'price_sub_5', quantity: 1 }],
+			line_items: [{ price: 'price_sub_5', quantity: 3 }],
 			success_url: 'https://app/return?ok=1',
 			cancel_url: 'https://app/return?cancel=1',
 			subscription_data: { metadata: { app: 'feega', org_id: 'org_1', credits: '500' } },
@@ -378,6 +424,7 @@ describe('createSubscriptionCheckout', () => {
 				orgId: 'org_1',
 				priceId: 'price_sub_5',
 				credits: 500,
+				quantity: 1,
 				successUrl: 'https://app/return',
 				cancelUrl: 'https://app/return'
 			})

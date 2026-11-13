@@ -612,6 +612,9 @@ worktree con `.env` copiato ma `PUBLIC_SUPABASE_URL` sul progetto remoto: il log
 ### Un test che sceglie un ramo in base all'env locale non è un test
 `queue-dm.test` girava o no il ramo kit secondo `AGENT_KIT` del `.env` locale: sul laptop di chi lo ha spento passava, su chi lo ha acceso il turno andava nel kit e `harnessCalls` restava vuoto (`expected +0 to be 1`). Segnale: un test che fallisce solo su un'altra macchina, senza cambiamento di codice. Mossa: chi fissa `$env/dynamic/private` nel test (`vi.mock('$env/dynamic/private', () => ({ env: { AGENT_KIT: 'off' } }))`), come già fa `queue-kit-heartbeat.test` — la scelta del ramo è parte del test, non del computer che lo esegue.
 
+### CI `Build` fails with `Invalid export 'X' in /api/...`, while vitest and svelte-check are green
+Signal: a `+server.ts` exports a constant (shared with its test). SvelteKit only allows handlers, `config`, `prerender`… or `_`-prefixed names, and only `vite build` checks it. Move: put the constant in the `$lib` module the route already imports, and run `npx vite build` before pushing a new route.
+
 ### Un test di checkout rosso solo in locale: l'URL di ritorno è `https://www.dazero.co/...`
 Signal: `successUrl`/`cancelUrl` attesi su `example.test` o `feega.test`, ricevuti sull'host di `PUBLIC_APP_URL` del `.env`; in CI verde. `appOrigin` legge `$env/dynamic/public`. Move: nel test `vi.mock('$env/dynamic/public', () => ({ env: {} }))`, come in `settings-actions-billing.test.ts`.
 

@@ -38,6 +38,35 @@ export async function subscribedPlan(subscriptionId: string): Promise<Plan | nul
   return planForLookupKey(sub.items.data[0]?.price.lookup_key) ?? null;
 }
 
+export enum SeatProration {
+  None = 'none',
+  Invoice = 'always_invoice'
+}
+
+export type SeatSubscription = { itemId: string; quantity: number; perEditor: boolean; status: string; endsAt: string | null; periodEnd: string | null };
+
+export async function seatSubscription(subscriptionId: string): Promise<SeatSubscription | null> {
+  const sub = await stripe().subscriptions.retrieve(subscriptionId);
+  const items = sub.items.data;
+  const item = items.find((i) => i.price.lookup_key === PLAN.lookupKey) ?? items[0];
+  if (!item) {
+    return null;
+  }
+
+  return {
+    itemId: item.id,
+    quantity: item.quantity ?? 1,
+    perEditor: item.price.lookup_key === PLAN.lookupKey,
+    status: sub.status,
+    endsAt: sub.cancel_at ? new Date(sub.cancel_at * 1000).toISOString() : null,
+    periodEnd: item.current_period_end ? new Date(item.current_period_end * 1000).toISOString() : null
+  };
+}
+
+export async function setSeatQuantity(subscriptionId: string, itemId: string, quantity: number, proration: SeatProration): Promise<void> {
+  await stripe().subscriptions.update(subscriptionId, { items: [{ id: itemId, quantity }], proration_behavior: proration });
+}
+
 /**
  * Billing is org-level (CLAUDE.md: `orgs.stripe_customer_id`, not a brand column) — every brand
  * under the org checks out against the same customer. Written with the service role: this id is a join
@@ -94,13 +123,14 @@ export async function createSubscriptionCheckout(opts: {
   orgId: string;
   priceId: string;
   credits: number;
+  quantity: number;
   successUrl: string;
   cancelUrl: string;
 }): Promise<string> {
   const session = await stripe().checkout.sessions.create({
     mode: 'subscription',
     customer: opts.customerId,
-    line_items: [{ price: opts.priceId, quantity: 1 }],
+    line_items: [{ price: opts.priceId, quantity: opts.quantity }],
     success_url: opts.successUrl,
     cancel_url: opts.cancelUrl,
     subscription_data: { metadata: { app: APP_TAG, org_id: opts.orgId, credits: String(opts.credits) } },

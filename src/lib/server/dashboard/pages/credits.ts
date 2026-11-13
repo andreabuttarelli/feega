@@ -14,6 +14,8 @@ import {
 import { checkoutOutcomeOf } from '$lib/billing-path';
 import { billingChannelOf, storeBillingOf } from '$lib/billing-channel';
 import { env } from '$env/dynamic/private';
+import { seatStatus } from '$lib/server/team/seat-billing';
+import type { Db } from '$lib/server/db/client';
 
 const stripeApi = () => import('$lib/server/stripe');
 
@@ -39,9 +41,13 @@ export const load = async ({ parent, url, request, locals: { supabase } }: Param
 
   const brands = (brandRows ?? []) as BrandRow[];
 
-  const [balance, currentPlan] = await Promise.all([
+  const [balance, currentPlan, seats] = await Promise.all([
     orgCreditBalance(supabase, orgId),
-    currentPlanOf(supabase, orgId)
+    currentPlanOf(supabase, orgId),
+    seatStatus(supabase as unknown as Db, orgId).catch((e) => {
+      console.error('[seats] seat state unreadable on the credits page', orgId, e);
+      return null;
+    })
   ]);
 
   const spends = await Promise.all(
@@ -61,6 +67,7 @@ export const load = async ({ parent, url, request, locals: { supabase } }: Param
     brands: spends,
     hasBilling: !!org.stripe_customer_id,
     currentPlan,
+    seats,
     checkoutOutcome: checkoutOutcomeOf(url),
     isOwner: (membership as { role?: string } | null)?.role === 'owner',
     purchasesReady,

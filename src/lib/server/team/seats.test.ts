@@ -12,6 +12,11 @@ describe('i posti da editor', () => {
     expect(editorSeatsLeft(SeatPlan.Free, { members: ['owner'], pendingInviteRoles: ['member', 'viewer'] })).toBe(SEAT_LIMITS[SeatPlan.Free] - 2);
   });
 
+  it('a free team has one editor seat, the owner', () => {
+    expect(SEAT_LIMITS[SeatPlan.Free]).toBe(1);
+    expect(editorSeatsLeft(SeatPlan.Free, { members: ['owner', 'viewer'], pendingInviteRoles: [] })).toBe(0);
+  });
+
   it("un'org che paga non ha limite", () => {
     expect(editorSeatsLeft(SeatPlan.Paid, { members: Array(50).fill('member'), pendingInviteRoles: [] })).toBe(Infinity);
   });

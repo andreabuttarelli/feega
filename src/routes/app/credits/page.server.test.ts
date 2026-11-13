@@ -3,11 +3,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const ensureOrgCustomer = vi.fn();
 const createOneTimeCreditCheckout = vi.fn();
 const subscribedPlan = vi.fn();
+const seatSubscription = vi.fn();
 
 vi.mock('$lib/server/stripe', () => ({
 	ensureOrgCustomer: (...a: unknown[]) => ensureOrgCustomer(...a),
 	createOneTimeCreditCheckout: (...a: unknown[]) => createOneTimeCreditCheckout(...a),
-	subscribedPlan: (...a: unknown[]) => subscribedPlan(...a)
+	subscribedPlan: (...a: unknown[]) => subscribedPlan(...a),
+	seatSubscription: (...a: unknown[]) => seatSubscription(...a)
 }));
 
 const { privateEnv } = vi.hoisted(() => ({ privateEnv: {} as Record<string, string | undefined> }));
@@ -61,6 +63,10 @@ function fakeSupabase(world: World = {}) {
 			limit: chain,
 			eq: (col: string, val: unknown) => {
 				rows = rows.filter((r) => !(col in r) || r[col] === val);
+				return q;
+			},
+			in: (col: string, vals: unknown[]) => {
+				rows = rows.filter((r) => !(col in r) || vals.includes(r[col]));
 				return q;
 			},
 			maybeSingle: async () => ({ data: rows[0] ?? null, error: null }),
@@ -176,6 +182,30 @@ describe('/app/credits — the workspace credits page', () => {
 
 	it('reads owner status from orgs_members', async () => {
 		expect((await run(fakeSupabase({ role: 'member' }))).isOwner).toBe(false);
+	});
+
+	it('says how many editors the plan bills and when a cancelled plan ends', async () => {
+		subscribedPlan.mockResolvedValue({ price: 9, credits: 500, lookupKey: 'feega_monthly_9' });
+		seatSubscription.mockResolvedValue({ itemId: 'si_1', quantity: 1, perEditor: true, status: 'active', endsAt: '2026-12-13T00:00:00.000Z' });
+
+		const data = await run(fakeSupabase({ org: { stripe_subscription_id: 'sub_1' } }));
+
+		expect(data.seats).toMatchObject({ editors: 1, paid: true, endsAt: '2026-12-13T00:00:00.000Z' });
+	});
+
+	it('loads with seats unknown when seat state cannot be read, so anyone can still subscribe or top up', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const supabase = fakeSupabase();
+		const realFrom = supabase.from;
+		supabase.from = ((table: string) => {
+			const q = realFrom(table) as Record<string, unknown>;
+			return table === 'orgs' ? { ...q, select: (cols: string) => (cols.includes('seats_paid') ? { eq: () => ({ maybeSingle: async () => ({ data: null, error: { message: 'missing column' } }) }) } : (q.select as (c: string) => unknown)(cols)) } : q;
+		}) as typeof supabase.from;
+
+		const data = await run(supabase);
+
+		expect(data.seats).toBeNull();
+		expect(data.plan.price).toBe(9);
 	});
 
 	it('never warns of expiring credits: credits do not expire', async () => {

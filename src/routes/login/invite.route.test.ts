@@ -50,7 +50,7 @@ function invite(overrides: Record<string, unknown> = {}) {
     id: 'inv-1',
     org_id: ORG_A,
     email: INVITED,
-    role: 'member',
+    role: 'viewer',
     token: hashInviteToken(TOKEN),
     expires_at: new Date(Date.now() + 86_400_000).toISOString(),
     accepted_at: null,
@@ -101,7 +101,7 @@ beforeEach(() => {
 });
 
 function expectJoinedOrgA() {
-  expect(members()).toEqual([expect.objectContaining({ org_id: ORG_A, user_id: 'user-b', role: 'member' })]);
+  expect(members()).toEqual([expect.objectContaining({ org_id: ORG_A, user_id: 'user-b', role: 'viewer' })]);
   expect(acceptedAt()).not.toBeNull();
   expect(vi.mocked(homePathFor).mock.calls[0][3]).toBe(ORG_A);
 }

@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 
-const MIGRATIONS = ['20260924_credit_balance_service_role.sql', '20260929_feega_plan_grants.sql', '20261112_credits_never_expire.sql'].map((file) =>
+const MIGRATIONS = ['20260924_credit_balance_service_role.sql', '20260929_feega_plan_grants.sql', '20261112_credits_never_expire.sql', '20261113_editor_seats.sql'].map((file) =>
   join(fileURLToPath(new URL('..', import.meta.url)), 'supabase/canvas-migrations', file)
 );
 const ORG = '11111111-1111-4111-8111-111111111111';
@@ -17,6 +17,7 @@ const STUBS = `
   create function public.auth_org_ids() returns setof uuid language sql as $$ select null::uuid where false $$;
   create role anon; create role authenticated; create role service_role;
   create table public.orgs (id uuid primary key, stripe_subscription_id text);
+  create table public.orgs_members (org_id uuid not null, user_id text not null, role text not null);
   create table public.credit_ledger (
     id bigserial primary key, org_id uuid not null, kind text not null, source text not null,
     amount integer not null check (amount > 0), expires_at timestamptz,
@@ -37,6 +38,7 @@ const SCENARIOS = [
 const RENEWAL = {
   id: 'in_renewal',
   status: 'paid',
+  currency: 'eur',
   billing_reason: 'subscription_cycle',
   parent: { subscription_details: { metadata: { app: 'feega', org_id: ORG, credits: '500' } } },
   lines: { data: [{ period: { end: 1893456000 } }] }

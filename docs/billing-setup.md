@@ -54,6 +54,24 @@ Once the `stripe` schema exists and is being written to, apply, in this order:
   `metadata.credits × line quantity` (per-seat ready), and the `org_credits_at_risk` view is
   dropped. Verified in-process by `npm run test:credit-expiry` (pglite, no database needed).
 
+- `supabase/canvas-migrations/20261113_editor_seats.sql` — one file, so no order to get wrong:
+  - adds `orgs.editor_seats_grandfathered_at` and stamps every free org with more than one editor
+    on the day it is applied (nothing sets it later; subscribing clears it);
+  - adds `orgs.seats_paid` / `seats_paid_until` (the seats Stripe was paid for in the
+    subscription's current period; written only by the app's `syncSeats`, through the service role,
+    around each quantity change; backfilled from `stripe.subscriptions` for existing per-editor
+    subscriptions) and `seats_checked_at` (the reconcile cron's cursor);
+  - a renewal grants `metadata.credits × quantity` summed over the plan lines, wherever they sit;
+  - a paid `subscription_update` grants what that invoice charged:
+    `round(least(Σ proration line amounts, invoice total) × credits / unit_amount)`, euro only,
+    once per invoice. It does not depend on how Stripe splits the lines (a credit/debit pair or one
+    line), nor on the order invoices arrive in;
+  - `canceled` / `incomplete_expired` unlink the org and turn every admin and member into a
+    viewer; `unpaid` keeps it linked and turns them into viewers (they stay viewers when the plan is
+    paid again; the owner promotes them); `paused` unlinks without demoting; `past_due` keeps it
+    linked and blocks new editors.
+  `npm run test:seat-billing` runs it in pglite, and CI runs both pglite harnesses.
+
 Verify with a local Postgres: `DATABASE_URL=postgres://postgres@127.0.0.1:5432/postgres npm run
 test:stripe-grants`.
 
@@ -80,8 +98,22 @@ The six retired Prices (`feega_monthly_8` … `feega_monthly_256`): set them **i
 delete them**. A subscriber still on one keeps renewing — the trigger reads that Price's
 `metadata.credits` — and the credits page names their plan as current.
 
-Configure the customer portal **without plan switching**: invoices, payment method and
-cancellation only. There is one plan; the app never sends anyone to switch.
+Configure Stripe **dunning (Billing → Revenue recovery → retries) to end by cancelling the
+subscription or marking it unpaid**, never by leaving it `past_due`: a team left `past_due`
+forever keeps its editors (it only cannot add more), while `unpaid` turns them into viewers and
+`canceled` ends the plan.
+
+Configure the customer portal **without plan switching and without quantity changes**:
+invoices, payment method and cancellation only. The quantity is the number of editors, and only
+the app sets it (`syncSeats`): an editor beyond the seats already paid this period is charged at
+once (`always_invoice`); a removed editor lowers the quantity with no proration (the seat stays
+paid until renewal, and re-adding within the period is free). It runs on an accepted editor
+invite, a role change across viewer/editor, a removal or a leave, and hourly from the Vercel cron
+`/api/v1/billing/seats/reconcile` (40 teams per run, oldest checked first, 502 when Stripe refuses
+one). A subscription on a retired price (`feega_monthly_8` …) is never touched. Seat changes are
+serialised per team (`claim_seat_sync`, a 30-second lease on `orgs.seats_sync_until`): the target
+is computed from the member rows inside it, and a lower quantity is never sent with
+`always_invoice`.
 
 ## Going live
 
