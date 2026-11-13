@@ -11,10 +11,11 @@ const STUBS = `
   create role anon; create role authenticated; create role service_role;
   create schema auth;
   create function auth.role() returns text language sql as $$ select 'service_role' $$;
+  create function auth.uid() returns uuid language sql as $$ select null::uuid $$;
   create function public.auth_org_ids() returns setof uuid language sql as $$ select null::uuid where false $$;
   create function public.auth_editor_org_ids() returns setof uuid language sql as $$ select null::uuid where false $$;
   create table public.nodes (id uuid primary key, org_id uuid not null, type text not null);
-  create table public.canvas_events (id bigserial primary key, org_id uuid, actor_kind text, created_at timestamptz default now());
+  create table public.canvas_events (id bigserial primary key, org_id uuid, actor_kind text, actor_id uuid, created_at timestamptz default now());
   insert into public.nodes values ('22222222-2222-4222-8222-222222222222', '11111111-1111-4111-8111-111111111111', 'motion');
   create table public.motion_revisions (
     id uuid primary key default gen_random_uuid(), org_id uuid not null, node_id uuid not null, version integer not null,
