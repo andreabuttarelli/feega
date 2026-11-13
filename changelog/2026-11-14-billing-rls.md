@@ -47,9 +47,10 @@ Follow-up in the same PR:
 
 Deploy order: only `20261114_team_writes_server_only.sql` waits for the app deploy; before it, the
 old Team page writes roles and invites with the session. The other five files are safe in either
-order. #2138's migration must not redefine the eleven-argument `commit_motion_revision`: applied
-after this one, an invoker version comes back and folding fails for sessions. Re-applying
-`20261114_history_append_only.sql` restores it.
+order. `20261113_agent_edit_counts.sql` (#2138, unapplied everywhere) no longer defines the
+eleven-argument `commit_motion_revision`: `20261114_history_append_only.sql` is its only
+definition, so the two apply in either order. The harness re-applies the unapplied siblings
+after the hardening and runs every probe again.
 
 Renders still running when the app deploys were held under the old note and are not refunded by
 the new code; deploy with no render running, or refund those holds by hand.
