@@ -30,23 +30,36 @@ export async function signMediaPaths(db: Db, paths: string[], ttlSeconds: number
     .filter((url): url is string => url !== null);
 }
 
-export async function signOrgMediaPaths(db: Db, orgId: string, paths: string[], ttlSeconds: number = PROVIDER_INPUT_TTL_S): Promise<string[]> {
-  const stored = [...new Set(paths.filter((p) => p && !ABSOLUTE_URL.test(p)))];
+async function heldByOrg(db: Db, orgId: string, stored: string[]): Promise<Set<string>> {
   const held = new Set<string>();
-  if (stored.length) {
-    const client = db as unknown as { from(t: string): { select(c: string): { eq(c: string, v: string): { in(c: string, v: string[]): Promise<{ data: unknown; error: unknown }> } } } };
-    const found = await Promise.all(SIGNED_COLUMNS.map((column) => client.from('assets').select('url, proxy_url').eq('org_id', orgId).in(column, stored)));
-    if (found.some((r) => r.error)) {
-      throw new Error('signOrgMediaPaths: the asset rows are unreadable');
-    }
-    for (const row of found.flatMap((r) => (r.data ?? []) as Array<{ url: string | null; proxy_url: string | null }>)) {
-      for (const path of [row.url, row.proxy_url]) {
-        if (path) {
-          held.add(path);
-        }
+  if (!stored.length) {
+    return held;
+  }
+  const client = db as unknown as { from(t: string): { select(c: string): { eq(c: string, v: string): { in(c: string, v: string[]): Promise<{ data: unknown; error: unknown }> } } } };
+  const found = await Promise.all(SIGNED_COLUMNS.map((column) => client.from('assets').select('url, proxy_url').eq('org_id', orgId).in(column, stored)));
+  if (found.some((r) => r.error)) {
+    throw new Error('signOrgMediaPaths: the asset rows are unreadable');
+  }
+  for (const row of found.flatMap((r) => (r.data ?? []) as Array<{ url: string | null; proxy_url: string | null }>)) {
+    for (const path of [row.url, row.proxy_url]) {
+      if (path) {
+        held.add(path);
       }
     }
   }
+  return held;
+}
+
+const storedOf = (paths: string[]) => [...new Set(paths.filter((p) => p && !ABSOLUTE_URL.test(p)))];
+
+export async function unheldMediaPaths(db: Db, orgId: string, paths: string[]): Promise<string[]> {
+  const stored = storedOf(paths);
+  const held = await heldByOrg(db, orgId, stored);
+  return stored.filter((p) => !held.has(p));
+}
+
+export async function signOrgMediaPaths(db: Db, orgId: string, paths: string[], ttlSeconds: number = PROVIDER_INPUT_TTL_S): Promise<string[]> {
+  const held = await heldByOrg(db, orgId, storedOf(paths));
   return signMediaPaths(db, paths.filter((p) => ABSOLUTE_URL.test(p) || held.has(p)), ttlSeconds);
 }
 

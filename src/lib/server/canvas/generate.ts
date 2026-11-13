@@ -35,7 +35,7 @@ import {
 } from '$lib/server/repos/node-runs';
 import { DataCheck, findNode, patchNodeData, writeNodeData } from '$lib/server/repos/canvas';
 import type { Actor } from '$lib/server/repos/actor';
-import { signOrgMediaPaths } from './sign-media';
+import { signOrgMediaPaths, unheldMediaPaths } from './sign-media';
 import { editInputsOf } from './edit-inputs';
 import { peopleScreened, ReferenceMedium } from '$lib/server/moderation/people';
 import { composePrompt } from '$lib/canvas/compose-prompt';
@@ -637,6 +637,14 @@ function offeredDuration(options: readonly number[] | undefined, wanted: number 
   return nearestVideoDuration(options, wanted ?? options[0]);
 }
 
+const wiredMediaOf = (upstream: UpstreamInputs): string[] => [
+  ...upstream.referenceImageUrls,
+  ...upstream.pickedImageUrls,
+  ...upstream.referenceVideoUrls,
+  ...upstream.referenceAudioUrls,
+  ...(upstream.endFrameUrl ? [upstream.endFrameUrl] : [])
+];
+
 export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcome> {
   const { generationRefusal, projectModeOf } = await import('$lib/server/uncensored-workspace/workspace-server');
   const mode = await projectModeOf(db, { orgId: requested.orgId, projectId: requested.projectId });
@@ -716,6 +724,13 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
   // provider, che lo scoprirebbe comunque pagando la latenza. `giveUp` è la chiusura giusta: il
   // `refId` del giro precedente resta, solo `running`/`error` cambiano — il nodo mostra l'alert,
   // non perde il suo ultimo risultato.
+  const outOfReach = await unheldMediaPaths(db, input.orgId, wiredMediaOf(upstream));
+  if (outOfReach.length) {
+    const message = `reference_out_of_reach: ${outOfReach.length} wired file(s) are not in this workspace's library (${outOfReach.join(', ')}). Re-add them from the library and run again.`;
+    await giveUp(db, input, run, message);
+    return { kind: 'refused', error: message };
+  }
+
   if (upstream.blocked) {
     await giveUp(db, input, run, upstream.blocked);
     return { kind: 'refused', error: upstream.blocked };
