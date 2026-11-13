@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { existsSync } from 'node:fs';
 import { LAYOUTS } from '@feega/motion-core/canvas/composition';
 import { join } from 'node:path';
+import sharp from 'sharp';
 import {
   ALL_TEMPLATES,
   CANVAS_TEMPLATES,
@@ -30,6 +31,8 @@ import { MODEL3D_MODELS } from '$lib/model3d-models';
 const MIN_TEMPLATES = 8;
 
 const STATIC_DIR = join(process.cwd(), 'static');
+const MAX_CHANNEL = 255;
+const MIN_THUMBNAIL_BRIGHTNESS = 0.2;
 
 type Model = string | null | undefined;
 
@@ -180,6 +183,11 @@ describe('la galleria dei template', () => {
     const path = templateThumbnail(t);
     expect(path).toMatch(/\.webp$/);
     expect(existsSync(join(STATIC_DIR, path)), path).toBe(true);
+  });
+
+  it.each(templatesIn('effects'))('$id: la miniatura si legge, non è un riquadro quasi nero', async (t) => {
+    const { channels } = await sharp(join(STATIC_DIR, templateThumbnail(t))).greyscale().stats();
+    expect(channels[0].mean / MAX_CHANNEL, t.id).toBeGreaterThan(MIN_THUMBNAIL_BRIGHTNESS);
   });
 
   it('Product → 3D model turns a product image into a 3D node, under 3D', () => {
