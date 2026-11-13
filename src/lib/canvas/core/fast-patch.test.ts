@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip } from '@feega/motion-core/motion/timeline';
-import { DEFAULT_AUTO_LAYOUT } from '@feega/motion-core/motion/layout/model';
+import { DEFAULT_AUTO_LAYOUT, DEFAULT_LAYOUT_ITEM } from '@feega/motion-core/motion/layout/model';
+import { Sizing } from '@feega/motion-core/motion/layout/auto-layout';
 import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-list';
 import { moveBy } from '$lib/motion/space';
 import { EditMode } from '$lib/motion/edit-mode';
+import { estimatedText } from '@feega/motion-core/motion/layout/text-extent';
 import { fastPatch } from './fast-patch';
 
 const SHAPE = { shape: 'rect', x: 0.5, y: 0.5, width: 0.3, height: 0.3, fills: [{ type: 'solid', color: '#ff6a3d' }] };
@@ -30,54 +32,72 @@ const hidden = (c: MotionClip) => ({ ...c, hidden: true });
 
 const nested = () => edit(built(['card', 'dot']), 'dot', (c) => ({ ...c, parent: 'card' }));
 
+const SMALL = { width: 0.05, height: 0.05 };
+
+const stack = (sizing: Sizing) => ['a', 'b', 'c'].reduce((d, id) => edit(d, id, (c) => ({ ...c, parent: 'card', props: { ...c.props, ...SMALL } })), edit(built(['card', 'a', 'b', 'c']), 'card', (c) => ({ ...c, autoLayout: { ...DEFAULT_AUTO_LAYOUT, gap: 8 }, layoutItem: { ...DEFAULT_LAYOUT_ITEM, width: sizing } })));
+
 describe('fastPatch draws a simple edit without rebuilding the frame', () => {
   it('a new opacity gives the list the full build would give', () => {
     const before = built(['a', 'b']);
     const after = edit(before, 'a', faded(0.4));
 
-    expect(fastPatch(drawn(before), before, after)).toEqual(drawn(after));
+    expect(fastPatch(drawn(before), before, after, estimatedText)).toEqual(drawn(after));
   });
 
   it('fading a parent fades its children as the full build does', () => {
     const before = nested();
     const after = edit(before, 'card', faded(0.5));
 
-    expect(fastPatch(drawn(before), before, after)).toEqual(drawn(after));
+    expect(fastPatch(drawn(before), before, after, estimatedText)).toEqual(drawn(after));
   });
 
   it('fading a layer already drawn as one group fades the group as the full build does', () => {
     const before = edit(built(['a']), 'a', (c) => ({ ...faded(0.8)(c), props: { ...c.props, fills: [{ type: 'solid', color: '#ff6a3d' }, { type: 'solid', color: '#0000ff80' }] } }));
     const after = edit(before, 'a', faded(0.4));
 
-    expect(fastPatch(drawn(before), before, after)).toEqual(drawn(after));
+    expect(fastPatch(drawn(before), before, after, estimatedText)).toEqual(drawn(after));
   });
 
   it('hiding a layer drops its items as the full build does', () => {
     const before = nested();
-    const after = edit(before, 'card', hidden);
-
-    expect(fastPatch(drawn(before), before, after)).toEqual(drawn(after));
-  });
-
-  it('leaves to the full build a layer whose auto layout parent would reflow', () => {
-    const before = edit(nested(), 'card', (c) => ({ ...c, autoLayout: DEFAULT_AUTO_LAYOUT }));
     const after = edit(before, 'dot', hidden);
 
-    expect(fastPatch(drawn(before), before, after)).toBeNull();
+    expect(fastPatch(drawn(before), before, after, estimatedText)).toEqual(drawn(after));
+  });
+
+  it('hiding a layer in a fixed auto layout slides its siblings as the full build does', () => {
+    const before = stack(Sizing.Fixed);
+    const after = edit(before, 'a', hidden);
+
+    expect(fastPatch(drawn(before), before, after, estimatedText)).toEqual(drawn(after));
+  });
+
+  it('leaves to the full build a hide that shrinks a hugging auto layout parent', () => {
+    const before = stack(Sizing.Hug);
+    const after = edit(before, 'a', hidden);
+
+    expect(fastPatch(drawn(before), before, after, estimatedText)).toBeNull();
+  });
+
+  it('leaves to the full build a hidden parent, whose children go with it', () => {
+    const before = nested();
+    const after = edit(before, 'card', hidden);
+
+    expect(fastPatch(drawn(before), before, after, estimatedText)).toBeNull();
   });
 
   it('leaves to the full build an edit that touches two layers', () => {
     const before = built(['a', 'b']);
     const after = edit(edit(before, 'a', faded(0.4)), 'b', faded(0.4));
 
-    expect(fastPatch(drawn(before), before, after)).toBeNull();
+    expect(fastPatch(drawn(before), before, after, estimatedText)).toBeNull();
   });
 
   it('leaves to the full build a fade from nothing, which no ratio can scale', () => {
     const before = edit(built(['a']), 'a', faded(0));
     const after = edit(before, 'a', faded(1));
 
-    expect(fastPatch(drawn(before), before, after)).toBeNull();
+    expect(fastPatch(drawn(before), before, after, estimatedText)).toBeNull();
   });
 
   const moved = (doc: MotionDoc, id: string) => {
@@ -92,20 +112,41 @@ describe('fastPatch draws a simple edit without rebuilding the frame', () => {
     const before = built(['a', 'b']);
     const after = moved(before, 'a');
 
-    expect(fastPatch(drawn(before), before, after)).toEqual(drawn(after));
+    expect(fastPatch(drawn(before), before, after, estimatedText)).toEqual(drawn(after));
   });
 
   it('a nudged parent carries its children as the full build does', () => {
     const before = nested();
     const after = moved(before, 'card');
 
-    expect(fastPatch(drawn(before), before, after)).toEqual(drawn(after));
+    expect(fastPatch(drawn(before), before, after, estimatedText)).toEqual(drawn(after));
   });
 
-  it('leaves to the full build a move inside an auto layout parent', () => {
-    const before = edit(nested(), 'card', (c) => ({ ...c, autoLayout: DEFAULT_AUTO_LAYOUT }));
-    const after = edit(before, 'dot', (c) => ({ ...c, transform: { ...c.transform, x: 0.2 } }));
+  it('a nudge inside an auto layout parent shifts the layer as the full build does', () => {
+    const before = stack(Sizing.Fixed);
+    const after = moved(before, 'b');
 
-    expect(fastPatch(drawn(before), before, after)).toBeNull();
+    expect(fastPatch(drawn(before), before, after, estimatedText)).toEqual(drawn(after));
+  });
+
+  it('a nudged layer inside a clipping frame keeps the frame cut, as the full build does', () => {
+    const before = edit(stack(Sizing.Fixed), 'card', (c) => ({ ...c, clipContent: true }));
+    const after = moved(before, 'b');
+
+    expect(fastPatch(drawn(before), before, after, estimatedText)).toEqual(drawn(after));
+  });
+
+  it('a nudged clipping frame carries its children as the full build does', () => {
+    const before = edit(stack(Sizing.Fixed), 'card', (c) => ({ ...c, clipContent: true }));
+    const after = moved(before, 'card');
+
+    expect(fastPatch(drawn(before), before, after, estimatedText)).toEqual(drawn(after));
+  });
+
+  it('a nudged layer drawn as one group shifts what the group holds, as the full build does', () => {
+    const before = edit(built(['a']), 'a', (c) => ({ ...faded(0.8)(c), props: { ...c.props, fills: [{ type: 'solid', color: '#ff6a3d' }, { type: 'solid', color: '#0000ff80' }] } }));
+    const after = moved(before, 'a');
+
+    expect(fastPatch(drawn(before), before, after, estimatedText)).toEqual(drawn(after));
   });
 });
