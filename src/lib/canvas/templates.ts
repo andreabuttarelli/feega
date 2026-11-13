@@ -162,9 +162,9 @@ const effectLook = (look: { id: EffectId; template: string; name?: string; why: 
 
 const EFFECT_LOOKS: CanvasTemplate[] = [
   effectLook({ id: 'word-weave', template: 'fx-word-weave', why: 'Wire any image or video into it; animates on video and stills.' }),
-  effectLook({ id: 'word-field', template: 'fx-word-field', why: 'Wire any image or video into it; animates on video and stills.' }),
+  effectLook({ id: 'word-field', template: 'fx-word-field', why: 'Wire any image or video into it; animates on video and stills.', params: { cellSize: 12, threshold: 36, contrast: 4, floor: 14, background: '#2f4a7a' } }),
   effectLook({ id: 'glyph-tiles', template: 'fx-glyph-tiles', why: 'Wire any image or video into it; animates on video and stills.' }),
-  effectLook({ id: 'word-silhouette', template: 'fx-word-silhouette', why: 'Wire any image or video into it; animates on video and stills.' }),
+  effectLook({ id: 'word-silhouette', template: 'fx-word-silhouette', why: 'Wire any image or video into it; animates on video and stills.', params: { cellSize: 12, threshold: 45, contrast: 5, faint: 18, backgroundMode: 'set', background: '#2f4a7a' } }),
   effectLook({ id: 'ascii', template: 'fx-ascii-colour', name: 'Colour ASCII', why: 'Redraws the picture as ASCII characters in the image colours. Pick it for a retro terminal look.', params: { mode: 'color', cellSize: 8 } }),
   effectLook({ id: 'halftone', template: 'fx-halftone-print', name: 'Halftone print', why: 'Turns the picture into printed halftone dots. Pick it for a newsprint or comic feel.', params: { dotSize: 8 } }),
   effectLook({ id: 'duotone', template: 'fx-orange-duotone', name: 'Orange duotone', why: 'Maps shadows to near black and highlights to orange. Pick it for a bold two-colour poster.', params: { shadow: '#14110f', highlight: '#ff5100' } }),
