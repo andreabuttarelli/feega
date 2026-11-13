@@ -1,5 +1,8 @@
 begin;
 
+grant execute on function public.auth_org_ids() to authenticated, service_role;
+grant execute on function public.auth_editor_org_ids() to authenticated, service_role;
+
 revoke update, delete, truncate, references, trigger on public.canvas_events from anon, authenticated;
 drop policy if exists org_isolation on public.canvas_events;
 drop policy if exists canvas_events_read on public.canvas_events;

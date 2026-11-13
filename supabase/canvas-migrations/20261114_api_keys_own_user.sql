@@ -1,5 +1,8 @@
 begin;
 
+grant execute on function public.auth_editor_org_ids() to authenticated, service_role;
+grant execute on function public.auth_admin_org_ids() to authenticated, service_role;
+
 revoke update, truncate, references, trigger on public.api_keys from anon, authenticated;
 drop policy if exists org_update on public.api_keys;
 drop policy if exists editors_update on public.api_keys;

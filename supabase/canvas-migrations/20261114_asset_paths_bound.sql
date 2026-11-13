@@ -12,6 +12,7 @@ as $$
 $$;
 
 revoke all on function public.asset_path_in_reach(uuid, text) from public, anon;
+grant execute on function public.asset_path_in_reach(uuid, text) to authenticated, service_role;
 
 create or replace function public.assets_path_in_reach() returns trigger
 language plpgsql
