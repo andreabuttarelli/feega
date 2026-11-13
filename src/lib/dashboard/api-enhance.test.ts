@@ -19,3 +19,39 @@ describe('which page action a dashboard form posts to', () => {
     expect(actionTarget('/auth/signout', '/app')).toBeNull();
   });
 });
+
+describe('a dashboard form posts once per submission', () => {
+  function fakeForm() {
+    let listener: (event: unknown) => Promise<void> = async () => {};
+    const form = {
+      getAttribute: () => '?/subscribe',
+      addEventListener: (_: string, fn: typeof listener) => (listener = fn),
+      removeEventListener: () => {},
+      reset: () => {}
+    };
+    const submit = () => listener({ preventDefault: () => {}, submitter: null });
+    return { form, submit };
+  }
+
+  it('a second click while the first is still on its way does not post again', async () => {
+    const { hasTwin, postPageAction } = await import('$lib/api/page-action');
+    vi.mocked(hasTwin).mockReturnValue(true);
+    let land: (r: unknown) => void = () => {};
+    vi.mocked(postPageAction).mockReturnValue(new Promise((done) => (land = done)) as never);
+    vi.stubGlobal('location', { pathname: '/app/credits', href: 'https://dashboard/app/credits', origin: 'https://dashboard' });
+    vi.stubGlobal('FormData', class {});
+    const { apiEnhance } = await import('./api-enhance');
+    const { form, submit } = fakeForm();
+    apiEnhance(form as never);
+
+    const first = submit();
+    const second = submit();
+    land({ type: 'success', status: 200 });
+    await Promise.all([first, second]);
+    vi.mocked(postPageAction).mockResolvedValue({ type: 'success', status: 200 } as never);
+    await submit();
+
+    expect(postPageAction).toHaveBeenCalledTimes(2);
+    vi.unstubAllGlobals();
+  });
+});
