@@ -60,7 +60,7 @@ export function upscalerJsonLd(): string {
         operatingSystem: 'Web',
         url: PAGE,
         description: 'Upscale an MP4 clip of up to 20 seconds to 2x or 4K with FLUX Video Upscale, with a price quote before you run it.',
-        offers: { '@type': 'Offer', priceCurrency: 'USD', description: 'Billed in credits per second of output.' },
+        offers: { '@type': 'Offer', priceCurrency: 'EUR', description: 'Billed in credits per second of output.' },
         publisher: { '@type': 'Organization', name: 'Feega', url: 'https://feega.app' }
       },
       {
