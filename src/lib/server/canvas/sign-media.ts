@@ -44,19 +44,24 @@ export async function signMediaPaths(db: Db, paths: string[], ttlSeconds: number
  */
 const ownerOf = (path: string) => path.split('/')[0];
 
-async function reachOf(userDb: Db): Promise<{ orgs: Set<string>; teammates: Set<string> }> {
-  const client = userDb as unknown as {
-    rpc(fn: string): Promise<{ data: unknown; error: unknown }>;
-    from(table: string): { select(columns: string): Promise<{ data: unknown; error: unknown }> };
-  };
-  const [orgs, members] = await Promise.all([client.rpc('auth_org_ids'), client.from('orgs_members').select('user_id')]);
-  if (orgs.error || members.error) {
-    throw new Error('signAssetPaths: the caller org scope is unreadable');
+type HeldBy = Map<string, string>;
+const heldByClient = new WeakMap<object, HeldBy>();
+
+async function orgsHolding(userDb: Db, paths: string[]): Promise<HeldBy> {
+  const known = heldByClient.get(userDb) ?? new Map<string, string>();
+  heldByClient.set(userDb, known);
+  const unknown = [...new Set(paths)].filter((p) => !known.has(p));
+  if (unknown.length) {
+    const client = userDb as unknown as { from(t: string): { select(c: string): { in(c: string, v: string[]): Promise<{ data: unknown; error: unknown }> } } };
+    const { data, error } = await client.from('assets').select('url, org_id').in('url', unknown);
+    if (error) {
+      throw new Error('signAssetPaths: the asset rows are unreadable');
+    }
+    for (const row of (data ?? []) as Array<{ url: string; org_id: string }>) {
+      known.set(row.url, row.org_id);
+    }
   }
-  return {
-    orgs: new Set(((orgs.data ?? []) as Array<string | { auth_org_ids: string }>).map((r) => (typeof r === 'string' ? r : r.auth_org_ids))),
-    teammates: new Set(((members.data ?? []) as Array<{ user_id: string }>).map((m) => m.user_id))
-  };
+  return known;
 }
 
 export async function signAssetPaths(
@@ -70,10 +75,13 @@ export async function signAssetPaths(
     throw new Error('signAssetPaths richiede un client utente scoped RLS come prova di appartenenza');
   }
 
-  const { orgs, teammates } = await reachOf(userDb);
+  const wanted = [...paths.generated, ...paths.uploaded];
+  const heldBy = await orgsHolding(userDb, wanted);
+  const held = wanted.filter((p) => heldBy.has(p));
+  const inOrgFolder = (p: string) => ownerOf(p) === heldBy.get(p);
   const [rendered, uploaded] = await Promise.all([
-    signKnowledgePaths(serviceDb as never, paths.generated.filter((p) => teammates.has(ownerOf(p))), ttlSeconds ?? SIGNED_URL_TTL_S.canvas, preset),
-    signAssetFiles(serviceDb, paths.uploaded.filter((p) => orgs.has(ownerOf(p))), ttlSeconds ?? SIGNED_URL_TTL_S.canvas, preset)
+    signKnowledgePaths(serviceDb as never, held.filter((p) => !inOrgFolder(p)), ttlSeconds ?? SIGNED_URL_TTL_S.canvas, preset),
+    signAssetFiles(serviceDb, held.filter(inOrgFolder), ttlSeconds ?? SIGNED_URL_TTL_S.canvas, preset)
   ]);
 
   return new Map([...rendered, ...uploaded]);
