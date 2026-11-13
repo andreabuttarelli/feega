@@ -17,6 +17,11 @@ describe('layersChanged — how many layers an edit touched', () => {
     expect(layersChanged(doc(clip('a')) as never, { ...doc(clip('a')), fps: 60 } as never)).toBe(1);
   });
 
+  it('a malformed doc never throws: it counts as one change, and the save refuses it later', () => {
+    expect(layersChanged(null, { tracks: 'nope' } as never)).toBe(1);
+    expect(layersChanged(null, { tracks: [{ clips: 'nope' }] } as never)).toBe(1);
+  });
+
   it('the same doc counts nothing', () => {
     expect(layersChanged(doc(clip('a')) as never, doc(clip('a')) as never)).toBe(0);
   });

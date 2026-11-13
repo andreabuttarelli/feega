@@ -2,8 +2,10 @@ import type { MotionDoc } from '@feega/motion-core/motion/doc';
 
 type Layered = { tracks?: { clips?: { id: string }[] }[] } | null | undefined;
 
+const listOf = <T>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
+
 const layersOf = (doc: Layered): Map<string, string> =>
-  new Map((doc?.tracks ?? []).flatMap((t) => (t.clips ?? []).map((c) => [c.id, JSON.stringify(c)] as const)));
+  new Map(listOf<{ clips?: unknown }>(doc?.tracks).flatMap((t) => listOf<{ id: string }>(t?.clips).map((c) => [String(c?.id), JSON.stringify(c)] as const)));
 
 export function layersChanged(before: MotionDoc | null | undefined, after: MotionDoc): number {
   const was = layersOf(before as Layered);
