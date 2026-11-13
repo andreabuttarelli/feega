@@ -17,13 +17,18 @@ export type EffectId =
 	| 'shape-cutout'
 	| 'colour-grade'
 	| 'chroma-key'
-	| 'fit-aspect';
+	| 'fit-aspect'
+	| 'word-weave'
+	| 'word-field'
+	| 'glyph-tiles'
+	| 'word-silhouette';
 
 export type EffectParam =
 	| { name: string; label: string; kind: 'range'; min: number; max: number; step: number; default: number }
 	| { name: string; label: string; kind: 'select'; options: { value: string; label: string }[]; default: string }
 	| { name: string; label: string; kind: 'color'; default: string }
-	| { name: string; label: string; kind: 'seed'; default: number };
+	| { name: string; label: string; kind: 'seed'; default: number }
+	| { name: string; label: string; kind: 'text'; default: string; maxLength: number };
 
 export type BuiltinStep = {
 	id: EffectId;

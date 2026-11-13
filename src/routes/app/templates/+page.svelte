@@ -2,19 +2,40 @@
   import PageHeader from '$lib/components/app/PageHeader.svelte';
   import ComponentShelf from '$lib/components/app/ComponentShelf.svelte';
   import PosterShelf from '$lib/components/app/PosterShelf.svelte';
+  import NodeTemplateShelf from '$lib/components/app/NodeTemplateShelf.svelte';
   import { GALLERY_PATH, byline, itemPath } from '$lib/gallery/model';
+  import { TEMPLATE_FAMILIES, TemplateFamily, familyShown } from '$lib/dashboard/template-families';
 
   let { data } = $props();
+
+  let family = $state<TemplateFamily | null>(null);
+  const ofFamily = (id: TemplateFamily) => data.nodeTemplates.filter((t) => t.family === id);
 </script>
 
-<svelte:head><title>Frame templates · feega</title></svelte:head>
+<svelte:head><title>Templates · Feega</title></svelte:head>
 
 <div class="templates">
-  <PageHeader title="frame templates" lede="each one opens a new canvas with the frame already in it." />
+  <PageHeader title="templates" lede="motion frames, compositions and effects. each one opens a new canvas with it already in place." />
 
-  <ComponentShelf items={data.components} projectId={data.attachProjectId} />
+  <div class="families" role="tablist" aria-label="Template type">
+    <button type="button" role="tab" aria-selected={family === null} class:on={family === null} onclick={() => (family = null)}>all</button>
+    {#each TEMPLATE_FAMILIES as f (f.id)}
+      <button type="button" role="tab" aria-selected={family === f.id} class:on={family === f.id} data-family={f.id} onclick={() => (family = f.id)}>{f.label}</button>
+    {/each}
+  </div>
 
-  {#if data.posters.length}<PosterShelf items={data.posters} projectId={data.attachProjectId} />{/if}
+  {#if familyShown(family, TemplateFamily.Motion)}
+    <ComponentShelf items={data.components} projectId={data.attachProjectId} />
+    {#if data.posters.length}<PosterShelf items={data.posters} projectId={data.attachProjectId} />{/if}
+  {/if}
+
+  {#if familyShown(family, TemplateFamily.Composition)}
+    <NodeTemplateShelf title="composition" items={ofFamily(TemplateFamily.Composition)} projectId={data.attachProjectId} />
+  {/if}
+
+  {#if familyShown(family, TemplateFamily.Effects)}
+    <NodeTemplateShelf title="effects" items={ofFamily(TemplateFamily.Effects)} projectId={data.attachProjectId} />
+  {/if}
 
   {#if data.gallery.length}
     <section class="shelf" aria-labelledby="gallery-heading">
@@ -46,6 +67,28 @@
     display: flex;
     flex-direction: column;
     gap: 64px;
+    color: var(--ui-text);
+  }
+
+  .families {
+    display: flex;
+    gap: var(--ui-space-1);
+    margin-top: -40px;
+  }
+
+  .families button {
+    height: 28px;
+    padding: 0 var(--ui-space-3);
+    border: 0;
+    border-radius: var(--ui-radius-full);
+    background: transparent;
+    color: var(--ui-text-tertiary);
+    font-size: var(--ui-type-label);
+    cursor: pointer;
+  }
+
+  .families button.on {
+    background: var(--ui-wash);
     color: var(--ui-text);
   }
 

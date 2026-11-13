@@ -6,7 +6,8 @@ import NumberField from "./number-field.svelte";
 import OptionMenu from "./option-menu.svelte";
 import ListMenu from "./list-menu.svelte";
 import ColorField from "./color-field.svelte";
+import TextField from "./text-field.svelte";
 import ControlRow, { ControlLayout } from "./control-row.svelte";
 
 export * from "./types";
-export { ColorField, Segmented, RatioChips, Switch, SliderField, NumberField, OptionMenu, ListMenu, ControlRow, ControlLayout };
+export { ColorField, TextField, Segmented, RatioChips, Switch, SliderField, NumberField, OptionMenu, ListMenu, ControlRow, ControlLayout };

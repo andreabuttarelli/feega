@@ -8,6 +8,9 @@ import { nodeSize } from './node-size';
 import { PLACEMENT_GAP } from './placement';
 import { DEFAULT_MODEL3D_MODEL } from '$lib/model3d-models';
 import { OPENROUTER_UPSCALE_MODEL } from '$lib/video-models';
+import { LAYOUTS } from '@feega/motion-core/canvas/composition';
+import type { LayoutId } from '@feega/motion-core/canvas/composition/types';
+import { EFFECTS, type EffectId } from './effects';
 
 export type TemplateNode = {
   key: string;
@@ -24,7 +27,9 @@ export const TEMPLATE_CATEGORIES = [
   { id: 'video', label: 'Video' },
   { id: 'audio', label: 'Audio' },
   { id: '3d', label: '3D' },
-  { id: 'social', label: 'Social' }
+  { id: 'social', label: 'Social' },
+  { id: 'composition', label: 'Composition' },
+  { id: 'effects', label: 'Effects' }
 ] as const;
 
 export type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number]['id'];
@@ -136,6 +141,62 @@ const model3d = (key: string, col: number, row: number): TemplateNode => ({
   row,
   data: { prompt: '', model: DEFAULT_MODEL3D_MODEL }
 });
+
+const EFFECT_SOURCE = 'Portrait photo of a person against a plain wall, strong side light. Replace this with your own image or video.';
+
+const effectLook = (look: { id: EffectId; template: string; name?: string; why: string; params?: Record<string, number | string> }): CanvasTemplate => {
+  const definition = EFFECTS[look.id];
+  const defaults = Object.fromEntries(definition.params.map((param) => [param.name, param.default]));
+  return {
+    id: look.template,
+    category: 'effects',
+    name: look.name ?? definition.label,
+    description: [definition.description, look.why].filter(Boolean).join(' '),
+    nodes: [
+      image('source', 0, 0, EFFECT_SOURCE, '4:5', CHEAP_IMAGE_MODEL),
+      { key: 'look', type: 'effects', col: 1, row: 0, data: { effects: [{ id: look.id, params: { ...defaults, ...look.params }, enabled: true }] } }
+    ],
+    edges: [{ from: 'source', to: 'look', handle: 'images' }]
+  };
+};
+
+const EFFECT_LOOKS: CanvasTemplate[] = [
+  effectLook({ id: 'word-weave', template: 'fx-word-weave', why: 'Wire any image or video into it; animates on video and stills.' }),
+  effectLook({ id: 'word-field', template: 'fx-word-field', why: 'Wire any image or video into it; animates on video and stills.' }),
+  effectLook({ id: 'glyph-tiles', template: 'fx-glyph-tiles', why: 'Wire any image or video into it; animates on video and stills.' }),
+  effectLook({ id: 'word-silhouette', template: 'fx-word-silhouette', why: 'Wire any image or video into it; animates on video and stills.' }),
+  effectLook({ id: 'ascii', template: 'fx-ascii-colour', name: 'Colour ASCII', why: 'Redraws the picture as ASCII characters in the image colours. Pick it for a retro terminal look.', params: { mode: 'color', cellSize: 8 } }),
+  effectLook({ id: 'halftone', template: 'fx-halftone-print', name: 'Halftone print', why: 'Turns the picture into printed halftone dots. Pick it for a newsprint or comic feel.', params: { dotSize: 8 } }),
+  effectLook({ id: 'duotone', template: 'fx-orange-duotone', name: 'Orange duotone', why: 'Maps shadows to near black and highlights to orange. Pick it for a bold two-colour poster.', params: { shadow: '#14110f', highlight: '#ff5100' } }),
+  effectLook({ id: 'shape-mosaic', template: 'fx-shape-mosaic', name: 'Shape mosaic', why: 'Rebuilds the picture from adaptive rounded shapes, finer where there is detail. Pick it for a playful, graphic version of a photo.' }),
+  effectLook({ id: 'dither', template: 'fx-one-bit-dither', name: '1-bit dither', why: 'Reduces the picture to black and white error-diffused dots. Pick it for a lo-fi, Mac-classic print look.' })
+];
+
+const COMPOSITION_SOURCES = [
+  'Product photo of a ceramic mug on a pastel background. Replace with your own pictures or videos.',
+  'Lifestyle photo of someone holding the same mug in a sunny kitchen.',
+  'Close-up detail of the mug glaze and handle, soft light.'
+];
+
+const compositionLook = (layout: LayoutId): CanvasTemplate => ({
+  id: `composition-${layout}`,
+  category: 'composition',
+  name: LAYOUTS[layout].label,
+  description: `${LAYOUTS[layout].description} A composition node that animates every picture, video or frame wired into it; pick it to turn a set of media into one looping 3D showcase clip.`,
+  nodes: [
+    ...COMPOSITION_SOURCES.map((prompt, row) => image(`media-${row}`, 0, row, prompt, '1:1', CHEAP_IMAGE_MODEL)),
+    {
+      key: 'composition',
+      type: 'composition',
+      col: 1,
+      row: 1,
+      data: { layout, layoutParams: {}, camera: { preset: 'slow-orbit', params: {} }, background: { color: '#000000' }, duration: 6, aspect: '9:16' }
+    }
+  ],
+  edges: COMPOSITION_SOURCES.map((_, row) => ({ from: `media-${row}`, to: 'composition', handle: 'images' as const }))
+});
+
+const COMPOSITION_LOOKS: CanvasTemplate[] = (Object.keys(LAYOUTS) as LayoutId[]).map(compositionLook);
 
 const PRODUCT_SHOT =
   'Studio packshot of a minimalist ceramic coffee mug on a seamless off-white background, soft daylight, product centred. Replace this with your own product.';
@@ -458,7 +519,9 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
       }
     ],
     edges: [{ from: 'clip', to: 'upscale', handle: 'videos' }]
-  }
+  },
+  ...EFFECT_LOOKS,
+  ...COMPOSITION_LOOKS
 ];
 
 export function templateById(id: string): CanvasTemplate | undefined {
