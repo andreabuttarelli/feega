@@ -14,7 +14,7 @@ fn canvas_step(extent: Rect, finest: i32, allowed: usize) -> i32 {
 }
 
 pub const TILE_BUDGET_BYTES: u64 = 384 << 20;
-const SCREENS_KEPT: u64 = 12;
+const SCREENS_KEPT: u64 = 16;
 
 pub fn tiles_kept((w, h): (u32, u32), budget: u64) -> usize {
     let per_screen = (w as u64).div_ceil(TILE_PX as u64) * (h as u64).div_ceil(TILE_PX as u64);
