@@ -2264,6 +2264,21 @@ difesa deve stare al punto d'uso.
 «chi scrive questa colonna, e con quale ruolo?». Le tre difese non sono intercambiabili, e sceglierne
 una senza quella risposta dà la sensazione di aver chiuso qualcosa.
 
+## Chiudere una tabella alla sessione non la chiude a una chiave API
+
+`20261114_*` toglie ad `authenticated` ogni scrittura su `orgs_members`, `api_keys`, `node_runs`…
+e il percorso più largo restava aperto: `/api/v1/org/rows` con una chiave `feega_…` gira con la
+service role (`org-data/auth.ts`), impone solo `org_id`, e un member con una chiave in scrittura
+si metteva owner con un `update_row`. Nessuna policy lo vede, perché la service role non le legge.
+
+**Segnale**: un tool generico che scrive «qualunque tabella dell'org» e un `authority.kind ===
+'service'` nello stesso percorso. **Mossa**: dopo ogni grant/policy, cerca chi scrive la stessa
+tabella con la service role (`grep -rn "createServiceRoleDb\|createAdminClient"` e i tool
+generici) e chiudi anche lì — qui `SERVER_WRITTEN_TABLES` in `org-data/tables.ts`. E per provare
+la policy vera, `npm run test:billing-rls` carica in pglite l'intera `supabase/baseline` più le
+migration successive: bastano gli stub di `auth`, `storage`, `realtime`, `stripe`, un
+`jsonb_matches_schema` finto e `vector(1536)` letto come `text`.
+
 ## Due chiavi al tenant sulla stessa riga di coda, e il worker ne guarda una
 
 `webhook_deliveries` porta `brand_id` **e** `webhook_id`; `chat_jobs` porta `brand_id` **e**

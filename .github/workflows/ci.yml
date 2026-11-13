@@ -34,6 +34,9 @@ jobs:
       - name: Runtime type gate
         run: node scripts/typecheck-runtime.mjs
 
+      - name: Session writes on billing rows (pglite)
+        run: npm run test:billing-rls
+
       - name: Type check (svelte-check)
         env:
           NODE_OPTIONS: --max-old-space-size=6144
