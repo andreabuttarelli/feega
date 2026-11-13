@@ -79,7 +79,7 @@ describe('fastPatch draws a simple edit without rebuilding the frame', () => {
     expect(fastPatch(drawn(before), before, after, estimatedText)).toBeNull();
   });
 
-  it('leaves to the full build a hidden parent, whose children lose it', () => {
+  it('leaves to the full build a hidden parent, whose children go with it', () => {
     const before = nested();
     const after = edit(before, 'card', hidden);
 
