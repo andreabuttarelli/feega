@@ -278,8 +278,9 @@ export async function revokeApiKey(event: Ev) {
   const scope = await scopeOf(event);
   if (!scope) return fail(404, { apiKeyError: 'Project not found' });
 
-  const { error } = await event.locals.supabase.from('api_keys').delete().eq('id', id).eq('org_id', scope.orgId);
+  const { data: revoked, error } = await event.locals.supabase.from('api_keys').delete().eq('id', id).eq('org_id', scope.orgId).select('id');
   if (error) return fail(500, { apiKeyError: error.message });
+  if (!revoked?.length) return fail(404, { apiKeyError: 'Key not found, or not yours to revoke' });
 
   return { apiKeyRevoked: true };
 }

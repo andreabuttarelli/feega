@@ -25,7 +25,8 @@ function baseRows(brandId: string | null): Rows {
     brands: [BRAND],
     orgs_members: [{ org_id: ORG, user_id: USER, role: 'owner' }],
     orgs_invites: [{ id: 'inv-1', org_id: ORG, email: 'x@y.com', role: 'member', expires_at: '', accepted_at: null, created_at: '' }],
-    orgs: [{ id: ORG, name: 'Org', stripe_customer_id: null, stripe_subscription_id: null }]
+    orgs: [{ id: ORG, name: 'Org', stripe_customer_id: null, stripe_subscription_id: null }],
+    api_keys: [{ id: 'k-1', org_id: ORG, user_id: USER }]
   };
 }
 
@@ -74,6 +75,14 @@ describe('le azioni delle impostazioni leggono il progetto, non un params.brand 
 
     expect(result).toMatchObject({ apiKeyRevoked: true });
     expect(writes(calls, 'api_keys', 'delete')[0].filters).toContainEqual(['org_id', ORG]);
+  });
+
+  it('una chiave che il database non lascia revocare non risulta revocata', async () => {
+    const { ev } = event(baseRows(null), { key_id: 'k-of-someone-else' });
+
+    const result = await run(apiKeyActions.revokeApiKey, ev);
+
+    expect(result).toMatchObject({ status: 404, data: { apiKeyError: 'Key not found, or not yours to revoke' } });
   });
 
   it('cancella il brand del progetto quando il nome combacia', async () => {
