@@ -14,14 +14,15 @@ fn canvas_step(extent: Rect, finest: i32, allowed: usize) -> i32 {
 }
 
 pub const TILE_BUDGET_BYTES: u64 = 384 << 20;
-const SCREENS_KEPT: u64 = 12;
+const SCREENS_KEPT: u64 = 16;
 
 pub fn tiles_kept((w, h): (u32, u32), budget: u64) -> usize {
     let per_screen = (w as u64).div_ceil(TILE_PX as u64) * (h as u64).div_ceil(TILE_PX as u64);
     (per_screen * SCREENS_KEPT).min(budget / TILE_BYTES) as usize
 }
 const STEPS_PER_DOUBLING: f64 = 4.0;
-const STEPS_PER_LEVEL: i32 = 4;
+const STEPS_PER_LEVEL: i32 = 2;
+const LEVELS_PER_DOUBLING: f64 = 2.0;
 const VIEW_MARGIN: f64 = 0.25;
 const STEP_SLACK: f64 = 1e-9;
 const COARSER_STEPS: i32 = 40;
@@ -32,11 +33,13 @@ pub struct Level {
     pub share_percent: u64,
 }
 
-pub const PYRAMID: [Level; 5] = [
-    Level { below_top: 16, share_percent: 10 },
-    Level { below_top: 12, share_percent: 10 },
-    Level { below_top: 8, share_percent: 15 },
-    Level { below_top: 4, share_percent: 20 },
+pub const PYRAMID: [Level; 7] = [
+    Level { below_top: 16, share_percent: 5 },
+    Level { below_top: 12, share_percent: 5 },
+    Level { below_top: 8, share_percent: 10 },
+    Level { below_top: 6, share_percent: 10 },
+    Level { below_top: 4, share_percent: 10 },
+    Level { below_top: 2, share_percent: 15 },
     Level { below_top: 0, share_percent: 25 },
 ];
 
@@ -246,8 +249,8 @@ impl Tiles {
         if step >= top {
             return step;
         }
-        let doublings = (self.pixel_ratio.unwrap_or(1.0) / camera.zoom).log2().round() as i32;
-        let level = top - doublings * STEPS_PER_LEVEL;
+        let levels = ((self.pixel_ratio.unwrap_or(1.0) / camera.zoom).log2() * LEVELS_PER_DOUBLING + STEP_SLACK).floor() as i32;
+        let level = top - levels * STEPS_PER_LEVEL;
         self.floor.map_or(level, |floor| level.max(floor))
     }
 
