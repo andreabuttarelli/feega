@@ -698,3 +698,29 @@ fn the_level_that_covers_the_whole_canvas_survives_eviction_without_a_plan() {
     assert!(gone.iter().all(|k| k.step != canvas_step), "evicted {} overview tiles", gone.iter().filter(|k| k.step == canvas_step).count());
 }
 
+#[test]
+fn zooming_in_bakes_ahead_the_sharper_tiles_around_the_anchor() {
+    let tiles = baked(WIDE, Camera { x: -10000.0, y: -5000.0, zoom: 0.25 });
+    let anchor = Point::new(12000.0, 6000.0);
+    let at = |zoom: f64| Camera { x: 512.0 - anchor.x * zoom, y: 384.0 - anchor.y * zoom, zoom };
+
+    let ahead = tiles.ahead(at(0.25), at(0.27), SCREEN);
+
+    let now = tiles.step_for(at(0.27));
+    assert!(!ahead.is_empty());
+    assert!(ahead.iter().all(|k| k.step > now), "{:?}", ahead.iter().map(|k| k.step).collect::<Vec<_>>());
+    let seen = Rect::new(anchor.x - 512.0 / 0.27, anchor.y - 384.0 / 0.27, anchor.x + 512.0 / 0.27, anchor.y + 384.0 / 0.27);
+    assert!(ahead.iter().all(|k| k.world().overlaps(seen)));
+}
+
+#[test]
+fn panning_bakes_ahead_the_tiles_the_motion_brings_on_screen() {
+    let tiles = baked(WIDE, Camera { x: -10000.0, y: -5000.0, zoom: 1.0 });
+    let from = Camera { x: -10000.0, y: -5000.0, zoom: 1.0 };
+    let to = Camera { x: -10300.0, y: -5000.0, zoom: 1.0 };
+
+    let ahead = tiles.ahead(from, to, SCREEN);
+
+    assert!(!ahead.is_empty());
+    assert!(ahead.iter().all(|k| k.world().x1 > 10300.0 + SCREEN.0 as f64), "behind: {:?}", ahead.iter().find(|k| k.world().x1 <= 10300.0 + SCREEN.0 as f64));
+}

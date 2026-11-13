@@ -28,6 +28,7 @@ const STEP_SLACK: f64 = 1e-9;
 const COARSER_STEPS: i32 = 40;
 const FINER_STEPS: i32 = 4;
 pub const NEAR_STEPS: i32 = 4;
+const AHEAD_FRAMES: f64 = 6.0;
 pub struct Level {
     pub below_top: i32,
     pub share_percent: u64,
@@ -286,6 +287,16 @@ impl Tiles {
             return self.held.iter().filter(|k| k.step == step && k.world().overlaps(world)).copied().collect();
         }
         keys_over(world, step).into_iter().filter(|k| self.held.contains(k)).collect()
+    }
+
+    pub fn ahead(&self, was: Camera, now: Camera, screen: (u32, u32)) -> Vec<TileKey> {
+        let (from, to) = (seen_world(was, screen).center(), seen_world(now, screen).center());
+        let zoom = now.zoom * (now.zoom / was.zoom).powf(AHEAD_FRAMES);
+        let centre = to + (to - from) * AHEAD_FRAMES;
+        let (w, h) = (screen.0 as f64, screen.1 as f64);
+        let predicted = Camera { x: w / 2.0 - centre.x * zoom, y: h / 2.0 - centre.y * zoom, zoom };
+        let current: FxHashSet<TileKey> = self.frame(now, screen).missing.into_iter().collect();
+        self.frame(predicted, screen).missing.into_iter().filter(|k| !current.contains(k)).collect()
     }
 
     pub fn covered(&self, key: TileKey) -> bool {
