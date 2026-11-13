@@ -299,6 +299,12 @@ impl Tiles {
         self.frame(predicted, screen).missing.into_iter().filter(|k| !current.contains(k)).collect()
     }
 
+    pub fn sharper(&self, key: TileKey) -> Option<Vec<TileKey>> {
+        let step = key.step + STEPS_PER_DOUBLING as i32;
+        let children: Vec<TileKey> = [(0, 0), (1, 0), (0, 1), (1, 1)].iter().map(|(dx, dy)| TileKey { step, tx: key.tx * 2 + dx, ty: key.ty * 2 + dy }).collect();
+        children.iter().all(|k| self.held.contains(k) && !self.stale.contains(k)).then_some(children)
+    }
+
     pub fn covered(&self, key: TileKey) -> bool {
         self.covered_within(key, COARSER_STEPS)
     }

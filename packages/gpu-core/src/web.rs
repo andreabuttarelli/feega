@@ -193,7 +193,7 @@ fn tile_texture(device: &wgpu::Device, side: u32) -> wgpu::Texture {
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
         format: wgpu::TextureFormat::Rgba8Unorm,
-        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::COPY_SRC,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::COPY_SRC | wgpu::TextureUsages::RENDER_ATTACHMENT,
         view_formats: &[],
     })
 }
@@ -601,6 +601,13 @@ impl WebCore {
 
     fn raster_batch(&mut self, batch: &Batch) -> Result<(), JsValue> {
         let began = now_ms();
+        let (derived, rendered): (Vec<TileKey>, Vec<TileKey>) = batch.keys.iter().partition(|k| self.tiles.sharper(**k).is_some());
+        derived.into_iter().for_each(|key| self.downsample(key));
+        if rendered.is_empty() {
+            self.count_bake(began);
+            return Ok(());
+        }
+        let batch = &Batch { step: batch.step, keys: rendered };
         let (pieces, lacking, size) = self.render_batch(batch, Source::Scene)?;
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
         for key in &batch.keys {
@@ -625,6 +632,38 @@ impl WebCore {
         self.counted.tiles += batch.keys.len() as u32;
         self.count_bake(began);
         Ok(())
+    }
+
+    fn downsample(&mut self, key: TileKey) {
+        let Some(children) = self.tiles.sharper(key) else { return };
+        let target = match self.tile_textures.remove(&key) {
+            Some(texture) => texture,
+            None => self.fresh_tile(),
+        };
+        let zoom = step_zoom(key.step);
+        let world = key.world();
+        let gutter = TILE_GUTTER_PX as f64;
+        let camera = Camera { x: -world.x0 * zoom + gutter, y: -world.y0 * zoom + gutter, zoom };
+        let side = (TILE_PX + 2 * TILE_GUTTER_PX) as f64;
+        let whole = Rect::new(0.0, 0.0, side, side);
+        let view = target.create_view(&wgpu::TextureViewDescriptor::default());
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+        drop(encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: None,
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment { view: &view, depth_slice: None, resolve_target: None, ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT), store: wgpu::StoreOp::Store } })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+            multiview_mask: None,
+        }));
+        let step = children[0].step;
+        let ring = (key.ty * 2 - 1..=key.ty * 2 + 2).flat_map(|ty| (key.tx * 2 - 1..=key.tx * 2 + 2).map(move |tx| TileKey { step, tx, ty }));
+        let sources: Vec<Tile> = ring.filter_map(|k| placed(k, self.tile_textures.get(&k)?, camera, whole)).collect();
+        self.reprojector.draw_tiles(&self.device, &self.queue, &mut encoder, &view, wgpu::TextureFormat::Rgba8Unorm, Output::Straight, &sources);
+        self.queue.submit([encoder.finish()]);
+        self.tile_textures.insert(key, target);
+        self.tiles.hold(key);
+        self.counted.tiles += 1;
     }
 
     fn raster_alone(&mut self, clip: &str, batch: &Batch) -> Result<Vec<(TileKey, wgpu::Texture)>, JsValue> {

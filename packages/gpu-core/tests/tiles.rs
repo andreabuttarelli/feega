@@ -724,3 +724,19 @@ fn panning_bakes_ahead_the_tiles_the_motion_brings_on_screen() {
     assert!(!ahead.is_empty());
     assert!(ahead.iter().all(|k| k.world().x1 > 10300.0 + SCREEN.0 as f64), "behind: {:?}", ahead.iter().find(|k| k.world().x1 <= 10300.0 + SCREEN.0 as f64));
 }
+
+#[test]
+fn a_tile_whose_four_twice_as_sharp_tiles_are_held_is_built_from_them() {
+    let mut tiles = Tiles::default();
+    let parent = TileKey { step: -8, tx: 3, ty: -2 };
+    let children: Vec<TileKey> = [(6, -4), (7, -4), (6, -3), (7, -3)].iter().map(|(tx, ty)| TileKey { step: -4, tx: *tx, ty: *ty }).collect();
+    children[..3].iter().for_each(|k| tiles.hold(*k));
+    assert_eq!(tiles.sharper(parent), None);
+
+    tiles.hold(children[3]);
+    assert_eq!(tiles.sharper(parent), Some(children.clone()));
+    assert!(children.iter().all(|k| parent.world().contains(k.world().center())));
+
+    tiles.invalidate(children[0].world());
+    assert_eq!(tiles.sharper(parent), None);
+}
