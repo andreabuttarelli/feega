@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const runs = vi.hoisted(() => ({
   createRun: vi.fn(),
@@ -13,7 +13,7 @@ const runs = vi.hoisted(() => ({
 }));
 const saveExport = vi.hoisted(() => vi.fn());
 const logAiCall = vi.hoisted(() => vi.fn());
-const hold = vi.hoisted(() => ({ holdCredits: vi.fn(), releaseCredits: vi.fn() }));
+const hold = vi.hoisted(() => ({ holdCredits: vi.fn(), refundHold: vi.fn() }));
 const farmCalls = vi.hoisted(() => ({ launchPiece: vi.fn(), launchAssembly: vi.fn(), checkTask: vi.fn(), stopWorker: vi.fn() }));
 
 vi.mock('$lib/server/repos/node-runs', () => ({ ...runs, RENDER_JOB_PREFIX: 'motion-render:' }));
@@ -22,7 +22,9 @@ vi.mock('$lib/server/ai-log', () => ({ logAiCall }));
 vi.mock('$lib/server/credit-hold', async (original) => ({ ...(await original<typeof import('$lib/server/credit-hold')>()), ...hold }));
 vi.mock('./farm-render', async (original) => ({ ...(await original<typeof import('./farm-render')>()), ...farmCalls }));
 
-import { BATCH_CONCURRENCY, batchView, cancelRender, farmJob, reconcileRenders, RenderRefusal, renderRequest, renderView, startBatch, startRender, type RenderRequest } from './render-run';
+import { BATCH_CONCURRENCY, batchView, cancelRender, farmJob, reconcileRenders, releaseHold, RenderRefusal, renderRequest, renderView, startBatch, startRender, type RenderRequest } from './render-run';
+
+const HELD_IN_LEDGER = 123;
 import { TaskState, WORKER_GONE } from './farm-render';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
@@ -92,9 +94,9 @@ beforeEach(() => {
   runs.activeRenderRuns.mockResolvedValue([]);
   farm.running.mockResolvedValue([]);
   farm.usage.mockResolvedValue(MINUTE_OF_8GB);
-  hold.holdCredits.mockImplementation(async (_org: string, amount: number) => [{ amount, expiresAt: null }]);
-  hold.releaseCredits.mockResolvedValue(undefined);
-  runs.createRun.mockImplementation(async (_db, input) => runOf(input.params));
+  hold.holdCredits.mockResolvedValue(true);
+  hold.refundHold.mockResolvedValue(HELD_IN_LEDGER);
+  runs.createRun.mockImplementation(async (_db, input) => ({ ...runOf(input.params), id: input.id ?? 'run-1' }));
   runs.claimRun.mockImplementation(async (_db, input) => ({ ...runOf({}), id: input.runId }));
   saveExport.mockResolvedValue({ ok: true, assetId: 'asset-9' });
   let n = 0;
@@ -130,6 +132,12 @@ describe('startRender refuses before spending anything', () => {
 });
 
 describe('startRender only enqueues and starts the workers', () => {
+  let pinned: { mockRestore(): void };
+  beforeEach(() => {
+    pinned = vi.spyOn(crypto, 'randomUUID').mockReturnValue('run-1' as never);
+  });
+  afterEach(() => pinned.mockRestore());
+
   it('records the revision, the format and the quote on a run the tick can find', async () => {
     const { db } = fakeDb(request(sevenChunks()).job);
 
@@ -365,11 +373,12 @@ describe('reconcileRenders', () => {
 describe('a render is paid by the sandbox time it really used', () => {
   const heldFor = (run: NodeRun) => Math.ceil((run.params.quote as { credits: number }).credits * HOLD_BUFFER);
 
-  it('starting holds the quote plus a buffer, and refuses when the balance cannot cover it', async () => {
+  it('starting holds the quote plus a buffer under the run it pays for, and refuses when the balance cannot cover it', async () => {
     const run = await started();
-    expect(hold.holdCredits).toHaveBeenCalledWith('org', heldFor(run), expect.any(String));
+    const runId = runs.createRun.mock.calls[0][1].id;
+    expect(hold.holdCredits).toHaveBeenCalledWith('org', [{ amount: heldFor(run), note: expect.stringContaining(runId) }]);
 
-    hold.holdCredits.mockResolvedValue(null);
+    hold.holdCredits.mockResolvedValue(false);
     const { db } = fakeDb();
     const refused = await startRender(db, farm, longScope, request(sevenChunks()), storage);
 
@@ -392,8 +401,8 @@ describe('a render is paid by the sandbox time it really used', () => {
 
     const cost = sandboxCostUsd(Array(7).fill(MINUTE_OF_8GB));
     expect(order.indexOf('usage')).toBeGreaterThan(order.lastIndexOf('stop'));
-    expect(logAiCall.mock.calls[0][0]).toMatchObject({ flatCostUsd: cost, creditCap: heldFor(run) });
-    expect(hold.releaseCredits).toHaveBeenCalledWith('org', [{ amount: heldFor(run), expiresAt: null }], expect.any(String));
+    expect(logAiCall.mock.calls[0][0]).toMatchObject({ flatCostUsd: cost, creditCap: HELD_IN_LEDGER });
+    expect(hold.refundHold).toHaveBeenCalledWith('org', expect.stringContaining(run.id));
     expect(runs.completeRun).toHaveBeenCalledWith(db, expect.objectContaining({ costUsd: cost }));
   });
 
@@ -431,7 +440,25 @@ describe('a render is paid by the sandbox time it really used', () => {
     }
 
     expect(logAiCall).not.toHaveBeenCalled();
-    expect(hold.releaseCredits).toHaveBeenCalledWith('org', [{ amount: heldFor(run), expiresAt: null }], expect.any(String));
+    expect(hold.refundHold).toHaveBeenCalledWith('org', expect.stringContaining(run.id));
+  });
+});
+
+describe('a refund is decided by the ledger', () => {
+  it('pays back what the ledger held for the run, whatever the run row carries', async () => {
+    await releaseHold({ ...runOf({ billing: { held: 1_000_000, portions: [{ amount: 1_000_000, expiresAt: null }] } }), id: 'run-7' });
+
+    expect(hold.refundHold).toHaveBeenCalledTimes(1);
+    expect(hold.refundHold).toHaveBeenCalledWith('org', expect.stringContaining('run-7'));
+  });
+
+  it('a batch holds each row under its own run', async () => {
+    const { db } = fakeDb(request().job);
+    await startBatch(db, farm, longScope, [{ name: 'a', req: request() }, { name: 'b', req: request() }], storage);
+
+    const ids = runs.createRun.mock.calls.map((c) => c[1].id);
+    expect(new Set(ids).size).toBe(2);
+    expect(hold.holdCredits.mock.calls[0][1].map((h: { note: string }) => h.note)).toEqual(ids.map((id) => expect.stringContaining(id)));
   });
 });
 

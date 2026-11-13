@@ -26,48 +26,43 @@ export function portionsOf(rows: LedgerRow[], amount: number): Portion[] | null 
   return wanted > 0 ? null : portions;
 }
 
-export function splitPortions(portions: Portion[], amounts: number[]): Portion[][] {
-  const left = portions.map((p) => ({ ...p }));
-  return amounts.map((amount) => {
-    const taken: Portion[] = [];
-    let wanted = amount;
-    for (const p of left) {
-      const take = Math.min(wanted, p.amount);
-      if (take <= 0) {
-        continue;
-      }
-      taken.push({ amount: take, expiresAt: p.expiresAt });
-      p.amount -= take;
-      wanted -= take;
-    }
-    return taken;
-  });
-}
+export type Hold = { amount: number; note: string };
 
-export async function holdCredits(orgId: string, amount: number, note: string): Promise<Portion[] | null> {
+type HeldRow = { kind: string; source: string; amount: number };
+
+export async function holdCredits(orgId: string, holds: Hold[]): Promise<boolean> {
   const admin = createAdminClient();
   const { data, error } = await admin.from('credit_ledger').select('kind, amount, expires_at').eq('org_id', orgId);
   if (error) {
     throw new Error(`credit ledger read failed: ${error.message}`);
   }
-  const portions = portionsOf((data ?? []) as LedgerRow[], amount);
-  if (!portions) {
-    return null;
+  const total = holds.reduce((sum, h) => sum + h.amount, 0);
+  if (!portionsOf((data ?? []) as LedgerRow[], total)) {
+    return false;
   }
-  const { error: held } = await admin.from('credit_ledger').insert({ org_id: orgId, kind: 'debit', source: 'ai_usage', amount, note });
+  const rows = holds.map((h) => ({ org_id: orgId, kind: 'debit', source: 'ai_usage', amount: h.amount, note: h.note }));
+  const { error: held } = await admin.from('credit_ledger').insert(rows);
   if (held) {
     throw new Error(`credit hold failed: ${held.message}`);
   }
-  return portions;
+  return true;
 }
 
-export async function releaseCredits(orgId: string, portions: Portion[], note: string): Promise<void> {
-  const rows = portions.filter((p) => p.amount > 0).map((p) => ({ org_id: orgId, kind: 'grant', source: 'refund', amount: p.amount, expires_at: p.expiresAt, note }));
-  if (!rows.length) {
-    return;
-  }
-  const { error } = await createAdminClient().from('credit_ledger').insert(rows);
+export async function refundHold(orgId: string, note: string): Promise<number> {
+  const admin = createAdminClient();
+  const { data, error } = await admin.from('credit_ledger').select('kind, source, amount').eq('org_id', orgId).eq('note', note);
   if (error) {
-    throw new Error(`credit release failed: ${error.message}`);
+    throw new Error(`credit ledger read failed: ${error.message}`);
   }
+  const rows = (data ?? []) as HeldRow[];
+  const held = rows.filter((r) => r.kind === 'debit').reduce((sum, r) => sum + r.amount, 0);
+  const refunded = rows.some((r) => r.kind === 'grant' && r.source === 'refund');
+  if (!held || refunded) {
+    return held;
+  }
+  const { error: back } = await admin.from('credit_ledger').insert({ org_id: orgId, kind: 'grant', source: 'refund', amount: held, note });
+  if (back) {
+    throw new Error(`credit refund failed: ${back.message}`);
+  }
+  return held;
 }

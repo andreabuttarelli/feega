@@ -83,6 +83,7 @@ function toRun(row: RunColumns): NodeRun {
 export async function createRun(
   db: Db,
   input: {
+    id?: string;
     orgId: string;
     nodeId: string;
     prompt: string;
@@ -96,6 +97,7 @@ export async function createRun(
   const { data, error } = await db
     .from('node_runs')
     .insert({
+      ...(input.id ? { id: input.id } : {}),
       org_id: input.orgId,
       node_id: input.nodeId,
       prompt: input.prompt,
