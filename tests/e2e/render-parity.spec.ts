@@ -2,8 +2,10 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { test, expect, REAL_STACK, gotoHydrated, seedsRuns } from './fixtures/session';
 import { RENDER_BUCKET, mintRenderLink, renderOnPage, renderedAsset, seedMotion } from './fixtures/render-link';
+
+seedsRuns();
 
 const DOCS = ['flat', 'mattes', 'three', 'particles'];
 const MIN_PSNR_DB = 40;

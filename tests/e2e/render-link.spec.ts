@@ -1,7 +1,9 @@
 import { chromium, devices, webkit, type BrowserType } from '@playwright/test';
-import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { test, expect, REAL_STACK, gotoHydrated, seedsRuns } from './fixtures/session';
 import doc from './fixtures/motion-doc.json' with { type: 'json' };
 import { RENDER_BUCKET, mintRenderLink, renderedAsset, seedMotion } from './fixtures/render-link';
+
+seedsRuns();
 
 const SHORT = { ...doc, durationInFrames: 20 };
 const RENDER_TIMEOUT_MS = 120_000;
