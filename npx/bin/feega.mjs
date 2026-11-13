@@ -161,6 +161,7 @@ async function importFolder(url, folder, { routes, app, file }) {
     throw new Error('could not find the local canvas');
   }
 
+  console.log(eventLine({ event: 'step', step: 'find', state: 'active' }));
   console.log(`feega: looking for the pages of ${basename(folder)}…`);
   const discovered = await discover(url, place, folder, app);
   const plan = routePlan(discovered.found, routes);
@@ -168,6 +169,7 @@ async function importFolder(url, folder, { routes, app, file }) {
     console.log('feega: no router found, importing the home page only');
   }
 
+  console.log(eventLine({ event: 'step', step: 'find', state: 'done', pages: plan.routes.length }));
   console.log(`feega: importing ${basename(folder)}: ${plan.routes.length} pages (starts its dev server, can take a minute)…`);
   const { path, body } = importAsk(place, folder, { routes: plan.routes, app: discovered.app });
   const { res, body: done } = await fetchJson(url, path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });

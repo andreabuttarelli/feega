@@ -1,7 +1,7 @@
 const vscode = require('vscode');
 const { spawn } = require('node:child_process');
 const { readFile, writeFile } = require('node:fs/promises');
-const { Launch, launchArgs, mcpServers, canvasFileFor, canvasPage, eventReader, importMessage, gitignoreWith, loadingPage, errorPage, logTail, spawnOptions, Step, stepOf, RETRY, localUrl, freePort, readyProbe, served } = require('./canvas-run');
+const { Launch, launchArgs, mcpServers, canvasFileFor, canvasPage, eventReader, importMessage, gitignoreWith, progressOf, advance, failedAt, finishedAll, stepsPage, logTail, spawnOptions, RETRY, localUrl, freePort, readyProbe, served } = require('./canvas-run');
 
 const READY_POLL_MS = 400;
 const QUIET_TIMEOUT_MS = 180_000;
@@ -78,10 +78,6 @@ async function onEvent(event, child, file) {
     return chooseApp(event.apps, child);
   }
 
-  if (event.event === 'import-failed') {
-    return vscode.window.showErrorMessage(`Feega: the folder import failed: ${event.message}`);
-  }
-
   if (event.event === 'imported') {
     await vscode.window.showInformationMessage(importMessage(event, file));
     return offerGitignore(file.replace(/[\\/][^\\/]*$/, ''));
@@ -107,28 +103,54 @@ function openCanvas(panel, file, launch, output) {
 }
 
 async function startCanvas(panel, file, launch, output) {
-  panel.webview.html = loadingPage(Step.Launch);
+  let progress = progressOf(launch);
+  const show = () => {
+    panel.webview.html = stepsPage(progress);
+  };
+  show();
   const port = await freePort();
   const tail = logTail(LOG_TAIL_LINES);
-  const attempt = { ended: false, lastOutput: Date.now() };
+  const attempt = { ended: false, lastOutput: Date.now(), failed: false, served: null, imported: launch !== Launch.ImportFolder };
   attempts.set(panel, attempt);
   const child = spawn('npx', launchArgs(file, port, launch), spawnOptions(file, process.platform, process.env));
   children.add(child);
 
-  const fail = (message) => {
-    if (attempts.get(panel) !== attempt) {
+  const current = () => attempts.get(panel) === attempt && !attempt.failed;
+  const fail = (message, log = tail.text()) => {
+    if (!current()) {
       return;
     }
 
+    attempt.failed = true;
     output.appendLine(`feega: ${message}`);
-    output.show(true);
-    panel.webview.html = errorPage(message, tail.text());
+    progress = failedAt(progress, message, log);
+    show();
+  };
+  const reveal = () => {
+    if (current() && attempt.served && attempt.imported) {
+      panel.webview.html = canvasPage(attempt.served);
+    }
+  };
+  const onStep = (event) => {
+    if (!current()) {
+      return;
+    }
+
+    if (event.event === 'import-failed') {
+      return fail(`The folder import failed: ${event.message}`);
+    }
+    if (event.event === 'imported') {
+      progress = finishedAll(progress);
+      attempt.imported = true;
+      return reveal();
+    }
+    progress = advance(progress, event);
+    if (!attempt.served || !attempt.imported) {
+      show();
+    }
   };
   const events = eventReader((event) => {
-    const step = stepOf(event);
-    if (step && !attempt.ready) {
-      panel.webview.html = loadingPage(step);
-    }
+    onStep(event);
     onEvent(event, child, file);
   });
   const log = (d) => {
@@ -136,11 +158,15 @@ async function startCanvas(panel, file, launch, output) {
     output.append(d.toString());
     tail.push(d.toString());
   };
+  const lines = eventReader(onStep);
   child.stdout.on('data', (d) => {
     log(d);
     events(d.toString());
   });
-  child.stderr.on('data', log);
+  child.stderr.on('data', (d) => {
+    log(d);
+    lines(d.toString());
+  });
   child.on('error', (error) => {
     attempt.ended = true;
     fail(`Could not run npx: ${error.message}. Is Node.js 22+ installed?`);
@@ -164,11 +190,14 @@ async function startCanvas(panel, file, launch, output) {
     return child;
   }
 
-  attempt.ready = true;
   running.set(file, port);
   publishMcp();
-  const external = (await vscode.env.asExternalUri(vscode.Uri.parse(url))).toString().replace(/\/$/, '');
-  panel.webview.html = canvasPage(external);
+  attempt.served = (await vscode.env.asExternalUri(vscode.Uri.parse(url))).toString().replace(/\/$/, '');
+  progress = advance(progress, { event: 'step', step: 'start', state: 'done' });
+  if (!attempt.imported) {
+    show();
+  }
+  reveal();
   return child;
 }
 
