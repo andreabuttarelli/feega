@@ -175,6 +175,24 @@ const PROBES = [
   { name: 'motion_revisions: another org cannot commit', user: User.Stranger, sql: `select 1 from (${commit(1, User.Stranger)}) c where c.version = 2`, want: Want.Refused }
 ];
 
+const HARDENING = ['20261114_tenancy_writes_server_only.sql', '20261114_money_rows_read_only.sql', '20261114_api_keys_own_user.sql', '20261114_history_append_only.sql'];
+
+const DEFINERS_A_SESSION_CALLS = {
+  'auth_admin_org_ids()': 'reads only the caller rows',
+  'auth_editor_org_ids()': 'reads only the caller rows',
+  'auth_org_ids()': 'reads only the caller rows',
+  'auth_project_ids()': 'reads only the caller rows',
+  'billing_grants_ready()': 'reads trigger names, no tenant data',
+  'commit_motion_revision(uuid,uuid,integer,jsonb,text,text,uuid,text,integer,uuid)': 'motion_revision_writer refuses a non-editor',
+  'org_credit_balance(uuid)': 'sums only an org in auth_org_ids()',
+  'transfer_org_ownership(uuid,uuid)': 'refuses anyone but the owner',
+  'project_has_shares(uuid)': 'a boolean for any project id: an oracle, no write',
+  'project_has_uncensored_outputs(uuid)': 'a boolean for any project id: an oracle, no write',
+  'project_is_uncensored(uuid)': 'a boolean for any project id: an oracle, no write',
+  'uncensored_switch_refusal(uuid,uuid)': 'a refusal code for any org id: an oracle, no write',
+  'voice_owned_elsewhere(text,uuid)': 'a boolean for any voice id: an oracle, no write'
+};
+
 const REALTIME_TABLES = ['canvases', 'node_runs', 'nodes', 'nodes_connections'];
 
 function roleName(user) {
@@ -212,6 +230,33 @@ async function probe(db, { user, setup, sql }) {
   }
 }
 
+async function reapplies(db) {
+  const plan = selfHostPlan();
+  for (const file of HARDENING) {
+    const entry = plan.find((e) => e.file === file);
+    if (!entry) {
+      return `${file} is not in the self-host plan`;
+    }
+    try {
+      await db.exec(readFileSync(join(entry.dir, file), 'utf8'));
+    } catch (e) {
+      return `${file} does not re-apply: ${e.message}`;
+    }
+  }
+  return null;
+}
+
+async function unreviewedDefiners(db) {
+  const { rows } = await db.query(
+    `select p.oid::regprocedure::text as fn
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.prosecdef and p.prorettype <> 'trigger'::regtype
+       and has_function_privilege('authenticated', p.oid, 'execute')`
+  );
+  const unknown = rows.map((r) => r.fn).filter((fn) => !(fn in DEFINERS_A_SESSION_CALLS));
+  return unknown.length ? `not reviewed: ${unknown.join(', ')}` : null;
+}
+
 async function realtimeIntact(db) {
   const { rows } = await db.query(
     `select c.relname, c.relreplident = 'f' as full, exists (select 1 from pg_publication_tables p where p.pubname = 'supabase_realtime' and p.tablename = c.relname) as published
@@ -234,9 +279,17 @@ for (const p of PROBES) {
   console.log(`${ok ? 'ok  ' : 'FAIL'} ${p.name}${ok ? '' : ` — want ${p.want}, got ${outcome} (${detail})`}`);
 }
 
+const unreviewed = await unreviewedDefiners(db);
+failures += unreviewed ? 1 : 0;
+console.log(`${unreviewed ? 'FAIL' : 'ok  '} every SECURITY DEFINER a session can call checks the caller${unreviewed ? ` — ${unreviewed}` : ''}`);
+
+const again = await reapplies(db);
+failures += again ? 1 : 0;
+console.log(`${again ? 'FAIL' : 'ok  '} the hardening migrations re-apply cleanly${again ? ` — ${again}` : ''}`);
+
 const realtime = await realtimeIntact(db);
 failures += realtime ? 1 : 0;
 console.log(`${realtime ? 'FAIL' : 'ok  '} realtime: ${REALTIME_TABLES.join(', ')} stay published with replica identity full${realtime ? ` — ${realtime}` : ''}`);
 
-console.log(`\n${PROBES.length + 1 - failures}/${PROBES.length + 1} passed`);
+console.log(`\n${PROBES.length + 3 - failures}/${PROBES.length + 3} passed`);
 process.exit(failures ? 1 : 0);
