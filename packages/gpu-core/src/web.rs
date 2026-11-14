@@ -576,6 +576,11 @@ impl WebCore {
         let camera = Camera { x: -world.x0 * zoom + gutter, y: -world.y0 * zoom + gutter, zoom };
         let (cols, rows) = batch.span();
         let size = (cols * TILE_PX + 2 * TILE_GUTTER_PX, rows * TILE_PX + 2 * TILE_GUTTER_PX);
+        let (pieces, lacking) = self.render_view(camera, size, source)?;
+        Ok((pieces, lacking, size))
+    }
+
+    fn render_view(&mut self, camera: Camera, size: (u32, u32), source: Source) -> Result<(Vec<(Piece, wgpu::Texture)>, bool), JsValue> {
         let mut drawn: Vec<(Piece, wgpu::Texture)> = Vec::new();
         let mut lacking = false;
         let mut failure = None;
@@ -596,7 +601,7 @@ impl WebCore {
             pieces.into_iter().for_each(|(piece, texture)| self.recycle(piece, size, texture));
             return Err(e);
         }
-        Ok((pieces, lacking, size))
+        Ok((pieces, lacking))
     }
 
     fn cut(&self, encoder: &mut wgpu::CommandEncoder, batch: &Batch, key: TileKey, pieces: &[(Piece, wgpu::Texture)], into: wgpu::Texture) -> wgpu::Texture {
