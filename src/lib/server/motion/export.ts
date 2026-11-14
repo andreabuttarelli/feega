@@ -1,6 +1,7 @@
 import type { Db } from '$lib/server/db/client';
 import { coreEvent } from '$lib/server/core-usage';
 import { CoreEvent, ExportKind } from '$lib/core-usage';
+import { ProductEvent, track } from '$lib/server/product-events/track';
 import type { Actor } from '$lib/server/repos/actor';
 import { insertAsset } from '$lib/server/repos/assets';
 import { DataCheck, patchNodeData } from '$lib/server/repos/canvas';
@@ -20,6 +21,14 @@ function inFolder(scope: ExportScope, path: string, ext: string): boolean {
 }
 
 export async function saveExport(db: Db, input: ExportInput): Promise<ExportSaved> {
+  const saved = await storeExport(db, input);
+  if (!saved.ok) {
+    void track(ProductEvent.ExportFailed, { userId: input.actor.id, orgId: input.orgId }, { format: FORMAT[input.format ?? ExportFormat.Mp4H264].ext, error: saved.error });
+  }
+  return saved;
+}
+
+async function storeExport(db: Db, input: ExportInput): Promise<ExportSaved> {
   const spec = FORMAT[input.format ?? ExportFormat.Mp4H264];
   if (!inFolder(input, input.path, spec.ext)) {
     return { ok: false, error: 'invalid_path' };
@@ -58,6 +67,6 @@ export async function saveExport(db: Db, input: ExportInput): Promise<ExportSave
   });
 
   await patchNodeData(db, { orgId: input.orgId, nodeId: input.nodeId, patch: { lastRenderAssetId: asset.id }, check: DataCheck.Schema, actor: input.actor });
-  coreEvent(input.actor.id, CoreEvent.ExportCompleted, { format: ExportKind.Video, target: spec.ext });
+  coreEvent(input.actor.id, CoreEvent.ExportCompleted, { format: ExportKind.Video, target: spec.ext }, input.orgId);
   return { ok: true, assetId: asset.id };
 }

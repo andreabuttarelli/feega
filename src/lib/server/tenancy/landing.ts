@@ -74,5 +74,7 @@ export async function landingPath(
     return `/login?${INVITE_ERROR_PARAM}=${result.outcome}`;
   }
 
+  await deps.track(ProductEvent.TeamInviteAccepted, { userId: user.id, orgId: result.orgId }, { role: result.role });
+
   return deps.homePathFor(db, ENTRY_DEPS, user, result.orgId, null, null, EntryVia.Invite);
 }

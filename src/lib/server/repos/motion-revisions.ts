@@ -354,7 +354,7 @@ export async function appendRevision(
     return { outcome: RevisionOutcome.Conflict };
   }
 
-  coreEvent(input.actor.id, input.expectedVersion === 0 ? CoreEvent.FrameCreated : CoreEvent.FrameEdited, { frame_id: input.nodeId, actor: input.actor.kind as ActorKind });
+  coreEvent(input.actor.id, input.expectedVersion === 0 ? CoreEvent.FrameCreated : CoreEvent.FrameEdited, { frame_id: input.nodeId, actor: input.actor.kind as ActorKind }, input.orgId);
   return { outcome: RevisionOutcome.Written, head: { version: input.expectedVersion + 1, doc: parsed.doc, summary, actorKind: input.actor.kind } };
 }
 

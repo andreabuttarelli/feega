@@ -285,7 +285,7 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
 
   const nodeIdsInPost = [...new Set(sources.map((source) => source.nodeId))];
 
-  coreEvent(userId, CoreEvent.CanvasOpened, { canvas_id: canvasId });
+  coreEvent(userId, CoreEvent.CanvasOpened, { canvas_id: canvasId }, orgId);
   return {
     handoff,
     canvas,

@@ -14,6 +14,19 @@ function stripe(): Stripe {
   return client;
 }
 
+export function readStripeWebhook(body: string, signature: string | null): Stripe.Event | null {
+  const secret = env.STRIPE_WEBHOOK_SECRET;
+  if (!secret || !signature) {
+    return null;
+  }
+
+  try {
+    return stripe().webhooks.constructEvent(body, signature, secret);
+  } catch {
+    return null;
+  }
+}
+
 const APP_TAG = 'feega';
 const CENTS_PER_UNIT = 100;
 

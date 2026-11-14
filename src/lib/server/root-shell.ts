@@ -4,10 +4,11 @@ import { selineSetUser } from '$lib/server/seline';
 import { isInternalEmail } from '$lib/server/internal-users';
 import { trackingAllowed } from '$lib/analytics';
 import { firstRunFlags } from '$lib/server/dashboard/first-run-flags';
+import { ORG_COOKIE } from '$lib/server/tenancy/context';
 
 export const APP_HOST_PARAM = 'host';
 
-export const load = async ({ url, untrack, locals: { safeGetSession, db } }: Pick<ServerLoadEvent, 'url' | 'untrack' | 'locals'>) => {
+export const load = async ({ url, untrack, cookies, locals: { safeGetSession, db } }: Pick<ServerLoadEvent, 'url' | 'untrack' | 'locals'> & Partial<Pick<ServerLoadEvent, 'cookies'>>) => {
   const { session, user } = await safeGetSession();
 
   // Chi ha già accettato una versione dei termini vede l'avviso solo quando la versione corrente
@@ -46,6 +47,7 @@ export const load = async ({ url, untrack, locals: { safeGetSession, db } }: Pic
   return {
     session,
     analyticsOptOut,
+    analyticsOrgId: user ? (cookies?.get(ORG_COOKIE) ?? null) : null,
     internalViewer,
     planGo: isPlanGoEnabled(),
     termsNoticeVersion,

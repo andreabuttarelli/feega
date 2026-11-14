@@ -11,6 +11,7 @@ import { nearestVideoDuration, upscaleLimitsOf } from '$lib/video-models';
 import { findAsset, insertAsset, type Asset, type AssetType } from '$lib/server/repos/assets';
 import { coreEvent } from '$lib/server/core-usage';
 import { CoreEvent, GeneratedMedium } from '$lib/core-usage';
+import { ProductEvent, track } from '$lib/server/product-events/track';
 import {
   AUDIO_JOB_PREFIX,
   claimRun,
@@ -154,7 +155,7 @@ async function landRun(db: Db, run: NodeRun, asset: Asset, costUsd: number | nul
 
   const medium = MEDIUM_OF_ASSET[asset.type];
   if (medium) {
-    coreEvent(run.actorId, CoreEvent.NodeGenerated, { medium });
+    coreEvent(run.actorId, CoreEvent.NodeGenerated, { medium }, run.orgId);
   }
 }
 
@@ -270,6 +271,7 @@ async function enhancedPromptFor(input: StartRun, prompt: string): Promise<strin
 
 async function giveUp(db: Db, input: StartRun, run: NodeRun, message: string): Promise<void> {
   await failRun(db, { orgId: input.orgId, runId: run.id, error: message }).catch(() => {});
+  void track(ProductEvent.GenerationFailed, { userId: run.actorId, orgId: input.orgId }, { medium: input.medium, error: message });
 
   await showRunState(db, input, { running: false, runId: run.id, error: message });
 }

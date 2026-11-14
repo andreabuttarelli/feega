@@ -1,7 +1,7 @@
 import type { ClientInit, HandleClientError } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import { env } from '$env/dynamic/public';
-import { dropIfInternal, isInternalViewer, trackerAllowed } from '$lib/analytics';
+import { dropIfInternal, isInternalViewer, sentryTags, trackerAllowed } from '$lib/analytics';
 import { Tracker } from '$lib/consent-model';
 import { pageAt } from '$lib/dashboard/pages';
 import { bundleApiBase, sendServerCallsTo } from '$lib/api/bundle-fetch';
@@ -65,7 +65,7 @@ async function bootSentry(): Promise<SentryModule | null> {
     // Guard 2 — chi sta guardando. Il client si inizializza lo stesso, ma ogni evento viene
     // scartato se il visitatore è dei nostri. Valutato a ogni invio, non una volta qui, così un
     // login lato client conta subito.
-    beforeSend: (event) => privateEvent(event, dropIfInternal),
+    beforeSend: (event) => privateEvent({ ...event, tags: { ...event.tags, ...sentryTags() } }, dropIfInternal),
     beforeSendTransaction: dropIfInternal,
     beforeSendLog: dropIfInternal
   });
