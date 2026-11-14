@@ -5,6 +5,7 @@ use vello::peniko::{color::AlphaColor, Color, Fill, Gradient, ImageData};
 use vello::wgpu;
 use vello::{AaConfig, AaSupport, RenderParams, RendererOptions, Scene};
 
+use crate::atlas::Packer;
 use crate::display_list::{Cover, DisplayList, Item, Rgba};
 use crate::groups::Plan;
 use crate::filter_passes::{layer_texture, FilterPasses, Pooled, WgpuRunner};
@@ -21,6 +22,8 @@ const KEPT_FRAMES: u64 = 240;
 const LAYER_BYTES: u64 = 32 * 1024 * 1024;
 const KEYED_POINTS_MAX: usize = 1000;
 const OFF_TARGET: Rect = Rect::new(-2.0, -2.0, -1.0, -1.0);
+const SHEET_SIDE: u32 = 2048;
+const SHEET_FULLNESS: f64 = 0.5;
 
 struct Cached {
     image: ImageData,
@@ -99,14 +102,23 @@ fn keyed(item: &Item) -> bool {
     plain_content(item) && points(item) <= KEYED_POINTS_MAX
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Atlas {
+    #[default]
+    On,
+    Off,
+}
+
 pub struct Engine {
     pub vello: vello::Renderer,
     pub blending: Blending,
+    pub atlas: Atlas,
     filters: FilterPasses,
     cache: LayerCache,
     held: FxHashMap<String, wgpu::Texture>,
     spare: Vec<wgpu::Texture>,
     scenes: Vec<Scene>,
+    sheet: Option<wgpu::Texture>,
     tally: Tally,
     drawing: Reason,
     fullness: f64,
@@ -133,6 +145,19 @@ struct Gpu<'a> {
     cache: &'a mut LayerCache,
     scenes: &'a mut Vec<Scene>,
     tally: &'a mut Tally,
+    atlas: Atlas,
+    sheet: &'a mut Option<wgpu::Texture>,
+    open: Option<Sheet>,
+    unsettled: rustc_hash::FxHashSet<u64>,
+}
+
+struct Sheet {
+    scene: Scene,
+    packer: Packer,
+}
+
+fn reads_any(scene: &Scene, images: &rustc_hash::FxHashSet<u64>) -> bool {
+    !images.is_empty() && scene.encoding().resources.patches.iter().any(|p| matches!(p, vello::low_level::vello_encoding::Patch::Image { image, .. } if images.contains(&image.data.id())))
 }
 
 fn borrowed(scenes: &mut Vec<Scene>) -> Scene {
@@ -174,10 +199,58 @@ fn base(colour: Option<Rgba>) -> Color {
 
 impl Gpu<'_> {
     fn render(&mut self, reason: Reason, scene: &Scene, base: Color, target: &wgpu::TextureView, size: (u32, u32)) -> Result<(), EngineError> {
+        self.settle()?;
         let started = now_ms();
         let rendered = self.encode(scene, base, target, size);
         self.tally.add(reason, now_ms() - started);
         rendered
+    }
+
+    fn settle(&mut self) -> Result<(), EngineError> {
+        self.unsettled.clear();
+        let Some(sheet) = self.open.take() else { return Ok(()) };
+        let texture = self.sheet.get_or_insert_with(|| layer_texture(self.runner.device, SHEET_SIDE, SHEET_SIDE)).clone();
+        let started = now_ms();
+        let params = RenderParams { base_color: Color::TRANSPARENT, width: SHEET_SIDE, height: SHEET_SIDE, antialiasing_method: AaConfig::Area };
+        let mut anchored = sheet.scene;
+        if empties_the_atlas(&anchored) {
+            anchored.fill(Fill::NonZero, Affine::IDENTITY, &atlas_anchor(), None, &OFF_TARGET);
+        }
+        let rendered = self.vello.render_to_texture(self.runner.device, self.runner.queue, &anchored, &texture.create_view(&wgpu::TextureViewDescriptor::default()), &params);
+        self.tally.add(Reason::Atlas, now_ms() - started);
+        self.scenes.push(anchored);
+        self.runner.passes.flush(self.runner.queue);
+        rendered
+    }
+
+    fn packed(&mut self, region: Rect, colour: Option<Rgba>, drawn: &Scene) -> Result<Option<Pooled>, EngineError> {
+        let size = (region.width() as u32, region.height() as u32);
+        if size.0 > SHEET_SIDE || size.1 > SHEET_SIDE {
+            return Ok(None);
+        }
+        if reads_any(drawn, &self.unsettled) {
+            self.settle()?;
+        }
+        let mut at = self.open.as_mut().and_then(|s| s.packer.fit(size.0, size.1));
+        if at.is_none() || self.open.as_ref().is_some_and(|s| fullness(&s.scene) > SHEET_FULLNESS) {
+            self.settle()?;
+            let scene = borrowed(self.scenes);
+            self.open = Some(Sheet { scene, packer: Packer::new(SHEET_SIDE) });
+            at = self.open.as_mut().and_then(|s| s.packer.fit(size.0, size.1));
+        }
+        let Some((x, y)) = at else { return Ok(None) };
+        let sheet = self.open.as_mut().expect("an open sheet");
+        let cell = Rect::new(x as f64, y as f64, (x + size.0) as f64, (y + size.1) as f64);
+        sheet.scene.push_clip_layer(Fill::NonZero, Affine::IDENTITY, &cell);
+        if let Some(colour) = colour {
+            sheet.scene.fill(Fill::NonZero, Affine::IDENTITY, base(Some(colour)), None, &cell);
+        }
+        sheet.scene.append(drawn, Some(Affine::translate((x as f64 - region.x0, y as f64 - region.y0))));
+        sheet.scene.pop_layer();
+        let texture = self.runner.passes.texture(self.runner.device, size.0, size.1);
+        let from = self.sheet.get_or_insert_with(|| layer_texture(self.runner.device, SHEET_SIDE, SHEET_SIDE)).clone();
+        self.runner.passes.copy(self.runner.device, &from, (x, y), &texture);
+        Ok(Some(texture))
     }
 
     fn encode(&mut self, scene: &Scene, base: Color, target: &wgpu::TextureView, (width, height): (u32, u32)) -> Result<(), EngineError> {
@@ -204,9 +277,15 @@ impl<'a> Surface for Gpu<'a> {
 
     fn paint(&mut self, reason: Reason, region: Rect, colour: Option<Rgba>, draw: &dyn Fn(&mut Scene)) -> Result<Pooled, EngineError> {
         let size = (region.width() as u32, region.height() as u32);
-        let texture = self.runner.passes.texture(self.runner.device, size.0, size.1);
         let mut scene = borrowed(self.scenes);
         draw(&mut scene);
+        if self.atlas == Atlas::On {
+            if let Some(texture) = self.packed(region, colour, &scene)? {
+                self.scenes.push(scene);
+                return Ok(texture);
+            }
+        }
+        let texture = self.runner.passes.texture(self.runner.device, size.0, size.1);
         let mut moved = borrowed(self.scenes);
         moved.append(&scene, Some(Affine::translate((-region.x0, -region.y0))));
         let rendered = self.render(reason, &moved, base(colour), &texture.create_view(&wgpu::TextureViewDescriptor::default()), size);
@@ -242,6 +321,7 @@ impl<'a> Surface for Gpu<'a> {
 
     fn place(&mut self, texture: Pooled, region: Rect) -> Placed {
         let image = self.vello.register_texture((*texture).clone());
+        self.unsettled.insert(image.data.id());
         self.last = Some(texture.clone());
         self.kept.push(texture);
         Placed { image, origin: region.origin() }
@@ -257,7 +337,7 @@ impl Gpu<'_> {
 impl Engine {
     pub fn new(device: &wgpu::Device) -> Result<Self, EngineError> {
         let vello = vello::Renderer::new(device, RendererOptions { antialiasing_support: AaSupport::area_only(), ..Default::default() })?;
-        Ok(Self { vello, blending: Blending::Native, filters: FilterPasses::new(device), cache: LayerCache::default(), held: FxHashMap::default(), spare: Vec::new(), scenes: Vec::new(), tally: Tally::default(), drawing: Reason::Screen, fullness: 0.0, draws: 0 })
+        Ok(Self { vello, blending: Blending::Native, atlas: Atlas::On, filters: FilterPasses::new(device), cache: LayerCache::default(), held: FxHashMap::default(), spare: Vec::new(), scenes: Vec::new(), sheet: None, tally: Tally::default(), drawing: Reason::Screen, fullness: 0.0, draws: 0 })
     }
 
     pub fn set_budget(&mut self, pool: u64, layers: u64) {
@@ -278,7 +358,7 @@ impl Engine {
     }
 
     pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures, target: &wgpu::TextureView) -> Result<Vec<Skipped>, EngineError> {
-        let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, kept: Vec::new(), last: None, cache: &mut self.cache, scenes: &mut self.scenes, tally: &mut self.tally };
+        let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, kept: Vec::new(), last: None, cache: &mut self.cache, scenes: &mut self.scenes, tally: &mut self.tally, atlas: self.atlas, sheet: &mut self.sheet, open: None, unsettled: Default::default() };
         let layers = prepare(&mut gpu, list, pictures, self.blending)?;
         let mut scene = borrowed(gpu.scenes);
         let skipped = build_into(&mut scene, list, pictures, &layers);
