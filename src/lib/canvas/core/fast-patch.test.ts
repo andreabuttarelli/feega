@@ -150,3 +150,58 @@ describe('fastPatch draws a simple edit without rebuilding the frame', () => {
     expect(fastPatch(drawn(before), before, after, estimatedText)).toEqual(drawn(after));
   });
 });
+
+const LOOK = { tokens: FEEGA_TOKENS, assets: {}, frame: 0 };
+
+const restyled = (props: Record<string, unknown>) => (c: MotionClip) => ({ ...c, props: { ...c.props, ...props } });
+
+describe('fastPatch redraws one restyled layer without rebuilding the frame', () => {
+  it('a resized layer gives the list the full build would give', () => {
+    const before = built(['a', 'b']);
+    const after = edit(before, 'a', restyled({ width: 0.42 }));
+
+    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toEqual(drawn(after));
+  });
+
+  it('a recoloured child gives the list the full build would give', () => {
+    const before = nested();
+    const after = edit(before, 'dot', restyled({ fills: [{ type: 'solid', color: '#2050ff' }] }));
+
+    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toEqual(drawn(after));
+  });
+
+  it('a resized layer inside a hugging auto layout parent reflows its siblings as the full build does', () => {
+    const before = stack(Sizing.Hug);
+    const after = edit(before, 'a', restyled({ width: 0.2 }));
+
+    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toEqual(drawn(after));
+  });
+
+  it('a resized layer inside a fixed auto layout parent reflows its siblings as the full build does', () => {
+    const before = stack(Sizing.Fixed);
+    const after = edit(before, 'b', restyled({ height: 0.2 }));
+
+    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toEqual(drawn(after));
+  });
+
+  it('a hidden layer inside a hugging auto layout parent closes the gap as the full build does', () => {
+    const before = stack(Sizing.Hug);
+    const after = edit(before, 'a', hidden);
+
+    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toEqual(drawn(after));
+  });
+
+  it('a resize that also moves the children by their constraints redraws them as the full build does', () => {
+    const before = nested();
+    const after = edit(edit(before, 'card', restyled({ width: 0.5 })), 'dot', restyled({ x: 0.6 }));
+
+    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toEqual(drawn(after));
+  });
+
+  it('a resized layer with children redraws them as the full build does', () => {
+    const before = nested();
+    const after = edit(before, 'card', restyled({ width: 0.5 }));
+
+    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toEqual(drawn(after));
+  });
+});

@@ -94,6 +94,10 @@ fn hull(m: Affine, points: impl Iterator<Item = (f64, f64)>) -> Option<Rect> {
     points.map(|(x, y)| t * Point::new(x, y)).fold(None, |acc: Option<Rect>, p| Some(acc.map_or(Rect::from_points(p, p), |r| r.union_pt(p))))
 }
 
+fn corners(r: Rect) -> impl Iterator<Item = (f64, f64)> {
+    [(r.x0, r.y0), (r.x1, r.y0), (r.x1, r.y1), (r.x0, r.y1)].into_iter()
+}
+
 fn reach(u: &UseItem, size: Option<(f64, f64)>) -> Option<Rect> {
     let (w, h) = size?;
     hull(u.matrix, [(0.0, 0.0), (w, 0.0), (w, h), (0.0, h)].into_iter())
@@ -226,6 +230,10 @@ impl World {
     }
 
     pub fn patch(&mut self, patch: Patch, sizes: impl Fn(&str) -> Option<(f64, f64)>) {
+        self.patch_edited(patch, sizes, |_, _| None);
+    }
+
+    pub fn patch_edited(&mut self, patch: Patch, sizes: impl Fn(&str) -> Option<(f64, f64)>, edited: impl Fn(&str, &str) -> Option<Rect>) {
         for gone in &patch.drop {
             let Some(old) = self.uses.get(gone) else { continue };
             let was_scene = self.in_scene(old);
@@ -240,14 +248,17 @@ impl World {
             if !u.hold {
                 self.rest.insert(u.clip.clone(), (u.group.clone(), u.matrix));
             }
-            let clip = u.clip.clone();
+            let (clip, group, matrix) = (u.clip.clone(), u.group.clone(), u.matrix);
             let old = self.uses.put(u, fresh);
             let now_scene = self.in_scene(self.uses.get(&clip).expect("just put"));
             let Some((old, was_scene)) = old.zip(was_scene) else {
                 self.mark_use(fresh, now_scene);
                 continue;
             };
-            let stale = reach(&old, sizes(&old.group));
+            let (stale, fresh) = match edited(&old.group, &group).filter(|_| old.matrix == matrix) {
+                Some(local) => (hull(matrix, corners(local)), None),
+                None => (reach(&old, sizes(&old.group)), fresh),
+            };
             if moved {
                 self.damage.join(Damage::Rects(stale.into_iter().chain(fresh).collect()));
             }
@@ -255,7 +266,7 @@ impl World {
                 self.mark_scene(stale);
             }
             if now_scene && (moved || !was_scene) {
-                self.mark_scene(fresh);
+                self.mark_scene(if was_scene { fresh } else { fresh.or(stale) });
             }
         }
         if let Some(order) = patch.order {

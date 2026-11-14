@@ -3,7 +3,7 @@
   import { addTally, countFrame } from '$lib/canvas/gpu/frame-stats';
   import { sharedFrames } from '$lib/motion/gpu/shared-frames';
   import { drawFrame, prepare, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
-  import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
+  import { smoothingOf, type Typeset } from '@feega/motion-core/motion/gpu-full/text/painter';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
   import { CoreMotion, createCore, createCoreGl, dropCore, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
@@ -316,6 +316,10 @@
     asking.set(f.id, key);
 
     noteImages(f.id, built.list);
+    const seed = f.scenes ? null : (given ?? read?.source ?? null);
+    if (seed) {
+      seedLive(f, seed, built.list);
+    }
     const present = (ready: Readiness) => {
       if (asking.get(f.id) !== key) {
         return;
@@ -619,18 +623,34 @@
   }
 
   const liveMeasures = new Map<string, TextMeasure>();
+  const liveTypesets = new Map<string, Typeset>();
 
   function measureLive(f: FrameAt, source: LiveDoc) {
     idle(() =>
       loadFonts(source.doc, source.assets, source.tokens).then(
         (fonts) => {
-          const measure = shapedText({ fonts, smoothing });
+          const typeset = { fonts, smoothing };
+          const measure = shapedText(typeset);
           liveMeasures.set(f.id, measure);
+          liveTypesets.set(f.id, typeset);
           readyPatch(source.doc, measure);
         },
-        () => liveMeasures.delete(f.id)
+        () => {
+          liveMeasures.delete(f.id);
+          liveTypesets.delete(f.id);
+        }
       )
     );
+  }
+
+  function seedLive(f: FrameAt, source: LiveDoc, list: DisplayList) {
+    void media.ready(list).then((ready) => {
+      if (liveShown.has(f.id)) {
+        return;
+      }
+      liveShown.set(f.id, { doc: source.doc, list, ready });
+      measureLive(f, source);
+    });
   }
 
   type ShownLive = { doc: MotionDoc; list: DisplayList; ready: Awaited<ReturnType<typeof media.ready>> };
@@ -648,7 +668,7 @@
   function patchLive(f: FrameAt, source: LiveDoc): boolean {
     const shown = liveShown.get(f.id);
     const measure = liveMeasures.get(f.id);
-    const list = shown && measure && fastPatch(shown.list, shown.doc, source.doc, measure);
+    const list = shown && measure && fastPatch(shown.list, shown.doc, source.doc, measure, { tokens: source.tokens, assets: source.assets, frame: frameOfLive(source), typeset: liveTypesets.get(f.id) });
     if (!shown || !list) {
       return false;
     }
@@ -700,6 +720,7 @@
       liveBuilt.delete(id);
       liveShown.delete(id);
       liveMeasures.delete(id);
+      liveTypesets.delete(id);
       heldMain.drop(id);
       customPictures.drop(liveRead(id));
       const saved = frames.find((f) => f.id === id);
