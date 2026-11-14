@@ -247,7 +247,7 @@ describe('/app/credits — the workspace credits page', () => {
 				status: 303,
 				location: 'https://checkout.stripe.com/c/pay/cs_test_one_time'
 			});
-			expect(ensureOrgCustomer).toHaveBeenCalledWith({ id: 'org-1', name: 'Ana', stripe_customer_id: null });
+			expect(ensureOrgCustomer).toHaveBeenCalledWith({ id: 'org-1', name: 'Ana', stripe_customer_id: null }, 'ana@example.com');
 			expect(createOneTimeCreditCheckout).toHaveBeenCalledWith(
 				expect.objectContaining({
 					orgId: 'org-1',

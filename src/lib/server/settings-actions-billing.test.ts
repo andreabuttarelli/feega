@@ -34,7 +34,7 @@ function ownerSupabase() {
 	const q = { select: () => q, eq: () => q, in: () => editorQuery, then: (resolve: (v: unknown) => void) => resolve({ data: memberships, error: null }) };
 	const editorQuery = { then: (resolve: (v: unknown) => void) => resolve({ data: editors, error: null }) };
 	return {
-		auth: { getUser: async () => ({ data: { user: { id: 'user-1' } } }) },
+		auth: { getUser: async () => ({ data: { user: { id: 'user-1', email: 'ana@example.com' } } }) },
 		from: () => q
 	};
 }
@@ -138,6 +138,7 @@ describe('buyOneTime — the three top-ups', () => {
 			location: 'https://checkout.stripe.com/c/pay/cs_test_pack'
 		});
 		expect(createOneTimeCreditCheckout).toHaveBeenCalledWith(expect.objectContaining({ orgId: 'org-1', price: 20, credits: 2000 }));
+		expect(ensureOrgCustomer).toHaveBeenCalledWith(expect.anything(), 'ana@example.com');
 	});
 
 	it('refuses an amount that is not a top-up, such as an old ladder step', async () => {

@@ -85,16 +85,36 @@ export async function setSeatQuantity(subscriptionId: string, itemId: string, qu
  * under the org checks out against the same customer. Written with the service role: this id is a join
  * key another org's session must never set.
  */
-export async function ensureOrgCustomer(org: {
-  id: string;
-  name: string;
-  stripe_customer_id: string | null;
-}): Promise<string> {
-  if (org.stripe_customer_id) return org.stripe_customer_id;
+async function fillMissingEmail(customerId: string, email: string | undefined): Promise<void> {
+  if (!email) {
+    return;
+  }
+
+  const customer = await stripe().customers.retrieve(customerId);
+  if (customer.deleted || customer.email) {
+    return;
+  }
+
+  await stripe().customers.update(customerId, { email });
+}
+
+export async function ensureOrgCustomer(
+  org: {
+    id: string;
+    name: string;
+    stripe_customer_id: string | null;
+  },
+  email: string | undefined
+): Promise<string> {
+  if (org.stripe_customer_id) {
+    await fillMissingEmail(org.stripe_customer_id, email);
+    return org.stripe_customer_id;
+  }
 
   const customer = await stripe().customers.create({
+    email,
     name: org.name,
-    metadata: { org_id: org.id }
+    metadata: { org_id: org.id, app: APP_TAG }
   });
   await createAdminClient().from('orgs').update({ stripe_customer_id: customer.id }).eq('id', org.id);
 
@@ -117,7 +137,7 @@ export async function createOneTimeCreditCheckout(opts: {
         price_data: {
           currency: PLAN_CURRENCY,
           unit_amount: Math.round(opts.price * CENTS_PER_UNIT),
-          product_data: { name: `${formatCredits(opts.credits)} feega credits` }
+          product_data: { name: `${formatCredits(opts.credits)} Feega credits` }
         },
         quantity: 1
       }

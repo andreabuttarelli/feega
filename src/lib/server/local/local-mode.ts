@@ -9,7 +9,7 @@ type Resolve = (event: RequestEvent, opts?: ResolveOptions) => Response | Promis
 export const LOCAL_FILE_ENV = 'FEEGA_LOCAL_FILE';
 export const LOCAL_LATENCY_ENV = 'FEEGA_LOCAL_LATENCY_MS';
 export const LOCAL_TOKEN = 'local';
-export const LOCAL_AI_MESSAGE = 'AI generation runs on feega cloud. Import this .feega file at feega.app to generate.';
+export const LOCAL_AI_MESSAGE = 'AI generation runs on Feega Cloud. Import this .feega file at feega.app to generate.';
 
 const LOOPBACK = ['localhost', '127.0.0.1', '::1', '[::1]'];
 const SEE_OTHER = 303;
@@ -34,7 +34,7 @@ const ROUTES: { route: LocalRoute; matches: (path: string, canvas: string) => bo
   { route: LocalRoute.Home, matches: (path) => path === '/' || path.startsWith('/p/') || path.startsWith('/app') || path === '/login' }
 ];
 
-const CLOUD_ONLY = 'needs feega cloud. Import this .feega file at feega.app to use it.';
+const CLOUD_ONLY = 'needs Feega Cloud. Import this .feega file at feega.app to use it.';
 
 const ONE_FILE = 'Local mode works on one .feega file. To open another, restart with: npm run local -- <file>.feega';
 

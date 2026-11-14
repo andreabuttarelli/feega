@@ -6,6 +6,8 @@ const subscriptionsUpdate = vi.fn();
 const subscriptionsCancel = vi.fn();
 const checkoutSessionsCreate = vi.fn();
 const customersCreate = vi.fn();
+const customersRetrieve = vi.fn();
+const customersUpdate = vi.fn();
 const pricesList = vi.fn();
 
 vi.mock('$env/dynamic/private', () => ({
@@ -23,7 +25,7 @@ vi.mock('stripe', () => ({
 			cancel: subscriptionsCancel
 		};
 		checkout = { sessions: { create: checkoutSessionsCreate } };
-		customers = { create: customersCreate };
+		customers = { create: customersCreate, retrieve: customersRetrieve, update: customersUpdate };
 		prices = { list: pricesList };
 	}
 }));
@@ -197,21 +199,36 @@ describe('ensureSubscriptionCanceled', () => {
 });
 
 describe('ensureOrgCustomer', () => {
-	it('returns the existing customer id without calling Stripe', async () => {
+	const EMAIL = 'ana@example.com';
+
+	it('returns the existing customer id when it already has an email', async () => {
+		customersRetrieve.mockResolvedValue({ id: 'cus_existing', email: 'other@example.com' });
 		const { ensureOrgCustomer } = await import('./stripe');
-		const id = await ensureOrgCustomer({ id: 'org_1', name: 'Acme', stripe_customer_id: 'cus_existing' });
+		const id = await ensureOrgCustomer({ id: 'org_1', name: 'Acme', stripe_customer_id: 'cus_existing' }, EMAIL);
 		expect(id).toBe('cus_existing');
 		expect(customersCreate).not.toHaveBeenCalled();
+		expect(customersUpdate).not.toHaveBeenCalled();
 	});
 
-	it('creates a customer tagged with the org id and persists it on orgs', async () => {
+	it('sets the email on an existing customer that has none', async () => {
+		customersRetrieve.mockResolvedValue({ id: 'cus_existing', email: null });
+		const { ensureOrgCustomer } = await import('./stripe');
+		await ensureOrgCustomer({ id: 'org_1', name: 'Acme', stripe_customer_id: 'cus_existing' }, EMAIL);
+		expect(customersUpdate).toHaveBeenCalledWith('cus_existing', { email: EMAIL });
+	});
+
+	it('creates a customer with the email and persists it on orgs', async () => {
 		customersCreate.mockResolvedValue({ id: 'cus_new' });
 		const { ensureOrgCustomer } = await import('./stripe');
 
-		const id = await ensureOrgCustomer({ id: 'org_1', name: 'Acme', stripe_customer_id: null });
+		const id = await ensureOrgCustomer({ id: 'org_1', name: 'Acme', stripe_customer_id: null }, EMAIL);
 
 		expect(id).toBe('cus_new');
-		expect(customersCreate).toHaveBeenCalledWith({ name: 'Acme', metadata: { org_id: 'org_1' } });
+		expect(customersCreate).toHaveBeenCalledWith({
+			email: EMAIL,
+			name: 'Acme',
+			metadata: { org_id: 'org_1', app: 'feega' }
+		});
 		expect(adminFrom).toHaveBeenCalledWith('orgs');
 		expect(adminUpdate).toHaveBeenCalledWith({ stripe_customer_id: 'cus_new' });
 		expect(adminUpdateEq).toHaveBeenCalledWith('id', 'org_1');
@@ -359,7 +376,7 @@ describe('createOneTimeCreditCheckout', () => {
 					price_data: {
 						currency: 'eur',
 						unit_amount: 1000,
-						product_data: { name: '1,000 feega credits' }
+						product_data: { name: '1,000 Feega credits' }
 					},
 					quantity: 1
 				}
