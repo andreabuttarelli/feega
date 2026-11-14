@@ -2,6 +2,23 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { PLANS } from '$lib/plans';
 import { swallow } from '$lib/server/swallow';
 import { billedCreditsFor } from '$lib/credit-ladder';
+import { usageBreakdown, type ProjectName, type UsageBreakdown, type UsageCall } from '$lib/credits/usage-breakdown';
+
+const USAGE_WINDOW_DAYS = 30;
+const DAY_MS = 86_400_000;
+
+export async function recentUsage(supabase: SupabaseClient, orgId: string, now = new Date()): Promise<UsageBreakdown> {
+  const since = new Date(now.getTime() - USAGE_WINDOW_DAYS * DAY_MS).toISOString();
+  const [calls, projects] = await Promise.all([
+    supabase.from('ai_calls').select('operation, actor_kind, project_id, billed_credits, cost_usd').eq('org_id', orgId).gte('created_at', since),
+    supabase.from('projects').select('id, name').eq('org_id', orgId)
+  ]);
+  if (calls.error) {
+    throw new Error(`ai_calls usage failed: ${calls.error.message}`);
+  }
+
+  return usageBreakdown((calls.data ?? []) as UsageCall[], (projects.data ?? []) as ProjectName[]);
+}
 
 // ── AI Credits: consumption tracking per billing period ─────────────────────────
 // Every AI call logs cost_usd in ai_calls (tagged by brand_id via the AsyncLocalStorage

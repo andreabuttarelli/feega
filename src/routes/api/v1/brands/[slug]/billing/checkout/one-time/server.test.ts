@@ -61,7 +61,7 @@ beforeEach(() => {
 	vi.clearAllMocks();
 	vi.mocked(authenticate).mockResolvedValue({
 		supabase: {},
-		user: { id: 'user-1' },
+		user: { id: 'user-1', email: 'ana@example.com' },
 		apiKey: undefined,
 		error: null
 	} as never);
@@ -105,7 +105,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout/one-time', () => {
 			id: 'org-1',
 			name: 'Acme',
 			stripe_customer_id: null
-		});
+		}, 'ana@example.com');
 	});
 
 	it('rejects an amount that is not a top-up, an old ladder step included, before touching Stripe', async () => {

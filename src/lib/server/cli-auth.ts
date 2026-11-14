@@ -6,6 +6,7 @@ import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { markRlsScoped } from '$lib/server/rls-client';
 import { LOCAL_AI_MESSAGE, localStore } from '$lib/server/local/local-mode';
 import { hasAiKey } from '$lib/local-ai-keys';
+import { ProductEvent, track } from '$lib/server/product-events/track';
 
 /**
  * The new `api_keys` (org_id NOT NULL, scopes: string[]) has no per-brand scoping column — a key
@@ -100,7 +101,7 @@ async function authenticateApiKey(token: string) {
 
   const { data: keyRow, error: lookupError } = await admin
     .from('api_keys')
-    .select('id, user_id, org_id, name, scopes, expires_at, revoked_at')
+    .select('id, user_id, org_id, name, scopes, expires_at, revoked_at, last_used_at')
     .eq('key_hash', keyHash)
     .maybeSingle();
 
@@ -116,6 +117,9 @@ async function authenticateApiKey(token: string) {
 
   // Fire-and-forget: update last_used_at
   admin.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', keyRow.id);
+  if (!keyRow.last_used_at) {
+    void track(ProductEvent.AgentConnected, { userId: keyRow.user_id, orgId: keyRow.org_id }, { key_id: keyRow.id });
+  }
 
   const apiKey: ApiKeyInfo = {
     id: keyRow.id,

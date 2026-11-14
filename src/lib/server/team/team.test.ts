@@ -362,7 +362,7 @@ describe('la squadra', () => {
   it('says how many editors the team pays for, and whether it pays', async () => {
     const { ctx } = ctxFor(OWNER);
 
-    expect((await listTeam(ctx))?.seats).toEqual({ editors: 3, paid: false, billing: 'free', pastDue: false, unpaid: false, grandfathered: false, endsAt: null, pricePerEditor: 9 });
+    expect((await listTeam(ctx))?.seats).toEqual({ editors: 3, paid: false, billing: 'free', pastDue: false, unpaid: false, grandfathered: false, endsAt: null, renewsAt: null, pricePerEditor: 9 });
   });
 
   it('a grandfathered free team says so', async () => {

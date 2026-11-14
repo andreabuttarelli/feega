@@ -9,7 +9,39 @@ type PostHog = {
   startSessionRecording?: () => void;
   capture?: (event: string, props?: Record<string, unknown>) => void;
   identify?: (id: string, props?: Record<string, unknown>) => void;
+  group?: (type: string, key: string) => void;
+  getFeatureFlag?: (key: string) => boolean | string | undefined;
+  get_distinct_id?: () => string;
+  get_session_id?: () => string;
 };
+
+export const REPLAY_SAMPLE_RATE = 0.25;
+const ORG_GROUP = 'organization';
+
+export enum ClientEvent {
+  ExportSaved = 'export_saved'
+}
+
+export function replaySampled(roll: number): boolean {
+  return roll < REPLAY_SAMPLE_RATE;
+}
+
+export function postHogTags(ph: Pick<PostHog, 'get_distinct_id' | 'get_session_id'> | undefined): Record<string, string> {
+  const person = ph?.get_distinct_id?.();
+  const session = ph?.get_session_id?.();
+  if (!person || !session) {
+    return {};
+  }
+  return { posthog_distinct_id: person, posthog_session_id: session };
+}
+
+export function sentryTags(): Record<string, string> {
+  return browser ? postHogTags(posthog()) : {};
+}
+
+export function featureFlag(key: string): boolean | string | undefined {
+  return browser ? posthog()?.getFeatureFlag?.(key) : undefined;
+}
 
 const GOOGLE_CONVERSION_TAG_ID = 'AW-740942237';
 
@@ -246,12 +278,15 @@ function selineBrowser(): SelineBrowser | undefined {
   return (window as unknown as { seline?: SelineBrowser }).seline;
 }
 
-export function identifyUser(id: string, props?: Record<string, unknown>) {
+export function identifyUser(id: string, props?: Record<string, unknown>, orgId: string | null = null) {
   if (blocked(Tracker.PostHog) || !id) {
     return;
   }
   startPostHog();
   posthog()?.identify?.(id, props);
+  if (orgId) {
+    posthog()?.group?.(ORG_GROUP, orgId);
+  }
   selineBrowser()?.setUser?.({ userId: id, ...props });
 }
 
@@ -270,8 +305,12 @@ function startPostHog() {
       person_profiles: 'identified_only',
       capture_pageview: true,
       autocapture: true,
-      session_recording: { maskAllInputs: true, maskTextSelector: '*' }
+      disable_session_recording: true,
+      session_recording: { maskAllInputs: true, maskTextSelector: '*', blockSelector: 'canvas, video, img' }
     });
+    if (replaySampled(Math.random())) {
+      posthog()?.startSessionRecording?.();
+    }
   });
 }
 

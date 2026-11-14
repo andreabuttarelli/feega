@@ -88,7 +88,7 @@ describe('le route della modalità locale', () => {
 
   it('commenti, condivisione e versioni rispondono con un messaggio chiaro', async () => {
     const answer = await served(`${canvas}?/share_canvas`, { method: 'POST' });
-    expect(answer.body).toContain('feega cloud');
+    expect(answer.body).toContain('Feega Cloud');
     expect(answer.seen).toEqual([]);
   });
 });

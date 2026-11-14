@@ -1,7 +1,7 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { Actions, ServerLoad as PageServerLoad } from '@sveltejs/kit';
-import { orgCreditBalance } from '$lib/server/credits';
-import { billedCreditsFor, PLAN, planForLookupKey, TOP_UPS, type Plan } from '$lib/credit-ladder';
+import { orgCreditBalance, recentUsage } from '$lib/server/credits';
+import { PLAN, planForLookupKey, TOP_UPS, type Plan } from '$lib/credit-ladder';
 import { orgBillingById } from '$lib/server/org-billing';
 import { billingGrantsReady } from '$lib/server/billing-readiness';
 import {
@@ -21,7 +21,7 @@ import type { Db } from '$lib/server/db/client';
 const stripeApi = () => import('$lib/server/stripe');
 
 type OrgRow = { id: string; name: string; stripe_customer_id: string | null };
-type BrandRow = { id: string; name: string; slug: string };
+const NO_USAGE = { total: 0, byProject: [], byKind: [] };
 
 export const load = async ({ parent, url, request, locals: { supabase } }: Parameters<PageServerLoad>[0]) => {
   const {
@@ -31,42 +31,34 @@ export const load = async ({ parent, url, request, locals: { supabase } }: Param
 
   const orgId = (await parent()).org.id;
 
-  const [{ data: orgData }, { data: membership }, { data: brandRows }, purchasesReady] = await Promise.all([
+  const [{ data: orgData }, { data: membership }, purchasesReady] = await Promise.all([
     supabase.from('orgs').select('id, name, stripe_customer_id').eq('id', orgId).maybeSingle(),
     supabase.from('orgs_members').select('role').eq('org_id', orgId).eq('user_id', user.id).maybeSingle(),
-    supabase.from('brands').select('id, name, slug').eq('org_id', orgId),
     billingGrantsReady(supabase)
   ]);
   const org = orgData as OrgRow | null;
   if (!org) throw error(404, 'Organization not found');
 
-  const brands = (brandRows ?? []) as BrandRow[];
-
-  const [balance, currentPlan, seats, agentEdits] = await Promise.all([
+  const [balance, currentPlan, seats, agentEdits, usage] = await Promise.all([
     orgCreditBalance(supabase, orgId),
     currentPlanOf(supabase, orgId),
     seatStatus(supabase as unknown as Db, orgId).catch((e) => {
       console.error('[seats] seat state unreadable on the credits page', orgId, e);
       return null;
     }),
-    agentEditUsage(supabase as unknown as Db, orgId)
+    agentEditUsage(supabase as unknown as Db, orgId),
+    recentUsage(supabase, orgId).catch((e) => {
+      console.error('[credits] usage unreadable on the credits page', orgId, e);
+      return NO_USAGE;
+    })
   ]);
-
-  const spends = await Promise.all(
-    brands.map(async (b) => ({
-      id: b.id,
-      name: b.name,
-      slug: b.slug,
-      credits: billedCreditsFor(await sumBrandCostUsd(supabase, b.id))
-    }))
-  );
 
   return {
     org: { id: org.id, name: org.name },
     credits: { balance },
     plan: PLAN,
     topUps: TOP_UPS,
-    brands: spends,
+    usage,
     hasBilling: !!org.stripe_customer_id,
     currentPlan,
     seats,
@@ -108,21 +100,6 @@ async function currentPlanOf(supabase: App.Locals['supabase'], orgId: string): P
   } catch {
     return null;
   }
-}
-
-async function sumBrandCostUsd(supabase: App.Locals['supabase'], brandId: string): Promise<number> {
-  const now = new Date();
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-
-  const { data } = await supabase
-    .from('ai_calls')
-    .select('cost_usd')
-    .eq('brand_id', brandId)
-    .gte('created_at', start.toISOString())
-    .lt('created_at', end.toISOString());
-
-  return (data ?? []).reduce((sum: number, row: { cost_usd: number | null }) => sum + (row.cost_usd ?? 0), 0);
 }
 
 export const actions: Actions = {
