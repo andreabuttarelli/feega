@@ -170,17 +170,31 @@ describe('fastPatch redraws one restyled layer without rebuilding the frame', ()
     expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toEqual(drawn(after));
   });
 
-  it('leaves to the full build a layer inside an auto layout parent, whose siblings may reflow', () => {
+  it('a resized layer inside a hugging auto layout parent reflows its siblings as the full build does', () => {
     const before = stack(Sizing.Hug);
     const after = edit(before, 'a', restyled({ width: 0.2 }));
 
-    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toBeNull();
+    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toEqual(drawn(after));
   });
 
-  it('leaves to the full build a layer with children, which may be pinned to it', () => {
+  it('a resized layer inside a fixed auto layout parent reflows its siblings as the full build does', () => {
+    const before = stack(Sizing.Fixed);
+    const after = edit(before, 'b', restyled({ height: 0.2 }));
+
+    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toEqual(drawn(after));
+  });
+
+  it('a hidden layer inside a hugging auto layout parent closes the gap as the full build does', () => {
+    const before = stack(Sizing.Hug);
+    const after = edit(before, 'a', hidden);
+
+    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toEqual(drawn(after));
+  });
+
+  it('a resized layer with children redraws them as the full build does', () => {
     const before = nested();
     const after = edit(before, 'card', restyled({ width: 0.5 }));
 
-    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toBeNull();
+    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toEqual(drawn(after));
   });
 });
