@@ -648,7 +648,7 @@
   function patchLive(f: FrameAt, source: LiveDoc): boolean {
     const shown = liveShown.get(f.id);
     const measure = liveMeasures.get(f.id);
-    const list = shown && measure && fastPatch(shown.list, shown.doc, source.doc, measure);
+    const list = shown && measure && fastPatch(shown.list, shown.doc, source.doc, measure, { tokens: source.tokens, assets: source.assets, frame: frameOfLive(source) });
     if (!shown || !list) {
       return false;
     }
