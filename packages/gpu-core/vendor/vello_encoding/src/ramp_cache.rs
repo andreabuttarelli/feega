@@ -1,7 +1,7 @@
 // Copyright 2022 the Vello Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::hash::Hash;
 use std::hash::Hasher;
 
@@ -48,7 +48,7 @@ impl BitEq for GradientCacheKey {
 pub(crate) struct RampCache {
     epoch: u64,
     revision: u64,
-    map: HashMap<CacheKey<GradientCacheKey>, (u32, u64)>,
+    map: FxHashMap<CacheKey<GradientCacheKey>, (u32, u64)>,
     data: Vec<u32>,
 }
 

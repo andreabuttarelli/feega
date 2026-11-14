@@ -28,7 +28,7 @@ fn list(fit: &str, clipped: bool) -> String {
 #[cfg(feature = "gpu")]
 fn halves() -> Pictures {
     let row: Vec<u8> = [RED, RED, GREEN, GREEN].concat();
-    Pictures::from([("pic".to_string(), picture(4, 2, [row.clone(), row].concat()))])
+    Pictures::from_iter([("pic".to_string(), picture(4, 2, [row.clone(), row].concat()))])
 }
 
 #[cfg(feature = "gpu")]
@@ -45,7 +45,7 @@ fn parses_an_image_item() {
 
 #[test]
 fn an_image_without_its_picture_is_skipped_by_name() {
-    let (_, skipped) = build(&parse(&list("cover", true)).unwrap(), &Pictures::new(), &Layers::new());
+    let (_, skipped) = build(&parse(&list("cover", true)).unwrap(), &Pictures::default(), &Layers::new());
 
     assert_eq!(skipped.len(), 1);
     assert_eq!(skipped[0].what, "image");
@@ -141,7 +141,7 @@ fn a_gpu_picture_is_copied_again_only_when_its_change_is_announced() {
     let list = parse(&list("fill", true)).unwrap();
     let mut shown = |rgba: [u8; 4], change: Change| {
         let image = renderer.picture("pic", 2, 2, &rgba.repeat(4), change);
-        at(&renderer.render(&list, &Pictures::from([("pic".to_string(), image)])).unwrap().pixels, 32, 32)
+        at(&renderer.render(&list, &Pictures::from_iter([("pic".to_string(), image)])).unwrap().pixels, 32, 32)
     };
 
     assert_eq!(shown(RED, Change::Announced), RED);

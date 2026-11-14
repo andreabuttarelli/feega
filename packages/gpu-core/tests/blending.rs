@@ -15,7 +15,7 @@ const POSTER: &str = r#"{ "width": 64, "height": 32, "background": null, "items"
 
 fn rendered(blending: Blending) -> Vec<u8> {
     let mut renderer = Renderer::new().expect("a GPU adapter").blending(blending);
-    renderer.render(&parse(POSTER).unwrap(), &Pictures::new()).unwrap().pixels
+    renderer.render(&parse(POSTER).unwrap(), &Pictures::default()).unwrap().pixels
 }
 
 fn at(pixels: &[u8], x: usize, y: usize) -> Vec<u8> {
@@ -41,7 +41,7 @@ const ADDED: &str = r#"{ "width": 64, "height": 32, "background": [0.5, 0.25, 0.
 #[test]
 fn linear_dodge_adds_the_layer_to_its_backdrop_on_the_native_path() {
     let mut renderer = Renderer::new().expect("a GPU adapter").blending(Blending::Native);
-    let pixels = renderer.render(&parse(ADDED).unwrap(), &Pictures::new()).unwrap().pixels;
+    let pixels = renderer.render(&parse(ADDED).unwrap(), &Pictures::default()).unwrap().pixels;
 
     let inside = at(&pixels, 32, 16);
     let outside = at(&pixels, 4, 16);

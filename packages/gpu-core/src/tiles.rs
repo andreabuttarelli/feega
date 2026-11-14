@@ -224,11 +224,11 @@ fn count_over(world: Rect, step: i32) -> f64 {
     ((world.x1 / side).ceil() - (world.x0 / side).floor()) * ((world.y1 / side).ceil() - (world.y0 / side).floor())
 }
 
-fn keys_over(world: Rect, step: i32) -> Vec<TileKey> {
+fn keys_over(world: Rect, step: i32) -> impl Iterator<Item = TileKey> {
     let side = TILE_PX as f64 / step_zoom(step);
     let (x0, y0) = ((world.x0 / side).floor() as i64, (world.y0 / side).floor() as i64);
     let (x1, y1) = ((world.x1 / side).ceil() as i64, (world.y1 / side).ceil() as i64);
-    (y0..y1).flat_map(|ty| (x0..x1).map(move |tx| TileKey { step, tx, ty })).collect()
+    (y0..y1).flat_map(move |ty| (x0..x1).map(move |tx| TileKey { step, tx, ty }))
 }
 
 pub fn lifted_keys(camera: Camera, screen: (u32, u32), rest: Rect, (dx, dy): (f64, f64), step: i32) -> Vec<TileKey> {
@@ -237,7 +237,7 @@ pub fn lifted_keys(camera: Camera, screen: (u32, u32), rest: Rect, (dx, dy): (f6
     if !shown.overlaps(rest) {
         return Vec::new();
     }
-    keys_over(shown.intersect(rest), step)
+    keys_over(shown.intersect(rest), step).collect()
 }
 
 impl Tiles {
@@ -264,10 +264,10 @@ impl Tiles {
         let world = seen_world(camera, screen);
         let centre = Point::new(screen.0 as f64 / 2.0, screen.1 as f64 / 2.0);
         let distance = |k: &TileKey| k.screen(camera).center().distance(centre);
-        let mut missing: Vec<TileKey> = keys_over(world, step).into_iter().filter(|k| !self.held.contains(k) || self.stale.contains(k)).filter(|k| self.paints(*k)).collect();
+        let mut missing: Vec<TileKey> = keys_over(world, step).filter(|k| !self.held.contains(k) || self.stale.contains(k)).filter(|k| self.paints(*k)).collect();
         missing.sort_by(|a, b| distance(a).total_cmp(&distance(b)));
         let fallback: Vec<i32> = if missing.is_empty() { vec![] } else { (step - COARSER_STEPS..step).chain((step + 1..=step + FINER_STEPS).rev()).collect() };
-        let whole = |s: i32| keys_over(world, s).iter().filter(|k| self.paints(**k)).all(|k| self.held.contains(k));
+        let whole = |s: i32| keys_over(world, s).filter(|k| self.paints(*k)).all(|k| self.held.contains(&k));
         let shown = if missing.is_empty() { Some(step) } else { ((step + 1..=step + FINER_STEPS).chain((step - COARSER_STEPS..step).rev())).find(|s| whole(*s)) };
         let draw: Vec<TileKey> = match shown {
             Some(top) => self.held_over(world, top),
@@ -286,7 +286,7 @@ impl Tiles {
         if (world.width() / side) * (world.height() / side) > (self.held.len() as f64) {
             return self.held.iter().filter(|k| k.step == step && k.world().overlaps(world)).copied().collect();
         }
-        keys_over(world, step).into_iter().filter(|k| self.held.contains(k)).collect()
+        keys_over(world, step).filter(|k| self.held.contains(k)).collect()
     }
 
     pub fn ahead(&self, was: Camera, now: Camera, screen: (u32, u32)) -> Vec<TileKey> {
@@ -307,11 +307,11 @@ impl Tiles {
         let world = key.world();
         let coarser = key.step - steps..key.step;
         let finer = key.step + 1..=key.step + steps.min(FINER_STEPS);
-        coarser.chain(finer).any(|step| keys_over(world, step).iter().all(|k| self.held.contains(k)))
+        coarser.chain(finer).any(|step| keys_over(world, step).all(|k| self.held.contains(&k)))
     }
 
     fn shown_sharper(&self, key: TileKey) -> bool {
-        (key.step + 1..=key.step + FINER_STEPS).any(|step| keys_over(key.world(), step).iter().all(|k| self.held.contains(k)))
+        (key.step + 1..=key.step + FINER_STEPS).any(|step| keys_over(key.world(), step).all(|k| self.held.contains(&k)))
     }
 
     pub fn unsharp(&self, missing: &[TileKey]) -> usize {

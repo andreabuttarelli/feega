@@ -53,7 +53,7 @@ fn a_use_clips_to_its_frame_on_screen_and_paints_the_frame_background() {
 fn a_put_group_is_drawn_where_its_use_places_it() {
     let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
     renderer.put_group("frame-1", parse(FRAME).unwrap());
-    let rendered = renderer.render(&parse(SCREEN).unwrap(), &gpu_core::pictures::Pictures::new()).unwrap();
+    let rendered = renderer.render(&parse(SCREEN).unwrap(), &gpu_core::pictures::Pictures::default()).unwrap();
     let at = |x: usize, y: usize| rendered.pixels[(y * 400 + x) * 4..(y * 400 + x) * 4 + 4].to_vec();
 
     assert!(at(70, 70)[0] > 240 && at(70, 70)[2] < 15);
@@ -96,7 +96,7 @@ fn a_used_lens_is_placed_in_screen_space_inside_its_frame() {
 fn a_used_lens_draws_nothing_outside_its_frame() {
     let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
     renderer.put_group("blob-frame", parse(BLOB_FRAME).unwrap());
-    let rendered = renderer.render(&parse(BLOB_SCREEN).unwrap(), &gpu_core::pictures::Pictures::new()).unwrap();
+    let rendered = renderer.render(&parse(BLOB_SCREEN).unwrap(), &gpu_core::pictures::Pictures::default()).unwrap();
     let at = |x: usize, y: usize| rendered.pixels[(y * 256 + x) * 4..(y * 256 + x) * 4 + 4].to_vec();
 
     assert_eq!(at(32, 32), vec![0, 0, 0, 255]);

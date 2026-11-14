@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
 use vello::peniko::{Blob, ImageAlphaType, ImageData, ImageFormat};
 
 use crate::display_list::Size;
 
-pub type Pictures = HashMap<String, ImageData>;
+pub type Pictures = FxHashMap<String, ImageData>;
 
 pub fn picture(width: u32, height: u32, rgba: Vec<u8>) -> ImageData {
     ImageData { data: Blob::new(Arc::new(rgba)), format: ImageFormat::Rgba8, alpha_type: ImageAlphaType::Alpha, width, height }

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 use vello::kurbo::{Affine, Point, Rect};
 use vello::peniko::{color::AlphaColor, Color, Fill, Gradient, ImageData};
@@ -30,14 +30,14 @@ struct Cached {
 }
 
 struct LayerCache {
-    entries: HashMap<String, Cached>,
+    entries: FxHashMap<String, Cached>,
     tick: u64,
     cap: u64,
 }
 
 impl Default for LayerCache {
     fn default() -> Self {
-        LayerCache { entries: HashMap::new(), tick: 0, cap: LAYER_BYTES }
+        LayerCache { entries: FxHashMap::default(), tick: 0, cap: LAYER_BYTES }
     }
 }
 
@@ -104,7 +104,7 @@ pub struct Engine {
     pub blending: Blending,
     filters: FilterPasses,
     cache: LayerCache,
-    held: HashMap<String, wgpu::Texture>,
+    held: FxHashMap<String, wgpu::Texture>,
     spare: Vec<wgpu::Texture>,
     scenes: Vec<Scene>,
     tally: Tally,
@@ -257,7 +257,7 @@ impl Gpu<'_> {
 impl Engine {
     pub fn new(device: &wgpu::Device) -> Result<Self, EngineError> {
         let vello = vello::Renderer::new(device, RendererOptions { antialiasing_support: AaSupport::area_only(), ..Default::default() })?;
-        Ok(Self { vello, blending: Blending::Native, filters: FilterPasses::new(device), cache: LayerCache::default(), held: HashMap::new(), spare: Vec::new(), scenes: Vec::new(), tally: Tally::default(), drawing: Reason::Screen, fullness: 0.0, draws: 0 })
+        Ok(Self { vello, blending: Blending::Native, filters: FilterPasses::new(device), cache: LayerCache::default(), held: FxHashMap::default(), spare: Vec::new(), scenes: Vec::new(), tally: Tally::default(), drawing: Reason::Screen, fullness: 0.0, draws: 0 })
     }
 
     pub fn set_budget(&mut self, pool: u64, layers: u64) {

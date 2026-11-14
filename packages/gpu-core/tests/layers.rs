@@ -33,7 +33,7 @@ fn grey(pixels: &[u8], x: usize, y: usize) -> u8 {
 #[cfg(feature = "gpu")]
 fn render(json: &str) -> Vec<u8> {
     let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
-    renderer.render(&parse(json).unwrap(), &Pictures::new()).unwrap().pixels
+    renderer.render(&parse(json).unwrap(), &Pictures::default()).unwrap().pixels
 }
 
 #[test]
@@ -57,7 +57,7 @@ fn wide_kernels_stride_to_stay_within_the_tap_budget() {
 fn a_path_is_bounded_by_its_transformed_points() {
     let list = parse(&square(r#", "matrix": [2, 0, 0, 1, 4, 0]"#).replace(r#""matrix": [1, 0, 0, 1, 0, 0], "blend": "normal", "matrix""#, r#""blend": "normal", "matrix""#)).unwrap();
 
-    let b = gpu_core::scene::bounds::<vello::Scene>(&list.items[0], &gpu_core::pictures::Pictures::new()).unwrap();
+    let b = gpu_core::scene::bounds::<vello::Scene>(&list.items[0], &gpu_core::pictures::Pictures::default()).unwrap();
     assert_eq!((b.x0, b.y0, b.x1, b.y1), (36.0, 16.0, 100.0, 48.0));
 }
 
@@ -66,7 +66,7 @@ fn an_image_is_bounded_by_its_box_when_clipped() {
     let json = r#"{ "width": 64, "height": 64, "background": null, "items": [
     { "kind": "image", "clip": "pic", "src": "x", "video": false, "mediaTime": 0, "size": { "width": 20, "height": 10 },
       "fit": "cover", "focus": [0.5, 0.5], "zoom": 1, "clipped": true, "inner": [1, 0, 0, 1, 0, 0], "opacity": 1, "matrix": [1, 0, 0, 1, 5, 6], "blend": "normal" } ] }"#;
-    let pictures = gpu_core::pictures::Pictures::from([("pic".to_string(), gpu_core::pictures::picture(1, 1, vec![0; 4]))]);
+    let pictures = gpu_core::pictures::Pictures::from_iter([("pic".to_string(), gpu_core::pictures::picture(1, 1, vec![0; 4]))]);
 
     let b = gpu_core::scene::bounds::<vello::Scene>(&parse(json).unwrap().items[0], &pictures).unwrap();
     assert_eq!((b.x0, b.y0, b.x1, b.y1), (5.0, 6.0, 25.0, 16.0));
@@ -122,7 +122,7 @@ fn a_picture_mask_keeps_what_its_picture_covers() {
     );
     let opaque = picture(1, 1, vec![255, 255, 255, 255]);
     let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
-    let pixels = renderer.render(&parse(&json).unwrap(), &Pictures::from([("p".to_string(), opaque)])).unwrap().pixels;
+    let pixels = renderer.render(&parse(&json).unwrap(), &Pictures::from_iter([("p".to_string(), opaque)])).unwrap().pixels;
 
     assert_eq!(grey(&pixels, 24, 32), 255);
     assert_eq!(grey(&pixels, 40, 32), 0);
@@ -145,7 +145,7 @@ fn a_picture_mask_survives_frames_that_grow_the_image_atlas() {
     let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
     let gpu = renderer.picture("p", 1, 1, &[255, 255, 255, 255], gpu_core::render::Change::Announced);
 
-    for (kind, pictures) in [("memory", Pictures::from([("p".to_string(), picture(1, 1, vec![255, 255, 255, 255]))])), ("gpu", Pictures::from([("p".to_string(), gpu)]))] {
+    for (kind, pictures) in [("memory", Pictures::from_iter([("p".to_string(), picture(1, 1, vec![255, 255, 255, 255]))])), ("gpu", Pictures::from_iter([("p".to_string(), gpu)]))] {
         for n in [0, 12, 0, 24, 1] {
             let pixels = renderer.render(&parse(&crowded(n)).unwrap(), &pictures).unwrap().pixels;
             assert_eq!(grey(&pixels, 24, 32), 255, "{kind} picture with {n} extra layers");
@@ -162,7 +162,7 @@ fn a_backdrop_blurs_only_what_lies_under_the_item() {
     { "kind": "path", "clip": "glass", "contours": [[16, 16, 48, 16, 48, 48, 16, 48]], "rule": "nonzero",
       "paint": { "kind": "solid", "color": [1, 1, 1, 0] }, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blend": "normal", "backdrop": 4 } ] }"#;
     let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
-    let rendered = renderer.render(&parse(json).unwrap(), &Pictures::new()).unwrap();
+    let rendered = renderer.render(&parse(json).unwrap(), &Pictures::default()).unwrap();
     let pixels = rendered.pixels;
 
     assert!(rendered.skipped.is_empty());
@@ -179,7 +179,7 @@ fn a_picture_under_a_backdrop_stays_drawn_frame_after_frame() {
       "fit": "fill", "focus": [0.5, 0.5], "zoom": 1, "clipped": true, "inner": [1, 0, 0, 1, 0, 0], "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blend": "normal" },
     { "kind": "path", "clip": "glass", "contours": [[16, 16, 48, 16, 48, 48, 16, 48]], "rule": "nonzero",
       "paint": { "kind": "solid", "color": [1, 1, 1, 0] }, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blend": "normal", "backdrop": 4 } ] }"#;
-    let pictures = Pictures::from([("under".to_string(), picture(2, 2, vec![255; 16]))]);
+    let pictures = Pictures::from_iter([("under".to_string(), picture(2, 2, vec![255; 16]))]);
     let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
 
     for frame in 0..3 {
@@ -203,9 +203,9 @@ fn a_remembered_layer_is_drawn_as_it_was_and_replaced_when_it_changes() {
     let soft = square(r#", "blur": 6"#);
     let softer = square(r#", "blur": 9"#);
     let mut shared = gpu_core::render::Renderer::new().expect("a GPU adapter");
-    let first = shared.render(&parse(&soft).unwrap(), &Pictures::new()).unwrap().pixels;
-    let other = shared.render(&parse(&softer).unwrap(), &Pictures::new()).unwrap().pixels;
-    let again = shared.render(&parse(&soft).unwrap(), &Pictures::new()).unwrap().pixels;
+    let first = shared.render(&parse(&soft).unwrap(), &Pictures::default()).unwrap().pixels;
+    let other = shared.render(&parse(&softer).unwrap(), &Pictures::default()).unwrap().pixels;
+    let again = shared.render(&parse(&soft).unwrap(), &Pictures::default()).unwrap().pixels;
 
     assert_eq!(first, render(&soft));
     assert_eq!(other, render(&softer));
@@ -219,8 +219,8 @@ fn a_frame_after_a_blurred_one_matches_a_fresh_renderer() {
     let blurred = square(r#", "blur": 6"#);
     let plain = square(RECT_MASK);
     let mut shared = gpu_core::render::Renderer::new().expect("a GPU adapter");
-    shared.render(&parse(&blurred).unwrap(), &Pictures::new()).unwrap();
-    let reused = shared.render(&parse(&plain).unwrap(), &Pictures::new()).unwrap().pixels;
+    shared.render(&parse(&blurred).unwrap(), &Pictures::default()).unwrap();
+    let reused = shared.render(&parse(&plain).unwrap(), &Pictures::default()).unwrap().pixels;
 
     assert_eq!(reused, render(&plain));
 }

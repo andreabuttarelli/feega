@@ -88,7 +88,7 @@ fn composing_the_encoding_paints_the_same_pixels_as_expanding_the_group() {
             renderer.compose_encodings();
         }
         renderer.put_group("a", parse(BARS).unwrap());
-        renderer.render(&screen("a", 3.0, 20.0, false), &Pictures::new()).unwrap().pixels
+        renderer.render(&screen("a", 3.0, 20.0, false), &Pictures::default()).unwrap().pixels
     };
 
     assert!(paint(true) == paint(false));
@@ -158,7 +158,7 @@ fn the_layer_of_a_composed_group_keeps_the_reach_of_its_paths() {
     plain.put_group("a", &parse(&mixed()).unwrap());
     let shape = |lib: &mut Library| {
         let plan = lib.plan(&screen("a", 2.0, 5.0, false), LIMITS);
-        bounds::<Scene>(&plan.screen.items[1], &Pictures::new()).unwrap()
+        bounds::<Scene>(&plan.screen.items[1], &Pictures::default()).unwrap()
     };
 
     assert_eq!(shape(&mut lib), shape(&mut plain));
@@ -176,7 +176,7 @@ fn composing_a_blurred_group_paints_the_same_pixels_as_expanding_it() {
             renderer.compose_encodings();
         }
         renderer.put_group("a", parse(&mixed()).unwrap());
-        renderer.render(&screen("a", 2.0, 5.0, false), &Pictures::new()).unwrap().pixels
+        renderer.render(&screen("a", 2.0, 5.0, false), &Pictures::default()).unwrap().pixels
     };
 
     assert!(paint(true) == paint(false));

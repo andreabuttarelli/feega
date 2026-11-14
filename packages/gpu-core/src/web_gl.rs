@@ -249,7 +249,7 @@ impl WebGlCore {
         let spare = held(renderer.gl_context(), compositor.size());
         let reprojector = GlReprojector::new(renderer.gl_context());
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        WebGlCore { renderer, resources, canvas: GlCanvas { scene: Scene::new(width as u16, height as u16), by: Affine::IDENTITY }, runner, width, height, pictures: Shelf::new(), library: Library::new(), cached: Shelf::new(), pending: false, compositor, camera, retained, spare, reprojector }
+        WebGlCore { renderer, resources, canvas: GlCanvas { scene: Scene::new(width as u16, height as u16), by: Affine::IDENTITY }, runner, width, height, pictures: Shelf::default(), library: Library::new(), cached: Shelf::default(), pending: false, compositor, camera, retained, spare, reprojector }
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {

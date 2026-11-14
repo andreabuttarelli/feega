@@ -46,7 +46,7 @@ fn read(path: &str) -> Vec<u8> {
 fn the_blur_matches_the_golden_images() {
     let mut renderer = Renderer::new().expect("a GPU adapter");
     for (name, filter) in CASES {
-        let pixels = renderer.render(&parse(&scene(filter)).unwrap(), &Pictures::new()).unwrap().pixels;
+        let pixels = renderer.render(&parse(&scene(filter)).unwrap(), &Pictures::default()).unwrap().pixels;
         if std::env::var_os("WRITE_GOLDEN").is_some() {
             write_png(&golden(name), SIZE as u32, SIZE as u32, &pixels).unwrap();
             continue;

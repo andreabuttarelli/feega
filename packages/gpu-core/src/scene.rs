@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use vello::kurbo::{Affine, BezPath, Point, Rect, Shape};
 use vello::peniko::{Fill, ImageData};
@@ -11,7 +11,7 @@ use crate::shades::{shade_of, Side};
 use crate::pictures::{crop_rect, image_rect, tile_cells, Pictures, Placed as Window};
 use crate::Skipped;
 
-pub type Shelf<P> = HashMap<String, P>;
+pub type Shelf<P> = FxHashMap<String, P>;
 
 fn polygon(points: &[f64]) -> BezPath {
     let mut path = BezPath::new();
@@ -269,17 +269,17 @@ pub struct Placed<P = ImageData> {
 }
 
 pub struct Layers<P = ImageData> {
-    pub bodies: HashMap<usize, Placed<P>>,
-    pub behind: HashMap<usize, Placed<P>>,
-    pub groups: HashMap<usize, Layers<P>>,
-    pub blended: HashMap<usize, Placed<P>>,
-    pub culled: HashSet<usize>,
+    pub bodies: FxHashMap<usize, Placed<P>>,
+    pub behind: FxHashMap<usize, Placed<P>>,
+    pub groups: FxHashMap<usize, Layers<P>>,
+    pub blended: FxHashMap<usize, Placed<P>>,
+    pub culled: FxHashSet<usize>,
     pub fragments: Fragments,
 }
 
 impl<P> Default for Layers<P> {
     fn default() -> Self {
-        Self { bodies: HashMap::new(), behind: HashMap::new(), groups: HashMap::new(), blended: HashMap::new(), culled: HashSet::new(), fragments: Fragments::default() }
+        Self { bodies: FxHashMap::default(), behind: FxHashMap::default(), groups: FxHashMap::default(), blended: FxHashMap::default(), culled: FxHashSet::default(), fragments: Fragments::default() }
     }
 }
 
