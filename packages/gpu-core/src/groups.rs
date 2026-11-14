@@ -402,7 +402,7 @@ fn item_reach(item: &Item) -> Option<Rect> {
         return None;
     }
     let pad = item.look().map_or(0.0, |l| l.blur) * BLUR_REACH + EDIT_SLACK_PX;
-    bounds::<Scene>(item, &Pictures::new()).map(|r| r.inflate(pad, pad))
+    bounds::<Scene>(item, &Pictures::default()).map(|r| r.inflate(pad, pad))
 }
 
 fn reach_of<'a>(items: impl Iterator<Item = &'a Item>) -> Option<Rect> {
