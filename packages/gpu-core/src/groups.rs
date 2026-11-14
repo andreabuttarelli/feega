@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
@@ -172,7 +171,7 @@ fn used_within(u: &UseItem, group: &DisplayList, start: usize, view: Rect) -> Ve
 }
 
 fn reaches(item: &Item, m: Affine, scale: f64, view: Rect) -> bool {
-    reaches_bounds(item, bounds::<Scene>(item, &Pictures::new()), m, scale, view)
+    reaches_bounds(item, bounds::<Scene>(item, &Pictures::default()), m, scale, view)
 }
 
 fn reaches_bounds(item: &Item, own: Option<Rect>, m: Affine, scale: f64, view: Rect) -> bool {
@@ -359,7 +358,7 @@ fn standalone(item: &Item) -> bool {
 }
 
 fn visible(item: &Item, view: Rect) -> bool {
-    visible_bounds(item, bounds::<Scene>(item, &Pictures::new()), item.look().map_or(0.0, |l| l.blur), view)
+    visible_bounds(item, bounds::<Scene>(item, &Pictures::default()), item.look().map_or(0.0, |l| l.blur), view)
 }
 
 fn visible_bounds(item: &Item, own: Option<Rect>, blur: f64, view: Rect) -> bool {
@@ -372,7 +371,7 @@ fn visible_bounds(item: &Item, own: Option<Rect>, blur: f64, view: Rect) -> bool
 }
 
 fn softened(item: Item) -> Item {
-    let extent = bounds::<Scene>(&item, &Pictures::new()).map_or(f64::INFINITY, |b| b.width().max(b.height()));
+    let extent = bounds::<Scene>(&item, &Pictures::default()).map_or(f64::INFINITY, |b| b.width().max(b.height()));
     let soften = |look: &Look| plain_when_tiny(&Look { blur: blur_px(look.blur), backdrop: backdrop_px(look.backdrop), ..look.clone() }, extent);
     match item {
         Item::Path(p) => Item::Path(PathItem { look: soften(&p.look), ..p }),
@@ -530,10 +529,10 @@ fn span_of(row: &Row, range: std::ops::Range<usize>, key: String, frame: Rect, b
     }
     let paint = |items: &[Item]| {
         let mut scene = Scene::new();
-        build_items(&mut scene, items, frame, &Pictures::new(), &Layers::new());
+        build_items(&mut scene, items, frame, &Pictures::default(), &Layers::new());
         scene
     };
-    let encoded = Arc::new(Encoded::reusing(base.map(|o| kept(o, &local)), &local, frame, |i| bounds::<Scene>(i, &Pictures::new()), paint));
+    let encoded = Arc::new(Encoded::reusing(base.map(|o| kept(o, &local)), &local, frame, |i| bounds::<Scene>(i, &Pictures::default()), paint));
     let bounds = encoded.runs.iter().map(|r| r.bounds).reduce(|a, b| a.union(b)).unwrap_or(frame);
     Span { key, encoded, bounds, local, frame }
 }
@@ -554,7 +553,7 @@ fn pieces_of(row: &Row, path: &str, frame: Rect, before: Option<&Before>) -> Vec
             at = end;
             continue;
         }
-        let own = bounds::<Scene>(item, &Pictures::new());
+        let own = bounds::<Scene>(item, &Pictures::default());
         match item {
             Item::Group(g) if g.look.backdrop.is_none() => {
                 let inside = pieces_of(&Row::plain(&g.items), &here, frame, before);
@@ -586,7 +585,7 @@ struct Laying<'a> {
     frame: Rect,
     scale: f64,
     view: Rect,
-    encoded: &'a mut HashMap<String, Arc<Encoded>>,
+    encoded: &'a mut FxHashMap<String, Arc<Encoded>>,
 }
 
 impl Laying<'_> {
@@ -641,9 +640,9 @@ fn shade_reach(look: &Look, own: Option<Rect>, scale: f64) -> Option<f64> {
     Some((soft + reach.px + side * reach.share) * scale)
 }
 
-fn laid(u: &UseItem, group: &DisplayList, cast: &Cast, view: Rect) -> (Vec<Item>, HashMap<String, Arc<Encoded>>) {
+fn laid(u: &UseItem, group: &DisplayList, cast: &Cast, view: Rect) -> (Vec<Item>, FxHashMap<String, Arc<Encoded>>) {
     let frame = screen_rect(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64));
-    let mut encoded = HashMap::new();
+    let mut encoded = FxHashMap::default();
     let items = Laying { u, frame, scale: scale_of(u.matrix), view, encoded: &mut encoded }.lay(&cast.pieces, &group.items);
     (items, encoded)
 }
@@ -812,7 +811,7 @@ impl Library {
         used(u, group, start)
     }
 
-    fn live(&self, u: &UseItem, group: &DisplayList, cast: Option<&Cast>, view: Rect, items: &mut Vec<Item>, encoded: &mut HashMap<String, Arc<Encoded>>) {
+    fn live(&self, u: &UseItem, group: &DisplayList, cast: Option<&Cast>, view: Rect, items: &mut Vec<Item>, encoded: &mut FxHashMap<String, Arc<Encoded>>) {
         let start = items.len();
         match cast {
             Some(cast) => {
@@ -928,7 +927,7 @@ impl Library {
         let mut finished = Vec::new();
         let mut waiting = Vec::new();
         let mut items = Vec::with_capacity(list.items.len());
-        let mut encoded: HashMap<String, Arc<Encoded>> = HashMap::new();
+        let mut encoded: FxHashMap<String, Arc<Encoded>> = FxHashMap::default();
         let view = Rect::new(0.0, 0.0, list.width as f64, list.height as f64);
         let first = self.sharpened_first(list, limits.side);
         let mut off_screen = Vec::new();

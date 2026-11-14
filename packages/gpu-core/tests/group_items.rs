@@ -75,7 +75,7 @@ fn rendered(json: &str, pictures: &Pictures) -> Vec<u8> {
 #[cfg(feature = "gpu")]
 #[test]
 fn a_group_fades_once_so_its_overlap_is_not_darker() {
-    let pixels = rendered(&group(""), &Pictures::new());
+    let pixels = rendered(&group(""), &Pictures::default());
 
     assert_eq!(at(&pixels, 32, 16), at(&pixels, 8, 16));
 }
@@ -84,7 +84,7 @@ fn a_group_fades_once_so_its_overlap_is_not_darker() {
 #[test]
 fn a_filtered_group_filters_its_children_together() {
     let filters = r#", "filters": [{ "kind": "css", "fns": [{ "name": "invert", "args": ["1"] }] }]"#;
-    let pixels = rendered(&group(filters), &Pictures::new());
+    let pixels = rendered(&group(filters), &Pictures::default());
 
     assert_eq!(at(&pixels, 32, 16), at(&pixels, 8, 16));
     assert!(at(&pixels, 8, 16)[1] > 100);
@@ -94,7 +94,7 @@ fn a_filtered_group_filters_its_children_together() {
 #[test]
 fn a_layer_draws_its_picture_at_its_size_through_its_matrix() {
     let green = [0u8, 255, 0, 255].repeat(4 * 4);
-    let pictures = Pictures::from([("c:canvas".to_string(), picture(4, 4, green))]);
+    let pictures = Pictures::from_iter([("c:canvas".to_string(), picture(4, 4, green))]);
 
     let pixels = rendered(LAYER, &pictures);
 

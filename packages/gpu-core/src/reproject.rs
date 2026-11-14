@@ -71,7 +71,7 @@ pub struct Reprojector {
     next: usize,
     tiles: Option<wgpu::Buffer>,
     layout: wgpu::BindGroupLayout,
-    bound: std::collections::HashMap<wgpu::Texture, wgpu::BindGroup>,
+    bound: rustc_hash::FxHashMap<wgpu::Texture, wgpu::BindGroup>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

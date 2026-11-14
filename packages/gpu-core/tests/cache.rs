@@ -165,7 +165,7 @@ fn frame_at(scale: f64, cache: bool) -> Vec<u8> {
     let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
     renderer.put_group("a", parse(FRAME).unwrap());
     let list = parse(&format!(r#"{{ "width": 400, "height": 300, "background": [0, 0, 0, 1], "items": [{{ "kind": "use", "clip": "a", "group": "a", "matrix": [{scale}, 0, 0, {scale}, 20, 30], "cache": {cache} }}] }}"#)).unwrap();
-    renderer.render(&list, &gpu_core::pictures::Pictures::new()).unwrap().pixels
+    renderer.render(&list, &gpu_core::pictures::Pictures::default()).unwrap().pixels
 }
 
 #[cfg(feature = "gpu")]
@@ -259,7 +259,7 @@ fn a_frame_rastered_in_chunks_draws_the_same_pixels_as_one_raster() {
     let draw = |items: usize| {
         let mut renderer = gpu_core::render::Renderer::with_limits(Limits { side: 4096, rasters: 1, items }).expect("a GPU adapter");
         renderer.put_group("a", parse(two).unwrap());
-        let pictures = gpu_core::pictures::Pictures::new();
+        let pictures = gpu_core::pictures::Pictures::default();
         (0..4).map(|_| renderer.render(&list, &pictures).unwrap().pixels).last().unwrap()
     };
     let (whole, chunked) = (draw(1000), draw(1));

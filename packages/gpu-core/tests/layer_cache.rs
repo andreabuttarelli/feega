@@ -16,7 +16,7 @@ fn blurred_group(paths: usize) -> String {
 #[cfg(feature = "gpu")]
 fn layers_kept_after_drawing(paths: usize) -> usize {
     let mut renderer = Renderer::new().expect("a GPU adapter");
-    renderer.render(&parse(&blurred_group(paths)).unwrap(), &Pictures::new()).unwrap();
+    renderer.render(&parse(&blurred_group(paths)).unwrap(), &Pictures::default()).unwrap();
     renderer.cached_layers()
 }
 

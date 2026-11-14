@@ -21,8 +21,8 @@ mod gpu {
     #[test]
     fn a_thin_strip_beside_a_shape_repaints_the_shadow_cast_into_it() {
         let mut renderer = Renderer::new().expect("a GPU adapter");
-        let whole = renderer.render(&parse(&placed(418, 358, 109.0, 109.0)).unwrap(), &Pictures::new()).unwrap().pixels;
-        let strip = renderer.render(&parse(&placed(6, 146, -197.0, 3.0)).unwrap(), &Pictures::new()).unwrap().pixels;
+        let whole = renderer.render(&parse(&placed(418, 358, 109.0, 109.0)).unwrap(), &Pictures::default()).unwrap().pixels;
+        let strip = renderer.render(&parse(&placed(6, 146, -197.0, 3.0)).unwrap(), &Pictures::default()).unwrap().pixels;
 
         let (x, y) = (311, 200);
         assert_eq!(red(&strip, 6, x - 306, y - 106), red(&whole, 418, x, y));

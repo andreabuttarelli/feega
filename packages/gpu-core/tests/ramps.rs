@@ -19,10 +19,10 @@ mod gpu {
         let mut renderer = Renderer::new().expect("a GPU adapter");
         let blue = parse(&gradient("[0, 0, 1, 1]")).unwrap();
         let green = parse(&gradient("[0, 1, 0, 1]")).unwrap();
-        let first = renderer.render(&blue, &Pictures::new()).unwrap().pixels;
-        let again = renderer.render(&blue, &Pictures::new()).unwrap().pixels;
+        let first = renderer.render(&blue, &Pictures::default()).unwrap().pixels;
+        let again = renderer.render(&blue, &Pictures::default()).unwrap().pixels;
         let uploads = renderer.ramp_uploads();
-        let changed = renderer.render(&green, &Pictures::new()).unwrap().pixels;
+        let changed = renderer.render(&green, &Pictures::default()).unwrap().pixels;
         let end = (8 * 64 + 63) * 4;
 
         assert_eq!(first, again);

@@ -49,7 +49,7 @@ fn a_run_in_a_font_never_put_is_named() {
 fn text_renders_natively_without_a_browser() {
     let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
     renderer.put_font("dm-sans", Source::from_bytes(DM_SANS).unwrap());
-    let rendered = renderer.render(&parse(&list(letter_h(), "dm-sans")).unwrap(), &gpu_core::pictures::Pictures::new()).unwrap();
+    let rendered = renderer.render(&parse(&list(letter_h(), "dm-sans")).unwrap(), &gpu_core::pictures::Pictures::default()).unwrap();
     let lit = rendered.pixels.chunks(4).filter(|p| p[0] > 200).count();
 
     assert!(rendered.skipped.is_empty(), "{:?}", rendered.skipped);

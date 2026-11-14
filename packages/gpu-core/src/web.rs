@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -66,8 +66,8 @@ pub struct WebCore {
     engine: Engine,
     target: wgpu::Texture,
     pictures: Pictures,
-    textures: HashMap<String, wgpu::Texture>,
-    arriving: HashMap<String, wgpu::Texture>,
+    textures: FxHashMap<String, wgpu::Texture>,
+    arriving: FxHashMap<String, wgpu::Texture>,
     library: Library,
     cached: Pictures,
     limits: Limits,
@@ -87,9 +87,9 @@ pub struct WebCore {
     tiled: bool,
     overlay_tex: Option<wgpu::Texture>,
     tiles: Tiles,
-    tile_textures: HashMap<TileKey, wgpu::Texture>,
+    tile_textures: FxHashMap<TileKey, wgpu::Texture>,
     spare_tiles: Vec<wgpu::Texture>,
-    atlases: HashMap<(u32, u32), wgpu::Texture>,
+    atlases: FxHashMap<(u32, u32), wgpu::Texture>,
     rest: Option<Rest>,
     adopted: Option<Camera>,
     drew_tiles: bool,
@@ -100,7 +100,7 @@ pub struct WebCore {
     credit: RasterCredit,
     was: Camera,
     rest_shown: Vec<(Rect, wgpu::Texture)>,
-    rest_spare: HashMap<(u32, u32), Vec<wgpu::Texture>>,
+    rest_spare: FxHashMap<(u32, u32), Vec<wgpu::Texture>>,
     counted: Counted,
 }
 
@@ -176,7 +176,7 @@ fn placed<'a>(key: TileKey, source: &'a wgpu::Texture, c: Camera, clip: Rect) ->
 struct Lifted {
     rest: Rect,
     by: (f64, f64),
-    tiles: HashMap<TileKey, wgpu::Texture>,
+    tiles: FxHashMap<TileKey, wgpu::Texture>,
 }
 
 #[derive(Clone, Copy)]
@@ -343,7 +343,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new(), counted: Counted::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 } })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 } })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -645,14 +645,14 @@ impl WebCore {
     fn lift_tiles(&mut self, screen: (u32, u32)) -> Result<(), JsValue> {
         let lifts = self.compositor.lifts(&self.library);
         let step = self.tiles.step_for(self.camera);
-        let mut was: HashMap<String, Lifted> = self.lifted.drain(..).collect();
+        let mut was: FxHashMap<String, Lifted> = self.lifted.drain(..).collect();
         let mut now = Vec::with_capacity(lifts.len());
         for lift in lifts {
             let mut layer = match was.remove(&lift.clip) {
                 Some(layer) if layer.rest == lift.rest => layer,
                 other => {
                     other.into_iter().flat_map(|l| l.tiles.into_values()).for_each(|t| self.spare(t));
-                    Lifted { rest: lift.rest, by: lift.by, tiles: HashMap::new() }
+                    Lifted { rest: lift.rest, by: lift.by, tiles: FxHashMap::default() }
                 }
             };
             layer.by = lift.by;
