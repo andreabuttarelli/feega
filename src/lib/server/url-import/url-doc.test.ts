@@ -247,3 +247,32 @@ describe('a page taller than what fits under the shorter pages', () => {
     expect(names).toEqual([['short'], ['wiki'], ['wiki']]);
   });
 });
+
+describe('a text with a smaller run on a board as wide as fifteen pages', () => {
+  it('keeps its colour, font and runs (traidue /glossario: every definition with a smaller link came in black, default font and size)', () => {
+    const width = 16000;
+    const text = { id: 't', type: 'TEXT', characters: 'Definition. More', absoluteBoundingBox: { x: 100, y: 100, width: 600, height: 30 }, fills: [{ type: 'SOLID', color: { r: 0.2, g: 0.2, b: 0.2, a: 1 } }], style: { fontFamily: 'Inter', fontSize: 19, fontWeight: 400 }, characterStyleOverrides: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1], styleOverrideTable: { '1': { fontFamily: 'Inter', fontSize: 16.8, fontWeight: 400, fills: [{ type: 'SOLID', color: { r: 0.07, g: 0.07, b: 0.07, a: 1 } }] } } };
+    const tree: PageTree = { title: 'wide', url: 'http://localhost/', width, height: 16000, truncated: false, root: { id: 'root', type: 'FRAME', name: 'wide', absoluteBoundingBox: { x: 0, y: 0, width, height: 16000 }, fills: [], children: [text] } };
+    const made = urlPlan(tree, newId, undefined, {}, PLAIN_SHAPE)!;
+    const clip = clipsOf(made).find((c) => c.props.text === 'Definition. More')!;
+
+    expect(made.plan.skipped).toEqual([]);
+    expect([clip.props.color, clip.props.font, (clip.props.runs as unknown[]).length]).toEqual(['#333333', 'Inter', 1]);
+  });
+});
+
+describe('a 1 px border on a board as wide as fifteen pages', () => {
+  it('stays 1 px, not rounded up to 1.6 (traidue /glossario: every table border came in thicker)', () => {
+    const width = 16000;
+    const cell = { id: 'td', type: 'FRAME', name: 'td', absoluteBoundingBox: { x: 100, y: 100, width: 600, height: 60 }, fills: [], strokes: [{ type: 'SOLID', color: { r: 0.9, g: 0.9, b: 0.9, a: 1 } }], strokeWeight: 1, strokeAlign: 'INSIDE', children: [] };
+    const tree: PageTree = { title: 'wide', url: 'http://localhost/', width, height: 16000, truncated: false, root: { id: 'root', type: 'FRAME', name: 'wide', absoluteBoundingBox: { x: 0, y: 0, width, height: 16000 }, fills: [], children: [cell] } };
+    const made = urlPlan(tree, newId, undefined, {}, PLAIN_SHAPE)!;
+    const doc = made.plan.items[0].doc;
+    const td = clipsOf(made).find((c) => c.name === 'td')!;
+    const [stroke] = td.props.strokes as { width: number }[];
+
+    const cssPx = (stroke.width * Math.min(doc.width, doc.height) * width) / doc.width;
+
+    expect(cssPx).toBeCloseTo(1, 1);
+  });
+});

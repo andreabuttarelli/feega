@@ -48,6 +48,7 @@ export type FigmaPasted = { doc: MotionDoc; selection: string[]; skipped: string
 
 const IMAGE_PLACEHOLDER = '#d9d9d9';
 const DIGITS = 10000;
+const FINE_DIGITS = 1e7;
 const MAX_NAME = 60;
 const SHADOW_DISTANCE_LIMIT = 300;
 const MAX_STROKE_WIDTH = 0.2;
@@ -55,6 +56,7 @@ const MIN_STOPS = 2;
 const CENTRE: Unit = { x: 0.5, y: 0.5 };
 
 const round = (n: number) => Math.round(n * DIGITS) / DIGITS;
+const fine = (n: number) => Math.round(n * FINE_DIGITS) / FINE_DIGITS;
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 const minSide = (doc: MotionDoc) => Math.min(doc.width, doc.height);
 
@@ -96,7 +98,7 @@ function imageSlots(fills: Fill[]): Omit<FigmaImage, 'clipId'>[] {
 function strokeStack(strokes: Stroke[], doc: MotionDoc, p: Place): Painted[] {
   return strokes.flatMap((s) => {
     const paint = MOTION_FILL[s.fill.kind](s.fill);
-    const unit = (px: number) => clamp(round((px * p.scale) / minSide(doc)), 0, MAX_STROKE_WIDTH);
+    const unit = (px: number) => clamp(fine((px * p.scale) / minSide(doc)), 0, MAX_STROKE_WIDTH);
     return paint ? [{ paint, width: unit(s.weight), align: s.align, ...(s.dash ? { dash: unit(s.dash[0]), gap: unit(s.dash[1]) } : {}) }] : [];
   });
 }
@@ -198,7 +200,7 @@ function textClip(doc: MotionDoc, layer: TextLayer, p: Place): Built {
   const [width, height] = [Math.max(x1 - x0, MIN_BOX.width), Math.max(y1 - y0, MIN_BOX.height)];
   const id = p.newId();
   const drawn = drawClip(next, DrawTool.Text, { x: x0 + width / 2, y: y0 + height / 2, width, height }, p.frame, id, layer.sizing, { text: layer.text });
-  const size = (n: number) => clamp(round((n * p.scale) / minSide(next)), TYPE_SIZE.min, TYPE_SIZE.max);
+  const size = (n: number) => clamp(fine((n * p.scale) / minSide(next)), TYPE_SIZE.min, TYPE_SIZE.max);
   const font = known.get(layer.font);
   const runs = layer.runs.map(({ font: f, size: s, ...rest }) => ({ ...rest, ...(f && known.get(f) ? { font: f } : {}), ...(s ? { size: size(s) } : {}) }));
   const stacked = layer.fills.length > 1 || layer.fills.some((f) => f.kind !== FillKind.Solid || f.opacity < 1);
