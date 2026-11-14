@@ -15,3 +15,5 @@ the tiles back and replays the server redo gesture.
 Not a `REGISTRY` row: the nodes are created server-side from Figma HTML, ids
 unknown until the answer, so `createOptimistic` (apply locally, then write)
 does not fit; the job holds the placeholder instead.
+
+The placeholder label reads "Pasting…", shorter than "Importing from Figma…".

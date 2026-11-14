@@ -4819,7 +4819,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       {#each figmaPlaceholders as job (job.id)}
         <div class="figma-loading" data-testid="figma-paste-placeholder" data-state={job.state} style={`transform: translate(${job.at.x - FIGMA_PLACEHOLDER.w / 2}px, ${job.at.y - FIGMA_PLACEHOLDER.h / 2}px);width:${FIGMA_PLACEHOLDER.w}px;height:${FIGMA_PLACEHOLDER.h}px`} role="status">
           {#if job.state === PasteState.Loading}
-            <span class="figma-spinner" aria-hidden="true"></span><span>Importing from Figma…</span>
+            <span class="figma-spinner" aria-hidden="true"></span><span>Pasting…</span>
           {:else}
             <span>{job.error}</span>
             <span class="figma-actions"><button type="button" onclick={() => retryPaste(job)}>Retry</button><button type="button" onclick={() => dismissPaste(job)}>Dismiss</button></span>
