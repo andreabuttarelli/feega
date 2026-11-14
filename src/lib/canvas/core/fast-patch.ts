@@ -8,6 +8,7 @@ import { SEPARATOR } from '@feega/motion-core/motion/precomp';
 import { paintBleed } from '@feega/motion-core/motion/effects/paint-area';
 import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-list';
 import { isText } from '@feega/motion-core/motion/layout/text-extent';
+import { mattePairs } from '@feega/motion-core/motion/matte';
 import type { BrandTokens } from '@feega/motion-core/motion/brand';
 
 export type Look = { tokens: BrandTokens; assets: Record<string, string>; frame: number };
@@ -289,7 +290,7 @@ const keptOnly = (doc: MotionDoc, ids: ReadonlySet<string>): MotionDoc => ({ ...
 const alone = (doc: MotionDoc, clip: MotionClip): boolean => {
   const all = clipsOf(doc);
   const chain = ancestorsOf(doc, clip.id).map((id) => all.find((c) => c.id === id));
-  const pairs = all.some((c) => c.mask === clip.id || c.id === clip.mask);
+  const pairs = mattePairs(doc).some((p) => p.target === clip.id || p.source === clip.id);
   return !isText(clip.component) && clip.component !== 'Precomp' && !pairs && !Object.keys(clip.keyframes).length && !all.some((c) => c.parent === clip.id) && chain.every((c) => c && !c.autoLayout && !Object.keys(c.keyframes).length);
 };
 
