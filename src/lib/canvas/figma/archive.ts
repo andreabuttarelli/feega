@@ -85,6 +85,7 @@ export type FigmaRawNode = {
   letterSpacing?: { value: number; units: string };
   textAlignHorizontal?: string;
   textAutoResize?: string;
+  maxLines?: number;
   textDecoration?: string;
   fontAxes?: string;
   fontFeatures?: string;

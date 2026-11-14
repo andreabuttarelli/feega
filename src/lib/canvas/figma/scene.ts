@@ -131,6 +131,7 @@ export type TextLayer = Common & {
   color: string;
   runs: TextRun[];
   sizing: TextSizing;
+  maxLines: number;
   fills: Fill[];
   strokes: Stroke[];
 };
@@ -626,6 +627,7 @@ function textLayer(n: FigmaRawNode, m: Matrix, ctx: Ctx): TextLayer {
     align: ALIGN[n.textAlignHorizontal ?? 'LEFT'] ?? 'left',
     runs: runsOf(n, base, ctx.report),
     sizing: TEXT_SIZING[n.textAutoResize ?? ''] ?? TextSizing.AutoWidth,
+    maxLines: n.maxLines ?? 0,
     decoration: DECORATION[n.textDecoration ?? ''] ?? Decoration.None,
     axes: n.fontAxes ?? '',
     features: n.fontFeatures ?? '',

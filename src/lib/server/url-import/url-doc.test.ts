@@ -276,3 +276,13 @@ describe('a 1 px border on a board as wide as fifteen pages', () => {
     expect(cssPx).toBeCloseTo(1, 1);
   });
 });
+
+describe('a text the page cuts after two lines', () => {
+  it('comes in cut after two lines with an ellipsis', () => {
+    const text = { id: 't', type: 'TEXT', characters: 'A long card summary that runs on', maxLines: 2, absoluteBoundingBox: { x: 100, y: 100, width: 200, height: 40 }, fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0, a: 1 } }], textAutoResize: 'HEIGHT', style: { fontFamily: 'Inter', fontSize: 16, fontWeight: 400, lineHeightUnit: 'PIXELS', lineHeightPx: 20 } };
+    const tree: PageTree = { title: 'cut', url: 'http://localhost/', width: 1280, height: 800, truncated: false, root: { id: 'root', type: 'FRAME', name: 'cut', absoluteBoundingBox: { x: 0, y: 0, width: 1280, height: 800 }, fills: [], children: [text] } };
+    const clip = clipsOf(urlPlan(tree, newId, undefined, {}, PLAIN_SHAPE)!).find((c) => c.component === 'Text')!;
+
+    expect([clip.props.maxLines, clip.props.truncate]).toEqual([2, true]);
+  });
+});

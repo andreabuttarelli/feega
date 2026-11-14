@@ -643,3 +643,36 @@ describe.runIf(process.env.CHROMIUM_PATH)('a block whose smaller span holds more
     }
   }, 30_000);
 });
+
+const CLAMPED = `<body style="margin:0;padding-top:20px"><p id="clamp" style="margin:0;width:200px;font:16px/20px monospace;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden">one two three four five six seven eight nine ten eleven twelve thirteen</p><p id="dots" style="margin:0;width:120px;font:16px/20px monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">a single line far too long to fit</p></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('text cut with an ellipsis', () => {
+  const textsOf = async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 400, height: 200 });
+      await page.setContent(CLAMPED);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+      return all(tree.root).filter((n) => n.type === 'TEXT');
+    } finally {
+      await browser.close();
+    }
+  };
+
+  it('by line-clamp stays one text that stops after its lines with an ellipsis (traidue /operazioni: cards showed their whole text)', async () => {
+    const clamped = (await textsOf()).filter((n) => n.characters?.startsWith('one'));
+
+    expect(clamped).toHaveLength(1);
+    expect(clamped[0].maxLines).toBe(2);
+    expect(clamped[0].absoluteBoundingBox!.height).toBeCloseTo(40, 0);
+  }, 30_000);
+
+  it('by text-overflow stays inside its box and ends in an ellipsis', async () => {
+    const dots = (await textsOf()).find((n) => n.characters?.startsWith('a single'))!;
+
+    expect(dots.maxLines).toBe(1);
+    expect(dots.absoluteBoundingBox!.width).toBeLessThanOrEqual(120);
+  }, 30_000);
+});

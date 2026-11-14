@@ -587,6 +587,16 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     return path;
   };
 
+  const hidesX = (css: CSSStyleDeclaration) => /hidden|clip|auto|scroll/.test(css.overflowX);
+  const cutLinesOf = (block: CSSStyleDeclaration) => {
+    const clamp = parseInt(block.webkitLineClamp, 10);
+    if (clamp > 0) {
+      return clamp;
+    }
+    return block.textOverflow === 'ellipsis' && /nowrap|pre$/.test(block.whiteSpace) && hidesX(block) ? 1 : 0;
+  };
+  const withinClip = (b: Rect, clip: Rect) => ({ ...b, width: round(Math.min(b.width, clip.x + clip.width - b.x)) });
+
   const runNodes = (segs: Seg[], ctx: Ctx, block: CSSStyleDeclaration, key: string): RestNode[] => {
     const chars = charsOf(segs);
     if (!chars.some((c) => c.c.trim())) {
@@ -607,6 +617,11 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
       return [];
     }
     const align = TEXT_ALIGN[block.textAlign] ?? 'LEFT';
+    const cut = cutLinesOf(block);
+    if (cut) {
+      const made = textNode(chars, segs, kept.slice(0, cut), ctx, align, block);
+      return made ? [{ ...made, key, maxLines: cut, absoluteBoundingBox: withinClip(made.absoluteBoundingBox!, ctx.clip) }] : [];
+    }
     const edge = (l: KitRect) => (align === 'CENTER' ? (l.left + l.right) / 2 : align === 'RIGHT' ? l.right : l.left);
     const clean = kept.length === lines.length && (lines.length === 1 || lines.every((l) => Math.abs(edge(l) - edge(lines[0])) <= LINE_SLACK || (align === 'JUSTIFIED' && Math.abs(l.left - lines[0].left) <= LINE_SLACK)));
     if (clean) {
