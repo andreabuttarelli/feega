@@ -42,12 +42,16 @@ type Tally = { tried: number; patched: number; mismatched: string[] };
 
 const drawn = (doc: MotionDoc): DisplayList => drawFrame(prepare(doc, FEEGA_TOKENS), 0);
 
-function check(tally: Tally, label: string, list: DisplayList, before: MotionDoc, after: MotionDoc | null) {
+const LOOK = { tokens: FEEGA_TOKENS, assets: {}, frame: 0 };
+const SAMPLE_EVERY = 7;
+const MOST_PATCHED = 0.5;
+
+function check(tally: Tally, label: string, list: DisplayList, before: MotionDoc, after: MotionDoc | null, look?: typeof LOOK) {
   if (!after) {
     return;
   }
   tally.tried++;
-  const patched = fastPatch(list, before, after, estimatedText);
+  const patched = fastPatch(list, before, after, estimatedText, look);
   if (!patched) {
     return;
   }
@@ -75,5 +79,25 @@ describe.skipIf(!existsSync(FIXTURE))('fastPatch on every clip of the landings f
     }
     console.log(JSON.stringify({ hide: { ...hide, mismatched: hide.mismatched.length }, move: { ...move, mismatched: move.mismatched.length } }));
     expect([...hide.mismatched, ...move.mismatched].slice(0, 20)).toEqual([]);
+  }, 3_600_000);
+
+  it('redraws resized and hidden layers inside auto layout exactly as the full build, for most of them', () => {
+    const resize: Tally = { tried: 0, patched: 0, mismatched: [] };
+    const hide: Tally = { tried: 0, patched: 0, mismatched: [] };
+    for (const doc of docs()) {
+      const list = drawn(doc);
+      const sampled = clipsOf(doc).filter((c, i) => !c.hidden && c.parent && i % SAMPLE_EVERY === 0);
+      for (const clip of sampled) {
+        const width = Number(clip.props.width);
+        if (Number.isFinite(width) && width > 0) {
+          check(resize, `resize ${clip.id}`, list, doc, withClip(doc, clip.id, (c) => ({ ...c, props: { ...c.props, width: width * 0.9 } })), LOOK);
+        }
+        check(hide, `hide ${clip.id}`, list, doc, withClip(doc, clip.id, (c) => ({ ...c, hidden: true })), LOOK);
+      }
+    }
+    console.log(JSON.stringify({ resize: { ...resize, mismatched: resize.mismatched.slice(0, 5) }, hide: { ...hide, mismatched: hide.mismatched.slice(0, 5) } }));
+    expect([...resize.mismatched, ...hide.mismatched].slice(0, 20)).toEqual([]);
+    expect(resize.patched / resize.tried).toBeGreaterThan(MOST_PATCHED);
+    expect(hide.patched / hide.tried).toBeGreaterThan(MOST_PATCHED);
   }, 3_600_000);
 });

@@ -10,8 +10,9 @@ import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-l
 import { isText } from '@feega/motion-core/motion/layout/text-extent';
 import { mattePairs } from '@feega/motion-core/motion/matte';
 import type { BrandTokens } from '@feega/motion-core/motion/brand';
+import type { Typeset } from '@feega/motion-core/motion/gpu-full/text/painter';
 
-export type Look = { tokens: BrandTokens; assets: Record<string, string>; frame: number };
+export type Look = { tokens: BrandTokens; assets: Record<string, string>; frame: number; typeset?: Typeset };
 
 type Shift = readonly [number, number];
 
@@ -283,7 +284,7 @@ function relaid(list: DisplayList, before: MotionDoc, after: MotionDoc, measure:
   return plan.gone.size ? rebled(patched, before, after) : patched;
 }
 
-const STATIC_KEYS = new Set(['props']);
+const STATIC_KEYS = new Set(['props', 'layoutItem']);
 
 const keptOnly = (doc: MotionDoc, ids: ReadonlySet<string>): MotionDoc => ({ ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => ids.has(c.id)) })) });
 
@@ -322,9 +323,53 @@ function redrawn(list: DisplayList, after: MotionDoc, b: MotionClip, look: Look 
     return null;
   }
   const kept = new Set([b.id, ...ancestorsOf(after, b.id), ...(after.surface ? [after.surface] : [])]);
-  const fresh = ownItems(drawFrame(prepare(keptOnly(after, kept), look.tokens, look.assets), look.frame).items, b.id);
+  const fresh = ownItems(drawFrame(prepare(keptOnly(after, kept), look.tokens, look.assets, look.typeset), look.frame).items, b.id);
   const items = fresh.length ? spliced(list.items, b.id, fresh) : null;
   return items && { ...list, items };
+}
+
+const sameProps = (a: MotionClip, b: MotionClip) => a === b || (a.transform === b.transform && changedKeys(a.props, b.props).length === 0);
+
+const settled = (c: MotionClip): MotionClip => {
+  const { autoLayout: _layout, ...rest } = c;
+  return rest as MotionClip;
+};
+
+const below = (doc: MotionDoc, ids: ReadonlySet<string>) => clipsOf(doc).filter((c) => ids.has(c.id) || ancestorsOf(doc, c.id).some((id) => ids.has(id))).map((c) => c.id);
+
+function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, edited: MotionClip, measure: TextMeasure, look: Look | undefined): DisplayList | null {
+  if (!look) {
+    return null;
+  }
+  const was = laid(before, measure);
+  const relaid = laid(after, measure);
+  const moved = new Set([edited.id, ...[...relaid].filter(([id, c]) => !was.get(id) || !sameProps(was.get(id)!, c)).map(([id]) => id)]);
+  const redraw = below(after, moved);
+  const paired = new Set(mattePairs(after).flatMap((p) => [p.source, p.target]));
+  if (redraw.some((id) => paired.has(id) || clipsOf(after).find((c) => c.id === id)?.component === 'Precomp')) {
+    return null;
+  }
+  const now = (c: MotionClip) => settled(relaid.get(c.id) ?? was.get(c.id) ?? c);
+  const kept = new Set([...redraw, ...redraw.flatMap((id) => ancestorsOf(after, id)), ...(after.surface ? [after.surface] : [])]);
+  const shown = withoutHidden(after);
+  const mini = { ...shown, tracks: shown.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => kept.has(c.id)).map(now) })) };
+  const fresh = drawFrame(prepare(mini, look.tokens, look.assets, look.typeset), look.frame).items;
+  let items: Item[] | null = list.items;
+  for (const id of redraw) {
+    const own = ownItems(fresh, id);
+    const old = ownItems(items!, id);
+    if (!old.length && !own.length) {
+      continue;
+    }
+    items = old.length ? spliced(items!, id, own) : null;
+    if (!items) {
+      return null;
+    }
+  }
+  const left = new Set(clipsOf(shown).map((c) => c.id));
+  const gone = new Set(clipsOf(after).map((c) => c.id).filter((id) => !left.has(id)));
+  const patched = { ...list, items: items!, unsupported: list.unsupported.filter((g) => !gone.has(g.clip)) };
+  return edited.hidden ? rebled(patched, before, after) : patched;
 }
 
 enum Edit {
@@ -345,17 +390,33 @@ type Patch = (list: DisplayList, before: MotionDoc, after: MotionDoc, a: MotionC
 
 const PATCHES: Record<Edit, Patch> = {
   [Edit.Fade]: (list, _before, after, a, b) => fadeOf(list, after, a, b),
-  [Edit.Hide]: (list, before, after, _a, b, measure) => relaid(list, before, after, measure, hidePairing(before, after, b, measure)),
+  [Edit.Hide]: (list, before, after, _a, b, measure, look) => relaid(list, before, after, measure, hidePairing(before, after, b, measure)) ?? subtreeRedrawn(list, before, after, b, measure, look),
   [Edit.Move]: (list, before, after, _a, _b, measure) => relaid(list, before, after, measure, unlaid(before, after)),
-  [Edit.Redraw]: (list, _before, after, _a, b, _measure, look) => redrawn(list, after, b, look)
+  [Edit.Redraw]: (list, before, after, _a, b, measure, look) => redrawn(list, after, b, look) ?? subtreeRedrawn(list, before, after, b, measure, look)
 };
 
 export function readyPatch(doc: MotionDoc, measure: TextMeasure): void {
   laid(doc, measure);
 }
 
+function restyledClips(before: MotionDoc, after: MotionDoc): MotionClip[] | null {
+  if (changedKeys(before, after).some((k) => k !== 'tracks')) {
+    return null;
+  }
+  const [was, now] = [clipsOf(before), clipsOf(after)];
+  if (was.length !== now.length || was.some((c, i) => c.id !== now[i].id)) {
+    return null;
+  }
+  const edited = now.filter((c, i) => c !== was[i]);
+  return edited.length && edited.every((c) => changedKeys(was[now.indexOf(c)], c).every((k) => STATIC_KEYS.has(k))) ? edited : null;
+}
+
 export function fastPatch(list: DisplayList, before: MotionDoc, after: MotionDoc, measure: TextMeasure, look?: Look): DisplayList | null {
   const pair = onlyClip(before, after);
+  const many = pair ? null : restyledClips(before, after);
+  if (many) {
+    return subtreeRedrawn(list, before, after, many[0], measure, look);
+  }
   const edit = pair && EDIT_OF.find(([, is]) => is(pair[0], pair[1]))?.[0];
   return pair && edit ? PATCHES[edit](list, before, after, pair[0], pair[1], measure, look) : null;
 }
