@@ -23,7 +23,9 @@ enum Edit {
   NudgeLeaf = 'nudge-leaf',
   HideLeaf = 'hide-leaf',
   HideTextLeaf = 'hide-text-leaf',
-  Text = 'text'
+  Text = 'text',
+  Colour = 'colour',
+  Keyframe = 'keyframe'
 }
 
 enum Target {
@@ -308,7 +310,7 @@ for (const target of TARGETS) {
 
 const EDITS_EACH = Number(process.env.BUDGET_EDITS ?? 8);
 const EDIT_GIVE_UP_MS = 3000;
-const EDIT_PAUSE_MS = 250;
+const EDIT_PAUSE_MS = Number(process.env.BUDGET_EDIT_PAUSE ?? 250);
 const RESIZE_STEP_PX = 6;
 const CHILD_AT = { x: 0.07, y: 0.032 };
 const TEXT_AT = { x: 0.51, y: 0.032 };
@@ -395,7 +397,7 @@ async function stagesAfter(page: Page): Promise<Stages | null> {
       while (probe.__pixelAt === null && performance.now() - pixelStarted < pixelGiveUp) {
         await new Promise((done) => requestAnimationFrame(done));
       }
-      const pixel = probe.__pixelAt === null ? null : probe.__pixelAt - at;
+      const pixel = probe.__pixelAt === null || probe.__pixelAt < at ? null : probe.__pixelAt - at;
       return { total: drawn.startTime - at, effect: asked - at, build: built - asked, media: ready - built, upload: put - ready, draw: drawn.startTime - put, patched, pixel };
     }
     return null;
@@ -409,7 +411,41 @@ enum Depth {
 
 type Pick = { at: { x: number; y: number }; depth: Depth };
 
-const PICKS: Record<Exclude<Edit, Edit.Resize | Edit.Text>, Pick> = {
+type FieldEdit = Edit.Colour | Edit.Keyframe;
+
+const FIELDS: Record<FieldEdit, { testId: string; values: [string, string] | null }> = {
+  [Edit.Colour]: { testId: 'fill-opacity', values: ['50', '100'] },
+  [Edit.Keyframe]: { testId: 'fill-key', values: null }
+};
+
+function fieldEdit({ testId, value }: { testId: string; value: string | null }) {
+  const el = document.querySelector<HTMLInputElement>(`[data-testid="${testId}"]`);
+  if (!el) {
+    throw new Error(`${testId} not on screen`);
+  }
+  (window as unknown as { __editAt: number }).__editAt = performance.now();
+  if (value === null) {
+    el.click();
+    return;
+  }
+  el.value = value;
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+async function fieldEdits(page: Page, edit: FieldEdit, count: number): Promise<(Stages | null)[]> {
+  const { testId, values } = FIELDS[edit];
+  await page.getByTestId(testId).first().waitFor({ timeout: 10_000 });
+  const seen: (Stages | null)[] = [];
+  for (let i = 0; i < count; i++) {
+    await arm(page);
+    await page.evaluate(fieldEdit, { testId, value: values ? values[i % 2] : null });
+    seen.push(await stagesAfter(page));
+    await page.waitForTimeout(EDIT_PAUSE_MS);
+  }
+  return seen;
+}
+
+const PICKS: Record<Exclude<Edit, Edit.Resize | Edit.Text | FieldEdit>, Pick> = {
   [Edit.Nudge]: { at: CHILD_AT, depth: Depth.Top },
   [Edit.Opacity]: { at: CHILD_AT, depth: Depth.Top },
   [Edit.Hide]: { at: CHILD_AT, depth: Depth.Top },
@@ -446,7 +482,7 @@ async function resizeEdits(page: Page, count: number): Promise<(Stages | null)[]
   return seen;
 }
 
-const KEYS: Record<Exclude<Edit, Edit.Resize | Edit.Text>, [string, string]> = {
+const KEYS: Record<Exclude<Edit, Edit.Resize | Edit.Text | FieldEdit>, [string, string]> = {
   [Edit.Nudge]: ['ArrowRight', 'ArrowLeft'],
   [Edit.Opacity]: ['Digit5', 'Digit0'],
   [Edit.Hide]: ['ControlOrMeta+Shift+KeyH', 'ControlOrMeta+Shift+KeyH'],
@@ -571,6 +607,10 @@ async function edits(page: Page, edit: Edit): Promise<(Stages | null)[]> {
   if (edit === Edit.Resize) {
     await selectChild(page);
     return resizeEdits(page, EDITS_EACH);
+  }
+  if (edit === Edit.Colour || edit === Edit.Keyframe) {
+    await selectChild(page);
+    return fieldEdits(page, edit, EDITS_EACH);
   }
   await selectChild(page, PICKS[edit]);
   return keyEdits(page, KEYS[edit], EDITS_EACH, edit);
