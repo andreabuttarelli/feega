@@ -59,7 +59,7 @@ mod gpu {
 
     fn render(json: &str) -> Vec<u8> {
         let mut renderer = Renderer::new().expect("a GPU adapter");
-        let rendered = renderer.render(&parse(json).unwrap(), &Pictures::new()).unwrap();
+        let rendered = renderer.render(&parse(json).unwrap(), &Pictures::default()).unwrap();
         assert!(rendered.skipped.is_empty(), "{:?}", rendered.skipped);
         rendered.pixels
     }

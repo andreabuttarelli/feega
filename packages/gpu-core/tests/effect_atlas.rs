@@ -46,7 +46,7 @@ fn drawn(atlas: Atlas) -> (Vec<u8>, u32) {
     engine.atlas = atlas;
     let list = parse(&wall()).unwrap();
     let target = device.create_texture(&wgpu::TextureDescriptor { label: None, size: wgpu::Extent3d { width: SIZE, height: SIZE, depth_or_array_layers: 1 }, mip_level_count: 1, sample_count: 1, dimension: wgpu::TextureDimension::D2, format: wgpu::TextureFormat::Rgba8Unorm, usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::COPY_SRC, view_formats: &[] });
-    engine.draw(&device, &queue, &list, &Pictures::new(), &target.create_view(&wgpu::TextureViewDescriptor::default())).unwrap();
+    engine.draw(&device, &queue, &list, &Pictures::default(), &target.create_view(&wgpu::TextureViewDescriptor::default())).unwrap();
     let renders = engine.take_tally().total();
     (read(&device, &queue, &target), renders)
 }

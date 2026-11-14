@@ -1,3 +1,4 @@
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::Cell;
 
 use serde::Deserialize;
@@ -74,8 +75,8 @@ pub struct World {
     overlays: [Overlay; 3],
     damage: Damage,
     scene_damage: Damage,
-    rest: std::collections::HashMap<String, (String, Affine)>,
-    covering: std::collections::HashSet<String>,
+    rest: FxHashMap<String, (String, Affine)>,
+    covering: FxHashSet<String>,
     visited: Cell<usize>,
 }
 
@@ -134,7 +135,7 @@ fn through(item: &Item, camera: Affine) -> Item {
     }
 }
 
-fn steady(was: &[usize]) -> std::collections::HashSet<usize> {
+fn steady(was: &[usize]) -> FxHashSet<usize> {
     let mut tails: Vec<usize> = Vec::new();
     let mut back: Vec<Option<usize>> = vec![None; was.len()];
     for (i, v) in was.iter().enumerate() {
@@ -207,7 +208,7 @@ impl World {
     }
 
     fn cover(&mut self, sizes: impl Fn(&str) -> Option<(f64, f64)>) {
-        let mut next = std::collections::HashSet::new();
+        let mut next = FxHashSet::default();
         if self.holding() {
             for u in self.uses.flagged().into_iter().filter(|u| self.shifted_from_rest(u).is_some()) {
                 let at = self.rest.get(&u.clip).map_or(u.matrix, |(_, m)| *m);
@@ -288,12 +289,12 @@ impl World {
         let old = std::mem::replace(&mut self.overlays[part.index()].items, items);
         let new = &self.overlays[part.index()].items;
         let by_clip = |items: &[Item]| {
-            let mut m: std::collections::HashMap<String, Vec<usize>> = std::collections::HashMap::new();
+            let mut m: FxHashMap<String, Vec<usize>> = FxHashMap::default();
             items.iter().enumerate().for_each(|(i, item)| m.entry(item.clip().to_string()).or_default().push(i));
             m
         };
         let (was, now) = (by_clip(&old), by_clip(new));
-        let kept = |item: &Item, other: &[Item], index: &std::collections::HashMap<String, Vec<usize>>| index.get(item.clip()).is_some_and(|at| at.iter().any(|&i| same(item, &other[i])));
+        let kept = |item: &Item, other: &[Item], index: &FxHashMap<String, Vec<usize>>| index.get(item.clip()).is_some_and(|at| at.iter().any(|&i| same(item, &other[i])));
         let gone = old.iter().filter(|i| !kept(i, new, &now));
         let came = new.iter().filter(|i| !kept(i, &old, &was));
         let bounds: Vec<Option<Rect>> = gone.chain(came).map(extent).collect();

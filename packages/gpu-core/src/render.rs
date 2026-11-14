@@ -51,7 +51,7 @@ impl Renderer {
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default())).map_err(failed)?;
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default())).map_err(failed)?;
         let engine = Engine::new(&device).map_err(failed)?;
-        Ok(Self { device, queue, engine, library: Library::new(), cached: Pictures::new(), limits, textures: HashMap::new() })
+        Ok(Self { device, queue, engine, library: Library::new(), cached: Pictures::default(), limits, textures: HashMap::new() })
     }
 
     pub fn blending(mut self, blending: crate::layers::Blending) -> Self {

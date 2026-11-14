@@ -32,7 +32,7 @@ fn list(fns: &str) -> String {
 fn main() {
     let analytic = r#"{ "name": "drop-shadow", "args": ["0px", "8px", "24px", "rgba(0, 0, 0, 0.18)"] }"#;
     let filtered = r#"{ "name": "drop-shadow", "args": ["0px", "8px", "24px", "rgba(0, 0, 0, 0.18)"] }, { "name": "brightness", "args": ["1"] }"#;
-    let pictures = Pictures::new();
+    let pictures = Pictures::default();
     let mut renderer = Renderer::new().expect("a GPU adapter");
     for (name, fns) in [("no shadow", ""), ("filter path", filtered), ("analytic", analytic)] {
         let list = parse(&list(fns)).unwrap();

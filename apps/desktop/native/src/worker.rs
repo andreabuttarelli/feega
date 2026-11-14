@@ -94,7 +94,7 @@ impl Core {
         let retained = held_texture(&gpu.device, compositor.size());
         let spare = held_texture(&gpu.device, compositor.size());
         let reprojector = Reprojector::new(&gpu.device);
-        Ok(Core { gpu, engine, library, compositor, pictures: Pictures::new(), textures: HashMap::new(), cached: Pictures::new(), limits, retained, spare, reprojector, scratch: ScratchPool::default(), camera: Camera { x: 0.0, y: 0.0, zoom: 1.0 }, pending: false, drawable: None, last_look: None, size })
+        Ok(Core { gpu, engine, library, compositor, pictures: Pictures::default(), textures: HashMap::new(), cached: Pictures::default(), limits, retained, spare, reprojector, scratch: ScratchPool::default(), camera: Camera { x: 0.0, y: 0.0, zoom: 1.0 }, pending: false, drawable: None, last_look: None, size })
     }
 
     fn picture(&mut self, clip: &str, rgba: &[u8], width: u32, height: u32) {

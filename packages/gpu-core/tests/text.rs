@@ -108,7 +108,7 @@ fn the_renderer_lays_out_and_draws_a_text_item_with_its_fonts() {
     for face in &case.list.faces {
         renderer.put_font(&face.url, Source::from_bytes(&fs::read(Path::new(REPO).join(&face.url)).unwrap()).unwrap());
     }
-    let rendered = renderer.render(&case.list, &gpu_core::pictures::Pictures::new()).unwrap();
+    let rendered = renderer.render(&case.list, &gpu_core::pictures::Pictures::default()).unwrap();
     let background = rendered.pixels[..4].to_vec();
 
     assert!(rendered.skipped.is_empty(), "{:?}", rendered.skipped);

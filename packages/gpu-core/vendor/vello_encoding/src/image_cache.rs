@@ -3,7 +3,7 @@
 
 use guillotiere::{AllocId, AtlasAllocator, size2};
 use peniko::ImageData;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::collections::hash_map::Entry;
 
 const DEFAULT_ATLAS_SIZE: i32 = 1024;
@@ -46,7 +46,7 @@ pub(crate) struct ImageCache {
     /// prevents repeated stale-eviction scans during the same resolve pass.
     evicted_in_resolve: usize,
     /// Map from image blob id to atlas residency.
-    map: HashMap<u64, ResidentImage>,
+    map: FxHashMap<u64, ResidentImage>,
     /// Images that must be uploaded in the current resolve pass, with atlas locations.
     images: Vec<(ImageData, u32, u32)>,
 }
@@ -68,7 +68,7 @@ impl ImageCache {
             max_size,
             generation: 0,
             evicted_in_resolve: 0,
-            map: HashMap::default(),
+            map: FxHashMap::default(),
             images: Vec::default(),
         }
     }
@@ -185,7 +185,7 @@ impl ImageCache {
         let mut atlas = AtlasAllocator::new(size2(size, size));
         let mut entries: Vec<_> = self.map.iter().collect();
         entries.sort_by_key(|(id, _)| *id);
-        let mut map = HashMap::with_capacity(self.map.len());
+        let mut map = FxHashMap::with_capacity_and_hasher(self.map.len(), Default::default());
         for (id, resident) in entries {
             let Some(alloc) =
                 atlas.allocate(size2(resident.image.width as _, resident.image.height as _))

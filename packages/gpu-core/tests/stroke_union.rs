@@ -41,7 +41,7 @@ fn a_stroke_union_is_one_fill_so_overlapping_bands_leave_no_seams() {
     .unwrap();
     let mut canvas = Recording::default();
 
-    build_into(&mut canvas, &list, &Shelf::new(), &Layers::new());
+    build_into(&mut canvas, &list, &Shelf::default(), &Layers::new());
 
     assert_eq!(canvas.fills.len(), 1);
     assert_eq!(canvas.fills[0].0, Fill::NonZero);

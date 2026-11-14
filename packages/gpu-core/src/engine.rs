@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 use vello::kurbo::{Affine, Point, Rect};
 use vello::peniko::{color::AlphaColor, Color, Fill, Gradient, ImageData};
@@ -33,14 +33,14 @@ struct Cached {
 }
 
 struct LayerCache {
-    entries: HashMap<String, Cached>,
+    entries: FxHashMap<String, Cached>,
     tick: u64,
     cap: u64,
 }
 
 impl Default for LayerCache {
     fn default() -> Self {
-        LayerCache { entries: HashMap::new(), tick: 0, cap: LAYER_BYTES }
+        LayerCache { entries: FxHashMap::default(), tick: 0, cap: LAYER_BYTES }
     }
 }
 
@@ -115,7 +115,7 @@ pub struct Engine {
     pub atlas: Atlas,
     filters: FilterPasses,
     cache: LayerCache,
-    held: HashMap<String, wgpu::Texture>,
+    held: FxHashMap<String, wgpu::Texture>,
     spare: Vec<wgpu::Texture>,
     scenes: Vec<Scene>,
     sheet: Option<wgpu::Texture>,
@@ -148,7 +148,7 @@ struct Gpu<'a> {
     atlas: Atlas,
     sheet: &'a mut Option<wgpu::Texture>,
     open: Option<Sheet>,
-    unsettled: std::collections::HashSet<u64>,
+    unsettled: rustc_hash::FxHashSet<u64>,
 }
 
 struct Sheet {
@@ -156,7 +156,7 @@ struct Sheet {
     packer: Packer,
 }
 
-fn reads_any(scene: &Scene, images: &std::collections::HashSet<u64>) -> bool {
+fn reads_any(scene: &Scene, images: &rustc_hash::FxHashSet<u64>) -> bool {
     !images.is_empty() && scene.encoding().resources.patches.iter().any(|p| matches!(p, vello::low_level::vello_encoding::Patch::Image { image, .. } if images.contains(&image.data.id())))
 }
 
@@ -337,7 +337,7 @@ impl Gpu<'_> {
 impl Engine {
     pub fn new(device: &wgpu::Device) -> Result<Self, EngineError> {
         let vello = vello::Renderer::new(device, RendererOptions { antialiasing_support: AaSupport::area_only(), ..Default::default() })?;
-        Ok(Self { vello, blending: Blending::Native, atlas: Atlas::On, filters: FilterPasses::new(device), cache: LayerCache::default(), held: HashMap::new(), spare: Vec::new(), scenes: Vec::new(), sheet: None, tally: Tally::default(), drawing: Reason::Screen, fullness: 0.0, draws: 0 })
+        Ok(Self { vello, blending: Blending::Native, atlas: Atlas::On, filters: FilterPasses::new(device), cache: LayerCache::default(), held: FxHashMap::default(), spare: Vec::new(), scenes: Vec::new(), sheet: None, tally: Tally::default(), drawing: Reason::Screen, fullness: 0.0, draws: 0 })
     }
 
     pub fn set_budget(&mut self, pool: u64, layers: u64) {

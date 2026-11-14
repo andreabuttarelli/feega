@@ -121,3 +121,6 @@ check-cfg = [
     "cfg(disable_dispatch_avx2)",
     "cfg(disable_dispatch_avx512)",
 ]
+
+[dependencies.rustc-hash]
+version = "2"

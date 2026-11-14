@@ -100,7 +100,7 @@ fn a_backdrop_encodes_only_what_lies_under_it() {
     let list = parse(&format!(r#"{{ "width": 100, "height": 100, "background": [0, 0, 0, 1], "items": [{}] }}"#, items.join(","))).unwrap();
     let mut surface = Backdrops::default();
 
-    prepare(&mut surface, &list, &Shelf::new(), Blending::Native).unwrap();
+    prepare(&mut surface, &list, &Shelf::default(), Blending::Native).unwrap();
 
     assert_eq!(surface.fills, vec![1]);
 }
