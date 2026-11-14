@@ -413,6 +413,7 @@ type Pick = { at: { x: number; y: number }; depth: Depth };
 type FieldEdit = Edit.Colour;
 
 const PROPERTIES_TAB = 'Properties';
+const EMPTY_AT = { x: 300, y: 300 };
 
 const FIELDS: Record<FieldEdit, { selector: string; values: [string, string] | null }> = {
   [Edit.Colour]: { selector: '[data-testid="fill-eye"]', values: null }
@@ -610,6 +611,7 @@ async function edits(page: Page, edit: Edit): Promise<(Stages | null)[]> {
     return resizeEdits(page, EDITS_EACH);
   }
   if (edit === Edit.Colour) {
+    await page.mouse.click(EMPTY_AT.x, EMPTY_AT.y);
     await selectChild(page, { at: CHILD_AT, depth: Depth.Leaf });
     return fieldEdits(page, edit, EDITS_EACH).catch(async (e: unknown) => {
       await page.screenshot({ path: join(OUT, `edit-${edit}-missing.png`) });

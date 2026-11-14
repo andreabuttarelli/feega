@@ -284,7 +284,7 @@ function relaid(list: DisplayList, before: MotionDoc, after: MotionDoc, measure:
   return plan.gone.size ? rebled(patched, before, after) : patched;
 }
 
-const STATIC_KEYS = new Set(['props']);
+const STATIC_KEYS = new Set(['props', 'layoutItem']);
 
 const keptOnly = (doc: MotionDoc, ids: ReadonlySet<string>): MotionDoc => ({ ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => ids.has(c.id)) })) });
 
@@ -399,8 +399,24 @@ export function readyPatch(doc: MotionDoc, measure: TextMeasure): void {
   laid(doc, measure);
 }
 
+function restyledClips(before: MotionDoc, after: MotionDoc): MotionClip[] | null {
+  if (changedKeys(before, after).some((k) => k !== 'tracks')) {
+    return null;
+  }
+  const [was, now] = [clipsOf(before), clipsOf(after)];
+  if (was.length !== now.length || was.some((c, i) => c.id !== now[i].id)) {
+    return null;
+  }
+  const edited = now.filter((c, i) => c !== was[i]);
+  return edited.length && edited.every((c) => changedKeys(was[now.indexOf(c)], c).every((k) => STATIC_KEYS.has(k))) ? edited : null;
+}
+
 export function fastPatch(list: DisplayList, before: MotionDoc, after: MotionDoc, measure: TextMeasure, look?: Look): DisplayList | null {
   const pair = onlyClip(before, after);
+  const many = pair ? null : restyledClips(before, after);
+  if (many) {
+    return subtreeRedrawn(list, before, after, many[0], measure, look);
+  }
   const edit = pair && EDIT_OF.find(([, is]) => is(pair[0], pair[1]))?.[0];
   return pair && edit ? PATCHES[edit](list, before, after, pair[0], pair[1], measure, look) : null;
 }

@@ -191,6 +191,13 @@ describe('fastPatch redraws one restyled layer without rebuilding the frame', ()
     expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toEqual(drawn(after));
   });
 
+  it('a resize that also moves the children by their constraints redraws them as the full build does', () => {
+    const before = nested();
+    const after = edit(edit(before, 'card', restyled({ width: 0.5 })), 'dot', restyled({ x: 0.6 }));
+
+    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toEqual(drawn(after));
+  });
+
   it('a resized layer with children redraws them as the full build does', () => {
     const before = nested();
     const after = edit(before, 'card', restyled({ width: 0.5 }));
