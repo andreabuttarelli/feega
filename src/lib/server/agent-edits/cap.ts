@@ -92,7 +92,7 @@ export async function agentEditRefusal(db: Db, orgId: string, cost = 1): Promise
 
 export const AGENT_EDIT_CAP_STATUS = HTTP_PAYMENT_REQUIRED;
 
-export type AgentEditUsage = { used: number; limit: number };
+export type AgentEditUsage = { used: number; limit: number; resetsAt: string | null };
 
 export async function agentEditUsage(db: Db, orgId: string, now = new Date()): Promise<AgentEditUsage | null> {
   try {
@@ -100,7 +100,8 @@ export async function agentEditUsage(db: Db, orgId: string, now = new Date()): P
       return null;
     }
     const week = await agentWeek(db, orgId, new Date(now.getTime() - WEEK_MS).toISOString());
-    return { used: Math.min(week.used, FREE_AGENT_LAYERS_PER_WEEK), limit: FREE_AGENT_LAYERS_PER_WEEK };
+    const resetsAt = week.oldest === null ? null : new Date(week.oldest + WEEK_MS).toISOString();
+    return { used: Math.min(week.used, FREE_AGENT_LAYERS_PER_WEEK), limit: FREE_AGENT_LAYERS_PER_WEEK, resetsAt };
   } catch {
     return null;
   }

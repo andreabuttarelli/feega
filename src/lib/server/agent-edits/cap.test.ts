@@ -92,7 +92,11 @@ describe('the weekly cap on agent edits, free teams only', () => {
 
 describe('agentEditUsage, what the credits page shows', () => {
   it('counts this week for a free team', async () => {
-    expect(await agentEditUsage(world({ events: many(640, daysAgo(2)) }), ORG, NOW)).toEqual({ used: 640, limit: 1000 });
+    expect(await agentEditUsage(world({ events: many(640, daysAgo(2)) }), ORG, NOW)).toEqual({ used: 640, limit: 1000, resetsAt: new Date(NOW.getTime() + 5 * DAY_MS).toISOString() });
+  });
+
+  it('has no reset time before the first agent edit', async () => {
+    expect(await agentEditUsage(world({}), ORG, NOW)).toEqual({ used: 0, limit: 1000, resetsAt: null });
   });
 
   it('shows nothing for a paying team', async () => {

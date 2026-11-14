@@ -38,6 +38,7 @@ export type SeatStatus = {
   unpaid: boolean;
   grandfathered: boolean;
   endsAt: string | null;
+  renewsAt: string | null;
   pricePerEditor: number;
 };
 
@@ -238,6 +239,7 @@ export async function seatStatus(db: Db, orgId: string): Promise<SeatStatus> {
     unpaid: sub?.status === 'unpaid',
     grandfathered: !!org.editor_seats_grandfathered_at,
     endsAt: sub?.endsAt ?? null,
+    renewsAt: sub?.periodEnd ?? null,
     pricePerEditor: PLAN.price
   };
 }

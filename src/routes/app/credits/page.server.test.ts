@@ -30,7 +30,7 @@ type World = {
 		store_plan_expires_at: string | null;
 	}>;
 	role?: string;
-	brands?: Row[];
+	projects?: Row[];
 	aiCalls?: Row[];
 	balance?: number;
 	ready?: boolean;
@@ -42,7 +42,7 @@ function fakeSupabase(world: World = {}) {
 	const tables: Record<string, Row[]> = {
 		orgs: [{ ...ORG, stripe_customer_id: 'cus_1', stripe_subscription_id: null, ...world.org }],
 		orgs_members: [{ org_id: ORG.id, user_id: 'u1', role: world.role ?? 'owner', orgs: ORG }],
-		brands: (world.brands ?? []).map((b) => ({ org_id: ORG.id, ...b })),
+		projects: (world.projects ?? []).map((p) => ({ org_id: ORG.id, ...p })),
 		ai_calls: world.aiCalls ?? []
 	};
 	const rpcs: Record<string, unknown> = {
@@ -111,7 +111,7 @@ describe('/app/credits — the workspace credits page', () => {
 	it('renders for a workspace without brands', async () => {
 		const data = await run(fakeSupabase({ org: { stripe_customer_id: null } }));
 
-		expect(data.brands).toEqual([]);
+		expect(data.usage).toEqual({ total: 0, byProject: [], byKind: [] });
 		expect(data.org.id).toBe('org-1');
 		expect(data.credits.balance).toBe(3600);
 		expect(data.hasBilling).toBe(false);
@@ -160,24 +160,20 @@ describe('/app/credits — the workspace credits page', () => {
 		expect(data.checkoutOutcome).toBe('paid');
 	});
 
-	it('breaks usage down over every brand of the workspace', async () => {
+	it('breaks the last 30 days down by project and by kind', async () => {
 		const data = await run(
 			fakeSupabase({
-				brands: [
-					{ id: 'b1', name: 'One', slug: 'one' },
-					{ id: 'b2', name: 'Two', slug: 'two' }
-				],
+				projects: [{ id: 'p1', name: 'Launch' }],
 				aiCalls: [
-					{ brand_id: 'b1', cost_usd: 3 },
-					{ brand_id: 'b2', cost_usd: 1 }
+					{ org_id: ORG.id, project_id: 'p1', operation: 'renderImage', actor_kind: 'user', billed_credits: 30, cost_usd: 0.25 },
+					{ org_id: ORG.id, project_id: 'p1', operation: 'chat', actor_kind: 'user', billed_credits: 10, cost_usd: 0.08 }
 				]
 			})
 		);
 
-		expect(data.brands).toEqual([
-			{ id: 'b1', name: 'One', slug: 'one', credits: 360 },
-			{ id: 'b2', name: 'Two', slug: 'two', credits: 120 }
-		]);
+		expect(data.usage.total).toBe(40);
+		expect(data.usage.byProject).toEqual([{ id: 'p1', name: 'Launch', credits: 40 }]);
+		expect(data.usage.byKind.map((k: { kind: string }) => k.kind)).toEqual(['image', 'chat']);
 	});
 
 	it('reads owner status from orgs_members', async () => {
@@ -191,6 +187,15 @@ describe('/app/credits — the workspace credits page', () => {
 		const data = await run(fakeSupabase({ org: { stripe_subscription_id: 'sub_1' } }));
 
 		expect(data.seats).toMatchObject({ editors: 1, paid: true, endsAt: '2026-12-13T00:00:00.000Z' });
+	});
+
+	it('says when the plan renews', async () => {
+		subscribedPlan.mockResolvedValue({ price: 9, credits: 500, lookupKey: 'feega_monthly_9' });
+		seatSubscription.mockResolvedValue({ itemId: 'si_1', quantity: 1, perEditor: true, status: 'active', endsAt: null, periodEnd: '2026-12-01T00:00:00.000Z' });
+
+		const data = await run(fakeSupabase({ org: { stripe_subscription_id: 'sub_1' } }));
+
+		expect(data.seats).toMatchObject({ renewsAt: '2026-12-01T00:00:00.000Z' });
 	});
 
 	it('loads with seats unknown when seat state cannot be read, so anyone can still subscribe or top up', async () => {
