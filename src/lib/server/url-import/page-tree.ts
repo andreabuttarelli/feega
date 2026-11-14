@@ -1375,7 +1375,13 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     });
     const opacity = Number(css.opacity);
     const masking = Boolean(maskOf(css));
-    const roundsKids = clipsSelf && kids.length > 0 && Object.keys(cornersOf(css, r)).length > 0;
+    const corners = clipsSelf ? cornersOf(css, r) : {};
+    const rounded = Object.keys(corners).length > 0 && kids.length > 0;
+    const soleKid = rounded && kids.length === 1 && kids[0].type === 'RECTANGLE' && sameBox(kids[0], r) && !kids[0].cornerRadius && !kids[0].rectangleCornerRadii;
+    if (soleKid) {
+      kids[0] = { ...kids[0], ...corners };
+    }
+    const roundsKids = rounded && !soleKid;
     const framed = paintedSelf || overflows || roundsKids || /flex/.test(css.display) || opacity < 1 || masking;
     const kidZ = kids.map((k) => zOf.get(k) ?? 0);
     const zEff = stacks(el, css) || clipsSelf ? z : Math.max(z, ...kidZ);
