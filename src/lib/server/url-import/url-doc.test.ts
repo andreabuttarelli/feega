@@ -226,3 +226,24 @@ describe('urlPlan', () => {
     expect(Math.round(Number(heading.props.size) * Math.min(first.doc.width, first.doc.height))).toBe(64);
   });
 });
+
+const BOARD_WIDTH = 1280;
+const boardOf = (id: string, y: number, height: number) => ({ id, type: 'FRAME', name: id, absoluteBoundingBox: { x: 160, y, width: BOARD_WIDTH, height }, fills: [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 1 } }], children: [] });
+const boardsTree = (boards: ReturnType<typeof boardOf>[], height: number): PageTree => ({
+  title: 'boards',
+  url: 'http://localhost/',
+  width: 1600,
+  height,
+  truncated: false,
+  root: { id: 'root', type: 'FRAME', name: 'boards', absoluteBoundingBox: { x: 0, y: 0, width: 1600, height }, fills: [], children: boards }
+});
+
+describe('a page taller than what fits under the shorter pages', () => {
+  it('starts the frame its own top lands in, not 9599 px into the frame before (traidue /wiki: the tail of the board ran into a second frame)', () => {
+    const tree = boardsTree([boardOf('short', 160, 6465), boardOf('wiki', 6785, 23355)], 30300);
+    const docs = urlPlan(tree, newId, undefined, {}, PLAIN_SHAPE)!.plan.items.map((item) => item.doc);
+    const names = docs.map((doc) => doc.tracks.flatMap((t) => t.clips).map((c) => c.name).filter((n) => n === 'short' || n === 'wiki'));
+
+    expect(names).toEqual([['short'], ['wiki'], ['wiki']]);
+  });
+});

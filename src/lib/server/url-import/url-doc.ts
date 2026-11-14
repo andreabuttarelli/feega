@@ -171,7 +171,21 @@ function slicesAt(root: RestNode, cuts: number[]): Slice[] {
   });
 }
 
-const slicesOf = (root: RestNode): Slice[] => slicesAt(root, Array.from({ length: Math.max(1, Math.ceil(root.absoluteBoundingBox!.height / SLICE)) }, (_, i) => i * SLICE));
+function cutsOf(root: RestNode): number[] {
+  const page = root.absoluteBoundingBox!;
+  const spans = (root.children ?? []).map((c) => c.absoluteBoundingBox!);
+  const free = (y: number) => spans.every((b) => y <= b.y || y >= b.y + b.height);
+  const cuts = [page.y];
+  while (cuts[cuts.length - 1] + SLICE < page.y + page.height) {
+    const last = cuts[cuts.length - 1];
+    const limit = last + SLICE;
+    const tooTall = spans.filter((b) => b.height > SLICE && b.y > last && b.y < limit && free(b.y) && free(b.y - 1));
+    cuts.push(tooTall.length ? Math.min(...tooTall.map((b) => b.y)) : limit);
+  }
+  return cuts;
+}
+
+const slicesOf = (root: RestNode): Slice[] => slicesAt(root, cutsOf(root));
 
 type ViewSlices = { view: PageView; slices: Slice[] };
 
