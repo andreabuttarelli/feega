@@ -226,3 +226,63 @@ describe('urlPlan', () => {
     expect(Math.round(Number(heading.props.size) * Math.min(first.doc.width, first.doc.height))).toBe(64);
   });
 });
+
+const BOARD_WIDTH = 1280;
+const boardOf = (id: string, y: number, height: number) => ({ id, type: 'FRAME', name: id, absoluteBoundingBox: { x: 160, y, width: BOARD_WIDTH, height }, fills: [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 1 } }], children: [] });
+const boardsTree = (boards: ReturnType<typeof boardOf>[], height: number): PageTree => ({
+  title: 'boards',
+  url: 'http://localhost/',
+  width: 1600,
+  height,
+  truncated: false,
+  root: { id: 'root', type: 'FRAME', name: 'boards', absoluteBoundingBox: { x: 0, y: 0, width: 1600, height }, fills: [], children: boards }
+});
+
+describe('a page taller than what fits under the shorter pages', () => {
+  it('starts the frame its own top lands in, not 9599 px into the frame before (traidue /wiki: the tail of the board ran into a second frame)', () => {
+    const tree = boardsTree([boardOf('short', 160, 6465), boardOf('wiki', 6785, 23355)], 30300);
+    const docs = urlPlan(tree, newId, undefined, {}, PLAIN_SHAPE)!.plan.items.map((item) => item.doc);
+    const names = docs.map((doc) => doc.tracks.flatMap((t) => t.clips).map((c) => c.name).filter((n) => n === 'short' || n === 'wiki'));
+
+    expect(names).toEqual([['short'], ['wiki'], ['wiki']]);
+  });
+});
+
+describe('a text with a smaller run on a board as wide as fifteen pages', () => {
+  it('keeps its colour, font and runs (traidue /glossario: every definition with a smaller link came in black, default font and size)', () => {
+    const width = 16000;
+    const text = { id: 't', type: 'TEXT', characters: 'Definition. More', absoluteBoundingBox: { x: 100, y: 100, width: 600, height: 30 }, fills: [{ type: 'SOLID', color: { r: 0.2, g: 0.2, b: 0.2, a: 1 } }], style: { fontFamily: 'Inter', fontSize: 19, fontWeight: 400 }, characterStyleOverrides: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1], styleOverrideTable: { '1': { fontFamily: 'Inter', fontSize: 16.8, fontWeight: 400, fills: [{ type: 'SOLID', color: { r: 0.07, g: 0.07, b: 0.07, a: 1 } }] } } };
+    const tree: PageTree = { title: 'wide', url: 'http://localhost/', width, height: 16000, truncated: false, root: { id: 'root', type: 'FRAME', name: 'wide', absoluteBoundingBox: { x: 0, y: 0, width, height: 16000 }, fills: [], children: [text] } };
+    const made = urlPlan(tree, newId, undefined, {}, PLAIN_SHAPE)!;
+    const clip = clipsOf(made).find((c) => c.props.text === 'Definition. More')!;
+
+    expect(made.plan.skipped).toEqual([]);
+    expect([clip.props.color, clip.props.font, (clip.props.runs as unknown[]).length]).toEqual(['#333333', 'Inter', 1]);
+  });
+});
+
+describe('a 1 px border on a board as wide as fifteen pages', () => {
+  it('stays 1 px, not rounded up to 1.6 (traidue /glossario: every table border came in thicker)', () => {
+    const width = 16000;
+    const cell = { id: 'td', type: 'FRAME', name: 'td', absoluteBoundingBox: { x: 100, y: 100, width: 600, height: 60 }, fills: [], strokes: [{ type: 'SOLID', color: { r: 0.9, g: 0.9, b: 0.9, a: 1 } }], strokeWeight: 1, strokeAlign: 'INSIDE', children: [] };
+    const tree: PageTree = { title: 'wide', url: 'http://localhost/', width, height: 16000, truncated: false, root: { id: 'root', type: 'FRAME', name: 'wide', absoluteBoundingBox: { x: 0, y: 0, width, height: 16000 }, fills: [], children: [cell] } };
+    const made = urlPlan(tree, newId, undefined, {}, PLAIN_SHAPE)!;
+    const doc = made.plan.items[0].doc;
+    const td = clipsOf(made).find((c) => c.name === 'td')!;
+    const [stroke] = td.props.strokes as { width: number }[];
+
+    const cssPx = (stroke.width * Math.min(doc.width, doc.height) * width) / doc.width;
+
+    expect(cssPx).toBeCloseTo(1, 1);
+  });
+});
+
+describe('a text the page cuts after two lines', () => {
+  it('comes in cut after two lines with an ellipsis', () => {
+    const text = { id: 't', type: 'TEXT', characters: 'A long card summary that runs on', maxLines: 2, absoluteBoundingBox: { x: 100, y: 100, width: 200, height: 40 }, fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0, a: 1 } }], textAutoResize: 'HEIGHT', style: { fontFamily: 'Inter', fontSize: 16, fontWeight: 400, lineHeightUnit: 'PIXELS', lineHeightPx: 20 } };
+    const tree: PageTree = { title: 'cut', url: 'http://localhost/', width: 1280, height: 800, truncated: false, root: { id: 'root', type: 'FRAME', name: 'cut', absoluteBoundingBox: { x: 0, y: 0, width: 1280, height: 800 }, fills: [], children: [text] } };
+    const clip = clipsOf(urlPlan(tree, newId, undefined, {}, PLAIN_SHAPE)!).find((c) => c.component === 'Text')!;
+
+    expect([clip.props.maxLines, clip.props.truncate]).toEqual([2, true]);
+  });
+});

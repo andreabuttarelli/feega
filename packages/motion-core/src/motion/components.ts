@@ -23,7 +23,7 @@ import { fillsSchema } from './fill/model';
 import { strokesSchema } from './stroke/model';
 import { runsSchema } from './text-runs';
 import { listsSchema } from './text-lists';
-import { AXES, LETTER_SPACING, LINE_HEIGHT } from './type-units';
+import { AXES, LETTER_SPACING, LINE_HEIGHT, TYPE_SIZE } from './type-units';
 import { DECORATION_STYLES, DECORATIONS, FEATURES, RULE } from './decoration';
 import { counterSchema } from './text-counter';
 import { BooleanOp } from './shape/boolean-op';
@@ -153,7 +153,7 @@ export const TYPE = {
 
 type Look = { weight?: number; tracking: number; leading: number };
 
-export const TYPE_SIZE = { min: 0.001, max: 4 } as const;
+export { TYPE_SIZE };
 
 const typography = (size: number, fallbackColor: string, look: Look) => ({
   color: color(fallbackColor, 'Colour'),

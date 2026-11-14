@@ -1,13 +1,12 @@
 import { z } from 'zod';
 import { fillSchema, FillType, type Fill } from './fill/model';
+import { TYPE_SIZE } from './type-units';
 
 const MIN_WEIGHT = 100;
 const MAX_WEIGHT = 900;
 const MAX_RUNS = 200;
 export const BOLD = 700;
 
-const MIN_SIZE = 0.005;
-const MAX_SIZE = 1;
 const MIN_TRACKING = -0.2;
 const MAX_TRACKING = 1;
 const MIN_LEADING = 0.6;
@@ -31,7 +30,7 @@ const runStyleShape = {
   weight: z.number().int().min(MIN_WEIGHT).max(MAX_WEIGHT).optional(),
   italic: z.boolean().optional(),
   font: z.string().min(1).max(64).optional(),
-  size: z.number().min(MIN_SIZE).max(MAX_SIZE).optional(),
+  size: z.number().min(TYPE_SIZE.min).max(TYPE_SIZE.max).optional(),
   tracking: z.number().min(MIN_TRACKING).max(MAX_TRACKING).optional(),
   leading: z.number().min(MIN_LEADING).max(MAX_LEADING).optional(),
   underline: z.boolean().optional(),
