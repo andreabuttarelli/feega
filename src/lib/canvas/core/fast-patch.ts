@@ -347,6 +347,8 @@ function exactLaid(doc: MotionDoc, measure: TextMeasure): Clips {
   return byMeasure.get(measure) ?? byMeasure.set(measure, byId(clipsOf(withAutoLayout(withoutHidden(doc), measure)))).get(measure)!;
 }
 
+const REDRAW_MOST = 48;
+
 const drawOrder = (doc: MotionDoc): string[] => [...doc.tracks].reverse().filter((t) => t.kind === TrackKind.Visual && !t.hidden).flatMap((t) => t.clips.map((c) => c.id));
 
 function runAt(items: Item[], clip: string): { within: Item[]; at: number; path: number[] } | null {
@@ -394,6 +396,9 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
   const relaid = exactLaid(after, measure);
   const moved = new Set([edited.id, ...[...relaid].filter(([id, c]) => !was.get(id) || !sameProps(was.get(id)!, c)).map(([id]) => id)]);
   const redraw = below(after, moved);
+  if (redraw.length > REDRAW_MOST) {
+    return null;
+  }
   const paired = new Set(mattePairs(after).flatMap((p) => [p.source, p.target]));
   if (redraw.some((id) => paired.has(id))) {
     return null;

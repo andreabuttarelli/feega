@@ -230,3 +230,19 @@ describe('fastPatch shows a hidden layer without rebuilding the frame', () => {
     expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toEqual(drawn(after));
   });
 });
+
+const MANY = 80;
+
+const tallStack = () => {
+  const ids = Array.from({ length: MANY }, (_, i) => `k${i}`);
+  return ids.reduce((d, id) => edit(d, id, (c) => ({ ...c, parent: 'card', props: { ...c.props, width: 0.01, height: 0.01 } })), edit(built(['card', ...ids]), 'card', (c) => ({ ...c, autoLayout: { ...DEFAULT_AUTO_LAYOUT, gap: 1 }, layoutItem: { ...DEFAULT_LAYOUT_ITEM, width: Sizing.Hug } })));
+};
+
+describe('fastPatch keeps a main-thread redraw within a frame', () => {
+  it('leaves to the worker a reflow that would redraw dozens of layers', () => {
+    const before = tallStack();
+    const after = edit(before, 'k0', restyled({ width: 0.02 }));
+
+    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toBeNull();
+  });
+});
