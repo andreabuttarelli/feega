@@ -20,3 +20,11 @@ auto-layout ancestor.
 - Spec: a `colour` kind (the fill's eye toggle, from the Properties tab; a keyframe kind was dropped:
   design mode shows no keyframe button to drive), `BUDGET_EDIT_PAUSE`
   between edits so a 4x throttled run is not polluted by the previous edit.
+- A resize drag rewrites `layoutItem` and the children's props by their constraints, so it never
+  matched the one-clip patch: edits that change only `props`/`layoutItem` of any number of clips
+  now take the relayout redraw.
+
+Landings, desktop, input → first changed pixel p50/p95 (ms), before → after: resize 123/134 →
+6/8 (the drag preview; the patched list lands at ~67 ms p50), hide 79/90 → 18/48, colour 141/191
+→ 98/157, nudge/opacity/leaf unchanged (~23/16 ms). Hide still rebuilds on every unhide, colour on
+edits the patch declines. Details and the 4x table in PR.

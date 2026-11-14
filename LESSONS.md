@@ -46,6 +46,9 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 ### A perf spec times out at 30 min with no numbers
 **Signal:** `perf:budget -g edits` ends with `Test timeout of 1800000ms exceeded` and `keyboard.press: Target page ... closed`, no JSON written. `locator.boundingBox()` without a `timeout` waits for an element that an edit removed (the selection after a hide) until the test dies. **Move:** give every probe `boundingBox({ timeout })` a short timeout and `.catch`; and check `lsof bench.lock` before assuming your run started — another agent's bench may hold it.
 
+### A wait loop on `pgrep -f` returns at once
+**Signal:** `until pgrep -f "port=5388"` finishes before the server exists. `pgrep -f` matches the shell running the loop, whose command line holds the same text. **Move:** wait on a file or on `lsof -i :<port>`, never on `pgrep -f` with text from your own command.
+
 ### Two worktrees sharing one `CARGO_TARGET_DIR` build the same wasm
 **Signal:** a gpu-core change makes no difference in the browser, and `md5` of `static/gpu-core/gpu_core_bg.wasm` is identical in the before and after worktrees; `cargo build` says `Finished` in under a second. Cargo checks freshness against the source files of the last build in that target dir, so the other worktree's sources look unchanged. **Move:** one target dir per worktree (`cp -c -R` a warm one to start fast), or `touch` the changed sources before building; compare the wasm checksums before any A/B.
 
