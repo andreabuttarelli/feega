@@ -7,7 +7,7 @@ import { diffDoc } from '$lib/motion/doc-ops';
 import { commitOps } from '$lib/server/motion/frame-ops';
 import { appendRevision } from '$lib/server/repos/motion-revisions';
 import { revisionsDb } from '$lib/server/repos/motion-revisions.test';
-import { Build, coreEvent, orgIdentify, postHogSink, useCoreSink, type CoreBody } from './core-usage';
+import { Build, coreEvent, markSignedUp, orgIdentify, postHogSink, useCoreSink, type CoreBody } from './core-usage';
 
 vi.mock('$lib/server/repos/canvas', async (real) => ({ ...(await real<object>()), patchNodeData: vi.fn(async () => ({ ok: true })), findNode: vi.fn(async () => null) }));
 
@@ -107,6 +107,15 @@ describe('postHogSink', () => {
   it('senza utente non parte niente', () => {
     coreEvent(null, CoreEvent.CanvasOpened, { canvas_id: 'c' });
     expect(sent).toEqual([]);
+  });
+});
+
+describe('signed_up_at', () => {
+  it('la registrazione fissa signed_up_at una volta sola, su una persona vera', () => {
+    markSignedUp('u1', '2026-11-14T10:00:00.000Z');
+
+    expect(sent[0]).toMatchObject({ event: '$set', distinct_id: 'u1', properties: { $set_once: { signed_up_at: '2026-11-14T10:00:00.000Z' } } });
+    expect(sent[0].properties).not.toHaveProperty('$process_person_profile');
   });
 });
 

@@ -125,6 +125,20 @@ export function orgIdentify(orgId: string, traits: Partial<OrgTraits>): void {
   activeSink()?.({ event: '$groupidentify', distinct_id: orgDistinctId(orgId), properties: { $group_type: ORG_GROUP, $group_key: orgId, $group_set: traits, ...personless } });
 }
 
+export function markSignedUp(userId: string, at: string): void {
+  const send = activeSink();
+  if (!send) {
+    return;
+  }
+
+  const body = { event: '$set', distinct_id: userId, properties: { $set_once: { signed_up_at: at }, $geoip_disable: true, $ip: null } };
+  if (!internal) {
+    send(body);
+    return;
+  }
+  void internal(userId).then((team) => !team && send(body)).catch(() => {});
+}
+
 export function captureForOrg(orgId: string, event: string, props: object): void {
   activeSink()?.({ event, distinct_id: orgDistinctId(orgId), properties: { ...props, ...groupOf(orgId), ...personless } });
 }
