@@ -213,4 +213,39 @@ describe('the wasm core', () => {
 
     expect(got).toEqual([['g']]);
   });
+
+  describe('after a trap', () => {
+    const RECURSIVE = 'recursive use of an object detected which would lead to unsafe aliasing in rust';
+    const trapping = () => {
+      let trapped = false;
+      const borrowed = () => {
+        if (trapped) {
+          throw new Error(RECURSIVE);
+        }
+      };
+      const core = {
+        frame: () => {
+          trapped = true;
+          throw new WebAssembly.RuntimeError('unreachable');
+        },
+        set_camera: borrowed,
+        drop_group: borrowed,
+        lost: () => (borrowed(), false)
+      };
+      return core;
+    };
+
+    it('the trap itself still reaches the caller that made the call', () => {
+      expect(() => overBytes(trapping()).frame(0)).toThrow(WebAssembly.RuntimeError);
+    });
+
+    it('a poisoned core reports itself lost instead of throwing on every call', () => {
+      const attached = overBytes(trapping());
+      expect(() => attached.frame(0)).toThrow();
+
+      expect(attached.lost()).toBe(true);
+      expect(() => attached.set_camera(0, 0, 1)).not.toThrow();
+      expect(() => attached.drop_group('g')).not.toThrow();
+    });
+  });
 });

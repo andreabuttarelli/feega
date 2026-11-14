@@ -122,20 +122,51 @@ const utf8 = new TextEncoder();
 const WIRED_PACKED = new Set(['put_group_packed', 'append_group_packed']);
 const WIRED_LAST = new Set(['draw', 'patch_uses', 'set_overlay', 'set_selected_overlay', 'set_live_overlay', 'put_group', 'append_group', 'patch_group']);
 
+const BORROW_LEFT = 'recursive use of an object detected';
+
+const poisons = (e: unknown): boolean => e instanceof WebAssembly.RuntimeError || (e instanceof Error && e.message.includes(BORROW_LEFT));
+
+const POISONED_ANSWERS: Record<string, () => unknown> = {
+  lost: () => true,
+  poster: () => Promise.reject(new Error('core poisoned'))
+};
+
+function bytesCall(target: object, name: string | symbol, member: (...args: unknown[]) => unknown): (...args: unknown[]) => unknown {
+  if (typeof name === 'string' && WIRED_PACKED.has(name)) {
+    return (key, list, floats, ends) => member.apply(target, [key, utf8.encode(list as string), floats, ends]);
+  }
+  if (typeof name !== 'string' || !WIRED_LAST.has(name)) {
+    return member.bind(target);
+  }
+  return (...args) => member.apply(target, [...args.slice(0, -1), utf8.encode(args.at(-1) as string)]);
+}
+
 export function overBytes(core: object): Attached {
+  let poisoned = false;
+
+  const guarded = (name: string | symbol, call: (...args: unknown[]) => unknown) => (...args: unknown[]) => {
+    if (poisoned) {
+      return POISONED_ANSWERS[name as string]?.();
+    }
+    try {
+      return call(...args);
+    } catch (e) {
+      if (!poisons(e)) {
+        throw e;
+      }
+      poisoned = true;
+      dropCore();
+      throw e;
+    }
+  };
+
   return new Proxy(core, {
     get(target, name) {
       const member = Reflect.get(target, name) as unknown;
       if (typeof member !== 'function') {
         return member;
       }
-      if (typeof name === 'string' && WIRED_PACKED.has(name)) {
-        return (key: string, list: string, floats: Float64Array, ends: Uint32Array) => member.apply(target, [key, utf8.encode(list), floats, ends]);
-      }
-      if (typeof name !== 'string' || !WIRED_LAST.has(name)) {
-        return member.bind(target);
-      }
-      return (...args: unknown[]) => member.apply(target, [...args.slice(0, -1), utf8.encode(args.at(-1) as string)]);
+      return guarded(name, bytesCall(target, name, member as (...args: unknown[]) => unknown));
     }
   }) as Attached;
 }
