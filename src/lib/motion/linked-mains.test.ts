@@ -182,3 +182,28 @@ describe('a followed main resolves in the variables of the frame that shows it',
     expect((followed.comps[compId].tracks[0].clips[0] as MotionClip).props.color).toBe('#1565c0');
   });
 });
+
+describe('a main that holds an instance of another main', () => {
+  const box = (id: string, x: number, extra: Partial<MotionClip> = {}) => ({ id, name: id, from: 0, durationInFrames: 90, trimStart: 0, component: 'Shape', props: { x, y: 0.5, width: 0.1, height: 0.1 }, transform: {}, keyframes: {}, ...extra }) as unknown as MotionClip;
+  const host = (comp: string) => ({ id: 'nested', name: 'nested', from: 0, durationInFrames: 90, trimStart: 0, component: 'Precomp', parent: 'frame', props: { comp }, transform: {}, keyframes: {} }) as unknown as MotionClip;
+  const at = (x: number): MotionDoc => {
+    const doc = { ...newMotionDoc(MotionFormat.Square), width: 1000, height: 1000 } as MotionDoc;
+    const track = (clips: MotionClip[]) => [{ ...doc.tracks[0], clips }];
+    return {
+      ...doc,
+      comps: {
+        inner: { name: 'Search', durationInFrames: 90, component: { name: 'Search', home: 'H' }, tracks: track([box('field', x)]) },
+        outer: { name: 'Navbar', durationInFrames: 90, component: { name: 'Navbar', home: 'H' }, tracks: track([box('frame', x), host('inner')]) }
+      }
+    } as MotionDoc;
+  };
+
+  it('keeps the inner instance on its frame when both mains follow a home where they sit elsewhere (traidue: the navbar search input drew 2045 px off its place)', () => {
+    const resolved = linkedMains(at(0.2), 'P', new Map([['H', at(0.7)]]));
+    const nested = resolved.comps.outer.tracks.flatMap((t) => t.clips as MotionClip[]).find((c) => c.id === 'nested')!;
+    const frame = resolved.comps.outer.tracks.flatMap((t) => t.clips as MotionClip[]).find((c) => c.id === 'frame')!;
+    const field = resolved.comps.inner.tracks.flatMap((t) => t.clips as MotionClip[])[0];
+
+    expect(Number(field.props.x) + Number(nested.transform.x ?? 0)).toBeCloseTo(Number(frame.props.x), 6);
+  });
+});
