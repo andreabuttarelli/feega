@@ -62,7 +62,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
       id: billing.orgId,
       name: billing.orgName,
       stripe_customer_id: billing.customerId
-    });
+    }, user.email);
     const checkoutUrl = await createOneTimeCreditCheckout({
       customerId,
       orgId: billing.orgId,

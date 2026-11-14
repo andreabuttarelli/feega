@@ -62,14 +62,22 @@ async function ownedScope(event: RequestEvent): Promise<SettingsScope | null> {
 
 const OWNER_ROLE = 'owner';
 
-async function ownedOrgId({ cookies, locals: { supabase } }: RequestEvent): Promise<string | null> {
+type OwnerScope = { orgId: string; email: string | undefined };
+
+async function ownerScope({ cookies, locals: { supabase } }: RequestEvent): Promise<OwnerScope | null> {
   const {
     data: { user }
   } = await supabase.auth.getUser();
   if (!user) return null;
 
   const membership = chooseOrg(await listMemberships(supabase as Db, user.id), cookies.get(ORG_COOKIE) ?? null);
-  return membership?.role === OWNER_ROLE ? membership.org.id : null;
+  if (membership?.role !== OWNER_ROLE) return null;
+
+  return { orgId: membership.org.id, email: user.email };
+}
+
+async function ownedOrgId(event: RequestEvent): Promise<string | null> {
+  return (await ownerScope(event))?.orgId ?? null;
 }
 
 const billingUrl = (event: RequestEvent) => `${appOrigin(event.url)}${BILLING_PATH}`;
@@ -107,8 +115,9 @@ export async function billingPortal(event: Ev) {
 const PURCHASES_NOT_READY = 'Purchases open soon.';
 
 export async function subscribe(event: Ev) {
-  const orgId = await ownedOrgId(event);
-  if (!orgId) return fail(403, { billingError: 'Owner only' });
+  const owner = await ownerScope(event);
+  if (!owner) return fail(403, { billingError: 'Owner only' });
+  const { orgId, email } = owner;
   const { supabase } = event.locals;
   if (!(await billingGrantsReady(supabase))) return fail(409, { billingError: PURCHASES_NOT_READY });
 
@@ -127,7 +136,7 @@ export async function subscribe(event: Ev) {
       id: billing.orgId,
       name: billing.orgName,
       stripe_customer_id: billing.customerId
-    });
+    }, email);
     checkoutUrl = await createSubscriptionCheckout({
       customerId,
       orgId: billing.orgId,
@@ -184,8 +193,9 @@ export async function cancelPlan(event: Ev) {
 }
 
 export async function buyOneTime(event: Ev) {
-  const orgId = await ownedOrgId(event);
-  if (!orgId) return fail(403, { billingError: 'Owner only' });
+  const owner = await ownerScope(event);
+  if (!owner) return fail(403, { billingError: 'Owner only' });
+  const { orgId, email } = owner;
   const { supabase } = event.locals;
   if (!(await billingGrantsReady(supabase))) return fail(409, { billingError: PURCHASES_NOT_READY });
 
@@ -202,7 +212,7 @@ export async function buyOneTime(event: Ev) {
       id: billing.orgId,
       name: billing.orgName,
       stripe_customer_id: billing.customerId
-    });
+    }, email);
     checkoutUrl = await createOneTimeCreditCheckout({
       customerId,
       orgId: billing.orgId,

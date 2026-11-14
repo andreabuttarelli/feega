@@ -82,7 +82,7 @@ beforeEach(() => {
 	vi.clearAllMocks();
 	vi.mocked(authenticate).mockResolvedValue({
 		supabase: {},
-		user: { id: 'user-1' },
+		user: { id: 'user-1', email: 'ana@example.com' },
 		apiKey: undefined,
 		error: null
 	} as never);
@@ -106,7 +106,10 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 
 		expect(res.status).toBe(200);
 		expect(body).toEqual({ ok: true, url: CHECKOUT_URL, plans: PLANS });
-		expect(ensureOrgCustomer).toHaveBeenCalledWith({ id: 'org-1', name: 'Acme', stripe_customer_id: 'cus_org' });
+		expect(ensureOrgCustomer).toHaveBeenCalledWith(
+			{ id: 'org-1', name: 'Acme', stripe_customer_id: 'cus_org' },
+			'ana@example.com'
+		);
 		expect(createSubscriptionCheckout).toHaveBeenCalledWith({
 			customerId: 'cus_org',
 			orgId: 'org-1',
