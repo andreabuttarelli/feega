@@ -5195,16 +5195,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     padding: 16px;
     text-align: center;
     font-size: 13px;
-    color: var(--ui-text-muted, #888);
+    color: var(--ui-text-secondary);
     background: var(--ui-surface);
-    border: 1px dashed var(--ui-border);
+    border: 1px dashed var(--ui-line-strong);
     border-radius: var(--ui-radius-md);
     pointer-events: auto;
   }
-  .figma-loading[data-state='failed'] { color: var(--ui-danger, #d33); }
+  .figma-loading[data-state='failed'] { color: var(--ui-danger); }
   .figma-actions { display: flex; gap: 8px; }
-  .figma-actions button { padding: 4px 10px; border: 1px solid var(--ui-border); border-radius: var(--ui-radius-sm); background: var(--ui-surface); color: inherit; }
-  .figma-spinner { width: 18px; height: 18px; border: 2px solid var(--ui-border); border-top-color: currentColor; border-radius: 9999px; animation: figma-spin 0.8s linear infinite; }
+  .figma-actions button { padding: 4px 10px; border: 1px solid var(--ui-line); border-radius: var(--ui-radius-sm); background: var(--ui-surface); color: inherit; }
+  .figma-spinner { width: 18px; height: 18px; border: 2px solid var(--ui-line); border-top-color: currentColor; border-radius: 9999px; animation: figma-spin 0.8s linear infinite; }
   @keyframes figma-spin { to { transform: rotate(360deg); } }
   .feed-drop {
     position: absolute;
