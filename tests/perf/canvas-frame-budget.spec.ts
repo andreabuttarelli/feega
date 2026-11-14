@@ -24,8 +24,7 @@ enum Edit {
   HideLeaf = 'hide-leaf',
   HideTextLeaf = 'hide-text-leaf',
   Text = 'text',
-  Colour = 'colour',
-  Keyframe = 'keyframe'
+  Colour = 'colour'
 }
 
 enum Target {
@@ -411,17 +410,18 @@ enum Depth {
 
 type Pick = { at: { x: number; y: number }; depth: Depth };
 
-type FieldEdit = Edit.Colour | Edit.Keyframe;
+type FieldEdit = Edit.Colour;
 
-const FIELDS: Record<FieldEdit, { testId: string; values: [string, string] | null }> = {
-  [Edit.Colour]: { testId: 'fill-opacity', values: ['50', '100'] },
-  [Edit.Keyframe]: { testId: 'fill-key', values: null }
+const PROPERTIES_TAB = 'Properties';
+
+const FIELDS: Record<FieldEdit, { selector: string; values: [string, string] | null }> = {
+  [Edit.Colour]: { selector: '[data-testid="fill-eye"]', values: null }
 };
 
-function fieldEdit({ testId, value }: { testId: string; value: string | null }) {
-  const el = document.querySelector<HTMLInputElement>(`[data-testid="${testId}"]`);
+function fieldEdit({ selector, value }: { selector: string; value: string | null }) {
+  const el = document.querySelector<HTMLInputElement>(selector);
   if (!el) {
-    throw new Error(`${testId} not on screen`);
+    throw new Error(`${selector} not on screen`);
   }
   (window as unknown as { __editAt: number }).__editAt = performance.now();
   if (value === null) {
@@ -433,12 +433,13 @@ function fieldEdit({ testId, value }: { testId: string; value: string | null }) 
 }
 
 async function fieldEdits(page: Page, edit: FieldEdit, count: number): Promise<(Stages | null)[]> {
-  const { testId, values } = FIELDS[edit];
-  await page.getByTestId(testId).first().waitFor({ timeout: 10_000 });
+  const { selector, values } = FIELDS[edit];
+  await page.getByText(PROPERTIES_TAB, { exact: true }).first().click();
+  await page.locator(selector).first().waitFor({ state: 'attached', timeout: 10_000 });
   const seen: (Stages | null)[] = [];
   for (let i = 0; i < count; i++) {
     await arm(page);
-    await page.evaluate(fieldEdit, { testId, value: values ? values[i % 2] : null });
+    await page.evaluate(fieldEdit, { selector, value: values ? values[i % 2] : null });
     seen.push(await stagesAfter(page));
     await page.waitForTimeout(EDIT_PAUSE_MS);
   }
@@ -608,9 +609,12 @@ async function edits(page: Page, edit: Edit): Promise<(Stages | null)[]> {
     await selectChild(page);
     return resizeEdits(page, EDITS_EACH);
   }
-  if (edit === Edit.Colour || edit === Edit.Keyframe) {
-    await selectChild(page);
-    return fieldEdits(page, edit, EDITS_EACH);
+  if (edit === Edit.Colour) {
+    await selectChild(page, { at: CHILD_AT, depth: Depth.Leaf });
+    return fieldEdits(page, edit, EDITS_EACH).catch(async (e: unknown) => {
+      await page.screenshot({ path: join(OUT, `edit-${edit}-missing.png`) });
+      throw e;
+    });
   }
   await selectChild(page, PICKS[edit]);
   return keyEdits(page, KEYS[edit], EDITS_EACH, edit);

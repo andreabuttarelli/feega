@@ -17,5 +17,6 @@ auto-layout ancestor.
 - First edit of a frame: the loaded list and its doc seed the patch state, so the first edit no
   longer waits for a full build to have something to patch.
 - The redraw gets the frame's real typeset (fonts + smoothing), not the estimate.
-- Spec: `colour` (fill opacity) and `keyframe` (fill keyframe toggle) kinds, `BUDGET_EDIT_PAUSE`
+- Spec: a `colour` kind (the fill's eye toggle, from the Properties tab; a keyframe kind was dropped:
+  design mode shows no keyframe button to drive), `BUDGET_EDIT_PAUSE`
   between edits so a 4x throttled run is not polluted by the previous edit.
