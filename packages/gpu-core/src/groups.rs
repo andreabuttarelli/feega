@@ -13,7 +13,7 @@ use crate::glyphs::{outline, Fonts};
 use crate::text::typeset;
 use crate::pictures::Pictures;
 use crate::fragments::{Encoded, Fragments, Kept};
-use crate::lod::{backdrop_px, blur_px, detail, Detail, BLUR_REACH, SPLIT_DESCENDANTS};
+use crate::lod::{backdrop_px, blur_px, detail, plain_when_tiny, Detail, BLUR_REACH, SPLIT_DESCENDANTS};
 use crate::scene::{bounds, build_items, needs_layer, Layers};
 use crate::Skipped;
 
@@ -372,7 +372,8 @@ fn visible_bounds(item: &Item, own: Option<Rect>, blur: f64, view: Rect) -> bool
 }
 
 fn softened(item: Item) -> Item {
-    let soften = |look: &Look| Look { blur: blur_px(look.blur), backdrop: backdrop_px(look.backdrop), ..look.clone() };
+    let extent = bounds::<Scene>(&item, &Pictures::new()).map_or(f64::INFINITY, |b| b.width().max(b.height()));
+    let soften = |look: &Look| plain_when_tiny(&Look { blur: blur_px(look.blur), backdrop: backdrop_px(look.backdrop), ..look.clone() }, extent);
     match item {
         Item::Path(p) => Item::Path(PathItem { look: soften(&p.look), ..p }),
         Item::Group(g) => Item::Group(Box::new(GroupItem { look: soften(&g.look), ..*g })),
