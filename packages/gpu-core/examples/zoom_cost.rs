@@ -54,7 +54,7 @@ fn run(compose: bool, from: f64, step: f64) -> (f64, f64, f64) {
     for g in 0..GROUPS {
         renderer.put_group(&format!("g{g}"), group());
     }
-    let pictures = Pictures::new();
+    let pictures = Pictures::default();
     let frames: Vec<DisplayList> = (0..FRAMES).map(|f| screen(from + step * f as f64)).collect();
     renderer.draw_and_wait(&frames[0], &pictures).expect("warm up");
     let mut times: Vec<f64> = frames
