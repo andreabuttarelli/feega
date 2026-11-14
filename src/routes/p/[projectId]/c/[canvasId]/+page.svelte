@@ -309,6 +309,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import type { SocialPost } from '$lib/server/repos/social-posts';
   import { BILLING_PATH } from '$lib/billing-path';
   import type { FigmaImage } from '$lib/canvas/figma/figma-doc';
+  import { Landing, PLACEHOLDER_STATES, PasteState, cancelPaste, failPaste, landPaste, startPaste, undoPaste, type PasteJob } from '$lib/canvas/figma/paste-job';
   import type { FigmaJob } from '$lib/canvas/figma/images';
   import { ImagesOutcome, type ImagesAnswer } from '$lib/canvas/figma/fetch-images';
   import { figmaNotice } from '$lib/canvas/figma/notice';
@@ -1852,7 +1853,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    */
   type ResizeEntry = { source: 'resize'; gesture: ResizeGesture; inner: StackEntry[] };
   type DrawEntry = { source: 'draw'; op: Op; answer: Promise<DrawAnswer> };
-  type StackEntry = DrawEntry | { source: 'undrawn'; op: Op } | { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | ResizeEntry | { source: 'turn'; turn: Turn } | { source: 'frame'; step: FrameStep } | { source: 'many'; steps: StackEntry[] };
+  type FigmaEntry = { source: 'figma'; job: PasteJob; removed: Tile[]; redo: Promise<Gesture | null> };
+  type StackEntry = FigmaEntry | DrawEntry | { source: 'undrawn'; op: Op } | { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | ResizeEntry | { source: 'turn'; turn: Turn } | { source: 'frame'; step: FrameStep } | { source: 'many'; steps: StackEntry[] };
   const undoStack = createUndoStack<StackEntry>();
 
   /** Ogni scrittura che passa da `undo` (server) spinge qui, mai `undoStack.push` diretto — la
@@ -4006,24 +4008,94 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return { tiles: clipboard };
   }
 
+  const FIGMA_PLACEHOLDER = { w: 320, h: 200 };
   const FIGMA_PASTE = 'These Figma layers could not be read. In Figma use Copy as → Copy as SVG, then paste here.';
 
-  async function pasteFigma(html: string, at: { x: number; y: number }) {
-    const res = await post('pasteFigma', { html, at: JSON.stringify(at) });
+  let figmaPastes = $state<PasteJob[]>([]);
+  const figmaPlaceholders = $derived(figmaPastes.filter((j) => PLACEHOLDER_STATES.has(j.state)));
+
+  function setPaste(job: PasteJob) {
+    figmaPastes = figmaPastes.some((j) => j.id === job.id) ? figmaPastes.map((j) => (j.id === job.id ? job : j)) : [...figmaPastes, job];
+  }
+
+  const pasteOf = (id: string) => figmaPastes.find((j) => j.id === id);
+
+  function pasteFigma(html: string, at: { x: number; y: number }) {
+    const job = startPaste(html, at);
+    setPaste(job);
+    undoStack.push({ source: 'figma', job, removed: [], redo: Promise.resolve(null) });
+    void runPaste(job);
+  }
+
+  async function runPaste(job: PasteJob) {
+    const res = await post('pasteFigma', { html: job.html, at: JSON.stringify(job.at) });
     const landedNodes = res?.outcome === 'done' ? ((res.nodes ?? []) as CanvasNodeRecord[]) : [];
+    const current = pasteOf(job.id) ?? job;
     if (!landedNodes.length) {
-      failed = FIGMA_PASTE;
+      setPaste(current.state === PasteState.Cancelled ? current : failPaste(current, FIGMA_PASTE));
       return;
     }
+
+    const landed = landPaste(current, { nodeIds: landedNodes.map((n) => n.id), undo: (res?.undo ?? []) as UndoItem[] });
+    setPaste(landed.job);
+    if (landed.landing === Landing.Discard) {
+      void applyUndo({ items: landed.job.undo }, () => {});
+      return;
+    }
+
     nodes = [...nodes, ...landedNodes.map((n) => toTile(n))];
-    pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
-    focusOn(landedNodes.map((n) => n.id), undefined, FocusMode.Select);
+    focusOn(landed.job.nodeIds, undefined, FocusMode.Select);
     const fileKey = (res?.fileKey ?? null) as string | null;
     const fills = (res?.fills ?? []) as { nodeId: string; images: FigmaImage[] }[];
     figmaPasted({ skipped: (res?.skipped ?? []) as string[], images: fills.reduce((n, f) => n + f.images.length, 0), loading: Boolean(fileKey && fills.length) });
     if (fileKey && fills.length) {
       figmaJobs = [...figmaJobs, ...fills.map((f) => ({ ...f, fileKey }))];
     }
+  }
+
+  function retryPaste(job: PasteJob) {
+    const again = { ...job, state: PasteState.Loading, error: null };
+    setPaste(again);
+    void runPaste(again);
+  }
+
+  function dismissPaste(job: PasteJob) {
+    setPaste(cancelPaste(job));
+  }
+
+  function unpasteFigma(entry: FigmaEntry): FigmaEntry {
+    const job = pasteOf(entry.job.id) ?? entry.job;
+    if (job.state !== PasteState.Landed) {
+      setPaste(cancelPaste(job));
+      return { ...entry, job: cancelPaste(job) };
+    }
+
+    const ids = new Set(job.nodeIds);
+    const removed = nodes.filter((n) => ids.has(n.id));
+    nodes = nodes.filter((n) => !ids.has(n.id));
+    setPaste(undoPaste(job));
+    const redo = new Promise<Gesture | null>((resolve) => void applyUndo({ items: job.undo }, resolve).finally(() => resolve(null)));
+    return { source: 'figma', job: undoPaste(job), removed, redo };
+  }
+
+  function repasteFigma(entry: FigmaEntry): FigmaEntry {
+    if (entry.job.state !== PasteState.Undone) {
+      const job = startPaste(entry.job.html, entry.job.at);
+      setPaste(job);
+      void runPaste(job);
+      return { source: 'figma', job, removed: [], redo: Promise.resolve(null) };
+    }
+
+    nodes = [...nodes, ...entry.removed];
+    const job = { ...entry.job, state: PasteState.Landed };
+    setPaste(job);
+    const landing = entry.redo.then((gesture) => {
+      if (!gesture) { return job.undo; }
+      let back = job.undo;
+      return applyUndo(gesture, (undoAgain) => (back = undoAgain.items)).then(() => back);
+    });
+    void landing.then((undo) => setPaste({ ...(pasteOf(job.id) ?? job), undo }));
+    return { ...entry, job, removed: [] };
   }
 
   const LOTTIE_SKIPPED = 'Imported from Lottie. Not carried over:';
@@ -4397,6 +4469,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function reverse(entry: StackEntry, way: Way): Promise<StackEntry | null> {
     let out: StackEntry | null = null;
+    if (entry.source === 'figma') {
+      return way === Way.Back ? unpasteFigma(entry) : repasteFigma(entry);
+    }
     if (entry.source === 'frame') {
       STEP[way](entry.step);
       return entry;
@@ -4741,6 +4816,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     follow={followView}
   >
     {#snippet canvasOver()}
+      {#each figmaPlaceholders as job (job.id)}
+        <div class="figma-loading" data-testid="figma-paste-placeholder" data-state={job.state} style={`transform: translate(${job.at.x - FIGMA_PLACEHOLDER.w / 2}px, ${job.at.y - FIGMA_PLACEHOLDER.h / 2}px);width:${FIGMA_PLACEHOLDER.w}px;height:${FIGMA_PLACEHOLDER.h}px`} role="status">
+          {#if job.state === PasteState.Loading}
+            <span class="figma-spinner" aria-hidden="true"></span><span>Importing from Figma…</span>
+          {:else}
+            <span>{job.error}</span>
+            <span class="figma-actions"><button type="button" onclick={() => retryPaste(job)}>Retry</button><button type="button" onclick={() => dismissPaste(job)}>Dismiss</button></span>
+          {/if}
+        </div>
+      {/each}
       {#if feedImageHover.over && feedImageHover.size}
         <div class="feed-drop" data-testid="feed-drop" style={`transform: translate(${feedImageHover.over.x - feedImageHover.size.w / 2}px, ${feedImageHover.over.y - feedImageHover.size.h / 2}px);width:${feedImageHover.size.w}px;height:${feedImageHover.size.h}px`}></div>
       {/if}
@@ -5098,6 +5183,29 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     animation: pending-pulse 1.2s ease-in-out infinite alternate;
   }
 
+  .figma-loading {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 16px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--ui-text-muted, #888);
+    background: var(--ui-surface);
+    border: 1px dashed var(--ui-border);
+    border-radius: var(--ui-radius-md);
+    pointer-events: auto;
+  }
+  .figma-loading[data-state='failed'] { color: var(--ui-danger, #d33); }
+  .figma-actions { display: flex; gap: 8px; }
+  .figma-actions button { padding: 4px 10px; border: 1px solid var(--ui-border); border-radius: var(--ui-radius-sm); background: var(--ui-surface); color: inherit; }
+  .figma-spinner { width: 18px; height: 18px; border: 2px solid var(--ui-border); border-top-color: currentColor; border-radius: 9999px; animation: figma-spin 0.8s linear infinite; }
+  @keyframes figma-spin { to { transform: rotate(360deg); } }
   .feed-drop {
     position: absolute;
     top: 0;
