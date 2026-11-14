@@ -7,7 +7,7 @@ import { diffDoc } from '$lib/motion/doc-ops';
 import { commitOps } from '$lib/server/motion/frame-ops';
 import { appendRevision } from '$lib/server/repos/motion-revisions';
 import { revisionsDb } from '$lib/server/repos/motion-revisions.test';
-import { Build, coreEvent, postHogSink, useCoreSink, type CoreBody } from './core-usage';
+import { Build, coreEvent, orgIdentify, postHogSink, useCoreSink, type CoreBody } from './core-usage';
 
 vi.mock('$lib/server/repos/canvas', async (real) => ({ ...(await real<object>()), patchNodeData: vi.fn(async () => ({ ok: true })), findNode: vi.fn(async () => null) }));
 
@@ -107,5 +107,25 @@ describe('postHogSink', () => {
   it('senza utente non parte niente', () => {
     coreEvent(null, CoreEvent.CanvasOpened, { canvas_id: 'c' });
     expect(sent).toEqual([]);
+  });
+});
+
+describe('il gruppo organization', () => {
+  it("un evento con l'org porta il gruppo organization", () => {
+    coreEvent('u1', CoreEvent.CanvasOpened, { canvas_id: 'c1' }, ORG);
+
+    expect(sent[0].properties).toMatchObject({ canvas_id: 'c1', $groups: { organization: ORG } });
+  });
+
+  it("senza org l'evento parte senza gruppo", () => {
+    coreEvent('u1', CoreEvent.CanvasOpened, { canvas_id: 'c1' });
+
+    expect(sent[0].properties).not.toHaveProperty('$groups');
+  });
+
+  it("orgIdentify manda le proprietà dell'org come $groupidentify", () => {
+    orgIdentify(ORG, { plan: 'pro', member_count: 3, created_at: '2026-01-01' });
+
+    expect(sent[0]).toMatchObject({ event: '$groupidentify', properties: { $group_type: 'organization', $group_key: ORG, $group_set: { plan: 'pro', member_count: 3 } } });
   });
 });

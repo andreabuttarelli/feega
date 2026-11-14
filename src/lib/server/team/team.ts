@@ -1,4 +1,5 @@
 import type { Db } from '$lib/server/db/client';
+import { ProductEvent, track } from '$lib/server/product-events/track';
 import { assignableRoles, can, isOrgRole, OrgAction, OrgRoleName, type OrgRole } from '$lib/org-roles';
 import { handOverOrg, listMembers, memberRole, orgName, removeMember, setMemberRole } from '$lib/server/repos/orgs';
 import {
@@ -153,6 +154,7 @@ async function invite(ctx: TeamCtx, actor: OrgRole, input: { email: string; role
 
   try {
     const { invite: created, token } = await createInvite(ctx.writer, { orgId: ctx.orgId, email, role: input.role, invitedBy: ctx.userId });
+    await track(ProductEvent.TeamInviteSent, { userId: ctx.userId, orgId: ctx.orgId }, { role: input.role, via: 'email' });
     return done({ invite_id: created.id, ...(await sendInvite(ctx, email, token)) });
   } catch (e) {
     if ((e as { code?: string } | null)?.code === UNIQUE_VIOLATION) {
@@ -179,6 +181,7 @@ async function inviteLink(ctx: TeamCtx): Promise<TeamResult> {
     invitedBy: ctx.userId,
     expiresInDays: LINK_EXPIRES_IN_DAYS
   });
+  await track(ProductEvent.TeamInviteSent, { userId: ctx.userId, orgId: ctx.orgId }, { role: LINK_ROLE, via: 'link' });
   return done({ url: acceptUrl(ctx, token), role: LINK_ROLE });
 }
 

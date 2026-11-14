@@ -56,7 +56,7 @@ describe('saving a browser export', () => {
     expect(patchNodeData).toHaveBeenCalledWith(db, expect.objectContaining({ nodeId: 'node', patch: { lastRenderAssetId: 'asset-1' } }));
   });
 
-  it('a saved render is export_completed as an mp4 video, a missing file is not', async () => {
+  it('a saved render is export_completed as an mp4 video, a missing file is export_failed', async () => {
     const { useCoreSink } = await import('$lib/server/core-usage');
     const sent: { event: string; distinct_id: string; properties: Record<string, unknown> }[] = [];
     useCoreSink((b) => sent.push(b));
@@ -65,7 +65,10 @@ describe('saving a browser export', () => {
     await saveExport(fakeDb(MP4).db, { ...scope, ...file, path: exportPath(scope, 'abc') });
     useCoreSink(null);
 
-    expect(sent).toMatchObject([{ event: 'export_completed', distinct_id: 'u', properties: { format: 'video', target: 'mp4' } }]);
+    expect(sent).toMatchObject([
+      { event: 'export_failed', distinct_id: 'u', properties: { format: 'mp4', error: 'file_not_found' } },
+      { event: 'export_completed', distinct_id: 'u', properties: { format: 'video', target: 'mp4' } }
+    ]);
   });
 
   it('refuses a path outside this motion node folder', async () => {

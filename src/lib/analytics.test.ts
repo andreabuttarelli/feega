@@ -7,7 +7,7 @@ vi.mock('$app/environment', () => ({ browser: false, dev: false }));
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 vi.mock('$env/dynamic/private', () => ({ env: { INTERNAL_EMAILS: 'interno-a@example.com, Interno-B@Example.com' } }));
 
-import { isProdHost, trackingAllowed, dropIfInternal, setInternalViewer } from './analytics';
+import { isProdHost, trackingAllowed, dropIfInternal, setInternalViewer, replaySampled, postHogTags, REPLAY_SAMPLE_RATE } from './analytics';
 import { isInternalEmail } from './server/internal-users';
 
 describe('isProdHost', () => {
@@ -96,5 +96,22 @@ describe('dropIfInternal', () => {
     setInternalViewer(true);
     expect(dropIfInternal({ message: 'boom' })).toBeNull();
     setInternalViewer(false); // non lasciare lo stato sporco agli altri test
+  });
+});
+
+describe('replaySampled', () => {
+  it('registra solo il tiro sotto la soglia', () => {
+    expect(replaySampled(REPLAY_SAMPLE_RATE - 0.01)).toBe(true);
+    expect(replaySampled(REPLAY_SAMPLE_RATE)).toBe(false);
+  });
+});
+
+describe('postHogTags', () => {
+  it('senza PostHog caricato Sentry non riceve tag', () => {
+    expect(postHogTags(undefined)).toEqual({});
+  });
+
+  it('con PostHog porta persona e sessione, per saltare da un errore al replay', () => {
+    expect(postHogTags({ get_distinct_id: () => 'u1', get_session_id: () => 's1' })).toEqual({ posthog_distinct_id: 'u1', posthog_session_id: 's1' });
   });
 });

@@ -8,6 +8,9 @@ import type { OrgRole } from '$lib/server/repos/orgs';
 import { assertFreeOrgLimit } from '$lib/server/tenancy/free-org-limit';
 import { OrgRoleName } from '$lib/org-roles';
 import { needsSeat } from '$lib/server/team/seats';
+import { orgIdentify } from '$lib/server/core-usage';
+
+const FREE_PLAN = 'free';
 import { editorSeatGate, SeatGate, SeatSync, syncedOrLogged } from '$lib/server/team/seat-billing';
 import { tellOwnerOfSeat } from '$lib/server/team/seat-mail';
 
@@ -97,6 +100,7 @@ export async function createFirstOrgWith(db: Db, input: { userId: string; name: 
   }
 
   await grantSignupCredits(db, { orgId: org.id, userId: input.userId }).catch((e) => console.error('[bootstrap] signup credits not granted', e));
+  orgIdentify(org.id, { plan: FREE_PLAN, member_count: 1, created_at: new Date().toISOString() });
   return { orgId: org.id, slug: org.slug, role: 'owner' };
 }
 

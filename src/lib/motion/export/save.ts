@@ -1,4 +1,5 @@
 import { postPageAction } from '$lib/api/page-action';
+import { ClientEvent, track } from '$lib/analytics';
 import { createSupabaseBrowserClient } from '$lib/supabase/client';
 import { exportPath, type ExportScope, type Size } from '../export-plan';
 import { MP4_MIME } from './encode';
@@ -21,6 +22,7 @@ export async function saveExport(blob: Blob, input: { scope: ExportScope; editor
   form.set('seconds', String(input.seconds));
   const result = await postPageAction(input.editorUrl, 'exported', form);
   if (result.type === 'success') {
+    track(ClientEvent.ExportSaved, { seconds: input.seconds });
     return { ok: true, assetId: String(result.data?.assetId) };
   }
   return { ok: false, error: result.type === 'failure' ? String(result.data?.error ?? 'not saved') : 'not saved' };

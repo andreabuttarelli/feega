@@ -91,7 +91,7 @@
   // per-user funnel. First-party, authenticated use only. Re-runs if the session changes client-side.
   $effect(() => {
     const user = data?.session?.user as { id?: string; email?: string } | undefined;
-    if (user?.id) identifyUser(user.id, user.email ? { email: user.email } : undefined);
+    if (user?.id) identifyUser(user.id, user.email ? { email: user.email } : undefined, data?.analyticsOrgId ?? null);
   });
 
   $effect(() => {
