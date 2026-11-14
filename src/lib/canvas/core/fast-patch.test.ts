@@ -150,3 +150,37 @@ describe('fastPatch draws a simple edit without rebuilding the frame', () => {
     expect(fastPatch(drawn(before), before, after, estimatedText)).toEqual(drawn(after));
   });
 });
+
+const LOOK = { tokens: FEEGA_TOKENS, assets: {}, frame: 0 };
+
+const restyled = (props: Record<string, unknown>) => (c: MotionClip) => ({ ...c, props: { ...c.props, ...props } });
+
+describe('fastPatch redraws one restyled layer without rebuilding the frame', () => {
+  it('a resized layer gives the list the full build would give', () => {
+    const before = built(['a', 'b']);
+    const after = edit(before, 'a', restyled({ width: 0.42 }));
+
+    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toEqual(drawn(after));
+  });
+
+  it('a recoloured child gives the list the full build would give', () => {
+    const before = nested();
+    const after = edit(before, 'dot', restyled({ fills: [{ type: 'solid', color: '#2050ff' }] }));
+
+    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toEqual(drawn(after));
+  });
+
+  it('leaves to the full build a layer inside an auto layout parent, whose siblings may reflow', () => {
+    const before = stack(Sizing.Hug);
+    const after = edit(before, 'a', restyled({ width: 0.2 }));
+
+    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toBeNull();
+  });
+
+  it('leaves to the full build a layer with children, which may be pinned to it', () => {
+    const before = nested();
+    const after = edit(before, 'card', restyled({ width: 0.5 }));
+
+    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toBeNull();
+  });
+});

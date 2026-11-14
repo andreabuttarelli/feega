@@ -43,6 +43,9 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 ### A perf run from a worktree measures the main checkout's packages
 **Signal:** a change under `packages/` (gpu-core glue, motion-core) leaves the probe numbers identical, or `build:node` / vitest fail with `X is not a function` / `is not exported` for a symbol that exists in the worktree's `packages/`; `realpath node_modules/@feega/motion-core` points into the main checkout, which is behind `dev`. **Move:** give the worktree its own `node_modules`: a real folder of symlinks to every entry of the main one, except `@feega/*`, which point to `../../packages/<name>` of the worktree. Check with `realpath` before the first run.
 
+### A perf spec times out at 30 min with no numbers
+**Signal:** `perf:budget -g edits` ends with `Test timeout of 1800000ms exceeded` and `keyboard.press: Target page ... closed`, no JSON written. `locator.boundingBox()` without a `timeout` waits for an element that an edit removed (the selection after a hide) until the test dies. **Move:** give every probe `boundingBox({ timeout })` a short timeout and `.catch`; and check `lsof bench.lock` before assuming your run started — another agent's bench may hold it.
+
 ### Two worktrees sharing one `CARGO_TARGET_DIR` build the same wasm
 **Signal:** a gpu-core change makes no difference in the browser, and `md5` of `static/gpu-core/gpu_core_bg.wasm` is identical in the before and after worktrees; `cargo build` says `Finished` in under a second. Cargo checks freshness against the source files of the last build in that target dir, so the other worktree's sources look unchanged. **Move:** one target dir per worktree (`cp -c -R` a warm one to start fast), or `touch` the changed sources before building; compare the wasm checksums before any A/B.
 
