@@ -16,7 +16,7 @@ use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile, OPAQUE};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys, magnified, fallback_serves, fade_in, FADE_MS};
+use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys, magnified, fallback_serves, fallback_area, fade_in, FADE_MS};
 use crate::overlay_seen::OverlaySeen;
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
@@ -894,14 +894,19 @@ impl WebCore {
         if bare.is_empty() {
             return Ok(false);
         }
-        if self.fallback.as_ref().is_some_and(|f| f.size == screen && fallback_serves(f.camera, self.camera, screen, bare)) {
+        if self.fallback.as_ref().is_some_and(|f| fallback_serves(f.camera, self.camera, f.size, bare)) {
             return Ok(true);
         }
         let began = js_sys::Date::now();
         self.forget_fallback();
-        let camera = Camera { x: self.camera.x.round(), y: self.camera.y.round(), zoom: self.camera.zoom };
-        let (pieces, _) = self.render_view(camera, screen, Source::Scene)?;
-        self.fallback = Some(Fallback { camera, size: screen, pieces });
+        let area = fallback_area(self.camera, screen, bare);
+        if area.area() <= 0.0 {
+            return Ok(false);
+        }
+        let camera = Camera { x: self.camera.x.round() - area.x0, y: self.camera.y.round() - area.y0, zoom: self.camera.zoom };
+        let size = (area.width() as u32, area.height() as u32);
+        let (pieces, _) = self.render_view(camera, size, Source::Scene)?;
+        self.fallback = Some(Fallback { camera, size, pieces });
         let took = js_sys::Date::now() - began;
         self.credit.spend(took);
         self.sharpness.fallbacks += 1;
@@ -920,7 +925,7 @@ impl WebCore {
 
     fn forget_fallback(&mut self) {
         if let Some(fallback) = self.fallback.take() {
-            fallback.pieces.into_iter().for_each(|(piece, texture)| self.recycle(piece, fallback.size, texture));
+            fallback.pieces.into_iter().for_each(|(_, texture)| texture.destroy());
         }
     }
 

@@ -1,5 +1,5 @@
 use gpu_core::retained::Camera;
-use gpu_core::tiles::{lifted_keys, magnified, fallback_serves, fade_in, FADE_MS, NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, bake_batches, BAKE_BATCH_TILES, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
+use gpu_core::tiles::{lifted_keys, magnified, fallback_serves, fallback_area, fade_in, FADE_MS, NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, bake_batches, BAKE_BATCH_TILES, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
 use vello::kurbo::{Point, Rect};
 
 const SCREEN: (u32, u32) = (1024, 768);
@@ -797,4 +797,13 @@ fn an_idle_bake_leaves_a_half_octave_zoom_either_way_with_nothing_bare() {
             assert!(frame.bare.is_empty(), "rest {rest} zoom {zoom}: {} bare", frame.bare.len());
         }
     }
+}
+
+#[test]
+fn the_scene_fallback_renders_only_the_screen_area_the_bare_tiles_cover() {
+    let at = camera(1.0);
+    let bare = [TileKey { step: 0, tx: 1, ty: 1 }];
+
+    assert_eq!(fallback_area(at, SCREEN, &bare), Rect::new(256.0, 256.0, 512.0, 512.0));
+    assert_eq!(fallback_area(at, SCREEN, &[TileKey { step: 0, tx: 3, ty: 2 }]), Rect::new(768.0, 512.0, 1024.0, 768.0));
 }
