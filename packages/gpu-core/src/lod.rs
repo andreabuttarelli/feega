@@ -1,3 +1,5 @@
+use crate::display_list::Look;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Detail {
     Skip,
@@ -40,4 +42,31 @@ pub fn blur_px(blur: f64) -> f64 {
 
 pub fn backdrop_px(backdrop: Option<f64>) -> Option<f64> {
     backdrop.filter(|sigma| *sigma >= BACKDROP_FLOOR_PX)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Effect {
+    Backdrop,
+    Mask,
+    Matte,
+    Filter,
+    Blur,
+}
+
+pub const PLAIN_BELOW_PX: [(Effect, f64); 5] = [(Effect::Backdrop, 16.0), (Effect::Mask, 4.0), (Effect::Matte, 4.0), (Effect::Filter, 4.0), (Effect::Blur, 4.0)];
+
+fn shown(effect: Effect, extent_px: f64) -> bool {
+    PLAIN_BELOW_PX.iter().find(|(e, _)| *e == effect).is_none_or(|(_, below)| extent_px >= *below)
+}
+
+pub fn plain_when_tiny(look: &Look, extent_px: f64) -> Look {
+    let keep = |effect: Effect| shown(effect, extent_px);
+    Look {
+        backdrop: look.backdrop.filter(|_| keep(Effect::Backdrop)),
+        masks: look.masks.clone().filter(|_| keep(Effect::Mask)),
+        matte: look.matte.clone().filter(|_| keep(Effect::Matte)),
+        filters: look.filters.clone().filter(|_| keep(Effect::Filter)),
+        blur: if keep(Effect::Blur) { look.blur } else { 0.0 },
+        ..look.clone()
+    }
 }
