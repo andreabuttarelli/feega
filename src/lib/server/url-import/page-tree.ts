@@ -1375,7 +1375,8 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     });
     const opacity = Number(css.opacity);
     const masking = Boolean(maskOf(css));
-    const framed = paintedSelf || overflows || /flex/.test(css.display) || opacity < 1 || masking;
+    const roundsKids = clipsSelf && kids.length > 0 && Object.keys(cornersOf(css, r)).length > 0;
+    const framed = paintedSelf || overflows || roundsKids || /flex/.test(css.display) || opacity < 1 || masking;
     const kidZ = kids.map((k) => zOf.get(k) ?? 0);
     const zEff = stacks(el, css) || clipsSelf ? z : Math.max(z, ...kidZ);
     if (!framed) {
@@ -1415,7 +1416,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
           ...strokedBy(borders),
           ...(effects ? { effects } : {}),
           ...cornersOf(css, r),
-          clipsContent: overflows || masking,
+          clipsContent: overflows || masking || roundsKids,
           ...(positioned ? { layoutPositioning: 'ABSOLUTE' } : {}),
           ...flow,
           children

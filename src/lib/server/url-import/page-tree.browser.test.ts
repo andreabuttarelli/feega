@@ -700,3 +700,23 @@ describe.runIf(process.env.CHROMIUM_PATH)('a list', () => {
     }
   }, 30_000);
 });
+
+const ROUNDED = `<body style="margin:0"><div id="r" style="width:200px;height:120px;overflow:hidden;border-radius:12px;margin:10px"><img style="display:block;width:100%;height:100%;object-fit:cover" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyJyBoZWlnaHQ9JzInPjxyZWN0IHdpZHRoPScyJyBoZWlnaHQ9JzInIGZpbGw9J3JlZCcvPjwvc3ZnPg=="></div></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('a picture inside a rounded box that clips it', () => {
+  it('comes in clipped by the rounded corners (traidue: every card image lost its rounded corners)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 400, height: 200 });
+      await page.setContent(ROUNDED);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+      const holder = all(tree.root).find((n) => n.absoluteBoundingBox?.width === 200 && n.type === 'FRAME');
+
+      expect(holder).toMatchObject({ cornerRadius: 12, clipsContent: true });
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
