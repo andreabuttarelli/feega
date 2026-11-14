@@ -205,3 +205,28 @@ describe('fastPatch redraws one restyled layer without rebuilding the frame', ()
     expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toEqual(drawn(after));
   });
 });
+
+const shownAgain = (c: MotionClip) => ({ ...c, hidden: false });
+
+describe('fastPatch shows a hidden layer without rebuilding the frame', () => {
+  it('an unhidden layer is drawn where the full build draws it', () => {
+    const before = edit(built(['a', 'b', 'c']), 'b', hidden);
+    const after = edit(before, 'b', shownAgain);
+
+    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toEqual(drawn(after));
+  });
+
+  it('an unhidden layer inside a hugging auto layout parent reopens the gap as the full build does', () => {
+    const before = edit(stack(Sizing.Hug), 'b', hidden);
+    const after = edit(before, 'b', shownAgain);
+
+    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toEqual(drawn(after));
+  });
+
+  it('an unhidden last layer is drawn on top as the full build does', () => {
+    const before = edit(built(['a', 'b']), 'b', hidden);
+    const after = edit(before, 'b', shownAgain);
+
+    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toEqual(drawn(after));
+  });
+});
