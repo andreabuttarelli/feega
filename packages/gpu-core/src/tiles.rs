@@ -29,6 +29,7 @@ const COARSER_STEPS: i32 = 40;
 const FINER_STEPS: i32 = 4;
 pub const NEAR_STEPS: i32 = 4;
 const AHEAD_FRAMES: f64 = 6.0;
+const HALF_OCTAVE: f64 = std::f64::consts::SQRT_2;
 pub struct Level {
     pub below_top: i32,
     pub share_percent: u64,
@@ -57,6 +58,10 @@ impl Planned {
     fn over(step: i32, world: Rect) -> Planned {
         let side = TILE_PX as f64 / step_zoom(step);
         Planned { step, x0: (world.x0 / side).floor() as i64, y0: (world.y0 / side).floor() as i64, x1: (world.x1 / side).ceil() as i64, y1: (world.y1 / side).ceil() as i64 }
+    }
+
+    fn widened(self, other: Planned) -> Planned {
+        Planned { step: self.step, x0: self.x0.min(other.x0), y0: self.y0.min(other.y0), x1: self.x1.max(other.x1), y1: self.y1.max(other.y1) }
     }
 
     fn holds(&self, key: TileKey) -> bool {
@@ -351,6 +356,22 @@ impl Tiles {
         let whole = self.canvas.filter(|_| self.canvas_allowed() > 0);
         let shown = self.step_for(camera);
         let margin = world.inflate(world.width() * VIEW_MARGIN, world.height() * VIEW_MARGIN);
+        let mut plan = self.levels(world, margin, shown, kept, whole);
+        let near = |zoom: f64| self.step_for(Camera { zoom, ..camera });
+        let adjacent = [(near(camera.zoom / HALF_OCTAVE), margin), (near(camera.zoom * HALF_OCTAVE), world)];
+        let coarsest = plan.iter().map(|level| level.step).min().unwrap_or(shown);
+        for (step, area) in adjacent.into_iter().filter(|(step, _)| *step >= coarsest) {
+            let wanted = Planned::over(step, whole.map_or(area, |canvas| area.intersect(canvas)));
+            match plan.iter_mut().find(|level| level.step == step) {
+                Some(level) => *level = level.widened(wanted),
+                None => plan.push(wanted),
+            }
+        }
+        plan.sort_by_key(|level| level.step);
+        plan
+    }
+
+    fn levels(&self, world: Rect, margin: Rect, shown: i32, kept: usize, whole: Option<Rect>) -> Vec<Planned> {
         PYRAMID.iter().enumerate().map(|(i, level)| {
             let step = self.top() - level.below_top;
             let share = (kept as u64 * level.share_percent / 100) as usize;

@@ -779,3 +779,22 @@ fn a_tile_fades_in_over_the_fallback_and_is_opaque_after_the_fade() {
     assert!(fade_in(FADE_MS / 2.0) > 0.4 && fade_in(FADE_MS / 2.0) < 0.6);
     assert_eq!(fade_in(FADE_MS * 3.0), 1.0);
 }
+
+#[test]
+fn an_idle_bake_leaves_a_half_octave_zoom_either_way_with_nothing_bare() {
+    let retina = (2880, 1800);
+    let kept = tiles_kept(retina, TILE_BUDGET_BYTES);
+    let centre = Point::new(20000.0, 10000.0);
+    for rest in [0.05, 0.1, 0.2, 0.3, 0.6] {
+        let at = |zoom: f64| Camera { x: retina.0 as f64 / 2.0 - centre.x * zoom, y: retina.1 as f64 / 2.0 - centre.y * zoom, zoom };
+        let mut tiles = Tiles::default();
+        tiles.set_pixel_ratio(2.0);
+        tiles.set_canvas(WIDE);
+        tiles.pyramid(at(rest), retina, kept).iter().for_each(|k| tiles.hold(*k));
+
+        for zoom in [rest * 2f64.sqrt(), rest / 2f64.sqrt()] {
+            let frame = tiles.frame(at(zoom), retina);
+            assert!(frame.bare.is_empty(), "rest {rest} zoom {zoom}: {} bare", frame.bare.len());
+        }
+    }
+}
