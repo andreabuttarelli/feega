@@ -1,3 +1,4 @@
+pub mod atlas;
 pub mod canvas;
 pub mod colour;
 pub mod compositor;
