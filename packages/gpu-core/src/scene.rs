@@ -401,10 +401,17 @@ impl<'a> SharedClips<'a> {
 }
 
 pub fn build_items<C: Canvas>(scene: &mut C, items: &[Item], frame: Rect, pictures: &Shelf<C::Picture>, layers: &Layers<C::Picture>) -> Vec<Skipped> {
+    build_where(scene, items, frame, pictures, layers, |_: usize| true)
+}
+
+pub fn build_where<C: Canvas>(scene: &mut C, items: &[Item], frame: Rect, pictures: &Shelf<C::Picture>, layers: &Layers<C::Picture>, keep: impl Fn(usize) -> bool) -> Vec<Skipped> {
     let mut skipped = Vec::new();
     let mut shared = SharedScissor { open: None };
     let mut clips = SharedClips { open: Vec::new() };
     for (i, item) in items.iter().enumerate() {
+        if !keep(i) {
+            continue;
+        }
         if !matches!(item, Item::Path(_) | Item::Image(_) | Item::Layer(_)) || layer_worthy(item) || item.look().is_some_and(|l| l.backdrop.is_some()) || layers.blended.contains_key(&i) {
             clips.close(scene);
             shared.close(scene);
