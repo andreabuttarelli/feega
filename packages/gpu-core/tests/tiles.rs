@@ -1,5 +1,5 @@
 use gpu_core::retained::Camera;
-use gpu_core::tiles::{lifted_keys, magnified, NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, bake_batches, BAKE_BATCH_TILES, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
+use gpu_core::tiles::{lifted_keys, magnified, fallback_serves, fade_in, FADE_MS, NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, bake_batches, BAKE_BATCH_TILES, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
 use vello::kurbo::{Point, Rect};
 
 const SCREEN: (u32, u32) = (1024, 768);
@@ -753,4 +753,29 @@ fn panning_bakes_ahead_the_tiles_the_motion_brings_on_screen() {
 
     assert!(!ahead.is_empty());
     assert!(ahead.iter().all(|k| k.world().x1 > 10300.0 + SCREEN.0 as f64), "behind: {:?}", ahead.iter().find(|k| k.world().x1 <= 10300.0 + SCREEN.0 as f64));
+}
+
+#[test]
+fn the_scene_fallback_serves_the_bare_tiles_while_no_softer_than_a_quarter_stretch() {
+    let at = camera(1.0);
+    let bare = Tiles::default().frame(camera(1.2), SCREEN).missing;
+
+    assert!(fallback_serves(at, camera(1.2), SCREEN, &bare));
+    assert!(!fallback_serves(at, camera(1.3), SCREEN, &Tiles::default().frame(camera(1.3), SCREEN).missing));
+}
+
+#[test]
+fn the_scene_fallback_does_not_serve_tiles_beyond_what_it_saw() {
+    let at = camera(1.0);
+    let panned = Camera { x: -600.0, y: 0.0, zoom: 1.0 };
+    let bare = Tiles::default().frame(panned, SCREEN).missing;
+
+    assert!(!fallback_serves(at, panned, SCREEN, &bare));
+}
+
+#[test]
+fn a_tile_fades_in_over_the_fallback_and_is_opaque_after_the_fade() {
+    assert_eq!(fade_in(0.0), 0.0);
+    assert!(fade_in(FADE_MS / 2.0) > 0.4 && fade_in(FADE_MS / 2.0) < 0.6);
+    assert_eq!(fade_in(FADE_MS * 3.0), 1.0);
 }

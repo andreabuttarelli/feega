@@ -207,6 +207,22 @@ pub fn sharp_at(zoom: f64, step: i32) -> bool {
     zoom / step_zoom(step) <= SHARP_STRETCH + STEP_SLACK
 }
 
+pub const FADE_MS: f64 = 120.0;
+const FALLBACK_MIN_STRETCH: f64 = 0.5;
+
+pub fn fallback_serves(at: Camera, now: Camera, screen: (u32, u32), bare: &[TileKey]) -> bool {
+    let stretch = now.zoom / at.zoom;
+    if !(FALLBACK_MIN_STRETCH..=SHARP_STRETCH + STEP_SLACK).contains(&stretch) {
+        return false;
+    }
+    let (seen, view) = (seen_world(at, screen), seen_world(now, screen));
+    bare.iter().map(|k| k.world().intersect(view)).all(|r| r.area() <= 0.0 || seen.union(r) == seen)
+}
+
+pub fn fade_in(age_ms: f64) -> f32 {
+    (age_ms / FADE_MS).clamp(0.0, 1.0) as f32
+}
+
 pub fn magnified(draw: &[TileKey], zoom: f64) -> usize {
     draw.iter().filter(|k| !sharp_at(zoom, k.step)).count()
 }
