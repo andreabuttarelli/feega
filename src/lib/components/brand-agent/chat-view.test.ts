@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TOOL_STATUS, canvasLinkOf, failureOfStatus, keyboardInset, speakerStarts, toolStatusOf, viewedPicturesOf } from './chat-view';
+import { FAILURES, TOOL_STATUS, canvasLinkOf, failureOfStatus, keyboardInset, speakerStarts, toolStatusOf, viewedPicturesOf } from './chat-view';
 
 describe('toolStatusOf', () => {
   it('treats a call without a status as still running', () => {
@@ -96,5 +96,12 @@ describe('pictures the agent looked at', () => {
   it('shows nothing without a canvas or for other tools', () => {
     expect(viewedPicturesOf(call([{ url: 'u', path: 'o/p/web-views/v/0.jpg' }]), 'p1', '')).toEqual([]);
     expect(viewedPicturesOf({ toolName: 'read_page', output: { images: [{ path: 'o/p/web-views/v/0.jpg' }] } }, 'p1', 'c1')).toEqual([]);
+  });
+});
+
+describe('the billing link under a refused turn', () => {
+  it('asks for a subscription at the agent-edit cap, where buying credits would not help', () => {
+    expect(FAILURES.agentCap.linkKey).toBe('app.account.billing.subscribe');
+    expect(FAILURES.credits.linkKey).toBe('chat.panel.buyCredits');
   });
 });

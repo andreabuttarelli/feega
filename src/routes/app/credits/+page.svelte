@@ -15,8 +15,13 @@
   import PageHead from '$lib/components/PageHead.svelte';
   import StorePaywall from '$lib/components/StorePaywall.svelte';
   import { BillingChannel } from '$lib/billing-channel';
+  import { paymentNotice, planEndNotice } from '$lib/team-seat-copy';
 
   let { data, form } = $props();
+
+  const payment = $derived(paymentNotice(data.seats));
+  const planEnd = $derived(planEndNotice(data.seats, (d) => new Date(d).toLocaleDateString()));
+  const legacyPlan = $derived(data.currentPlan && data.seats?.billing === 'legacy');
 
   const BALANCE_POLL_MS = 3000;
   const BALANCE_POLL_LIMIT = 20;
@@ -49,8 +54,10 @@
   <Notice>{$_('app.account.billing.checkoutCanceled')}</Notice>
 {/if}
 
-{#if data.seats?.endsAt}
-  <Notice>{$_('app.account.billing.planEnds', { values: { date: new Date(data.seats.endsAt).toLocaleDateString(), editors: data.seats.editors - 1 } })}</Notice>
+{#if payment}
+  <Notice tone="error">{payment}</Notice>
+{:else if planEnd}
+  <Notice>{planEnd}</Notice>
 {/if}
 
 {#if data.isOwner}
@@ -94,6 +101,8 @@
               <td>
                 {#if data.currentPlan && data.seats?.billing === 'per_editor'}
                   {$_('app.account.billing.planTotal', { values: { price: plan.price, editors: data.seats.editors, total: plan.price * data.seats.editors } })}
+                {:else if legacyPlan}
+                  {$_('app.account.billing.planFlat', { values: { price: plan.price } })}
                 {:else}
                   {$_('app.account.billing.planPrice', { values: { price: plan.price } })}
                 {/if}
