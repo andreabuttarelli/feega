@@ -1336,11 +1336,12 @@
     if (sceneDue(quiet) || (sceneBusy && uploadOwed(into, owed).length)) {
       restage(into);
     }
-    for (const part of quiet ? sentOverlay.changed(overlay) : []) {
+    const motion = quiet ? CoreMotion.Still : CoreMotion.Gesture;
+    for (const part of sentOverlay.changed(overlay, motion)) {
       into.setOverlay(part, overlay[part]);
     }
     const at = deviceView();
-    into.setMotion?.(quiet ? CoreMotion.Still : CoreMotion.Gesture);
+    into.setMotion?.(motion);
     into.setCamera(at.x, at.y, at.zoom);
     const began = performance.now();
     const { outcome, pending, skipped } = into.frame(began);
