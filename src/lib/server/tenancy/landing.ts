@@ -11,6 +11,7 @@ import { takeCampaign } from '$lib/server/onboarding/campaign-cookie';
 import { takeStartUrl } from '$lib/server/onboarding/start-url-cookie';
 import { resumedQuery } from '$lib/home/handoff';
 import { ProductEvent, track } from '$lib/server/product-events/track';
+import { markSignedUp } from '$lib/server/core-usage';
 
 export const INVITE_PARAM = 'invite_token';
 export const INVITE_ERROR_PARAM = 'invite_error';
@@ -32,6 +33,7 @@ async function recordFirstAcceptance(db: Db, deps: LandingDeps, userId: string, 
   }
   await deps.recordTermsAcceptance(db, userId, CURRENT_TERMS_VERSION);
   await deps.track(ProductEvent.SignupCompleted, { userId }, {});
+  markSignedUp(userId, new Date().toISOString());
 }
 
 function takeHomeDraft(cookies: Cookies): string | null {
