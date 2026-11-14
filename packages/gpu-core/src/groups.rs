@@ -381,6 +381,35 @@ fn softened(item: Item) -> Item {
     }
 }
 
+struct Edit {
+    from: String,
+    reach: Option<Rect>,
+}
+
+const EDIT_SLACK_PX: f64 = 2.0;
+
+fn self_contained(item: &Item) -> bool {
+    let Some(look) = item.look() else { return false };
+    let alone = look.filters.is_none() && look.backdrop.is_none() && look.matte.is_none() && look.masks.is_none();
+    match item {
+        Item::Path(_) => alone,
+        Item::Group(g) => alone && g.items.iter().all(self_contained),
+        _ => false,
+    }
+}
+
+fn item_reach(item: &Item) -> Option<Rect> {
+    if !self_contained(item) {
+        return None;
+    }
+    let pad = item.look().map_or(0.0, |l| l.blur) * BLUR_REACH + EDIT_SLACK_PX;
+    bounds::<Scene>(item, &Pictures::new()).map(|r| r.inflate(pad, pad))
+}
+
+fn reach_of<'a>(items: impl Iterator<Item = &'a Item>) -> Option<Rect> {
+    items.map(item_reach).try_fold(None, |acc: Option<Rect>, r| r.map(|r| Some(acc.map_or(r, |a| a.union(r)))))?
+}
+
 struct Seed {
     before: Arc<Cast>,
     group: String,
@@ -624,6 +653,7 @@ pub struct Library {
     groups: Groups,
     encodings: FxHashMap<String, Option<Arc<Cast>>>,
     seeds: FxHashMap<String, Seed>,
+    edits: FxHashMap<String, Edit>,
     composes: bool,
     held: FxHashMap<String, Held>,
     building: FxHashMap<String, Building>,
@@ -743,12 +773,19 @@ impl Library {
         }
         let (drawn, _) = self.drawable(&DisplayList { items: splice.items.clone(), ..base.clone_empty() });
         let before = self.encodings.get(from).cloned().flatten();
+        let gone = &base.items[splice.head..base.items.len() - splice.tail];
+        let edit = Edit { from: from.to_string(), reach: reach_of(gone.iter().chain(&drawn.items)) };
         self.groups.splice(from, to, splice.head, splice.tail, drawn.items);
         self.forget(to);
+        self.edits.insert(to.to_string(), edit);
         if let Some(before) = before {
             self.seeds.insert(to.to_string(), Seed { before, group: from.to_string() });
         }
         true
+    }
+
+    pub fn edit_reach(&self, from: &str, to: &str) -> Option<Rect> {
+        self.edits.get(to).filter(|e| e.from == from).and_then(|e| e.reach)
     }
 
     pub fn items_in(&self, group: &str) -> Option<usize> {
@@ -797,6 +834,7 @@ impl Library {
     fn forget(&mut self, key: &str) {
         self.encodings.remove(key);
         self.seeds.remove(key);
+        self.edits.remove(key);
         if self.held.remove(key).is_some() {
             self.stale.push(cache_clip(key));
         }

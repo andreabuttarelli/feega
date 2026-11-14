@@ -64,7 +64,7 @@ impl Compositor {
     }
 
     pub fn patch(&mut self, patch: Patch, library: &Library) {
-        self.world.patch(patch, |g| library.size_of(g));
+        self.world.patch_edited(patch, |g| library.size_of(g), |from, to| library.edit_reach(from, to));
     }
 
     pub fn set_overlay(&mut self, part: OverlayPart, items: Vec<Item>, library: &mut Library) {
