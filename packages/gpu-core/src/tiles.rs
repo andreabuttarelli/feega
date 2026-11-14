@@ -200,6 +200,15 @@ impl Queue {
 pub struct TileFrame {
     pub draw: Vec<TileKey>,
     pub missing: Vec<TileKey>,
+    pub bare: Vec<TileKey>,
+}
+
+pub fn sharp_at(zoom: f64, step: i32) -> bool {
+    zoom / step_zoom(step) <= SHARP_STRETCH + STEP_SLACK
+}
+
+pub fn magnified(draw: &[TileKey], zoom: f64) -> usize {
+    draw.iter().filter(|k| !sharp_at(zoom, k.step)).count()
 }
 
 #[derive(Default)]
@@ -273,8 +282,10 @@ impl Tiles {
             Some(top) => self.held_over(world, top),
             None => fallback.into_iter().chain([step]).flat_map(|s| self.held_over(world, s)).collect(),
         };
+        let sharp: Vec<i32> = (step - COARSER_STEPS..step).filter(|s| sharp_at(camera.zoom, *s)).chain(step + 1..=step + FINER_STEPS).collect();
+        let bare = missing.iter().filter(|k| !self.held.contains(k) && !self.under_any(**k, &sharp)).copied().collect();
         missing.extend(draw.iter().filter(|k| k.step != step && self.stale.contains(k)));
-        TileFrame { draw, missing }
+        TileFrame { draw, missing, bare }
     }
 
     fn paints(&self, key: TileKey) -> bool {
@@ -310,12 +321,12 @@ impl Tiles {
         coarser.chain(finer).any(|step| keys_over(world, step).all(|k| self.held.contains(&k)))
     }
 
-    fn shown_sharper(&self, key: TileKey) -> bool {
-        (key.step + 1..=key.step + FINER_STEPS).any(|step| keys_over(key.world(), step).all(|k| self.held.contains(&k)))
+    fn under_any(&self, key: TileKey, steps: &[i32]) -> bool {
+        steps.iter().any(|step| keys_over(key.world(), *step).all(|k| self.held.contains(&k)))
     }
 
-    pub fn unsharp(&self, missing: &[TileKey]) -> usize {
-        missing.iter().filter(|k| !self.shown_sharper(**k)).count()
+    fn shown_sharper(&self, key: TileKey) -> bool {
+        (key.step + 1..=key.step + FINER_STEPS).any(|step| keys_over(key.world(), step).all(|k| self.held.contains(&k)))
     }
 
     fn planned(&self, camera: Camera, screen: (u32, u32), kept: usize) -> Vec<Planned> {

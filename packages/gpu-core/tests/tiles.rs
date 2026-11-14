@@ -1,5 +1,5 @@
 use gpu_core::retained::Camera;
-use gpu_core::tiles::{lifted_keys, NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, bake_batches, BAKE_BATCH_TILES, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
+use gpu_core::tiles::{lifted_keys, magnified, NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, bake_batches, BAKE_BATCH_TILES, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
 use vello::kurbo::{Point, Rect};
 
 const SCREEN: (u32, u32) = (1024, 768);
@@ -518,15 +518,31 @@ fn evicting_thousands_of_tiles_zoomed_in_on_a_wide_canvas_takes_milliseconds() {
 }
 
 #[test]
-fn a_missing_tile_shown_by_sharper_held_tiles_is_not_unsharp() {
+fn a_missing_tile_shown_by_sharper_held_tiles_is_not_bare() {
     let mut tiles = Tiles::default();
-    let coarse = tiles.frame(camera(1.0), SCREEN).missing;
     tiles.frame(camera(step_zoom(2)), (SCREEN.0 * 2, SCREEN.1 * 2)).missing.iter().for_each(|k| tiles.hold(*k));
-    assert_eq!(tiles.unsharp(&coarse), 0);
+    assert!(tiles.frame(camera(1.0), SCREEN).bare.is_empty());
 
     let mut blurry = Tiles::default();
     blurry.frame(camera(step_zoom(-2)), SCREEN).missing.iter().for_each(|k| blurry.hold(*k));
-    assert_eq!(blurry.unsharp(&coarse), coarse.len());
+    let frame = blurry.frame(camera(1.0), SCREEN);
+    assert_eq!(frame.bare.len(), frame.missing.len());
+}
+
+#[test]
+fn a_coarser_tile_within_a_quarter_stretch_leaves_nothing_bare() {
+    let mut tiles = Tiles::default();
+    tiles.frame(camera(1.0), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
+
+    assert!(tiles.frame(camera(1.2), SCREEN).bare.is_empty());
+}
+
+#[test]
+fn a_tile_drawn_past_a_quarter_stretch_counts_as_magnified() {
+    let key = TileKey { step: 0, tx: 0, ty: 0 };
+
+    assert_eq!(magnified(&[key], 1.2), 0);
+    assert_eq!(magnified(&[key], 1.5), 1);
 }
 
 #[test]
