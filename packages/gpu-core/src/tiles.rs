@@ -275,14 +275,15 @@ impl Tiles {
         let distance = |k: &TileKey| k.screen(camera).center().distance(centre);
         let mut missing: Vec<TileKey> = keys_over(world, step).filter(|k| !self.held.contains(k) || self.stale.contains(k)).filter(|k| self.paints(*k)).collect();
         missing.sort_by(|a, b| distance(a).total_cmp(&distance(b)));
-        let fallback: Vec<i32> = if missing.is_empty() { vec![] } else { (step - COARSER_STEPS..step).chain((step + 1..=step + FINER_STEPS).rev()).collect() };
+        let coarser: Vec<i32> = (step - COARSER_STEPS..step).filter(|s| sharp_at(camera.zoom, *s)).collect();
+        let fallback: Vec<i32> = if missing.is_empty() { vec![] } else { coarser.iter().copied().chain((step + 1..=step + FINER_STEPS).rev()).collect() };
         let whole = |s: i32| keys_over(world, s).filter(|k| self.paints(*k)).all(|k| self.held.contains(&k));
-        let shown = if missing.is_empty() { Some(step) } else { ((step + 1..=step + FINER_STEPS).chain((step - COARSER_STEPS..step).rev())).find(|s| whole(*s)) };
+        let shown = if missing.is_empty() { Some(step) } else { ((step + 1..=step + FINER_STEPS).chain(coarser.iter().rev().copied())).find(|s| whole(*s)) };
         let draw: Vec<TileKey> = match shown {
             Some(top) => self.held_over(world, top),
             None => fallback.into_iter().chain([step]).flat_map(|s| self.held_over(world, s)).collect(),
         };
-        let sharp: Vec<i32> = (step - COARSER_STEPS..step).filter(|s| sharp_at(camera.zoom, *s)).chain(step + 1..=step + FINER_STEPS).collect();
+        let sharp: Vec<i32> = coarser.into_iter().chain(step + 1..=step + FINER_STEPS).collect();
         let bare = missing.iter().filter(|k| !self.held.contains(k) && !self.under_any(**k, &sharp)).copied().collect();
         missing.extend(draw.iter().filter(|k| k.step != step && self.stale.contains(k)));
         TileFrame { draw, missing, bare }

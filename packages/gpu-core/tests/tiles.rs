@@ -48,11 +48,11 @@ fn zooming_in_draws_the_coarser_tiles_until_the_new_step_is_rastered() {
         tiles.hold(key);
     }
 
-    let zoomed = tiles.frame(camera(1.5), SCREEN);
+    let zoomed = tiles.frame(camera(1.2), SCREEN);
     assert!(!zoomed.missing.is_empty());
     assert!(zoomed.draw.iter().all(|k| k.step == 0));
     let screen = Rect::new(0.0, 0.0, SCREEN.0 as f64, SCREEN.1 as f64);
-    let covered: f64 = zoomed.draw.iter().map(|k| k.screen(camera(1.5)).intersect(screen).area()).sum();
+    let covered: f64 = zoomed.draw.iter().map(|k| k.screen(camera(1.2)).intersect(screen).area()).sum();
     assert!(covered >= screen.area() - 1.0);
 }
 
@@ -216,16 +216,17 @@ fn a_retina_desktop_keeps_as_many_tiles_as_the_memory_budget_holds() {
 #[test]
 fn a_sharper_step_replaces_the_one_on_screen_only_once_it_covers_the_whole_screen() {
     let mut tiles = Tiles::default();
-    let coarse = tiles.frame(camera(step_zoom(-4)), SCREEN).missing;
+    let near = camera(step_zoom(4));
+    let coarse = tiles.frame(camera(step_zoom(3)), SCREEN).missing;
     coarse.iter().for_each(|k| tiles.hold(*k));
-    let sharp = tiles.frame(camera(1.0), SCREEN).missing;
+    let sharp = tiles.frame(near, SCREEN).missing;
     sharp.iter().take(sharp.len() / 2).for_each(|k| tiles.hold(*k));
 
-    let half = tiles.frame(camera(1.0), SCREEN);
-    assert!(half.draw.iter().all(|k| k.step != step_of(1.0)));
+    let half = tiles.frame(near, SCREEN);
+    assert!(half.draw.iter().all(|k| k.step != 4));
 
     sharp.iter().for_each(|k| tiles.hold(*k));
-    let whole = tiles.frame(camera(1.0), SCREEN);
+    let whole = tiles.frame(near, SCREEN);
     assert!(sharp.iter().all(|k| whole.draw.contains(k)));
 }
 
@@ -538,6 +539,18 @@ fn a_coarser_tile_within_a_quarter_stretch_leaves_nothing_bare() {
 }
 
 #[test]
+fn a_cached_tile_is_never_drawn_stretched_past_a_quarter() {
+    let mut tiles = Tiles::default();
+    tiles.frame(camera(1.0), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
+    tiles.frame(camera(step_zoom(-8)), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
+
+    for zoom in [1.3, 1.5, 2.0, 3.0] {
+        let frame = tiles.frame(camera(zoom), SCREEN);
+        assert_eq!(magnified(&frame.draw, zoom), 0, "zoom {zoom}");
+    }
+}
+
+#[test]
 fn a_tile_drawn_past_a_quarter_stretch_counts_as_magnified() {
     let key = TileKey { step: 0, tx: 0, ty: 0 };
 
@@ -647,8 +660,9 @@ fn a_level_covering_the_painted_screen_hides_the_coarser_ones_under_it() {
     let coarsest = planned[0].step;
     planned.iter().filter(|k| k.step == coarsest).for_each(|k| tiles.hold(*k));
     tiles.hold(TileKey { step: coarsest - 4, tx: 0, ty: 0 });
+    let closer = Camera { zoom: step_zoom(coarsest) * 1.1, ..fit };
 
-    let frame = tiles.frame(fit, SCREEN);
+    let frame = tiles.frame(closer, SCREEN);
 
     assert!(!frame.missing.is_empty());
     let steps: std::collections::BTreeSet<i32> = frame.draw.iter().map(|k| k.step).collect();
