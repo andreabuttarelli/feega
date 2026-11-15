@@ -3977,3 +3977,11 @@ snapshot of the page looks clean). **Move:** a Chrome snapshot of the page does 
 workers; in WebKit they count in the same WebContent process. Terminate the worker in Playwright
 WebKit (`Worker.terminate()` from an init-script registry) and read `footprint` again: the frame
 worker held ~260 MB (its last parsed doc and prepared frame). Phones release idle frame workers.
+
+## Quadratic edit: a lookup by id inside a loop
+
+**Signal:** an edit or panel rebuild slows with document size (`laidIncrementally` cost ~28 ms per
+edit on 2,125 clips); the code has `find`/`findIndex`/`some`/`includes`/`filter` by id or parent
+inside a `map`/`filter`/`forEach` over clips, tracks, nodes or layers. **Move:** lookup by id
+inside a loop → build a `Map`/`Set` once outside it. Prove it with a test that counts scans or
+property reads on ~2,000 items (`src/lib/canvas/counted-list.testkit.ts`), not wall time.
