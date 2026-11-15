@@ -482,6 +482,53 @@ function inserted(items: Item[], order: string[], clip: string, fresh: Item[]): 
   return placedAt(items, last.run.path, end, fresh);
 }
 
+const hostOf = (item: Item) => instanceHost(item.clip) ?? item.clip;
+
+function hostsWithin(item: Item, into: Set<string>) {
+  if (item.kind !== ItemKind.Group) {
+    return;
+  }
+  for (const inner of item.items) {
+    into.add(hostOf(inner));
+    hostsWithin(inner, into);
+  }
+}
+
+function replacedRuns(items: Item[], fresh: ReadonlyMap<string, Item[]>, found: Set<string>, covered: Set<string>): Item[] | null {
+  const out: Item[] = [];
+  let changed = false;
+  let open: string | null = null;
+  for (const item of items) {
+    const key = hostOf(item);
+    if (fresh.has(key)) {
+      changed = true;
+      hostsWithin(item, covered);
+      if (key === open) {
+        continue;
+      }
+      if (found.has(key)) {
+        return null;
+      }
+      found.add(key);
+      open = key;
+      out.push(...fresh.get(key)!);
+      continue;
+    }
+    open = null;
+    if (item.kind !== ItemKind.Group) {
+      out.push(item);
+      continue;
+    }
+    const inner = replacedRuns(item.items, fresh, found, covered);
+    if (!inner) {
+      return null;
+    }
+    changed ||= inner !== item.items;
+    out.push(inner === item.items ? item : { ...item, items: inner });
+  }
+  return changed ? out : items;
+}
+
 function slidAll(items: Item[], slides: ReadonlyMap<string, Shift>): Item[] {
   if (!slides.size) {
     return items;
@@ -499,7 +546,7 @@ function withoutClips(items: Item[], gone: ReadonlySet<string>): Item[] {
   if (!gone.size) {
     return items;
   }
-  return items.flatMap((item) => {
+  return items.flatMap<Item>((item) => {
     if (gone.has(instanceHost(item.clip) ?? item.clip)) {
       return [];
     }
@@ -546,21 +593,24 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
   const fresh = drawnMini.items;
   mark = performance.now();
   const hiddenNow = new Set(redraw.filter((id) => !relaid.has(id)));
-  let items: Item[] | null = withoutClips(list.items, hiddenNow);
+  let items: Item[] | null = timed('patch:splice:hidden', () => withoutClips(list.items, hiddenNow));
   const order = drawOrder(shown);
   const rank = (clip: string) => order.indexOf(instanceHost(clip) ?? clip);
-  for (const id of redraw.filter((id) => !hiddenNow.has(id)).sort((x, y) => rank(x) - rank(y))) {
-    const own = ownItems(fresh, id);
-    const old = ownItems(items!, id);
-    if (!old.length && !own.length) {
-      continue;
-    }
-    items = old.length ? spliced(items!, id, own) : inserted(items!, order, id, own);
-    if (!items) {
-      return declined('splice');
-    }
+  const loopAt = performance.now();
+  const shownRedraw = redraw.filter((id) => !hiddenNow.has(id));
+  traceSince(`patch:splice:count:${shownRedraw.length}`, loopAt);
+  const owned = new Map(shownRedraw.map((id) => [id, ownItems(fresh, id)]));
+  const found = new Set<string>();
+  const covered = new Set<string>();
+  items = replacedRuns(items, owned, found, covered);
+  for (const id of shownRedraw.filter((id) => !found.has(id) && !covered.has(id) && owned.get(id)!.length).sort((x, y) => rank(x) - rank(y))) {
+    items = items && inserted(items, order, id, owned.get(id)!);
   }
-  items = slidAll(items!, new Map([...slides].filter(([id]) => !redrawSet.has(id))));
+  if (!items) {
+    return declined('splice');
+  }
+  traceSince('patch:splice:redraw', loopAt);
+  items = timed('patch:splice:slide', () => slidAll(items!, new Map([...slides].filter(([id]) => !redrawSet.has(id)))));
   traceSince('patch:splice', mark);
   mark = performance.now();
   const left = new Set(clipsOf(shown).map((c) => c.id));

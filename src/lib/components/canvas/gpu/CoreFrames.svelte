@@ -736,6 +736,7 @@
       liveMeasures.delete(id);
       liveTypesets.delete(id);
       patchBudget.forgetFrame(id);
+      traceSince('patch:budget-reset', performance.now());
       heldMain.drop(id);
       customPictures.drop(liveRead(id));
       const saved = frames.find((f) => f.id === id);
