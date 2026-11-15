@@ -724,3 +724,13 @@ fn panning_bakes_ahead_the_tiles_the_motion_brings_on_screen() {
     assert!(!ahead.is_empty());
     assert!(ahead.iter().all(|k| k.world().x1 > 10300.0 + SCREEN.0 as f64), "behind: {:?}", ahead.iter().find(|k| k.world().x1 <= 10300.0 + SCREEN.0 as f64));
 }
+
+#[test]
+fn looking_ahead_of_a_fast_zoom_out_ends_in_time() {
+    let tiles = baked(WIDE, camera(0.3));
+    let (was, now) = (camera(2.4), camera(0.3));
+    let (done, ended) = std::sync::mpsc::channel();
+    std::thread::spawn(move || done.send(tiles.ahead(was, now, SCREEN).len()).unwrap());
+
+    assert!(ended.recv_timeout(std::time::Duration::from_secs(2)).is_ok());
+}
