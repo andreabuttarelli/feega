@@ -758,3 +758,22 @@ describe.runIf(process.env.CHROMIUM_PATH)('a large title in a font without an op
     }
   }, 30_000);
 });
+
+const LINK_WRAPPED = `<body style="margin:0"><p style="margin:0;width:200px;font:16px/20px monospace">aaaa bbbb cccc dddd <a style="margin-left:4px;font-size:14px">More</a></p></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('a link with a left margin that wraps to start a line', () => {
+  it('stays in the same text as the paragraph, not split into one text per line (traidue /glossario: lines wrapped apart and overlapped "Approfondisci")', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 400, height: 200 });
+      await page.setContent(LINK_WRAPPED);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+
+      expect(all(tree.root).filter((n) => n.type === 'TEXT').map((n) => n.characters)).toEqual(["aaaa bbbb cccc dddd More"]);
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});

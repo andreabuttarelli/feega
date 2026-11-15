@@ -644,7 +644,8 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
       return made ? [{ ...made, key, maxLines: cut, absoluteBoundingBox: withinClip(made.absoluteBoundingBox!, ctx.clip) }] : [];
     }
     const edge = (l: KitRect) => (align === 'CENTER' ? (l.left + l.right) / 2 : align === 'RIGHT' ? l.right : l.left);
-    const clean = kept.length === lines.length && (lines.length === 1 || lines.every((l) => Math.abs(edge(l) - edge(lines[0])) <= LINE_SLACK || (align === 'JUSTIFIED' && Math.abs(l.left - lines[0].left) <= LINE_SLACK)));
+    const leadRoom = LINE_SLACK + Math.max(0, ...segs.map((seg) => seg.lead ?? 0));
+    const clean = kept.length === lines.length && (lines.length === 1 || lines.every((l) => Math.abs(edge(l) - edge(lines[0])) <= leadRoom || (align === 'JUSTIFIED' && Math.abs(l.left - lines[0].left) <= LINE_SLACK)));
     if (clean) {
       const made = textNode(chars, segs, lines, ctx, align, block);
       return made ? [{ ...made, key }] : [];
