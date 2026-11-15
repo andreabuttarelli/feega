@@ -9,6 +9,7 @@ use crate::atlas::Packer;
 use crate::display_list::{Cover, DisplayList, Item, Rgba};
 use crate::groups::Plan;
 use crate::filter_passes::{layer_texture, FilterPasses, Pooled, WgpuRunner};
+use crate::layer_key::{layer_key, LayerKey};
 use crate::layers::{prepare, Blending, Surface};
 use crate::pictures::Pictures;
 use crate::scene::{build_into, Placed};
@@ -33,7 +34,7 @@ struct Cached {
 }
 
 struct LayerCache {
-    entries: FxHashMap<String, Cached>,
+    entries: FxHashMap<LayerKey, Cached>,
     tick: u64,
     cap: u64,
 }
@@ -52,14 +53,14 @@ impl LayerCache {
     fn sweep(&mut self, vello: &mut vello::Renderer) {
         self.tick += 1;
         let tick = self.tick;
-        let mut stale: Vec<String> = self.entries.iter().filter(|(_, c)| c.used + KEPT_FRAMES < tick).map(|(k, _)| k.clone()).collect();
+        let mut stale: Vec<LayerKey> = self.entries.iter().filter(|(_, c)| c.used + KEPT_FRAMES < tick).map(|(k, _)| k.clone()).collect();
         if self.entries.len() - stale.len() > KEPT_LAYERS {
-            let mut rest: Vec<(&String, u64)> = self.entries.iter().filter(|(k, _)| !stale.contains(k)).map(|(k, c)| (k, c.used)).collect();
+            let mut rest: Vec<(&LayerKey, u64)> = self.entries.iter().filter(|(k, _)| !stale.contains(k)).map(|(k, c)| (k, c.used)).collect();
             rest.sort_by_key(|(_, used)| *used);
             let excess = rest.len() - KEPT_LAYERS;
             stale.extend(rest.into_iter().take(excess).map(|(k, _)| k.clone()));
         }
-        let rest: Vec<(String, u64, u64)> = self.entries.iter().filter(|(k, _)| !stale.contains(k)).map(|(k, c)| (k.clone(), c.used, bytes_of((c._texture.width(), c._texture.height())))).collect();
+        let rest: Vec<(LayerKey, u64, u64)> = self.entries.iter().filter(|(k, _)| !stale.contains(k)).map(|(k, c)| (k.clone(), c.used, bytes_of((c._texture.width(), c._texture.height())))).collect();
         stale.extend(over_cap(&rest, self.cap));
         for key in stale {
             if let Some(gone) = self.entries.remove(&key) {
@@ -329,8 +330,8 @@ impl<'a> Surface for Gpu<'a> {
 }
 
 impl Gpu<'_> {
-    fn key(&self, item: &Item) -> String {
-        format!("{}x{} {:?}", self.width, self.height, item)
+    fn key(&self, item: &Item) -> LayerKey {
+        layer_key((self.width, self.height), item)
     }
 }
 
