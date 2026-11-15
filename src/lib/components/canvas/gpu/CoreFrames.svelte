@@ -677,7 +677,9 @@
     const began = performance.now();
     const after = shown && !viewOf(f.id) && reloaded(shown.doc, source.doc) ? relinked(shown.doc, source.doc) : source.doc;
     const list = shown && measure && fastPatch(shown.list, shown.doc, after, measure, look);
-    patchBudget.took(budgetKey, performance.now() - began);
+    if (look) {
+      patchBudget.took(budgetKey, performance.now() - began);
+    }
     performance.measure(`patch:total:${list ? 'patched' : look ? 'declined' : 'budget'}`, { start: began, end: performance.now() });
     if (!shown || !list) {
       return false;
