@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, setKeyframes } from '@feega/motion-core/motion/timeline';
 import { Ease } from '@feega/motion-core/motion/design';
@@ -27,6 +27,8 @@ const withProp = (doc: MotionDoc, id: string, key: string, value: unknown): Moti
 const without = (doc: MotionDoc, id: string): MotionDoc => ({ ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => c.id !== id) })) });
 
 const valid = (doc: MotionDoc) => parseMotionDoc(doc).ok;
+
+const UNTOUCHED_CLIP_CALLS = 12;
 
 describe('diffing two docs into ops', () => {
   it('finds no ops between equal docs', () => {
@@ -200,5 +202,20 @@ describe('order survives concurrent inserts: ops anchor on a neighbour, not an i
     const start = base();
     const [first, second] = ids(start);
     expect(ids(applyOps(start, [{ kind: OpKind.TrackMove, trackId: first, index: 1 } as never]))).toEqual([second, first]);
+  });
+});
+
+describe('diffDoc on an edit of one clip', () => {
+  it('leaves the clips the edit did not touch unserialised', () => {
+    const before = base();
+    const after = withProp(before, 'a', 'x', 0.3);
+    const stringify = vi.spyOn(JSON, 'stringify');
+
+    diffDoc(before, after);
+
+    const calls = stringify.mock.calls.length;
+    stringify.mockRestore();
+    expect(diffDoc(before, after)).toEqual([{ kind: OpKind.ClipEntry, clipId: 'a', field: 'props', key: 'x', value: 0.3 }]);
+    expect(calls).toBeLessThan(UNTOUCHED_CLIP_CALLS);
   });
 });

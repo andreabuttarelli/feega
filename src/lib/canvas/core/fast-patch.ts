@@ -1,5 +1,6 @@
 import { ItemKind, type DisplayList, type GroupItem, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import { clipsOf, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { TrackKind } from '@feega/motion-core/motion/components';
 import { ParentOpacity, ancestorsOf } from '@feega/motion-core/motion/parent';
 import { relaidWithin, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import type { TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
@@ -295,12 +296,14 @@ const alone = (doc: MotionDoc, clip: MotionClip): boolean => {
   return !isText(clip.component) && clip.component !== 'Precomp' && !pairs && !Object.keys(clip.keyframes).length && !all.some((c) => c.parent === clip.id) && chain.every((c) => c && !c.autoLayout && !Object.keys(c.keyframes).length);
 };
 
+const drawsFor = (item: Item, clip: string) => item.clip === clip || item.clip.startsWith(`${clip}${SEPARATOR}`);
+
 function spliced(items: Item[], clip: string, fresh: Item[]): Item[] | null {
-  const at = items.findIndex((i) => i.clip === clip);
+  const at = items.findIndex((i) => drawsFor(i, clip));
   if (at >= 0) {
-    const end = at + items.slice(at).findIndex((i) => i.clip !== clip);
+    const end = at + items.slice(at).findIndex((i) => !drawsFor(i, clip));
     const stop = end < at ? items.length : end;
-    return items.slice(stop).some((i) => i.clip === clip) ? null : [...items.slice(0, at), ...fresh, ...items.slice(stop)];
+    return items.slice(stop).some((i) => drawsFor(i, clip)) ? null : [...items.slice(0, at), ...fresh, ...items.slice(stop)];
   }
   const holder = items.findIndex((i) => i.kind === ItemKind.Group && holds(i, clip));
   if (holder < 0) {
@@ -311,10 +314,10 @@ function spliced(items: Item[], clip: string, fresh: Item[]): Item[] | null {
   return inner && [...items.slice(0, holder), { ...group, items: inner }, ...items.slice(holder + 1)];
 }
 
-const holds = (group: GroupItem, clip: string): boolean => group.items.some((i) => i.clip === clip || (i.kind === ItemKind.Group && holds(i, clip)));
+const holds = (group: GroupItem, clip: string): boolean => group.items.some((i) => drawsFor(i, clip) || (i.kind === ItemKind.Group && holds(i, clip)));
 
 function ownItems(items: Item[], clip: string): Item[] {
-  const direct = items.filter((i) => i.clip === clip);
+  const direct = items.filter((i) => drawsFor(i, clip));
   return direct.length ? direct : items.flatMap((i) => (i.kind === ItemKind.Group ? ownItems(i.items, clip) : []));
 }
 
@@ -337,51 +340,118 @@ const settled = (c: MotionClip): MotionClip => {
 
 const below = (doc: MotionDoc, ids: ReadonlySet<string>) => clipsOf(doc).filter((c) => ids.has(c.id) || ancestorsOf(doc, c.id).some((id) => ids.has(id))).map((c) => c.id);
 
+const exactDocs = new WeakMap<MotionDoc, Map<TextMeasure, Clips>>();
+
+function exactLaid(doc: MotionDoc, measure: TextMeasure): Clips {
+  const byMeasure = exactDocs.get(doc) ?? exactDocs.set(doc, new Map()).get(doc)!;
+  return byMeasure.get(measure) ?? byMeasure.set(measure, byId(clipsOf(withAutoLayout(withoutHidden(doc), measure)))).get(measure)!;
+}
+
+const REDRAW_MOST = 48;
+
+const drawOrder = (doc: MotionDoc): string[] => [...doc.tracks].reverse().filter((t) => t.kind === TrackKind.Visual && !t.hidden).flatMap((t) => t.clips.map((c) => c.id));
+
+function runAt(items: Item[], clip: string): { within: Item[]; at: number; path: number[] } | null {
+  const at = items.findIndex((i) => drawsFor(i, clip));
+  if (at >= 0) {
+    return { within: items, at, path: [] };
+  }
+  for (const [index, item] of items.entries()) {
+    const inner = item.kind === ItemKind.Group ? runAt(item.items, clip) : null;
+    if (inner) {
+      return { ...inner, path: [index, ...inner.path] };
+    }
+  }
+  return null;
+}
+
+function placedAt(items: Item[], path: number[], at: number, fresh: Item[]): Item[] {
+  if (!path.length) {
+    return [...items.slice(0, at), ...fresh, ...items.slice(at)];
+  }
+  const [head, ...rest] = path;
+  const group = items[head] as GroupItem;
+  return [...items.slice(0, head), { ...group, items: placedAt(group.items, rest, at, fresh) }, ...items.slice(head + 1)];
+}
+
+function inserted(items: Item[], order: string[], clip: string, fresh: Item[]): Item[] | null {
+  const from = order.indexOf(clip);
+  const next = order.slice(from + 1).map((id) => runAt(items, id)).find((r) => r !== null);
+  if (next) {
+    return placedAt(items, next.path, next.at, fresh);
+  }
+  const last = order.slice(0, from).reverse().map((id) => ({ id, run: runAt(items, id) })).find((r) => r.run !== null);
+  if (!last?.run) {
+    return null;
+  }
+  const end = last.run.within.findLastIndex((i) => drawsFor(i, last.id)) + 1;
+  return placedAt(items, last.run.path, end, fresh);
+}
+
 function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, edited: MotionClip, measure: TextMeasure, look: Look | undefined): DisplayList | null {
   if (!look) {
     return null;
   }
-  const was = laid(before, measure);
-  const relaid = laid(after, measure);
+  const was = exactLaid(before, measure);
+  const relaid = exactLaid(after, measure);
   const moved = new Set([edited.id, ...[...relaid].filter(([id, c]) => !was.get(id) || !sameProps(was.get(id)!, c)).map(([id]) => id)]);
   const redraw = below(after, moved);
+  if (redraw.length > REDRAW_MOST) {
+    return null;
+  }
   const paired = new Set(mattePairs(after).flatMap((p) => [p.source, p.target]));
-  if (redraw.some((id) => paired.has(id) || clipsOf(after).find((c) => c.id === id)?.component === 'Precomp')) {
+  if (redraw.some((id) => paired.has(id))) {
     return null;
   }
   const now = (c: MotionClip) => settled(relaid.get(c.id) ?? was.get(c.id) ?? c);
   const kept = new Set([...redraw, ...redraw.flatMap((id) => ancestorsOf(after, id)), ...(after.surface ? [after.surface] : [])]);
   const shown = withoutHidden(after);
   const mini = { ...shown, tracks: shown.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => kept.has(c.id)).map(now) })) };
-  const fresh = drawFrame(prepare(mini, look.tokens, look.assets, look.typeset), look.frame).items;
+  const back = new Set(redraw.filter((id) => relaid.has(id) && !was.has(id)));
+  const drawnMini = drawFrame(prepare(mini, look.tokens, look.assets, look.typeset), look.frame);
+  const fresh = drawnMini.items;
   let items: Item[] | null = list.items;
-  for (const id of redraw) {
+  const order = drawOrder(shown);
+  const rank = (clip: string) => order.indexOf(instanceHost(clip) ?? clip);
+  for (const id of [...redraw].sort((x, y) => rank(x) - rank(y))) {
     const own = ownItems(fresh, id);
     const old = ownItems(items!, id);
     if (!old.length && !own.length) {
       continue;
     }
-    items = old.length ? spliced(items!, id, own) : null;
+    items = old.length ? spliced(items!, id, own) : inserted(items!, order, id, own);
     if (!items) {
       return null;
     }
   }
   const left = new Set(clipsOf(shown).map((c) => c.id));
   const gone = new Set(clipsOf(after).map((c) => c.id).filter((id) => !left.has(id)));
-  const patched = { ...list, items: items!, unsupported: list.unsupported.filter((g) => !gone.has(g.clip)) };
-  return edited.hidden ? rebled(patched, before, after) : patched;
+  const redrawn = new Set(redraw);
+  const host = (g: DisplayList['unsupported'][number]) => instanceHost(g.clip) ?? g.clip;
+  const steady = (g: DisplayList['unsupported'][number]) => redrawn.has(host(g)) && !back.has(host(g)) && !gone.has(host(g));
+  if (JSON.stringify(list.unsupported.filter(steady)) !== JSON.stringify(drawnMini.unsupported.filter(steady))) {
+    return null;
+  }
+  const unsupported = drawnMini.unsupported.filter((g) => back.has(host(g))).reduce((all, g) => {
+    const at = all.findIndex((k) => rank(k.clip) > rank(g.clip));
+    return at < 0 ? [...all, g] : [...all.slice(0, at), g, ...all.slice(at)];
+  }, list.unsupported.filter((g) => !gone.has(host(g))));
+  const patched = { ...list, items: items!, unsupported };
+  return rebled(patched, before, after);
 }
 
 enum Edit {
   Fade = 'fade',
   Hide = 'hide',
   Move = 'move',
-  Redraw = 'redraw'
+  Redraw = 'redraw',
+  Show = 'show'
 }
 
 const EDIT_OF: [Edit, (a: MotionClip, b: MotionClip) => boolean][] = [
   [Edit.Fade, (a, b) => changedKeys(a, b).join() === 'transform' && changedKeys(a.transform, b.transform).join() === 'opacity'],
   [Edit.Hide, (a, b) => changedKeys(a, b).join() === 'hidden' && !a.hidden],
+  [Edit.Show, (a, b) => changedKeys(a, b).join() === 'hidden' && !!a.hidden],
   [Edit.Move, (a, b) => changedKeys(a, b).join() === 'transform' && slidOnly(changedKeys(a.transform, b.transform))],
   [Edit.Redraw, (a, b) => changedKeys(a, b).every((k) => STATIC_KEYS.has(k))]
 ];
@@ -392,11 +462,13 @@ const PATCHES: Record<Edit, Patch> = {
   [Edit.Fade]: (list, _before, after, a, b) => fadeOf(list, after, a, b),
   [Edit.Hide]: (list, before, after, _a, b, measure, look) => relaid(list, before, after, measure, hidePairing(before, after, b, measure)) ?? subtreeRedrawn(list, before, after, b, measure, look),
   [Edit.Move]: (list, before, after, _a, _b, measure) => relaid(list, before, after, measure, unlaid(before, after)),
+  [Edit.Show]: (list, before, after, _a, b, measure, look) => subtreeRedrawn(list, before, after, b, measure, look),
   [Edit.Redraw]: (list, before, after, _a, b, measure, look) => redrawn(list, after, b, look) ?? subtreeRedrawn(list, before, after, b, measure, look)
 };
 
 export function readyPatch(doc: MotionDoc, measure: TextMeasure): void {
   laid(doc, measure);
+  exactLaid(doc, measure);
 }
 
 function restyledClips(before: MotionDoc, after: MotionDoc): MotionClip[] | null {

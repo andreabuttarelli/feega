@@ -250,6 +250,7 @@
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { assetTier } from '$lib/canvas/core/asset-tier';
   import { whenIdle } from '$lib/motion/hyperframes/warm-player';
+  import { paintThenIdle } from '$lib/canvas/core/paint-then-idle';
   import { Fling, type Glide } from '$lib/canvas/core/inertia';
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
   import { themeOf } from '$lib/canvas/gpu/theme';
@@ -1490,10 +1491,11 @@
   const viewDocs = new Map<string, LiveDoc['doc']>();
   let viewSources = $state(untrack(() => liveDocs.map));
   let viewTurn = 0;
+  const viewsLater = paintThenIdle((job) => afterPaint(job), whenIdle);
   $effect(() => {
     const next = liveDocs.map;
     const turn = ++viewTurn;
-    whenIdle(() => turn === viewTurn && (viewSources = next));
+    viewsLater(() => turn === viewTurn && (viewSources = next));
   });
   const viewDocOf = (id: string) => {
     const held = viewDocs.get(id);

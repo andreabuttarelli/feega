@@ -84,6 +84,8 @@ describe.skipIf(!existsSync(FIXTURE))('fastPatch on every clip of the landings f
   it('redraws resized and hidden layers inside auto layout exactly as the full build, for most of them', () => {
     const resize: Tally = { tried: 0, patched: 0, mismatched: [] };
     const hide: Tally = { tried: 0, patched: 0, mismatched: [] };
+    const show: Tally = { tried: 0, patched: 0, mismatched: [] };
+    const colour: Tally = { tried: 0, patched: 0, mismatched: [] };
     for (const doc of docs()) {
       const list = drawn(doc);
       const sampled = clipsOf(doc).filter((c, i) => !c.hidden && c.parent && i % SAMPLE_EVERY === 0);
@@ -92,11 +94,19 @@ describe.skipIf(!existsSync(FIXTURE))('fastPatch on every clip of the landings f
         if (Number.isFinite(width) && width > 0) {
           check(resize, `resize ${clip.id}`, list, doc, withClip(doc, clip.id, (c) => ({ ...c, props: { ...c.props, width: width * 0.9 } })), LOOK);
         }
-        check(hide, `hide ${clip.id}`, list, doc, withClip(doc, clip.id, (c) => ({ ...c, hidden: true })), LOOK);
+        const gone = withClip(doc, clip.id, (c) => ({ ...c, hidden: true }));
+        check(hide, `hide ${clip.id}`, list, doc, gone, LOOK);
+        check(show, `show ${clip.id}`, drawn(gone), gone, doc, LOOK);
+        const fills = clip.props.fills as { visible?: boolean }[] | undefined;
+        if (fills?.length) {
+          check(colour, `colour ${clip.id}`, list, doc, withClip(doc, clip.id, (c) => ({ ...c, props: { ...c.props, fills: fills.map((f, i) => (i === 0 ? { ...f, visible: f.visible === false } : f)) } })), LOOK);
+        }
       }
     }
-    console.log(JSON.stringify({ resize: { ...resize, mismatched: resize.mismatched.slice(0, 5) }, hide: { ...hide, mismatched: hide.mismatched.slice(0, 5) } }));
-    expect([...resize.mismatched, ...hide.mismatched].slice(0, 20)).toEqual([]);
+    console.log(JSON.stringify({ resize: { ...resize, mismatched: resize.mismatched.slice(0, 5) }, hide: { ...hide, mismatched: hide.mismatched.slice(0, 5) }, show: { ...show, mismatched: show.mismatched.slice(0, 5) }, colour: { ...colour, mismatched: colour.mismatched.slice(0, 5) } }));
+    expect([...resize.mismatched, ...hide.mismatched, ...show.mismatched, ...colour.mismatched].slice(0, 20)).toEqual([]);
+    expect(colour.patched / colour.tried).toBeGreaterThan(MOST_PATCHED);
+    expect(show.patched / show.tried).toBeGreaterThan(MOST_PATCHED);
     expect(resize.patched / resize.tried).toBeGreaterThan(MOST_PATCHED);
     expect(hide.patched / hide.tried).toBeGreaterThan(MOST_PATCHED);
   }, 3_600_000);
