@@ -29,6 +29,8 @@ const COARSER_STEPS: i32 = 40;
 const FINER_STEPS: i32 = 4;
 pub const NEAR_STEPS: i32 = 4;
 const AHEAD_FRAMES: f64 = 6.0;
+const AHEAD_ZOOM_REACH: f64 = 2.0;
+const FRAME_TILES_MAX: f64 = 4096.0;
 pub struct Level {
     pub below_top: i32,
     pub share_percent: u64,
@@ -261,7 +263,10 @@ impl Tiles {
 
     pub fn frame(&self, camera: Camera, screen: (u32, u32)) -> TileFrame {
         let step = self.step_for(camera);
-        let world = seen_world(camera, screen);
+        let world = match self.on_canvas(seen_world(camera, screen)) {
+            Some(world) if count_over(world, step) <= FRAME_TILES_MAX => world,
+            _ => return TileFrame { draw: Vec::new(), missing: Vec::new() },
+        };
         let centre = Point::new(screen.0 as f64 / 2.0, screen.1 as f64 / 2.0);
         let distance = |k: &TileKey| k.screen(camera).center().distance(centre);
         let mut missing: Vec<TileKey> = keys_over(world, step).filter(|k| !self.held.contains(k) || self.stale.contains(k)).filter(|k| self.paints(*k)).collect();
@@ -275,6 +280,14 @@ impl Tiles {
         };
         missing.extend(draw.iter().filter(|k| k.step != step && self.stale.contains(k)));
         TileFrame { draw, missing }
+    }
+
+    fn on_canvas(&self, world: Rect) -> Option<Rect> {
+        match self.canvas {
+            Some(canvas) if !world.overlaps(canvas) => None,
+            Some(canvas) => Some(world.intersect(canvas)),
+            None => Some(world),
+        }
     }
 
     fn paints(&self, key: TileKey) -> bool {
@@ -291,7 +304,7 @@ impl Tiles {
 
     pub fn ahead(&self, was: Camera, now: Camera, screen: (u32, u32)) -> Vec<TileKey> {
         let (from, to) = (seen_world(was, screen).center(), seen_world(now, screen).center());
-        let zoom = now.zoom * (now.zoom / was.zoom).powf(AHEAD_FRAMES);
+        let zoom = (now.zoom * (now.zoom / was.zoom).powf(AHEAD_FRAMES)).clamp(now.zoom / AHEAD_ZOOM_REACH, now.zoom * AHEAD_ZOOM_REACH);
         let centre = to + (to - from) * AHEAD_FRAMES;
         let (w, h) = (screen.0 as f64, screen.1 as f64);
         let predicted = Camera { x: w / 2.0 - centre.x * zoom, y: h / 2.0 - centre.y * zoom, zoom };
