@@ -482,6 +482,19 @@ function inserted(items: Item[], order: string[], clip: string, fresh: Item[]): 
   return placedAt(items, last.run.path, end, fresh);
 }
 
+function slidAll(items: Item[], slides: ReadonlyMap<string, Shift>): Item[] {
+  if (!slides.size) {
+    return items;
+  }
+  return items.map((item) => {
+    const by = slides.get(instanceHost(item.clip) ?? item.clip);
+    if (by) {
+      return slidItem(item, by);
+    }
+    return item.kind === ItemKind.Group ? { ...item, items: slidAll(item.items, slides) } : item;
+  });
+}
+
 function withoutClips(items: Item[], gone: ReadonlySet<string>): Item[] {
   if (!gone.size) {
     return items;
@@ -547,13 +560,7 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
       return declined('splice');
     }
   }
-  for (const [id, by] of slides) {
-    const old = ownItems(items!, id);
-    items = redrawSet.has(id) || !old.length ? items : spliced(items!, id, old.map((i) => slidItem(i, by)));
-    if (!items) {
-      return declined('slide');
-    }
-  }
+  items = slidAll(items!, new Map([...slides].filter(([id]) => !redrawSet.has(id))));
   traceSince('patch:splice', mark);
   mark = performance.now();
   const left = new Set(clipsOf(shown).map((c) => c.id));

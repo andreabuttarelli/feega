@@ -3,7 +3,7 @@ import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip } from '@feega/motion-core/motion/timeline';
 import { DEFAULT_AUTO_LAYOUT, DEFAULT_LAYOUT_ITEM } from '@feega/motion-core/motion/layout/model';
-import { Sizing } from '@feega/motion-core/motion/layout/auto-layout';
+import { Direction, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
 import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-list';
 import { moveBy } from '$lib/motion/space';
 import { EditMode } from '$lib/motion/edit-mode';
@@ -313,6 +313,23 @@ describe('hiding a big section', () => {
     const kids = Array.from({ length: MANY }, (_, i) => `k${i}`);
     const doc = [['section', 'page'], ['after', 'page'], ...kids.map((k) => [k, 'section'])].reduce((d, [id, parent]) => edit(d, id, (c) => ({ ...c, parent, props: { ...c.props, ...SMALL } })), built(['page', 'section', 'after', ...kids]));
     const laid = edit(edit(doc, 'page', (c) => ({ ...c, autoLayout: { ...DEFAULT_AUTO_LAYOUT, gap: 4 } })), 'section', (c) => ({ ...c, autoLayout: { ...DEFAULT_AUTO_LAYOUT, gap: 4 } }));
+    const list = drawn(laid);
+    const after = edit(laid, 'section', hidden);
+    fastPatch(list, laid, laid, estimatedText, LOOK);
+    const slice = vi.spyOn(Array.prototype, 'slice');
+
+    const patched = fastPatch(list, laid, after, estimatedText, LOOK);
+
+    const calls = slice.mock.calls.length;
+    slice.mockRestore();
+    expect(rounded(patched)).toEqual(rounded(drawn(after)));
+    expect(calls).toBeLessThan(MANY);
+  });
+
+  it('slides the layers after a hidden section in one pass', () => {
+    const later = Array.from({ length: MANY }, (_, i) => `n${i}`);
+    const doc = [['section', 'page'], ['inside', 'section'], ...later.map((k) => [k, 'page'])].reduce((d, [id, parent]) => edit(d, id, (c) => ({ ...c, parent, props: { ...c.props, ...SMALL } })), built(['page', 'section', 'inside', ...later]));
+    const laid = edit(edit(doc, 'page', (c) => ({ ...c, autoLayout: { ...DEFAULT_AUTO_LAYOUT, direction: Direction.Vertical, gap: 1 } })), 'section', (c) => ({ ...c, autoLayout: { ...DEFAULT_AUTO_LAYOUT, gap: 4 } }));
     const list = drawn(laid);
     const after = edit(laid, 'section', hidden);
     fastPatch(list, laid, laid, estimatedText, LOOK);

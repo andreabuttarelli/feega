@@ -15,4 +15,6 @@ with `too-many` in 10 of 36 cases, and the fallback relaid out the page with rea
 With the cap fixed hides still took ~300 ms. Block marks inside the redraw (`patch:plan`, `mini`,
 `draw`, `splice`, `gaps`, `bleed`, traced) showed `patch:splice` at ~300 ms on every hide and
 ~2 ms on shows: each hidden layer of the section was spliced out on its own, copying the whole
-item list per layer. The hidden subtree is now removed in one pass before the splices.
+item list per layer, and each layer after the section was slid the same way (a landing page has
+hundreds after a top section). The hidden subtree is now removed and the slid layers shifted in
+one pass each.
