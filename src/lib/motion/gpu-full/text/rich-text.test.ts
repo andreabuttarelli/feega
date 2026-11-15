@@ -129,3 +129,15 @@ describe('rich text on the GPU path', () => {
     expect(linear).toHaveLength(2);
   });
 });
+
+describe('a smaller run after a widened space that wraps to the next line', () => {
+  it('starts its own line below the text before it, not on top of it (traidue /glossario: "Approfondisci" drew over the last line)', () => {
+    const book = () => ({ face: boxFace, skew: 0 });
+    const painted = inks(paintText(env({ text: 'aaa bbb ccc ddd', color: '#ffffff', size: 0.05, sizing: 'auto-height', width: 0.16, x: 0.5, y: 0.5, height: 0.3, runs: [{ start: 11, end: 12, tracking: 0.25 }, { start: 12, end: 15, color: '#ff0000', size: 0.04 }] }, book)));
+    const ys = (all: Ink[]) => all.flatMap((i) => i.contours.flatMap((c) => c.filter((_, k) => k % 2 === 1)));
+    const red = painted.filter((i) => i.paint.kind === PaintKind.Solid && i.paint.color[1] === 0);
+    const white = painted.filter((i) => !red.includes(i));
+
+    expect(Math.min(...ys(red))).toBeGreaterThan(Math.max(...ys(white)));
+  });
+});

@@ -758,3 +758,43 @@ describe.runIf(process.env.CHROMIUM_PATH)('a large title in a font without an op
     }
   }, 30_000);
 });
+
+const LINK_WRAPPED = `<body style="margin:0"><p style="margin:0;width:200px;font:16px/20px monospace">aaaa bbbb cccc dddd <a style="margin-left:4px;font-size:14px">More</a></p></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('a link with a left margin that wraps to start a line', () => {
+  it('stays in the same text as the paragraph, not split into one text per line (traidue /glossario: lines wrapped apart and overlapped "Approfondisci")', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 400, height: 200 });
+      await page.setContent(LINK_WRAPPED);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+
+      expect(all(tree.root).filter((n) => n.type === 'TEXT').map((n) => n.characters)).toEqual(["aaaa bbbb cccc dddd More"]);
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
+
+const SVG_ABOVE = `<body style="margin:0"><div style="position:relative;height:300px;overflow:hidden"><svg style="position:absolute;left:0;top:-200px" width="400" height="600" viewBox="0 0 400 600"><rect x="100" y="300" width="50" height="50" fill="red"/></svg></div></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('an svg that starts above the page', () => {
+  it('draws its shapes where the page shows them, not pushed down by the part above (traidue /servizi: the map land fell out of its box)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 400, height: 300 });
+      await page.setContent(SVG_ABOVE);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+      const square = all(tree.root).find((n) => n.type === 'VECTOR')!;
+      const ys = [...square.fillGeometry![0].path.matchAll(/-?[\d.]+ (-?[\d.]+)/g)].map((m) => Number(m[1]));
+
+      expect(square.absoluteBoundingBox!.y + Math.min(...ys)).toBeCloseTo(100, 0);
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
