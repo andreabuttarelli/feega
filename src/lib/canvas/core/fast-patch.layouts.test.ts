@@ -58,4 +58,26 @@ describe('fastPatch layouts', () => {
 
     expect(vi.mocked(resolve.relaidWithin)).not.toHaveBeenCalled();
   });
+
+  it('hides a section of dozens of layers by redrawing the reflow, not by laying out the page again', () => {
+    const kids = Array.from({ length: 60 }, (_, i) => `k${i}`);
+    const doc = ['page', 'section', 'after', ...kids].reduce((d, id) => {
+      const next = addClip(d, { component: 'Shape', from: 0, durationInFrames: 30, props: SHAPE }, id);
+      if (!next.ok) {
+        throw new Error(next.error);
+      }
+      return next.doc;
+    }, { ...newMotionDoc(MotionFormat.Square), durationInFrames: 30 } as MotionDoc);
+    const flow = { ...DEFAULT_AUTO_LAYOUT, gap: 4 };
+    const hug = { ...DEFAULT_LAYOUT_ITEM, width: Sizing.Hug };
+    const page = [['section', 'page'], ['after', 'page'], ...kids.map((k) => [k, 'section'])].reduce((d, [id, parent]) => edit(d, id, (c) => ({ ...c, parent })), doc);
+    const laid = edit(edit(page, 'page', (c) => ({ ...c, autoLayout: flow, layoutItem: hug })), 'section', (c) => ({ ...c, autoLayout: flow, layoutItem: hug }));
+    const list = drawFrame(prepare(laid, FEEGA_TOKENS), 0);
+    vi.mocked(resolve.relaidWithin).mockClear();
+
+    const patched = fastPatch(list, laid, edit(laid, 'section', (c) => ({ ...c, hidden: true })), estimatedText, LOOK);
+
+    expect(patched).not.toBeNull();
+    expect(vi.mocked(resolve.relaidWithin)).not.toHaveBeenCalled();
+  });
 });

@@ -8,7 +8,7 @@ import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-l
 import { moveBy } from '$lib/motion/space';
 import { EditMode } from '$lib/motion/edit-mode';
 import { estimatedText } from '@feega/motion-core/motion/layout/text-extent';
-import { editedClipId, fastPatch, laidIncrementally, relinked, reloaded } from './fast-patch';
+import { editedClipId, editKindOf, fastPatch, laidIncrementally, relinked, reloaded } from './fast-patch';
 
 const SHAPE = { shape: 'rect', x: 0.5, y: 0.5, width: 0.3, height: 0.3, fills: [{ type: 'solid', color: '#ff6a3d' }] };
 
@@ -295,5 +295,15 @@ describe('laidIncrementally on a big frame', () => {
     const calls = some.mock.calls.length;
     some.mockRestore();
     expect(calls).toBeLessThan(MANY);
+  });
+});
+
+describe('editKindOf', () => {
+  it('names the kind of an edit, so a slow hide and a fast show of one layer keep separate budgets', () => {
+    const before = built(['a', 'b']);
+    const gone = edit(before, 'b', hidden);
+
+    expect(editKindOf(before, gone)).not.toEqual(editKindOf(gone, before));
+    expect(editKindOf(before, edit(edit(before, 'a', hidden), 'b', hidden))).toBe('many');
   });
 });

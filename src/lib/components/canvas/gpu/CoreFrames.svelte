@@ -57,7 +57,7 @@
   import { StartupStep, markStartup, reportFramesShown } from '$lib/canvas/core/startup-marks';
   import LoadTimeline from './LoadTimeline.svelte';
   import { editedLayers } from '$lib/canvas/core/edited-layers';
-  import { editedClipId, fastPatch, readyPatch, reloaded, relinked } from '$lib/canvas/core/fast-patch';
+  import { editKindOf, editedClipId, fastPatch, readyPatch, reloaded, relinked } from '$lib/canvas/core/fast-patch';
   import { PatchBudget } from '$lib/canvas/core/patch-budget';
   import { traceSince, traceSinceInput } from '$lib/canvas/core/edit-trace';
   import { shapedText } from '@feega/motion-core/motion/gpu-full/text/measure';
@@ -674,7 +674,7 @@
     traceSinceInput('edit:to-patch');
     const shown = liveShown.get(f.id);
     const measure = liveMeasures.get(f.id);
-    const budgetKey = shown ? `${f.id}|${editedClipId(shown.doc, source.doc) ?? ''}` : f.id;
+    const budgetKey = shown ? `${f.id}|${editedClipId(shown.doc, source.doc) ?? ''}|${editKindOf(shown.doc, source.doc)}` : f.id;
     const look = patchBudget.redraws(budgetKey) ? { tokens: source.tokens, assets: source.assets, frame: frameOfLive(source), typeset: liveTypesets.get(f.id) } : undefined;
     const began = performance.now();
     const after = shown && !viewOf(f.id) && reloaded(shown.doc, source.doc) ? relinked(shown.doc, source.doc) : source.doc;

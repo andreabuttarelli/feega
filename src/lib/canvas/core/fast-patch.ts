@@ -293,6 +293,13 @@ export function relinked(before: MotionDoc, after: MotionDoc): MotionDoc {
   return fields as unknown as MotionDoc;
 }
 
+const MANY_CLIPS = 'many';
+
+export function editKindOf(before: MotionDoc, after: MotionDoc): string {
+  const pair = onlyClip(before, after);
+  return (pair && EDIT_OF.find(([, is]) => is(pair[0], pair[1]))?.[0]) ?? MANY_CLIPS;
+}
+
 export const editedClipId = (before: MotionDoc, after: MotionDoc): string | null => onlyClip(before, after)?.[1].id ?? null;
 
 function rebled(list: DisplayList, before: MotionDoc, after: MotionDoc): DisplayList | null {
@@ -475,9 +482,14 @@ function inserted(items: Item[], order: string[], clip: string, fresh: Item[]): 
   return placedAt(items, last.run.path, end, fresh);
 }
 
+const declined = (reason: string): null => {
+  traceSince(`patch:decline:${reason}`, performance.now());
+  return null;
+};
+
 function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, edited: MotionClip, measure: TextMeasure, look: Look | undefined): DisplayList | null {
   if (!look) {
-    return null;
+    return declined('no-look');
   }
   const was = timed('patch:layout:before', () => exactLaid(before, measure));
   const relaid = laidIncrementally(before, after, measure);
@@ -488,12 +500,12 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
   }));
   const cutting = new Set([...slides.keys()].filter((id) => !!relaid.get(id)?.clipContent || !!relaid.get(id)?.mask));
   const redraw = [...below(after, new Set([edited.id, ...cutting])), ...[...moved].filter((id) => !slides.has(id) && id !== edited.id)].filter((id, i, all) => all.indexOf(id) === i);
-  if (redraw.length > REDRAW_MOST) {
-    return null;
+  if (redraw.filter((id) => relaid.has(id)).length > REDRAW_MOST) {
+    return declined('too-many');
   }
   const paired = new Set(mattePairs(after).flatMap((p) => [p.source, p.target]));
   if (redraw.some((id) => paired.has(id))) {
-    return null;
+    return declined('paired');
   }
   const now = (c: MotionClip) => settled(relaid.get(c.id) ?? was.get(c.id) ?? c);
   const kept = new Set([...redraw, ...redraw.flatMap((id) => ancestorsOf(after, id)), ...(after.surface ? [after.surface] : [])]);
@@ -514,14 +526,14 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
     }
     items = old.length ? spliced(items!, id, own) : inserted(items!, order, id, own);
     if (!items) {
-      return null;
+      return declined('splice');
     }
   }
   for (const [id, by] of slides) {
     const old = ownItems(items!, id);
     items = redrawSet.has(id) || !old.length ? items : spliced(items!, id, old.map((i) => slidItem(i, by)));
     if (!items) {
-      return null;
+      return declined('slide');
     }
   }
   const left = new Set(clipsOf(shown).map((c) => c.id));
@@ -530,7 +542,7 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
   const host = (g: DisplayList['unsupported'][number]) => instanceHost(g.clip) ?? g.clip;
   const steady = (g: DisplayList['unsupported'][number]) => redrawn.has(host(g)) && !back.has(host(g)) && !gone.has(host(g));
   if (JSON.stringify(list.unsupported.filter(steady)) !== JSON.stringify(drawnMini.unsupported.filter(steady))) {
-    return null;
+    return declined('gaps');
   }
   const unsupported = drawnMini.unsupported.filter((g) => back.has(host(g))).reduce((all, g) => {
     const at = all.findIndex((k) => rank(k.clip) > rank(g.clip));
