@@ -937,11 +937,12 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
   };
 
   const vectorOf = (svg: SVGSVGElement, r: Rect, ctx: Ctx, name: string): RestNode | null => {
-    const children = svgWalk(svg, r, svg, ctx, null);
+    const onPage = box(r);
+    const children = svgWalk(svg, onPage, svg, ctx, null);
     if (!children.length) {
       return null;
     }
-    return { id: id(), type: 'GROUP', name, absoluteBoundingBox: box(r), children };
+    return { id: id(), type: 'GROUP', name, absoluteBoundingBox: onPage, children };
   };
 
   const imageOf = (el: HTMLImageElement, css: CSSStyleDeclaration, r: Rect, ctx: Ctx): RestNode | null => {
