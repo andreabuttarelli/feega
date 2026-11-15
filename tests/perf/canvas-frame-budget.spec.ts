@@ -35,7 +35,12 @@ enum Target {
 type Place = { projectId: string; canvasId: string };
 type Box = { x: number; y: number; w: number; h: number };
 
-const HEAVY_PLACE: Place = { projectId: '9af789a4-da22-4231-bf6c-68bcb10b0377', canvasId: 'bf55d313-9155-4de3-a5ef-c3c0259e98e2' };
+const probedPlace = (pair: string | undefined): Place | null => {
+  const [projectId, canvasId] = pair?.split(':') ?? [];
+  return projectId && canvasId ? { projectId, canvasId } : null;
+};
+
+const HEAVY_PLACE: Place = probedPlace(process.env.PROBE_PLACE) ?? { projectId: '9af789a4-da22-4231-bf6c-68bcb10b0377', canvasId: 'bf55d313-9155-4de3-a5ef-c3c0259e98e2' };
 const MS_PER_S = 1000;
 const RUNS = Number(process.env.BUDGET_RUNS ?? 3);
 const OUT = process.env.BUDGET_OUT ?? 'perf-results';
