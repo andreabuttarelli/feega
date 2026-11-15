@@ -31,6 +31,17 @@ describe('PatchBudget', () => {
     expect(budget.redraws('f1|b')).toBe(true);
   });
 
+  it('turns redraws off for a layer whose slow patches alternate with fast ones, as hide and show do', () => {
+    const budget = new PatchBudget();
+
+    Array.from({ length: SLOW_STRIKES }, () => {
+      budget.took('f1|a', SLOW);
+      budget.took('f1|a', 1);
+    });
+
+    expect(budget.redraws('f1|a')).toBe(false);
+  });
+
   it('gives a dropped layer another try after a few edits on the worker', () => {
     const budget = new PatchBudget();
     slowTimes(budget, 'f1|a', SLOW_STRIKES);
