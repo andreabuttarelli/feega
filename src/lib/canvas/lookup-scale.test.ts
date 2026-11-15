@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newClip, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { Ease } from '@feega/motion-core/motion/design';
 import { removeClips, snapTargets } from '@feega/motion-core/motion/timeline';
 import { edgeHandles, graphLanes } from '$lib/motion/timeline-view';
 import { Place, dropLayers } from './layers';
@@ -48,7 +49,7 @@ describe('lookups index their ids once', () => {
 
   it('choosing graph lanes by selection scans no id list per lane', () => {
     const base = newMotionDoc(MotionFormat.Landscape);
-    const clips = Array.from({ length: SIZE }, (_, i) => newClip({ id: `c${i}`, from: 0, durationInFrames: 30, component: 'Shape', props: {}, keyframes: { x: [{ frame: 0, value: 0, ease: 'linear' }] } }));
+    const clips = Array.from({ length: SIZE }, (_, i) => newClip({ id: `c${i}`, from: 0, durationInFrames: 30, component: 'Shape', props: {}, keyframes: { x: [{ frame: 0, value: 0, ease: Ease.Linear }] } }));
     const doc = { ...base, tracks: [{ ...base.tracks[0], clips }] };
     const selection = counted(Array.from({ length: PICKED }, (_, i) => `c${i}`));
 
