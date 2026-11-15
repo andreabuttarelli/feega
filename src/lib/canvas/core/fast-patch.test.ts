@@ -402,4 +402,14 @@ describe('editing inside a component', () => {
     expect(patched).not.toBeNull();
     expect(rounded(patched)).toEqual(rounded(drawn(after)));
   });
+
+  it('a nudged frame carries the component instance inside it as the full build does', () => {
+    const framed = edit(withComponent(), 'host', (c) => ({ ...c, parent: 'a' }));
+    const after = edit(framed, 'a', (c) => ({ ...c, transform: { ...c.transform, x: 0.1, y: -0.05 } }));
+
+    const patched = fastPatch(drawn(framed), framed, after, estimatedText);
+
+    expect(patched).not.toBeNull();
+    expect(rounded(patched)).toEqual(rounded(drawn(after)));
+  });
 });
