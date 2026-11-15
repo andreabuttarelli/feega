@@ -15,7 +15,6 @@ export class PatchBudget {
 
   took(key: string, ms: number) {
     if (ms <= Math.max(PATCH_BUDGET_MS, this.#builds.get(frameOf(key)) ?? 0)) {
-      this.#strikes.delete(key);
       return;
     }
     this.#strikes.set(key, (this.#strikes.get(key) ?? 0) + 1);
