@@ -30,3 +30,23 @@ describe('PatchBudget', () => {
     expect(budget.redraws('f10|a')).toBe(false);
   });
 });
+
+describe('PatchBudget against the worker', () => {
+  it('keeps a patch slower than the default budget when the frame worker build is slower still', () => {
+    const budget = new PatchBudget();
+    budget.built('f1', 4 * PATCH_BUDGET_MS);
+
+    budget.took('f1|a', 2 * PATCH_BUDGET_MS);
+
+    expect(budget.redraws('f1|a')).toBe(true);
+  });
+
+  it('drops a patch slower than the frame worker build', () => {
+    const budget = new PatchBudget();
+    budget.built('f1', 4 * PATCH_BUDGET_MS);
+
+    budget.took('f1|a', 5 * PATCH_BUDGET_MS);
+
+    expect(budget.redraws('f1|a')).toBe(false);
+  });
+});

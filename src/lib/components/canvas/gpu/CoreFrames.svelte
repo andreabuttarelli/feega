@@ -608,7 +608,9 @@
     const generation = liveGeneration.ask(f.id);
     const key = `${f.id}:live${generation}`;
     markFrame(key, Step.LiveAsked);
+    const asked = performance.now();
     const list = await liveOff(f, { revision: f.revision, ...source }).catch((e: unknown) => (console.warn('[canvas] core live frame failed', f.id, e), null));
+    patchBudget.built(f.id, performance.now() - asked);
     const built = list ? { list } : null;
     if (!built || !liveGeneration.newer(f.id, generation)) {
       return;
