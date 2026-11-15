@@ -9,7 +9,9 @@ import { drawFrame, prepare, type DisplayList } from '@feega/motion-core/motion/
 import { moveBy } from '$lib/motion/space';
 import { EditMode } from '$lib/motion/edit-mode';
 import { estimatedText } from '@feega/motion-core/motion/layout/text-extent';
-import { fastPatch } from './fast-patch';
+import { fastPatch, laidIncrementally } from './fast-patch';
+import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+import { withoutHidden } from '@feega/motion-core/motion/organize';
 
 const FIXTURE = process.env.LANDINGS_FEEGA ?? join(homedir(), 'Documents/feega-videos/perf/landings/landings.feega');
 const MOVES: [number, number][] = [[12, -7], [1, 0], [0, -10]];
@@ -41,6 +43,19 @@ function alike(a: unknown, b: unknown): boolean {
 type Tally = { tried: number; patched: number; mismatched: string[] };
 
 const drawn = (doc: MotionDoc): DisplayList => drawFrame(prepare(doc, FEEGA_TOKENS), 0);
+
+const LAYOUT_EPSILON = 1e-5;
+
+function sameWithin(a: unknown, b: unknown, epsilon: number): boolean {
+  if (typeof a === 'number' && typeof b === 'number') {
+    return Math.abs(a - b) <= epsilon;
+  }
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+    return [...keys].every((k) => sameWithin((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k], epsilon));
+  }
+  return a === b;
+}
 
 const LOOK = { tokens: FEEGA_TOKENS, assets: {}, frame: 0 };
 const SAMPLE_EVERY = 7;
@@ -84,6 +99,8 @@ describe.skipIf(!existsSync(FIXTURE))('fastPatch on every clip of the landings f
   it('redraws resized and hidden layers inside auto layout exactly as the full build, for most of them', () => {
     const resize: Tally = { tried: 0, patched: 0, mismatched: [] };
     const hide: Tally = { tried: 0, patched: 0, mismatched: [] };
+    const show: Tally = { tried: 0, patched: 0, mismatched: [] };
+    const colour: Tally = { tried: 0, patched: 0, mismatched: [] };
     for (const doc of docs()) {
       const list = drawn(doc);
       const sampled = clipsOf(doc).filter((c, i) => !c.hidden && c.parent && i % SAMPLE_EVERY === 0);
@@ -92,12 +109,47 @@ describe.skipIf(!existsSync(FIXTURE))('fastPatch on every clip of the landings f
         if (Number.isFinite(width) && width > 0) {
           check(resize, `resize ${clip.id}`, list, doc, withClip(doc, clip.id, (c) => ({ ...c, props: { ...c.props, width: width * 0.9 } })), LOOK);
         }
-        check(hide, `hide ${clip.id}`, list, doc, withClip(doc, clip.id, (c) => ({ ...c, hidden: true })), LOOK);
+        const gone = withClip(doc, clip.id, (c) => ({ ...c, hidden: true }));
+        check(hide, `hide ${clip.id}`, list, doc, gone, LOOK);
+        check(show, `show ${clip.id}`, drawn(gone), gone, doc, LOOK);
+        const fills = clip.props.fills as { visible?: boolean }[] | undefined;
+        if (fills?.length) {
+          check(colour, `colour ${clip.id}`, list, doc, withClip(doc, clip.id, (c) => ({ ...c, props: { ...c.props, fills: fills.map((f, i) => (i === 0 ? { ...f, visible: f.visible === false } : f)) } })), LOOK);
+        }
       }
     }
-    console.log(JSON.stringify({ resize: { ...resize, mismatched: resize.mismatched.slice(0, 5) }, hide: { ...hide, mismatched: hide.mismatched.slice(0, 5) } }));
-    expect([...resize.mismatched, ...hide.mismatched].slice(0, 20)).toEqual([]);
+    console.log(JSON.stringify({ resize: { ...resize, mismatched: resize.mismatched.slice(0, 5) }, hide: { ...hide, mismatched: hide.mismatched.slice(0, 5) }, show: { ...show, mismatched: show.mismatched.slice(0, 5) }, colour: { ...colour, mismatched: colour.mismatched.slice(0, 5) } }));
+    expect([...resize.mismatched, ...hide.mismatched, ...show.mismatched, ...colour.mismatched].slice(0, 20)).toEqual([]);
+    expect(colour.patched / colour.tried).toBeGreaterThan(MOST_PATCHED);
+    expect(show.patched / show.tried).toBeGreaterThan(MOST_PATCHED);
     expect(resize.patched / resize.tried).toBeGreaterThan(MOST_PATCHED);
     expect(hide.patched / hide.tried).toBeGreaterThan(MOST_PATCHED);
+  }, 3_600_000);
+
+  it('lays out every edit incrementally exactly as the whole doc layout does', () => {
+    const mismatched: string[] = [];
+    let tried = 0;
+    for (const doc of docs()) {
+      const edits = clipsOf(doc).filter((c, i) => !c.hidden && i % SAMPLE_EVERY === 0).flatMap((clip) => {
+        const width = Number(clip.props.width);
+        const gone = withClip(doc, clip.id, (c) => ({ ...c, hidden: true }));
+        return [
+          [`hide ${clip.id}`, doc, gone],
+          [`show ${clip.id}`, gone, doc],
+          ...(Number.isFinite(width) && width > 0 ? [[`resize ${clip.id}`, doc, withClip(doc, clip.id, (c) => ({ ...c, props: { ...c.props, width: width * 0.9 } }))]] : [])
+        ] as [string, MotionDoc, MotionDoc][];
+      });
+      for (const [label, before, after] of edits) {
+        tried++;
+        const whole = new Map(clipsOf(withAutoLayout(withoutHidden(after), estimatedText)).map((c) => [c.id, c]));
+        const laid = laidIncrementally(before, after, estimatedText);
+        const same = laid.size === whole.size && [...whole].every(([id, c]) => sameWithin(laid.get(id), c, LAYOUT_EPSILON));
+        if (!same) {
+          mismatched.push(label);
+        }
+      }
+    }
+    console.log(JSON.stringify({ tried, mismatched: mismatched.length, first: mismatched.slice(0, 5) }));
+    expect(mismatched).toEqual([]);
   }, 3_600_000);
 });

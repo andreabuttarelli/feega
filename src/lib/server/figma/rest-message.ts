@@ -74,6 +74,7 @@ export type RestNode = {
   strokeGeometry?: { path: string; windingRule?: string }[];
   characters?: string;
   textAutoResize?: string;
+  maxLines?: number;
   style?: RestStyle;
   characterStyleOverrides?: number[];
   styleOverrideTable?: Record<string, RestStyle>;
@@ -234,6 +235,7 @@ function textOf(n: RestNode): Partial<FigmaRawNode> {
     letterSpacing: style?.letterSpacing ? { value: style.letterSpacing, units: 'PIXELS' } : undefined,
     textAlignHorizontal: style?.textAlignHorizontal,
     textAutoResize: n.textAutoResize,
+    maxLines: n.maxLines,
     textDecoration: style?.textDecoration,
     fontAxes: style?.fontAxes,
     fontFeatures: style?.fontFeatures,

@@ -246,16 +246,28 @@ function heldAt(laid: MotionClip): MotionClip {
   return { ...laid, layoutItem: { ...own, ...held } };
 }
 
-export function relaidWithin(doc: MotionDoc, laidContainer: MotionClip, measure: TextMeasure = estimatedText): MotionClip[] {
+export function relaidBelow(doc: MotionDoc, laidContainer: MotionClip, measure: TextMeasure = estimatedText): MotionClip[] {
+  const size = { width: doc.width, height: doc.height };
+  const content = instanceContent({ ...doc, comps: cachedComps(doc, size, measure) }, size, measure);
+  const container = heldAt(laidContainer);
+  const clips = visualClips(doc.tracks).map((c) => (c.id === container.id ? container : c));
+  const kids = kidsIndex(clips);
+  const below = (id: string): MotionClip[] => kids(id).flatMap((c) => [c, ...below(c.id)]);
+  const within = [container, ...below(container.id)];
+  const place = placer(within, boxesOf(within, size, content, measure), size, measure, content);
+  return within.map((c) => (c === container ? { ...place(c), layoutItem: laidContainer.layoutItem } : place(c)));
+}
+
+export function relaidWithin(doc: MotionDoc, laidContainer: MotionClip, measure: TextMeasure = estimatedText, content: Content = NO_CONTENT): MotionClip[] {
   const size = { width: doc.width, height: doc.height };
   const container = heldAt(laidContainer);
   const clips = visualClips(doc.tracks).map((c) => (c.id === container.id ? container : c));
   const kids = kidsIndex(clips);
   const { left, top } = pivotBox(container.props, size);
-  const boxes = layoutTree(itemOf(container, kids, size, NO_CONTENT, measure), { left, top });
+  const boxes = layoutTree(itemOf(container, kids, size, content, measure), { left, top });
   const below = (id: string): MotionClip[] => kids(id).flatMap((c) => [c, ...below(c.id)]);
   const within = [container, ...below(container.id)];
-  const place = placer(within, boxes, size, measure, NO_CONTENT);
+  const place = placer(within, boxes, size, measure, content);
   return within.map((c) => (c === container ? { ...place(c), layoutItem: laidContainer.layoutItem } : place(c)));
 }
 
@@ -268,14 +280,38 @@ export function withAutoLayout(doc: MotionDoc, measure: TextMeasure = estimatedT
   return byMeasure.get(measure) ?? byMeasure.set(measure, layAll(doc, measure)).get(measure)!;
 }
 
+const laysOut = (doc: MotionDoc) => [doc.tracks, ...Object.values(doc.comps).map((c) => c.tracks)].some((tracks) => visualClips(tracks).some(isContainer));
+
 function layAll(doc: MotionDoc, measure: TextMeasure): MotionDoc {
-  const all = [doc.tracks, ...Object.values(doc.comps).map((c) => c.tracks)];
-  if (!all.some((tracks) => visualClips(tracks).some(isContainer))) {
+  if (!laysOut(doc)) {
     return doc;
   }
   const size = { width: doc.width, height: doc.height };
   const comps = laidComps(doc, size, measure);
   return { ...doc, tracks: laidOut(doc.tracks, size, measure, instanceContent({ ...doc, comps }, size, measure)), comps };
+}
+
+const laidCompsCache = new WeakMap<object, Map<TextMeasure, MotionDoc['comps']>>();
+
+function cachedComps(doc: MotionDoc, size: Size, measure: TextMeasure): MotionDoc['comps'] {
+  const byMeasure = laidCompsCache.get(doc.comps) ?? laidCompsCache.set(doc.comps, new Map()).get(doc.comps)!;
+  return byMeasure.get(measure) ?? byMeasure.set(measure, laidComps(doc, size, measure)).get(measure)!;
+}
+
+export function laidSubtree(doc: MotionDoc, rootId: string, measure: TextMeasure = estimatedText): MotionClip[] {
+  const size = { width: doc.width, height: doc.height };
+  const kids = kidsIndex(visualClips(doc.tracks));
+  const below = (id: string): string[] => kids(id).flatMap((c) => [c.id, ...below(c.id)]);
+  const ids = new Set([rootId, ...below(rootId)]);
+  const clips = visualClips(doc.tracks).filter((c) => ids.has(c.id));
+  if (!laysOut(doc)) {
+    return clips;
+  }
+  const content = instanceContent({ ...doc, comps: cachedComps(doc, size, measure) }, size, measure);
+  if (!visualClips(doc.tracks).some(isContainer)) {
+    return clips;
+  }
+  return clips.map(placer(clips, boxesOf(clips, size, content, measure), size, measure, content));
 }
 
 export function instanceBoxes(doc: MotionDoc, measure: TextMeasure = estimatedText): ReadonlyMap<string, Box> {

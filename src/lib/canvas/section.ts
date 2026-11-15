@@ -23,7 +23,8 @@ export function sectionBoxAround(boxes: readonly Box[]): Box {
 export const membersOf = (nodes: readonly Holder[], sectionId: string): string[] => nodes.filter((n) => layoutOf(n.data).groupId === sectionId).map((n) => n.id);
 
 export function withMembers(nodes: readonly Holder[], ids: readonly string[]): string[] {
-  const sections = new Set(nodes.filter((n) => ids.includes(n.id) && n.type === SECTION_TYPE).map((n) => n.id));
+  const wanted = new Set(ids);
+  const sections = new Set(nodes.filter((n) => wanted.has(n.id) && n.type === SECTION_TYPE).map((n) => n.id));
   const held = nodes.filter((n) => sections.has(layoutOf(n.data).groupId ?? '')).map((n) => n.id);
   return [...new Set([...ids, ...held])];
 }
@@ -40,10 +41,11 @@ const centreIn = (n: { x: number; y: number; w: number; h: number }, s: { x: num
 
 export function membershipAfter(nodes: readonly Placed[], moves: readonly Dropped[]): Membership[] {
   const dropped = new Map(moves.map((m) => [m.id, m]));
+  const byId = new Map(nodes.map((n) => [n.id, n]));
   const sections = nodes.filter((n) => n.type === SECTION_TYPE).map((n) => ({ ...n, ...(dropped.get(n.id) ?? {}) }));
 
   return moves.flatMap((m) => {
-    const node = nodes.find((n) => n.id === m.id);
+    const node = byId.get(m.id);
     if (!node || node.type === SECTION_TYPE) {
       return [];
     }

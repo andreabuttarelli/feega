@@ -447,6 +447,8 @@ function camera(page: Page): { shoot: Shoot; done: () => Promise<void> } {
   return { shoot, done };
 }
 
+const OFF_PAGE = { x: -1, y: -1 };
+
 function tabOf(page: Page, close: () => Promise<number>, left: () => number): AppTab {
   const quiet = quietOf(page);
   return {
@@ -459,7 +461,10 @@ function tabOf(page: Page, close: () => Promise<number>, left: () => number): Ap
     url: () => page.url(),
     html: () => page.content(),
     look: () => page.evaluate(lookOf),
-    click: (target) => page.locator(locator(target)).click(),
+    click: async (target) => {
+      await page.locator(locator(target)).click();
+      await page.mouse.move(OFF_PAGE.x, OFF_PAGE.y);
+    },
     type: (selector, text) => page.locator(selector).fill(text),
     scroll: (to) => page.evaluate((s) => window.scrollTo(0, s.to === 'bottom' ? document.body.scrollHeight : s.to === 'top' ? 0 : window.scrollY + (s.px ?? 0)), to),
     waitFor: async (selector, ms) => {

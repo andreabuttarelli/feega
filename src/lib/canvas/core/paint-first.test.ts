@@ -38,3 +38,21 @@ describe('paint first', () => {
     expect(ran).toEqual(['a:1', 'b:2']);
   });
 });
+
+describe('paint first, once the edits go quiet', () => {
+  it('a burst of patched edits starts one rebuild, after the last edit has been quiet and painted', () => {
+    const p = painter();
+    const quiet = painter();
+    const ran: string[] = [];
+    const rebuild = paintFirst(p.later, (id: string, doc: string) => ran.push(`${id}:${doc}`), quiet.later);
+
+    rebuild.afterQuiet('frame', 'first');
+    rebuild.afterQuiet('frame', 'second');
+    p.paint();
+    expect(ran).toEqual([]);
+
+    quiet.paint();
+    p.paint();
+    expect(ran).toEqual(['frame:second']);
+  });
+});

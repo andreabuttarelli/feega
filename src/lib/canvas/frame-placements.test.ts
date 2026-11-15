@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { TransitionKind } from '@feega/motion-core/motion/design';
@@ -234,5 +234,20 @@ describe('an element with no area', () => {
 
     expect(pickAt(doc, [x + 200, y + 100])).toBe('under');
     expect(at(doc).stackAt([x + 200, y + 100])).toEqual(['under']);
+  });
+});
+
+describe('placing every clip of a frame', () => {
+  it('finds each clip by id without walking the tracks once per clip', () => {
+    const ids = Array.from({ length: 40 }, (_, i) => `c${i}`);
+    const doc = ids.reduce((d, id, i) => shape(d, id, 0.1 + i * 0.01, 0.5, 0.05), empty);
+    const placements = at(doc);
+    const flatMap = vi.spyOn(Array.prototype, 'flatMap');
+
+    ids.forEach((id) => placements.rectOf(id));
+
+    const overTracks = (flatMap.mock.contexts as unknown[]).filter((on) => Array.isArray(on) && on.length > 0 && on.every((t) => t && typeof t === 'object' && 'clips' in t)).length;
+    flatMap.mockRestore();
+    expect(overTracks).toBeLessThan(ids.length);
   });
 });

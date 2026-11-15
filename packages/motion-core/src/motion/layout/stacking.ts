@@ -6,7 +6,9 @@ const clipsOf = (tracks: readonly MotionTrack[]): MotionClip[] => tracks.flatMap
 const isStacked = (clip: MotionClip): clip is MotionClip & { autoLayout: NonNullable<MotionClip['autoLayout']> } => Boolean(clip.autoLayout?.firstOnTop);
 
 function trackOfEach(tracks: readonly MotionTrack[], kids: readonly MotionClip[]): number[] | null {
-  const at = kids.map((k) => tracks.findIndex((t) => t.clips.some((c) => c.id === k.id)));
+  const trackOf = new Map<string, number>();
+  tracks.forEach((t, i) => t.clips.forEach((c) => trackOf.set(c.id, trackOf.get(c.id) ?? i)));
+  const at = kids.map((k) => trackOf.get(k.id) ?? -1);
   const alone = at.every((i) => i >= 0 && tracks[i].clips.length === 1) && new Set(at).size === at.length;
   return alone ? at : null;
 }

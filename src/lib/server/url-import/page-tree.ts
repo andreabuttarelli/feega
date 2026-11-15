@@ -66,6 +66,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     ['button', 'button, [role=button], input[type=submit], input[type=button]'],
     ['link', 'a[href], [role=link]']
   ];
+  const BULLETS: Record<string, string> = { disc: '•', circle: '◦', square: '▪' };
   const PRESSABLE = PRESSES.map(([, selector]) => selector).join(', ');
 
   const width = document.documentElement.clientWidth;
@@ -372,12 +373,32 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     return names.find((n) => loadedFamilies.has(n.toLowerCase()) || declaredFamilies.has(n.toLowerCase())) ?? names.join(', ');
   };
 
+  const SMALLEST_OPTICAL = 0;
+  const OPTICAL_PROBE = { text: 'Hamburgefonstiv', size: 64, small: 8, large: 144 };
+  const opticalAxes = new Map<string, boolean>();
+  const hasOpticalAxis = (css: CSSStyleDeclaration) => {
+    const key = `${css.fontFamily}|${css.fontWeight}|${css.fontStyle}`;
+    if (!opticalAxes.has(key) && document.body) {
+      const probe = document.createElement('span');
+      probe.textContent = OPTICAL_PROBE.text;
+      probe.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;font-family:${css.fontFamily};font-weight:${css.fontWeight};font-style:${css.fontStyle};font-size:${OPTICAL_PROBE.size}px`;
+      document.body.appendChild(probe);
+      const widthAt = (opsz: number) => {
+        probe.style.fontVariationSettings = `'opsz' ${opsz}`;
+        return probe.getBoundingClientRect().width;
+      };
+      opticalAxes.set(key, widthAt(OPTICAL_PROBE.small) !== widthAt(OPTICAL_PROBE.large));
+      probe.remove();
+    }
+    return opticalAxes.get(key) ?? true;
+  };
+
   const quadOf = (raw: string) => [...raw.matchAll(/["']([A-Za-z0-9]{4})["']\s*(-?[\d.]+|on|off)?/g)];
   const tuning = (css: CSSStyleDeclaration, size: number) => {
     const axes = quadOf(css.fontVariationSettings === 'normal' ? '' : css.fontVariationSettings)
       .filter(([, tag]) => tag !== 'wght')
       .map(([, tag, v]) => `'${tag}' ${Number(v ?? 0)}`);
-    const optical = css.fontOpticalSizing !== 'none' && !axes.some((a) => a.startsWith("'opsz'")) ? [`'opsz' ${round(size)}`] : [];
+    const optical = css.fontOpticalSizing !== 'none' && !axes.some((a) => a.startsWith("'opsz'")) ? [`'opsz' ${hasOpticalAxis(css) ? round(size) : SMALLEST_OPTICAL}`] : [];
     const features = quadOf(css.fontFeatureSettings === 'normal' ? '' : css.fontFeatureSettings).map(([, tag, v]) => `'${tag}' ${v === undefined || v === 'on' ? 1 : v === 'off' ? 0 : Number(v) ? 1 : 0}`);
     return { ...(axes.length || optical.length ? { fontAxes: [...axes, ...optical].join(', ') } : {}), ...(features.length ? { fontFeatures: features.join(', ') } : {}) };
   };
@@ -587,6 +608,16 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     return path;
   };
 
+  const hidesX = (css: CSSStyleDeclaration) => /hidden|clip|auto|scroll/.test(css.overflowX);
+  const cutLinesOf = (block: CSSStyleDeclaration) => {
+    const clamp = parseInt(block.webkitLineClamp, 10);
+    if (clamp > 0) {
+      return clamp;
+    }
+    return block.textOverflow === 'ellipsis' && /nowrap|pre$/.test(block.whiteSpace) && hidesX(block) ? 1 : 0;
+  };
+  const withinClip = (b: Rect, clip: Rect) => ({ ...b, width: round(Math.min(b.width, clip.x + clip.width - b.x)) });
+
   const runNodes = (segs: Seg[], ctx: Ctx, block: CSSStyleDeclaration, key: string): RestNode[] => {
     const chars = charsOf(segs);
     if (!chars.some((c) => c.c.trim())) {
@@ -607,8 +638,14 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
       return [];
     }
     const align = TEXT_ALIGN[block.textAlign] ?? 'LEFT';
+    const cut = cutLinesOf(block);
+    if (cut) {
+      const made = textNode(chars, segs, kept.slice(0, cut), ctx, align, block);
+      return made ? [{ ...made, key, maxLines: cut, absoluteBoundingBox: withinClip(made.absoluteBoundingBox!, ctx.clip) }] : [];
+    }
     const edge = (l: KitRect) => (align === 'CENTER' ? (l.left + l.right) / 2 : align === 'RIGHT' ? l.right : l.left);
-    const clean = kept.length === lines.length && (lines.length === 1 || lines.every((l) => Math.abs(edge(l) - edge(lines[0])) <= LINE_SLACK || (align === 'JUSTIFIED' && Math.abs(l.left - lines[0].left) <= LINE_SLACK)));
+    const leadRoom = LINE_SLACK + Math.max(0, ...segs.map((seg) => seg.lead ?? 0));
+    const clean = kept.length === lines.length && (lines.length === 1 || lines.every((l) => Math.abs(edge(l) - edge(lines[0])) <= leadRoom || (align === 'JUSTIFIED' && Math.abs(l.left - lines[0].left) <= LINE_SLACK)));
     if (clean) {
       const made = textNode(chars, segs, lines, ctx, align, block);
       return made ? [{ ...made, key }] : [];
@@ -900,11 +937,12 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
   };
 
   const vectorOf = (svg: SVGSVGElement, r: Rect, ctx: Ctx, name: string): RestNode | null => {
-    const children = svgWalk(svg, r, svg, ctx, null);
+    const onPage = box(r);
+    const children = svgWalk(svg, onPage, svg, ctx, null);
     if (!children.length) {
       return null;
     }
-    return { id: id(), type: 'GROUP', name, absoluteBoundingBox: box(r), children };
+    return { id: id(), type: 'GROUP', name, absoluteBoundingBox: onPage, children };
   };
 
   const imageOf = (el: HTMLImageElement, css: CSSStyleDeclaration, r: Rect, ctx: Ctx): RestNode | null => {
@@ -1359,7 +1397,14 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     });
     const opacity = Number(css.opacity);
     const masking = Boolean(maskOf(css));
-    const framed = paintedSelf || overflows || /flex/.test(css.display) || opacity < 1 || masking;
+    const corners = clipsSelf ? cornersOf(css, r) : {};
+    const rounded = Object.keys(corners).length > 0 && kids.length > 0;
+    const soleKid = rounded && kids.length === 1 && kids[0].type === 'RECTANGLE' && sameBox(kids[0], r) && !kids[0].cornerRadius && !kids[0].rectangleCornerRadii;
+    if (soleKid) {
+      kids[0] = { ...kids[0], ...corners };
+    }
+    const roundsKids = rounded && !soleKid;
+    const framed = paintedSelf || overflows || roundsKids || /flex/.test(css.display) || opacity < 1 || masking;
     const kidZ = kids.map((k) => zOf.get(k) ?? 0);
     const zEff = stacks(el, css) || clipsSelf ? z : Math.max(z, ...kidZ);
     if (!framed) {
@@ -1399,7 +1444,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
           ...strokedBy(borders),
           ...(effects ? { effects } : {}),
           ...cornersOf(css, r),
-          clipsContent: overflows || masking,
+          clipsContent: overflows || masking || roundsKids,
           ...(positioned ? { layoutPositioning: 'ABSOLUTE' } : {}),
           ...flow,
           children
@@ -1569,8 +1614,42 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
         made++;
       }
     }
+    made += listMarkers(scope);
     sheet.replaceSync([...new Set(rules)].join('\n'));
     document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+  }
+
+  function markerText(el: Element, type: string): string {
+    const bullet = BULLETS[type];
+    if (bullet) {
+      return bullet;
+    }
+    if (type !== 'decimal') {
+      return '';
+    }
+    const items = el.parentElement ? [...el.parentElement.children].filter((c) => getComputedStyle(c).display === 'list-item') : [el];
+    const start = Number(el.parentElement?.getAttribute('start') ?? 1) || 1;
+    return `${start + items.indexOf(el)}.`;
+  }
+
+  function listMarkers(scope: Element): number {
+    let made = 0;
+    for (const el of scope.querySelectorAll('li')) {
+      const css = getComputedStyle(el);
+      const text = css.display === 'list-item' && css.listStyleImage === 'none' && css.listStylePosition === 'outside' ? markerText(el, css.listStyleType) : '';
+      if (!text || el.querySelector(`:scope > [${limits.standAttr}][data-feega-marker]`)) {
+        continue;
+      }
+      const look = getComputedStyle(el, '::marker');
+      const stand = document.createElement('feega-pseudo');
+      stand.setAttribute(limits.standAttr, '');
+      stand.setAttribute('data-feega-marker', '');
+      stand.style.cssText = `position:absolute;transform:translateX(-100%);white-space:pre;font:${look.font};color:${look.color}`;
+      stand.textContent = `${text} `;
+      el.insertBefore(stand, el.firstChild);
+      made++;
+    }
+    return made;
   }
 
   async function svgImages() {

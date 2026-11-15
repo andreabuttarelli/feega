@@ -92,6 +92,10 @@ Signal: with the pointer still over a frame, a wheel zoom makes its hover outlin
 
 **Signal:** a Kie price in `ai_models` differs from the billed one, or a Kie model exists that the picker lacks. **Move:** do not edit a table. Prices: `POST api.kie.ai/client/v1/model-pricing/page` (no key, 100 rows max per page; a bigger page answers 422). Wires: the OpenAPI block in `docs.kie.ai/market/*.md`, listed by `docs.kie.ai/llms.txt`. A price line joins a model through `?model=` in its `anchor`, else the page slug; lines on a shared page (Seedream 5) cannot be joined.
 
+### "recursive use of an object detected" after one GPU error, then everything fails
+
+**Signal:** one wasm `RuntimeError` (or none logged), then every call on the core throws `recursive use of an object detected which would lead to unsafe aliasing in rust`. **Move:** it is rarely re-entry: `gpu-core` builds with `panic = "abort"`, so a panic inside a `&mut self` method traps before wasm-bindgen releases the borrow flag and the object stays borrowed forever. Look for the first trap, not for a callback. `overBytes` (`core-web.ts`) now marks the core lost and drops the module on either error; never call a raster after it throws.
+
 ## Motion editor
 
 ### A playing frame's picture trails the playhead by seconds
@@ -3973,3 +3977,11 @@ snapshot of the page looks clean). **Move:** a Chrome snapshot of the page does 
 workers; in WebKit they count in the same WebContent process. Terminate the worker in Playwright
 WebKit (`Worker.terminate()` from an init-script registry) and read `footprint` again: the frame
 worker held ~260 MB (its last parsed doc and prepared frame). Phones release idle frame workers.
+
+## Quadratic edit: a lookup by id inside a loop
+
+**Signal:** an edit or panel rebuild slows with document size (`laidIncrementally` cost ~28 ms per
+edit on 2,125 clips); the code has `find`/`findIndex`/`some`/`includes`/`filter` by id or parent
+inside a `map`/`filter`/`forEach` over clips, tracks, nodes or layers. **Move:** lookup by id
+inside a loop → build a `Map`/`Set` once outside it. Prove it with a test that counts scans or
+property reads on ~2,000 items (`src/lib/canvas/counted-list.testkit.ts`), not wall time.

@@ -1,5 +1,7 @@
 export const AUTO = 'auto';
 
+export const TYPE_SIZE = { min: 0.0001, max: 4 } as const;
+
 export type Leading = number | typeof AUTO;
 
 export const LINE_HEIGHT = /^(auto|\d+(\.\d+)?(px|%))?$/;

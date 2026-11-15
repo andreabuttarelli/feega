@@ -86,7 +86,8 @@ const named = (planned: DuplicatedNode, source: CopiedNode): DuplicatedNode => (
 
 export function copyPlan(input: { ids: string[]; nodes: CopiedNode[]; edges: DuplicateEdge[]; offset: { dx: number; dy: number }; copyIds?: CopyIds }): DuplicatePlan {
   const plan = planDuplicate(input);
-  const chosen = input.nodes.filter((n) => input.ids.includes(n.id));
+  const wanted = new Set(input.ids);
+  const chosen = input.nodes.filter((n) => wanted.has(n.id));
   return {
     ...plan,
     nodes: plan.nodes.map((planned) => {

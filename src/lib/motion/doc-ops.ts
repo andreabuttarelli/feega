@@ -39,7 +39,7 @@ const ID = 'id';
 type Bag = Record<string, unknown>;
 type Placed = { trackId: string; index: number; clip: MotionClip };
 
-const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+const same = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JSON.stringify(b);
 
 const keysOf = (...bags: (Bag | undefined)[]) => [...new Set(bags.flatMap((b) => Object.keys(b ?? {})))];
 
@@ -139,7 +139,7 @@ function clipOps(before: MotionDoc, after: MotionDoc): DocOp[] {
 
   const edited = [...now.values()].flatMap(({ clip }) => {
     const old = was.get(clip.id)?.clip;
-    if (!old) {
+    if (!old || old === clip) {
       return [];
     }
     const before = old as unknown as Bag;
