@@ -26,7 +26,7 @@ describe('optimistic registry scans each id list once, not once per row', () => 
     const edgeIds = counted(ids('e'));
     const op = optimisticOp(OptimisticAction.Remove, { nodeIds, edgeIds }, rows(), ctx, async () => ({}));
 
-    const undo = op.undo({}, rows());
+    const undo = op.undo({});
 
     expect(undo).toHaveLength(SIZE * 2);
     expect(nodeIds.scans() + edgeIds.scans()).toBe(0);
