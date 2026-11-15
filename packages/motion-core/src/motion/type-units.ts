@@ -1,6 +1,6 @@
 export const AUTO = 'auto';
 
-export const TYPE_SIZE = { min: 0.001, max: 4 } as const;
+export const TYPE_SIZE = { min: 0.0001, max: 4 } as const;
 
 export type Leading = number | typeof AUTO;
 

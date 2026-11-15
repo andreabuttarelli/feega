@@ -286,3 +286,17 @@ describe('a text the page cuts after two lines', () => {
     expect([clip.props.maxLines, clip.props.truncate]).toEqual([2, true]);
   });
 });
+
+describe('small text on a board as wide as fifteen pages', () => {
+  it('keeps its size, not raised to 16 px by the smallest size a text takes (traidue: every 14 px label came in at 16 px)', () => {
+    const width = 16000;
+    const text = { id: 't', type: 'TEXT', characters: 'SCIENZA', absoluteBoundingBox: { x: 100, y: 100, width: 64, height: 19 }, fills: [{ type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5, a: 1 } }], style: { fontFamily: 'Inter', fontSize: 14.3, fontWeight: 400 } };
+    const tree: PageTree = { title: 'wide', url: 'http://localhost/', width, height: 16000, truncated: false, root: { id: 'root', type: 'FRAME', name: 'wide', absoluteBoundingBox: { x: 0, y: 0, width, height: 16000 }, fills: [], children: [text] } };
+    const made = urlPlan(tree, newId, undefined, {}, PLAIN_SHAPE)!;
+    const doc = made.plan.items[0].doc;
+    const clip = clipsOf(made).find((c) => c.props.text === 'SCIENZA')!;
+    const cssPx = (Number(clip.props.size) * Math.min(doc.width, doc.height) * width) / doc.width;
+
+    expect(cssPx).toBeCloseTo(14.3, 1);
+  });
+});
