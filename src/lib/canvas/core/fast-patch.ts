@@ -494,16 +494,28 @@ export function laidIncrementally(before: MotionDoc, after: MotionDoc, measure: 
   const [old, now] = [clipsOf(before), clipsOf(after)];
   const oldById = new Map(old.map((c) => [c.id, c]));
   const touched = now.filter((c) => oldById.get(c.id) !== c).map((c) => c.id);
-  const gone = old.filter((c) => !now.some((n) => n.id === c.id)).map((c) => c.id);
+  const kept = new Set(now.map((c) => c.id));
+  const gone = old.filter((c) => !kept.has(c.id)).map((c) => c.id);
   const shown = withoutHidden(after);
   const left = new Set(clipsOf(shown).map((c) => c.id));
+  const started = performance.now();
   const near = gone.length ? null : laidNear(before, after, measure);
   const roots = new Set([...touched.map((id) => rootOf(after, id)), ...[...touched, ...gone].filter((id) => oldById.has(id)).map((id) => rootOf(before, id))]);
   const fresh = near ?? new Map([...roots].filter((id) => left.has(id)).flatMap((id) => laidSubtree(shown, id, measure).map((c) => [c.id, c] as const)));
   const next: Clips = new Map(clipsOf(shown).map((c) => [c.id, fresh.get(c.id) ?? was.get(c.id) ?? c]));
   byMeasure.set(measure, next);
+  performance.measure(near ? 'patch:layout:near' : 'patch:layout:root', { start: started, end: performance.now() });
   return next;
 }
+
+const timed = <T>(name: string, run: () => T): T => {
+  const start = performance.now();
+  try {
+    return run();
+  } finally {
+    performance.measure(name, { start, end: performance.now() });
+  }
+};
 
 const drawOrder = (doc: MotionDoc): string[] => [...doc.tracks].reverse().filter((t) => t.kind === TrackKind.Visual && !t.hidden).flatMap((t) => t.clips.map((c) => c.id));
 
@@ -548,7 +560,7 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
   if (!look) {
     return null;
   }
-  const was = exactLaid(before, measure);
+  const was = timed('patch:layout:before', () => exactLaid(before, measure));
   const relaid = laidIncrementally(before, after, measure);
   const moved = new Set([edited.id, ...[...relaid].filter(([id, c]) => !was.get(id) || !sameProps(was.get(id)!, c)).map(([id]) => id)]);
   const slides = new Map([...moved].flatMap((id) => {
@@ -570,7 +582,7 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
   const mini = { ...shown, tracks: shown.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => kept.has(c.id)).map(now) })) };
   const back = new Set(redraw.filter((id) => relaid.has(id) && !was.has(id)));
   const redrawSet = new Set(redraw);
-  const drawnMini = drawFrame(prepare(mini, look.tokens, look.assets, look.typeset), look.frame);
+  const drawnMini = timed('patch:draw', () => drawFrame(prepare(mini, look.tokens, look.assets, look.typeset), look.frame));
   const fresh = drawnMini.items;
   let items: Item[] | null = list.items;
   const order = drawOrder(shown);
