@@ -34,6 +34,8 @@ const EXERCISED = ROWS.filter((r) => !PICKED || PICKED.test(r.id));
 
 const slug = (id: string) => id.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
 
+const CORE_PANIC = '[gpu-core] panic';
+
 let page: Page;
 const thrown: string[] = [];
 
@@ -42,6 +44,11 @@ test.beforeAll(async ({ browser, baseURL, viewport }) => {
   mkdirSync(join(OUT, 'rows'), { recursive: true });
   page = await browser.newPage({ baseURL, viewport });
   page.on('pageerror', (e) => thrown.push(e.message));
+  page.on('console', (m) => {
+    if (m.text().startsWith(CORE_PANIC)) {
+      thrown.push(m.text());
+    }
+  });
   await openCanvas(page);
 });
 

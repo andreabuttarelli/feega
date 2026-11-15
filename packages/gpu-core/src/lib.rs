@@ -39,6 +39,8 @@ pub mod tiles;
 pub mod turbulence;
 pub mod uses;
 #[cfg(target_arch = "wasm32")]
+pub mod panic_log;
+#[cfg(target_arch = "wasm32")]
 pub mod web;
 #[cfg(all(target_arch = "wasm32", feature = "webgl"))]
 pub mod web_gl;
