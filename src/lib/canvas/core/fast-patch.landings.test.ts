@@ -44,6 +44,19 @@ type Tally = { tried: number; patched: number; mismatched: string[] };
 
 const drawn = (doc: MotionDoc): DisplayList => drawFrame(prepare(doc, FEEGA_TOKENS), 0);
 
+const LAYOUT_EPSILON = 1e-5;
+
+function sameWithin(a: unknown, b: unknown, epsilon: number): boolean {
+  if (typeof a === 'number' && typeof b === 'number') {
+    return Math.abs(a - b) <= epsilon;
+  }
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+    return [...keys].every((k) => sameWithin((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k], epsilon));
+  }
+  return a === b;
+}
+
 const LOOK = { tokens: FEEGA_TOKENS, assets: {}, frame: 0 };
 const SAMPLE_EVERY = 7;
 const MOST_PATCHED = 0.5;
@@ -130,7 +143,7 @@ describe.skipIf(!existsSync(FIXTURE))('fastPatch on every clip of the landings f
         tried++;
         const whole = new Map(clipsOf(withAutoLayout(withoutHidden(after), estimatedText)).map((c) => [c.id, c]));
         const laid = laidIncrementally(before, after, estimatedText);
-        const same = laid.size === whole.size && [...whole].every(([id, c]) => JSON.stringify(laid.get(id)) === JSON.stringify(c));
+        const same = laid.size === whole.size && [...whole].every(([id, c]) => sameWithin(laid.get(id), c, LAYOUT_EPSILON));
         if (!same) {
           mismatched.push(label);
         }

@@ -1,8 +1,9 @@
 import { ItemKind, type DisplayList, type GroupItem, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import { clipsOf, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { TrackKind } from '@feega/motion-core/motion/components';
+import { Sizing } from '@feega/motion-core/motion/layout/auto-layout';
 import { ParentOpacity, ancestorsOf } from '@feega/motion-core/motion/parent';
-import { laidSubtree, relaidWithin, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+import { laidSubtree, relaidBelow, relaidWithin, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import type { TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
 import { withoutHidden } from '@feega/motion-core/motion/organize';
 import { SEPARATOR } from '@feega/motion-core/motion/precomp';
@@ -383,7 +384,47 @@ function exactLaid(doc: MotionDoc, measure: TextMeasure): Clips {
 
 const REDRAW_MOST = 48;
 
+const SLIDING = new Set(['x', 'y']);
+
+function slideOf(a: MotionClip | undefined, b: MotionClip | undefined, doc: MotionDoc): Shift | null {
+  if (!a || !b || !sameJson(a.transform, b.transform) || !changedKeys(a.props, b.props).every((k) => SLIDING.has(k))) {
+    return null;
+  }
+  return shiftOf(a.props, b.props, doc);
+}
+
+const plainToSlide = (item: Item): boolean => !item.masks && !item.matte && !item.scissor && (item.kind !== ItemKind.Group || item.items.every(plainToSlide));
+
+function slidItem(item: Item, by: Shift): Item {
+  if (item.kind === ItemKind.Group) {
+    return { ...item, items: item.items.map((i) => slidItem(i, by)) };
+  }
+  return { ...item, matrix: slid(item.matrix, by) } as Item;
+}
+
 const rootOf = (doc: MotionDoc, id: string) => ancestorsOf(doc, id)[0] ?? id;
+
+const heldFixed = (c: MotionClip) => (c.layoutItem?.width ?? Sizing.Fixed) === Sizing.Fixed && (c.layoutItem?.height ?? Sizing.Fixed) === Sizing.Fixed && !c.layoutItem?.absolute;
+
+const sameBox = (a: MotionClip, b: MotionClip) => (['x', 'y', 'width', 'height'] as const).every((k) => a.props[k] === b.props[k]);
+
+function relaidNear(shown: MotionDoc, after: MotionDoc, was: Clips, edited: string, measure: TextMeasure): Clips | null {
+  const parents = ancestorsOf(after, edited).reverse();
+  for (const id of parents) {
+    const container = was.get(id);
+    if (!container?.autoLayout || !heldFixed(container)) {
+      continue;
+    }
+    const relaid = new Map(relaidBelow(shown, container, measure).map((c) => [c.id, c] as const));
+    if ([...relaid.values()].some((c) => c.layoutItem?.absolute)) {
+      return null;
+    }
+    if (sameBox(relaid.get(id)!, container)) {
+      return relaid;
+    }
+  }
+  return null;
+}
 
 export function laidIncrementally(before: MotionDoc, after: MotionDoc, measure: TextMeasure): Clips {
   const byMeasure = exactDocs.get(after) ?? exactDocs.set(after, new Map()).get(after)!;
@@ -396,10 +437,11 @@ export function laidIncrementally(before: MotionDoc, after: MotionDoc, measure: 
   const oldById = new Map(old.map((c) => [c.id, c]));
   const touched = now.filter((c) => oldById.get(c.id) !== c).map((c) => c.id);
   const gone = old.filter((c) => !now.some((n) => n.id === c.id)).map((c) => c.id);
-  const roots = new Set([...touched.map((id) => rootOf(after, id)), ...[...touched, ...gone].filter((id) => oldById.has(id)).map((id) => rootOf(before, id))]);
   const shown = withoutHidden(after);
   const left = new Set(clipsOf(shown).map((c) => c.id));
-  const fresh = new Map([...roots].filter((id) => left.has(id)).flatMap((id) => laidSubtree(shown, id, measure).map((c) => [c.id, c] as const)));
+  const near = touched.length === 1 && !gone.length ? relaidNear(shown, after, was, touched[0], measure) : null;
+  const roots = new Set([...touched.map((id) => rootOf(after, id)), ...[...touched, ...gone].filter((id) => oldById.has(id)).map((id) => rootOf(before, id))]);
+  const fresh = near ?? new Map([...roots].filter((id) => left.has(id)).flatMap((id) => laidSubtree(shown, id, measure).map((c) => [c.id, c] as const)));
   const next: Clips = new Map(clipsOf(shown).map((c) => [c.id, fresh.get(c.id) ?? was.get(c.id) ?? c]));
   byMeasure.set(measure, next);
   return next;
@@ -451,7 +493,12 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
   const was = exactLaid(before, measure);
   const relaid = laidIncrementally(before, after, measure);
   const moved = new Set([edited.id, ...[...relaid].filter(([id, c]) => !was.get(id) || !sameProps(was.get(id)!, c)).map(([id]) => id)]);
-  const redraw = below(after, moved);
+  const slides = new Map([...moved].flatMap((id) => {
+    const by = id === edited.id ? null : slideOf(was.get(id), relaid.get(id), after);
+    return by && ownItems(list.items, id).every(plainToSlide) ? [[id, by] as const] : [];
+  }));
+  const cutting = new Set([...slides.keys()].filter((id) => !!relaid.get(id)?.clipContent || !!relaid.get(id)?.mask));
+  const redraw = [...below(after, new Set([edited.id, ...cutting])), ...[...moved].filter((id) => !slides.has(id) && id !== edited.id)].filter((id, i, all) => all.indexOf(id) === i);
   if (redraw.length > REDRAW_MOST) {
     return null;
   }
@@ -464,6 +511,7 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
   const shown = withoutHidden(after);
   const mini = { ...shown, tracks: shown.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => kept.has(c.id)).map(now) })) };
   const back = new Set(redraw.filter((id) => relaid.has(id) && !was.has(id)));
+  const redrawSet = new Set(redraw);
   const drawnMini = drawFrame(prepare(mini, look.tokens, look.assets, look.typeset), look.frame);
   const fresh = drawnMini.items;
   let items: Item[] | null = list.items;
@@ -476,6 +524,13 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
       continue;
     }
     items = old.length ? spliced(items!, id, own) : inserted(items!, order, id, own);
+    if (!items) {
+      return null;
+    }
+  }
+  for (const [id, by] of slides) {
+    const old = ownItems(items!, id);
+    items = redrawSet.has(id) || !old.length ? items : spliced(items!, id, old.map((i) => slidItem(i, by)));
     if (!items) {
       return null;
     }

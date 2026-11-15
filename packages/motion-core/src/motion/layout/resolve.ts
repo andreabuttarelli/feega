@@ -246,16 +246,28 @@ function heldAt(laid: MotionClip): MotionClip {
   return { ...laid, layoutItem: { ...own, ...held } };
 }
 
-export function relaidWithin(doc: MotionDoc, laidContainer: MotionClip, measure: TextMeasure = estimatedText): MotionClip[] {
+export function relaidBelow(doc: MotionDoc, laidContainer: MotionClip, measure: TextMeasure = estimatedText): MotionClip[] {
+  const size = { width: doc.width, height: doc.height };
+  const content = instanceContent({ ...doc, comps: cachedComps(doc, size, measure) }, size, measure);
+  const container = heldAt(laidContainer);
+  const clips = visualClips(doc.tracks).map((c) => (c.id === container.id ? container : c));
+  const kids = kidsIndex(clips);
+  const below = (id: string): MotionClip[] => kids(id).flatMap((c) => [c, ...below(c.id)]);
+  const within = [container, ...below(container.id)];
+  const place = placer(within, boxesOf(within, size, content, measure), size, measure, content);
+  return within.map((c) => (c === container ? { ...place(c), layoutItem: laidContainer.layoutItem } : place(c)));
+}
+
+export function relaidWithin(doc: MotionDoc, laidContainer: MotionClip, measure: TextMeasure = estimatedText, content: Content = NO_CONTENT): MotionClip[] {
   const size = { width: doc.width, height: doc.height };
   const container = heldAt(laidContainer);
   const clips = visualClips(doc.tracks).map((c) => (c.id === container.id ? container : c));
   const kids = kidsIndex(clips);
   const { left, top } = pivotBox(container.props, size);
-  const boxes = layoutTree(itemOf(container, kids, size, NO_CONTENT, measure), { left, top });
+  const boxes = layoutTree(itemOf(container, kids, size, content, measure), { left, top });
   const below = (id: string): MotionClip[] => kids(id).flatMap((c) => [c, ...below(c.id)]);
   const within = [container, ...below(container.id)];
-  const place = placer(within, boxes, size, measure, NO_CONTENT);
+  const place = placer(within, boxes, size, measure, content);
   return within.map((c) => (c === container ? { ...place(c), layoutItem: laidContainer.layoutItem } : place(c)));
 }
 
