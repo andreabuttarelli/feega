@@ -2,7 +2,7 @@ use gpu_core::compositor::{render_tile, Compositor, Painter};
 use gpu_core::display_list::{parse, Item};
 use gpu_core::groups::{Library, Limits, Plan};
 use gpu_core::retained::{Camera, Lookup, Outcome, Quality};
-use gpu_core::world::{parse_patch, OverlayPart};
+use gpu_core::world::{parse_patch, OverlayPart, Spliced};
 use gpu_core::Skipped;
 use vello::kurbo::Rect;
 
@@ -297,10 +297,18 @@ fn a_spliced_overlay_holds_what_a_whole_one_would() {
     let (mut c, mut lib) = overlaid(true);
     let hover = gpu_core::world::parse_overlay(HOVER).unwrap();
 
-    assert!(c.splice_overlay(OverlayPart::Fixed, 1, 0, hover.clone(), &mut lib));
-    assert!(!c.splice_overlay(OverlayPart::Fixed, 2, 1, hover, &mut lib));
+    assert_eq!(c.splice_overlay(OverlayPart::Fixed, 1, 0, hover.clone(), &mut lib), Spliced::Changed);
+    assert_eq!(c.splice_overlay(OverlayPart::Fixed, 2, 1, hover, &mut lib), Spliced::Refused);
 
     assert_eq!(lib.items_in(OverlayPart::Fixed.group()), Some(2));
+}
+
+#[test]
+fn splicing_in_the_items_already_there_changes_nothing() {
+    let (mut c, mut lib) = overlaid(true);
+    let ring = gpu_core::world::parse_overlay(RING).unwrap();
+
+    assert_eq!(c.splice_overlay(OverlayPart::Fixed, 0, 0, ring, &mut lib), Spliced::Same);
 }
 
 #[test]

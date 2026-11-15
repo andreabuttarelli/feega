@@ -18,7 +18,7 @@ use crate::reproject::{Draw, Output, Reprojector, Tile};
 use crate::retained::{Camera, Damage, Lookup, Quality};
 use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys};
 use crate::overlay_seen::OverlaySeen;
-use crate::world::{parse_overlay, parse_patch, OverlayPart};
+use crate::world::{parse_overlay, parse_patch, OverlayPart, Spliced};
 use crate::texture_budget::split;
 use crate::tally::now_ms;
 use crate::Skipped;
@@ -501,21 +501,23 @@ impl WebCore {
     }
 
     pub fn splice_overlay(&mut self, head: usize, tail: usize, items_json: &[u8]) -> Result<bool, JsValue> {
-        self.splice_part(OverlayPart::Fixed, head, tail, items_json)
+        Ok(self.splice_part(OverlayPart::Fixed, head, tail, items_json)? != Spliced::Refused)
     }
 
     pub fn splice_selected_overlay(&mut self, head: usize, tail: usize, items_json: &[u8]) -> Result<bool, JsValue> {
-        self.splice_part(OverlayPart::Selected, head, tail, items_json)
+        Ok(self.splice_part(OverlayPart::Selected, head, tail, items_json)? != Spliced::Refused)
     }
 
     pub fn splice_live_overlay(&mut self, head: usize, tail: usize, items_json: &[u8]) -> Result<bool, JsValue> {
         let spliced = self.splice_part(OverlayPart::Live, head, tail, items_json)?;
-        self.changed_at = js_sys::Date::now();
-        self.warmup.moved(self.changed_at);
-        Ok(spliced)
+        if spliced == Spliced::Changed {
+            self.changed_at = js_sys::Date::now();
+            self.warmup.moved(self.changed_at);
+        }
+        Ok(spliced != Spliced::Refused)
     }
 
-    fn splice_part(&mut self, part: OverlayPart, head: usize, tail: usize, items_json: &[u8]) -> Result<bool, JsValue> {
+    fn splice_part(&mut self, part: OverlayPart, head: usize, tail: usize, items_json: &[u8]) -> Result<Spliced, JsValue> {
         self.overlay_seen.forget(part);
         let items = parse_overlay(utf8(items_json)?).map_err(failed)?;
         Ok(self.compositor.splice_overlay(part, head, tail, items, &mut self.library))

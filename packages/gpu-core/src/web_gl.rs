@@ -14,7 +14,7 @@ use crate::tally::Reason;
 use crate::gl_passes::{texture, GlRunner, Tex};
 use crate::gl_reproject::{held, smooth, GlReprojector, Held, Target};
 use crate::retained::{Camera, Lookup, Quality};
-use crate::world::{parse_overlay, parse_patch, OverlayPart};
+use crate::world::{parse_overlay, parse_patch, OverlayPart, Spliced};
 use crate::layers::{prepare, Blending, Surface};
 use crate::scene::{build_into, Placed, Shelf};
 use crate::Skipped;
@@ -357,18 +357,18 @@ impl WebGlCore {
     }
 
     pub fn splice_overlay(&mut self, head: usize, tail: usize, items_json: &[u8]) -> Result<bool, JsValue> {
-        self.splice_part(OverlayPart::Fixed, head, tail, items_json)
+        Ok(self.splice_part(OverlayPart::Fixed, head, tail, items_json)? != Spliced::Refused)
     }
 
     pub fn splice_selected_overlay(&mut self, head: usize, tail: usize, items_json: &[u8]) -> Result<bool, JsValue> {
-        self.splice_part(OverlayPart::Selected, head, tail, items_json)
+        Ok(self.splice_part(OverlayPart::Selected, head, tail, items_json)? != Spliced::Refused)
     }
 
     pub fn splice_live_overlay(&mut self, head: usize, tail: usize, items_json: &[u8]) -> Result<bool, JsValue> {
-        self.splice_part(OverlayPart::Live, head, tail, items_json)
+        Ok(self.splice_part(OverlayPart::Live, head, tail, items_json)? != Spliced::Refused)
     }
 
-    fn splice_part(&mut self, part: OverlayPart, head: usize, tail: usize, items_json: &[u8]) -> Result<bool, JsValue> {
+    fn splice_part(&mut self, part: OverlayPart, head: usize, tail: usize, items_json: &[u8]) -> Result<Spliced, JsValue> {
         let items = parse_overlay(utf8(items_json)?).map_err(failed)?;
         Ok(self.compositor.splice_overlay(part, head, tail, items, &mut self.library))
     }

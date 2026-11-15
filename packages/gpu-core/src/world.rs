@@ -43,7 +43,14 @@ pub enum OverlayPart {
     Live,
 }
 
-const OVERLAY_PARTS: [OverlayPart; 3] = [OverlayPart::Fixed, OverlayPart::Selected, OverlayPart::Live];
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Spliced {
+    Refused,
+    Same,
+    Changed,
+}
+
+const OVERLAY_PARTS:[OverlayPart; 3] = [OverlayPart::Fixed, OverlayPart::Selected, OverlayPart::Live];
 
 impl OverlayPart {
     pub fn group(self) -> &'static str {
@@ -302,14 +309,17 @@ impl World {
         bounds.into_iter().for_each(|b| self.mark(b));
     }
 
-    pub fn splice_overlay(&mut self, part: OverlayPart, head: usize, tail: usize, items: Vec<Item>) -> bool {
+    pub fn splice_overlay(&mut self, part: OverlayPart, head: usize, tail: usize, items: Vec<Item>) -> Spliced {
         let old = &self.overlays[part.index()].items;
         if head + tail > old.len() {
-            return false;
+            return Spliced::Refused;
+        }
+        if old[head..old.len() - tail] == items[..] {
+            return Spliced::Same;
         }
         let spliced = old[..head].iter().cloned().chain(items).chain(old[old.len() - tail..].iter().cloned()).collect();
         self.set_overlay(part, spliced);
-        true
+        Spliced::Changed
     }
 
     pub fn overlay_group(&self, part: OverlayPart) -> Option<(DisplayList, UseItem)> {

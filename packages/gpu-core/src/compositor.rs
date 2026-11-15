@@ -3,7 +3,7 @@ use vello::kurbo::{Affine as Matrix, Rect};
 use crate::display_list::{DisplayList, Item};
 use crate::groups::{Library, Limits, Plan, Sweep};
 use crate::retained::{tiles, Camera, Damage, Lookup, Outcome, Quality, Raster, Retained, Step};
-use crate::world::{Lift, OverlayPart, Patch, World};
+use crate::world::{Lift, OverlayPart, Patch, Spliced, World};
 use crate::tally::now_ms;
 use crate::Skipped;
 
@@ -72,12 +72,12 @@ impl Compositor {
         self.group_overlay(part, library);
     }
 
-    pub fn splice_overlay(&mut self, part: OverlayPart, head: usize, tail: usize, items: Vec<Item>, library: &mut Library) -> bool {
-        if !self.world.splice_overlay(part, head, tail, items) {
-            return false;
+    pub fn splice_overlay(&mut self, part: OverlayPart, head: usize, tail: usize, items: Vec<Item>, library: &mut Library) -> Spliced {
+        let spliced = self.world.splice_overlay(part, head, tail, items);
+        if spliced == Spliced::Changed {
+            self.group_overlay(part, library);
         }
-        self.group_overlay(part, library);
-        true
+        spliced
     }
 
     fn group_overlay(&mut self, part: OverlayPart, library: &mut Library) {
