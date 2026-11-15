@@ -690,8 +690,21 @@ function restyledClips(before: MotionDoc, after: MotionDoc): MotionClip[] | null
   return edited.length && edited.every((c) => changedKeys(was[now.indexOf(c)], c).every((k) => STATIC_KEYS.has(k))) ? edited : null;
 }
 
+function instanceOfEdit(before: MotionDoc, after: MotionDoc): MotionClip | null {
+  if (before.tracks !== after.tracks || changedKeys(before, after).join() !== 'comps') {
+    return null;
+  }
+  const edited = new Set(changedKeys(before.comps, after.comps));
+  const hosts = clipsOf(after).filter((c) => c.component === 'Precomp' && edited.has(String(c.props.comp ?? '')));
+  return hosts.length === 1 ? hosts[0] : null;
+}
+
 export function fastPatch(list: DisplayList, before: MotionDoc, after: MotionDoc, measure: TextMeasure, look?: Look): DisplayList | null {
   const pair = onlyClip(before, after);
+  const host = pair ? null : instanceOfEdit(before, after);
+  if (host) {
+    return subtreeRedrawn(list, before, after, host, measure, look);
+  }
   const many = pair ? null : restyledClips(before, after);
   if (many) {
     return subtreeRedrawn(list, before, after, many[0], measure, look);
