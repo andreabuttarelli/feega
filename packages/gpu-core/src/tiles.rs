@@ -224,11 +224,17 @@ pub fn fallback_serves(at: Camera, now: Camera, screen: (u32, u32), bare: &[Tile
     bare.iter().map(|k| k.world().intersect(view)).all(|r| r.area() <= 0.0 || seen.union(r) == seen)
 }
 
-pub fn fallback_area(camera: Camera, (w, h): (u32, u32), bare: &[TileKey]) -> Rect {
-    let screen = Rect::new(0.0, 0.0, w as f64, h as f64);
-    let covered = bare.iter().map(|k| k.screen(camera)).reduce(|a, b| a.union(b)).unwrap_or(Rect::ZERO);
-    let area = covered.intersect(screen);
-    Rect::new(area.x0.floor(), area.y0.floor(), area.x1.ceil(), area.y1.ceil())
+pub fn fallback_bands(held: Option<Rect>, uncovered: &[Rect]) -> Vec<Rect> {
+    let Some(held) = held else {
+        return uncovered.iter().copied().reduce(|a, b| a.union(b)).into_iter().collect();
+    };
+    let side = |r: &Rect| match r.center() {
+        c if c.y < held.y0 => 0,
+        c if c.y > held.y1 => 1,
+        c if c.x < held.x0 => 2,
+        _ => 3,
+    };
+    (0..4).filter_map(|band| uncovered.iter().filter(|r| side(r) == band).copied().reduce(|a, b| a.union(b))).collect()
 }
 
 pub fn fade_in(age_ms: f64) -> f32 {

@@ -16,7 +16,7 @@ use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile, OPAQUE};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys, magnified, fallback_serves, fallback_area, fade_in, FADE_MS};
+use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys, magnified, fallback_serves, fallback_bands, fade_in, FADE_MS};
 use crate::overlay_seen::OverlaySeen;
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
@@ -39,6 +39,7 @@ const NOT_TIMED: u64 = u64::MAX;
 const TILE_BUDGET_GESTURE_MS: f64 = 4.0;
 const TILE_BUDGET_STILL_MS: f64 = 12.0;
 const FALLBACK_FLOORS: f64 = 3.0;
+const FALLBACK_PATCHES: usize = 8;
 const SPARE_TILES: usize = 32;
 const REST_AFTER_MS: f64 = 200.0;
 const EVICT_DOWN_TO_PERCENT: usize = 90;
@@ -106,7 +107,7 @@ pub struct WebCore {
     rest_spare: FxHashMap<(u32, u32), Vec<wgpu::Texture>>,
     counted: Counted,
     sharpness: Sharpness,
-    fallback: Option<Fallback>,
+    fallback: Vec<Fallback>,
     born: FxHashMap<TileKey, f64>,
 }
 
@@ -186,6 +187,10 @@ struct Fallback {
 }
 
 impl Fallback {
+    fn destroy(self) {
+        self.pieces.into_iter().for_each(|(_, texture)| texture.destroy());
+    }
+
     fn tiles(&self, c: Camera, screen: Rect) -> Vec<Tile<'_>> {
         let scale = self.camera.zoom / c.zoom;
         self.pieces.iter().filter_map(|(piece, source)| {
@@ -193,6 +198,13 @@ impl Fallback {
             let within = Rect::new((-x / scale).ceil(), (-y / scale).ceil(), ((piece.w as f64 - x) / scale).floor(), ((piece.h as f64 - y) / scale).floor()).intersect(screen);
             (within.area() > 0.0).then_some(Tile { source, look: Lookup { scale, x, y }, within, opacity: OPAQUE })
         }).collect()
+    }
+
+    fn on(&self, c: Camera) -> Rect {
+        let (w, h) = (self.size.0 as f64, self.size.1 as f64);
+        let at = |x: f64, y: f64| ((x - self.camera.x) / self.camera.zoom * c.zoom + c.x, (y - self.camera.y) / self.camera.zoom * c.zoom + c.y);
+        let ((x0, y0), (x1, y1)) = (at(0.0, 0.0), at(w, h));
+        Rect::new(x0, y0, x1, y1)
     }
 }
 
@@ -380,7 +392,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), sharpness: Sharpness::default(), fallback: None, born: FxHashMap::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 } })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), sharpness: Sharpness::default(), fallback: Vec::new(), born: FxHashMap::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 } })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -895,33 +907,44 @@ impl WebCore {
         if bare.is_empty() {
             return Ok(false);
         }
-        if self.fallback.as_ref().is_some_and(|f| fallback_serves(f.camera, self.camera, f.size, bare)) {
+        let c = self.camera;
+        let (kept, stale): (Vec<Fallback>, Vec<Fallback>) = std::mem::take(&mut self.fallback).into_iter().partition(|f| fallback_serves(f.camera, c, f.size, &[]));
+        stale.into_iter().for_each(Fallback::destroy);
+        self.fallback = kept;
+        let uncovered: Vec<Rect> = bare.iter().filter(|k| !self.fallback.iter().any(|f| fallback_serves(f.camera, c, f.size, &[**k]))).map(|k| k.screen(c)).collect();
+        if uncovered.is_empty() {
             return Ok(true);
         }
         let began = js_sys::Date::now();
-        self.forget_fallback();
-        let area = fallback_area(self.camera, screen, bare);
-        if area.area() <= 0.0 {
-            return Ok(false);
+        let whole = Rect::new(0.0, 0.0, screen.0 as f64, screen.1 as f64);
+        let held = self.fallback.iter().map(|f| f.on(c)).reduce(|a, b| a.union(b));
+        for band in fallback_bands(held, &uncovered) {
+            let area = band.intersect(whole);
+            let area = Rect::new(area.x0.floor(), area.y0.floor(), area.x1.ceil(), area.y1.ceil());
+            if area.area() <= 0.0 {
+                continue;
+            }
+            let camera = Camera { x: c.x.round() - area.x0, y: c.y.round() - area.y0, zoom: c.zoom };
+            let size = (area.width() as u32, area.height() as u32);
+            let limits = self.limits;
+            self.limits = Limits { rasters: 0, ..limits };
+            let rendered = crate::lod::coarser(FALLBACK_FLOORS, || self.render_view(camera, size, Source::Scene));
+            self.limits = limits;
+            let (pieces, _) = rendered?;
+            self.fallback.push(Fallback { camera, size, pieces });
+            self.sharpness.fallbacks += 1;
         }
-        let camera = Camera { x: self.camera.x.round() - area.x0, y: self.camera.y.round() - area.y0, zoom: self.camera.zoom };
-        let size = (area.width() as u32, area.height() as u32);
-        let limits = self.limits;
-        self.limits = Limits { rasters: 0, ..limits };
-        let rendered = crate::lod::coarser(FALLBACK_FLOORS, || self.render_view(camera, size, Source::Scene));
-        self.limits = limits;
-        let (pieces, _) = rendered?;
-        self.fallback = Some(Fallback { camera, size, pieces });
+        while self.fallback.len() > FALLBACK_PATCHES {
+            self.fallback.remove(0).destroy();
+        }
         let took = js_sys::Date::now() - began;
         self.credit.spend(took);
-        self.sharpness.fallbacks += 1;
         self.sharpness.fallback_ms += took;
         Ok(true)
     }
 
     fn fading(&self, draw: &[TileKey]) -> Vec<(TileKey, f32)> {
-        let Some(fallback) = self.fallback.as_ref() else { return vec![] };
-        if !fallback_serves(fallback.camera, self.camera, fallback.size, &[]) {
+        if !self.fallback.iter().any(|f| fallback_serves(f.camera, self.camera, f.size, &[])) {
             return vec![];
         }
         let now = now_ms();
@@ -929,9 +952,7 @@ impl WebCore {
     }
 
     fn forget_fallback(&mut self) {
-        if let Some(fallback) = self.fallback.take() {
-            fallback.pieces.into_iter().for_each(|(_, texture)| texture.destroy());
-        }
+        std::mem::take(&mut self.fallback).into_iter().for_each(Fallback::destroy);
     }
 
     fn bake_ahead(&mut self) -> Result<usize, JsValue> {
