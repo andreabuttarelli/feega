@@ -133,12 +133,31 @@ function masksOf(doc: MotionDoc): { masks: Masks; masked: ReadonlySet<string> } 
 
 const groupsTrack = (track: Track, mode: EditMode) => mode === EditMode.Motion && track.clips.length > 1;
 
-function kidsOf(walk: Walk, clip: Clip): Clip[] {
-  const scope = walk.scope ?? [];
-  if (clip.autoLayout) {
-    return childrenInOrder(scope as MotionClip[], clip as MotionClip & { autoLayout: AutoLayout });
+const kidIndexes = new WeakMap<readonly Clip[], Map<string, Clip[]>>();
+
+function kidIndex(scope: readonly Clip[]): Map<string, Clip[]> {
+  const known = kidIndexes.get(scope);
+  if (known) {
+    return known;
   }
-  return scope.filter((c) => c.parent === clip.id);
+  const index = new Map<string, Clip[]>();
+  for (const c of scope) {
+    if (c.parent) {
+      const siblings = index.get(c.parent) ?? [];
+      siblings.push(c);
+      index.set(c.parent, siblings);
+    }
+  }
+  kidIndexes.set(scope, index);
+  return index;
+}
+
+function kidsOf(walk: Walk, clip: Clip): Clip[] {
+  const kids = kidIndex(walk.scope ?? []).get(clip.id) ?? [];
+  if (clip.autoLayout) {
+    return childrenInOrder(kids as MotionClip[], clip as MotionClip & { autoLayout: AutoLayout });
+  }
+  return kids;
 }
 
 const frontFirst = (track: Track): Clip[] => [...track.clips].reverse();
