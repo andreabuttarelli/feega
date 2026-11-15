@@ -686,8 +686,8 @@ function restyledClips(before: MotionDoc, after: MotionDoc): MotionClip[] | null
   if (was.length !== now.length || was.some((c, i) => c.id !== now[i].id)) {
     return null;
   }
-  const edited = now.filter((c, i) => c !== was[i]);
-  return edited.length && edited.every((c) => changedKeys(was[now.indexOf(c)], c).every((k) => STATIC_KEYS.has(k))) ? edited : null;
+  const edited = now.flatMap((c, i) => (c === was[i] ? [] : [[was[i], c] as const]));
+  return edited.length && edited.every(([a, b]) => changedKeys(a, b).every((k) => STATIC_KEYS.has(k))) ? edited.map(([, b]) => b) : null;
 }
 
 export function fastPatch(list: DisplayList, before: MotionDoc, after: MotionDoc, measure: TextMeasure, look?: Look): DisplayList | null {
