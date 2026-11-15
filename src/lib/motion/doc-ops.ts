@@ -112,7 +112,7 @@ function placedTracks(before: MotionDoc, after: MotionDoc): DocOp[] {
     if (!old) {
       return [{ kind: OpKind.TrackAdd, track, ...afterOf(order, i) }];
     }
-    const set = fieldOps(old.t as unknown as Bag, t as unknown as Bag, new Set([CLIPS, ID]), (field, value): DocOp => ({ kind: OpKind.TrackSet, trackId: t.id, field, ...valued(value) }));
+    const set = old.t === t ? [] : fieldOps(old.t as unknown as Bag, t as unknown as Bag, new Set([CLIPS, ID]), (field, value): DocOp => ({ kind: OpKind.TrackSet, trackId: t.id, field, ...valued(value) }));
     return stays.has(i) ? set : [{ kind: OpKind.TrackMove, trackId: t.id, ...afterOf(order, i) }, ...set];
   });
 }

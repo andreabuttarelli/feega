@@ -242,4 +242,17 @@ describe('applying ops to a big doc', () => {
     expect(clip(doc, 'c7')?.props.text).toBe('hello');
     expect(next.tracks[0]).toBe(doc.tracks[0]);
   });
+
+  it('diffs one edited clip without comparing the fields of every track', () => {
+    const doc = big();
+    const edited = { ...doc, tracks: doc.tracks.map((t, i) => (i === 7 ? withProp({ ...doc, tracks: [t] }, 'c7', 'text', 'moved').tracks[0] : t)) };
+    const keys = vi.spyOn(Object, 'keys');
+
+    const ops = diffDoc(doc, edited);
+
+    const calls = keys.mock.calls.length;
+    keys.mockRestore();
+    expect(ops).toEqual([{ kind: OpKind.ClipEntry, clipId: 'c7', field: 'props', key: 'text', value: 'moved' }]);
+    expect(calls).toBeLessThan(SIZE);
+  });
 });
