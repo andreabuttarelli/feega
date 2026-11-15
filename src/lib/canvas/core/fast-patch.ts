@@ -249,16 +249,7 @@ const instanceHost = (clip: string): string | null => (clip.includes(SEPARATOR) 
 
 const withItems = (group: GroupItem, items: Item[] | null): Item | null => (items ? { ...group, items } : null);
 
-type Pair = [MotionClip, MotionClip] | null;
-
-const pairs = new WeakMap<MotionDoc, WeakMap<MotionDoc, Pair>>();
-
-function onlyClip(before: MotionDoc, after: MotionDoc): Pair {
-  const known = pairs.get(before) ?? pairs.set(before, new WeakMap()).get(before)!;
-  return known.has(after) ? known.get(after)! : known.set(after, pairedClip(before, after)).get(after)!;
-}
-
-function pairedClip(before: MotionDoc, after: MotionDoc): Pair {
+function onlyClip(before: MotionDoc, after: MotionDoc): [MotionClip, MotionClip] | null {
   if (changedKeys(before, after).some((k) => k !== 'tracks')) {
     return null;
   }
@@ -599,7 +590,7 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
     return by && ownItems(list.items, id).every(plainToSlide) ? [[id, by] as const] : [];
   }));
   const cutting = new Set([...slides.keys()].filter((id) => !!relaid.get(id)?.clipContent || !!relaid.get(id)?.mask));
-  const redraw = [...new Set([...below(after, new Set([edited.id, ...cutting])), ...[...moved].filter((id) => !slides.has(id) && id !== edited.id)])];
+  const redraw = [...below(after, new Set([edited.id, ...cutting])), ...[...moved].filter((id) => !slides.has(id) && id !== edited.id)].filter((id, i, all) => all.indexOf(id) === i);
   traceSince('patch:plan', mark);
   if (redraw.filter((id) => relaid.has(id)).length > REDRAW_MOST) {
     return declined('too-many');
@@ -695,8 +686,8 @@ function restyledClips(before: MotionDoc, after: MotionDoc): MotionClip[] | null
   if (was.length !== now.length || was.some((c, i) => c.id !== now[i].id)) {
     return null;
   }
-  const edited = now.flatMap((c, i) => (c === was[i] ? [] : [[was[i], c] as const]));
-  return edited.length && edited.every(([a, b]) => changedKeys(a, b).every((k) => STATIC_KEYS.has(k))) ? edited.map(([, b]) => b) : null;
+  const edited = now.filter((c, i) => c !== was[i]);
+  return edited.length && edited.every((c) => changedKeys(was[now.indexOf(c)], c).every((k) => STATIC_KEYS.has(k))) ? edited : null;
 }
 
 export function fastPatch(list: DisplayList, before: MotionDoc, after: MotionDoc, measure: TextMeasure, look?: Look): DisplayList | null {

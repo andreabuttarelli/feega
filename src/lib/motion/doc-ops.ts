@@ -112,7 +112,7 @@ function placedTracks(before: MotionDoc, after: MotionDoc): DocOp[] {
     if (!old) {
       return [{ kind: OpKind.TrackAdd, track, ...afterOf(order, i) }];
     }
-    const set = old.t === t ? [] : fieldOps(old.t as unknown as Bag, t as unknown as Bag, new Set([CLIPS, ID]), (field, value): DocOp => ({ kind: OpKind.TrackSet, trackId: t.id, field, ...valued(value) }));
+    const set = fieldOps(old.t as unknown as Bag, t as unknown as Bag, new Set([CLIPS, ID]), (field, value): DocOp => ({ kind: OpKind.TrackSet, trackId: t.id, field, ...valued(value) }));
     return stays.has(i) ? set : [{ kind: OpKind.TrackMove, trackId: t.id, ...afterOf(order, i) }, ...set];
   });
 }
@@ -181,43 +181,16 @@ function assignEntry(owner: Bag, field: string, key: string, value: unknown) {
   owner[field] = entries;
 }
 
-const ownedBy = new WeakMap<Draft, WeakSet<object>>();
-
-function owned<T extends object>(doc: Draft, value: T, copy: (value: T) => T): T {
-  const mine = ownedBy.get(doc)!;
-  if (mine.has(value)) {
-    return value;
-  }
-  const fresh = copy(value);
-  mine.add(fresh);
-  return fresh;
-}
-
-function trackAt(doc: Draft, index: number): MotionTrack {
-  const track = owned(doc, doc.tracks[index], (t) => ({ ...t, clips: [...t.clips] }));
-  doc.tracks[index] = track;
-  return track;
-}
-
-function trackOf(doc: Draft, trackId: string): MotionTrack | undefined {
-  const index = doc.tracks.findIndex((t) => t.id === trackId);
-  return index < 0 ? undefined : trackAt(doc, index);
-}
+const trackOf = (doc: Draft, trackId: string) => doc.tracks.find((t) => t.id === trackId);
 
 function clipOf(doc: Draft, clipId: string): { track: MotionTrack; index: number } | null {
-  for (const [i, track] of doc.tracks.entries()) {
+  for (const track of doc.tracks) {
     const index = track.clips.findIndex((c) => c.id === clipId);
     if (index >= 0) {
-      return { track: trackAt(doc, i), index };
+      return { track, index };
     }
   }
   return null;
-}
-
-function clipAt(doc: Draft, { track, index }: { track: MotionTrack; index: number }): Bag {
-  const clip = owned(doc, track.clips[index], (c) => ({ ...c }));
-  track.clips[index] = clip;
-  return clip as unknown as Bag;
 }
 
 const insertAt = <T>(list: T[], index: number, item: T) => list.splice(Math.min(Math.max(index, 0), list.length), 0, item);
@@ -278,20 +251,19 @@ const APPLY: { [K in OpKind]: (doc: Draft, op: Extract<DocOp, { kind: K }>) => v
   [OpKind.ClipSet]: (doc, op) => {
     const at = clipOf(doc, op.clipId);
     if (at) {
-      assign(clipAt(doc, at), op.field, op.value);
+      assign(at.track.clips[at.index] as unknown as Bag, op.field, op.value);
     }
   },
   [OpKind.ClipEntry]: (doc, op) => {
     const at = clipOf(doc, op.clipId);
     if (at) {
-      assignEntry(clipAt(doc, at), op.field, op.key, op.value);
+      assignEntry(at.track.clips[at.index] as unknown as Bag, op.field, op.key, op.value);
     }
   }
 };
 
 export function applyOps(doc: MotionDoc, ops: readonly DocOp[]): MotionDoc {
-  const draft = { ...doc, tracks: [...doc.tracks] } as unknown as Draft;
-  ownedBy.set(draft, new WeakSet());
+  const draft = JSON.parse(JSON.stringify(doc)) as Draft;
   for (const op of ops) {
     (APPLY[op.kind] as (doc: Draft, op: DocOp) => void)(draft, op);
   }
