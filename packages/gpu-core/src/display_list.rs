@@ -480,6 +480,30 @@ impl<'de> Deserialize<'de> for Item {
     }
 }
 
+#[derive(Deserialize)]
+struct Tag<'a> {
+    #[serde(default, borrow)]
+    kind: Option<std::borrow::Cow<'a, str>>,
+    #[serde(default, borrow)]
+    clip: Option<std::borrow::Cow<'a, str>>,
+}
+
+pub fn item_from_json(raw: &str) -> Result<Item, serde_json::Error> {
+    let tag: Tag = serde_json::from_str(raw)?;
+    let kind = tag.kind.unwrap_or_default();
+    match kind.as_ref() {
+        "path" => serde_json::from_str(raw).map(Item::Path),
+        "image" => serde_json::from_str(raw).map(Item::Image),
+        "layer" => serde_json::from_str(raw).map(Item::Layer),
+        "group" => serde_json::from_str(raw).map(|g| Item::Group(Box::new(g))),
+        "use" => serde_json::from_str(raw).map(Item::Use),
+        "glyphs" => serde_json::from_str(raw).map(Item::Glyphs),
+        "text" => serde_json::from_str(raw).map(|t| Item::Text(Box::new(t))),
+        "lens" => serde_json::from_str(raw).map(|l| Item::Lens(Box::new(l))),
+        _ => Ok(Item::Other { clip: tag.clip.unwrap_or_default().into_owned(), kind: kind.into_owned() }),
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct FaceSpec {
     pub family: String,
