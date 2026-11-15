@@ -314,6 +314,7 @@
   });
   let area = $state({ width: 0, height: 0 });
   let selected = $state<string[]>([]);
+  const selectedIds = $derived(new Set(selected));
   let selectedEdge = $state<string | null>(null);
   let hovered = $state<string | null>(null);
   let addLinger = $state<string | null>(null);
@@ -523,7 +524,7 @@
       if (!t) {
         return [];
       }
-      const on = savers.get(v.nodeId)?.breakpoint === v.breakpointId && selected.includes(t.id);
+      const on = savers.get(v.nodeId)?.breakpoint === v.breakpointId && selectedIds.has(t.id);
       const chrome = nodeChrome(t.id, on, layersSource.video, typedFreeText());
       const { x, y, w, h } = v.frame.box;
       return [{ id: v.frame.id, x, y, width: w, height: h, ...portMarks({ ...t, connectable: false }), label: `${v.name} ${v.width}`, icon: text.icons.get(t.kind as NodeType) ?? null, tag: null, zoom: labelZoom, ring: on ? chrome.ring : NodeChrome.None, handles: false, ringColor: ringColour(), names: false, strokeZoom, addBeside: false, radius: cardRadiusOf(t.kind ?? ''), turn: undefined, layers: ChromeLayers.Whole }];
@@ -533,7 +534,7 @@
       if (!coreDrawn.has(t.id) && !handed) {
         return [];
       }
-      const on = selected.includes(t.id);
+      const on = selectedIds.has(t.id);
       const chrome = nodeChrome(t.id, on, layersSource.video, typedFreeText());
       const layers = holdsDoc(t.kind ?? '') ? ChromeLayers.Whole : handed ? ChromeLayers.Ports : ChromeLayers.State;
       if (layers === ChromeLayers.State && chrome.ring === NodeChrome.None) {
@@ -548,7 +549,7 @@
   const hoverRings = $derived.by(() => {
     const openId = layersSource.video?.nodeId ?? null;
     const ringed = (t: Tile) => {
-      const on = selected.includes(t.id);
+      const on = selectedIds.has(t.id);
       const outlined = (!on && frameRinged(layersSource.hovered, t.id, openId, hovered)) || emptyAreaRinged(layersSource.hovered, t.id, openId, hovered);
       const solo = hovered === t.id && !on && layersSource.hovered?.nodeId !== t.id;
       return (outlined || solo) && nodeChrome(t.id, on, layersSource.video, typedFreeText()).ring !== NodeChrome.Selected;
@@ -4274,7 +4275,7 @@
     }
   }
 
-  const selectedSummaries = $derived((props.nodeSummaries ?? []).filter((n) => selected.includes(n.id)));
+  const selectedSummaries = $derived((props.nodeSummaries ?? []).filter((n) => selectedIds.has(n.id)));
   const selectionEdges = $derived(edges.map((e) => ({ sourceNodeId: e.source, targetNodeId: e.target })));
   const selectionMenuIds = $derived(new Set([...canvasMenuIds()].filter((id) => (id !== 'copy-link' || props.onCopyLink) && enabledFor(id, selectedSummaries, selectionEdges, props.stale ?? []).enabled)));
   const selectionMedium = $derived(
@@ -4588,7 +4589,7 @@
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom});--zoom:${view.zoom}`}>
       <svg class="gpu-edges core" aria-hidden="true">
         {#each curves as c (c.edge.id)}
-          <g class="svelte-flow__edge" class:selected={c.edge.id === selectedEdge} class:iterate={(c.edge.mode ?? 'fixed') === 'iterate'} class:linked={selected.includes(c.edge.source) || selected.includes(c.edge.target)} data-id={c.edge.id} data-source={c.edge.source} data-target={c.edge.target}>
+          <g class="svelte-flow__edge" class:selected={c.edge.id === selectedEdge} class:iterate={(c.edge.mode ?? 'fixed') === 'iterate'} class:linked={selectedIds.has(c.edge.source) || selectedIds.has(c.edge.target)} data-id={c.edge.id} data-source={c.edge.source} data-target={c.edge.target}>
             <path class="svelte-flow__edge-path" d={`M${c.curve.from.x},${c.curve.from.y} C${c.curve.c1.x},${c.curve.c1.y} ${c.curve.c2.x},${c.curve.c2.y} ${c.curve.to.x},${c.curve.to.y}`} />
             {#if (c.edge.mode ?? 'fixed') === 'iterate'}
               <g class="wire-iterate-badge" data-testid="wire-iterate-icon" transform={`translate(${c.curve.mid.x} ${c.curve.mid.y})`}>
@@ -4638,7 +4639,7 @@
         <div class="gpu-copy-ghost" data-testid="gpu-copy-ghost" style={`transform: translate(${c.x}px, ${c.y}px);width:${c.w}px;height:${c.h}px`}></div>
       {/each}
       {#each placed as t (t.id)}
-        {@const on = selected.includes(t.id)}
+        {@const on = selectedIds.has(t.id)}
         <div
           class="svelte-flow__node gpu-node"
           class:selected={on}
