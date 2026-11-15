@@ -738,3 +738,23 @@ describe.runIf(process.env.CHROMIUM_PATH)('a picture that fills the rounded box 
     }
   }, 30_000);
 });
+
+const NO_OPTICAL = `<body style="margin:0"><h1 style="margin:0;font:600 48px monospace">Large title</h1></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('a large title in a font without an optical size axis', () => {
+  it('asks for the smallest optical size, so a font that has the axis is not narrowed on the canvas (traidue: Inter titles came in narrower)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 600, height: 200 });
+      await page.setContent(NO_OPTICAL);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+      const title = all(tree.root).find((n) => n.characters === 'Large title')!;
+
+      expect(title.style?.fontAxes).toBe("'opsz' 0");
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});

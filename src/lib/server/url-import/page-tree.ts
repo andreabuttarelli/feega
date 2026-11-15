@@ -373,12 +373,32 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     return names.find((n) => loadedFamilies.has(n.toLowerCase()) || declaredFamilies.has(n.toLowerCase())) ?? names.join(', ');
   };
 
+  const SMALLEST_OPTICAL = 0;
+  const OPTICAL_PROBE = { text: 'Hamburgefonstiv', size: 64, small: 8, large: 144 };
+  const opticalAxes = new Map<string, boolean>();
+  const hasOpticalAxis = (css: CSSStyleDeclaration) => {
+    const key = `${css.fontFamily}|${css.fontWeight}|${css.fontStyle}`;
+    if (!opticalAxes.has(key) && document.body) {
+      const probe = document.createElement('span');
+      probe.textContent = OPTICAL_PROBE.text;
+      probe.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;font-family:${css.fontFamily};font-weight:${css.fontWeight};font-style:${css.fontStyle};font-size:${OPTICAL_PROBE.size}px`;
+      document.body.appendChild(probe);
+      const widthAt = (opsz: number) => {
+        probe.style.fontVariationSettings = `'opsz' ${opsz}`;
+        return probe.getBoundingClientRect().width;
+      };
+      opticalAxes.set(key, widthAt(OPTICAL_PROBE.small) !== widthAt(OPTICAL_PROBE.large));
+      probe.remove();
+    }
+    return opticalAxes.get(key) ?? true;
+  };
+
   const quadOf = (raw: string) => [...raw.matchAll(/["']([A-Za-z0-9]{4})["']\s*(-?[\d.]+|on|off)?/g)];
   const tuning = (css: CSSStyleDeclaration, size: number) => {
     const axes = quadOf(css.fontVariationSettings === 'normal' ? '' : css.fontVariationSettings)
       .filter(([, tag]) => tag !== 'wght')
       .map(([, tag, v]) => `'${tag}' ${Number(v ?? 0)}`);
-    const optical = css.fontOpticalSizing !== 'none' && !axes.some((a) => a.startsWith("'opsz'")) ? [`'opsz' ${round(size)}`] : [];
+    const optical = css.fontOpticalSizing !== 'none' && !axes.some((a) => a.startsWith("'opsz'")) ? [`'opsz' ${hasOpticalAxis(css) ? round(size) : SMALLEST_OPTICAL}`] : [];
     const features = quadOf(css.fontFeatureSettings === 'normal' ? '' : css.fontFeatureSettings).map(([, tag, v]) => `'${tag}' ${v === undefined || v === 'on' ? 1 : v === 'off' ? 0 : Number(v) ? 1 : 0}`);
     return { ...(axes.length || optical.length ? { fontAxes: [...axes, ...optical].join(', ') } : {}), ...(features.length ? { fontFeatures: features.join(', ') } : {}) };
   };
