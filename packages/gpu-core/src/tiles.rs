@@ -150,7 +150,7 @@ pub fn bake_batches(missing: &[TileKey]) -> Vec<Batch> {
     batches_of(missing, BAKE_BATCH_TILES)
 }
 
-fn batches_of(missing: &[TileKey], side: i64) -> Vec<Batch> {
+pub fn batches_of(missing: &[TileKey], side: i64) -> Vec<Batch> {
     let mut out: Vec<Batch> = Vec::new();
     let mut at: rustc_hash::FxHashMap<(i32, i64, i64), usize> = Default::default();
     for key in missing {
@@ -168,9 +168,11 @@ fn batches_of(missing: &[TileKey], side: i64) -> Vec<Batch> {
 pub struct RasterCredit {
     ms: f64,
     budget_ms: f64,
+    tile_ms: Option<f64>,
 }
 
 const DEBT_FRAMES: f64 = 3.0;
+const TILE_MS_WEIGHT: f64 = 0.25;
 
 impl RasterCredit {
     pub fn earn(&mut self, budget_ms: f64) {
@@ -184,6 +186,20 @@ impl RasterCredit {
 
     pub fn allows(&self) -> bool {
         self.ms > 0.0
+    }
+
+    pub fn learn(&mut self, ms: f64, tiles: usize) {
+        let measured = ms / tiles.max(1) as f64;
+        self.tile_ms = Some(self.tile_ms.map_or(measured, |was| was + (measured - was) * TILE_MS_WEIGHT));
+    }
+
+    pub fn affords(&self, tiles: usize) -> bool {
+        self.allows() && (self.tile_ms.is_none_or(|per| per * tiles as f64 <= self.ms) || (tiles == 1 && self.ms >= self.budget_ms))
+    }
+
+    pub fn side(&self) -> i64 {
+        let Some(per) = self.tile_ms.filter(|per| *per > 0.0) else { return BATCH_TILES };
+        ((self.budget_ms / per).sqrt().floor() as i64).clamp(1, BATCH_TILES)
     }
 }
 
