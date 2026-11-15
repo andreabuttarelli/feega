@@ -66,6 +66,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     ['button', 'button, [role=button], input[type=submit], input[type=button]'],
     ['link', 'a[href], [role=link]']
   ];
+  const BULLETS: Record<string, string> = { disc: '•', circle: '◦', square: '▪' };
   const PRESSABLE = PRESSES.map(([, selector]) => selector).join(', ');
 
   const width = document.documentElement.clientWidth;
@@ -1374,7 +1375,14 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     });
     const opacity = Number(css.opacity);
     const masking = Boolean(maskOf(css));
-    const framed = paintedSelf || overflows || /flex/.test(css.display) || opacity < 1 || masking;
+    const corners = clipsSelf ? cornersOf(css, r) : {};
+    const rounded = Object.keys(corners).length > 0 && kids.length > 0;
+    const soleKid = rounded && kids.length === 1 && kids[0].type === 'RECTANGLE' && sameBox(kids[0], r) && !kids[0].cornerRadius && !kids[0].rectangleCornerRadii;
+    if (soleKid) {
+      kids[0] = { ...kids[0], ...corners };
+    }
+    const roundsKids = rounded && !soleKid;
+    const framed = paintedSelf || overflows || roundsKids || /flex/.test(css.display) || opacity < 1 || masking;
     const kidZ = kids.map((k) => zOf.get(k) ?? 0);
     const zEff = stacks(el, css) || clipsSelf ? z : Math.max(z, ...kidZ);
     if (!framed) {
@@ -1414,7 +1422,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
           ...strokedBy(borders),
           ...(effects ? { effects } : {}),
           ...cornersOf(css, r),
-          clipsContent: overflows || masking,
+          clipsContent: overflows || masking || roundsKids,
           ...(positioned ? { layoutPositioning: 'ABSOLUTE' } : {}),
           ...flow,
           children
@@ -1584,8 +1592,42 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
         made++;
       }
     }
+    made += listMarkers(scope);
     sheet.replaceSync([...new Set(rules)].join('\n'));
     document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+  }
+
+  function markerText(el: Element, type: string): string {
+    const bullet = BULLETS[type];
+    if (bullet) {
+      return bullet;
+    }
+    if (type !== 'decimal') {
+      return '';
+    }
+    const items = el.parentElement ? [...el.parentElement.children].filter((c) => getComputedStyle(c).display === 'list-item') : [el];
+    const start = Number(el.parentElement?.getAttribute('start') ?? 1) || 1;
+    return `${start + items.indexOf(el)}.`;
+  }
+
+  function listMarkers(scope: Element): number {
+    let made = 0;
+    for (const el of scope.querySelectorAll('li')) {
+      const css = getComputedStyle(el);
+      const text = css.display === 'list-item' && css.listStyleImage === 'none' && css.listStylePosition === 'outside' ? markerText(el, css.listStyleType) : '';
+      if (!text || el.querySelector(`:scope > [${limits.standAttr}][data-feega-marker]`)) {
+        continue;
+      }
+      const look = getComputedStyle(el, '::marker');
+      const stand = document.createElement('feega-pseudo');
+      stand.setAttribute(limits.standAttr, '');
+      stand.setAttribute('data-feega-marker', '');
+      stand.style.cssText = `position:absolute;transform:translateX(-100%);white-space:pre;font:${look.font};color:${look.color}`;
+      stand.textContent = `${text} `;
+      el.insertBefore(stand, el.firstChild);
+      made++;
+    }
+    return made;
   }
 
   async function svgImages() {

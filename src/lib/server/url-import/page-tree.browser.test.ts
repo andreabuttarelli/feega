@@ -676,3 +676,65 @@ describe.runIf(process.env.CHROMIUM_PATH)('text cut with an ellipsis', () => {
     expect(dots.absoluteBoundingBox!.width).toBeLessThanOrEqual(120);
   }, 30_000);
 });
+
+const LISTED = `<body style="margin:0;font:16px/20px sans-serif"><ul style="margin:0;padding-left:40px"><li>Alpha</li><li>Beta</li></ul><ol style="margin:0;padding-left:40px"><li>Gamma</li></ol><ul style="list-style:none;margin:0"><li>Plain</li></ul></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('a list', () => {
+  it('keeps its bullets and numbers left of each item, and none where the list has no marker (traidue: every list came in without bullets)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 400, height: 200 });
+      await page.setContent(LISTED);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+      const texts = all(tree.root).filter((n) => n.type === 'TEXT');
+      const markers = texts.filter((n) => /^(•|\d+\.)$/.test((n.characters ?? '').trim()));
+      const alpha = texts.find((n) => n.characters === 'Alpha')!;
+
+      expect(markers.map((n) => n.characters!.trim())).toEqual(['•', '•', '1.']);
+      expect(markers[0].absoluteBoundingBox!.x + markers[0].absoluteBoundingBox!.width).toBeLessThanOrEqual(alpha.absoluteBoundingBox!.x);
+      expect(alpha.absoluteBoundingBox!.x).toBeCloseTo(40, 0);
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
+
+const ROUNDED = `<body style="margin:0"><div id="r" style="width:200px;height:120px;overflow:hidden;border-radius:12px;margin:10px"><img style="display:block;width:100%;height:100%;object-fit:cover" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="></div></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('a picture inside a rounded box that clips it', () => {
+  it('comes in clipped by the rounded corners (traidue: every card image lost its rounded corners)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 400, height: 200 });
+      await page.setContent(ROUNDED.replace('width:100%;height:100%', 'width:100%;height:80%').replace('</div></body>', '<p style="margin:0">caption</p></div></body>'));
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+      const holder = all(tree.root).find((n) => n.absoluteBoundingBox?.width === 200 && n.type === 'FRAME');
+
+      expect(holder).toMatchObject({ cornerRadius: 12, clipsContent: true });
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
+
+describe.runIf(process.env.CHROMIUM_PATH)('a picture that fills the rounded box clipping it', () => {
+  it('takes the rounded corners itself, so the box does not become a frame that stretches it (traidue /chi-siamo: the hero picture spread to the column width)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 400, height: 200 });
+      await page.setContent(ROUNDED);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+      const picture = all(tree.root).find((n) => n.fills?.some((f) => f.type === 'IMAGE'))!;
+
+      expect(picture.cornerRadius).toBe(12);
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});

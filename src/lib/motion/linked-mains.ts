@@ -5,6 +5,9 @@ import type { Overrides } from './main-component';
 import { compBox, reframed, type Point, type Size } from './comp-frame';
 import { resolveVariables } from './variables';
 
+const INSTANCE = 'Precomp';
+const STILL: Point = { x: 0, y: 0 };
+
 export type HomeDocs = ReadonlyMap<string, MotionDoc | null>;
 
 const homeOf = (comp: MotionComp, frameId: string): string | null => {
@@ -42,7 +45,7 @@ function detached(doc: MotionDoc, compId: string): MotionDoc {
   const own: MotionDoc['comps'] = {};
 
   const unlink = (clip: MotionClip): MotionClip => {
-    if (clip.component !== 'Precomp' || clip.props.comp !== compId) {
+    if (clip.component !== INSTANCE || clip.props.comp !== compId) {
       return clip;
     }
     const { overrides, ...props } = clip.props as Record<string, unknown> & { overrides?: Overrides };
@@ -67,6 +70,18 @@ function anchored(local: MotionComp | undefined, arriving: MotionComp, size: Siz
   return was && now ? { x: was.left - now.left, y: was.top - now.top } : { x: 0, y: 0 };
 }
 
+function innerKept(main: MotionComp, doc: MotionDoc, homeDoc: MotionDoc, from: Size, to: Size): MotionComp {
+  const keptShift = (inner: string): Point => (doc.comps[inner] && homeDoc.comps[inner] ? anchored(doc.comps[inner], reframed(homeDoc.comps[inner], from, to), to) : STILL);
+  const kept = (clip: MotionClip): MotionClip => {
+    if (clip.component !== INSTANCE || typeof clip.props.comp !== 'string') {
+      return clip;
+    }
+    const by = keptShift(clip.props.comp);
+    return by.x || by.y ? { ...clip, transform: { ...clip.transform, x: Number(clip.transform?.x ?? 0) - by.x / to.width, y: Number(clip.transform?.y ?? 0) - by.y / to.height } } : clip;
+  };
+  return { ...main, tracks: mapClips(main.tracks, kept) };
+}
+
 function followed(doc: MotionDoc, compId: string, home: string, homeDoc: MotionDoc): MotionDoc {
   const main = homeDoc.comps[compId];
   if (!main?.component) {
@@ -79,7 +94,7 @@ function followed(doc: MotionDoc, compId: string, home: string, homeDoc: MotionD
   const picked = Object.fromEntries(
     Object.entries(slice).flatMap(([id, comp]) => {
       if (id === compId) {
-        return [[id, { ...reframed(comp, from, to, shift), component: { ...comp.component!, home } }]];
+        return [[id, { ...innerKept(reframed(comp, from, to, shift), doc, homeDoc, from, to), component: { ...comp.component!, home } }]];
       }
       if (doc.comps[id] && comp.component) {
         return [];
