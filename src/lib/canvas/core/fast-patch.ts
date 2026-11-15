@@ -482,6 +482,18 @@ function inserted(items: Item[], order: string[], clip: string, fresh: Item[]): 
   return placedAt(items, last.run.path, end, fresh);
 }
 
+function withoutClips(items: Item[], gone: ReadonlySet<string>): Item[] {
+  if (!gone.size) {
+    return items;
+  }
+  return items.flatMap((item) => {
+    if (gone.has(instanceHost(item.clip) ?? item.clip)) {
+      return [];
+    }
+    return item.kind === ItemKind.Group ? [{ ...item, items: withoutClips(item.items, gone) }] : [item];
+  });
+}
+
 const declined = (reason: string): null => {
   traceSince(`patch:decline:${reason}`, performance.now());
   return null;
@@ -492,7 +504,8 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
     return declined('no-look');
   }
   const was = timed('patch:layout:before', () => exactLaid(before, measure));
-  const relaid = laidIncrementally(before, after, measure);
+  const relaid = timed('patch:layout:after', () => laidIncrementally(before, after, measure));
+  let mark = performance.now();
   const moved = new Set([edited.id, ...[...relaid].filter(([id, c]) => !was.get(id) || !sameProps(was.get(id)!, c)).map(([id]) => id)]);
   const slides = new Map([...moved].flatMap((id) => {
     const by = id === edited.id ? null : slideOf(was.get(id), relaid.get(id), after);
@@ -500,6 +513,7 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
   }));
   const cutting = new Set([...slides.keys()].filter((id) => !!relaid.get(id)?.clipContent || !!relaid.get(id)?.mask));
   const redraw = [...below(after, new Set([edited.id, ...cutting])), ...[...moved].filter((id) => !slides.has(id) && id !== edited.id)].filter((id, i, all) => all.indexOf(id) === i);
+  traceSince('patch:plan', mark);
   if (redraw.filter((id) => relaid.has(id)).length > REDRAW_MOST) {
     return declined('too-many');
   }
@@ -507,18 +521,22 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
   if (redraw.some((id) => paired.has(id))) {
     return declined('paired');
   }
+  mark = performance.now();
   const now = (c: MotionClip) => settled(relaid.get(c.id) ?? was.get(c.id) ?? c);
   const kept = new Set([...redraw, ...redraw.flatMap((id) => ancestorsOf(after, id)), ...(after.surface ? [after.surface] : [])]);
   const shown = withoutHidden(after);
   const mini = { ...shown, tracks: shown.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => kept.has(c.id)).map(now) })) };
   const back = new Set(redraw.filter((id) => relaid.has(id) && !was.has(id)));
   const redrawSet = new Set(redraw);
+  traceSince('patch:mini', mark);
   const drawnMini = timed('patch:draw', () => drawFrame(prepare(mini, look.tokens, look.assets, look.typeset), look.frame));
   const fresh = drawnMini.items;
-  let items: Item[] | null = list.items;
+  mark = performance.now();
+  const hiddenNow = new Set(redraw.filter((id) => !relaid.has(id)));
+  let items: Item[] | null = withoutClips(list.items, hiddenNow);
   const order = drawOrder(shown);
   const rank = (clip: string) => order.indexOf(instanceHost(clip) ?? clip);
-  for (const id of [...redraw].sort((x, y) => rank(x) - rank(y))) {
+  for (const id of redraw.filter((id) => !hiddenNow.has(id)).sort((x, y) => rank(x) - rank(y))) {
     const own = ownItems(fresh, id);
     const old = ownItems(items!, id);
     if (!old.length && !own.length) {
@@ -536,6 +554,8 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
       return declined('slide');
     }
   }
+  traceSince('patch:splice', mark);
+  mark = performance.now();
   const left = new Set(clipsOf(shown).map((c) => c.id));
   const gone = new Set(clipsOf(after).map((c) => c.id).filter((id) => !left.has(id)));
   const redrawn = new Set(redraw);
@@ -548,8 +568,9 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
     const at = all.findIndex((k) => rank(k.clip) > rank(g.clip));
     return at < 0 ? [...all, g] : [...all.slice(0, at), g, ...all.slice(at)];
   }, list.unsupported.filter((g) => !gone.has(host(g))));
+  traceSince('patch:gaps', mark);
   const patched = { ...list, items: items!, unsupported };
-  return rebled(patched, before, after);
+  return timed('patch:bleed', () => rebled(patched, before, after));
 }
 
 enum Edit {

@@ -307,3 +307,22 @@ describe('editKindOf', () => {
     expect(editKindOf(before, edit(edit(before, 'a', hidden), 'b', hidden))).toBe('many');
   });
 });
+
+describe('hiding a big section', () => {
+  it('removes the hidden subtree in one pass instead of splicing each hidden layer out', () => {
+    const kids = Array.from({ length: MANY }, (_, i) => `k${i}`);
+    const doc = [['section', 'page'], ['after', 'page'], ...kids.map((k) => [k, 'section'])].reduce((d, [id, parent]) => edit(d, id, (c) => ({ ...c, parent, props: { ...c.props, ...SMALL } })), built(['page', 'section', 'after', ...kids]));
+    const laid = edit(edit(doc, 'page', (c) => ({ ...c, autoLayout: { ...DEFAULT_AUTO_LAYOUT, gap: 4 } })), 'section', (c) => ({ ...c, autoLayout: { ...DEFAULT_AUTO_LAYOUT, gap: 4 } }));
+    const list = drawn(laid);
+    const after = edit(laid, 'section', hidden);
+    fastPatch(list, laid, laid, estimatedText, LOOK);
+    const slice = vi.spyOn(Array.prototype, 'slice');
+
+    const patched = fastPatch(list, laid, after, estimatedText, LOOK);
+
+    const calls = slice.mock.calls.length;
+    slice.mockRestore();
+    expect(rounded(patched)).toEqual(rounded(drawn(after)));
+    expect(calls).toBeLessThan(MANY);
+  });
+});
