@@ -15,6 +15,9 @@ the canvas without producing anything new:
   sweep. The key is now a 128-bit hash streamed from the same text
   (`layer_key.rs`): no string, no per-frame clones.
 
-Left alone: the overlay JSON parse through `serde_json::Value` (boundary work,
-owned by the TS↔wasm audit; a RawValue rewrite cut it from 34 to 15
-allocations per item).
+- **Overlay parsed through a JSON tree.** Each overlay item went into a
+  `serde_json::Value`, then `from_value` (~2.8 s of the profile).
+  `parse_overlay` now splits the list into raw items and parses each one
+  straight into its type (34 → 14 allocations per path item). Only the top
+  level: items nested under a `#[serde(flatten)]` look arrive buffered, where a
+  `RawValue` cannot be read, so `Item::deserialize` keeps the tree there.
