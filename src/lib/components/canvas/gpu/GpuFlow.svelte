@@ -178,6 +178,8 @@
   import { frameSources } from '$lib/canvas/core/frame-sources';
   import { ChromeLayers, NO_OVERLAY, overlayOf } from '$lib/canvas/core/world-overlay';
   import { labelStepOf, labelZoomStep, strokeZoomStep } from '$lib/canvas/core/label-size';
+  import { settledZoom } from '$lib/canvas/core/settled-zoom';
+  import { GESTURE_QUIET_MS } from '$lib/canvas/core/gesture-quiet';
   import { SIGHT_SLACK, grown, stillHolds, type Taken } from '$lib/canvas/core/sight';
   import { nodeHitRects } from '$lib/canvas/core/node-hit';
   import type { ChromeTile, Glyphs } from '$lib/canvas/core/chrome';
@@ -464,11 +466,20 @@
   };
   const drawsCard = (t: Tile) => !!t.kind && isNodeType(t.kind) && !handedOver(t);
   const drawCard = $derived(coreType && coreLook ? cardsOnCanvas({ ...coreLook, panel: coreLook.paper }, coreType.glyphs, coreType.bold, coreType.gen) : null);
+  const labelHold = settledZoom(labelZoomStep, () => performance.now(), untrack(() => view.zoom));
+  const strokeHold = settledZoom(strokeZoomStep, () => performance.now(), untrack(() => view.zoom));
   let labelZoom = $state(labelZoomStep(untrack(() => view.zoom)));
+  let strokeZoom = $state(strokeZoomStep(untrack(() => view.zoom)));
   $effect(() => {
-    labelZoom = labelZoomStep(view.zoom);
+    const zoom = view.zoom;
+    const settle = () => {
+      labelZoom = labelHold.at(zoom);
+      strokeZoom = strokeHold.at(zoom);
+    };
+    settle();
+    const later = setTimeout(settle, GESTURE_QUIET_MS);
+    return () => clearTimeout(later);
   });
-  const strokeZoom = $derived(strokeZoomStep(view.zoom));
   const basesAt = (size: AssetSize) => {
     const text = coreType;
     if (!text) {
