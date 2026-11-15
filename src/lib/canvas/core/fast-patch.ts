@@ -383,6 +383,24 @@ function exactLaid(doc: MotionDoc, measure: TextMeasure): Clips {
 
 const REDRAW_MOST = 48;
 
+const SLIDING = new Set(['x', 'y']);
+
+function slideOf(a: MotionClip | undefined, b: MotionClip | undefined, doc: MotionDoc): Shift | null {
+  if (!a || !b || !sameJson(a.transform, b.transform) || !changedKeys(a.props, b.props).every((k) => SLIDING.has(k))) {
+    return null;
+  }
+  return shiftOf(a.props, b.props, doc);
+}
+
+const plainToSlide = (item: Item): boolean => !item.masks && !item.matte && !item.scissor && (item.kind !== ItemKind.Group || item.items.every(plainToSlide));
+
+function slidItem(item: Item, by: Shift): Item {
+  if (item.kind === ItemKind.Group) {
+    return { ...item, items: item.items.map((i) => slidItem(i, by)) };
+  }
+  return { ...item, matrix: slid(item.matrix, by) } as Item;
+}
+
 const rootOf = (doc: MotionDoc, id: string) => ancestorsOf(doc, id)[0] ?? id;
 
 export function laidIncrementally(before: MotionDoc, after: MotionDoc, measure: TextMeasure): Clips {
@@ -451,7 +469,12 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
   const was = exactLaid(before, measure);
   const relaid = laidIncrementally(before, after, measure);
   const moved = new Set([edited.id, ...[...relaid].filter(([id, c]) => !was.get(id) || !sameProps(was.get(id)!, c)).map(([id]) => id)]);
-  const redraw = below(after, moved);
+  const slides = new Map([...moved].flatMap((id) => {
+    const by = id === edited.id ? null : slideOf(was.get(id), relaid.get(id), after);
+    return by && ownItems(list.items, id).every(plainToSlide) ? [[id, by] as const] : [];
+  }));
+  const cutting = new Set([...slides.keys()].filter((id) => !!relaid.get(id)?.clipContent || !!relaid.get(id)?.mask));
+  const redraw = [...below(after, new Set([edited.id, ...cutting])), ...[...moved].filter((id) => !slides.has(id) && id !== edited.id)].filter((id, i, all) => all.indexOf(id) === i);
   if (redraw.length > REDRAW_MOST) {
     return null;
   }
@@ -464,6 +487,7 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
   const shown = withoutHidden(after);
   const mini = { ...shown, tracks: shown.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => kept.has(c.id)).map(now) })) };
   const back = new Set(redraw.filter((id) => relaid.has(id) && !was.has(id)));
+  const redrawSet = new Set(redraw);
   const drawnMini = drawFrame(prepare(mini, look.tokens, look.assets, look.typeset), look.frame);
   const fresh = drawnMini.items;
   let items: Item[] | null = list.items;
@@ -476,6 +500,13 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
       continue;
     }
     items = old.length ? spliced(items!, id, own) : inserted(items!, order, id, own);
+    if (!items) {
+      return null;
+    }
+  }
+  for (const [id, by] of slides) {
+    const old = ownItems(items!, id);
+    items = redrawSet.has(id) || !old.length ? items : spliced(items!, id, old.map((i) => slidItem(i, by)));
     if (!items) {
       return null;
     }
