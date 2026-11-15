@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CoreMotion } from '@feega/motion-core/motion/gpu-full/core-web';
 import { NodeChrome } from '$lib/canvas/selection-chrome';
-import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { GESTURE_QUIET_MS } from './gesture-quiet';
 import { strokeZoomStep } from './label-size';
 import { settledZoom } from './settled-zoom';
@@ -32,7 +31,7 @@ const world = (strokeZoom: number, zoom: number): WorldOverlay => ({
   outlines: [],
   ghost: null,
   running: [],
-  chrome: Array.from({ length: TILES }, (_, i) => ({ id: `t${i}`, x: i * 300, y: 0, width: 200, height: 120, label: null, icon: null, ring: NodeChrome.Selected, handles: false, ringColor: FEEGA_TOKENS.primary ?? '#ff6a3d', names: false, strokeZoom, radius: 4, layers: ChromeLayers.State }) as never)
+  chrome: Array.from({ length: TILES }, (_, i) => ({ id: `t${i}`, x: i * 300, y: 0, width: 200, height: 120, label: null, icon: null, ring: NodeChrome.Selected, handles: false, ringColor: '#ff6a3d', names: false, strokeZoom, radius: 4, layers: ChromeLayers.State }) as never)
 });
 
 describe('settledZoom', () => {
