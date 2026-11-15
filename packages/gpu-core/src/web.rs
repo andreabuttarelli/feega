@@ -16,7 +16,7 @@ use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys};
+use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, batches_of, bake_batches, BAKE_BATCH_TILES, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys};
 use crate::overlay_seen::OverlaySeen;
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
@@ -799,16 +799,12 @@ impl WebCore {
         queue.stale.sort_by_key(|k| !self.lifted.iter().any(|(_, l)| k.world().overlaps(l.rest)));
         let left_blank = queue.blank.clone();
         let order = queue.order();
-        let blocks = batches(&order);
         self.credit.earn(budget);
-        for batch in blocks {
-            if !self.credit.allows() {
+        for batch in batches_of(&order, self.credit.side()) {
+            if !self.credit.affords(batch.keys.len()) {
                 break;
             }
-            let began = js_sys::Date::now();
-            self.raster_batch(&batch)?;
-            self.credit.spend(js_sys::Date::now() - began);
-            rastered += batch.keys.len();
+            rastered += self.paid_batch(&batch)?;
         }
         if matches!(self.motion, CoreMotion::Gesture) && self.credit.allows() {
             rastered += self.bake_ahead()?;
@@ -841,16 +837,22 @@ impl WebCore {
     fn bake_ahead(&mut self) -> Result<usize, JsValue> {
         let screen = (self.target.width(), self.target.height());
         let mut rastered = 0;
-        for batch in bake_batches(&self.tiles.ahead(self.was, self.camera, screen)) {
-            if !self.credit.allows() {
+        for batch in batches_of(&self.tiles.ahead(self.was, self.camera, screen), self.credit.side().min(BAKE_BATCH_TILES)) {
+            if !self.credit.affords(batch.keys.len()) {
                 break;
             }
-            let began = js_sys::Date::now();
-            self.raster_batch(&batch)?;
-            self.credit.spend(js_sys::Date::now() - began);
-            rastered += batch.keys.len();
+            rastered += self.paid_batch(&batch)?;
         }
         Ok(rastered)
+    }
+
+    fn paid_batch(&mut self, batch: &Batch) -> Result<usize, JsValue> {
+        let began = js_sys::Date::now();
+        self.raster_batch(batch)?;
+        let took = js_sys::Date::now() - began;
+        self.credit.spend(took);
+        self.credit.learn(took, batch.keys.len());
+        Ok(batch.keys.len())
     }
 
     fn forget_rest(&mut self) {

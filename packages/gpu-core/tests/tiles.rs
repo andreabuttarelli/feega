@@ -734,3 +734,23 @@ fn looking_ahead_of_a_fast_zoom_out_ends_in_time() {
 
     assert!(ended.recv_timeout(std::time::Duration::from_secs(2)).is_ok());
 }
+
+#[test]
+fn a_gesture_bakes_only_the_tiles_its_budget_can_pay_for() {
+    let mut credit = gpu_core::tiles::RasterCredit::default();
+    credit.learn(11.2, 16);
+    credit.earn(4.0);
+
+    assert!(!credit.affords(16));
+    assert!(credit.affords(4));
+    assert_eq!(credit.side(), 2);
+}
+
+#[test]
+fn a_credit_that_has_measured_nothing_yet_lets_one_batch_through() {
+    let mut credit = gpu_core::tiles::RasterCredit::default();
+    credit.earn(4.0);
+
+    assert!(credit.affords(16));
+    assert_eq!(credit.side(), BATCH_TILES);
+}
