@@ -154,8 +154,10 @@ function carriedRow(notice: string): Row<Carried> {
 }
 
 function removedUndo(before: Rows, input: Inputs[OptimisticAction.Remove]): UndoItem[] {
-  const edges = before.edges.filter((e) => input.edgeIds.includes(e.id));
-  const nodes = before.nodes.filter((n) => input.nodeIds.includes(n.id));
+  const edgeIds = new Set(input.edgeIds);
+  const nodeIds = new Set(input.nodeIds);
+  const edges = before.edges.filter((e) => edgeIds.has(e.id));
+  const nodes = before.nodes.filter((n) => nodeIds.has(n.id));
   return [
     ...edges.map((e): UndoItem => ({ kind: 'edge.delete', edgeId: e.id, sourceNodeId: e.source, targetNodeId: e.target })),
     ...nodes.map((n): UndoItem => ({
@@ -204,7 +206,8 @@ const REGISTRY: { [K in OptimisticAction]: Row<Inputs[K]> } = {
   [OptimisticAction.Section]: {
     fields: idsField,
     apply: (rows, i, ctx) => {
-      const picked = rows.nodes.filter((n) => i.ids.includes(n.id));
+      const wanted = new Set(i.ids);
+      const picked = rows.nodes.filter((n) => wanted.has(n.id));
       return picked.length ? { ...rows, nodes: [ctx.toTile(sectionRecord(i.id, picked)), ...joined(rows.nodes, i.ids, i.id)] } : rows;
     },
     touched: (i) => nodesOnly([...i.ids, i.id]),
@@ -269,7 +272,10 @@ const REGISTRY: { [K in OptimisticAction]: Row<Inputs[K]> } = {
   },
   [OptimisticAction.EdgeTie]: {
     fields: (i) => ({ connection_ids: i.connectionIds.join(','), ...(i.tie ? { tie: JSON.stringify(i.tie) } : {}) }),
-    apply: (rows, i) => ({ ...rows, edges: rows.edges.map((e) => (i.connectionIds.includes(e.id) ? ({ ...e, tie: i.tie } as typeof e) : e)) }),
+    apply: (rows, i) => {
+      const tied = new Set(i.connectionIds);
+      return { ...rows, edges: rows.edges.map((e) => (tied.has(e.id) ? ({ ...e, tie: i.tie } as typeof e) : e)) };
+    },
     touched: (i) => ({ nodes: [], edges: i.connectionIds }),
     landing: Landing.Answered,
     undo: noUndo,
@@ -278,7 +284,11 @@ const REGISTRY: { [K in OptimisticAction]: Row<Inputs[K]> } = {
   },
   [OptimisticAction.Remove]: {
     fields: (i) => ({ node_ids: i.nodeIds.join(','), connection_ids: i.edgeIds.join(',') }),
-    apply: (rows, i) => ({ nodes: rows.nodes.filter((n) => !i.nodeIds.includes(n.id)), edges: rows.edges.filter((e) => !i.edgeIds.includes(e.id)) }),
+    apply: (rows, i) => {
+      const nodeIds = new Set(i.nodeIds);
+      const edgeIds = new Set(i.edgeIds);
+      return { nodes: rows.nodes.filter((n) => !nodeIds.has(n.id)), edges: rows.edges.filter((e) => !edgeIds.has(e.id)) };
+    },
     touched: (i) => ({ nodes: i.nodeIds, edges: i.edgeIds }),
     landing: Landing.Answered,
     undo: (_, before, i) => removedUndo(before, i),
