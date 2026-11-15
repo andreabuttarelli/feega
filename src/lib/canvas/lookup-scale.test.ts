@@ -3,7 +3,7 @@ import { MotionFormat, newClip, newMotionDoc } from '@feega/motion-core/motion/d
 import { Ease } from '@feega/motion-core/motion/design';
 import { removeClips, snapTargets } from '@feega/motion-core/motion/timeline';
 import { edgeHandles, graphLanes } from '$lib/motion/timeline-view';
-import { Place, dropLayers } from './layers';
+import { Place, dropLayers, frameRows } from './layers';
 import { counted } from './counted-list.testkit';
 import { subtreeOf } from './core/lifted-drag';
 
@@ -77,5 +77,17 @@ describe('lookups index their ids once', () => {
     dropLayers(doc, dragged, `c${SIZE - 1}`, Place.Above, topFirst);
 
     expect(dragged.scans()).toBe(0);
+  });
+
+  it('rebuilding the layer rows after one edit keeps the rows of every untouched layer', () => {
+    const { doc } = flatDoc();
+    const before = frameRows(doc, 'n1');
+    const edited = { ...doc, tracks: [{ ...doc.tracks[0], clips: doc.tracks[0].clips.map((c, i) => (i === 7 ? { ...c, name: 'Moved' } : c)) }] };
+
+    const after = frameRows(edited, 'n1');
+
+    const fresh = after.filter((row, i) => row !== before[i]).length;
+    expect(after.length).toBe(before.length);
+    expect(fresh).toBeLessThan(3);
   });
 });
