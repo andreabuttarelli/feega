@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newClip, newMotionDoc } from '@feega/motion-core/motion/doc';
-import { snapTargets } from '@feega/motion-core/motion/timeline';
+import { removeClips, snapTargets } from '@feega/motion-core/motion/timeline';
 import { counted } from './counted-list.testkit';
 import { subtreeOf } from './core/lifted-drag';
 
@@ -31,5 +31,16 @@ describe('lookups index their ids once', () => {
 
     expect(clips.scans()).toBe(0);
     expect(exclude.scans()).toBe(0);
+  });
+
+  it('removing clips scans neither the ids nor the track per clip', () => {
+    const { doc, clips } = flatDoc();
+    const ids = counted(Array.from({ length: PICKED }, (_, i) => `c${i}`));
+
+    const result = removeClips(doc, ids);
+
+    expect(result.ok).toBe(true);
+    expect(ids.scans()).toBe(0);
+    expect(clips.scans()).toBe(0);
   });
 });

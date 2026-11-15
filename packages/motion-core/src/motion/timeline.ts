@@ -208,12 +208,15 @@ export function duplicateClip(doc: MotionDoc, clipId: string, newId: string): Op
 }
 
 export function removeClips(doc: MotionDoc, ids: readonly string[]): OpResult {
-  const missing = ids.find((id) => !findClip(doc, id));
-  if (missing) {
-    return fail(`no clip ${missing}`);
+  const present = new Set(clipsOf(doc).map((c) => c.id));
+  for (const id of ids) {
+    if (!present.has(id)) {
+      return fail(`no clip ${id}`);
+    }
   }
-  const orphan = (c: MotionTrack['clips'][number]) => (c.parent && ids.includes(c.parent) ? { ...c, parent: null } : c);
-  return { ok: true, doc: { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => !ids.includes(c.id)).map(orphan) })) } };
+  const removed = new Set(ids);
+  const orphan = (c: MotionTrack['clips'][number]) => (c.parent && removed.has(c.parent) ? { ...c, parent: null } : c);
+  return { ok: true, doc: { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => !removed.has(c.id)).map(orphan) })) } };
 }
 
 function ratioKept(clip: MotionClip | undefined, doc: MotionDoc, patch: Record<string, unknown>): Record<string, unknown> {
