@@ -59,6 +59,7 @@
   import { editedLayers } from '$lib/canvas/core/edited-layers';
   import { editedClipId, fastPatch, readyPatch, reloaded, relinked } from '$lib/canvas/core/fast-patch';
   import { PatchBudget } from '$lib/canvas/core/patch-budget';
+  import { traceSince, traceSinceInput } from '$lib/canvas/core/edit-trace';
   import { shapedText } from '@feega/motion-core/motion/gpu-full/text/measure';
   import type { TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
   import { paintFirst } from '$lib/canvas/core/paint-first';
@@ -670,6 +671,7 @@
   }
 
   function patchLive(f: FrameAt, source: LiveDoc): boolean {
+    traceSinceInput('edit:to-patch');
     const shown = liveShown.get(f.id);
     const measure = liveMeasures.get(f.id);
     const budgetKey = shown ? `${f.id}|${editedClipId(shown.doc, source.doc) ?? ''}` : f.id;
@@ -680,7 +682,7 @@
     if (look) {
       patchBudget.took(budgetKey, performance.now() - began);
     }
-    performance.measure(`patch:total:${list ? 'patched' : look ? 'declined' : 'budget'}`, { start: began, end: performance.now() });
+    traceSince(`patch:total:${list ? 'patched' : look ? 'declined' : 'budget'}`, began);
     if (!shown || !list) {
       return false;
     }

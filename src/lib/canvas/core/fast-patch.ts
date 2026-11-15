@@ -1,6 +1,7 @@
 import { ItemKind, type DisplayList, type GroupItem, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import { clipsOf, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { TrackKind } from '@feega/motion-core/motion/components';
+import { traceSince } from './edit-trace';
 import { ParentOpacity, ancestorsOf } from '@feega/motion-core/motion/parent';
 import { laidSubtree, relaidWithin, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import type { TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
@@ -118,7 +119,7 @@ const laidOf = (doc: MotionDoc) => laidDocs.get(doc) ?? laidDocs.set(doc, new Ma
 
 function laid(doc: MotionDoc, measure: TextMeasure): Clips {
   const byMeasure = laidOf(doc);
-  return byMeasure.get(measure) ?? byMeasure.set(measure, byId(clipsOf(withAutoLayout(withoutHidden(doc), measure)))).get(measure)!;
+  return byMeasure.get(measure) ?? byMeasure.set(measure, exactDocs.get(doc)?.get(measure) ?? byId(clipsOf(withAutoLayout(withoutHidden(doc), measure)))).get(measure)!;
 }
 
 function carryLaid(before: MotionDoc, after: MotionDoc, measure: TextMeasure, carry: (laidBefore: Clips) => Clips) {
@@ -422,7 +423,7 @@ export function laidIncrementally(before: MotionDoc, after: MotionDoc, measure: 
   const fresh = new Map([...roots].filter((id) => left.has(id)).flatMap((id) => laidSubtree(shown, id, measure).map((c) => [c.id, c] as const)));
   const next: Clips = new Map(clipsOf(shown).map((c) => [c.id, fresh.get(c.id) ?? was.get(c.id) ?? c]));
   byMeasure.set(measure, next);
-  performance.measure('patch:layout:root', { start: started, end: performance.now() });
+  traceSince('patch:layout:root', started);
   return next;
 }
 
@@ -431,7 +432,7 @@ const timed = <T>(name: string, run: () => T): T => {
   try {
     return run();
   } finally {
-    performance.measure(name, { start, end: performance.now() });
+    traceSince(name, start);
   }
 };
 

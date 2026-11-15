@@ -645,6 +645,7 @@ async function editRun(browser: Browser, target: Target): Promise<Record<Edit, (
   const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 2, serviceWorkers: 'block' });
   const page = await context.newPage();
   await page.addInitScript(listenInput);
+  await page.addInitScript(() => Object.assign(globalThis, { __editTrace: true }));
   if (SHOTS) {
     await page.addInitScript(holdBuilds);
   }
@@ -669,7 +670,7 @@ async function editRun(browser: Browser, target: Target): Promise<Record<Edit, (
     const startedAt = await page.evaluate(() => performance.now());
     await page.evaluate(() => performance.clearMeasures());
     seen[edit] = await edits(page, edit).catch((e: unknown) => (console.log(`${edit}: ${e}`), []));
-    phases[edit] = await page.evaluate(() => performance.getEntriesByType('measure').filter((m) => m.name.startsWith('patch:')).map((m) => [m.name, m.duration] as [string, number]));
+    phases[edit] = await page.evaluate(() => performance.getEntriesByType('measure').filter((m) => m.name.startsWith('patch:') || m.name.startsWith('edit:')).map((m) => [m.name, m.duration] as [string, number]));
     if (cdp) {
       const { profile } = await cdp.send('Profiler.stop');
       writeFileSync(join(OUT, `edit-${target}-${edit}.cpuprofile`), JSON.stringify(profile));
