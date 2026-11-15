@@ -2,7 +2,7 @@ import { ItemKind, type DisplayList, type GroupItem, type Item } from '@feega/mo
 import { clipsOf, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { TrackKind } from '@feega/motion-core/motion/components';
 import { ParentOpacity, ancestorsOf } from '@feega/motion-core/motion/parent';
-import { relaidWithin, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+import { laidSubtree, relaidWithin, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import type { TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
 import { withoutHidden } from '@feega/motion-core/motion/organize';
 import { SEPARATOR } from '@feega/motion-core/motion/precomp';
@@ -351,6 +351,28 @@ function exactLaid(doc: MotionDoc, measure: TextMeasure): Clips {
 
 const REDRAW_MOST = 48;
 
+const rootOf = (doc: MotionDoc, id: string) => ancestorsOf(doc, id)[0] ?? id;
+
+export function laidIncrementally(before: MotionDoc, after: MotionDoc, measure: TextMeasure): Clips {
+  const byMeasure = exactDocs.get(after) ?? exactDocs.set(after, new Map()).get(after)!;
+  const known = byMeasure.get(measure);
+  if (known) {
+    return known;
+  }
+  const was = exactLaid(before, measure);
+  const [old, now] = [clipsOf(before), clipsOf(after)];
+  const oldById = new Map(old.map((c) => [c.id, c]));
+  const touched = now.filter((c) => oldById.get(c.id) !== c).map((c) => c.id);
+  const gone = old.filter((c) => !now.some((n) => n.id === c.id)).map((c) => c.id);
+  const roots = new Set([...touched.map((id) => rootOf(after, id)), ...[...touched, ...gone].filter((id) => oldById.has(id)).map((id) => rootOf(before, id))]);
+  const shown = withoutHidden(after);
+  const left = new Set(clipsOf(shown).map((c) => c.id));
+  const fresh = new Map([...roots].filter((id) => left.has(id)).flatMap((id) => laidSubtree(shown, id, measure).map((c) => [c.id, c] as const)));
+  const next: Clips = new Map(clipsOf(shown).map((c) => [c.id, fresh.get(c.id) ?? was.get(c.id) ?? c]));
+  byMeasure.set(measure, next);
+  return next;
+}
+
 const drawOrder = (doc: MotionDoc): string[] => [...doc.tracks].reverse().filter((t) => t.kind === TrackKind.Visual && !t.hidden).flatMap((t) => t.clips.map((c) => c.id));
 
 function runAt(items: Item[], clip: string): { within: Item[]; at: number; path: number[] } | null {
@@ -395,7 +417,7 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
     return null;
   }
   const was = exactLaid(before, measure);
-  const relaid = exactLaid(after, measure);
+  const relaid = laidIncrementally(before, after, measure);
   const moved = new Set([edited.id, ...[...relaid].filter(([id, c]) => !was.get(id) || !sameProps(was.get(id)!, c)).map(([id]) => id)]);
   const redraw = below(after, moved);
   if (redraw.length > REDRAW_MOST) {

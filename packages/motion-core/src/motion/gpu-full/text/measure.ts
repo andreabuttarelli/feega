@@ -13,13 +13,22 @@ const MEASURES_KEPT = 4096;
 
 function remembered(measure: TextMeasure): TextMeasure {
   const known = new Map<string, ReturnType<TextMeasure>>();
+  const byProps = new WeakMap<object, Map<string, ReturnType<TextMeasure>>>();
   return (component, props, unit, width) => {
-    const key = `${component}\u0000${unit}\u0000${width}\u0000${JSON.stringify(props)}`;
+    const at = `${component}\u0000${unit}\u0000${width}`;
+    const same = byProps.get(props) ?? byProps.set(props, new Map()).get(props)!;
+    const seen = same.get(at);
+    if (seen) {
+      return { ...seen };
+    }
+    const key = `${at}\u0000${JSON.stringify(props)}`;
     const hit = known.get(key);
     if (hit) {
+      same.set(at, hit);
       return { ...hit };
     }
     const size = measure(component, props, unit, width);
+    same.set(at, size);
     if (known.size >= MEASURES_KEPT) {
       known.delete(known.keys().next().value as string);
     }
