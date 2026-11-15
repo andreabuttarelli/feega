@@ -1,6 +1,6 @@
 #![cfg(feature = "gpu")]
 
-use gpu_core::reproject::{Draw, Output, Reprojector, Tile};
+use gpu_core::reproject::{Draw, Output, Reprojector, Tile, OPAQUE};
 use gpu_core::retained::Lookup;
 use vello::wgpu;
 
@@ -162,9 +162,9 @@ fn many_tiles_composited_in_one_pass_each_keep_their_own_look() {
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
     let half = SIDE as f64 / 2.0;
     let tiles = [
-        Tile { source: &left, look: IDENTITY, within: vello::kurbo::Rect::new(0.0, 0.0, half, SIDE as f64) },
-        Tile { source: &right, look: IDENTITY, within: vello::kurbo::Rect::new(half, 0.0, SIDE as f64, SIDE as f64) },
-        Tile { source: &right, look: AWAY, within: vello::kurbo::Rect::new(half, 0.0, SIDE as f64, SIDE as f64) },
+        Tile { source: &left, look: IDENTITY, within: vello::kurbo::Rect::new(0.0, 0.0, half, SIDE as f64), opacity: OPAQUE },
+        Tile { source: &right, look: IDENTITY, within: vello::kurbo::Rect::new(half, 0.0, SIDE as f64, SIDE as f64), opacity: OPAQUE },
+        Tile { source: &right, look: AWAY, within: vello::kurbo::Rect::new(half, 0.0, SIDE as f64, SIDE as f64), opacity: OPAQUE },
     ];
     Reprojector::new(&device).draw_tiles(&device, &queue, &mut encoder, &view, FORMAT, Output::Straight, &tiles);
 
