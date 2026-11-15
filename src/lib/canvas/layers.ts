@@ -475,7 +475,8 @@ export function dropTool(doc: MotionDoc, tool: DrawTool, target: string, place: 
 }
 
 export function dropLayers(doc: MotionDoc, dragged: readonly string[], target: string, place: Place, topFirst: readonly string[], here: string | null = null, newId: NewId = newTrackId): OpResult {
-  const block = topFirst.filter((id) => dragged.includes(id) && id !== target);
+  const moving = new Set(dragged);
+  const block = topFirst.filter((id) => moving.has(id) && id !== target);
   const sequence = place === Place.Below ? [...block].reverse() : block;
   return sequence.reduce<OpResult>((result, id) => (result.ok ? dropLayer(result.doc, id, target, place, newId, here) : result), { ok: true, doc });
 }

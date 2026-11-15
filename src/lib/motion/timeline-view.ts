@@ -74,7 +74,8 @@ export type Handle = { clipId: string; grip: Grip; left: number; width: number }
 type Span = { id: string; from: number; durationInFrames: number };
 
 export function edgeHandles(clips: readonly Span[], ppf: number, selected: readonly string[] = []): Handle[] {
-  const topmostLast = [...clips.filter((c) => !selected.includes(c.id)), ...clips.filter((c) => selected.includes(c.id))];
+  const chosen = new Set(selected);
+  const topmostLast = [...clips.filter((c) => !chosen.has(c.id)), ...clips.filter((c) => chosen.has(c.id))];
   return topmostLast.flatMap((clip) => {
     const left = clip.from * ppf;
     const right = (clip.from + clip.durationInFrames) * ppf;
@@ -148,7 +149,8 @@ export function graphLanes(doc: MotionDoc, selection: readonly string[], keySele
   if (chosen.length) {
     return chosen;
   }
-  return numeric.filter((l) => selection.includes(l.clipId) || (camera && l.clipId === CAMERA_LANE));
+  const selectedClips = new Set(selection);
+  return numeric.filter((l) => selectedClips.has(l.clipId) || (camera && l.clipId === CAMERA_LANE));
 }
 
 const HEADERS: readonly { from: number; px: number }[] = [

@@ -316,29 +316,33 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
     },
     upload: (list: DisplayList, pictures: Pictures, most: number) => {
       const queue = queues.get(list) ?? queues.set(list, wantedPictures(list.items)).get(list)!;
+      const waiting: PictureItem[] = [];
       let sent = 0;
-      for (const item of [...queue]) {
+      for (const [at, item] of queue.entries()) {
         if (sent >= most) {
+          queue.slice(at).forEach((item) => waiting.push(item));
           break;
         }
         const picture = pictures(item);
         const bitmap = picture && !moving(picture) ? decodedOf(picture) : undefined;
         if (bitmap === null) {
+          waiting.push(item);
           continue;
         }
         const key = pictureKey(item);
         if (bitmap && uploaded.get(key) !== picture!.source) {
           sent++;
           if (!sendRows(key, bitmap)) {
+            waiting.push(item);
             continue;
           }
-          queue.splice(queue.indexOf(item), 1);
           uploaded.set(key, picture!.source);
           continue;
         }
-        queue.splice(queue.indexOf(item), 1);
         sent += upload(item, pictures) ? 1 : 0;
       }
+      queue.length = 0;
+      waiting.forEach((item) => queue.push(item));
       return queue.length === 0;
     },
     setCamera: (x: number, y: number, zoom: number) => attached.set_camera(x, y, zoom),

@@ -208,12 +208,15 @@ export function duplicateClip(doc: MotionDoc, clipId: string, newId: string): Op
 }
 
 export function removeClips(doc: MotionDoc, ids: readonly string[]): OpResult {
-  const missing = ids.find((id) => !findClip(doc, id));
-  if (missing) {
-    return fail(`no clip ${missing}`);
+  const present = new Set(clipsOf(doc).map((c) => c.id));
+  for (const id of ids) {
+    if (!present.has(id)) {
+      return fail(`no clip ${id}`);
+    }
   }
-  const orphan = (c: MotionTrack['clips'][number]) => (c.parent && ids.includes(c.parent) ? { ...c, parent: null } : c);
-  return { ok: true, doc: { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => !ids.includes(c.id)).map(orphan) })) } };
+  const removed = new Set(ids);
+  const orphan = (c: MotionTrack['clips'][number]) => (c.parent && removed.has(c.parent) ? { ...c, parent: null } : c);
+  return { ok: true, doc: { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => !removed.has(c.id)).map(orphan) })) } };
 }
 
 function ratioKept(clip: MotionClip | undefined, doc: MotionDoc, patch: Record<string, unknown>): Record<string, unknown> {
@@ -396,9 +399,10 @@ export function snapFrame(frame: number, targets: readonly number[], threshold: 
 }
 
 export function snapTargets(doc: MotionDoc, input: { playhead: number; exclude: readonly string[] }): number[] {
-  const kept = doc.tracks.flatMap((t) => t.clips.filter((c) => !input.exclude.includes(c.id)));
+  const excluded = new Set(input.exclude);
+  const kept = doc.tracks.flatMap((t) => t.clips.filter((c) => !excluded.has(c.id)));
   const edges = kept.flatMap((c) => [c.from, clipEnd(c)]);
-  const keys = keyframeFrames(doc, kept.map((c) => c.id));
+  const keys = framesOfClips(kept);
   const seconds = Array.from({ length: Math.floor(doc.durationInFrames / doc.fps) + 1 }, (_, i) => i * doc.fps);
   const markers = [...(doc.markers ?? []).map((m) => m.frame), ...kept.flatMap((c) => (c.markers ?? []).map((m) => c.from + m.frame))];
   return [...new Set([...edges, ...keys, ...markers, input.playhead, ...seconds])];
@@ -596,12 +600,14 @@ export function setLaneMuted(doc: MotionDoc, clipId: string, prop: string, muted
   });
 }
 
-export function keyframeFrames(doc: MotionDoc, clipIds: readonly string[]): number[] {
-  const frames = clipIds.flatMap((id) => {
-    const clip = findClip(doc, id)?.clip;
-    return clip ? Object.values(clip.keyframes).flatMap((track) => track.map((k) => clip.from + k.frame)) : [];
-  });
+function framesOfClips(clips: readonly MotionTrack['clips'][number][]): number[] {
+  const frames = clips.flatMap((clip) => Object.values(clip.keyframes).flatMap((track) => track.map((k) => clip.from + k.frame)));
   return [...new Set(frames)].sort((a, b) => a - b);
+}
+
+export function keyframeFrames(doc: MotionDoc, clipIds: readonly string[]): number[] {
+  const wanted = new Set(clipIds);
+  return framesOfClips(doc.tracks.flatMap((t) => t.clips.filter((c) => wanted.has(c.id))));
 }
 
 export function adjacentKeyframe(frames: readonly number[], frame: number, direction: Direction): number | null {
