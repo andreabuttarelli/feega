@@ -249,7 +249,16 @@ const instanceHost = (clip: string): string | null => (clip.includes(SEPARATOR) 
 
 const withItems = (group: GroupItem, items: Item[] | null): Item | null => (items ? { ...group, items } : null);
 
-function onlyClip(before: MotionDoc, after: MotionDoc): [MotionClip, MotionClip] | null {
+type Pair = [MotionClip, MotionClip] | null;
+
+const pairs = new WeakMap<MotionDoc, WeakMap<MotionDoc, Pair>>();
+
+function onlyClip(before: MotionDoc, after: MotionDoc): Pair {
+  const known = pairs.get(before) ?? pairs.set(before, new WeakMap()).get(before)!;
+  return known.has(after) ? known.get(after)! : known.set(after, pairedClip(before, after)).get(after)!;
+}
+
+function pairedClip(before: MotionDoc, after: MotionDoc): Pair {
   if (changedKeys(before, after).some((k) => k !== 'tracks')) {
     return null;
   }

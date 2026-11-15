@@ -423,4 +423,18 @@ describe('one edit on a frame of 2,000 layers', () => {
 
     expect(passes).toBeLessThan(20);
   });
+
+  it('compares the two docs of one edit once, however many times the patch asks which clip changed', () => {
+    const before = wide();
+    const after = touched(before, 1, faded(0.5));
+    const list = drawn(before);
+
+    const passes = fullPasses(() => {
+      editedClipId(before, after);
+      editKindOf(before, after);
+      fastPatch(list, before, after, estimatedText);
+    });
+
+    expect(passes).toBeLessThanOrEqual(4);
+  });
 });
