@@ -197,6 +197,23 @@ function onlyIn(doc: MotionDoc, clip: Clip): { only?: string } {
   return ids.length ? { only: viewsOf(doc).filter((v) => ids.includes(v.id)).map((v) => v.name).join(VIEW_JOIN) } : {};
 }
 
+const rowsOf = new WeakMap<Clip, Map<string, LayerRow>>();
+
+const sameRow = (a: LayerRow, b: LayerRow) => {
+  const keys = Object.keys(a) as (keyof LayerRow)[];
+  return keys.length === Object.keys(b).length && keys.every((k) => a[k] === b[k]);
+};
+
+function keptRow(clip: Clip, row: LayerRow): LayerRow {
+  const byKey = rowsOf.get(clip) ?? rowsOf.set(clip, new Map()).get(clip)!;
+  const known = byKey.get(row.key);
+  if (known && sameRow(known, row)) {
+    return known;
+  }
+  byKey.set(row.key, row);
+  return row;
+}
+
 function layerTree(walk: Walk, clip: Clip, depth: number): LayerRow[] {
   const { doc, nodeId, nested, parts, path } = walk;
   const comp = clip.component === 'Precomp' ? String((clip.props as { comp?: string }).comp ?? '') : '';
@@ -221,12 +238,13 @@ function layerTree(walk: Walk, clip: Clip, depth: number): LayerRow[] {
   const nests = comp !== '' && !template;
   const kids = kidsOf(walk, clip);
   row.foldable = nests || kids.length > 0 || undefined;
+  const kept = keptRow(clip, row);
   const open = !walk.folded.has(key);
   const inside = nests && open ? (doc.comps[comp]?.tracks ?? []) : [];
   const own = (parts[clip.id] ?? []).map((part) => partRow(doc, clip, part, nodeId, depth + 1, key));
   const held = open ? kids.flatMap((kid) => clipRows(walk, kid, depth + 1)) : [];
   const compRows = trackRows({ ...walk, ...NO_MASKS, nested: true, parts: {}, path: `${key}${KEY_SEP}`, scene: `${walk.scene ?? ''}${clip.id}${SEPARATOR}${FIRST_LOOP}${SEPARATOR}` }, inside, depth + 1);
-  return [row, ...own, ...held, ...withoutFrame(compRows, doc.comps[comp] ? soleFrame(doc.comps[comp]) : null), ...maskedRows(walk, clip.id, depth + 1)];
+  return [kept, ...own, ...held, ...withoutFrame(compRows, doc.comps[comp] ? soleFrame(doc.comps[comp]) : null), ...maskedRows(walk, clip.id, depth + 1)];
 }
 
 function withoutFrame(rows: LayerRow[], frame: string | null): LayerRow[] {
