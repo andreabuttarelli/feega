@@ -39,5 +39,6 @@ export function liftedPut(frame: HeldFrame, group: string, by: [number, number])
 }
 
 export function subtreeOf(doc: MotionDoc, ids: readonly string[]): Set<string> {
-  return new Set(clipsOf(doc).map((c) => c.id).filter((id) => ids.includes(id) || ancestorsOf(doc, id).some((a) => ids.includes(a))));
+  const picked = new Set(ids);
+  return new Set(clipsOf(doc).map((c) => c.id).filter((id) => picked.has(id) || ancestorsOf(doc, id).some((a) => picked.has(a))));
 }
