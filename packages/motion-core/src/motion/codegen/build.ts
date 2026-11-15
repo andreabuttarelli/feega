@@ -50,6 +50,7 @@ type Scope = {
   open: string[];
   boxOf: (clip: MotionClip) => Box;
   stacks: Map<string | null, MotionClip[] | null>;
+  kids: Map<string | null, MotionClip[]>;
   timeline: Timeline;
 };
 
@@ -98,11 +99,24 @@ function rankOf(tracks: readonly MotionTrack[]): Map<string, number> {
   return rank;
 }
 
+function kidsByParent(clips: readonly MotionClip[]): Map<string | null, MotionClip[]> {
+  const index = new Map<string | null, MotionClip[]>();
+  for (const c of clips) {
+    if (SKIPPED.has(c.component)) {
+      continue;
+    }
+    const siblings = index.get(c.parent ?? null) ?? [];
+    siblings.push(c);
+    index.set(c.parent ?? null, siblings);
+  }
+  return index;
+}
+
 function childrenOf(clip: MotionClip | null, scope: Scope): MotionClip[] {
-  const parentId = clip?.id ?? null;
-  const kids = scope.clips.filter((c) => (c.parent ?? null) === parentId && !SKIPPED.has(c.component));
+  const kids = scope.kids.get(clip?.id ?? null) ?? [];
   if (clip?.autoLayout) {
-    return childrenInOrder(scope.clips, clip as MotionClip & { autoLayout: NonNullable<MotionClip['autoLayout']> }).filter((c) => kids.includes(c));
+    const shown = new Set(kids);
+    return childrenInOrder(kids, clip as MotionClip & { autoLayout: NonNullable<MotionClip['autoLayout']> }).filter((c) => shown.has(c));
   }
   return stackOf(clip, kids, scope) ?? [...kids].sort((a, b) => (scope.rank.get(a.id) ?? 0) - (scope.rank.get(b.id) ?? 0));
 }
@@ -425,7 +439,7 @@ function scopeOf(shared: Shared, tracks: readonly MotionTrack[], space: Size, pl
     const dy = (clip.transform.y ?? 0) * space.height;
     return { ...content, left: content.left + dx, top: content.top + dy };
   };
-  return { shared, space, clips, rank: rankOf(tracks), names: new NameBook(), plan, uses: new Set(), painter, rootId: null, open: [], boxOf, stacks: new Map(), timeline };
+  return { shared, space, clips, rank: rankOf(tracks), names: new NameBook(), plan, uses: new Set(), painter, rootId: null, open: [], boxOf, stacks: new Map(), kids: kidsByParent(clips), timeline };
 }
 
 const HIDDEN: Rule[] = [['overflow', 'hidden']];
