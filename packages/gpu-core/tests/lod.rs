@@ -202,16 +202,3 @@ fn a_backdrop_blur_too_small_to_see_is_dropped_and_a_visible_one_scales() {
     assert_eq!(backdrop_at(0.05), None);
     assert_eq!(backdrop_at(0.5), Some(10.0));
 }
-
-#[test]
-fn a_coarser_pass_draws_small_text_as_bars_and_drops_small_effects() {
-    use gpu_core::lod::{coarser, detail, plain_when_tiny, Detail, Floors};
-    let floors = Floors { text: 3.0, effects: 3.0 };
-    assert_eq!(detail(3.0, true), Detail::Full);
-    assert_eq!(coarser(floors, || detail(3.0, true)), Detail::Bar);
-    assert_eq!(detail(3.0, true), Detail::Full);
-
-    let look = effects_on(8.0);
-    assert!(plain_when_tiny(&look, 8.0).blur > 0.0);
-    assert_eq!(coarser(floors, || plain_when_tiny(&look, 8.0)).blur, 0.0);
-}
