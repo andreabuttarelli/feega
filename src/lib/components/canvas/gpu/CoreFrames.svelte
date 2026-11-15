@@ -59,6 +59,7 @@
   import { editedLayers } from '$lib/canvas/core/edited-layers';
   import { editKindOf, editedClipId, fastPatch, readyPatch, reloaded, relinked } from '$lib/canvas/core/fast-patch';
   import { PatchBudget } from '$lib/canvas/core/patch-budget';
+  import { OffScreenRead, readSight } from '$lib/canvas/core/read-sight';
   import { traceSince, traceSinceInput } from '$lib/canvas/core/edit-trace';
   import { shapedText } from '@feega/motion-core/motion/gpu-full/text/measure';
   import type { TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
@@ -136,6 +137,7 @@
   const domRead = readPool({ lanes: READ_LANES, timeoutMs: READ_TIMEOUT_MS });
   const fromView = (f: FrameAt) => () => Math.hypot(view.x + (f.box.x + f.box.w / 2) * view.zoom - area.width / 2, view.y + (f.box.y + f.box.h / 2) * view.zoom - area.height / 2);
   const customPictures = customPicturesOf();
+  const readGate = readSight();
   const liveRead = (id: string) => `${id}:live`;
   const thumbs = thumbStore(place?.userId && place.orgId ? { userId: place.userId, orgId: place.orgId } : null, place?.canvasId ?? '');
   const thumbPictures = new Map<string, Picture>();
@@ -188,6 +190,9 @@
     const fonts = await loadFonts(source.doc, source.assets, source.tokens);
     const prepared = prepare(source.doc, source.tokens, source.assets, { fonts, smoothing });
     const still = frameOfLive(source);
+    if (readClips(source.doc).read.length) {
+      readGate.hold(f.id, sight.onScreen);
+    }
     const custom = await readDom(f, source, prepared, still).catch((e: unknown) => (console.warn('[canvas] core DOM read failed', f.id, e), null));
     markFrame(f.id, Step.MainBuild);
     const list = drawFrame(prepared, still, custom?.reads);
@@ -756,7 +761,7 @@
     readable = readableAt(zoomStep);
   });
   const bounded = Number.isFinite(budget.builtBytes);
-  const withinBudget = (f: FrameAt) => !bounded || sight.onScreen.has(f.id);
+  const withinBudget = (f: FrameAt) => (!bounded || sight.onScreen.has(f.id)) && readGate.admits(f.id, sight.onScreen);
   let inFlight = $state(0);
   let settledFrames = $state(new Set<string>());
 
@@ -776,7 +781,7 @@
       asked.add(keyOf(f));
       inFlight++;
       void load(f)
-        .catch((e: unknown) => console.warn('[canvas] core frame not loaded', f.id, e))
+        .catch((e: unknown) => (e instanceof OffScreenRead ? asked.delete(keyOf(f)) : console.warn('[canvas] core frame not loaded', f.id, e)))
         .finally(() => {
           inFlight--;
           settledFrames = new Set(settledFrames).add(f.id);
