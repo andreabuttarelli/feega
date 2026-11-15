@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newClip, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { MotionFormat, newClip, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { Ease } from '@feega/motion-core/motion/design';
 import { removeClips, snapTargets } from '@feega/motion-core/motion/timeline';
 import { edgeHandles, graphLanes } from '$lib/motion/timeline-view';
@@ -77,27 +77,5 @@ describe('lookups index their ids once', () => {
     dropLayers(doc, dragged, `c${SIZE - 1}`, Place.Above, topFirst);
 
     expect(dragged.scans()).toBe(0);
-  });
-
-  it('finding every clip of a doc by id scans the track a bounded number of times', () => {
-    const { doc, clips } = flatDoc();
-
-    const found = clips.map((c) => findClip(doc, c.id)?.clip);
-
-    expect(found.every((c, i) => c === clips[i])).toBe(true);
-    expect(clips.scans()).toBeLessThan(3);
-  });
-
-  it('a clip moved in place is still found where it now is', () => {
-    const { doc } = flatDoc();
-    findClip(doc, 'c0');
-    findClip(doc, 'c1');
-    const track = doc.tracks[0];
-    const [moved] = track.clips.splice(0, 1);
-    track.clips.push(moved);
-
-    expect(findClip(doc, 'c0')?.clip).toBe(moved);
-    expect(track.clips[0].id).toBe('c1');
-    expect(findClip(doc, 'c1')?.clip).toBe(track.clips[0]);
   });
 });

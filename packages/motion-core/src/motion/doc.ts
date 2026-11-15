@@ -503,27 +503,7 @@ export function everyClip(doc: Pick<MotionDoc, 'tracks' | 'comps'>): MotionClip[
   return [doc.tracks, ...Object.values(doc.comps).map((c) => c.tracks)].flatMap((tracks) => tracks.flatMap((t) => t.clips as MotionClip[]));
 }
 
-type ClipAt = { track: number; clip: number };
-
-const asked = new WeakSet<MotionDoc>();
-
-type ClipIndex = { at: Map<string, ClipAt>; tracks: number };
-
-const indexes = new WeakMap<MotionDoc, ClipIndex>();
-
-function indexOf(doc: MotionDoc): ClipIndex {
-  const at = new Map<string, ClipAt>();
-  doc.tracks.forEach((track, t) => {
-    for (let c = 0; c < track.clips.length; c++) {
-      at.set(track.clips[c].id, { track: t, clip: c });
-    }
-  });
-  const index = { at, tracks: doc.tracks.length };
-  indexes.set(doc, index);
-  return index;
-}
-
-function scanned(doc: MotionDoc, clipId: string): { track: MotionTrack; clip: MotionClip } | null {
+export function findClip(doc: MotionDoc, clipId: string): { track: MotionTrack; clip: MotionClip } | null {
   for (const track of doc.tracks) {
     const clip = track.clips.find((c) => c.id === clipId);
     if (clip) {
@@ -531,29 +511,4 @@ function scanned(doc: MotionDoc, clipId: string): { track: MotionTrack; clip: Mo
     }
   }
   return null;
-}
-
-const sameTracks = (doc: MotionDoc, index: ClipIndex) => doc.tracks.length === index.tracks;
-
-function indexed(doc: MotionDoc, clipId: string, index: ClipIndex): { track: MotionTrack; clip: MotionClip } | null | undefined {
-  const at = index.at.get(clipId);
-  if (!at) {
-    return sameTracks(doc, index) ? null : undefined;
-  }
-  const track = doc.tracks[at.track];
-  const clip = track?.clips[at.clip];
-  return clip?.id === clipId ? { track, clip: clip as MotionClip } : undefined;
-}
-
-export function findClip(doc: MotionDoc, clipId: string): { track: MotionTrack; clip: MotionClip } | null {
-  if (!asked.has(doc)) {
-    asked.add(doc);
-    return scanned(doc, clipId);
-  }
-  const known = indexes.get(doc);
-  const hit = known ? indexed(doc, clipId, known) : undefined;
-  if (hit !== undefined) {
-    return hit;
-  }
-  return indexed(doc, clipId, indexOf(doc)) ?? null;
 }
