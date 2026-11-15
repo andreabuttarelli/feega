@@ -1,5 +1,5 @@
 use gpu_core::retained::Camera;
-use gpu_core::tiles::{lifted_keys, magnified, fallback_serves, fallback_bands, ahead_camera, fade_in, FADE_MS, NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, bake_batches, BAKE_BATCH_TILES, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
+use gpu_core::tiles::{lifted_keys, NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, bake_batches, BAKE_BATCH_TILES, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
 use vello::kurbo::{Point, Rect};
 
 const SCREEN: (u32, u32) = (1024, 768);
@@ -48,11 +48,11 @@ fn zooming_in_draws_the_coarser_tiles_until_the_new_step_is_rastered() {
         tiles.hold(key);
     }
 
-    let zoomed = tiles.frame(camera(1.2), SCREEN);
+    let zoomed = tiles.frame(camera(1.5), SCREEN);
     assert!(!zoomed.missing.is_empty());
     assert!(zoomed.draw.iter().all(|k| k.step == 0));
     let screen = Rect::new(0.0, 0.0, SCREEN.0 as f64, SCREEN.1 as f64);
-    let covered: f64 = zoomed.draw.iter().map(|k| k.screen(camera(1.2)).intersect(screen).area()).sum();
+    let covered: f64 = zoomed.draw.iter().map(|k| k.screen(camera(1.5)).intersect(screen).area()).sum();
     assert!(covered >= screen.area() - 1.0);
 }
 
@@ -216,17 +216,16 @@ fn a_retina_desktop_keeps_as_many_tiles_as_the_memory_budget_holds() {
 #[test]
 fn a_sharper_step_replaces_the_one_on_screen_only_once_it_covers_the_whole_screen() {
     let mut tiles = Tiles::default();
-    let near = camera(step_zoom(4));
-    let coarse = tiles.frame(camera(step_zoom(3)), SCREEN).missing;
+    let coarse = tiles.frame(camera(step_zoom(-4)), SCREEN).missing;
     coarse.iter().for_each(|k| tiles.hold(*k));
-    let sharp = tiles.frame(near, SCREEN).missing;
+    let sharp = tiles.frame(camera(1.0), SCREEN).missing;
     sharp.iter().take(sharp.len() / 2).for_each(|k| tiles.hold(*k));
 
-    let half = tiles.frame(near, SCREEN);
-    assert!(half.draw.iter().all(|k| k.step != 4));
+    let half = tiles.frame(camera(1.0), SCREEN);
+    assert!(half.draw.iter().all(|k| k.step != step_of(1.0)));
 
     sharp.iter().for_each(|k| tiles.hold(*k));
-    let whole = tiles.frame(near, SCREEN);
+    let whole = tiles.frame(camera(1.0), SCREEN);
     assert!(sharp.iter().all(|k| whole.draw.contains(k)));
 }
 
@@ -519,43 +518,15 @@ fn evicting_thousands_of_tiles_zoomed_in_on_a_wide_canvas_takes_milliseconds() {
 }
 
 #[test]
-fn a_missing_tile_shown_by_sharper_held_tiles_is_not_bare() {
+fn a_missing_tile_shown_by_sharper_held_tiles_is_not_unsharp() {
     let mut tiles = Tiles::default();
+    let coarse = tiles.frame(camera(1.0), SCREEN).missing;
     tiles.frame(camera(step_zoom(2)), (SCREEN.0 * 2, SCREEN.1 * 2)).missing.iter().for_each(|k| tiles.hold(*k));
-    assert!(tiles.frame(camera(1.0), SCREEN).bare.is_empty());
+    assert_eq!(tiles.unsharp(&coarse), 0);
 
     let mut blurry = Tiles::default();
     blurry.frame(camera(step_zoom(-2)), SCREEN).missing.iter().for_each(|k| blurry.hold(*k));
-    let frame = blurry.frame(camera(1.0), SCREEN);
-    assert_eq!(frame.bare.len(), frame.missing.len());
-}
-
-#[test]
-fn a_coarser_tile_within_a_quarter_stretch_leaves_nothing_bare() {
-    let mut tiles = Tiles::default();
-    tiles.frame(camera(1.0), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
-
-    assert!(tiles.frame(camera(1.2), SCREEN).bare.is_empty());
-}
-
-#[test]
-fn a_cached_tile_is_never_drawn_stretched_past_a_quarter() {
-    let mut tiles = Tiles::default();
-    tiles.frame(camera(1.0), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
-    tiles.frame(camera(step_zoom(-8)), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
-
-    for zoom in [1.3, 1.5, 2.0, 3.0] {
-        let frame = tiles.frame(camera(zoom), SCREEN);
-        assert_eq!(magnified(&frame.draw, zoom), 0, "zoom {zoom}");
-    }
-}
-
-#[test]
-fn a_tile_drawn_past_a_quarter_stretch_counts_as_magnified() {
-    let key = TileKey { step: 0, tx: 0, ty: 0 };
-
-    assert_eq!(magnified(&[key], 1.2), 0);
-    assert_eq!(magnified(&[key], 1.5), 1);
+    assert_eq!(blurry.unsharp(&coarse), coarse.len());
 }
 
 #[test]
@@ -660,9 +631,8 @@ fn a_level_covering_the_painted_screen_hides_the_coarser_ones_under_it() {
     let coarsest = planned[0].step;
     planned.iter().filter(|k| k.step == coarsest).for_each(|k| tiles.hold(*k));
     tiles.hold(TileKey { step: coarsest - 4, tx: 0, ty: 0 });
-    let closer = Camera { zoom: step_zoom(coarsest) * 1.1, ..fit };
 
-    let frame = tiles.frame(closer, SCREEN);
+    let frame = tiles.frame(fit, SCREEN);
 
     assert!(!frame.missing.is_empty());
     let steps: std::collections::BTreeSet<i32> = frame.draw.iter().map(|k| k.step).collect();
@@ -753,73 +723,4 @@ fn panning_bakes_ahead_the_tiles_the_motion_brings_on_screen() {
 
     assert!(!ahead.is_empty());
     assert!(ahead.iter().all(|k| k.world().x1 > 10300.0 + SCREEN.0 as f64), "behind: {:?}", ahead.iter().find(|k| k.world().x1 <= 10300.0 + SCREEN.0 as f64));
-}
-
-#[test]
-fn the_scene_fallback_serves_the_bare_tiles_while_no_softer_than_a_quarter_stretch() {
-    let at = camera(1.0);
-    let bare = Tiles::default().frame(camera(1.2), SCREEN).missing;
-
-    assert!(fallback_serves(at, camera(1.2), SCREEN, &bare));
-    assert!(!fallback_serves(at, camera(1.3), SCREEN, &Tiles::default().frame(camera(1.3), SCREEN).missing));
-}
-
-#[test]
-fn the_scene_fallback_does_not_serve_tiles_beyond_what_it_saw() {
-    let at = camera(1.0);
-    let panned = Camera { x: -600.0, y: 0.0, zoom: 1.0 };
-    let bare = Tiles::default().frame(panned, SCREEN).missing;
-
-    assert!(!fallback_serves(at, panned, SCREEN, &bare));
-}
-
-#[test]
-fn a_tile_fades_in_over_the_fallback_and_is_opaque_after_the_fade() {
-    assert_eq!(fade_in(0.0), 0.0);
-    assert!(fade_in(FADE_MS / 2.0) > 0.4 && fade_in(FADE_MS / 2.0) < 0.6);
-    assert_eq!(fade_in(FADE_MS * 3.0), 1.0);
-}
-
-#[test]
-fn an_idle_bake_leaves_a_half_octave_zoom_either_way_with_nothing_bare() {
-    let retina = (2880, 1800);
-    let kept = tiles_kept(retina, TILE_BUDGET_BYTES);
-    let centre = Point::new(20000.0, 10000.0);
-    for rest in [0.05, 0.1, 0.2, 0.3, 0.6] {
-        let at = |zoom: f64| Camera { x: retina.0 as f64 / 2.0 - centre.x * zoom, y: retina.1 as f64 / 2.0 - centre.y * zoom, zoom };
-        let mut tiles = Tiles::default();
-        tiles.set_pixel_ratio(2.0);
-        tiles.set_canvas(WIDE);
-        tiles.pyramid(at(rest), retina, kept).iter().for_each(|k| tiles.hold(*k));
-
-        for zoom in [rest * 2f64.sqrt(), rest / 2f64.sqrt()] {
-            let frame = tiles.frame(at(zoom), retina);
-            assert!(frame.bare.is_empty(), "rest {rest} zoom {zoom}: {} bare", frame.bare.len());
-        }
-    }
-}
-
-#[test]
-fn a_zoom_out_renders_only_the_bands_around_what_the_fallback_already_holds() {
-    let held = Rect::new(100.0, 100.0, 300.0, 300.0);
-    let around = [Rect::new(0.0, 0.0, 400.0, 100.0), Rect::new(0.0, 300.0, 400.0, 400.0), Rect::new(0.0, 100.0, 100.0, 300.0), Rect::new(300.0, 100.0, 400.0, 300.0)];
-
-    let bands = fallback_bands(Some(held), &around);
-
-    assert_eq!(bands.len(), 4);
-    assert!(bands.iter().all(|b| b.intersect(held).area() == 0.0));
-    assert_eq!(fallback_bands(None, &around), vec![Rect::new(0.0, 0.0, 400.0, 400.0)]);
-}
-
-#[test]
-fn a_zoom_in_prepares_the_next_fallback_a_quarter_closer_about_the_same_point() {
-    let was = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-    let now = Camera { x: 100.0 - 100.0 * 1.1, y: 50.0 - 50.0 * 1.1, zoom: 1.1 };
-
-    let next = ahead_camera(was, now).expect("zooming in");
-
-    assert!((next.zoom - 1.375).abs() < 1e-9);
-    assert!((next.x - (100.0 - 100.0 * 1.375)).abs() < 1e-6);
-    assert!((next.y - (50.0 - 50.0 * 1.375)).abs() < 1e-6);
-    assert!(ahead_camera(now, was).is_none());
 }
