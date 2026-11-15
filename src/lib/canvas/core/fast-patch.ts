@@ -1,8 +1,9 @@
 import { ItemKind, type DisplayList, type GroupItem, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import { clipsOf, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { TrackKind } from '@feega/motion-core/motion/components';
+import { Sizing } from '@feega/motion-core/motion/layout/auto-layout';
 import { ParentOpacity, ancestorsOf } from '@feega/motion-core/motion/parent';
-import { laidSubtree, relaidWithin, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+import { laidSubtree, relaidBelow, relaidWithin, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import type { TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
 import { withoutHidden } from '@feega/motion-core/motion/organize';
 import { SEPARATOR } from '@feega/motion-core/motion/precomp';
@@ -403,6 +404,28 @@ function slidItem(item: Item, by: Shift): Item {
 
 const rootOf = (doc: MotionDoc, id: string) => ancestorsOf(doc, id)[0] ?? id;
 
+const heldFixed = (c: MotionClip) => (c.layoutItem?.width ?? Sizing.Fixed) === Sizing.Fixed && (c.layoutItem?.height ?? Sizing.Fixed) === Sizing.Fixed && !c.layoutItem?.absolute;
+
+const sameBox = (a: MotionClip, b: MotionClip) => (['x', 'y', 'width', 'height'] as const).every((k) => a.props[k] === b.props[k]);
+
+function relaidNear(shown: MotionDoc, after: MotionDoc, was: Clips, edited: string, measure: TextMeasure): Clips | null {
+  const parents = ancestorsOf(after, edited).reverse();
+  for (const id of parents) {
+    const container = was.get(id);
+    if (!container?.autoLayout || !heldFixed(container)) {
+      continue;
+    }
+    const relaid = new Map(relaidBelow(shown, container, measure).map((c) => [c.id, c] as const));
+    if ([...relaid.values()].some((c) => c.layoutItem?.absolute)) {
+      return null;
+    }
+    if (sameBox(relaid.get(id)!, container)) {
+      return relaid;
+    }
+  }
+  return null;
+}
+
 export function laidIncrementally(before: MotionDoc, after: MotionDoc, measure: TextMeasure): Clips {
   const byMeasure = exactDocs.get(after) ?? exactDocs.set(after, new Map()).get(after)!;
   const known = byMeasure.get(measure);
@@ -414,10 +437,11 @@ export function laidIncrementally(before: MotionDoc, after: MotionDoc, measure: 
   const oldById = new Map(old.map((c) => [c.id, c]));
   const touched = now.filter((c) => oldById.get(c.id) !== c).map((c) => c.id);
   const gone = old.filter((c) => !now.some((n) => n.id === c.id)).map((c) => c.id);
-  const roots = new Set([...touched.map((id) => rootOf(after, id)), ...[...touched, ...gone].filter((id) => oldById.has(id)).map((id) => rootOf(before, id))]);
   const shown = withoutHidden(after);
   const left = new Set(clipsOf(shown).map((c) => c.id));
-  const fresh = new Map([...roots].filter((id) => left.has(id)).flatMap((id) => laidSubtree(shown, id, measure).map((c) => [c.id, c] as const)));
+  const near = touched.length === 1 && !gone.length ? relaidNear(shown, after, was, touched[0], measure) : null;
+  const roots = new Set([...touched.map((id) => rootOf(after, id)), ...[...touched, ...gone].filter((id) => oldById.has(id)).map((id) => rootOf(before, id))]);
+  const fresh = near ?? new Map([...roots].filter((id) => left.has(id)).flatMap((id) => laidSubtree(shown, id, measure).map((c) => [c.id, c] as const)));
   const next: Clips = new Map(clipsOf(shown).map((c) => [c.id, fresh.get(c.id) ?? was.get(c.id) ?? c]));
   byMeasure.set(measure, next);
   return next;
