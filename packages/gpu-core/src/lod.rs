@@ -19,8 +19,23 @@ pub const INK_SHARE: f64 = 0.55;
 pub const VIEW_SLACK_PX: f64 = 1.0;
 pub const BLUR_REACH: f64 = 3.0;
 
+thread_local! {
+    static FLOOR_SCALE: std::cell::Cell<f64> = const { std::cell::Cell::new(1.0) };
+}
+
+pub fn coarser<R>(scale: f64, draw: impl FnOnce() -> R) -> R {
+    let was = FLOOR_SCALE.replace(scale);
+    let drawn = draw();
+    FLOOR_SCALE.set(was);
+    drawn
+}
+
+fn floor(px: f64) -> f64 {
+    px * FLOOR_SCALE.get()
+}
+
 pub fn detail(extent_px: f64, inked: bool) -> Detail {
-    let found = LADDER.iter().find(|(below, _)| extent_px < *below).map(|(_, d)| *d);
+    let found = LADDER.iter().find(|(below, _)| extent_px < floor(*below)).map(|(_, d)| *d);
     match found {
         Some(Detail::Bar) if !inked => Detail::Full,
         Some(d) => d,
@@ -56,7 +71,7 @@ pub enum Effect {
 pub const PLAIN_BELOW_PX: [(Effect, f64); 5] = [(Effect::Backdrop, 16.0), (Effect::Mask, 4.0), (Effect::Matte, 4.0), (Effect::Filter, 4.0), (Effect::Blur, 4.0)];
 
 fn shown(effect: Effect, extent_px: f64) -> bool {
-    PLAIN_BELOW_PX.iter().find(|(e, _)| *e == effect).is_none_or(|(_, below)| extent_px >= *below)
+    PLAIN_BELOW_PX.iter().find(|(e, _)| *e == effect).is_none_or(|(_, below)| extent_px >= floor(*below))
 }
 
 pub fn plain_when_tiny(look: &Look, extent_px: f64) -> Look {

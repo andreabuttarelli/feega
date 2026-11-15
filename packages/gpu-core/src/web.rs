@@ -38,6 +38,7 @@ const UNMOVED: Lookup = Lookup { scale: 1.0, x: 0.0, y: 0.0 };
 const NOT_TIMED: u64 = u64::MAX;
 const TILE_BUDGET_GESTURE_MS: f64 = 4.0;
 const TILE_BUDGET_STILL_MS: f64 = 12.0;
+const FALLBACK_FLOORS: f64 = 3.0;
 const SPARE_TILES: usize = 32;
 const REST_AFTER_MS: f64 = 200.0;
 const EVICT_DOWN_TO_PERCENT: usize = 90;
@@ -905,7 +906,11 @@ impl WebCore {
         }
         let camera = Camera { x: self.camera.x.round() - area.x0, y: self.camera.y.round() - area.y0, zoom: self.camera.zoom };
         let size = (area.width() as u32, area.height() as u32);
-        let (pieces, _) = self.render_view(camera, size, Source::Scene)?;
+        let limits = self.limits;
+        self.limits = Limits { rasters: 0, ..limits };
+        let rendered = crate::lod::coarser(FALLBACK_FLOORS, || self.render_view(camera, size, Source::Scene));
+        self.limits = limits;
+        let (pieces, _) = rendered?;
         self.fallback = Some(Fallback { camera, size, pieces });
         let took = js_sys::Date::now() - began;
         self.credit.spend(took);
