@@ -748,8 +748,12 @@ impl Library {
 
     pub fn put_group(&mut self, key: &str, list: &DisplayList) {
         let (drawn, _) = self.drawable(list);
+        let before = self.encodings.get(key).cloned().flatten();
         self.groups.put(key, drawn);
         self.forget(key);
+        if let Some(before) = before {
+            self.seeds.insert(key.to_string(), Seed { before, group: key.to_string() });
+        }
     }
 
     pub fn append_group(&mut self, key: &str, list: &DisplayList) {

@@ -51,7 +51,7 @@ fn the_encoding_survives_a_zoom_and_dies_with_an_edit() {
     let zoomed = lib.plan(&screen("a", 3.0, 0.0, false), LIMITS).screen.fragments;
     assert!(std::ptr::eq(first.get("a").unwrap(), zoomed.get("a").unwrap()));
 
-    lib.put_group("a", &parse(BARS).unwrap());
+    lib.put_group("a", &parse(&BARS.replace("[1, 0, 0, 1] }", "[0, 1, 0, 1] }")).unwrap());
     let edited = lib.plan(&screen("a", 3.0, 0.0, false), LIMITS).screen.fragments;
     assert!(!std::ptr::eq(first.get("a").unwrap(), edited.get("a").unwrap()));
 }
