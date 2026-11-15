@@ -260,6 +260,8 @@ function onlyClip(before: MotionDoc, after: MotionDoc): [MotionClip, MotionClip]
   return edited.length === 1 ? [was[edited[0]], now[edited[0]]] : null;
 }
 
+export const editedClipId = (before: MotionDoc, after: MotionDoc): string | null => onlyClip(before, after)?.[1].id ?? null;
+
 function rebled(list: DisplayList, before: MotionDoc, after: MotionDoc): DisplayList | null {
   const { bleed: was = 0, ...rest } = list;
   if (paintBleed(withoutHidden(before)) !== was) {

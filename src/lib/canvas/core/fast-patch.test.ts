@@ -8,7 +8,7 @@ import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-l
 import { moveBy } from '$lib/motion/space';
 import { EditMode } from '$lib/motion/edit-mode';
 import { estimatedText } from '@feega/motion-core/motion/layout/text-extent';
-import { fastPatch } from './fast-patch';
+import { editedClipId, fastPatch } from './fast-patch';
 
 const SHAPE = { shape: 'rect', x: 0.5, y: 0.5, width: 0.3, height: 0.3, fills: [{ type: 'solid', color: '#ff6a3d' }] };
 
@@ -244,5 +244,14 @@ describe('fastPatch keeps a main-thread redraw within a frame', () => {
     const after = edit(before, 'k0', restyled({ width: 0.02 }));
 
     expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toBeNull();
+  });
+});
+
+describe('editedClipId', () => {
+  it('names the one clip an edit changed, so a slow edit of one layer does not slow the patches of another', () => {
+    const before = built(['a', 'b']);
+
+    expect(editedClipId(before, edit(before, 'b', hidden))).toBe('b');
+    expect(editedClipId(before, edit(edit(before, 'a', hidden), 'b', hidden))).toBeNull();
   });
 });
