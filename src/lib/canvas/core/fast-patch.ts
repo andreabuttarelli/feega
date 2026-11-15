@@ -293,6 +293,13 @@ export function relinked(before: MotionDoc, after: MotionDoc): MotionDoc {
   return fields as unknown as MotionDoc;
 }
 
+const MANY_CLIPS = 'many';
+
+export function editKindOf(before: MotionDoc, after: MotionDoc): string {
+  const pair = onlyClip(before, after);
+  return (pair && EDIT_OF.find(([, is]) => is(pair[0], pair[1]))?.[0]) ?? MANY_CLIPS;
+}
+
 export const editedClipId = (before: MotionDoc, after: MotionDoc): string | null => onlyClip(before, after)?.[1].id ?? null;
 
 function rebled(list: DisplayList, before: MotionDoc, after: MotionDoc): DisplayList | null {
@@ -438,49 +445,145 @@ const timed = <T>(name: string, run: () => T): T => {
 
 const drawOrder = (doc: MotionDoc): string[] => [...doc.tracks].reverse().filter((t) => t.kind === TrackKind.Visual && !t.hidden).flatMap((t) => t.clips.map((c) => c.id));
 
-function runAt(items: Item[], clip: string): { within: Item[]; at: number; path: number[] } | null {
-  const at = items.findIndex((i) => drawsFor(i, clip));
-  if (at >= 0) {
-    return { within: items, at, path: [] };
+const hostOf = (item: Item) => instanceHost(item.clip) ?? item.clip;
+
+function hostsWithin(item: Item, into: Set<string>) {
+  if (item.kind !== ItemKind.Group) {
+    return;
   }
-  for (const [index, item] of items.entries()) {
-    const inner = item.kind === ItemKind.Group ? runAt(item.items, clip) : null;
-    if (inner) {
-      return { ...inner, path: [index, ...inner.path] };
+  for (const inner of item.items) {
+    into.add(hostOf(inner));
+    hostsWithin(inner, into);
+  }
+}
+
+function replacedRuns(items: Item[], fresh: ReadonlyMap<string, Item[]>, found: Set<string>, covered: Set<string>): Item[] | null {
+  const out: Item[] = [];
+  let changed = false;
+  let open: string | null = null;
+  for (const item of items) {
+    const key = hostOf(item);
+    if (fresh.has(key)) {
+      changed = true;
+      hostsWithin(item, covered);
+      if (key === open) {
+        continue;
+      }
+      if (found.has(key)) {
+        return null;
+      }
+      found.add(key);
+      open = key;
+      out.push(...fresh.get(key)!);
+      continue;
+    }
+    open = null;
+    if (item.kind !== ItemKind.Group) {
+      out.push(item);
+      continue;
+    }
+    const inner = replacedRuns(item.items, fresh, found, covered);
+    if (!inner) {
+      return null;
+    }
+    changed ||= inner !== item.items;
+    out.push(inner === item.items ? item : { ...item, items: inner });
+  }
+  return changed ? out : items;
+}
+
+function hostsIn(items: Item[], into = new Set<string>()): Set<string> {
+  for (const item of items) {
+    into.add(hostOf(item));
+    hostsIn(item.kind === ItemKind.Group ? item.items : [], into);
+  }
+  return into;
+}
+
+function insertedAll(items: Item[], order: string[], fresh: ReadonlyMap<string, Item[]>): Item[] | null {
+  if (!fresh.size) {
+    return items;
+  }
+  const present = hostsIn(items);
+  const before = new Map<string, Item[]>();
+  let pending: Item[] = [];
+  let last: string | null = null;
+  for (const id of order) {
+    if (fresh.has(id)) {
+      pending.push(...fresh.get(id)!);
+      continue;
+    }
+    if (!present.has(id)) {
+      continue;
+    }
+    last = id;
+    if (pending.length) {
+      before.set(id, pending);
+      pending = [];
     }
   }
-  return null;
-}
-
-function placedAt(items: Item[], path: number[], at: number, fresh: Item[]): Item[] {
-  if (!path.length) {
-    return [...items.slice(0, at), ...fresh, ...items.slice(at)];
-  }
-  const [head, ...rest] = path;
-  const group = items[head] as GroupItem;
-  return [...items.slice(0, head), { ...group, items: placedAt(group.items, rest, at, fresh) }, ...items.slice(head + 1)];
-}
-
-function inserted(items: Item[], order: string[], clip: string, fresh: Item[]): Item[] | null {
-  const from = order.indexOf(clip);
-  const next = order.slice(from + 1).map((id) => runAt(items, id)).find((r) => r !== null);
-  if (next) {
-    return placedAt(items, next.path, next.at, fresh);
-  }
-  const last = order.slice(0, from).reverse().map((id) => ({ id, run: runAt(items, id) })).find((r) => r.run !== null);
-  if (!last?.run) {
+  if (pending.length && !last) {
     return null;
   }
-  const end = last.run.within.findLastIndex((i) => drawsFor(i, last.id)) + 1;
-  return placedAt(items, last.run.path, end, fresh);
+  const after = new Map(pending.length ? [[last!, pending]] : []);
+  return placedAll(items, before, after, new Set());
 }
+
+function placedAll(items: Item[], before: ReadonlyMap<string, Item[]>, after: ReadonlyMap<string, Item[]>, used: Set<string>): Item[] {
+  const out: Item[] = [];
+  items.forEach((item, i) => {
+    const key = hostOf(item);
+    if (before.has(key) && !used.has(`<${key}`)) {
+      used.add(`<${key}`);
+      out.push(...before.get(key)!);
+    }
+    out.push(item.kind === ItemKind.Group ? { ...item, items: placedAll(item.items, before, after, used) } : item);
+    const next = items[i + 1];
+    if (after.has(key) && (!next || hostOf(next) !== key) && !used.has(`>${key}`)) {
+      used.add(`>${key}`);
+      out.push(...after.get(key)!);
+    }
+  });
+  return out;
+}
+
+function slidAll(items: Item[], slides: ReadonlyMap<string, Shift>): Item[] {
+  if (!slides.size) {
+    return items;
+  }
+  return items.map((item) => {
+    const by = slides.get(instanceHost(item.clip) ?? item.clip);
+    if (by) {
+      return slidItem(item, by);
+    }
+    return item.kind === ItemKind.Group ? { ...item, items: slidAll(item.items, slides) } : item;
+  });
+}
+
+function withoutClips(items: Item[], gone: ReadonlySet<string>): Item[] {
+  if (!gone.size) {
+    return items;
+  }
+  return items.flatMap<Item>((item) => {
+    if (gone.has(instanceHost(item.clip) ?? item.clip)) {
+      return [];
+    }
+    return item.kind === ItemKind.Group ? [{ ...item, items: withoutClips(item.items, gone) }] : [item];
+  });
+}
+
+const declined = (reason: string): null => {
+  traceSince(`patch:decline:${reason}`, performance.now());
+  return null;
+};
 
 function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, edited: MotionClip, measure: TextMeasure, look: Look | undefined): DisplayList | null {
   if (!look) {
-    return null;
+    return declined('no-look');
   }
   const was = timed('patch:layout:before', () => exactLaid(before, measure));
-  const relaid = laidIncrementally(before, after, measure);
+  const relaid = timed('patch:layout:after', () => laidIncrementally(before, after, measure));
+  let mark = performance.now();
   const moved = new Set([edited.id, ...[...relaid].filter(([id, c]) => !was.get(id) || !sameProps(was.get(id)!, c)).map(([id]) => id)]);
   const slides = new Map([...moved].flatMap((id) => {
     const by = id === edited.id ? null : slideOf(was.get(id), relaid.get(id), after);
@@ -488,56 +591,60 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
   }));
   const cutting = new Set([...slides.keys()].filter((id) => !!relaid.get(id)?.clipContent || !!relaid.get(id)?.mask));
   const redraw = [...below(after, new Set([edited.id, ...cutting])), ...[...moved].filter((id) => !slides.has(id) && id !== edited.id)].filter((id, i, all) => all.indexOf(id) === i);
-  if (redraw.length > REDRAW_MOST) {
-    return null;
+  traceSince('patch:plan', mark);
+  if (redraw.filter((id) => relaid.has(id)).length > REDRAW_MOST) {
+    return declined('too-many');
   }
   const paired = new Set(mattePairs(after).flatMap((p) => [p.source, p.target]));
   if (redraw.some((id) => paired.has(id))) {
-    return null;
+    return declined('paired');
   }
+  mark = performance.now();
   const now = (c: MotionClip) => settled(relaid.get(c.id) ?? was.get(c.id) ?? c);
   const kept = new Set([...redraw, ...redraw.flatMap((id) => ancestorsOf(after, id)), ...(after.surface ? [after.surface] : [])]);
   const shown = withoutHidden(after);
   const mini = { ...shown, tracks: shown.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => kept.has(c.id)).map(now) })) };
   const back = new Set(redraw.filter((id) => relaid.has(id) && !was.has(id)));
   const redrawSet = new Set(redraw);
+  traceSince('patch:mini', mark);
   const drawnMini = timed('patch:draw', () => drawFrame(prepare(mini, look.tokens, look.assets, look.typeset), look.frame));
   const fresh = drawnMini.items;
-  let items: Item[] | null = list.items;
+  mark = performance.now();
+  const hiddenNow = new Set(redraw.filter((id) => !relaid.has(id)));
+  let items: Item[] | null = timed('patch:splice:hidden', () => withoutClips(list.items, hiddenNow));
   const order = drawOrder(shown);
   const rank = (clip: string) => order.indexOf(instanceHost(clip) ?? clip);
-  for (const id of [...redraw].sort((x, y) => rank(x) - rank(y))) {
-    const own = ownItems(fresh, id);
-    const old = ownItems(items!, id);
-    if (!old.length && !own.length) {
-      continue;
-    }
-    items = old.length ? spliced(items!, id, own) : inserted(items!, order, id, own);
-    if (!items) {
-      return null;
-    }
+  const loopAt = performance.now();
+  const shownRedraw = redraw.filter((id) => !hiddenNow.has(id));
+  traceSince(`patch:splice:count:${shownRedraw.length}`, loopAt);
+  const owned = new Map(shownRedraw.map((id) => [id, ownItems(fresh, id)]));
+  const found = new Set<string>();
+  const covered = new Set<string>();
+  items = replacedRuns(items, owned, found, covered);
+  const missing = new Map(shownRedraw.filter((id) => !found.has(id) && !covered.has(id) && owned.get(id)!.length).map((id) => [id, owned.get(id)!]));
+  items = items && insertedAll(items, order, missing);
+  if (!items) {
+    return declined('splice');
   }
-  for (const [id, by] of slides) {
-    const old = ownItems(items!, id);
-    items = redrawSet.has(id) || !old.length ? items : spliced(items!, id, old.map((i) => slidItem(i, by)));
-    if (!items) {
-      return null;
-    }
-  }
+  traceSince('patch:splice:redraw', loopAt);
+  items = timed('patch:splice:slide', () => slidAll(items!, new Map([...slides].filter(([id]) => !redrawSet.has(id)))));
+  traceSince('patch:splice', mark);
+  mark = performance.now();
   const left = new Set(clipsOf(shown).map((c) => c.id));
   const gone = new Set(clipsOf(after).map((c) => c.id).filter((id) => !left.has(id)));
   const redrawn = new Set(redraw);
   const host = (g: DisplayList['unsupported'][number]) => instanceHost(g.clip) ?? g.clip;
   const steady = (g: DisplayList['unsupported'][number]) => redrawn.has(host(g)) && !back.has(host(g)) && !gone.has(host(g));
   if (JSON.stringify(list.unsupported.filter(steady)) !== JSON.stringify(drawnMini.unsupported.filter(steady))) {
-    return null;
+    return declined('gaps');
   }
   const unsupported = drawnMini.unsupported.filter((g) => back.has(host(g))).reduce((all, g) => {
     const at = all.findIndex((k) => rank(k.clip) > rank(g.clip));
     return at < 0 ? [...all, g] : [...all.slice(0, at), g, ...all.slice(at)];
   }, list.unsupported.filter((g) => !gone.has(host(g))));
+  traceSince('patch:gaps', mark);
   const patched = { ...list, items: items!, unsupported };
-  return rebled(patched, before, after);
+  return timed('patch:bleed', () => rebled(patched, before, after));
 }
 
 enum Edit {

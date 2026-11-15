@@ -3,12 +3,12 @@ import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip } from '@feega/motion-core/motion/timeline';
 import { DEFAULT_AUTO_LAYOUT, DEFAULT_LAYOUT_ITEM } from '@feega/motion-core/motion/layout/model';
-import { Sizing } from '@feega/motion-core/motion/layout/auto-layout';
+import { Direction, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
 import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-list';
 import { moveBy } from '$lib/motion/space';
 import { EditMode } from '$lib/motion/edit-mode';
 import { estimatedText } from '@feega/motion-core/motion/layout/text-extent';
-import { editedClipId, fastPatch, laidIncrementally, relinked, reloaded } from './fast-patch';
+import { editedClipId, editKindOf, fastPatch, laidIncrementally, relinked, reloaded } from './fast-patch';
 
 const SHAPE = { shape: 'rect', x: 0.5, y: 0.5, width: 0.3, height: 0.3, fills: [{ type: 'solid', color: '#ff6a3d' }] };
 
@@ -295,5 +295,89 @@ describe('laidIncrementally on a big frame', () => {
     const calls = some.mock.calls.length;
     some.mockRestore();
     expect(calls).toBeLessThan(MANY);
+  });
+});
+
+describe('editKindOf', () => {
+  it('names the kind of an edit, so a slow hide and a fast show of one layer keep separate budgets', () => {
+    const before = built(['a', 'b']);
+    const gone = edit(before, 'b', hidden);
+
+    expect(editKindOf(before, gone)).not.toEqual(editKindOf(gone, before));
+    expect(editKindOf(before, edit(edit(before, 'a', hidden), 'b', hidden))).toBe('many');
+  });
+});
+
+describe('hiding a big section', () => {
+  it('removes the hidden subtree in one pass instead of splicing each hidden layer out', () => {
+    const kids = Array.from({ length: MANY }, (_, i) => `k${i}`);
+    const doc = [['section', 'page'], ['after', 'page'], ...kids.map((k) => [k, 'section'])].reduce((d, [id, parent]) => edit(d, id, (c) => ({ ...c, parent, props: { ...c.props, ...SMALL } })), built(['page', 'section', 'after', ...kids]));
+    const laid = edit(edit(doc, 'page', (c) => ({ ...c, autoLayout: { ...DEFAULT_AUTO_LAYOUT, gap: 4 } })), 'section', (c) => ({ ...c, autoLayout: { ...DEFAULT_AUTO_LAYOUT, gap: 4 } }));
+    const list = drawn(laid);
+    const after = edit(laid, 'section', hidden);
+    fastPatch(list, laid, laid, estimatedText, LOOK);
+    const slice = vi.spyOn(Array.prototype, 'slice');
+
+    const patched = fastPatch(list, laid, after, estimatedText, LOOK);
+
+    const calls = slice.mock.calls.length;
+    slice.mockRestore();
+    expect(rounded(patched)).toEqual(rounded(drawn(after)));
+    expect(calls).toBeLessThan(MANY);
+  });
+
+  it('slides the layers after a hidden section in one pass', () => {
+    const later = Array.from({ length: MANY }, (_, i) => `n${i}`);
+    const doc = [['section', 'page'], ['inside', 'section'], ...later.map((k) => [k, 'page'])].reduce((d, [id, parent]) => edit(d, id, (c) => ({ ...c, parent, props: { ...c.props, ...SMALL } })), built(['page', 'section', 'inside', ...later]));
+    const laid = edit(edit(doc, 'page', (c) => ({ ...c, autoLayout: { ...DEFAULT_AUTO_LAYOUT, direction: Direction.Vertical, gap: 1 } })), 'section', (c) => ({ ...c, autoLayout: { ...DEFAULT_AUTO_LAYOUT, gap: 4 } }));
+    const list = drawn(laid);
+    const after = edit(laid, 'section', hidden);
+    fastPatch(list, laid, laid, estimatedText, LOOK);
+    const slice = vi.spyOn(Array.prototype, 'slice');
+
+    const patched = fastPatch(list, laid, after, estimatedText, LOOK);
+
+    const calls = slice.mock.calls.length;
+    slice.mockRestore();
+    expect(rounded(patched)).toEqual(rounded(drawn(after)));
+    expect(calls).toBeLessThan(MANY);
+  });
+  it('splices every redrawn layer back in one walk of the list', () => {
+    const shells = Array.from({ length: 20 }, (_, i) => `s${i}`);
+    const still = Array.from({ length: MANY }, (_, i) => `n${i}`);
+    const parents = [...shells.map((s, i) => [s, i ? shells[i - 1] : 'page']), ['section', shells[shells.length - 1]], ...still.map((k) => [k, 'page'])];
+    const doc = parents.reduce((d, [id, parent]) => edit(d, id, (c) => ({ ...c, parent, props: { ...c.props, ...SMALL } })), built(['page', ...shells, 'section', ...still]));
+    const laid = [...shells].reduce((d, id) => edit(d, id, (c) => ({ ...c, clipContent: true, autoLayout: { ...DEFAULT_AUTO_LAYOUT, gap: 4 }, layoutItem: { ...DEFAULT_LAYOUT_ITEM, width: Sizing.Hug } })), doc);
+    const list = drawn(laid);
+    const after = edit(laid, 'section', hidden);
+    fastPatch(list, laid, laid, estimatedText, LOOK);
+    const scan = vi.spyOn(String.prototype, 'startsWith');
+
+    const patched = fastPatch(list, laid, after, estimatedText, LOOK);
+
+    const calls = scan.mock.calls.length;
+    scan.mockRestore();
+    expect(rounded(patched)).toEqual(rounded(drawn(after)));
+    expect(calls).toBeLessThan(8 * MANY);
+  });
+
+  it('puts every unhidden layer back in one walk of the list', () => {
+    const shells = Array.from({ length: 20 }, (_, i) => `s${i}`);
+    const still = Array.from({ length: MANY }, (_, i) => `n${i}`);
+    const kids = Array.from({ length: 20 }, (_, i) => `k${i}`);
+    const parents = [...shells.map((s, i) => [s, i ? shells[i - 1] : 'page']), ['section', shells[shells.length - 1]], ...still.map((k) => [k, 'page']), ...kids.map((k) => [k, 'section'])];
+    const doc = parents.reduce((d, [id, parent]) => edit(d, id, (c) => ({ ...c, parent, props: { ...c.props, ...SMALL } })), built(['page', ...shells, 'section', ...still, ...kids]));
+    const laid = [...shells].reduce((d, id) => edit(d, id, (c) => ({ ...c, clipContent: true, autoLayout: { ...DEFAULT_AUTO_LAYOUT, gap: 4 }, layoutItem: { ...DEFAULT_LAYOUT_ITEM, width: Sizing.Hug } })), doc);
+    const shut = edit(laid, 'section', hidden);
+    const list = drawn(shut);
+    fastPatch(list, shut, shut, estimatedText, LOOK);
+    const scan = vi.spyOn(String.prototype, 'startsWith');
+
+    const patched = fastPatch(list, shut, laid, estimatedText, LOOK);
+
+    const calls = scan.mock.calls.length;
+    scan.mockRestore();
+    expect(rounded(patched)).toEqual(rounded(drawn(laid)));
+    expect(calls).toBeLessThan(30 * MANY);
   });
 });
