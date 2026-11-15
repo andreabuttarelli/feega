@@ -25,3 +25,13 @@ fn parts_do_not_share_a_memory() {
 
     assert!(seen.is_new(OverlayPart::Selected, b"[1]"));
 }
+
+#[test]
+fn a_forgotten_part_takes_its_last_payload_again() {
+    let mut seen = OverlaySeen::default();
+    seen.is_new(OverlayPart::Fixed, b"[1]");
+
+    seen.forget(OverlayPart::Fixed);
+
+    assert!(seen.is_new(OverlayPart::Fixed, b"[1]"));
+}

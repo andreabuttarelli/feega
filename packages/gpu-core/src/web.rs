@@ -500,6 +500,27 @@ impl WebCore {
         Ok(())
     }
 
+    pub fn splice_overlay(&mut self, head: usize, tail: usize, items_json: &[u8]) -> Result<bool, JsValue> {
+        self.splice_part(OverlayPart::Fixed, head, tail, items_json)
+    }
+
+    pub fn splice_selected_overlay(&mut self, head: usize, tail: usize, items_json: &[u8]) -> Result<bool, JsValue> {
+        self.splice_part(OverlayPart::Selected, head, tail, items_json)
+    }
+
+    pub fn splice_live_overlay(&mut self, head: usize, tail: usize, items_json: &[u8]) -> Result<bool, JsValue> {
+        let spliced = self.splice_part(OverlayPart::Live, head, tail, items_json)?;
+        self.changed_at = js_sys::Date::now();
+        self.warmup.moved(self.changed_at);
+        Ok(spliced)
+    }
+
+    fn splice_part(&mut self, part: OverlayPart, head: usize, tail: usize, items_json: &[u8]) -> Result<bool, JsValue> {
+        self.overlay_seen.forget(part);
+        let items = parse_overlay(utf8(items_json)?).map_err(failed)?;
+        Ok(self.compositor.splice_overlay(part, head, tail, items, &mut self.library))
+    }
+
     pub fn set_motion(&mut self, motion: CoreMotion) {
         if matches!(motion, CoreMotion::Gesture) {
             self.changed_at = js_sys::Date::now();

@@ -356,6 +356,23 @@ impl WebGlCore {
         Ok(())
     }
 
+    pub fn splice_overlay(&mut self, head: usize, tail: usize, items_json: &[u8]) -> Result<bool, JsValue> {
+        self.splice_part(OverlayPart::Fixed, head, tail, items_json)
+    }
+
+    pub fn splice_selected_overlay(&mut self, head: usize, tail: usize, items_json: &[u8]) -> Result<bool, JsValue> {
+        self.splice_part(OverlayPart::Selected, head, tail, items_json)
+    }
+
+    pub fn splice_live_overlay(&mut self, head: usize, tail: usize, items_json: &[u8]) -> Result<bool, JsValue> {
+        self.splice_part(OverlayPart::Live, head, tail, items_json)
+    }
+
+    fn splice_part(&mut self, part: OverlayPart, head: usize, tail: usize, items_json: &[u8]) -> Result<bool, JsValue> {
+        let items = parse_overlay(utf8(items_json)?).map_err(failed)?;
+        Ok(self.compositor.splice_overlay(part, head, tail, items, &mut self.library))
+    }
+
     pub fn frame(&mut self, now_ms: f64) -> Result<String, JsValue> {
         let mut library = std::mem::take(&mut self.library);
         let mut compositor = std::mem::replace(&mut self.compositor, Compositor::new(0, 0));

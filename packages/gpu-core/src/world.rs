@@ -302,6 +302,16 @@ impl World {
         bounds.into_iter().for_each(|b| self.mark(b));
     }
 
+    pub fn splice_overlay(&mut self, part: OverlayPart, head: usize, tail: usize, items: Vec<Item>) -> bool {
+        let old = &self.overlays[part.index()].items;
+        if head + tail > old.len() {
+            return false;
+        }
+        let spliced = old[..head].iter().cloned().chain(items).chain(old[old.len() - tail..].iter().cloned()).collect();
+        self.set_overlay(part, spliced);
+        true
+    }
+
     pub fn overlay_group(&self, part: OverlayPart) -> Option<(DisplayList, UseItem)> {
         let overlay = &self.overlays[part.index()].items;
         let reach = overlay.iter().map(extent).collect::<Option<Vec<Rect>>>()?.into_iter().reduce(|a, b| a.union(b))?;

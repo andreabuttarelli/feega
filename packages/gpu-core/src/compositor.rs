@@ -69,6 +69,18 @@ impl Compositor {
 
     pub fn set_overlay(&mut self, part: OverlayPart, items: Vec<Item>, library: &mut Library) {
         self.world.set_overlay(part, items);
+        self.group_overlay(part, library);
+    }
+
+    pub fn splice_overlay(&mut self, part: OverlayPart, head: usize, tail: usize, items: Vec<Item>, library: &mut Library) -> bool {
+        if !self.world.splice_overlay(part, head, tail, items) {
+            return false;
+        }
+        self.group_overlay(part, library);
+        true
+    }
+
+    fn group_overlay(&mut self, part: OverlayPart, library: &mut Library) {
         match self.world.overlay_group(part) {
             Some((list, placement)) => {
                 library.put_group(part.group(), &list);

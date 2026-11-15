@@ -293,6 +293,17 @@ fn clearing_the_live_overlay_keeps_the_fixed_one() {
 }
 
 #[test]
+fn a_spliced_overlay_holds_what_a_whole_one_would() {
+    let (mut c, mut lib) = overlaid(true);
+    let hover = gpu_core::world::parse_overlay(HOVER).unwrap();
+
+    assert!(c.splice_overlay(OverlayPart::Fixed, 1, 0, hover.clone(), &mut lib));
+    assert!(!c.splice_overlay(OverlayPart::Fixed, 2, 1, hover, &mut lib));
+
+    assert_eq!(lib.items_in(OverlayPart::Fixed.group()), Some(2));
+}
+
+#[test]
 fn a_frame_painted_in_tiles_rasters_at_most_one_cached_group() {
     let mut lib = Library::new();
     for g in ["a", "b", "c"] {
