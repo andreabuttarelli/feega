@@ -4,7 +4,7 @@ use std::cell::Cell;
 use serde::Deserialize;
 use vello::kurbo::{Affine as Matrix, Point, Rect};
 
-use crate::display_list::{Affine, DisplayList, Item, Look, PathItem, UseItem};
+use crate::display_list::{item_from_json, Affine, DisplayList, Item, Look, PathItem, UseItem};
 use crate::lod::{BLUR_REACH, VIEW_SLACK_PX};
 use crate::retained::Damage;
 use crate::uses::{Plus, Uses};
@@ -30,7 +30,8 @@ pub fn parse_patch(json: &str) -> Result<Patch, serde_json::Error> {
 }
 
 pub fn parse_overlay(json: &str) -> Result<Vec<Item>, serde_json::Error> {
-    serde_json::from_str(json)
+    let raw: Vec<&serde_json::value::RawValue> = serde_json::from_str(json)?;
+    raw.into_iter().map(|item| item_from_json(item.get())).collect()
 }
 
 pub type Sizes<'a> = &'a dyn Fn(&str) -> Option<(f64, f64)>;

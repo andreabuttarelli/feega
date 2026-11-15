@@ -89,6 +89,20 @@ fn runs_before_the_edit_are_kept_and_the_edited_run_is_rebuilt() {
 }
 
 #[test]
+fn a_group_put_again_under_its_key_keeps_the_runs_it_did_not_change() {
+    let mut lib = composing();
+    lib.put_group("overlay", &list(&red_bars()));
+    let before = lib.plan(&screen("overlay"), LIMITS).screen.fragments;
+
+    lib.put_group("overlay", &list(&one_edited()));
+    let after = lib.plan(&screen("overlay"), LIMITS).screen.fragments;
+
+    let (old, new) = (before.get("overlay").unwrap(), after.get("overlay").unwrap());
+    assert!(Arc::ptr_eq(&old.runs[0], &new.runs[0]));
+    assert!(!Arc::ptr_eq(&old.runs[3], &new.runs[3]));
+}
+
+#[test]
 fn a_patch_grows_and_shrinks_the_group() {
     let mut lib = composing();
     lib.put_group("v1", &list(&red_bars()));
