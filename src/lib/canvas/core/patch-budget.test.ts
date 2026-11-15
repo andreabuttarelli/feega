@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PatchBudget, PATCH_BUDGET_MS, SLOW_STRIKES, STRIKE_WINDOW_MS } from './patch-budget';
+import { PatchBudget, PATCH_BUDGET_MS, PATCH_MOST_MS, SLOW_STRIKES, STRIKE_WINDOW_MS } from './patch-budget';
 
 const SLOW = PATCH_BUDGET_MS + 1;
 const FAST = 1;
@@ -93,6 +93,16 @@ describe('PatchBudget against the worker', () => {
     warmed(budget, 'f1|a');
 
     Array.from({ length: SLOW_STRIKES }, () => budget.took('f1|a', 5 * PATCH_BUDGET_MS));
+
+    expect(budget.redraws('f1|a')).toBe(false);
+  });
+
+  it('drops a patch slower than a frame, however slow the worker build looks', () => {
+    const { budget } = clocked();
+    budget.built('f1', 10 * PATCH_MOST_MS);
+    warmed(budget, 'f1|a');
+
+    Array.from({ length: SLOW_STRIKES }, () => budget.took('f1|a', 2 * PATCH_MOST_MS));
 
     expect(budget.redraws('f1|a')).toBe(false);
   });

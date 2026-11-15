@@ -1,4 +1,5 @@
 export const PATCH_BUDGET_MS = 24;
+export const PATCH_MOST_MS = 80;
 export const SLOW_STRIKES = 2;
 export const STRIKE_WINDOW_MS = 2000;
 
@@ -23,7 +24,7 @@ export class PatchBudget {
       this.#warm.add(key);
       return;
     }
-    if (ms <= Math.max(PATCH_BUDGET_MS, this.#builds.get(frameOf(key)) ?? 0)) {
+    if (ms <= Math.min(PATCH_MOST_MS, Math.max(PATCH_BUDGET_MS, this.#builds.get(frameOf(key)) ?? 0))) {
       this.#strikes.delete(key);
       return;
     }
