@@ -58,6 +58,7 @@
   import LoadTimeline from './LoadTimeline.svelte';
   import { editedLayers } from '$lib/canvas/core/edited-layers';
   import { fastPatch, readyPatch } from '$lib/canvas/core/fast-patch';
+  import { PatchBudget } from '$lib/canvas/core/patch-budget';
   import { shapedText } from '@feega/motion-core/motion/gpu-full/text/measure';
   import type { TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
   import { paintFirst } from '$lib/canvas/core/paint-first';
@@ -623,6 +624,7 @@
   }
 
   const liveMeasures = new Map<string, TextMeasure>();
+  const patchBudget = new PatchBudget();
   const liveTypesets = new Map<string, Typeset>();
 
   function measureLive(f: FrameAt, source: LiveDoc) {
@@ -668,7 +670,10 @@
   function patchLive(f: FrameAt, source: LiveDoc): boolean {
     const shown = liveShown.get(f.id);
     const measure = liveMeasures.get(f.id);
-    const list = shown && measure && fastPatch(shown.list, shown.doc, source.doc, measure, { tokens: source.tokens, assets: source.assets, frame: frameOfLive(source), typeset: liveTypesets.get(f.id) });
+    const look = patchBudget.redraws(f.id) ? { tokens: source.tokens, assets: source.assets, frame: frameOfLive(source), typeset: liveTypesets.get(f.id) } : undefined;
+    const began = performance.now();
+    const list = shown && measure && fastPatch(shown.list, shown.doc, source.doc, measure, look);
+    patchBudget.took(f.id, performance.now() - began);
     if (!shown || !list) {
       return false;
     }
@@ -696,7 +701,7 @@
       liveBuilt.set(f.id, source);
       liveStamp.set(f.id, f.scenes);
       if (patchLive(f, source)) {
-        rebuild.afterPaint(f.id, { f, source });
+        rebuild.afterQuiet(f.id, { f, source });
       } else {
         rebuild.now(f.id, { f, source });
       }
@@ -721,6 +726,7 @@
       liveShown.delete(id);
       liveMeasures.delete(id);
       liveTypesets.delete(id);
+      patchBudget.forget(id);
       heldMain.drop(id);
       customPictures.drop(liveRead(id));
       const saved = frames.find((f) => f.id === id);
