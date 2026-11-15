@@ -1,5 +1,5 @@
 use gpu_core::retained::Camera;
-use gpu_core::tiles::{lifted_keys, magnified, fallback_serves, fallback_bands, fade_in, FADE_MS, NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, bake_batches, BAKE_BATCH_TILES, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
+use gpu_core::tiles::{lifted_keys, magnified, fallback_serves, fallback_bands, ahead_camera, fade_in, FADE_MS, NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, bake_batches, BAKE_BATCH_TILES, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
 use vello::kurbo::{Point, Rect};
 
 const SCREEN: (u32, u32) = (1024, 768);
@@ -809,4 +809,17 @@ fn a_zoom_out_renders_only_the_bands_around_what_the_fallback_already_holds() {
     assert_eq!(bands.len(), 4);
     assert!(bands.iter().all(|b| b.intersect(held).area() == 0.0));
     assert_eq!(fallback_bands(None, &around), vec![Rect::new(0.0, 0.0, 400.0, 400.0)]);
+}
+
+#[test]
+fn a_zoom_in_prepares_the_next_fallback_a_quarter_closer_about_the_same_point() {
+    let was = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
+    let now = Camera { x: 100.0 - 100.0 * 1.1, y: 50.0 - 50.0 * 1.1, zoom: 1.1 };
+
+    let next = ahead_camera(was, now).expect("zooming in");
+
+    assert!((next.zoom - 1.375).abs() < 1e-9);
+    assert!((next.x - (100.0 - 100.0 * 1.375)).abs() < 1e-6);
+    assert!((next.y - (50.0 - 50.0 * 1.375)).abs() < 1e-6);
+    assert!(ahead_camera(now, was).is_none());
 }

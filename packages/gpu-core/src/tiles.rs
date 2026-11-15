@@ -237,6 +237,18 @@ pub fn fallback_bands(held: Option<Rect>, uncovered: &[Rect]) -> Vec<Rect> {
     (0..4).filter_map(|band| uncovered.iter().filter(|r| side(r) == band).copied().reduce(|a, b| a.union(b))).collect()
 }
 
+pub fn ahead_camera(was: Camera, now: Camera) -> Option<Camera> {
+    if now.zoom <= was.zoom * (1.0 + STEP_SLACK) {
+        return None;
+    }
+    let zoom = now.zoom * SHARP_STRETCH;
+    let toward = |at_was: f64, at_now: f64| {
+        let world = (at_now - at_was) / (was.zoom - now.zoom);
+        at_now + world * now.zoom - world * zoom
+    };
+    Some(Camera { x: toward(was.x, now.x), y: toward(was.y, now.y), zoom })
+}
+
 pub fn fade_in(age_ms: f64) -> f32 {
     (age_ms / FADE_MS).clamp(0.0, 1.0) as f32
 }
