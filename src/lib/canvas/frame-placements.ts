@@ -57,6 +57,7 @@ export class FramePlacements {
   readonly #placed = new Map<string, Placed | null>();
   readonly #owners = new Map<string, string[]>();
   #hosts: ReadonlySet<string> | null = null;
+  #byId: ReadonlyMap<string, MotionClip> | null = null;
   #members: Map<string, string[]> | null = null;
   #cells: Map<string, number[]> | null = null;
 
@@ -121,6 +122,11 @@ export class FramePlacements {
     return Object.fromEntries(this.#all().filter((p) => p.opacity > 0).map((p) => [p.clip, spanOf(p.corners)]));
   }
 
+  #clipsById(): ReadonlyMap<string, MotionClip> {
+    this.#byId ??= new Map(this.#prepared.doc.tracks.flatMap((t) => (t.clips as MotionClip[]).map((c) => [c.id, c] as const)));
+    return this.#byId;
+  }
+
   #hostIds(): ReadonlySet<string> {
     this.#hosts ??= new Set(this.#prepared.doc.tracks.flatMap((t) => (t.clips as MotionClip[]).filter((c) => c.component === HOST).map((c) => c.id)));
     return this.#hosts;
@@ -134,7 +140,7 @@ export class FramePlacements {
   }
 
   #wordsOf(placed: Placed | null): Placed | null {
-    const clip = placed ? this.#prepared.doc.tracks.flatMap((t) => t.clips as MotionClip[]).find((c) => c.id === placed.clip) : null;
+    const clip = placed ? this.#clipsById().get(placed.clip) : null;
     const hugs = clip?.component === HUGGING_TEXT && clip.props.sizing === TextSizing.AutoWidth;
     const caret = placed && hugs ? textCaretAt(this.#prepared, this.#frame, placed.clip) : null;
     if (!placed || !caret) {

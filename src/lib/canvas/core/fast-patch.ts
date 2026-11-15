@@ -260,6 +260,38 @@ function onlyClip(before: MotionDoc, after: MotionDoc): [MotionClip, MotionClip]
   return edited.length === 1 ? [was[edited[0]], now[edited[0]]] : null;
 }
 
+const sameJson = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JSON.stringify(b);
+
+function relinkedClip(was: MotionClip | undefined, now: MotionClip): MotionClip {
+  if (!was || sameJson(was, now)) {
+    return was ?? now;
+  }
+  return Object.fromEntries(Object.entries(now).map(([k, v]) => [k, sameJson((was as never)[k], v) ? (was as never)[k] : v])) as unknown as MotionClip;
+}
+
+function relinkedTrack(was: MotionDoc['tracks'][number] | undefined, now: MotionDoc['tracks'][number]): MotionDoc['tracks'][number] {
+  if (!was) {
+    return now;
+  }
+  const old = new Map(was.clips.map((c) => [c.id, c]));
+  const clips = now.clips.map((c) => relinkedClip(old.get(c.id), c));
+  const { clips: _was, ...wasRest } = was;
+  const { clips: _now, ...nowRest } = now;
+  const same = clips.length === was.clips.length && clips.every((c, i) => c === was.clips[i]) && sameJson(wasRest, nowRest);
+  return same ? was : { ...now, clips };
+}
+
+export const reloaded = (before: MotionDoc, after: MotionDoc): boolean => {
+  const [was, now] = [clipsOf(before), clipsOf(after)];
+  return was.length > 0 && was.length === now.length && was[0] !== now[0] && was.at(-1) !== now.at(-1);
+};
+
+export function relinked(before: MotionDoc, after: MotionDoc): MotionDoc {
+  const tracks = new Map(before.tracks.map((t) => [t.id, t]));
+  const fields = Object.fromEntries(Object.entries(after).map(([k, v]) => [k, k === 'tracks' ? after.tracks.map((t) => relinkedTrack(tracks.get(t.id), t)) : sameJson((before as never)[k], v) ? (before as never)[k] : v]));
+  return fields as unknown as MotionDoc;
+}
+
 export const editedClipId = (before: MotionDoc, after: MotionDoc): string | null => onlyClip(before, after)?.[1].id ?? null;
 
 function rebled(list: DisplayList, before: MotionDoc, after: MotionDoc): DisplayList | null {

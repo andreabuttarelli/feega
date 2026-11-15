@@ -8,7 +8,7 @@ import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-l
 import { moveBy } from '$lib/motion/space';
 import { EditMode } from '$lib/motion/edit-mode';
 import { estimatedText } from '@feega/motion-core/motion/layout/text-extent';
-import { editedClipId, fastPatch } from './fast-patch';
+import { editedClipId, fastPatch, relinked, reloaded } from './fast-patch';
 
 const SHAPE = { shape: 'rect', x: 0.5, y: 0.5, width: 0.3, height: 0.3, fills: [{ type: 'solid', color: '#ff6a3d' }] };
 
@@ -253,5 +253,25 @@ describe('editedClipId', () => {
 
     expect(editedClipId(before, edit(before, 'b', hidden))).toBe('b');
     expect(editedClipId(before, edit(edit(before, 'a', hidden), 'b', hidden))).toBeNull();
+  });
+});
+
+describe('relinked', () => {
+  it('lets an edit made on a reloaded copy of the shown doc patch like one made on the doc itself', () => {
+    const before = built(['a', 'b']);
+    const reloaded = JSON.parse(JSON.stringify(before)) as MotionDoc;
+    const after = edit(reloaded, 'a', restyled({ width: 0.42 }));
+
+    expect(fastPatch(drawn(before), before, after, estimatedText, LOOK)).toBeNull();
+    expect(fastPatch(drawn(before), before, relinked(before, after), estimatedText, LOOK)).toEqual(drawn(after));
+  });
+});
+
+describe('reloaded', () => {
+  it('tells a reloaded copy of a doc from an edit of the doc itself', () => {
+    const before = built(['a', 'b']);
+
+    expect(reloaded(before, edit(before, 'a', hidden))).toBe(false);
+    expect(reloaded(before, JSON.parse(JSON.stringify(before)) as MotionDoc)).toBe(true);
   });
 });
