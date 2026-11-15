@@ -360,4 +360,24 @@ describe('hiding a big section', () => {
     expect(rounded(patched)).toEqual(rounded(drawn(after)));
     expect(calls).toBeLessThan(8 * MANY);
   });
+
+  it('puts every unhidden layer back in one walk of the list', () => {
+    const shells = Array.from({ length: 20 }, (_, i) => `s${i}`);
+    const still = Array.from({ length: MANY }, (_, i) => `n${i}`);
+    const kids = Array.from({ length: 20 }, (_, i) => `k${i}`);
+    const parents = [...shells.map((s, i) => [s, i ? shells[i - 1] : 'page']), ['section', shells[shells.length - 1]], ...still.map((k) => [k, 'page']), ...kids.map((k) => [k, 'section'])];
+    const doc = parents.reduce((d, [id, parent]) => edit(d, id, (c) => ({ ...c, parent, props: { ...c.props, ...SMALL } })), built(['page', ...shells, 'section', ...still, ...kids]));
+    const laid = [...shells].reduce((d, id) => edit(d, id, (c) => ({ ...c, clipContent: true, autoLayout: { ...DEFAULT_AUTO_LAYOUT, gap: 4 }, layoutItem: { ...DEFAULT_LAYOUT_ITEM, width: Sizing.Hug } })), doc);
+    const shut = edit(laid, 'section', hidden);
+    const list = drawn(shut);
+    fastPatch(list, shut, shut, estimatedText, LOOK);
+    const scan = vi.spyOn(String.prototype, 'startsWith');
+
+    const patched = fastPatch(list, shut, laid, estimatedText, LOOK);
+
+    const calls = scan.mock.calls.length;
+    scan.mockRestore();
+    expect(rounded(patched)).toEqual(rounded(drawn(laid)));
+    expect(calls).toBeLessThan(30 * MANY);
+  });
 });

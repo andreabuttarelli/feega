@@ -445,43 +445,6 @@ const timed = <T>(name: string, run: () => T): T => {
 
 const drawOrder = (doc: MotionDoc): string[] => [...doc.tracks].reverse().filter((t) => t.kind === TrackKind.Visual && !t.hidden).flatMap((t) => t.clips.map((c) => c.id));
 
-function runAt(items: Item[], clip: string): { within: Item[]; at: number; path: number[] } | null {
-  const at = items.findIndex((i) => drawsFor(i, clip));
-  if (at >= 0) {
-    return { within: items, at, path: [] };
-  }
-  for (const [index, item] of items.entries()) {
-    const inner = item.kind === ItemKind.Group ? runAt(item.items, clip) : null;
-    if (inner) {
-      return { ...inner, path: [index, ...inner.path] };
-    }
-  }
-  return null;
-}
-
-function placedAt(items: Item[], path: number[], at: number, fresh: Item[]): Item[] {
-  if (!path.length) {
-    return [...items.slice(0, at), ...fresh, ...items.slice(at)];
-  }
-  const [head, ...rest] = path;
-  const group = items[head] as GroupItem;
-  return [...items.slice(0, head), { ...group, items: placedAt(group.items, rest, at, fresh) }, ...items.slice(head + 1)];
-}
-
-function inserted(items: Item[], order: string[], clip: string, fresh: Item[]): Item[] | null {
-  const from = order.indexOf(clip);
-  const next = order.slice(from + 1).map((id) => runAt(items, id)).find((r) => r !== null);
-  if (next) {
-    return placedAt(items, next.path, next.at, fresh);
-  }
-  const last = order.slice(0, from).reverse().map((id) => ({ id, run: runAt(items, id) })).find((r) => r.run !== null);
-  if (!last?.run) {
-    return null;
-  }
-  const end = last.run.within.findLastIndex((i) => drawsFor(i, last.id)) + 1;
-  return placedAt(items, last.run.path, end, fresh);
-}
-
 const hostOf = (item: Item) => instanceHost(item.clip) ?? item.clip;
 
 function hostsWithin(item: Item, into: Set<string>) {
@@ -527,6 +490,61 @@ function replacedRuns(items: Item[], fresh: ReadonlyMap<string, Item[]>, found: 
     out.push(inner === item.items ? item : { ...item, items: inner });
   }
   return changed ? out : items;
+}
+
+function hostsIn(items: Item[], into = new Set<string>()): Set<string> {
+  for (const item of items) {
+    into.add(hostOf(item));
+    hostsIn(item.kind === ItemKind.Group ? item.items : [], into);
+  }
+  return into;
+}
+
+function insertedAll(items: Item[], order: string[], fresh: ReadonlyMap<string, Item[]>): Item[] | null {
+  if (!fresh.size) {
+    return items;
+  }
+  const present = hostsIn(items);
+  const before = new Map<string, Item[]>();
+  let pending: Item[] = [];
+  let last: string | null = null;
+  for (const id of order) {
+    if (fresh.has(id)) {
+      pending.push(...fresh.get(id)!);
+      continue;
+    }
+    if (!present.has(id)) {
+      continue;
+    }
+    last = id;
+    if (pending.length) {
+      before.set(id, pending);
+      pending = [];
+    }
+  }
+  if (pending.length && !last) {
+    return null;
+  }
+  const after = new Map(pending.length ? [[last!, pending]] : []);
+  return placedAll(items, before, after, new Set());
+}
+
+function placedAll(items: Item[], before: ReadonlyMap<string, Item[]>, after: ReadonlyMap<string, Item[]>, used: Set<string>): Item[] {
+  const out: Item[] = [];
+  items.forEach((item, i) => {
+    const key = hostOf(item);
+    if (before.has(key) && !used.has(`<${key}`)) {
+      used.add(`<${key}`);
+      out.push(...before.get(key)!);
+    }
+    out.push(item.kind === ItemKind.Group ? { ...item, items: placedAll(item.items, before, after, used) } : item);
+    const next = items[i + 1];
+    if (after.has(key) && (!next || hostOf(next) !== key) && !used.has(`>${key}`)) {
+      used.add(`>${key}`);
+      out.push(...after.get(key)!);
+    }
+  });
+  return out;
 }
 
 function slidAll(items: Item[], slides: ReadonlyMap<string, Shift>): Item[] {
@@ -603,9 +621,8 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
   const found = new Set<string>();
   const covered = new Set<string>();
   items = replacedRuns(items, owned, found, covered);
-  for (const id of shownRedraw.filter((id) => !found.has(id) && !covered.has(id) && owned.get(id)!.length).sort((x, y) => rank(x) - rank(y))) {
-    items = items && inserted(items, order, id, owned.get(id)!);
-  }
+  const missing = new Map(shownRedraw.filter((id) => !found.has(id) && !covered.has(id) && owned.get(id)!.length).map((id) => [id, owned.get(id)!]));
+  items = items && insertedAll(items, order, missing);
   if (!items) {
     return declined('splice');
   }
