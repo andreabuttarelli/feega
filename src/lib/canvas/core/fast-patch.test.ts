@@ -413,3 +413,70 @@ describe('editing inside a component', () => {
     expect(rounded(patched)).toEqual(rounded(drawn(after)));
   });
 });
+
+const HUGE = 2000;
+
+const PASSES = ['some', 'every', 'find', 'findIndex', 'indexOf', 'includes', 'filter', 'map', 'flatMap', 'forEach', 'reduce'] as const;
+
+function fullPasses(run: () => void): number {
+  let passes = 0;
+  const spies = PASSES.map((name) => {
+    const original = Array.prototype[name] as (...args: unknown[]) => unknown;
+    return vi.spyOn(Array.prototype, name).mockImplementation(function (this: unknown[], ...args: unknown[]) {
+      passes += this.length >= HUGE ? 1 : 0;
+      return original.apply(this, args);
+    } as never);
+  });
+  try {
+    run();
+  } finally {
+    spies.forEach((spy) => spy.mockRestore());
+  }
+  return passes;
+}
+
+const wide = (parent: string | null = null): MotionDoc => {
+  const doc = built(['root']);
+  const template = doc.tracks.flatMap((t) => t.clips)[0];
+  const clips = Array.from({ length: HUGE }, (_, i) => ({ ...template, id: `w${i}`, parent: parent && `w${i}` !== parent ? parent : null }));
+  return { ...doc, tracks: [{ ...doc.tracks.find((t) => t.clips.length)!, clips }] };
+};
+
+const touched = (doc: MotionDoc, count: number, change: (c: MotionClip) => MotionClip): MotionDoc => ({ ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c, i) => (i < count ? change(c) : c)) })) });
+
+describe('one edit on a frame of 2,000 layers', () => {
+  it('pairs the clips of a restyle of many layers without searching the list once per layer', () => {
+    const before = wide();
+    const after = touched(before, 100, restyled({ width: 0.02 }));
+
+    const list = drawn(before);
+
+    const passes = fullPasses(() => fastPatch(list, before, after, estimatedText));
+
+    expect(passes).toBeLessThan(20);
+  });
+
+  it('compares the two docs of one edit once, however many times the patch asks which clip changed', () => {
+    const before = wide();
+    const after = touched(before, 1, faded(0.5));
+    const list = drawn(before);
+
+    const passes = fullPasses(() => {
+      editedClipId(before, after);
+      editKindOf(before, after);
+      fastPatch(list, before, after, estimatedText);
+    });
+
+    expect(passes).toBeLessThanOrEqual(4);
+  });
+
+  it('lists the layers a hide redraws without searching the list once per layer', () => {
+    const before = wide('w0');
+    const after = touched(before, 1, hidden);
+    const list = drawn(before);
+
+    const passes = fullPasses(() => fastPatch(list, before, after, estimatedText, LOOK));
+
+    expect(passes).toBeLessThan(60);
+  });
+});
