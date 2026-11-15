@@ -1,9 +1,9 @@
 import { ItemKind, type DisplayList, type GroupItem, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import { clipsOf, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { TrackKind } from '@feega/motion-core/motion/components';
-import { Sizing } from '@feega/motion-core/motion/layout/auto-layout';
+import { Direction, Justify, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
 import { ParentOpacity, ancestorsOf } from '@feega/motion-core/motion/parent';
-import { laidSubtree, relaidBelow, relaidWithin, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+import { childrenInOrder, laidSubtree, relaidBelow, relaidWithin, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import type { TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
 import { withoutHidden } from '@feega/motion-core/motion/organize';
 import { SEPARATOR } from '@feega/motion-core/motion/precomp';
@@ -404,26 +404,84 @@ function slidItem(item: Item, by: Shift): Item {
 
 const rootOf = (doc: MotionDoc, id: string) => ancestorsOf(doc, id)[0] ?? id;
 
-const heldFixed = (c: MotionClip) => (c.layoutItem?.width ?? Sizing.Fixed) === Sizing.Fixed && (c.layoutItem?.height ?? Sizing.Fixed) === Sizing.Fixed && !c.layoutItem?.absolute;
-
 const sameBox = (a: MotionClip, b: MotionClip) => (['x', 'y', 'width', 'height'] as const).every((k) => a.props[k] === b.props[k]);
 
-function relaidNear(shown: MotionDoc, after: MotionDoc, was: Clips, edited: string, measure: TextMeasure): Clips | null {
-  const parents = ancestorsOf(after, edited).reverse();
-  for (const id of parents) {
-    const container = was.get(id);
-    if (!container?.autoLayout || !heldFixed(container)) {
-      continue;
-    }
-    const relaid = new Map(relaidBelow(shown, container, measure).map((c) => [c.id, c] as const));
-    if ([...relaid.values()].some((c) => c.layoutItem?.absolute)) {
+type Axis = { size: 'width' | 'height'; at: 'x' | 'y'; cross: 'width' | 'height' };
+
+const AXES: Partial<Record<Direction, Axis>> = {
+  [Direction.Horizontal]: { size: 'width', at: 'x', cross: 'height' },
+  [Direction.Vertical]: { size: 'height', at: 'y', cross: 'width' }
+};
+
+const flowAxis = (parent: MotionClip | undefined): Axis | null => {
+  const layout = parent?.autoLayout;
+  return layout && !layout.wrap && layout.justify === Justify.Start ? (AXES[layout.direction] ?? null) : null;
+};
+
+const num = (c: MotionClip, k: string) => Number(c.props[k]);
+
+const shifted = (c: MotionClip, at: 'x' | 'y', by: number): MotionClip => ({ ...c, props: { ...c.props, [at]: num(c, at) + by } });
+
+function pushedOn(region: Clips, shown: MotionDoc, was: Clips, moved: MotionClip, parent: MotionClip, axis: Axis): MotionClip | null {
+  const old = was.get(moved.id)!;
+  const delta = num(moved, axis.size) - num(old, axis.size);
+  if (num(moved, axis.cross) !== num(old, axis.cross)) {
+    return null;
+  }
+  const all = clipsOf(shown);
+  const siblings = childrenInOrder(all, parent as MotionClip & { autoLayout: NonNullable<MotionClip['autoLayout']> });
+  const after = siblings.slice(siblings.findIndex((c) => c.id === moved.id) + 1);
+  if (after.some((c) => c.layoutItem?.absolute || (c.layoutItem?.[axis.size] ?? Sizing.Fixed) === Sizing.Fill)) {
+    return null;
+  }
+  for (const id of below(shown, new Set(after.map((c) => c.id)))) {
+    const laid = region.get(id) ?? was.get(id);
+    if (!laid) {
       return null;
     }
-    if (sameBox(relaid.get(id)!, container)) {
-      return relaid;
-    }
+    region.set(id, shifted(laid, axis.at, delta));
   }
-  return null;
+  const laidParent = was.get(parent.id)!;
+  if ((laidParent.layoutItem?.[axis.size] ?? Sizing.Fixed) !== Sizing.Hug) {
+    return laidParent;
+  }
+  return { ...laidParent, props: { ...laidParent.props, [axis.size]: num(laidParent, axis.size) + delta, [axis.at]: num(laidParent, axis.at) + delta / 2 } };
+}
+
+export function laidNear(before: MotionDoc, after: MotionDoc, measure: TextMeasure): Clips | null {
+  const was = exactLaid(before, measure);
+  const shown = withoutHidden(after);
+  const [old, now] = [clipsOf(before), clipsOf(after)];
+  const touched = now.filter((c, i) => c !== old[i]);
+  if (touched.length !== 1 || old.length !== now.length) {
+    return null;
+  }
+  const byId = new Map(clipsOf(shown).map((c) => [c.id, c]));
+  const start = ancestorsOf(after, touched[0].id).reverse().find((id) => was.get(id)?.autoLayout);
+  if (!start) {
+    return null;
+  }
+  const region = new Map(relaidBelow(shown, was.get(start)!, measure).map((c) => [c.id, c] as const));
+  if ([...region.values()].some((c) => c.layoutItem?.absolute)) {
+    return null;
+  }
+  for (let at = start; ; ) {
+    const moved = region.get(at)!;
+    const parent = byId.get(byId.get(at)?.parent ?? '');
+    if (sameBox(moved, was.get(at)!) || !byId.get(at)?.parent) {
+      return region;
+    }
+    const axis = flowAxis(parent);
+    if (!parent || !axis || !was.get(parent.id)) {
+      return null;
+    }
+    const grown = pushedOn(region, shown, was, moved, parent, axis);
+    if (!grown) {
+      return null;
+    }
+    region.set(parent.id, grown);
+    at = parent.id;
+  }
 }
 
 export function laidIncrementally(before: MotionDoc, after: MotionDoc, measure: TextMeasure): Clips {
@@ -439,7 +497,7 @@ export function laidIncrementally(before: MotionDoc, after: MotionDoc, measure: 
   const gone = old.filter((c) => !now.some((n) => n.id === c.id)).map((c) => c.id);
   const shown = withoutHidden(after);
   const left = new Set(clipsOf(shown).map((c) => c.id));
-  const near = touched.length === 1 && !gone.length ? relaidNear(shown, after, was, touched[0], measure) : null;
+  const near = gone.length ? null : laidNear(before, after, measure);
   const roots = new Set([...touched.map((id) => rootOf(after, id)), ...[...touched, ...gone].filter((id) => oldById.has(id)).map((id) => rootOf(before, id))]);
   const fresh = near ?? new Map([...roots].filter((id) => left.has(id)).flatMap((id) => laidSubtree(shown, id, measure).map((c) => [c.id, c] as const)));
   const next: Clips = new Map(clipsOf(shown).map((c) => [c.id, fresh.get(c.id) ?? was.get(c.id) ?? c]));
