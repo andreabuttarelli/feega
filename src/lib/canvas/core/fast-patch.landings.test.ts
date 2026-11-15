@@ -9,7 +9,9 @@ import { drawFrame, prepare, type DisplayList } from '@feega/motion-core/motion/
 import { moveBy } from '$lib/motion/space';
 import { EditMode } from '$lib/motion/edit-mode';
 import { estimatedText } from '@feega/motion-core/motion/layout/text-extent';
-import { fastPatch } from './fast-patch';
+import { fastPatch, laidIncrementally } from './fast-patch';
+import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+import { withoutHidden } from '@feega/motion-core/motion/organize';
 
 const FIXTURE = process.env.LANDINGS_FEEGA ?? join(homedir(), 'Documents/feega-videos/perf/landings/landings.feega');
 const MOVES: [number, number][] = [[12, -7], [1, 0], [0, -10]];
@@ -109,5 +111,32 @@ describe.skipIf(!existsSync(FIXTURE))('fastPatch on every clip of the landings f
     expect(show.patched / show.tried).toBeGreaterThan(MOST_PATCHED);
     expect(resize.patched / resize.tried).toBeGreaterThan(MOST_PATCHED);
     expect(hide.patched / hide.tried).toBeGreaterThan(MOST_PATCHED);
+  }, 3_600_000);
+
+  it('lays out every edit incrementally exactly as the whole doc layout does', () => {
+    const mismatched: string[] = [];
+    let tried = 0;
+    for (const doc of docs()) {
+      const edits = clipsOf(doc).filter((c, i) => !c.hidden && i % SAMPLE_EVERY === 0).flatMap((clip) => {
+        const width = Number(clip.props.width);
+        const gone = withClip(doc, clip.id, (c) => ({ ...c, hidden: true }));
+        return [
+          [`hide ${clip.id}`, doc, gone],
+          [`show ${clip.id}`, gone, doc],
+          ...(Number.isFinite(width) && width > 0 ? [[`resize ${clip.id}`, doc, withClip(doc, clip.id, (c) => ({ ...c, props: { ...c.props, width: width * 0.9 } }))]] : [])
+        ] as [string, MotionDoc, MotionDoc][];
+      });
+      for (const [label, before, after] of edits) {
+        tried++;
+        const whole = new Map(clipsOf(withAutoLayout(withoutHidden(after), estimatedText)).map((c) => [c.id, c]));
+        const laid = laidIncrementally(before, after, estimatedText);
+        const same = laid.size === whole.size && [...whole].every(([id, c]) => JSON.stringify(laid.get(id)) === JSON.stringify(c));
+        if (!same) {
+          mismatched.push(label);
+        }
+      }
+    }
+    console.log(JSON.stringify({ tried, mismatched: mismatched.length, first: mismatched.slice(0, 5) }));
+    expect(mismatched).toEqual([]);
   }, 3_600_000);
 });

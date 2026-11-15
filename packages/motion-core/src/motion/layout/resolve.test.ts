@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, newClip, newMotionDoc, parseMotionDoc, type MotionClip, type MotionDoc } from '../doc';
 import { Align, Direction, Justify, Sizing } from './auto-layout';
 import { DEFAULT_AUTO_LAYOUT, DEFAULT_LAYOUT_ITEM, type AutoLayout } from './model';
-import { relaidWithin, withAutoLayout } from './resolve';
+import { laidSubtree, relaidWithin, withAutoLayout } from './resolve';
 import { flattenComps } from '../precomp';
 import { TrackKind } from '../components';
 import { textBaseline, textExtent } from './text-extent';
@@ -329,5 +329,27 @@ describe('relaidWithin', () => {
     const alone = relaidWithin(hidden, laidClip(doc, 'row'));
 
     expect(alone).toEqual(['row', 'b', 'c'].map((id) => laidClip(hidden, id)));
+  });
+});
+
+describe('laidSubtree', () => {
+  const twoRoots = () =>
+    docOf([
+      shape('page', { x: 0.3, y: 0.5, width: 0.4, height: 0.8 }, { autoLayout: flow({ direction: Direction.Vertical, gap: 10 }), layoutItem: { ...DEFAULT_LAYOUT_ITEM, height: Sizing.Hug } }),
+      shape('head', { x: 0, y: 0, width: 0.3, height: 0.1 }, { parent: 'page' }),
+      shape('row', { x: 0, y: 0, width: 0.2, height: 0.2 }, { parent: 'page', autoLayout: flow({ gap: 4 }), layoutItem: { ...DEFAULT_LAYOUT_ITEM, width: Sizing.Hug } }),
+      shape('cell', { x: 0, y: 0, width: 0.05, height: 0.05 }, { parent: 'row' }),
+      shape('side', { x: 0.8, y: 0.5, width: 0.2, height: 0.4 }, { autoLayout: flow({ gap: 5 }) }),
+      shape('dot', { x: 0, y: 0, width: 0.05, height: 0.05 }, { parent: 'side' })
+    ]);
+
+  it('lays out one root tree exactly as the whole doc layout does', () => {
+    const doc = twoRoots();
+    const whole = new Map(withAutoLayout(doc).tracks.flatMap((t) => t.clips).map((c) => [c.id, c]));
+
+    const laid = laidSubtree(doc, 'page');
+
+    expect(laid.map((c) => c.id).sort()).toEqual(['cell', 'head', 'page', 'row']);
+    laid.forEach((c) => expect(c).toEqual(whole.get(c.id)));
   });
 });
