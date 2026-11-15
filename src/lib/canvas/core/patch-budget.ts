@@ -13,7 +13,7 @@ export class PatchBudget {
     return !this.#slow.has(frame);
   }
 
-  forget(frame: string) {
-    this.#slow.delete(frame);
+  forgetFrame(frame: string) {
+    [...this.#slow].filter((key) => key.startsWith(`${frame}|`)).forEach((key) => this.#slow.delete(key));
   }
 }

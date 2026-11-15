@@ -19,12 +19,14 @@ describe('PatchBudget', () => {
     expect(budget.redraws('f2')).toBe(true);
   });
 
-  it('gives a frame its redraws back when its doc is replaced', () => {
+  it('gives every layer of a frame its redraws back when the frame doc is replaced', () => {
     const budget = new PatchBudget();
-    budget.took('f1', PATCH_BUDGET_MS + 1);
+    budget.took('f1|a', PATCH_BUDGET_MS + 1);
+    budget.took('f10|a', PATCH_BUDGET_MS + 1);
 
-    budget.forget('f1');
+    budget.forgetFrame('f1');
 
-    expect(budget.redraws('f1')).toBe(true);
+    expect(budget.redraws('f1|a')).toBe(true);
+    expect(budget.redraws('f10|a')).toBe(false);
   });
 });
