@@ -1,5 +1,5 @@
 use gpu_core::retained::Camera;
-use gpu_core::tiles::{lifted_keys, magnified, fallback_serves, fallback_bands, ahead_camera, fade_in, FADE_MS, NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, bake_batches, BAKE_BATCH_TILES, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
+use gpu_core::tiles::{lifted_keys, magnified, fallback_serves, fallback_bands, ahead_camera, fade_in, fades_over, FADE_MS, NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, bake_batches, BAKE_BATCH_TILES, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
 use vello::kurbo::{Point, Rect};
 
 const SCREEN: (u32, u32) = (1024, 768);
@@ -852,4 +852,14 @@ fn a_zoom_in_prepares_the_next_fallback_a_quarter_closer_about_the_same_point() 
     assert!((next.x - (100.0 - 100.0 * 1.375)).abs() < 1e-6);
     assert!((next.y - (50.0 - 50.0 * 1.375)).abs() < 1e-6);
     assert!(ahead_camera(now, was).is_none());
+}
+
+#[test]
+fn a_tile_fades_in_only_over_something_that_covers_it() {
+    let tile = Rect::new(0.0, 0.0, 256.0, 256.0);
+    let halves = [Rect::new(-10.0, -10.0, 128.0, 300.0), Rect::new(128.0, -10.0, 300.0, 300.0)];
+
+    assert!(fades_over(tile, &halves));
+    assert!(!fades_over(tile, &halves[..1]));
+    assert!(!fades_over(tile, &[]));
 }

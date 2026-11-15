@@ -267,6 +267,13 @@ pub fn ahead_camera(was: Camera, now: Camera) -> Option<Camera> {
     Some(Camera { x: toward(was.x, now.x), y: toward(was.y, now.y), zoom })
 }
 
+const COVERED_SHARE: f64 = 0.999;
+
+pub fn fades_over(tile: Rect, under: &[Rect]) -> bool {
+    let covered: f64 = under.iter().map(|r| r.intersect(tile).area()).sum();
+    tile.area() > 0.0 && covered >= tile.area() * COVERED_SHARE
+}
+
 pub fn fade_in(age_ms: f64) -> f32 {
     (age_ms / FADE_MS).clamp(0.0, 1.0) as f32
 }

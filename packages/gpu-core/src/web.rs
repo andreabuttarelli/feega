@@ -16,7 +16,7 @@ use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile, OPAQUE};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, batches_of, bake_batches, BAKE_BATCH_TILES, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys, magnified, fallback_serves, fallback_bands, ahead_camera, fade_in, FADE_MS};
+use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, batches_of, bake_batches, BAKE_BATCH_TILES, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys, magnified, fallback_serves, fallback_bands, ahead_camera, fade_in, fades_over, FADE_MS};
 use crate::overlay_seen::OverlaySeen;
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
@@ -952,11 +952,11 @@ impl WebCore {
     }
 
     fn fading(&self, draw: &[TileKey]) -> Vec<(TileKey, f32)> {
-        if !self.fallback.iter().any(|f| fallback_serves(f.camera, self.camera, f.size, &[])) {
-            return vec![];
-        }
+        let screen = Rect::new(0.0, 0.0, self.target.width() as f64, self.target.height() as f64);
+        let under: Vec<Rect> = self.fallback.iter().filter(|f| fallback_serves(f.camera, self.camera, f.size, &[])).flat_map(|f| f.tiles(self.camera, screen)).map(|t| t.within).collect();
         let now = now_ms();
-        draw.iter().filter_map(|k| self.born.get(k).map(|at| (*k, now - at))).filter(|(_, age)| *age < FADE_MS).map(|(k, age)| (k, fade_in(age))).collect()
+        let young = |k: &TileKey| self.born.get(k).map(|at| now - at).filter(|age| *age < FADE_MS);
+        draw.iter().filter(|k| fades_over(k.screen(self.camera).intersect(screen), &under)).filter_map(|k| young(k).map(|age| (*k, fade_in(age)))).collect()
     }
 
     fn forget_fallback(&mut self) {
