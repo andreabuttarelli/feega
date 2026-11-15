@@ -770,7 +770,7 @@ impl WebCore {
         }
     }
 
-    fn present_tiles(&mut self, draw: &[TileKey], fading: &[(TileKey, f32)]) -> Result<(), JsValue> {
+    fn present_tiles(&mut self, draw: &[TileKey], beneath: &[TileKey], fading: &[(TileKey, f32)]) -> Result<(), JsValue> {
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(t) | wgpu::CurrentSurfaceTexture::Suboptimal(t) => t,
             _ => return Err(failed("no surface texture")),
@@ -794,7 +794,7 @@ impl WebCore {
         let underlay = self.compositor.held_look(c).filter(|(_, stretch)| crate::tiles::underlay_shows(*stretch)).map(|(look, _)| Tile { source: &self.retained, look, within: covered(look), opacity: OPAQUE }).filter(|t| t.within.area() > 0.0);
         let fades = |k: &TileKey| fading.iter().any(|(f, _)| f == k);
         let fallback = self.fallback.iter().flat_map(|f| f.tiles(c, screen));
-        let still = draw.iter().filter(|k| k.step != step).filter_map(tile_of).chain(underlay).chain(fallback).chain(draw.iter().filter(|k| k.step == step && !fades(k)).filter_map(tile_of));
+        let still = beneath.iter().filter_map(tile_of).chain(draw.iter().filter(|k| k.step != step).filter_map(tile_of)).chain(underlay).chain(fallback).chain(draw.iter().filter(|k| k.step == step && !fades(k)).filter_map(tile_of));
         let faded = fading.iter().filter_map(|(k, opacity)| tile_of(k).map(|t| Tile { opacity: *opacity, ..t }));
         let complete = self.rest.as_ref().is_some_and(Rest::adoptable);
         let exact = self.rest_shown.iter().filter(|_| complete).map(|(block, source)| Tile { source, look: Lookup { scale: 1.0, x: -block.x0, y: -block.y0 }, within: *block, opacity: OPAQUE });
@@ -894,7 +894,7 @@ impl WebCore {
         if tiles.bare.is_empty() && fading.is_empty() {
             self.forget_fallback();
         }
-        self.present_tiles(&tiles.draw, &fading)?;
+        self.present_tiles(&tiles.draw, &tiles.beneath, &fading)?;
         self.tiles.drawn(&tiles.draw);
         let kept = tiles_kept(screen, self.tile_budget);
         if self.tiles.len() > kept {

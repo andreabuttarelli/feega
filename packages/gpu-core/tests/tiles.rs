@@ -863,3 +863,15 @@ fn a_tile_fades_in_only_over_something_that_covers_it() {
     assert!(!fades_over(tile, &halves[..1]));
     assert!(!fades_over(tile, &[]));
 }
+
+#[test]
+fn a_coarser_level_stays_beneath_the_sharp_tiles_so_an_incomplete_tile_never_shows_the_empty_canvas() {
+    let mut tiles = Tiles::default();
+    tiles.frame(camera(1.0), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
+    tiles.frame(camera(2.0), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
+    let frame = tiles.frame(camera(2.0), SCREEN);
+
+    assert!(frame.bare.is_empty());
+    assert!(!frame.beneath.is_empty());
+    assert!(frame.beneath.iter().all(|k| k.step < tiles.step_for(camera(2.0))));
+}

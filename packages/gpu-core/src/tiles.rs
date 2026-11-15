@@ -224,6 +224,7 @@ pub struct TileFrame {
     pub draw: Vec<TileKey>,
     pub missing: Vec<TileKey>,
     pub bare: Vec<TileKey>,
+    pub beneath: Vec<TileKey>,
 }
 
 pub fn sharp_at(zoom: f64, step: i32) -> bool {
@@ -343,7 +344,7 @@ impl Tiles {
         let step = self.step_for(camera);
         let world = match self.on_canvas(seen_world(camera, screen)) {
             Some(world) if count_over(world, step) <= FRAME_TILES_MAX => world,
-            _ => return TileFrame { draw: Vec::new(), missing: Vec::new(), bare: Vec::new() },
+            _ => return TileFrame { draw: Vec::new(), missing: Vec::new(), bare: Vec::new(), beneath: Vec::new() },
         };
         let centre = Point::new(screen.0 as f64 / 2.0, screen.1 as f64 / 2.0);
         let distance = |k: &TileKey| k.screen(camera).center().distance(centre);
@@ -359,8 +360,9 @@ impl Tiles {
         };
         let sharp: Vec<i32> = coarser.into_iter().chain(step + 1..=step + FINER_STEPS).collect();
         let bare = missing.iter().filter(|k| !self.held.contains(k) && !self.under_any(**k, &sharp)).copied().collect();
+        let beneath = (step - COARSER_STEPS..step).rev().filter(|s| !sharp.contains(s)).map(|s| self.held_over(world, s)).find(|keys| !keys.is_empty()).unwrap_or_default();
         missing.extend(draw.iter().filter(|k| k.step != step && self.stale.contains(k)));
-        TileFrame { draw, missing, bare }
+        TileFrame { draw, missing, bare, beneath }
     }
 
     fn on_canvas(&self, world: Rect) -> Option<Rect> {
