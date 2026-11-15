@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, newClip, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { removeClips, snapTargets } from '@feega/motion-core/motion/timeline';
 import { edgeHandles, graphLanes } from '$lib/motion/timeline-view';
+import { Place, dropLayers } from './layers';
 import { counted } from './counted-list.testkit';
 import { subtreeOf } from './core/lifted-drag';
 
@@ -65,5 +66,15 @@ describe('lookups index their ids once', () => {
 
     expect(handles.length).toBeGreaterThan(SIZE);
     expect(selected.scans()).toBe(0);
+  });
+
+  it('dropping layers scans no dragged list per layer in the stack', () => {
+    const { doc } = flatDoc();
+    const topFirst = Array.from({ length: SIZE }, (_, i) => `c${i}`);
+    const dragged = counted(Array.from({ length: PICKED }, (_, i) => `c${i}`));
+
+    dropLayers(doc, dragged, `c${SIZE - 1}`, Place.Above, topFirst);
+
+    expect(dragged.scans()).toBe(0);
   });
 });
