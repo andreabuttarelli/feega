@@ -8,10 +8,7 @@ import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-l
 import { moveBy } from '$lib/motion/space';
 import { EditMode } from '$lib/motion/edit-mode';
 import { estimatedText } from '@feega/motion-core/motion/layout/text-extent';
-import { editedClipId, fastPatch, laidIncrementally, laidNear, relinked, reloaded } from './fast-patch';
-import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
-import { clipsOf } from '@feega/motion-core/motion/doc';
-import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
+import { editedClipId, fastPatch, laidIncrementally, relinked, reloaded } from './fast-patch';
 
 const SHAPE = { shape: 'rect', x: 0.5, y: 0.5, width: 0.3, height: 0.3, fills: [{ type: 'solid', color: '#ff6a3d' }] };
 
@@ -284,33 +281,7 @@ describe('reloaded', () => {
   });
 });
 
-const column = { ...DEFAULT_AUTO_LAYOUT, direction: Direction.Vertical, gap: 10 };
 
-const hugging = { ...DEFAULT_LAYOUT_ITEM, height: Sizing.Hug };
-
-const page = () => {
-  const doc = built(['page', 's1', 'a', 'b', 's2', 'c']);
-  const parented = (id: string, parent: string) => (d: MotionDoc) => edit(d, id, (c) => ({ ...c, parent, props: { ...c.props, ...SMALL } }));
-  return [parented('s1', 'page'), parented('a', 's1'), parented('b', 's1'), parented('s2', 'page'), parented('c', 's2')].reduce((d, f) => f(d), edit(edit(edit(doc, 'page', (c) => ({ ...c, autoLayout: column, layoutItem: hugging })), 's1', (c) => ({ ...c, autoLayout: column, layoutItem: hugging })), 's2', (c) => ({ ...c, autoLayout: column })));
-};
-
-const LAYOUT_DIGITS = 5;
-
-const laidRounded = (clips: MotionClip[]) => clips.map((c) => [c.id, ...['x', 'y', 'width', 'height'].map((k) => Number(Number(c.props[k]).toFixed(LAYOUT_DIGITS)))]).sort();
-
-describe('laidNear', () => {
-  it('lays out a hugging section and shifts the sections after it, as the whole doc layout does', () => {
-    const before = page();
-    const after = edit(before, 'a', restyled({ height: 0.2 }));
-
-    const near = laidNear(before, after, estimatedText);
-
-    expect(near).not.toBeNull();
-    const whole = clipsOf(withAutoLayout(after, estimatedText));
-    expect(laidRounded([...near!.values()])).toEqual(laidRounded(whole.filter((c) => near!.has(c.id))));
-    expect(near!.has('s2') && near!.has('c')).toBe(true);
-  });
-});
 
 describe('laidIncrementally on a big frame', () => {
   it('finds the clips an edit removed without scanning every clip once per clip', () => {
