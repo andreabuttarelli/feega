@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip } from '@feega/motion-core/motion/timeline';
@@ -8,7 +8,7 @@ import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-l
 import { moveBy } from '$lib/motion/space';
 import { EditMode } from '$lib/motion/edit-mode';
 import { estimatedText } from '@feega/motion-core/motion/layout/text-extent';
-import { editedClipId, fastPatch, laidNear, relinked, reloaded } from './fast-patch';
+import { editedClipId, fastPatch, laidIncrementally, laidNear, relinked, reloaded } from './fast-patch';
 import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { clipsOf } from '@feega/motion-core/motion/doc';
 import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
@@ -309,5 +309,20 @@ describe('laidNear', () => {
     const whole = clipsOf(withAutoLayout(after, estimatedText));
     expect(laidRounded([...near!.values()])).toEqual(laidRounded(whole.filter((c) => near!.has(c.id))));
     expect(near!.has('s2') && near!.has('c')).toBe(true);
+  });
+});
+
+describe('laidIncrementally on a big frame', () => {
+  it('finds the clips an edit removed without scanning every clip once per clip', () => {
+    const before = tallStack();
+    const after = edit(before, 'k0', restyled({ width: 0.02 }));
+    laidIncrementally(before, before, estimatedText);
+    const some = vi.spyOn(Array.prototype, 'some');
+
+    laidIncrementally(before, after, estimatedText);
+
+    const calls = some.mock.calls.length;
+    some.mockRestore();
+    expect(calls).toBeLessThan(MANY);
   });
 });
