@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newClip, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { removeClips, snapTargets } from '@feega/motion-core/motion/timeline';
+import { edgeHandles, graphLanes } from '$lib/motion/timeline-view';
 import { counted } from './counted-list.testkit';
 import { subtreeOf } from './core/lifted-drag';
 
@@ -42,5 +43,27 @@ describe('lookups index their ids once', () => {
     expect(result.ok).toBe(true);
     expect(ids.scans()).toBe(0);
     expect(clips.scans()).toBe(0);
+  });
+
+  it('choosing graph lanes by selection scans no id list per lane', () => {
+    const base = newMotionDoc(MotionFormat.Landscape);
+    const clips = Array.from({ length: SIZE }, (_, i) => newClip({ id: `c${i}`, from: 0, durationInFrames: 30, component: 'Shape', props: {}, keyframes: { x: [{ frame: 0, value: 0, ease: 'linear' }] } }));
+    const doc = { ...base, tracks: [{ ...base.tracks[0], clips }] };
+    const selection = counted(Array.from({ length: PICKED }, (_, i) => `c${i}`));
+
+    const lanes = graphLanes(doc, selection, [], false);
+
+    expect(lanes.length).toBeGreaterThanOrEqual(PICKED);
+    expect(selection.scans()).toBe(0);
+  });
+
+  it('placing edge handles scans no selection list per clip', () => {
+    const spans = Array.from({ length: SIZE }, (_, i) => ({ id: `c${i}`, from: i, durationInFrames: 10 }));
+    const selected = counted(Array.from({ length: PICKED }, (_, i) => `c${i}`));
+
+    const handles = edgeHandles(spans, 1, selected);
+
+    expect(handles.length).toBeGreaterThan(SIZE);
+    expect(selected.scans()).toBe(0);
   });
 });
