@@ -1,6 +1,6 @@
 # 0039 — Never show a tile magnified past 1.25×; draw a native LOD scene instead
 
-Status: proposed (2026-11-14). Step 1 (effect LOD table) has landed; the rest has not.
+Status: proposed (2026-11-14). Steps 1 (effect LOD table) and the cap, scene fallback and adjacent-level bake (branch `perf/never-blurry`) are built; the fallback is not yet cheap enough to merge.
 
 ## Context
 
@@ -45,3 +45,23 @@ landings wall before the cap is switched on:
   4/16 px floors.
 
 Until then, enforcing the cap would leave holes. So step 1 ships without the cap.
+
+## Measured, 2026-11-15 (`perf/never-blurry`, effect atlas merged)
+
+Sharp-zoom bench, landings wall, 10 legs, 3 runs per column. "Before" is the same build with only the counters.
+
+| | desk before | desk after | CPU 4x before | CPU 4x after |
+|---|---|---|---|---|
+| frames with a tile magnified > 1.25× | 203 / 218 / 216 | 0 / 0 / 0 | 407 / 407 / 421 | 0 / 0 (1 run failed) |
+| frames with bare tiles (blur or blank) | 187 / 193 / 190 | 0 | 224 / 209 / 248 | 0 |
+| blank frames | 12 / 10 / 8 | 0 | 6 / 5 / 5 | 0 |
+| fps | 56.0 / 56.7 / 56.8 | 55.9 / 55.6 / 56.4 | 35.0 / 35.8 / 35.0 | 34.8 / 34.9 |
+| worst frame | 52 / 67 / 51 ms | 115 / 148 / 83 ms | 400 / 267 / 266 ms | 782 / 768 ms |
+
+Getting fps back took patches: a fallback patch is kept while it stays within the cap, and only the bands newly uncovered around it render. Before that change the fallback cost 7.9 s per run at CPU 4x; after it, 2.4 s. Coarser detail floors for the fallback (text bars below ~4 px, effects dropped below 3× the usual floors, no new group rasters) gained only ~7%.
+
+**Still open: the worst frame.** It is a single full-screen fallback after a large jump. The renderer
+spends almost all of it encoding (plan 45–62 ms of 687 ms). Spreading it over frames is not
+possible without showing either a magnified or an empty area. Block-budgeted rendering was tried
+and brought back 1.8–3.2 s of blur. Fixing it needs a cheaper encode for the overview (for example
+GPU-derived mip levels, proposal B in the architecture notes) before this can merge.
