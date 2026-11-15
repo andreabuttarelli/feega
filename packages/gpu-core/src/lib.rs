@@ -19,7 +19,6 @@ pub mod glyphs;
 pub mod fragments;
 pub mod groups;
 pub mod kernel;
-pub mod layer_key;
 pub mod layers;
 pub mod lod;
 pub mod overlay_seen;
