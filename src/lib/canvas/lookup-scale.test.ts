@@ -100,6 +100,15 @@ describe('lookups index their ids once', () => {
     expect(clips.scans()).toBeLessThan(3);
   });
 
+  it('two clips sharing an id resolve to the first, however often they are looked up', () => {
+    const { doc, clips } = flatDoc();
+    const twin = { ...clips[0], props: { twin: true } };
+    const doubled = { ...doc, tracks: [{ ...doc.tracks[0], clips: [...clips, twin] }] };
+
+    expect(findClip(doubled, 'c0')?.clip).toBe(clips[0]);
+    expect(findClip(doubled, 'c0')?.clip).toBe(clips[0]);
+  });
+
   it('a clip moved in place is still found where it now is', () => {
     const { doc } = flatDoc();
     findClip(doc, 'c0');

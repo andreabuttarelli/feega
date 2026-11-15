@@ -515,7 +515,9 @@ function indexOf(doc: MotionDoc): ClipIndex {
   const at = new Map<string, ClipAt>();
   doc.tracks.forEach((track, t) => {
     for (let c = 0; c < track.clips.length; c++) {
-      at.set(track.clips[c].id, { track: t, clip: c });
+      if (!at.has(track.clips[c].id)) {
+        at.set(track.clips[c].id, { track: t, clip: c });
+      }
     }
   });
   const index = { at, tracks: doc.tracks.length };
