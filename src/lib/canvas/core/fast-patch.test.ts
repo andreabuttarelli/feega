@@ -437,4 +437,14 @@ describe('one edit on a frame of 2,000 layers', () => {
 
     expect(passes).toBeLessThanOrEqual(4);
   });
+
+  it('lists the layers a hide redraws without searching the list once per layer', () => {
+    const before = wide('w0');
+    const after = touched(before, 1, hidden);
+    const list = drawn(before);
+
+    const passes = fullPasses(() => fastPatch(list, before, after, estimatedText, LOOK));
+
+    expect(passes).toBeLessThan(60);
+  });
 });

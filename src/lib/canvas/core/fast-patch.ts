@@ -599,7 +599,7 @@ function subtreeRedrawn(list: DisplayList, before: MotionDoc, after: MotionDoc, 
     return by && ownItems(list.items, id).every(plainToSlide) ? [[id, by] as const] : [];
   }));
   const cutting = new Set([...slides.keys()].filter((id) => !!relaid.get(id)?.clipContent || !!relaid.get(id)?.mask));
-  const redraw = [...below(after, new Set([edited.id, ...cutting])), ...[...moved].filter((id) => !slides.has(id) && id !== edited.id)].filter((id, i, all) => all.indexOf(id) === i);
+  const redraw = [...new Set([...below(after, new Set([edited.id, ...cutting])), ...[...moved].filter((id) => !slides.has(id) && id !== edited.id)])];
   traceSince('patch:plan', mark);
   if (redraw.filter((id) => relaid.has(id)).length > REDRAW_MOST) {
     return declined('too-many');
