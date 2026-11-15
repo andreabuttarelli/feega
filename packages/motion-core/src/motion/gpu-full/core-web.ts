@@ -3,6 +3,7 @@ import type { Picture, Pictures, Raster } from './raster';
 import type { Affine } from '../affine';
 import type { Outcome } from './core-outcome';
 import { OverlayPart } from './core-overlay';
+import { overlaySplice } from './overlay-splice';
 import { listPack, listWire, spliceWire, type Splice } from './wire';
 import { inlineCore, unzipBase64 } from './inline-core';
 import { releaseOnDispose, type GpuSurface } from './gpu-release';
@@ -22,7 +23,7 @@ const coreUrl = (build: CoreBuild) => `/gpu-core/${build}.js?v=${BUILD_VERSIONS[
 const wasmUrl = (build: CoreBuild) => `/gpu-core/${build}_bg.wasm?v=${BUILD_VERSIONS[build]}`;
 
 type Size = { width: number; height: number };
-export type Attached = { draw: (list: string) => string; set_camera: (x: number, y: number, zoom: number) => void; patch_uses: (patch: string) => void; set_overlay: (items: string) => void; set_selected_overlay: (items: string) => void; set_live_overlay: (items: string) => void; frame: (now: number) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; picture_rows?: (clip: string, source: unknown, width: number, height: number, top: number, rows: number) => boolean; put_group: (key: string, list: string) => void; patch_group: (from: string, to: string, splice: string) => boolean; drop_group: (key: string) => void; append_group: (key: string, list: string) => void; put_group_packed?: (key: string, list: string, floats: Float64Array, ends: Uint32Array) => void; append_group_packed?: (key: string, list: string, floats: Float64Array, ends: Uint32Array) => void; cache_pending: () => boolean; cache_bytes: () => number; render_tally?: () => string; frame_counts?: () => Float64Array; warming?: () => boolean; scratch_bytes?: () => number; forget_picture: (clip: string) => void; picture_bytes: () => number; lost: () => boolean; busy?: () => boolean; set_motion?: (motion: CoreMotion) => void; set_budget?: (bytes: number) => void; set_tiles?: (on: boolean) => void; set_tile_budget?: (bytes: number) => void; set_canvas_tiles?: (allowed: number) => void; set_pixel_ratio?: (ratio: number) => void; poster?: (group: string, width: number, height: number, scale: number) => Promise<Uint8Array<ArrayBuffer>>; free: () => void };
+export type Attached = { draw: (list: string) => string; set_camera: (x: number, y: number, zoom: number) => void; patch_uses: (patch: string) => void; set_overlay: (items: string) => void; set_selected_overlay: (items: string) => void; set_live_overlay: (items: string) => void; splice_overlay?: (head: number, tail: number, items: string) => boolean; splice_selected_overlay?: (head: number, tail: number, items: string) => boolean; splice_live_overlay?: (head: number, tail: number, items: string) => boolean; frame: (now: number) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; picture_rows?: (clip: string, source: unknown, width: number, height: number, top: number, rows: number) => boolean; put_group: (key: string, list: string) => void; patch_group: (from: string, to: string, splice: string) => boolean; drop_group: (key: string) => void; append_group: (key: string, list: string) => void; put_group_packed?: (key: string, list: string, floats: Float64Array, ends: Uint32Array) => void; append_group_packed?: (key: string, list: string, floats: Float64Array, ends: Uint32Array) => void; cache_pending: () => boolean; cache_bytes: () => number; render_tally?: () => string; frame_counts?: () => Float64Array; warming?: () => boolean; scratch_bytes?: () => number; forget_picture: (clip: string) => void; picture_bytes: () => number; lost: () => boolean; busy?: () => boolean; set_motion?: (motion: CoreMotion) => void; set_budget?: (bytes: number) => void; set_tiles?: (on: boolean) => void; set_tile_budget?: (bytes: number) => void; set_canvas_tiles?: (allowed: number) => void; set_pixel_ratio?: (ratio: number) => void; poster?: (group: string, width: number, height: number, scale: number) => Promise<Uint8Array<ArrayBuffer>>; free: () => void };
 
 export enum CoreMotion {
   Still = 0,
@@ -43,6 +44,25 @@ const OVERLAY_SETTERS: Record<OverlayPart, (core: Attached, items: string) => vo
   [OverlayPart.Selected]: (core, items) => core.set_selected_overlay(items),
   [OverlayPart.Live]: (core, items) => core.set_live_overlay(items)
 };
+
+const OVERLAY_SPLICERS: Record<OverlayPart, (core: Attached) => Attached['splice_overlay']> = {
+  [OverlayPart.Fixed]: (core) => core.splice_overlay?.bind(core),
+  [OverlayPart.Selected]: (core) => core.splice_selected_overlay?.bind(core),
+  [OverlayPart.Live]: (core) => core.splice_live_overlay?.bind(core)
+};
+
+export function overlaySender(core: Attached): (part: OverlayPart, items: readonly Item[]) => void {
+  const sent = new Map<OverlayPart, readonly Item[]>();
+  return (part, items) => {
+    const splice = overlaySplice(sent.get(part) ?? null, items);
+    sent.set(part, items);
+    const splicer = OVERLAY_SPLICERS[part](core);
+    if (splice && splicer && splice.items.length < items.length && splicer(splice.head, splice.tail, JSON.stringify(splice.items))) {
+      return;
+    }
+    OVERLAY_SETTERS[part](core, JSON.stringify(items));
+  };
+}
 
 const NO_PICTURES: Pictures = () => null;
 
@@ -120,7 +140,7 @@ export function warmCore(build: CoreBuild = preferredBuild()): Promise<CoreModul
 
 const utf8 = new TextEncoder();
 const WIRED_PACKED = new Set(['put_group_packed', 'append_group_packed']);
-const WIRED_LAST = new Set(['draw', 'patch_uses', 'set_overlay', 'set_selected_overlay', 'set_live_overlay', 'put_group', 'append_group', 'patch_group']);
+const WIRED_LAST = new Set(['draw', 'patch_uses', 'set_overlay', 'set_selected_overlay', 'set_live_overlay', 'splice_overlay', 'splice_selected_overlay', 'splice_live_overlay', 'put_group', 'append_group', 'patch_group']);
 
 const BORROW_LEFT = 'recursive use of an object detected';
 
@@ -347,7 +367,7 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
     },
     setCamera: (x: number, y: number, zoom: number) => attached.set_camera(x, y, zoom),
     patchUses: (patch: UsePatch) => attached.patch_uses(JSON.stringify(patch)),
-    setOverlay: (part: OverlayPart, items: readonly Item[]) => OVERLAY_SETTERS[part](attached, JSON.stringify(items)),
+    setOverlay: overlaySender(attached),
     frame: (now: number) => {
       const [outcome, ...skipped] = attached.frame(now).split('\n');
       return { outcome: outcome as Outcome, pending: attached.cache_pending(), skipped: skipped.filter(Boolean) };
