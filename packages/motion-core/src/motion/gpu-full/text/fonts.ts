@@ -66,7 +66,7 @@ function coordsFor(source: Source, weight: number, request: Request): Record<str
   if (source.axes.opsz) {
     auto.opsz = request.size;
   }
-  return { ...auto, ...Object.fromEntries(Object.entries(request.axes).filter(([tag]) => source.axes[tag])) };
+  return { ...auto, ...Object.fromEntries(Object.entries(request.axes).flatMap(([tag, value]) => (source.axes[tag] ? [[tag, clamp(value, [source.axes[tag][0], source.axes[tag][1]])]] : []))) };
 }
 
 export const resolvedRequest = <R extends Omit<Request, 'size'>>(request: R, registry: readonly FontFace[]): R => ({ ...request, family: familyName(request.family, registry), weight: loadedWeight(request.family, request.weight, registry) });
