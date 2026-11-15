@@ -560,7 +560,7 @@ type Patch = (list: DisplayList, before: MotionDoc, after: MotionDoc, a: MotionC
 
 const PATCHES: Record<Edit, Patch> = {
   [Edit.Fade]: (list, _before, after, a, b) => fadeOf(list, after, a, b),
-  [Edit.Hide]: (list, before, after, _a, b, measure, look) => relaid(list, before, after, measure, hidePairing(before, after, b, measure)) ?? subtreeRedrawn(list, before, after, b, measure, look),
+  [Edit.Hide]: (list, before, after, _a, b, measure, look) => subtreeRedrawn(list, before, after, b, measure, look) ?? relaid(list, before, after, measure, hidePairing(before, after, b, measure)),
   [Edit.Move]: (list, before, after, _a, _b, measure) => relaid(list, before, after, measure, unlaid(before, after)),
   [Edit.Show]: (list, before, after, _a, b, measure, look) => subtreeRedrawn(list, before, after, b, measure, look),
   [Edit.Redraw]: (list, before, after, _a, b, measure, look) => redrawn(list, after, b, look) ?? subtreeRedrawn(list, before, after, b, measure, look)

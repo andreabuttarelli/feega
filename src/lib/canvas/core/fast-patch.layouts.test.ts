@@ -10,7 +10,7 @@ import * as resolve from '@feega/motion-core/motion/layout/resolve';
 
 vi.mock('@feega/motion-core/motion/layout/resolve', async (original) => {
   const real = await original<typeof import('@feega/motion-core/motion/layout/resolve')>();
-  return { ...real, withAutoLayout: vi.fn(real.withAutoLayout) };
+  return { ...real, withAutoLayout: vi.fn(real.withAutoLayout), relaidWithin: vi.fn(real.relaidWithin) };
 });
 
 const { fastPatch } = await import('./fast-patch');
@@ -45,5 +45,17 @@ describe('fastPatch layouts', () => {
 
     const laysOutContainers = vi.mocked(resolve.withAutoLayout).mock.calls.filter(([doc]) => doc.tracks.some((t) => t.clips.some((c) => c.autoLayout)));
     expect(laysOutContainers).toEqual([]);
+  });
+
+  it('does not lay out the whole parent of a hidden layer when it can redraw the reflow', () => {
+    const first = stack();
+    const list = drawFrame(prepare(first, FEEGA_TOKENS), 0);
+    const warm = edit(first, 'a', (c) => ({ ...c, props: { ...c.props, width: 0.1 } }));
+    const patched = fastPatch(list, first, warm, estimatedText, LOOK);
+    vi.mocked(resolve.relaidWithin).mockClear();
+
+    fastPatch(patched!, warm, edit(warm, 'b', (c) => ({ ...c, hidden: true })), estimatedText, LOOK);
+
+    expect(vi.mocked(resolve.relaidWithin)).not.toHaveBeenCalled();
   });
 });
