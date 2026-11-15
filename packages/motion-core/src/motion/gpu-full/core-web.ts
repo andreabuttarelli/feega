@@ -352,7 +352,7 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
       const [outcome, ...skipped] = attached.frame(now).split('\n');
       return { outcome: outcome as Outcome, pending: attached.cache_pending(), skipped: skipped.filter(Boolean) };
     },
-    ...(attached.poster ? { poster: (group: string, size: { width: number; height: number }, scale: number) => attached.poster!(group, size.width, size.height, scale).then((bytes) => new ImageData(Uint8ClampedArray.from(bytes), size.width, size.height)) } : {}),
+    ...(attached.poster ? { poster: (group: string, size: { width: number; height: number }, scale: number) => attached.poster!(group, size.width, size.height, scale).then((bytes) => new ImageData(new Uint8ClampedArray(bytes.buffer, bytes.byteOffset, bytes.byteLength), size.width, size.height)) } : {}),
     cacheBytes: () => attached.cache_bytes(),
     renderTally: () => attached.render_tally?.() ?? '{}',
     frameCounts: () => attached.frame_counts?.() ?? new Float64Array(),
