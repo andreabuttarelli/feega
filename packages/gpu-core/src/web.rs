@@ -992,7 +992,8 @@ impl WebCore {
         while self.fallback.len() > FALLBACK_PATCHES {
             self.fallback.remove(0).destroy();
         }
-        self.draw_fallback_blocks(deadline)?;
+        let blank = bare.iter().any(|k| !self.tiles.covered(*k));
+        self.draw_fallback_blocks(if blank { f64::INFINITY } else { deadline })?;
         let took = js_sys::Date::now() - began;
         self.credit.spend(took);
         self.sharpness.fallback_ms += took;
