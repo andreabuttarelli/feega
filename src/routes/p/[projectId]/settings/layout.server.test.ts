@@ -9,11 +9,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const orgBillingForBrand = vi.fn();
 
-vi.mock('$lib/server/plans', () => ({
-	accountLimit: () => 5,
-	plansAbove: () => [],
-	isTopPlan: () => false
-}));
 vi.mock('$lib/server/org-billing', () => ({
 	orgBillingForBrand: (...a: unknown[]) => orgBillingForBrand(...a)
 }));

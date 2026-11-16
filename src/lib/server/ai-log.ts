@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { gatewayRate } from '$lib/server/openrouter-models';
 import { createAdminClient } from '$lib/server/supabase-admin';
-import { GEMINI_FLASH, geminiFlash, isGeminiFlashId, NANO_BANANA_PRO, isNanoBananaProId, geminiVisualCreditShare } from '$lib/server/google-models';
+import { GEMINI_FLASH, geminiFlash, isGeminiFlashId, NANO_BANANA_PRO } from '$lib/server/google-models';
 import { AI_MARKUP, billedCreditsFor, CHAT_MULTIPLIER } from '$lib/credit-ladder';
 import { RENDER_CALL_LABEL, RENDER_MULTIPLIER } from '$lib/motion/render-quote';
 import type { Database } from '$lib/database.types';
@@ -31,8 +31,6 @@ type BrandLogContext = {
    * per sempre. La riga la porta scritta addosso (`ai_calls.org_id`), e la somma la trova.
    */
   orgId?: string;
-  /** Set when the caller already knows the plan. `undefined` = not resolved yet (look up). */
-  plan?: string | null;
   /** Costo fatturato dal gateway in questo scope, sommato: la fattura vera del turno. */
   llmCostUsd?: number;
   /** Le fatture gia` ritirate e scritte in `ai_calls`, per chi deve DIRE quanto e` costato. */
@@ -41,60 +39,24 @@ type BrandLogContext = {
 
 const brandStorage = new AsyncLocalStorage<BrandLogContext>();
 
-const PLAN_CACHE_TTL_MS = 60_000;
-const planCache = new Map<string, { plan: string | null; at: number }>();
-
-export function rememberBrandPlan(brandId: string, plan: string | null): void {
-  planCache.set(brandId, { plan, at: Date.now() });
-}
-
-function cachedBrandPlan(brandId: string): string | null | undefined {
-  const hit = planCache.get(brandId);
-  if (!hit || Date.now() - hit.at >= PLAN_CACHE_TTL_MS) return undefined;
-  return hit.plan;
-}
-
-// `ai_calls.org_id` is NOT NULL — every row needs one, even a brand-attributed row that never
-// passed `orgId` explicitly. Same TTL and shape as the plan cache, keyed the same way, because
-// both come off the same `brands` row and a brand's org never changes under it.
+const ORG_CACHE_TTL_MS = 60_000;
 const orgIdCache = new Map<string, { orgId: string | null; at: number }>();
 
-function cachedBrandOrgId(brandId: string): string | null | undefined {
+async function brandOrgId(brandId: string): Promise<string | null> {
   const hit = orgIdCache.get(brandId);
-  if (!hit || Date.now() - hit.at >= PLAN_CACHE_TTL_MS) return undefined;
-  return hit.orgId;
-}
-
-async function resolveBrandPlanAndOrgId(brandId: string): Promise<{ plan: string | null; orgId: string | null }> {
-  const cachedPlan = cachedBrandPlan(brandId);
-  const cachedOrgId = cachedBrandOrgId(brandId);
-  if (cachedPlan !== undefined && cachedOrgId !== undefined) return { plan: cachedPlan, orgId: cachedOrgId };
+  if (hit && Date.now() - hit.at < ORG_CACHE_TTL_MS) return hit.orgId;
   try {
-    const admin = createAdminClient();
-    const { data } = await admin.from('brands').select('org_id').eq('id', brandId).maybeSingle();
-    const plan = null;
+    const { data } = await createAdminClient().from('brands').select('org_id').eq('id', brandId).maybeSingle();
     const orgId = (data?.org_id as string | null | undefined) ?? null;
-    rememberBrandPlan(brandId, plan);
     orgIdCache.set(brandId, { orgId, at: Date.now() });
-    return { plan, orgId };
+    return orgId;
   } catch {
-    return { plan: null, orgId: null };
+    return null;
   }
 }
 
-/**
- * Run `fn` in a brand-scoped async context: every AI call inside it, and in any async descendant,
- * resolves brandId from here. Pass `plan` when the brand row is already loaded, or `logAiCall`
- * looks it up (cached) before writing cost_usd.
- */
-export function withBrandContext<T>(brandId: string, fn: () => T, plan?: string | null): T {
-  const ctx: BrandLogContext = { brandId, plan };
-  if (plan !== undefined) rememberBrandPlan(brandId, plan);
-  else {
-    const cached = cachedBrandPlan(brandId);
-    if (cached !== undefined) ctx.plan = cached;
-  }
-  return brandStorage.run(ctx, fn);
+export function withBrandContext<T>(brandId: string, fn: () => T): T {
+  return brandStorage.run({ brandId }, fn);
 }
 
 /**
@@ -169,20 +131,6 @@ export function getBrandContext(): string | null {
 /** The org paying for the current scope when no brand does (null = there is a brand, or no scope). */
 export function getOrgContext(): string | null {
   return brandStorage.getStore()?.orgId ?? null;
-}
-
-/** `undefined` = no brand context / not resolved yet. `null` = free tier. */
-export function getBrandPlanContext(): string | null | undefined {
-  return brandStorage.getStore()?.plan;
-}
-
-/** Stamp the active scope + cache once a brands row is loaded. */
-export function setBrandPlanContext(plan: string | null): void {
-  const ctx = brandStorage.getStore();
-  if (ctx?.brandId) {
-    ctx.plan = plan;
-    rememberBrandPlan(ctx.brandId, plan);
-  }
 }
 
 // One-time SYSTEM-initiated generation (onboarding) must always complete: it is acquisition cost,
@@ -318,19 +266,6 @@ const RATES: Record<string, { input: number; cachedInput: number; output: number
   'deepseek-v4-pro': { input: 1.32, cachedInput: 0.044, output: 3.96 }
 };
 
-function usesGeminiVisualCreditShare(entry: AiCallLog): boolean {
-  return isGeminiFlashId(entry.model) || !entry.model || isNanoBananaProId(entry.model);
-}
-
-function planForVisualShare(explicit?: string | null): string | null | undefined {
-  if (explicit !== undefined) return explicit;
-  const fromAls = getBrandPlanContext();
-  if (fromAls !== undefined) return fromAls;
-  const brandId = getBrandContext();
-  if (brandId) return cachedBrandPlan(brandId);
-  return undefined;
-}
-
 /**
  * Esente per costruzione: l'evento c'è stato ma non è una chiamata a un modello, e nessuno ce lo
  * fattura. Vale `0`, che è un FATTO — non `null`, che ormai vuol dire una cosa sola.
@@ -360,7 +295,7 @@ function gatewayCompletionRate(model: string | undefined) {
   return rate ? { ...rate, thinkingInOutput: true } : null;
 }
 
-export function computeCostUsd(entry: AiCallLog, plan?: string | null): number | null {
+export function computeCostUsd(entry: AiCallLog): number | null {
   if (COST_EXEMPT_PROVIDERS.has(entry.provider)) return 0;
   // Flat-fee providers: la richiesta fallita non ce la fatturano, quindi non la fatturiamo.
   if (entry.flatCostUsd != null) {
@@ -404,10 +339,7 @@ export function computeCostUsd(entry: AiCallLog, plan?: string | null): number |
       imageOut * (rate.imageOutput ?? rate.output)) /
       1e6 +
     (entry.groundingQueries ?? 0) * (rate.searchPerQuery ?? 0);
-  // Sempre 1 (vedi geminiVisualCreditShare): l'unica cucitura da cui uno sconto rientrerebbe.
-  // cost_usd si scrive QUI, al log — le righe vecchie tengono la share in vigore quando girarono.
-  const share = usesGeminiVisualCreditShare(entry) ? geminiVisualCreditShare(planForVisualShare(plan)) : 1;
-  return Math.round(usd * share * 1e6) / 1e6;
+  return Math.round(usd * 1e6) / 1e6;
 }
 
 
@@ -468,9 +400,7 @@ async function resolveOrgId(entry: AiCallLog, brandId: string | null): Promise<s
   const fromScope = getOrgContext();
   if (fromScope) return fromScope;
   if (!brandId) return null;
-  const cached = cachedBrandOrgId(brandId);
-  if (cached !== undefined) return cached;
-  return (await resolveBrandPlanAndOrgId(brandId)).orgId;
+  return brandOrgId(brandId);
 }
 
 const WRITE_ATTEMPTS = 4;
@@ -516,7 +446,6 @@ export function logAiCall(entry: AiCallLog): void {
     const admin = createAdminClient();
     const brandId = entry.brandId ?? getBrandContext();
     const nodeId = nodeStorage.getStore() ?? null;
-    const planFromAls = getBrandPlanContext();
     // Letti QUI, sincroni, come il brand: dopo il primo await lo scope è di chi ha aspettato.
     const operation = operationTag(entry);
     const status = statusFor(entry);
@@ -526,17 +455,11 @@ export function logAiCall(entry: AiCallLog): void {
         swallow(`ai-log: no org to bill for "${operation}" (brandId=${brandId ?? 'null'}), usage unbilled`, new Error('no org_id'));
         return;
       }
-      const plan =
-        planFromAls !== undefined
-          ? planFromAls
-          : brandId
-            ? (await resolveBrandPlanAndOrgId(brandId)).plan
-            : null;
       if (entry.provider === 'llm' && entry.flatCostUsd == null) {
         const { ensureGatewayModels } = await import('$lib/server/openrouter-models');
         await ensureGatewayModels();
       }
-      const costUsd = computeCostUsd(entry, plan);
+      const costUsd = computeCostUsd(entry);
       const billedCredits = billedToUser(entry) && costUsd != null && costUsd > 0 ? creditsOf(entry, costUsd) : null;
       const row: AiCallInsert = {
         id: randomUUID(),

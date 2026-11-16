@@ -32,5 +32,5 @@ export function configuredVoiceDeps(db: Db): VoiceDeps | null {
     return null;
   }
   const provider = elevenLabsVoices({ apiKey, baseUrl: env.ELEVENLABS_BASE_URL || undefined });
-  return { store: supabaseVoiceStore(db), provider, bill: billVoice, plan: null };
+  return { store: supabaseVoiceStore(db), provider, bill: billVoice };
 }

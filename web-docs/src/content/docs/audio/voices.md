@@ -7,13 +7,7 @@ sidebar:
 
 Text to speech and the voice changer use a voice. The **Voice** menu of a Generate audio node lists the default ElevenLabs voices plus your organization's own voices. Other organizations' voices are never listed.
 
-Custom voices (added from the library, designed or cloned) belong to your organization and use a voice slot.
-
-| Plan | Custom voice slots |
-|---|---|
-| No plan, Go | 3 |
-| Starter | 5 |
-| Pro | 10 |
+Custom voices (added from the library, designed or cloned) belong to your organization and use a voice slot. Every organization has 3 custom voice slots.
 
 ## Open the voice studio
 

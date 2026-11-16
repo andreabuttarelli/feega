@@ -4,14 +4,7 @@ import { env } from '$env/dynamic/private';
 // so toggling the var on Vercel takes effect without a rebuild.
 //
 //   GEMINI_FLASH=gemini-3.7-flash  → Flash text/vision model (see gemini.ts)
-//   FEATURE_PLAN_GO=true           → show & sell the Go tier on /pricing and /activate
-//   FEATURE_PLAN_GO unset          → Go is hidden; existing Go subscribers keep working
 //
-
-/** Public launch gate for the Go plan (€29 prepare-and-export tier). */
-export function isPlanGoEnabled(): boolean {
-  return env.FEATURE_PLAN_GO === 'true';
-}
 
 /**
  * Soft→hard GSC gate on SEO plan generation when OAuth is configured.

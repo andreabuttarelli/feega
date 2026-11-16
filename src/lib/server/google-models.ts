@@ -43,11 +43,3 @@ export function isNanoBananaProId(model: string | undefined): boolean {
 /** Nano Banana 2 Lite — the default render model everywhere (Gemini 3.1 Flash-Lite Image). */
 export const NANO_BANANA_2_LITE = GEMINI_NANO_BANANA_2_LITE;
 
-/**
- * Share of *list* written to `ai_calls.cost_usd` for Gemini Flash / Nano Banana Pro: always 1,
- * on every plan — full price IS the rule, `plan` is ignored and kept only for the call sites.
- * The single seam a discount would go back through.
- */
-export function geminiVisualCreditShare(plan?: string | null): number {
-  return 1;
-}

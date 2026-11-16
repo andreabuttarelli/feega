@@ -15,7 +15,7 @@ import {
   type VoiceDeps,
   type VoiceStore
 } from './custom-voices';
-import { CLONE_MIN_SECONDS, VOICE_CREATION_USD, VOICE_SLOTS_BY_PLAN } from '$lib/canvas/voices';
+import { CLONE_MIN_SECONDS, VOICE_CREATION_USD, VOICE_SLOTS } from '$lib/canvas/voices';
 import { ProjectMode } from '$lib/project-mode';
 import type { VoiceProvider } from './voice-provider';
 
@@ -49,7 +49,7 @@ function fakes(rows: CustomVoice[] = [], account = { used: 0, limit: 30 }) {
     slots: vi.fn(async () => account)
   };
   const bill = vi.fn();
-  const deps: VoiceDeps = { store, provider, bill, plan: null };
+  const deps: VoiceDeps = { store, provider, bill };
   return { store, provider, bill, deps };
 }
 
@@ -58,7 +58,7 @@ const CLONE = { name: 'Me', samples: [SAMPLE], seconds: CLONE_MIN_SECONDS, conse
 describe('custom voice slots', () => {
   it('count what the org made against its plan and the account', async () => {
     const { deps } = fakes([voice()]);
-    expect(await voiceSlots(deps, 'org-1')).toEqual({ used: 1, quota: VOICE_SLOTS_BY_PLAN.none, left: VOICE_SLOTS_BY_PLAN.none - 1 });
+    expect(await voiceSlots(deps, 'org-1')).toEqual({ used: 1, quota: VOICE_SLOTS, left: VOICE_SLOTS - 1 });
   });
 });
 

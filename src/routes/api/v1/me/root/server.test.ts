@@ -4,7 +4,6 @@ const { USER } = vi.hoisted(() => ({ USER: { id: 'u1', email: 'ada@x.it', user_m
 
 vi.mock('$lib/server/db/client', async (original) => ({ ...(await original<object>()), createUserDb: () => ({}) }));
 vi.mock('$lib/server/nav-cache', async (original) => ({ ...(await original<object>()), verifiedToken: async (_db: unknown, token: string) => (token === 'jwt' ? USER : null) }));
-vi.mock('$lib/server/feature-flags', () => ({ isPlanGoEnabled: () => false }));
 vi.mock('$lib/server/seline', () => ({ selineSetUser: vi.fn() }));
 vi.mock('$lib/server/internal-users', () => ({ isInternalEmail: () => false }));
 vi.mock('$lib/analytics', () => ({ trackingAllowed: (host: string) => host === 'feega.app' }));
@@ -24,7 +23,7 @@ describe('the root shell over the API', () => {
     const res = await get('', { authorization: 'Bearer jwt' });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ tour: 'seen', planGo: false });
+    expect(await res.json()).toMatchObject({ tour: 'seen' });
   });
 
   it('decides tracking for the host the app runs on, not the API host', async () => {

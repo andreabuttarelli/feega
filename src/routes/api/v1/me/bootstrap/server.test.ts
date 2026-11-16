@@ -31,7 +31,6 @@ const DASHBOARD = { canvases: [], projects: [], batches: [], motions: [], moreVi
 const dashboardFor = vi.fn(async (_db: unknown, _deps: unknown, _org: string) => DASHBOARD);
 vi.mock('$lib/server/dashboard/dashboard', () => ({ DASHBOARD_DEPS: {}, dashboardFor }));
 vi.mock('$lib/server/db/client', () => ({ createUserDb: () => db }));
-vi.mock('$lib/server/feature-flags', () => ({ isPlanGoEnabled: () => false }));
 vi.mock('$lib/server/seline', () => ({ selineSetUser: vi.fn() }));
 
 const { GET } = await import('./+server');

@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TourState } from '$lib/onboarding/tour';
 
-vi.mock('$lib/server/feature-flags', () => ({ isPlanGoEnabled: () => false }));
 vi.mock('$lib/server/seline', () => ({ selineSetUser: vi.fn() }));
 vi.mock('$lib/server/internal-users', () => ({ isInternalEmail: () => false }));
 vi.mock('$lib/analytics', () => ({ trackingAllowed: () => true }));

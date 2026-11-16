@@ -11,15 +11,6 @@ function closedProvider(reason: string): BillingProvider {
     kind: 'dazero',
     async gate() {
       throw new BillingUnavailableError(reason);
-    },
-    async quota() {
-      return 0;
-    },
-    plansAbove() {
-      return [];
-    },
-    isTopPlan() {
-      return false;
     }
   };
 }

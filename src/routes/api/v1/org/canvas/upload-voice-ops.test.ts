@@ -66,8 +66,7 @@ function fakeVoices(): VoiceDeps {
       labelled: async () => [],
       slots: async () => ({ used: 0, limit: 30 })
     },
-    bill: () => {},
-    plan: 'pro'
+    bill: () => {}
   } as VoiceDeps;
 }
 

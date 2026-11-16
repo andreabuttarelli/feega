@@ -3,24 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const env: Record<string, string | undefined> = {};
 vi.mock('$env/dynamic/private', () => ({ env }));
 
-const { GEMINI_FLASH, geminiFlash, isGeminiFlashId, NANO_BANANA_PRO, isNanoBananaProId, geminiVisualCreditShare } = await import('./google-models');
+const { GEMINI_FLASH, geminiFlash, isGeminiFlashId, NANO_BANANA_PRO, isNanoBananaProId } = await import('./google-models');
 
 describe('GEMINI_FLASH', () => {
   it('is a Gemini Flash model id — the default when the env var is unset', () => {
     expect(GEMINI_FLASH).toMatch(/^gemini-\d+(\.\d+)?-flash$/);
-  });
-});
-
-describe('geminiVisualCreditShare', () => {
-  // Flash and Nano Banana Pro are billed at FULL list, like every other model: what the call
-  // costs us is what the brand pays. Until 2026-08 this returned a per-plan discount (free 0.75,
-  // go 0.35, starter 0.3, pro/scale 0.27), which is why the plans are still enumerated here — if
-  // ANY of them ever comes back a fraction, that is a revenue change and this test must catch it.
-  // Do not collapse this to a single toBe(1): the plans are the assertion.
-  it('bills every plan at 100% of list — no discount, no plan variation', () => {
-    for (const plan of [null, undefined, '', 'free', 'go', 'starter', 'pro', 'scale', 'GO', 'unknown']) {
-      expect(geminiVisualCreditShare(plan)).toBe(1);
-    }
   });
 });
 

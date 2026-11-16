@@ -1,4 +1,3 @@
-import type { PlanKey } from '$lib/plans';
 import { ProjectMode } from '$lib/project-mode';
 
 export type VoiceMethod = 'design' | 'instant_clone' | 'library';
@@ -10,12 +9,7 @@ export const CONSENT_BASES: Readonly<Record<ConsentBasis, string>> = {
   consented_speaker: 'The speaker gave me explicit consent'
 };
 
-export const VOICE_SLOTS_BY_PLAN: Readonly<Record<PlanKey | 'none', number>> = {
-  none: 3,
-  go: 3,
-  starter: 5,
-  pro: 10
-};
+export const VOICE_SLOTS = 3;
 
 export const VOICE_CREATION_USD: Readonly<Record<VoiceMethod, number>> = {
   design: 0.08,
@@ -92,8 +86,8 @@ export function cloneRefusal(request: CloneRequest): VoiceRefusal | null {
 
 export type SlotCount = { used: number; limit: number };
 
-export function slotsLeft(input: { plan: PlanKey | null; used: number; account: SlotCount }): number {
-  const forOrg = VOICE_SLOTS_BY_PLAN[input.plan ?? 'none'] - input.used;
+export function slotsLeft(input: { used: number; account: SlotCount }): number {
+  const forOrg = VOICE_SLOTS - input.used;
   const forAccount = input.account.limit - input.account.used;
   return Math.max(0, Math.min(forOrg, forAccount));
 }

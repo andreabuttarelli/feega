@@ -6,7 +6,6 @@ import { swallow } from '$lib/server/swallow';
 import { createHash } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { env } from '$env/dynamic/private';
-import { isPaidPlan } from '$lib/server/plans';
 import { withBrandContext, logAiCall } from '$lib/server/ai-log';
 import { structured } from '$lib/server/research';
 import { writeMemory, detectConflict, type MemoryCategory } from '$lib/server/brand-memory';
@@ -14,8 +13,7 @@ import { isSupportedKnowledgeFile, MAX_KNOWLEDGE_FILE_BYTES } from '$lib/chat-do
 
 export const MAX_FILE_BYTES = MAX_KNOWLEDGE_FILE_BYTES;
 export const MAX_CHUNKS_PER_BRAND = 4000;
-export const DOC_LIMIT_STARTER = 50;
-export const DOC_LIMIT_PRO = 300;
+export const DOC_LIMIT = 50;
 
 const EMBED_BATCH = 32;
 const RRF_K = 60;
@@ -93,10 +91,6 @@ function sha256Hex(buf: ArrayBuffer): string {
 
 export function isSupportedKnowledgeDoc(mimeType: string, fileName: string): boolean {
   return isSupportedKnowledgeFile(mimeType, fileName);
-}
-
-export function docLimitForPlan(plan: string | null | undefined): number {
-  return isPaidPlan(plan) ? DOC_LIMIT_PRO : DOC_LIMIT_STARTER;
 }
 
 /**
@@ -606,15 +600,13 @@ export async function ingestDocument(
     title?: string;
     text?: string;
     url?: string;
-    plan?: string | null;
     kind?: 'note' | 'document';
     sourceType?: string;
   }
 ): Promise<{ id: string; deduped: boolean }> {
-  const limit = docLimitForPlan(input.plan);
   const existing = await countBrandDocuments(supabase, brandId);
-  if (existing >= limit) {
-    throw new Error(`Document limit reached (${limit}). Upgrade or delete unused documents.`);
+  if (existing >= DOC_LIMIT) {
+    throw new Error(`Document limit reached (${DOC_LIMIT}). Delete unused documents.`);
   }
 
   // Note / pasted text

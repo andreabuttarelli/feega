@@ -1,21 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { CLONE_MAX_SECONDS, CLONE_MIN_SECONDS, cloneRefusal, slotsLeft, VOICE_SLOTS_BY_PLAN } from './voices';
+import { CLONE_MAX_SECONDS, CLONE_MIN_SECONDS, cloneRefusal, slotsLeft, VOICE_SLOTS } from './voices';
 import { ProjectMode } from '$lib/project-mode';
 
 const OWN = { consentBasis: 'own_voice', speaker: '', attested: true, seconds: CLONE_MIN_SECONDS, mode: ProjectMode.Standard } as const;
 
 describe('voice slots', () => {
-  it('give an org what its plan allows minus what it already made', () => {
-    expect(slotsLeft({ plan: 'pro', used: 1, account: { used: 0, limit: 1000 } })).toBe(VOICE_SLOTS_BY_PLAN.pro - 1);
+  it('give an org its slots minus what it already made', () => {
+    expect(slotsLeft({ used: 1, account: { used: 0, limit: 1000 } })).toBe(VOICE_SLOTS - 1);
   });
 
   it('never promise more than the shared account still has', () => {
-    expect(slotsLeft({ plan: 'pro', used: 0, account: { used: 29, limit: 30 } })).toBe(1);
+    expect(slotsLeft({ used: 0, account: { used: 29, limit: 30 } })).toBe(1);
   });
 
-  it('read an org without a plan as the smallest quota and never go below zero', () => {
-    expect(slotsLeft({ plan: null, used: 99, account: { used: 0, limit: 30 } })).toBe(0);
-    expect(slotsLeft({ plan: null, used: 0, account: { used: 0, limit: 30 } })).toBe(VOICE_SLOTS_BY_PLAN.none);
+  it('never go below zero', () => {
+    expect(slotsLeft({ used: 99, account: { used: 0, limit: 30 } })).toBe(0);
+    expect(slotsLeft({ used: 0, account: { used: 0, limit: 30 } })).toBe(VOICE_SLOTS);
   });
 });
 

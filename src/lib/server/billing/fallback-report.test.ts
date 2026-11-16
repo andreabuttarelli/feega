@@ -27,7 +27,7 @@ describe('billingProvider() without the paid provider refuses to spend, and says
 		const { BillingUnavailableError } = await import('$lib/billing/contract');
 		const provider = await billingProvider();
 
-		await expect(provider.gate('credits', { orgId: 'org-free' })).rejects.toBeInstanceOf(BillingUnavailableError);
+		await expect(provider.gate({ orgId: 'org-free' })).rejects.toBeInstanceOf(BillingUnavailableError);
 		expect(swallowed).toHaveLength(1);
 		expect(swallowed[0]).toMatch(/billing/i);
 	});
@@ -40,7 +40,7 @@ describe('billingProvider() without the paid provider refuses to spend, and says
 		const { BillingUnavailableError } = await import('$lib/billing/contract');
 		const provider = await billingProvider();
 
-		await expect(provider.gate('credits', { brandId: 'brand-1' })).rejects.toBeInstanceOf(BillingUnavailableError);
+		await expect(provider.gate({ brandId: 'brand-1' })).rejects.toBeInstanceOf(BillingUnavailableError);
 		expect(swallowed).toHaveLength(1);
 	});
 

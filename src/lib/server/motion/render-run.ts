@@ -30,7 +30,7 @@ export enum RenderRefusal {
   NoCredits = 'credits_exhausted'
 }
 
-export type RenderScope = { orgId: string; projectId: string; nodeId: string; userId: string; editorUrl: string; plan?: string | null };
+export type RenderScope = { orgId: string; projectId: string; nodeId: string; userId: string; editorUrl: string };
 export type RenderRequest = { version: number; doc: MotionDoc; settings: RenderSettings; job: FarmJob };
 export type RenderStart = { ok: true; runId: string; quote: RenderQuote } | { ok: false; error: RenderRefusal; detail?: string };
 export type RenderStorage = { host: string; limit: () => Promise<number> };
@@ -180,7 +180,7 @@ async function fail(db: Db, farm: RenderFarm, run: NodeRun, state: RenderState, 
 
 type Refusal = { error: RenderRefusal; detail?: string };
 
-function refusal(farm: RenderFarm | null, runs: NodeRun[], plan: string | null, req: RenderRequest): Refusal | null {
+function refusal(farm: RenderFarm | null, runs: NodeRun[], req: RenderRequest): Refusal | null {
   if (!farm) {
     return { error: RenderRefusal.NotConfigured };
   }
@@ -190,7 +190,7 @@ function refusal(farm: RenderFarm | null, runs: NodeRun[], plan: string | null, 
   if (runs.some(isActive)) {
     return { error: RenderRefusal.Busy };
   }
-  const problem = lengthProblem(req.doc.durationInFrames / req.doc.fps, plan) ?? exportProblem(req.doc, req.settings) ?? farmProblem(req.job);
+  const problem = lengthProblem(req.doc.durationInFrames / req.doc.fps) ?? exportProblem(req.doc, req.settings) ?? farmProblem(req.job);
   return problem ? { error: RenderRefusal.Unsupported, detail: problem } : null;
 }
 
@@ -232,7 +232,7 @@ async function launch(db: Db, farm: RenderFarm, storage: RenderStorage, run: Nod
 
 export async function startRender(db: Db, farm: RenderFarm | null, scope: RenderScope, req: RenderRequest, storage: RenderStorage): Promise<RenderStart> {
   const runs = farm ? await listNodeRuns(db, { orgId: scope.orgId, nodeId: scope.nodeId }) : [];
-  const refused = refusal(farm, runs, scope.plan ?? null, req);
+  const refused = refusal(farm, runs, req);
   if (refused || !farm) {
     return { ok: false, ...(refused ?? { error: RenderRefusal.NotConfigured }) };
   }
@@ -255,7 +255,7 @@ export async function startRender(db: Db, farm: RenderFarm | null, scope: Render
 export async function startBatch(db: Db, farm: RenderFarm | null, scope: RenderScope, rows: BatchRow[], storage: RenderStorage): Promise<BatchStart> {
   const runs = farm ? await listNodeRuns(db, { orgId: scope.orgId, nodeId: scope.nodeId }) : [];
   for (const [i, row] of rows.entries()) {
-    const refused = refusal(farm, runs, scope.plan ?? null, row.req);
+    const refused = refusal(farm, runs, row.req);
     if (refused) {
       return { ok: false, error: refused.error, detail: refused.detail ? `row ${i + 1}: ${refused.detail}` : undefined };
     }

@@ -45,7 +45,6 @@ vi.mock('$lib/server/billing-readiness', () => ({
 vi.mock('$lib/server/team/seat-billing', () => ({ editorCount: async () => 2 }));
 vi.mock('$lib/server/research', () => ({ structured: (...args: unknown[]) => structured(...args) }));
 vi.mock('$lib/server/app-url', () => ({ appOrigin: () => 'https://feega.test' }));
-vi.mock('$lib/server/feature-flags', () => ({ isPlanGoEnabled: () => false }));
 
 import { POST } from './+server';
 import { authenticate, loadBrandForUser, checkApiKeyWriteAccess, gateAiAction } from '$lib/server/cli-auth';

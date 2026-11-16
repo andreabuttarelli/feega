@@ -5,7 +5,7 @@ import type { BillingProvider } from '$lib/billing/contract';
 // Mocking '$lib/server/billing' directly — gateCredits's one dependency — proves the delegation
 // itself cleanly: a fake provider that denies makes gateCredits throw, a fake provider that
 // allows makes it resolve, with no Supabase involved. (feega-provider.test.ts separately
-// proves the real feega provider's gate('credits', ...) still calls the real,
+// proves the real feega provider's gate(...) still calls the real,
 // unrewritten gateCreditsCore.)
 
 const mockProvider: { current: BillingProvider | null } = { current: null };
@@ -14,13 +14,7 @@ vi.mock('./billing', () => ({
 }));
 
 function fakeProvider(kind: 'open' | 'dazero', gate: BillingProvider['gate']): BillingProvider {
-  return {
-    kind,
-    gate,
-    quota: async () => Infinity,
-    plansAbove: () => [],
-    isTopPlan: () => true
-  };
+  return { kind, gate };
 }
 
 describe('gateCredits() delegation', () => {
@@ -46,6 +40,6 @@ describe('gateCredits() delegation', () => {
     mockProvider.current = fakeProvider('open', gateFn);
     const { gateCredits } = await import('$lib/server/credits');
     await expect(gateCredits('brand-1')).resolves.toBeUndefined();
-    expect(gateFn).toHaveBeenCalledWith('credits', { brandId: 'brand-1' });
+    expect(gateFn).toHaveBeenCalledWith({ brandId: 'brand-1' });
   });
 });

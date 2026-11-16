@@ -1,4 +1,3 @@
-import type { PlanKey } from '$lib/plans';
 import type { Actor } from '$lib/server/repos/actor';
 import type { AudioFile } from '$lib/server/canvas/audio-provider';
 import { ProjectMode } from '$lib/project-mode';
@@ -6,7 +5,7 @@ import {
   cloneRefusal,
   slotsLeft,
   VOICE_CREATION_USD,
-  VOICE_SLOTS_BY_PLAN,
+  VOICE_SLOTS,
   type CloneRequest,
   type ConsentBasis,
   type VoiceMethod,
@@ -50,7 +49,7 @@ export type VoiceStore = {
 
 export type VoiceBill = { orgId: string; userId: string; actor: Actor; method: VoiceMethod; costUsd: number | null; ok: boolean; error?: string; ms: number };
 
-export type VoiceDeps = { store: VoiceStore; provider: VoiceProvider; bill: (entry: VoiceBill) => void; plan: PlanKey | null };
+export type VoiceDeps = { store: VoiceStore; provider: VoiceProvider; bill: (entry: VoiceBill) => void };
 
 export type VoiceScope = { orgId: string; userId: string; actor: Actor };
 
@@ -59,7 +58,7 @@ export type Outcome<T> = ({ ok: true } & T) | { ok: false; error: VoiceRefusal |
 export async function voiceSlots(deps: VoiceDeps, orgId: string): Promise<{ used: number; quota: number; left: number }> {
   const [mine, account] = await Promise.all([deps.store.list(orgId), deps.provider.slots()]);
   const used = mine.length;
-  return { used, quota: VOICE_SLOTS_BY_PLAN[deps.plan ?? 'none'], left: slotsLeft({ plan: deps.plan, used, account }) };
+  return { used, quota: VOICE_SLOTS, left: slotsLeft({ used, account }) };
 }
 
 async function slotsFull(deps: VoiceDeps, orgId: string): Promise<boolean> {

@@ -14,7 +14,7 @@ describe('billingProvider()', () => {
 		const { BillingUnavailableError } = await import('$lib/billing/contract');
 		const provider = await billingProvider();
 
-		await expect(provider.gate('credits', { brandId: 'brand-1' })).rejects.toBeInstanceOf(BillingUnavailableError);
+		await expect(provider.gate({ brandId: 'brand-1' })).rejects.toBeInstanceOf(BillingUnavailableError);
 	});
 });
 
@@ -24,12 +24,7 @@ describe('billingProvider() with the real dazero-provider present', () => {
 		vi.doUnmock('./dazero-provider');
 		vi.doMock('$lib/server/credits', () => ({
 			gateCreditsCore: async () => {},
-			creditQuota: () => 400
-		}));
-		vi.doMock('$lib/server/plans', () => ({
-			postQuota: () => 15,
-			plansAbove: () => [],
-			isTopPlan: () => false
+			gateOrgCreditsCore: async () => {}
 		}));
 
 		const { billingProvider } = await import('./index');

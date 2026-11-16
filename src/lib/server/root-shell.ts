@@ -1,5 +1,4 @@
 import type { ServerLoadEvent } from '@sveltejs/kit';
-import { isPlanGoEnabled } from '$lib/server/feature-flags';
 import { selineSetUser } from '$lib/server/seline';
 import { isInternalEmail } from '$lib/server/internal-users';
 import { trackingAllowed } from '$lib/analytics';
@@ -40,7 +39,6 @@ export const load = async ({ url, untrack, cookies, locals: { safeGetSession, db
     });
   }
 
-  // planGo: Vercel FEATURE_PLAN_GO — toggle without rebuild via $env/dynamic.
   // `internalViewer` viaggia separato da `analyticsOptOut` perché serve a Sentry, che sui deploy di
   // preview deve restare acceso (vedi setInternalViewer in $lib/analytics). Anche qui al browser
   // arriva solo il booleano, mai la lista degli indirizzi.
@@ -49,7 +47,6 @@ export const load = async ({ url, untrack, cookies, locals: { safeGetSession, db
     analyticsOptOut,
     analyticsOrgId: user ? (cookies?.get(ORG_COOKIE) ?? null) : null,
     internalViewer,
-    planGo: isPlanGoEnabled(),
     termsNoticeVersion,
     tour
   };

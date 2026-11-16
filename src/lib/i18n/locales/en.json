@@ -11,9 +11,7 @@
     },
     "start": {
       "title": "Welcome",
-      "titlePlan": "Welcome",
-      "sub": "Create your account with an email and password. Right after, you'll set up your first brand.",
-      "subPlan": "Create your account with an email and password. Right after, you'll set up your first brand on {plan}."
+      "sub": "Create your account with an email and password. Right after, you'll set up your first brand."
     },
     "signin": {
       "title": "Sign in",
