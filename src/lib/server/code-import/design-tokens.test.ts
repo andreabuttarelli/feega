@@ -152,3 +152,20 @@ describe('Arc tokens', () => {
     expect(set.skipped.some((s) => s.startsWith('--accent under :root[data-theme="dark"][data-accent="violet"]'))).toBe(true);
   });
 });
+
+describe('calc() costante', () => {
+  it('un calc() di soli numeri è un valore: 4 * 16px è 64px', () => {
+    const set = tokenSetOf(parseSheets([{ path: 'a.css', text: '@theme { --spacing-card: calc(4 * 16px); --radius-x: calc(var(--r) - 4px); }' }]));
+
+    const made = variablesOf(set, 'app');
+
+    expect(made.variables['app Spacing'].vars.card.values.Light).toBe(64);
+    expect(set.skipped).toContain('--radius-x: computed with calc(), not a literal');
+  });
+
+  it('un token dentro @media (min-width) è elencato come valore responsivo', () => {
+    const set = tokenSetOf(parseSheets([{ path: 'a.css', text: '@media (min-width: 768px) { :root { --spacing-section: 4rem; } }' }]));
+
+    expect(set.skipped).toEqual(['--spacing-section under @media (min-width: 768px) :root is a responsive value: variables have modes, not breakpoints']);
+  });
+});

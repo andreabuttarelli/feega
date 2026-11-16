@@ -1,6 +1,7 @@
 import { MAX_MODES, MAX_VARIABLES, VARIABLE_NAME, VarType, keyOf, type Collection, type VarAlias, type VarLiteral, type Variables } from '@feega/motion-core/motion/variables-model';
 import { ACCENT, accentOf, DARK, LIGHT, fromPage, type DeclAt, type Parsed } from './css-tokens';
 import { colourOf } from './token-colour';
+import { constantCalcPx } from './token-calc';
 
 export enum TokenKind {
   Colour = 'colour',
@@ -94,6 +95,10 @@ const tokenGroup = (token: Token) => (token.accent ? ACCENT : groupOf(token.name
 export const aliasOf = (raw: string) => ALIAS.exec(raw.trim())?.[1] ?? null;
 
 export function lengthPx(raw: string): number | null {
+  const calc = constantCalcPx(raw);
+  if (calc !== null) {
+    return calc;
+  }
   const m = LENGTH.exec(raw.trim());
   if (!m || (m[2] === undefined && Number(m[1]) !== 0)) {
     return null;
@@ -124,7 +129,7 @@ function kindOf(name: string, raws: string[], declared: Map<string, string[]>, s
   if (!row.kind) {
     return refused(row.reason!);
   }
-  if (raws.some((r) => /\bcalc\(/.test(r))) {
+  if (raws.some((r) => /\bcalc\(/.test(r) && constantCalcPx(r) === null)) {
     return refused('computed with calc(), not a literal');
   }
   const target = raws.map(aliasOf).find(Boolean);

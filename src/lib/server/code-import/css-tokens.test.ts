@@ -80,7 +80,7 @@ describe('parseSheets', () => {
     const parsed = await declared('tailwind4');
 
     expect(parsed.declared.filter((d) => d.name === '--color-muted').map((d) => d.raw)).toEqual(['#777777', '#888888']);
-    expect(parsed.skipped).toContain('--color-muted under @media (min-width: 640px) :root is not a theme');
+    expect(parsed.skipped).toContain('--color-muted under @media (min-width: 640px) :root is a responsive value: variables have modes, not breakpoints');
   });
 
   it('una regola che legge un token con var() resta, col suo selettore', async () => {
