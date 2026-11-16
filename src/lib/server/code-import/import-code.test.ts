@@ -72,6 +72,17 @@ describe('importCodeAt con la libreria letta dal codice', () => {
     expect('library' in done && done.library!.reasons).toEqual({ Callout: 'no component gallery for sveltekit apps yet' });
   });
 
+  it('importBoards takes the gallery itself, not only through the runner', async () => {
+    const { ask, tab } = askOf();
+    const pages = [{ label: '/settings', url: `${APP}/settings` }];
+    const gallery = { plan: { pages: [{ label: 'Library', path: '/feega-gallery?page=0', components: ['Button'] }], left: [] }, pages: [{ label: 'Library', url: `${APP}/feega-gallery?page=0`, ready: GALLERY_READY }] };
+
+    const done = await importBoards({ ...ask, name: 'app', pages, names: ['Button'], crop: Crop.Page, library: LIBRARY, gallery });
+
+    expect(tab.goto).toHaveBeenLastCalledWith(`${APP}/feega-gallery?page=0`);
+    expect('library' in done && done.library!.components.find((c) => c.name === 'Button')?.drawn).toBe(true);
+  });
+
   it('una prop type dichiarata come unione diventa asse di variante', async () => {
     const { ask, tab } = askOf({ runner: withLibrary() });
     tab.marks.mockResolvedValue([

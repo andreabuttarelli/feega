@@ -196,11 +196,12 @@ async function captured(open: OpenAppBrowser, pages: CodePage[], names: string[]
 export type Designer = (loaded: LoadedSheet[]) => Promise<Design | null>;
 
 const NO_GALLERY = 'no captured route renders it';
+const VIEWS_NO_GALLERY = { unrun: 'a responsive import (views) draws no component gallery' };
 
 type Drawn = { captures: Capture[]; drawing: (name: string) => Drawing };
 
 async function galleryDrawn(open: OpenAppBrowser, ask: BoardsAsk, window: Window, sign: SignIn, routed: Capture[]): Promise<Drawn> {
-  const gallery = ask.gallery ?? { unrun: NO_GALLERY };
+  const gallery = ask.responsive === Responsive.Views ? VIEWS_NO_GALLERY : (ask.gallery ?? { unrun: NO_GALLERY });
   if ('unrun' in gallery) {
     return { captures: [], drawing: () => ({ drawn: false, reason: gallery.unrun }) };
   }
