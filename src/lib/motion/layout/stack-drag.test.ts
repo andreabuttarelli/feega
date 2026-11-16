@@ -5,7 +5,7 @@ import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
 import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { guessedBoxes } from '../move-element';
 import { setAutoLayout, wrapInStack } from './ops';
-import { StackDrop, dragInStack, dropInStack, followCursor, stackLineAt } from './stack-drag';
+import { StackDrop, dragInStack, dropInStack, followCursor, holdInStack, stackLineAt } from './stack-drag';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -107,5 +107,41 @@ describe('while an element from outside the frame is dragged over it', () => {
 
   it('shows nothing where no stack is under the cursor', () => {
     expect(stackLineAt(doc, [boxes.free.left + 1, boxes.free.top + 1])).toBeNull();
+  });
+});
+
+describe('holding a stack child while it is dragged', () => {
+  const drawnBox = (d: MotionDoc, id: string) => {
+    const laid = guessedBoxes(withAutoLayout(d))[id];
+    const t = findClip(d, id)!.clip.transform;
+    return { left: laid.left + (t.x ?? 0) * d.width, top: laid.top + (t.y ?? 0) * d.height };
+  };
+
+  it('the siblings already stand in the order it will land in, laid out by the stack itself', () => {
+    const hold = holdInStack(doc, 'c', boxes);
+    const from = centreOf('c');
+    const shown = must(hold(from, [boxes.a.left + 1, from[1]]).shown);
+
+    expect(guessedBoxes(withAutoLayout(shown)).a.left).toBeCloseTo(guessedBoxes(withAutoLayout(must(dragInStack(doc, 'c', boxes, [boxes.a.left + 1, from[1]]).result))).a.left, 3);
+    expect(guessedBoxes(withAutoLayout(shown)).a.left).toBeGreaterThan(boxes.a.left);
+  });
+
+  it('the dragged child stays under the pointer, wherever the stack lays it', () => {
+    const hold = holdInStack(doc, 'c', boxes);
+    const from = centreOf('c');
+    const to: [number, number] = [boxes.a.left + 1, from[1] + 7];
+    const drawn = drawnBox(must(hold(from, to).shown), 'c');
+
+    expect(drawn.left).toBeCloseTo(boxes.c.left + to[0] - from[0], 3);
+    expect(drawn.top).toBeCloseTo(boxes.c.top + to[1] - from[1], 3);
+  });
+
+  it('lays the stack out again only when the landing slot changes', () => {
+    const hold = holdInStack(doc, 'c', boxes);
+    const from = centreOf('c');
+    const first = hold(from, [boxes.a.left + 1, from[1]]);
+    const second = hold(from, [boxes.a.left + 2, from[1]]);
+
+    expect(second.dragged.result).toBe(first.dragged.result);
   });
 });

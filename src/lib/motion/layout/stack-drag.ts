@@ -142,3 +142,31 @@ export function followCursor(doc: MotionDoc, clipId: string, [dx, dy]: Pt): OpRe
   }
   return setTransform(doc, clipId, { x: (clip.transform.x ?? 0) + dx / doc.width, y: (clip.transform.y ?? 0) + dy / doc.height });
 }
+
+export type StackHold = { dragged: StackDragged; shown: OpResult };
+
+const NOT_HELD = 'none';
+
+const slotKey = (aim: Aim | null) => (aim && aim.kind !== StackDrop.Leave ? `${aim.kind}:${aim.stack!.id}:${aim.index}` : NOT_HELD);
+
+export function holdInStack(doc: MotionDoc, clipId: string, boxes: Record<string, Box>, measure: TextMeasure = estimatedText): (from: Pt, to: Pt) => StackHold {
+  let held: { key: string; dragged: StackDragged; shift: Pt } | null = null;
+  return (from, to) => {
+    const aim = aimOf(doc, clipId, boxes, to);
+    const key = slotKey(aim);
+    if (key === NOT_HELD || !aim) {
+      held = null;
+      const dragged = dragInStack(doc, clipId, boxes, to);
+      return { dragged, shown: followCursor(doc, clipId, [to[0] - from[0], to[1] - from[1]]) };
+    }
+    if (held?.key !== key) {
+      const result = LANDING[aim.kind](doc, clipId, aim, to);
+      const laid = result.ok ? guessedBoxes(withAutoLayout(result.doc, measure))[clipId] : null;
+      const was = boxes[clipId];
+      held = { key, dragged: { kind: aim.kind, result, line: aim.line }, shift: laid && was ? [laid.left - was.left, laid.top - was.top] : [0, 0] };
+    }
+    const { dragged, shift } = held;
+    const shown = dragged.result.ok ? followCursor(dragged.result.doc, clipId, [to[0] - from[0] - shift[0], to[1] - from[1] - shift[1]]) : dragged.result;
+    return { dragged: { ...dragged, line: aim.line }, shown };
+  };
+}
