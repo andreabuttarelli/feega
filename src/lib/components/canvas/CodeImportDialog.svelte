@@ -91,7 +91,7 @@
     routeDelayMs: Object.fromEntries(routeList.flatMap((r) => (msOf(routeWaits[r]) === undefined ? [] : [[r, msOf(routeWaits[r])!]])))
   });
   let designSystem = $state(true);
-  let responsive = $state<'views' | 'boards'>('views');
+  let responsive = $state<'views' | 'boards'>('boards');
   const severalWidths = $derived(widths.length > 1 && schemes.length === 1);
   let designTouched = $state(false);
   let found = $state<number | null>(null);
@@ -359,9 +359,9 @@
             <label><input type="checkbox" value={w.id} bind:group={widths} data-testid={`code-import-width-${w.id}`} /> {w.label}</label>
           {/each}
           {#if severalWidths}
-            <label><input type="radio" value="views" bind:group={responsive} data-testid="code-import-responsive-views" /> Widths as views of one frame</label>
-            <label><input type="radio" value="boards" bind:group={responsive} data-testid="code-import-responsive-boards" /> Each width as a board, components kept</label>
-            <p class="ui-note" data-testid="code-import-responsive-note">Views need one page: the narrower widths are breakpoint views of the widest, and the repo's components are not extracted. With several pages the widths come as boards.</p>
+            <label><input type="radio" value="views" bind:group={responsive} data-testid="code-import-responsive-views" /> Widths as views of one frame (gives up components and the Design system board)</label>
+            <label><input type="radio" value="boards" bind:group={responsive} data-testid="code-import-responsive-boards" /> Each width as a board (components and Design system board kept)</label>
+            <p class="ui-note" data-testid="code-import-responsive-note">Views need one page in one theme: the narrower widths are breakpoint views of the widest. With several pages the widths come as boards.</p>
           {/if}
           <p class="ui-note">Each page lands once per theme and width, side by side. Language, flags and loading or error states are not switched.</p>
         </fieldset>

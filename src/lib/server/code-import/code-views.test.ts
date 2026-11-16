@@ -38,7 +38,7 @@ const TREES: Record<number, PageTree> = {
 const widths = [1280, 768, 390];
 
 function sized(extra: Record<string, unknown> = {}) {
-  const made = askOf({ routes: ['/'], ...extra, conditions: widths.map((width) => ({ scheme: Scheme.Light, width })) });
+  const made = askOf({ routes: ['/'], responsive: Responsive.Views, ...extra, conditions: widths.map((width) => ({ scheme: Scheme.Light, width })) });
   let width = BASE_CONDITIONS.width;
   made.tab.viewport.mockImplementation(async (w: number) => {
     width = w;
@@ -83,10 +83,10 @@ describe('code import at several widths of one page', () => {
     expect(ok.boards?.map((b) => b.view)).toEqual([undefined, 'w768', 'w390']);
   });
 
-  it('keeps separate boards when asked for boards', async () => {
+  it('keeps separate boards by default', async () => {
     const { ask, docs } = sized();
 
-    const done = await importCodeAt({ ...ask, responsive: Responsive.Boards });
+    const done = await importCodeAt({ ...ask, responsive: undefined });
 
     expect(done.outcome).toBe(CodeImportOutcome.Ok);
     expect(docOf(docs).breakpoints ?? []).toEqual([]);

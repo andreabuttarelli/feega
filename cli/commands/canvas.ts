@@ -77,7 +77,7 @@ export function routeDelaysOf(pairs: string[]): Record<string, number> {
   return Object.fromEntries(pairs.map((pair) => [pair.slice(0, pair.lastIndexOf('=')), Number(pair.slice(pair.lastIndexOf('=') + 1))]));
 }
 
-export async function cmdCanvasImportCode(project: string, repo: string | undefined, opts: { canvas?: string; into?: string; app?: string; route: string[]; routes?: string; scheme?: string[]; width?: string[]; designSystem?: boolean; boards?: boolean; delay?: number; routeDelay?: string[]; x: number; y: number; org?: string }) {
+export async function cmdCanvasImportCode(project: string, repo: string | undefined, opts: { canvas?: string; into?: string; app?: string; route: string[]; routes?: string; scheme?: string[]; width?: string[]; designSystem?: boolean; views?: boolean; delay?: number; routeDelay?: string[]; x: number; y: number; org?: string }) {
   const source = codeSource(repo, opts.into);
   if (!source) {
     console.error('Give a repository link or folder, or --into <frame> to add pages to a frame imported before');
@@ -95,7 +95,7 @@ export async function cmdCanvasImportCode(project: string, repo: string | undefi
     process.exit(1);
   }
   const conditions = conditionsOf(opts.scheme, opts.width);
-  const input = { canvasId: opts.canvas, ...source, ...app, routes: plan.routes, ...(conditions ? { conditions } : {}), ...(opts.designSystem === false ? { designSystem: false } : {}), ...(opts.boards ? { responsive: 'boards' } : {}), ...(opts.delay ? { captureDelayMs: opts.delay } : {}), ...(opts.routeDelay?.length ? { routeDelayMs: routeDelaysOf(opts.routeDelay) } : {}), x: opts.x, y: opts.y };
+  const input = { canvasId: opts.canvas, ...source, ...app, routes: plan.routes, ...(conditions ? { conditions } : {}), ...(opts.designSystem === false ? { designSystem: false } : {}), ...(opts.views ? { responsive: 'views' } : {}), ...(opts.delay ? { captureDelayMs: opts.delay } : {}), ...(opts.routeDelay?.length ? { routeDelayMs: routeDelaysOf(opts.routeDelay) } : {}), x: opts.x, y: opts.y };
   const result = await canvasApi.run(await token(), { project, op: 'import_code', input }, opts.org);
   console.log(JSON.stringify(result, null, 2));
 }

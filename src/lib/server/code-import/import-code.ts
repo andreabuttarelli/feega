@@ -244,7 +244,7 @@ export async function importBoards(ask: BoardsAsk): Promise<CodeImported> {
 
   const cropped = captures.map(CROPS[ask.crop]);
   const tokens = ask.design ? await ask.design(loadedOf(captures, ask.pages)) : null;
-  const { viewed, note } = layoutOf(ask.responsive ?? Responsive.Views, cropped, ask.pages);
+  const { viewed, note } = layoutOf(ask.responsive ?? Responsive.Boards, cropped, ask.pages);
   const boards = viewed ? { tree: viewed.base.tree, uses: [] } : boardsOf(ask.name, tokens ? withBoard(tokens, ask.name, cropped) : cropped);
   const [tree, uses] = [await withSheetFonts(ask, boards.tree), boards.uses];
   const planned = viewed ? viewedPlan(viewed, ask.newId, await fontsFor(ask, tree)) : codePlan(tree, uses, ask.newId, await fontsFor(ask, tree), ask.library ? declaredAxes(ask.library) : undefined);
