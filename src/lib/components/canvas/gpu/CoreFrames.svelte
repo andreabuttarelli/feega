@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { addTally, countFrame } from '$lib/canvas/gpu/frame-stats';
+  import { showsBeforeMedia } from '$lib/canvas/core/first-show';
   import { sharedFrames } from '$lib/motion/gpu/shared-frames';
   import { drawFrame, prepare, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
   import { smoothingOf, type Typeset } from '@feega/motion-core/motion/gpu-full/text/painter';
@@ -262,6 +263,7 @@
     }
     markFrame(f.id, Step.Source);
     const source = place ? tieredAssets(fetched, place, at) : fetched;
+    onsource(f.id, { ...source, revision: f.revision });
     if (source !== fetched && !imaged.has(f.id)) {
       imaged.add(f.id);
       asked.add(tieredKey(f, at));
@@ -623,6 +625,9 @@
       return;
     }
     markFrame(key, Step.LiveBuilt);
+    if (showsBeforeMedia(f.id, liveShown.has(f.id))) {
+      showLive(f, key, { doc: source.doc, list: built.list, ready: Readiness.Partial });
+    }
     const ready = await media.ready(built.list);
     if (!liveGeneration.land(f.id, generation)) {
       return;
