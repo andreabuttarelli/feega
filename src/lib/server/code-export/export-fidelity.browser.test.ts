@@ -31,16 +31,16 @@ const SETTLE_MS = 400;
 const TARGET_SCORE = 0.9;
 const FLOOR_MARGIN = 0.02;
 const MEASURED: Record<string, number> = {
-  'landing:base': 0.7646,
+  'landing:base': 0.7854,
   'landing:tablet': 0.6609,
-  'landing:phone': 0.6337,
-  'hero-phone:base': 0.9362,
-  'hero-phone:phone': 0.8469,
+  'landing:phone': 0.7698,
+  'hero-phone:base': 0.9962,
+  'hero-phone:phone': 0.9659,
   'features-grid:base': 0.9838,
   'features-grid:tablet': 0.9598,
   'features-grid:phone': 0.8798,
-  'component-main-override:base': 0.9362,
-  'component-main-override:phone': 0.6872
+  'component-main-override:base': 0.9962,
+  'component-main-override:phone': 0.7321
 };
 const floorOf = (fixture: string, view: string) => (MEASURED[`${fixture}:${view}`] ?? TARGET_SCORE) - (`${fixture}:${view}` in MEASURED ? FLOOR_MARGIN : 0);
 const OVERFLOW_WIDTHS = [320, 390, 414, 600, 720, 810, 900, 1100];
