@@ -208,7 +208,7 @@ function planOf(after: MotionDoc, { laying, was, now, touched }: Pairing): Plan 
 
 const slid = (m: readonly number[], [x, y]: Shift) => [m[0], m[1], m[2], m[3], m[4] + x, m[5] + y];
 
-type Ctx = { plan: Plan; masked: (clip: string) => boolean; ownMask: (clip: string) => boolean };
+type Ctx = { plan: Plan; masked: (clip: string) => boolean; ownMask: (clip: string) => boolean; within?: string };
 
 function shiftedItem(item: Item, { by, carried }: Slide, ctx: Ctx): Item | null {
   if (item.scissor || (item.masks && ctx.ownMask(item.clip))) {
@@ -220,7 +220,7 @@ function shiftedItem(item: Item, { by, carried }: Slide, ctx: Ctx): Item | null 
   }
   const base = { ...item, ...(item.origin ? { origin: [item.origin[0] + carried[0], item.origin[1] + carried[1]] } : {}), ...(item.matte ? { matte: { ...item.matte, items: matte } } : {}) };
   if (item.kind === ItemKind.Group) {
-    const inner = replanned(item.items, ctx);
+    const inner = replanned(item.items, { ...ctx, within: instanceHost(item.clip) ?? item.clip });
     return inner ? ({ ...base, items: inner } as Item) : null;
   }
   return { ...base, matrix: slid(item.matrix, by) } as Item;
@@ -232,10 +232,11 @@ function replanned(items: Item[], ctx: Ctx): Item[] | null {
     if (ctx.plan.gone.has(item.clip)) {
       continue;
     }
-    if ((item.masks && ctx.masked(item.clip)) || ctx.plan.slides.has(instanceHost(item.clip) ?? '')) {
+    if (item.masks && ctx.masked(item.clip)) {
       return null;
     }
-    const slide = ctx.plan.slides.get(item.clip);
+    const host = instanceHost(item.clip);
+    const slide = ctx.plan.slides.get(item.clip) ?? (host && host !== ctx.within ? ctx.plan.slides.get(host) : undefined);
     const next = slide ? shiftedItem(item, slide, ctx) : item.kind === ItemKind.Group ? withItems(item, replanned(item.items, ctx)) : item;
     if (!next) {
       return null;
@@ -690,8 +691,21 @@ function restyledClips(before: MotionDoc, after: MotionDoc): MotionClip[] | null
   return edited.length && edited.every((c) => changedKeys(was[now.indexOf(c)], c).every((k) => STATIC_KEYS.has(k))) ? edited : null;
 }
 
+function instanceOfEdit(before: MotionDoc, after: MotionDoc): MotionClip | null {
+  if (before.tracks !== after.tracks || changedKeys(before, after).join() !== 'comps') {
+    return null;
+  }
+  const edited = new Set(changedKeys(before.comps, after.comps));
+  const hosts = clipsOf(after).filter((c) => c.component === 'Precomp' && edited.has(String(c.props.comp ?? '')));
+  return hosts.length === 1 ? hosts[0] : null;
+}
+
 export function fastPatch(list: DisplayList, before: MotionDoc, after: MotionDoc, measure: TextMeasure, look?: Look): DisplayList | null {
   const pair = onlyClip(before, after);
+  const host = pair ? null : instanceOfEdit(before, after);
+  if (host) {
+    return subtreeRedrawn(list, before, after, host, measure, look);
+  }
   const many = pair ? null : restyledClips(before, after);
   if (many) {
     return subtreeRedrawn(list, before, after, many[0], measure, look);

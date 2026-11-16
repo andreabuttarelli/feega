@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { precompose } from '@feega/motion-core/motion/precomp';
 import { addClip } from '@feega/motion-core/motion/timeline';
 import { DEFAULT_AUTO_LAYOUT, DEFAULT_LAYOUT_ITEM } from '@feega/motion-core/motion/layout/model';
 import { Direction, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
@@ -379,5 +380,36 @@ describe('hiding a big section', () => {
     scan.mockRestore();
     expect(rounded(patched)).toEqual(rounded(drawn(laid)));
     expect(calls).toBeLessThan(30 * MANY);
+  });
+});
+
+describe('editing inside a component', () => {
+  const withComponent = (): MotionDoc => {
+    const r = precompose(built(['a', 'inner', 'b']), ['inner'], { comp: 'cmp', clip: 'host' }, 'Card');
+    if (!r.ok) {
+      throw new Error(r.error);
+    }
+    return r.doc;
+  };
+  const recoloured = (doc: MotionDoc): MotionDoc => ({ ...doc, comps: Object.fromEntries(Object.entries(doc.comps).map(([id, comp]) => [id, { ...comp, tracks: comp.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, props: { ...c.props, fills: [{ type: 'solid', color: '#0000ff' }] } })) })) }])) });
+
+  it('redraws the instance of the edited component as the full build does', () => {
+    const before = withComponent();
+    const after = recoloured(before);
+
+    const patched = fastPatch(drawn(before), before, after, estimatedText, LOOK);
+
+    expect(patched).not.toBeNull();
+    expect(rounded(patched)).toEqual(rounded(drawn(after)));
+  });
+
+  it('a nudged frame carries the component instance inside it as the full build does', () => {
+    const framed = edit(withComponent(), 'host', (c) => ({ ...c, parent: 'a' }));
+    const after = edit(framed, 'a', (c) => ({ ...c, transform: { ...c.transform, x: 0.1, y: -0.05 } }));
+
+    const patched = fastPatch(drawn(framed), framed, after, estimatedText);
+
+    expect(patched).not.toBeNull();
+    expect(rounded(patched)).toEqual(rounded(drawn(after)));
   });
 });
