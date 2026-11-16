@@ -59,3 +59,38 @@ Not yet. Direct removes tile pops and blur on vector content, but:
 - **Effects are paid every frame.** Core p95 is 15 ms against 5 ms on tiles, and at 4× CPU it
   is 62 ms (35 fps). The layer cache misses on every zoom step. The finer-level effect texture
   cache is the step that decides whether this fits.
+
+## Round 3: native pages and zoom-free effects (2026-11-16)
+
+- `Library::set_native(Native::Vectors)`: a direct frame composes cached pages from their
+  encodings instead of their held rasters. Held textures stay for lifted (dragged) nodes, and
+  are kept, not evicted, so the still path finds them after the gesture.
+- `zoomless`: an effect body is keyed on a hash of camera-free content plus a power-of-2 scale
+  bucket, rendered at the next finer bucket and drawn at `s / bucket` (0.5, 1], so it is
+  only ever downsampled. The bucket-space item is built only on a miss. The cache keeps up to
+  4096 entries / 256 MB.
+
+Split per overview frame at 1× CPU, p95: plan 2 ms, effect prepare 4 ms (hits only), scene
+build 1 ms, vello CPU encode 4 ms.
+
+| | dev (tiles) | direct round 3 |
+|---|---|---|
+| capped fps, moderate / extreme | 60 / 60 | 60 / 60 |
+| worst frame capped | 19 ms | 19–34 ms |
+| core ms p50 / p95, moderate | 0.4 / 5.1 | 3.0–3.4 / 11.7–12.1 |
+| core ms p50 / p95, extreme | 0.5 / 5.6 | 1.4–1.6 / 12.0–12.4 |
+| uncapped core p95, moderate / extreme | 0.7 / 0.7 ms | 2.5 / 1.2 ms |
+| 4× CPU fps, moderate / extreme | 59 / 57 | 37 / 39 |
+| 4× CPU core p95 | 9.4–9.6 ms | 50–51 ms |
+| Laplacian median / p90, moderate | 235 / 354 | 264 / 408 |
+| Laplacian median / p90, extreme | 223 / 349 | 224 / 393 |
+| dips (6 moderate + 3 extreme) | 0 | 0 |
+
+Targets: capped 60 met; 0 vanishes met; sharpness better (median +12% moderate, p90 +13–15%;
+extreme-zoom median flat because those frames are mostly blank canvas); 4× CPU ≥ 55 fps
+missed (37–39); core p95 < 8 ms missed (12).
+
+The remaining cost is re-encoding the whole visible scene every frame: the vello CPU encode
+alone is 4 ms at 1× and about 4× that under throttling. Hitting the targets needs encode
+reuse across frames (append the previous frame's scene encoding with a camera transform
+instead of rebuilding it), or a cheaper effect prepare (memoised fingerprints per clip).
