@@ -170,6 +170,11 @@ impl Resolver {
         Self::default()
     }
 
+    /// Caps the side of the image atlas, shrinking it now if it is larger.
+    pub fn set_image_atlas_max(&mut self, side: u32) {
+        self.image_cache.set_max_size(side as i32);
+    }
+
     /// Marks the atlas entry for `image` as dirty.
     ///
     /// If `image` is already resident in the atlas and appears in a later resolve pass,

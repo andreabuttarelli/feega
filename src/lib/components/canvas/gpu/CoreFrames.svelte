@@ -965,6 +965,8 @@
         sentOverlay = new SentParts();
         r.setBudget?.(textureBudget(budget.textureBytes, { width, height }));
         r.setTileBudget?.(budget.tileBytes);
+        r.setImageAtlas?.(budget.atlasSide);
+        r.setEffectBudget?.(budget.effectBytes);
         r.setCanvasTiles?.(budget.canvasTiles);
         r.setPixelRatio?.(resolution);
         r.setTiles?.(TILED);
