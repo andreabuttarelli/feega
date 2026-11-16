@@ -75,7 +75,7 @@
   import { flightNote, startFlight } from '$lib/canvas/debug/flight';
   import { Camera } from '$lib/canvas/perf/session-perf';
   import { liftOut, liftedPut, movingGroup, restGroup, type Lift, type Lifted } from '$lib/canvas/core/lifted-drag';
-  import { AttachStep, GpuBackend, afterAttachFailure, backendAfterLoss, isTrap, type BackendSwitch } from '$lib/canvas/gpu/gpu-loss';
+  import { AttachStep, GpuBackend, afterAttachFailure, backendAfterLoss, isTrap, lossesExhausted, type BackendSwitch } from '$lib/canvas/gpu/gpu-loss';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
@@ -1228,12 +1228,16 @@
     perf.deviceLost();
     perf.error(why instanceof Error ? why.message : String(why));
     flightNote('gpu-lost', { backend: BACKENDS[backend].name, why: why instanceof Error ? why.message : String(why) });
+    raster = null;
+    if (lossesExhausted(backend, losses, BACKENDS.length)) {
+      onfallback(why instanceof Error ? why.message : String(why));
+      return;
+    }
     const next = backendAfterLoss(backend, losses, BACKENDS.length);
     if (next !== backend) {
       losses = 0;
       switchTo(next, why instanceof Error ? why.message : String(why));
     }
-    raster = null;
     attempt++;
   }
 

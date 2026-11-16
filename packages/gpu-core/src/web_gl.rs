@@ -1,7 +1,7 @@
 use vello::kurbo::{Affine, BezPath, Rect, Shape};
 use vello::peniko::{BlendMode, Brush, Compose, Fill, ImageQuality, ImageSampler, Mix};
 use vello_common::paint::{Image, ImageId, ImageSource};
-use vello_hybrid::{RenderSize, Resources, Scene, WebGlRenderer, WebGlTextureBindings, WebGlTextureWithDimensions};
+use vello_hybrid::{RenderSettings, RenderSize, Resources, Scene, SizeU16, WebGlRenderer, WebGlTextureBindings, WebGlTextureWithDimensions};
 use wasm_bindgen::prelude::*;
 use web_sys::{HtmlCanvasElement, HtmlImageElement, HtmlVideoElement, ImageBitmap, WebGl2RenderingContext as Gl};
 
@@ -17,6 +17,7 @@ use crate::retained::{Camera, Lookup, Quality};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::layers::{prepare, Blending, Surface};
 use crate::scene::{build_into, Placed, Shelf};
+use crate::screen_fit::fit;
 use crate::Skipped;
 
 #[derive(Clone, Copy)]
@@ -148,6 +149,7 @@ impl Surface for GlSurface<'_> {
 }
 
 const CACHE_SIDE: u32 = 4096;
+const SCREEN_SIDE: u32 = 3840;
 const RASTERS_PER_DRAW: usize = 1;
 const ITEMS_PER_RASTER: usize = 16;
 
@@ -159,6 +161,7 @@ pub struct WebGlCore {
     runner: GlRunner,
     width: u32,
     height: u32,
+    scale: f64,
     pictures: Shelf<GlPicture>,
     library: Library,
     cached: Shelf<GlPicture>,
@@ -240,16 +243,20 @@ impl Painter for WebGlCore {
 #[wasm_bindgen]
 impl WebGlCore {
     pub fn attach(canvas: HtmlCanvasElement, width: u32, height: u32) -> WebGlCore {
+        let fitted = fit((width, height), SCREEN_SIDE);
+        let (width, height) = fitted.size;
         canvas.set_width(width);
         canvas.set_height(height);
-        let (renderer, resources) = WebGlRenderer::new(&canvas);
+        let mut settings = RenderSettings::default();
+        settings.memory_settings.layers_config.max_texture_size = SizeU16::new(u16::MAX);
+        let (renderer, resources) = WebGlRenderer::new_with(&canvas, settings);
         let runner = GlRunner::new(renderer.gl_context());
         let compositor = Compositor::new(width, height);
         let retained = held(renderer.gl_context(), compositor.size());
         let spare = held(renderer.gl_context(), compositor.size());
         let reprojector = GlReprojector::new(renderer.gl_context());
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        WebGlCore { renderer, resources, canvas: GlCanvas { scene: Scene::new(width as u16, height as u16), by: Affine::IDENTITY }, runner, width, height, pictures: Shelf::default(), library: Library::new(), cached: Shelf::default(), pending: false, compositor, camera, retained, spare, reprojector }
+        WebGlCore { renderer, resources, canvas: GlCanvas { scene: Scene::new(width as u16, height as u16), by: Affine::IDENTITY }, runner, width, height, scale: fitted.scale, pictures: Shelf::default(), library: Library::new(), cached: Shelf::default(), pending: false, compositor, camera, retained, spare, reprojector }
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -333,7 +340,7 @@ impl WebGlCore {
     }
 
     pub fn set_camera(&mut self, x: f64, y: f64, zoom: f64) {
-        self.camera = Camera { x, y, zoom };
+        self.camera = Camera { x: x * self.scale, y: y * self.scale, zoom: zoom * self.scale };
     }
 
     pub fn patch_uses(&mut self, patch_json: &[u8]) -> Result<(), JsValue> {
