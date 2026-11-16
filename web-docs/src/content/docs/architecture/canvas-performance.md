@@ -60,7 +60,7 @@ Separately, by-id lookups inside loops were replaced with `Map` and `Set` indexe
 
 ## The rethink: vectors during gestures
 
-Tiles were fast but could never be sharp mid-zoom. So on desktop we now do what Figma does: draw pages from their vector encodings at the current zoom, every frame.
+Tiles were fast but could never be sharp mid-zoom. So we built what Figma does, as an opt-in path: draw pages from their vector encodings at the current zoom, every frame.
 
 - The scene is built once per gesture, then redrawn each frame with the camera transform.
 - Effects (blur, shadows) are expensive to redraw. They are cached per power-of-two zoom level and rendered finer than needed, so they are only ever downscaled, never magnified.
@@ -72,7 +72,7 @@ Results on desktop:
 - mid-zoom sharpness up: Laplacian-variance median 234 → 260, p90 354 → 396;
 - 0 page dropouts in 9 runs.
 
-The honest limit: on slow devices, full scene rebuilds still spike. So phones and weak machines keep tiles, and a runtime guard falls back to tiles when gesture frames miss their budget. Per-page rebuilds are next.
+The honest limit: full scene rebuilds still spike. At 120 Hz the rebuild frames cost 114–173 ms, and zoom on a real-sites canvas fell from 118–120 to 90–95 fps. So tiles are the default again on every device, and direct is opt-in with `?directZoom=1` until per-page rebuilds land.
 
 ## Lessons
 

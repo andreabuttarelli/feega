@@ -1,4 +1,5 @@
 import { sandboxUsd } from '$lib/server/code-import/sandbox-runner';
+import type { Coverage } from '$lib/server/code-import/token-coverage';
 import type { CorpusEntry } from './corpus';
 
 export enum Metric {
@@ -32,6 +33,7 @@ export type ImportRun = {
   instances: number | null;
   uses: number | null;
   tokens: number | null;
+  coverage: Coverage | null;
   bound: Bound | null;
   fidelity: Fidelity[] | null;
   phases: Record<string, number>;
@@ -73,6 +75,16 @@ function success(run: ImportRun): Measured {
   return { value: run.routes.filter((r) => r.ok).length / run.routes.length, failures };
 }
 
+function tokenCoverage(coverage: Coverage | null, imported: number | null): Measured {
+  const kinds = Object.entries(coverage ?? {});
+  const declared = kinds.reduce((n, [, c]) => n + c.declared, 0);
+  if (!kinds.length || !declared) {
+    return { unrun: 'import reported no declared tokens', imported };
+  }
+  const kept = kinds.reduce((n, [, c]) => n + c.imported, 0);
+  return { value: kept / declared, declared, imported: kept, kinds: Object.fromEntries(kinds.map(([kind, c]) => [kind, c.imported / c.declared])) };
+}
+
 function bindRate(bound: Bound | null): Measured {
   if (!bound) {
     return { unrun: 'import reported no design-system binding' };
@@ -100,7 +112,7 @@ function measured(entry: CorpusEntry, run: ImportRun): Record<Metric, Measured> 
     [Metric.Components]: ratio(run.components, entry.componentFiles, `no file matches the counting rule in ${entry.repo}`),
     [Metric.Variants]: ratio(run.variants, entry.declaredVariants, 'declared variant axes not counted for this repo'),
     [Metric.Linked]: ratio(run.instances, run.uses, 'import does not report component uses'),
-    [Metric.Tokens]: { unrun: 'tokens declared in the repo are not counted: only the imported count is known', imported: run.tokens },
+    [Metric.Tokens]: tokenCoverage(run.coverage, run.tokens),
     [Metric.Bind]: bindRate(run.bound),
     [Metric.Fidelity]: fidelity(run.fidelity),
     [Metric.Time]: totalMs ? { value: totalMs, phases: run.phases } : { unrun: 'no phase timed' },

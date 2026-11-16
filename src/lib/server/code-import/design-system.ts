@@ -6,6 +6,9 @@ import { boundToTokens, spacingMultiples, type BoundCount } from './design-bind'
 import { boardBound, designBoard, DESIGN_BOARD } from './design-board';
 import { readOnlyKeys, tokenSetOf, variableName, variablesOf, type TokenMap, type TokenSet } from './design-tokens';
 import { readTokenFiles } from './json-tokens';
+import { readSassVars } from './sass-vars';
+import { readTailwindConfig } from './tailwind-config';
+import { coverageOf, declaredNames, type Coverage } from './token-coverage';
 import { madeStyles, styleTokensOf, type StyleToken } from './design-styles';
 import type { RenderConditions } from './render-conditions';
 import type { ReadFile } from './write-back';
@@ -17,10 +20,9 @@ export enum DesignSystem {
 
 export const designSystemOf = (on: boolean | undefined) => (on === false ? DesignSystem.Off : DesignSystem.On);
 
-export type Design = { set: TokenSet; rules: VarRule[]; styles: StyleToken[] };
+export type Design = { set: TokenSet; rules: VarRule[]; styles: StyleToken[]; declared: string[] };
 
-export type DesignReport = { tokens: number; styles: number } & BoundCount;
-
+export type DesignReport = { tokens: number; styles: number; coverage: Coverage } & BoundCount;
 
 export type Designed = { plan: UrlPlan; map: TokenMap; report: DesignReport; skipped: string[] };
 
@@ -29,17 +31,23 @@ const DEFAULT_WIDTH = 1280;
 
 export async function designOf(read: ReadFile, loaded: LoadedSheet[] = []): Promise<Design | null> {
   const sheets = parseSheets(await readSheets(read, loaded));
-  const files = await readTokenFiles(read);
-  const parsed = { ...sheets, declared: [...sheets.declared, ...files.declared], skipped: [...sheets.skipped, ...files.skipped] };
+  const sources = [await readTokenFiles(read), await readTailwindConfig(read), await readSassVars(read)];
+  const parsed = { ...sheets, declared: [...sheets.declared, ...sources.flatMap((f) => f.declared)], skipped: [...sheets.skipped, ...sources.flatMap((f) => f.skipped)] };
   const set = tokenSetOf(parsed);
   const styles = styleTokensOf(parsed);
-  return set.tokens.length || styles.length ? { set, rules: parsed.rules, styles } : null;
+  return set.tokens.length || styles.length ? { set, rules: parsed.rules, styles, declared: declaredNames(parsed.declared, parsed.skipped) } : null;
 }
 
 export const tokenCount = async (read: ReadFile) => {
   const design = await designOf(read);
   return design ? design.set.tokens.length + design.styles.length : 0;
 };
+
+export function coverageOfDesign(design: Design, repo: string): Coverage {
+  const made = variablesOf(design.set, repo);
+  const styled = madeStyles(design.styles, repo, { side: DEFAULT_WIDTH, scale: 1 });
+  return coverageOf(design.declared, { ...made.map, ...styled.map });
+}
 
 export const modeOfScheme = (c: RenderConditions) => c.scheme.charAt(0).toUpperCase() + c.scheme.slice(1);
 
@@ -82,6 +90,7 @@ export function designed(design: Design, plan: UrlPlan, ask: DesignAsk): Designe
   const readOnly = readOnlyKeys(made.map).size;
   const pageOnly = readOnly ? [`${readOnly} token${readOnly === 1 ? '' : 's'} ${READ_ONLY}`] : [];
   const skipped = [...design.set.skipped, ...made.dropped, ...styled.dropped, ...pageOnly].map((s) => `${SKIPPED_PREFIX}: ${s}`);
-  const report = { tokens: Object.keys(made.map).length, styles: Object.keys(styled.styles).length, ...counted };
+  const coverage = coverageOf(design.declared, { ...made.map, ...styled.map });
+  const report = { tokens: Object.keys(made.map).length, styles: Object.keys(styled.styles).length, coverage, ...counted };
   return { plan: { ...plan, sets, plan: { ...plan.plan, items } }, map: { ...made.map, ...styled.map }, report, skipped };
 }

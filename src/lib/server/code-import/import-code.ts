@@ -6,6 +6,7 @@ import { urlPlan } from '$lib/server/url-import/url-doc';
 import type { OpenAppBrowser } from '$lib/server/web/browser';
 import type { ComponentUse } from './component-marks';
 import { codePlan } from './code-doc';
+import { componentsLeftOut, layoutOf, Responsive, viewedPlan, type Viewed } from './code-views';
 import { boardsOf, conditioned, cropped, type Capture } from './boards';
 import { BASE_CONDITIONS, conditionKey, variantsOf, type RenderConditions, type Variant } from './render-conditions';
 import { CAPTURE_BUDGET_MS, delayFor, NO_DELAY, type CaptureDelay } from './capture-wait';
@@ -77,7 +78,7 @@ type Refusal = { outcome: Exclude<CodeImportOutcome, CodeImportOutcome.Ok>; erro
 
 export type CodeOrigin = { repo: string; branch: string | null; sha: string | null; app: string | null };
 
-export type LandedBoard = { label: string; route: string; cond: string; clip: string };
+export type LandedBoard = { label: string; route: string; cond: string; clip: string; view?: string };
 
 export type CodeImported = ({ outcome: CodeImportOutcome.Ok; frameId: string; origin?: CodeOrigin; name: string; undo: unknown[]; skipped: string[]; locked: LockedRoute[]; missed?: MissedPage[]; boards?: LandedBoard[]; truncated: boolean; pages: string[]; links?: string[]; design?: DesignReport; tokenMap?: TokenMap; library?: LibraryReport } & ComponentCount) | Refusal;
 
@@ -95,7 +96,7 @@ export type BranchList = (repo: RepoRef) => Promise<string[]>;
 
 export type SignInAsk = { account?: TestAccount | null };
 
-export type CodeAsk = LandAsk & DesignOptions & SignInAsk & { repo: string; app?: string; routes: string[]; conditions?: RenderConditions[]; variants?: Variant[]; delay?: CaptureDelay; runner: RepoRunner | null; archive?: RepoArchive | null; branches?: BranchList | null };
+export type CodeAsk = LandAsk & DesignOptions & SignInAsk & { responsive?: Responsive; repo: string; app?: string; routes: string[]; conditions?: RenderConditions[]; variants?: Variant[]; delay?: CaptureDelay; runner: RepoRunner | null; archive?: RepoArchive | null; branches?: BranchList | null };
 
 const refused = (outcome: Refusal['outcome'], error?: string, apps?: string[]): Refusal => ({ outcome, ...(error ? { error } : {}), ...(apps?.length ? { apps } : {}) });
 
@@ -200,9 +201,16 @@ function boardsLanded(doc: MotionDoc, pages: CodePage[], labels: string[]): Land
   });
 }
 
+function viewsLanded(doc: MotionDoc, viewed: Viewed, route: string): LandedBoard[] {
+  const clips = doc.tracks.flatMap((t) => t.clips as MotionClip[]).filter((c) => c.id !== SURFACE);
+  const page = clips.find((c) => !c.parent);
+  const label = (conditions: RenderConditions) => ({ label: viewed.base.label, route, cond: condKey(conditions), clip: page?.id ?? '' });
+  return page ? [label(viewed.baseConditions), ...viewed.widths.map((w) => ({ ...label(w.conditions), view: w.view.id }))] : [];
+}
+
 const lockedLine = (route: LockedRoute) => `${route.label}: ${route.reason}${route.detail ? ` (${route.detail})` : ''}`;
 
-export type BoardsAsk = LandAsk & SignInAsk & { name: string; pages: CodePage[]; names: string[]; crop: Crop; budgetMs?: number; now?: () => number; design?: Designer | null; library?: Discovery; delay?: CaptureDelay };
+export type BoardsAsk = LandAsk & SignInAsk & { responsive?: Responsive; name: string; pages: CodePage[]; names: string[]; crop: Crop; budgetMs?: number; now?: () => number; design?: Designer | null; library?: Discovery; delay?: CaptureDelay };
 
 export function designFor(ask: DesignOptions, rev: string | null): Designer | null {
   const code = ask.code;
@@ -236,9 +244,10 @@ export async function importBoards(ask: BoardsAsk): Promise<CodeImported> {
 
   const cropped = captures.map(CROPS[ask.crop]);
   const tokens = ask.design ? await ask.design(loadedOf(captures, ask.pages)) : null;
-  const boards = boardsOf(ask.name, tokens ? withBoard(tokens, ask.name, cropped) : cropped);
+  const { viewed, note } = layoutOf(ask.responsive ?? Responsive.Boards, cropped, ask.pages);
+  const boards = viewed ? { tree: viewed.base.tree, uses: [] } : boardsOf(ask.name, tokens ? withBoard(tokens, ask.name, cropped) : cropped);
   const [tree, uses] = [await withSheetFonts(ask, boards.tree), boards.uses];
-  const planned = codePlan(tree, uses, ask.newId, await fontsFor(ask, tree), ask.library ? declaredAxes(ask.library) : undefined);
+  const planned = viewed ? viewedPlan(viewed, ask.newId, await fontsFor(ask, tree)) : codePlan(tree, uses, ask.newId, await fontsFor(ask, tree), ask.library ? declaredAxes(ask.library) : undefined);
   const base = ask.pages[0]?.conditions ?? BASE_CONDITIONS;
   const boardModes = Object.fromEntries(ask.pages.map((p) => [p.label, modeOfScheme(p.conditions ?? BASE_CONDITIONS)]));
   const design = tokens && planned ? designed(tokens, planned, { repo: ask.name, base, boards: boardModes, captures: cropped, width: tree.root.absoluteBoundingBox?.width ?? tree.width }) : null;
@@ -249,14 +258,14 @@ export async function importBoards(ask: BoardsAsk): Promise<CodeImported> {
 
   const frame = await ask.store.read(done.frameId);
   const count = frame ? componentCount(frame.doc) : { components: 0, variants: 0, instances: 0 };
-  const skipped = [...done.skipped, ...missed.map((m) => `${m.label}: ${m.reason}`), ...locked.map(lockedLine), ...(design?.skipped ?? [])];
+  const skipped = [...done.skipped, ...(note ? [note] : []), ...(viewed ? componentsLeftOut(cropped) : []), ...missed.map((m) => `${m.label}: ${m.reason}`), ...locked.map(lockedLine), ...(design?.skipped ?? [])];
   const report = design ? { design: design.report, tokenMap: design.map } : {};
   const library = ask.library ? { library: libraryReport(ask.library, new Set(uses.map((u) => u.component))) } : {};
-  const landed = frame ? boardsLanded(frame.doc, ask.pages, captures.map((c) => c.label)) : [];
+  const landed = frame ? (viewed ? viewsLanded(frame.doc, viewed, ask.pages[0]?.route ?? ask.pages[0]?.label ?? '') : boardsLanded(frame.doc, ask.pages, captures.map((c) => c.label))) : [];
   return { ...done, outcome: CodeImportOutcome.Ok, skipped, locked, missed, boards: landed, pages: captures.map((c) => c.label), links: sameOriginPaths(links, first), ...count, ...report, ...library };
 }
 
-export type RunAsk = LandAsk & DesignOptions & SignInAsk & { repo: RepoRef; app: string | null; routes: string[]; conditions?: RenderConditions[]; variants?: Variant[]; delay?: CaptureDelay; runner: RepoRunner | null; archive: Uint8Array | null };
+export type RunAsk = LandAsk & DesignOptions & SignInAsk & { responsive?: Responsive; repo: RepoRef; app: string | null; routes: string[]; conditions?: RenderConditions[]; variants?: Variant[]; delay?: CaptureDelay; runner: RepoRunner | null; archive: Uint8Array | null };
 
 const AMBIGUOUS_REF = '/';
 

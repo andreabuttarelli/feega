@@ -7,6 +7,7 @@ import { withMedia } from './media';
 import { resolveAt, viewsOf } from '../breakpoints/model';
 import type { PageSpec } from './ir';
 import { CodeTarget, type CodeAsset, type CodeExport, type CodeFile } from './model';
+import { fontAssetIds } from './fonts';
 import { kebab } from './naming';
 import { htmlProject } from './targets/html';
 import { reactProject } from './targets/react';
@@ -53,5 +54,5 @@ export function codeAssetIds(doc: MotionDoc): string[] {
     const filled = Array.isArray(clip.props.fills) ? fillsOf(clip.props).flatMap((f) => (f.type === FillType.Image && f.assetId ? [f.assetId] : [])) : [];
     return [...own, ...filled];
   });
-  return [...new Set(ids)].sort();
+  return [...new Set([...ids, ...fontAssetIds(doc)])].sort();
 }

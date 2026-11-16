@@ -107,8 +107,10 @@ describe('Figma REST nodes carried into the canvas mapper', () => {
     expect(b.centre.y - a.centre.y).toBe(0);
   });
 
-  it('skips a hidden layer', () => {
+  it('keeps a hidden layer, hidden', () => {
     const hidden = planOfFrames([{ ...card, children: [rect('2:1', { visible: false }), rect('2:2')] }]);
-    expect(JSON.stringify(hidden.items[0].doc)).not.toContain('rect 2:1');
+    const clips = hidden.items[0].doc.tracks.flatMap((t) => t.clips);
+    expect(clips.find((c) => c.name === 'rect 2:1')?.hidden).toBe(true);
+    expect(clips.find((c) => c.name === 'rect 2:2')?.hidden).toBeFalsy();
   });
 });

@@ -1,12 +1,13 @@
 import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 import { changedLook, LOOK, LookKey, minSideOf, type Look, type LookValue } from '$lib/canvas/code-look';
 import { BASE_CONDITIONS, parseKey, Scheme } from './render-conditions';
+import { viewChanges } from './view-look';
 
 export type SourceAt = { file: string; line: number; column: number };
 
 export type Spot = { tag: string; cls: string };
 
-export type SourceEdit = { at: SourceAt; look: Look; was: Look; spot?: Spot; cond?: string };
+export type SourceEdit = { at: SourceAt; look: Look; was: Look; spot?: Spot; cond?: string; view?: string };
 
 export type FileChange = { path: string; before: string; after: string };
 
@@ -54,7 +55,15 @@ export function editsOf(doc: MotionDoc): SourceEdit[] {
     const { tag, cls, cond } = clip.source!;
     byAt.set(key, { at, look, was: clip.source!.was, ...(tag ? { spot: { tag, cls: cls ?? '' } } : {}), ...(cond ? { cond } : {}) });
   }
-  return [...byAt.values()];
+  return [...byAt.values(), ...viewEditsOf(doc)];
+}
+
+function viewEditsOf(doc: MotionDoc): SourceEdit[] {
+  return viewChanges(doc).flatMap(({ clip, view, look, was }) => {
+    const at = clip.source ? atOf(clip.source.at) : null;
+    const { tag, cls, cond } = clip.source!;
+    return at ? [{ at, look, was, view: view.name, ...(tag ? { spot: { tag, cls: cls ?? '' } } : {}), ...(cond ? { cond } : {}) }] : [];
+  });
 }
 
 function offsetOf(text: string, at: SourceAt): number {
@@ -261,6 +270,10 @@ const cssOf = (look: Look): [string, string][] =>
 async function styledFor(files: Files, text: string, tag: Tag, edit: SourceEdit, skipped: string[]): Promise<string> {
   const cond = parseKey(edit.cond);
   const where = label(edit.at);
+  if (edit.view) {
+    skipped.push(`${where}: edited in the ${edit.view} view, a rule for one width is not written`);
+    return text;
+  }
   if (cond.width !== BASE_CONDITIONS.width) {
     skipped.push(`${where}: edited at ${cond.width}px, a rule for one width is not written`);
     return text;

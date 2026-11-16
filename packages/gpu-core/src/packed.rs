@@ -5,7 +5,7 @@ use serde::de::{self, Deserializer, SeqAccess, Visitor};
 
 #[derive(Default)]
 struct Pack {
-    floats: Vec<f32>,
+    floats: Vec<f64>,
     ends: Vec<u32>,
     base: usize,
     read: usize,
@@ -15,7 +15,7 @@ thread_local! {
     static PACK: RefCell<Pack> = RefCell::new(Pack::default());
 }
 
-pub fn within<T>(floats: Vec<f32>, ends: Vec<u32>, read: impl FnOnce() -> T) -> T {
+pub fn within<T>(floats: Vec<f64>, ends: Vec<u32>, read: impl FnOnce() -> T) -> T {
     PACK.with(|pack| *pack.borrow_mut() = Pack { floats, ends, base: 0, read: 0 });
     let out = read();
     PACK.with(|pack| *pack.borrow_mut() = Pack::default());
@@ -29,7 +29,7 @@ fn packed_contour(local: usize) -> Option<Vec<f64>> {
         let index = pack.base + local;
         let end = *pack.ends.get(index)? as usize;
         let start = if index == 0 { 0 } else { pack.ends[index - 1] as usize };
-        pack.floats.get(start..end).map(|f| f.iter().map(|&n| f64::from(n)).collect())
+        pack.floats.get(start..end).map(<[f64]>::to_vec)
     })
 }
 

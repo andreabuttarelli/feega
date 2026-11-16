@@ -6,7 +6,8 @@ import { blankElement, canvasReady, drawClip, drawnFrame, penClip } from '$lib/m
 import { DrawTool } from '$lib/motion/draw-tool';
 import { EffectKind } from '@feega/motion-core/motion/effects/registry';
 import type { Effect } from '@feega/motion-core/motion/effects/model';
-import { MIN_BOX, TYPE_SIZE } from '@feega/motion-core/motion/components';
+import { MIN_BOX, PARAGRAPH, TYPE_SIZE } from '@feega/motion-core/motion/components';
+import { MAX_LAYOUT_PX } from '@feega/motion-core/motion/layout/model';
 import { FillType, MAX_STOPS } from '@feega/motion-core/motion/fill/model';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { registerFont, registerUpload } from '$lib/motion/fonts/ops';
@@ -25,14 +26,14 @@ import { mapOutline, parsePath, type Pt } from '@feega/motion-core/motion/shape/
 import { TextSizing } from '@feega/motion-core/motion/text-sizing';
 import { addClip, editClip, setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { figmaMessage, type FigmaMessage } from './archive';
-import { Clip, Cross, Decoration, Destination, Fit, FillKind, Flow, Justify, LayerKind, MaskBand, PictureFit, figmaScene, type AutoLayout, type ComponentRef, type Fill, type FrameLayer, type Blur, type Layer, type LayerEffect, type Shadow, type ShapeLayer, type Stroke, type TextLayer } from './scene';
+import { Clip, Cross, Decoration, Destination, Fit, FillKind, Flow, Justify, LayerKind, MaskBand, PictureFit, figmaScene, type AutoLayout, type ComponentRef, type Fill, type PictureCrop, type FrameLayer, type Blur, type Layer, type LayerEffect, type Shadow, type ShapeLayer, type Stroke, type TextLayer } from './scene';
 
 type NewId = () => string;
 type Unit = { x: number; y: number };
 type Size = { width: number; height: number };
 type Root = { id: string; layer: Layer };
 type Built = { doc: MotionDoc; ids: string[]; roots: Root[] };
-export type FigmaImage = { clipId: string; hash: string; at: number; innerId?: string; fit?: PictureFit; focus?: Unit };
+export type FigmaImage = { clipId: string; hash: string; at: number; innerId?: string; fit?: PictureFit; focus?: Unit; crop?: PictureCrop; scale?: number; rotation?: number };
 type Main = { compId: string; at: Unit; images: FigmaImage[] };
 export enum Grouping {
   Precomp = 'precomp',
@@ -92,14 +93,15 @@ const fillStack = (fills: Fill[]): Painted[] => fills.map((f) => MOTION_FILL[f.k
 
 function imageSlots(fills: Fill[]): Omit<FigmaImage, 'clipId'>[] {
   const painted = fills.filter((f) => MOTION_FILL[f.kind](f));
-  return painted.flatMap((f, at) => (f.kind === FillKind.Image ? [{ hash: f.hash, at, fit: f.fit, focus: f.focus }] : []));
+  return painted.flatMap((f, at) => (f.kind === FillKind.Image ? [{ hash: f.hash, at, fit: f.fit, focus: f.focus, ...(f.crop ? { crop: f.crop } : {}), ...(f.scale ? { scale: f.scale } : {}), ...(f.rotation ? { rotation: f.rotation } : {}) }] : []));
 }
 
 function strokeStack(strokes: Stroke[], doc: MotionDoc, p: Place): Painted[] {
   return strokes.flatMap((s) => {
     const paint = MOTION_FILL[s.fill.kind](s.fill);
     const unit = (px: number) => clamp(fine((px * p.scale) / minSide(doc)), 0, MAX_STROKE_WIDTH);
-    return paint ? [{ paint, width: unit(s.weight), align: s.align, ...(s.dash ? { dash: unit(s.dash[0]), gap: unit(s.dash[1]) } : {}) }] : [];
+    const dashed = s.pattern ? { pattern: s.pattern.map(unit) } : s.dash ? { dash: unit(s.dash[0]), gap: unit(s.dash[1]) } : {};
+    return paint ? [{ paint, width: unit(s.weight), align: s.align, ...dashed, ...(s.cap ? { cap: s.cap } : {}), ...(s.join ? { join: s.join } : {}), ...(s.miter ? { miter: s.miter } : {}) }] : [];
   });
 }
 
@@ -186,6 +188,13 @@ const scaledPixels = (measure: string, p: Place) => {
   return px ? `${round(Number(px[1]) * p.scale)}px` : measure;
 };
 
+const runFill = (fill: Fill) => {
+  const painted = MOTION_FILL[fill.kind](fill);
+  return painted ? { fill: painted } : {};
+};
+
+const emOf = (px: number, size: number, range: { min: number; max: number }) => clamp(round(px / size), range.min, range.max);
+
 function textClip(doc: MotionDoc, layer: TextLayer, p: Place): Built {
   const fonts = [layer.font, ...layer.runs.flatMap((r) => (r.font ? [r.font] : []))];
   let next = doc;
@@ -202,7 +211,7 @@ function textClip(doc: MotionDoc, layer: TextLayer, p: Place): Built {
   const drawn = drawClip(next, DrawTool.Text, { x: x0 + width / 2, y: y0 + height / 2, width, height }, p.frame, id, layer.sizing, { text: layer.text });
   const size = (n: number) => clamp(fine((n * p.scale) / minSide(next)), TYPE_SIZE.min, TYPE_SIZE.max);
   const font = known.get(layer.font);
-  const runs = layer.runs.map(({ font: f, size: s, ...rest }) => ({ ...rest, ...(f && known.get(f) ? { font: f } : {}), ...(s ? { size: size(s) } : {}) }));
+  const runs = layer.runs.map(({ font: f, size: s, fill, ...rest }) => ({ ...rest, ...(fill ? runFill(fill) : {}), ...(f && known.get(f) ? { font: f } : {}), ...(s ? { size: size(s) } : {}) }));
   const stacked = layer.fills.length > 1 || layer.fills.some((f) => f.kind !== FillKind.Solid || f.opacity < 1);
   const look = {
     text: layer.text,
@@ -216,7 +225,9 @@ function textClip(doc: MotionDoc, layer: TextLayer, p: Place): Built {
     letterSpacing: scaledPixels(layer.letterSpacing, p),
     lineHeight: scaledPixels(layer.lineHeight, p),
     align: layer.align,
-    verticalAlign: 'top',
+    verticalAlign: layer.verticalAlign,
+    ...(layer.paragraphSpacing ? { paragraphSpacing: emOf(layer.paragraphSpacing, layer.size, PARAGRAPH.spacing) } : {}),
+    ...(layer.paragraphIndent ? { paragraphIndent: emOf(layer.paragraphIndent, layer.size, PARAGRAPH.indent) } : {}),
     ...(oneLineFixed(layer) && !layer.maxLines ? { textWrap: 'none' } : {}),
     ...(layer.maxLines ? { maxLines: layer.maxLines, truncate: true } : {}),
     ...(layer.decoration === Decoration.None ? {} : { decoration: layer.decoration }),
@@ -322,7 +333,9 @@ function oneLineFixed(layer: TextLayer): boolean {
   return layer.sizing === TextSizing.Fixed && layer.box.height < line * ONE_LINE_SHARE;
 }
 
-function itemFor(child: Layer, parent: AutoLayout, scale: number, width: number): Partial<{ width: Sizing; height: Sizing; absolute: boolean; maxWidth: number }> {
+const limitPx = (v: number, scale: number) => Math.min(MAX_LAYOUT_PX, v * scale);
+
+function itemFor(child: Layer, parent: AutoLayout, scale: number, width: number): Partial<{ width: Sizing; height: Sizing; absolute: boolean; minWidth: number; maxWidth: number; minHeight: number; maxHeight: number }> {
   const row = parent.flow === Flow.Row;
   const fillsWidth = row ? child.item.grow : child.item.stretch;
   const fillsHeight = row ? child.item.stretch : child.item.grow;
@@ -331,7 +344,10 @@ function itemFor(child: Layer, parent: AutoLayout, scale: number, width: number)
     ...(fillsWidth ? { width: Sizing.Fill } : {}),
     ...(fillsHeight ? { height: Sizing.Fill } : {}),
     ...(child.item.absolute ? { absolute: true } : {}),
-    ...(child.item.maxWidth ? { maxWidth: Math.max(child.item.maxWidth * scale, width) } : {})
+    ...(child.item.minWidth ? { minWidth: limitPx(child.item.minWidth, scale) } : {}),
+    ...(child.item.maxWidth ? { maxWidth: Math.min(MAX_LAYOUT_PX, Math.max(child.item.maxWidth * scale, width)) } : {}),
+    ...(child.item.minHeight ? { minHeight: limitPx(child.item.minHeight, scale) } : {}),
+    ...(child.item.maxHeight ? { maxHeight: limitPx(child.item.maxHeight, scale) } : {})
   };
 }
 
@@ -365,11 +381,12 @@ function layersOf(doc: MotionDoc, layer: FrameLayer, p: Place, need = Background
   const background = frameBackground(doc, layer, p, holding ? Background.Always : need);
   const build = flow ? BUILD_IN_FLOW : BUILD;
   let built: Built = { ...background, roots: holding ? [] : background.roots };
+  const cutters = new Map<string, string>();
   for (const child of layer.children) {
     const made = build[child.kind](built.doc, child, p);
     const shown = { ...made, doc: blended(child.hidden ? hiddenAll(made.doc, made.roots) : made.doc, made.roots, child.blend) };
     const acting = { ...shown, doc: sourced(moving(ownsBehaviour(child) ? behaved(shown.doc, shown.roots, child) : shown.doc, shown.roots, child, p), shown.roots, child) };
-    const next = masked(acting, child, p);
+    const next = cutAs(constrained(masked(acting, child, p), child, flow), child, cutters);
     if (child.ref && next.roots[0] && !p.keys.has(child.ref)) {
       p.keys.set(child.ref, next.roots[0].id);
     }
@@ -414,6 +431,38 @@ function masked(built: Built, layer: Layer, p: Place): Built {
   const [first, ...rest] = masks;
   const set = editClip(held.doc, held.roots[0].id, (clip) => ({ ...clip, mask: first, maskStack: rest }));
   return set.ok ? { ...held, doc: set.doc } : held;
+}
+
+function constrained(built: Built, layer: Layer, flow: AutoLayout | null): Built {
+  const pinned = layer.item.constraints;
+  if (!pinned || flow) {
+    return built;
+  }
+  const doc = built.roots.reduce((d, root) => {
+    const set = editClip(d, root.id, (clip) => ({ ...clip, constraints: pinned }));
+    return set.ok ? set.doc : d;
+  }, built.doc);
+  return { ...built, doc };
+}
+
+function cutAs(built: Built, layer: Layer, cutters: Map<string, string>): Built {
+  const [first] = built.roots;
+  if (!first) {
+    return built;
+  }
+  if (layer.cutter) {
+    cutters.set(layer.cutter.id, first.id);
+  }
+  const source = layer.cutBy ? cutters.get(layer.cutBy.id) : undefined;
+  if (!layer.cutBy || !source) {
+    return built;
+  }
+  const { matte } = layer.cutBy;
+  const doc = built.roots.reduce((d, root) => {
+    const set = editClip(d, root.id, (clip) => ({ ...clip, matte, matteFrom: source }));
+    return set.ok ? set.doc : d;
+  }, built.doc);
+  return { ...built, doc };
 }
 
 function blended(doc: MotionDoc, roots: Root[], blend: BlendMode): MotionDoc {

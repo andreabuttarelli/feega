@@ -42,8 +42,6 @@ feega products &lt;slug&gt; sync            # Re-import the store catalog</code>
 </p>
 <ul>
   <li>{$_('docs.cli.s14')}</li>
-  <li>{$_('docs.cli.s15')}</li>
-  <li>{$_('docs.cli.s16')}</li>
 </ul>
 
 <hr />

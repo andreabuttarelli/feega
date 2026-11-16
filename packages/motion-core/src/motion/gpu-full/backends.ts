@@ -7,7 +7,7 @@ export enum FullBackend {
   CoreGl = 'core-gl'
 }
 
-export const BACKENDS: Record<FullBackend, (canvas: HTMLCanvasElement, width: number, height: number) => Promise<Raster>> = {
+export const BACKENDS: Record<FullBackend, (canvas: HTMLCanvasElement, width: number, height: number, pictureSide?: number) => Promise<Raster>> = {
   [FullBackend.WebGl2]: async (canvas, width, height) => createRaster(canvas, width, height),
   [FullBackend.Core]: createCore,
   [FullBackend.CoreGl]: createCoreGl

@@ -1,8 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { Offscreen, ZoomPicture } from '$lib/canvas/core/residency';
-import { Device, BUDGET, buildLanes, deviceOf, previewHtml, textureBudget } from './memory-budget';
+import { Device, BUDGET, PHONE_GPU_BYTES, buildLanes, deviceOf, gpuBytes, previewHtml, textureBudget } from './memory-budget';
 
 describe('memory budget', () => {
+  it('a phone holds frames, tiles and the image atlas inside one hard GPU budget', () => {
+    expect(PHONE_GPU_BYTES).toBe(192 * 1024 * 1024);
+    expect(gpuBytes(Device.Phone)).toBeLessThanOrEqual(PHONE_GPU_BYTES);
+  });
+
+  it('a phone caps cached effects too, which otherwise hold up to 256 MB', () => {
+    expect(BUDGET[Device.Phone].effectBytes).toBeGreaterThan(0);
+    expect(gpuBytes(Device.Phone)).toBe(BUDGET[Device.Phone].textureBytes + BUDGET[Device.Phone].tileBytes + BUDGET[Device.Phone].effectBytes + BUDGET[Device.Phone].atlasSide ** 2 * 4);
+  });
+
+  it('a phone image atlas still fits sixteen pictures at the phone picture side', () => {
+    const { atlasSide, pictureSide } = BUDGET[Device.Phone];
+
+    expect((atlasSide / pictureSide) ** 2).toBeGreaterThanOrEqual(16);
+  });
+
   it('the texture budget follows the canvas size, up to the device ceiling', () => {
     const small = textureBudget(BUDGET[Device.Desktop].textureBytes, { width: 1280, height: 800 });
     const large = textureBudget(BUDGET[Device.Desktop].textureBytes, { width: 7680, height: 4320 });
@@ -61,7 +77,7 @@ describe('device profile', () => {
   const MB = 1024 * 1024;
 
   it('a desktop keeps the values it had before phones got their own profile', () => {
-    expect(BUDGET[Device.Desktop]).toEqual({ textureBytes: 256 * MB, tileBytes: 384 * MB, pictureSide: 4096, resolution: 2, framesInFlight: 6, retainMs: 15_000, buildLanes: 4, canvasTiles: 320, offscreen: Offscreen.Resident, zoomPicture: ZoomPicture.Exact, readableWidth: 0, builtBytes: Infinity });
+    expect(BUDGET[Device.Desktop]).toEqual({ textureBytes: 256 * MB, tileBytes: 384 * MB, pictureSide: 4096, atlasSide: 8192, effectBytes: 256 * MB, resolution: 2, framesInFlight: 6, retainMs: 15_000, buildLanes: 4, canvasTiles: 320, offscreen: Offscreen.Resident, zoomPicture: ZoomPicture.Exact, readableWidth: 0, builtBytes: Infinity });
   });
 
   it('a desktop builds frames on one lane per spare core, up to four', () => {

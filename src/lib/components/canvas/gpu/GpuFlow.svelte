@@ -178,7 +178,7 @@
   import { frameSources } from '$lib/canvas/core/frame-sources';
   import { ChromeLayers, NO_OVERLAY, overlayOf } from '$lib/canvas/core/world-overlay';
   import { labelStepOf, labelZoomStep, strokeZoomStep } from '$lib/canvas/core/label-size';
-  import { settledZoom } from '$lib/canvas/core/settled-zoom';
+  import { Chrome, settledZoom, strokeZoomOf } from '$lib/canvas/core/settled-zoom';
   import { GESTURE_QUIET_MS } from '$lib/canvas/core/gesture-quiet';
   import { SIGHT_SLACK, grown, stillHolds, type Taken } from '$lib/canvas/core/sight';
   import { nodeHitRects } from '$lib/canvas/core/node-hit';
@@ -470,6 +470,8 @@
   const strokeHold = settledZoom(strokeZoomStep, () => performance.now(), untrack(() => view.zoom));
   let labelZoom = $state(labelZoomStep(untrack(() => view.zoom)));
   let strokeZoom = $state(strokeZoomStep(untrack(() => view.zoom)));
+  const liveStroke = $derived(strokeZoomStep(view.zoom));
+  const strokeOf = (on: boolean) => strokeZoomOf(on ? Chrome.Selected : Chrome.Resting, strokeZoom, liveStroke);
   $effect(() => {
     const zoom = view.zoom;
     const settle = () => {
@@ -538,7 +540,7 @@
       const on = savers.get(v.nodeId)?.breakpoint === v.breakpointId && selectedIds.has(t.id);
       const chrome = nodeChrome(t.id, on, layersSource.video, typedFreeText());
       const { x, y, w, h } = v.frame.box;
-      return [{ id: v.frame.id, x, y, width: w, height: h, ...portMarks({ ...t, connectable: false }), label: `${v.name} ${v.width}`, icon: text.icons.get(t.kind as NodeType) ?? null, tag: null, zoom: labelZoom, ring: on ? chrome.ring : NodeChrome.None, handles: false, ringColor: ringColour(), names: false, strokeZoom, addBeside: false, radius: cardRadiusOf(t.kind ?? ''), turn: undefined, layers: ChromeLayers.Whole }];
+      return [{ id: v.frame.id, x, y, width: w, height: h, ...portMarks({ ...t, connectable: false }), label: `${v.name} ${v.width}`, icon: text.icons.get(t.kind as NodeType) ?? null, tag: null, zoom: labelZoom, ring: on ? chrome.ring : NodeChrome.None, handles: false, ringColor: ringColour(), names: false, strokeZoom: strokeOf(on), addBeside: false, radius: cardRadiusOf(t.kind ?? ''), turn: undefined, layers: ChromeLayers.Whole }];
     });
     const tiles = placed.flatMap((t) => {
       const handed = handedOver(t) && !holdsDoc(t.kind ?? '');
@@ -553,7 +555,7 @@
       }
       const marks = portMarks(t);
       const own = layers === ChromeLayers.Whole ? { label: labelOf(t), icon: text.icons.get(t.kind as NodeType) ?? null, tag: tagHexOf(t.id), zoom: labelZoom } : { label: null, icon: null };
-      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, ringColor: ringColour(), names: on, strokeZoom, addBeside: addsBeside(t) && (on || hovered === t.id || addLinger === t.id), radius: cardRadiusOf(t.kind ?? ''), turn: turnOf(t), layers }];
+      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, ringColor: ringColour(), names: on, strokeZoom: strokeOf(on), addBeside: addsBeside(t) && (on || hovered === t.id || addLinger === t.id), radius: cardRadiusOf(t.kind ?? ''), turn: turnOf(t), layers }];
     });
     return [...tiles, ...views];
   });

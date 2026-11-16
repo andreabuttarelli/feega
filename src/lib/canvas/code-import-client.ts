@@ -16,7 +16,7 @@ export type RenderCondition = { scheme: 'light' | 'dark'; width: number };
 
 export type CaptureWait = { captureDelayMs?: number; routeDelayMs?: Record<string, number> };
 
-export type CodeTarget = ({ repo: string; app?: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean } & CaptureWait) | ({ folder: string; app?: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean } & CaptureWait) | ({ upload: string; app?: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean } & CaptureWait) | { storybook: string };
+export type CodeTarget = ({ repo: string; app?: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean; responsive?: 'views' | 'boards' } & CaptureWait) | ({ folder: string; app?: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean; responsive?: 'views' | 'boards' } & CaptureWait) | ({ upload: string; app?: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean; responsive?: 'views' | 'boards' } & CaptureWait) | { storybook: string };
 
 export type CodeAsk = { projectId: string; canvasId: string; target: CodeTarget; at: { x: number; y: number } };
 

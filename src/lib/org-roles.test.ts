@@ -4,6 +4,7 @@ import { assignableRoles, can, ORG_ROLES, OrgAction, OrgRoleName } from '$lib/or
 const MATRIX: Record<OrgAction, OrgRoleName[]> = {
   [OrgAction.View]: [OrgRoleName.Owner, OrgRoleName.Admin, OrgRoleName.Member, OrgRoleName.Viewer],
   [OrgAction.Edit]: [OrgRoleName.Owner, OrgRoleName.Admin, OrgRoleName.Member],
+  [OrgAction.ManageApiKeys]: [OrgRoleName.Owner, OrgRoleName.Admin, OrgRoleName.Member],
   [OrgAction.Invite]: [OrgRoleName.Owner, OrgRoleName.Admin],
   [OrgAction.ManageMembers]: [OrgRoleName.Owner, OrgRoleName.Admin],
   [OrgAction.Billing]: [OrgRoleName.Owner],

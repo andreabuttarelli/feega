@@ -42,12 +42,12 @@ async function imported(entry: CorpusEntry): Promise<ImportRun> {
   const common = { discovered: await discovered(entry), uses: null, fidelity: null, phases: { request: ms }, sandboxMs: ms };
 
   if (!res.ok) {
-    return { ...common, boot: { ok: false, failure: body.error ?? `http_${res.status}`, detail: body.detail ?? '' }, routes: [], components: null, variants: null, instances: null, tokens: null, bound: null };
+    return { ...common, boot: { ok: false, failure: body.error ?? `http_${res.status}`, detail: body.detail ?? '' }, routes: [], components: null, variants: null, instances: null, tokens: null, coverage: null, bound: null };
   }
 
   const landed = new Set<string>(body.pages ?? []);
   const routes = entry.routes.flatMap((route) => entry.conditions.map((c) => labelOf(route, c))).map((label) => ({ route: label, condition: label, ok: landed.has(label), ...(landed.has(label) ? {} : { failure: NOT_LANDED }) }));
-  return { ...common, boot: { ok: true, installMs: null, readyMs: null }, routes, components: body.components, variants: body.variants, instances: body.instances, tokens: body.design?.tokens ?? null, bound: body.design ?? null };
+  return { ...common, boot: { ok: true, installMs: null, readyMs: null }, routes, components: body.components, variants: body.variants, instances: body.instances, tokens: body.design?.tokens ?? null, coverage: body.design?.coverage ?? null, bound: body.design ?? null };
 }
 
 function spendRefusal(): string | null {

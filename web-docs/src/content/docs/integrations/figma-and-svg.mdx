@@ -19,6 +19,13 @@ Copy layers in Figma and paste on the canvas.
 - Component instances stay instances of one main component when the main is in the paste and the instance is untouched. An instance with overrides lands as a plain group that shows its own text, fills, hidden layers and swapped icons.
 - Every text is kept, however small its size or long its paragraph.
 - Layers keep their Figma names in the Layers panel.
+- Constraints (left, right, left and right, center, scale; top, bottom, top and bottom) on the children of a frame without auto layout come across, as do minimum and maximum sizes of children in auto layout.
+- Mask layers cut the layers above them, by alpha or by luminance, until the next mask. An outline mask is drawn as an alpha mask, and the notice says so when its shape has no fill.
+- Text keeps its vertical alignment, paragraph spacing and indent, and a gradient on part of a text.
+- Strokes keep their caps, joins and a dash pattern of any length. Per-side stroke weights are drawn at one weight and the notice lists them.
+- Hidden layers stay in the Layers panel, hidden, and take no room in an auto layout.
+- Image fills keep their crop, and tiled images keep their scale and rotation.
+- An inner shadow loses its spread, and the notice lists it.
 - A short notice says how many things were approximated. **Details** lists them grouped by kind, and the notice closes by itself.
 
 ### Small text and component instances

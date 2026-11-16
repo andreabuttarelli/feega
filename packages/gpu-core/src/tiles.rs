@@ -20,6 +20,10 @@ pub fn tiles_kept((w, h): (u32, u32), budget: u64) -> usize {
     let per_screen = (w as u64).div_ceil(TILE_PX as u64) * (h as u64).div_ceil(TILE_PX as u64);
     (per_screen * SCREENS_KEPT).min(budget / TILE_BYTES) as usize
 }
+
+pub fn tiles_kept_beside(screen: (u32, u32), budget: u64, held_elsewhere: u64) -> usize {
+    tiles_kept(screen, budget.saturating_sub(held_elsewhere))
+}
 const STEPS_PER_DOUBLING: f64 = 4.0;
 const STEPS_PER_LEVEL: i32 = 2;
 const LEVELS_PER_DOUBLING: f64 = 2.0;

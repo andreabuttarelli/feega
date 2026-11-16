@@ -37,6 +37,14 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 | Colours, fonts, radii, spacing | a tokens file (`@theme` for Tailwind, CSS variables otherwise); colour variables keep their names |
 | Images | `img` pointing at a file bundled in the project (`public/assets/` for React, `static/assets/` for Svelte, `assets/` for HTML) |
 | Vectors, polygons, stars | inline `svg` |
+| Fonts uploaded to your organisation | `@font-face` rules in a font stylesheet (`styles/fonts.css`, `src/fonts.css`, `src/lib/styles/fonts.css`) with the font files bundled next to the images; variable fonts keep their weight range |
+| Google fonts | a Google Fonts link with the weights, italics and variable axes the frame uses |
+| Width, slant and other variable axes, OpenType features | `font-variation-settings`, `font-feature-settings` |
+| Layer blend mode, per-fill blend mode | `mix-blend-mode`, `background-blend-mode` |
+| Radial, angular and diamond gradients | `radial-gradient` with its centre and circle size, `conic-gradient`, four quadrant gradients; several fills stack in order |
+| Strokes: inside, centred, outside, several | `border` for an inside stroke, `box-shadow` rings for centred and outside ones, `outline` for dashed ones |
+| Text drop shadow | `text-shadow` |
+| A plain rectangle or ellipse mask | `clip-path` |
 
 Class names come from layer names (`Feature card` becomes `FeatureCard` and `.feature-card`), and the same frame always gives the same files.
 
@@ -58,6 +66,7 @@ Position moves are written as `translate` (CSS variables `--tx`/`--ty` registere
 ## What does not map
 
 - Effects with no CSS equivalent (noise, displacement, chromatic aberration…) are left out and listed under **Not exported**. Drop shadow, inner shadow, layer blur and background blur are kept.
+- Blend modes CSS lacks (linear burn, linear dodge, vivid light, linear light, pin light, hard mix, subtract, divide, darker colour, lighter colour), mattes, mask stacks and masks that are feathered, rotated, inverted, expanded, subtracted or made from a picture or text are listed under **Not exported**. So are gradient strokes, per-side strokes that are not inside, a text inner shadow, a font installed only on your machine and Audio, Adjustment and Light layers.
 - Shaders, 3D, particles and video effects are not exported.
 - Animation of anything but position, scale, rotation, opacity and text colour (blur, skew, 3D rotation, fills, masks, effect parameters…) is listed under **Not exported**, as is animation on a whole component instance: animate the layers inside it.
 - Scroll-scrubbed and paused playback play on load instead.
@@ -80,6 +89,6 @@ The `export_code` MCP tool returns the same files as JSON, free and without AI:
 { "name": "Landing", "target": "react", "files": [{ "path": "src/components/Button.tsx", "content": "…" }], "assets": [{ "path": "public/assets/<assetId>.png", "ref": "/assets/<assetId>.png", "url": "https://…" }], "notes": [] }
 ```
 
-`feega motion code` downloads each `assets` entry to its `path`; `url` is a link that expires, so fetch it right away.
+`assets` holds the images and the font files of uploaded fonts. `feega motion code` downloads each `assets` entry to its `path`; `url` is a link that expires, so fetch it right away.
 
 The endpoint behind both is `GET /api/v1/motion/{nodeId}/code?target=react|html|svelte`.

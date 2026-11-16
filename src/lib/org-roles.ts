@@ -12,6 +12,7 @@ export type OrgRole = `${OrgRoleName}`;
 export enum OrgAction {
   View = 'view',
   Edit = 'edit',
+  ManageApiKeys = 'manage_api_keys',
   Invite = 'invite',
   ManageMembers = 'manage_members',
   Billing = 'billing',
@@ -24,6 +25,7 @@ const { Owner, Admin, Member, Viewer } = OrgRoleName;
 const PERMISSIONS: Record<OrgAction, readonly OrgRole[]> = {
   [OrgAction.View]: [Owner, Admin, Member, Viewer],
   [OrgAction.Edit]: [Owner, Admin, Member],
+  [OrgAction.ManageApiKeys]: [Owner, Admin, Member],
   [OrgAction.Invite]: [Owner, Admin],
   [OrgAction.ManageMembers]: [Owner, Admin],
   [OrgAction.Billing]: [Owner],
