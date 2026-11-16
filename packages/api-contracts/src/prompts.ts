@@ -34,6 +34,6 @@ export const ENHANCE_PROMPT = {
     changed: z.boolean().describe('False when the original came back untouched — `notes` says why'),
     notes: z.array(z.string()).describe('What was done, or why it was not')
   }),
-  failures: [{ error: 'credits_exhausted', status: 402 }],
+  failures: [{ error: 'credits_exhausted', status: 402 }, { error: 'billing_unavailable', status: 503 }],
   destructive: false
 } satisfies BrandEndpoint;
