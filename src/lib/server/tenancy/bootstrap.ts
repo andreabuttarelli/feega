@@ -1,4 +1,4 @@
-import { FREE_CREDITS } from '$lib/plans';
+import { FREE_CREDITS } from '$lib/credit-ladder';
 import { randomBytes } from 'node:crypto';
 import type { Db } from '$lib/server/db/client';
 import { createServiceRoleDb } from '$lib/server/db/client';

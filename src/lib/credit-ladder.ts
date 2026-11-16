@@ -6,6 +6,8 @@ export const CREDITS_PER_USD_SUBSCRIPTION_LIST = 100 * (1 + AI_MARKUP); // 120
 
 export const CREDITS_PER_USD_GRANT = 100;
 
+export const FREE_CREDITS = CREDITS_PER_USD_GRANT;
+
 export const MULTIPLIER_FLOOR = 4;
 export const CHAT_MULTIPLIER = 1.2;
 

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
   import { toc } from '$lib/stores/toc';
-  import { FREE_CREDITS } from '$lib/plans';
+  import { FREE_CREDITS } from '$lib/credit-ladder';
   import { PLAN, TOP_UPS } from '$lib/credit-ladder';
   import { formatCredits } from '$lib/components/credit-amount-format';
 
