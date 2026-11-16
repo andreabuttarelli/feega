@@ -614,6 +614,7 @@ impl WebCore {
 
     pub fn set_pixel_ratio(&mut self, ratio: f64) {
         self.tiles.set_pixel_ratio(ratio * self.scale);
+        self.compositor.set_pixel_ratio(ratio * self.scale);
     }
 
     pub fn set_tiles(&mut self, on: bool) {
@@ -874,14 +875,15 @@ impl WebCore {
     fn overlay_texture(&mut self) -> Result<Option<wgpu::Texture>, JsValue> {
         let size = (self.target.width(), self.target.height());
         let plan = self.compositor.overlay_at(&mut self.library, self.camera, size, self.limits);
-        if plan.screen.items.is_empty() {
+        let pinned = self.compositor.pinned_at(self.camera);
+        if plan.screen.items.is_empty() && pinned.is_empty() {
             return Ok(None);
         }
         let began = now_ms();
         let (list, _) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
         let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
         let texture = self.overlay_tex.take().filter(|t| t.width() == size.0 && t.height() == size.1).unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
-        self.engine.draw(&self.device, &self.queue, &list, &pictures, &texture.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
+        self.engine.draw_over(&self.device, &self.queue, &list, &pictures, &pinned, &texture.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
         self.count_bake(began);
         Ok(Some(texture))
     }

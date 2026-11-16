@@ -5,6 +5,36 @@ use vello::kurbo::Rect;
 
 const SIZE: Option<(f64, f64)> = Some((100.0, 50.0));
 
+const PINNED_RING: &str = r#"[{ "kind": "path", "clip": "ring", "contours": [[10, 10, 10, 10, 10, 10]], "nudge": [[0, 0, -3, 0, 0, -3]], "rule": "nonzero", "paint": { "kind": "solid", "color": [0, 0, 1, 1] }, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0] }]"#;
+
+fn pinned_on_screen(list: &gpu_core::display_list::DisplayList) -> Vec<(f64, f64)> {
+    let ring = list.items.iter().find_map(|i| match i { Item::Path(p) if p.clip == "ring" => Some(p), _ => None }).expect("the pinned ring");
+    let [a, b, c, d, e, f] = ring.look.matrix;
+    ring.contours[0].chunks_exact(2).map(|xy| (a * xy[0] + c * xy[1] + e, b * xy[0] + d * xy[1] + f)).collect()
+}
+
+#[test]
+fn a_pinned_overlay_keeps_its_screen_size_at_every_zoom_and_leaves_the_encoded_overlay_to_its_cache() {
+    for ratio in [1.0, 2.0] {
+        let mut w = World::new();
+        w.set_pixel_ratio(ratio);
+        w.set_overlay(OverlayPart::Selected, parse_overlay(PINNED_RING).unwrap());
+
+        for zoom in [0.25, 1.0, 3.0] {
+            let z = zoom * ratio;
+            let camera = [z, 0.0, 0.0, z, 7.0, 9.0];
+            assert!(w.overlay(camera, 640, 480).items.iter().all(|i| i.clip() != "ring"));
+            assert_eq!(w.pinned_at(camera).len(), 1);
+            for list in [w.screen(camera, 640, 480)] {
+                let at = pinned_on_screen(&list);
+                assert_eq!(at[0], (10.0 * z + 7.0, 10.0 * z + 9.0));
+                assert!((at[0].0 - at[1].0 - 3.0 * ratio).abs() < 1e-9, "zoom {zoom} ratio {ratio}: {at:?}");
+                assert!((at[0].1 - at[2].1 - 3.0 * ratio).abs() < 1e-9, "zoom {zoom} ratio {ratio}: {at:?}");
+            }
+        }
+    }
+}
+
 fn sized(_: &str) -> Option<(f64, f64)> {
     SIZE
 }

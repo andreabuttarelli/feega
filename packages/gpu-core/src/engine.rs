@@ -528,10 +528,17 @@ impl Engine {
     }
 
     pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures, target: &wgpu::TextureView) -> Result<Vec<Skipped>, EngineError> {
+        self.draw_over(device, queue, list, pictures, &[], target)
+    }
+
+    pub fn draw_over(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures, over: &[(std::rc::Rc<Scene>, crate::display_list::Affine)], target: &wgpu::TextureView) -> Result<Vec<Skipped>, EngineError> {
         let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, kept: Vec::new(), last: None, cache: &mut self.cache, scenes: &mut self.scenes, tally: &mut self.tally, atlas: self.atlas, sheet: &mut self.sheet, open: None, unsettled: Default::default(), effects: self.effects, effect_cache: &mut self.effect_cache, fingerprints: &mut self.fingerprints, frame_override: None };
         let layers = prepare(&mut gpu, list, pictures, self.blending)?;
         let mut scene = borrowed(gpu.scenes);
         let skipped = build_into(&mut scene, list, pictures, &layers);
+        for (drawn, at) in over {
+            scene.append(drawn, Some(Affine::new(*at)));
+        }
         let fullness = fullness(&scene);
         let drawn = gpu.render(self.drawing, &scene, base(list.background), target, (list.width, list.height));
         gpu.scenes.push(scene);

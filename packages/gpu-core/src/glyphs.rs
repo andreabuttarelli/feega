@@ -72,7 +72,7 @@ fn outlined(run: &GlyphsItem, source: &Source) -> Item {
             polylines(&path_of(&face.outline(*glyph as u32), to), tolerance)
         })
         .collect();
-    Item::Path(PathItem { clip: run.clip.clone(), contours, rule: FillRule::NonZero, paint: run.paint.clone(), within: None, look: run.look.clone() })
+    Item::Path(PathItem { clip: run.clip.clone(), contours, nudge: Vec::new(), rule: FillRule::NonZero, paint: run.paint.clone(), within: None, look: run.look.clone() })
 }
 
 fn outlined_items(items: &[Item], fonts: &Fonts, missing: &mut Vec<String>) -> Vec<Item> {

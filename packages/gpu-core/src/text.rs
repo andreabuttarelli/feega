@@ -352,7 +352,7 @@ fn paths(item: &TextItem, painted: Painted) -> Vec<Item> {
         .into_iter()
         .map(|ink| {
             let look = Look { opacity: item.look.opacity * ink.opacity, matrix: times(item.look.matrix, times(turn, ink.matrix)), blur: item.look.blur + ink.blur * item.turn.scale * placed, ..item.look.clone() };
-            Item::Path(PathItem { clip: item.clip.clone(), contours: ink.contours, rule: ink.rule, paint: ink.paint, within: None, look })
+            Item::Path(PathItem { clip: item.clip.clone(), contours: ink.contours, nudge: Vec::new(), rule: ink.rule, paint: ink.paint, within: None, look })
         })
         .collect()
 }
