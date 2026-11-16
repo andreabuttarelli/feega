@@ -1,6 +1,8 @@
 <script lang="ts">
   import { heldFrames } from '$lib/canvas/core/held-frames';
   import { baseNodeId, heldViews, viewAt, viewOf } from '$lib/canvas/breakpoint-views';
+  import { viewsAway } from '$lib/canvas/breakpoint-views-away';
+  import { traceSince, traceSinceInput } from '$lib/canvas/core/edit-trace';
   import { posterUploads } from '$lib/canvas/core/poster-upload';
   import { POSTER_DEBOUNCE_MS } from '$lib/motion/poster-capture';
   import { postPageAction } from '$lib/api/page-action';
@@ -1520,8 +1522,21 @@
     }
     return doc;
   };
-  const resolveViews = heldViews();
-  const bpViews = $derived(resolveViews(coreFrames, viewDocOf));
+  let viewsLanded = $state(0);
+  const viewsWorker = viewsAway(() => (typeof Worker === 'function' ? new Worker(new URL('../../../canvas/breakpoint-views.worker.ts', import.meta.url), { type: 'module' }) : null));
+  onDestroy(viewsWorker.stop);
+  const resolveViews = heldViews({ resolve: viewsWorker, landed: () => {
+      traceSinceInput('edit:views-landed');
+      viewsLanded++;
+    }
+  });
+  const bpViews = $derived.by(() => {
+    void viewsLanded;
+    const started = performance.now();
+    const views = resolveViews(coreFrames, viewDocOf);
+    traceSince('edit:views-main', started);
+    return views;
+  });
   const heldInGesture = $derived(heldFrames({ resizing, heldOnResize: (id) => frameChrome(kindOfNode(id)).resize === ResizePaint.Held, moving: [...overrides.keys()].filter((id) => !resizing.has(id)), shown: bpViews.map((v) => v.frame.id), base: baseNodeId }));
   const drawnFrames = $derived(coreFrames.map((f) => {
     const doc = liveOf(f.id)?.doc;

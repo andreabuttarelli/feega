@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { landingDoc } from '@feega/motion-core/motion/codegen/fixtures/landing';
 import { FrameKind } from '$lib/canvas/motion-node';
-import { baseNodeId, heldViews, VIEW_GAP, viewAt, viewId, viewOf, withoutViews } from './breakpoint-views';
+import { baseNodeId, heldViews, resolvedViewDoc, VIEW_GAP, viewAt, viewId, viewOf, withoutViews } from './breakpoint-views';
 
 const doc = { width: 1440, height: 900, tracks: [], breakpoints: [{ id: 'ph', name: 'Phone', width: 390 }, { id: 'tab', name: 'Tablet', width: 810 }] } as unknown as MotionDoc;
 const frame = { id: 'n1', kind: FrameKind.Frame, revision: 4, box: { x: 100, y: 50, w: 720, h: 450 } };
@@ -87,5 +87,63 @@ describe('a view tile id never reaches the network', () => {
     const views = heldViews()([frame], () => doc).map((v) => v.frame);
 
     expect(withoutViews([frame, ...views]).map((f) => f.id)).toEqual(['n1']);
+  });
+});
+
+describe('breakpoint views resolved off the main thread', () => {
+  const page = landingDoc();
+  const big = { ...frame, box: { x: 0, y: 0, w: 720, h: 2240 } };
+  const edited = (height: number): MotionDoc => ({ ...page, tracks: [...page.tracks] , height });
+
+  type Ask = { doc: MotionDoc; ids: string[]; answer: (docs: MotionDoc[]) => void };
+
+  const deferred = () => {
+    const asks: Ask[] = [];
+    let landed = 0;
+    const resolve = heldViews({
+      resolve: (doc, ids) => new Promise<MotionDoc[]>((answer) => asks.push({ doc, ids, answer })),
+      landed: () => landed++
+    });
+    return { resolve, asks, landedCount: () => landed };
+  };
+
+  const answer = (ask: Ask) => ask.answer(ask.ids.map((id) => resolvedViewDoc(ask.doc, id)));
+  const settle = () => new Promise((r) => setTimeout(r, 0));
+
+  it('keeps showing the previous views while an edit is resolving', () => {
+    const { resolve, asks } = deferred();
+    const first = resolve([big], () => page);
+    const second = resolve([big], () => edited(page.height + 10));
+
+    expect(asks).toHaveLength(1);
+    expect(second.map((v) => v.doc)).toEqual(first.map((v) => v.doc));
+  });
+
+  it('applies results in edit order and drops a stale one that lands late', async () => {
+    const { resolve, asks, landedCount } = deferred();
+    resolve([big], () => page);
+    const one = edited(page.height + 10);
+    const two = edited(page.height + 20);
+    resolve([big], () => one);
+    resolve([big], () => two);
+
+    answer(asks[1]);
+    await settle();
+    answer(asks[0]);
+    await settle();
+
+    expect(landedCount()).toBe(1);
+    expect(resolve([big], () => two).map((v) => v.doc)).toEqual(asks[1].ids.map((id) => resolvedViewDoc(two, id)));
+  });
+
+  it('shows the same views as resolving on the main thread', async () => {
+    const { resolve, asks } = deferred();
+    resolve([big], () => page);
+    const one = edited(page.height + 10);
+    resolve([big], () => one);
+    answer(asks[0]);
+    await settle();
+
+    expect(resolve([big], () => one)).toEqual(heldViews()([big], () => one));
   });
 });
