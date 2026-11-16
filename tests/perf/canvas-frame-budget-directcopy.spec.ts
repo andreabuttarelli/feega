@@ -93,6 +93,14 @@ test('direct zoom on the user canvas copy', async () => {
   const t = await page.evaluate((from) => (window as unknown as { __t: number[] }).__t.filter((x) => x >= from), startT);
   const gaps = t.slice(1).map((x, i) => x - t[i]).sort((a, b) => a - b);
   console.log(`frames fps=${Math.round((gaps.length * 1000) / (t.at(-1)! - t[0]))} p95=${gaps[Math.floor(gaps.length * 0.95)].toFixed(1)} worst=${gaps.at(-1)!.toFixed(0)} mean=${(gaps.reduce((a, b) => a + b, 0) / gaps.length).toFixed(2)} over50=${gaps.filter((g) => g > 50).length} over8=${gaps.filter((g) => g > 8.3).length} n=${gaps.length}`);
+  const core = await page.evaluate(() => {
+    const f = ((window as unknown as { __gpuCanvas?: { frames?: { ms: number; moving: boolean; bakes: number; bakeMs: number; plans: number; tiles: number; unsharp: number }[] } }).__gpuCanvas?.frames ?? []).filter((x) => x.moving);
+    const sorted = (k: 'ms' | 'bakeMs') => f.map((x) => x[k]).sort((a, b) => a - b);
+    const p = (a: number[], q: number) => +(a[Math.floor(a.length * q)] ?? 0).toFixed(2);
+    const per = (k: 'bakes' | 'plans' | 'tiles' | 'unsharp') => +(f.reduce((n, x) => n + x[k], 0) / Math.max(1, f.length)).toFixed(2);
+    return { n: f.length, ms50: p(sorted('ms'), 0.5), ms95: p(sorted('ms'), 0.95), msMax: p(sorted('ms'), 0.999), bake50: p(sorted('bakeMs'), 0.5), bake95: p(sorted('bakeMs'), 0.95), bakes: per('bakes'), plans: per('plans'), tiles: per('tiles'), unsharp: per('unsharp') };
+  });
+  console.log(`core ${JSON.stringify(core)}`);
   if (casting) {
     await cdp.send('Page.stopScreencast');
   }
