@@ -151,6 +151,7 @@ fn background(clip: &str, colour: crate::display_list::Rgba, frame: Rect, contou
     Item::Path(PathItem {
         clip: format!("frame:{clip}"),
         contours: vec![contour],
+        nudge: Vec::new(),
         rule: FillRule::NonZero,
         paint: Paint::Solid { color: colour },
         within: None,

@@ -332,6 +332,10 @@ impl WebGlCore {
         self.compositor.drop_group(key, &mut self.library);
     }
 
+    pub fn set_pixel_ratio(&mut self, ratio: f64) {
+        self.compositor.set_pixel_ratio(ratio);
+    }
+
     pub fn set_camera(&mut self, x: f64, y: f64, zoom: f64) {
         self.camera = Camera { x, y, zoom };
     }

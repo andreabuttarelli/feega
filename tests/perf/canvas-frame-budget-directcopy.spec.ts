@@ -52,6 +52,11 @@ test('direct zoom on the user canvas copy', async () => {
   await page.waitForSelector('[data-canvas-surface]', { timeout: 120_000 });
   await page.getByRole('button', { name: 'Reject all' }).click({ timeout: 5000 }).catch(() => {});
   await page.waitForTimeout(20_000);
+  if (process.env.PROBE_SELECT_ALL === '1') {
+    await page.mouse.click(CENTRE.x, CENTRE.y);
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.waitForTimeout(SETTLE_MS);
+  }
 
   const logged: string[] = [];
   page.on('console', (m) => m.text().startsWith('DBG') && logged.push(m.text()));

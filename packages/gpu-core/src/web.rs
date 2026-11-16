@@ -599,6 +599,7 @@ impl WebCore {
 
     pub fn set_pixel_ratio(&mut self, ratio: f64) {
         self.tiles.set_pixel_ratio(ratio);
+        self.compositor.set_pixel_ratio(ratio);
     }
 
     pub fn set_tiles(&mut self, on: bool) {

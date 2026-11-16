@@ -81,6 +81,10 @@ impl Compositor {
         }
     }
 
+    pub fn set_pixel_ratio(&mut self, ratio: f64) {
+        self.world.set_pixel_ratio(ratio);
+    }
+
     pub fn touch(&mut self, group: &str, library: &Library) {
         self.world.touch(group, library.size_of(group));
     }
