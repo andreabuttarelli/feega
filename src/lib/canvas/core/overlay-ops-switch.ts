@@ -1,7 +1,7 @@
 const PARAM = 'overlayOps';
 const ON = '1';
 const OFF = '0';
-const BY_DEFAULT = false;
+const BY_DEFAULT = true;
 
 export const OVERLAY_OPS_STORAGE_KEY = 'feega:overlayOps';
 

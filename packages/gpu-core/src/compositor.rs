@@ -1,6 +1,6 @@
 use vello::kurbo::{Affine as Matrix, Rect};
 
-use crate::display_list::{DisplayList, Item};
+use crate::display_list::{DisplayList, Item, Splice, UseItem};
 use crate::groups::{Library, Limits, Plan, Sweep};
 use crate::overlay_chunks::{ChunkOps, OverlayChunks};
 use crate::retained::{tiles, Camera, Damage, Lookup, Outcome, Quality, Raster, Retained, Step};
@@ -14,6 +14,17 @@ const TILE_DAMAGE_RECTS: usize = 256;
 pub fn render_tile(max_texture: u32) -> (u32, u32) {
     let side = max_texture.min(RENDER_TILE_PX);
     (side, side)
+}
+
+fn same_frame(a: &DisplayList, b: &DisplayList) -> bool {
+    a.width == b.width && a.height == b.height
+}
+
+fn splice_between(was: &[Item], now: &[Item]) -> Splice {
+    let head = was.iter().zip(now).take_while(|(a, b)| a == b).count();
+    let room = was.len().min(now.len()) - head;
+    let tail = was.iter().rev().zip(now.iter().rev()).take(room).take_while(|(a, b)| a == b).count();
+    Splice { head, tail, items: now[head..now.len() - tail].to_vec() }
 }
 
 pub trait Painter {
@@ -47,6 +58,7 @@ pub struct Compositor {
     tile_damage: Damage,
     planned: Planned,
     chunks: OverlayChunks,
+    overlays_sent: [Option<(DisplayList, UseItem)>; 3],
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
@@ -58,7 +70,7 @@ pub struct Planned {
 
 impl Compositor {
     pub fn new(width: u32, height: u32) -> Self {
-        Compositor { world: World::new(), retained: Retained::new(width, height), pending: false, tile_damage: Damage::none(), planned: Planned::default(), chunks: OverlayChunks::default() }
+        Compositor { world: World::new(), retained: Retained::new(width, height), pending: false, tile_damage: Damage::none(), planned: Planned::default(), chunks: OverlayChunks::default(), overlays_sent: [None, None, None] }
     }
 
     pub fn size(&self) -> (u32, u32) {
@@ -71,16 +83,19 @@ impl Compositor {
 
     pub fn set_overlay(&mut self, part: OverlayPart, items: Vec<Item>, library: &mut Library) {
         self.world.set_overlay(part, items);
-        match self.world.overlay_group(part) {
-            Some((list, placement)) => {
-                library.put_group(part.group(), &list);
-                self.world.place_overlay(part, Some(placement));
-            }
-            None => {
-                library.drop_group(part.group());
-                self.world.place_overlay(part, None);
-            }
+        let next = self.world.overlay_group(part);
+        let sent = std::mem::replace(&mut self.overlays_sent[part.index()], next.clone());
+        let Some((list, placement)) = next else {
+            library.drop_group(part.group());
+            self.world.place_overlay(part, None);
+            return;
+        };
+
+        let patched = sent.filter(|(was, at)| same_frame(was, &list) && at.matrix == placement.matrix).is_some_and(|(was, _)| library.patch_group(part.group(), part.group(), &splice_between(&was.items, &list.items)));
+        if !patched {
+            library.put_group(part.group(), &list);
         }
+        self.world.place_overlay(part, Some(placement));
     }
 
     pub fn overlay_chunks(&mut self, ops: ChunkOps, library: &mut Library) {

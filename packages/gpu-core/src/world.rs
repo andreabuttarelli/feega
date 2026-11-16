@@ -53,7 +53,7 @@ impl OverlayPart {
         }
     }
 
-    fn index(self) -> usize {
+    pub(crate) fn index(self) -> usize {
         self as usize
     }
 }
