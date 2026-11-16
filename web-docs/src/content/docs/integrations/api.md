@@ -7,6 +7,8 @@ sidebar:
 
 Everything the [CLI](/integrations/cli/) and the [MCP server](/integrations/mcp/) do goes through `/api/v1` on the app (`https://feega.app`, or your own instance). Send `Authorization: Bearer <token>`: a session token from `feega login` or a `feega_` API key.
 
+A key acts with its owner's current role: only owners, admins and members can create one, a key whose owner is demoted to viewer can read but not write, and a key whose owner leaves the organization stops working.
+
 The surface changes with the app. Prefer the MCP tools or the CLI; the routes below are the stable entry points they use.
 
 ## Read and change a canvas

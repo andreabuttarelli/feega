@@ -43,7 +43,7 @@ async function resolveWith(row: {
     env: { PUBLIC_SUPABASE_URL: 'https://x.supabase.co', PUBLIC_SUPABASE_ANON_KEY: 'anon-key' }
   }));
   vi.doMock('@supabase/supabase-js', () => ({
-    createClient: () => createTestSupabase({ api_keys: rows }).client
+    createClient: () => createTestSupabase({ api_keys: rows, orgs_members: [{ org_id: row.org_id, user_id: 'user-1', role: 'member' }] }).client
   }));
 
   const { resolveOrgCaller } = await import('./auth');

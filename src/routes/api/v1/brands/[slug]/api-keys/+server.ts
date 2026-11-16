@@ -1,5 +1,8 @@
 import { json } from '@sveltejs/kit';
 import { authenticate, loadBrandForUser, generateApiKey, checkApiKeyBrandAccess } from '$lib/server/cli-auth';
+import { can, OrgAction } from '$lib/org-roles';
+import { memberRole } from '$lib/server/repos/orgs';
+import type { Db } from '$lib/server/db/client';
 import type { RequestHandler } from './$types';
 
 /** GET — list API keys for the brand (never returns raw keys) */
@@ -40,6 +43,11 @@ export const POST: RequestHandler = async ({ request, params }) => {
 
   const { brand, error: brandError } = await loadBrandForUser(auth.supabase, params.slug, auth.apiKey);
   if (brandError) return brandError;
+
+  const role = await memberRole(auth.supabase as unknown as Db, { orgId: brand.org_id, userId: auth.user.id });
+  if (!role || !can(role, OrgAction.ManageApiKeys)) {
+    return json({ error: 'Your role cannot create API keys' }, { status: 403 });
+  }
 
   const body = await request.json().catch(() => ({}));
   const name: string = (body.name || '').trim() || 'API Key';
