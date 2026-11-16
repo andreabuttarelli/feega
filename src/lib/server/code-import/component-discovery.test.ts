@@ -344,7 +344,8 @@ describe('cellsOf', () => {
     axes: Object.fromEntries(Object.entries(axes).map(([k, values]) => [k, { values, default: values[0], evidence: [AxisSource.Union] }])),
     texts: [],
     states: [],
-    unresolved: []
+    unresolved: [],
+    serverOnly: false
   });
 
   it('il prodotto cartesiano entro 64 celle', () => {
