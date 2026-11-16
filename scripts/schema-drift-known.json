@@ -160,7 +160,6 @@
 		"brand_memory": "legacy old-product code path, fails soft (empty read); delete with its code: src/lib/server/brand-memory.ts:187",
 		"brand_social_handles": "legacy old-product code path, fails soft (empty read); delete with its code: src/lib/server/scrapecreators.ts:913",
 		"brands.content_prefs": "legacy old-product code path, fails soft (empty read); delete with its code: src/lib/server/brand-design-doc.ts:526",
-		"brands.plan": "legacy old-product code path, fails soft (empty read); delete with its code: src/lib/server/ai-log.ts:72",
 		"brands.target_platforms": "legacy old-product code path, fails soft (empty read); delete with its code: src/lib/server/brand-design-doc.ts:526",
 		"brands.timezone": "legacy old-product code path, fails soft (empty read); delete with its code: src/lib/server/media-generate.ts:690",
 		"competitors": "legacy old-product code path, fails soft (empty read); delete with its code: src/lib/server/brand-design-doc.ts:543",

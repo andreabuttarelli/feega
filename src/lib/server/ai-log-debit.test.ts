@@ -1,14 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * `logAiCall` scriveva `ai_calls.cost_usd` e non toccava mai `credit_ledger`: un'org che aveva
- * COMPRATO crediti restava misurata contro `ai_calls` sommato, mai contro il saldo che aveva
- * pagato — un debito mai scritto, quindi un consumo mai visto dal saldo. Qui si prova che un
- * insert riuscito e prezzato scrive ANCHE un debito, agganciato alla riga con `ai_call_id`.
- */
-
 const aiCallsRows: Record<string, unknown>[] = [];
 const ledgerRows: Record<string, unknown>[] = [];
+const failures = { next: 0, code: undefined as string | undefined };
+const swallowed: string[] = [];
+
+vi.mock('./swallow', () => ({ swallow: (reason: string) => void swallowed.push(reason) }));
 
 vi.mock('./supabase-admin', () => ({
 	createAdminClient: () => ({
@@ -18,23 +15,23 @@ vi.mock('./supabase-admin', () => ({
 					insert: (row: Record<string, unknown>) => ({
 						select: () => ({
 							single: async () => {
-								const id = `call-${aiCallsRows.length + 1}`;
-								aiCallsRows.push({ ...row, id });
-								return { data: { id }, error: null };
+								if (failures.next > 0) {
+									failures.next -= 1;
+									return { data: null, error: { message: 'connection reset', code: failures.code } };
+								}
+								if (aiCallsRows.some((r) => r.id === row.id)) {
+									return { data: null, error: { message: 'duplicate key value violates unique constraint "ai_calls_pkey"', code: '23505' } };
+								}
+								aiCallsRows.push(row);
+								const credits = Number(row.billed_credits ?? 0);
+								if (credits > 0) ledgerRows.push({ org_id: row.org_id, kind: 'debit', source: 'ai_usage', amount: Math.ceil(credits), ai_call_id: row.id });
+								return { data: { id: row.id }, error: null };
 							}
 						})
 					})
 				};
 			}
-			if (table === 'credit_ledger') {
-				return {
-					insert: async (row: Record<string, unknown>) => {
-						ledgerRows.push(row);
-						return { error: null };
-					}
-				};
-			}
-			throw new Error(`unexpected table ${table}`);
+			throw new Error(`the app writes ${table} itself: the debit belongs to the ai_calls insert`);
 		}
 	})
 }));
@@ -52,10 +49,64 @@ async function settled(): Promise<void> {
 beforeEach(() => {
 	aiCallsRows.length = 0;
 	ledgerRows.length = 0;
+	swallowed.length = 0;
+	failures.next = 0;
+	failures.code = undefined;
 });
 
-describe('logAiCall debita credit_ledger per una chiamata prezzata', () => {
-	it('scrive un debit agganciato con ai_call_id, sull\'org della riga', async () => {
+describe('a usage row is written until it lands, once', () => {
+	it('carries its own id, so the database can tell a retry from a second call', async () => {
+		logAiCall({ label: 'chat', provider: 'llm', ms: 5, ok: true, flatCostUsd: 0.01, orgId: 'org-1' });
+
+		await settled();
+		expect(aiCallsRows[0].id).toMatch(/^[0-9a-f-]{36}$/);
+	});
+
+	it('a failed insert is retried with the same id until it lands', async () => {
+		failures.next = 2;
+		logAiCall({ label: 'chat', provider: 'llm', ms: 5, ok: true, flatCostUsd: 0.01, orgId: 'org-1' });
+
+		await vi.waitFor(() => expect(aiCallsRows).toHaveLength(1), { timeout: 5000 });
+		expect(ledgerRows).toHaveLength(1);
+		expect(swallowed).toEqual([]);
+	});
+
+	it('a row that never lands is reported, with the credits it leaves unbilled', async () => {
+		failures.next = 99;
+		logAiCall({ label: 'chat', provider: 'llm', ms: 5, ok: true, flatCostUsd: 0.01, orgId: 'org-1' });
+
+		await vi.waitFor(() => expect(swallowed).toHaveLength(1), { timeout: 5000 });
+		expect(swallowed[0]).toMatch(/unbilled/);
+		expect(aiCallsRows).toHaveLength(0);
+	});
+
+	it('a retry answered "already there" counts as landed, not as a second charge', async () => {
+		failures.next = 1;
+		failures.code = '23505';
+		logAiCall({ label: 'chat', provider: 'llm', ms: 5, ok: true, flatCostUsd: 0.01, orgId: 'org-1' });
+
+		await new Promise((r) => setTimeout(r, 50));
+		expect(swallowed).toEqual([]);
+		expect(ledgerRows.length).toBeLessThanOrEqual(1);
+	});
+
+	it('a row with no org to bill is reported, not dropped in silence', async () => {
+		logAiCall({ label: 'chat', provider: 'llm', ms: 5, ok: true, flatCostUsd: 0.01 });
+
+		await vi.waitFor(() => expect(swallowed).toHaveLength(1));
+		expect(swallowed[0]).toMatch(/no org/);
+	});
+
+	it('a render settles the hold it names', async () => {
+		logAiCall({ label: RENDER_CALL_LABEL, provider: 'vercel-sandbox', ms: 900, ok: true, flatCostUsd: 0.02, orgId: 'org-1', creditCap: 1000, holdKey: 'motion render hold r1' });
+
+		await settled();
+		expect(aiCallsRows[0].hold_key).toBe('motion render hold r1');
+	});
+});
+
+describe('a priced call is debited by its own row', () => {
+	it('the debit hangs off the row, on the row\'s org', async () => {
 		withBrandContext('brand-1', () => {
 			logAiCall({
 				label: 'renderImage',

@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { gatewayRate } from '$lib/server/openrouter-models';
 import { createAdminClient } from '$lib/server/supabase-admin';
@@ -6,6 +6,8 @@ import { GEMINI_FLASH, geminiFlash, isGeminiFlashId, NANO_BANANA_PRO, isNanoBana
 import { AI_MARKUP, billedCreditsFor, CHAT_MULTIPLIER } from '$lib/credit-ladder';
 import { RENDER_CALL_LABEL, RENDER_MULTIPLIER } from '$lib/motion/render-quote';
 import type { Database } from '$lib/database.types';
+import { runInBackground } from '$lib/server/background-work';
+import { swallow } from '$lib/server/swallow';
 
 type AiCallInsert = Database['public']['Tables']['ai_calls']['Insert'];
 
@@ -69,8 +71,8 @@ async function resolveBrandPlanAndOrgId(brandId: string): Promise<{ plan: string
   if (cachedPlan !== undefined && cachedOrgId !== undefined) return { plan: cachedPlan, orgId: cachedOrgId };
   try {
     const admin = createAdminClient();
-    const { data } = await admin.from('brands').select('plan, org_id').eq('id', brandId).maybeSingle();
-    const plan = (data?.plan as string | null | undefined) ?? null;
+    const { data } = await admin.from('brands').select('org_id').eq('id', brandId).maybeSingle();
+    const plan = null;
     const orgId = (data?.org_id as string | null | undefined) ?? null;
     rememberBrandPlan(brandId, plan);
     orgIdCache.set(brandId, { orgId, at: Date.now() });
@@ -279,6 +281,7 @@ export type AiCallLog = {
   agentKey?: string | null;
   projectId?: string | null;
   uncensored?: boolean;
+  holdKey?: string;
 };
 
 // USD per 1M tokens. cachedTokens are a SUBSET of inputTokens, billed at the cache rate.
@@ -470,6 +473,31 @@ async function resolveOrgId(entry: AiCallLog, brandId: string | null): Promise<s
   return (await resolveBrandPlanAndOrgId(brandId)).orgId;
 }
 
+const WRITE_ATTEMPTS = 4;
+const WRITE_BACKOFF_MS = 200;
+const ALREADY_WRITTEN = '23505';
+
+async function insertUsage(admin: ReturnType<typeof createAdminClient>, row: AiCallInsert): Promise<string | null> {
+  try {
+    const { error } = await admin.from('ai_calls').insert(row).select('id').single();
+    return !error || error.code === ALREADY_WRITTEN ? null : error.message;
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+}
+
+async function writeUsage(admin: ReturnType<typeof createAdminClient>, row: AiCallInsert): Promise<void> {
+  let failure: string | null = null;
+  for (let attempt = 1; attempt <= WRITE_ATTEMPTS; attempt++) {
+    failure = await insertUsage(admin, row);
+    if (!failure) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, WRITE_BACKOFF_MS * attempt));
+  }
+  swallow(`ai-log: usage row ${row.id} for "${row.operation}" never landed, ${row.billed_credits ?? 0} credits unbilled on org ${row.org_id}`, new Error(failure ?? 'insert failed'));
+}
+
 export function logAiCall(entry: AiCallLog): void {
   try {
     // La fattura vera del gateway, se questo turno ne ha lasciata una. Si ritira QUI, sincrono:
@@ -492,12 +520,10 @@ export function logAiCall(entry: AiCallLog): void {
     // Letti QUI, sincroni, come il brand: dopo il primo await lo scope è di chi ha aspettato.
     const operation = operationTag(entry);
     const status = statusFor(entry);
-    void (async () => {
+    runInBackground(async () => {
       const orgId = await resolveOrgId(entry, brandId);
       if (!orgId) {
-        console.error(
-          `[ai-log] no org_id resolved for operation "${operation}" (brandId=${brandId ?? 'null'}) — row NOT written, cost is unbilled and invisible.`
-        );
+        swallow(`ai-log: no org to bill for "${operation}" (brandId=${brandId ?? 'null'}), usage unbilled`, new Error('no org_id'));
         return;
       }
       const plan =
@@ -506,8 +532,6 @@ export function logAiCall(entry: AiCallLog): void {
           : brandId
             ? (await resolveBrandPlanAndOrgId(brandId)).plan
             : null;
-      // Il listino serve PRIMA di prezzare, e solo per le righe che possono averne bisogno: la
-      // prima chiamata del processo lo carica, le altre lo trovano in memoria.
       if (entry.provider === 'llm' && entry.flatCostUsd == null) {
         const { ensureGatewayModels } = await import('$lib/server/openrouter-models');
         await ensureGatewayModels();
@@ -515,6 +539,7 @@ export function logAiCall(entry: AiCallLog): void {
       const costUsd = computeCostUsd(entry, plan);
       const billedCredits = billedToUser(entry) && costUsd != null && costUsd > 0 ? creditsOf(entry, costUsd) : null;
       const row: AiCallInsert = {
+        id: randomUUID(),
         org_id: orgId,
         brand_id: brandId,
         project_id: entry.projectId ?? null,
@@ -537,31 +562,11 @@ export function logAiCall(entry: AiCallLog): void {
         agent_key: entry.agentKey ?? null,
         thread_id: entry.threadId ?? null,
         node_id: nodeId,
-        uncensored: entry.uncensored ?? false
+        uncensored: entry.uncensored ?? false,
+        ...(entry.holdKey ? { hold_key: entry.holdKey } : {})
       };
-      // Tipizzata contro AiCallInsert (generato da database.types.ts): una colonna sbagliata qui
-      // è un errore di compilazione, non più un console.warn scoperto in produzione.
-      const { data: inserted, error } = await admin.from('ai_calls').insert(row).select('id').single();
-      if (error) {
-        console.error(`[ai-log] insert failed for operation "${operation}":`, error.message, row);
-        return;
-      }
-      // Il debito è qui, non altrove: OGNI generazione passa da logAiCall, quindi questo è l'unico
-      // posto che deve addebitare — due punti che scrivono `credit_ledger` per la stessa spesa
-      // divergerebbero al primo cambio (CLAUDE.md, "scattered conditions").
-      if (billedCredits && billedCredits > 0) {
-        const { error: ledgerError } = await admin.from('credit_ledger').insert({
-          org_id: orgId,
-          kind: 'debit',
-          source: 'ai_usage',
-          amount: billedCredits,
-          ai_call_id: (inserted as { id: string }).id
-        });
-        if (ledgerError) {
-          console.error(`[ai-log] credit_ledger debit failed for operation "${operation}":`, ledgerError.message);
-        }
-      }
-    })();
+      await writeUsage(admin, row);
+    }, 'ai-log');
   } catch {
     // no admin client (missing env) — observability is optional, AI keeps working
   }
