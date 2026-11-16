@@ -16,7 +16,9 @@ What is read now:
 - `textAlignVertical`, `paragraphSpacing`, `paragraphIndent` (px in Figma, em in
   the doc), and gradient fills on a text run;
 - `strokeCap`, `strokeJoin`, `miterLimit`, dash patterns longer than two values;
-- image fills: a stretched fill with a crop transform becomes a crop window,
+- image fills: a stretched fill with a crop transform becomes a crop window
+  (the transform is read as node space to image space; Figma's docs do not
+  confirm the direction),
   a tiled fill keeps `scale` and `rotation`;
 - `visible: false` keeps the layer, hidden. The doc already skips hidden clips
   in auto layout and lets an instance override `hidden`. Hidden top-level nodes
@@ -27,8 +29,9 @@ inner shadow spread, stroke caps that are arrows, an outline mask without a
 fill, a rotated image crop.
 
 Left alone on purpose:
-- the layer blur halving is right: the doc blur radius is a sigma
-  (`effects/registry.ts`), and Figma's radius is twice the sigma;
+- the layer blur halving is unchanged behaviour. The doc blur radius is a sigma
+  (`effects/registry.ts`); that Figma's radius is twice the sigma is not
+  confirmed by Figma's documentation;
 - a child that hugs: an auto layout child already hugs through its own
   sizing; a shape or a frame without auto layout has nothing to hug.
 
