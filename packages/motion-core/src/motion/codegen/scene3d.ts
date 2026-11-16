@@ -134,6 +134,10 @@ export function sceneOf(clip: MotionClip, input: SceneInput): SceneMade | null {
   if (input.camera && clip.space === Space.World) {
     input.notes.add(`${input.label}: the video camera does not move this 3D layer in code; it keeps its own camera.`);
   }
+  const backdrop = BACKDROP[props.backdrop] ?? null;
+  if (backdrop) {
+    input.notes.add(`${input.label}: the canvas paints this layer's background over the whole frame; in code it fills only the layer box.`);
+  }
   const spec: SceneSpec = {
     src: model ? input.asset(props.assetId!) : null,
     geometry: model ? null : (GEOMETRY[props.shape ?? 'cube'] ?? GEOMETRY.cube),
@@ -147,5 +151,5 @@ export function sceneOf(clip: MotionClip, input: SceneInput): SceneMade | null {
     ...channelsOf(clip, props, input),
     rig: RIG
   };
-  return { spec, backdrop: BACKDROP[props.backdrop] ?? null };
+  return { spec, backdrop };
 }

@@ -7,6 +7,8 @@ import { CodeTarget, exportCode, type CodeExport } from './index';
 import { RIG } from './scene3d';
 import { MODEL_ASSET, MODEL_URL, SCENE_ASSETS, sceneDoc } from './fixtures/scene3d';
 
+const LIB = '$lib';
+
 const file = (out: CodeExport, path: string) => {
   const found = out.files.find((f) => f.path === path);
   if (!found) {
@@ -82,8 +84,8 @@ describe('a frame with a 3D model', () => {
     const out = svelte();
 
     expect(file(out, 'src/routes/+page.svelte')).toContain('use:scene3d={toyModelScene}');
-    expect(file(out, 'src/routes/+page.svelte')).toContain("import { scene3d } from '$lib/scene3d';");
-    expect(file(out, 'src/routes/+page.svelte')).toContain("import { toyModelScene } from '$lib/scenes';");
+    expect(file(out, 'src/routes/+page.svelte')).toContain(`import { scene3d } from '${LIB}/scene3d';`);
+    expect(file(out, 'src/routes/+page.svelte')).toContain(`import { toyModelScene } from '${LIB}/scenes';`);
     expect(JSON.parse(file(out, 'package.json')).dependencies.three).toBe('0.181.2');
   });
 
@@ -157,6 +159,14 @@ describe('what the canvas shows that code cannot', () => {
     const out = exportCode(sceneDoc([{ id: 'word', component: 'Text3D', at: { left: 0, top: 0, width: 200, height: 100 }, props: {} }]), { name: 'Toy', assets: SCENE_ASSETS });
 
     expect(out.notes).toContain('word: Text3D layers have no static HTML equivalent and were left out.');
+  });
+
+  it('says so when the layer has a background', () => {
+    const doc = sceneDoc();
+    doc.tracks[0].clips.forEach((c) => c.component === 'Model3D' && (c.props.backdrop = 'dark'));
+    const out = exportCode(doc, { name: 'Toy', assets: SCENE_ASSETS });
+
+    expect(out.notes).toContain("Toy model: the canvas paints this layer's background over the whole frame; in code it fills only the layer box.");
   });
 
   it('says so when no model is picked', () => {

@@ -71,10 +71,12 @@ const styleTag = (root: ElementNode, ctx: Ctx) => {
 };
 
 const INVIEW_MODULE = '$lib/inview';
+const SCENE_MODULE = '$lib/scene3d';
+const SCENES_MODULE = '$lib/scenes';
 
 const sceneImports = (root: ElementNode) => {
   const scenes = scenesIn(root);
-  return scenes.length ? ["  import { scene3d } from '$lib/scene3d';", `  import { ${scenes.map((s) => s.name).sort().join(', ')} } from '$lib/scenes';`] : [];
+  return scenes.length ? [`  import { scene3d } from '${SCENE_MODULE}';`, `  import { ${scenes.map((s) => s.name).sort().join(', ')} } from '${SCENES_MODULE}';`] : [];
 };
 
 const imports = (uses: readonly string[], from: string, root: ElementNode) => [...uses.map((u) => `  import ${u} from '${from}${u}.svelte';`), ...(animatedNodes(root).some(inView) ? [`  import { inview } from '${INVIEW_MODULE}';`] : []), ...sceneImports(root)];
