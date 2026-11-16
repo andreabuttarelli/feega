@@ -126,3 +126,29 @@ Reading:
   main: a picture registered out of order with the scene, likely the async `createImageBitmap`
   hop.
 - Edit main busy barely moves: edits are dominated by build and staging, which stay on main.
+
+## Round 2: ordered pictures, tick pacing, pan-y probe
+
+Changes:
+- **Ordered pictures:** `picture` posts a `PictureSlot` synchronously. The worker queues every
+  scene message behind an open slot until that bitmap lands, so the scene never references a
+  picture before its upload. That is the main-thread ordering.
+- **Tick pacing:** the main pacer's `Tick` renders at once (MessageChannel); camera and pending
+  cache still ride the worker rAF.
+- **Probe:** it now carries y and the worker rAF gap.
+
+Results (raw in `~/Documents/feega-videos/perf/core-worker/round2/`):
+- **Panic: not fixed.** It still fires in worker mode, and in main mode at 2200×1100. Ordering
+  was not the cause. The next suspect is a picture texture released (`release` →
+  `unregister_texture` + `destroy`) while a retained or tile encoding still holds its id.
+- **Flicker: worse.** Worker dips were 0,0,0,1,0,0,1,0,1 (main all 0). Dip frames are saved
+  (`dip-worker-*`). They show the GPU frame and the DOM labels at slightly different zooms: the
+  worker commits its canvas independently of the main frame, so the screencast pairs mismatched
+  cameras. That reading is not yet confirmed.
+- **Display rate:** the worker rAF median gap is 15–22 ms, so it does not follow the display.
+  Main rAF capped is 60 Hz in this bench browser; 120 Hz was not observed.
+- **Wide window (2200×1100 @2x):** broken in both modes. Main hit
+  `IntermediateTexture TooLarge 4100×1608 > 4096`, and many configs presented 0 frames. That is a
+  gpu-core limit unrelated to the worker.
+- **Long tasks:** the worker keeps 0 long tasks during pan at 1440×900. Zoom latency p50 is
+  comparable (8–12 ms vs 6–10 ms).

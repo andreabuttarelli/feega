@@ -21,8 +21,8 @@ enum Gesture {
 }
 
 type Place = { projectId: string; canvasId: string };
-type Probe = { x: number; zoom: number; at: number };
-type Seen = { raf: number[]; presented: number[]; latency: number[]; longMs: number; longCount: number };
+type Probe = { x: number; y: number; zoom: number; at: number; raf: number };
+type Seen = { raf: number[]; presented: number[]; latency: number[]; workerRaf: number[]; longMs: number; longCount: number };
 
 const PORT = Number(process.env.BENCH_PORT ?? 5288);
 const OUT = process.env.BENCH_OUT ?? 'perf-results/core-worker';
@@ -36,8 +36,9 @@ const MODES = (process.env.BENCH_MODES?.split(',') ?? Object.values(Mode)) as Mo
 const CPUS = (process.env.BENCH_CPUS ?? '1,4').split(',').map(Number);
 const CAPS = (process.env.BENCH_CAPS ?? 'uncapped,capped').split(',');
 const FLICKER_RUNS = Number(process.env.BENCH_FLICKER_RUNS ?? 9);
-const VIEWPORT = { width: 1440, height: 900 };
-const CENTRE = { x: 720, y: 450 };
+const [VIEW_W, VIEW_H] = (process.env.BENCH_VIEWPORT ?? '1440x900').split('x').map(Number);
+const VIEWPORT = { width: VIEW_W, height: VIEW_H };
+const CENTRE = { x: VIEW_W / 2, y: VIEW_H / 2 };
 const CTRL = 2;
 const SETTLE_MS = 20_000;
 const QUIET_MS = 1500;
@@ -70,9 +71,9 @@ function summary(gaps: number[]) {
 }
 
 function arm() {
-  const w = window as unknown as { __bench: { raf: number[]; probes: Probe[]; inputs: number[]; long: number[]; counting: boolean }; __coreProbe: (x: number, zoom: number, at: number) => void };
+  const w = window as unknown as { __bench: { raf: number[]; probes: Probe[]; inputs: number[]; long: number[]; counting: boolean }; __coreProbe: (x: number, y: number, zoom: number, at: number, raf: number) => void };
   w.__bench = { raf: [], probes: [], inputs: [], long: [], counting: false };
-  w.__coreProbe = (x, zoom, done) => w.__bench.counting && w.__bench.probes.push({ x, zoom, at: done });
+  w.__coreProbe = (x, y, zoom, done, raf) => w.__bench.counting && w.__bench.probes.push({ x, y, zoom, at: done, raf });
   const tick = (t: number) => (w.__bench.counting && w.__bench.raf.push(t), requestAnimationFrame(tick));
   requestAnimationFrame(tick);
   addEventListener('wheel', (e) => w.__bench.counting && w.__bench.inputs.push(e.timeStamp), { capture: true, passive: true });
@@ -82,7 +83,7 @@ function arm() {
 function latencies(inputs: number[], probes: Probe[]): number[] {
   return inputs.flatMap((input) => {
     const before = probes.filter((p) => p.at <= input).at(-1);
-    const after = probes.find((p) => p.at > input && (!before || p.x !== before.x || p.zoom !== before.zoom));
+    const after = probes.find((p) => p.at > input && (!before || p.x !== before.x || p.y !== before.y || p.zoom !== before.zoom));
     return after ? [after.at - input] : [];
   });
 }
@@ -135,7 +136,7 @@ async function gesture(page: Page, cdp: CDPSession, which: Gesture): Promise<See
   });
   const active = (t: number) => got.inputs.length > 0 && t >= got.inputs[0] && t <= got.inputs.at(-1)! + 100;
   const gapsOf = (ts: number[]) => ts.filter(active).flatMap((t, i, all) => (i ? [t - all[i - 1]] : []));
-  return { raf: gapsOf(got.raf), presented: gapsOf(got.probes.map((p) => p.at)), latency: latencies(got.inputs, got.probes), longMs: round(got.long.reduce((a, b) => a + b, 0)), longCount: got.long.length };
+  return { raf: gapsOf(got.raf), presented: gapsOf(got.probes.map((p) => p.at)), latency: latencies(got.inputs, got.probes), workerRaf: got.probes.map((p) => p.raf).filter((g) => g > 0), longMs: round(got.long.reduce((a, b) => a + b, 0)), longCount: got.long.length };
 }
 
 async function taskSeconds(cdp: CDPSession): Promise<number> {
@@ -183,7 +184,7 @@ async function cells(jpeg: Buffer): Promise<number[]> {
 
 const vanished = (a: number[], b: number[], c: number[]) => b.some((v, i) => Math.min(a[i], c[i]) > 0.3 && v < 0.4 * Math.min(a[i], c[i]));
 
-async function flickerDips(page: Page, cdp: CDPSession): Promise<number> {
+async function flickerDips(page: Page, cdp: CDPSession, tag: string): Promise<number> {
   await page.keyboard.press('Shift+Digit1');
   await page.waitForTimeout(QUIET_MS);
   const frames: Buffer[] = [];
@@ -198,7 +199,9 @@ async function flickerDips(page: Page, cdp: CDPSession): Promise<number> {
   await cdp.send('Page.stopScreencast');
   cdp.off('Page.screencastFrame', onFrame);
   const grid = await Promise.all(frames.map(cells));
-  return grid.filter((g, i) => i > 0 && i < grid.length - 1 && vanished(grid[i - 1], g, grid[i + 1])).length;
+  const dips = grid.flatMap((g, i) => (i > 0 && i < grid.length - 1 && vanished(grid[i - 1], g, grid[i + 1]) ? [i] : []));
+  dips.forEach((i) => [i - 1, i, i + 1].forEach((j) => writeFileSync(join(OUT, `dip-${tag}-${i}-${j}.jpg`), frames[j])));
+  return dips.length;
 }
 
 const LOG = join(OUT, 'results.jsonl');
@@ -213,10 +216,10 @@ for (const target of TARGETS) {
         const backend = await page.locator('[data-testid="core-canvas"]').count();
         for (const cpu of CPUS) {
           await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpu });
-          const row: Record<string, unknown> = { target, mode, cap, cpu, canvases: backend };
+          const row: Record<string, unknown> = { target, mode, cap, cpu, viewport: `${VIEW_W}x${VIEW_H}`, canvases: backend };
           for (const which of Object.values(Gesture)) {
             const seen = await gesture(page, cdp, which);
-            row[which] = { raf: summary(seen.raf), presented: summary(seen.presented), latency: summary(seen.latency), longMs: seen.longMs, longCount: seen.longCount };
+            row[which] = { raf: summary(seen.raf), presented: summary(seen.presented), latency: summary(seen.latency), workerRaf: summary(seen.workerRaf), longMs: seen.longMs, longCount: seen.longCount };
           }
           row.editBusyMs = await editBusy(page, cdp).catch(() => null);
           console.log(JSON.stringify(row));
@@ -226,7 +229,7 @@ for (const target of TARGETS) {
         if (cap === 'capped' && target === Target.Heavy && FLICKER_RUNS > 0) {
           const dips: number[] = [];
           for (let i = 0; i < FLICKER_RUNS; i++) {
-            dips.push(await flickerDips(page, cdp));
+            dips.push(await flickerDips(page, cdp, `${mode}-${i}`));
           }
           console.log(`flicker ${target} ${mode}: ${dips.join(',')}`);
           appendFileSync(LOG, JSON.stringify({ target, mode, flicker: dips }) + '\n');

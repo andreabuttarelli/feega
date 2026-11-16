@@ -1397,7 +1397,7 @@
     const began = performance.now();
     const { outcome, pending, skipped } = into.frame(began);
     if (!WORKER) {
-      probed(at.x, at.zoom, performance.now());
+      probed(at.x, at.y, at.zoom, performance.now());
     }
     if (DIRECT_GUARDED && gesture.active() && directGuard.slow(performance.now() - began)) {
       into.setDirectGesture?.(false);

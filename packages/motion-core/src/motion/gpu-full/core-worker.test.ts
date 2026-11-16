@@ -38,7 +38,7 @@ function wired(core: object) {
   const toHost: Port = { post: (message) => host.receive(message), listen: () => {} };
   let toMain: (message: unknown) => void = () => {};
   const mainPort: Port = { post: (message) => toHost.post(message), listen: (on) => (toMain = on) };
-  const host = hostCore(core, { post: (message) => toMain(message), frame: (run) => frames.push(run) });
+  const host = hostCore(core, { post: (message) => toMain(message), frame: (run) => frames.push(run), soon: (run) => frames.push(run) });
   const attached = attachedOverPort(mainPort);
   const tickFrames = (now: number) => frames.splice(0).forEach((run) => run(now));
   return { attached, tickFrames };
@@ -105,6 +105,36 @@ describe('core in a worker', () => {
     expect(attached.patch_group('missing', 'b', '{}')).toBe(false);
     attached.put_group('a', '{}');
     expect(attached.patch_group('a', 'b', '{}')).toBe(true);
+  });
+
+  it('never lets the scene reference a picture whose bitmap has not arrived', async () => {
+    const calls: Call[] = [];
+    const arrivals: (() => void)[] = [];
+    const bitmapOf = (name: string) => ({ name, close: () => {} });
+    globalThis.createImageBitmap = ((source: { name: string }) => new Promise((resolve) => arrivals.push(() => resolve(bitmapOf(source.name))))) as unknown as typeof createImageBitmap;
+    const { attached, tickFrames } = wired({ ...fakeCore(calls), picture: (clip: string) => calls.push(['picture', clip]) });
+
+    attached.picture('a', { name: 'a' }, 1, 1);
+    attached.picture('b', { name: 'b' }, 1, 1);
+    attached.put_group('g', '{"items":[]}');
+    attached.patch_uses('{"put":["g"]}');
+    attached.set_camera(5, 0, 1);
+    tickFrames(16);
+    expect(calls.map(([name]) => name)).toEqual(['set_camera', 'frame']);
+
+    arrivals[1]();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(calls.map(([name]) => name)).toEqual(['set_camera', 'frame']);
+
+    arrivals[0]();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(calls.slice(2).map((c) => c.slice(0, 2))).toEqual([
+      ['picture', 'a'],
+      ['picture', 'b'],
+      ['put_group', 'g'],
+      ['patch_uses', '{"put":["g"]}']
+    ]);
   });
 
   it('answers a poster with the bytes the worker rendered', async () => {

@@ -24,7 +24,8 @@ export enum Op {
   Ready,
   Failed,
   Poster,
-  Posted
+  Posted,
+  PictureSlot
 }
 
 export enum Slot {
@@ -38,14 +39,16 @@ export enum Slot {
   Presented,
   FrameMs,
   CameraX,
+  CameraY,
   CameraZoom,
   DoneAt,
+  RafGap,
   Length
 }
 
 export type Message = [Op, ...unknown[]];
 export type Port = { post: (message: Message, transfer?: Transferable[]) => void; listen: (on: (message: Message) => void) => void };
-export type HostPort = { post: (message: Message, transfer?: Transferable[]) => void; frame: (run: (now: number) => void) => void };
+export type HostPort = { post: (message: Message, transfer?: Transferable[]) => void; frame: (run: (now: number) => void) => void; soon: (run: (now: number) => void) => void };
 
 const OUTCOMES = Object.values(Outcome);
 const SETTINGS = ['set_motion', 'set_budget', 'set_tiles', 'set_direct_gesture', 'set_tile_budget', 'set_canvas_tiles', 'set_pixel_ratio'] as const;
@@ -53,16 +56,16 @@ type SettingName = (typeof SETTINGS)[number];
 
 const utf8 = new TextEncoder();
 
-export type FrameProbe = (x: number, zoom: number, doneAt: number) => void;
+export type FrameProbe = (x: number, y: number, zoom: number, doneAt: number, rafGap: number) => void;
 
-export function probed(x: number, zoom: number, doneAt: number): void {
-  (globalThis as { __coreProbe?: FrameProbe }).__coreProbe?.(x, zoom, doneAt);
+export function probed(x: number, y: number, zoom: number, doneAt: number, rafGap = 0): void {
+  (globalThis as { __coreProbe?: FrameProbe }).__coreProbe?.(x, y, zoom, doneAt, rafGap);
 }
 const bytesOf = (text: string) => utf8.encode(text);
 
 export function attachedOverPort(port: Port): Attached {
   const known = new Set<string>();
-  const forgotten = new Map<string, number>();
+  let slots = 0;
   let status = new Float64Array(Slot.Length);
   let counts = new Float64Array();
   let camera: [number, number, number] | null = null;
@@ -86,7 +89,7 @@ export function attachedOverPort(port: Port): Attached {
     }
     status = rest[0] as Float64Array;
     counts = (rest[1] as Float64Array | undefined) ?? counts;
-    probed(status[Slot.CameraX], status[Slot.CameraZoom], status[Slot.DoneAt] - performance.timeOrigin);
+    probed(status[Slot.CameraX], status[Slot.CameraY], status[Slot.CameraZoom], status[Slot.DoneAt] - performance.timeOrigin, status[Slot.RafGap]);
   });
 
   const wired = (op: Op, ...head: unknown[]) => (text: string) => {
@@ -122,14 +125,12 @@ export function attachedOverPort(port: Port): Attached {
       return OUTCOMES[status[Slot.Outcome]] ?? Outcome.Idle;
     },
     picture: (clip, source, width, height) => {
-      const asked = forgotten.get(clip) ?? 0;
-      void createImageBitmap(source as ImageBitmapSource).then((bitmap) => {
-        if ((forgotten.get(clip) ?? 0) !== asked) {
-          bitmap.close();
-          return;
-        }
-        port.post([Op.Picture, clip, bitmap, width, height], [bitmap]);
-      });
+      const slot = ++slots;
+      port.post([Op.PictureSlot, slot]);
+      void createImageBitmap(source as ImageBitmapSource).then(
+        (bitmap) => port.post([Op.Picture, slot, clip, bitmap, width, height], [bitmap]),
+        () => port.post([Op.Picture, slot, clip, null, width, height])
+      );
     },
     put_group: (key, list) => {
       known.add(key);
@@ -153,10 +154,7 @@ export function attachedOverPort(port: Port): Attached {
       known.delete(key);
       port.post([Op.Drop, key]);
     },
-    forget_picture: (clip) => {
-      forgotten.set(clip, (forgotten.get(clip) ?? 0) + 1);
-      port.post([Op.Forget, clip]);
-    },
+    forget_picture: (clip) => port.post([Op.Forget, clip]),
     cache_pending: () => status[Slot.Pending] === 1,
     cache_bytes: () => status[Slot.CacheBytes],
     warming: () => status[Slot.Warming] === 1,
@@ -199,9 +197,34 @@ export function hostCore(core: object, port: HostPort): { receive: (message: Mes
   const hosted = core as HostedCore;
   let camera: unknown[] | null = null;
   let asked = false;
+  let hurried = false;
   let presented = 0;
+  let lastRaf = 0;
+  let rafGap = 0;
   let broken = false;
   let applied = [0, 0, 1];
+  const waiting: (Message | number)[] = [];
+  const arrived = new Map<number, unknown[]>();
+
+  function drain() {
+    while (waiting.length) {
+      const head = waiting[0];
+      if (typeof head === 'number') {
+        const picture = arrived.get(head);
+        if (!picture) {
+          return;
+        }
+        arrived.delete(head);
+        const [clip, bitmap, width, height] = picture as [string, ImageBitmap | null, number, number];
+        if (bitmap) {
+          call(hosted, 'picture', clip, bitmap, width, height);
+        }
+      } else {
+        APPLIED[head[0]]?.(hosted, head.slice(1));
+      }
+      waiting.shift();
+    }
+  }
 
   function lostNow() {
     broken = true;
@@ -210,8 +233,26 @@ export function hostCore(core: object, port: HostPort): { receive: (message: Mes
     port.post([Op.Status, status], [status.buffer]);
   }
 
-  function render(now: number) {
+  function onRaf(now: number) {
+    rafGap = lastRaf ? now - lastRaf : 0;
+    lastRaf = now;
     asked = false;
+    if (dirty) {
+      render(now);
+    }
+  }
+
+  function onSoon(now: number) {
+    hurried = false;
+    if (dirty) {
+      render(now);
+    }
+  }
+
+  let dirty = false;
+
+  function render(now: number) {
+    dirty = false;
     if (broken) {
       return;
     }
@@ -246,7 +287,9 @@ export function hostCore(core: object, port: HostPort): { receive: (message: Mes
     status[Slot.Presented] = presented;
     status[Slot.FrameMs] = performance.now() - began;
     status[Slot.CameraX] = applied[0];
+    status[Slot.CameraY] = applied[1];
     status[Slot.CameraZoom] = applied[2];
+    status[Slot.RafGap] = rafGap;
     status[Slot.DoneAt] = performance.timeOrigin + performance.now();
     const counts = call(hosted, 'frame_counts') as Float64Array | undefined;
     port.post([Op.Status, status, ...(counts ? [counts] : [])], [status.buffer, ...(counts ? [counts.buffer] : [])]);
@@ -256,11 +299,21 @@ export function hostCore(core: object, port: HostPort): { receive: (message: Mes
   }
 
   function ask() {
+    dirty = true;
     if (asked) {
       return;
     }
     asked = true;
-    port.frame(render);
+    port.frame(onRaf);
+  }
+
+  function hurry() {
+    dirty = true;
+    if (hurried) {
+      return;
+    }
+    hurried = true;
+    port.soon(onSoon);
   }
 
   return {
@@ -284,12 +337,16 @@ export function hostCore(core: object, port: HostPort): { receive: (message: Mes
         return;
       }
       if (op === Op.Tick) {
-        ask();
+        hurry();
+        return;
+      }
+      if (op === Op.PictureSlot) {
+        waiting.push(args[0] as number);
         return;
       }
       if (op === Op.Picture) {
-        const [clip, bitmap, width, height] = args as [string, ImageBitmap, number, number];
-        call(hosted, 'picture', clip, bitmap, width, height);
+        arrived.set(args[0] as number, args.slice(1));
+        drain();
         ask();
         return;
       }
@@ -303,6 +360,10 @@ export function hostCore(core: object, port: HostPort): { receive: (message: Mes
       }
       if (op === Op.Free) {
         call(hosted, 'free');
+        return;
+      }
+      if (waiting.length) {
+        waiting.push([op, ...args]);
         return;
       }
       APPLIED[op]?.(hosted, args);
@@ -364,7 +425,10 @@ export function coreInWorker(spawn: Spawn) {
 type WorkerScope = { postMessage: (message: unknown, transfer: Transferable[]) => void; onmessage: ((e: MessageEvent<Message>) => void) | null; requestAnimationFrame: (run: (now: number) => void) => number };
 
 export function serveCore(scope: WorkerScope): void {
-  const port: HostPort = { post: (message, transfer = []) => scope.postMessage(message, transfer), frame: (run) => scope.requestAnimationFrame(run) };
+  const channel = new MessageChannel();
+  const soonRuns: ((now: number) => void)[] = [];
+  channel.port1.onmessage = () => soonRuns.splice(0).forEach((run) => run(performance.now()));
+  const port: HostPort = { post: (message, transfer = []) => scope.postMessage(message, transfer), frame: (run) => scope.requestAnimationFrame(run), soon: (run) => (soonRuns.push(run), channel.port2.postMessage(0)) };
   let host: { receive: (message: Message) => void } | null = null;
   const early: Message[] = [];
 
