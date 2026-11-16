@@ -19,7 +19,7 @@ export enum DeviceClass {
 export type Device = { coarse: boolean; mobile: boolean; cores: number; memoryGb?: number };
 
 const DIRECT_BY_DEVICE: Record<DeviceClass, boolean> = {
-  [DeviceClass.Desktop]: true,
+  [DeviceClass.Desktop]: false,
   [DeviceClass.Phone]: false,
   [DeviceClass.Weak]: false
 };
