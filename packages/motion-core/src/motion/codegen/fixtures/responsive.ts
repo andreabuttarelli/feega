@@ -59,12 +59,21 @@ export function viewOnlyDoc(): MotionDoc {
   return must(setOverride(must(setOverride(phone, 'phone', 'promo', OverrideKey.Hidden, false)), 'phone', 'tip', OverrideKey.Hidden, false));
 }
 
+export function tallViewsDoc(): MotionDoc {
+  const kit = new DocKit(1280, 1600);
+  kit.frame('band-a', { name: 'Band A', box: box(0, 0, 1280, 300), fill: '#e8eefc' });
+  kit.frame('band-b', { name: 'Band B', box: box(0, 300, 1280, 300), fill: '#fce8ee' });
+  const doc = must(addBreakpoint(kit.doc(), { name: 'Phone', width: 390, height: 900 }, 'phone'));
+  return doc;
+}
+
 export const baseFixtures = (): Fixture[] => [
   { name: 'landing', doc: landingDoc() },
   { name: 'hero-phone', doc: heroOnPhone() },
   { name: 'features-grid', doc: featuresOnViews() },
   { name: 'view-only-layers', doc: viewOnlyDoc() },
-  { name: 'component-main-override', doc: compMainDoc() }
+  { name: 'component-main-override', doc: compMainDoc() },
+  { name: 'view-heights', doc: tallViewsDoc() }
 ];
 
 export const allFixtures = (): Fixture[] => baseFixtures();

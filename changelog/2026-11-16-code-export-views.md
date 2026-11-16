@@ -44,3 +44,19 @@ so a phone view was not applied at exactly 390px (page scrolled to 399px).
 React export (npm install + vite build, ~30 s) and compares wrapped rows and
 sideways scroll with the HTML export at 1440/1439/810/809/600/390/389/320: equal.
 Variant order was fine; the off-by-one was the defect.
+
+Round three (Linear frame from the landings fixture, text-metrics agent):
+- The synthetic page root keeps `min-height` of the base frame; views now
+  restate it (`heightMedia`): Linear phone 9648px -> 5937px, height ratio 1.000.
+- A view that switches padding from four sides to `padding-block/inline`
+  reset each side with `unset` after the shorthand, zeroing the padding
+  (landing phone: the 'Controllers at 1,400 companies' line lost its 20px
+  gutters, which is why it did not wrap). Covered sides are no longer reset.
+- `jsxSvg` turned `style` into SVG attributes and left `<img>` unclosed inside
+  `foreignObject`: the React build of Linear failed. Style is now a JSX object,
+  void elements are self-closed. The env-gated React build (`CODE_EXPORT_REACT=1`
+  with `CODE_EXPORT_DOC=<doc.json>`) covers it. Not touched by this PR, so
+  inferred to fail on dev too.
+- `letter-spacing` and `line-height` keep four decimals (-0.045em was -0.04em).
+- Titles are clipped to the 5% safe area on the canvas; the export lists that
+  under Not exported instead of reproducing it.

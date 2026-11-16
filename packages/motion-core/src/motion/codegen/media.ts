@@ -18,6 +18,14 @@ const HIDE: Rule = [DISPLAY, 'none'];
 const UNSET = 'unset';
 const PAGE_FRAME: ReadonlySet<string> = new Set(['width', 'max-width', 'margin-inline']);
 const RESET_VALUE: Record<string, string> = { [DISPLAY]: 'revert' };
+const SHORTHANDS: Record<string, readonly string[]> = Object.fromEntries(
+  ['padding', 'margin'].flatMap((box) => [
+    [`${box}-top`, [box, `${box}-block`]],
+    [`${box}-bottom`, [box, `${box}-block`]],
+    [`${box}-left`, [box, `${box}-inline`]],
+    [`${box}-right`, [box, `${box}-inline`]]
+  ])
+);
 const WRAP = 'flex-wrap';
 const BETWEEN_VIEWS: Rule = [WRAP, 'wrap'];
 const AT_VIEW: Rule = [WRAP, 'nowrap'];
@@ -56,7 +64,8 @@ function changed(before: readonly Rule[], after: readonly Rule[]): Rule[] {
   const was = new Map(before.map(([p, v]) => [p, key(v)]));
   const now = new Set(after.map(([p]) => p));
   const set = after.filter(([p, v]) => was.get(p) !== key(v));
-  const dropped: Rule[] = before.filter(([p]) => !now.has(p)).map(([p]) => [p, RESET_VALUE[p] ?? UNSET]);
+  const covered = (p: string) => (SHORTHANDS[p] ?? []).some((shorthand) => now.has(shorthand)) || [...now].some((q) => SHORTHANDS[q]?.includes(p));
+  const dropped: Rule[] = before.filter(([p]) => !now.has(p) && !covered(p)).map(([p]) => [p, RESET_VALUE[p] ?? UNSET]);
   return [...set, ...dropped];
 }
 
@@ -129,11 +138,28 @@ function attach(node: CodeNode, media: Map<string, MediaRules[]>, deferred: Read
   return withOwn.kind === NodeKind.Element ? { ...withOwn, children: withOwn.children.map((c) => attach(c, media, deferred)) } : withOwn;
 }
 
+const MIN_HEIGHT = 'min-height';
+
+function heightMedia(root: ElementNode, views: readonly ViewRoot[]): MediaRules[] {
+  const heightOf = (rules: readonly Rule[]) => rules.find(([p]) => p === MIN_HEIGHT)?.[1];
+  let previous = heightOf(root.rules);
+  return views.flatMap((view) => {
+    const now = view.root && heightOf(view.root.rules);
+    if (now === undefined || key(now) === key(previous ?? '')) {
+      return [];
+    }
+    previous = now;
+    return [{ maxWidth: view.maxWidth, rules: [[MIN_HEIGHT, now] as Rule] }];
+  });
+}
+
 function withRootMedia(root: ElementNode, kind: Root, deferred: ReadonlySet<string>, views: readonly ViewRoot[], baseWidth: number): ElementNode {
   const base = entriesOf(root, kind);
   const present = new Set([...deferred].filter((id) => base.has(id)));
   const widths = [baseWidth, ...views.map((v) => v.maxWidth)];
-  return attach(root, withRows(mediaByClip(base, kind, present, views), base, widths, views, kind), present) as ElementNode;
+  const attached = attach(root, withRows(mediaByClip(base, kind, present, views), base, widths, views, kind), present) as ElementNode;
+  const own = kind === Root.Page && !root.clipId ? heightMedia(root, views) : [];
+  return own.length ? { ...attached, media: [...(attached.media ?? []), ...own] } : attached;
 }
 
 const sameName = (name: string) => (c: ComponentSpec) => c.name === name;

@@ -4,7 +4,7 @@ import type { MotionDoc } from '../doc';
 import { addBreakpoint, BreakpointPreset, OverrideKey, setOverride } from '../breakpoints/model';
 import { CodeTarget, exportCode } from './index';
 import { box, DocKit } from './fixtures/kit';
-import { PHONE, TABLET, compMainDoc, must, viewOnlyDoc, withViews } from './fixtures/responsive';
+import { PHONE, TABLET, compMainDoc, must, tallViewsDoc, viewOnlyDoc, withViews } from './fixtures/responsive';
 
 const must = (r: { ok: true; doc: MotionDoc } | { ok: false; error: string }) => {
   if (!r.ok) {
@@ -147,5 +147,29 @@ describe('rows between breakpoints', () => {
     expect(rule(css, 1439)).toBe('flex-wrap: wrap;');
     expect(rule(css, 809)).toBe('flex-wrap: wrap;');
     expect(rule(css, 389)).toBe('flex-wrap: wrap;');
+  });
+});
+
+describe('the page height per view', () => {
+  it('follows each view, not the base frame', () => {
+    const css = file(tallViewsDoc(), CodeTarget.Html, 'page.css');
+
+    expect(css).toMatch(/^\.page \{[^}]*min-height: 1600px;/m);
+    expect(css).toMatch(/@media \(max-width: 390px\) \{\s+\.page \{\s+min-height: 900px;/);
+  });
+});
+
+describe('padding that changes shape between views', () => {
+  it('does not reset a side that the new shorthand already sets', () => {
+    const kit = new DocKit(1280, 600);
+    const pad = (top: number, right: number, bottom: number, left: number) => ({ top, right, bottom, left });
+    kit.frame('page', { name: 'Page', box: box(0, 0, 1280, 600), layout: { direction: Direction.Vertical, padding: pad(10, 20, 30, 40) }, item: { width: Sizing.Fixed, height: Sizing.Hug } });
+    kit.text('a', 'A', { parent: 'page', name: 'A', size: 20, font: 'Inter' });
+    const doc = must(setOverride(withViews(kit.doc(), PHONE), 'phone', 'page', OverrideKey.Padding, pad(14, 20, 14, 20)));
+    const css = file(doc, CodeTarget.Html, 'page.css');
+    const phone = css.slice(css.indexOf('@media (max-width: 390px)'));
+
+    expect(phone).toContain('padding-block: 14px;');
+    expect(phone).not.toMatch(/padding-(top|right|bottom|left): unset/);
   });
 });

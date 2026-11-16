@@ -12,6 +12,7 @@ import { resolveColor, FEEGA_TOKENS } from '../brand';
 import { ShapeKind } from '../shape/schema';
 import { pivotBox, type Size } from '../parent';
 import type { Box } from '../layout';
+import { safeBox } from '../fit';
 import { kebab, NameBook } from './naming';
 import { literal, NodeKind, type Attr, type Bound, type CodeNode, type ComponentSpec, type ElementNode, type PageSpec, type SetSpec, type Rule, type StyleBind } from './ir';
 import { absoluteRules, containerRules, flowItemRules, fluidWidth, isFlowChild, px, Shape, STACK_RULES, stackItemRules, stackOrder } from './place';
@@ -297,7 +298,19 @@ function textTag(clip: MotionClip, at: { link: string | null; parentTag: string;
   return clip.component === 'Kicker' ? PARAGRAPH : headingTag(clip, at.sizePx, scope);
 }
 
+const BOX_EPSILON_PX = 0.5;
+
+const sameBox = (a: Box, b: Box) => [a.left - b.left, a.top - b.top, a.width - b.width, a.height - b.height].every((d) => Math.abs(d) < BOX_EPSILON_PX);
+
+function noteSafeArea(clip: MotionClip, scope: Scope) {
+  const box = scope.boxOf(clip);
+  if (clip.component === 'Title' && !sameBox(box, safeBox(box, scope.space))) {
+    scope.shared.notes.add(`${layerName(clip)}: the canvas clips a title to a 5% safe area, the export does not.`);
+  }
+}
+
 function textNode(clip: MotionClip, parent: MotionClip | null, scope: Scope, parentTag: string): ElementNode {
+  noteSafeArea(clip, scope);
   const text = String(clip.props.text ?? clip.props.title ?? '');
   const runs = clip.props.runs as TextRun[] | undefined;
   const prop = bound(clip, PropKey.Text, scope);

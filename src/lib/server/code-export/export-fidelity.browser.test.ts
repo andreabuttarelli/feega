@@ -30,9 +30,9 @@ const SETTLE_MS = 400;
 const TARGET_SCORE = 0.9;
 const FLOOR_MARGIN = 0.02;
 const MEASURED: Record<string, number> = {
-  'landing:base': 0.766,
-  'landing:tablet': 0.599,
-  'landing:phone': 0.6461,
+  'landing:base': 0.7646,
+  'landing:tablet': 0.6609,
+  'landing:phone': 0.6337,
   'hero-phone:base': 0.9362,
   'hero-phone:phone': 0.8469,
   'features-grid:base': 0.9838,
@@ -165,7 +165,11 @@ function firstDivergence(canvas: Seen[], exported: Map<string, Seen[]>): string 
   return 'none';
 }
 
-const cases = ENABLED ? allFixtures().map((f) => ({ ...f, doc: parsed(f.doc) })) : [];
+const EXTRA_DOC = process.env.CODE_EXPORT_DOC;
+const extra = EXTRA_DOC ? [{ name: 'extra-doc', doc: JSON.parse(readFileSync(EXTRA_DOC, 'utf8')) as MotionDoc }] : [];
+const cases = ENABLED ? [...allFixtures(), ...extra].map((f) => ({ ...f, doc: parsed(f.doc) })) : [];
+const HEIGHT_TOLERANCE = 0.02;
+const TALLER_THAN_CANVAS = new Set(['component-main-override:phone']);
 const only = process.env.CODE_EXPORT_ONLY?.split(',');
 
 describe.runIf(ENABLED)('exported HTML paints like the canvas at every view', () => {
@@ -193,6 +197,9 @@ describe.runIf(ENABLED)('exported HTML paints like the canvas at every view', ()
           console.log(`FIDELITY ${fixture.name} ${view.id} ${view.width} mean=${score.mean.toFixed(4)} min=${score.min.toFixed(4)} height=${score.heightRatio.toFixed(3)} first-diverging=${diverges}`);
 
           expect(score.mean).toBeGreaterThanOrEqual(floorOf(fixture.name, view.id));
+          if (!TALLER_THAN_CANVAS.has(`${fixture.name}:${view.id}`)) {
+            expect(Math.abs(score.heightRatio - 1)).toBeLessThanOrEqual(HEIGHT_TOLERANCE);
+          }
         });
       }
 
@@ -216,7 +223,7 @@ describe.runIf(ENABLED)('exported HTML paints like the canvas at every view', ()
 });
 
 const REACT_ENABLED = ENABLED && process.env.CODE_EXPORT_REACT === '1';
-const REACT_FIXTURE = 'landing';
+const REACT_FIXTURES = ['landing', ...extra.map((f) => f.name)];
 const REACT_WIDTHS = [1440, 1439, 810, 809, 600, 390, 389, 320];
 const MIME: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
 const BUILD_TIMEOUT_MS = 240_000;
@@ -232,8 +239,8 @@ async function measuredAt(url: string, width: number) {
 }
 
 describe.runIf(REACT_ENABLED)('the React export lays out like the HTML export at every width', () => {
-  it(`${REACT_FIXTURE}: same wrapped rows, no sideways scroll`, async () => {
-    const fixture = cases.find((f) => f.name === REACT_FIXTURE)!;
+  it.each(REACT_FIXTURES)('%s: builds, same wrapped rows, no sideways scroll', async (name) => {
+    const fixture = cases.find((f) => f.name === name)!;
     const html = written(mkdtempSync(join(tmpdir(), 'export-html-')), exportCode(fixture.doc, { target: CodeTarget.Html, name: 'Page' }).files);
     const reactDir = mkdtempSync(join(tmpdir(), 'export-react-'));
     written(reactDir, exportCode(fixture.doc, { target: CodeTarget.React, name: 'Page' }).files);
