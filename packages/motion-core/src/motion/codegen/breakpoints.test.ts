@@ -4,6 +4,7 @@ import type { MotionDoc } from '../doc';
 import { addBreakpoint, BreakpointPreset, OverrideKey, setOverride } from '../breakpoints/model';
 import { CodeTarget, exportCode } from './index';
 import { box, DocKit } from './fixtures/kit';
+import { PHONE, compMainDoc, viewOnlyDoc } from './fixtures/responsive';
 
 const must = (r: { ok: true; doc: MotionDoc } | { ok: false; error: string }) => {
   if (!r.ok) {
@@ -70,5 +71,40 @@ describe('code export with breakpoints', () => {
       ['810', 'row', 'flex-direction: column;'],
       ['390', 'aside', 'display: none;']
     ]);
+  });
+});
+
+describe('view-only layers', () => {
+  it('stay in the markup, hidden at base and shown in their view', () => {
+    const html = file(viewOnlyDoc(), CodeTarget.Html, 'index.html');
+    const css = file(viewOnlyDoc(), CodeTarget.Html, 'page.css');
+
+    expect(html).toContain('class="promo"');
+    expect(html).toContain('Phone only');
+    expect(css).toMatch(/\.promo \{[^}]*display: none;/);
+    expect(css).toMatch(/@media \(max-width: 390px\) \{\s+\.promo \{\s+display: flex;/);
+  });
+
+  it('a layer that has no display of its own is restored with revert, never unset', () => {
+    const css = file(viewOnlyDoc(), CodeTarget.Html, 'page.css');
+
+    expect(css).toMatch(/@media \(max-width: 390px\) \{\s+\.tip \{[^}]*display: revert;/);
+    expect(css).not.toContain('display: unset');
+  });
+
+  it('React: the layer is hidden by default and shown by its variant', () => {
+    const tsx = file(viewOnlyDoc(), CodeTarget.React, '.tsx');
+
+    expect(tsx).toContain('Phone only');
+    expect(tsx).toMatch(/hidden[^"]*max-\[390px\]:flex/);
+  });
+});
+
+describe('overrides inside a component main', () => {
+  it('reach every instance through a media query on the main', () => {
+    const doc = compMainDoc();
+    const css = file(doc, CodeTarget.Html, 'button.css') + file(doc, CodeTarget.Html, 'page.css');
+
+    expect(css).toMatch(/@media \(max-width: 390px\) \{\s+\.button \{\s+padding-block: 4px;/);
   });
 });
