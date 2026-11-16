@@ -8,6 +8,11 @@ describe('memory budget', () => {
     expect(gpuBytes(Device.Phone)).toBeLessThanOrEqual(PHONE_GPU_BYTES);
   });
 
+  it('a phone caps cached effects too, which otherwise hold up to 256 MB', () => {
+    expect(BUDGET[Device.Phone].effectBytes).toBeGreaterThan(0);
+    expect(gpuBytes(Device.Phone)).toBe(BUDGET[Device.Phone].textureBytes + BUDGET[Device.Phone].tileBytes + BUDGET[Device.Phone].effectBytes + BUDGET[Device.Phone].atlasSide ** 2 * 4);
+  });
+
   it('a phone image atlas still fits sixteen pictures at the phone picture side', () => {
     const { atlasSide, pictureSide } = BUDGET[Device.Phone];
 
@@ -72,7 +77,7 @@ describe('device profile', () => {
   const MB = 1024 * 1024;
 
   it('a desktop keeps the values it had before phones got their own profile', () => {
-    expect(BUDGET[Device.Desktop]).toEqual({ textureBytes: 256 * MB, tileBytes: 384 * MB, pictureSide: 4096, atlasSide: 8192, resolution: 2, framesInFlight: 6, retainMs: 15_000, buildLanes: 4, canvasTiles: 320, offscreen: Offscreen.Resident, zoomPicture: ZoomPicture.Exact, readableWidth: 0, builtBytes: Infinity });
+    expect(BUDGET[Device.Desktop]).toEqual({ textureBytes: 256 * MB, tileBytes: 384 * MB, pictureSide: 4096, atlasSide: 8192, effectBytes: 256 * MB, resolution: 2, framesInFlight: 6, retainMs: 15_000, buildLanes: 4, canvasTiles: 320, offscreen: Offscreen.Resident, zoomPicture: ZoomPicture.Exact, readableWidth: 0, builtBytes: Infinity });
   });
 
   it('a desktop builds frames on one lane per spare core, up to four', () => {

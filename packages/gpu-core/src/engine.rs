@@ -395,6 +395,11 @@ impl Engine {
         self.cache.cap = layers;
     }
 
+    pub fn set_effect_budget(&mut self, bytes: u64) {
+        self.effect_cache.cap = bytes;
+        self.effect_cache.sweep(&mut self.vello);
+    }
+
     pub fn set_image_atlas(&mut self, side: u32) {
         self.vello.set_image_atlas_max(side);
     }
