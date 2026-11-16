@@ -9,7 +9,8 @@ vi.mock('$lib/server/motion/move-element', () => ({ frameStore: () => ({ read })
 
 const { adoptedLibrary } = await import('./canvas-import');
 
-const scope = { db: {}, orgId: 'o', projectId: 'p', userId: 'u', actor: {} } as never;
+const db = {};
+const scope = { db, orgId: 'o', projectId: 'p', userId: 'u', actor: {} } as never;
 const doc = { variables: { 'app Colors': { modes: ['Light'], vars: {} } } };
 const ok = { outcome: CodeImportOutcome.Ok, frameId: 'f', design: { tokens: 1 } } as never;
 
@@ -22,7 +23,7 @@ describe('adoptedLibrary', () => {
   it('le variabili e gli stili di un import di codice entrano nella libreria del progetto, come per un URL', async () => {
     await adoptedLibrary(scope, ok);
 
-    expect(adopt).toHaveBeenCalledWith(scope.db, scope, doc);
+    expect(adopt).toHaveBeenCalledWith(db, scope, doc);
   });
 
   it('senza design system, o con un import rifiutato, la libreria non si tocca', async () => {
