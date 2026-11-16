@@ -31,6 +31,26 @@ function longestBareAfterStop(frames: Counted[]): number {
   return longest;
 }
 
+const GRID = [12, 8] as const;
+const GRID_CELL_PX = 10;
+
+async function cells(jpeg: Buffer): Promise<number[]> {
+  const [gw, gh] = GRID;
+  const { data, info } = await sharp(jpeg).resize(gw * GRID_CELL_PX, gh * GRID_CELL_PX).raw().toBuffer({ resolveWithObject: true });
+  const bg = [data[0], data[1], data[2]];
+  const out = new Array(gw * gh).fill(0);
+  for (let y = 0; y < info.height; y++) {
+    for (let x = 0; x < info.width; x++) {
+      const i = (y * info.width + x) * info.channels;
+      const inked = Math.abs(data[i] - bg[0]) + Math.abs(data[i + 1] - bg[1]) + Math.abs(data[i + 2] - bg[2]) > 24;
+      out[Math.floor(y / GRID_CELL_PX) * gw + Math.floor(x / GRID_CELL_PX)] += inked ? 1 / GRID_CELL_PX ** 2 : 0;
+    }
+  }
+  return out;
+}
+
+const dipped = (a: number[], b: number[], c: number[]) => b.some((v, i) => Math.min(a[i], c[i]) > 0.3 && v < 0.4 * Math.min(a[i], c[i]));
+
 async function ink(jpeg: Buffer) {
   const { data, info } = await sharp(jpeg).resize(INK_SIZE.width, INK_SIZE.height).raw().toBuffer({ resolveWithObject: true });
   return inkOf(new Uint8Array(data), info.width, info.height, info.channels);
@@ -66,8 +86,10 @@ test(`wide screen ${WIDTH}x${HEIGHT}@${DPR}: no gpu loss, no panic, no vanish`, 
       }
     });
     const frames: Buffer[] = [];
-    const take = (f: { data: string; sessionId: number }) => {
+    const shotAt: number[] = [];
+    const take = (f: { data: string; sessionId: number; metadata: { timestamp?: number } }) => {
       frames.push(Buffer.from(f.data, 'base64'));
+      shotAt.push((f.metadata.timestamp ?? 0) * 1000);
       void cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }).catch(() => {});
     };
     cdp.on('Page.screencastFrame', take);
@@ -82,14 +104,21 @@ test(`wide screen ${WIDTH}x${HEIGHT}@${DPR}: no gpu loss, no panic, no vanish`, 
       void cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: s.x, y: s.y, deltaX: s.dx, deltaY: s.dy, modifiers: s.ctrl ? CTRL : 0 }).catch(() => {});
     }
     await page.waitForTimeout(1500);
-    bare.push(longestBareAfterStop(await page.evaluate(() => ((window as unknown as { __gpuCanvas?: { frames?: Counted[] } }).__gpuCanvas?.frames ?? []).map((f) => ({ moving: f.moving, uncovered: f.uncovered })))));
+    const core = await page.evaluate(() => ((window as unknown as { __gpuCanvas?: { frames?: (Counted & { at: number })[] } }).__gpuCanvas?.frames ?? []).map((f) => ({ ...f, wall: performance.timeOrigin + f.at })));
+    bare.push(longestBareAfterStop(core));
     await cdp.send('Page.stopScreencast');
     cdp.off('Page.screencastFrame', take);
-    const grays = await Promise.all(frames.map(ink));
-    for (let i = 1; i < grays.length - 1; i++) {
-      if (vanishes(grays[i - 1], grays[i], grays[i + 1])) {
+    const grid = await Promise.all(frames.map(cells));
+    for (let i = 1; i < grid.length - 1; i++) {
+      if (!dipped(grid[i - 1], grid[i], grid[i + 1])) {
+        continue;
+      }
+      const [a, b, c] = await Promise.all([i - 1, i, i + 1].map((j) => ink(frames[j])));
+      if (vanishes(a, b, c)) {
         vanished++;
-        writeFileSync(`${OUT}/run${run}-vanish-${i}.jpg`, frames[i]);
+        [i - 1, i, i + 1].forEach((j) => writeFileSync(`${OUT}/run${run}-vanish-${i}-${j}.jpg`, frames[j]));
+        const near = core.filter((c) => Math.abs(c.wall - shotAt[i]) < 120).map((c) => ({ ...c, dt: Math.round(c.wall - shotAt[i]) }));
+        writeFileSync(`${OUT}/run${run}-vanish-${i}.json`, JSON.stringify(near, null, 1));
       }
     }
   }
