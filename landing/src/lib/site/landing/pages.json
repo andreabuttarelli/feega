@@ -1,9 +1,9 @@
 {
  "ai-video-generator": {
   "title": "AI Video Generator – Text to Video & Image to Video | Feega",
-  "description": "Generate videos from text or images with Seedance 2.5, Kling 3.0 and Grok Imagine. Control the first and last frame, add voice and music, and publish.",
+  "description": "Generate videos from text or images with Seedance 2.5, Kling 3.0 and Grok Imagine. Control the first and last frame, add voice and music, and export.",
   "heading": "AI video generator: text to video and image to video",
-  "intro": "feega turns a text prompt or an image into a video clip of up to 15 seconds with Seedance 2.5, Kling 3.0 or Grok Imagine. You can fix the first and the last frame, compare models side by side on the same prompt, and add voice-over and music before you publish.",
+  "intro": "feega turns a text prompt or an image into a video clip of up to 15 seconds with Seedance 2.5, Kling 3.0 or Grok Imagine. You can fix the first and the last frame, compare models side by side on the same prompt, and add voice-over and music before you export.",
   "cta": {
    "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=ai-video-generator",
    "label": "Generate a video →"
@@ -15,7 +15,7 @@
   "sections": [
    {
     "heading": "How it works on feega",
-    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or publish.</p>",
+    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or export.</p>",
     "examples": [],
     "cta": null
    },
@@ -94,7 +94,7 @@
   "sections": [
    {
     "heading": "How it works on feega",
-    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or publish.</p>",
+    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or export.</p>",
     "examples": [],
     "cta": null
    },
@@ -134,7 +134,7 @@
    },
    {
     "heading": "Questions",
-    "html": "<p><strong>Is Feega a text-to-video tool?</strong></p><p>Yes, and image-to-video too. It also generates images, audio and documents on the same canvas.</p><p><strong>Which video models are available?</strong></p><p>Seedance 2.5, Seedance 2, Kling 3.0 and Grok Imagine for generation, FLUX Video Upscale for upscaling.</p><p><strong>Can I publish directly?</strong></p><p>Yes. Schedule posts to your connected social accounts from the calendar.</p>",
+    "html": "<p><strong>Is Feega a text-to-video tool?</strong></p><p>Yes, and image-to-video too. It also generates images, audio and documents on the same canvas.</p><p><strong>Which video models are available?</strong></p><p>Seedance 2.5, Seedance 2, Kling 3.0 and Grok Imagine for generation, FLUX Video Upscale for upscaling.</p><p><strong>Can I publish directly?</strong></p><p>No. Feega does not post for you: export the clip and upload it where you publish.</p>",
     "examples": [],
     "cta": {
      "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=ai-video-styles",
@@ -167,7 +167,7 @@
   "sections": [
    {
     "heading": "How it works on feega",
-    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or publish.</p>",
+    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or export.</p>",
     "examples": [],
     "cta": null
    },
@@ -234,7 +234,7 @@
   "sections": [
    {
     "heading": "How it works on feega",
-    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or publish.</p>",
+    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or export.</p>",
     "examples": [],
     "cta": null
    },
@@ -246,7 +246,7 @@
    },
    {
     "heading": "Why a canvas instead of a single prompt box",
-    "html": "<p>Every step stays visible: the prompt, the reference image, each take. Branch a take, change one word, run again, and keep the versions next to each other.</p><p>Add voice-over, music or sound effects from an audio node, then send the finished clip to the calendar and publish it.</p>",
+    "html": "<p>Every step stays visible: the prompt, the reference image, each take. Branch a take, change one word, run again, and keep the versions next to each other.</p><p>Add voice-over, music or sound effects from an audio node, then export the finished clip.</p>",
     "examples": [],
     "cta": null
    },
@@ -292,10 +292,10 @@
   "exampleHeight": 180
  },
  "ai-commercial-maker": {
-  "title": "AI Commercial & Ad Maker – Product Video Ads | Feega",
-  "description": "Create AI video commercials and ad creatives from your product catalog, add voice-over and music, then run them as Meta ads from the same canvas.",
-  "heading": "AI commercial and ad maker",
-  "intro": "feega creates video commercials and ad creatives from your products: import your store catalog, generate product shots and video clips, add a voice-over and music, and launch the result as a Meta ad campaign that you approve before it spends. Everything happens on one canvas.",
+  "title": "AI Commercial Maker – Product Videos | Feega",
+  "description": "Create AI video commercials and ad creatives from your product catalog, and add voice-over and music, all on the same canvas.",
+  "heading": "AI commercial maker",
+  "intro": "feega creates video commercials and ad creatives from your products: import your store catalog, generate product shots and video clips, add a voice-over and music, and export the result. Everything happens on one canvas.",
   "cta": {
    "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=ai-commercial-maker",
    "label": "Create an AI commercial →"
@@ -307,19 +307,19 @@
   "sections": [
    {
     "heading": "How it works on feega",
-    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or publish.</p>",
+    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or export.</p>",
     "examples": [],
     "cta": null
    },
    {
     "heading": "From product to ad in four steps",
-    "html": "<p>1. Import your catalog: the products node pulls titles, prices and images from your connected store.</p><p>2. Generate the visuals: product images with GPT Image, Nano Banana or Seedream, and video clips with Seedance, Kling or Grok Imagine.</p><p>3. Add sound: a text-to-speech voice-over, music and sound effects from the audio node.</p><p>4. Publish: schedule it as an organic post, or turn it into a Meta ad creative and approve the campaign.</p>",
+    "html": "<p>1. Import your catalog: the products node pulls titles, prices and images from your connected store.</p><p>2. Generate the visuals: product images with GPT Image, Nano Banana or Seedream, and video clips with Seedance, Kling or Grok Imagine.</p><p>3. Add sound: a text-to-speech voice-over, music and sound effects from the audio node.</p><p>4. Export: download the finished video or still.</p>",
     "examples": [],
     "cta": null
    },
    {
     "heading": "What makes it different from an ad template tool",
-    "html": "<p>You keep your brand voice, palette and logo in one place, and every generation can read them.</p><p>You see and approve every campaign before it runs. Ads are Meta only today (Facebook and Instagram).</p>",
+    "html": "<p>You keep your brand voice, palette and logo in one place, and every generation can read them.</p><p>You review every take on the canvas before you export it.</p>",
     "examples": [],
     "cta": null
    },
@@ -347,7 +347,7 @@
    },
    {
     "heading": "Questions",
-    "html": "<p><strong>Which ad platforms does Feega support?</strong></p><p>Meta (Facebook and Instagram). Google, TikTok and other ad platforms are not supported.</p><p><strong>Can Feega write the ad script?</strong></p><p>Yes. Ask the chat on the canvas for a script, then turn it into a voice-over with the audio node.</p><p><strong>Do ads go live automatically?</strong></p><p>No. A campaign runs only after you approve it.</p><p><strong>How long can a video ad be?</strong></p><p>Each generated clip lasts up to 15 seconds. Combine clips for longer spots.</p>",
+    "html": "<p><strong>Can Feega run my ads?</strong></p><p>No. Feega creates the ad video and images; you upload them to the ad platform you use.</p><p><strong>Can Feega write the ad script?</strong></p><p>Yes. Ask the chat on the canvas for a script, then turn it into a voice-over with the audio node.</p><p><strong>How long can a video ad be?</strong></p><p>Each generated clip lasts up to 15 seconds. Combine clips for longer spots.</p>",
     "examples": [],
     "cta": {
      "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=ai-commercial-maker",
@@ -380,7 +380,7 @@
   "sections": [
    {
     "heading": "How it works on feega",
-    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or publish.</p>",
+    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or export.</p>",
     "examples": [],
     "cta": null
    },
@@ -439,7 +439,7 @@
  },
  "80s-retro-video": {
   "title": "80s Retro & VHS Video Generator – AI | Feega",
-  "description": "Create 80s retro and VHS-look videos with AI: scanlines, tracking noise, neon and film grain. Generate a clip, add glitch effects to stills, and publish.",
+  "description": "Create 80s retro and VHS-look videos with AI: scanlines, tracking noise, neon and film grain. Generate a clip, add glitch effects to stills, and export.",
   "heading": "80s retro and VHS video generator",
   "intro": "feega generates 80s retro and VHS-style clips from a prompt: ask for VHS tracking noise, scanlines, chromatic bleed and neon lighting, and a video model renders the clip. For stills, the effects node adds glitch, RGB shift, noise and pixelation directly on the canvas.",
   "cta": {
@@ -453,7 +453,7 @@
   "sections": [
    {
     "heading": "How it works on feega",
-    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or publish.</p>",
+    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or export.</p>",
     "examples": [],
     "cta": null
    },
@@ -526,7 +526,7 @@
   "sections": [
    {
     "heading": "How it works on feega",
-    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or publish.</p>",
+    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or export.</p>",
     "examples": [],
     "cta": null
    },
@@ -599,7 +599,7 @@
   "sections": [
    {
     "heading": "How it works on feega",
-    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or publish.</p>",
+    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or export.</p>",
     "examples": [],
     "cta": null
    },
@@ -678,7 +678,7 @@
    },
    {
     "heading": "Node types",
-    "html": "<p>Generation: text, image, video and audio (text to speech, voice changer, dubbing, music, sound effects, voice isolation).</p><p>Sources: documents, products from your store, social account feeds.</p><p>Flow: lists and select nodes to iterate over items, effects stacks on images, compositions, and a calendar to publish.</p>",
+    "html": "<p>Generation: text, image, video and audio (text to speech, voice changer, dubbing, music, sound effects, voice isolation).</p><p>Sources: documents, products from your store, social account feeds.</p><p>Flow: lists and select nodes to iterate over items, effects stacks on images, compositions.</p>",
     "examples": [],
     "cta": null
    },

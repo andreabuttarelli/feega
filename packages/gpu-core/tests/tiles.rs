@@ -1,5 +1,5 @@
 use gpu_core::retained::Camera;
-use gpu_core::tiles::{lifted_keys, magnified, fallback_serves, fallback_bands, ahead_camera, fade_in, fades_over, FADE_MS, NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, bake_batches, BAKE_BATCH_TILES, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
+use gpu_core::tiles::{lifted_keys, magnified, fallback_serves, fallback_bands, ahead_camera, fade_in, fades_over, FADE_MS, NEAR_STEPS, tiles_kept, tiles_kept_beside, TILE_BUDGET_BYTES, TILE_BYTES, batches, bake_batches, BAKE_BATCH_TILES, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
 use vello::kurbo::{Point, Rect};
 
 const SCREEN: (u32, u32) = (1024, 768);
@@ -206,6 +206,18 @@ fn the_tile_budget_follows_the_screen_and_caps_at_the_memory_budget() {
     assert!(tiles_kept((100_000, 100_000), TILE_BUDGET_BYTES) as u64 * TILE_BYTES <= TILE_BUDGET_BYTES);
     let phone = 128 << 20;
     assert!(tiles_kept((100_000, 100_000), phone) as u64 * TILE_BYTES <= phone);
+}
+
+#[test]
+fn spare_fallback_and_lifted_textures_count_inside_the_tile_budget() {
+    let phone = 64 << 20;
+    let screen = (780, 1688);
+    let spare = 32 * TILE_BYTES;
+    let fallback = 2 * 780 * 1688 * 4;
+
+    assert_eq!(tiles_kept_beside(screen, phone, 0), tiles_kept(screen, phone));
+    assert_eq!(tiles_kept_beside(screen, phone, spare + fallback) as u64 * TILE_BYTES + spare + fallback <= phone, true);
+    assert_eq!(tiles_kept_beside(screen, phone, phone * 2), 0);
 }
 
 #[test]

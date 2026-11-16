@@ -170,6 +170,14 @@ enum Reuse {
 
 const BUFFERS_PER_KIND: usize = 16;
 const POOLED_IMAGES: usize = 8;
+const POOLED_IMAGE_MAX_BYTES: u64 = 16 * 1024 * 1024;
+const POOLED_IMAGE_TEXEL_BYTES: u64 = 4;
+
+impl ImageKind {
+    fn poolable(&self) -> bool {
+        u64::from(self.width) * u64::from(self.height) * POOLED_IMAGE_TEXEL_BYTES < POOLED_IMAGE_MAX_BYTES
+    }
+}
 const CACHED_BIND_GROUPS: usize = 512;
 
 #[derive(Default)]
@@ -1111,6 +1119,11 @@ impl ResourcePool {
             height: texture.height(),
             format: texture.format(),
         };
+        if !kind.poolable() {
+            bind_groups.retain(|key, _| !key.binds_view(&view));
+            texture.destroy();
+            return;
+        }
         self.images.push((kind, texture, view));
         if self.images.len() <= POOLED_IMAGES {
             return;
@@ -1369,5 +1382,23 @@ impl<'a> TransientBindMap<'a> {
                 ResourceProxy::Image(_) => todo!(),
             })
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod pool_tests {
+    use super::*;
+
+    const RGBA: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+
+    #[test]
+    fn a_resized_atlas_is_not_kept_in_the_pool() {
+        assert!(!ImageKind { width: 8192, height: 8192, format: RGBA }.poolable());
+        assert!(!ImageKind { width: 4096, height: 4096, format: RGBA }.poolable());
+    }
+
+    #[test]
+    fn small_images_are_still_pooled() {
+        assert!(ImageKind { width: 512, height: 512, format: RGBA }.poolable());
     }
 }

@@ -1,8 +1,8 @@
 # feega MCP — how to use it
 
 feega exposes a [Model Context Protocol](https://modelcontextprotocol.io) server so coding agents
-(Cursor, Claude, etc.) can read and write the canvas — projects, canvases, nodes, motion videos, ad
-campaigns — with the **same OAuth login as the CLI**. There are **no static API tokens**.
+(Cursor, Claude, etc.) can read and write the canvas — projects, canvases, nodes, motion videos —
+with the **same OAuth login as the CLI**. There are **no static API tokens**.
 
 ```
 Your agent

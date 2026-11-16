@@ -206,9 +206,10 @@ describe('a whole landing page', () => {
     expect(joined.props.color).toBe('#1ab34d');
   });
 
-  it('leaves out the icon an instance hides', () => {
+  it('keeps the icon an instance hides, as a hidden layer', () => {
     const arrows = clipsOf(item.doc).filter((c) => c.name === HIDDEN_ICON);
-    expect(arrows).toHaveLength(1);
+    expect(arrows).toHaveLength(2);
+    expect(arrows.filter((c) => c.hidden)).toHaveLength(1);
   });
 
   it('does not report the flattened instance as a loss', () => {

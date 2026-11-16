@@ -42,6 +42,10 @@ exports[`a real Figma clipboard > maps the copied frame to one frame placement w
             "hidden": false,
             "item": {
               "absolute": false,
+              "constraints": {
+                "horizontal": "scale",
+                "vertical": "scale",
+              },
               "grow": false,
               "stretch": false,
             },
@@ -73,6 +77,10 @@ exports[`a real Figma clipboard > maps the copied frame to one frame placement w
             "hidden": false,
             "item": {
               "absolute": false,
+              "constraints": {
+                "horizontal": "scale",
+                "vertical": "scale",
+              },
               "grow": false,
               "stretch": false,
             },
@@ -104,6 +112,10 @@ exports[`a real Figma clipboard > maps the copied frame to one frame placement w
             "hidden": false,
             "item": {
               "absolute": false,
+              "constraints": {
+                "horizontal": "scale",
+                "vertical": "scale",
+              },
               "grow": false,
               "stretch": false,
             },
@@ -123,6 +135,10 @@ exports[`a real Figma clipboard > maps the copied frame to one frame placement w
         "hidden": false,
         "item": {
           "absolute": false,
+          "constraints": {
+            "horizontal": "scale",
+            "vertical": "scale",
+          },
           "grow": false,
           "stretch": false,
         },
@@ -166,6 +182,10 @@ exports[`a real Figma clipboard > maps the copied frame to one frame placement w
         "italic": false,
         "item": {
           "absolute": false,
+          "constraints": {
+            "horizontal": "scale",
+            "vertical": "scale",
+          },
           "grow": false,
           "stretch": false,
         },
@@ -176,6 +196,8 @@ exports[`a real Figma clipboard > maps the copied frame to one frame placement w
         "maxLines": 0,
         "name": "dal nulla",
         "opacity": 1,
+        "paragraphIndent": 0,
+        "paragraphSpacing": 0,
         "rotation": 0,
         "runs": [],
         "size": 240,
@@ -183,6 +205,7 @@ exports[`a real Figma clipboard > maps the copied frame to one frame placement w
         "strokes": [],
         "text": "dal 
 nulla",
+        "verticalAlign": "top",
         "weight": 700,
       },
     ],
@@ -263,6 +286,10 @@ nulla",
                 "hidden": false,
                 "item": {
                   "absolute": false,
+                  "constraints": {
+                    "horizontal": "scale",
+                    "vertical": "scale",
+                  },
                   "grow": false,
                   "stretch": false,
                 },
@@ -294,6 +321,10 @@ nulla",
                 "hidden": false,
                 "item": {
                   "absolute": false,
+                  "constraints": {
+                    "horizontal": "scale",
+                    "vertical": "scale",
+                  },
                   "grow": false,
                   "stretch": false,
                 },
@@ -325,6 +356,10 @@ nulla",
                 "hidden": false,
                 "item": {
                   "absolute": false,
+                  "constraints": {
+                    "horizontal": "scale",
+                    "vertical": "scale",
+                  },
                   "grow": false,
                   "stretch": false,
                 },
@@ -344,6 +379,10 @@ nulla",
             "hidden": false,
             "item": {
               "absolute": false,
+              "constraints": {
+                "horizontal": "scale",
+                "vertical": "scale",
+              },
               "grow": false,
               "stretch": false,
             },
@@ -387,6 +426,10 @@ nulla",
             "italic": false,
             "item": {
               "absolute": false,
+              "constraints": {
+                "horizontal": "scale",
+                "vertical": "scale",
+              },
               "grow": false,
               "stretch": false,
             },
@@ -397,6 +440,8 @@ nulla",
             "maxLines": 0,
             "name": "dal nulla",
             "opacity": 1,
+            "paragraphIndent": 0,
+            "paragraphSpacing": 0,
             "rotation": 0,
             "runs": [],
             "size": 240,
@@ -404,6 +449,7 @@ nulla",
             "strokes": [],
             "text": "dal 
 nulla",
+            "verticalAlign": "top",
             "weight": 700,
           },
         ],

@@ -1,22 +1,29 @@
 import { Offscreen, ZoomPicture } from '$lib/canvas/core/residency';
 
 const MB = 1024 * 1024;
+const RGBA_BYTES = 4;
 
 export enum Device {
   Desktop = 'desktop',
   Phone = 'phone'
 }
 
-type Budget = { textureBytes: number; tileBytes: number; pictureSide: number; resolution: number; framesInFlight: number; retainMs: number; buildLanes: number; canvasTiles: number; offscreen: Offscreen; zoomPicture: ZoomPicture; readableWidth: number; builtBytes: number };
+type Budget = { textureBytes: number; tileBytes: number; pictureSide: number; atlasSide: number; effectBytes: number; resolution: number; framesInFlight: number; retainMs: number; buildLanes: number; canvasTiles: number; offscreen: Offscreen; zoomPicture: ZoomPicture; readableWidth: number; builtBytes: number };
 
 export const BUDGET: Record<Device, Budget> = {
-  [Device.Desktop]: { textureBytes: 256 * MB, tileBytes: 384 * MB, pictureSide: 4096, resolution: 2, framesInFlight: 6, retainMs: 15_000, buildLanes: 4, canvasTiles: 320, offscreen: Offscreen.Resident, zoomPicture: ZoomPicture.Exact, readableWidth: 0, builtBytes: Infinity },
-  [Device.Phone]: { textureBytes: 128 * MB, tileBytes: 128 * MB, pictureSide: 2048, resolution: 2, framesInFlight: 3, retainMs: 0, buildLanes: 1, canvasTiles: 0, offscreen: Offscreen.Dropped, zoomPicture: ZoomPicture.Held, readableWidth: 160, builtBytes: 64 * MB }
+  [Device.Desktop]: { textureBytes: 256 * MB, tileBytes: 384 * MB, pictureSide: 4096, atlasSide: 8192, effectBytes: 256 * MB, resolution: 2, framesInFlight: 6, retainMs: 15_000, buildLanes: 4, canvasTiles: 320, offscreen: Offscreen.Resident, zoomPicture: ZoomPicture.Exact, readableWidth: 0, builtBytes: Infinity },
+  [Device.Phone]: { textureBytes: 64 * MB, tileBytes: 24 * MB, pictureSide: 1024, atlasSide: 4096, effectBytes: 16 * MB, resolution: 2, framesInFlight: 3, retainMs: 0, buildLanes: 1, canvasTiles: 0, offscreen: Offscreen.Dropped, zoomPicture: ZoomPicture.Held, readableWidth: 160, builtBytes: 64 * MB }
+};
+
+export const PHONE_GPU_BYTES = 192 * MB;
+
+export const gpuBytes = (device: Device): number => {
+  const { textureBytes, tileBytes, effectBytes, atlasSide } = BUDGET[device];
+  return textureBytes + tileBytes + effectBytes + atlasSide * atlasSide * RGBA_BYTES;
 };
 
 export const buildLanes = (device: Device, cores: number): number => Math.max(1, Math.min(BUDGET[device].buildLanes, cores - 1));
 
-const RGBA_BYTES = 4;
 const SCREENS_HELD = 12;
 
 export const textureBudget = (ceiling: number, canvas: { width: number; height: number }): number => Math.min(ceiling, SCREENS_HELD * canvas.width * canvas.height * RGBA_BYTES);
