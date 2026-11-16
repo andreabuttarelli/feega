@@ -10,10 +10,13 @@ on:
       - 'src/lib/components/ui/**'
       - 'src/lib/motion/**'
       - 'packages/motion-core/src/**'
+      - 'scripts/local.mjs'
       - 'tests/e2e/inspector-audit.*'
       - 'tests/e2e/fixtures/inspector-audit/**'
       - '.github/workflows/inspector-audit.yml'
   workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * *'
 
 concurrency:
   group: inspector-audit-${{ github.event.pull_request.number || github.ref }}
@@ -23,10 +26,11 @@ jobs:
   audit:
     if: github.event.action != 'labeled' || github.event.label.name == 'inspector-audit'
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 30
     continue-on-error: true
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
         include:
           - part: rect
@@ -43,6 +47,8 @@ jobs:
             rows: '^fx-[h-z]'
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'dev' || '' }}
 
       - uses: actions/setup-node@v4
         with:

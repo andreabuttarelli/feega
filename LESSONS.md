@@ -3989,3 +3989,7 @@ property reads on ~2,000 items (`src/lib/canvas/counted-list.testkit.ts`), not w
 ## A component with a mask inside lands as a plain group, never linked
 
 **Signal:** a main with a mask layer pasted from Figma, its untouched instances come out as groups named after the component instead of instances. **Move:** `instanceOverrides` (`instance-diff.ts`) refuses a pair whose clip fields differ outside the ignored set; `matteFrom` holds a clip id, and the own copy and the main have different ids. Compare it through the clip pairs as `parent` is, never by value.
+
+## A CI audit matrix holds runners for hours when one row wedges the page
+
+**Signal:** `ci.yml` `test` sits queued while `audit (…)` jobs run past an hour; the audit log shows the same `locator.click: Timeout 3000ms exceeded ... waiting for element to be visible, enabled and stable` on every row, about 2 minutes apart. **Move:** a run that is not required must still be bounded: `timeout-minutes` from a measured run, `max-parallel` on the matrix, and a circuit breaker in the spec (`unreachedRows` in `inspector-audit.spec.ts`) so one wedged page fails the rest at once instead of timing out row by row.
