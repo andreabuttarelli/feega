@@ -135,6 +135,8 @@ struct Counted {
     uncovered: u32,
     tiles: u32,
     uploads: u32,
+    fallback_ms: f64,
+    exact: bool,
 }
 
 struct GpuPainter<'a> {
@@ -995,6 +997,7 @@ impl WebCore {
         let took = js_sys::Date::now() - began;
         self.credit.spend(took);
         self.sharpness.fallback_ms += took;
+        self.counted.fallback_ms += took;
         Ok(true)
     }
 
@@ -1047,6 +1050,7 @@ impl WebCore {
         let took = js_sys::Date::now() - began;
         self.credit.spend(took);
         self.sharpness.fallback_ms += took;
+        self.counted.fallback_ms += took;
         if self.ahead.as_ref().is_some_and(|a| a.todo.is_empty()) {
             let Ahead { camera, size, pieces, .. } = self.ahead.take().expect("ahead finished");
             self.fallback.push(Fallback { camera, size, pieces });
@@ -1136,6 +1140,7 @@ impl WebCore {
             return Ok(report);
         }
         self.drew_tiles = false;
+        self.counted.exact = true;
         let limits = self.frame_limits(now_ms);
         let mut painter = GpuPainter { device: &self.device, queue: &self.queue, surface: &self.surface, format: self.format, engine: &mut self.engine, pictures: &self.pictures, cached: &mut self.cached, limits, retained: &mut self.retained, spare: &mut self.spare, reprojector: &mut self.reprojector, scratch: &mut self.scratch };
         let timed = self.gpu_full_ms.swap(NOT_TIMED, Ordering::Relaxed);
@@ -1292,7 +1297,7 @@ impl WebCore {
     pub fn frame_counts(&mut self) -> Vec<f64> {
         let planned = self.compositor.take_planned();
         let counted = std::mem::take(&mut self.counted);
-        vec![f64::from(planned.plans), f64::from(planned.walked), planned.ms, f64::from(counted.bakes), counted.ms, counted.upload_bytes, f64::from(counted.unsharp), f64::from(counted.uncovered), f64::from(step_of(self.camera.zoom)), f64::from(counted.tiles), f64::from(self.engine.take_draws()), f64::from(counted.uploads)]
+        vec![f64::from(planned.plans), f64::from(planned.walked), planned.ms, f64::from(counted.bakes), counted.ms, counted.upload_bytes, f64::from(counted.unsharp), f64::from(counted.uncovered), f64::from(step_of(self.camera.zoom)), f64::from(counted.tiles), f64::from(self.engine.take_draws()), f64::from(counted.uploads), counted.fallback_ms, f64::from(u8::from(counted.exact))]
     }
     pub fn warming(&self) -> bool {
         self.warming
