@@ -9,7 +9,7 @@ type Slot = Omit<FigmaImage, 'clipId'>;
 export type InstanceDiff = { overrides: Overrides; images: Slot[] };
 export type ImagesOf = { own: FigmaImage[]; main: FigmaImage[] };
 
-const IGNORED = new Set(['id', 'name', 'parent', 'props', 'source', ...CLIP_LEVEL_OVERRIDES]);
+const IGNORED = new Set(['id', 'name', 'parent', 'matteFrom', 'props', 'source', ...CLIP_LEVEL_OVERRIDES]);
 
 const PRECISION = 1e6;
 
@@ -39,7 +39,7 @@ function paired(doc: MotionDoc, ownId: string, mainId: string, top: boolean): Pa
   return pairs;
 }
 
-const shownOf = (image: FigmaImage | undefined) => ({ hash: image?.hash, fit: image?.fit, focus: image?.focus });
+const shownOf = ({ clipId: _clip, innerId: _inner, at: _at, ...look }: Partial<FigmaImage> = {}) => look;
 
 const restOf = (clip: MotionClip) => Object.fromEntries(Object.entries(clip).filter(([k]) => !IGNORED.has(k)));
 
@@ -57,7 +57,8 @@ export function instanceOverrides(doc: MotionDoc, ownId: string, mainId: string,
     return null;
   }
   const mainOf = new Map(pairs.map((p) => [p.own.id, p]));
-  const parentsMatch = pairs.every((p) => (p.own.parent ? mainOf.get(p.own.parent)?.main.id === p.main.parent : !p.main.parent));
+  const linked = (own: string | null | undefined, main: string | null | undefined) => (own ? mainOf.get(own)?.main.id === main : !main);
+  const parentsMatch = pairs.every((p) => linked(p.own.parent, p.main.parent) && linked(p.own.matteFrom, p.main.matteFrom));
   if (!parentsMatch || pairs.some((p) => !same(restOf(p.own), restOf(p.main)))) {
     return null;
   }
@@ -93,7 +94,8 @@ export function instanceOverrides(doc: MotionDoc, ownId: string, mainId: string,
     if (!pair.top) {
       return null;
     }
-    slots.push({ hash: image.hash, at: image.at, fit: image.fit, focus: image.focus, innerId: pair.main.id });
+    const { clipId: _clip, ...look } = image;
+    slots.push({ ...look, innerId: pair.main.id });
   }
   const covered = images.main.every((m) => pairs.some((p) => p.main.id === m.clipId && slot(images.own, p.own.id, m.at)));
   return covered ? { overrides, images: slots } : null;
