@@ -589,6 +589,14 @@ impl Warmup {
 pub enum Path {
     Exact,
     Tiles,
+    Direct,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum GestureDraw {
+    #[default]
+    Tiles,
+    Direct,
 }
 
 #[derive(Clone, Copy)]
@@ -596,9 +604,13 @@ pub struct Moment {
     pub gesture: bool,
     pub lifting: bool,
     pub settling: bool,
+    pub draw: GestureDraw,
 }
 
 pub fn path_for(m: Moment) -> Path {
+    if m.draw == GestureDraw::Direct && !m.lifting && (m.gesture || m.settling) {
+        return Path::Direct;
+    }
     if m.gesture || m.lifting || m.settling {
         return Path::Tiles;
     }

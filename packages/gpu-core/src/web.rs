@@ -16,7 +16,7 @@ use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, batches_of, bake_batches, BAKE_BATCH_TILES, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys};
+use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, GestureDraw, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, batches_of, bake_batches, BAKE_BATCH_TILES, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys};
 use crate::overlay_seen::OverlaySeen;
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
@@ -104,6 +104,8 @@ pub struct WebCore {
     rest_shown: Vec<(Rect, wgpu::Texture)>,
     rest_spare: FxHashMap<(u32, u32), Vec<wgpu::Texture>>,
     counted: Counted,
+    gesture_draw: GestureDraw,
+    direct: Option<wgpu::Texture>,
 }
 
 #[derive(Default)]
@@ -345,7 +347,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 } })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 }, gesture_draw: GestureDraw::Tiles, direct: None })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -534,6 +536,10 @@ impl WebCore {
 
     pub fn set_tiles(&mut self, on: bool) {
         self.tiled = on;
+    }
+
+    pub fn set_direct_gesture(&mut self, on: bool) {
+        self.gesture_draw = if on { GestureDraw::Direct } else { GestureDraw::Tiles };
     }
 
     fn fill_pyramid(&mut self) -> Result<bool, JsValue> {
@@ -898,7 +904,11 @@ impl WebCore {
             self.adopted = None;
         }
         let moving = matches!(self.motion, CoreMotion::Gesture);
-        let moment = || Moment { gesture: moving, lifting: self.compositor.holding() || !self.compositor.lifts(&self.library).is_empty(), settling: self.adopted.is_none() && self.drew_tiles && self.tiles_show_all() };
+        let moment = || Moment { gesture: moving, lifting: self.compositor.holding() || !self.compositor.lifts(&self.library).is_empty(), settling: self.adopted.is_none() && self.drew_tiles && self.tiles_show_all(), draw: self.gesture_draw };
+        if path_for(moment()) == Path::Direct {
+            self.drew_tiles = false;
+            return self.direct_frame(now_ms);
+        }
         if self.tiled && path_for(moment()) == Path::Tiles {
             self.adopted = None;
             self.drew_tiles = true;
@@ -944,6 +954,45 @@ impl WebCore {
         }
         self.warming = self.tiled && building == Building::Nothing && (!idle || coarse_left);
         Ok(frame.report())
+    }
+
+    fn direct_frame(&mut self, at_ms: f64) -> Result<String, JsValue> {
+        let began = now_ms();
+        self.compositor.take_damage();
+        let size = (self.target.width(), self.target.height());
+        let plan = self.compositor.plan_at(&mut self.library, self.camera, size, self.limits);
+        let building = plan.pending;
+        let (list, missing) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
+        let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
+        let texture = self.direct.take().filter(|t| (t.width(), t.height()) == size).unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
+        self.engine.draw(&self.device, &self.queue, &list, &pictures, &texture.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
+        let frame = match self.surface.get_current_texture() {
+            wgpu::CurrentSurfaceTexture::Success(t) | wgpu::CurrentSurfaceTexture::Suboptimal(t) => t,
+            _ => return Err(failed("no surface texture")),
+        };
+        let out = frame.texture.create_view(&wgpu::TextureViewDescriptor { format: Some(self.format), ..Default::default() });
+        let screen = Rect::new(0.0, 0.0, size.0 as f64, size.1 as f64);
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+        self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source: &texture, target: &out, format: self.format, look: UNMOVED, within: None, output: Output::Premultiplied });
+        if let Some(overlay) = self.overlay_texture()? {
+            self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source: &overlay, target: &out, format: self.format, look: UNMOVED, within: Some(screen), output: Output::Over });
+            self.overlay_tex = Some(overlay);
+        }
+        let whole = !building && missing.is_empty();
+        if whole {
+            let o = self.compositor.retained_overscan();
+            encoder.copy_texture_to_texture(texel(&texture, 0, 0), texel(&self.retained, o, o), wgpu::Extent3d { width: size.0, height: size.1, depth_or_array_layers: 1 });
+        }
+        self.queue.submit([encoder.finish()]);
+        self.queue.present(frame);
+        if whole {
+            self.compositor.adopt(self.camera, at_ms);
+            self.adopted = Some(self.camera);
+        }
+        self.direct = Some(texture);
+        self.count_bake(began);
+        self.pending = !whole || self.compositor.pending_raster();
+        Ok("direct".into())
     }
 
     fn tiles_show_all(&self) -> bool {

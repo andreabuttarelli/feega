@@ -18,6 +18,7 @@
   import { PART_ITEMS, parts } from '$lib/canvas/core/group-parts';
   import { spliceOf } from '@feega/motion-core/canvas/core/group-diff';
   import { storedTiles, tilesOn } from '$lib/canvas/core/tiles-switch';
+  import { directOn, storedDirect } from '$lib/canvas/core/direct-switch';
   import { cacheZoom, cached, uncached, pictureBytes, resident, heldWhileMoving, movingWhileZooming, ZoomPicture, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, buildLanes, currentDevice, textureBudget } from '$lib/canvas/gpu/memory-budget';
   import { worldUses, type Turn } from '$lib/canvas/core/screen-uses';
@@ -967,6 +968,7 @@
         r.setCanvasTiles?.(budget.canvasTiles);
         r.setPixelRatio?.(resolution);
         r.setTiles?.(TILED);
+        r.setDirectGesture?.(DIRECT);
         raster = r;
         markStartup(StartupStep.GpuReady);
       },
@@ -1104,6 +1106,7 @@
   const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.search).has('coreDebug');
   const TIMELINE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('loadTimeline');
   const TILED = typeof location !== 'undefined' && tilesOn(location.search, storedTiles());
+  const DIRECT = typeof location !== 'undefined' && directOn(location.search, storedDirect());
   const MAX_LISTED = 12;
   const OVERSCAN_SHARE = 8;
   const OVERSCAN_MAX = 128;

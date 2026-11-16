@@ -274,13 +274,24 @@ fn tiles_warm_a_moment_after_the_last_gesture() {
 
 #[test]
 fn a_lift_without_a_camera_move_draws_from_tiles() {
-    use gpu_core::tiles::{path_for, Moment, Path};
-    let still = Moment { gesture: false, lifting: false, settling: false };
+    use gpu_core::tiles::{path_for, GestureDraw, Moment, Path};
+    let still = Moment { gesture: false, lifting: false, settling: false, draw: GestureDraw::Tiles };
 
     assert_eq!(path_for(still), Path::Exact);
     assert_eq!(path_for(Moment { lifting: true, ..still }), Path::Tiles);
     assert_eq!(path_for(Moment { gesture: true, ..still }), Path::Tiles);
     assert_eq!(path_for(Moment { settling: true, ..still }), Path::Tiles);
+}
+
+#[test]
+fn a_direct_gesture_draws_the_scene_but_a_lift_keeps_its_tiles() {
+    use gpu_core::tiles::{path_for, GestureDraw, Moment, Path};
+    let still = Moment { gesture: false, lifting: false, settling: false, draw: GestureDraw::Direct };
+
+    assert_eq!(path_for(still), Path::Exact);
+    assert_eq!(path_for(Moment { gesture: true, ..still }), Path::Direct);
+    assert_eq!(path_for(Moment { settling: true, ..still }), Path::Direct);
+    assert_eq!(path_for(Moment { gesture: true, lifting: true, ..still }), Path::Tiles);
 }
 
 #[test]
