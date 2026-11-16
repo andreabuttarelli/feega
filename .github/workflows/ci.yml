@@ -29,7 +29,14 @@ jobs:
       - run: npm ci
 
       - name: Billing SQL harnesses (pglite)
-        run: npm run test:credit-expiry && npm run test:seat-billing && npm run test:agent-edits && npm run test:billing-rls
+        run: npm run test:credit-expiry && npm run test:seat-billing && npm run test:agent-edits && npm run test:billing-rls && npm run test:credit-spend
+
+      - name: Credit spend harness on Postgres, parallel connections
+        run: |
+          sudo systemctl start postgresql.service
+          sudo -u postgres psql -c "alter user postgres password 'postgres'"
+          sudo -u postgres createdb credit_spend
+          CREDIT_SPEND_DATABASE_URL=postgres://postgres:postgres@localhost:5432/credit_spend npm run test:credit-spend
 
       - name: Runtime type gate
         run: node scripts/typecheck-runtime.mjs
