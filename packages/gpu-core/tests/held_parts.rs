@@ -92,3 +92,33 @@ fn a_content_change_makes_every_page_unusable() {
     assert_eq!(work.now, vec!["a".to_string()]);
     assert_eq!(work.gone, vec![1]);
 }
+
+#[test]
+fn a_gesture_starts_only_builds_it_knows_will_fit_its_budget() {
+    use gpu_core::held_parts::{Budget, Pace};
+    let moving = Budget::new(Pace::Gesture);
+
+    assert!(moving.allows(Some(1.0), 2.0));
+    assert!(!moving.allows(Some(1.5), 2.0));
+    assert!(!moving.allows(None, 0.0));
+}
+
+#[test]
+fn a_still_canvas_builds_unknown_pages_until_its_budget_is_spent() {
+    use gpu_core::held_parts::{Budget, Pace};
+    let still = Budget::new(Pace::Still);
+
+    assert!(still.allows(None, 0.0));
+    assert!(still.allows(Some(5.0), 2.0));
+    assert!(!still.allows(None, 20.0));
+}
+
+#[test]
+fn a_frame_is_drawn_direct_only_when_every_page_on_screen_is_covered() {
+    let mut parts: Parts<()> = Parts::default();
+    parts.put("a", HeldView::around(at(0.0, 0.0, 1.0), SCREEN), (), 0);
+
+    assert!(parts.covers(&seen(&["a"], &["b"]), at(0.0, 0.0, 1.6), SCREEN));
+    assert!(!parts.covers(&seen(&["a", "b"], &[]), at(0.0, 0.0, 1.0), SCREEN));
+    assert!(!parts.covers(&seen(&["a"], &[]), at(-600.0, 0.0, 1.0), SCREEN));
+}

@@ -1109,6 +1109,8 @@
   const DIRECT = typeof location !== 'undefined' && directOn(location.search, storedDirect(), thisDevice());
   const DIRECT_GUARDED = DIRECT && typeof location !== 'undefined' && !forcedDirect(location.search, storedDirect());
   const directGuard = new GestureGuard();
+  let lastPaint = 0;
+  let wasMoving = false;
   const MAX_LISTED = 12;
   const OVERSCAN_SHARE = 8;
   const OVERSCAN_MAX = 128;
@@ -1392,9 +1394,12 @@
     into.setCamera(at.x, at.y, at.zoom);
     const began = performance.now();
     const { outcome, pending, skipped } = into.frame(began);
-    if (DIRECT_GUARDED && gesture.active() && directGuard.slow(performance.now() - began)) {
+    const presented = began - lastPaint;
+    lastPaint = began;
+    if (DIRECT_GUARDED && gesture.active() && wasMoving && directGuard.slow(presented)) {
       into.setDirectGesture?.(false);
     }
+    wasMoving = gesture.active();
     countFrame(began, into.frameCounts?.(), gesture.active(), pending);
     perf.frame(gesture.active() ? camera : Camera.Still, lift !== null, began);
     settleEdits(began);

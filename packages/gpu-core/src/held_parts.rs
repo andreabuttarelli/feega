@@ -89,6 +89,10 @@ impl<P> Parts<P> {
         work
     }
 
+    pub fn covers(&self, seen: &Seen, now: Camera, screen: (u32, u32)) -> bool {
+        seen.on_screen.iter().all(|k| self.freshness(k, now, screen) != Freshness::Gone)
+    }
+
     pub fn drawn(&self, seen: &Seen) -> Vec<(&HeldView, &P)> {
         seen.on_screen.iter().filter_map(|k| self.parts.get(k)).map(|p| (&p.view, &p.scene)).collect()
     }
@@ -121,4 +125,38 @@ pub fn pages_of(list: &DisplayList, size_of: impl Fn(&str) -> Option<(f64, f64)>
         }
     }
     (seen, pages)
+}
+
+const GESTURE_BUDGET_MS: f64 = 3.0;
+const STILL_BUDGET_MS: f64 = 12.0;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Pace {
+    Gesture,
+    Still,
+}
+
+pub struct Budget {
+    pace: Pace,
+}
+
+impl Budget {
+    pub fn new(pace: Pace) -> Budget {
+        Budget { pace }
+    }
+
+    pub fn ms(&self) -> f64 {
+        match self.pace {
+            Pace::Gesture => GESTURE_BUDGET_MS,
+            Pace::Still => STILL_BUDGET_MS,
+        }
+    }
+
+    pub fn allows(&self, cost: Option<f64>, spent: f64) -> bool {
+        match (self.pace, cost) {
+            (Pace::Gesture, None) => false,
+            (_, Some(cost)) => spent + cost <= self.ms(),
+            (Pace::Still, None) => spent < self.ms(),
+        }
+    }
 }

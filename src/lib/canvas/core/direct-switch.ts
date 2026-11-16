@@ -4,9 +4,12 @@ const OFF = '0';
 
 const WEAK_CORES = 4;
 const WEAK_MEMORY_GB = 4;
-const FRAME_BUDGET_MS = 16.7;
-const SAMPLED_FRAMES = 120;
-const SLOW_SHARE = 0.1;
+const WINDOW_FRAMES = 240;
+const REFRESH_PERCENTILE = 0.1;
+const LATE_FACTOR = 1.4;
+const SLOW_SHARE = 0.05;
+const STALL_MS = 100;
+const STALLS_ALLOWED = 1;
 
 export const DIRECT_STORAGE_KEY = 'feega:directZoom';
 
@@ -65,17 +68,27 @@ export function thisDevice(): Device {
 }
 
 export class GestureGuard {
-  #seen = 0;
-  #over = 0;
+  #window: number[] = [];
+  #stalls = 0;
   #gaveUp = false;
 
-  slow(frameMs: number): boolean {
-    if (this.#gaveUp || this.#seen >= SAMPLED_FRAMES) {
-      return this.#gaveUp;
+  slow(presentedMs: number): boolean {
+    if (this.#gaveUp) {
+      return true;
     }
-    this.#seen += 1;
-    this.#over += frameMs > FRAME_BUDGET_MS ? 1 : 0;
-    this.#gaveUp = this.#seen >= SAMPLED_FRAMES && this.#over / this.#seen > SLOW_SHARE;
+    this.#stalls += presentedMs >= STALL_MS ? 1 : 0;
+    this.#window.push(presentedMs);
+    if (this.#window.length >= WINDOW_FRAMES) {
+      this.#gaveUp = lateShare(this.#window) > SLOW_SHARE;
+      this.#window = [];
+    }
+    this.#gaveUp ||= this.#stalls > STALLS_ALLOWED;
     return this.#gaveUp;
   }
+}
+
+function lateShare(intervals: number[]): number {
+  const sorted = [...intervals].sort((a, b) => a - b);
+  const refresh = sorted[Math.floor(sorted.length * REFRESH_PERCENTILE)];
+  return intervals.filter((ms) => ms > refresh * LATE_FACTOR).length / intervals.length;
 }
