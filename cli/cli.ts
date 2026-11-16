@@ -612,7 +612,7 @@ canvas
   .option('--routes <spec>', 'discover = list the pages the file router declares, without running the app; all = import every static page found; or a list "/ /pricing /blog/hello"')
   .option('--scheme <schemes...>', 'Render each page under these themes: light, dark (default light)')
   .option('--width <px...>', 'Render each page at these widths in px (default 1280); one page at several widths of one theme becomes breakpoint views of the widest, otherwise one board per combination')
-  .option('--boards', 'Keep each width as its own board, with components, instead of breakpoint views of one frame (the default when one page is imported at several widths of one theme)')
+  .option('--boards', 'Several widths of one page in one theme now give ONE frame with the narrower widths as breakpoint views (components not extracted); pass --boards to get a board per width with components, as before')
   .option('--no-design-system', 'Skip the design system: no variables from the CSS tokens, no Design system board')
   .option('--delay <ms>', 'Extra wait in ms before each page is captured, for content that arrives late (default 0, at most 10000)', Number)
   .option('--route-delay <route=ms...>', 'Extra wait for one route, wins over --delay, e.g. /blog/post=3000')

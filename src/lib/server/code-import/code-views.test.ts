@@ -8,6 +8,8 @@ import { Responsive, responsiveOf } from './code-views';
 import { applyEdits, editsOf } from './write-back';
 import { OverrideKey, setOverride } from '@feega/motion-core/motion/breakpoints/model';
 import { askOf, APP } from './code-import.testkit';
+import { fixture } from '../../../../tests/fixtures/design-tokens/read';
+import { DESIGN_BOARD } from './design-board';
 
 const WHITE = { r: 1, g: 1, b: 1, a: 1 };
 const BLUE = { r: 0, g: 0.4, b: 1, a: 1 };
@@ -35,8 +37,8 @@ const TREES: Record<number, PageTree> = {
 
 const widths = [1280, 768, 390];
 
-function sized() {
-  const made = askOf({ routes: ['/'], conditions: widths.map((width) => ({ scheme: Scheme.Light, width })) });
+function sized(extra: Record<string, unknown> = {}) {
+  const made = askOf({ routes: ['/'], ...extra, conditions: widths.map((width) => ({ scheme: Scheme.Light, width })) });
   let width = BASE_CONDITIONS.width;
   made.tab.viewport.mockImplementation(async (w: number) => {
     width = w;
@@ -167,5 +169,19 @@ describe('pull of a frame imported with views', () => {
     expect(responsiveOf(page('w390'))).toBe(Responsive.Views);
     expect(responsiveOf(page())).toBe(Responsive.Boards);
     expect(responsiveOf({})).toBe(Responsive.Boards);
+  });
+});
+
+describe('design tokens on a frame with views', () => {
+  it('keeps the variables, bound once for the page, and has no Design system board beside the views', async () => {
+    const { ask, docs } = sized({ code: () => fixture('tailwind4') });
+
+    const done = await importCodeAt(ask);
+
+    const doc = docOf(docs);
+    expect(done).toMatchObject({ outcome: CodeImportOutcome.Ok, design: { tokens: 14 } });
+    expect(doc.variables!['app Colors']).toMatchObject({ modes: ['Light', 'Dark'] });
+    expect(clipsOf(doc).some((c) => c.name === DESIGN_BOARD)).toBe(false);
+    expect(doc.breakpoints).toHaveLength(2);
   });
 });

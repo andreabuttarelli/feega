@@ -37,7 +37,6 @@ footer{background:#111;color:#ddd;padding:32px 48px}
 
 const WIDTHS = [1280, 768, 390];
 const FOLD_HEIGHT = 800;
-const SPEC = { mime: 'image/png', ext: 'png', scale: 1, quality: undefined, size: () => ({ width: 1, height: 1 }) } as never;
 
 let url = '';
 let close = () => undefined as unknown;
@@ -80,7 +79,7 @@ async function treeAt(width: number) {
 }
 
 async function painted(doc: MotionDoc): Promise<Buffer> {
-  return drawStill(chromiumFrames, { doc, tokens: FEEGA_TOKENS, assets: {} }, { ...SPEC, size: () => ({ width: doc.width, height: doc.height }) });
+  return drawStill(chromiumFrames, { doc, tokens: FEEGA_TOKENS, assets: {} }, { mime: 'image/png', ext: 'png', scale: 1, quality: undefined, size: () => ({ width: doc.width, height: doc.height }) } as never);
 }
 
 async function score(source: Buffer, drawn: Buffer, width: number): Promise<number> {

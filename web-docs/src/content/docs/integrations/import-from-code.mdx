@@ -54,7 +54,7 @@ Choose several and every page lands once per combination, side by side in the sa
 
 ### One page at several widths: views
 
-When you import **one page** at **several widths in one theme**, the dialog offers **Widths as views of one frame** (the default). The widest width is the frame; each narrower one is a breakpoint view of it, as in a page imported from a URL. A layer the page keeps at every width is one layer with per-view overrides, so a text edited on the desktop view changes in every view. Use the view switcher of the frame editor to see and adjust each width. The import map lists every width on the page, marked as a view.
+When you import **one page** at **several widths in one theme**, the dialog offers **Widths as views of one frame** (the default; before, every width was its own board: pass `--boards` or `responsive: "boards"` to get that back). The widest width is the frame; each narrower one is a breakpoint view of it, as in a page imported from a URL. A layer the page keeps at every width is one layer with per-view overrides, so a text edited on the desktop view changes in every view. Use the view switcher of the frame editor to see and adjust each width. The import map lists every width on the page, marked as a view.
 
 - **Components are not extracted** in this shape: an instance cannot follow a view. The answer lists the components it found under `skipped`. Choose **Each width as a board, components kept** (CLI `--boards`, API `responsive: "boards"`) to keep components and get one board per width as before.
 - **Several pages, or several themes, in one run** always come as boards, and the answer says so. A dark theme is a variables mode or its own board, never a view.
