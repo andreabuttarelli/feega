@@ -58,6 +58,12 @@ describe('write-back', () => {
     expect(editsOf(doc)).toEqual([{ at: { file: 'src/x.svelte', line: 3, column: 4 }, look: { text: 'new' }, was: { text: 'old' } }]);
   });
 
+  it('an edit on a layer drawn by the component gallery is never written back: the gallery exists only in the sandbox', () => {
+    const clip = (id: string, at: string) => ({ id, component: 'Text', props: { text: 'new' }, source: { at, was: { text: 'old' } } });
+    const doc = { width: 100, height: 100, tracks: [{ clips: [clip('a', 'app/feega-gallery/page.tsx:3:4'), clip('b', 'src/feega-gallery.tsx:9:2'), clip('c', 'pages/feega-gallery.tsx:1:0'), clip('d', 'src/x.svelte:3:4')] }], comps: {} } as unknown as MotionDoc;
+    expect(editsOf(doc).map((e) => e.at.file)).toEqual(['src/x.svelte']);
+  });
+
   it('un livello legato a una variabile non scrive il suo colore nel template: lo scrive il token', () => {
     const clip = { id: 'a', component: 'Text', props: { text: 'new', color: '#f0f0f0' }, bind: { color: 'app Colors/primary' }, source: { at: 'src/x.svelte:3:4', was: { text: 'old', color: '#111111' } } };
     const doc = { width: 100, height: 100, tracks: [{ clips: [clip] }], comps: {} } as unknown as MotionDoc;

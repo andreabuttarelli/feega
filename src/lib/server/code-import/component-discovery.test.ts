@@ -237,6 +237,22 @@ describe('discover', () => {
     expect(box.unresolved).toEqual(['size']);
   });
 
+  it('a component that only renders on the server is flagged, so the client gallery leaves it out', () => {
+    const found = discover({
+      'components/Header.tsx': `import 'server-only';\nexport function Header() { return <header />; }`,
+      'components/Feed.tsx': `export default async function Feed() { return <ul />; }`,
+      'components/Save.tsx': `'use server';\nexport function Save() { return <form />; }`,
+      'components/Plain.tsx': `export function Plain() { return <div />; }`
+    }).components;
+
+    expect(found.map((c) => [c.name, c.serverOnly])).toEqual([
+      ['Header', true],
+      ['Feed', true],
+      ['Save', true],
+      ['Plain', false]
+    ]);
+  });
+
   it('una funzione con la maiuscola che non rende JSX non è un componente', () => {
     expect(discover({ 'src/components/format.ts': 'export function Format(x: string) { return x.trim(); }' }).components).toEqual([]);
   });

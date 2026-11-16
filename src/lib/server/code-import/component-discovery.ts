@@ -18,7 +18,9 @@ export enum ExportKind {
 
 export type Axis = { values: string[]; default: string | null; evidence: AxisSource[] };
 
-export type DiscoveredComponent = { name: string; file: string; exported: ExportKind; axes: Record<string, Axis>; texts: string[]; states: string[]; unresolved: string[] };
+export type DiscoveredComponent = { name: string; file: string; exported: ExportKind; axes: Record<string, Axis>; texts: string[]; states: string[]; unresolved: string[]; serverOnly: boolean };
+
+type Parsed = Omit<DiscoveredComponent, 'serverOnly'>;
 
 export type Discovery = { components: DiscoveredComponent[] };
 
@@ -42,6 +44,7 @@ const NOT_TEXT = /^(class|className|style|id|key|ref|href|src|alt|on[A-Z].*|aria
 const TEXT_TYPES = new Set(['Snippet', 'ReactNode', 'ReactElement', 'Element', 'VNode', 'JSXElement']);
 const VARIANT_CALLS: Record<string, AxisSource> = { cva: AxisSource.Cva, tv: AxisSource.Tv };
 const WRAPPERS = /(^|\.)(forwardRef|memo)$/;
+const SERVER_ONLY = /(['"])use server\1|['"]server-only['"]|['"]next\/headers['"]|export\s+(default\s+)?async\s+function/;
 
 enum Kind {
   Axis = 'axis',
@@ -288,7 +291,7 @@ function withDefaults(props: Prop[], defaults: Map<string, string | undefined>):
 
 type Candidate = { name: string; exported: ExportKind; props: Prop[] };
 
-function componentOf(file: string, candidate: Candidate, defaults: Map<string, string | undefined>): DiscoveredComponent {
+function componentOf(file: string, candidate: Candidate, defaults: Map<string, string | undefined>): Parsed {
   const axes: Record<string, Axis> = {};
   const texts: string[] = [];
   const unresolved: string[] = [];
@@ -346,7 +349,7 @@ function functionOf(init: ts.Expression | undefined): { fn: Fn; typeArg?: ts.Typ
 
 const capitalised = (name: string) => /^[A-Z]/.test(name);
 
-function scriptComponents(file: string, sf: ts.SourceFile, scope: Scope): DiscoveredComponent[] {
+function scriptComponents(file: string, sf: ts.SourceFile, scope: Scope): Parsed[] {
   const exported = new Map<string, ExportKind>();
   const fns = new Map<string, { fn: Fn; typeArg?: ts.TypeNode }>();
   for (const s of sf.statements) {
@@ -449,7 +452,7 @@ function blockOf(text: string, keep: (attrs: string) => boolean): string {
   return [...text.matchAll(SCRIPT)].filter((m) => keep(m[1] ?? '')).map((m) => m[2]).join('\n');
 }
 
-type Reader = { source: (file: string, text: string) => ts.SourceFile; components: (file: string, sf: ts.SourceFile, scope: Scope) => DiscoveredComponent[] };
+type Reader = { source: (file: string, text: string) => ts.SourceFile; components: (file: string, sf: ts.SourceFile, scope: Scope) => Parsed[] };
 
 const singleFile = (read: (sf: ts.SourceFile, scope: Scope) => { props: Prop[]; defaults: Map<string, string | undefined> }) => (file: string, sf: ts.SourceFile, scope: Scope) => {
   const { props, defaults } = read(sf, scope);
@@ -488,7 +491,7 @@ function storyAxes(sf: ts.SourceFile): { component: string; axes: Record<string,
   return { component: component.text, axes };
 }
 
-function withStory(component: DiscoveredComponent, axes: Record<string, string[]>): DiscoveredComponent {
+function withStory(component: Parsed, axes: Record<string, string[]>): Parsed {
   const merged = { ...component.axes };
   for (const [name, values] of Object.entries(axes)) {
     const known = merged[name] ?? { values: [], default: null, evidence: [] };
@@ -511,7 +514,7 @@ export function discover(files: Record<string, string>): Discovery {
 
   const components = [...sources].filter(([file]) => !STORY_FILE.test(file)).flatMap(([file, { reader, sf }]) => reader.components(file, sf, { ...scopes.get(file)!, hop: false }));
   const stories = [...sources].filter(([file]) => STORY_FILE.test(file)).flatMap(([, { sf }]) => storyAxes(sf) ?? []);
-  return { components: components.map((c) => stories.filter((s) => s.component === c.name).reduce((acc, s) => withStory(acc, s.axes), c)) };
+  return { components: components.map((c) => ({ ...stories.filter((s) => s.component === c.name).reduce((acc, s) => withStory(acc, s.axes), c), serverOnly: SERVER_ONLY.test(files[c.file]) })) };
 }
 
 export type LibraryComponent = DiscoveredComponent & { captured: boolean; cells: number };
