@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./gl": "./src/gl.ts",
-    "./measure": "./src/measure.ts"
+    "./measure": "./src/measure.ts",
+    "./library": "./src/library/index.ts"
   },
   "dependencies": {
     "twgl.js": "7.0.0",

@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { findReachableProject } from '$lib/server/projects/lookup';
 import { listEffects } from '$lib/server/repos/effects';
+import { libraryEffects } from '$lib/server/effects/listing';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ params, locals }) => {
@@ -22,5 +23,5 @@ export const GET: RequestHandler = async ({ params, locals }) => {
   }
 
   const effects = await listEffects(db, found.orgId);
-  return json({ effects: effects ?? [], available: effects !== null });
+  return json({ effects: [...(effects ?? []), ...libraryEffects()], available: effects !== null });
 };
