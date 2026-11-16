@@ -1,7 +1,7 @@
 import { isProp, NodeKind, type Bound, type CodeNode, type ComponentSpec, type ElementNode, type PageSpec, type Rule, type SvgNode, type UseNode } from '../ir';
 import { kebab } from '../naming';
 import type { CodeFile } from '../model';
-import { BASE_CSS, fontLinks, lookupOf, mediaBlocks, ruleBlock, stateBlocks, tokensCss, type TokenLookup } from './css';
+import { BASE_CSS, fontFaceCss, fontLinks, lookupOf, mediaBlocks, ruleBlock, stateBlocks, tokensCss, type TokenLookup } from './css';
 import { escapeHtml, nodeLines, type Dialect } from './markup';
 import { readme } from './project';
 import { animatedNodes, animationCss, inView, INVIEW_CLASS, INVIEW_SCRIPT, PROPERTY_RULES, translates } from './keyframes';
@@ -101,11 +101,13 @@ export function htmlProject(page: PageSpec): CodeFile[] {
   const animations = animationFiles(page);
   const has = (path: string) => animations.some((f) => f.path === path);
   const scripts = has(INVIEW_JS) ? [`    <script src="${INVIEW_JS}" defer></script>`] : [];
-  const links = ['styles/tokens.css', 'styles/base.css', ...componentCss.map((c) => c.path), 'styles/page.css', ...(has(ANIMATIONS_CSS) ? [ANIMATIONS_CSS] : [])].map((href) => `    <link rel="stylesheet" href="${href}" />`);
-  const html = ['<!doctype html>', '<html lang="en">', '  <head>', '    <meta charset="UTF-8" />', '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />', `    <title>${escapeHtml(page.name)}</title>`, ...fontLinks(page.tokens).map((l) => `    ${l}`), ...links, ...scripts, '  </head>', '  <body>', ...body, '  </body>', '</html>', ''];
+  const fontCss = page.fonts.files.length ? ['styles/fonts.css'] : [];
+  const links = [...fontCss, 'styles/tokens.css', 'styles/base.css', ...componentCss.map((c) => c.path), 'styles/page.css', ...(has(ANIMATIONS_CSS) ? [ANIMATIONS_CSS] : [])].map((href) => `    <link rel="stylesheet" href="${href}" />`);
+  const html = ['<!doctype html>', '<html lang="en">', '  <head>', '    <meta charset="UTF-8" />', '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />', `    <title>${escapeHtml(page.name)}</title>`, ...fontLinks(page).map((l) => `    ${l}`), ...links, ...scripts, '  </head>', '  <body>', ...body, '  </body>', '</html>', ''];
   return [
     { path: 'README.md', content: readme(page, 'HTML + CSS', ['npx serve .'], 'styles/components/') },
     { path: 'index.html', content: html.join('\n') },
+    ...(page.fonts.files.length ? [{ path: 'styles/fonts.css', content: fontFaceCss(page.fonts.files, (ref) => `../${ref}`) }] : []),
     { path: 'styles/tokens.css', content: tokensCss(page.tokens) },
     { path: 'styles/base.css', content: BASE_CSS },
     ...componentCss,
