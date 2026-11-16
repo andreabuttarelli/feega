@@ -39,7 +39,22 @@ Before the pages are captured, the component files are read as text, never run: 
 | Vue | `defineProps<{…}>()`, `withDefaults`, runtime `defineProps({ x: { type: String as PropType<…> } })` |
 | Storybook | `argTypes` options add values to an axis |
 
-Types are followed inside the file and one relative import away; a type from a package or an alias (`$lib/types`) is listed as not resolved, never guessed. Svelte keeps no props at runtime, so for Svelte this is the only place its variants are known; drawing every variant of every component is the next step.
+Types are followed inside the file and one relative import away; a type from a package or an alias (`$lib/types`) is listed as not resolved, never guessed. Svelte keeps no props at runtime, so for Svelte this is the only place its variants are known.
+
+## The component gallery
+
+A page renders only the variants it uses. So after the pages are captured, the import draws the **whole library**: inside the sandbox it adds a gallery page to the running app that renders every component it read, once per combination of its declared axes (variant × size × boolean states such as `disabled`, up to 64 per component, one axis at a time beyond that). Each component becomes a main with its full variant set on the Components page; a variant a page already used is the same main, so page instances stay linked to it. The gallery lands as `Library` boards in the frame, a page of at most 120 cells each.
+
+| App | Gallery | Providers around it |
+|---|---|---|
+| Next.js App Router | `app/feega-gallery/page.tsx` | the root `layout.tsx` |
+| Next.js Pages Router | `pages/feega-gallery.tsx` | `_app` |
+| Vite + React | `feega-gallery.html`, a copy of `index.html`, and an entry beside `main.tsx` | none; the stylesheets `main.tsx` imports |
+| SvelteKit, Nuxt, Vue, Astro, React Router, others | not yet | — |
+
+Each component gets a text child named after it and its text props set to its name; a component that rejects children is retried without. A component that still cannot render (it needs a provider, a required list, a context) prints why on the board instead of the cell, and the import map lists it under **in code only** with that reason. So do components that render only on the server (`server-only`, `'use server'`, `async` components), components that draw nothing on their own (closed dialogs, tooltips), and gallery pages left out when the import runs out of time — the pages with the most components no route captured go first. A folder import (local mode) draws no gallery: it would write into your folder.
+
+The gallery is written only into the sandbox's copy of the repository and is never published: edits on its layers are not written back, and no pull request includes it.
 
 ## Theme and width
 
@@ -65,7 +80,7 @@ When you import **one page** at **several widths in one theme**, the dialog offe
 |---|---|
 | Locale, text direction | The browser language is fixed: the default catalog is shown. |
 | Feature flags, env vars, loading, empty and error states | The dev server renders what its own setup gives. Login: see [Pages behind a login](#pages-behind-a-login). |
-| A component variant the route does not render | Only what appears on the page is drawn. The import response lists every component found in the code with its axes, and which no page rendered (`library.uncaptured`). |
+| A component variant the route does not render | Drawn by the [component gallery](#the-component-gallery). The import response lists every component found in the code with its axes, whether a page rendered it (`captured`), whether the gallery drew it (`drawn`), and for the rest `library.uncaptured` with `library.reasons`. |
 
 ### Edits on a dark board
 
