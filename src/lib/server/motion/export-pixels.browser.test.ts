@@ -83,8 +83,8 @@ function cases(fontUrl: string): Case[] {
   const masked = page(rect('card', 60, 40));
   Object.assign(clipOf(masked, 'card'), { mask: { kind: 'ellipse', mode: 'add', x: 0.27, y: 0.25, width: 0.2, height: 0.3, rotation: 0, feather: 0, expansion: 0, opacity: 1, invert: false, points: [[0.5, 0], [1, 1], [0, 1]], assetId: null, text: 'T' } });
 
-  const fonted = page((kit) => kit.text('serif', 'Instrument', { parent: 'page', name: 'Serif', size: 96, font: 'Instrument Serif', box: box(30, 90, 420, 140) }));
-  fonted.fonts = [{ family: 'Instrument Serif', source: 'upload', category: 'serif', weights: [400], italic: false, axes: [], variants: [{ assetId: 'font-1', weight: 400, italic: false }] }] as never;
+  const fonted = page((kit) => kit.text('serif', 'Instrument', { parent: 'page', name: 'Serif', size: 96, font: 'Zxq Test Serif', box: box(30, 90, 420, 140) }));
+  fonted.fonts = [{ family: 'Zxq Test Serif', source: 'upload', category: 'serif', weights: [400], italic: false, axes: [], variants: [{ assetId: 'font-1', weight: 400, italic: false }] }] as never;
 
   return [
     { name: 'blend mode', doc: blend },
