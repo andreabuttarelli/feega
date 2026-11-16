@@ -90,6 +90,10 @@ Signal: with the pointer still over a frame, a wheel zoom makes its hover outlin
 
 **Signal:** pinch zoom across octaves presents 85–95 fps at 120 Hz, with 50–340 ms gaps, while the bake counters say each frame baked 0–1 tiles in a few ms. **Move:** read `fallbackMs` in `window.__gpuCanvas.frames`. Any producer that runs in `tiled_frame` must check the one frame deadline per unit of work: bake batches, `serve_bare`'s never-blurry fallback, `render_ahead`, and any future one. On 2026-11-16 the fallback drew whole screen bands with no budget and caused 180 of 204 long frames.
 
+### A render block sized from cost per pixel still overruns: effects cost per layer, not per pixel
+
+**Signal:** after sizing fallback blocks from measured ms per pixel, some 32-64 px blocks still take 18-36 ms. **Move:** look at what the block contains. A blur, shadow or filter costs its layer preparation whatever block intersects it, and the per-pixel model hides that. Bound those by skipping effect layers in gesture-time blocks (coarser LOD), not by shrinking blocks further.
+
 ## Providers
 
 ### Kie publishes its price list and its request schemas, you just have to find them
