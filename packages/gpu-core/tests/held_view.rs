@@ -67,3 +67,23 @@ fn a_held_scene_drawn_moved_matches_the_scene_drawn_where_it_moved_to() {
 
     assert!(worst <= 2, "worst channel difference {worst}");
 }
+
+#[test]
+fn a_held_scene_keeps_its_effects_while_other_draws_sweep_the_caches() {
+    use gpu_core::layers::Effects;
+    let list = |x: f64| gpu_core::display_list::parse(&CARD.replace('X', &x.to_string())).unwrap();
+    let pictures = gpu_core::pictures::Pictures::default();
+    let mut held = gpu_core::render::Renderer::new().expect("a GPU adapter").effects(Effects::Zoomless);
+    let mut fresh = gpu_core::render::Renderer::new().expect("a GPU adapter");
+    let blank = gpu_core::display_list::parse(r#"{ "width": 8, "height": 8, "background": [1, 1, 1, 1], "items": [] }"#).unwrap();
+
+    held.hold_scene(&list(30.0), &pictures).unwrap();
+    for _ in 0..300 {
+        held.render(&blank, &pictures).unwrap();
+    }
+    let kept = held.render_held(Affine::IDENTITY, (200, 160)).unwrap();
+    let expected = fresh.render(&list(30.0), &pictures).unwrap().pixels;
+    let mean = kept.iter().zip(&expected).map(|(a, b)| a.abs_diff(*b) as f64).sum::<f64>() / kept.len() as f64;
+
+    assert!(mean < 1.0, "mean channel difference {mean}");
+}

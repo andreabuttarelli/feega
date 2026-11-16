@@ -58,9 +58,11 @@ impl LayerCache {
         self.entries.values().any(|c| c.image.data.id() == image.data.id())
     }
 
-    fn sweep(&mut self, vello: &mut vello::Renderer) {
+    fn sweep(&mut self, vello: &mut vello::Renderer, pinned: &FxHashMap<u64, u32>) {
         self.tick += 1;
         let tick = self.tick;
+        let tick_pinned = |c: &Cached| pinned.contains_key(&c.image.data.id());
+        self.entries.values_mut().filter(|c| tick_pinned(c)).for_each(|c| c.used = tick);
         let mut stale: Vec<String> = self.entries.iter().filter(|(_, c)| c.used + KEPT_FRAMES < tick).map(|(k, _)| k.clone()).collect();
         if self.entries.len() - stale.len() > self.kept {
             let mut rest: Vec<(&String, u64)> = self.entries.iter().filter(|(k, _)| !stale.contains(k)).map(|(k, c)| (k, c.used)).collect();
@@ -70,6 +72,7 @@ impl LayerCache {
         }
         let rest: Vec<(String, u64, u64)> = self.entries.iter().filter(|(k, _)| !stale.contains(k)).map(|(k, c)| (k.clone(), c.used, bytes_of((c._texture.width(), c._texture.height())))).collect();
         stale.extend(over_cap(&rest, self.cap));
+        stale.retain(|k| !self.entries.get(k).is_some_and(|c| pinned.contains_key(&c.image.data.id())));
         for key in stale {
             if let Some(gone) = self.entries.remove(&key) {
                 vello.unregister_texture(gone.image);
@@ -127,6 +130,7 @@ pub struct Engine {
     cache: LayerCache,
     effect_cache: LayerCache,
     fingerprints: Fingerprints,
+    pinned: FxHashMap<u64, u32>,
     held: FxHashMap<String, wgpu::Texture>,
     spare: Vec<wgpu::Texture>,
     scenes: Vec<Scene>,
@@ -387,7 +391,7 @@ impl Gpu<'_> {
 impl Engine {
     pub fn new(device: &wgpu::Device) -> Result<Self, EngineError> {
         let vello = vello::Renderer::new(device, RendererOptions { antialiasing_support: AaSupport::area_only(), ..Default::default() })?;
-        Ok(Self { vello, blending: Blending::Native, atlas: Atlas::On, effects: Effects::Screen, filters: FilterPasses::new(device), cache: LayerCache::default(), effect_cache: LayerCache { cap: HELD_EFFECT_BYTES, kept: HELD_EFFECTS, ..LayerCache::default() }, fingerprints: Fingerprints::default(), held: FxHashMap::default(), spare: Vec::new(), scenes: Vec::new(), sheet: None, tally: Tally::default(), drawing: Reason::Screen, fullness: 0.0, draws: 0 })
+        Ok(Self { vello, blending: Blending::Native, atlas: Atlas::On, effects: Effects::Screen, filters: FilterPasses::new(device), cache: LayerCache::default(), effect_cache: LayerCache { cap: HELD_EFFECT_BYTES, kept: HELD_EFFECTS, ..LayerCache::default() }, fingerprints: Fingerprints::default(), pinned: FxHashMap::default(), held: FxHashMap::default(), spare: Vec::new(), scenes: Vec::new(), sheet: None, tally: Tally::default(), drawing: Reason::Screen, fullness: 0.0, draws: 0 })
     }
 
     pub fn set_budget(&mut self, pool: u64, layers: u64) {
@@ -421,7 +425,11 @@ impl Engine {
         let ids = images.iter().map(|i| i.data.id()).collect();
         let loose = images.into_iter().filter(|i| !gpu.cache.holds(i) && !gpu.effect_cache.holds(i)).collect();
         let textures = std::mem::take(&mut gpu.kept);
-        Ok((HeldScene { scene, loose, _textures: textures, ids }, skipped))
+        let held = HeldScene { scene, loose, _textures: textures, ids };
+        for id in &held.ids {
+            *self.pinned.entry(*id).or_default() += 1;
+        }
+        Ok((held, skipped))
     }
 
     pub fn draw_held(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, held: &HeldScene, transform: Affine, background: Option<Rgba>, target: &wgpu::TextureView, size: (u32, u32)) -> Result<(), EngineError> {
@@ -451,6 +459,14 @@ impl Engine {
     }
 
     pub fn drop_held(&mut self, held: HeldScene) {
+        for id in &held.ids {
+            if let Some(n) = self.pinned.get_mut(id) {
+                *n -= 1;
+                if *n == 0 {
+                    self.pinned.remove(id);
+                }
+            }
+        }
         for image in held.loose {
             self.vello.unregister_texture(image);
         }
@@ -473,8 +489,8 @@ impl Engine {
                 gpu.vello.unregister_texture(image);
             }
         }
-        gpu.cache.sweep(gpu.vello);
-        gpu.effect_cache.sweep(gpu.vello);
+        gpu.cache.sweep(gpu.vello, &self.pinned);
+        gpu.effect_cache.sweep(gpu.vello, &self.pinned);
         self.fullness = fullness;
         self.draws += 1;
         drawn.map(|_| skipped)
