@@ -668,6 +668,10 @@ impl Warmup {
         now_ms - self.stirred_at >= WARM_AFTER_MS
     }
 
+    pub fn wait_ms(&self, now_ms: f64) -> f64 {
+        (WARM_AFTER_MS - (now_ms - self.stirred_at)).max(0.0)
+    }
+
     pub fn due_when(&self, now_ms: f64, building: Building) -> bool {
         building == Building::Nothing && self.due(now_ms)
     }

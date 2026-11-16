@@ -286,6 +286,14 @@ fn tiles_warm_a_moment_after_the_last_gesture() {
 }
 
 #[test]
+fn waiting_to_warm_says_how_long_is_left_instead_of_asking_for_frames() {
+    let mut warm = gpu_core::tiles::Warmup::default();
+    warm.stirred(0.0);
+    assert_eq!(warm.wait_ms(100.0), 400.0);
+    assert_eq!(warm.wait_ms(600.0), 0.0);
+}
+
+#[test]
 fn a_lift_without_a_camera_move_draws_from_tiles() {
     use gpu_core::tiles::{path_for, GestureDraw, Moment, Path};
     let still = Moment { gesture: false, lifting: false, settling: false, draw: GestureDraw::Tiles };

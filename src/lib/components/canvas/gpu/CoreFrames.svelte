@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { addTally, countFrame } from '$lib/canvas/gpu/frame-stats';
+  import { Again, paintAgain } from '$lib/canvas/gpu/paint-again';
   import { showsBeforeMedia } from '$lib/canvas/core/first-show';
   import { sharedFrames } from '$lib/motion/gpu/shared-frames';
   import { drawFrame, prepare, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
@@ -1246,6 +1247,24 @@
     attempt++;
   }
 
+  let wake: ReturnType<typeof setTimeout> | null = null;
+
+  $effect(() => () => {
+    if (wake) {
+      clearTimeout(wake);
+    }
+  });
+
+  function wakeIn(ms: number) {
+    if (wake) {
+      clearTimeout(wake);
+    }
+    wake = setTimeout(() => {
+      wake = null;
+      pacer.invalidate();
+    }, ms);
+  }
+
   function paint(): boolean {
     const into = raster;
     if (!into) {
@@ -1434,7 +1453,11 @@
       (window as Window & { __gpuMem?: object }).__gpuMem = { ...crashes.sample, put: put.size, pictured: pictured.size };
       debugFrame(outcome, skipped, shown);
     }
-    return pending || (into.warming?.() ?? false) || zooming.active() || (!quiet && sentOverlay.waiting(overlay)) || sceneBusy;
+    const next = paintAgain({ pending, warming: into.warming?.() ?? false, warmWait: into.warmWait?.() ?? 0, zooming: zooming.active(), overlayWaiting: !quiet && sentOverlay.waiting(overlay), sceneBusy });
+    if (next.at === Again.Later) {
+      wakeIn(next.ms);
+    }
+    return next.at === Again.Frame;
   }
 
   let ahead = false;

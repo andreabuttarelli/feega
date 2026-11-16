@@ -74,7 +74,8 @@ const CPU_SLOWDOWN = Number(process.env.BUDGET_CPU ?? 1);
 const SHOT_SETTLE_MS = 1500;
 const PIXEL_TOLERANCE = 8;
 const PERCENT = 100;
-const UNCAPPED = ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--disable-gpu-vsync', '--disable-frame-rate-limit'];
+const GPU_FLAGS = ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist'];
+const UNCAPPED = process.env.BUDGET_VSYNC === '1' ? GPU_FLAGS : [...GPU_FLAGS, '--disable-gpu-vsync', '--disable-frame-rate-limit'];
 
 const PLACES: Record<Target, { base: string; place: Place; login: boolean }> = {
   [Target.Landings]: { base: LANDINGS_BASE, place: LANDINGS_FIXTURE_PLACE, login: false },
@@ -393,7 +394,12 @@ async function pixelRect(page: Page): Promise<Box | null> {
   return body && { x: body.x - PIXEL_MARGIN_PX, y: body.y - PIXEL_MARGIN_PX, w: body.width + 2 * PIXEL_MARGIN_PX, h: body.height + 2 * PIXEL_MARGIN_PX };
 }
 
+const PIXELS = process.env.BUDGET_PIXELS !== '0';
+
 async function arm(page: Page) {
+  if (!PIXELS) {
+    return;
+  }
   const rect = await pixelRect(page);
   if (rect) {
     await page.evaluate(armPixels, { rect, side: PIXEL_SAMPLE, change: PIXEL_CHANGE });
@@ -469,6 +475,33 @@ function fieldEdit({ selector, value }: { selector: string; value: string | null
   el.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
+type Busy = { toPatch: number[]; cycle: number[]; frames: number[]; idle: number[] };
+
+const paintedFrames = (page: Page) => page.evaluate(() => (document.querySelector<HTMLCanvasElement>('[data-testid="core-canvas"]')?.dataset.painted ?? '0').split(',').reduce((a, b) => a + Number(b), 0));
+
+const busyOf: Record<string, Busy> = {};
+let metrics: CDPSession | null = null;
+
+const taskMs = async (): Promise<number> => (metrics ? (await taskSeconds(metrics)) * MS_PER_S : 0);
+
+async function busyEdit(page: Page, edit: string, act: () => Promise<void>): Promise<Stages | null> {
+  const quiet = await taskMs();
+  await page.waitForTimeout(EDIT_PAUSE_MS);
+  const framesBefore = await paintedFrames(page);
+  const start = await taskMs();
+  await act();
+  const stages = await stagesAfter(page);
+  const patched = await taskMs();
+  await page.waitForTimeout(EDIT_PAUSE_MS);
+  const settled = await taskMs();
+  const busy = (busyOf[edit] ??= { toPatch: [], cycle: [], frames: [], idle: [] });
+  busy.idle.push(start - quiet);
+  busy.frames.push((await paintedFrames(page)) - framesBefore);
+  busy.toPatch.push(patched - start);
+  busy.cycle.push(settled - start);
+  return stages;
+}
+
 async function fieldEdits(page: Page, edit: FieldEdit, count: number): Promise<(Stages | null)[]> {
   const { selector, values } = FIELDS[edit];
   await page.getByText(PROPERTIES_TAB, { exact: true }).first().click();
@@ -476,9 +509,7 @@ async function fieldEdits(page: Page, edit: FieldEdit, count: number): Promise<(
   const seen: (Stages | null)[] = [];
   for (let i = 0; i < count; i++) {
     await arm(page);
-    await page.evaluate(fieldEdit, { selector, value: values ? values[i % 2] : null });
-    seen.push(await stagesAfter(page));
-    await page.waitForTimeout(EDIT_PAUSE_MS);
+    seen.push(await busyEdit(page, edit, () => page.evaluate(fieldEdit, { selector, value: values ? values[i % 2] : null })));
   }
   return seen;
 }
@@ -603,9 +634,7 @@ async function keyEdits(page: Page, keys: [string, string], count: number, edit:
       continue;
     }
     await arm(page);
-    await page.keyboard.press(keys[i % 2]);
-    seen.push(await stagesAfter(page));
-    await page.waitForTimeout(EDIT_PAUSE_MS);
+    seen.push(await busyEdit(page, edit, () => page.keyboard.press(keys[i % 2])));
   }
   return seen;
 }
@@ -694,6 +723,8 @@ async function editRun(browser: Browser, target: Target): Promise<Record<Edit, (
   if (CPU_SLOWDOWN > 1) {
     await (await context.newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: CPU_SLOWDOWN });
   }
+  metrics = await context.newCDPSession(page);
+  await metrics.send('Performance.enable');
   const seen = {} as Record<Edit, (Stages | null)[]>;
   const phases = {} as Record<string, [string, number][]>;
   for (const edit of Object.values(Edit).filter((e) => !EDIT_KINDS || EDIT_KINDS.includes(e))) {
@@ -719,6 +750,7 @@ async function editRun(browser: Browser, target: Target): Promise<Record<Edit, (
   }
   await context.close();
   writeFileSync(join(OUT, `edit-phases-${target}.json`), JSON.stringify(phases, null, 2));
+  writeFileSync(join(OUT, `edit-busy-${target}.json`), JSON.stringify(busyOf, null, 2));
   return seen;
 }
 
