@@ -38,6 +38,14 @@ During a gesture they do not change, so now they are held still until it ends.
 | Desktop zoom fps (60 Hz cap) | 48 | 60 |
 | Frames over 8.3 ms (uncapped) | 55 | 25 |
 | p95 frame time (uncapped) | 18.6 ms | 4.4 ms |
+
+Moving a selection hit the same cost from the other side: every move resent every unselected label, because a selected frame's breakpoint views counted as unselected. The selection's chrome is now built once and carried by its offset; a move sends two numbers to the core.
+
+| Marquee + move, landings (uncapped) | Before | After |
+|---|---|---|
+| Overlay bytes sent per move | 640 KB | under 2 KB |
+| Main-thread time in overlay sends | 14–20% | under 1% |
+| p95 frame time | 21.5–27 ms | 6.2–6.4 ms |
 | 4× CPU fps | 38 | 59.5 |
 
 ## Tile bake budget
