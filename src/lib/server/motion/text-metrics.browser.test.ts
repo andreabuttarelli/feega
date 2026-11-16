@@ -110,7 +110,7 @@ async function browserWidths(doc: MotionDoc, assets: Record<string, string>, all
   const html = `<!doctype html><html><head>${google ? `<link rel="stylesheet" href="${google}">` : ''}<style>${uploadFaceCss(doc.fonts, assets)}</style></head><body>${spans}</body></html>`;
   const page = await browser.newPage();
   try {
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.setContent(html, { waitUntil: 'load' });
     await page.evaluate(async () => {
       const used = [...document.querySelectorAll<HTMLElement>('span')].map((s) => `${getComputedStyle(s).fontWeight} 20px ${getComputedStyle(s).fontFamily}`);
       await Promise.all([...new Set(used)].map((f) => document.fonts.load(f, 'Aa1日🚀')));
