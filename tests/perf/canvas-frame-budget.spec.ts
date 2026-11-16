@@ -73,7 +73,8 @@ const CPU_SLOWDOWN = Number(process.env.BUDGET_CPU ?? 1);
 const SHOT_SETTLE_MS = 1500;
 const PIXEL_TOLERANCE = 8;
 const PERCENT = 100;
-const UNCAPPED = ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--disable-gpu-vsync', '--disable-frame-rate-limit'];
+const GPU_FLAGS = ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist'];
+const UNCAPPED = process.env.BUDGET_VSYNC === '1' ? GPU_FLAGS : [...GPU_FLAGS, '--disable-gpu-vsync', '--disable-frame-rate-limit'];
 
 const PLACES: Record<Target, { base: string; place: Place; login: boolean }> = {
   [Target.Landings]: { base: LANDINGS_BASE, place: LANDINGS_FIXTURE_PLACE, login: false },
@@ -362,7 +363,12 @@ async function pixelRect(page: Page): Promise<Box | null> {
   return body && { x: body.x - PIXEL_MARGIN_PX, y: body.y - PIXEL_MARGIN_PX, w: body.width + 2 * PIXEL_MARGIN_PX, h: body.height + 2 * PIXEL_MARGIN_PX };
 }
 
+const PIXELS = process.env.BUDGET_PIXELS !== '0';
+
 async function arm(page: Page) {
+  if (!PIXELS) {
+    return;
+  }
   const rect = await pixelRect(page);
   if (rect) {
     await page.evaluate(armPixels, { rect, side: PIXEL_SAMPLE, change: PIXEL_CHANGE });
@@ -438,7 +444,9 @@ function fieldEdit({ selector, value }: { selector: string; value: string | null
   el.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-type Busy = { toPatch: number[]; cycle: number[] };
+type Busy = { toPatch: number[]; cycle: number[]; frames: number[]; idle: number[] };
+
+const paintedFrames = (page: Page) => page.evaluate(() => (document.querySelector<HTMLCanvasElement>('[data-testid="core-canvas"]')?.dataset.painted ?? '0').split(',').reduce((a, b) => a + Number(b), 0));
 
 const busyOf: Record<string, Busy> = {};
 let metrics: CDPSession | null = null;
@@ -446,13 +454,18 @@ let metrics: CDPSession | null = null;
 const taskMs = async (): Promise<number> => (metrics ? (await taskSeconds(metrics)) * MS_PER_S : 0);
 
 async function busyEdit(page: Page, edit: string, act: () => Promise<void>): Promise<Stages | null> {
+  const quiet = await taskMs();
+  await page.waitForTimeout(EDIT_PAUSE_MS);
+  const framesBefore = await paintedFrames(page);
   const start = await taskMs();
   await act();
   const stages = await stagesAfter(page);
   const patched = await taskMs();
   await page.waitForTimeout(EDIT_PAUSE_MS);
   const settled = await taskMs();
-  const busy = (busyOf[edit] ??= { toPatch: [], cycle: [] });
+  const busy = (busyOf[edit] ??= { toPatch: [], cycle: [], frames: [], idle: [] });
+  busy.idle.push(start - quiet);
+  busy.frames.push((await paintedFrames(page)) - framesBefore);
   busy.toPatch.push(patched - start);
   busy.cycle.push(settled - start);
   return stages;
