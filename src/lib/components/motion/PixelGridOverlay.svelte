@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { pixelGridShown, type GridToggle } from '$lib/motion/pixel-grid';
+  import { GridToggle, pixelGridShown } from '$lib/motion/pixel-grid';
 
   let { width, height, toggle }: { width: number; height: number; toggle: GridToggle } = $props();
 
@@ -11,7 +11,7 @@
 
   $effect(() => {
     const el = host;
-    if (!el) {
+    if (!el || toggle === GridToggle.Off) {
       return;
     }
     const read = () => (shownWidth = el.getBoundingClientRect().width);
