@@ -8,7 +8,7 @@ import { SentOverlay, SentParts, SentUses } from './use-diff';
 
 describe('sent parts during a gesture', () => {
   const item = (id: string) => ({ id }) as unknown as PathItem;
-  const overlay = (fixed: PathItem[], live: PathItem[]): CoreOverlay => ({ fixed, selected: [], live });
+  const overlay = (fixed: PathItem[], live: PathItem[]): CoreOverlay => ({ fixed, selected: [], live, chunks: { fixed: [], selected: [] } });
 
   it('sends the labels part but holds the live part while the camera moves', () => {
     const sent = new SentParts();

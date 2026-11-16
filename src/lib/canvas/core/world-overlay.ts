@@ -1,5 +1,6 @@
 import { mul2d } from '@feega/motion-core/motion/affine';
 import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import type { KeyedOverlay, OverlayChunk } from '@feega/motion-core/motion/gpu-full/core-overlay';
 import type { Box, Curve } from '$lib/canvas/gpu/geometry';
 import type { SnapGuide } from '$lib/canvas/snap';
 import { EdgeLook, edgeItems, ghostItems, guideItems, marqueeItems, runningItems, peerItems, type CorePeer, type CoreTheme } from './overlay';
@@ -51,12 +52,11 @@ const turnedBy = (items: PathItem[], turn: Turn | undefined): PathItem[] => (tur
 type Fixed = Pick<WorldOverlay, 'curves' | 'chrome' | 'selected' | 'selectedEdge' | 'theme' | 'glyphs'>;
 const FIXED_KEYS = ['curves', 'chrome', 'selected', 'selectedEdge', 'theme', 'glyphs'] as const;
 
-type Settled = { fixed: PathItem[]; selected: PathItem[] };
+type Settled = { fixed: PathItem[]; selected: PathItem[]; chunks: KeyedOverlay };
+type Parts = { fixed: OverlayChunk[]; selected: OverlayChunk[] };
 
 let fixedFor: Fixed | null = null;
-let settled: Settled = { fixed: [], selected: [] };
-let settledParts: Record<keyof Settled, PathItem[][]> = { fixed: [], selected: [] };
-const NO_ITEMS: PathItem[] = [];
+let settled: Settled = { fixed: [], selected: [], chunks: { fixed: [], selected: [] } };
 let built = new Map<string, Built>();
 
 type Built = { from: Record<string, unknown>; items: PathItem[] };
@@ -75,7 +75,7 @@ function sameFields(a: Record<string, unknown>, b: Record<string, unknown>): boo
   return keys.length === Object.keys(b).length && keys.every((k) => alike(a[k], b[k]));
 }
 
-const flatOnChange = (parts: PathItem[][], was: PathItem[][], items: PathItem[]) => (parts.length === was.length && parts.every((p, i) => p === was[i]) ? items : parts.flat());
+const flatOnChange = (parts: OverlayChunk[], was: readonly OverlayChunk[], items: PathItem[]) => (parts.length === was.length && parts.every((p, i) => p.items === was[i].items) ? items : parts.flatMap((p) => p.items));
 
 function zoomFree(o: Fixed): Settled {
   if (fixedFor && FIXED_KEYS.every((k) => fixedFor![k] === o[k])) {
@@ -83,15 +83,15 @@ function zoomFree(o: Fixed): Settled {
   }
   const kept = fixedFor?.theme === o.theme && fixedFor.glyphs === o.glyphs ? built : new Map<string, Built>();
   const next = new Map<string, Built>();
-  const once = (key: string, from: Record<string, unknown>, make: () => PathItem[]) => {
+  const once = (key: string, from: Record<string, unknown>, make: () => PathItem[]): OverlayChunk => {
     const old = kept.get(key);
     const items = old && sameFields(old.from, from) ? old.items : make();
     next.set(key, { from, items });
-    return items;
+    return { key, items };
   };
   fixedFor = o;
   const picked = new Set(o.selected);
-  const parts: Record<keyof Settled, PathItem[][]> = { fixed: [], selected: [] };
+  const parts: Parts = { fixed: [], selected: [] };
   for (const c of o.curves) {
     const look = edgeLook(c.edge, o.selected, o.selectedEdge);
     const moving = picked.has(c.edge.source) || picked.has(c.edge.target);
@@ -100,17 +100,18 @@ function zoomFree(o: Fixed): Settled {
   for (const t of o.chrome) {
     const into = parts[picked.has(t.id) ? 'selected' : 'fixed'];
     into.push(once(`chrome:${t.id}`, tileFields(t), () => turnedBy(layersOf(t).tile(t, o.glyphs), t.turn)));
-    into.push(drawsState(t) ? once(`state:${t.id}`, t, () => turnedBy(stateChrome(t, o.glyphs), t.turn)) : NO_ITEMS);
+    if (drawsState(t)) {
+      into.push(once(`state:${t.id}`, t, () => turnedBy(stateChrome(t, o.glyphs), t.turn)));
+    }
   }
   built = next;
-  settled = { fixed: flatOnChange(parts.fixed, settledParts.fixed, settled.fixed), selected: flatOnChange(parts.selected, settledParts.selected, settled.selected) };
-  settledParts = parts;
+  settled = { fixed: flatOnChange(parts.fixed, settled.chunks.fixed, settled.fixed), selected: flatOnChange(parts.selected, settled.chunks.selected, settled.selected), chunks: parts };
   return settled;
 }
 
-export type CoreOverlay = { fixed: readonly PathItem[]; selected: readonly PathItem[]; live: readonly PathItem[] };
+export type CoreOverlay = { fixed: readonly PathItem[]; selected: readonly PathItem[]; live: readonly PathItem[]; chunks: KeyedOverlay };
 
-export const NO_OVERLAY: CoreOverlay = { fixed: [], selected: [], live: [] };
+export const NO_OVERLAY: CoreOverlay = { fixed: [], selected: [], live: [], chunks: { fixed: [], selected: [] } };
 
 export function overlayOf(o: WorldOverlay): CoreOverlay {
   return { ...zoomFree(o), live: liveItems(o) };

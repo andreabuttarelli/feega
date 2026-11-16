@@ -19,6 +19,8 @@
   import { spliceOf } from '@feega/motion-core/canvas/core/group-diff';
   import { storedTiles, tilesOn } from '$lib/canvas/core/tiles-switch';
   import { directOn, forcedDirect, GestureGuard, storedDirect, thisDevice } from '$lib/canvas/core/direct-switch';
+  import { overlayOpsOn, storedOverlayOps } from '$lib/canvas/core/overlay-ops-switch';
+  import { OverlayPart } from '@feega/motion-core/motion/gpu-full/core-overlay';
   import { cacheZoom, cached, uncached, pictureBytes, resident, heldWhileMoving, movingWhileZooming, ZoomPicture, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, buildLanes, currentDevice, textureBudget } from '$lib/canvas/gpu/memory-budget';
   import { worldUses, type Turn } from '$lib/canvas/core/screen-uses';
@@ -1109,6 +1111,7 @@
   const DIRECT = typeof location !== 'undefined' && directOn(location.search, storedDirect(), thisDevice());
   const DIRECT_GUARDED = DIRECT && typeof location !== 'undefined' && !forcedDirect(location.search, storedDirect());
   const directGuard = new GestureGuard();
+  const OVERLAY_OPS = typeof location !== 'undefined' && overlayOpsOn(location.search, storedOverlayOps());
   const MAX_LISTED = 12;
   const OVERSCAN_SHARE = 8;
   const OVERSCAN_MAX = 128;
@@ -1378,15 +1381,24 @@
     }
   });
 
+  function sendOverlay(into: CoreRaster, parts: OverlayPart[]) {
+    const keyed = OVERLAY_OPS ? into.setOverlayChunks : undefined;
+    const whole = keyed ? parts.filter((part) => part === OverlayPart.Live) : parts;
+    if (keyed && whole.length < parts.length) {
+      keyed(overlay.chunks);
+    }
+    for (const part of whole) {
+      into.setOverlay(part, overlay[part]);
+    }
+  }
+
   function paintOn(into: CoreRaster): boolean {
     const quiet = !gesture.active();
     if (sceneDue(quiet) || (sceneBusy && uploadOwed(into, owed).length)) {
       restage(into);
     }
     const motion = quiet ? CoreMotion.Still : CoreMotion.Gesture;
-    for (const part of sentOverlay.changed(overlay, motion)) {
-      into.setOverlay(part, overlay[part]);
-    }
+    sendOverlay(into, sentOverlay.changed(overlay, motion));
     const at = deviceView();
     into.setMotion?.(motion);
     into.setCamera(at.x, at.y, at.zoom);

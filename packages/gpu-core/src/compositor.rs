@@ -2,6 +2,7 @@ use vello::kurbo::{Affine as Matrix, Rect};
 
 use crate::display_list::{DisplayList, Item};
 use crate::groups::{Library, Limits, Plan, Sweep};
+use crate::overlay_chunks::{ChunkOps, OverlayChunks};
 use crate::retained::{tiles, Camera, Damage, Lookup, Outcome, Quality, Raster, Retained, Step};
 use crate::world::{Lift, OverlayPart, Patch, World};
 use crate::tally::now_ms;
@@ -45,6 +46,7 @@ pub struct Compositor {
     pending: bool,
     tile_damage: Damage,
     planned: Planned,
+    chunks: OverlayChunks,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
@@ -56,7 +58,7 @@ pub struct Planned {
 
 impl Compositor {
     pub fn new(width: u32, height: u32) -> Self {
-        Compositor { world: World::new(), retained: Retained::new(width, height), pending: false, tile_damage: Damage::none(), planned: Planned::default() }
+        Compositor { world: World::new(), retained: Retained::new(width, height), pending: false, tile_damage: Damage::none(), planned: Planned::default(), chunks: OverlayChunks::default() }
     }
 
     pub fn size(&self) -> (u32, u32) {
@@ -78,6 +80,12 @@ impl Compositor {
                 library.drop_group(part.group());
                 self.world.place_overlay(part, None);
             }
+        }
+    }
+
+    pub fn overlay_chunks(&mut self, ops: ChunkOps, library: &mut Library) {
+        for (part, items) in self.chunks.apply(ops) {
+            self.set_overlay(part, items, library);
         }
     }
 

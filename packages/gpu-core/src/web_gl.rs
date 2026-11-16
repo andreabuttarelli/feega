@@ -14,6 +14,7 @@ use crate::tally::Reason;
 use crate::gl_passes::{texture, GlRunner, Tex};
 use crate::gl_reproject::{held, smooth, GlReprojector, Held, Target};
 use crate::retained::{Camera, Lookup, Quality};
+use crate::overlay_chunks::parse_chunk_ops;
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::layers::{prepare, Blending, Surface};
 use crate::scene::{build_into, Placed, Shelf};
@@ -343,6 +344,11 @@ impl WebGlCore {
 
     pub fn set_overlay(&mut self, items_json: &[u8]) -> Result<(), JsValue> {
         self.compositor.set_overlay(OverlayPart::Fixed, parse_overlay(utf8(items_json)?).map_err(failed)?, &mut self.library);
+        Ok(())
+    }
+
+    pub fn overlay_chunks(&mut self, ops_json: &[u8]) -> Result<(), JsValue> {
+        self.compositor.overlay_chunks(parse_chunk_ops(utf8(ops_json)?).map_err(failed)?, &mut self.library);
         Ok(())
     }
 

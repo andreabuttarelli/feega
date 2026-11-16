@@ -20,6 +20,7 @@ use crate::reproject::{Draw, Output, Reprojector, Tile, OPAQUE};
 use crate::retained::{Camera, Damage, Lookup, Quality};
 use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, GestureDraw, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, batches_of, bake_batches, BAKE_BATCH_TILES, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys, magnified, fallback_serves, fallback_bands, ahead_camera, fade_in, fades_over, FADE_MS};
 use crate::overlay_seen::OverlaySeen;
+use crate::overlay_chunks::parse_chunk_ops;
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
 use crate::tally::now_ms;
@@ -546,6 +547,11 @@ impl WebCore {
         }
 
         self.compositor.set_overlay(OverlayPart::Fixed, parse_overlay(utf8(items_json)?).map_err(failed)?, &mut self.library);
+        Ok(())
+    }
+
+    pub fn overlay_chunks(&mut self, ops_json: &[u8]) -> Result<(), JsValue> {
+        self.compositor.overlay_chunks(parse_chunk_ops(utf8(ops_json)?).map_err(failed)?, &mut self.library);
         Ok(())
     }
 
