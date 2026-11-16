@@ -94,3 +94,37 @@ The remaining cost is re-encoding the whole visible scene every frame: the vello
 alone is 4 ms at 1× and about 4× that under throttling. Hitting the targets needs encode
 reuse across frames (append the previous frame's scene encoding with a camera transform
 instead of rebuilding it), or a cheaper effect prepare (memoised fingerprints per clip).
+
+## Round 4: held scene and memoised fingerprints (2026-11-16)
+
+- `HeldView` / `Engine::build_held` / `draw_held`: a direct gesture plans, prepares and builds
+  its scene once, with a 25% margin around the screen, and draws it every frame under the
+  camera transform. It is rebuilt when content changes, when the view leaves the margin, or when
+  the zoom leaves 0.7–1.41× of the build zoom. Effects are held one zoom room (√2) finer, so
+  zooming in inside the room never magnifies them.
+- `Fingerprints`: effect fingerprints are memoised per item until content changes.
+
+| | dev (tiles) | direct round 4 |
+|---|---|---|
+| capped fps, moderate / extreme | 60 / 60 | 60 / 59–60 |
+| worst frame capped | 19 ms | 32–50 ms (rebuild frames) |
+| core ms p50 / p95, moderate | 0.4 / 5.2 | 0.7–0.8 / 7.7–8.4 |
+| core ms p50 / p95, extreme | 0.5 / 5.3 | 0.6–0.7 / 7.6–8.3 |
+| uncapped core p95 | 0.7 ms | 0.5–0.6 ms |
+| 4× CPU fps, moderate / extreme | 58 / 58 | 41 / 40 |
+| 4× CPU core p50 / p95 | 2.0 / 9.7–13 ms | 2.2–2.3 / 32–33 ms |
+| Laplacian median / p90, moderate | 234 / 354 | 260 / 396 |
+| Laplacian median / p90, extreme | 222 / 343 | 223 / 392 |
+| dips (6 moderate + 3 extreme) | 0 | 0 |
+
+Targets: capped 60, 0 dips and sharpness are kept. Core p95 is at the 8 ms line, not reliably
+under it. 4× CPU ≥ 55 fps is missed (40–41), so direct stays behind the flag.
+
+What is left: a steady direct frame now costs less than a tile frame (uncapped p95 0.5 against
+0.7 ms). What remains is the rebuild: about 7–9% of gesture frames rebuild, and each one
+re-plans, re-prepares and re-encodes a 1.5×1.5-screen scene, taking about 30 ms at 1× and
+about 100 ms at 4×. Both the p95 and the 4× fps come from these frames. Ways to close it,
+not built:
+- build the next held scene ahead, in slices spread over the frames before the room runs out;
+- keep per-frame encodings and re-append only the frames whose LOD or effect bucket changed;
+- move planning and encoding to a worker.
