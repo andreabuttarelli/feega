@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+vi.mock('$lib/server/spend-gate', () => ({ spendGate: async () => {} }));
 
 // Il grounding di `groundedText` è il motore NOMINATO: l'audit GEO misura "il brand è citato
 // nelle risposte di Gemini". Se torna senza citazioni, quell'audit misura la memoria del modello

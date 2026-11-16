@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+vi.mock('$lib/server/spend-gate', () => ({ spendGate: async () => {} }));
 
 /**
  * `POST /api/v1/images` è un endpoint diverso da `chat/completions`, non una variante: corpo

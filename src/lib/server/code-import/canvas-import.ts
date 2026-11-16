@@ -1,4 +1,5 @@
 import { componentsPage } from '$lib/server/canvas/components-page';
+import { spendGate } from '$lib/server/spend-gate';
 import { env } from '$env/dynamic/private';
 import type { Db } from '$lib/server/db/client';
 import { frameStore } from '$lib/server/motion/move-element';
@@ -68,6 +69,7 @@ function metered(runner: RepoRunner, scope: CodeScope): RepoRunner {
       const ms = Date.now() - started;
       logAiCall({ label: SANDBOX_LABEL, provider: 'vercel-sandbox', ms, ok: true, flatCostUsd: sandboxUsd(ms), orgId: scope.orgId, userId: scope.userId, projectId: scope.projectId, actorKind: 'agent', actorId: scope.userId });
     };
+    await spendGate({ orgId: scope.orgId });
     const run = await runner(repo, archive, app);
     if (!run.ok) {
       bill();

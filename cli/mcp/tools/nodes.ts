@@ -56,7 +56,7 @@ export function registerNodeTools(server: McpServer) {
         'org owner turned them on in Settings; minors and real, identifiable people are refused regardless. ' +
         'An uncensored model takes NO input of any kind — no upstream connections, no picked references, ' +
         'no image/mask/init params — and the call is refused before anything is spent if any are present. ' +
-        'Spends credits; a `credits_exhausted` failure means the org is out. ' +
+        'Spends credits; a `credits_exhausted` failure means the org is out, `billing_unavailable` that billing could not be checked and nothing ran. ' +
         '`variants` (1, 2, 4 or 8; video up to 4) makes several results in one call and spends that many times the price of one run: ' +
         '`into: "nodes"` (default) creates new output nodes next to this one, wired from the same inputs, and returns their `nodeIds`; ' +
         '`into: "history"` lands every result in this node\'s own history, the last one shown. ' +

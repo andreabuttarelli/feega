@@ -1,4 +1,5 @@
 import type { Db } from '$lib/server/db/client';
+import { spendGate } from '$lib/server/spend-gate';
 import { insertAsset, type Asset, type AssetType } from '$lib/server/repos/assets';
 import { AUDIO_HISTORY_PREFIX, AUDIO_JOB_PREFIX } from '$lib/server/repos/node-runs';
 import type { Purgers } from './provider-purge';
@@ -217,6 +218,7 @@ export async function runAudio(db: Db, provider: AudioProvider, req: AudioReques
     return { kind: 'refused', error: AUDIO_PROBLEM_MESSAGE[problem] };
   }
 
+  await spendGate({ orgId: req.scope.orgId });
   const firstMedia = req.audioUrls[0] ?? req.videoUrls[0];
   const startedAt = Date.now();
   let produced: Produced;

@@ -109,7 +109,7 @@ the node's own `type`, or the call is refused before anything is spent. Pass the
 `nodes.version`; a stale value comes back `conflict`, never a silent overwrite. A `video` never
 returns finished here — it comes back `queued` with an `external_job_id`, and the render lands
 later on a tick you do not control: poll the node with `query` rather than waiting on this call.
-Spends credits; `credits_exhausted` means the org is out. A finished result carries `asset_ids` and
+Spends credits; `credits_exhausted` means the org is out, `billing_unavailable` that billing could not be checked and nothing ran. A finished result carries `asset_ids` and
 `media` with the same two links `get_media` returns.
 
 ## See what a node holds

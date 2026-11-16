@@ -4,6 +4,7 @@ import { PromptCache } from '../prompt-cache';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { VIEW_FRAMES } from './frames';
 import type { MotionSession, MotionToolDeps } from './motion-tools';
+vi.mock('$lib/server/spend-gate', () => ({ spendGate: async () => {} }));
 
 const M = vi.hoisted(() => ({
   env: {} as Record<string, string | undefined>,

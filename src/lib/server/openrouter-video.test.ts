@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+vi.mock('$lib/server/spend-gate', () => ({ spendGate: async () => {} }));
 
 /**
  * IL VIDEO SU OPENROUTER È ASINCRONO, quindi porta con sé lo stesso rischio che su kie è costato

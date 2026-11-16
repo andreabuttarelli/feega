@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MockLanguageModelV4 } from 'ai/test';
 import type { Tool } from 'ai';
+vi.mock('$lib/server/spend-gate', () => ({ spendGate: async () => {} }));
 
 const ORG = 'org-1';
 const USER = 'user-1';

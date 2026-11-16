@@ -96,9 +96,9 @@ async function decideWith(scope: ModerationScope, label: string, categories: Mod
 }
 
 async function judgeWith(scope: ModerationScope, label: string, system: string, state: string) {
-  const [{ llmText }, { withOrgContext }] = await Promise.all([import('$lib/server/llm'), import('$lib/server/ai-log')]);
+  const [{ llmText }, { withCreditExempt, withOrgContext }] = await Promise.all([import('$lib/server/llm'), import('$lib/server/ai-log')]);
   const model = await judgeModel(MODERATION_PROFILES[carriedProfile(scope)].judgeTier);
-  const { text } = await withOrgContext(scope.orgId, () => llmText({ prompt: state, system, model, label }));
+  const { text } = await withCreditExempt(() => withOrgContext(scope.orgId, () => llmText({ prompt: state, system, model, label })));
   return parseJudgeVerdict(text);
 }
 

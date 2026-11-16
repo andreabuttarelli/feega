@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+vi.mock('$lib/server/spend-gate', () => ({ spendGate: async () => {} }));
 
 /**
  * IL CABLAGGIO: che il render arrivi davvero al gateway, e che un job consegnato resti

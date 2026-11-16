@@ -15,6 +15,7 @@
  * scritto a mano — verificato che coincide alla sesta cifra con la tariffa dell'endpoint a monte.
  */
 import { env } from '$env/dynamic/private';
+import { spendGate } from '$lib/server/spend-gate';
 import { logAiCall } from '$lib/server/ai-log';
 import { OPENROUTER_DATA_POLICY } from '$lib/server/llm-usage-cost';
 import type { GeminiImageRequest } from '$lib/server/image-request';
@@ -93,6 +94,7 @@ export async function generateImageOnOpenrouter(
     throw new Error(`OpenRouter (${model}): ${error}`);
   };
 
+  await spendGate();
   let payload: OpenrouterImageResponse;
   try {
     const res = await fetch(`${baseUrl()}/chat/completions`, {

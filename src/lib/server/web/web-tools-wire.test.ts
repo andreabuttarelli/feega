@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generateText, stepCountIs } from 'ai';
 import { PromptCache } from '../prompt-cache';
 import type { WebToolDeps } from './web-tools';
+vi.mock('$lib/server/spend-gate', () => ({ spendGate: async () => {} }));
 
 const M = vi.hoisted(() => ({
   env: {} as Record<string, string | undefined>,

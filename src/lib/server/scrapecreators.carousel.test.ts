@@ -6,6 +6,7 @@
  * dentro il mapper stesso.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+vi.mock('$lib/server/spend-gate', () => ({ spendGate: async () => {} }));
 
 const { envMock } = vi.hoisted(() => ({ envMock: {} as Record<string, string | undefined> }));
 vi.mock('$env/dynamic/private', () => ({ env: envMock }));

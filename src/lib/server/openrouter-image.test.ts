@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+vi.mock('$lib/server/spend-gate', () => ({ spendGate: async () => {} }));
 
 // Il render su OpenRouter è SINCRONO: niente createTask, niente polling, quindi niente task
 // abbandonato-e-fatturato. Le due cose che devono reggere sono l'estrazione dell'immagine — una

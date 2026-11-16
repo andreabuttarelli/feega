@@ -4,6 +4,7 @@
  * Non è un secondo SDK Google, non è DeepSeek/Xiaomi per il testo: è IL tubo.
  */
 import { createOpenAI } from '@ai-sdk/openai';
+import { spendGate } from '$lib/server/spend-gate';
 import { embedMany, generateObject, generateText, jsonSchema } from 'ai';
 import { env } from '$env/dynamic/private';
 import { extractSdkUsage, logAiCall, noteLlmCost } from '$lib/server/ai-log';
@@ -117,6 +118,7 @@ const clients = new Map<string, ReturnType<typeof createOpenAI>>();
  * quando `logAiCall` scrive la riga.
  */
 const billedFetch: typeof fetch = async (input, init) => {
+	await spendGate();
 	const patched = typeof init?.body === 'string' ? withOpenrouterDefaults(init.body, llmBaseUrl()) : null;
 	const res = await fetch(input, patched ? { ...init, body: patched } : init);
 	if (!patched) return res;
@@ -373,6 +375,7 @@ async function groundedCall(
 		...(opts.system ? [{ role: 'system', content: opts.system }] : []),
 		{ role: 'user', content: opts.prompt }
 	];
+	await spendGate();
 	const res = await fetch(`${llmBaseUrl()}/chat/completions`, {
 		method: 'POST',
 		headers: { authorization: `Bearer ${llmApiKey() ?? ''}`, 'content-type': 'application/json' },
@@ -462,6 +465,7 @@ async function mediaCall(
 		...(opts.system ? [{ role: 'system', content: opts.system }] : []),
 		{ role: 'user', content }
 	];
+	await spendGate();
 	const res = await fetch(`${llmBaseUrl()}/chat/completions`, {
 		method: 'POST',
 		headers: { authorization: `Bearer ${llmApiKey() ?? ''}`, 'content-type': 'application/json' },
@@ -658,6 +662,7 @@ export async function llmChatCompletions(opts: {
 }): Promise<unknown> {
 	const key = llmApiKey();
 	if (!key) throw new Error('LLM_API_KEY is not configured');
+	await spendGate();
 	const res = await fetch(`${llmBaseUrl()}/chat/completions`, {
 		method: 'POST',
 		headers: {
@@ -710,6 +715,7 @@ export async function llmSpeech(opts: {
 }): Promise<{ pcm: Uint8Array; sampleRate: number; channels: number }> {
 	const key = llmApiKey();
 	if (!key) throw new Error('LLM_API_KEY is not configured');
+	await spendGate();
 	const res = await fetch(`${llmBaseUrl()}/audio/speech`, {
 		method: 'POST',
 		headers: {

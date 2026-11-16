@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generateText } from 'ai';
 import { PromptCache } from './prompt-cache';
+vi.mock('$lib/server/spend-gate', () => ({ spendGate: async () => {} }));
 
 const M = vi.hoisted(() => ({
   env: {} as Record<string, string | undefined>,

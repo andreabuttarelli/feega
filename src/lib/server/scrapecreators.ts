@@ -1,4 +1,5 @@
 import { swallow } from '$lib/server/swallow';
+import { spendGate } from '$lib/server/spend-gate';
 import { env } from '$env/dynamic/private';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createHash } from 'node:crypto';
@@ -59,6 +60,7 @@ async function scfetch(
   path: string,
   body?: Record<string, unknown>
 ): Promise<any> {
+  await spendGate();
   const t0 = Date.now();
   // The endpoint (path without query) identifies WHAT was scraped in cost reports. Computed from a
   // parameter that must exist — see the arity gate in scripts/typecheck-runtime.mjs, added after a

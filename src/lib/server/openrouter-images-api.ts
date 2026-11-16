@@ -27,6 +27,7 @@
  * disegnata da zero e $0,017 per una modificata, contro i $0,0748 medi del Gemini su OpenRouter.
  */
 import { env } from '$env/dynamic/private';
+import { spendGate } from '$lib/server/spend-gate';
 import { logAiCall } from '$lib/server/ai-log';
 import {
   imageModelSpec,
@@ -123,6 +124,7 @@ export async function generateImageOnOpenrouterImages(
     throw new Error(`OpenRouter images (${model}): ${error}`);
   };
 
+  await spendGate();
   let payload: ImagesResponse;
   try {
     const res = await fetch(`${baseUrl()}/images`, {

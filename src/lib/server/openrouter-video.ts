@@ -16,6 +16,7 @@
  * stima a priori sta in `pricing_skus` sul catalogo, e il conto vero lo dice chi lo manda.
  */
 import { env } from '$env/dynamic/private';
+import { spendGate } from '$lib/server/spend-gate';
 import { logAiCall } from '$lib/server/ai-log';
 import { clampVideoPrompt, upscaleLimitsOf, videoModelSpec } from '$lib/video-models';
 
@@ -166,6 +167,7 @@ async function submit(
   render: OpenrouterVideoRender,
   signal?: AbortSignal
 ): Promise<{ jobId?: string; error?: string }> {
+  await spendGate();
   const res = await fetch(`${baseUrl()}/videos`, {
     method: 'POST',
     headers: { ...openrouterVideoHeaders(), 'content-type': 'application/json' },

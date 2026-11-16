@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+vi.mock('$lib/server/spend-gate', () => ({ spendGate: async () => {} }));
 
 /**
  * IL DIFETTO PAGATO, 2026-09-24. Un nodo video collegato a un nodo testo su un modello Gemini

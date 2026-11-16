@@ -9,6 +9,7 @@ import { reconcileAudioNodeRuns, runGenNode } from './generate';
 import { audioPurgers } from './audio-run';
 import type { AudioProvider } from './audio-provider';
 import { DEFAULT_VOICE } from '$lib/canvas/audio-operations';
+vi.mock('$lib/server/spend-gate', () => ({ spendGate: async () => {} }));
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const NODE = '22222222-2222-2222-2222-222222222222';
