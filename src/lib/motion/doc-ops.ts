@@ -39,7 +39,24 @@ const ID = 'id';
 type Bag = Record<string, unknown>;
 type Placed = { trackId: string; index: number; clip: MotionClip };
 
-const same = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JSON.stringify(b);
+const definedKeys = (bag: Bag) => Object.keys(bag).filter((key) => bag[key] !== undefined);
+
+function same(a: unknown, b: unknown): boolean {
+  if (a === b) {
+    return true;
+  }
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object' || Array.isArray(a) !== Array.isArray(b)) {
+    return false;
+  }
+  if (Array.isArray(a)) {
+    return a.length === (b as unknown[]).length && a.every((item, i) => same(item, (b as unknown[])[i]));
+  }
+
+  const was = a as Bag;
+  const now = b as Bag;
+  const keys = definedKeys(was);
+  return keys.length === definedKeys(now).length && keys.every((key) => same(was[key], now[key]));
+}
 
 const keysOf = (...bags: (Bag | undefined)[]) => [...new Set(bags.flatMap((b) => Object.keys(b ?? {})))];
 
