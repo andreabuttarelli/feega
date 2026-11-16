@@ -12,6 +12,7 @@ import { DesignSystem } from './design-system';
 import { DESIGN_BOARD } from './design-board';
 import { discover } from './component-discovery';
 import { APP, askOf, button, tabOf, TREE } from './code-import.testkit';
+import { GALLERY_READY } from './gallery';
 
 const LIBRARY = discover({
   'src/components/Button.tsx': "export function Button({ type = 'button' }: { type?: 'button' | 'submit' | 'reset'; children?: React.ReactNode }) { return <button type={type} />; }",
@@ -33,6 +34,42 @@ describe('importCodeAt con la libreria letta dal codice', () => {
       ['Button', true, 3],
       ['Callout', false, 2]
     ]);
+  });
+
+  it('after the routes, the gallery pages are captured: library components become mains, the gallery is no route, and what it could not draw says why', async () => {
+    const gallery = { pages: [{ label: 'Library', path: '/feega-gallery?page=0', components: ['Button', 'Callout'] }], left: [] };
+    const runner = vi.fn(async () => ({ ok: true as const, app: { url: APP, key: 'k3y', names: ['Button'], sha: null, stop: async () => undefined, library: LIBRARY, gallery } }));
+    const { ask, tab } = askOf({ runner });
+    let at = '';
+    tab.goto.mockImplementation(async (url: string) => {
+      at = url;
+      return 200;
+    });
+    tab.marks.mockImplementation(async () => (at.includes('feega-gallery') ? [{ component: 'Button', props: { variant: 'outline', children: 'Button' } }, { component: 'Button', props: { size: 'sm', children: 'Button' } }] : [{ component: 'Button', props: { children: 'Save' } }]));
+    tab.tree.mockImplementation(async () => (at.includes('feega-gallery') ? { ...TREE, root: { ...TREE.root, children: [button('2', 0, 10, 'Button'), button('3', 1, 100, 'Button'), { id: 'n', type: 'TEXT', characters: 'Not drawn: Callout: needs a provider', absoluteBoundingBox: { x: 0, y: 60, width: 200, height: 16 } }] } } : TREE));
+
+    const done = await importCodeAt(ask);
+
+    expect(tab.goto).toHaveBeenLastCalledWith(`${APP}/feega-gallery?page=0`);
+    expect(tab.waitFor).toHaveBeenCalledWith(GALLERY_READY, expect.any(Number));
+    expect(tab.marks).toHaveBeenLastCalledWith(['Button', 'Callout']);
+    expect(done).toMatchObject({ outcome: CodeImportOutcome.Ok, pages: ['/settings'], components: 1, variants: 3 });
+    const library = 'library' in done ? done.library! : null;
+    expect(library?.components.map((c) => [c.name, c.captured, c.drawn])).toEqual([
+      ['Button', true, true],
+      ['Callout', false, false]
+    ]);
+    expect(library?.uncaptured).toEqual(['Callout']);
+    expect(library?.reasons).toEqual({ Callout: 'needs a provider' });
+  });
+
+  it('a gallery the framework cannot host leaves every uncaptured component with that reason', async () => {
+    const runner = vi.fn(async () => ({ ok: true as const, app: { url: APP, key: 'k3y', names: ['Button'], sha: null, stop: async () => undefined, library: LIBRARY, gallery: { unrun: 'no component gallery for sveltekit apps yet' } } }));
+    const { ask } = askOf({ runner });
+
+    const done = await importCodeAt(ask);
+
+    expect('library' in done && done.library!.reasons).toEqual({ Callout: 'no component gallery for sveltekit apps yet' });
   });
 
   it('una prop type dichiarata come unione diventa asse di variante', async () => {

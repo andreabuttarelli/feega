@@ -2,7 +2,7 @@ import { posix } from 'node:path';
 import type { RestNode } from '$lib/server/figma/rest-message';
 import type { PageTree } from '$lib/server/url-import/page-tree';
 import type { ComponentUse, PropValue } from './component-marks';
-import { AxisSource, cellsOf, ExportKind, type DiscoveredComponent, type Discovery, type ReadMany } from './component-discovery';
+import { AxisSource, cellsOf, ExportKind, type DiscoveredComponent, type Discovery, type Drawing, type ReadMany } from './component-discovery';
 import { Framework } from './run-plan';
 
 export const GALLERY_NAME = 'feega-gallery';
@@ -32,7 +32,6 @@ export type GalleryPlan = { pages: GalleryPage[]; left: Unrendered[] };
 export type GalleryUnrun = { unrun: string };
 export type GalleryMade = { files: GalleryFile[]; plan: GalleryPlan } | GalleryUnrun;
 export type GalleryApp = { framework: Framework; appDir: string; files: string[] };
-export type GalleryState = { drawn: true } | { drawn: false; reason: string };
 export type GalleryCapture = { label: string; tree: PageTree; uses: ComponentUse[] };
 
 type Cells = Record<string, PropValue>[];
@@ -180,8 +179,8 @@ function notesIn(tree: PageTree): Map<string, string> {
   return notes;
 }
 
-export function galleryStates(plan: GalleryPlan, captures: GalleryCapture[], missed: ReadonlySet<string>): Map<string, GalleryState> {
-  const states = new Map<string, GalleryState>();
+export function galleryStates(plan: GalleryPlan, captures: GalleryCapture[], missed: ReadonlySet<string>): Map<string, Drawing> {
+  const states = new Map<string, Drawing>();
   for (const page of plan.pages) {
     const capture = captures.find((c) => c.label === page.label);
     const drawn = new Set(capture?.uses.map((u) => u.component));

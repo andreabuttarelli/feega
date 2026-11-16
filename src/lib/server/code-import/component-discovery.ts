@@ -517,15 +517,22 @@ export function discover(files: Record<string, string>): Discovery {
   return { components: components.map((c) => ({ ...stories.filter((s) => s.component === c.name).reduce((acc, s) => withStory(acc, s.axes), c), serverOnly: SERVER_ONLY.test(files[c.file]) })) };
 }
 
-export type LibraryComponent = DiscoveredComponent & { captured: boolean; cells: number };
+export type Drawing = { drawn: true } | { drawn: false; reason: string };
 
-export type LibraryReport = { components: LibraryComponent[]; uncaptured: string[] };
+export type LibraryComponent = DiscoveredComponent & { captured: boolean; drawn: boolean; cells: number };
+
+export type LibraryReport = { components: LibraryComponent[]; uncaptured: string[]; reasons: Record<string, string> };
 
 export const declaredAxes = (library: Discovery): DeclaredAxes => new Map(library.components.map((c) => [c.name, Object.fromEntries(Object.entries(c.axes).map(([k, a]) => [k, a.values]))]));
 
-export function libraryReport(library: Discovery, captured: ReadonlySet<string>): LibraryReport {
-  const components = library.components.map((c) => ({ ...c, captured: captured.has(c.name), cells: cellsOf(c).length }));
-  return { components, uncaptured: components.filter((c) => !c.captured).map((c) => c.name) };
+export function libraryReport(library: Discovery, captured: ReadonlySet<string>, drawing: (name: string) => Drawing): LibraryReport {
+  const components = library.components.map((c) => ({ ...c, captured: captured.has(c.name), drawn: drawing(c.name).drawn, cells: cellsOf(c).length }));
+  const missing = components.filter((c) => !c.captured && !c.drawn).map((c) => c.name);
+  const reasons = Object.fromEntries(missing.flatMap((name) => {
+    const state = drawing(name);
+    return state.drawn ? [] : [[name, state.reason]];
+  }));
+  return { components, uncaptured: missing, reasons };
 }
 
 export function cellsOf(component: DiscoveredComponent): Record<string, string>[] {
