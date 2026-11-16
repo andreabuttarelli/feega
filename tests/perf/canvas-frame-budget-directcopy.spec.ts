@@ -101,6 +101,7 @@ test('direct zoom on the user canvas copy', async () => {
     return { n: f.length, ms50: p(sorted('ms'), 0.5), ms95: p(sorted('ms'), 0.95), msMax: p(sorted('ms'), 0.999), bake50: p(sorted('bakeMs'), 0.5), bake95: p(sorted('bakeMs'), 0.95), bakes: per('bakes'), plans: per('plans'), tiles: per('tiles'), unsharp: per('unsharp') };
   });
   console.log(`core ${JSON.stringify(core)}`);
+  console.log(`canvasdata ${JSON.stringify(await page.evaluate(() => ({ ...(document.querySelector('[data-testid=core-canvas]') as HTMLElement | null)?.dataset })))}`);
   if (casting) {
     await cdp.send('Page.stopScreencast');
   }

@@ -47,8 +47,9 @@ fn another_octave_gets_another_effect_key() {
 
 #[test]
 fn the_held_texture_maps_back_to_where_the_item_is_on_screen() {
-    let z = zoomless(&blurred(1.5, 100.0, 50.0, 1.0)).unwrap();
-    let Item::Path(held) = &z.item else { panic!() };
+    let item = blurred(1.5, 100.0, 50.0, 1.0);
+    let z = zoomless(&item).unwrap();
+    let Item::Path(held) = &z.item(&item) else { panic!() };
 
     assert_eq!(&held.look.matrix[..4], &[2.0, 0.0, 0.0, 2.0]);
     assert_eq!(held.look.blur, 8.0);

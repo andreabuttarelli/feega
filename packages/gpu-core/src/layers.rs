@@ -132,16 +132,17 @@ fn prepare_items<S: Surface>(surface: &mut S, items: &[Item], background: Option
 
 fn held_body<S: Surface>(surface: &mut S, item: &Item, pictures: &Shelf<Pic<S>>, blending: Blending, fragments: &Fragments) -> Result<Option<Placed<Pic<S>>>, S::Error> {
     let Some(z) = zoomless(item) else { return Ok(None) };
-    let Some(look) = z.item.look() else { return Ok(None) };
-    let Some(spread) = inflated::<S::Canvas>(&z.item, look, pictures) else { return Ok(None) };
-    if spread.width() > HELD_SIDE || spread.height() > HELD_SIDE {
-        return Ok(None);
-    }
     let held = match surface.recall_held(&z.key) {
         Some(held) => held,
         None => {
+            let at_held = z.item(item);
+            let Some(look) = at_held.look() else { return Ok(None) };
+            let Some(spread) = inflated::<S::Canvas>(&at_held, look, pictures) else { return Ok(None) };
+            if spread.width() > HELD_SIDE || spread.height() > HELD_SIDE {
+                return Ok(None);
+            }
             surface.set_frame(Some(Rect::new(spread.x0.floor(), spread.y0.floor(), spread.x1.ceil(), spread.y1.ceil())));
-            let made = held_made(surface, &z.item, pictures, blending, fragments);
+            let made = held_made(surface, &at_held, pictures, blending, fragments);
             surface.set_frame(None);
             let made = made?;
             surface.remember_held(&z.key, &made);

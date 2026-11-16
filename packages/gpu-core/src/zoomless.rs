@@ -1,17 +1,37 @@
+use std::hash::{Hash, Hasher};
+
+use rustc_hash::FxHasher;
 use vello::kurbo::{Point, Rect};
 
-use crate::display_list::{Affine, Item, Look};
+use crate::display_list::{Affine, Cover, Item, Look, Paint};
 use crate::groups::placed;
 
 const UNBOUNDED: Rect = Rect::new(-1.0e7, -1.0e7, 1.0e7, 1.0e7);
 const SIMILAR: f64 = 1e-6;
-const KEY_DECIMALS: usize = 3;
+const KEY_STEPS: f64 = 1000.0;
+const SAMPLED_EVERY: usize = 16;
+
+fn sampled(contours: &[Vec<f64>], h: &mut FxHasher) {
+    for c in contours {
+        c.len().hash(h);
+        c.iter().step_by(SAMPLED_EVERY).chain(c.last()).for_each(|v| v.to_bits().hash(h));
+    }
+}
 
 pub struct Zoomless {
     pub key: String,
-    pub item: Item,
     pub scale: f64,
     pub shift: Point,
+    held: f64,
+    screen: f64,
+}
+
+impl Zoomless {
+    pub fn item(&self, item: &Item) -> Item {
+        let k = self.held / self.screen;
+        let [tx, ty] = [self.shift.x, self.shift.y];
+        placed(&unscissored(item), [k, 0.0, 0.0, k, -tx * k, -ty * k], UNBOUNDED, k)
+    }
 }
 
 fn similarity(m: Affine) -> Option<f64> {
@@ -43,37 +63,113 @@ fn unscissored(item: &Item) -> Item {
     }
 }
 
-fn rounded(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut number = String::new();
-    let flush = |number: &mut String, out: &mut String| {
-        if number.is_empty() {
-            return;
-        }
-        match number.parse::<f64>() {
-            Ok(v) if number.contains('.') || number.contains('e') => {
-                let r = format!("{:.*}", KEY_DECIMALS, v);
-                out.push_str(if r.trim_start_matches('-').trim_matches(|c| c == '0' || c == '.').is_empty() { "0" } else { &r });
-            }
-            _ => out.push_str(number),
-        }
-        number.clear();
-    };
-    for c in text.chars() {
-        let continues = c.is_ascii_digit() || c == '.' || ((c == 'e' || c == '-') && !number.is_empty()) || (c == '-' && number.is_empty());
-        if continues {
-            number.push(c);
-            continue;
-        }
-        flush(&mut number, &mut out);
-        out.push(c);
-    }
-    flush(&mut number, &mut out);
-    out
+struct Unit {
+    s: f64,
+    t: [f64; 2],
 }
 
-fn moved(m: [f64; 6], item: &Item, scale: f64) -> Item {
-    placed(item, m, UNBOUNDED, scale)
+impl Unit {
+    fn length(&self, v: f64, h: &mut FxHasher) {
+        ((v / self.s * KEY_STEPS).round() as i64).hash(h);
+    }
+
+    fn plain(&self, v: f64, h: &mut FxHasher) {
+        ((v * KEY_STEPS).round() as i64).hash(h);
+    }
+
+    fn matrix(&self, m: Affine, h: &mut FxHasher) {
+        let [a, b, c, d, e, f] = m;
+        for v in [a, b, c, d, e - self.t[0], f - self.t[1]] {
+            self.length(v, h);
+        }
+    }
+
+    fn paint(&self, paint: &Paint, h: &mut FxHasher) {
+        format!("{paint:?}").hash(h);
+    }
+
+    fn cover(&self, cover: &Cover, h: &mut FxHasher) {
+        match cover {
+            Cover::Path { contours, matrix } => {
+                0u8.hash(h);
+                sampled(contours, h);
+                self.matrix(*matrix, h);
+            }
+            Cover::Ramp { ramp, contours, matrix } => {
+                1u8.hash(h);
+                format!("{ramp:?}").hash(h);
+                sampled(contours, h);
+                self.matrix(*matrix, h);
+            }
+            Cover::Picture { src, luma, matrix } => {
+                2u8.hash(h);
+                src.hash(h);
+                luma.hash(h);
+                self.matrix(*matrix, h);
+            }
+        }
+    }
+
+    fn look(&self, look: &Look, h: &mut FxHasher) {
+        look.opacity.to_bits().hash(h);
+        self.matrix(look.matrix, h);
+        self.length(look.blur, h);
+        look.blend.hash(h);
+        for mask in look.masks.iter().flatten() {
+            format!("{:?}", mask.mode).hash(h);
+            mask.invert.hash(h);
+            mask.level.to_bits().hash(h);
+            self.length(mask.feather, h);
+            self.cover(&mask.cover, h);
+        }
+        if let Some(matte) = &look.matte {
+            matte.luma.hash(h);
+            matte.invert.hash(h);
+            matte.items.iter().for_each(|i| self.item(i, h));
+        }
+        format!("{:?}", look.filters).hash(h);
+        for v in look.space.into_iter().flatten() {
+            self.length(v, h);
+        }
+        for [x, y] in look.origin {
+            self.length(x - self.t[0], h);
+            self.length(y - self.t[1], h);
+        }
+    }
+
+    fn item(&self, item: &Item, h: &mut FxHasher) {
+        item.kind().hash(h);
+        item.clip().hash(h);
+        if let Some(look) = item.look() {
+            self.look(look, h);
+        }
+        match item {
+            Item::Path(p) => {
+                sampled(&p.contours, h);
+                format!("{:?}", p.rule).hash(h);
+                self.paint(&p.paint, h);
+                p.within.is_some().hash(h);
+            }
+            Item::Image(i) => {
+                i.src.hash(h);
+                i.fit.hash(h);
+                for v in [i.size.width, i.size.height, i.focus[0], i.focus[1], i.zoom, i.tile_turn] {
+                    self.plain(v, h);
+                }
+                format!("{:?} {:?}", i.crop, i.inner).hash(h);
+            }
+            Item::Layer(l) => {
+                l.source.hash(h);
+                self.plain(l.size.width, h);
+                self.plain(l.size.height, h);
+            }
+            Item::Group(g) => {
+                g.items.len().hash(h);
+                g.items.iter().for_each(|i| self.item(i, h));
+            }
+            _ => {}
+        }
+    }
 }
 
 pub fn bucket(scale: f64) -> f64 {
@@ -88,10 +184,7 @@ pub fn zoomless(item: &Item) -> Option<Zoomless> {
     let s = similarity(look.matrix)?;
     let [.., tx, ty] = look.matrix;
     let held = bucket(s);
-    let free = unscissored(item);
-    let to_unit = [1.0 / s, 0.0, 0.0, 1.0 / s, -tx / s, -ty / s];
-    let unit = moved(to_unit, &free, 1.0 / s);
-    let k = held / s;
-    let at_held = moved([k, 0.0, 0.0, k, -tx * k, -ty * k], &free, k);
-    Some(Zoomless { key: format!("{held} {}", rounded(&format!("{unit:?}"))), item: at_held, scale: s / held, shift: Point::new(tx, ty) })
+    let mut hasher = FxHasher::default();
+    Unit { s, t: [tx, ty] }.item(item, &mut hasher);
+    Some(Zoomless { key: format!("{held} {:016x}", hasher.finish()), scale: s / held, shift: Point::new(tx, ty), held, screen: s })
 }
