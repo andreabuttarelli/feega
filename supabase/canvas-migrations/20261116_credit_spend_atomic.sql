@@ -1,5 +1,3 @@
-begin;
-
 alter table public.credit_ledger add column if not exists call_key text;
 alter table public.ai_calls add column if not exists hold_key text;
 
@@ -123,8 +121,7 @@ begin
   return NEW;
 end; $$;
 
-drop trigger if exists ai_calls_debit on public.ai_calls;
-create trigger ai_calls_debit after insert on public.ai_calls
+create or replace trigger ai_calls_debit after insert on public.ai_calls
   for each row execute function public.debit_ai_call();
 
 revoke execute on function public.lock_org_credits(uuid) from public, anon, authenticated;
@@ -138,4 +135,3 @@ grant execute on function public.credit_hold(uuid, text[], integer[]) to service
 grant execute on function public.credit_release(uuid, text) to service_role;
 grant execute on function public.credit_release_stale(interval) to service_role;
 
-commit;
