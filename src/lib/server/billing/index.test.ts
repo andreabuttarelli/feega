@@ -9,12 +9,12 @@ vi.mock('$env/dynamic/private', () => ({ env: {} }));
 vi.mock('./dazero-provider', () => ({ dazeroBillingProvider: undefined }));
 
 describe('billingProvider()', () => {
-	it('ricade su open quando il modulo del provider non esporta niente', async () => {
+	it('refuses every spend when the provider module exports nothing', async () => {
 		const { billingProvider } = await import('./index');
+		const { BillingUnavailableError } = await import('$lib/billing/contract');
 		const provider = await billingProvider();
 
-		expect(provider.kind).toBe('open');
-		await expect(provider.gate('credits', { brandId: 'brand-1' })).resolves.toBeUndefined();
+		await expect(provider.gate('credits', { brandId: 'brand-1' })).rejects.toBeInstanceOf(BillingUnavailableError);
 	});
 });
 

@@ -84,8 +84,8 @@ describe('gateCreditsCore fails CLOSED when the org cannot be resolved from bran
 
     const { gateCreditsCore } = await import('./credits');
 
-    // Brand not found: nothing to gate, allowed through (matches the pre-existing "no brand → return" contract).
-    await expect(gateCreditsCore('missing-brand')).resolves.toBeUndefined();
+    const { BillingUnavailableError } = await import('$lib/billing/contract');
+    await expect(gateCreditsCore('missing-brand')).rejects.toBeInstanceOf(BillingUnavailableError);
   });
 
   it('denies the spend once ai_calls spend crosses the free quota, with no plan to inflate it', async () => {

@@ -18,6 +18,7 @@ vi.mock('./credits', () => ({
 
 import { gateOrgAiActionForForm, gateAiActionForForm } from './cli-auth';
 import { CreditsExhaustedError, type CreditsUsage } from './credits';
+import { BillingUnavailableError, BILLING_UNAVAILABLE_MESSAGE } from '$lib/billing/contract';
 
 const EXHAUSTED: CreditsUsage = { used: 100, quota: 100, bonus: 0, remaining: 0, periodStart: new Date(0), periodEnd: new Date(0), percent: 100 };
 
@@ -43,6 +44,14 @@ describe('gateOrgAiActionForForm', () => {
 		expect(denied?.data).toMatchObject({ error: 'credits_exhausted' });
 		expect(typeof denied?.data.message).toBe('string');
 		expect(denied?.data.message.length).toBeGreaterThan(0);
+	});
+
+	it('a gate that cannot read the balance answers 503 with a message the user can read', async () => {
+		gateOrgCredits.mockRejectedValue(new BillingUnavailableError('credit_gate failed'));
+
+		const denied = await gateOrgAiActionForForm('org-1');
+
+		expect(denied).toEqual({ status: 503, data: { error: 'billing_unavailable', message: BILLING_UNAVAILABLE_MESSAGE } });
 	});
 
 	it('re-throws an error that is not a credits exhaustion', async () => {

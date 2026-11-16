@@ -16,7 +16,7 @@ beforeEach(() => {
 	vi.resetModules();
 });
 
-describe('billingProvider() fallback reporting', () => {
+describe('billingProvider() without the paid provider refuses to spend, and says so', () => {
 	it('reports when the paid provider throws on load', async () => {
 		vi.doMock('$env/dynamic/private', () => ({ env: {} }));
 		vi.doMock('./dazero-provider', () => {
@@ -24,9 +24,10 @@ describe('billingProvider() fallback reporting', () => {
 		});
 
 		const { billingProvider } = await import('./index');
+		const { BillingUnavailableError } = await import('$lib/billing/contract');
 		const provider = await billingProvider();
 
-		expect(provider.kind).toBe('open');
+		await expect(provider.gate('credits', { orgId: 'org-free' })).rejects.toBeInstanceOf(BillingUnavailableError);
 		expect(swallowed).toHaveLength(1);
 		expect(swallowed[0]).toMatch(/billing/i);
 	});
@@ -36,10 +37,26 @@ describe('billingProvider() fallback reporting', () => {
 		vi.doMock('./dazero-provider', () => ({ dazeroBillingProvider: undefined }));
 
 		const { billingProvider } = await import('./index');
+		const { BillingUnavailableError } = await import('$lib/billing/contract');
+		const provider = await billingProvider();
+
+		await expect(provider.gate('credits', { brandId: 'brand-1' })).rejects.toBeInstanceOf(BillingUnavailableError);
+		expect(swallowed).toHaveLength(1);
+	});
+
+	it('local mode is open on purpose: file-only, the user pays with their own keys', async () => {
+		vi.doMock('$env/dynamic/private', () => ({ env: {} }));
+		vi.doMock('$lib/server/local/local-mode', () => ({ localStore: () => ({}) }));
+		vi.doMock('./dazero-provider', () => {
+			throw new Error('must not be asked in local mode');
+		});
+
+		const { billingProvider } = await import('./index');
 		const provider = await billingProvider();
 
 		expect(provider.kind).toBe('open');
-		expect(swallowed).toHaveLength(1);
+		expect(swallowed).toEqual([]);
+		vi.doUnmock('$lib/server/local/local-mode');
 	});
 
 	it('stays silent when BILLING_PROVIDER=open asked for it', async () => {

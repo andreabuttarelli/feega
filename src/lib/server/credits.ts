@@ -317,151 +317,59 @@ export function assertCreditsAvailable(usage: CreditsUsage): void {
 
 // ── Self-contained hard gate ─────────────────────────────────────────────────────
 // The runaway-spend circuit breaker (incident 2026-07-13: one crash-looping onboarding job
-// burned ~$365 in 42h). Called at the top of every expensive flow AND inside renderImage —
-// the costly chokepoint — so even a loop nobody anticipated stops at the quota.
-// Fail-OPEN by design: a billing outage must never take the product down. The 60s per-brand
-// cache bounds the DB overhead to ~3 queries per brand per minute.
+// burned ~$365 in 42h). Fail-CLOSED: a balance that cannot be read refuses the spend, for paying
+// and free orgs alike — a week of unmetered AI is what failing open cost.
 
 import { createAdminClient } from './supabase-admin';
+import { BillingUnavailableError } from '$lib/billing/contract';
 
-const gateCache = new Map<string, { usage: CreditsUsage; at: number }>();
-const GATE_TTL_MS = 60_000;
-
-/**
- * The 29 call sites (17 direct + 12 via cli-auth.ts's gateAiAction) all call THIS function,
- * unchanged — it's the chokepoint. It delegates to the billing provider: the open provider's
- * gate() is a no-op, the feega provider's gate() calls gateCreditsCore below (the real,
- * unrewritten enforcement). Dynamic import dodges a credits↔billing↔credits init-order cycle
- * (same trick already used below for ai-log).
- */
 export async function gateCredits(brandId: string): Promise<void> {
   const { billingProvider } = await import('./billing');
   const provider = await billingProvider();
   await provider.gate('credits', { brandId });
 }
 
-/**
- * Lo stesso cancello per un lavoro senza brand: il pagante è l'organizzazione, e passa dallo stesso
- * provider — un fork self-hosted, che di fatturazione non ne ha, non deve trovarsi contato proprio
- * su questa strada perché è nuova.
- */
 export async function gateOrgCredits(orgId: string): Promise<void> {
   const { billingProvider } = await import('./billing');
   const provider = await billingProvider();
   await provider.gate('credits', { orgId });
 }
 
-/**
- * Both fail-open paths below give up on the same thing — evaluating the ledger — and both let the
- * action through on purpose: a transient Supabase error must not block a paying customer. Neither
- * may do it silently. Unmetered AI nobody is told about is exactly how a week of it went unnoticed.
- */
-function reportFailOpen(brandId: string, err: unknown): void {
-  swallow(`credits: allowed brand ${brandId} without evaluating its ledger`, err);
+function refuse(payer: string, err: unknown): never {
+  swallow(`credits: refused ${payer}, its balance could not be read`, err);
+  throw new BillingUnavailableError(err instanceof Error ? err.message : String(err));
 }
 
-/**
- * L'applicazione vera per chi il brand non ce l'ha. Stessa cassa e stessa chiave di `gateCredits`
- * — che risolve l'organizzazione e poi mette in cache SU DI ESSA — quindi una generazione senza
- * brand e una con lo stesso brand leggono la stessa riga invece di pagarsi due copie dello stesso
- * conto. Non per uso diretto: si chiama `gateOrgCredits`.
- */
+async function gateBalance(orgId: string): Promise<CreditsUsage> {
+  const { data, error } = await createAdminClient().rpc('credit_gate', { _org_id: orgId });
+  if (error) {
+    throw new Error(`credit_gate failed: ${error.message}`);
+  }
+  const balance = Math.max(0, Number(data ?? 0));
+  const now = new Date();
+  return { used: 0, quota: balance, bonus: 0, remaining: balance, periodStart: now, periodEnd: now, percent: 0 };
+}
+
 export async function gateOrgCreditsCore(orgId: string): Promise<void> {
   const { isCreditExempt } = await import('./ai-log');
   if (isCreditExempt()) return;
 
-  // Fuori dal try di proposito: un rifiuto qui è il cancello che fa il suo mestiere, e non deve
-  // finire nel catch che lascia passare.
-  const hit = gateCache.get(orgId);
-  if (hit && Date.now() - hit.at < GATE_TTL_MS) {
-    assertCreditsAvailable(hit.usage);
-    return;
-  }
-
-  let usage: CreditsUsage;
-  try {
-    const admin = createAdminClient();
-    usage = await ledgerCreditsUsage(admin, orgId);
-    gateCache.set(orgId, { usage, at: Date.now() });
-  } catch (e) {
-    reportFailOpen(orgId, e);
-    return;
-  }
+  const usage = await gateBalance(orgId).catch((e) => refuse(`org ${orgId}`, e));
   assertCreditsAvailable(usage);
 }
 
-/**
- * Il saldo `credit_ledger` travestito da `CreditsUsage`, per il cancello e per la cache che già
- * esiste — non un secondo concetto di "quota", solo il saldo vero letto una volta. `quota`/`used`
- * qui sono display: quello che decide è `remaining`, ed è il saldo stesso.
- */
-async function ledgerCreditsUsage(supabase: SupabaseClient, orgId: string): Promise<CreditsUsage> {
-  const balance = await orgCreditBalance(supabase, orgId);
-  const now = new Date();
-  return {
-    used: 0,
-    quota: Math.max(0, balance),
-    bonus: 0,
-    remaining: Math.max(0, balance),
-    periodStart: now,
-    periodEnd: now,
-    percent: 0
-  };
-}
-
-/**
- * The real enforcement, moved out of gateCredits() unchanged so the feega provider can call
- * it without gateCredits recursing back through itself. Not for direct use — call gateCredits().
- */
 export async function gateCreditsCore(brandId: string): Promise<void> {
-  // One-time system generation (onboarding pipeline) is exempt — it must always complete and has
-  // its own runaway watchdog. Dynamic import dodges any credits↔ai-log init-order cycle.
   const { isCreditExempt } = await import('./ai-log');
   if (isCreditExempt()) return;
 
-  // The pool is the org's, so the cache entry is too: every brand under an org reads and refreshes
-  // the same one, instead of each paying for its own copy of the same numbers.
-  let admin: SupabaseClient | null = null;
-  let cacheKey = brandId;
-  let orgId: string | null = null;
-  try {
-    admin = createAdminClient();
-    const org = await resolveOrgBilling(admin, brandId);
-    if (org) {
-      cacheKey = org.orgId;
-      orgId = org.orgId;
-    }
-  } catch (e) {
-    reportFailOpen(brandId, e);
-    return;
-  }
-
-  // Outside the try on purpose: a denial here is the gate doing its job, and must not be
-  // swallowed by the fail-open catch below.
-  const hit = gateCache.get(cacheKey);
-  if (hit && Date.now() - hit.at < GATE_TTL_MS) {
-    assertCreditsAvailable(hit.usage);
-    return;
-  }
-
-  let usage: CreditsUsage | null = null;
-  try {
-    if (orgId) {
-      // Il saldo vero è dell'org, non del brand: due brand dello stesso org leggono lo stesso saldo.
-      usage = await ledgerCreditsUsage(admin, orgId);
-      gateCache.set(cacheKey, { usage, at: Date.now() });
-    } else {
-      const { data: brand, error } = await admin.from('brands').select('id').eq('id', brandId).maybeSingle();
-      if (error) throw new Error(`brands lookup failed: ${error.message}`);
-      if (!brand) return;
-      // Un brand senza org risolvibile (dato inconsistente) non ha un saldo da leggere — fallback
-      // alla quota free, per non lasciare la spesa senza alcun tetto.
-      usage = await getCreditsUsage(admin, { id: brand.id, plan: null, activated_at: null, status: 'active' });
-      gateCache.set(cacheKey, { usage, at: Date.now() });
-    }
-  } catch (e) {
-    reportFailOpen(brandId, e);
-    return;
-  }
+  const usage = await brandBalance(brandId).catch((e) => refuse(`brand ${brandId}`, e));
   assertCreditsAvailable(usage);
+}
+
+async function brandBalance(brandId: string): Promise<CreditsUsage> {
+  const org = await resolveOrgBilling(createAdminClient(), brandId);
+  if (!org) {
+    throw new Error(`brand ${brandId} resolves to no org`);
+  }
+  return gateBalance(org.orgId);
 }

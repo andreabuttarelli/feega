@@ -1,3 +1,4 @@
+import { BillingUnavailableError, BILLING_UNAVAILABLE_MESSAGE } from '$lib/billing/contract';
 import { createClient, createServerClient } from '$lib/server/db/connect';
 import { env as publicEnv } from '$env/dynamic/public';
 import { env } from '$env/dynamic/private';
@@ -244,6 +245,9 @@ async function creditGateOutcome(spend: () => Promise<void>): Promise<CreditGate
   } catch (e) {
     if (e instanceof CreditsExhaustedError) {
       return { status: 402, data: { error: 'credits_exhausted', message: CREDITS_EXHAUSTED_MESSAGE } };
+    }
+    if (e instanceof BillingUnavailableError) {
+      return { status: 503, data: { error: 'billing_unavailable', message: BILLING_UNAVAILABLE_MESSAGE } };
     }
     throw e;
   }

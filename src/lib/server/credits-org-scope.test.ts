@@ -93,13 +93,12 @@ describe('getCreditsUsage, org-scoped', () => {
   });
 });
 
-describe('gateCreditsCore, org-scoped cache', () => {
+describe('gateCreditsCore, org-scoped balance', () => {
   beforeEach(() => {
     vi.resetModules();
   });
 
-  it('two brands of the same org share one pool reading', async () => {
-    // The cache keys on the org: the second brand must not pay for the same sum all over again.
+  it('two brands of the same org read the same pool, fresh each time', async () => {
     const { client, rpcCalls } = createTestSupabase({
       orgs: [{ id: ORG }],
       brands: [
@@ -107,9 +106,6 @@ describe('gateCreditsCore, org-scoped cache', () => {
         { id: 'brand-b', org_id: ORG }
       ]
     });
-    // The balance the gate reads is `org_credit_balance` (credit_ledger), not a sum over ai_calls
-    // — a positive balance here is "plenty of credits left", the same thing an empty ai_calls
-    // seed used to mean under the old quota model.
     client.rpc = (async (fn: string, args?: unknown) => {
       rpcCalls.push({ fn, args });
       return { data: 1000, error: null };
@@ -121,6 +117,9 @@ describe('gateCreditsCore, org-scoped cache', () => {
     await gateCreditsCore('brand-a');
     await gateCreditsCore('brand-b');
 
-    expect(rpcCalls.filter((c) => c.fn === 'org_credit_balance')).toHaveLength(1);
+    expect(rpcCalls.filter((c) => c.fn === 'credit_gate')).toEqual([
+      { fn: 'credit_gate', args: { _org_id: ORG } },
+      { fn: 'credit_gate', args: { _org_id: ORG } }
+    ]);
   });
 });
