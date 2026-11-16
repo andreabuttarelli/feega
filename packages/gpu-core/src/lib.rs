@@ -26,6 +26,7 @@ pub mod overlay_seen;
 pub mod pictures;
 pub mod reproject;
 pub mod retained;
+pub mod screen_fit;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod render;
 pub mod scene;
