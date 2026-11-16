@@ -7,6 +7,7 @@ const STEP_PX = 12;
 const HELD_MS = 1200;
 const LABEL_ABOVE_PX = 14;
 const LABEL_IN_PX = 8;
+const UNDO_SLACK_PX = 2;
 const STYLE_SAVE = /name="summary"\r?\n\r?\n[^\r\n]*\bstyle\b/i;
 
 const BODY = { kind: 'text', font: 'Inter', size: 0.05, weight: 400, tracking: 0, leading: 1.4, textCase: 'as-typed' };
@@ -41,7 +42,7 @@ async function styleSaves(page: Page, nodeId: string): Promise<() => string[]> {
 test.describe('resizing a frame leaves its styles alone @real', () => {
   test.skip(!REAL_STACK, 'needs E2E_REAL_STACK=1');
 
-  test('no style is rewritten or saved while the corner is held, nor after it lands', async ({ page, session, admin, seedNode }) => {
+  test('no style is rewritten or saved while the corner is held, nor after it lands or is undone', async ({ page, session, admin, seedNode }) => {
     test.setTimeout(120_000);
     await page.setViewportSize({ width: 1440, height: 900 });
     const node = await seedNode({ type: 'motion', x: 200, y: 150, data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } });
@@ -72,5 +73,10 @@ test.describe('resizing a frame leaves its styles alone @real', () => {
     expect(resizing.width, 'the frame follows the corner').toBeLessThan(box.width - STEP_PX);
     expect(midGesture, 'nothing writes a style while the corner is held').toEqual([]);
     expect(saves(), 'the resize keeps its styles at their pixel size, so nothing is pushed back after it lands').toEqual([]);
+
+    await page.keyboard.press('ControlOrMeta+z');
+    await page.waitForTimeout(SETTLE_MS);
+    expect(Math.abs((await tile.boundingBox())!.width - box.width), 'undo puts the frame back to its size').toBeLessThan(UNDO_SLACK_PX);
+    expect(saves(), 'undoing the resize writes no style either').toEqual([]);
   });
 });
