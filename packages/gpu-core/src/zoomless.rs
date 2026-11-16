@@ -5,6 +5,7 @@ use vello::kurbo::{Point, Rect};
 
 use crate::display_list::{Affine, Cover, Item, Look, Paint};
 use crate::groups::placed;
+use crate::held_view::ZOOM_IN_ROOM;
 
 const UNBOUNDED: Rect = Rect::new(-1.0e7, -1.0e7, 1.0e7, 1.0e7);
 const SIMILAR: f64 = 1e-6;
@@ -173,10 +174,51 @@ impl Unit {
 }
 
 pub fn bucket(scale: f64) -> f64 {
-    2f64.powf(scale.log2().ceil())
+    2f64.powf((scale * ZOOM_IN_ROOM).log2().ceil())
+}
+
+#[derive(Default)]
+pub struct Fingerprints {
+    known: rustc_hash::FxHashMap<String, u64>,
+    hashed: usize,
+}
+
+impl Fingerprints {
+    pub fn forget(&mut self) {
+        self.known.clear();
+    }
+
+    pub fn hashed(&self) -> usize {
+        self.hashed
+    }
+
+    fn of(&mut self, item: &Item, unit: Unit) -> u64 {
+        let name = format!("{} {} {}", item.kind(), item.clip(), shape_of(item));
+        if let Some(known) = self.known.get(&name) {
+            return *known;
+        }
+        let mut hasher = FxHasher::default();
+        unit.item(item, &mut hasher);
+        let print = hasher.finish();
+        self.hashed += 1;
+        self.known.insert(name, print);
+        print
+    }
+}
+
+fn shape_of(item: &Item) -> usize {
+    match item {
+        Item::Path(p) => p.contours.iter().map(Vec::len).sum(),
+        Item::Group(g) => g.items.len(),
+        _ => 0,
+    }
 }
 
 pub fn zoomless(item: &Item) -> Option<Zoomless> {
+    zoomless_in(item, &mut Fingerprints::default())
+}
+
+pub fn zoomless_in(item: &Item, memo: &mut Fingerprints) -> Option<Zoomless> {
     if reads_behind(item) {
         return None;
     }
@@ -184,7 +226,6 @@ pub fn zoomless(item: &Item) -> Option<Zoomless> {
     let s = similarity(look.matrix)?;
     let [.., tx, ty] = look.matrix;
     let held = bucket(s);
-    let mut hasher = FxHasher::default();
-    Unit { s, t: [tx, ty] }.item(item, &mut hasher);
-    Some(Zoomless { key: format!("{held} {:016x}", hasher.finish()), scale: s / held, shift: Point::new(tx, ty), held, screen: s })
+    let print = memo.of(item, Unit { s, t: [tx, ty] });
+    Some(Zoomless { key: format!("{held} {print:016x}"), scale: s / held, shift: Point::new(tx, ty), held, screen: s })
 }

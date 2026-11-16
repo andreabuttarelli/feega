@@ -18,6 +18,7 @@ pub mod gl_state;
 pub mod glyphs;
 pub mod fragments;
 pub mod groups;
+pub mod held_view;
 pub mod kernel;
 pub mod layers;
 pub mod lod;

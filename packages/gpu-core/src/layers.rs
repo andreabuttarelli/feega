@@ -6,7 +6,7 @@ use crate::fragments::Fragments;
 use crate::filters::{paints_from_nothing, reach as filter_reach, Fold, Fx, Reach, Runner};
 use crate::canvas::shader_only;
 use crate::tally::Reason;
-use crate::zoomless::zoomless;
+use crate::zoomless::{zoomless, Zoomless};
 use crate::scene::{alone, bounds, build_items, build_where, cover, layer_worthy, plain, silhouette, unblended, Layers, Placed, Shelf};
 
 const UNIT_SPACE: [f64; 4] = [1.0, 0.0, 0.0, 1.0];
@@ -45,6 +45,10 @@ pub trait Surface {
     }
 
     fn set_frame(&mut self, _frame: Option<Rect>) {}
+
+    fn zoomless(&mut self, item: &Item) -> Option<Zoomless> {
+        zoomless(item)
+    }
 
     fn recall_held(&mut self, _key: &str) -> Option<Placed<Pic<Self>>> {
         None
@@ -131,7 +135,7 @@ fn prepare_items<S: Surface>(surface: &mut S, items: &[Item], background: Option
 }
 
 fn held_body<S: Surface>(surface: &mut S, item: &Item, pictures: &Shelf<Pic<S>>, blending: Blending, fragments: &Fragments) -> Result<Option<Placed<Pic<S>>>, S::Error> {
-    let Some(z) = zoomless(item) else { return Ok(None) };
+    let Some(z) = surface.zoomless(item) else { return Ok(None) };
     let held = match surface.recall_held(&z.key) {
         Some(held) => held,
         None => {

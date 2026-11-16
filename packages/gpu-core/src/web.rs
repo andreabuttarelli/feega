@@ -10,7 +10,8 @@ use vello::kurbo::Rect;
 
 use crate::compositor::{Compositor, Painter};
 use crate::display_list::{parse, parse_packed, parse_splice};
-use crate::engine::Engine;
+use crate::engine::{Engine, HeldScene};
+use crate::held_view::HeldView;
 use crate::filter_passes::layer_texture;
 use crate::groups::{report, Library, Limits, Motion, Native, Plan};
 use crate::layers::Effects;
@@ -107,6 +108,14 @@ pub struct WebCore {
     counted: Counted,
     gesture_draw: GestureDraw,
     direct: Option<wgpu::Texture>,
+    held_scene: Option<HeldScreen>,
+}
+
+struct HeldScreen {
+    view: HeldView,
+    scene: HeldScene,
+    whole: bool,
+    background: Option<crate::display_list::Rgba>,
 }
 
 #[derive(Default)]
@@ -348,7 +357,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 }, gesture_draw: GestureDraw::Tiles, direct: None })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 }, gesture_draw: GestureDraw::Tiles, direct: None, held_scene: None })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -906,11 +915,13 @@ impl WebCore {
         }
         let moving = matches!(self.motion, CoreMotion::Gesture);
         let moment = || Moment { gesture: moving, lifting: self.compositor.holding() || !self.compositor.lifts(&self.library).is_empty(), settling: self.adopted.is_none() && self.drew_tiles && self.tiles_show_all(), draw: self.gesture_draw };
-        if path_for(moment()) == Path::Direct {
+        let path = path_for(moment());
+        if path == Path::Direct {
             self.drew_tiles = false;
             return self.direct_frame(now_ms);
         }
-        if self.tiled && path_for(moment()) == Path::Tiles {
+        self.drop_held_scene();
+        if self.tiled && path == Path::Tiles {
             self.adopted = None;
             self.drew_tiles = true;
             let report = self.tiled_frame()?;
@@ -959,19 +970,19 @@ impl WebCore {
 
     fn direct_frame(&mut self, at_ms: f64) -> Result<String, JsValue> {
         let began = now_ms();
-        self.compositor.take_damage();
+        if !matches!(self.compositor.take_damage(), Damage::Rects(rects) if rects.is_empty()) {
+            self.engine.forget_fingerprints();
+            self.drop_held_scene();
+        }
         let size = (self.target.width(), self.target.height());
-        self.library.set_native(Native::Vectors);
-        let plan = self.compositor.plan_at(&mut self.library, self.camera, size, self.limits);
-        self.library.set_native(Native::Textures);
-        let building = plan.pending;
-        let (list, missing) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
-        let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
+        if !self.held_scene.as_ref().is_some_and(|h| h.view.holds(self.camera, size)) {
+            self.drop_held_scene();
+            self.held_scene = Some(self.build_held_scene(size)?);
+        }
+        let held = self.held_scene.as_ref().expect("a held scene");
+        let whole = held.whole;
         let texture = self.direct.take().filter(|t| (t.width(), t.height()) == size).unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
-        self.engine.effects = Effects::Zoomless;
-        let drawn = self.engine.draw(&self.device, &self.queue, &list, &pictures, &texture.create_view(&wgpu::TextureViewDescriptor::default()));
-        self.engine.effects = Effects::Screen;
-        drawn.map_err(failed)?;
+        self.engine.draw_held(&self.device, &self.queue, &held.scene, held.view.transform(self.camera), held.background, &texture.create_view(&wgpu::TextureViewDescriptor::default()), size).map_err(failed)?;
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(t) | wgpu::CurrentSurfaceTexture::Suboptimal(t) => t,
             _ => return Err(failed("no surface texture")),
@@ -984,7 +995,6 @@ impl WebCore {
             self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source: &overlay, target: &out, format: self.format, look: UNMOVED, within: Some(screen), output: Output::Over });
             self.overlay_tex = Some(overlay);
         }
-        let whole = !building && missing.is_empty();
         if whole {
             let o = self.compositor.retained_overscan();
             encoder.copy_texture_to_texture(texel(&texture, 0, 0), texel(&self.retained, o, o), wgpu::Extent3d { width: size.0, height: size.1, depth_or_array_layers: 1 });
@@ -996,9 +1006,34 @@ impl WebCore {
             self.adopted = Some(self.camera);
         }
         self.direct = Some(texture);
+        if !whole {
+            self.drop_held_scene();
+        }
         self.count_bake(began);
         self.pending = !whole || self.compositor.pending_raster();
         Ok("direct".into())
+    }
+
+    fn build_held_scene(&mut self, size: (u32, u32)) -> Result<HeldScreen, JsValue> {
+        let view = HeldView::around(self.camera, size);
+        let (planned, planned_size) = view.planned();
+        self.library.set_native(Native::Vectors);
+        let plan = self.compositor.plan_at(&mut self.library, planned, planned_size, self.limits);
+        self.library.set_native(Native::Textures);
+        let building = plan.pending;
+        let (list, missing) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
+        let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
+        self.engine.effects = Effects::Zoomless;
+        let built = self.engine.build_held(&self.device, &self.queue, &list, &pictures);
+        self.engine.effects = Effects::Screen;
+        let (scene, _) = built.map_err(failed)?;
+        Ok(HeldScreen { view, scene, whole: !building && missing.is_empty(), background: list.background })
+    }
+
+    fn drop_held_scene(&mut self) {
+        if let Some(held) = self.held_scene.take() {
+            self.engine.drop_held(held.scene);
+        }
     }
 
     fn tiles_show_all(&self) -> bool {

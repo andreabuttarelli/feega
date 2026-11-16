@@ -1,5 +1,6 @@
 use gpu_core::display_list::{parse, Item};
-use gpu_core::zoomless::zoomless;
+use gpu_core::held_view::ZOOM_IN_ROOM;
+use gpu_core::zoomless::{zoomless, zoomless_in, Fingerprints};
 
 fn blurred(scale: f64, x: f64, y: f64, colour: f64) -> Item {
     let list = format!(
@@ -15,17 +16,17 @@ fn blurred(scale: f64, x: f64, y: f64, colour: f64) -> Item {
 #[test]
 fn a_zoom_inside_one_octave_keeps_the_same_effect_key() {
     let near = zoomless(&blurred(1.1, 13.25, 40.5, 1.0)).unwrap();
-    let far = zoomless(&blurred(1.9, -310.7, 7.125, 1.0)).unwrap();
+    let far = zoomless(&blurred(1.4, -310.7, 7.125, 1.0)).unwrap();
 
     assert_eq!(near.key, far.key);
 }
 
 #[test]
-fn an_effect_is_held_at_the_next_finer_power_of_two_so_it_is_only_ever_downsampled() {
+fn an_effect_is_held_fine_enough_to_zoom_in_by_its_room_without_magnifying() {
     for scale in [0.3, 0.5, 0.74, 1.0, 1.1, 1.9, 2.4] {
         let z = zoomless(&blurred(scale, 5.0, 5.0, 1.0)).unwrap();
-        assert!(z.scale <= 1.0, "drawn at {} of its texture at zoom {scale}", z.scale);
-        assert!(z.scale > 0.5, "texture more than twice too fine at zoom {scale}");
+        assert!(z.scale * ZOOM_IN_ROOM <= 1.0 + 1e-9, "drawn at {} of its texture at zoom {scale}", z.scale);
+        assert!(z.scale * ZOOM_IN_ROOM > 0.5, "texture more than twice too fine at zoom {scale}");
     }
 }
 
@@ -51,8 +52,8 @@ fn the_held_texture_maps_back_to_where_the_item_is_on_screen() {
     let z = zoomless(&item).unwrap();
     let Item::Path(held) = &z.item(&item) else { panic!() };
 
-    assert_eq!(&held.look.matrix[..4], &[2.0, 0.0, 0.0, 2.0]);
-    assert_eq!(held.look.blur, 8.0);
+    assert_eq!(&held.look.matrix[..4], &[4.0, 0.0, 0.0, 4.0]);
+    assert_eq!(held.look.blur, 16.0);
     assert_eq!((z.shift.x, z.shift.y), (100.0, 50.0));
 }
 
@@ -92,4 +93,19 @@ fn a_held_effect_draws_like_one_made_at_the_screen_scale() {
     let worst = a.iter().zip(&b).map(|(x, y)| x.abs_diff(*y)).max().unwrap();
 
     assert!(mean < 1.0 && worst <= 24, "mean {mean} worst {worst}");
+}
+
+#[test]
+fn a_fingerprint_is_hashed_once_until_the_content_changes() {
+    let item = blurred(1.2, 3.0, 4.0, 1.0);
+    let mut memo = Fingerprints::default();
+
+    let first = zoomless_in(&item, &mut memo).unwrap().key;
+    let again = zoomless_in(&blurred(1.3, 9.0, 1.0, 1.0), &mut memo).unwrap().key;
+    assert_eq!(memo.hashed(), 1);
+    assert_eq!(first, again);
+
+    memo.forget();
+    zoomless_in(&item, &mut memo).unwrap();
+    assert_eq!(memo.hashed(), 2);
 }
