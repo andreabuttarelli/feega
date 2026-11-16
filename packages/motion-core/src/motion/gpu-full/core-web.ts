@@ -131,14 +131,26 @@ const POISONED_ANSWERS: Record<string, () => unknown> = {
   poster: () => Promise.reject(new Error('core poisoned'))
 };
 
+export const wireBytes: Record<string, number> = {};
+
+const tally = (name: string, bytes: number) => (wireBytes[name] = (wireBytes[name] ?? 0) + bytes);
+
 function bytesCall(target: object, name: string | symbol, member: (...args: unknown[]) => unknown): (...args: unknown[]) => unknown {
   if (typeof name === 'string' && WIRED_PACKED.has(name)) {
-    return (key, list, floats, ends) => member.apply(target, [key, utf8.encode(list as string), floats, ends]);
+    return (key, list, floats, ends) => {
+      const json = utf8.encode(list as string);
+      tally(name, json.byteLength + (floats as ArrayBufferView).byteLength + (ends as ArrayBufferView).byteLength);
+      return member.apply(target, [key, json, floats, ends]);
+    };
   }
   if (typeof name !== 'string' || !WIRED_LAST.has(name)) {
     return member.bind(target);
   }
-  return (...args) => member.apply(target, [...args.slice(0, -1), utf8.encode(args.at(-1) as string)]);
+  return (...args) => {
+    const bytes = utf8.encode(args.at(-1) as string);
+    tally(name, bytes.byteLength);
+    return member.apply(target, [...args.slice(0, -1), bytes]);
+  };
 }
 
 export function overBytes(core: object): Attached {

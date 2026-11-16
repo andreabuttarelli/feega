@@ -6,7 +6,7 @@
   import { smoothingOf, type Typeset } from '@feega/motion-core/motion/gpu-full/text/painter';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
-  import { CoreMotion, createCore, createCoreGl, dropCore, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
+  import { CoreMotion, createCore, createCoreGl, dropCore, wireBytes, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
   import { createCoreNative, nativeCanvasOffered } from '@feega/motion-core/motion/gpu-full/core-native';
   import { createMedia, Readiness, VideoPreload, videoUses } from '@feega/motion-core/motion/gpu-full/media';
   import { createRamPreview, type FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
@@ -1420,7 +1420,7 @@
     }
     crashes.tick({ x: view.x, y: view.y, zoom: view.zoom, now: performance.now(), motion: gesture.active() ? Motion.Moving : Motion.Still, rastered: RASTERED.has(outcome) }, { cacheBytes, pictureBytes: into.pictureBytes(), scratchBytes: into.scratchBytes?.() ?? 0, wasmBytes: into.wasmBytes?.() ?? 0, width: canvas?.width ?? 0, height: canvas?.height ?? 0 });
     if (DEBUG) {
-      (window as Window & { __gpuMem?: object }).__gpuMem = { ...crashes.sample, put: put.size, pictured: pictured.size };
+      (window as Window & { __gpuMem?: object }).__gpuMem = { ...crashes.sample, put: put.size, pictured: pictured.size, wire: wireBytes };
       debugFrame(outcome, skipped, shown);
     }
     return pending || (into.warming?.() ?? false) || zooming.active() || (!quiet && sentOverlay.waiting(overlay)) || sceneBusy;
