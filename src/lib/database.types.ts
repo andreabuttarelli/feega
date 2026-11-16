@@ -372,6 +372,7 @@ export type Database = {
           cost_usd: number | null
           created_at: string
           error: string | null
+          hold_key: string | null
           id: string
           latency_ms: number | null
           model: string | null
@@ -403,6 +404,7 @@ export type Database = {
           cost_usd?: number | null
           created_at?: string
           error?: string | null
+          hold_key?: string | null
           id?: string
           latency_ms?: number | null
           model?: string | null
@@ -434,6 +436,7 @@ export type Database = {
           cost_usd?: number | null
           created_at?: string
           error?: string | null
+          hold_key?: string | null
           id?: string
           latency_ms?: number | null
           model?: string | null
@@ -1792,6 +1795,7 @@ export type Database = {
       credit_ledger: {
         Row: {
           ai_call_id: string | null
+          call_key: string | null
           amount: number
           billing_scope: string
           created_at: string
@@ -1810,6 +1814,7 @@ export type Database = {
         }
         Insert: {
           ai_call_id?: string | null
+          call_key?: string | null
           amount: number
           billing_scope?: string
           created_at?: string
@@ -1828,6 +1833,7 @@ export type Database = {
         }
         Update: {
           ai_call_id?: string | null
+          call_key?: string | null
           amount?: number
           billing_scope?: string
           created_at?: string
@@ -4493,6 +4499,13 @@ export type Database = {
             }
             Returns: number
           }
+      credit_gate: { Args: { _org_id: string }; Returns: number }
+      credit_hold: {
+        Args: { _amounts: number[]; _keys: string[]; _org_id: string }
+        Returns: boolean
+      }
+      credit_release: { Args: { _key: string; _org_id: string }; Returns: number }
+      credit_release_stale: { Args: { _older_than: unknown }; Returns: number }
       credits_from_price_id: { Args: { price_id: string }; Returns: number }
       delete_account: { Args: { p_user: string }; Returns: Json }
       embed_node_writable: { Args: { object_name: string }; Returns: boolean }

@@ -25,6 +25,7 @@ vi.mock('./farm-render', async (original) => ({ ...(await original<typeof import
 import { BATCH_CONCURRENCY, batchView, cancelRender, farmJob, reconcileRenders, releaseHold, RenderRefusal, renderRequest, renderView, startBatch, startRender, type RenderRequest } from './render-run';
 
 const HELD_IN_LEDGER = 123;
+const heldFor = (run: NodeRun) => Math.ceil((run.params.quote as { credits: number }).credits * HOLD_BUFFER);
 import { TaskState, WORKER_GONE } from './farm-render';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
@@ -371,7 +372,6 @@ describe('reconcileRenders', () => {
 });
 
 describe('a render is paid by the sandbox time it really used', () => {
-  const heldFor = (run: NodeRun) => Math.ceil((run.params.quote as { credits: number }).credits * HOLD_BUFFER);
 
   it('starting holds the quote plus a buffer under the run it pays for, and refuses when the balance cannot cover it', async () => {
     const run = await started();
@@ -386,7 +386,7 @@ describe('a render is paid by the sandbox time it really used', () => {
     expect(farmCalls.launchPiece).toHaveBeenCalledTimes(7);
   });
 
-  it('a finished render stops every worker before measuring, charges the measured cost, and releases the hold', async () => {
+  it('a finished render stops every worker before measuring, and charges the measured cost on the row that settles its hold', async () => {
     let run = await started();
     runs.queuedRenderRuns.mockImplementation(async () => [run]);
     farmCalls.checkTask.mockResolvedValue(done);
@@ -401,8 +401,8 @@ describe('a render is paid by the sandbox time it really used', () => {
 
     const cost = sandboxCostUsd(Array(7).fill(MINUTE_OF_8GB));
     expect(order.indexOf('usage')).toBeGreaterThan(order.lastIndexOf('stop'));
-    expect(logAiCall.mock.calls[0][0]).toMatchObject({ flatCostUsd: cost, creditCap: HELD_IN_LEDGER });
-    expect(hold.refundHold).toHaveBeenCalledWith('org', expect.stringContaining(run.id));
+    expect(logAiCall.mock.calls[0][0]).toMatchObject({ flatCostUsd: cost, creditCap: heldFor(run), holdKey: expect.stringContaining(run.id) });
+    expect(hold.refundHold).not.toHaveBeenCalled();
     expect(runs.completeRun).toHaveBeenCalledWith(db, expect.objectContaining({ costUsd: cost }));
   });
 

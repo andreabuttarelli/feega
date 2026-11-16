@@ -415,12 +415,12 @@ async function charge(farm: RenderFarm, run: NodeRun, state: RenderState): Promi
   const { scope } = state;
   const usages = await Promise.all(workersOf(state).map((name) => farm.usage(name).catch(() => null)));
   const usd = sandboxCostUsd(usages.filter((u) => u !== null));
-  const held = await releaseHold(run);
+  const held = heldOf(state.quote);
   if (creditsOfCost(usd) > held) {
     console.warn('[motion render] measured cost over the hold, charged the hold', { runId: run.id, usd, held });
   }
   const ms = Date.now() - new Date(run.startedAt).getTime();
-  logAiCall({ label: RENDER_CALL_LABEL, provider: 'vercel-sandbox', model: RENDER_MODEL, flatCostUsd: usd, creditCap: held, ms, ok: true, orgId: scope.orgId, projectId: scope.projectId, userId: scope.userId, actorKind: 'user', actorId: scope.userId });
+  logAiCall({ label: RENDER_CALL_LABEL, provider: 'vercel-sandbox', model: RENDER_MODEL, flatCostUsd: usd, creditCap: held, holdKey: holdNote(run.id), ms, ok: true, orgId: scope.orgId, projectId: scope.projectId, userId: scope.userId, actorKind: 'user', actorId: scope.userId });
   return usd;
 }
 
