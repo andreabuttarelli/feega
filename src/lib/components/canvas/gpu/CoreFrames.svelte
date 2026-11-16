@@ -18,6 +18,7 @@
   import { PART_ITEMS, parts } from '$lib/canvas/core/group-parts';
   import { spliceOf } from '@feega/motion-core/canvas/core/group-diff';
   import { storedTiles, tilesOn } from '$lib/canvas/core/tiles-switch';
+  import { directOn, forcedDirect, GestureGuard, storedDirect, thisDevice } from '$lib/canvas/core/direct-switch';
   import { cacheZoom, cached, uncached, pictureBytes, resident, heldWhileMoving, movingWhileZooming, ZoomPicture, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, buildLanes, currentDevice, textureBudget } from '$lib/canvas/gpu/memory-budget';
   import { worldUses, type Turn } from '$lib/canvas/core/screen-uses';
@@ -967,6 +968,7 @@
         r.setCanvasTiles?.(budget.canvasTiles);
         r.setPixelRatio?.(resolution);
         r.setTiles?.(TILED);
+        r.setDirectGesture?.(DIRECT);
         raster = r;
         markStartup(StartupStep.GpuReady);
       },
@@ -1104,6 +1106,9 @@
   const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.search).has('coreDebug');
   const TIMELINE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('loadTimeline');
   const TILED = typeof location !== 'undefined' && tilesOn(location.search, storedTiles());
+  const DIRECT = typeof location !== 'undefined' && directOn(location.search, storedDirect(), thisDevice());
+  const DIRECT_GUARDED = DIRECT && typeof location !== 'undefined' && !forcedDirect(location.search, storedDirect());
+  const directGuard = new GestureGuard();
   const MAX_LISTED = 12;
   const OVERSCAN_SHARE = 8;
   const OVERSCAN_MAX = 128;
@@ -1387,6 +1392,9 @@
     into.setCamera(at.x, at.y, at.zoom);
     const began = performance.now();
     const { outcome, pending, skipped } = into.frame(began);
+    if (DIRECT_GUARDED && gesture.active() && directGuard.slow(performance.now() - began)) {
+      into.setDirectGesture?.(false);
+    }
     countFrame(began, into.frameCounts?.(), gesture.active(), pending);
     perf.frame(gesture.active() ? camera : Camera.Still, lift !== null, began);
     settleEdits(began);

@@ -18,6 +18,7 @@ pub mod gl_state;
 pub mod glyphs;
 pub mod fragments;
 pub mod groups;
+pub mod held_view;
 pub mod kernel;
 pub mod layers;
 pub mod lod;
@@ -28,6 +29,7 @@ pub mod retained;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod render;
 pub mod scene;
+pub mod zoomless;
 pub mod shades;
 pub mod tally;
 #[cfg(not(target_arch = "wasm32"))]

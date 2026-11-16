@@ -266,6 +266,7 @@ pub fn plain<C: Canvas>(scene: &mut C, items: &[Item], pictures: &Shelf<C::Pictu
 pub struct Placed<P = ImageData> {
     pub image: P,
     pub origin: Point,
+    pub scale: f64,
 }
 
 pub struct Layers<P = ImageData> {
@@ -296,7 +297,7 @@ impl<P> Layers<P> {
 
 fn placed<C: Canvas>(scene: &mut C, layer: &Placed<C::Picture>) {
     let size = C::size(&layer.image);
-    scene.picture(Affine::translate(layer.origin.to_vec2()), &layer.image, Affine::IDENTITY, Rect::new(0.0, 0.0, size.width, size.height));
+    scene.picture(Affine::translate(layer.origin.to_vec2()) * Affine::scale(layer.scale), &layer.image, Affine::IDENTITY, Rect::new(0.0, 0.0, size.width, size.height));
 }
 
 fn corners(m: Affine, r: Rect) -> impl Iterator<Item = Point> {
