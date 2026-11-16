@@ -29,7 +29,7 @@ const COARSER_STEPS: i32 = 40;
 const FINER_STEPS: i32 = 4;
 pub const NEAR_STEPS: i32 = 4;
 const AHEAD_FRAMES: f64 = 6.0;
-const AHEAD_ZOOM_REACH: f64 = 2.0;
+pub const AHEAD_ZOOM_REACH: f64 = 2.0;
 const FRAME_TILES_MAX: f64 = 4096.0;
 const HALF_OCTAVE: f64 = std::f64::consts::SQRT_2;
 pub struct Level {
@@ -392,6 +392,10 @@ impl Tiles {
         let centre = to + (to - from) * AHEAD_FRAMES;
         let (w, h) = (screen.0 as f64, screen.1 as f64);
         let predicted = Camera { x: w / 2.0 - centre.x * zoom, y: h / 2.0 - centre.y * zoom, zoom };
+        self.ahead_to(predicted, now, screen)
+    }
+
+    pub fn ahead_to(&self, predicted: Camera, now: Camera, screen: (u32, u32)) -> Vec<TileKey> {
         let current: FxHashSet<TileKey> = self.frame(now, screen).missing.into_iter().collect();
         self.frame(predicted, screen).missing.into_iter().filter(|k| !current.contains(k)).collect()
     }
@@ -761,4 +765,80 @@ pub fn split_render(size: (u32, u32), mut render: impl FnMut(Piece) -> Rendered)
         todo.extend([(b, rb, depth + 1), (a, ra, depth + 1)]);
     }
     done
+}
+
+const VELOCITY_SAMPLES: usize = 4;
+const VELOCITY_WINDOW_MS: f64 = 100.0;
+const STILL_ZOOM_RATE: f64 = 1e-6;
+const STILL_PAN_RATE: f64 = 1e-3;
+const COARSE_PASS_STEPS: i32 = 4;
+const SHARE_GRID_PX: f64 = 16.0;
+
+#[derive(Default)]
+pub struct Velocity {
+    samples: Vec<(f64, f64, Point)>,
+}
+
+fn centre_of(camera: Camera, (w, h): (u32, u32)) -> Point {
+    Point::new((w as f64 / 2.0 - camera.x) / camera.zoom, (h as f64 / 2.0 - camera.y) / camera.zoom)
+}
+
+impl Velocity {
+    pub fn saw(&mut self, at_ms: f64, camera: Camera, screen: (u32, u32)) {
+        self.samples.push((at_ms, camera.zoom.ln(), centre_of(camera, screen)));
+        self.samples.retain(|(t, _, _)| at_ms - t <= VELOCITY_WINDOW_MS);
+        if self.samples.len() > VELOCITY_SAMPLES {
+            self.samples.remove(0);
+        }
+    }
+
+    pub fn forget(&mut self) {
+        self.samples.clear();
+    }
+
+    pub fn predict(&self, ahead_ms: f64, (w, h): (u32, u32)) -> Option<Camera> {
+        let (&(t0, z0, c0), &(t1, z1, c1)) = (self.samples.first()?, self.samples.last()?);
+        let dt = t1 - t0;
+        if dt <= 0.0 {
+            return None;
+        }
+        let (zoom_rate, pan_rate) = ((z1 - z0) / dt, (c1 - c0) / dt);
+        if zoom_rate.abs() * ahead_ms < STILL_ZOOM_RATE && pan_rate.hypot() * ahead_ms < STILL_PAN_RATE {
+            return None;
+        }
+        let now = z1.exp();
+        let zoom = (z1 + zoom_rate * ahead_ms).exp().clamp(now / AHEAD_ZOOM_REACH, now * AHEAD_ZOOM_REACH);
+        let centre = c1 + pan_rate * ahead_ms;
+        Some(Camera { x: w as f64 / 2.0 - centre.x * zoom, y: h as f64 / 2.0 - centre.y * zoom, zoom })
+    }
+}
+
+pub fn coarse_first(tiles: &Tiles, camera: Camera, screen: (u32, u32), missing: Vec<TileKey>) -> Vec<TileKey> {
+    let step = tiles.step_for(camera);
+    let coarse = step - COARSE_PASS_STEPS;
+    let centre = seen_world(camera, screen).center();
+    let mut first: Vec<TileKey> = Vec::new();
+    for key in missing.iter().filter(|k| k.step == step && !tiles.covered_within(**k, COARSE_PASS_STEPS)) {
+        for parent in keys_over(key.world(), coarse) {
+            if !tiles.holds(parent) && !first.contains(&parent) {
+                first.push(parent);
+            }
+        }
+    }
+    first.sort_by(|a, b| a.world().center().distance(centre).total_cmp(&b.world().center().distance(centre)));
+    first.into_iter().chain(missing).collect()
+}
+
+pub fn magnified_share(draw: &[TileKey], camera: Camera, (w, h): (u32, u32)) -> f64 {
+    let rects: Vec<(Rect, i32)> = draw.iter().map(|k| (k.screen(camera), k.step)).collect();
+    let (cols, rows) = ((w as f64 / SHARE_GRID_PX).ceil() as usize, (h as f64 / SHARE_GRID_PX).ceil() as usize);
+    let mut magnified = 0usize;
+    for row in 0..rows {
+        for col in 0..cols {
+            let p = Point::new((col as f64 + 0.5) * SHARE_GRID_PX, (row as f64 + 0.5) * SHARE_GRID_PX);
+            let finest = rects.iter().filter(|(r, _)| r.contains(p)).map(|(_, s)| *s).max();
+            magnified += usize::from(finest.is_some_and(|s| !sharp_at(camera.zoom, s)));
+        }
+    }
+    magnified as f64 / (cols * rows).max(1) as f64
 }
