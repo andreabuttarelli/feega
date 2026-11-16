@@ -114,3 +114,47 @@ unchanged or better (vercel, stripe, linear, feega; linear phone fold 0.864 → 
 
 Rejected: content overrides per view (texts and pictures varying silently per size); linking
 instances through comp-level overrides (every copy of a main would take the first copy's layout).
+
+## Amendment 2026-11-16: code import widths are views, components stay a choice
+
+Code import (`docs/specs/code-import.md`) rendered each width as its own board. One page at several
+widths of one theme now takes the URL importer's merge: the widest capture is the base, each narrower
+one a view (`w<width>`), the same layers with overrides. A scheme is not a view; dark stays a variables
+mode or its own board.
+
+- **Components and views stay exclusive per import, by an explicit choice.** Code import's value is
+  component identity; this ADR's rule is that an instance cannot follow a view. Keeping instances at
+  base with overrides on the instance box only would freeze each component's inside at the desktop
+  layout (a three-column card stays three columns on the phone), and the importer's pairing never
+  pairs instance clips (`PRECOMP`). So the dialog, API (`responsive`) and CLI (`--boards`) choose:
+  views (default, components listed in `skipped`, never silently dropped) or boards with components.
+- **Write-back refuses views.** A change in a view is detected against a per-view baseline in
+  `source.was` and listed as not written; a plain rule would change every width.
+- **Several pages or themes stay boards.** One frame holds one set of breakpoints, and Pull, `into`
+  and the design board assume one frame of boards.
+
+Open: letting instance internals take view overrides needs per-instance overrides in the model
+(a comp-level override keyed by instance, resolved in `resolveAt`), so every copy of a main can lay
+itself out differently per view. Proposed, not built.
+
+## Amendment 2026-11-16: code import widths are views, components stay a choice
+
+Code import (`docs/specs/code-import.md`) rendered each width as its own board. One page at several
+widths of one theme now takes the URL importer's merge: the widest capture is the base, each narrower
+one a view (`w<width>`), the same layers with overrides. A scheme is not a view; dark stays a variables
+mode or its own board.
+
+- **Components and views stay exclusive per import, by an explicit choice.** Code import's value is
+  component identity; this ADR's rule is that an instance cannot follow a view. Keeping instances at
+  base with overrides on the instance box only would freeze each component's inside at the desktop
+  layout (a three-column card stays three columns on the phone), and the importer's pairing never
+  pairs instance clips (`PRECOMP`). So the dialog, API (`responsive`) and CLI (`--boards`) choose:
+  views (default, components listed in `skipped`, never silently dropped) or boards with components.
+- **Write-back refuses views.** A change in a view is detected against a per-view baseline in
+  `source.was` and listed as not written; a plain rule would change every width.
+- **Several pages or themes stay boards.** One frame holds one set of breakpoints, and Pull, `into`
+  and the design board assume one frame of boards.
+
+Open: letting instance internals take view overrides needs per-instance overrides in the model
+(a comp-level override keyed by instance, resolved in `resolveAt`), so every copy of a main can lay
+itself out differently per view. Proposed, not built.
