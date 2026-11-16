@@ -57,12 +57,10 @@ Setup details: [references/mcp.md](references/mcp.md).
    need nothing named; the tools that DO need a `brand_id` or `project_id` take it as an input —
    read it back with `query` first (recipe below), never invent one. Guessing spends a real
    organisation's credits and writes into a real client's canvas.
-2. Ad campaign ids accept short unambiguous prefixes from list output — never guess
-   if ambiguous.
-3. `run_node_generation` needs the node's current `version` (optimistic concurrency): read the
+2. `run_node_generation` needs the node's current `version` (optimistic concurrency): read the
    node with `query` first, pass that number, and if the call comes back `conflict`, re-read and
    retry — never assume your write landed.
-4. Confirm before deleting unless the user clearly asked: `delete_row` does not come back.
+3. Confirm before deleting unless the user clearly asked: `delete_row` does not come back.
 
 ## Reading is one tool
 

@@ -15,21 +15,13 @@ export function siteUrl(reqOrigin?: string): string {
 
 // Indexable public pages. Everything under /app is excluded.
 export const MARKETING_PATHS = [
-  '/docs',
-  '/docs/getting-started',
   '/docs/credits',
   '/docs/cli',
   '/docs/mcp',
   '/docs/api',
   '/docs/api/brands',
   '/docs/api/products',
-  '/docs/agents',
-  '/docs/brands',
-  '/docs/studio',
-  '/docs/shopify',
-  '/docs/webflow',
-  '/docs/wix',
-  '/docs/team-invites'
+  '/docs/agents'
 ] as const;
 
 /** Static files that should appear in the sitemap but aren't marketing HTML pages. */
