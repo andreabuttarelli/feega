@@ -25,3 +25,21 @@ describe('zipCode', () => {
     expect(strFromU8(entries['page/src/pages/Page.tsx'])).toBe(`<img src="/assets/a.png" /><img src="${URL_DOWN}" />`);
   });
 });
+
+describe('zipCode with a 3D model', () => {
+  it('bundles the model file next to the project', async () => {
+    const glb = new Uint8Array([0x67, 0x6c, 0x54, 0x46]);
+    const model = { path: 'public/assets/toy.glb', ref: '/assets/toy.glb', url: 'https://cdn.test/toy.glb?token=3' };
+    const entries = unzipSync(await zipCode('page', { files: [{ path: 'src/scenes.ts', content: '{ "src": "/assets/toy.glb" }' }], assets: [model] }, async () => glb));
+
+    expect([...entries['page/public/assets/toy.glb']]).toEqual([...glb]);
+    expect(strFromU8(entries['page/src/scenes.ts'])).toBe('{ "src": "/assets/toy.glb" }');
+  });
+
+  it('points the scene at the remote link when the model cannot be fetched', async () => {
+    const model = { path: 'public/assets/toy.glb', ref: '/assets/toy.glb', url: 'https://cdn.test/toy.glb?token=3' };
+    const entries = unzipSync(await zipCode('page', { files: [{ path: 'src/scenes.ts', content: '{ "src": "/assets/toy.glb" }' }], assets: [model] }, async () => null));
+
+    expect(strFromU8(entries['page/src/scenes.ts'])).toBe(`{ "src": "${model.url}" }`);
+  });
+});

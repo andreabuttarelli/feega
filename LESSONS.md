@@ -3989,3 +3989,7 @@ property reads on ~2,000 items (`src/lib/canvas/counted-list.testkit.ts`), not w
 ## A component with a mask inside lands as a plain group, never linked
 
 **Signal:** a main with a mask layer pasted from Figma, its untouched instances come out as groups named after the component instead of instances. **Move:** `instanceOverrides` (`instance-diff.ts`) refuses a pair whose clip fields differ outside the ignored set; `matteFrom` holds a clip id, and the own copy and the main have different ids. Compare it through the clip pairs as `parent` is, never by value.
+
+## A 3D export scores 0.99 against the canvas though every number matches
+
+**Signal:** SSIM of an exported canvas against the composed canvas stays near 0.99 with thin rim differences, only on one layer. **Move:** the layer's width came out as a rounded percentage (`32.81%` of 1280 is 419.97 px); React Three Fiber sizes the renderer to the fractional width while a `clientWidth` read rounds it. Give the fixture a width that is an exact percentage (400 of 1280) before suspecting the scene.

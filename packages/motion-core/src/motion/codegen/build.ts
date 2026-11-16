@@ -12,7 +12,7 @@ import { resolveColor, FEEGA_TOKENS } from '../brand';
 import { ShapeKind } from '../shape/schema';
 import { pivotBox, type Size } from '../parent';
 import type { Box } from '../layout';
-import { kebab, NameBook } from './naming';
+import { camel, kebab, NameBook } from './naming';
 import { literal, NodeKind, type Attr, type Bound, type CodeNode, type ComponentSpec, type ElementNode, type PageSpec, type SetSpec, type Rule, type StyleBind } from './ir';
 import { absoluteRules, containerRules, flowItemRules, fluidWidth, isFlowChild, px, Shape, STACK_RULES, stackItemRules, stackOrder } from './place';
 import { backgroundRules, borderRules, effectRules, mergeShadows, paintNotes, radiusRules, typeRules, type Painter } from './paint';
@@ -20,6 +20,7 @@ import { planFonts } from './fonts';
 import { ColourRole, TokenBook } from './tokens';
 import { animationOf, timelineOf, type Timeline } from './animate';
 import { stateStyleOf } from './states';
+import { isScene, sceneOf, withoutSceneKeys } from './scene3d';
 import { planComponents, PlanExport, PropKey, READINGS, specsOf, type Binding, type ComponentPlan } from './instances';
 
 export type BuildInput = { doc: MotionDoc; name: string; assets: Record<string, string>; assetBase: string; brand: BrandTokens | null };
@@ -36,6 +37,7 @@ type Shared = {
   h1: { taken: boolean };
   content: Map<string, Box>;
   timeline: Timeline;
+  scenes: NameBook;
 };
 
 type Scope = {
@@ -344,6 +346,18 @@ function mediaNode(clip: MotionClip, parent: MotionClip | null, scope: Scope): E
   return node;
 }
 
+function sceneNode(clip: MotionClip, parent: MotionClip | null, scope: Scope): ElementNode | null {
+  const { shared } = scope;
+  const made = sceneOf(clip, { timeline: scope.timeline, label: layerName(clip), notes: shared.notes, asset: shared.local, hex: (v) => resolveColor(v, shared.brand ?? FEEGA_TOKENS), look: shared.doc.look !== null, camera: shared.doc.camera !== null });
+  if (!made) {
+    return null;
+  }
+  const backdrop: Rule[] = made.backdrop ? [['background-color', shared.tokens.colour(made.backdrop, ColourRole.Fill)]] : [];
+  const node = element('div', withoutSceneKeys(clip), [...placement(clip, parent, scope), ...backdrop], scope);
+  node.scene = { name: shared.scenes.unique(`${camel(layerName(clip))}Scene`), spec: made.spec };
+  return node;
+}
+
 function svgNode(clip: MotionClip, parent: MotionClip | null, scope: Scope): CodeNode {
   const box = scope.boxOf(clip);
   const brand = scope.shared.brand ?? FEEGA_TOKENS;
@@ -406,6 +420,9 @@ function nodeOf(clip: MotionClip, parent: MotionClip | null, scope: Scope, paren
   }
   if (MEDIA_TAG[clip.component]) {
     return mediaNode(clip, parent, scope);
+  }
+  if (isScene(clip.component)) {
+    return sceneNode(clip, parent, scope);
   }
   if (clip.component === 'Precomp') {
     if (clip.props.scene) {
@@ -528,7 +545,7 @@ export function buildPage(input: BuildInput): PageSpec {
   };
   const resolve = (key: PropKey, value: string | boolean) => (key === PropKey.Image && typeof value === 'string' ? local(value) : value);
   const notes = new Set<string>();
-  const shared: Shared = { doc, tokens, plans: planComponents(doc, resolve), built: new Map(), assets, local, brand: input.brand, notes, h1: { taken: false }, content: contentOf(doc), timeline: timelineOf(doc, notes) };
+  const shared: Shared = { doc, tokens, plans: planComponents(doc, resolve), built: new Map(), assets, local, brand: input.brand, notes, h1: { taken: false }, content: contentOf(doc), timeline: timelineOf(doc, notes), scenes: new NameBook('') };
   const scope = scopeOf(shared, doc.tracks, { width: doc.width, height: doc.height }, null, doc.still?.frame ?? 0, shared.timeline);
   const backdrop = scope.clips.find((c) => c.component === 'BrandBackground' && !c.parent);
   const background: Rule[] = backdrop ? [['background-color', tokens.colour(String(backdrop.props.fill ?? 'brand.background'), ColourRole.Page)]] : pageBackground(doc, tokens);
