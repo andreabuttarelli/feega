@@ -45,6 +45,7 @@ pub struct Compositor {
     pending: bool,
     tile_damage: Damage,
     planned: Planned,
+    epoch: u64,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
@@ -56,7 +57,7 @@ pub struct Planned {
 
 impl Compositor {
     pub fn new(width: u32, height: u32) -> Self {
-        Compositor { world: World::new(), retained: Retained::new(width, height), pending: false, tile_damage: Damage::none(), planned: Planned::default() }
+        Compositor { world: World::new(), retained: Retained::new(width, height), pending: false, tile_damage: Damage::none(), planned: Planned::default(), epoch: 0 }
     }
 
     pub fn size(&self) -> (u32, u32) {
@@ -162,8 +163,21 @@ impl Compositor {
         damage.join(self.world.take_scene_damage());
         if !matches!(self.world.take_damage(), Damage::Rects(r) if r.is_empty()) {
             self.retained.forget();
+            self.epoch += 1;
         }
         damage
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
+    pub fn scene_at(&self, camera: Camera, (w, h): (u32, u32)) -> DisplayList {
+        self.world.scene(camera.matrix(), w, h)
+    }
+
+    pub fn plan_list(&mut self, library: &mut Library, list: &DisplayList, limits: Limits) -> Plan {
+        self.plan_kept(library, list, limits)
     }
 
     pub fn take_tile_damage(&mut self) -> Damage {
@@ -217,6 +231,9 @@ impl Compositor {
     pub fn frame<P: Painter>(&mut self, painter: &mut P, library: &mut Library, camera: Camera, now_ms: f64, clock: &mut dyn FnMut() -> f64) -> Result<Frame, P::Error> {
         self.pending = false;
         let damage: Damage = self.world.take_damage();
+        if !matches!(&damage, Damage::Rects(r) if r.is_empty()) {
+            self.epoch += 1;
+        }
         self.tile_damage.join(self.world.take_scene_damage());
         if matches!(&self.tile_damage, Damage::Rects(rects) if rects.len() > TILE_DAMAGE_RECTS) {
             self.tile_damage = Damage::All;

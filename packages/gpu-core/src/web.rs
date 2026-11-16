@@ -12,6 +12,7 @@ use crate::compositor::{Compositor, Painter};
 use crate::display_list::{parse, parse_packed, parse_splice};
 use crate::engine::{Engine, HeldScene};
 use crate::held_view::HeldView;
+use crate::held_parts::{pages_of, Parts, Seen};
 use crate::filter_passes::layer_texture;
 use crate::groups::{report, Library, Limits, Motion, Native, Plan};
 use crate::layers::Effects;
@@ -116,15 +117,20 @@ pub struct WebCore {
     born: FxHashMap<TileKey, f64>,
     gesture_draw: GestureDraw,
     direct: Option<wgpu::Texture>,
-    held_scene: Option<HeldScreen>,
+    parts: Parts<HeldScene>,
+    part_seen: Seen,
+    part_background: Option<crate::display_list::Rgba>,
+    part_epoch: u64,
+    lacking: rustc_hash::FxHashSet<String>,
 }
 
-struct HeldScreen {
-    view: HeldView,
-    scene: HeldScene,
-    whole: bool,
-    background: Option<crate::display_list::Rgba>,
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Tend {
+    Draw,
+    Warm,
 }
+
+const PART_BUDGET_MS: f64 = 4.0;
 
 #[derive(Default)]
 struct Counted {
@@ -414,7 +420,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), sharpness: Sharpness::default(), fallback: Vec::new(), ahead: None, fallback_was: camera, born: FxHashMap::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 }, gesture_draw: GestureDraw::Tiles, direct: None, held_scene: None })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), sharpness: Sharpness::default(), fallback: Vec::new(), ahead: None, fallback_was: camera, born: FxHashMap::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 }, gesture_draw: GestureDraw::Tiles, direct: None, parts: Parts::default(), part_seen: Seen { on_screen: Vec::new(), near: Vec::new() }, part_background: None, part_epoch: u64::MAX, lacking: Default::default() })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -1094,7 +1100,6 @@ impl WebCore {
             self.drew_tiles = false;
             return self.direct_frame(now_ms);
         }
-        self.drop_held_scene();
         if self.tiled && path == Path::Tiles {
             self.adopted = None;
             self.drew_tiles = true;
@@ -1105,6 +1110,9 @@ impl WebCore {
             return Ok(report);
         }
         self.drew_tiles = false;
+        if self.gesture_draw == GestureDraw::Direct && !self.pending {
+            self.tend_parts(crate::tally::now_ms(), Tend::Warm)?;
+        }
         let limits = self.frame_limits(now_ms);
         let mut painter = GpuPainter { device: &self.device, queue: &self.queue, surface: &self.surface, format: self.format, engine: &mut self.engine, pictures: &self.pictures, cached: &mut self.cached, limits, retained: &mut self.retained, spare: &mut self.spare, reprojector: &mut self.reprojector, scratch: &mut self.scratch };
         let timed = self.gpu_full_ms.swap(NOT_TIMED, Ordering::Relaxed);
@@ -1144,19 +1152,13 @@ impl WebCore {
 
     fn direct_frame(&mut self, at_ms: f64) -> Result<String, JsValue> {
         let began = now_ms();
-        if !matches!(self.compositor.take_damage(), Damage::Rects(rects) if rects.is_empty()) {
-            self.engine.forget_fingerprints();
-            self.drop_held_scene();
-        }
+        self.compositor.take_damage();
         let size = (self.target.width(), self.target.height());
-        if !self.held_scene.as_ref().is_some_and(|h| h.view.holds(self.camera, size)) {
-            self.drop_held_scene();
-            self.held_scene = Some(self.build_held_scene(size)?);
-        }
-        let held = self.held_scene.as_ref().expect("a held scene");
-        let whole = held.whole;
+        let whole = self.tend_parts(began, Tend::Draw)?;
         let texture = self.direct.take().filter(|t| (t.width(), t.height()) == size).unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
-        self.engine.draw_held(&self.device, &self.queue, &held.scene, held.view.transform(self.camera), held.background, &texture.create_view(&wgpu::TextureViewDescriptor::default()), size).map_err(failed)?;
+        let camera = self.camera;
+        let drawn: Vec<(&HeldScene, vello::kurbo::Affine)> = self.parts.drawn(&self.part_seen).into_iter().map(|(view, scene)| (scene, view.transform(camera))).collect();
+        self.engine.draw_parts(&self.device, &self.queue, &drawn, self.part_background, &texture.create_view(&wgpu::TextureViewDescriptor::default()), size).map_err(failed)?;
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(t) | wgpu::CurrentSurfaceTexture::Suboptimal(t) => t,
             _ => return Err(failed("no surface texture")),
@@ -1180,34 +1182,70 @@ impl WebCore {
             self.adopted = Some(self.camera);
         }
         self.direct = Some(texture);
-        if !whole {
-            self.drop_held_scene();
-        }
         self.count_bake(began);
         self.pending = !whole || self.compositor.pending_raster();
         Ok("direct".into())
     }
 
-    fn build_held_scene(&mut self, size: (u32, u32)) -> Result<HeldScreen, JsValue> {
+    fn tend_parts(&mut self, began: f64, tend: Tend) -> Result<bool, JsValue> {
+        let size = (self.target.width(), self.target.height());
+        let epoch = self.compositor.epoch();
+        if epoch != self.part_epoch {
+            self.engine.forget_fingerprints();
+            self.part_epoch = epoch;
+        }
         let view = HeldView::around(self.camera, size);
         let (planned, planned_size) = view.planned();
-        self.library.set_native(Native::Vectors);
-        let plan = self.compositor.plan_at(&mut self.library, planned, planned_size, self.limits);
-        self.library.set_native(Native::Textures);
-        let building = plan.pending;
-        let (list, missing) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
-        let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
-        self.engine.effects = Effects::Zoomless;
-        let built = self.engine.build_held(&self.device, &self.queue, &list, &pictures);
-        self.engine.effects = Effects::Screen;
-        let (scene, _) = built.map_err(failed)?;
-        Ok(HeldScreen { view, scene, whole: !building && missing.is_empty(), background: list.background })
+        let list = self.compositor.scene_at(planned, planned_size);
+        let library = &self.library;
+        let (seen, mut pages) = pages_of(&list, |g| library.size_of(g), view.screen());
+        let work = self.parts.work(&seen, self.camera, size, epoch);
+        for gone in work.gone {
+            self.engine.drop_held(gone);
+        }
+        let lacking: Vec<String> = seen.on_screen.iter().filter(|k| self.lacking.contains(*k) && !work.now.contains(k) && !work.later.contains(k)).cloned().collect();
+        let (now, later) = match tend {
+            Tend::Draw => (work.now, [lacking, work.later].concat()),
+            Tend::Warm => (Vec::new(), [work.now, lacking, work.later].concat()),
+        };
+        for key in &now {
+            self.build_part(key, pages.remove(key).unwrap_or_default(), &list, view, epoch)?;
+        }
+        let mut left = 0;
+        for key in &later {
+            if now_ms() - began > PART_BUDGET_MS {
+                left += 1;
+                continue;
+            }
+            self.build_part(key, pages.remove(key).unwrap_or_default(), &list, view, epoch)?;
+        }
+        let done = left == 0 && !seen.on_screen.iter().any(|k| self.lacking.contains(k));
+        self.part_seen = seen;
+        self.part_background = list.background;
+        Ok(done)
     }
 
-    fn drop_held_scene(&mut self) {
-        if let Some(held) = self.held_scene.take() {
-            self.engine.drop_held(held.scene);
+    fn build_part(&mut self, key: &str, items: Vec<crate::display_list::Item>, list: &crate::display_list::DisplayList, view: HeldView, epoch: u64) -> Result<(), JsValue> {
+        let page = crate::display_list::DisplayList { items, ..list.clone_empty() };
+        self.library.set_native(Native::Vectors);
+        let plan = self.compositor.plan_list(&mut self.library, &page, self.limits);
+        self.library.set_native(Native::Textures);
+        let building = plan.pending;
+        let (drawable, missing) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
+        let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
+        self.engine.effects = Effects::Zoomless;
+        let built = self.engine.build_held(&self.device, &self.queue, &drawable, &pictures);
+        self.engine.effects = Effects::Screen;
+        let (scene, _) = built.map_err(failed)?;
+        if building || !missing.is_empty() {
+            self.lacking.insert(key.to_string());
+        } else {
+            self.lacking.remove(key);
         }
+        if let Some(old) = self.parts.put(key, view, scene, epoch) {
+            self.engine.drop_held(old);
+        }
+        Ok(())
     }
 
     fn tiles_show_all(&self) -> bool {

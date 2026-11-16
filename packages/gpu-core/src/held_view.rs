@@ -26,18 +26,28 @@ impl HeldView {
         (Camera { x: c.x + self.margin.0, y: c.y + self.margin.1, zoom: c.zoom }, self.size)
     }
 
+    pub fn screen(&self) -> Rect {
+        let (w, h) = (self.size.0 as f64 - 2.0 * self.margin.0, self.size.1 as f64 - 2.0 * self.margin.1);
+        Rect::new(self.margin.0, self.margin.1, self.margin.0 + w, self.margin.1 + h)
+    }
+
     pub fn transform(&self, now: Camera) -> Affine {
         let (planned, _) = self.planned();
         Affine::new(now.matrix()) * Affine::new(planned.matrix()).inverse()
     }
 
-    pub fn holds(&self, now: Camera, (w, h): (u32, u32)) -> bool {
-        let ratio = now.zoom / self.camera.zoom;
-        if !(ZOOM_OUT_ROOM..=ZOOM_IN_ROOM).contains(&ratio) {
-            return false;
-        }
+    pub fn holds(&self, now: Camera, screen: (u32, u32)) -> bool {
+        (ZOOM_OUT_ROOM..=ZOOM_IN_ROOM).contains(&self.ratio(now)) && self.covers(now, screen, 0.0)
+    }
+
+    pub(crate) fn ratio(&self, now: Camera) -> f64 {
+        now.zoom / self.camera.zoom
+    }
+
+    pub(crate) fn covers(&self, now: Camera, (w, h): (u32, u32), inset_share: f64) -> bool {
         let seen = self.transform(now).inverse().transform_rect_bbox(Rect::new(0.0, 0.0, w as f64, h as f64));
-        let held = Rect::new(0.0, 0.0, self.size.0 as f64, self.size.1 as f64).inflate(EDGE_SLACK, EDGE_SLACK);
+        let (ix, iy) = (self.margin.0 * inset_share, self.margin.1 * inset_share);
+        let held = Rect::new(ix, iy, self.size.0 as f64 - ix, self.size.1 as f64 - iy).inflate(EDGE_SLACK, EDGE_SLACK);
         held.contains(seen.origin()) && held.contains(vello::kurbo::Point::new(seen.x1, seen.y1))
     }
 }

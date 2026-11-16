@@ -424,12 +424,20 @@ impl Engine {
         Ok((HeldScene { scene, loose, _textures: textures, ids }, skipped))
     }
 
-    pub fn draw_held(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, held: &HeldScene, transform: Affine, background: Option<Rgba>, target: &wgpu::TextureView, (width, height): (u32, u32)) -> Result<(), EngineError> {
-        self.cache.touch(&held.ids);
-        self.effect_cache.touch(&held.ids);
+    pub fn draw_held(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, held: &HeldScene, transform: Affine, background: Option<Rgba>, target: &wgpu::TextureView, size: (u32, u32)) -> Result<(), EngineError> {
+        self.draw_parts(device, queue, &[(held, transform)], background, target, size)
+    }
+
+    pub fn draw_parts(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, parts: &[(&HeldScene, Affine)], background: Option<Rgba>, target: &wgpu::TextureView, (width, height): (u32, u32)) -> Result<(), EngineError> {
+        for (held, _) in parts {
+            self.cache.touch(&held.ids);
+            self.effect_cache.touch(&held.ids);
+        }
         self.filters.flush(queue);
         let mut scene = borrowed(&mut self.scenes);
-        scene.append(&held.scene, Some(transform));
+        for (held, transform) in parts {
+            scene.append(&held.scene, Some(*transform));
+        }
         if empties_the_atlas(&scene) {
             scene.fill(Fill::NonZero, Affine::IDENTITY, &atlas_anchor(), None, &OFF_TARGET);
         }
