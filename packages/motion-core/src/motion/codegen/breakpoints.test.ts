@@ -4,7 +4,7 @@ import type { MotionDoc } from '../doc';
 import { addBreakpoint, BreakpointPreset, OverrideKey, setOverride } from '../breakpoints/model';
 import { CodeTarget, exportCode } from './index';
 import { box, DocKit } from './fixtures/kit';
-import { PHONE, compMainDoc, viewOnlyDoc } from './fixtures/responsive';
+import { PHONE, compMainDoc, must, viewOnlyDoc, withViews } from './fixtures/responsive';
 
 const must = (r: { ok: true; doc: MotionDoc } | { ok: false; error: string }) => {
   if (!r.ok) {
@@ -45,7 +45,7 @@ describe('code export with breakpoints', () => {
     const queried = [...css.matchAll(/@media \(max-width: 390px\) \{\s+\.([a-z-]+) \{\s+([^}]+)\}/g)].map((m) => [m[1], m[2].trim()]);
 
     expect(queried).toEqual([
-      ['row', 'flex-direction: column;'],
+      ['row', 'flex-direction: column;\n    flex-wrap: nowrap;'],
       ['aside', 'display: none;']
     ]);
   });
@@ -68,7 +68,7 @@ describe('code export with breakpoints', () => {
     const queried = [...css.matchAll(/@media \(max-width: (\d+)px\) \{\s+\.([a-z-]+) \{\s+([^}]+)\}/g)].map((m) => [m[1], m[2], m[3].trim()]);
 
     expect(queried).toEqual([
-      ['810', 'row', 'flex-direction: column;'],
+      ['810', 'row', 'flex-direction: column;\n    flex-wrap: nowrap;'],
       ['390', 'aside', 'display: none;']
     ]);
   });
@@ -106,5 +106,24 @@ describe('overrides inside a component main', () => {
     const css = file(doc, CodeTarget.Html, 'button.css') + file(doc, CodeTarget.Html, 'page.css');
 
     expect(css).toMatch(/@media \(max-width: 390px\) \{\s+\.button \{\s+padding-block: 4px;/);
+  });
+});
+
+describe('overrides on the exported frame itself', () => {
+  it('reach a media query on the page root, which keeps its own width rules', () => {
+    const kit = new DocKit(1200, 400);
+    kit.frame('only', { name: 'Only', box: box(0, 0, 1200, 400), layout: { direction: Direction.Horizontal }, item: { width: Sizing.Fixed, height: Sizing.Hug } });
+    kit.text('a', 'A', { parent: 'only', name: 'A', size: 20, font: 'Inter' });
+    const doc = must(setOverride(withViews(kit.doc(), PHONE), 'phone', 'only', OverrideKey.Direction, Direction.Vertical));
+    const css = file(doc, CodeTarget.Html, 'page.css');
+
+    expect(css).toMatch(/@media \(max-width: 390px\) \{\s+\.page \{\s+flex-direction: column;[^}]*\}/);
+    expect(css).not.toMatch(/@media[^}]*max-width: unset/);
+  });
+});
+
+describe('rows between breakpoints', () => {
+  it('wrap instead of pushing the page wider than the screen', () => {
+    expect(file(page(), CodeTarget.Html, 'page.css')).toMatch(/\.row \{[^}]*flex-wrap: wrap;/);
   });
 });

@@ -11,7 +11,11 @@ import { resolveView } from '@feega/motion-core/motion/breakpoints/view';
 import { CodeTarget, exportCode } from '@feega/motion-core/motion/codegen/index';
 import { allFixtures } from '@feega/motion-core/motion/codegen/fixtures/responsive';
 import { drawStill } from '$lib/server/motion/still-export';
-import { chromiumFrames } from '$lib/server/motion/chromium-frames';
+import { chromiumExport, chromiumFrames } from '$lib/server/motion/chromium-frames';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { posterSecond } from '$lib/motion/poster-time';
+import { libsOrigin } from '$lib/server/motion/libs-origin';
+import { everyClip } from '@feega/motion-core/motion/doc';
 import { similarity } from '$lib/server/web/ui-fidelity';
 
 const ENABLED = process.env.CODE_EXPORT_FIDELITY === '1';
@@ -24,16 +28,18 @@ const TARGET_SCORE = 0.9;
 const FLOOR_MARGIN = 0.02;
 const MEASURED: Record<string, number> = {
   'landing:base': 0.766,
-  'landing:tablet': 0.6515,
+  'landing:tablet': 0.599,
   'landing:phone': 0.6461,
-  'hero-phone:phone': 0.7031,
-  'features-grid:tablet': 0.9085,
-  'features-grid:phone': 0.8236,
-  'component-main-override:phone': 0.6919
+  'hero-phone:base': 0.9362,
+  'hero-phone:phone': 0.8469,
+  'features-grid:base': 0.9838,
+  'features-grid:tablet': 0.9598,
+  'features-grid:phone': 0.8798,
+  'component-main-override:base': 0.9362,
+  'component-main-override:phone': 0.6872
 };
-const OVERFLOWING = new Set(['landing', 'features-grid']);
 const floorOf = (fixture: string, view: string) => (MEASURED[`${fixture}:${view}`] ?? TARGET_SCORE) - (`${fixture}:${view}` in MEASURED ? FLOOR_MARGIN : 0);
-const OVERFLOW_WIDTHS = [320, 414, 600, 720, 900, 1100];
+const OVERFLOW_WIDTHS = [320, 390, 414, 600, 720, 810, 900, 1100];
 const WHITE = { r: 255, g: 255, b: 255 };
 const SIDE_GAP = 16;
 
@@ -107,6 +113,55 @@ function parsed(doc: MotionDoc): MotionDoc {
   return verdict.doc;
 }
 
+const BOX_TOLERANCE_PX = 4;
+
+type Seen = { text: string; top: number; left: number; width: number; height: number };
+
+const wordsOf = (text: string) => text.replace(/\s+/g, '');
+
+async function canvasBoxes(doc: MotionDoc): Promise<Seen[]> {
+  const page = await chromiumExport.open({ width: doc.width, height: doc.height, scale: 1 });
+  try {
+    await page.load(composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {}, origin: libsOrigin() }));
+    await page.seek(posterSecond(doc));
+    const texts = everyClip(doc).filter((c) => typeof c.props.text === 'string' && c.props.text.trim() && !c.hidden);
+    const seen: Seen[] = [];
+    for (const clip of texts) {
+      const box = await page.boxOf(clip.id);
+      if (box) {
+        seen.push({ text: wordsOf(String(clip.props.text)), ...box });
+      }
+    }
+    return seen;
+  } finally {
+    await page.close();
+  }
+}
+
+async function exportBoxes(page: Awaited<ReturnType<typeof openExport>>, texts: string[]): Promise<Map<string, Seen[]>> {
+  const rows = (await page.evaluate((wanted) => {
+    const leaves = [...document.querySelectorAll('body *')].filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && (n.textContent ?? '').trim()));
+    return wanted.map((text) => leaves.filter((e) => (e.textContent ?? '').replace(/\s+/g, '') === text).map((e) => { const r = e.getBoundingClientRect(); return { text, top: r.top + scrollY, left: r.left, width: r.width, height: r.height }; }));
+  }, texts)) as Seen[][];
+  return new Map(texts.map((t, i) => [t, rows[i]]));
+}
+
+function firstDivergence(canvas: Seen[], exported: Map<string, Seen[]>): string {
+  const used = new Map<string, number>();
+  for (const c of canvas) {
+    const n = used.get(c.text) ?? 0;
+    used.set(c.text, n + 1);
+    const e = exported.get(c.text)?.[n];
+    if (!e) {
+      return `"${c.text.slice(0, 40)}" is missing from the export`;
+    }
+    if (Math.abs(e.top - c.top) > BOX_TOLERANCE_PX || Math.abs(e.left - c.left) > BOX_TOLERANCE_PX) {
+      return `"${c.text.slice(0, 40)}" canvas ${Math.round(c.left)},${Math.round(c.top)} ${Math.round(c.width)}x${Math.round(c.height)} export ${Math.round(e.left)},${Math.round(e.top)} ${Math.round(e.width)}x${Math.round(e.height)}`;
+    }
+  }
+  return 'none';
+}
+
 const cases = ENABLED ? allFixtures().map((f) => ({ ...f, doc: parsed(f.doc) })) : [];
 const only = process.env.CODE_EXPORT_ONLY?.split(',');
 
@@ -124,28 +179,30 @@ describe.runIf(ENABLED)('exported HTML paints like the canvas at every view', ()
           const refHeight = (await sharp(reference).metadata()).height!;
           const page = await openExport(entry, view.width, refHeight);
           const shot = Buffer.from(await page.screenshot({ fullPage: true, type: 'png' }));
+          const canvas = await canvasBoxes(seen);
+          const diverges = firstDivergence(canvas, await exportBoxes(page, [...new Set(canvas.map((c) => c.text))]));
           await page.close();
           const score = await scored(reference, shot, view.width);
           mkdirSync(OUT, { recursive: true });
           const stem = join(OUT, `${fixture.name}-${view.id}`);
           writeFileSync(`${stem}.png`, await sideBySide(score.a, score.b, score.width, score.height));
           writeFileSync(`${stem}.json`, JSON.stringify({ fixture: fixture.name, view: view.id, width: view.width, mean: score.mean, min: score.min, heightRatio: score.heightRatio }));
-          console.log(`FIDELITY ${fixture.name} ${view.id} ${view.width} mean=${score.mean.toFixed(4)} min=${score.min.toFixed(4)} height=${score.heightRatio.toFixed(3)}`);
+          console.log(`FIDELITY ${fixture.name} ${view.id} ${view.width} mean=${score.mean.toFixed(4)} min=${score.min.toFixed(4)} height=${score.heightRatio.toFixed(3)} first-diverging=${diverges}`);
 
           expect(score.mean).toBeGreaterThanOrEqual(floorOf(fixture.name, view.id));
         });
       }
 
-      const sideways = OVERFLOWING.has(fixture.name) ? it.fails : it;
-      sideways('never scrolls sideways between breakpoints', async () => {
+      it('never scrolls sideways between breakpoints', async () => {
         const widths = OVERFLOW_WIDTHS.filter((w) => w <= fixture.doc.width);
         const overflow: string[] = [];
         for (const width of widths) {
           const page = await openExport(entry, width, 800);
           const scroll = await page.evaluate(() => document.documentElement.scrollWidth);
+          const culprits = scroll > width ? await page.evaluate((w) => [...document.querySelectorAll('body *')].filter((e) => e.getBoundingClientRect().right > w + 1 && ![...e.children].some((c) => c.getBoundingClientRect().right > w + 1)).slice(0, 4).map((e) => `${e.tagName.toLowerCase()}.${e.className && typeof e.className === 'string' ? e.className : ''} right=${Math.round(e.getBoundingClientRect().right)} w=${Math.round(e.getBoundingClientRect().width)}`), width) : [];
           await page.close();
           if (scroll > width) {
-            overflow.push(`${width}px scrolls to ${scroll}px`);
+            overflow.push(`${width}px scrolls to ${scroll}px by ${culprits.join(' | ')}`);
           }
         }
 

@@ -16,11 +16,12 @@ type ViewRoot = { maxWidth: number; root: ElementNode | undefined };
 const DISPLAY = 'display';
 const HIDE: Rule = [DISPLAY, 'none'];
 const UNSET = 'unset';
-const RESET_VALUE: Record<string, string> = { [DISPLAY]: 'revert' };
+const PAGE_FRAME: ReadonlySet<string> = new Set(['width', 'max-width', 'margin-inline']);
+const RESET_VALUE: Record<string, string> = { [DISPLAY]: 'revert', 'flex-wrap': 'nowrap' };
 
 const styled = (node: CodeNode): node is Styled => node.kind !== NodeKind.Text && node.kind !== NodeKind.Break;
 
-function collect(node: CodeNode, parent: string | null, into: Entries, seen: Set<string>) {
+function collect(node: CodeNode, parent: string | null, into: Entries, seen: Set<string>, framed: ElementNode | null) {
   if (!styled(node)) {
     return;
   }
@@ -29,21 +30,18 @@ function collect(node: CodeNode, parent: string | null, into: Entries, seen: Set
     if (into.has(id)) {
       seen.add(id);
     }
-    into.set(id, { rules: node.rules, parent });
+    into.set(id, { rules: node === framed ? node.rules.filter(([p]) => !PAGE_FRAME.has(p)) : node.rules, parent });
   }
   if (node.kind === NodeKind.Element) {
-    node.children.forEach((c) => collect(c, id ?? parent, into, seen));
+    node.children.forEach((c) => collect(c, id ?? parent, into, seen, framed));
   }
 }
 
 function entriesOf(root: ElementNode, keep: Root): Entries {
   const twice = new Set<string>();
   const all: Entries = new Map();
-  collect(root, null, all, twice);
+  collect(root, null, all, twice, keep === Root.Page ? root : null);
   twice.forEach((id) => all.delete(id));
-  if (keep === Root.Page) {
-    all.delete(root.clipId ?? '');
-  }
   return all;
 }
 

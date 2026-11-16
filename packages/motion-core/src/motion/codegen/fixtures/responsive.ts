@@ -1,6 +1,7 @@
 import type { MotionDoc } from '../../doc';
 import { addBreakpoint, BreakpointPreset, OverrideKey, setOverride } from '../../breakpoints/model';
 import { Direction, Sizing } from '../../layout/auto-layout';
+import { DEFAULT_LAYOUT_ITEM } from '../../layout/model';
 import { box, DocKit } from './kit';
 import { featureGridDoc, heroDoc } from './small';
 import { landingDoc } from './landing';
@@ -24,13 +25,20 @@ export const hiddenAtBase = (doc: MotionDoc, clipId: string): MotionDoc => ({
   tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === clipId ? { ...c, hidden: true } : c)) }))
 }) as MotionDoc;
 
+const hugHeight = (doc: MotionDoc, clipId: string): MotionDoc => ({
+  ...doc,
+  tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === clipId ? { ...c, layoutItem: { ...DEFAULT_LAYOUT_ITEM, ...c.layoutItem, height: Sizing.Hug } } : c)) }))
+}) as MotionDoc;
+
 function heroOnPhone(): MotionDoc {
-  const doc = withViews(heroDoc(), PHONE);
-  return must(setOverride(doc, 'phone', 'actions', OverrideKey.Direction, Direction.Vertical));
+  const doc = withViews(hugHeight(heroDoc(), 'page'), PHONE);
+  const stacked = must(setOverride(doc, 'phone', 'actions', OverrideKey.Direction, Direction.Vertical));
+  const padded = must(setOverride(stacked, 'phone', 'page', OverrideKey.Padding, { top: 24, right: 20, bottom: 48, left: 20 }));
+  return must(setOverride(padded, 'phone', 'headline', OverrideKey.FontSize, 36 / 720));
 }
 
 function featuresOnViews(): MotionDoc {
-  const doc = withViews(featureGridDoc(), TABLET, PHONE);
+  const doc = withViews(hugHeight(featureGridDoc(), 'features'), TABLET, PHONE);
   const tablet = must(setOverride(doc, 'tablet', 'features', OverrideKey.Columns, 2));
   return must(setOverride(tablet, 'phone', 'features', OverrideKey.Columns, 1));
 }
