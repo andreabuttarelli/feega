@@ -16,8 +16,8 @@ describe('deviceClass', () => {
 });
 
 describe('directOn', () => {
-  it('draws gestures directly on a desktop and from tiles elsewhere', () => {
-    expect(directOn('', null, DESKTOP)).toBe(true);
+  it('draws gestures from tiles on every device unless direct is asked for', () => {
+    expect(directOn('', null, DESKTOP)).toBe(false);
     expect(directOn('', null, PHONE)).toBe(false);
     expect(directOn('', null, WEAK)).toBe(false);
   });

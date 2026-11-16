@@ -71,12 +71,6 @@ describe('the packed wire to the core', () => {
     expect(json.width).toBe(100);
   });
 
-  it('packs contours as f32, half the bytes of f64', () => {
-    const packed = listPack(listOf([bar(0)]));
-
-    expect(packed.floats).toBeInstanceOf(Float32Array);
-  });
-
   it('packs an item once however often it is sent', () => {
     const items = [bar(0), bar(1)];
 

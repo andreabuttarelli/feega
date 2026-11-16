@@ -506,7 +506,7 @@ impl WebCore {
         Ok(())
     }
 
-    pub fn put_group_packed(&mut self, key: &str, list_json: &[u8], floats: Vec<f32>, ends: Vec<u32>) -> Result<(), JsValue> {
+    pub fn put_group_packed(&mut self, key: &str, list_json: &[u8], floats: Vec<f64>, ends: Vec<u32>) -> Result<(), JsValue> {
         self.warmup.uploaded(js_sys::Date::now());
         self.compositor.touch(key, &self.library);
         self.library.put_group(key, &parse_packed(utf8(list_json)?, floats, ends).map_err(failed)?);
@@ -514,7 +514,7 @@ impl WebCore {
         Ok(())
     }
 
-    pub fn append_group_packed(&mut self, key: &str, list_json: &[u8], floats: Vec<f32>, ends: Vec<u32>) -> Result<(), JsValue> {
+    pub fn append_group_packed(&mut self, key: &str, list_json: &[u8], floats: Vec<f64>, ends: Vec<u32>) -> Result<(), JsValue> {
         self.warmup.uploaded(js_sys::Date::now());
         self.library.append_group(key, &parse_packed(utf8(list_json)?, floats, ends).map_err(failed)?);
         self.compositor.touch(key, &self.library);
