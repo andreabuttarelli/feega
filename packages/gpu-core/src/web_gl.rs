@@ -351,6 +351,15 @@ impl WebGlCore {
         Ok(())
     }
 
+    pub fn set_carried_overlay(&mut self, items_json: &[u8]) -> Result<(), JsValue> {
+        self.compositor.set_overlay(OverlayPart::Carried, parse_overlay(utf8(items_json)?).map_err(failed)?, &mut self.library);
+        Ok(())
+    }
+
+    pub fn carry_overlay(&mut self, x: f64, y: f64) {
+        self.compositor.carry_overlay(OverlayPart::Carried, (x, y));
+    }
+
     pub fn set_live_overlay(&mut self, items_json: &[u8]) -> Result<(), JsValue> {
         self.compositor.set_overlay(OverlayPart::Live, parse_overlay(utf8(items_json)?).map_err(failed)?, &mut self.library);
         Ok(())

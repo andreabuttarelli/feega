@@ -2,7 +2,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::Cell;
 
 use serde::Deserialize;
-use vello::kurbo::{Affine as Matrix, Point, Rect};
+use vello::kurbo::{Affine as Matrix, Point, Rect, Vec2};
 
 use crate::display_list::{Affine, DisplayList, Item, Look, PathItem, UseItem};
 use crate::lod::{BLUR_REACH, VIEW_SLACK_PX};
@@ -39,16 +39,18 @@ pub type Sizes<'a> = &'a dyn Fn(&str) -> Option<(f64, f64)>;
 pub enum OverlayPart {
     Fixed,
     Selected,
+    Carried,
     Live,
 }
 
-const OVERLAY_PARTS: [OverlayPart; 3] = [OverlayPart::Fixed, OverlayPart::Selected, OverlayPart::Live];
+const OVERLAY_PARTS: [OverlayPart; 4] = [OverlayPart::Fixed, OverlayPart::Selected, OverlayPart::Carried, OverlayPart::Live];
 
 impl OverlayPart {
     pub fn group(self) -> &'static str {
         match self {
             OverlayPart::Fixed => "overlay:fixed",
             OverlayPart::Selected => "overlay:selected",
+            OverlayPart::Carried => "overlay:carried",
             OverlayPart::Live => "overlay:live",
         }
     }
@@ -58,10 +60,52 @@ impl OverlayPart {
     }
 }
 
-#[derive(Default)]
+type Shift = (f64, f64);
+
+const UNMOVED: Shift = (0.0, 0.0);
+
 struct Overlay {
     items: Vec<Item>,
     at: Option<UseItem>,
+    by: Shift,
+    reach: Damage,
+}
+
+impl Default for Overlay {
+    fn default() -> Self {
+        Overlay { items: Vec::new(), at: None, by: UNMOVED, reach: Damage::none() }
+    }
+}
+
+impl Overlay {
+    fn shown_at(&self) -> Damage {
+        match &self.reach {
+            Damage::All => Damage::All,
+            Damage::Rects(rects) => Damage::Rects(rects.iter().map(|r| *r + Vec2::new(self.by.0, self.by.1)).collect()),
+        }
+    }
+
+    fn drawn(&self, camera: Affine) -> Vec<Item> {
+        let (x, y) = self.by;
+        match &self.at {
+            Some(at) => vec![Item::Use(UseItem { matrix: times(camera, [at.matrix[0], at.matrix[1], at.matrix[2], at.matrix[3], at.matrix[4] + x, at.matrix[5] + y]), ..at.clone() })],
+            None => self.items.iter().map(|i| through(i, times(camera, [1.0, 0.0, 0.0, 1.0, x, y]))).collect(),
+        }
+    }
+}
+
+fn reach_of(items: &[Item]) -> Damage {
+    let mut reach = Damage::none();
+    for item in items {
+        match extent(item) {
+            Some(r) => reach.add(r),
+            None => return Damage::All,
+        }
+    }
+    match reach {
+        Damage::Rects(rects) => Damage::Rects(rects.into_iter().reduce(|a, b| a.union(b)).into_iter().collect()),
+        all => all,
+    }
 }
 
 pub struct Lift {
@@ -72,7 +116,7 @@ pub struct Lift {
 
 pub struct World {
     uses: Uses,
-    overlays: [Overlay; 3],
+    overlays: [Overlay; 4],
     damage: Damage,
     scene_damage: Damage,
     rest: FxHashMap<String, (String, Affine)>,
@@ -286,7 +330,17 @@ impl World {
     }
 
     pub fn set_overlay(&mut self, part: OverlayPart, items: Vec<Item>) {
-        let old = std::mem::replace(&mut self.overlays[part.index()].items, items);
+        if self.overlays[part.index()].by != UNMOVED {
+            self.damage.join(self.overlays[part.index()].shown_at());
+            self.overlays[part.index()].reach = reach_of(&items);
+            self.overlays[part.index()].items = items;
+            self.damage.join(self.overlays[part.index()].shown_at());
+            return;
+        }
+        let reach = reach_of(&items);
+        let overlay = &mut self.overlays[part.index()];
+        overlay.reach = reach;
+        let old = std::mem::replace(&mut overlay.items, items);
         let new = &self.overlays[part.index()].items;
         let by_clip = |items: &[Item]| {
             let mut m: FxHashMap<String, Vec<usize>> = FxHashMap::default();
@@ -316,6 +370,15 @@ impl World {
 
     pub fn place_overlay(&mut self, part: OverlayPart, at: Option<UseItem>) {
         self.overlays[part.index()].at = at;
+    }
+
+    pub fn carry_overlay(&mut self, part: OverlayPart, by: Shift) {
+        if self.overlays[part.index()].by == by {
+            return;
+        }
+        self.damage.join(self.overlays[part.index()].shown_at());
+        self.overlays[part.index()].by = by;
+        self.damage.join(self.overlays[part.index()].shown_at());
     }
 
     pub fn take_damage(&mut self) -> Damage {
@@ -349,25 +412,13 @@ impl World {
 
     pub fn overlay(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
         let held = self.visit(self.uses.flagged()).into_iter().filter(|u| self.lifted(u) && self.shifted_from_rest(u).is_none()).map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
-        let items = held.chain(OVERLAY_PARTS.iter().flat_map(|p| {
-            let part = &self.overlays[p.index()];
-            match &part.at {
-                Some(at) => vec![Item::Use(UseItem { matrix: times(camera, at.matrix), ..at.clone() })],
-                None => part.items.iter().map(|i| through(i, camera)).collect(),
-            }
-        }));
+        let items = held.chain(OVERLAY_PARTS.iter().flat_map(|p| self.overlays[p.index()].drawn(camera)));
         DisplayList { width, height, background: None, items: items.collect(), faces: Vec::new(), fragments: Default::default() }
     }
 
     pub fn screen(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
         let uses = self.visit(self.uses.meeting(sighted(camera, width, height), Plus::Flagged)).into_iter().map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
-        let overlay = OVERLAY_PARTS.iter().flat_map(|p| {
-            let part = &self.overlays[p.index()];
-            match &part.at {
-                Some(at) => vec![Item::Use(UseItem { matrix: times(camera, at.matrix), ..at.clone() })],
-                None => part.items.iter().map(|i| through(i, camera)).collect(),
-            }
-        });
+        let overlay = OVERLAY_PARTS.iter().flat_map(|p| self.overlays[p.index()].drawn(camera));
         DisplayList { width, height, background: None, items: uses.chain(overlay).collect(), faces: Vec::new(), fragments: Default::default() }
     }
 }

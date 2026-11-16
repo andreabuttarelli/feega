@@ -81,6 +81,10 @@ impl Compositor {
         }
     }
 
+    pub fn carry_overlay(&mut self, part: OverlayPart, by: (f64, f64)) {
+        self.world.carry_overlay(part, by);
+    }
+
     pub fn touch(&mut self, group: &str, library: &Library) {
         self.world.touch(group, library.size_of(group));
     }

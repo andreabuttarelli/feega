@@ -160,6 +160,39 @@ fn a_live_overlay_change_damages_only_the_live_items() {
     assert_eq!(w.overlay_group(OverlayPart::Fixed).map(|(l, _)| l.items.len()), Some(1));
 }
 
+fn ring_at(x: f64) -> String {
+    format!(r#"[{{ "kind": "path", "clip": "sel", "contours": [[{x}, 0, {}, 0, {}, 10, {x}, 10]], "rule": "nonzero", "paint": {{ "kind": "solid", "color": [0, 0, 1, 1] }}, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0] }}]"#, x + 10.0, x + 10.0)
+}
+
+#[test]
+fn a_carried_overlay_is_drawn_at_its_offset_and_damages_where_it_left_and_landed() {
+    let mut w = World::new();
+    w.set_overlay(OverlayPart::Carried, parse_overlay(&ring_at(0.0)).unwrap());
+    let (_, placed) = w.overlay_group(OverlayPart::Carried).unwrap();
+    w.place_overlay(OverlayPart::Carried, Some(placed.clone()));
+    w.take_damage();
+
+    w.carry_overlay(OverlayPart::Carried, (50.0, 5.0));
+
+    let Item::Use(u) = &w.overlay(IDENTITY, 1000, 100).items[0] else { panic!("the carried part") };
+    assert_eq!(u.matrix[4..], [placed.matrix[4] + 50.0, placed.matrix[5] + 5.0]);
+    assert_eq!(rects(w.take_damage()), vec![Rect::new(0.0, 0.0, 10.0, 10.0), Rect::new(50.0, 5.0, 60.0, 15.0)]);
+}
+
+#[test]
+fn a_carried_overlay_set_again_keeps_its_offset_and_damages_both_places() {
+    let mut w = World::new();
+    w.set_overlay(OverlayPart::Carried, parse_overlay(&ring_at(0.0)).unwrap());
+    w.carry_overlay(OverlayPart::Carried, (50.0, 0.0));
+    w.take_damage();
+
+    w.set_overlay(OverlayPart::Carried, parse_overlay(&ring_at(20.0)).unwrap());
+
+    let Item::Path(ring) = &w.overlay(IDENTITY, 1000, 100).items[0] else { panic!("the carried ring") };
+    assert_eq!(ring.look.matrix, [1.0, 0.0, 0.0, 1.0, 50.0, 0.0]);
+    assert_eq!(rects(w.take_damage()), vec![Rect::new(50.0, 0.0, 60.0, 10.0), Rect::new(70.0, 0.0, 80.0, 10.0)]);
+}
+
 #[test]
 fn a_tiled_canvas_takes_resting_uses_uncached_and_keeps_held_ones_as_textures() {
     let patch = gpu_core::world::parse_patch(r#"{ "put": [{ "kind": "use", "clip": "a", "group": "g", "matrix": [1, 0, 0, 1, 0, 0], "cache": true, "hold": true }, { "kind": "use", "clip": "b", "group": "g", "matrix": [1, 0, 0, 1, 0, 0], "cache": true }], "drop": [] }"#).unwrap();

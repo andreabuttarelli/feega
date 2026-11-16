@@ -1,7 +1,7 @@
 use crate::world::OverlayPart;
 
 #[derive(Default)]
-pub struct OverlaySeen([Vec<u8>; 3]);
+pub struct OverlaySeen([Vec<u8>; 4]);
 
 impl OverlaySeen {
     pub fn is_new(&mut self, part: OverlayPart, payload: &[u8]) -> bool {
