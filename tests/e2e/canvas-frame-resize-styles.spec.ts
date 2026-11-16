@@ -26,6 +26,10 @@ const styledDoc = {
   styles: { Body: BODY }
 };
 
+const PAGE_SIZE = { width: 400, height: 300 };
+
+const pageDoc = { ...styledDoc, width: PAGE_SIZE.width, height: PAGE_SIZE.height, still: undefined };
+
 const savedSummary = (r: Request, nodeId: string) => (r.method() === 'POST' && r.url().includes(`/motion/${nodeId}`) ? (r.postDataBuffer()?.toString() ?? '') : null);
 
 async function styleSaves(page: Page, nodeId: string): Promise<() => string[]> {
@@ -78,5 +82,47 @@ test.describe('resizing a frame leaves its styles alone @real', () => {
     await page.waitForTimeout(SETTLE_MS);
     expect(Math.abs((await tile.boundingBox())!.width - box.width), 'undo puts the frame back to its size').toBeLessThan(UNDO_SLACK_PX);
     expect(saves(), 'undoing the resize writes no style either').toEqual([]);
+  });
+
+  test('narrowing a frame to its minimum and undoing puts back its box and its doc, with no style step between', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(150_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const node = await seedNode({ type: 'motion', x: 200, y: 150, data: { format: 'custom', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } });
+    expect((await admin.from('nodes').update(PAGE_SIZE).eq('id', node.id)).error).toBeNull();
+    const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: pageDoc, actor_kind: 'user', actor_id: session.userId });
+    expect(error).toBeNull();
+    const docWidth = async () => {
+      const { data } = await admin.from('motion_revisions').select('doc').eq('node_id', node.id).order('version', { ascending: false }).limit(1).single();
+      return (data?.doc as { width?: number } | null)?.width;
+    };
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    const tile = page.locator(`[data-testid="gpu-node"][data-id="${node.id}"]`);
+    await expect(tile).toBeAttached({ timeout: 30_000 });
+    await page.waitForTimeout(SETTLE_MS);
+
+    const box = (await tile.boundingBox())!;
+    const placed = await tile.getAttribute('data-box');
+    await page.mouse.click(box.x + LABEL_IN_PX, box.y - LABEL_ABOVE_PX);
+    await page.waitForTimeout(SETTLE_MS);
+    const saves = await styleSaves(page, node.id);
+
+    const corner = { x: box.x + box.width, y: box.y + box.height };
+    await page.mouse.move(corner.x, corner.y);
+    await page.mouse.down();
+    for (let i = 1; i <= STEPS; i++) {
+      await page.mouse.move(corner.x - (i * (box.width + STEP_PX)) / STEPS, corner.y);
+    }
+    await page.mouse.up();
+    await expect.poll(docWidth, { timeout: 15_000 }).toBeLessThan(PAGE_SIZE.width);
+    await page.waitForTimeout(SETTLE_MS);
+
+    await page.keyboard.press('ControlOrMeta+z');
+    await expect.poll(() => tile.getAttribute('data-box'), { timeout: 15_000, message: 'undo puts the box back' }).toBe(placed);
+    await expect.poll(docWidth, { timeout: 15_000, message: 'undo puts the doc back' }).toBe(PAGE_SIZE.width);
+
+    await page.keyboard.press('ControlOrMeta+z');
+    await page.waitForTimeout(SETTLE_MS);
+    expect(await tile.getAttribute('data-box'), 'a second undo finds nothing of this frame to undo').toBe(placed);
+    expect(saves(), 'no style is written by the narrowing, its landing or its undo').toEqual([]);
   });
 });
