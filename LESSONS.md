@@ -3992,3 +3992,6 @@ property reads on ~2,000 items (`src/lib/canvas/counted-list.testkit.ts`), not w
 
 ## A service-role credential carries no role unless the request re-derives it
 **Signal:** a token row (`api_keys`) is checked for hash, revocation and expiry, then the request runs on the service-role client. RLS role rules (viewers read-only) do not apply, and a demotion or removal changes nothing for the token. **Move:** derive the effective scopes from the holder's current membership on every request (`scopesOfHolder`); never trust what was stored at mint time.
+
+## A route that serves user HTML is an XSS surface for every iframe that can name it
+**Signal:** an iframe takes a URL a member writes, with `allow-same-origin`, and the app serves member-uploaded HTML from its own origin (`/e/<id>`). **Move:** a route that serves a user-authored document sends `INERT_DOCUMENT_HEADERS` (`Content-Security-Policy: sandbox`, `nosniff`), and every iframe takes `IFRAME_SANDBOX`. Never write a sandbox string inline.

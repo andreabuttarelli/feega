@@ -1,6 +1,7 @@
 <script lang="ts">
   import type GpuFlow from '$lib/components/canvas/gpu/GpuFlow.svelte';
   import { onMount } from 'svelte';
+  import { IFRAME_REFERRER_POLICY, IFRAME_SANDBOX } from '$lib/canvas/iframe-node';
   import { CanvasMode } from '$lib/canvas/canvas-mode';
   import { renderDocHtml } from '$lib/canvas/doc-render';
   import type { SharedNode } from '$lib/canvas/shared-view';
@@ -68,9 +69,9 @@
           {:else if node.view.kind === 'doc'}
             <div class="prose doc-prose nowheel">{@html renderDocHtml(node.view.content)}</div>
           {:else if node.view.kind === 'frame' && node.view.url}
-            <iframe src={node.view.url} title={node.displayName ?? 'embed'} sandbox="allow-scripts allow-same-origin"></iframe>
+            <iframe src={node.view.url} title={node.displayName ?? 'embed'} sandbox={IFRAME_SANDBOX} referrerpolicy={IFRAME_REFERRER_POLICY}></iframe>
           {:else if node.view.kind === 'frame'}
-            <iframe srcdoc={node.view.html} title={node.displayName ?? 'embed'} sandbox="allow-scripts"></iframe>
+            <iframe srcdoc={node.view.html} title={node.displayName ?? 'embed'} sandbox={IFRAME_SANDBOX} referrerpolicy={IFRAME_REFERRER_POLICY}></iframe>
           {:else if node.view.kind === 'grid'}
             <SourcePreview
               icon={NODE_KIND_ICON[node.type as NodeType]}
