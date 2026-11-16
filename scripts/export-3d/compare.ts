@@ -65,7 +65,7 @@ const reference = await serve((path) => {
   if (path === '/ref') {
     return { body: composeHtml({ doc, tokens: FEEGA_TOKENS, assets: { [MODEL_ASSET]: `${reference.origin}/toy.glb` }, origin: reference.origin }), type: 'text/html' };
   }
-  return path === '/toy.glb' ? { body: Buffer.from(toyGlb()), type: MIME['.glb'] } : libs(path);
+  return path === '/toy.glb' ? { body: (process.env.MODEL_GLB ? readFileSync(process.env.MODEL_GLB) : Buffer.from(toyGlb())), type: MIME['.glb'] } : libs(path);
 });
 const targets = {
   html: await serve(fromDir(join(projects, 'html'))),
