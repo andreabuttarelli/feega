@@ -12,7 +12,8 @@ enum Gesture {
   Zoom = 'zoom',
   Fit = 'fit',
   Drag = 'drag',
-  DragElement = 'drag-element'
+  DragElement = 'drag-element',
+  Resize = 'resize'
 }
 
 enum Edit {
@@ -222,12 +223,41 @@ async function dragElement(page: Page, until: number) {
   return moves;
 }
 
+const SELECT_SETTLE_MS = 400;
+const UNDO_SETTLE_MS = 300;
+
+async function selectFrame(page: Page): Promise<string> {
+  const id = await zoomOntoFrame(page);
+  const box = (await tiles(page)).find((t) => t.id === id)!;
+  const at = labelAt(box);
+  await page.mouse.click(at.x, at.y);
+  await page.waitForTimeout(SELECT_SETTLE_MS);
+  return id;
+}
+
+async function resize(page: Page, until: number, aim?: string) {
+  const box = (await tiles(page)).find((t) => t.id === aim)!;
+  const bottom = box.y + box.h;
+  const corner = { x: box.x + box.w, y: bottom < VIEWPORT.height - SCREEN_MARGIN_PX ? bottom : box.y };
+  const moves = await swing(page, corner, until);
+  const resized = (await placeOf(page, box.id)) !== box.at;
+  console.log(`resize: ${moves} moves on ${box.id}`);
+  await release(page, corner);
+  await page.keyboard.press('ControlOrMeta+z');
+  await page.waitForTimeout(UNDO_SETTLE_MS);
+  if (!resized) {
+    throw new Error(`resize: frame ${box.id} did not change size`);
+  }
+  return moves;
+}
+
 const GESTURES: Record<Gesture, (page: Page, until: number, aim?: string) => Promise<number | void>> = {
   [Gesture.Pan]: wheelPan,
   [Gesture.Zoom]: zoom,
   [Gesture.Fit]: fit,
   [Gesture.Drag]: drag,
-  [Gesture.DragElement]: dragElement
+  [Gesture.DragElement]: dragElement,
+  [Gesture.Resize]: resize
 };
 
 type Seen = { gaps: number[]; taskMs: number; moves: number };
@@ -239,7 +269,8 @@ async function taskSeconds(cdp: CDPSession): Promise<number> {
 
 const SETUP: Partial<Record<Gesture, (page: Page) => Promise<string>>> = {
   [Gesture.Drag]: zoomOntoFrame,
-  [Gesture.DragElement]: selectContainer
+  [Gesture.DragElement]: selectContainer,
+  [Gesture.Resize]: selectFrame
 };
 
 async function gaps(page: Page, cdp: CDPSession, gesture: Gesture): Promise<Seen> {
