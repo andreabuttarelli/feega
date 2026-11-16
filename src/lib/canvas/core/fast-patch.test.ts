@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { precompose } from '@feega/motion-core/motion/precomp';
 import { addClip } from '@feega/motion-core/motion/timeline';
 import { DEFAULT_AUTO_LAYOUT, DEFAULT_LAYOUT_ITEM } from '@feega/motion-core/motion/layout/model';
 import { Direction, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
@@ -379,5 +380,103 @@ describe('hiding a big section', () => {
     scan.mockRestore();
     expect(rounded(patched)).toEqual(rounded(drawn(laid)));
     expect(calls).toBeLessThan(30 * MANY);
+  });
+});
+
+describe('editing inside a component', () => {
+  const withComponent = (): MotionDoc => {
+    const r = precompose(built(['a', 'inner', 'b']), ['inner'], { comp: 'cmp', clip: 'host' }, 'Card');
+    if (!r.ok) {
+      throw new Error(r.error);
+    }
+    return r.doc;
+  };
+  const recoloured = (doc: MotionDoc): MotionDoc => ({ ...doc, comps: Object.fromEntries(Object.entries(doc.comps).map(([id, comp]) => [id, { ...comp, tracks: comp.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, props: { ...c.props, fills: [{ type: 'solid', color: '#0000ff' }] } })) })) }])) });
+
+  it('redraws the instance of the edited component as the full build does', () => {
+    const before = withComponent();
+    const after = recoloured(before);
+
+    const patched = fastPatch(drawn(before), before, after, estimatedText, LOOK);
+
+    expect(patched).not.toBeNull();
+    expect(rounded(patched)).toEqual(rounded(drawn(after)));
+  });
+
+  it('a nudged frame carries the component instance inside it as the full build does', () => {
+    const framed = edit(withComponent(), 'host', (c) => ({ ...c, parent: 'a' }));
+    const after = edit(framed, 'a', (c) => ({ ...c, transform: { ...c.transform, x: 0.1, y: -0.05 } }));
+
+    const patched = fastPatch(drawn(framed), framed, after, estimatedText);
+
+    expect(patched).not.toBeNull();
+    expect(rounded(patched)).toEqual(rounded(drawn(after)));
+  });
+});
+
+const HUGE = 2000;
+
+const PASSES = ['some', 'every', 'find', 'findIndex', 'indexOf', 'includes', 'filter', 'map', 'flatMap', 'forEach', 'reduce'] as const;
+
+function fullPasses(run: () => void): number {
+  let passes = 0;
+  const spies = PASSES.map((name) => {
+    const original = Array.prototype[name] as (...args: unknown[]) => unknown;
+    return vi.spyOn(Array.prototype, name).mockImplementation(function (this: unknown[], ...args: unknown[]) {
+      passes += this.length >= HUGE ? 1 : 0;
+      return original.apply(this, args);
+    } as never);
+  });
+  try {
+    run();
+  } finally {
+    spies.forEach((spy) => spy.mockRestore());
+  }
+  return passes;
+}
+
+const wide = (parent: string | null = null): MotionDoc => {
+  const doc = built(['root']);
+  const template = doc.tracks.flatMap((t) => t.clips)[0];
+  const clips = Array.from({ length: HUGE }, (_, i) => ({ ...template, id: `w${i}`, parent: parent && `w${i}` !== parent ? parent : null }));
+  return { ...doc, tracks: [{ ...doc.tracks.find((t) => t.clips.length)!, clips }] };
+};
+
+const touched = (doc: MotionDoc, count: number, change: (c: MotionClip) => MotionClip): MotionDoc => ({ ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c, i) => (i < count ? change(c) : c)) })) });
+
+describe('one edit on a frame of 2,000 layers', () => {
+  it('pairs the clips of a restyle of many layers without searching the list once per layer', () => {
+    const before = wide();
+    const after = touched(before, 100, restyled({ width: 0.02 }));
+
+    const list = drawn(before);
+
+    const passes = fullPasses(() => fastPatch(list, before, after, estimatedText));
+
+    expect(passes).toBeLessThan(20);
+  });
+
+  it('compares the two docs of one edit once, however many times the patch asks which clip changed', () => {
+    const before = wide();
+    const after = touched(before, 1, faded(0.5));
+    const list = drawn(before);
+
+    const passes = fullPasses(() => {
+      editedClipId(before, after);
+      editKindOf(before, after);
+      fastPatch(list, before, after, estimatedText);
+    });
+
+    expect(passes).toBeLessThanOrEqual(4);
+  });
+
+  it('lists the layers a hide redraws without searching the list once per layer', () => {
+    const before = wide('w0');
+    const after = touched(before, 1, hidden);
+    const list = drawn(before);
+
+    const passes = fullPasses(() => fastPatch(list, before, after, estimatedText, LOOK));
+
+    expect(passes).toBeLessThan(60);
   });
 });
