@@ -92,6 +92,10 @@ Signal: with the pointer still over a frame, a wheel zoom makes its hover outlin
 ### A perf run on the landings fixture finds no frame to grab the second time
 **Signal:** `profile.mjs`/`measure.mjs` throw `Cannot read properties of undefined (reading 'x')` or report `resized=false` on a run after a resize. **Move:** local mode saves into the served `.feega` copy and the kit's Cmd+Z does not undo a whole resize, so the fixture drifts run to run; copy the original over the served file and restart the server before every resize run. On the hosted test canvas, another agent's cursor on screen means another run is editing the same rows: its numbers are not yours.
 
+### Zoom hitches whenever new tiles load: check every producer against the frame deadline, not only bakes
+
+**Signal:** pinch zoom across octaves presents 85–95 fps at 120 Hz, with 50–340 ms gaps, while the bake counters say each frame baked 0–1 tiles in a few ms. **Move:** read `fallbackMs` in `window.__gpuCanvas.frames`. Any producer that runs in `tiled_frame` must check the one frame deadline per unit of work: bake batches, `serve_bare`'s never-blurry fallback, `render_ahead`, and any future one. On 2026-11-16 the fallback drew whole screen bands with no budget and caused 180 of 204 long frames.
+
 ## Providers
 
 ### Kie publishes its price list and its request schemas, you just have to find them
