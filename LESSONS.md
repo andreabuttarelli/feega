@@ -86,6 +86,9 @@ Signal: with the pointer still over a frame, a wheel zoom makes its hover outlin
 ### Tiles turn sharp slowly after a zoom-in: count paints per tile, not ms per tile
 **Signal:** zoomed far in, every tile costs ~3 ms whatever its size (one tile or a 2×2 block cost the same), almost all in `layers::prepare_items`, and the layer cache never hits. **Move:** log, per `raster_batch`, the number of `Surface::paint` calls by `Reason` and the clip of each layer-worthy item. A tile paying for layers it does not show is the defect: on the landings fixture ten of twelve were groups emptied by `Laying::lay` that still carried an SVG effect filter (no bounds, so never culled, so a full-tile body, mask and filter). A cost fixed per draw also means bigger batches are nearly free on the CPU; measure the GPU side by frames over 11 ms before growing them.
 
+### A held drag drops in the wrong place only when the test takes a screenshot
+**Signal:** a headed e2e drags a stack child, takes a screenshot mid-drag, releases, and the saved doc shows the child left its stack (`parent` null) at a point far from the pointer; without the screenshot it passes. **Move:** log `clientX`, `buttons` and `isTrusted` of the last `pointermove`: Chrome sends a trusted move with `buttons: 0` from the OS cursor's real position when the page repaints. A drag handler must ignore moves with no button held.
+
 ## Providers
 
 ### Kie publishes its price list and its request schemas, you just have to find them
