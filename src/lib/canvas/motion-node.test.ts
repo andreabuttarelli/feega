@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FORMATS, MOTION_FORMATS, MotionFormat } from '@feega/motion-core/motion/doc';
+import { FORMATS, MIN_SIDE, MOTION_FORMATS, MotionFormat } from '@feega/motion-core/motion/doc';
 import { EnterTo, FramePanel, FrameKind, clickReachesClip, MOTION_NODE_BAR_H, elementNodeOf, frameChrome, frameResize, freshText, heightFollowsDoc, tileFollowsDoc, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionLivePath, motionOf, motionPreviewPath, TileBody, hoverHostOf, HoverHost, newMotionData, storyboardPath, holdsDoc } from './motion-node';
 import { NodeMode, Opening } from './inline-motion';
 import { nodeSize } from './node-size';
@@ -207,6 +207,13 @@ describe('a custom frame takes the size the hand gives it', () => {
 
   it('a preset frame takes any ratio the hand gives it', () => {
     expect(frameResize(preset, { w: 420, h: 900 }, FORMATS[MotionFormat.Landscape])).toEqual({ w: 420, h: 900, picture: { width: 420, height: 900 - MOTION_NODE_BAR_H } });
+  });
+
+  it('a frame stops at the smallest side its doc can take, so its box and its doc never disagree', () => {
+    const page = { width: 1280, height: 9648 };
+
+    expect(frameResize(custom, { w: 8, h: 9648 + MOTION_NODE_BAR_H }, page)).toEqual({ w: MIN_SIDE, h: 9648 + MOTION_NODE_BAR_H, picture: { width: MIN_SIDE, height: 9648 } });
+    expect(frameResize(custom, { w: 8, h: 9648 + MOTION_NODE_BAR_H }, { ...page, still: { frame: 0 } }).w).toBe(8);
   });
 
   it('a free element takes the box it is given, width and height apart, like a shape or a text box', () => {
