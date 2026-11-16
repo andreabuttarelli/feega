@@ -48,11 +48,13 @@ fn the_held_scene_is_rebuilt_past_its_margin_or_its_zoom_room() {
     assert!(!held.holds(at(150.0, 90.0, 0.6), SCREEN));
 }
 
+#[cfg(feature = "gpu")]
 const CARD: &str = r#"{ "width": 200, "height": 160, "background": [1, 1, 1, 1], "items": [
   { "kind": "path", "clip": "card", "contours": [[0, 0, 40, 0, 40, 30, 0, 30]], "rule": "nonzero",
     "paint": { "kind": "solid", "color": [1, 0, 0, 1] }, "opacity": 1, "matrix": [1, 0, 0, 1, X, 20],
     "blend": "normal", "blur": 3 } ] }"#;
 
+#[cfg(feature = "gpu")]
 #[test]
 fn a_held_scene_drawn_moved_matches_the_scene_drawn_where_it_moved_to() {
     let list = |x: f64| gpu_core::display_list::parse(&CARD.replace('X', &x.to_string())).unwrap();
