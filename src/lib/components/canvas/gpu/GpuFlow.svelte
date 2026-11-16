@@ -2895,7 +2895,7 @@
 
     const move = (ev: PointerEvent) => {
       const now = carry(ev);
-      if (now === Carry.Held) {
+      if (now === Carry.Held || !ev.buttons) {
         return;
       }
       started = true;
