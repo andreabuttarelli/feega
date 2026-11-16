@@ -76,6 +76,18 @@ describe('scene sources', () => {
     expect(sceneStamp(parent, (id) => revisions[id] ?? 0)).toBe(`${A}@3,${B}@7`);
     expect(sceneStamp(newMotionDoc(MotionFormat.Landscape), () => 1)).toBe('');
   });
+
+  it('stamping the same doc again reads its clips once: a canvas restamps every frame on each pointer move', () => {
+    let walks = 0;
+    const counted = Object.defineProperty({ ...parent }, 'tracks', { get: () => (walks++, parent.tracks) }) as MotionDoc;
+    const revisions: Record<string, number> = { [A]: 3, [B]: 7 };
+
+    sceneStamp(counted, (id) => revisions[id] ?? 0);
+    revisions[A] = 4;
+
+    expect(sceneStamp(counted, (id) => revisions[id] ?? 0)).toBe(`${A}@4,${B}@7`);
+    expect(walks).toBe(1);
+  });
 });
 
 describe('a scene being edited moves its stamp before it saves', () => {
