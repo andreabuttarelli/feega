@@ -236,3 +236,14 @@ describe('resizing a frame that defines text styles', () => {
     });
   }
 });
+
+describe('narrowing a styled frame below its type size', () => {
+  it('keeps a doc the schema accepts: a style past the type limit stops at it', () => {
+    const text = { id: 't', from: 0, durationInFrames: 150, component: 'Text', styleRef: 'H1', props: { text: 'Hi', x: 0.5, y: 0.5, width: 0.5, height: 0.2, size: 0.06 } };
+    const doc = { ...newMotionDoc(MotionFormat.Landscape), tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [text] }], styles: { H1: { kind: 'text', size: 0.06 } } } as unknown as MotionDoc;
+
+    const sized = fitToNode(doc, { width: 8, height: 1080 }, ResizeMode.Constrained);
+
+    expect(sized.ok && motionDocSchema.safeParse({ ...sized.doc, tracks: [] }).success).toBe(true);
+  });
+});
