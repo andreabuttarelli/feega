@@ -214,3 +214,25 @@ describe('resizing a frame keeps what is inside it, as in Figma', () => {
     expect(clip(sized, 'title').size * Math.min(sized.width, sized.height)).toBeCloseTo(0.04 * 600, 3);
   });
 });
+
+describe('resizing a frame that defines text styles', () => {
+  const BODY = { kind: 'text', font: 'Inter', size: 0.05, weight: 400 };
+  const styled = (): MotionDoc => {
+    const text = { id: 't', from: 0, durationInFrames: 150, component: 'Text', styleRef: 'Body', props: { text: 'Hi', x: 0.5, y: 0.5, width: 0.5, height: 0.2, size: 0.05 }, transform: {}, keyframes: {} };
+    return { ...newMotionDoc(MotionFormat.Landscape), tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [text] }], styles: { Body: BODY } } as unknown as MotionDoc;
+  };
+  const pixels = (doc: MotionDoc, size: number) => size * Math.min(doc.width, doc.height);
+
+  for (const mode of [ResizeMode.Constrained, ResizeMode.Ignored]) {
+    it(`keeps a text style at the pixel size its text keeps (${mode}), so the shared library sees nothing to push back`, () => {
+      const before = styled();
+      const sized = fitToNode(before, { width: 1280, height: 720 }, mode);
+      const doc = sized.ok ? sized.doc : before;
+      const style = doc.styles?.Body as { size: number };
+
+      expect(doc.width).toBe(1280);
+      expect(pixels(doc, style.size)).toBeCloseTo(pixels(before, BODY.size), 2);
+      expect(pixels(doc, doc.tracks[0].clips[0].props.size as number)).toBeCloseTo(pixels(doc, style.size), 2);
+    });
+  }
+});
