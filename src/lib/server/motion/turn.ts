@@ -67,6 +67,7 @@ import { awaitFrames, awaitVerdict, framesPrefix, FRAME_POLL_MS, type FrameBucke
 import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S, storeAssetFile } from '$lib/server/repos/asset-storage';
 import { ASSETS_ADDED, CHECK_REQUEST, DOC_EDITED, FRAMES_REQUEST, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
 import { rowRequests } from '$lib/server/motion/batch-input';
+import { withShapedText } from '$lib/server/motion/shaped-compose';
 import { startFarmBatch } from '$lib/server/motion/render-start';
 import { Preset, settingsOf, type Quality } from '$lib/motion/export-formats';
 import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
@@ -272,7 +273,8 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
         return { ok: false, error: 'this turn has unsaved edits: the batch renders the saved video, so finish the turn and run render_batch in the next one' };
       }
       const renderAssets = await motionAssets({ db, orgId, projectId: project.id, canvasId: motion.record.canvasId }, SIGNED_URL_TTL_S.render);
-      const made = rowRequests({ version: head.version, doc: await watermarked(db, orgId, head.doc) }, rows, { tokens, assets: assetUrls(renderAssets) }, settingsOf(Preset.Social));
+      const doc = await watermarked(db, orgId, head.doc);
+      const made = rowRequests({ version: head.version, doc }, rows, await withShapedText({ doc, tokens, assets: assetUrls(renderAssets) }), settingsOf(Preset.Social));
       if (!made.ok) {
         return made;
       }

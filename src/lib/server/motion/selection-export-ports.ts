@@ -12,6 +12,7 @@ import { chromiumExport } from './chromium-frames';
 import { drawTargets } from './selection-draw';
 import { vectorOf, type Span } from './vector-list';
 import { libsOrigin } from './libs-origin';
+import { withShapedText } from './shaped-compose';
 import { watermarked } from '$lib/server/export-watermark';
 import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { assetUrls, motionAssets, motionTokens } from './editor';
@@ -40,7 +41,7 @@ export function selectionPorts(scope: SelectionScope): SelectionPorts {
 
   const shown = (target: DrawTarget) => watermarked(db, orgId, target.doc);
 
-  const compose = async (target: DrawTarget) => composeHtml({ doc: await shown(target), tokens: await tokens, assets: await urlsOf(target), origin: libsOrigin() });
+  const compose = async (target: DrawTarget) => composeHtml(await withShapedText({ doc: await shown(target), tokens: await tokens, assets: await urlsOf(target), origin: libsOrigin() }));
 
   const vector = async (target: DrawTarget, span: Span) => vectorOf({ doc: await shown(target), tokens: await tokens, assets: await urlsOf(target) }, span);
 

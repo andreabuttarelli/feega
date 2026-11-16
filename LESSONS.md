@@ -130,6 +130,10 @@ Signal: with the pointer still over a frame, a wheel zoom makes its hover outlin
 
 **Signal:** parity SSIM 0.3–0.9 with the HTML frames in a serif fallback while the core frames look right. **Move:** the headless harness does not load the template's Google fonts; compare the sheets by eye before calling the core wrong.
 
+### Server-side font shaping of a variable Google family comes out at the default weight
+
+**Signal:** text shaped in Node (fontkit via `fontLoader`) matches Chromium for static families but is ~5% narrow for a variable family at 700. **Move:** Google Fonts CSS2 answers a request with no browser user agent with one static TTF of the default instance. Fetch the stylesheet with a browser user agent (`browserFontReader` in `src/lib/server/motion/shaped-compose.ts`), so the server gets the same variable file the canvas does.
+
 ### A Playwright spec cannot import motion-core: build the page with vite-node first
 
 **Signal:** `Module ".../part-usage.json" needs an import attribute of "type: json"` the moment a spec or demo imports `bundle.ts` or the doc ops. **Move:** Playwright loads TypeScript through Node, not Vite. Build the fixture in a separate `npx vite-node tests/e2e/fixtures/build-lumen.ts <dir> <origin>` step and let the spec read the files (`tests/e2e/fixtures/interactive-routes.ts`).
