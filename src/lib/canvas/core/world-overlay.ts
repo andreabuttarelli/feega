@@ -24,7 +24,7 @@ export enum ChromeLayers {
   Ports = 'ports'
 }
 
-export type ChromeOnCanvas = StateTile & { turn?: Turn; layers?: ChromeLayers };
+export type ChromeOnCanvas = StateTile & { turn?: Turn; layers?: ChromeLayers; owner?: string };
 
 const CHROME_OF: Record<ChromeLayers, { tile: (t: ChromeOnCanvas, glyphs: Glyphs) => PathItem[]; state: boolean }> = {
   [ChromeLayers.State]: { tile: () => [], state: true },
@@ -53,9 +53,17 @@ const FIXED_KEYS = ['curves', 'chrome', 'selected', 'selectedEdge', 'theme', 'gl
 
 type Settled = { fixed: PathItem[]; selected: PathItem[] };
 
+export type Shift = { x: number; y: number };
+
+const UNMOVED: Shift = { x: 0, y: 0 };
+const SAME_PLACE = 1e-6;
+
+type Carried = { rest: readonly ChromeOnCanvas[]; items: PathItem[]; by: Shift };
+
 let fixedFor: Fixed | null = null;
 let settled: Settled = { fixed: [], selected: [] };
 let settledParts: Record<keyof Settled, PathItem[][]> = { fixed: [], selected: [] };
+let carried: Carried = { rest: [], items: [], by: UNMOVED };
 const NO_ITEMS: PathItem[] = [];
 let built = new Map<string, Built>();
 
@@ -77,11 +85,31 @@ function sameFields(a: Record<string, unknown>, b: Record<string, unknown>): boo
 
 const flatOnChange = (parts: PathItem[][], was: PathItem[][], items: PathItem[]) => (parts.length === was.length && parts.every((p, i) => p === was[i]) ? items : parts.flat());
 
-function zoomFree(o: Fixed): Settled {
-  if (fixedFor && FIXED_KEYS.every((k) => fixedFor![k] === o[k])) {
-    return settled;
+const near = (a: number, b: number) => Math.abs(a - b) <= SAME_PLACE;
+
+const placeFree = ({ x: _x, y: _y, turn, ...tile }: ChromeOnCanvas) => ({ ...tile, degrees: turn?.degrees });
+
+const pivotMovedBy = (t: ChromeOnCanvas, rest: ChromeOnCanvas, by: Shift) => !t.turn || !rest.turn || (near(t.turn.about.x - rest.turn.about.x, by.x) && near(t.turn.about.y - rest.turn.about.y, by.y));
+
+const movedBy = (t: ChromeOnCanvas, rest: ChromeOnCanvas, by: Shift) => sameFields(placeFree(t), placeFree(rest)) && near(t.x - rest.x, by.x) && near(t.y - rest.y, by.y) && pivotMovedBy(t, rest, by);
+
+function shiftOf(now: readonly ChromeOnCanvas[], rest: readonly ChromeOnCanvas[]): Shift | null {
+  if (now.length !== rest.length) {
+    return null;
   }
-  const kept = fixedFor?.theme === o.theme && fixedFor.glyphs === o.glyphs ? built : new Map<string, Built>();
+  if (!now.length) {
+    return UNMOVED;
+  }
+  const by = { x: now[0].x - rest[0].x, y: now[0].y - rest[0].y };
+  return now.every((t, i) => movedBy(t, rest[i], by)) ? by : null;
+}
+
+function zoomFree(o: Fixed): Settled & { carried: PathItem[]; by: Shift } {
+  if (fixedFor && FIXED_KEYS.every((k) => fixedFor![k] === o[k])) {
+    return { ...settled, carried: carried.items, by: carried.by };
+  }
+  const fresh = !(fixedFor?.theme === o.theme && fixedFor.glyphs === o.glyphs);
+  const kept = fresh ? new Map<string, Built>() : built;
   const next = new Map<string, Built>();
   const once = (key: string, from: Record<string, unknown>, make: () => PathItem[]) => {
     const old = kept.get(key);
@@ -97,20 +125,21 @@ function zoomFree(o: Fixed): Settled {
     const moving = picked.has(c.edge.source) || picked.has(c.edge.target);
     parts[moving ? 'selected' : 'fixed'].push(once(`wire:${c.edge.id}`, { look, curve: c.curve }, () => edgeItems(c.edge.id, c.curve, look, o.theme)));
   }
-  for (const t of o.chrome) {
-    const into = parts[picked.has(t.id) ? 'selected' : 'fixed'];
-    into.push(once(`chrome:${t.id}`, tileFields(t), () => turnedBy(layersOf(t).tile(t, o.glyphs), t.turn)));
-    into.push(drawsState(t) ? once(`state:${t.id}`, t, () => turnedBy(stateChrome(t, o.glyphs), t.turn)) : NO_ITEMS);
-  }
+  const chromeOf = (t: ChromeOnCanvas) => [once(`chrome:${t.id}`, tileFields(t), () => turnedBy(layersOf(t).tile(t, o.glyphs), t.turn)), drawsState(t) ? once(`state:${t.id}`, t, () => turnedBy(stateChrome(t, o.glyphs), t.turn)) : NO_ITEMS];
+  const pickedTile = (t: ChromeOnCanvas) => picked.has(t.owner ?? t.id);
+  o.chrome.filter((t) => !pickedTile(t)).forEach((t) => parts.fixed.push(...chromeOf(t)));
+  const lifted = o.chrome.filter(pickedTile);
+  const by = fresh ? null : shiftOf(lifted, carried.rest);
+  carried = by ? { ...carried, by } : { rest: lifted, items: lifted.flatMap(chromeOf).flat(), by: UNMOVED };
   built = next;
   settled = { fixed: flatOnChange(parts.fixed, settledParts.fixed, settled.fixed), selected: flatOnChange(parts.selected, settledParts.selected, settled.selected) };
   settledParts = parts;
-  return settled;
+  return { ...settled, carried: carried.items, by: carried.by };
 }
 
-export type CoreOverlay = { fixed: readonly PathItem[]; selected: readonly PathItem[]; live: readonly PathItem[] };
+export type CoreOverlay = { fixed: readonly PathItem[]; selected: readonly PathItem[]; carried: readonly PathItem[]; live: readonly PathItem[]; by: Shift };
 
-export const NO_OVERLAY: CoreOverlay = { fixed: [], selected: [], live: [] };
+export const NO_OVERLAY: CoreOverlay = { fixed: [], selected: [], carried: [], live: [], by: UNMOVED };
 
 export function overlayOf(o: WorldOverlay): CoreOverlay {
   return { ...zoomFree(o), live: liveItems(o) };

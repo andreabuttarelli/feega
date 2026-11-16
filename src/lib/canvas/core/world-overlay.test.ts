@@ -10,8 +10,8 @@ const edge = (over: Partial<{ id: string; source: string; target: string; mode: 
 const glyphs = ((text: string, size: number) => ({ contours: [[0, 0, size, 0, size, size]], width: text.length * size, height: size })) as never;
 const none = { peers: [], outlines: [], ghost: null, running: [], chrome: [], glyphs };
 const overlayOf = (o: WorldOverlay) => {
-  const { fixed, selected, live } = parts(o);
-  return [...fixed, ...selected, ...live];
+  const { fixed, selected, carried, live } = parts(o);
+  return [...fixed, ...selected, ...carried, ...live];
 };
 const curve = wireCurve({ x: 0, y: 0 }, { x: 100, y: 50 });
 
@@ -114,15 +114,60 @@ describe('world overlay, node by node', () => {
     expect(after.fixed.at(-1)).not.toBe(before.fixed.at(-1));
   });
 
-  it('moving a selected node hands back the same fixed part and a new selected part', () => {
+  it('moving a selected node hands back the same fixed part, its wires in the selected part and its chrome carried', () => {
     const base = { curves: [{ edge: edge({ source: 'b', target: 'c' }), curve }, { edge: edge({ id: 'f', source: 'a', target: 'c' }), curve }], selected: ['b'], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none };
     const before = parts({ ...base, chrome: [tile('a', 0), tile('b', 200)] });
-    const after = parts({ ...base, curves: [{ edge: edge({ source: 'b', target: 'c' }), curve: { ...curve } }, base.curves[1]], chrome: [tile('a', 0), tile('b', 300)] });
+    const after = parts({ ...base, curves: [{ edge: edge({ source: 'b', target: 'c' }), curve: { ...curve, to: { x: 1, y: 1 } } }, base.curves[1]], chrome: [tile('a', 0), tile('b', 300)] });
 
     expect(after.fixed).toBe(before.fixed);
     expect(after.selected).not.toBe(before.selected);
-    expect(after.selected.map((i) => i.clip.split(':')[0])).toContain('b');
+    expect(after.selected.map((i) => i.clip)).toEqual(['e:wire']);
+    expect(after.carried.map((i) => i.clip.split(':')[0])).toContain('b');
     expect(after.fixed.some((i) => i.clip.startsWith('b:'))).toBe(false);
+  });
+
+  it('moving a multi-selection carries its chrome by the offset, without building it again', () => {
+    const base = { curves: [], selected: ['a', 'b'], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none };
+    const before = parts({ ...base, chrome: [tile('a', 0), tile('b', 200), tile('c', 400)] });
+    const after = parts({ ...base, chrome: [tile('a', 30.7), tile('b', 230.7), tile('c', 400)] });
+
+    expect(after.carried).toBe(before.carried);
+    expect(after.carried.map((i) => i.clip.split(':')[0])).toEqual(expect.arrayContaining(['a', 'b']));
+    expect(after.by.x).toBeCloseTo(30.7, 9);
+    expect(after.by.y).toBe(0);
+    expect(after.fixed).toBe(before.fixed);
+  });
+
+  it('a carried selection draws where a fresh build at its new place would', () => {
+    const base = { curves: [], selected: ['a', 'b'], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none };
+    parts({ ...base, chrome: [tile('a', 0), tile('b', 200)] });
+    const moved = parts({ ...base, chrome: [tile('a', 30.7), tile('b', 230.7)] });
+    const placed = moved.carried.flatMap((i) => i.contours.flatMap((c) => c.map((v, k) => v + (k % 2 ? moved.by.y : moved.by.x))));
+    const fresh = parts({ ...base, theme: { ...theme }, chrome: [tile('a', 30.7), tile('b', 230.7)] });
+
+    expect(fresh.by).toEqual({ x: 0, y: 0 });
+    expect(placed).toHaveLength(fresh.carried.flatMap((i) => i.contours.flat()).length);
+    fresh.carried.flatMap((i) => i.contours.flat()).forEach((v, k) => expect(placed[k]).toBeCloseTo(v, 9));
+  });
+
+  it('carries the breakpoint views of a selected node with it and leaves the fixed part alone', () => {
+    const base = { curves: [], selected: ['a'], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none };
+    const view = (x: number) => ({ ...tile('a@bp:tablet', x), owner: 'a' });
+    const before = parts({ ...base, chrome: [tile('a', 0), view(150), tile('c', 400)] });
+    const after = parts({ ...base, chrome: [tile('a', 20), view(170), tile('c', 400)] });
+
+    expect(after.fixed).toBe(before.fixed);
+    expect(after.carried).toBe(before.carried);
+    expect(after.carried.some((i) => i.clip.startsWith('a@bp:tablet:'))).toBe(true);
+  });
+
+  it('builds a selection again at its place when its nodes did not all move alike', () => {
+    const base = { curves: [], selected: ['a', 'b'], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none };
+    const before = parts({ ...base, chrome: [tile('a', 0), tile('b', 200)] });
+    const after = parts({ ...base, chrome: [tile('a', 30), tile('b', 240)] });
+
+    expect(after.carried).not.toBe(before.carried);
+    expect(after.by).toEqual({ x: 0, y: 0 });
   });
 
   it('a zoom frame that rebuilds equal chrome compares it without serialising', () => {
@@ -152,7 +197,7 @@ describe('world overlay across stroke zoom steps', () => {
   it('builds again only the ring and handles of a selected node, not its label and ports', () => {
     const before = parts({ ...base, selected: ['f'], chrome: [frame(1, NodeChrome.Selected)] });
     const after = parts({ ...base, selected: ['f'], chrome: [frame(1.04, NodeChrome.Selected)] });
-    const kept = (clip: string) => after.selected.find((i) => i.clip === clip) === before.selected.find((i) => i.clip === clip);
+    const kept = (clip: string) => after.carried.find((i) => i.clip === clip) === before.carried.find((i) => i.clip === clip);
 
     expect(kept('f:label')).toBe(true);
     expect(kept('f:port-out')).toBe(true);

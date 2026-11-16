@@ -180,6 +180,17 @@ describe('the live overlay on the native engine', () => {
 
     expect(calls.filter(([name]) => name === 'setOverlay').at(-1)).toEqual(['setOverlay', '[{"a":1},{"c":3},{"b":2}]']);
   });
+
+  it('draws the carried part at its offset, above the selected part', () => {
+    const { bridge, calls } = fakeBridge();
+    const core = attachedOf(bridge, rgba);
+
+    core.set_selected_overlay('[{"c":3}]');
+    core.set_carried_overlay('[{"d":4,"matrix":[1,0,0,1,10,20]}]');
+    core.carry_overlay(5, -2);
+
+    expect(calls.filter(([name]) => name === 'setOverlay').at(-1)).toEqual(['setOverlay', '[{"c":3},{"d":4,"matrix":[1,0,0,1,15,18]}]']);
+  });
 });
 
 describe('an app release older or newer than the web app', () => {

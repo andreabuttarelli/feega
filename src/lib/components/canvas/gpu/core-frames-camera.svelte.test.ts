@@ -27,6 +27,7 @@ vi.mock('@feega/motion-core/motion/gpu-full/core-web', () => ({
       setCamera: (x: number, y: number, zoom: number) => calls.cameras.push([x, y, zoom]),
       patchUses: (patch: unknown) => calls.patches.push(patch),
       setOverlay: (part: string) => (calls.overlays++, calls.parts.push(part)),
+      carryOverlay: () => undefined,
       frame: () => {
         calls.frames++;
         return { outcome: 'reused', pending: false };
@@ -103,13 +104,13 @@ describe('CoreFrames camera', () => {
     const wire = { kind: 'path', clip: 'e:wire', contours: [[0, 0, 10, 0]], rule: 'nonzero', paint: { kind: 'solid', color: [0, 0, 0, 1] }, opacity: 1, matrix: [1, 0, 0, 1, 0, 0] };
     const fixed = [wire];
     const selected: unknown[] = [];
-    const props = $state({ frames: [], cards: [card], overlay: { fixed, selected, live: [] as unknown[] }, view: { x: 0, y: 0, zoom: 1 }, area: { width: 100, height: 80 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
+    const props = $state({ frames: [], cards: [card], overlay: { fixed, selected, carried: [] as unknown[], live: [] as unknown[], by: { x: 0, y: 0 } }, view: { x: 0, y: 0, zoom: 1 }, area: { width: 100, height: 80 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
     app = mount(CoreFrames, { target: document.body, props: props as never });
     flushSync();
     await vi.waitFor(() => expect(calls.parts).toContain('fixed'));
     calls.parts.length = 0;
 
-    props.overlay = { fixed, selected, live: [{ ...wire, clip: 'n:hover' }] };
+    props.overlay = { fixed, selected, carried: [], live: [{ ...wire, clip: 'n:hover' }], by: { x: 0, y: 0 } };
     flushSync();
 
     await vi.waitFor(() => expect(calls.parts).toEqual(['live']));
@@ -253,14 +254,14 @@ describe('CoreFrames camera', () => {
     const fixed: unknown[] = [];
     const live: unknown[] = [];
     const selected: unknown[] = [];
-    const props = $state({ frames: [], cards: manyCards(), overlay: { fixed, selected, live }, view: { x: 0, y: 0, zoom: 1 }, area: { width: 400, height: 300 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
+    const props = $state({ frames: [], cards: manyCards(), overlay: { fixed, selected, carried: [], live, by: { x: 0, y: 0 } }, view: { x: 0, y: 0, zoom: 1 }, area: { width: 400, height: 300 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
     app = mount(CoreFrames, { target: document.body, props: props as never });
     flushSync();
     await vi.waitFor(() => expect(calls.patches.length).toBeGreaterThan(0));
     await settled();
     const frames = calls.frames;
 
-    props.overlay = { fixed, selected, live };
+    props.overlay = { fixed, selected, carried: [], live, by: { x: 0, y: 0 } };
     flushSync();
 
     await vi.waitFor(() => expect(calls.frames).toBeGreaterThan(frames));

@@ -12,7 +12,8 @@ enum Gesture {
   Zoom = 'zoom',
   Fit = 'fit',
   Drag = 'drag',
-  DragElement = 'drag-element'
+  DragElement = 'drag-element',
+  MoveSelection = 'move-selection'
 }
 
 enum Edit {
@@ -222,12 +223,34 @@ async function dragElement(page: Page, until: number) {
   return moves;
 }
 
+const MARQUEE_FROM = { x: 0.08, y: 0.12 };
+const MARQUEE_TO = { x: 0.85, y: 0.85 };
+const MARQUEE_STEPS = 60;
+const MARQUEE_SETTLE_MS = 600;
+
+async function marqueeOnScreen(page: Page): Promise<string> {
+  const from = { x: VIEWPORT.width * MARQUEE_FROM.x, y: VIEWPORT.height * MARQUEE_FROM.y };
+  const to = { x: VIEWPORT.width * MARQUEE_TO.x, y: VIEWPORT.height * MARQUEE_TO.y };
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: MARQUEE_STEPS });
+  await page.mouse.up();
+  await page.waitForTimeout(MARQUEE_SETTLE_MS);
+  const inside = (await tiles(page)).filter((t) => t.x > from.x && t.y > from.y && t.x + t.w < to.x && t.y + t.h < to.y && reachable(t));
+  if (inside.length < 2) {
+    throw new Error(`move-selection: the marquee caught ${inside.length} nodes`);
+  }
+  console.log(`move-selection: ${inside.length} nodes in the marquee`);
+  return inside[0].id;
+}
+
 const GESTURES: Record<Gesture, (page: Page, until: number, aim?: string) => Promise<number | void>> = {
   [Gesture.Pan]: wheelPan,
   [Gesture.Zoom]: zoom,
   [Gesture.Fit]: fit,
   [Gesture.Drag]: drag,
-  [Gesture.DragElement]: dragElement
+  [Gesture.DragElement]: dragElement,
+  [Gesture.MoveSelection]: drag
 };
 
 type Seen = { gaps: number[]; taskMs: number; moves: number };
@@ -239,7 +262,8 @@ async function taskSeconds(cdp: CDPSession): Promise<number> {
 
 const SETUP: Partial<Record<Gesture, (page: Page) => Promise<string>>> = {
   [Gesture.Drag]: zoomOntoFrame,
-  [Gesture.DragElement]: selectContainer
+  [Gesture.DragElement]: selectContainer,
+  [Gesture.MoveSelection]: marqueeOnScreen
 };
 
 async function gaps(page: Page, cdp: CDPSession, gesture: Gesture): Promise<Seen> {

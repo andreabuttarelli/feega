@@ -8,7 +8,7 @@ import { SentOverlay, SentParts, SentUses } from './use-diff';
 
 describe('sent parts during a gesture', () => {
   const item = (id: string) => ({ id }) as unknown as PathItem;
-  const overlay = (fixed: PathItem[], live: PathItem[]): CoreOverlay => ({ fixed, selected: [], live });
+  const overlay = (fixed: PathItem[], live: PathItem[]): CoreOverlay => ({ fixed, selected: [], carried: [], live, by: { x: 0, y: 0 } });
 
   it('sends the labels part but holds the live part while the camera moves', () => {
     const sent = new SentParts();
@@ -16,6 +16,22 @@ describe('sent parts during a gesture', () => {
 
     expect(sent.changed(overlay([item('b')], [item('h')]), CoreMotion.Gesture)).toEqual([OverlayPart.Fixed]);
     expect(sent.changed(overlay([item('b')], [item('h')]), CoreMotion.Still)).toEqual([OverlayPart.Live]);
+  });
+});
+
+describe('sent carry', () => {
+  const carried = [{ kind: 'path', clip: 'a:ring', matrix: [1, 0, 0, 1, 0, 0] } as unknown as PathItem];
+  const at = (x: number, y: number): CoreOverlay => ({ fixed: [], selected: [], carried, live: [], by: { x, y } });
+
+  it('hands the offset of the carried part over only when it moved, and no part with it', () => {
+    const sent = new SentParts();
+    sent.changed(at(0, 0), CoreMotion.Still);
+
+    expect(sent.carry(at(0, 0))).toBeNull();
+    expect(sent.changed(at(30, 5), CoreMotion.Still)).toEqual([]);
+    expect(sent.carry(at(30, 5))).toEqual({ x: 30, y: 5 });
+    expect(sent.carry(at(30, 5))).toBeNull();
+    expect(sent.carry(at(0, 0))).toEqual({ x: 0, y: 0 });
   });
 });
 

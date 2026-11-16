@@ -24,6 +24,7 @@ export type NativeCanvasBridge = {
   close: () => void;
 };
 
+type Placed = { matrix: number[] };
 type ToRgba = (source: unknown, width: number, height: number) => ArrayBuffer;
 type Told = { report: string; pending: boolean; cacheBytes: number };
 
@@ -48,8 +49,10 @@ export function attachedOf(bridge: NativeCanvasBridge, toRgba: ToRgba): Attached
   const known = new Set<string>();
   let wanted: NativeCamera | null = null;
   let sent: NativeCamera | null = null;
-  const overlay = { fixed: [] as unknown[], selected: [] as unknown[], live: [] as unknown[] };
-  const sendOverlay = () => bridge.setOverlay(JSON.stringify([...overlay.fixed, ...overlay.selected, ...overlay.live]));
+  const overlay = { fixed: [] as unknown[], selected: [] as unknown[], carried: [] as Placed[], live: [] as unknown[] };
+  let by = { x: 0, y: 0 };
+  const carriedAt = () => overlay.carried.map((i) => ({ ...i, matrix: [i.matrix[0], i.matrix[1], i.matrix[2], i.matrix[3], i.matrix[4] + by.x, i.matrix[5] + by.y] }));
+  const sendOverlay = () => bridge.setOverlay(JSON.stringify([...overlay.fixed, ...overlay.selected, ...carriedAt(), ...overlay.live]));
 
   return {
     draw: () => {
@@ -65,6 +68,14 @@ export function attachedOf(bridge: NativeCanvasBridge, toRgba: ToRgba): Attached
     },
     set_selected_overlay: (items) => {
       overlay.selected = JSON.parse(items);
+      sendOverlay();
+    },
+    set_carried_overlay: (items) => {
+      overlay.carried = JSON.parse(items);
+      sendOverlay();
+    },
+    carry_overlay: (x, y) => {
+      by = { x, y };
       sendOverlay();
     },
     set_live_overlay: (items) => {

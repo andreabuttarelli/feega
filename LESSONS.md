@@ -86,6 +86,10 @@ Signal: with the pointer still over a frame, a wheel zoom makes its hover outlin
 ### Tiles turn sharp slowly after a zoom-in: count paints per tile, not ms per tile
 **Signal:** zoomed far in, every tile costs ~3 ms whatever its size (one tile or a 2×2 block cost the same), almost all in `layers::prepare_items`, and the layer cache never hits. **Move:** log, per `raster_batch`, the number of `Surface::paint` calls by `Reason` and the clip of each layer-worthy item. A tile paying for layers it does not show is the defect: on the landings fixture ten of twelve were groups emptied by `Laying::lay` that still carried an SVG effect filter (no bounds, so never culled, so a full-tile body, mask and filter). A cost fixed per draw also means bigger batches are nearly free on the CPU; measure the GPU side by frames over 11 ms before growing them.
 
+### Moving a selection costs as much as every unselected node: read what crosses into wasm per move
+
+**Signal:** marquee + move runs at 40-80 fps; the CPU profile is led by `setOverlay` (`JSON.stringify`, `encode`, `set_overlay` in wasm), and the setter that is hot is the fixed part's, not the selected one's. **Move:** wrap `TextEncoder.prototype.encode` in an init script and log, per call during the drag, the payload size and its first `clip`s. On 2026-11-16 the fixed part (1.5 MB, every unselected label) crossed on every move because a selected node's breakpoint views (`<id>@bp:<bp>`) were not counted as selected; diffing two consecutive fixed payloads item by item named them in one run.
+
 ## Providers
 
 ### Kie publishes its price list and its request schemas, you just have to find them

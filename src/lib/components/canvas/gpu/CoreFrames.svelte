@@ -1387,6 +1387,10 @@
     for (const part of sentOverlay.changed(overlay, motion)) {
       into.setOverlay(part, overlay[part]);
     }
+    const carried = sentOverlay.carry(overlay);
+    if (carried) {
+      into.carryOverlay(carried.x, carried.y);
+    }
     const at = deviceView();
     into.setMotion?.(motion);
     into.setCamera(at.x, at.y, at.zoom);

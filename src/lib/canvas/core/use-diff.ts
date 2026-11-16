@@ -2,7 +2,7 @@ import type { Use, UsePatch } from '@feega/motion-core/motion/gpu-full/core-web'
 import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import { OverlayPart } from '@feega/motion-core/motion/gpu-full/core-overlay';
 import { CoreMotion } from '@feega/motion-core/motion/gpu-full/core-web';
-import type { CoreOverlay } from './world-overlay';
+import type { CoreOverlay, Shift } from './world-overlay';
 
 const same = (a: Use, b: Use) => a.group === b.group && Boolean(a.cache) === Boolean(b.cache) && Boolean(a.hold) === Boolean(b.hold) && a.matrix.every((v, i) => v === b.matrix[i]);
 
@@ -37,10 +37,11 @@ export class SentOverlay {
   }
 }
 
-const LIVE_CAMERA_PARTS: ReadonlySet<OverlayPart> = new Set([OverlayPart.Fixed, OverlayPart.Selected]);
+const LIVE_CAMERA_PARTS: ReadonlySet<OverlayPart> = new Set([OverlayPart.Fixed, OverlayPart.Selected, OverlayPart.Carried]);
 
 export class SentParts {
   #parts = new Map(Object.values(OverlayPart).map((p) => [p, new SentOverlay()]));
+  #by: Shift = { x: 0, y: 0 };
 
   waiting(overlay: CoreOverlay): boolean {
     return [...this.#parts].some(([part, sent]) => sent.waiting(overlay[part]));
@@ -49,6 +50,14 @@ export class SentParts {
   changed(overlay: CoreOverlay, motion: CoreMotion): OverlayPart[] {
     const due = motion === CoreMotion.Still ? [...this.#parts] : [...this.#parts].filter(([part]) => LIVE_CAMERA_PARTS.has(part));
     return due.filter(([part, sent]) => sent.changed(overlay[part])).map(([part]) => part);
+  }
+
+  carry(overlay: CoreOverlay): Shift | null {
+    if (overlay.by.x === this.#by.x && overlay.by.y === this.#by.y) {
+      return null;
+    }
+    this.#by = overlay.by;
+    return overlay.by;
   }
 }
 
