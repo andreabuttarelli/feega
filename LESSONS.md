@@ -90,6 +90,10 @@ Signal: with the pointer still over a frame, a wheel zoom makes its hover outlin
 
 **Signal:** marquee + move runs at 40-80 fps; the CPU profile is led by `setOverlay` (`JSON.stringify`, `encode`, `set_overlay` in wasm), and the setter that is hot is the fixed part's, not the selected one's. **Move:** wrap `TextEncoder.prototype.encode` in an init script and log, per call during the drag, the payload size and its first `clip`s. On 2026-11-16 the fixed part (1.5 MB, every unselected label) crossed on every move because a selected node's breakpoint views (`<id>@bp:<bp>`) were not counted as selected; diffing two consecutive fixed payloads item by item named them in one run.
 
+### The first zoom after a load stalls: read the engine counters before blaming the GPU
+
+**Signal:** one 50-500 ms gap early in the first gesture after every cold load. **Move:** reset `window.__gpuCanvas.tally` and `.frames` at the gesture start and read them after it. On the direct path a first frame whose `ms` equals its `bakeMs` is `direct_frame` building the held scene; on the tile path a long frame with a small `bakeMs` and a `fallback` tally of 40-60 ms per render is `serve_bare` drawing the never-blurry fallback. Only when the renderer's frame is short and the gap stays, trace `disabled-by-default-gpu.dawn,disabled-by-default-gpu.service,gpu`: `DeviceBase::APICreateRenderPipeline` is a pipeline wgpu creates on first use (on the web it calls the synchronous `createRenderPipeline`), `IOSurfaceImageBacking::WaitForCommandsToBeScheduled::Dawn` is the swap waiting on a large submission. The default categories show neither. On 2026-11-16 warming the pipelines and sizing the first bake batch moved nothing once the held scene and the fallback were in the frame.
+
 ## Providers
 
 ### Kie publishes its price list and its request schemas, you just have to find them

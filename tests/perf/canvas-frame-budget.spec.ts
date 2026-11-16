@@ -5,7 +5,7 @@ import { loadavg } from 'node:os';
 import { test, expect, chromium, type Browser, type CDPSession, type Page } from '@playwright/test';
 import { instrument, wheelPan } from '../e2e/fixtures/frame-sweeps';
 import { LANDINGS_FIXTURE_PLACE } from '../../scripts/perf/landings-fixture.mjs';
-import { budgetOf, editBudgetOf, EDIT_BUDGET_MS, FRAME_BUDGET_MS, Rate } from '../../scripts/perf/frame-budget';
+import { budgetMs, budgetOf, editBudgetOf, EDIT_BUDGET_MS, FRAME_BUDGET_MS, Rate } from '../../scripts/perf/frame-budget';
 
 enum Gesture {
   Pan = 'pan',
@@ -333,6 +333,47 @@ for (const target of TARGETS) {
     writeFileSync(join(OUT, `frame-budget-${target}.json`), JSON.stringify(report, null, 2));
     console.table(Object.fromEntries(Object.entries(report).map(([g, { at120, ...at90 }]) => [g, { ...at90, p95at120: at120.p95, overAt120: at120.overShare, passedAt120: at120.passed }])));
     expect(Object.entries(report).filter(([, r]) => !r.passed).map(([g]) => g)).toEqual([]);
+  });
+}
+
+const COLD_LOADS = Number(process.env.BUDGET_COLD_LOADS ?? 5);
+const FIRST_ZOOM_TICKS = 16;
+const ONE_MISSED_VSYNC_MS = 2 * budgetMs(Rate.ProMotion);
+
+async function firstZoomWorst(browser: Browser, target: Target): Promise<number> {
+  const { base, place, login: needsLogin } = PLACES[target];
+  const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 2, serviceWorkers: 'block' });
+  const page = await context.newPage();
+  await page.addInitScript(instrument);
+  if (needsLogin) {
+    await login(page, base);
+  }
+  await page.goto(`${base}/p/${place.projectId}/c/${place.canvasId}`, { waitUntil: 'commit' });
+  await page.locator('[data-canvas-surface]').first().waitFor({ timeout: 120_000 });
+  await page.waitForTimeout(SETTLE_MS);
+  await page.mouse.move(VIEWPORT.width / 2, VIEWPORT.height / 2);
+  await page.evaluate(() => Object.assign((window as unknown as { __frames: object }).__frames, { gaps: [], work: [], counting: true }));
+  await page.keyboard.down('Control');
+  for (let i = 0; i < FIRST_ZOOM_TICKS; i++) {
+    await page.mouse.wheel(0, -ZOOM_WHEEL_PX);
+    await nextFrame(page);
+  }
+  await page.keyboard.up('Control');
+  const seen = await page.evaluate(() => (window as unknown as { __frames: { gaps: number[] } }).__frames.gaps);
+  await context.close();
+  return Math.max(...seen);
+}
+
+for (const target of TARGETS) {
+  test(`the first zoom after a cold load misses at most one vsync on ${target}`, async () => {
+    const browser = await chromium.launch({ headless: false, args: UNCAPPED });
+    const worst: number[] = [];
+    for (let i = 0; i < COLD_LOADS; i++) {
+      worst.push(Math.round(await firstZoomWorst(browser, target)));
+    }
+    await browser.close();
+    console.log(`first zoom worst gap per cold load on ${target}: ${worst.join(' ')} ms`);
+    expect(worst.filter((ms) => ms > ONE_MISSED_VSYNC_MS)).toEqual([]);
   });
 }
 
