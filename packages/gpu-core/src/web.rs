@@ -121,6 +121,7 @@ pub struct WebCore {
     part_seen: Seen,
     part_background: Option<crate::display_list::Rgba>,
     part_epoch: u64,
+    drew_direct: bool,
     lacking: rustc_hash::FxHashSet<String>,
 }
 
@@ -420,7 +421,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), sharpness: Sharpness::default(), fallback: Vec::new(), ahead: None, fallback_was: camera, born: FxHashMap::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 }, gesture_draw: GestureDraw::Tiles, direct: None, parts: Parts::default(), part_seen: Seen { on_screen: Vec::new(), near: Vec::new() }, part_background: None, part_epoch: u64::MAX, lacking: Default::default() })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), sharpness: Sharpness::default(), fallback: Vec::new(), ahead: None, fallback_was: camera, born: FxHashMap::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 }, gesture_draw: GestureDraw::Tiles, direct: None, parts: Parts::default(), part_seen: Seen { on_screen: Vec::new(), near: Vec::new() }, part_background: None, part_epoch: u64::MAX, drew_direct: false, lacking: Default::default() })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -1094,8 +1095,9 @@ impl WebCore {
             self.adopted = None;
         }
         let moving = matches!(self.motion, CoreMotion::Gesture);
-        let moment = || Moment { gesture: moving, lifting: self.compositor.holding() || !self.compositor.lifts(&self.library).is_empty(), settling: self.adopted.is_none() && self.drew_tiles && self.tiles_show_all(), draw: self.gesture_draw };
+        let moment = || Moment { gesture: moving, lifting: self.compositor.holding() || !self.compositor.lifts(&self.library).is_empty(), settling: (self.adopted.is_none() && self.drew_tiles && self.tiles_show_all()) || (self.drew_direct && self.adopted != Some(self.camera)), draw: self.gesture_draw };
         let path = path_for(moment());
+        self.drew_direct = path == Path::Direct;
         if path == Path::Direct {
             self.drew_tiles = false;
             return self.direct_frame(now_ms);

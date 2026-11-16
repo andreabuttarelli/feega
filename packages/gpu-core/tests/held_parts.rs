@@ -19,7 +19,9 @@ fn a_view_is_fresh_near_where_it_was_built_and_stale_before_it_is_gone() {
     assert_eq!(Freshness::of(&view, at(-20.0, 10.0, 1.05), SCREEN), Freshness::Fresh);
     assert_eq!(Freshness::of(&view, at(0.0, 0.0, 1.35), SCREEN), Freshness::Stale);
     assert_eq!(Freshness::of(&view, at(-200.0, 0.0, 1.0), SCREEN), Freshness::Stale);
-    assert_eq!(Freshness::of(&view, at(0.0, 0.0, 1.6), SCREEN), Freshness::Gone);
+    assert_eq!(Freshness::of(&view, at(0.0, 0.0, 1.6), SCREEN), Freshness::Stale);
+    assert_eq!(Freshness::of(&view, at(-400.0, 0.0, 1.0), SCREEN), Freshness::Gone);
+    assert_eq!(Freshness::of(&view, at(150.0, 90.0, 0.6), SCREEN), Freshness::Gone);
 }
 
 #[test]
@@ -27,7 +29,7 @@ fn a_page_on_screen_without_a_usable_scene_must_be_built_this_frame() {
     let mut parts: Parts<()> = Parts::default();
     parts.put("a", HeldView::around(at(0.0, 0.0, 1.0), SCREEN), (), 0);
 
-    let work = parts.work(&seen(&["a", "b"], &[]), at(0.0, 0.0, 1.7), SCREEN, 0);
+    let work = parts.work(&seen(&["a", "b"], &[]), at(-400.0, 0.0, 1.0), SCREEN, 0);
 
     assert_eq!(work.now, vec!["a".to_string(), "b".to_string()]);
     assert!(work.later.is_empty());

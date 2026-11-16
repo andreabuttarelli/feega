@@ -19,7 +19,7 @@ pub enum Freshness {
 
 impl Freshness {
     pub fn of(view: &HeldView, now: Camera, screen: (u32, u32)) -> Freshness {
-        if !view.holds(now, screen) {
+        if !view.covers(now, screen, 0.0) {
             return Freshness::Gone;
         }
         if FRESH_ZOOM.contains(&view.ratio(now)) && view.covers(now, screen, FRESH_INSET_SHARE) {

@@ -12,7 +12,7 @@ use crate::scene::{alone, bounds, build_items, build_where, cover, layer_worthy,
 const UNIT_SPACE: [f64; 4] = [1.0, 0.0, 0.0, 1.0];
 const REACH: f64 = 3.0;
 const SLACK: f64 = 2.0;
-const HELD_SIDE: f64 = 4096.0;
+const HELD_SIDE: f64 = 2048.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Effects {

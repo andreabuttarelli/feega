@@ -101,6 +101,9 @@ test('direct zoom on the user canvas copy', async () => {
     return { n: f.length, ms50: p(sorted('ms'), 0.5), ms95: p(sorted('ms'), 0.95), msMax: p(sorted('ms'), 0.999), bake50: p(sorted('bakeMs'), 0.5), bake95: p(sorted('bakeMs'), 0.95), bakes: per('bakes'), plans: per('plans'), tiles: per('tiles'), unsharp: per('unsharp') };
   });
   console.log(`core ${JSON.stringify(core)}`);
+  const long = t.slice(1).map((x, i) => [x - t[i], t[i] - t[0]]).filter(([g]) => g > 50).map(([g, at]) => `${g.toFixed(0)}@${at.toFixed(0)}`);
+  const slowCore = await page.evaluate((from) => ((window as unknown as { __gpuCanvas?: { frames?: { at: number; ms: number; moving: boolean; bakes: number }[] } }).__gpuCanvas?.frames ?? []).filter((f) => f.ms > 30).map((f) => `${f.ms.toFixed(0)}@${(f.at - from).toFixed(0)}${f.moving ? 'm' : 's'}`), t[0]);
+  console.log(`longgaps ${long.join(' ')} slowcore ${slowCore.join(' ')}`);
   console.log(`canvasdata ${JSON.stringify(await page.evaluate(() => ({ ...(document.querySelector('[data-testid=core-canvas]') as HTMLElement | null)?.dataset })))}`);
   if (casting) {
     await cdp.send('Page.stopScreencast');
