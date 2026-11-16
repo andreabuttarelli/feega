@@ -50,7 +50,7 @@ describe('custom effect tools of the motion agent', () => {
     const { effects } = (await run('list_effects', {})) as { effects: { name: string }[] };
 
     expect(effects[0]).toMatchObject({ effect_id: 'eff-1', name: 'dim', state: 'passed', cost_ms: 2 });
-    expect(effects.map((e) => e.name)).toEqual(['dim', 'ember-field', 'voice-orb', 'petal-field']);
+    expect(effects.map((e) => e.name)).toEqual(['dim', 'ember-field', 'voice-orb']);
   });
 
   it('a library shader goes on a clip and its source travels in the doc', async () => {

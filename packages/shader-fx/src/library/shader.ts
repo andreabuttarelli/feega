@@ -2,8 +2,7 @@ import type { EffectInput, ShaderParam } from '../effect';
 
 export enum LibraryGenre {
   Field = 'field',
-  Orb = 'orb',
-  Bloom = 'bloom'
+  Orb = 'orb'
 }
 
 export type LibraryShader = EffectInput & { genre: LibraryGenre; description: string };

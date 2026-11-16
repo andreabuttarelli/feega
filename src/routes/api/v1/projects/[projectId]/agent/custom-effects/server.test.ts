@@ -34,7 +34,7 @@ describe('GET /api/v1/projects/[projectId]/agent/custom-effects', () => {
     const { body } = await call({ id: 'user-1' });
 
     const names = body.effects.map((e: { name: string }) => e.name);
-    expect(names).toEqual(['vhs', 'ember-field', 'voice-orb', 'petal-field']);
+    expect(names).toEqual(['vhs', 'ember-field', 'voice-orb']);
     expect(body.effects[1]).toMatchObject({ id: 'library-ember-field', check: { state: 'passed' } });
   });
 

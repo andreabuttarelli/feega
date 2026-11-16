@@ -58,6 +58,6 @@ describe('effectStore library', () => {
 
     const listed = await effectStore({ db: fake.db, orgId: 'org-1', actor, gl: null }).list();
 
-    expect(listed?.map((e) => e.name)).toEqual(['vhs', 'ember-field', 'voice-orb', 'petal-field']);
+    expect(listed?.map((e) => e.name)).toEqual(['vhs', 'ember-field', 'voice-orb']);
   });
 });

@@ -17,8 +17,7 @@ const easeInOut = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x 
 const smooth = (a: number, b: number, x: number) => easeInOut(Math.min(1, Math.max(0, (x - a) / (b - a))));
 
 const DRIVERS: Record<string, (t: number) => Record<string, number>> = {
-  'voice-orb': (t) => ({ state: smooth(1.6, 2.3, t) + smooth(3.7, 4.3, t), energy: 0.75 }),
-  'petal-field': (t) => ({ pointer_x: 0.2 + 0.6 * smooth(0, 6, t), pointer_y: 0.5 + 0.22 * Math.sin(t * 1.1) })
+  'voice-orb': (t) => ({ state: smooth(1.6, 2.3, t) + smooth(3.7, 4.3, t), energy: 0.75 })
 };
 
 function frameAt(shader: LibraryShader, time: number): Frame {
