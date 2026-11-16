@@ -18,6 +18,7 @@ import { chromiumExport, chromiumFrames } from '$lib/server/motion/chromium-fram
 import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { posterSecond } from '$lib/motion/poster-time';
 import { libsOrigin } from '$lib/server/motion/libs-origin';
+import { withShapedText } from '$lib/server/motion/shaped-compose';
 import { everyClip } from '@feega/motion-core/motion/doc';
 import { similarity } from '$lib/server/web/ui-fidelity';
 
@@ -30,16 +31,16 @@ const SETTLE_MS = 400;
 const TARGET_SCORE = 0.9;
 const FLOOR_MARGIN = 0.02;
 const MEASURED: Record<string, number> = {
-  'landing:base': 0.7646,
+  'landing:base': 0.7854,
   'landing:tablet': 0.6609,
-  'landing:phone': 0.6337,
-  'hero-phone:base': 0.9362,
-  'hero-phone:phone': 0.8469,
+  'landing:phone': 0.7698,
+  'hero-phone:base': 0.9962,
+  'hero-phone:phone': 0.9659,
   'features-grid:base': 0.9838,
   'features-grid:tablet': 0.9598,
   'features-grid:phone': 0.8798,
-  'component-main-override:base': 0.9362,
-  'component-main-override:phone': 0.6872
+  'component-main-override:base': 0.9962,
+  'component-main-override:phone': 0.7321
 };
 const floorOf = (fixture: string, view: string) => (MEASURED[`${fixture}:${view}`] ?? TARGET_SCORE) - (`${fixture}:${view}` in MEASURED ? FLOOR_MARGIN : 0);
 const OVERFLOW_WIDTHS = [320, 390, 414, 600, 720, 810, 900, 1100];
@@ -125,7 +126,7 @@ const wordsOf = (text: string) => text.replace(/\s+/g, '');
 async function canvasBoxes(doc: MotionDoc): Promise<Seen[]> {
   const page = await chromiumExport.open({ width: doc.width, height: doc.height, scale: 1 });
   try {
-    await page.load(composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {}, origin: libsOrigin() }));
+    await page.load(composeHtml(await withShapedText({ doc, tokens: FEEGA_TOKENS, assets: {}, origin: libsOrigin() })));
     await page.seek(posterSecond(doc));
     const texts = everyClip(doc).filter((c) => typeof c.props.text === 'string' && c.props.text.trim() && !c.hidden);
     const seen: Seen[] = [];
