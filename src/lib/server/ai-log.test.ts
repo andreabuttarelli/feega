@@ -17,7 +17,6 @@ import {
 } from './ai-log';
 import { GEMINI_FLASH, NANO_BANANA_PRO } from './google-models';
 
-const GO = 'go';
 
 // The two image-call expectations are real billed receipts from live Nano Banana Pro calls
 // (2026-07-13): usageMetadata captured via the API, cost cross-checked against the official
@@ -108,11 +107,11 @@ describe('computeCostUsd', () => {
     ).toBeNull();
   });
 
-  it('prices a Nano Banana Pro render (text-only prompt) at the Go share', () => {
+  it('prices a Nano Banana Pro render (text-only prompt) at full list', () => {
     const cost = computeCostUsd({
       label: 'renderImage', provider: 'llm', model: NANO_BANANA_PRO, ms: 0, ok: true,
       inputTokens: 35, outputTokens: 1229, thinkingTokens: 156, imageOutputTokens: 1120
-    }, GO);
+    });
     // List: 35×2 + 156×12 + 109×12 + 1120×120 (per 1M) = $0.13765, billed in full
     expect(cost).toBeCloseTo(0.13765, 4);
   });
@@ -121,20 +120,18 @@ describe('computeCostUsd', () => {
     const cost = computeCostUsd({
       label: 'renderImage', provider: 'llm', model: NANO_BANANA_PRO, ms: 0, ok: true,
       inputTokens: 539, outputTokens: 1252, thinkingTokens: 128, imageOutputTokens: 1120
-    }, GO);
+    });
     // List: 539×2 + 128×12 + 132×12 + 1120×120 (per 1M) = $0.138598, billed in full
     expect(cost).toBeCloseTo(0.1386, 4);
   });
 
-  it('leaves Nano Banana 2 at full list regardless of plan', () => {
+  it('leaves Nano Banana 2 at full list', () => {
     const entry = {
       label: 'renderImage', provider: 'llm' as const, model: 'gemini-3.1-flash-image', ms: 0, ok: true,
       inputTokens: 1000, outputTokens: 1120, imageOutputTokens: 1120
     };
     // (1000×0.5 + 1120×60)/1M = $0.0677
     expect(computeCostUsd(entry)).toBeCloseTo(0.0677, 4);
-    expect(computeCostUsd(entry, 'pro')).toBeCloseTo(0.0677, 4);
-    expect(computeCostUsd(entry, null)).toBeCloseTo(0.0677, 4);
   });
 
   it('prices a Flash call with cache discount, defaulting a missing model to Flash', () => {
@@ -207,29 +204,8 @@ describe('computeCostUsd', () => {
       inputTokens: 539, outputTokens: 1252, thinkingTokens: 128, imageOutputTokens: 1120
     };
     // List Flash: (1000×1.5 + 1000×7.5)/1M = $0.009
-    for (const plan of [null, 'go', 'starter', 'pro', 'scale']) {
-      expect(computeCostUsd(flashEntry, plan)).toBeCloseTo(0.009, 6);
-      // Same full price for Nano Banana Pro (list $0.1386)
-      expect(computeCostUsd(stillEntry, plan)).toBeCloseTo(0.1386, 4);
-    }
-  });
-
-  it('reads the plan from withBrandContext when computeCostUsd is not passed one', () => {
-    const cost = withBrandContext(
-      'brand-1',
-      () =>
-        computeCostUsd({
-          label: 'grounded',
-          provider: 'llm',
-          model: GEMINI_FLASH,
-          ms: 0,
-          ok: true,
-          inputTokens: 1000,
-          outputTokens: 1000
-        }),
-      'starter'
-    );
-    expect(cost).toBeCloseTo(0.009, 6); // full list, whatever the plan in context says
+    expect(computeCostUsd(flashEntry)).toBeCloseTo(0.009, 6);
+    expect(computeCostUsd(stillEntry)).toBeCloseTo(0.1386, 4);
   });
 
   it('returns null when usage is missing or the model has no price list', () => {
