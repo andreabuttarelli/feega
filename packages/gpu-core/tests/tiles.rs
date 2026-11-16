@@ -927,3 +927,38 @@ fn every_coarser_level_held_is_drawn_beneath_coarsest_first_so_a_gap_in_one_show
     assert!(steps.contains(&tiles.step_for(camera(0.5))));
     assert!(steps.windows(2).all(|w| w[0] <= w[1]), "coarsest must come first: {steps:?}");
 }
+
+#[test]
+fn a_block_that_cost_too_much_shrinks_the_next_blocks_to_fit_the_budget() {
+    let mut sizer = gpu_core::tiles::BlockSizer::default();
+    sizer.learn(37.0, (REST_BLOCK_PX * REST_BLOCK_PX) as f64);
+
+    let side = sizer.side(4.0);
+
+    assert!(side < REST_BLOCK_PX, "side {side}");
+    assert!(37.0 * (side * side) as f64 / (REST_BLOCK_PX * REST_BLOCK_PX) as f64 <= 4.0, "a block of {side} px would cost more than the budget");
+}
+
+#[test]
+fn cheap_blocks_grow_back_to_the_rest_block_but_not_beyond() {
+    let mut sizer = gpu_core::tiles::BlockSizer::default();
+    sizer.learn(37.0, (REST_BLOCK_PX * REST_BLOCK_PX) as f64);
+    (0..40).for_each(|_| sizer.learn(0.1, (REST_BLOCK_PX * REST_BLOCK_PX) as f64));
+
+    assert_eq!(sizer.side(4.0), REST_BLOCK_PX);
+}
+
+#[test]
+fn a_sizer_that_measured_nothing_starts_below_the_rest_block() {
+    assert!(gpu_core::tiles::BlockSizer::default().side(4.0) < REST_BLOCK_PX);
+}
+
+#[test]
+fn rest_blocks_of_a_given_side_cover_the_screen_once() {
+    let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
+    let rest = Rest::sized(camera, (300, 200), 64);
+    let area: f64 = rest.todo().iter().map(|b| b.area()).sum();
+
+    assert_eq!(area, 300.0 * 200.0);
+    assert!(rest.todo().iter().all(|b| b.width() <= 64.0 && b.height() <= 64.0));
+}

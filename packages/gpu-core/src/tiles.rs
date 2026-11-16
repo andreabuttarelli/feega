@@ -588,9 +588,42 @@ pub struct Rest {
     lacking: bool,
 }
 
+const MIN_BLOCK_PX: u32 = 32;
+const BLOCK_STEP_PX: u32 = 32;
+const UNMEASURED_BLOCK_PX: u32 = 128;
+const BLOCK_COST_EASE: f64 = 0.25;
+
+#[derive(Default)]
+pub struct BlockSizer {
+    ms_per_px: Option<f64>,
+}
+
+impl BlockSizer {
+    pub fn learn(&mut self, ms: f64, px: f64) {
+        if px <= 0.0 {
+            return;
+        }
+        let measured = ms / px;
+        self.ms_per_px = Some(match self.ms_per_px {
+            Some(was) if measured < was => was + (measured - was) * BLOCK_COST_EASE,
+            _ => measured,
+        });
+    }
+
+    pub fn side(&self, budget_ms: f64) -> u32 {
+        let Some(per) = self.ms_per_px.filter(|per| *per > 0.0) else { return UNMEASURED_BLOCK_PX };
+        let fits = (budget_ms / per).sqrt() as u32;
+        (fits / BLOCK_STEP_PX * BLOCK_STEP_PX).clamp(MIN_BLOCK_PX, REST_BLOCK_PX)
+    }
+}
+
 impl Rest {
     pub fn new(camera: Camera, screen: (u32, u32)) -> Rest {
-        let side = REST_BLOCK_PX as f64;
+        Rest::sized(camera, screen, REST_BLOCK_PX)
+    }
+
+    pub fn sized(camera: Camera, screen: (u32, u32), side: u32) -> Rest {
+        let side = side as f64;
         let (w, h) = (screen.0 as f64, screen.1 as f64);
         let centre = Point::new(w / 2.0, h / 2.0);
         let cols = (w / side).ceil() as u32;
