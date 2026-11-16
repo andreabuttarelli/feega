@@ -220,3 +220,15 @@ describe('writeTokens su tailwind.config', () => {
     expect(twice.skipped[0]).toContain('--color-brand');
   });
 });
+
+describe('writeTokens su SCSS e LESS', () => {
+  it('un raggio cambiato sulla tela riscrive la sua variabile, il resto del file resta com’era', async () => {
+    const read = fixture('scss-less');
+    const { variables, map } = variablesOf((await designOf(read))!.set, 'app');
+
+    const done = await writeTokens(edited(variables, 'app Radius/md', 'Light', 12), map, read);
+
+    expect(done.files.map((f) => f.path)).toEqual(['src/styles/_variables.scss']);
+    expect(changedLines(done.files[0].before, done.files[0].after)).toEqual([[3, '$radius-md: 8px;', '$radius-md: 12px;']]);
+  });
+});
