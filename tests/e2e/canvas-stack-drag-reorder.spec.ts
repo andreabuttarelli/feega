@@ -149,6 +149,9 @@ test.describe('reordering a stack by dragging a child @real', () => {
 
       await page.keyboard.press('ControlOrMeta+z');
       await expect.poll(order, { timeout: 15_000 }).toEqual(CHILDREN);
+
+      await page.keyboard.press(c.axis === Axis.Y ? 'ArrowUp' : 'ArrowLeft');
+      await expect.poll(order, { timeout: 15_000, message: 'an arrow key steps the child one slot earlier' }).toEqual(['a', 'c', 'b', 'd']);
     });
   }
 });
