@@ -8,6 +8,7 @@ import { assertPublicUrl } from '$lib/server/tool-guard';
 import { rateWindow } from '$lib/server/figma/rate-window';
 import { liveBrowser } from '$lib/server/web/live';
 import { pageAssets } from '$lib/server/url-import/canvas-import';
+import { adoptDocLibrary } from '$lib/server/canvas/project-library';
 import { CodeImportOutcome, Crop, designFor, importBoards, importCodeAt, importRepoAt, type BranchList, type CodeImported, type CodeReader, type LandAsk } from './import-code';
 import { DesignSystem, tokenCount } from './design-system';
 import type { Responsive } from './code-views';
@@ -93,7 +94,22 @@ function landing(scope: CodeScope, canvasId: string, at: { x: number; y: number 
 
 export type CodeLanded = CodeImported & { code?: CodeOriginData };
 
+export async function adoptedLibrary(scope: CodeScope, done: CodeLanded): Promise<CodeLanded> {
+  if (done.outcome !== CodeImportOutcome.Ok || !done.design) {
+    return done;
+  }
+  const head = await frameStore(scope.db, { orgId: scope.orgId, actor: scope.actor, projectId: scope.projectId }).read(done.frameId);
+  if (head) {
+    await adoptDocLibrary(scope.db, scope, head.doc);
+  }
+  return done;
+}
+
 export async function importCodeInto(scope: CodeScope, canvasId: string, ask: CodeImportAsk): Promise<CodeLanded> {
+  return adoptedLibrary(scope, await landedCode(scope, canvasId, ask));
+}
+
+async function landedCode(scope: CodeScope, canvasId: string, ask: CodeImportAsk): Promise<CodeLanded> {
   const land = landing(scope, canvasId, ask.at);
   if (ask.folder !== undefined) {
     return importFolderInto(scope, land, ask);
