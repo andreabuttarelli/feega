@@ -169,7 +169,9 @@ const MAPPERS: Record<string, Mapper> = {
 
 const classesOf = (rules: readonly Rule[], tokens: TokenLookup) => rules.flatMap(([property, value]) => (MAPPERS[property]?.(value, tokens) ?? `[${property}:${arbitrary(plain(value))}]`).split(' ')).filter(Boolean);
 
-const variant = ({ maxWidth, rules }: MediaRules, tokens: TokenLookup) => classesOf(rules, tokens).map((c) => `max-[${maxWidth}px]:${c}`);
+const TAILWIND_MAX_IS_EXCLUSIVE = 1;
+
+const variant = ({ maxWidth, rules }: MediaRules, tokens: TokenLookup) => classesOf(rules, tokens).map((c) => `max-[${maxWidth + TAILWIND_MAX_IS_EXCLUSIVE}px]:${c}`);
 
 const stateClasses = (style: StateStyle | undefined, tokens: TokenLookup) =>
   style ? [...classesOf(style.base, tokens), ...style.rows.flatMap((row) => classesOf(row.rules, tokens).map((c) => `${row.variant}:${c}`))] : [];

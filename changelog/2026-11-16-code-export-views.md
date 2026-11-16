@@ -37,3 +37,10 @@ Round two (gate named causes):
 - Canvas text can shrink 5% per `fitSize` step when the layout estimate
   (`layout/resolve.ts` measure) is narrower than the browser text: hero
   headline 598px canvas vs 629px export. Export does not mimic it.
+
+React: Tailwind v4's `max-[N]` is `width < N`, the HTML rule is `width <= N`,
+so a phone view was not applied at exactly 390px (page scrolled to 399px).
+`tailwind.ts` now emits `max-[N+1]`. `CODE_EXPORT_REACT=1` builds the landing
+React export (npm install + vite build, ~30 s) and compares wrapped rows and
+sideways scroll with the HTML export at 1440/1439/810/809/600/390/389/320: equal.
+Variant order was fine; the off-by-one was the defect.

@@ -1,3 +1,6 @@
+import { execFileSync } from 'node:child_process';
+import { createServer } from 'node:http';
+import { readFileSync } from 'node:fs';
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -210,4 +213,51 @@ describe.runIf(ENABLED)('exported HTML paints like the canvas at every view', ()
       });
     });
   }
+});
+
+const REACT_ENABLED = ENABLED && process.env.CODE_EXPORT_REACT === '1';
+const REACT_FIXTURE = 'landing';
+const REACT_WIDTHS = [1440, 1439, 810, 809, 600, 390, 389, 320];
+const MIME: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
+const BUILD_TIMEOUT_MS = 240_000;
+
+async function measuredAt(url: string, width: number) {
+  const page = await browser.newPage();
+  await page.setViewport({ width, height: 800 });
+  await page.goto(url, { waitUntil: 'networkidle0' });
+  await new Promise((r) => setTimeout(r, SETTLE_MS));
+  const row = await page.evaluate(() => ({ wrapped: ([...document.querySelectorAll('body *')] as HTMLElement[]).filter((e) => getComputedStyle(e).flexWrap === 'wrap').length, scroll: document.documentElement.scrollWidth }));
+  await page.close();
+  return row;
+}
+
+describe.runIf(REACT_ENABLED)('the React export lays out like the HTML export at every width', () => {
+  it(`${REACT_FIXTURE}: same wrapped rows, no sideways scroll`, async () => {
+    const fixture = cases.find((f) => f.name === REACT_FIXTURE)!;
+    const html = written(mkdtempSync(join(tmpdir(), 'export-html-')), exportCode(fixture.doc, { target: CodeTarget.Html, name: 'Page' }).files);
+    const reactDir = mkdtempSync(join(tmpdir(), 'export-react-'));
+    written(reactDir, exportCode(fixture.doc, { target: CodeTarget.React, name: 'Page' }).files);
+    execFileSync('npm', ['install', '--no-audit', '--no-fund'], { cwd: reactDir, stdio: 'ignore' });
+    execFileSync('npx', ['vite', 'build'], { cwd: reactDir, stdio: 'ignore' });
+    const dist = join(reactDir, 'dist');
+    const server = createServer((req, res) => {
+      const path = join(dist, req.url === '/' ? 'index.html' : (req.url ?? '').split('?')[0]);
+      const ext = path.slice(path.lastIndexOf('.'));
+      res.setHeader('content-type', MIME[ext] ?? 'application/octet-stream');
+      res.end(existsSync(path) ? readFileSync(path) : '');
+    });
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    const port = (server.address() as { port: number }).port;
+
+    const mismatches: string[] = [];
+    for (const width of REACT_WIDTHS) {
+      const [h, r] = [await measuredAt(`file://${html}`, width), await measuredAt(`http://127.0.0.1:${port}/`, width)];
+      if (h.wrapped !== r.wrapped || r.scroll > width) {
+        mismatches.push(`${width}px html wrapped ${h.wrapped} react wrapped ${r.wrapped} react scroll ${r.scroll}`);
+      }
+    }
+    server.close();
+
+    expect(mismatches).toEqual([]);
+  }, BUILD_TIMEOUT_MS);
 });

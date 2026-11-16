@@ -50,11 +50,11 @@ describe('code export with breakpoints', () => {
     ]);
   });
 
-  it('React: overrides become max-[390px] variants', () => {
+  it('React: overrides become max-[391px] variants (Tailwind max is exclusive)', () => {
     const tsx = file(phoneStacked(), CodeTarget.React, '.tsx');
 
-    expect(tsx).toContain('max-[390px]:flex-col');
-    expect(tsx).toContain('max-[390px]:hidden');
+    expect(tsx).toContain('max-[391px]:flex-col');
+    expect(tsx).toContain('max-[391px]:hidden');
   });
 
   it('Svelte: overrides become a media query in the component style', () => {
@@ -96,7 +96,7 @@ describe('view-only layers', () => {
     const tsx = file(viewOnlyDoc(), CodeTarget.React, '.tsx');
 
     expect(tsx).toContain('Phone only');
-    expect(tsx).toMatch(/hidden[^"]*max-\[390px\]:flex/);
+    expect(tsx).toMatch(/hidden[^"]*max-\[391px\]:flex/);
   });
 });
 
