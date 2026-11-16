@@ -1872,7 +1872,12 @@
   onMount(() => presence?.onHead(takeStep));
   onMount(lockOverscroll);
 
+  const gestureHeld = $derived(overrides.size > 0 || resizing.size > 0);
+
   $effect(() => {
+    if (gestureHeld) {
+      return;
+    }
     styleLibrary.found(libraryOf(coreFrames.flatMap((f) => placedDoc(f.id))));
   });
 
@@ -1924,6 +1929,9 @@
   });
 
   $effect(() => {
+    if (gestureHeld) {
+      return;
+    }
     variableLibrary.found(variableLibraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? [])));
   });
 
