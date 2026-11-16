@@ -115,7 +115,7 @@ test('tiles zoom on the user canvas copy', async () => {
     const end = moving.at(-1)?.at ?? 0;
     const settled = f.find((x) => !x.moving && x.at > end && x.magnified === 0 && x.unsharp === 0 && !x.pending);
     const mag = moving.reduce((n, x) => n + x.magnified, 0) / Math.max(1, moving.length);
-    return { magnifiedShare: +(mag * 100).toFixed(1), timeToSharpMs: settled ? Math.round(settled.at - end) : -1 };
+    return { magnifiedShare: +(mag * 100).toFixed(1), magnifiedMax: +(Math.max(0, ...moving.map((x) => x.magnified)) * 100).toFixed(1), magnifiedFrames: moving.filter((x) => x.magnified > 0).length, timeToSharpMs: settled ? Math.round(settled.at - end) : -1 };
   });
   console.log(`sharp ${JSON.stringify(sharp)}`);
   console.log(`lost n=${lost.length} ${lost.slice(0, 3).join(' | ')}`);

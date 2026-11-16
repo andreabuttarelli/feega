@@ -64,6 +64,17 @@ fn the_magnified_share_counts_screen_shown_past_the_cap() {
     let sharp: Vec<TileKey> = (0..4).flat_map(|ty| (0..5).map(move |tx| TileKey { step: step_of(1.0), tx, ty })).collect();
     let blurry = vec![TileKey { step: step_of(1.0) - 8, tx: 0, ty: 0 }];
 
-    assert!(magnified_share(&sharp, c, SCREEN) < 0.01);
-    assert!(magnified_share(&blurry, c, SCREEN) > 0.9);
+    assert!(magnified_share(&sharp, c, SCREEN, &[]) < 0.01);
+    assert!(magnified_share(&blurry, c, SCREEN, &[]) > 0.9);
+}
+
+#[test]
+fn screen_under_a_native_patch_is_not_counted_as_magnified() {
+    let c = zoomed(1.0);
+    let blurry = vec![TileKey { step: step_of(1.0) - 8, tx: 0, ty: 0 }];
+    let left_half = vello::kurbo::Rect::new(0.0, 0.0, SCREEN.0 as f64 / 2.0, SCREEN.1 as f64);
+
+    let share = magnified_share(&blurry, c, SCREEN, &[left_half]);
+
+    assert!((share - 0.5).abs() < 0.05, "share {share}");
 }

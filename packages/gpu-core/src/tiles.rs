@@ -829,13 +829,16 @@ pub fn coarse_first(tiles: &Tiles, camera: Camera, screen: (u32, u32), missing: 
     first.into_iter().chain(missing).collect()
 }
 
-pub fn magnified_share(draw: &[TileKey], camera: Camera, (w, h): (u32, u32)) -> f64 {
+pub fn magnified_share(draw: &[TileKey], camera: Camera, (w, h): (u32, u32), native: &[Rect]) -> f64 {
     let rects: Vec<(Rect, i32)> = draw.iter().map(|k| (k.screen(camera), k.step)).collect();
     let (cols, rows) = ((w as f64 / SHARE_GRID_PX).ceil() as usize, (h as f64 / SHARE_GRID_PX).ceil() as usize);
     let mut magnified = 0usize;
     for row in 0..rows {
         for col in 0..cols {
             let p = Point::new((col as f64 + 0.5) * SHARE_GRID_PX, (row as f64 + 0.5) * SHARE_GRID_PX);
+            if native.iter().any(|r| r.contains(p)) {
+                continue;
+            }
             let finest = rects.iter().filter(|(r, _)| r.contains(p)).map(|(_, s)| *s).max();
             magnified += usize::from(finest.is_some_and(|s| !sharp_at(camera.zoom, s)));
         }

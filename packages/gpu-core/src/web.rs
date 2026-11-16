@@ -905,8 +905,10 @@ impl WebCore {
         }
         self.was = self.camera;
         let tiles = self.tiles.frame(self.camera, screen);
-        self.counted.magnified = magnified_share(&tiles.draw, self.camera, screen);
         let served = self.serve_bare(&tiles.bare, screen)?;
+        let patched: Vec<Rect> = self.fallback.iter().filter(|f| fallback_serves(f.camera, self.camera, f.size, &[])).map(|f| f.on(self.camera)).collect();
+        let shown: Vec<TileKey> = tiles.draw.iter().chain(&tiles.beneath).copied().collect();
+        self.counted.magnified = magnified_share(&shown, self.camera, screen, &patched);
         self.counted.unsharp = if served { 0 } else { tiles.bare.len() as u32 };
         self.sharpness.magnified_frames += u32::from(magnified(&tiles.draw, self.camera.zoom) > 0);
         let underlaid = self.compositor.held_look(self.camera).is_some_and(|(_, stretch)| crate::tiles::underlay_shows(stretch));
