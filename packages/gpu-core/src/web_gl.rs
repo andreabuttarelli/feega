@@ -308,14 +308,14 @@ impl WebGlCore {
         Ok(())
     }
 
-    pub fn put_group_packed(&mut self, key: &str, list_json: &[u8], floats: Vec<f64>, ends: Vec<u32>) -> Result<(), JsValue> {
+    pub fn put_group_packed(&mut self, key: &str, list_json: &[u8], floats: Vec<f32>, ends: Vec<u32>) -> Result<(), JsValue> {
         self.compositor.touch(key, &self.library);
         self.library.put_group(key, &parse_packed(utf8(list_json)?, floats, ends).map_err(failed)?);
         self.compositor.touch(key, &self.library);
         Ok(())
     }
 
-    pub fn append_group_packed(&mut self, key: &str, list_json: &[u8], floats: Vec<f64>, ends: Vec<u32>) -> Result<(), JsValue> {
+    pub fn append_group_packed(&mut self, key: &str, list_json: &[u8], floats: Vec<f32>, ends: Vec<u32>) -> Result<(), JsValue> {
         self.library.append_group(key, &parse_packed(utf8(list_json)?, floats, ends).map_err(failed)?);
         self.compositor.touch(key, &self.library);
         Ok(())
