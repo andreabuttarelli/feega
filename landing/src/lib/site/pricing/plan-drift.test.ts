@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { FREE_EDITORS, PLAN } from './plan';
+import { CREDITS_PER_PROVIDER_USD, FREE_CREDITS, FREE_EDITORS, PLAN } from './plan';
 
 const APP_LADDER = readFileSync(new URL('../../../../../src/lib/credit-ladder.ts', import.meta.url), 'utf8');
 
@@ -18,5 +18,11 @@ describe('the landing quotes the plan the app sells', () => {
     const prices = APP_LADDER.match(/export const TOP_UPS[^=]*= \[([\d, ]+)\]/)?.[1].split(',').map(Number);
     const perEuro = appNumber(/export const CREDITS_PER_USD_GRANT = (\d+)/);
     expect(prices?.map((price) => ({ price, credits: price * perEuro }))).toEqual(PLAN.topUps);
+  });
+
+  it('matches the welcome credits and what a provider dollar costs in credits', () => {
+    expect(appNumber(/export const CREDITS_PER_USD_GRANT = (\d+)/)).toBe(FREE_CREDITS);
+    expect(APP_LADDER).toMatch(/export const FREE_CREDITS = CREDITS_PER_USD_GRANT;/);
+    expect(appNumber(/export const CREDITS_PER_USD_SUBSCRIPTION_LIST = 100 \* \(1 \+ AI_MARKUP\); \/\/ (\d+)/)).toBe(CREDITS_PER_PROVIDER_USD);
   });
 });
