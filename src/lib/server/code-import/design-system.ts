@@ -6,6 +6,7 @@ import { boundToTokens, spacingMultiples, type BoundCount } from './design-bind'
 import { boardBound, designBoard, DESIGN_BOARD } from './design-board';
 import { readOnlyKeys, tokenSetOf, variableName, variablesOf, type TokenMap, type TokenSet } from './design-tokens';
 import { readTokenFiles } from './json-tokens';
+import { readTailwindConfig } from './tailwind-config';
 import { coverageOf, declaredNames, type Coverage } from './token-coverage';
 import { madeStyles, styleTokensOf, type StyleToken } from './design-styles';
 import type { RenderConditions } from './render-conditions';
@@ -29,8 +30,8 @@ const DEFAULT_WIDTH = 1280;
 
 export async function designOf(read: ReadFile, loaded: LoadedSheet[] = []): Promise<Design | null> {
   const sheets = parseSheets(await readSheets(read, loaded));
-  const files = await readTokenFiles(read);
-  const parsed = { ...sheets, declared: [...sheets.declared, ...files.declared], skipped: [...sheets.skipped, ...files.skipped] };
+  const sources = [await readTokenFiles(read), await readTailwindConfig(read)];
+  const parsed = { ...sheets, declared: [...sheets.declared, ...sources.flatMap((f) => f.declared)], skipped: [...sheets.skipped, ...sources.flatMap((f) => f.skipped)] };
   const set = tokenSetOf(parsed);
   const styles = styleTokensOf(parsed);
   return set.tokens.length || styles.length ? { set, rules: parsed.rules, styles, declared: declaredNames(parsed.declared, parsed.skipped) } : null;

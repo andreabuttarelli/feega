@@ -6,6 +6,7 @@ import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { applyEdits, atOf, editsOf, type FileChange, type ReadFile } from './write-back';
 import { LIGHT, READ_ONLY, fromPage, parseSheets } from './css-tokens';
 import { parseTokenFile } from './json-tokens';
+import { CONFIG_FILE, readConfigText } from './tailwind-config';
 import { importedValue as importedStyleValue, sameStyleValue, styleText, styleValue, type StyleField } from './design-styles';
 import type { Style } from '@feega/motion-core/motion/styles-model';
 
@@ -102,9 +103,21 @@ function replacedJson(text: string, line: number, _name: string, was: string, ne
   return lines.join('\n');
 }
 
+function replacedConfig(text: string, line: number, _name: string, was: string, next: string): string | null {
+  const lines = text.split('\n');
+  const literal = new RegExp(`(['"\`])${escaped(was.trim())}\\1`, 'g');
+  const found = lines[line - 1] === undefined ? [] : [...lines[line - 1].matchAll(literal)];
+  if (found.length !== 1 || CSS_TEXT_ONLY.test(next)) {
+    return null;
+  }
+  lines[line - 1] = lines[line - 1].replace(literal, (_all, quote: string) => `${quote}${next}${quote}`);
+  return lines.join('\n');
+}
+
 type Format = { declared: (text: string, file: string) => { name: string; mode: string; raw: string; at: { line: number } }[]; replace: typeof replaced };
 
 const FORMATS: { test: RegExp; format: Format }[] = [
+  { test: CONFIG_FILE, format: { declared: (text, file) => readConfigText(text, file).declared, replace: replacedConfig } },
   { test: /\.json$/, format: { declared: (text, file) => parseTokenFile(file, text).declared, replace: replacedJson } },
   { test: /$/, format: { declared: (text, file) => parseSheets([{ path: file, text }]).declared, replace: replaced } }
 ];

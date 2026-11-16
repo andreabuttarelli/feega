@@ -3,6 +3,7 @@ import type { Variables } from '@feega/motion-core/motion/variables-model';
 import { fixture } from '../../../../tests/fixtures/design-tokens/read';
 import { PAGE_SHEET, parseSheets, readSheets } from './css-tokens';
 import { tokenSetOf, variablesOf } from './design-tokens';
+import { designOf } from './design-system';
 import { frameEdits, writeTokens } from './token-write';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 
@@ -189,5 +190,33 @@ describe('frameEdits', () => {
     const done = await frameEdits(doc, undefined, async () => '<h1>Vecchio</h1>\n');
 
     expect(done.files.map((f) => f.after)).toEqual(['<h1>Nuovo</h1>\n']);
+  });
+});
+
+describe('writeTokens su tailwind.config', () => {
+  const importedConfig = async () => {
+    const read = fixture('tailwind3-config');
+    const design = (await designOf(read))!;
+    return { read, ...variablesOf(design.set, 'app') };
+  };
+
+  it('un colore cambiato sulla tela riscrive il solo letterale della config, con la sua virgoletta', async () => {
+    const { read, variables, map } = await importedConfig();
+
+    const done = await writeTokens(edited(variables, 'app Colors/ink', 'Light', '#000000'), map, read);
+
+    expect(done.files.map((f) => f.path)).toEqual(['tailwind.config.ts']);
+    expect(changedLines(done.files[0].before, done.files[0].after)).toEqual([[10, "        ink: '#111827',", "        ink: '#000000',"]]);
+  });
+
+  it('un raggio torna in rem, e un letterale che compare due volte sulla riga non si indovina', async () => {
+    const { read, variables, map } = await importedConfig();
+
+    const radius = await writeTokens(edited(variables, 'app Radius/card', 'Light', 16), map, read);
+    const twice = await writeTokens(edited(variables, 'app Colors/brand', 'Light', '#000000'), map, read);
+
+    expect(changedLines(radius.files[0].before, radius.files[0].after).map(([, , after]) => after)).toEqual(["      borderRadius: { card: '1rem', pill: '9999px' },"]);
+    expect(twice.files).toEqual([]);
+    expect(twice.skipped[0]).toContain('--color-brand');
   });
 });
