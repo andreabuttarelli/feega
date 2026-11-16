@@ -3200,6 +3200,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       failed = 'Undo skipped: someone else already changed this node';
       return null;
     }
+    const boxed = putBox(entry.gesture.nodeId, entry.gesture.before);
     const inner: StackEntry[] = [];
     for (const step of [...entry.inner].reverse()) {
       const back = await reverse(step, way);
@@ -3207,7 +3208,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
         inner.push(back);
       }
     }
-    await putBox(entry.gesture.nodeId, entry.gesture.before);
+    await boxed;
     return { source: 'resize', gesture: inverseResize(entry.gesture), inner };
   }
 

@@ -1,6 +1,6 @@
 # feega
 
-> feega is an AI infinite canvas. Text, image, video, audio and document nodes are generated, connected and edited on one board by a person, by the built-in chat, or by an external agent over MCP. Finished material is scheduled to social accounts and run as Meta ads.
+> feega is an AI infinite canvas. Text, image, video, audio and document nodes are generated, connected and edited on one board by a person, by the built-in chat, or by an external agent over MCP.
 
 - App: https://oh.feega.app
 - MCP server: https://mcp.feega.app/mcp
@@ -13,11 +13,11 @@
 - Video upscaling up to 30 s per clip: FLUX Video Upscale.
 - Audio: text to speech, voice changer, dubbing, music, sound effects, voice isolation.
 - Image effects: glitch, RGB shift, dither, halftone, pixelate, posterize and more.
-- Products imported from a connected store; social calendar and publishing; Meta ad campaigns approved before they run.
+- Products imported from a connected store.
 
 ## What it does not do
 
-- Background removal, automatic captions, video colourization, 3D model export (GLB/FBX), ads outside Meta.
+- Background removal, automatic captions, video colourization, 3D model export (GLB/FBX), scheduling or publishing posts, running ad campaigns.
 
 ## Pages
 

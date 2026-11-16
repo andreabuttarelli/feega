@@ -75,19 +75,13 @@ codex plugin marketplace add andreabuttarelli/feega</code></pre>
 <h2 id="rules">{$_('docs.agents.s51')}</h2>
 <ol>
   <li>{$_('docs.agents.s52')}</li>
-  <li>{$_('docs.agents.s53')}</li>
   <li>{$_('docs.agents.s54')}</li>
-  <li>{$_('docs.agents.s55')}</li>
   <li>{$_('docs.agents.s56')}</li>
-  <li>{$_('docs.agents.s85')}</li>
 </ol>
 
 <h2 id="examples">{$_('docs.agents.s25')}</h2>
-<pre><code>"Show me every draft post for flashcamp"
-"Draft a post for flashcamp from this photo"
-"Approve the post about the new drop"
-"What's on flashcamp's calendar this week?"
-"Draft a Meta ad campaign for our new arrivals"</code></pre>
+<pre><code>"Show me my brands"
+"Run the video node in my project"</code></pre>
 
 <h2 id="supported-agents">{$_('docs.agents.s10')}</h2>
 <ul>
@@ -101,9 +95,7 @@ codex plugin marketplace add andreabuttarelli/feega</code></pre>
 <p>{$_('docs.agents.s65')}</p>
 <pre><code>curl -sSL https://raw.githubusercontent.com/andreabuttarelli/feega/main/cli/scripts/install.sh | bash
 feega login
-feega brands
-feega content &lt;slug&gt; --status pending_user
-feega approve &lt;slug&gt; --all</code></pre>
+feega brands</code></pre>
 
 <hr />
 

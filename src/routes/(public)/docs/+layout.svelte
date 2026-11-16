@@ -5,7 +5,7 @@
   import { cn } from '$lib/utils';
   import { toc } from '$lib/stores/toc';
   import { onMount } from 'svelte';
-  import { siShopify, siWebflow, siWix, type SimpleIcon } from 'simple-icons';
+  import type { SimpleIcon } from 'simple-icons';
   import DocsSearch, { type DocsSearchItem } from '$lib/components/docs/DocsSearch.svelte';
   import DocsPager from '$lib/components/docs/DocsPager.svelte';
   import '$lib/styles/tailwind.css';
@@ -27,21 +27,7 @@
 
   const DOCS_NAV: NavGroup[] = $derived([
     { label: $_('docs.layout.s0'), items: [
-      { title: $_('docs.layout.s1'), href: '/docs', icon: 'book' },
-      { title: $_('docs.layout.s2'), href: '/docs/getting-started', icon: 'zap' },
       { title: $_('docs.layout.s59'), href: '/docs/credits', icon: 'coins' },
-    ]},
-    { label: $_('docs.layout.s3'), items: [
-      { title: $_('docs.layout.s4'), href: '/docs/brands', icon: 'layers' },
-      { title: $_('docs.layout.s5'), href: '/docs/team-invites', icon: 'users' },
-    ]},
-    { label: $_('docs.layout.s6'), items: [
-      { title: $_('docs.layout.s8'), href: '/docs/studio', icon: 'palette' },
-    ]},
-    { label: $_('docs.layout.s21'), items: [
-      { title: $_('docs.layout.s23'), href: '/docs/shopify', icon: 'shopping-bag', siIcon: siShopify },
-      { title: $_('docs.layout.s24'), href: '/docs/webflow', icon: 'layout', siIcon: siWebflow },
-      { title: $_('docs.layout.s25'), href: '/docs/wix', icon: 'layout', siIcon: siWix },
     ]},
     { label: $_('docs.layout.s26'), items: [
       { title: $_('docs.layout.s27'), href: '/docs/cli', icon: 'terminal' },

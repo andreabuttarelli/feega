@@ -1,6 +1,7 @@
 import { MAX_MODES, MAX_VARIABLES, VARIABLE_NAME, VarType, keyOf, type Collection, type VarAlias, type VarLiteral, type Variables } from '@feega/motion-core/motion/variables-model';
 import { ACCENT, accentOf, DARK, LIGHT, fromPage, type DeclAt, type Parsed } from './css-tokens';
 import { colourOf } from './token-colour';
+import { constantCalcPx } from './token-calc';
 
 export enum TokenKind {
   Colour = 'colour',
@@ -28,7 +29,7 @@ export type TokenMap = Record<string, TokenEntry>;
 
 export const readOnlyKeys = (map: TokenMap) => new Set(Object.entries(map).flatMap(([key, entry]) => (Object.values(entry.origins).every(fromPage) ? [key] : [])));
 
-type Row = { test: RegExp; strip: string; kind: TokenKind | null; group: string; reason?: string };
+type Row = { test: RegExp; label: string; strip: string; kind: TokenKind | null; group: string; reason?: string };
 
 export const OTHER_GROUP = 'Other';
 
@@ -40,22 +41,22 @@ const REM_PX = 16;
 const MAX_NAME = 40;
 
 const TOKEN_ROWS: Row[] = [
-  { test: /^--color-/, strip: '--color-', kind: TokenKind.Colour, group: 'Colors' },
-  { test: /^--radius-/, strip: '--radius-', kind: TokenKind.Radius, group: 'Radius' },
-  { test: /^--spacing-/, strip: '--spacing-', kind: TokenKind.Spacing, group: 'Spacing' },
-  { test: /^--font-(weight|feature|variation)/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'font weights and features are not variables yet' },
-  { test: /^--font-/, strip: '--font-', kind: TokenKind.Font, group: 'Type' },
-  { test: /^--(inset-shadow|drop-shadow|text-shadow)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'only box shadows become effect styles' },
-  { test: /^--(text|shadow)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: AS_STYLE },
-  { test: /^--(leading|tracking)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'a line-height or letter-spacing scale is not a variable; text styles carry it' },
-  { test: /^--breakpoint-/, strip: '--breakpoint-', kind: TokenKind.Breakpoint, group: OTHER_GROUP },
-  { test: /^--ease-/, strip: '--ease-', kind: TokenKind.Easing, group: OTHER_GROUP },
-  { test: /^--(container|animate|blur|perspective|aspect)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'not bindable to a layer in feega yet' },
-  { test: /^--border-width-/, strip: '--border-width-', kind: TokenKind.Border, group: 'Border' },
-  { test: /border-?width|stroke-?width/, strip: DEFAULT_STRIP, kind: TokenKind.Border, group: 'Border' },
-  { test: /radius/i, strip: DEFAULT_STRIP, kind: TokenKind.Radius, group: 'Radius' },
-  { test: /gap|spacing|space/i, strip: DEFAULT_STRIP, kind: TokenKind.Spacing, group: 'Spacing' },
-  { test: /^--/, strip: DEFAULT_STRIP, kind: TokenKind.Colour, group: PALETTE }
+  { label: 'colour', test: /^--color-/, strip: '--color-', kind: TokenKind.Colour, group: 'Colors' },
+  { label: 'radius', test: /^--radius-/, strip: '--radius-', kind: TokenKind.Radius, group: 'Radius' },
+  { label: 'spacing', test: /^--spacing-/, strip: '--spacing-', kind: TokenKind.Spacing, group: 'Spacing' },
+  { label: 'font weight', test: /^--font-(weight|feature|variation)/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'font weights and features are not variables yet' },
+  { label: 'font family', test: /^--font-/, strip: '--font-', kind: TokenKind.Font, group: 'Type' },
+  { label: 'shadow part', test: /^--(inset-shadow|drop-shadow|text-shadow)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'only box shadows become effect styles' },
+  { label: 'text and shadow style', test: /^--(text|shadow)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: AS_STYLE },
+  { label: 'leading and tracking', test: /^--(leading|tracking)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'a line-height or letter-spacing scale is not a variable; text styles carry it' },
+  { label: 'breakpoint', test: /^--breakpoint-/, strip: '--breakpoint-', kind: TokenKind.Breakpoint, group: OTHER_GROUP },
+  { label: 'easing', test: /^--ease-/, strip: '--ease-', kind: TokenKind.Easing, group: OTHER_GROUP },
+  { label: 'other scale', test: /^--(container|animate|blur|perspective|aspect)-/, strip: DEFAULT_STRIP, kind: null, group: '', reason: 'not bindable to a layer in feega yet' },
+  { label: 'border width', test: /^--border-width-/, strip: '--border-width-', kind: TokenKind.Border, group: 'Border' },
+  { label: 'border width', test: /border-?width|stroke-?width/, strip: DEFAULT_STRIP, kind: TokenKind.Border, group: 'Border' },
+  { label: 'radius', test: /radius/i, strip: DEFAULT_STRIP, kind: TokenKind.Radius, group: 'Radius' },
+  { label: 'spacing', test: /gap|spacing|space/i, strip: DEFAULT_STRIP, kind: TokenKind.Spacing, group: 'Spacing' },
+  { label: 'custom property', test: /^--/, strip: DEFAULT_STRIP, kind: TokenKind.Colour, group: PALETTE }
 ];
 
 const VAR_TYPE: Record<TokenKind, VarType> = {
@@ -87,11 +88,17 @@ export function collectionName(repo: string, group: string): string {
 
 export const groupOf = (name: string) => rowOf(name).group;
 
+export const labelOf = (name: string) => rowOf(name).label;
+
 const tokenGroup = (token: Token) => (token.accent ? ACCENT : groupOf(token.name));
 
 export const aliasOf = (raw: string) => ALIAS.exec(raw.trim())?.[1] ?? null;
 
 export function lengthPx(raw: string): number | null {
+  const calc = constantCalcPx(raw);
+  if (calc !== null) {
+    return calc;
+  }
   const m = LENGTH.exec(raw.trim());
   if (!m || (m[2] === undefined && Number(m[1]) !== 0)) {
     return null;
@@ -122,7 +129,7 @@ function kindOf(name: string, raws: string[], declared: Map<string, string[]>, s
   if (!row.kind) {
     return refused(row.reason!);
   }
-  if (raws.some((r) => /\bcalc\(/.test(r))) {
+  if (raws.some((r) => /\bcalc\(/.test(r) && constantCalcPx(r) === null)) {
     return refused('computed with calc(), not a literal');
   }
   const target = raws.map(aliasOf).find(Boolean);

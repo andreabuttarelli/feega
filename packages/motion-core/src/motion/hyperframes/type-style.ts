@@ -11,7 +11,7 @@ type TypeCtx = { font: (family: string) => string; weight: (family: string, weig
 
 const em = (v: Keyed) => (typeof v === 'number' ? `${v}em` : `calc(${v} * 1em)`);
 
-function variation(p: TypeProps): string | undefined {
+export function variation(p: Pick<TypeProps, 'stretch' | 'slant' | 'axes'>): string | undefined {
   const plain = p.stretch === TYPE.stretch.fallback && p.slant === TYPE.slant.fallback && !p.axes;
   return plain ? undefined : [`'wdth' ${p.stretch}`, `'slnt' ${p.slant}`, ...(p.axes ? [p.axes] : [])].join(', ');
 }

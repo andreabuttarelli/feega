@@ -19,6 +19,7 @@ import { githubSource, SourceKind, type CodeSource, type GithubCalls } from './c
 import { folderOf, folderSource } from './folder-source';
 import { uploadedArchive, uploadOf, uploadSource } from './upload-source';
 import { BASE_CONDITIONS, conditionsOf, labelOf, type RenderConditions, type Variant } from './render-conditions';
+import { responsiveOf } from './code-views';
 import { addBoards, AddRefusal, boardParent } from '$lib/canvas/code-boards';
 import { boardsUsed, condOf, MAX_FRAME_BOARDS, mergedMap, PageState, type ImportMap } from '$lib/canvas/import-map';
 import { routesFound } from './canvas-import';
@@ -173,7 +174,7 @@ export async function codePull(scope: CodeScope, nodeId: string, branch?: string
 
   const origin = linked.origin;
   const [fresh, listed] = await Promise.all([
-    importCodeInto(scope, local.canvasId, { ...linked.link(rev), app: origin.app, routes: origin.routes, conditions: conditionsOf(origin.conditions), variants: pulledVariants(origin), delay: origin.delay, at: local.at ?? { x: 0, y: 0 } }),
+    importCodeInto(scope, local.canvasId, { ...linked.link(rev), app: origin.app, routes: origin.routes, conditions: conditionsOf(origin.conditions), variants: pulledVariants(origin), responsive: responsiveOf(origin), delay: origin.delay, at: local.at ?? { x: 0, y: 0 } }),
     routesFound(scope, { ...WHERE[origin.kind as SourceKind](origin), app: origin.app }).catch(() => null)
   ]);
   if (fresh.outcome !== CodeImportOutcome.Ok) {
@@ -246,6 +247,9 @@ export async function codeAdd(scope: CodeScope, nodeId: string, ask: AddAsk): Pr
   const local = linked ? await store.read(nodeId) : null;
   if (!linked || !local) {
     return { outcome: SyncOutcome.NotFromCode };
+  }
+  if (local.doc.breakpoints?.length) {
+    return { outcome: SyncOutcome.NoRoom, error: 'this frame is one page with views; import more pages as a new frame' };
   }
   const variants = variantsOfAsk(ask);
   const room = MAX_FRAME_BOARDS - boardsUsed(linked.origin.map, (id) => clipIds(local.doc).has(id));

@@ -69,6 +69,10 @@ export class TokenBook {
     return { token: TokenKind.Colour, raw: value };
   }
 
+  literal(raw: string): string {
+    return this.colourValue(raw);
+  }
+
   font(family: string): Ref {
     this.fonts.set(family, (this.fonts.get(family) ?? 0) + 1);
     return { token: TokenKind.Font, raw: family };

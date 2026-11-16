@@ -1,7 +1,7 @@
 import { axisCondition, axisType, fallbackMember, isFlagAxis, isProp, NodeKind, PropType, type SetSpec, type Bound, type CodeNode, type ComponentSpec, type PropSpec, type ElementNode, type PageSpec, type SvgNode, type UseNode } from '../ir';
 import { kebab } from '../naming';
 import type { CodeFile } from '../model';
-import { BASE_CSS, fontLinks, lookupOf, mediaBlocks, ruleBlock, stateBlocks, tokensCss, type TokenLookup } from './css';
+import { BASE_CSS, fontFaceCss, fontLinks, lookupOf, mediaBlocks, ruleBlock, stateBlocks, tokensCss, type TokenLookup } from './css';
 import { escapeHtml, nodeLines, pad, type Dialect } from './markup';
 import { readme } from './project';
 import { animatedNodes, animationCss, inView, INVIEW_CLASS, INVIEW_SCRIPT, PROPERTY_RULES, translates } from './keyframes';
@@ -138,15 +138,16 @@ const PACKAGE = (name: string) => ({
 export function svelteProject(page: PageSpec, slug: string): CodeFile[] {
   const tokens = lookupOf(page.tokens);
   const animated = [page.root, ...page.components.map((c) => c.root)].flatMap(animatedNodes);
-  const appHtml = ['<!doctype html>', '<html lang="en">', '  <head>', '    <meta charset="utf-8" />', '    <meta name="viewport" content="width=device-width, initial-scale=1" />', ...fontLinks(page.tokens).map((l) => `    ${l}`), '    %sveltekit.head%', '  </head>', '  <body>', '    <div style="display: contents">%sveltekit.body%</div>', '  </body>', '</html>', ''];
+  const appHtml = ['<!doctype html>', '<html lang="en">', '  <head>', '    <meta charset="utf-8" />', '    <meta name="viewport" content="width=device-width, initial-scale=1" />', ...fontLinks(page).map((l) => `    ${l}`), '    %sveltekit.head%', '  </head>', '  <body>', '    <div style="display: contents">%sveltekit.body%</div>', '  </body>', '</html>', ''];
   return [
     { path: 'README.md', content: readme(page, 'SvelteKit (Svelte 5)', ['npm install', 'npm run dev'], 'src/lib/components/') },
     { path: 'package.json', content: json(PACKAGE(slug)) },
     { path: 'svelte.config.js', content: ["import adapter from '@sveltejs/adapter-auto';", '', 'export default { kit: { adapter: adapter() } };', ''].join('\n') },
     { path: 'vite.config.ts', content: ["import { sveltekit } from '@sveltejs/kit/vite';", "import { defineConfig } from 'vite';", '', 'export default defineConfig({ plugins: [sveltekit()] });', ''].join('\n') },
     { path: 'src/app.html', content: appHtml.join('\n') },
-    { path: 'src/app.css', content: ["@import './lib/styles/tokens.css';", '', BASE_CSS, ...(animated.some((n) => translates(n.animation)) ? PROPERTY_RULES : [])].join('\n') },
+    { path: 'src/app.css', content: [...(page.fonts.files.length ? ["@import './lib/styles/fonts.css';"] : []), "@import './lib/styles/tokens.css';", '', BASE_CSS, ...(animated.some((n) => translates(n.animation)) ? PROPERTY_RULES : [])].join('\n') },
     ...(animated.some(inView) ? [{ path: 'src/lib/inview.ts', content: INVIEW_ACTION.join('\n') }] : []),
+    ...(page.fonts.files.length ? [{ path: 'src/lib/styles/fonts.css', content: fontFaceCss(page.fonts.files) }] : []),
     { path: 'src/lib/styles/tokens.css', content: tokensCss(page.tokens) },
     { path: 'src/routes/+layout.svelte', content: ['<script lang="ts">', "  import '../app.css';", '', '  let { children } = $props();', '</script>', '', '{@render children()}', ''].join('\n') },
     pageFile(page, tokens),

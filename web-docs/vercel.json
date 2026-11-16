@@ -19,5 +19,12 @@
   ],
   "git": {
     "deploymentEnabled": false
-  }
+  },
+  "redirects": [
+    {
+      "source": "/canvas/create-a-post/",
+      "destination": "/canvas/nodes-and-connections/",
+      "permanent": true
+    }
+  ]
 }

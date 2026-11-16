@@ -1,6 +1,8 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { addTally, countFrame } from '$lib/canvas/gpu/frame-stats';
+  import { Again, paintAgain } from '$lib/canvas/gpu/paint-again';
+  import { showsBeforeMedia } from '$lib/canvas/core/first-show';
   import { sharedFrames } from '$lib/motion/gpu/shared-frames';
   import { drawFrame, prepare, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
   import { smoothingOf, type Typeset } from '@feega/motion-core/motion/gpu-full/text/painter';
@@ -75,7 +77,7 @@
   import { flightNote, startFlight } from '$lib/canvas/debug/flight';
   import { Camera } from '$lib/canvas/perf/session-perf';
   import { liftOut, liftedPut, movingGroup, restGroup, type Lift, type Lifted } from '$lib/canvas/core/lifted-drag';
-  import { AttachStep, GpuBackend, afterAttachFailure, backendAfterLoss, isTrap, type BackendSwitch } from '$lib/canvas/gpu/gpu-loss';
+  import { AttachStep, GpuBackend, afterAttachFailure, backendAfterLoss, isTrap, lossesExhausted, type BackendSwitch } from '$lib/canvas/gpu/gpu-loss';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
@@ -262,6 +264,7 @@
     }
     markFrame(f.id, Step.Source);
     const source = place ? tieredAssets(fetched, place, at) : fetched;
+    onsource(f.id, { ...source, revision: f.revision });
     if (source !== fetched && !imaged.has(f.id)) {
       imaged.add(f.id);
       asked.add(tieredKey(f, at));
@@ -623,6 +626,9 @@
       return;
     }
     markFrame(key, Step.LiveBuilt);
+    if (showsBeforeMedia(f.id, liveShown.has(f.id))) {
+      showLive(f, key, { doc: source.doc, list: built.list, ready: Readiness.Partial });
+    }
     const ready = await media.ready(built.list);
     if (!liveGeneration.land(f.id, generation)) {
       return;
@@ -965,6 +971,8 @@
         sentOverlay = new SentParts();
         r.setBudget?.(textureBudget(budget.textureBytes, { width, height }));
         r.setTileBudget?.(budget.tileBytes);
+        r.setImageAtlas?.(budget.atlasSide);
+        r.setEffectBudget?.(budget.effectBytes);
         r.setCanvasTiles?.(budget.canvasTiles);
         r.setPixelRatio?.(resolution);
         r.setTiles?.(TILED);
@@ -1226,13 +1234,35 @@
     perf.deviceLost();
     perf.error(why instanceof Error ? why.message : String(why));
     flightNote('gpu-lost', { backend: BACKENDS[backend].name, why: why instanceof Error ? why.message : String(why) });
+    raster = null;
+    if (lossesExhausted(backend, losses, BACKENDS.length)) {
+      onfallback(why instanceof Error ? why.message : String(why));
+      return;
+    }
     const next = backendAfterLoss(backend, losses, BACKENDS.length);
     if (next !== backend) {
       losses = 0;
       switchTo(next, why instanceof Error ? why.message : String(why));
     }
-    raster = null;
     attempt++;
+  }
+
+  let wake: ReturnType<typeof setTimeout> | null = null;
+
+  $effect(() => () => {
+    if (wake) {
+      clearTimeout(wake);
+    }
+  });
+
+  function wakeIn(ms: number) {
+    if (wake) {
+      clearTimeout(wake);
+    }
+    wake = setTimeout(() => {
+      wake = null;
+      pacer.invalidate();
+    }, ms);
   }
 
   function paint(): boolean {
@@ -1423,7 +1453,11 @@
       (window as Window & { __gpuMem?: object }).__gpuMem = { ...crashes.sample, put: put.size, pictured: pictured.size };
       debugFrame(outcome, skipped, shown);
     }
-    return pending || (into.warming?.() ?? false) || zooming.active() || (!quiet && sentOverlay.waiting(overlay)) || sceneBusy;
+    const next = paintAgain({ pending, warming: into.warming?.() ?? false, warmWait: into.warmWait?.() ?? 0, zooming: zooming.active(), overlayWaiting: !quiet && sentOverlay.waiting(overlay), sceneBusy });
+    if (next.at === Again.Later) {
+      wakeIn(next.ms);
+    }
+    return next.at === Again.Frame;
   }
 
   let ahead = false;

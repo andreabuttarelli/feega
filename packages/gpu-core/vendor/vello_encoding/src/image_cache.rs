@@ -110,6 +110,16 @@ impl ImageCache {
         false
     }
 
+    pub(crate) fn set_max_size(&mut self, size: i32) {
+        self.max_size = size;
+        if self.atlas.size().width <= size || self.repack_to_size(size) {
+            return;
+        }
+        self.map.clear();
+        self.images.clear();
+        self.atlas = AtlasAllocator::new(size2(size, size));
+    }
+
     pub(crate) fn get_or_insert(&mut self, image: &ImageData) -> Option<(u32, u32)> {
         match self.map.entry(image.data.id()) {
             Entry::Occupied(mut occupied) => {
@@ -343,5 +353,33 @@ mod tests {
         assert_eq!(cache.atlas.size().width, 16);
         assert_eq!(cache.get_or_insert(&image), Some(xy));
         assert_eq!(cache.map.len(), 1);
+    }
+
+    #[test]
+    fn a_capped_atlas_shrinks_back_and_never_grows_past_the_cap() {
+        let mut cache = ImageCache::new_with_sizes(16, 64);
+        cache.begin_resolve();
+        cache.get_or_insert(&image(1, 12, 12)).unwrap();
+        assert!(cache.bump_size());
+        assert!(cache.bump_size());
+        assert_eq!(cache.atlas.size().width, 64);
+
+        cache.set_max_size(32);
+
+        assert_eq!(cache.atlas.size().width, 32);
+        assert!(!cache.bump_size());
+        assert_eq!(cache.atlas.size().width, 32);
+    }
+
+    #[test]
+    fn a_cap_too_small_for_the_residents_drops_them_to_be_uploaded_again() {
+        let mut cache = ImageCache::new_with_sizes(64, 64);
+        cache.begin_resolve();
+        cache.get_or_insert(&image(1, 40, 40)).unwrap();
+
+        cache.set_max_size(32);
+
+        assert_eq!(cache.atlas.size().width, 32);
+        assert!(cache.map.is_empty());
     }
 }
