@@ -35,7 +35,7 @@ const asked: unknown[] = [];
 
 vi.mock('$env/dynamic/private', () => ({ env: {} }));
 vi.mock('$lib/server/local/local-mode', () => ({ localModeRefusal: () => null }));
-vi.mock('./folder-source', async (real) => ({ ...(await real<object>()), folderOf: (path: string) => path }));
+vi.mock('./folder-source', async (real) => ({ ...(await real<object>()), folderOf: (path: string) => path, folderSource: () => ({ head: async () => 'def5678', read: () => async () => null, publish: async () => null }) }));
 vi.mock('$lib/server/repos/canvas', async (real) => ({ ...(await real<object>()), findNode: async () => node }));
 vi.mock('$lib/server/motion/move-element', async (real) => ({
   ...(await real<object>()),
@@ -65,7 +65,7 @@ vi.mock('./canvas-import', async (real) => ({
   }
 }));
 
-const { codeAdd, Land, SyncOutcome } = await import('./code-sync');
+const { codeAdd, codePull, Land, SyncOutcome } = await import('./code-sync');
 
 const SCOPE = { orgId: 'o1', userId: 'u1', projectId: 'p1', db: {}, actor: { kind: 'user', id: 'u1' } } as never;
 
@@ -144,5 +144,38 @@ describe('importing one more page into a code frame', () => {
 
     const imported = ((node.data.code as unknown as { map: ImportMap }).map.pages ?? []).filter((p) => p.state === PageState.Imported).map((p) => p.path);
     expect(imported).toEqual(expect.arrayContaining(['/slow', '/pricing']));
+  });
+});
+
+const WITH_VIEWS: ImportMap = {
+  rev: 'abc1234',
+  pages: [{ path: '/', state: PageState.Imported, boards: [{ cond: 'light@1280', clip: 'n2' }, { cond: 'light@390', clip: 'n2', view: 'w390' }] }]
+};
+
+describe('a code frame imported with views', () => {
+  it('refuses to add a page before capturing anything', async () => {
+    localDoc = { ...LOCAL, breakpoints: [{ id: 'w390', name: '390px', width: 390 }] } as MotionDoc;
+
+    const out = await codeAdd(SCOPE, 'node-1', { routes: ['/pricing'], land: Land.Frame });
+
+    expect(out.outcome).toBe(SyncOutcome.NoRoom);
+    expect(asked).toHaveLength(0);
+    expect(writes).toHaveLength(0);
+  });
+
+  it('is pulled as views again, with the widths it was captured at', async () => {
+    node = { projectId: 'p1', data: { code: origin(WITH_VIEWS) } };
+
+    const out = await codePull(SCOPE, 'node-1');
+
+    expect(out.outcome).toBe(SyncOutcome.Ok);
+    expect(asked[0]).toMatchObject({ responsive: 'views', variants: [{ route: '/', conditions: { width: 1280 } }, { route: '/', conditions: { width: 390 } }] });
+  });
+
+  it('a frame of boards is pulled as boards', async () => {
+    const out = await codePull(SCOPE, 'node-1');
+
+    expect(out.outcome).toBe(SyncOutcome.Ok);
+    expect(asked[0]).toMatchObject({ responsive: 'boards' });
   });
 });

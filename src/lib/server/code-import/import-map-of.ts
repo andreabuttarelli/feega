@@ -23,7 +23,7 @@ function imported(done: Landed): MapPage[] {
   for (const board of done.boards ?? []) {
     byRoute.set(board.route, [...(byRoute.get(board.route) ?? []), board]);
   }
-  return [...byRoute].map(([path, boards]) => ({ path, state: PageState.Imported, boards: boards.map((b) => ({ cond: b.cond, clip: b.clip })) }));
+  return [...byRoute].map(([path, boards]) => ({ path, state: PageState.Imported, boards: boards.map((b) => ({ cond: b.cond, clip: b.clip, ...(b.view ? { view: b.view } : {}) })) }));
 }
 
 function unlanded(done: Landed): MapPage[] {

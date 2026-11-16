@@ -52,6 +52,15 @@ The import opens the app in a real browser, so everything the app does at render
 
 Choose several and every page lands once per combination, side by side in the same frame, named like `/ · dark · 390px`. Pull re-renders the same combinations.
 
+### One page at several widths: views
+
+When you import **one page** at **several widths in one theme**, the dialog offers **Widths as views of one frame**. It is a choice, not the default: by default every width is its own board, with components and the Design system board (CLI `--views`, API `responsive: "views"` opt in). The widest width is the frame; each narrower one is a breakpoint view of it, as in a page imported from a URL. A layer the page keeps at every width is one layer with per-view overrides, so a text edited on the desktop view changes in every view. Use the view switcher of the frame editor to see and adjust each width. The import map lists every width on the page, marked as a view.
+
+- **Components are not extracted and there is no Design system board** in this shape: an instance cannot follow a view, and the board would sit inside every view. Variables are still created and bound. The answer lists the components it found under `skipped`. Keep **Each width as a board** (the default) to keep both.
+- **Several pages, or several themes, in one run** always come as boards, and the answer says so. A dark theme is a variables mode or its own board, never a view.
+- **Edits in a view are not written back.** A change made in the 768 or 390 view is listed as not written, since one plain rule would change every width. Edits on the widest view write back as usual.
+- **Add width/theme** on a page imported with views is refused: import the page again with the widths you want.
+
 | Not switched | Why |
 |---|---|
 | Locale, text direction | The browser language is fixed: the default catalog is shown. |
@@ -60,7 +69,7 @@ Choose several and every page lands once per combination, side by side in the sa
 
 ### Edits on a dark board
 
-Tailwind projects only: a change on a dark board is written as a `dark:` class (`dark:bg-[#101010]`) and replaces the earlier `dark:` class of the same kind. A change on a light board edits the plain class and leaves the `dark:` ones alone. Without Tailwind a dark edit is listed as not written back, and so is any edit made at a width other than desktop, because a plain rule would change every width.
+Tailwind projects only: a change on a dark board is written as a `dark:` class (`dark:bg-[#101010]`) and replaces the earlier `dark:` class of the same kind. A change on a light board edits the plain class and leaves the `dark:` ones alone. Without Tailwind a dark edit is listed as not written back, and so is any edit made at a width other than desktop or in a view, because a plain rule would change every width.
 
 ## Pages behind a login
 
