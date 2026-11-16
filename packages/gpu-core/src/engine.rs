@@ -9,7 +9,7 @@ use crate::atlas::Packer;
 use crate::display_list::{Cover, DisplayList, Item, Rgba};
 use crate::groups::Plan;
 use crate::filter_passes::{layer_texture, FilterPasses, Pooled, WgpuRunner};
-use crate::layers::{prepare, Blending, Surface};
+use crate::layers::{prepare, Blending, Effects, Surface};
 use crate::pictures::Pictures;
 use crate::scene::{build_into, Placed};
 use crate::tally::{now_ms, Reason, Tally};
@@ -20,6 +20,8 @@ const KEPT_LAYERS: usize = 32;
 const SPARE_TEXTURES: usize = 4;
 const KEPT_FRAMES: u64 = 240;
 const LAYER_BYTES: u64 = 32 * 1024 * 1024;
+const HELD_EFFECTS: usize = 4096;
+const HELD_EFFECT_BYTES: u64 = 256 * 1024 * 1024;
 const KEYED_POINTS_MAX: usize = 1000;
 const OFF_TARGET: Rect = Rect::new(-2.0, -2.0, -1.0, -1.0);
 const SHEET_SIDE: u32 = 2048;
@@ -36,11 +38,12 @@ struct LayerCache {
     entries: FxHashMap<String, Cached>,
     tick: u64,
     cap: u64,
+    kept: usize,
 }
 
 impl Default for LayerCache {
     fn default() -> Self {
-        LayerCache { entries: FxHashMap::default(), tick: 0, cap: LAYER_BYTES }
+        LayerCache { entries: FxHashMap::default(), tick: 0, cap: LAYER_BYTES, kept: KEPT_LAYERS }
     }
 }
 
@@ -53,10 +56,10 @@ impl LayerCache {
         self.tick += 1;
         let tick = self.tick;
         let mut stale: Vec<String> = self.entries.iter().filter(|(_, c)| c.used + KEPT_FRAMES < tick).map(|(k, _)| k.clone()).collect();
-        if self.entries.len() - stale.len() > KEPT_LAYERS {
+        if self.entries.len() - stale.len() > self.kept {
             let mut rest: Vec<(&String, u64)> = self.entries.iter().filter(|(k, _)| !stale.contains(k)).map(|(k, c)| (k, c.used)).collect();
             rest.sort_by_key(|(_, used)| *used);
-            let excess = rest.len() - KEPT_LAYERS;
+            let excess = rest.len() - self.kept;
             stale.extend(rest.into_iter().take(excess).map(|(k, _)| k.clone()));
         }
         let rest: Vec<(String, u64, u64)> = self.entries.iter().filter(|(k, _)| !stale.contains(k)).map(|(k, c)| (k.clone(), c.used, bytes_of((c._texture.width(), c._texture.height())))).collect();
@@ -113,8 +116,10 @@ pub struct Engine {
     pub vello: vello::Renderer,
     pub blending: Blending,
     pub atlas: Atlas,
+    pub effects: Effects,
     filters: FilterPasses,
     cache: LayerCache,
+    effect_cache: LayerCache,
     held: FxHashMap<String, wgpu::Texture>,
     spare: Vec<wgpu::Texture>,
     scenes: Vec<Scene>,
@@ -149,6 +154,9 @@ struct Gpu<'a> {
     sheet: &'a mut Option<wgpu::Texture>,
     open: Option<Sheet>,
     unsettled: rustc_hash::FxHashSet<u64>,
+    effects: Effects,
+    effect_cache: &'a mut LayerCache,
+    frame_override: Option<Rect>,
 }
 
 struct Sheet {
@@ -272,7 +280,7 @@ impl<'a> Surface for Gpu<'a> {
     type Error = EngineError;
 
     fn frame(&self) -> Rect {
-        Rect::new(0.0, 0.0, self.width as f64, self.height as f64)
+        self.frame_override.unwrap_or(Rect::new(0.0, 0.0, self.width as f64, self.height as f64))
     }
 
     fn paint(&mut self, reason: Reason, region: Rect, colour: Option<Rgba>, draw: &dyn Fn(&mut Scene)) -> Result<Pooled, EngineError> {
@@ -305,7 +313,7 @@ impl<'a> Surface for Gpu<'a> {
         let cached = self.cache.entries.get_mut(&self.key(item))?;
         cached.used = tick;
         self.vello.mark_override_image_dirty(&cached.image);
-        Some(Placed { image: cached.image.clone(), origin: cached.origin })
+        Some(Placed { image: cached.image.clone(), origin: cached.origin, scale: 1.0 })
     }
 
     fn remember(&mut self, item: &Item, placed: &Placed) {
@@ -324,7 +332,30 @@ impl<'a> Surface for Gpu<'a> {
         self.unsettled.insert(image.data.id());
         self.last = Some(texture.clone());
         self.kept.push(texture);
-        Placed { image, origin: region.origin() }
+        Placed { image, origin: region.origin(), scale: 1.0 }
+    }
+
+    fn effects(&self) -> Effects {
+        self.effects
+    }
+
+    fn set_frame(&mut self, frame: Option<Rect>) {
+        self.frame_override = frame;
+    }
+
+    fn recall_held(&mut self, key: &str) -> Option<Placed> {
+        let tick = self.effect_cache.tick;
+        let cached = self.effect_cache.entries.get_mut(key)?;
+        cached.used = tick;
+        self.vello.mark_override_image_dirty(&cached.image);
+        Some(Placed { image: cached.image.clone(), origin: cached.origin, scale: 1.0 })
+    }
+
+    fn remember_held(&mut self, key: &str, placed: &Placed) {
+        if let Some(texture) = self.last.take() {
+            let used = self.effect_cache.tick;
+            self.effect_cache.entries.insert(key.to_string(), Cached { image: placed.image.clone(), origin: placed.origin, _texture: texture, used });
+        }
     }
 }
 
@@ -337,7 +368,7 @@ impl Gpu<'_> {
 impl Engine {
     pub fn new(device: &wgpu::Device) -> Result<Self, EngineError> {
         let vello = vello::Renderer::new(device, RendererOptions { antialiasing_support: AaSupport::area_only(), ..Default::default() })?;
-        Ok(Self { vello, blending: Blending::Native, atlas: Atlas::On, filters: FilterPasses::new(device), cache: LayerCache::default(), held: FxHashMap::default(), spare: Vec::new(), scenes: Vec::new(), sheet: None, tally: Tally::default(), drawing: Reason::Screen, fullness: 0.0, draws: 0 })
+        Ok(Self { vello, blending: Blending::Native, atlas: Atlas::On, effects: Effects::Screen, filters: FilterPasses::new(device), cache: LayerCache::default(), effect_cache: LayerCache { cap: HELD_EFFECT_BYTES, kept: HELD_EFFECTS, ..LayerCache::default() }, held: FxHashMap::default(), spare: Vec::new(), scenes: Vec::new(), sheet: None, tally: Tally::default(), drawing: Reason::Screen, fullness: 0.0, draws: 0 })
     }
 
     pub fn set_budget(&mut self, pool: u64, layers: u64) {
@@ -357,8 +388,12 @@ impl Engine {
         self.cache.entries.len()
     }
 
+    pub fn held_effects(&self) -> usize {
+        self.effect_cache.entries.len()
+    }
+
     pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures, target: &wgpu::TextureView) -> Result<Vec<Skipped>, EngineError> {
-        let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, kept: Vec::new(), last: None, cache: &mut self.cache, scenes: &mut self.scenes, tally: &mut self.tally, atlas: self.atlas, sheet: &mut self.sheet, open: None, unsettled: Default::default() };
+        let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, kept: Vec::new(), last: None, cache: &mut self.cache, scenes: &mut self.scenes, tally: &mut self.tally, atlas: self.atlas, sheet: &mut self.sheet, open: None, unsettled: Default::default(), effects: self.effects, effect_cache: &mut self.effect_cache, frame_override: None };
         let layers = prepare(&mut gpu, list, pictures, self.blending)?;
         let mut scene = borrowed(gpu.scenes);
         let skipped = build_into(&mut scene, list, pictures, &layers);
@@ -366,11 +401,12 @@ impl Engine {
         let drawn = gpu.render(self.drawing, &scene, base(list.background), target, (list.width, list.height));
         gpu.scenes.push(scene);
         for image in layers.into_images() {
-            if !gpu.cache.holds(&image) {
+            if !gpu.cache.holds(&image) && !gpu.effect_cache.holds(&image) {
                 gpu.vello.unregister_texture(image);
             }
         }
         gpu.cache.sweep(gpu.vello);
+        gpu.effect_cache.sweep(gpu.vello);
         self.fullness = fullness;
         self.draws += 1;
         drawn.map(|_| skipped)
@@ -408,7 +444,7 @@ impl Engine {
     }
 
     pub fn scratch_bytes(&self) -> u64 {
-        let layers: u64 = self.cache.entries.values().map(|c| bytes_of((c._texture.width(), c._texture.height()))).sum();
+        let layers: u64 = self.cache.entries.values().chain(self.effect_cache.entries.values()).map(|c| bytes_of((c._texture.width(), c._texture.height()))).sum();
         self.filters.pooled_bytes() + layers + self.spare_bytes()
     }
 

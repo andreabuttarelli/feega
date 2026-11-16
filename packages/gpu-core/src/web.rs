@@ -12,7 +12,8 @@ use crate::compositor::{Compositor, Painter};
 use crate::display_list::{parse, parse_packed, parse_splice};
 use crate::engine::Engine;
 use crate::filter_passes::layer_texture;
-use crate::groups::{report, Library, Limits, Motion, Plan};
+use crate::groups::{report, Library, Limits, Motion, Native, Plan};
+use crate::layers::Effects;
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile};
 use crate::retained::{Camera, Damage, Lookup, Quality};
@@ -960,12 +961,17 @@ impl WebCore {
         let began = now_ms();
         self.compositor.take_damage();
         let size = (self.target.width(), self.target.height());
+        self.library.set_native(Native::Vectors);
         let plan = self.compositor.plan_at(&mut self.library, self.camera, size, self.limits);
+        self.library.set_native(Native::Textures);
         let building = plan.pending;
         let (list, missing) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
         let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
         let texture = self.direct.take().filter(|t| (t.width(), t.height()) == size).unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
-        self.engine.draw(&self.device, &self.queue, &list, &pictures, &texture.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
+        self.engine.effects = Effects::Zoomless;
+        let drawn = self.engine.draw(&self.device, &self.queue, &list, &pictures, &texture.create_view(&wgpu::TextureViewDescriptor::default()));
+        self.engine.effects = Effects::Screen;
+        drawn.map_err(failed)?;
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(t) | wgpu::CurrentSurfaceTexture::Suboptimal(t) => t,
             _ => return Err(failed("no surface texture")),

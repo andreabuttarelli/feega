@@ -63,6 +63,15 @@ impl Renderer {
         self.engine.vello.ramp_uploads()
     }
 
+    pub fn effects(mut self, effects: crate::layers::Effects) -> Self {
+        self.engine.effects = effects;
+        self
+    }
+
+    pub fn zoomless_layers(&self) -> usize {
+        self.engine.held_effects()
+    }
+
     pub fn cached_layers(&self) -> usize {
         self.engine.cached_layers()
     }

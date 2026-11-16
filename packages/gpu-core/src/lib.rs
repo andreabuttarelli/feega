@@ -28,6 +28,7 @@ pub mod retained;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod render;
 pub mod scene;
+pub mod zoomless;
 pub mod shades;
 pub mod tally;
 #[cfg(not(target_arch = "wasm32"))]
