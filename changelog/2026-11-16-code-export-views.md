@@ -26,10 +26,12 @@ Round two (gate named causes):
 - Overrides on the exported frame's own root were never diffed (`entriesOf`
   excluded the root): features-grid tablet 0.909 -> 0.960. Root keeps its
   width/max-width/margin rules out of the diff.
-- Horizontal rows now `flex-wrap: wrap`; component roots `max-width: 100%`;
-  the overflow cases (landing 414/600, features-grid 320) are green.
-  Cost: landing tablet 0.652 -> 0.599 (a stats row wraps where the canvas
-  squeezes it).
+- Component roots get `max-width: 100%`. Rows that do not wrap in the doc
+  wrap only strictly between and below the defined view widths
+  (`@media (max-width: V-1px)`, reset to `nowrap` at each view width), so a
+  view width matches the canvas and in-between widths never scroll sideways
+  (landing 414/600, features-grid 320 are green). A default wrap on every row
+  was tried: landing tablet fell 0.652 -> 0.599.
 - A component root with a Fixed width keeps it (button 140px): hero base
   0.922 -> 0.936.
 - Canvas text can shrink 5% per `fitSize` step when the layout estimate

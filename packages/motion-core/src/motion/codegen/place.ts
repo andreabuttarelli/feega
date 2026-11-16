@@ -253,7 +253,7 @@ function flexRules(flow: AutoLayout): Rule[] {
   return [
     ['display', 'flex'],
     ...(flow.direction === Direction.Vertical ? [['flex-direction', 'column'] as Rule] : []),
-    ...(flow.wrap || flow.direction === Direction.Horizontal ? [['flex-wrap', 'wrap'] as Rule] : []),
+    ...(flow.wrap ? [['flex-wrap', 'wrap'] as Rule] : []),
     ...(justify ? [['justify-content', justify] as Rule] : []),
     ['align-items', ALIGN_CSS[flow.align]]
   ];

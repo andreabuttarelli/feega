@@ -17,7 +17,10 @@ const DISPLAY = 'display';
 const HIDE: Rule = [DISPLAY, 'none'];
 const UNSET = 'unset';
 const PAGE_FRAME: ReadonlySet<string> = new Set(['width', 'max-width', 'margin-inline']);
-const RESET_VALUE: Record<string, string> = { [DISPLAY]: 'revert', 'flex-wrap': 'nowrap' };
+const RESET_VALUE: Record<string, string> = { [DISPLAY]: 'revert' };
+const WRAP = 'flex-wrap';
+const BETWEEN_VIEWS: Rule = [WRAP, 'wrap'];
+const AT_VIEW: Rule = [WRAP, 'nowrap'];
 
 const styled = (node: CodeNode): node is Styled => node.kind !== NodeKind.Text && node.kind !== NodeKind.Break;
 
@@ -91,6 +94,30 @@ function mediaByClip(base: Entries, kind: Root, deferred: ReadonlySet<string>, v
   return out;
 }
 
+const hasRule = (rules: readonly Rule[], property: string, value?: string) => rules.some(([p, v]) => p === property && (value === undefined || v === value));
+
+const isRow = (rules: readonly Rule[]) => hasRule(rules, DISPLAY, 'flex') && !hasRule(rules, 'flex-direction') && !hasRule(rules, WRAP);
+
+const settled = (rules: readonly Rule[] | undefined) => !rules || hasRule(rules, WRAP) || hasRule(rules, 'flex-direction');
+
+function betweenViews(id: string, base: Entry, widths: readonly number[], seen: readonly (Entries | null)[]): MediaRules[] {
+  const settledAt = (i: number) => (i ? settled(seen[i - 1]?.get(id)?.rules) : hasRule(base.rules, WRAP));
+  return widths.flatMap((width, i) => [
+    ...(i && !settledAt(i) && !settledAt(i - 1) ? [{ maxWidth: width, rules: [AT_VIEW] }] : []),
+    ...(settledAt(i) ? [] : [{ maxWidth: width - 1, rules: [BETWEEN_VIEWS] }])
+  ]);
+}
+
+function withRows(media: Map<string, MediaRules[]>, base: Entries, widths: readonly number[], views: readonly ViewRoot[], kind: Root): Map<string, MediaRules[]> {
+  const seen = views.map((v) => (v.root ? entriesOf(v.root, kind) : null));
+  for (const [id, entry] of base) {
+    if (isRow(entry.rules)) {
+      media.set(id, [...(media.get(id) ?? []), ...betweenViews(id, entry, widths, seen)].sort((a, b) => b.maxWidth - a.maxWidth));
+    }
+  }
+  return media;
+}
+
 function attach(node: CodeNode, media: Map<string, MediaRules[]>, deferred: ReadonlySet<string>): CodeNode {
   if (!styled(node)) {
     return node;
@@ -102,18 +129,19 @@ function attach(node: CodeNode, media: Map<string, MediaRules[]>, deferred: Read
   return withOwn.kind === NodeKind.Element ? { ...withOwn, children: withOwn.children.map((c) => attach(c, media, deferred)) } : withOwn;
 }
 
-function withRootMedia(root: ElementNode, kind: Root, deferred: ReadonlySet<string>, views: readonly ViewRoot[]): ElementNode {
+function withRootMedia(root: ElementNode, kind: Root, deferred: ReadonlySet<string>, views: readonly ViewRoot[], baseWidth: number): ElementNode {
   const base = entriesOf(root, kind);
   const present = new Set([...deferred].filter((id) => base.has(id)));
-  return attach(root, mediaByClip(base, kind, present, views), present) as ElementNode;
+  const widths = [baseWidth, ...views.map((v) => v.maxWidth)];
+  return attach(root, withRows(mediaByClip(base, kind, present, views), base, widths, views, kind), present) as ElementNode;
 }
 
 const sameName = (name: string) => (c: ComponentSpec) => c.name === name;
 
-export function withMedia(base: PageSpec, views: readonly ViewPage[], deferred: ReadonlySet<string> = new Set()): PageSpec {
+export function withMedia(base: PageSpec, views: readonly ViewPage[], baseWidth: number, deferred: ReadonlySet<string> = new Set()): PageSpec {
   if (!views.length) {
     return base;
   }
-  const components = base.components.map((c) => ({ ...c, root: withRootMedia(c.root, Root.Component, deferred, views.map((v) => ({ maxWidth: v.maxWidth, root: v.page.components.find(sameName(c.name))?.root }))) }));
-  return { ...base, root: withRootMedia(base.root, Root.Page, deferred, views.map((v) => ({ maxWidth: v.maxWidth, root: v.page.root }))), components };
+  const components = base.components.map((c) => ({ ...c, root: withRootMedia(c.root, Root.Component, deferred, views.map((v) => ({ maxWidth: v.maxWidth, root: v.page.components.find(sameName(c.name))?.root })), baseWidth) }));
+  return { ...base, root: withRootMedia(base.root, Root.Page, deferred, views.map((v) => ({ maxWidth: v.maxWidth, root: v.page.root })), baseWidth), components };
 }

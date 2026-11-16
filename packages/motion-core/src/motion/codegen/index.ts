@@ -41,7 +41,7 @@ export function exportCode(doc: MotionDoc, options: ExportOptions = {}): CodeExp
     .slice(1)
     .map((v) => ({ maxWidth: v.width, page: build(resolveAt(doc, v.id)) }));
   const deferred = viewOnlyClips(doc);
-  const page = withMedia(build(withViewOnlyShown(doc, deferred)), views, deferred);
+  const page = withMedia(build(withViewOnlyShown(doc, deferred)), views, doc.width, deferred);
   const files = spec.project(page, kebab(name)).sort(byPath);
   return { target, files, assets: bundled(page, spec), notes: page.notes };
 }

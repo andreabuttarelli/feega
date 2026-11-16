@@ -4,7 +4,7 @@ import type { MotionDoc } from '../doc';
 import { addBreakpoint, BreakpointPreset, OverrideKey, setOverride } from '../breakpoints/model';
 import { CodeTarget, exportCode } from './index';
 import { box, DocKit } from './fixtures/kit';
-import { PHONE, compMainDoc, must, viewOnlyDoc, withViews } from './fixtures/responsive';
+import { PHONE, TABLET, compMainDoc, must, viewOnlyDoc, withViews } from './fixtures/responsive';
 
 const must = (r: { ok: true; doc: MotionDoc } | { ok: false; error: string }) => {
   if (!r.ok) {
@@ -45,7 +45,7 @@ describe('code export with breakpoints', () => {
     const queried = [...css.matchAll(/@media \(max-width: 390px\) \{\s+\.([a-z-]+) \{\s+([^}]+)\}/g)].map((m) => [m[1], m[2].trim()]);
 
     expect(queried).toEqual([
-      ['row', 'flex-direction: column;\n    flex-wrap: nowrap;'],
+      ['row', 'flex-direction: column;'],
       ['aside', 'display: none;']
     ]);
   });
@@ -65,10 +65,10 @@ describe('code export with breakpoints', () => {
     const tablet = must(addBreakpoint(phoneStacked(), BreakpointPreset.Tablet, 'tab'));
     const doc = must(setOverride(tablet, 'tab', 'row', OverrideKey.Direction, Direction.Vertical));
     const css = file(doc, CodeTarget.Html, 'page.css');
-    const queried = [...css.matchAll(/@media \(max-width: (\d+)px\) \{\s+\.([a-z-]+) \{\s+([^}]+)\}/g)].map((m) => [m[1], m[2], m[3].trim()]);
+    const queried = [...css.matchAll(/@media \(max-width: (\d+)px\) \{\s+\.([a-z-]+) \{\s+([^}]+)\}/g)].map((m) => [m[1], m[2], m[3].trim()]).filter(([, , rules]) => !rules.startsWith('flex-wrap'));
 
     expect(queried).toEqual([
-      ['810', 'row', 'flex-direction: column;\n    flex-wrap: nowrap;'],
+      ['810', 'row', 'flex-direction: column;'],
       ['390', 'aside', 'display: none;']
     ]);
   });
@@ -123,7 +123,29 @@ describe('overrides on the exported frame itself', () => {
 });
 
 describe('rows between breakpoints', () => {
-  it('wrap instead of pushing the page wider than the screen', () => {
-    expect(file(page(), CodeTarget.Html, 'page.css')).toMatch(/\.row \{[^}]*flex-wrap: wrap;/);
+  const rule = (css: string, width: number) => css.match(new RegExp(`@media \\(max-width: ${width}px\\) \\{\\s+\\.lane \\{\\s+([^}]+)\\}`))?.[1].trim();
+
+  function lane() {
+    const kit = new DocKit(1440, 900);
+    kit.frame('page', { name: 'Page', box: box(0, 0, 1440, 900), layout: { direction: Direction.Vertical }, item: { width: Sizing.Fixed, height: Sizing.Hug } });
+    kit.frame('lane', { name: 'Lane', parent: 'page', box: box(0, 0, 1440, 100), layout: { direction: Direction.Horizontal, gap: 8 }, item: { width: Sizing.Fill, height: Sizing.Hug } });
+    kit.text('a', 'A', { parent: 'lane', name: 'A', size: 20, font: 'Inter' });
+    return withViews(kit.doc(), TABLET, PHONE);
+  }
+
+  it('do not wrap at a defined view width, as the canvas does not', () => {
+    const css = file(lane(), CodeTarget.Html, 'page.css');
+
+    expect(css).not.toMatch(/^\.lane \{[^}]*flex-wrap/m);
+    expect(rule(css, 810)).toBe('flex-wrap: nowrap;');
+    expect(rule(css, 390)).toBe('flex-wrap: nowrap;');
+  });
+
+  it('wrap strictly between and below the defined view widths', () => {
+    const css = file(lane(), CodeTarget.Html, 'page.css');
+
+    expect(rule(css, 1439)).toBe('flex-wrap: wrap;');
+    expect(rule(css, 809)).toBe('flex-wrap: wrap;');
+    expect(rule(css, 389)).toBe('flex-wrap: wrap;');
   });
 });
