@@ -14,7 +14,7 @@ fn pinned_on_screen(list: &gpu_core::display_list::DisplayList) -> Vec<(f64, f64
 }
 
 #[test]
-fn a_pinned_overlay_keeps_its_screen_size_at_every_zoom_and_never_leaves_its_anchor() {
+fn a_pinned_overlay_keeps_its_screen_size_at_every_zoom_and_leaves_the_encoded_overlay_to_its_cache() {
     for ratio in [1.0, 2.0] {
         let mut w = World::new();
         w.set_pixel_ratio(ratio);
@@ -23,7 +23,9 @@ fn a_pinned_overlay_keeps_its_screen_size_at_every_zoom_and_never_leaves_its_anc
         for zoom in [0.25, 1.0, 3.0] {
             let z = zoom * ratio;
             let camera = [z, 0.0, 0.0, z, 7.0, 9.0];
-            for list in [w.overlay(camera, 640, 480), w.screen(camera, 640, 480)] {
+            assert!(w.overlay(camera, 640, 480).items.iter().all(|i| i.clip() != "ring"));
+            assert_eq!(w.pinned_at(camera).len(), 1);
+            for list in [w.screen(camera, 640, 480)] {
                 let at = pinned_on_screen(&list);
                 assert_eq!(at[0], (10.0 * z + 7.0, 10.0 * z + 9.0));
                 assert!((at[0].0 - at[1].0 - 3.0 * ratio).abs() < 1e-9, "zoom {zoom} ratio {ratio}: {at:?}");

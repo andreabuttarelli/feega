@@ -6,6 +6,7 @@ use vello::kurbo::{Affine as Matrix, Point, Rect};
 
 use crate::display_list::{Affine, DisplayList, Item, Look, PathItem, UseItem};
 use crate::lod::{BLUR_REACH, VIEW_SLACK_PX};
+use crate::pinned::PinnedScene;
 use crate::retained::Damage;
 use crate::uses::{Plus, Uses};
 
@@ -62,6 +63,7 @@ impl OverlayPart {
 struct Overlay {
     items: Vec<Item>,
     at: Option<UseItem>,
+    pinned: Option<PinnedScene>,
 }
 
 pub struct Lift {
@@ -137,7 +139,7 @@ fn through(item: &Item, camera: Affine) -> Item {
     }
 }
 
-fn pinned(item: &Item, per_px: f64) -> Item {
+pub fn pinned(item: &Item, per_px: f64) -> Item {
     match item {
         Item::Path(p) if !p.nudge.is_empty() => {
             let contours = p.contours.iter().zip(&p.nudge).map(|(c, n)| c.iter().zip(n).map(|(at, by)| at + by * per_px).collect()).collect();
@@ -319,7 +321,14 @@ impl World {
         }
     }
 
+    pub fn pinned_at(&self, camera: Affine) -> Vec<(std::rc::Rc<vello::Scene>, Affine)> {
+        let per_px = self.seen_through(camera);
+        self.overlays.iter().filter_map(|o| o.pinned.as_ref()).map(|p| (p.at(per_px), camera)).collect()
+    }
+
     pub fn set_overlay(&mut self, part: OverlayPart, items: Vec<Item>) {
+        let cached = items.iter().any(nudged).then(|| PinnedScene::new(&items)).filter(PinnedScene::fits);
+        self.overlays[part.index()].pinned = cached;
         let old = std::mem::replace(&mut self.overlays[part.index()].items, items);
         let new = &self.overlays[part.index()].items;
         let by_clip = |items: &[Item]| {
@@ -388,7 +397,7 @@ impl World {
     pub fn overlay(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
         let per_px = self.seen_through(camera);
         let held = self.visit(self.uses.flagged()).into_iter().filter(|u| self.lifted(u) && self.shifted_from_rest(u).is_none()).map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
-        let items = held.chain(OVERLAY_PARTS.iter().flat_map(|p| self.part_items(&self.overlays[p.index()], camera, per_px)));
+        let items = held.chain(OVERLAY_PARTS.iter().map(|p| &self.overlays[p.index()]).filter(|o| o.pinned.is_none()).flat_map(|o| self.part_items(o, camera, per_px)));
         DisplayList { width, height, background: None, items: items.collect(), faces: Vec::new(), fragments: Default::default() }
     }
 

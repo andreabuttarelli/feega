@@ -24,6 +24,7 @@ pub mod layers;
 pub mod lod;
 pub mod overlay_seen;
 pub mod pictures;
+pub mod pinned;
 pub mod reproject;
 pub mod retained;
 #[cfg(not(target_arch = "wasm32"))]

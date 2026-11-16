@@ -197,6 +197,10 @@ impl Compositor {
         plan
     }
 
+    pub fn pinned_at(&self, camera: Camera) -> Vec<(std::rc::Rc<vello::Scene>, crate::display_list::Affine)> {
+        self.world.pinned_at(camera.matrix())
+    }
+
     pub fn overlay_at(&mut self, library: &mut Library, camera: Camera, (w, h): (u32, u32), limits: Limits) -> Plan {
         let started = now_ms();
         let plan = library.plan(&self.world.overlay(camera.matrix(), w, h), limits);
