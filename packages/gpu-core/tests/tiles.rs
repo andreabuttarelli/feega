@@ -875,3 +875,19 @@ fn a_coarser_level_stays_beneath_the_sharp_tiles_so_an_incomplete_tile_never_sho
     assert!(!frame.beneath.is_empty());
     assert!(frame.beneath.iter().all(|k| k.step < tiles.step_for(camera(2.0))));
 }
+
+#[test]
+fn a_stale_coarser_tile_is_rebaked_before_it_has_to_show() {
+    let mut tiles = Tiles::default();
+    let at = camera(step_zoom(-12));
+    let coarse: Vec<TileKey> = tiles.frame(camera(step_zoom(-14)), SCREEN).missing;
+    coarse.iter().for_each(|k| tiles.hold(*k));
+    tiles.frame(at, SCREEN).missing.into_iter().for_each(|k| tiles.hold(k));
+
+    tiles.invalidate(coarse[0].world());
+    tiles.frame(at, SCREEN).missing.into_iter().filter(|k| k.step == -12).for_each(|k| tiles.hold(k));
+
+    let frame = tiles.frame(at, SCREEN);
+    assert!(frame.draw.iter().all(|k| k.step == -12));
+    assert!(frame.missing.contains(&coarse[0]));
+}
