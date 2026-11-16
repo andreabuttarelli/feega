@@ -20,4 +20,21 @@ describe('coverageOfDesign', () => {
     const imported = Object.values(coverage).reduce((n, c) => n + c.imported, 0);
     expect(declared).toBeGreaterThan(imported);
   });
+
+  it('un tema da 242 colori li importa tutti; i generi senza variabile restano dichiarati e non importati', async () => {
+    const coverage = await covered('big-theme');
+
+    expect(coverage.colour).toEqual({ declared: 242, imported: 242 });
+    expect(coverage['font weight']).toEqual({ declared: 3, imported: 0 });
+    expect(coverage['shadow part']).toEqual({ declared: 3, imported: 0 });
+  });
+
+  it('una config Tailwind 3 e le variabili SCSS contano tra i dichiarati del repo', async () => {
+    const config = await covered('tailwind3-config');
+    const sass = await covered('scss-less');
+
+    expect(config.colour).toEqual({ declared: 6, imported: 6 });
+    expect(config.spacing).toEqual({ declared: 2, imported: 2 });
+    expect(sass.radius).toEqual({ declared: 2, imported: 2 });
+  });
 });
