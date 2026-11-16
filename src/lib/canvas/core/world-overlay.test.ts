@@ -102,6 +102,18 @@ describe('world overlay across zoom', () => {
   });
 });
 
+describe('world overlay as keyed chunks', () => {
+  const tile = (id: string) => ({ id, x: 0, y: 0, width: 100, height: 50, inputs: [], outputs: [], label: null, icon: null, ring: NodeChrome.Selected, handles: true, ringColor: '#7c5cff', names: false });
+
+  it('flattens to the same items the parts carry', () => {
+    const o = parts({ curves: [{ edge: edge({ source: 'b', target: 'c' }), curve }], selected: ['b'], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none, chrome: [tile('a'), tile('b')] });
+
+    expect(o.chunks.fixed.flatMap((c) => c.items)).toEqual(o.fixed);
+    expect(o.chunks.selected.flatMap((c) => c.items)).toEqual(o.selected);
+    expect(o.chunks.selected.map((c) => c.key)).toContain('wire:e');
+  });
+});
+
 describe('world overlay, node by node', () => {
   const tile = (id: string, x: number) => ({ id, x, y: 0, width: 100, height: 50, inputs: [], outputs: [], label: null, icon: null, ring: NodeChrome.Selected, handles: true, ringColor: '#7c5cff', names: false });
 
