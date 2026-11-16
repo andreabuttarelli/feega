@@ -23,6 +23,7 @@
     "typecheck:runtime": "node scripts/typecheck-runtime.mjs",
     "release": "node scripts/release.mjs",
     "test:unit": "vitest run",
+    "test:export-fidelity": "CODE_EXPORT_FIDELITY=1 vitest run src/lib/server/code-export/export-fidelity.browser.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:frames": "E2E_REAL_STACK=1 node --env-file-if-exists=.env node_modules/@playwright/test/cli.js test canvas-frames --project=chromium --workers=1",
     "build:spa": "DEPLOY_TARGET=spa vite build",

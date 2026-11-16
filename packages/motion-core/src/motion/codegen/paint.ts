@@ -17,6 +17,10 @@ import { isRef, type CssValue, type Rule } from './ir';
 import { px, round } from './place';
 import { ColourRole, type TokenBook } from './tokens';
 
+const TYPE_PRECISION = 10000;
+
+const typeExact = (n: number) => Math.round(n * TYPE_PRECISION) / TYPE_PRECISION;
+
 export type Painter = { tokens: TokenBook; unit: number; asset: (id: string) => string; colourVar: (clip: MotionClip, key: string) => string | undefined };
 
 const FULL_OPACITY = 1;
@@ -337,10 +341,10 @@ export function typeRules(clip: MotionClip, painter: Painter, multiline: boolean
     ['font-family', painter.tokens.font(familyOf(p.font))],
     ['font-size', px((p.size ?? 0) * painter.unit)],
     ['font-weight', String(p.weight ?? 400)],
-    ['line-height', String(round(p.leading ?? 1.2))]
+    ['line-height', String(typeExact(p.leading ?? 1.2))]
   ];
   if (p.tracking) {
-    rules.push(['letter-spacing', `${round(p.tracking)}em`]);
+    rules.push(['letter-spacing', `${typeExact(p.tracking)}em`]);
   }
   if (colour) {
     rules.push(['color', painter.tokens.colour(colour, ColourRole.Text, painter.colourVar(clip, 'color'), (p.size ?? 0) * painter.unit)]);
