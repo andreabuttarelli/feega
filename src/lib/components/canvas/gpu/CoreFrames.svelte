@@ -6,7 +6,7 @@
   import { smoothingOf, type Typeset } from '@feega/motion-core/motion/gpu-full/text/painter';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
-  import { CoreMotion, createCore, createCoreGl, dropCore, wireBytes, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
+  import { CoreMotion, createCore, createCoreGl, dropCore, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
   import { createCoreNative, nativeCanvasOffered } from '@feega/motion-core/motion/gpu-full/core-native';
   import { createMedia, Readiness, VideoPreload, videoUses } from '@feega/motion-core/motion/gpu-full/media';
   import { createRamPreview, type FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
@@ -75,7 +75,8 @@
   import { flightNote, startFlight } from '$lib/canvas/debug/flight';
   import { Camera } from '$lib/canvas/perf/session-perf';
   import { liftOut, liftedPut, movingGroup, restGroup, type Lift, type Lifted } from '$lib/canvas/core/lifted-drag';
-  import { AttachStep, GpuBackend, afterAttachFailure, backendAfterLoss, isTrap, type BackendSwitch } from '$lib/canvas/gpu/gpu-loss';
+  import { fitResolution, overscanOf } from '$lib/canvas/gpu/surface-fit';
+  import { AttachStep, GpuBackend, afterAttachFailure, afterLoss, isTrap, type BackendSwitch } from '$lib/canvas/gpu/gpu-loss';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
@@ -113,7 +114,7 @@
   const bestTier = new Map<string, AssetSize>();
   const tierOf = (f: FrameAt) => keptTier(tier, bestTier.get(f.id), sight.near.has(f.id) ? Reach.Near : Reach.Far);
   const keyOf = (f: FrameAt) => tieredKey(f, tierOf(f));
-  const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, budget.resolution);
+  const resolution = $derived(fitResolution(area, typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, budget.resolution));
   const crashes = watchCrashes({ device: currentDevice(), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, resolution });
   const RASTERED = new Set<Outcome>([Outcome.Full, Outcome.Partial]);
   const perf = startCanvasPerf({ canvasId: untrack(() => place?.canvasId ?? ''), device: currentDevice(), platform: platformOf(navigator.userAgent, navigator.maxTouchPoints), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, frames: () => frames.length, area: () => ({ width: Math.round(area.width), height: Math.round(area.height) }), memory: () => heldBy(crashes.sample), diedBefore: crashes.diedBefore, before: crashes.before });
@@ -1110,8 +1111,6 @@
   const DIRECT_GUARDED = DIRECT && typeof location !== 'undefined' && !forcedDirect(location.search, storedDirect());
   const directGuard = new GestureGuard();
   const MAX_LISTED = 12;
-  const OVERSCAN_SHARE = 8;
-  const OVERSCAN_MAX = 128;
   let debugSignature = '';
   let debugMoving = false;
   let debugFacts: NodeFacts[] = [];
@@ -1152,7 +1151,7 @@
       return factsOf(id, { onScreen: onScreen(box), drawn: drawn.get(id) ?? null, ready: readyIds.has(id), candidates: { ready: readyIds.get(id) ?? null, previous: drawnLast.get(id) ?? null, blocks: blocksById.get(id) ?? null, placeholder: c[c.length - 1] } });
     });
     const moving = gesture.active();
-    const overscan = Math.min(Math.floor((Math.min(area.width, area.height) * resolution) / OVERSCAN_SHARE), OVERSCAN_MAX);
+    const overscan = overscanOf(area, resolution);
     const refine = `${Math.round(area.width * resolution) + 2 * overscan}x${Math.round(area.height * resolution) + 2 * overscan}`;
     const header = `zoom=${view.zoom.toFixed(3)} view=${Math.round(view.x)},${Math.round(view.y)} area=${Math.round(area.width)}x${Math.round(area.height)} retained=${refine} outcome=${outcome} caching=${zooming.active()} cacheBytes=${cacheBytes} held=${held.length} pictured=${pictured.size} put=${put.size}`;
     const signature = signatureOf(debugFacts);
@@ -1226,12 +1225,16 @@
     perf.deviceLost();
     perf.error(why instanceof Error ? why.message : String(why));
     flightNote('gpu-lost', { backend: BACKENDS[backend].name, why: why instanceof Error ? why.message : String(why) });
-    const next = backendAfterLoss(backend, losses, BACKENDS.length);
-    if (next !== backend) {
-      losses = 0;
-      switchTo(next, why instanceof Error ? why.message : String(why));
-    }
+    const next = afterLoss(backend, losses, BACKENDS.length);
     raster = null;
+    if (next.step === AttachStep.GiveUp) {
+      onfallback(why instanceof Error ? why.message : String(why));
+      return;
+    }
+    if (next.step === AttachStep.NextBackend) {
+      losses = 0;
+      switchTo(next.backend, why instanceof Error ? why.message : String(why));
+    }
     attempt++;
   }
 
@@ -1420,7 +1423,7 @@
     }
     crashes.tick({ x: view.x, y: view.y, zoom: view.zoom, now: performance.now(), motion: gesture.active() ? Motion.Moving : Motion.Still, rastered: RASTERED.has(outcome) }, { cacheBytes, pictureBytes: into.pictureBytes(), scratchBytes: into.scratchBytes?.() ?? 0, wasmBytes: into.wasmBytes?.() ?? 0, width: canvas?.width ?? 0, height: canvas?.height ?? 0 });
     if (DEBUG) {
-      (window as Window & { __gpuMem?: object }).__gpuMem = { ...crashes.sample, put: put.size, pictured: pictured.size, wire: wireBytes };
+      (window as Window & { __gpuMem?: object }).__gpuMem = { ...crashes.sample, put: put.size, pictured: pictured.size };
       debugFrame(outcome, skipped, shown);
     }
     return pending || (into.warming?.() ?? false) || zooming.active() || (!quiet && sentOverlay.waiting(overlay)) || sceneBusy;
