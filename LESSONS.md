@@ -130,6 +130,10 @@ Signal: with the pointer still over a frame, a wheel zoom makes its hover outlin
 
 **Signal:** parity SSIM 0.3–0.9 with the HTML frames in a serif fallback while the core frames look right. **Move:** the headless harness does not load the template's Google fonts; compare the sheets by eye before calling the core wrong.
 
+### A hugged Title renders one 0.95 step small in the HTML render only
+
+**Signal:** a server still or video shows a headline exactly 5% smaller than the canvas and the exported page, though its box hugs it. **Move:** check the fit inputs in Chromium (`offsetHeight` of the `[data-fit]` element against its `.box`). The lines' descender pad (`padding-bottom` with an equal negative margin) collapsed through the Title element, so fit saw it 0.08em too tall and shrank one step. `display: flow-root` on the Title keeps it inside; `text-metrics.browser.test.ts` guards it.
+
 ### Server-side font shaping of a variable Google family comes out at the default weight
 
 **Signal:** text shaped in Node (fontkit via `fontLoader`) matches Chromium for static families but is ~5% narrow for a variable family at 700. **Move:** Google Fonts CSS2 answers a request with no browser user agent with one static TTF of the default instance. Fetch the stylesheet with a browser user agent (`browserFontReader` in `src/lib/server/motion/shaped-compose.ts`), so the server gets the same variable file the canvas does.

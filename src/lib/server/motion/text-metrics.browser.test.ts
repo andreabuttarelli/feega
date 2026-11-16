@@ -3,13 +3,16 @@ import puppeteer, { type Browser } from 'puppeteer-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { DocKit, box } from '@feega/motion-core/motion/codegen/fixtures/kit';
-import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+import { parseMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { googleFontsUrl, uploadFaceCss, usedFaces, type FontFace } from '@feega/motion-core/motion/fonts/model';
 import { fontLoader } from '@feega/motion-core/motion/gpu-full/text/load';
 import { shapedText } from '@feega/motion-core/motion/gpu-full/text/measure';
 import { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { estimatedText, type TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
-import { browserFontReader } from './shaped-compose';
+import { Align, Direction } from '@feega/motion-core/motion/layout/auto-layout';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { browserFontReader, withShapedText } from './shaped-compose';
+import { libsOrigin } from './libs-origin';
 
 const ENABLED = process.env.TEXT_METRICS === '1';
 const CHROME_PATHS = ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium'];
@@ -19,6 +22,7 @@ const UPLOADED_SOURCE = 'https://fonts.googleapis.com/css2?family=Lora:wght@400&
 const UPLOAD_ASSET = 'uploaded-serif';
 const SHAPED_BOUND = 0.01;
 const SHAPED_FLOOR_PX = 1;
+const FIT_SETTLE_MS = 1500;
 
 const FAMILIES: readonly FontFace[] = [
   { family: 'Inter', source: 'google', category: 'sans', weights: [400, 700], italic: false, axes: [] },
@@ -146,5 +150,36 @@ describe.runIf(ENABLED)('text metrics: layout measure against Chromium', () => {
 
     const off = rows.filter((r) => !FALLBACK_DRAWN_BY_THE_SYSTEM.has(r.key) && Math.abs(r.shaped - r.browser) > Math.max(SHAPED_FLOOR_PX, SHAPED_BOUND * r.browser));
     expect(off.map((r) => `${r.id}: browser ${r.browser.toFixed(1)} shaped ${r.shaped.toFixed(1)}`)).toEqual([]);
+  });
+});
+
+function huggedTitles(): MotionDoc {
+  const kit = new DocKit(1280, 720);
+  kit.frame('page', { name: 'Page', box: box(0, 0, 1280, 720), fill: '#ffffff', layout: { direction: Direction.Vertical, align: Align.Center, gap: 24, padding: { top: 120, right: 0, bottom: 0, left: 0 } } });
+  kit.text('two-lines', 'Ship the release notes\nyour customers read', { parent: 'page', name: 'Headline', component: 'Title', size: 64, weight: 600, leading: 1.05, tracking: -0.04, align: 'center' });
+  kit.text('one-line', 'Close the month in three days', { parent: 'page', name: 'Lead', component: 'Title', size: 40, weight: 700, leading: 1.1 });
+  kit.text('kicker', 'Release notes', { parent: 'page', name: 'Kicker', component: 'Kicker', size: 14, weight: 500 });
+  const parsed = parseMotionDoc(kit.doc());
+  if (!parsed.ok) {
+    throw new Error(parsed.error);
+  }
+  return parsed.doc;
+}
+
+describe.runIf(ENABLED)('fit-text in the HTML renderer', () => {
+  it('never shrinks a title whose box hugs it', { timeout: 120_000 }, async () => {
+    const doc = huggedTitles();
+    const page = await browser.newPage();
+    try {
+      await page.setViewport({ width: doc.width, height: doc.height });
+      await page.setContent(composeHtml(await withShapedText({ doc, tokens: FEEGA_TOKENS, assets: {}, origin: libsOrigin() })), { waitUntil: 'load' });
+      await page.evaluate(() => document.fonts.ready.then(() => undefined));
+      await new Promise((r) => setTimeout(r, FIT_SETTLE_MS));
+      const sizes = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('[data-fit]')].map((el) => ({ text: el.textContent?.trim().slice(0, 20), asked: Number(el.dataset.fit), drawn: parseFloat(el.style.fontSize || el.dataset.fit!) })));
+
+      expect(sizes.filter((s) => s.drawn !== s.asked)).toEqual([]);
+    } finally {
+      await page.close();
+    }
   });
 });

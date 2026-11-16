@@ -158,7 +158,7 @@ const Title: Template<'Title'> = {
       .lines(ctx.p.text)
       .map((line, i) => `<div style="${css({ overflow: 'hidden', paddingBottom: DESCENDER, marginBottom: `-${DESCENDER}` })}"><div class="li" id="li-${ctx.id}-${i}"${glyphStyle(paint)}>${line || '&nbsp;'}</div></div>`)
       .join('');
-    const style = css({ ...typeStyle(ctx, ctx.p, size), color: paint.color, ...glyphStroke(ctx, 'Title'), ...ctx.text.vars });
+    const style = css({ ...typeStyle(ctx, ctx.p, size), display: 'flow-root', color: paint.color, ...glyphStroke(ctx, 'Title'), ...ctx.text.vars });
     return placed(ctx, ctx.p, `<div${hostId(ctx)} data-fit="${size}" style="${style}">${ctx.text.style}${lines}</div>`, false, box);
   },
   tweens: (ctx) =>
