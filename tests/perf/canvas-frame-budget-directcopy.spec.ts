@@ -2,6 +2,7 @@ import { test, chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import sharp from 'sharp';
 import { zoomPath } from '../../scripts/perf/gestures';
+import { inkOf, vanishes } from '../../scripts/perf/flicker';
 
 const BASE = `http://127.0.0.1:${Number(process.env.BENCH_PORT ?? 5288) + 1}`;
 const OUT = process.env.PROBE_OUT ?? 'perf-results/flicker';
@@ -28,7 +29,14 @@ async function cells(jpeg: Buffer): Promise<number[]> {
   return out;
 }
 
-const vanished = (a: number[], b: number[], c: number[]) => b.some((v, i) => Math.min(a[i], c[i]) > 0.3 && v < 0.4 * Math.min(a[i], c[i]));
+const INK_SIZE = { width: 180, height: 112 };
+
+async function ink(jpeg: Buffer) {
+  const { data, info } = await sharp(jpeg).resize(INK_SIZE.width, INK_SIZE.height).raw().toBuffer({ resolveWithObject: true });
+  return inkOf(new Uint8Array(data), info.width, info.height, info.channels);
+}
+
+const dipped = (a: number[], b: number[], c: number[]) => b.some((v, i) => Math.min(a[i], c[i]) > 0.3 && v < 0.4 * Math.min(a[i], c[i]));
 
 test('direct zoom on the user canvas copy', async () => {
   test.setTimeout(600_000);
@@ -108,9 +116,13 @@ test('direct zoom on the user canvas copy', async () => {
 
   if (MODE === 'flicker') {
     const grid = await Promise.all(frames.map((f) => cells(f.data)));
+    const vanishedAt = async (i: number) => {
+      const [a, b, c] = await Promise.all([i - 1, i, i + 1].map((j) => ink(frames[j].data)));
+      return vanishes(a, b, c);
+    };
     const dips: number[] = [];
     for (let i = 1; i < grid.length - 1; i++) {
-      if (vanished(grid[i - 1], grid[i], grid[i + 1])) {
+      if (dipped(grid[i - 1], grid[i], grid[i + 1]) && (await vanishedAt(i))) {
         dips.push(i);
       }
     }
