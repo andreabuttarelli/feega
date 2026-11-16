@@ -2,9 +2,9 @@ import { build } from 'esbuild';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
-export type Frame = { name: string; time: number; values: Record<string, number | string>; width: number; height: number; source?: string | null };
+export type Frame = { name: string; time: number; values: Record<string, number | string>; width: number; height: number };
 
-export type Harness = { render: (frame: Frame) => Promise<Buffer>; close: () => Promise<void> };
+export type Harness = { render: (frame: Frame) => Promise<Buffer>; costMs: (name: string) => Promise<number>; close: () => Promise<void> };
 
 const ENTRY = fileURLToPath(new URL('./page-entry.ts', import.meta.url));
 const PNG_PREFIX = 'data:image/png;base64,';
@@ -23,9 +23,10 @@ export async function openHarness(): Promise<Harness> {
 
   return {
     render: async (frame) => {
-      const url = await page.evaluate((f) => window.renderFrame({ ...f, source: f.source ?? null }), frame);
+      const url = await page.evaluate((f) => window.renderFrame(f), frame);
       return Buffer.from(url.slice(PNG_PREFIX.length), 'base64');
     },
+    costMs: (name) => page.evaluate((n) => window.costMs(n), name),
     close: () => browser.close()
   };
 }

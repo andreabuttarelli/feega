@@ -34,8 +34,8 @@ describe('GET /api/v1/projects/[projectId]/agent/custom-effects', () => {
     const { body } = await call({ id: 'user-1' });
 
     const names = body.effects.map((e: { name: string }) => e.name);
-    expect(names).toEqual(['vhs', 'silk-drift', 'liquid-lens', 'ember-field', 'voice-orb', 'veil-wipe']);
-    expect(body.effects[1]).toMatchObject({ id: 'library-silk-drift', check: { state: 'passed' } });
+    expect(names).toEqual(['vhs', 'ember-field', 'voice-orb', 'petal-field']);
+    expect(body.effects[1]).toMatchObject({ id: 'library-ember-field', check: { state: 'passed' } });
   });
 
   it('refuses without a session', async () => {

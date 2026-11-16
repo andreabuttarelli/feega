@@ -28,7 +28,7 @@ describe('shader library frames', () => {
     expect(second.equals(first)).toBe(true);
   });
 
-  it.each(SHADER_LIBRARY.filter((s) => s.name !== 'veil-wipe').map((s) => s.name))('%s moves with time', async (name) => {
+  it.each(SHADER_LIBRARY.map((s) => s.name))('%s moves with time', async (name) => {
     const frame = { name, values: defaults(name), ...SIZE };
 
     const early = await harness.render({ ...frame, time: 0.5 });

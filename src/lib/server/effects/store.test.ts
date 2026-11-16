@@ -43,3 +43,21 @@ describe('effectStore.write', () => {
     expect(gl.run).not.toHaveBeenCalled();
   });
 });
+
+describe('effectStore library', () => {
+  it('finds a library shader by its id without a workspace row', async () => {
+    const fake = fakeDb({ effects: [] }, { filter: true });
+
+    const found = await effectStore({ db: fake.db, orgId: 'org-1', actor, gl: null }).find('library-voice-orb');
+
+    expect(found).toMatchObject({ name: 'voice-orb', check: { state: 'passed' } });
+  });
+
+  it('lists the library after the workspace effects', async () => {
+    const fake = fakeDb({ effects: [row()] }, { filter: true });
+
+    const listed = await effectStore({ db: fake.db, orgId: 'org-1', actor, gl: null }).list();
+
+    expect(listed?.map((e) => e.name)).toEqual(['vhs', 'ember-field', 'voice-orb', 'petal-field']);
+  });
+});

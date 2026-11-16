@@ -14,6 +14,7 @@ import {
   type Written
 } from '$lib/server/repos/effects';
 import { checkEffect, type GlPage } from './check';
+import { libraryEffects } from './listing';
 
 export type EffectDraft = { name: string; frag: string; params: ShaderParam[] };
 
@@ -57,7 +58,10 @@ export function effectStore(scope: StoreScope): EffectStore {
       return checked(written);
     },
     patch: async (edit) => checked(await patchEffect(db, orgId, edit.effectId, { version: edit.version, frag: edit.frag, edits: edit.edits, params: edit.params })),
-    list: () => listEffects(db, orgId),
-    find: (id) => findEffect(db, orgId, id)
+    list: async () => {
+      const own = await listEffects(db, orgId);
+      return own && [...own, ...libraryEffects()];
+    },
+    find: async (id) => libraryEffects().find((e) => e.id === id) ?? findEffect(db, orgId, id)
   };
 }

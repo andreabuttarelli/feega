@@ -47,7 +47,21 @@ describe('custom effect tools of the motion agent', () => {
   it('list_effects shows name, params, state and cost', async () => {
     const { run } = setup();
 
-    expect(await run('list_effects', {})).toMatchObject({ effects: [{ effect_id: 'eff-1', name: 'dim', state: 'passed', cost_ms: 2 }] });
+    const { effects } = (await run('list_effects', {})) as { effects: { name: string }[] };
+
+    expect(effects[0]).toMatchObject({ effect_id: 'eff-1', name: 'dim', state: 'passed', cost_ms: 2 });
+    expect(effects.map((e) => e.name)).toEqual(['dim', 'ember-field', 'voice-orb', 'petal-field']);
+  });
+
+  it('a library shader goes on a clip and its source travels in the doc', async () => {
+    const { run, session } = setup();
+    const clip = (await run('add_clip', { component: 'Image', start: 0, duration: 2, props: { assetId: 'a1' } })) as { clip_id: string };
+
+    const out = await run('add_custom_effect', { clip_id: clip.clip_id, effect_id: 'library-voice-orb', params: { state: 1 } });
+
+    expect(out).toMatchObject({ ok: true });
+    expect(session.doc.shaders['library-voice-orb'].name).toBe('voice-orb');
+    expect(parseMotionDoc(JSON.parse(JSON.stringify(session.doc))).ok).toBe(true);
   });
 
   it('a written effect goes on a clip and the doc still validates', async () => {
