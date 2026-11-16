@@ -128,3 +128,29 @@ not built:
 - build the next held scene ahead, in slices spread over the frames before the room runs out;
 - keep per-frame encodings and re-append only the frames whose LOD or effect bucket changed;
 - move planning and encoding to a worker.
+
+## Round 5: held scenes per page (2026-11-16)
+
+- `held_parts`: each page (and the loose items together) holds its own scene. A page on screen
+  with no covering scene is built in the frame. Stale pages keep drawing and are rebuilt
+  later, on-screen first, under a 4 ms budget per frame, and warmed while the canvas is
+  still. A zoom past the room keeps drawing until rebuilt; only lost coverage forces a build.
+- After a gesture, direct frames continue until one is adopted.
+- Layer images referenced by a live held scene are pinned against cache eviction. Without the
+  pin, pages went blank once the caches swept images that a long-lived scene still drew.
+
+| | tiles | direct round 5 |
+|---|---|---|
+| capped fps / worst, moderate | 60 / 19 ms | 60 / 19 ms |
+| capped fps / worst, extreme | 60 / 19 ms | 58–60 / 19–67 ms |
+| core p95, 1× | 5.2–5.9 ms | 5.5–7.1 ms |
+| 4× CPU fps, moderate / extreme | 55 / 56 | 44 / 31 |
+| 4× CPU core p95 | 11.6–14 ms | 24–39 ms |
+| Laplacian median / p90, moderate | 238 / 353 | 264 / 397 |
+| Laplacian median / p90, extreme | 223 / 349 | 224 / 385 |
+| dips (9 runs) | — | 0 (2 motion false positives) |
+
+Desktop meets every target. Slow devices do not: at 4× CPU a single page build costs
+50–110 ms, so one page is too coarse a unit for a 4 ms budget, and drawing fully built pages
+costs more than tiles do. Phones and weak devices stay on tiles. The next unit is the encoded
+run inside a page (`Fragments` runs), built a few runs per frame.
