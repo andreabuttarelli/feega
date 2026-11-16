@@ -1,6 +1,7 @@
 export enum GpuBackend {
   Native = 'native',
   WebGpu = 'webgpu',
+  WebGpuWorker = 'webgpu-worker',
   WebGl = 'webgl'
 }
 

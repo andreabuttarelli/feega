@@ -8,6 +8,8 @@
   import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
   import { CoreMotion, createCore, createCoreGl, dropCore, wireBytes, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
   import { createCoreNative, nativeCanvasOffered } from '@feega/motion-core/motion/gpu-full/core-native';
+  import { coreInWorker, probed } from '@feega/motion-core/motion/gpu-full/core-worker';
+  import { coreWorkerOn } from '$lib/canvas/core/worker-switch';
   import { createMedia, Readiness, VideoPreload, videoUses } from '@feega/motion-core/motion/gpu-full/media';
   import { createRamPreview, type FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
@@ -87,7 +89,9 @@
   const NATIVE = { name: GpuBackend.Native, create: createCoreNative };
   const WEBGPU = { name: GpuBackend.WebGpu, create: createCore };
   const WEBGL = { name: GpuBackend.WebGl, create: createCoreGl };
-  const BACKENDS = nativeCanvasOffered() ? [NATIVE, WEBGPU, WEBGL] : [WEBGPU, WEBGL];
+  const IN_WORKER = { name: GpuBackend.WebGpuWorker, create: coreInWorker(() => new Worker(new URL('../../../canvas/core/core.worker.ts', import.meta.url), { type: 'module' })) };
+  const WORKER = typeof location !== 'undefined' && coreWorkerOn(location.search);
+  const BACKENDS = nativeCanvasOffered() ? [NATIVE, WEBGPU, WEBGL] : WORKER ? [IN_WORKER, WEBGPU, WEBGL] : [WEBGPU, WEBGL];
   const budget = BUDGET[currentDevice()];
 
   let canvas = $state<HTMLCanvasElement | null>(null);
@@ -1392,6 +1396,9 @@
     into.setCamera(at.x, at.y, at.zoom);
     const began = performance.now();
     const { outcome, pending, skipped } = into.frame(began);
+    if (!WORKER) {
+      probed(at.x, at.zoom, performance.now());
+    }
     if (DIRECT_GUARDED && gesture.active() && directGuard.slow(performance.now() - began)) {
       into.setDirectGesture?.(false);
     }
@@ -1469,6 +1476,13 @@
     }
   });
 
+  $effect(() => {
+    const at = deviceView();
+    if (WORKER && raster) {
+      untrack(() => raster)?.setCamera(at.x, at.y, at.zoom);
+    }
+  });
+
   const pacer = new FramePacer(paint, (frame) => requestAnimationFrame(frame), () => raster?.busy?.() ?? false);
 
   export function afterPaint(job: () => void) {
@@ -1530,7 +1544,7 @@
 {#if !raster?.behindPage}
   <div class="core-grid" data-testid="core-grid" style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')}></div>
 {/if}
-{#key `${backend}:${attempt}`}
+{#key WORKER ? `${backend}:${attempt}:${surfaceWidth}x${surfaceHeight}` : `${backend}:${attempt}`}
   <canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-held={held.length} data-waiting={waiting} data-frames={framePuts.length} data-built-mb={builtMb} data-cards={cardPuts.length} data-posters={cardPuts.length - cards.filter((c) => cardLists.has(c.key)).length} data-partial={[...lists.values()].filter((l) => l.unsupported.length).length}></canvas>
 {/key}
 
