@@ -151,3 +151,32 @@ export function claimTweak<T>(ledger: TweakLedger<T>, el: T, now: number, limit 
 export function releaseTweak<T>(ledger: TweakLedger<T>, el: T) {
   ledger.active.delete(el);
 }
+
+export const CREW_SELECTOR = '.site-foot .mark';
+
+export const SECTION_CAPS: { selector: string; cap: number }[] = [
+  { selector: '#pricing', cap: 2 },
+  { selector: '#faq', cap: 1 },
+  { selector: '.site-foot', cap: 1 }
+];
+
+export const PROTECTED_SELECTOR = 'button, summary, a, .price';
+
+type Within<T> = (el: T, selector: string) => boolean;
+
+export function mayEnter<T>(el: T, occupants: T[], within: Within<T>): boolean {
+  if (within(el, CREW_SELECTOR)) {
+    return true;
+  }
+
+  const section = SECTION_CAPS.find((s) => within(el, s.selector));
+  if (!section) {
+    return true;
+  }
+
+  return occupants.filter((o) => within(o, section.selector) && !within(o, CREW_SELECTOR)).length < section.cap;
+}
+
+export function isProtected<T>(el: T, within: Within<T>): boolean {
+  return SECTION_CAPS.some((s) => within(el, s.selector)) && within(el, PROTECTED_SELECTOR);
+}

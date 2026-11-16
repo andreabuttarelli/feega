@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ACTIONS_BY_TARGET, AGENTS, lockHeight, BUILD_SELECTOR, BuildMode, PEER_COLOURS, claimTweak, ruleFor, createLedger, mayTweak, releaseTweak, curve, initials, outermost, pick, type ActionKind, type Point, type TargetKind } from './live-agents';
+  import { ACTIONS_BY_TARGET, AGENTS, lockHeight, BUILD_SELECTOR, BuildMode, PEER_COLOURS, isProtected, mayEnter, claimTweak, ruleFor, createLedger, mayTweak, releaseTweak, curve, initials, outermost, pick, type ActionKind, type Point, type TargetKind } from './live-agents';
 
   type Box = { x: number; y: number; w: number; h: number };
   type Menu = { items: string[]; active: number };
@@ -311,8 +311,16 @@
     select: () => [wait(between(700, 1200))]
   };
 
+  const within = (el: Element, selector: string) => el.closest(selector) !== null;
+
+  function roomFor(agent: Agent): (el: HTMLElement) => boolean {
+    const others = running.filter((a) => a !== agent).flatMap((a) => (a.anchor.el ? [a.anchor.el] : []));
+    return (el) => mayEnter(el, others, within);
+  }
+
   function plan(agent: Agent, targets: HTMLElement[]) {
-    const unbuilt = targets.filter((el) => !('built' in el.dataset) && !busy.has(el) && nearViewport(el));
+    const room = roomFor(agent);
+    const unbuilt = targets.filter((el) => !('built' in el.dataset) && !busy.has(el) && nearViewport(el) && room(el));
     if (unbuilt.length > 0) {
       const el = unbuilt[Math.floor(rand() * Math.min(PARALLEL_FRONT, unbuilt.length))];
       const section = el.closest('section');
@@ -330,7 +338,7 @@
     }
 
     const kind = pick(agent.skills, rand);
-    const free = targets.filter((el) => mayTweak(ledger, el, clock, TWEAK_GAP_MS) && 'built' in el.dataset && el.closest('main') && !underReader(el) && !busy.has(el) && ACTIONS_BY_TARGET[kindOf(el)].includes(kind) && nearViewport(el));
+    const free = targets.filter((el) => mayTweak(ledger, el, clock, TWEAK_GAP_MS) && 'built' in el.dataset && el.closest('main') && !underReader(el) && !busy.has(el) && ACTIONS_BY_TARGET[kindOf(el)].includes(kind) && nearViewport(el) && room(el));
 
     if (free.length === 0) {
       agent.steps = agent.view.live ? [moveTo(agent, edgeOf(resolve(agent.anchor))), wait(1, () => (agent.view.live = false))] : [wait(between(300, 600))];
@@ -407,7 +415,7 @@
       seed: rand()
     }));
 
-    const targets = outermost([...document.querySelectorAll<HTMLElement>(BUILD_SELECTOR)]);
+    const targets = outermost([...document.querySelectorAll<HTMLElement>(BUILD_SELECTOR)]).filter((el) => !isProtected(el, within));
     for (const el of targets) {
       if (ruleOf(el).build === BuildMode.Place && el.getBoundingClientRect().top > innerHeight) {
         el.dataset.pending = '';

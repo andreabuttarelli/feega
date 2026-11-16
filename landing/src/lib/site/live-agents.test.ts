@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as live from './live-agents';
-import { BuildMode, ELEMENT_RULES, TEXT_SELECTOR, TweakLimit, claimTweak, createLedger, curve, mayTweak, releaseTweak, ruleFor } from './live-agents';
+import { BuildMode, ELEMENT_RULES, PROTECTED_SELECTOR, isProtected, mayEnter, TEXT_SELECTOR, TweakLimit, claimTweak, createLedger, curve, mayTweak, releaseTweak, ruleFor } from './live-agents';
 
 describe('cursor path', () => {
   it('starts and lands on its endpoints', () => {
@@ -88,5 +88,46 @@ describe('size lock', () => {
     const el = { offsetHeight: 541, style: { height: '' }, getBoundingClientRect: () => ({ height: 483 }) };
     live.lockHeight(el as unknown as HTMLElement);
     expect(el.style.height).toBe('541px');
+  });
+});
+
+describe('section caps', () => {
+  const sections: Record<string, string[]> = {
+    p1: ['#pricing'],
+    p2: ['#pricing'],
+    p3: ['#pricing'],
+    f1: ['#faq'],
+    f2: ['#faq'],
+    foot: ['.site-foot'],
+    foot2: ['.site-foot'],
+    mark: ['.site-foot', '.site-foot .mark'],
+    hero: ['.hero'],
+    buy: ['#pricing', PROTECTED_SELECTOR]
+  };
+  const within = (el: string, selector: string) => sections[el].includes(selector);
+
+  it('lets pricing hold two cursors and refuses a third', () => {
+    expect(mayEnter('p3', ['p1', 'p2'], within)).toBe(false);
+    expect(mayEnter('p2', ['p1'], within)).toBe(true);
+  });
+
+  it('holds the faq and the footer to one cursor each', () => {
+    expect(mayEnter('f2', ['f1'], within)).toBe(false);
+    expect(mayEnter('foot2', ['foot'], within)).toBe(false);
+    expect(mayEnter('f1', [], within)).toBe(true);
+  });
+
+  it('keeps the wordmark crew out of the footer count and never capped', () => {
+    expect(mayEnter('foot', ['mark', 'mark', 'mark', 'mark'], within)).toBe(true);
+    expect(mayEnter('mark', ['foot', 'mark', 'mark', 'mark'], within)).toBe(true);
+  });
+
+  it('leaves every other section uncapped', () => {
+    expect(mayEnter('hero', ['hero', 'hero', 'hero', 'hero', 'hero'], within)).toBe(true);
+  });
+
+  it('never rests on a price, a button or a question inside a capped section', () => {
+    expect(isProtected('buy', within)).toBe(true);
+    expect(isProtected('hero', within)).toBe(false);
   });
 });
