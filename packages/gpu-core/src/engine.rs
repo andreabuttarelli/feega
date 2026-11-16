@@ -395,6 +395,10 @@ impl Engine {
         self.cache.cap = layers;
     }
 
+    pub fn set_image_atlas(&mut self, side: u32) {
+        self.vello.set_image_atlas_max(side);
+    }
+
     pub fn take_tally(&mut self) -> Tally {
         std::mem::take(&mut self.tally)
     }

@@ -589,6 +589,10 @@ impl WebCore {
         Limits { rasters: if waiting { 0 } else { self.limits.rasters }, ..self.limits }
     }
 
+    pub fn set_image_atlas(&mut self, side: u32) {
+        self.engine.set_image_atlas(side);
+    }
+
     pub fn set_tile_budget(&mut self, bytes: f64) {
         self.tile_budget = bytes as u64;
     }
