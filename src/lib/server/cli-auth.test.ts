@@ -93,7 +93,7 @@ describe('una chiave di sola lettura', () => {
     vi.resetModules();
     vi.doMock('$env/dynamic/private', () => ({ env: { SUPABASE_SERVICE_ROLE_KEY: 'service-role' } }));
     vi.doMock('@supabase/supabase-js', () => ({
-      createClient: () => createTestSupabase({ api_keys: rows }).client
+      createClient: () => createTestSupabase({ api_keys: rows, orgs_members: [{ org_id: 'org-1', user_id: 'user-1', role: 'member' }] }).client
     }));
 
     const { authenticate, hashApiKey } = await import('./cli-auth');
@@ -143,7 +143,7 @@ describe('una chiave emessa prima della rinomina', () => {
     vi.resetModules();
     vi.doMock('$env/dynamic/private', () => ({ env: { SUPABASE_SERVICE_ROLE_KEY: 'service-role' } }));
     vi.doMock('@supabase/supabase-js', () => ({
-      createClient: () => createTestSupabase({ api_keys: rows }).client
+      createClient: () => createTestSupabase({ api_keys: rows, orgs_members: [{ org_id: 'org-1', user_id: 'user-1', role: 'member' }] }).client
     }));
 
     const { authenticate, hashApiKey } = await import('./cli-auth');
