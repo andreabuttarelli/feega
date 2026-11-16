@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { addTally, countFrame } from '$lib/canvas/gpu/frame-stats';
+  import { showsBeforeMedia } from '$lib/canvas/core/first-show';
   import { sharedFrames } from '$lib/motion/gpu/shared-frames';
   import { drawFrame, prepare, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
   import { smoothingOf, type Typeset } from '@feega/motion-core/motion/gpu-full/text/painter';
@@ -75,8 +76,7 @@
   import { flightNote, startFlight } from '$lib/canvas/debug/flight';
   import { Camera } from '$lib/canvas/perf/session-perf';
   import { liftOut, liftedPut, movingGroup, restGroup, type Lift, type Lifted } from '$lib/canvas/core/lifted-drag';
-  import { fitResolution, overscanOf } from '$lib/canvas/gpu/surface-fit';
-  import { AttachStep, GpuBackend, afterAttachFailure, afterLoss, isTrap, type BackendSwitch } from '$lib/canvas/gpu/gpu-loss';
+  import { AttachStep, GpuBackend, afterAttachFailure, backendAfterLoss, isTrap, lossesExhausted, type BackendSwitch } from '$lib/canvas/gpu/gpu-loss';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
@@ -114,7 +114,7 @@
   const bestTier = new Map<string, AssetSize>();
   const tierOf = (f: FrameAt) => keptTier(tier, bestTier.get(f.id), sight.near.has(f.id) ? Reach.Near : Reach.Far);
   const keyOf = (f: FrameAt) => tieredKey(f, tierOf(f));
-  const resolution = $derived(fitResolution(area, typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, budget.resolution));
+  const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, budget.resolution);
   const crashes = watchCrashes({ device: currentDevice(), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, resolution });
   const RASTERED = new Set<Outcome>([Outcome.Full, Outcome.Partial]);
   const perf = startCanvasPerf({ canvasId: untrack(() => place?.canvasId ?? ''), device: currentDevice(), platform: platformOf(navigator.userAgent, navigator.maxTouchPoints), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, frames: () => frames.length, area: () => ({ width: Math.round(area.width), height: Math.round(area.height) }), memory: () => heldBy(crashes.sample), diedBefore: crashes.diedBefore, before: crashes.before });
@@ -263,6 +263,7 @@
     }
     markFrame(f.id, Step.Source);
     const source = place ? tieredAssets(fetched, place, at) : fetched;
+    onsource(f.id, { ...source, revision: f.revision });
     if (source !== fetched && !imaged.has(f.id)) {
       imaged.add(f.id);
       asked.add(tieredKey(f, at));
@@ -624,6 +625,9 @@
       return;
     }
     markFrame(key, Step.LiveBuilt);
+    if (showsBeforeMedia(f.id, liveShown.has(f.id))) {
+      showLive(f, key, { doc: source.doc, list: built.list, ready: Readiness.Partial });
+    }
     const ready = await media.ready(built.list);
     if (!liveGeneration.land(f.id, generation)) {
       return;
@@ -966,6 +970,8 @@
         sentOverlay = new SentParts();
         r.setBudget?.(textureBudget(budget.textureBytes, { width, height }));
         r.setTileBudget?.(budget.tileBytes);
+        r.setImageAtlas?.(budget.atlasSide);
+        r.setEffectBudget?.(budget.effectBytes);
         r.setCanvasTiles?.(budget.canvasTiles);
         r.setPixelRatio?.(resolution);
         r.setTiles?.(TILED);
@@ -1111,6 +1117,8 @@
   const DIRECT_GUARDED = DIRECT && typeof location !== 'undefined' && !forcedDirect(location.search, storedDirect());
   const directGuard = new GestureGuard();
   const MAX_LISTED = 12;
+  const OVERSCAN_SHARE = 8;
+  const OVERSCAN_MAX = 128;
   let debugSignature = '';
   let debugMoving = false;
   let debugFacts: NodeFacts[] = [];
@@ -1151,7 +1159,7 @@
       return factsOf(id, { onScreen: onScreen(box), drawn: drawn.get(id) ?? null, ready: readyIds.has(id), candidates: { ready: readyIds.get(id) ?? null, previous: drawnLast.get(id) ?? null, blocks: blocksById.get(id) ?? null, placeholder: c[c.length - 1] } });
     });
     const moving = gesture.active();
-    const overscan = overscanOf(area, resolution);
+    const overscan = Math.min(Math.floor((Math.min(area.width, area.height) * resolution) / OVERSCAN_SHARE), OVERSCAN_MAX);
     const refine = `${Math.round(area.width * resolution) + 2 * overscan}x${Math.round(area.height * resolution) + 2 * overscan}`;
     const header = `zoom=${view.zoom.toFixed(3)} view=${Math.round(view.x)},${Math.round(view.y)} area=${Math.round(area.width)}x${Math.round(area.height)} retained=${refine} outcome=${outcome} caching=${zooming.active()} cacheBytes=${cacheBytes} held=${held.length} pictured=${pictured.size} put=${put.size}`;
     const signature = signatureOf(debugFacts);
@@ -1225,15 +1233,15 @@
     perf.deviceLost();
     perf.error(why instanceof Error ? why.message : String(why));
     flightNote('gpu-lost', { backend: BACKENDS[backend].name, why: why instanceof Error ? why.message : String(why) });
-    const next = afterLoss(backend, losses, BACKENDS.length);
     raster = null;
-    if (next.step === AttachStep.GiveUp) {
+    if (lossesExhausted(backend, losses, BACKENDS.length)) {
       onfallback(why instanceof Error ? why.message : String(why));
       return;
     }
-    if (next.step === AttachStep.NextBackend) {
+    const next = backendAfterLoss(backend, losses, BACKENDS.length);
+    if (next !== backend) {
       losses = 0;
-      switchTo(next.backend, why instanceof Error ? why.message : String(why));
+      switchTo(next, why instanceof Error ? why.message : String(why));
     }
     attempt++;
   }

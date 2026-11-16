@@ -22,9 +22,9 @@ const onWholeFrame = (prepared: Prepared, time: number): boolean => Math.abs(tim
 
 export const coreExportable = (prepared: Prepared, times: number[], read = NO_READS): boolean => times.every((t) => onWholeFrame(prepared, t) && drawFrame(prepared, frameAt(prepared, t)).unsupported.every((gap) => read.has(gap.clip)));
 
-async function ownRaster(backend: FullBackend, width: number, height: number): Promise<{ canvas: HTMLCanvasElement; raster: CoreRaster } | null> {
+async function ownRaster(backend: FullBackend, width: number, height: number, pictureSide?: number): Promise<{ canvas: HTMLCanvasElement; raster: CoreRaster } | null> {
   const canvas = document.createElement('canvas');
-  const raster = (await BACKENDS[backend](canvas, width, height).catch(() => null)) as CoreRaster | null;
+  const raster = (await BACKENDS[backend](canvas, width, height, pictureSide).catch(() => null)) as CoreRaster | null;
   return raster ? { canvas, raster: loseOnDispose(raster, canvas.getContext('webgl2')) } : null;
 }
 
@@ -66,12 +66,15 @@ export type Size = { width: number; height: number };
 
 export type StillRaster = { shoot: (prepared: Prepared, time: number, size: Size) => Promise<ImageBitmap | null>; dispose: () => void };
 
-export async function stillRaster(backend: FullBackend, side: number): Promise<StillRaster | null> {
-  const owned = await ownRaster(backend, side, side);
+export type HeldImages = { pictureSide: number; atlasSide: number };
+
+export async function stillRaster(backend: FullBackend, side: number, held: HeldImages): Promise<StillRaster | null> {
+  const owned = await ownRaster(backend, side, side, held.pictureSide);
   if (!owned) {
     return null;
   }
   const { canvas, raster } = owned;
+  raster.setImageAtlas?.(held.atlasSide);
   const media = createMedia({ frames: originalFrames() });
 
   async function shoot(prepared: Prepared, time: number, size: Size): Promise<ImageBitmap | null> {

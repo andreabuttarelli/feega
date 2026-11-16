@@ -128,3 +128,30 @@ not built:
 - build the next held scene ahead, in slices spread over the frames before the room runs out;
 - keep per-frame encodings and re-append only the frames whose LOD or effect bucket changed;
 - move planning and encoding to a worker.
+
+## Default back to tiles on desktop (120 Hz, 2026-11-16)
+
+Round 4 shipped direct as the desktop default. Its bench ran at a 60 Hz cadence. Measured at
+120 Hz on dev 83acfdc29 (presented frames from the trace, production build, three
+configurations in one session):
+
+| | before direct (tiles) | default (direct) | `?directZoom=0` (tiles) |
+|---|---|---|---|
+| real-sites canvas, zoom | 118–120 fps | 90–95 fps | 108–115 fps |
+| real-sites canvas, pan | 119.6–119.9 fps | 102–104 fps | 119.1–119.7 fps |
+| user canvas copy, zoom | 118.5–119.5 fps | 112–114 fps | |
+
+The expensive frames are held-scene rebuilds: `direct_frame` → `build_held_scene`, 114–173 ms
+with vsync and up to 2.7 s uncapped. On cold loads of the real-sites canvas the first direct
+frame costs 72–402 ms of core time, and it comes back at the start of later gestures.
+
+The guard did not catch it: it times the CPU cost of `frame()` over the first 120 gesture frames
+only, 2–7 of them were over 16.7 ms (at most 6%, under the 10% threshold), and the rebuilds land
+later.
+
+So `DIRECT_BY_DEVICE` in `direct-switch.ts` now says tiles on every device. Direct stays
+available with `?directZoom=1` (or `localStorage['feega:directZoom']='1'`). With the default off
+the guard never runs: it only watches sessions where direct is on by default and not forced.
+Turning direct back on by default needs the rebuild cost closed first (see Round 4), and a guard
+that watches presented frame intervals over the whole session.
+

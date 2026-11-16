@@ -38,7 +38,7 @@ export const COND_CHOICES: Cond[] = [Scheme.Light, Scheme.Dark].flatMap((scheme)
 
 export const condLabel = (c: Cond): string => `${c.scheme === Scheme.Dark ? 'Dark' : 'Light'} · ${c.width}`;
 
-const boardSchema = z.object({ cond: z.string().max(24), clip: z.string().min(1).max(64) });
+const boardSchema = z.object({ cond: z.string().max(24), clip: z.string().min(1).max(64), view: z.string().max(40).optional() });
 
 const pageSchema = z.object({
   path: z.string().max(PATH_MAX),

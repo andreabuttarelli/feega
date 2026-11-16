@@ -67,18 +67,10 @@
 <section class="mb-9">
   <h2 class="!text-lg !font-bold !mb-3 !pb-2 !border-b !border-border !mt-0 !pt-0 !border-t-0">{$_('docs.api.s24')}</h2>
   <div class="relative bg-muted border border-border px-4 py-3.5 my-2 mb-4 overflow-x-auto group">
-    <button class="absolute top-2 right-2 text-[11px] font-semibold px-2.5 py-1 border border-border bg-background text-muted-foreground cursor-pointer opacity-0 group-hover:opacity-100 hover:text-primary hover:border-primary transition-all" onclick={() => cp(`export TOKEN="feega_live_..."\n\n# List brands\ncurl -H "Authorization: Bearer $TOKEN" https://feega.app/api/v1/brands\n\n# Get posts\ncurl -H "Authorization: Bearer $TOKEN" \\\n  https://feega.app/api/v1/brands/my-brand/posts\n\n# Approve a post\ncurl -X POST -H "Authorization: Bearer $TOKEN" \\\n  https://feega.app/api/v1/brands/my-brand/posts/ID/approve`, 'quickstart')}>{copied === 'quickstart' ? '✓' : $_('docs.api.s3')}</button>
+    <button class="absolute top-2 right-2 text-[11px] font-semibold px-2.5 py-1 border border-border bg-background text-muted-foreground cursor-pointer opacity-0 group-hover:opacity-100 hover:text-primary hover:border-primary transition-all" onclick={() => cp(`export TOKEN="feega_live_..."\n\n# List brands\ncurl -H "Authorization: Bearer $TOKEN" https://feega.app/api/v1/brands\n\n`, 'quickstart')}>{copied === 'quickstart' ? '✓' : $_('docs.api.s3')}</button>
     <pre class="!text-[12.5px] !bg-transparent !p-0 font-mono text-foreground whitespace-pre m-0">export TOKEN="feega_live_..."
 
 # List brands
-curl -H "Authorization: Bearer $TOKEN" https://feega.app/api/v1/brands
-
-# Get posts
-curl -H "Authorization: Bearer $TOKEN" \
-  https://feega.app/api/v1/brands/my-brand/posts
-
-# Approve a post
-curl -X POST -H "Authorization: Bearer $TOKEN" \
-  https://feega.app/api/v1/brands/my-brand/posts/ID/approve</pre>
+curl -H "Authorization: Bearer $TOKEN" https://feega.app/api/v1/brands</pre>
   </div>
 </section>

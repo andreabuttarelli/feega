@@ -58,11 +58,9 @@ impl LayerCache {
         self.entries.values().any(|c| c.image.data.id() == image.data.id())
     }
 
-    fn sweep(&mut self, vello: &mut vello::Renderer, pinned: &FxHashMap<u64, u32>) {
+    fn sweep(&mut self, vello: &mut vello::Renderer, reads: &Reads) {
         self.tick += 1;
         let tick = self.tick;
-        let tick_pinned = |c: &Cached| pinned.contains_key(&c.image.data.id());
-        self.entries.values_mut().filter(|c| tick_pinned(c)).for_each(|c| c.used = tick);
         let mut stale: Vec<String> = self.entries.iter().filter(|(_, c)| c.used + KEPT_FRAMES < tick).map(|(k, _)| k.clone()).collect();
         if self.entries.len() - stale.len() > self.kept {
             let mut rest: Vec<(&String, u64)> = self.entries.iter().filter(|(k, _)| !stale.contains(k)).map(|(k, c)| (k, c.used)).collect();
@@ -72,13 +70,69 @@ impl LayerCache {
         }
         let rest: Vec<(String, u64, u64)> = self.entries.iter().filter(|(k, _)| !stale.contains(k)).map(|(k, c)| (k.clone(), c.used, bytes_of((c._texture.width(), c._texture.height())))).collect();
         stale.extend(over_cap(&rest, self.cap));
-        stale.retain(|k| !self.entries.get(k).is_some_and(|c| pinned.contains_key(&c.image.data.id())));
+        stale.retain(|key| !reads.holds(self.entries[key].image.data.id()));
         for key in stale {
             if let Some(gone) = self.entries.remove(&key) {
                 vello.unregister_texture(gone.image);
             }
         }
     }
+}
+
+fn free(vello: &mut vello::Renderer, image: ImageData, texture: Option<wgpu::Texture>) {
+    vello.unregister_texture(image);
+    if let Some(texture) = texture {
+        texture.destroy();
+    }
+}
+
+#[derive(Default)]
+struct Reads {
+    counts: FxHashMap<u64, u32>,
+    retired: Vec<(ImageData, Option<wgpu::Texture>)>,
+}
+
+impl Reads {
+    fn holds(&self, id: u64) -> bool {
+        self.counts.contains_key(&id)
+    }
+
+    fn add(&mut self, ids: &[u64]) {
+        for id in ids {
+            *self.counts.entry(*id).or_default() += 1;
+        }
+    }
+
+    fn remove(&mut self, vello: &mut vello::Renderer, ids: &[u64]) {
+        for id in ids {
+            let Some(count) = self.counts.get_mut(id) else { continue };
+            *count -= 1;
+            if *count == 0 {
+                self.counts.remove(id);
+            }
+        }
+        let (held, unread): (Vec<_>, Vec<_>) = std::mem::take(&mut self.retired).into_iter().partition(|(image, _)| self.holds(image.data.id()));
+        self.retired = held;
+        unread.into_iter().for_each(|(image, texture)| free(vello, image, texture));
+    }
+
+    fn retire(&mut self, vello: &mut vello::Renderer, image: ImageData, texture: Option<wgpu::Texture>) {
+        if self.holds(image.data.id()) {
+            self.retired.push((image, texture));
+            return;
+        }
+        free(vello, image, texture);
+    }
+}
+
+fn read_images(scene: &Scene) -> Vec<u64> {
+    let mut ids: Vec<u64> = scene.encoding().resources.patches.iter().filter_map(|p| match p {
+        vello::low_level::vello_encoding::Patch::Image { image, .. } => Some(image.data.id()),
+        _ => None,
+    }).collect();
+    ids.sort_unstable();
+    ids.dedup();
+    ids
 }
 
 fn plain_content(item: &Item) -> bool {
@@ -130,11 +184,11 @@ pub struct Engine {
     cache: LayerCache,
     effect_cache: LayerCache,
     fingerprints: Fingerprints,
-    pinned: FxHashMap<u64, u32>,
     held: FxHashMap<String, wgpu::Texture>,
     spare: Vec<wgpu::Texture>,
     scenes: Vec<Scene>,
     sheet: Option<wgpu::Texture>,
+    reads: Reads,
     tally: Tally,
     drawing: Reason,
     fullness: f64,
@@ -176,6 +230,7 @@ pub struct HeldScene {
     loose: Vec<ImageData>,
     _textures: Vec<Pooled>,
     ids: rustc_hash::FxHashSet<u64>,
+    reads: Vec<u64>,
 }
 
 struct Sheet {
@@ -391,12 +446,21 @@ impl Gpu<'_> {
 impl Engine {
     pub fn new(device: &wgpu::Device) -> Result<Self, EngineError> {
         let vello = vello::Renderer::new(device, RendererOptions { antialiasing_support: AaSupport::area_only(), ..Default::default() })?;
-        Ok(Self { vello, blending: Blending::Native, atlas: Atlas::On, effects: Effects::Screen, filters: FilterPasses::new(device), cache: LayerCache::default(), effect_cache: LayerCache { cap: HELD_EFFECT_BYTES, kept: HELD_EFFECTS, ..LayerCache::default() }, fingerprints: Fingerprints::default(), pinned: FxHashMap::default(), held: FxHashMap::default(), spare: Vec::new(), scenes: Vec::new(), sheet: None, tally: Tally::default(), drawing: Reason::Screen, fullness: 0.0, draws: 0 })
+        Ok(Self { vello, blending: Blending::Native, atlas: Atlas::On, effects: Effects::Screen, filters: FilterPasses::new(device), cache: LayerCache::default(), effect_cache: LayerCache { cap: HELD_EFFECT_BYTES, kept: HELD_EFFECTS, ..LayerCache::default() }, fingerprints: Fingerprints::default(), held: FxHashMap::default(), spare: Vec::new(), scenes: Vec::new(), sheet: None, reads: Reads::default(), tally: Tally::default(), drawing: Reason::Screen, fullness: 0.0, draws: 0 })
     }
 
     pub fn set_budget(&mut self, pool: u64, layers: u64) {
         self.filters.set_pool_bytes(pool);
         self.cache.cap = layers;
+    }
+
+    pub fn set_effect_budget(&mut self, bytes: u64) {
+        self.effect_cache.cap = bytes;
+        self.effect_cache.sweep(&mut self.vello, &self.reads);
+    }
+
+    pub fn set_image_atlas(&mut self, side: u32) {
+        self.vello.set_image_atlas_max(side);
     }
 
     pub fn take_tally(&mut self) -> Tally {
@@ -425,11 +489,9 @@ impl Engine {
         let ids = images.iter().map(|i| i.data.id()).collect();
         let loose = images.into_iter().filter(|i| !gpu.cache.holds(i) && !gpu.effect_cache.holds(i)).collect();
         let textures = std::mem::take(&mut gpu.kept);
-        let held = HeldScene { scene, loose, _textures: textures, ids };
-        for id in &held.ids {
-            *self.pinned.entry(*id).or_default() += 1;
-        }
-        Ok((held, skipped))
+        let reads = read_images(&scene);
+        self.reads.add(&reads);
+        Ok((HeldScene { scene, loose, _textures: textures, ids, reads }, skipped))
     }
 
     pub fn draw_held(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, held: &HeldScene, transform: Affine, background: Option<Rgba>, target: &wgpu::TextureView, (width, height): (u32, u32)) -> Result<(), EngineError> {
@@ -451,17 +513,14 @@ impl Engine {
     }
 
     pub fn drop_held(&mut self, held: HeldScene) {
-        for id in &held.ids {
-            if let Some(n) = self.pinned.get_mut(id) {
-                *n -= 1;
-                if *n == 0 {
-                    self.pinned.remove(id);
-                }
-            }
-        }
         for image in held.loose {
             self.vello.unregister_texture(image);
         }
+        self.reads.remove(&mut self.vello, &held.reads);
+    }
+
+    pub fn retire(&mut self, image: ImageData, texture: wgpu::Texture) {
+        self.reads.retire(&mut self.vello, image, Some(texture));
     }
 
     pub fn held_effects(&self) -> usize {
@@ -481,8 +540,8 @@ impl Engine {
                 gpu.vello.unregister_texture(image);
             }
         }
-        gpu.cache.sweep(gpu.vello, &self.pinned);
-        gpu.effect_cache.sweep(gpu.vello, &self.pinned);
+        gpu.cache.sweep(gpu.vello, &self.reads);
+        gpu.effect_cache.sweep(gpu.vello, &self.reads);
         self.fullness = fullness;
         self.draws += 1;
         drawn.map(|_| skipped)
@@ -511,6 +570,11 @@ impl Engine {
     }
 
     fn release(&mut self, clip: &str, image: ImageData) {
+        if self.reads.holds(image.data.id()) {
+            let texture = self.held.remove(clip);
+            self.reads.retire(&mut self.vello, image, texture);
+            return;
+        }
         self.vello.unregister_texture(image);
         let Some(texture) = self.held.remove(clip) else { return };
         self.spare.push(texture);

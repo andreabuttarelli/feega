@@ -1,6 +1,8 @@
 import type { CodeSpot } from '$lib/canvas/code-look';
 import type { CapturedMotion } from './captured-motion';
 import { BLEND_MODES, BlendMode } from '@feega/motion-core/motion/blend';
+import { Horizontal, Vertical } from '@feega/motion-core/motion/constraints/model';
+import { Matte } from '@feega/motion-core/motion/mask';
 import { TextSizing } from '@feega/motion-core/motion/text-sizing';
 import type { ClipBehaviour, ColorStop, Effect, FigmaMessage, FigmaRawNode, Guid, Matrix, NodePatch, Paint, Rgba, Vec } from './archive';
 import { geometryPath } from './commands';
@@ -61,11 +63,14 @@ export type Box = { x: number; y: number; width: number; height: number };
 export type Stop = { color: string; pos: number };
 
 export enum PictureFit {
+  Crop = 'crop',
   Cover = 'cover',
   Contain = 'contain',
   Stretch = 'fill',
   Tile = 'tile'
 }
+
+export type PictureCrop = { x: number; y: number; w: number; h: number };
 
 export type Fill =
   | { kind: FillKind.Solid; color: string; opacity: number }
@@ -73,9 +78,9 @@ export type Fill =
   | { kind: FillKind.Radial; stops: Stop[]; center: { x: number; y: number }; radius: number; opacity: number }
   | { kind: FillKind.Angular; stops: Stop[]; angle: number; center: { x: number; y: number }; opacity: number }
   | { kind: FillKind.Diamond; stops: Stop[]; opacity: number }
-  | { kind: FillKind.Image; hash: string; opacity: number; fit: PictureFit; focus: { x: number; y: number } };
+  | { kind: FillKind.Image; hash: string; opacity: number; fit: PictureFit; focus: { x: number; y: number }; crop?: PictureCrop; scale?: number; rotation?: number };
 
-export type Stroke = { fill: Fill; weight: number; align: string; dash: [number, number] | null };
+export type Stroke = { fill: Fill; weight: number; align: string; dash: [number, number] | null; pattern?: number[]; cap?: string; join?: string; miter?: number };
 
 export type Shadow = { kind: 'drop-shadow' | 'inner-shadow'; x: number; y: number; blur: number; spread: number; color: string; opacity: number };
 export type Blur = { kind: 'layer-blur' | 'background-blur'; radius: number };
@@ -83,9 +88,12 @@ export type LayerEffect = Shadow | Blur;
 
 export type Padding = { top: number; right: number; bottom: number; left: number };
 export type AutoLayout = { flow: Flow; wrap: boolean; gap: number; crossGap: number; padding: Padding; justify: Justify; align: Cross; width: Fit; height: Fit };
-export type ChildItem = { grow: boolean; stretch: boolean; absolute: boolean; maxWidth?: number };
+export type PinnedTo = { horizontal: Horizontal; vertical: Vertical };
+export type ChildItem = { grow: boolean; stretch: boolean; absolute: boolean; minWidth?: number; maxWidth?: number; minHeight?: number; maxHeight?: number; constraints?: PinnedTo };
 
-export type TextRun = { start: number; end: number; font?: string; weight?: number; size?: number; color?: string; italic?: boolean; tracking?: number; underline?: boolean; strike?: boolean };
+export type Cutter = { id: string; matte: Matte };
+
+export type TextRun = { start: number; end: number; font?: string; weight?: number; size?: number; color?: string; fill?: Fill; italic?: boolean; tracking?: number; underline?: boolean; strike?: boolean };
 
 export enum MaskBand {
   Solid = 'solid',
@@ -94,7 +102,7 @@ export enum MaskBand {
 
 export type LayerMask = { band: MaskBand; x: number; y: number; length: number; span: number; rotation: number; opacity: number };
 
-type Common = { name: string; box: Box; rotation: number; opacity: number; effects: LayerEffect[]; item: ChildItem; hidden: boolean; blend: BlendMode; masks: LayerMask[]; ref?: string; behaviour?: ClipBehaviour; motion?: CapturedMotion; source?: CodeSpot };
+type Common = { name: string; box: Box; rotation: number; opacity: number; effects: LayerEffect[]; item: ChildItem; hidden: boolean; blend: BlendMode; masks: LayerMask[]; cutter?: Cutter; cutBy?: Cutter; ref?: string; behaviour?: ClipBehaviour; motion?: CapturedMotion; source?: CodeSpot };
 
 export type ComponentRef = { key: string; name: string; inPaste: boolean; variant?: Record<string, string>; texts?: Record<string, string> };
 
@@ -128,6 +136,9 @@ export type TextLayer = Common & {
   lineHeight: string;
   letterSpacing: string;
   align: 'left' | 'center' | 'right' | 'justify';
+  verticalAlign: VerticalAlign;
+  paragraphSpacing: number;
+  paragraphIndent: number;
   color: string;
   runs: TextRun[];
   sizing: TextSizing;
@@ -136,6 +147,8 @@ export type TextLayer = Common & {
   strokes: Stroke[];
 };
 export type Layer = FrameLayer | ShapeLayer | TextLayer;
+
+type VerticalAlign = 'top' | 'center' | 'bottom';
 
 export type Placement = { destination: Destination; layer: Layer; size: { width: number; height: number }; centre: Vec };
 export type FigmaScene = { placements: Placement[]; combined: FrameLayer; skipped: string[] };
@@ -193,6 +206,18 @@ const DECORATION: Record<string, Decoration> = { UNDERLINE: Decoration.Underline
 const RUN_DECORATION: Record<Decoration, Pick<TextRun, 'underline' | 'strike'>> = { [Decoration.None]: {}, [Decoration.Underline]: { underline: true }, [Decoration.Strikethrough]: { strike: true } };
 
 const ALIGN: Record<string, TextLayer['align']> = { LEFT: 'left', CENTER: 'center', RIGHT: 'right', JUSTIFIED: 'justify' };
+
+const VERTICAL_ALIGN: Record<string, VerticalAlign> = { TOP: 'top', CENTER: 'center', BOTTOM: 'bottom' };
+
+const PINNED_HORIZONTAL: Record<string, Horizontal> = { MIN: Horizontal.Left, FIXED_MIN: Horizontal.Left, CENTER: Horizontal.Center, MAX: Horizontal.Right, FIXED_MAX: Horizontal.Right, STRETCH: Horizontal.LeftRight, SCALE: Horizontal.Scale };
+
+const PINNED_VERTICAL: Record<string, Vertical> = { MIN: Vertical.Top, FIXED_MIN: Vertical.Top, CENTER: Vertical.Center, MAX: Vertical.Bottom, FIXED_MAX: Vertical.Bottom, STRETCH: Vertical.TopBottom, SCALE: Vertical.Scale };
+
+const STROKE_CAP: Record<string, string> = { NONE: 'butt', ROUND: 'round', SQUARE: 'square' };
+
+const STROKE_JOIN: Record<string, string> = { MITER: 'miter', BEVEL: 'bevel', ROUND: 'round' };
+
+const MASK_MATTE: Record<string, Matte> = { ALPHA: Matte.Alpha, OUTLINE: Matte.Alpha, LUMINANCE: Matte.Luma };
 
 const round = (n: number) => Math.round(n * DIGITS) / DIGITS;
 const keyOf = (g: Guid) => `${g.sessionID}:${g.localID}`;
@@ -332,24 +357,55 @@ function radialReach(t: Matrix | undefined, size: Vec): number {
 }
 
 const PICTURE_FIT: Record<string, PictureFit> = { FILL: PictureFit.Cover, FIT: PictureFit.Contain, STRETCH: PictureFit.Stretch, TILE: PictureFit.Tile, CROP: PictureFit.Cover };
+
+const SKEW = 1e-3;
+const MIN_CROP_SIDE = 0.01;
+const NO_CROP_SLACK = 0.005;
+
+function cropOf(t: Matrix | undefined): PictureCrop | null {
+  if (!t || Math.abs(t.m01) > SKEW || Math.abs(t.m10) > SKEW || t.m00 <= 0 || t.m11 <= 0) {
+    return null;
+  }
+  const [x, y] = [unitClamp(t.m02), unitClamp(t.m12)];
+  const [w, h] = [Math.max(MIN_CROP_SIDE, Math.min(1 - x, round(t.m00))), Math.max(MIN_CROP_SIDE, Math.min(1 - y, round(t.m11)))];
+  const whole = x < NO_CROP_SLACK && y < NO_CROP_SLACK && w > 1 - NO_CROP_SLACK && h > 1 - NO_CROP_SLACK;
+  return whole ? null : { x, y, w, h };
+}
+
+function imageFill(p: Paint, report: Report): Fill {
+  const base = { kind: FillKind.Image as const, hash: hashHex(p.image?.hash), opacity: round(p.opacity ?? 1), focus: p.focus ?? CENTRED };
+  const mode = PICTURE_FIT[p.imageScaleMode ?? 'FILL'] ?? PictureFit.Cover;
+  const turned = p.rotation ? { rotation: round(p.rotation) } : {};
+  if (mode === PictureFit.Tile) {
+    return { ...base, fit: mode, ...turned, ...(p.scale ? { scale: round(p.scale) } : {}) };
+  }
+  if (mode !== PictureFit.Stretch || !p.transform) {
+    return { ...base, fit: mode };
+  }
+  const crop = cropOf(p.transform);
+  if (!crop && (Math.abs(p.transform.m01) > SKEW || Math.abs(p.transform.m10) > SKEW)) {
+    report('rotated image crop shown uncropped');
+  }
+  return crop ? { ...base, fit: PictureFit.Crop, crop } : { ...base, fit: mode };
+}
 const CENTRED = { x: GRADIENT_MIDDLE, y: GRADIENT_MIDDLE };
 
 type Report = (what: string) => void;
 
-const FILLS: Record<string, (p: Paint, size: Vec) => Fill | null> = {
+const FILLS: Record<string, (p: Paint, size: Vec, report: Report) => Fill | null> = {
   SOLID: (p) => ({ kind: FillKind.Solid, color: hexOf(p.color!), opacity: round((p.opacity ?? 1) * (p.color?.a ?? 1)) }),
   GRADIENT_LINEAR: (p, size) => ({ kind: FillKind.Linear, stops: stopsOf(p.stops), angle: axisAngle(p.transform, size), opacity: round(p.opacity ?? 1) }),
   GRADIENT_RADIAL: (p, size) => ({ kind: FillKind.Radial, stops: stopsOf(p.stops), center: gradientCentre(p.transform), radius: radialReach(p.transform, size), opacity: round(p.opacity ?? 1) }),
   GRADIENT_DIAMOND: (p) => ({ kind: FillKind.Diamond, stops: stopsOf(p.stops), opacity: round(p.opacity ?? 1) }),
   GRADIENT_ANGULAR: (p, size) => ({ kind: FillKind.Angular, stops: stopsOf(p.stops), angle: sweepAngle(p.transform, size), center: gradientCentre(p.transform), opacity: round(p.opacity ?? 1) }),
-  IMAGE: (p) => ({ kind: FillKind.Image, hash: hashHex(p.image?.hash), opacity: round(p.opacity ?? 1), fit: PICTURE_FIT[p.imageScaleMode ?? 'FILL'] ?? PictureFit.Cover, focus: p.focus ?? CENTRED })
+  IMAGE: (p, _size, report) => imageFill(p, report)
 };
 
 function fillsOf(paints: Paint[] | undefined, report: Report, size: Vec = SQUARE): Fill[] {
   return (paints ?? [])
     .filter((p) => p.visible !== false)
     .flatMap((p) => {
-      const made = FILLS[p.type]?.(p, size);
+      const made = FILLS[p.type]?.(p, size, report);
       if (made === undefined) {
         report(`${p.type.toLowerCase()} paint`);
       }
@@ -359,14 +415,36 @@ function fillsOf(paints: Paint[] | undefined, report: Report, size: Vec = SQUARE
 
 const STROKE_KINDS = new Set([FillKind.Solid, FillKind.Linear, FillKind.Radial, FillKind.Angular, FillKind.Diamond]);
 
+const MITER_DEFAULT = 4;
+const SHORT_PATTERN = 2;
+
+function strokeStyleOf(n: FigmaRawNode, report: Report): Pick<Stroke, 'cap' | 'join' | 'miter' | 'pattern'> {
+  const cap = n.strokeCap ? STROKE_CAP[n.strokeCap] : undefined;
+  if (n.strokeCap && !cap) {
+    report(`${n.strokeCap.toLowerCase()} stroke cap`);
+  }
+  const join = n.strokeJoin ? STROKE_JOIN[n.strokeJoin] : undefined;
+  const pattern = (n.dashPattern ?? []).map(round);
+  return {
+    ...(cap && cap !== 'butt' ? { cap } : {}),
+    ...(join && join !== 'miter' ? { join } : {}),
+    ...(n.miterLimit && round(n.miterLimit) !== MITER_DEFAULT ? { miter: round(n.miterLimit) } : {}),
+    ...(pattern.length > SHORT_PATTERN ? { pattern } : {})
+  };
+}
+
 function strokesOf(n: FigmaRawNode, report: Report): Stroke[] {
-  return fillsOf(n.strokePaints, report, n.size).flatMap((fill) => {
+  const painted = fillsOf(n.strokePaints, report, n.size);
+  if (painted.length && n.borderStrokeWeightsIndependent) {
+    report(`per-side stroke weights of ${n.name ?? ''} drawn at one weight`);
+  }
+  return painted.flatMap((fill) => {
     if (!STROKE_KINDS.has(fill.kind)) {
       report(`${fill.kind} stroke`);
       return [];
     }
     const [dash, gap = dash] = n.dashPattern ?? [];
-    return [{ fill, weight: round(n.strokeWeight ?? 1), align: (n.strokeAlign ?? 'CENTER').toLowerCase(), dash: dash ? [round(dash), round(gap)] : null }];
+    return [{ fill, weight: round(n.strokeWeight ?? 1), align: (n.strokeAlign ?? 'CENTER').toLowerCase(), dash: dash ? [round(dash), round(gap)] : null, ...strokeStyleOf(n, report) }];
   });
 }
 
@@ -384,6 +462,9 @@ function effectsOf(n: FigmaRawNode, report: Report): LayerEffect[] {
       const made = EFFECTS[e.type];
       if (!made) {
         report(`${e.type.toLowerCase()} effect`);
+      }
+      if (e.type === 'INNER_SHADOW' && e.spread) {
+        report(`inner shadow spread of ${n.name ?? ''} dropped`);
       }
       return made ? [made(e)] : [];
     });
@@ -418,13 +499,34 @@ function autoLayoutOf(n: FigmaRawNode, report: Report): AutoLayout | null {
   };
 }
 
-const itemOf = (n: FigmaRawNode): ChildItem => ({ grow: (n.stackChildPrimaryGrow ?? 0) > 0, stretch: n.stackChildAlignSelf === 'STRETCH', absolute: n.stackPositioning === 'ABSOLUTE', ...(n.maxWidth ? { maxWidth: n.maxWidth } : {}) });
+const HUGE_LIMIT = 1e5;
+
+const limit = (v: number | undefined) => (v !== undefined && v > 0 && v < HUGE_LIMIT ? { v } : null);
+
+function limitsOf(n: FigmaRawNode): Pick<ChildItem, 'minWidth' | 'maxWidth' | 'minHeight' | 'maxHeight'> {
+  const found = { minWidth: limit(n.minWidth ?? n.minSize?.value.x), maxWidth: limit(n.maxWidth ?? n.maxSize?.value.x), minHeight: limit(n.minHeight ?? n.minSize?.value.y), maxHeight: limit(n.maxHeight ?? n.maxSize?.value.y) };
+  return Object.fromEntries(Object.entries(found).flatMap(([key, got]) => (got ? [[key, got.v]] : [])));
+}
+
+function pinnedOf(n: FigmaRawNode): PinnedTo | null {
+  if (!n.horizontalConstraint && !n.verticalConstraint) {
+    return null;
+  }
+  return { horizontal: PINNED_HORIZONTAL[n.horizontalConstraint ?? ''] ?? Horizontal.Left, vertical: PINNED_VERTICAL[n.verticalConstraint ?? ''] ?? Vertical.Top };
+}
+
+function itemOf(n: FigmaRawNode): ChildItem {
+  const pinned = pinnedOf(n);
+  return { grow: (n.stackChildPrimaryGrow ?? 0) > 0, stretch: n.stackChildAlignSelf === 'STRETCH', absolute: n.stackPositioning === 'ABSOLUTE', ...limitsOf(n), ...(pinned ? { constraints: pinned } : {}) };
+}
 
 const SPACING_PX: Record<string, (value: number, size: number) => number> = { PIXELS: (v) => v, PERCENT: (v, size) => (v / PERCENT) * size, RAW: (v, size) => v * size };
 
 const spacingPx = (u: { value: number; units: string } | undefined, size: number) => (u && SPACING_PX[u.units] ? SPACING_PX[u.units](u.value, size) : 0);
 
 const SPACING_STEP = 0.01;
+
+const RUN_GRADIENTS = new Set([FillKind.Linear, FillKind.Radial, FillKind.Angular, FillKind.Diamond]);
 
 function runsOf(n: FigmaRawNode, base: { font: string; weight: number; size: number; color: string }, report: Report): TextRun[] {
   const ids = n.textData?.characterStyleIDs ?? [];
@@ -437,7 +539,9 @@ function runsOf(n: FigmaRawNode, base: { font: string; weight: number; size: num
     }
     const style = table.get(ids[start]);
     if (ids[start] && style) {
-      const fill = fillsOf(style.fillPaints, report).find((f) => f.kind === FillKind.Solid);
+      const painted = fillsOf(style.fillPaints, report, n.size);
+      const fill = painted.find((f) => f.kind === FillKind.Solid);
+      const sweep = fill ? undefined : painted.find((f) => RUN_GRADIENTS.has(f.kind));
       const run: TextRun = { start, end: i };
       if (style.fontName && style.fontName.family !== base.font) {
         run.font = style.fontName.family;
@@ -451,8 +555,11 @@ function runsOf(n: FigmaRawNode, base: { font: string; weight: number; size: num
       if (positive(style.fontSize) && style.fontSize !== base.size) {
         run.size = style.fontSize;
       }
-      if (fill && fill.color !== base.color) {
+      if (fill && fill.kind === FillKind.Solid && fill.color !== base.color) {
         run.color = fill.color;
+      }
+      if (sweep) {
+        run.fill = sweep;
       }
       const size = positive(style.fontSize) ? style.fontSize : base.size;
       const spacing = spacingPx(style.letterSpacing, size);
@@ -598,8 +705,20 @@ function masksOf(gradient: FigmaRawNode['maskGradient'], box: Box): LayerMask[] 
     .slice(0, MAX_MASKS);
 }
 
+function cutterOf(n: FigmaRawNode, report: Report): Cutter | null {
+  if (!n.mask || n.visible === false) {
+    return null;
+  }
+  const kind = n.maskType ?? (n.maskIsOutline ? 'OUTLINE' : 'ALPHA');
+  if (kind === 'OUTLINE' && !(n.fillPaints ?? []).some((p) => p.visible !== false)) {
+    report(`outline mask ${n.name ?? ''} without a fill cuts nothing`);
+  }
+  return { id: keyOf(n.guid), matte: MASK_MATTE[kind] ?? Matte.Alpha };
+}
+
 function common(n: FigmaRawNode, m: Matrix, ctx: Ctx): Common {
-  return { name: n.name ?? n.type ?? '', box: boxOf(m, n.size ?? { x: 0, y: 0 }), rotation: rotationOf(m), opacity: round(n.opacity ?? 1), effects: effectsOf(n, ctx.report), item: itemOf(n), hidden: n.collapsed === true, blend: blendOf(n.blendMode), masks: masksOf(n.maskGradient, boxOf(m, n.size ?? { x: 0, y: 0 })), ...(n.ref ? { ref: n.ref } : {}), ...(n.behaviour ? { behaviour: n.behaviour } : {}), ...(n.motion ? { motion: n.motion } : {}), ...(n.source ? { source: n.source } : {}) };
+  const cutter = cutterOf(n, ctx.report);
+  return { name: n.name ?? n.type ?? '', box: boxOf(m, n.size ?? { x: 0, y: 0 }), rotation: rotationOf(m), opacity: round(n.opacity ?? 1), effects: effectsOf(n, ctx.report), item: itemOf(n), hidden: n.collapsed === true || n.visible === false, ...(cutter ? { cutter } : {}), blend: blendOf(n.blendMode), masks: masksOf(n.maskGradient, boxOf(m, n.size ?? { x: 0, y: 0 })), ...(n.ref ? { ref: n.ref } : {}), ...(n.behaviour ? { behaviour: n.behaviour } : {}), ...(n.motion ? { motion: n.motion } : {}), ...(n.source ? { source: n.source } : {}) };
 }
 
 const DEFAULT_TEXT_SIZE = 12;
@@ -625,6 +744,9 @@ function textLayer(n: FigmaRawNode, m: Matrix, ctx: Ctx): TextLayer {
     lineHeight: unitOf(n.lineHeight, 'auto'),
     letterSpacing: unitOf(n.letterSpacing, '0%'),
     align: ALIGN[n.textAlignHorizontal ?? 'LEFT'] ?? 'left',
+    verticalAlign: VERTICAL_ALIGN[n.textAlignVertical ?? 'TOP'] ?? 'top',
+    paragraphSpacing: round(n.paragraphSpacing ?? 0),
+    paragraphIndent: round(n.paragraphIndent ?? 0),
     runs: runsOf(n, base, ctx.report),
     sizing: TEXT_SIZING[n.textAutoResize ?? ''] ?? TextSizing.AutoWidth,
     maxLines: n.maxLines ?? 0,
@@ -680,9 +802,6 @@ function componentOf(n: FigmaRawNode, ctx: Ctx): ComponentRef | null {
 
 function layerOf(raw: FigmaRawNode, parent: Matrix, ctx: Ctx): Layer | null {
   const n = patchedNode(raw, ctx);
-  if (n.visible === false) {
-    return null;
-  }
   const m = multiply(parent, n.transform ?? IDENTITY);
   const type = n.type ?? '';
   if (CONTAINERS.has(type)) {
@@ -722,8 +841,19 @@ function frameLayer(n: FigmaRawNode, m: Matrix, ctx: Ctx): FrameLayer {
     outline: transformedPath(roundedRect(n.size ?? { x: 0, y: 0 }, radiiOf(n)), m),
     clip: clips ? Clip.Content : Clip.None,
     autoLayout: upright ? stacked : null,
-    children: kids.flatMap((c) => layerOf(c, m, within) ?? [])
+    children: cutInOrder(kids.flatMap((c) => layerOf(c, m, within) ?? []))
   };
+}
+
+function cutInOrder(layers: Layer[]): Layer[] {
+  let cutter: Cutter | undefined;
+  return layers.map((layer) => {
+    if (layer.cutter) {
+      cutter = layer.cutter;
+      return layer;
+    }
+    return cutter ? { ...layer, cutBy: cutter } : layer;
+  });
 }
 
 type Extent = { left: number; top: number; right: number; bottom: number };
@@ -747,7 +877,7 @@ function corners(box: Box, degrees: number): Vec[] {
 function extentOf(layer: Layer): Extent {
   const upright = layer.kind === LayerKind.Text && layer.rotation ? corners(layer.box, 0) : [];
   const own = [...corners(layer.box, layer.rotation), ...upright];
-  const inside = layer.kind === LayerKind.Frame && layer.clip === Clip.None ? layer.children.map(extentOf) : [];
+  const inside = layer.kind === LayerKind.Frame && layer.clip === Clip.None ? layer.children.filter((c) => !c.hidden).map(extentOf) : [];
   const xs = [...own.map((p) => p.x), ...inside.flatMap((e) => [e.left, e.right])];
   const ys = [...own.map((p) => p.y), ...inside.flatMap((e) => [e.top, e.bottom])];
   return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
@@ -790,7 +920,7 @@ export function figmaScene(message: FigmaMessage): FigmaScene | null {
   }
   const ctx: Ctx = { byKey, children, blobs: message.blobs, report: (what) => skipped.add(what.trim()), scope: OUTSIDE };
   const internal = new Set(message.nodes.filter((n) => n.type === 'CANVAS' && n.internalOnly).map((n) => keyOf(n.guid)));
-  const nodes = message.nodes.filter((n) => !PAGES.has(n.type ?? '') && n.parentIndex && PAGES.has(byKey.get(keyOf(n.parentIndex.guid))?.type ?? '') && !internal.has(keyOf(n.parentIndex.guid))).sort(byPosition);
+  const nodes = message.nodes.filter((n) => n.visible !== false && !PAGES.has(n.type ?? '') && n.parentIndex && PAGES.has(byKey.get(keyOf(n.parentIndex.guid))?.type ?? '') && !internal.has(keyOf(n.parentIndex.guid))).sort(byPosition);
   const tops: Top[] = nodes.flatMap((node) => {
     const layer = layerOf(node, IDENTITY, ctx);
     return layer ? [{ node, extent: extentOf(layer) }] : [];

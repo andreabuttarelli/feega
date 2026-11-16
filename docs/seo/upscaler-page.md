@@ -18,7 +18,7 @@ review.** The live page still says "up to 30 seconds": wrong, the model takes 20
 Takeaways: every page-1 result is a tool page with a working upload and a real before/after.
 None of ours had real examples. Honest gaps: we are not free and not unlimited (credits, 20 s,
 mp4), we do no denoise/stabilise/colour/frame interpolation. Compete on: real output shown,
-exact price per second before running, the clip lands in a workspace (canvas, social calendar).
+exact price per second before running, the clip lands in a workspace (canvas).
 
 ## Meta
 

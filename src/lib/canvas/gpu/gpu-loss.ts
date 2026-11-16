@@ -12,6 +12,10 @@ export const LOSSES_PER_BACKEND = 3;
 
 export const FRESH_CORES = 2;
 
+export const backendAfterLoss = (backend: number, losses: number, backends: number): number => (losses >= LOSSES_PER_BACKEND && backend + 1 < backends ? backend + 1 : backend);
+
+export const lossesExhausted = (backend: number, losses: number, backends: number): boolean => losses >= LOSSES_PER_BACKEND && backend + 1 >= backends;
+
 export enum AttachStep {
   FreshCore = 'fresh-core',
   NextBackend = 'next-backend',
@@ -22,16 +26,6 @@ export const isTrap = (e: unknown): boolean => typeof WebAssembly !== 'undefined
 
 export function afterAttachFailure(e: unknown, backend: number, freshCores: number, backends: number): { step: AttachStep; backend: number } {
   if (isTrap(e) && freshCores < FRESH_CORES) {
-    return { step: AttachStep.FreshCore, backend };
-  }
-  if (backend + 1 < backends) {
-    return { step: AttachStep.NextBackend, backend: backend + 1 };
-  }
-  return { step: AttachStep.GiveUp, backend };
-}
-
-export function afterLoss(backend: number, losses: number, backends: number): { step: AttachStep; backend: number } {
-  if (losses < LOSSES_PER_BACKEND) {
     return { step: AttachStep.FreshCore, backend };
   }
   if (backend + 1 < backends) {
