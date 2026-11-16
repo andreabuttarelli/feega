@@ -3985,3 +3985,20 @@ edit on 2,125 clips); the code has `find`/`findIndex`/`some`/`includes`/`filter`
 inside a `map`/`filter`/`forEach` over clips, tracks, nodes or layers. **Move:** lookup by id
 inside a loop → build a `Map`/`Set` once outside it. Prove it with a test that counts scans or
 property reads on ~2,000 items (`src/lib/canvas/counted-list.testkit.ts`), not wall time.
+
+## A concurrency test in PGlite passes without the lock
+
+**Signal:** a harness fires N holds with `Promise.all` against PGlite and they all behave; drop the
+lock from the SQL and it still passes. PGlite is one connection and runs queries one at a time,
+so it proves the logic, never the lock. **Move:** run the same harness on a real Postgres with a
+pool of N connections (`CREDIT_SPEND_DATABASE_URL`, CI starts the runner's preinstalled
+Postgres). Locally without Docker: `brew install postgresql@16`, `initdb` into a scratch dir,
+`pg_ctl -o "-p 54329"`. Without the advisory lock `credit_hold` let 4 of 12 holds through on a
+balance that fit 3.
+
+## A debit written after the call, in a detached promise, is a free call waiting to happen
+
+**Signal:** `credit_ledger debit failed` in the logs with nothing retrying it, or `ai_calls` rows
+with `billed_credits > 0` and no matching `kind = 'debit'`. **Move:** the debit belongs to the
+same transaction as the usage row (the `ai_calls_debit` trigger); the row carries its own id so
+a retry answers `23505` instead of charging twice; a row that never lands goes to Sentry.

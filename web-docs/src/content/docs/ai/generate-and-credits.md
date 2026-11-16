@@ -43,6 +43,12 @@ Subscribe, manage the plan and buy top-ups on the **Credits** page. From the CLI
 
 The canvas chat agent runs on Claude Opus 5.5, and every turn spends credits. When the balance runs out, the chat stops before spending and shows the upgrade screen.
 
+### When the balance cannot be checked
+
+Every call that costs money (chat, image, video, audio, renders, code import, and the same actions from the CLI, MCP and API) checks the balance first. If billing cannot be checked at that moment, the action is refused instead of running unpaid: the app shows *AI is paused: billing cannot be checked right now. Nothing was charged.* and the API answers `503` with `{"error": "billing_unavailable"}`. Reading, editing and everything that does not spend keep working. Self-hosted builds with `BILLING_PROVIDER=open` and local `.feega` files with your own keys are not metered.
+
+A video render reserves its quoted credits before it starts and is charged what it actually used when it ends; a render that fails or is cancelled gives the reservation back, and one left unfinished is released within a day.
+
 ## Improve prompt
 
 On image and video nodes, the **Improve prompt** switch rewrites the text with the chosen model's best practices before generating. The node's own prompt is unchanged. Off by default. When on, the price on Generate and Loop includes the rewrite.
