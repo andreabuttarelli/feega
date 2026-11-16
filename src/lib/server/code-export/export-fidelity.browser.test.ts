@@ -18,6 +18,7 @@ import { chromiumExport, chromiumFrames } from '$lib/server/motion/chromium-fram
 import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { posterSecond } from '$lib/motion/poster-time';
 import { libsOrigin } from '$lib/server/motion/libs-origin';
+import { withShapedText } from '$lib/server/motion/shaped-compose';
 import { everyClip } from '@feega/motion-core/motion/doc';
 import { similarity } from '$lib/server/web/ui-fidelity';
 
@@ -125,7 +126,7 @@ const wordsOf = (text: string) => text.replace(/\s+/g, '');
 async function canvasBoxes(doc: MotionDoc): Promise<Seen[]> {
   const page = await chromiumExport.open({ width: doc.width, height: doc.height, scale: 1 });
   try {
-    await page.load(composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {}, origin: libsOrigin() }));
+    await page.load(composeHtml(await withShapedText({ doc, tokens: FEEGA_TOKENS, assets: {}, origin: libsOrigin() })));
     await page.seek(posterSecond(doc));
     const texts = everyClip(doc).filter((c) => typeof c.props.text === 'string' && c.props.text.trim() && !c.hidden);
     const seen: Seen[] = [];
