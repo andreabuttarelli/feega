@@ -227,9 +227,23 @@ function placer(clips: readonly MotionClip[], boxes: Map<string, Box>, size: Siz
   };
 }
 
+type HeldBoxes = { size: Size; content: Content; measure: TextMeasure; boxes: Map<string, Box> };
+
+const heldBoxes = new WeakMap<readonly MotionTrack[], HeldBoxes>();
+
+function tracksBoxes(tracks: readonly MotionTrack[], size: Size, content: Content, measure: TextMeasure): Map<string, Box> {
+  const held = heldBoxes.get(tracks);
+  if (held && held.content === content && held.measure === measure && held.size.width === size.width && held.size.height === size.height) {
+    return held.boxes;
+  }
+  const boxes = boxesOf(visualClips(tracks), size, content, measure);
+  heldBoxes.set(tracks, { size, content, measure, boxes });
+  return boxes;
+}
+
 function laidOut(tracks: MotionTrack[], size: Size, measure: TextMeasure, content: Content = NO_CONTENT): MotionTrack[] {
   const clips = visualClips(tracks);
-  const boxes = boxesOf(clips, size, content, measure);
+  const boxes = tracksBoxes(tracks, size, content, measure);
   if (!boxes.size) {
     return tracks;
   }
@@ -275,15 +289,28 @@ function layAll(doc: MotionDoc, measure: TextMeasure): MotionDoc {
     return doc;
   }
   const size = { width: doc.width, height: doc.height };
-  const comps = laidComps(doc, size, measure);
-  return { ...doc, tracks: laidOut(doc.tracks, size, measure, instanceContent({ ...doc, comps }, size, measure)), comps };
+  const { comps, content } = laidContent(doc, size, measure);
+  return { ...doc, tracks: laidOut(doc.tracks, size, measure, content), comps };
 }
 
-const laidCompsCache = new WeakMap<object, Map<TextMeasure, MotionDoc['comps']>>();
+type ByComps<T> = WeakMap<object, Map<TextMeasure, Map<string, T>>>;
 
-function cachedComps(doc: MotionDoc, size: Size, measure: TextMeasure): MotionDoc['comps'] {
-  const byMeasure = laidCompsCache.get(doc.comps) ?? laidCompsCache.set(doc.comps, new Map()).get(doc.comps)!;
-  return byMeasure.get(measure) ?? byMeasure.set(measure, laidComps(doc, size, measure)).get(measure)!;
+function byComps<T>(cache: ByComps<T>, doc: MotionDoc, size: Size, measure: TextMeasure, make: () => T): T {
+  const byMeasure = cache.get(doc.comps) ?? cache.set(doc.comps, new Map()).get(doc.comps)!;
+  const bySize = byMeasure.get(measure) ?? byMeasure.set(measure, new Map()).get(measure)!;
+  const key = `${size.width}x${size.height}`;
+  return bySize.get(key) ?? bySize.set(key, make()).get(key)!;
+}
+
+const laidCompsCache: ByComps<MotionDoc['comps']> = new WeakMap();
+const contentCache: ByComps<Content> = new WeakMap();
+
+const cachedComps = (doc: MotionDoc, size: Size, measure: TextMeasure) => byComps(laidCompsCache, doc, size, measure, () => laidComps(doc, size, measure));
+
+function laidContent(doc: MotionDoc, size: Size, measure: TextMeasure): { comps: MotionDoc['comps']; content: Content } {
+  const comps = cachedComps(doc, size, measure);
+  const laid = { ...doc, comps };
+  return { comps, content: byComps(contentCache, laid, size, measure, () => instanceContent(laid, size, measure)) };
 }
 
 export function laidSubtree(doc: MotionDoc, rootId: string, measure: TextMeasure = estimatedText): MotionClip[] {
@@ -295,7 +322,7 @@ export function laidSubtree(doc: MotionDoc, rootId: string, measure: TextMeasure
   if (!laysOut(doc)) {
     return clips;
   }
-  const content = instanceContent({ ...doc, comps: cachedComps(doc, size, measure) }, size, measure);
+  const { content } = laidContent(doc, size, measure);
   if (!visualClips(doc.tracks).some(isContainer)) {
     return clips;
   }
@@ -341,8 +368,8 @@ function widened(comp: MotionComp, width: number, space: Size): MotionComp | nul
 
 export function withFittedInstances(doc: MotionDoc): MotionDoc {
   const size = { width: doc.width, height: doc.height };
-  const content = instanceContent({ ...doc, comps: laidComps(doc, size, estimatedText) }, size, estimatedText);
-  const boxes = boxesOf(visualClips(doc.tracks), size, content, estimatedText);
+  const { content } = laidContent(doc, size, estimatedText);
+  const boxes = tracksBoxes(doc.tracks, size, content, estimatedText);
   const variants: MotionDoc['comps'] = {};
 
   const fitted = (clip: MotionClip): MotionClip => {
