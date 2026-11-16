@@ -97,15 +97,15 @@ describe('variablesOf', () => {
     expect(made.map['app Radius/card'].scale).toBe(0.5);
   });
 
-  it('oltre 64 variabili per collezione, le usate restano e le altre sono elencate come lasciate fuori', () => {
+  it('oltre il limite di variabili per collezione, le usate restano e le altre sono elencate come lasciate fuori', () => {
     const many = Array.from({ length: MAX_VARIABLES + 2 }, (_, i) => `  --color-c${i}: #${String(i).padStart(6, '0')};`).join('\n');
     const set = tokenSetOf(parseSheets([{ path: 'a.css', text: `@theme {\n${many}\n}` }]));
 
-    const made = variablesOf(set, 'app', { used: new Set(['--color-c65']) });
+    const made = variablesOf(set, 'app', { used: new Set([`--color-c${MAX_VARIABLES + 1}`]) });
 
     expect(Object.keys(made.variables['app Colors'].vars)).toHaveLength(MAX_VARIABLES);
-    expect(made.variables['app Colors'].vars.c65).toBeDefined();
-    expect(made.dropped).toEqual(['--color-c63: over the 64-variable limit of app Colors', '--color-c64: over the 64-variable limit of app Colors']);
+    expect(made.variables['app Colors'].vars[`c${MAX_VARIABLES + 1}`]).toBeDefined();
+    expect(made.dropped).toEqual([`--color-c${MAX_VARIABLES - 1}: over the ${MAX_VARIABLES}-variable limit of app Colors`, `--color-c${MAX_VARIABLES}: over the ${MAX_VARIABLES}-variable limit of app Colors`]);
   });
 
   it('un alias il cui bersaglio è stato lasciato fuori resta fuori anche lui, e lo dice', () => {
@@ -124,6 +124,16 @@ describe('variablesOf', () => {
     expect(Object.keys(byName['--mui-palette-primary-main'].values)).toEqual(['Light', 'Dark']);
     expect(byName['--mui-shape-borderRadius'].kind).toBe(TokenKind.Radius);
     expect(byName['--mui-spacing'].kind).toBe(TokenKind.Spacing);
+  });
+});
+
+describe('un tema vero, con centinaia di colori', () => {
+  it('una palette di 242 colori entra intera, e il documento resta valido', async () => {
+    const made = variablesOf(await setOf('big-theme'), 'big');
+
+    expect(Object.keys(made.variables['big Colors'].vars)).toHaveLength(242);
+    expect(made.dropped.filter((d) => d.includes('limit'))).toEqual([]);
+    expect(variablesSchema.safeParse(made.variables).success).toBe(true);
   });
 });
 
