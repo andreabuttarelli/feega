@@ -524,10 +524,10 @@ pub fn parse_splice(json: &str) -> Result<Splice, serde_json::Error> {
     serde_json::from_str(json)
 }
 
-pub fn parse_packed(json: &str, floats: Vec<f64>, ends: Vec<u32>) -> Result<DisplayList, serde_json::Error> {
+pub fn parse_packed(json: &str, floats: Vec<f32>, ends: Vec<u32>) -> Result<DisplayList, serde_json::Error> {
     packed::within(floats, ends, || serde_json::from_str(json))
 }
 
-pub fn parse_splice_packed(json: &str, floats: Vec<f64>, ends: Vec<u32>) -> Result<Splice, serde_json::Error> {
+pub fn parse_splice_packed(json: &str, floats: Vec<f32>, ends: Vec<u32>) -> Result<Splice, serde_json::Error> {
     packed::within(floats, ends, || serde_json::from_str(json))
 }

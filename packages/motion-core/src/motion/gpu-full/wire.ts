@@ -36,7 +36,7 @@ export const listWire = (list: DisplayList): string => `{"width":${Math.ceil(lis
 
 export const spliceWire = (splice: Splice): string => `{"head":${splice.head},"tail":${splice.tail},"items":${itemsWire(splice.items)}}`;
 
-export type ItemPack = { json: string; floats: Float64Array; ends: Uint32Array };
+export type ItemPack = { json: string; floats: Float32Array; ends: Uint32Array };
 export type ListPack = ItemPack;
 
 const packs = new WeakMap<Item, ItemPack>();
@@ -81,8 +81,8 @@ export function packsKnown(items: readonly Item[], known: readonly ItemPack[]): 
   items.forEach((item, i) => packs.set(item, known[i]));
 }
 
-function joined(parts: readonly ContourView[]): ContourView {
-  const floats = new Float64Array(parts.reduce((n, p) => n + p.floats.length, 0));
+function joined(parts: readonly { floats: ArrayLike<number> & { length: number }; ends: Uint32Array }[]): { floats: Float32Array; ends: Uint32Array } {
+  const floats = new Float32Array(parts.reduce((n, p) => n + p.floats.length, 0));
   const ends = new Uint32Array(parts.reduce((n, p) => n + p.ends.length, 0));
   let f = 0;
   let e = 0;
@@ -96,8 +96,8 @@ function joined(parts: readonly ContourView[]): ContourView {
 
 const keys = new WeakMap<Item, string>();
 
-function hashOf(floats: Float64Array): string {
-  const words = new Uint32Array(floats.buffer, floats.byteOffset, floats.length * 2);
+function hashOf(floats: Float32Array): string {
+  const words = new Uint32Array(floats.buffer, floats.byteOffset, floats.length);
   let hash = 0x811c9dc5;
   for (let i = 0; i < words.length; i++) {
     hash = Math.imul(hash ^ words[i], 0x01000193);
