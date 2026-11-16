@@ -18,7 +18,7 @@ use crate::layers::Effects;
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile, OPAQUE};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, GestureDraw, Moment, Path, Warmup, tiles_kept_beside, TILE_BUDGET_BYTES, TILE_BYTES, TILE_GUTTER_PX, batches, batches_of, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys, magnified, fallback_serves, fallback_bands, ahead_camera, fade_in, fades_over, FADE_MS};
+use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, GestureDraw, Moment, Path, Warmup, tiles_kept_beside, TILE_BUDGET_BYTES, TILE_BYTES, TILE_GUTTER_PX, batches, batches_of, bake_batches, step_of, step_zoom, Batch, BlockSizer, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys, magnified, fallback_serves, fallback_bands, ahead_camera, fade_in, fades_over, FADE_MS};
 use crate::overlay_seen::OverlaySeen;
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
@@ -36,6 +36,7 @@ const FRAMES_IN_FLIGHT: u32 = 1;
 const GESTURE_RASTER_EVERY_MS: f64 = 80.0;
 
 const UNMOVED: Lookup = Lookup { scale: 1.0, x: 0.0, y: 0.0 };
+const SCREEN_OUTPUTS: [Output; 2] = [Output::Premultiplied, Output::Over];
 
 const NOT_TIMED: u64 = u64::MAX;
 const TILE_BUDGET_GESTURE_MS: f64 = 4.0;
@@ -109,6 +110,9 @@ pub struct WebCore {
     rest_shown: Vec<(Rect, wgpu::Texture)>,
     rest_spare: FxHashMap<(u32, u32), Vec<wgpu::Texture>>,
     counted: Counted,
+    fallback_blocks: BlockSizer,
+    tiles_warmed: bool,
+    rest_blocks: BlockSizer,
     sharpness: Sharpness,
     fallback: Vec<Fallback>,
     ahead: Option<Ahead>,
@@ -421,7 +425,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), sharpness: Sharpness::default(), fallback: Vec::new(), ahead: None, fallback_was: camera, born: FxHashMap::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 }, gesture_draw: GestureDraw::Tiles, direct: None, held_scene: None })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), fallback_blocks: BlockSizer::default(), tiles_warmed: false, rest_blocks: BlockSizer::default(), sharpness: Sharpness::default(), fallback: Vec::new(), ahead: None, fallback_was: camera, born: FxHashMap::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 }, gesture_draw: GestureDraw::Tiles, direct: None, held_scene: None })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -909,7 +913,7 @@ impl WebCore {
         if !self.rest.as_ref().is_some_and(|r| r.shows(self.camera, screen)) {
             self.forget_rest();
         }
-        let budget = if matches!(self.motion, CoreMotion::Gesture) { TILE_BUDGET_GESTURE_MS } else { TILE_BUDGET_STILL_MS };
+        let budget = self.frame_budget();
         let started = js_sys::Date::now();
         let mut rastered = 0;
         self.lift_tiles(screen)?;
@@ -986,7 +990,7 @@ impl WebCore {
             }
             let camera = Camera { x: c.x.round() - area.x0, y: c.y.round() - area.y0, zoom: c.zoom };
             let size = (area.width() as u32, area.height() as u32);
-            self.fallback.push(Fallback { camera, size, pieces: Vec::new(), todo: Rest::new(camera, size).todo().to_vec() });
+            self.fallback.push(Fallback { camera, size, pieces: Vec::new(), todo: Rest::sized(camera, size, self.fallback_blocks.side(self.frame_budget())).todo().to_vec() });
             self.sharpness.fallbacks += 1;
         }
         while self.fallback.len() > FALLBACK_PATCHES {
@@ -1001,11 +1005,28 @@ impl WebCore {
         Ok(true)
     }
 
+    fn warm_tiled_path(&mut self) -> Result<(), JsValue> {
+        if self.tiles_warmed {
+            return Ok(());
+        }
+        self.tiles_warmed = true;
+        self.reprojector.warm(&self.device, self.format, &SCREEN_OUTPUTS);
+        if let Some(overlay) = self.overlay_texture()? {
+            self.overlay_tex = Some(overlay);
+        }
+        Ok(())
+    }
+
+    fn frame_budget(&self) -> f64 {
+        if matches!(self.motion, CoreMotion::Gesture) { TILE_BUDGET_GESTURE_MS } else { TILE_BUDGET_STILL_MS }
+    }
+
     fn draw_fallback_blocks(&mut self, deadline: f64) -> Result<(), JsValue> {
         while js_sys::Date::now() < deadline {
             let Some(at) = self.fallback.iter().position(|f| !f.todo.is_empty()) else { return Ok(()) };
             let block = self.fallback[at].todo.remove(0);
             let camera = self.fallback[at].camera;
+            let began = now_ms();
             let shifted = Camera { x: camera.x - block.x0, y: camera.y - block.y0, zoom: camera.zoom };
             let limits = self.limits;
             self.limits = Limits { rasters: 0, ..limits };
@@ -1014,6 +1035,7 @@ impl WebCore {
             let (pieces, _) = rendered?;
             let placed = |p: Piece| Piece { x: p.x + block.x0 as u32, y: p.y + block.y0 as u32, ..p };
             self.fallback[at].pieces.extend(pieces.into_iter().map(|(p, t)| (placed(p), t)));
+            self.fallback_blocks.learn(now_ms() - began, block.area());
         }
         Ok(())
     }
@@ -1045,7 +1067,7 @@ impl WebCore {
         if !self.ahead.as_ref().is_some_and(|a| a.size == screen && fallback_serves(a.camera, self.camera, a.size, &[])) {
             self.forget_ahead();
             let camera = Camera { x: next.x.round(), y: next.y.round(), zoom: next.zoom };
-            self.ahead = Some(Ahead { camera, size: screen, pieces: Vec::new(), todo: Rest::new(camera, screen).todo().to_vec() });
+            self.ahead = Some(Ahead { camera, size: screen, pieces: Vec::new(), todo: Rest::sized(camera, screen, self.fallback_blocks.side(self.frame_budget())).todo().to_vec() });
         }
         let began = js_sys::Date::now();
         while js_sys::Date::now() < deadline.min(began + AHEAD_BUDGET_MS) {
@@ -1055,6 +1077,7 @@ impl WebCore {
             }
             let block = ahead.todo.remove(0);
             let camera = ahead.camera;
+            let block_began = now_ms();
             let shifted = Camera { x: camera.x - block.x0, y: camera.y - block.y0, zoom: camera.zoom };
             let limits = self.limits;
             self.limits = Limits { rasters: 0, ..limits };
@@ -1063,6 +1086,7 @@ impl WebCore {
             let (pieces, _) = rendered?;
             let at = |p: Piece| Piece { x: p.x + block.x0 as u32, y: p.y + block.y0 as u32, ..p };
             self.ahead.as_mut().expect("ahead started").pieces.extend(pieces.into_iter().map(|(p, t)| (at(p), t)));
+            self.fallback_blocks.learn(now_ms() - block_began, block.area());
         }
         let took = js_sys::Date::now() - began;
         self.credit.spend(took);
@@ -1110,11 +1134,11 @@ impl WebCore {
             self.forget_rest();
         }
         if self.rest.is_none() {
-            self.rest = Some(Rest::new(self.camera, screen));
+            self.rest = Some(Rest::sized(self.camera, screen, self.rest_blocks.side(budget)));
         }
         let mut spent = spent;
         loop {
-            if spent && js_sys::Date::now() - started > budget {
+            if spent && (js_sys::Date::now() - started > budget || input_pending()) {
                 return Ok(false);
             }
             let Some(block) = self.rest.as_mut().and_then(Rest::next) else { return Ok(self.rest.as_ref().is_some_and(Rest::adoptable)) };
@@ -1130,6 +1154,7 @@ impl WebCore {
             let texture = self.rest_spare.get_mut(&size).and_then(Vec::pop).unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
             self.engine.draw(&self.device, &self.queue, &list, &pictures, &texture.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
             self.rest_shown.push((block, texture));
+            self.rest_blocks.learn(now_ms() - began, block.area());
             self.count_bake(began);
             spent = true;
         }
@@ -1187,6 +1212,7 @@ impl WebCore {
         let coarse = building == Building::Nothing && self.warmup.coarse_due(js_sys::Date::now());
         let mut coarse_left = false;
         if self.tiled && !frame.pending && idle {
+            self.warm_tiled_path()?;
             self.warm_tiles()?;
         } else if self.tiled && !frame.pending && coarse {
             coarse_left = self.fill_pyramid()?;

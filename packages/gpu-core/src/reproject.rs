@@ -140,6 +140,12 @@ impl Reprojector {
         slot
     }
 
+    pub fn warm(&mut self, device: &wgpu::Device, format: wgpu::TextureFormat, outputs: &[Output]) {
+        for output in outputs {
+            self.pipeline(device, format, *output);
+        }
+    }
+
     fn pipeline(&mut self, device: &wgpu::Device, format: wgpu::TextureFormat, output: Output) -> &wgpu::RenderPipeline {
         if let Some(at) = self.pipelines.iter().position(|(key, _)| *key == (format, output)) {
             return &self.pipelines[at].1;
