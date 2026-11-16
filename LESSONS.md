@@ -3985,3 +3985,7 @@ edit on 2,125 clips); the code has `find`/`findIndex`/`some`/`includes`/`filter`
 inside a `map`/`filter`/`forEach` over clips, tracks, nodes or layers. **Move:** lookup by id
 inside a loop → build a `Map`/`Set` once outside it. Prove it with a test that counts scans or
 property reads on ~2,000 items (`src/lib/canvas/counted-list.testkit.ts`), not wall time.
+
+## A component with a mask inside lands as a plain group, never linked
+
+**Signal:** a main with a mask layer pasted from Figma, its untouched instances come out as groups named after the component instead of instances. **Move:** `instanceOverrides` (`instance-diff.ts`) refuses a pair whose clip fields differ outside the ignored set; `matteFrom` holds a clip id, and the own copy and the main have different ids. Compare it through the clip pairs as `parent` is, never by value.

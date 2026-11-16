@@ -21,6 +21,8 @@ export type Paint = {
   image?: { hash?: Uint8Array; name?: string };
   imageScaleMode?: string;
   focus?: Vec;
+  scale?: number;
+  rotation?: number;
 };
 
 export type Effect = { type: string; color?: Rgba; offset?: Vec; radius?: number; spread?: number; visible?: boolean };
@@ -51,6 +53,27 @@ export type FigmaRawNode = {
   rectangleCornerRadiiIndependent?: boolean;
   frameMaskDisabled?: boolean;
   dashPattern?: number[];
+  strokeCap?: string;
+  strokeJoin?: string;
+  miterLimit?: number;
+  borderStrokeWeightsIndependent?: boolean;
+  borderTopWeight?: number;
+  borderRightWeight?: number;
+  borderBottomWeight?: number;
+  borderLeftWeight?: number;
+  mask?: boolean;
+  maskType?: string;
+  maskIsOutline?: boolean;
+  horizontalConstraint?: string;
+  verticalConstraint?: string;
+  minSize?: { value: Vec };
+  maxSize?: { value: Vec };
+  minWidth?: number;
+  minHeight?: number;
+  maxHeight?: number;
+  textAlignVertical?: string;
+  paragraphSpacing?: number;
+  paragraphIndent?: number;
   blendMode?: string;
   maskGradient?: { handles: { x: number; y: number }[]; stops: { position: number; alpha: number }[] };
   collapsed?: boolean;
