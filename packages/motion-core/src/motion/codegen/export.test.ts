@@ -4,6 +4,7 @@ import { CodeTarget, exportCode, type CodeExport } from './index';
 import { Align } from '../layout/auto-layout';
 import { absoluteDoc, featureGridDoc, heroDoc, variantsDoc } from './fixtures/small';
 import { landingDoc, LANDING_ASSETS } from './fixtures/landing';
+import { box, DocKit } from './fixtures/kit';
 
 const file = (out: CodeExport, path: string) => {
   const found = out.files.find((f) => f.path === path);
@@ -237,5 +238,51 @@ describe('a plain group, not a component', () => {
     expect(all).not.toMatch(/Group\d*\.(tsx|svelte)/);
     expect(all).not.toContain('<Group');
     expect(file(out, page)).toContain('Save');
+  });
+});
+
+describe('paint carried through every target', () => {
+  const kit = new DocKit(800, 400);
+  kit.frame('card', { name: 'Card', box: box(0, 0, 400, 200), fill: '#ffeedd', stroke: { color: '#112233', width: 8 } });
+  kit.text('label', 'Hello', { parent: 'card', name: 'Label', size: 32, box: box(20, 20, 200, 40) });
+  const doc = kit.doc();
+  const clips = doc.tracks[0].clips;
+  Object.assign(clips[0], { blend: 'multiply' });
+  Object.assign((clips[0].props.strokes as { align: string }[])[0], { align: 'outside' });
+  Object.assign(clips[1], { effects: [{ id: 's', kind: 'drop-shadow', enabled: true, params: { distance: 0, x: 0, y: 4, blur: 8, spread: 0, color: '#000000', opacity: 1 } }] });
+
+  it('writes the blend, the outside stroke and the text shadow in HTML', () => {
+    const css = file(exportCode(doc, { target: CodeTarget.Html }), 'styles/page.css');
+    expect(css).toContain('mix-blend-mode: multiply;');
+    expect(css).toContain('box-shadow: 0 0 0 8px #112233;');
+    expect(css).toContain('text-shadow: 0px 4px 8px #000000;');
+  });
+
+  it('writes them as Tailwind classes in React', () => {
+    const page = file(exportCode(doc, { target: CodeTarget.React }), 'src/pages/Page.tsx');
+    expect(page).toContain('[mix-blend-mode:multiply]');
+    expect(page).toContain('shadow-[0_0_0_8px_#112233]');
+    expect(page).toContain('[text-shadow:0px_4px_8px_#000000]');
+  });
+
+  it('writes them in the Svelte style block', () => {
+    const page = file(exportCode(doc, { target: CodeTarget.Svelte }), 'src/routes/+page.svelte');
+    expect(page).toContain('mix-blend-mode: multiply;');
+    expect(page).toContain('text-shadow: 0px 4px 8px #000000;');
+  });
+});
+
+describe('layers with no static HTML equivalent', () => {
+  it('names the audio, adjustment and light layers it leaves out', () => {
+    const kit = new DocKit(800, 400);
+    kit.frame('page', { name: 'Page', box: box(0, 0, 800, 400), fill: '#ffffff' });
+    const doc = kit.doc();
+    const [page] = doc.tracks[0].clips;
+    const extra = (component: string, name: string) => ({ ...page, id: name, name, component, parent: null, props: {} }) as typeof page;
+    doc.tracks[0].clips.push(extra('Audio', 'Voice-over'), extra('Adjustment', 'Grade'), extra('Light', 'Key light'));
+    const notes = exportCode(doc).notes.join('\n');
+    expect(notes).toContain('Voice-over: Audio layers have no static HTML equivalent');
+    expect(notes).toContain('Grade: Adjustment layers have no static HTML equivalent');
+    expect(notes).toContain('Key light: Light layers have no static HTML equivalent');
   });
 });

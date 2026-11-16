@@ -2,7 +2,7 @@ import { axisCondition, axisType, fallbackMember, isFlagAxis, isProp, PropType, 
 import { camel, pascal } from '../naming';
 import { MOTION_IMPORT, MOTION_VERSION, motionFiles } from './react-motion';
 import type { CodeFile } from '../model';
-import { fontLinks, lookupOf, type TokenLookup } from './css';
+import { fontFaceCss, fontLinks, lookupOf, type TokenLookup } from './css';
 import { tailwindOf } from './tailwind';
 import { bindsOf, camelProperty, jsxSvg, nodeLines, pad, type Dialect } from './markup';
 import { readme, themeCss } from './project';
@@ -159,7 +159,7 @@ export function reactProject(page: PageSpec, slug: string): CodeFile[] {
   const name = pascal(page.name);
   const anims = new Map<string, Animation>();
   const sources = [pageFile(page, name, tokens, anims), ...page.components.map((c) => componentFile(c, tokens, anims)), ...page.sets.map(setFile)];
-  const head = ['<!doctype html>', '<html lang="en">', '  <head>', '    <meta charset="UTF-8" />', '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />', `    <title>${page.name}</title>`, ...fontLinks(page.tokens).map((l) => `    ${l}`), '  </head>', '  <body>', '    <div id="root"></div>', '    <script type="module" src="/src/main.tsx"></script>', '  </body>', '</html>', ''];
+  const head = ['<!doctype html>', '<html lang="en">', '  <head>', '    <meta charset="UTF-8" />', '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />', `    <title>${page.name}</title>`, ...fontLinks(page).map((l) => `    ${l}`), '  </head>', '  <body>', '    <div id="root"></div>', '    <script type="module" src="/src/main.tsx"></script>', '  </body>', '</html>', ''];
   return [
     { path: 'README.md', content: readme(page, 'React + Tailwind CSS', ['npm install', 'npm run dev'], 'src/components/') },
     { path: 'package.json', content: json(PACKAGE(slug, anims.size > 0)) },
@@ -167,7 +167,8 @@ export function reactProject(page: PageSpec, slug: string): CodeFile[] {
     { path: 'vite.config.ts', content: ["import { defineConfig } from 'vite';", "import react from '@vitejs/plugin-react';", "import tailwindcss from '@tailwindcss/vite';", '', 'export default defineConfig({ plugins: [react(), tailwindcss()] });', ''].join('\n') },
     { path: 'index.html', content: head.join('\n') },
     { path: 'src/main.tsx', content: ["import { StrictMode } from 'react';", "import { createRoot } from 'react-dom/client';", "import './index.css';", `import { ${name} } from './pages/${name}';`, '', "createRoot(document.getElementById('root')!).render(", '  <StrictMode>', `    <${name} />`, '  </StrictMode>', ');', ''].join('\n') },
-    { path: 'src/index.css', content: ['@import "tailwindcss";', '@import "./tokens.css";', ''].join('\n') },
+    { path: 'src/index.css', content: ['@import "tailwindcss";', ...(page.fonts.files.length ? ['@import "./fonts.css";'] : []), '@import "./tokens.css";', ''].join('\n') },
+    ...(page.fonts.files.length ? [{ path: 'src/fonts.css', content: fontFaceCss(page.fonts.files) }] : []),
     { path: 'src/tokens.css', content: themeCss(page.tokens) },
     { path: 'src/lib/cx.ts', content: "export const cx = (...classes: (string | false | null | undefined)[]) => classes.filter(Boolean).join(' ');\n" },
     ...sources,

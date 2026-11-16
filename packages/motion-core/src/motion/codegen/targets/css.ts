@@ -1,5 +1,5 @@
 import type { StateStyle } from '../states';
-import { isRef, TokenKind, type CssValue, type MediaRules, type Rule, type Token } from '../ir';
+import { isRef, TokenKind, type CssValue, type FontFile, type MediaRules, type PageSpec, type Rule, type Token } from '../ir';
 import { tokenIndex, tokenKey } from '../tokens';
 
 export const TOKEN_PREFIX: Record<TokenKind, string> = {
@@ -93,14 +93,33 @@ export const BASE_CSS = [
 const GOOGLE_FONTS = 'https://fonts.googleapis.com/css2';
 const WEIGHTS = 'wght@300;400;500;600;700;800';
 
-export function fontLinks(tokens: readonly Token[]): string[] {
-  const families = tokens.filter((t) => t.kind === TokenKind.Font).map((t) => `family=${encodeURIComponent(t.raw).replace(/%20/g, '+')}:${WEIGHTS}`);
-  if (!families.length) {
+export function fontLinks(page: Pick<PageSpec, 'tokens' | 'fonts'>): string[] {
+  const families = page.tokens.filter((t) => t.kind === TokenKind.Font && !page.fonts.handled.includes(t.raw)).map((t) => `family=${encodeURIComponent(t.raw).replace(/%20/g, '+')}:${WEIGHTS}`);
+  const sheets = [...(page.fonts.google ? [page.fonts.google] : []), ...(families.length ? [`${GOOGLE_FONTS}?${families.join('&')}&display=swap`] : [])];
+  if (!sheets.length) {
     return [];
   }
-  return [
-    '<link rel="preconnect" href="https://fonts.googleapis.com" />',
-    '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />',
-    `<link rel="stylesheet" href="${GOOGLE_FONTS}?${families.join('&')}&display=swap" />`
-  ];
+  return ['<link rel="preconnect" href="https://fonts.googleapis.com" />', '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />', ...sheets.map((href) => `<link rel="stylesheet" href="${href}" />`)];
+}
+
+const FONT_FORMAT: Record<string, string> = { '.woff2': 'woff2', '.woff': 'woff', '.ttf': 'truetype', '.otf': 'opentype' };
+
+const formatOf = (ref: string) => {
+  const format = FONT_FORMAT[/\.[a-z0-9]+$/i.exec(ref)?.[0].toLowerCase() ?? ''];
+  return format ? ` format("${format}")` : '';
+};
+
+export function fontFaceCss(files: readonly FontFile[], href: (ref: string) => string = (ref) => ref): string {
+  return files
+    .flatMap((f) => [
+      '@font-face {',
+      `${INDENT}font-family: "${f.family}";`,
+      `${INDENT}src: url("${href(f.ref)}")${formatOf(f.ref)};`,
+      `${INDENT}font-weight: ${f.weight};`,
+      `${INDENT}font-style: ${f.italic ? 'italic' : 'normal'};`,
+      `${INDENT}font-display: swap;`,
+      '}',
+      ''
+    ])
+    .join('\n');
 }
