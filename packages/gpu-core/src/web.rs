@@ -19,6 +19,7 @@ use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile, OPAQUE};
 use crate::retained::{Camera, Damage, Lookup, Quality};
 use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, GestureDraw, Moment, Path, Warmup, tiles_kept_beside, TILE_BUDGET_BYTES, TILE_BYTES, TILE_GUTTER_PX, batches, batches_of, bake_batches, BAKE_BATCH_TILES, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys, magnified, fallback_serves, fallback_bands, ahead_camera, fade_in, fades_over, FADE_MS};
+use crate::overlay_kept::{OverlayDrawn, OverlayKept, OverlayKey};
 use crate::overlay_seen::OverlaySeen;
 use crate::screen_fit::{fit, screen_side};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
@@ -95,6 +96,7 @@ pub struct WebCore {
     tiled: bool,
     overlay_seen: OverlaySeen,
     overlay_tex: Option<wgpu::Texture>,
+    overlay_kept: OverlayKept,
     tiles: Tiles,
     tile_textures: FxHashMap<TileKey, wgpu::Texture>,
     spare_tiles: Vec<wgpu::Texture>,
@@ -425,10 +427,11 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, warm_wait: 0.0, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), sharpness: Sharpness::default(), fallback: Vec::new(), ahead: None, fallback_was: camera, born: FxHashMap::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 }, gesture_draw: GestureDraw::Tiles, direct: None, held_scene: None, scale: fitted.scale })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, warm_wait: 0.0, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, overlay_kept: OverlayKept::default(), overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), sharpness: Sharpness::default(), fallback: Vec::new(), ahead: None, fallback_was: camera, born: FxHashMap::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 }, gesture_draw: GestureDraw::Tiles, direct: None, held_scene: None, scale: fitted.scale })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
+        self.overlay_kept.forget();
         self.warmup.uploaded(js_sys::Date::now());
         let source = external(source)?;
         let fits = self.textures.get(clip).is_some_and(|t| t.width() == width && t.height() == height);
@@ -447,6 +450,7 @@ impl WebCore {
     }
 
     pub fn picture_rows(&mut self, clip: &str, source: JsValue, width: u32, height: u32, top: u32, rows: u32) -> Result<bool, JsValue> {
+        self.overlay_kept.forget();
         self.warmup.uploaded(js_sys::Date::now());
         let source = external(source)?;
         if top == 0 {
@@ -470,6 +474,7 @@ impl WebCore {
     }
 
     pub fn forget_picture(&mut self, clip: &str) {
+        self.overlay_kept.forget();
         self.release(clip);
         if let Some(texture) = self.arriving.remove(clip) {
             texture.destroy();
@@ -495,6 +500,7 @@ impl WebCore {
     }
 
     pub fn put_group(&mut self, key: &str, list_json: &[u8]) -> Result<(), JsValue> {
+        self.overlay_kept.forget();
         self.warmup.uploaded(js_sys::Date::now());
         self.compositor.touch(key, &self.library);
         self.library.put_group(key, &parse(utf8(list_json)?).map_err(failed)?);
@@ -503,6 +509,7 @@ impl WebCore {
     }
 
     pub fn append_group(&mut self, key: &str, list_json: &[u8]) -> Result<(), JsValue> {
+        self.overlay_kept.forget();
         self.warmup.uploaded(js_sys::Date::now());
         self.library.append_group(key, &parse(utf8(list_json)?).map_err(failed)?);
         self.compositor.touch(key, &self.library);
@@ -510,6 +517,7 @@ impl WebCore {
     }
 
     pub fn put_group_packed(&mut self, key: &str, list_json: &[u8], floats: Vec<f64>, ends: Vec<u32>) -> Result<(), JsValue> {
+        self.overlay_kept.forget();
         self.warmup.uploaded(js_sys::Date::now());
         self.compositor.touch(key, &self.library);
         self.library.put_group(key, &parse_packed(utf8(list_json)?, floats, ends).map_err(failed)?);
@@ -518,6 +526,7 @@ impl WebCore {
     }
 
     pub fn append_group_packed(&mut self, key: &str, list_json: &[u8], floats: Vec<f64>, ends: Vec<u32>) -> Result<(), JsValue> {
+        self.overlay_kept.forget();
         self.warmup.uploaded(js_sys::Date::now());
         self.library.append_group(key, &parse_packed(utf8(list_json)?, floats, ends).map_err(failed)?);
         self.compositor.touch(key, &self.library);
@@ -525,6 +534,7 @@ impl WebCore {
     }
 
     pub fn patch_group(&mut self, from: &str, to: &str, splice_json: &[u8]) -> Result<bool, JsValue> {
+        self.overlay_kept.forget();
         self.warmup.uploaded(js_sys::Date::now());
         self.compositor.touch(to, &self.library);
         let patched = self.library.patch_group(from, to, &parse_splice(utf8(splice_json)?).map_err(failed)?);
@@ -533,6 +543,7 @@ impl WebCore {
     }
 
     pub fn drop_group(&mut self, key: &str) {
+        self.overlay_kept.forget();
         self.compositor.drop_group(key, &mut self.library);
     }
 
@@ -541,6 +552,7 @@ impl WebCore {
     }
 
     pub fn patch_uses(&mut self, patch_json: &[u8]) -> Result<(), JsValue> {
+        self.overlay_kept.forget();
         let patch = parse_patch(utf8(patch_json)?).map_err(failed)?;
         let patch = if self.tiled { patch.for_tiles() } else { patch };
         self.compositor.patch(patch, &self.library);
@@ -548,6 +560,7 @@ impl WebCore {
     }
 
     pub fn set_overlay(&mut self, items_json: &[u8]) -> Result<(), JsValue> {
+        self.overlay_kept.forget();
         if !self.overlay_seen.is_new(OverlayPart::Fixed, items_json) {
             return Ok(());
         }
@@ -557,6 +570,7 @@ impl WebCore {
     }
 
     pub fn set_selected_overlay(&mut self, items_json: &[u8]) -> Result<(), JsValue> {
+        self.overlay_kept.forget();
         if !self.overlay_seen.is_new(OverlayPart::Selected, items_json) {
             return Ok(());
         }
@@ -566,6 +580,7 @@ impl WebCore {
     }
 
     pub fn set_live_overlay(&mut self, items_json: &[u8]) -> Result<(), JsValue> {
+        self.overlay_kept.forget();
         if !self.overlay_seen.is_new(OverlayPart::Live, items_json) {
             return Ok(());
         }
@@ -586,6 +601,7 @@ impl WebCore {
     }
 
     pub fn set_budget(&mut self, bytes: f64) {
+        self.overlay_kept.forget();
         let share = split(bytes as u64, self.compositor.size());
         self.library.set_budget(share.cache);
         self.engine.set_budget(share.pool, share.layers);
@@ -613,6 +629,7 @@ impl WebCore {
     }
 
     pub fn set_pixel_ratio(&mut self, ratio: f64) {
+        self.overlay_kept.forget();
         self.tiles.set_pixel_ratio(ratio * self.scale);
         self.compositor.set_pixel_ratio(ratio * self.scale);
     }
@@ -874,9 +891,16 @@ impl WebCore {
 
     fn overlay_texture(&mut self) -> Result<Option<wgpu::Texture>, JsValue> {
         let size = (self.target.width(), self.target.height());
+        let key = OverlayKey { camera: self.camera, size };
+        if !self.overlay_kept.stale(&key) {
+            return Ok(self.overlay_tex.take());
+        }
         let plan = self.compositor.overlay_at(&mut self.library, self.camera, size, self.limits);
         let pinned = self.compositor.pinned_at(self.camera);
+        let drawn = if plan.pending { OverlayDrawn::Pending } else { OverlayDrawn::Settled };
         if plan.screen.items.is_empty() && pinned.is_empty() {
+            self.overlay_tex = None;
+            self.overlay_kept.drew(key, drawn);
             return Ok(None);
         }
         let began = now_ms();
@@ -885,6 +909,7 @@ impl WebCore {
         let texture = self.overlay_tex.take().filter(|t| t.width() == size.0 && t.height() == size.1).unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
         self.engine.draw_over(&self.device, &self.queue, &list, &pictures, &pinned, &texture.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
         self.count_bake(began);
+        self.overlay_kept.drew(key, drawn);
         Ok(Some(texture))
     }
 

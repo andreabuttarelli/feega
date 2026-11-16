@@ -46,19 +46,28 @@ impl PinnedScene {
         if let Some((_, scene)) = last.as_ref().filter(|(seen, _)| *seen == per_px) {
             return scene.clone();
         }
-        let scene = Rc::new(self.lerped(per_px));
+        let mut scene = last.take().map(|(_, s)| s).unwrap_or_else(|| Rc::new(self.once.clone()));
+        match Rc::get_mut(&mut scene) {
+            Some(own) => self.lerp_into(own, per_px),
+            None => scene = Rc::new(self.lerped(per_px)),
+        }
         *last = Some((per_px, scene.clone()));
         scene
     }
 
     fn lerped(&self, per_px: f64) -> Scene {
         let mut scene = self.once.clone();
+        self.lerp_into(&mut scene, per_px);
+        scene
+    }
+
+    fn lerp_into(&self, scene: &mut Scene, per_px: f64) {
         let k = (per_px - ONCE) as f32 / (TWICE - ONCE) as f32;
-        let twice = &self.twice.encoding().path_data;
-        for (word, far) in scene.encoding_mut().path_data.iter_mut().zip(twice) {
-            let (a, b) = (f32::from_bits(*word), f32::from_bits(*far));
+        let near = &self.once.encoding().path_data;
+        let far = &self.twice.encoding().path_data;
+        for ((word, a), b) in scene.encoding_mut().path_data.iter_mut().zip(near).zip(far) {
+            let (a, b) = (f32::from_bits(*a), f32::from_bits(*b));
             *word = (a + (b - a) * k).to_bits();
         }
-        scene
     }
 }
