@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createConnection, createNode, listConnections, listNodes, renameNode } from '$lib/server/repos/canvas';
+import { createConnection, createNode, listConnections, listNodes, moveNode, renameNode } from '$lib/server/repos/canvas';
 import { appendRevision, readHead } from '$lib/server/repos/motion-revisions';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { unpackFeega } from '$lib/canvas/feega-file';
@@ -211,6 +211,20 @@ describe('scrittura atomica', () => {
     const events = await listCanvasEvents(store.db, { orgId: LOCAL_ORG_ID, canvasId: store.place.canvasId });
 
     expect(events[0]).toMatchObject({ kind: 'node.update', nodeId: node.id, actorKind: 'agent', agentKey: 'mcp', after: { displayName: 'Hero' } });
+  });
+
+  it('spostare un nodo a mano lascia un evento di chi lo ha fatto, e restare fermi non ne lascia', async () => {
+    const store = openFeegaStore(tempFile(), { origin: ORIGIN });
+    const node = await addText(store, 'drag me');
+    const scope = { orgId: LOCAL_ORG_ID, canvasId: store.place.canvasId };
+    const person = { kind: 'user' as const, id: LOCAL_USER.id };
+
+    await moveNode(store.db, { orgId: LOCAL_ORG_ID, nodeId: node.id, x: 40, y: 50, actor: person });
+    await moveNode(store.db, { orgId: LOCAL_ORG_ID, nodeId: node.id, x: 40, y: 50, actor: person });
+    const moves = (await listCanvasEvents(store.db, scope)).filter((e) => e.kind === 'node.update');
+
+    expect(moves).toHaveLength(1);
+    expect(moves[0]).toMatchObject({ nodeId: node.id, actorKind: 'user', before: { position: { x: 0, y: 0 } }, after: { position: { x: 40, y: 50 } } });
   });
 
 });
