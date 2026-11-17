@@ -281,7 +281,8 @@
         return;
       }
       const list = retiered(built.list, tierSwap(fetched, place, built.at, to));
-      const ready = await media.ready(list);
+      const done = await turns.take();
+      const ready = await media.ready(list).finally(done);
       await whenQuiet(() => gesture.active());
       const group = keyOf(f);
       if (ready !== Readiness.Whole || builtTiers.get(f.id) !== built || loaded.get(f.id) !== group) {
@@ -355,9 +356,15 @@
     asking.set(f.id, key);
 
     noteImages(f.id, built.list);
+    const picturesOnce = async () => {
+      const done = await turns.take();
+      return media.ready(built.list).finally(done);
+    };
+    const firstPictures = picturesOnce();
+    let tries = 0;
     const seed = f.scenes ? null : (given ?? read?.source ?? null);
     if (seed) {
-      seedLive(f, seed, built.list);
+      seedLive(f, seed, built.list, firstPictures);
     }
     const present = (ready: Readiness, stage: Stage) => {
       if (asking.get(f.id) !== key) {
@@ -373,10 +380,7 @@
       lists = listed(lists, f.id, group, onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), shown, drawnLast.get(f.id)?.group]);
     };
     void showStaged(
-      async () => {
-        const done = await turns.take();
-        return media.ready(built.list).finally(done);
-      },
+      () => (tries++ === 0 ? firstPictures : picturesOnce()),
       held,
       (ready, stage) => (stage === Stage.Settled ? vectorsFirst.after(() => present(ready, stage)) : present(ready, stage)),
       atRestAfter
@@ -709,8 +713,8 @@
     );
   }
 
-  function seedLive(f: FrameAt, source: LiveDoc, list: DisplayList) {
-    void media.ready(list).then((ready) => {
+  function seedLive(f: FrameAt, source: LiveDoc, list: DisplayList, pictured: Promise<Readiness>) {
+    void pictured.then((ready) => {
       if (liveShown.has(f.id)) {
         return;
       }
