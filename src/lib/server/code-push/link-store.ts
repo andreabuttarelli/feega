@@ -15,6 +15,7 @@ type Row = Record<string, unknown>;
 export type LinkStore = {
   read: (nodeId: string) => Promise<CodeLink | null>;
   save: (nodeId: string, link: CodeLink) => Promise<boolean>;
+  remove: (nodeId: string) => Promise<boolean>;
 };
 
 type Scope = { orgId: string; userId: string; projectId: string };
@@ -74,6 +75,16 @@ export function linkStore(db: Db, scope: Scope): LinkStore {
         throw error;
       }
       return true;
+    },
+    remove: async (nodeId) => {
+      const { data, error } = await table().delete().eq('org_id', scope.orgId).eq('node_id', nodeId).select('node_id');
+      if (missing(error)) {
+        return false;
+      }
+      if (error) {
+        throw error;
+      }
+      return (data ?? []).length > 0;
     }
   };
 }

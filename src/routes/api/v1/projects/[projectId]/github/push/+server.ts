@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { projectScopeOf, type ProjectScope } from '$lib/server/projects/project-scope';
-import { framesPush, frameStatus } from '$lib/server/code-push/frames-push';
+import { frameDetach, framesPush, frameStatus } from '$lib/server/code-push/frames-push';
 import { answer, invalid } from '$lib/server/code-push/push-http';
 import { framesDeps } from '$lib/server/code-push/frames-runtime';
 import type { RequestHandler } from './$types';
@@ -44,4 +44,17 @@ export const GET: RequestHandler = async (event) => {
     return invalid();
   }
   return answer(await frameStatus(framesDeps(scope.db, scope), userScope(scope), nodeId));
+};
+
+export const DELETE: RequestHandler = async (event) => {
+  const scope = await projectScopeOf(event);
+  if (scope instanceof Response) {
+    return scope;
+  }
+
+  const nodeId = event.url.searchParams.get('nodeId');
+  if (!nodeId) {
+    return invalid();
+  }
+  return answer(await frameDetach(framesDeps(scope.db, scope), nodeId));
 };

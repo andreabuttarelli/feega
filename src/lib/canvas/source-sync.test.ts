@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { SourceSync } from './core/frame-header';
-import { syncOf, linkedFrames } from './source-sync';
+import { syncOf, linkedFrames, pushOutcomeOf, PushOutcome, editedFilesText } from './source-sync';
+
+describe('la risposta di una spinta', () => {
+  it('ogni rifiuto che il pannello sa gestire ha il suo esito', () => {
+    expect(pushOutcomeOf({ ok: true })).toBe(PushOutcome.Pushed);
+    expect(pushOutcomeOf({ ok: false, refusal: 'needs_confirm' })).toBe(PushOutcome.NeedsConfirm);
+    expect(pushOutcomeOf({ ok: false, refusal: 'read_only' })).toBe(PushOutcome.ReadOnly);
+    expect(pushOutcomeOf({ ok: false, refusal: 'secret' })).toBe(PushOutcome.Failed);
+    expect(pushOutcomeOf(null)).toBe(PushOutcome.Failed);
+  });
+
+  it('chi legge soltanto scarica i file modificati in un testo solo', () => {
+    expect(editedFilesText([{ path: 'a.tsx', content: 'A' }, { path: 'b.tsx', content: 'B' }])).toBe('--- a.tsx\nA\n\n--- b.tsx\nB');
+  });
+});
 
 describe('lo stato GitHub di un frame', () => {
   it('ogni stato del server ha un’icona, uno sconosciuto nessuna', () => {
