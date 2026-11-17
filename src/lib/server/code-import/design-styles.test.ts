@@ -10,7 +10,8 @@ import { tokenSetOf, variablesOf } from './design-tokens';
 import { madeStyles, styleTokensOf } from './design-styles';
 import { boundToTokens } from './design-bind';
 import { boardBound, designBoard } from './design-board';
-import { writeTokens } from './token-write';
+import { frameEdits, writeTokens } from './token-write';
+import { fitToNode } from '$lib/motion/custom-size';
 import { pulledTokens } from './token-pull';
 
 const WIDTH = 1280;
@@ -136,6 +137,37 @@ describe('designBoard styles', () => {
     expect(texts(doc)).toEqual(expect.arrayContaining(['Text', 'hero', '48px · 1.1667 · 700', 'Shadow', 'card', 'Other', 'md', '768px', 'snappy']));
     expect(clips(doc).some((c) => c.styleRef === 'app Text/hero')).toBe(true);
     expect(clips(doc).some((c) => c.effectStyleRef === 'app Shadow/card')).toBe(true);
+  });
+});
+
+describe('frameEdits after a refit', () => {
+  const importedFrame = async () => {
+    const { vars, styled } = await imported();
+    const doc = { ...docOf(tree([])), styles: styled.styles };
+    return { doc, map: { ...vars.map, ...styled.map } };
+  };
+
+  it('a frame refitted, resized or split without edits has nothing to push', async () => {
+    const { doc, map } = await importedFrame();
+
+    for (const size of [{ width: 640, height: 800 }, { width: 2560, height: 3200 }, { width: 573, height: 16384 }]) {
+      const fitted = fitToNode(doc, size);
+      expect(fitted.ok).toBe(true);
+      const done = await frameEdits(fitted.ok ? fitted.doc : doc, map, read);
+      expect(done.files).toEqual([]);
+    }
+  });
+
+  it('a size edited after a refit still writes its declaration', async () => {
+    const { doc, map } = await importedFrame();
+    const fitted = fitToNode(doc, { width: 640, height: 800 });
+    const resized = fitted.ok ? fitted.doc : doc;
+    const unit = Math.min(resized.width, resized.height);
+    const edited = { ...resized, styles: restyled(resized.styles!, 'app Text/hero', { size: 56 / unit }) };
+
+    const done = await frameEdits(edited, map, read);
+
+    expect(changedLines(done.files[0].before, done.files[0].after)).toEqual([[5, '--text-hero: 3rem;', '--text-hero: 3.5rem;']]);
   });
 });
 

@@ -227,7 +227,7 @@ export function madeStyles(tokens: StyleToken[], repo: string, units: Units): Ma
     }
     made.styles[name] = style;
     for (const [field, part] of Object.entries(token.parts) as [StyleField, Part][]) {
-      const entry: TokenEntry = { name: part.name, origins: { [LIGHT]: atText(part.at) }, raw: { [LIGHT]: part.raw }, scale: FIELDS[field].unit(units), style: name, field, ...(token.rule ? { rule: token.rule } : {}) };
+      const entry: TokenEntry = { name: part.name, origins: { [LIGHT]: atText(part.at) }, raw: { [LIGHT]: part.raw }, scale: FIELDS[field].unit(units), side: units.side, style: name, field, ...(token.rule ? { rule: token.rule } : {}) };
       made.map[`${name}#${field}`] = entry;
     }
     if (token.utility) {
