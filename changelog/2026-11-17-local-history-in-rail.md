@@ -15,5 +15,14 @@ field). Bound: the latest `MAX_PERSISTED_EVENTS` (1000) events by id. A count, n
 holds node before/after snapshots, and a count keeps the newest changes whole instead of cutting
 one in half. Named versions stay off in local mode.
 
+Also, in the same change:
+- File-open revisions (`motion_revisions` seeded from `heads` at every start) were stamped as You,
+  dated now. They are now `system`, dated `manifest.exportedAt`. Not duplicated across restarts
+  (the file keeps one head per frame, the seed makes one row per head); they only polluted the map.
+- `renameNode` recorded no event, hosted included. It now writes a `node.update` with
+  `{displayName}` before/after and the actor, for the page action and the `rename_node` op.
+- The bottom-right "Runs" button (`RunsPanel`) wore the History icon; it now uses `WandSparkles`,
+  the generate icon of the add bar. Behaviour unchanged.
+
 Considered: a bottom-right History button for local only. Rejected: a second entry point to the
 same panel is the divergence being removed.
