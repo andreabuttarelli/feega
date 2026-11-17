@@ -922,6 +922,45 @@ program
     await cmdAppAccount(projectId, opts);
   });
 
+const github = program.command('github').description('Push code edits of linked frames to GitHub as a branch and pull request');
+
+github
+  .command('push <projectId> <nodeIds...>')
+  .description('Commit the code edits of the frames on feega/<name> and open or update its pull request')
+  .requiredOption('--name <name>', 'Branch name; the branch is feega/<name>')
+  .option('--title <text>', 'Pull request title')
+  .option('--body <text>', 'Pull request body')
+  .option('--base <branch>', 'Base branch (default: the repo default)')
+  .option('--confirm-sensitive', 'Allow changes to config files, lockfiles and dotfiles')
+  .action(async (projectId: string, nodeIds: string[], opts) => {
+    const { cmdGithubPush } = await import('./commands/github.ts');
+    await cmdGithubPush(projectId, nodeIds, opts);
+  });
+
+github
+  .command('status <projectId> <nodeId>')
+  .description('Computed GitHub state of a linked frame, its pull request and CI checks')
+  .action(async (projectId: string, nodeId: string) => {
+    const { cmdGithubStatus } = await import('./commands/github.ts');
+    await cmdGithubStatus(projectId, nodeId);
+  });
+
+github
+  .command('undo <projectId> <nodeId>')
+  .description('Undo the last push of a frame with a forward commit restoring the files it touched')
+  .action(async (projectId: string, nodeId: string) => {
+    const { cmdGithubUndo } = await import('./commands/github.ts');
+    await cmdGithubUndo(projectId, nodeId);
+  });
+
+github
+  .command('detach <projectId> <nodeId>')
+  .description('Unlink a frame from its GitHub source; the frame stays on the canvas')
+  .action(async (projectId: string, nodeId: string) => {
+    const { cmdGithubDetach } = await import('./commands/github.ts');
+    await cmdGithubDetach(projectId, nodeId);
+  });
+
 const cloud = program.command('cloud').description('Google Drive and Dropbox files of a project');
 
 cloud

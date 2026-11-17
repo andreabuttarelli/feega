@@ -15,7 +15,8 @@ export enum ChromePart {
   PortName = 'port-name',
   PortRing = 'port-ring',
   Icon = 'icon',
-  Tag = 'tag'
+  Tag = 'tag',
+  Badge = 'badge'
 }
 
 export type TextSet = { width?: number; height?: number; leading?: number; tracking?: number };
@@ -31,6 +32,8 @@ export type PortMark = { type: ConnectorType; state: PortState; label?: string }
 
 export type Glyphs = (text: string, size: number, set?: TextSet) => { contours: number[][]; width: number; height: number };
 
+export type HeaderIcon = { key: string; contours: number[][] };
+
 export type ChromeTile = {
   id: string;
   x: number;
@@ -42,6 +45,7 @@ export type ChromeTile = {
   label: string | null;
   icon: number[][] | null;
   tag?: string | null;
+  badges?: readonly HeaderIcon[];
   addBeside?: boolean;
   radius?: number;
   zoom?: number;
@@ -69,6 +73,9 @@ const LABEL_COLOR = '#6e6e73';
 const ICON_SIZE = 12;
 const ICON_GAP = 5;
 const ELLIPSIS = '…';
+const NAME_MIN_CHARS = 3;
+const BADGE_GAP = 4;
+const BADGE_SLOT = ICON_SIZE + BADGE_GAP;
 const NAME_SIZE = 11;
 const NAME_GAP = 16;
 export const ADD_BESIDE = { offset: 8, size: 24, gap: 8 };
@@ -215,14 +222,29 @@ function tag(t: ChromeTile): PathItem[] {
   return [item(t, ChromePart.Tag, circle(t.x + t.width - TAG_RADIUS * k, centre, TAG_RADIUS * k), t.tag)];
 }
 
+export function badgesKept(room: number, count: number, slot: number, minName: number): number {
+  let kept = count;
+  while (kept > 0 && room - kept * slot < minName) {
+    kept -= 1;
+  }
+  return kept;
+}
+
+const shortest = (text: string, glyphs: Glyphs) => (text.length > NAME_MIN_CHARS ? shaped(text.slice(0, NAME_MIN_CHARS) + ELLIPSIS, glyphs).width : shaped(text, glyphs).width);
+
 function labelLayout(t: ChromeTile, glyphs: Glyphs) {
   const k = labelK(t);
   const line = LABEL_SIZE * LABEL_LEADING * k;
   const top = t.y - (LABEL_GAP + LABEL_PAD) * k - line;
-  const left = t.icon ? t.x + (ICON_SIZE + ICON_GAP) * k : t.x;
-  const room = t.width / heldK(t) - (t.icon ? ICON_SIZE + ICON_GAP : 0);
-  const unitText = fitted(t.label ?? '', room, glyphs);
-  return { k, line, top, left, unitText, width: unitText.width * k };
+  const lead = t.icon ? ICON_SIZE + ICON_GAP : 0;
+  const trail = t.tag ? 2 * TAG_RADIUS + BADGE_GAP : 0;
+  const left = t.x + lead * k;
+  const free = t.width / heldK(t) - lead - trail;
+  const all = t.badges ?? [];
+  const kept = all.length ? badgesKept(free, all.length, BADGE_SLOT, shortest(t.label ?? '', glyphs)) : 0;
+  const badges = all.slice(0, kept).map((b, i) => ({ ...b, x: t.x + t.width - (trail + (kept - i) * BADGE_SLOT - BADGE_GAP) * k }));
+  const unitText = fitted(t.label ?? '', free - kept * BADGE_SLOT, glyphs);
+  return { k, line, top, left, unitText, width: unitText.width * k, badges };
 }
 
 function label(t: ChromeTile, glyphs: Glyphs): PathItem[] {
@@ -233,6 +255,23 @@ function label(t: ChromeTile, glyphs: Glyphs): PathItem[] {
   const iconSize = ICON_SIZE * k;
   const icon = t.icon ? [{ ...placed(item(t, ChromePart.Icon, t.icon, LABEL_COLOR), k, t.x, top + (line - iconSize) / 2), rule: FillRule.Union }] : [];
   return [...icon, placed(item(t, ChromePart.Label, unitText.contours, LABEL_COLOR), k, left, top)];
+}
+
+function badges(t: ChromeTile, glyphs: Glyphs): PathItem[] {
+  if (!t.badges?.length || labelHidden(t)) {
+    return [];
+  }
+  const { k, line, top, badges: kept } = labelLayout(t, glyphs);
+  const centre = top + (line - ICON_SIZE * k) / 2;
+  return kept.map((b) => ({ ...placed(item(t, `${ChromePart.Badge}:${b.key}` as ChromePart, b.contours, LABEL_COLOR), k, b.x, centre), rule: FillRule.Union }));
+}
+
+export function headerIconBoxes(t: ChromeTile, glyphs: Glyphs): (ChromeBox & { key: string })[] {
+  if (!t.badges?.length || labelHidden(t)) {
+    return [];
+  }
+  const { k, line, top, badges: kept } = labelLayout(t, glyphs);
+  return kept.map((b) => ({ key: b.key, x: b.x, y: top, w: ICON_SIZE * k, h: line }));
 }
 
 export type ChromeBox = { x: number; y: number; w: number; h: number };
@@ -265,7 +304,7 @@ const lit = (m: PortMark) => PORT_LOOK[m.state].named;
 
 export const portChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...ports(t), ...names(t, glyphs, lit)];
 
-export const labelChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...label(t, glyphs), ...tag(t)];
+export const labelChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...label(t, glyphs), ...badges(t, glyphs), ...tag(t)];
 
 export const tileChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...portChrome(t, glyphs), ...labelChrome(t, glyphs)];
 

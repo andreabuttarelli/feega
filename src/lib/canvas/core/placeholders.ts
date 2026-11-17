@@ -81,6 +81,10 @@ const blocked = (items: readonly Item[], look: Look, missing: Missing): Item[] =
     return i;
   });
 
+const imagesIn = (items: readonly Item[]): ImageItem[] => items.flatMap((i) => (i.kind === ItemKind.Image ? [i] : i.kind === ItemKind.Group ? imagesIn(i.items) : []));
+
+export const missingPictures = (list: DisplayList, missing: Missing): ImageItem[] => imagesIn(list.items).filter(missing);
+
 export const withoutPictures = (list: DisplayList, look: Look, missing: Missing = ALL): DisplayList => ({ ...list, items: blocked(list.items, look, missing) });
 
 export const drawable = (list: DisplayList, ready: Readiness, look: Look, missing: Missing): DisplayList => (ready === Readiness.Whole ? list : withoutPictures(list, look, missing));
