@@ -31,7 +31,7 @@
   import { retiered } from '$lib/canvas/core/retier';
   import { drawsAny, frameOfLive, legible, logGaps, onStage, sameLive, shownGroup, stagedBox, toBuild, toWarm, untilFound, frameSourceUrl, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
-  import { postersFor, showsPoster } from '$lib/canvas/core/frame-poster';
+  import { postersFor, showsPoster, showsStage } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
   import { bitmapBlob, grabThumb, posterBlob, posterSize, shotSize, thumbClip, thumbList, thumbRect, thumbSize, thumbStore, thumbsDue } from '$lib/canvas/core/frame-thumbs';
   import { shrunk } from '$lib/canvas/core/frame-shot';
@@ -899,7 +899,7 @@
   });
 
   const posterIds = $derived(new Set(posters.map((p) => p.frame.id)));
-  const shownCards = $derived([...cards, ...postersFor(posters, new Set(framePuts.map((f) => f.id))).filter((p) => readable.has(p.frame.id) || showsPoster(p.frame.list))]);
+  const shownCards = $derived([...cards, ...postersFor(posters, new Set(framePuts.map((f) => f.id))).filter((p) => readable.has(p.frame.id) || showsPoster(p.frame.list) || showsStage(p.frame.list))]);
 
   const cardIndex = $derived(new SpatialIndex(shownCards.map((c) => ({ id: c.key, ...c.frame.box }))));
 
