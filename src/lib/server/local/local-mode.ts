@@ -3,6 +3,7 @@ import { stringify } from 'devalue';
 import { hasAiKey } from '$lib/local-ai-keys';
 import { LOCAL_ORG_ID, LOCAL_USER, openFeegaStore, type FeegaStore, type LocalPlace } from './feega-store';
 import { warmHeads } from '$lib/server/repos/motion-revisions';
+import { warmSources } from '$lib/server/motion/sources';
 
 type Env = Record<string, string | undefined>;
 type Resolve = (event: RequestEvent, opts?: ResolveOptions) => Response | Promise<Response>;
@@ -98,7 +99,7 @@ export function localStore(env: Env = process.env): FeegaStore | null {
   const opened = openFeegaStore(path, { origin: env.PUBLIC_APP_URL ?? 'http://localhost:5173', latencyMs: Number(env[LOCAL_LATENCY_ENV] ?? 0) });
   process.once('exit', () => opened.flushNow());
   store = opened;
-  void warmFrames(opened);
+  void warmFrames(opened).catch((e: unknown) => console.warn('feega local: frames not prepared at start', e));
   if (hasAiKey(env)) {
     void syncModels(opened, env);
     void reportKeys(env);
@@ -114,6 +115,7 @@ async function warmFrames(opened: FeegaStore): Promise<void> {
     newest.set(row.node_id, Math.max(Number(row.version), newest.get(row.node_id) ?? 0));
   }
   await warmHeads(opened.db, { orgId: LOCAL_ORG_ID, heads: [...newest].map(([nodeId, version]) => ({ nodeId, version })) });
+  await warmSources({ db: opened.db, orgId: LOCAL_ORG_ID, projectId: opened.place.projectId, canvasId: opened.place.canvasId, nodeIds: [...newest.keys()] });
 }
 
 async function syncModels(opened: FeegaStore, env: Env): Promise<void> {

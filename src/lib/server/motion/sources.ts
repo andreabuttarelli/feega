@@ -8,6 +8,7 @@ import { assetUrls, motionAssets, namedAssets, type AssetSigner, type MotionAsse
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { mayUseAssets, mentionedIds, referencedAssets } from '$lib/motion/doc-assets';
 import { serverTiming, type Phases } from '$lib/server/server-timing';
+import { jsonOfDoc } from './doc-json';
 
 export type MotionSource = { revision: number; doc: MotionDoc; assets: Record<string, string> };
 
@@ -84,4 +85,20 @@ export async function motionSources(scope: FramesScope): Promise<BatchedSources>
     })
   );
   return { frames, signed: signedUrls([...used.values()]) };
+}
+
+const frameJson = (frame: BatchedSource) => `{"revision":${frame.revision},"doc":${jsonOfDoc(frame.doc)},"assets":${JSON.stringify(frame.assets)},"media":${JSON.stringify(frame.media)}}`;
+
+export const sourcesJson = (tokens: unknown, sources: BatchedSources): string =>
+  `{"tokens":${JSON.stringify(tokens ?? null)},"frames":{${[...sources.frames].map(([id, frame]) => `${JSON.stringify(id)}:${frameJson(frame)}`).join(',')}},"signed":${JSON.stringify(sources.signed)}}`;
+
+export async function warmSources(scope: FramesScope): Promise<void> {
+  for (const nodeId of scope.nodeIds) {
+    const heads = await linkedHeads(scope.db, { orgId: scope.orgId, heads: await ownHeads({ ...scope, nodeIds: [nodeId] }) });
+    heads.forEach(({ doc }) => {
+      mentionedIds(doc);
+      jsonOfDoc(doc);
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+  }
 }

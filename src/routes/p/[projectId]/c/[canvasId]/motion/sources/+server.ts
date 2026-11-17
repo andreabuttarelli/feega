@@ -4,7 +4,7 @@ import type { RequestHandler } from './$types';
 import { openCanvasForUser } from '$lib/server/canvas/lookup';
 import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-server';
 import { motionTokens } from '$lib/server/motion/editor';
-import { motionSources } from '$lib/server/motion/sources';
+import { motionSources, sourcesJson } from '$lib/server/motion/sources';
 import { MEDIA_UUID_RE } from '$lib/media-url';
 import { revalidated } from '$lib/server/revalidated';
 import { serverTiming } from '$lib/server/server-timing';
@@ -51,5 +51,5 @@ export const GET: RequestHandler = async ({ locals, params, request, url }) => {
   }
 
   const [sources, tokens] = await Promise.all([early ?? read(found.orgId), phases.time('tokens', motionTokens(db, { orgId: found.orgId, brandId: found.projectBrandId }))]);
-  return revalidated(request, phases.span('stringify', () => JSON.stringify({ tokens, frames: Object.fromEntries(sources.frames), signed: sources.signed })), phases);
+  return revalidated(request, phases.span('stringify', () => sourcesJson(tokens, sources)), phases);
 };
