@@ -6,7 +6,7 @@ use vello::kurbo::{Affine as Matrix, Point, Rect};
 
 use crate::display_list::{Affine, DisplayList, Item, Look, PathItem, UseItem};
 use crate::lod::{BLUR_REACH, VIEW_SLACK_PX};
-use crate::pinned::PinnedScene;
+use crate::pinned::PinnedPieces;
 use crate::retained::Damage;
 use crate::uses::{Plus, Uses};
 
@@ -63,7 +63,7 @@ impl OverlayPart {
 struct Overlay {
     items: Vec<Item>,
     at: Option<UseItem>,
-    pinned: Option<PinnedScene>,
+    pinned: Option<PinnedPieces>,
 }
 
 pub struct Lift {
@@ -321,13 +321,13 @@ impl World {
         }
     }
 
-    pub fn pinned_at(&self, camera: Affine, drawn: f64) -> Vec<(std::rc::Rc<vello::Scene>, Affine)> {
+    pub fn pinned_at_in(&self, camera: Affine, drawn: f64, view: (u32, u32)) -> Vec<(std::rc::Rc<vello::Scene>, Affine)> {
         let per_px = self.seen_through(camera, drawn);
-        self.overlays.iter().filter_map(|o| o.pinned.as_ref()).map(|p| (p.at(per_px), camera)).collect()
+        self.overlays.iter().filter_map(|o| o.pinned.as_ref()).flat_map(|p| p.seen(camera, per_px, view)).map(|s| (s, camera)).collect()
     }
 
     pub fn set_overlay(&mut self, part: OverlayPart, items: Vec<Item>) {
-        let cached = items.iter().any(nudged).then(|| PinnedScene::new(&items)).filter(PinnedScene::fits);
+        let cached = items.iter().any(nudged).then(|| PinnedPieces::new(&items)).flatten();
         self.overlays[part.index()].pinned = cached;
         let old = std::mem::replace(&mut self.overlays[part.index()].items, items);
         let new = &self.overlays[part.index()].items;

@@ -197,8 +197,8 @@ impl Compositor {
         plan
     }
 
-    pub fn pinned_at(&self, camera: Camera, drawn: f64) -> Vec<(std::rc::Rc<vello::Scene>, crate::display_list::Affine)> {
-        self.world.pinned_at(camera.matrix(), drawn)
+    pub fn pinned_at(&self, camera: Camera, drawn: f64, view: (u32, u32)) -> Vec<(std::rc::Rc<vello::Scene>, crate::display_list::Affine)> {
+        self.world.pinned_at_in(camera.matrix(), drawn, view)
     }
 
     pub fn overlay_at(&mut self, library: &mut Library, camera: Camera, (w, h): (u32, u32), limits: Limits, drawn: f64) -> Plan {

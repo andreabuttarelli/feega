@@ -913,7 +913,7 @@ impl WebCore {
             return Ok(self.overlay_tex.take().map(|t| (t, look)));
         }
         let plan = self.compositor.overlay_at(&mut self.library, camera, size, self.limits, q);
-        let pinned = self.compositor.pinned_at(camera, q);
+        let pinned = self.compositor.pinned_at(camera, q, size);
         let drawn = if plan.pending { OverlayDrawn::Pending } else { OverlayDrawn::Settled };
         if plan.screen.items.is_empty() && pinned.is_empty() {
             self.overlay_tex = None;

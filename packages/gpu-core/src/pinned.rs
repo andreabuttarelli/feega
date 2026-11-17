@@ -1,10 +1,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use vello::kurbo::Rect;
+use vello::kurbo::{Affine as Matrix, Point, Rect};
 use vello::Scene;
 
-use crate::display_list::Item;
+use crate::display_list::{Affine, Item};
 use crate::pictures::Pictures;
 use crate::scene::{build_items, Layers};
 use crate::world::pinned;
@@ -12,6 +12,7 @@ use crate::world::pinned;
 const EVERYWHERE: f64 = 1e9;
 const ONCE: f64 = 1.0;
 const TWICE: f64 = 2.0;
+const SEEN_PX: f64 = 0.5;
 
 pub struct PinnedScene {
     once: Scene,
@@ -69,5 +70,55 @@ impl PinnedScene {
             let (a, b) = (f32::from_bits(*a), f32::from_bits(*b));
             *word = (a + (b - a) * k).to_bits();
         }
+    }
+}
+
+struct Piece {
+    anchors: Rect,
+    reach: f64,
+    scene: PinnedScene,
+}
+
+pub struct PinnedPieces {
+    pieces: Vec<Piece>,
+}
+
+fn owner(item: &Item) -> &str {
+    item.clip().split(':').next().unwrap_or_default()
+}
+
+fn anchors_of(items: &[Item]) -> Rect {
+    let points = items.iter().flat_map(|i| match i {
+        Item::Path(p) => {
+            let m = Matrix::new(p.look.matrix);
+            p.contours.iter().flat_map(|c| c.chunks_exact(2)).map(|xy| m * Point::new(xy[0], xy[1])).collect()
+        }
+        _ => Vec::new(),
+    });
+    points.map(|pt| Rect::from_points(pt, pt)).reduce(|a, b| a.union(b)).unwrap_or(Rect::ZERO)
+}
+
+fn reach_of(items: &[Item]) -> f64 {
+    let nudges = items.iter().flat_map(|i| match i {
+        Item::Path(p) => p.nudge.iter().flatten().copied().collect(),
+        _ => Vec::new(),
+    });
+    nudges.map(f64::abs).fold(0.0, f64::max)
+}
+
+impl PinnedPieces {
+    pub fn new(items: &[Item]) -> Option<PinnedPieces> {
+        let pieces: Vec<Piece> = items.chunk_by(|a, b| owner(a) == owner(b)).map(|g| Piece { anchors: anchors_of(g), reach: reach_of(g), scene: PinnedScene::new(g) }).collect();
+        pieces.iter().all(|p| p.scene.fits()).then_some(PinnedPieces { pieces })
+    }
+
+    pub fn seen(&self, camera: Affine, per_px: f64, (w, h): (u32, u32)) -> Vec<Rc<Scene>> {
+        let view = Rect::new(0.0, 0.0, w as f64, h as f64);
+        let camera = Matrix::new(camera);
+        let shows = |p: &&Piece| {
+            let on = camera.transform_rect_bbox(p.anchors.inflate(p.reach * per_px, p.reach * per_px));
+            on.overlaps(view) && on.width().max(on.height()) >= SEEN_PX
+        };
+        self.pieces.iter().filter(shows).map(|p| p.scene.at(per_px)).collect()
     }
 }
