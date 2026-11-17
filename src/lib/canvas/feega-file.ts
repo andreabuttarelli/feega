@@ -54,6 +54,7 @@ const canvasSchema = z.object({
     })
   ),
   heads: z.record(z.string(), z.object({ version: z.number(), doc: z.unknown() })),
+  events: z.array(z.record(z.string(), z.unknown())).optional(),
   assets: z.array(
     z.object({
       id: z.string(),

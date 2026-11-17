@@ -10,6 +10,9 @@ import { snapshotSchema } from '$lib/canvas/canvas-version';
 import { LOCAL_ORG_ID, LOCAL_USER, openFeegaStore, writeAtomically, type FeegaStore } from './feega-store';
 import { orgFontFamilies, storeFontFile } from '$lib/server/motion/font-upload';
 import { listOrgFonts } from '$lib/server/repos/org-fonts';
+import { listCanvasEvents, recordEvent } from '$lib/server/repos/canvas-events';
+import { agentActor, AgentKey } from '$lib/server/repos/actor';
+import { MAX_PERSISTED_EVENTS } from './feega-store';
 
 const ORIGIN = 'http://127.0.0.1:5173';
 const actor = { kind: 'user' as const, id: null };
@@ -148,5 +151,39 @@ describe('scrittura atomica', () => {
     expect(families.map((f) => f.family)).toEqual(['Fraunces']);
     const [font] = await listOrgFonts(second.db, LOCAL_ORG_ID);
     expect(second.blob('canvas-assets', font.path)?.bytes.length).toBe(bytes.length);
+  });
+  it('la storia dei cambiamenti torna alla riapertura, con chi li ha fatti', async () => {
+    const path = tempFile();
+    const store = openFeegaStore(path, { origin: ORIGIN });
+    const node = await addText(store, 'who');
+    await recordEvent(store.db, { ...scopeOf(store), kind: 'node.create', nodeId: node.id, after: { type: 'text' }, actor: agentActor(LOCAL_USER.id, AgentKey.Mcp) });
+    await store.flush();
+
+    const events = await listCanvasEvents(openFeegaStore(path, { origin: ORIGIN }).db, { orgId: LOCAL_ORG_ID, canvasId: store.place.canvasId });
+
+    expect(events.map((e) => [e.kind, e.actorKind, e.agentKey])).toContainEqual(['node.create', 'agent', 'mcp']);
+  });
+
+  it('il file salva solo gli ultimi eventi, i piu recenti', async () => {
+    const path = tempFile();
+    const store = openFeegaStore(path, { origin: ORIGIN });
+    for (let n = 0; n < MAX_PERSISTED_EVENTS + 5; n++) {
+      await recordEvent(store.db, { ...scopeOf(store), kind: 'node.update', nodeId: `n${n}`, actor });
+    }
+    await store.flush();
+
+    const events = await listCanvasEvents(openFeegaStore(path, { origin: ORIGIN }).db, { orgId: LOCAL_ORG_ID, canvasId: store.place.canvasId, limit: MAX_PERSISTED_EVENTS + 10 });
+
+    expect(events).toHaveLength(MAX_PERSISTED_EVENTS);
+    expect(events.map((e) => e.nodeId)).toContain(`n${MAX_PERSISTED_EVENTS + 4}`);
+    expect(events.map((e) => e.nodeId)).not.toContain('n0');
+  });
+
+  it('un file senza eventi si apre ancora', async () => {
+    const path = tempFile();
+    await openFeegaStore(path, { origin: ORIGIN }).flush();
+    const opened = unpackFeega(new Uint8Array(readFileSync(path)));
+
+    expect(opened.ok && opened.file.canvas.events).toEqual([]);
   });
 });

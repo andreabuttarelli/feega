@@ -9,8 +9,11 @@ The entry now carries `local: true`: same `FloatingRail` entry, same `HistoryPan
 local copy of the panel. `Versions` stays off in local mode (`LocalOff.Versions`), so the panel
 hides "Save version" there.
 
-Limit: `canvas_events` is not in the store's `PERSISTED` set and the `.feega` format has no slot
-for it, so the history survives reloads but not a restart of the local server.
+The history now lives in the file. `canvas_events` joined `PERSISTED`; the `.feega` canvas gets an
+optional `events` array (the format version stays 1: files without it open, older readers drop the
+field). Bound: the latest `MAX_PERSISTED_EVENTS` (1000) events by id. A count, not bytes: each event
+holds node before/after snapshots, and a count keeps the newest changes whole instead of cutting
+one in half. Named versions stay off in local mode.
 
 Considered: a bottom-right History button for local only. Rejected: a second entry point to the
 same panel is the divergence being removed.
