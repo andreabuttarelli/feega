@@ -180,7 +180,7 @@
   import { ChromeLayers, NO_OVERLAY, overlayOf } from '$lib/canvas/core/world-overlay';
   import { labelStepOf, labelZoomStep, strokeZoomStep } from '$lib/canvas/core/label-size';
   import { settledZoom } from '$lib/canvas/core/settled-zoom';
-  import { CameraMotion, tileDom } from '$lib/canvas/core/camera-motion';
+  import { CameraMotion, shownAtRest, screenOverlays, tileDom } from '$lib/canvas/core/camera-motion';
   import { GESTURE_QUIET_MS } from '$lib/canvas/core/gesture-quiet';
   import { SIGHT_SLACK, grown, stillHolds, type Taken } from '$lib/canvas/core/sight';
   import { nodeHitRects } from '$lib/canvas/core/node-hit';
@@ -4542,7 +4542,7 @@
         <div class="hover-ring" data-testid="node-hover-ring" data-node={ring.id} style={highlightStyle(HighlightKind.Node) + ';' + hoverRingStyle(view, ring)}></div>
       {/each}
     </div>
-    <FrameOverlays {view} frames={shownOverlays}>
+    <FrameOverlays {view} frames={screenOverlays(shownOverlays, (id) => typing?.nodeId === id || cropping?.nodeId === id, cameraMotion)}>
       {#snippet children(frame)}
         {@const edit = typingMark(frame.id)}
         {#if edit}
@@ -4597,7 +4597,7 @@
         {/if}
       {/snippet}
     </FrameOverlays>
-    <FrameOverlays {view} frames={viewOverlays}>
+    <FrameOverlays {view} frames={screenOverlays(viewOverlays, (id) => cropping?.nodeId === baseNodeId(id), cameraMotion)}>
       {#snippet children(frame)}
         {@const nodeId = baseNodeId(frame.id)}
         {#each typing || cropping?.nodeId === nodeId ? [] : marksIn(frame.id) as mark (mark.clip)}
@@ -4612,8 +4612,8 @@
         {/if}
       {/snippet}
     </FrameOverlays>
-    {#if manyQuad}
-      <FrameSelection clip="" quad={manyQuad} kind={SelectionKind.Many} ongrab={grabMany} />
+    {#if shownAtRest(manyQuad, cameraMotion)}
+      <FrameSelection clip="" quad={manyQuad!} kind={SelectionKind.Many} ongrab={grabMany} />
     {/if}
     <PrototypePlayerHost frames={playerFrames} />
     {#if showsPrototype}
