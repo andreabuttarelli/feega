@@ -47,7 +47,7 @@ describe('the canvas shell: a full-bleed canvas under floating rounded groups (D
     const top = shell.indexOf('<CanvasTopBar');
     const row = shell.indexOf('<div class="canvas-row"');
     const rail = shell.indexOf('<FloatingRail');
-    const panel = shell.indexOf('<CanvasLeftPanel');
+    const panel = shell.indexOf('<CanvasLeftPanel', row);
     const stage = shell.indexOf('<div class="canvas-stage">');
     expect(top).toBeGreaterThan(-1);
     expect(top).toBeLessThan(row);
