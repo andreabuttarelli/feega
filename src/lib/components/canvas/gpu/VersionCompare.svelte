@@ -1,13 +1,8 @@
 <script lang="ts">
-  import { changedRegions, type Pixels, type Region } from '$lib/canvas/pixel-diff';
+  import { changedRegions, DiffMode, type Pixels, type Region } from '$lib/canvas/pixel-diff';
   import type { Timeline } from '$lib/canvas/version-client';
 
   type Side = { url: string; label: string };
-
-  enum DiffMode {
-    Overlay = 'overlay',
-    Slider = 'slider'
-  }
 
   type History = { line: Timeline; busy: boolean; onpick: (sha: string) => void };
 
