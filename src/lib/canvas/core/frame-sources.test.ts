@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { batchedSources, sourceReader } from './frame-sources';
 import { frameCache, memoryShelf } from './frame-cache';
 import { framesOnCanvas, frameSourceUrl } from './frame-source';
@@ -240,5 +240,53 @@ describe('a frame kept from an earlier open is drawn only at the revision the ca
 
     expect(await cache.take(`${C}/${A}@3@l1@`)).toBeNull();
     expect(await cache.take(`${C}/${A}@3@@`)).toBeNull();
+  });
+});
+
+describe('a frame whose source the server fails to answer', () => {
+  const C = '00000000-0000-4000-8000-0000000000c1';
+  const A = '00000000-0000-4000-8000-00000000000a';
+  const url = `/p/p1/c/${C}/motion/${A}/source?revision=3&org=o1&look=l1`;
+  const failing = { ok: false, status: 500, json: async () => ({ message: 'Internal Error' }) } as Response;
+  const json = (body: unknown) => ({ ok: true, status: 200, json: async () => body }) as Response;
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('asks again with a growing wait, and draws the frame once the server answers (a 500 left it blank for good)', async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    const read = sourceReader(async () => (calls++ < 2 ? failing : json({ doc: {} })));
+
+    const reading = read('/s?revision=2');
+    await vi.runAllTimersAsync();
+
+    expect(await reading).toEqual({ doc: {} });
+    expect(calls).toBe(3);
+  });
+
+  it('does not ask again for a frame that is not there (404)', async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    const read = sourceReader(async () => (calls++, { ok: false, status: 404, json: async () => null }) as unknown as Response);
+
+    const reading = read('/s?revision=2');
+    await vi.runAllTimersAsync();
+
+    expect(await reading).toBeNull();
+    expect(calls).toBe(1);
+  });
+
+  it('a 500 behind the batch and the cache still reaches the retry, not a silent "no source"', async () => {
+    vi.useFakeTimers();
+    const cache = frameCache(memoryShelf());
+    let calls = 0;
+    const read = batchedSources(async (u) => (calls++ < 2 ? failing : u.includes('/sources?') ? json({ tokens: {}, frames: { [A]: { revision: 3, doc: { back: 1 }, assets: {} } } }) : json({ revision: 3, doc: { back: 1 }, assets: {}, tokens: {} })), undefined, () => cache);
+
+    const reading = read(url);
+    await vi.runAllTimersAsync();
+
+    expect((await reading)?.doc).toEqual({ back: 1 });
   });
 });
