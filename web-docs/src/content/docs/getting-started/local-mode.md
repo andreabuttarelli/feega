@@ -6,7 +6,9 @@ sidebar:
 ---
 
 Local mode runs Feega on your computer for one canvas. Everything you draw is saved in a single
-`.feega` file, the same file feega.app imports.
+`.feega` file, the same file feega.app imports. Saving runs in the background a moment after each
+change and replaces the file in one step, so the canvas never waits for it and a crash leaves the
+last complete save.
 
 ```sh
 npx feega my-canvas.feega
