@@ -27,7 +27,8 @@
   import PrototypePlayerHost from '../PrototypePlayerHost.svelte';
   import FrameHeaderIcons from './FrameHeaderIcons.svelte';
   import SourceSyncPanel from './SourceSyncPanel.svelte';
-  import { versionMarkOf } from '$lib/canvas/version-frame';
+  import { comparedWith, versionMarkOf } from '$lib/canvas/version-frame';
+  import VersionCompare from './VersionCompare.svelte';
   import { HeaderAction, headerBadges, headerHits, headerRow, type HeaderHit } from '$lib/canvas/core/frame-header';
   import { sourceStatus } from '$lib/canvas/source-status.svelte';
   import { linkedFrames } from '$lib/canvas/source-sync';
@@ -393,6 +394,12 @@
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
   const sources = sourceStatus(() => page.params.projectId ?? '', () => linkedFrames(props.nodeSummaries ?? []).map((id) => ({ id, name: byId.get(id)?.displayName ?? '' })));
   let sourceOpen = $state<{ id: string; left: number; top: number } | null>(null);
+  let versionOpen = $state<{ before: string; after: string } | null>(null);
+  const sideOf = (id: string) => {
+    const url = posterOf(id);
+    return url ? { url, label: byId.get(id)?.displayName ?? '' } : null;
+  };
+  const versionSides = $derived(versionOpen ? { before: sideOf(versionOpen.before), after: sideOf(versionOpen.after) } : null);
   const posterOf = (id: string) => {
     const poster = (summaries.get(id)?.data as { posterAssetId?: string | null } | undefined)?.posterAssetId;
     return poster ? tierUrl(AssetSize.Full)(poster) : null;
@@ -654,7 +661,10 @@
       prototypePlayer.play();
     },
     [HeaderAction.Source]: (id) => select([id]),
-    [HeaderAction.Version]: (id) => select([id])
+    [HeaderAction.Version]: (id) => {
+      const mark = versionMarkOf(summaries.get(id)?.data);
+      versionOpen = mark ? { before: comparedWith(id, mark.of, selected), after: id } : null;
+    }
   };
   const SOURCE_POP_GAP = 6;
   const pressHeader = (hit: HeaderHit) => {
@@ -4668,6 +4678,9 @@
       <FrameSelection clip="" quad={manyQuad!} kind={SelectionKind.Many} ongrab={grabMany} />
     {/if}
     <FrameHeaderIcons {view} hits={headerHits(headerWorld, cameraMotion)} onpress={pressHeader} />
+    {#if versionSides?.before && versionSides.after}
+      <VersionCompare before={versionSides.before} after={versionSides.after} onclose={() => (versionOpen = null)} />
+    {/if}
     <SourceSyncPanel projectId={page.params.projectId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} />
     <PrototypePlayerHost frames={playerFrames} />
     {#if showsPrototype}

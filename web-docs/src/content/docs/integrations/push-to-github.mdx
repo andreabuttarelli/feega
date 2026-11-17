@@ -67,6 +67,10 @@ feega github compare <projectId> <nodeId> main feega/x '#12'
 
 `POST /api/v1/projects/:id/github/compare` with `{ nodeId, refs }` answers `{ ok, versions: [{ frameId, ref, label, sha, entry }] }`; MCP `github_compare {nodeId,refs}`. A ref that does not exist answers 404 `not_found`. A local folder is checked out at that commit in a separate temporary git worktree, so your branch and uncommitted work stay as they are.
 
+### Visual diff
+
+Click the git icon on a version frame to compare it with the frame it came from, or select two frames first to compare those two. **Overlay** shows the version with the changed regions outlined, found by comparing the two posters pixel by pixel. **Slider** puts one over the other with a handle to wipe between before and after.
+
 ## CLI
 
 ```bash
