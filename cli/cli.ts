@@ -52,6 +52,14 @@ program
   });
 
 program
+  .command('dev-server [action]')
+  .description('Local mode: the dev server of the opened folder that live frames show — status (default), start or stop')
+  .action(async (action: string | undefined) => {
+    const { cmdDevServer } = await import('./commands/dev-server.ts');
+    await cmdDevServer(action ?? 'status');
+  });
+
+program
   .command('brands')
   .description('Elenca tutti i brand')
   .action(async () => {

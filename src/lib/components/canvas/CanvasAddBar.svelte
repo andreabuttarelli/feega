@@ -9,6 +9,7 @@
   import Frame from '@lucide/svelte/icons/frame';
   import Link from '@lucide/svelte/icons/link';
   import CodeXml from '@lucide/svelte/icons/code-xml';
+  import Radio from '@lucide/svelte/icons/radio';
   import MessageCircle from '@lucide/svelte/icons/message-circle';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
@@ -49,6 +50,7 @@
     onfigma,
     onurl,
     oncode,
+    onlive,
     ontemplate,
     techniques = [],
     ontechnique,
@@ -68,6 +70,7 @@
     onfigma?: () => void;
     onurl?: () => void;
     oncode?: () => void;
+    onlive?: () => void;
     ontemplate?: (id: string) => void;
     techniques?: { id: string; name: string; nodes: number }[];
     ontechnique?: (id: string) => void;
@@ -256,7 +259,8 @@
       ...optional({ id: 'cloud', label: 'Import from Drive or Dropbox', icon: Cloud, run: () => oncloud?.() }, oncloud),
       ...optional({ id: 'figma', label: 'Import from Figma', icon: Frame, run: () => onfigma?.() }, onfigma),
       ...optional({ id: 'url', label: 'From URL…', icon: Link, run: () => onurl?.() }, onurl),
-      ...optional({ id: 'code', label: 'From code…', icon: CodeXml, run: () => oncode?.() }, oncode)
+      ...optional({ id: 'code', label: 'From code…', icon: CodeXml, run: () => oncode?.() }, oncode),
+      ...optional({ id: 'live', label: 'Add live frame', icon: Radio, run: () => onlive?.() }, onlive)
     ],
     [InsertSection.Templates]: () => [
       ...optional({ id: 'templates', label: 'Templates', icon: LayoutTemplate, run: () => (showTemplates = true) }, ontemplate),

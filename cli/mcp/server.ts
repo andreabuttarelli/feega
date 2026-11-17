@@ -15,6 +15,7 @@ import { registerLayoutTools } from './tools/layouts.ts';
 import { registerStudioTools } from './tools/studio.ts';
 import { registerModelAllowlistTools } from './tools/model-allowlist.ts';
 import { registerFontTools } from './tools/fonts.ts';
+import { registerDevServerTools } from './tools/dev-server.ts';
 import { registerSpendCapsTools } from './tools/spend-caps.ts';
 import { registerCloudTools } from './tools/cloud.ts';
 import { registerAppAccountTools } from './tools/app-account.ts';
@@ -141,6 +142,7 @@ function build(session: string): { server: McpServer; surface: ToolSurface } {
   registerOrgDataTools(server);
   registerModelAllowlistTools(server);
   registerFontTools(server);
+  registerDevServerTools(server);
   registerSpendCapsTools(server);
   registerNodeTools(server);
   registerCanvasTools(server);

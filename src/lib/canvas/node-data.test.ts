@@ -160,6 +160,11 @@ describe('validateNodeData — iframe', () => {
     expect(out.ok).toBe(true);
   });
 
+  it('accetta un live frame del dev server: rotta e larghezza, poster ancora vuoto', () => {
+    const out = validateNodeData('iframe', { live: { route: '/pricing', width: 390, poster: null } });
+    expect(out.ok).toBe(true);
+  });
+
   it('accetta il modo content (l\'html incorporato)', () => {
     const out = validateNodeData('iframe', { content: '<div>ciao</div>' });
     expect(out.ok).toBe(true);
