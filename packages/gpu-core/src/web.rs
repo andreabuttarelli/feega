@@ -940,7 +940,7 @@ impl WebCore {
         let panning = self.camera.zoom == self.was.zoom && (self.camera.x != self.was.x || self.camera.y != self.was.y);
         let bakes = !gesture || bakes_in_gesture(started - self.zoom_changed_at);
         self.aimed = if bakes { None } else { mid_gesture_level(self.camera.zoom, self.shown_step, self.aimed) };
-        self.tiles.aim(self.aimed);
+        self.tiles.keep_levels(&self.shown_step.into_iter().chain(self.aimed).collect::<Vec<_>>());
         let order = match self.aimed {
             Some(level) => self.tiles.missing_over(self.camera, screen, level),
             None => order,

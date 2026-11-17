@@ -1002,9 +1002,23 @@ fn eviction_keeps_the_aimed_level_baking_mid_gesture_though_it_was_never_drawn()
     let at = camera(1.0);
     let aimed = tiles.step_for(at) - 2;
     tiles.missing_over(at, SCREEN, aimed).into_iter().for_each(|k| tiles.hold(k));
-    tiles.aim(Some(aimed));
+    tiles.keep_levels(&[aimed]);
 
     let gone = tiles.evict_beyond(at, SCREEN, 0);
 
     assert!(gone.iter().all(|k| k.step != aimed || !k.screen(at).overlaps(Rect::new(0.0, 0.0, SCREEN.0 as f64, SCREEN.1 as f64))));
+}
+
+#[test]
+fn eviction_keeps_the_level_a_gesture_draws_though_the_zoom_wants_another() {
+    let mut tiles = Tiles::default();
+    filled(&mut tiles);
+    let at = camera(1.0);
+    let drawn = tiles.step_for(at) - 6;
+    tiles.missing_over(at, SCREEN, drawn).into_iter().for_each(|k| tiles.hold(k));
+    tiles.keep_levels(&[drawn]);
+
+    let gone = tiles.evict_beyond(at, SCREEN, 0);
+
+    assert!(gone.iter().all(|k| k.step != drawn || !k.screen(at).overlaps(Rect::new(0.0, 0.0, SCREEN.0 as f64, SCREEN.1 as f64))));
 }
