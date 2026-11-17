@@ -154,17 +154,36 @@ export function releaseTweak<T>(ledger: TweakLedger<T>, el: T) {
 
 export const CREW_SELECTOR = '.site-foot .mark';
 
-export const SECTION_CAPS: { selector: string; cap: number }[] = [
-  { selector: '#pricing', cap: 1 },
-  { selector: '#faq', cap: 1 },
-  { selector: '.site-foot', cap: 1 }
+export const SECTION_CAPS: { selector: string; cap: number; restMs: number }[] = [
+  { selector: '#pricing', cap: 1, restMs: 24000 },
+  { selector: '#faq', cap: 1, restMs: 0 },
+  { selector: '.site-foot', cap: 1, restMs: 0 }
 ];
 
 export const PROTECTED_SELECTOR = 'button, summary, a, .price';
 
 type Within<T> = (el: T, selector: string) => boolean;
+export type Rest = Map<string, number>;
+export type Gate = { rest: Rest; now: number };
 
-export function mayEnter<T>(el: T, occupants: T[], within: Within<T>): boolean {
+export const createRest = (): Rest => new Map();
+
+export function holders<T>(agents: { el: T | null; leaving: T | null }[]): T[] {
+  return agents.flatMap((a) => {
+    const held = a.el ?? a.leaving;
+    return held ? [held] : [];
+  });
+}
+
+export function noteOccupancy<T>(rest: Rest, occupants: T[], within: Within<T>, now: number) {
+  for (const section of SECTION_CAPS) {
+    if (occupants.some((o) => within(o, section.selector))) {
+      rest.set(section.selector, now);
+    }
+  }
+}
+
+export function mayEnter<T>(el: T, occupants: T[], within: Within<T>, gate?: Gate): boolean {
   if (within(el, CREW_SELECTOR)) {
     return true;
   }
@@ -174,7 +193,13 @@ export function mayEnter<T>(el: T, occupants: T[], within: Within<T>): boolean {
     return true;
   }
 
-  return occupants.filter((o) => within(o, section.selector) && !within(o, CREW_SELECTOR)).length < section.cap;
+  const held = occupants.filter((o) => within(o, section.selector) && !within(o, CREW_SELECTOR)).length;
+  if (held >= section.cap) {
+    return false;
+  }
+
+  const lastBusy = gate?.rest.get(section.selector) ?? -Infinity;
+  return held > 0 || !gate || gate.now - lastBusy >= section.restMs;
 }
 
 export function isProtected<T>(el: T, within: Within<T>): boolean {

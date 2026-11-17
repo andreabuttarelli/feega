@@ -1,13 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ACTIONS_BY_TARGET, AGENTS, lockHeight, BUILD_SELECTOR, BuildMode, PEER_COLOURS, isProtected, mayEnter, claimTweak, ruleFor, createLedger, mayTweak, releaseTweak, curve, initials, outermost, pick, type ActionKind, type Point, type TargetKind } from './live-agents';
+  import { ACTIONS_BY_TARGET, AGENTS, lockHeight, BUILD_SELECTOR, BuildMode, PEER_COLOURS, isProtected, mayEnter, createRest, noteOccupancy, holders, claimTweak, ruleFor, createLedger, mayTweak, releaseTweak, curve, initials, outermost, pick, type ActionKind, type Point, type TargetKind } from './live-agents';
 
   type Box = { x: number; y: number; w: number; h: number };
   type Menu = { items: string[]; active: number };
   type View = { name: string; colour: string; x: number; y: number; box: Box | null; handles: boolean; tip: string | null; menu: Menu | null; live: boolean };
   type Anchor = { el: HTMLElement | null; fx: number; fy: number };
   type Step = { ms: number; move?: boolean; start?: () => void; tick?: (t: number) => void; end?: () => void };
-  type Agent = { skills: ActionKind[]; view: View; anchor: Anchor; from: Point; steps: Step[]; step: Step | null; since: number; target: HTMLElement | null; resident: HTMLElement | null; grow: number; push: Point; seed: number };
+  type Agent = { skills: ActionKind[]; view: View; anchor: Anchor; from: Point; steps: Step[]; step: Step | null; since: number; target: HTMLElement | null; resident: HTMLElement | null; grow: number; push: Point; seed: number; leaving: HTMLElement | null };
 
   const DESKTOP_AGENTS = 24;
   const MOBILE_AGENTS = 8;
@@ -313,9 +313,12 @@
 
   const within = (el: Element, selector: string) => el.closest(selector) !== null;
 
+  const rest = createRest();
+  const held = (a: Agent) => ({ el: a.anchor.el, leaving: a.leaving });
+
   function roomFor(agent: Agent): (el: HTMLElement) => boolean {
-    const others = running.filter((a) => a !== agent).flatMap((a) => (a.anchor.el ? [a.anchor.el] : []));
-    return (el) => mayEnter(el, others, within);
+    const others = holders(running.filter((a) => a !== agent).map(held));
+    return (el) => mayEnter(el, others, within, { rest, now: clock });
   }
 
   function plan(agent: Agent, targets: HTMLElement[]) {
@@ -341,7 +344,8 @@
     const free = targets.filter((el) => mayTweak(ledger, el, clock, TWEAK_GAP_MS) && 'built' in el.dataset && el.closest('main') && !underReader(el) && !busy.has(el) && ACTIONS_BY_TARGET[kindOf(el)].includes(kind) && nearViewport(el) && room(el));
 
     if (free.length === 0) {
-      agent.steps = agent.view.live ? [moveTo(agent, edgeOf(resolve(agent.anchor))), wait(1, () => (agent.view.live = false))] : [wait(between(300, 600))];
+      agent.leaving = agent.view.live ? agent.anchor.el : null;
+      agent.steps = agent.view.live ? [moveTo(agent, edgeOf(resolve(agent.anchor))), wait(1, () => ((agent.view.live = false), (agent.leaving = null)))] : [wait(between(300, 600))];
       return;
     }
 
@@ -370,6 +374,7 @@
 
   function frame(agent: Agent, now: number, targets: HTMLElement[]) {
     clock = now;
+    noteOccupancy(rest, holders(running.map(held)), within, now);
     advance(agent, now, targets);
     const step = agent.step as Step;
     const t = Math.min(1, (now - agent.since) / step.ms);
@@ -412,7 +417,8 @@
       resident: null,
       grow: 1,
       push: { x: 0, y: 0 },
-      seed: rand()
+      seed: rand(),
+      leaving: null
     }));
 
     const targets = outermost([...document.querySelectorAll<HTMLElement>(BUILD_SELECTOR)]).filter((el) => !isProtected(el, within));

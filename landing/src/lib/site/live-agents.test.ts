@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as live from './live-agents';
-import { BuildMode, ELEMENT_RULES, PROTECTED_SELECTOR, isProtected, mayEnter, TEXT_SELECTOR, TweakLimit, claimTweak, createLedger, curve, mayTweak, releaseTweak, ruleFor } from './live-agents';
+import { createRest, noteOccupancy, BuildMode, ELEMENT_RULES, PROTECTED_SELECTOR, isProtected, mayEnter, TEXT_SELECTOR, TweakLimit, claimTweak, createLedger, curve, mayTweak, releaseTweak, ruleFor } from './live-agents';
 
 describe('cursor path', () => {
   it('starts and lands on its endpoints', () => {
@@ -128,5 +128,33 @@ describe('section caps', () => {
   it('never rests on a price, a button or a question inside a capped section', () => {
     expect(isProtected('buy', within)).toBe(true);
     expect(isProtected('hero', within)).toBe(false);
+  });
+});
+
+describe('section rest', () => {
+  const within = (el: string, selector: string) => el === 'p1' && selector === '#pricing';
+  const REST = live.SECTION_CAPS.find((s) => s.selector === '#pricing')!.restMs;
+
+  it('refuses a new cursor in pricing right after the last one left', () => {
+    const rest = createRest();
+    noteOccupancy(rest, ['p1'], within, 1000);
+    expect(mayEnter('p1', [], within, { rest, now: 1000 + REST - 1 })).toBe(false);
+  });
+
+  it('lets a cursor in once pricing has rested', () => {
+    const rest = createRest();
+    noteOccupancy(rest, ['p1'], within, 1000);
+    expect(mayEnter('p1', [], within, { rest, now: 1000 + REST })).toBe(true);
+  });
+
+  it('never blocks the cursor that already holds the section', () => {
+    const rest = createRest();
+    noteOccupancy(rest, ['p1'], within, 1000);
+    expect(mayEnter('p1', ['p1'], within, { rest, now: 1001 })).toBe(false);
+    expect(mayEnter('p1', [], within, { rest, now: 1e9 })).toBe(true);
+  });
+
+  it('keeps counting a cursor that is still flying out of a section', () => {
+    expect(live.holders([{ el: null, leaving: 'p1' }, { el: 'p1', leaving: null }, { el: null, leaving: null }])).toEqual(['p1', 'p1']);
   });
 });

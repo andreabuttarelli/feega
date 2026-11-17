@@ -14,3 +14,8 @@ Known effect: FAQ has no tweakable target left except its title, so its
 cursors mostly disappear.
 
 Tests: `section caps` in `live-agents.test.ts`.
+
+Second pass: `#pricing` also has `restMs`. After a cursor leaves, no other
+may enter for that long, and a cursor still flying out of a section counts
+as present (`holders`, `noteOccupancy`, `mayEnter` gate). Before, one
+cursor leaving while another arrived showed two at once.
