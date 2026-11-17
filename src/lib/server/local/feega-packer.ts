@@ -2,6 +2,7 @@ import { Worker } from 'node:worker_threads';
 import { renameSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import workerSource from './feega-pack-worker.cjs?raw';
+import { jsonOfDoc } from '$lib/server/motion/doc-json';
 import type { FeegaAsset, FeegaCanvas, FeegaManifest } from '$lib/canvas/feega-file';
 
 export type PackedAsset = { row: FeegaAsset; always: boolean; bytes: Uint8Array | null };
@@ -13,21 +14,6 @@ export type Packed = { hashed: number };
 type Reply = { id: number; ok: true; hashed: [string, number][] } | { id: number; ok: false; error: string };
 
 const SAVING_SUFFIX = '.saving';
-
-const docJson = new WeakMap<object, string>();
-
-function jsonOfDoc(doc: unknown): string {
-  if (!doc || typeof doc !== 'object') {
-    return JSON.stringify(doc ?? null);
-  }
-  const known = docJson.get(doc);
-  if (known !== undefined) {
-    return known;
-  }
-  const json = JSON.stringify(doc);
-  docJson.set(doc, json);
-  return json;
-}
 
 function bodyJson(body: PackJob['body']): string {
   const heads = Object.entries(body.heads).map(([id, head]) => `${JSON.stringify(id)}:{"version":${JSON.stringify(head.version)},"doc":${jsonOfDoc(head.doc)}}`);
