@@ -16,7 +16,8 @@ const SAVE_DELAY_MS = 300;
 const ASSET_BUCKET = 'canvas-assets';
 const ABSOLUTE_URL = /^https?:\/\//;
 const UNSAFE_NAME = /[^\w.-]+/g;
-const PERSISTED = new Set(['canvases', 'nodes', 'nodes_connections', 'motion_revisions', 'assets', 'storage.objects']);
+const PERSISTED = new Set(['canvases', 'nodes', 'nodes_connections', 'motion_revisions', 'canvas_events', 'assets', 'storage.objects']);
+export const MAX_PERSISTED_EVENTS = 1000;
 const BUCKETS = [ASSET_BUCKET, 'brand-knowledge', 'media'];
 
 export type LocalPlace = { projectId: string; canvasId: string };
@@ -84,7 +85,8 @@ function seed(file: FeegaFile, blobs: FeegaBlobs): { tables: Tables; storage: Bl
     ['canvases', [{ ...org, id: place.canvasId, project_id: place.projectId, name: file.manifest.canvasName, viewport: null, deleted_at: null, created_at: at, updated_at: at }]],
     ['nodes', file.canvas.nodes.map((n) => ({ ...org, id: n.id, project_id: place.projectId, canvas_id: place.canvasId, type: n.type, display_name: n.displayName, x: n.position.x, y: n.position.y, z: n.position.z, width: n.size.width, height: n.size.height, data: n.data, version: 1, deleted_at: null, created_at: at, updated_at: at }))],
     ['nodes_connections', file.canvas.connections.map((c) => ({ ...org, id: c.id, canvas_id: place.canvasId, source_node_id: c.sourceNodeId, target_node_id: c.targetNodeId, source_handle: c.sourceHandle, target_handle: c.targetHandle, mode: c.mode, deleted_at: null, created_at: at }))],
-    ['motion_revisions', Object.entries(file.canvas.heads).map(([nodeId, head]) => ({ ...org, id: crypto.randomUUID(), node_id: nodeId, version: head.version, doc: head.doc, summary: null, actor_kind: 'user', actor_id: LOCAL_USER_ID, agent_key: null, sealed: true, created_at: at }))],
+    ['motion_revisions', Object.entries(file.canvas.heads).map(([nodeId, head]) => ({ ...org, id: crypto.randomUUID(), node_id: nodeId, version: head.version, doc: head.doc, summary: null, actor_kind: 'system', actor_id: null, agent_key: null, sealed: true, created_at: file.manifest.exportedAt }))],
+    ['canvas_events', (file.canvas.events ?? []).map((e) => ({ ...e, org_id: LOCAL_ORG_ID, canvas_id: place.canvasId }))],
     ['assets', assets],
     ['org_fonts', assets.filter((a) => isFont(a.mime_type) && a.url).map((a) => orgFontRow(a, at))]
   ]);
@@ -120,7 +122,8 @@ function snapshot(tables: Tables, storage: Blobs, place: LocalPlace, acp: AcpCho
   const body: Omit<FeegaCanvas, 'assets'> = {
     nodes: nodes.map((n) => ({ id: String(n.id), type: String(n.type), displayName: (n.display_name as string | null) ?? null, position: { x: Number(n.x), y: Number(n.y), z: Number(n.z ?? 0) }, size: { width: n.width == null ? null : Number(n.width), height: n.height == null ? null : Number(n.height) }, data: (n.data ?? {}) as Record<string, unknown> })),
     connections: rows('nodes_connections').filter((c) => c.canvas_id === place.canvasId && live(c) && nodeIds.has(c.source_node_id) && nodeIds.has(c.target_node_id)).map((c) => ({ id: String(c.id), sourceNodeId: String(c.source_node_id), targetNodeId: String(c.target_node_id), sourceHandle: (c.source_handle as string | null) ?? null, targetHandle: (c.target_handle as string | null) ?? null, mode: c.mode === 'iterate' ? 'iterate' : 'fixed' })),
-    heads: Object.fromEntries([...heads].map(([id, r]) => [id, { version: Number(r.version), doc: r.doc }]))
+    heads: Object.fromEntries([...heads].map(([id, r]) => [id, { version: Number(r.version), doc: r.doc }])),
+    events: rows('canvas_events').filter((e) => e.canvas_id === place.canvasId).sort((a, b) => Number(a.id) - Number(b.id)).slice(-MAX_PERSISTED_EVENTS).map(({ org_id: _org, canvas_id: _canvas, ...event }) => event)
   };
 
   const referenced = new Set(idsIn(body));

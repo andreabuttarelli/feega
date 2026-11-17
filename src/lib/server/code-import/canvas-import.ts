@@ -192,6 +192,8 @@ function unstarted(e: unknown): DevServerFailed {
   throw e;
 }
 
+const FOLDER_GALLERY = { unrun: 'a folder import draws no gallery: it would write into your folder' };
+
 async function importServed(land: LandAsk, ask: CodeImportAsk, { root, routes, url }: { root: string; routes: string[]; url: string }): Promise<CodeImported> {
   const origin = new URL(url).origin;
   const only = async (at: URL) => {
@@ -201,7 +203,7 @@ async function importServed(land: LandAsk, ask: CodeImportAsk, { root, routes, u
   };
   const pages = (ask.variants ?? variantsOf(routes, ask.conditions ?? [BASE_CONDITIONS])).map((v) => ({ label: v.label, url: new URL(v.route, url).toString(), route: v.route, conditions: v.conditions }));
   const design = await designFor({ code: () => folderSource(root).read(''), designSystem: ask.designSystem }, null);
-  return importBoards({ ...land, open: pagesCounted(localBrowser(chromiumPage, origin), pages.length), guard: only, name: basename(root), pages, names: await folderNames(root), crop: Crop.Page, design, library: await folderLibrary(root).catch(() => undefined), delay: ask.delay, responsive: ask.responsive });
+  return importBoards({ ...land, open: pagesCounted(localBrowser(chromiumPage, origin), pages.length), guard: only, name: basename(root), pages, names: await folderNames(root), crop: Crop.Page, design, library: await folderLibrary(root).catch(() => undefined), gallery: FOLDER_GALLERY, delay: ask.delay, responsive: ask.responsive });
 }
 
 export async function rememberOrigin(scope: CodeScope, nodeId: string, origin: CodeOriginData): Promise<void> {

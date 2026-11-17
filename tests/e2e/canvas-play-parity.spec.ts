@@ -83,6 +83,7 @@ test.describe('Play paints each view like the canvas @real', () => {
       await openPlay(page, node.id, name);
       const scores: Record<string, number> = {};
       for (const view of viewsOf(doc)) {
+        await page.getByTestId('viewport-menu').click();
         await page.getByTestId(`viewport-${view.width}`).click();
         await page.waitForTimeout(SETTLE_MS);
         const played = await seen(page, page.locator('[data-testid="prototype-player"] .viewport'), STAGE.height);
@@ -94,6 +95,7 @@ test.describe('Play paints each view like the canvas @real', () => {
       }
       console.log(`PLAY-PARITY ${name} ${JSON.stringify(scores)}`);
 
+      await page.getByTestId('viewport-menu').click();
       await page.getByTestId('viewport-window').click();
       await page.setViewportSize(NARROW_WINDOW);
       await expect(page.getByTestId('viewport-readout')).toContainText(viewsOf(doc).at(-1)!.name);

@@ -58,6 +58,12 @@ describe('write-back', () => {
     expect(editsOf(doc)).toEqual([{ at: { file: 'src/x.svelte', line: 3, column: 4 }, look: { text: 'new' }, was: { text: 'old' } }]);
   });
 
+  it('an edit on a layer drawn by the component gallery is never written back: the gallery exists only in the sandbox', () => {
+    const clip = (id: string, at: string) => ({ id, component: 'Text', props: { text: 'new' }, source: { at, was: { text: 'old' } } });
+    const doc = { width: 100, height: 100, tracks: [{ clips: [clip('a', 'app/feega-gallery/page.tsx:3:4'), clip('b', 'src/feega-gallery.tsx:9:2'), clip('c', 'pages/feega-gallery.tsx:1:0'), clip('d', 'src/x.svelte:3:4')] }], comps: {} } as unknown as MotionDoc;
+    expect(editsOf(doc).map((e) => e.at.file)).toEqual(['src/x.svelte']);
+  });
+
   it('un livello legato a una variabile non scrive il suo colore nel template: lo scrive il token', () => {
     const clip = { id: 'a', component: 'Text', props: { text: 'new', color: '#f0f0f0' }, bind: { color: 'app Colors/primary' }, source: { at: 'src/x.svelte:3:4', was: { text: 'old', color: '#111111' } } };
     const doc = { width: 100, height: 100, tracks: [{ clips: [clip] }], comps: {} } as unknown as MotionDoc;
@@ -96,11 +102,19 @@ describe('write-back', () => {
     expect(done.files[0].after).toBe('<div class="bg-white dark:bg-[#101010]">x</div>\n');
   });
 
+  it('un colore cambiato sostituisce solo la sua classe e tiene tutte le altre', async () => {
+    const h1 = (cls: string) => `<h1 class="${cls}">{m.about_page_title()}</h1>\n`;
+    const files: Record<string, string> = { 'a.svelte': h1('text-2xl sm:text-3xl lg:text-4xl font-heading font-semibold tracking-tight text-primary mb-4'), 'package.json': '{"devDependencies":{"tailwindcss":"^4"}}' };
+    const colour = { at: { file: 'a.svelte', line: 1, column: 0 }, look: { color: '#e91e63' }, was: { color: '#1a1a2e' } };
+    const done = await applyEdits([colour], async (path) => files[path] ?? null);
+    expect(done.files[0].after).toBe(h1('text-2xl sm:text-3xl lg:text-4xl font-heading font-semibold tracking-tight text-[#e91e63] mb-4'));
+  });
+
   it('una modifica sotto il chiaro, in Tailwind, scrive la classe base e non tocca il dark:', async () => {
     const files: Record<string, string> = { 'a.svelte': '<div class="bg-white dark:bg-zinc-900">x</div>\n', 'package.json': '{"dependencies":{"tailwindcss":"3"}}' };
     const light = { at: { file: 'a.svelte', line: 1, column: 0 }, look: { fill: '#fafafa' }, was: { fill: '#ffffff' } };
     const done = await applyEdits([light], async (path) => files[path] ?? null);
-    expect(done.files[0].after).toBe('<div class="dark:bg-zinc-900 bg-[#fafafa]">x</div>\n');
+    expect(done.files[0].after).toBe('<div class="bg-[#fafafa] dark:bg-zinc-900">x</div>\n');
   });
 
   it('dark senza Tailwind non si scrive: si salta e si dice perché, mai uno style inline che schiaccia il chiaro', async () => {

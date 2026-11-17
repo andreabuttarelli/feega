@@ -15,7 +15,7 @@ const right = (items: { contours: number[][] }[]) => Math.max(...items.flatMap((
 
 const left = (items: { contours: number[][] }[]) => Math.min(...items.flatMap((i) => i.contours.flatMap((c) => c.filter((_, j) => j % 2 === 0))));
 
-const partsOf = (t: ChromeTile, part: ChromePart) => tileChrome(t, glyphs).filter((i) => i.clip.startsWith(`${t.id}:${part}`));
+const partsOf = (t: ChromeTile, part: ChromePart) => tileChrome(t, glyphs).filter((i) => i.clip === `${t.id}:${part}` || i.clip.startsWith(`${t.id}:${part}:`));
 
 const LONG = 'Checkout page on a very narrow phone frame';
 
@@ -80,8 +80,44 @@ describe('frameHeaderIcons', () => {
     const icons = partsOf(t, ChromePart.Badge);
 
     expect(icons).toHaveLength(2);
-    expect(right(icons)).toBeCloseTo(400, 6);
+    expect(right(partsOf(t, ChromePart.BadgeBox))).toBeCloseTo(400, 6);
+    expect(right(icons)).toBeCloseTo(393.5, 6);
     expect(headerIconBoxes(t, glyphs).map((b) => b.key)).toEqual([FrameBadge.Play, FrameBadge.Component]);
+  });
+});
+
+describe('header icon box', () => {
+  const two = [{ key: FrameBadge.Play, contours: ICON }, { key: FrameBadge.Component, contours: ICON }];
+  const t = tile({ label: 'Home', badges: two });
+
+  it('gives each icon a 20px slot, 2px apart', () => {
+    const [a, b] = headerIconBoxes(t, glyphs);
+
+    expect(a.w).toBe(20);
+    expect(a.h).toBe(20);
+    expect(b.x - (a.x + a.w)).toBe(2);
+  });
+
+  it('draws one rounded fill behind the slots with 3px around them', () => {
+    const [box] = partsOf(t, ChromePart.BadgeBox);
+    const [a, b] = headerIconBoxes(t, glyphs);
+
+    expect(partsOf(t, ChromePart.BadgeBox)).toHaveLength(1);
+    expect(left([box])).toBeCloseTo(a.x - 3, 6);
+    expect(right([box])).toBeCloseTo(b.x + b.w + 3, 6);
+    expect(box.opacity).toBeLessThan(0.3);
+  });
+
+  it('keeps the box inside the frame and the name clear of it', () => {
+    const narrow = tile({ label: LONG, width: 90, badges: two });
+    const [box] = partsOf(narrow, ChromePart.BadgeBox);
+
+    expect(right([box])).toBeLessThanOrEqual(190 + 1e-6);
+    expect(right(partsOf(narrow, ChromePart.Label))).toBeLessThanOrEqual(left([box]));
+  });
+
+  it('draws no box on a frame with no icons', () => {
+    expect(partsOf(tile({ label: 'Home' }), ChromePart.BadgeBox)).toHaveLength(0);
   });
 });
 
@@ -105,7 +141,7 @@ describe('narrow frames', () => {
   });
 
   it('keeps Play when only one icon fits', () => {
-    const t = tile({ label: LONG, width: 70, badges });
+    const t = tile({ label: LONG, width: 80, badges });
 
     expect(headerIconBoxes(t, glyphs).map((b) => b.key)).toEqual([FrameBadge.Play]);
   });

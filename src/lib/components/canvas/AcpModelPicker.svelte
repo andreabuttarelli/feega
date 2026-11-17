@@ -69,8 +69,9 @@
 
 <style>
   .model {
-    flex: 0 1 50%;
+    position: relative;
     min-width: 0;
+    max-width: 200px;
   }
 
   .trigger {
@@ -100,9 +101,10 @@
   .menu {
     position: absolute;
     z-index: 10;
-    left: var(--ui-space-3);
-    right: var(--ui-space-3);
-    top: calc(100% - var(--ui-space-1));
+    left: 0;
+    bottom: calc(100% + var(--ui-space-1));
+    width: 240px;
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
     max-height: min(480px, 70vh);
@@ -113,6 +115,9 @@
   }
 
   .search {
+    box-sizing: border-box;
+    width: 100%;
+    margin: 0;
     height: 28px;
     padding: 0 var(--ui-space-2);
     border: 0;

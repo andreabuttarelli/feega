@@ -5,6 +5,8 @@
   import { AgentModelChoice } from '$lib/acp/agent-model-choice.svelte';
   import AcpAgentPicker from './AcpAgentPicker.svelte';
   import AcpModelPicker from './AcpModelPicker.svelte';
+  import ChatComposer from '$lib/components/brand-agent/ChatComposer.svelte';
+  import ChatMessage from '$lib/components/brand-agent/ChatMessage.svelte';
 
   const CLOUD_HINT = 'Feega cloud chat spends credits and runs at feega.app: import this .feega file there, or pick an agent installed on this computer. It edits the canvas through Feega’s tools and asks before each one.';
   const OPTION_VARIANT: Record<string, ButtonVariant> = { allow_once: 'primary', allow_always: 'primary', reject_once: 'secondary', reject_always: 'secondary' };
@@ -24,8 +26,10 @@
     void model.load(choices.chosen);
   });
 
-  function submit(e: Event) {
-    e.preventDefault();
+  const lastLine = $derived(chat.lines.at(-1));
+  const awaiting = $derived(chat.busy && lastLine?.line === Line.User);
+
+  function send() {
     const prompt = draft.trim();
     if (!agent || !prompt || chat.busy) {
       return;
@@ -35,21 +39,17 @@
     void chat.send(agent.id, prompt);
   }
 
-  function sendOnEnter(e: KeyboardEvent) {
-    if (e.key !== 'Enter' || e.shiftKey) {
-      return;
-    }
+  function startsRun(i: number) {
+    return chat.lines[i - 1]?.line !== Line.Agent;
+  }
 
-    submit(e);
+  function isLive(i: number) {
+    return chat.busy && i === chat.lines.length - 1;
   }
 </script>
 
 <section class="acp" data-testid="acp-chat">
-  <AcpAgentPicker agents={choices.agents} chosen={choices.chosen} refreshing={choices.refreshing} onchoose={(id) => void choices.choose(id)} onrefresh={() => void Promise.all([choices.refresh(), model.refresh()])}>
-    {#snippet beside()}
-      <AcpModelPicker models={model.models} selected={model.selected} onchoose={(id) => void model.choose(id)} />
-    {/snippet}
-  </AcpAgentPicker>
+  <AcpAgentPicker agents={choices.agents} chosen={choices.chosen} refreshing={choices.refreshing} onchoose={(id) => void choices.choose(id)} onrefresh={() => void Promise.all([choices.refresh(), model.refresh()])} />
 
   <ol class="lines">
     {#if !agent}
@@ -57,9 +57,9 @@
     {/if}
     {#each chat.lines as l, i (i)}
       {#if l.line === Line.User}
-        <li class="user">{l.text}</li>
+        <li><ChatMessage role="user" content={l.text} projectId="" /></li>
       {:else if l.line === Line.Agent}
-        <li class="agent">{l.text}</li>
+        <li><ChatMessage role="assistant" content={l.text} projectId="" first={startsRun(i)} live={isLive(i)} /></li>
       {:else if l.line === Line.Tool}
         <li class="tool">{l.title}</li>
       {:else if l.line === Line.Error}
@@ -75,12 +75,20 @@
         </li>
       {/if}
     {/each}
+    {#if awaiting}
+      <li><ChatMessage role="assistant" content="" projectId="" pending live /></li>
+    {/if}
   </ol>
 
-  <form class="composer" onsubmit={submit}>
-    <textarea bind:value={draft} onkeydown={sendOnEnter} rows="2" placeholder={agent ? `Ask ${agent.name}` : 'Pick an agent first'} disabled={!agent} data-testid="acp-input"></textarea>
-    <Button size="sm" type="submit" disabled={!agent || chat.busy || !draft.trim()}>Send</Button>
-  </form>
+  <div class="dock">
+    <ChatComposer bind:value={draft} busy={chat.busy} enabled={!!agent} placeholder={agent ? `Ask ${agent.name}` : 'Pick an agent first'} onsend={send} onstop={() => chat.stop()}>
+      {#snippet controls()}
+        <span class="model-slot" data-testid="acp-model-slot">
+          <AcpModelPicker models={model.models} selected={model.selected} onchoose={(id) => void model.choose(id)} />
+        </span>
+      {/snippet}
+    </ChatComposer>
+  </div>
 </section>
 
 <style>
@@ -89,6 +97,9 @@
     flex-direction: column;
     min-height: 0;
     font-size: var(--ui-type-body);
+    font-family: 'DM Sans', var(--font-sans, system-ui), sans-serif;
+    --chat-font: 14px;
+    --chat-action: 32px;
   }
 
   .lines {
@@ -103,16 +114,10 @@
     gap: var(--ui-space-2);
   }
 
-  .lines li {
+  .hint,
+  .tool,
+  .error {
     white-space: pre-wrap;
-  }
-
-  .user {
-    align-self: flex-end;
-    max-width: 85%;
-    padding: var(--ui-space-2) var(--ui-space-3);
-    border-radius: var(--ui-radius-md);
-    background: var(--ui-input);
   }
 
   .hint,
@@ -140,22 +145,8 @@
     gap: var(--ui-space-2);
   }
 
-  .composer {
-    display: flex;
-    gap: var(--ui-space-2);
-    align-items: flex-end;
-    padding: var(--ui-space-3);
-    border-top: 1px solid var(--ui-divider);
-  }
-
-  .composer textarea {
-    flex: 1;
-    resize: none;
-    padding: var(--ui-space-2);
-    border: 0;
-    border-radius: var(--ui-radius-sm);
-    background: var(--ui-input);
-    color: var(--ui-text);
-    font: inherit;
+  .dock {
+    flex: 0 0 auto;
+    padding: 0 var(--ui-space-3) var(--ui-space-3);
   }
 </style>
