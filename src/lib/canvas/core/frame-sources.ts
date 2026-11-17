@@ -2,7 +2,7 @@ import type { FrameDoc } from './frame-build';
 import { StartupStep, markStartup } from './startup-marks';
 import { keptKey, scopedCache, type CacheScope, type FrameCache } from './frame-cache';
 import { env as publicEnv } from '$env/dynamic/public';
-import { sourceAsksFor, type SourceAsks } from '$lib/local-user';
+import { isLocalMode, sourceAsksFor, type SourceAsks } from '$lib/local-user';
 
 const SOURCES_KEPT = 8;
 const HTTP_NO_CONTENT = 204;
@@ -184,7 +184,7 @@ export const batchedSources = (fetcher: Fetcher, kept = SOURCES_KEPT, cacheOf: (
 let scoped: FrameCache | null = null;
 
 export function scopeFrameCache(scope: CacheScope | null): FrameCache | null {
-  scoped = scopedCache(scope);
+  scoped = isLocalMode(publicEnv) ? null : scopedCache(scope);
   return scoped;
 }
 
