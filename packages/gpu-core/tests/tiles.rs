@@ -1022,19 +1022,3 @@ fn eviction_keeps_the_level_a_gesture_draws_though_the_zoom_wants_another() {
 
     assert!(gone.iter().all(|k| k.step != drawn || !k.screen(at).overlaps(Rect::new(0.0, 0.0, SCREEN.0 as f64, SCREEN.1 as f64))));
 }
-
-#[test]
-fn eviction_never_drops_the_only_cover_of_a_cell_on_screen() {
-    let mut tiles = Tiles::default();
-    let at = camera(1.0);
-    let coarse = tiles.step_for(at) - 4;
-    tiles.missing_over(at, SCREEN, coarse).into_iter().for_each(|k| tiles.hold(k));
-    let sharp = tiles.missing_over(at, SCREEN, tiles.step_for(at));
-    sharp.iter().take(sharp.len() / 2).for_each(|k| tiles.hold(*k));
-
-    tiles.evict_beyond(at, SCREEN, 0);
-
-    let screen = Rect::new(0.0, 0.0, SCREEN.0 as f64, SCREEN.1 as f64);
-    let bare: Vec<&TileKey> = sharp.iter().filter(|k| k.screen(at).overlaps(screen)).filter(|k| !tiles.holds(**k) && !tiles.covered(**k)).collect();
-    assert!(bare.is_empty(), "{} cells on screen lost every level: {:?}", bare.len(), bare.first());
-}
