@@ -5,9 +5,19 @@ export enum CameraMotion {
 
 export type TileDom<M> = { on: boolean; resizable: boolean; showAdd: boolean; marks: readonly M[] };
 
-const DOM_OF: Record<CameraMotion, <M>(dom: TileDom<M>) => TileDom<M>> = {
-  [CameraMotion.Still]: (dom) => dom,
-  [CameraMotion.Moving]: () => ({ on: false, resizable: false, showAdd: false, marks: [] })
+type Rule = {
+  tile: <M>(dom: TileDom<M>) => TileDom<M>;
+  overlays: <F extends { id: string }>(frames: readonly F[], editing: (id: string) => boolean) => readonly F[];
+  rests: boolean;
 };
 
-export const tileDom = <M>(dom: TileDom<M>, motion: CameraMotion): TileDom<M> => DOM_OF[motion](dom);
+const DURING: Record<CameraMotion, Rule> = {
+  [CameraMotion.Still]: { tile: (dom) => dom, overlays: (frames) => frames, rests: true },
+  [CameraMotion.Moving]: { tile: () => ({ on: false, resizable: false, showAdd: false, marks: [] }), overlays: (frames, editing) => frames.filter((f) => editing(f.id)), rests: false }
+};
+
+export const tileDom = <M>(dom: TileDom<M>, motion: CameraMotion): TileDom<M> => DURING[motion].tile(dom);
+
+export const screenOverlays = <F extends { id: string }>(frames: readonly F[], editing: (id: string) => boolean, motion: CameraMotion): readonly F[] => DURING[motion].overlays(frames, editing);
+
+export const shownAtRest = <T>(value: T | null, motion: CameraMotion): T | null => (DURING[motion].rests ? value : null);

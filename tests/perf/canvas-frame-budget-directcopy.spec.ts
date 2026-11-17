@@ -87,12 +87,12 @@ test('direct zoom on the user canvas copy', async () => {
   const legs = moderate ? [{ to: 1.5, ms: LEG_MS }, { to: 0.5, ms: LEG_MS }, { to: 1.5, ms: LEG_MS }, { to: 0.5, ms: LEG_MS }] : [{ to: 1.2, ms: LEG_MS }, { to: 0.3, ms: LEG_MS }, { to: 2.4, ms: LEG_MS }, { to: 0.3, ms: LEG_MS }];
   const steps = zoomPath({ from: moderate ? 0.5 : 0.3, anchor: CENTRE, legs });
   const profiled = process.env.PROBE_PROFILE === '1';
-  type Traced = { name: string; dur?: number; ph: string; args?: { elementCount?: number; beginData?: { elementCount?: number } } };
+  type Traced = { name: string; dur?: number; ph: string; args?: { elementCount?: number; beginData?: { elementCount?: number }; data?: { nodeName?: string; reason?: string; invalidatedSelectors?: string[]; changedClass?: string; changedAttribute?: string; changedId?: string; changedPseudo?: string; extraData?: string } } };
   const traced: Traced[] = [];
   const tracing = process.env.PROBE_TRACE === '1';
   if (tracing) {
     cdp.on('Tracing.dataCollected', (e) => traced.push(...(e.value as unknown as Traced[])));
-    await cdp.send('Tracing.start', { categories: 'devtools.timeline,disabled-by-default-devtools.timeline', transferMode: 'ReportEvents' });
+    await cdp.send('Tracing.start', { categories: 'devtools.timeline,disabled-by-default-devtools.timeline,disabled-by-default-devtools.timeline.invalidationTracking', transferMode: 'ReportEvents' });
   }
   if (profiled) {
     await cdp.send('Profiler.enable');
@@ -130,6 +130,13 @@ test('direct zoom on the user canvas copy', async () => {
     }
     const styled = traced.filter((t) => t.name === 'UpdateLayoutTree' && t.ph === 'X').map((t) => t.args?.elementCount ?? t.args?.beginData?.elementCount ?? 0);
     console.log(`styles n=${styled.length} elements mean=${(styled.reduce((a, b) => a + b, 0) / Math.max(1, styled.length)).toFixed(0)}`);
+    const why = new Map<string, number>();
+    for (const t of traced.filter((e) => e.name.endsWith('InvalidationTracking'))) {
+      const d = t.args?.data ?? {};
+      const key = `${t.name} ${d.nodeName ?? ''} ${d.reason ?? ''} ${d.changedClass ?? d.changedAttribute ?? d.changedId ?? d.changedPseudo ?? ''} ${(d.invalidatedSelectors ?? []).slice(0, 2).join('|')}`;
+      why.set(key, (why.get(key) ?? 0) + 1);
+    }
+    writeFileSync(`${OUT}/invalidations.txt`, [...why].sort((a, b) => b[1] - a[1]).slice(0, TRACE_TOP).map(([k, v]) => `${v}\t${k}`).join('\n'));
     writeFileSync(`${OUT}/trace.txt`, [...sums].sort((a, b) => b[1] - a[1]).slice(0, TRACE_TOP).map(([k, v]) => `${v.toFixed(0)}\t${k}`).join('\n'));
   }
   if (profiled) {
