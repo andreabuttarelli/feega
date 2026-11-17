@@ -29,6 +29,7 @@
   import SourceSyncPanel from './SourceSyncPanel.svelte';
   import { comparedWith, versionMarkOf } from '$lib/canvas/version-frame';
   import VersionCompare from './VersionCompare.svelte';
+  import RefPicker from './RefPicker.svelte';
   import { historyOf, moveVersion, timelineOf, type CommitStep } from '$lib/canvas/version-client';
   import { HeaderAction, headerBadges, headerHits, headerRow, type HeaderHit } from '$lib/canvas/core/frame-header';
   import { sourceStatus } from '$lib/canvas/source-status.svelte';
@@ -396,6 +397,7 @@
   const sources = sourceStatus(() => page.params.projectId ?? '', () => linkedFrames(props.nodeSummaries ?? []).map((id) => ({ id, name: byId.get(id)?.displayName ?? '' })));
   let sourceOpen = $state<{ id: string; left: number; top: number } | null>(null);
   let versionOpen = $state<{ before: string; after: string } | null>(null);
+  let pickerOpen = $state<{ id: string; left: number; top: number } | null>(null);
   const sideOf = (id: string) => {
     const url = posterOf(id);
     return url ? { url, label: byId.get(id)?.displayName ?? '' } : null;
@@ -4703,7 +4705,10 @@
     {#if versionSides?.before && versionSides.after}
       <VersionCompare projectId={page.params.projectId ?? ''} versionId={versionOpen?.after ?? ''} before={versionSides.before} after={versionSides.after} history={versionHistory} onclose={() => (versionOpen = null)} onchanged={sources.refresh} />
     {/if}
-    <SourceSyncPanel projectId={page.params.projectId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} />
+    <SourceSyncPanel projectId={page.params.projectId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} oncompare={(id) => ((pickerOpen = sourceOpen && { ...sourceOpen, id }), (sourceOpen = null))} />
+    {#if pickerOpen}
+      <RefPicker projectId={page.params.projectId ?? ''} nodeId={pickerOpen.id} anchor={pickerOpen} onclose={() => (pickerOpen = null)} oncompared={(frames) => ((versionOpen = { before: pickerOpen?.id ?? '', after: frames[0] }), (pickerOpen = null))} />
+    {/if}
     <PrototypePlayerHost frames={playerFrames} />
     {#if showsPrototype}
       <PrototypeArrows {view} frames={overlayFrames} links={arrowLinks} elements={linkElements()} handle={pickedHandle()} aimingFrom={prototypeLink.draft ? (inside?.nodeId ?? null) : null} onpick={openLink} ondrag={dragLink} />

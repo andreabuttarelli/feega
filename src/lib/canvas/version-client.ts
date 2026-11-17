@@ -1,8 +1,8 @@
 import { VersionAction } from './version-frame';
+import type { CommitStep, Versions } from './ref-choices';
 
 export { VersionAction };
-
-export type CommitStep = { sha: string; message: string; author: string; at: string };
+export type { CommitStep };
 
 export type Timeline = { steps: CommitStep[]; at: number };
 
@@ -21,6 +21,11 @@ const github = (projectId: string, path: string) => `/api/v1/projects/${projectI
 async function post(fetchFn: Fetch, url: string, body: unknown): Promise<Record<string, unknown> | null> {
   const res = await fetchFn(url, { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(body) }).catch(() => null);
   return (await res?.json().catch(() => null)) as Record<string, unknown> | null;
+}
+
+export async function versionsOf(projectId: string, nodeId: string, fetchFn: Fetch = fetch): Promise<Versions | null> {
+  const body = await post(fetchFn, github(projectId, 'versions'), { nodeId });
+  return body?.ok ? (body as unknown as Versions) : null;
 }
 
 export async function historyOf(projectId: string, nodeId: string, fetchFn: Fetch = fetch): Promise<CommitStep[]> {
