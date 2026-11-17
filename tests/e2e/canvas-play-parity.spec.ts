@@ -11,9 +11,9 @@ const STAGE = { width: 2400, height: 1300 };
 const SETTLE_MS = 5000;
 const MIN_SSIM = 0.98;
 const TOOLBAR_PX = 80;
-const CASES = (process.env.PLAY_CASES ?? 'hero-phone,features-grid,view-only-layers,component-main-override').split(',');
+const CASES = (process.env.PLAY_CASES ?? 'hero-phone,features-grid,view-only-layers,component-main-override,landing').split(',');
 const DATA = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
-const NODE_SCALE = 0.5;
+const NODE_SCALE = 1;
 
 const fixtureDoc = (name: string) => baseFixtures().find((f) => f.name === name)!.doc;
 
@@ -22,12 +22,12 @@ type Seen = { png: Buffer; shown: number; width: number };
 async function seen(page: Page, target: Locator, bottom: number): Promise<Seen> {
   const box = (await target.boundingBox())!;
   const height = Math.min(box.height, bottom - box.y);
-  return { png: await page.screenshot({ clip: { ...box, height } }), shown: height / box.height, width: box.width };
+  return { png: await page.screenshot({ clip: { ...box, height } }), shown: height / box.width, width: box.width };
 }
 
 async function topOf(s: Seen, shown: number): Promise<Buffer> {
   const meta = await sharp(s.png).metadata();
-  return sharp(s.png).extract({ left: 0, top: 0, width: meta.width!, height: Math.max(1, Math.floor((meta.height! * shown) / s.shown)) }).png().toBuffer();
+  return sharp(s.png).extract({ left: 0, top: 0, width: meta.width!, height: Math.max(1, Math.min(meta.height!, Math.floor(meta.width! * shown))) }).png().toBuffer();
 }
 
 const WINDOW = 8;
@@ -44,6 +44,20 @@ const save = (name: string, png: Buffer) => {
   mkdirSync(SHOTS_DIR, { recursive: true });
   writeFileSync(`${SHOTS_DIR}/${name}.png`, png);
 };
+
+const FRAME_MARGIN = 80;
+
+async function zoomOnto(page: Page, target: Locator) {
+  await page.mouse.move(STAGE.width / 2, STAGE.height / 2);
+  await page.keyboard.press('Shift+Digit0');
+  await page.waitForTimeout(SETTLE_MS);
+  const box = (await target.boundingBox())!;
+  await page.mouse.move(STAGE.width / 2, STAGE.height / 2);
+  await page.mouse.wheel(box.x - FRAME_MARGIN, box.y - FRAME_MARGIN);
+  await page.mouse.move(STAGE.width - 1, STAGE.height / 2);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(SETTLE_MS);
+}
 
 const HEADER_PAD = 24;
 const NARROW_WINDOW = { width: 400, height: 900 };
@@ -77,8 +91,11 @@ test.describe('Play paints each view like the canvas @real', () => {
       for (const view of viewsOf(doc)) {
         const tile = page.locator(`[data-frame="${view.id === viewsOf(doc)[0].id ? node.id : `${node.id}@bp:${view.id}`}"]`).first();
         await expect(tile).toHaveCount(1, { timeout: 30_000 });
+        await zoomOnto(page, tile);
         canvasShots.set(view.id, await seen(page, tile, STAGE.height - TOOLBAR_PX));
       }
+      await page.keyboard.press('Shift+Digit1');
+      await page.waitForTimeout(SETTLE_MS);
 
       await openPlay(page, node.id, name);
       const scores: Record<string, number> = {};
