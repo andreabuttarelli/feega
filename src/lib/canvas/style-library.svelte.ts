@@ -12,18 +12,23 @@ export type StyleSink = {
 };
 
 
+type AtRest = (job: () => void) => void;
+
 export class StyleLibrary {
   styles = $state<Library>({});
   failed = $state(false);
   private sink: StyleSink | null = null;
+  private atRest: AtRest = (job) => job();
+  private syncOwed = false;
   private store: LibraryStore | null = null;
   private seen: Library = {};
   private queue: Promise<unknown> = Promise.resolve();
   private renamedTo = new Map<string, string>();
   private adopt = adoptBatch<Style>((entries) => void this.send({ op: LibraryOp.Adopt, entries }));
 
-  connect(sink: StyleSink | null) {
+  connect(sink: StyleSink | null, atRest: AtRest = (job) => job()) {
     this.sink = sink;
+    this.atRest = atRest;
   }
 
   async open(store: LibraryStore | null) {
@@ -48,7 +53,18 @@ export class StyleLibrary {
     if (Object.keys(fresh).length) {
       this.adopt(fresh);
     }
-    for (const [name, style] of Object.entries(inDocs)) {
+    if (this.syncOwed) {
+      return;
+    }
+    this.syncOwed = true;
+    this.atRest(() => {
+      this.syncOwed = false;
+      this.bringUpToDate();
+    });
+  }
+
+  private bringUpToDate() {
+    for (const [name, style] of Object.entries(this.seen)) {
       if (!sameValue(style, this.styles[name])) {
         this.sink?.push(name, this.styles[name]);
       }

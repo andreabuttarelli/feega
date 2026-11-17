@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { RunListing } from '$lib/canvas/run-graph';
 import RunsPanel from './RunsPanel.svelte';
 
-vi.mock('@lucide/svelte/icons/history', () => ({ default: () => {} }));
+vi.mock('@lucide/svelte/icons/wand-sparkles', () => ({ default: () => {} }));
 
 const dir = dirname(fileURLToPath(import.meta.url));
 const { flushSync, mount, unmount } = (await import(join(dir, '../../../../node_modules/svelte/src/index-client.js'))) as typeof import('svelte');
@@ -15,6 +15,12 @@ const source = readFileSync(join(dir, 'RunsPanel.svelte'), 'utf8');
 const LONG = 40;
 const RUNNING = 3;
 const runs: RunListing[] = Array.from({ length: LONG }, (_, i) => ({ id: `r${i}`, nodeId: `n${i}`, name: `Generate image ${i + 1}`, status: i < RUNNING ? 'running' : 'done', startedAt: '2026-10-27T10:00:00Z', costUsd: 0.012 }));
+
+describe('the runs button', () => {
+  it('does not wear the History icon, which belongs to the rail entry', () => {
+    expect(source).not.toContain('icons/history');
+  });
+});
 
 describe('the runs popover with a long list', () => {
   let app: Record<string, unknown> | null = null;

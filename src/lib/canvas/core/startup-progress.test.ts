@@ -50,3 +50,19 @@ describe('revealDue', () => {
     expect(revealDue({ sinceStartMs: 12_000, sinceEngineMs: null })).toBe(true);
   });
 });
+
+describe('revealing on the frames nearest the centre', () => {
+  const ready = new Set([StartupStep.GpuReady]);
+
+  it('reveals once the engine is ready and the nearest frames show something, though others still load (stress36 kept the splash 9 s over frames drawn at 2.5 s)', () => {
+    expect(startupProgress(ready, { shown: 6, total: 36, nearShown: 6, nearTotal: 6 })).toBe(1);
+  });
+
+  it('keeps the splash while a nearest frame is still empty', () => {
+    expect(startupProgress(ready, { shown: 5, total: 36, nearShown: 5, nearTotal: 6 })).toBeLessThan(1);
+  });
+
+  it('keeps the splash before the engine is ready', () => {
+    expect(startupProgress(new Set(), { shown: 6, total: 36, nearShown: 6, nearTotal: 6 })).toBeLessThan(1);
+  });
+});

@@ -17,7 +17,7 @@ vi.mock('$lib/server/code-push/frames-runtime', () => ({
   framesDeps: () => ({
     host: async () => (connected ? githubHost(gh.call, { owner: 'acme', repo: 'app', ref: null }) : null),
     edits: (...args: unknown[]) => codeEdits(...args),
-    links: { read: async (id: string) => links.get(id) ?? null, save: async (id: string, l: CodeLink) => Boolean(links.set(id, l)), remove: async (id: string) => links.delete(id) },
+    links: { read: async (id: string) => links.get(id) ?? null, all: async (id: string) => (links.has(id) ? [links.get(id)!] : []), save: async (id: string, l: CodeLink) => Boolean(links.set(id, l)), remove: async (id: string) => links.delete(id) },
     lock
   })
 }));

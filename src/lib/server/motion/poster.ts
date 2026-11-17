@@ -5,6 +5,7 @@ import { insertAsset } from '$lib/server/repos/assets';
 import { DataCheck, patchNodeData } from '$lib/server/repos/canvas';
 import { storeAssetFile } from '$lib/server/repos/asset-storage';
 import { exportFolder, type ExportScope } from '$lib/motion/export-plan';
+import { keepBeforePoster } from '$lib/server/code-push/link-store';
 
 const POSTER_EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 const POSTER_MAX_BYTES = 1_000_000;
@@ -43,5 +44,6 @@ export async function savePoster(db: Db, input: PosterInput) {
   });
 
   await patchNodeData(db, { orgId: input.orgId, nodeId: input.nodeId, patch: { posterAssetId: asset.id, ...revisionOf(input.form.get('revision')) }, check: DataCheck.Schema, actor: input.actor });
+  await keepBeforePoster(db, input, input.nodeId, asset.id);
   return { assetId: asset.id };
 }

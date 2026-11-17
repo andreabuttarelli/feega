@@ -22,7 +22,7 @@ describe('dopo Update il frame è in pari', () => {
     const first = await commit(dir, 'page.tsx', 'v1');
     const second = await commit(dir, 'page.tsx', 'v2');
     const saved = new Map<string, CodeLink>([['n1', linkSchema.parse({ source: CodeSourceKind.Folder, repo: dir, entryKind: EntryKind.Page, entry: 'page.tsx', baseBranch: 'main', baseSha: first })]]);
-    const links: LinkStore = { read: async (id) => saved.get(id) ?? null, save: async (id, l) => Boolean(saved.set(id, l)), remove: async (id) => saved.delete(id) };
+    const links: LinkStore = { read: async (id) => saved.get(id) ?? null, all: async (id) => (saved.has(id) ? [saved.get(id)!] : []), save: async (id, l) => Boolean(saved.set(id, l)), remove: async (id) => saved.delete(id) };
 
     await frameRebased({ host: async () => localGitHost(dir, { publish: Publish.Local }), links }, 'n1');
 
