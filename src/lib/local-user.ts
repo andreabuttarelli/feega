@@ -8,7 +8,7 @@ export const isLocalMode = (env: Record<string, string | undefined>) => env.PUBL
 
 export type SourceAsks = { framesPerAsk: number; open: number };
 
-const LOCAL_SOURCE_ASKS: SourceAsks = { framesPerAsk: 2, open: 2 };
+const LOCAL_SOURCE_ASKS: SourceAsks = { framesPerAsk: 6, open: 2 };
 const HOSTED_SOURCE_ASKS: SourceAsks = { framesPerAsk: 3, open: 6 };
 
 export const sourceAsksFor = (env: Record<string, string | undefined>): SourceAsks => (isLocalMode(env) ? LOCAL_SOURCE_ASKS : HOSTED_SOURCE_ASKS);

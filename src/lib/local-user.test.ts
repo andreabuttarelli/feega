@@ -70,9 +70,9 @@ describe('in locale niente nodi che chiedono il cloud', () => {
 });
 
 describe('frame sources asked per mode', () => {
-  it('local keeps two small asks open: one server thread, six browser connections shared with posters and fonts', async () => {
+  it('local keeps two asks open but makes each one wide: the server answers from frames written at start, and every ask waits for one of six connections shared with posters and fonts', async () => {
     const { sourceAsksFor } = await import('./local-user');
-    expect(sourceAsksFor({ PUBLIC_FEEGA_LOCAL: '1' })).toEqual({ framesPerAsk: 2, open: 2 });
+    expect(sourceAsksFor({ PUBLIC_FEEGA_LOCAL: '1' })).toEqual({ framesPerAsk: 6, open: 2 });
   });
 
   it('hosted asks wider, so separate instances parse in parallel', async () => {
