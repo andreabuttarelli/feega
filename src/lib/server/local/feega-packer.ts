@@ -14,6 +14,8 @@ type Reply = { id: number; ok: true; hashed: [string, number][] } | { id: number
 
 const SAVING_SUFFIX = '.saving';
 
+export const savingPath = (path: string) => `${path}${SAVING_SUFFIX}`;
+
 const docJson = new WeakMap<object, string>();
 
 function jsonOfDoc(doc: unknown): string {
@@ -29,9 +31,9 @@ function jsonOfDoc(doc: unknown): string {
   return json;
 }
 
-function bodyJson(body: PackJob['body']): string {
-  const heads = Object.entries(body.heads).map(([id, head]) => `${JSON.stringify(id)}:{"version":${JSON.stringify(head.version)},"doc":${jsonOfDoc(head.doc)}}`);
-  return `{"nodes":${JSON.stringify(body.nodes)},"connections":${JSON.stringify(body.connections)},"heads":{${heads.join(',')}}}`;
+function bodyJson({ heads, ...rest }: PackJob['body']): string {
+  const headsJson = Object.entries(heads).map(([id, head]) => `${JSON.stringify(id)}:{"version":${JSON.stringify(head.version)},"doc":${jsonOfDoc(head.doc)}}`);
+  return `${JSON.stringify(rest).slice(0, -1)},"heads":{${headsJson.join(',')}}}`;
 }
 
 export function createPacker() {
@@ -53,7 +55,7 @@ export function createPacker() {
 
   async function write(path: string, job: PackJob): Promise<Packed> {
     const id = next++;
-    const saving = `${path}${SAVING_SUFFIX}`;
+    const saving = savingPath(path);
     const byFile = new Map(job.assets.flatMap((a) => (a.row.file && a.bytes ? [[a.row.file, a.bytes] as const] : [])));
     const reply = await new Promise<Reply>((resolve, reject) => {
       waiting.set(id, { resolve, reject });

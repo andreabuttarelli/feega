@@ -144,6 +144,19 @@ describe('il file .feega è il database della modalità locale', () => {
 });
 
 describe('scrittura atomica', () => {
+  it('un salvataggio rimasto a metà da un processo ucciso viene tolto alla riapertura', async () => {
+    const path = tempFile();
+    const store = openFeegaStore(path, { origin: ORIGIN });
+    await addText(store, 'x');
+    await store.flush();
+    const { writeFileSync } = await import('node:fs');
+    writeFileSync(`${path}.saving`, 'half a zip');
+
+    openFeegaStore(path, { origin: ORIGIN });
+
+    expect(readdirSync(join(path, '..'))).toEqual(['work.feega']);
+  });
+
   it('dopo il salvataggio non resta nessun file temporaneo', async () => {
     const path = tempFile();
     const store = openFeegaStore(path, { origin: ORIGIN });

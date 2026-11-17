@@ -91,4 +91,17 @@ describe('il salvataggio della modalità locale impacchetta fuori dal thread pri
     expect(first.hashed).toBe(1);
     expect(second.hashed).toBe(0);
   });
+
+  it('the canvas history written beside the frames comes back as it was', async () => {
+    const path = tempFile();
+    const job = jobWith(new Uint8Array([1]));
+    const events = [{ id: 1, kind: 'node.create', node_id: 'n1', actor_kind: 'user' }];
+    const packer = createPacker();
+
+    await packer.write(path, { ...job, body: { ...job.body, events } });
+    const opened = unpackFeega(new Uint8Array(readFileSync(path)));
+    await packer.stop();
+
+    expect(opened.ok && opened.file.canvas.events).toEqual(events);
+  });
 });

@@ -1,11 +1,11 @@
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import type { Db } from '$lib/server/db/client';
 import { FEEGA_EXTENSION, FEEGA_REFUSAL_MESSAGE, FEEGA_VERSION, idsIn, packFeega, unpackFeega, type FeegaBlobs, type FeegaCanvas, type FeegaFile } from '$lib/canvas/feega-file';
 import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
 import { FONT_MIME_TYPES, fontFileOf } from '$lib/motion/fonts/library';
 import { orgFontPrefix } from '$lib/motion/fonts/upload-path';
-import { createPacker, type PackJob } from './feega-packer';
+import { createPacker, savingPath, type PackJob } from './feega-packer';
 import { createMemoryDb, type Blobs, type Change, type Row, type Tables } from './memory-db';
 
 import { LOCAL_ORG_ID, LOCAL_USER, LOCAL_USER_ID } from '$lib/local-user';
@@ -134,6 +134,7 @@ export type FeegaStoreOptions = { origin: string; saveDelayMs?: number; latencyM
 
 export function openFeegaStore(path: string, options: FeegaStoreOptions) {
   const { file, blobs } = readFile(path);
+  rmSync(savingPath(path), { force: true });
   const { tables, storage, place } = seed(file, blobs);
   const listeners = new Set<(change: Change) => void>();
   let timer: ReturnType<typeof setTimeout> | null = null;
