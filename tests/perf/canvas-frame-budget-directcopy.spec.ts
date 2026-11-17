@@ -15,6 +15,8 @@ const CTRL = 2;
 const GRID = [12, 8] as const;
 const PAUSE_AT_MS = [1000, 3900, 5200];
 const SETTLE_MS = 3000;
+const MS_PER_S = 1000;
+const TRACE_TOP = 30;
 
 async function cells(jpeg: Buffer): Promise<number[]> {
   const [gw, gh] = GRID;
@@ -85,6 +87,13 @@ test('direct zoom on the user canvas copy', async () => {
   const legs = moderate ? [{ to: 1.5, ms: LEG_MS }, { to: 0.5, ms: LEG_MS }, { to: 1.5, ms: LEG_MS }, { to: 0.5, ms: LEG_MS }] : [{ to: 1.2, ms: LEG_MS }, { to: 0.3, ms: LEG_MS }, { to: 2.4, ms: LEG_MS }, { to: 0.3, ms: LEG_MS }];
   const steps = zoomPath({ from: moderate ? 0.5 : 0.3, anchor: CENTRE, legs });
   const profiled = process.env.PROBE_PROFILE === '1';
+  type Traced = { name: string; dur?: number; ph: string; args?: { elementCount?: number; beginData?: { elementCount?: number } } };
+  const traced: Traced[] = [];
+  const tracing = process.env.PROBE_TRACE === '1';
+  if (tracing) {
+    cdp.on('Tracing.dataCollected', (e) => traced.push(...(e.value as unknown as Traced[])));
+    await cdp.send('Tracing.start', { categories: 'devtools.timeline,disabled-by-default-devtools.timeline', transferMode: 'ReportEvents' });
+  }
   if (profiled) {
     await cdp.send('Profiler.enable');
     await cdp.send('Profiler.setSamplingInterval', { interval: 200 });
@@ -111,6 +120,18 @@ test('direct zoom on the user canvas copy', async () => {
     void cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: s.x, y: s.y, deltaX: s.dx, deltaY: s.dy, modifiers: s.ctrl ? CTRL : 0 }).catch(() => {});
   }
   await page.waitForTimeout(2000);
+  if (tracing) {
+    const done = new Promise((r) => cdp.once('Tracing.tracingComplete', r));
+    await cdp.send('Tracing.end');
+    await done;
+    const sums = new Map<string, number>();
+    for (const e of traced.filter((t) => t.ph === 'X' && t.dur)) {
+      sums.set(e.name, (sums.get(e.name) ?? 0) + e.dur! / MS_PER_S);
+    }
+    const styled = traced.filter((t) => t.name === 'UpdateLayoutTree' && t.ph === 'X').map((t) => t.args?.elementCount ?? t.args?.beginData?.elementCount ?? 0);
+    console.log(`styles n=${styled.length} elements mean=${(styled.reduce((a, b) => a + b, 0) / Math.max(1, styled.length)).toFixed(0)}`);
+    writeFileSync(`${OUT}/trace.txt`, [...sums].sort((a, b) => b[1] - a[1]).slice(0, TRACE_TOP).map(([k, v]) => `${v.toFixed(0)}\t${k}`).join('\n'));
+  }
   if (profiled) {
     const { profile } = (await cdp.send('Profiler.stop')) as { profile: { nodes: { id: number; callFrame: { functionName: string; url: string; lineNumber: number } }[]; samples: number[] } };
     const byId = new Map(profile.nodes.map((n) => [n.id, n.callFrame]));
