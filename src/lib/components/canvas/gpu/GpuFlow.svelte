@@ -1981,7 +1981,7 @@
   }
 
   onMount(() => {
-    styleLibrary.connect({ push: syncStyle, rename: syncRename, remove: syncRemove });
+    styleLibrary.connect({ push: syncStyle, rename: syncRename, remove: syncRemove }, paintThenIdle(afterPaint, whenIdle));
     const projectId = page.params.projectId;
     void styleLibrary.open(projectId ? projectLibraryStore(projectId, LibraryKind.Style) : null);
     return () => {
