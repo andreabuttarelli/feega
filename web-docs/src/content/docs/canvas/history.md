@@ -18,6 +18,9 @@ newest first, in one place.
 
 Moves are not recorded.
 
+In a local `.feega` file the same panel is in the rail. It lists the changes made since the
+local server started; there are no named versions, and the list is lost when the server stops.
+
 The list updates live: changes by teammates, the chat or outside agents appear within a
 second. If the live connection drops, the panel rereads every 15 seconds and whenever you
 return to the tab.
