@@ -1,3 +1,7 @@
+import { VersionAction } from './version-frame';
+
+export { VersionAction };
+
 export type CommitStep = { sha: string; message: string; author: string; at: string };
 
 export type Timeline = { steps: CommitStep[]; at: number };
@@ -32,4 +36,11 @@ export async function moveVersion(projectId: string, versionId: string, ref: str
 export async function compareRefs(projectId: string, nodeId: string, refs: string[], fetchFn: Fetch = fetch): Promise<string[]> {
   const body = await post(fetchFn, github(projectId, 'compare'), { nodeId, refs });
   return body?.ok ? (body.versions as { frameId: string }[]).map((v) => v.frameId) : [];
+}
+
+export type FileDiff = { path: string; before: string | null; after: string | null };
+
+export async function versionAction(projectId: string, versionId: string, action: VersionAction, fetchFn: Fetch = fetch): Promise<Record<string, unknown> | null> {
+  const body = await post(fetchFn, github(projectId, 'version-actions'), { versionId, action });
+  return body?.ok ? body : null;
 }

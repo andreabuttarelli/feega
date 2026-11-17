@@ -81,6 +81,20 @@ feega github version-ref <projectId> <versionId> <ref>
 
 `POST /api/v1/projects/:id/github/compare` with `{ versionId, ref }`; MCP `github_version_ref {versionId,ref}`.
 
+### Actions from a version
+
+- **Restore this version**: the files of the version become changes of the linked frame. It shows as modified in Changes and goes out with the next push, as a pull request like any edit. The default branch is never written.
+- **Make variant**: an editable copy of the version below it, not linked to the code.
+- **Open code diff**: the line diff of every file of the frame between the version and the base branch.
+
+```bash
+feega github restore <projectId> <versionId>
+feega github variant <projectId> <versionId>
+feega github code-diff <projectId> <versionId>
+```
+
+`POST /api/v1/projects/:id/github/version-actions` with `{ versionId, action: "restore" | "variant" | "code_diff" }`; MCP `github_version_action`.
+
 ## CLI
 
 ```bash

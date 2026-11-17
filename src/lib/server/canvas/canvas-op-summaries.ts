@@ -52,6 +52,7 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   github_versions: 'Branches, tags, open pull requests and the commit history of the file behind a linked frame or component.',
   github_compare: 'Import a linked frame at other git refs as read-only version frames placed beside it.',
   github_version_ref: 'Move a version frame to another commit, branch, tag or pull request, in the same place.',
+  github_version_action: 'From a version frame: restore it onto the linked frame as changes to push, make an unlinked variant, or read the code diff.',
   github_undo: 'Undo the last push of a frame with a forward commit that restores only the files that push touched.',
   github_detach: 'Unlink a frame from its GitHub source; the frame stays on the canvas.',
   github_branches: 'The GitHub branches of one repository (owner/name) your connected account can read.',

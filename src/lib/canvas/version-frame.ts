@@ -15,3 +15,9 @@ export function comparedWith(versionId: string, originalId: string, selected: re
   const other = selected.length === PAIR && selected.includes(versionId) ? selected.find((id) => id !== versionId) : undefined;
   return other ?? originalId;
 }
+
+export enum VersionAction {
+  Restore = 'restore',
+  Variant = 'variant',
+  CodeDiff = 'code_diff'
+}
