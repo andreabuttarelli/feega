@@ -1,12 +1,7 @@
 <script lang="ts">
-  import { changedRegions, type Pixels, type Region } from '$lib/canvas/pixel-diff';
+  import { changedRegions, DiffMode, type Pixels, type Region } from '$lib/canvas/pixel-diff';
 
   type Side = { url: string; label: string };
-
-  enum DiffMode {
-    Overlay = 'overlay',
-    Slider = 'slider'
-  }
 
   let { before, after, onclose }: { before: Side; after: Side; onclose: () => void } = $props();
 

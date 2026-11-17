@@ -1,3 +1,8 @@
+export enum DiffMode {
+  Overlay = 'overlay',
+  Slider = 'slider'
+}
+
 export type Pixels = { width: number; height: number; data: Uint8ClampedArray };
 
 export type Region = { x: number; y: number; w: number; h: number };
