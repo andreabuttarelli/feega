@@ -43,6 +43,14 @@ export async function cmdGithubVariant(projectId: string, canvasId: string, node
   await print(`${base(projectId)}/variant`, { method: 'POST', body: JSON.stringify({ canvasId, nodeId }) });
 }
 
+export async function cmdGithubConflicts(projectId: string, nodeId: string) {
+  await print(`${base(projectId)}/conflicts?${new URLSearchParams({ nodeId })}`);
+}
+
+export async function cmdGithubResolve(projectId: string, nodeId: string, choice: string) {
+  await print(`${base(projectId)}/conflicts`, { method: 'POST', body: JSON.stringify({ nodeId, choice }) });
+}
+
 export async function cmdGithubDetach(projectId: string, nodeId: string) {
   await print(`${base(projectId)}?${new URLSearchParams({ nodeId })}`, { method: 'DELETE' });
 }

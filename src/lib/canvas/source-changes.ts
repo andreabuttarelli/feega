@@ -1,4 +1,5 @@
 export enum SourceAction {
+  Resolve = 'resolve',
   Update = 'update',
   ViewPr = 'view-pr',
   MakeVariant = 'make-variant',
@@ -32,6 +33,7 @@ const GREEN = new Set(['success', 'skipped', 'neutral']);
 type ActionRule = { action: SourceAction; holds: (s: FrameSync) => boolean };
 
 const ACTION_RULES: ActionRule[] = [
+  { action: SourceAction.Resolve, holds: (s) => s.state === 'conflict' },
   { action: SourceAction.Update, holds: (s) => UPDATE_STATES.has(s.state) },
   { action: SourceAction.ViewPr, holds: (s) => Boolean(s.push?.pull?.url) },
   { action: SourceAction.MakeVariant, holds: (s) => !s.link.variantOf },

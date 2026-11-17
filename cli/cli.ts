@@ -925,6 +925,22 @@ program
 const github = program.command('github').description('Push code edits of linked frames to GitHub as a branch and pull request');
 
 github
+  .command('conflicts <projectId> <nodeId>')
+  .description('Show base, canvas and GitHub versions of the files a frame and GitHub both changed')
+  .action(async (projectId: string, nodeId: string) => {
+    const { cmdGithubConflicts } = await import('./commands/github.ts');
+    await cmdGithubConflicts(projectId, nodeId);
+  });
+
+github
+  .command('resolve <projectId> <nodeId> <choice>')
+  .description('Resolve a conflict: keep_canvas (canvas wins on push) or agent (prints a merge prompt); to take GitHub, pull the frame')
+  .action(async (projectId: string, nodeId: string, choice: string) => {
+    const { cmdGithubResolve } = await import('./commands/github.ts');
+    await cmdGithubResolve(projectId, nodeId, choice);
+  });
+
+github
   .command('variant <projectId> <canvasId> <nodeId>')
   .description('Copy a linked frame as a variant of it; its push asks to replace the original, become a new route or stay on the canvas')
   .action(async (projectId: string, canvasId: string, nodeId: string) => {

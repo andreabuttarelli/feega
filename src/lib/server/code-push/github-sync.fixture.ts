@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import type { CodeScope } from '$lib/server/code-import/canvas-import';
 import type { SourceEdit } from '$lib/server/code-import/write-back';
 import { EditTarget, routedEdits } from '$lib/server/code-import/instance-edits';
-import { git } from './git-cli';
+import { commitTree, git } from './git-cli';
 import type { FramesDeps } from './frames-push';
 import { linkKey, type CodeLink } from './link';
 import type { LinkStore } from './link-store';
@@ -68,7 +68,7 @@ const run = async (dir: string, args: string[]) => {
   return done.out.trim();
 };
 
-export type World = { origin: string; clone: string; at: (ref: string, path: string) => Promise<string | null>; changed: (from: string, to: string) => Promise<string[]>; run: (args: string[]) => Promise<string>; done: () => Promise<void> };
+export type World = { origin: string; clone: string; upstream: (path: string, content: string) => Promise<string>; at: (ref: string, path: string) => Promise<string | null>; changed: (from: string, to: string) => Promise<string[]>; run: (args: string[]) => Promise<string>; done: () => Promise<void> };
 
 export async function fixtureWorld(): Promise<World> {
   const origin = await mkdtemp(join(tmpdir(), 'feega-origin-'));
@@ -93,7 +93,13 @@ export async function fixtureWorld(): Promise<World> {
     return done.code ? null : done.out;
   };
   const changed = async (from: string, to: string) => (await run(origin, ['diff', '--name-only', from, to])).split('\n').filter(Boolean);
-  return { origin, clone, at, changed, run: (args) => run(clone, args), done: () => Promise.all([rm(origin, { recursive: true, force: true }), rm(clone, { recursive: true, force: true })]).then(() => undefined) };
+  const upstream = async (path: string, content: string) => {
+    const head = await run(origin, ['rev-parse', 'main']);
+    const made = await commitTree(origin, [{ path, content }], [head], 'upstream change');
+    await run(origin, ['update-ref', 'refs/heads/main', made.out.trim()]);
+    return made.out.trim();
+  };
+  return { origin, clone, upstream, at, changed, run: (args) => run(clone, args), done: () => Promise.all([rm(origin, { recursive: true, force: true }), rm(clone, { recursive: true, force: true })]).then(() => undefined) };
 }
 
 export function memoryLinks(): LinkStore & { every: () => { nodeId: string; link: CodeLink }[] } {
@@ -113,13 +119,13 @@ export type FrameEdits = Map<string, SourceEdit[]>;
 
 export function fixtureDeps(world: World, links: LinkStore, edits: FrameEdits): FramesDeps {
   const host = localGitHost(world.clone, { publish: Publish.Origin });
-  const read = (path: string) => host.readFile(path, 'main');
   return {
     host: async () => host,
     links,
     lock: memoryLock(),
     edits: async (_scope, nodeId, target = EditTarget.Instance) => {
-      const done = await routedEdits(edits.get(nodeId) ?? [], read, target);
+      const base = (await links.read(nodeId))?.baseSha ?? 'main';
+      const done = await routedEdits(edits.get(nodeId) ?? [], (path) => host.readFile(path, base), target);
       return { repo: world.clone, kind: 'folder', files: done.files.map((f) => ({ path: f.path, content: f.after })), skipped: done.skipped, proposals: done.proposals };
     }
   };

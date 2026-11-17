@@ -44,7 +44,8 @@ const COLUMN_OF: Record<keyof CodeLink, string> = {
   pullNumber: 'pull_number',
   writable: 'writable',
   beforePoster: 'before_poster',
-  variantOf: 'variant_of'
+  variantOf: 'variant_of',
+  keptSha: 'kept_sha'
 };
 
 const FIELDS = Object.entries(COLUMN_OF) as [keyof CodeLink, string][];

@@ -16,6 +16,7 @@ describe('il popover di un frame collegato', () => {
   it('dice file, commit corto e le azioni che lo stato permette', () => {
     expect(popoverOf(sync({ state: 'in_sync' }))).toEqual({ file: 'app/page.tsx', commit: 'abcdef1', branch: 'main', actions: [SourceAction.MakeVariant, SourceAction.Detach] });
     expect(popoverOf(sync({ state: 'newer_upstream' })).actions).toEqual([SourceAction.Update, SourceAction.MakeVariant, SourceAction.Detach]);
+    expect(popoverOf(sync({ state: 'conflict' })).actions).toEqual([SourceAction.Resolve, SourceAction.Update, SourceAction.MakeVariant, SourceAction.Detach]);
     expect(popoverOf(sync({ state: 'in_pull', push: { pull: pull('open') } })).actions).toEqual([SourceAction.ViewPr, SourceAction.MakeVariant, SourceAction.Detach]);
     expect(popoverOf(sync({ link: { ...sync().link, variantOf: 'n0' } })).actions).not.toContain(SourceAction.MakeVariant);
   });

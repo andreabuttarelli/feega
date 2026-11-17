@@ -103,6 +103,7 @@ import { githubFor } from '$lib/server/code-import/github-runtime';
 import { frameDetach, framesPush, frameStatus, frameUndo } from '$lib/server/code-push/frames-push';
 import { framesDeps, importLinker, variantDeps } from '$lib/server/code-push/frames-runtime';
 import { frameVariant } from '$lib/server/code-push/variants';
+import { ConflictChoice, frameConflicts, frameResolve } from '$lib/server/code-push/conflicts';
 import { VariantChoice } from '$lib/canvas/source-changes';
 import { libsOrigin } from '$lib/server/motion/libs-origin';
 import { GithubRefusal } from '$lib/server/code-import/github-http';
@@ -1169,6 +1170,18 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: z.object({ canvasId: z.string(), nodeId: z.string() }).strict(),
     run: async (ctx, input) => frameVariant(variantDeps(ctx.db, ctx, input.canvasId), input.nodeId)
+  }),
+
+  github_conflicts: op({
+    access: Access.Read,
+    input: z.object({ nodeId: z.string() }).strict(),
+    run: async (ctx, input) => frameConflicts(framesDeps(ctx.db, ctx), figmaScope(ctx), input.nodeId)
+  }),
+
+  github_resolve: op({
+    access: Access.Write,
+    input: z.object({ nodeId: z.string(), choice: z.enum(ConflictChoice).describe('keep_canvas: the canvas version wins on push; agent: answers a prompt with base, canvas and GitHub versions to merge') }).strict(),
+    run: async (ctx, input) => frameResolve(framesDeps(ctx.db, ctx), figmaScope(ctx), input.nodeId, input.choice)
   }),
 
   github_detach: op({
