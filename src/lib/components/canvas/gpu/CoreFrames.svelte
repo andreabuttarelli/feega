@@ -54,7 +54,7 @@
   import { readClips, type CustomFrame, type CustomReads } from '@feega/motion-core/motion/gpu-full/dom/custom';
   import type { Picture, Pictures } from '@feega/motion-core/motion/gpu-full/raster';
   import { Stand, drawable, fillOrder, firstDrawn, inView, layersOf, nearestFirst, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
-  import { OnScreen, VectorGate, showStaged, shownBefore } from '$lib/canvas/core/staged-show';
+  import { Stage, VectorGate, showStaged, shownBefore } from '$lib/canvas/core/staged-show';
   import { uploadWithin } from '$lib/canvas/core/picture-uploads';
   import { Step, markFrame, noteImages } from '$lib/canvas/core/frame-timeline';
   import { StartupStep, markStartup, reportFramesShown } from '$lib/canvas/core/startup-marks';
@@ -355,18 +355,18 @@
     if (seed) {
       seedLive(f, seed, built.list);
     }
-    const present = (ready: Readiness) => {
+    const present = (ready: Readiness, stage: Stage) => {
       if (asking.get(f.id) !== key) {
         return;
       }
-      const group = ready === Readiness.Whole || held === OnScreen.Thumb ? key : `${key}${VECTORS}`;
+      const group = stage === Stage.Settled ? key : `${key}${VECTORS}`;
       const shown = loaded.get(f.id);
       loaded.set(f.id, group);
       weights.set(f.id, heldBytes(built.list));
       markFrame(f.id, ready === Readiness.Whole ? Step.Whole : Step.Vectors);
       lists = listed(lists, f.id, group, onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), shown, drawnLast.get(f.id)?.group]);
     };
-    void showStaged(media.ready(built.list), held, (ready) => (ready === Readiness.Whole ? vectorsFirst.after(() => present(ready)) : present(ready)));
+    void showStaged(media.ready(built.list), held, (ready, stage) => (stage === Stage.Settled ? vectorsFirst.after(() => present(ready, stage)) : present(ready, stage)));
   }
 
   const thumbLists = new Map<string, DisplayList>();

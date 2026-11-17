@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Readiness } from '@feega/motion-core/motion/gpu-full/media';
-import { OnScreen, VectorGate, showStaged, shownBefore } from './staged-show';
+import { OnScreen, Stage, VectorGate, showStaged, shownBefore } from './staged-show';
 
 const pending = () => {
   let settle: (r: Readiness) => void = () => {};
@@ -27,6 +27,20 @@ describe('showStaged', () => {
     await ready;
 
     expect(shown).toEqual([Readiness.Partial, Readiness.Whole]);
+  });
+
+  it('a frame whose pictures only partly decode is shown again once they settle, so the ones that arrived replace their blocks', async () => {
+    const shown: [Readiness, Stage][] = [];
+    const { ready, settle } = pending();
+
+    showStaged(ready, OnScreen.Nothing, (r, stage) => shown.push([r, stage]));
+    settle(Readiness.Partial);
+    await ready;
+
+    expect(shown).toEqual([
+      [Readiness.Partial, Stage.Vectors],
+      [Readiness.Partial, Stage.Settled]
+    ]);
   });
 
   it('una miniatura resta finché le immagini non sono pronte', async () => {
