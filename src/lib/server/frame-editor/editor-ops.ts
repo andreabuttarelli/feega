@@ -19,6 +19,7 @@ import { parseMotionDoc } from '@feega/motion-core/motion/doc';
 import type { Sfx } from '$lib/motion/sfx';
 import { Sound, generateSound } from '$lib/server/motion/voiceover';
 import { rowRequests, rowsFrom } from '$lib/server/motion/batch-input';
+import { withShapedText } from '$lib/server/motion/shaped-compose';
 import { startFarmBatch } from '$lib/server/motion/render-start';
 import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
 import { settingsFrom } from '$lib/motion/export-formats';
@@ -273,7 +274,8 @@ export const EDITOR_OPS = {
       }
 
       const [assets, tokens] = await Promise.all([motionAssets(placeOf(ctx), SIGNED_URL_TTL_S.render), motionTokens(ctx.db, { orgId: ctx.orgId, brandId: ctx.projectBrandId })]);
-      const rows = rowRequests({ version: head.version, doc: await watermarked(ctx.db, ctx.orgId, head.doc) }, rowsIn.rows, { tokens, assets: assetUrls(assets) }, settings.settings);
+      const doc = await watermarked(ctx.db, ctx.orgId, head.doc);
+      const rows = rowRequests({ version: head.version, doc }, rowsIn.rows, await withShapedText({ doc, tokens, assets: assetUrls(assets) }), settings.settings);
       if (!rows.ok) {
         return refused(HTTP_BAD_REQUEST, { error: 'invalid_row', detail: rows.error });
       }

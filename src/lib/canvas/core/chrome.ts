@@ -3,7 +3,7 @@ import { CONNECTOR_STYLE, type ConnectorType } from '$lib/canvas/connectors';
 import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import { dashes } from '@feega/motion-core/motion/gpu-full/stroke';
 import { FillRule } from '@feega/motion-core/motion/gpu-full/paint';
-import { HANDLE_SCREEN_PX, SELECT_SCREEN_PX, labelScale, labelShown, strokeWorld } from './label-size';
+import { HANDLE_SCREEN_PX, LABEL_SCREEN_PX, SELECT_SCREEN_PX, labelScale, labelScreenPx, labelShown, strokeWorld } from './label-size';
 import { circle, line, rect, reverse, roundRect, solid } from './shapes';
 
 export enum ChromePart {
@@ -46,6 +46,7 @@ export type ChromeTile = {
   radius?: number;
   zoom?: number;
   strokeZoom?: number;
+  perPx?: number;
 };
 
 export type ChromeState = { ring: NodeChrome; handles: boolean; ringColor: string; names: boolean };
@@ -85,9 +86,13 @@ const PORT_LOOK: Record<PortState, { opacity: number; ring: boolean; named: bool
 
 const item = (t: ChromeTile, part: ChromePart, contours: number[][], color: string, opacity = 1): PathItem => solid(`${t.id}:${part}`, contours, color, opacity);
 
-const unit = (t: ChromeTile, screenPx: number): number => screenPx / (t.strokeZoom ?? 1);
+const strokeZoomOf = (t: ChromeTile) => t.strokeZoom ?? 1;
 
-const widthOf = (t: ChromeTile, screenPx: number): number => strokeWorld(screenPx, t.strokeZoom ?? 1);
+const perPxOf = (t: ChromeTile, zoom: number) => t.perPx ?? 1 / zoom;
+
+const unit = (t: ChromeTile, screenPx: number): number => screenPx * perPxOf(t, strokeZoomOf(t));
+
+const widthOf = (t: ChromeTile, screenPx: number): number => strokeWorld(screenPx, strokeZoomOf(t)) * strokeZoomOf(t) * perPxOf(t, strokeZoomOf(t));
 
 function outline(t: ChromeTile, width: number): number[] {
   const inset = unit(t, RING_OFFSET) + width / 2;
@@ -108,8 +113,13 @@ const band = (t: ChromeTile, width: number) => (t.radius ? roundBand(t, width, t
 const RINGS: Record<NodeChrome, (t: StateTile) => PathItem[]> = {
   [NodeChrome.None]: () => [],
   [NodeChrome.Selected]: (t) => [item(t, ChromePart.Ring, band(t, widthOf(t, SELECT_SCREEN_PX)), t.ringColor)],
-  [NodeChrome.Editing]: (t) => [item(t, ChromePart.Ring, dashes(outline(t, unit(t, EDITING_SCREEN_PX)), true, [unit(t, DASH), unit(t, DASH)]).flatMap((d) => line(d, unit(t, EDITING_SCREEN_PX))), t.ringColor, EDITING_OPACITY)]
+  [NodeChrome.Editing]: (t) => editing({ ...t, perPx: undefined })
 };
+
+function editing(t: StateTile): PathItem[] {
+  const width = unit(t, EDITING_SCREEN_PX);
+  return [item(t, ChromePart.Ring, dashes(outline(t, width), true, [unit(t, DASH), unit(t, DASH)]).flatMap((d) => line(d, width)), t.ringColor, EDITING_OPACITY)];
+}
 
 const spaced = (t: ChromeTile, i: number, n: number) => t.y + ((i + 1) / (n + 1)) * t.height;
 
@@ -153,7 +163,7 @@ function handles(t: StateTile): PathItem[] {
 
 const shift = (contours: number[][], dx: number, dy: number) => contours.map((c) => c.map((v, i) => (i % 2 === 0 ? v + dx : v + dy)));
 
-const placed = (item: PathItem, k: number, x: number, y: number): PathItem => ({ ...item, matrix: [k, 0, 0, k, x, y] });
+const placed = (item: PathItem, k: number, x: number, y: number): PathItem => ({ ...item, contours: item.contours.map((c) => c.map((v, i) => v * k + (i % 2 === 0 ? x : y))) });
 
 const LABEL_SET: TextSet = { leading: LABEL_LEADING, tracking: 0 };
 
@@ -187,7 +197,11 @@ function fitted(text: string, room: number, glyphs: Glyphs) {
   return cut;
 }
 
-const labelK = (t: ChromeTile) => labelScale(t.zoom ?? 1);
+const labelZoomOf = (t: ChromeTile) => t.zoom ?? 1;
+
+const labelK = (t: ChromeTile) => (labelScreenPx(labelZoomOf(t)) / LABEL_SCREEN_PX) * perPxOf(t, labelZoomOf(t));
+
+const heldK = (t: ChromeTile) => labelScale(labelZoomOf(t));
 
 const labelHidden = (t: ChromeTile) => !labelShown(t.zoom ?? 1, t.width);
 
@@ -206,7 +220,8 @@ function labelLayout(t: ChromeTile, glyphs: Glyphs) {
   const line = LABEL_SIZE * LABEL_LEADING * k;
   const top = t.y - (LABEL_GAP + LABEL_PAD) * k - line;
   const left = t.icon ? t.x + (ICON_SIZE + ICON_GAP) * k : t.x;
-  const unitText = fitted(t.label ?? '', (t.x + t.width - left) / k, glyphs);
+  const room = t.width / heldK(t) - (t.icon ? ICON_SIZE + ICON_GAP : 0);
+  const unitText = fitted(t.label ?? '', room, glyphs);
   return { k, line, top, left, unitText, width: unitText.width * k };
 }
 
@@ -255,3 +270,22 @@ export const labelChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...la
 export const tileChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...portChrome(t, glyphs), ...labelChrome(t, glyphs)];
 
 export const stateChrome = (t: StateTile, glyphs: Glyphs): PathItem[] => [...RINGS[t.ring](t), ...(t.names ? names(t, glyphs, (m) => !lit(m)) : []), ...handles(t)];
+
+const nudgeOf = (at: PathItem, by: PathItem): number[][] => by.contours.map((c, j) => c.map((v, i) => v - at.contours[j][i]));
+
+const sameShape = (a: PathItem[], b: PathItem[]) => a.length === b.length && a.every((x, i) => x.contours.length === b[i].contours.length && x.contours.every((c, j) => c.length === b[i].contours[j].length));
+
+export function pinned<T extends ChromeTile>(t: T, build: (t: T) => PathItem[]): PathItem[] {
+  const once = build({ ...t, perPx: 1 });
+  const twice = build({ ...t, perPx: 2 });
+  if (!sameShape(once, twice)) {
+    return build({ ...t, perPx: undefined });
+  }
+  return once.map((item, i) => {
+    const nudge = nudgeOf(item, twice[i]);
+    if (nudge.every((c) => c.every((v) => v === 0))) {
+      return item;
+    }
+    return { ...item, contours: item.contours.map((c, j) => c.map((v, k) => v - nudge[j][k])), nudge };
+  });
+}

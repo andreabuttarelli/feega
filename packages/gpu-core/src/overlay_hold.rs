@@ -3,7 +3,6 @@ use vello::kurbo::Rect;
 use crate::retained::{Camera, Lookup};
 
 const MARGIN_SHARE: f64 = 0.25;
-const HOLD_STRETCH: f64 = 1.189_207_115;
 const EDGE_SLACK: f64 = 1e-6;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -30,8 +29,7 @@ impl OverlayHold {
     }
 
     pub fn serves(&self, now: Camera, (w, h): (u32, u32)) -> bool {
-        let ratio = now.zoom / self.planned.zoom;
-        if !(1.0 / HOLD_STRETCH..=HOLD_STRETCH).contains(&ratio) {
+        if now.zoom != self.planned.zoom {
             return false;
         }
         let look = self.look(now);

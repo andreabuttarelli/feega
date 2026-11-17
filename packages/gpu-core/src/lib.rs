@@ -25,6 +25,7 @@ pub mod lod;
 pub mod overlay_hold;
 pub mod overlay_seen;
 pub mod pictures;
+pub mod pinned;
 pub mod reproject;
 pub mod retained;
 pub mod screen_fit;

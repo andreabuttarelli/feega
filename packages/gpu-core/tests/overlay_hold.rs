@@ -9,11 +9,17 @@ fn at(x: f64, y: f64, zoom: f64) -> Camera {
 }
 
 #[test]
-fn a_held_overlay_serves_a_pan_inside_its_margin_and_a_small_zoom() {
+fn a_held_overlay_serves_a_pan_inside_its_margin() {
     let hold = OverlayHold::around(at(0.0, 0.0, 1.0), SCREEN, 8192);
 
     assert!(hold.serves(at(-200.0, 100.0, 1.0), SCREEN));
-    assert!(hold.serves(at(-100.0, -50.0, 1.15), SCREEN));
+}
+
+#[test]
+fn any_zoom_redraws_the_overlay_because_its_chrome_keeps_a_screen_size() {
+    let hold = OverlayHold::around(at(0.0, 0.0, 1.0), SCREEN, 8192);
+
+    assert!(!hold.serves(at(-100.0, -50.0, 1.01), SCREEN));
 }
 
 #[test]

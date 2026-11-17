@@ -286,6 +286,14 @@ fn tiles_warm_a_moment_after_the_last_gesture() {
 }
 
 #[test]
+fn waiting_to_warm_says_how_long_is_left_instead_of_asking_for_frames() {
+    let mut warm = gpu_core::tiles::Warmup::default();
+    warm.stirred(0.0);
+    assert_eq!(warm.wait_ms(100.0), 400.0);
+    assert_eq!(warm.wait_ms(600.0), 0.0);
+}
+
+#[test]
 fn a_lift_without_a_camera_move_draws_from_tiles() {
     use gpu_core::tiles::{path_for, GestureDraw, Moment, Path};
     let still = Moment { gesture: false, lifting: false, settling: false, draw: GestureDraw::Tiles };
@@ -913,4 +921,17 @@ fn a_stale_coarser_tile_is_rebaked_before_it_has_to_show() {
     let frame = tiles.frame(at, SCREEN);
     assert!(frame.draw.iter().all(|k| k.step == -12));
     assert!(frame.missing.contains(&coarse[0]));
+}
+
+#[test]
+fn every_coarser_level_held_is_drawn_beneath_coarsest_first_so_a_gap_in_one_shows_the_next() {
+    let mut tiles = Tiles::default();
+    tiles.frame(camera(0.25), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
+    tiles.frame(camera(0.5), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
+    let frame = tiles.frame(camera(4.0), SCREEN);
+    let steps: Vec<i32> = frame.beneath.iter().map(|k| k.step).collect();
+
+    assert!(steps.contains(&tiles.step_for(camera(0.25))), "the full coarse level is missing beneath: {steps:?}");
+    assert!(steps.contains(&tiles.step_for(camera(0.5))));
+    assert!(steps.windows(2).all(|w| w[0] <= w[1]), "coarsest must come first: {steps:?}");
 }
