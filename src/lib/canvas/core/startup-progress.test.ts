@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { StartupStep } from './startup-marks';
-import { CanvasContent, revealDue, startupProgress } from './startup-progress';
+import { CanvasContent, Reveal, revealDue, revealOf, startupProgress } from './startup-progress';
 
 const none = { shown: 0, total: 0 };
 
@@ -48,5 +48,31 @@ describe('revealDue', () => {
   it('gives up 12 s after start even when the engine never becomes ready', () => {
     expect(revealDue({ sinceStartMs: 11_999, sinceEngineMs: null })).toBe(false);
     expect(revealDue({ sinceStartMs: 12_000, sinceEngineMs: null })).toBe(true);
+  });
+});
+
+describe('revealing early on the frames nearest the centre', () => {
+  const ready = new Set([StartupStep.GpuReady]);
+
+  it('reveals once the engine is ready and the nearest frames show something, though others still load (stress36 kept the splash 9 s over frames drawn at 2.5 s)', () => {
+    expect(startupProgress(ready, { shown: 6, total: 36, nearShown: 6, nearTotal: 6 }, CanvasContent.Frames, Reveal.Early)).toBe(1);
+  });
+
+  it('keeps the splash while a nearest frame is still empty', () => {
+    expect(startupProgress(ready, { shown: 5, total: 36, nearShown: 5, nearTotal: 6 }, CanvasContent.Frames, Reveal.Early)).toBeLessThan(1);
+  });
+
+  it('keeps the splash before the engine is ready', () => {
+    expect(startupProgress(new Set(), { shown: 6, total: 36, nearShown: 6, nearTotal: 6 }, CanvasContent.Frames, Reveal.Early)).toBeLessThan(1);
+  });
+
+  it('waits for every on-screen frame when asked to reveal all', () => {
+    expect(startupProgress(ready, { shown: 6, total: 36, nearShown: 6, nearTotal: 6 }, CanvasContent.Frames, Reveal.All)).toBeLessThan(1);
+  });
+
+  it('reads the choice from the address, early unless told all', () => {
+    expect(revealOf(null)).toBe(Reveal.Early);
+    expect(revealOf('all')).toBe(Reveal.All);
+    expect(revealOf('nonsense')).toBe(Reveal.Early);
   });
 });

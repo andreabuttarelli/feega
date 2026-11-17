@@ -5,7 +5,18 @@ export enum CanvasContent {
   Empty = 'empty'
 }
 
-export type FramesShown = { shown: number; total: number };
+export type FramesShown = { shown: number; total: number; nearShown?: number; nearTotal?: number };
+
+export enum Reveal {
+  Early = 'early',
+  All = 'all'
+}
+
+export const NEAREST_FRAMES = 6;
+
+export const revealOf = (asked: string | null): Reveal => (asked === Reveal.All ? Reveal.All : Reveal.Early);
+
+const nearestShown = (frames: FramesShown) => Boolean(frames.nearTotal) && (frames.nearShown ?? 0) >= frames.nearTotal!;
 
 const READY: Record<CanvasContent, StartupStep> = {
   [CanvasContent.Frames]: StartupStep.AllShown,
@@ -23,8 +34,11 @@ const WEIGHT: Partial<Record<StartupStep, number>> = {
 
 const FRAMES_WEIGHT = 0.5;
 
-export function startupProgress(done: ReadonlySet<StartupStep>, frames: FramesShown, content = CanvasContent.Frames): number {
+export function startupProgress(done: ReadonlySet<StartupStep>, frames: FramesShown, content = CanvasContent.Frames, reveal = Reveal.All): number {
   if (done.has(READY[content])) {
+    return 1;
+  }
+  if (reveal === Reveal.Early && content === CanvasContent.Frames && done.has(StartupStep.GpuReady) && nearestShown(frames)) {
     return 1;
   }
   const steps = [...done].reduce((sum, step) => sum + (WEIGHT[step] ?? 0), 0);

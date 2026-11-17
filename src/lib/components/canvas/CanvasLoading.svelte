@@ -4,7 +4,8 @@
   import Wordmark from '$lib/components/app/Wordmark.svelte';
   import FeegaMark from '$lib/components/FeegaMark.svelte';
   import { FRAMES_SHOWN_EVENT, STARTUP_EVENT, StartupStep, startupMarks } from '$lib/canvas/core/startup-marks';
-  import { CanvasContent, revealDue, startupProgress, type FramesShown } from '$lib/canvas/core/startup-progress';
+  import { CanvasContent, revealDue, revealOf, startupProgress, type FramesShown } from '$lib/canvas/core/startup-progress';
+  import { page } from '$app/state';
 
   let { content }: { content: CanvasContent } = $props();
 
@@ -15,7 +16,8 @@
   let done = $state(new Set<StartupStep>());
   let frames = $state<FramesShown>({ shown: 0, total: 0 });
   let gaveUp = $state(false);
-  const progress = $derived(startupProgress(done, frames, content));
+  const reveal = revealOf(page.url.searchParams.get('reveal'));
+  const progress = $derived(startupProgress(done, frames, content, reveal));
   const shown = $derived(progress < 1 && !gaveUp);
   const FADE_MS = 240;
   const MARK_SIZE = 48;
