@@ -87,17 +87,27 @@ const SVG_ATTR = /\s([a-z]+(?:-[a-z]+)+)=/g;
 
 const STYLE_ATTR = /\sstyle="([^"]*)"/g;
 
-const asAttributes = (style: string) =>
-  style
-    .split(';')
-    .map((d) => d.split(':').map((part) => part.trim()))
+const DECLARATION_BREAK = /;(?![^(]*\))/;
+
+const VOID_ELEMENT = /<(img|br|hr|input|source|track|wbr|col|embed)(\s[^>]*?)?(?<!\/)>/g;
+
+const styleKey = (name: string) => (name.startsWith('--') ? `'${name}'` : camelProperty(name));
+
+const quoted = (value: string) => `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+
+const asStyleObject = (style: string) => {
+  const declarations = style
+    .split(DECLARATION_BREAK)
+    .map((d) => [d.slice(0, d.indexOf(':')).trim(), d.slice(d.indexOf(':') + 1).trim()])
     .filter(([name, value]) => name && value)
-    .map(([name, value]) => ` ${name}="${value}"`)
-    .join('');
+    .map(([name, value]) => `${styleKey(name)}: ${quoted(value)}`);
+  return declarations.length ? ` style={{ ${declarations.join(', ')} }}` : '';
+};
 
 export const jsxSvg = (markup: string) =>
   markup
-    .replace(STYLE_ATTR, (_, style: string) => asAttributes(style))
+    .replace(STYLE_ATTR, (_, style: string) => asStyleObject(style))
     .replace(SVG_ATTR, (_, name: string) => ` ${camelProperty(name)}=`)
     .replace(/\sclass=/g, ' className=')
+    .replace(VOID_ELEMENT, (_, tag: string, attrs = '') => `<${tag}${attrs} />`)
     .replace(/xlink:href=/g, 'xlinkHref=');

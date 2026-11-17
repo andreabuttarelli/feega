@@ -324,11 +324,12 @@ export class FrameEditSession {
       return;
     }
     this.failures = 0;
-    if (result.ok && result.doc) {
-      this.port.landed(base, { version: result.version, doc: result.doc });
-    }
     if (result.ok) {
-      this.follow(landed(base, sent, this.history.present, { version: result.version, doc: result.doc as MotionDoc }));
+      const next = landed(base, sent, this.history.present, { version: result.version, doc: result.doc as MotionDoc });
+      if (result.doc) {
+        this.port.landed(base, next.base);
+      }
+      this.follow(next);
       this.saveState = SaveState.Saved;
       this.keepDraft();
     } else if (result.head) {

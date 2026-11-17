@@ -42,6 +42,11 @@ describe('code mode', () => {
     expect(code).not.toMatch(/\{:else if tokens\}/);
   });
 
+  it('exports the source doc with every view, not the one being edited', () => {
+    expect(panel).toMatch(/<DevCode doc=\{source!\}/);
+    expect(panel).not.toMatch(/<DevCode \{doc\}/);
+  });
+
   it('exports under the real frame name', () => {
     expect(panel).toContain('name={frameProperties.name}');
     expect(panel).not.toContain('name="Frame"');

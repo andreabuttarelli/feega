@@ -281,7 +281,11 @@ function reportOf(found: RoutesFound, asked: string[], done: CodeImported): Rout
   return { discovered: found.routes.length, leftOut: leftOut(found.routes, { asked: asked.length ? asked : ['/'], landed: done.pages, links: done.links ?? [] }) };
 }
 
-export async function importRoutesInto(scope: CodeScope, canvasId: string, ask: RoutesAsk): Promise<RoutedImport> {
+export type ImportLinker = (nodeId: string, origin: CodeOriginData, listed: RoutesFound) => Promise<unknown>;
+
+const unlinked: ImportLinker = async () => null;
+
+export async function importRoutesInto(scope: CodeScope, canvasId: string, ask: RoutesAsk, link: ImportLinker = unlinked): Promise<RoutedImport> {
   if (ask.storybook) {
     return importCodeInto(scope, canvasId, { ...ask, routes: [] });
   }
@@ -305,6 +309,7 @@ export async function importRoutesInto(scope: CodeScope, canvasId: string, ask: 
   const listed = await discovering;
   if (done.code) {
     await rememberOrigin(scope, done.frameId, { ...done.code, map: mapOf(listed, done, { asked: routes.length ? routes : ['/'], rev: done.code.sha }) });
+    await link(done.frameId, { ...done.code, routes: done.pages.length ? done.pages : done.code.routes }, listed);
   }
   return { ...done, routes: reportOf(listed, routes, done) };
 }

@@ -12,6 +12,7 @@ import { resolveColor, FEEGA_TOKENS } from '../brand';
 import { ShapeKind } from '../shape/schema';
 import { pivotBox, type Size } from '../parent';
 import type { Box } from '../layout';
+import { safeBox } from '../fit';
 import { camel, kebab, NameBook } from './naming';
 import { literal, NodeKind, type Attr, type Bound, type CodeNode, type ComponentSpec, type ElementNode, type PageSpec, type SetSpec, type Rule, type StyleBind } from './ir';
 import { absoluteRules, containerRules, flowItemRules, fluidWidth, isFlowChild, px, Shape, STACK_RULES, stackItemRules, stackOrder } from './place';
@@ -299,7 +300,19 @@ function textTag(clip: MotionClip, at: { link: string | null; parentTag: string;
   return clip.component === 'Kicker' ? PARAGRAPH : headingTag(clip, at.sizePx, scope);
 }
 
+const BOX_EPSILON_PX = 0.5;
+
+const sameBox = (a: Box, b: Box) => [a.left - b.left, a.top - b.top, a.width - b.width, a.height - b.height].every((d) => Math.abs(d) < BOX_EPSILON_PX);
+
+function noteSafeArea(clip: MotionClip, scope: Scope) {
+  const box = scope.boxOf(clip);
+  if (clip.component === 'Title' && !sameBox(box, safeBox(box, scope.space))) {
+    scope.shared.notes.add(`${layerName(clip)}: the canvas clips a title to a 5% safe area, the export does not.`);
+  }
+}
+
 function textNode(clip: MotionClip, parent: MotionClip | null, scope: Scope, parentTag: string): ElementNode {
+  noteSafeArea(clip, scope);
   const text = String(clip.props.text ?? clip.props.title ?? '');
   const runs = clip.props.runs as TextRun[] | undefined;
   const prop = bound(clip, PropKey.Text, scope);
@@ -472,6 +485,8 @@ function pageCut(doc: MotionDoc): Rule[] {
   return [...(clipsContent(doc) ? HIDDEN : []), ...rounded];
 }
 
+const fixedWidth = (clip: MotionClip, framed: Rule[]): Rule[] => ((clip.layoutItem ?? DEFAULT_LAYOUT_ITEM).width === Sizing.Fixed ? framed : []);
+
 function rootOf(scope: Scope, tag: string, own: Rule[], framed: Rule[]): ElementNode {
   const top = childrenOf(null, scope);
   const visual = top.filter((c) => c.component !== 'BrandBackground');
@@ -481,7 +496,7 @@ function rootOf(scope: Scope, tag: string, own: Rule[], framed: Rule[]): Element
     const container = sole.component === 'Shape' || sole.component === 'Null';
     const root = container ? boxNode(sole, null, scope, tag) : (nodeOf(sole, null, scope, tag) as ElementNode | null);
     if (root && root.kind === NodeKind.Element) {
-      root.rules = [...own, ...root.rules];
+      root.rules = [...own, ...fixedWidth(sole, framed), ...root.rules];
       return root;
     }
   }
@@ -504,7 +519,7 @@ function ensureComponent(plan: ComponentPlan, shared: Shared) {
   const instanceTag = INSTANCE_TAGS.find(([re]) => re.test(label));
   const [, tag, attrs] = instanceTag ?? [null, tagFor(label, SEMANTIC_CONTAINERS, 'div'), []];
   shared.built.set(plan.compId, { name: plan.name, props: [], root: { kind: NodeKind.Element, tag, className: plan.block, rules: [], attrs: [], children: [], styleBinds: [] }, uses: [] });
-  const root = rootOf(scope, tag, [], [['width', px(content?.width ?? space.width)]]);
+  const root = rootOf(scope, tag, [], [['width', px(content?.width ?? space.width)], ['max-width', '100%']]);
   root.className = plan.block;
   root.attrs = [...attrs, ...root.attrs];
   if (instanceTag) {

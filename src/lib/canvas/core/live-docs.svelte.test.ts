@@ -39,4 +39,15 @@ describe('live docs', () => {
     expect(heard).toEqual(['d:one']);
     liveDocs.clear('d');
   });
+
+  it('leaves the map alone when a save echoes the doc already shown', () => {
+    const shown = live('one');
+    liveDocs.set('e', shown);
+    const map = liveDocs.map;
+
+    liveDocs.set('e', { ...shown });
+
+    expect(liveDocs.map).toBe(map);
+    liveDocs.clear('e');
+  });
 });

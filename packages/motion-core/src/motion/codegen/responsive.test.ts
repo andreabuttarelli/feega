@@ -72,7 +72,7 @@ describe('responsive code export', () => {
   it('a phone override on an auto-layout row becomes a breakpoint class on the same markup', () => {
     const tsx = file(exportCode(rowPage(), { name: 'Page' }), 'pages/Page.tsx');
 
-    expect(tsx).toMatch(/className="[^"]*\bflex\b[^"]*max-\[390px\]:flex-col/);
+    expect(tsx).toMatch(/className="[^"]*\bflex\b[^"]*max-\[391px\]:flex-col/);
   });
 
   it('an image points at a file bundled in the project, not at the signed link', () => {

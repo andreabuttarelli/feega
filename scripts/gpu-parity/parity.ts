@@ -14,6 +14,7 @@ import { lanesWithin, webglPerLane } from '@feega/motion-core/motion/export/webg
 import base from '../vite-node.config';
 import { libraryPath } from '../motion-libs';
 import { differing, luma, psnr, ssim } from './metrics';
+import { withShapedText } from '../../src/lib/server/motion/shaped-compose';
 import { VIDEO_ASSET, assetPath, placeholder, placeholderVideo } from './assets';
 import type { ExportInput, ExportResult, PreviewInput, PreviewResult, ShotsInput, ShotsResult } from './probe';
 
@@ -134,7 +135,7 @@ for (const id of ids) {
 }
 const server = await serve(await hostBundle(), assetFiles);
 const assets = Object.fromEntries([...ids].map((id) => [id, `${server.origin}${assetPath(id)}`]));
-const html = composeHtml({ doc, tokens: FEEGA_TOKENS, assets, origin: server.origin });
+const html = composeHtml(await withShapedText({ doc, tokens: FEEGA_TOKENS, assets, origin: server.origin }));
 const size = { width: doc.width, height: doc.height };
 const spec = { doc, assets, origin: server.origin, faces: flags.get('faces') };
 const dir = join(OUT, name);
