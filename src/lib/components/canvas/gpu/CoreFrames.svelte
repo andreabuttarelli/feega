@@ -59,6 +59,9 @@
   import { Step, markFrame, noteImages } from '$lib/canvas/core/frame-timeline';
   import { StartupStep, markStartup, reportFramesShown } from '$lib/canvas/core/startup-marks';
   import { NEAREST_FRAMES } from '$lib/canvas/core/startup-progress';
+  import { pictureTurns } from '$lib/canvas/core/picture-turns';
+  import { picturesWhileVectorsOwed } from '$lib/local-user';
+  import { env as publicEnv } from '$env/dynamic/public';
   import LoadTimeline from './LoadTimeline.svelte';
   import { editedLayers } from '$lib/canvas/core/edited-layers';
   import { editKindOf, editedClipId, fastPatch, readyPatch, reloaded, relinked } from '$lib/canvas/core/fast-patch';
@@ -167,6 +170,7 @@
 
   const smoothing = smoothingOf(navigator.userAgent);
   const lanes = buildLanes(currentDevice(), typeof navigator === 'object' ? navigator.hardwareConcurrency : 2);
+  const turns = pictureTurns(picturesWhileVectorsOwed(publicEnv));
   const buildAway = frameBuilder(() => (typeof Worker === 'function' ? (markStartup(StartupStep.WorkerSpawned), new Worker(new URL('../../../canvas/core/frame-build.worker.ts', import.meta.url), { type: 'module' })) : null), lanes);
   buildAway.warm();
 
@@ -370,7 +374,15 @@
       markFrame(f.id, ready === Readiness.Whole ? Step.Whole : Step.Vectors);
       lists = listed(lists, f.id, group, onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), shown, drawnLast.get(f.id)?.group]);
     };
-    void showStaged(() => media.ready(built.list), held, present, atRestAfter);
+    void showStaged(
+      async () => {
+        const done = await turns.take();
+        return media.ready(built.list).finally(done);
+      },
+      held,
+      present,
+      atRestAfter
+    );
   }
 
   const MISSING = ':missing';
@@ -833,6 +845,11 @@
           settledFrames = new Set(settledFrames).add(f.id);
         });
     }
+  });
+
+  $effect(() => {
+    void lists;
+    turns.owed(legible(withoutViews(frames), zoomStep, budget.readableWidth).some((f) => sight.onScreen.has(f.id) && !loaded.has(f.id) && !thumbShown.has(f.id)));
   });
 
   let cardLists = $state(new Map<string, DisplayList>());
