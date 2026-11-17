@@ -16,7 +16,7 @@ function jobWith(bytes: Uint8Array, nodeText = 'Hero'): PackJob {
   const used = crypto.randomUUID();
   return {
     manifest,
-    body: { nodes: [{ id: crypto.randomUUID(), type: 'text', displayName: null, position: { x: 0, y: 0, z: 0 }, size: { width: null, height: null }, data: { text: nodeText, image: used } }], connections: [], heads: {} },
+    body: { nodes: [{ id: crypto.randomUUID(), type: 'text', displayName: null, position: { x: 0, y: 0, z: 0 }, size: { width: null, height: null }, data: { text: nodeText, image: used } }], connections: [], heads: { [crypto.randomUUID()]: { version: 3, doc: { tracks: [{ id: 'v1', clips: [] }], note: 'a "quoted" doc' } } } },
     assets: [
       { row: imageRow(used, 'assets/used.png'), always: false, bytes },
       { row: imageRow(crypto.randomUUID(), 'assets/unused.png'), always: false, bytes: new Uint8Array([9]) }
@@ -30,7 +30,8 @@ describe('il salvataggio della modalità locale impacchetta fuori dal thread pri
     const bytes = new Uint8Array(randomBytes(64 * 1024));
     const packer = createPacker();
 
-    await packer.write(path, jobWith(bytes));
+    const job = jobWith(bytes);
+    await packer.write(path, job);
     const opened = unpackFeega(new Uint8Array(readFileSync(path)));
     await packer.stop();
 
@@ -39,6 +40,7 @@ describe('il salvataggio della modalità locale impacchetta fuori dal thread pri
       return;
     }
     expect(opened.file.canvas.nodes[0].data.text).toBe('Hero');
+    expect(opened.file.canvas.heads).toEqual(job.body.heads);
     expect(opened.file.canvas.assets.map((a) => a.file)).toEqual(['assets/used.png']);
     expect(opened.blobs.get('assets/used.png')).toEqual(bytes);
   });

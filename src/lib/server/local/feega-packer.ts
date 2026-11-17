@@ -14,6 +14,26 @@ type Reply = { id: number; ok: true; hashed: [string, number][] } | { id: number
 
 const SAVING_SUFFIX = '.saving';
 
+const docJson = new WeakMap<object, string>();
+
+function jsonOfDoc(doc: unknown): string {
+  if (!doc || typeof doc !== 'object') {
+    return JSON.stringify(doc ?? null);
+  }
+  const known = docJson.get(doc);
+  if (known !== undefined) {
+    return known;
+  }
+  const json = JSON.stringify(doc);
+  docJson.set(doc, json);
+  return json;
+}
+
+function bodyJson(body: PackJob['body']): string {
+  const heads = Object.entries(body.heads).map(([id, head]) => `${JSON.stringify(id)}:{"version":${JSON.stringify(head.version)},"doc":${jsonOfDoc(head.doc)}}`);
+  return `{"nodes":${JSON.stringify(body.nodes)},"connections":${JSON.stringify(body.connections)},"heads":{${heads.join(',')}}}`;
+}
+
 export function createPacker() {
   const worker = new Worker(workerSource, { eval: true });
   worker.unref();
@@ -41,7 +61,7 @@ export function createPacker() {
         id,
         path: saving,
         manifest: JSON.stringify(job.manifest),
-        body: JSON.stringify(job.body),
+        body: bodyJson(job.body),
         assets: job.assets.map((a) => ({ ...a, crc: a.bytes ? crcs.get(a.bytes) : undefined }))
       });
     });
