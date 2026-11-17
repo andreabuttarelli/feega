@@ -969,3 +969,13 @@ fn tiles_are_baked_only_once_the_zoom_holds_still() {
     assert!(!bakes_in_gesture(60.0));
     assert!(bakes_in_gesture(200.0));
 }
+
+#[test]
+fn a_zoom_bakes_mid_gesture_once_the_drawn_level_is_stretched_past_an_octave() {
+    use gpu_core::tiles::{sharpens_mid_gesture, step_of};
+    let drawn = Some(step_of(1.0));
+    assert!(!sharpens_mid_gesture(1.9, drawn));
+    assert!(sharpens_mid_gesture(2.1, drawn));
+    assert!(!sharpens_mid_gesture(0.1, drawn), "zooming out downsamples, it stays sharp");
+    assert!(!sharpens_mid_gesture(8.0, None));
+}

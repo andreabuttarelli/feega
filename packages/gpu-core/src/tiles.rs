@@ -237,6 +237,12 @@ pub fn bakes_in_gesture(since_zoom_ms: f64) -> bool {
     since_zoom_ms >= ZOOM_SETTLE_MS
 }
 
+const GESTURE_STRETCH_MAX: f64 = 2.0;
+
+pub fn sharpens_mid_gesture(zoom: f64, drawn: Option<i32>) -> bool {
+    drawn.is_some_and(|step| zoom / step_zoom(step) > GESTURE_STRETCH_MAX)
+}
+
 pub fn sharp_at(zoom: f64, step: i32) -> bool {
     zoom / step_zoom(step) <= SHARP_STRETCH + STEP_SLACK
 }

@@ -18,7 +18,7 @@ use crate::layers::Effects;
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile, OPAQUE};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, GestureDraw, Moment, Path, Warmup, tiles_kept_beside, TILE_BUDGET_BYTES, TILE_BYTES, TILE_GUTTER_PX, batches, batches_of, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, bakes_in_gesture, TileKey, Tiles, TILE_PX, lifted_keys, magnified, fallback_serves, fallback_bands, ahead_camera, fade_in, fades_over, FADE_MS};
+use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, GestureDraw, Moment, Path, Warmup, tiles_kept_beside, TILE_BUDGET_BYTES, TILE_BYTES, TILE_GUTTER_PX, batches, batches_of, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, bakes_in_gesture, sharpens_mid_gesture, TileKey, Tiles, TILE_PX, lifted_keys, magnified, fallback_serves, fallback_bands, ahead_camera, fade_in, fades_over, FADE_MS};
 use crate::overlay_seen::OverlaySeen;
 use crate::screen_fit::{fit, screen_side};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
@@ -937,9 +937,10 @@ impl WebCore {
         }
         let panning = self.camera.zoom == self.was.zoom && (self.camera.x != self.was.x || self.camera.y != self.was.y);
         let bakes = !gesture || bakes_in_gesture(started - self.zoom_changed_at);
+        let sharpens = bakes || sharpens_mid_gesture(self.camera.zoom, self.shown_step);
         let side = if gesture { 1 } else { self.credit.side() };
         self.credit.earn(budget);
-        for batch in batches_of(&order, side).into_iter().filter(|_| bakes) {
+        for batch in batches_of(&order, side).into_iter().filter(|_| sharpens) {
             if !self.credit.affords(batch.keys.len()) || js_sys::Date::now() >= deadline {
                 break;
             }
