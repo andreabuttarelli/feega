@@ -9,6 +9,7 @@ import { devCrons } from './scripts/dev-crons';
 import { motionBundles } from './scripts/motion-bundles';
 import { motionLibs } from './scripts/motion-libs';
 import { changelogEntries } from './scripts/changelog-entries';
+import { motionDocStamp } from './scripts/motion-doc-stamp';
 
 const libsSource = async (id: string): Promise<string | null> => {
   const load = motionLibs().load as (id: string) => Promise<string | null>;
@@ -65,7 +66,7 @@ export default defineConfig({
     org: "021-6z",
     project: "021-1m",
     autoInstrument: { load: false, serverLoad: true }
-  }), sveltekit(), tailwindcss(), devCrons(), motionBundles(libsSource), motionLibs(), changelogEntries()],
+  }), sveltekit(), tailwindcss(), devCrons(), motionBundles(libsSource), motionLibs(), changelogEntries(), motionDocStamp()],
   worker: { format: 'es', plugins: () => [motionBundles(libsSource), motionLibs()] },
   // Modern baselines: skip legacy transforms (e.g. Array.from) that PSI flags as unused
   // on current Chrome/Safari/Firefox. Aligns with "Baseline widely available" guidance.

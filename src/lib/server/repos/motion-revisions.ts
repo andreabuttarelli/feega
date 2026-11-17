@@ -2,6 +2,7 @@ import type { Db } from '$lib/server/db/client';
 import { parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { layersChanged } from '$lib/motion/layers-changed';
 import { actorCols, type Actor } from './actor';
+import { openDoc, sealDoc } from './sealed-doc';
 import { Attempt, recordConflict } from './canvas-conflicts';
 import { coreEvent } from '$lib/server/core-usage';
 import { CoreEvent, type ActorKind } from '$lib/core-usage';
@@ -25,7 +26,7 @@ const SUMMARY_MAX = 300;
 type RevisionRow = { version: number; doc: unknown; summary: string | null; actor_kind: string };
 
 function headOf(row: RevisionRow): MotionHead | null {
-  const parsed = parseMotionDoc(row.doc);
+  const parsed = openDoc(row.doc);
   if (!parsed.ok) {
     return null;
   }
@@ -348,7 +349,7 @@ export async function appendRevision(
 
   const summary = input.summary?.slice(0, SUMMARY_MAX) ?? null;
   const layers = input.actor.kind === 'agent' ? layersChanged((await readHead(db, input))?.doc, parsed.doc) : 0;
-  const written = await commitRevision(db, { ...input, doc: parsed.doc, summary, checkpoint: input.checkpoint ?? Checkpoint.Cut, layers });
+  const written = await commitRevision(db, { ...input, doc: sealDoc(parsed.doc), summary, checkpoint: input.checkpoint ?? Checkpoint.Cut, layers });
   if (!written) {
     await noteStaleHead(db, { ...input, doc: parsed.doc });
     return { outcome: RevisionOutcome.Conflict };

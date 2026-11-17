@@ -127,7 +127,7 @@ In local mode a frame imported from a folder pushes through the git CLI of that 
 | `PUBLIC_SUPABASE_ANON_KEY` | Public key. Must be your project's. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server only. Never sent to the client. |
 | `PUBLIC_APP_URL` | The origin the app is served from, no trailing slash. |
-| `APP_SECRET` | Signs tokens and seals stored secrets. `openssl rand -hex 32`. |
+| `APP_SECRET` | Signs tokens, seals stored secrets, and signs saved frames so they open without being re-validated (rotating it only makes each frame open at full cost until its next edit). `openssl rand -hex 32`. |
 | `DATABASE_URL` | Only `npm run setup`, `db:migrate` and `db:seed` read it. |
 
 Everything else is optional and grouped by feature in `.env.example`.
