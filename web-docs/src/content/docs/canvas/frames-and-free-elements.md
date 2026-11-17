@@ -9,6 +9,16 @@ A **frame** is a node with its own size, content and timeline: a video, a poster
 
 A **free element** is a shape, text, image or SVG placed directly on the canvas. It is saved as an element, never as a frame, so duplicating or copy-pasting it keeps its drawing and size. Technically a free element is a chromeless frame ([ADR 0011](/architecture/adr/0011-a-free-canvas-element-is-a-chromeless-frame/)).
 
+## The frame header
+
+Above every frame sits a header row: the frame name on the left, cut with "…" when it is wider than the frame, and small icons on the right:
+
+- **Component set**: the frame holds a component and its variants.
+- **Breakpoints**: the frame has responsive breakpoints.
+- **Play prototype**: the frame links to other frames; click to play it.
+
+Hover an icon to see its name. On a narrow frame the icons go first, from the right, so at least three letters of the name stay readable. The header hides while you pan or zoom and comes back when the canvas rests.
+
 ## A free element is one object
 
 A free element behaves like a single object, as in Figma ([ADR 0032](/architecture/adr/0032-a-free-element-is-its-node/)):
