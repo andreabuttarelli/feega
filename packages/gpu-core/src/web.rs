@@ -88,6 +88,8 @@ pub struct WebCore {
     in_flight: Arc<AtomicU32>,
     warming: bool,
     warm_wait: f64,
+    shown_step: Option<i32>,
+    gesture_baked: rustc_hash::FxHashSet<TileKey>,
     scratch: Option<wgpu::Texture>,
     motion: CoreMotion,
     rastered_at: f64,
@@ -140,6 +142,8 @@ struct Counted {
     uploads: u32,
     fallback_ms: f64,
     exact: bool,
+    swaps: u32,
+    rebaked: u32,
 }
 
 struct GpuPainter<'a> {
@@ -428,7 +432,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, warm_wait: 0.0, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), sharpness: Sharpness::default(), fallback: Vec::new(), ahead: None, fallback_was: camera, born: FxHashMap::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 }, gesture_draw: GestureDraw::Tiles, direct: None, held_scene: None, scale: fitted.scale })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, warm_wait: 0.0, shown_step: None, gesture_baked: Default::default(), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), sharpness: Sharpness::default(), fallback: Vec::new(), ahead: None, fallback_was: camera, born: FxHashMap::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 }, gesture_draw: GestureDraw::Tiles, direct: None, held_scene: None, scale: fitted.scale })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -746,6 +750,9 @@ impl WebCore {
             };
             let texture = self.cut(&mut encoder, batch, *key, &pieces, into);
             self.tile_textures.insert(*key, texture);
+            if !self.gesture_baked.insert(*key) {
+                self.counted.rebaked += 1;
+            }
             self.born.insert(*key, began);
             if !lacking {
                 self.tiles.hold(*key);
@@ -936,6 +943,14 @@ impl WebCore {
         }
         self.was = self.camera;
         let tiles = self.tiles.frame(self.camera, screen);
+        let shown = tiles.draw.iter().map(|k| k.step).max();
+        if shown != self.shown_step {
+            self.counted.swaps += 1;
+            self.shown_step = shown;
+        }
+        if !matches!(self.motion, CoreMotion::Gesture) {
+            self.gesture_baked.clear();
+        }
         let served = self.serve_bare(&tiles.bare, screen, deadline)?;
         self.counted.unsharp = if served { 0 } else { tiles.bare.len() as u32 };
         self.sharpness.magnified_frames += u32::from(magnified(&tiles.draw, self.camera.zoom) > 0);
@@ -1320,7 +1335,7 @@ impl WebCore {
     pub fn frame_counts(&mut self) -> Vec<f64> {
         let planned = self.compositor.take_planned();
         let counted = std::mem::take(&mut self.counted);
-        vec![f64::from(planned.plans), f64::from(planned.walked), planned.ms, f64::from(counted.bakes), counted.ms, counted.upload_bytes, f64::from(counted.unsharp), f64::from(counted.uncovered), f64::from(step_of(self.camera.zoom)), f64::from(counted.tiles), f64::from(self.engine.take_draws()), f64::from(counted.uploads), counted.fallback_ms, f64::from(u8::from(counted.exact))]
+        vec![f64::from(planned.plans), f64::from(planned.walked), planned.ms, f64::from(counted.bakes), counted.ms, counted.upload_bytes, f64::from(counted.unsharp), f64::from(counted.uncovered), f64::from(step_of(self.camera.zoom)), f64::from(counted.tiles), f64::from(self.engine.take_draws()), f64::from(counted.uploads), counted.fallback_ms, f64::from(u8::from(counted.exact)), f64::from(counted.swaps), f64::from(counted.rebaked)]
     }
     pub fn warming(&self) -> bool {
         self.warming
