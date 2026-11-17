@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 import { brotliCompressSync, constants, gzipSync } from 'node:zlib';
+import { env as publicEnv } from '$env/dynamic/public';
+import { isLocalMode } from '$lib/local-user';
 import { serverTiming, type Phases } from '$lib/server/server-timing';
 
 const HTTP_NOT_MODIFIED = 304;
@@ -18,6 +20,9 @@ const PACK: Record<Encoding, (body: string) => Buffer> = {
 };
 
 function encodingOf(request: Request): Encoding | null {
+  if (isLocalMode(publicEnv)) {
+    return null;
+  }
   const accepted = (request.headers.get('accept-encoding') ?? '').split(',').map((e) => e.trim().split(';')[0]);
   return Object.values(Encoding).find((e) => accepted.includes(e)) ?? null;
 }
