@@ -16,7 +16,9 @@ const SAVE_DELAY_MS = 300;
 const ASSET_BUCKET = 'canvas-assets';
 const ABSOLUTE_URL = /^https?:\/\//;
 const UNSAFE_NAME = /[^\w.-]+/g;
-const PERSISTED = new Set(['canvases', 'nodes', 'nodes_connections', 'motion_revisions', 'assets', 'storage.objects']);
+const CODE_LINKS = 'frame_code_links';
+const LINK_SCOPE_COLUMNS = new Set(['node_id', 'org_id', 'project_id']);
+const PERSISTED = new Set(['canvases', 'nodes', 'nodes_connections', 'motion_revisions', 'assets', CODE_LINKS, 'storage.objects']);
 const BUCKETS = [ASSET_BUCKET, 'brand-knowledge', 'media'];
 
 export type LocalPlace = { projectId: string; canvasId: string };
@@ -86,6 +88,7 @@ function seed(file: FeegaFile, blobs: FeegaBlobs): { tables: Tables; storage: Bl
     ['nodes_connections', file.canvas.connections.map((c) => ({ ...org, id: c.id, canvas_id: place.canvasId, source_node_id: c.sourceNodeId, target_node_id: c.targetNodeId, source_handle: c.sourceHandle, target_handle: c.targetHandle, mode: c.mode, deleted_at: null, created_at: at }))],
     ['motion_revisions', Object.entries(file.canvas.heads).map(([nodeId, head]) => ({ ...org, id: crypto.randomUUID(), node_id: nodeId, version: head.version, doc: head.doc, summary: null, actor_kind: 'user', actor_id: LOCAL_USER_ID, agent_key: null, sealed: true, created_at: at }))],
     ['assets', assets],
+    [CODE_LINKS, Object.entries(file.canvas.codeLinks ?? {}).map(([nodeId, link]) => ({ ...link, ...org, node_id: nodeId, project_id: place.projectId }))],
     ['org_fonts', assets.filter((a) => isFont(a.mime_type) && a.url).map((a) => orgFontRow(a, at))]
   ]);
   return { tables, storage, place };
@@ -101,6 +104,8 @@ function orgFontRow(asset: Row, at: string): Row {
 const live = (row: Row) => row.deleted_at === null || row.deleted_at === undefined;
 const ASSET_DIR = 'assets/';
 const assetFileName = (url: string) => `${ASSET_DIR}${url.split('/').map((part) => part.replace(UNSAFE_NAME, '_')).join('/')}`;
+
+const withoutScope = (row: Row) => Object.fromEntries(Object.entries(row).filter(([column]) => !LINK_SCOPE_COLUMNS.has(column)));
 
 function snapshot(tables: Tables, storage: Blobs, place: LocalPlace): Uint8Array {
   const rows = (table: string) => tables.get(table) ?? [];
@@ -118,7 +123,8 @@ function snapshot(tables: Tables, storage: Blobs, place: LocalPlace): Uint8Array
   const body: Omit<FeegaCanvas, 'assets'> = {
     nodes: nodes.map((n) => ({ id: String(n.id), type: String(n.type), displayName: (n.display_name as string | null) ?? null, position: { x: Number(n.x), y: Number(n.y), z: Number(n.z ?? 0) }, size: { width: n.width == null ? null : Number(n.width), height: n.height == null ? null : Number(n.height) }, data: (n.data ?? {}) as Record<string, unknown> })),
     connections: rows('nodes_connections').filter((c) => c.canvas_id === place.canvasId && live(c) && nodeIds.has(c.source_node_id) && nodeIds.has(c.target_node_id)).map((c) => ({ id: String(c.id), sourceNodeId: String(c.source_node_id), targetNodeId: String(c.target_node_id), sourceHandle: (c.source_handle as string | null) ?? null, targetHandle: (c.target_handle as string | null) ?? null, mode: c.mode === 'iterate' ? 'iterate' : 'fixed' })),
-    heads: Object.fromEntries([...heads].map(([id, r]) => [id, { version: Number(r.version), doc: r.doc }]))
+    heads: Object.fromEntries([...heads].map(([id, r]) => [id, { version: Number(r.version), doc: r.doc }])),
+    codeLinks: Object.fromEntries(rows(CODE_LINKS).filter((l) => nodeIds.has(l.node_id)).map((l) => [String(l.node_id), withoutScope(l)]))
   };
 
   const referenced = new Set(idsIn(body));
