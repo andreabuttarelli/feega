@@ -23,9 +23,13 @@ Frames imported from a GitHub repository ([Import from code](/integrations/impor
 - Config files, lockfiles and dotfiles need an explicit confirmation (`--confirm-sensitive`, `confirmSensitive: true`).
 - Without write access to the repository, the push answers `read_only` with the patch, so you can apply it or open a pull request from a fork.
 
+## Link
+
+Importing a repository or a git folder links the frame to its source: the first imported page is the entry file, every imported page file joins the link, with the app root (monorepos), the base branch and commit, and the values a dynamic route was opened with (`/blog/[slug]` → `slug`). A local folder takes the branch it is on and its current commit. Uploads are not linked. Duplicating a frame does not copy its link.
+
 ## Status
 
-The state of a linked frame is computed on request, never stored, with this priority: `conflict`, `orphan` (the file is gone upstream), `access_lost`, `newer_upstream`, `modified`, `in_pull`, `in_sync`. Files renamed upstream are followed automatically. The answer also carries the pull request and its CI checks.
+The frame header shows one GitHub icon per linked frame, checked when the canvas opens and every minute after. The state of a linked frame is computed on request, never stored, with this priority: `conflict`, `orphan` (the file is gone upstream), `access_lost`, `newer_upstream`, `modified`, `in_pull`, `in_sync`. Files renamed upstream are followed automatically. The answer also carries the pull request and its CI checks.
 
 ## Undo
 

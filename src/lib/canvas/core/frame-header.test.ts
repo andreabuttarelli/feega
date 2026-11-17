@@ -48,8 +48,9 @@ describe('frameHeaderIcons', () => {
     expect(headerBadges(facts())).toEqual([]);
   });
 
-  it('keeps the GitHub states behind the flag', () => {
-    expect(headerBadges(facts({ source: [SourceSync.Conflict] }))).toEqual([]);
+  it('shows the GitHub states by default, hides them when the flag is off', () => {
+    expect(headerBadges(facts({ source: [SourceSync.Conflict] }))).toEqual([FrameBadge.SourceConflict]);
+    expect(headerBadges(facts({ source: [SourceSync.Conflict] }), { sourceSync: false })).toEqual([]);
   });
 
   it('shows only the highest-priority GitHub state', () => {

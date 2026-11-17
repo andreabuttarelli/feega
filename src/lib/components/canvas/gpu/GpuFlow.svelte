@@ -27,6 +27,8 @@
   import PrototypePlayerHost from '../PrototypePlayerHost.svelte';
   import FrameHeaderIcons from './FrameHeaderIcons.svelte';
   import { HeaderAction, headerBadges, headerHits, headerRow, type HeaderHit } from '$lib/canvas/core/frame-header';
+  import { sourceStatus } from '$lib/canvas/source-status.svelte';
+  import { linkedFrames } from '$lib/canvas/source-sync';
   import { prototypePlayer } from '$lib/canvas/prototype-player.svelte';
   import { prototypeLink } from '$lib/canvas/prototype-link.svelte';
   import { prototypeLinks } from '$lib/motion/prototype/links';
@@ -387,6 +389,7 @@
   });
   const byId = $derived(new Map(placed.map((t) => [t.id, t])));
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
+  const sources = sourceStatus(() => page.params.projectId ?? '', () => linkedFrames(props.nodeSummaries ?? []));
   const ports = $derived(placed.flatMap((t) => portsOf(t)));
   const nodeOf = $derived(new Map(placed.filter((t) => t.node).map((t) => [t.id, t.node!])));
   const lookup = (id: string) => nodeOf.get(id) ?? null;
@@ -634,7 +637,7 @@
     if (!text || kindOfNode(t.id) !== FrameKind.Frame) {
       return [];
     }
-    const facts = { breakpoints: Boolean(liveOf(t.id)?.doc.breakpoints?.length), component: isComponentSet(t.id), prototype: prototypeFroms.has(t.id), source: [] };
+    const facts = { breakpoints: Boolean(liveOf(t.id)?.doc.breakpoints?.length), component: isComponentSet(t.id), prototype: prototypeFroms.has(t.id), source: sources.of(t.id) };
     return headerBadges(facts).map((key) => ({ key, contours: text.badges.get(key) ?? [] }));
   };
   const HEADER_PRESS: Record<HeaderAction, (id: string) => void> = {
