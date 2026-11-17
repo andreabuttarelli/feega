@@ -7,7 +7,7 @@ export type TileDom<M> = { on: boolean; resizable: boolean; showAdd: boolean; ma
 
 type Rule = {
   tile: <M>(dom: TileDom<M>) => TileDom<M>;
-  overlays: <F extends { id: string }>(frames: readonly F[], editing: (id: string) => boolean) => readonly F[];
+  overlays: <F extends { id: string }>(frames: F[], editing: (id: string) => boolean) => F[];
   rests: boolean;
 };
 
@@ -18,6 +18,6 @@ const DURING: Record<CameraMotion, Rule> = {
 
 export const tileDom = <M>(dom: TileDom<M>, motion: CameraMotion): TileDom<M> => DURING[motion].tile(dom);
 
-export const screenOverlays = <F extends { id: string }>(frames: readonly F[], editing: (id: string) => boolean, motion: CameraMotion): readonly F[] => DURING[motion].overlays(frames, editing);
+export const screenOverlays = <F extends { id: string }>(frames: F[], editing: (id: string) => boolean, motion: CameraMotion): F[] => DURING[motion].overlays(frames, editing);
 
 export const shownAtRest = <T>(value: T | null, motion: CameraMotion): T | null => (DURING[motion].rests ? value : null);
