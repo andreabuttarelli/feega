@@ -1,6 +1,8 @@
 import type { FrameDoc } from './frame-build';
 import { StartupStep, markStartup } from './startup-marks';
 import { keptKey, scopedCache, type CacheScope, type FrameCache } from './frame-cache';
+import { env as publicEnv } from '$env/dynamic/public';
+import { sourceAsksFor, type SourceAsks } from '$lib/local-user';
 
 const SOURCES_KEPT = 8;
 const HTTP_NO_CONTENT = 204;
@@ -68,8 +70,6 @@ const signedFrame = (batch: Batch, frame: Omit<FrameDoc, 'tokens'>): FrameDoc =>
 
 const FRAME_SOURCE = /^(\/p\/[^/]+\/c\/[^/]+\/motion)\/([0-9a-f-]{36})\/source(?:\?|$)/i;
 const HTTP_OK = 200;
-export const SOURCES_PER_ASK = 2;
-export const SOURCE_ASKS_OPEN = 2;
 
 const answered = (body: FrameDoc): Response => ({ ok: true, status: HTTP_OK, json: async () => body }) as unknown as Response;
 
@@ -85,7 +85,7 @@ function batchUrl(base: string, waiting: Waiting[]): string {
   return `${base}/sources?ids=${ids.join(',')}${held}`;
 }
 
-function frameBatcher(fetcher: Fetcher): Fetcher {
+function frameBatcher(fetcher: Fetcher, asks: SourceAsks): Fetcher {
   const queues = new Map<string, Waiting[]>();
   const due: { base: string; waiting: Waiting[] }[] = [];
   let open = 0;
@@ -104,7 +104,7 @@ function frameBatcher(fetcher: Fetcher): Fetcher {
   };
 
   const next = () => {
-    while (open < SOURCE_ASKS_OPEN && due.length) {
+    while (open < asks.open && due.length) {
       const { base, waiting } = due.shift()!;
       open++;
       void ask(base, waiting).finally(() => {
@@ -117,8 +117,8 @@ function frameBatcher(fetcher: Fetcher): Fetcher {
   const flush = (base: string) => {
     const waiting = queues.get(base) ?? [];
     queues.delete(base);
-    for (let at = 0; at < waiting.length; at += SOURCES_PER_ASK) {
-      due.push({ base, waiting: waiting.slice(at, at + SOURCES_PER_ASK) });
+    for (let at = 0; at < waiting.length; at += asks.framesPerAsk) {
+      due.push({ base, waiting: waiting.slice(at, at + asks.framesPerAsk) });
     }
     next();
   };
@@ -179,7 +179,7 @@ function cached(fetcher: Fetcher, cacheOf: () => FrameCache | null): Fetcher {
   };
 }
 
-export const batchedSources = (fetcher: Fetcher, kept = SOURCES_KEPT, cacheOf: () => FrameCache | null = () => null): ReadSource => sourceReader(cached(frameBatcher(fetcher), cacheOf), kept);
+export const batchedSources = (fetcher: Fetcher, kept = SOURCES_KEPT, cacheOf: () => FrameCache | null = () => null, asks: SourceAsks = sourceAsksFor(publicEnv)): ReadSource => sourceReader(cached(frameBatcher(fetcher, asks), cacheOf), kept);
 
 let scoped: FrameCache | null = null;
 

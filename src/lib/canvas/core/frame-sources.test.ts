@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { SOURCE_ASKS_OPEN, SOURCES_PER_ASK, batchedSources, sourceReader } from './frame-sources';
+import { batchedSources as batchedWith, sourceReader } from './frame-sources';
+
+const ASKS = { framesPerAsk: 2, open: 2 };
+const batchedSources: typeof batchedWith = (fetcher, kept, cacheOf) => batchedWith(fetcher, kept, cacheOf, ASKS);
 import { frameCache, memoryShelf } from './frame-cache';
 import { framesOnCanvas, frameSourceUrl } from './frame-source';
 import { adoptFrameHead } from '$lib/canvas/node-save';
@@ -120,7 +123,7 @@ describe('warming the sources of every frame on open', () => {
     }
 
     expect(asked.flatMap((u) => new URLSearchParams(u.split('?')[1]).get('ids')!.split(','))).toEqual(ids);
-    expect(Math.max(...asked.map((u) => new URLSearchParams(u.split('?')[1]).get('ids')!.split(',').length))).toBeLessThanOrEqual(SOURCES_PER_ASK);
+    expect(Math.max(...asked.map((u) => new URLSearchParams(u.split('?')[1]).get('ids')!.split(',').length))).toBeLessThanOrEqual(ASKS.framesPerAsk);
   });
 
   it('hands the nearest frame its source without waiting for the rest (a 36-frame canvas waited 10 s for one 38 MB answer)', async () => {
@@ -142,8 +145,8 @@ describe('warming the sources of every frame on open', () => {
     await read(url(ids[0]));
     await new Promise((r) => setTimeout(r, 0));
 
-    expect(open).toBe(SOURCE_ASKS_OPEN);
-    expect(pending.length).toBe(SOURCE_ASKS_OPEN + 1);
+    expect(open).toBe(ASKS.open);
+    expect(pending.length).toBe(ASKS.open + 1);
   });
 });
 
