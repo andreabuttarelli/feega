@@ -1,0 +1,58 @@
+---
+title: Push to GitHub
+description: Send the edits of frames imported from code back to their repository as a branch and a pull request.
+sidebar:
+  order: 6
+---
+
+Frames imported from a GitHub repository ([Import from code](/integrations/import-from-code/)) can send their edits back. Feega patches the source files it read (text, style, tokens) and commits them; it never rewrites a file wholesale.
+
+## How a push lands
+
+- **Never the default branch.** Every push goes to `feega/<name>` and opens one pull request against the base branch.
+- **One pull request per merge cycle.** Later pushes update the same pull request. Once it is merged or closed, the next push opens `feega/<name>-2`.
+- **Never force-pushed.** If someone rewrote, deleted or protected the branch, the push goes to `feega/<name>-sync` and opens a pull request from there.
+- **One commit, all files.** The files of a push land in a single commit; if access is lost mid-push, no branch is created.
+- **One push at a time.** A second push on the same branch while one runs answers `busy`.
+- **Co-authors.** Pass co-authors and they are added to the commit.
+
+## Safety
+
+- Files named `.env` or `.env.*` are never read nor written.
+- The diff is scanned for secrets (API keys, tokens, private keys) before anything reaches GitHub; a match stops the push.
+- Config files, lockfiles and dotfiles need an explicit confirmation (`--confirm-sensitive`, `confirmSensitive: true`).
+- Without write access to the repository, the push answers `read_only` with the patch, so you can apply it or open a pull request from a fork.
+
+## Status
+
+The state of a linked frame is computed on request, never stored, with this priority: `conflict`, `orphan` (the file is gone upstream), `access_lost`, `newer_upstream`, `modified`, `in_pull`, `in_sync`. Files renamed upstream are followed automatically. The answer also carries the pull request and its CI checks.
+
+## Undo
+
+Undoing a push adds a commit that restores only the files that push touched, as they were before it. History is never rewritten.
+
+## CLI
+
+```bash
+feega github push <projectId> <nodeId...> --name hero
+feega github status <projectId> <nodeId>
+feega github undo <projectId> <nodeId>
+```
+
+## API
+
+| Method | Path | Body or query |
+|---|---|---|
+| `POST` | `/api/v1/projects/:id/github/push` | `{ name, nodeIds, title?, body?, base?, confirmSensitive? }` |
+| `GET` | `/api/v1/projects/:id/github/push?nodeId=` | — |
+| `POST` | `/api/v1/projects/:id/github/push/undo` | `{ nodeId }` |
+
+Refusals answer `{ ok: false, refusal }`: `not_connected`, `read_only` (403, with `patch`), `secret` and `env_file` (422), `needs_confirm` (428), `busy` (423), `unauthorized` (401), `forbidden` (403).
+
+## MCP
+
+`github_push`, `github_push_status` and `github_undo`, with the same inputs.
+
+## Setting up GitHub on a self-hosted server
+
+The GitHub connection runs through Composio (`COMPOSIO_API_KEY`). Pushing needs write scopes on the GitHub auth config: a GitHub App installed on selected repositories with **Contents: read and write**, **Pull requests: read and write**, **Checks: read** and **Metadata: read**.

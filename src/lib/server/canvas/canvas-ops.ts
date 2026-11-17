@@ -100,6 +100,8 @@ import { conditionsOf, MAX_CONDITIONS } from '$lib/server/code-import/render-con
 import { CAPTURE_DELAY_MAX_MS, delayOf } from '$lib/server/code-import/capture-wait';
 import { designSystemOf } from '$lib/server/code-import/design-system';
 import { githubFor } from '$lib/server/code-import/github-runtime';
+import { framesPush, frameStatus, frameUndo } from '$lib/server/code-push/frames-push';
+import { framesDeps } from '$lib/server/code-push/frames-runtime';
 import { libsOrigin } from '$lib/server/motion/libs-origin';
 import { GithubRefusal } from '$lib/server/code-import/github-http';
 import { MAX_STORIES } from '$lib/server/code-import/storybook';
@@ -1141,6 +1143,24 @@ export const CANVAS_OPS = {
       const repos = await githubFor(ctx.db, ctx).repos();
       return repos ? { repos } : { error: GithubRefusal.NotConnected };
     }
+  }),
+
+  github_push: op({
+    access: Access.Write,
+    input: z.object({ name: z.string().min(1).max(100).describe('names the branch feega/<name>; later pushes update its pull request until it is merged, then a new branch opens'), nodeIds: z.array(z.string()).min(1).max(50).describe('code frames imported from one GitHub repo'), title: z.string().max(200).optional(), body: z.string().max(10_000).optional(), confirmSensitive: z.boolean().optional().describe('true after the user agreed to change config files, lockfiles or dotfiles') }).strict(),
+    run: async (ctx, input) => framesPush(framesDeps(ctx.db, ctx), figmaScope(ctx), input)
+  }),
+
+  github_push_status: op({
+    access: Access.Read,
+    input: z.object({ nodeId: z.string() }).strict(),
+    run: async (ctx, input) => frameStatus(framesDeps(ctx.db, ctx), figmaScope(ctx), input.nodeId)
+  }),
+
+  github_undo: op({
+    access: Access.Write,
+    input: z.object({ nodeId: z.string() }).strict(),
+    run: async (ctx, input) => frameUndo(framesDeps(ctx.db, ctx), input.nodeId)
   }),
 
   github_branches: op({
