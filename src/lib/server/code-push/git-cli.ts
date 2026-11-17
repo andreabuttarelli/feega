@@ -9,14 +9,18 @@ const NO_PROMPT = { GIT_TERMINAL_PROMPT: '0', GIT_ASKPASS: 'echo', LC_ALL: 'C' }
 
 export function git(dir: string, args: string[], opts: { input?: string; env?: Record<string, string> } = {}): Promise<GitRun> {
   return new Promise((resolve) => {
-    const child = spawn('git', ['-C', dir, ...args], { env: { ...process.env, ...NO_PROMPT, ...opts.env }, stdio: ['pipe', 'pipe', 'pipe'] });
+    const piped = opts.input !== undefined;
+    const child = spawn('git', ['-C', dir, ...args], { env: { ...process.env, ...NO_PROMPT, ...opts.env }, stdio: [piped ? 'pipe' : 'ignore', 'pipe', 'pipe'] });
     let out = '';
     let err = '';
-    child.stdout.on('data', (d) => (out += d));
-    child.stderr.on('data', (d) => (err += d));
+    child.stdout!.on('data', (d) => (out += d));
+    child.stderr!.on('data', (d) => (err += d));
     child.on('error', (e) => resolve({ code: -1, out, err: String(e) }));
     child.on('close', (code) => resolve({ code: code ?? -1, out, err }));
-    child.stdin.end(opts.input ?? '');
+    if (piped) {
+      child.stdin!.on('error', () => undefined);
+      child.stdin!.end(opts.input);
+    }
   });
 }
 
