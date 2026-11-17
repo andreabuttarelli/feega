@@ -180,6 +180,7 @@
   import { ChromeLayers, NO_OVERLAY, overlayOf } from '$lib/canvas/core/world-overlay';
   import { labelStepOf, labelZoomStep, strokeZoomStep } from '$lib/canvas/core/label-size';
   import { settledZoom } from '$lib/canvas/core/settled-zoom';
+  import { CameraMotion, shownAtRest, screenOverlays, tileDom } from '$lib/canvas/core/camera-motion';
   import { GESTURE_QUIET_MS } from '$lib/canvas/core/gesture-quiet';
   import { SIGHT_SLACK, grown, stillHolds, type Taken } from '$lib/canvas/core/sight';
   import { nodeHitRects } from '$lib/canvas/core/node-hit';
@@ -352,6 +353,13 @@
   let targeting = $state<string[] | null>(null);
   let space = $state(false);
   let gesturing = $state(false);
+  let cameraMotion = $state(CameraMotion.Still);
+  $effect(() => {
+    void [view.x, view.y, view.zoom];
+    cameraMotion = CameraMotion.Moving;
+    const rest = setTimeout(() => (cameraMotion = CameraMotion.Still), GESTURE_QUIET_MS);
+    return () => clearTimeout(rest);
+  });
   let resizing = $state<ReadonlySet<string>>(new Set());
   let fitted = false;
   let fittedCanvas = '';
@@ -4534,13 +4542,13 @@
         <div class="hover-ring" data-testid="node-hover-ring" data-node={ring.id} style={highlightStyle(HighlightKind.Node) + ';' + hoverRingStyle(view, ring)}></div>
       {/each}
     </div>
-    <FrameOverlays {view} frames={shownOverlays}>
+    <FrameOverlays {view} frames={screenOverlays(shownOverlays, (id) => typing?.nodeId === id || cropping?.nodeId === id, cameraMotion)}>
       {#snippet children(frame)}
         {@const edit = typingMark(frame.id)}
         {#if edit}
           <CoreTextEdit lines={edit.lines} ontype={showTyping} caretAt={edit.at} layout={edit.layout} look={edit.look} text={edit.text} typedAhead={edit.typed} runs={edit.runs} lists={edit.lists} styled={edit.styled} base={edit.base} body={edit.body} clipId={edit.clip} oncommit={stopTyping} />
         {/if}
-        {#each typing?.nodeId === frame.id || cropping?.nodeId === frame.id ? [] : marksIn(frame.id) as mark (mark.clip)}
+        {#each typing?.nodeId === frame.id || cropping?.nodeId === frame.id ? [] : tileDom({ on: true, resizable: true, showAdd: false, marks: marksIn(frame.id) }, cameraMotion).marks as mark (mark.clip)}
           <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} highlight={mark.highlight} pivot={frameViews.isOn(FrameView.Pivot) && picks.length === 1 ? mark.pivot : null} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
         {/each}
         {@const gradient = gradientMark(frame.id)}
@@ -4589,7 +4597,7 @@
         {/if}
       {/snippet}
     </FrameOverlays>
-    <FrameOverlays {view} frames={viewOverlays}>
+    <FrameOverlays {view} frames={screenOverlays(viewOverlays, (id) => cropping?.nodeId === baseNodeId(id), cameraMotion)}>
       {#snippet children(frame)}
         {@const nodeId = baseNodeId(frame.id)}
         {#each typing || cropping?.nodeId === nodeId ? [] : marksIn(frame.id) as mark (mark.clip)}
@@ -4604,8 +4612,8 @@
         {/if}
       {/snippet}
     </FrameOverlays>
-    {#if manyQuad}
-      <FrameSelection clip="" quad={manyQuad} kind={SelectionKind.Many} ongrab={grabMany} />
+    {#if shownAtRest(manyQuad, cameraMotion)}
+      <FrameSelection clip="" quad={manyQuad!} kind={SelectionKind.Many} ongrab={grabMany} />
     {/if}
     <PrototypePlayerHost frames={playerFrames} />
     {#if showsPrototype}
@@ -4665,6 +4673,7 @@
       {/each}
       {#each placed as t (t.id)}
         {@const on = selectedIds.has(t.id)}
+        {@const dom = tileDom({ on, resizable: resizable && on, showAdd: on || hovered === t.id || addLinger === t.id, marks: [] }, cameraMotion)}
         <div
           class="svelte-flow__node gpu-node"
           class:selected={on}
@@ -4681,7 +4690,7 @@
           data-box={`${t.x},${t.y},${t.w},${t.h}`}
           style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px;--bar-h:${holdsDoc(t.kind ?? '') && frameChrome(kindOfNode(t.id)).bar ? MOTION_NODE_BAR_H : 0}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}
         >
-          <GpuTileChrome tile={t} selected={on} painted={coreDrawn.has(t.id)} full={chromeIds.has(t.id)} resizable={resizable && on} onaddbeside={addsBeside(t) && props.onAddBeside ? (id) => seed(props.onAddBeside?.(id)) : undefined} showAdd={on || hovered === t.id || addLinger === t.id} />
+          <GpuTileChrome tile={t} selected={dom.on} painted={coreDrawn.has(t.id)} full={chromeIds.has(t.id)} resizable={dom.resizable} onaddbeside={addsBeside(t) && props.onAddBeside ? (id) => seed(props.onAddBeside?.(id)) : undefined} showAdd={dom.showAdd} />
           {#if !domIds.has(t.id) && holdsDoc(t.kind ?? '')}
             {@const kind = kindOfNode(t.id)}
             <div class="frame-standin" data-testid="motion-node" data-motion-node={t.id} data-kind={kind} data-mode="gpu" style={`--bar-h:${kind === 'frame' ? MOTION_NODE_BAR_H : 0}px`}>

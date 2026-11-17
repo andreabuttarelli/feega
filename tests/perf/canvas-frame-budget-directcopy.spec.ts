@@ -7,12 +7,16 @@ import { inkOf, vanishes } from '../../scripts/perf/flicker';
 const BASE = `http://127.0.0.1:${Number(process.env.BENCH_PORT ?? 5288) + 1}`;
 const OUT = process.env.PROBE_OUT ?? 'perf-results/flicker';
 const MODE = process.env.PROBE_MODE ?? 'flicker';
-const CENTRE = { x: 720, y: 450 };
+const [WIDTH, HEIGHT] = (process.env.PROBE_VIEWPORT ?? '1440x900').split('x').map(Number);
+const DPR = Number(process.env.PROBE_DPR ?? 1);
+const CENTRE = { x: WIDTH / 2, y: HEIGHT / 2 };
 const LEG_MS = 1500;
 const CTRL = 2;
 const GRID = [12, 8] as const;
 const PAUSE_AT_MS = [1000, 3900, 5200];
 const SETTLE_MS = 3000;
+const MS_PER_S = 1000;
+const TRACE_TOP = 30;
 
 async function cells(jpeg: Buffer): Promise<number[]> {
   const [gw, gh] = GRID;
@@ -42,7 +46,7 @@ test('direct zoom on the user canvas copy', async () => {
   test.setTimeout(600_000);
   mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch({ headless: false, args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', ...(process.env.PROBE_UNCAPPED === '1' ? ['--disable-frame-rate-limit', '--disable-gpu-vsync'] : [])] });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const page = await browser.newPage({ viewport: { width: WIDTH, height: HEIGHT }, deviceScaleFactor: DPR });
   await page.goto(`${BASE}/login`);
   await page.fill('input[type=email]', process.env.E2E_TEST_EMAIL!);
   await page.fill('input[type=password]', process.env.E2E_TEST_PASSWORD!);
@@ -82,6 +86,19 @@ test('direct zoom on the user canvas copy', async () => {
   const moderate = process.env.PROBE_MODERATE === '1';
   const legs = moderate ? [{ to: 1.5, ms: LEG_MS }, { to: 0.5, ms: LEG_MS }, { to: 1.5, ms: LEG_MS }, { to: 0.5, ms: LEG_MS }] : [{ to: 1.2, ms: LEG_MS }, { to: 0.3, ms: LEG_MS }, { to: 2.4, ms: LEG_MS }, { to: 0.3, ms: LEG_MS }];
   const steps = zoomPath({ from: moderate ? 0.5 : 0.3, anchor: CENTRE, legs });
+  const profiled = process.env.PROBE_PROFILE === '1';
+  type Traced = { name: string; dur?: number; ph: string; args?: { elementCount?: number; beginData?: { elementCount?: number }; data?: { nodeName?: string; reason?: string; invalidatedSelectors?: string[]; changedClass?: string; changedAttribute?: string; changedId?: string; changedPseudo?: string; extraData?: string } } };
+  const traced: Traced[] = [];
+  const tracing = process.env.PROBE_TRACE === '1';
+  if (tracing) {
+    cdp.on('Tracing.dataCollected', (e) => traced.push(...(e.value as unknown as Traced[])));
+    await cdp.send('Tracing.start', { categories: 'devtools.timeline,disabled-by-default-devtools.timeline,disabled-by-default-devtools.timeline.invalidationTracking', transferMode: 'ReportEvents' });
+  }
+  if (profiled) {
+    await cdp.send('Profiler.enable');
+    await cdp.send('Profiler.setSamplingInterval', { interval: 200 });
+    await cdp.send('Profiler.start');
+  }
   const startT = await page.evaluate(() => performance.now());
   began = Date.now();
   const pauses = MODE === 'sharp' ? [...PAUSE_AT_MS] : [];
@@ -103,6 +120,37 @@ test('direct zoom on the user canvas copy', async () => {
     void cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: s.x, y: s.y, deltaX: s.dx, deltaY: s.dy, modifiers: s.ctrl ? CTRL : 0 }).catch(() => {});
   }
   await page.waitForTimeout(2000);
+  if (tracing) {
+    const done = new Promise((r) => cdp.once('Tracing.tracingComplete', r));
+    await cdp.send('Tracing.end');
+    await done;
+    const sums = new Map<string, number>();
+    for (const e of traced.filter((t) => t.ph === 'X' && t.dur)) {
+      sums.set(e.name, (sums.get(e.name) ?? 0) + e.dur! / MS_PER_S);
+    }
+    const styled = traced.filter((t) => t.name === 'UpdateLayoutTree' && t.ph === 'X').map((t) => t.args?.elementCount ?? t.args?.beginData?.elementCount ?? 0);
+    console.log(`styles n=${styled.length} elements mean=${(styled.reduce((a, b) => a + b, 0) / Math.max(1, styled.length)).toFixed(0)}`);
+    const why = new Map<string, number>();
+    for (const t of traced.filter((e) => e.name.endsWith('InvalidationTracking'))) {
+      const d = t.args?.data ?? {};
+      const key = `${t.name} ${d.nodeName ?? ''} ${d.reason ?? ''} ${d.changedClass ?? d.changedAttribute ?? d.changedId ?? d.changedPseudo ?? ''} ${(d.invalidatedSelectors ?? []).slice(0, 2).join('|')}`;
+      why.set(key, (why.get(key) ?? 0) + 1);
+    }
+    writeFileSync(`${OUT}/invalidations.txt`, [...why].sort((a, b) => b[1] - a[1]).slice(0, TRACE_TOP).map(([k, v]) => `${v}\t${k}`).join('\n'));
+    writeFileSync(`${OUT}/trace.txt`, [...sums].sort((a, b) => b[1] - a[1]).slice(0, TRACE_TOP).map(([k, v]) => `${v.toFixed(0)}\t${k}`).join('\n'));
+  }
+  if (profiled) {
+    const { profile } = (await cdp.send('Profiler.stop')) as { profile: { nodes: { id: number; callFrame: { functionName: string; url: string; lineNumber: number } }[]; samples: number[] } };
+    const byId = new Map(profile.nodes.map((n) => [n.id, n.callFrame]));
+    const counts = new Map<string, number>();
+    for (const id of profile.samples) {
+      const f = byId.get(id)!;
+      const key = `${f.functionName || '(anon)'} ${f.url.split('/').pop()}:${f.lineNumber}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    const top = [...counts].sort((a, b) => b[1] - a[1]).slice(0, 25);
+    writeFileSync(`${OUT}/profile.txt`, top.map(([k, v]) => `${v}\t${k}`).join('\n'));
+  }
   const t = await page.evaluate((from) => (window as unknown as { __t: number[] }).__t.filter((x) => x >= from), startT);
   const gaps = t.slice(1).map((x, i) => x - t[i]).sort((a, b) => a - b);
   console.log(`frames fps=${Math.round((gaps.length * 1000) / (t.at(-1)! - t[0]))} p95=${gaps[Math.floor(gaps.length * 0.95)].toFixed(1)} worst=${gaps.at(-1)!.toFixed(0)} mean=${(gaps.reduce((a, b) => a + b, 0) / gaps.length).toFixed(2)} over50=${gaps.filter((g) => g > 50).length} over8=${gaps.filter((g) => g > 8.3).length} n=${gaps.length}`);

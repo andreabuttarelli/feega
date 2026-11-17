@@ -22,6 +22,7 @@ pub mod held_view;
 pub mod kernel;
 pub mod layers;
 pub mod lod;
+pub mod overlay_hold;
 pub mod overlay_seen;
 pub mod pictures;
 pub mod pinned;

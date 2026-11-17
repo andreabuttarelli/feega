@@ -24,7 +24,7 @@ fn a_pinned_overlay_keeps_its_screen_size_at_every_zoom_and_leaves_the_encoded_o
             let z = zoom * ratio;
             let camera = [z, 0.0, 0.0, z, 7.0, 9.0];
             assert!(w.overlay(camera, 640, 480).items.iter().all(|i| i.clip() != "ring"));
-            assert_eq!(w.pinned_at(camera).len(), 1);
+            assert_eq!(w.pinned_at_in(camera, 1.0, (640, 480)).len(), 1);
             for list in [w.screen(camera, 640, 480)] {
                 let at = pinned_on_screen(&list);
                 assert_eq!(at[0], (10.0 * z + 7.0, 10.0 * z + 9.0));
@@ -35,8 +35,39 @@ fn a_pinned_overlay_keeps_its_screen_size_at_every_zoom_and_leaves_the_encoded_o
     }
 }
 
+fn tile_chrome(id: &str, x: f64, w: f64) -> String {
+    format!(r#"{{ "kind": "path", "clip": "{id}:ring", "contours": [[{x}, 0, {x1}, 0, {x1}, {w}, {x}, {w}]], "nudge": [[-2, -2, 2, -2, 2, 2, -2, 2]], "rule": "nonzero", "paint": {{ "kind": "solid", "color": [0, 0, 1, 1] }}, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0] }},
+        {{ "kind": "path", "clip": "{id}:label", "contours": [[{x}, 0, {x}, 0, {x}, 0]], "nudge": [[0, -20, 40, -20, 40, -8]], "rule": "nonzero", "paint": {{ "kind": "solid", "color": [0, 0, 0, 1] }}, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0] }}"#, x1 = x + w)
+}
+
+#[test]
+fn pinned_chrome_off_screen_or_too_small_to_see_is_left_out_of_the_frame() {
+    let mut w = World::new();
+    let near = tile_chrome("near", 100.0, 400.0);
+    let far = tile_chrome("far", 100_000.0, 400.0);
+    let wire = r#"{ "kind": "path", "clip": "wire:a", "contours": [[300, 300, 310, 300, 310, 302]], "rule": "nonzero", "paint": { "kind": "solid", "color": [0, 0, 0, 1] }, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0] }"#;
+    w.set_overlay(OverlayPart::Fixed, parse_overlay(&format!("[{near}, {far}, {wire}]")).unwrap());
+
+    let camera = [1.0, 0.0, 0.0, 1.0, 0.0, 100.0];
+    assert_eq!(w.pinned_at_in(camera, 1.0, (1000, 800)).len(), 2);
+
+    let wide = [0.01, 0.0, 0.0, 0.01, 0.0, 100.0];
+    assert_eq!(w.pinned_at_in(wide, 1.0, (1000, 800)).len(), 2);
+}
+
 fn sized(_: &str) -> Option<(f64, f64)> {
     SIZE
+}
+
+#[test]
+fn a_frame_too_small_on_screen_for_its_label_keeps_only_its_ring() {
+    let mut w = World::new();
+    w.set_overlay(OverlayPart::Fixed, parse_overlay(&format!("[{}]", tile_chrome("t", 0.0, 400.0))).unwrap());
+
+    let paths = |zoom: f64| w.pinned_at_in([zoom, 0.0, 0.0, zoom, 10.0, 100.0], 1.0, (1000, 800)).iter().map(|(s, _)| s.encoding().n_paths).sum::<u32>();
+
+    assert_eq!(paths(1.0), 2);
+    assert_eq!(paths(0.02), 1);
 }
 
 fn put(clip: &str, x: f64) -> String {
