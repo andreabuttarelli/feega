@@ -2,7 +2,7 @@
   import { untrack } from 'svelte';
   import { addTally, countFrame } from '$lib/canvas/gpu/frame-stats';
   import { Again, paintAgain } from '$lib/canvas/gpu/paint-again';
-  import { showsBeforeMedia } from '$lib/canvas/core/first-show';
+  import { VECTORS, beforeMediaGroup, showsBeforeMedia } from '$lib/canvas/core/first-show';
   import { sharedFrames } from '$lib/motion/gpu/shared-frames';
   import { drawFrame, prepare, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
   import { smoothingOf, type Typeset } from '@feega/motion-core/motion/gpu-full/text/painter';
@@ -147,7 +147,6 @@
   const thumbAsked = new Set<string>();
   const thumbTaken = new Set<string>();
   const THUMB = ':thumb';
-  const VECTORS = ':vectors';
   const pictures: Pictures = (item) => thumbPictures.get(item.clip) ?? customPictures.of(item) ?? media.pictures(item);
 
   async function mountReads(host: HTMLElement, source: FrameDoc, prepared: Prepared): Promise<CustomReads> {
@@ -627,7 +626,7 @@
     }
     markFrame(key, Step.LiveBuilt);
     if (showsBeforeMedia(f.id, liveShown.has(f.id))) {
-      showLive(f, key, { doc: source.doc, list: built.list, ready: Readiness.Partial });
+      showLive(f, beforeMediaGroup(key), { doc: source.doc, list: built.list, ready: Readiness.Partial });
     }
     const ready = await media.ready(built.list);
     if (!liveGeneration.land(f.id, generation)) {
