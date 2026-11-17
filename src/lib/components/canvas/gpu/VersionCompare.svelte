@@ -190,7 +190,7 @@
   }
   .version-compare {
     position: absolute;
-    right: 16px;
+    left: 72px;
     top: 56px;
     width: min(560px, calc(100% - 32px));
     max-height: calc(100% - 72px);

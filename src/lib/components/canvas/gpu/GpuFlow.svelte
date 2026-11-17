@@ -691,9 +691,10 @@
     }
   };
   const SOURCE_POP_GAP = 6;
+  const POPOVER_ROOM = 340;
   const pressHeader = (hit: HeaderHit) => {
     HEADER_PRESS[headerRow(hit.key).action](hit.id);
-    sourceOpen = headerRow(hit.key).action === HeaderAction.Source ? { id: hit.id, left: view.x + hit.x * view.zoom, top: view.y + (hit.y + hit.h) * view.zoom + SOURCE_POP_GAP } : null;
+    sourceOpen = headerRow(hit.key).action === HeaderAction.Source ? { id: hit.id, left: Math.min(view.x + hit.x * view.zoom, window.innerWidth - POPOVER_ROOM), top: view.y + (hit.y + hit.h) * view.zoom + SOURCE_POP_GAP } : null;
   };
   const labelOf = (t: Tile) => {
     const kind = t.kind && isNodeType(t.kind) ? t.kind : null;
