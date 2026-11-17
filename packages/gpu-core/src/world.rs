@@ -6,7 +6,7 @@ use vello::kurbo::{Affine as Matrix, Point, Rect};
 
 use crate::display_list::{Affine, DisplayList, Item, Look, PathItem, UseItem};
 use crate::lod::{BLUR_REACH, VIEW_SLACK_PX};
-use crate::pinned::PinnedScene;
+use crate::pinned::PinnedPieces;
 use crate::retained::Damage;
 use crate::uses::{Plus, Uses};
 
@@ -63,7 +63,7 @@ impl OverlayPart {
 struct Overlay {
     items: Vec<Item>,
     at: Option<UseItem>,
-    pinned: Option<PinnedScene>,
+    pinned: Option<PinnedPieces>,
 }
 
 pub struct Lift {
@@ -307,9 +307,9 @@ impl World {
         self.pixel_ratio = ratio;
     }
 
-    fn seen_through(&self, camera: Affine) -> f64 {
+    fn seen_through(&self, camera: Affine, drawn: f64) -> f64 {
         let zoom = (camera[0] * camera[3] - camera[1] * camera[2]).abs().sqrt();
-        let per_px = self.pixel_ratio / zoom;
+        let per_px = self.pixel_ratio * drawn / zoom;
         self.per_px.set(per_px);
         per_px
     }
@@ -321,13 +321,13 @@ impl World {
         }
     }
 
-    pub fn pinned_at(&self, camera: Affine) -> Vec<(std::rc::Rc<vello::Scene>, Affine)> {
-        let per_px = self.seen_through(camera);
-        self.overlays.iter().filter_map(|o| o.pinned.as_ref()).map(|p| (p.at(per_px), camera)).collect()
+    pub fn pinned_at_in(&self, camera: Affine, drawn: f64, view: (u32, u32)) -> Vec<(std::rc::Rc<vello::Scene>, Affine)> {
+        let per_px = self.seen_through(camera, drawn);
+        self.overlays.iter().filter_map(|o| o.pinned.as_ref()).flat_map(|p| p.seen(camera, per_px, view)).map(|s| (s, camera)).collect()
     }
 
     pub fn set_overlay(&mut self, part: OverlayPart, items: Vec<Item>) {
-        let cached = items.iter().any(nudged).then(|| PinnedScene::new(&items)).filter(PinnedScene::fits);
+        let cached = items.iter().any(nudged).then(|| PinnedPieces::new(&items)).flatten();
         self.overlays[part.index()].pinned = cached;
         let old = std::mem::replace(&mut self.overlays[part.index()].items, items);
         let new = &self.overlays[part.index()].items;
@@ -395,14 +395,18 @@ impl World {
     }
 
     pub fn overlay(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
-        let per_px = self.seen_through(camera);
+        self.overlay_drawn(camera, width, height, 1.0)
+    }
+
+    pub fn overlay_drawn(&self, camera: Affine, width: u32, height: u32, drawn: f64) -> DisplayList {
+        let per_px = self.seen_through(camera, drawn);
         let held = self.visit(self.uses.flagged()).into_iter().filter(|u| self.lifted(u) && self.shifted_from_rest(u).is_none()).map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
         let items = held.chain(OVERLAY_PARTS.iter().map(|p| &self.overlays[p.index()]).filter(|o| o.pinned.is_none()).flat_map(|o| self.part_items(o, camera, per_px)));
         DisplayList { width, height, background: None, items: items.collect(), faces: Vec::new(), fragments: Default::default() }
     }
 
     pub fn screen(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
-        let per_px = self.seen_through(camera);
+        let per_px = self.seen_through(camera, 1.0);
         let uses = self.visit(self.uses.meeting(sighted(camera, width, height), Plus::Flagged)).into_iter().map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
         let overlay = OVERLAY_PARTS.iter().flat_map(|p| self.part_items(&self.overlays[p.index()], camera, per_px));
         DisplayList { width, height, background: None, items: uses.chain(overlay).collect(), faces: Vec::new(), fragments: Default::default() }

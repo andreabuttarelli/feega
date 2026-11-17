@@ -51,3 +51,23 @@ fn the_held_overlay_never_exceeds_the_device_texture_limit() {
 
     assert!(size.0 <= 4096 && size.1 <= 4096);
 }
+
+#[test]
+fn a_zooming_camera_draws_a_half_resolution_overlay_that_still_lands_on_the_world_and_rest_redraws_it_sharp() {
+    use gpu_core::overlay_hold::{Moving, OverlayQuality};
+    let rough = OverlayQuality::of(Moving::Camera);
+    let hold = OverlayHold::around_at(at(10.0, 20.0, 1.0), SCREEN, 8192, rough);
+    let (_, size) = hold.planned();
+    let world = Point::new(300.0, 200.0);
+    let in_held = Affine::new(hold.planned().0.matrix()) * world;
+
+    let look = hold.look(at(10.0, 20.0, 1.0));
+    let on_screen = Point::new((in_held.x - look.x) / look.scale, (in_held.y - look.y) / look.scale);
+
+    assert!(size.0 <= SCREEN.0 * 3 / 4);
+    assert!((on_screen - Affine::new(at(10.0, 20.0, 1.0).matrix()) * world).hypot() < 1e-6);
+    assert!(hold.serves(at(-200.0, 100.0, 1.0), SCREEN));
+    assert_eq!(OverlayQuality::of(Moving::Still), OverlayQuality::Sharp);
+    assert_eq!(OverlayQuality::of(Moving::Lift), OverlayQuality::Sharp);
+    assert_ne!(hold.quality(), OverlayQuality::Sharp);
+}

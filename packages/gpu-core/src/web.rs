@@ -20,7 +20,7 @@ use crate::reproject::{Draw, Output, Reprojector, Tile, OPAQUE};
 use crate::retained::{Camera, Damage, Lookup, Quality};
 use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, GestureDraw, Moment, Path, Warmup, tiles_kept_beside, TILE_BUDGET_BYTES, TILE_BYTES, TILE_GUTTER_PX, batches, batches_of, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys, magnified, fallback_serves, fallback_bands, ahead_camera, fade_in, fades_over, FADE_MS};
 use crate::overlay_seen::OverlaySeen;
-use crate::overlay_hold::OverlayHold;
+use crate::overlay_hold::{Moving, OverlayHold, OverlayQuality};
 use crate::screen_fit::{fit, screen_side};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
@@ -892,16 +892,27 @@ impl WebCore {
         self.overlay_dirty |= group.starts_with(OVERLAY_GROUPS) || self.compositor.holding();
     }
 
+    fn overlay_moving(&self) -> Moving {
+        if self.compositor.holding() || !self.compositor.lifts(&self.library).is_empty() {
+            return Moving::Lift;
+        }
+        match self.motion {
+            CoreMotion::Gesture => Moving::Camera,
+            CoreMotion::Still => Moving::Still,
+        }
+    }
+
     fn overlay_texture(&mut self) -> Result<Option<(wgpu::Texture, Lookup)>, JsValue> {
         let size = (self.target.width(), self.target.height());
         let moving = matches!(self.motion, CoreMotion::Gesture);
-        let held = self.overlay_held.as_ref().is_some_and(|(hold, _, at)| !self.overlay_dirty && if moving { hold.serves(self.camera, size) } else { *at == self.camera });
+        let quality = OverlayQuality::of(self.overlay_moving());
+        let held = self.overlay_held.as_ref().is_some_and(|(hold, _, at)| !self.overlay_dirty && hold.quality() == quality && if moving { hold.serves(self.camera, size) } else { *at == self.camera });
         if !held {
             self.overlay_dirty = false;
-            let hold = OverlayHold::around(self.camera, size, self.device.limits().max_texture_dimension_2d);
+            let hold = OverlayHold::around_at(self.camera, size, self.device.limits().max_texture_dimension_2d, quality);
             let (camera, planned) = hold.planned();
-            let plan = self.compositor.overlay_at(&mut self.library, camera, planned, self.limits);
-            let pinned = self.compositor.pinned_at(camera);
+            let plan = self.compositor.overlay_at(&mut self.library, camera, planned, self.limits, quality.scale());
+            let pinned = self.compositor.pinned_at(camera, quality.scale(), planned);
             if plan.screen.items.is_empty() && pinned.is_empty() {
                 self.overlay_held = None;
                 return Ok(None);
