@@ -13,6 +13,10 @@ const HOSTED_SOURCE_ASKS: SourceAsks = { framesPerAsk: 3, open: 6 };
 
 export const sourceAsksFor = (env: Record<string, string | undefined>): SourceAsks => (isLocalMode(env) ? LOCAL_SOURCE_ASKS : HOSTED_SOURCE_ASKS);
 
+const LOCAL_PICTURES_WHILE_VECTORS_OWED = 1;
+
+export const picturesWhileVectorsOwed = (env: Record<string, string | undefined>): number => (isLocalMode(env) ? LOCAL_PICTURES_WHILE_VECTORS_OWED : Infinity);
+
 export enum LocalOff {
   CookieBanner = 'cookie_banner',
   Analytics = 'analytics',
