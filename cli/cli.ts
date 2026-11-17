@@ -925,6 +925,14 @@ program
 const github = program.command('github').description('Push code edits of linked frames to GitHub as a branch and pull request');
 
 github
+  .command('variant <projectId> <canvasId> <nodeId>')
+  .description('Copy a linked frame as a variant of it; its push asks to replace the original, become a new route or stay on the canvas')
+  .action(async (projectId: string, canvasId: string, nodeId: string) => {
+    const { cmdGithubVariant } = await import('./commands/github.ts');
+    await cmdGithubVariant(projectId, canvasId, nodeId);
+  });
+
+github
   .command('push <projectId> <nodeIds...>')
   .description('Commit the code edits of the frames on feega/<name> and open or update its pull request')
   .requiredOption('--name <name>', 'Branch name; the branch is feega/<name>')
@@ -933,6 +941,7 @@ github
   .option('--base <branch>', 'Base branch (default: the repo default)')
   .option('--confirm-sensitive', 'Allow changes to config files, lockfiles and dotfiles')
   .option('--main <nodeIds...>', 'Frames whose instance edits apply to the main component file instead of the usage site')
+  .option('--variant <nodeId:choice[:route]...>', 'What a variant frame does on push: replace, new_route (with /route) or keep')
   .action(async (projectId: string, nodeIds: string[], opts) => {
     const { cmdGithubPush } = await import('./commands/github.ts');
     await cmdGithubPush(projectId, nodeIds, opts);

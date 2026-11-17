@@ -5,6 +5,7 @@ import { Access, GitError, GitFailure, PullStatus, type GitHost } from './git-ho
 import { CodeSourceKind, EntryKind, followRenames, isPushable, linkStatus, type CodeLink, type LinkState } from './link';
 import type { LinkStore } from './link-store';
 import type { PushLock } from './push-lock';
+import { relocated, suggestedRoute, VariantChoice, type Suggested, type VariantAsk } from './variants';
 import { PushRefusal, pushFiles, pushStatus, undoPush, type LastPush, type PushRefused, type PushState, type Pushed, type Undone } from './push';
 
 export enum FramesRefusal {
@@ -12,10 +13,11 @@ export enum FramesRefusal {
   NotPushable = 'not_pushable',
   ManyRepos = 'many_repos',
   NotLinked = 'not_linked',
-  NotPushed = 'not_pushed'
+  NotPushed = 'not_pushed',
+  VariantChoice = 'variant_choice'
 }
 
-export type FramesRefused = { ok: false; refusal: FramesRefusal | SyncRefusal | PushRefused['refusal']; paths?: string[]; patch?: { path: string; content: string }[] };
+export type FramesRefused = { ok: false; refusal: FramesRefusal | SyncRefusal | PushRefused['refusal']; paths?: string[]; patch?: { path: string; content: string }[]; suggested?: Suggested[] };
 
 export type FramesDeps = {
   host: (source: CodeSourceKind, repo: string) => Promise<GitHost | null>;
@@ -24,7 +26,7 @@ export type FramesDeps = {
   lock: PushLock;
 };
 
-export type FramesPushAsk = { name: string; nodeIds: string[]; title?: string; body?: string; since?: LastPush; base?: string; coAuthors?: string[]; confirmSensitive?: boolean; mains?: string[] };
+export type FramesPushAsk = { name: string; nodeIds: string[]; title?: string; body?: string; since?: LastPush; base?: string; coAuthors?: string[]; confirmSensitive?: boolean; mains?: string[]; variants?: VariantAsk[] };
 
 export type Affected = { path: string; pages: number };
 
@@ -37,14 +39,18 @@ const refused = (refusal: FramesRefused['refusal']): FramesRefused => ({ ok: fal
 
 const targetOf = (mains: string[] | undefined, nodeId: string) => (mains?.includes(nodeId) ? EditTarget.Main : EditTarget.Instance);
 
-async function editsOf(deps: FramesDeps, scope: CodeScope, nodeIds: string[], mains?: string[]): Promise<{ source: CodeSourceKind; repo: string; files: { path: string; content: string }[] } | FramesRefused> {
+type Shape = (nodeId: string, files: CodeEdits['files']) => CodeEdits['files'];
+
+const asIs: Shape = (_nodeId, files) => files;
+
+async function editsOf(deps: FramesDeps, scope: CodeScope, nodeIds: string[], mains?: string[], shape: Shape = asIs): Promise<{ source: CodeSourceKind; repo: string; files: { path: string; content: string }[] } | FramesRefused> {
   const all: CodeEdits[] = [];
   for (const nodeId of nodeIds) {
     const got = await deps.edits(scope, nodeId, targetOf(mains, nodeId));
     if (typeof got === 'string') {
       return refused(got);
     }
-    all.push(got);
+    all.push({ ...got, files: shape(nodeId, got.files) });
   }
   if (all.some((e) => !isPushable(e.kind))) {
     return refused(FramesRefusal.NotPushable);
@@ -59,8 +65,36 @@ async function editsOf(deps: FramesDeps, scope: CodeScope, nodeIds: string[], ma
 
 const lastPushOf = (link: CodeLink | null): LastPush | undefined => (link?.pushBranch && link.pushSha ? { branch: link.pushBranch, sha: link.pushSha } : undefined);
 
+type Planned = { nodeIds: string[]; shape: Shape };
+
+async function variantPlan(deps: FramesDeps, ask: FramesPushAsk): Promise<Planned | FramesRefused> {
+  const primary = await Promise.all(ask.nodeIds.map(async (nodeId) => ({ nodeId, link: await deps.links.read(nodeId) })));
+  const variants = primary.filter((p) => p.link?.variantOf);
+  const choiceOf = new Map((ask.variants ?? []).map((v) => [v.nodeId, v]));
+  const unanswered = variants.filter((v) => !choiceOf.has(v.nodeId));
+  if (unanswered.length) {
+    return { ...refused(FramesRefusal.VariantChoice), suggested: unanswered.map((v) => ({ nodeId: v.nodeId, route: suggestedRoute(v.link!.route) })) };
+  }
+
+  const linkOf = new Map(primary.map((p) => [p.nodeId, p.link]));
+  const nodeIds = ask.nodeIds.filter((id) => choiceOf.get(id)?.choice !== VariantChoice.Keep || !linkOf.get(id)?.variantOf);
+  const shape: Shape = (nodeId, files) => {
+    const asked = choiceOf.get(nodeId);
+    const link = linkOf.get(nodeId);
+    return asked?.choice === VariantChoice.NewRoute && link?.variantOf ? relocated(link, asked.route ?? suggestedRoute(link.route), files) : files;
+  };
+  return { nodeIds, shape };
+}
+
 export async function framesPush(deps: FramesDeps, scope: CodeScope, ask: FramesPushAsk): Promise<Pushed | FramesRefused> {
-  const edits = await editsOf(deps, scope, ask.nodeIds, ask.mains);
+  const plan = await variantPlan(deps, ask);
+  if ('ok' in plan) {
+    return plan;
+  }
+  if (!plan.nodeIds.length) {
+    return refused(PushRefusal.NoFiles);
+  }
+  const edits = await editsOf(deps, scope, plan.nodeIds, ask.mains, plan.shape);
   if ('ok' in edits) {
     return edits;
   }
@@ -148,6 +182,7 @@ const HTTP_STATUS: Record<string, number> = {
   [FramesRefusal.ManyRepos]: 400,
   [FramesRefusal.NotLinked]: 404,
   [FramesRefusal.NotPushed]: 409,
+  [FramesRefusal.VariantChoice]: 409,
   [PushRefusal.ReadOnly]: 403,
   [PushRefusal.EnvFile]: 422,
   [PushRefusal.Secret]: 422,

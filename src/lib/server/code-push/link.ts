@@ -48,7 +48,8 @@ export const linkSchema = z.object({
   pushTouched: z.array(PATH).max(500).optional(),
   pullNumber: z.number().int().positive().optional(),
   writable: z.boolean().default(true),
-  beforePoster: z.string().max(200).optional()
+  beforePoster: z.string().max(200).optional(),
+  variantOf: z.string().max(100).optional()
 });
 
 export type CodeLink = z.infer<typeof linkSchema>;
