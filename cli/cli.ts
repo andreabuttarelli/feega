@@ -52,6 +52,16 @@ program
   });
 
 program
+  .command('init [dir]')
+  .description('Tag every element of a Vite or Next.js app with its file:line in dev, so Feega can open the source behind what you click')
+  .option('--dry-run', 'show the changes without writing them')
+  .option('-y, --yes', 'apply without asking')
+  .action(async (dir, options) => {
+    const { cmdInit } = await import('./commands/init.ts');
+    await cmdInit(dir ?? '.', options);
+  });
+
+program
   .command('brands')
   .description('Elenca tutti i brand')
   .action(async () => {
