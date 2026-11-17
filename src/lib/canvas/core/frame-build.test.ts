@@ -72,6 +72,16 @@ describe('the builder', () => {
     return worker;
   };
 
+  it('starts every lane when warmed, so the worker script is fetched before the pictures (it waited 3.8 s behind them)', () => {
+    const spawn = vi.fn(() => echo());
+    const build = frameBuilder(spawn, 4);
+
+    build.warm();
+    build.warm();
+
+    expect(spawn).toHaveBeenCalledTimes(4);
+  });
+
   it('answers each request with its own list', async () => {
     const worker = echo();
     const build = frameBuilder(() => worker);
