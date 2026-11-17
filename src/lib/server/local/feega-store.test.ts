@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createConnection, createNode, listConnections, listNodes } from '$lib/server/repos/canvas';
+import { createConnection, createNode, listConnections, listNodes, renameNode } from '$lib/server/repos/canvas';
 import { appendRevision, readHead } from '$lib/server/repos/motion-revisions';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { unpackFeega } from '$lib/canvas/feega-file';
@@ -10,6 +10,9 @@ import { snapshotSchema } from '$lib/canvas/canvas-version';
 import { LOCAL_ORG_ID, LOCAL_USER, openFeegaStore, writeAtomically, type FeegaStore } from './feega-store';
 import { orgFontFamilies, storeFontFile } from '$lib/server/motion/font-upload';
 import { listOrgFonts } from '$lib/server/repos/org-fonts';
+import { listCanvasEvents, recordEvent } from '$lib/server/repos/canvas-events';
+import { agentActor, AgentKey } from '$lib/server/repos/actor';
+import { MAX_PERSISTED_EVENTS } from './feega-store';
 
 const ORIGIN = 'http://127.0.0.1:5173';
 const actor = { kind: 'user' as const, id: null };
@@ -160,4 +163,65 @@ describe('scrittura atomica', () => {
     const [font] = await listOrgFonts(second.db, LOCAL_ORG_ID);
     expect(second.blob('canvas-assets', font.path)?.bytes.length).toBe(bytes.length);
   });
+  it('la storia dei cambiamenti torna alla riapertura, con chi li ha fatti', async () => {
+    const path = tempFile();
+    const store = openFeegaStore(path, { origin: ORIGIN });
+    const node = await addText(store, 'who');
+    await recordEvent(store.db, { ...scopeOf(store), kind: 'node.create', nodeId: node.id, after: { type: 'text' }, actor: agentActor(LOCAL_USER.id, AgentKey.Mcp) });
+    await store.flush();
+
+    const events = await listCanvasEvents(openFeegaStore(path, { origin: ORIGIN }).db, { orgId: LOCAL_ORG_ID, canvasId: store.place.canvasId });
+
+    expect(events.map((e) => [e.kind, e.actorKind, e.agentKey])).toContainEqual(['node.create', 'agent', 'mcp']);
+  });
+
+  it('il file salva solo gli ultimi eventi, i piu recenti', async () => {
+    const path = tempFile();
+    const store = openFeegaStore(path, { origin: ORIGIN });
+    for (let n = 0; n < MAX_PERSISTED_EVENTS + 5; n++) {
+      await recordEvent(store.db, { ...scopeOf(store), kind: 'node.update', nodeId: `n${n}`, actor });
+    }
+    await store.flush();
+
+    const events = await listCanvasEvents(openFeegaStore(path, { origin: ORIGIN }).db, { orgId: LOCAL_ORG_ID, canvasId: store.place.canvasId, limit: MAX_PERSISTED_EVENTS + 10 });
+
+    expect(events).toHaveLength(MAX_PERSISTED_EVENTS);
+    expect(events.map((e) => e.nodeId)).toContain(`n${MAX_PERSISTED_EVENTS + 4}`);
+    expect(events.map((e) => e.nodeId)).not.toContain('n0');
+  });
+
+  it('un file senza eventi si apre ancora', async () => {
+    const path = tempFile();
+    await openFeegaStore(path, { origin: ORIGIN }).flush();
+    const opened = unpackFeega(new Uint8Array(readFileSync(path)));
+
+    expect(opened.ok && opened.file.canvas.events).toEqual([]);
+  });
+  it('la riapertura non attribuisce a una persona una revisione che nessuno ha fatto ora', async () => {
+    const path = tempFile();
+    const first = openFeegaStore(path, { origin: ORIGIN });
+    const frame = await addText(first, 'frame');
+    await appendRevision(first.db, { orgId: LOCAL_ORG_ID, nodeId: frame.id, expectedVersion: 0, doc: newMotionDoc(MotionFormat.Square), actor });
+    await first.flush();
+    const exportedAt = (unpackFeega(new Uint8Array(readFileSync(path))) as { file: { manifest: { exportedAt: string } } }).file.manifest.exportedAt;
+
+    const rows = async () => ((await openFeegaStore(path, { origin: ORIGIN }).db.from('motion_revisions').select('actor_kind, created_at, node_id')).data ?? []) as { actor_kind: string; created_at: string }[];
+    const reopened = await rows();
+    const again = await rows();
+
+    expect(reopened).toHaveLength(1);
+    expect(again).toHaveLength(1);
+    expect(reopened[0]).toMatchObject({ actor_kind: 'system', created_at: exportedAt });
+  });
+
+  it('rinominare un nodo lascia un evento con chi lo ha fatto', async () => {
+    const store = openFeegaStore(tempFile(), { origin: ORIGIN });
+    const node = await addText(store, 'name me');
+    await renameNode(store.db, { orgId: LOCAL_ORG_ID, nodeId: node.id, name: 'Hero', actor: agentActor(LOCAL_USER.id, AgentKey.Mcp) });
+
+    const events = await listCanvasEvents(store.db, { orgId: LOCAL_ORG_ID, canvasId: store.place.canvasId });
+
+    expect(events[0]).toMatchObject({ kind: 'node.update', nodeId: node.id, actorKind: 'agent', agentKey: 'mcp', after: { displayName: 'Hero' } });
+  });
+
 });

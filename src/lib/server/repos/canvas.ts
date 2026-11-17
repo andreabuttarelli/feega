@@ -474,7 +474,9 @@ export async function moveNode(
   return node;
 }
 
-export async function renameNode(db: Db, input: { orgId: string; nodeId: string; name: string | null }): Promise<void> {
+export async function renameNode(db: Db, input: { orgId: string; nodeId: string; name: string | null; actor?: Actor }): Promise<void> {
+  const before = input.actor ? await findNode(db, { orgId: input.orgId, nodeId: input.nodeId }) : null;
+
   const { error } = await db
     .from('nodes')
     .update({ display_name: input.name, updated_at: new Date().toISOString() })
@@ -483,6 +485,18 @@ export async function renameNode(db: Db, input: { orgId: string; nodeId: string;
 
   if (error) {
     throw error;
+  }
+
+  if (before) {
+    await recordEvent(db, {
+      orgId: input.orgId,
+      canvasId: before.canvasId,
+      kind: 'node.update',
+      nodeId: input.nodeId,
+      before: { displayName: before.displayName },
+      after: { displayName: input.name },
+      actor: input.actor
+    });
   }
 }
 
