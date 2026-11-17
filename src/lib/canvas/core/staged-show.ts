@@ -31,10 +31,9 @@ export async function showStaged(ready: () => Promise<Readiness>, held: OnScreen
   }
 }
 
-export class VectorGate {
-  #open = false;
+export class VectorsSeen {
+  #all = false;
   #seen = new Set<string>();
-  #waiting: (() => void)[] = [];
 
   presented(id: string) {
     this.#seen.add(id);
@@ -44,22 +43,11 @@ export class VectorGate {
     return ids.filter((id) => this.#seen.has(id)).length;
   }
 
-  after(show: () => void) {
-    if (this.#open) {
-      show();
-      return;
-    }
-    this.#waiting.push(show);
-  }
-
   settle(onScreen: readonly string[]): boolean {
-    if (this.#open || !onScreen.every((id) => this.#seen.has(id))) {
+    if (this.#all || !onScreen.every((id) => this.#seen.has(id))) {
       return false;
     }
-    this.#open = true;
-    const waiting = this.#waiting;
-    this.#waiting = [];
-    waiting.forEach((show) => show());
+    this.#all = true;
     return true;
   }
 }

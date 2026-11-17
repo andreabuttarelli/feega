@@ -77,12 +77,14 @@ describe('device profile', () => {
   const MB = 1024 * 1024;
 
   it('a desktop keeps the values it had before phones got their own profile', () => {
-    expect(BUDGET[Device.Desktop]).toEqual({ textureBytes: 256 * MB, tileBytes: 384 * MB, pictureSide: 4096, atlasSide: 8192, effectBytes: 256 * MB, resolution: 2, framesInFlight: 6, retainMs: 15_000, buildLanes: 4, canvasTiles: 320, offscreen: Offscreen.Resident, zoomPicture: ZoomPicture.Exact, readableWidth: 0, builtBytes: Infinity });
+    expect(BUDGET[Device.Desktop]).toEqual({ textureBytes: 256 * MB, tileBytes: 384 * MB, pictureSide: 4096, atlasSide: 8192, effectBytes: 256 * MB, resolution: 2, framesInFlight: 16, retainMs: 15_000, buildLanes: 8, canvasTiles: 320, offscreen: Offscreen.Resident, zoomPicture: ZoomPicture.Exact, readableWidth: 0, builtBytes: Infinity });
   });
 
-  it('a desktop builds frames on one lane per spare core, up to four', () => {
-    expect(buildLanes(Device.Desktop, 16)).toBe(4);
-    expect(buildLanes(Device.Desktop, 3)).toBe(2);
+  it('a desktop builds frames on one lane per core beyond the main thread and one more, up to eight', () => {
+    expect(buildLanes(Device.Desktop, 16)).toBe(8);
+    expect(buildLanes(Device.Desktop, 12)).toBe(8);
+    expect(buildLanes(Device.Desktop, 6)).toBe(4);
+    expect(buildLanes(Device.Desktop, 3)).toBe(1);
     expect(buildLanes(Device.Desktop, 1)).toBe(1);
   });
 

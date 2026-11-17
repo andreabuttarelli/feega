@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Readiness } from '@feega/motion-core/motion/gpu-full/media';
-import { OnScreen, RETRY_MS, Stage, VectorGate, showStaged, shownBefore } from './staged-show';
+import { OnScreen, RETRY_MS, Stage, VectorsSeen, showStaged, shownBefore } from './staged-show';
 
 const pending = () => {
   let settle: (r: Readiness) => void = () => {};
@@ -81,30 +81,16 @@ describe('showStaged', () => {
   });
 });
 
-describe('VectorGate', () => {
-  it('le immagini aspettano che ogni frame visibile abbia mostrato i vettori', () => {
-    const gate = new VectorGate();
-    const shown: string[] = [];
+describe('VectorsSeen', () => {
+  it('settles once, when every on-screen frame has shown its vectors', () => {
+    const seen = new VectorsSeen();
 
-    gate.after(() => shown.push('a'));
-    gate.settle(['a', 'b']);
-    gate.presented('a');
-    gate.settle(['a', 'b']);
-    expect(shown).toEqual([]);
+    seen.presented('a');
+    expect(seen.settle(['a', 'b'])).toBe(false);
 
-    gate.presented('b');
-    expect(gate.settle(['a', 'b'])).toBe(true);
-    expect(shown).toEqual(['a']);
-  });
-
-  it('una volta aperto resta aperto', () => {
-    const gate = new VectorGate();
-    gate.settle([]);
-    const shown: string[] = [];
-
-    gate.after(() => shown.push('x'));
-
-    expect(shown).toEqual(['x']);
+    seen.presented('b');
+    expect(seen.settle(['a', 'b'])).toBe(true);
+    expect(seen.settle(['a', 'b'])).toBe(false);
   });
 });
 
@@ -118,9 +104,9 @@ describe('shownBefore', () => {
   });
 });
 
-describe('VectorGate.shownOf', () => {
+describe('VectorsSeen.shownOf', () => {
   it('counts the given frames that already showed content', () => {
-    const gate = new VectorGate();
+    const gate = new VectorsSeen();
     gate.presented('a');
     gate.presented('c');
     expect(gate.shownOf(['a', 'b', 'c'])).toBe(2);

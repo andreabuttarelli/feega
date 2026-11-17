@@ -54,7 +54,7 @@
   import { readClips, type CustomFrame, type CustomReads } from '@feega/motion-core/motion/gpu-full/dom/custom';
   import type { Picture, Pictures } from '@feega/motion-core/motion/gpu-full/raster';
   import { Stand, drawable, missingPictures, fillOrder, firstDrawn, inView, layersOf, nearestFirst, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
-  import { Stage, VectorGate, showStaged, shownBefore } from '$lib/canvas/core/staged-show';
+  import { Stage, VectorsSeen, showStaged, shownBefore } from '$lib/canvas/core/staged-show';
   import { uploadWithin } from '$lib/canvas/core/picture-uploads';
   import { Step, markFrame, noteImages } from '$lib/canvas/core/frame-timeline';
   import { StartupStep, markStartup, reportFramesShown } from '$lib/canvas/core/startup-marks';
@@ -369,7 +369,7 @@
       markFrame(f.id, ready === Readiness.Whole ? Step.Whole : Step.Vectors);
       lists = listed(lists, f.id, group, onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), shown, drawnLast.get(f.id)?.group]);
     };
-    void showStaged(() => media.ready(built.list), held, (ready, stage) => (stage === Stage.Settled ? vectorsFirst.after(() => present(ready, stage)) : present(ready, stage)), atRestAfter);
+    void showStaged(() => media.ready(built.list), held, present, atRestAfter);
   }
 
   const MISSING = ':missing';
@@ -638,8 +638,7 @@
   const groupOf = (f: FrameAt) => liveGroup.get(f.id) ?? keyOf(f);
   const loaded = new Map<string, string>();
   const asking = new Map<string, string>();
-  const VECTORS_FIRST_MAX_MS = 8000;
-  const vectorsFirst = new VectorGate();
+  const vectorsSeen = new VectorsSeen();
   let lastShown = '';
   function reportShownOnce(shown: number, total: number) {
     const key = `${shown}/${total}`;
@@ -649,7 +648,6 @@
     lastShown = key;
     reportFramesShown(shown, total);
   }
-  setTimeout(() => vectorsFirst.settle([]), VECTORS_FIRST_MAX_MS);
   const shownOf = (f: FrameAt) => shownGroup(groupOf(f), loaded.get(f.id), (g) => lists.has(g));
 
   async function rebuildLive(f: FrameAt, source: LiveDoc) {
@@ -1377,7 +1375,7 @@
     for (const layer of shown) {
       if (!layer.group.startsWith('placeholder') && !layer.group.endsWith(BLOCKS)) {
         if (lists.has(layer.group) || thumbLists.has(layer.group) || (posterIds.has(layer.id) && showsPoster(listOf(layer.group)))) {
-          vectorsFirst.presented(layer.id);
+          vectorsSeen.presented(layer.id);
         }
         if (lists.has(layer.group)) {
           presented.add(layer.id);
@@ -1424,9 +1422,9 @@
     sharpOwed = !sharpMarked;
     const onScreenIds = fillOrder(frames, view, area).map((f) => f.id);
     if (frames.length) {
-      reportShownOnce(vectorsFirst.shownOf(onScreenIds), onScreenIds.length);
+      reportShownOnce(vectorsSeen.shownOf(onScreenIds), onScreenIds.length);
     }
-    if (frames.length && vectorsFirst.settle(onScreenIds)) {
+    if (frames.length && vectorsSeen.settle(onScreenIds)) {
       markFrame('all', Step.AllVectors);
     }
   }
