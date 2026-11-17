@@ -8,7 +8,7 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
 import { sendTelemetry, telemetryEnv } from '../telemetry.mjs';
-import { ImportStep, MCP_ENTRY, USAGE, appDir, bundleSource, boundUrl, cachedVersions, folderApp, freePort, importAsk, discoverAsk, importReport, routePlan, eventLine, importStep, isCached, latestAppVersion, markCached, mcpEnv, parseArgs, pickVersion, placeOf, readyProbe, served } from '../launcher.mjs';
+import { ImportStep, MCP_ENTRY, USAGE, appDir, bundleSource, boundUrl, cachedVersions, folderApp, freePort, importAsk, discoverAsk, importReport, routePlan, eventLine, importStep, isCached, latestAppVersion, markCached, mcpEnv, parseArgs, pickVersion, placeOf, readyProbe, served, untilReady } from '../launcher.mjs';
 
 const MIN_NODE_MAJOR = 22;
 const WEBSTORAGE_NODE_MAJOR = 25;
@@ -81,10 +81,9 @@ async function install(dir, version) {
   markCached(dir);
 }
 
-async function whenReady(url) {
-  while (!(await fetch(url, readyProbe).then((r) => served(r.status), () => false))) {
-    await new Promise((r) => setTimeout(r, READY_POLL_MS));
-  }
+async function whenReady(url, server) {
+  const exited = new Promise((r) => server.once('exit', r));
+  await untilReady(() => fetch(url, readyProbe).then((r) => served(r.status), () => false), exited, READY_POLL_MS);
 }
 
 function openBrowser(url) {
@@ -240,9 +239,8 @@ async function main() {
   const nodeOptions = nodeMajor >= WEBSTORAGE_NODE_MAJOR ? '--no-experimental-webstorage' : '';
   const env = { ...process.env, ...telemetryEnv(homedir(), process.env), NODE_OPTIONS: [process.env.NODE_OPTIONS, nodeOptions].filter(Boolean).join(' ') };
   const server = spawn(process.execPath, [realpathSync(join(dir, 'scripts/local.mjs')), file, `--port=${port}`], { stdio: 'inherit', env });
+  await whenReady(url, server);
   forward(server);
-
-  await whenReady(url);
   if (browser === 'open') {
     openBrowser(url);
   }
