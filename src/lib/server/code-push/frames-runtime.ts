@@ -6,6 +6,8 @@ import { folderOf } from '$lib/server/code-import/folder-source';
 import { localModeRefusal } from '$lib/server/local/local-mode';
 import type { FramesDeps } from './frames-push';
 import { hostOf } from './hosts';
+import { linkImported } from './import-link';
+import type { ImportLinker } from '$lib/server/code-import/canvas-import';
 import { dbLock, linkStore } from './link-store';
 
 type Scope = { orgId: string; userId: string; projectId: string };
@@ -18,3 +20,13 @@ export const framesDeps = (db: Db, scope: Scope): FramesDeps => ({
   links: linkStore(db, scope),
   lock: dbLock(db, scope)
 });
+
+export const importLinker =
+  (db: Db, scope: Scope): ImportLinker =>
+  async (nodeId, origin, listed) => {
+    if (!listed.ok) {
+      return null;
+    }
+    const deps = framesDeps(db, scope);
+    return linkImported({ host: deps.host, links: deps.links }, nodeId, origin, listed).catch(() => null);
+  };

@@ -44,7 +44,7 @@ export type FrameFacts = { breakpoints: boolean; component: boolean; prototype: 
 
 export type HeaderFlags = { sourceSync: boolean };
 
-export const HEADER_FLAGS: HeaderFlags = { sourceSync: false };
+export const HEADER_FLAGS: HeaderFlags = { sourceSync: true };
 
 type HeaderRow = { badge: FrameBadge; icon: Component; tooltip: string; action: HeaderAction; shows: (f: FrameFacts) => boolean; source?: SourceSync };
 

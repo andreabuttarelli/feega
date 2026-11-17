@@ -60,7 +60,7 @@ export function localGitHost(dir: string, options: LocalOptions): GitHost {
   return {
     defaultBranch: async () => {
       if (!onOrigin) {
-        return FALLBACK_DEFAULT;
+        return (await git(dir, ['symbolic-ref', '--short', 'HEAD'])).out.trim() || FALLBACK_DEFAULT;
       }
       const symref = await git(dir, ['ls-remote', '--symref', ORIGIN, 'HEAD']);
       return symref.out.match(/ref: refs\/heads\/(\S+)\s+HEAD/)?.[1] ?? FALLBACK_DEFAULT;

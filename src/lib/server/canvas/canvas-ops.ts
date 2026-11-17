@@ -101,7 +101,7 @@ import { CAPTURE_DELAY_MAX_MS, delayOf } from '$lib/server/code-import/capture-w
 import { designSystemOf } from '$lib/server/code-import/design-system';
 import { githubFor } from '$lib/server/code-import/github-runtime';
 import { framesPush, frameStatus, frameUndo } from '$lib/server/code-push/frames-push';
-import { framesDeps } from '$lib/server/code-push/frames-runtime';
+import { framesDeps, importLinker } from '$lib/server/code-push/frames-runtime';
 import { libsOrigin } from '$lib/server/motion/libs-origin';
 import { GithubRefusal } from '$lib/server/code-import/github-http';
 import { MAX_STORIES } from '$lib/server/code-import/storybook';
@@ -1079,7 +1079,7 @@ export const CANVAS_OPS = {
   import_code: op({
     access: Access.Write,
     input: importCodeInput,
-    run: async (ctx, input) => (input.into && input.routes !== ALL_ROUTES ? codeAdd(figmaScope(ctx), input.into, { routes: askedRoutes(input.route, input.routes) ?? [], conditions: input.conditions ? conditionsOf(input.conditions) : undefined, land: Land.Frame }) : importRoutesInto(figmaScope(ctx), input.canvasId, { repo: input.repo, folder: input.folder, app: input.app, routes: input.routes === ALL_ROUTES ? ALL_ROUTES : askedRoutes(input.route, input.routes), conditions: input.conditions ? conditionsOf(input.conditions) : undefined, delay: delayOf({ ms: input.captureDelayMs, routes: input.routeDelayMs }), designSystem: designSystemOf(input.designSystem), responsive: input.responsive, storybook: input.storybook, stories: input.stories, at: { x: input.x, y: input.y } }))
+    run: async (ctx, input) => (input.into && input.routes !== ALL_ROUTES ? codeAdd(figmaScope(ctx), input.into, { routes: askedRoutes(input.route, input.routes) ?? [], conditions: input.conditions ? conditionsOf(input.conditions) : undefined, land: Land.Frame }) : importRoutesInto(figmaScope(ctx), input.canvasId, { repo: input.repo, folder: input.folder, app: input.app, routes: input.routes === ALL_ROUTES ? ALL_ROUTES : askedRoutes(input.route, input.routes), conditions: input.conditions ? conditionsOf(input.conditions) : undefined, delay: delayOf({ ms: input.captureDelayMs, routes: input.routeDelayMs }), designSystem: designSystemOf(input.designSystem), responsive: input.responsive, storybook: input.storybook, stories: input.stories, at: { x: input.x, y: input.y } }, importLinker(ctx.db, figmaScope(ctx))))
   }),
 
   code_map: op({
