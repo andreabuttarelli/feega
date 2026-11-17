@@ -1,5 +1,5 @@
 import { commitTree, git, type GitRun } from './git-cli';
-import { Access, FileMove, GitError, GitFailure, type GitHost } from './git-host';
+import { Access, FileMove, GitError, GitFailure, RefKind, type GitHost, type RefSeen } from './git-host';
 
 export enum Publish {
   Origin = 'origin',
@@ -12,6 +12,9 @@ const ORIGIN = 'origin';
 const MIRROR = 'refs/feega/origin/';
 const FALLBACK_DEFAULT = 'main';
 const NO_PULLS = 0;
+const FIELD = '\x1f';
+const LOG_FORMAT = ['%H', '%s', '%an', '%aI'].join('%x1f');
+const PEELED = '^{}';
 const SHA = /^[0-9a-f]{7,40}$/;
 
 const MOVE_OF_CODE: Record<string, FileMove> = { A: FileMove.Added, D: FileMove.Removed, R: FileMove.Renamed, M: FileMove.Modified };
@@ -22,6 +25,26 @@ const REFUSAL_OF_STDERR: [RegExp, GitFailure][] = [
   [/authentication failed|could not read username|invalid username or password|bad credentials/i, GitFailure.Unauthorized],
   [/permission denied|protected branch|403|GH006/i, GitFailure.Forbidden]
 ];
+
+const KIND_OF_PREFIX: [string, RefKind][] = [
+  ['refs/heads/', RefKind.Branch],
+  ['refs/tags/', RefKind.Tag]
+];
+
+function refsOf(lines: string): RefSeen[] {
+  const seen = new Map<string, RefSeen>();
+  for (const line of lines.split('\n').filter(Boolean)) {
+    const [sha, full] = line.split(/\s+/);
+    const peeled = full.endsWith(PEELED);
+    const ref = peeled ? full.slice(0, -PEELED.length) : full;
+    const kind = KIND_OF_PREFIX.find(([prefix]) => ref.startsWith(prefix));
+    if (!kind || (seen.has(ref) && !peeled)) {
+      continue;
+    }
+    seen.set(ref, { name: ref.slice(kind[0].length), kind: kind[1], sha });
+  }
+  return [...seen.values()];
+}
 
 const failureOf = (run: GitRun) => REFUSAL_OF_STDERR.find(([pattern]) => pattern.test(run.err))?.[1] ?? GitFailure.Unexpected;
 
@@ -109,6 +132,21 @@ export function localGitHost(dir: string, options: LocalOptions): GitHost {
           const move = MOVE_OF_CODE[code[0]] ?? FileMove.Modified;
           return move === FileMove.Renamed ? { path: b, move, from: a } : { path: a, move, from: null };
         });
-    }
+    },
+    listRefs: async () => {
+      const listed = onOrigin ? await run(['ls-remote', '--heads', '--tags', ORIGIN]) : await run(['for-each-ref', '--format=%(if)%(*objectname)%(then)%(*objectname)%(else)%(objectname)%(end) %(refname)', 'refs/heads', 'refs/tags']);
+      return refsOf(listed);
+    },
+    listCommits: async (ref, ask) => {
+      const log = await run(['log', `--format=${LOG_FORMAT}`, '-n', String(ask.limit), await resolve(ref), '--', ...(ask.path ? [ask.path] : [])]);
+      return log
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => {
+          const [sha, message, author, at] = line.split(FIELD);
+          return { sha, message, author, at };
+        });
+    },
+    listPulls: async () => (pulls ? pulls.listPulls() : [])
   };
 }

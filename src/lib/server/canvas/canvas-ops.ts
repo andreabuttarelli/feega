@@ -101,6 +101,7 @@ import { CAPTURE_DELAY_MAX_MS, delayOf } from '$lib/server/code-import/capture-w
 import { designSystemOf } from '$lib/server/code-import/design-system';
 import { githubFor } from '$lib/server/code-import/github-runtime';
 import { frameDetach, framesPush, frameStatus, frameUndo } from '$lib/server/code-push/frames-push';
+import { frameVersions } from '$lib/server/code-push/frames-versions';
 import { framesDeps, importLinker } from '$lib/server/code-push/frames-runtime';
 import { libsOrigin } from '$lib/server/motion/libs-origin';
 import { GithubRefusal } from '$lib/server/code-import/github-http';
@@ -1161,6 +1162,12 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: z.object({ nodeId: z.string() }).strict(),
     run: async (ctx, input) => frameUndo(framesDeps(ctx.db, ctx), input.nodeId)
+  }),
+
+  github_versions: op({
+    access: Access.Read,
+    input: z.object({ nodeId: z.string(), ref: z.string().max(200).optional().describe('branch, tag or sha whose history to list; default the base branch of the link'), limit: z.number().int().positive().max(100).optional() }).strict(),
+    run: async (ctx, input) => frameVersions(framesDeps(ctx.db, ctx), { nodeId: input.nodeId, ref: input.ref, limit: input.limit ?? 30 })
   }),
 
   github_detach: op({
