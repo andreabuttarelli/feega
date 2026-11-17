@@ -637,13 +637,12 @@
   });
   let hoverChrome = $state<string | null>(null);
   const chromeIds = $derived(new Set([...selected, ...domIds, ...(hoverChrome ? [hoverChrome] : []), ...(ghost ? [ghost.from.nodeId] : [])]));
-  const prototypeFroms = $derived(new Set(arrowLinks.map((l) => l.from)));
   const headerOf = (t: Tile) => {
     const text = coreType;
     if (!text || kindOfNode(t.id) !== FrameKind.Frame) {
       return [];
     }
-    const facts = { breakpoints: Boolean(liveOf(t.id)?.doc.breakpoints?.length), component: isComponentSet(t.id), prototype: prototypeFroms.has(t.id), source: sources.of(t.id) };
+    const facts = { breakpoints: Boolean(liveOf(t.id)?.doc.breakpoints?.length), component: isComponentSet(t.id), source: sources.of(t.id) };
     return headerBadges(facts).map((key) => ({ key, contours: text.badges.get(key) ?? [] }));
   };
   const HEADER_PRESS: Record<HeaderAction, (id: string) => void> = {
