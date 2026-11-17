@@ -387,7 +387,7 @@ fn every_plan_counts_itself_and_the_uses_it_walked() {
     c.patch(parse_patch(r#"{ "put": [{ "kind": "use", "clip": "far", "group": "g", "matrix": [1, 0, 0, 1, 100000, 0] }], "drop": [] }"#).unwrap(), &lib);
     let limits = Limits { side: 4096, rasters: 1, items: 1000 };
     c.plan_at(&mut lib, at(0.0, 0.0, 1.0), (256, 256), limits);
-    c.overlay_at(&mut lib, at(0.0, 0.0, 1.0), (256, 256), limits);
+    c.overlay_at(&mut lib, at(0.0, 0.0, 1.0), (256, 256), limits, 1.0);
 
     let planned = c.take_planned();
 

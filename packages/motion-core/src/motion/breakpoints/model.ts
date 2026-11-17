@@ -270,12 +270,15 @@ export function heldPixels(doc: MotionDoc, from: { width: number; height: number
 
 const rescale = (doc: MotionDoc, width: number): MotionDoc => heldPixels({ ...doc, width }, doc);
 
+const cascadedClip = (clip: MotionClip, cascade: string[]): MotionClip =>
+  cascade.reduce((c, id) => Object.entries(clip.overrides?.[id] ?? {}).reduce((acc, [key, value]) => applyOverride(acc, key as OverrideKey, value), c), clip);
+
 function cascaded(doc: MotionDoc, breakpointId: string): { doc: MotionDoc; width: number; height: number } {
   const views = viewsOf(doc);
   const target = views.find((v) => v.id === breakpointId) ?? views[0];
   const cascade = views.filter((v) => v.width >= target.width).map((v) => v.id);
 
-  const applied = mapClips(doc, (clip) => cascade.reduce((c, id) => Object.entries(clip.overrides?.[id] ?? {}).reduce((acc, [key, value]) => applyOverride(acc, key as OverrideKey, value), c), clip));
+  const applied = mapClips(doc, (clip) => cascadedClip(clip, cascade));
   return { doc: applied, width: target.width, height: target.height ?? doc.height };
 }
 
@@ -320,10 +323,55 @@ export function liftEdit(source: MotionDoc, breakpointId: string, edited: Motion
 
 const heightened = (doc: MotionDoc, height: number) => (doc.height === height ? doc : restretched(doc, height));
 
+type Scaling = { cascade: string[]; unit: number; across: number; key: string };
+
+function memo<K extends object, V>(cache: WeakMap<K, Map<string, V>>, owner: K, key: string, make: () => V): V {
+  const byKey = cache.get(owner) ?? cache.set(owner, new Map()).get(owner)!;
+  const known = byKey.get(key);
+  if (known !== undefined) {
+    return known;
+  }
+  const made = make();
+  byKey.set(key, made);
+  return made;
+}
+
+const NO_COMPS: NonNullable<MotionDoc['comps']> = {};
+
+const resolvedClips = new WeakMap<MotionClip, Map<string, MotionClip>>();
+const resolvedTracks = new WeakMap<object, Map<string, unknown>>();
+const resolvedComps = new WeakMap<object, Map<string, MotionDoc['comps']>>();
+
+function resolvedClip(clip: MotionClip, s: Scaling, anchor: Anchor | null, key: string): MotionClip {
+  return memo(resolvedClips, clip, key, () => {
+    const plain = withOverrides(cascadedClip(clip, s.cascade), undefined);
+    return anchor ? rescaleClip(plain, s.unit, s.across, anchor) : plain;
+  });
+}
+
+function resolvedTrack<T extends Tracks[number]>(track: T, s: Scaling, anchor: Anchor | null): T {
+  const key = `${s.key}|${anchor}`;
+  return memo(resolvedTracks, track, key, () => ({ ...track, clips: track.clips.map((c) => resolvedClip(c as MotionClip, s, anchor, key)) })) as T;
+}
+
+const resolvedCompsOf = (comps: NonNullable<MotionDoc['comps']>, s: Scaling): MotionDoc['comps'] =>
+  memo(resolvedComps, comps, s.key, () => Object.fromEntries(Object.entries(comps).map(([id, comp]) => [id, { ...comp, tracks: comp.tracks.map((t) => resolvedTrack(t, s, comp.frame ? null : Anchor.Pixels)) }])) as MotionDoc['comps']);
+
 export function resolveAt(doc: MotionDoc, breakpointId: string): MotionDoc {
-  const { doc: applied, width, height } = cascaded(doc, breakpointId);
-  const { breakpoints: _bps, ...rest } = rescale(mapClips(applied, (c) => withOverrides(c, undefined)), width);
-  return heightened(rest as MotionDoc, height);
+  const views = viewsOf(doc);
+  const target = views.find((v) => v.id === breakpointId) ?? views[0];
+  const cascade = views.filter((v) => v.width >= target.width).map((v) => v.id);
+  const unit = unitOf(doc) / unitOf({ width: target.width, height: doc.height });
+  const across = doc.width / target.width;
+  const s = { cascade, unit, across, key: `${cascade.join(',')}|${unit}|${across}` };
+
+  const { breakpoints: _bps, ...rest } = {
+    ...doc,
+    width: target.width,
+    tracks: doc.tracks.map((t) => resolvedTrack(t, s, Anchor.Frame)),
+    comps: resolvedCompsOf(doc.comps ?? NO_COMPS, s)
+  };
+  return heightened(rest as MotionDoc, target.height ?? doc.height);
 }
 
 export const inView = (doc: MotionDoc, breakpointId: string): MotionDoc => (breakpointId === BASE_BREAKPOINT ? doc : resolveAt(doc, breakpointId));

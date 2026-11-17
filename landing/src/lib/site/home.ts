@@ -111,7 +111,7 @@ export const FAQ = [
   },
   {
     q: "Are generated files marked as AI-generated?",
-    a: "Yes. Every image and video Feega renders carries a machine-readable AI-generated marker in the file, and when we publish for you we set the platform\u2019s AI-content label where one exists. See <a href=\"/ai-transparency\">AI Transparency</a>."
+    a: "Yes. Every image and video Feega renders carries a machine-readable AI-generated marker in the file. See <a href=\"/ai-transparency\">AI Transparency</a>."
   },
   {
     q: "Who owns what I create?",

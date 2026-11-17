@@ -383,3 +383,29 @@ fn a_tile_planned_beside_a_held_texture_leaves_that_texture_alone() {
     assert!(tile.evicted.is_empty());
     assert!(lib.cache_bytes() > 0);
 }
+
+#[test]
+fn a_native_gesture_draws_a_cached_page_live_instead_of_its_magnified_texture() {
+    use gpu_core::groups::{Motion, Native};
+    let mut lib = library(&["a"]);
+    lib.compose_encodings();
+    lib.plan(&screen(&[("a", 1.0, 0.0)]), LIMITS);
+    lib.set_motion(Motion::Gesture);
+    lib.set_native(Native::Vectors);
+
+    let zoomed = lib.plan(&screen(&[("a", 1.3, 0.0)]), LIMITS);
+
+    assert!(zoomed.rasters.is_empty());
+    assert!(!kinds(&zoomed.screen).contains(&"image"));
+    assert!(!zoomed.pending);
+}
+
+#[test]
+fn a_held_node_being_resized_keeps_its_texture_even_when_native() {
+    use gpu_core::groups::Native;
+    let mut lib = library(&["a"]);
+    lib.plan(&screen(&[("a", 1.0, 0.0)]), LIMITS);
+    lib.set_native(Native::Vectors);
+
+    assert_eq!(kinds(&lib.plan(&held("a", 2.0, 1.5), LIMITS).screen), vec!["image"]);
+}

@@ -10,14 +10,18 @@ use vello::kurbo::Rect;
 
 use crate::compositor::{Compositor, Painter};
 use crate::display_list::{parse, parse_packed, parse_splice};
-use crate::engine::Engine;
+use crate::engine::{Engine, HeldScene};
+use crate::held_view::HeldView;
 use crate::filter_passes::layer_texture;
-use crate::groups::{report, Library, Limits, Motion, Plan};
+use crate::groups::{report, Library, Limits, Motion, Native, Plan};
+use crate::layers::Effects;
 use crate::pictures::Pictures;
-use crate::reproject::{Draw, Output, Reprojector, Tile};
+use crate::reproject::{Draw, Output, Reprojector, Tile, OPAQUE};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, batches_of, bake_batches, BAKE_BATCH_TILES, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys};
+use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, GestureDraw, Moment, Path, Warmup, tiles_kept_beside, TILE_BUDGET_BYTES, TILE_BYTES, TILE_GUTTER_PX, batches, batches_of, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys, magnified, fallback_serves, fallback_bands, ahead_camera, fade_in, fades_over, FADE_MS};
 use crate::overlay_seen::OverlaySeen;
+use crate::overlay_hold::{Moving, OverlayHold, OverlayQuality};
+use crate::screen_fit::{fit, screen_side};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
 use crate::tally::now_ms;
@@ -33,11 +37,15 @@ const ITEMS_PER_RASTER: usize = 48;
 const FRAMES_IN_FLIGHT: u32 = 1;
 const GESTURE_RASTER_EVERY_MS: f64 = 80.0;
 
+const OVERLAY_GROUPS: &str = "overlay:";
 const UNMOVED: Lookup = Lookup { scale: 1.0, x: 0.0, y: 0.0 };
 
 const NOT_TIMED: u64 = u64::MAX;
 const TILE_BUDGET_GESTURE_MS: f64 = 4.0;
 const TILE_BUDGET_STILL_MS: f64 = 12.0;
+const FALLBACK_FLOORS: crate::lod::Floors = crate::lod::Floors { text: 3.0, effects: 10.0 };
+const FALLBACK_PATCHES: usize = 8;
+const AHEAD_BUDGET_MS: f64 = 6.0;
 const SPARE_TILES: usize = 32;
 const REST_AFTER_MS: f64 = 200.0;
 const EVICT_DOWN_TO_PERCENT: usize = 90;
@@ -81,13 +89,15 @@ pub struct WebCore {
     lost: Arc<AtomicBool>,
     in_flight: Arc<AtomicU32>,
     warming: bool,
+    warm_wait: f64,
     scratch: Option<wgpu::Texture>,
     motion: CoreMotion,
     rastered_at: f64,
     gpu_full_ms: Arc<AtomicU64>,
     tiled: bool,
     overlay_seen: OverlaySeen,
-    overlay_tex: Option<wgpu::Texture>,
+    overlay_held: Option<(OverlayHold, wgpu::Texture, Camera)>,
+    overlay_dirty: bool,
     tiles: Tiles,
     tile_textures: FxHashMap<TileKey, wgpu::Texture>,
     spare_tiles: Vec<wgpu::Texture>,
@@ -104,6 +114,22 @@ pub struct WebCore {
     rest_shown: Vec<(Rect, wgpu::Texture)>,
     rest_spare: FxHashMap<(u32, u32), Vec<wgpu::Texture>>,
     counted: Counted,
+    sharpness: Sharpness,
+    fallback: Vec<Fallback>,
+    ahead: Option<Ahead>,
+    fallback_was: Camera,
+    born: FxHashMap<TileKey, f64>,
+    gesture_draw: GestureDraw,
+    direct: Option<wgpu::Texture>,
+    held_scene: Option<HeldScreen>,
+    scale: f64,
+}
+
+struct HeldScreen {
+    view: HeldView,
+    scene: HeldScene,
+    whole: bool,
+    background: Option<crate::display_list::Rgba>,
 }
 
 #[derive(Default)]
@@ -115,6 +141,8 @@ struct Counted {
     uncovered: u32,
     tiles: u32,
     uploads: u32,
+    fallback_ms: f64,
+    exact: bool,
 }
 
 struct GpuPainter<'a> {
@@ -172,7 +200,57 @@ fn placed<'a>(key: TileKey, source: &'a wgpu::Texture, c: Camera, clip: Rect) ->
     let zoom = step_zoom(key.step);
     let world = key.world();
     let gutter = TILE_GUTTER_PX as f64;
-    Some(Tile { source, look: Lookup { scale: zoom / c.zoom, x: (-c.x / c.zoom - world.x0) * zoom + gutter, y: (-c.y / c.zoom - world.y0) * zoom + gutter }, within })
+    Some(Tile { source, look: Lookup { scale: zoom / c.zoom, x: (-c.x / c.zoom - world.x0) * zoom + gutter, y: (-c.y / c.zoom - world.y0) * zoom + gutter }, within, opacity: OPAQUE })
+}
+
+struct Ahead {
+    camera: Camera,
+    size: (u32, u32),
+    pieces: Vec<(Piece, wgpu::Texture)>,
+    todo: Vec<Rect>,
+}
+
+struct Fallback {
+    camera: Camera,
+    size: (u32, u32),
+    pieces: Vec<(Piece, wgpu::Texture)>,
+    todo: Vec<Rect>,
+}
+
+impl Fallback {
+    fn destroy(self) {
+        self.pieces.into_iter().for_each(|(_, texture)| texture.destroy());
+    }
+
+    fn tiles(&self, c: Camera, screen: Rect) -> Vec<Tile<'_>> {
+        let scale = self.camera.zoom / c.zoom;
+        self.pieces.iter().filter_map(|(piece, source)| {
+            let (x, y) = (self.camera.x - c.x * scale - piece.x as f64, self.camera.y - c.y * scale - piece.y as f64);
+            let within = Rect::new((-x / scale).ceil(), (-y / scale).ceil(), ((piece.w as f64 - x) / scale).floor(), ((piece.h as f64 - y) / scale).floor()).intersect(screen);
+            (within.area() > 0.0).then_some(Tile { source, look: Lookup { scale, x, y }, within, opacity: OPAQUE })
+        }).collect()
+    }
+
+    fn on(&self, c: Camera) -> Rect {
+        let (w, h) = (self.size.0 as f64, self.size.1 as f64);
+        let at = |x: f64, y: f64| ((x - self.camera.x) / self.camera.zoom * c.zoom + c.x, (y - self.camera.y) / self.camera.zoom * c.zoom + c.y);
+        let ((x0, y0), (x1, y1)) = (at(0.0, 0.0), at(w, h));
+        Rect::new(x0, y0, x1, y1)
+    }
+}
+
+#[derive(Default)]
+struct Sharpness {
+    magnified_frames: u32,
+    fallbacks: u32,
+    fallback_ms: f64,
+}
+
+impl Sharpness {
+    fn json(&mut self, tally: &str) -> String {
+        let Sharpness { magnified_frames, fallbacks, fallback_ms } = std::mem::take(self);
+        format!(r#"{},"magnified":{{"n":{magnified_frames},"ms":0}},"fallback":{{"n":{fallbacks},"ms":{fallback_ms:.3}}}}}"#, tally.strip_suffix('}').unwrap_or(tally))
+    }
 }
 
 struct Lifted {
@@ -185,6 +263,10 @@ struct Lifted {
 enum Source<'a> {
     Scene,
     Alone(&'a str),
+}
+
+fn texture_bytes(texture: &wgpu::Texture) -> u64 {
+    crate::texture_budget::bytes_of((texture.width(), texture.height()))
 }
 
 fn tile_texture(device: &wgpu::Device, side: u32) -> wgpu::Texture {
@@ -324,12 +406,16 @@ fn copy_rows(queue: &wgpu::Queue, source: wgpu::ExternalImageSource, texture: &w
 #[wasm_bindgen]
 impl WebCore {
     pub async fn attach(canvas: HtmlCanvasElement, width: u32, height: u32) -> Result<WebCore, JsValue> {
-        canvas.set_width(width);
-        canvas.set_height(height);
+        let sized = canvas.clone();
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor { backends: wgpu::Backends::BROWSER_WEBGPU, ..wgpu::InstanceDescriptor::new_without_display_handle() });
         let surface = instance.create_surface(wgpu::SurfaceTarget::Canvas(canvas)).map_err(failed)?;
         let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions { compatible_surface: Some(&surface), ..Default::default() }).await.map_err(failed)?;
-        let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor::default()).await.map_err(failed)?;
+        let required_limits = wgpu::Limits { max_texture_dimension_2d: adapter.limits().max_texture_dimension_2d, ..wgpu::Limits::default() };
+        let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor { required_limits, ..Default::default() }).await.map_err(failed)?;
+        let fitted = fit((width, height), screen_side(device.limits().max_texture_dimension_2d));
+        let (width, height) = fitted.size;
+        sized.set_width(width);
+        sized.set_height(height);
         let lost = Arc::new(AtomicBool::new(false));
         let flag = lost.clone();
         device.set_device_lost_callback(move |_, _| flag.store(true, Ordering::Relaxed));
@@ -345,10 +431,11 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 } })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, warm_wait: 0.0, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_held: None, overlay_dirty: true, overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), sharpness: Sharpness::default(), fallback: Vec::new(), ahead: None, fallback_was: camera, born: FxHashMap::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 }, gesture_draw: GestureDraw::Tiles, direct: None, held_scene: None, scale: fitted.scale })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
+        self.overlay_dirty = true;
         self.warmup.uploaded(js_sys::Date::now());
         let source = external(source)?;
         let fits = self.textures.get(clip).is_some_and(|t| t.width() == width && t.height() == height);
@@ -398,12 +485,8 @@ impl WebCore {
     }
 
     fn release(&mut self, clip: &str) {
-        if let Some(old) = self.pictures.remove(clip) {
-            self.engine.vello.unregister_texture(old);
-        }
-        if let Some(texture) = self.textures.remove(clip) {
-            texture.destroy();
-        }
+        let (Some(image), Some(texture)) = (self.pictures.remove(clip), self.textures.remove(clip)) else { return };
+        self.engine.retire(image, texture);
     }
 
     pub fn picture_bytes(&self) -> f64 {
@@ -419,6 +502,7 @@ impl WebCore {
     }
 
     pub fn put_group(&mut self, key: &str, list_json: &[u8]) -> Result<(), JsValue> {
+        self.touch_overlay(key);
         self.warmup.uploaded(js_sys::Date::now());
         self.compositor.touch(key, &self.library);
         self.library.put_group(key, &parse(utf8(list_json)?).map_err(failed)?);
@@ -427,6 +511,7 @@ impl WebCore {
     }
 
     pub fn append_group(&mut self, key: &str, list_json: &[u8]) -> Result<(), JsValue> {
+        self.touch_overlay(key);
         self.warmup.uploaded(js_sys::Date::now());
         self.library.append_group(key, &parse(utf8(list_json)?).map_err(failed)?);
         self.compositor.touch(key, &self.library);
@@ -434,6 +519,7 @@ impl WebCore {
     }
 
     pub fn put_group_packed(&mut self, key: &str, list_json: &[u8], floats: Vec<f64>, ends: Vec<u32>) -> Result<(), JsValue> {
+        self.touch_overlay(key);
         self.warmup.uploaded(js_sys::Date::now());
         self.compositor.touch(key, &self.library);
         self.library.put_group(key, &parse_packed(utf8(list_json)?, floats, ends).map_err(failed)?);
@@ -442,6 +528,7 @@ impl WebCore {
     }
 
     pub fn append_group_packed(&mut self, key: &str, list_json: &[u8], floats: Vec<f64>, ends: Vec<u32>) -> Result<(), JsValue> {
+        self.touch_overlay(key);
         self.warmup.uploaded(js_sys::Date::now());
         self.library.append_group(key, &parse_packed(utf8(list_json)?, floats, ends).map_err(failed)?);
         self.compositor.touch(key, &self.library);
@@ -449,6 +536,7 @@ impl WebCore {
     }
 
     pub fn patch_group(&mut self, from: &str, to: &str, splice_json: &[u8]) -> Result<bool, JsValue> {
+        self.touch_overlay(to);
         self.warmup.uploaded(js_sys::Date::now());
         self.compositor.touch(to, &self.library);
         let patched = self.library.patch_group(from, to, &parse_splice(utf8(splice_json)?).map_err(failed)?);
@@ -457,14 +545,16 @@ impl WebCore {
     }
 
     pub fn drop_group(&mut self, key: &str) {
+        self.touch_overlay(key);
         self.compositor.drop_group(key, &mut self.library);
     }
 
     pub fn set_camera(&mut self, x: f64, y: f64, zoom: f64) {
-        self.camera = Camera { x, y, zoom };
+        self.camera = Camera { x: x * self.scale, y: y * self.scale, zoom: zoom * self.scale };
     }
 
     pub fn patch_uses(&mut self, patch_json: &[u8]) -> Result<(), JsValue> {
+        self.overlay_dirty |= self.compositor.holding();
         let patch = parse_patch(utf8(patch_json)?).map_err(failed)?;
         let patch = if self.tiled { patch.for_tiles() } else { patch };
         self.compositor.patch(patch, &self.library);
@@ -472,6 +562,7 @@ impl WebCore {
     }
 
     pub fn set_overlay(&mut self, items_json: &[u8]) -> Result<(), JsValue> {
+        self.overlay_dirty = true;
         if !self.overlay_seen.is_new(OverlayPart::Fixed, items_json) {
             return Ok(());
         }
@@ -481,6 +572,7 @@ impl WebCore {
     }
 
     pub fn set_selected_overlay(&mut self, items_json: &[u8]) -> Result<(), JsValue> {
+        self.overlay_dirty = true;
         if !self.overlay_seen.is_new(OverlayPart::Selected, items_json) {
             return Ok(());
         }
@@ -490,6 +582,7 @@ impl WebCore {
     }
 
     pub fn set_live_overlay(&mut self, items_json: &[u8]) -> Result<(), JsValue> {
+        self.overlay_dirty = true;
         if !self.overlay_seen.is_new(OverlayPart::Live, items_json) {
             return Ok(());
         }
@@ -520,6 +613,14 @@ impl WebCore {
         Limits { rasters: if waiting { 0 } else { self.limits.rasters }, ..self.limits }
     }
 
+    pub fn set_effect_budget(&mut self, bytes: f64) {
+        self.engine.set_effect_budget(bytes as u64);
+    }
+
+    pub fn set_image_atlas(&mut self, side: u32) {
+        self.engine.set_image_atlas(side);
+    }
+
     pub fn set_tile_budget(&mut self, bytes: f64) {
         self.tile_budget = bytes as u64;
     }
@@ -529,11 +630,16 @@ impl WebCore {
     }
 
     pub fn set_pixel_ratio(&mut self, ratio: f64) {
-        self.tiles.set_pixel_ratio(ratio);
+        self.tiles.set_pixel_ratio(ratio * self.scale);
+        self.compositor.set_pixel_ratio(ratio * self.scale);
     }
 
     pub fn set_tiles(&mut self, on: bool) {
         self.tiled = on;
+    }
+
+    pub fn set_direct_gesture(&mut self, on: bool) {
+        self.gesture_draw = if on { GestureDraw::Direct } else { GestureDraw::Tiles };
     }
 
     fn fill_pyramid(&mut self) -> Result<bool, JsValue> {
@@ -542,7 +648,7 @@ impl WebCore {
         }
         let started = js_sys::Date::now();
         let screen = (self.target.width(), self.target.height());
-        let wanted = self.tiles.pyramid(self.camera, screen, tiles_kept(screen, self.tile_budget));
+        let wanted = self.tiles.pyramid(self.camera, screen, tiles_kept_beside(screen, self.tile_budget, self.beside_tiles()));
         for batch in bake_batches(&wanted) {
             if js_sys::Date::now() - started > TILE_BUDGET_GESTURE_MS || input_pending() {
                 return Ok(true);
@@ -554,10 +660,29 @@ impl WebCore {
 
     fn drop_tiles(&mut self, gone: Vec<TileKey>) {
         for key in gone {
+            self.born.remove(&key);
             if let Some(texture) = self.tile_textures.remove(&key) {
                 self.spare(texture);
             }
         }
+    }
+
+    fn beside_tiles(&self) -> u64 {
+        let spare = self.spare_tiles.iter();
+        let lifted = self.lifted.iter().flat_map(|(_, l)| l.tiles.values());
+        let fallback = self.fallback.iter().flat_map(|f| f.pieces.iter().map(|(_, t)| t));
+        let ahead = self.ahead.iter().flat_map(|a| a.pieces.iter().map(|(_, t)| t));
+        let rest = self.rest_shown.iter().map(|(_, t)| t).chain(self.rest_spare.values().flatten());
+        spare.chain(lifted).chain(fallback).chain(ahead).chain(rest).chain(self.atlases.values()).map(texture_bytes).sum()
+    }
+
+    fn trim_spares(&mut self) {
+        if self.tiles.len() as u64 * TILE_BYTES + self.beside_tiles() <= self.tile_budget {
+            return;
+        }
+        self.spare_tiles.drain(..).for_each(|t| t.destroy());
+        self.rest_spare.drain().flat_map(|(_, v)| v).for_each(|t| t.destroy());
+        self.atlases.drain().for_each(|(_, t)| t.destroy());
     }
 
     fn spare(&mut self, texture: wgpu::Texture) {
@@ -575,6 +700,11 @@ impl WebCore {
         let camera = Camera { x: -world.x0 * zoom + gutter, y: -world.y0 * zoom + gutter, zoom };
         let (cols, rows) = batch.span();
         let size = (cols * TILE_PX + 2 * TILE_GUTTER_PX, rows * TILE_PX + 2 * TILE_GUTTER_PX);
+        let (pieces, lacking) = self.render_view(camera, size, source)?;
+        Ok((pieces, lacking, size))
+    }
+
+    fn render_view(&mut self, camera: Camera, size: (u32, u32), source: Source) -> Result<(Vec<(Piece, wgpu::Texture)>, bool), JsValue> {
         let mut drawn: Vec<(Piece, wgpu::Texture)> = Vec::new();
         let mut lacking = false;
         let mut failure = None;
@@ -595,7 +725,7 @@ impl WebCore {
             pieces.into_iter().for_each(|(piece, texture)| self.recycle(piece, size, texture));
             return Err(e);
         }
-        Ok((pieces, lacking, size))
+        Ok((pieces, lacking))
     }
 
     fn cut(&self, encoder: &mut wgpu::CommandEncoder, batch: &Batch, key: TileKey, pieces: &[(Piece, wgpu::Texture)], into: wgpu::Texture) -> wgpu::Texture {
@@ -630,6 +760,7 @@ impl WebCore {
             };
             let texture = self.cut(&mut encoder, batch, *key, &pieces, into);
             self.tile_textures.insert(*key, texture);
+            self.born.insert(*key, began);
             if !lacking {
                 self.tiles.hold(*key);
             }
@@ -706,7 +837,7 @@ impl WebCore {
         }
     }
 
-    fn present_tiles(&mut self, draw: &[TileKey]) -> Result<(), JsValue> {
+    fn present_tiles(&mut self, draw: &[TileKey], beneath: &[TileKey], fading: &[(TileKey, f32)]) -> Result<(), JsValue> {
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(t) | wgpu::CurrentSurfaceTexture::Suboptimal(t) => t,
             _ => return Err(failed("no surface texture")),
@@ -727,10 +858,13 @@ impl WebCore {
         let tile_of = |key: &TileKey| placed(*key, self.tile_textures.get(key)?, c, screen);
         let painted = self.compositor.held_painted();
         let covered = |look: Lookup| Rect::new(((painted.x0 - look.x) / look.scale).ceil(), ((painted.y0 - look.y) / look.scale).ceil(), ((painted.x1 - look.x) / look.scale).floor(), ((painted.y1 - look.y) / look.scale).floor()).intersect(screen);
-        let underlay = self.compositor.held_look(c).filter(|(_, stretch)| crate::tiles::underlay_shows(*stretch)).map(|(look, _)| Tile { source: &self.retained, look, within: covered(look) }).filter(|t| t.within.area() > 0.0);
-        let still = draw.iter().filter(|k| k.step != step).filter_map(tile_of).chain(underlay).chain(draw.iter().filter(|k| k.step == step).filter_map(tile_of));
+        let underlay = self.compositor.held_look(c).filter(|(_, stretch)| crate::tiles::underlay_shows(*stretch)).map(|(look, _)| Tile { source: &self.retained, look, within: covered(look), opacity: OPAQUE }).filter(|t| t.within.area() > 0.0);
+        let fades = |k: &TileKey| fading.iter().any(|(f, _)| f == k);
+        let fallback = self.fallback.iter().flat_map(|f| f.tiles(c, screen));
+        let still = beneath.iter().filter_map(tile_of).chain(draw.iter().filter(|k| k.step != step).filter_map(tile_of)).chain(underlay).chain(fallback).chain(draw.iter().filter(|k| k.step == step && !fades(k)).filter_map(tile_of));
+        let faded = fading.iter().filter_map(|(k, opacity)| tile_of(k).map(|t| Tile { opacity: *opacity, ..t }));
         let complete = self.rest.as_ref().is_some_and(Rest::adoptable);
-        let exact = self.rest_shown.iter().filter(|_| complete).map(|(block, source)| Tile { source, look: Lookup { scale: 1.0, x: -block.x0, y: -block.y0 }, within: *block });
+        let exact = self.rest_shown.iter().filter(|_| complete).map(|(block, source)| Tile { source, look: Lookup { scale: 1.0, x: -block.x0, y: -block.y0 }, within: *block, opacity: OPAQUE });
         let lifted = self.lifted.iter().flat_map(|(_, layer)| {
             let moved = Camera { x: c.x + (layer.by.0 * c.zoom).round(), y: c.y + (layer.by.1 * c.zoom).round(), zoom: c.zoom };
             let frame = Rect::new(layer.rest.x0 * c.zoom + moved.x, layer.rest.y0 * c.zoom + moved.y, layer.rest.x1 * c.zoom + moved.x, layer.rest.y1 * c.zoom + moved.y).intersect(screen);
@@ -739,35 +873,59 @@ impl WebCore {
             keys.into_iter().filter_map(move |k| placed(*k, &layer.tiles[k], moved, frame))
         });
         let placed: Vec<Tile> = still.chain(exact).collect();
-        let lifted: Vec<Tile> = lifted.collect();
+        let lifted: Vec<Tile> = faded.chain(lifted).collect();
         self.reprojector.draw_tiles(&self.device, &self.queue, &mut encoder, &out, self.format, Output::Premultiplied, &placed);
         if !lifted.is_empty() {
             self.queue.submit([encoder.finish()]);
             encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
             self.reprojector.draw_tiles(&self.device, &self.queue, &mut encoder, &out, self.format, Output::Over, &lifted);
         }
-        if let Some(overlay) = self.overlay_texture()? {
-            self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source: &overlay, target: &out, format: self.format, look: UNMOVED, within: Some(screen), output: Output::Over });
-            self.overlay_tex = Some(overlay);
+        if let Some((overlay, look)) = self.overlay_texture()? {
+            self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source: &overlay, target: &out, format: self.format, look, within: Some(screen), output: Output::Over });
         }
         self.queue.submit([encoder.finish()]);
         self.queue.present(frame);
         Ok(())
     }
 
-    fn overlay_texture(&mut self) -> Result<Option<wgpu::Texture>, JsValue> {
-        let size = (self.target.width(), self.target.height());
-        let plan = self.compositor.overlay_at(&mut self.library, self.camera, size, self.limits);
-        if plan.screen.items.is_empty() {
-            return Ok(None);
+    fn touch_overlay(&mut self, group: &str) {
+        self.overlay_dirty |= group.starts_with(OVERLAY_GROUPS) || self.compositor.holding();
+    }
+
+    fn overlay_moving(&self) -> Moving {
+        if self.compositor.holding() || !self.compositor.lifts(&self.library).is_empty() {
+            return Moving::Lift;
         }
-        let began = now_ms();
-        let (list, _) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
-        let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
-        let texture = self.overlay_tex.take().filter(|t| t.width() == size.0 && t.height() == size.1).unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
-        self.engine.draw(&self.device, &self.queue, &list, &pictures, &texture.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
-        self.count_bake(began);
-        Ok(Some(texture))
+        match self.motion {
+            CoreMotion::Gesture => Moving::Camera,
+            CoreMotion::Still => Moving::Still,
+        }
+    }
+
+    fn overlay_texture(&mut self) -> Result<Option<(wgpu::Texture, Lookup)>, JsValue> {
+        let size = (self.target.width(), self.target.height());
+        let moving = matches!(self.motion, CoreMotion::Gesture);
+        let quality = OverlayQuality::of(self.overlay_moving());
+        let held = self.overlay_held.as_ref().is_some_and(|(hold, _, at)| !self.overlay_dirty && hold.quality() == quality && if moving { hold.serves(self.camera, size) } else { *at == self.camera });
+        if !held {
+            self.overlay_dirty = false;
+            let hold = OverlayHold::around_at(self.camera, size, self.device.limits().max_texture_dimension_2d, quality);
+            let (camera, planned) = hold.planned();
+            let plan = self.compositor.overlay_at(&mut self.library, camera, planned, self.limits, quality.scale());
+            let pinned = self.compositor.pinned_at(camera, quality.scale(), planned);
+            if plan.screen.items.is_empty() && pinned.is_empty() {
+                self.overlay_held = None;
+                return Ok(None);
+            }
+            let began = now_ms();
+            let (list, _) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
+            let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
+            let texture = self.overlay_held.take().map(|(_, t, _)| t).filter(|t| (t.width(), t.height()) == planned).unwrap_or_else(|| layer_texture(&self.device, planned.0, planned.1));
+            self.engine.draw_over(&self.device, &self.queue, &list, &pictures, &pinned, &texture.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
+            self.count_bake(began);
+            self.overlay_held = Some((hold, texture, self.camera));
+        }
+        Ok(self.overlay_held.as_ref().map(|(hold, texture, _)| (texture.clone(), hold.look(self.camera))))
     }
 
     fn tiled_frame(&mut self) -> Result<String, JsValue> {
@@ -778,11 +936,13 @@ impl WebCore {
             Damage::Rects(rects) if rects.is_empty() => {}
             Damage::All => {
                 self.forget_rest();
+                self.forget_fallback();
                 self.changed_at = js_sys::Date::now();
                 self.tiles.clear();
             }
             Damage::Rects(rects) => {
                 self.forget_rest();
+                self.forget_fallback();
                 self.changed_at = js_sys::Date::now();
                 rects.iter().for_each(|r| self.tiles.invalidate(*r));
             }
@@ -799,29 +959,38 @@ impl WebCore {
         queue.stale.sort_by_key(|k| !self.lifted.iter().any(|(_, l)| k.world().overlaps(l.rest)));
         let left_blank = queue.blank.clone();
         let order = queue.order();
+        let deadline = started + budget;
+        let side = if matches!(self.motion, CoreMotion::Gesture) { 1 } else { self.credit.side() };
         self.credit.earn(budget);
-        for batch in batches_of(&order, self.credit.side()) {
-            if !self.credit.affords(batch.keys.len()) {
+        for batch in batches_of(&order, side) {
+            if !self.credit.affords(batch.keys.len()) || js_sys::Date::now() >= deadline {
                 break;
             }
             rastered += self.paid_batch(&batch)?;
         }
         if matches!(self.motion, CoreMotion::Gesture) && self.credit.allows() {
-            rastered += self.bake_ahead()?;
+            rastered += self.bake_ahead(deadline)?;
         }
         self.was = self.camera;
         let tiles = self.tiles.frame(self.camera, screen);
-        self.counted.unsharp = self.tiles.unsharp(&tiles.missing) as u32;
+        let served = self.serve_bare(&tiles.bare, screen, deadline)?;
+        self.counted.unsharp = if served { 0 } else { tiles.bare.len() as u32 };
+        self.sharpness.magnified_frames += u32::from(magnified(&tiles.draw, self.camera.zoom) > 0);
         let underlaid = self.compositor.held_look(self.camera).is_some_and(|(_, stretch)| crate::tiles::underlay_shows(stretch));
-        self.counted.uncovered = if underlaid { 0 } else { left_blank.iter().filter(|k| !self.tiles.holds(**k)).count() as u32 };
+        self.counted.uncovered = if underlaid || served { 0 } else { left_blank.iter().filter(|k| !self.tiles.holds(**k)).count() as u32 };
         let resting = matches!(self.motion, CoreMotion::Still) && tiles.missing.iter().all(|k| self.tiles.covered_within(*k, NEAR_STEPS)) && js_sys::Date::now() - self.changed_at >= REST_AFTER_MS;
         let mut exact = false;
         if resting {
             exact = self.raster_rest(started, budget, rastered > 0)?;
         }
-        self.present_tiles(&tiles.draw)?;
+        let fading = self.fading(&tiles.draw);
+        if tiles.bare.is_empty() && fading.is_empty() {
+            self.forget_fallback();
+        }
+        self.present_tiles(&tiles.draw, &tiles.beneath, &fading)?;
         self.tiles.drawn(&tiles.draw);
-        let kept = tiles_kept(screen, self.tile_budget);
+        self.trim_spares();
+        let kept = tiles_kept_beside(screen, self.tile_budget, self.beside_tiles());
         if self.tiles.len() > kept {
             let evicted = self.tiles.evict_beyond(self.camera, screen, kept * EVICT_DOWN_TO_PERCENT / 100);
             self.drop_tiles(evicted);
@@ -834,11 +1003,126 @@ impl WebCore {
         Ok(if rastered > 0 { "partial".into() } else { "reused".into() })
     }
 
-    fn bake_ahead(&mut self) -> Result<usize, JsValue> {
+    fn serve_bare(&mut self, bare: &[TileKey], screen: (u32, u32), deadline: f64) -> Result<bool, JsValue> {
+        if bare.is_empty() {
+            return Ok(false);
+        }
+        let c = self.camera;
+        let was = std::mem::replace(&mut self.fallback_was, c);
+        let (kept, stale): (Vec<Fallback>, Vec<Fallback>) = std::mem::take(&mut self.fallback).into_iter().partition(|f| fallback_serves(f.camera, c, f.size, &[]));
+        stale.into_iter().for_each(Fallback::destroy);
+        self.fallback = kept;
+        let uncovered: Vec<Rect> = bare.iter().filter(|k| !self.fallback.iter().any(|f| fallback_serves(f.camera, c, f.size, &[**k]))).map(|k| k.screen(c)).collect();
+        if uncovered.is_empty() && self.fallback.iter().all(|f| f.todo.is_empty()) {
+            self.render_ahead(was, screen, deadline)?;
+            return Ok(true);
+        }
+        let began = js_sys::Date::now();
+        let whole = Rect::new(0.0, 0.0, screen.0 as f64, screen.1 as f64);
+        let held = self.fallback.iter().map(|f| f.on(c)).reduce(|a, b| a.union(b));
+        for band in fallback_bands(held, &uncovered) {
+            let area = band.intersect(whole);
+            let area = Rect::new(area.x0.floor(), area.y0.floor(), area.x1.ceil(), area.y1.ceil());
+            if area.area() <= 0.0 {
+                continue;
+            }
+            let camera = Camera { x: c.x.round() - area.x0, y: c.y.round() - area.y0, zoom: c.zoom };
+            let size = (area.width() as u32, area.height() as u32);
+            self.fallback.push(Fallback { camera, size, pieces: Vec::new(), todo: Rest::new(camera, size).todo().to_vec() });
+            self.sharpness.fallbacks += 1;
+        }
+        while self.fallback.len() > FALLBACK_PATCHES {
+            self.fallback.remove(0).destroy();
+        }
+        let blank = bare.iter().any(|k| !self.tiles.covered(*k));
+        self.draw_fallback_blocks(if blank { f64::INFINITY } else { deadline })?;
+        let took = js_sys::Date::now() - began;
+        self.credit.spend(took);
+        self.sharpness.fallback_ms += took;
+        self.counted.fallback_ms += took;
+        Ok(true)
+    }
+
+    fn draw_fallback_blocks(&mut self, deadline: f64) -> Result<(), JsValue> {
+        while js_sys::Date::now() < deadline {
+            let Some(at) = self.fallback.iter().position(|f| !f.todo.is_empty()) else { return Ok(()) };
+            let block = self.fallback[at].todo.remove(0);
+            let camera = self.fallback[at].camera;
+            let shifted = Camera { x: camera.x - block.x0, y: camera.y - block.y0, zoom: camera.zoom };
+            let limits = self.limits;
+            self.limits = Limits { rasters: 0, ..limits };
+            let rendered = crate::lod::coarser(FALLBACK_FLOORS, || self.render_view(shifted, (block.width() as u32, block.height() as u32), Source::Scene));
+            self.limits = limits;
+            let (pieces, _) = rendered?;
+            let placed = |p: Piece| Piece { x: p.x + block.x0 as u32, y: p.y + block.y0 as u32, ..p };
+            self.fallback[at].pieces.extend(pieces.into_iter().map(|(p, t)| (placed(p), t)));
+        }
+        Ok(())
+    }
+
+    fn fading(&self, draw: &[TileKey]) -> Vec<(TileKey, f32)> {
+        let screen = Rect::new(0.0, 0.0, self.target.width() as f64, self.target.height() as f64);
+        let under: Vec<Rect> = self.fallback.iter().filter(|f| fallback_serves(f.camera, self.camera, f.size, &[])).flat_map(|f| f.tiles(self.camera, screen)).map(|t| t.within).collect();
+        let now = now_ms();
+        let young = |k: &TileKey| self.born.get(k).map(|at| now - at).filter(|age| *age < FADE_MS);
+        draw.iter().filter(|k| fades_over(k.screen(self.camera).intersect(screen), &under)).filter_map(|k| young(k).map(|age| (*k, fade_in(age)))).collect()
+    }
+
+    fn forget_fallback(&mut self) {
+        std::mem::take(&mut self.fallback).into_iter().for_each(Fallback::destroy);
+        self.forget_ahead();
+    }
+
+    fn forget_ahead(&mut self) {
+        if let Some(ahead) = self.ahead.take() {
+            ahead.pieces.into_iter().for_each(|(_, texture)| texture.destroy());
+        }
+    }
+
+    fn render_ahead(&mut self, was: Camera, screen: (u32, u32), deadline: f64) -> Result<(), JsValue> {
+        let Some(next) = ahead_camera(was, self.camera) else {
+            self.forget_ahead();
+            return Ok(());
+        };
+        if !self.ahead.as_ref().is_some_and(|a| a.size == screen && fallback_serves(a.camera, self.camera, a.size, &[])) {
+            self.forget_ahead();
+            let camera = Camera { x: next.x.round(), y: next.y.round(), zoom: next.zoom };
+            self.ahead = Some(Ahead { camera, size: screen, pieces: Vec::new(), todo: Rest::new(camera, screen).todo().to_vec() });
+        }
+        let began = js_sys::Date::now();
+        while js_sys::Date::now() < deadline.min(began + AHEAD_BUDGET_MS) {
+            let Some(ahead) = self.ahead.as_mut() else { break };
+            if ahead.todo.is_empty() {
+                break;
+            }
+            let block = ahead.todo.remove(0);
+            let camera = ahead.camera;
+            let shifted = Camera { x: camera.x - block.x0, y: camera.y - block.y0, zoom: camera.zoom };
+            let limits = self.limits;
+            self.limits = Limits { rasters: 0, ..limits };
+            let rendered = crate::lod::coarser(FALLBACK_FLOORS, || self.render_view(shifted, (block.width() as u32, block.height() as u32), Source::Scene));
+            self.limits = limits;
+            let (pieces, _) = rendered?;
+            let at = |p: Piece| Piece { x: p.x + block.x0 as u32, y: p.y + block.y0 as u32, ..p };
+            self.ahead.as_mut().expect("ahead started").pieces.extend(pieces.into_iter().map(|(p, t)| (at(p), t)));
+        }
+        let took = js_sys::Date::now() - began;
+        self.credit.spend(took);
+        self.sharpness.fallback_ms += took;
+        self.counted.fallback_ms += took;
+        if self.ahead.as_ref().is_some_and(|a| a.todo.is_empty()) {
+            let Ahead { camera, size, pieces, .. } = self.ahead.take().expect("ahead finished");
+            self.fallback.push(Fallback { camera, size, pieces, todo: Vec::new() });
+            self.sharpness.fallbacks += 1;
+        }
+        Ok(())
+    }
+
+    fn bake_ahead(&mut self, deadline: f64) -> Result<usize, JsValue> {
         let screen = (self.target.width(), self.target.height());
         let mut rastered = 0;
-        for batch in batches_of(&self.tiles.ahead(self.was, self.camera, screen), self.credit.side().min(BAKE_BATCH_TILES)) {
-            if !self.credit.affords(batch.keys.len()) {
+        for batch in batches_of(&self.tiles.ahead(self.was, self.camera, screen), 1) {
+            if !self.credit.affords(batch.keys.len()) || js_sys::Date::now() >= deadline {
                 break;
             }
             rastered += self.paid_batch(&batch)?;
@@ -898,8 +1182,14 @@ impl WebCore {
             self.adopted = None;
         }
         let moving = matches!(self.motion, CoreMotion::Gesture);
-        let moment = || Moment { gesture: moving, lifting: self.compositor.holding() || !self.compositor.lifts(&self.library).is_empty(), settling: self.adopted.is_none() && self.drew_tiles && self.tiles_show_all() };
-        if self.tiled && path_for(moment()) == Path::Tiles {
+        let moment = || Moment { gesture: moving, lifting: self.compositor.holding() || !self.compositor.lifts(&self.library).is_empty(), settling: self.adopted.is_none() && self.drew_tiles && self.tiles_show_all(), draw: self.gesture_draw };
+        let path = path_for(moment());
+        if path == Path::Direct {
+            self.drew_tiles = false;
+            return self.direct_frame(now_ms);
+        }
+        self.drop_held_scene();
+        if self.tiled && path == Path::Tiles {
             self.adopted = None;
             self.drew_tiles = true;
             let report = self.tiled_frame()?;
@@ -909,6 +1199,7 @@ impl WebCore {
             return Ok(report);
         }
         self.drew_tiles = false;
+        self.counted.exact = true;
         let limits = self.frame_limits(now_ms);
         let mut painter = GpuPainter { device: &self.device, queue: &self.queue, surface: &self.surface, format: self.format, engine: &mut self.engine, pictures: &self.pictures, cached: &mut self.cached, limits, retained: &mut self.retained, spare: &mut self.spare, reprojector: &mut self.reprojector, scratch: &mut self.scratch };
         let timed = self.gpu_full_ms.swap(NOT_TIMED, Ordering::Relaxed);
@@ -943,7 +1234,75 @@ impl WebCore {
             coarse_left = self.fill_pyramid()?;
         }
         self.warming = self.tiled && building == Building::Nothing && (!idle || coarse_left);
+        self.warm_wait = if self.warming && !coarse_left { self.warmup.wait_ms(js_sys::Date::now()) } else { 0.0 };
         Ok(frame.report())
+    }
+
+    fn direct_frame(&mut self, at_ms: f64) -> Result<String, JsValue> {
+        let began = now_ms();
+        if !matches!(self.compositor.take_damage(), Damage::Rects(rects) if rects.is_empty()) {
+            self.engine.forget_fingerprints();
+            self.drop_held_scene();
+        }
+        let size = (self.target.width(), self.target.height());
+        if !self.held_scene.as_ref().is_some_and(|h| h.view.holds(self.camera, size)) {
+            self.drop_held_scene();
+            self.held_scene = Some(self.build_held_scene(size)?);
+        }
+        let held = self.held_scene.as_ref().expect("a held scene");
+        let whole = held.whole;
+        let texture = self.direct.take().filter(|t| (t.width(), t.height()) == size).unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
+        self.engine.draw_held(&self.device, &self.queue, &held.scene, held.view.transform(self.camera), held.background, &texture.create_view(&wgpu::TextureViewDescriptor::default()), size).map_err(failed)?;
+        let frame = match self.surface.get_current_texture() {
+            wgpu::CurrentSurfaceTexture::Success(t) | wgpu::CurrentSurfaceTexture::Suboptimal(t) => t,
+            _ => return Err(failed("no surface texture")),
+        };
+        let out = frame.texture.create_view(&wgpu::TextureViewDescriptor { format: Some(self.format), ..Default::default() });
+        let screen = Rect::new(0.0, 0.0, size.0 as f64, size.1 as f64);
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+        self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source: &texture, target: &out, format: self.format, look: UNMOVED, within: None, output: Output::Premultiplied });
+        if let Some((overlay, look)) = self.overlay_texture()? {
+            self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source: &overlay, target: &out, format: self.format, look, within: Some(screen), output: Output::Over });
+        }
+        if whole {
+            let o = self.compositor.retained_overscan();
+            encoder.copy_texture_to_texture(texel(&texture, 0, 0), texel(&self.retained, o, o), wgpu::Extent3d { width: size.0, height: size.1, depth_or_array_layers: 1 });
+        }
+        self.queue.submit([encoder.finish()]);
+        self.queue.present(frame);
+        if whole {
+            self.compositor.adopt(self.camera, at_ms);
+            self.adopted = Some(self.camera);
+        }
+        self.direct = Some(texture);
+        if !whole {
+            self.drop_held_scene();
+        }
+        self.count_bake(began);
+        self.pending = !whole || self.compositor.pending_raster();
+        Ok("direct".into())
+    }
+
+    fn build_held_scene(&mut self, size: (u32, u32)) -> Result<HeldScreen, JsValue> {
+        let view = HeldView::around(self.camera, size);
+        let (planned, planned_size) = view.planned();
+        self.library.set_native(Native::Vectors);
+        let plan = self.compositor.plan_at(&mut self.library, planned, planned_size, self.limits);
+        self.library.set_native(Native::Textures);
+        let building = plan.pending;
+        let (list, missing) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
+        let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
+        self.engine.effects = Effects::Zoomless;
+        let built = self.engine.build_held(&self.device, &self.queue, &list, &pictures);
+        self.engine.effects = Effects::Screen;
+        let (scene, _) = built.map_err(failed)?;
+        Ok(HeldScreen { view, scene, whole: !building && missing.is_empty(), background: list.background })
+    }
+
+    fn drop_held_scene(&mut self) {
+        if let Some(held) = self.held_scene.take() {
+            self.engine.drop_held(held.scene);
+        }
     }
 
     fn tiles_show_all(&self) -> bool {
@@ -997,10 +1356,14 @@ impl WebCore {
     pub fn frame_counts(&mut self) -> Vec<f64> {
         let planned = self.compositor.take_planned();
         let counted = std::mem::take(&mut self.counted);
-        vec![f64::from(planned.plans), f64::from(planned.walked), planned.ms, f64::from(counted.bakes), counted.ms, counted.upload_bytes, f64::from(counted.unsharp), f64::from(counted.uncovered), f64::from(step_of(self.camera.zoom)), f64::from(counted.tiles), f64::from(self.engine.take_draws()), f64::from(counted.uploads)]
+        vec![f64::from(planned.plans), f64::from(planned.walked), planned.ms, f64::from(counted.bakes), counted.ms, counted.upload_bytes, f64::from(counted.unsharp), f64::from(counted.uncovered), f64::from(step_of(self.camera.zoom)), f64::from(counted.tiles), f64::from(self.engine.take_draws()), f64::from(counted.uploads), counted.fallback_ms, f64::from(u8::from(counted.exact))]
     }
     pub fn warming(&self) -> bool {
         self.warming
+    }
+
+    pub fn warm_wait(&self) -> f64 {
+        self.warm_wait
     }
 
     pub fn cache_pending(&self) -> bool {
@@ -1016,7 +1379,8 @@ impl WebCore {
     }
 
     pub fn render_tally(&mut self) -> String {
-        self.engine.take_tally().json()
+        let tally = self.engine.take_tally().json();
+        self.sharpness.json(&tally)
     }
 
     pub fn draw(&mut self, list_json: &[u8]) -> Result<String, JsValue> {

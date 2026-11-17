@@ -30,6 +30,7 @@ const RUN: ImportRun = {
   instances: 9,
   uses: null,
   tokens: 12,
+  coverage: { colour: { declared: 10, imported: 9 }, radius: { declared: 2, imported: 1 } },
   bound: { byClass: 6, byRule: 1, byValue: 1, unbound: 2 },
   fidelity: [
     { route: '/', condition: 'base', ssim: 0.96 },
@@ -40,6 +41,16 @@ const RUN: ImportRun = {
 };
 
 describe('the code import scorecard', () => {
+  it('scores token coverage as imported over declared, per kind', () => {
+    const tokens = scoreRepo(ENTRY, RUN).metrics[Metric.Tokens];
+
+    expect(tokens).toMatchObject({ value: 10 / 12, kinds: { colour: 0.9, radius: 0.5 } });
+  });
+
+  it('says token coverage is unrun when the import reported none', () => {
+    expect(scoreRepo(ENTRY, { ...RUN, coverage: null }).metrics[Metric.Tokens]).toMatchObject({ unrun: expect.any(String) });
+  });
+
   it('marks every metric unrun with the reason when nothing ran', () => {
     const card = scoreRepo(ENTRY, null, 'dry run');
 

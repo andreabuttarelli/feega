@@ -97,15 +97,15 @@ describe('variablesOf', () => {
     expect(made.map['app Radius/card'].scale).toBe(0.5);
   });
 
-  it('oltre 64 variabili per collezione, le usate restano e le altre sono elencate come lasciate fuori', () => {
+  it('oltre il limite di variabili per collezione, le usate restano e le altre sono elencate come lasciate fuori', () => {
     const many = Array.from({ length: MAX_VARIABLES + 2 }, (_, i) => `  --color-c${i}: #${String(i).padStart(6, '0')};`).join('\n');
     const set = tokenSetOf(parseSheets([{ path: 'a.css', text: `@theme {\n${many}\n}` }]));
 
-    const made = variablesOf(set, 'app', { used: new Set(['--color-c65']) });
+    const made = variablesOf(set, 'app', { used: new Set([`--color-c${MAX_VARIABLES + 1}`]) });
 
     expect(Object.keys(made.variables['app Colors'].vars)).toHaveLength(MAX_VARIABLES);
-    expect(made.variables['app Colors'].vars.c65).toBeDefined();
-    expect(made.dropped).toEqual(['--color-c63: over the 64-variable limit of app Colors', '--color-c64: over the 64-variable limit of app Colors']);
+    expect(made.variables['app Colors'].vars[`c${MAX_VARIABLES + 1}`]).toBeDefined();
+    expect(made.dropped).toEqual([`--color-c${MAX_VARIABLES - 1}: over the ${MAX_VARIABLES}-variable limit of app Colors`, `--color-c${MAX_VARIABLES}: over the ${MAX_VARIABLES}-variable limit of app Colors`]);
   });
 
   it('un alias il cui bersaglio è stato lasciato fuori resta fuori anche lui, e lo dice', () => {
@@ -127,6 +127,16 @@ describe('variablesOf', () => {
   });
 });
 
+describe('un tema vero, con centinaia di colori', () => {
+  it('una palette di 242 colori entra intera, e il documento resta valido', async () => {
+    const made = variablesOf(await setOf('big-theme'), 'big');
+
+    expect(Object.keys(made.variables['big Colors'].vars)).toHaveLength(242);
+    expect(made.dropped.filter((d) => d.includes('limit'))).toEqual([]);
+    expect(variablesSchema.safeParse(made.variables).success).toBe(true);
+  });
+});
+
 describe('Arc tokens', () => {
   it('light and dark land as the modes of the palette, every accent as a mode of its own collection', async () => {
     const { variables } = variablesOf(await setOf('arc'), 'arc');
@@ -140,5 +150,22 @@ describe('Arc tokens', () => {
   it('an accent inside dark mode stays out and says so', async () => {
     const set = await setOf('arc');
     expect(set.skipped.some((s) => s.startsWith('--accent under :root[data-theme="dark"][data-accent="violet"]'))).toBe(true);
+  });
+});
+
+describe('calc() costante', () => {
+  it('un calc() di soli numeri è un valore: 4 * 16px è 64px', () => {
+    const set = tokenSetOf(parseSheets([{ path: 'a.css', text: '@theme { --spacing-card: calc(4 * 16px); --radius-x: calc(var(--r) - 4px); }' }]));
+
+    const made = variablesOf(set, 'app');
+
+    expect(made.variables['app Spacing'].vars.card.values.Light).toBe(64);
+    expect(set.skipped).toContain('--radius-x: computed with calc(), not a literal');
+  });
+
+  it('un token dentro @media (min-width) è elencato come valore responsivo', () => {
+    const set = tokenSetOf(parseSheets([{ path: 'a.css', text: '@media (min-width: 768px) { :root { --spacing-section: 4rem; } }' }]));
+
+    expect(set.skipped).toEqual(['--spacing-section under @media (min-width: 768px) :root is a responsive value: variables have modes, not breakpoints']);
   });
 });

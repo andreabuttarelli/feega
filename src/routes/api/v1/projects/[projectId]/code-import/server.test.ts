@@ -13,7 +13,9 @@ vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: vi.fn(async () => []
 vi.mock('$lib/server/projects/lookup', () => ({ findReachableProject: (...args: unknown[]) => findReachableProject(...args) }));
 vi.mock('$lib/server/code-import/import-code', async (actual) => ({ ...(await actual<object>()), importCodeAt: (...args: unknown[]) => importCodeAt(...args), importRepoAt: (...args: unknown[]) => importRepoAt(...args) }));
 vi.mock('$lib/server/repos/canvas', async (actual) => ({ ...(await actual<object>()), findNode: (...args: unknown[]) => findNode(...args), patchNodeData: (...args: unknown[]) => patchNodeData(...args) }));
-vi.mock('$lib/server/motion/move-element', () => ({ frameStore: () => ({}) }));
+const adoptDocLibrary = vi.fn();
+vi.mock('$lib/server/canvas/project-library', () => ({ adoptDocLibrary: (...args: unknown[]) => adoptDocLibrary(...args) }));
+vi.mock('$lib/server/motion/move-element', () => ({ frameStore: () => ({ read: async () => ({ doc: { variables: {} } }) }) }));
 vi.mock('$lib/server/canvas/upload', () => ({ importCanvasLink: vi.fn() }));
 vi.mock('$lib/server/web/live', () => ({ liveBrowser: () => null }));
 vi.mock('$lib/server/code-import/github', async (actual) => ({ ...(await actual<object>()), treeOf: (...args: unknown[]) => treeOf(...args) }));
@@ -71,6 +73,7 @@ describe('POST /api/v1/projects/:id/code-import', () => {
 
     const on = await call({ canvasId: 'c1', repo: 'https://github.com/a/b', x: 0, y: 0 }, 'u-ds-on');
     expect(on.body).toMatchObject({ design: { tokens: 15, byClass: 9 } });
+    expect(adoptDocLibrary).toHaveBeenCalledTimes(1);
     expect(on.body).not.toHaveProperty('tokenMap');
     expect(importCodeAt.mock.calls.at(-1)![0]).toMatchObject({ designSystem: 'on' });
 

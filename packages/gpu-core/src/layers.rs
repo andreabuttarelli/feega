@@ -1,4 +1,4 @@
-use vello::kurbo::Rect;
+use vello::kurbo::{Point, Rect};
 
 use crate::canvas::Canvas;
 use crate::display_list::{Cover, DisplayList, Item, Lens, Look, MaskMode, Rgba};
@@ -6,11 +6,20 @@ use crate::fragments::Fragments;
 use crate::filters::{paints_from_nothing, reach as filter_reach, Fold, Fx, Reach, Runner};
 use crate::canvas::shader_only;
 use crate::tally::Reason;
+use crate::zoomless::{zoomless, Zoomless};
 use crate::scene::{alone, bounds, build_items, build_where, cover, layer_worthy, plain, silhouette, unblended, Layers, Placed, Shelf};
 
 const UNIT_SPACE: [f64; 4] = [1.0, 0.0, 0.0, 1.0];
 const REACH: f64 = 3.0;
 const SLACK: f64 = 2.0;
+const HELD_SIDE: f64 = 4096.0;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Effects {
+    #[default]
+    Screen,
+    Zoomless,
+}
 
 pub type Tex<S> = <<S as Surface>::Runner as Runner>::Tex;
 pub type Pic<S> = <<S as Surface>::Canvas as Canvas>::Picture;
@@ -30,6 +39,22 @@ pub trait Surface {
     }
 
     fn remember(&mut self, _item: &Item, _placed: &Placed<Pic<Self>>) {}
+
+    fn effects(&self) -> Effects {
+        Effects::Screen
+    }
+
+    fn set_frame(&mut self, _frame: Option<Rect>) {}
+
+    fn zoomless(&mut self, item: &Item) -> Option<Zoomless> {
+        zoomless(item)
+    }
+
+    fn recall_held(&mut self, _key: &str) -> Option<Placed<Pic<Self>>> {
+        None
+    }
+
+    fn remember_held(&mut self, _key: &str, _placed: &Placed<Pic<Self>>) {}
 }
 
 fn reach(sigma: f64) -> f64 {
@@ -79,6 +104,12 @@ fn prepare_items<S: Surface>(surface: &mut S, items: &[Item], background: Option
             layers.culled.insert(i);
             continue;
         }
+        if layer_worthy(item) && !composited_blend(item, blending) && surface.effects() == Effects::Zoomless {
+            if let Some(layer) = held_body(surface, item, pictures, blending, fragments)? {
+                layers.bodies.insert(i, layer);
+                continue;
+            }
+        }
         let recalled = if layer_worthy(item) { surface.recall(item) } else { None };
         if let (Item::Group(group), None) = (item, &recalled) {
             let inner = prepare_items(surface, &group.items, None, pictures, blending, fragments)?;
@@ -101,6 +132,37 @@ fn prepare_items<S: Surface>(surface: &mut S, items: &[Item], background: Option
         }
     }
     Ok(layers)
+}
+
+fn held_body<S: Surface>(surface: &mut S, item: &Item, pictures: &Shelf<Pic<S>>, blending: Blending, fragments: &Fragments) -> Result<Option<Placed<Pic<S>>>, S::Error> {
+    let Some(z) = surface.zoomless(item) else { return Ok(None) };
+    let held = match surface.recall_held(&z.key) {
+        Some(held) => held,
+        None => {
+            let at_held = z.item(item);
+            let Some(look) = at_held.look() else { return Ok(None) };
+            let Some(spread) = inflated::<S::Canvas>(&at_held, look, pictures) else { return Ok(None) };
+            if spread.width() > HELD_SIDE || spread.height() > HELD_SIDE {
+                return Ok(None);
+            }
+            surface.set_frame(Some(Rect::new(spread.x0.floor(), spread.y0.floor(), spread.x1.ceil(), spread.y1.ceil())));
+            let made = held_made(surface, &at_held, pictures, blending, fragments);
+            surface.set_frame(None);
+            let made = made?;
+            surface.remember_held(&z.key, &made);
+            made
+        }
+    };
+    let origin = Point::new(z.shift.x + held.origin.x * z.scale, z.shift.y + held.origin.y * z.scale);
+    Ok(Some(Placed { image: held.image, origin, scale: z.scale }))
+}
+
+fn held_made<S: Surface>(surface: &mut S, item: &Item, pictures: &Shelf<Pic<S>>, blending: Blending, fragments: &Fragments) -> Result<Placed<Pic<S>>, S::Error> {
+    let inner = match item {
+        Item::Group(group) => Some(prepare_items(surface, &group.items, None, pictures, blending, fragments)?),
+        _ => None,
+    };
+    body(surface, item, pictures, inner.as_ref())
 }
 
 fn composited<S: Surface>(surface: &mut S, items: &[Item], spreads: &[Option<Rect>], at: usize, background: Option<Rgba>, layers: &Layers<Pic<S>>, pictures: &Shelf<Pic<S>>) -> Result<Placed<Pic<S>>, S::Error> {

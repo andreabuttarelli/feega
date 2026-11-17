@@ -9,7 +9,8 @@ use crate::atlas::Packer;
 use crate::display_list::{Cover, DisplayList, Item, Rgba};
 use crate::groups::Plan;
 use crate::filter_passes::{layer_texture, FilterPasses, Pooled, WgpuRunner};
-use crate::layers::{prepare, Blending, Surface};
+use crate::layers::{prepare, Blending, Effects, Surface};
+use crate::zoomless::{zoomless_in, Fingerprints, Zoomless};
 use crate::pictures::Pictures;
 use crate::scene::{build_into, Placed};
 use crate::tally::{now_ms, Reason, Tally};
@@ -20,6 +21,8 @@ const KEPT_LAYERS: usize = 32;
 const SPARE_TEXTURES: usize = 4;
 const KEPT_FRAMES: u64 = 240;
 const LAYER_BYTES: u64 = 32 * 1024 * 1024;
+const HELD_EFFECTS: usize = 4096;
+const HELD_EFFECT_BYTES: u64 = 256 * 1024 * 1024;
 const KEYED_POINTS_MAX: usize = 1000;
 const OFF_TARGET: Rect = Rect::new(-2.0, -2.0, -1.0, -1.0);
 const SHEET_SIDE: u32 = 2048;
@@ -36,37 +39,100 @@ struct LayerCache {
     entries: FxHashMap<String, Cached>,
     tick: u64,
     cap: u64,
+    kept: usize,
 }
 
 impl Default for LayerCache {
     fn default() -> Self {
-        LayerCache { entries: FxHashMap::default(), tick: 0, cap: LAYER_BYTES }
+        LayerCache { entries: FxHashMap::default(), tick: 0, cap: LAYER_BYTES, kept: KEPT_LAYERS }
     }
 }
 
 impl LayerCache {
+    fn touch(&mut self, ids: &rustc_hash::FxHashSet<u64>) {
+        let tick = self.tick;
+        self.entries.values_mut().filter(|c| ids.contains(&c.image.data.id())).for_each(|c| c.used = tick);
+    }
+
     fn holds(&self, image: &ImageData) -> bool {
         self.entries.values().any(|c| c.image.data.id() == image.data.id())
     }
 
-    fn sweep(&mut self, vello: &mut vello::Renderer) {
+    fn sweep(&mut self, vello: &mut vello::Renderer, reads: &Reads) {
         self.tick += 1;
         let tick = self.tick;
         let mut stale: Vec<String> = self.entries.iter().filter(|(_, c)| c.used + KEPT_FRAMES < tick).map(|(k, _)| k.clone()).collect();
-        if self.entries.len() - stale.len() > KEPT_LAYERS {
+        if self.entries.len() - stale.len() > self.kept {
             let mut rest: Vec<(&String, u64)> = self.entries.iter().filter(|(k, _)| !stale.contains(k)).map(|(k, c)| (k, c.used)).collect();
             rest.sort_by_key(|(_, used)| *used);
-            let excess = rest.len() - KEPT_LAYERS;
+            let excess = rest.len() - self.kept;
             stale.extend(rest.into_iter().take(excess).map(|(k, _)| k.clone()));
         }
         let rest: Vec<(String, u64, u64)> = self.entries.iter().filter(|(k, _)| !stale.contains(k)).map(|(k, c)| (k.clone(), c.used, bytes_of((c._texture.width(), c._texture.height())))).collect();
         stale.extend(over_cap(&rest, self.cap));
+        stale.retain(|key| !reads.holds(self.entries[key].image.data.id()));
         for key in stale {
             if let Some(gone) = self.entries.remove(&key) {
                 vello.unregister_texture(gone.image);
             }
         }
     }
+}
+
+fn free(vello: &mut vello::Renderer, image: ImageData, texture: Option<wgpu::Texture>) {
+    vello.unregister_texture(image);
+    if let Some(texture) = texture {
+        texture.destroy();
+    }
+}
+
+#[derive(Default)]
+struct Reads {
+    counts: FxHashMap<u64, u32>,
+    retired: Vec<(ImageData, Option<wgpu::Texture>)>,
+}
+
+impl Reads {
+    fn holds(&self, id: u64) -> bool {
+        self.counts.contains_key(&id)
+    }
+
+    fn add(&mut self, ids: &[u64]) {
+        for id in ids {
+            *self.counts.entry(*id).or_default() += 1;
+        }
+    }
+
+    fn remove(&mut self, vello: &mut vello::Renderer, ids: &[u64]) {
+        for id in ids {
+            let Some(count) = self.counts.get_mut(id) else { continue };
+            *count -= 1;
+            if *count == 0 {
+                self.counts.remove(id);
+            }
+        }
+        let (held, unread): (Vec<_>, Vec<_>) = std::mem::take(&mut self.retired).into_iter().partition(|(image, _)| self.holds(image.data.id()));
+        self.retired = held;
+        unread.into_iter().for_each(|(image, texture)| free(vello, image, texture));
+    }
+
+    fn retire(&mut self, vello: &mut vello::Renderer, image: ImageData, texture: Option<wgpu::Texture>) {
+        if self.holds(image.data.id()) {
+            self.retired.push((image, texture));
+            return;
+        }
+        free(vello, image, texture);
+    }
+}
+
+fn read_images(scene: &Scene) -> Vec<u64> {
+    let mut ids: Vec<u64> = scene.encoding().resources.patches.iter().filter_map(|p| match p {
+        vello::low_level::vello_encoding::Patch::Image { image, .. } => Some(image.data.id()),
+        _ => None,
+    }).collect();
+    ids.sort_unstable();
+    ids.dedup();
+    ids
 }
 
 fn plain_content(item: &Item) -> bool {
@@ -113,12 +179,16 @@ pub struct Engine {
     pub vello: vello::Renderer,
     pub blending: Blending,
     pub atlas: Atlas,
+    pub effects: Effects,
     filters: FilterPasses,
     cache: LayerCache,
+    effect_cache: LayerCache,
+    fingerprints: Fingerprints,
     held: FxHashMap<String, wgpu::Texture>,
     spare: Vec<wgpu::Texture>,
     scenes: Vec<Scene>,
     sheet: Option<wgpu::Texture>,
+    reads: Reads,
     tally: Tally,
     drawing: Reason,
     fullness: f64,
@@ -149,6 +219,18 @@ struct Gpu<'a> {
     sheet: &'a mut Option<wgpu::Texture>,
     open: Option<Sheet>,
     unsettled: rustc_hash::FxHashSet<u64>,
+    effects: Effects,
+    effect_cache: &'a mut LayerCache,
+    fingerprints: &'a mut Fingerprints,
+    frame_override: Option<Rect>,
+}
+
+pub struct HeldScene {
+    scene: Scene,
+    loose: Vec<ImageData>,
+    _textures: Vec<Pooled>,
+    ids: rustc_hash::FxHashSet<u64>,
+    reads: Vec<u64>,
 }
 
 struct Sheet {
@@ -272,7 +354,7 @@ impl<'a> Surface for Gpu<'a> {
     type Error = EngineError;
 
     fn frame(&self) -> Rect {
-        Rect::new(0.0, 0.0, self.width as f64, self.height as f64)
+        self.frame_override.unwrap_or(Rect::new(0.0, 0.0, self.width as f64, self.height as f64))
     }
 
     fn paint(&mut self, reason: Reason, region: Rect, colour: Option<Rgba>, draw: &dyn Fn(&mut Scene)) -> Result<Pooled, EngineError> {
@@ -305,7 +387,7 @@ impl<'a> Surface for Gpu<'a> {
         let cached = self.cache.entries.get_mut(&self.key(item))?;
         cached.used = tick;
         self.vello.mark_override_image_dirty(&cached.image);
-        Some(Placed { image: cached.image.clone(), origin: cached.origin })
+        Some(Placed { image: cached.image.clone(), origin: cached.origin, scale: 1.0 })
     }
 
     fn remember(&mut self, item: &Item, placed: &Placed) {
@@ -324,7 +406,34 @@ impl<'a> Surface for Gpu<'a> {
         self.unsettled.insert(image.data.id());
         self.last = Some(texture.clone());
         self.kept.push(texture);
-        Placed { image, origin: region.origin() }
+        Placed { image, origin: region.origin(), scale: 1.0 }
+    }
+
+    fn effects(&self) -> Effects {
+        self.effects
+    }
+
+    fn set_frame(&mut self, frame: Option<Rect>) {
+        self.frame_override = frame;
+    }
+
+    fn zoomless(&mut self, item: &Item) -> Option<Zoomless> {
+        zoomless_in(item, self.fingerprints)
+    }
+
+    fn recall_held(&mut self, key: &str) -> Option<Placed> {
+        let tick = self.effect_cache.tick;
+        let cached = self.effect_cache.entries.get_mut(key)?;
+        cached.used = tick;
+        self.vello.mark_override_image_dirty(&cached.image);
+        Some(Placed { image: cached.image.clone(), origin: cached.origin, scale: 1.0 })
+    }
+
+    fn remember_held(&mut self, key: &str, placed: &Placed) {
+        if let Some(texture) = self.last.take() {
+            let used = self.effect_cache.tick;
+            self.effect_cache.entries.insert(key.to_string(), Cached { image: placed.image.clone(), origin: placed.origin, _texture: texture, used });
+        }
     }
 }
 
@@ -337,12 +446,21 @@ impl Gpu<'_> {
 impl Engine {
     pub fn new(device: &wgpu::Device) -> Result<Self, EngineError> {
         let vello = vello::Renderer::new(device, RendererOptions { antialiasing_support: AaSupport::area_only(), ..Default::default() })?;
-        Ok(Self { vello, blending: Blending::Native, atlas: Atlas::On, filters: FilterPasses::new(device), cache: LayerCache::default(), held: FxHashMap::default(), spare: Vec::new(), scenes: Vec::new(), sheet: None, tally: Tally::default(), drawing: Reason::Screen, fullness: 0.0, draws: 0 })
+        Ok(Self { vello, blending: Blending::Native, atlas: Atlas::On, effects: Effects::Screen, filters: FilterPasses::new(device), cache: LayerCache::default(), effect_cache: LayerCache { cap: HELD_EFFECT_BYTES, kept: HELD_EFFECTS, ..LayerCache::default() }, fingerprints: Fingerprints::default(), held: FxHashMap::default(), spare: Vec::new(), scenes: Vec::new(), sheet: None, reads: Reads::default(), tally: Tally::default(), drawing: Reason::Screen, fullness: 0.0, draws: 0 })
     }
 
     pub fn set_budget(&mut self, pool: u64, layers: u64) {
         self.filters.set_pool_bytes(pool);
         self.cache.cap = layers;
+    }
+
+    pub fn set_effect_budget(&mut self, bytes: u64) {
+        self.effect_cache.cap = bytes;
+        self.effect_cache.sweep(&mut self.vello, &self.reads);
+    }
+
+    pub fn set_image_atlas(&mut self, side: u32) {
+        self.vello.set_image_atlas_max(side);
     }
 
     pub fn take_tally(&mut self) -> Tally {
@@ -357,20 +475,80 @@ impl Engine {
         self.cache.entries.len()
     }
 
+    pub fn forget_fingerprints(&mut self) {
+        self.fingerprints.forget();
+    }
+
+    pub fn build_held(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures) -> Result<(HeldScene, Vec<Skipped>), EngineError> {
+        let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, kept: Vec::new(), last: None, cache: &mut self.cache, scenes: &mut self.scenes, tally: &mut self.tally, atlas: self.atlas, sheet: &mut self.sheet, open: None, unsettled: Default::default(), effects: self.effects, effect_cache: &mut self.effect_cache, fingerprints: &mut self.fingerprints, frame_override: None };
+        let layers = prepare(&mut gpu, list, pictures, self.blending)?;
+        let mut scene = Scene::new();
+        let skipped = build_into(&mut scene, list, pictures, &layers);
+        gpu.settle()?;
+        let images = layers.into_images();
+        let ids = images.iter().map(|i| i.data.id()).collect();
+        let loose = images.into_iter().filter(|i| !gpu.cache.holds(i) && !gpu.effect_cache.holds(i)).collect();
+        let textures = std::mem::take(&mut gpu.kept);
+        let reads = read_images(&scene);
+        self.reads.add(&reads);
+        Ok((HeldScene { scene, loose, _textures: textures, ids, reads }, skipped))
+    }
+
+    pub fn draw_held(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, held: &HeldScene, transform: Affine, background: Option<Rgba>, target: &wgpu::TextureView, (width, height): (u32, u32)) -> Result<(), EngineError> {
+        self.cache.touch(&held.ids);
+        self.effect_cache.touch(&held.ids);
+        self.filters.flush(queue);
+        let mut scene = borrowed(&mut self.scenes);
+        scene.append(&held.scene, Some(transform));
+        if empties_the_atlas(&scene) {
+            scene.fill(Fill::NonZero, Affine::IDENTITY, &atlas_anchor(), None, &OFF_TARGET);
+        }
+        let started = now_ms();
+        let params = RenderParams { base_color: base(background), width, height, antialiasing_method: AaConfig::Area };
+        let drawn = self.vello.render_to_texture(device, queue, &scene, target, &params);
+        self.tally.add(Reason::Screen, now_ms() - started);
+        self.scenes.push(scene);
+        self.draws += 1;
+        drawn
+    }
+
+    pub fn drop_held(&mut self, held: HeldScene) {
+        for image in held.loose {
+            self.vello.unregister_texture(image);
+        }
+        self.reads.remove(&mut self.vello, &held.reads);
+    }
+
+    pub fn retire(&mut self, image: ImageData, texture: wgpu::Texture) {
+        self.reads.retire(&mut self.vello, image, Some(texture));
+    }
+
+    pub fn held_effects(&self) -> usize {
+        self.effect_cache.entries.len()
+    }
+
     pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures, target: &wgpu::TextureView) -> Result<Vec<Skipped>, EngineError> {
-        let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, kept: Vec::new(), last: None, cache: &mut self.cache, scenes: &mut self.scenes, tally: &mut self.tally, atlas: self.atlas, sheet: &mut self.sheet, open: None, unsettled: Default::default() };
+        self.draw_over(device, queue, list, pictures, &[], target)
+    }
+
+    pub fn draw_over(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures, over: &[(std::rc::Rc<Scene>, crate::display_list::Affine)], target: &wgpu::TextureView) -> Result<Vec<Skipped>, EngineError> {
+        let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, kept: Vec::new(), last: None, cache: &mut self.cache, scenes: &mut self.scenes, tally: &mut self.tally, atlas: self.atlas, sheet: &mut self.sheet, open: None, unsettled: Default::default(), effects: self.effects, effect_cache: &mut self.effect_cache, fingerprints: &mut self.fingerprints, frame_override: None };
         let layers = prepare(&mut gpu, list, pictures, self.blending)?;
         let mut scene = borrowed(gpu.scenes);
         let skipped = build_into(&mut scene, list, pictures, &layers);
+        for (drawn, at) in over {
+            scene.append(drawn, Some(Affine::new(*at)));
+        }
         let fullness = fullness(&scene);
         let drawn = gpu.render(self.drawing, &scene, base(list.background), target, (list.width, list.height));
         gpu.scenes.push(scene);
         for image in layers.into_images() {
-            if !gpu.cache.holds(&image) {
+            if !gpu.cache.holds(&image) && !gpu.effect_cache.holds(&image) {
                 gpu.vello.unregister_texture(image);
             }
         }
-        gpu.cache.sweep(gpu.vello);
+        gpu.cache.sweep(gpu.vello, &self.reads);
+        gpu.effect_cache.sweep(gpu.vello, &self.reads);
         self.fullness = fullness;
         self.draws += 1;
         drawn.map(|_| skipped)
@@ -399,6 +577,11 @@ impl Engine {
     }
 
     fn release(&mut self, clip: &str, image: ImageData) {
+        if self.reads.holds(image.data.id()) {
+            let texture = self.held.remove(clip);
+            self.reads.retire(&mut self.vello, image, texture);
+            return;
+        }
         self.vello.unregister_texture(image);
         let Some(texture) = self.held.remove(clip) else { return };
         self.spare.push(texture);
@@ -408,7 +591,7 @@ impl Engine {
     }
 
     pub fn scratch_bytes(&self) -> u64 {
-        let layers: u64 = self.cache.entries.values().map(|c| bytes_of((c._texture.width(), c._texture.height()))).sum();
+        let layers: u64 = self.cache.entries.values().chain(self.effect_cache.entries.values()).map(|c| bytes_of((c._texture.width(), c._texture.height()))).sum();
         self.filters.pooled_bytes() + layers + self.spare_bytes()
     }
 

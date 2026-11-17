@@ -218,4 +218,63 @@ describe('diffDoc on an edit of one clip', () => {
     expect(diffDoc(before, after)).toEqual([{ kind: OpKind.ClipEntry, clipId: 'a', field: 'props', key: 'x', value: 0.3 }]);
     expect(calls).toBeLessThan(UNTOUCHED_CLIP_CALLS);
   });
+
+  it('compares an edited comp without serialising it', () => {
+    const inner = base();
+    const before = { ...base(), comps: { card: { durationInFrames: 60, tracks: inner.tracks } } } as unknown as MotionDoc;
+    const moved = withProp(inner, 'a', 'x', 0.3);
+    const after = { ...before, comps: { card: { durationInFrames: 60, tracks: moved.tracks } } } as unknown as MotionDoc;
+    const stringify = vi.spyOn(JSON, 'stringify');
+
+    const ops = diffDoc(before, after);
+
+    const calls = stringify.mock.calls.length;
+    stringify.mockRestore();
+    expect(ops.map((op) => op.kind)).toEqual([OpKind.DocEntry]);
+    expect(calls).toBe(0);
+  });
+
+  it('finds no op when a comp is rebuilt with the same content', () => {
+    const before = { ...base(), comps: { card: { durationInFrames: 60, tracks: base().tracks } } } as unknown as MotionDoc;
+    const after = { ...before, comps: { card: { durationInFrames: 60, tracks: base().tracks } } } as unknown as MotionDoc;
+
+    expect(diffDoc(before, after)).toEqual([]);
+  });
+});
+
+describe('applying ops to a big doc', () => {
+  const SIZE = 2000;
+
+  function big(): MotionDoc {
+    const start = newMotionDoc(MotionFormat.Landscape);
+    const clips = Array.from({ length: SIZE }, (_, i) => ({ ...clip(base(), 'a')!, id: `c${i}` }));
+    return { ...start, tracks: clips.map((c, i) => ({ id: `t${i}`, kind: start.tracks[0].kind, name: `t${i}`, clips: [c] })) } as MotionDoc;
+  }
+
+  it('changes one clip without serialising the whole doc', () => {
+    const doc = big();
+    const stringify = vi.spyOn(JSON, 'stringify');
+
+    const next = applyOps(doc, [{ kind: OpKind.ClipEntry, clipId: 'c7', field: 'props', key: 'text', value: 'moved' }]);
+
+    const calls = stringify.mock.calls.length;
+    stringify.mockRestore();
+    expect(calls).toBe(0);
+    expect(clip(next, 'c7')?.props.text).toBe('moved');
+    expect(clip(doc, 'c7')?.props.text).toBe('hello');
+    expect(next.tracks[0]).toBe(doc.tracks[0]);
+  });
+
+  it('diffs one edited clip without comparing the fields of every track', () => {
+    const doc = big();
+    const edited = { ...doc, tracks: doc.tracks.map((t, i) => (i === 7 ? withProp({ ...doc, tracks: [t] }, 'c7', 'text', 'moved').tracks[0] : t)) };
+    const keys = vi.spyOn(Object, 'keys');
+
+    const ops = diffDoc(doc, edited);
+
+    const calls = keys.mock.calls.length;
+    keys.mockRestore();
+    expect(ops).toEqual([{ kind: OpKind.ClipEntry, clipId: 'c7', field: 'props', key: 'text', value: 'moved' }]);
+    expect(calls).toBeLessThan(SIZE);
+  });
 });

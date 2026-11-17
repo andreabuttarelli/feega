@@ -67,9 +67,4 @@
   {$_('docs.credits.s40')}
 </p>
 
-<hr />
 
-<h2 id="see-also">{$_('docs.credits.s33')}</h2>
-<ul>
-  <li><a href={'/docs/getting-started'}>{$_('docs.credits.s36')}</a> {$_('docs.credits.s37')}</li>
-</ul>

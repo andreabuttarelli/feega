@@ -9,6 +9,7 @@ import { insertAsset } from '$lib/server/repos/assets';
 import { signAssetFile, storeAssetFile } from '$lib/server/repos/asset-storage';
 import { watermarked } from '$lib/server/export-watermark';
 import { libsOrigin } from './libs-origin';
+import { withShapedText } from './shaped-compose';
 import { chromiumFrames, serverFramesOpen } from './chromium-frames';
 import type { StillPort } from './server-frames';
 import { assetUrls, type MotionAsset } from './editor';
@@ -22,7 +23,7 @@ export async function drawStill(port: StillPort, compose: ComposeInput, spec: St
   const { doc } = compose;
   const page = await port.open({ width: doc.width, height: doc.height, scale: spec.scale });
   try {
-    await page.load(composeHtml({ ...compose, origin: compose.origin ?? libsOrigin() }));
+    await page.load(composeHtml({ ...(await withShapedText(compose)), origin: compose.origin ?? libsOrigin() }));
     await page.seek(posterSecond(doc));
     return await page.picture(spec.mime, spec.quality);
   } finally {

@@ -97,7 +97,7 @@ async function rasterOf(): Promise<StillRaster | null> {
   raster ??= (async () => {
     const { stillRaster } = await import('$lib/motion/gpu-full/core-export');
     for (const backend of TRIED) {
-      const made = await stillRaster(backend, side() * PROBE_SCALE);
+      const made = await stillRaster(backend, side() * PROBE_SCALE, BUDGET[device]);
       if (made) {
         return made;
       }

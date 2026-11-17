@@ -5,7 +5,7 @@ Errori comuni di auth: vedi [01-overview](01-overview.md).
 
 ## `GET /api/v1/brands`
 
-Elenco di tutti i brand accessibili all'utente autenticato (per API key: limitato allo scope `brand_ids` della chiave), con il conteggio dei post in attesa di approvazione.
+Elenco di tutti i brand accessibili all'utente autenticato (per API key: limitato allo scope `brand_ids` della chiave).
 
 **Query params**: nessuno
 
@@ -16,14 +16,7 @@ Elenco di tutti i brand accessibili all'utente autenticato (per API key: limitat
   {
     "id": "6f2c…",
     "name": "Mio Brand",
-    "slug": "mio-brand",
-    "plan": "pro",
-    "status": "active",
-    "autopilot_enabled": true,
-    "autopilot_failure_count": 0,
-    "last_autopilot_run_at": "2026-08-12T08:30:00Z",
-    "timezone": "Europe/Rome",
-    "pendingCount": 3
+    "slug": "mio-brand"
   }
 ]
 ```
@@ -37,52 +30,25 @@ curl -s "https://feega.app/api/v1/brands" -H "Authorization: Bearer $TOKEN"
 ---
 ## `GET /api/v1/brands/:slug`
 
-Dettaglio completo del brand: riga `brands` completa unita agli aggregati calcolati da `getBrandDetail` (conteggi, ultimi run autopilot, piano editoriale attivo, kit).
+Dettaglio del brand: la riga `brands` e gli aggregati calcolati da `getBrandDetail` (prodotti, logo).
 
 **Response** `200`:
 
 ```json
 {
-  "id": "6f2c…",
-  "org_id": "019e…",
-  "name": "Mio Brand",
-  "slug": "mio-brand",
-  "status": "active",
-  "plan": "pro",
-  "timezone": "Europe/Rome",
-  "target_platforms": ["instagram", "tiktok"],
-  "launched_at": "2026-05-01T00:00:00Z",
-  "content_prefs": { "…": "…" },
-  "setup_step": null,
-  "setup_completed_at": "2026-05-01T10:00:00Z",
-  "autopilot_enabled": true,
-  "autopilot_failure_count": 0,
-  "last_autopilot_run_at": "2026-08-12T08:30:00Z",
-  "zernio_profile_id": "zp_…",
-  "ads_settings": { "…": "…" },
-  "pendingCount": 3,
-  "runs": [
-    { "status": "success", "posts_created": 5, "created_at": "2026-08-12T08:30:00Z", "error": null }
-  ],
-  "plan": {
-    "id": "…",
-    "status": "active",
-    "cadence": "3/week",
-    "weeks": [ { "…": "contenuti generati da AI" } ]
+  "brand": {
+    "id": "6f2c…",
+    "org_id": "019e…",
+    "name": "Mio Brand",
+    "slug": "mio-brand",
+    "status": "active"
   },
   "productCount": 4,
-  "accountCount": 2,
-  "scheduledCount": 6,
-  "publishedCount": 120,
-  "hasGtm": true,
-  "hasContentPlans": true,
-  "hasHistory": true,
-  "kit": { "about": "…", "brand_colors": ["#7c5cff", "#ffffff"] },
   "logoUrl": "https://…/logo.png"
 }
 ```
 
-Note: `plan` è `null` senza piano attivo; `kit` è `null` senza riga `brand_kit`; `runs` contiene al massimo gli ultimi 3 run; `content_prefs`, `ads_settings` e `plan.weeks` contengono dati dinamici.
+Note: `logoUrl` è `null` senza logo.
 
 **Esempio**:
 
@@ -94,7 +60,7 @@ curl -s "https://feega.app/api/v1/brands/mio-brand" -H "Authorization: Bearer $T
 ## `GET /api/v1/brands/:slug/media`
 
 Elenca la libreria media del brand, dalla più recente, con una URL firmata per l'anteprima.
-Gli id restituiti sono quelli che `POST /posts` accetta in `media_ids`.
+Ogni elemento porta l'id dell'asset che un nodo della tela può mostrare.
 
 **Query params**
 
@@ -136,7 +102,7 @@ curl -s "https://feega.app/api/v1/brands/mio-brand/media?query=logo&limit=20" \
 ## `POST /api/v1/brands/:slug/media`
 
 Copia un'immagine o un video pubblicati altrove dentro la libreria del brand, e restituisce
-l'id che `POST /posts` accetta in `media_ids`. Nessun modello viene chiamato e nessun credito
+l'id dell'asset. Nessun modello viene chiamato e nessun credito
 viene speso: il file viene copiato, non generato.
 
 **Body**

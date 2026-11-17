@@ -127,7 +127,7 @@ fn placed_look(look: &Look, m: Affine, frame: Rect, scale: f64) -> Look {
     Look { matrix: times(m, look.matrix), blur: look.blur * scale, backdrop: look.backdrop.map(|b| b * scale), scissor: Some(scissor_of(clip)), masks, matte, space, origin, ..look.clone() }
 }
 
-fn placed(item: &Item, m: Affine, frame: Rect, scale: f64) -> Item {
+pub(crate) fn placed(item: &Item, m: Affine, frame: Rect, scale: f64) -> Item {
     let look = |look: &Look| placed_look(look, m, frame, scale);
     match item {
         Item::Path(p) => Item::Path(PathItem { look: look(&p.look), ..p.clone() }),
@@ -151,6 +151,7 @@ fn background(clip: &str, colour: crate::display_list::Rgba, frame: Rect, contou
     Item::Path(PathItem {
         clip: format!("frame:{clip}"),
         contours: vec![contour],
+        nudge: Vec::new(),
         rule: FillRule::NonZero,
         paint: Paint::Solid { color: colour },
         within: None,
@@ -659,6 +660,7 @@ pub struct Library {
     stale: Vec<String>,
     retiring: Vec<String>,
     motion: Motion,
+    native: Native,
     budget: Option<u64>,
     #[cfg(not(target_arch = "wasm32"))]
     fonts: Fonts,
@@ -668,6 +670,13 @@ pub struct Library {
 pub enum Sweep {
     Evict,
     Keep,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Native {
+    #[default]
+    Textures,
+    Vectors,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -858,6 +867,10 @@ impl Library {
         self.motion = motion;
     }
 
+    pub fn set_native(&mut self, native: Native) {
+        self.native = native;
+    }
+
     pub fn set_budget(&mut self, bytes: u64) {
         self.budget = Some(bytes);
     }
@@ -950,6 +963,15 @@ impl Library {
                     let (laid, spans) = laid(u, group, whole, view);
                     items.extend(laid);
                     encoded.extend(spans);
+                }
+                continue;
+            }
+            if self.native == Native::Vectors && !moved_as_texture {
+                if u.cache {
+                    seen.insert(u.group.clone());
+                }
+                if on_screen {
+                    self.live(u, group, cast.as_deref(), view, &mut items, &mut encoded);
                 }
                 continue;
             }

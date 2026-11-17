@@ -11,7 +11,8 @@ import { isOrgOwner, orgBillingById } from '$lib/server/org-billing';
 import { portalLink } from '$lib/server/billing-links';
 import { billingGrantsReady } from '$lib/server/billing-readiness';
 import { BILLING_PATH, checkoutReturnUrls } from '$lib/billing-path';
-import { listMemberships } from '$lib/server/repos/orgs';
+import { listMemberships, memberRole } from '$lib/server/repos/orgs';
+import { can, OrgAction } from '$lib/org-roles';
 import { chooseOrg, ORG_COOKIE } from '$lib/server/tenancy/context';
 import type { Db } from '$lib/server/db/client';
 import { appOrigin } from '$lib/server/app-url';
@@ -271,6 +272,9 @@ export async function createApiKey(event: Ev) {
     data: { user }
   } = await supabase.auth.getUser();
   if (!user) return fail(401, { apiKeyError: 'Not authenticated' });
+
+  const role = await memberRole(supabase as Db, { orgId: scope.orgId, userId: user.id });
+  if (!role || !can(role, OrgAction.ManageApiKeys)) return fail(403, { apiKeyError: 'Your role cannot create API keys' });
 
   const { error } = await supabase
     .from('api_keys')

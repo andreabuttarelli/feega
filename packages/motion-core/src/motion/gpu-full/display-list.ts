@@ -91,7 +91,7 @@ export type Within = { contours: number[][]; outside: boolean };
 
 export type Origin = [number, number];
 
-export type PathItem = { kind: ItemKind.Path; clip: string; contours: number[][]; rule: FillRule; paint: Paint; opacity: number; matrix: Affine; blur: number; blend: BlendMode; within?: Within; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; origin?: Origin; backdrop?: number };
+export type PathItem = { kind: ItemKind.Path; clip: string; contours: number[][]; nudge?: number[][]; rule: FillRule; paint: Paint; opacity: number; matrix: Affine; blur: number; blend: BlendMode; within?: Within; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; origin?: Origin; backdrop?: number };
 
 export type ImageItem = { kind: ItemKind.Image; clip: string; src: string; video: boolean; mediaTime: number; size: Size; fit: string; focus: [number, number]; zoom: number; crop?: [number, number, number, number]; tileTurn?: number; clipped: boolean; inner: Affine; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; origin?: Origin; backdrop?: number };
 

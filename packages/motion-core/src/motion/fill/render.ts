@@ -162,14 +162,14 @@ const IMAGE_SIZE: Record<ImageFit, (scale: number) => string> = {
   [ImageFit.Tile]: (scale) => `${round(scale * TEXT_TILE_SHARE)}% auto`
 };
 
-const QUADRANT = '50% 50%';
-const DIAMOND_CORNERS: [string, string][] = [
+export const QUADRANT = '50% 50%';
+export const DIAMOND_CORNERS: [string, string][] = [
   ['to bottom right', '100% 100%'],
   ['to bottom left', '0% 100%'],
   ['to top right', '100% 0%'],
   ['to top left', '0% 0%']
 ];
-const halfway = (stops: Stop[]) => stops.map((s) => ({ ...s, pos: s.pos / 2 }));
+export const halfway = (stops: Stop[]) => stops.map((s) => ({ ...s, pos: s.pos / 2 }));
 
 const TEXT_LAYER: { [T in FillType]: (f: FillOf<T>) => TextLayer[] } = {
   [FillType.Solid]: (f) => [flat(`linear-gradient(${faded(f.color, f.opacity)},${faded(f.color, f.opacity)})`)],

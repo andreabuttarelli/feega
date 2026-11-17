@@ -10,7 +10,7 @@ export enum StyleKind {
   Paint = 'paint'
 }
 
-export const MAX_STYLES = 40;
+export const MAX_STYLES = 200;
 export const MAX_TYPE_PX = 4096;
 export const STYLE_NAME = /^(?=.{1,40}$)[A-Za-z0-9][A-Za-z0-9 _-]*(?:\/ *[A-Za-z0-9][A-Za-z0-9 _-]*)*$/;
 
