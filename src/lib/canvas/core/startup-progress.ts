@@ -5,7 +5,11 @@ export enum CanvasContent {
   Empty = 'empty'
 }
 
-export type FramesShown = { shown: number; total: number };
+export type FramesShown = { shown: number; total: number; nearShown?: number; nearTotal?: number };
+
+export const NEAREST_FRAMES = 6;
+
+const nearestShown = (frames: FramesShown) => Boolean(frames.nearTotal) && (frames.nearShown ?? 0) >= frames.nearTotal!;
 
 const READY: Record<CanvasContent, StartupStep> = {
   [CanvasContent.Frames]: StartupStep.AllShown,
@@ -25,6 +29,9 @@ const FRAMES_WEIGHT = 0.5;
 
 export function startupProgress(done: ReadonlySet<StartupStep>, frames: FramesShown, content = CanvasContent.Frames): number {
   if (done.has(READY[content])) {
+    return 1;
+  }
+  if (content === CanvasContent.Frames && done.has(StartupStep.GpuReady) && nearestShown(frames)) {
     return 1;
   }
   const steps = [...done].reduce((sum, step) => sum + (WEIGHT[step] ?? 0), 0);

@@ -52,6 +52,16 @@ program
   });
 
 program
+  .command('init [dir]')
+  .description('Tag every element of a Vite or Next.js app with its file:line in dev, so Feega can open the source behind what you click')
+  .option('--dry-run', 'show the changes without writing them')
+  .option('-y, --yes', 'apply without asking')
+  .action(async (dir, options) => {
+    const { cmdInit } = await import('./commands/init.ts');
+    await cmdInit(dir ?? '.', options);
+  });
+
+program
   .command('brands')
   .description('Elenca tutti i brand')
   .action(async () => {
@@ -65,6 +75,15 @@ program
   .action(async (slug: string, tab: string | undefined) => {
     const { cmdLibrary } = await import('./commands/library.ts');
     await cmdLibrary(slug, tab ?? 'kit');
+  });
+
+program
+  .command('agents')
+  .description('List the coding agents a local Feega found on this computer and whether they can drive the chat over ACP')
+  .option('--refresh', 'Detect again instead of using the cached result')
+  .action(async (options: { refresh?: boolean }) => {
+    const { cmdAgents } = await import('./commands/agents.ts');
+    await cmdAgents(options);
   });
 
 program
@@ -961,6 +980,16 @@ github
   .action(async (projectId: string, nodeId: string) => {
     const { cmdGithubUndo } = await import('./commands/github.ts');
     await cmdGithubUndo(projectId, nodeId);
+  });
+
+github
+  .command('versions <projectId> <nodeId>')
+  .description('Branches, tags, open pull requests and the commits that touched the file of a linked frame')
+  .option('--ref <ref>', 'Branch, tag or sha whose history to list (default: the base branch)')
+  .option('--limit <n>', 'How many commits, at most 100')
+  .action(async (projectId: string, nodeId: string, opts) => {
+    const { cmdGithubVersions } = await import('./commands/github.ts');
+    await cmdGithubVersions(projectId, nodeId, opts);
   });
 
 github

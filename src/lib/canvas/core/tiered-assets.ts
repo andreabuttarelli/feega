@@ -14,3 +14,9 @@ export function tieredAssets(source: Hinted, place: Place, tier: AssetSize): Fra
   const sized = Object.fromEntries(images.map(([id]) => [id, canvasAssetUrl(place.projectId, place.canvasId, id, tier)]));
   return { ...source, assets: { ...source.assets, ...sized } };
 }
+
+export function tierSwap(source: Hinted, place: Place, from: AssetSize, to: AssetSize): Map<string, string> {
+  const was = tieredAssets(source, place, from).assets;
+  const now = tieredAssets(source, place, to).assets;
+  return new Map(Object.entries(now).flatMap(([id, url]) => (was[id] && was[id] !== url ? [[was[id], url] as const] : [])));
+}

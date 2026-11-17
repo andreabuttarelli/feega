@@ -49,6 +49,7 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   github_repos: 'The GitHub repositories your connected account can read, newest push first, with their default branch.',
   github_push: 'Push the code edits of linked frames to GitHub: one commit on feega/<name> and one pull request per merge cycle, never the default branch, never force-pushed; a rewritten, deleted or protected branch falls back to <branch>-sync. Read-only access answers the edits as a patch.',
   github_push_status: 'The computed GitHub state of a linked frame (conflict, orphan, access lost, newer upstream, modified, in PR, in sync), its pull request and CI checks; upstream renames are followed.',
+  github_versions: 'Branches, tags, open pull requests and the commit history of the file behind a linked frame or component.',
   github_undo: 'Undo the last push of a frame with a forward commit that restores only the files that push touched.',
   github_variant: 'Make a variant of a linked frame: a copy whose push asks to replace the original, become a new route or stay on the canvas.',
   github_detach: 'Unlink a frame from its GitHub source; the frame stays on the canvas.',

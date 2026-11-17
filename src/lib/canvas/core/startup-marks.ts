@@ -19,8 +19,8 @@ export enum StartupStep {
   AllShown = 'all-shown'
 }
 
-export function reportFramesShown(shown: number, total: number) {
-  globalThis.dispatchEvent?.(new CustomEvent(FRAMES_SHOWN_EVENT, { detail: { shown, total } }));
+export function reportFramesShown(shown: number, total: number, nearShown = shown, nearTotal = total) {
+  globalThis.dispatchEvent?.(new CustomEvent(FRAMES_SHOWN_EVENT, { detail: { shown, total, nearShown, nearTotal } }));
   if (shown === total) {
     markStartup(StartupStep.AllShown);
   }

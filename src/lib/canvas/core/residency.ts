@@ -1,6 +1,6 @@
 import type { Viewport } from '$lib/canvas/dot-grid';
 import type { Screen } from '$lib/canvas/gpu/camera';
-import { ItemKind, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
+import { ItemKind, type ImageItem, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import type { PutFrame } from './screen-uses';
 import { textured } from './texture-budget';
 
@@ -11,14 +11,30 @@ export const CACHE_SHARE = 0.5;
 
 const bytesOfList = new WeakMap<readonly Item[], number>();
 
-const summed = (items: readonly Item[]): number => items.reduce((sum, i) => sum + (i.kind === ItemKind.Image ? i.size.width * i.size.height * RGBA_BYTES : 0), 0);
+type PixelSize = { width: number; height: number };
 
-export function pictureBytes(items: readonly Item[]): number {
+export type DecodedSize = (item: ImageItem) => PixelSize | null;
+
+const drawnSize: DecodedSize = (i) => i.size;
+
+const summed = (items: readonly Item[], sizeOf: DecodedSize): number =>
+  items.reduce((sum, i) => {
+    if (i.kind !== ItemKind.Image) {
+      return sum;
+    }
+    const size = sizeOf(i) ?? i.size;
+    return sum + size.width * size.height * RGBA_BYTES;
+  }, 0);
+
+export function pictureBytes(items: readonly Item[], decoded?: DecodedSize): number {
+  if (decoded) {
+    return summed(items, decoded);
+  }
   const known = bytesOfList.get(items);
   if (known !== undefined) {
     return known;
   }
-  const bytes = summed(items);
+  const bytes = summed(items, drawnSize);
   bytesOfList.set(items, bytes);
   return bytes;
 }
