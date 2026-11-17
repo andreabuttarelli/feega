@@ -64,6 +64,7 @@ async function originWorld(): Promise<HostWorld & { clone: string }> {
   return {
     clone,
     host: localGitHost(clone, { publish: Publish.Origin }),
+    tag: (name, ref) => must(git(origin, ['tag', name, ref])),
     files: (ref) => filesAt(origin, ref),
     forcePush: (branch, files) => setRef(origin, branch, files, null),
     seed: async (branch, files) => setRef(origin, branch, files, await head(branch)),
@@ -76,6 +77,7 @@ async function localWorld(): Promise<HostWorld> {
   const head = async (b: string) => (await git(clone, ['rev-parse', '--verify', `refs/heads/${b}`])).out.trim() || null;
   return {
     host: localGitHost(clone, { publish: Publish.Local }),
+    tag: (name, ref) => must(git(clone, ['tag', name, ref])),
     files: (ref) => filesAt(clone, ref),
     forcePush: (branch, files) => setRef(clone, branch, files, null),
     seed: async (branch, files) => setRef(clone, branch, files, await head(branch)),

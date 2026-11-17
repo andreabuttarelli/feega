@@ -1,5 +1,4 @@
 import { AcpEventKind, readAcpEvents, type AcpEvent, type AcpOption, type AcpUpdate } from './acp-events';
-import type { AcpAgent } from './agent-choices';
 
 export const ACP_ENDPOINT = '/api/v1/local/acp';
 
@@ -45,7 +44,7 @@ export class AcpChat {
     this.push({ line: Line.Agent, text });
   }
 
-  async send(agent: AcpAgent, prompt: string) {
+  async send(agent: string, prompt: string) {
     this.push({ line: Line.User, text: prompt });
     this.busy = true;
 

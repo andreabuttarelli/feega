@@ -29,7 +29,8 @@ const manifestSchema = z.object({
   version: z.number().int().positive(),
   exportedAt: z.string(),
   canvasName: z.string(),
-  source: z.object({ projectId: z.string(), canvasId: z.string() })
+  source: z.object({ projectId: z.string(), canvasId: z.string() }),
+  acpAgent: z.string().nullable().optional()
 });
 
 const canvasSchema = z.object({
@@ -54,6 +55,7 @@ const canvasSchema = z.object({
     })
   ),
   heads: z.record(z.string(), z.object({ version: z.number(), doc: z.unknown() })),
+  events: z.array(z.record(z.string(), z.unknown())).optional(),
   assets: z.array(
     z.object({
       id: z.string(),

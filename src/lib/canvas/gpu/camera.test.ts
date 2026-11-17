@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hitTop, panBy, toWorld, visibleIds, wheelPan, zoomAt } from './camera';
+import { MAX_ZOOM, hitTop, panBy, toWorld, visibleIds, wheelPan, zoomAt } from './camera';
 
 const rects = [
   { id: 'a', x: 0, y: 0, w: 100, h: 100 },
@@ -18,7 +18,8 @@ describe('camera', () => {
   });
 
   it('zoom stays inside its bounds', () => {
-    expect(zoomAt({ x: 0, y: 0, zoom: 1 }, { x: 0, y: 0 }, 1000).zoom).toBe(4);
+    expect(zoomAt({ x: 0, y: 0, zoom: 1 }, { x: 0, y: 0 }, 1000).zoom).toBe(MAX_ZOOM);
+    expect(MAX_ZOOM).toBeGreaterThanOrEqual(32);
     expect(zoomAt({ x: 0, y: 0, zoom: 1 }, { x: 0, y: 0 }, 0.0001).zoom).toBe(0.05);
   });
 
