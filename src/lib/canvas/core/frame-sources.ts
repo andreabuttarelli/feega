@@ -68,7 +68,8 @@ const signedFrame = (batch: Batch, frame: Omit<FrameDoc, 'tokens'>): FrameDoc =>
 
 const FRAME_SOURCE = /^(\/p\/[^/]+\/c\/[^/]+\/motion)\/([0-9a-f-]{36})\/source(?:\?|$)/i;
 const HTTP_OK = 200;
-const BATCH_MAX = 100;
+export const SOURCES_PER_ASK = 2;
+export const SOURCE_ASKS_OPEN = 2;
 
 const answered = (body: FrameDoc): Response => ({ ok: true, status: HTTP_OK, json: async () => body }) as unknown as Response;
 
@@ -86,6 +87,8 @@ function batchUrl(base: string, waiting: Waiting[]): string {
 
 function frameBatcher(fetcher: Fetcher): Fetcher {
   const queues = new Map<string, Waiting[]>();
+  const due: { base: string; waiting: Waiting[] }[] = [];
+  let open = 0;
 
   const ask = async (base: string, waiting: Waiting[]) => {
     markStartup(StartupStep.SourcesAsked);
@@ -100,12 +103,24 @@ function frameBatcher(fetcher: Fetcher): Fetcher {
     }
   };
 
+  const next = () => {
+    while (open < SOURCE_ASKS_OPEN && due.length) {
+      const { base, waiting } = due.shift()!;
+      open++;
+      void ask(base, waiting).finally(() => {
+        open--;
+        next();
+      });
+    }
+  };
+
   const flush = (base: string) => {
     const waiting = queues.get(base) ?? [];
     queues.delete(base);
-    for (let at = 0; at < waiting.length; at += BATCH_MAX) {
-      void ask(base, waiting.slice(at, at + BATCH_MAX));
+    for (let at = 0; at < waiting.length; at += SOURCES_PER_ASK) {
+      due.push({ base, waiting: waiting.slice(at, at + SOURCES_PER_ASK) });
     }
+    next();
   };
 
   return (url, init) => {
