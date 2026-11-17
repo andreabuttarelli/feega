@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Readiness } from '@feega/motion-core/motion/gpu-full/media';
-import { OnScreen, Stage, VectorGate, showStaged, shownBefore } from './staged-show';
+import { OnScreen, RETRY_MS, Stage, VectorGate, showStaged, shownBefore } from './staged-show';
 
 const pending = () => {
   let settle: (r: Readiness) => void = () => {};
@@ -13,7 +13,7 @@ describe('showStaged', () => {
     const shown: Readiness[] = [];
     const { ready } = pending();
 
-    showStaged(ready, OnScreen.Nothing, (r) => shown.push(r));
+    showStaged(() => ready, OnScreen.Nothing, (r) => shown.push(r));
 
     expect(shown).toEqual([Readiness.Partial]);
   });
@@ -22,7 +22,7 @@ describe('showStaged', () => {
     const shown: Readiness[] = [];
     const { ready, settle } = pending();
 
-    showStaged(ready, OnScreen.Nothing, (r) => shown.push(r));
+    showStaged(() => ready, OnScreen.Nothing, (r) => shown.push(r));
     settle(Readiness.Whole);
     await ready;
 
@@ -33,7 +33,7 @@ describe('showStaged', () => {
     const shown: [Readiness, Stage][] = [];
     const { ready, settle } = pending();
 
-    showStaged(ready, OnScreen.Nothing, (r, stage) => shown.push([r, stage]));
+    showStaged(() => ready, OnScreen.Nothing, (r, stage) => shown.push([r, stage]));
     settle(Readiness.Partial);
     await ready;
 
@@ -43,11 +43,35 @@ describe('showStaged', () => {
     ]);
   });
 
+  it('pictures that failed are asked again at rest until they arrive', async () => {
+    const shown: [Readiness, Stage][] = [];
+    const answers = [Readiness.Partial, Readiness.Partial, Readiness.Whole];
+    const waits: number[] = [];
+
+    await showStaged(async () => answers.shift()!, OnScreen.Nothing, (r, stage) => shown.push([r, stage]), async (ms) => void waits.push(ms));
+
+    expect(shown).toEqual([
+      [Readiness.Partial, Stage.Vectors],
+      [Readiness.Partial, Stage.Settled],
+      [Readiness.Partial, Stage.Settled],
+      [Readiness.Whole, Stage.Settled]
+    ]);
+    expect(waits.length).toBe(2);
+  });
+
+  it('gives up after a few attempts', async () => {
+    const shown: Readiness[] = [];
+
+    await showStaged(async () => Readiness.Partial, OnScreen.Thumb, (r) => shown.push(r), async () => {});
+
+    expect(shown.length).toBe(1 + RETRY_MS.length);
+  });
+
   it('una miniatura resta finché le immagini non sono pronte', async () => {
     const shown: Readiness[] = [];
     const { ready, settle } = pending();
 
-    showStaged(ready, OnScreen.Thumb, (r) => shown.push(r));
+    showStaged(() => ready, OnScreen.Thumb, (r) => shown.push(r));
     expect(shown).toEqual([]);
 
     settle(Readiness.Partial);
