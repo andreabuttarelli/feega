@@ -971,11 +971,26 @@ fn tiles_are_baked_only_once_the_zoom_holds_still() {
 }
 
 #[test]
-fn a_zoom_bakes_mid_gesture_once_the_drawn_level_is_stretched_past_an_octave() {
-    use gpu_core::tiles::{sharpens_mid_gesture, step_of};
+fn a_zoom_aims_one_level_mid_gesture_once_the_drawn_level_is_stretched_past_an_octave() {
+    use gpu_core::tiles::{mid_gesture_level, step_of};
     let drawn = Some(step_of(1.0));
-    assert!(!sharpens_mid_gesture(1.9, drawn));
-    assert!(sharpens_mid_gesture(2.1, drawn));
-    assert!(!sharpens_mid_gesture(0.1, drawn), "zooming out downsamples, it stays sharp");
-    assert!(!sharpens_mid_gesture(8.0, None));
+    assert_eq!(mid_gesture_level(1.9, drawn, None), None);
+    assert_eq!(mid_gesture_level(0.1, drawn, None), None, "zooming out downsamples, it stays sharp");
+    assert_eq!(mid_gesture_level(8.0, None, None), None);
+
+    let aimed = mid_gesture_level(2.1, drawn, None).expect("past an octave it aims a sharper level");
+    assert!(aimed > drawn.unwrap() && aimed <= step_of(2.1));
+    assert_eq!(mid_gesture_level(3.0, drawn, Some(aimed)), Some(aimed), "the aim holds while the zoom moves on");
+    assert_eq!(mid_gesture_level(2.1, Some(aimed), Some(aimed)), None, "once drawn, nothing is aimed");
+}
+
+#[test]
+fn the_aimed_level_bakes_from_the_centre_of_the_view_out() {
+    let tiles = Tiles::default();
+    let level = tiles.step_for(camera(1.0));
+    let missing = tiles.missing_over(camera(1.0), SCREEN, level);
+    let centre = |k: &TileKey| { let c = k.screen(camera(1.0)).center(); (c.x - 512.0).hypot(c.y - 384.0) };
+
+    assert!(!missing.is_empty() && missing.iter().all(|k| k.step == level));
+    assert!(missing.windows(2).all(|w| centre(&w[0]) <= centre(&w[1])));
 }

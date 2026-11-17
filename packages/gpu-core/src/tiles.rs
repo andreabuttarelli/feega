@@ -239,8 +239,12 @@ pub fn bakes_in_gesture(since_zoom_ms: f64) -> bool {
 
 const GESTURE_STRETCH_MAX: f64 = 2.0;
 
-pub fn sharpens_mid_gesture(zoom: f64, drawn: Option<i32>) -> bool {
-    drawn.is_some_and(|step| zoom / step_zoom(step) > GESTURE_STRETCH_MAX)
+pub fn mid_gesture_level(zoom: f64, drawn: Option<i32>, aimed: Option<i32>) -> Option<i32> {
+    let drawn = drawn?;
+    if let Some(level) = aimed.filter(|level| *level > drawn) {
+        return Some(level);
+    }
+    (zoom / step_zoom(drawn) > GESTURE_STRETCH_MAX).then(|| step_of(zoom / HALF_OCTAVE))
 }
 
 pub fn sharp_at(zoom: f64, step: i32) -> bool {
@@ -390,6 +394,14 @@ impl Tiles {
             Some(level) => TileFrame { draw: self.held_over(world, level), missing: Vec::new(), bare: Vec::new(), beneath: Vec::new() },
             None => self.frame(camera, screen),
         }
+    }
+
+    pub fn missing_over(&self, camera: Camera, screen: (u32, u32), step: i32) -> Vec<TileKey> {
+        let Some(world) = self.on_canvas(seen_world(camera, screen)) else { return Vec::new() };
+        let centre = world.center();
+        let mut missing: Vec<TileKey> = keys_over(world, step).filter(|k| self.paints(*k) && !self.held.contains(k)).collect();
+        missing.sort_by(|a, b| a.world().center().distance(centre).total_cmp(&b.world().center().distance(centre)));
+        missing
     }
 
     fn on_canvas(&self, world: Rect) -> Option<Rect> {
