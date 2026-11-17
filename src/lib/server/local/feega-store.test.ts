@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createConnection, createNode, listConnections, listNodes } from '$lib/server/repos/canvas';
 import { appendRevision, readHead } from '$lib/server/repos/motion-revisions';
-import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { MotionFormat, newClip, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { unpackFeega } from '$lib/canvas/feega-file';
 import { snapshotSchema } from '$lib/canvas/canvas-version';
 import { LOCAL_ORG_ID, LOCAL_USER, openFeegaStore, type FeegaStore } from './feega-store';
@@ -67,6 +67,21 @@ describe('il file .feega è il database della modalità locale', () => {
     }
     expect(snapshotSchema.safeParse(opened.file.canvas).success).toBe(true);
     expect(opened.file.canvas.nodes[0].data).toEqual({ text: 'Pricing' });
+  });
+
+  it('un frame di un file aperto ha già il colore della sua pagina, prima che arrivi il documento', async () => {
+    const path = tempFile();
+    const first = openFeegaStore(path, { origin: ORIGIN });
+    const node = await createNode(first.db, { ...scopeOf(first), type: 'motion', x: 0, y: 0, data: { docHeadRevision: 1 }, actor });
+    const doc = newMotionDoc(MotionFormat.Square);
+    const page = { ...doc, tracks: [{ ...doc.tracks[0], clips: [newClip({ id: 'bg', from: 0, durationInFrames: 30, component: 'Shape', props: { x: 0.5, y: 0.5, width: 1, height: 1, fill: '#13111c' } })] }, ...doc.tracks.slice(1)] };
+    await appendRevision(first.db, { orgId: LOCAL_ORG_ID, nodeId: node.id, expectedVersion: 0, doc: page, actor });
+    await first.db.from('nodes').update({ data: { docHeadRevision: 1 } }).eq('id', node.id);
+    await first.flush();
+
+    const [opened] = await listNodes(openFeegaStore(path, { origin: ORIGIN }).db, scopeOf(first));
+
+    expect(opened.data.standInFill).toBe('#13111c');
   });
 
   it('un nodo cancellato non torna alla riapertura', async () => {

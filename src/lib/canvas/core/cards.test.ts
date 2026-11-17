@@ -73,6 +73,12 @@ describe('cardItems', () => {
     expect(paths(cardItems(card('motion', { kind: 'frame' }), theme, glyphs), CardPart.Stage)).toEqual([]);
   });
 
+  it('a frame not drawn yet fills its stage with the colour of its page', () => {
+    const [stage] = paths(cardItems(card('motion', { kind: 'frame', standInFill: '#07080a' }), theme, glyphs), CardPart.Stage);
+
+    expect(stage.paint).toEqual({ kind: 'solid', color: rgbaOf('#07080a') });
+  });
+
   it('lays thumbnails of a source in three square columns under the header', () => {
     const c = { ...card('social_account_feed', { handle: 'x' }), face: faceOf({ id: 'n', kind: 'social_account_feed' }, { handle: 'x' }, asset, view(['t1', 't2'])), w: 300, h: 300 };
     const thumbs = part(cardItems(c, theme, glyphs), CardPart.Thumb).filter((i): i is ImageItem => i.kind === ItemKind.Image);

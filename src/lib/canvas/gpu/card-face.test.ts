@@ -27,6 +27,11 @@ describe('faceOf — what a GPU card draws, one row per node type', () => {
     expect(face).toMatchObject({ surface: Surface.Frame, media: { url: '/a/p', video: false } });
   });
 
+  it('a motion frame with no poster yet is tinted with the colour of its page', () => {
+    expect(faceOf({ id: 'm', kind: 'motion', tag: NameTag.Shown }, { docHeadRevision: 2, standInFill: '#07080a' }, asset).tint).toBe('#07080a');
+    expect(faceOf({ id: 'm', kind: 'motion', tag: NameTag.Shown }, { docHeadRevision: 2 }, asset).tint).toBeNull();
+  });
+
   it('a motion frame never draws content older than its doc: a stale poster, an unversioned one, a past render', () => {
     const poster = { url: '/a/p', source: PosterSource.Image };
     const stale = faceOf({ id: 'm', kind: 'motion', tag: NameTag.Shown, poster }, { docHeadRevision: 9, posterRevision: 4 }, asset);
