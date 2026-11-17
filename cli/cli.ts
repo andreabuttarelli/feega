@@ -77,13 +77,24 @@ program
     await cmdLibrary(slug, tab ?? 'kit');
   });
 
-program
+const agents = program
   .command('agents')
   .description('List the coding agents a local Feega found on this computer and whether they can drive the chat over ACP')
   .option('--refresh', 'Detect again instead of using the cached result')
   .action(async (options: { refresh?: boolean }) => {
     const { cmdAgents } = await import('./commands/agents.ts');
     await cmdAgents(options);
+  });
+
+agents
+  .command('models <agent>')
+  .description('List the models an agent offers, read live from it; --set picks one for this .feega file')
+  .option('--set <model>', 'Use this model for the agent (an id from the list)')
+  .option('--clear', 'Go back to the agent default')
+  .option('--refresh', 'Ask the agent again instead of using the cached list')
+  .action(async (agent: string, options: { set?: string; clear?: boolean; refresh?: boolean }) => {
+    const { cmdAgentModels } = await import('./commands/agents.ts');
+    await cmdAgentModels(agent, options);
   });
 
 program

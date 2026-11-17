@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import { AGENT_STATUS, readyFirst, statusOf } from '$lib/acp/agent-status';
   import { markOf, type AgentMark } from '$lib/acp/agent-marks';
   import type { DetectedAgent } from '$lib/acp/detected-agent';
@@ -10,9 +11,10 @@
     refreshing?: boolean;
     onchoose: (id: string | null) => void;
     onrefresh: () => void;
+    beside?: Snippet;
   };
 
-  let { agents, chosen, open = $bindable(false), refreshing = false, onchoose, onrefresh }: Props = $props();
+  let { agents, chosen, open = $bindable(false), refreshing = false, onchoose, onrefresh, beside }: Props = $props();
 
   const CLOUD_LABEL = 'Feega cloud';
   const CLOUD_ID = 'cloud';
@@ -37,11 +39,14 @@
 {/snippet}
 
 <div class="picker" data-testid="acp-agent-picker">
-  <button type="button" class="trigger" aria-haspopup="listbox" aria-expanded={open} onclick={() => (open = !open)} data-testid="acp-agent-trigger">
-    <span class="label">Agent</span>
-    <span class="value">{current ? current.name : CLOUD_LABEL}</span>
-    <span class="caret" aria-hidden="true">▾</span>
-  </button>
+  <div class="bar">
+    <button type="button" class="trigger" aria-haspopup="listbox" aria-expanded={open} onclick={() => (open = !open)} data-testid="acp-agent-trigger">
+      <span class="label">Agent</span>
+      <span class="value">{current ? current.name : CLOUD_LABEL}</span>
+      <span class="caret" aria-hidden="true">▾</span>
+    </button>
+    {@render beside?.()}
+  </div>
 
   {#if open}
     <div class="menu" role="listbox" aria-label="Agent">
@@ -77,11 +82,17 @@
     border-bottom: 1px solid var(--ui-divider);
   }
 
+  .bar {
+    display: flex;
+    gap: var(--ui-space-2);
+  }
+
   .trigger {
     display: flex;
+    flex: 1;
+    min-width: 0;
     align-items: center;
     gap: var(--ui-space-2);
-    width: 100%;
     height: 24px;
     padding: 0 var(--ui-space-2);
     border: 0;
@@ -98,6 +109,10 @@
 
   .value {
     flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
     text-align: left;
   }
 

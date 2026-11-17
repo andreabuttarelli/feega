@@ -2,12 +2,15 @@
   import { Button, type ButtonVariant } from '$lib/components/ui/button';
   import { AcpChat, Line } from '$lib/acp/acp-chat.svelte';
   import { AgentChoices } from '$lib/acp/agent-choices.svelte';
+  import { AgentModelChoice } from '$lib/acp/agent-model-choice.svelte';
   import AcpAgentPicker from './AcpAgentPicker.svelte';
+  import AcpModelPicker from './AcpModelPicker.svelte';
 
   const CLOUD_HINT = 'Feega cloud chat spends credits and runs at feega.app: import this .feega file there, or pick an agent installed on this computer. It edits the canvas through Feega’s tools and asks before each one.';
   const OPTION_VARIANT: Record<string, ButtonVariant> = { allow_once: 'primary', allow_always: 'primary', reject_once: 'secondary', reject_always: 'secondary' };
   const chat = new AcpChat();
   const choices = new AgentChoices();
+  const model = new AgentModelChoice();
 
   let draft = $state('');
 
@@ -15,6 +18,10 @@
 
   $effect(() => {
     void choices.load();
+  });
+
+  $effect(() => {
+    void model.load(choices.chosen);
   });
 
   function submit(e: Event) {
@@ -38,7 +45,11 @@
 </script>
 
 <section class="acp" data-testid="acp-chat">
-  <AcpAgentPicker agents={choices.agents} chosen={choices.chosen} refreshing={choices.refreshing} onchoose={(id) => void choices.choose(id)} onrefresh={() => void choices.refresh()} />
+  <AcpAgentPicker agents={choices.agents} chosen={choices.chosen} refreshing={choices.refreshing} onchoose={(id) => void choices.choose(id)} onrefresh={() => void choices.refresh()}>
+    {#snippet beside()}
+      <AcpModelPicker models={model.models} selected={model.selected} onchoose={(id) => void model.choose(id)} />
+    {/snippet}
+  </AcpAgentPicker>
 
   <ol class="lines">
     {#if !agent}

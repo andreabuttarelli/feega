@@ -6,6 +6,19 @@ let servers = [];
 let nextId = 1000;
 let cancelled = false;
 
+const MODELS = [
+  { modelId: 'fast', name: 'Fast', description: 'Quick answers' },
+  { modelId: 'deep', name: 'Deep' }
+];
+let model = 'fast';
+
+const SESSION_MODELS = {
+  config: () => ({ configOptions: [{ id: 'mode', name: 'Mode', category: 'mode', type: 'select', currentValue: 'a', options: [{ value: 'a', name: 'A' }] }, { id: 'model', name: 'Model', category: 'model', type: 'select', currentValue: model, options: MODELS.map((m) => ({ value: m.modelId, name: m.name, description: m.description })) }] }),
+  models: () => ({ models: { availableModels: MODELS, currentModelId: model } }),
+  none: () => ({})
+};
+const shape = SESSION_MODELS[process.env.FAKE_ACP_MODELS ?? 'none'];
+
 const ask = (method, params) => new Promise((done) => {
   const id = nextId++;
   pending.set(id, done);
@@ -18,12 +31,20 @@ const HANDLERS = {
   initialize: () => ({ protocolVersion: 1, agentCapabilities: {} }),
   'session/new': (p) => {
     servers = p.mcpServers;
-    return { sessionId: 'fake-session' };
+    return { sessionId: 'fake-session', ...shape() };
+  },
+  'session/set_config_option': (p) => {
+    model = p.value;
+    return shape();
+  },
+  'session/set_model': (p) => {
+    model = p.modelId;
+    return {};
   },
   'session/prompt': async (p) => {
     const text = p.prompt.map((b) => b.text).join('');
     send({ method: '_fake/notice', params: {} });
-    update(p.sessionId, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: `heard: ${text}` } });
+    update(p.sessionId, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: `heard: ${text}${process.env.FAKE_ACP_MODELS ? ` on ${model}` : ''}` } });
     const answer = await ask('session/request_permission', { sessionId: p.sessionId, toolCall: { toolCallId: 't1', title: 'feega edit' }, options: [{ optionId: 'no', name: 'Reject', kind: 'reject_once' }, { optionId: 'yes', name: 'Allow', kind: 'allow_once' }] });
     if (cancelled) {
       return { stopReason: 'cancelled' };

@@ -102,7 +102,9 @@ const live = (row: Row) => row.deleted_at === null || row.deleted_at === undefin
 const ASSET_DIR = 'assets/';
 const assetFileName = (url: string) => `${ASSET_DIR}${url.split('/').map((part) => part.replace(UNSAFE_NAME, '_')).join('/')}`;
 
-function snapshot(tables: Tables, storage: Blobs, place: LocalPlace, acpAgent: string | null): Uint8Array {
+type AcpChoice = { acpAgent: string | null; acpModels: Record<string, string> };
+
+function snapshot(tables: Tables, storage: Blobs, place: LocalPlace, acp: AcpChoice): Uint8Array {
   const rows = (table: string) => tables.get(table) ?? [];
   const canvas = rows('canvases').find((c) => c.id === place.canvasId);
   const nodes = rows('nodes').filter((n) => n.canvas_id === place.canvasId && live(n));
@@ -134,7 +136,7 @@ function snapshot(tables: Tables, storage: Blobs, place: LocalPlace, acpAgent: s
   });
 
   const name = String(canvas?.name ?? 'Local canvas');
-  return packFeega({ manifest: { format: 'feega', version: FEEGA_VERSION, exportedAt: new Date().toISOString(), canvasName: name, source: place, acpAgent }, canvas: { ...body, assets } }, blobs);
+  return packFeega({ manifest: { format: 'feega', version: FEEGA_VERSION, exportedAt: new Date().toISOString(), canvasName: name, source: place, ...acp }, canvas: { ...body, assets } }, blobs);
 }
 
 export type FeegaStoreOptions = { origin: string; saveDelayMs?: number; latencyMs?: number };
@@ -146,7 +148,7 @@ export function openFeegaStore(path: string, options: FeegaStoreOptions) {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let dirty = !existsSync(path);
   let saving: Promise<void> = Promise.resolve();
-  let acpAgent = file.manifest.acpAgent ?? null;
+  const acp: AcpChoice = { acpAgent: file.manifest.acpAgent ?? null, acpModels: { ...file.manifest.acpModels } };
 
   const save = () => {
     timer = null;
@@ -154,7 +156,7 @@ export function openFeegaStore(path: string, options: FeegaStoreOptions) {
       return saving;
     }
     dirty = false;
-    saving = saving.then(() => writeAtomically(path, snapshot(tables, storage, place, acpAgent)));
+    saving = saving.then(() => writeAtomically(path, snapshot(tables, storage, place, acp)));
     return saving;
   };
 
@@ -186,9 +188,18 @@ export function openFeegaStore(path: string, options: FeegaStoreOptions) {
     place,
     db: db as unknown as Db,
     blob: (bucket: string, key: string) => storage.get(`${bucket}/${key}`),
-    acpAgent: () => acpAgent,
+    acpAgent: () => acp.acpAgent,
     chooseAcpAgent(id: string | null) {
-      acpAgent = id;
+      acp.acpAgent = id;
+      schedule();
+    },
+    acpModel: (agent: string) => acp.acpModels[agent] ?? null,
+    chooseAcpModel(agent: string, model: string | null) {
+      if (model === null) {
+        delete acp.acpModels[agent];
+      } else {
+        acp.acpModels[agent] = model;
+      }
       schedule();
     },
     subscribe(listen: (change: Change) => void) {
@@ -208,7 +219,7 @@ export function openFeegaStore(path: string, options: FeegaStoreOptions) {
       }
       if (dirty) {
         dirty = false;
-        writeAtomicallyNow(path, snapshot(tables, storage, place, acpAgent));
+        writeAtomicallyNow(path, snapshot(tables, storage, place, acp));
       }
     }
   };
