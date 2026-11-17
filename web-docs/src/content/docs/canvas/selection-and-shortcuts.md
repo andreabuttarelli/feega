@@ -108,7 +108,7 @@ pointer hands focus to the canvas instead, so the next shortcut acts at once.
 | Shift+Cmd/Ctrl+Z | Redo |
 | Arrows | Move the selection |
 | Arrows + Shift | Move by a longer step |
-| Shift+1 / Shift+2 | Zoom to fit everything / the selection, up to 400% |
+| Shift+1 / Shift+2 | Zoom to fit everything / the selection, up to 400% (the canvas itself zooms to 3200%) |
 | Shift+0 | Zoom to 100% |
 | R | Rectangle tool (Shift+R in Motion) |
 | Shift+R | Rulers (in Design) |
