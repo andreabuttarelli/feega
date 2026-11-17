@@ -53,7 +53,7 @@
   import { backendLog, consoleSink, debugActive, debugStart, gestureLog, renderLog, teeSink, tierLog } from '$lib/canvas/core/debug-log';
   import { readClips, type CustomFrame, type CustomReads } from '@feega/motion-core/motion/gpu-full/dom/custom';
   import type { Picture, Pictures } from '@feega/motion-core/motion/gpu-full/raster';
-  import { Stand, drawable, missingPictures, fillOrder, firstDrawn, inView, layersOf, nearestFirst, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
+  import { Stand, drawable, missingPictures, fillOrder, firstDrawn, inView, layersOf, nearestFirst, onScreenFirst, placeholder, standIn, stopgaps, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Stage, VectorGate, showStaged, shownBefore } from '$lib/canvas/core/staged-show';
   import { uploadWithin } from '$lib/canvas/core/picture-uploads';
   import { Step, markFrame, noteImages } from '$lib/canvas/core/frame-timeline';
@@ -957,7 +957,7 @@
   const chains = $derived.by(() => {
     const ready = new Map(real.map((f) => [f.id, f]));
     const holding = new Set([...rebuilding, ...retained(Date.now()), ...real.filter((f) => !pictured.has(f.group)).map((f) => f.id)]);
-    for (const id of [...drawnLast.keys()].filter((id) => !holding.has(id))) {
+    for (const id of [...drawnLast.keys()].filter((id) => !placeholders.has(id) || !listIfKnown(drawnLast.get(id)!.group))) {
       drawnLast.delete(id);
     }
     return [...placeholders.values()].map((p) => {
@@ -1351,8 +1351,8 @@
       pictured.delete(group);
       markFrame(group, Step.Dropped);
     }
-    const stopgaps = chains.flatMap((c) => (pictured.has(c[0].group) ? [] : c.filter((l) => thumbLists.has(l.group))));
-    for (const f of [...tails, ...stopgaps, ...editedLayers(held, liveGroup)]) {
+    const fallbacks = stopgaps(chains, pictured, (l) => thumbLists.has(l.group) || drawnLast.get(l.id)?.group === l.group);
+    for (const f of [...tails, ...fallbacks, ...editedLayers(held, liveGroup)]) {
       while (!put.has(f.group)) {
         putPart(into, f.group);
       }
@@ -1365,7 +1365,7 @@
         room -= putPart(into, f.group);
       }
     }
-    const unpictured = [...new Set([...tails, ...stopgaps, ...onScreenFirst(held, view, area)].filter((f) => put.has(f.group) && !pictured.has(f.group)).map((f) => f.group))];
+    const unpictured = [...new Set([...tails, ...fallbacks, ...onScreenFirst(held, view, area)].filter((f) => put.has(f.group) && !pictured.has(f.group)).map((f) => f.group))];
     uploadOwed(into, unpictured);
     for (const group of [...repictured].filter((g) => !put.has(g) || !pictured.has(g))) {
       repictured.delete(group);
