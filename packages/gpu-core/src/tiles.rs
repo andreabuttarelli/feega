@@ -314,6 +314,7 @@ pub struct Tiles {
     stale: FxHashSet<TileKey>,
     last_drawn: rustc_hash::FxHashMap<TileKey, u64>,
     tick: u64,
+    aimed: Option<i32>,
 }
 
 fn seen_world(camera: Camera, (w, h): (u32, u32)) -> Rect {
@@ -507,6 +508,10 @@ impl Tiles {
         }).collect()
     }
 
+    pub fn aim(&mut self, level: Option<i32>) {
+        self.aimed = level;
+    }
+
     pub fn set_canvas(&mut self, extent: Rect) {
         self.canvas = Some(extent);
     }
@@ -580,7 +585,7 @@ impl Tiles {
         if self.plan.iter().any(|level| level.holds(key)) || self.overview().is_some_and(|overview| key.step <= overview) {
             return true;
         }
-        key.step == step && key.world().overlaps(near.inflate(key.side(), key.side()))
+        (key.step == step || Some(key.step) == self.aimed) && key.world().overlaps(near.inflate(key.side(), key.side()))
     }
 
     pub fn evict_beyond(&mut self, camera: Camera, screen: (u32, u32), keep: usize) -> Vec<TileKey> {

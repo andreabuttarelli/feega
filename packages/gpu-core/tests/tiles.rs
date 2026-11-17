@@ -994,3 +994,17 @@ fn the_aimed_level_bakes_from_the_centre_of_the_view_out() {
     assert!(!missing.is_empty() && missing.iter().all(|k| k.step == level));
     assert!(missing.windows(2).all(|w| centre(&w[0]) <= centre(&w[1])));
 }
+
+#[test]
+fn eviction_keeps_the_aimed_level_baking_mid_gesture_though_it_was_never_drawn() {
+    let mut tiles = Tiles::default();
+    filled(&mut tiles);
+    let at = camera(1.0);
+    let aimed = tiles.step_for(at) - 2;
+    tiles.missing_over(at, SCREEN, aimed).into_iter().for_each(|k| tiles.hold(k));
+    tiles.aim(Some(aimed));
+
+    let gone = tiles.evict_beyond(at, SCREEN, 0);
+
+    assert!(gone.iter().all(|k| k.step != aimed || !k.screen(at).overlaps(Rect::new(0.0, 0.0, SCREEN.0 as f64, SCREEN.1 as f64))));
+}
