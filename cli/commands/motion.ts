@@ -139,7 +139,7 @@ export async function cmdMotionCode(nodeId: string, opts: { org?: string; target
   for (const file of code.files) {
     await write(file.path, missing.reduce((text, a) => text.replaceAll(a.ref, a.url), file.content));
   }
-  console.log(`Wrote ${code.files.length} files and ${(code.assets?.length ?? 0) - missing.length} images and fonts to ${root}/ (${code.target}).`);
+  console.log(`Wrote ${code.files.length} files and ${(code.assets?.length ?? 0) - missing.length} images, fonts and 3D models to ${root}/ (${code.target}).`);
   for (const note of code.notes) {
     console.log(`  not exported: ${note}`);
   }

@@ -24,6 +24,8 @@
   import { CANVAS_SHORTCUTS } from '$lib/canvas/shortcuts';
   import { openSheet } from '$lib/canvas/sheet-nav';
   import { BURGER_ENTRIES, mobileNavHref } from '$lib/shell-nav';
+  import { leftPanelRequest } from '$lib/canvas/left-panel-request.svelte';
+  import type { LeftPanelKind } from './CanvasLeftPanel.svelte';
   import { page } from '$app/state';
   import { env as publicEnv } from '$env/dynamic/public';
   import { LocalOff, isLocalMode, isOff } from '$lib/local-user';
@@ -201,12 +203,19 @@
         <DropdownMenu.GroupHeading class="menu-heading">{$_('app.shell.menu.pages')}</DropdownMenu.GroupHeading>
         {#each BURGER_ENTRIES as entry (entry.id)}
           {@const Icon = NAV_ICONS[entry.icon]}
-          <DropdownMenu.Item class="menu-row">
+          <DropdownMenu.Item class="menu-row" onSelect={() => entry.family === 'panel' && leftPanelRequest.ask(entry.id as LeftPanelKind)}>
             {#snippet child({ props })}
-              <a {...props} href={mobileNavHref(projectId, entry)}>
-                <Icon size={16} />
-                <span>{$_(entry.labelKey)}</span>
-              </a>
+              {#if entry.family === 'panel'}
+                <button {...props} type="button">
+                  <Icon size={16} />
+                  <span>{$_(entry.labelKey)}</span>
+                </button>
+              {:else}
+                <a {...props} href={mobileNavHref(projectId, entry)}>
+                  <Icon size={16} />
+                  <span>{$_(entry.labelKey)}</span>
+                </a>
+              {/if}
             {/snippet}
           </DropdownMenu.Item>
         {/each}

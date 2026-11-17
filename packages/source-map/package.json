@@ -1,0 +1,24 @@
+{
+  "name": "@feega/source-map",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dev-only plugins that tag every element with the file:line:col that wrote it, so Feega can open the source behind what you click.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    "./vite": "./src/vite.ts",
+    "./next": "./src/next.ts",
+    "./runtime": "./src/runtime.js",
+    "./bridge": "./src/bridge.js"
+  },
+  "dependencies": {
+    "@babel/parser": "^7.26.0",
+    "magic-string": "^0.30.0"
+  },
+  "peerDependencies": {
+    "svelte": ">=5"
+  },
+  "peerDependenciesMeta": {
+    "svelte": { "optional": true }
+  }
+}

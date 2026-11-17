@@ -270,6 +270,17 @@ const LONG_LIVED_MS = 4_000;
 const QUIET_POLL_MS = 100;
 const FONTS_MS = 3_000;
 const DOM_QUIET = { quietMs: 300, maxMs: 3_000 };
+const HYDRATION_QUIET = { quietMs: 1_000, maxMs: 6_000 };
+const IMAGES_MS = 5_000;
+
+function imagesLoaded(maxMs: number): Promise<void> {
+  const images = [...document.images];
+  images.forEach((img) => {
+    img.loading = 'eager';
+  });
+  const each = images.map((img) => (img.complete ? Promise.resolve() : img.decode().catch(() => undefined)));
+  return Promise.race([Promise.all(each).then(() => undefined), new Promise<void>((done) => setTimeout(done, maxMs))]);
+}
 
 function domStill(wait: { quietMs: number; maxMs: number }): Promise<void> {
   return new Promise((resolve) => {
@@ -451,8 +462,10 @@ const OFF_PAGE = { x: -1, y: -1 };
 
 function tabOf(page: Page, close: () => Promise<number>, left: () => number): AppTab {
   const quiet = quietOf(page);
+  let hydrated = false;
   return {
     goto: async (url) => {
+      hydrated = false;
       const until = Date.now() + NAV_TIMEOUT_MS;
       const response = await page.goto(url, { waitUntil: 'load', timeout: NAV_TIMEOUT_MS });
       await quiet(until - Date.now());
@@ -516,7 +529,9 @@ function tabOf(page: Page, close: () => Promise<number>, left: () => number): Ap
     settle: async (ms) => {
       await quiet(ms);
       await page.evaluate((fontsMs) => Promise.race([document.fonts.ready, new Promise((done) => setTimeout(done, fontsMs))]), FONTS_MS).catch(() => undefined);
-      await page.evaluate(domStill, DOM_QUIET).catch(() => undefined);
+      await page.evaluate(imagesLoaded, IMAGES_MS).catch(() => undefined);
+      await page.evaluate(domStill, hydrated ? DOM_QUIET : HYDRATION_QUIET).catch(() => undefined);
+      hydrated = true;
     },
     marks: (names) => page.evaluate(componentMarksOf, { names, limits: MARK_LIMITS, attr: TREE_LIMITS.useAttr }),
     overlay: () => page.evaluate(overlayOf, OVERLAY_SELECTOR),

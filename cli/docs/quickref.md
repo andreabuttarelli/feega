@@ -6,6 +6,7 @@
 # Panoramica
 feega brands                              # Lista brand
 feega health                              # Stato API (Supabase, Gemini)
+feega agents [--refresh]                  # Feega locale: agenti installati su questa macchina
 
 # Prodotti
 feega products <slug>                     # Lista
