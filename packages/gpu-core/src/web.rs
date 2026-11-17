@@ -145,6 +145,7 @@ struct Counted {
     exact: bool,
     swaps: u32,
     rebaked: u32,
+    stretch: f64,
 }
 
 struct GpuPainter<'a> {
@@ -953,6 +954,7 @@ impl WebCore {
         let whole_levels = gesture && !(bakes && panning);
         let tiles = if whole_levels { self.tiles.gesture_frame(self.camera, screen) } else { self.tiles.frame(self.camera, screen) };
         let shown = tiles.draw.iter().map(|k| k.step).max();
+        self.counted.stretch = shown.map_or(0.0, |step| self.camera.zoom / step_zoom(step));
         if shown != self.shown_step {
             self.counted.swaps += 1;
             self.shown_step = shown;
@@ -1344,7 +1346,7 @@ impl WebCore {
     pub fn frame_counts(&mut self) -> Vec<f64> {
         let planned = self.compositor.take_planned();
         let counted = std::mem::take(&mut self.counted);
-        vec![f64::from(planned.plans), f64::from(planned.walked), planned.ms, f64::from(counted.bakes), counted.ms, counted.upload_bytes, f64::from(counted.unsharp), f64::from(counted.uncovered), f64::from(step_of(self.camera.zoom)), f64::from(counted.tiles), f64::from(self.engine.take_draws()), f64::from(counted.uploads), counted.fallback_ms, f64::from(u8::from(counted.exact)), f64::from(counted.swaps), f64::from(counted.rebaked)]
+        vec![f64::from(planned.plans), f64::from(planned.walked), planned.ms, f64::from(counted.bakes), counted.ms, counted.upload_bytes, f64::from(counted.unsharp), f64::from(counted.uncovered), f64::from(step_of(self.camera.zoom)), f64::from(counted.tiles), f64::from(self.engine.take_draws()), f64::from(counted.uploads), counted.fallback_ms, f64::from(u8::from(counted.exact)), f64::from(counted.swaps), f64::from(counted.rebaked), counted.stretch]
     }
     pub fn warming(&self) -> bool {
         self.warming
