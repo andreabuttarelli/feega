@@ -28,8 +28,8 @@ export async function versionsOf(projectId: string, nodeId: string, fetchFn: Fet
   return body?.ok ? (body as unknown as Versions) : null;
 }
 
-export async function historyOf(projectId: string, nodeId: string, fetchFn: Fetch = fetch): Promise<CommitStep[]> {
-  const body = await post(fetchFn, github(projectId, 'versions'), { nodeId });
+export async function historyOf(projectId: string, nodeId: string, ref: string, fetchFn: Fetch = fetch): Promise<CommitStep[]> {
+  const body = await post(fetchFn, github(projectId, 'versions'), { nodeId, ref });
   return body?.ok ? (body.commits as CommitStep[]) : [];
 }
 

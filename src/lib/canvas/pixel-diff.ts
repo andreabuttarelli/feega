@@ -97,3 +97,14 @@ export function changedRegions(a: Pixels, b: Pixels, options: DiffOptions = {}):
   );
   return regions;
 }
+
+export function isBlank(p: Pixels, threshold = DEFAULT_THRESHOLD): boolean {
+  for (let at = 0; at < p.data.length; at += RGBA) {
+    for (let c = 0; c < RGB; c++) {
+      if (Math.abs(p.data[at + c] - p.data[c]) > threshold) {
+        return false;
+      }
+    }
+  }
+  return true;
+}

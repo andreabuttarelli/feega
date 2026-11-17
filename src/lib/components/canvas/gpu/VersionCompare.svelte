@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { changedRegions, DiffMode, type Pixels, type Region } from '$lib/canvas/pixel-diff';
+  import { changedRegions, DiffMode, isBlank, type Pixels, type Region } from '$lib/canvas/pixel-diff';
   import { VersionAction, versionAction, type FileDiff, type Timeline } from '$lib/canvas/version-client';
   import { LineMove, lineDiff } from '$lib/canvas/line-diff';
 
-  type Side = { url: string; label: string };
+  type Side = { url: string | null; label: string };
 
   type History = { line: Timeline; busy: boolean; onpick: (sha: string) => void };
 
@@ -54,6 +54,7 @@
   let split = $state(50);
   let regions = $state<Region[] | null>(null);
   let failed = $state(false);
+  let blank = $state(false);
 
   const load = (url: string) =>
     new Promise<HTMLImageElement>((resolve, reject) => {
@@ -74,12 +75,17 @@
   $effect(() => {
     regions = null;
     failed = false;
+    if (!before.url || !after.url) {
+      return;
+    }
     Promise.all([load(before.url), load(after.url)]).then(
       ([a, b]) => {
         const scale = Math.min(1, MAX_SIDE / Math.max(a.naturalWidth, a.naturalHeight));
         const width = Math.round(a.naturalWidth * scale);
         const height = Math.round(Math.max(a.naturalHeight, b.naturalHeight) * scale);
-        regions = changedRegions(pixelsOf(a, width, height), pixelsOf(b, width, height));
+        const [pa, pb] = [pixelsOf(a, width, height), pixelsOf(b, width, height)];
+        blank = isBlank(pa) || isBlank(pb);
+        regions = blank ? null : changedRegions(pa, pb);
       },
       () => (failed = true)
     );
@@ -96,7 +102,7 @@
         <button type="button" role="tab" aria-selected={mode === m} class:on={mode === m} data-testid="diff-mode-{m}" onclick={() => (mode = m)}>{MODE_LABEL[m]}</button>
       {/each}
     </div>
-    <span class="count" data-testid="diff-count">{failed ? 'posters unavailable' : regions === null ? 'comparing…' : `${regions.length} changed`}</span>
+    <span class="count" data-testid="diff-count">{failed ? 'posters unavailable' : !before.url || !after.url || blank ? 'rendering…' : regions === null ? 'comparing…' : `${regions.length} changed`}</span>
     <button type="button" class="close" aria-label="Close" onclick={onclose}>×</button>
   </header>
 
@@ -131,6 +137,9 @@
     </div>
   {:else}
   <div class="stage">
+    {#if !before.url || !after.url || blank}
+      <p class="note waiting">Rendering the versions…</p>
+    {:else}
     {#if mode === DiffMode.Overlay}
       <img src={after.url} alt={after.label} />
       {#each regions ?? [] as r, i (i)}
@@ -141,6 +150,7 @@
       <img class="before" src={before.url} alt={before.label} style="clip-path: inset(0 {100 - split}% 0 0)" />
       <div class="divider" style="left:{split}%"></div>
       <input class="slider" type="range" min="0" max="100" bind:value={split} aria-label="Before and after" data-testid="diff-slider" />
+    {/if}
     {/if}
   </div>
   {/if}
@@ -254,6 +264,9 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .waiting {
+    padding: 24px 10px;
   }
   .stage {
     position: relative;

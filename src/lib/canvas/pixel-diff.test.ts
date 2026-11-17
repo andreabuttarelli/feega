@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changedRegions, type Pixels } from './pixel-diff';
+import { changedRegions, isBlank, type Pixels } from './pixel-diff';
 
 const W = 64;
 const H = 64;
@@ -15,6 +15,13 @@ function paint(p: Pixels, box: { x: number; y: number; w: number; h: number }): 
   }
   return { ...p, data };
 }
+
+describe('un poster vuoto', () => {
+  it('un colore solo è vuoto, un disegno no', () => {
+    expect(isBlank(blank())).toBe(true);
+    expect(isBlank(paint(blank(), { x: 8, y: 8, w: 4, h: 4 }))).toBe(false);
+  });
+});
 
 describe('le regioni cambiate tra due poster', () => {
   it('due immagini uguali non hanno regioni', () => {

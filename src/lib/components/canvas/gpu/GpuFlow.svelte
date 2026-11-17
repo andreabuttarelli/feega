@@ -399,17 +399,16 @@
   let versionOpen = $state<{ before: string; after: string } | null>(null);
   let pickerOpen = $state<{ id: string; left: number; top: number } | null>(null);
   const sideOf = (id: string) => {
-    const url = posterOf(id);
-    return url ? { url, label: byId.get(id)?.displayName ?? '' } : null;
+    return { url: posterOf(id), label: byId.get(id)?.displayName ?? '' };
   };
   let versionCommits = $state<CommitStep[]>([]);
   let versionMoving = $state(false);
   const versionShown = $derived(versionOpen ? versionMarkOf(summaries.get(versionOpen.after)?.data) : null);
   $effect(() => {
-    const of = versionShown?.of;
+    const shown = versionShown;
     versionCommits = [];
-    if (of) {
-      void historyOf(page.params.projectId ?? '', of).then((c) => (versionCommits = c));
+    if (shown) {
+      void historyOf(page.params.projectId ?? '', shown.of, shown.ref).then((c) => (versionCommits = c));
     }
   });
   const pickVersion = async (sha: string) => {
@@ -422,6 +421,17 @@
     versionMoving = false;
     versionOpen = moved ? { ...open, after: moved } : open;
   };
+  let versionFitted = '';
+  $effect(() => {
+    const open = versionOpen;
+    const tiles = open ? [byId.get(open.before), byId.get(open.after)] : [];
+    const key = open ? `${open.before}:${open.after}` : '';
+    if (!open || key === versionFitted || tiles.some((t) => !t)) {
+      return;
+    }
+    versionFitted = key;
+    fitTo(tiles as Tile[], FitPurpose.Command);
+  });
   const versionHistory = $derived(versionShown ? { line: timelineOf(versionCommits, versionShown.sha), busy: versionMoving, onpick: pickVersion } : null);
   const versionSides = $derived(versionOpen ? { before: sideOf(versionOpen.before), after: sideOf(versionOpen.after) } : null);
   const posterOf = (id: string) => {
@@ -692,9 +702,10 @@
   };
   const SOURCE_POP_GAP = 6;
   const POPOVER_ROOM = 340;
+  const PROPERTIES_PANEL_PX = 300;
   const pressHeader = (hit: HeaderHit) => {
     HEADER_PRESS[headerRow(hit.key).action](hit.id);
-    sourceOpen = headerRow(hit.key).action === HeaderAction.Source ? { id: hit.id, left: Math.min(view.x + hit.x * view.zoom, window.innerWidth - POPOVER_ROOM), top: view.y + (hit.y + hit.h) * view.zoom + SOURCE_POP_GAP } : null;
+    sourceOpen = headerRow(hit.key).action === HeaderAction.Source ? { id: hit.id, left: Math.min(view.x + hit.x * view.zoom, window.innerWidth - POPOVER_ROOM - PROPERTIES_PANEL_PX), top: view.y + (hit.y + hit.h) * view.zoom + SOURCE_POP_GAP } : null;
   };
   const labelOf = (t: Tile) => {
     const kind = t.kind && isNodeType(t.kind) ? t.kind : null;
@@ -4703,7 +4714,7 @@
       <FrameSelection clip="" quad={manyQuad!} kind={SelectionKind.Many} ongrab={grabMany} />
     {/if}
     <FrameHeaderIcons {view} hits={headerHits(headerWorld, cameraMotion)} onpress={pressHeader} />
-    {#if versionSides?.before && versionSides.after}
+    {#if versionSides}
       <VersionCompare projectId={page.params.projectId ?? ''} versionId={versionOpen?.after ?? ''} before={versionSides.before} after={versionSides.after} history={versionHistory} onclose={() => (versionOpen = null)} onchanged={sources.refresh} />
     {/if}
     <SourceSyncPanel projectId={page.params.projectId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} oncompare={(id) => ((pickerOpen = sourceOpen && { ...sourceOpen, id }), (sourceOpen = null))} />
