@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createConnection, createNode, listConnections, listNodes } from '$lib/server/repos/canvas';
+import { createConnection, createNode, listConnections, listNodes, renameNode } from '$lib/server/repos/canvas';
 import { appendRevision, readHead } from '$lib/server/repos/motion-revisions';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { unpackFeega } from '$lib/canvas/feega-file';
@@ -201,6 +201,16 @@ describe('scrittura atomica', () => {
     expect(reopened).toHaveLength(1);
     expect(again).toHaveLength(1);
     expect(reopened[0]).toMatchObject({ actor_kind: 'system', created_at: exportedAt });
+  });
+
+  it('rinominare un nodo lascia un evento con chi lo ha fatto', async () => {
+    const store = openFeegaStore(tempFile(), { origin: ORIGIN });
+    const node = await addText(store, 'name me');
+    await renameNode(store.db, { orgId: LOCAL_ORG_ID, nodeId: node.id, name: 'Hero', actor: agentActor(LOCAL_USER.id, AgentKey.Mcp) });
+
+    const events = await listCanvasEvents(store.db, { orgId: LOCAL_ORG_ID, canvasId: store.place.canvasId });
+
+    expect(events[0]).toMatchObject({ kind: 'node.update', nodeId: node.id, actorKind: 'agent', agentKey: 'mcp', after: { displayName: 'Hero' } });
   });
 
 });
