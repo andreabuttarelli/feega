@@ -5,17 +5,17 @@ export enum OnScreen {
   Thumb = 'thumb'
 }
 
-export function showStaged(ready: Promise<Readiness>, held: OnScreen, show: (r: Readiness) => void): Promise<void> {
+export enum Stage {
+  Vectors = 'vectors',
+  Settled = 'settled'
+}
+
+export function showStaged(ready: Promise<Readiness>, held: OnScreen, show: (r: Readiness, stage: Stage) => void): Promise<void> {
   if (held === OnScreen.Nothing) {
-    show(Readiness.Partial);
+    show(Readiness.Partial, Stage.Vectors);
   }
 
-  return ready.then((r) => {
-    if (held === OnScreen.Nothing && r === Readiness.Partial) {
-      return;
-    }
-    show(r);
-  });
+  return ready.then((r) => show(r, Stage.Settled));
 }
 
 export class VectorGate {
