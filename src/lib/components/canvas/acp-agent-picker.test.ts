@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import { AcpLaunch, AgentAuth, type DetectedAgent } from '$lib/acp/detected-agent';
+import { markOf } from '$lib/acp/agent-marks';
+import { AGENT_CATALOG } from '$lib/server/acp/detect';
 import AcpAgentPicker from './AcpAgentPicker.svelte';
 
 const agent = (over: Partial<DetectedAgent>): DetectedAgent => ({ id: 'claude', name: 'Claude Code', installed: true, version: '2.1.3', launch: AcpLaunch.Adapter, auth: AgentAuth.SignedIn, install: 'npm i -g claude', login: 'claude /login', ...over });
@@ -13,32 +15,49 @@ describe('the agent picker', () => {
   it('offers Feega cloud first, then each agent', () => {
     const body = html([agent({}), agent({ id: 'codex', name: 'Codex CLI' })]);
 
-    expect(body.indexOf('Feega cloud (credits)')).toBeLessThan(body.indexOf('Claude Code'));
+    expect(body.indexOf('Feega cloud')).toBeLessThan(body.indexOf('Claude Code'));
     expect(body.indexOf('Claude Code')).toBeLessThan(body.indexOf('Codex CLI'));
   });
 
-  it('shows the version and a ready badge for a signed-in agent', () => {
+  it('shows a ready agent as a tile with its mark and no version or badge', () => {
     const claude = row(html([agent({})]), 'claude');
 
-    expect(claude).toContain('2.1.3');
-    expect(claude).toContain('Ready');
+    expect(claude).toContain('<svg');
+    expect(claude).not.toContain('2.1.3');
+    expect(claude).not.toContain('Ready');
+    expect(claude).not.toContain('data-dot');
     expect(claude).not.toContain('disabled');
   });
 
-  it('greys out an agent that is not installed and offers its install command to copy', () => {
+  it('lists ready agents before the ones that are not installed', () => {
+    const body = html([agent({ id: 'goose', name: 'Goose', installed: false, launch: AcpLaunch.None }), agent({})]);
+
+    expect(body.indexOf('Claude Code')).toBeLessThan(body.indexOf('Goose'));
+  });
+
+  it('dims an agent that is not installed, with a tooltip and no install command', () => {
     const goose = row(html([agent({ id: 'goose', name: 'Goose', installed: false, version: null, launch: AcpLaunch.None, install: 'brew install block-goose-cli' })]), 'goose');
 
     expect(goose).toContain('disabled');
-    expect(goose).toContain('brew install block-goose-cli');
-    expect(goose).toContain('Copy');
+    expect(goose).toContain('title="Not installed"');
+    expect(goose).toContain('data-dot');
+    expect(goose).not.toContain('brew install');
+    expect(goose).not.toContain('Copy');
   });
 
-  it('offers the login command to copy when the agent needs a login', () => {
+  it('says to sign in from the terminal when the agent needs a login', () => {
     const codex = row(html([agent({ id: 'codex', name: 'Codex CLI', auth: AgentAuth.NeedsLogin, login: 'codex login' })]), 'codex');
 
-    expect(codex).toContain('Needs login');
-    expect(codex).toContain('codex login');
-    expect(codex).toContain('Copy');
+    expect(codex).toContain('title="Sign in from your terminal"');
+    expect(codex).toContain('data-dot');
+    expect(codex).not.toContain('codex login');
+    expect(codex).not.toContain('Copy');
+  });
+
+  it('gives every catalogue agent a real mark', () => {
+    for (const a of AGENT_CATALOG) {
+      expect(markOf(a.id), a.id).not.toBeNull();
+    }
   });
 
   it('marks the remembered choice', () => {
