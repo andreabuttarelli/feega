@@ -2,6 +2,7 @@ import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 import { changedLook, LOOK, LookKey, minSideOf, type Look, type LookValue } from '$lib/canvas/code-look';
 import { BASE_CONDITIONS, parseKey, Scheme } from './render-conditions';
 import { viewChanges } from './view-look';
+import { isGalleryFile } from './gallery';
 
 export type SourceAt = { file: string; line: number; column: number };
 
@@ -49,7 +50,7 @@ export function editsOf(doc: MotionDoc): SourceEdit[] {
     const at = clip.source ? atOf(clip.source.at) : null;
     const look = at ? unbound(clip, changedLook(clip, side)) : {};
     const key = `${clip.source?.at}|${clip.source?.cond ?? ''}`;
-    if (!at || !Object.keys(look).length || byAt.has(key)) {
+    if (!at || isGalleryFile(at.file) || !Object.keys(look).length || byAt.has(key)) {
       continue;
     }
     const { tag, cls, cond } = clip.source!;

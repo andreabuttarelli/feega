@@ -56,7 +56,7 @@ export function mapOf(found: RoutesFound, done: Landed, ask: MapAsk): ImportMap 
       pages.set(page.path, page);
     }
   }
-  const library = done.library ? { captured: done.library.components.filter((c) => c.captured).map((c) => c.name), uncaptured: done.library.uncaptured } : undefined;
+  const library = done.library ? { captured: done.library.components.filter((c) => c.captured || c.drawn).map((c) => c.name), uncaptured: done.library.uncaptured, reasons: done.library.reasons } : undefined;
   const design = designOf(done);
   return { rev: ask.rev, pages: [...pages.values()], ...(library ? { library } : {}), ...(design ? { design } : {}), ...(found.ok ? {} : { unrun: `${found.error}: ${found.detail}` }) };
 }
