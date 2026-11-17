@@ -102,11 +102,19 @@ describe('write-back', () => {
     expect(done.files[0].after).toBe('<div class="bg-white dark:bg-[#101010]">x</div>\n');
   });
 
+  it('un colore cambiato sostituisce solo la sua classe e tiene tutte le altre', async () => {
+    const h1 = (cls: string) => `<h1 class="${cls}">{m.about_page_title()}</h1>\n`;
+    const files: Record<string, string> = { 'a.svelte': h1('text-2xl sm:text-3xl lg:text-4xl font-heading font-semibold tracking-tight text-primary mb-4'), 'package.json': '{"devDependencies":{"tailwindcss":"^4"}}' };
+    const colour = { at: { file: 'a.svelte', line: 1, column: 0 }, look: { color: '#e91e63' }, was: { color: '#1a1a2e' } };
+    const done = await applyEdits([colour], async (path) => files[path] ?? null);
+    expect(done.files[0].after).toBe(h1('text-2xl sm:text-3xl lg:text-4xl font-heading font-semibold tracking-tight text-[#e91e63] mb-4'));
+  });
+
   it('una modifica sotto il chiaro, in Tailwind, scrive la classe base e non tocca il dark:', async () => {
     const files: Record<string, string> = { 'a.svelte': '<div class="bg-white dark:bg-zinc-900">x</div>\n', 'package.json': '{"dependencies":{"tailwindcss":"3"}}' };
     const light = { at: { file: 'a.svelte', line: 1, column: 0 }, look: { fill: '#fafafa' }, was: { fill: '#ffffff' } };
     const done = await applyEdits([light], async (path) => files[path] ?? null);
-    expect(done.files[0].after).toBe('<div class="dark:bg-zinc-900 bg-[#fafafa]">x</div>\n');
+    expect(done.files[0].after).toBe('<div class="bg-[#fafafa] dark:bg-zinc-900">x</div>\n');
   });
 
   it('dark senza Tailwind non si scrive: si salta e si dice perché, mai uno style inline che schiaccia il chiaro', async () => {
