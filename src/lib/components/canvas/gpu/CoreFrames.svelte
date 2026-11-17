@@ -28,7 +28,7 @@
   import { SentParts, SentUses } from '$lib/canvas/core/use-diff';
   import { NO_OVERLAY, type CoreOverlay } from '$lib/canvas/core/world-overlay';
   import { memoSources } from '$lib/canvas/core/source-memo';
-  import { retiered, retiers } from '$lib/canvas/core/retier';
+  import { retiered } from '$lib/canvas/core/retier';
   import { drawsAny, frameOfLive, legible, logGaps, onStage, sameLive, shownGroup, stagedBox, toBuild, toWarm, untilFound, frameSourceUrl, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor, showsPoster } from '$lib/canvas/core/frame-poster';
@@ -46,10 +46,10 @@
   import { heldBuilds } from '$lib/canvas/core/held-build';
   import { customPictures as customPicturesOf } from '$lib/canvas/core/custom-pictures';
   import { frameSources } from '$lib/canvas/core/frame-sources';
-  import { tieredAssets } from '$lib/canvas/core/tiered-assets';
+  import { tierSwap, tieredAssets } from '$lib/canvas/core/tiered-assets';
   import { Reach, assetTier, keptTier } from '$lib/canvas/core/asset-tier';
   import { AssetSize } from '$lib/canvas/asset-url';
-  import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
+  import { GESTURE_QUIET_MS, gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
   import { backendLog, consoleSink, debugActive, debugStart, gestureLog, renderLog, teeSink, tierLog } from '$lib/canvas/core/debug-log';
   import { readClips, type CustomFrame, type CustomReads } from '@feega/motion-core/motion/gpu-full/dom/custom';
   import type { Picture, Pictures } from '@feega/motion-core/motion/gpu-full/raster';
@@ -109,12 +109,9 @@
   });
   $effect(() => tierLog(tier, untrack(() => view.zoom)));
   let sight = $state.raw<Sight>(NO_SIGHT);
-  const imaged = new Set<string>();
-  const baseKey = (f: FrameAt) => `${f.id}:${f.revision}:${place?.look ?? ''}${f.linked ? `:${f.linked}` : ''}${f.scenes ? `:${f.scenes}` : ''}`;
-  const tieredKey = (f: FrameAt, at: AssetSize) => (imaged.has(f.id) ? `${baseKey(f)}:${at}` : baseKey(f));
-  const bestTier = new Map<string, AssetSize>();
-  const tierOf = (f: FrameAt) => keptTier(tier, bestTier.get(f.id), sight.near.has(f.id) ? Reach.Near : Reach.Far);
-  const keyOf = (f: FrameAt) => tieredKey(f, tierOf(f));
+  let motion = $state(Motion.Still);
+  const keyOf = (f: FrameAt) => `${f.id}:${f.revision}:${place?.look ?? ''}${f.linked ? `:${f.linked}` : ''}${f.scenes ? `:${f.scenes}` : ''}`;
+  const tierOf = (f: FrameAt) => keptTier(tier, builtTiers.get(f.id)?.at, sight.near.has(f.id) ? Reach.Near : Reach.Far, motion);
   const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, budget.resolution);
   const crashes = watchCrashes({ device: currentDevice(), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, resolution });
   const RASTERED = new Set<Outcome>([Outcome.Full, Outcome.Partial]);
@@ -254,7 +251,10 @@
 
   const weights = new Map<string, number>();
 
-  const builtTiers = new Map<string, { revision: number; at: AssetSize; list: DisplayList; custom: boolean }>();
+  type BuiltTier = { revision: number; at: AssetSize; list: DisplayList; custom: boolean };
+  const builtTiers = new Map<string, BuiltTier>();
+  const swapping = new Set<string>();
+  const repictured = new Set<string>();
 
   async function fetchAndBuild(f: FrameAt, at: AssetSize) {
     const fetched = await readSource(f);
@@ -264,23 +264,48 @@
     markFrame(f.id, Step.Source);
     const source = place ? tieredAssets(fetched, place, at) : fetched;
     onsource(f.id, { ...source, revision: f.revision });
-    if (source !== fetched && !imaged.has(f.id)) {
-      imaged.add(f.id);
-      asked.add(tieredKey(f, at));
-    }
-
-    const prior = builtTiers.get(f.id);
-    if (place && prior && prior.revision === f.revision && prior.at !== at && !prior.custom) {
-      const was = tieredAssets(fetched, place, prior.at).assets;
-      const swap = new Map(Object.entries(source.assets).flatMap(([id, url]) => (was[id] && was[id] !== url ? [[was[id], url] as const] : [])));
-      if (retiers(prior.list, swap)) {
-        return { list: retiered(prior.list, swap), custom: null, source };
-      }
-    }
     const built = await builtOff(f, source);
     builtTiers.set(f.id, { revision: f.revision, at, list: built.list, custom: built.custom !== null });
     return { ...built, source };
   }
+
+  async function swapTier(f: FrameAt, built: BuiltTier, to: AssetSize) {
+    swapping.add(f.id);
+    try {
+      const fetched = await readSource(f);
+      if (!fetched || !place) {
+        return;
+      }
+      const list = retiered(built.list, tierSwap(fetched, place, built.at, to));
+      const ready = await media.ready(list);
+      await whenQuiet(() => gesture.active());
+      const group = keyOf(f);
+      if (ready !== Readiness.Whole || builtTiers.get(f.id) !== built || loaded.get(f.id) !== group) {
+        return;
+      }
+      builtTiers.set(f.id, { ...built, at: to, list });
+      lists = new Map(lists).set(group, onStage(list, f.kind));
+      repictured.add(group);
+    } finally {
+      swapping.delete(f.id);
+    }
+  }
+
+  $effect(() => {
+    void lists;
+    if (motion === Motion.Moving || !place) {
+      return;
+    }
+    for (const f of nearestFirst(untrack(() => frames), sight.view, area)) {
+      const built = builtTiers.get(f.id);
+      if (swapping.size >= budget.framesInFlight) {
+        return;
+      }
+      if (built && !built.custom && built.revision === f.revision && !swapping.has(f.id) && tierOf(f) !== built.at) {
+        void swapTier(f, built, tierOf(f));
+      }
+    }
+  });
 
   async function builtOff(f: FrameAt, source: FrameDoc): Promise<{ list: DisplayList; custom: CustomFrame | null }> {
     const away = f.scenes ? null : await buildAway(source, smoothing).catch(() => null);
@@ -317,7 +342,7 @@
     if (read) {
       onsource(f.id, { ...read.source, revision: f.revision });
     }
-    const key = tieredKey(f, at);
+    const key = keyOf(f);
     const held = shownBefore({ thumb: thumbShown.has(f.id), drawn: presented.has(f.id) });
     if (built.custom) {
       customPictures.set(key, built.custom.picture);
@@ -334,9 +359,6 @@
       if (asking.get(f.id) !== key) {
         return;
       }
-      if (ready === Readiness.Whole) {
-        bestTier.set(f.id, keptTier(at, bestTier.get(f.id), Reach.Near));
-      }
       const group = ready === Readiness.Whole || held === OnScreen.Thumb ? key : `${key}${VECTORS}`;
       const shown = loaded.get(f.id);
       loaded.set(f.id, group);
@@ -352,7 +374,7 @@
   const presented = new Set<string>();
 
   async function showThumb(f: FrameAt, given: Blob | null = null) {
-    const key = baseKey(f);
+    const key = keyOf(f);
     const blob = given ?? (await thumbs.get(key));
     shotChecked.add(f.id);
     if (blob) {
@@ -418,7 +440,7 @@
     if (!into) {
       return;
     }
-    const drawn = frames.map((f) => ({ id: f.id, key: baseKey(f), group: groupOf(f), box: f.box, revision: f.revision, saved: !liveGroup.has(f.id) }));
+    const drawn = frames.map((f) => ({ id: f.id, key: keyOf(f), group: groupOf(f), box: f.box, revision: f.revision, saved: !liveGroup.has(f.id) }));
     const offscreen = raster?.poster;
     for (const f of thumbsDue(shown, drawn, thumbTaken)) {
       if (offscreen) {
@@ -447,8 +469,8 @@
   $effect(() => {
     const seen = slackened(sight.view, area);
     for (const f of fillOrder(drawnFrames, seen.view, seen.area)) {
-      if (!thumbAsked.has(baseKey(f))) {
-        thumbAsked.add(baseKey(f));
+      if (!thumbAsked.has(keyOf(f))) {
+        thumbAsked.add(keyOf(f));
         void showThumb(f);
         void showViewShots(f);
       }
@@ -465,7 +487,7 @@
     if (viewOf(f.id) || viewShots.has(f.id)) {
       return;
     }
-    const blob = await thumbs.get(`${baseKey(f)}${VIEWS}`);
+    const blob = await thumbs.get(`${keyOf(f)}${VIEWS}`);
     const shots = blob ? ((await blob.text().then(JSON.parse, () => null)) as ViewShot[] | null) : null;
     if (shots?.length) {
       viewShots = new Map(viewShots).set(f.id, shots);
@@ -552,7 +574,7 @@
     if (!blob) {
       return;
     }
-    const key = baseKey(frame);
+    const key = keyOf(frame);
     thumbs.put(key, blob);
     thumbTaken.add(key);
     if (upload) {
@@ -586,7 +608,7 @@
       await snap(shot.frame as FrameAt, shot.list, shot.frame.id === f.id);
     }
     const views = shotsOf(f.box, (shots ?? []).slice(1));
-    thumbs.put(`${baseKey(f)}${VIEWS}`, new Blob([JSON.stringify(views)], { type: 'application/json' }));
+    thumbs.put(`${keyOf(f)}${VIEWS}`, new Blob([JSON.stringify(views)], { type: 'application/json' }));
     viewShots = new Map(viewShots).set(f.id, views);
     flightNote('snapshot', { id: f.id, shots: shots?.length ?? 0, away: away !== null, ms: Math.round(performance.now() - started) });
   }
@@ -814,16 +836,17 @@
     for (const [, list] of gone) {
       media.release(list, [...lists.values()]);
     }
-    for (const held of [loaded, asking, builtTiers, bestTier, weights, drawnLast]) {
+    for (const held of [loaded, asking, builtTiers, weights, drawnLast]) {
       [...held.keys()].filter(owned).forEach((key) => held.delete(key));
     }
-    for (const held of [asked, imaged, presented]) {
+    for (const held of [asked, presented]) {
       [...held].filter(owned).forEach((key) => held.delete(key));
     }
     readSource.forget(f.id);
     frameSources.forget(sourceOf(f));
-    thumbAsked.delete(baseKey(f));
+    thumbAsked.delete(keyOf(f));
     onevict(f.id);
+    markFrame(f.id, Step.SentBack);
     flightNote('sent-back', { id: f.id });
   }
 
@@ -848,7 +871,7 @@
   $effect(() => {
     void lists;
     builtMb = Math.round(untrack(() => [...weights.values()].reduce((sum, bytes) => sum + bytes, 0)) / MB);
-    if (!bounded) {
+    if (!bounded || motion === Motion.Moving) {
       return;
     }
     void sight;
@@ -1306,6 +1329,7 @@
       put.delete(group);
       putting.delete(group);
       pictured.delete(group);
+      markFrame(group, Step.Dropped);
     }
     const stopgaps = chains.flatMap((c) => (pictured.has(c[0].group) ? [] : c.filter((l) => thumbLists.has(l.group))));
     for (const f of [...tails, ...stopgaps, ...editedLayers(held, liveGroup)]) {
@@ -1323,6 +1347,12 @@
     }
     const unpictured = [...new Set([...tails, ...stopgaps, ...onScreenFirst(held, view, area)].filter((f) => put.has(f.group) && !pictured.has(f.group)).map((f) => f.group))];
     uploadOwed(into, unpictured);
+    for (const group of [...repictured].filter((g) => !put.has(g) || !pictured.has(g))) {
+      repictured.delete(group);
+    }
+    for (const group of uploadWithin([...repictured], (g) => into.upload(listOf(g), pictures, 1), () => performance.now(), gesture.active() ? 0 : UPLOAD_BUDGET_MS)) {
+      repictured.delete(group);
+    }
     const shown = chains.flatMap((c) => {
       const layer = firstDrawn(c, pictured);
       return layer ? [layer] : [];
@@ -1372,7 +1402,7 @@
     staleScene = false;
     stagedCache = cacheAt();
     shown = stage(into);
-    sceneBusy = held.some((f) => !pictured.has(f.group));
+    sceneBusy = held.some((f) => !pictured.has(f.group)) || repictured.size > 0;
     thumbsOwed = true;
     sharpOwed = !sharpMarked;
     const onScreenIds = fillOrder(frames, view, area).map((f) => f.id);
@@ -1398,7 +1428,7 @@
   $effect(() => {
     const now = performance.now();
     for (const f of frames) {
-      const seen = `${baseKey(f)}|${liveGroup.get(f.id) ?? ''}`;
+      const seen = `${keyOf(f)}|${liveGroup.get(f.id) ?? ''}`;
       const before = editSeen.get(f.id);
       editSeen.set(f.id, seen);
       if (before !== undefined && before !== seen) {
@@ -1464,11 +1494,19 @@
   let lastView = '';
   let lastZoom = 0;
   const zooming = gestureWatch();
+  let stillTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function moved() {
+    gesture.moved();
+    motion = Motion.Moving;
+    clearTimeout(stillTimer);
+    stillTimer = setTimeout(() => (motion = Motion.Still), GESTURE_QUIET_MS);
+  }
 
   $effect(() => {
     const now = `${view.x},${view.y},${view.zoom}`;
     if (lastView && now !== lastView) {
-      gesture.moved();
+      moved();
       camera = view.zoom !== lastZoom ? Camera.Zooming : Camera.Panning;
       gestureLog(view.zoom !== lastZoom ? 'zoom' : 'pan');
     }
