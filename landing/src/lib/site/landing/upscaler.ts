@@ -2,9 +2,9 @@ const PAGE = 'https://feega.app/ai-video-upscaler';
 const MEDIA = '/site/landing/ai-video-upscaler';
 
 export const UPSCALER = {
-  title: 'AI Video Upscaler – Upscale Video to 2× or 4K | Feega',
+  title: 'AI Video Upscaler: Upscale Video to 4K in Minutes | Feega',
   description:
-    'Upscale a video to 2× or 4K with AI. Upload an MP4 up to 20 s, see the exact price before you run, compare before and after, download. FLUX Video Upscale.',
+    'Upscale a video to 2× or 4K with AI in minutes. See the exact price before you run, compare before and after, download. FLUX Video Upscale, free quote.',
   cta: {
     href: 'https://oh.feega.app/app/upscale?utm_source=feega.app&utm_medium=seo&utm_campaign=ai-video-upscaler',
     label: 'Upscale a video →'
