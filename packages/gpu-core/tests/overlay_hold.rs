@@ -71,3 +71,13 @@ fn a_zooming_camera_draws_a_half_resolution_overlay_that_still_lands_on_the_worl
     assert_eq!(OverlayQuality::of(Moving::Lift), OverlayQuality::Sharp);
     assert_ne!(hold.quality(), OverlayQuality::Sharp);
 }
+
+#[test]
+fn a_zooming_overlay_is_held_across_a_small_zoom_step_and_redrawn_past_it() {
+    use gpu_core::overlay_hold::{Moving, OverlayQuality};
+    let hold = OverlayHold::around_at(at(0.0, 0.0, 1.0), SCREEN, 8192, OverlayQuality::of(Moving::Camera));
+
+    assert!(hold.serves(at(-20.0, -10.0, 1.02), SCREEN));
+    assert!(hold.serves(at(20.0, 10.0, 0.98), SCREEN));
+    assert!(!hold.serves(at(0.0, 0.0, 1.06), SCREEN));
+}

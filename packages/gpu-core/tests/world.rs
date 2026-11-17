@@ -59,6 +59,17 @@ fn sized(_: &str) -> Option<(f64, f64)> {
     SIZE
 }
 
+#[test]
+fn a_frame_too_small_on_screen_for_its_label_keeps_only_its_ring() {
+    let mut w = World::new();
+    w.set_overlay(OverlayPart::Fixed, parse_overlay(&format!("[{}]", tile_chrome("t", 0.0, 400.0))).unwrap());
+
+    let paths = |zoom: f64| w.pinned_at_in([zoom, 0.0, 0.0, zoom, 10.0, 100.0], 1.0, (1000, 800)).iter().map(|(s, _)| s.encoding().n_paths).sum::<u32>();
+
+    assert_eq!(paths(1.0), 2);
+    assert_eq!(paths(0.02), 1);
+}
+
 fn put(clip: &str, x: f64) -> String {
     format!(r#"{{ "put": [{{ "kind": "use", "clip": "{clip}", "group": "g:{clip}", "matrix": [1, 0, 0, 1, {x}, 0] }}], "drop": [] }}"#)
 }
