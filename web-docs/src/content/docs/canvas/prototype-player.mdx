@@ -19,11 +19,21 @@ Click the layers that have links. The next frame arrives with the transition you
 
 The player draws with the same renderer as the canvas, at the frame's resting frame, so a frame looks the same in both.
 
+## The player bar
+
+One bar runs across the top:
+
+- **Left**: the frame name. When the canvas has flows, click it to start another flow.
+- **Centre**: **Desktop**, **Tablet** and **Phone** (`1`, `2`, `3`) pin the width to 1440, 768 or 390 px. Type any width in the px field. The view menu next to it shows the breakpoint view in use and lists **Follow window** and the frame's own views.
+- **Right**: **Restart** (`R`), the zoom menu (**Fit**, **Fill width**, **100%**, **Responsive**), **Full screen** (`F`) and **Close** (`Esc`).
+
+In full screen the bar hides after two seconds without moving the mouse and comes back on the next move.
+
 ## Responsive
 
-The player opens in **Responsive**, sized to the window: resize the window and the frame reflows, switching to the breakpoint view whose width fits (a view applies at its width and below). The width bar lists **Window**, **Desktop**, **Tablet**, **Mobile** and the frame's own views; pick one to fix the width, drag the side handles or type a width. The readout shows the width and the view in use. Links, overlays and states keep working in every view.
+The player opens in **Responsive**, sized to the window: resize the window and the frame reflows, switching to the breakpoint view whose width fits (a view applies at its width and below). Pick a device or a view to fix the width, or drag the handles on either side of the frame; while you drag, a label shows the width and the view. When the frame is narrower than the window it sits centred on a neutral backdrop with rounded corners and a shadow; a tall frame scrolls inside the stage. Links, overlays and states keep working in every view.
 
-Clicking an empty spot flashes the linked areas. **Restart** (or `R`) goes back to the start; `Esc` closes the player, or closes an overlay first.
+Clicking an empty spot flashes the linked areas. **Restart** goes back to the start; `Esc` closes the player, or closes an overlay first.
 
 | Trigger | In the player |
 |---|---|
