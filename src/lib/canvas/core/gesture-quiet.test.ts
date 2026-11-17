@@ -40,6 +40,20 @@ describe('a gesture in progress', () => {
     expect(watch.active()).toBe(true);
   });
 
+  it('keeps the full window once a gesture resumes after a short pause', () => {
+    let now = 1000;
+    const watch = gestureWatch(() => now);
+    for (let i = 0; i < 3; i++) {
+      watch.moved();
+      now += 8;
+    }
+    now += 100;
+    watch.moved();
+    watch.moved();
+    now += GESTURE_QUIET_MS - 1;
+    expect(watch.active()).toBe(true);
+  });
+
   it('is not active before anything moved', () => {
     expect(gestureWatch(() => 0).active()).toBe(false);
   });

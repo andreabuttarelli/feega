@@ -7,10 +7,13 @@ const quietAfter = (gap: number) => (gap < GESTURE_QUIET_MS ? Math.min(GESTURE_Q
 export function gestureWatch(now: () => number = () => performance.now()) {
   let movedAt = -Infinity;
   let quiet = GESTURE_QUIET_MS;
+  let resumed = false;
   return {
     moved: () => {
       const at = now();
-      quiet = quietAfter(at - movedAt);
+      const gap = at - movedAt;
+      resumed = gap < GESTURE_QUIET_MS && (resumed || gap >= quiet);
+      quiet = resumed ? GESTURE_QUIET_MS : quietAfter(gap);
       movedAt = at;
     },
     active: () => now() - movedAt < quiet
