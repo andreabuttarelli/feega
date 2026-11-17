@@ -35,6 +35,19 @@ export enum FileMove {
   Renamed = 'renamed'
 }
 
+export enum RefKind {
+  Branch = 'branch',
+  Tag = 'tag'
+}
+
+export type RefSeen = { name: string; kind: RefKind; sha: string };
+
+export type CommitSeen = { sha: string; message: string; author: string; at: string };
+
+export type HistoryAsk = { limit: number; path?: string };
+
+export type PullOpen = { number: number; title: string; branch: string; sha: string };
+
 export type FileWrite = { path: string; content: string | null };
 
 export type CommitAsk = { parent: string; message: string; files: FileWrite[] };
@@ -64,4 +77,7 @@ export type GitHost = {
   upsertPull: (ask: PullAsk) => Promise<PullRef>;
   pull: (number: number) => Promise<PullState>;
   changedSince: (sha: string, ref: string) => Promise<FileChanged[]>;
+  listRefs: () => Promise<RefSeen[]>;
+  listCommits: (ref: string, ask: HistoryAsk) => Promise<CommitSeen[]>;
+  listPulls: () => Promise<PullOpen[]>;
 };

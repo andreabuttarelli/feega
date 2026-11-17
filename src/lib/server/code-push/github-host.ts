@@ -1,7 +1,7 @@
 import type { ProviderAnswer, ProviderCall } from '$lib/server/connections/account-links';
 import type { GithubCall } from '$lib/server/code-import/github';
 import type { RepoRef } from '$lib/server/code-import/repo';
-import { Access, FileMove, GitError, GitFailure, PullStatus, type Check, type GitHost, type PullRef } from './git-host';
+import { Access, FileMove, GitError, GitFailure, PullStatus, RefKind, type Check, type GitHost, type PullRef } from './git-host';
 
 const HTTP_UNAUTHORIZED = 401;
 const HTTP_FORBIDDEN = 403;
@@ -11,6 +11,7 @@ const HTTP_OK_MIN = 200;
 const HTTP_OK_MAX = 299;
 const FILE_MODE = '100644';
 const BLOB = 'blob';
+const PAGE_MAX = 100;
 const ANCESTOR_STATES = new Set(['ahead', 'identical']);
 
 const FAILURE_OF_STATUS: Record<number, GitFailure> = {
@@ -65,6 +66,13 @@ export function githubHost(call: GithubCall, repo: RepoRef): GitHost {
     });
     return ANCESTOR_STATES.has(String(compared.status));
   };
+
+  const list = async (endpoint: string, query: Record<string, string> = {}) => {
+    const found = (await send({ endpoint, query: { per_page: String(PAGE_MAX), ...query } })) as unknown as Json[];
+    return Array.isArray(found) ? found : [];
+  };
+
+  const refsOf = async (endpoint: string, kind: RefKind) => (await list(endpoint)).map((r) => ({ name: String(r.name), kind, sha: String((r.commit as Json).sha) }));
 
   const pullsOf = async (branch: string, state: string) => {
     const found = (await send({ endpoint: '/pulls', query: { head: `${repo.owner}:${branch}`, state } })) as unknown as Json[];
@@ -121,6 +129,16 @@ export function githubHost(call: GithubCall, repo: RepoRef): GitHost {
     changedSince: async (sha, ref) => {
       const files = ((await send({ endpoint: `/compare/${sha}...${encoded(ref)}` })).files ?? []) as Json[];
       return files.map((f) => ({ path: String(f.filename), move: MOVE_OF_STATUS[String(f.status)] ?? FileMove.Modified, from: f.previous_filename ? String(f.previous_filename) : null }));
-    }
+    },
+    listRefs: async () => [...(await refsOf('/branches', RefKind.Branch)), ...(await refsOf('/tags', RefKind.Tag))],
+    listCommits: async (ref, ask) => {
+      const found = await list('/commits', { sha: ref, per_page: String(Math.min(ask.limit, PAGE_MAX)), ...(ask.path ? { path: ask.path } : {}) });
+      return found.map((c) => {
+        const commit = c.commit as Json;
+        const author = (commit.author ?? {}) as Json;
+        return { sha: String(c.sha), message: String(commit.message).split('\n')[0], author: String(author.name ?? ''), at: String(author.date ?? '') };
+      });
+    },
+    listPulls: async () => (await list('/pulls', { state: 'open' })).map((p) => ({ number: Number(p.number), title: String(p.title), branch: String((p.head as Json).ref), sha: String((p.head as Json).sha) }))
   };
 }

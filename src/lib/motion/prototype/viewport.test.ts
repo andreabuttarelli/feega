@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { addBreakpoint, BASE_BREAKPOINT, BreakpointPreset } from '@feega/motion-core/motion/breakpoints/model';
-import { ViewportMode, WIDTH_PRESETS, activeView, clampWidth, frameBox, parseViewport } from './viewport';
+import { resolveView } from '@feega/motion-core/motion/breakpoints/view';
+import { baseFixtures } from '@feega/motion-core/motion/codegen/fixtures/responsive';
+import { ViewportMode, WIDTH_PRESETS, WidthSource, activeView, clampWidth, docAtWidth, frameBox, parseViewport, shownWidth, viewChoices } from './viewport';
 
 const stage = { w: 1000, h: 600 };
 const frame = { w: 1440, h: 3000 };
@@ -82,9 +84,39 @@ describe('clampWidth and parseViewport', () => {
   });
 
   it('reads a stored choice and ignores junk', () => {
-    expect(parseViewport('{"mode":"responsive","width":390}')).toEqual({ mode: ViewportMode.Responsive, width: 390 });
-    expect(parseViewport('nope')).toEqual({ mode: ViewportMode.Fit, width: WIDTH_PRESETS[0].width });
-    expect(parseViewport('{"mode":"zzz","width":5}').mode).toBe(ViewportMode.Fit);
-    expect(parseViewport(null).mode).toBe(ViewportMode.Fit);
+    expect(parseViewport('{"mode":"responsive","width":390,"source":"fixed"}')).toEqual({ mode: ViewportMode.Responsive, width: 390, source: WidthSource.Fixed });
+    expect(parseViewport('nope')).toEqual({ mode: ViewportMode.Responsive, width: WIDTH_PRESETS[0].width, source: WidthSource.Window });
+    expect(parseViewport('{"mode":"zzz","width":5}').mode).toBe(ViewportMode.Responsive);
+    expect(parseViewport(null).source).toBe(WidthSource.Window);
+  });
+});
+
+describe('responsive Play', () => {
+  const doc = withViews();
+
+  it('offers Desktop, Tablet, Mobile and the frame own views, widest first, once per width', () => {
+    const choices = viewChoices(doc);
+
+    expect(choices.slice(0, 3).map((c) => c.label)).toEqual(['Desktop', 'Tablet', 'Tablet']);
+    expect(new Set(choices.map((c) => c.width)).size).toBe(choices.length);
+    expect(choices.map((c) => c.width)).toEqual([...choices.map((c) => c.width)].sort((a, b) => b - a));
+    expect(choices.some((c) => c.label === 'Mobile')).toBe(true);
+  });
+
+  it('follows the window width until a width is picked', () => {
+    expect(shownWidth({ mode: ViewportMode.Responsive, width: 390, source: WidthSource.Window }, 700)).toBe(700);
+    expect(shownWidth({ mode: ViewportMode.Responsive, width: 390, source: WidthSource.Fixed }, 700)).toBe(390);
+  });
+
+  it('picks the view by width as the window narrows', () => {
+    const at = (stage: number) => activeView(doc, shownWidth({ mode: ViewportMode.Responsive, width: 0, source: WidthSource.Window }, stage)).id;
+
+    expect([at(1600), at(800), at(375)]).toEqual([BASE_BREAKPOINT, 'tablet', 'phone']);
+  });
+
+  it.each(baseFixtures().flatMap((f) => (f.doc.breakpoints ?? []).map((b) => [f.name, b.id, f.doc] as const)))('lays %s %s out at its own width exactly as the canvas view', (_name, id, fixture) => {
+    const canvas = resolveView(fixture, id);
+
+    expect(docAtWidth(fixture, canvas.width)).toEqual(canvas);
   });
 });

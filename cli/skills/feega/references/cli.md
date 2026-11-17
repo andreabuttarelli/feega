@@ -23,6 +23,7 @@ bun run cli.ts --help
 ```bash
 feega brands                                    # List brands
 feega health                                     # Check Supabase / Gemini
+feega agents [--refresh]                         # Local Feega: coding agents found on this machine
 feega products <slug> [sync]                    # List, or re-import from the connected store
 feega upgrade <slug>                            # Checkout the plan (€9 / editor / month, 500 credits)
 feega upgrade <slug> --top-up 1000              # One-time top-up (1000/2000/5000), never expires
