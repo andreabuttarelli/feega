@@ -28,6 +28,16 @@ describe('AgentModelChoice', () => {
     expect(choice.selected).toBe('sol');
   });
 
+  it('asks the agent again on refresh', async () => {
+    const { calls, fetcher } = server(LISTING);
+    const choice = new AgentModelChoice(fetcher);
+    await choice.load('codex');
+    await choice.refresh();
+
+    expect(calls.at(-1)?.url).toBe('/api/v1/local/acp/agents/codex/models?refresh=1');
+    expect(choice.models).toHaveLength(2);
+  });
+
   it('shows the saved model over the default', async () => {
     const choice = new AgentModelChoice(server({ ...LISTING, chosen: 'luna' }).fetcher);
     await choice.load('codex');

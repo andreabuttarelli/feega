@@ -1,5 +1,7 @@
 import { agentModelsEndpoint, type AgentModel, type ModelListing } from './agent-models';
 
+const REFRESH = '?refresh=1';
+
 export class AgentModelChoice {
   models = $state<AgentModel[]>([]);
   selected = $state<string | null>(null);
@@ -9,15 +11,23 @@ export class AgentModelChoice {
 
   constructor(private fetcher: typeof fetch = fetch) {}
 
-  async load(agent: string | null) {
+  load(agent: string | null) {
     this.agent = agent;
     this.models = [];
     this.selected = null;
+    return this.read(agent, '');
+  }
+
+  refresh() {
+    return this.read(this.agent, REFRESH);
+  }
+
+  private async read(agent: string | null, query: string) {
     if (!agent) {
       return;
     }
 
-    const res = await this.fetcher(agentModelsEndpoint(agent)).catch(() => null);
+    const res = await this.fetcher(`${agentModelsEndpoint(agent)}${query}`).catch(() => null);
     if (!res?.ok || this.agent !== agent) {
       return;
     }

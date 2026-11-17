@@ -45,7 +45,7 @@
 </script>
 
 <section class="acp" data-testid="acp-chat">
-  <AcpAgentPicker agents={choices.agents} chosen={choices.chosen} refreshing={choices.refreshing} onchoose={(id) => void choices.choose(id)} onrefresh={() => void choices.refresh()}>
+  <AcpAgentPicker agents={choices.agents} chosen={choices.chosen} refreshing={choices.refreshing} onchoose={(id) => void choices.choose(id)} onrefresh={() => void Promise.all([choices.refresh(), model.refresh()])}>
     {#snippet beside()}
       <AcpModelPicker models={model.models} selected={model.selected} onchoose={(id) => void model.choose(id)} />
     {/snippet}
