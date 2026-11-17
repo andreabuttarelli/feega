@@ -18,7 +18,7 @@ use crate::layers::Effects;
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile, OPAQUE};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, GestureDraw, Moment, Path, Warmup, tiles_kept_beside, TILE_BUDGET_BYTES, TILE_BYTES, TILE_GUTTER_PX, batches, batches_of, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys, magnified, fallback_serves, fallback_bands, ahead_camera, fade_in, fades_over, FADE_MS};
+use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, GestureDraw, Moment, Path, Warmup, tiles_kept_beside, TILE_BUDGET_BYTES, TILE_BYTES, TILE_GUTTER_PX, batches, batches_of, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, bakes_in_gesture, TileKey, Tiles, TILE_PX, lifted_keys, magnified, fallback_serves, fallback_bands, ahead_camera, fade_in, fades_over, FADE_MS};
 use crate::overlay_seen::OverlaySeen;
 use crate::screen_fit::{fit, screen_side};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
@@ -88,6 +88,7 @@ pub struct WebCore {
     in_flight: Arc<AtomicU32>,
     warming: bool,
     warm_wait: f64,
+    zoom_changed_at: f64,
     shown_step: Option<i32>,
     gesture_baked: rustc_hash::FxHashSet<TileKey>,
     scratch: Option<wgpu::Texture>,
@@ -432,7 +433,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, warm_wait: 0.0, shown_step: None, gesture_baked: Default::default(), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), sharpness: Sharpness::default(), fallback: Vec::new(), ahead: None, fallback_was: camera, born: FxHashMap::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 }, gesture_draw: GestureDraw::Tiles, direct: None, held_scene: None, scale: fitted.scale })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, warm_wait: 0.0, zoom_changed_at: f64::NEG_INFINITY, shown_step: None, gesture_baked: Default::default(), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), sharpness: Sharpness::default(), fallback: Vec::new(), ahead: None, fallback_was: camera, born: FxHashMap::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 }, gesture_draw: GestureDraw::Tiles, direct: None, held_scene: None, scale: fitted.scale })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -930,25 +931,32 @@ impl WebCore {
         let left_blank = queue.blank.clone();
         let order = queue.order();
         let deadline = started + budget;
-        let side = if matches!(self.motion, CoreMotion::Gesture) { 1 } else { self.credit.side() };
+        let gesture = matches!(self.motion, CoreMotion::Gesture);
+        if self.camera.zoom != self.was.zoom {
+            self.zoom_changed_at = started;
+        }
+        let panning = self.camera.zoom == self.was.zoom && (self.camera.x != self.was.x || self.camera.y != self.was.y);
+        let bakes = !gesture || bakes_in_gesture(started - self.zoom_changed_at);
+        let side = if gesture { 1 } else { self.credit.side() };
         self.credit.earn(budget);
-        for batch in batches_of(&order, side) {
+        for batch in batches_of(&order, side).into_iter().filter(|_| bakes) {
             if !self.credit.affords(batch.keys.len()) || js_sys::Date::now() >= deadline {
                 break;
             }
             rastered += self.paid_batch(&batch)?;
         }
-        if matches!(self.motion, CoreMotion::Gesture) && self.credit.allows() {
+        if gesture && bakes && self.credit.allows() {
             rastered += self.bake_ahead(deadline)?;
         }
         self.was = self.camera;
-        let tiles = self.tiles.frame(self.camera, screen);
+        let whole_levels = gesture && !(bakes && panning);
+        let tiles = if whole_levels { self.tiles.gesture_frame(self.camera, screen) } else { self.tiles.frame(self.camera, screen) };
         let shown = tiles.draw.iter().map(|k| k.step).max();
         if shown != self.shown_step {
             self.counted.swaps += 1;
             self.shown_step = shown;
         }
-        if !matches!(self.motion, CoreMotion::Gesture) {
+        if !gesture {
             self.gesture_baked.clear();
         }
         let served = self.serve_bare(&tiles.bare, screen, deadline)?;

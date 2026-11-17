@@ -231,6 +231,12 @@ pub struct TileFrame {
     pub beneath: Vec<TileKey>,
 }
 
+const ZOOM_SETTLE_MS: f64 = 120.0;
+
+pub fn bakes_in_gesture(since_zoom_ms: f64) -> bool {
+    since_zoom_ms >= ZOOM_SETTLE_MS
+}
+
 pub fn sharp_at(zoom: f64, step: i32) -> bool {
     zoom / step_zoom(step) <= SHARP_STRETCH + STEP_SLACK
 }
@@ -368,6 +374,16 @@ impl Tiles {
         let held_stale = (step - COARSER_STEPS..=step + FINER_STEPS).filter(|s| *s != step).flat_map(|s| self.held_over(world, s)).filter(|k| self.stale.contains(k));
         missing.extend(held_stale);
         TileFrame { draw, missing, bare, beneath }
+    }
+
+    pub fn gesture_frame(&self, camera: Camera, screen: (u32, u32)) -> TileFrame {
+        let step = self.step_for(camera);
+        let Some(world) = self.on_canvas(seen_world(camera, screen)).filter(|w| count_over(*w, step) <= FRAME_TILES_MAX) else { return self.frame(camera, screen) };
+        let whole = |s: i32| keys_over(world, s).filter(|k| self.paints(*k)).all(|k| self.held.contains(&k));
+        match (step - COARSER_STEPS..=step + FINER_STEPS).rev().find(|s| whole(*s)) {
+            Some(level) => TileFrame { draw: self.held_over(world, level), missing: Vec::new(), bare: Vec::new(), beneath: Vec::new() },
+            None => self.frame(camera, screen),
+        }
     }
 
     fn on_canvas(&self, world: Rect) -> Option<Rect> {

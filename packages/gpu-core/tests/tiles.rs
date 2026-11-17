@@ -935,3 +935,37 @@ fn every_coarser_level_held_is_drawn_beneath_coarsest_first_so_a_gap_in_one_show
     assert!(steps.contains(&tiles.step_for(camera(0.5))));
     assert!(steps.windows(2).all(|w| w[0] <= w[1]), "coarsest must come first: {steps:?}");
 }
+
+#[test]
+fn a_gesture_frame_draws_one_whole_level_never_a_mix_of_sharp_and_soft() {
+    let mut tiles = Tiles::default();
+    tiles.frame(camera(1.0), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
+    let sharp = tiles.frame(camera(2.0), SCREEN).missing;
+    sharp.iter().take(sharp.len() / 2).for_each(|k| tiles.hold(*k));
+
+    let frame = tiles.gesture_frame(camera(2.0), SCREEN);
+    let steps: std::collections::BTreeSet<i32> = frame.draw.iter().map(|k| k.step).collect();
+
+    assert_eq!(steps.len(), 1, "drew several levels at once: {steps:?}");
+    assert!(steps.contains(&tiles.step_for(camera(1.0))));
+    assert!(frame.bare.is_empty() && frame.beneath.is_empty());
+}
+
+#[test]
+fn a_gesture_frame_switches_to_the_sharp_level_once_it_covers_the_view() {
+    let mut tiles = Tiles::default();
+    tiles.frame(camera(1.0), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
+    tiles.frame(camera(2.0), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
+
+    let frame = tiles.gesture_frame(camera(2.0), SCREEN);
+
+    assert!(frame.draw.iter().all(|k| k.step == tiles.step_for(camera(2.0))));
+}
+
+#[test]
+fn tiles_are_baked_only_once_the_zoom_holds_still() {
+    use gpu_core::tiles::bakes_in_gesture;
+    assert!(!bakes_in_gesture(0.0));
+    assert!(!bakes_in_gesture(60.0));
+    assert!(bakes_in_gesture(200.0));
+}
