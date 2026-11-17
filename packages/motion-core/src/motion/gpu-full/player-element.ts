@@ -199,7 +199,7 @@ export class GpuPlayerElement extends HTMLElement {
     Object.assign(canvas.style, { position: 'absolute', inset: '0', width: '100%', height: '100%' });
     this.append(host, canvas);
     const backend = BACKEND_ORDER[this.tried];
-    this.player = mountPlayer({ canvas, host, backend, size: { width: source.doc.width, height: source.doc.height }, time: () => this.currentTime, onfallback: (reason) => this.fallback(reason), inputs: this.live });
+    this.player = mountPlayer({ canvases: [{ canvas, strip: { top: 0, height: source.doc.height } }], host, backend, size: { width: source.doc.width, height: source.doc.height }, time: () => this.currentTime, onfallback: (reason) => this.fallback(reason), inputs: this.live });
     this.fitCanvas();
     const origin = inlineCore()?.origin ?? new URL(import.meta.url).origin;
     this.player.show({ ...source, compose: (only) => composeHtml({ ...source, liveness: Liveness.Baked, target: Target.Screen, origin, runtime: RuntimeDelivery.Hosted, only }) });

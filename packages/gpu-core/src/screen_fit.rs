@@ -22,12 +22,25 @@ pub fn fit((width, height): (u32, u32), side: u32) -> Fit {
     Fit { size: (scaled(width), scaled(height)), scale }
 }
 
-pub fn fitted_list(library: &mut Library, list: DisplayList, fit: Fit) -> DisplayList {
-    if fit.scale == 1.0 {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Piece {
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
+}
+
+pub fn pieces((width, height): (u32, u32), (side_w, side_h): (u32, u32)) -> Vec<Piece> {
+    let starts = |total: u32, step: u32| (0..total).step_by(step.max(1) as usize).map(move |at| (at, step.min(total - at)));
+    starts(height, side_h).flat_map(|(y, h)| starts(width, side_w).map(move |(x, w)| Piece { x, y, w, h })).collect()
+}
+
+pub fn fitted_list(library: &mut Library, list: DisplayList, fit: Fit, (x, y): (f64, f64)) -> DisplayList {
+    if fit.scale == 1.0 && x == 0.0 && y == 0.0 && fit.size == (list.width, list.height) {
         return list;
     }
     library.put_group(FITTED_GROUP, &list);
-    let whole = UseItem { clip: FITTED_GROUP.into(), group: FITTED_GROUP.into(), matrix: [fit.scale, 0.0, 0.0, fit.scale, 0.0, 0.0], cache: false, hold: false, reach: None };
+    let whole = UseItem { clip: FITTED_GROUP.into(), group: FITTED_GROUP.into(), matrix: [fit.scale, 0.0, 0.0, fit.scale, -x * fit.scale, -y * fit.scale], cache: false, hold: false, reach: None };
     DisplayList { width: fit.size.0, height: fit.size.1, background: list.background, items: vec![Item::Use(whole)], faces: list.faces, fragments: Default::default() }
 }
 

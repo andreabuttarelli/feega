@@ -173,7 +173,7 @@ export type Picture = { source: TexImageSource; size: Size };
 
 export type Pictures = (item: ImageItem | LayerItem) => Picture | null;
 
-export type Raster = { draw: (list: DisplayList, pictures?: Pictures) => void; dispose: () => void };
+export type Raster = { draw: (list: DisplayList, pictures?: Pictures) => void; dispose: () => void; setOrigin?: (x: number, y: number) => void };
 
 const NO_PICTURES: Pictures = () => null;
 

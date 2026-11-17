@@ -8,6 +8,7 @@ import { liveFeed, type LiveFeed, type LiveInputs } from '../interactive/gpu-liv
 import { NO_TYPESET, smoothingOf, type Typeset } from './text/painter';
 import { faceEngineOf, loadFontsWith } from './text/engines';
 import type { Raster } from './raster';
+import type { Strip } from './strips';
 import { BACKENDS, type FullBackend } from './backends';
 import { createMedia } from './media';
 import type { VideoFrames } from './video-frames';
@@ -16,8 +17,10 @@ import type { Compose } from './dom/reader';
 
 export type Shown = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; compose: Compose; analyses?: Record<string, AudioAnalysis> };
 
+export type StripCanvas = { canvas: HTMLCanvasElement; strip: Strip };
+
 export type PlayerMount = {
-  canvas: HTMLCanvasElement;
+  canvases: readonly StripCanvas[];
   host: HTMLElement;
   backend: FullBackend;
   size: { width: number; height: number };
@@ -39,13 +42,13 @@ const MAX_STEP_SECONDS = 0.1;
 const MS_PER_SECOND = 1000;
 
 export function mountPlayer(mount: PlayerMount): Player {
-  const { canvas, host, backend, size, time, onfallback } = mount;
+  const { canvases, host, backend, size, time, onfallback } = mount;
   const loadFonts = loadFontsWith(faceEngineOf(mount.faces ?? null));
   const media = createMedia({ frames: mount.frames });
   let shown: Shown | null = null;
   let typeset: Typeset = NO_TYPESET;
   let reads: Reads | null = null;
-  let raster: Raster | null = null;
+  let rasters: Raster[] | null = null;
   let gone = false;
   let drawn: [Prepared | null, number] = [null, -1];
   let last: Drawn | null = null;
@@ -77,13 +80,16 @@ export function mountPlayer(mount: PlayerMount): Player {
     });
   }
 
-  BACKENDS[backend](canvas, size.width, size.height).then((made) => (gone ? made.dispose() : (raster = made)), onfallback);
+  Promise.all(canvases.map(({ canvas, strip }) => BACKENDS[backend](canvas, size.width, strip.height).then((made) => (made.setOrigin?.(0, strip.top), made)))).then(
+    (made) => (gone ? made.forEach((r) => r.dispose()) : (rasters = made)),
+    onfallback
+  );
 
   let loop = 0;
   const tick = () => {
     loop = requestAnimationFrame(tick);
     const current = reads;
-    const into = raster;
+    const into = rasters;
     if (!current || !into || busy) {
       return;
     }
@@ -104,7 +110,8 @@ export function mountPlayer(mount: PlayerMount): Player {
         last = { prepared: now, frame, list };
         mount.ongaps?.(list.unsupported.length);
         await media.ready(list);
-        into.draw(list, (item) => read.picture(item) ?? media.pictures(item));
+        const pictures = (item: Parameters<typeof read.picture>[0]) => read.picture(item) ?? media.pictures(item);
+        into.forEach((r) => r.draw(list, pictures));
       })
       .catch((reason) => {
         if (reads !== current) {
@@ -126,7 +133,7 @@ export function mountPlayer(mount: PlayerMount): Player {
     dispose() {
       cancelAnimationFrame(loop);
       gone = true;
-      raster?.dispose();
+      rasters?.forEach((r) => r.dispose());
       media.dispose();
       void reads?.custom.then((r) => r.dispose(), () => {});
     }

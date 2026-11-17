@@ -17,7 +17,7 @@ use crate::retained::{Camera, Lookup, Quality};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::layers::{prepare, Blending, Surface};
 use crate::scene::{build_into, Placed, Shelf};
-use crate::screen_fit::{fit, fitted_list, Fit};
+use crate::screen_fit::{fit, fitted_list, pieces, Fit};
 use crate::Skipped;
 
 #[derive(Clone, Copy)]
@@ -127,13 +127,15 @@ impl Surface for GlSurface<'_> {
     }
 
     fn paint(&mut self, _reason: crate::tally::Reason, region: Rect, base: Option<Rgba>, draw: &dyn Fn(&mut GlCanvas)) -> Result<Tex, JsValue> {
-        self.render(base, Affine::translate((-region.x0, -region.y0)), draw)?;
         let (w, h) = (region.width() as u32, region.height() as u32);
         let gl = self.renderer.gl_context().clone();
         let raw = texture(&gl, w, h);
-        gl.bind_framebuffer(Gl::FRAMEBUFFER, None);
-        gl.bind_texture(Gl::TEXTURE_2D, Some(&raw.texture));
-        gl.copy_tex_sub_image_2d(Gl::TEXTURE_2D, 0, 0, 0, 0, (self.height - h) as i32, w as i32, h as i32);
+        for p in pieces((w, h), (self.width, self.height)) {
+            self.render(base, Affine::translate((-region.x0 - p.x as f64, -region.y0 - p.y as f64)), draw)?;
+            gl.bind_framebuffer(Gl::FRAMEBUFFER, None);
+            gl.bind_texture(Gl::TEXTURE_2D, Some(&raw.texture));
+            gl.copy_tex_sub_image_2d(Gl::TEXTURE_2D, 0, p.x as i32, (h - p.y - p.h) as i32, 0, (self.height - p.h) as i32, p.w as i32, p.h as i32);
+        }
         Ok(self.runner.flipped(&raw))
     }
 
@@ -171,6 +173,7 @@ pub struct WebGlCore {
     retained: Held,
     spare: Held,
     reprojector: GlReprojector,
+    origin: (f64, f64),
 }
 
 impl Painter for WebGlCore {
@@ -256,7 +259,7 @@ impl WebGlCore {
         let spare = held(renderer.gl_context(), compositor.size());
         let reprojector = GlReprojector::new(renderer.gl_context());
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        WebGlCore { renderer, resources, canvas: GlCanvas { scene: Scene::new(width as u16, height as u16), by: Affine::IDENTITY }, runner, width, height, scale: fitted.scale, pictures: Shelf::default(), library: Library::new(), cached: Shelf::default(), pending: false, compositor, camera, retained, spare, reprojector }
+        WebGlCore { renderer, resources, canvas: GlCanvas { scene: Scene::new(width as u16, height as u16), by: Affine::IDENTITY }, runner, width, height, scale: fitted.scale, pictures: Shelf::default(), library: Library::new(), cached: Shelf::default(), pending: false, compositor, camera, retained, spare, reprojector, origin: (0.0, 0.0) }
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -343,6 +346,10 @@ impl WebGlCore {
         self.compositor.set_pixel_ratio(ratio);
     }
 
+    pub fn set_origin(&mut self, x: f64, y: f64) {
+        self.origin = (x, y);
+    }
+
     pub fn set_camera(&mut self, x: f64, y: f64, zoom: f64) {
         self.camera = Camera { x: x * self.scale, y: y * self.scale, zoom: zoom * self.scale };
     }
@@ -423,7 +430,7 @@ impl WebGlCore {
     }
 
     pub fn draw(&mut self, list_json: &[u8]) -> Result<String, JsValue> {
-        let list = fitted_list(&mut self.library, parse(utf8(list_json)?).map_err(failed)?, Fit { size: (self.width, self.height), scale: self.scale });
+        let list = fitted_list(&mut self.library, parse(utf8(list_json)?).map_err(failed)?, Fit { size: (self.width, self.height), scale: self.scale }, self.origin);
         let plan = self.library.plan(&list, self.limits());
         self.pending = plan.pending;
         let (list, missing) = self.hold(plan)?;
