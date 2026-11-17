@@ -150,3 +150,7 @@ const HTTP_STATUS: Record<string, number> = {
 const CONFLICT = 409;
 
 export const httpStatusOf = (refusal: FramesRefused['refusal']) => HTTP_STATUS[refusal] ?? CONFLICT;
+
+export async function frameDetach(deps: Pick<FramesDeps, 'links'>, nodeId: string): Promise<{ ok: true } | FramesRefused> {
+  return (await deps.links.remove(nodeId)) ? { ok: true } : refused(FramesRefusal.NotLinked);
+}

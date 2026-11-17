@@ -17,7 +17,7 @@ vi.mock('$lib/server/code-push/frames-runtime', () => ({
   framesDeps: () => ({
     host: async () => (connected ? githubHost(gh.call, { owner: 'acme', repo: 'app', ref: null }) : null),
     edits: (...args: unknown[]) => codeEdits(...args),
-    links: { read: async (id: string) => links.get(id) ?? null, save: async (id: string, l: CodeLink) => Boolean(links.set(id, l)) },
+    links: { read: async (id: string) => links.get(id) ?? null, save: async (id: string, l: CodeLink) => Boolean(links.set(id, l)), remove: async (id: string) => links.delete(id) },
     lock
   })
 }));
@@ -100,6 +100,12 @@ describe('/api/v1/projects/:id/github/push', () => {
 
   it('una richiesta senza nome o frame è 400', async () => {
     expect((await post(push.POST, { nodeIds: [] })).res.status).toBe(400);
+  });
+
+  it('staccare toglie il link, una seconda volta è 404', async () => {
+    expect((await call(push.DELETE, '?nodeId=n1', { method: 'DELETE' })).res.status).toBe(200);
+    expect(links.has('n1')).toBe(false);
+    expect((await call(push.DELETE, '?nodeId=n1', { method: 'DELETE' })).res.status).toBe(404);
   });
 
   it('annullare è un commit in avanti che rimette i file toccati', async () => {

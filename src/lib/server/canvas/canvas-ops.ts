@@ -100,7 +100,7 @@ import { conditionsOf, MAX_CONDITIONS } from '$lib/server/code-import/render-con
 import { CAPTURE_DELAY_MAX_MS, delayOf } from '$lib/server/code-import/capture-wait';
 import { designSystemOf } from '$lib/server/code-import/design-system';
 import { githubFor } from '$lib/server/code-import/github-runtime';
-import { framesPush, frameStatus, frameUndo } from '$lib/server/code-push/frames-push';
+import { frameDetach, framesPush, frameStatus, frameUndo } from '$lib/server/code-push/frames-push';
 import { framesDeps, importLinker } from '$lib/server/code-push/frames-runtime';
 import { libsOrigin } from '$lib/server/motion/libs-origin';
 import { GithubRefusal } from '$lib/server/code-import/github-http';
@@ -1161,6 +1161,12 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: z.object({ nodeId: z.string() }).strict(),
     run: async (ctx, input) => frameUndo(framesDeps(ctx.db, ctx), input.nodeId)
+  }),
+
+  github_detach: op({
+    access: Access.Write,
+    input: z.object({ nodeId: z.string() }).strict(),
+    run: async (ctx, input) => frameDetach(framesDeps(ctx.db, ctx), input.nodeId)
   }),
 
   github_branches: op({

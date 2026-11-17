@@ -26,6 +26,7 @@
   import PrototypeArrows from '../PrototypeArrows.svelte';
   import PrototypePlayerHost from '../PrototypePlayerHost.svelte';
   import FrameHeaderIcons from './FrameHeaderIcons.svelte';
+  import SourceSyncPanel from './SourceSyncPanel.svelte';
   import { HeaderAction, headerBadges, headerHits, headerRow, type HeaderHit } from '$lib/canvas/core/frame-header';
   import { sourceStatus } from '$lib/canvas/source-status.svelte';
   import { linkedFrames } from '$lib/canvas/source-sync';
@@ -389,7 +390,12 @@
   });
   const byId = $derived(new Map(placed.map((t) => [t.id, t])));
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
-  const sources = sourceStatus(() => page.params.projectId ?? '', () => linkedFrames(props.nodeSummaries ?? []));
+  const sources = sourceStatus(() => page.params.projectId ?? '', () => linkedFrames(props.nodeSummaries ?? []).map((id) => ({ id, name: byId.get(id)?.displayName ?? '' })));
+  let sourceOpen = $state<{ id: string; left: number; top: number } | null>(null);
+  const posterOf = (id: string) => {
+    const poster = (summaries.get(id)?.data as { posterAssetId?: string | null } | undefined)?.posterAssetId;
+    return poster ? tierUrl(AssetSize.Full)(poster) : null;
+  };
   const ports = $derived(placed.flatMap((t) => portsOf(t)));
   const nodeOf = $derived(new Map(placed.filter((t) => t.node).map((t) => [t.id, t.node!])));
   const lookup = (id: string) => nodeOf.get(id) ?? null;
@@ -648,7 +654,11 @@
     },
     [HeaderAction.Source]: (id) => select([id])
   };
-  const pressHeader = (hit: HeaderHit) => HEADER_PRESS[headerRow(hit.key).action](hit.id);
+  const SOURCE_POP_GAP = 6;
+  const pressHeader = (hit: HeaderHit) => {
+    HEADER_PRESS[headerRow(hit.key).action](hit.id);
+    sourceOpen = headerRow(hit.key).action === HeaderAction.Source ? { id: hit.id, left: view.x + hit.x * view.zoom, top: view.y + (hit.y + hit.h) * view.zoom + SOURCE_POP_GAP } : null;
+  };
   const labelOf = (t: Tile) => {
     const kind = t.kind && isNodeType(t.kind) ? t.kind : null;
     return t.tag === NameTag.Hidden ? null : t.displayName?.trim() || (kind ? NODE_KIND_LABEL[kind] : null);
@@ -4654,6 +4664,7 @@
       <FrameSelection clip="" quad={manyQuad!} kind={SelectionKind.Many} ongrab={grabMany} />
     {/if}
     <FrameHeaderIcons {view} hits={headerHits(headerWorld, cameraMotion)} onpress={pressHeader} />
+    <SourceSyncPanel projectId={page.params.projectId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} />
     <PrototypePlayerHost frames={playerFrames} />
     {#if showsPrototype}
       <PrototypeArrows {view} frames={overlayFrames} links={arrowLinks} elements={linkElements()} handle={pickedHandle()} aimingFrom={prototypeLink.draft ? (inside?.nodeId ?? null) : null} onpick={openLink} ondrag={dragLink} />

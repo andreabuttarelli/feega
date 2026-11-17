@@ -33,3 +33,7 @@ export async function cmdGithubStatus(projectId: string, nodeId: string) {
 export async function cmdGithubUndo(projectId: string, nodeId: string) {
   await print(`${base(projectId)}/undo`, { method: 'POST', body: JSON.stringify({ nodeId }) });
 }
+
+export async function cmdGithubDetach(projectId: string, nodeId: string) {
+  await print(`${base(projectId)}?${new URLSearchParams({ nodeId })}`, { method: 'DELETE' });
+}

@@ -31,6 +31,18 @@ Importing a repository or a git folder links the frame to its source: the first 
 
 The frame header shows one GitHub icon per linked frame, checked when the canvas opens and every minute after. The state of a linked frame is computed on request, never stored, with this priority: `conflict`, `orphan` (the file is gone upstream), `access_lost`, `newer_upstream`, `modified`, `in_pull`, `in_sync`. Files renamed upstream are followed automatically. The answer also carries the pull request and its CI checks.
 
+## On the canvas
+
+Click the GitHub icon in a frame header to see its file, the base commit and branch, and the actions its state allows: **Update** (newer upstream, conflict, orphan) pulls the upstream code into the frame, **View PR** opens the pull request, **Detach** removes the link and keeps the frame. **Changes** opens the panel: every modified or conflicting linked frame with a checkbox, **Create PR** (or **Update PR** once a branch exists) with the branch, the pull request link and its CI state, a confirmation when config files, lockfiles or dotfiles are touched, and **Undo last push**. Without write access the button becomes **Download patch**.
+
+## Detach
+
+```bash
+feega github detach <projectId> <nodeId>
+```
+
+`DELETE /api/v1/projects/:id/github/push?nodeId=` (404 `not_linked` when there is no link), MCP `github_detach {nodeId}`.
+
 ## Undo
 
 Undoing a push adds a commit that restores only the files that push touched, as they were before it. History is never rewritten.

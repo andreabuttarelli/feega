@@ -953,6 +953,14 @@ github
     await cmdGithubUndo(projectId, nodeId);
   });
 
+github
+  .command('detach <projectId> <nodeId>')
+  .description('Unlink a frame from its GitHub source; the frame stays on the canvas')
+  .action(async (projectId: string, nodeId: string) => {
+    const { cmdGithubDetach } = await import('./commands/github.ts');
+    await cmdGithubDetach(projectId, nodeId);
+  });
+
 const cloud = program.command('cloud').description('Google Drive and Dropbox files of a project');
 
 cloud

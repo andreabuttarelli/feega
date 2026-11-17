@@ -38,7 +38,7 @@ describe('il link creato all’import', () => {
 
 const memoryLinks = () => {
   const saved = new Map<string, CodeLink>();
-  const links: LinkStore = { read: async (id) => saved.get(id) ?? null, save: async (id, l) => Boolean(saved.set(id, l)) };
+  const links: LinkStore = { read: async (id) => saved.get(id) ?? null, save: async (id, l) => Boolean(saved.set(id, l)), remove: async (id) => saved.delete(id) };
   return { saved, links };
 };
 
