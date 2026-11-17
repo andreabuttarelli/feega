@@ -10,6 +10,7 @@ import { CONFIG_FILE, readConfigText } from './tailwind-config';
 import { SASS_FILE, readSassText } from './sass-vars';
 import { importedValue as importedStyleValue, sameStyleValue, styleText, styleValue, type StyleField } from './design-styles';
 import type { Style } from '@feega/motion-core/motion/styles-model';
+import { inDoc, inLibrary } from '$lib/motion/style-library';
 
 export type TokensWritten = { files: FileChange[]; skipped: string[]; map: TokenMap };
 
@@ -343,13 +344,25 @@ export async function writeTokens(variables: Variables | undefined, map: TokenMa
   return { files, skipped, map: next };
 }
 
+const importSide = (tokens: TokenMap) => Object.values(tokens).find((entry) => entry.side)?.side;
+
+function stylesAtImport(doc: MotionDoc, tokens: TokenMap): Record<string, Style> {
+  const side = importSide(tokens);
+  const styles = doc.styles ?? {};
+  if (!side) {
+    return styles;
+  }
+  const square = { width: side, height: side };
+  return Object.fromEntries(Object.entries(styles).map(([name, style]) => [name, inDoc(inLibrary(style, doc), square)]));
+}
+
 export async function frameEdits(doc: MotionDoc, tokens: TokenMap | undefined, read: ReadFile): Promise<TokensWritten> {
   const layers = await applyEdits(editsOf(doc), read);
   if (!tokens) {
     return { ...layers, map: {} };
   }
   const layered = new Map(layers.files.map((f) => [f.path, f]));
-  const written = await writeTokens(doc.variables, tokens, async (path) => layered.get(path)?.after ?? read(path), doc.styles ?? {});
+  const written = await writeTokens(doc.variables, tokens, async (path) => layered.get(path)?.after ?? read(path), stylesAtImport(doc, tokens));
   const touched = new Set(written.files.map((f) => f.path));
   const files = [...layers.files.filter((f) => !touched.has(f.path)), ...written.files.map((f) => ({ ...f, before: layered.get(f.path)?.before ?? f.before }))];
   return { files, skipped: [...layers.skipped, ...written.skipped], map: written.map };

@@ -127,6 +127,35 @@ describe('the project style library', () => {
     expect(pushed).toEqual([['Headline', HEADLINE]]);
   });
 
+  it('brings an older frame up to date only once the canvas is at rest, never on the load path (a 36-page canvas rewrote a frame mid-load)', async () => {
+    const library = new StyleLibrary();
+    const pushed: [string, unknown][] = [];
+    const atRest: (() => void)[] = [];
+    library.connect(sinkOf(pushed), (job) => atRest.push(job));
+    await library.open(store({ Headline: HEADLINE }).backend);
+
+    library.found({ Headline: { kind: StyleKind.Text, size: 0.9 } });
+    const duringLoad = [...pushed];
+    atRest.forEach((job) => job());
+
+    expect(duringLoad).toEqual([]);
+    expect(pushed).toEqual([['Headline', HEADLINE]]);
+  });
+
+  it('pushes nothing at rest when the frame caught up in the meantime', async () => {
+    const library = new StyleLibrary();
+    const pushed: [string, unknown][] = [];
+    const atRest: (() => void)[] = [];
+    library.connect(sinkOf(pushed), (job) => atRest.push(job));
+    await library.open(store({ Headline: HEADLINE }).backend);
+
+    library.found({ Headline: { kind: StyleKind.Text, size: 0.9 } });
+    library.found({ Headline: HEADLINE });
+    atRest.forEach((job) => job());
+
+    expect(pushed).toEqual([]);
+  });
+
   it('an edit shows at once, is saved to the project, and rolls back if the save fails', async () => {
     const library = new StyleLibrary();
     const pushed: [string, unknown][] = [];

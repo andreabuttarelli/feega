@@ -9,6 +9,7 @@ export type Dialect<C> = {
   shown: (prop: string, lines: string[], depth: number, ctx: C) => string[];
   selfClosing: boolean;
   tagOf?: (node: ElementNode) => string;
+  inner?: (node: ElementNode, ctx: C) => string[];
 };
 
 const tagName = <C>(node: ElementNode, dialect: Dialect<C>) => dialect.tagOf?.(node) ?? node.tag;
@@ -37,6 +38,10 @@ function elementLines<C>(node: ElementNode, depth: number, dialect: Dialect<C>, 
   const open = dialect.openTag(node, ctx);
   if (VOID_TAGS.has(node.tag)) {
     return [`${pad(depth)}${dialect.selfClosing ? open.replace(/>$/, ' />') : open}`];
+  }
+  const inner = dialect.inner?.(node, ctx) ?? [];
+  if (inner.length) {
+    return [`${pad(depth)}${open}`, ...inner.map((l) => `${pad(depth + 1)}${l}`), `${pad(depth)}</${tagName(node, dialect)}>`];
   }
   if (!node.children.length) {
     return [`${pad(depth)}${dialect.selfClosing ? open.replace(/>$/, ' />') : `${open}</${tagName(node, dialect)}>`}`];

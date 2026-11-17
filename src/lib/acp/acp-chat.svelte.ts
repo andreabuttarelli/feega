@@ -1,5 +1,4 @@
 import { AcpEventKind, readAcpEvents, type AcpEvent, type AcpOption, type AcpUpdate } from './acp-events';
-import type { AcpAgent } from './agent-choices';
 
 export const ACP_ENDPOINT = '/api/v1/local/acp';
 
@@ -18,6 +17,7 @@ export type ChatLine =
 
 type PermissionLine = Extract<ChatLine, { line: Line.Permission }>;
 
+const ABORT_ERROR = 'AbortError';
 const ANSWER_FAILED = 'The agent did not get your answer. Try again.';
 
 const UPDATE_LINES: Record<string, (update: AcpUpdate, chat: AcpChat) => void> = {
@@ -28,6 +28,7 @@ const UPDATE_LINES: Record<string, (update: AcpUpdate, chat: AcpChat) => void> =
 export class AcpChat {
   lines = $state<ChatLine[]>([]);
   busy = $state(false);
+  private turn: AbortController | null = null;
 
   constructor(public fetcher: typeof fetch = fetch) {}
 
@@ -45,20 +46,28 @@ export class AcpChat {
     this.push({ line: Line.Agent, text });
   }
 
-  async send(agent: AcpAgent, prompt: string) {
+  async send(agent: string, prompt: string) {
     this.push({ line: Line.User, text: prompt });
     this.busy = true;
+    this.turn = new AbortController();
 
     try {
-      const res = await this.post({ agent, prompt });
+      const res = await this.post({ agent, prompt }, this.turn.signal);
       for await (const event of readAcpEvents(res.body!)) {
         this.receive(event);
       }
     } catch (e) {
-      this.push({ line: Line.Error, text: (e as Error).message });
+      if ((e as Error).name !== ABORT_ERROR) {
+        this.push({ line: Line.Error, text: (e as Error).message });
+      }
     }
 
+    this.turn = null;
     this.busy = false;
+  }
+
+  stop() {
+    this.turn?.abort();
   }
 
   async answer(id: string, optionId: string) {
@@ -93,7 +102,7 @@ export class AcpChat {
     }
   }
 
-  private post(body: unknown) {
-    return this.fetcher(ACP_ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  private post(body: unknown, signal?: AbortSignal) {
+    return this.fetcher(ACP_ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal });
   }
 }

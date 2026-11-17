@@ -7,7 +7,7 @@ const glyphs: Glyphs = (text, size) => ({ contours: [[0, 0, text.length * size, 
 
 const ICON = [[0, 0, 12, 0, 12, 12, 0, 12]];
 
-const facts = (over: Partial<FrameFacts> = {}): FrameFacts => ({ breakpoints: false, component: false, prototype: false, source: [], ...over });
+const facts = (over: Partial<FrameFacts> = {}): FrameFacts => ({ breakpoints: false, component: false, source: [], ...over });
 
 const tile = (over: Partial<ChromeTile> = {}): ChromeTile => ({ id: 'f1', x: 100, y: 200, width: 300, height: 150, inputs: [], outputs: [], label: null, icon: null, ...over });
 
@@ -15,7 +15,7 @@ const right = (items: { contours: number[][] }[]) => Math.max(...items.flatMap((
 
 const left = (items: { contours: number[][] }[]) => Math.min(...items.flatMap((i) => i.contours.flatMap((c) => c.filter((_, j) => j % 2 === 0))));
 
-const partsOf = (t: ChromeTile, part: ChromePart) => tileChrome(t, glyphs).filter((i) => i.clip.startsWith(`${t.id}:${part}`));
+const partsOf = (t: ChromeTile, part: ChromePart) => tileChrome(t, glyphs).filter((i) => i.clip === `${t.id}:${part}` || i.clip.startsWith(`${t.id}:${part}:`));
 
 const LONG = 'Checkout page on a very narrow phone frame';
 
@@ -44,21 +44,25 @@ describe('frame name truncation', () => {
 
 describe('frameHeaderIcons', () => {
   it('shows a row only when its fact holds', () => {
-    expect(headerBadges(facts({ component: true, prototype: true }))).toEqual([FrameBadge.Component, FrameBadge.Prototype]);
-    expect(headerBadges(facts())).toEqual([]);
+    expect(headerBadges(facts({ component: true }))).toEqual([FrameBadge.Play, FrameBadge.Component]);
+    expect(headerBadges(facts())).toEqual([FrameBadge.Play]);
+  });
+
+  it('puts Play on every frame, before every state icon', () => {
+    expect(headerBadges(facts({ breakpoints: true, component: true, source: [SourceSync.Modified] }))[0]).toBe(FrameBadge.Play);
   });
 
   it('shows the GitHub states by default, hides them when the flag is off', () => {
-    expect(headerBadges(facts({ source: [SourceSync.Conflict] }))).toEqual([FrameBadge.SourceConflict]);
-    expect(headerBadges(facts({ source: [SourceSync.Conflict] }), { sourceSync: false })).toEqual([]);
+    expect(headerBadges(facts({ source: [SourceSync.Conflict] }))).toEqual([FrameBadge.Play, FrameBadge.SourceConflict]);
+    expect(headerBadges(facts({ source: [SourceSync.Conflict] }), { sourceSync: false })).toEqual([FrameBadge.Play]);
   });
 
   it('shows only the highest-priority GitHub state', () => {
     const on = { sourceSync: true };
 
-    expect(headerBadges(facts({ source: [SourceSync.InSync, SourceSync.Modified, SourceSync.Orphan] }), on)).toEqual([FrameBadge.SourceOrphan]);
-    expect(headerBadges(facts({ source: [SourceSync.InPr, SourceSync.Upstream] }), on)).toEqual([FrameBadge.SourceUpstream]);
-    expect(headerBadges(facts({ source: [SourceSync.InSync] }), on)).toEqual([FrameBadge.SourceInSync]);
+    expect(headerBadges(facts({ source: [SourceSync.InSync, SourceSync.Modified, SourceSync.Orphan] }), on)).toEqual([FrameBadge.Play, FrameBadge.SourceOrphan]);
+    expect(headerBadges(facts({ source: [SourceSync.InPr, SourceSync.Upstream] }), on)).toEqual([FrameBadge.Play, FrameBadge.SourceUpstream]);
+    expect(headerBadges(facts({ source: [SourceSync.InSync] }), on)).toEqual([FrameBadge.Play, FrameBadge.SourceInSync]);
   });
 
   it('orders the GitHub states conflict, orphan, read-only, upstream, modified, in PR, in sync', () => {
@@ -72,17 +76,53 @@ describe('frameHeaderIcons', () => {
   });
 
   it('draws the icons right-aligned in the header row', () => {
-    const t = tile({ label: 'Home', badges: [{ key: FrameBadge.Component, contours: ICON }, { key: FrameBadge.Prototype, contours: ICON }] });
+    const t = tile({ label: 'Home', badges: [{ key: FrameBadge.Play, contours: ICON }, { key: FrameBadge.Component, contours: ICON }] });
     const icons = partsOf(t, ChromePart.Badge);
 
     expect(icons).toHaveLength(2);
-    expect(right(icons)).toBeCloseTo(400, 6);
-    expect(headerIconBoxes(t, glyphs).map((b) => b.key)).toEqual([FrameBadge.Component, FrameBadge.Prototype]);
+    expect(right(partsOf(t, ChromePart.BadgeBox))).toBeCloseTo(400, 6);
+    expect(right(icons)).toBeCloseTo(393.5, 6);
+    expect(headerIconBoxes(t, glyphs).map((b) => b.key)).toEqual([FrameBadge.Play, FrameBadge.Component]);
+  });
+});
+
+describe('header icon box', () => {
+  const two = [{ key: FrameBadge.Play, contours: ICON }, { key: FrameBadge.Component, contours: ICON }];
+  const t = tile({ label: 'Home', badges: two });
+
+  it('gives each icon a 20px slot, 2px apart', () => {
+    const [a, b] = headerIconBoxes(t, glyphs);
+
+    expect(a.w).toBe(20);
+    expect(a.h).toBe(20);
+    expect(b.x - (a.x + a.w)).toBe(2);
+  });
+
+  it('draws one rounded fill behind the slots with 3px around them', () => {
+    const [box] = partsOf(t, ChromePart.BadgeBox);
+    const [a, b] = headerIconBoxes(t, glyphs);
+
+    expect(partsOf(t, ChromePart.BadgeBox)).toHaveLength(1);
+    expect(left([box])).toBeCloseTo(a.x - 3, 6);
+    expect(right([box])).toBeCloseTo(b.x + b.w + 3, 6);
+    expect(box.opacity).toBeLessThan(0.3);
+  });
+
+  it('keeps the box inside the frame and the name clear of it', () => {
+    const narrow = tile({ label: LONG, width: 90, badges: two });
+    const [box] = partsOf(narrow, ChromePart.BadgeBox);
+
+    expect(right([box])).toBeLessThanOrEqual(190 + 1e-6);
+    expect(right(partsOf(narrow, ChromePart.Label))).toBeLessThanOrEqual(left([box]));
+  });
+
+  it('draws no box on a frame with no icons', () => {
+    expect(partsOf(tile({ label: 'Home' }), ChromePart.BadgeBox)).toHaveLength(0);
   });
 });
 
 describe('narrow frames', () => {
-  const badges = [FrameBadge.Component, FrameBadge.Breakpoint, FrameBadge.Prototype].map((key) => ({ key, contours: ICON }));
+  const badges = headerBadges(facts({ breakpoints: true, component: true })).map((key) => ({ key, contours: ICON }));
 
   it('drops icons from the lowest priority before the name falls under three letters and an ellipsis', () => {
     expect(badgesKept(100, 3, 16, 48)).toBe(3);
@@ -98,6 +138,12 @@ describe('narrow frames', () => {
     expect(icons.length).toBeLessThan(3);
     expect(right(label)).toBeLessThanOrEqual(left(icons));
     expect(headerIconBoxes(t, glyphs).map((b) => b.key)).toEqual(badges.slice(0, icons.length).map((b) => b.key));
+  });
+
+  it('keeps Play when only one icon fits', () => {
+    const t = tile({ label: LONG, width: 80, badges });
+
+    expect(headerIconBoxes(t, glyphs).map((b) => b.key)).toEqual([FrameBadge.Play]);
   });
 });
 
