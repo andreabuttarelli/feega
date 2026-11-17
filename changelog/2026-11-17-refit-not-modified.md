@@ -13,6 +13,11 @@ to that side (`inLibrary` → `inDoc` on a `side × side` square) before compari
 changed px value is an edit. Imports made before this change carry no `side` and keep the old
 behaviour until reimported.
 
+Verified on the traidue clone: frames 2 and 3 of a page split at 16384 px still went modified.
+The import side was the first slice's `min(width, height)` (8800 × 160 → 160), and every slice got
+the same style numbers, so the 16384-tall part showed text 55× too large. `designed` now converts
+the styles into each frame's own units (px kept), so every part starts at the true px and in sync.
+
 Considered: deriving status from the revision log since import. Rejected for now: refits write
 revisions too, so the log does not separate user edits from fits without tagging every write.
 
