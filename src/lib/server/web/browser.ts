@@ -56,7 +56,7 @@ export type AppTab = Tab & {
   poster: (width: number, height: number) => Promise<PagePoster>;
 };
 
-export type PagePoster = { bytes: Uint8Array; width: number; height: number };
+export type PagePoster = { bytes: Uint8Array<ArrayBuffer>; width: number; height: number };
 
 export type OpenBrowser = () => Promise<Tab>;
 export type OpenAppBrowser = () => Promise<AppTab>;
