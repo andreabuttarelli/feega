@@ -186,4 +186,21 @@ describe('scrittura atomica', () => {
 
     expect(opened.ok && opened.file.canvas.events).toEqual([]);
   });
+  it('la riapertura non attribuisce a una persona una revisione che nessuno ha fatto ora', async () => {
+    const path = tempFile();
+    const first = openFeegaStore(path, { origin: ORIGIN });
+    const frame = await addText(first, 'frame');
+    await appendRevision(first.db, { orgId: LOCAL_ORG_ID, nodeId: frame.id, expectedVersion: 0, doc: newMotionDoc(MotionFormat.Square), actor });
+    await first.flush();
+    const exportedAt = (unpackFeega(new Uint8Array(readFileSync(path))) as { file: { manifest: { exportedAt: string } } }).file.manifest.exportedAt;
+
+    const rows = async () => ((await openFeegaStore(path, { origin: ORIGIN }).db.from('motion_revisions').select('actor_kind, created_at, node_id')).data ?? []) as { actor_kind: string; created_at: string }[];
+    const reopened = await rows();
+    const again = await rows();
+
+    expect(reopened).toHaveLength(1);
+    expect(again).toHaveLength(1);
+    expect(reopened[0]).toMatchObject({ actor_kind: 'system', created_at: exportedAt });
+  });
+
 });
