@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ItemKind, type DisplayList, type Item } from './display-list';
-import { createMedia } from './media';
+import { Readiness, createMedia } from './media';
 
 class Bitmap {
   closed = false;
@@ -36,5 +36,22 @@ describe('decoded pictures', () => {
     expect(shared.closed).toBe(false);
     expect(media.pictures(gone.items[0] as never)).toBeNull();
     expect(media.pictures(kept.items[0] as never)).not.toBeNull();
+  });
+
+  it('asks a failed picture again on the next ready, and says why it failed', async () => {
+    vi.stubGlobal('ImageBitmap', Bitmap);
+    let up = false;
+    vi.stubGlobal('fetch', async () => (up ? { ok: true, blob: async () => new Blob() } : { ok: false, status: 503 }));
+    vi.stubGlobal('createImageBitmap', async () => new Bitmap(10, 10));
+    vi.stubGlobal('Image', class { decode = () => Promise.reject(new Error('EncodingError')); });
+    const media = createMedia();
+    const frame = list(image('hero', '/hero.png'));
+
+    expect(await media.ready(frame)).toBe(Readiness.Partial);
+    expect(media.failure('/hero.png')).toMatch(/503/);
+
+    up = true;
+    expect(await media.ready(frame)).toBe(Readiness.Whole);
+    expect(media.failure('/hero.png')).toBeNull();
   });
 });

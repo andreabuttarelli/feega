@@ -1,0 +1,14 @@
+{
+  "name": "feega-source-map-fixture-next15",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@babel/parser": "7.28.5",
+    "@tailwindcss/postcss": "4.1.17",
+    "magic-string": "0.30.21",
+    "next": "15.5.29",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "tailwindcss": "4.1.17"
+  }
+}

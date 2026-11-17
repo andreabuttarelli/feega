@@ -25,6 +25,7 @@
     "test:unit": "vitest run",
     "test:export-fidelity": "CODE_EXPORT_FIDELITY=1 vitest run src/lib/server/code-export/export-fidelity.browser.test.ts",
     "test:e2e": "playwright test",
+    "test:source-map": "SOURCE_MAP_E2E=1 vitest run packages/source-map/src/frameworks.integration.test.ts",
     "test:e2e:frames": "E2E_REAL_STACK=1 node --env-file-if-exists=.env node_modules/@playwright/test/cli.js test canvas-frames --project=chromium --workers=1",
     "build:spa": "DEPLOY_TARGET=spa vite build",
     "test:text-metrics": "TEXT_METRICS=1 vitest run src/lib/server/motion/text-metrics.browser.test.ts",

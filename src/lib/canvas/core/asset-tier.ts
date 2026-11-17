@@ -1,5 +1,6 @@
 import { AssetSize } from '$lib/canvas/asset-url';
 import { AHEAD_REACH } from './screen-uses';
+import { Motion } from '$lib/canvas/gpu/crash-watch';
 
 const NEAR_ZOOM = 0.75;
 
@@ -27,4 +28,12 @@ export function reachOf(box: Box, view: View, screen: Screen, screens = AHEAD_RE
   return near ? Reach.Near : Reach.Far;
 }
 
-export const keptTier = (wanted: AssetSize, loaded: AssetSize | undefined, reach: Reach): AssetSize => (reach === Reach.Near && loaded !== undefined && rank(loaded) > rank(wanted) ? loaded : wanted);
+const higher = (a: AssetSize, b: AssetSize) => (rank(a) >= rank(b) ? a : b);
+const lower = (a: AssetSize, b: AssetSize) => (rank(a) <= rank(b) ? a : b);
+
+const KEPT: Record<Motion, Record<Reach, (wanted: AssetSize, loaded: AssetSize) => AssetSize>> = {
+  [Motion.Moving]: { [Reach.Near]: (_, loaded) => loaded, [Reach.Far]: (_, loaded) => loaded },
+  [Motion.Still]: { [Reach.Near]: higher, [Reach.Far]: lower }
+};
+
+export const keptTier = (wanted: AssetSize, loaded: AssetSize | undefined, reach: Reach, motion: Motion): AssetSize => (loaded === undefined ? wanted : KEPT[motion][reach](wanted, loaded));

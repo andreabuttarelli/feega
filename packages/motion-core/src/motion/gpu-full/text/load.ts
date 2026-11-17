@@ -5,12 +5,12 @@ import { googleFontsUrl, uploadFaceCss, usedFaces } from '../../fonts/model';
 import type { MotionDoc } from '../../doc';
 import type { FaceBook } from './face';
 import { fallbackOf, faceBook, type Fallback, faceRules, type FaceRule, type Source } from './fonts';
-import { fontkitSource } from './fontkit-face';
+import { fontkitSource, type Broken } from './fontkit-face';
 import { TEXT_COMPONENTS } from './painter';
 
 export const BUILTIN_FONTS_URL = 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fragment+Mono&display=block';
 
-export type Engine = () => Promise<(bytes: Uint8Array) => Source>;
+export type Engine = () => Promise<(bytes: Uint8Array, broken: Broken) => Source>;
 
 export const fontkitEngine: Engine = async () => fontkitSource;
 
@@ -62,7 +62,7 @@ const remembered = <T>(load: (url: string) => Promise<T>) => {
 export function fontLoader(read: Reader = webReader, engine: Engine = fontkitEngine): (doc: MotionDoc, assets: Record<string, string>, tokens: BrandTokens) => Promise<FaceBook> {
   const sheet = remembered((url) => read.text(url).catch(() => ''));
   let made: ReturnType<Engine> | null = null;
-  const source = remembered((url) => Promise.all([read.bytes(url), (made ??= engine())]).then(([bytes, make]): [string, Source] => [url, make(bytes)]).catch(() => null));
+  const source = remembered((url) => Promise.all([read.bytes(url), (made ??= engine())]).then(([bytes, make]): [string, Source] => [url, make(bytes, (error) => console.warn('[fonts] glyphs not decodable, drawn with the fallback', url, error))]).catch(() => null));
   const books = new Map<string, FaceBook>();
   return async (raw, assets, tokens) => {
     const doc = preparedDoc({ doc: raw, tokens, assets });
