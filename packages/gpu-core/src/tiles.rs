@@ -601,14 +601,34 @@ impl Tiles {
             let used = |k: &TileKey| self.last_drawn.get(k).copied().unwrap_or(0);
             used(a).cmp(&used(b)).then(distance(b).total_cmp(&distance(a)))
         });
-        let excess = (self.held.len() - keep).min(loose.len());
-        let gone: Vec<TileKey> = loose.into_iter().take(excess).collect();
-        gone.iter().for_each(|k| {
-            self.held.remove(k);
-            self.stale.remove(k);
-            self.last_drawn.remove(k);
-        });
+        let mut excess = self.held.len() - keep;
+        let mut gone = Vec::new();
+        for key in loose {
+            if excess == 0 {
+                break;
+            }
+            if self.only_cover(key, world, step) {
+                continue;
+            }
+            self.held.remove(&key);
+            self.stale.remove(&key);
+            self.last_drawn.remove(&key);
+            gone.push(key);
+            excess -= 1;
+        }
         gone
+    }
+
+    fn only_cover(&mut self, key: TileKey, seen: Rect, step: i32) -> bool {
+        let area = key.world().intersect(seen);
+        if area.area() <= 0.0 {
+            return false;
+        }
+        let cells: Vec<TileKey> = keys_over(area, step).filter(|k| self.paints(*k) && !self.held.contains(k) && self.covered(*k)).collect();
+        self.held.remove(&key);
+        let bared = cells.iter().any(|k| !self.held.contains(k) && !self.covered(*k));
+        self.held.insert(key);
+        bared
     }
 }
 
