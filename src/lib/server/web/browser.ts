@@ -53,7 +53,10 @@ export type AppTab = Tab & {
   press: (key: string) => Promise<void>;
   paint: (html: string, size: { width: number; height: number }) => Promise<Buffer>;
   beside: () => Promise<AppTab>;
+  poster: (width: number, height: number) => Promise<PagePoster>;
 };
+
+export type PagePoster = { bytes: Uint8Array; width: number; height: number };
 
 export type OpenBrowser = () => Promise<Tab>;
 export type OpenAppBrowser = () => Promise<AppTab>;
@@ -78,6 +81,8 @@ const RETRYABLE = /\b(429|503)\b|too many|rate limit/i;
 const VIEWPORT = { width: 1280, height: 800 };
 const NAV_TIMEOUT_MS = 20_000;
 const JPEG_QUALITY = 70;
+const POSTER_WIDTH_PX = 512;
+const POSTER_QUALITY = 80;
 const REDACTED = '[redacted]';
 
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -532,6 +537,11 @@ function tabOf(page: Page, close: () => Promise<number>, left: () => number): Ap
         },
         left
       );
+    },
+    poster: async (width, height) => {
+      const scale = Math.min(1, POSTER_WIDTH_PX / width);
+      const bytes = await page.screenshot({ type: 'webp', quality: POSTER_QUALITY, clip: { x: 0, y: 0, width, height, scale }, captureBeyondViewport: true });
+      return { bytes: new Uint8Array(bytes), width: Math.round(width * scale), height: Math.round(height * scale) };
     },
     paint: async (html, size) => {
       await page.setContent(html, { waitUntil: 'load', timeout: NAV_TIMEOUT_MS });

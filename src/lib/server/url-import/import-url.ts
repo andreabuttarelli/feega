@@ -4,7 +4,7 @@ import { imagesFilled, type ImageAssets } from '$lib/canvas/figma/images';
 import { DocRejected, placeFigmaPlan, type FrameStore, type Place } from '$lib/server/motion/move-element';
 import type { UndoItem } from '$lib/canvas/undo-plan';
 import { homedAt } from '$lib/motion/canvas-components';
-import type { AppTab, OpenAppBrowser } from '$lib/server/web/browser';
+import type { AppTab, OpenAppBrowser, PagePoster } from '$lib/server/web/browser';
 import { BrowserBusy } from '$lib/server/web/browser-slots';
 import { dismissOverlays } from '$lib/server/web/overlays';
 import { SnapMode, TREE_LIMITS, type PageTree } from './page-tree';
@@ -76,6 +76,7 @@ export type PageAsk = {
   shape?: PageShape;
   components?: () => Promise<ComponentsPage>;
   views?: PageView[];
+  keepPoster?: (frameId: string, poster: PagePoster) => Promise<void>;
 };
 
 export type ComponentsPage = { place: Place; at: { x: number; y: number } };
@@ -246,9 +247,15 @@ async function readAndLand(ask: PageAsk): Promise<UrlImported> {
   const open = ask.open;
   const planner = ask.planner ?? PLAIN_PLANNER;
   const unreadable = (read: PageTree | UrlImported) => 'outcome' in read && read.outcome === UrlImportOutcome.Unreadable;
+  let poster: PagePoster | null = null;
   const readWith = async (sight: Sight) => {
     const tab = await open();
-    const read = await pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight, sight).finally(() => tab.close());
+    const read = await pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight, sight)
+      .then(async (tree) => {
+        poster = 'outcome' in tree ? null : await posterOf(tab, tree);
+        return tree;
+      })
+      .finally(() => tab.close());
     return unreadable(read) && tab.left() <= 0 ? refused(UrlImportOutcome.TooSlow) : read;
   };
   const readPage = async () => {
@@ -281,7 +288,20 @@ async function readAndLand(ask: PageAsk): Promise<UrlImported> {
   const tree = await withSheetFonts(ask, read);
   const views = narrow.flat();
 
-  return landPlan(ask, planner.plan(tree, ask.newId, await fontsFor(ask, tree), ask.shape ?? FULL_SHAPE, views), tree.truncated);
+  const landed = await landPlan(ask, planner.plan(tree, ask.newId, await fontsFor(ask, tree), ask.shape ?? FULL_SHAPE, views), tree.truncated);
+  const shot: PagePoster | null = poster;
+  if (landed.outcome === UrlImportOutcome.Ok && shot && ask.keepPoster) {
+    await ask.keepPoster(landed.frameId, shot).catch(() => undefined);
+  }
+  return landed;
+}
+
+async function posterOf(tab: AppTab, tree: PageTree): Promise<PagePoster | null> {
+  try {
+    return await tab.poster(tree.width, tree.height);
+  } catch {
+    return null;
+  }
 }
 
 const STATEMENT_TIMEOUT = '57014';
