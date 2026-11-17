@@ -50,3 +50,25 @@ Consequences:
   boxes back when a clip leaves a container, so it stays where it was seen.
 - The estimate can disagree with the browser by a few px for unusual fonts. Accepted until a
   real case shows it matters; the fix then is a better metrics table, not a measurement cache.
+
+## Amended 2026-11-16: hugged text is sized by the font, not by the estimate
+
+The GPU canvas had already moved to the font's own metrics: `prepare` lays out with `shapedText`,
+the shaper the painter draws with (fontkit over the real font files, kerning included). The HTML
+renderer kept `textExtent`, so a server still or video, laid out by the estimate, disagreed with the
+canvas the user had just looked at. Measured against Chromium over 756 cases (7 fonts, 3 sizes, 2
+weights, 3 trackings, 7 scripts; `npm run test:text-metrics`): the estimate is off by 9.9% at the
+median and 45–52% at p90/max (CJK at 0.5 em, monospace, emoji, any weight or family); the shaper
+is within 0.7% for every non-emoji string. The "few px for unusual fonts" this ADR accepted was
+the common case.
+
+Server renders (`drawStill`, `drawFrames`, render-farm and batch requests, selection export) now
+compose with `withShapedText`: the same fonts the canvas loads, fetched as a browser fetches them,
+shaped by the same code. It is still deterministic and still no measurement cache: the input is
+the font file, not whichever browser opened the editor last. `textExtent` remains the fallback when
+a face cannot load, and the measure for callers that have no fonts at hand (editor ops, the code
+export's own layout pass, compose in the browser players).
+
+Emoji are the exception the shaper cannot close: Chromium draws them with the system's emoji font
+(Apple Color Emoji on macOS), the shaper with Noto Emoji, so a line of emoji differs by 5–10%
+between machines' browsers. Not fixable by measuring; the guard leaves them out and says so.

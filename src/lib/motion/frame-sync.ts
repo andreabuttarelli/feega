@@ -18,9 +18,14 @@ export function remote(base: Revision, present: MotionDoc, head: Revision): Sync
   return { base: head, present: rebase(base.doc, present, head.doc) };
 }
 
+const onItsBase = (base: Revision, server: Revision) => server.version === base.version + 1;
+
 export function landed(base: Revision, sent: MotionDoc, present: MotionDoc, server: Revision): Synced {
   if (server.version <= base.version) {
     return { base, present };
+  }
+  if (onItsBase(base, server)) {
+    return { base: { version: server.version, doc: sent }, present };
   }
   const untouched = present === sent && !outgoing({ version: 0, doc: sent }, server.doc).length;
   return { base: server, present: untouched ? present : rebase(sent, present, server.doc) };
