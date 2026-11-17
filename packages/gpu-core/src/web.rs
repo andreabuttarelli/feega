@@ -21,7 +21,7 @@ use crate::retained::{Camera, Damage, Lookup, Quality};
 use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, GestureDraw, Moment, Path, Warmup, tiles_kept_beside, TILE_BUDGET_BYTES, TILE_BYTES, TILE_GUTTER_PX, batches, batches_of, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys, magnified, fallback_serves, fallback_bands, ahead_camera, fade_in, fades_over, FADE_MS};
 use crate::overlay_seen::OverlaySeen;
 use crate::overlay_hold::{Moving, OverlayHold, OverlayQuality};
-use crate::screen_fit::{fit, screen_side};
+use crate::screen_fit::{fit, fitted_list, screen_side, Fit};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
 use crate::tally::now_ms;
@@ -1384,7 +1384,9 @@ impl WebCore {
     }
 
     pub fn draw(&mut self, list_json: &[u8]) -> Result<String, JsValue> {
-        let plan = self.library.plan(&parse(utf8(list_json)?).map_err(failed)?, self.limits);
+        let fitted = Fit { size: (self.target.width(), self.target.height()), scale: self.scale };
+        let list = fitted_list(&mut self.library, parse(utf8(list_json)?).map_err(failed)?, fitted);
+        let plan = self.library.plan(&list, self.limits);
         self.pending = plan.pending;
         let (list, missing) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
         let pictures: Pictures = self.pictures.iter().chain(&self.cached).map(|(k, v)| (k.clone(), v.clone())).collect();

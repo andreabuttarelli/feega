@@ -1,4 +1,49 @@
-use gpu_core::screen_fit::{fit, screen_side, screen_targets};
+use gpu_core::display_list::{parse, DisplayList, Item, PathItem};
+use gpu_core::groups::{Library, Limits};
+use gpu_core::screen_fit::{fit, fitted_list, screen_side, screen_targets};
+
+const TALL: &str = r#"{
+  "width": 400, "height": 5000, "background": [1, 1, 1, 1],
+  "items": [
+    { "kind": "path", "clip": "footer", "contours": [[0, 4900, 400, 4900, 400, 5000, 0, 5000]], "rule": "nonzero",
+      "paint": { "kind": "solid", "color": [1, 0, 0, 1] }, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blur": 10, "blend": "normal" }
+  ]
+}"#;
+const DEVICE_SIDE: u32 = 1000;
+
+fn footer(list: &DisplayList) -> PathItem {
+    list.items.iter().find_map(|i| match i {
+        Item::Path(p) if p.clip == "footer" => Some(p.clone()),
+        _ => None,
+    }).expect("the footer path")
+}
+
+#[test]
+fn a_frame_taller_than_the_device_draws_whole_and_scaled() {
+    let list = parse(TALL).unwrap();
+    let fitted = fit((list.width, list.height), DEVICE_SIDE);
+    let mut library = Library::new();
+
+    let screen = fitted_list(&mut library, list, fitted);
+    let planned = library.plan(&screen, Limits { side: DEVICE_SIDE, rasters: 1, items: 16 }).screen;
+    let path = footer(&planned);
+
+    assert_eq!((planned.width, planned.height), (80, DEVICE_SIDE));
+    assert_eq!(planned.background, Some([1.0, 1.0, 1.0, 1.0]));
+    assert!((path.look.matrix[3] - 0.2).abs() < 1e-9, "{:?}", path.look.matrix);
+    assert!((path.look.blur - 2.0).abs() < 1e-9, "{}", path.look.blur);
+}
+
+#[test]
+fn a_frame_that_fits_is_drawn_as_written() {
+    let list = parse(TALL).unwrap();
+    let mut library = Library::new();
+
+    let screen = fitted_list(&mut library, list.clone(), fit((list.width, list.height), 8192));
+
+    assert_eq!((screen.width, screen.height), (list.width, list.height));
+    assert_eq!(screen.items, list.items);
+}
 
 const WEBGL_ATLAS: u32 = 4096;
 const WEBGPU_DEFAULT: u32 = 8192;

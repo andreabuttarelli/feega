@@ -17,7 +17,7 @@ use crate::retained::{Camera, Lookup, Quality};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::layers::{prepare, Blending, Surface};
 use crate::scene::{build_into, Placed, Shelf};
-use crate::screen_fit::fit;
+use crate::screen_fit::{fit, fitted_list, Fit};
 use crate::Skipped;
 
 #[derive(Clone, Copy)]
@@ -423,7 +423,8 @@ impl WebGlCore {
     }
 
     pub fn draw(&mut self, list_json: &[u8]) -> Result<String, JsValue> {
-        let plan = self.library.plan(&parse(utf8(list_json)?).map_err(failed)?, self.limits());
+        let list = fitted_list(&mut self.library, parse(utf8(list_json)?).map_err(failed)?, Fit { size: (self.width, self.height), scale: self.scale });
+        let plan = self.library.plan(&list, self.limits());
         self.pending = plan.pending;
         let (list, missing) = self.hold(plan)?;
         let pictures: Shelf<GlPicture> = self.pictures.iter().chain(&self.cached).map(|(k, v)| (k.clone(), *v)).collect();

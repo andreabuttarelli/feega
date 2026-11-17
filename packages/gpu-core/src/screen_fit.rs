@@ -1,7 +1,10 @@
+use crate::display_list::{DisplayList, Item, UseItem};
+use crate::groups::Library;
 use crate::held_view::HeldView;
 use crate::retained::{Camera, Retained};
 
 const ORIGIN: Camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
+const FITTED_GROUP: &str = "fitted-frame";
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Fit {
@@ -17,6 +20,15 @@ pub fn fit((width, height): (u32, u32), side: u32) -> Fit {
     let scale = f64::from(side) / f64::from(longest);
     let scaled = |v: u32| ((f64::from(v) * scale).round() as u32).clamp(1, side);
     Fit { size: (scaled(width), scaled(height)), scale }
+}
+
+pub fn fitted_list(library: &mut Library, list: DisplayList, fit: Fit) -> DisplayList {
+    if fit.scale == 1.0 {
+        return list;
+    }
+    library.put_group(FITTED_GROUP, &list);
+    let whole = UseItem { clip: FITTED_GROUP.into(), group: FITTED_GROUP.into(), matrix: [fit.scale, 0.0, 0.0, fit.scale, 0.0, 0.0], cache: false, hold: false, reach: None };
+    DisplayList { width: fit.size.0, height: fit.size.1, background: list.background, items: vec![Item::Use(whole)], faces: list.faces, fragments: Default::default() }
 }
 
 pub fn screen_targets(size: (u32, u32)) -> [(u32, u32); 3] {
