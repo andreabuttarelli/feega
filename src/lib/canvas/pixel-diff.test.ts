@@ -40,6 +40,18 @@ describe('le regioni cambiate tra due poster', () => {
     expect(changedRegions(blank(), noisy)).toEqual([]);
   });
 
+  it('lo stesso disegno con i bordi resi in modo diverso non conta', () => {
+    const sharp = paint(blank(), { x: 16, y: 16, w: 16, h: 16 });
+    const soft = { ...sharp, data: new Uint8ClampedArray(sharp.data) };
+    for (let y = 15; y <= 32; y++) {
+      for (const x of [15, 32]) {
+        soft.data.set([128, 128, 128, 255], (y * W + x) * 4);
+      }
+    }
+
+    expect(changedRegions(sharp, soft)).toEqual([]);
+  });
+
   it('dimensioni diverse sono un cambiamento su tutto il poster', () => {
     expect(changedRegions(blank(), { width: 32, height: 32, data: new Uint8ClampedArray(32 * 32 * 4) })).toEqual([{ x: 0, y: 0, w: 1, h: 1 }]);
   });
