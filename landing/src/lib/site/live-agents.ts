@@ -202,6 +202,10 @@ export function mayEnter<T>(el: T, occupants: T[], within: Within<T>, gate?: Gat
   return held > 0 || !gate || gate.now - lastBusy >= section.restMs;
 }
 
+export function mayHide<T>(el: T, within: Within<T>): boolean {
+  return !SECTION_CAPS.some((s) => within(el, s.selector));
+}
+
 export function isProtected<T>(el: T, within: Within<T>): boolean {
   return SECTION_CAPS.some((s) => within(el, s.selector)) && within(el, PROTECTED_SELECTOR);
 }

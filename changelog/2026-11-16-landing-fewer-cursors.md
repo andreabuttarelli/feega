@@ -19,3 +19,7 @@ Second pass: `#pricing` also has `restMs`. After a cursor leaves, no other
 may enter for that long, and a cursor still flying out of a section counts
 as present (`holders`, `noteOccupancy`, `mayEnter` gate). Before, one
 cursor leaving while another arrived showed two at once.
+
+Third pass: elements in a capped section are never hidden waiting for a
+cursor (`mayHide`). Below-the-fold elements elsewhere still are; with the
+rest period, pricing would otherwise stay blank for the whole visit.

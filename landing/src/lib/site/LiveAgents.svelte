@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ACTIONS_BY_TARGET, AGENTS, lockHeight, BUILD_SELECTOR, BuildMode, PEER_COLOURS, isProtected, mayEnter, createRest, noteOccupancy, holders, claimTweak, ruleFor, createLedger, mayTweak, releaseTweak, curve, initials, outermost, pick, type ActionKind, type Point, type TargetKind } from './live-agents';
+  import { ACTIONS_BY_TARGET, AGENTS, lockHeight, BUILD_SELECTOR, BuildMode, PEER_COLOURS, isProtected, mayEnter, mayHide, createRest, noteOccupancy, holders, claimTweak, ruleFor, createLedger, mayTweak, releaseTweak, curve, initials, outermost, pick, type ActionKind, type Point, type TargetKind } from './live-agents';
 
   type Box = { x: number; y: number; w: number; h: number };
   type Menu = { items: string[]; active: number };
@@ -423,7 +423,7 @@
 
     const targets = outermost([...document.querySelectorAll<HTMLElement>(BUILD_SELECTOR)]).filter((el) => !isProtected(el, within));
     for (const el of targets) {
-      if (ruleOf(el).build === BuildMode.Place && el.getBoundingClientRect().top > innerHeight) {
+      if (ruleOf(el).build === BuildMode.Place && mayHide(el, within) && el.getBoundingClientRect().top > innerHeight) {
         el.dataset.pending = '';
         el.style.opacity = '0';
       }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as live from './live-agents';
-import { createRest, noteOccupancy, BuildMode, ELEMENT_RULES, PROTECTED_SELECTOR, isProtected, mayEnter, TEXT_SELECTOR, TweakLimit, claimTweak, createLedger, curve, mayTweak, releaseTweak, ruleFor } from './live-agents';
+import { mayHide, createRest, noteOccupancy, BuildMode, ELEMENT_RULES, PROTECTED_SELECTOR, isProtected, mayEnter, TEXT_SELECTOR, TweakLimit, claimTweak, createLedger, curve, mayTweak, releaseTweak, ruleFor } from './live-agents';
 
 describe('cursor path', () => {
   it('starts and lands on its endpoints', () => {
@@ -156,5 +156,17 @@ describe('section rest', () => {
 
   it('keeps counting a cursor that is still flying out of a section', () => {
     expect(live.holders([{ el: null, leaving: 'p1' }, { el: 'p1', leaving: null }, { el: null, leaving: null }])).toEqual(['p1', 'p1']);
+  });
+});
+
+describe('content never waits for a cursor', () => {
+  const within = (el: string, selector: string) => ({ price: ['#pricing'], question: ['#faq'], legal: ['.site-foot'], hero: ['.hero'] } as Record<string, string[]>)[el].includes(selector);
+
+  it('keeps pricing, faq and footer elements visible without a cursor visit', () => {
+    expect(['price', 'question', 'legal'].map((el) => mayHide(el, within))).toEqual([false, false, false]);
+  });
+
+  it('still lets other sections be built in by a cursor', () => {
+    expect(mayHide('hero', within)).toBe(true);
   });
 });
