@@ -91,7 +91,7 @@ test('direct zoom on the user canvas copy', async () => {
   const traced: Traced[] = [];
   const tracing = process.env.PROBE_TRACE === '1';
   if (tracing) {
-    cdp.on('Tracing.dataCollected', (e: { value: Traced[] }) => traced.push(...e.value));
+    cdp.on('Tracing.dataCollected', (e) => traced.push(...(e.value as unknown as Traced[])));
     await cdp.send('Tracing.start', { categories: 'devtools.timeline,disabled-by-default-devtools.timeline', transferMode: 'ReportEvents' });
   }
   if (profiled) {
