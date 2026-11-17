@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeGithub, type FakeGithub } from '$lib/server/code-push/fake-github.testkit';
+import { githubHost } from '$lib/server/code-push/github-host';
 import { memoryLock } from '$lib/server/code-push/push-lock';
 import { EntryKind, linkSchema, type CodeLink } from '$lib/server/code-push/link';
 
@@ -14,7 +15,7 @@ vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: vi.fn(async () => []
 vi.mock('$lib/server/projects/lookup', () => ({ findReachableProject: (...args: unknown[]) => findReachableProject(...args) }));
 vi.mock('$lib/server/code-push/frames-runtime', () => ({
   framesDeps: () => ({
-    call: async () => (connected ? gh.call : null),
+    host: async () => (connected ? githubHost(gh.call, { owner: 'acme', repo: 'app', ref: null }) : null),
     edits: (...args: unknown[]) => codeEdits(...args),
     links: { read: async (id: string) => links.get(id) ?? null, save: async (id: string, l: CodeLink) => Boolean(links.set(id, l)) },
     lock

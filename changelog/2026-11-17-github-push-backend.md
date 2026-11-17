@@ -17,5 +17,12 @@ errors. Now `src/lib/server/code-push/` holds the write path the GitHub sync dec
   renames are followed. Stored in `frame_code_links`, locks in `git_push_locks`
   (`20261117120000_frame_code_links.sql`, not applied: both stores degrade to "no link"/"no lock").
 
+Three adapters behind the same port and contract suite: `github-host.ts` (Composio-connected
+GitHub App, or `GITHUB_PUSH_TOKEN` + `GITHUB_API_URL` for self-hosted/Enterprise, picked in
+`hosts.ts`), and `local-git-host.ts` for folder imports (desktop, local dev): git plumbing with a
+private index (`git-cli.ts`), so the user's branch, worktree and history are never touched; pushes
+to `origin` without force, PRs only when a GitHub token exists (`pull_unavailable` otherwise).
+Plumbing instead of a separate `git worktree`: same isolation, nothing checked out on disk.
+
 Not here: creating links at import time, webhooks (status is polled), 3-way merge, fork PRs,
 images in PR bodies. `code_publish` is unchanged.

@@ -35,7 +35,7 @@ describe('pushFiles', () => {
     const second = pushed(await pushFiles(host, lock, ask({ files: [{ path: 'src/Hero.tsx', content: 'v2' }], since: { branch: first.branch, sha: first.sha } })));
 
     expect(first).toMatchObject({ ok: true, branch: 'feega/hero-redesign', touched: ['src/Hero.tsx'] });
-    expect(second.pull.number).toBe(first.pull.number);
+    expect(second.pull!.number).toBe(first.pull!.number);
     expect(gh.pulls).toHaveLength(1);
     expect(gh.files('feega/hero-redesign')['src/Hero.tsx']).toBe('v2');
     expect(gh.files('main')['src/Hero.tsx']).toBeUndefined();
@@ -44,12 +44,12 @@ describe('pushFiles', () => {
   it('dopo il merge la modifica successiva apre un ramo e una PR nuovi', async () => {
     const { gh, host, lock } = setup();
     const first = pushed(await pushFiles(host, lock, ask()));
-    gh.endPull(first.pull.number, true);
+    gh.endPull(first.pull!.number, true);
 
     const next = pushed(await pushFiles(host, lock, ask({ since: { branch: first.branch, sha: first.sha } })));
 
     expect(next.branch).toBe('feega/hero-redesign-2');
-    expect(next.pull.number).not.toBe(first.pull.number);
+    expect(next.pull!.number).not.toBe(first.pull!.number);
   });
 
   it('i co-autori finiscono nel messaggio del commit', async () => {
@@ -171,7 +171,7 @@ describe('pushStatus', () => {
     const { gh, host, lock } = setup();
     const base = await host.headOf('main');
     const first = pushed(await pushFiles(host, lock, ask()));
-    gh.endPull(first.pull.number, false);
+    gh.endPull(first.pull!.number, false);
 
     expect(await pushStatus(host, { branch: first.branch, sha: first.sha, baseSha: base })).toMatchObject({ ok: true, pull: { status: 'closed' } });
   });

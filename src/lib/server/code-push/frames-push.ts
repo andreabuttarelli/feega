@@ -1,17 +1,14 @@
 import type { CodeScope } from '$lib/server/code-import/canvas-import';
 import type { CodeEdits, SyncRefusal } from '$lib/server/code-import/code-sync';
-import type { GithubCall } from '$lib/server/code-import/github';
-import { repoOf } from '$lib/server/code-import/repo';
 import { Access, GitError, GitFailure, PullStatus, type GitHost } from './git-host';
-import { githubHost } from './github-host';
-import { followRenames, linkStatus, type CodeLink, type LinkState } from './link';
+import { CodeSourceKind, followRenames, isPushable, linkStatus, type CodeLink, type LinkState } from './link';
 import type { LinkStore } from './link-store';
 import type { PushLock } from './push-lock';
 import { PushRefusal, pushFiles, pushStatus, undoPush, type LastPush, type PushRefused, type PushState, type Pushed, type Undone } from './push';
 
 export enum FramesRefusal {
   NotConnected = 'not_connected',
-  NotGithub = 'not_github',
+  NotPushable = 'not_pushable',
   ManyRepos = 'many_repos',
   NotLinked = 'not_linked',
   NotPushed = 'not_pushed'
@@ -20,7 +17,7 @@ export enum FramesRefusal {
 export type FramesRefused = { ok: false; refusal: FramesRefusal | SyncRefusal | PushRefused['refusal']; paths?: string[]; patch?: { path: string; content: string }[] };
 
 export type FramesDeps = {
-  call: () => Promise<GithubCall | null>;
+  host: (source: CodeSourceKind, repo: string) => Promise<GitHost | null>;
   edits: (scope: CodeScope, nodeId: string) => Promise<CodeEdits | SyncRefusal>;
   links: LinkStore;
   lock: PushLock;
@@ -30,13 +27,12 @@ export type FramesPushAsk = { name: string; nodeIds: string[]; title?: string; b
 
 export type FrameStatus = { ok: true; state: LinkState; link: CodeLink; push: PushState | null };
 
-const GITHUB_KIND = 'github';
 const DEFAULT_TITLE = 'UI edits from Feega';
 const DEFAULT_BODY = 'Edited on the Feega canvas.';
 
 const refused = (refusal: FramesRefused['refusal']): FramesRefused => ({ ok: false, refusal });
 
-async function editsOf(deps: FramesDeps, scope: CodeScope, nodeIds: string[]): Promise<{ repo: string; files: { path: string; content: string }[] } | FramesRefused> {
+async function editsOf(deps: FramesDeps, scope: CodeScope, nodeIds: string[]): Promise<{ source: CodeSourceKind; repo: string; files: { path: string; content: string }[] } | FramesRefused> {
   const all: CodeEdits[] = [];
   for (const nodeId of nodeIds) {
     const got = await deps.edits(scope, nodeId);
@@ -45,21 +41,15 @@ async function editsOf(deps: FramesDeps, scope: CodeScope, nodeIds: string[]): P
     }
     all.push(got);
   }
-  if (all.some((e) => e.kind !== GITHUB_KIND)) {
-    return refused(FramesRefusal.NotGithub);
+  if (all.some((e) => !isPushable(e.kind))) {
+    return refused(FramesRefusal.NotPushable);
   }
-  const repos = new Set(all.map((e) => e.repo));
+  const repos = new Set(all.map((e) => `${e.kind}:${e.repo}`));
   if (repos.size !== 1) {
     return refused(FramesRefusal.ManyRepos);
   }
   const byPath = new Map(all.flatMap((e) => e.files).map((f) => [f.path, f]));
-  return { repo: [...repos][0], files: [...byPath.values()] };
-}
-
-async function hostFor(deps: FramesDeps, repoName: string): Promise<GitHost | null> {
-  const repo = repoOf(`https://github.com/${repoName}`);
-  const call = repo ? await deps.call() : null;
-  return repo && call ? githubHost(call, repo) : null;
+  return { source: all[0].kind as CodeSourceKind, repo: all[0].repo, files: [...byPath.values()] };
 }
 
 const lastPushOf = (link: CodeLink | null): LastPush | undefined => (link?.pushBranch && link.pushSha ? { branch: link.pushBranch, sha: link.pushSha } : undefined);
@@ -69,7 +59,7 @@ export async function framesPush(deps: FramesDeps, scope: CodeScope, ask: Frames
   if ('ok' in edits) {
     return edits;
   }
-  const host = await hostFor(deps, edits.repo);
+  const host = await deps.host(edits.source, edits.repo);
   if (!host) {
     return refused(FramesRefusal.NotConnected);
   }
@@ -81,7 +71,7 @@ export async function framesPush(deps: FramesDeps, scope: CodeScope, ask: Frames
     return out.refusal === PushRefusal.ReadOnly ? { ...out, patch: edits.files } : out;
   }
 
-  const pushed = { pushBranch: out.branch, pushSha: out.sha, pushParent: out.parent, pushTouched: out.touched, pullNumber: out.pull.number };
+  const pushed = { pushBranch: out.branch, pushSha: out.sha, pushParent: out.parent, pushTouched: out.touched, pullNumber: out.pull?.number };
   await Promise.all(links.filter((l) => l.link).map((l) => deps.links.save(l.nodeId, { ...l.link!, ...pushed })));
   return out;
 }
@@ -106,7 +96,7 @@ export async function frameStatus(deps: FramesDeps, scope: CodeScope, nodeId: st
   if (!stored) {
     return refused(FramesRefusal.NotLinked);
   }
-  const host = await hostFor(deps, stored.repo);
+  const host = await deps.host(stored.source, stored.repo);
   if (!host) {
     return refused(FramesRefusal.NotConnected);
   }
@@ -133,13 +123,13 @@ export async function frameUndo(deps: FramesDeps, nodeId: string): Promise<Undon
   if (!link.pushBranch || !link.pushParent || !link.pushTouched?.length) {
     return refused(FramesRefusal.NotPushed);
   }
-  const host = await hostFor(deps, link.repo);
+  const host = await deps.host(link.source, link.repo);
   return host ? undoPush(host, deps.lock, { branch: link.pushBranch, parent: link.pushParent, paths: link.pushTouched }) : refused(FramesRefusal.NotConnected);
 }
 
 const HTTP_STATUS: Record<string, number> = {
   [FramesRefusal.NotConnected]: 409,
-  [FramesRefusal.NotGithub]: 409,
+  [FramesRefusal.NotPushable]: 409,
   [FramesRefusal.ManyRepos]: 400,
   [FramesRefusal.NotLinked]: 404,
   [FramesRefusal.NotPushed]: 409,

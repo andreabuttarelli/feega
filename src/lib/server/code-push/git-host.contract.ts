@@ -3,10 +3,10 @@ import { Access, FileMove, GitError, GitFailure, PullStatus, type GitHost } from
 
 export type HostWorld = {
   host: GitHost;
-  files: (ref: string) => Record<string, string>;
-  forcePush: (branch: string, files: Record<string, string>) => void;
-  seed: (branch: string, files: Record<string, string>) => string;
-  branches: () => string[];
+  files: (ref: string) => Record<string, string> | Promise<Record<string, string>>;
+  forcePush: (branch: string, files: Record<string, string>) => unknown;
+  seed: (branch: string, files: Record<string, string>) => unknown;
+  branches: () => string[] | Promise<string[]>;
 };
 
 const failureOf = async (work: Promise<unknown>) => {
@@ -24,9 +24,14 @@ const onBranch = async (host: GitHost, branch: string, files: { path: string; co
   return { base, sha };
 };
 
-export function gitHostContract(world: () => HostWorld) {
+export enum PullSupport {
+  Full = 'full',
+  None = 'none'
+}
+
+export function gitHostContract(world: () => HostWorld | Promise<HostWorld>, pulls: PullSupport = PullSupport.Full) {
   it('scrive più file in un solo commit, e il ramo nasce solo quando il commit esiste', async () => {
-    const { host, files } = world();
+    const { host, files } = (await world());
 
     const { sha } = await onBranch(host, 'feega/s1', [
       { path: 'src/a.tsx', content: 'a' },
@@ -34,43 +39,43 @@ export function gitHostContract(world: () => HostWorld) {
     ]);
 
     expect(await host.headOf('feega/s1')).toBe(sha);
-    expect(files('feega/s1')).toEqual({ 'README.md': 'hi', 'src/a.tsx': 'a', 'src/b.tsx': 'b' });
-    expect(files('main')).toEqual({ 'README.md': 'hi' });
+    expect(await files('feega/s1')).toEqual({ 'README.md': 'hi', 'src/a.tsx': 'a', 'src/b.tsx': 'b' });
+    expect(await files('main')).toEqual({ 'README.md': 'hi' });
   });
 
   it('un file a null viene tolto', async () => {
-    const { host, files } = world();
+    const { host, files } = (await world());
 
     await onBranch(host, 'feega/del', [{ path: 'README.md', content: null }]);
 
-    expect(files('feega/del')).toEqual({});
+    expect(await files('feega/del')).toEqual({});
   });
 
   it('un ramo che non esiste è branch_gone', async () => {
-    expect(await failureOf(world().host.headOf('feega/none'))).toBe(GitFailure.BranchGone);
+    expect(await failureOf((await world()).host.headOf('feega/none'))).toBe(GitFailure.BranchGone);
   });
 
   it('spostare un ramo che non è più dove lo avevamo lasciato è diverged, mai forzato', async () => {
-    const { host, forcePush, files } = world();
+    const { host, forcePush, files } = (await world());
     const { sha } = await onBranch(host, 'feega/s2', [{ path: 'a', content: 'a' }]);
-    forcePush('feega/s2', { other: 'x' });
+    await forcePush('feega/s2', { other: 'x' });
     const next = await host.writeCommit({ parent: sha, message: 'Edit', files: [{ path: 'a', content: 'b' }] });
 
     expect(await failureOf(host.moveBranch('feega/s2', sha, next))).toBe(GitFailure.Diverged);
-    expect(files('feega/s2')).toEqual({ other: 'x' });
+    expect(await files('feega/s2')).toEqual({ other: 'x' });
   });
 
   it("riconosce un force-push dall'ascendenza degli sha", async () => {
-    const { host, forcePush } = world();
+    const { host, forcePush } = (await world());
     const { sha } = await onBranch(host, 'feega/s3', [{ path: 'a', content: 'a' }]);
 
     expect(await host.isAncestor(sha, await host.headOf('feega/s3'))).toBe(true);
-    forcePush('feega/s3', { a: 'rewritten' });
+    await forcePush('feega/s3', { a: 'rewritten' });
     expect(await host.isAncestor(sha, await host.headOf('feega/s3'))).toBe(false);
   });
 
-  it('una PR per ramo: la seconda richiesta la aggiorna, e la si ritrova col suo stato', async () => {
-    const { host } = world();
+  it.skipIf(pulls === PullSupport.None)('una PR per ramo: la seconda richiesta la aggiorna, e la si ritrova col suo stato', async () => {
+    const { host } = (await world());
     await onBranch(host, 'feega/s4', [{ path: 'a', content: 'a' }]);
 
     const first = await host.upsertPull({ branch: 'feega/s4', base: 'main', title: 'One', body: '' });
@@ -83,21 +88,28 @@ export function gitHostContract(world: () => HostWorld) {
   });
 
   it('dice quali file sono cambiati da uno sha, e riconosce un rinomino', async () => {
-    const { host, seed } = world();
+    const { host, seed } = (await world());
     const base = await host.headOf('main');
-    seed('main', { 'ui/README.md': 'hi' });
+    await seed('main', { 'ui/README.md': 'hi' });
 
     expect(await host.changedSince(base, 'main')).toEqual([{ path: 'ui/README.md', move: FileMove.Renamed, from: 'README.md' }]);
   });
 
   it('legge un file a un ref, null se non c’è', async () => {
-    const { host } = world();
+    const { host } = (await world());
 
     expect(await host.readFile('README.md', 'main')).toBe('hi');
     expect(await host.readFile('missing.ts', 'main')).toBeNull();
   });
 
+  it.skipIf(pulls === PullSupport.Full)('senza un host di PR, aprirla è pull_unavailable e nessuna PR risulta', async () => {
+    const { host } = await world();
+
+    expect(await host.lastPull('feega/none')).toBeNull();
+    expect(await failureOf(host.upsertPull({ branch: 'feega/none', base: 'main', title: 't', body: '' }))).toBe(GitFailure.PullUnavailable);
+  });
+
   it('chi può scrivere ha accesso write', async () => {
-    expect(await world().host.access()).toBe(Access.Write);
+    expect(await (await world()).host.access()).toBe(Access.Write);
   });
 }

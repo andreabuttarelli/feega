@@ -53,6 +53,10 @@ Refusals answer `{ ok: false, refusal }`: `not_connected`, `read_only` (403, wit
 
 `github_push`, `github_push_status` and `github_undo`, with the same inputs.
 
-## Setting up GitHub on a self-hosted server
+## Local folders
 
-The GitHub connection runs through Composio (`COMPOSIO_API_KEY`). Pushing needs write scopes on the GitHub auth config: a GitHub App installed on selected repositories with **Contents: read and write**, **Pull requests: read and write**, **Checks: read** and **Metadata: read**.
+A frame imported from a local folder (desktop app, local dev) pushes through git in that folder: Feega commits with a private index, so your current branch, uncommitted work and history stay untouched. The branch goes to `origin` with your git credentials; the pull request opens when a GitHub token is available, otherwise the answer carries `pull: null` and the branch is left for you. The live preview is your own dev server.
+
+## Self-hosting
+
+A connected GitHub App, or `GITHUB_PUSH_TOKEN` (fine-grained token) with `GITHUB_API_URL` for GitHub Enterprise. Permissions: **Contents: read and write**, **Pull requests: read and write**, **Checks: read**, **Metadata: read**. Details in the self-hosting guide.

@@ -4,6 +4,7 @@ export enum GitFailure {
   Unauthorized = 'unauthorized',
   Forbidden = 'forbidden',
   NotFound = 'not_found',
+  PullUnavailable = 'pull_unavailable',
   Unexpected = 'unexpected'
 }
 

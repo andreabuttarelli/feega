@@ -23,6 +23,7 @@ const untyped = (db: Db) => db as unknown as SupabaseClient;
 const missing = (error: DbError) => Boolean(error && MISSING_TABLE_CODES.has(error.code ?? ''));
 
 const COLUMN_OF: Record<keyof CodeLink, string> = {
+  source: 'source',
   repo: 'repo',
   appRoot: 'app_root',
   entryKind: 'entry_kind',

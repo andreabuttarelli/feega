@@ -29,7 +29,7 @@ export type LastPush = { branch: string; sha: string };
 
 export type PushAsk = { name: string; files: { path: string; content: string }[]; title: string; body: string; coAuthors?: string[]; since?: LastPush; base?: string; confirmSensitive?: boolean };
 
-export type Pushed = { ok: true; branch: string; sha: string; parent: string; touched: string[]; pull: PullRef; fallback?: Fallback };
+export type Pushed = { ok: true; branch: string; sha: string; parent: string; touched: string[]; pull: PullRef | null; fallback?: Fallback };
 
 export type PushRefused = { ok: false; refusal: PushRefusal | GitFailure; paths?: string[] };
 
@@ -141,7 +141,12 @@ export async function pushFiles(host: GitHost, lock: PushLock, ask: PushAsk): Pr
         return { ...(await commitOn(host, sync, base, ask.files, message, null)), branch: sync, fallback };
       }
     );
-    const pull = await host.upsertPull({ branch: landed.branch, base, title: ask.title, body: ask.body });
+    const pull = await host.upsertPull({ branch: landed.branch, base, title: ask.title, body: ask.body }).catch((e: unknown) => {
+      if (e instanceof GitError && e.failure === GitFailure.PullUnavailable) {
+        return null;
+      }
+      throw e;
+    });
     return { ok: true, branch: landed.branch, sha: landed.sha, parent: landed.parent, touched, pull, ...(landed.fallback ? { fallback: landed.fallback } : {}) } as Pushed;
   });
 }

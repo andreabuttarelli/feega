@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { FileMove, type FileChanged } from './git-host';
 
+export enum CodeSourceKind {
+  Github = 'github',
+  Folder = 'folder'
+}
+
+export const isPushable = (kind: string): kind is CodeSourceKind => (Object.values(CodeSourceKind) as string[]).includes(kind);
+
 export enum EntryKind {
   Page = 'page',
   Component = 'component'
@@ -24,7 +31,8 @@ export enum LinkState {
 const PATH = z.string().max(500);
 
 export const linkSchema = z.object({
-  repo: z.string().min(3).max(200),
+  source: z.enum(CodeSourceKind).default(CodeSourceKind.Github),
+  repo: z.string().min(3).max(1000),
   appRoot: PATH.default(''),
   entryKind: z.enum(EntryKind),
   entry: PATH,
