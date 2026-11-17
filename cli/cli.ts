@@ -954,6 +954,16 @@ github
   });
 
 github
+  .command('versions <projectId> <nodeId>')
+  .description('Branches, tags, open pull requests and the commits that touched the file of a linked frame')
+  .option('--ref <ref>', 'Branch, tag or sha whose history to list (default: the base branch)')
+  .option('--limit <n>', 'How many commits, at most 100')
+  .action(async (projectId: string, nodeId: string, opts) => {
+    const { cmdGithubVersions } = await import('./commands/github.ts');
+    await cmdGithubVersions(projectId, nodeId, opts);
+  });
+
+github
   .command('detach <projectId> <nodeId>')
   .description('Unlink a frame from its GitHub source; the frame stays on the canvas')
   .action(async (projectId: string, nodeId: string) => {
