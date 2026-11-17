@@ -1,9 +1,9 @@
 # Landing: per-section cap on roaming cursors
 
-Pricing, FAQ and footer showed up to two cursors at once each, over text the
+Pricing, FAQ and footer showed several cursors at once, over text the
 reader is reading. The global pool (24 desktop, 8 mobile) is unchanged: a
 second table in `live-agents.ts` (`SECTION_CAPS`) caps how many cursors may
-target elements of a section: `#pricing` 2, `#faq` 1, `.site-foot` 1.
+target elements of a section: `#pricing` 1, `#faq` 1, `.site-foot` 1.
 `.site-foot .mark` keeps its crew of 4 and is outside the footer count.
 
 Elements matching `PROTECTED_SELECTOR` (buttons, links, summaries, price) in a

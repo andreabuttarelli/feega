@@ -155,7 +155,7 @@ export function releaseTweak<T>(ledger: TweakLedger<T>, el: T) {
 export const CREW_SELECTOR = '.site-foot .mark';
 
 export const SECTION_CAPS: { selector: string; cap: number }[] = [
-  { selector: '#pricing', cap: 2 },
+  { selector: '#pricing', cap: 1 },
   { selector: '#faq', cap: 1 },
   { selector: '.site-foot', cap: 1 }
 ];

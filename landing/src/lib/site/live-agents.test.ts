@@ -95,7 +95,6 @@ describe('section caps', () => {
   const sections: Record<string, string[]> = {
     p1: ['#pricing'],
     p2: ['#pricing'],
-    p3: ['#pricing'],
     f1: ['#faq'],
     f2: ['#faq'],
     foot: ['.site-foot'],
@@ -106,9 +105,9 @@ describe('section caps', () => {
   };
   const within = (el: string, selector: string) => sections[el].includes(selector);
 
-  it('lets pricing hold two cursors and refuses a third', () => {
-    expect(mayEnter('p3', ['p1', 'p2'], within)).toBe(false);
-    expect(mayEnter('p2', ['p1'], within)).toBe(true);
+  it('lets pricing hold one cursor and refuses a second', () => {
+    expect(mayEnter('p2', ['p1'], within)).toBe(false);
+    expect(mayEnter('p1', [], within)).toBe(true);
   });
 
   it('holds the faq and the footer to one cursor each', () => {
