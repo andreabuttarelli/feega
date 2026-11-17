@@ -7,6 +7,7 @@ import type { Glyphs } from '$lib/canvas/core/chrome';
 import { NODE_KIND_ICON } from '$lib/canvas/node-label';
 import type { NodeType } from '$lib/canvas/node-data';
 import { iconNodes } from './icon-nodes';
+import { frameHeaderIcons, type FrameBadge } from '$lib/canvas/core/frame-header';
 import { UiGlyph, type CardIcons } from '$lib/canvas/core/card-kit';
 import ImagePlus from '@lucide/svelte/icons/image-plus';
 import CircleDollarSign from '@lucide/svelte/icons/circle-dollar-sign';
@@ -48,7 +49,7 @@ const UI_GLYPHS = [
   [UiGlyph.Camera, Camera, 22, 1.5]
 ] as const;
 
-export type CoreText = { glyphs: Glyphs; bold: Glyphs; icons: Map<NodeType, number[][]>; gen: CardIcons };
+export type CoreText = { glyphs: Glyphs; bold: Glyphs; icons: Map<NodeType, number[][]>; gen: CardIcons; badges: Map<FrameBadge, number[][]> };
 
 export async function coreText(kinds: readonly NodeType[]): Promise<CoreText> {
   const faces = CORE_FACES.map((f) => ({ ...f, href: new URL(f.url, location.origin).href }));
@@ -60,5 +61,6 @@ export async function coreText(kinds: readonly NodeType[]): Promise<CoreText> {
   const badge = new Map(await Promise.all(kinds.map(async (k) => [k, iconContours(await iconNodes(NODE_KIND_ICON[k]), BADGE_ICON_PX, BADGE_ICON_STROKE)] as const)));
   const ui = Object.fromEntries(await Promise.all(UI_GLYPHS.map(async ([name, icon, px, stroke]) => [name, iconContours(await iconNodes(icon), px, stroke)] as const))) as Record<UiGlyph, number[][]>;
   const gen = { chevron: iconContours(await iconNodes(ChevronDown), 12, 2), voicePlay: iconContours(await iconNodes(Play), 12, 2), head, badge, ui, layers: iconContours(await iconNodes(Layers), BADGE_PX, BADGE_STROKE), play: iconContours(await iconNodes(Play), BADGE_PX, BADGE_STROKE), person: iconContours(await iconNodes(UserRound), PERSON_PX, PERSON_STROKE), references: iconContours(await iconNodes(ImagePlus), REFERENCES_PX, REFERENCES_STROKE), credit: iconContours(await iconNodes(CircleDollarSign), CREDIT_PX, CREDIT_STROKE) };
-  return { glyphs: glyphsOf(book, CORE_FAMILY, REGULAR), bold: glyphsOf(book, CORE_FAMILY, BOLD), icons, gen };
+  const badges = new Map(await Promise.all(frameHeaderIcons.map(async (r) => [r.badge, iconContours(await iconNodes(r.icon), ICON_PX, ICON_STROKE)] as const)));
+  return { glyphs: glyphsOf(book, CORE_FAMILY, REGULAR), bold: glyphsOf(book, CORE_FAMILY, BOLD), icons, gen, badges };
 }
