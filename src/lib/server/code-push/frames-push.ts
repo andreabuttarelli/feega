@@ -154,3 +154,14 @@ export const httpStatusOf = (refusal: FramesRefused['refusal']) => HTTP_STATUS[r
 export async function frameDetach(deps: Pick<FramesDeps, 'links'>, nodeId: string): Promise<{ ok: true } | FramesRefused> {
   return (await deps.links.remove(nodeId)) ? { ok: true } : refused(FramesRefusal.NotLinked);
 }
+
+export async function frameRebased(deps: Pick<FramesDeps, 'host' | 'links'>, nodeId: string): Promise<CodeLink | null> {
+  const link = await deps.links.read(nodeId);
+  const host = link ? await deps.host(link.source, link.repo) : null;
+  if (!link || !host) {
+    return null;
+  }
+  const rebased = { ...link, baseSha: await host.headOf(link.baseBranch) };
+  await deps.links.save(nodeId, rebased);
+  return rebased;
+}
