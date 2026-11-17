@@ -10,6 +10,7 @@ import { MAX_STORIES } from '$lib/server/code-import/storybook';
 import { Responsive } from '$lib/server/code-import/code-views';
 import { designSystemOf } from '$lib/server/code-import/design-system';
 import { projectScopeOf } from '$lib/server/projects/project-scope';
+import { importLinker } from '$lib/server/code-push/frames-runtime';
 import { findNode } from '$lib/server/repos/canvas';
 import { codeAdd, Land, SYNC_STATUS, SyncOutcome, type CodeAdded } from '$lib/server/code-import/code-sync';
 import type { RequestHandler } from './$types';
@@ -54,7 +55,7 @@ export const POST: RequestHandler = async (event) => {
   }
 
   const { canvasId, repo, folder, upload, app, route, routes, storybook, stories, conditions, designSystem, responsive, captureDelayMs, routeDelayMs, x, y } = ask.data;
-  const done = await importRoutesInto({ ...scope, actor: { kind: 'user', id: scope.userId } }, canvasId, { repo, folder, upload, app, routes: routes === ALL_ROUTES ? ALL_ROUTES : askedRoutes(route, routes), conditions: conditions ? conditionsOf(conditions) : undefined, delay: delayOf({ ms: captureDelayMs, routes: routeDelayMs }), designSystem: designSystemOf(designSystem), responsive, storybook, stories, at: { x, y } });
+  const done = await importRoutesInto({ ...scope, actor: { kind: 'user', id: scope.userId } }, canvasId, { repo, folder, upload, app, routes: routes === ALL_ROUTES ? ALL_ROUTES : askedRoutes(route, routes), conditions: conditions ? conditionsOf(conditions) : undefined, delay: delayOf({ ms: captureDelayMs, routes: routeDelayMs }), designSystem: designSystemOf(designSystem), responsive, storybook, stories, at: { x, y } }, importLinker(scope.db, scope));
   if (done.outcome !== CodeImportOutcome.Ok) {
     return json({ error: done.outcome, ...(done.error ? { detail: done.error } : {}), ...(done.locked ? { locked: done.locked } : {}), ...(done.apps ? { apps: done.apps } : {}) }, { status: CODE_IMPORT_STATUS[done.outcome] });
   }

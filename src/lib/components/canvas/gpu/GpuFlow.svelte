@@ -25,6 +25,11 @@
   import FrameOverlays from '../FrameOverlays.svelte';
   import PrototypeArrows from '../PrototypeArrows.svelte';
   import PrototypePlayerHost from '../PrototypePlayerHost.svelte';
+  import FrameHeaderIcons from './FrameHeaderIcons.svelte';
+  import SourceSyncPanel from './SourceSyncPanel.svelte';
+  import { HeaderAction, headerBadges, headerHits, headerRow, type HeaderHit } from '$lib/canvas/core/frame-header';
+  import { sourceStatus } from '$lib/canvas/source-status.svelte';
+  import { linkedFrames } from '$lib/canvas/source-sync';
   import { prototypePlayer } from '$lib/canvas/prototype-player.svelte';
   import { prototypeLink } from '$lib/canvas/prototype-link.svelte';
   import { prototypeLinks } from '$lib/motion/prototype/links';
@@ -184,6 +189,7 @@
   import { GESTURE_QUIET_MS } from '$lib/canvas/core/gesture-quiet';
   import { SIGHT_SLACK, grown, stillHolds, type Taken } from '$lib/canvas/core/sight';
   import { nodeHitRects } from '$lib/canvas/core/node-hit';
+  import { headerIconBoxes } from '$lib/canvas/core/chrome';
   import type { ChromeTile, Glyphs } from '$lib/canvas/core/chrome';
   import { peerOutlines } from '$lib/canvas/peer-outlines';
   import { displayName } from '$lib/realtime/frame-presence';
@@ -384,6 +390,12 @@
   });
   const byId = $derived(new Map(placed.map((t) => [t.id, t])));
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
+  const sources = sourceStatus(() => page.params.projectId ?? '', () => linkedFrames(props.nodeSummaries ?? []).map((id) => ({ id, name: byId.get(id)?.displayName ?? '' })));
+  let sourceOpen = $state<{ id: string; left: number; top: number } | null>(null);
+  const posterOf = (id: string) => {
+    const poster = (summaries.get(id)?.data as { posterAssetId?: string | null } | undefined)?.posterAssetId;
+    return poster ? tierUrl(AssetSize.Full)(poster) : null;
+  };
   const ports = $derived(placed.flatMap((t) => portsOf(t)));
   const nodeOf = $derived(new Map(placed.filter((t) => t.node).map((t) => [t.id, t.node!])));
   const lookup = (id: string) => nodeOf.get(id) ?? null;
@@ -566,7 +578,7 @@
         return [];
       }
       const marks = portMarks(t);
-      const own = layers === ChromeLayers.Whole ? { label: labelOf(t), icon: text.icons.get(t.kind as NodeType) ?? null, tag: tagHexOf(t.id), zoom: labelZoom } : { label: null, icon: null };
+      const own = layers === ChromeLayers.Whole ? { label: labelOf(t), icon: text.icons.get(t.kind as NodeType) ?? null, tag: tagHexOf(t.id), badges: headerOf(t), zoom: labelZoom } : { label: null, icon: null };
       return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, ringColor: ringColour(), names: on, strokeZoom, addBeside: addsBeside(t) && (on || hovered === t.id || addLinger === t.id), radius: cardRadiusOf(t.kind ?? ''), turn: turnOf(t), layers }];
     });
     return [...tiles, ...views];
@@ -625,6 +637,28 @@
   });
   let hoverChrome = $state<string | null>(null);
   const chromeIds = $derived(new Set([...selected, ...domIds, ...(hoverChrome ? [hoverChrome] : []), ...(ghost ? [ghost.from.nodeId] : [])]));
+  const prototypeFroms = $derived(new Set(arrowLinks.map((l) => l.from)));
+  const headerOf = (t: Tile) => {
+    const text = coreType;
+    if (!text || kindOfNode(t.id) !== FrameKind.Frame) {
+      return [];
+    }
+    const facts = { breakpoints: Boolean(liveOf(t.id)?.doc.breakpoints?.length), component: isComponentSet(t.id), prototype: prototypeFroms.has(t.id), source: sources.of(t.id) };
+    return headerBadges(facts).map((key) => ({ key, contours: text.badges.get(key) ?? [] }));
+  };
+  const HEADER_PRESS: Record<HeaderAction, (id: string) => void> = {
+    [HeaderAction.Select]: (id) => select([id]),
+    [HeaderAction.Play]: (id) => {
+      prototypePlayer.editing = id;
+      prototypePlayer.play();
+    },
+    [HeaderAction.Source]: (id) => select([id])
+  };
+  const SOURCE_POP_GAP = 6;
+  const pressHeader = (hit: HeaderHit) => {
+    HEADER_PRESS[headerRow(hit.key).action](hit.id);
+    sourceOpen = headerRow(hit.key).action === HeaderAction.Source ? { id: hit.id, left: view.x + hit.x * view.zoom, top: view.y + (hit.y + hit.h) * view.zoom + SOURCE_POP_GAP } : null;
+  };
   const labelOf = (t: Tile) => {
     const kind = t.kind && isNodeType(t.kind) ? t.kind : null;
     return t.tag === NameTag.Hidden ? null : t.displayName?.trim() || (kind ? NODE_KIND_LABEL[kind] : null);
@@ -1151,6 +1185,20 @@
   const viewLabelIndex = $derived.by(() => {
     const glyphs = coreType?.glyphs ?? NO_GLYPHS;
     return new SpatialIndex(bpViews.flatMap((v) => nodeHitRects({ id: v.frame.id, x: v.frame.box.x, y: v.frame.box.y, width: v.frame.box.w, height: v.frame.box.h, inputs: [], outputs: [], label: `${v.name} ${v.width}`, icon: null, tag: null, zoom: labelZoom }, glyphs).slice(1)));
+  });
+  const headerWorld = $derived.by(() => {
+    const glyphs = coreType?.glyphs;
+    if (!glyphs) {
+      return [];
+    }
+    return placed.flatMap((t) => {
+      const badges = headerOf(t);
+      if (!badges.length) {
+        return [];
+      }
+      const tile: ChromeTile = { id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, inputs: [], outputs: [], label: labelOf(t), icon: coreType?.icons.get(t.kind as NodeType) ?? null, tag: tagHexOf(t.id), badges, zoom: labelZoom };
+      return headerIconBoxes(tile, glyphs).map((b) => ({ ...b, id: t.id, key: b.key as HeaderHit['key'] }));
+    });
   });
   const labelIndex = $derived(new SpatialIndex(hitRects.flatMap((r) => r.labels)));
 
@@ -4615,6 +4663,8 @@
     {#if shownAtRest(manyQuad, cameraMotion)}
       <FrameSelection clip="" quad={manyQuad!} kind={SelectionKind.Many} ongrab={grabMany} />
     {/if}
+    <FrameHeaderIcons {view} hits={headerHits(headerWorld, cameraMotion)} onpress={pressHeader} />
+    <SourceSyncPanel projectId={page.params.projectId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} />
     <PrototypePlayerHost frames={playerFrames} />
     {#if showsPrototype}
       <PrototypeArrows {view} frames={overlayFrames} links={arrowLinks} elements={linkElements()} handle={pickedHandle()} aimingFrom={prototypeLink.draft ? (inside?.nodeId ?? null) : null} onpick={openLink} ondrag={dragLink} />

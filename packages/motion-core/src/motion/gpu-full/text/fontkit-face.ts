@@ -7,7 +7,7 @@ import { memoOutline, memoShape } from './shape-memo';
 type KitPoint = TruePoint & { copy: () => KitPoint };
 type Component = { glyphID: number; dx: number; dy: number; scaleX: number; scaleY: number; scale01: number; scale10: number };
 type RawGlyph = { numberOfContours: number; points?: KitPoint[]; components?: Component[] };
-type KitGlyph = { id: number; codePoints: number[]; _decode: () => RawGlyph | null; path: { commands: { command: string; args: number[] }[] } };
+type KitGlyph = { id: number; codePoints: number[]; advanceWidth: number; _decode: () => RawGlyph | null; path: { commands: { command: string; args: number[] }[] } };
 type Processor = { transformPoints: (id: number, points: KitPoint[]) => void };
 type KitFont = {
   unitsPerEm: number;
@@ -21,6 +21,7 @@ type KitFont = {
   _glyphs: Record<number, unknown>;
   _variationProcessor: Processor | null;
   hasGlyphForCodePoint: (cp: number) => boolean;
+  glyphForCodePoint: (cp: number) => KitGlyph;
   getGlyph: (id: number) => KitGlyph;
   layout: (text: string, features: Record<string, boolean>) => { glyphs: KitGlyph[]; positions: { xAdvance: number; xOffset: number; yOffset: number }[] };
 };
@@ -121,8 +122,27 @@ function faceOf(base: KitFont, inst: KitFont): Face {
 
 const COORD_DIGITS = 100;
 
-export function fontkitSource(bytes: Uint8Array): Source {
+export type Broken = (error: unknown) => void;
+
+function decodable(base: KitFont, broken: Broken): (cp: number) => boolean {
+  let told = false;
+  return (cp) => {
+    try {
+      const glyph = base.glyphForCodePoint(cp);
+      return Number.isFinite(glyph.advanceWidth) && glyph.path !== null;
+    } catch (error) {
+      if (!told) {
+        told = true;
+        broken(error);
+      }
+      return false;
+    }
+  };
+}
+
+export function fontkitSource(bytes: Uint8Array, broken: Broken = () => {}): Source {
   const base = create(bytes) as KitFont;
+  const decodes = decodable(base, broken);
   if (base.directory.tables.glyf) {
     base.getGlyph(0)._decode();
   }
@@ -130,7 +150,7 @@ export function fontkitSource(bytes: Uint8Array): Source {
   const faces = new Map<string, Face>();
   return {
     axes,
-    covers: (cp) => base.hasGlyphForCodePoint(cp),
+    covers: (cp) => base.hasGlyphForCodePoint(cp) && decodes(cp),
     at: (coords) => {
       const key = Object.entries(coords)
         .map(([tag, v]) => `${tag}${Math.round(v * COORD_DIGITS)}`)

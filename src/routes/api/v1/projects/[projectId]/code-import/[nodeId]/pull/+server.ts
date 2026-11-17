@@ -2,6 +2,8 @@ import { json } from '@sveltejs/kit';
 import { z } from 'zod';
 import { codePull, SYNC_STATUS, SyncOutcome } from '$lib/server/code-import/code-sync';
 import { projectScopeOf } from '$lib/server/projects/project-scope';
+import { frameRebased } from '$lib/server/code-push/frames-push';
+import { framesDeps } from '$lib/server/code-push/frames-runtime';
 import type { RequestHandler } from './$types';
 
 export const config = { maxDuration: 300 };
@@ -19,6 +21,7 @@ export const POST: RequestHandler = async (event) => {
   }
   const done = await codePull({ ...scope, actor: { kind: 'user', id: scope.userId } }, event.params.nodeId, ask.data.branch);
   if (done.outcome === SyncOutcome.Ok || done.outcome === SyncOutcome.UpToDate) {
+    await frameRebased(framesDeps(scope.db, scope), event.params.nodeId).catch(() => null);
     return json(done);
   }
   return json({ error: done.outcome, ...('error' in done && done.error ? { detail: done.error } : {}) }, { status: SYNC_STATUS[done.outcome] });
