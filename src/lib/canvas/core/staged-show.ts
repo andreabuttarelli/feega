@@ -10,12 +10,25 @@ export enum Stage {
   Settled = 'settled'
 }
 
-export function showStaged(ready: Promise<Readiness>, held: OnScreen, show: (r: Readiness, stage: Stage) => void): Promise<void> {
+export const RETRY_MS = [1_000, 4_000, 15_000];
+
+const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+export async function showStaged(ready: () => Promise<Readiness>, held: OnScreen, show: (r: Readiness, stage: Stage) => void, wait: (ms: number) => Promise<void> = pause): Promise<void> {
   if (held === OnScreen.Nothing) {
     show(Readiness.Partial, Stage.Vectors);
   }
 
-  return ready.then((r) => show(r, Stage.Settled));
+  let settled = await ready();
+  show(settled, Stage.Settled);
+  for (const ms of RETRY_MS) {
+    if (settled === Readiness.Whole) {
+      return;
+    }
+    await wait(ms);
+    settled = await ready();
+    show(settled, Stage.Settled);
+  }
 }
 
 export class VectorGate {

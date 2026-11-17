@@ -53,7 +53,7 @@
   import { backendLog, consoleSink, debugActive, debugStart, gestureLog, renderLog, teeSink, tierLog } from '$lib/canvas/core/debug-log';
   import { readClips, type CustomFrame, type CustomReads } from '@feega/motion-core/motion/gpu-full/dom/custom';
   import type { Picture, Pictures } from '@feega/motion-core/motion/gpu-full/raster';
-  import { Stand, drawable, fillOrder, firstDrawn, inView, layersOf, nearestFirst, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
+  import { Stand, drawable, missingPictures, fillOrder, firstDrawn, inView, layersOf, nearestFirst, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Stage, VectorGate, showStaged, shownBefore } from '$lib/canvas/core/staged-show';
   import { uploadWithin } from '$lib/canvas/core/picture-uploads';
   import { Step, markFrame, noteImages } from '$lib/canvas/core/frame-timeline';
@@ -359,14 +359,30 @@
       if (asking.get(f.id) !== key) {
         return;
       }
-      const group = stage === Stage.Settled ? key : `${key}${VECTORS}`;
+      const missing = missingPictures(built.list, (i) => !pictures(i));
+      tellFailures(f.id, missing);
+      const group = stage === Stage.Vectors ? `${key}${VECTORS}` : missing.length ? `${key}${MISSING}${missing.length}` : key;
       const shown = loaded.get(f.id);
       loaded.set(f.id, group);
       weights.set(f.id, heldBytes(built.list));
       markFrame(f.id, ready === Readiness.Whole ? Step.Whole : Step.Vectors);
       lists = listed(lists, f.id, group, onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), shown, drawnLast.get(f.id)?.group]);
     };
-    void showStaged(media.ready(built.list), held, (ready, stage) => (stage === Stage.Settled ? vectorsFirst.after(() => present(ready, stage)) : present(ready, stage)));
+    void showStaged(() => media.ready(built.list), held, (ready, stage) => (stage === Stage.Settled ? vectorsFirst.after(() => present(ready, stage)) : present(ready, stage)), atRestAfter);
+  }
+
+  const MISSING = ':missing';
+  const told = new Set<string>();
+  const atRestAfter = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)).then(() => whenQuiet(() => gesture.active()));
+
+  function tellFailures(id: string, missing: readonly { src: string }[]) {
+    for (const { src } of missing) {
+      const why = media.failure(src);
+      if (why && !told.has(`${id}|${src}`)) {
+        told.add(`${id}|${src}`);
+        console.warn('[canvas] picture not loaded', id, src, why);
+      }
+    }
   }
 
   const thumbLists = new Map<string, DisplayList>();
