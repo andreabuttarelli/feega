@@ -15,7 +15,7 @@
   import { ActionKind, DEFAULT_OVERLAY, TransitionKind, TriggerKind, type Overlay } from '@feega/motion-core/motion/prototype/model';
   import { Background } from '@feega/motion-core/motion/doc';
   import { overlayBox } from '$lib/motion/prototype/overlay-place';
-  import { MODES, MODE_ORDER, WIDTH_PRESETS, ViewportMode, activeView, clampWidth, docAtWidth, frameBox, type Viewport } from '$lib/motion/prototype/viewport';
+  import { MODES, MODE_ORDER, ViewportMode, WidthSource, activeView, clampWidth, docAtWidth, frameBox, shownWidth, viewChoices, type Viewport } from '$lib/motion/prototype/viewport';
   import { readViewport, writeViewport } from '$lib/motion/prototype/viewport-pref';
 
   let { frames, start: first, onclose }: { frames: PlayerFrame[]; start: string; onclose?: () => void } = $props();
@@ -47,16 +47,18 @@
   let dragFrom: { x: number; width: number; side: number } | null = null;
 
   const responsive = $derived(view.mode === ViewportMode.Responsive);
+  const width = $derived(shownWidth(view, stageW - STAGE_PAD_PX * 2));
   const liveOf = (id: string) => {
     const live = byId.get(id)?.live;
-    return live && responsive ? { ...live, doc: docAtWidth(live.doc, view.width) } : live;
+    return live && responsive ? { ...live, doc: docAtWidth(live.doc, width) } : live;
   };
   const baseFrame = $derived(byId.get(at.current));
   const baseLive = $derived(liveOf(at.current));
   const box = $derived(
-    baseLive ? frameBox(view.mode, { w: stageW - STAGE_PAD_PX * 2, h: stageH - STAGE_PAD_PX }, { w: baseLive.doc.width, h: baseLive.doc.height }, view.width) : null
+    baseLive ? frameBox(view.mode, { w: stageW - STAGE_PAD_PX * 2, h: stageH - STAGE_PAD_PX }, { w: baseLive.doc.width, h: baseLive.doc.height }, width) : null
   );
-  const breakpoint = $derived(baseFrame ? activeView(baseFrame.live.doc, view.width) : null);
+  const breakpoint = $derived(baseFrame ? activeView(baseFrame.live.doc, width) : null);
+  const choices = $derived(baseFrame ? viewChoices(baseFrame.live.doc) : []);
   const percent = (fraction: number) => `${fraction * 100}%`;
   const sheetStyle = (id: string, overlay: Overlay) => {
     const sheet = liveOf(id)?.doc;
@@ -73,7 +75,7 @@
   }
 
   function grab(e: PointerEvent & { currentTarget: HTMLElement }, side: number) {
-    dragFrom = { x: e.clientX, width: view.width, side };
+    dragFrom = { x: e.clientX, width, side };
     e.currentTarget.setPointerCapture(e.pointerId);
   }
 
@@ -82,7 +84,7 @@
       return;
     }
     const factor = box.w * box.scale < stageW - STAGE_PAD_PX * 2 ? EDGE_FACTOR_CENTERED : 1;
-    setView({ width: dragFrom.width + (dragFrom.side * (e.clientX - dragFrom.x) * factor) / box.scale });
+    setView({ width: dragFrom.width + (dragFrom.side * (e.clientX - dragFrom.x) * factor) / box.scale, source: WidthSource.Fixed });
   }
 
   const drop = () => (dragFrom = null);
@@ -232,15 +234,16 @@
     </span>
     {#if responsive}
       <span class="seg">
-        {#each WIDTH_PRESETS as preset (preset.label)}
-          <button type="button" class:on={view.width === preset.width} data-testid={`viewport-${preset.label.toLowerCase()}`} onclick={() => setView({ width: preset.width })}>{preset.label} {preset.width}</button>
+        <button type="button" class:on={view.source === WidthSource.Window} data-testid="viewport-window" onclick={() => setView({ source: WidthSource.Window })}>Window</button>
+        {#each choices as choice (choice.width)}
+          <button type="button" class:on={view.source === WidthSource.Fixed && view.width === choice.width} data-testid={`viewport-${choice.width}`} onclick={() => setView({ width: choice.width, source: WidthSource.Fixed })}>{choice.label} {choice.width}</button>
         {/each}
       </span>
       <label class="width">
-        <input type="number" min="120" max="4096" aria-label="Width in pixels" data-testid="viewport-width" value={view.width} onchange={(e) => setView({ width: e.currentTarget.valueAsNumber })} />
+        <input type="number" min="120" max="4096" aria-label="Width in pixels" data-testid="viewport-width" value={width} onchange={(e) => setView({ width: e.currentTarget.valueAsNumber, source: WidthSource.Fixed })} />
         <span>px</span>
       </label>
-      <span class="readout" data-testid="viewport-readout">{view.width} px · {breakpoint?.name}</span>
+      <span class="readout" data-testid="viewport-readout">{width} px · {breakpoint?.name}</span>
     {/if}
   </div>
   <div class="stage" class:scrolls={box?.scrolls} role="presentation" bind:clientWidth={stageW} bind:clientHeight={stageH} onpointerdown={showHints}>
@@ -344,6 +347,8 @@
 
   .seg {
     display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     gap: 2px;
     padding: 2px;
     border-radius: var(--ui-radius-sm, 4px);

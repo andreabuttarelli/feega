@@ -25,6 +25,17 @@ async function addText(store: FeegaStore, text: string, x = 0) {
 }
 
 describe('il file .feega è il database della modalità locale', () => {
+  it('l’agente scelto per la chat resta nel file e torna alla riapertura', async () => {
+    const path = tempFile();
+    const first = openFeegaStore(path, { origin: ORIGIN });
+    expect(first.acpAgent()).toBeNull();
+
+    first.chooseAcpAgent('codex');
+    await first.flush();
+
+    expect(openFeegaStore(path, { origin: ORIGIN }).acpAgent()).toBe('codex');
+  });
+
   it('un file che non esiste nasce vuoto e viene scritto sul disco', async () => {
     const path = tempFile();
     const store = openFeegaStore(path, { origin: ORIGIN });

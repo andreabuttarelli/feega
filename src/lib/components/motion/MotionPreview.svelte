@@ -17,7 +17,7 @@
   import { InputKey, type InputValues } from '@feega/motion-core/motion/expression/inputs';
   import { INPUT_MESSAGE } from '@feega/motion-core/motion/interactive/runtime';
   import type { VarValues } from '@feega/motion-core/motion/interactive/var-model';
-  import { RenderEngine, drawableOn } from '$lib/motion/gpu/engine-flag';
+  import { RenderEngine, drawableOn, fallbackOf } from '$lib/motion/gpu/engine-flag';
   import { EditEnd, TEXT_EDIT, type TextEditMessage } from '@feega/motion-core/motion/hyperframes/text-edit';
   import GpuFullLayer from './GpuFullLayer.svelte';
   import { FullBackend } from '@feega/motion-core/motion/gpu-full/backends';
@@ -60,7 +60,9 @@
 
   const FULL_BACKEND: Partial<Record<RenderEngine, FullBackend>> = { [RenderEngine.GpuFull]: FullBackend.WebGl2, [RenderEngine.GpuCore]: FullBackend.Core, [RenderEngine.GpuCoreGl]: FullBackend.CoreGl };
   const FULL_ENGINES: ReadonlySet<RenderEngine> = new Set(Object.keys(FULL_BACKEND) as RenderEngine[]);
-  const drawnOn = $derived(fullDoc && FULL_ENGINES.has(engine) ? drawableOn(engine, fullDoc.doc) : RenderEngine.Html);
+  let fellTo = $state<RenderEngine | null>(null);
+  const tried = $derived(fellTo ?? engine);
+  const drawnOn = $derived(fullDoc && FULL_ENGINES.has(tried) ? drawableOn(tried, fullDoc.doc) : RenderEngine.Html);
   const drawnOver = $derived(drawnOn !== RenderEngine.Html);
 
   let pointer = $state<InputValues>({});
@@ -388,7 +390,16 @@
     player?.iframeElement?.contentWindow?.postMessage({ type: TEXT_EDIT.stop }, '*');
   }
 
-  function showPlayer(reason: unknown) {
+  function showPlayer(failed: RenderEngine, reason: unknown) {
+    if (failed !== tried) {
+      return;
+    }
+    const next = fallbackOf(tried);
+    if (FULL_ENGINES.has(next)) {
+      console.warn(`motion preview: ${tried} unavailable, trying ${next}`, reason);
+      fellTo = next;
+      return;
+    }
     console.warn('motion preview: gpu-core unavailable, HTML player shown', reason);
     if (player) {
       player.style.opacity = '';
@@ -488,8 +499,9 @@
   <div class="host" bind:this={host}></div>
   {#if drawnOver && fullDoc}
     <div class="gpu-wrap" style:visibility={textEditing ? 'hidden' : null}>
-      {#key `${fullDoc.doc.width}x${fullDoc.doc.height}`}
-        <GpuFullLayer backend={FULL_BACKEND[engine] ?? FullBackend.WebGl2} doc={fullDoc.doc} tokens={fullDoc.tokens} assets={fullDoc.assets} analyses={fullDoc.analyses} compose={fullDoc.compose ?? gpuCompose ?? (() => html)} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={showPlayer} />
+      {#key `${fullDoc.doc.width}x${fullDoc.doc.height}:${tried}`}
+        {@const mounted = tried}
+        <GpuFullLayer backend={FULL_BACKEND[mounted] ?? FullBackend.WebGl2} doc={fullDoc.doc} tokens={fullDoc.tokens} assets={fullDoc.assets} analyses={fullDoc.analyses} compose={fullDoc.compose ?? gpuCompose ?? (() => html)} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={(reason) => showPlayer(mounted, reason)} />
       {/key}
     </div>
   {/if}
