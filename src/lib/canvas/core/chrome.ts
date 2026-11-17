@@ -16,7 +16,8 @@ export enum ChromePart {
   PortRing = 'port-ring',
   Icon = 'icon',
   Tag = 'tag',
-  Badge = 'badge'
+  Badge = 'badge',
+  BadgeBox = 'badge-box'
 }
 
 export type TextSet = { width?: number; height?: number; leading?: number; tracking?: number };
@@ -75,7 +76,14 @@ const ICON_GAP = 5;
 const ELLIPSIS = '…';
 const NAME_MIN_CHARS = 3;
 const BADGE_GAP = 4;
-const BADGE_SLOT = ICON_SIZE + BADGE_GAP;
+const SLOT_SIZE = 20;
+const SLOT_GAP = 2;
+const BOX_PAD = 3;
+const BOX_RADIUS = 4;
+const BOX_OPACITY = 0.14;
+const GLYPH_SCALE = 13 / ICON_SIZE;
+const BADGE_SLOT = SLOT_SIZE + SLOT_GAP;
+const BOX_EXTRA = 2 * BOX_PAD - SLOT_GAP;
 const NAME_SIZE = 11;
 const NAME_GAP = 16;
 export const ADD_BESIDE = { offset: 8, size: 24, gap: 8 };
@@ -241,10 +249,12 @@ function labelLayout(t: ChromeTile, glyphs: Glyphs) {
   const left = t.x + lead * k;
   const free = t.width / heldK(t) - lead - trail;
   const all = t.badges ?? [];
-  const kept = all.length ? badgesKept(free, all.length, BADGE_SLOT, shortest(t.label ?? '', glyphs)) : 0;
-  const badges = all.slice(0, kept).map((b, i) => ({ ...b, x: t.x + t.width - (trail + (kept - i) * BADGE_SLOT - BADGE_GAP) * k }));
-  const unitText = fitted(t.label ?? '', free - kept * BADGE_SLOT, glyphs);
-  return { k, line, top, left, unitText, width: unitText.width * k, badges };
+  const kept = all.length ? badgesKept(free - BOX_EXTRA, all.length, BADGE_SLOT, shortest(t.label ?? '', glyphs)) : 0;
+  const boxUnits = kept ? kept * BADGE_SLOT + BOX_EXTRA : 0;
+  const boxLeft = t.x + t.width - (trail + boxUnits) * k;
+  const badges = all.slice(0, kept).map((b, i) => ({ ...b, x: boxLeft + (BOX_PAD + i * BADGE_SLOT) * k }));
+  const unitText = fitted(t.label ?? '', free - boxUnits - (kept ? BADGE_GAP : 0), glyphs);
+  return { k, line, top, left, unitText, width: unitText.width * k, badges, boxLeft, boxWidth: boxUnits * k };
 }
 
 function label(t: ChromeTile, glyphs: Glyphs): PathItem[] {
@@ -261,9 +271,12 @@ function badges(t: ChromeTile, glyphs: Glyphs): PathItem[] {
   if (!t.badges?.length || labelHidden(t)) {
     return [];
   }
-  const { k, line, top, badges: kept } = labelLayout(t, glyphs);
-  const centre = top + (line - ICON_SIZE * k) / 2;
-  return kept.map((b) => ({ ...placed(item(t, `${ChromePart.Badge}:${b.key}` as ChromePart, b.contours, LABEL_COLOR), k, b.x, centre), rule: FillRule.Union }));
+  const { k, line, top, badges: kept, boxLeft, boxWidth } = labelLayout(t, glyphs);
+  const centre = top + line / 2;
+  const side = (SLOT_SIZE + 2 * BOX_PAD) * k;
+  const box = item(t, ChromePart.BadgeBox, roundRect(boxLeft, centre - side / 2, boxWidth, side, BOX_RADIUS * k), LABEL_COLOR, BOX_OPACITY);
+  const drawn = kept.map((b) => ({ ...placed(item(t, `${ChromePart.Badge}:${b.key}` as ChromePart, b.contours, LABEL_COLOR), k * GLYPH_SCALE, b.x + ((SLOT_SIZE - ICON_SIZE * GLYPH_SCALE) / 2) * k, centre - (ICON_SIZE * GLYPH_SCALE * k) / 2), rule: FillRule.Union }));
+  return [box, ...drawn];
 }
 
 export function headerIconBoxes(t: ChromeTile, glyphs: Glyphs): (ChromeBox & { key: string })[] {
@@ -271,7 +284,8 @@ export function headerIconBoxes(t: ChromeTile, glyphs: Glyphs): (ChromeBox & { k
     return [];
   }
   const { k, line, top, badges: kept } = labelLayout(t, glyphs);
-  return kept.map((b) => ({ key: b.key, x: b.x, y: top, w: ICON_SIZE * k, h: line }));
+  const size = SLOT_SIZE * k;
+  return kept.map((b) => ({ key: b.key, x: b.x, y: top + (line - size) / 2, w: size, h: size }));
 }
 
 export type ChromeBox = { x: number; y: number; w: number; h: number };

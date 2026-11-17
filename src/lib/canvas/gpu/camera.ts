@@ -5,7 +5,7 @@ export type Rect = { id: string; x: number; y: number; w: number; h: number };
 export type Screen = { width: number; height: number };
 
 const MIN_ZOOM = 0.05;
-const MAX_ZOOM = 4;
+export const MAX_ZOOM = 32;
 
 export const toWorld = (view: Viewport, p: Point): Point => ({ x: (p.x - view.x) / view.zoom, y: (p.y - view.y) / view.zoom });
 

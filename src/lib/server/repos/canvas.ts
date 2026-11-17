@@ -437,7 +437,9 @@ export async function createNode(
  * farebbe fallire la scrittura del contenuto di chi sta scrivendo nel pannello mentre un altro
  * muove il nodo, che è esattamente il lavoro che la versione dovrebbe proteggere.
  */
-const LOGGED_MOVERS: ActorKind[] = ['agent'];
+const LOGGED_MOVERS: ActorKind[] = ['agent', 'user'];
+
+const samePlace = (a: CanvasNodeRecord['position'], b: CanvasNodeRecord['position']) => a.x === b.x && a.y === b.y && a.z === b.z;
 
 export async function moveNode(
   db: Db,
@@ -460,7 +462,7 @@ export async function moveNode(
   }
   const node = data ? toNode(data) : null;
 
-  if (node && before) {
+  if (node && before && !samePlace(before.position, node.position)) {
     await recordEvent(db, {
       orgId: input.orgId,
       canvasId: node.canvasId,
@@ -474,7 +476,9 @@ export async function moveNode(
   return node;
 }
 
-export async function renameNode(db: Db, input: { orgId: string; nodeId: string; name: string | null }): Promise<void> {
+export async function renameNode(db: Db, input: { orgId: string; nodeId: string; name: string | null; actor?: Actor }): Promise<void> {
+  const before = input.actor ? await findNode(db, { orgId: input.orgId, nodeId: input.nodeId }) : null;
+
   const { error } = await db
     .from('nodes')
     .update({ display_name: input.name, updated_at: new Date().toISOString() })
@@ -483,6 +487,18 @@ export async function renameNode(db: Db, input: { orgId: string; nodeId: string;
 
   if (error) {
     throw error;
+  }
+
+  if (before) {
+    await recordEvent(db, {
+      orgId: input.orgId,
+      canvasId: before.canvasId,
+      kind: 'node.update',
+      nodeId: input.nodeId,
+      before: { displayName: before.displayName },
+      after: { displayName: input.name },
+      actor: input.actor
+    });
   }
 }
 

@@ -1,6 +1,7 @@
 import type { StateStyle } from './states';
 import { DEFAULT_VARIANT } from '../doc';
 import type { CodeEase } from './ease';
+import type { SceneSpec } from './scene3d';
 
 export enum TokenKind {
   Colour = 'color',
@@ -42,6 +43,7 @@ export type ElementNode = {
   animation?: Animation;
   states?: StateStyle;
   media?: MediaRules[];
+  scene?: { name: string; spec: SceneSpec };
 };
 
 export type StyleBind = { property: string; prop: string };

@@ -13,7 +13,7 @@ export enum CiState {
 
 export type PullView = { number: number; url: string; status: string; checks: { name: string; status: string; conclusion: string | null }[] };
 
-export type LinkView = { entry: string; appRoot: string; baseSha: string; baseBranch: string; writable: boolean; pushBranch?: string; pullNumber?: number };
+export type LinkView = { entry: string; appRoot: string; baseSha: string; baseBranch: string; writable: boolean; pushBranch?: string; pullNumber?: number; beforePoster?: string };
 
 export type FrameSync = { nodeId: string; name: string; state: string; link: LinkView; push: { pull?: PullView | null } | null };
 

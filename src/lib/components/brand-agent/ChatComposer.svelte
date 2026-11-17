@@ -17,6 +17,7 @@
     onsend,
     onstop,
     controls,
+    placeholder,
     files = [],
     ready = 0,
     uploading = false,
@@ -31,6 +32,7 @@
     onsend: () => void;
     onstop: () => void;
     controls?: Snippet;
+    placeholder?: string;
     files?: Upload[];
     ready?: number;
     uploading?: boolean;
@@ -44,6 +46,7 @@
   let picker = $state<HTMLInputElement | null>(null);
   let dragging = $state(false);
 
+  const hint = $derived(placeholder ?? $_('chat.panel.placeholder'));
   const canSend = $derived(!busy && enabled && !uploading && (!!value.trim() || ready > 0));
 
   function picked(e: Event) {
@@ -130,7 +133,7 @@
   {#if dragging}
     <p class="drop-hint" aria-hidden="true">{$_('chat.panel.attach.drop')}</p>
   {/if}
-  <label class="sr-only" for="chat-composer-input">{$_('chat.panel.placeholder')}</label>
+  <label class="sr-only" for="chat-composer-input">{hint}</label>
   <textarea
     id="chat-composer-input"
     bind:this={textarea}
@@ -138,7 +141,7 @@
     onkeydown={onKeydown}
     onpaste={pasted}
     rows="1"
-    placeholder={$_('chat.panel.placeholder')}
+    placeholder={hint}
     disabled={!enabled}
     enterkeyhint="send"
   ></textarea>
