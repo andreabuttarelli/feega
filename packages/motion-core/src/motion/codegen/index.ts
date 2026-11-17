@@ -4,7 +4,8 @@ import { FillType, fillsOf } from '../fill/model';
 import { withAutoLayout } from '../layout/resolve';
 import { buildPage } from './build';
 import { withMedia } from './media';
-import { resolveAt, viewsOf } from '../breakpoints/model';
+import { resolveAt, shownOnlyIn, viewsOf } from '../breakpoints/model';
+import type { MotionClip } from '../doc';
 import type { PageSpec } from './ir';
 import { CodeTarget, type CodeAsset, type CodeExport, type CodeFile } from './model';
 import { fontAssetIds } from './fonts';
@@ -39,9 +40,24 @@ export function exportCode(doc: MotionDoc, options: ExportOptions = {}): CodeExp
   const views = viewsOf(doc)
     .slice(1)
     .map((v) => ({ maxWidth: v.width, page: build(resolveAt(doc, v.id)) }));
-  const page = withMedia(build(doc), views);
+  const deferred = viewOnlyClips(doc);
+  const page = withMedia(build(withViewOnlyShown(doc, deferred)), views, doc.width, deferred);
   const files = spec.project(page, kebab(name)).sort(byPath);
   return { target, files, assets: bundled(page, spec), notes: page.notes };
+}
+
+function viewOnlyClips(doc: MotionDoc): Set<string> {
+  return new Set(everyClip(doc).filter((c) => shownOnlyIn(c).length).map((c) => c.id));
+}
+
+function withViewOnlyShown(doc: MotionDoc, ids: ReadonlySet<string>): MotionDoc {
+  if (!ids.size) {
+    return doc;
+  }
+  const show = (c: MotionClip) => (ids.has(c.id) ? { ...c, hidden: false } : c);
+  const tracks = (ts: MotionDoc['tracks']) => ts.map((t) => ({ ...t, clips: t.clips.map((c) => show(c as MotionClip)) })) as MotionDoc['tracks'];
+  const comps = doc.comps ? Object.fromEntries(Object.entries(doc.comps).map(([id, comp]) => [id, { ...comp, tracks: tracks(comp.tracks) }])) : doc.comps;
+  return { ...doc, tracks: tracks(doc.tracks), comps } as MotionDoc;
 }
 
 function bundled(page: PageSpec, spec: TargetSpec): CodeAsset[] {

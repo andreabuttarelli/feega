@@ -22,7 +22,9 @@ export enum Step {
   Thumb = 'thumb',
   Images = 'images',
   AllVectors = 'all-vectors',
-  Sharp = 'sharp'
+  Sharp = 'sharp',
+  SentBack = 'sent-back',
+  Dropped = 'dropped'
 }
 
 export type FrameSteps = { id: string; steps: { step: Step; at: number; group: string }[] };

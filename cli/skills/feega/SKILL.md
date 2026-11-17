@@ -243,7 +243,7 @@ real font file; `approximate: true` when the font could not be read) to place th
 
 A frame becomes a code project with `export_code` ({node_id, target?}): react (React + Tailwind,
 default), html or svelte. Stacks (auto layout) become flex/grid, each component one file with typed props
-for what differs between instances, colours and fonts a tokens file. Static only, free, no AI.
+for what differs between instances, colours and fonts a tokens file. Animation and breakpoints come along; the rest is listed in `notes`. Free, no AI.
 CLI: `feega motion code <nodeId> [--target svelte] [--out ./site]`.
 
 Every save is a revision. `list_motion_revisions` lists them (who saved, clip count);

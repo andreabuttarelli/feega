@@ -148,6 +148,8 @@ pub struct PathItem {
     pub clip: String,
     #[serde(deserialize_with = "packed::contours")]
     pub contours: Vec<Vec<f64>>,
+    #[serde(default)]
+    pub nudge: Vec<Vec<f64>>,
     pub rule: FillRule,
     pub paint: Paint,
     #[serde(default)]

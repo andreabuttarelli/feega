@@ -645,9 +645,13 @@ const laidOut = perDoc((doc: MotionDoc, measure: TextMeasure): MotionDoc => with
 
 const shownDoc = (raw: ComposeInput): MotionDoc => laidOut(bound(raw.doc, raw.vars), raw.measure ?? estimatedText);
 
-const liveDoc = (raw: ComposeInput, shown: MotionDoc): MotionDoc => bakePaths(withoutBackdrop(onlyClips(flattenComps(withJunctions(shown)), raw.only)));
+const liveOf = perDoc((shown: MotionDoc, only: ReadonlySet<string> | undefined): MotionDoc => bakePaths(withoutBackdrop(onlyClips(flattenComps(withJunctions(shown)), only))));
 
-const bakedDoc = (raw: ComposeInput, live: MotionDoc): MotionDoc => bakePhysics(bakeExpressions(live, raw.analyses));
+const bakedOf = perDoc((live: MotionDoc, analyses: Record<string, AudioAnalysis> | undefined): MotionDoc => bakePhysics(bakeExpressions(live, analyses)));
+
+const liveDoc = (raw: ComposeInput, shown: MotionDoc): MotionDoc => liveOf(shown, raw.only);
+
+const bakedDoc = (raw: ComposeInput, live: MotionDoc): MotionDoc => bakedOf(live, raw.analyses);
 
 export const preparedDoc = (raw: ComposeInput): MotionDoc => bakedDoc(raw, liveDoc(raw, shownDoc(raw)));
 

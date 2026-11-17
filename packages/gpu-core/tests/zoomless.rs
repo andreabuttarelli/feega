@@ -57,6 +57,7 @@ fn the_held_texture_maps_back_to_where_the_item_is_on_screen() {
     assert_eq!((z.shift.x, z.shift.y), (100.0, 50.0));
 }
 
+#[cfg(feature = "gpu")]
 fn scene(scale: f64) -> gpu_core::display_list::DisplayList {
     parse(&format!(
         r#"{{ "width": 200, "height": 160, "background": [1, 1, 1, 1], "items": [
@@ -68,6 +69,7 @@ fn scene(scale: f64) -> gpu_core::display_list::DisplayList {
     .unwrap()
 }
 
+#[cfg(feature = "gpu")]
 #[test]
 fn a_zoom_step_inside_an_octave_draws_the_held_effect_instead_of_a_new_one() {
     use gpu_core::layers::Effects;
@@ -80,6 +82,7 @@ fn a_zoom_step_inside_an_octave_draws_the_held_effect_instead_of_a_new_one() {
     assert_eq!(renderer.zoomless_layers(), 1);
 }
 
+#[cfg(feature = "gpu")]
 #[test]
 fn a_held_effect_draws_like_one_made_at_the_screen_scale() {
     use gpu_core::layers::Effects;
