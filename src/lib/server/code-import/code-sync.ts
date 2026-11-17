@@ -121,7 +121,17 @@ export async function codeChanges(scope: CodeScope, nodeId: string): Promise<Cod
   return { outcome: SyncOutcome.Ok, kind: done.linked.origin.kind, repo: done.linked.origin.repo, sha: done.rev, patch: patchOf(done.files), files: done.files.map((f) => f.path), skipped: done.skipped };
 }
 
-export type CodePublished = { outcome: SyncOutcome.Ok; url: string | null; branch: string | null; files: string[]; skipped: string[] };
+export type CodeEdits = { repo: string; kind: string; files: { path: string; content: string }[]; skipped: string[] };
+
+export async function codeEdits(scope: CodeScope, nodeId: string): Promise<CodeEdits | SyncRefusal> {
+  const done = await changed(scope, nodeId);
+  if (typeof done === 'string') {
+    return done;
+  }
+  return { repo: done.linked.origin.repo, kind: done.linked.origin.kind, files: done.files.map((f) => ({ path: f.path, content: f.after })), skipped: done.skipped };
+}
+
+export type CodePublished ={ outcome: SyncOutcome.Ok; url: string | null; branch: string | null; files: string[]; skipped: string[] };
 
 export async function codePublish(scope: CodeScope, nodeId: string, now = Date.now()): Promise<CodePublished | { outcome: SyncRefusal }> {
   const done = await changed(scope, nodeId);

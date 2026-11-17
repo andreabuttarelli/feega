@@ -1,0 +1,232 @@
+<script lang="ts">
+  import { SvelteSet } from 'svelte/reactivity';
+  import { SourceAction, changedRows, ciOf, CiState, popoverOf, pushAskOf, type FrameSync, type PullView } from '$lib/canvas/source-changes';
+  import { PushOutcome, pushOutcomeOf, editedFilesText } from '$lib/canvas/source-sync';
+
+  type Anchor = { left: number; top: number };
+  type Pushed = { branch: string; pull: PullView | null };
+
+  let { projectId, open, anchor, syncs, posterOf, onclose, onchanged }: { projectId: string; open: FrameSync | null; anchor: Anchor | null; syncs: FrameSync[]; posterOf: (nodeId: string) => string | null; onclose: () => void; onchanged: () => Promise<unknown> } = $props();
+
+  const DEFAULT_NAME = 'canvas-edits';
+  const PATCH_FILE = 'feega-changes.patch';
+
+  const ACTION_LABEL: Record<SourceAction, string> = { [SourceAction.Update]: 'Update', [SourceAction.ViewPr]: 'View PR', [SourceAction.Detach]: 'Detach' };
+  const CI_LABEL: Record<CiState, string> = { [CiState.None]: 'no checks', [CiState.Running]: 'CI running', [CiState.Passed]: 'CI passed', [CiState.Failed]: 'CI failed' };
+
+  let panel = $state(false);
+  let busy = $state(false);
+  let note = $state('');
+  let confirming = $state(false);
+  let pushed = $state<Pushed | null>(null);
+  const picked = new SvelteSet<string>();
+
+  const rows = $derived(changedRows(syncs));
+  const pop = $derived(open ? popoverOf(open) : null);
+  const base = $derived(`/api/v1/projects/${projectId}/github/push`);
+
+  $effect(() => {
+    for (const r of rows) {
+      picked.add(r.nodeId);
+    }
+  });
+
+  async function call(url: string, init: RequestInit) {
+    const res = await fetch(url, { ...init, headers: { 'content-type': 'application/json' } }).catch(() => null);
+    return (await res?.json().catch(() => null)) as Record<string, unknown> | null;
+  }
+
+  function download(files: { path: string; content: string }[]) {
+    const url = URL.createObjectURL(new Blob([editedFilesText(files)], { type: 'text/plain' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: PATCH_FILE });
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const ACTION_RUN: Record<SourceAction, (s: FrameSync) => Promise<void>> = {
+    [SourceAction.Update]: async (s) => {
+      const body = await call(`/api/v1/projects/${projectId}/code-import/${s.nodeId}/pull`, { method: 'POST', body: '{}' });
+      const conflicts = (body?.conflicts as string[] | undefined) ?? [];
+      note = conflicts.length ? `${conflicts.length} conflicts kept on canvas` : 'Updated from GitHub';
+    },
+    [SourceAction.ViewPr]: async (s) => {
+      window.open(s.push?.pull?.url, '_blank', 'noopener');
+    },
+    [SourceAction.Detach]: async (s) => {
+      await call(`${base}?nodeId=${encodeURIComponent(s.nodeId)}`, { method: 'DELETE' });
+      onclose();
+    }
+  };
+
+  async function act(action: SourceAction) {
+    if (!open) {
+      return;
+    }
+    busy = true;
+    await ACTION_RUN[action](open);
+    await onchanged();
+    busy = false;
+  }
+
+  async function push(confirmSensitive = false) {
+    const ask = pushAskOf(rows, picked, DEFAULT_NAME);
+    if (!ask) {
+      return;
+    }
+    busy = true;
+    const body = await call(base, { method: 'POST', body: JSON.stringify({ ...ask, confirmSensitive }) });
+    const outcome = pushOutcomeOf(body as { ok?: boolean; refusal?: string } | null);
+    confirming = outcome === PushOutcome.NeedsConfirm;
+    if (outcome === PushOutcome.ReadOnly) {
+      download((body?.patch as { path: string; content: string }[]) ?? []);
+    }
+    if (outcome === PushOutcome.Pushed) {
+      pushed = { branch: String(body?.branch), pull: null };
+      await onchanged();
+      pushed = { branch: String(body?.branch), pull: syncs.find((s) => ask.nodeIds.includes(s.nodeId))?.push?.pull ?? null };
+    }
+    note = outcome === PushOutcome.Failed ? `Push refused: ${String(body?.refusal ?? 'network')}` : '';
+    busy = false;
+  }
+
+  async function undo() {
+    const first = rows.find((r) => r.link.pushBranch) ?? syncs.find((s) => s.link.pushBranch);
+    if (!first) {
+      return;
+    }
+    busy = true;
+    const body = await call(`${base}/undo`, { method: 'POST', body: JSON.stringify({ nodeId: first.nodeId }) });
+    note = body?.ok ? 'Last push undone' : `Undo refused: ${String(body?.refusal ?? 'network')}`;
+    await onchanged();
+    busy = false;
+  }
+
+  const hasPush = $derived(syncs.some((s) => s.link.pushBranch));
+  const readOnly = $derived(rows.some((r) => !r.link.writable));
+  const updating = $derived(rows.some((r) => r.link.pushBranch));
+</script>
+
+{#if open && pop && anchor}
+  <div class="source-pop" data-testid="source-popover" style="left:{anchor.left}px;top:{anchor.top}px">
+    <div class="row"><span class="label">File</span><code>{pop.file}</code></div>
+    <div class="row"><span class="label">Commit</span><code>{pop.commit}</code> <span class="muted">on {pop.branch}</span></div>
+    <div class="row"><span class="label">State</span><span>{open.state.replace('_', ' ')}</span></div>
+    {#if note}<p class="note">{note}</p>{/if}
+    <div class="actions">
+      {#each pop.actions as action (action)}
+        <button type="button" disabled={busy} onclick={() => act(action)}>{ACTION_LABEL[action]}</button>
+      {/each}
+      <button type="button" onclick={() => ((panel = true), onclose())}>Changes</button>
+    </div>
+  </div>
+{/if}
+
+{#if panel}
+  <aside class="changes" data-testid="changes-panel">
+    <header><strong>Changes</strong><button type="button" aria-label="Close" onclick={() => (panel = false)}>×</button></header>
+    {#if !rows.length}<p class="muted">No linked frame changed since its last sync.</p>{/if}
+    {#each rows as row (row.nodeId)}
+      <label class="change">
+        <input type="checkbox" checked={picked.has(row.nodeId)} onchange={(e) => (e.currentTarget.checked ? picked.add(row.nodeId) : picked.delete(row.nodeId))} />
+        {#if posterOf(row.nodeId)}<img src={posterOf(row.nodeId)} alt="" />{/if}
+        <span><strong>{row.name || 'Frame'}</strong><br /><code>{popoverOf(row).file}</code> <span class="muted">{row.state}</span></span>
+      </label>
+    {/each}
+    {#if confirming}
+      <p class="note">This push touches config, lockfiles or dotfiles.</p>
+      <button type="button" disabled={busy} onclick={() => push(true)}>Push anyway</button>
+    {/if}
+    {#if note}<p class="note">{note}</p>{/if}
+    {#if pushed}
+      <p class="pushed">Branch <code>{pushed.branch}</code>{#if pushed.pull} · <a href={pushed.pull.url} target="_blank" rel="noopener">PR #{pushed.pull.number}</a> · {CI_LABEL[ciOf(pushed.pull)]}{/if}</p>
+    {/if}
+    <footer>
+      {#if readOnly}
+        <button type="button" disabled={busy || !picked.size} onclick={() => push()}>Download patch</button>
+      {:else}
+        <button type="button" class="primary" disabled={busy || !picked.size} onclick={() => push()}>{updating ? 'Update PR' : 'Create PR'}</button>
+      {/if}
+      <button type="button" disabled={busy || !hasPush} onclick={undo}>Undo last push</button>
+    </footer>
+  </aside>
+{/if}
+
+<style>
+  .source-pop,
+  .changes {
+    position: absolute;
+    z-index: 30;
+    background: var(--ui-surface, #fff);
+    color: var(--ui-text, inherit);
+    border: 1px solid var(--ui-border, rgba(0, 0, 0, 0.1));
+    border-radius: var(--ui-radius-md);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    font-size: 12px;
+    pointer-events: auto;
+  }
+  .source-pop {
+    width: 280px;
+    padding: 10px;
+  }
+  .changes {
+    top: 56px;
+    right: 12px;
+    width: 320px;
+    max-height: 70vh;
+    overflow: auto;
+    padding: 12px;
+    border-radius: var(--ui-radius-lg);
+  }
+  .row {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    margin-bottom: 4px;
+  }
+  .label {
+    width: 52px;
+    opacity: 0.6;
+  }
+  .muted {
+    opacity: 0.6;
+  }
+  .actions,
+  footer {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .change {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 0;
+  }
+  .change img {
+    width: 48px;
+    height: 32px;
+    object-fit: cover;
+    border-radius: var(--ui-radius-xs);
+  }
+  button {
+    border: 1px solid var(--ui-border, rgba(0, 0, 0, 0.15));
+    border-radius: var(--ui-radius-sm);
+    background: transparent;
+    padding: 4px 8px;
+    cursor: pointer;
+    color: inherit;
+  }
+  button.primary {
+    background: var(--ui-text, #111);
+    color: var(--ui-surface, #fff);
+  }
+  .note {
+    margin: 6px 0;
+  }
+</style>
