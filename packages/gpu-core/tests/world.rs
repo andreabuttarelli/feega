@@ -24,7 +24,7 @@ fn a_pinned_overlay_keeps_its_screen_size_at_every_zoom_and_leaves_the_encoded_o
             let z = zoom * ratio;
             let camera = [z, 0.0, 0.0, z, 7.0, 9.0];
             assert!(w.overlay(camera, 640, 480).items.iter().all(|i| i.clip() != "ring"));
-            assert_eq!(w.pinned_at(camera).len(), 1);
+            assert_eq!(w.pinned_at(camera, 1.0).len(), 1);
             for list in [w.screen(camera, 640, 480)] {
                 let at = pinned_on_screen(&list);
                 assert_eq!(at[0], (10.0 * z + 7.0, 10.0 * z + 9.0));

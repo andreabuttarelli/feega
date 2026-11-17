@@ -19,7 +19,7 @@ use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile, OPAQUE};
 use crate::retained::{Camera, Damage, Lookup, Quality};
 use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, GestureDraw, Moment, Path, Warmup, tiles_kept_beside, TILE_BUDGET_BYTES, TILE_BYTES, TILE_GUTTER_PX, batches, batches_of, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys, magnified, fallback_serves, fallback_bands, ahead_camera, fade_in, fades_over, FADE_MS};
-use crate::overlay_kept::{OverlayDrawn, OverlayKept, OverlayKey};
+use crate::overlay_kept::{Moving, OverlayDrawn, OverlayKept, OverlayKey, OverlayQuality};
 use crate::overlay_seen::OverlaySeen;
 use crate::screen_fit::{fit, screen_side};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
@@ -883,8 +883,8 @@ impl WebCore {
             encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
             self.reprojector.draw_tiles(&self.device, &self.queue, &mut encoder, &out, self.format, Output::Over, &lifted);
         }
-        if let Some(overlay) = self.overlay_texture()? {
-            self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source: &overlay, target: &out, format: self.format, look: UNMOVED, within: Some(screen), output: Output::Over });
+        if let Some((overlay, look)) = self.overlay_texture()? {
+            self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source: &overlay, target: &out, format: self.format, look, within: Some(screen), output: Output::Over });
             self.overlay_tex = Some(overlay);
         }
         self.queue.submit([encoder.finish()]);
@@ -892,14 +892,28 @@ impl WebCore {
         Ok(())
     }
 
-    fn overlay_texture(&mut self) -> Result<Option<wgpu::Texture>, JsValue> {
-        let size = (self.target.width(), self.target.height());
-        let key = OverlayKey { camera: self.camera, size };
-        if !self.overlay_kept.stale(&key) {
-            return Ok(self.overlay_tex.take());
+    fn overlay_moving(&self) -> Moving {
+        if self.compositor.holding() || !self.compositor.lifts(&self.library).is_empty() {
+            return Moving::Lift;
         }
-        let plan = self.compositor.overlay_at(&mut self.library, self.camera, size, self.limits);
-        let pinned = self.compositor.pinned_at(self.camera);
+        match self.motion {
+            CoreMotion::Gesture => Moving::Camera,
+            CoreMotion::Still => Moving::Still,
+        }
+    }
+
+    fn overlay_texture(&mut self) -> Result<Option<(wgpu::Texture, Lookup)>, JsValue> {
+        let quality = OverlayQuality::of(self.overlay_moving());
+        let q = quality.scale();
+        let size = ((self.target.width() as f64 * q).ceil() as u32, (self.target.height() as f64 * q).ceil() as u32);
+        let camera = Camera { x: self.camera.x * q, y: self.camera.y * q, zoom: self.camera.zoom * q };
+        let look = Lookup { scale: q, x: 0.0, y: 0.0 };
+        let key = OverlayKey { camera: self.camera, size, quality };
+        if !self.overlay_kept.stale(&key) {
+            return Ok(self.overlay_tex.take().map(|t| (t, look)));
+        }
+        let plan = self.compositor.overlay_at(&mut self.library, camera, size, self.limits, q);
+        let pinned = self.compositor.pinned_at(camera, q);
         let drawn = if plan.pending { OverlayDrawn::Pending } else { OverlayDrawn::Settled };
         if plan.screen.items.is_empty() && pinned.is_empty() {
             self.overlay_tex = None;
@@ -913,7 +927,7 @@ impl WebCore {
         self.engine.draw_over(&self.device, &self.queue, &list, &pictures, &pinned, &texture.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
         self.count_bake(began);
         self.overlay_kept.drew(key, drawn);
-        Ok(Some(texture))
+        Ok(Some((texture, look)))
     }
 
     fn tiled_frame(&mut self) -> Result<String, JsValue> {
@@ -1249,8 +1263,8 @@ impl WebCore {
         let screen = Rect::new(0.0, 0.0, size.0 as f64, size.1 as f64);
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
         self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source: &texture, target: &out, format: self.format, look: UNMOVED, within: None, output: Output::Premultiplied });
-        if let Some(overlay) = self.overlay_texture()? {
-            self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source: &overlay, target: &out, format: self.format, look: UNMOVED, within: Some(screen), output: Output::Over });
+        if let Some((overlay, look)) = self.overlay_texture()? {
+            self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source: &overlay, target: &out, format: self.format, look, within: Some(screen), output: Output::Over });
             self.overlay_tex = Some(overlay);
         }
         if whole {
