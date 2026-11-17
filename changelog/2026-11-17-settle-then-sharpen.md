@@ -26,3 +26,23 @@ to 475). Noisy.
 
 Cost: during a zoom the view is uniformly softer than before, because it stays on a coarser
 whole level until the zoom settles.
+
+## Follow-up: an octave cap mid-gesture
+
+The owner found a long zoom-in too soft: the stretched level had no bound until the zoom stopped.
+A new `stretch` counter (zoom over the scale of the coarsest drawn level) measured it on landings:
+3.2x at most on zoom, 7.2x on zoom and pan, more than 2x for ~530 of ~1,210 frames per 10 s zoom.
+
+- `mid_gesture_level`: once the drawn level is stretched past 2x, aim one level half an octave
+  below the zoom and keep that aim until it is drawn. Its tiles bake from the centre out within
+  the gesture budget; `gesture_frame` still swaps only to a whole level.
+- A first version baked the current zoom's level each frame. That target moved every half
+  octave, and never-drawn tiles were evicted the next frame: 4,291–9,897 bakes per zoom, 99%
+  baked again. Eviction now keeps the drawn and the aimed level near the view.
+
+Result, same scenario, no other GPU load, on battery: frames over 2x fall to ~245 (zoom) and
+~235 (zoom and pan). The peak stays at 3.2x/7x: at these pinch speeds a level does not finish
+in time. Cost: bakes 0 → ~900 per zoom, swaps 9 → ~44, fps unchanged (119.4–120).
+
+Settling after 60 or 32 ms instead of 120 ms, and a larger rest budget, did not shorten the time
+to sharp after a zoom (median ~168 ms each). They were not kept.

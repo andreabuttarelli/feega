@@ -998,7 +998,7 @@ impl WebCore {
         let whole_levels = gesture && !(bakes && panning);
         let tiles = if whole_levels { self.tiles.gesture_frame(self.camera, screen) } else { self.tiles.frame(self.camera, screen) };
         let shown = tiles.draw.iter().map(|k| k.step).max();
-        self.counted.stretch = tiles.draw.iter().map(|k| k.step).min().map_or(0.0, |step| self.camera.zoom / step_zoom(step));
+        self.counted.stretch = tiles.draw.iter().chain(&tiles.beneath).map(|k| k.step).min().map_or(0.0, |step| self.camera.zoom / step_zoom(step));
         if shown != self.shown_step {
             self.counted.swaps += 1;
             self.shown_step = shown;

@@ -3,5 +3,5 @@ import type { ChangelogEntry } from './index';
 export default {
   date: '2026-11-17',
   title: 'Steadier zoom',
-  items: ['While you zoom, pages no longer refresh piece by piece; they sharpen together once you stop.']
+  items: ['While you zoom, pages no longer refresh piece by piece; they sharpen together once you stop.', 'Long zooms sharpen along the way instead of staying soft until you stop.']
 } satisfies ChangelogEntry;
