@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AcpChat, Line } from './acp-chat.svelte';
 import { AcpEventKind, encodeAcpEvent, type AcpEvent } from './acp-events';
-import { AcpAgent } from './agent-choices';
 
 const ACP_URL = '/api/v1/local/acp';
 
@@ -32,7 +31,7 @@ describe('AcpChat', () => {
     ]);
     const chat = new AcpChat(fetcher);
 
-    const turn = chat.send(AcpAgent.Claude, 'add a title');
+    const turn = chat.send('claude', 'add a title');
     expect(chat.lines[0]).toEqual({ line: Line.User, text: 'add a title' });
     await turn;
 
@@ -44,7 +43,7 @@ describe('AcpChat', () => {
   it('shows a permission prompt and sends the user choice once', async () => {
     const { calls, fetcher } = server([PERMISSION, { kind: AcpEventKind.Done, stopReason: 'end_turn' }]);
     const chat = new AcpChat(fetcher);
-    await chat.send(AcpAgent.Codex, 'x');
+    await chat.send('codex', 'x');
 
     const asked = chat.lines[1];
     expect(asked).toMatchObject({ line: Line.Permission, id: 'p1', title: 'feega edit', chosen: null });
@@ -60,7 +59,7 @@ describe('AcpChat', () => {
   it('takes the choice back and says so when the answer does not reach the agent', async () => {
     const { fetcher } = server([PERMISSION]);
     const chat = new AcpChat(fetcher);
-    await chat.send(AcpAgent.Claude, 'x');
+    await chat.send('claude', 'x');
     chat.fetcher = (async () => new Response(null, { status: 404 })) as typeof fetch;
 
     await chat.answer('p1', 'yes');
@@ -72,7 +71,7 @@ describe('AcpChat', () => {
   it('reports a failed turn', async () => {
     const { fetcher } = server([{ kind: AcpEventKind.Failed, message: 'spawn claude ENOENT' }]);
     const chat = new AcpChat(fetcher);
-    await chat.send(AcpAgent.Claude, 'x');
+    await chat.send('claude', 'x');
 
     expect(chat.lines.at(-1)).toEqual({ line: Line.Error, text: 'spawn claude ENOENT' });
   });
