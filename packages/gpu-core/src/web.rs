@@ -19,8 +19,8 @@ use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile, OPAQUE};
 use crate::retained::{Camera, Damage, Lookup, Quality};
 use crate::tiles::{split_render, Piece, Rendered, Building, NEAR_STEPS, Drawn, path_for, GestureDraw, Moment, Path, Warmup, tiles_kept_beside, TILE_BUDGET_BYTES, TILE_BYTES, TILE_GUTTER_PX, batches, batches_of, bake_batches, step_of, step_zoom, Batch, Rest, RasterCredit, TileKey, Tiles, TILE_PX, lifted_keys, magnified, fallback_serves, fallback_bands, ahead_camera, fade_in, fades_over, FADE_MS};
-use crate::overlay_kept::{Moving, OverlayDrawn, OverlayKept, OverlayKey, OverlayQuality};
 use crate::overlay_seen::OverlaySeen;
+use crate::overlay_hold::{Moving, OverlayHold, OverlayQuality};
 use crate::screen_fit::{fit, screen_side};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
@@ -37,6 +37,7 @@ const ITEMS_PER_RASTER: usize = 48;
 const FRAMES_IN_FLIGHT: u32 = 1;
 const GESTURE_RASTER_EVERY_MS: f64 = 80.0;
 
+const OVERLAY_GROUPS: &str = "overlay:";
 const UNMOVED: Lookup = Lookup { scale: 1.0, x: 0.0, y: 0.0 };
 
 const NOT_TIMED: u64 = u64::MAX;
@@ -95,8 +96,8 @@ pub struct WebCore {
     gpu_full_ms: Arc<AtomicU64>,
     tiled: bool,
     overlay_seen: OverlaySeen,
-    overlay_tex: Option<wgpu::Texture>,
-    overlay_kept: OverlayKept,
+    overlay_held: Option<(OverlayHold, wgpu::Texture, Camera)>,
+    overlay_dirty: bool,
     tiles: Tiles,
     tile_textures: FxHashMap<TileKey, wgpu::Texture>,
     spare_tiles: Vec<wgpu::Texture>,
@@ -430,11 +431,11 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, warm_wait: 0.0, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, overlay_kept: OverlayKept::default(), overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), sharpness: Sharpness::default(), fallback: Vec::new(), ahead: None, fallback_was: camera, born: FxHashMap::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 }, gesture_draw: GestureDraw::Tiles, direct: None, held_scene: None, scale: fitted.scale })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, warm_wait: 0.0, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_held: None, overlay_dirty: true, overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), sharpness: Sharpness::default(), fallback: Vec::new(), ahead: None, fallback_was: camera, born: FxHashMap::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 }, gesture_draw: GestureDraw::Tiles, direct: None, held_scene: None, scale: fitted.scale })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
-        self.overlay_kept.forget();
+        self.overlay_dirty = true;
         self.warmup.uploaded(js_sys::Date::now());
         let source = external(source)?;
         let fits = self.textures.get(clip).is_some_and(|t| t.width() == width && t.height() == height);
@@ -453,7 +454,6 @@ impl WebCore {
     }
 
     pub fn picture_rows(&mut self, clip: &str, source: JsValue, width: u32, height: u32, top: u32, rows: u32) -> Result<bool, JsValue> {
-        self.overlay_kept.forget();
         self.warmup.uploaded(js_sys::Date::now());
         let source = external(source)?;
         if top == 0 {
@@ -477,7 +477,6 @@ impl WebCore {
     }
 
     pub fn forget_picture(&mut self, clip: &str) {
-        self.overlay_kept.forget();
         self.release(clip);
         if let Some(texture) = self.arriving.remove(clip) {
             texture.destroy();
@@ -503,7 +502,7 @@ impl WebCore {
     }
 
     pub fn put_group(&mut self, key: &str, list_json: &[u8]) -> Result<(), JsValue> {
-        self.overlay_kept.forget();
+        self.touch_overlay(key);
         self.warmup.uploaded(js_sys::Date::now());
         self.compositor.touch(key, &self.library);
         self.library.put_group(key, &parse(utf8(list_json)?).map_err(failed)?);
@@ -512,7 +511,7 @@ impl WebCore {
     }
 
     pub fn append_group(&mut self, key: &str, list_json: &[u8]) -> Result<(), JsValue> {
-        self.overlay_kept.forget();
+        self.touch_overlay(key);
         self.warmup.uploaded(js_sys::Date::now());
         self.library.append_group(key, &parse(utf8(list_json)?).map_err(failed)?);
         self.compositor.touch(key, &self.library);
@@ -520,7 +519,7 @@ impl WebCore {
     }
 
     pub fn put_group_packed(&mut self, key: &str, list_json: &[u8], floats: Vec<f64>, ends: Vec<u32>) -> Result<(), JsValue> {
-        self.overlay_kept.forget();
+        self.touch_overlay(key);
         self.warmup.uploaded(js_sys::Date::now());
         self.compositor.touch(key, &self.library);
         self.library.put_group(key, &parse_packed(utf8(list_json)?, floats, ends).map_err(failed)?);
@@ -529,7 +528,7 @@ impl WebCore {
     }
 
     pub fn append_group_packed(&mut self, key: &str, list_json: &[u8], floats: Vec<f64>, ends: Vec<u32>) -> Result<(), JsValue> {
-        self.overlay_kept.forget();
+        self.touch_overlay(key);
         self.warmup.uploaded(js_sys::Date::now());
         self.library.append_group(key, &parse_packed(utf8(list_json)?, floats, ends).map_err(failed)?);
         self.compositor.touch(key, &self.library);
@@ -537,7 +536,7 @@ impl WebCore {
     }
 
     pub fn patch_group(&mut self, from: &str, to: &str, splice_json: &[u8]) -> Result<bool, JsValue> {
-        self.overlay_kept.forget();
+        self.touch_overlay(to);
         self.warmup.uploaded(js_sys::Date::now());
         self.compositor.touch(to, &self.library);
         let patched = self.library.patch_group(from, to, &parse_splice(utf8(splice_json)?).map_err(failed)?);
@@ -546,7 +545,7 @@ impl WebCore {
     }
 
     pub fn drop_group(&mut self, key: &str) {
-        self.overlay_kept.forget();
+        self.touch_overlay(key);
         self.compositor.drop_group(key, &mut self.library);
     }
 
@@ -555,7 +554,7 @@ impl WebCore {
     }
 
     pub fn patch_uses(&mut self, patch_json: &[u8]) -> Result<(), JsValue> {
-        self.overlay_kept.forget();
+        self.overlay_dirty |= self.compositor.holding();
         let patch = parse_patch(utf8(patch_json)?).map_err(failed)?;
         let patch = if self.tiled { patch.for_tiles() } else { patch };
         self.compositor.patch(patch, &self.library);
@@ -563,7 +562,7 @@ impl WebCore {
     }
 
     pub fn set_overlay(&mut self, items_json: &[u8]) -> Result<(), JsValue> {
-        self.overlay_kept.forget();
+        self.overlay_dirty = true;
         if !self.overlay_seen.is_new(OverlayPart::Fixed, items_json) {
             return Ok(());
         }
@@ -573,7 +572,7 @@ impl WebCore {
     }
 
     pub fn set_selected_overlay(&mut self, items_json: &[u8]) -> Result<(), JsValue> {
-        self.overlay_kept.forget();
+        self.overlay_dirty = true;
         if !self.overlay_seen.is_new(OverlayPart::Selected, items_json) {
             return Ok(());
         }
@@ -583,7 +582,7 @@ impl WebCore {
     }
 
     pub fn set_live_overlay(&mut self, items_json: &[u8]) -> Result<(), JsValue> {
-        self.overlay_kept.forget();
+        self.overlay_dirty = true;
         if !self.overlay_seen.is_new(OverlayPart::Live, items_json) {
             return Ok(());
         }
@@ -604,7 +603,6 @@ impl WebCore {
     }
 
     pub fn set_budget(&mut self, bytes: f64) {
-        self.overlay_kept.forget();
         let share = split(bytes as u64, self.compositor.size());
         self.library.set_budget(share.cache);
         self.engine.set_budget(share.pool, share.layers);
@@ -632,7 +630,6 @@ impl WebCore {
     }
 
     pub fn set_pixel_ratio(&mut self, ratio: f64) {
-        self.overlay_kept.forget();
         self.tiles.set_pixel_ratio(ratio * self.scale);
         self.compositor.set_pixel_ratio(ratio * self.scale);
     }
@@ -885,11 +882,14 @@ impl WebCore {
         }
         if let Some((overlay, look)) = self.overlay_texture()? {
             self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source: &overlay, target: &out, format: self.format, look, within: Some(screen), output: Output::Over });
-            self.overlay_tex = Some(overlay);
         }
         self.queue.submit([encoder.finish()]);
         self.queue.present(frame);
         Ok(())
+    }
+
+    fn touch_overlay(&mut self, group: &str) {
+        self.overlay_dirty |= group.starts_with(OVERLAY_GROUPS) || self.compositor.holding();
     }
 
     fn overlay_moving(&self) -> Moving {
@@ -903,31 +903,29 @@ impl WebCore {
     }
 
     fn overlay_texture(&mut self) -> Result<Option<(wgpu::Texture, Lookup)>, JsValue> {
+        let size = (self.target.width(), self.target.height());
+        let moving = matches!(self.motion, CoreMotion::Gesture);
         let quality = OverlayQuality::of(self.overlay_moving());
-        let q = quality.scale();
-        let size = ((self.target.width() as f64 * q).ceil() as u32, (self.target.height() as f64 * q).ceil() as u32);
-        let camera = Camera { x: self.camera.x * q, y: self.camera.y * q, zoom: self.camera.zoom * q };
-        let look = Lookup { scale: q, x: 0.0, y: 0.0 };
-        let key = OverlayKey { camera: self.camera, size, quality };
-        if !self.overlay_kept.stale(&key) {
-            return Ok(self.overlay_tex.take().map(|t| (t, look)));
+        let held = self.overlay_held.as_ref().is_some_and(|(hold, _, at)| !self.overlay_dirty && hold.quality() == quality && if moving { hold.serves(self.camera, size) } else { *at == self.camera });
+        if !held {
+            self.overlay_dirty = false;
+            let hold = OverlayHold::around_at(self.camera, size, self.device.limits().max_texture_dimension_2d, quality);
+            let (camera, planned) = hold.planned();
+            let plan = self.compositor.overlay_at(&mut self.library, camera, planned, self.limits, quality.scale());
+            let pinned = self.compositor.pinned_at(camera, quality.scale(), planned);
+            if plan.screen.items.is_empty() && pinned.is_empty() {
+                self.overlay_held = None;
+                return Ok(None);
+            }
+            let began = now_ms();
+            let (list, _) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
+            let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
+            let texture = self.overlay_held.take().map(|(_, t, _)| t).filter(|t| (t.width(), t.height()) == planned).unwrap_or_else(|| layer_texture(&self.device, planned.0, planned.1));
+            self.engine.draw_over(&self.device, &self.queue, &list, &pictures, &pinned, &texture.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
+            self.count_bake(began);
+            self.overlay_held = Some((hold, texture, self.camera));
         }
-        let plan = self.compositor.overlay_at(&mut self.library, camera, size, self.limits, q);
-        let pinned = self.compositor.pinned_at(camera, q, size);
-        let drawn = if plan.pending { OverlayDrawn::Pending } else { OverlayDrawn::Settled };
-        if plan.screen.items.is_empty() && pinned.is_empty() {
-            self.overlay_tex = None;
-            self.overlay_kept.drew(key, drawn);
-            return Ok(None);
-        }
-        let began = now_ms();
-        let (list, _) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
-        let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
-        let texture = self.overlay_tex.take().filter(|t| t.width() == size.0 && t.height() == size.1).unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
-        self.engine.draw_over(&self.device, &self.queue, &list, &pictures, &pinned, &texture.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
-        self.count_bake(began);
-        self.overlay_kept.drew(key, drawn);
-        Ok(Some((texture, look)))
+        Ok(self.overlay_held.as_ref().map(|(hold, texture, _)| (texture.clone(), hold.look(self.camera))))
     }
 
     fn tiled_frame(&mut self) -> Result<String, JsValue> {
@@ -1265,7 +1263,6 @@ impl WebCore {
         self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source: &texture, target: &out, format: self.format, look: UNMOVED, within: None, output: Output::Premultiplied });
         if let Some((overlay, look)) = self.overlay_texture()? {
             self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source: &overlay, target: &out, format: self.format, look, within: Some(screen), output: Output::Over });
-            self.overlay_tex = Some(overlay);
         }
         if whole {
             let o = self.compositor.retained_overscan();
