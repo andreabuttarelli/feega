@@ -84,6 +84,12 @@ test('direct zoom on the user canvas copy', async () => {
   const moderate = process.env.PROBE_MODERATE === '1';
   const legs = moderate ? [{ to: 1.5, ms: LEG_MS }, { to: 0.5, ms: LEG_MS }, { to: 1.5, ms: LEG_MS }, { to: 0.5, ms: LEG_MS }] : [{ to: 1.2, ms: LEG_MS }, { to: 0.3, ms: LEG_MS }, { to: 2.4, ms: LEG_MS }, { to: 0.3, ms: LEG_MS }];
   const steps = zoomPath({ from: moderate ? 0.5 : 0.3, anchor: CENTRE, legs });
+  const profiled = process.env.PROBE_PROFILE === '1';
+  if (profiled) {
+    await cdp.send('Profiler.enable');
+    await cdp.send('Profiler.setSamplingInterval', { interval: 200 });
+    await cdp.send('Profiler.start');
+  }
   const startT = await page.evaluate(() => performance.now());
   began = Date.now();
   const pauses = MODE === 'sharp' ? [...PAUSE_AT_MS] : [];
@@ -105,6 +111,18 @@ test('direct zoom on the user canvas copy', async () => {
     void cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: s.x, y: s.y, deltaX: s.dx, deltaY: s.dy, modifiers: s.ctrl ? CTRL : 0 }).catch(() => {});
   }
   await page.waitForTimeout(2000);
+  if (profiled) {
+    const { profile } = (await cdp.send('Profiler.stop')) as { profile: { nodes: { id: number; callFrame: { functionName: string; url: string; lineNumber: number } }[]; samples: number[] } };
+    const byId = new Map(profile.nodes.map((n) => [n.id, n.callFrame]));
+    const counts = new Map<string, number>();
+    for (const id of profile.samples) {
+      const f = byId.get(id)!;
+      const key = `${f.functionName || '(anon)'} ${f.url.split('/').pop()}:${f.lineNumber}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    const top = [...counts].sort((a, b) => b[1] - a[1]).slice(0, 25);
+    writeFileSync(`${OUT}/profile.txt`, top.map(([k, v]) => `${v}\t${k}`).join('\n'));
+  }
   const t = await page.evaluate((from) => (window as unknown as { __t: number[] }).__t.filter((x) => x >= from), startT);
   const gaps = t.slice(1).map((x, i) => x - t[i]).sort((a, b) => a - b);
   console.log(`frames fps=${Math.round((gaps.length * 1000) / (t.at(-1)! - t[0]))} p95=${gaps[Math.floor(gaps.length * 0.95)].toFixed(1)} worst=${gaps.at(-1)!.toFixed(0)} mean=${(gaps.reduce((a, b) => a + b, 0) / gaps.length).toFixed(2)} over50=${gaps.filter((g) => g > 50).length} over8=${gaps.filter((g) => g > 8.3).length} n=${gaps.length}`);

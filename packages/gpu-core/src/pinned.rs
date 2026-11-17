@@ -13,6 +13,8 @@ const EVERYWHERE: f64 = 1e9;
 const ONCE: f64 = 1.0;
 const TWICE: f64 = 2.0;
 const SEEN_PX: f64 = 0.5;
+const LABELLED_PX: f64 = 24.0;
+const RING: &str = "ring";
 
 pub struct PinnedScene {
     once: Scene,
@@ -77,6 +79,35 @@ struct Piece {
     anchors: Rect,
     reach: f64,
     scene: PinnedScene,
+    small: Option<PinnedScene>,
+}
+
+impl Piece {
+    fn of(items: &[Item]) -> Piece {
+        let rings: Vec<Item> = items.iter().filter(|i| part(i) == RING).cloned().collect();
+        let small = (!rings.is_empty()).then(|| PinnedScene::new(&rings));
+        Piece { anchors: anchors_of(items), reach: reach_of(items), scene: PinnedScene::new(items), small }
+    }
+
+    fn fits(&self) -> bool {
+        self.scene.fits() && self.small.as_ref().is_none_or(PinnedScene::fits)
+    }
+
+    fn shown(&self, camera: Matrix, per_px: f64, view: Rect) -> Option<&PinnedScene> {
+        let on = camera.transform_rect_bbox(self.anchors.inflate(self.reach * per_px, self.reach * per_px));
+        if !on.overlaps(view) || on.width().max(on.height()) < SEEN_PX {
+            return None;
+        }
+        let frame = camera.transform_rect_bbox(self.anchors);
+        self.drawn(frame.width().max(frame.height()))
+    }
+
+    fn drawn(&self, frame_px: f64) -> Option<&PinnedScene> {
+        match &self.small {
+            Some(rings) if frame_px < LABELLED_PX => Some(rings),
+            _ => Some(&self.scene),
+        }
+    }
 }
 
 pub struct PinnedPieces {
@@ -85,6 +116,10 @@ pub struct PinnedPieces {
 
 fn owner(item: &Item) -> &str {
     item.clip().split(':').next().unwrap_or_default()
+}
+
+fn part(item: &Item) -> &str {
+    item.clip().rsplit(':').next().unwrap_or_default()
 }
 
 fn anchors_of(items: &[Item]) -> Rect {
@@ -108,17 +143,13 @@ fn reach_of(items: &[Item]) -> f64 {
 
 impl PinnedPieces {
     pub fn new(items: &[Item]) -> Option<PinnedPieces> {
-        let pieces: Vec<Piece> = items.chunk_by(|a, b| owner(a) == owner(b)).map(|g| Piece { anchors: anchors_of(g), reach: reach_of(g), scene: PinnedScene::new(g) }).collect();
-        pieces.iter().all(|p| p.scene.fits()).then_some(PinnedPieces { pieces })
+        let pieces: Vec<Piece> = items.chunk_by(|a, b| owner(a) == owner(b)).map(Piece::of).collect();
+        pieces.iter().all(Piece::fits).then_some(PinnedPieces { pieces })
     }
 
     pub fn seen(&self, camera: Affine, per_px: f64, (w, h): (u32, u32)) -> Vec<Rc<Scene>> {
         let view = Rect::new(0.0, 0.0, w as f64, h as f64);
         let camera = Matrix::new(camera);
-        let shows = |p: &&Piece| {
-            let on = camera.transform_rect_bbox(p.anchors.inflate(p.reach * per_px, p.reach * per_px));
-            on.overlaps(view) && on.width().max(on.height()) >= SEEN_PX
-        };
-        self.pieces.iter().filter(shows).map(|p| p.scene.at(per_px)).collect()
+        self.pieces.iter().filter_map(|p| p.shown(camera, per_px, view)).map(|s| s.at(per_px)).collect()
     }
 }

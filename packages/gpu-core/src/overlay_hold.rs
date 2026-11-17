@@ -5,6 +5,7 @@ use crate::retained::{Camera, Lookup};
 const MARGIN_SHARE: f64 = 0.25;
 const EDGE_SLACK: f64 = 1e-6;
 const ROUGH_SCALE: f64 = 0.5;
+const ROUGH_ZOOM_DRIFT: f64 = 1.03;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Moving {
@@ -24,6 +25,13 @@ impl OverlayQuality {
         match moving {
             Moving::Camera => OverlayQuality::Rough,
             Moving::Still | Moving::Lift => OverlayQuality::Sharp,
+        }
+    }
+
+    fn drift(self) -> f64 {
+        match self {
+            OverlayQuality::Sharp => 1.0,
+            OverlayQuality::Rough => ROUGH_ZOOM_DRIFT,
         }
     }
 
@@ -70,7 +78,9 @@ impl OverlayHold {
     }
 
     pub fn serves(&self, now: Camera, (w, h): (u32, u32)) -> bool {
-        if now.zoom * self.quality.scale() != self.planned.zoom {
+        let ratio = now.zoom * self.quality.scale() / self.planned.zoom;
+        let drift = self.quality.drift();
+        if !(1.0 / drift..=drift).contains(&ratio) {
             return false;
         }
         let look = self.look(now);
