@@ -7,7 +7,7 @@ const glyphs: Glyphs = (text, size) => ({ contours: [[0, 0, text.length * size, 
 
 const ICON = [[0, 0, 12, 0, 12, 12, 0, 12]];
 
-const facts = (over: Partial<FrameFacts> = {}): FrameFacts => ({ breakpoints: false, component: false, prototype: false, source: [], ...over });
+const facts = (over: Partial<FrameFacts> = {}): FrameFacts => ({ breakpoints: false, component: false, prototype: false, version: false, source: [], ...over });
 
 const tile = (over: Partial<ChromeTile> = {}): ChromeTile => ({ id: 'f1', x: 100, y: 200, width: 300, height: 150, inputs: [], outputs: [], label: null, icon: null, ...over });
 
@@ -46,6 +46,10 @@ describe('frameHeaderIcons', () => {
   it('shows a row only when its fact holds', () => {
     expect(headerBadges(facts({ component: true, prototype: true }))).toEqual([FrameBadge.Component, FrameBadge.Prototype]);
     expect(headerBadges(facts())).toEqual([]);
+  });
+
+  it('a version frame shows the git icon and no GitHub state', () => {
+    expect(headerBadges(facts({ version: true, source: [SourceSync.InSync] }))).toEqual([FrameBadge.Version]);
   });
 
   it('shows the GitHub states by default, hides them when the flag is off', () => {

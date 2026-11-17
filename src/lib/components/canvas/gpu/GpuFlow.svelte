@@ -27,6 +27,7 @@
   import PrototypePlayerHost from '../PrototypePlayerHost.svelte';
   import FrameHeaderIcons from './FrameHeaderIcons.svelte';
   import SourceSyncPanel from './SourceSyncPanel.svelte';
+  import { versionMarkOf } from '$lib/canvas/version-frame';
   import { HeaderAction, headerBadges, headerHits, headerRow, type HeaderHit } from '$lib/canvas/core/frame-header';
   import { sourceStatus } from '$lib/canvas/source-status.svelte';
   import { linkedFrames } from '$lib/canvas/source-sync';
@@ -643,7 +644,7 @@
     if (!text || kindOfNode(t.id) !== FrameKind.Frame) {
       return [];
     }
-    const facts = { breakpoints: Boolean(liveOf(t.id)?.doc.breakpoints?.length), component: isComponentSet(t.id), prototype: prototypeFroms.has(t.id), source: sources.of(t.id) };
+    const facts = { breakpoints: Boolean(liveOf(t.id)?.doc.breakpoints?.length), component: isComponentSet(t.id), prototype: prototypeFroms.has(t.id), version: isVersionFrame(t.id), source: sources.of(t.id) };
     return headerBadges(facts).map((key) => ({ key, contours: text.badges.get(key) ?? [] }));
   };
   const HEADER_PRESS: Record<HeaderAction, (id: string) => void> = {
@@ -652,7 +653,8 @@
       prototypePlayer.editing = id;
       prototypePlayer.play();
     },
-    [HeaderAction.Source]: (id) => select([id])
+    [HeaderAction.Source]: (id) => select([id]),
+    [HeaderAction.Version]: (id) => select([id])
   };
   const SOURCE_POP_GAP = 6;
   const pressHeader = (hit: HeaderHit) => {
@@ -2137,6 +2139,8 @@
   }
 
   const onComponentsPage = $derived((page.data as { canvas?: { name?: string } }).canvas?.name === COMPONENTS_PAGE);
+
+  const isVersionFrame = (nodeId: string) => versionMarkOf(summaries.get(nodeId)?.data) !== null;
 
   const isComponentSet = (nodeId: string) => {
     const doc = onComponentsPage ? liveOf(nodeId)?.doc : null;
