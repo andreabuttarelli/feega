@@ -47,6 +47,16 @@ feega github detach <projectId> <nodeId>
 
 Undoing a push adds a commit that restores only the files that push touched, as they were before it. History is never rewritten.
 
+## Versions
+
+The versions of a linked frame are the branches, tags and open pull requests of its repo, and the commits that touched its file, newest first, with message and author.
+
+```bash
+feega github versions <projectId> <nodeId> [--ref <branch|tag|sha>] [--limit 30]
+```
+
+`POST /api/v1/projects/:id/github/versions` with `{ nodeId, ref?, limit? }` answers `{ ok, entry, refs, commits, pulls }`; MCP `github_versions {nodeId,ref?,limit?}`. A local folder lists its own branches and tags; pull requests appear when its `origin` is on GitHub and a token is available.
+
 ## CLI
 
 ```bash
@@ -62,12 +72,13 @@ feega github undo <projectId> <nodeId>
 | `POST` | `/api/v1/projects/:id/github/push` | `{ name, nodeIds, title?, body?, base?, confirmSensitive? }` |
 | `GET` | `/api/v1/projects/:id/github/push?nodeId=` | — |
 | `POST` | `/api/v1/projects/:id/github/push/undo` | `{ nodeId }` |
+| `POST` | `/api/v1/projects/:id/github/versions` | `{ nodeId, ref?, limit? }` |
 
 Refusals answer `{ ok: false, refusal }`: `not_connected`, `read_only` (403, with `patch`), `secret` and `env_file` (422), `needs_confirm` (428), `busy` (423), `unauthorized` (401), `forbidden` (403).
 
 ## MCP
 
-`github_push`, `github_push_status` and `github_undo`, with the same inputs.
+`github_push`, `github_push_status`, `github_undo` and `github_versions`, with the same inputs.
 
 ## What a frame is linked to
 

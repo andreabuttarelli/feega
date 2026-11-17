@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const insertAsset = vi.fn();
 const patchNodeData = vi.fn();
 
+vi.mock('$lib/server/code-push/link-store', () => ({ keepBeforePoster: async () => undefined }));
 vi.mock('$lib/server/repos/assets', async (original) => ({ ...(await original<object>()), insertAsset }));
 vi.mock('$lib/server/repos/canvas', async (original) => ({ ...(await original<object>()), patchNodeData }));
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));

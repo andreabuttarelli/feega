@@ -30,3 +30,12 @@ export const GPU_SURFACE_MAX_SIDE = 8192;
 
 export const drawableOn = (engine: RenderEngine, size: { width: number; height: number }): RenderEngine =>
   Math.max(size.width, size.height) > GPU_SURFACE_MAX_SIDE ? RenderEngine.Html : engine;
+
+const FALLBACK: Record<RenderEngine, RenderEngine> = {
+  [RenderEngine.GpuCore]: RenderEngine.GpuCoreGl,
+  [RenderEngine.GpuCoreGl]: RenderEngine.Html,
+  [RenderEngine.GpuFull]: RenderEngine.Html,
+  [RenderEngine.Html]: RenderEngine.Html
+};
+
+export const fallbackOf = (engine: RenderEngine): RenderEngine => FALLBACK[engine];

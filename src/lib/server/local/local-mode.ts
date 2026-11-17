@@ -1,7 +1,8 @@
 import { json, redirect, type RequestEvent, type ResolveOptions } from '@sveltejs/kit';
 import { stringify } from 'devalue';
 import { hasAiKey } from '$lib/local-ai-keys';
-import { LOCAL_USER, openFeegaStore, type FeegaStore, type LocalPlace } from './feega-store';
+import { LOCAL_ORG_ID, LOCAL_USER, openFeegaStore, type FeegaStore, type LocalPlace } from './feega-store';
+import { warmHeads } from '$lib/server/repos/motion-revisions';
 
 type Env = Record<string, string | undefined>;
 type Resolve = (event: RequestEvent, opts?: ResolveOptions) => Response | Promise<Response>;
@@ -97,12 +98,22 @@ export function localStore(env: Env = process.env): FeegaStore | null {
   const opened = openFeegaStore(path, { origin: env.PUBLIC_APP_URL ?? 'http://localhost:5173', latencyMs: Number(env[LOCAL_LATENCY_ENV] ?? 0) });
   process.once('exit', () => opened.flushNow());
   store = opened;
+  void warmFrames(opened);
   if (hasAiKey(env)) {
     void syncModels(opened, env);
     void reportKeys(env);
     void import('./local-ticker').then(({ startLocalTicker }) => startLocalTicker(opened.db));
   }
   return store;
+}
+
+async function warmFrames(opened: FeegaStore): Promise<void> {
+  const { data } = await opened.db.from('motion_revisions').select('node_id, version');
+  const newest = new Map<string, number>();
+  for (const row of (data ?? []) as { node_id: string; version: number }[]) {
+    newest.set(row.node_id, Math.max(Number(row.version), newest.get(row.node_id) ?? 0));
+  }
+  await warmHeads(opened.db, { orgId: LOCAL_ORG_ID, heads: [...newest].map(([nodeId, version]) => ({ nodeId, version })) });
 }
 
 async function syncModels(opened: FeegaStore, env: Env): Promise<void> {

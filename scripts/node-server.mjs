@@ -1,4 +1,6 @@
+import { realpathSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { pathToFileURL } from 'node:url';
 
 export const OPAQUE_FRAME_ROUTES = ['/motion-libs', '/motion-env'];
 
@@ -36,6 +38,6 @@ async function serve() {
   process.once('SIGINT', stop);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   await serve();
 }

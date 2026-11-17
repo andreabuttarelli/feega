@@ -54,3 +54,8 @@ export async function cmdGithubResolve(projectId: string, nodeId: string, choice
 export async function cmdGithubDetach(projectId: string, nodeId: string) {
   await print(`${base(projectId)}?${new URLSearchParams({ nodeId })}`, { method: 'DELETE' });
 }
+
+export async function cmdGithubVersions(projectId: string, nodeId: string, opts: { ref?: string; limit?: string }) {
+  const limit = opts.limit ? Number(opts.limit) : undefined;
+  await print(`/api/v1/projects/${encodeURIComponent(projectId)}/github/versions`, { method: 'POST', body: JSON.stringify({ nodeId, ref: opts.ref, limit }) });
+}

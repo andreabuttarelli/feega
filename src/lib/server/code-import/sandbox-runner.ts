@@ -4,9 +4,10 @@ import { cloneUrl, namesIn, type RepoRef } from './repo';
 import { randomBytes } from 'node:crypto';
 import { IMPORT_KEY_COOKIE, ORIGIN_PROXY } from './origin-proxy';
 import { discoverIn, type Discovery } from './component-discovery';
+import { galleryOf, type GalleryPlan, type GalleryUnrun } from './gallery';
 import { NodeLine, planFile, PlanRefusal, runPlan, textsWanted, type Planned, type RepoFacts, type RunPlan } from './run-plan';
 
-export type RunningApp = { url: string; key: string; names: string[]; sha: string | null; stop: () => Promise<void>; library?: Discovery };
+export type RunningApp = { url: string; key: string; names: string[]; sha: string | null; stop: () => Promise<void>; library?: Discovery; gallery?: GalleryPlan | GalleryUnrun };
 
 export enum RunFailure {
   Clone = 'clone_failed',
@@ -97,9 +98,25 @@ async function factsIn(box: Box): Promise<RepoFacts> {
 
 const readIn = (box: Box) => async (paths: string[]) => JSON.parse((await shell(box, `node -e ${quoted(READ_SCRIPT)} ${line(paths)}`)).out || '{}') as Record<string, string>;
 
-async function libraryIn(box: Box): Promise<Discovery | undefined> {
+type Library = { library?: Discovery; gallery?: GalleryPlan | GalleryUnrun };
+
+async function galleryWritten(box: Box, plan: RunPlan, library: Discovery, files: string[]): Promise<GalleryPlan | GalleryUnrun> {
+  const made = await galleryOf(library, { framework: plan.framework, appDir: plan.appDir, files }, readIn(box));
+  if ('unrun' in made) {
+    return made;
+  }
+  await box.sandbox.writeFiles(made.files.map((f) => ({ path: `${box.dir}/${f.path}`, content: Buffer.from(f.content) })));
+  return made.plan;
+}
+
+async function libraryIn(box: Box, plan: RunPlan): Promise<Library> {
   const listed = (await shell(box, LIST)).out.split('\n').map((f) => f.trim()).filter(Boolean);
-  return discoverIn(listed, readIn(box)).catch(() => undefined);
+  const library = await discoverIn(listed, readIn(box)).catch(() => undefined);
+  if (!library) {
+    return {};
+  }
+  const gallery = await galleryWritten(box, plan, library, listed).catch((e: unknown) => ({ unrun: `the gallery could not be written: ${reason(e)}` }));
+  return { library, gallery };
 }
 
 async function started(box: Box, plan: RunPlan, limits: RunLimits): Promise<RunOutcome> {
@@ -123,8 +140,8 @@ async function started(box: Box, plan: RunPlan, limits: RunLimits): Promise<RunO
 
   const names = namesIn((await shell(box, NAMES)).out);
   const head = (await shell(box, 'git rev-parse HEAD')).out.trim();
-  const library = await libraryIn(box);
-  return { ok: true, app: { url: box.sandbox.domain(limits.port), key, names, sha: SHA.test(head) ? head : null, stop: () => box.sandbox.stop().then(() => undefined), library } };
+  const library = await libraryIn(box, plan);
+  return { ok: true, app: { url: box.sandbox.domain(limits.port), key, names, sha: SHA.test(head) ? head : null, stop: () => box.sandbox.stop().then(() => undefined), ...library } };
 }
 
 const ARCHIVE_FILE = '/tmp/feega-repo.tgz';

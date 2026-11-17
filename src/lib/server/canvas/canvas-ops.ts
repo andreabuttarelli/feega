@@ -101,6 +101,7 @@ import { CAPTURE_DELAY_MAX_MS, delayOf } from '$lib/server/code-import/capture-w
 import { designSystemOf } from '$lib/server/code-import/design-system';
 import { githubFor } from '$lib/server/code-import/github-runtime';
 import { frameDetach, framesPush, frameStatus, frameUndo } from '$lib/server/code-push/frames-push';
+import { frameVersions } from '$lib/server/code-push/frames-versions';
 import { framesDeps, importLinker, variantDeps } from '$lib/server/code-push/frames-runtime';
 import { frameVariant } from '$lib/server/code-push/variants';
 import { ConflictChoice, frameConflicts, frameResolve } from '$lib/server/code-push/conflicts';
@@ -1184,6 +1185,12 @@ export const CANVAS_OPS = {
     run: async (ctx, input) => frameResolve(framesDeps(ctx.db, ctx), figmaScope(ctx), input.nodeId, input.choice)
   }),
 
+  github_versions: op({
+    access: Access.Read,
+    input: z.object({ nodeId: z.string(), ref: z.string().max(200).optional().describe('branch, tag or sha whose history to list; default the base branch of the link'), limit: z.number().int().positive().max(100).optional() }).strict(),
+    run: async (ctx, input) => frameVersions(framesDeps(ctx.db, ctx), { nodeId: input.nodeId, ref: input.ref, limit: input.limit ?? 30 })
+  }),
+
   github_detach: op({
     access: Access.Write,
     input: z.object({ nodeId: z.string() }).strict(),
@@ -1550,7 +1557,7 @@ export const CANVAS_OPS = {
       if (!node) {
         return NODE_NOT_FOUND;
       }
-      await renameOnCanvas(ctx.db, { orgId: ctx.orgId, canvasId: node.canvasId, ...input });
+      await renameOnCanvas(ctx.db, { orgId: ctx.orgId, canvasId: node.canvasId, ...input, actor: ctx.actor });
       return { renamed: true };
     }
   }),
