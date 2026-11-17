@@ -1,6 +1,7 @@
 <script lang="ts">
   import { SvelteSet } from 'svelte/reactivity';
-  import { SourceAction, changedRows, ciOf, CiState, popoverOf, pushAskOf, type FrameSync, type PullView } from '$lib/canvas/source-changes';
+  import { SvelteMap } from 'svelte/reactivity';
+  import { SourceAction, changedRows, ciOf, CiState, filesOfPatch, filesToPush, popoverOf, pushAskOf, pushedNote, pushLabel, rowTitle, type ChangedFile, type FrameSync, type PullView } from '$lib/canvas/source-changes';
   import { PushOutcome, pushOutcomeOf, editedFilesText } from '$lib/canvas/source-sync';
 
   type Anchor = { left: number; top: number };
@@ -19,17 +20,33 @@
   let note = $state('');
   let confirming = $state(false);
   let pushed = $state<Pushed | null>(null);
+  let reviewing = $state(false);
+  let copied = $state(false);
   const picked = new SvelteSet<string>();
+  const files = new SvelteMap<string, ChangedFile[]>();
 
   const rows = $derived(changedRows(syncs));
   const pop = $derived(open ? popoverOf(open) : null);
   const base = $derived(`/api/v1/projects/${projectId}/github/push`);
 
   $effect(() => {
+    if (!panel) {
+      return;
+    }
     for (const r of rows) {
-      picked.add(r.nodeId);
+      void loadFiles(r.nodeId);
     }
   });
+
+  async function loadFiles(nodeId: string) {
+    const body = await fetch(`/api/v1/projects/${projectId}/code-import/${nodeId}/changes`).then((r) => r.json(), () => null);
+    files.set(nodeId, filesOfPatch(String(body?.patch ?? '')));
+  }
+
+  async function copyBranch(branch: string) {
+    await navigator.clipboard.writeText(branch).catch(() => {});
+    copied = true;
+  }
 
   async function call(url: string, init: RequestInit) {
     const res = await fetch(url, { ...init, headers: { 'content-type': 'application/json' } }).catch(() => null);
@@ -74,6 +91,8 @@
       return;
     }
     busy = true;
+    reviewing = false;
+    copied = false;
     const body = await call(base, { method: 'POST', body: JSON.stringify({ ...ask, confirmSensitive }) });
     const outcome = pushOutcomeOf(body as { ok?: boolean; refusal?: string } | null);
     confirming = outcome === PushOutcome.NeedsConfirm;
@@ -103,7 +122,7 @@
 
   const hasPush = $derived(syncs.some((s) => s.link.pushBranch));
   const readOnly = $derived(rows.some((r) => !r.link.writable));
-  const updating = $derived(rows.some((r) => r.link.pushBranch));
+  const toPush = $derived(filesToPush(picked, files));
 </script>
 
 {#if open && pop && anchor}
@@ -129,8 +148,14 @@
       <label class="change">
         <input type="checkbox" checked={picked.has(row.nodeId)} onchange={(e) => (e.currentTarget.checked ? picked.add(row.nodeId) : picked.delete(row.nodeId))} />
         {#if posterOf(row.nodeId)}<img src={posterOf(row.nodeId)} alt="" />{/if}
-        <span><strong>{row.name || 'Frame'}</strong><br /><code>{popoverOf(row).file}</code> <span class="muted">{row.state}</span></span>
+        <span><strong>{rowTitle(row)}</strong> <span class="muted">{row.state}</span></span>
       </label>
+      {#each files.get(row.nodeId) ?? [] as file (file.path)}
+        <details class="file">
+          <summary><code>{file.path}</code></summary>
+          <pre>{file.diff}</pre>
+        </details>
+      {/each}
     {/each}
     {#if confirming}
       <p class="note">This push touches config, lockfiles or dotfiles.</p>
@@ -138,13 +163,26 @@
     {/if}
     {#if note}<p class="note">{note}</p>{/if}
     {#if pushed}
-      <p class="pushed">Branch <code>{pushed.branch}</code>{#if pushed.pull} · <a href={pushed.pull.url} target="_blank" rel="noopener">PR #{pushed.pull.number}</a> · {CI_LABEL[ciOf(pushed.pull)]}{/if}</p>
+      <p class="pushed" data-testid="pushed-note">{pushedNote(pushed)}{#if pushed.pull} · <a href={pushed.pull.url} target="_blank" rel="noopener">open</a> · {CI_LABEL[ciOf(pushed.pull)]}{/if}</p>
+      {#if !pushed.pull}
+        <button type="button" onclick={() => copyBranch(pushed!.branch)}>{copied ? 'Branch copied' : 'Copy branch'}</button>
+      {/if}
+    {/if}
+    {#if reviewing}
+      <div class="review" data-testid="push-review">
+        <p>These files will be pushed:</p>
+        <ul>
+          {#each toPush as path (path)}<li><code>{path}</code></li>{/each}
+        </ul>
+        <button type="button" class="primary" disabled={busy || !toPush.length} onclick={() => push()}>Push {toPush.length} files</button>
+        <button type="button" onclick={() => (reviewing = false)}>Back</button>
+      </div>
     {/if}
     <footer>
       {#if readOnly}
         <button type="button" disabled={busy || !picked.size} onclick={() => push()}>Download patch</button>
       {:else}
-        <button type="button" class="primary" disabled={busy || !picked.size} onclick={() => push()}>{updating ? 'Update PR' : 'Create PR'}</button>
+        <button type="button" class="primary" disabled={busy || !picked.size || reviewing} onclick={() => (reviewing = true)}>{pushLabel(rows)}</button>
       {/if}
       <button type="button" disabled={busy || !hasPush} onclick={undo}>Undo last push</button>
     </footer>
@@ -169,8 +207,8 @@
     padding: 10px;
   }
   .changes {
-    top: 56px;
-    right: 12px;
+    top: 72px;
+    left: 72px;
     width: 320px;
     max-height: 70vh;
     overflow: auto;
@@ -225,6 +263,17 @@
   button.primary {
     background: var(--ui-text, #111);
     color: var(--ui-surface, #fff);
+  }
+  .file pre {
+    max-height: 120px;
+    overflow: auto;
+    margin: 4px 0;
+    font-size: 11px;
+    white-space: pre;
+  }
+  .review ul {
+    margin: 4px 0 8px;
+    padding-left: 16px;
   }
   .note {
     margin: 6px 0;
