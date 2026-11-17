@@ -75,4 +75,20 @@ describe('AcpChat', () => {
 
     expect(chat.lines.at(-1)).toEqual({ line: Line.Error, text: 'spawn claude ENOENT' });
   });
+
+  it('stop aborts the running turn without an error line', async () => {
+    const fetcher = ((_url: string, init: RequestInit) =>
+      new Promise((_, reject) => {
+        init.signal!.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+      })) as unknown as typeof fetch;
+    const chat = new AcpChat(fetcher);
+
+    const turn = chat.send('claude', 'x');
+    expect(chat.busy).toBe(true);
+    chat.stop();
+    await turn;
+
+    expect(chat.busy).toBe(false);
+    expect(chat.lines).toEqual([{ line: Line.User, text: 'x' }]);
+  });
 });
