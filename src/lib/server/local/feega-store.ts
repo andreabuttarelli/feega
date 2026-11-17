@@ -1,3 +1,5 @@
+import { standInFill } from '$lib/motion/stand-in-fill';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { rename, writeFile } from 'node:fs/promises';
 import { basename } from 'node:path';
@@ -83,7 +85,7 @@ function seed(file: FeegaFile, blobs: FeegaBlobs): { tables: Tables; storage: Bl
     ['orgs_members', [{ ...org, id: crypto.randomUUID(), user_id: LOCAL_USER_ID, role: 'owner', created_at: at }]],
     ['projects', [{ ...org, id: place.projectId, name: file.manifest.canvasName, slug: 'local', mode: 'standard', brand_id: null, deleted_at: null, created_at: at, updated_at: at }]],
     ['canvases', [{ ...org, id: place.canvasId, project_id: place.projectId, name: file.manifest.canvasName, viewport: null, deleted_at: null, created_at: at, updated_at: at }]],
-    ['nodes', file.canvas.nodes.map((n) => ({ ...org, id: n.id, project_id: place.projectId, canvas_id: place.canvasId, type: n.type, display_name: n.displayName, x: n.position.x, y: n.position.y, z: n.position.z, width: n.size.width, height: n.size.height, data: n.data, version: 1, deleted_at: null, created_at: at, updated_at: at }))],
+    ['nodes', file.canvas.nodes.map((n) => ({ ...org, id: n.id, project_id: place.projectId, canvas_id: place.canvasId, type: n.type, display_name: n.displayName, x: n.position.x, y: n.position.y, z: n.position.z, width: n.size.width, height: n.size.height, data: withStandIn(n.data, file.canvas.heads[n.id]?.doc), version: 1, deleted_at: null, created_at: at, updated_at: at }))],
     ['nodes_connections', file.canvas.connections.map((c) => ({ ...org, id: c.id, canvas_id: place.canvasId, source_node_id: c.sourceNodeId, target_node_id: c.targetNodeId, source_handle: c.sourceHandle, target_handle: c.targetHandle, mode: c.mode, deleted_at: null, created_at: at }))],
     ['motion_revisions', Object.entries(file.canvas.heads).map(([nodeId, head]) => ({ ...org, id: crypto.randomUUID(), node_id: nodeId, version: head.version, doc: head.doc, summary: null, actor_kind: 'system', actor_id: null, agent_key: null, sealed: true, created_at: file.manifest.exportedAt }))],
     ['canvas_events', (file.canvas.events ?? []).map((e) => ({ ...e, org_id: LOCAL_ORG_ID, canvas_id: place.canvasId }))],
@@ -91,6 +93,18 @@ function seed(file: FeegaFile, blobs: FeegaBlobs): { tables: Tables; storage: Bl
     ['org_fonts', assets.filter((a) => isFont(a.mime_type) && a.url).map((a) => orgFontRow(a, at))]
   ]);
   return { tables, storage, place };
+}
+
+function withStandIn(data: Record<string, unknown>, doc: unknown): Record<string, unknown> {
+  if (data.standInFill || !doc) {
+    return data;
+  }
+  try {
+    const fill = standInFill(doc as MotionDoc);
+    return fill ? { ...data, standInFill: fill } : data;
+  } catch {
+    return data;
+  }
 }
 
 const isFont = (mimeType: unknown) => FONT_MIME_TYPES.includes(String(mimeType));

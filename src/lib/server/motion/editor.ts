@@ -1,3 +1,4 @@
+import { standInFill } from '$lib/motion/stand-in-fill';
 import { isInteractive } from '@feega/motion-core/motion/interactive/settings';
 import type { Db } from '$lib/server/db/client';
 import { uploadName } from '$lib/motion/asset-name';
@@ -137,7 +138,7 @@ export function assetUrls(assets: MotionAsset[]): Record<string, string> {
 
 export const headPatch = (doc: MotionDoc, version: number, nodeId: string) => {
   const homes = mainHomesOf(doc, nodeId);
-  return { docHeadRevision: version, format: formatOf(doc), interactive: isInteractive(doc), mainHomes: homes.length ? homes : undefined };
+  return { docHeadRevision: version, format: formatOf(doc), interactive: isInteractive(doc), mainHomes: homes.length ? homes : undefined, standInFill: standInFill(doc) ?? undefined };
 };
 
 export async function saveMotionDoc(
