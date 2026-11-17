@@ -1147,7 +1147,7 @@ export const CANVAS_OPS = {
 
   github_push: op({
     access: Access.Write,
-    input: z.object({ name: z.string().min(1).max(100).describe('names the branch feega/<name>; later pushes update its pull request until it is merged, then a new branch opens'), nodeIds: z.array(z.string()).min(1).max(50).describe('code frames imported from one GitHub repo'), title: z.string().max(200).optional(), body: z.string().max(10_000).optional(), confirmSensitive: z.boolean().optional().describe('true after the user agreed to change config files, lockfiles or dotfiles') }).strict(),
+    input: z.object({ name: z.string().min(1).max(100).describe('names the branch feega/<name>; later pushes update its pull request until it is merged, then a new branch opens'), nodeIds: z.array(z.string()).min(1).max(50).describe('code frames imported from one GitHub repo'), title: z.string().max(200).optional(), body: z.string().max(10_000).optional(), confirmSensitive: z.boolean().optional().describe('true after the user agreed to change config files, lockfiles or dotfiles'), mains: z.array(z.string()).max(50).optional().describe('frames whose instance edits go to the main component file instead of props at the usage site') }).strict(),
     run: async (ctx, input) => framesPush(framesDeps(ctx.db, ctx), figmaScope(ctx), input)
   }),
 

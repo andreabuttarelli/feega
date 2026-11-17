@@ -1,6 +1,6 @@
 <script lang="ts">
   import { SvelteSet } from 'svelte/reactivity';
-  import { SourceAction, changedRows, ciOf, CiState, popoverOf, pushAskOf, type FrameSync, type PullView } from '$lib/canvas/source-changes';
+  import { SourceAction, changedRows, ciOf, CiState, impactOf, popoverOf, pushAskOf, type FrameSync, type PullView } from '$lib/canvas/source-changes';
   import { PushOutcome, pushOutcomeOf, editedFilesText } from '$lib/canvas/source-sync';
 
   type Anchor = { left: number; top: number };
@@ -20,6 +20,7 @@
   let confirming = $state(false);
   let pushed = $state<Pushed | null>(null);
   const picked = new SvelteSet<string>();
+  const mains = new SvelteSet<string>();
 
   const rows = $derived(changedRows(syncs));
   const pop = $derived(open ? popoverOf(open) : null);
@@ -69,7 +70,7 @@
   }
 
   async function push(confirmSensitive = false) {
-    const ask = pushAskOf(rows, picked, DEFAULT_NAME);
+    const ask = pushAskOf(rows, picked, DEFAULT_NAME, mains);
     if (!ask) {
       return;
     }
@@ -130,8 +131,12 @@
         <input type="checkbox" checked={picked.has(row.nodeId)} onchange={(e) => (e.currentTarget.checked ? picked.add(row.nodeId) : picked.delete(row.nodeId))} />
         {#if row.link.beforePoster}<img src={assetUrl(row.link.beforePoster)} alt="Before" title="Before" />{/if}
         {#if posterOf(row.nodeId)}<img src={posterOf(row.nodeId)} alt="After" title="After" />{/if}
-        <span><strong>{row.name || 'Frame'}</strong><br /><code>{popoverOf(row).file}</code> <span class="muted">{row.state}</span></span>
+        <span><strong>{row.name || 'Frame'}</strong><br /><code>{popoverOf(row).file}</code> <span class="muted">{row.state}</span>{#if impactOf(row)}<br /><span class="note">{impactOf(row)}</span>{/if}</span>
       </label>
+      {#each row.proposals ?? [] as p (p.component)}
+        <p class="muted">No prop on <code>{p.component}</code> for {p.props.join(', ')}: ask the agent to add one, or apply to the main component.</p>
+      {/each}
+      <label class="change"><input type="checkbox" checked={mains.has(row.nodeId)} onchange={(e) => (e.currentTarget.checked ? mains.add(row.nodeId) : mains.delete(row.nodeId))} /> Apply instance edits to main component</label>
     {/each}
     {#if confirming}
       <p class="note">This push touches config, lockfiles or dotfiles.</p>
