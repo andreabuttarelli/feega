@@ -18,11 +18,15 @@ a different scale on each axis (×0.87 in x, ×0.94 in y at zoom 0.05). The page
 pushed down and stretched. `heldBox` keeps a held layer at the box it was drawn at, moved with the
 frame and never rescaled.
 
-**Pictures one frame at a time, first come first served.** `pictureTurns` (#2325) let one frame
-fetch pictures while any on-screen frame lacked a layer. Turns were handed out FIFO, and a frame
-held its turn until every one of its pictures had decoded. Frames whose vectors were already drawn
-waited behind each other in build order, not nearest-first. Turns are now ranked at hand-out time
-by `sightRank`: on-screen frames by distance from the centre first, then the rest. Three frames
-fetch pictures at a time while on-screen sources are still owed (local mode). A frame counts as
-owing its source until it is built (`owesVectors`), which no longer depends on its vectors being
-shown, because a postered frame now never shows them.
+**Pictures one frame at a time, then all at once.** `pictureTurns` (#2325) let one frame fetch
+pictures while any on-screen frame lacked a layer. Turns were handed out FIFO, and a frame held its
+turn until every one of its pictures had decoded. Frames whose vectors were already drawn waited
+behind each other in build order. When the last on-screen frame got its vectors, every waiting
+frame started at once: on posters36, ~900 image requests in one second at 10 s, off-screen frames
+included, after a 6 s trickle. A frame built just after that queued behind all of them.
+
+Now `sightRank` ranks turns at hand-out time: on-screen frames by distance from the centre first,
+then the rest. Local mode (`pictureLimitsFor`) lets 3 frames fetch while on-screen sources are
+still owed, and 6 after, so the burst is capped and a newly visible frame goes ahead of off-screen
+ones. Hosted stays unbounded. A frame counts as owing its source until it is built
+(`owesVectors`), not until its vectors show, because a postered frame now never shows them.
