@@ -1,5 +1,4 @@
-import type { FrameStep } from './frame-multi';
-import { editBody, fieldValue, previewOf, type LiveEditBody, type LiveField, type LivePick, type LivePreview } from './live-fields';
+import type { LiveEditBody } from './live-fields';
 
 const PATH = '/api/v1/local/live-edit';
 
@@ -27,33 +26,4 @@ export async function livePush(): Promise<{ ok: boolean; branch?: string; messag
   const res = await posted(`${PATH}/push`, {});
   const body = await res.json().catch(() => null);
   return res.ok ? { ok: true, branch: body.branch } : { ok: false, message: body?.message };
-}
-
-export type LiveEditOutcome = { ok: true; step: FrameStep } | { ok: false; reason: string };
-
-export async function editLive(api: LiveApi, pick: LivePick, field: LiveField, value: string, show: (preview: LivePreview) => void): Promise<LiveEditOutcome> {
-  const body = editBody(pick, field, value);
-  const was = fieldValue(field, pick);
-  show(previewOf(field, value));
-
-  const first = await api.edit(body);
-  if (!first.ok) {
-    show(previewOf(field, was));
-    return first;
-  }
-
-  let sha = first.sha;
-  const step: FrameStep = {
-    back: () => {
-      show(previewOf(field, was));
-      void api.undo(sha);
-    },
-    forward: () => {
-      show(previewOf(field, value));
-      void api.edit(body).then((again) => {
-        sha = again.ok ? again.sha : sha;
-      });
-    }
-  };
-  return { ok: true, step };
 }

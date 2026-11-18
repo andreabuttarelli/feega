@@ -3,8 +3,14 @@
   import { liveUrl, type LiveFrame } from '$lib/canvas/live-frame';
   import { LiveAsk as Ask, pickOf, type LivePreview, type LiveRect } from '$lib/canvas/live-fields';
   import { dropLive, liveSelection, selectLive } from '$lib/canvas/live-selection.svelte';
+  import { liveSession } from '$lib/canvas/live-session';
+  import { liveApi, liveChanges, livePush, type LiveChangesView } from '$lib/canvas/live-edit-client';
+  import type { FrameStep } from '$lib/canvas/frame-multi';
+  import { frameProperties } from './frame-properties.svelte';
+  import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+  import { untrack } from 'svelte';
 
-  let { id, live, mode, origin, poster, selected, onsnapshot }: { id: string; live: LiveFrame; mode: FrameMode; origin: string | null; poster: string | null; selected: boolean; onsnapshot: () => void } = $props();
+  let { id, live, mode, origin, poster, selected, onsnapshot, onstep, onfail }: { id: string; live: LiveFrame; mode: FrameMode; origin: string | null; poster: string | null; selected: boolean; onsnapshot: () => void; onstep: (step: FrameStep) => void; onfail: (reason: string) => void } = $props();
 
   const INSPECT = 'feega:inspect';
   const INSPECT_RESULT = 'feega:inspect:result';
@@ -22,6 +28,37 @@
   const showsLive = $derived(origin !== null && mode === FrameMode.Live);
   const editing = $derived(selected && showsLive);
   const picked = $derived(liveSelection.current?.nodeId === id ? liveSelection.current : null);
+  const source = $derived(picked?.pick?.source ?? null);
+  let changes = $state<LiveChangesView | null>(null);
+  let pushNote = $state('');
+
+  const loadChanges = () => liveChanges().then((next) => (changes = next), () => (changes = null));
+
+  function written(step: FrameStep) {
+    onstep(step);
+    setTimeout(loadChanges, REFRESH_MS);
+  }
+
+  $effect(() => {
+    const pick = source ? untrack(() => picked?.pick) : null;
+    if (!pick) {
+      return;
+    }
+    frameProperties.publish(id, liveSession(pick, { api: liveApi, preview, stepped: written, failed: onfail }), FEEGA_TOKENS, null);
+    frameProperties.name = pick.source;
+    return () => frameProperties.clear();
+  });
+
+  $effect(() => {
+    if (editing) {
+      void loadChanges();
+    }
+  });
+
+  async function push() {
+    const out = await livePush();
+    pushNote = out.ok ? `Pushed on ${out.branch}` : `Not pushed: ${out.message ?? 'unknown error'}`;
+  }
 
   $effect(() => {
     if (showsLive) {
@@ -128,6 +165,11 @@
       {/if}
       {#if picked?.untagged}
         <span class="badge rounded-full" data-testid="live-frame-untagged">Not tagged · run feega init</span>
+      {:else if changes?.files.length}
+        <span class="badge changes rounded-full" data-testid="live-changes">
+          {pushNote || `${changes.files.length} file${changes.files.length === 1 ? '' : 's'} on ${changes.branch}`}
+          <button type="button" class="rounded-full" data-testid="live-push" onclick={(e) => (e.stopPropagation(), void push())}>Push</button>
+        </span>
       {/if}
     </div>
   {/if}
@@ -146,6 +188,8 @@
   .poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
   .badge { position: absolute; left: 8px; bottom: 8px; font-size: 11px; padding: 3px 8px; background: rgba(0, 0, 0, 0.7); color: #fff; }
   .edit { position: absolute; inset: 0; cursor: default; }
+  .changes { display: flex; align-items: center; gap: 8px; }
+  .changes button { font: inherit; padding: 1px 8px; border: 0; background: #fff; color: #000; cursor: pointer; }
   .outline { position: absolute; pointer-events: none; box-sizing: border-box; }
   .outline.hover { border: 1px solid var(--ui-accent, #0a84ff); }
   .outline.picked { border: 2px solid var(--ui-accent, #0a84ff); }

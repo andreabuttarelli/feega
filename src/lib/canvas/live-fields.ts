@@ -50,34 +50,11 @@ export const CLASS_RULE: Record<Exclude<LiveProp, LiveProp.Text>, ClassRule> = {
   [LiveProp.Radius]: { make: (v) => (v ? `rounded-${v}` : 'rounded'), owns: (t) => (t === 'rounded' || t.startsWith('rounded-')) && !RADIUS_SIDE.test(t) }
 };
 
-export enum FieldKind {
-  Text = 'text',
-  Colour = 'colour',
-  Px = 'px',
-  Weight = 'weight'
-}
-
-export type LiveField = { key: string; label: string; prop: LiveProp; side?: Side; css: string[]; kind: FieldKind };
-
-export const LIVE_FIELDS: LiveField[] = [
-  { key: 'text', label: 'Text', prop: LiveProp.Text, css: [], kind: FieldKind.Text },
-  { key: 'color', label: 'Text colour', prop: LiveProp.Color, css: ['color'], kind: FieldKind.Colour },
-  { key: 'fill', label: 'Fill', prop: LiveProp.Fill, css: ['background-color'], kind: FieldKind.Colour },
-  { key: 'size', label: 'Font size', prop: LiveProp.FontSize, css: ['font-size'], kind: FieldKind.Px },
-  { key: 'weight', label: 'Weight', prop: LiveProp.FontWeight, css: ['font-weight'], kind: FieldKind.Weight },
-  { key: 'px', label: 'Padding X', prop: LiveProp.Padding, side: Side.X, css: ['padding-left', 'padding-right'], kind: FieldKind.Px },
-  { key: 'py', label: 'Padding Y', prop: LiveProp.Padding, side: Side.Y, css: ['padding-top', 'padding-bottom'], kind: FieldKind.Px },
-  { key: 'mt', label: 'Margin top', prop: LiveProp.Margin, side: Side.Top, css: ['margin-top'], kind: FieldKind.Px },
-  { key: 'mb', label: 'Margin bottom', prop: LiveProp.Margin, side: Side.Bottom, css: ['margin-bottom'], kind: FieldKind.Px },
-  { key: 'gap', label: 'Gap', prop: LiveProp.Gap, css: ['gap'], kind: FieldKind.Px },
-  { key: 'radius', label: 'Radius', prop: LiveProp.Radius, css: ['border-radius'], kind: FieldKind.Px }
-];
-
 export type LiveRect = { x: number; y: number; width: number; height: number };
 
-export type LivePick = { source: string; rect: LiveRect; styles: Record<string, string>; classes: string; text: string | null; rem: number | null };
+export type LivePick = { source: string; rect: LiveRect; styles: Record<string, string>; classes: string; text: string | null; rem: number | null; viewport: number | null };
 
-type InspectResult = { source: { file: string; line: number; col: number }; rect?: LiveRect; styles?: Record<string, string>; classes?: string; text?: string | null; rem?: number };
+type InspectResult = { source: { file: string; line: number; col: number }; rect?: LiveRect; styles?: Record<string, string>; classes?: string; text?: string | null; rem?: number; viewport?: number };
 
 const NO_RECT: LiveRect = { x: 0, y: 0, width: 0, height: 0 };
 
@@ -86,35 +63,9 @@ export function pickOf(result: InspectResult | null | undefined): LivePick | nul
     return null;
   }
   const { file, line, col } = result.source;
-  return { source: `${file}:${line}:${col}`, rect: result.rect ?? NO_RECT, styles: result.styles ?? {}, classes: result.classes ?? '', text: result.text ?? null, rem: result.rem ?? null };
+  return { source: `${file}:${line}:${col}`, rect: result.rect ?? NO_RECT, styles: result.styles ?? {}, classes: result.classes ?? '', text: result.text ?? null, rem: result.rem ?? null, viewport: result.viewport ?? null };
 }
-
-export const fieldValue = (field: LiveField, pick: LivePick) => (field.kind === FieldKind.Text ? (pick.text ?? '') : (pick.styles[field.css[0]] ?? ''));
-
-export function classOf(field: LiveField, classes: string): string | null {
-  if (field.prop === LiveProp.Text) {
-    return null;
-  }
-  const rule = CLASS_RULE[field.prop];
-  return classes.split(/\s+/).find((t) => t && !t.includes(':') && rule.owns(t, field.side ?? Side.All)) ?? null;
-}
-
-const BARE_NUMBER = /^-?\d+(\.\d+)?$/;
-
-const cssValue = (field: LiveField, value: string) => (field.kind === FieldKind.Px && BARE_NUMBER.test(value.trim()) ? `${value.trim()}px` : value);
 
 export type LivePreview = { text?: string; style?: Record<string, string> };
 
-export function previewOf(field: LiveField, value: string): LivePreview {
-  if (field.kind === FieldKind.Text) {
-    return { text: value };
-  }
-  return { style: Object.fromEntries(field.css.map((name) => [name, cssValue(field, value)])) };
-}
-
-export type LiveEditBody = { at: string; prop: LiveProp; side?: Side; value: string; was: string; rem?: number };
-
-export function editBody(pick: LivePick, field: LiveField, value: string): LiveEditBody {
-  return { at: pick.source, prop: field.prop, ...(field.side ? { side: field.side } : {}), value: cssValue(field, value), was: fieldValue(field, pick), ...(pick.rem ? { rem: pick.rem } : {}) };
-}
-
+export type LiveEditBody = { at: string; prop: LiveProp; side?: Side; value: string; was: string; rem?: number; viewport?: number };
