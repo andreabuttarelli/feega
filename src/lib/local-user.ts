@@ -1,5 +1,5 @@
 import { env as publicEnv } from '$env/dynamic/public';
-import type { SourceAsks } from '$lib/canvas/core/frame-sources';
+import { HOSTED_SOURCE_ASKS, type SourceAsks } from '$lib/canvas/core/frame-sources';
 
 export const LOCAL_ORG_ID = '00000000-0000-4000-8000-00000000f001';
 export const LOCAL_USER_ID = '00000000-0000-4000-8000-00000000f002';
@@ -8,7 +8,6 @@ export const LOCAL_USER = { id: LOCAL_USER_ID, email: 'you@feega.local', created
 export const isLocalMode = (env: Record<string, string | undefined>) => env.PUBLIC_FEEGA_LOCAL === '1';
 
 const LOCAL_SOURCE_ASKS: SourceAsks = { framesPerAsk: 2, open: 2 };
-const HOSTED_SOURCE_ASKS: SourceAsks = { framesPerAsk: 3, open: 6 };
 
 export const sourceAsksFor = (env: Record<string, string | undefined>): SourceAsks => (isLocalMode(env) ? LOCAL_SOURCE_ASKS : HOSTED_SOURCE_ASKS);
 

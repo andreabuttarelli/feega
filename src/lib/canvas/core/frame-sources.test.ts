@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { batchedSources as batchedWith, sourceReader } from './frame-sources';
+import { batchedSources as batchedWith, sourceReader, HOSTED_SOURCE_ASKS } from './frame-sources';
 
 const ASKS = { framesPerAsk: 2, open: 2 };
 const batchedSources: typeof batchedWith = (fetcher, kept, cacheOf) => batchedWith(fetcher, kept, cacheOf, () => ASKS);
@@ -124,6 +124,25 @@ describe('warming the sources of every frame on open', () => {
 
     expect(asked.flatMap((u) => new URLSearchParams(u.split('?')[1]).get('ids')!.split(','))).toEqual(ids);
     expect(Math.max(...asked.map((u) => new URLSearchParams(u.split('?')[1]).get('ids')!.split(',').length))).toBeLessThanOrEqual(ASKS.framesPerAsk);
+  });
+
+  it('asks the hosted sizes when no route sized them', async () => {
+    const pending: (() => void)[] = [];
+    const many = Array.from({ length: 40 }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`);
+    const read = batchedWith((u) => new Promise<Response>((settle) => pending.push(() => settle(json({ tokens: {}, frames: Object.fromEntries(new URLSearchParams(u.split('?')[1]).get('ids')!.split(',').map((id) => [id, { revision: 1, doc: { id }, assets: {} }])) })))));
+
+    read.warm(many.map(url));
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(pending.length).toBe(HOSTED_SOURCE_ASKS.open);
+  });
+
+  it('passes a share-view source straight through, unbatched, so no sizing reaches it', async () => {
+    const asked: string[] = [];
+    const read = batchedWith(async (u) => (asked.push(u), json({ revision: 1, doc: { s: 1 }, assets: {}, tokens: {} })));
+
+    expect((await read('/s/tok/source/n1'))?.doc).toEqual({ s: 1 });
+    expect(asked).toEqual(['/s/tok/source/n1']);
   });
 
   it('hands the nearest frame its source without waiting for the rest (a 36-frame canvas waited 10 s for one 38 MB answer)', async () => {

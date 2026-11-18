@@ -4,8 +4,8 @@ import { keptKey, scopedCache, type CacheScope, type FrameCache } from './frame-
 
 export type SourceAsks = { framesPerAsk: number; open: number };
 
-const ONE_FRAME_AT_A_TIME: SourceAsks = { framesPerAsk: 1, open: 1 };
-let sized = ONE_FRAME_AT_A_TIME;
+export const HOSTED_SOURCE_ASKS: SourceAsks = { framesPerAsk: 3, open: 6 };
+let sized = HOSTED_SOURCE_ASKS;
 
 export function sizeSourceAsks(asks: SourceAsks) {
   sized = asks;
