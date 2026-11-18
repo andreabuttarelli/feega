@@ -17,16 +17,16 @@ const READY_GIVE_UP_MS = 120_000;
 export const LANDINGS_FIXTURE_PLACE = { projectId: PROJECT_ID, canvasId: CANVAS_ID };
 export const LANDINGS_FIXTURE_CENTRE = { x: (SITES.length * COLUMN_WIDTH) / 2, y: 4000 };
 
-function emptyCanvas(file) {
+export function emptyCanvas(file) {
   const manifest = { format: 'feega', version: 1, exportedAt: EXPORTED_AT, canvasName: 'landings bench', source: { projectId: PROJECT_ID, canvasId: CANVAS_ID } };
   const canvas = { nodes: [], connections: [], heads: {}, assets: [] };
   writeFileSync(file, zipSync({ 'manifest.json': strToU8(JSON.stringify(manifest)), 'canvas.json': strToU8(JSON.stringify(canvas)) }));
 }
 
-async function untilReady() {
+export async function untilReady(base = BASE) {
   const started = Date.now();
   while (Date.now() - started < READY_GIVE_UP_MS) {
-    const up = await fetch(`${BASE}/favicon-16.png`).then((r) => r.ok).catch(() => false);
+    const up = await fetch(`${base}/favicon-16.png`).then((r) => r.ok).catch(() => false);
     if (up) {
       return;
     }
