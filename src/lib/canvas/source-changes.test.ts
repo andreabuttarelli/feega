@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SourceAction, pushLabel, changedRows, popoverOf, pushAskOf, ciOf, CiState, filesOfPatch, filesToPush, pushedNote, rowTitle, type FrameSync } from './source-changes';
+import { SourceAction, pushLabel, changedRows, popoverOf, pushAskOf, ciOf, CiState, filesOfPatch, filesToPush, impactOf, pushedNote, rowTitle, type FrameSync } from './source-changes';
 
 const sync = (over: Partial<FrameSync> = {}): FrameSync => ({
   nodeId: 'n1',
@@ -47,6 +47,15 @@ describe('il pannello Changes', () => {
     expect(ciOf(pull('open', [{ conclusion: null }]))).toBe(CiState.Running);
     expect(ciOf(pull('open', [{ conclusion: 'success' }, { conclusion: 'failure' }]))).toBe(CiState.Failed);
     expect(ciOf(pull('open', [{ conclusion: 'success' }, { conclusion: 'skipped' }]))).toBe(CiState.Passed);
+  });
+
+  it('una modifica a un file condiviso dice quante pagine tocca', () => {
+    expect(impactOf(sync({ affected: [{ path: 'components/Button.tsx', pages: 3 }] }))).toBe('3 pages affected');
+    expect(impactOf(sync())).toBeNull();
+  });
+
+  it('"applica al componente main" manda il frame tra i main', () => {
+    expect(pushAskOf([sync({ nodeId: 'a' })], new Set(['a']), 'home', new Set(['a']))).toEqual({ name: 'home', nodeIds: ['a'], mains: ['a'] });
   });
 });
 

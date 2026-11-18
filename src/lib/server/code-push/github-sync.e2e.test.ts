@@ -2,13 +2,16 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { SourceEdit } from '$lib/server/code-import/write-back';
-import { framesPush, frameUndo } from './frames-push';
+import { framesPush, frameStatus, frameUndo, type FrameStatus } from './frames-push';
 import { linkImported } from './import-link';
 import { ComponentRole, EntryKind } from './link';
 import type { Pushed, Undone } from './push';
-import { fixtureDeps, fixtureWorld, H1_COLUMN, H1_LINE, memoryLinks, NO_SCOPE, ROUTES, USER_BRANCH, USER_DIRTY, type FrameEdits, type World } from './github-sync.fixture';
+import { BUTTON_COLUMN, BUTTON_LINE, fixtureDeps, fixtureWorld, H1_COLUMN, H1_LINE, memoryLinks, NO_SCOPE, ROUTES, USER_BRANCH, USER_DIRTY, type FrameEdits, type World } from './github-sync.fixture';
 
 const FRAME = 'frame-shop';
+
+const inButton = { file: 'components/Button.tsx', line: BUTTON_LINE, column: BUTTON_COLUMN };
+const pricingButton = { file: 'app/pricing/page.tsx', line: 7, column: 6 };
 
 const h1 = (look: SourceEdit['look'], was: SourceEdit['was']): SourceEdit => ({ at: { file: 'app/page.tsx', line: H1_LINE, column: H1_COLUMN }, look, was });
 
@@ -85,5 +88,38 @@ describe('GitHub sync su un repo Next.js 15 + Tailwind', () => {
     expect(await world.run(['--git-dir', world.origin, 'rev-parse', `${undone.sha}^`]).catch(() => null)).toBe(second.sha);
     expect(await world.changed(second.sha, undone.sha)).toEqual(['app/page.tsx']);
     expect(await world.at(undone.sha, 'app/page.tsx')).toContain('Ship today');
+  });
+
+  it('una modifica sul componente main cambia un solo file e dichiara tre pagine toccate', async () => {
+    const deps = fixtureDeps(world, links, edits);
+    edits.set(FRAME, [{ at: inButton, look: { color: '#e11d48' }, was: { color: '#ffffff' } }]);
+
+    const status = (await frameStatus(deps, NO_SCOPE, FRAME)) as FrameStatus;
+    const out = (await framesPush(deps, NO_SCOPE, { name: 'button', nodeIds: [FRAME] })) as Pushed;
+
+    expect(status.affected).toEqual([{ path: 'components/Button.tsx', pages: 3 }]);
+    expect(await world.changed('main', out.branch)).toEqual(['components/Button.tsx']);
+    expect(await world.at(out.branch, 'components/Button.tsx')).toContain('#e11d48');
+  });
+
+  it('una modifica su un’istanza diventa una prop in quel solo punto d’uso', async () => {
+    edits.set(FRAME, [{ at: inButton, usage: pricingButton, look: { text: 'Buy today' }, was: { text: 'Buy now' } }]);
+
+    const out = (await framesPush(fixtureDeps(world, links, edits), NO_SCOPE, { name: 'pricing cta', nodeIds: [FRAME] })) as Pushed;
+
+    expect(await world.changed('main', out.branch)).toEqual(['app/pricing/page.tsx']);
+    expect(await world.at(out.branch, 'app/pricing/page.tsx')).toContain('<Button label="Buy today" />');
+    expect(await world.at(out.branch, 'components/Button.tsx')).toBe(await world.at('main', 'components/Button.tsx'));
+  });
+
+  it('un’istanza senza prop adatta propone di aggiungerla; "applica al main" scrive il componente', async () => {
+    const deps = fixtureDeps(world, links, edits);
+    edits.set(FRAME, [{ at: inButton, usage: pricingButton, look: { color: '#e11d48' }, was: { color: '#ffffff' } }]);
+
+    const status = (await frameStatus(deps, NO_SCOPE, FRAME)) as FrameStatus;
+    const out = (await framesPush(deps, NO_SCOPE, { name: 'to main', nodeIds: [FRAME], mains: [FRAME] })) as Pushed;
+
+    expect(status.proposals).toEqual([{ component: 'components/Button.tsx', usage: pricingButton, props: ['color'] }]);
+    expect(await world.changed('main', out.branch)).toEqual(['components/Button.tsx']);
   });
 });

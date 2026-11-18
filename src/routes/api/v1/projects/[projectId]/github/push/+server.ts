@@ -15,7 +15,8 @@ const pushBody = z.object({
   body: z.string().max(10_000).optional(),
   since: z.object({ branch: z.string().max(200), sha: SHA }).optional(),
   base: z.string().max(200).optional(),
-  confirmSensitive: z.boolean().optional()
+  confirmSensitive: z.boolean().optional(),
+  mains: z.array(z.string().min(1)).max(MAX_FRAMES).optional()
 });
 
 const userScope = (scope: ProjectScope) => ({ ...scope, actor: { kind: 'user' as const, id: scope.userId } });

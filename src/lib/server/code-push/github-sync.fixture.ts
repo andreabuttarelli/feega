@@ -2,7 +2,8 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { CodeScope } from '$lib/server/code-import/canvas-import';
-import { applyEdits, type SourceEdit } from '$lib/server/code-import/write-back';
+import type { SourceEdit } from '$lib/server/code-import/write-back';
+import { EditTarget, routedEdits } from '$lib/server/code-import/instance-edits';
 import { git } from './git-cli';
 import type { FramesDeps } from './frames-push';
 import { linkKey, type CodeLink } from './link';
@@ -24,9 +25,9 @@ export default function Page() {
 
 export const BUTTON = `'use client';
 
-export function Button({ label, tone = 'primary' }: { label: string; tone?: 'primary' | 'ghost' }) {
+export function Button({ label }: { label: string }) {
   return (
-    <button className={tone === 'primary' ? 'rounded-md bg-blue-600 px-4 py-2 text-white' : 'rounded-md px-4 py-2'} onClick={() => console.log('clicked', label)}>
+    <button className="rounded-md bg-blue-600 px-4 py-2 text-white" onClick={() => console.log('clicked', label)}>
       {label}
     </button>
   );
@@ -102,6 +103,7 @@ export function memoryLinks(): LinkStore & { every: () => { nodeId: string; link
     all: async (id) => [...of(id).values()],
     read: async (id) => [...of(id).values()][0] ?? null,
     save: async (id, link) => Boolean(of(id).set(linkKey(link), link)),
+    inProject: async () => [...saved.values()].flatMap((links) => [...links.values()]),
     remove: async (id) => saved.delete(id),
     every: () => [...saved].flatMap(([nodeId, links]) => [...links.values()].map((link) => ({ nodeId, link })))
   };
@@ -116,9 +118,9 @@ export function fixtureDeps(world: World, links: LinkStore, edits: FrameEdits): 
     host: async () => host,
     links,
     lock: memoryLock(),
-    edits: async (_scope, nodeId) => {
-      const done = await applyEdits(edits.get(nodeId) ?? [], read);
-      return { repo: world.clone, kind: 'folder', files: done.files.map((f) => ({ path: f.path, content: f.after })), skipped: done.skipped };
+    edits: async (_scope, nodeId, target = EditTarget.Instance) => {
+      const done = await routedEdits(edits.get(nodeId) ?? [], read, target);
+      return { repo: world.clone, kind: 'folder', files: done.files.map((f) => ({ path: f.path, content: f.after })), skipped: done.skipped, proposals: done.proposals };
     }
   };
 }

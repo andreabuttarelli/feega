@@ -8,7 +8,7 @@ export type SourceAt = { file: string; line: number; column: number };
 
 export type Spot = { tag: string; cls: string };
 
-export type SourceEdit = { at: SourceAt; look: Look; was: Look; spot?: Spot; cond?: string; view?: string };
+export type SourceEdit = { at: SourceAt; look: Look; was: Look; spot?: Spot; cond?: string; view?: string; usage?: SourceAt };
 
 export type FileChange = { path: string; before: string; after: string };
 
@@ -49,12 +49,13 @@ export function editsOf(doc: MotionDoc): SourceEdit[] {
   for (const clip of allClips(doc)) {
     const at = clip.source ? atOf(clip.source.at) : null;
     const look = at ? unbound(clip, changedLook(clip, side)) : {};
-    const key = `${clip.source?.at}|${clip.source?.cond ?? ''}`;
+    const key = `${clip.source?.at}|${clip.source?.via ?? ''}|${clip.source?.cond ?? ''}`;
     if (!at || isGalleryFile(at.file) || !Object.keys(look).length || byAt.has(key)) {
       continue;
     }
-    const { tag, cls, cond } = clip.source!;
-    byAt.set(key, { at, look, was: clip.source!.was, ...(tag ? { spot: { tag, cls: cls ?? '' } } : {}), ...(cond ? { cond } : {}) });
+    const { tag, cls, cond, via } = clip.source!;
+    const usage = via ? atOf(via) : null;
+    byAt.set(key, { at, look, was: clip.source!.was, ...(tag ? { spot: { tag, cls: cls ?? '' } } : {}), ...(cond ? { cond } : {}), ...(usage ? { usage } : {}) });
   }
   return [...byAt.values(), ...viewEditsOf(doc)];
 }

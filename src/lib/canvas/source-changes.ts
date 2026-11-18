@@ -15,7 +15,11 @@ export type PullView = { number: number; url: string; status: string; checks: { 
 
 export type LinkView = { entry: string; appRoot: string; baseSha: string; baseBranch: string; writable: boolean; route?: string; pushBranch?: string; pullNumber?: number; beforePoster?: string };
 
-export type FrameSync = { nodeId: string; name: string; state: string; link: LinkView; push: { pull?: PullView | null } | null };
+export type Affected = { path: string; pages: number };
+
+export type Proposal = { component: string; props: string[] };
+
+export type FrameSync = { nodeId: string; name: string; state: string; link: LinkView; push: { pull?: PullView | null } | null; affected?: Affected[]; proposals?: Proposal[] };
 
 export type Popover = { file: string; commit: string; branch: string; actions: SourceAction[] };
 
@@ -40,13 +44,21 @@ export const changedRows = (syncs: readonly FrameSync[]) => syncs.filter((s) => 
 
 const PUSH_PREFIX = 'feega/';
 
-export function pushAskOf(rows: readonly FrameSync[], picked: ReadonlySet<string>, name: string) {
+const NO_MAINS: ReadonlySet<string> = new Set();
+
+export function pushAskOf(rows: readonly FrameSync[], picked: ReadonlySet<string>, name: string, mains: ReadonlySet<string> = NO_MAINS) {
   const chosen = rows.filter((r) => picked.has(r.nodeId));
   if (!chosen.length) {
     return null;
   }
   const open = chosen.find((r) => r.link.pushBranch)?.link.pushBranch;
-  return { name: open ? open.slice(PUSH_PREFIX.length) : name, nodeIds: chosen.map((r) => r.nodeId) };
+  const toMain = chosen.filter((r) => mains.has(r.nodeId)).map((r) => r.nodeId);
+  return { name: open ? open.slice(PUSH_PREFIX.length) : name, nodeIds: chosen.map((r) => r.nodeId), ...(toMain.length ? { mains: toMain } : {}) };
+}
+
+export function impactOf(row: FrameSync): string | null {
+  const pages = Math.max(0, ...(row.affected ?? []).map((a) => a.pages));
+  return pages ? `${pages} pages affected` : null;
 }
 
 export function ciOf(pull: PullView): CiState {

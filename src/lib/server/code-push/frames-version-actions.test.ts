@@ -65,7 +65,7 @@ describe('il diff del codice tra una versione e il ramo del frame', () => {
 });
 
 describe('un ripristino passa da Changes e dalla PR', () => {
-  const pushDeps = () => ({ ...deps(), links: { ...deps().links, all: async (id: string) => (links.has(id) ? [links.get(id)!] : []), remove: async () => true }, edits: async () => SyncOutcome.NoChanges as const, lock: memoryLock() });
+  const pushDeps = () => ({ ...deps(), links: { ...deps().links, all: async (id: string) => (links.has(id) ? [links.get(id)!] : []), remove: async () => true, inProject: async () => [...links.values()] }, edits: async () => SyncOutcome.NoChanges as const, lock: memoryLock() });
 
   it('i file ripristinati vanno nella spinta del frame, anche senza altre modifiche, e poi il link li dimentica', async () => {
     await frameRestore(deps(), 'v1');
