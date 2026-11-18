@@ -127,6 +127,12 @@ export function localGitHost(dir: string, options: LocalOptions): GitHost {
       }
       return pulls.upsertPull(ask);
     },
+    markReady: async (number) => {
+      if (!pulls) {
+        throw new GitError(GitFailure.PullUnavailable, NO_PULLS);
+      }
+      return pulls.markReady(number);
+    },
     pull: async (number) => {
       if (!pulls) {
         throw new GitError(GitFailure.PullUnavailable, NO_PULLS);

@@ -4,6 +4,7 @@ import { frameDetach, framesPush, frameStatus } from '$lib/server/code-push/fram
 import { answer, invalid } from '$lib/server/code-push/push-http';
 import { framesDeps } from '$lib/server/code-push/frames-runtime';
 import { VariantChoice } from '$lib/canvas/source-changes';
+import { PullKind, PushTarget } from '$lib/server/code-push/push';
 import type { RequestHandler } from './$types';
 
 const MAX_FRAMES = 50;
@@ -17,6 +18,9 @@ const pushBody = z.object({
   since: z.object({ branch: z.string().max(200), sha: SHA }).optional(),
   base: z.string().max(200).optional(),
   confirmSensitive: z.boolean().optional(),
+  branch: z.string().min(1).max(200).regex(/^(?!.*\.\.)[\w./-]+$/).optional(),
+  target: z.enum(PushTarget).optional(),
+  pull: z.enum(PullKind).optional(),
   mains: z.array(z.string().min(1)).max(MAX_FRAMES).optional(),
   variants: z.array(z.object({ nodeId: z.string().min(1), choice: z.enum(VariantChoice), route: z.string().min(1).max(300).optional() })).max(MAX_FRAMES).optional()
 });

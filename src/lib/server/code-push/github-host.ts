@@ -13,6 +13,8 @@ const FILE_MODE = '100644';
 const BLOB = 'blob';
 const PAGE_MAX = 100;
 const ANCESTOR_STATES = new Set(['ahead', 'identical']);
+const GRAPHQL = '/graphql';
+const MARK_READY = 'mutation($id: ID!) { markPullRequestReadyForReview(input: { pullRequestId: $id }) { pullRequest { number } } }';
 
 const FAILURE_OF_STATUS: Record<number, GitFailure> = {
   [HTTP_UNAUTHORIZED]: GitFailure.Unauthorized,
@@ -117,14 +119,21 @@ export function githubHost(call: GithubCall, repo: RepoRef): GitHost {
         await send({ endpoint: `/pulls/${open.number}`, method: 'PATCH', body: { title: ask.title, body: ask.body } });
         return pullRefOf(open);
       }
-      return pullRefOf(await send({ endpoint: '/pulls', method: 'POST', body: { title: ask.title, body: ask.body, head: ask.branch, base: ask.base } }));
+      return pullRefOf(await send({ endpoint: '/pulls', method: 'POST', body: { title: ask.title, body: ask.body, head: ask.branch, base: ask.base, draft: ask.draft ?? false } }));
+    },
+    markReady: async (number) => {
+      const id = String((await send({ endpoint: `/pulls/${number}` })).node_id);
+      const answer = await call({ endpoint: GRAPHQL, method: 'POST', body: { query: MARK_READY, variables: { id } } });
+      if (!ok(answer.status) || (answer.data as Json | null)?.errors) {
+        throw new GitError(FAILURE_OF_STATUS[answer.status] ?? GitFailure.Unexpected, answer.status);
+      }
     },
     pull: async (number) => {
       const data = await send({ endpoint: `/pulls/${number}` });
       const headSha = String((data.head as Json).sha);
       const runs = ((await send({ endpoint: `/commits/${headSha}/check-runs` })).check_runs ?? []) as Json[];
       const checks: Check[] = runs.map((r) => ({ name: String(r.name), status: String(r.status), conclusion: r.conclusion == null ? null : String(r.conclusion) }));
-      return { ...pullRefOf(data), status: statusOf(data), headSha, checks };
+      return { ...pullRefOf(data), status: statusOf(data), headSha, checks, draft: data.draft === true };
     },
     changedSince: async (sha, ref) => {
       const files = ((await send({ endpoint: `/compare/${sha}...${encoded(ref)}` })).files ?? []) as Json[];

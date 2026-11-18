@@ -3,7 +3,7 @@ import { fakeGithub } from './fake-github.testkit';
 import { githubHost } from './github-host';
 import { GitFailure } from './git-host';
 import { memoryLock } from './push-lock';
-import { Fallback, PushRefusal, pushFiles, pushStatus, sessionBranch, undoPush, type PushAsk, type Pushed } from './push';
+import { Fallback, PullKind, PushRefusal, PushTarget, pushFiles, pushStatus, readyPull, sessionBranch, undoPush, type PushAsk, type Pushed } from './push';
 
 const REPO = { owner: 'acme', repo: 'app', ref: null };
 
@@ -128,6 +128,48 @@ describe('pushFiles', () => {
 
     expect(out).toEqual({ ok: false, refusal: PushRefusal.Secret, paths: ['src/Hero.tsx'] });
     expect(gh.calls).toEqual([]);
+  });
+});
+
+describe('autosave e opzioni di ramo', () => {
+  it('una spinta in bozza apre una PR draft, e pronta per la revisione la segna pronta', async () => {
+    const { gh, host, lock } = setup();
+
+    const first = pushed(await pushFiles(host, lock, ask({ pull: PullKind.Draft })));
+    expect(gh.pulls[0].draft).toBe(true);
+
+    expect(await readyPull(host, first.pull!.number)).toEqual({ ok: true, number: first.pull!.number });
+    expect(gh.pulls[0].draft).toBe(false);
+  });
+
+  it('un nome di ramo scelto si usa così com’è', async () => {
+    const { gh, host, lock } = setup();
+
+    expect(await pushFiles(host, lock, ask({ branch: 'design/hero' }))).toMatchObject({ ok: true, branch: 'design/hero' });
+    expect(gh.files('design/hero')['src/Hero.tsx']).toBeDefined();
+  });
+
+  it('il commit diretto va sul ramo base, senza PR', async () => {
+    const { gh, host, lock } = setup();
+
+    expect(await pushFiles(host, lock, ask({ target: PushTarget.Base }))).toMatchObject({ ok: true, branch: 'main', pull: null });
+    expect(gh.files('main')['src/Hero.tsx']).toBeDefined();
+    expect(gh.pulls).toHaveLength(0);
+  });
+
+  it('dopo un commit diretto, la spinta di sessione non riparte dal ramo base', async () => {
+    const { host, lock } = setup();
+    const direct = pushed(await pushFiles(host, lock, ask({ target: PushTarget.Base })));
+
+    expect(await pushFiles(host, lock, ask({ since: { branch: direct.branch, sha: direct.sha } }))).toMatchObject({ ok: true, branch: 'feega/hero-redesign' });
+  });
+
+  it('il commit diretto su un ramo protetto è rifiutato come protected, senza ripiego', async () => {
+    const { gh, host, lock } = setup();
+    gh.protect('main');
+
+    expect(await pushFiles(host, lock, ask({ target: PushTarget.Base }))).toEqual({ ok: false, refusal: PushRefusal.Protected });
+    expect(gh.branches()).toEqual(['main']);
   });
 });
 

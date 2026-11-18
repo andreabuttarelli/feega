@@ -20,19 +20,23 @@ async function print(path: string, init?: RequestInit) {
   }
 }
 
-type PushOpts = { name: string; title?: string; body?: string; base?: string; confirmSensitive?: boolean; main?: string[]; variant?: string[] };
+type PushOpts = { name: string; title?: string; body?: string; base?: string; confirmSensitive?: boolean; main?: string[]; variant?: string[]; branch?: string; direct?: boolean; draft?: boolean };
 
 const variantOf = (raw: string) => {
   const [nodeId, choice, route] = raw.split(':');
   return { nodeId, choice, ...(route ? { route } : {}) };
 };
 
-export async function cmdGithubPush(projectId: string, nodeIds: string[], { main, variant, ...opts }: PushOpts) {
-  await print(base(projectId), { method: 'POST', body: JSON.stringify({ ...opts, nodeIds, ...(main ? { mains: main } : {}), ...(variant ? { variants: variant.map(variantOf) } : {}) }) });
+export async function cmdGithubPush(projectId: string, nodeIds: string[], { main, variant, direct, draft, ...opts }: PushOpts) {
+  await print(base(projectId), { method: 'POST', body: JSON.stringify({ ...opts, nodeIds, ...(direct ? { target: 'base' } : {}), ...(draft ? { pull: 'draft' } : {}), ...(main ? { mains: main } : {}), ...(variant ? { variants: variant.map(variantOf) } : {}) }) });
 }
 
 export async function cmdGithubStatus(projectId: string, nodeId: string) {
   await print(`${base(projectId)}?${new URLSearchParams({ nodeId })}`);
+}
+
+export async function cmdGithubReady(projectId: string, nodeId: string) {
+  await print(`${base(projectId)}/ready`, { method: 'POST', body: JSON.stringify({ nodeId }) });
 }
 
 export async function cmdGithubUndo(projectId: string, nodeId: string) {

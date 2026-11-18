@@ -3,7 +3,7 @@ import type { GithubCall } from '$lib/server/code-import/github';
 
 type Tree = Record<string, string>;
 type Commit = { tree: string; parents: string[]; message: string };
-type Pull = { number: number; head: string; base: string; title: string; body: string; state: 'open' | 'closed'; merged: boolean };
+type Pull = { number: number; head: string; base: string; title: string; body: string; state: 'open' | 'closed'; merged: boolean; draft: boolean };
 type TreeEntry = { path: string; content?: string; sha?: string | null };
 
 export type FakeGithub = {
@@ -19,6 +19,7 @@ export type FakeGithub = {
   failAfter: (count: number, status: number) => void;
   branches: () => string[];
   tag: (name: string, ref: string) => void;
+  protect: (branch: string) => void;
 };
 
 const answer = (status: number, data: unknown = null): ProviderAnswer => ({ status, data, headers: {}, file: null });
@@ -32,6 +33,7 @@ export function fakeGithub(opts: { owner?: string; repo?: string; push?: boolean
   const pulls: Pull[] = [];
   const checks: FakeGithub['checks'] = {};
   const calls: ProviderCall[] = [];
+  const protectedBranches = new Set<string>();
   let seq = 0;
 
   const id = (prefix: string) => `${prefix}${(++seq).toString(16).padStart(8, '0')}`;
@@ -69,7 +71,7 @@ export function fakeGithub(opts: { owner?: string; repo?: string; push?: boolean
   };
   seed(defaultBranch, { 'README.md': 'hi' });
 
-  const pullJson = (p: Pull) => ({ number: p.number, title: p.title, html_url: `https://github.com${root.slice(6)}/pull/${p.number}`, state: p.state, merged: p.merged, head: { sha: refs.get(p.head) ?? '', ref: p.head } });
+  const pullJson = (p: Pull) => ({ number: p.number, title: p.title, html_url: `https://github.com${root.slice(6)}/pull/${p.number}`, state: p.state, merged: p.merged, draft: p.draft, node_id: `PR_${p.number}`, head: { sha: refs.get(p.head) ?? '', ref: p.head } });
 
   let budget = Infinity;
   let failStatus = 0;
@@ -81,6 +83,16 @@ export function fakeGithub(opts: { owner?: string; repo?: string; push?: boolean
     const method = r.method ?? 'GET';
     const path = r.endpoint.slice(root.length);
     const body = (r.body ?? {}) as Record<string, unknown>;
+
+    if (r.endpoint === '/graphql' && method === 'POST') {
+      const nodeId = String((body.variables as Record<string, unknown>)?.id);
+      const p = pulls.find((x) => `PR_${x.number}` === nodeId);
+      if (!p) {
+        return answer(200, { errors: [{ message: 'Could not resolve to a node' }] });
+      }
+      p.draft = false;
+      return answer(200, { data: { markPullRequestReadyForReview: { pullRequest: { number: p.number } } } });
+    }
 
     if (path === '' && method === 'GET') {
       return answer(200, { default_branch: defaultBranch, permissions: { push: opts.push ?? true, pull: true } });
@@ -102,6 +114,9 @@ export function fakeGithub(opts: { owner?: string; repo?: string; push?: boolean
     if (m && method === 'PATCH') {
       const name = decodeURIComponent(m[1]);
       const current = refs.get(name);
+      if (protectedBranches.has(name)) {
+        return answer(403, { message: 'Protected branch update failed' });
+      }
       if (!current) {
         return answer(422, { message: 'Reference does not exist' });
       }
@@ -184,7 +199,7 @@ export function fakeGithub(opts: { owner?: string; repo?: string; push?: boolean
       return text === undefined ? answer(404) : answer(200, { content: Buffer.from(text, 'utf8').toString('base64'), encoding: 'base64' });
     }
     if (path === '/pulls' && method === 'POST') {
-      const p: Pull = { number: pulls.length + 1, head: String(body.head), base: String(body.base), title: String(body.title), body: String(body.body), state: 'open', merged: false };
+      const p: Pull = { number: pulls.length + 1, head: String(body.head), base: String(body.base), title: String(body.title), body: String(body.body), state: 'open', merged: false, draft: body.draft === true };
       pulls.push(p);
       return answer(201, pullJson(p));
     }
@@ -231,6 +246,9 @@ export function fakeGithub(opts: { owner?: string; repo?: string; push?: boolean
     branches: () => [...refs.keys()],
     tag: (name, ref) => {
       tags.set(name, refs.get(ref) ?? ref);
+    },
+    protect: (branch) => {
+      protectedBranches.add(branch);
     },
     checks,
     pulls,

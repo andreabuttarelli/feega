@@ -6,7 +6,7 @@ import { CodeSourceKind, EntryKind, followRenames, isPushable, linkStatus, type 
 import type { LinkStore } from './link-store';
 import type { PushLock } from './push-lock';
 import { relocated, suggestedRoute, VariantChoice, type Suggested, type VariantAsk } from './variants';
-import { PushRefusal, pushFiles, pushStatus, undoPush, type LastPush, type PushRefused, type PushState, type Pushed, type Undone } from './push';
+import { PushRefusal, pushFiles, pushStatus, readyPull, undoPush, type PullKind, type PushTarget, type LastPush, type PushRefused, type PushState, type Pushed, type Readied, type Undone } from './push';
 
 export enum FramesRefusal {
   NotConnected = 'not_connected',
@@ -26,7 +26,7 @@ export type FramesDeps = {
   lock: PushLock;
 };
 
-export type FramesPushAsk = { name: string; nodeIds: string[]; title?: string; body?: string; since?: LastPush; base?: string; coAuthors?: string[]; confirmSensitive?: boolean; mains?: string[]; variants?: VariantAsk[] };
+export type FramesPushAsk = { name: string; nodeIds: string[]; title?: string; body?: string; since?: LastPush; base?: string; coAuthors?: string[]; confirmSensitive?: boolean; mains?: string[]; variants?: VariantAsk[]; branch?: string; target?: PushTarget; pull?: PullKind };
 
 export type Affected = { path: string; pages: number };
 
@@ -116,7 +116,7 @@ export async function framesPush(deps: FramesDeps, scope: CodeScope, ask: Frames
 
   const links = await Promise.all(ask.nodeIds.map(async (nodeId) => ({ nodeId, link: await deps.links.read(nodeId) })));
   const since = ask.since ?? lastPushOf(links[0]?.link ?? null);
-  const out = await pushFiles(host, deps.lock, { name: ask.name, files: edits.files, title: ask.title ?? DEFAULT_TITLE, body: ask.body ?? DEFAULT_BODY, since, base: ask.base, coAuthors: ask.coAuthors, confirmSensitive: ask.confirmSensitive });
+  const out = await pushFiles(host, deps.lock, { name: ask.name, files: edits.files, title: ask.title ?? DEFAULT_TITLE, body: ask.body ?? DEFAULT_BODY, since, base: ask.base, coAuthors: ask.coAuthors, confirmSensitive: ask.confirmSensitive, branch: ask.branch, target: ask.target, pull: ask.pull });
   if (!out.ok) {
     return out.refusal === PushRefusal.ReadOnly ? { ...out, patch: edits.files } : out;
   }
@@ -187,6 +187,18 @@ export async function frameUndo(deps: FramesDeps, nodeId: string): Promise<Undon
   return host ? undoPush(host, deps.lock, { branch: link.pushBranch, parent: link.pushParent, paths: link.pushTouched }) : refused(FramesRefusal.NotConnected);
 }
 
+export async function frameReady(deps: FramesDeps, nodeId: string): Promise<Readied | FramesRefused> {
+  const link = await deps.links.read(nodeId);
+  if (!link) {
+    return refused(FramesRefusal.NotLinked);
+  }
+  if (!link.pullNumber) {
+    return refused(FramesRefusal.NotPushed);
+  }
+  const host = await deps.host(link.source, link.repo);
+  return host ? readyPull(host, link.pullNumber) : refused(FramesRefusal.NotConnected);
+}
+
 const HTTP_STATUS: Record<string, number> = {
   [FramesRefusal.NotConnected]: 409,
   [FramesRefusal.NotPushable]: 409,
@@ -200,6 +212,7 @@ const HTTP_STATUS: Record<string, number> = {
   [PushRefusal.NeedsConfirm]: 428,
   [PushRefusal.NoFiles]: 409,
   [PushRefusal.Busy]: 423,
+  [PushRefusal.Protected]: 403,
   [GitFailure.BranchGone]: 409,
   [GitFailure.Diverged]: 409,
   [GitFailure.Unauthorized]: 401,

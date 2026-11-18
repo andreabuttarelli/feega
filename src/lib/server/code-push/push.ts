@@ -16,7 +16,18 @@ export enum PushRefusal {
   Secret = 'secret',
   NeedsConfirm = 'needs_confirm',
   NoFiles = 'no_files',
-  Busy = 'busy'
+  Busy = 'busy',
+  Protected = 'protected'
+}
+
+export enum PushTarget {
+  Session = 'session',
+  Base = 'base'
+}
+
+export enum PullKind {
+  Draft = 'draft',
+  Ready = 'ready'
 }
 
 export enum Fallback {
@@ -27,13 +38,15 @@ export enum Fallback {
 
 export type LastPush = { branch: string; sha: string };
 
-export type PushAsk = { name: string; files: { path: string; content: string }[]; title: string; body: string; coAuthors?: string[]; since?: LastPush; base?: string; confirmSensitive?: boolean };
+export type PushAsk = { name: string; files: { path: string; content: string }[]; title: string; body: string; coAuthors?: string[]; since?: LastPush; base?: string; confirmSensitive?: boolean; branch?: string; target?: PushTarget; pull?: PullKind };
 
 export type Pushed = { ok: true; branch: string; sha: string; parent: string; touched: string[]; pull: PullRef | null; fallback?: Fallback };
 
 export type PushRefused = { ok: false; refusal: PushRefusal | GitFailure; paths?: string[] };
 
 export type Undone = { ok: true; branch: string; sha: string };
+
+export type Readied = { ok: true; number: number };
 
 export type PushState = { ok: true; branch: string; head: string; diverged: boolean; upstream: FileChanged[]; pull: PullState | null };
 
@@ -77,8 +90,10 @@ const headOrNull = (host: GitHost, branch: string) =>
     throw e;
   });
 
+const startBranch = (ask: PushAsk) => ask.since?.branch ?? ask.branch ?? sessionBranch(ask.name);
+
 async function cycleBranch(host: GitHost, ask: PushAsk): Promise<string> {
-  let branch = ask.since?.branch ?? sessionBranch(ask.name);
+  let branch = startBranch(ask);
   for (let last = await host.lastPull(branch); last && last.status !== PullStatus.Open; last = await host.lastPull(branch)) {
     branch = nextCycle(branch);
   }
@@ -115,18 +130,47 @@ async function withLock<T>(lock: PushLock, key: string, work: () => Promise<T>):
   }
 }
 
+async function commitDirect(host: GitHost, base: string, ask: PushAsk): Promise<Pushed | PushRefused> {
+  const since = ask.since?.branch === base ? ask.since.sha : null;
+  const done = await commitOn(host, base, base, ask.files, messageOf(ask.title, ask.coAuthors ?? []), since).catch((e: unknown) => {
+    if (e instanceof GitError && e.failure === GitFailure.Forbidden) {
+      return null;
+    }
+    throw e;
+  });
+  if (!done) {
+    return { ok: false, refusal: PushRefusal.Protected };
+  }
+  return { ok: true, branch: base, sha: done.sha, parent: done.parent, touched: ask.files.map((f) => f.path), pull: null };
+}
+
+export async function readyPull(host: GitHost, number: number): Promise<Readied | PushRefused> {
+  try {
+    await host.markReady(number);
+    return { ok: true, number };
+  } catch (e) {
+    if (e instanceof GitError) {
+      return { ok: false, refusal: e.failure };
+    }
+    throw e;
+  }
+}
+
 export async function pushFiles(host: GitHost, lock: PushLock, ask: PushAsk): Promise<Pushed | PushRefused> {
   const refused = refusedBeforeWrite(ask);
   if (refused) {
     return refused;
   }
 
-  return withLock(lock, ask.since?.branch ?? sessionBranch(ask.name), async () => {
+  return withLock(lock, ask.target === PushTarget.Base ? (ask.base ?? '') : startBranch(ask), async () => {
     if ((await host.access()) === Access.Read) {
       return { ok: false, refusal: PushRefusal.ReadOnly } as PushRefused;
     }
     const base = ask.base ?? (await host.defaultBranch());
-    const branch = await cycleBranch(host, ask);
+    if (ask.target === PushTarget.Base) {
+      return commitDirect(host, base, ask);
+    }
+    const branch = await cycleBranch(host, ask.since?.branch === base ? { ...ask, since: undefined } : ask);
     const since = ask.since?.branch === branch ? ask.since.sha : null;
     const message = messageOf(ask.title, ask.coAuthors ?? []);
     const touched = ask.files.map((f) => f.path);
@@ -141,7 +185,7 @@ export async function pushFiles(host: GitHost, lock: PushLock, ask: PushAsk): Pr
         return { ...(await commitOn(host, sync, base, ask.files, message, null)), branch: sync, fallback };
       }
     );
-    const pull = await host.upsertPull({ branch: landed.branch, base, title: ask.title, body: ask.body }).catch((e: unknown) => {
+    const pull = await host.upsertPull({ branch: landed.branch, base, title: ask.title, body: ask.body, draft: ask.pull === PullKind.Draft }).catch((e: unknown) => {
       if (e instanceof GitError && e.failure === GitFailure.PullUnavailable) {
         return null;
       }

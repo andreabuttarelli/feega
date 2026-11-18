@@ -24,6 +24,7 @@ vi.mock('$lib/server/code-push/frames-runtime', () => ({
 
 const push = await import('./+server');
 const undo = await import('./undo/+server');
+const ready = await import('./ready/+server');
 
 type Handler = (event: unknown) => Promise<Response>;
 
@@ -115,5 +116,31 @@ describe('/api/v1/projects/:id/github/push', () => {
 
     expect(res.status).toBe(200);
     expect(gh.files('feega/hero')['src/Hero.tsx']).toBe('v0');
+  });
+
+  it('l’autosave apre una PR in bozza, pronta per la revisione la segna pronta', async () => {
+    await post(push.POST, { name: 'hero', nodeIds: ['n1'], pull: 'draft' });
+    expect(gh.pulls[0].draft).toBe(true);
+
+    const { res, body } = await post(ready.POST, { nodeId: 'n1' });
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({ ok: true, number: 1 });
+    expect(gh.pulls[0].draft).toBe(false);
+  });
+
+  it('il commit diretto su un ramo protetto è 403 protected', async () => {
+    gh.protect('main');
+
+    const { res, body } = await post(push.POST, { name: 'hero', nodeIds: ['n1'], target: 'base' });
+
+    expect(res.status).toBe(403);
+    expect(body).toMatchObject({ ok: false, refusal: 'protected' });
+  });
+
+  it('un nome di ramo scelto arriva su GitHub così com’è', async () => {
+    const { body } = await post(push.POST, { name: 'hero', nodeIds: ['n1'], branch: 'design/hero' });
+
+    expect(body).toMatchObject({ ok: true, branch: 'design/hero' });
   });
 });

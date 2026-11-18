@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { SourceEdit } from '$lib/server/code-import/write-back';
-import { FramesRefusal, framesPush, frameStatus, frameUndo, type FrameStatus } from './frames-push';
+import { FramesRefusal, frameReady, framesPush, frameStatus, frameUndo, type FrameStatus } from './frames-push';
 import { makeVariant, VariantChoice } from './variants';
 import { ConflictChoice, frameConflicts, frameResolve } from './conflicts';
 import { linkImported } from './import-link';
 import { ComponentRole, EntryKind, LinkState } from './link';
-import type { Pushed, Undone } from './push';
+import { PushTarget, type Pushed, type Undone } from './push';
 import { BUTTON_COLUMN, BUTTON_LINE, FIXTURE, fixtureDeps, fixtureWorld, H1_COLUMN, H1_LINE, memoryLinks, NO_SCOPE, ROUTES, USER_BRANCH, USER_DIRTY, type FrameEdits, type World } from './github-sync.fixture';
 
 const FRAME = 'frame-shop';
@@ -47,6 +47,19 @@ describe('GitHub sync su un repo Next.js 15 + Tailwind', () => {
       [EntryKind.Component, ComponentRole.Instance, '/pricing', 'components/Button.tsx'],
       [EntryKind.Component, ComponentRole.Instance, '/about', 'components/Button.tsx']
     ]);
+  });
+
+  it('il ramo scelto e il commit diretto arrivano dove si è chiesto', async () => {
+    edits.set(FRAME, [h1({ color: '#e11d48' }, { color: '#171717' })]);
+    const deps = fixtureDeps(world, links, edits);
+
+    expect(await framesPush(deps, NO_SCOPE, { name: 'x', nodeIds: [FRAME], branch: 'design/hero' })).toMatchObject({ ok: true, branch: 'design/hero' });
+    expect(await framesPush(deps, NO_SCOPE, { name: 'x', nodeIds: [FRAME], target: PushTarget.Base })).toMatchObject({ ok: true, branch: 'main', pull: null });
+    expect(await world.at('main', 'app/page.tsx')).toContain('#e11d48');
+  });
+
+  it('pronta per la revisione senza una PR aperta è not_pushed', async () => {
+    expect(await frameReady(fixtureDeps(world, links, edits), FRAME)).toEqual({ ok: false, refusal: FramesRefusal.NotPushed });
   });
 
   it('colore e testo arrivano su un ramo feega/ che contiene solo il diff voluto', async () => {
