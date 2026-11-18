@@ -7,6 +7,7 @@ import { codePlan } from './code-doc';
 import { designed, designOf, withBoard } from './design-system';
 import { DESIGN_BOARD } from './design-board';
 import { BASE_CONDITIONS } from './render-conditions';
+import { frameEdits } from './token-write';
 
 let ids = 0;
 const nid = () => `n${++ids}`;
@@ -26,6 +27,26 @@ describe('designed', () => {
     const mains = Object.values(set.doc.comps).flatMap((c) => c.tracks.flatMap((t) => t.clips as MotionClip[]));
     expect(mains.some((c) => c.bind?.fill === 'app Colors/muted')).toBe(true);
     expect(set.doc.variables?.['app Colors']).toBeDefined();
+  });
+});
+
+describe('designed, a page split into frames of different sizes', () => {
+  it('every frame reads its text styles at the same pixel size, and none has edits to push', async () => {
+    const design = (await designOf(fixture('typescale')))!;
+    const plan = codePlan(tree, [], nid)!;
+    const slice = plan.plan.items[0];
+    const split = { ...plan, plan: { ...plan.plan, items: [{ ...slice, doc: { ...slice.doc, width: 1280, height: 160 } }, { ...slice, doc: { ...slice.doc, width: 1280, height: 16384 } }] } };
+
+    const done = designed(design, split, { repo: 'app', base: BASE_CONDITIONS, boards: {}, captures: [{ label: '/', tree, uses: [] }], width: 1280 });
+
+    const px = done.plan.plan.items.map(({ doc }) => {
+      const hero = doc.styles?.['app Text/hero'] as { size: number };
+      return Math.round(hero.size * Math.min(doc.width, doc.height));
+    });
+    expect(px).toEqual([48, 48]);
+    for (const { doc } of done.plan.plan.items) {
+      expect((await frameEdits(doc, done.map, fixture('typescale'))).files).toEqual([]);
+    }
   });
 });
 

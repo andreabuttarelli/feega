@@ -6,7 +6,7 @@
   type Anchor = { left: number; top: number };
   type Pushed = { branch: string; pull: PullView | null };
 
-  let { projectId, open, anchor, syncs, posterOf, onclose, onchanged, oncompare }: { projectId: string; open: FrameSync | null; anchor: Anchor | null; syncs: FrameSync[]; posterOf: (nodeId: string) => string | null; onclose: () => void; onchanged: () => Promise<unknown>; oncompare: (nodeId: string) => void } = $props();
+  let { projectId, open, anchor, syncs, posterOf, assetUrl, onclose, onchanged, oncompare }: { projectId: string; open: FrameSync | null; anchor: Anchor | null; syncs: FrameSync[]; posterOf: (nodeId: string) => string | null; assetUrl: (assetId: string) => string; onclose: () => void; onchanged: () => Promise<unknown>; oncompare: (nodeId: string) => void } = $props();
 
   const DEFAULT_NAME = 'canvas-edits';
   const PATCH_FILE = 'feega-changes.patch';
@@ -129,7 +129,8 @@
     {#each rows as row (row.nodeId)}
       <label class="change">
         <input type="checkbox" checked={picked.has(row.nodeId)} onchange={(e) => (e.currentTarget.checked ? picked.add(row.nodeId) : picked.delete(row.nodeId))} />
-        {#if posterOf(row.nodeId)}<img src={posterOf(row.nodeId)} alt="" />{/if}
+        {#if row.link.beforePoster}<img src={assetUrl(row.link.beforePoster)} alt="Before" title="Before" />{/if}
+        {#if posterOf(row.nodeId)}<img src={posterOf(row.nodeId)} alt="After" title="After" />{/if}
         <span><strong>{row.name || 'Frame'}</strong><br /><code>{popoverOf(row).file}</code> <span class="muted">{row.state}</span></span>
       </label>
     {/each}
