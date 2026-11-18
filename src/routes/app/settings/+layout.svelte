@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { OrgRole } from '$lib/org-roles';
   import { page } from '$app/stores';
   import { _ } from 'svelte-i18n';
   import PageTitle from '$lib/components/PageTitle.svelte';
@@ -10,7 +11,7 @@
   let { data, children } = $props();
 
   const path = $derived($page.url.pathname.replace(/\/$/, ''));
-  const editable = $derived(sectionEditable(path, data.org.role));
+  const editable = $derived(sectionEditable(path, data.org.role as OrgRole));
   const activeSection = $derived(SETTINGS_SECTIONS.find((s) => path.endsWith(`/settings/${s.path}`))?.path ?? '');
   const title = $derived($_(SETTINGS_SECTIONS.find((s) => s.path === activeSection)?.labelKey ?? 'app.nav.settings'));
 </script>

@@ -28,7 +28,7 @@
     <p class="m-0 text-[0.8125rem] text-muted-foreground">{$_('app.settings.spend.adminOnly')}</p>
   {/if}
 
-  {#each SCOPES.filter((row) => data.scopes.includes(row.scope)) as row (row.scope)}
+  {#each SCOPES.filter((row) => (data.scopes as readonly string[]).includes(row.scope)) as row (row.scope)}
     {@const cap = capOf(row.scope)}
     <form method="POST" action="?/saveCap" use:enhance class="flex flex-wrap items-end gap-3 py-3" data-testid={`cap-${row.scope}`}>
       <input type="hidden" name="scope" value={row.scope} />

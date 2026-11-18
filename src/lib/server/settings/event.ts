@@ -21,4 +21,4 @@ export type SharedShell = Pick<ProjectShell, 'org' | 'brand'> & { project: Pick<
 
 export type SharedEvent = RequestEvent<Partial<ProjectParams>> & { parent: () => Promise<SharedShell> };
 
-export type SharedActions = Actions<Partial<ProjectParams>>;
+export type SharedActions = Record<string, (event: SharedEvent) => unknown>;

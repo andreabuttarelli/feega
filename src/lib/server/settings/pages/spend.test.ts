@@ -36,7 +36,7 @@ function event(role: string, entries: [string, string][] = [], projectId: string
   };
 }
 
-type Loaded = { caps: { scope: string; capUsd: number }[]; scopes: string[]; canEdit: boolean };
+type Loaded = { caps: { scope: string; capUsd: number }[]; scopes: readonly string[]; canEdit: boolean };
 
 const save = (e: never) => (actions.saveCap as (e: never) => Promise<unknown>)(e);
 const insertOf = (fake: ReturnType<typeof event>['fake']) => fake.calls.find((c) => c.table === 'org_spend_caps' && c.op === 'insert');
