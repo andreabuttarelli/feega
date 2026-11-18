@@ -18,6 +18,11 @@ Measured on the landings fixture before the change, canvas at 100% vs Play as op
 1280x860, pixels off by more than 48: Vercel 7.77%, Notion 95.99% (the centred page moved
 sideways). At the frame width the same frames were 0.27% and 1.66%.
 
+Images: Play reused the live doc's `assets`, which hold the canvas tier the frame was last built
+at (`?size=256` at an overview zoom), so every picture in Play was a blurred 256 px rendition.
+`fullAssets` (tiered-assets.ts) maps them back to the originals for `playerFrames`. Notion
+landing: 1.66% → 0.42%; Vercel: 0.27% → 0.00%.
+
 Not in this change: frames taller than 8192 px still play on the HTML player
 (`drawableOn`); with #2318's strips the cap applies to width only on the cores, in a PR
 stacked on #2318. The HTML

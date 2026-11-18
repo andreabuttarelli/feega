@@ -2,6 +2,7 @@
   import { heldFrames } from '$lib/canvas/core/held-frames';
   import { baseNodeId, heldViews, viewAt, viewOf } from '$lib/canvas/breakpoint-views';
   import { posterUploads } from '$lib/canvas/core/poster-upload';
+  import { fullAssets } from '$lib/canvas/core/tiered-assets';
   import { POSTER_DEBOUNCE_MS } from '$lib/motion/poster-capture';
   import { postPageAction } from '$lib/api/page-action';
   import { motionNodePath } from '$lib/canvas/motion-node';
@@ -507,7 +508,7 @@
   const shownOverlays = $derived(overlayFrames.filter((f) => seenIds.has(f.id) || keptOverlays.has(f.id)));
   const prototypeDocs = $derived(new Map(coreFrames.flatMap((f) => (liveOf(f.id) ? [[f.id, liveOf(f.id)!.doc] as const] : []))));
   const arrowLinks = $derived(prototypeLinks(prototypeDocs));
-  const playerFrames = $derived(coreFrames.filter((f) => kindOfNode(f.id) === FrameKind.Frame && liveOf(f.id)).map((f) => ({ id: f.id, name: tileLabel(byId.get(f.id)!), live: liveOf(f.id)! })));
+  const playerFrames = $derived(coreFrames.filter((f) => kindOfNode(f.id) === FrameKind.Frame && liveOf(f.id)).map((f) => ({ id: f.id, name: tileLabel(byId.get(f.id)!), live: { ...liveOf(f.id)!, assets: fullAssets(liveOf(f.id)!.assets) } })));
   $effect(() => {
     prototypePlayer.editing = inside?.nodeId ?? (selected.length === 1 && playerFrames.some((f) => f.id === selected[0]) ? selected[0] : null);
   });
