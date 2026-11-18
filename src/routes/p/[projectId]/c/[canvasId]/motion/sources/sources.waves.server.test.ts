@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readSources } from '$lib/canvas/core/sources-wire';
 import { fakeDb } from '$lib/server/db/fake-db';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip } from '@feega/motion-core/motion/timeline';
@@ -12,6 +13,11 @@ vi.mock('$lib/server/canvas/sign-media', () => ({
     return new Map(paths.uploaded.map((p) => [p, `signed:${p}`]));
   }
 }));
+
+const framesOf = async (res: Response) => {
+  const { head, frames } = readSources(await res.text())!;
+  return { ...head, frames: Object.fromEntries([...frames].map(([id, { meta: { id: _id, ...meta }, docText }]) => [id, { ...meta, doc: JSON.parse(docText) }])) } as { tokens: unknown; signed?: Record<string, string>; frames: Record<string, { revision: number; doc: unknown; assets: Record<string, string>; media?: Record<string, unknown>; tokens?: unknown }> };
+};
 
 const { GET } = await import('./+server');
 
@@ -56,7 +62,7 @@ async function wavesToAnswer(query = ''): Promise<{ waves: number; status: numbe
     waves++;
   }
   await asked;
-  return { waves, status: (answer as Response).status, body: await (answer as Response).json() };
+  return { waves, status: (answer as Response).status, body: (answer as Response).ok ? await framesOf(answer as Response) : {} } as never;
 }
 
 afterEach(() => vi.useRealTimers());

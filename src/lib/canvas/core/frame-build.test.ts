@@ -12,7 +12,8 @@ import { sequenceScenes } from '$lib/motion/scenes';
 import { keepLocalFiles, forgetLocalFiles } from '@feega/motion-core/motion/fonts/local-files';
 import { itemWire } from '@feega/motion-core/motion/gpu-full/wire';
 import type { DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
-import { builtAnswer, buildFrame, frameBuilder, playingBuilder, shotLists, transfers, type BuildAsk, type BuildWorker } from './frame-build';
+import { builtAnswer, buildFrame, frameBuilder, playingBuilder, shotLists, transfers, type BuildAsk, type FrameDoc, type BuildWorker } from './frame-build';
+import { textFrame, withAssets } from './text-frame';
 import { itemPack, listPack } from '@feega/motion-core/motion/gpu-full/wire';
 import { onStage } from './frame-source';
 import { withoutPictures } from './placeholders';
@@ -105,6 +106,37 @@ describe('the builder', () => {
 
     expect(docWrites).toBe(2);
     expect(worker.asked.map((a) => JSON.parse(a.source))).toEqual([{ ...source(doc), assets: { a: 'small' } }, { ...source(doc), assets: { a: 'large' } }].map((x) => JSON.parse(JSON.stringify(x))));
+  });
+
+  it('hands the worker the doc text it arrived as, so the page never parses nor writes out a 1 MB doc to build it', async () => {
+    const worker = echo();
+    const build = frameBuilder(() => worker);
+    const text = JSON.stringify(shapeDoc);
+    const parsed = vi.spyOn(JSON, 'parse');
+    const written = vi.spyOn(JSON, 'stringify');
+
+    await build(withAssets(textFrame<FrameDoc>({ revision: 1, assets: {}, tokens: FEEGA_TOKENS }, text), { a: 'large' }), Smoothing.Plain);
+    const docParses = parsed.mock.calls.filter(([value]) => value === text).length;
+    const docWrites = written.mock.calls.filter(([value]) => value === shapeDoc || typeof (value as { doc?: unknown })?.doc === 'object').length;
+    parsed.mockRestore();
+    written.mockRestore();
+
+    expect(docParses).toBe(0);
+    expect(docWrites).toBe(0);
+    expect(JSON.parse(worker.asked[0].source)).toEqual(JSON.parse(JSON.stringify({ revision: 1, assets: { a: 'large' }, tokens: FEEGA_TOKENS, doc: shapeDoc })));
+  });
+
+  it('parses a doc that arrived as text once, the first time the page reads it', () => {
+    const text = JSON.stringify(shapeDoc);
+    const parsed = vi.spyOn(JSON, 'parse');
+    const frame = textFrame<FrameDoc>({ revision: 1, assets: {}, tokens: FEEGA_TOKENS }, text);
+    const resized = withAssets(frame, { a: 'small' });
+
+    expect(parsed.mock.calls.filter(([value]) => value === text).length).toBe(0);
+    expect(resized.doc).toEqual(shapeDoc);
+    expect({ ...frame }.doc).toBe(resized.doc);
+    expect(parsed.mock.calls.filter(([value]) => value === text).length).toBe(1);
+    parsed.mockRestore();
   });
 
   it('lets its idle workers go, so a phone does not hold the last doc built, and starts a new one for the next build', async () => {

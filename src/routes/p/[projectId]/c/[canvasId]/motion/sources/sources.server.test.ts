@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readSources } from '$lib/canvas/core/sources-wire';
 import { fakeDb } from '$lib/server/db/fake-db';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip } from '@feega/motion-core/motion/timeline';
@@ -7,6 +8,11 @@ const lookup = vi.fn();
 vi.mock('$lib/server/canvas/lookup', () => ({ openCanvasForUser: async (...a: unknown[]) => ({ memberships: [], found: await lookup(...a) }) }));
 vi.mock('$lib/server/canvas/sign-media', () => ({ createAssetSigningDb: () => ({}), signAssetPaths: async () => new Map() }));
 vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ canvasReachable: async () => true }));
+
+const framesOf = async (res: Response) => {
+  const { head, frames } = readSources(await res.text())!;
+  return { ...head, frames: Object.fromEntries([...frames].map(([id, { meta: { id: _id, ...meta }, docText }]) => [id, { ...meta, doc: JSON.parse(docText) }])) } as { tokens: unknown; signed?: Record<string, string>; frames: Record<string, { revision: number; doc: unknown; assets: Record<string, string>; media?: Record<string, unknown>; tokens?: unknown }> };
+};
 
 const { GET } = await import('./+server');
 
@@ -42,7 +48,7 @@ beforeEach(() => lookup.mockResolvedValue({ orgId: 'org-a', canvas: { id: 'c1', 
 
 describe('GET the sources of every frame on a canvas at once', () => {
   it('answers each frame with its head, and the brand tokens once', async () => {
-    const body = await (await ask([M1, M2]).run()).json();
+    const body = await framesOf(await ask([M1, M2]).run());
 
     expect(Object.keys(body.frames).sort()).toEqual([M1, M2]);
     expect(body.frames[M1].revision).toBe(3);
@@ -59,13 +65,13 @@ describe('GET the sources of every frame on a canvas at once', () => {
   });
 
   it('leaves out a frame that lives on another canvas', async () => {
-    const body = await (await ask([M1, ELSEWHERE]).run()).json();
+    const body = await framesOf(await ask([M1, ELSEWHERE]).run());
 
     expect(Object.keys(body.frames)).toEqual([M1]);
   });
 
   it('says which assets of a frame are images and how big, so the page can fetch them before the frame builds', async () => {
-    const body = await (await ask([M1, M2]).run()).json();
+    const body = await framesOf(await ask([M1, M2]).run());
 
     expect(body.frames[M1].media).toEqual({ [PHOTO]: { kind: 'image', width: 640, height: 480 } });
     expect(body.frames[M2].media).toEqual({});

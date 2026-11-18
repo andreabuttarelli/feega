@@ -8,6 +8,7 @@ import { assetUrls, motionAssets, namedAssets, type AssetSigner, type MotionAsse
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { mayUseAssets, mentionedIds, referencedAssets } from '$lib/motion/doc-assets';
 import { serverTiming, type Phases } from '$lib/server/server-timing';
+import { writeSources } from '$lib/canvas/core/sources-wire';
 
 export type MotionSource = { revision: number; doc: MotionDoc; assets: Record<string, string> };
 
@@ -85,3 +86,6 @@ export async function motionSources(scope: FramesScope): Promise<BatchedSources>
   );
   return { frames, signed: signedUrls([...used.values()]) };
 }
+
+export const sourcesLines = (tokens: unknown, sources: BatchedSources): string =>
+  writeSources({ tokens: tokens ?? null, signed: sources.signed }, [...sources.frames].map(([id, frame]) => ({ meta: { id, revision: frame.revision, assets: frame.assets, media: frame.media }, docText: JSON.stringify(frame.doc) })));

@@ -6,8 +6,18 @@ const batchedSources: typeof batchedWith = (fetcher, kept, cacheOf) => batchedWi
 import { frameCache, memoryShelf } from './frame-cache';
 import { framesOnCanvas, frameSourceUrl } from './frame-source';
 import { adoptFrameHead } from '$lib/canvas/node-save';
+import { writeSources } from './sources-wire';
 
 const answer = (body: unknown, ok = true) => ({ ok, json: async () => body }) as Response;
+
+type Batched = { tokens: unknown; signed?: Record<string, string>; frames: Record<string, { revision: number; doc: unknown; assets: Record<string, string> }> };
+
+const wired = (body: unknown): string =>
+  body && typeof body === 'object' && 'frames' in body
+    ? writeSources({ tokens: (body as Batched).tokens, signed: (body as Batched).signed }, Object.entries((body as Batched).frames).map(([id, { doc, ...meta }]) => ({ meta: { id, ...meta }, docText: JSON.stringify(doc) })))
+    : JSON.stringify(body);
+
+const answerOf = (body: unknown) => ({ ok: true, status: 200, json: async () => JSON.parse(JSON.stringify(body)), text: async () => wired(body) }) as Response;
 
 describe('reading a frame source once for the whole canvas', () => {
   it('fetches a revision once, however many parts of the canvas ask for it (an imported page was downloaded twice on open: once to draw, once to pick)', async () => {
@@ -77,7 +87,7 @@ describe('reading the frames of a canvas in one request', () => {
   const A = '00000000-0000-4000-8000-00000000000a';
   const B = '00000000-0000-4000-8000-00000000000b';
   const url = (id: string) => `/p/p1/c/c1/motion/${id}/source?revision=3`;
-  const json = (body: unknown) => ({ ok: true, status: 200, json: async () => body }) as Response;
+  const json = answerOf;
 
   it('asks once for every frame requested in the same tick, and adds the tokens to each', async () => {
     const asked: { url: string; init?: RequestInit }[] = [];
@@ -90,11 +100,32 @@ describe('reading the frames of a canvas in one request', () => {
     expect(b?.doc).toEqual({ b: 1 });
   });
 
+  it('hands each frame its doc unparsed, so the page parses it only if it reads it', async () => {
+    const read = batchedSources(async () => json({ tokens: {}, frames: { [A]: { revision: 3, doc: { a: 'unparsed' }, assets: {} } } }));
+    const parsed = vi.spyOn(JSON, 'parse');
+
+    const a = await read(url(A));
+    const before = parsed.mock.calls.filter(([value]) => typeof value === 'string' && value.includes('unparsed')).length;
+    parsed.mockRestore();
+
+    expect(before).toBe(0);
+    expect(a?.doc).toEqual({ a: 'unparsed' });
+  });
+
   it('falls back to the single source for a frame the batch left out', async () => {
     const asked: string[] = [];
     const read = batchedSources(async (u) => (asked.push(u), u.includes('/sources?') ? json({ tokens: {}, frames: {} }) : json({ revision: 3, doc: {}, assets: {}, tokens: {} })));
 
     expect(await read(url(A))).toEqual({ revision: 3, doc: {}, assets: {}, tokens: {} });
+    expect(asked).toEqual([`/p/p1/c/c1/motion/sources?ids=${A}`, url(A)]);
+  });
+
+  it('asks frame by frame when an older server answers the batch as one JSON object (a deploy rolling out or back)', async () => {
+    const asked: string[] = [];
+    const older = { ok: true, status: 200, text: async () => JSON.stringify({ tokens: {}, frames: { [A]: { revision: 3, doc: { stale: 1 }, assets: {} } }, signed: {} }) } as Response;
+    const read = batchedSources(async (u) => (asked.push(u), u.includes('/sources?') ? older : json({ revision: 3, doc: { single: 1 }, assets: {}, tokens: {} })));
+
+    expect((await read(url(A)))?.doc).toEqual({ single: 1 });
     expect(asked).toEqual([`/p/p1/c/c1/motion/sources?ids=${A}`, url(A)]);
   });
 
@@ -111,7 +142,7 @@ describe('reading the frames of a canvas in one request', () => {
 describe('warming the sources of every frame on open', () => {
   const ids = Array.from({ length: 30 }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`);
   const url = (id: string) => `/p/p1/c/c1/motion/${id}/source?revision=1`;
-  const json = (body: unknown) => ({ ok: true, status: 200, json: async () => body }) as Response;
+  const json = answerOf;
 
   it('asks for every frame in the order given, a few per request', async () => {
     const asked: string[] = [];
@@ -172,7 +203,7 @@ describe('warming the sources of every frame on open', () => {
 describe('signed asset links beside the frames', () => {
   const A = '00000000-0000-4000-8000-00000000000a';
   const P = '00000000-0000-4000-8000-0000000000f1';
-  const json = (body: unknown) => ({ ok: true, status: 200, json: async () => body }) as Response;
+  const json = answerOf;
 
   it('draws with the signed link, and keeps the stable address beside it', async () => {
     const read = batchedSources(async () => json({ tokens: {}, signed: { [P]: 'https://signed/p' }, frames: { [A]: { revision: 3, doc: {}, assets: { [P]: `/p/p1/c/c1/assets/${P}` } } } }));
@@ -187,7 +218,7 @@ describe('signed asset links beside the frames', () => {
 describe('naming the org and the revisions held', () => {
   const A = '00000000-0000-4000-8000-00000000000a';
   const B = '00000000-0000-4000-8000-00000000000b';
-  const json = (body: unknown) => ({ ok: true, status: 200, json: async () => body }) as Response;
+  const json = answerOf;
 
   it('passes the org and each revision on, so the server reads them beside the canvas check', async () => {
     const asked: string[] = [];
@@ -214,7 +245,7 @@ describe('a frame kept from an earlier open is drawn only at the revision the ca
   const C = '00000000-0000-4000-8000-0000000000c1';
   const A = '00000000-0000-4000-8000-00000000000a';
   const urlAt = (revision: number, look = 'l1') => `/p/p1/c/${C}/motion/${A}/source?revision=${revision}&org=o1&look=${look}`;
-  const json = (body: unknown) => ({ ok: true, status: 200, json: async () => body }) as Response;
+  const json = answerOf;
   const doc = (revision: number, tag: string) => ({ revision, doc: { tag }, assets: {}, tokens: { t: 1 } });
   const frames = (revision: number, tag: string) => json({ tokens: { t: 1 }, frames: { [A]: { revision, doc: { tag }, assets: {} } } });
 
@@ -294,7 +325,7 @@ describe('a frame whose source the server fails to answer', () => {
   const A = '00000000-0000-4000-8000-00000000000a';
   const url = `/p/p1/c/${C}/motion/${A}/source?revision=3&org=o1&look=l1`;
   const failing = { ok: false, status: 500, json: async () => ({ message: 'Internal Error' }) } as Response;
-  const json = (body: unknown) => ({ ok: true, status: 200, json: async () => body }) as Response;
+  const json = answerOf;
 
   afterEach(() => {
     vi.useRealTimers();

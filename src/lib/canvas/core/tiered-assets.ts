@@ -1,6 +1,7 @@
 import { AssetKind } from '@feega/motion-core/motion/components';
 import { canvasAssetUrl, type AssetSize } from '$lib/canvas/asset-url';
 import type { FrameDoc } from './frame-build';
+import { withAssets } from './text-frame';
 
 type Hinted = FrameDoc & { media?: Record<string, { kind: AssetKind }> };
 type Place = { projectId: string; canvasId: string };
@@ -12,7 +13,7 @@ export function tieredAssets(source: Hinted, place: Place, tier: AssetSize): Fra
   }
 
   const sized = Object.fromEntries(images.map(([id]) => [id, canvasAssetUrl(place.projectId, place.canvasId, id, tier)]));
-  return { ...source, assets: { ...source.assets, ...sized } };
+  return withAssets(source, { ...source.assets, ...sized });
 }
 
 export function tierSwap(source: Hinted, place: Place, from: AssetSize, to: AssetSize): Map<string, string> {

@@ -10,6 +10,7 @@ import { sceneNodeIds } from '$lib/motion/scenes';
 import { frameOfLive } from './frame-source';
 import { viewsOfFrame } from '$lib/canvas/breakpoint-views';
 import { tieredAssets } from './tiered-assets';
+import { frameText } from './text-frame';
 import { AssetSize } from '$lib/canvas/asset-url';
 import type { Box } from './canvas-scene';
 
@@ -98,8 +99,6 @@ export const transfers = (answer: BuildAnswer): ArrayBuffer[] => ('buffers' in a
 
 type Lane = { worker: BuildWorker; busy: number };
 
-const sourceText = ({ playhead: _playhead, ...rest }: FrameDoc): string => JSON.stringify(rest);
-
 export type FrameBuilder = ((source: FrameDoc, smoothing: Smoothing) => Promise<DisplayList | null>) & { release: () => void; warm: () => void; shoot: (shot: ShotOf, smoothing: Smoothing) => Promise<Shot[] | null> };
 
 export function frameBuilder(spawn: () => BuildWorker | null, lanes = 1): FrameBuilder {
@@ -166,7 +165,7 @@ export function frameBuilder(spawn: () => BuildWorker | null, lanes = 1): FrameB
     return new Promise<T>((resolve, reject) => waiting.set(id, { lane, resolve: resolve as (answer: never) => void, reject }));
   };
 
-  const build = (source: FrameDoc, smoothing: Smoothing) => ask<DisplayList | null>({ source: sourceText(source), playhead: source.playhead, smoothing });
+  const build = (source: FrameDoc, smoothing: Smoothing) => ask<DisplayList | null>({ source: frameText(source), playhead: source.playhead, smoothing });
 
   const shoot = (shot: ShotOf, smoothing: Smoothing) => ask<Shot[] | null>({ source: '', smoothing, shot });
 

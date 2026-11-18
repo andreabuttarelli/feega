@@ -39,7 +39,7 @@ function packOnce(tag: string, encoding: Encoding, body: string): Buffer {
   return packed;
 }
 
-export function revalidated(request: Request, body: string, phases: Phases = serverTiming()): Response {
+export function revalidated(request: Request, body: string, phases: Phases = serverTiming(), type = 'application/json'): Response {
   const tag = phases.span('etag', () => `"${createHash('sha1').update(body).digest('base64url')}"`);
   const headers = () => ({ etag: tag, 'cache-control': REVALIDATE, vary: 'accept-encoding', 'server-timing': phases.header() });
   if (request.headers.get('if-none-match') === tag) {
@@ -48,8 +48,8 @@ export function revalidated(request: Request, body: string, phases: Phases = ser
 
   const encoding = encodingOf(request);
   if (!encoding) {
-    return new Response(body, { headers: { ...headers(), 'content-type': 'application/json' } });
+    return new Response(body, { headers: { ...headers(), 'content-type': type } });
   }
   const packed = phases.span('compress', () => packOnce(tag, encoding, body));
-  return new Response(new Uint8Array(packed), { headers: { ...headers(), 'content-type': 'application/json', 'content-encoding': encoding } });
+  return new Response(new Uint8Array(packed), { headers: { ...headers(), 'content-type': type, 'content-encoding': encoding } });
 }

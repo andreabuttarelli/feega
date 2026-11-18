@@ -1,6 +1,8 @@
 import type { FrameDoc } from './frame-build';
 import { StartupStep, markStartup } from './startup-marks';
 import { keptKey, scopedCache, type CacheScope, type FrameCache } from './frame-cache';
+import { readSources, type WiredFrame } from './sources-wire';
+import { textFrame } from './text-frame';
 
 export type SourceAsks = { framesPerAsk: number; open: number };
 
@@ -85,10 +87,10 @@ export function sourceReader(fetcher: (url: string) => Promise<Response>, kept =
 
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
 type Waiting = { id: string; url: string; settle: (res: Response | Promise<Response>) => void };
-type Batch = { tokens: unknown; signed?: Record<string, string>; frames: Record<string, Omit<FrameDoc, 'tokens'>> };
+type Batch = NonNullable<ReturnType<typeof readSources>>;
 
-const signedFrame = (batch: Batch, frame: Omit<FrameDoc, 'tokens'>): FrameDoc =>
-  ({ ...frame, tokens: batch.tokens, addresses: frame.assets, assets: Object.fromEntries(Object.entries(frame.assets).map(([id, at]) => [id, batch.signed?.[id] ?? at])) }) as FrameDoc;
+const signedFrame = ({ head }: Batch, { meta: { id: _id, ...frame }, docText }: WiredFrame): FrameDoc =>
+  textFrame<FrameDoc>({ ...frame, tokens: head.tokens as FrameDoc['tokens'], addresses: frame.assets, assets: Object.fromEntries(Object.entries(frame.assets).map(([id, at]) => [id, head.signed?.[id] ?? at])) }, docText);
 
 const FRAME_SOURCE = /^(\/p\/[^/]+\/c\/[^/]+\/motion)\/([0-9a-f-]{36})\/source(?:\?|$)/i;
 const HTTP_OK = 200;
@@ -115,13 +117,13 @@ function frameBatcher(fetcher: Fetcher, asksOf: () => SourceAsks): Fetcher {
   const ask = async (base: string, waiting: Waiting[]) => {
     markStartup(StartupStep.SourcesAsked);
     const batch = await fetcher(batchUrl(base, waiting))
-      .then((res) => (res.ok ? (res.json() as Promise<Batch>) : null))
+      .then(async (res) => (res.ok ? readSources(await res.text()) : null))
       .catch(() => null);
     markStartup(StartupStep.SourcesArrived);
 
     for (const w of waiting) {
-      const frame = batch?.frames[w.id];
-      w.settle(frame ? answered(signedFrame(batch, frame)) : fetcher(w.url));
+      const frame = batch?.frames.get(w.id);
+      w.settle(batch && frame ? answered(signedFrame(batch, frame)) : fetcher(w.url));
     }
   };
 
