@@ -174,7 +174,7 @@
             <p class="sub">{$_('login.signup.sub')}</p>
           {/if}
         {:else}
-          <h1 class="hidden-title">{$_('login.signin.title')}</h1>
+          <div class="hidden-title"><PageTitle size={TitleSize.Small} text={$_('login.signin.title')} /></div>
         {/if}
         {#if mode !== 'forgot'}
         {#if data.appleSignIn}
