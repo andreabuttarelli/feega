@@ -164,3 +164,31 @@ describe('code import of routes behind a login', () => {
     expect(JSON.stringify(done)).not.toContain(PASSWORD);
   });
 });
+
+describe('capturing several routes', () => {
+  it('opens a few tabs at once instead of one after another, and keeps the routes in order', async () => {
+    const { open } = pageServer();
+    let live = 0;
+    let peak = 0;
+    const slowOpen: BoardsAsk['open'] = async () => {
+      const tab = await open();
+      live += 1;
+      peak = Math.max(peak, live);
+      const close = tab.close;
+      tab.close = (async () => {
+        await new Promise((r) => setTimeout(r, 20));
+        live -= 1;
+        return close();
+      }) as typeof tab.close;
+      return tab;
+    };
+    const routes = ['/', '/a', '/b', '/c', '/d', '/e'];
+
+    const done = await importBoards(askOf(slowOpen, routes));
+
+    expect(done.outcome).toBe(CodeImportOutcome.Ok);
+    expect(peak).toBeGreaterThan(1);
+    expect(peak).toBeLessThanOrEqual(4);
+    expect(done.pages).toEqual(routes);
+  });
+});
