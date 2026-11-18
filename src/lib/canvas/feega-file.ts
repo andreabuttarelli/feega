@@ -8,6 +8,7 @@ export const FEEGA_MAX_BYTES = 200 * 1024 * 1024;
 
 const MANIFEST_ENTRY = 'manifest.json';
 const CANVAS_ENTRY = 'canvas.json';
+const STORED = 0;
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 
 export enum FeegaRefusal {
@@ -84,7 +85,7 @@ export function packFeega(file: FeegaFile, blobs: FeegaBlobs): Uint8Array {
   return zipSync({
     [MANIFEST_ENTRY]: strToU8(JSON.stringify(file.manifest)),
     [CANVAS_ENTRY]: strToU8(JSON.stringify(file.canvas)),
-    ...Object.fromEntries(blobs)
+    ...Object.fromEntries([...blobs].map(([name, bytes]) => [name, [bytes, { level: STORED }]]))
   });
 }
 

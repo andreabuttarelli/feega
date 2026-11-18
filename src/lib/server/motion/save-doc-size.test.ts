@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MotionFormat, newClip, newMotionDoc } from '@feega/motion-core/motion/doc';
 
 const appendRevision = vi.fn();
 const patchNodeData = vi.fn();
@@ -49,3 +50,38 @@ describe('saving a frame doc resizes its node to the doc canvas', () => {
     expect(resizeNode).not.toHaveBeenCalled();
   });
 });
+
+describe('the page colour saved with a revision', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    nodeSized(720, 450);
+  });
+
+  const saved = async (head: unknown) => {
+    appendRevision.mockResolvedValue({ outcome: 'written', head: { version: 2, doc: head, summary: null, actorKind: 'user' } });
+    const write = await saveMotionDoc(db, { orgId: 'o', nodeId: 'n', expectedVersion: 1, doc: page, actor });
+    return { write, patch: patchNodeData.mock.calls[0]?.[1].patch };
+  };
+
+  it('is the page fill of a drawn frame', async () => {
+    const blank = newMotionDoc(MotionFormat.Landscape);
+    const bg = newClip({ id: 'bg', from: 0, durationInFrames: 30, component: 'Shape', props: { x: 0.5, y: 0.5, width: 1, height: 1, fill: '#07080a' } });
+
+    const { write, patch } = await saved({ ...blank, tracks: [{ ...blank.tracks[0], clips: [bg] }, ...blank.tracks.slice(1)] });
+
+    expect(write.outcome).toBe('written');
+    expect(patch.standInFill).toBe('#07080a');
+  });
+
+  it.each([
+    ['no tracks', page],
+    ['tracks without clips', { ...page, tracks: [{}] }],
+    ['a shape without props', { ...page, tracks: [{ clips: [{ id: 'a', component: 'Shape' }] }] }]
+  ])('is left out, and the save still lands, for a head with %s', async (_, head) => {
+    const { write, patch } = await saved(head);
+
+    expect(write.outcome).toBe('written');
+    expect(patch.standInFill).toBeUndefined();
+  });
+});
+

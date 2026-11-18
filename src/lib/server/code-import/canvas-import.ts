@@ -283,7 +283,9 @@ function reportOf(found: RoutesFound, asked: string[], done: CodeImported): Rout
   return { discovered: found.routes.length, leftOut: leftOut(found.routes, { asked: asked.length ? asked : ['/'], landed: done.pages, links: done.links ?? [] }) };
 }
 
-export type ImportLinker = (nodeId: string, origin: CodeOriginData, listed: RoutesFound) => Promise<unknown>;
+export const importedFrames = (done: { frameId: string; parts?: string[] }) => [done.frameId, ...(done.parts ?? [])];
+
+export type ImportLinker = (nodeId: string, origin: CodeOriginData, listed: RoutesFound, components: { name: string; file: string }[]) => Promise<unknown>;
 
 const unlinked: ImportLinker = async () => null;
 
@@ -310,8 +312,12 @@ export async function importRoutesInto(scope: CodeScope, canvasId: string, ask: 
   }
   const listed = await discovering;
   if (done.code) {
-    await rememberOrigin(scope, done.frameId, { ...done.code, map: mapOf(listed, done, { asked: routes.length ? routes : ['/'], rev: done.code.sha }) });
-    await link(done.frameId, { ...done.code, routes: done.pages.length ? done.pages : done.code.routes }, listed);
+    const origin = { ...done.code, map: mapOf(listed, done, { asked: routes.length ? routes : ['/'], rev: done.code.sha }) };
+    const components = (done.library?.components ?? []).map((c) => ({ name: c.name, file: c.file }));
+    for (const frameId of importedFrames(done)) {
+      await rememberOrigin(scope, frameId, origin);
+      await link(frameId, { ...done.code, routes: done.pages.length ? done.pages : done.code.routes }, listed, components);
+    }
   }
   return { ...done, routes: reportOf(listed, routes, done) };
 }

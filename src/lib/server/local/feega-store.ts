@@ -1,11 +1,12 @@
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { rename, writeFile } from 'node:fs/promises';
+import { standInFill } from '$lib/motion/stand-in-fill';
+import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import type { Db } from '$lib/server/db/client';
 import { FEEGA_EXTENSION, FEEGA_REFUSAL_MESSAGE, FEEGA_VERSION, idsIn, packFeega, unpackFeega, type FeegaBlobs, type FeegaCanvas, type FeegaFile } from '$lib/canvas/feega-file';
 import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
 import { FONT_MIME_TYPES, fontFileOf } from '$lib/motion/fonts/library';
 import { orgFontPrefix } from '$lib/motion/fonts/upload-path';
+import { createPacker, savingPath, type PackJob } from './feega-packer';
 import { createMemoryDb, type Blobs, type Change, type Row, type Tables } from './memory-db';
 
 import { LOCAL_ORG_ID, LOCAL_USER, LOCAL_USER_ID } from '$lib/local-user';
@@ -21,19 +22,6 @@ export const MAX_PERSISTED_EVENTS = 1000;
 const BUCKETS = [ASSET_BUCKET, 'brand-knowledge', 'media'];
 
 export type LocalPlace = { projectId: string; canvasId: string };
-
-export type AtomicFs = {
-  writeFile: (path: string, bytes: Uint8Array) => Promise<void>;
-  rename: (from: string, to: string) => Promise<void>;
-};
-
-const nodeFs: AtomicFs = { writeFile, rename };
-
-export async function writeAtomically(path: string, bytes: Uint8Array, fs: AtomicFs = nodeFs): Promise<void> {
-  const temporary = `${path}.tmp`;
-  await fs.writeFile(temporary, bytes);
-  await fs.rename(temporary, path);
-}
 
 function writeAtomicallyNow(path: string, bytes: Uint8Array): void {
   writeFileSync(`${path}.tmp`, bytes);
@@ -83,7 +71,7 @@ function seed(file: FeegaFile, blobs: FeegaBlobs): { tables: Tables; storage: Bl
     ['orgs_members', [{ ...org, id: crypto.randomUUID(), user_id: LOCAL_USER_ID, role: 'owner', created_at: at }]],
     ['projects', [{ ...org, id: place.projectId, name: file.manifest.canvasName, slug: 'local', mode: 'standard', brand_id: null, deleted_at: null, created_at: at, updated_at: at }]],
     ['canvases', [{ ...org, id: place.canvasId, project_id: place.projectId, name: file.manifest.canvasName, viewport: null, deleted_at: null, created_at: at, updated_at: at }]],
-    ['nodes', file.canvas.nodes.map((n) => ({ ...org, id: n.id, project_id: place.projectId, canvas_id: place.canvasId, type: n.type, display_name: n.displayName, x: n.position.x, y: n.position.y, z: n.position.z, width: n.size.width, height: n.size.height, data: n.data, version: 1, deleted_at: null, created_at: at, updated_at: at }))],
+    ['nodes', file.canvas.nodes.map((n) => ({ ...org, id: n.id, project_id: place.projectId, canvas_id: place.canvasId, type: n.type, display_name: n.displayName, x: n.position.x, y: n.position.y, z: n.position.z, width: n.size.width, height: n.size.height, data: withStandIn(n.data, file.canvas.heads[n.id]?.doc), version: 1, deleted_at: null, created_at: at, updated_at: at }))],
     ['nodes_connections', file.canvas.connections.map((c) => ({ ...org, id: c.id, canvas_id: place.canvasId, source_node_id: c.sourceNodeId, target_node_id: c.targetNodeId, source_handle: c.sourceHandle, target_handle: c.targetHandle, mode: c.mode, deleted_at: null, created_at: at }))],
     ['motion_revisions', Object.entries(file.canvas.heads).map(([nodeId, head]) => ({ ...org, id: crypto.randomUUID(), node_id: nodeId, version: head.version, doc: head.doc, summary: null, actor_kind: 'system', actor_id: null, agent_key: null, sealed: true, created_at: file.manifest.exportedAt }))],
     ['canvas_events', (file.canvas.events ?? []).map((e) => ({ ...e, org_id: LOCAL_ORG_ID, canvas_id: place.canvasId }))],
@@ -91,6 +79,14 @@ function seed(file: FeegaFile, blobs: FeegaBlobs): { tables: Tables; storage: Bl
     ['org_fonts', assets.filter((a) => isFont(a.mime_type) && a.url).map((a) => orgFontRow(a, at))]
   ]);
   return { tables, storage, place };
+}
+
+function withStandIn(data: Record<string, unknown>, doc: unknown): Record<string, unknown> {
+  if (data.standInFill || !doc) {
+    return data;
+  }
+  const fill = standInFill(doc);
+  return fill ? { ...data, standInFill: fill } : data;
 }
 
 const isFont = (mimeType: unknown) => FONT_MIME_TYPES.includes(String(mimeType));
@@ -106,7 +102,7 @@ const assetFileName = (url: string) => `${ASSET_DIR}${url.split('/').map((part) 
 
 type AcpChoice = { acpAgent: string | null; acpModels: Record<string, string> };
 
-function snapshot(tables: Tables, storage: Blobs, place: LocalPlace, acp: AcpChoice): Uint8Array {
+function packJob(tables: Tables, storage: Blobs, place: LocalPlace, acp: AcpChoice): PackJob {
   const rows = (table: string) => tables.get(table) ?? [];
   const canvas = rows('canvases').find((c) => c.id === place.canvasId);
   const nodes = rows('nodes').filter((n) => n.canvas_id === place.canvasId && live(n));
@@ -126,40 +122,54 @@ function snapshot(tables: Tables, storage: Blobs, place: LocalPlace, acp: AcpCho
     events: rows('canvas_events').filter((e) => e.canvas_id === place.canvasId).sort((a, b) => Number(a.id) - Number(b.id)).slice(-MAX_PERSISTED_EVENTS).map(({ org_id: _org, canvas_id: _canvas, ...event }) => event)
   };
 
-  const referenced = new Set(idsIn(body));
-  const blobs: FeegaBlobs = new Map();
-  const assets = rows('assets').filter((a) => referenced.has(String(a.id).toLowerCase()) || isFont(a.mime_type)).map((a) => {
+  const assets = rows('assets').map((a) => {
     const url = (a.url as string | null) ?? null;
     const blob = url && !ABSOLUTE_URL.test(url) ? BUCKETS.map((b) => storage.get(`${b}/${url}`)).find(Boolean) : undefined;
     const file = blob && url ? assetFileName(url) : null;
-    if (blob && file) {
-      blobs.set(file, blob.bytes);
-    }
-    return { id: String(a.id), type: String(a.type), mimeType: (a.mime_type as string | null) ?? null, width: (a.width as number | null) ?? null, height: (a.height as number | null) ?? null, durationS: (a.duration_s as number | null) ?? null, content: (a.content as string | null) ?? null, url: url && ABSOLUTE_URL.test(url) ? url : null, file };
+    const row = { id: String(a.id), type: String(a.type), mimeType: (a.mime_type as string | null) ?? null, width: (a.width as number | null) ?? null, height: (a.height as number | null) ?? null, durationS: (a.duration_s as number | null) ?? null, content: (a.content as string | null) ?? null, url: url && ABSOLUTE_URL.test(url) ? url : null, file };
+    return { row, always: isFont(a.mime_type), bytes: blob?.bytes ?? null };
   });
 
   const name = String(canvas?.name ?? 'Local canvas');
-  return packFeega({ manifest: { format: 'feega', version: FEEGA_VERSION, exportedAt: new Date().toISOString(), canvasName: name, source: place, ...acp }, canvas: { ...body, assets } }, blobs);
+  return { manifest: { format: 'feega', version: FEEGA_VERSION, exportedAt: new Date().toISOString(), canvasName: name, source: place, ...acp }, body, assets };
+}
+
+function snapshot(job: PackJob): Uint8Array {
+  const referenced = new Set(idsIn(job.body));
+  const kept = job.assets.filter((a) => a.always || referenced.has(a.row.id.toLowerCase()));
+  const blobs: FeegaBlobs = new Map(kept.flatMap((a) => (a.row.file && a.bytes ? [[a.row.file, a.bytes] as const] : [])));
+  return packFeega({ manifest: job.manifest, canvas: { ...job.body, assets: kept.map((a) => a.row) } }, blobs);
 }
 
 export type FeegaStoreOptions = { origin: string; saveDelayMs?: number; latencyMs?: number };
 
 export function openFeegaStore(path: string, options: FeegaStoreOptions) {
   const { file, blobs } = readFile(path);
+  rmSync(savingPath(path), { force: true });
   const { tables, storage, place } = seed(file, blobs);
   const listeners = new Set<(change: Change) => void>();
   let timer: ReturnType<typeof setTimeout> | null = null;
   let dirty = !existsSync(path);
   let saving: Promise<void> = Promise.resolve();
   const acp: AcpChoice = { acpAgent: file.manifest.acpAgent ?? null, acpModels: { ...file.manifest.acpModels } };
+  const packer = createPacker();
+
+  const write = async () => {
+    if (!dirty) {
+      return;
+    }
+    dirty = false;
+    try {
+      await packer.write(path, packJob(tables, storage, place, acp));
+    } catch (error) {
+      dirty = true;
+      console.error(`feega local: could not save ${path}`, error);
+    }
+  };
 
   const save = () => {
     timer = null;
-    if (!dirty) {
-      return saving;
-    }
-    dirty = false;
-    saving = saving.then(() => writeAtomically(path, snapshot(tables, storage, place, acp)));
+    saving = saving.then(write);
     return saving;
   };
 
@@ -220,9 +230,10 @@ export function openFeegaStore(path: string, options: FeegaStoreOptions) {
         clearTimeout(timer);
         timer = null;
       }
+      void packer.stop();
       if (dirty) {
         dirty = false;
-        writeAtomicallyNow(path, snapshot(tables, storage, place, acp));
+        writeAtomicallyNow(path, snapshot(packJob(tables, storage, place, acp)));
       }
     }
   };

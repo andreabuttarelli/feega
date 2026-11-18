@@ -1,7 +1,7 @@
 const KEEP = 600;
 const FRAMES_KEPT = 2400;
 
-export type CoreFrameCount = { at: number; ms: number; moving: boolean; plans: number; walked: number; planMs: number; bakes: number; bakeMs: number; uploadBytes: number; unsharp: number; uncovered: number; step: number; tiles: number; draws: number; uploads: number; fallbackMs: number; exact: boolean; pending: boolean };
+export type CoreFrameCount = { at: number; ms: number; moving: boolean; plans: number; walked: number; planMs: number; bakes: number; bakeMs: number; uploadBytes: number; unsharp: number; uncovered: number; step: number; tiles: number; draws: number; uploads: number; fallbackMs: number; exact: boolean; swaps: number; rebaked: number; stretch: number; pending: boolean };
 
 export type TextureReport = { count: number; bytes: number; largest: string[] };
 
@@ -75,8 +75,8 @@ export function addTally(json: string) {
 export function countFrame(began: number, counts: Float64Array | undefined, moving: boolean, pending: boolean) {
   const stats = (window.__gpuCanvas ??= { render: [] });
   const frames = (stats.frames ??= []);
-  const [plans = 0, walked = 0, planMs = 0, bakes = 0, bakeMs = 0, uploadBytes = 0, unsharp = 0, uncovered = 0, step = 0, tiles = 0, draws = 0, uploads = 0, fallbackMs = 0, exact = 0] = counts ?? [];
-  frames.push({ at: began, ms: performance.now() - began, moving, plans, walked, planMs, bakes, bakeMs, uploadBytes, unsharp, uncovered, step, tiles, draws, uploads, fallbackMs, exact: exact === 1, pending });
+  const [plans = 0, walked = 0, planMs = 0, bakes = 0, bakeMs = 0, uploadBytes = 0, unsharp = 0, uncovered = 0, step = 0, tiles = 0, draws = 0, uploads = 0, fallbackMs = 0, exact = 0, swaps = 0, rebaked = 0, stretch = 0] = counts ?? [];
+  frames.push({ at: began, ms: performance.now() - began, moving, plans, walked, planMs, bakes, bakeMs, uploadBytes, unsharp, uncovered, step, tiles, draws, uploads, fallbackMs, exact: exact === 1, swaps, rebaked, stretch, pending });
   if (frames.length > FRAMES_KEPT) {
     frames.shift();
   }
