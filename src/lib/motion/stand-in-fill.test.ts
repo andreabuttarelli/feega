@@ -28,4 +28,17 @@ describe('the colour a frame shows before it is drawn', () => {
     expect(standInFill(doc)).toBe('#fafafa');
     expect(standInFill(pageOf())).toBeNull();
   });
+
+  it.each([
+    ['nothing', undefined],
+    ['null', null],
+    ['a doc with no tracks', { width: 1440, height: 900 }],
+    ['tracks that are not a list', { tracks: 'x' }],
+    ['a track with no clips', { tracks: [{}] }],
+    ['clips that are not objects', { tracks: [{ clips: [null, 3, 'Shape'] }] }],
+    ['a shape with no props', { tracks: [{ clips: [{ id: 'a', component: 'Shape' }] }] }],
+    ['a legacy gradient its fills cannot parse', { tracks: [{ clips: [{ id: 'a', component: 'Shape', props: { width: 1, height: 1, fillKind: 'linear', gradientAngle: 'wide' } }] }] }]
+  ])('is nothing, never an error, for %s', (_, doc) => {
+    expect(standInFill(doc)).toBeNull();
+  });
 });

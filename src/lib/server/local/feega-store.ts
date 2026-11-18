@@ -1,5 +1,4 @@
 import { standInFill } from '$lib/motion/stand-in-fill';
-import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import type { Db } from '$lib/server/db/client';
@@ -86,12 +85,8 @@ function withStandIn(data: Record<string, unknown>, doc: unknown): Record<string
   if (data.standInFill || !doc) {
     return data;
   }
-  try {
-    const fill = standInFill(doc as MotionDoc);
-    return fill ? { ...data, standInFill: fill } : data;
-  } catch {
-    return data;
-  }
+  const fill = standInFill(doc);
+  return fill ? { ...data, standInFill: fill } : data;
 }
 
 const isFont = (mimeType: unknown) => FONT_MIME_TYPES.includes(String(mimeType));

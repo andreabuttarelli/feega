@@ -98,6 +98,24 @@ describe('il file .feega è il database della modalità locale', () => {
     expect(opened.data.standInFill).toBe('#13111c');
   });
 
+  it.each([
+    ['senza tracce', { width: 1440, height: 900 }],
+    ['con tracce senza clip', { width: 1440, height: 900, tracks: [{}] }],
+    ['con una forma senza props', { width: 1440, height: 900, tracks: [{ clips: [{ id: 'a', component: 'Shape' }] }] }]
+  ])('un file con un documento %s si apre, senza colore della pagina', async (_, doc) => {
+    const path = tempFile();
+    const first = openFeegaStore(path, { origin: ORIGIN });
+    const node = await createNode(first.db, { ...scopeOf(first), type: 'motion', x: 0, y: 0, data: { docHeadRevision: 1, interactive: false }, actor });
+    await appendRevision(first.db, { orgId: LOCAL_ORG_ID, nodeId: node.id, expectedVersion: 0, doc: newMotionDoc(MotionFormat.Square), actor });
+    await first.db.from('motion_revisions').update({ doc }).eq('node_id', node.id);
+    await first.db.from('nodes').update({ data: { docHeadRevision: 1, interactive: false } }).eq('id', node.id);
+    await first.flush();
+
+    const [opened] = await listNodes(openFeegaStore(path, { origin: ORIGIN }).db, scopeOf(first));
+
+    expect(opened.data).not.toHaveProperty('standInFill');
+  });
+
   it('un nodo cancellato non torna alla riapertura', async () => {
     const path = tempFile();
     const store = openFeegaStore(path, { origin: ORIGIN });
