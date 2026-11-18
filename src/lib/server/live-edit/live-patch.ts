@@ -4,7 +4,7 @@ import { applyEdits, type FileChange, type ReadFile } from '$lib/server/code-imp
 
 export type LiveAt = { file: string; line: number; col: number };
 
-export type LiveChange = { prop: LiveProp; value: string; side?: Side; was?: string };
+export type LiveChange = { prop: LiveProp; value: string; side?: Side; was?: string; viewport?: number };
 
 export type LivePatched = { files: FileChange[]; skipped: string[] };
 
@@ -39,13 +39,22 @@ function openTagEnd(text: string, start: number): number {
   return -1;
 }
 
-function swapped(cls: string, rule: ClassRule, made: string, side: Side): string {
+const BASE = '';
+const MIN_WIDTH_PX: Record<string, number> = { [BASE]: 0, sm: 640, md: 768, lg: 1024, xl: 1280, '2xl': 1536 };
+
+const variantOf = (token: string) => token.slice(0, Math.max(0, token.lastIndexOf(':')));
+const utilityOf = (token: string) => token.slice(token.lastIndexOf(':') + 1);
+const appliesAt = (token: string, viewport: number) => (MIN_WIDTH_PX[variantOf(token)] ?? Infinity) <= viewport;
+
+function swapped(cls: string, rule: ClassRule, made: string, side: Side, viewport: number): string {
   const parts = cls.split(/(\s+)/);
-  const at = parts.findIndex((p) => p.trim() && !p.includes(':') && rule.owns(p, side));
-  if (at < 0) {
+  const owned = parts.map((token, at) => ({ token, at })).filter(({ token }) => token.trim() && appliesAt(token, viewport) && rule.owns(utilityOf(token), side));
+  if (!owned.length) {
     return cls.trimEnd() ? `${cls.trimEnd()} ${made}` : made;
   }
-  parts[at] = made;
+  const seen = owned.reduce((best, next) => (MIN_WIDTH_PX[variantOf(next.token)] > MIN_WIDTH_PX[variantOf(best.token)] ? next : best));
+  const variant = variantOf(seen.token);
+  parts[seen.at] = variant ? `${variant}:${made}` : made;
   return parts.join('');
 }
 
@@ -70,7 +79,7 @@ async function classPatch(read: ReadFile, at: LiveAt, change: LiveChange, rule: 
   const made = rule.make(change.value, side);
   const closing = open.endsWith('/>') ? open.length - 2 : open.length - 1;
   const attr = /\.(t|j)sx$/.test(at.file) ? 'className' : 'class';
-  const next = found ? open.replace(CLASS_ATTR, `$1"${swapped(found[3] ?? '', rule, made, side)}"`) : `${open.slice(0, closing).trimEnd()} ${attr}="${made}"${open.slice(closing)}`;
+  const next = found ? open.replace(CLASS_ATTR, `$1"${swapped(found[3] ?? '', rule, made, side, change.viewport ?? 0)}"`) : `${open.slice(0, closing).trimEnd()} ${attr}="${made}"${open.slice(closing)}`;
   const after = source.slice(0, start) + next + source.slice(end + 1);
   return { files: after === source ? [] : [{ path: at.file, before: source, after }], skipped: [] };
 }

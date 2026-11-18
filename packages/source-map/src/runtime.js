@@ -37,7 +37,8 @@ export function inspectElement(element, { maxHtml = DEFAULT_MAX_HTML } = {}) {
     rect: rectOf(tagged),
     classes: tagged.getAttribute('class') ?? '',
     text: tagged.children.length ? null : tagged.textContent,
-    rem: rootFontSize(tagged.ownerDocument)
+    rem: rootFontSize(tagged.ownerDocument),
+    viewport: tagged.ownerDocument.defaultView.innerWidth
   };
 }
 

@@ -1,7 +1,7 @@
 import { loadSession } from '../lib/auth.ts';
 import { LiveProp, LiveSide, liveChangesApi, liveEditApi, livePushApi, liveUndoApi, type LiveEdited } from '../lib/live-edit.ts';
 
-export type LiveEditOptions = { side?: string; token?: string; was?: string };
+export type LiveEditOptions = { side?: string; token?: string; was?: string; viewport?: string };
 
 async function token(): Promise<string> {
   const session = await loadSession();
@@ -27,7 +27,7 @@ export async function cmdLiveEdit(at: string, prop: string, value: string | unde
     throw new Error('Give a value, or --token for an exact Tailwind token');
   }
 
-  printEdited(await liveEditApi(await token(), { at, prop: prop as LiveProp, value, token: options.token, side: options.side as LiveSide | undefined, was: options.was }));
+  printEdited(await liveEditApi(await token(), { at, prop: prop as LiveProp, value, token: options.token, side: options.side as LiveSide | undefined, was: options.was, viewport: options.viewport ? Number(options.viewport) : undefined }));
 }
 
 export async function cmdLiveUndo(sha: string) {

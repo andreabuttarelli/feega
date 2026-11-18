@@ -21,7 +21,7 @@ export function registerLiveEditTools(server: McpServer) {
       description:
         'Local Feega only. `edit` (default) changes one property of the element at `at` (the `file:line:col` in its `data-feega-src`, set by `feega init`): text, color, fill, fontSize, fontWeight, padding, margin, gap or radius. ' +
         'Only the one Tailwind class or text is rewritten, with a repo token when the value matches one; commits on the branch `feega/live`, which the live frames run from, never on the user branch. ' +
-        '`side` (x, y, t, r, b, l) narrows padding, margin and gap. `undo` reverts the commit `sha`. `changes` lists files and the diff. `push` sends them to a `feega/` branch. Free.',
+        '`side` (x, y, t, r, b, l) narrows padding, margin and gap. `viewport` is the page width the change is for: with `sm:`/`lg:` classes, the one that applies at that width is changed. `undo` reverts the commit `sha`. `changes` lists files and the diff. `push` sends them to a `feega/` branch. Free.',
       inputSchema: z.object({
         action: z.enum(LiveAction).optional(),
         at: z.string().optional(),
@@ -30,11 +30,12 @@ export function registerLiveEditTools(server: McpServer) {
         token: z.string().optional(),
         side: z.enum(LiveSide).optional(),
         was: z.string().optional(),
+        viewport: z.number().positive().optional(),
         sha: z.string().optional()
       }),
       annotations: { readOnlyHint: false, destructiveHint: false }
     },
-    async ({ action, at, prop, value, token, side, was, sha }) =>
+    async ({ action, at, prop, value, token, side, was, viewport, sha }) =>
       withAuth((auth) => {
         if (action === LiveAction.Changes) {
           return liveChangesApi(auth);
@@ -51,7 +52,7 @@ export function registerLiveEditTools(server: McpServer) {
         if (!at || !prop || (value === undefined && !token)) {
           throw new Error(MISSING_EDIT);
         }
-        return liveEditApi(auth, { at, prop, value, token, side, was });
+        return liveEditApi(auth, { at, prop, value, token, side, was, viewport });
       })
   );
 }

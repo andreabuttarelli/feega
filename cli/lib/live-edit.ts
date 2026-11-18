@@ -21,7 +21,7 @@ export enum LiveSide {
   Left = 'l'
 }
 
-export type LiveEditAsk = { at: string; prop: LiveProp; value?: string; token?: string; side?: LiveSide; was?: string };
+export type LiveEditAsk = { at: string; prop: LiveProp; value?: string; token?: string; side?: LiveSide; was?: string; viewport?: number };
 
 export type LiveEdited = { ok: true; sha: string; files: string[]; token: string | null; patch: string };
 

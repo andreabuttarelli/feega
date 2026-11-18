@@ -120,4 +120,28 @@ describe('livePatch', () => {
     expect(out.files).toEqual([]);
     expect(out.skipped[0]).toMatch(/not where/);
   });
+
+  it('a 1440 di larghezza cambia la classe che vale lì, non quella di base che non si vede', async () => {
+    const read = filesOf({ [ABOUT_H1.file]: ABOUT });
+
+    const out = await livePatch(read, ABOUT_H1, { prop: LiveProp.FontSize, value: '[40px]', viewport: 1440 });
+
+    expect(out.files[0].after).toContain('class="text-2xl sm:text-3xl lg:text-[40px] font-heading');
+  });
+
+  it('a 390 di larghezza cambia la classe di base', async () => {
+    const read = filesOf({ [ABOUT_H1.file]: ABOUT });
+
+    const out = await livePatch(read, ABOUT_H1, { prop: LiveProp.FontSize, value: '[40px]', viewport: 390 });
+
+    expect(out.files[0].after).toContain('class="text-[40px] sm:text-3xl lg:text-4xl font-heading');
+  });
+
+  it('a 700 di larghezza il padding orizzontale che vale è quello di sm', async () => {
+    const read = filesOf({ [ABOUT_BOX.file]: ABOUT });
+
+    const out = await livePatch(read, ABOUT_BOX, { prop: LiveProp.Padding, side: Side.X, value: '8', viewport: 700 });
+
+    expect(out.files[0].after).toContain('px-4 sm:px-8 lg:px-12 py-8');
+  });
 });

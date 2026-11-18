@@ -65,6 +65,7 @@ program
   .option('--side <side>', 'x, y, t, r, b or l, for padding, margin and gap')
   .option('--token <token>', 'exact Tailwind token instead of a value')
   .option('--was <text>', 'current text, when prop is text')
+  .option('--viewport <px>', 'page width the change is for: the class with the breakpoint that applies there is the one changed')
   .action(async (at: string, prop: string, value: string | undefined, options) => {
     const { cmdLiveEdit } = await import('./commands/live-edit.ts');
     await cmdLiveEdit(at, prop, value, options);

@@ -10,7 +10,7 @@ import { LiveProp, type Side } from '$lib/canvas/live-fields';
 import { livePatch, type LiveAt } from './live-patch';
 import { liveTheme, tokenFor } from './live-tokens';
 
-export type LiveEditAsk = { at: string; prop: LiveProp; value?: string; token?: string; side?: Side; was?: string; rem?: number };
+export type LiveEditAsk = { at: string; prop: LiveProp; value?: string; token?: string; side?: Side; was?: string; rem?: number; viewport?: number };
 
 export type LiveEdited = { ok: true; sha: string; files: string[]; token: string | null; patch: string };
 
@@ -75,7 +75,7 @@ async function edited(root: string, ask: LiveEditAsk): Promise<LiveEdited | Live
 
   const token = await tokenOf(root, ask);
   const value = token ?? ask.value ?? '';
-  const out = await livePatch(reader(root), at, { prop: ask.prop, value, side: ask.side, was: ask.was });
+  const out = await livePatch(reader(root), at, { prop: ask.prop, value, side: ask.side, was: ask.was, viewport: ask.viewport });
   if (!out.files.length) {
     return { ok: false, reason: out.skipped[0] ?? 'nothing changed' };
   }
