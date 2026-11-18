@@ -41,7 +41,7 @@
 <Story />
 <Faq />
 
-<section class="closing">
+<section class="closing site-wide">
   <h2>Start designing in your code</h2>
   <Modes id="closing-modes" />
 </section>
@@ -59,6 +59,11 @@
     text-align: center;
   }
 
+  .closing :global(.modes) {
+    width: 100%;
+    max-width: none;
+  }
+
   .closing h2 {
     margin: 0;
     font-family: 'Instrument Serif', serif;
@@ -70,7 +75,12 @@
   }
 
   @media (min-width: 810px) {
-    .closing h2 {
+    .closing :global(.modes) {
+    width: 100%;
+    max-width: none;
+  }
+
+  .closing h2 {
       font-size: 72px;
     }
   }
