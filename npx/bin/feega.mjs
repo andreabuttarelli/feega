@@ -8,7 +8,7 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
 import { sendTelemetry, telemetryEnv } from '../telemetry.mjs';
-import { ImportStep, MCP_ENTRY, USAGE, appDir, bundleSource, boundUrl, cachedVersions, folderApp, freePort, importAsk, discoverAsk, importReport, routePlan, eventLine, importStep, isCached, latestAppVersion, markCached, mcpEnv, parseArgs, pickVersion, placeOf, readyProbe, served, untilReady } from '../launcher.mjs';
+import { ImportStep, MCP_ENTRY, USAGE, appDir, bundleSource, boundUrl, cachedVersions, exitOf, folderApp, freePort, importAsk, discoverAsk, importReport, routePlan, eventLine, importStep, isCached, latestAppVersion, markCached, mcpEnv, parseArgs, pickVersion, placeOf, readyProbe, served, untilReady } from '../launcher.mjs';
 
 const MIN_NODE_MAJOR = 22;
 const WEBSTORAGE_NODE_MAJOR = 25;
@@ -185,7 +185,13 @@ function forward(child) {
   for (const signal of ['SIGINT', 'SIGTERM']) {
     process.on(signal, () => child.kill(signal));
   }
-  child.on('exit', (code) => process.exit(code ?? 0));
+  child.on('exit', (code, signal) => {
+    const out = exitOf(code, signal);
+    if (out.line) {
+      console.error(out.line);
+    }
+    process.exit(out.code);
+  });
 }
 
 function serveMcp(dir, port) {

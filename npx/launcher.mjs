@@ -295,3 +295,13 @@ export async function untilReady(probe, exited, pollMs) {
     }
   }
 }
+
+const KILLED = 1;
+
+export function exitOf(code, signal) {
+  if (signal) {
+    return { code: KILLED, line: `feega: the app server was stopped by ${signal}` };
+  }
+  return { code: code ?? 0, line: code ? `feega: the app server exited with code ${code}` : null };
+}
+
