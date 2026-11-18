@@ -268,6 +268,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import CodeImportDialog from '$lib/components/canvas/CodeImportDialog.svelte';
   import LiveFrameDialog from '$lib/components/canvas/LiveFrameDialog.svelte';
   import LiveFrameNode from '$lib/components/canvas/LiveFrameNode.svelte';
+  import LiveInspector from '$lib/components/canvas/LiveInspector.svelte';
+  import { liveSelection } from '$lib/canvas/live-selection.svelte';
   import { LIVE_HEIGHT, liveFrameData, liveFrameOf, liveRoutes, type Breakpoint } from '$lib/canvas/live-frame';
   import { captureLiveSnapshot, devServerAction, devServerStatus } from '$lib/canvas/dev-server-client';
   import { isLocalMode } from '$lib/local-user';
@@ -4703,6 +4705,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {#if inpaintFor}
     <InpaintDialog src={assetUrl(sourceAssetIdOf(nodes.find((n) => n.id === inpaintFor)?.data ?? {}) ?? '') ?? ''} onapply={(prompt, mask) => inpaint(inpaintFor!, prompt, mask)} onclose={() => (inpaintFor = null)} />
   {/if}
+  {#if liveSelection.current}
+    <LiveInspector selected={liveSelection.current} onstep={(step: FrameStep) => undoStack.push({ source: 'frame', step })} onfail={(message: string) => (failed = message)} />
+  {/if}
   {#if liveFrameAt}
     <LiveFrameDialog routes={liveRoutes(nodes.map((n) => n.data ?? {}))} onadd={(route, breakpoint) => void addLiveFrame(route, breakpoint)} onclose={() => (liveFrameAt = null)} />
   {/if}
@@ -5045,7 +5050,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
         {:else if liveFrameOf(row.data)}
           {@const liveFrame = liveFrameOf(row.data)}
           {#if liveFrame}
-            <LiveFrameNode live={liveFrame} mode={live} origin={devOrigin} poster={liveFrame.poster ? canvasAssetUrl(data.projectId, data.canvas.id, liveFrame.poster, AssetSize.Full) : null} onsnapshot={() => shootLive(id)} />
+            <LiveFrameNode {id} {selected} live={liveFrame} mode={live} origin={devOrigin} poster={liveFrame.poster ? canvasAssetUrl(data.projectId, data.canvas.id, liveFrame.poster, AssetSize.Full) : null} onsnapshot={() => shootLive(id)} />
           {/if}
         {:else if frame}
           {@const codeRow = frame.source === 'view' ? nodes.find((n) => n.id === frame.sourceNodeId) : null}
