@@ -14,7 +14,8 @@ const Channel = {
   Place: 'native-canvas:place',
   Close: 'native-canvas:close',
   Stats: 'native-canvas:stats',
-  Report: 'native-canvas:report'
+  Report: 'native-canvas:report',
+  Available: 'native-canvas:available'
 };
 
 const DEBUG_FLAG = 'FEEGA_NATIVE_DEBUG';

@@ -25,7 +25,11 @@
       "updates.cjs",
       "files.cjs",
       "server.cjs",
-      "chrome.cjs"
+      "chrome.cjs",
+      "preload.cjs",
+      "local-agents.cjs",
+      "acp-agents.cjs",
+      "acp-client.cjs"
     ],
     "directories": {
       "buildResources": "build",
