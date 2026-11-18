@@ -3,23 +3,22 @@
   import { AGENT_LOGOS } from '../home';
   import { APP_URL } from '../links';
 
-  type Copy = { first: string; second: string; agents: string; before: string; after: string };
+  type Copy = { before: string };
 
   const COPY: Record<string, Copy> = {
-    '1': { first: 'Open the Feega VS Code extension in your codebase →', second: 'start designing directly in your real app.', agents: 'Use it with your', before: 'Then move to', after: 'to collaborate in real time.' },
-    '2': { first: 'Open the Feega VS Code extension in your codebase.', second: 'Start designing directly in your real app.', agents: 'Use it with your', before: 'Then move to', after: 'to collaborate in real time.' },
-    '3': { first: 'Open the Feega VS Code extension in your codebase →', second: 'start designing directly in real app.', agents: 'Use with your', before: 'Move then in', after: 'to collaborate in real-time' }
+    '1': { before: 'Open the Feega VS Code extension in your codebase, design directly in your real app with your' },
+    '2': { before: 'Open the Feega VS Code extension in your codebase to design directly in your real app with your' },
+    '3': { before: 'Design directly in your real app from the Feega VS Code extension, with your' }
   };
 
-  const secondary = $derived(page.url.searchParams.get('last') === 'sub');
   const copy = $derived(COPY[page.url.searchParams.get('copy') ?? '1'] ?? COPY['1']);
 </script>
 
 <section class="open site-wide">
   <h2 data-agent-id="open-title">
-    {copy.first}<br />{copy.second}<br />{copy.agents}
-    <span class="tail">agents<span class="logos" data-agent-id="open-logos">{#each AGENT_LOGOS as logo (logo.file)}<img src="/site/home/{logo.file}" alt={logo.name} width={logo.width} height="32" />{/each}</span></span>
-    <span class="closing" class:secondary>{copy.before} <a href={APP_URL}>Feega Cloud</a> {copy.after}</span>
+    {copy.before}
+    <span class="tail">agents<span class="logos" data-agent-id="open-logos">{#each AGENT_LOGOS as logo (logo.file)}<img src="/site/home/{logo.file}" alt={logo.name} width={logo.width} height="32" />{/each}</span>,</span>
+    then move to <a href={APP_URL}>Feega Cloud</a> to collaborate in real time.
   </h2>
 </section>
 
@@ -41,18 +40,7 @@
     overflow-wrap: break-word;
   }
 
-  .closing {
-    display: block;
-  }
-
-  .closing.secondary {
-    margin-top: 0.5em;
-    font-size: 0.6em;
-    line-height: 1.3;
-    opacity: 0.6;
-  }
-
-  .closing a {
+  h2 a {
     text-decoration: underline;
     text-underline-offset: 0.15em;
   }
