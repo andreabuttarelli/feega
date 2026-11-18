@@ -1,5 +1,7 @@
 # Feega for Cursor and VS Code
 
+![Three agents editing design frames on a Feega canvas at the same time](media/canvas.png)
+
 Open `.feega` canvases in an editor tab: motion video, UI and graphic design on one infinite canvas, saved to a file in your repo. Your editor's agent connects to the open canvas over MCP and edits it live.
 
 - **Open a `.feega` file** to see it as a canvas.
