@@ -129,7 +129,7 @@
   import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
   import { estimatedText, type TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
   import { stackFrame, stackPlaced } from '$lib/motion/layout/ops';
-  import { dragInStack, dropInStack, followCursor, stackLineAt, type DropLine } from '$lib/motion/layout/stack-drag';
+  import { dropInStack, holdInStack, stackLineAt, type DropLine } from '$lib/motion/layout/stack-drag';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
   import { commitScoped, doubledOn, textScope } from '$lib/canvas/scoped-text';
   import { mul2d } from '@feega/motion-core/motion/parent';
@@ -3012,6 +3012,7 @@
 
     const carry = (ev: PointerEvent): Carry => carryOf({ down, now: local(ev), started, frame: edited, world: toWorld(view, local(ev)) });
     const stackChild = grip === Grip.Move && work.ids.length === 1 && stackPlaced(work.doc, work.ids[0]) ? work.ids[0] : null;
+    const held = stackChild ? holdInStack(work.doc, stackChild, boxes, measure) : null;
     const joinable = grip === Grip.Move && work.ids.length === 1 && !stackChild;
     const liftable = grip === Grip.Move && !stackChild && !shownView && work.doc === inScope.view && inScope.view === start;
     const lift = liftable ? { id: nodeId, key: ++liftKey, clips: subtreeOf(work.doc, work.ids), landing: false } : null;
@@ -3028,7 +3029,7 @@
 
     const move = (ev: PointerEvent) => {
       const now = carry(ev);
-      if (now === Carry.Held) {
+      if (now === Carry.Held || !ev.buttons) {
         return;
       }
       started = true;
@@ -3037,14 +3038,12 @@
         props.onElementOut?.(nodeId, out ?? { clipId: '', client: { x: ev.clientX, y: ev.clientY }, box: null }, out ? DragPhase.Over : DragPhase.Back);
         carried = !!out;
       }
-      if (stackChild) {
-        const to = framePt(ev);
-        const dropped = dragInStack(work.doc, stackChild, boxes, to);
+      if (held) {
+        const { dragged: dropped, shown: following } = held(from, framePt(ev));
         result = dropped.result.ok ? { ok: true, doc: lifted(inScope.merge(dropped.result.doc)) } : dropped.result;
         frameGuides = { nodeId, guides: [], gaps: [], drop: dropped.line };
-        const followed = followCursor(work.doc, stackChild, [to[0] - from[0], to[1] - from[1]]);
-        if (followed.ok) {
-          liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? at.live), doc: lifted(inScope.merge(followed.doc)) });
+        if (following.ok) {
+          liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? at.live), doc: lifted(inScope.merge(following.doc)) });
         }
         return;
       }
