@@ -80,7 +80,7 @@ export async function runCanvasOp(caller: OrgCaller, ask: CanvasAsk): Promise<An
     return denied;
   }
 
-  const ctx = canvasCtx({ db: caller.db, orgId: caller.orgId, projectId: project.id, userId: caller.userId, brandId: project.brandId, agentKey: MCP_AGENT_KEY, sessionId: caller.sessionId });
+  const ctx = canvasCtx({ db: caller.db, orgId: caller.orgId, projectId: project.id, userId: caller.userId, agentKey: MCP_AGENT_KEY, sessionId: caller.sessionId });
   return noted(caller, ask.op, { status: HTTP_OK, body: await runOp(ctx, ask.op, input.data) }, op.access === Access.Read ? Writes.No : Writes.Yes);
 }
 

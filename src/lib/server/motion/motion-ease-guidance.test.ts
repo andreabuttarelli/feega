@@ -15,7 +15,7 @@ function tools() {
 
 describe('the motion agent prefers the house curves', () => {
   it.each(MOTION_STYLES)('%s carries the easing rule', (style) => {
-    expect(motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Available, style })).toContain(EASING_RULE);
+    expect(motionAgentPrompt({ selectionNote: '', vision: Vision.Available, style })).toContain(EASING_RULE);
   });
 
   it('the rule names the house curves, keeps linear for drifts and loops, and refuses bounce', () => {

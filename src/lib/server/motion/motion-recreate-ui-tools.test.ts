@@ -85,7 +85,7 @@ describe('recreating a UI from a site capture', () => {
   });
 
   it('the launch film director plans the UI each act recreates, screenshots only as raw material', () => {
-    const text = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Available });
+    const text = motionAgentPrompt({ selectionNote: '', vision: Vision.Available });
 
     expect(text).toContain('recreate_ui');
     expect(text).toContain('raw material');

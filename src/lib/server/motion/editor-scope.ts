@@ -55,7 +55,7 @@ export function motionOrThrow({ db, userId, found }: CanvasScope, [reachable, mo
   if (!motion) {
     throw error(404, 'This frame does not exist');
   }
-  return { db, userId, orgId: found.orgId, canvas: found.canvas, mode: found.mode, projectBrandId: found.projectBrandId, motion };
+  return { db, userId, orgId: found.orgId, canvas: found.canvas, mode: found.mode, motion };
 }
 
 export async function callerCanvasScope(db: Db, caller: { orgId: string; userId: string; nodeId: string }): Promise<CanvasScope | null> {

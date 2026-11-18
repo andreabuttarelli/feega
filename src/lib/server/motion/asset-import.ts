@@ -1,7 +1,7 @@
 import sharp, { type FormatEnum } from 'sharp';
 import type { Db } from '$lib/server/db/client';
 import { safeFetchBytes } from '$lib/server/tool-guard';
-import { probeImageDimensions } from '$lib/server/brand-media';
+import { probeImageDimensions } from '$lib/server/image-dimensions';
 import { insertAsset } from '$lib/server/repos/assets';
 import { removeAssetFile, signAssetFile, storeAssetFile } from '$lib/server/repos/asset-storage';
 import type { ScreenOutcome } from '$lib/server/moderation/screen';

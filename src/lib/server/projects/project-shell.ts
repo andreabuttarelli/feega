@@ -6,7 +6,6 @@ import { listCanvases } from '$lib/server/repos/canvas';
 import { findProjectForUser } from '$lib/server/projects/lookup';
 import { LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
 import { ensureProfile } from '$lib/server/repos/profiles';
-import { loadBrandShell } from '$lib/server/projects/brand-shell';
 import { orgCreditBalance } from '$lib/server/credits';
 import { env } from '$env/dynamic/private';
 import { ProjectMode } from '$lib/project-mode';
@@ -21,13 +20,6 @@ const FLAGS = {
   navTeam: env.FEATURE_NAV_TEAM === 'true'
 };
 
-/**
- * IL GUSCIO DEL PROGETTO: la stessa pagina di `/app/[brand]`, con il progetto al posto del brand.
- *
- * Il progetto è il contenitore — tele, pagine, materiali. Il brand resta una PROPRIETÀ del
- * progetto (`projects.brand_id`, nullable): si apre una tela per esplorare, e solo quando il
- * materiale diventa qualcosa da pubblicare si decide per chi.
- */
 export const load = async ({ params, locals, depends, cookies }: Pick<ServerLoadEvent<{ projectId: string }>, 'params' | 'locals' | 'depends' | 'cookies'>) => {
   depends('app:credits', CANVAS_LIST_DEPENDENCY);
 
@@ -54,10 +46,9 @@ export const load = async ({ params, locals, depends, cookies }: Pick<ServerLoad
   }
 
   const membership = memberships.find((m) => m.org.id === orgId)!;
-  const [allProjects, canvases, brand, creditBalance] = await Promise.all([
+  const [allProjects, canvases, creditBalance] = await Promise.all([
     listProjects(db, orgId),
     listCanvases(db, { orgId, projectId: project.id }),
-    loadBrandShell(db, orgId, project.brandId),
     orgCreditBalance(db, orgId)
   ]);
   const listed = allProjects.filter((p) => p.mode === ProjectMode.Standard || uncensoredLock === UncensoredLock.Open);
@@ -68,7 +59,6 @@ export const load = async ({ params, locals, depends, cookies }: Pick<ServerLoad
     profile: { name: profile.name, email: profile.email, avatarUrl: profile.avatarUrl },
     org: { id: orgId, name: membership.org.name, slug: membership.org.slug, role: membership.role },
     project,
-    brand,
     creditBalance,
     uncensored: { lock: uncensoredLock, visible: uncensoredSectionVisible(uncensoredLock), text: UNCENSORED_LOCK_TEXT[uncensoredLock] },
     projects: listed.map((p) => {
@@ -78,7 +68,6 @@ export const load = async ({ params, locals, depends, cookies }: Pick<ServerLoad
         name: p.name,
         slug: p.slug,
         href: `/p/${p.id}`,
-        brandId: p.brandId,
         mode: p.mode,
         active: p.id === project.id,
         firstCanvasId: first?.id ?? null,

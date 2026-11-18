@@ -12,7 +12,6 @@ import { registerPromptTools } from './tools/prompts.ts';
 import { registerMotionTools } from './tools/motion.ts';
 import { registerGalleryTools } from './tools/gallery.ts';
 import { registerLayoutTools } from './tools/layouts.ts';
-import { registerStudioTools } from './tools/studio.ts';
 import { registerModelAllowlistTools } from './tools/model-allowlist.ts';
 import { registerFontTools } from './tools/fonts.ts';
 import { registerDevServerTools } from './tools/dev-server.ts';
@@ -32,7 +31,7 @@ const MCP_INSTRUCTION_LINES = [
   'A video is a frame: `edit` op draw_frame, then frame ops inside it; check it with `view` snapshot; `render_video` exports it.',
   'Reads cost nothing: `query` (tables, name `columns`, `offset` pages) and `view` (canvas). Change with `edit`. `describe` {op} gives one exact schema; never call it bare to browse: `find_tools` searches.',
   'Everything else: `find_tools`, then `load_tools` to list it, or call it through `edit` {op: "<tool>", input}.',
-  'A project needs no brand; never guess one. Signing in is no tool: HTTP hosts send the Bearer; locally `feega login`.'
+  'Signing in is no tool: HTTP hosts send the Bearer; locally `feega login`.'
 ];
 
 export const MCP_INSTRUCTIONS = MCP_INSTRUCTION_LINES.join(' ');
@@ -79,11 +78,6 @@ function shapeListedTools(server: McpServer, surface: ToolSurface): void {
   }) as typeof inner.setRequestHandler;
 }
 
-function brandSlugOf(args: unknown[]): string | undefined {
-  const input = args[0] as { slug?: unknown } | undefined;
-  return typeof input?.slug === 'string' ? input.slug : undefined;
-}
-
 function recordToolCalls(server: McpServer, surface: ToolSurface): void {
   const register = server.registerTool.bind(server);
 
@@ -93,7 +87,6 @@ function recordToolCalls(server: McpServer, surface: ToolSurface): void {
       const common = {
         event: 'tool.call',
         toolName: name,
-        brandSlug: brandSlugOf(args),
         userId: getRequestAuth()?.user.id,
       } as const;
 
@@ -153,7 +146,6 @@ function build(session: string): { server: McpServer; surface: ToolSurface } {
   registerMotionTools(server);
   registerGalleryTools(server);
   registerLayoutTools(server);
-  registerStudioTools(server);
   registerAppAccountTools(server);
   registerCloudTools(server);
   registerOrgTools(server);

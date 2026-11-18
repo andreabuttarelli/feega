@@ -59,7 +59,6 @@ const STORY_TOOLS: ReadonlySet<string> = new Set([
   'list_assets',
   'read_video_reference',
   'analyze_site',
-  'use_brand',
   'import_asset',
   'add_asset',
   'recreate_ui',

@@ -6,7 +6,7 @@ import type { CoreTheme } from './overlay';
 import { circle, line, rect, solid } from './shapes';
 import { emptyItems } from './empty-card';
 import { embedItems } from './embed-card';
-import { batchItems, effectsItems } from './media-card';
+import { effectsItems } from './media-card';
 import { selectItems } from './select-card';
 import { personItems, previewItems } from './source-card';
 import { genBody, genItems, genMatte } from './gen-card';
@@ -128,7 +128,6 @@ const SURFACES: Record<Surface, (x: Ctx) => Item[]> = {
   [Surface.Preview]: previewItems,
   [Surface.Person]: personItems,
   [Surface.Empty]: emptyItems,
-  [Surface.Pick]: batchItems,
   [Surface.Embed]: embedItems,
   [Surface.Select]: selectItems,
   [Surface.Effects]: effectsItems,

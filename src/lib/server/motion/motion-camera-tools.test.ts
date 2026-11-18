@@ -81,7 +81,7 @@ describe('motion agent camera tools', () => {
   });
 
   it('the prompt teaches the camera', () => {
-    const prompt = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Missing });
+    const prompt = motionAgentPrompt({ selectionNote: '', vision: Vision.Missing });
 
     for (const name of ['set_camera', 'set_camera_keyframes', 'apply_camera_preset', 'set_clip_depth']) {
       expect(prompt).toContain(name);

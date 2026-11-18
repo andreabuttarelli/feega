@@ -6,7 +6,7 @@
  * (`loop.ts`, con un `db`) fa una volta per combinazione.
  *
  * UN ASSE È UN NODO CHE PORTA PIÙ VALORI CON UN ORDINE DICHIARATO — `list` (`data.items`), e allo
- * stesso modo `products`/`social_account_feed`: un catalogo e un feed sincronizzati sono N righe
+ * stesso modo `social_account_feed`: un feed sincronizzato è N righe
  * in un ordine fisso, la stessa idea che `select-node.ts::SELECTABLE_SOURCE_TYPES` già dichiara
  * per `select`. Un filo `iterate` la cui sorgente non è in quella tabella non è un asse — lo dice
  * `axesFrom` con lo stesso `rejected` che il resolver usa per un input che non alimenta niente,
@@ -36,7 +36,7 @@ export function axesFrom(targetId: string, edges: LoopEdge[], nodesById: Map<str
     if (!source) continue;
 
     if (!isSelectableSourceType(source.type)) {
-      rejected.push({ nodeId: source.id, why: 'Only list, products or social_account_feed can be a loop axis' });
+      rejected.push({ nodeId: source.id, why: 'Only list or social_account_feed can be a loop axis' });
       continue;
     }
     if (source.itemCount === 0) {

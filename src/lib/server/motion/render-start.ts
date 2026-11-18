@@ -10,7 +10,7 @@ import { withShapedText } from './shaped-compose';
 import { motionRenderFarm, motionRenderStorage } from './renderer';
 import { RenderRefusal, renderRequest, startBatch, startRender, type BatchRow, type BatchStart, type RenderScope, type RenderStart } from './render-run';
 
-export type FarmStart = { orgId: string; projectId: string; canvasId: string; nodeId: string; userId: string; brandId: string | null; editorUrl: string; head: { version: number; doc: MotionDoc }; settings: RenderSettings };
+export type FarmStart = { orgId: string; projectId: string; canvasId: string; nodeId: string; userId: string; editorUrl: string; head: { version: number; doc: MotionDoc }; settings: RenderSettings };
 
 const CLOSED = { ok: false, error: RenderRefusal.Closed, detail: SERVER_RENDER_UNAVAILABLE } as const;
 

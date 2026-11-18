@@ -47,7 +47,7 @@ describe('motion agent text path tools', () => {
   });
 
   it('the prompt teaches text on a path', () => {
-    const prompt = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Missing });
+    const prompt = motionAgentPrompt({ selectionNote: '', vision: Vision.Missing });
     expect(prompt).toContain('set_text_path');
   });
 });

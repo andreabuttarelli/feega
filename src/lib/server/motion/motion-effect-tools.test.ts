@@ -53,7 +53,7 @@ describe('motion agent effect tools', () => {
   });
 
   it('the prompt lists the effects', () => {
-    const prompt = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Missing });
+    const prompt = motionAgentPrompt({ selectionNote: '', vision: Vision.Missing });
     for (const needle of ['add_effect', 'drop-shadow', 'chromatic-aberration', 'fx.<effect id>.<param>']) {
       expect(prompt).toContain(needle);
     }

@@ -3,13 +3,11 @@ import { signedInDb } from './app-shell';
 import { listMemberships, type Membership } from '$lib/server/repos/orgs';
 import { listProjects } from '$lib/server/repos/projects';
 import { findReachableProject } from '$lib/server/projects/lookup';
-import { findBatch, type Batch } from '$lib/server/repos/product-batches';
 import { chooseOrg, ORG_COOKIE } from '$lib/server/tenancy/context';
 import { ProjectMode } from '$lib/project-mode';
 import type { Db } from '$lib/server/db/client';
-import type { StudioCtx } from '$lib/server/studio/studio-batch';
 
-export type ToolScope = StudioCtx & { db: Db };
+export type ToolScope = { db: Db; orgId: string; projectId: string; userId: string };
 
 export const PROJECT_PARAM = 'project';
 
@@ -42,18 +40,4 @@ export async function toolScope(event: ScopeEvent, chosenProjectId: string | nul
   }
 
   return { db, orgId: found.orgId, projectId: found.project.id, userId };
-}
-
-export async function batchScope(event: ScopeEvent): Promise<ToolScope & { batch: Batch }> {
-  const { db, userId, memberships } = await signedIn(event);
-  const batchId = event.params.batchId ?? '';
-
-  for (const { org } of memberships) {
-    const batch = await findBatch(db, { orgId: org.id, batchId });
-    if (batch) {
-      return { db, orgId: org.id, projectId: batch.projectId, userId, batch };
-    }
-  }
-
-  throw error(HTTP_NOT_FOUND, 'Batch not found');
 }

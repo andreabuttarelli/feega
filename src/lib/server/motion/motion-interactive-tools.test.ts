@@ -95,7 +95,7 @@ describe('motion agent interactive tools', () => {
   });
 
   it('the prompt teaches live input and the interactive export', () => {
-    const prompt = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Missing });
+    const prompt = motionAgentPrompt({ selectionNote: '', vision: Vision.Missing });
 
     expect(prompt).toContain('input.pointer.x');
     expect(prompt).toContain('export_interactive');

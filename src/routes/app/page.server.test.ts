@@ -30,7 +30,7 @@ vi.mock('$lib/server/repos/dashboard', () => ({
   listRecentBatches: vi.fn(async () => [{ id: 'b1', projectId: 'p1', name: 'Autumn', status: 'running', createdAt: '2026-10-03' }]),
   listRecentNodes: vi.fn(async () => [])
 }));
-vi.mock('$lib/server/studio/studio-media', () => ({ signedAssets: vi.fn(async () => ({ assets: new Map(), urls: {} })) }));
+vi.mock('$lib/server/dashboard/signed-assets', () => ({ signedAssets: vi.fn(async () => ({ assets: new Map(), urls: {} })) }));
 
 const listMemberships = vi.fn(async () => [
   { org: { id: 'org-a', name: 'A', slug: 'a' }, role: 'owner' },

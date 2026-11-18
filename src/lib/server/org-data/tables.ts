@@ -15,15 +15,9 @@
  * come promemoria, non un difetto da silenziare.
  */
 export const ORG_TABLES = [
-  'ad_accounts',
-  'ad_campaigns',
-  'ad_creatives',
   'ai_calls',
   'api_keys',
   'assets',
-  'brand_fonts',
-  'brand_pins',
-  'brands',
   'canvas_events',
   'canvases',
   'chat_messages',
@@ -37,12 +31,8 @@ export const ORG_TABLES = [
   'orgs',
   'orgs_invites',
   'orgs_members',
-  'post_sources',
-  'posts',
-  'products',
   'profiles',
   'projects',
-  'social_accounts',
   'social_posts'
 ] as const;
 

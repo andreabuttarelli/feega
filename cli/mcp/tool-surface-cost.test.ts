@@ -10,10 +10,9 @@ import { handleMcpFetch } from './http-app.ts';
  * fermano nulla.
  *
  * Il rientro promesso da `insert_row` e `update_row` è arrivato in due tempi. I due tool avevano
- * portato la lista a 94.215 su 88; poi `update_brand_identity` ha preso il posto di quattro tool
+ * portato la lista a 94.215 su 88; poi un tool unico ha preso il posto di quattro tool
  * che scrivevano le stesse due righe e `generate_media` è uscito, 91.053 su 84. Ora escono i
- * quattro CRUD di una riga che il censimento di #392 aveva già isolato — `create_product`,
- * `update_product`, `update_person`, `update_competitor` — e il conto torna sotto quello di
+ * quattro CRUD di una riga che il censimento di #392 aveva già isolato — `update_person`, `update_competitor` — e il conto torna sotto quello di
  * partenza: 87.360 su 80, senza nessuna capacità persa.
  *
  * Si misura il TRANSPORT, non i sorgenti: il conto dei sorgenti ha già sbagliato due volte,

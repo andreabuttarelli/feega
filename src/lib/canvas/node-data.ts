@@ -392,7 +392,6 @@ const techniqueSchema = z.object({
 const calendarSchema = z.object({
   view: z.enum(CALENDAR_VIEWS),
   scope: z.enum(CALENDAR_SCOPES),
-  brand_id: z.string().nullable().optional(),
   anchor: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 });
 

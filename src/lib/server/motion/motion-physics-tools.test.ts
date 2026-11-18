@@ -53,7 +53,7 @@ describe('motion agent physics tools', () => {
   });
 
   it('the prompt names the physics tools', () => {
-    const prompt = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Missing });
+    const prompt = motionAgentPrompt({ selectionNote: '', vision: Vision.Missing });
     expect(prompt).toContain('set_physics');
     expect(prompt).toContain('apply_physics_preset');
   });

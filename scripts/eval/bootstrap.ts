@@ -41,13 +41,12 @@ try {
   assert.deepEqual(concurrent, first);
   const second = await enterApp(db, ENTRY_DEPS, signed.data.user);
   assert.deepEqual(second, first);
-  const projects = await db.from('projects').select('id, brand_id').eq('org_id', first.orgId);
+  const projects = await db.from('projects').select('id').eq('org_id', first.orgId);
   if (projects.error) {
     throw projects.error;
   }
   assert.equal(projects.data.length, 1);
-  assert.equal(projects.data[0].brand_id, null);
-  console.log('PASS: authenticated bootstrap creates one brandless project and reuses its canvas');
+  console.log('PASS: authenticated bootstrap creates one project and reuses its canvas');
 } catch (error) {
   console.error('FAIL:', error instanceof Error ? error.message : error);
   process.exitCode = 1;

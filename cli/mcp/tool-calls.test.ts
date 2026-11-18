@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
 
 /**
- * `mcp_logs` aveva zero righe, e uno dei due motivi era qui: `tool_name`, `user_id` e `brand_slug`
+ * `mcp_logs` aveva zero righe, e uno dei due motivi era qui: `tool_name` e `user_id`
  * esistono nello schema e `observability.ts` le scrive già fra le sue quindici colonne — ma nessuno
  * in `cli/mcp/` le passava, quindi arrivavano sempre `null`. Adesso che la tabella riceve le righe
  * sappiamo raccontare il transport e non cosa succede dentro:
@@ -118,9 +118,7 @@ beforeEach(() => {
   apiCalls.length = 0;
 });
 
-describe('ogni chiamata a un tool riempie le tre colonne vuote', () => {
-  // `query` non passa da un modello e non ha bisogno di un brand per fallire: senza bearer
-  // `withAuth` lo rifiuta subito, ed è un tool che resta sulla superficie nuova.
+describe('ogni chiamata a un tool riempie le colonne vuote', () => {
   test('il tool su cui è stato chiamato', async () => {
     await callTool('query', {});
 
@@ -172,8 +170,8 @@ describe('il nome del tool viaggia con le chiamate che il tool fa', () => {
 
   test('fuori da un tool non parte nessuna intestazione inventata', async () => {
     const { api } = await import('../lib/api.ts');
-    await api.listBrands(BEARER);
+    await api.getMedia(BEARER, { node: ['n1'] });
 
-    expect(apiCalls.at(-1)).toEqual({ path: '/api/v1/brands', tool: null });
+    expect(apiCalls.at(-1)).toEqual({ path: '/api/v1/org/media?node=n1', tool: null });
   });
 });

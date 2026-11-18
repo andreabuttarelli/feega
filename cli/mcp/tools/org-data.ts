@@ -4,12 +4,9 @@ import { request } from '../../lib/api.ts';
 import { withAuth } from '../util.ts';
 
 /**
- * `query` / `insert_row` / `update_row` / `delete_row` — SCOPO ORG, NON BRAND.
+ * `query` / `insert_row` / `update_row` / `delete_row` — SCOPO ORG.
  *
- * Il vecchio registro (`brand-content.ts`) parlava sempre di UN brand identificato da uno slug.
- * Qui non c'è slug: un'org può avere progetti senza brand, tele senza brand, post che invece un
- * brand ce l'hanno sempre — e questi quattro tool leggono e scrivono ovunque dentro l'org di chi
- * chiama, mai un brand che sta al posto di progetto/tela/brand. Il server (`/api/v1/org/query`,
+ * Questi quattro tool leggono e scrivono ovunque dentro l'org di chi chiama. Il server (`/api/v1/org/query`,
  * `/api/v1/org/rows`) impone `org_id` per costruzione: un id di un'altra org non torna mai niente,
  * né un errore che lo distingua da un id inventato.
  *
@@ -42,11 +39,10 @@ export function registerOrgDataTools(server: McpServer) {
       title: 'Query the database',
       description:
         'READ ANYTHING in your org: projects, canvases, nodes, connections, assets, posts, ads, ' +
-        'products, social accounts — every table, scoped to your org and nothing else. No SQL: name ' +
+        'social accounts — every table, scoped to your org and nothing else. No SQL: name ' +
         'a table, columns and `where` filters, and it issues one PostgREST read. Omit `table` to list every ' +
-        'name. A project has no brand until one is attached (`projects.brand_id` is nullable, and ' +
-        'that is the normal case). A canvas belongs to a project; nodes and their connections belong ' +
-        'to a canvas. A post (`posts` table) is the promoted artifact — caption, media, brand — ' +
+        'name. A canvas belongs to a project; nodes and their connections belong ' +
+        'to a canvas. A post (`posts` table) is the promoted artifact — caption and media — ' +
         'different from a node, which is raw canvas material; `post_sources` links a post back to ' +
         'the nodes it came from. Free.',
       inputSchema: z.object({
@@ -112,9 +108,9 @@ export function registerOrgDataTools(server: McpServer) {
         'name one to save tokens once you know which you need — an unknown `type` comes back as an ' +
         'error naming the ones that exist, so this list is never hand-maintained here. `list` holds ' +
         'N iteration values (images or text, never mixed); `select` picks exactly one item back out ' +
-        'of a connected `list`, `products` or `social_account_feed` by a 1-based `index` — a synced ' +
-        'catalogue or feed is an ordered list too, so `select` can pull one product or one post out ' +
-        'of either the same way, exposing named outputs (`out:images`, `out:text`, and ' +
+        'of a connected `list` or `social_account_feed` by a 1-based `index` — a synced ' +
+        'feed is an ordered list too, so `select` can pull one post out ' +
+        'of it the same way, exposing named outputs (`out:images`, `out:text`, and ' +
         '`out:field:<field>` for each entry of `data.outputs` — the fields per source are listed in ' +
         'its schema) that an edge picks with `source_handle`; `effects` holds a stack of image filters over an upstream ' +
         'image, each with its own params — set it with `update_row`, then render it with ' +

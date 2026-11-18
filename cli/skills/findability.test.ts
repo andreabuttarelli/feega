@@ -16,13 +16,13 @@ import { MCP_INSTRUCTIONS, listAllTools } from '../mcp/server.ts';
  *
  * Le descrizioni si leggono dal SERVER VERO (`tools/list`), non da un registro dichiarativo: la
  * superficie MCP di feega è cablata a mano in `cli/mcp/tools/*.ts`, e un contratto REST separato
- * (`cli/lib/contracts/`) descrive le rotte brand-scoped che il CLI chiama — leggere quello per
+ * (`cli/lib/contracts/`) descrive le rotte org-scoped che il CLI chiama — leggere quello per
  * `tools/list` mentirebbe sul tool che un agente vede davvero.
  */
 const ASKED_FOR: ReadonlyArray<{ tool: string; question: string; words: readonly string[] }> = [
-  { tool: 'query', question: 'how is this brand supposed to sound', words: ['brand', 'read'] },
+  { tool: 'query', question: 'which projects does this org have', words: ['projects', 'read'] },
   { tool: 'query', question: 'how many posts went out last month', words: ['table', 'read'] },
-  { tool: 'query', question: 'what does this brand sell', words: ['products', 'read'] },
+  { tool: 'query', question: 'which nodes sit on this canvas', words: ['nodes', 'read'] },
   { tool: 'run_node_generation', question: 'generate an image in this node', words: ['generate', 'image', 'node'] },
   { tool: 'run_node_generation', question: 'animate this into a video', words: ['generate', 'video', 'node'] },
   { tool: 'insert_row', question: 'add a row to a table', words: ['add', 'row', 'table'] },
@@ -61,8 +61,8 @@ async function listedTools(): Promise<Map<string, string>> {
 const INSTRUCTIONS_MAX_CHARS = 2_000;
 
 describe('le istruzioni del server sono una mappa, non un ordine', () => {
-  test('dicono di non scegliere brand/org da soli, che è il danno vero', () => {
-    expect(MCP_INSTRUCTIONS).toMatch(/never guess|nullable, and that is the normal case/i);
+  test('non nominano nessun brand: un progetto non ne ha', () => {
+    expect(MCP_INSTRUCTIONS).not.toMatch(/brand/i);
   });
 
   test('dicono che una lettura non costa', () => {

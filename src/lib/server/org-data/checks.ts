@@ -10,15 +10,6 @@
  * tabelle è vuoto, quindi non c'è un `ORG_WRITABLE_COLUMNS` da generare — il confine è tutto RLS.
  */
 export const ORG_TABLE_CHECKS: Record<string, string> = {
-  ad_accounts_platform_check: "platform = 'meta'",
-  ad_accounts_status_check: "status in ('connected', 'expired', 'revoked')",
-  ad_campaigns_actor_kind_check: "actor_kind in ('user', 'agent', 'system')",
-  ad_campaigns_budget_type_check: "budget_type in ('daily', 'lifetime')",
-  ad_campaigns_objective_check:
-    "objective in ('awareness', 'traffic', 'engagement', 'video_views', 'lead_generation', 'conversions', 'app_promotion', 'catalog_sales')",
-  ad_campaigns_status_check:
-    "status in ('draft', 'pending_review', 'scheduled', 'active', 'paused', 'completed', 'failed', 'rejected')",
-  ad_creatives_status_check: "status in ('draft', 'active', 'paused', 'rejected')",
   ai_calls_actor_kind_check: "actor_kind in ('user', 'agent', 'system')",
   ai_calls_status_check: "status in ('ok', 'error', 'timeout', 'refused')",
   assets_source_check: "source in ('upload', 'generated', 'imported')",
@@ -42,12 +33,5 @@ export const ORG_TABLE_CHECKS: Record<string, string> = {
   nodes_type_check:
     "type in ('text', 'image', 'video', 'doc', 'iframe', 'social_account_feed', 'social_post_mockup', 'products', 'ads', 'influencer', 'list', 'select', 'effects', 'composition', 'calendar', 'audio', 'model3d', 'motion', 'element', 'studio_batch', 'section', 'technique')",
   orgs_invites_role_check: "role in ('owner', 'admin', 'member', 'viewer')",
-  orgs_members_role_check: "role in ('owner', 'admin', 'member', 'viewer')",
-  post_sources_role_check: "role in ('caption', 'media', 'reference')",
-  posts_actor_kind_check: "actor_kind in ('user', 'agent', 'system')",
-  posts_status_check: "status in ('draft', 'ready', 'archived')",
-  products_platform_check: "platform in ('shopify', 'woocommerce')",
-  social_accounts_platform_check:
-    "platform in ('instagram', 'facebook', 'x', 'linkedin', 'tiktok', 'threads', 'youtube', 'reddit', 'pinterest')",
-  social_accounts_status_check: "status in ('connected', 'expired', 'revoked')"
+  orgs_members_role_check: "role in ('owner', 'admin', 'member', 'viewer')"
 };

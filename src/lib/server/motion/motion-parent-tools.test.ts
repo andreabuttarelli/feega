@@ -64,7 +64,7 @@ describe('motion agent parenting tools', () => {
   });
 
   it('the prompt teaches nulls and parenting', () => {
-    const prompt = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Missing });
+    const prompt = motionAgentPrompt({ selectionNote: '', vision: Vision.Missing });
 
     for (const name of ['add_null', 'set_parent', 'parent_clips']) {
       expect(prompt).toContain(name);

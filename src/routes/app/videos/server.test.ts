@@ -7,7 +7,7 @@ const listRecentNodes = vi.fn(async () => [{ id: 'm9', projectId: 'p1', canvasId
 vi.mock('$lib/server/repos/dashboard', () => ({ listRecentNodes, listRecentCanvases: vi.fn(), listRecentImages: vi.fn(), listRecentBatches: vi.fn() }));
 
 const signedAssets = vi.fn(async (_db: unknown, _org: string, ids: string[]) => ({ assets: new Map(), urls: Object.fromEntries(ids.map((id) => [id, `https://signed/${id}`])) }));
-vi.mock('$lib/server/studio/studio-media', () => ({ signedAssets }));
+vi.mock('$lib/server/dashboard/signed-assets', () => ({ signedAssets }));
 
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: vi.fn(async () => [{ org: { id: 'org-a', name: 'A', slug: 'a' }, role: 'owner' }]) }));
 

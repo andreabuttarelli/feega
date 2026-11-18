@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { htmlToMarkdown } from '$lib/server/knowledge';
+import { htmlToMarkdown } from '$lib/server/markdown';
 import type { RequestHandler } from './$types';
 
 /**

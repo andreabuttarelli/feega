@@ -104,7 +104,7 @@
   <div class="select-body">
     {#if !list}
       <p class="select-empty">
-        Picks one item from a connected list, by number.<br />Connect a list, products or a feed
+        Picks one item from a connected list, by number.<br />Connect a list or a feed
       </p>
     {:else if !length}
       <p class="select-empty">Empty list</p>

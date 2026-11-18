@@ -17,7 +17,7 @@ function setup() {
   return { session, run };
 }
 
-const prompt = (style?: MotionStyle) => motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Available, style });
+const prompt = (style?: MotionStyle) => motionAgentPrompt({ selectionNote: '', vision: Vision.Available, style });
 
 describe('the motion style', () => {
   it('the doc shows the launch film until the user asks for another style, and set_style changes it', async () => {

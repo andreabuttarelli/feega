@@ -66,8 +66,8 @@ describe('motion agent template tools', () => {
   });
 
   it('the prompt mentions templates and batches', () => {
-    expect(motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Missing })).toContain('render_batch');
-    expect(motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Missing })).toContain('add_template');
+    expect(motionAgentPrompt({ selectionNote: '', vision: Vision.Missing })).toContain('render_batch');
+    expect(motionAgentPrompt({ selectionNote: '', vision: Vision.Missing })).toContain('add_template');
   });
 });
 

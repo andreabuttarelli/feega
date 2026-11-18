@@ -101,8 +101,8 @@ import { ElementPaste, elementPaste, pasteTargets } from '$lib/canvas/paste-into
   import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
   import { onMount, untrack } from 'svelte';
-  import { feedView, personView, productsView } from '$lib/canvas/source-thumbs';
-import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type NodeView } from '$lib/canvas/node-view';
+  import { feedView, personView } from '$lib/canvas/source-thumbs';
+import { selectView, type NodeView } from '$lib/canvas/node-view';
   import type GpuFlow from '$lib/components/canvas/gpu/GpuFlow.svelte';
   import { CanvasContent } from '$lib/canvas/core/startup-progress';
   import { holdsDoc } from '$lib/canvas/motion-node';
@@ -111,7 +111,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import IframeNode from '$lib/components/canvas/IframeNode.svelte';
   import type { ExportMode } from '$lib/canvas/code-frame';
   import DocNode from '$lib/components/canvas/DocNode.svelte';
-  import ProductsNode from '$lib/components/canvas/ProductsNode.svelte';
   import SocialFeedNode from '$lib/components/canvas/SocialFeedNode.svelte';
   import InfluencerNode from '$lib/components/canvas/InfluencerNode.svelte';
   import EmptyNode from '$lib/components/canvas/EmptyNode.svelte';
@@ -182,8 +181,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { frameHead } from '$lib/canvas/frame-outlines';
   import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
   import type { TemplateEntry } from '$lib/motion/template/library';
-  import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
-  import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
   import type { SceneDrop } from '$lib/canvas/scene-drop';
   import { DragPhase, DropVerdict, frameUnderPointer, type ElementOut, type FrameTarget, type PointerPoint, type StageRect } from '$lib/canvas/canvas-drop';
   import { canvasSelection, canvasSelectionChips } from '$lib/canvas/canvas-selection';
@@ -199,9 +196,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { hasCutout } from '$lib/canvas/effects/shape-cutout';
   import { upstreamCards as compositionCards, cardAssetIds } from '$lib/canvas/composition-node';
   import { listFeedingSelect } from '$lib/canvas/select-node';
-  import { fieldValue, productItem, socialPostItem } from '$lib/canvas/select-sources';
+  import { fieldValue, socialPostItem } from '$lib/canvas/select-sources';
   import { fieldsFor, isOutputHandle, outputValues, portOfOutputHandle, selectOutputs, sourceOutputs, type OutputValue, type SelectOutput } from '$lib/canvas/select-outputs';
-  import { feedFiltersOf, filterPosts, filterProducts, productFiltersOf } from '$lib/canvas/source-filters';
+  import { feedFiltersOf, filterPosts } from '$lib/canvas/source-filters';
   import { hasInspector, inspectorOf } from '$lib/canvas/node-inspector';
   import SourceSettingsFrame from '$lib/components/canvas/SourceSettingsFrame.svelte';
   import {
@@ -295,7 +292,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     listData,
     listOf,
     newNodeRow,
-    productsOf,
     selectData,
     selectOf,
     effectsOf,
@@ -311,7 +307,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   } from '$lib/canvas-edges';
   import { loopAffordance, type LoopSourceNode } from '$lib/canvas/loop-axes';
   import type { CanvasNodeRecord, Connection } from '$lib/server/repos/canvas';
-  import type { Product } from '$lib/server/repos/products';
   import type { SocialPost } from '$lib/server/repos/social-posts';
   import { BILLING_PATH } from '$lib/billing-path';
   import type { FigmaImage } from '$lib/canvas/figma/figma-doc';
@@ -1195,11 +1190,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   const nodesById = $derived(new Map(nodes.map((n) => [n.id, { id: n.id, type: n.type }])));
 
   /** Quanti item porta un nodo, qualunque sia la sua sorgente — una `list` conta i suoi valori
-   *  risolti, `products`/`social_account_feed` contano le righe sincronizzate che la pagina ha già
-   *  in mano (`data.products`/`data.socialPosts`, lette da `load`): la stessa tabella di
+   *  risolti, `social_account_feed` contano le righe sincronizzate che la pagina ha già
+   *  in mano (`data.socialPosts`, lette da `load`): la stessa tabella di
    *  `select-node.ts::SELECTABLE_SOURCE_TYPES`, qui applicata al conteggio invece che al filtro. */
   function itemCountOf(n: Tile): number {
-    if (n.type === 'products') return shownProducts[n.id]?.length ?? 0;
     if (n.type === 'social_account_feed') return shownPosts[n.id]?.length ?? 0;
     return listValuesByNode[n.id]?.values.length ?? 0;
   }
@@ -1225,12 +1219,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     )
   );
 
-  /** Un `products`/`social_account_feed` come `ListNodeState` — la stessa forma che `SelectNode`
-   *  già disegna per una `list`, con `productItem`/`socialPostItem` (`select-sources.ts`) a
+  /** Un `social_account_feed` come `ListNodeState` — la stessa forma che `SelectNode`
+   *  già disegna per una `list`, con `socialPostItem` (`select-sources.ts`) a
    *  tradurre ogni riga sincronizzata in un item: la stessa tabella per tipo che `upstream.ts`
    *  usa lato server, qui applicata all'anteprima invece che alla generazione. */
   function syncedSourceListOf(source: { id: string; type: string }): ListNodeState {
-    const rows = source.type === 'products' ? (shownProducts[source.id] ?? []).map(productItem) : (shownPosts[source.id] ?? []).map(socialPostItem);
+    const rows = (shownPosts[source.id] ?? []).map(socialPostItem);
 
     return {
       id: source.id,
@@ -1246,7 +1240,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const upstreamEdges = edges.map((e) => ({ sourceNodeId: e.source, targetNodeId: e.target }));
     const source = listFeedingSelect(selectId, upstreamEdges, nodesById);
     if (!source) return null;
-    if (source.type === 'products' || source.type === 'social_account_feed') return syncedSourceListOf(source);
+    if (source.type === 'social_account_feed') return syncedSourceListOf(source);
     const values = listValuesByNode[source.id];
     return values ? { id: source.id, itemKind: values.itemKind, items: values.values.map((v) => v.item) } : null;
   }
@@ -1257,7 +1251,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   function syncedRowAt(source: { id: string; type: string }, index: number) {
-    const rows = source.type === 'products' ? shownProducts[source.id] : source.type === 'social_account_feed' ? shownPosts[source.id] : undefined;
+    const rows = source.type === 'social_account_feed' ? shownPosts[source.id] : undefined;
     return rows?.[index - 1] ?? null;
   }
 
@@ -1273,9 +1267,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (!select || !source || !row) {
       return undefined;
     }
-    return source.type === 'products'
-      ? outputValues('products', row as Product, select.outputs)
-      : outputValues('social_account_feed', row as SocialPost, select.outputs);
+    return outputValues('social_account_feed', row as SocialPost, select.outputs);
   }
 
   function selectFieldPreview(selectId: string, index: number, field: string) {
@@ -1284,7 +1276,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (!source || !row) {
       return null;
     }
-    return source.type === 'products' ? fieldValue('products', field, row as Product) : fieldValue('social_account_feed', field, row as SocialPost);
+    return fieldValue('social_account_feed', field, row as SocialPost);
   }
 
   function upstreamEffectsMediaOf(effectsId: string) {
@@ -1327,11 +1319,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   );
 
   /**
-   * IL CATALOGO E IL FEED SCARICATI, per nodo. Come `runsByNode`: `products`/`social_account_feed`
-   * non portano il contenuto in `data.data` — vive in `products`/`social_posts` — quindi arriva
+   * IL CATALOGO E IL FEED SCARICATI, per nodo. Come `runsByNode`: `social_account_feed`
+   * non porta il contenuto in `data.data` — vive in `social_posts` — quindi arriva
    * qui, letto dal server in `load` e riletto a ogni `refresh()`.
    */
-  const productsByNode = $derived((data.products ?? {}) as Record<string, Product[]>);
   const socialPostsByNode = $derived((data.socialPosts ?? {}) as Record<string, SocialPost[]>);
   type InfluencerTile = { name: string; views: { id: string; label: string; url: string | null }[] };
   let influencersOverride = $state<Record<string, InfluencerTile> | null>(null);
@@ -1457,7 +1448,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
         ? { id: n.id, kind: 'effects' as const, mediaKind: n.data.mediaKind === 'video' ? 'video' as const : 'image' as const }
         : tileNode({
         id: n.id,
-        medium: n.type === 'iframe' || n.type === 'document' || n.type === 'doc' ? null : (n.type as 'text' | 'image' | 'video' | 'audio' | 'list' | 'select' | 'products' | 'social_account_feed'),
+        medium: n.type === 'iframe' || n.type === 'document' || n.type === 'doc' ? null : (n.type as 'text' | 'image' | 'video' | 'audio' | 'list' | 'select' | 'social_account_feed'),
         model: typeof n.data.model === 'string' ? n.data.model : null,
         uncensored: uncensoredModelOf(n),
         operation: n.type === 'audio' ? audioOperationOfTile(n) : undefined
@@ -1468,39 +1459,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   /** `type`/`data` grezzi di ogni tile — la forma che `commonPropertiesOf` legge, per la barra
    *  della selezione: `tiles` porta già `node: CanvasNode`, un'astrazione diversa che non ha
    *  `model`/`params` come campi diretti. */
-  const STUDIO_REFRESH_MS = 10000;
-  let studioBatches = $state<Record<string, BatchView>>({});
-  const studioWatched = $derived(
-    nodes
-      .filter((n) => n.type === 'studio_batch')
-      .map((n) => `${n.id}:${studioBatchOf(n)?.batchId ?? ''}`)
-      .join('|')
-  );
-
-  async function studioJson<T>(url: string): Promise<T | null> {
-    const response = await fetch(url).catch(() => null);
-    return response?.ok ? ((await response.json()) as T) : null;
-  }
-
-  $effect(() => {
-    const stops = studioWatched
-      .split('|')
-      .filter(Boolean)
-      .map((entry) => {
-        const [nodeId, batchId] = entry.split(':');
-        const show = (view: BatchView) => (studioBatches = { ...studioBatches, [nodeId]: view });
-        if (!batchId) {
-          void studioJson<unknown[]>(`/app/studio/cards?project=${data.projectId}`).then((list) => show(pickBatch(list ? list.length > 0 : null)));
-          return () => {};
-        }
-        const refresh = () => void studioJson<Parameters<typeof batchOf>[0]>(`/app/studio/${batchId}/card`).then((card) => show(card ? batchOf(card) : unreachableBatch()));
-        refresh();
-        const timer = setInterval(refresh, STUDIO_REFRESH_MS);
-        return () => clearInterval(timer);
-      });
-    return () => stops.forEach((stop) => stop());
-  });
-
   function mediaView(row: Tile): NodeView | null {
     const effects = effectsOf(row);
     if (!effects) {
@@ -1523,9 +1481,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (shownPosts[id]) {
       return { source: feedView(shownPosts[id], socialPosts[id]?.length ?? 0) };
     }
-    if (shownProducts[id]) {
-      return { source: productsView(shownProducts[id], products[id]?.length ?? 0) };
-    }
     const person = influencersByNode[id];
     if (person) {
       return { source: personView(person.name, person.views) };
@@ -1534,7 +1489,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (!row) {
       return null;
     }
-    return mediaView(row) ?? selectedView(row) ?? techniqueView(row) ?? (studioBatches[id] ? { batch: studioBatches[id] } : null);
+    return mediaView(row) ?? selectedView(row) ?? techniqueView(row);
   }
 
   let Flow = $state<typeof GpuFlow | null>(null);
@@ -1909,15 +1864,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     })).finally(() => sent.drop(kept.id));
   }
 
-  let productsOverride = $state<Record<string, Product[]> | null>(null);
   let socialPostsOverride = $state<Record<string, SocialPost[]> | null>(null);
-  const products = $derived(productsOverride ?? productsByNode);
   const socialPosts = $derived(socialPostsOverride ?? socialPostsByNode);
-  const shownProducts = $derived(
-    Object.fromEntries(
-      nodes.filter((n) => n.type === 'products').map((n) => [n.id, filterProducts(products[n.id] ?? [], productFiltersOf(n.data.filters))])
-    ) as Record<string, Product[]>
-  );
   const shownPosts = $derived(
     Object.fromEntries(
       nodes
@@ -2093,7 +2041,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const before = nodes;
     nodes = keepSame(nodes, keepDrawn(keepPending((snapshot.nodes as CanvasNodeRecord[]).map((n) => toTile(n)), nodes, saves.dirtyKeys, (id) => places.dirty(id) || places.placedAfter(id, asked)), nodes, draws.pending()), now);
     edges = keepSame(edges, keepLines((snapshot.connections as Connection[]).map(toEdge), edges, lines.pending()), now);
-    productsOverride = keepSame(products, (snapshot.products ?? {}) as Record<string, Product[]>, now);
     socialPostsOverride = keepSame(socialPosts, (snapshot.socialPosts ?? {}) as Record<string, SocialPost[]>, now);
     influencersOverride = keepSame(influencersByNode, (snapshot.influencers ?? {}) as Record<string, InfluencerTile>, now);
     return changedElsewhere(before, nodes);
@@ -2317,7 +2264,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   /**
    * UN FILE VA DRITTO NELLO STORAGE DAL BROWSER, e solo il percorso arriva al server: lo stesso
-   * schema di `StudioPage.svelte::handleImageUpload`, per la stessa ragione — un video o un
+   * schema dei caricamenti diretti, per la stessa ragione — un video o un
    * documento normale supera facilmente il corpo che un'azione SvelteKit regge su Vercel.
    *
    * Il nodo nasce SOLO quando la riga torna, come `create`: niente tile senza riga dietro.
@@ -2671,7 +2618,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   /**
-   * UN NODO CHE NASCE GIÀ PIENO — trascinato dalla libreria degli asset o dai brand, non dal menù
+   * UN NODO CHE NASCE GIÀ PIENO — trascinato dalla libreria degli asset, non dal menù
    * del doppio clic. Stessa forma di `create`, ma `type`/`data` arrivano dal trascinamento e non
    * da `newNodeRow`: il server li rivalida comunque (`validateNodeData`), perché un payload che
    * viaggia nel `dataTransfer` del browser non è meno un input esterno di un form.
@@ -3011,7 +2958,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   /**
-   * SINCRONIZZARE UN NODO `products` O `social_account_feed`. Ottimista sullo stato — "sta
+   * SINCRONIZZARE UN NODO `social_account_feed`. Ottimista sullo stato — "sta
    * scaricando" appare subito — ma il risultato lo scrive il server: qui non c'è modo di sapere
    * quanti prodotti o post sono arrivati prima che risponda.
    */
@@ -4910,7 +4857,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
         {@const gen = genOf(row)}
         {@const frame = frameOf(row)}
         {@const doc = docOf(row)}
-        {@const catalog = productsOf(row)}
         {@const feed = socialFeedOf(row)}
         {@const influencer = influencerOf(row)}
         {@const list = listOf(row)}
@@ -4918,7 +4864,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
         {@const effects = effectsOf(row)}
         {@const composition = compositionOf(row)}
         {@const motion = motionOf(row)}
-        {@const studioBatch = studioBatchOf(row)}
         {@const estimateRevision = textEstimateRevision(id)}
         {@const textCost = textCostEstimates[id]?.revision === estimateRevision ? textCostEstimates[id] : undefined}
         {@const uploaded = isUploadedNodeRow(row) ? uploadedNodeOf(row) : null}
@@ -5066,16 +5011,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             onchange={(patch) => write(id, docData({ ...doc, ...patch }))}
             onshare={(on) => share(id, on)}
           />
-        {:else if catalog}
-          <SourceSettingsFrame
-            {selected}
-            view={selected ? inspectorOf(row) : null}
-            shown={shownProducts[id]?.length ?? 0}
-            onfield={(patch) => write(id, patch)}
-            onsync={() => sync(id)}
-          >
-            <ProductsNode node={catalog} nodeId={id} products={shownProducts[id] ?? []} total={products[id]?.length ?? 0} />
-          </SourceSettingsFrame>
         {:else if feed}
           <SourceSettingsFrame
             {selected}
@@ -5136,8 +5071,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
         {:else if motion}
           {@const motionAt = { projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }}
           <MotionNode node={motion} href={motionNodePath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={(posterFresh(motion) ? assetUrl(motion.posterAssetId) : null) ?? (ghostShown(motion) ? catalogPosters.get(id) : null) ?? null} {liveHost} liveUrl={motionLivePath(motionAt)} />
-        {:else if studioBatch}
-          <StudioBatchNode node={studioBatch} projectId={data.projectId} onpick={(batchId) => write(id, newStudioBatchData(batchId), SaveTiming.Now)} />
         {:else if isNodeType(row.type)}
           <EmptyNode type={row.type} />
         {/if}

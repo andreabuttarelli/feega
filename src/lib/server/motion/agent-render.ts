@@ -52,7 +52,7 @@ export async function requestRender(db: Db, input: RenderAskInput): Promise<Rend
   }
 
   const editorUrl = motionEditorPath({ projectId: record.projectId, canvasId: record.canvasId, nodeId: record.id });
-  const started = await startFarmRender(db, { orgId: input.orgId, nodeId: input.nodeId, projectId: record.projectId, canvasId: record.canvasId, userId: input.userId, brandId: project.brandId, editorUrl, head, settings: input.settings });
+  const started = await startFarmRender(db, { orgId: input.orgId, nodeId: input.nodeId, projectId: record.projectId, canvasId: record.canvasId, userId: input.userId, editorUrl, head, settings: input.settings });
   if (!started.ok) {
     return { ok: false, error: started.error, detail: started.detail };
   }

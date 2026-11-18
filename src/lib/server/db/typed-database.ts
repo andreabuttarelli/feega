@@ -26,12 +26,7 @@
 import { z } from 'zod';
 import type { Database } from '$lib/database.types';
 import { NODE_DATA_SCHEMAS } from '$lib/canvas/node-data';
-import {
-  postMediaSchema,
-  canvasViewportSchema,
-  adTargetingSchema,
-  adPlacementsSchema
-} from '$lib/server/org-data/jsonb-schemas';
+import { canvasViewportSchema } from '$lib/server/org-data/jsonb-schemas';
 
 type Overwrite<Row, Patch> = Omit<Row, keyof Patch> & Patch;
 
@@ -39,10 +34,7 @@ type NodeTypeAndData = {
   [K in keyof typeof NODE_DATA_SCHEMAS]: { type: K; data: z.infer<(typeof NODE_DATA_SCHEMAS)[K]> };
 }[keyof typeof NODE_DATA_SCHEMAS];
 
-type PostMedia = z.infer<typeof postMediaSchema>;
 type CanvasViewport = z.infer<typeof canvasViewportSchema>;
-type AdTargeting = z.infer<typeof adTargetingSchema>;
-type AdPlacements = z.infer<typeof adPlacementsSchema>;
 
 type Tables = Database['public']['Tables'];
 
@@ -53,26 +45,6 @@ type NarrowedNodes = {
   Relationships: Tables['nodes']['Relationships'];
 };
 
-type NarrowedPosts = {
-  Row: Overwrite<Tables['posts']['Row'], { media: PostMedia }>;
-  Insert: Overwrite<Tables['posts']['Insert'], { media?: PostMedia }>;
-  Update: Overwrite<Tables['posts']['Update'], { media?: PostMedia }>;
-  Relationships: Tables['posts']['Relationships'];
-};
-
-type NarrowedAdCampaigns = {
-  Row: Overwrite<Tables['ad_campaigns']['Row'], { targeting: AdTargeting | null; placements: AdPlacements | null }>;
-  Insert: Overwrite<
-    Tables['ad_campaigns']['Insert'],
-    { targeting?: AdTargeting | null; placements?: AdPlacements | null }
-  >;
-  Update: Overwrite<
-    Tables['ad_campaigns']['Update'],
-    { targeting?: AdTargeting | null; placements?: AdPlacements | null }
-  >;
-  Relationships: Tables['ad_campaigns']['Relationships'];
-};
-
 type NarrowedCanvases = {
   Row: Overwrite<Tables['canvases']['Row'], { viewport: CanvasViewport | null }>;
   Insert: Overwrite<Tables['canvases']['Insert'], { viewport?: CanvasViewport | null }>;
@@ -81,19 +53,16 @@ type NarrowedCanvases = {
 };
 
 /**
- * IL DATABASE NARROWED — le stesse 26+ tabelle di `Database`, con le sei colonne validate
- * (`nodes.type`+`data`, `posts.media`, `ad_campaigns.targeting`,
- * `ad_campaigns.placements`, `canvases.viewport`) sostituite dalla loro forma vera. Ogni altra
+ * IL DATABASE NARROWED — le stesse 26+ tabelle di `Database`, con le colonne validate
+ * (`nodes.type`+`data`, `canvases.viewport`) sostituite dalla loro forma vera. Ogni altra
  * tabella, e ogni altra colonna jsonb — quelle che `jsonb-schemas.ts` registra `free_form`, col
  * motivo scritto lì — resta `Json` esattamente come il generatore l'ha scritta: non c'è ancora un
  * codice reale la cui forma vada derivata, e imporne una qui sarebbe un contratto inventato.
  */
 export type NarrowedDatabase = Omit<Database, 'public'> & {
   public: Omit<Database['public'], 'Tables'> & {
-    Tables: Omit<Tables, 'nodes' | 'posts' | 'ad_campaigns' | 'canvases'> & {
+    Tables: Omit<Tables, 'nodes' | 'canvases'> & {
       nodes: NarrowedNodes;
-      posts: NarrowedPosts;
-      ad_campaigns: NarrowedAdCampaigns;
       canvases: NarrowedCanvases;
     };
   };

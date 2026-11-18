@@ -53,7 +53,7 @@ describe('motion agent expression tool', () => {
   });
 
   it('the prompt teaches the expression language with shake, rotation and follow examples', () => {
-    const prompt = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Missing });
+    const prompt = motionAgentPrompt({ selectionNote: '', vision: Vision.Missing });
     for (const needle of ['set_expression', 'wiggle(', 'time * ', 'layer("']) {
       expect(prompt).toContain(needle);
     }

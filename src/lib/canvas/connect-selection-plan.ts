@@ -14,7 +14,7 @@
  * sorgenti del suo medium, nell'ordine.
  *
  * IL MEDIUM DI UNA SORGENTE VIENE DAL SUO TIPO DI NODO — `text`/`image`/`video` sono anche il loro
- * medium; un `doc` è testo (ciò che porta è testo scritto), gli altri tipi (`iframe`, `products`,
+ * medium; un `doc` è testo (ciò che porta è testo scritto), gli altri tipi (`iframe`,
  * `social_account_feed`, `influencer`) non hanno un medium che questo file sappia offrire e sono
  * sempre respinti, con lo stesso motivo di un `canConnect` negativo su un ruolo che non alimenta.
  */

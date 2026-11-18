@@ -28,6 +28,6 @@ describe('motion agent blend tool', () => {
   });
 
   it('the prompt mentions blend modes', () => {
-    expect(motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Missing })).toContain('set_blend_mode');
+    expect(motionAgentPrompt({ selectionNote: '', vision: Vision.Missing })).toContain('set_blend_mode');
   });
 });

@@ -19,7 +19,7 @@ import { assetUrls, motionAssets, motionTokens } from './editor';
 import { docScaleOf } from './doc-scale';
 import type { DrawTarget, SelectionPorts } from './selection-export';
 
-export type SelectionScope = { db: Db; orgId: string; projectId: string; brandId: string | null; actor: Actor };
+export type SelectionScope = { db: Db; orgId: string; projectId: string; actor: Actor };
 
 const FRAME_NAME = 'Frame';
 

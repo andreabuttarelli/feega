@@ -4,7 +4,7 @@ import { toolScope } from '$lib/server/dashboard/tool-scope';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { orgCreditBalance } from '$lib/server/credits';
 import { listProjectAssets } from '$lib/server/repos/assets';
-import { signedAssets } from '$lib/server/studio/studio-media';
+import { signedAssets } from '$lib/server/dashboard/signed-assets';
 import { startUpscale, UPSCALE_START_DEPS, type UpscaleSourceInput } from '$lib/server/upscale/start';
 import { recentUpscales, upscaleJob, upscalePricing } from '$lib/server/upscale/job';
 import { OPENROUTER_UPSCALE_MODEL, upscaleLimitsOf } from '$lib/video-models';

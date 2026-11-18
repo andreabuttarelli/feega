@@ -334,7 +334,6 @@ export type MotionToolDeps = {
   templates?: TemplateLibrary;
   revisions?: RevisionLibrary;
   site?: (url: string) => Promise<SourceRead>;
-  brand?: (name?: string) => Promise<SourceRead>;
   importAsset?: (url: string, label?: string) => Promise<AssetImport>;
   capture?: (url: string, view: CaptureView) => Promise<SiteCapture>;
   readUi?: (asset: MotionAsset, region?: UiRegion) => Promise<UiRead>;
@@ -813,8 +812,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
   };
 
   const readLogos = (read: SourceRead) => {
-    const found = read as { site?: { logos?: { url?: string }[] }; brand?: { logoUrl?: string | null } };
-    for (const url of [...(found.site?.logos ?? []).map((l) => l.url), found.brand?.logoUrl]) {
+    const found = read as { site?: { logos?: { url?: string }[] } };
+    for (const url of (found.site?.logos ?? []).map((l) => l.url)) {
       if (url) {
         logoUrls.add(url);
       }
@@ -2855,12 +2854,6 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         return deps.storyboard.link(input.node_id, input.clip_ids);
       }
-    }),
-
-    use_brand: tool({
-      description: "Read a brand of this workspace: the project brand without a name, or the brand the user names. Returns name, website, logo url, palette, fonts, voice notes and products. import_asset its logo and product pictures to use them in clips.",
-      inputSchema: z.object({ name: z.string().max(120).optional().describe('brand name or slug; omit for the project brand') }),
-      execute: async (input) => (deps.brand ? readLogos(await deps.brand(input.name)) : UNREADABLE('reading brands'))
     }),
 
     import_asset: tool({

@@ -157,11 +157,7 @@ export function createOrgQueryTool({ authority, orgId, userId, threadId, hidden 
         `This reads inside org ${orgId} only — every row you get back belongs to it, and a where ` +
           '`org_id` you pass yourself is ignored in favour of this org.',
         '',
-        'A project has NO brand until one is attached — `projects.brand_id` is nullable, and that is ' +
-          'the normal case, not an edge case. A canvas belongs to a project; nodes and their ' +
-          'connections belong to a canvas. A post (the `posts` table) is a different thing from a ' +
-          'node: a post is the promoted artifact — caption, media, brand — that gets scheduled or ' +
-          'becomes an ad creative. `post_sources` links a post back to the nodes it came from.'
+        'A canvas belongs to a project; nodes and their connections belong to a canvas.'
       ].join('\n'),
       inputSchema: z
         .object({

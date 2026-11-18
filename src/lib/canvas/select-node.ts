@@ -58,10 +58,9 @@ export function clampIndex(index: number, length: number): number {
 }
 
 /**
- * I TIPI DI NODO DA CUI UN `select` PUÒ SCEGLIERE — una lista è il caso storico, `products` e
- * `social_account_feed` sono intrinsecamente liste anche loro: un catalogo sincronizzato e un feed
- * scaricato sono N righe nello stesso ordine per tutta la vita del nodo, la stessa idea di
- * `list.data.items` con la sorgente altrove (`products`/`social_posts`, non `data`). Una riga sola
+ * I TIPI DI NODO DA CUI UN `select` PUÒ SCEGLIERE — una lista è il caso storico, `social_account_feed`
+ * è intrinsecamente una lista anche lui: un feed scaricato è N righe nello stesso ordine per tutta la vita del nodo, la stessa idea di
+ * `list.data.items` con la sorgente altrove (`social_posts`, non `data`). Una riga sola
  * qui è ciò che tiene `listFeedingSelect` (client) e `listFeeding` (`upstream.ts`, server) d'accordo
  * su COSA conta come sorgente, senza due elenchi che divergono al primo tipo aggiunto.
  */

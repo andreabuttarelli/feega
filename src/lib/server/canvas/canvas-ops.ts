@@ -37,7 +37,7 @@ import { imageToolAskSchema } from '$lib/image-tools';
 import { videoReframeAskSchema } from '$lib/reframe';
 import { VIDEO_REFRAME_DEPS, startVideoReframe } from '$lib/server/canvas/video-reframe';
 import { AgentKey, agentActor, type Actor } from '$lib/server/repos/actor';
-import { withBrandContext, withOrgContext } from '$lib/server/ai-log';
+import { withOrgContext } from '$lib/server/ai-log';
 import { GEN_MEDIUMS, isGenMedium, type GenParams } from '$lib/canvas/gen-node';
 import { connectRefusal, nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPUTS_ERROR } from '$lib/server/canvas/node-model';
 import { unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
@@ -156,7 +156,6 @@ export type CanvasDeps = {
   orgId: string;
   projectId: string;
   userId: string;
-  brandId?: string | null;
   agentKey?: AgentKey;
   sessionId?: string | null;
 };
@@ -167,8 +166,7 @@ export type CanvasCtx = CanvasDeps & {
 };
 
 export function canvasCtx(deps: CanvasDeps): CanvasCtx {
-  const billed = <T>(fn: () => Promise<T>): Promise<T> =>
-    deps.brandId ? withBrandContext(deps.brandId, fn) : withOrgContext(deps.orgId, fn);
+  const billed = <T>(fn: () => Promise<T>): Promise<T> => withOrgContext(deps.orgId, fn);
   return { ...deps, actor: agentActor(deps.userId, deps.agentKey, deps.sessionId), billed };
 }
 
@@ -974,7 +972,7 @@ export const CANVAS_OPS = {
         return { error: 'renderer_unavailable', message: 'image export needs the server renderer, which is not available here' };
       }
       const targets = [...input.frameIds.map((nodeId) => ({ nodeId, seconds: input.seconds })), ...input.elements.map((e) => ({ nodeId: e.frameId, elementId: e.elementId, seconds: input.seconds }))];
-      const out = await exportSelection(selectionPorts({ db: ctx.db, orgId: ctx.orgId, projectId: ctx.projectId, brandId: ctx.brandId ?? null, actor: ctx.actor }), { targets, rows: input.rows, name: input.name ?? 'Export' });
+      const out = await exportSelection(selectionPorts({ db: ctx.db, orgId: ctx.orgId, projectId: ctx.projectId, actor: ctx.actor }), { targets, rows: input.rows, name: input.name ?? 'Export' });
       if (out.outcome !== ExportOutcome.Done) {
         return { error: out.outcome, nodeId: out.nodeId, elementId: out.elementId };
       }

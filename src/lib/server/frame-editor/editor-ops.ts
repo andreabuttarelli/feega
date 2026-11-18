@@ -90,7 +90,7 @@ export const EDITOR_OPS = {
     access: EditorAccess.Read,
     input: z.object({ briefIds: z.array(z.string()).optional() }),
     run: async (ctx, input) => {
-      const found = { orgId: ctx.orgId, canvas: ctx.canvas, mode: ctx.mode, projectBrandId: ctx.projectBrandId };
+      const found = { orgId: ctx.orgId, canvas: ctx.canvas, mode: ctx.mode };
       return ok(await editorSession({ db: ctx.db, userId: ctx.userId, found }, { projectId: ctx.canvas.projectId, nodeId: ctx.motion.record.id, briefIds: input.briefIds ?? [] }));
     }
   }),
@@ -393,7 +393,7 @@ export const EDITOR_OPS = {
         return denied;
       }
       const editorUrl = motionEditorPath({ projectId: ctx.canvas.projectId, canvasId: ctx.canvas.id, nodeId: ctx.motion.record.id });
-      const started = await startFarmRender(ctx.db, { ...nodeScope(ctx), projectId: ctx.canvas.projectId, canvasId: ctx.canvas.id, userId: ctx.userId, brandId: ctx.projectBrandId, editorUrl, head, settings: settings.settings });
+      const started = await startFarmRender(ctx.db, { ...nodeScope(ctx), projectId: ctx.canvas.projectId, canvasId: ctx.canvas.id, userId: ctx.userId, editorUrl, head, settings: settings.settings });
       return started.ok ? ok({ runId: started.runId, quote: started.quote }) : refused(HTTP_UNAVAILABLE, { error: started.error, detail: started.detail });
     }
   }),

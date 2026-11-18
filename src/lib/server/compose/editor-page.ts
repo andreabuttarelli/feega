@@ -10,7 +10,6 @@ import { renderView } from '$lib/server/motion/render-run';
 import { serverRenderOpen } from '$lib/motion/server-render';
 import { renderQueue } from '$lib/server/motion/render-queue';
 import { listNodeRuns } from '$lib/server/repos/node-runs';
-import { listProjects } from '$lib/server/repos/projects';
 import { registerUploadedAsset, UploadError } from '$lib/server/canvas/upload';
 import { motionNodePath } from '$lib/canvas/motion-node';
 import { uploadKindOf } from '$lib/canvas/upload-kind';
@@ -38,8 +37,6 @@ export const load = async (event: ServerLoadEvent<ComposeParams>) => {
   const { db, orgId, projectId, motion } = await scopeOf(event);
   const nodeScope = { orgId, nodeId: motion.record.id };
   const canvasId = motion.record.canvasId;
-  const projects = await listProjects(db, orgId);
-  const brandId = projects.find((p) => p.id === projectId)?.brandId ?? null;
 
   const [head, tokens, assets, runs, gallery] = await Promise.all([
     headOrNew(db, nodeScope, motion.node),

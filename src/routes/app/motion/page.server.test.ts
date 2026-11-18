@@ -14,7 +14,7 @@ vi.mock('$lib/server/repos/dashboard', () => ({
   listRecentBatches: vi.fn(async () => []),
   listRecentNodes: vi.fn(async () => [{ id: 'm1', projectId: 'p1', canvasId: 'c1', name: 'Teaser', data: {}, updatedAt: '2026-10-03' }])
 }));
-vi.mock('$lib/server/studio/studio-media', () => ({ signedAssets: vi.fn(async () => ({ assets: new Map(), urls: {} })) }));
+vi.mock('$lib/server/dashboard/signed-assets', () => ({ signedAssets: vi.fn(async () => ({ assets: new Map(), urls: {} })) }));
 
 const canvases = [{ id: 'c1', projectId: 'p1', name: 'Board', viewport: null }];
 const createNode = vi.fn(async (_db: unknown, input: { canvasId: string }) => ({ id: 'm-new', canvasId: input.canvasId }));

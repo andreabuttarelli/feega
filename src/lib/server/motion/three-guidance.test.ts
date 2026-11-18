@@ -15,7 +15,7 @@ describe('three.js guidance for the agent', () => {
 
     expect(THREE_GUIDANCE).toContain('three.renderer(canvas)');
     expect(THREE_GUIDANCE).toContain('InstancedMesh');
-    expect(motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Missing })).toContain(THREE_GUIDANCE);
+    expect(motionAgentPrompt({ selectionNote: '', vision: Vision.Missing })).toContain(THREE_GUIDANCE);
     expect(schema).toContain(THREE_GUIDANCE);
   });
 });

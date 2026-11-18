@@ -123,7 +123,7 @@ describe('motion agent mask tools', () => {
   });
 
   it('the prompt teaches masks and mattes', () => {
-    const prompt = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Available });
+    const prompt = motionAgentPrompt({ selectionNote: '', vision: Vision.Available });
 
     expect(prompt).toContain('set_mask');
     expect(prompt).toContain('set_track_matte');
