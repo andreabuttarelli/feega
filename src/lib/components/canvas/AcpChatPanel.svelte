@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { tick } from 'svelte';
+  import { nearBottom } from '$lib/chat-scroll';
+  import { nextFollow, type Follow } from '$lib/components/brand-agent/chat-follow';
   import { Button, type ButtonVariant } from '$lib/components/ui/button';
   import { AcpChat, Line } from '$lib/acp/acp-chat.svelte';
   import { AgentChoices } from '$lib/acp/agent-choices.svelte';
@@ -18,6 +21,17 @@
   const model = new AgentModelChoice();
 
   let draft = $state('');
+  let scroller = $state<HTMLOListElement | null>(null);
+  let follow = $state<Follow>('following');
+
+  $effect(() => {
+    void chat.revision;
+    void tick().then(() => {
+      if (scroller && follow === 'following') {
+        scroller.scrollTo({ top: scroller.scrollHeight });
+      }
+    });
+  });
 
   const agent = $derived(choices.current);
 
@@ -40,6 +54,7 @@
     }
 
     draft = '';
+    follow = nextFollow(follow, { kind: 'sent' });
     void chat.send(agent.id, prompt);
   }
 
@@ -64,7 +79,7 @@
 <section class="acp" data-testid="acp-chat">
   <AcpAgentPicker agents={choices.agents} chosen={choices.chosen} refreshing={choices.refreshing} onchoose={(id) => void choices.choose(id)} onrefresh={() => void Promise.all([choices.refresh(), model.refresh()])} />
 
-  <ol class="lines">
+  <ol class="lines" bind:this={scroller} onscroll={() => (follow = nextFollow(follow, { kind: 'scrolled', atBottom: nearBottom(scroller) }))}>
     {#if !agent}
       <li class="hint">{hint}</li>
     {/if}
@@ -111,12 +126,14 @@
   <div class="dock">
     <ChatComposer bind:value={draft} busy={chat.busy} enabled={!!agent} placeholder={agent ? `Ask ${agent.name}` : 'Pick an agent first'} onsend={send} onstop={() => void chat.stop()}>
       {#snippet controls()}
+        <div class="pickers">
         <span class="model-slot" data-testid="acp-model-slot">
           <AcpModelPicker models={model.models} selected={model.selected} onchoose={(id) => void model.choose(id)} />
         </span>
         <span class="effort-slot" data-testid="acp-effort-slot">
           <ChatEffortPicker efforts={model.efforts} value={model.effort} onchoose={(effort) => void model.chooseEffort(effort)} />
         </span>
+        </div>
       {/snippet}
     </ChatComposer>
   </div>
@@ -184,6 +201,18 @@
   .options {
     display: flex;
     gap: var(--ui-space-2);
+  }
+
+  .pickers {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-1);
+    min-width: 0;
+  }
+
+  .model-slot {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   .dock {

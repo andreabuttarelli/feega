@@ -61,12 +61,14 @@ export class AcpChat {
   lines = $state<ChatLine[]>([]);
   busy = $state(false);
   starting = $state(false);
+  revision = $state(0);
   thread = $state(crypto.randomUUID());
   private turn: AbortController | null = null;
 
   constructor(public fetcher: typeof fetch = fetch) {}
 
   push(line: ChatLine) {
+    this.revision += 1;
     this.lines.push(line);
   }
 
@@ -160,6 +162,7 @@ export class AcpChat {
   }
 
   private receive(event: AcpEvent) {
+    this.revision += 1;
     this.starting = event.kind === AcpEventKind.Starting;
 
     if (event.kind === AcpEventKind.Update) {

@@ -218,4 +218,16 @@ describe('AcpChat', () => {
     expect(chat.busy).toBe(false);
     expect(chat.lines).toEqual([{ line: Line.User, text: 'x' }, { line: Line.Stopped }]);
   });
+
+  it('counts every change, so the panel can follow the latest line', async () => {
+    const { fetcher } = server([
+      { kind: AcpEventKind.Update, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'a' } } },
+      { kind: AcpEventKind.Update, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'b' } } },
+      { kind: AcpEventKind.Done, stopReason: 'end_turn' }
+    ]);
+    const chat = new AcpChat(fetcher);
+    await chat.send('claude', 'x');
+
+    expect(chat.revision).toBeGreaterThanOrEqual(4);
+  });
 });
