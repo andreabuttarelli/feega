@@ -40,6 +40,8 @@ jobs:
         run: cp .env.example .env && npm run check && rm .env
 
       - name: Build
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
         run: npx vite build && rm -rf .vercel/output build
 
       - name: Install Playwright Chromium
