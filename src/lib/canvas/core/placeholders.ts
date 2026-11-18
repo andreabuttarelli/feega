@@ -60,6 +60,16 @@ export function nearestFirst<T extends { box: Box }>(items: readonly T[], view: 
   return [...first, ...items.filter((i) => !seen.has(i)).sort((a, b) => distance(a.box) - distance(b.box))];
 }
 
+export const heldBox = (drawn: Box, frameThen: Box, frameNow: Box): Box => ({ ...drawn, x: drawn.x + frameNow.x - frameThen.x, y: drawn.y + frameNow.y - frameThen.y });
+
+const OFF_SCREEN = 1e9;
+
+export function sightRank(box: Box, view: Viewport, screen: Screen): number {
+  const centre = centreOf(view, screen);
+  const distance = Math.hypot(box.x + box.w / 2 - centre.x, box.y + box.h / 2 - centre.y);
+  return inView([{ box }], view, screen).length ? distance : OFF_SCREEN + distance;
+}
+
 export function onScreenFirst<T extends { box: Box }>(items: readonly T[], view: Viewport, screen: Screen): T[] {
   const first = fillOrder(items, view, screen);
   const seen = new Set(first);

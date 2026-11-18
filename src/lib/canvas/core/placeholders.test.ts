@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ItemKind, type DisplayList, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import { BlendMode } from '@feega/motion-core/motion/blend';
-import { Stand, drawable, fillOrder, firstDrawn, layersOf, onScreenFirst, placeholder, standIn, stopgaps, withoutPictures, type Look } from './placeholders';
+import { Stand, drawable, fillOrder, heldBox, sightRank, firstDrawn, layersOf, onScreenFirst, placeholder, standIn, stopgaps, withoutPictures, type Look } from './placeholders';
 import { Readiness } from '@feega/motion-core/motion/gpu-full/media';
 
 const LOOK: Look = { paper: '#ffffff', line: '#e5e5e5' };
@@ -59,6 +59,36 @@ describe('fill order', () => {
 
 const picture = (clip: string): Item => ({ kind: ItemKind.Image, clip, src: `https://x/${clip}.png`, video: false, mediaTime: 0, size: { width: 40, height: 30 }, fit: 'cover', focus: [0.5, 0.5], zoom: 1, clipped: true, inner: [1, 0, 0, 1, 0, 0], opacity: 1, matrix: [1, 0, 0, 1, 5, 6], blur: 0, blend: BlendMode.Normal });
 const listOf = (items: Item[]): DisplayList => ({ width: 100, height: 100, background: null, items, unsupported: [] });
+
+describe('heldBox', () => {
+  const card = { x: -96, y: -768, w: 1472, h: 11882 };
+  const frame = { x: 0, y: 0, w: 1280, h: 11110 };
+
+  it('a held poster card keeps its own size instead of being squeezed onto the frame rect', () => {
+    expect(heldBox(card, frame, frame)).toEqual(card);
+  });
+
+  it('moves with the frame', () => {
+    expect(heldBox(card, frame, { ...frame, x: 50, y: 20 })).toEqual({ x: -46, y: -748, w: 1472, h: 11882 });
+  });
+
+  it('never stretches a layer drawn for another frame size', () => {
+    expect(heldBox(card, frame, { ...frame, h: 20000 })).toEqual(card);
+  });
+});
+
+describe('sightRank', () => {
+  const view = { x: 0, y: 0, zoom: 1 };
+  const screen = { width: 1000, height: 100 };
+
+  it('ranks on-screen frames by distance from the centre, before any off-screen one', () => {
+    const ranks = [box(400), box(0), box(5000)].map((b) => sightRank(b, view, screen));
+
+    expect(ranks[0]).toBeLessThan(ranks[1]);
+    expect(ranks[1]).toBeLessThan(ranks[2]);
+    expect(sightRank(box(1100), view, screen)).toBeGreaterThan(sightRank(box(0), view, screen));
+  });
+});
 
 describe('pictures not there', () => {
   it('a card whose pictures have not arrived draws a grey block where each picture goes, nested too', () => {

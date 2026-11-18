@@ -2,7 +2,8 @@ import { Readiness } from '@feega/motion-core/motion/gpu-full/media';
 
 export enum OnScreen {
   Nothing = 'nothing',
-  Thumb = 'thumb'
+  Thumb = 'thumb',
+  Poster = 'poster'
 }
 
 export enum Stage {
@@ -14,20 +15,30 @@ export const RETRY_MS = [1_000, 4_000, 15_000];
 
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+type Shows = { vectors: boolean; partial: (last: boolean) => boolean };
+
+const SHOWS: Record<OnScreen, Shows> = {
+  [OnScreen.Nothing]: { vectors: true, partial: () => true },
+  [OnScreen.Thumb]: { vectors: false, partial: () => true },
+  [OnScreen.Poster]: { vectors: false, partial: (last) => last }
+};
+
 export async function showStaged(ready: () => Promise<Readiness>, held: OnScreen, show: (r: Readiness, stage: Stage) => void, wait: (ms: number) => Promise<void> = pause): Promise<void> {
-  if (held === OnScreen.Nothing) {
+  const shows = SHOWS[held];
+  if (shows.vectors) {
     show(Readiness.Partial, Stage.Vectors);
   }
 
-  let settled = await ready();
-  show(settled, Stage.Settled);
-  for (const ms of RETRY_MS) {
-    if (settled === Readiness.Whole) {
+  for (let attempt = 0; ; attempt++) {
+    const settled = await ready();
+    const last = attempt === RETRY_MS.length;
+    if (settled === Readiness.Whole || shows.partial(last)) {
+      show(settled, Stage.Settled);
+    }
+    if (settled === Readiness.Whole || last) {
       return;
     }
-    await wait(ms);
-    settled = await ready();
-    show(settled, Stage.Settled);
+    await wait(RETRY_MS[attempt]);
   }
 }
 
@@ -64,4 +75,4 @@ export class VectorGate {
   }
 }
 
-export const shownBefore = ({ thumb, drawn }: { thumb: boolean; drawn: boolean }): OnScreen => (thumb || drawn ? OnScreen.Thumb : OnScreen.Nothing);
+export const shownBefore = ({ thumb, drawn, poster = false }: { thumb: boolean; drawn: boolean; poster?: boolean }): OnScreen => (thumb || drawn ? OnScreen.Thumb : poster ? OnScreen.Poster : OnScreen.Nothing);
