@@ -935,3 +935,90 @@ fn every_coarser_level_held_is_drawn_beneath_coarsest_first_so_a_gap_in_one_show
     assert!(steps.contains(&tiles.step_for(camera(0.5))));
     assert!(steps.windows(2).all(|w| w[0] <= w[1]), "coarsest must come first: {steps:?}");
 }
+
+#[test]
+fn a_gesture_frame_draws_one_whole_level_never_a_mix_of_sharp_and_soft() {
+    let mut tiles = Tiles::default();
+    tiles.frame(camera(1.0), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
+    let sharp = tiles.frame(camera(2.0), SCREEN).missing;
+    sharp.iter().take(sharp.len() / 2).for_each(|k| tiles.hold(*k));
+
+    let frame = tiles.gesture_frame(camera(2.0), SCREEN);
+    let steps: std::collections::BTreeSet<i32> = frame.draw.iter().map(|k| k.step).collect();
+
+    assert_eq!(steps.len(), 1, "drew several levels at once: {steps:?}");
+    assert!(steps.contains(&tiles.step_for(camera(1.0))));
+    assert!(frame.bare.is_empty() && frame.beneath.is_empty());
+}
+
+#[test]
+fn a_gesture_frame_switches_to_the_sharp_level_once_it_covers_the_view() {
+    let mut tiles = Tiles::default();
+    tiles.frame(camera(1.0), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
+    tiles.frame(camera(2.0), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
+
+    let frame = tiles.gesture_frame(camera(2.0), SCREEN);
+
+    assert!(frame.draw.iter().all(|k| k.step == tiles.step_for(camera(2.0))));
+}
+
+#[test]
+fn tiles_are_baked_only_once_the_zoom_holds_still() {
+    use gpu_core::tiles::bakes_in_gesture;
+    assert!(!bakes_in_gesture(0.0));
+    assert!(!bakes_in_gesture(60.0));
+    assert!(bakes_in_gesture(200.0));
+}
+
+#[test]
+fn a_zoom_aims_one_level_mid_gesture_once_the_drawn_level_is_stretched_past_an_octave() {
+    use gpu_core::tiles::{mid_gesture_level, step_of};
+    let drawn = Some(step_of(1.0));
+    assert_eq!(mid_gesture_level(1.9, drawn, None), None);
+    assert_eq!(mid_gesture_level(0.1, drawn, None), None, "zooming out downsamples, it stays sharp");
+    assert_eq!(mid_gesture_level(8.0, None, None), None);
+
+    let aimed = mid_gesture_level(2.1, drawn, None).expect("past an octave it aims a sharper level");
+    assert!(aimed > drawn.unwrap() && aimed <= step_of(2.1));
+    assert_eq!(mid_gesture_level(3.0, drawn, Some(aimed)), Some(aimed), "the aim holds while the zoom moves on");
+    assert_eq!(mid_gesture_level(2.1, Some(aimed), Some(aimed)), None, "once drawn, nothing is aimed");
+}
+
+#[test]
+fn the_aimed_level_bakes_from_the_centre_of_the_view_out() {
+    let tiles = Tiles::default();
+    let level = tiles.step_for(camera(1.0));
+    let missing = tiles.missing_over(camera(1.0), SCREEN, level);
+    let centre = |k: &TileKey| { let c = k.screen(camera(1.0)).center(); (c.x - 512.0).hypot(c.y - 384.0) };
+
+    assert!(!missing.is_empty() && missing.iter().all(|k| k.step == level));
+    assert!(missing.windows(2).all(|w| centre(&w[0]) <= centre(&w[1])));
+}
+
+#[test]
+fn eviction_keeps_the_aimed_level_baking_mid_gesture_though_it_was_never_drawn() {
+    let mut tiles = Tiles::default();
+    filled(&mut tiles);
+    let at = camera(1.0);
+    let aimed = tiles.step_for(at) - 2;
+    tiles.missing_over(at, SCREEN, aimed).into_iter().for_each(|k| tiles.hold(k));
+    tiles.keep_levels(&[aimed]);
+
+    let gone = tiles.evict_beyond(at, SCREEN, 0);
+
+    assert!(gone.iter().all(|k| k.step != aimed || !k.screen(at).overlaps(Rect::new(0.0, 0.0, SCREEN.0 as f64, SCREEN.1 as f64))));
+}
+
+#[test]
+fn eviction_keeps_the_level_a_gesture_draws_though_the_zoom_wants_another() {
+    let mut tiles = Tiles::default();
+    filled(&mut tiles);
+    let at = camera(1.0);
+    let drawn = tiles.step_for(at) - 6;
+    tiles.missing_over(at, SCREEN, drawn).into_iter().for_each(|k| tiles.hold(k));
+    tiles.keep_levels(&[drawn]);
+
+    let gone = tiles.evict_beyond(at, SCREEN, 0);
+
+    assert!(gone.iter().all(|k| k.step != drawn || !k.screen(at).overlaps(Rect::new(0.0, 0.0, SCREEN.0 as f64, SCREEN.1 as f64))));
+}

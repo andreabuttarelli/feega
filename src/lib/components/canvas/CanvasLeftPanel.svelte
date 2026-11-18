@@ -35,12 +35,14 @@
     kind,
     labelKey,
     pages,
+    docked = false,
     onclose
   }: {
     projectId: string;
     kind: LeftPanelKind;
     labelKey: string;
     pages: ComponentProps<typeof PagesList>;
+    docked?: boolean;
     onclose: () => void;
   } = $props();
 
@@ -49,14 +51,15 @@
   let searching = $state(false);
 
   const panelWidth = $derived(PANEL_WIDTHS[kind] ?? PANEL_WIDTHS.assets);
+  const widthStyle = $derived(docked ? undefined : `width: min(${panelWidth}px, calc(100vw - 92px));`);
 </script>
 
 {#if kind === 'influencers'}
-  <div class="left-panel" style={`width: min(${panelWidth}px, calc(100vw - 92px));`}>
+  <div class="left-panel" style={widthStyle} class:is-docked={docked}>
     <InfluencersPanel {projectId} {onclose} />
   </div>
 {:else if kind === 'layers'}
-  <div class="left-panel is-tree" style={`width: min(${panelWidth}px, calc(100vw - 92px));`} data-testid="pages-layers">
+  <div class="left-panel is-tree" class:is-docked={docked} style={widthStyle} data-testid="pages-layers">
     <PagesList {...pages} />
     <div class="section-head">
       <span class="section-label">{$_(labelKey)}</span>
@@ -69,13 +72,15 @@
     </div>
   </div>
 {:else}
-  <div class="left-panel" style={`width: min(${panelWidth}px, calc(100vw - 92px));`}>
+  <div class="left-panel" style={widthStyle} class:is-docked={docked}>
+    {#if !docked}
     <div class="section-head is-first">
       <span class="section-label">{$_(labelKey)}</span>
       <IconButton label={$_('app.shell.closePanel')} shortcut="Escape" size={IconSize.Sm} side={Side.Bottom} onclick={onclose} data-testid="panel-close">
         <X />
       </IconButton>
     </div>
+    {/if}
     <div class="left-panel-body is-flush" class:is-split={kind === 'styles'}>
       {#if kind === 'components'}
         <ProjectComponentsPanel {projectId} />
@@ -115,6 +120,14 @@
     .left-panel {
       bottom: calc(var(--dock-lift, 0px) + 76px);
     }
+  }
+
+  .left-panel.is-docked {
+    position: static;
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    box-shadow: none;
   }
 
   .left-panel-body {

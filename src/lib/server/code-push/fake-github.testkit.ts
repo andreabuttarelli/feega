@@ -171,7 +171,7 @@ export function fakeGithub(opts: { owner?: string; repo?: string; push?: boolean
         return !file || treeOf(sha)[file] !== (parent ? treeOf(parent)[file] : undefined);
       };
       const history: string[] = [];
-      for (let at = refs.get(String(r.query?.sha)) ?? String(r.query?.sha); commits.has(at); at = commits.get(at)!.parents[0]) {
+      for (let at = refs.get(String(r.query?.sha)) ?? tags.get(String(r.query?.sha)) ?? String(r.query?.sha); commits.has(at); at = commits.get(at)!.parents[0]) {
         history.push(at);
       }
       const shown = history.filter(touches).slice(0, Number(r.query?.per_page ?? 30));

@@ -10,6 +10,7 @@ export type LocalOptions = { publish: Publish; pulls?: GitHost | null };
 
 const ORIGIN = 'origin';
 const MIRROR = 'refs/feega/origin/';
+const TAG_MIRROR = 'refs/feega/tags/';
 const FALLBACK_DEFAULT = 'main';
 const NO_PULLS = 0;
 const FIELD = '\x1f';
@@ -67,7 +68,17 @@ export function localGitHost(dir: string, options: LocalOptions): GitHost {
     return run(['rev-parse', '--verify', `refs/heads/${branch}^{commit}`], GitFailure.BranchGone);
   };
 
-  const resolve = (ref: string) => (SHA.test(ref) ? run(['rev-parse', '--verify', `${ref}^{commit}`], GitFailure.NotFound) : headOf(ref));
+  const tagOf = async (tag: string) => {
+    if (onOrigin) {
+      await run(['fetch', '-q', '--no-tags', ORIGIN, `+refs/tags/${tag}:${TAG_MIRROR}${tag}`], GitFailure.BranchGone);
+      return run(['rev-parse', '--verify', `${TAG_MIRROR}${tag}^{commit}`], GitFailure.BranchGone);
+    }
+    return run(['rev-parse', '--verify', `refs/tags/${tag}^{commit}`], GitFailure.BranchGone);
+  };
+
+  const branchOrTag = (ref: string) => headOf(ref).catch(() => tagOf(ref));
+
+  const resolve = (ref: string) => (SHA.test(ref) ? run(['rev-parse', '--verify', `${ref}^{commit}`], GitFailure.NotFound) : branchOrTag(ref));
 
   const setRef = async (branch: string, to: string, from: string | null) => {
     if (onOrigin) {

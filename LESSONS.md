@@ -96,6 +96,9 @@ Signal: with the pointer still over a frame, a wheel zoom makes its hover outlin
 
 **Signal:** pinch zoom across octaves presents 85–95 fps at 120 Hz, with 50–340 ms gaps, while the bake counters say each frame baked 0–1 tiles in a few ms. **Move:** read `fallbackMs` in `window.__gpuCanvas.frames`. Any producer that runs in `tiled_frame` must check the one frame deadline per unit of work: bake batches, `serve_bare`'s never-blurry fallback, `render_ahead`, and any future one. On 2026-11-16 the fallback drew whole screen bands with no budget and caused 180 of 204 long frames.
 
+### A frame you pan back to stays empty, then fills seconds later or never
+**Signal:** after a while away, frames at the far edge show the canvas background (not a card); `frame|dropped|<id>:…:vectors` lands before `frame|pictured|<id>:…` of the whole group, or no `pictured` comes at all. **Move:** a frame shows only *pictured* chain layers and the readable-frame placeholder draws nothing, so any gap between dropping the last drawn layer and picturing the head is an empty frame. Check `drawnLast` survives the frame leaving `holding`. To drive the camera, CDP `Input.synthesizePinchGesture` anchored near a screen corner fails with "Position out of bounds": pinch at the centre, then pan with `Input.synthesizeScrollGesture` in a closed loop on `data-view`.
+
 ## Providers
 
 ### Kie publishes its price list and its request schemas, you just have to find them
@@ -121,6 +124,10 @@ Signal: with the pointer still over a frame, a wheel zoom makes its hover outlin
 ### A worktree dev server runs the main checkout's `packages/`
 
 **Signal:** a fix in `packages/motion-core` passes its test but the browser on the worktree's dev server still shows the old behaviour. **Move:** the worktree has no `node_modules`, so `@feega/*` resolves to the main checkout's symlinks. Create `node_modules/@feega/*` in the worktree pointing at its own `packages/`, link the other top-level entries from the main `node_modules`, and start Vite with `server.fs.strict: false` (the Kit client lives outside the worktree's allow list).
+
+### A worktree `.env` turns generation tests red
+
+**Signal:** after copying `.env` into a worktree (`npm run check` needs it, or every `$env/static/public` read errors as `string | undefined`), `vitest run src/lib/server/canvas` fails ~20 cases in `generate*.test.ts` and `canvas-catalogue.test.ts` that pass in CI. **Move:** the tests read the real env when it exists. Keep `.env` in the worktree only while `npm run check` / `build:node` run; move it out for vitest.
 
 ### A snapcn port that works in tests throws in the player
 
@@ -4007,6 +4014,10 @@ property reads on ~2,000 items (`src/lib/canvas/counted-list.testkit.ts`), not w
 ## A component with a mask inside lands as a plain group, never linked
 
 **Signal:** a main with a mask layer pasted from Figma, its untouched instances come out as groups named after the component instead of instances. **Move:** `instanceOverrides` (`instance-diff.ts`) refuses a pair whose clip fields differ outside the ignored set; `matteFrom` holds a clip id, and the own copy and the main have different ids. Compare it through the clip pairs as `parent` is, never by value.
+
+## A 3D export scores 0.99 against the canvas though every number matches
+
+**Signal:** SSIM of an exported canvas against the composed canvas stays near 0.99 with thin rim differences, only on one layer. **Move:** the layer's width came out as a rounded percentage (`32.81%` of 1280 is 419.97 px); React Three Fiber sizes the renderer to the fractional width while a `clientWidth` read rounds it. Give the fixture a width that is an exact percentage (400 of 1280) before suspecting the scene.
 
 ## A service-role credential carries no role unless the request re-derives it
 **Signal:** a token row (`api_keys`) is checked for hash, revocation and expiry, then the request runs on the service-role client. RLS role rules (viewers read-only) do not apply, and a demotion or removal changes nothing for the token. **Move:** derive the effective scopes from the holder's current membership on every request (`scopesOfHolder`); never trust what was stored at mint time.

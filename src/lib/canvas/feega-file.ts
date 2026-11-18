@@ -8,6 +8,7 @@ export const FEEGA_MAX_BYTES = 200 * 1024 * 1024;
 
 const MANIFEST_ENTRY = 'manifest.json';
 const CANVAS_ENTRY = 'canvas.json';
+const STORED = 0;
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 
 export enum FeegaRefusal {
@@ -29,7 +30,8 @@ const manifestSchema = z.object({
   version: z.number().int().positive(),
   exportedAt: z.string(),
   canvasName: z.string(),
-  source: z.object({ projectId: z.string(), canvasId: z.string() })
+  source: z.object({ projectId: z.string(), canvasId: z.string() }),
+  acpAgent: z.string().nullable().optional()
 });
 
 const canvasSchema = z.object({
@@ -54,6 +56,7 @@ const canvasSchema = z.object({
     })
   ),
   heads: z.record(z.string(), z.object({ version: z.number(), doc: z.unknown() })),
+  events: z.array(z.record(z.string(), z.unknown())).optional(),
   assets: z.array(
     z.object({
       id: z.string(),
@@ -82,7 +85,7 @@ export function packFeega(file: FeegaFile, blobs: FeegaBlobs): Uint8Array {
   return zipSync({
     [MANIFEST_ENTRY]: strToU8(JSON.stringify(file.manifest)),
     [CANVAS_ENTRY]: strToU8(JSON.stringify(file.canvas)),
-    ...Object.fromEntries(blobs)
+    ...Object.fromEntries([...blobs].map(([name, bytes]) => [name, [bytes, { level: STORED }]]))
   });
 }
 

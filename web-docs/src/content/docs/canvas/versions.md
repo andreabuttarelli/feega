@@ -7,7 +7,7 @@ sidebar:
 
 ## Canvas versions
 
-- **Save the whole canvas under a name** from [History](/canvas/history/) (the bookmark button) and restore it later from its row. Restoring keeps the moment before it as a version too, so a restore can be undone.
+- **Save the whole canvas under a name** from [History](/canvas/history/) (the bookmark button) and restore it later from its row. Restoring keeps the moment before it as a version too, so a restore can be undone. A frame whose saved content is damaged is not restored: History names it, and the API answers list it under `unlanded`.
 - A version holds every node, connection and the content of frames and free elements.
 
 ## Frame versions

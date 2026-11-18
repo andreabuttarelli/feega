@@ -43,7 +43,7 @@ const loadAttachments = vi.fn(async (_db: unknown, input: { ids: string[] }) => 
 vi.mock('$lib/server/chat-attachments/register', () => ({ loadAttachments }));
 
 const importStoredCanvasFile = vi.fn(async (_db: unknown, input: { path: string; projectFor: (name: string) => Promise<string> }) =>
-  input.path.endsWith('bad.feega') ? { outcome: 'refused', refusal: 'damaged' } : { outcome: 'imported', canvas: { id: 'c-imported', projectId: await input.projectFor('Launch kit'), name: 'Launch kit', viewport: null } }
+  input.path.endsWith('bad.feega') ? { outcome: 'refused', refusal: 'damaged' } : { outcome: 'imported', canvas: { id: 'c-imported', projectId: await input.projectFor('Launch kit'), name: 'Launch kit', viewport: null }, unlanded: ['Broken'] }
 );
 vi.mock('$lib/server/canvas/feega-file', async (original) => ({ ...(await original<object>()), importStoredCanvasFile }));
 
@@ -134,10 +134,10 @@ describe('/app is the dashboard for a returning user', () => {
   });
 
   it('a .feega file opens as a new project named after its canvas', async () => {
-    const redirected = await thrown(() => actions.import_canvas_file({ locals, cookies: cookieJar({ 'dz-org': 'org-b' }), request: form({ path: 'org-b/imports/x.feega' }) } as never));
+    const imported = await actions.import_canvas_file({ locals, cookies: cookieJar({ 'dz-org': 'org-b' }), request: form({ path: 'org-b/imports/x.feega' }) } as never);
 
     expect(createProject).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ orgId: 'org-b', name: 'Launch kit' }));
-    expect(redirected).toMatchObject({ status: 303, location: '/p/p-new/c/c-imported' });
+    expect(imported).toMatchObject({ location: '/p/p-new/c/c-imported', unlanded: ['Broken'] });
   });
 
   it('a damaged .feega file says why and opens nothing', async () => {

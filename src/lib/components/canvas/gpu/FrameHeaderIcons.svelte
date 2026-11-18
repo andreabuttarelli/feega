@@ -23,7 +23,7 @@
     padding: 0;
     border: 0;
     background: transparent;
-    border-radius: var(--ui-radius-xs);
+    border-radius: var(--ui-radius-sm);
     cursor: pointer;
     pointer-events: auto;
   }
