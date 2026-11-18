@@ -44,21 +44,24 @@ Feega never writes to your working copy. In a git repository it checks the branc
 
 Select a live frame by its label, then click an element inside it. A frame that is not selected stays a normal page you can scroll and use.
 
-The panel shows the element's file, line and column and these fields:
+The element opens in the **Properties** tab of the right bar, the same panel and controls as any element on the canvas. These are written to your code:
 
-| Field | Written as |
+| In Properties | Written as |
 |---|---|
-| Text | the text between the tags, or the message it comes from |
+| Content | the text between the tags, or the message it comes from |
 | Text colour, Fill | `text-…`, `bg-…` |
-| Font size, Weight | `text-…`, `font-…` |
-| Padding X / Y | `px-…`, `py-…` |
-| Margin top / bottom | `mt-…`, `mb-…` |
-| Gap | `gap-…` |
-| Radius | `rounded-…` |
+| Size, Weight | `text-…`, `font-…` |
+| Auto layout padding | `p-…`, `px-…`, `py-…`, `pt-…` and the other sides |
+| Auto layout gap | `gap-…` |
+| Corner radius | `rounded-…` |
+
+Any other control changes nothing in the code.
 
 A value that matches a token of your theme is written as that token (`text-primary`, `p-6`, `rounded-card`); any other value is written exactly (`text-[#2563eb]`, `py-[16px]`). Only the one class or text changes: the rest of the class list is left as it was.
 
-The change shows at once, then the dev server hot-reloads the file. Each edit is one commit on `feega/live`; **Cmd/Ctrl+Z** reverts it with a new commit. The panel lists the changed files, shows the diff, and **Push** sends them to a `feega/` branch.
+With responsive classes (`text-2xl sm:text-3xl lg:text-4xl`) the class that applies at the frame's width is the one changed, so a desktop frame edits `lg:` and a mobile frame edits the base class.
+
+The change shows at once, then the dev server hot-reloads the file. Each edit is one commit on `feega/live`; **Cmd/Ctrl+Z** writes the previous value back. The selected frame shows how many files changed, and **Push** sends them to a `feega/` branch.
 
 An element without a source position is read-only: run [`feega init`](/integrations/source-map/) in the app and restart the dev server.
 
@@ -66,7 +69,7 @@ From a terminal or an agent:
 
 ```bash
 feega live-edit src/routes/+page.svelte:12:3 color "#2563eb"
-feega live-edit src/routes/+page.svelte:12:3 padding 24px --side y
+feega live-edit src/routes/+page.svelte:12:3 padding 24px --side y --viewport 1440
 feega live-edit src/routes/+page.svelte:12:3 text "Ship today" --was "Ship faster"
 feega live-edit src/routes/+page.svelte:12:3 fill --token primary
 feega live-undo <sha>
@@ -78,7 +81,8 @@ The position is the element's `data-feega-src`. The MCP tool is `live_edit` (`ac
 
 ### Limits
 
-- Classes with a variant (`sm:px-6`, `hover:bg-…`) are not edited: the change goes to the class without a variant, and a variant that applies at the frame's width still wins.
+- State and theme variants (`hover:bg-…`, `dark:…`) and custom breakpoints are not edited.
+- Margin is not in Properties; set it with `feega live-edit … margin`.
 - A class list that is not a plain string (`class={cn(...)}`) is not written; the edit is refused with the reason.
 - Local Feega only.
 
