@@ -3,12 +3,18 @@
   import { SvelteMap } from 'svelte/reactivity';
   import { SourceAction, changedRows, ciOf, CiState, filesOfPatch, filesToPush, impactOf, popoverOf, pushAskOf, pushedNote, pushLabel, rowTitle, VariantChoice, type ChangedFile, type FrameSync, type PullView, type VariantAnswer } from '$lib/canvas/source-changes';
   import { PushOutcome, pushOutcomeOf, editedFilesText } from '$lib/canvas/source-sync';
-  import { BranchMode, branchFields, type BranchOptions } from '$lib/canvas/git-status';
+  import { BranchMode, branchFields, type BranchOptions, type GitSummary } from '$lib/canvas/git-status';
+  import X from '@lucide/svelte/icons/x';
+  import Ellipsis from '@lucide/svelte/icons/ellipsis';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Segmented, Switch } from '$lib/components/ui/control';
+  import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
   type Anchor = { left: number; top: number };
   type Pushed = { branch: string; pull: PullView | null };
 
-  let { projectId, canvasId, open, anchor, syncs, posterOf, assetUrl, onclose, onchanged, oncompare, options = $bindable(), panel = $bindable(false) }: { options: BranchOptions; panel?: boolean; projectId: string; canvasId: string; open: FrameSync | null; anchor: Anchor | null; syncs: FrameSync[]; posterOf: (nodeId: string) => string | null; assetUrl: (assetId: string) => string; onclose: () => void; onchanged: () => Promise<unknown>; oncompare: (nodeId: string) => void } = $props();
+  let { projectId, canvasId, open, anchor, syncs, posterOf, assetUrl, onclose, onchanged, oncompare, options = $bindable(), panel = $bindable(false), autosaveOn = $bindable(true), git = null, savedAt = null }: { options: BranchOptions; panel?: boolean; autosaveOn?: boolean; git?: GitSummary | null; savedAt?: number | null; projectId: string; canvasId: string; open: FrameSync | null; anchor: Anchor | null; syncs: FrameSync[]; posterOf: (nodeId: string) => string | null; assetUrl: (assetId: string) => string; onclose: () => void; onchanged: () => Promise<unknown>; oncompare: (nodeId: string) => void } = $props();
 
   const DEFAULT_NAME = 'canvas-edits';
   const PROTECTED = 'protected';
@@ -193,6 +199,22 @@
   }
 
   const hasPush = $derived(syncs.some((s) => s.link.pushBranch));
+  const direct = $derived(options.mode === BranchMode.Direct);
+  const baseBranch = $derived(git?.base ?? rows[0]?.link.baseBranch ?? syncs[0]?.link.baseBranch ?? 'main');
+  const workBranch = $derived(options.branch.trim() || git?.branch || 'feega/canvas-edits');
+  const WHERE = $derived([{ value: BranchMode.Session, label: 'New branch + PR' }, { value: BranchMode.Direct, label: `Commit to ${baseBranch}` }]);
+  const MINUTE_MS = 60_000;
+  const savedAgo = (ms: number) => (ms < MINUTE_MS ? 'Saved just now' : `Saved ${Math.round(ms / MINUTE_MS)} min ago`);
+  const offered = new Set<string>();
+  $effect(() => {
+    for (const r of rows) {
+      if (!offered.has(r.nodeId)) {
+        offered.add(r.nodeId);
+        picked.add(r.nodeId);
+      }
+    }
+  });
+  const savedLabel = $derived(!autosaveOn ? 'Off: push by hand' : savedAt ? savedAgo(Date.now() - savedAt) : 'Not saved yet');
   const draft = $derived(syncs.find((s) => s.push?.pull?.draft && s.push.pull.status === 'open') ?? null);
   const readOnly = $derived(rows.some((r) => !r.link.writable));
   const toPush = $derived(filesToPush(picked, files));
@@ -233,9 +255,21 @@
 {/if}
 
 {#if panel}
-  <aside class="changes" data-testid="changes-panel">
-    <header><strong>Changes</strong><button type="button" aria-label="Close" onclick={() => (panel = false)}>×</button></header>
-    {#if !rows.length}<p class="muted">No linked frame changed since its last sync.</p>{/if}
+  <aside class="changes" data-testid="changes-panel" aria-label="Changes">
+    <header class="head">
+      <div class="title">
+        <strong>{git?.repo ?? 'Changes'}</strong>
+        <span class="muted"><code>{baseBranch}</code> → <code>{direct ? baseBranch : workBranch}</code></span>
+      </div>
+      {#if git?.pull}<a class="pr" href={git.pull.url} target="_blank" rel="noopener">#{git.pull.number} · {git.draft ? 'Draft' : git.pull.status}</a>{/if}
+      <Button variant="ghost" size="icon-sm" aria-label="Close" onclick={() => (panel = false)}><X size={14} /></Button>
+    </header>
+
+    <section class="list">
+      <p class="label">Next commit</p>
+      {#if !rows.length}
+        <p class="empty" data-testid="changes-empty">No changes yet. Edit a linked frame and it is committed here.</p>
+      {/if}
     {#each rows as row (row.nodeId)}
       <label class="change">
         <input type="checkbox" checked={picked.has(row.nodeId)} onchange={(e) => (e.currentTarget.checked ? picked.add(row.nodeId) : picked.delete(row.nodeId))} />
@@ -254,6 +288,8 @@
       {/each}
       <label class="change"><input type="checkbox" checked={mains.has(row.nodeId)} onchange={(e) => (e.currentTarget.checked ? mains.add(row.nodeId) : mains.delete(row.nodeId))} /> Apply instance edits to main component</label>
     {/each}
+    </section>
+
     {#each asking as v (v.nodeId)}
       <p class="note">{syncs.find((s) => s.nodeId === v.nodeId)?.name || 'Variant'} is a variant:</p>
       <input aria-label="New route" bind:value={v.route} />
@@ -267,10 +303,6 @@
       <p class="note">This push touches config, lockfiles or dotfiles.</p>
       <button type="button" disabled={busy} onclick={() => push(true)}>Push anyway</button>
     {/if}
-    <fieldset class="branch-options" data-testid="branch-options">
-      <input aria-label="Branch name" placeholder="branch (default: feega/canvas-edits)" bind:value={options.branch} disabled={options.mode === BranchMode.Direct} data-testid="branch-name" />
-      <label class="change"><input type="checkbox" checked={options.mode === BranchMode.Direct} onchange={(e) => (options.mode = e.currentTarget.checked ? BranchMode.Direct : BranchMode.Session)} data-testid="branch-direct" /> Commit directly to {rows[0]?.link.baseBranch ?? syncs[0]?.link.baseBranch ?? 'the base branch'}</label>
-    </fieldset>
     {#if note}<p class="note" data-testid="changes-note">{note}</p>{/if}
     {#if pushed}
       <p class="pushed" data-testid="pushed-note">{pushedNote(pushed)}{#if pushed.pull} · <a href={pushed.pull.url} target="_blank" rel="noopener">open</a> · {CI_LABEL[ciOf(pushed.pull)]}{/if}</p>
@@ -288,35 +320,43 @@
         <button type="button" onclick={() => (reviewing = false)}>Back</button>
       </div>
     {/if}
+    <section class="where" data-testid="branch-options">
+      <p class="label">Where changes go</p>
+      <Segmented label="Where changes go" value={options.mode} options={WHERE} onchange={(v) => (options.mode = v as BranchMode)} />
+      {#if direct}
+        <p class="hint" data-testid="branch-direct-note">Commits land on <code>{baseBranch}</code> with no pull request. If it is protected, GitHub refuses them.</p>
+      {:else}
+        <label class="label" for="branch-name">Branch</label>
+        <Input id="branch-name" placeholder="feega/canvas-edits" bind:value={options.branch} data-testid="branch-name" />
+      {/if}
+    </section>
+
+    <div class="autosave">
+      <Switch label="Autosave" value={autosaveOn} onchange={(v) => (autosaveOn = v === true)} />
+      <span>Autosave</span>
+      <span class="muted" data-testid="last-saved">{savedLabel}</span>
+    </div>
+
     <footer>
       {#if readOnly}
-        <button type="button" disabled={busy || !picked.size} onclick={() => push()}>Download patch</button>
-      {:else if draft}
-        <button type="button" class="primary" disabled={busy} onclick={ready} data-testid="ready-for-review">Ready for review</button>
-        <button type="button" disabled={busy || !picked.size || reviewing} onclick={() => (reviewing = true)}>Push now</button>
+        <Button size="sm" disabled={busy || !picked.size} onclick={() => push()}>Download patch</Button>
+      {:else if draft && !direct}
+        <Button size="sm" disabled={busy} onclick={ready} data-testid="ready-for-review">Ready for review</Button>
+        <Button size="sm" variant="secondary" disabled={busy || !picked.size || reviewing} onclick={() => (reviewing = true)}>Push now</Button>
       {:else}
-        <button type="button" class="primary" disabled={busy || !picked.size || reviewing} onclick={() => (reviewing = true)}>{pushLabel(rows)}</button>
+        <Button size="sm" disabled={busy || !picked.size || reviewing} onclick={() => (reviewing = true)}>{direct ? `Commit to ${baseBranch}` : pushLabel(rows)}</Button>
       {/if}
-      <button type="button" disabled={busy || !hasPush} onclick={undo}>Undo last push</button>
+      <DropdownMenu.Root>
+        <DropdownMenu.Trigger class="more" aria-label="More" data-testid="changes-more"><Ellipsis size={14} /></DropdownMenu.Trigger>
+        <DropdownMenu.Content align="end" collisionPadding={8}>
+          <DropdownMenu.Item disabled={busy || !hasPush} onSelect={undo}>Undo last push</DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu.Root>
     </footer>
   </aside>
 {/if}
 
 <style>
-  .branch-options {
-    display: grid;
-    gap: 6px;
-    margin: 0;
-    padding: 0;
-    border: 0;
-  }
-  .branch-options input[aria-label='Branch name'] {
-    padding: 4px 6px;
-    border: 1px solid var(--ui-border);
-    border-radius: var(--ui-radius-sm);
-    background: transparent;
-    color: inherit;
-  }
   .source-pop,
   .changes,
   .split {
@@ -335,13 +375,76 @@
     padding: 10px;
   }
   .changes {
-    top: 72px;
-    left: 72px;
-    width: 320px;
-    max-height: 70vh;
+    position: fixed;
+    top: 56px;
+    right: 10px;
+    display: grid;
+    gap: 12px;
+    width: 360px;
+    max-height: calc(100vh - 72px);
     overflow: auto;
     padding: 12px;
+    border: 0;
     border-radius: var(--ui-radius-lg);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
+  }
+  .head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+  }
+  .title {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+  }
+  .pr {
+    padding: 2px 8px;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-wash);
+    color: var(--ui-text);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .list,
+  .where {
+    display: grid;
+    gap: 6px;
+  }
+  .changes .label {
+    width: auto;
+    margin: 0;
+    color: var(--ui-text-muted);
+    opacity: 1;
+    font-size: 11px;
+  }
+  .empty,
+  .hint {
+    margin: 0;
+    padding: 10px;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-wash);
+    color: var(--ui-text-secondary);
+  }
+  .autosave {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .autosave .muted {
+    margin-inline-start: auto;
+  }
+  .changes footer {
+    align-items: center;
+    margin: 0;
+  }
+  .changes :global(.more) {
+    margin-inline-start: auto;
+    padding: 6px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
   }
   .split {
     top: 56px;

@@ -410,6 +410,8 @@
   let branchOptions = $state<BranchOptions>({ mode: BranchMode.Session, branch: '' });
   let changesOpen = $state(false);
   let autosaveState = $state(AutosaveState.Idle);
+  let autosaveOn = $state(true);
+  let savedAt = $state<number | null>(null);
   let gitSlot = $state<HTMLElement | null>(null);
   const pushUrl = $derived(`/api/v1/projects/${page.params.projectId ?? ''}/github/push`);
   const postJson = async (url: string, body: unknown) => {
@@ -426,7 +428,12 @@
       await sources.refresh();
       return state;
     },
-    onstate: (state) => (autosaveState = state)
+    onstate: (state) => {
+      autosaveState = state;
+      if (state === AutosaveState.Saved) {
+        savedAt = Date.now();
+      }
+    }
   });
   const seenCode = new Map<string, unknown>();
   $effect(() => {
@@ -435,7 +442,7 @@
       if (!linked.has(n.id)) {
         continue;
       }
-      if (seenCode.has(n.id) && seenCode.get(n.id) !== n.data) {
+      if (autosaveOn && seenCode.has(n.id) && seenCode.get(n.id) !== n.data) {
         autosave.touch(n.id);
       }
       seenCode.set(n.id, n.data);
@@ -446,6 +453,10 @@
     return () => autosave.stop();
   });
   const git = $derived(gitSummary(sources.all(), autosaveState));
+  async function pullUpstream(nodeId: string) {
+    await postJson(`/api/v1/projects/${page.params.projectId ?? ''}/code-import/${nodeId}/pull`, {});
+    await sources.refresh();
+  }
   async function markReady(nodeId: string) {
     await postJson(`${pushUrl}/ready`, { nodeId });
     await sources.refresh();
@@ -4798,9 +4809,9 @@
       <VersionCompare projectId={page.params.projectId ?? ''} versionId={versionOpen?.after ?? ''} before={versionSides.before} after={versionSides.after} history={versionHistory} onclose={() => (versionOpen = null)} onchanged={sources.refresh} />
     {/if}
     {#if gitSlot && git}
-      <Portal to={gitSlot}><GitStatus summary={git} onchanges={() => (changesOpen = true)} onversions={(id) => (pickerOpen = { id, left: window.innerWidth - 360, top: 56 })} onready={markReady} onresume={() => ((changesOpen = true), autosave.resume())} /></Portal>
+      <Portal to={gitSlot}><GitStatus summary={git} open={changesOpen} onupstream={pullUpstream} onchanges={() => (changesOpen = !changesOpen)} onversions={(id) => (pickerOpen = { id, left: window.innerWidth - 360, top: 56 })} onready={markReady} onresume={() => ((changesOpen = true), autosave.resume())} /></Portal>
     {/if}
-    <SourceSyncPanel bind:options={branchOptions} bind:panel={changesOpen} projectId={page.params.projectId ?? ''} canvasId={page.params.canvasId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} assetUrl={tierUrl(AssetSize.Full)} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} oncompare={(id) => ((pickerOpen = sourceOpen && { ...sourceOpen, id }), (sourceOpen = null))} />
+    <SourceSyncPanel bind:options={branchOptions} bind:panel={changesOpen} bind:autosaveOn {git} {savedAt} projectId={page.params.projectId ?? ''} canvasId={page.params.canvasId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} assetUrl={tierUrl(AssetSize.Full)} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} oncompare={(id) => ((pickerOpen = sourceOpen && { ...sourceOpen, id }), (sourceOpen = null))} />
     {#if pickerOpen}
       <RefPicker projectId={page.params.projectId ?? ''} nodeId={pickerOpen.id} anchor={pickerOpen} onclose={() => (pickerOpen = null)} oncompared={(frames) => ((versionOpen = { before: pickerOpen?.id ?? '', after: frames[0] }), (pickerOpen = null))} />
     {/if}
