@@ -129,6 +129,33 @@ describe.runIf(process.env.CHROMIUM_PATH)('the state a block is frozen in', () =
   }, 30_000);
 });
 
+const FIXED_ENDING = `<!doctype html><html><head><style>
+@keyframes appear{from{opacity:0}to{opacity:1}}
+body{margin:0;font:16px sans-serif;timeline-scope:--ending}
+#runway{height:600px;view-timeline:--ending block}
+#chrome{position:fixed;inset:0;background:#000;color:#fff}
+#chrome > div{animation:appear linear both;animation-timeline:--ending;animation-range:entry 0% entry 100%}
+</style></head><body>
+<h1>hero</h1><div style="height:3000px"></div><div id="runway">footer</div>
+<div id="chrome"><div id="overlay">canvas chrome</div></div>
+</body></html>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('a fixed overlay driven by scrolling to the footer', () => {
+  it('stays as it is at the top of the page, not finished nor pinned at its most visible (landing: the footer canvas covered the hero)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      let page: Page | null = null;
+      const tab = await localBrowser(async () => (page = await browser.newPage()))();
+      await pagePrepared(tab, new URL(`data:text/html,${encodeURIComponent(FIXED_ENDING)}`), SETTLE_MS, PLAIN_PLANNER);
+      const opacity = await page!.evaluate(() => getComputedStyle(document.getElementById('overlay')!).opacity);
+
+      expect(opacity).toBe('0');
+    } finally {
+      await browser.close();
+    }
+  }, 60_000);
+});
+
 const GL_PAGE = `<body style="margin:0"><canvas id="gl" width="40" height="40" style="display:block"></canvas><div style="height:4000px"></div><script>
 const gl = document.getElementById('gl').getContext('webgl', { preserveDrawingBuffer: true });
 window.colour = [0, 1, 0, 1];
