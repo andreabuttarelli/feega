@@ -2,12 +2,13 @@ import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
 import { createCanvas, createConnection, createNode, deleteCanvas, listCanvases, listConnections, listNodes, type Canvas } from '$lib/server/repos/canvas';
 import { ASSET_TYPES, findAssets, insertAsset, type Asset, type AssetType } from '$lib/server/repos/assets';
-import { readHead } from '$lib/server/repos/motion-revisions';
+import { readHead, RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { saveMotionDoc } from '$lib/server/motion/editor';
 import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
 import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
 import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
 import { holdsDoc } from '$lib/canvas/motion-node';
+import { frameName } from '$lib/canvas/unlanded-frames';
 import { FEEGA_EXTENSION, FEEGA_MIME, FEEGA_VERSION, FeegaRefusal, idsIn, packFeega, remapIds, unpackFeega, type FeegaAsset, type FeegaBlobs, type FeegaCanvas } from '$lib/canvas/feega-file';
 
 type CanvasScope = { orgId: string; projectId: string; canvasId: string };
@@ -17,7 +18,7 @@ export enum FeegaImport {
   Refused = 'refused'
 }
 
-export type FeegaImportOutcome = { outcome: FeegaImport.Imported; canvas: Canvas } | { outcome: FeegaImport.Refused; refusal: FeegaRefusal };
+export type FeegaImportOutcome = { outcome: FeegaImport.Imported; canvas: Canvas; unlanded: string[] } | { outcome: FeegaImport.Refused; refusal: FeegaRefusal };
 
 const ABSOLUTE_URL = /^https?:\/\//;
 const UNSAFE_NAME = /[^\w.-]+/g;
@@ -121,17 +122,22 @@ async function importAsset(db: Db, scope: { orgId: string; projectId: string }, 
   return row.id;
 }
 
-async function fillCanvas(db: Db, scope: CanvasScope & { actor: Actor }, canvas: FeegaCanvas): Promise<void> {
+async function fillCanvas(db: Db, scope: CanvasScope & { actor: Actor }, canvas: FeegaCanvas): Promise<string[]> {
   for (const n of canvas.nodes) {
     await createNode(db, { id: n.id, orgId: scope.orgId, projectId: scope.projectId, canvasId: scope.canvasId, type: n.type, displayName: n.displayName, x: n.position.x, y: n.position.y, z: n.position.z, width: n.size.width ?? undefined, height: n.size.height ?? undefined, data: n.data, actor: scope.actor });
   }
   for (const c of canvas.connections) {
     await createConnection(db, { id: c.id, orgId: scope.orgId, canvasId: scope.canvasId, sourceNodeId: c.sourceNodeId, targetNodeId: c.targetNodeId, sourceHandle: c.sourceHandle, targetHandle: c.targetHandle, mode: c.mode, actor: scope.actor });
   }
+  const unlanded: string[] = [];
   for (const [nodeId, head] of Object.entries(canvas.heads)) {
     const now = await readHead(db, { orgId: scope.orgId, nodeId });
-    await saveMotionDoc(db, { orgId: scope.orgId, nodeId, expectedVersion: now?.version ?? 0, doc: head.doc, actor: scope.actor, summary: 'Imported from a .feega file' });
+    const write = await saveMotionDoc(db, { orgId: scope.orgId, nodeId, expectedVersion: now?.version ?? 0, doc: head.doc, actor: scope.actor, summary: 'Imported from a .feega file' });
+    if (write.outcome !== RevisionOutcome.Written) {
+      unlanded.push(frameName(canvas.nodes.find((n) => n.id === nodeId)?.displayName));
+    }
   }
+  return unlanded;
 }
 
 export type ProjectFor = (canvasName: string) => Promise<string>;
@@ -162,8 +168,8 @@ export async function importCanvasFile(db: Db, input: ImportInput & { bytes: Uin
       ids.set(item.id.toLowerCase(), crypto.randomUUID());
     }
 
-    await fillCanvas(db, { orgId: input.orgId, projectId, canvasId: created.id, actor: input.actor }, remapIds(canvas, ids));
-    return { outcome: FeegaImport.Imported, canvas: created };
+    const unlanded = await fillCanvas(db, { orgId: input.orgId, projectId, canvasId: created.id, actor: input.actor }, remapIds(canvas, ids));
+    return { outcome: FeegaImport.Imported, canvas: created, unlanded };
   } catch (error) {
     await deleteCanvas(db, { orgId: input.orgId, canvasId: created.id });
     throw error;

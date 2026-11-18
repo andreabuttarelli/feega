@@ -124,7 +124,8 @@ export const motionNodeSchema = z.object({
   interactive: z.boolean().default(false),
   mainHomes: z.array(z.string()).optional(),
   linked: z.record(z.string(), z.string()).optional(),
-  code: codeOriginSchema.optional()
+  code: codeOriginSchema.optional(),
+  standInFill: z.string().max(64).optional()
 });
 
 export const elementNodeSchema = z.object({

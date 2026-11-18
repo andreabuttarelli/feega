@@ -43,6 +43,7 @@ const COLUMN_OF: Record<keyof CodeLink, string> = {
   pushTouched: 'push_touched',
   pullNumber: 'pull_number',
   writable: 'writable',
+  restored: 'restored',
   beforePoster: 'before_poster',
   variantOf: 'variant_of',
   keptSha: 'kept_sha'
@@ -50,7 +51,11 @@ const COLUMN_OF: Record<keyof CodeLink, string> = {
 
 const FIELDS = Object.entries(COLUMN_OF) as [keyof CodeLink, string][];
 
-export const rowOf = (link: CodeLink): Row => Object.fromEntries(FIELDS.map(([field, column]) => [column, link[field] ?? null]));
+const WRITTEN_ONLY_WHEN_SET = new Set<keyof CodeLink>(['restored']);
+
+const written = ([field]: [keyof CodeLink, string], link: CodeLink) => !WRITTEN_ONLY_WHEN_SET.has(field) || link[field] !== undefined;
+
+export const rowOf = (link: CodeLink): Row => Object.fromEntries(FIELDS.filter((f) => written(f, link)).map(([field, column]) => [column, link[field] ?? null]));
 
 export const linkOf = (row: Row): CodeLink | null => {
   const parsed = linkSchema.safeParse(Object.fromEntries(FIELDS.filter(([, column]) => row[column] !== null && row[column] !== undefined).map(([field, column]) => [field, row[column]])));

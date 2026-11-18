@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SourceAction, changedRows, popoverOf, pushAskOf, ciOf, CiState, impactOf, type FrameSync } from './source-changes';
+import { SourceAction, pushLabel, changedRows, popoverOf, pushAskOf, ciOf, CiState, filesOfPatch, filesToPush, impactOf, pushedNote, rowTitle, type FrameSync } from './source-changes';
 
 const sync = (over: Partial<FrameSync> = {}): FrameSync => ({
   nodeId: 'n1',
@@ -64,5 +64,46 @@ describe('il pannello Changes', () => {
     const rows = [sync({ nodeId: 'v', link: { ...sync().link, variantOf: 'a' } })];
 
     expect(pushAskOf(rows, new Set(['v']), 'home', undefined, [{ nodeId: 'v', choice: 'new_route', route: '/home-b' }])).toEqual({ name: 'home', nodeIds: ['v'], variants: [{ nodeId: 'v', choice: 'new_route', route: '/home-b' }] });
+  });
+});
+
+describe('il pannello Changes non invita a push sbagliati', () => {
+  const PATCH = '--- a/src/app.css\n+++ b/src/app.css\n@@ -1,1 +1,1 @@\n-a\n+b\n--- a/src/routes/+page.svelte\n+++ b/src/routes/+page.svelte\n@@ -2,1 +2,1 @@\n-x\n+y\n';
+
+  it('ogni riga dice la pagina e i file cambiati, ognuno col suo diff', () => {
+    expect(filesOfPatch(PATCH)).toEqual([
+      { path: 'src/app.css', diff: '@@ -1,1 +1,1 @@\n-a\n+b\n' },
+      { path: 'src/routes/+page.svelte', diff: '@@ -2,1 +2,1 @@\n-x\n+y\n' }
+    ]);
+    expect(rowTitle(sync({ link: { ...sync().link, route: '/chi-siamo' } }))).toBe('/chi-siamo');
+    expect(rowTitle(sync())).toBe('Home');
+  });
+
+  it('la conferma elenca esattamente i file dei frame spuntati, una volta sola', () => {
+    const files = new Map([
+      ['a', filesOfPatch(PATCH)],
+      ['b', [{ path: 'src/app.css', diff: '' }]],
+      ['c', [{ path: 'src/lib/Other.svelte', diff: '' }]]
+    ]);
+    expect(filesToPush(new Set(['a', 'b']), files)).toEqual(['src/app.css', 'src/routes/+page.svelte']);
+  });
+});
+
+describe('dopo il push', () => {
+  it('senza PR lo dice, e dice come averla', () => {
+    expect(pushedNote({ branch: 'feega/x', pull: null })).toBe('Branch feega/x pushed. No PR opened: connect GitHub or set a token');
+  });
+
+  it('con la PR la nomina', () => {
+    expect(pushedNote({ branch: 'feega/x', pull: pull('open') })).toBe('Branch feega/x pushed · PR #4');
+  });
+});
+
+describe('il bottone del push', () => {
+  it('dice cosa farà davvero', () => {
+    const pushed = (pullNumber?: number) => sync({ link: { ...sync().link, pushBranch: 'feega/x', pullNumber } });
+    expect(pushLabel([sync()])).toBe('Push and open PR');
+    expect(pushLabel([pushed()])).toBe('Update branch');
+    expect(pushLabel([pushed(4)])).toBe('Update PR');
   });
 });
