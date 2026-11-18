@@ -61,7 +61,7 @@ program
 
 program
   .command('live-edit <at> <prop> [value]')
-  .description('Local mode: change one property of the element at file:line:col in the running app and write it to its source file)
+  .description('Local mode: change one property of the element at file:line:col in the running app and write it to its source file')
   .option('--side <side>', 'x, y, t, r, b or l, for padding, margin and gap')
   .option('--token <token>', 'exact Tailwind token instead of a value')
   .option('--was <text>', 'current text, when prop is text')
