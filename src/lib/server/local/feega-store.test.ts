@@ -43,6 +43,21 @@ describe('il file .feega è il database della modalità locale', () => {
     expect(openFeegaStore(path, { origin: ORIGIN }).acpAgent()).toBe('codex');
   });
 
+  it('il modello scelto per ogni agente resta nel file e torna alla riapertura', async () => {
+    const path = tempFile();
+    const first = openFeegaStore(path, { origin: ORIGIN });
+    expect(first.acpModel('codex')).toBeNull();
+
+    first.chooseAcpModel('codex', 'gpt-5.6-sol');
+    first.chooseAcpModel('claude', 'opus');
+    first.chooseAcpModel('claude', null);
+    await first.flush();
+
+    const reopened = openFeegaStore(path, { origin: ORIGIN });
+    expect(reopened.acpModel('codex')).toBe('gpt-5.6-sol');
+    expect(reopened.acpModel('claude')).toBeNull();
+  });
+
   it('un file che non esiste nasce vuoto e viene scritto sul disco', async () => {
     const path = tempFile();
     const store = openFeegaStore(path, { origin: ORIGIN });
