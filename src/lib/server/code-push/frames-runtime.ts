@@ -9,6 +9,8 @@ import { hostOf } from './hosts';
 import { linkImported } from './import-link';
 import type { ImportLinker } from '$lib/server/code-import/canvas-import';
 import { dbLock, linkStore } from './link-store';
+import { duplicateNodes } from '$lib/server/canvas/duplicate';
+import type { VariantDeps } from './variants';
 
 type Scope = { orgId: string; userId: string; projectId: string };
 
@@ -30,3 +32,8 @@ export const importLinker =
     const deps = framesDeps(db, scope);
     return linkImported({ host: deps.host, links: deps.links }, nodeId, origin, listed, { components, poster: null }).catch(() => null);
   };
+
+export const variantDeps = (db: Db, scope: Scope, canvasId: string): VariantDeps => ({
+  links: linkStore(db, scope),
+  duplicate: async (nodeId) => (await duplicateNodes(db, { orgId: scope.orgId, projectId: scope.projectId, canvasId, nodeIds: [nodeId] })).nodes[0]?.id ?? null
+});

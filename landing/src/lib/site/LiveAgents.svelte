@@ -1,13 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ACTIONS_BY_TARGET, AGENTS, lockHeight, BUILD_SELECTOR, BuildMode, PEER_COLOURS, claimTweak, ruleFor, createLedger, mayTweak, releaseTweak, curve, initials, outermost, pick, type ActionKind, type Point, type TargetKind } from './live-agents';
+  import { AGENTS, Act, actOf, lockHeight, BUILD_SELECTOR, PEER_COLOURS, claimTweak, ruleFor, createLedger, mayTweak, releaseTweak, curve, initials, outermost, pick, type ActionKind, type Point, type TargetKind } from './live-agents';
 
   type Box = { x: number; y: number; w: number; h: number };
   type Menu = { items: string[]; active: number };
   type View = { name: string; colour: string; x: number; y: number; box: Box | null; handles: boolean; tip: string | null; menu: Menu | null; live: boolean };
   type Anchor = { el: HTMLElement | null; fx: number; fy: number };
   type Step = { ms: number; move?: boolean; start?: () => void; tick?: (t: number) => void; end?: () => void };
-  type Agent = { skills: ActionKind[]; view: View; anchor: Anchor; from: Point; steps: Step[]; step: Step | null; since: number; target: HTMLElement | null; resident: HTMLElement | null; grow: number; push: Point; seed: number };
+  type Agent = { view: View; anchor: Anchor; from: Point; steps: Step[]; step: Step | null; since: number; target: HTMLElement | null; resident: HTMLElement | null; grow: number; push: Point; seed: number };
 
   const DESKTOP_AGENTS = 24;
   const MOBILE_AGENTS = 8;
@@ -24,7 +24,6 @@
   const PARALLEL_FRONT = 24;
   const OFFSCREEN_PX = 60;
   const TWEAK_GAP_MS = 3500;
-  const READING_MARGIN = 120;
   const MEDIA_START_SCALE = 0.6;
   const FONTS = ['BDO Grotesk', 'Instrument Serif', 'DM Sans', 'Fragment Mono', 'Inter'];
   const SWATCHES = ['#ff4000', '#f0eee9', '#0090ff', '#ffc53d', '#30a46c'];
@@ -62,11 +61,6 @@
   function nearViewport(el: HTMLElement): boolean {
     const r = el.getBoundingClientRect();
     return r.width > 0 && r.bottom > -NEAR_VIEWPORT_PX && r.top < innerHeight + NEAR_VIEWPORT_PX && el.checkVisibility?.({ visibilityProperty: true }) !== false;
-  }
-
-  function underReader(el: HTMLElement): boolean {
-    const r = el.getBoundingClientRect();
-    return mouse.x > r.left - READING_MARGIN && mouse.x < r.right + READING_MARGIN && mouse.y > r.top - READING_MARGIN && mouse.y < r.bottom + READING_MARGIN;
   }
 
   function edgeOf(p: Point): Anchor {
@@ -329,20 +323,7 @@
       return;
     }
 
-    const kind = pick(agent.skills, rand);
-    const free = targets.filter((el) => mayTweak(ledger, el, clock, TWEAK_GAP_MS) && 'built' in el.dataset && el.closest('main') && !underReader(el) && !busy.has(el) && ACTIONS_BY_TARGET[kindOf(el)].includes(kind) && nearViewport(el));
-
-    if (free.length === 0) {
-      agent.steps = agent.view.live ? [moveTo(agent, edgeOf(resolve(agent.anchor))), wait(1, () => (agent.view.live = false))] : [wait(between(300, 600))];
-      return;
-    }
-
-    agent.view.live = true;
-
-    const el = pick(free, rand);
-    busy.add(el);
-    claimTweak(ledger, el, clock);
-    agent.steps = [moveTo(agent, { el, fx: between(0.15, 0.85), fy: between(0.3, 0.8) }), select(agent, el, kind === 'resize'), ...ACTION_STEPS[kind](agent, el), release(agent, el)];
+    agent.steps = agent.view.live ? [moveTo(agent, edgeOf(resolve(agent.anchor))), wait(1, () => (agent.view.live = false))] : [wait(between(300, 600))];
   }
 
   function advance(agent: Agent, now: number, targets: HTMLElement[]) {
@@ -393,7 +374,6 @@
     agents = AGENTS.slice(0, count).map((a, i) => ({ name: a.name, colour: PEER_COLOURS[i % PEER_COLOURS.length], x: -50, y: -50, box: null, handles: false, tip: null, menu: null, live: false }));
     const start = performance.now();
     running = agents.map((view, i) => ({
-      skills: AGENTS[i].skills,
       view,
       anchor: edgeOf({ x: rand() * innerWidth, y: rand() * innerHeight }),
       from: { x: 0, y: 0 },
@@ -409,9 +389,8 @@
 
     const targets = outermost([...document.querySelectorAll<HTMLElement>(BUILD_SELECTOR)]);
     for (const el of targets) {
-      if (ruleOf(el).build === BuildMode.Place && el.getBoundingClientRect().top > innerHeight) {
-        el.dataset.pending = '';
-        el.style.opacity = '0';
+      if (actOf({ top: el.getBoundingClientRect().top, viewport: innerHeight, crew: ruleOf(el).crew }) === Act.Still) {
+        reveal(el);
       }
     }
     let raf = 0;

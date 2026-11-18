@@ -1,24 +1,57 @@
 {
-  "name": "@feega/source-map",
+  "name": "feega-source-map",
   "version": "0.1.0",
-  "private": true,
   "description": "Dev-only plugins that tag every element with the file:line:col that wrote it, so Feega can open the source behind what you click.",
   "license": "Apache-2.0",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andreabuttarelli/feega.git",
+    "directory": "packages/source-map"
+  },
+  "homepage": "https://docs.feega.app/integrations/source-map/",
   "exports": {
-    "./vite": "./src/vite.ts",
-    "./next": "./src/next.ts",
-    "./runtime": "./src/runtime.js",
-    "./bridge": "./src/bridge.js"
+    "./vite": {
+      "types": "./dist/vite.d.ts",
+      "default": "./dist/vite.js"
+    },
+    "./next": {
+      "types": "./dist/next.d.ts",
+      "default": "./dist/next.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "default": "./dist/runtime.js"
+    },
+    "./bridge": {
+      "types": "./dist/bridge.d.ts",
+      "default": "./dist/bridge.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run build"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "@babel/parser": "^7.26.0",
     "magic-string": "^0.30.0"
   },
   "peerDependencies": {
-    "svelte": ">=5"
+    "svelte": ">=5",
+    "vite": ">=5"
   },
   "peerDependenciesMeta": {
-    "svelte": { "optional": true }
+    "svelte": {
+      "optional": true
+    },
+    "vite": {
+      "optional": true
+    }
   }
 }

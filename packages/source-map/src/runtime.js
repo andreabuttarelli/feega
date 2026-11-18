@@ -33,8 +33,32 @@ export function inspectElement(element, { maxHtml = DEFAULT_MAX_HTML } = {}) {
     source,
     styles: designStyles(tagged),
     html: truncate(tagged.outerHTML, maxHtml),
-    component: componentBoundary(tagged, source.file)
+    component: componentBoundary(tagged, source.file),
+    rect: rectOf(tagged),
+    classes: tagged.getAttribute('class') ?? '',
+    text: tagged.children.length ? null : tagged.textContent,
+    rem: rootFontSize(tagged.ownerDocument),
+    viewport: tagged.ownerDocument.defaultView.innerWidth
   };
+}
+
+function rootFontSize(doc) {
+  return parseFloat(doc.defaultView.getComputedStyle(doc.documentElement).fontSize);
+}
+
+function rectOf(element) {
+  const { x, y, width, height } = element.getBoundingClientRect();
+  return { x, y, width, height };
+}
+
+export function previewEdit(doc, { source, text, style }) {
+  const sourced = [...doc.querySelectorAll(`[${SOURCE_ATTR}]`)].filter((e) => e.getAttribute(SOURCE_ATTR) === source);
+  for (const element of sourced) {
+    if (typeof text === 'string') {
+      element.textContent = text;
+    }
+    Object.entries(style ?? {}).forEach(([name, value]) => element.style.setProperty(name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`), value));
+  }
 }
 
 function designStyles(element) {

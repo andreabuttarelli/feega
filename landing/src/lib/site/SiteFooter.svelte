@@ -12,10 +12,10 @@
 
 <footer class="site-foot">
   <div class="top">
-    <div class="ready">
-      <h2>Ready?</h2>
-      <a href={APP_URL}><span>Let's start now</span></a>
-    </div>
+    <a class="brand" href="/">
+      <span class="name"><Mark size={28} />Feega</span>
+      <span class="tagline">Design in your codebase</span>
+    </a>
 
     <div class="col">
       <p>( Navigate )</p>
@@ -81,11 +81,27 @@
     column-gap: 12px;
   }
 
-  .ready {
+  .brand {
     grid-column: 1 / -1;
-    font-size: 37px;
-    line-height: 37px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    color: #fff;
+    text-decoration: none;
+  }
+
+  .name {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 28px;
+    font-weight: 600;
     letter-spacing: -0.04em;
+  }
+
+  .tagline {
+    font-size: 15px;
+    color: rgb(255 255 255 / 0.6);
   }
 
   .col :global(.dl) {
@@ -103,21 +119,6 @@
     display: block;
     font-size: 14px;
     line-height: 16.8px;
-  }
-
-  .ready h2 {
-    font: inherit;
-    color: #fff;
-  }
-
-  .ready a {
-    display: block;
-    margin-top: 1px;
-  }
-
-  .ready span {
-    display: inline-block;
-    border-bottom: 2px solid var(--site-ink);
   }
 
   .col {
@@ -228,18 +229,8 @@
       column-gap: 20px;
     }
 
-    .ready {
+    .brand {
       grid-column: 1;
-      font-size: 58px;
-      line-height: 58px;
-    }
-
-    .ready a {
-      margin-top: 8px;
-    }
-
-    .ready span {
-      border-bottom-width: 3px;
     }
 
     .col {
@@ -299,14 +290,8 @@
       column-gap: 20px;
     }
 
-    .ready {
+    .brand {
       grid-column: 1;
-      font-size: 46px;
-      line-height: 46px;
-    }
-
-    .ready a {
-      margin-top: 8px;
     }
 
     .col {

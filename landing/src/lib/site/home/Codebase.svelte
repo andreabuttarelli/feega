@@ -4,7 +4,7 @@
 </script>
 
 <section class="chapter-block site-wide" id="codebase">
-  <CodebaseStory number="01" />
+  <CodebaseStory />
   <div class="proof">
     <StartSite />
   </div>

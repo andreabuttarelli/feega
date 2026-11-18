@@ -2,14 +2,19 @@
   import { Button, type ButtonVariant } from '$lib/components/ui/button';
   import { AcpChat, Line } from '$lib/acp/acp-chat.svelte';
   import { AgentChoices } from '$lib/acp/agent-choices.svelte';
+  import { AgentModelChoice } from '$lib/acp/agent-model-choice.svelte';
   import AcpAgentPicker from './AcpAgentPicker.svelte';
+  import AcpModelPicker from './AcpModelPicker.svelte';
   import ChatComposer from '$lib/components/brand-agent/ChatComposer.svelte';
   import ChatMessage from '$lib/components/brand-agent/ChatMessage.svelte';
 
   const CLOUD_HINT = 'Feega cloud chat spends credits and runs at feega.app: import this .feega file there, or pick an agent installed on this computer. It edits the canvas through Feega’s tools and asks before each one.';
   const OPTION_VARIANT: Record<string, ButtonVariant> = { allow_once: 'primary', allow_always: 'primary', reject_once: 'secondary', reject_always: 'secondary' };
-  const chat = new AcpChat();
-  const choices = new AgentChoices();
+  let { fetcher = fetch, hint = CLOUD_HINT }: { fetcher?: typeof fetch; hint?: string } = $props();
+
+  const chat = new AcpChat(fetcher);
+  const choices = new AgentChoices(fetcher);
+  const model = new AgentModelChoice();
 
   let draft = $state('');
 
@@ -17,6 +22,10 @@
 
   $effect(() => {
     void choices.load();
+  });
+
+  $effect(() => {
+    void model.load(choices.chosen);
   });
 
   const lastLine = $derived(chat.lines.at(-1));
@@ -42,11 +51,11 @@
 </script>
 
 <section class="acp" data-testid="acp-chat">
-  <AcpAgentPicker agents={choices.agents} chosen={choices.chosen} refreshing={choices.refreshing} onchoose={(id) => void choices.choose(id)} onrefresh={() => void choices.refresh()} />
+  <AcpAgentPicker agents={choices.agents} chosen={choices.chosen} refreshing={choices.refreshing} onchoose={(id) => void choices.choose(id)} onrefresh={() => void Promise.all([choices.refresh(), model.refresh()])} />
 
   <ol class="lines">
     {#if !agent}
-      <li class="hint">{CLOUD_HINT}</li>
+      <li class="hint">{hint}</li>
     {/if}
     {#each chat.lines as l, i (i)}
       {#if l.line === Line.User}
@@ -76,7 +85,9 @@
   <div class="dock">
     <ChatComposer bind:value={draft} busy={chat.busy} enabled={!!agent} placeholder={agent ? `Ask ${agent.name}` : 'Pick an agent first'} onsend={send} onstop={() => chat.stop()}>
       {#snippet controls()}
-        <span data-testid="acp-model-slot"></span>
+        <span class="model-slot" data-testid="acp-model-slot">
+          <AcpModelPicker models={model.models} selected={model.selected} onchoose={(id) => void model.choose(id)} />
+        </span>
       {/snippet}
     </ChatComposer>
   </div>

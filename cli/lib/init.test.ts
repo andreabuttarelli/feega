@@ -21,26 +21,26 @@ export default nextConfig;
 const VITE_DRY_RUN = `Detected vite.
 
 --- vite.config.ts
-+ import { feegaSource } from '@feega/source-map/vite';
++ import { feegaSource } from 'feega-source-map/vite';
 -   plugins: [react()]
 +   plugins: [feegaSource(), react()]
 
 --- package.json
 -     "@vitejs/plugin-react": "^5.0.0"
 +     "@vitejs/plugin-react": "^5.0.0",
-+     "@feega/source-map": "^0.1.0"`;
++     "feega-source-map": "^0.1.0"`;
 
 const NEXT_DRY_RUN = `Detected next.
 
 --- next.config.ts
-+ import { withFeegaSource } from '@feega/source-map/next';
++ import { withFeegaSource } from 'feega-source-map/next';
 - export default nextConfig;
 + export default withFeegaSource(nextConfig);
 
 --- package.json
 +   },
 +   "devDependencies": {
-+     "@feega/source-map": "^0.1.0"`;
++     "feega-source-map": "^0.1.0"`;
 
 describe('planInit', () => {
   it('shows the vite dry-run diff', () => {
@@ -61,7 +61,7 @@ describe('planInit', () => {
     const plan = planInit({ 'package.json': nextPkg, 'next.config.js': 'module.exports = {\n  images: {}\n};\n' });
 
     expect(plan.edits['next.config.js']).toBe(
-      "const { withFeegaSource } = require('@feega/source-map/next');\n\nmodule.exports = withFeegaSource({\n  images: {}\n});\n"
+      "const { withFeegaSource } = require('feega-source-map/next');\n\nmodule.exports = withFeegaSource({\n  images: {}\n});\n"
     );
   });
 

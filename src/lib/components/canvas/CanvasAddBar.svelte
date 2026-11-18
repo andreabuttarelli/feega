@@ -9,6 +9,7 @@
   import Frame from '@lucide/svelte/icons/frame';
   import Link from '@lucide/svelte/icons/link';
   import CodeXml from '@lucide/svelte/icons/code-xml';
+  import Radio from '@lucide/svelte/icons/radio';
   import MessageCircle from '@lucide/svelte/icons/message-circle';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
@@ -16,7 +17,7 @@
   import ImagePlus from '@lucide/svelte/icons/image-plus';
   import Plus from '@lucide/svelte/icons/plus';
   import { DockPlace, toolsIn } from '$lib/canvas/draw-dock';
-  import { BAR_COMPACT_QUERY, BarContext, BarSlot, BarWidth, PINNED_GENERATE, PINNED_TOOLS, barSlots } from '$lib/canvas/bottom-bar';
+  import { BAR_COMPACT_QUERY, BarContext, BarSlot, BarWidth, PINNED_TOOLS, barSlots } from '$lib/canvas/bottom-bar';
   import { INSERT_SECTION_TITLE, InsertSection, insertMenuMaxHeight, insertSections } from '$lib/canvas/insert-menu';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
@@ -49,6 +50,7 @@
     onfigma,
     onurl,
     oncode,
+    onlive,
     ontemplate,
     techniques = [],
     ontechnique,
@@ -68,6 +70,7 @@
     onfigma?: () => void;
     onurl?: () => void;
     oncode?: () => void;
+    onlive?: () => void;
     ontemplate?: (id: string) => void;
     techniques?: { id: string; name: string; nodes: number }[];
     ontechnique?: (id: string) => void;
@@ -245,18 +248,18 @@
   const optional = (tile: Tile, shown: unknown): Tile[] => (shown ? [tile] : []);
 
   const pinnedTools = PINNED_TOOLS.map(toolOf);
-  const pinnedGenerate = $derived(PINNED_GENERATE.filter(offered).map(addTile));
 
   const SECTION_TILES: Record<InsertSection, () => Tile[]> = {
     [InsertSection.Tools]: () => MENU_TOOLS.map(toolTile),
-    [InsertSection.Generate]: () => CANVAS_ADD_BAR.filter(offered).map(addTile),
+    [InsertSection.Generate]: () => CANVAS_ADD_BAR.filter(offered).filter((what) => !AI_ADDABLE.has(what)).map(addTile),
     [InsertSection.Models]: () => models.map(modelTile),
     [InsertSection.Import]: () => [
       { id: 'upload', label: 'Upload file', icon: Upload, run: pickFile },
       ...optional({ id: 'cloud', label: 'Import from Drive or Dropbox', icon: Cloud, run: () => oncloud?.() }, oncloud),
       ...optional({ id: 'figma', label: 'Import from Figma', icon: Frame, run: () => onfigma?.() }, onfigma),
       ...optional({ id: 'url', label: 'From URL…', icon: Link, run: () => onurl?.() }, onurl),
-      ...optional({ id: 'code', label: 'From code…', icon: CodeXml, run: () => oncode?.() }, oncode)
+      ...optional({ id: 'code', label: 'From code…', icon: CodeXml, run: () => oncode?.() }, oncode),
+      ...optional({ id: 'live', label: 'Add live frame', icon: Radio, run: () => onlive?.() }, onlive)
     ],
     [InsertSection.Templates]: () => [
       ...optional({ id: 'templates', label: 'Templates', icon: LayoutTemplate, run: () => (showTemplates = true) }, ontemplate),
@@ -299,7 +302,6 @@
   const SLOT: Record<BarSlot, Snippet> = {
     [BarSlot.Select]: selectSlot,
     [BarSlot.Draw]: drawSlot,
-    [BarSlot.Generate]: generateSlot,
     [BarSlot.Insert]: insertSlot,
     [BarSlot.Comment]: commentSlot
   };
@@ -326,23 +328,6 @@
       </span>
     {/each}
   </div>
-{/snippet}
-
-{#snippet generateSlot()}
-  {#if pinnedGenerate.length}
-    <span class="mode-divider" aria-hidden="true"></span>
-    <div class="group pinned" role="group" aria-label="Generate" data-testid="pinned-generate">
-      {#each pinnedGenerate as tile (tile.id)}
-        <span class="tool">
-          <button type="button" class="pick" aria-label={tile.label} data-pinned={tile.id} draggable="true" ondragstart={(e) => startDrag(e, tile)} onclick={() => insert(tile)}>
-            <tile.icon size={17} strokeWidth={1.7} />
-          </button>
-          <span class="add-tip" role="tooltip">{tile.hint}</span>
-        </span>
-      {/each}
-    </div>
-    <span class="mode-divider" aria-hidden="true"></span>
-  {/if}
 {/snippet}
 
 {#snippet insertSlot()}
