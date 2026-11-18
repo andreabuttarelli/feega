@@ -32,7 +32,10 @@
 
   <p class="local">Prefer your own AI keys? Feega is <strong>free on your machine, forever</strong>. <a href={DOCS_URL}>Run it locally →</a></p>
 
-  <Estimator {plan} />
+  <details class="estimate">
+    <summary>Estimate what you'd use</summary>
+    <Estimator {plan} />
+  </details>
 
   <div class="rules">
     <p>{CREDIT_RULES}</p>
