@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { batchedSources as batchedWith, sourceReader } from './frame-sources';
 
 const ASKS = { framesPerAsk: 2, open: 2 };
-const batchedSources: typeof batchedWith = (fetcher, kept, cacheOf) => batchedWith(fetcher, kept, cacheOf, ASKS);
+const batchedSources: typeof batchedWith = (fetcher, kept, cacheOf) => batchedWith(fetcher, kept, cacheOf, () => ASKS);
 import { frameCache, memoryShelf } from './frame-cache';
 import { framesOnCanvas, frameSourceUrl } from './frame-source';
 import { adoptFrameHead } from '$lib/canvas/node-save';
