@@ -1,5 +1,7 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
+  import ChatEffortPicker from './ChatEffortPicker.svelte';
+  import './chat-pick.css';
   import { defaultEffortOf, shortLabel, type ChatModelChoice, type ChatModelGroup, type ChatModelOption } from '$lib/chat-model';
 
   let {
@@ -28,7 +30,7 @@
 <div class="picker">
   <select
     name="model"
-    class="pick model"
+    class="chat-pick model"
     aria-label={$_('chat.panel.model')}
     title={chosen ? price(chosen) : $_('chat.panel.model')}
     value={choice.model}
@@ -43,20 +45,7 @@
     {/each}
   </select>
 
-  {#if efforts.length}
-    <select
-      name="reasoning"
-      class="pick effort"
-      aria-label={$_('chat.panel.reasoning')}
-      title={$_('chat.panel.reasoning')}
-      value={choice.reasoning ?? ''}
-      onchange={(e) => onchoose({ model: choice.model, reasoning: e.currentTarget.value })}
-    >
-      {#each efforts as effort (effort)}
-        <option value={effort} selected={effort === choice.reasoning}>{$_(`chat.panel.effort.${effort}`, { default: effort })}</option>
-      {/each}
-    </select>
-  {/if}
+  <ChatEffortPicker {efforts} value={choice.reasoning} onchoose={(reasoning) => onchoose({ model: choice.model, reasoning })} />
 </div>
 
 <style>
@@ -67,33 +56,8 @@
     min-width: 0;
   }
 
-  .pick {
-    min-width: 0;
-    max-width: 100%;
-    height: 26px;
-    padding: 0 6px;
-    border: 0;
-    border-radius: var(--ui-radius-sm);
-    background: transparent;
-    color: var(--ui-text-tertiary);
-    font: inherit;
-    font-size: 11.5px;
-    cursor: pointer;
-    text-overflow: ellipsis;
-  }
-  .pick:hover {
-    background: var(--ui-input);
-    color: var(--ui-text);
-  }
-  .pick:focus-visible {
-    outline: 2px solid var(--accent, #c485fe);
-    outline-offset: 1px;
-  }
   .model {
     flex: 1 1 auto;
     max-width: 200px;
-  }
-  .effort {
-    flex: 0 0 auto;
   }
 </style>
