@@ -1,7 +1,7 @@
 import { parseSheets, readSheets } from '$lib/server/code-import/css-tokens';
 import { colourOf } from '$lib/server/code-import/token-colour';
 import type { ReadFile } from '$lib/server/code-import/write-back';
-import { LiveProp } from '$lib/canvas/live-fields';
+import { LiveProp, type StyleProp } from '$lib/canvas/live-fields';
 
 export type LiveTheme = { colours: Map<string, string>; radii: Map<number, string>; sizes: Map<number, string>; spacingPx: number };
 
@@ -75,7 +75,7 @@ function scaleToken(raw: string, scale: Map<number, string>): string {
   return px === null ? arbitrary(raw) : (scale.get(Math.round(px)) ?? pxToken(raw));
 }
 
-const TOKEN_OF: Record<Exclude<LiveProp, LiveProp.Text>, (raw: string, theme: LiveTheme) => string> = {
+const TOKEN_OF: Record<StyleProp, (raw: string, theme: LiveTheme) => string> = {
   [LiveProp.Color]: colourToken,
   [LiveProp.Fill]: colourToken,
   [LiveProp.FontSize]: (raw, theme) => scaleToken(raw, theme.sizes),
@@ -86,4 +86,4 @@ const TOKEN_OF: Record<Exclude<LiveProp, LiveProp.Text>, (raw: string, theme: Li
   [LiveProp.Radius]: (raw, theme) => (pxOf(raw) !== null && pxOf(raw)! >= FULL_RADIUS_PX ? 'full' : scaleToken(raw, theme.radii))
 };
 
-export const tokenFor = (prop: Exclude<LiveProp, LiveProp.Text>, raw: string, theme: LiveTheme) => TOKEN_OF[prop](raw, theme);
+export const tokenFor = (prop: StyleProp, raw: string, theme: LiveTheme) => TOKEN_OF[prop](raw, theme);

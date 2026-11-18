@@ -49,13 +49,20 @@ The element opens in the **Properties** tab of the right bar, the same panel and
 | In Properties | Written as |
 |---|---|
 | Content | the text between the tags, or the message it comes from |
-| Text colour, Fill | `text-…`, `bg-…` |
+| Text colour, Fill | `text-…`, `bg-…` (theme token when it matches) |
 | Size, Weight | `text-…`, `font-…` |
-| Auto layout padding | `p-…`, `px-…`, `py-…`, `pt-…` and the other sides |
-| Auto layout gap | `gap-…` |
+| Font | `font-['Family']` |
+| Leading, Tracking | `leading-[…]`, `tracking-[…]` |
+| Align, Case, Italic, Underline/Strikethrough, Truncate | `text-left/center/right`, `uppercase`…, `italic`, `underline`/`line-through`, `truncate`/`line-clamp-N` |
+| X, Y | `translate-x-[…px]`, `translate-y-[…px]` (offset from where the element is) |
+| W, H | `w-[…px]`, `h-[…px]` |
+| Rotation, Flip | `rotate-[…deg]`, `-scale-x-100`/`-scale-y-100` |
+| Opacity, Blend mode, Hide | `opacity-[…]`, `mix-blend-…`, `hidden` |
+| Auto layout direction, alignment, gap, padding | `flex-row`/`flex-col`, `items-…`, `justify-…`, `gap-…`, `p-…`/`px-…`/`py-…` |
 | Corner radius | `rounded-…` |
+| Shadow and other effects | `shadow-[…]`, or an arbitrary property `[property:value]` |
 
-Any other control changes nothing in the code.
+Setting a control back to where it started puts the element's original class back. A control with no CSS equivalent (constraints, keyframes) changes nothing in the code and says so.
 
 A value that matches a token of your theme is written as that token (`text-primary`, `p-6`, `rounded-card`); any other value is written exactly (`text-[#2563eb]`, `py-[16px]`). Only the one class or text changes: the rest of the class list is left as it was.
 
@@ -83,6 +90,7 @@ The position is the element's `data-feega-src`. The MCP tool is `live_edit` (`ac
 
 - State and theme variants (`hover:bg-…`, `dark:…`) and custom breakpoints are not edited.
 - Margin is not in Properties; set it with `feega live-edit … margin`.
+- `feega live-edit` takes the theme-backed properties; the other controls are canvas only for now.
 - A class list that is not a plain string (`class={cn(...)}`) is not written; the edit is refused with the reason.
 - Local Feega only.
 
