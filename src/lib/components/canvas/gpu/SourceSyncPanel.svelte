@@ -1,7 +1,7 @@
 <script lang="ts">
   import { SvelteSet } from 'svelte/reactivity';
   import { SvelteMap } from 'svelte/reactivity';
-  import { SourceAction, changedRows, ciOf, CiState, filesOfPatch, filesToPush, popoverOf, pushAskOf, pushedNote, pushLabel, rowTitle, type ChangedFile, type FrameSync, type PullView } from '$lib/canvas/source-changes';
+  import { SourceAction, changedRows, ciOf, CiState, filesOfPatch, filesToPush, impactOf, popoverOf, pushAskOf, pushedNote, pushLabel, rowTitle, type ChangedFile, type FrameSync, type PullView } from '$lib/canvas/source-changes';
   import { PushOutcome, pushOutcomeOf, editedFilesText } from '$lib/canvas/source-sync';
 
   type Anchor = { left: number; top: number };
@@ -23,6 +23,7 @@
   let reviewing = $state(false);
   let copied = $state(false);
   const picked = new SvelteSet<string>();
+  const mains = new SvelteSet<string>();
   const files = new SvelteMap<string, ChangedFile[]>();
 
   const rows = $derived(changedRows(syncs));
@@ -86,7 +87,7 @@
   }
 
   async function push(confirmSensitive = false) {
-    const ask = pushAskOf(rows, picked, DEFAULT_NAME);
+    const ask = pushAskOf(rows, picked, DEFAULT_NAME, mains);
     if (!ask) {
       return;
     }
@@ -149,7 +150,7 @@
         <input type="checkbox" checked={picked.has(row.nodeId)} onchange={(e) => (e.currentTarget.checked ? picked.add(row.nodeId) : picked.delete(row.nodeId))} />
         {#if row.link.beforePoster}<img src={assetUrl(row.link.beforePoster)} alt="Before" title="Before" />{/if}
         {#if posterOf(row.nodeId)}<img src={posterOf(row.nodeId)} alt="After" title="After" />{/if}
-        <span><strong>{rowTitle(row)}</strong> <span class="muted">{row.state}</span></span>
+        <span><strong>{rowTitle(row)}</strong> <span class="muted">{row.state}</span>{#if impactOf(row)}<br /><span class="note">{impactOf(row)}</span>{/if}</span>
       </label>
       {#each files.get(row.nodeId) ?? [] as file (file.path)}
         <details class="file">
@@ -157,6 +158,10 @@
           <pre>{file.diff}</pre>
         </details>
       {/each}
+      {#each row.proposals ?? [] as p (p.component)}
+        <p class="muted">No prop on <code>{p.component}</code> for {p.props.join(', ')}: ask the agent to add one, or apply to the main component.</p>
+      {/each}
+      <label class="change"><input type="checkbox" checked={mains.has(row.nodeId)} onchange={(e) => (e.currentTarget.checked ? mains.add(row.nodeId) : mains.delete(row.nodeId))} /> Apply instance edits to main component</label>
     {/each}
     {#if confirming}
       <p class="note">This push touches config, lockfiles or dotfiles.</p>

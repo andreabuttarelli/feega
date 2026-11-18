@@ -70,7 +70,8 @@ const canvasSchema = z.object({
       url: z.string().nullable(),
       file: z.string().nullable()
     })
-  )
+  ),
+  codeLinks: z.array(z.record(z.string(), z.unknown())).optional()
 });
 
 export type FeegaManifest = z.infer<typeof manifestSchema>;

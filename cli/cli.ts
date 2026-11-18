@@ -962,6 +962,7 @@ github
   .option('--body <text>', 'Pull request body')
   .option('--base <branch>', 'Base branch (default: the repo default)')
   .option('--confirm-sensitive', 'Allow changes to config files, lockfiles and dotfiles')
+  .option('--main <nodeIds...>', 'Frames whose instance edits apply to the main component file instead of the usage site')
   .action(async (projectId: string, nodeIds: string[], opts) => {
     const { cmdGithubPush } = await import('./commands/github.ts');
     await cmdGithubPush(projectId, nodeIds, opts);
