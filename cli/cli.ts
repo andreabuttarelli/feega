@@ -78,6 +78,15 @@ program
   });
 
 program
+  .command('agents')
+  .description('List the coding agents a local Feega found on this computer and whether they can drive the chat over ACP')
+  .option('--refresh', 'Detect again instead of using the cached result')
+  .action(async (options: { refresh?: boolean }) => {
+    const { cmdAgents } = await import('./commands/agents.ts');
+    await cmdAgents(options);
+  });
+
+program
   .command('health')
   .description('Verifica lo stato delle API')
   .action(async () => {

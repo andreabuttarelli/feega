@@ -83,7 +83,8 @@ export async function framesPush(deps: FramesDeps, scope: CodeScope, ask: Frames
   }
 
   const pushed = { pushBranch: out.branch, pushSha: out.sha, pushParent: out.parent, pushTouched: out.touched, pullNumber: out.pull?.number };
-  await Promise.all(links.filter((l) => l.link).map((l) => deps.links.save(l.nodeId, { ...l.link!, ...pushed, ...(l.link!.restored ? { restored: [] } : {}) })));
+  const every = (await Promise.all(ask.nodeIds.map(async (nodeId) => (await deps.links.all(nodeId)).map((link) => ({ nodeId, link }))))).flat();
+  await Promise.all(every.map((l) => deps.links.save(l.nodeId, { ...l.link, ...pushed, ...(l.link.restored ? { restored: [] } : {}) })));
   return out;
 }
 
@@ -172,7 +173,7 @@ export async function frameRebased(deps: Pick<FramesDeps, 'host' | 'links'>, nod
   if (!link || !host) {
     return null;
   }
-  const rebased = { ...link, baseSha: await host.headOf(link.baseBranch) };
-  await deps.links.save(nodeId, rebased);
-  return rebased;
+  const baseSha = await host.headOf(link.baseBranch);
+  await Promise.all((await deps.links.all(nodeId)).map((l) => deps.links.save(nodeId, { ...l, baseSha })));
+  return { ...link, baseSha };
 }
