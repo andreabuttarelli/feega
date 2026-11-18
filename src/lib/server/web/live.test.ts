@@ -10,7 +10,7 @@ import { SocialPlatform } from './social-search';
 import { loggedSearch, pinterestPort, productImport, socialPort, screenedImport } from './live';
 import { SearchEngine } from './search';
 
-const SCOPE = { orgId: 'org-1', userId: 'u-1', projectId: 'p-1', brandId: null };
+const SCOPE = { orgId: 'org-1', userId: 'u-1', projectId: 'p-1' };
 
 describe('web search billing', () => {
   it('logs every search in ai_calls with the provider cost, on the org and project', async () => {

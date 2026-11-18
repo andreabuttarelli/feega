@@ -44,7 +44,6 @@ describe('cosa una riga di `nodes` può essere', () => {
       'model3d',
       'motion',
       'element',
-      'studio_batch',
       'section',
       'technique'
     ]);

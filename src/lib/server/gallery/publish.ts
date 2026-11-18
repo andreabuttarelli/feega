@@ -93,7 +93,7 @@ export async function publishToGallery(db: Db, ports: PublishPorts, input: Publi
     return fail(PublishError.NotFound, 'No motion video with that id in your workspace.');
   }
 
-  const refused = publishRefusal({ mode: project.mode, hasBrand: project.brandId !== null, doc: source.doc, siteAssetIds: new Set(projectAssets.filter(isSiteMaterial).map((a) => a.id)) });
+  const refused = publishRefusal({ mode: project.mode, doc: source.doc, siteAssetIds: new Set(projectAssets.filter(isSiteMaterial).map((a) => a.id)) });
   if (refused) {
     return fail(refused.refusal, refused.message);
   }

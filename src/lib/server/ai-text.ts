@@ -1,4 +1,4 @@
-import { requireBrandContext } from '$lib/server/ai-log';
+import { requireOrgContext } from '$lib/server/ai-log';
 import { env } from '$env/dynamic/private';
 import { route } from '$lib/server/model-routing';
 import {
@@ -30,7 +30,7 @@ export function textRouteLabel(): string {
 }
 
 // Extra fields threaded into logAiCall so per-site labels/attribution survive both providers.
-export type AiLogExtras = { brandId?: string; userId?: string; threadId?: string; context?: string };
+export type AiLogExtras = { orgId?: string; userId?: string; threadId?: string; context?: string };
 
 let warnedStaleBudget = false;
 
@@ -99,7 +99,7 @@ export async function aiStructured<T>(
     reasoningEffort?: ReasoningEffort;
   } & AiLogExtras
 ): Promise<T> {
-  requireBrandContext(opts);
+  requireOrgContext(opts);
   const t0 = Date.now();
   const { images, temperature, model, reasoningEffort: effort } = opts ?? {};
 
@@ -131,7 +131,7 @@ export async function aiText(
   systemInstruction?: string,
   opts?: { label?: string; images?: ImagePart[] } & AiLogExtras
 ): Promise<string> {
-  requireBrandContext(opts);
+  requireOrgContext(opts);
   const t0 = Date.now();
   const { label = 'text', images } = opts ?? {};
 
@@ -153,7 +153,7 @@ const DEFAULT_VARIANTS = 3;
 // Positioning lenses assigned one-per-variant by the multi-variant planners (GTM roadmap,
 // editorial plan). Without them the N "variants" share prompt AND sampling and collapse onto the
 // same positioning/imagery run after run — the judge then just picks between near-clones. Each
-// lens biases the strategic BET only; the brand facts and data always win over the lens.
+// lens biases the strategic BET only; the facts and data always win over the lens.
 export const VARIANT_LENSES = [
   'Lean COMMUNITY-LED: conversations, niche communities, user-generated content and direct engagement carry the growth.',
   'Lean PRODUCT/EDUCATION-LED: concrete use-cases, demos, how-tos and proof of capability carry the growth.',

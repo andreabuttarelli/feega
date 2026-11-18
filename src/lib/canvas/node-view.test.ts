@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BatchState, SelectBody, batchOf, selectView } from './node-view';
+import { SelectBody, selectView } from './node-view';
 import type { ListNode } from './list-node';
 import type { SelectOutput } from './select-outputs';
 
@@ -27,12 +27,5 @@ describe('selectView — what the select card shows of its connected list', () =
     expect(rows.map((r) => r.value)).toEqual(['2 files', `${'z'.repeat(60)}…`, 'Not available']);
     expect(rows[0].thumb).toBe('x');
     expect(rows[2].flagged).toBe(true);
-  });
-});
-
-describe('batchOf', () => {
-  it('reads like the studio card: approved in bold, then done of total, running and failed only when there are some', () => {
-    expect(batchOf({ approved: 3, done: 5, total: 8, running: 0, failed: 0, thumbs: [] })).toMatchObject({ state: BatchState.Card, approved: '3', rest: ' approved · 5/8 done' });
-    expect(batchOf({ approved: 0, done: 1, total: 8, running: 2, failed: 1, thumbs: [] }).rest).toBe(' approved · 1/8 done · 2 running · 1 failed');
   });
 });

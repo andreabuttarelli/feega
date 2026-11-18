@@ -68,7 +68,7 @@ export async function motionFrames(db: Db, scope: { orgId: string; nodeId: strin
   }
 
   const assets = await motionAssets({ db, orgId: scope.orgId, projectId: saved.project.id, canvasId: saved.record.canvasId });
-  const tokens = await motionTokens(db, { orgId: scope.orgId, brandId: saved.project.brandId });
+  const tokens = await motionTokens();
   const frames = await drawFrames(chromiumFrames, { compose: { doc, tokens, assets: assetUrls(assets) }, times: ask.times, size: ask.size });
 
   const audioAssets = assets.filter((a) => a.kind === AssetKind.Audio).length;

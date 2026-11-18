@@ -15,15 +15,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  */
 
 const submitAndTrackVideoRender = vi.fn();
-const countOutstandingVideoRenders = vi.fn();
 
 vi.mock('$lib/server/supabase-admin', () => ({ createAdminClient: () => admin }));
 vi.mock('$lib/server/video-render-queue', () => ({
-  submitAndTrackVideoRender: (...a: unknown[]) => submitAndTrackVideoRender(...a),
-  countOutstandingVideoRenders: (...a: unknown[]) => countOutstandingVideoRenders(...a)
+  submitAndTrackVideoRender: (...a: unknown[]) => submitAndTrackVideoRender(...a)
 }));
-vi.mock('$lib/server/brand-media', () => ({ resolveBrandImageIds: async () => ['https://x/y.png'] }));
-vi.mock('$lib/server/usage', () => ({ remaining: async () => ({ videos: 5 }) }));
 vi.mock('$lib/server/ai-log', () => ({ withOrgContext: <T>(_o: string, fn: () => T) => fn() }));
 // Questo file misura la durata, non il catalogo: il modello passato e' sempre uno che il canvas
 // offrirebbe davvero, quindi il cancello di `canvasModelAccepts` lo lascia passare senza dover
@@ -47,13 +43,12 @@ const admin = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  countOutstandingVideoRenders.mockResolvedValue(0);
   submitAndTrackVideoRender.mockResolvedValue({ taskId: 't', model: 'grok-imagine-video-1-5-preview' });
 });
 
 const run = async (over: Record<string, unknown> = {}) => {
-  const { generateVideoWithoutBrand } = await import('./media-generate');
-  return generateVideoWithoutBrand({
+  const { generateVideo } = await import('./media-generate');
+  return generateVideo({
     orgId: 'org-1',
     userId: 'user-1',
     prompt: 'un carrello lento',

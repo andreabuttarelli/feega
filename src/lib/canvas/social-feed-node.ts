@@ -1,7 +1,7 @@
 /**
  * IL NODO `social_account_feed`: una query su un handle pubblico, non una copia del suo profilo.
  *
- * Stesso patto di `products-node.ts`: indipendente da qualsiasi brand — prende una piattaforma e
+ * Prende una piattaforma e
  * un handle e scarica da lì. I post scaricati vivono in `social_posts`, mai dentro `nodes.data`.
  */
 import type { SyncStatus } from './sync-state';

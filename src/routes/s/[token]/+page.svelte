@@ -117,8 +117,6 @@
               {/each}
               <p>{node.view.caption}</p>
             </article>
-          {:else if node.view.kind === 'ads'}
-            <p class="big">{node.view.query}<span>{node.view.country}</span></p>
           {:else if node.view.kind === 'calendar'}
             <p class="big">{periodTitle(node.view.view, node.view.anchor)}<span>Calendar</span></p>
           {:else}

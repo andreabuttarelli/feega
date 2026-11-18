@@ -84,7 +84,7 @@ vi.mock('$lib/server/llm', async () => ({
 }));
 vi.mock('$lib/server/ai-log', () => ({
   logAiCall: vi.fn(),
-  requireBrandContext: () => 'brand-1'
+  requireOrgContext: () => 'org-1'
 }));
 
 describe('routing del lavoro strutturato', () => {
@@ -102,7 +102,7 @@ describe('routing del lavoro strutturato', () => {
     Object.assign(env, overrides);
     const { aiStructured } = await import('./ai-text');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return aiStructured<any>('prompt', SCHEMA, undefined, 'return_plan', { brandId: 'b' });
+    return aiStructured<any>('prompt', SCHEMA, undefined, 'return_plan', { orgId: 'o' });
   }
 
   it('manda il lavoro strutturato al gateway LLM, e a nessun altro endpoint', async () => {
@@ -157,7 +157,7 @@ describe('lo sforzo di ragionamento chiesto da un giudice', () => {
     const { aiStructured } = await import('./ai-text');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await aiStructured<any>('prompt', SCHEMA, undefined, 'return_plan', {
-      brandId: 'b',
+      orgId: 'o',
       reasoningEffort: 'low'
     });
     expect(M.llmStructured.mock.calls[0][0]).toMatchObject({ reasoningEffort: 'low' });
@@ -166,7 +166,7 @@ describe('lo sforzo di ragionamento chiesto da un giudice', () => {
   it('senza richiesta il gateway decide da sé: nessuno sforzo inventato qui', async () => {
     const { aiStructured } = await import('./ai-text');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await aiStructured<any>('prompt', SCHEMA, undefined, 'return_plan', { brandId: 'b' });
+    await aiStructured<any>('prompt', SCHEMA, undefined, 'return_plan', { orgId: 'o' });
     expect(M.llmStructured.mock.calls[0][0].reasoningEffort).toBeUndefined();
   });
 

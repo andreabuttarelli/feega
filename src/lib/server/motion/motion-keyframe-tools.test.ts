@@ -101,7 +101,7 @@ describe('motion agent keyframe tools', () => {
   });
 
   it('the prompt tells the agent how to animate', () => {
-    const prompt = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Missing });
+    const prompt = motionAgentPrompt({ selectionNote: '', vision: Vision.Missing });
 
     expect(prompt).toContain('set_keyframes');
     expect(prompt).toContain('set_transform');
@@ -274,7 +274,7 @@ describe('motion agent units', () => {
   });
 
   it('the prompt says which unit every value takes', () => {
-    const prompt = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Missing });
+    const prompt = motionAgentPrompt({ selectionNote: '', vision: Vision.Missing });
 
     expect(prompt).toContain('in px of the composition');
     expect(prompt).toContain('in % (100 = as is)');

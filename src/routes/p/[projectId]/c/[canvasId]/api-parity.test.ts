@@ -22,7 +22,7 @@ const NODE = '44444444-4444-4444-4444-444444444444';
 const OTHER = '44444444-4444-4444-4444-444444444445';
 const USER = '55555555-5555-5555-5555-555555555555';
 
-const projectRow = { id: PROJECT, org_id: ORG, name: 'p', slug: 'p', brand_id: null, archived_at: null, updated_at: '2026-10-01T00:00:00Z', mode: null };
+const projectRow = { id: PROJECT, org_id: ORG, name: 'p', slug: 'p', archived_at: null, updated_at: '2026-10-01T00:00:00Z', mode: null };
 const canvasRow = { id: CANVAS, org_id: ORG, project_id: PROJECT, name: 'One', share_token: null, shared_at: null, deleted_at: null, created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-01T00:00:00Z' };
 const nodeRow = (id: string, version: number) => ({
   id,
@@ -61,7 +61,7 @@ function idSequence() {
 
 async function viaAction(name: keyof typeof actions, form: Record<string, string>) {
   const { db } = seed();
-  findCanvasForUser.mockResolvedValue({ orgId: ORG, canvas: { projectId: PROJECT }, mode: null, projectBrandId: null });
+  findCanvasForUser.mockResolvedValue({ orgId: ORG, canvas: { projectId: PROJECT }, mode: null, });
   const fd = new FormData();
   Object.entries(form).forEach(([k, v]) => fd.set(k, v));
   const out = await (actions[name] as (event: unknown) => Promise<unknown>)({

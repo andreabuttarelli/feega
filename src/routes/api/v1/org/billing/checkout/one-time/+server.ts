@@ -1,0 +1,79 @@
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
+import { checkApiKeyWriteAccess, openOrg } from '$lib/server/cli-auth';
+import { isOrgOwner, orgBillingById } from '$lib/server/org-billing';
+import { billingGrantsReady } from '$lib/server/billing-readiness';
+import { topUpFor } from '$lib/credit-ladder';
+import { BILLING_PATH, checkoutReturnUrls } from '$lib/billing-path';
+import { appOrigin } from '$lib/server/app-url';
+
+import { ONE_TIME_CHECKOUT_LINK, statusForFailure } from '@feega/api-contracts';
+
+export const POST: RequestHandler = async ({ request, url }) => {
+  const { call, error } = await openOrg(request);
+  if (error) return error;
+
+  const { supabase, user, orgId, apiKey } = call;
+
+  const readOnly = checkApiKeyWriteAccess(apiKey);
+  if (readOnly) return readOnly;
+
+  if (!(await billingGrantsReady(supabase))) {
+    return json(
+      { error: 'purchases_not_ready' },
+      { status: statusForFailure(ONE_TIME_CHECKOUT_LINK, 'purchases_not_ready') }
+    );
+  }
+
+  const parsed = ONE_TIME_CHECKOUT_LINK.input.safeParse(await request.json().catch(() => ({})));
+  if (!parsed.success) {
+    return json({ error: 'invalid_input', details: parsed.error.issues }, { status: 400 });
+  }
+
+  if (!(await isOrgOwner(supabase, orgId, user.id))) {
+    return json(
+      { error: 'not_org_owner' },
+      { status: statusForFailure(ONE_TIME_CHECKOUT_LINK, 'not_org_owner') }
+    );
+  }
+
+  const topUp = topUpFor(parsed.data.credits);
+  if (!topUp) {
+    return json(
+      { error: 'unknown_plan' },
+      { status: statusForFailure(ONE_TIME_CHECKOUT_LINK, 'unknown_plan') }
+    );
+  }
+
+  const billing = await orgBillingById(supabase, orgId);
+  if (!billing) {
+    return json(
+      { error: 'no_org_billing' },
+      { status: statusForFailure(ONE_TIME_CHECKOUT_LINK, 'no_org_billing') }
+    );
+  }
+
+  const appBillingUrl = `${appOrigin(url)}${BILLING_PATH}`;
+
+  try {
+    const { ensureOrgCustomer, createOneTimeCreditCheckout } = await import('$lib/server/stripe');
+    const customerId = await ensureOrgCustomer({
+      id: billing.orgId,
+      name: billing.orgName,
+      stripe_customer_id: billing.customerId
+    }, user.email);
+    const checkoutUrl = await createOneTimeCreditCheckout({
+      customerId,
+      orgId: billing.orgId,
+      price: topUp.price,
+      credits: topUp.credits,
+      ...checkoutReturnUrls(appBillingUrl)
+    });
+    return json({ ok: true, url: checkoutUrl, credits: topUp.credits });
+  } catch (e) {
+    return json(
+      { error: 'stripe_unavailable', message: e instanceof Error ? e.message : undefined },
+      { status: statusForFailure(ONE_TIME_CHECKOUT_LINK, 'stripe_unavailable') }
+    );
+  }
+};

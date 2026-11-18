@@ -22,7 +22,7 @@ const target = { nodeId: 'n1', doc: newMotionDoc(MotionFormat.Landscape), docSca
 
 async function composed(subscription: string | null): Promise<string> {
   const { db } = fakeDb({ orgs: [{ id: 'o', stripe_subscription_id: subscription }] }, { filter: true });
-  const ports = selectionPorts({ db, orgId: 'o', projectId: 'p', brandId: null, actor: { kind: 'user', id: 'u' } });
+  const ports = selectionPorts({ db, orgId: 'o', projectId: 'p', actor: { kind: 'user', id: 'u' } });
   await ports.draw([target], {} as never);
   return seen.ports!.compose(target);
 }

@@ -17,7 +17,6 @@ export type McpLogEvent = {
   path?: string;
   toolName?: string;
   userId?: string;
-  brandSlug?: string;
   statusCode?: number;
   durationMs?: number;
   error?: unknown;
@@ -103,7 +102,6 @@ export async function mcpLogAsync(entry: McpLogEvent): Promise<void> {
     path: entry.path,
     toolName: entry.toolName,
     userId: entry.userId,
-    brandSlug: entry.brandSlug,
     statusCode: entry.statusCode,
     durationMs: entry.durationMs,
     errorName: err.error_name,
@@ -123,7 +121,6 @@ export async function mcpLogAsync(entry: McpLogEvent): Promise<void> {
           scope.setTag('mcp.event', entry.event);
           scope.setTag('mcp.source', entry.source ?? 'mcp-http');
           if (entry.toolName) scope.setTag('mcp.tool', entry.toolName);
-          if (entry.brandSlug) scope.setTag('mcp.brand', entry.brandSlug);
           if (entry.requestId) scope.setTag('mcp.request_id', entry.requestId);
           if (entry.userId) scope.setUser({ id: entry.userId });
           scope.setContext('mcp', line as Record<string, unknown>);
@@ -152,7 +149,6 @@ export async function mcpLogAsync(entry: McpLogEvent): Promise<void> {
         path: entry.path ?? null,
         tool_name: entry.toolName ?? null,
         user_id: entry.userId ?? null,
-        brand_slug: entry.brandSlug ?? null,
         status_code: entry.statusCode ?? null,
         duration_ms: entry.durationMs ?? null,
         error_name: err.error_name ?? null,

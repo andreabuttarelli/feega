@@ -47,14 +47,14 @@ vi.mock('$lib/server/motion/editor', () => ({
   saveMotionDoc: async () => null
 }));
 vi.mock('$lib/server/motion/templates', () => ({ templateLibrary: () => ({ list: async () => [] }) }));
-vi.mock('$lib/server/motion/brand-sources', () => ({ brandSources: () => ({}) }));
+vi.mock('$lib/server/motion/site-sources', () => ({ siteSources: () => ({}) }));
 
 const { startMotionTurn, Browser } = await import('./turn');
 
 async function turn() {
   const db = { storage: { from: () => ({}) } } as never;
   const motion = { record: { id: 'n-1', canvasId: 'c-1' }, node: { id: 'n-1', format: MotionFormat.Landscape, docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null } } as never;
-  const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', brandId: null, mode: ProjectMode.Standard }, motion, message: 'make it pop', selection: [], model: 'anthropic/claude-opus-5.5', reasoning: 'low', requester: { kind: 'user', id: 'u-1' }, browser: Browser.Absent });
+  const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', mode: ProjectMode.Standard }, motion, message: 'make it pop', selection: [], model: 'anthropic/claude-opus-5.5', reasoning: 'low', requester: { kind: 'user', id: 'u-1' }, browser: Browser.Absent });
   if (started instanceof Response) {
     throw new Error('turn refused');
   }

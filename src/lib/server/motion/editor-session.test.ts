@@ -8,7 +8,7 @@ const RECORD = { id: 'n1', displayName: 'Frame', data: {} };
 
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: () => slow([{ org: { id: 'o1', name: 'o', slug: 'o' }, role: 'member' }]) }));
 vi.mock('$lib/server/canvas/lookup', () => ({
-  openCanvasForUser: () => slow({ memberships: [{ org: { id: 'o1', name: 'o', slug: 'o' }, role: 'member' }], found: { orgId: 'o1', canvas: { id: 'c1', projectId: 'p1', name: 'Canvas' }, mode: 'standard', projectBrandId: null } })
+  openCanvasForUser: () => slow({ memberships: [{ org: { id: 'o1', name: 'o', slug: 'o' }, role: 'member' }], found: { orgId: 'o1', canvas: { id: 'c1', projectId: 'p1', name: 'Canvas' }, mode: 'standard', } })
 }));
 vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ canvasReachable: () => slow(true) }));
 vi.mock('./editor', () => ({

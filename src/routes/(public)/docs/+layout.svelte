@@ -40,10 +40,6 @@
     { label: $_('docs.layout.s29'), items: [
       { title: $_('docs.layout.s30'), href: '/docs/api', icon: 'code' },
     ]},
-    { label: $_('docs.layout.s31'), items: [
-      { title: $_('docs.layout.s32'), href: '/docs/api/brands', icon: 'layers' },
-      { title: $_('docs.layout.s38'), href: '/docs/api/products', icon: 'package' },
-    ]},
   ]);
 
   const isApiPage = $derived($page.url.pathname.includes('/docs/api'));

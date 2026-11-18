@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ProjectMode } from '$lib/project-mode';
 
-vi.mock('$lib/server/repos/projects', () => ({ listProjects: vi.fn(async () => [{ id: 'p1', name: 'Launch', slug: 'launch', brandId: null, archivedAt: null, lastActiveAt: '2026-10-03', mode: ProjectMode.Standard }]), createProject: vi.fn() }));
+vi.mock('$lib/server/repos/projects', () => ({ listProjects: vi.fn(async () => [{ id: 'p1', name: 'Launch', slug: 'launch', archivedAt: null, lastActiveAt: '2026-10-03', mode: ProjectMode.Standard }]), createProject: vi.fn() }));
 
 const listRecentNodes = vi.fn(async () => [{ id: 'm9', projectId: 'p1', canvasId: 'c1', name: 'Older', data: { posterAssetId: 'a1' }, updatedAt: '2026-09-01' }]);
-vi.mock('$lib/server/repos/dashboard', () => ({ listRecentNodes, listRecentCanvases: vi.fn(), listRecentImages: vi.fn(), listRecentBatches: vi.fn() }));
+vi.mock('$lib/server/repos/dashboard', () => ({ listRecentNodes, listRecentCanvases: vi.fn(), listRecentImages: vi.fn()}));
 
 const signedAssets = vi.fn(async (_db: unknown, _org: string, ids: string[]) => ({ assets: new Map(), urls: Object.fromEntries(ids.map((id) => [id, `https://signed/${id}`])) }));
-vi.mock('$lib/server/studio/studio-media', () => ({ signedAssets }));
+vi.mock('$lib/server/dashboard/signed-assets', () => ({ signedAssets }));
 
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: vi.fn(async () => [{ org: { id: 'org-a', name: 'A', slug: 'a' }, role: 'owner' }]) }));
 

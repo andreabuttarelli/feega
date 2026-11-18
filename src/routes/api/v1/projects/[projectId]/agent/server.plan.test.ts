@@ -61,14 +61,13 @@ vi.mock('$lib/server/llm', () => ({
 vi.mock('$lib/server/ai-log', () => ({
   extractSdkUsage: () => ({}),
   logAiCall: (entry: { model?: string }) => calls.logged.push(entry),
-  withBrandContext: (_id: string, fn: () => void) => fn(),
   withOrgContext: (_id: string, fn: () => void) => fn()
 }));
 vi.mock('$lib/server/cli-auth', () => ({ gateAiAction: async () => calls.gate, gateOrgAiAction: async () => calls.gate }));
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
 vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/repos/canvas')>()), listCanvases: async () => [] }));
 vi.mock('$lib/server/projects/lookup', () => ({
-  findReachableProject: async () => ({ orgId: 'org-1', project: { id: 'p-1', name: 'P', brandId: null } })
+  findReachableProject: async () => ({ orgId: 'org-1', project: { id: 'p-1', name: 'P', } })
 }));
 vi.mock('$lib/server/repos/chat', () => ({
   openThread: async () => 'thread-1',
@@ -81,7 +80,6 @@ vi.mock('$lib/server/product-events/track', async (importOriginal) => ({
   track: async (event: string, actor: Record<string, unknown>, props: Record<string, unknown>) => void calls.events.push({ event, actor, props })
 }));
 vi.mock('$lib/server/project-agent/project-tools', () => ({ createProjectTools: () => ({}) }));
-vi.mock('$lib/server/project-agent/tool-surface', () => ({ openAgentTools: async () => ({ tools: {}, close: async () => undefined }) }));
 
 const { POST } = await import('./+server');
 

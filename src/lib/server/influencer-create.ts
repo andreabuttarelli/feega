@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { safeFetchBytes, ARCHIVE_USER_AGENT } from '$lib/server/tool-guard';
-import { generateImagesWithoutBrand } from '$lib/server/media-generate';
+import { generateImages } from '$lib/server/media-generate';
 import { createInfluencer, insertInfluencerViews, type CreateInfluencerInput } from '$lib/server/repos/influencers';
 import { FACE_FRONT_VIEW, INFLUENCER_VIEWS } from '$lib/canvas/influencer-views';
 import type { Db } from '$lib/server/db/client';
@@ -58,7 +58,7 @@ export type GenerateInfluencerResult =
 /**
  * IL VOLTO PRIMA, LE ALTRE VISTE DOPO — la stessa sequenza di `people.ts` nel prodotto vecchio
  * (un ritratto base, poi N pose con quel ritratto come riferimento), qui applicata alle 7 viste
- * di `INFLUENCER_VIEWS`. Ogni chiamata passa dallo stesso `generateImagesWithoutBrand` che i nodi
+ * di `INFLUENCER_VIEWS`. Ogni chiamata passa dallo stesso `generateImages` che i nodi
  * immagine della tela usano — non un percorso di generazione secondo, uno duplicato.
  *
  * UNA VISTA CHE FALLISCE NON FERMA LE ALTRE: un influencer con 5 viste su 7 è comunque utilizzabile
@@ -78,7 +78,7 @@ export async function generateInfluencer(
     return { ok: false, error: screened.error };
   }
 
-  const faceJob = await generateImagesWithoutBrand(db as never, {
+  const faceJob = await generateImages(db as never, {
     orgId: input.orgId,
     userId: input.userId,
     prompt: `${input.facePrompt} ${FACE_FRONT_VIEW.promptFragment}`,
@@ -116,7 +116,7 @@ export async function generateInfluencer(
 
   const restJobs = await Promise.all(
     INFLUENCER_VIEWS.slice(1).map(async (view) => {
-      const job = await generateImagesWithoutBrand(db as never, {
+      const job = await generateImages(db as never, {
         orgId: input.orgId,
         userId: input.userId,
         prompt: `${input.facePrompt} ${view.promptFragment} Same person as the reference image.`,

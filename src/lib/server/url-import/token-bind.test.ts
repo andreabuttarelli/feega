@@ -14,9 +14,9 @@ const read = <T>(path: string) => JSON.parse(readFileSync(new URL(path, import.m
 
 const pageOf = (name: string): PageTree => ({ ...read<PageTree>(`./fixtures/${name}.json`), outline: read<PageOutline>(`./fixtures/outlines/${name}.json`) });
 
-function docOf(name: string, tokening: Tokening, palette?: string[]): MotionDoc {
+function docOf(name: string, tokening: Tokening): MotionDoc {
   let n = 0;
-  return urlPlan(pageOf(name), () => `id${++n}`, undefined, {}, { ...FULL_SHAPE, tokening, ...(palette ? { brand: { palette } } : {}) })!.plan.items[0].doc;
+  return urlPlan(pageOf(name), () => `id${++n}`, undefined, {}, { ...FULL_SHAPE, tokening })!.plan.items[0].doc;
 }
 
 type Placed = { clip: MotionClip; width: number };
@@ -125,11 +125,10 @@ describe('imported pages become tokens', () => {
   });
 
   it.each([
-    ['stripe', undefined, '#533afd'],
-    ['vercel', undefined, '#171717'],
-    ['linear', ['#5e6ad2'], '#5e6ad2']
-  ])('%s: Primary is the colour of its main buttons or of its brand', (name, palette, primary) => {
-    const doc = docOf(name, Tokening.On, palette);
+    ['stripe', '#533afd'],
+    ['vercel', '#171717']
+  ])('%s: Primary is the colour of its main buttons', (name, primary) => {
+    const doc = docOf(name, Tokening.On);
     const site = name[0].toUpperCase() + name.slice(1);
 
     expect(doc.variables![site].vars.Primary.values.Default).toBe(primary);

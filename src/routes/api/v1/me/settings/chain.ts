@@ -9,7 +9,7 @@ export function once<T>(run: () => Promise<T>): () => Promise<T> {
 
 export function dashboardChain(bearer: Bearer, request: Request, apiUrl: URL, pagePath: string) {
   const event = bearerEvent(bearer, request, apiUrl, pagePath);
-  const org = once(async () => ({ org: (await appShell(event as never)).org, project: null, brand: null }));
+  const org = once(async () => ({ org: (await appShell(event as never)).org, project: null }));
   const layout = once(async () => (await settingsShell({ ...event, parent: org } as never)) as Record<string, unknown>);
   const parent = async () => ({ ...(await org()), ...(await layout()) });
   return { org, layout, page: { ...event, parent } };

@@ -32,7 +32,7 @@ function event(fields: Record<string, string>, rows: Record<string, unknown[]>) 
     {
       orgs_members: [{ user_id: 'user', org_id: 'org', role: 'owner', orgs: { id: 'org', name: 'Org', slug: 'org' } }],
       canvases: [{ id: 'canvas', org_id: 'org', project_id: 'project', name: 'Canvas', viewport: null }],
-      projects: [{ id: 'project', org_id: 'org', name: 'P', slug: 'p', brand_id: null, archived_at: null, updated_at: '', mode: 'standard' }],
+      projects: [{ id: 'project', org_id: 'org', name: 'P', slug: 'p', archived_at: null, updated_at: '', mode: 'standard' }],
       nodes_connections: [],
       ...rows
     },

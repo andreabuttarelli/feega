@@ -34,7 +34,7 @@ function world(over: { doc?: MotionDoc; mode?: string; logoSource?: string } = {
     {
       nodes: [{ id: 'n-1', org_id: ORG, canvas_id: 'c-1', project_id: 'p-1', type: 'motion', display_name: 'Demo', x: 0, y: 0, z: 0, width: null, height: null, version: 3, data: { format: '16:9', docHeadRevision: 1, posterAssetId: POSTER, lastRenderAssetId: RENDER } }],
       motion_revisions: [{ org_id: ORG, node_id: 'n-1', version: 1, doc: over.doc ?? demo(), summary: null, actor_kind: 'user' }],
-      projects: [{ id: 'p-1', org_id: ORG, name: 'P', slug: 'p', brand_id: null, archived_at: null, updated_at: '2026-10-01', mode: over.mode ?? 'standard' }],
+      projects: [{ id: 'p-1', org_id: ORG, name: 'P', slug: 'p', archived_at: null, updated_at: '2026-10-01', mode: over.mode ?? 'standard' }],
       assets: [asset(LOGO, 'image', `${ORG}/p-1/${over.logoSource === 'imported' ? 'imports/' : ''}logo.svg`, over.logoSource), asset(POSTER, 'image', `${ORG}/p-1/poster.png`), asset(RENDER, 'video', `${ORG}/p-1/render.mp4`)],
       gallery_remixes: []
     },

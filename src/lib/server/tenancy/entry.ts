@@ -136,7 +136,7 @@ const firstProjectFlights = new Map<string, Promise<Awaited<ReturnType<EntryDeps
 function firstProjectOnce(
   create: EntryDeps['createProject'],
   db: Db,
-  input: { orgId: string; name: string; slug: string; brandId: string | null }
+  input: { orgId: string; name: string; slug: string }
 ): Promise<Awaited<ReturnType<EntryDeps['createProject']>>> {
   const pending = firstProjectFlights.get(input.orgId);
   if (pending) {
@@ -183,8 +183,7 @@ async function projectIdFor(
   const project = await firstProjectOnce(deps.createProject, db, {
     orgId,
     name: DEFAULT_PROJECT_NAME,
-    slug: DEFAULT_PROJECT_SLUG,
-    brandId: null
+    slug: DEFAULT_PROJECT_SLUG
   });
   return { projectId: project.id, created: true };
 }
@@ -261,7 +260,7 @@ export async function startProject(db: Db, deps: EntryDeps, user: User, chosenOr
   const orgId = await orgIdFor(db, deps, user, chosenOrgId);
 
   const host = startHost(startUrl);
-  const project = await deps.createProject(db, { orgId, name: host, slug: siteSlug(host), brandId: null });
+  const project = await deps.createProject(db, { orgId, name: host, slug: siteSlug(host) });
   const canvas = await deps.createCanvas(db, { orgId, projectId: project.id, name: DEFAULT_CANVAS_NAME });
   return { projectId: project.id, canvasId: canvas.id };
 }

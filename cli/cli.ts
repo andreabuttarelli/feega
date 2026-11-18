@@ -15,8 +15,6 @@ program
   .version('0.1.0')
   .addHelpText('after', `
 Esempi:
-  $ feega brands                   Lista tutti i brand
-  $ feega library <slug> [tab]     Kit, prodotti, post e ads di un brand
   $ feega motion list              Lista i video
 
 Documentazione completa: cli/README.md
@@ -105,22 +103,6 @@ program
     await cmdInit(dir ?? '.', options);
   });
 
-program
-  .command('brands')
-  .description('Elenca tutti i brand')
-  .action(async () => {
-    const { cmdBrands } = await import('./commands/brands.ts');
-    await cmdBrands();
-  });
-
-program
-  .command('library <slug> [tab]')
-  .description('Materiale del brand trascinabile sulla tela: kit, products, posts, ads')
-  .action(async (slug: string, tab: string | undefined) => {
-    const { cmdLibrary } = await import('./commands/library.ts');
-    await cmdLibrary(slug, tab ?? 'kit');
-  });
-
 const agents = program
   .command('agents')
   .description('List the coding agents a local Feega found on this computer and whether they can drive the chat over ACP')
@@ -148,14 +130,6 @@ program
   .action(async () => {
     const { cmdHealth } = await import('./commands/health.ts');
     await cmdHealth();
-  });
-
-program
-  .command('products <slug> [action]')
-  .description('Prodotti: list (elenca), sync (reimporta dal sito e-commerce)')
-  .action(async (slug: string, action: string | undefined) => {
-    const { cmdProducts } = await import('./commands/products.ts');
-    await cmdProducts(slug, { action: action ?? 'list' });
   });
 
 program
@@ -893,98 +867,6 @@ layouts
     await cmdLayoutsPatch(layoutId, opts);
   });
 
-const studio = program.command('studio').description('Photo studio batches: quote, start and follow them');
-
-studio
-  .command('quote')
-  .description('Price a batch selection: image count, credits and a quote id, free')
-  .requiredOption('--file <path>', 'JSON selection: { name, productIds, environments, shots, variations, model, ... }')
-  .option('--project <id>', 'Which project')
-  .action(async (opts) => {
-    const { cmdStudioQuote } = await import('./commands/studio.ts');
-    await cmdStudioQuote(opts);
-  });
-
-studio
-  .command('start')
-  .description('Start a batch from a quoted selection, spends credits')
-  .requiredOption('--file <path>', 'The same JSON selection you quoted')
-  .requiredOption('--quote <id>', 'The quote id `studio quote` printed')
-  .option('--project <id>', 'Which project')
-  .action(async (opts) => {
-    const { cmdStudioStart } = await import('./commands/studio.ts');
-    await cmdStudioStart(opts);
-  });
-
-studio
-  .command('run <batchId>')
-  .description('Render the rest of a batch after its previews, spends credits')
-  .action(async (batchId: string, opts) => {
-    const { cmdStudioAct } = await import('./commands/studio.ts');
-    await cmdStudioAct('run', batchId, opts);
-  });
-
-studio
-  .command('more <batchId>')
-  .description('Add variations per cell and render them, spends credits')
-  .option('--variations <n>', 'Variations per cell')
-  .action(async (batchId: string, opts) => {
-    const { cmdStudioAct } = await import('./commands/studio.ts');
-    await cmdStudioAct('more', batchId, opts);
-  });
-
-studio
-  .command('cancel <batchId>')
-  .description('Stop the items still queued, free')
-  .action(async (batchId: string, opts) => {
-    const { cmdStudioAct } = await import('./commands/studio.ts');
-    await cmdStudioAct('cancel', batchId, opts);
-  });
-
-studio
-  .command('retry <batchId>')
-  .description('Requeue failed or cancelled items, spends credits')
-  .option('--items <ids...>', 'Item ids from `studio status`')
-  .action(async (batchId: string, opts) => {
-    const { cmdStudioAct } = await import('./commands/studio.ts');
-    await cmdStudioAct('retry', batchId, opts);
-  });
-
-studio
-  .command('regenerate <batchId>')
-  .description('Requeue finished items for a new render, spends credits')
-  .option('--items <ids...>', 'Item ids from `studio status`')
-  .action(async (batchId: string, opts) => {
-    const { cmdStudioAct } = await import('./commands/studio.ts');
-    await cmdStudioAct('regenerate', batchId, opts);
-  });
-
-studio
-  .command('approve <batchId>')
-  .description('Approve an item, free')
-  .option('--items <ids...>', 'Item ids from `studio status`')
-  .action(async (batchId: string, opts) => {
-    const { cmdStudioAct } = await import('./commands/studio.ts');
-    await cmdStudioAct('approve', batchId, opts);
-  });
-
-studio
-  .command('reject <batchId>')
-  .description('Reject an item, free')
-  .option('--items <ids...>', 'Item ids from `studio status`')
-  .action(async (batchId: string, opts) => {
-    const { cmdStudioAct } = await import('./commands/studio.ts');
-    await cmdStudioAct('reject', batchId, opts);
-  });
-
-studio
-  .command('status <batchId>')
-  .description('Show a batch: its items and their state, free')
-  .action(async (batchId: string) => {
-    const { cmdStudioStatus } = await import('./commands/studio.ts');
-    await cmdStudioStatus(batchId);
-  });
-
 program
   .command('app-account <projectId>')
   .description('Show, set or --forget the TEST account of your app that the chat and code import sign in with')
@@ -1160,12 +1042,12 @@ program
   });
 
 program
-  .command('upgrade <slug>')
+  .command('upgrade')
   .description('Open Stripe checkout: the plan (€9 / editor / month, 500 credits) or a one-time top-up (--top-up 1000|2000|5000)')
   .option('--top-up <credits>', 'One-time top-up: 1000 (€10), 2000 (€20) or 5000 (€50) credits')
-  .action(async (slug: string, opts) => {
+  .action(async (opts) => {
     const { cmdUpgrade } = await import('./commands/upgrade.ts');
-    await cmdUpgrade(slug, opts);
+    await cmdUpgrade(opts);
   });
 
 program

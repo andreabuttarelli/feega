@@ -1,12 +1,11 @@
 <script lang="ts" module>
-  export type LeftPanelKind = 'layers' | 'assets' | 'brands' | 'influencers' | 'components' | 'history' | 'styles' | 'ai';
+  export type LeftPanelKind = 'layers' | 'assets' | 'influencers' | 'components' | 'history' | 'styles' | 'ai';
 </script>
 
 <script lang="ts">
   import { _ } from 'svelte-i18n';
   import ProjectDragPanel from './ProjectDragPanel.svelte';
   import InfluencersPanel from './InfluencersPanel.svelte';
-  import BrandsPanel from './BrandsPanel.svelte';
   import LayersPanel from './LayersPanel.svelte';
   import PagesList from './PagesList.svelte';
   import type { ComponentProps } from 'svelte';
@@ -23,7 +22,7 @@
   import { PANEL_WIDTHS } from '$lib/shell-nav';
 
   /**
-   * IL PANNELLO ACCANTO ALLA TELA — Assets, Brands o Influencers, uno alla volta (CLAUDE.md: "One
+   * IL PANNELLO ACCANTO ALLA TELA — Assets o Influencers, uno alla volta (CLAUDE.md: "One
    * left panel at a time"). La tela resta interattiva dietro: non è un `Sheet`, è un riquadro non
    * modale che la rail apre e chiude, e da cui si trascina direttamente su `CanvasFlow`.
    *
@@ -94,8 +93,6 @@
         {/if}
       {:else if kind === 'ai'}
         <AiNodesPanel />
-      {:else if kind === 'brands'}
-        <BrandsPanel {projectId} />
       {:else}
         <ProjectDragPanel {projectId} />
       {/if}

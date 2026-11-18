@@ -5,7 +5,7 @@
  * The CLI auto-detects if a local dev server is running on localhost:5174.
  * If yes, uses it. Otherwise, uses the production URL.
  *
- * Override with: PUBLIC_APP_URL=http://my-server:3000 feega brands
+ * Override with: PUBLIC_APP_URL=http://my-server:3000 feega motion list
  */
 
 const LOCAL_URL = 'http://localhost:5173';
@@ -65,7 +65,7 @@ export async function loadEnv() {
 
   // Auto-detect: try localhost first (dev server), fall back to production
   try {
-    await fetch(`${LOCAL_URL}/api/v1/brands`, {
+    await fetch(`${LOCAL_URL}/api/v1/version`, {
       method: 'HEAD',
       signal: AbortSignal.timeout(1000),
     });

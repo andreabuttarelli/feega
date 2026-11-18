@@ -11,11 +11,8 @@ import { describe, expect, it } from 'vitest';
  * dalla rail flottante, `FloatingRail.svelte`) sta invece SEMPRE accanto alla tela aperta — è lì
  * che un trascinamento reale deve poter partire, non solo sulla pagina dedicata.
  *
- * Il vecchio pannello (`brand-agent/AssetsPanel`) è del brand, non del progetto — un progetto può
- * non averne uno (CLAUDE.md) — e non è draggabile: era lo scaffale della vecchia chat di brand.
- * `ProjectDragPanel` lo sostituisce con materiale che si trascina davvero, con lo stesso
- * pacchetto (`assetDrag`/`brandFieldDrag`) delle pagine dedicate. `kind` sceglie Assets o Brands:
- * un pannello alla volta, non i due insieme come nella vecchia sidebar.
+ * `ProjectDragPanel` offre materiale che si trascina davvero, con lo stesso
+ * pacchetto (`assetDrag`) delle pagine dedicate.
  *
  * Si legge il sorgente: montare il pannello intero per verificare un `import` è più peso che
  * risposta.
@@ -24,15 +21,13 @@ const dir = dirname(fileURLToPath(import.meta.url));
 const leftPanel = readFileSync(join(dir, 'CanvasLeftPanel.svelte'), 'utf8');
 const panel = readFileSync(join(dir, 'ProjectDragPanel.svelte'), 'utf8');
 
-describe('il pannello sinistro della tela (Assets/Brands)', () => {
-  it('monta ProjectDragPanel, non il vecchio scaffale del brand', () => {
+describe('il pannello sinistro della tela (Assets)', () => {
+  it('monta ProjectDragPanel', () => {
     expect(leftPanel).toMatch(/ProjectDragPanel/);
-    expect(leftPanel).not.toMatch(/brand-agent\/AssetsPanel/);
   });
 
-  it('gli riceve il progetto, non il brand: un progetto può non averne uno', () => {
+  it('riceve il progetto', () => {
     expect(leftPanel).toMatch(/<ProjectDragPanel[^>]*projectId/);
-    expect(leftPanel).toMatch(/<BrandsPanel[^>]*projectId/);
   });
 
   it('costruisce il pacchetto pieno con lo stesso builder delle pagine dedicate', () => {

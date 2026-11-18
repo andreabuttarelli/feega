@@ -58,7 +58,6 @@
                 {/if}
                 <span class="scope-badge read">{$_('app.settings.apiKeys.read')}</span>
               </span>
-              <span class="scope-badge all">{$_('app.settings.apiKeys.allBrands')}</span>
             </div>
             <div class="apikey-dates">
               {$_('app.settings.apiKeys.created')}: {new Date(k.created_at).toLocaleDateString()}

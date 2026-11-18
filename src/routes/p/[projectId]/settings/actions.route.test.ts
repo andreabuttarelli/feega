@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeDb, type Call } from '$lib/server/db/fake-db';
 
-vi.mock('$lib/server/tenancy', () => ({ hasManyTenants: () => true }));
 vi.mock('$lib/server/repos/orgs', async (original) => ({
   ...(await original<object>()),
   listMemberships: async () => [{ org: { id: 'org-1', name: 'Org', slug: 'org' }, role: 'owner' }]
@@ -14,19 +13,16 @@ vi.mock('$lib/server/email', () => ({
 }));
 
 import { actions as apiKeyActions } from '$lib/server/settings/pages/api-keys';
-import { actions as dangerActions } from '$lib/server/settings/pages/danger';
 
 const USER = 'user-1';
 const ORG = 'org-1';
 const PROJECT = 'project-1';
-const BRAND = { id: 'brand-1', slug: 'acme', name: 'Acme', org_id: ORG, zernio_profile_id: 'zp-1' };
 
 type Rows = Record<string, unknown[]>;
 
-function baseRows(brandId: string | null): Rows {
+function baseRows(): Rows {
   return {
-    projects: [{ id: PROJECT, org_id: ORG, brand_id: brandId, archived_at: null }],
-    brands: [BRAND],
+    projects: [{ id: PROJECT, org_id: ORG, archived_at: null }],
     orgs_members: [{ org_id: ORG, user_id: USER, role: 'owner' }],
     orgs_invites: [{ id: 'inv-1', org_id: ORG, email: 'x@y.com', role: 'member', expires_at: '', accepted_at: null, created_at: '' }],
     orgs: [{ id: ORG, name: 'Org', stripe_customer_id: null, stripe_subscription_id: null }],
@@ -62,9 +58,9 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe('le azioni delle impostazioni leggono il progetto, non un params.brand che non esiste', () => {
-  it.each([null, BRAND.id])('crea una chiave API per l org del progetto (brand %s)', async (brandId) => {
-    const { ev, calls } = event(baseRows(brandId), { key_name: 'CI' });
+describe('le azioni delle impostazioni leggono il progetto', () => {
+  it('crea una chiave API per l org del progetto', async () => {
+    const { ev, calls } = event(baseRows(), { key_name: 'CI' });
 
     const result = await run(apiKeyActions.createApiKey, ev);
 
@@ -73,7 +69,7 @@ describe('le azioni delle impostazioni leggono il progetto, non un params.brand 
   });
 
   it('crea una chiave API per l org scelta quando il percorso non ha un progetto', async () => {
-    const { ev, calls } = event(baseRows(null), { key_name: 'CI' });
+    const { ev, calls } = event(baseRows(), { key_name: 'CI' });
     const dashboard = { ...ev, params: {} };
 
     const result = await run(apiKeyActions.createApiKey, dashboard);
@@ -83,7 +79,7 @@ describe('le azioni delle impostazioni leggono il progetto, non un params.brand 
   });
 
   it('revoca una chiave API dentro l org del progetto', async () => {
-    const { ev, calls } = event(baseRows(null), { key_id: 'k-1' });
+    const { ev, calls } = event(baseRows(), { key_id: 'k-1' });
 
     const result = await run(apiKeyActions.revokeApiKey, ev);
 
@@ -92,26 +88,15 @@ describe('le azioni delle impostazioni leggono il progetto, non un params.brand 
   });
 
   it('una chiave che il database non lascia revocare non risulta revocata', async () => {
-    const { ev } = event(baseRows(null), { key_id: 'k-of-someone-else' });
+    const { ev } = event(baseRows(), { key_id: 'k-of-someone-else' });
 
     const result = await run(apiKeyActions.revokeApiKey, ev);
 
     expect(result).toMatchObject({ status: 404, data: { apiKeyError: 'Key not found, or not yours to revoke' } });
   });
 
-  it('cancella il brand dell URL quando il nome combacia, e torna all elenco dei brand', async () => {
-    const { ev, calls } = event(baseRows(BRAND.id), { confirm: 'Acme' });
-    const withBrand = { ...ev, parent: async () => ({ brand: BRAND }) };
-
-    const outcome = await run(dangerActions.deleteBrand, withBrand).catch((e: unknown) => e);
-
-    expect(outcome).toMatchObject({ status: 303 });
-    expect(writes(calls, 'brands', 'delete')[0].filters).toContainEqual(['id', BRAND.id]);
-    expect((outcome as { location: string }).location).toBe('/app/settings/brands');
-  });
-
   it('un progetto di un altra org non si raggiunge', async () => {
-    const rows = baseRows(BRAND.id);
+    const rows = baseRows();
     rows.projects = [];
     const { ev, calls } = event(rows, { key_name: 'CI' });
 

@@ -45,15 +45,15 @@ async function stored(db: Db, id: string): Promise<StoredEmbed | null> {
   return data ? { page: await data.text(), updatedAt } : null;
 }
 
-type PlaceRow = { org_id: string; project_id: string; canvas_id: string; display_name: string | null; deleted_at: string | null; projects: { brand_id: string | null; mode: string | null } | null };
+type PlaceRow = { org_id: string; project_id: string; canvas_id: string; display_name: string | null; deleted_at: string | null; projects: { mode: string | null } | null };
 
 async function place(db: Db, id: string): Promise<EmbedPlace | null> {
-  const { data } = await db.from('nodes').select('org_id, project_id, canvas_id, display_name, deleted_at, projects(brand_id, mode)').eq('id', id).eq('type', 'motion').maybeSingle();
+  const { data } = await db.from('nodes').select('org_id, project_id, canvas_id, display_name, deleted_at, projects(mode)').eq('id', id).eq('type', 'motion').maybeSingle();
   const row = data as PlaceRow | null;
   if (!row?.projects) {
     return null;
   }
-  return { orgId: row.org_id, projectId: row.project_id, canvasId: row.canvas_id, brandId: row.projects.brand_id, title: row.display_name ?? DEFAULT_TITLE, mode: modeOf(row.projects.mode), deleted: row.deleted_at !== null };
+  return { orgId: row.org_id, projectId: row.project_id, canvasId: row.canvas_id, title: row.display_name ?? DEFAULT_TITLE, mode: modeOf(row.projects.mode), deleted: row.deleted_at !== null };
 }
 
 async function revisionAt(db: Db, at: EmbedPlace, id: string, when: string) {
@@ -70,7 +70,7 @@ export function rebuildPorts(db: Db): RebuildPorts {
     input: async (at, doc) => {
       const [assets, tokens] = await Promise.all([
         motionAssets({ db, orgId: at.orgId, projectId: at.projectId, canvasId: at.canvasId, sign: serviceSigner(db) }, SIGNED_URL_TTL_S.agentPreview),
-        motionTokens(db, { orgId: at.orgId, brandId: at.brandId })
+        motionTokens()
       ]);
       return { doc, tokens, assetUrls: assetUrls(assets), title: at.title, fetchBlob };
     },

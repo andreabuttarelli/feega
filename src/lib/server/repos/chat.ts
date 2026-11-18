@@ -37,7 +37,7 @@ export type PromptTurn = { role: Turn['role']; content: string };
 
 export async function openThread(
   db: Db,
-  input: { orgId: string; projectId: string; userId: string; brandId?: string | null }
+  input: { orgId: string; projectId: string; userId: string }
 ): Promise<string> {
   const { data: existing } = await db
     .from('chat_threads')
@@ -59,7 +59,6 @@ export async function openThread(
     .insert({
       org_id: input.orgId,
       project_id: input.projectId,
-      brand_id: input.brandId ?? null,
       created_by: input.userId,
       surface: SIDEBAR_SURFACE,
       title: 'Project'
@@ -77,7 +76,7 @@ export const MOTION_SURFACE = 'motion';
 
 export async function openNodeThread(
   db: Db,
-  input: { orgId: string; projectId: string; nodeId: string; userId: string; brandId?: string | null }
+  input: { orgId: string; projectId: string; nodeId: string; userId: string }
 ): Promise<string> {
   const { data: existing } = await db
     .from('chat_threads')
@@ -100,7 +99,6 @@ export async function openNodeThread(
       org_id: input.orgId,
       project_id: input.projectId,
       node_id: input.nodeId,
-      brand_id: input.brandId ?? null,
       created_by: input.userId,
       surface: MOTION_SURFACE,
       title: 'Frame'

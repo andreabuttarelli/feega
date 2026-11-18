@@ -7,7 +7,7 @@ const state = vi.hoisted(() => ({ pending: [] as Promise<unknown>[], agent: vi.f
 vi.mock('$lib/server/background-work', () => ({ runInBackground: (work: () => Promise<unknown>) => state.pending.push(work()) }));
 vi.mock('$lib/server/canvas/comment-agent-http', () => ({ httpAgent: () => state.agent }));
 vi.mock('$lib/server/repos/orgs', async (original) => ({ ...(await original<object>()), listMemberships: async () => [{ orgId: 'org' }], listMembers: async () => [] }));
-vi.mock('$lib/server/canvas/lookup', () => ({ findCanvasForUser: async () => ({ orgId: 'org', mode: 'standard', canvas: { id: 'c', projectId: 'p' }, projectBrandId: null }) }));
+vi.mock('$lib/server/canvas/lookup', () => ({ findCanvasForUser: async () => ({ orgId: 'org', mode: 'standard', canvas: { id: 'c', projectId: 'p' }, }) }));
 
 const { actions } = await import('./canvas-page');
 

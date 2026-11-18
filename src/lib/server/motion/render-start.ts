@@ -10,7 +10,7 @@ import { withShapedText } from './shaped-compose';
 import { motionRenderFarm, motionRenderStorage } from './renderer';
 import { RenderRefusal, renderRequest, startBatch, startRender, type BatchRow, type BatchStart, type RenderScope, type RenderStart } from './render-run';
 
-export type FarmStart = { orgId: string; projectId: string; canvasId: string; nodeId: string; userId: string; brandId: string | null; editorUrl: string; head: { version: number; doc: MotionDoc }; settings: RenderSettings };
+export type FarmStart = { orgId: string; projectId: string; canvasId: string; nodeId: string; userId: string; editorUrl: string; head: { version: number; doc: MotionDoc }; settings: RenderSettings };
 
 const CLOSED = { ok: false, error: RenderRefusal.Closed, detail: SERVER_RENDER_UNAVAILABLE } as const;
 
@@ -21,7 +21,7 @@ export async function startFarmRender(db: Db, input: FarmStart): Promise<RenderS
 
   const [assets, tokens] = await Promise.all([
     motionAssets({ db, orgId: input.orgId, projectId: input.projectId, canvasId: input.canvasId }, SIGNED_URL_TTL_S.render),
-    motionTokens(db, { orgId: input.orgId, brandId: input.brandId })
+    motionTokens()
   ]);
   const soundIds = clipsOf(input.head.doc).map((c) => String(c.props.assetId ?? ''));
   const analyses = await analyzeSounds(storageAnalysis(db), { orgId: input.orgId, projectId: input.projectId }, assets, soundIds);

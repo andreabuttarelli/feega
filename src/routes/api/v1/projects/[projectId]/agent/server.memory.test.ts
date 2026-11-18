@@ -61,7 +61,6 @@ vi.mock('$lib/server/llm', () => ({
 vi.mock('$lib/server/ai-log', () => ({
   extractSdkUsage: () => ({}),
   logAiCall: (entry: { model?: string }) => calls.logged.push(entry),
-  withBrandContext: (_id: string, fn: () => void) => fn(),
   withOrgContext: (_id: string, fn: () => void) => fn()
 }));
 vi.mock('$lib/server/repos/profiles', () => ({ readAgentMemory: async (_db: unknown, userId: string) => { memory.reads.push(userId); return memory.value; } }));
@@ -69,7 +68,7 @@ vi.mock('$lib/server/cli-auth', () => ({ gateAiAction: async () => null, gateOrg
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
 vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/repos/canvas')>()), listCanvases: async () => [{ id: 'c-open', projectId: 'p-1', name: 'Prima tela', viewport: null }] }));
 vi.mock('$lib/server/projects/lookup', () => ({
-  findReachableProject: async () => ({ orgId: 'org-1', project: { id: 'p-1', name: 'P', brandId: null } })
+  findReachableProject: async () => ({ orgId: 'org-1', project: { id: 'p-1', name: 'P', } })
 }));
 vi.mock('$lib/server/repos/chat', () => ({
   openThread: async () => 'thread-1',
@@ -78,7 +77,6 @@ vi.mock('$lib/server/repos/chat', () => ({
   saveTurn: async () => undefined
 }));
 vi.mock('$lib/server/project-agent/project-tools', () => ({ createProjectTools: () => ({}) }));
-vi.mock('$lib/server/project-agent/tool-surface', () => ({ openAgentTools: async () => ({ tools: {}, close: async () => undefined }) }));
 
 const { POST } = await import('./+server');
 

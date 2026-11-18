@@ -9,8 +9,7 @@ type PageModule = { load: PageHandler; actions: object };
 
 const MODULES: Record<ProjectPage, () => Promise<PageModule>> = {
   [ProjectPage.Assets]: () => import('$lib/server/project-pages/assets') as Promise<PageModule>,
-  [ProjectPage.Influencers]: () => import('$lib/server/project-pages/influencers') as Promise<PageModule>,
-  [ProjectPage.BrandNew]: () => import('$lib/server/project-pages/brand-new') as Promise<PageModule>
+  [ProjectPage.Influencers]: () => import('$lib/server/project-pages/influencers') as Promise<PageModule>
 };
 
 type Params = { projectId: string; page: string };

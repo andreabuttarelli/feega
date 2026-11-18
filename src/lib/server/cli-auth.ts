@@ -9,13 +9,6 @@ import { hasAiKey } from '$lib/local-ai-keys';
 import { ProductEvent, track } from '$lib/server/product-events/track';
 import { scopesOfHolder } from '$lib/server/api-key-holder';
 
-/**
- * The new `api_keys` (org_id NOT NULL, scopes: string[]) has no per-brand scoping column — a key
- * is now good for every brand of ONE org, not a chosen list. `permissions.brand_ids` has no
- * successor: brand-level API key scoping is a genuine product gap on this schema, not something
- * repointed here — see the task report. `checkApiKeyBrandAccess` below checks org membership,
- * the only scoping the schema can still express.
- */
 export interface ApiKeyInfo {
   id: string;
   name: string;
@@ -135,51 +128,15 @@ async function authenticateApiKey(token: string) {
     scopes
   };
 
-  // Service-role client: it bypasses RLS, so the ownership check RLS would have done has to be
-  // redone by hand. Registering the identity here is what lets loadBrandForUser do it — the alternative
-  // (remembering a permission call in each of ~60 routes) is what left the tenant boundary open.
   const supabase = createClient(publicEnv.PUBLIC_SUPABASE_URL, adminKey, {
     auth: { persistSession: false, autoRefreshToken: false }
   });
-  apiKeyIdentity.set(supabase, { userId: keyRow.user_id, apiKey });
 
   return {
     supabase,
     user: { id: keyRow.user_id },
     apiKey
   };
-}
-
-/**
- * Who is behind a service-role client handed out for an API key. Keyed by the client itself so the
- * check lands in loadBrandForUser without changing every call site.
- */
-const apiKeyIdentity = new WeakMap<SupabaseClient, { userId: string; apiKey: ApiKeyInfo }>();
-
-/**
- * Mirrors the RLS org_isolation predicate: brands of every org this user belongs to (any role —
- * `brand_members` has no successor on the new schema, so membership is org-wide, not per-brand).
- */
-async function accessibleBrandIds(admin: SupabaseClient, userId: string): Promise<string[]> {
-  const { data: memberships } = await admin.from('orgs_members').select('org_id').eq('user_id', userId);
-  const orgIds = (memberships ?? []).map((m: any) => m.org_id);
-  if (!orgIds.length) return [];
-
-  const { data } = await admin.from('brands').select('id').in('org_id', orgIds);
-  return (data ?? []).map((b: any) => b.id);
-}
-
-/**
- * Brand ids this request is allowed to touch — the user's own brands narrowed to the key's org.
- * Returns null for JWT auth, where the client is already RLS-scoped and no filtering is needed.
- */
-export async function apiKeyBrandIds(supabase: SupabaseClient): Promise<string[] | null> {
-  const identity = apiKeyIdentity.get(supabase);
-  if (!identity) return null;
-  const owned = await accessibleBrandIds(supabase, identity.userId);
-  const { data } = await supabase.from('brands').select('id').eq('org_id', identity.apiKey.org_id);
-  const inKeyOrg = new Set((data ?? []).map((b: any) => b.id));
-  return owned.filter((id) => inKeyOrg.has(id));
 }
 
 /** Hash an API key with SHA-256, returns hex string. */
@@ -201,20 +158,6 @@ export async function generateApiKey(): Promise<{ raw: string; hash: string; pre
 }
 
 // ── API Key permission helpers ─────────────────────────────────
-
-/**
- * Check if an API key has access to a specific brand — i.e. the brand's org is the key's org.
- * Returns undefined if allowed, or a 403 Response if denied.
- * For JWT auth (no apiKey), this is a no-op — RLS handles it.
- */
-export function checkApiKeyBrandAccess(
-  apiKey: ApiKeyInfo | undefined,
-  brand: { org_id: string }
-): Response | undefined {
-  if (!apiKey) return undefined; // JWT auth — RLS handles it
-  if (brand.org_id === apiKey.org_id) return undefined;
-  return json({ error: 'API key does not have access to this brand' }, { status: 403 });
-}
 
 /**
  * Check if an API key has write permission.
@@ -256,32 +199,6 @@ async function creditGateOutcome(spend: () => Promise<void>): Promise<CreditGate
   return undefined;
 }
 
-/**
- * Gate an AI-spending CLI action: credits left (free matches Go for feature access).
- * Returns undefined if allowed, or the Response to return.
- */
-export async function gateAiAction(
-  brand: { id: string; plan?: unknown },
-  apiKey: ApiKeyInfo | undefined
-): Promise<Response | undefined> {
-  const write = checkApiKeyWriteAccess(apiKey);
-  if (write) return write;
-
-  const { gateCredits } = await import('./credits');
-  const denial = await creditGateOutcome(() => gateCredits(brand.id));
-  return denial ? json(denial.data, { status: denial.status }) : undefined;
-}
-
-/** Lo stesso cancello di gateAiAction, per una form action: nessuna Response, un esito per fail(). */
-export async function gateAiActionForForm(brandId: string): Promise<CreditGateDenial | undefined> {
-  const { gateCredits } = await import('./credits');
-  return creditGateOutcome(() => gateCredits(brandId));
-}
-
-/**
- * Lo stesso cancello per un'azione che un brand non ce l'ha: paga l'organizzazione, e senza questo
- * la strada nuova sarebbe l'unica del prodotto a spendere senza controllare il saldo.
- */
 export async function gateOrgAiAction(
   orgId: string,
   apiKey: ApiKeyInfo | undefined
@@ -300,16 +217,6 @@ export async function gateOrgAiActionForForm(orgId: string): Promise<CreditGateD
   return creditGateOutcome(() => gateOrgCredits(orgId));
 }
 
-/**
- * Una chiave API vale sempre per una sola org (`api_keys.org_id`, NOT NULL sul nuovo schema): la
- * vecchia distinzione fra "tutti i brand" e "solo alcuni" non ha più una colonna da cui leggersi,
- * e con essa il rifiuto in `orgScopeFor` — una chiave qualunque ORA ha un'org sola e ben definita,
- * la propria, quindi passa sempre; era il caso "* " di prima, non quello ristretto.
- */
-export function apiKeyIsBrandScoped(_apiKey: ApiKeyInfo | undefined): boolean {
-  return false;
-}
-
 export type OrgScope = {
   supabase: SupabaseClient;
   user: { id: string; email?: string };
@@ -319,18 +226,6 @@ export type OrgScope = {
   apiKey?: ApiKeyInfo;
 };
 
-/**
- * L'ingresso di OGNI rotta che genera senza un brand, in un posto solo — perché le domande che una
- * strada senza brand solleva hanno una risposta sola, e scritta quattro volte divergerebbe al
- * primo cambio:
- *
- *   chi paga         →  l'organizzazione dell'utente, con la stessa regola con cui atterra un
- *                       brand nuovo (pagante prima, poi la più vecchia). Nessuna → ci si ferma.
- *                       Andrea ha visto agenti scegliere un brand a caso pur di avere un addebito
- *                       che nessuno controlla: è il motivo per cui questa strada esiste.
- *   chiave ristretta →  si RIFIUTA, non si allarga: è una restrizione che l'utente ha scelto.
- *   crediti          →  lo stesso cancello del brand, sul saldo dell'organizzazione.
- */
 export async function openOrgScope(
   request: Request
 ): Promise<{ scope: OrgScope; error?: undefined } | { scope?: undefined; error: Response }> {
@@ -384,110 +279,25 @@ export async function orgScopeFor(
   };
 }
 
-/**
- * Lo stile di un brand chiesto dove un brand non c'è. Un default silenzioso consegnerebbe qualcosa
- * che nessuno ha chiesto: qui si dice la mossa, identica su ogni rotta che accetta il campo.
- */
-export function brandStyleRefusal(brandStyle: string | undefined): Response | undefined {
-  if (!brandStyle) return undefined;
+export type OrgCall = {
+  supabase: SupabaseClient;
+  user: { id: string; email?: string };
+  orgId: string;
+  apiKey?: ApiKeyInfo;
+};
 
-  return json(
-    {
-      error: 'brand_style_needs_a_brand',
-      reason:
-        'brand_style governs a brand look, and no brand was named — pass a slug, or drop brand_style.'
-    },
-    { status: 400 }
-  );
-}
-
-/**
- * The columns loadBrandForUser selects — typed, so callers don't get `unknown` everywhere.
- *
- * `status`, `plan`, `timezone`, `target_platforms`, `launched_at`, `content_prefs`, `setup_step`,
- * `setup_completed_at`, `zernio_profile_id`, `ads_settings` are NOT columns on the new `brands`
- * (verified against database.types.ts — it has only id, org_id, name, slug, website,
- * short_description, content, palette, target, logo_url, created_at, updated_at). They stay in
- * the type with safe defaults below so the ~60 call sites across api/v1/brands/[slug]/** that
- * read them still compile; their RUNTIME behavior against fields the database no longer has is a
- * separate, much larger defect than the auth path fixed here — see the task report.
- */
-export type CliBrand = {
-  id: string;
-  org_id: string;
-  name: string;
-  slug: string;
-  status: string;
-  plan: string | null;
-  timezone: string;
-  target_platforms: string[] | null;
-  launched_at: string | null;
-  content_prefs: Record<string, unknown> | null;
-  setup_step: string | null;
-  setup_completed_at: string | null;
-  zernio_profile_id: string | null;
-  ads_settings: unknown;
-} & Record<string, unknown>;
-
-const CLI_BRAND_DEFAULTS = {
-  status: 'active',
-  plan: null,
-  timezone: 'Europe/Rome',
-  target_platforms: null,
-  launched_at: null,
-  content_prefs: null,
-  setup_step: null,
-  setup_completed_at: null,
-  zernio_profile_id: null,
-  ads_settings: null
-} as const;
-
-/**
- * Load a brand by slug, verifying it belongs to the authenticated user via RLS.
- *
- * API-key requests run as service-role (RLS bypassed), so when `apiKey` is present the tenant
- * boundary is re-applied by hand: the brand's org must be the key's org — the only scoping the
- * new `api_keys` can still express (see ApiKeyInfo's doc). 404 (not 403) — an API key must not
- * be able to probe which slugs exist.
- */
-export async function loadBrandForUser(
-  supabase: SupabaseClient,
-  slug: string,
-  apiKey?: ApiKeyInfo | undefined
-): Promise<{ brand: CliBrand; error?: undefined }
-  | { brand?: undefined; error: Response }
-> {
-  // Service-role (API key) can see every row for a slug; JWT+RLS usually returns one.
-  // Never maybeSingle() here — duplicate trial rows for the same slug exist in prod.
-  const { data: rows, error } = await supabase.from('brands').select('id, org_id, name, slug').eq('slug', slug);
-
-  if (error || !rows?.length) {
-    return { error: json({ error: 'Brand not found' }, { status: 404 }) };
+export async function openOrg(
+  request: Request
+): Promise<{ call: OrgCall; error?: undefined } | { call?: undefined; error: Response }> {
+  const { supabase, user, apiKey, error } = await authenticate(request);
+  if (error) {
+    return { error };
   }
 
-  let candidates = (rows as { id: string; org_id: string; name: string; slug: string }[]).map(
-    (row) => ({ ...CLI_BRAND_DEFAULTS, ...row }) as CliBrand
-  );
-
-  // API-key path: the client bypassed RLS, so re-apply the tenant boundary by hand.
-  if (apiKey) {
-    candidates = candidates.filter((brand) => !checkApiKeyBrandAccess(apiKey, brand));
+  const orgId = apiKey ? apiKey.org_id : (await activeOrgOf(supabase, user as User)).orgId;
+  if (!orgId) {
+    return { error: json({ error: 'no_organization' }, { status: 500 }) };
   }
 
-  // Defense in depth: catches callers that forgot to pass `apiKey` while the client is still
-  // registered in the API-key identity map. No-op for JWT and for callers that passed apiKey.
-  const allowed = await apiKeyBrandIds(supabase);
-  if (allowed) {
-    candidates = candidates.filter((b) => allowed.includes(b.id));
-  }
-
-  if (!candidates.length) {
-    return { error: json({ error: 'Brand not found' }, { status: 404 }) };
-  }
-
-  // Used to prefer the live brand on a slug collision (active > trial, launched first) via
-  // status/launched_at/plan — none of those columns exist on the new `brands` (see CliBrand's
-  // doc), so a collision now returns whichever row the query happens to return first. Slugs are
-  // unique in practice; this is a real loss of a tiebreak, not a bug introduced here.
-  return { brand: candidates[0] };
+  return { call: { supabase, user, orgId, apiKey } };
 }

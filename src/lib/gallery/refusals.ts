@@ -5,23 +5,18 @@ import { Capability, MODE_ALLOWS, modeAllows, type ProjectMode } from '$lib/proj
 export enum PublishRefusal {
   Uncensored = 'uncensored_not_publishable',
   RealBrandScript = 'real_brand_not_publishable',
-  BrandLogo = 'brand_logo_not_publishable',
   SiteMaterial = 'site_material_not_publishable',
   Empty = 'empty_video'
 }
 
 export type PublishFacts = {
   mode: ProjectMode;
-  hasBrand: boolean;
   doc: MotionDoc;
   siteAssetIds: ReadonlySet<string>;
 };
 
 type Rule = { refusal: PublishRefusal; message: string; applies: (facts: PublishFacts) => boolean };
 
-const LOGO_COMPONENTS = new Set(['Logo', 'Logo3D']);
-
-const isLogo = (clip: MotionClip) => LOGO_COMPONENTS.has(clip.component);
 const usesAsset = (clip: MotionClip, id: string) => JSON.stringify([clip.props, clip.mask, clip.maskStack]).includes(JSON.stringify(id));
 
 const RULES: readonly Rule[] = [
@@ -39,11 +34,6 @@ const RULES: readonly Rule[] = [
     refusal: PublishRefusal.RealBrandScript,
     message: 'This video tells the story of a real brand: only invented brands and generic videos go to the gallery.',
     applies: (f) => f.doc.script?.brand === BrandKind.Real
-  },
-  {
-    refusal: PublishRefusal.BrandLogo,
-    message: "This video shows the project brand's logo: remove it, or use an invented logo, before publishing.",
-    applies: (f) => f.hasBrand && everyClip(f.doc).some((c) => isLogo(c) && !c.props.assetId)
   },
   {
     refusal: PublishRefusal.SiteMaterial,

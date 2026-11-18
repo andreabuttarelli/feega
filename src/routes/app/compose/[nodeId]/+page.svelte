@@ -14,8 +14,6 @@
   import PageHead from '$lib/components/PageHead.svelte';
   import PublishDialog from '$lib/components/gallery/PublishDialog.svelte';
   import RemixBanner from '$lib/components/gallery/RemixBanner.svelte';
-  import { goto } from '$app/navigation';
-  import { BRAND_PARAM } from '$lib/gallery/model';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
   import StudioParamControl from '$lib/components/canvas/StudioParamControl.svelte';
@@ -251,7 +249,7 @@
 
 <div class="compose" data-testid="compose-editor">
   {#if data.gallery.remixOf}
-    <RemixBanner origin={data.gallery.remixOf} onbrand={() => goto(`${data.editorUrl}?${BRAND_PARAM}=1`)} />
+    <RemixBanner origin={data.gallery.remixOf} />
   {/if}
   <header class="bar">
     <a class="back" href={`/app/compose?project=${data.projectId}`}>Compositions</a>
@@ -330,7 +328,7 @@
               {/each}
             </ul>
           {:else}
-            <p class="muted">No images or videos in this project yet. Upload some, or make them on a canvas or in the Photo studio.</p>
+            <p class="muted">No images or videos in this project yet. Upload some, or make them on a canvas.</p>
           {/if}
           {#if current.media.length}
             <button type="button" class="link" onclick={() => change({ ...current, media: [] })}><X size={12} /> Clear selection</button>
@@ -352,7 +350,7 @@
           <ControlRow label="Background" layout={ControlLayout.Inline}>
             <ColorField label="Background" value={current.background} onchange={(v) => change({ ...current, background: String(v) })} />
           </ControlRow>
-          <ControlRow label={`Logo${data.tokens.logoUrl ? '' : ' (no brand logo)'}`} layout={ControlLayout.Inline}>
+          <ControlRow label={`Logo${data.tokens.logoUrl ? '' : ' (no logo)'}`} layout={ControlLayout.Inline}>
             <Switch label="Logo" value={current.logo} disabled={!data.tokens.logoUrl} onchange={(v) => change({ ...current, logo: v === true })} />
           </ControlRow>
         </section>

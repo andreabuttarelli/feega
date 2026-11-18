@@ -1,7 +1,7 @@
 import type { Db } from '$lib/server/db/client';
 import { listProjects } from '$lib/server/repos/projects';
-import { listRecentBatches, listRecentCanvases, listRecentImages, listRecentNodes, type RecentNode } from '$lib/server/repos/dashboard';
-import { signedAssets } from '$lib/server/studio/studio-media';
+import { listRecentCanvases, listRecentImages, listRecentNodes, type RecentNode } from '$lib/server/repos/dashboard';
+import { signedAssets } from '$lib/server/dashboard/signed-assets';
 import { canvasPath } from '$lib/server/tenancy/entry';
 import { motionEditorPath, motionOf } from '$lib/canvas/motion-node';
 import type { MotionFormat } from '@feega/motion-core/motion/doc';
@@ -11,7 +11,6 @@ export type DashboardDeps = {
   listProjects: typeof listProjects;
   listRecentCanvases: typeof listRecentCanvases;
   listRecentImages: typeof listRecentImages;
-  listRecentBatches: typeof listRecentBatches;
   listRecentNodes: typeof listRecentNodes;
   signImages: (db: Db, orgId: string, ids: string[]) => Promise<Record<string, string | null>>;
   signVideos: (db: Db, orgId: string, ids: string[]) => Promise<Record<string, string | null>>;
@@ -21,7 +20,6 @@ export const DASHBOARD_DEPS: DashboardDeps = {
   listProjects,
   listRecentCanvases,
   listRecentImages,
-  listRecentBatches,
   listRecentNodes,
   signImages: async (db, orgId, ids) => (await signedAssets(db, orgId, ids, 'pickerTile')).urls,
   signVideos: async (db, orgId, ids) => (await signedAssets(db, orgId, ids)).urls
@@ -38,7 +36,6 @@ export type DashboardProject = {
   posters: string[];
 };
 
-export type DashboardBatch = { id: string; name: string; status: string; createdAt: string; projectName: string; href: string };
 
 export type DashboardMotion = {
   id: string;
@@ -53,7 +50,7 @@ export type DashboardMotion = {
 
 export type DashboardCanvas = { id: string; name: string; projectName: string; updatedAt: string; href: string; thumbs: string[] };
 
-export type Dashboard = { canvases: DashboardCanvas[]; projects: DashboardProject[]; batches: DashboardBatch[]; motions: DashboardMotion[]; moreVideos: string | null };
+export type Dashboard = { canvases: DashboardCanvas[]; projects: DashboardProject[]; motions: DashboardMotion[]; moreVideos: string | null };
 
 export type VideoPage = { videos: DashboardMotion[]; more: string | null };
 
@@ -154,17 +151,15 @@ export async function recentCanvasesFor(db: Db, deps: DashboardDeps, orgId: stri
 }
 
 export async function dashboardFor(db: Db, deps: DashboardDeps, orgId: string): Promise<Dashboard> {
-  const [allProjects, canvases, images, batches, motionNodes] = await Promise.all([
+  const [allProjects, canvases, images, motionNodes] = await Promise.all([
     deps.listProjects(db, orgId),
     deps.listRecentCanvases(db, { orgId, limit: CANVAS_SCAN }),
     deps.listRecentImages(db, { orgId, limit: IMAGE_SCAN }),
-    deps.listRecentBatches(db, { orgId, limit: OUTPUT_LIMIT * 2 }),
     deps.listRecentNodes(db, { orgId, type: 'motion', limit: MOTION_SCAN })
   ]);
 
   const projects = allProjects.filter((p) => p.mode === ProjectMode.Standard).slice(0, PROJECT_LIMIT);
   const names = new Map(projects.map((p) => [p.id, p.name]));
-  const visible = <T extends { projectId: string }>(rows: T[]) => rows.filter((r) => names.has(r.projectId)).slice(0, OUTPUT_LIMIT);
 
   const canvasesOf = firstPer(canvases, byProject, CANVASES_PER_PROJECT);
   const imagesOf = firstPer(images.filter((i) => names.has(i.projectId)), byProject, THUMBS_PER_PROJECT);
@@ -190,14 +185,6 @@ export async function dashboardFor(db: Db, deps: DashboardDeps, orgId: string): 
       thumbs: (imagesOf.get(p.id) ?? []).map((i) => urls[i.id]).filter(present),
       videoCount: ownMotions.filter((n) => n.projectId === p.id).length,
       posters: (postersOf.get(p.id) ?? []).map((n) => urls[posterIdOf(n)!]).filter(present)
-    })),
-    batches: visible(batches).map((b) => ({
-      id: b.id,
-      name: b.name,
-      status: b.status,
-      createdAt: b.createdAt,
-      projectName: names.get(b.projectId)!,
-      href: `/app/studio/${b.id}`
     })),
     motions: motions.map((n) => cardOf(n, names.get(n.projectId)!, urls, videos)),
     moreVideos: more

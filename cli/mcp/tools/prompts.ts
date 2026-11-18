@@ -4,8 +4,7 @@ import { request } from '../../lib/api.ts';
 import { withAuth } from '../util.ts';
 
 /**
- * RISCRIVERE UN BRIEF NELLA FORMA CHE UN MODELLO VUOLE — `/api/v1/prompts/enhance`, org-scoped,
- * senza brand: la stessa ragione di `/api/v1/images`, non chiede a quale azienda addebitarlo.
+ * RISCRIVERE UN BRIEF NELLA FORMA CHE UN MODELLO VUOLE — `/api/v1/prompts/enhance`, org-scoped.
  */
 const org = z.string().optional().describe('Which org, if you belong to more than one.');
 

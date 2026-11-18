@@ -17,7 +17,7 @@ function sharedDb() {
         { id: 'canvas-1', org_id: 'org-1', project_id: 'project-1', name: 'Launch', share_token: 'tok-live', deleted_at: null },
         { id: 'canvas-2', org_id: 'org-1', project_id: 'project-1', name: 'Private', share_token: null, deleted_at: null }
       ],
-      projects: [{ id: 'project-1', org_id: 'org-1', mode: 'standard', brand_id: null }],
+      projects: [{ id: 'project-1', org_id: 'org-1', mode: 'standard', }],
       nodes: [node('f1', 'canvas-1'), node('el', 'canvas-1', 'element'), node('img', 'canvas-1', 'image'), node('gone', 'canvas-1', 'motion', '2026-09-01T00:00:00Z'), node('secret', 'canvas-2')],
       motion_revisions: [revision('f1', 2), revision('el', 1), revision('secret', 1), revision('gone', 1)],
       assets: [],

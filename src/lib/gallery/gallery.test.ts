@@ -24,7 +24,7 @@ function demo(): MotionDoc {
   return { ...doc, assets: [{ id: LOGO_ASSET, kind: 'image', name: 'logo' }] };
 }
 
-const facts = (over: Partial<PublishFacts> = {}): PublishFacts => ({ mode: ProjectMode.Standard, hasBrand: false, doc: demo(), siteAssetIds: new Set(), ...over });
+const facts = (over: Partial<PublishFacts> = {}): PublishFacts => ({ mode: ProjectMode.Standard, doc: demo(), siteAssetIds: new Set(), ...over });
 
 describe('the gallery item', () => {
   it('reads kind, format and seconds from the doc', () => {
@@ -77,12 +77,6 @@ describe('what never goes to the gallery', () => {
   it('an invented brand goes', () => {
     const doc = { ...demo(), script: { brand: BrandKind.Fictional } } as MotionDoc;
     expect(publishRefusal(facts({ doc }))).toBeNull();
-  });
-
-  it('no logo picked from the project brand', () => {
-    const doc = must(addClip(demo(), { component: 'Logo', from: 0, durationInFrames: 30, props: { assetId: '' } }, 'brand-logo'));
-    expect(publishRefusal(facts({ doc, hasBrand: true }))?.refusal).toBe(PublishRefusal.BrandLogo);
-    expect(publishRefusal(facts({ doc, hasBrand: false }))).toBeNull();
   });
 
   it('no logo or picture imported from a website', () => {

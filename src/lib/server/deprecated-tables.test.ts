@@ -69,7 +69,7 @@ describe('deprecated tables', () => {
 	 */
 	it('non tocca le code né le funzionalità vive ma mai usate', () => {
 		const marked = new Set(commented().map((c) => c.table));
-		for (const alive of ['org_usage', 'ad_campaigns']) {
+		for (const alive of ['org_usage']) {
 			expect(marked.has(alive)).toBe(false);
 		}
 	});

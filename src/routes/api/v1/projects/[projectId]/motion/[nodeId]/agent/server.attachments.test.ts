@@ -4,7 +4,7 @@ import { fakeDb } from '$lib/server/db/fake-db';
 const world = vi.hoisted(() => ({ db: null as unknown, turns: [] as Record<string, unknown>[] }));
 
 vi.mock('$lib/server/motion/agent-scope', () => ({
-  motionAgentScope: async () => ({ db: world.db, user: { id: 'u-1' }, orgId: 'org-1', project: { id: 'p-1', brandId: null }, motion: { record: { id: 'n-1' } } })
+  motionAgentScope: async () => ({ db: world.db, user: { id: 'u-1' }, orgId: 'org-1', project: { id: 'p-1', }, motion: { record: { id: 'n-1' } } })
 }));
 vi.mock('$lib/server/cli-auth', () => ({ gateOrgAiAction: async () => null }));
 vi.mock('$lib/server/chat-model/catalogue', async (importOriginal) => ({

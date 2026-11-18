@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { BrandEndpoint } from './index';
+import type { OrgEndpoint } from './index';
 import { QUERY_TABLES } from './query-tables';
 
 export const QUERY_TABLE_NAMES = QUERY_TABLES.split(' ') as [string, ...string[]];
@@ -32,8 +32,8 @@ export const QUERY_DATABASE = {
   tool: 'query',
   title: 'Query the database',
   description:
-    'READ THE BRAND: this is the read tool. Posts, media, articles, memory, competitors, products, ' +
-    'plans, settings, audits — every table, AS YOU. The request runs with the anon key plus your own ' +
+    'READ THE WORKSPACE: this is the read tool. Projects, canvases, nodes, assets, runs, ' +
+    'chats, settings — every table, AS YOU. The request runs with the anon key plus your own ' +
     'session, so Postgres RLS returns exactly the rows you would see in the app, and nothing more. ' +
     'READ ONLY: there is no SQL here. You name a table, columns and filters, and it issues one ' +
     'PostgREST read, so a write has nowhere to go. Omit `table` to list every table you can name. ' +
@@ -49,10 +49,9 @@ export const QUERY_DATABASE = {
     'named in `limits` on the way back; none of them is silent. ONE ROW IS A DOCUMENT: with ' +
     '`limit: 1` long text comes back whole, which is how you read an article before rewriting it. ' +
     'With many rows long values are cut at 2,000 chars and `limits` says in which columns. ' +
-    'What this brand SELLS is the `products` table: one row per offer, with `title`, `kind`, ' +
-    '`pricing`, `url`, `featured` and the `images` it carries. Free.',
+    'Free.',
   method: 'POST',
-  pathUnderBrand: '/query',
+  path: '/org/query',
   input: z
     .object({
       table: z
@@ -109,4 +108,4 @@ export const QUERY_DATABASE = {
   }),
   failures: [],
   destructive: false
-} satisfies BrandEndpoint;
+} satisfies OrgEndpoint;

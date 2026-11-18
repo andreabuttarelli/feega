@@ -33,7 +33,7 @@ export function registerGalleryTools(server: McpServer) {
       description:
         'Remix a gallery item, free: copies its video and files into a new `motion` node of `project_id` (on `canvas_id`, or on the Motion canvas), ' +
         'with its main texts, colours, logo and media exposed as fields. Returns `node_id` and `editor_url`. ' +
-        'Then offer to put the user brand on it with `ask_motion_agent`.',
+        'Then offer to adapt it to the user with `ask_motion_agent`.',
       inputSchema: z.object({ org, item_id: z.string(), project_id: z.string(), canvas_id: z.string().optional() }),
       annotations: { readOnlyHint: false, destructiveHint: false }
     },

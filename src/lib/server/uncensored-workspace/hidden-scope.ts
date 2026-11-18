@@ -22,9 +22,7 @@ const SCOPE_COLUMN_OF: Readonly<Record<string, readonly [string, Key]>> = {
   nodes_connections: ['canvas_id', 'canvasIds'],
   canvas_events: ['canvas_id', 'canvasIds'],
   node_runs: ['node_id', 'nodeIds'],
-  moderation_checks: ['node_id', 'nodeIds'],
-  post_sources: ['node_id', 'nodeIds'],
-  competitor_ads: ['node_id', 'nodeIds']
+  moderation_checks: ['node_id', 'nodeIds']
 };
 
 export function exclusionsFor(table: string, hidden: HiddenScope): Array<[string, string[]]> {

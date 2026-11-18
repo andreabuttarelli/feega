@@ -128,7 +128,7 @@ bun run mcp:http
 
 <h2 id="first-calls">{$_('docs.mcp.s44')}</h2>
 <ol>
-  <li><code>query({'{'} table: "brands", columns: ["id","slug","name"] {'}'})</code> — {$_('docs.mcp.s45')}</li>
+  <li><code>query({'{'} table: "projects", columns: ["id","name"] {'}'})</code> — {$_('docs.mcp.s45')}</li>
   <li>{$_('docs.mcp.s47')}</li>
 </ol>
 <p>{$_('docs.mcp.s49')}</p>

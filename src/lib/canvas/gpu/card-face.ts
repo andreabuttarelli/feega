@@ -7,7 +7,7 @@ import type { Poster } from '../poster-lod';
 import type { GenTileView } from '../gen-tile-view';
 import type { SourceTile } from '../source-thumbs';
 import { techniqueFace } from '../technique-face';
-import { selectView, type BatchView, type NodeView, type SelectView } from '../node-view';
+import { selectView, type NodeView, type SelectView } from '../node-view';
 import { EMBED_REFUSAL_HINT, frameTabIndex, normalizeEmbedUrl, sourceOf, type IframeSource } from '../iframe-node';
 import { CODE_ENTRY, Framework, isCodeFiles, isFramework } from '../code-frame';
 
@@ -21,7 +21,6 @@ export enum Surface {
   Preview = 'preview',
   Person = 'person',
   Empty = 'empty',
-  Pick = 'pick',
   Embed = 'embed',
   Select = 'select',
   Effects = 'effects',
@@ -57,7 +56,6 @@ export type CardFace = {
   actions: string[];
   embed: EmbedFace | null;
   select: SelectView | null;
-  batch: BatchView | null;
   rows: CardRow[];
   pills: string[];
   count: string;
@@ -173,14 +171,12 @@ const FACES: Record<NodeType, Draw> = {
   social_account_feed: preview(feedTitle, 'Select the node to choose the account.', 'No posts yet. Select the node to sync.', (d) => str(d.handle).trim() !== ''),
   social_post_mockup: hollow('social_post_mockup'),
   products: preview(productsTitle, 'Select the node to enter the store address.', 'No products yet. Select the node to sync.', (d) => str(d.url).trim() !== ''),
-  ads: hollow('ads'),
   influencer: (_d, _a, _t, view) => ({ surface: Surface.Person, title: view?.source?.name ?? '', tiles: view?.source?.tiles.slice(0, 1) ?? [], count: String(view?.source?.total ?? 0) }),
   list: listFace,
   select: (d, _a, _t, view) => ({ surface: Surface.Select, select: view?.select ?? selectView(typeof d.index === 'number' ? d.index : 1, null, [], {}, false), count: String(typeof d.index === 'number' ? d.index : 1) }),
   effects: (d, _a, _t, view) => ({ surface: Surface.Effects, media: view?.media?.url ? { url: view.media.url, video: view.media.kind === 'video' } : null, subtitle: ref(d) ? '' : EFFECTS_PENDING, empty: EFFECTS_EMPTY, actions: [OPEN_EDITOR] }),
   composition: (d, asset) => ({ surface: Surface.Effects, media: ref(d) ? { url: asset(ref(d)!), video: true } : null, empty: COMPOSITION_EMPTY, actions: [COMPONENT, OPEN_EDITOR] }),
   calendar: hollow('calendar'),
-  studio_batch: (_d, _a, _t, view) => ({ surface: Surface.Pick, title: 'Open Photo studio', batch: view?.batch ?? null }),
   section: (d) => ({ surface: Surface.Section, title: str(d.title) || 'Section', tint: str(d.fill) || null }),
   technique: (d, _a, _t, view) => techniqueFace(str(d.name), view?.technique ?? null)
 };
@@ -203,7 +199,6 @@ const BLANK: CardFace = {
   actions: [],
   embed: null,
   select: null,
-  batch: null,
   rows: [],
   pills: [],
   count: '',

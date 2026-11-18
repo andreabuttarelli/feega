@@ -13,9 +13,8 @@ import { env as publicEnv } from '$env/dynamic/public';
 import { env as privateEnv } from '$env/dynamic/private';
 import type { Handle, HandleServerError, ServerInit } from '@sveltejs/kit';
 import { localModeRefusal, localSession, localStore, serveLocal } from '$lib/server/local/local-mode';
-import { withBrandContext, withToolContext } from '$lib/server/ai-log';
+import { withToolContext } from '$lib/server/ai-log';
 import { TOOL_HEADER, TOOL_HEADER_LEGACY, toolFromHeader } from '@feega/api-contracts';
-import { createAdminClient } from '$lib/server/supabase-admin';
 import { isCsrfForbidden } from '$lib/server/csrf';
 import { redirectFor } from '$lib/server/host-redirects';
 import { corsPreflight, extraOrigins, withCors } from '$lib/server/api-cors';
@@ -98,25 +97,6 @@ function isValidSessionCookie(cookie: { name: string; value: string }): boolean 
 function validSessionCookies(cookies: { name: string; value: string }[]) {
   if (cookies.every(isValidSessionCookie)) return cookies;
   return cookies.filter(({ name }) => !isSessionCookie(name));
-}
-
-// slug → brand id for the AI-credits brand context. Slugs are stable, so a per-instance cache
-// with a 10-min TTL amortises the lookup to ~once per brand per instance.
-// ponytail: in-memory Map; move to Redis only if instance churn ever makes the hit rate matter.
-const brandIdCache = new Map<string, { id: string; at: number }>();
-async function brandIdFromSlug(slug: string): Promise<string | null> {
-  const hit = brandIdCache.get(slug);
-  if (hit && Date.now() - hit.at < 600_000) return hit.id;
-  try {
-    const { data } = await createAdminClient().from('brands').select('id').eq('slug', slug).maybeSingle();
-    if (data?.id) {
-      brandIdCache.set(slug, { id: data.id as string, at: Date.now() });
-      return data.id as string;
-    }
-  } catch {
-    // no admin env (e.g. local tooling) — routes that need the context set it themselves
-  }
-  return null;
 }
 
 // Replaces kit's built-in CSRF check (disabled in svelte.config.js) so /oauth/token can opt out —
@@ -255,7 +235,7 @@ export const handle: Handle = sequence(cors, hostRedirect, marketingRedirect, cs
   }));
 
   // getSession() is local (cookie → JWT). getUser() hits GoTrue — cache it across SPA
-  // navigations on this isolate so every in-brand click is not a 300–800ms auth RTT.
+  // navigations on this isolate so every click is not a 300–800ms auth RTT.
   const verifyBearer = async (token: string) => (await import('$lib/server/nav-cache')).verifiedToken(createUserDb(token), token);
   let cachedSession: ReturnType<typeof getSession> | null = null;
   const getSession = async () => {
@@ -316,31 +296,12 @@ export const handle: Handle = sequence(cors, hostRedirect, marketingRedirect, cs
         name === 'content-range' || name === 'x-supabase-api-version'
     });
 
-  const slug = event.params.slug;
-
-  // Page-payload cache (see $lib/server/page-cache): anything that can write for this brand
-  // drops its cached pages, so the next navigation re-reads. Doing it here — once, on the
-  // request — rather than inside each form action means a newly added action cannot forget
-  // to invalidate and leave the dashboard showing a stale count. GET/HEAD never mutate, so
-  // read navigation keeps its hits.
-  if (slug && event.request.method !== 'GET' && event.request.method !== 'HEAD') {
-    const { invalidateBrandPages } = await import('$lib/server/page-cache');
-    invalidateBrandPages(slug);
-  }
-
-  // Chi ha causato la spesa, quando a chiamare è un agente esterno: lo stesso posto in cui si
-  // stabilisce a quale brand addebitarla. Una rotta non può dimenticarsene, e il nome si convalida
-  // qui — arriva dalla rete, non dal nostro codice.
   const inTool = <T>(fn: () => T): T =>
     withToolContext(
       toolFromHeader(event.request.headers.get(TOOL_HEADER) ?? event.request.headers.get(TOOL_HEADER_LEGACY)),
       fn
     );
 
-  if (slug) {
-    const brandId = await brandIdFromSlug(slug);
-    if (brandId) return inTool(() => withBrandContext(brandId, doResolve));
-  }
   return inTool(doResolve);
 });
 export const handleError = Sentry.handleErrorWithSentry((({ error, event, status }) => {

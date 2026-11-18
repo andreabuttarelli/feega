@@ -535,7 +535,7 @@ async function productShotOf(db: Db, input: StartRun, prompt: string): Promise<{
     return { ok: false, error: screened.error };
   }
 
-  const [{ offerableModels }, { generateImagesWithoutBrand }] = await Promise.all([
+  const [{ offerableModels }, { generateImages }] = await Promise.all([
     import('$lib/server/offerable-models'),
     import('$lib/server/media-generate')
   ]);
@@ -544,7 +544,7 @@ async function productShotOf(db: Db, input: StartRun, prompt: string): Promise<{
     return { ok: false, error: NO_IMAGE_MODEL };
   }
 
-  const out = await generateImagesWithoutBrand(db as never, {
+  const out = await generateImages(db as never, {
     orgId: input.orgId,
     userId: input.userId,
     prompt: productShotPrompt(prompt),
@@ -825,12 +825,12 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
     }
 
     if (input.medium === 'image') {
-      const { generateImagesWithoutBrand } = await import('$lib/server/media-generate');
+      const { generateImages } = await import('$lib/server/media-generate');
       const { offerableModels } = await import('$lib/server/offerable-models');
       const { extraParamsOf } = await import('$lib/canvas/model-params');
       const imageChoice = input.model ? (await offerableModels(db, 'image')).choices.find((c) => c.id === input.model) : undefined;
       const declared = imageChoice?.params ?? [];
-      const out = await generateImagesWithoutBrand(db as never, {
+      const out = await generateImages(db as never, {
         orgId: input.orgId,
         userId: input.userId,
         prompt: sentPrompt,
@@ -862,7 +862,7 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
       return land(db, input, run, asset, out.costUsd);
     }
 
-    const { generateVideoWithoutBrand } = await import('$lib/server/media-generate');
+    const { generateVideo } = await import('$lib/server/media-generate');
     const { offerableModels } = await import('$lib/server/offerable-models');
     const { extraParamsOf } = await import('$lib/canvas/model-params');
     const [referenceImageUrls, referenceVideoUrls, referenceAudioUrls, lastFrame, videoChoice] = await Promise.all([
@@ -875,7 +875,7 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
         : Promise.resolve(undefined)
     ]);
     const videoDeclared = videoChoice?.params ?? [];
-    const out = await generateVideoWithoutBrand({
+    const out = await generateVideo({
       orgId: input.orgId,
       userId: input.userId,
       prompt: sentPrompt,
@@ -916,7 +916,7 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
  *
  * `runGenNode` per un video torna `queued` e ferma lì — il rendering vive dal fornitore, minuti
  * dopo la richiesta HTTP che l'ha chiesto. `submitAndTrackVideoRender` (dentro
- * `generateVideoWithoutBrand`) ha già scritto la STESSA sottomissione due volte: su `node_runs`
+ * `generateVideo`) ha già scritto la STESSA sottomissione due volte: su `node_runs`
  * (qui, come `external_job_id`) e su `video_renders` (`task_id`, con tutto quel che serve a
  * finirla — risoluzione, opzioni di montaggio, quando è partita). Questa funzione non inventa un
  * secondo trasporto: legge quella riga per il task id e riusa `finishVideoRender`, lo stesso
@@ -1104,7 +1104,6 @@ export async function reconcileVideoNodeRuns(db: Db): Promise<VideoReconcileOutc
 
       const submitted = rowToSubmitted({
         id: row.id,
-        brand_id: null,
         org_id: run.orgId,
         user_id: startRunShape.userId,
         post_id: null,

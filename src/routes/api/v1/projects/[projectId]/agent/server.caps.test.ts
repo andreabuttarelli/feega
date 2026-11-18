@@ -18,7 +18,7 @@ vi.mock('$lib/server/cli-auth', () => ({ gateAiAction: async () => null, gateOrg
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
 vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/repos/canvas')>()), listCanvases: async () => [] }));
 vi.mock('$lib/server/projects/lookup', () => ({
-  findReachableProject: async () => ({ orgId: 'org-1', project: { id: 'p-1', name: 'P', brandId: null } })
+  findReachableProject: async () => ({ orgId: 'org-1', project: { id: 'p-1', name: 'P', } })
 }));
 vi.mock('$lib/server/repos/chat', () => ({ openThread: async () => 't', loadTurns: async () => [], promptHistory: () => [], saveTurn: async () => undefined }));
 

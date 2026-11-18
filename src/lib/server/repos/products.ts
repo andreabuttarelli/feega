@@ -3,22 +3,6 @@ import type { Database, Json } from '$lib/database.types';
 import type { FetchedProduct, StorePlatform } from '$lib/server/store-fetch';
 import type { ProductOptions, ProductVariant } from '$lib/canvas/product-shape';
 
-/**
- * IL CATALOGO CHE UN NODO `products` HA SCARICATO.
- *
- * `node_id` possiede la riga: un `products` node non appartiene a un brand — prende un URL di
- * store e basta — quindi `brand_id` resta nullable e non è la chiave. La chiave è
- * `products_node_external_idx`, un indice unico su `(node_id, platform, external_id)` — NON
- * parziale (`20260927130000_products_node_external_idx.sql` spiega perché: PostgREST genera
- * l'upsert come `ON CONFLICT (colonne) DO UPDATE` senza `WHERE`, e Postgres può far combaciare
- * quell'`ON CONFLICT` solo con un indice la cui definizione è IDENTICA — un indice parziale non
- * matcha mai, `42P10` ogni volta). Due NULL non collidono comunque in un indice non parziale, quindi
- * un `node_id` nullo (ogni riga di `products_brand_external_idx`, sotto) non collide con nessun'altra
- * riga tramite QUESTO indice — la protezione resta la stessa, solo espressa senza predicato.
- *
- * L'UPSERT usa `onConflict` su quello stesso indice: la stessa riga letta due volte aggiorna,
- * mai duplica.
- */
 type ProductRow = Database['public']['Tables']['products']['Row'];
 
 export type Product = {
@@ -99,6 +83,17 @@ function toProduct(row: ProductColumns): Product {
   };
 }
 
+const fetchedColumns = (p: FetchedProduct) => ({
+  handle: p.handle,
+  title: p.title,
+  description: p.description,
+  price: p.price,
+  currency: p.currency,
+  url: p.url,
+  images: p.images as Json,
+  available: p.available
+});
+
 const richColumns = (p: FetchedProduct) => ({
   compare_at_price: p.compareAtPrice,
   tags: p.tags,
@@ -147,14 +142,7 @@ export async function upsertNodeProducts(
     node_id: input.nodeId,
     platform: input.platform,
     external_id: p.externalId,
-    handle: p.handle,
-    title: p.title,
-    description: p.description,
-    price: p.price,
-    currency: p.currency,
-    url: p.url,
-    images: p.images as Json,
-    available: p.available,
+    ...fetchedColumns(p),
     ...richColumns(p),
     synced_at: syncedAt
   }));
@@ -189,69 +177,4 @@ export async function replaceNodeProducts(
 ): Promise<number> {
   await deleteNodeProducts(db, { orgId: input.orgId, nodeId: input.nodeId });
   return upsertNodeProducts(db, input);
-}
-
-export async function listBrandProducts(db: Db, scope: { orgId: string; brandId: string; limit: number }): Promise<Product[]> {
-  const { data, error } = await db
-    .from('products')
-    .select(PRODUCT_COLUMNS)
-    .eq('org_id', scope.orgId)
-    .eq('brand_id', scope.brandId)
-    .order('created_at', { ascending: true })
-    .limit(scope.limit);
-
-  if (error) {
-    throw error;
-  }
-  return (data ?? []).map(toProduct);
-}
-
-/**
- * IL CATALOGO DI UN BRAND APPENA CREATO — non di un nodo. `NEW_DATABASE_STRUCTURE.md` lo dice
- * esplicito: «la sincronizzazione è una sola, per brand» (`unique (brand_id, platform,
- * external_id)`), un asse diverso da `products_node_external_idx` che governa
- * `upsertNodeProducts` sopra. Il wizard non ha un `products` node da cui appendere le righe — il
- * brand non esiste ancora quando l'analisi del sito gira — quindi scrive qui, con `node_id`
- * assente, non `null` esplicito: un `onConflict` su `node_id` con due NULL non collide mai in
- * Postgres, e lasciarlo fuori dalla riga evita di far leva su quel comportamento per sbaglio.
- */
-export async function insertBrandProducts(
-  db: Db,
-  input: {
-    orgId: string;
-    brandId: string;
-    platform: StorePlatform;
-    products: FetchedProduct[];
-  }
-): Promise<number> {
-  if (!input.products.length) {
-    return 0;
-  }
-
-  const syncedAt = new Date().toISOString();
-  const rows = input.products.map((p) => ({
-    org_id: input.orgId,
-    brand_id: input.brandId,
-    platform: input.platform,
-    external_id: p.externalId,
-    handle: p.handle,
-    title: p.title,
-    description: p.description,
-    price: p.price,
-    currency: p.currency,
-    url: p.url,
-    images: p.images as Json,
-    available: p.available,
-    ...richColumns(p),
-    synced_at: syncedAt
-  }));
-
-  const { error } = await db
-    .from('products')
-    .upsert(rows, { onConflict: 'brand_id,platform,external_id' });
-
-  if (error) {
-    throw error;
-  }
-  return rows.length;
 }

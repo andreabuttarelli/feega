@@ -17,17 +17,9 @@ export type SelectRow = { color: string; label: string; value: string; thumb: st
 
 export type SelectView = { index: number; total: number; body: SelectBody; text: string; url: string | null; rows: SelectRow[]; canAdd: boolean };
 
-export enum BatchState {
-  Pick = 'pick',
-  Card = 'card',
-  Failed = 'failed'
-}
-
-export type BatchView = { state: BatchState; thumbs: string[]; approved: string; rest: string; options: boolean | null };
-
 export type TechniqueView = { name: string; version: number | null; inputs: number; outputs: number; ranVersion: number | null };
 
-export type NodeView = { source?: SourceView; media?: MediaView; select?: SelectView; batch?: BatchView; technique?: TechniqueView };
+export type NodeView = { source?: SourceView; media?: MediaView; select?: SelectView; technique?: TechniqueView };
 
 const PREVIEW_CHARS = 60;
 const NOTHING = '—';
@@ -72,15 +64,3 @@ function bodyOf(list: ListNode | null, index: number): Pick<SelectView, 'body' |
 export function selectView(index: number, list: ListNode | null, outputs: SelectOutput[], values: Record<string, OutputValue>, canAdd: boolean): SelectView {
   return { index, total: list?.items.length ?? 0, ...bodyOf(list, index), rows: outputs.map((o) => rowOf(o, values)), canAdd };
 }
-
-type BatchCounts = { approved: number; done: number; total: number; running: number; failed: number; thumbs: string[] };
-
-export function batchOf(card: BatchCounts): BatchView {
-  const running = card.running ? ` · ${card.running} running` : '';
-  const failed = card.failed ? ` · ${card.failed} failed` : '';
-  return { state: BatchState.Card, thumbs: card.thumbs, approved: String(card.approved), rest: ` approved · ${card.done}/${card.total} done${running}${failed}`, options: null };
-}
-
-export const unreachableBatch = (): BatchView => ({ state: BatchState.Failed, thumbs: [], approved: '', rest: '', options: null });
-
-export const pickBatch = (options: boolean | null): BatchView => ({ state: BatchState.Pick, thumbs: [], approved: '', rest: '', options });

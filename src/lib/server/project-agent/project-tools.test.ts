@@ -353,7 +353,7 @@ describe('frame elements, the same op the canvas drag uses', () => {
   const revision = (nodeId: string, doc: unknown) => ({ org_id: ORG, node_id: nodeId, version: 1, doc, summary: null, actor_kind: 'user' });
   const rows = () => ({
     nodes: [frame(A), frame(B), { ...nodeRow, id: GEN, type: 'image', data: { prompt: 'a cat', refId: ASSET } }],
-    projects: [{ id: PROJECT, org_id: ORG, name: 'P', slug: 'p', brand_id: null, archived_at: null, updated_at: '', mode: 'standard' }],
+    projects: [{ id: PROJECT, org_id: ORG, name: 'P', slug: 'p', archived_at: null, updated_at: '', mode: 'standard' }],
     motion_revisions: [revision(A, withText), revision(B, newMotionDoc(MotionFormat.Square))],
     assets: [{ id: ASSET, org_id: ORG, project_id: PROJECT, type: 'image', url: 'x.png', content: null, mime_type: 'image/png', bytes: 1, width: 64, height: 64, duration_s: null, source: 'generated', source_node_id: GEN, uncensored: false, created_at: '' }],
     nodes_connections: [],
@@ -436,7 +436,7 @@ describe('the chat draws what the canvas draws', () => {
   it('an arrow from two points becomes a free element', async () => {
     const rows = {
       canvases: [{ id: CANVAS, org_id: ORG, project_id: PROJECT, name: 'Canvas', viewport: null }],
-      projects: [{ id: PROJECT, org_id: ORG, name: 'P', slug: 'p', brand_id: null, archived_at: null, updated_at: '', mode: 'standard' }],
+      projects: [{ id: PROJECT, org_id: ORG, name: 'P', slug: 'p', archived_at: null, updated_at: '', mode: 'standard' }],
       nodes: [] as Record<string, unknown>[],
       motion_revisions: [] as Record<string, unknown>[],
       canvas_events: [{}]

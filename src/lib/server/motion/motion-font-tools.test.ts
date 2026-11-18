@@ -71,7 +71,7 @@ describe('motion agent font tools', () => {
   });
 
   it('the prompt teaches fonts', () => {
-    const prompt = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Missing });
+    const prompt = motionAgentPrompt({ selectionNote: '', vision: Vision.Missing });
     for (const needle of ['set_font', 'list_fonts', 'register_font']) {
       expect(prompt).toContain(needle);
     }

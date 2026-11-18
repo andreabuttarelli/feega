@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const findReachableProject = vi.fn();
 const importPageAt = vi.fn();
 const findNode = vi.fn();
-const findSiteBrand = vi.fn(async () => null as unknown);
 
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: vi.fn(async () => []) }));
 vi.mock('$lib/server/projects/lookup', () => ({ findReachableProject: (...args: unknown[]) => findReachableProject(...args) }));
@@ -12,7 +11,6 @@ vi.mock('$lib/server/repos/canvas', () => ({ findNode: (...args: unknown[]) => f
 vi.mock('$lib/server/motion/move-element', () => ({ frameStore: () => ({ read: async () => null }) }));
 vi.mock('$lib/server/canvas/upload', () => ({ importCanvasLink: vi.fn() }));
 vi.mock('$lib/server/web/live', () => ({ liveBrowser: () => null }));
-vi.mock('$lib/server/start/site-brand', () => ({ findSiteBrand: (...args: unknown[]) => findSiteBrand(...(args as [])) }));
 
 const route = await import('./+server');
 
@@ -60,17 +58,6 @@ describe('POST /api/v1/projects/:id/url-import', () => {
     await call({ canvasId: 'c1', url: 'https://acme.test', x: 0, y: 0, tokens: false }, 'u-tokens-off');
 
     expect(importPageAt.mock.calls.map((c) => c[0].shape?.tokening)).toEqual(['on', 'off']);
-  });
-
-  it('allinea i token alla palette del brand dello stesso sito', async () => {
-    importPageAt.mockReset();
-    importPageAt.mockResolvedValue({ outcome: 'ok', frameId: 'f1', name: 'Acme', undo: [], skipped: [], truncated: false });
-    findSiteBrand.mockResolvedValueOnce({ id: 'b1', kit: { palette: [{ hex: '#533AFD' }], fonts: ['Inter'] } });
-
-    await call({ canvasId: 'c1', url: 'https://www.acme.test/pricing', x: 0, y: 0 }, 'u-brand');
-
-    expect(findSiteBrand.mock.calls.at(-1)?.slice(1)).toEqual(['o1', 'acme.test']);
-    expect(importPageAt.mock.calls[0][0].shape?.brand).toEqual({ palette: ['#533AFD'] });
   });
 
   it('un indirizzo privato torna 400 not_public', async () => {

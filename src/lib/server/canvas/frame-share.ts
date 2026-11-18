@@ -30,11 +30,6 @@ export async function readSharedFrame(db: Db, token: string, frameId: string, is
 
 export type SharedSource = MotionSource & { tokens: BrandTokens };
 
-async function brandOf(db: Db, canvas: { org_id: string; project_id: string }): Promise<string | null> {
-  const { data } = await db.from('projects').select('brand_id').eq('id', canvas.project_id).eq('org_id', canvas.org_id).maybeSingle();
-  return data?.brand_id ?? null;
-}
-
 export async function readSharedSource(db: Db, token: string, nodeId: string): Promise<SharedSource | null> {
   const canvas = await findSharedCanvas(db, token);
   if (!canvas) {
@@ -52,5 +47,5 @@ export async function readSharedSource(db: Db, token: string, nodeId: string): P
   if (!source) {
     return null;
   }
-  return { ...source, tokens: await motionTokens(db, { orgId, brandId: await brandOf(db, canvas) }) };
+  return { ...source, tokens: await motionTokens() };
 }

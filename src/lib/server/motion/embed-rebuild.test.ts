@@ -33,7 +33,7 @@ function legacyPage(doc: MotionDoc): string {
   return `<!doctype html><html><head><title>Saturn</title></head><body><script>(function playerMain(cfg){})(${JSON.stringify(config).replace(/</g, '\\u003c')});</script></body></html>`;
 }
 
-const PLACE: EmbedPlace = { orgId: 'org', projectId: 'p', canvasId: 'c', brandId: null, title: 'Saturn', mode: ProjectMode.Standard, deleted: false };
+const PLACE: EmbedPlace = { orgId: 'org', projectId: 'p', canvasId: 'c', title: 'Saturn', mode: ProjectMode.Standard, deleted: false };
 
 function bucket(page: string, overrides: Partial<RebuildPorts> = {}) {
   let stored = { page, updatedAt: PUBLISHED_AT };

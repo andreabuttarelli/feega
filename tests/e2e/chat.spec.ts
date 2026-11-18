@@ -3,13 +3,8 @@ import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 test.describe('chat @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
 
-  test('su un progetto con brand i due turni sopravvivono al reload', async ({ page, session, admin }) => {
+  test('i due turni sopravvivono al reload', async ({ page, session, admin }) => {
     test.skip(!process.env.OPENROUTER_API_KEY, 'OPENROUTER_API_KEY assente: salto la chiamata reale');
-
-    const slug = `e2e-chat-${session.orgId.slice(0, 8)}`;
-    const brand = await admin.from('brands').insert({ org_id: session.orgId, name: 'E2E chat', slug }).select('id').single();
-    expect(brand.error).toBeNull();
-    await admin.from('projects').update({ brand_id: brand.data!.id }).eq('id', session.projectId);
 
     const prompt = 'Rispondi solo con la parola: pronto';
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);

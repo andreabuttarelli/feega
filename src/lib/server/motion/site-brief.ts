@@ -6,7 +6,7 @@ import {
   parseHTMLMetadata
 } from '@feega/site-analysis/crawl';
 import { safeFetchBytes, safeFetchUrl } from '$lib/server/tool-guard';
-import { probeImageDimensions } from '$lib/server/brand-media';
+import { probeImageDimensions } from '$lib/server/image-dimensions';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { AccentSource, pickAccent, type Accent } from '$lib/motion/accent';
 import { PageRole, appEntryOf, linksWorthReading, pageOf, type SitePage } from './site-copy';

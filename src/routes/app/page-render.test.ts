@@ -8,7 +8,7 @@ const project = { id: 'p1', name: 'Launch', href: '/p/p1', updatedAt: '2026-10-0
 const PLACEHOLDER = 'Describe a launch video, or paste your website…';
 
 function page(canvases: (typeof canvas)[] = [canvas], projects: { id: string; name: string }[] = []) {
-  const data = { projects, dashboard: { canvases, projects: [project], batches: [], motions: [], moreVideos: null }, templates: [{ id: 't', name: 'A poster series', brief: 'A poster series' }], tools: [], attachProjectId: 'p1' };
+  const data = { projects, dashboard: { canvases, projects: [project], motions: [], moreVideos: null }, templates: [{ id: 't', name: 'A poster series', brief: 'A poster series' }], tools: [], attachProjectId: 'p1' };
   return render(Page, { props: { data, form: null } as never }).body;
 }
 

@@ -20,7 +20,6 @@ const EXPECTED: Record<(typeof NODE_TYPES)[number], { inputs: boolean; output: b
   social_account_feed: { inputs: false, output: true },
   social_post_mockup: { inputs: false, output: false },
   products: { inputs: false, output: true },
-  ads: { inputs: false, output: false },
   influencer: { inputs: false, output: true },
   list: { inputs: true, output: true },
   select: { inputs: true, output: true },
@@ -31,7 +30,6 @@ const EXPECTED: Record<(typeof NODE_TYPES)[number], { inputs: boolean; output: b
   model3d: { inputs: true, output: false },
   motion: { inputs: false, output: true },
   element: { inputs: false, output: false },
-  studio_batch: { inputs: false, output: true },
   section: { inputs: false, output: true },
   technique: { inputs: false, output: false }
 };

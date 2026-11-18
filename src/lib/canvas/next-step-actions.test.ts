@@ -12,7 +12,6 @@ describe('NEXT_STEP_ACTIONS', () => {
       'social_account_feed',
       'social_post_mockup',
       'products',
-      'ads',
       'influencer'
     ]);
 

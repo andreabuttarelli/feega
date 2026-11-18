@@ -101,7 +101,7 @@ describe('the UI recreation kit', () => {
   });
 
   it('the launch film prompt asks to recreate SaaS UI from the kit, not to show screenshots', () => {
-    const text = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Available });
+    const text = motionAgentPrompt({ selectionNote: '', vision: Vision.Available });
 
     expect(text).toContain('add_ui');
     expect(text).toContain('never as screenshots');
@@ -115,7 +115,7 @@ describe('the UI recreation kit', () => {
 
   it('add_ui and the prompt offer the generic primitives to the agent', () => {
     const { run } = setup();
-    const text = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Available });
+    const text = motionAgentPrompt({ selectionNote: '', vision: Vision.Available });
 
     expect(text).toContain('prompt box');
     expect(text).toContain('pricing');
@@ -132,7 +132,7 @@ describe('the UI recreation kit', () => {
   });
 
   it('the trailer recipe tells the four acts with brand-specific pain, and keeps UI inside the frame', () => {
-    const text = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Available });
+    const text = motionAgentPrompt({ selectionNote: '', vision: Vision.Available });
 
     expect(text).toContain('Problem');
     expect(text).toContain('mark_story');

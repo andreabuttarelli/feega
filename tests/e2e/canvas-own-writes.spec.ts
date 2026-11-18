@@ -6,7 +6,6 @@ const SERVER_LAG_MS = 700;
 const CLICK_AFTER_MS = 50;
 const TYPING_MS = 5_000;
 const KEY_DELAY_MS = 25;
-const UNREACHABLE_STORE = 'https://store.example.invalid';
 const PROMPT_PLACEHOLDER = 'What should it be about…';
 const LOADING_SELECTORS = '[aria-busy="true"], .is-spinning';
 
@@ -46,7 +45,7 @@ test.describe('own pending writes never block or fail a run @real', () => {
   test.skip(!REAL_STACK, 'richiede E2E_REAL_STACK=1');
 
   for (const seed of [
-    { type: 'products', field: 'limit', value: '7', data: { type: 'shopify', url: UNREACHABLE_STORE, limit: 3 } },
+    { type: 'social_account_feed', field: 'limit', value: '7', data: { platform: 'instagram', handle: 'nike', limit: 3 } },
     { type: 'social_account_feed', field: 'handle', value: 'feega', data: { platform: 'instagram', handle: 'nike', limit: 3 } }
   ]) {
     test(`${seed.type}: edit ${seed.field} then sync within 50 ms sends the new value at the current version`, async ({ page, session, seedNode, admin }) => {
@@ -93,12 +92,12 @@ test.describe('own pending writes never block or fail a run @real', () => {
   test('typing 5 s in a source field shows no loading state and lands the final value', async ({ page, session, seedNode, admin }) => {
     test.setTimeout(120_000);
     await page.setViewportSize({ width: 1440, height: 900 });
-    const node = await seedNode({ type: 'products', x: 0, y: 0, data: { type: 'shopify', url: UNREACHABLE_STORE, limit: 3 } });
+    const node = await seedNode({ type: 'social_account_feed', x: 0, y: 0, data: { platform: 'instagram', handle: 'nike', limit: 3 } });
     await slowServer(page);
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     await page.locator(`.svelte-flow__node[data-id="${node.id}"]`).click();
     const settings = page.getByTestId('source-settings');
-    const input = settings.locator('input[name="filters.query"]');
+    const input = settings.locator('input[name="filters.include"]');
     await input.click();
 
     let typed = '';
@@ -113,7 +112,7 @@ test.describe('own pending writes never block or fail a run @real', () => {
       await expect(input).toHaveValue(typed);
     }
 
-    await expect.poll(async () => ((await nodeRow(admin, node.id)).data.filters as { query?: string } | undefined)?.query, { timeout: 15_000 }).toBe(typed);
+    await expect.poll(async () => ((await nodeRow(admin, node.id)).data.filters as { include?: string } | undefined)?.include, { timeout: 15_000 }).toBe(typed);
     await expect(input).toHaveValue(typed);
     await noConflict(page);
   });

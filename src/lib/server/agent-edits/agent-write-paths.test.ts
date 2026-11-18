@@ -27,8 +27,7 @@ const GATED_ENTRIES = [
   'src/routes/api/v1/motion/[nodeId]/poster/+server.ts',
   'src/routes/api/v1/motion/elements/+server.ts',
   'src/routes/api/v1/org/rows/+server.ts',
-  'src/routes/api/v1/org/nodes/[id]/loop/+server.ts',
-  'src/routes/api/v1/studio/start/+server.ts'
+  'src/routes/api/v1/org/nodes/[id]/loop/+server.ts'
 ];
 
 const NOT_AN_EDIT: Record<string, string> = {
@@ -43,8 +42,6 @@ const NOT_AN_EDIT: Record<string, string> = {
 const PERSON_LAUNCHED: Record<string, string> = {
   'src/lib/server/canvas/loop.ts': 'a loop a person started; it already costs credits',
   'src/lib/server/canvas/workflow.ts': 'a workflow a person started; it already costs credits',
-  'src/lib/server/studio/studio-batch.ts': 'a studio batch a person started; it already costs credits',
-  'src/lib/server/studio/studio-drain.ts': 'a studio batch a person started; it already costs credits',
   'src/lib/server/layouts/design.ts': 'a layout a person asked for from the compose editor'
 };
 
@@ -93,7 +90,7 @@ describe('every agent write path passes the free weekly cap', () => {
   it.each(Object.keys(PERSON_LAUNCHED))('%s uses only keys the initiator registry marks as person-launched, so it is never counted', async (file) => {
     const { AGENT_INITIATOR, AgentKey, Initiator } = await import('$lib/server/repos/actor');
     const used = [...read(file).matchAll(/AgentKey\.(\w+)|([A-Z_]+_AGENT_KEY)/g)].map((m) => m[1] ?? m[2]);
-    const keys = used.map((name) => (name in AgentKey ? AgentKey[name as keyof typeof AgentKey] : name === 'STUDIO_AGENT_KEY' ? AgentKey.Studio : name === 'COMPOSE_AGENT_KEY' ? AgentKey.Compose : null));
+    const keys = used.map((name) => (name in AgentKey ? AgentKey[name as keyof typeof AgentKey] : name === 'COMPOSE_AGENT_KEY' ? AgentKey.Compose : null));
     expect(keys.length).toBeGreaterThan(0);
     for (const key of keys) {
       expect(key && AGENT_INITIATOR[key], `${file} uses ${String(key)}`).toBe(Initiator.Person);

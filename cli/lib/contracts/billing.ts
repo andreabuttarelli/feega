@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { BrandEndpoint, EndpointFailure } from './index';
+import type { OrgEndpoint, EndpointFailure } from './index';
 
 const LinkSchema = z
   .string()
@@ -53,12 +53,12 @@ export const BILLING_PORTAL_LINK = {
     'reply, and never store or repeat it. Only the organization owner can mint one. Free: it ' +
     'works precisely when credits are gone.',
   method: 'POST',
-  pathUnderBrand: '/billing/portal',
+  path: '/org/billing/portal',
   input: PortalInputSchema,
   output: PortalResultSchema,
   failures: BILLING_FAILURES,
   destructive: false
-} satisfies BrandEndpoint;
+} satisfies OrgEndpoint;
 
 export const CHECKOUT_LINK = {
   tool: 'create_checkout_link',
@@ -73,7 +73,7 @@ export const CHECKOUT_LINK = {
     'where the human manages the plan and buys top-ups. To cancel, the owner uses the billing ' +
     'portal link, never this one.',
   method: 'POST',
-  pathUnderBrand: '/billing/checkout',
+  path: '/org/billing/checkout',
   input: CheckoutInputSchema,
   output: CheckoutResultSchema,
   failures: [
@@ -83,7 +83,7 @@ export const CHECKOUT_LINK = {
     { error: 'subscriptions_not_configured', status: 409 }
   ],
   destructive: false
-} satisfies BrandEndpoint;
+} satisfies OrgEndpoint;
 
 const OneTimeCheckoutInputSchema = z
   .object({
@@ -114,7 +114,7 @@ export const ONE_TIME_CHECKOUT_LINK = {
     'created on the spot — unlike the subscription link, there is nothing to check out AGAINST ' +
     'first.',
   method: 'POST',
-  pathUnderBrand: '/billing/checkout/one-time',
+  path: '/org/billing/checkout/one-time',
   input: OneTimeCheckoutInputSchema,
   output: OneTimeCheckoutResultSchema,
   failures: [
@@ -125,4 +125,4 @@ export const ONE_TIME_CHECKOUT_LINK = {
     { error: 'purchases_not_ready', status: 409 }
   ],
   destructive: false
-} satisfies BrandEndpoint;
+} satisfies OrgEndpoint;

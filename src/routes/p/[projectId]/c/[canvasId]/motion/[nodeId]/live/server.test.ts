@@ -5,14 +5,12 @@ import { LIVE_MESSAGE } from '$lib/motion/interactive/live-bridge';
 
 const state = vi.hoisted(() => ({ head: null as null | Record<string, unknown> }));
 
-vi.mock('$lib/server/repos/brands', () => ({ findBrandLook: async () => null, findFirstBrandLook: async () => null }));
 vi.mock('$lib/server/motion/editor-scope', () => ({
   motionScope: async () => ({
     db: {},
     userId: 'u-1',
     orgId: 'org-1',
     canvas: { id: 'c-1', name: 'Canvas' },
-    projectBrandId: null,
     motion: { record: { id: 'n-1' }, node: { id: 'n-1', format: '9:16', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } }
   })
 }));

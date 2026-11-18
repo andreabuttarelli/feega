@@ -20,7 +20,7 @@ const { POST } = await import('./+server');
 
 async function seeded(): Promise<{ db: Db; nodeId: string; entryId: string }> {
   const db = createMemoryDb({ tables: new Map(), blobs: new Map(), user: { id: MARCO, email: 'm@b.c', created_at: '2026-01-01' }, storageUrl: () => '', onChange: () => {} }) as unknown as Db;
-  await db.from('projects').insert({ id: PROJECT, org_id: ORG, name: 'P', mode: 'standard', brand_id: null } as never);
+  await db.from('projects').insert({ id: PROJECT, org_id: ORG, name: 'P', mode: 'standard', } as never);
   await db.from('canvases').insert({ id: CANVAS, org_id: ORG, project_id: PROJECT, name: 'C', deleted_at: null } as never);
   const node = await createNode(db, { orgId: ORG, projectId: PROJECT, canvasId: CANVAS, type: 'text', x: 0, y: 0, data: { prompt: 'first' }, actor: { kind: 'user', id: MARCO } });
   await patchNodeData(db, { orgId: ORG, nodeId: node.id, patch: { prompt: 'claude' }, check: DataCheck.None, actor: agentActor(MARCO, AgentKey.Mcp) });

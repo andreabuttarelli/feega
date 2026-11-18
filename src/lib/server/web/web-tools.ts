@@ -103,7 +103,7 @@ export const WEB_GUIDANCE = [
   'A Pinterest picture is someone else\'s work: use it as a reference for look and feel, never as the brand\'s own asset in the final video unless the user asks for that picture there. In an uncensored project pictures showing people are refused: choose pins without people.',
   'For video references, social_search finds clips on TikTok, Instagram Reels or YouTube by keyword, social_post reads one post the user links, and social_profile reads the latest posts of an account. Look before choosing: view_images the pictures, view_video_frames a video (cover and three frames).',
   'When the user asks for something in the style of @someone: social_profile that account, look at 6 to 12 of its posts (view_images, view_video_frames for videos), then ask_reference_pick with the best candidates, and once the user picks, record the account look with set_reference_look as the aggregate of its posts (palette, type, layout, and pacing for videos: seconds per shot and how it cuts), then the storyboard.',
-  'Posts from other accounts are references for style only: never present their content, logos, products, people or captions as the brand\'s own, and never copy a post one to one. In an uncensored project pictures showing people are refused: choose references without people.'
+  'Posts from other accounts are references for style only: never present their content, logos, products, people or captions as the user\'s own, and never copy a post one to one. In an uncensored project pictures showing people are refused: choose references without people.'
 ].join(' ');
 
 const AVOIDED = { ok: false as const, error: 'the user marked this reference as avoid: never use it as a target' };

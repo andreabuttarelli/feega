@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestSupabase, type TestSupabase } from '$lib/testkit/supabase';
 import { SettingsSection } from '$lib/settings/sections';
-import { servedForBrand } from '$lib/components/settings/platforms';
 import { UncensoredLock } from '$lib/uncensored-lock';
 import { ProjectMode } from '$lib/project-mode';
 
@@ -11,13 +10,12 @@ const { USER, state } = vi.hoisted(() => ({
 }));
 
 const ORG = { id: 'org-a', name: 'Acme', slug: 'acme' };
-const PROJECT = { id: 'p1', name: 'Launch', slug: 'launch', brandId: 'b1', archivedAt: null, lastActiveAt: '2026-10-01', mode: ProjectMode.Standard };
+const PROJECT = { id: 'p1', name: 'Launch', slug: 'launch', archivedAt: null, lastActiveAt: '2026-10-01', mode: ProjectMode.Standard };
 
 vi.mock('$lib/server/db/client', async (original) => ({ ...(await original<object>()), createUserDb: () => state.kit.client }));
 vi.mock('$lib/server/nav-cache', async (original) => ({
   ...(await original<object>()),
-  verifiedToken: async (_db: unknown, token: string) => (token === 'jwt' ? USER : null),
-  invalidateBrandNav: vi.fn()
+  verifiedToken: async (_db: unknown, token: string) => (token === 'jwt' ? USER : null)
 }));
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: vi.fn(async () => [{ org: ORG, role: 'owner' }]), memberRole: vi.fn(async () => 'owner') }));
 vi.mock('$lib/server/projects/lookup', () => ({ findProjectForUser: vi.fn(async () => ({ orgId: ORG.id, project: PROJECT })) }));
@@ -26,7 +24,6 @@ vi.mock('$lib/server/credits', async (original) => ({ ...(await original<object>
 vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ uncensoredLockFor: vi.fn(async () => UncensoredLock.Open) }));
 vi.mock('$lib/server/repos/canvas', async (original) => ({ ...(await original<object>()), listCanvases: vi.fn(async () => [{ id: 'c1', name: 'Board' }]) }));
 vi.mock('$lib/server/repos/projects', async (original) => ({ ...(await original<object>()), listProjects: vi.fn(async () => [PROJECT]) }));
-vi.mock('$lib/server/tenancy', async (original) => ({ ...(await original<object>()), hasManyTenants: () => true }));
 vi.mock('$lib/server/email', async (original) => ({ ...(await original<object>()), sendEmail: vi.fn(async () => undefined) }));
 vi.mock('$lib/server/cli-auth', async (original) => ({ ...(await original<object>()), generateApiKey: () => ({ key: 'feega_k', hash: 'h', prefix: 'feega_k' }) }));
 vi.mock('$lib/server/supabase-admin', () => ({ createAdminClient: () => state.kit.client }));
@@ -36,14 +33,10 @@ const projectLayout = await import('$lib/server/projects/project-shell');
 const settingsLayout = await import('$lib/server/settings/shell');
 const ROUTES: Record<SettingsSection, () => Promise<{ load?: (e: never) => unknown; actions?: Record<string, (e: never) => unknown> }>> = {
   [SettingsSection.Project]: () => import('$lib/server/settings/pages/project'),
-  [SettingsSection.Brand]: () => import('$lib/server/settings/pages/brand'),
-  [SettingsSection.Video]: () => import('$lib/server/settings/pages/video'),
   [SettingsSection.Profile]: () => import('$lib/server/settings/pages/profile'),
   [SettingsSection.Content]: () => import('$lib/server/settings/pages/content'),
   [SettingsSection.Team]: () => import('$lib/server/settings/pages/team'),
   [SettingsSection.ApiKeys]: () => import('$lib/server/settings/pages/api-keys'),
-  [SettingsSection.Danger]: () => import('$lib/server/settings/pages/danger'),
-  [SettingsSection.Products]: () => import('$lib/server/settings/pages/products'),
   [SettingsSection.Models]: () => import('$lib/server/settings/pages/models'),
   [SettingsSection.Fonts]: () => import('$lib/server/settings/pages/fonts'),
   [SettingsSection.Spend]: () => import('$lib/server/settings/pages/spend')
@@ -58,11 +51,7 @@ function seed(): TestSupabase {
   return createTestSupabase({
     orgs: [{ id: ORG.id, name: ORG.name, slug: ORG.slug, stripe_customer_id: null }],
     orgs_members: [{ org_id: ORG.id, user_id: USER.id, role: 'owner' }],
-    projects: [{ id: PROJECT.id, org_id: ORG.id, name: PROJECT.name, brand_id: 'b1', archived_at: null, mode: 'standard' }],
-    brands: [
-      { id: 'b1', org_id: ORG.id, name: 'Acme', slug: 'acme', website: null, logo_url: null, short_description: null, content: null },
-      { id: 'b2', org_id: ORG.id, name: 'Beta', slug: 'beta', website: null, logo_url: null, short_description: null, content: null }
-    ],
+    projects: [{ id: PROJECT.id, org_id: ORG.id, name: PROJECT.name, archived_at: null, mode: 'standard' }],
     profiles: [{ id: USER.id, name: 'Ada Lovelace', email: USER.email, avatar_url: null }],
     api_keys: [{ id: 'k1', org_id: ORG.id, user_id: USER.id, name: 'ci', key_prefix: 'feega_x', scopes: [], created_at: '2026-01-01', last_used_at: null }],
     orgs_invites: [{ id: 'i1', org_id: ORG.id, email: 'bob@x.it', accepted_at: null, created_at: '2026-01-01' }],
@@ -118,7 +107,7 @@ function form(fields: Record<string, string>): FormData {
   return body;
 }
 
-const PROJECT_SECTIONS = Object.values(SettingsSection).filter((section) => !servedForBrand(section));
+const PROJECT_SECTIONS = Object.values(SettingsSection);
 
 const ACTIONS: Array<[SettingsSection, string, Record<string, string>]> = [
   [SettingsSection.Models, 'saveAllowlist', { medium: 'image' }],
@@ -126,12 +115,6 @@ const ACTIONS: Array<[SettingsSection, string, Record<string, string>]> = [
   [SettingsSection.Spend, 'removeCap', { scope: 'org_member' }],
   [SettingsSection.Project, 'rename', { name: 'Relaunch' }],
   [SettingsSection.Project, 'rename', { name: '' }],
-  [SettingsSection.Project, 'linkBrand', { brandId: 'b2' }],
-  [SettingsSection.Project, 'linkBrand', { brandId: 'b2', returnTo: '/p/p1/settings/brand' }],
-  [SettingsSection.Project, 'linkBrand', { brandId: 'nope' }],
-  [SettingsSection.Project, 'createBrand', { name: '' }],
-  [SettingsSection.Project, 'createBrand', { name: 'Fresh' }],
-  [SettingsSection.Project, 'unlinkBrand', {}],
   [SettingsSection.Project, 'forgetAppAccount', {}],
   [SettingsSection.Project, 'saveAppAccount', { loginUrl: 'https://app.acme.example/login', email: 'qa@acme.example', password: 'fake-test-password' }],
   [SettingsSection.Project, 'saveAppAccount', { loginUrl: 'https://x.com/login', email: 'qa@acme.example', password: 'x' }],
@@ -166,11 +149,11 @@ beforeEach(() => {
 
 describe('settings over the API answer what the settings pages answer', () => {
   it('the settings shell', async () => {
-    const event = directEvent(`/p/${PROJECT.id}/settings/brand`, 'GET');
+    const event = directEvent(`/p/${PROJECT.id}/settings/project`, 'GET');
     const expected = await outcome(() => settingsLayout.load({ ...event, parent: event.shellParent } as never));
 
     state.kit = seed();
-    expect(await api('GET', `?path=${encodeURIComponent(`/p/${PROJECT.id}/settings/brand`)}`)).toEqual(expected);
+    expect(await api('GET', `?path=${encodeURIComponent(`/p/${PROJECT.id}/settings/project`)}`)).toEqual(expected);
   });
 
   it.each(PROJECT_SECTIONS)('the %s page load', async (section) => {
@@ -211,10 +194,6 @@ describe('settings over the API answer what the settings pages answer', () => {
 
     expect((await api('POST', '/project?action=rename', form({ name: 'Hijacked' }))).status).toBe(404);
     expect(state.kit && (state.kit as TestSupabase).tables.get('projects')![0].name).toBe(PROJECT.name);
-  });
-
-  it.each(Object.values(SettingsSection).filter(servedForBrand))('the brand section %s lives on the dashboard, not here', async (section) => {
-    expect((await api('GET', `/${section}`)).status).toBe(404);
   });
 
   it('an unknown section or action is a 404, a missing or bad token a 401', async () => {

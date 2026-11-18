@@ -4,7 +4,7 @@ import { CORE_TOOLS } from './surface.ts';
 
 /**
  * IL LEDGER DEL RITIRO. La superficie MCP passa da decine di tool brand-scoped (piano editoriale,
- * studio, media, SEO/GEO, blog…) a sedici org-scoped: `query` legge tutto, tre generici
+ * media, SEO/GEO, blog…) a sedici org-scoped: `query` legge tutto, tre generici
  * scrivono qualunque riga (nodi della tela compresi — disegnare non è un'azione sul mondo),
  * `describe_node_types` dà la forma di `nodes.data`, `run_node_generation` è il click Generare
  * della tela, `run_node_loop`/`preview_node_loop`/`cancel_node_loop` sono lo stesso click messo
@@ -23,7 +23,7 @@ async function tools(): Promise<Tool[]> {
 
 /**
  * Le uniche che restano. `list_posts` e `list_ad_campaigns` non sono un secondo `query`:
- * leggono le due famiglie autonome con i loro filtri propri (brand + status), la stessa asimmetria
+ * leggono le due famiglie autonome con i loro filtri propri (status), la stessa asimmetria
  * che i tool di scrittura hanno con `insert_row`. `describe_node_types` è la terza eccezione, e
  * per lo stesso motivo: la forma di `nodes.data` per `type` non è una riga a cui applicare
  * `where`, è un fatto del codice, non del database.
@@ -90,16 +90,6 @@ const RESTANO = [
   'dev_server',
   'live_edit',
   'spend_caps',
-  'studio_quote',
-  'studio_start',
-  'studio_status',
-  'studio_run',
-  'studio_more',
-  'studio_cancel',
-  'studio_retry',
-  'studio_regenerate',
-  'studio_approve',
-  'studio_reject',
   'edit',
   'view',
   'describe',

@@ -11,8 +11,6 @@ export type EffectUse = { key: string; blur: number; shadow: boolean };
 export type GradientUse = { key: string };
 export type CtaUse = { hex: string; area: number };
 export type Samples = { colours: ColourUse[]; texts: TextUse[]; effects: EffectUse[]; gradients: GradientUse[]; radii: number[]; spacing: number[]; ctas: CtaUse[] };
-export type SiteBrand = { palette: string[] };
-
 export type TextStyle = Omit<TextUse, 'chars' | 'heading' | 'button'>;
 export type ColourToken = { name: string; hex: string; members: string[]; paints: ColourPaint[] };
 export type TextToken = { name: string; key: string; style: TextStyle };
@@ -21,7 +19,6 @@ export type NumberToken = { name: string; value: number };
 export type Tokens = { colours: ColourToken[]; texts: TextToken[]; effects: KeyToken[]; gradients: KeyToken[]; radii: NumberToken[]; spacing: NumberToken[] };
 
 const SAME_COLOUR = 1.5;
-const BRAND_PULL = 8;
 const CHROMATIC = 20;
 const MIN_USES = 2;
 const FILL_FIRST = 100;
@@ -38,7 +35,7 @@ const ALL_PAINTS = Object.values(ColourPaint);
 
 type Lab = [number, number, number];
 
-type Cluster = { hex: string; lab: Lab; members: Map<string, number>; fill: number; text: number; border: number; button: number; cta: number; brandRank: number; fills: number; uses: number };
+type Cluster = { hex: string; lab: Lab; members: Map<string, number>; fill: number; text: number; border: number; button: number; cta: number; fills: number; uses: number };
 
 function labOf(hex: string): Lab {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c > 0.04045 ? ((c + 0.055) / 1.055) ** 2.4 : c / 12.92));
@@ -70,7 +67,7 @@ function clustersOf(uses: ColourUse[]): Cluster[] {
   const clusters: Cluster[] = [];
   for (const [hex, list] of heaviest) {
     const lab = labOf(hex);
-    const home = clusters.find((c) => distance(c.lab, lab) <= SAME_COLOUR) ?? clusters[clusters.push({ hex, lab, members: new Map(), fill: 0, text: 0, border: 0, button: 0, cta: 0, brandRank: -1, fills: 0, uses: 0 }) - 1];
+    const home = clusters.find((c) => distance(c.lab, lab) <= SAME_COLOUR) ?? clusters[clusters.push({ hex, lab, members: new Map(), fill: 0, text: 0, border: 0, button: 0, cta: 0, fills: 0, uses: 0 }) - 1];
     home.members.set(hex, list.length);
     for (const use of list) {
       home[PAINT_SCORE[use.paint]] += use.weight;
@@ -90,7 +87,6 @@ const filledPrimary = (c: Cluster) => (chromatic(c) && c.uses >= MIN_USES ? c.fi
 
 const PRIMARY_TIERS: { when: (c: Cluster) => boolean; rank: (c: Cluster) => number }[] = [
   { when: (c) => c.cta > 0 && chromatic(c), rank: (c) => c.cta },
-  { when: (c) => c.brandRank >= 0 && chromatic(c), rank: (c) => TIER - 1 - c.brandRank },
   { when: (c) => c.cta > 0, rank: (c) => c.cta }
 ];
 
@@ -161,18 +157,11 @@ function unique(name: string, taken: readonly string[]): string {
   return `${name} ${n}`;
 }
 
-function pulledToBrand(c: Cluster, brand: SiteBrand | undefined): string {
-  const near = (brand?.palette ?? []).map((hex) => hex.toLowerCase()).find((hex) => distance(labOf(hex), c.lab) <= BRAND_PULL);
-  return near ?? c.hex;
-}
-
-function withCtas(clusters: Cluster[], ctas: CtaUse[], brand: SiteBrand | undefined): Cluster[] {
+function withCtas(clusters: Cluster[], ctas: CtaUse[]): Cluster[] {
   const page = [...clusters].sort((a, b) => b.fill - a.fill)[0];
-  const palette = (brand?.palette ?? []).map((hex) => labOf(hex.toLowerCase()));
   for (const c of clusters) {
     const near = ctas.filter((cta) => distance(labOf(cta.hex.toLowerCase()), c.lab) <= SAME_COLOUR);
     c.cta = page ? near.reduce((sum, cta) => sum + (cta.area * Math.abs(c.lab[0] - page.lab[0])) / LIGHTNESS, 0) : 0;
-    c.brandRank = palette.findIndex((lab) => distance(lab, c.lab) <= BRAND_PULL);
   }
   return clusters;
 }
@@ -193,8 +182,8 @@ function contrastOrdered(named: ColourToken[]): void {
   }
 }
 
-function coloursOf(uses: ColourUse[], ctas: CtaUse[], brand: SiteBrand | undefined): ColourToken[] {
-  const clusters = withCtas(clustersOf(uses), ctas, brand);
+function coloursOf(uses: ColourUse[], ctas: CtaUse[]): ColourToken[] {
+  const clusters = withCtas(clustersOf(uses), ctas);
   const claimed = new Map<Cluster, Set<ColourPaint>>(clusters.map((c) => [c, new Set()]));
   const named: ColourToken[] = [];
   for (const role of COLOUR_ROLES) {
@@ -204,12 +193,12 @@ function coloursOf(uses: ColourUse[], ctas: CtaUse[], brand: SiteBrand | undefin
       continue;
     }
     role.paints.forEach((p) => claimed.get(best.c)!.add(p));
-    named.push({ name: role.name, hex: pulledToBrand(best.c, brand), members: [...best.c.members.keys()].sort(), paints: role.paints });
+    named.push({ name: role.name, hex: best.c.hex, members: [...best.c.members.keys()].sort(), paints: role.paints });
   }
   contrastOrdered(named);
   const extras = clusters.filter((c) => claimed.get(c)!.size === 0 && c.uses >= MIN_USES).sort((a, b) => b.uses - a.uses);
   for (const c of extras.slice(0, Math.max(0, MAX_COLOURS - named.length))) {
-    named.push({ name: unique(extraName(c), named.map((t) => t.name)), hex: pulledToBrand(c, brand), members: [...c.members.keys()].sort(), paints: ALL_PAINTS });
+    named.push({ name: unique(extraName(c), named.map((t) => t.name)), hex: c.hex, members: [...c.members.keys()].sort(), paints: ALL_PAINTS });
   }
   return named;
 }
@@ -325,9 +314,9 @@ const spacingOf = (values: number[]): NumberToken[] =>
     .slice(0, MAX_SPACING)
     .map((value, i) => ({ name: `Space ${i + 1}`, value }));
 
-export function tokensOf(samples: Samples, brand?: SiteBrand): Tokens {
+export function tokensOf(samples: Samples): Tokens {
   return {
-    colours: coloursOf(samples.colours, samples.ctas, brand),
+    colours: coloursOf(samples.colours, samples.ctas),
     texts: textsOf(samples.texts),
     effects: effectsOf(samples.effects),
     gradients: gradientsOf(samples.gradients),

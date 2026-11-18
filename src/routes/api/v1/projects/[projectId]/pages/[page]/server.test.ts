@@ -15,7 +15,7 @@ const PROJECT = 'project-1';
 function seed() {
   current.db = fakeDb({
     orgs_members: [{ role: 'owner', orgs: { id: ORG, name: 'Org', slug: 'org' } }],
-    projects: [{ id: PROJECT, name: 'Project', slug: 'project', brand_id: null, archived_at: null }],
+    projects: [{ id: PROJECT, name: 'Project', slug: 'project', archived_at: null }],
     influencers: [],
     influencer_views: []
   }).db;

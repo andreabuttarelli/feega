@@ -17,91 +17,18 @@ type AiCallStatus = 'ok' | 'error' | 'timeout' | 'refused';
 // Fire-and-forget observability: one ai_calls row per LLM call, written from the shared
 // chokepoints. NEVER throws and never awaited — a missing table or a dead DB must not break AI.
 //
-// Brand attribution rides an AsyncLocalStorage so concurrent requests can't contaminate each
-// other; entry points wrap their work in withBrandContext(brandId, fn).
-
-type BrandLogContext = {
-  /** `null` on a job asked for without a brand: then `orgId` is who pays, and nothing is attributed. */
-  brandId: string | null;
-  /**
-   * Chi paga quando non c'è un brand. `sum_org_ai_cost_usd` sommava passando da `brands`, quindi
-   * una riga senza brand valeva zero per ogni organizzazione: il cancello sopra sarebbe passato
-   * per sempre. La riga la porta scritta addosso (`ai_calls.org_id`), e la somma la trova.
-   */
+type LogContext = {
   orgId?: string;
-  /** Set when the caller already knows the plan. `undefined` = not resolved yet (look up). */
-  plan?: string | null;
   /** Costo fatturato dal gateway in questo scope, sommato: la fattura vera del turno. */
   llmCostUsd?: number;
   /** Le fatture gia` ritirate e scritte in `ai_calls`, per chi deve DIRE quanto e` costato. */
   billedUsd?: number;
 };
 
-const brandStorage = new AsyncLocalStorage<BrandLogContext>();
+const logStorage = new AsyncLocalStorage<LogContext>();
 
-const PLAN_CACHE_TTL_MS = 60_000;
-const planCache = new Map<string, { plan: string | null; at: number }>();
-
-export function rememberBrandPlan(brandId: string, plan: string | null): void {
-  planCache.set(brandId, { plan, at: Date.now() });
-}
-
-function cachedBrandPlan(brandId: string): string | null | undefined {
-  const hit = planCache.get(brandId);
-  if (!hit || Date.now() - hit.at >= PLAN_CACHE_TTL_MS) return undefined;
-  return hit.plan;
-}
-
-// `ai_calls.org_id` is NOT NULL — every row needs one, even a brand-attributed row that never
-// passed `orgId` explicitly. Same TTL and shape as the plan cache, keyed the same way, because
-// both come off the same `brands` row and a brand's org never changes under it.
-const orgIdCache = new Map<string, { orgId: string | null; at: number }>();
-
-function cachedBrandOrgId(brandId: string): string | null | undefined {
-  const hit = orgIdCache.get(brandId);
-  if (!hit || Date.now() - hit.at >= PLAN_CACHE_TTL_MS) return undefined;
-  return hit.orgId;
-}
-
-async function resolveBrandPlanAndOrgId(brandId: string): Promise<{ plan: string | null; orgId: string | null }> {
-  const cachedPlan = cachedBrandPlan(brandId);
-  const cachedOrgId = cachedBrandOrgId(brandId);
-  if (cachedPlan !== undefined && cachedOrgId !== undefined) return { plan: cachedPlan, orgId: cachedOrgId };
-  try {
-    const admin = createAdminClient();
-    const { data } = await admin.from('brands').select('plan, org_id').eq('id', brandId).maybeSingle();
-    const plan = (data?.plan as string | null | undefined) ?? null;
-    const orgId = (data?.org_id as string | null | undefined) ?? null;
-    rememberBrandPlan(brandId, plan);
-    orgIdCache.set(brandId, { orgId, at: Date.now() });
-    return { plan, orgId };
-  } catch {
-    return { plan: null, orgId: null };
-  }
-}
-
-/**
- * Run `fn` in a brand-scoped async context: every AI call inside it, and in any async descendant,
- * resolves brandId from here. Pass `plan` when the brand row is already loaded, or `logAiCall`
- * looks it up (cached) before writing cost_usd.
- */
-export function withBrandContext<T>(brandId: string, fn: () => T, plan?: string | null): T {
-  const ctx: BrandLogContext = { brandId, plan };
-  if (plan !== undefined) rememberBrandPlan(brandId, plan);
-  else {
-    const cached = cachedBrandPlan(brandId);
-    if (cached !== undefined) ctx.plan = cached;
-  }
-  return brandStorage.run(ctx, fn);
-}
-
-/**
- * Lo stesso scope per un lavoro che un brand non ce l'ha: a pagare è l'organizzazione, e ogni riga
- * scritta qui dentro la nomina. Senza, la spesa non atterra da nessuna parte — nessun brand da
- * attribuire, e la somma dell'organizzazione passa dai brand.
- */
 export function withOrgContext<T>(orgId: string, fn: () => T): T {
-  return brandStorage.run({ brandId: null, orgId }, fn);
+  return logStorage.run({ orgId }, fn);
 }
 
 const nodeStorage = new AsyncLocalStorage<string>();
@@ -113,8 +40,8 @@ export function withNodeContext<T>(nodeId: string, fn: () => T): T {
 export type BillingScope = { run: <T>(fn: () => T) => T; gatewayUsd: () => number };
 
 export function billingScope(orgId: string): BillingScope {
-  const ctx: BrandLogContext = { brandId: null, orgId };
-  return { run: (fn) => brandStorage.run(ctx, fn), gatewayUsd: () => ctx.llmCostUsd ?? 0 };
+  const ctx: LogContext = { orgId };
+  return { run: (fn) => logStorage.run(ctx, fn), gatewayUsd: () => ctx.llmCostUsd ?? 0 };
 }
 
 
@@ -125,13 +52,13 @@ export function billingScope(orgId: string): BillingScope {
  * copia della risposta, senza rallentare quella che sta leggendo l'utente.
  */
 export function noteLlmCost(usd: number): void {
-  const ctx = brandStorage.getStore();
+  const ctx = logStorage.getStore();
   if (!ctx || !Number.isFinite(usd) || usd < 0) return;
   ctx.llmCostUsd = (ctx.llmCostUsd ?? 0) + usd;
 }
 
 export function takeLlmCost(): number | undefined {
-  const ctx = brandStorage.getStore();
+  const ctx = logStorage.getStore();
   const cost = ctx?.llmCostUsd;
   if (!ctx || cost == null) return undefined;
   ctx.llmCostUsd = undefined;
@@ -144,7 +71,7 @@ export function takeLlmCost(): number | undefined {
  * riga raddoppierebbero il conto senza che nessuna somma lo smentisca.
  */
 function noteBilledUsd(usd: number): void {
-  const ctx = brandStorage.getStore();
+  const ctx = logStorage.getStore();
   if (!ctx || !Number.isFinite(usd) || usd < 0) return;
   ctx.billedUsd = (ctx.billedUsd ?? 0) + usd;
 }
@@ -156,35 +83,15 @@ function noteBilledUsd(usd: number): void {
  * `undefined` significa che nessuna fattura e` arrivata — non zero.
  */
 export function billedUsdInScope(): number | undefined {
-  return brandStorage.getStore()?.billedUsd;
+  return logStorage.getStore()?.billedUsd;
 }
 
-/** Read the active brandId from the current async scope (null = not in a brand context). */
-export function getBrandContext(): string | null {
-  return brandStorage.getStore()?.brandId ?? null;
-}
-
-/** The org paying for the current scope when no brand does (null = there is a brand, or no scope). */
 export function getOrgContext(): string | null {
-  return brandStorage.getStore()?.orgId ?? null;
-}
-
-/** `undefined` = no brand context / not resolved yet. `null` = free tier. */
-export function getBrandPlanContext(): string | null | undefined {
-  return brandStorage.getStore()?.plan;
-}
-
-/** Stamp the active scope + cache once a brands row is loaded. */
-export function setBrandPlanContext(plan: string | null): void {
-  const ctx = brandStorage.getStore();
-  if (ctx?.brandId) {
-    ctx.plan = plan;
-    rememberBrandPlan(ctx.brandId, plan);
-  }
+  return logStorage.getStore()?.orgId ?? null;
 }
 
 // One-time SYSTEM-initiated generation (onboarding) must always complete: it is acquisition cost,
-// not brand spend, and it has its own runaway watchdog. Cost is still LOGGED; only the gate is off.
+// not org spend, and it has its own runaway watchdog. Cost is still LOGGED; only the gate is off.
 const creditExemptStorage = new AsyncLocalStorage<boolean>();
 
 /** Run `fn` with the credit gate disabled (see gateCredits). Use only for one-time system flows. */
@@ -203,8 +110,8 @@ export function isCreditExempt(): boolean {
  * superfici diverse — l'autopilot, la chat in-app e gli agenti esterni — quindi il totale di
  * un'etichetta è un tetto, non un'attribuzione.
  *
- * Uno scope suo e non un campo dentro `BrandLogContext`: una rotta che rientra in
- * `withBrandContext` per conto proprio ricomincia quel contesto da capo, e si porterebbe via il
+ * Uno scope suo e non un campo dentro `LogContext`: una rotta che rientra in
+ * `withOrgContext` per conto proprio ricomincia quel contesto da capo, e si porterebbe via il
  * nome del tool senza che niente lo dica.
  */
 const toolStorage = new AsyncLocalStorage<string>();
@@ -226,22 +133,16 @@ function toolTag(): string | undefined {
   return tool ? `tool:${tool}` : undefined;
 }
 
-/**
- * Missing context is LOGGED, not thrown: pre-brand flows (onboarding website analysis) have no
- * brand yet, and an unattributed row (`brand_id is null` finds the gaps) beats a 500 at the user.
- */
-export function requireBrandContext(opts?: { brandId?: string }): string | null {
-  const scope = brandStorage.getStore();
-  const id = opts?.brandId ?? scope?.brandId;
+export function requireOrgContext(opts?: { orgId?: string }): string | null {
+  const id = opts?.orgId ?? logStorage.getStore()?.orgId;
   if (id) return id;
-  if (scope?.orgId) return null;
-  console.error('[ai-log] AI call without brand context — credits will not be billed to any brand. Wrap the entry point in withBrandContext(brandId, fn).');
+  console.error('[ai-log] AI call without org context — credits will not be billed to any org. Wrap the entry point in withOrgContext(orgId, fn).');
   return null;
 }
 
 export type AiCallLog = {
   label: string;
-  // LLM providers plus every paid non-LLM API that bills brand credits, so one timeline covers
+  // LLM providers plus every paid non-LLM API that bills org credits, so one timeline covers
   // every external call. Non-obvious members:
   //   'pagespeed' free (Google quota), logged anyway; 'ads' is the management fee, not an API call;
   //   'submitforbacklinks' a flat per-submission fee.
@@ -252,7 +153,7 @@ export type AiCallLog = {
   // Flat per-request price for non-token providers; when set it wins over the token rates.
   flatCostUsd?: number;
   creditCap?: number;
-  // Provider-reported credits, observability only — brand billing still sums cost_usd.
+  // Provider-reported credits, observability only — org billing still sums cost_usd.
   providerCredits?: number;
   prompt?: string; // hashed + measured, never stored
   ms: number;
@@ -267,11 +168,10 @@ export type AiCallLog = {
   // Google Search queries performed, $14/1k on Gemini 3.x past the 5k/month free tier.
   groundingQueries?: number;
   serviceTier?: string;
-  brandId?: string;
   userId?: string;
   threadId?: string;
   context?: string;
-  /** Esplicito vince sullo scope: una riga di progetto porta l'org anche quando c'è un brand. */
+  /** Esplicito vince sullo scope: una riga di progetto porta l'org. */
   orgId?: string;
   /** Come è stata causata la chiamata. Assente = `user`. Un agente passa `agent` + `agentKey`. */
   actorKind?: 'user' | 'agent' | 'system';
@@ -317,15 +217,6 @@ const RATES: Record<string, { input: number; cachedInput: number; output: number
 
 function usesGeminiVisualCreditShare(entry: AiCallLog): boolean {
   return isGeminiFlashId(entry.model) || !entry.model || isNanoBananaProId(entry.model);
-}
-
-function planForVisualShare(explicit?: string | null): string | null | undefined {
-  if (explicit !== undefined) return explicit;
-  const fromAls = getBrandPlanContext();
-  if (fromAls !== undefined) return fromAls;
-  const brandId = getBrandContext();
-  if (brandId) return cachedBrandPlan(brandId);
-  return undefined;
 }
 
 /**
@@ -403,7 +294,7 @@ export function computeCostUsd(entry: AiCallLog, plan?: string | null): number |
     (entry.groundingQueries ?? 0) * (rate.searchPerQuery ?? 0);
   // Sempre 1 (vedi geminiVisualCreditShare): l'unica cucitura da cui uno sconto rientrerebbe.
   // cost_usd si scrive QUI, al log — le righe vecchie tengono la share in vigore quando girarono.
-  const share = usesGeminiVisualCreditShare(entry) ? geminiVisualCreditShare(planForVisualShare(plan)) : 1;
+  const share = usesGeminiVisualCreditShare(entry) ? geminiVisualCreditShare(plan) : 1;
   return Math.round(usd * share * 1e6) / 1e6;
 }
 
@@ -454,20 +345,8 @@ function sumTokens(entry: AiCallLog): number | null {
   return parts.reduce((n: number, p) => n + (p ?? 0), 0);
 }
 
-/**
- * `ai_calls.org_id` è NOT NULL: ogni riga ne ha bisogno, anche quella attribuita a un brand.
- * Esplicito vince, poi lo scope (`withOrgContext`), poi il brand (`brands.org_id`, cache TTL
- * come il piano). Se nessuno dei tre risponde la riga non si scrive — meglio un buco loggato
- * forte che un vincolo NOT NULL violato in silenzio da PostgREST.
- */
-async function resolveOrgId(entry: AiCallLog, brandId: string | null): Promise<string | null> {
-  if (entry.orgId) return entry.orgId;
-  const fromScope = getOrgContext();
-  if (fromScope) return fromScope;
-  if (!brandId) return null;
-  const cached = cachedBrandOrgId(brandId);
-  if (cached !== undefined) return cached;
-  return (await resolveBrandPlanAndOrgId(brandId)).orgId;
+async function resolveOrgId(entry: AiCallLog): Promise<string | null> {
+  return entry.orgId ?? getOrgContext();
 }
 
 export function logAiCall(entry: AiCallLog): void {
@@ -486,37 +365,28 @@ export function logAiCall(entry: AiCallLog): void {
     if (entry.ok && entry.flatCostUsd != null) noteBilledUsd(entry.flatCostUsd);
 
     const admin = createAdminClient();
-    const brandId = entry.brandId ?? getBrandContext();
     const nodeId = nodeStorage.getStore() ?? null;
-    const planFromAls = getBrandPlanContext();
-    // Letti QUI, sincroni, come il brand: dopo il primo await lo scope è di chi ha aspettato.
+    // Letti QUI, sincroni, come l'org: dopo il primo await lo scope è di chi ha aspettato.
     const operation = operationTag(entry);
     const status = statusFor(entry);
     void (async () => {
-      const orgId = await resolveOrgId(entry, brandId);
+      const orgId = await resolveOrgId(entry);
       if (!orgId) {
         console.error(
-          `[ai-log] no org_id resolved for operation "${operation}" (brandId=${brandId ?? 'null'}) — row NOT written, cost is unbilled and invisible.`
+          `[ai-log] no org_id resolved for operation "${operation}" — row NOT written, cost is unbilled and invisible.`
         );
         return;
       }
-      const plan =
-        planFromAls !== undefined
-          ? planFromAls
-          : brandId
-            ? (await resolveBrandPlanAndOrgId(brandId)).plan
-            : null;
       // Il listino serve PRIMA di prezzare, e solo per le righe che possono averne bisogno: la
       // prima chiamata del processo lo carica, le altre lo trovano in memoria.
       if (entry.provider === 'llm' && entry.flatCostUsd == null) {
         const { ensureGatewayModels } = await import('$lib/server/openrouter-models');
         await ensureGatewayModels();
       }
-      const costUsd = computeCostUsd(entry, plan);
+      const costUsd = computeCostUsd(entry);
       const billedCredits = billedToUser(entry) && costUsd != null && costUsd > 0 ? creditsOf(entry, costUsd) : null;
       const row: AiCallInsert = {
         org_id: orgId,
-        brand_id: brandId,
         project_id: entry.projectId ?? null,
         provider: entry.provider,
         model: entry.model ?? null,

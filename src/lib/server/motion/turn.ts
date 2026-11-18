@@ -41,11 +41,10 @@ import { CutGate, KEPT_CUT, REVIEW_CUT, cutGate, keepsCut, reviewedBefore, type 
 import type { SavedTool } from '$lib/server/repos/chat';
 import { tileSheet } from '$lib/server/motion/contact-sheet';
 import { COPY_SCHEMA, copywrite } from '$lib/server/motion/copywriter';
-import { projectMemory } from '$lib/server/motion/studio-memory';
 import { DRAWS_FIX_RESERVE, REVIEWED, STUDIO_ROSTER, StudioRole, roleBudgetUsd, roleLooks, roleModel, roleTools, turnRole } from '$lib/server/motion/studio-roster';
 import { Looks, ownLook } from '$lib/server/motion/look';
 import { dropWorkingDoc, keepWorkingDoc } from '$lib/server/motion/working-doc';
-import { appAccountKept, liveWebDeps, productImport, screenedImport, uiCapture, webViewPrefix } from '$lib/server/web/live';
+import { appAccountKept, liveWebDeps, uiCapture, webViewPrefix } from '$lib/server/web/live';
 import { CAPTURE_MAX_EDGE, storeImage } from './asset-import';
 import { ATTACHMENT_PORTS } from '$lib/server/chat-attachments/register';
 import { createMotionTools, selectionNote, type MotionSession } from '$lib/server/motion/motion-tools';
@@ -58,7 +57,7 @@ import { speakVoiceover } from '$lib/server/motion/voiceover';
 import { layMusic } from '$lib/server/motion/music';
 import { laySfx } from '$lib/server/motion/sfx';
 import { RevisionOutcome, readRevision } from '$lib/server/repos/motion-revisions';
-import { brandSources } from '$lib/server/motion/brand-sources';
+import { siteSources } from '$lib/server/motion/site-sources';
 import { storyboardStore } from '$lib/server/motion/storyboard';
 import { boardNote } from '$lib/motion/storyboard';
 import { DESCRIBE_FRAMES, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBlocked, docTexts, checkMessage, keyFrameTimes, openErrors, selfCheckDue, stillOpenNote, finalReply, viewedReferences, usageByModel, visionStep, type Frame } from '$lib/server/motion/frames';
@@ -96,7 +95,7 @@ export type MotionTurnInput = {
   db: Db;
   userId: string;
   orgId: string;
-  project: { id: string; brandId: string | null; mode: ProjectMode };
+  project: { id: string; mode: ProjectMode };
   motion: { record: CanvasNodeRecord; node: MotionNode };
   message: string;
   attachments?: ChatAttachment[];
@@ -118,8 +117,8 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
 
   const [head, tokens, threadId] = await Promise.all([
     headOrNew(db, nodeScope, motion.node),
-    motionTokens(db, { orgId, brandId: project.brandId }),
-    openNodeThread(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, brandId: project.brandId })
+    motionTokens(),
+    openNodeThread(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId })
   ]);
   const screened = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: promptTexts(message, head.doc), scope: { orgId, userId, projectId: project.id, nodeId: motion.record.id, actor: requester } });
   if (!screened.ok) {
@@ -160,14 +159,13 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   const cut = new AbortController();
 
   const screenPicture = (url: string) => ATTACHMENT_PORTS.screenImage({ orgId, mode: project.mode, url });
-  const sources = brandSources(db, { orgId, userId, projectId: project.id, canvasId: motion.record.canvasId, brandId: project.brandId, screen: screenPicture }, (usd) => {
+  const sources = siteSources(db, { orgId, userId, projectId: project.id, canvasId: motion.record.canvasId, screen: screenPicture }, (usd) => {
     spent += usd;
   });
   const picked = await importFollowed(readAnswer(message), sources.importAsset, assets);
   session.pickAssets = picked.ids;
   const openingRound = role === StudioRole.Director ? Round.Research : Round.Edit;
-  const memory = role === StudioRole.Director ? await projectMemory(db, { orgId, projectId: project.id, nodeId: motion.record.id }).catch(() => '') : '';
-  const openingText = [message, note, picked.note, memory].filter(Boolean).join('\n\n');
+  const openingText = [message, note, picked.note].filter(Boolean).join('\n\n');
   const videoBreakdown = breakdownReader(db, { orgId, projectId: project.id, mode: project.mode });
   const openingContent = await userContent(db, { orgId, text: openingText, attachments, hint: motionPlaceHint, breakdown: videoBreakdown });
   let seamDraws = 0;
@@ -219,7 +217,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     web: {
       ...liveWebDeps(
         db,
-        { orgId, userId, projectId: project.id, brandId: project.brandId, mode: project.mode },
+        { orgId, userId, projectId: project.id, mode: project.mode },
         (usd) => {
           spent += usd;
         },
@@ -232,7 +230,6 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
           return stored.asset.id;
         }
       ),
-      importProducts: productImport(screenedImport(sources.importAsset, screenPicture, assets)),
       avoid: avoidedImages(pick),
       shown: shownRefs(turns),
       rejections: rejectedRounds([...turns, { role: 'user', content: message }])
@@ -248,8 +245,8 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
       spent += out.usd;
       return out.script;
     },
-    captureUi: uiCapture(db, { orgId, userId, projectId: project.id, brandId: project.brandId }),
-    appAccountKept: appAccountKept(db, { orgId, userId, projectId: project.id, brandId: project.brandId }),
+    captureUi: uiCapture(db, { orgId, userId, projectId: project.id }),
+    appAccountKept: appAccountKept(db, { orgId, userId, projectId: project.id }),
     readUi: uiReader({ ask: (q) => withOrgContext(orgId, () => llmStructured({ ...q, model: llmVisionModel() ?? model, label: 'motion-recreate-ui' })), fetchBytes: fetchImageBytes }),
     check: async (callId, doc, name) => {
       BROWSER_DRAWS[browser]();
@@ -290,7 +287,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   const vision = BROWSER_VISION[browser](visionModel);
   const asksPick = !choosesForUser(message);
   const toolNames = roleTools(role, Object.keys(tools)).filter((name) => (vision === Vision.Available || (name !== VIEW_FRAMES && name !== DESCRIBE_FRAMES)) && (asksPick || name !== ASK_REFERENCE_PICK));
-  const system = motionAgentPrompt({ brandName: project.brandId ? tokens.name : null, selectionNote: selectionNote(head.doc, selection), vision, frame: head.doc, style: styleOf(head.doc) });
+  const system = motionAgentPrompt({ selectionNote: selectionNote(head.doc, selection), vision, frame: head.doc, style: styleOf(head.doc) });
   const t0 = Date.now();
   const stepModels: string[] = [];
   const openingMessages = [...history, { role: 'user', content: openingContent }] as ModelMessage[];

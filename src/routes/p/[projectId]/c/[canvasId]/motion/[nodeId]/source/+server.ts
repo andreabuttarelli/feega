@@ -4,7 +4,6 @@ import { listMemberships } from '$lib/server/repos/orgs';
 import { findCanvasForUser } from '$lib/server/canvas/lookup';
 import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-server';
 import { findMotionNode, motionTokens } from '$lib/server/motion/editor';
-import { listProjects } from '$lib/server/repos/projects';
 import { motionSource } from '$lib/server/motion/sources';
 import { MEDIA_UUID_RE } from '$lib/media-url';
 import { revalidated } from '$lib/server/revalidated';
@@ -38,6 +37,5 @@ export const GET: RequestHandler = async ({ locals, params, request }) => {
   if (!source) {
     return new Response(null, { status: HTTP_NO_CONTENT });
   }
-  const brandId = (await listProjects(db, found.orgId)).find((p) => p.id === params.projectId)?.brandId ?? null;
-  return revalidated(request, JSON.stringify({ ...source, tokens: await motionTokens(db, { orgId: found.orgId, brandId }) }));
+  return revalidated(request, JSON.stringify({ ...source, tokens: await motionTokens() }));
 };

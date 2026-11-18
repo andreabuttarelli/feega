@@ -1,7 +1,6 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { ProjectEvent, SettingsActions, SettingsEvent } from '../event';
-import { archiveProject, renameProject, setProjectBrand } from '$lib/server/repos/projects';
-import { createOrgBrand, findBrand, listOrgBrands } from '$lib/server/repos/brands';
+import { archiveProject, renameProject } from '$lib/server/repos/projects';
 import type { Db } from '$lib/server/db/client';
 import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
 import { modeOf, ProjectMode } from '$lib/project-mode';
@@ -44,24 +43,16 @@ async function ownedProject(event: ProjectEvent): Promise<OwnedProject> {
   return { db, orgId: row.org_id, projectId, name: row.name };
 }
 
-function returnPathWithin(projectId: string, raw: FormDataEntryValue | null): string | null {
-  const path = String(raw ?? '');
-  return path.startsWith(`/p/${projectId}/`) ? path : null;
-}
-
 export const load = async ({ parent, locals }: SettingsEvent) => {
-  const { project, org, brand, uncensored } = await parent();
+  const { project, org, uncensored } = await parent();
   const db = await locals.db();
   if (!db) {
     throw error(500, 'sessione senza client');
   }
 
-  const orgBrands = await listOrgBrands(db, org.id);
   return {
     project: { id: project.id, name: project.name, mode: modeOf(project.mode) },
     uncensored: { lock: uncensored.lock, visible: uncensoredSectionVisible(uncensored.lock), text: UNCENSORED_LOCK_TEXT[uncensored.lock as UncensoredLock] },
-    linkedBrand: brand ? { id: brand.id, name: brand.name } : null,
-    orgBrands: orgBrands.map((b) => ({ id: b.id, name: b.name })),
     appAccount: await readAppAccount(db, { orgId: org.id, projectId: project.id })
   };
 };
@@ -102,42 +93,6 @@ export const actions: SettingsActions = {
     return { renamed: true };
   },
 
-  linkBrand: async (event) => {
-    const { db, orgId, projectId } = await ownedProject(event);
-    const fd = await event.request.formData();
-    const brandId = String(fd.get('brandId') ?? '').trim();
-    if (!brandId) {
-      return fail(400, { error: 'brand_required' });
-    }
-
-    const brand = await findBrand(db, { orgId, brandId });
-    if (!brand) {
-      return fail(404, { error: 'brand_not_found' });
-    }
-
-    await setProjectBrand(db, { orgId, projectId, brandId });
-    const back = returnPathWithin(projectId, fd.get('returnTo'));
-    if (back) {
-      throw redirect(303, back);
-    }
-    return { linked: true };
-  },
-
-  createBrand: async (event) => {
-    const { db, orgId, projectId } = await ownedProject(event);
-    const name = String((await event.request.formData()).get('name') ?? '').trim();
-    if (!name) {
-      return fail(HTTP_BAD_REQUEST, { error: 'name_required' });
-    }
-
-    try {
-      await setProjectBrand(db, { orgId, projectId, brandId: await createOrgBrand(db, { orgId, name }) });
-    } catch (e) {
-      return fail(HTTP_BAD_REQUEST, { error: e instanceof Error ? e.message : 'Could not create the brand' });
-    }
-    return { linked: true };
-  },
-
   saveAppAccount: async (event) => {
     const { db, orgId, projectId } = await ownedProject(event);
     const fd = await event.request.formData();
@@ -151,12 +106,6 @@ export const actions: SettingsActions = {
     const { db, orgId, projectId } = await ownedProject(event);
     await appAccountStore(db, { orgId, projectId, actor: { kind: 'user', id: await userIdOf(event) } }).forget();
     return { forgotten: true };
-  },
-
-  unlinkBrand: async (event) => {
-    const { db, orgId, projectId } = await ownedProject(event);
-    await setProjectBrand(db, { orgId, projectId, brandId: null });
-    return { unlinked: true };
   },
 
   delete: async (event) => {

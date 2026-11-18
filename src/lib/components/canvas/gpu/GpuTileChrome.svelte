@@ -30,9 +30,6 @@
   <div class="node-label" class:is-chosen={chrome.ring === NodeChrome.Selected}>
     <Icon size={12} strokeWidth={1.8} />
     <span>{label}</span>
-    {#if tile.inPost}
-      <span class="in-post-marker" title="Used in a post">●</span>
-    {/if}
   </div>
 {/if}
 
@@ -192,12 +189,6 @@
   .node-label span {
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-  .in-post-marker {
-    flex: none;
-    font-size: 8px;
-    line-height: 1;
-    color: var(--accent, #2563eb);
   }
   .node-label.is-chosen {
     color: var(--ink, #1d1d1f);

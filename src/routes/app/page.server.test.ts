@@ -4,7 +4,7 @@ import { ProjectMode } from '$lib/project-mode';
 const homePathFor = vi.fn(async () => '/app');
 vi.mock('$lib/server/tenancy/entry', async (original) => ({ ...(await original<object>()), homePathFor }));
 
-const project = { id: 'p1', name: 'Launch', slug: 'launch', brandId: null, archivedAt: null, lastActiveAt: '2026-10-03', mode: ProjectMode.Standard };
+const project = { id: 'p1', name: 'Launch', slug: 'launch', archivedAt: null, lastActiveAt: '2026-10-03', mode: ProjectMode.Standard };
 const listProjects = vi.fn(async () => [project]);
 const createProject = vi.fn(async (_db: unknown, input: { name: string }) => ({ ...project, id: 'p-new', name: input.name }));
 vi.mock('$lib/server/repos/projects', () => ({ listProjects, createProject }));
@@ -27,10 +27,9 @@ vi.mock('$lib/server/repos/gallery', () => ({ listGallery }));
 vi.mock('$lib/server/repos/dashboard', () => ({
   listRecentCanvases: vi.fn(async () => [{ id: 'c1', projectId: 'p1', name: 'Board', updatedAt: '2026-10-03' }]),
   listRecentImages: vi.fn(async () => []),
-  listRecentBatches: vi.fn(async () => [{ id: 'b1', projectId: 'p1', name: 'Autumn', status: 'running', createdAt: '2026-10-03' }]),
   listRecentNodes: vi.fn(async () => [])
 }));
-vi.mock('$lib/server/studio/studio-media', () => ({ signedAssets: vi.fn(async () => ({ assets: new Map(), urls: {} })) }));
+vi.mock('$lib/server/dashboard/signed-assets', () => ({ signedAssets: vi.fn(async () => ({ assets: new Map(), urls: {} })) }));
 
 const listMemberships = vi.fn(async () => [
   { org: { id: 'org-a', name: 'A', slug: 'a' }, role: 'owner' },
@@ -98,7 +97,7 @@ describe('/app is the dashboard for a returning user', () => {
 
     expect(data.dashboard).toBeUndefined();
     expect(listProjects).not.toHaveBeenCalled();
-    expect(data.tools.map((t) => t.id)).toEqual(['studio', 'compose', 'upscale']);
+    expect(data.tools.map((t) => t.id)).toEqual(['compose', 'upscale']);
   });
 
   it('un ritorno alla home non rifà il giro d’ingresso: guscio e progetto vengono dal layout', async () => {

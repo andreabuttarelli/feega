@@ -201,11 +201,6 @@ function postView({ node }: ViewInput): SharedView {
   return caption || media.length ? { kind: 'post', caption, media } : EMPTY;
 }
 
-function adsView({ node }: ViewInput): SharedView {
-  const query = str(node.data.page_name) || str(node.data.search_terms);
-  return query ? { kind: 'ads', query, country: str(node.data.country) } : EMPTY;
-}
-
 function docView({ node }: ViewInput): SharedView {
   const content = str(node.data.content);
   return content ? { kind: 'doc', content } : EMPTY;
@@ -243,7 +238,6 @@ export const SHARED_VIEW_OF: Record<NodeType, (input: ViewInput) => SharedView |
   social_account_feed: feedView,
   social_post_mockup: postView,
   products: productsView,
-  ads: adsView,
   influencer: influencerView,
   list: listView,
   select: selectView,
@@ -254,7 +248,6 @@ export const SHARED_VIEW_OF: Record<NodeType, (input: ViewInput) => SharedView |
   model3d: model3dView,
   motion: () => EMPTY,
   element: () => EMPTY,
-  studio_batch: () => EMPTY,
   section: () => EMPTY,
   technique: () => EMPTY
 };

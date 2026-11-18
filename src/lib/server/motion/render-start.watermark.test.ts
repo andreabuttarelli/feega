@@ -23,7 +23,7 @@ vi.mock('./render-run', async (importOriginal) => ({
 const { startFarmRender } = await import('./render-start');
 
 const head = { version: 3, doc: newMotionDoc(MotionFormat.Landscape) };
-const scope = { orgId: 'org-1', projectId: 'p1', canvasId: 'c1', nodeId: 'n1', userId: 'u1', brandId: null, editorUrl: '/e' };
+const scope = { orgId: 'org-1', projectId: 'p1', canvasId: 'c1', nodeId: 'n1', userId: 'u1', editorUrl: '/e' };
 
 describe('a server render', () => {
   it('draws the watermark for a free org', async () => {

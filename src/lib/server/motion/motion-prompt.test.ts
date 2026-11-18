@@ -7,7 +7,6 @@ import { LOOP_RULE } from '$lib/motion/loop';
 
 const prompt = (style: MotionStyle) =>
   motionAgentPrompt({
-    brandName: null,
     selectionNote: '',
     vision: Vision.Available,
     style

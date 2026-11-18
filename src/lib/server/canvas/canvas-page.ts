@@ -88,7 +88,6 @@ import { pasteNodes, type PastedEdge, type PastedNode } from '$lib/server/canvas
 import { parseUndoItem, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { canvasSnapshot, loadDownloaded, loadGenRuns } from '$lib/server/canvas/snapshot';
-import { listSourcesForNodes } from '$lib/server/repos/posts';
 import { nextStepsFor, nodeTextCost } from '$lib/server/canvas/node-hints';
 import { applyEffectsNode } from '$lib/server/canvas/apply-effects';
 import { makeEffectsPair } from '$lib/server/canvas/effects-actions';
@@ -100,8 +99,6 @@ import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib
 import { canvasPath } from '$lib/server/tenancy/entry';
 import { renameProject } from '$lib/server/repos/projects';
 import { canvasRevision, recordsRevision } from '$lib/server/canvas/revision';
-import { motionTokens } from '$lib/server/motion/editor';
-import { lookOf } from '$lib/server/motion/brand-look';
 import { restackAskSchema, restackNodes } from '$lib/server/canvas/restack-nodes';
 import { frameAskSchema, frameElements, groupAskSchema, groupElements, stackAskSchema, stackElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
@@ -126,7 +123,7 @@ import { DropOn, OutputKind } from '$lib/motion/move-element';
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
 // minuto, e il default della piattaforma è sotto quella soglia. Senza, la richiesta muore a metà
 // e il giro resta `running` senza che nessuno lo chiuda: lo stesso valore che porta ogni altra
-// rotta che genera un'immagine (`api/v1/brands/[slug]/media/images`).
+// rotta che genera un'immagine.
 export const config = { maxDuration: 300 };
 
 /**
@@ -142,7 +139,7 @@ export const config = { maxDuration: 300 };
  */
 type CanvasParams = { projectId: string; canvasId: string };
 
-type Scope = { db: Db; orgId: string; canvasId: string; canvas: Canvas; userId: string; accountCreatedAt: string; mode: ProjectMode; projectBrandId: string | null };
+type Scope = { db: Db; orgId: string; canvasId: string; canvas: Canvas; userId: string; accountCreatedAt: string; mode: ProjectMode };
 
 /** Ogni gesto della tela che passa da qui è di una persona, mai un `system` muto: `canvas_events` deve saperlo. */
 function userActor(scope: { userId: string }): Actor {
@@ -209,7 +206,7 @@ async function scopeFor(locals: App.Locals, canvasId: string): Promise<Scope> {
     throw error(404, 'questa tela non esiste, o non è tua');
   }
 
-  return { db, orgId: found.orgId, canvasId, canvas: found.canvas, userId: user.id, accountCreatedAt: user.created_at, mode, projectBrandId: found.projectBrandId };
+  return { db, orgId: found.orgId, canvasId, canvas: found.canvas, userId: user.id, accountCreatedAt: user.created_at, mode };
 }
 
 async function scopeAllowing(locals: App.Locals, canvasId: string, capability: Capability): Promise<Scope> {
@@ -261,9 +258,9 @@ function rowsRequest(fd: FormData) {
 }
 
 export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams>) => {
-  const { db, orgId, canvasId, canvas, mode, projectBrandId, userId, accountCreatedAt } = await scopeFor(locals, params.canvasId);
+  const { db, orgId, canvasId, canvas, mode, userId, accountCreatedAt } = await scopeFor(locals, params.canvasId);
 
-  const [nodes, listed, catalogue, shareToken, references, orgTemplates, handoff, previews, look] = await Promise.all([
+  const [nodes, listed, catalogue, shareToken, references, orgTemplates, handoff, previews] = await Promise.all([
     listNodes(db, { orgId, canvasId }),
     listConnections(db, { orgId, canvasId }),
     projectCatalogue(db, { orgId, mode }),
@@ -271,19 +268,15 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
     referenceLibrary(db, { orgId, projectId: canvas.projectId }),
     templateLibrary(db, { orgId, actor: userActor({ userId }) }).own(),
     chatHandoff(db, { orgId, projectId: canvas.projectId }, url),
-    cardPreviews(db, { orgId, projectId: canvas.projectId }).catch(() => ({})),
-    motionTokens(db, { orgId, brandId: projectBrandId }).then(lookOf).catch(() => '')
+    cardPreviews(db, { orgId, projectId: canvas.projectId }).catch(() => ({}))
   ]);
 
-  const [connections, runs, { products, socialPosts, influencers }, sources, onboarding] = await Promise.all([
+  const [connections, runs, { products, socialPosts, influencers }, onboarding] = await Promise.all([
     canvasFrameInputs(db, { orgId, actor: userActor({ userId }), projectId: canvas.projectId }, nodes, listed),
     loadGenRuns(db, { orgId, nodes }),
     loadDownloaded(db, { orgId, canvasId, nodes }),
-    listSourcesForNodes(db, nodes.map((node) => node.id)),
     firstRunFor(db, { userId, orgId, accountCreatedAt, nodeCount: nodes.length })
   ]);
-
-  const nodeIdsInPost = [...new Set(sources.map((source) => source.nodeId))];
 
   coreEvent(userId, CoreEvent.CanvasOpened, { canvas_id: canvasId }, orgId);
   return {
@@ -292,7 +285,6 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
     nodes,
     connections,
     revision: recordsRevision(nodes, connections),
-    look,
     catalogue,
     runs,
     products,
@@ -300,12 +292,10 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
     influencers,
     projectId: params.projectId,
     orgId,
-    nodeIdsInPost,
     shareToken,
     references,
     mode,
     musicEnabled: musicEnabled(),
-    projectBrandId,
     onboarding,
     orgTemplates,
     cardPreviews: previews
@@ -1290,7 +1280,7 @@ export const actions: Actions<CanvasParams> = {
     if (needsBrowser(rows.data) && !serverFramesOpen()) {
       return fail(503, { error: 'image export needs the server renderer, which is not available here' });
     }
-    const ports = selectionPorts({ db: scope.db, orgId: scope.orgId, projectId: scope.canvas.projectId, brandId: scope.projectBrandId, actor: userActor(scope) });
+    const ports = selectionPorts({ db: scope.db, orgId: scope.orgId, projectId: scope.canvas.projectId, actor: userActor(scope) });
     const shownAt = Number(fd.get('seconds'));
     const seconds = fd.has('seconds') && Number.isFinite(shownAt) && shownAt >= 0 ? shownAt : undefined;
     const out = await exportSelection(ports, { targets: [...frameIds.map((id) => ({ ...(viewOf(String(id)) ?? { nodeId: String(id) }), seconds })), ...elements.data.map((e) => ({ nodeId: e.frameId, elementId: e.elementId, seconds }))], rows: rows.data, name: String(fd.get('name') || 'Export') }).catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));

@@ -9,7 +9,6 @@ export const NODE_EMPTY_HINT: Record<NodeType, string> = {
   social_account_feed: 'Pick an account to sync its posts.',
   social_post_mockup: 'Connect an image or a text to preview the post.',
   products: 'Add a store URL to import products.',
-  ads: 'Search a brand or a keyword to see its ads.',
   influencer: 'Pick someone from the Influencers panel.',
   list: 'Add items to the list.',
   select: 'Connect a list to pick one item.',
@@ -21,6 +20,5 @@ export const NODE_EMPTY_HINT: Record<NodeType, string> = {
   motion: 'Open the editor to build a video from titles, media and 3D.',
   element: 'Select it to edit its fill, stroke and text.',
   technique: 'Connect the inputs this technique declares, then run it.',
-  section: 'Drag frames and nodes in to keep them together.',
-  studio_batch: 'Pick a Photo studio batch: its approved photos flow to the nodes you connect.'
+  section: 'Drag frames and nodes in to keep them together.'
 };

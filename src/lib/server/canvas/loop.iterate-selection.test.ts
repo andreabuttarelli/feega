@@ -11,7 +11,7 @@ import { fakeDb } from '$lib/server/db/fake-db';
  * Due immagini collegate a una `list` vuota (`data.items: []`), la `list` collegata `iterate` a
  * un nodo immagine: due iterazioni devono ricevere `baseMediaId` DIVERSO, il proprio item —
  * questo test le rigira una alla volta (`retryLoopCombination`, lo stesso motore di
- * `drainLoopQueue`) e lo verifica sulla chiamata reale a `generateImagesWithoutBrand`.
+ * `drainLoopQueue`) e lo verifica sulla chiamata reale a `generateImages`.
  */
 
 const { modalitiesOf } = vi.hoisted(() => ({ modalitiesOf: vi.fn() }));
@@ -25,8 +25,8 @@ vi.mock('$lib/server/ai-models-sync', async (importOriginal) => ({
 }));
 vi.mock('$lib/server/supabase-admin', () => ({ createAdminClient: () => ({}) }));
 
-const { generateImagesWithoutBrand } = vi.hoisted(() => ({ generateImagesWithoutBrand: vi.fn() }));
-vi.mock('$lib/server/media-generate', () => ({ generateImagesWithoutBrand }));
+const { generateImages } = vi.hoisted(() => ({ generateImages: vi.fn() }));
+vi.mock('$lib/server/media-generate', () => ({ generateImages }));
 
 const { screenModelInput } = vi.hoisted(() => ({ screenModelInput: vi.fn() }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput }));
@@ -76,8 +76,8 @@ beforeEach(() => {
   screenModelInput.mockResolvedValue({ ok: true });
   modalitiesOf.mockReset();
   modalitiesOf.mockResolvedValue({ input: ['text', 'image'], output: ['image'], synced_at: 'now' });
-  generateImagesWithoutBrand.mockReset();
-  generateImagesWithoutBrand.mockImplementation(async (_db, job) => ({
+  generateImages.mockReset();
+  generateImages.mockImplementation(async (_db, job) => ({
     ok: true,
     media: [{ storage_path: `out-${job.baseMediaId}.png`, mime: 'image/png', width: 1, height: 1 }],
     costUsd: 0.01
@@ -134,8 +134,8 @@ describe('un asse iterate su una list: ogni iterazione riceve il PROPRIO item, n
       combination: { label: '2', values: { [LIST_NODE]: '2' } }
     });
 
-    expect(generateImagesWithoutBrand).toHaveBeenCalledTimes(2);
-    const [firstCall, secondCall] = generateImagesWithoutBrand.mock.calls;
+    expect(generateImages).toHaveBeenCalledTimes(2);
+    const [firstCall, secondCall] = generateImages.mock.calls;
     const firstBaseMediaId = firstCall[1].baseMediaId;
     const secondBaseMediaId = secondCall[1].baseMediaId;
 
@@ -165,7 +165,7 @@ describe('a loop iteration is screened on the prompt it would send', () => {
       await retryLoopCombination(db, { orgId: ORG, projectId: PROJECT, canvasId: CANVAS, nodeId: GEN_NODE, userId: USER, outputListNodeId: OUTPUT_LIST, combination: { label, values: {} } });
     }
 
-    expect(generateImagesWithoutBrand).not.toHaveBeenCalled();
+    expect(generateImages).not.toHaveBeenCalled();
     expect(screenModelInput).toHaveBeenCalledTimes(2);
     expect(screenModelInput.mock.calls[0][1].texts.join(' ')).toContain('a beheading');
   });

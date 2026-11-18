@@ -97,9 +97,6 @@
   import RemixBanner from '$lib/components/gallery/RemixBanner.svelte';
   import { FramePeering, peerBoxes } from '$lib/canvas/frame-peering.svelte';
   import { framePresence } from '$lib/realtime/frame-presence';
-  import { handoffPath } from '$lib/canvas/chat-handoff';
-  import { BRAND_REMIX_PROMPT } from '$lib/gallery/model';
-  import { goto } from '$app/navigation';
   import { FrameExtras } from '$lib/canvas/frame-extras.svelte';
   import { historyPanel } from '$lib/canvas/history-panel.svelte';
   import { FRAME_DIALOG_ACTIONS, FRAME_MODE_ACTIONS, FrameDialog, isFrameDialogAction, isFrameModeAction } from '$lib/canvas/frame-dialogs';
@@ -1985,8 +1982,6 @@
   });
 
   const remixOf = $derived(panelExtras?.data?.gallery.remixOf ?? null);
-
-  const brandRemix = () => goto(handoffPath({ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '' }, BRAND_REMIX_PROMPT));
 
   const presence = framePresence();
   const peering = presence ? new FramePeering(presence) : null;
@@ -4967,7 +4962,7 @@
 
   {#if remixOf && spec.chrome}
     <div class="remix-banner">
-      <RemixBanner origin={remixOf} onbrand={brandRemix} />
+      <RemixBanner origin={remixOf} />
     </div>
   {/if}
 

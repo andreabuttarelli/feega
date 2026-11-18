@@ -4,8 +4,6 @@ import { listConnections, listNodes, type CanvasNodeRecord, type Connection } fr
 import { findAsset, findAssets } from '$lib/server/repos/assets';
 import { freeImageAssetOf } from './free-image';
 import { listInfluencerViews, signInfluencerViewFiles } from '$lib/server/repos/influencers';
-import { listItems } from '$lib/server/repos/product-batches';
-import { studioBatchOf, studioBatchSummary } from '$lib/canvas/studio-batch-node';
 import { findReferenceImages, signReferenceImages } from '$lib/server/repos/reference-images';
 import { expandSectionEdges } from '$lib/canvas/section-source';
 import { referencesOf } from '$lib/canvas/node-references';
@@ -129,15 +127,6 @@ async function influencerMediaUrls(db: Db, node: CanvasNodeRecord): Promise<stri
 
   const signed = await signInfluencerViewFiles(db, views.map((v) => v.storagePath));
   return views.map((v) => signed.get(v.storagePath)).filter((url): url is string => Boolean(url));
-}
-
-async function approvedPhotoUrls(db: Db, orgId: string, node: CanvasNodeRecord): Promise<string[]> {
-  const batchId = studioBatchOf(node)?.batchId;
-  if (!batchId) return [];
-
-  const { approvedAssetIds } = studioBatchSummary(await listItems(db, { orgId, batchId }));
-  const assets = await findAssets(db, { orgId, assetIds: approvedAssetIds });
-  return approvedAssetIds.map((id) => assets.get(id)?.url).filter((url): url is string => Boolean(url));
 }
 
 function listOfRow(node: CanvasNodeRecord): { itemKind: ListItemKind; items: ListItem[] } {
@@ -268,10 +257,6 @@ async function toUpstreamNode(
       mediaUrl: null,
       mediaUrls: await influencerMediaUrls(db, node)
     };
-  }
-
-  if (node.type === 'studio_batch') {
-    return { id: node.id, type: node.type, model: null, text: null, mediaUrl: null, mediaUrls: await approvedPhotoUrls(db, orgId, node) };
   }
 
   if (node.type === 'list') {

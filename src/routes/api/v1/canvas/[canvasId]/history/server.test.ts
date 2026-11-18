@@ -8,7 +8,7 @@ const MARCO = 'u-marco';
 const state = vi.hoisted(() => ({ db: null as unknown }));
 
 vi.mock('$lib/server/org-data/auth', () => ({ resolveOrgCaller: async (bearer?: string) => (bearer ? { caller: { db: state.db, orgId: ORG, userId: MARCO, writeAllowed: false } } : { error: { status: 401, body: { error: 'unauthorized' } } }) }));
-vi.mock('$lib/server/canvas/lookup', () => ({ openCanvasForUser: async (_db: unknown, i: { canvasId: string }) => ({ memberships: [], found: i.canvasId === CANVAS ? { orgId: ORG, canvas: { id: CANVAS, projectId: 'p-1' }, mode: 'standard', projectBrandId: null } : null }) }));
+vi.mock('$lib/server/canvas/lookup', () => ({ openCanvasForUser: async (_db: unknown, i: { canvasId: string }) => ({ memberships: [], found: i.canvasId === CANVAS ? { orgId: ORG, canvas: { id: CANVAS, projectId: 'p-1' }, mode: 'standard', } : null }) }));
 vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ canvasReachable: async () => true }));
 
 const { GET } = await import('./+server');

@@ -25,7 +25,7 @@ const assets = [
 ];
 vi.mock('$lib/server/repos/assets', () => ({ listProjectAssets: vi.fn(async () => assets), findAsset: vi.fn() }));
 
-vi.mock('$lib/server/studio/studio-media', () => ({ signedAssets: vi.fn(async () => ({ assets: new Map(), urls: { v1: 'https://signed/v1' } })) }));
+vi.mock('$lib/server/dashboard/signed-assets', () => ({ signedAssets: vi.fn(async () => ({ assets: new Map(), urls: { v1: 'https://signed/v1' } })) }));
 
 const upscaleNode = { id: 'n-up', canvasId: 'c-up', projectId: 'p1', type: 'video', position: { x: 0, y: 0, z: 0 }, data: { model: OPENROUTER_UPSCALE_MODEL, running: false, refId: 'out-1', error: null, params: { upscale_factor: 2 } }, version: 3 };
 vi.mock('$lib/server/repos/canvas', () => ({

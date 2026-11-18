@@ -1,9 +1,7 @@
 /**
- * Le due funzioni che scaricano un URL remoto e lo depositano: il logo del brand e l'archivio
- * immagini. Il test è uno solo perché la guardia è una sola — `safeFetchBytes` — e ciò che va
- * dimostrato per ognuna è identico: un nome pubblico che risolve su un indirizzo privato, un
- * redirect che ci cammina dentro, un corpo oltre il tetto con e senza content-length. Due copie
- * di questi helper sarebbero due copie che divergono.
+ * La funzione che scarica un URL remoto e lo deposita: l'archivio immagini. La guardia è
+ * `safeFetchBytes`, e ciò che va dimostrato è: un nome pubblico che risolve su un indirizzo privato, un
+ * redirect che ci cammina dentro, un corpo oltre il tetto con e senza content-length.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
@@ -13,7 +11,6 @@ vi.mock('node:dns/promises', () => ({ lookup: vi.fn() }));
 
 import { lookup } from 'node:dns/promises';
 import { archiveImageToBucket } from './media-archive';
-import { storeBrandLogoFromUrl } from './studio-actions';
 
 const PNG = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex');
 
@@ -122,13 +119,6 @@ function archiveImage(url: string) {
   }));
 }
 
-function storeLogo(url: string) {
-  const supa = fakeSupabase();
-  return storeBrandLogoFromUrl(supa.client as never, { userId: 'user-1', imageUrl: url }).then(
-    (result) => ({ result, ...supa })
-  );
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
   resolvesTo({ 'cdn.example.com': PUBLIC_ADDRESS });
@@ -136,80 +126,6 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
-});
-
-describe('storeBrandLogoFromUrl', () => {
-  it('deposita il logo e ne restituisce l URL pubblico', async () => {
-    serves({ 'https://cdn.example.com/logo.png': { status: 200, type: 'image/png', body: PNG } });
-
-    const { result, uploads } = await storeLogo('https://cdn.example.com/logo.png');
-
-    expect(result).toEqual({ url: expect.stringContaining('https://public.test/user-1/studio/logo-') });
-    expect(uploads).toHaveLength(1);
-    expect(uploads[0].contentType).toBe('image/png');
-  });
-
-  it('accetta ancora http: un logo di onboarding arriva anche da un sito in chiaro', async () => {
-    resolvesTo({ 'old-brand.example.com': PUBLIC_ADDRESS });
-    serves({ 'http://old-brand.example.com/logo.png': { status: 200, type: 'image/png', body: PNG } });
-
-    const { result, uploads } = await storeLogo('http://old-brand.example.com/logo.png');
-
-    expect(result).toEqual({ url: expect.any(String) });
-    expect(uploads).toHaveLength(1);
-  });
-
-  it('rifiuta un nome pubblico che il DNS risolve su un indirizzo privato', async () => {
-    resolvesTo({ 'cdn.example.com': '169.254.169.254' });
-    const { requested } = serves({});
-
-    const { result, uploads } = await storeLogo('https://cdn.example.com/logo.png');
-
-    expect(result).toEqual({ error: expect.stringMatching(/not fetchable/i) });
-    expect(requested).toEqual([]);
-    expect(uploads).toEqual([]);
-  });
-
-  it('rifiuta un redirect che entra in una rete privata, senza seguirlo', async () => {
-    resolvesTo({ 'cdn.example.com': PUBLIC_ADDRESS, 'internal.example.com': '127.0.0.1' });
-    const { requested } = serves({
-      'https://cdn.example.com/logo.png': { status: 302, location: 'https://internal.example.com/secret' },
-      'https://internal.example.com/secret': { status: 200, type: 'image/png', body: PNG }
-    });
-
-    const { result, uploads } = await storeLogo('https://cdn.example.com/logo.png');
-
-    expect(result).toEqual({ error: expect.stringMatching(/not fetchable/i) });
-    expect(requested).toEqual(['https://cdn.example.com/logo.png']);
-    expect(uploads).toEqual([]);
-  });
-
-  it('rifiuta un corpo oltre il tetto quando il content-length mente', async () => {
-    serves({
-      'https://cdn.example.com/big.png': {
-        status: 200,
-        type: 'image/png',
-        length: '120',
-        body: OVER_LOGO_CEILING
-      }
-    });
-
-    const { result, uploads } = await storeLogo('https://cdn.example.com/big.png');
-
-    expect(result).toEqual({ error: expect.stringMatching(/too large/i) });
-    expect(uploads).toEqual([]);
-  });
-
-  it('rifiuta un corpo oltre il tetto anche quando il content-length manca', async () => {
-    serves({
-      'https://cdn.example.com/nolength.png': { status: 200, type: 'image/png', body: OVER_LOGO_CEILING }
-    });
-
-    const { result, uploads } = await storeLogo('https://cdn.example.com/nolength.png');
-
-    expect(result).toEqual({ error: expect.stringMatching(/too large/i) });
-    expect(uploads).toEqual([]);
-  });
 });
 
 describe('archiveImageToBucket', () => {

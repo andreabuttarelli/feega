@@ -19,7 +19,7 @@ import { assetUrls, motionAssets, motionTokens } from './editor';
 import { docScaleOf } from './doc-scale';
 import type { DrawTarget, SelectionPorts } from './selection-export';
 
-export type SelectionScope = { db: Db; orgId: string; projectId: string; brandId: string | null; actor: Actor };
+export type SelectionScope = { db: Db; orgId: string; projectId: string; actor: Actor };
 
 const FRAME_NAME = 'Frame';
 
@@ -34,7 +34,7 @@ export async function playedDoc(store: Pick<FrameStore, 'read'>, doc: MotionDoc)
 export function selectionPorts(scope: SelectionScope): SelectionPorts {
   const { db, orgId, projectId } = scope;
   const frames = frameStore(db, { orgId, actor: scope.actor, projectId });
-  const tokens = motionTokens(db, { orgId, brandId: scope.brandId });
+  const tokens = motionTokens();
   const canvasOf = new Map<string, string>();
 
   const urlsOf = async (target: DrawTarget) => assetUrls(await motionAssets({ db, orgId, projectId, canvasId: canvasOf.get(target.nodeId)! }, SIGNED_URL_TTL_S.render));

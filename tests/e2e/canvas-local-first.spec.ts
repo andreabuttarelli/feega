@@ -6,7 +6,6 @@ const TYPING_MS = 5_000;
 const OFFLINE_MS = 10_000;
 const KEY_DELAY_MS = 25;
 const LOADING_SELECTORS = '[aria-busy="true"], .is-spinning';
-const UNREACHABLE_STORE = 'https://store.example.invalid';
 
 type Row = { data: Record<string, unknown>; version: number; display_name: string | null };
 
@@ -59,7 +58,6 @@ const CASES: Case[] = [
   { type: 'text', data: { prompt: '' }, field: promptField, read: (d) => d.prompt },
   { type: 'image', data: { prompt: '' }, field: promptField, read: (d) => d.prompt },
   { type: 'video', data: { prompt: '' }, field: promptField, read: (d) => d.prompt },
-  { type: 'products', data: { type: 'shopify', url: UNREACHABLE_STORE, limit: 3 }, field: sourceField('filters.query'), read: (d) => (d.filters as { query?: string } | undefined)?.query },
   { type: 'social_account_feed', data: { platform: 'instagram', handle: '', limit: 3 }, field: sourceField('handle'), read: (d) => d.handle }
 ];
 
@@ -94,7 +92,7 @@ test.describe('local-first editing never loses or remounts what the user types @
 
   test('two tabs edit different fields of the same node and both are kept', async ({ page, session, seedNode, admin }) => {
     test.setTimeout(120_000);
-    const node = await seedNode({ type: 'products', x: 0, y: 0, data: { type: 'shopify', url: UNREACHABLE_STORE, limit: 3 } });
+    const node = await seedNode({ type: 'social_account_feed', x: 0, y: 0, data: { platform: 'instagram', handle: 'nike', limit: 3 } });
     const other = await page.context().newPage();
     for (const tab of [page, other]) {
       await tab.setViewportSize({ width: 1440, height: 900 });
@@ -102,7 +100,7 @@ test.describe('local-first editing never loses or remounts what the user types @
       await tab.locator(`.svelte-flow__node[data-id="${node.id}"]`).click();
     }
 
-    const query = (tab: Page) => sourceField('filters.query')(tab.locator('body'), tab);
+    const query = (tab: Page) => sourceField('filters.include')(tab.locator('body'), tab);
     const limit = (tab: Page) => sourceField('limit')(tab.locator('body'), tab);
 
     await query(page).fill('from tab a');
@@ -112,7 +110,7 @@ test.describe('local-first editing never loses or remounts what the user types @
 
     await expect.poll(async () => {
       const data = (await nodeRow(admin, node.id)).data;
-      return [(data.filters as { query?: string } | undefined)?.query, String(data.limit)];
+      return [(data.filters as { include?: string } | undefined)?.include, String(data.limit)];
     }, { timeout: 20_000 }).toEqual(['from tab a', '9']);
     await expect(query(other), 'the second tab never saw the first tab write').toHaveValue('from tab a', { timeout: 15_000 });
     await expect(limit(page), 'the first tab never saw the second tab write').toHaveValue('9', { timeout: 15_000 });
@@ -145,7 +143,7 @@ test.describe('local-first editing never loses or remounts what the user types @
     test.setTimeout(180_000);
     await page.setViewportSize({ width: 1440, height: 900 });
     const text = await seedNode({ type: 'text', x: 0, y: 0, data: { prompt: 'before' } });
-    const products = await seedNode({ type: 'products', x: 500, y: 0, data: { type: 'shopify', url: UNREACHABLE_STORE, limit: 3 } });
+    const feed = await seedNode({ type: 'social_account_feed', x: 500, y: 0, data: { platform: 'instagram', handle: 'nike', limit: 3 } });
     await gotoHydrated(page, canvasPath(session));
     const context = page.context();
 
@@ -153,8 +151,8 @@ test.describe('local-first editing never loses or remounts what the user types @
     const textTile = page.locator(`.svelte-flow__node[data-id="${text.id}"]`);
     await textTile.click();
     const typed = await typeFor(page, promptField(textTile), textTile, OFFLINE_MS / 2, async () => {});
-    await page.locator(`.svelte-flow__node[data-id="${products.id}"]`).click();
-    await sourceField('filters.query')(page.locator('body'), page).fill('offline query');
+    await page.locator(`.svelte-flow__node[data-id="${feed.id}"]`).click();
+    await sourceField('filters.include')(page.locator('body'), page).fill('offline query');
     await page.keyboard.press('Tab');
     await page.waitForTimeout(OFFLINE_MS / 2);
 
@@ -168,7 +166,7 @@ test.describe('local-first editing never loses or remounts what the user types @
     await gotoHydrated(back, canvasPath(session));
 
     await expect.poll(async () => (await nodeRow(admin, text.id)).data.prompt, { timeout: 30_000 }).toBe(typed);
-    await expect.poll(async () => ((await nodeRow(admin, products.id)).data.filters as { query?: string } | undefined)?.query, { timeout: 30_000 }).toBe('offline query');
+    await expect.poll(async () => ((await nodeRow(admin, feed.id)).data.filters as { include?: string } | undefined)?.include, { timeout: 30_000 }).toBe('offline query');
     await expect(back.locator('.save-status')).toHaveAttribute('data-status', 'saved', { timeout: 15_000 });
   });
 });

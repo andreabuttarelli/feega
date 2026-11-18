@@ -105,7 +105,7 @@ describe('motion agent shape tools', () => {
   });
 
   it('the prompt tells the agent shapes exist', () => {
-    const prompt = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Missing });
+    const prompt = motionAgentPrompt({ selectionNote: '', vision: Vision.Missing });
     expect(prompt).toContain('add_shape');
     expect(prompt).toContain('add_modifier');
   });
@@ -145,7 +145,7 @@ describe('motion agent liquid shapes', () => {
   });
 
   it('the prompt names the liquid tools', () => {
-    const prompt = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Missing });
+    const prompt = motionAgentPrompt({ selectionNote: '', vision: Vision.Missing });
     expect(prompt).toContain('apply_shape_preset');
     expect(prompt).toContain('gooey');
   });

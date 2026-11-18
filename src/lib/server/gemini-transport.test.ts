@@ -27,12 +27,8 @@ describe('le superfici sul centralino (non lo SDK Google)', () => {
     setEnv({});
   });
 
-  it('3. la ricerca nativa resta sul centralino, con il suo modello dichiarato', () => {
-    const research = readFileSync(join(HERE, 'research.ts'), 'utf8');
+  it('3. la ricerca nativa resta sul centralino', () => {
     const llm = readFileSync(join(HERE, 'llm.ts'), 'utf8');
-    expect(research).toContain("webSearch: 'native'");
-    expect(research).toContain('llmGeminiSearchModel');
-    expect(research).not.toContain('tools: [{ googleSearch');
     expect(llm).toContain("engine: 'native'");
     // La chiave del loop lingua è LLM_API_KEY, letta in llm.ts.
     expect(llm).toContain('LLM_API_KEY');

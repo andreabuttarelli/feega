@@ -25,7 +25,7 @@ vi.mock('$lib/server/repos/canvas', () => ({
 const listProjectAssets = vi.fn(async (): Promise<{ id: string; type: string }[]> => []);
 vi.mock('$lib/server/repos/assets', () => ({ listProjectAssets }));
 const signedAssets = vi.fn(async (_db: unknown, _org: string, ids: string[]) => ({ assets: new Map(), urls: Object.fromEntries(ids.map((id) => [id, `https://cdn.test/${id}`])) }));
-vi.mock('$lib/server/studio/studio-media', () => ({ signedAssets }));
+vi.mock('$lib/server/dashboard/signed-assets', () => ({ signedAssets }));
 
 const { load, actions } = await import('$lib/server/dashboard/pages/compose');
 

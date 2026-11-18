@@ -2,8 +2,7 @@ import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 
 const PAGES = [
   { path: 'assets', api: 'assets' },
-  { path: 'influencers', api: 'influencers' },
-  { path: 'brands/new', api: 'brand-new' }
+  { path: 'influencers', api: 'influencers' }
 ];
 
 test.describe('project pages load over the API @real', () => {

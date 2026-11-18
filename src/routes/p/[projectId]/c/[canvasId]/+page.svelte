@@ -102,7 +102,7 @@ import { ElementPaste, elementPaste, pasteTargets } from '$lib/canvas/paste-into
   import { formatCredits } from '$lib/components/credit-amount-format';
   import { onMount, untrack } from 'svelte';
   import { feedView, personView, productsView } from '$lib/canvas/source-thumbs';
-import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type NodeView } from '$lib/canvas/node-view';
+import { selectView, type NodeView } from '$lib/canvas/node-view';
   import type GpuFlow from '$lib/components/canvas/gpu/GpuFlow.svelte';
   import { CanvasContent } from '$lib/canvas/core/startup-progress';
   import { holdsDoc } from '$lib/canvas/motion-node';
@@ -182,8 +182,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { frameHead } from '$lib/canvas/frame-outlines';
   import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
   import type { TemplateEntry } from '$lib/motion/template/library';
-  import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
-  import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
   import type { SceneDrop } from '$lib/canvas/scene-drop';
   import { DragPhase, DropVerdict, frameUnderPointer, type ElementOut, type FrameTarget, type PointerPoint, type StageRect } from '$lib/canvas/canvas-drop';
   import { canvasSelection, canvasSelectionChips } from '$lib/canvas/canvas-selection';
@@ -1447,7 +1445,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       rotatable: !!motionOf(n),
       behind: paintsBehind(n),
       members: paintsBehind(n) ? nodes.filter((m) => layoutOf(m.data).groupId === n.id).map((m) => m.id) : undefined,
-      inPost: data.nodeIdsInPost.includes(n.id),
       select: n.select,
       settings: hasInspector(n.type),
       poster: tilePoster(n) ?? undefined,
@@ -1468,39 +1465,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   /** `type`/`data` grezzi di ogni tile — la forma che `commonPropertiesOf` legge, per la barra
    *  della selezione: `tiles` porta già `node: CanvasNode`, un'astrazione diversa che non ha
    *  `model`/`params` come campi diretti. */
-  const STUDIO_REFRESH_MS = 10000;
-  let studioBatches = $state<Record<string, BatchView>>({});
-  const studioWatched = $derived(
-    nodes
-      .filter((n) => n.type === 'studio_batch')
-      .map((n) => `${n.id}:${studioBatchOf(n)?.batchId ?? ''}`)
-      .join('|')
-  );
-
-  async function studioJson<T>(url: string): Promise<T | null> {
-    const response = await fetch(url).catch(() => null);
-    return response?.ok ? ((await response.json()) as T) : null;
-  }
-
-  $effect(() => {
-    const stops = studioWatched
-      .split('|')
-      .filter(Boolean)
-      .map((entry) => {
-        const [nodeId, batchId] = entry.split(':');
-        const show = (view: BatchView) => (studioBatches = { ...studioBatches, [nodeId]: view });
-        if (!batchId) {
-          void studioJson<unknown[]>(`/app/studio/cards?project=${data.projectId}`).then((list) => show(pickBatch(list ? list.length > 0 : null)));
-          return () => {};
-        }
-        const refresh = () => void studioJson<Parameters<typeof batchOf>[0]>(`/app/studio/${batchId}/card`).then((card) => show(card ? batchOf(card) : unreachableBatch()));
-        refresh();
-        const timer = setInterval(refresh, STUDIO_REFRESH_MS);
-        return () => clearInterval(timer);
-      });
-    return () => stops.forEach((stop) => stop());
-  });
-
   function mediaView(row: Tile): NodeView | null {
     const effects = effectsOf(row);
     if (!effects) {
@@ -1534,7 +1498,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (!row) {
       return null;
     }
-    return mediaView(row) ?? selectedView(row) ?? techniqueView(row) ?? (studioBatches[id] ? { batch: studioBatches[id] } : null);
+    return mediaView(row) ?? selectedView(row) ?? techniqueView(row);
   }
 
   let Flow = $state<typeof GpuFlow | null>(null);
@@ -2317,7 +2281,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   /**
    * UN FILE VA DRITTO NELLO STORAGE DAL BROWSER, e solo il percorso arriva al server: lo stesso
-   * schema di `StudioPage.svelte::handleImageUpload`, per la stessa ragione — un video o un
+   * schema dei caricamenti diretti, per la stessa ragione — un video o un
    * documento normale supera facilmente il corpo che un'azione SvelteKit regge su Vercel.
    *
    * Il nodo nasce SOLO quando la riga torna, come `create`: niente tile senza riga dietro.
@@ -2671,7 +2635,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   /**
-   * UN NODO CHE NASCE GIÀ PIENO — trascinato dalla libreria degli asset o dai brand, non dal menù
+   * UN NODO CHE NASCE GIÀ PIENO — trascinato dalla libreria degli asset, non dal menù
    * del doppio clic. Stessa forma di `create`, ma `type`/`data` arrivano dal trascinamento e non
    * da `newNodeRow`: il server li rivalida comunque (`validateNodeData`), perché un payload che
    * viaggia nel `dataTransfer` del browser non è meno un input esterno di un form.
@@ -4918,7 +4882,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
         {@const effects = effectsOf(row)}
         {@const composition = compositionOf(row)}
         {@const motion = motionOf(row)}
-        {@const studioBatch = studioBatchOf(row)}
         {@const estimateRevision = textEstimateRevision(id)}
         {@const textCost = textCostEstimates[id]?.revision === estimateRevision ? textCostEstimates[id] : undefined}
         {@const uploaded = isUploadedNodeRow(row) ? uploadedNodeOf(row) : null}
@@ -5136,8 +5099,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
         {:else if motion}
           {@const motionAt = { projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }}
           <MotionNode node={motion} href={motionNodePath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={(posterFresh(motion) ? assetUrl(motion.posterAssetId) : null) ?? (ghostShown(motion) ? catalogPosters.get(id) : null) ?? null} {liveHost} liveUrl={motionLivePath(motionAt)} />
-        {:else if studioBatch}
-          <StudioBatchNode node={studioBatch} projectId={data.projectId} onpick={(batchId) => write(id, newStudioBatchData(batchId), SaveTiming.Now)} />
         {:else if isNodeType(row.type)}
           <EmptyNode type={row.type} />
         {/if}

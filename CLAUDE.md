@@ -13,45 +13,43 @@ curl -sSL https://raw.githubusercontent.com/andreabuttarelli/feega/main/cli/scri
 feega login
 
 # Quick commands
-feega brands                                    # List brands
 feega projects                                  # List projects
 feega canvases <projectId>                      # List a project's canvases
 feega motion list                               # List motion frames
 feega motion ask <nodeId> "<prompt>"            # Ask the motion agent to change a frame
-feega products <slug> sync                      # Re-import catalog from the connected store
-feega upgrade <slug>                            # Open billing checkout
+feega upgrade                                   # Open billing checkout
 ```
 
-## Lo schema del database (26 tabelle, progetto `klnswzhhgrqvbfjzioul`)
+## Lo schema del database (progetto `klnswzhhgrqvbfjzioul`)
 
 Il prodotto è una **tela infinita**: nodi tipizzati che una persona, la chat in sidebar o un agente
 esterno via MCP lavorano insieme. Il disegno completo, con le ragioni di ogni scelta, sta in
 [`NEW_DATABASE_STRUCTURE.md`](NEW_DATABASE_STRUCTURE.md); qui stanno i nomi e i vincoli che
 servono per non sbagliare una query.
 
-**La gerarchia, e dove sta il brand:**
+**La gerarchia:**
 
 ```
-org ──┬── brands            voce, palette, account: serve a PUBBLICARE
-      └── projects ──┬── canvases ── nodes ── nodes_connections
-                     │                 └── node_runs (una generazione)
-                     └── assets       testo/immagini/video/documenti
+org ── projects ──┬── canvases ── nodes ── nodes_connections
+                  │                 └── node_runs (una generazione)
+                  └── assets       testo/immagini/video/documenti
 ```
 
-`projects.brand_id` è **nullable, ed è il caso normale**: si apre una tela per esplorare e si
-sceglie il brand solo quando il materiale diventa qualcosa da pubblicare. Tutto il canvas
-funziona senza brand; chiederlo prima trasformerebbe un foglio bianco in un modulo da compilare.
+**I brand e i prodotti non esistono più (18/11/2026).** Il codice non legge né scrive `brands`,
+`brand_fonts`, `brand_pins`, `products`, `brand_memory` né nessuna colonna `brand_id`: un progetto
+non ha brand, i video e la chat girano senza contesto di brand. Le tabelle e le colonne restano nel
+database finché una migration separata, dopo il deploy, non le elimina; non vanno riusate. Dettaglio
+in `docs/adr/0040-remove-brands.md`.
 
-**Il post non appartiene al progetto.** `posts.brand_id` è NOT NULL, `posts` non ha `project_id`:
-il calendario è per brand, e un post assembla materiale da tele diverse. Il legame con l'origine
-è `post_sources` (molti-a-molti verso `nodes`), l'unica tabella senza `org_id` — il tenant lo
-porta il padre.
+**Il post non appartiene al progetto.** `posts` non ha `project_id`: un post assembla materiale da
+tele diverse. Il legame con l'origine è `post_sources` (molti-a-molti verso `nodes`), l'unica
+tabella senza `org_id` — il tenant lo porta il padre.
 
 | Gruppo | Tabelle |
 |---|---|
 | Tenant | `orgs` `orgs_members` `orgs_invites` `profiles` `api_keys` |
 | Tela | `projects` `canvases` `nodes` `nodes_connections` `node_runs` `assets` `canvas_events` |
-| Brand | `brands` `products` `social_accounts` |
+| Account | `social_accounts` |
 | Contenuto | `posts` `post_sources` `scheduled_posts` |
 | Ads (solo Meta) | `ad_accounts` `ad_campaigns` `ad_creatives` `competitor_ads` |
 | Sorgenti | `social_posts` (feed scaricati) |
@@ -68,7 +66,7 @@ porta il padre.
   `scripts/import-anomalia-talents.ts` con la service-role key) — ogni org lo legge, nessuna lo
   scrive; un'org che crea un proprio influencer ottiene `org_id` valorizzato, visibile solo a lei.
 - **`nodes.data jsonb`** porta il payload per tipo (`text` `image` `video` `doc` `iframe`
-  `social_account_feed` `social_post_mockup` `products` `ads` `influencer`). Una tabella sola: i
+  `social_account_feed` `social_post_mockup` `ads` `influencer`). Una tabella sola: i
   campi per tipo sarebbero ~40, quasi tutti NULL, e il mockup è un albero.
 - **`nodes.version`**: la posizione è last-write-wins, `data` va in concorrenza ottimistica
   (`where version = $atteso`; zero righe = conflitto, mai un successo silenzioso).
@@ -89,8 +87,7 @@ porta il padre.
   come ogni altra policy di questo bucket e di `canvas-assets`. Bucket `media`, PUBBLICO
   (`20260923_media_bucket.sql`, non ancora applicata) — non per la produzione AI riusabile, che va
   in `brand-knowledge`/`signKnowledgePaths` come ogni altro asset `generated`, ma per ciò che deve
-  restare un URL nudo, durevole oltre la sessione: avatar (`${userId}/profile/...`), logo del brand
-  (`${userId}/studio/...`, `${brandId}/logo-...`) e swatch di un colore trascinato sulla tela
+  restare un URL nudo, durevole oltre la sessione: avatar (`${userId}/profile/...`) e swatch di un colore trascinato sulla tela
   (`colours/${orgId}/${hex}.png`).
 
 I tipi vengono **generati** (`npm run db:types` → `src/lib/database.types.ts`), mai scritti a
@@ -103,7 +100,7 @@ mano: sono ciò che trasforma una colonna sbagliata in un errore di compilazione
   starts with an endpoint here.
 - **Shared queries** (`src/lib/server/cli-queries.ts`) — reusable read functions
 - **Auth** (`src/lib/server/cli-auth.ts`) — Bearer auth (Supabase JWT or `feega_` API key),
-  `loadBrandForUser`, and `gateAiAction` (paid plan + credits) for endpoints that spend AI
+  `openOrg` (the caller's org), and `gateOrgAiAction` (paid plan + credits) for endpoints that spend AI
 - **Login callback** (`src/routes/cli/callback/`) — the page the browser login flow posts back to
 
 

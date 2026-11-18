@@ -56,7 +56,7 @@ export async function convertFileToMarkdown(
     throw new Error(`Unsupported document type: ${mime || name}`);
   }
 
-  const { toMarkdownFallback } = await import('$lib/server/knowledge');
+  const { toMarkdownFallback } = await import('$lib/server/markdown');
   const e = fileExt(name);
   const isPdf = e === 'pdf' || mime === 'application/pdf';
   // Large PDFs: extract page-by-page (unpdf) instead of one-shot markitdown/pdf-parse,
@@ -74,7 +74,7 @@ export async function convertFileToMarkdown(
     }
   }
 
-  // Cheap, stable paths — also what knowledge.test.ts pins.
+  // Cheap, stable paths — also what markdown.test.ts pins.
   if (e === 'txt' || e === 'md' || e === 'markdown' || mime === 'text/plain' || mime === 'text/markdown') {
     return toMarkdownFallback(buf, mime, name);
   }

@@ -55,7 +55,7 @@ describe('in locale niente nodi che chiedono il cloud', () => {
     expect(localOff(LocalOff.CloudNodes, { PUBLIC_FEEGA_LOCAL: '1' })).toBe(true);
     expect(AI_ADDABLE.has('video')).toBe(true);
     expect(CLOUD_ADDABLE.has('video')).toBe(false);
-    expect(CLOUD_ADDABLE.has('products')).toBe(true);
+    expect(CLOUD_ADDABLE.has('social_account_feed')).toBe(true);
     expect(CLOUD_ADDABLE.has('doc')).toBe(false);
   });
 

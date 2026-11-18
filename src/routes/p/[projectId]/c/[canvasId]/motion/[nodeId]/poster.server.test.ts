@@ -7,7 +7,7 @@ vi.mock('$lib/server/code-push/link-store', () => ({ keepBeforePoster: async () 
 vi.mock('$lib/server/repos/assets', async (original) => ({ ...(await original<object>()), insertAsset }));
 vi.mock('$lib/server/repos/canvas', async (original) => ({ ...(await original<object>()), patchNodeData }));
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
-const lookupFound = () => ({ orgId: 'org-a', canvas: { id: 'c1', projectId: 'p1', name: 'C' }, projectBrandId: null });
+const lookupFound = () => ({ orgId: 'org-a', canvas: { id: 'c1', projectId: 'p1', name: 'C' }, });
 vi.mock('$lib/server/canvas/lookup', () => ({ findCanvasForUser: async () => lookupFound(), openCanvasForUser: async () => ({ memberships: [], found: lookupFound() }) }));
 vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ canvasReachable: async () => true }));
 vi.mock('$lib/server/motion/editor', () => ({ findMotionNode: async () => ({ record: { id: 'n1' }, node: {} }), assetUrls: vi.fn(), headOrNew: vi.fn(), motionAssets: vi.fn(), motionTokens: vi.fn(), saveMotionDoc: vi.fn() }));

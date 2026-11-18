@@ -2,17 +2,15 @@ import { CALENDAR_VIEWS, CalendarView } from '$lib/calendar/period-grid';
 import { dayKey } from '$lib/calendar/month-grid';
 
 export enum CalendarScope {
-  Canvas = 'canvas',
-  Brand = 'brand'
+  Canvas = 'canvas'
 }
 
-export const CALENDAR_SCOPES = [CalendarScope.Canvas, CalendarScope.Brand] as const;
+export const CALENDAR_SCOPES = [CalendarScope.Canvas] as const;
 
 export type CalendarNode = {
   id: string;
   view: CalendarView;
   scope: CalendarScope;
-  brandId: string | null;
   anchor: string;
 };
 
@@ -27,7 +25,7 @@ function todayKey(today: Date): string {
 }
 
 export function newCalendarData(today: Date): Record<string, unknown> {
-  return { view: CalendarView.Week, scope: CalendarScope.Canvas, brand_id: null, anchor: todayKey(today) };
+  return { view: CalendarView.Week, scope: CalendarScope.Canvas, anchor: todayKey(today) };
 }
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -46,33 +44,23 @@ export function calendarOf(row: { id: string; type: string; data: Record<string,
     id: row.id,
     view: pick(row.data.view, CALENDAR_VIEWS, CalendarView.Week),
     scope: pick(row.data.scope, CALENDAR_SCOPES, CalendarScope.Canvas),
-    brandId: typeof row.data.brand_id === 'string' && row.data.brand_id ? row.data.brand_id : null,
     anchor: typeof anchor === 'string' && ISO_DAY.test(anchor) ? anchor : todayKey(today)
   };
 }
 
 export function calendarData(node: CalendarNode): Record<string, unknown> {
-  return { view: node.view, scope: node.scope, brand_id: node.brandId, anchor: node.anchor };
-}
-
-export function calendarBrand(node: CalendarNode, projectBrandId: string | null): string | null {
-  return node.brandId ?? projectBrandId;
+  return { view: node.view, scope: node.scope, anchor: node.anchor };
 }
 
 export enum CalendarHint {
-  PickBrand = 'pick_brand',
   Empty = 'empty'
 }
 
 export const CALENDAR_HINT_TEXT: Record<CalendarHint, string> = {
-  [CalendarHint.PickBrand]: 'Pick a brand first: posts are planned for a brand.',
   [CalendarHint.Empty]: 'Connect or drop images, videos or text here to plan posts.'
 };
 
-export function calendarHint(brandId: string | null, posts: readonly unknown[] | null): CalendarHint | null {
-  if (!brandId) {
-    return CalendarHint.PickBrand;
-  }
+export function calendarHint(posts: readonly unknown[] | null): CalendarHint | null {
   if (posts === null || posts.length) {
     return null;
   }

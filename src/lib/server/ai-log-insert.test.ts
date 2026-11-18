@@ -15,7 +15,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  */
 
 const REAL_COLUMNS = new Set([
-  'id', 'org_id', 'brand_id', 'project_id',
+  'id', 'org_id', 'project_id',
   'provider', 'model', 'operation',
   'prompt_tokens', 'completion_tokens', 'reasoning_tokens', 'cached_tokens', 'total_tokens',
   'cost_usd', 'provider_credits', 'billed_credits',
@@ -65,7 +65,7 @@ vi.mock('./supabase-admin', () => ({
   })
 }));
 
-import { logAiCall, withBrandContext, withNodeContext, withOrgContext } from './ai-log';
+import { logAiCall, withOrgContext, withNodeContext } from './ai-log';
 
 async function settled(): Promise<void> {
   await vi.waitFor(() => expect(rows.length + Number(lastError !== null)).toBeGreaterThan(0));
@@ -78,7 +78,7 @@ beforeEach(() => {
 
 describe('logAiCall scrive le colonne reali di ai_calls', () => {
   it('inserisce una riga con org_id, operation, status, latency_ms, prompt_tokens/completion_tokens', async () => {
-    withBrandContext('brand-1', () => {
+    withOrgContext('org-1', () => {
       logAiCall({
         label: 'renderImage',
         provider: 'llm',
@@ -102,7 +102,6 @@ describe('logAiCall scrive le colonne reali di ai_calls', () => {
     expect(row.prompt_tokens).toBe(100);
     expect(row.completion_tokens).toBe(50);
     expect(row.org_id).toBe('org-1');
-    expect(row.brand_id).toBe('brand-1');
     expect(row).not.toHaveProperty('label');
     expect(row).not.toHaveProperty('ms');
     expect(row).not.toHaveProperty('input_tokens');
@@ -111,7 +110,7 @@ describe('logAiCall scrive le colonne reali di ai_calls', () => {
   });
 
   it('una riga fallita scrive status: error, non ok', async () => {
-    withBrandContext('brand-1', () => {
+    withOrgContext('org-1', () => {
       logAiCall({ label: 'chat', provider: 'llm', ms: 5, ok: false, error: 'boom', orgId: 'org-1' });
     });
 

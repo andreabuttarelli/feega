@@ -6,7 +6,7 @@ import { newDraft } from '$lib/motion/composition-draft';
 import { COMPOSITION_LAYOUTS } from '@feega/motion-core/motion/components';
 import { MOTION_FORMATS, MotionFormat } from '@feega/motion-core/motion/doc';
 import type { LayoutId } from '@feega/motion-core/canvas/composition/types';
-import { signedAssets } from '$lib/server/studio/studio-media';
+import { signedAssets } from '$lib/server/dashboard/signed-assets';
 import { findMotionNode } from '$lib/server/motion/editor';
 import { savePoster } from '$lib/server/motion/poster';
 

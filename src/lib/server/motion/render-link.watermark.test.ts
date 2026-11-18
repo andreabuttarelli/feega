@@ -7,7 +7,7 @@ vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/repos/canvas')>()),
   findNode: async () => ({ id: 'node-1', projectId: 'project-1', canvasId: 'canvas-1', displayName: 'Launch' })
 }));
-vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async () => ({ id: 'project-1', brandId: null }) }));
+vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async () => ({ id: 'project-1', }) }));
 vi.mock('$lib/server/repos/motion-revisions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/repos/motion-revisions')>()),
   readCheckpoint: async () => {

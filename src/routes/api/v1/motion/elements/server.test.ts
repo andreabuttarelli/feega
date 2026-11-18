@@ -22,7 +22,7 @@ function seed() {
   state.fake = fakeDb(
     {
       nodes: [node(A, 'motion', frameData), node(B, 'motion', frameData), node(GEN, 'video', { prompt: 'waves', refId: ASSET })],
-      projects: [{ id: 'p', org_id: ORG, name: 'P', slug: 'p', brand_id: null, archived_at: null, updated_at: '', mode: 'standard' }],
+      projects: [{ id: 'p', org_id: ORG, name: 'P', slug: 'p', archived_at: null, updated_at: '', mode: 'standard' }],
       motion_revisions: [
         { org_id: ORG, node_id: A, version: 1, doc: added.ok ? added.doc : null, summary: null, actor_kind: 'user' },
         { org_id: ORG, node_id: B, version: 1, doc: newMotionDoc(MotionFormat.Landscape), summary: null, actor_kind: 'user' }

@@ -13,7 +13,7 @@ vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
 vi.mock('$lib/server/canvas/lookup', () => ({ findCanvasForUser: async () => found }));
 vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ canvasReachable: async () => true }));
 vi.mock('$lib/server/motion/editor', () => ({ findMotionNode: (...a: unknown[]) => findMotionNode(...a), motionTokens: async () => ({}) }));
-vi.mock('$lib/server/repos/projects', () => ({ listProjects: async () => [{ id: 'p', brandId: null }] }));
+vi.mock('$lib/server/repos/projects', () => ({ listProjects: async () => [{ id: 'p', }] }));
 vi.mock('$lib/server/motion/sources', () => ({ motionSource: (...a: unknown[]) => motionSource(...a) }));
 
 const { GET } = await import('./+server');

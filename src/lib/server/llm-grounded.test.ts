@@ -12,8 +12,6 @@ const M = vi.hoisted(() => ({ env: {} as Record<string, string | undefined>, log
 vi.mock('$env/dynamic/private', () => ({ env: M.env }));
 vi.mock('$lib/server/ai-log', () => ({
   logAiCall: (e: unknown) => void M.logged.push(e),
-  getBrandContext: () => null,
-  requireBrandContext: () => null,
   extractSdkUsage: () => ({}),
   noteLlmCost: () => {},
   takeLlmCost: () => null

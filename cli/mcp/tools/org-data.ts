@@ -4,12 +4,9 @@ import { request } from '../../lib/api.ts';
 import { withAuth } from '../util.ts';
 
 /**
- * `query` / `insert_row` / `update_row` / `delete_row` — SCOPO ORG, NON BRAND.
+ * `query` / `insert_row` / `update_row` / `delete_row` — SCOPO ORG.
  *
- * Il vecchio registro (`brand-content.ts`) parlava sempre di UN brand identificato da uno slug.
- * Qui non c'è slug: un'org può avere progetti senza brand, tele senza brand, post che invece un
- * brand ce l'hanno sempre — e questi quattro tool leggono e scrivono ovunque dentro l'org di chi
- * chiama, mai un brand che sta al posto di progetto/tela/brand. Il server (`/api/v1/org/query`,
+ * Questi quattro tool leggono e scrivono ovunque dentro l'org di chi chiama. Il server (`/api/v1/org/query`,
  * `/api/v1/org/rows`) impone `org_id` per costruzione: un id di un'altra org non torna mai niente,
  * né un errore che lo distingua da un id inventato.
  *
@@ -41,14 +38,10 @@ export function registerOrgDataTools(server: McpServer) {
     {
       title: 'Query the database',
       description:
-        'READ ANYTHING in your org: projects, canvases, nodes, connections, assets, posts, ads, ' +
-        'products, social accounts — every table, scoped to your org and nothing else. No SQL: name ' +
+        'READ ANYTHING in your org: projects, canvases, nodes, connections, assets and the rest — every table, scoped to your org and nothing else. No SQL: name ' +
         'a table, columns and `where` filters, and it issues one PostgREST read. Omit `table` to list every ' +
-        'name. A project has no brand until one is attached (`projects.brand_id` is nullable, and ' +
-        'that is the normal case). A canvas belongs to a project; nodes and their connections belong ' +
-        'to a canvas. A post (`posts` table) is the promoted artifact — caption, media, brand — ' +
-        'different from a node, which is raw canvas material; `post_sources` links a post back to ' +
-        'the nodes it came from. Free.',
+        'name. A canvas belongs to a project; nodes and their connections belong ' +
+        'to a canvas. Free.',
       inputSchema: z.object({
         org,
         table: z.string().optional(),
@@ -92,7 +85,7 @@ export function registerOrgDataTools(server: McpServer) {
         'is refused, not quietly corrected. Never replaces anything — a row that already exists comes ' +
         'back as a collision, and changing it is `update_row`. Several jsonb columns are checked ' +
         'against a real shape before writing (`nodes.data` by `type` — call `describe_node_types` ' +
-        'first; `posts.media`, `ad_campaigns.targeting`/`placements`, `canvases.viewport` too); a ' +
+        'first; `canvases.viewport` too); a ' +
         'rejection names the exact field. On `nodes_connections`, an edge into a node whose model is ' +
         'uncensored is refused — those nodes take no input of any kind. Others are deliberately ' +
         'free-form. Free.',

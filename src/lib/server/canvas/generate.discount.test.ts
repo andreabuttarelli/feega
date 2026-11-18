@@ -40,11 +40,11 @@ const primaryChoice: ModelChoice = { id: PRIMARY, label: 'Nano Banana 2', aspect
 
 const gateway = { run: vi.fn(), task: vi.fn() };
 const bill = vi.fn<(entry: TaskBill) => void>();
-const generateImagesWithoutBrand = vi.hoisted(() => vi.fn());
+const generateImages = vi.hoisted(() => vi.fn());
 
 const { deps } = vi.hoisted(() => ({ deps: { current: null as null | ((db: Db) => TaskRunDeps) } }));
 vi.mock('$lib/server/task-providers-config', () => ({ taskRunDeps: (db: Db) => deps.current!(db) }));
-vi.mock('$lib/server/media-generate', () => ({ generateImagesWithoutBrand, generateVideoWithoutBrand: vi.fn() }));
+vi.mock('$lib/server/media-generate', () => ({ generateImages, generateVideo: vi.fn() }));
 vi.mock('$lib/server/generation/discount-routes', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/generation/discount-routes')>()),
   discountBook: async () => book
@@ -71,10 +71,10 @@ vi.mock('$lib/server/canvas/upstream', () => ({
 }));
 
 beforeEach(() => {
-  for (const fn of [gateway.run, gateway.task, bill, generateImagesWithoutBrand]) {
+  for (const fn of [gateway.run, gateway.task, bill, generateImages]) {
     fn.mockReset();
   }
-  generateImagesWithoutBrand.mockResolvedValue({ ok: true, media: [{ storage_path: `${USER}/media/primary.png`, mime: 'image/png', width: 1024, height: 1024 }], costUsd: 0.067 });
+  generateImages.mockResolvedValue({ ok: true, media: [{ storage_path: `${USER}/media/primary.png`, mime: 'image/png', width: 1024, height: 1024 }], costUsd: 0.067 });
   deps.current = () => ({
     providers: { kie: gateway },
     model: async (id) => (id === KIE_MODEL ? kieModel : null),
@@ -131,7 +131,7 @@ describe('kie is tried first for a model it discounts', () => {
     expect(gateway.run).toHaveBeenCalledWith(expect.objectContaining({ model: 'nano-banana-2' }), expect.objectContaining({ prompt: 'a lake', resolution: '1K' }), expect.any(String));
     expect(runUpdates(calls)).toContainEqual(expect.objectContaining({ model: KIE_MODEL, params: { resolution: '1K', fallbackModel: PRIMARY } }));
     expect(runUpdates(calls)).toContainEqual(expect.objectContaining({ external_job_id: 'kie:task_42' }));
-    expect(generateImagesWithoutBrand).not.toHaveBeenCalled();
+    expect(generateImages).not.toHaveBeenCalled();
   });
 
   it('a kie submit error runs the primary in the same request; the failed attempt is recorded and debits nothing', async () => {
@@ -141,8 +141,8 @@ describe('kie is tried first for a model it discounts', () => {
     const out = await runGenNode(db, start);
 
     expect(out.kind).toBe('done');
-    expect(generateImagesWithoutBrand).toHaveBeenCalledOnce();
-    expect(generateImagesWithoutBrand).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ model: PRIMARY }));
+    expect(generateImages).toHaveBeenCalledOnce();
+    expect(generateImages).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ model: PRIMARY }));
     expect(bill).toHaveBeenCalledOnce();
     expect(bill.mock.calls[0][0]).toMatchObject({ provider: 'kie', costUsd: null, error: 'kie_failed: HTTP 500 on /jobs/createTask' });
     expect(debited(bill.mock.calls[0][0])).toBeNull();
@@ -161,7 +161,7 @@ describe('the provider saved on the node decides the route', () => {
 
     expect(out.kind).toBe('done');
     expect(gateway.run).not.toHaveBeenCalled();
-    expect(generateImagesWithoutBrand).toHaveBeenCalledOnce();
+    expect(generateImages).toHaveBeenCalledOnce();
   });
 
   it('kie picked by hand that fails is refused with a clear reason, and never silently moves to OpenRouter', async () => {
@@ -171,7 +171,7 @@ describe('the provider saved on the node decides the route', () => {
     const out = await runGenNode(db, { ...start, params: { provider: 'kie' } });
 
     expect(out).toEqual({ kind: 'refused', error: expect.stringMatching(/^Kie\.ai failed: .*Pick Auto/) });
-    expect(generateImagesWithoutBrand).not.toHaveBeenCalled();
+    expect(generateImages).not.toHaveBeenCalled();
   });
 
   it('kie picked by hand queues without a fallback model', async () => {
@@ -221,8 +221,8 @@ describe('a kie task that fails falls back to the primary once, and only the pri
     await reconcileTaskNodeRuns(db);
 
     expect(runUpdates(calls)).toContainEqual(expect.objectContaining({ status: 'failed', error: 'kie_task_failed: Internal error, please try again later.' }));
-    expect(generateImagesWithoutBrand).toHaveBeenCalledOnce();
-    expect(generateImagesWithoutBrand).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ model: PRIMARY }));
+    expect(generateImages).toHaveBeenCalledOnce();
+    expect(generateImages).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ model: PRIMARY }));
     expect(bill).toHaveBeenCalledOnce();
     expect(debited(bill.mock.calls[0][0])).toBeNull();
     expect(gateway.run).not.toHaveBeenCalled();
@@ -235,7 +235,7 @@ describe('a kie task that fails falls back to the primary once, and only the pri
 
     expect(await reconcileTaskNodeRuns(db)).toMatchObject({ done: 1 });
 
-    expect(generateImagesWithoutBrand).not.toHaveBeenCalled();
+    expect(generateImages).not.toHaveBeenCalled();
     expect(bill).toHaveBeenCalledOnce();
     expect(bill.mock.calls[0][0]).toMatchObject({ provider: 'kie', costUsd: 0.04, quotedUsd: 0.04 });
     expect(debited(bill.mock.calls[0][0])).toBe(0.04);

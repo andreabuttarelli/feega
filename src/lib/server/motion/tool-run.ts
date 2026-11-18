@@ -64,7 +64,7 @@ export enum FrameToolAccess {
 
 const READ_TOOLS = ['get_motion_doc', 'read_layer_css', 'measure_text', 'list_components', 'list_assets', 'beat_times', 'list_effects', 'list_layouts', 'list_fields', 'list_fonts', 'read_component', 'list_shots', 'list_templates', 'get_template', 'list_revisions', 'view_frames', 'describe_frames', 'list_ui_kinds'];
 
-const EDITOR_ONLY_TOOLS = ['read_video_reference', 'render_batch', 'spawn_agent', 'render_video', 'analyze_site', 'write_storyboard', 'read_storyboard', 'update_storyboard_card', 'link_storyboard_beat', 'use_brand', 'import_asset', 'recreate_ui'];
+const EDITOR_ONLY_TOOLS = ['read_video_reference', 'render_batch', 'spawn_agent', 'render_video', 'analyze_site', 'write_storyboard', 'read_storyboard', 'update_storyboard_card', 'link_storyboard_beat', 'import_asset', 'recreate_ui'];
 
 const FRAME_ACCESS: ReadonlyMap<string, FrameToolAccess> = new Map([
   ...READ_TOOLS.map((name) => [name, FrameToolAccess.Read] as const),
@@ -167,7 +167,7 @@ async function prepare(db: Db, scope: ToolRunScope, version: number | undefined,
 
   const actor = agentActor(scope.userId, scope.agentKey ?? TOOL_RUN_AGENT_KEY, scope.sessionId);
   const assets = saved.alongside;
-  const tokens = once(() => motionTokens(db, { orgId: scope.orgId, brandId: saved.project.brandId }));
+  const tokens = once(async () => motionTokens());
   const session = carried(turn, scope.nodeId, saved.doc, saved.version);
   const editor = turn?.editor;
   const server = async (times: number[]) => (serverFramesOpen() ? drawFrames(chromiumFrames, { compose: { doc: session.doc, tokens: await tokens(), assets: assetUrls(assets) }, times }) : null);

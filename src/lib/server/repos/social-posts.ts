@@ -6,8 +6,8 @@ import { signAssetFiles } from '$lib/server/repos/asset-storage';
 /**
  * I POST CHE UN NODO `social_account_feed` HA SCARICATO.
  *
- * `node_id` possiede la riga, non un brand: il nodo prende una piattaforma e un handle, non un
- * brand — la stessa scelta di `repos/products.ts`. `social_posts_node_id_external_id_key` è la
+ * `node_id` possiede la riga: il nodo prende una piattaforma e un handle.
+ * `social_posts_node_id_external_id_key` è la
  * chiave dell'upsert: la stessa pagina letta due volte aggiorna la riga, mai la duplica.
  */
 type SocialPostRow = Database['public']['Tables']['social_posts']['Row'];

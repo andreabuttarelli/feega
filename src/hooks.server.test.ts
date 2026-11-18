@@ -144,8 +144,7 @@ describe('server session recovery', () => {
 });
 
 /**
- * Lo stesso posto in cui si stabilisce a quale brand addebitare la spesa stabilisce anche chi
- * l'ha causata: una rotta non può dimenticarsene. Il nome arriva dalla rete, quindi si convalida
+ * Chi ha causato la spesa si stabilisce qui: una rotta non può dimenticarsene. Il nome arriva dalla rete, quindi si convalida
  * qui — chiunque può spedire quell'intestazione, e una riga di `ai_calls` attribuita a un tool
  * inventato è peggio di una riga senza nessun tool.
  */
@@ -154,9 +153,9 @@ describe('il tool che ha chiesto il lavoro', () => {
 		aiCalls.length = 0;
 		await handle({
 			event: {
-				request: new Request('http://localhost/api/v1/brands/demo/posts', { headers }),
-				url: new URL('http://localhost/api/v1/brands/demo/posts'),
-				route: { id: '/api/v1/brands/[slug]/posts' },
+				request: new Request('http://localhost/api/v1/projects/demo/canvases', { headers }),
+				url: new URL('http://localhost/api/v1/projects/demo/canvases'),
+				route: { id: '/api/v1/projects/[projectId]/canvases' },
 				params: {},
 				cookies: { getAll: () => [], get: () => undefined, set: vi.fn() },
 				locals: {}

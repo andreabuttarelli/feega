@@ -4,7 +4,7 @@
  * `nodes.data` non è l'unica: il database ha 20 colonne jsonb su 11 tabelle (lette dal database
  * vero, klnswzhhgrqvbfjzioul, lo stesso motivo per cui `checks.ts` accanto non è generato dalle
  * migration). Ognuna è raggiungibile dagli stessi tre tool generici — un agente che scrive
- * `insert_row('ad_campaigns', {targeting: …})` indovina la forma esattamente come indovinava
+ * `insert_row('canvases', {viewport: …})` indovina la forma esattamente come indovinava
  * `nodes.data` prima di questo giro.
  *
  * STESSA REGOLA DI `checks.ts` e `node-data.ts`: un `if` per tabella sarebbe la stessa colonna
@@ -25,21 +25,6 @@
  * `ORG_TABLE_CHECKS` accanto.
  */
 import { z } from 'zod';
-import { logosSchema, paletteSchema, voiceSchema } from '$lib/brand-kit';
-
-/**
- * `posts.media`: la stessa `PostMedia` che `repos/posts.ts` e il tool
- * MCP `create_post` già usano — non una forma nuova, la STESSA riletta qui perché quel modulo
- * dipende da `$lib/server/db/client` e non conviene farlo dipendere anche da questo file, o
- * viceversa: due letture della stessa riga, mai due righe.
- */
-export const postMediaSchema = z.array(
-  z.object({
-    assetId: z.string(),
-    order: z.number().int(),
-    role: z.string().optional()
-  })
-);
 
 /**
  * `canvases.viewport`: la stessa forma che `repos/canvas.ts::saveViewport` scrive e
@@ -51,18 +36,6 @@ export const canvasViewportSchema = z.object({
   zoom: z.number()
 });
 
-export const adTargetingSchema = z.object({
-  age_min: z.number().optional(),
-  age_max: z.number().optional(),
-  genders: z.array(z.string()).optional(),
-  countries: z.array(z.string()).optional(),
-  languages: z.array(z.string()).optional(),
-  interests: z.array(z.object({ id: z.string(), name: z.string().optional() })).optional()
-});
-
-/** `ad_campaigns.placements`: `string[]` nello stesso client (`CreateStandaloneAdInput.placements`). */
-export const adPlacementsSchema = z.array(z.string());
-
 type JsonbEntry =
   | { kind: 'validated'; schema: z.ZodType }
   | { kind: 'free_form'; reason: string };
@@ -72,7 +45,7 @@ const freeForm = (reason: string): JsonbEntry => ({ kind: 'free_form', reason })
 
 /**
  * LA TABELLA. Un tipo nuovo, o una colonna jsonb nuova, è UNA RIGA qui — mai un `if` sparso in
- * `write-tool.ts`. `jsonb-schemas.test.ts` verifica che la lista resti quella delle 20 colonne
+ * `write-tool.ts`. `jsonb-schemas.test.ts` verifica che la lista resti quella delle colonne
  * vere; chi ne aggiunge una in una migration futura la aggiunge anche qui, come per `checks.ts`.
  */
 export const JSONB_COLUMN_SCHEMAS: Record<string, JsonbEntry> = {
@@ -81,36 +54,7 @@ export const JSONB_COLUMN_SCHEMAS: Record<string, JsonbEntry> = {
       'forma sola) — write-tool.ts la applica separatamente, prima di questo registro.'
   ),
 
-  'posts.media': validated(postMediaSchema),
-
-  'posts.per_platform': freeForm(
-    'nessun codice del nuovo schema legge o scrive un campo nominato al suo interno oggi — ' +
-      '`repos/posts.ts::Post.perPlatform` è `Record<string, unknown> | null` senza forma imposta. ' +
-      'Imporne una qui inventerebbe un contratto che il prodotto non ha ancora deciso.'
-  ),
-
-  'ad_campaigns.targeting': validated(adTargetingSchema),
-  'ad_campaigns.placements': validated(adPlacementsSchema),
-
   'canvases.viewport': validated(canvasViewportSchema),
-
-  'brands.palette': validated(paletteSchema),
-  'brands.voice': validated(voiceSchema),
-  'brands.logos': validated(logosSchema),
-  'brands.target': freeForm(
-    'separata da `content` "perché si interroghi" ' +
-      '(NEW_DATABASE_STRUCTURE.md), ma nessun repository la consuma ancora con una forma concreta.'
-  ),
-
-  'competitor_ads.raw': freeForm(
-    'la risposta INTERA della Meta Ad Library, tenuta verbatim apposta: quella libreria cambia ' +
-      'forma senza preavviso, e validarla vorrebbe dire rompere l\'ingest a ogni cambiamento del ' +
-      'provider invece di limitarsi a registrarlo.'
-  ),
-  'competitor_ads.media': freeForm(
-    'nessun repository del nuovo schema scrive ancora questa tabella (solo la FK verso nodes esiste ' +
-      'in database.types.ts) — nessuna forma reale da cui derivare uno schema onesto.'
-  ),
 
   'canvas_events.before': freeForm(
     'l\'istantanea di una riga qualunque prima della modifica, per uno storico/undo — la forma È ' +
@@ -137,12 +81,6 @@ export const JSONB_COLUMN_SCHEMAS: Record<string, JsonbEntry> = {
       'imporre una forma qui darebbe due verità con `media-model-slots`.'
   ),
 
-  'ad_creatives.media': freeForm(
-    'nessun repository del nuovo schema scrive ancora `ad_creatives` — `NEW_DATABASE_STRUCTURE.md` ' +
-      'propone `[{ asset_id, order }]`, ma è la proposta del documento, non codice che gira: si ' +
-      'valida quando un repository reale ne fissa la forma, non prima.'
-  ),
-
   'social_posts.media': freeForm(
     'nessun repository del nuovo schema scrive ancora `social_posts` — la tabella dei post scaricati ' +
       'dai feed social (§ `social_account_feed` in NEW_DATABASE_STRUCTURE.md) non ha ancora un ingest.'
@@ -150,9 +88,9 @@ export const JSONB_COLUMN_SCHEMAS: Record<string, JsonbEntry> = {
   'social_posts.metrics': freeForm('stesso motivo di social_posts.media: nessun ingest reale da cui derivare la forma.'),
 
   'products.images': freeForm(
-    '`brand-design-doc.ts::normalizeImageUrls` accetta di proposito tre forme diverse ' +
-      '(`["url"]`, `[{src}]`, `[{url}]`) perché la fonte è uno scraper su siti che non controlliamo ' +
-      '— la tolleranza è la scelta del prodotto, non una lacuna da chiudere con uno schema stretto.'
+    'la fonte è uno scraper su store che non controlliamo: `store-product.ts` normalizza le immagini ' +
+      'in ingresso, ma la tolleranza sulla forma è una scelta del prodotto, non una lacuna da chiudere ' +
+      'con uno schema stretto.'
   )
 };
 

@@ -44,7 +44,6 @@ export const NODE_PORTS: Record<NodeType, Ports> = {
   social_account_feed: { inputs: NONE, output: 'images' },
   social_post_mockup: { inputs: NONE, output: null },
   products: { inputs: NONE, output: 'images' },
-  ads: { inputs: NONE, output: null },
   influencer: { inputs: NONE, output: 'images' },
   list: { inputs: InputRule.List, output: OutputRule.Item },
   select: { inputs: ['text', 'images'], output: OutputRule.Item },
@@ -55,7 +54,6 @@ export const NODE_PORTS: Record<NodeType, Ports> = {
   model3d: { inputs: ['images', 'text'], output: null },
   motion: { inputs: NONE, output: 'motions' },
   element: { inputs: NONE, output: OutputRule.FreeImage },
-  studio_batch: { inputs: NONE, output: 'images' },
   section: { inputs: NONE, output: 'section' },
   technique: { inputs: InputRule.Technique, output: OutputRule.Technique }
 };

@@ -1,22 +1,5 @@
 import { safeFetchUrl, SafeFetchError } from '$lib/server/tool-guard';
 
-/**
- * IL CATALOGO PUBBLICO DI UNO STORE, MAI IL SUO PANNELLO PRIVATO.
- *
- * Shopify e WooCommerce espongono ognuno un endpoint che non chiede autenticazione:
- * `/products.json` sul primo, `/wp-json/wc/store/v1/products` sul secondo. Non è l'API che un
- * negoziante userebbe per gestire il suo store — è la stessa vetrina che un browser scarica
- * quando qualcuno visita la pagina prodotti. Questo file legge SOLO quella.
- *
- * `packages/site-analysis/src/crawl.ts` fa già questa lettura per l'analisi del brand
- * (`fetchShopifyProducts`/`fetchWooCommerceProducts`), ma torna una forma pensata per un brief di
- * marketing, non per la tabella `products` — e vive in un package che non può importare `$lib`,
- * quindi non può usare `assertPublicUrl`. Qui la stessa lettura torna la forma che
- * `repos/products.ts` scrive, e passa dalla guardia SSRF già in produzione
- * (`tool-guard.ts::safeFetchUrl`) invece di riscriverne una copia — la stessa che l'MCP e i tool
- * pubblici usano già per un URL scritto da una persona.
- */
-
 import { normaliseProduct, type FetchedProduct, type StorePlatform } from '$lib/server/store-product';
 
 export type { FetchedProduct, StorePlatform };

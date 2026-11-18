@@ -6,7 +6,7 @@ import { NODE_PORTS } from '$lib/canvas/node-ports';
 import { CardPart, cardItems, type CoreCard } from './cards';
 import type { CardIcons } from './card-kit';
 import { TileBadge } from '$lib/canvas/source-thumbs';
-import { SelectBody, batchOf, type NodeView } from '$lib/canvas/node-view';
+import { SelectBody, type NodeView } from '$lib/canvas/node-view';
 import type { CoreTheme } from './overlay';
 import type { Glyphs } from './chrome';
 
@@ -118,8 +118,8 @@ describe('cardItems', () => {
   });
 
   it('draws a kind with nothing to show as a dashed card with a badge, its name and what it waits for', () => {
-    const c = { ...card('ads', {}), w: 300, h: 200 };
-    const items = cardItems(c, theme, glyphs, glyphs, { ...icons, badge: new Map([['ads', [[0, 0, 4, 0, 4, 4]]]]) });
+    const c = { ...card('social_post_mockup', {}), w: 300, h: 200 };
+    const items = cardItems(c, theme, glyphs, glyphs, { ...icons, badge: new Map([['social_post_mockup', [[0, 0, 4, 0, 4, 4]]]]) });
 
     expect(paths(items, CardPart.Panel)[1].contours.length).toBeGreaterThan(10);
     expect(box(paths(items, CardPart.Badge)[0].contours)).toEqual([130, 38, 170, 78]);
@@ -133,14 +133,6 @@ describe('cardItems', () => {
 
     expect(rows.length).toBeGreaterThan(1);
     rows.forEach((r) => expect(box(r.contours)[0] + box(r.contours)[2]).toBeCloseTo(600, -1));
-  });
-
-  it('draws the studio batch pick state as an icon over an underlined link', () => {
-    const c = { ...card('studio_batch', {}), w: 300, h: 200 };
-    const items = cardItems(c, theme, glyphs, glyphs, { ...icons, badge: new Map([['studio_batch', [[0, 0, 4, 0, 4, 4]]]]) });
-
-    expect(paths(items, CardPart.Badge)).toHaveLength(1);
-    expect(paths(items, CardPart.Empty)).toHaveLength(2);
   });
 
   it('draws an embedded page as a mode switch and an address field over a blank page', () => {
@@ -180,14 +172,6 @@ describe('cardItems', () => {
     expect(paths(cardItems({ ...card('effects', {}), w: 300, h: 300 }, theme, glyphs), CardPart.Empty)).toHaveLength(1);
   });
 
-  it('draws a picked studio batch as a thumbnail grid over its counts', () => {
-    const view: NodeView = { batch: batchOf({ approved: 3, done: 5, total: 8, running: 1, failed: 0, thumbs: ['a', 'b', 'c', 'd'] }) };
-    const items = cardItems({ ...card('studio_batch', {}), face: faceOf({ id: 'n', kind: 'studio_batch' }, {}, asset, view), w: 300, h: 300 }, theme, glyphs);
-
-    expect((part(items, CardPart.Thumb) as ImageItem[]).filter((i) => i.kind === ItemKind.Image).map((i) => i.src)).toEqual(['a', 'b', 'c', 'd']);
-    expect(paths(items, CardPart.Footer).length).toBeGreaterThan(1);
-  });
-
   it('draws an influencer as a cover over a name and views band', () => {
     const f = faceOf({ id: 'n', kind: 'influencer' }, {}, asset, { source: { tiles: [{ thumb: 'face', caption: null, badge: null, sale: null }], total: 1, name: 'Giulia' } });
     const items = cardItems({ ...card('influencer', {}), face: f, w: 200, h: 200 }, theme, glyphs);
@@ -215,7 +199,7 @@ describe('cardItems', () => {
 
   it('sets a title in the bold face', () => {
     const bold: Glyphs = () => ({ contours: [[0, 0, 1, 0, 1, 1]], width: 1, height: 1 });
-    const [title] = paths(cardItems(card('ads', {}), theme, glyphs, bold), CardPart.Title);
+    const [title] = paths(cardItems(card('social_post_mockup', {}), theme, glyphs, bold), CardPart.Title);
 
     expect(box(title.contours)[2] - box(title.contours)[0]).toBe(1);
   });

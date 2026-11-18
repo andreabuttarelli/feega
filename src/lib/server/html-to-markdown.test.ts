@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { htmlToMarkdown } from './knowledge';
+import { htmlToMarkdown } from './markdown';
 
 // Guards what the /*.md docs mirror depends on: the docs pages are Tailwind-heavy Svelte, so the
 // conversion has to drop the chrome and keep code readable.

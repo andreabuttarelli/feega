@@ -26,7 +26,7 @@ function seed({ optedIn = true, paid = true, verified = true }: Seed = {}) {
   return {
     orgs_members: [{ user_id: USER.id, role: 'owner', orgs: { id: ORG, name: 'Acme', slug: 'acme' } }],
     orgs: [{ id: ORG, stripe_subscription_id: paid ? 'sub_1' : null }],
-    projects: [{ id: PROJECT, org_id: ORG, name: 'Main', slug: 'main', brand_id: null, archived_at: null, mode: 'standard', updated_at: '2026-09-29T00:00:00Z', canvases: [] }],
+    projects: [{ id: PROJECT, org_id: ORG, name: 'Main', slug: 'main', archived_at: null, mode: 'standard', updated_at: '2026-09-29T00:00:00Z', canvases: [] }],
     org_uncensored_optins: optedIn ? [{ org_id: ORG, enabled_by: USER.id, enabled_at: '2026-09-29T00:00:00Z', disabled_at: null }] : [],
     feature_flags: [{ key: 'uncensored_mode', enabled: false }],
     user_age_verifications: verified ? [{ id: 'v1', user_id: USER.id, provider: 'manual_admin', method: 'manual_admin', result: 'adult' }] : []

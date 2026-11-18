@@ -257,7 +257,6 @@
       org={data.org}
       share={onCanvasRoute ? { shareToken, onShare } : null}
       projectName={data.project.name}
-      brandName={data.brand?.name ?? null}
       projects={data.projects.filter((p: { mode: string }) => p.mode === data.project.mode).map((p: { id: string; name: string; href: string; updatedAt: string }) => ({
         id: p.id,
         name: p.name,

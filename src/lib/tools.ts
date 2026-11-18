@@ -11,7 +11,7 @@ export enum ToolRole {
   Support = 'support'
 }
 
-export type ToolIcon = 'camera' | 'clapperboard' | 'upscale' | 'orbit';
+export type ToolIcon = 'clapperboard' | 'upscale' | 'orbit';
 
 export type Tool = {
   id: string;
@@ -25,15 +25,6 @@ export type Tool = {
 };
 
 export const TOOLS: readonly Tool[] = [
-  {
-    id: 'studio',
-    name: 'Photo studio',
-    description: 'Product photos for your store from one picture, in three steps.',
-    icon: 'camera',
-    route: '/app/studio',
-    status: ToolStatus.Beta,
-    role: ToolRole.Support
-  },
   {
     id: 'motion',
     name: 'Motion editor',

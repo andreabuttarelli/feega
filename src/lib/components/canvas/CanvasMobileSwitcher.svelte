@@ -1,7 +1,6 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
   import * as Sheet from '$lib/components/ui/sheet/index.js';
-  import { Badge } from '$lib/components/ui/badge/index.js';
   import Check from '@lucide/svelte/icons/check';
   import Pencil from '@lucide/svelte/icons/pencil';
   import Search from '@lucide/svelte/icons/search';
@@ -20,7 +19,6 @@
     open,
     onOpenChange,
     projectName,
-    brandName = null,
     projects: projectRows,
     canvasName,
     canvasHref,
@@ -29,7 +27,6 @@
     open: boolean;
     onOpenChange: (open: boolean) => void;
     projectName: string;
-    brandName?: string | null;
     projects: ProjectRow[];
     canvasName: string;
     canvasHref: string | null;
@@ -67,9 +64,6 @@
       <div class="grabber" aria-hidden="true"></div>
       <Sheet.Header class="flex-row items-center gap-2 px-4 py-3 pr-14 text-left">
         <Sheet.Title class="min-w-0 truncate text-base font-semibold" title={projectName}>{projectName}</Sheet.Title>
-        {#if brandName}
-          <Badge variant="outline" data-testid="switcher-brand">{brandName}</Badge>
-        {/if}
       </Sheet.Header>
       {#if searchable}
         <label class="search">

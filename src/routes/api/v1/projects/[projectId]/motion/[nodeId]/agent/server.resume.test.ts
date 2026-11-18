@@ -6,7 +6,7 @@ import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 const world = vi.hoisted(() => ({ db: null as unknown, stored: new Map<string, string>() }));
 
 vi.mock('$lib/server/motion/agent-scope', () => ({
-  motionAgentScope: async () => ({ db: world.db, user: { id: 'u-1' }, orgId: 'org-1', project: { id: 'p-1', brandId: null }, motion: { record: { id: 'n-1' }, node: {} } })
+  motionAgentScope: async () => ({ db: world.db, user: { id: 'u-1' }, orgId: 'org-1', project: { id: 'p-1', }, motion: { record: { id: 'n-1' }, node: {} } })
 }));
 vi.mock('$lib/server/motion/editor', () => ({
   headOrNew: async () => ({ version: 3, doc: newMotionDoc(MotionFormat.Landscape), summary: null, actorKind: 'user' })

@@ -64,7 +64,6 @@ const store = vi.hoisted(() => ({
   history: [] as unknown[]
 }));
 
-vi.mock('$lib/server/repos/brands', () => ({ findBrandLook: async () => null, findFirstBrandLook: async () => null }));
 vi.mock('$lib/server/uncensored-workspace/hidden-scope', async (importOriginal) => {
   const real = await importOriginal<typeof import('$lib/server/uncensored-workspace/hidden-scope')>();
   return { ...real, hiddenFor: async () => real.NOTHING_HIDDEN };
@@ -93,7 +92,7 @@ vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
   patchNodeData: async () => ({ outcome: 'written', node: store.node }),
   resizeNode: async () => undefined
 }));
-vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async (_db: unknown, input: { orgId: string }) => (input.orgId === ORG ? { id: PROJECT, brandId: null } : null) }));
+vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async (_db: unknown, input: { orgId: string }) => (input.orgId === ORG ? { id: PROJECT, } : null) }));
 vi.mock('$lib/server/repos/assets', () => ({
   listFontAssets: async () => [],
   listProjectAssets: async () => [],

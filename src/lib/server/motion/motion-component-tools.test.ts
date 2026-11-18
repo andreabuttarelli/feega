@@ -165,7 +165,7 @@ describe('component tools', () => {
 
 describe('the authoring contract in the prompt', () => {
   it('names what the static check refuses and how to animate instead', () => {
-    const prompt = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Available, frame: { width: 1080, height: 1920 } });
+    const prompt = motionAgentPrompt({ selectionNote: '', vision: Vision.Available, frame: { width: 1080, height: 1920 } });
 
     for (const name of ['param(', 'var(--param-', 'setTimeout', 'requestAnimationFrame', 'fetch', 'Math.random', '@keyframes', 'tl', 'rand()', '1080×1920']) {
       expect(prompt).toContain(name);

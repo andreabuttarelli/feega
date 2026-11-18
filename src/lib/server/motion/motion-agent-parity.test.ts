@@ -171,7 +171,7 @@ describe('every editable part of a motion video has an agent path', () => {
   it('the agent can bring a brand in from outside the doc: a site, an org brand, a picture', () => {
     const { tools } = setup();
 
-    expect(['analyze_site', 'use_brand', 'import_asset'].filter((t) => !tools[t])).toEqual([]);
+    expect(['analyze_site', 'import_asset'].filter((t) => !tools[t])).toEqual([]);
   });
 
   it('a fill stack the Properties panel edits, the agent writes and reads back', async () => {

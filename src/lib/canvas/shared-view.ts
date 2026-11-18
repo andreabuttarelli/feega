@@ -14,7 +14,6 @@ export type SharedView =
   | { kind: 'select'; index: number; outputs: SharedOutput[] }
   | { kind: 'influencer'; name: string; summary: string | null; photo: string | null }
   | { kind: 'post'; caption: string; media: string[] }
-  | { kind: 'ads'; query: string; country: string }
   | { kind: 'calendar'; view: CalendarView; anchor: string }
   | { kind: 'empty' };
 

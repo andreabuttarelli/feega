@@ -20,7 +20,7 @@ export enum RebuildOutcome {
 }
 
 export type StoredEmbed = { page: string; updatedAt: string };
-export type EmbedPlace = { orgId: string; projectId: string; canvasId: string; brandId: string | null; title: string; mode: ProjectMode; deleted: boolean };
+export type EmbedPlace = { orgId: string; projectId: string; canvasId: string; title: string; mode: ProjectMode; deleted: boolean };
 export type RebuildInput = Omit<InteractiveInput, 'settings'>;
 
 export type RebuildPorts = {

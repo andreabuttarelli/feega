@@ -6,7 +6,7 @@ const listNodes = vi.fn();
 const list = vi.fn();
 
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
-vi.mock('$lib/server/canvas/lookup', () => ({ findCanvasForUser: async () => ({ orgId: 'org-1', canvas: { id: 'canvas-1', projectId: 'project-1' }, mode: 'standard', projectBrandId: null }) }));
+vi.mock('$lib/server/canvas/lookup', () => ({ findCanvasForUser: async () => ({ orgId: 'org-1', canvas: { id: 'canvas-1', projectId: 'project-1' }, mode: 'standard' }) }));
 vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ canvasReachable: async () => true }));
 vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({ ...(await importOriginal<object>()), listNodes: (...a: unknown[]) => listNodes(...a), listConnections: async () => [] }));
 vi.mock('$lib/server/project-catalogue', () => ({ projectCatalogue: async () => [] }));

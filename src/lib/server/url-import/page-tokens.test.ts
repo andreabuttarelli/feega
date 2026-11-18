@@ -51,13 +51,6 @@ describe('page tokens', () => {
     expect(surface.members).toEqual(['#f6f9fc', '#f6f9fd']);
   });
 
-  it('a brand colour of the same site wins over the page value it is close to', () => {
-    const primary = tokensOf(PAGE, { palette: ['#533AFE'] }).colours.find((c) => c.name === 'Primary')!;
-
-    expect(primary.hex).toBe('#533afe');
-    expect(primary.members).toContain('#533afd');
-  });
-
   it('Primary is the colour that fills things, over one only used for text', () => {
     const purple = [colour('#533afd', ColourPaint.Fill, 30), colour('#533afd', ColourPaint.Fill, 30)];
     const orange = Array.from({ length: 6 }, () => colour('#ff6118', ColourPaint.Text, 5, true));
@@ -79,14 +72,6 @@ describe('page tokens', () => {
     const found = names({ ...EMPTY, colours: [colour('#ffffff', ColourPaint.Fill, 1e6), colour('#171717', ColourPaint.Text, 1e4), colour('#4d4d4d', ColourPaint.Text, 900), ...blue, ...buttons], ctas });
 
     expect([found.Primary, found.Text]).toEqual(['#171717', '#171717']);
-  });
-
-  it('with no coloured button, the brand colour found on the page is Primary', () => {
-    const yellow = Array.from({ length: 8 }, () => colour('#f0bf00', ColourPaint.Fill, 400));
-    const indigo = [colour('#5e6ad2', ColourPaint.Fill, 20), colour('#5e6ad2', ColourPaint.Fill, 20)];
-    const page = { ...EMPTY, colours: [colour('#08090a', ColourPaint.Fill, 1e6), colour('#f7f8f8', ColourPaint.Text, 1e4), colour('#e5e5e6', ColourPaint.Fill, 30), colour('#e5e5e6', ColourPaint.Fill, 30), ...yellow, ...indigo], ctas: [{ hex: '#e5e5e6', area: 2_000 }] };
-
-    expect(Object.fromEntries(tokensOf(page, { palette: ['#5E6AD2', '#08090A'] }).colours.map((c) => [c.name, c.hex])).Primary).toBe('#5e6ad2');
   });
 
   it('a colour used once and with no role is not a token', () => {

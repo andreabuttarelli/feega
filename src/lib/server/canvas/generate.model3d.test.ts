@@ -49,7 +49,7 @@ imageStep.generate = vi.fn();
 moderation.screen = vi.fn();
 const ledger = vi.hoisted(() => ({ db: null as unknown }));
 vi.mock('$lib/server/supabase-admin', () => ({ createAdminClient: () => ledger.db }));
-vi.mock('$lib/server/media-generate', () => ({ generateImagesWithoutBrand: (...args: unknown[]) => imageStep.generate(...args) }));
+vi.mock('$lib/server/media-generate', () => ({ generateImages: (...args: unknown[]) => imageStep.generate(...args) }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput: (...args: unknown[]) => moderation.screen(...args) }));
 vi.mock('$lib/server/offerable-models', () => ({
   offerableModels: async () => ({

@@ -10,15 +10,6 @@
  * tabelle è vuoto, quindi non c'è un `ORG_WRITABLE_COLUMNS` da generare — il confine è tutto RLS.
  */
 export const ORG_TABLE_CHECKS: Record<string, string> = {
-  ad_accounts_platform_check: "platform = 'meta'",
-  ad_accounts_status_check: "status in ('connected', 'expired', 'revoked')",
-  ad_campaigns_actor_kind_check: "actor_kind in ('user', 'agent', 'system')",
-  ad_campaigns_budget_type_check: "budget_type in ('daily', 'lifetime')",
-  ad_campaigns_objective_check:
-    "objective in ('awareness', 'traffic', 'engagement', 'video_views', 'lead_generation', 'conversions', 'app_promotion', 'catalog_sales')",
-  ad_campaigns_status_check:
-    "status in ('draft', 'pending_review', 'scheduled', 'active', 'paused', 'completed', 'failed', 'rejected')",
-  ad_creatives_status_check: "status in ('draft', 'active', 'paused', 'rejected')",
   ai_calls_actor_kind_check: "actor_kind in ('user', 'agent', 'system')",
   ai_calls_status_check: "status in ('ok', 'error', 'timeout', 'refused')",
   assets_source_check: "source in ('upload', 'generated', 'imported')",
@@ -28,8 +19,6 @@ export const ORG_TABLE_CHECKS: Record<string, string> = {
   chat_messages_actor_kind_check: "actor_kind in ('user', 'agent', 'system')",
   chat_messages_role_check: "role in ('user', 'assistant', 'tool', 'system')",
   chat_threads_surface_check: "surface in ('sidebar', 'mcp', 'cli', 'motion')",
-  competitor_ads_found_via_check: "found_via in ('page', 'search')",
-  competitor_ads_platform_check: "platform = 'meta'",
   influencers_source_check: "source in ('catalogue', 'generated', 'upload')",
   influencers_actor_kind_check: "actor_kind in ('user', 'agent', 'system')",
   node_runs_actor_kind_check: "actor_kind in ('user', 'agent', 'system')",

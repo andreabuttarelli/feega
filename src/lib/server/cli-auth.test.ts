@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { readFileSync } from 'node:fs';
-import { authenticate, loadBrandForUser, type ApiKeyInfo } from './cli-auth';
+import { authenticate, type ApiKeyInfo } from './cli-auth';
 import { isRlsScoped } from '$lib/server/rls-client';
 import { createTestSupabase } from '$lib/testkit/supabase';
 
@@ -11,7 +11,6 @@ vi.mock('@supabase/ssr', () => ({
   })
 }));
 
-const BRAND = { id: 'brand-1', org_id: 'org-1', name: 'Acme', slug: 'acme' };
 
 const API_KEY: ApiKeyInfo = {
   id: 'key-1',
@@ -30,30 +29,6 @@ const API_KEY: ApiKeyInfo = {
 function mockClient(tables: Record<string, Record<string, unknown>[]>): SupabaseClient {
   return createTestSupabase(tables).client;
 }
-
-describe('loadBrandForUser with API key', () => {
-  it('returns the brand when the brand’s org matches the key’s org', async () => {
-    const supabase = mockClient({ brands: [BRAND] });
-    const { brand, error } = await loadBrandForUser(supabase, 'acme', API_KEY);
-    expect(error).toBeUndefined();
-    expect(brand?.id).toBe('brand-1');
-  });
-
-  it('returns 404 (not 403) when the brand belongs to a different org — anti-probing', async () => {
-    const supabase = mockClient({ brands: [{ ...BRAND, org_id: 'org-other' }] });
-    const { brand, error } = await loadBrandForUser(supabase, 'acme', API_KEY);
-    expect(brand).toBeUndefined();
-    expect(error?.status).toBe(404);
-    expect(await (error as Response).json()).toEqual({ error: 'Brand not found' });
-  });
-
-  it('returns 404 when the brand does not exist', async () => {
-    const supabase = mockClient({});
-    const { brand, error } = await loadBrandForUser(supabase, 'missing', API_KEY);
-    expect(brand).toBeUndefined();
-    expect(error?.status).toBe(404);
-  });
-});
 
 describe('authenticate', () => {
   beforeEach(() => {

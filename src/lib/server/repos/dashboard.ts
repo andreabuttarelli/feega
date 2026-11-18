@@ -4,7 +4,6 @@ import type { NodeType } from '$lib/canvas/node-data';
 
 export type RecentCanvas = { id: string; projectId: string; name: string; updatedAt: string };
 export type RecentImage = { id: string; projectId: string };
-export type RecentBatch = { id: string; projectId: string; name: string; status: string; createdAt: string };
 export type RecentNode = { id: string; projectId: string; canvasId: string; name: string | null; data: Record<string, unknown>; updatedAt: string };
 
 type Scope = { orgId: string; limit: number };
@@ -45,21 +44,6 @@ export async function listRecentImages(db: Db, scope: Scope): Promise<RecentImag
   return rowsOf<{ id: string; project_id: string }>(result).map((r) => ({ id: r.id, projectId: r.project_id }));
 }
 
-export async function listRecentBatches(db: Db, scope: Scope): Promise<RecentBatch[]> {
-  const result = await (db as unknown as SupabaseClient)
-    .from('product_batches')
-    .select('id, project_id, name, status, created_at')
-    .eq('org_id', scope.orgId)
-    .order('created_at', { ascending: false })
-    .limit(scope.limit);
-  return rowsOf<{ id: string; project_id: string; name: string; status: string; created_at: string }>(result).map((r) => ({
-    id: r.id,
-    projectId: r.project_id,
-    name: r.name,
-    status: r.status,
-    createdAt: r.created_at
-  }));
-}
 
 export async function listRecentNodes(db: Db, scope: Scope & { type: NodeType; before?: string }): Promise<RecentNode[]> {
   const query = db

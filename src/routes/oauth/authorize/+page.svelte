@@ -17,7 +17,7 @@
       <h2>{data.clientName} wants to access your account</h2>
       <p class="email">{data.userEmail}</p>
       <p class="desc">
-        It will read and manage your brands and content through MCP, with the same
+        It will read and manage your projects and canvases through MCP, with the same
         permissions as your account. You can disconnect it from the client at any time.
       </p>
 

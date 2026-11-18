@@ -40,7 +40,7 @@ export async function editorSession(canvas: CanvasScope, params: SessionAsk, pha
   const [lookup, savedHead, tokens, assets, runs, templates, gallery, briefAttachments, fonts, mark] = await Promise.all([
     phases.time('node', nodeLookup(canvas, params.nodeId)),
     phases.time('head', readHead(db, nodeScope, HEADS)),
-    phases.time('tokens', motionTokens(db, { orgId: found.orgId, brandId: found.projectBrandId })),
+    motionTokens(),
     phases.time('assets', motionAssets({ db, orgId: found.orgId, projectId: params.projectId, canvasId: found.canvas.id })),
     phases.time('runs', listNodeRuns(db, nodeScope)),
     phases.time('templates', libraryOf({ db, orgId: found.orgId, userId }).own()),

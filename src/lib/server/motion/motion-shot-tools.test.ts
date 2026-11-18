@@ -231,7 +231,7 @@ describe('the shot library', () => {
   });
 
   it('the prompt sends a product trailer to the shots', () => {
-    expect(motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Available })).toMatch(/add_shot/);
+    expect(motionAgentPrompt({ selectionNote: '', vision: Vision.Available })).toMatch(/add_shot/);
   });
 });
 

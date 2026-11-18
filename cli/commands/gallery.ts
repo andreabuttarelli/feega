@@ -29,7 +29,6 @@ export async function cmdGalleryRemix(itemId: string, opts: { project: string; c
   const remixed = await galleryApi.remix(await token(), itemId, { project_id: opts.project, ...(opts.canvas ? { canvas_id: opts.canvas } : {}) }, opts.org);
   console.log(`Remixed "${remixed.title}" into node ${remixed.node_id}.`);
   console.log(`Open it: ${remixed.editor_url}`);
-  console.log(`Put your brand on it: feega motion ask ${remixed.node_id} "Apply my brand"`);
 }
 
 export async function cmdGalleryPublish(nodeId: string, opts: { title: string; description?: string; tags?: string; org?: string }) {

@@ -6,12 +6,12 @@ const ORG = 'org-1';
 const PROJECT = 'project-1';
 const USER = 'user-1';
 
-const { generateImagesWithoutBrandMock, safeFetchBytesMock } = vi.hoisted(() => ({
-  generateImagesWithoutBrandMock: vi.fn(),
+const { generateImagesMock, safeFetchBytesMock } = vi.hoisted(() => ({
+  generateImagesMock: vi.fn(),
   safeFetchBytesMock: vi.fn()
 }));
 vi.mock('$lib/server/media-generate', () => ({
-  generateImagesWithoutBrand: generateImagesWithoutBrandMock
+  generateImages: generateImagesMock
 }));
 vi.mock('$lib/server/cli-auth', () => ({ gateOrgAiActionForForm: async () => null }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput: async () => ({ ok: true }) }));
@@ -23,7 +23,7 @@ vi.mock('$lib/server/tool-guard', async (importOriginal) => ({
 function fixture(rows: Record<string, unknown[]> = {}) {
   return fakeDb({
     orgs_members: [{ role: 'owner', orgs: { id: ORG, name: 'Org', slug: 'org' } }],
-    projects: [{ id: PROJECT, name: 'Project', slug: 'project', brand_id: null, archived_at: null }],
+    projects: [{ id: PROJECT, name: 'Project', slug: 'project', archived_at: null }],
     influencers: [],
     influencer_views: [],
     ...rows
@@ -47,7 +47,7 @@ function event(fake: ReturnType<typeof fixture>, form?: Record<string, string | 
 }
 
 beforeEach(() => {
-  generateImagesWithoutBrandMock.mockReset();
+  generateImagesMock.mockReset();
   safeFetchBytesMock.mockReset();
   safeFetchBytesMock.mockResolvedValue({
     url: 'https://cdn/face.png',
@@ -140,7 +140,7 @@ describe('actions.template — "usa come modello" legge l\'origine per il builde
 
 describe('actions.generate — il volto prima, poi le viste, attraverso i repository veri', () => {
   it('crea la riga influencer via createInfluencer quando la generazione del volto riesce', async () => {
-    generateImagesWithoutBrandMock.mockResolvedValue({
+    generateImagesMock.mockResolvedValue({
       ok: true,
       media: [{ id: 'm1', kind: 'image', mime: 'image/png', width: 1024, height: 1365, url: 'https://cdn/face.png', storage_path: 'x' }],
       model: 'gpt-image-2',
@@ -159,7 +159,7 @@ describe('actions.generate — il volto prima, poi le viste, attraverso i reposi
   });
 
   it('un volto che fallisce non scrive nessuna riga', async () => {
-    generateImagesWithoutBrandMock.mockResolvedValue({ ok: false, error: 'render_failed' });
+    generateImagesMock.mockResolvedValue({ ok: false, error: 'render_failed' });
 
     const fake = fixture();
     const result = await actions.generate(event(fake, { name: 'Nova', prompt: 'a presenter' }) as never);
@@ -168,12 +168,12 @@ describe('actions.generate — il volto prima, poi le viste, attraverso i reposi
     expect(fake.calls.some((c) => c.table === 'influencers' && c.op === 'insert')).toBe(false);
   });
 
-  it('senza nome o descrizione, generateImagesWithoutBrand non viene nemmeno chiamato', async () => {
+  it('senza nome o descrizione, generateImages non viene nemmeno chiamato', async () => {
     const fake = fixture();
     const result = await actions.generate(event(fake, { name: '', prompt: '' }) as never);
 
     expect(result).toMatchObject({ status: 400 });
-    expect(generateImagesWithoutBrandMock).not.toHaveBeenCalled();
+    expect(generateImagesMock).not.toHaveBeenCalled();
   });
 });
 

@@ -37,7 +37,6 @@ import { CALENDAR_SCOPES } from './calendar-node';
 import { elementNodeSchema, motionNodeSchema } from './motion-node';
 import { LAYOUT_KEYS, nodeLayoutSchema } from './node-layout';
 import { compositionTemplateSchema } from './composition-node';
-import { studioBatchNodeSchema } from './studio-batch-node';
 import { AUDIO_OPERATION_IDS, type AudioOperationId } from './audio-operations';
 import { MAX_CUSTOM_OUTPUTS, MAX_OUTPUT_LABEL } from './select-outputs';
 import { SOURCE_ITEM_FIELDS } from './select-sources';
@@ -242,37 +241,6 @@ const productsSchema = z.object({
 });
 
 /**
- * Due modi, un solo `mode`. Il CHECK non può imporre «page_id quando mode=page»: è codice, non
- * schema — la stessa scelta che `NEW_DATABASE_STRUCTURE.md` propone e che qui si applica con
- * `superRefine`, l'unico posto dove la coppia resta onesta.
- */
-const adsBase = z.object({
-  mode: z.enum(['page', 'search']),
-  page_id: z.string().optional(),
-  page_name: z.string().optional(),
-  search_terms: z.string().optional(),
-  country: z.string().min(2),
-  active_only: z.boolean().optional(),
-  limit: z.number().int().positive().optional(),
-  after: z.string().nullable().optional()
-});
-
-const adsSchema = adsBase.superRefine((v, ctx) => {
-  if (v.mode === 'page' && !v.page_id) {
-    ctx.addIssue({ code: 'custom', path: ['page_id'], message: 'mode "page" richiede page_id' });
-  }
-  if (v.mode === 'page' && v.search_terms) {
-    ctx.addIssue({ code: 'custom', path: ['search_terms'], message: 'mode "page" does not take search_terms' });
-  }
-  if (v.mode === 'search' && !v.search_terms) {
-    ctx.addIssue({ code: 'custom', path: ['search_terms'], message: 'mode "search" richiede search_terms' });
-  }
-  if (v.mode === 'search' && v.page_id) {
-    ctx.addIssue({ code: 'custom', path: ['page_id'], message: 'mode "search" does not take page_id' });
-  }
-});
-
-/**
  * `influencer`: nasce già pieno, come `products` — la riga in `influencers` esiste prima che il
  * nodo la referenzi, `influencer_id` è l'unico campo che il CHECK impone. `data` non porta le
  * viste (sarebbero decine di URL che viaggiano a ogni evento realtime, lo stesso motivo per cui
@@ -433,7 +401,6 @@ const techniqueSchema = z.object({
 const calendarSchema = z.object({
   view: z.enum(CALENDAR_VIEWS),
   scope: z.enum(CALENDAR_SCOPES),
-  brand_id: z.string().nullable().optional(),
   anchor: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 });
 
@@ -484,7 +451,6 @@ export const NODE_DATA_SCHEMAS = {
   social_account_feed: socialAccountFeedSchema,
   social_post_mockup: socialPostMockupSchema,
   products: productsSchema,
-  ads: adsSchema,
   influencer: influencerSchema,
   list: listSchema,
   select: selectSchema,
@@ -495,7 +461,6 @@ export const NODE_DATA_SCHEMAS = {
   model3d: model3dSchema,
   motion: motionNodeSchema,
   element: elementNodeSchema,
-  studio_batch: studioBatchNodeSchema,
   section: sectionSchema,
   technique: techniqueSchema
 } as const;

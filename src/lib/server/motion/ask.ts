@@ -53,7 +53,7 @@ export type PickReply = { follow: string[]; avoid: string[]; note?: string; reje
 
 const noPickAsked = () => json({ error: 'no_reference_pick_asked' }, { status: HTTP_CONFLICT });
 
-async function askedPick(db: Db, scope: { orgId: string; userId: string; projectId: string; nodeId: string; brandId: string | null }): Promise<PickAsk | null> {
+async function askedPick(db: Db, scope: { orgId: string; userId: string; projectId: string; nodeId: string }): Promise<PickAsk | null> {
   const threadId = await openNodeThread(db, scope);
   const turns = await loadTurns(db, { orgId: scope.orgId, threadId });
   const last = turns.findLast((t) => t.role === 'assistant');
@@ -80,7 +80,7 @@ export async function askMotion(db: Db, input: { orgId: string; userId: string; 
     return notFound();
   }
 
-  const pickAsked = input.pick ? await askedPick(db, { orgId, userId, projectId: project.id, nodeId, brandId: project.brandId }) : null;
+  const pickAsked = input.pick ? await askedPick(db, { orgId, userId, projectId: project.id, nodeId }) : null;
   if (input.pick && !pickAsked) {
     return noPickAsked();
   }

@@ -109,9 +109,7 @@ function secondsUntilUtcMidnight(): number {
 // SSRF-safe fetching
 // ---------------------------------------------------------------------------
 
-// NOTE: brand-analysis.ts has its own isUrlSafe, kept deliberately separate. That one matches
-// hostname PATTERNS only, which is fine for URLs we already trust (a brand's own site). These
-// tools take a URL from an anonymous stranger, so the check has to survive a public hostname
+// These tools take a URL from an anonymous stranger, so the check has to survive a public hostname
 // whose DNS record points at 127.0.0.1 — hence the resolve-then-check below.
 //
 // IPv4 private/loopback/link-local + IPv6 loopback/unique-local/link-local. 169.254.169.254 (the

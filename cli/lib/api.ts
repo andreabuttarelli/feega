@@ -8,12 +8,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import { appUrl } from './config.ts';
 import {
   pathFor,
-  pathWithoutBrand,
   SESSION_HEADER,
   TOOL_HEADER,
-  type BrandEndpoint,
-  type ResourceEndpoint,
-  type ResourcelessEndpoint,
+  type OrgEndpoint,
 } from './contracts/index.ts';
 
 /**
@@ -108,42 +105,12 @@ function post<T>(path: string, token: string, body?: unknown): Promise<T> {
   });
 }
 
-/**
- * Nessuno slug: si va per la strada senza brand, se il registro ne dichiara una. Se non la
- * dichiara è un errore qui e subito — cadere sulla rotta del brand costruirebbe `/brands//…`, che
- * il server rifiuterebbe con un 404 illeggibile molto più tardi.
- */
-function brandFreeCall(endpoint: BrandEndpoint, slug: string | null): string | null {
-  if (slug) return null;
-
-  const path = pathWithoutBrand(endpoint);
-  if (!path) throw new Error(`${endpoint.tool} needs a brand slug`);
-
-  return path;
-}
-
 export function callEndpoint<T>(
-  endpoint: ResourcelessEndpoint,
+  endpoint: OrgEndpoint,
   token: string,
-  slug: string | null,
-  input?: Record<string, unknown>,
-): Promise<T>;
-export function callEndpoint<T>(
-  endpoint: ResourceEndpoint,
-  token: string,
-  slug: string,
-  input: Record<string, unknown>,
-  id: string,
-): Promise<T>;
-export function callEndpoint<T>(
-  endpoint: BrandEndpoint,
-  token: string,
-  slug: string | null,
   input: Record<string, unknown> = {},
-  id?: string,
 ): Promise<T> {
-  const path = brandFreeCall(endpoint, slug)
-    ?? (endpoint.resource === undefined ? pathFor(endpoint, slug!) : pathFor(endpoint, slug!, id ?? ''));
+  const path = pathFor(endpoint);
   if (endpoint.method === 'DELETE') return request<T>(path, token, { method: 'DELETE' });
   if (endpoint.method !== 'GET') {
     return request<T>(path, token, { method: endpoint.method, body: JSON.stringify(input) });
@@ -158,15 +125,6 @@ export function callEndpoint<T>(
 }
 
 // ── Types ───────────────────────────────────────────────────────────────
-
-export type BrandSummary = {
-  id: string;
-  name: string;
-  slug: string;
-  scheduled: number;
-  accounts: number;
-  accountsDown: number;
-};
 
 export type MediaItem = {
   assetId: string;
@@ -203,21 +161,6 @@ function mediaPath(q: MediaQuery): string {
 // ── API methods ─────────────────────────────────────────────────────────
 
 export const api = {
-  // Brands
-  listBrands: (t: string) => get<BrandSummary[]>('/api/v1/brands', t),
-
-  // ── Products ──────────────────────────────────────────────────────────
-  listProducts: (t: string, slug: string) =>
-    get<{ products: { id: string; title: string; kind: string; pricing: string | null; imageCount: number; featured: boolean }[] }>(`/api/v1/brands/${slug}/products`, t),
-
-  syncProducts: (t: string, slug: string) =>
-    post<{
-      ok: boolean;
-      platform: string;
-      synced: number;
-      rejected: { title: string; reason: string }[];
-    }>(`/api/v1/brands/${slug}/products`, t),
-
   getMedia: (t: string, q: MediaQuery) => get<Media>(mediaPath(q), t),
 
 };

@@ -45,13 +45,13 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
   },
   {
     path: 'src/lib/server/motion/render-link.ts — openRenderLink + linkPayload + uploadSlot + finishRenderLink (rotta pubblica /render/[token])',
-    why: "Chi apre un link di render può non avere una sessione su quel dispositivo (il telefono a cui un agente MCP ha mandato il link): il token È l'autorizzazione, monouso e a scadenza breve. La riga si trova per id del run e passa solo se l'impronta del segreto coincide, il run è un `browser-render:` ancora in corso e, dopo la prima apertura, il cookie del dispositivo che l'ha reclamato coincide. org, nodo e revisione si LEGGONO da quella riga: si legge solo quella revisione del doc, il brand del suo progetto e gli asset firmati di quel progetto; si scrive solo il file al percorso fisso del run (`exportPath`), l'asset che lo registra, `lastRenderAssetId` del nodo e lo stato del run.",
-    tables: ['node_runs', 'nodes', 'motion_revisions', 'projects', 'brands', 'assets']
+    why: "Chi apre un link di render può non avere una sessione su quel dispositivo (il telefono a cui un agente MCP ha mandato il link): il token È l'autorizzazione, monouso e a scadenza breve. La riga si trova per id del run e passa solo se l'impronta del segreto coincide, il run è un `browser-render:` ancora in corso e, dopo la prima apertura, il cookie del dispositivo che l'ha reclamato coincide. org, nodo e revisione si LEGGONO da quella riga: si legge solo quella revisione del doc, gli asset firmati di quel progetto; si scrive solo il file al percorso fisso del run (`exportPath`), l'asset che lo registra, `lastRenderAssetId` del nodo e lo stato del run.",
+    tables: ['node_runs', 'nodes', 'motion_revisions', 'projects', 'assets']
   },
   {
     path: 'src/lib/server/motion/embed-rebuild-db.ts — rebuildPorts (rotta pubblica /e/[id], e il report di sola lettura scripts/embed-report.ts)',
-    why: "Chi apre un embed pubblicato non ha sessione: il file in `embeds/<nodeId>.html` È la pubblicazione. Quando quel file è nel formato vecchio (il motore congelato dentro la pagina), lo si ricostruisce una volta nel formato sorgente. Si parte solo dall'id di un file che esiste nel bucket: org, progetto e brand si LEGGONO dalla riga di quel nodo, mai da chi chiama. Un nodo cancellato, un progetto uncensored o un file assente non si toccano. Del nodo si legge solo la revisione che era la testa all'ora di pubblicazione del file (mai il doc corrente, che può avere modifiche non pubblicate), e solo se ricompone la stessa impronta (clip, tempi, testo) della pagina pubblicata; se no si serve la pagina vecchia. Si scrive solo `embeds/<nodeId>.html` (lo stesso file, ancora pubblicato e non cambiato nel frattempo) e il marcatore `embeds/rebuild-locks/<nodeId>` che fa ricostruire una volta sola.",
-    tables: ['nodes', 'projects', 'motion_revisions', 'brands', 'assets']
+    why: "Chi apre un embed pubblicato non ha sessione: il file in `embeds/<nodeId>.html` È la pubblicazione. Quando quel file è nel formato vecchio (il motore congelato dentro la pagina), lo si ricostruisce una volta nel formato sorgente. Si parte solo dall'id di un file che esiste nel bucket: org e progetto si LEGGONO dalla riga di quel nodo, mai da chi chiama. Un nodo cancellato, un progetto uncensored o un file assente non si toccano. Del nodo si legge solo la revisione che era la testa all'ora di pubblicazione del file (mai il doc corrente, che può avere modifiche non pubblicate), e solo se ricompone la stessa impronta (clip, tempi, testo) della pagina pubblicata; se no si serve la pagina vecchia. Si scrive solo `embeds/<nodeId>.html` (lo stesso file, ancora pubblicato e non cambiato nel frattempo) e il marcatore `embeds/rebuild-locks/<nodeId>` che fa ricostruire una volta sola.",
+    tables: ['nodes', 'projects', 'motion_revisions', 'assets']
   },
   {
     path: 'src/lib/server/cli-auth.ts — authenticateApiKey',
@@ -76,7 +76,7 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
   {
     path: 'le callback dei provider, src/routes/api/v1/webhooks/** (non ancora scritte: fase 3 e 5)',
     why: 'Zernio e i provider di generazione chiamano senza una sessione utente. La riga da aggiornare si trova dal loro id esterno, che è già legato a una org; la firma della richiesta è ciò che autentica, non un JWT. Programmazione e stato di pubblicazione si leggono da Zernio, non da una tabella nostra (scheduled_posts è stata rimossa, 2026-09-22): un eventuale webhook scriverebbe solo posts.zernio_post_ids.',
-    tables: ['posts', 'node_runs', 'ai_calls']
+    tables: ['node_runs', 'ai_calls']
   },
   {
     path: 'src/lib/server/tenancy/bootstrap.ts — createFirstOrg (also every org made with "New organisation", team/orgs.ts createOrg)',
@@ -136,7 +136,7 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
   {
     path: 'src/lib/server/account/account-server.ts — deleteAccount',
     why: "Cancellare il proprio account (GDPR art. 17) tocca righe che la RLS non lascia toccare a nessun JWT: auth.users, i riferimenti actor_id in org condivise, lo storage `${userId}/` e quello delle org di cui l'utente era l'unico membro. Lo user_id è sempre quello della sessione, verificata di recente e confermata a mano; nessun org_id arriva da chi chiama. La funzione SQL delete_account rifiuta se un'org resterebbe senza proprietario, cancella solo le org senza altri membri, e scrive in account_deletions un conteggio senza dati personali.",
-    tables: ['orgs_members', 'orgs', 'account_deletions', 'profiles', 'chat_threads', 'nodes', 'posts', 'chat_messages']
+    tables: ['orgs_members', 'orgs', 'account_deletions', 'profiles', 'chat_threads', 'nodes', 'chat_messages']
   },
   {
     path: 'src/lib/server/uncensored-workspace/age-verification.ts — recordAdult',

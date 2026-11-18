@@ -20,7 +20,7 @@ const MEMBERSHIPS = [
 ];
 
 function project(id: string, mode: ProjectMode) {
-  return { id, name: `P ${id}`, slug: id, brandId: null, archivedAt: null, lastActiveAt: '2026-10-19', mode };
+  return { id, name: `P ${id}`, slug: id, archivedAt: null, lastActiveAt: '2026-10-19', mode };
 }
 
 async function get(query = '', token: string | null = 'jwt') {

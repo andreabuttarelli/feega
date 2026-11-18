@@ -18,5 +18,5 @@ sidebar:
 From `CLAUDE.md`: dependencies point inward; the failing test comes first; reorder and change behaviour in separate commits; no cyclic dependencies; every change a user can notice updates two changelogs; PRs target `dev`. Also [Lessons](/architecture/lessons/).
 
 :::caution
-`CONTEXT.md` at the repo root is a glossary of an earlier product (agent teams, threads, brand memory). It does not describe the canvas and is not reproduced here.
+`CONTEXT.md` at the repo root is a glossary of an earlier product (agent teams, threads). It does not describe the canvas and is not reproduced here.
 :::

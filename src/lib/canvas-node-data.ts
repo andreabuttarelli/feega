@@ -25,7 +25,6 @@ import { compositionTemplateSchema, type CompositionNode } from '$lib/canvas/com
 import { cellSchema, type CellSpec } from '@feega/motion-core/motion/components';
 import { newCalendarData } from '$lib/canvas/calendar-node';
 import { newMotionData } from '$lib/canvas/motion-node';
-import { newStudioBatchData } from '$lib/canvas/studio-batch-node';
 import { SECTION_DEFAULT_FILL } from '$lib/canvas/node-data';
 export { influencerNodeOf as influencerOf, type InfluencerNode } from '$lib/canvas/influencer-node';
 
@@ -65,7 +64,6 @@ export const NODE_TYPES = [
   'model3d',
   'motion',
   'element',
-  'studio_batch',
   'section',
   'technique'
 ] as const;
@@ -420,10 +418,6 @@ export function newNodeRow(what: Addable): Record<string, unknown> {
 
   if (what === 'section') {
     return { title: 'Section', fill: SECTION_DEFAULT_FILL };
-  }
-
-  if (what === 'studio_batch') {
-    return newStudioBatchData();
   }
 
   return { prompt: '', model: null, params: {}, refId: null };
