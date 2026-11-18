@@ -13,6 +13,7 @@ export type NavEntry = {
   mobilePath?: string;
   group: 'canvas' | 'panel' | 'workbench' | 'menu';
   local?: true;
+  localOnly?: true;
   offRail?: true;
   shortcut?: string;
 };
@@ -30,6 +31,7 @@ export const NAV_ENTRIES: NavEntry[] = [
   { id: 'settings', labelKey: 'app.nav.settings', icon: 'settings', family: 'sheet', path: '/settings/project', mobilePath: '/settings', group: 'workbench' },
   { id: 'layers', labelKey: 'app.nav2.layers', icon: 'layers', family: 'panel', path: '', group: 'canvas', local: true, shortcut: 'Alt+1' },
   { id: 'components', labelKey: 'app.nav2.components', icon: 'components', family: 'panel', path: '', group: 'panel', local: true, shortcut: 'Alt+4' },
+  { id: 'history', labelKey: 'app.nav2.history', icon: 'history', family: 'panel', path: '', group: 'panel', localOnly: true, shortcut: 'Alt+7' },
   { id: 'styles', labelKey: 'app.nav2.styles', icon: 'styles', family: 'panel', path: '', group: 'panel', local: true, shortcut: 'Alt+5' },
   { id: 'ai', labelKey: 'app.nav2.ai', icon: 'sparkles', family: 'panel', path: '', group: 'panel', shortcut: 'Alt+6' }
 ];
@@ -37,6 +39,7 @@ export const NAV_ENTRIES: NavEntry[] = [
 export const PANEL_WIDTHS: Record<string, number> = {
   layers: 280,
   components: 300,
+  history: 300,
   styles: 300,
   assets: 320,
   brands: 320,
@@ -44,7 +47,8 @@ export const PANEL_WIDTHS: Record<string, number> = {
 };
 
 export function navEntriesByGroup(group: NavEntry['group']): NavEntry[] {
-  return NAV_ENTRIES.filter((entry) => entry.group === group && (entry.local || !isLocalMode(publicEnv)));
+  const local = isLocalMode(publicEnv);
+  return NAV_ENTRIES.filter((entry) => entry.group === group && (entry.localOnly ? local : entry.local || !local));
 }
 
 export const railEntries = (group: NavEntry['group']): NavEntry[] => navEntriesByGroup(group).filter((entry) => !entry.offRail);

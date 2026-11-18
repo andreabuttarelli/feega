@@ -1,5 +1,5 @@
 <script lang="ts" module>
-  export type LeftPanelKind = 'layers' | 'assets' | 'brands' | 'components' | 'styles' | 'ai';
+  export type LeftPanelKind = 'layers' | 'assets' | 'brands' | 'components' | 'history' | 'styles' | 'ai';
 </script>
 
 <script lang="ts">
@@ -10,6 +10,7 @@
   import PagesList from './PagesList.svelte';
   import type { ComponentProps } from 'svelte';
   import ProjectComponentsPanel from './ProjectComponentsPanel.svelte';
+  import HistoryPanel from './HistoryPanel.svelte';
   import AiNodesPanel from './AiNodesPanel.svelte';
   import StyleLibrarySection from '$lib/components/motion/StyleLibrarySection.svelte';
   import { StyleLayout } from '$lib/components/motion/style-layout';
@@ -82,6 +83,10 @@
       {:else if kind === 'styles'}
         <StyleLibrarySection tokens={FEEGA_TOKENS} layout={StyleLayout.Split} />
         <div class="tokens-region"><ColourTokensSection /></div>
+      {:else if kind === 'history'}
+        {#if pages.currentId}
+          <HistoryPanel {projectId} canvasId={pages.currentId} />
+        {/if}
       {:else if kind === 'ai'}
         <AiNodesPanel {projectId} />
       {:else if kind === 'brands'}

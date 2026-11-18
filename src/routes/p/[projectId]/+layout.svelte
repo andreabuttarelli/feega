@@ -1,6 +1,8 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
   import { historyPanel } from '$lib/canvas/history-panel.svelte';
+  import { isLocalMode } from '$lib/local-user';
+  import { env as publicEnv } from '$env/dynamic/public';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { modeOf, ProjectMode } from '$lib/project-mode';
   import '$lib/styles/tailwind.css';
@@ -121,9 +123,14 @@
   });
 
   $effect(() => {
-    if (historyPanel.asked) {
-      void openSheet(projectId, HISTORY_SETTINGS_PATH);
+    if (!historyPanel.asked) {
+      return;
     }
+    if (isLocalMode(publicEnv)) {
+      leftPanel = 'history';
+      return;
+    }
+    void openSheet(projectId, HISTORY_SETTINGS_PATH);
   });
 
   $effect(() => {
