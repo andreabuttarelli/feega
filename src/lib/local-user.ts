@@ -6,9 +6,9 @@ export const LOCAL_USER = { id: LOCAL_USER_ID, email: 'you@feega.local', created
 
 export const isLocalMode = (env: Record<string, string | undefined>) => env.PUBLIC_FEEGA_LOCAL === '1';
 
-export type SourceAsks = { framesPerAsk: number; open: number };
+export type SourceAsks = { framesPerAsk: number; open: number; firstAsk?: number };
 
-const LOCAL_SOURCE_ASKS: SourceAsks = { framesPerAsk: 6, open: 2 };
+const LOCAL_SOURCE_ASKS: SourceAsks = { framesPerAsk: 6, open: 2, firstAsk: 2 };
 const HOSTED_SOURCE_ASKS: SourceAsks = { framesPerAsk: 3, open: 6 };
 
 export const sourceAsksFor = (env: Record<string, string | undefined>): SourceAsks => (isLocalMode(env) ? LOCAL_SOURCE_ASKS : HOSTED_SOURCE_ASKS);

@@ -89,6 +89,7 @@ function frameBatcher(fetcher: Fetcher, asks: SourceAsks): Fetcher {
   const queues = new Map<string, Waiting[]>();
   const due: { base: string; waiting: Waiting[] }[] = [];
   let open = 0;
+  let asked = 0;
 
   const ask = async (base: string, waiting: Waiting[]) => {
     markStartup(StartupStep.SourcesAsked);
@@ -117,8 +118,11 @@ function frameBatcher(fetcher: Fetcher, asks: SourceAsks): Fetcher {
   const flush = (base: string) => {
     const waiting = queues.get(base) ?? [];
     queues.delete(base);
-    for (let at = 0; at < waiting.length; at += asks.framesPerAsk) {
-      due.push({ base, waiting: waiting.slice(at, at + asks.framesPerAsk) });
+    for (let at = 0; at < waiting.length; ) {
+      const size = asked === 0 ? (asks.firstAsk ?? asks.framesPerAsk) : asks.framesPerAsk;
+      due.push({ base, waiting: waiting.slice(at, at + size) });
+      asked++;
+      at += size;
     }
     next();
   };

@@ -126,6 +126,16 @@ describe('warming the sources of every frame on open', () => {
     expect(Math.max(...asked.map((u) => new URLSearchParams(u.split('?')[1]).get('ids')!.split(',').length))).toBeLessThanOrEqual(ASKS.framesPerAsk);
   });
 
+  it('asks for the nearest frames alone first, then wide, so wide asks cut the tail without delaying the first frame drawn', async () => {
+    const asked: string[] = [];
+    const read = batchedWith(async (u) => (asked.push(u), json({ tokens: {}, frames: Object.fromEntries(ids.map((id) => [id, { revision: 1, doc: { id }, assets: {} }])) })), undefined, undefined, { firstAsk: 2, framesPerAsk: 6, open: 2 });
+
+    read.warm(ids.map(url));
+    await read(url(ids.at(-1)!));
+
+    expect(asked.map((u) => new URLSearchParams(u.split('?')[1]).get('ids')!.split(',').length)).toEqual([2, 6, 6, 6, 6, 4]);
+  });
+
   it('hands the nearest frame its source without waiting for the rest (a 36-frame canvas waited 10 s for one 38 MB answer)', async () => {
     const read = batchedSources((u) => (!u.includes(ids.at(-1)!) ? Promise.resolve(json({ tokens: {}, frames: { [ids[0]]: { revision: 1, doc: { id: ids[0] }, assets: {} } } })) : new Promise<Response>(() => {})));
 
