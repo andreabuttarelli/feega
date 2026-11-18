@@ -1,3 +1,4 @@
+import { appendFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 
 const send = (msg) => process.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', ...msg })}\n`);
@@ -5,6 +6,12 @@ const pending = new Map();
 let servers = [];
 let nextId = 1000;
 let cancelled = false;
+let turns = 0;
+const log = (line) => process.env.FAKE_ACP_LOG && appendFileSync(process.env.FAKE_ACP_LOG, `${line}\n`);
+
+if (process.env.FAKE_ACP_NOISE) {
+  process.stdout.write('not json, just a banner\n');
+}
 
 const MODELS = [
   { modelId: 'fast', name: 'Fast', description: 'Quick answers' },
@@ -42,6 +49,21 @@ const HANDLERS = {
     return {};
   },
   'session/prompt': async (p) => {
+    turns += 1;
+    cancelled = false;
+    if (process.env.FAKE_ACP_CHATTY) {
+      while (!cancelled) {
+        update(p.sessionId, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '.' } });
+        await new Promise((r) => setTimeout(r, 5));
+      }
+      return { stopReason: 'cancelled' };
+    }
+
+    if (process.env.FAKE_ACP_MEMORY) {
+      update(p.sessionId, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: `turn ${turns} of ${process.pid}` } });
+      return { stopReason: 'end_turn' };
+    }
+
     const text = p.prompt.map((b) => b.text).join('');
     send({ method: '_fake/notice', params: {} });
     update(p.sessionId, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: `heard: ${text}${process.env.FAKE_ACP_MODELS ? ` on ${model}` : ''}` } });
@@ -56,6 +78,7 @@ const HANDLERS = {
 
 const NOTIFICATIONS = {
   'session/cancel': () => {
+    log('cancel');
     cancelled = true;
   }
 };

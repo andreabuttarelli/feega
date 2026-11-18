@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { localStore } from '$lib/server/local/local-mode';
 import { feegaMcp } from '$lib/server/acp/agents';
-import { runAcpTurn, type AgentCommand } from '$lib/server/acp/client';
+import { acpSessions, type AgentCommand } from '$lib/server/acp/client';
 import { Refresh, detectCached } from '$lib/server/acp/detect';
 import { awaitChoice, choose } from '$lib/server/acp/permissions';
 import { AcpEventKind, encodeAcpEvent, type AcpEvent } from '$lib/acp/acp-events';
@@ -14,7 +14,9 @@ const CONFLICT = 409;
 const LOCAL_APP_URL = 'http://127.0.0.1:5173';
 const SSE_HEADERS = { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' };
 
-type Body = { agent?: unknown; prompt?: unknown; permission?: { id?: unknown; optionId?: unknown } };
+type Body = { thread?: unknown; agent?: unknown; prompt?: unknown; cancel?: unknown; permission?: { id?: unknown; optionId?: unknown } };
+
+type Turn = { thread: string; agentId: string; agent: AgentCommand; model: string | null; prompt: string };
 
 function answer(permission: NonNullable<Body['permission']>): Response {
   if (typeof permission.id !== 'string' || typeof permission.optionId !== 'string') {
@@ -28,28 +30,49 @@ function answer(permission: NonNullable<Body['permission']>): Response {
   return new Response(null, { status: NO_CONTENT });
 }
 
-function stream(agent: AgentCommand, model: string | null, prompt: string, signal: AbortSignal): Response {
+function stop(thread: unknown): Response {
+  if (typeof thread !== 'string' || !acpSessions.cancel(thread)) {
+    error(NOT_FOUND, 'No agent turn is running in this thread');
+  }
+
+  return new Response(null, { status: NO_CONTENT });
+}
+
+function stream(turn: Turn, signal: AbortSignal): Response {
+  const encoder = new TextEncoder();
+  const gone = new AbortController();
+  signal.addEventListener('abort', () => gone.abort(), { once: true });
+
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const send = (event: AcpEvent) => controller.enqueue(new TextEncoder().encode(encodeAcpEvent(event)));
+      const send = (event: AcpEvent) => {
+        if (!gone.signal.aborted) {
+          controller.enqueue(encoder.encode(encodeAcpEvent(event)));
+        }
+      };
 
-      const ask = (permission: { title: string; options: { optionId: string; name: string; kind: string }[] }) => {
+      const ask = (permission: { title: string; options: { optionId: string; name: string; kind: string }[] }, cancelled: AbortSignal) => {
         const id = crypto.randomUUID();
         send({ kind: AcpEventKind.Permission, id, ...permission });
-        return awaitChoice(id, signal);
+        return awaitChoice(id, cancelled);
       };
 
       try {
-        const turn = await runAcpTurn(
-          { agent, cwd: process.cwd(), mcpServers: [feegaMcp(process.cwd(), process.env.PUBLIC_APP_URL ?? LOCAL_APP_URL)], prompt, model },
-          { onUpdate: (update) => send({ kind: AcpEventKind.Update, update }), ask, signal }
+        const done = await acpSessions.turn(
+          { ...turn, cwd: process.cwd(), mcpServers: [feegaMcp(process.cwd(), process.env.PUBLIC_APP_URL ?? LOCAL_APP_URL)] },
+          { onStarting: () => send({ kind: AcpEventKind.Starting }), onUpdate: (update) => send({ kind: AcpEventKind.Update, update }), ask, signal: gone.signal }
         );
-        send({ kind: AcpEventKind.Done, stopReason: turn.stopReason });
+        send({ kind: AcpEventKind.Done, stopReason: done.stopReason });
       } catch (e) {
         send({ kind: AcpEventKind.Failed, message: (e as Error).message });
       }
 
-      controller.close();
+      if (!gone.signal.aborted) {
+        controller.close();
+      }
+    },
+    cancel() {
+      gone.abort();
     }
   });
 
@@ -67,8 +90,12 @@ export const POST: RequestHandler = async ({ request }) => {
     return answer(body.permission);
   }
 
-  if (typeof body.agent !== 'string' || typeof body.prompt !== 'string') {
-    error(BAD_REQUEST, 'agent and prompt are required');
+  if (body.cancel !== undefined) {
+    return stop(body.cancel);
+  }
+
+  if (typeof body.thread !== 'string' || typeof body.agent !== 'string' || typeof body.prompt !== 'string') {
+    error(BAD_REQUEST, 'thread, agent and prompt are required');
   }
 
   const detected = (await detectCached(Refresh.Cached)).find((d) => d.agent.id === body.agent);
@@ -80,5 +107,5 @@ export const POST: RequestHandler = async ({ request }) => {
     error(CONFLICT, `${detected.agent.name} is not installed here, or cannot run over ACP`);
   }
 
-  return stream(detected.command, opened.acpModel(body.agent), body.prompt, request.signal);
+  return stream({ thread: body.thread, agentId: body.agent, agent: detected.command, model: opened.acpModel(body.agent), prompt: body.prompt }, request.signal);
 };

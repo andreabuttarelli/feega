@@ -32,9 +32,9 @@ export function modelsOf(session: NewSession): SessionModels | null {
   return null;
 }
 
-export function switchFor(session: NewSession, model: string | null): ModelSwitch | null {
+export function switchFor(session: NewSession, current: string | null, model: string | null): ModelSwitch | null {
   const offered = modelsOf(session);
-  if (!offered || !model || model === offered.current) {
+  if (!offered || !model || model === current) {
     return null;
   }
 

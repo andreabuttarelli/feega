@@ -1,7 +1,12 @@
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import type { AcpUpdate } from '$lib/acp/acp-events';
-import { listAcpModels, runAcpTurn, type PermissionAsk, type PermissionOutcome } from './client';
+import { createAcpSessions, listAcpModels, type AcpTurnHooks, type AcpTurnInput, type PermissionAsk, type PermissionOutcome } from './client';
+
+const sessions = createAcpSessions();
+afterAll(() => sessions.closeAll());
+
+const runAcpTurn = (input: AcpTurnInput, hooks: AcpTurnHooks) => sessions.turn({ ...input, thread: crypto.randomUUID(), agentId: 'fake' }, hooks);
 
 const FAKE_AGENT = { command: process.execPath, args: [fileURLToPath(new URL('./fake-agent.mjs', import.meta.url))] };
 const FEEGA_MCP = { name: 'feega', command: '/bin/feega-mcp', args: [], env: [] };
@@ -107,5 +112,55 @@ describe('runAcpTurn with a model', () => {
 
   it('keeps the agent default when the saved model no longer exists', async () => {
     expect((await run('config', 'gone')).text).toBe('heard: hi on fast');
+  });
+});
+
+describe('an agent session per chat thread', () => {
+  const memory = { ...FAKE_AGENT, env: { FAKE_ACP_MEMORY: '1' } };
+  const say = (thread: string, hooks: Partial<AcpTurnHooks> = {}, agentId = 'fake') =>
+    sessions.turn({ thread, agentId, agent: memory, cwd: process.cwd(), mcpServers: [], prompt: 'hi' }, { onUpdate: () => {}, ask: choose('yes'), ...hooks });
+
+  it('keeps the agent alive between turns, so the second turn remembers the first', async () => {
+    const thread = crypto.randomUUID();
+    const first = await say(thread);
+    const second = await say(thread);
+
+    const pid = first.text.split(' of ')[1];
+    expect(first.text).toBe(`turn 1 of ${pid}`);
+    expect(second.text).toBe(`turn 2 of ${pid}`);
+  });
+
+  it('says it is starting only when it launches the agent', async () => {
+    const thread = crypto.randomUUID();
+    const onStarting = vi.fn();
+    await say(thread, { onStarting });
+    await say(thread, { onStarting });
+
+    expect(onStarting).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts a fresh agent for another thread, or another agent on the same thread', async () => {
+    const thread = crypto.randomUUID();
+    await say(thread);
+
+    expect((await say(crypto.randomUUID())).text).toMatch(/^turn 1 of/);
+    expect((await say(thread, {}, 'other')).text).toMatch(/^turn 1 of/);
+  });
+
+  it('cancels the running turn of a thread on request', async () => {
+    const thread = crypto.randomUUID();
+    const chatty = { ...FAKE_AGENT, env: { FAKE_ACP_CHATTY: '1' } };
+    const turn = sessions.turn({ thread, agentId: 'chatty', agent: chatty, cwd: process.cwd(), mcpServers: [], prompt: 'go' }, { onUpdate: () => {}, ask: choose('yes') });
+    await vi.waitFor(() => expect(sessions.cancel(thread)).toBe(true));
+
+    expect((await turn).stopReason).toBe('cancelled');
+    expect(sessions.cancel(crypto.randomUUID())).toBe(false);
+  });
+
+  it('ignores a line on stdout that is not JSON instead of crashing', async () => {
+    const noisy = { ...FAKE_AGENT, env: { FAKE_ACP_NOISE: '1' } };
+    const done = await sessions.turn({ thread: crypto.randomUUID(), agentId: 'noisy', agent: noisy, cwd: process.cwd(), mcpServers: [FEEGA_MCP], prompt: 'x' }, { onUpdate: () => {}, ask: choose('yes') });
+
+    expect(done.text).toBe('heard: x');
   });
 });
