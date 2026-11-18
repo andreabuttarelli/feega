@@ -17,6 +17,7 @@
 
 <section class="agents site-wide" id="mcp">
   <h2 data-agent-id="agents-title">Let your agents do the work</h2>
+  <p class="lead">Your AI assistant, like Claude Code, Codex or Cursor, edits the canvas for you: ask it in plain words and watch the layers change. Paste this once to connect it.</p>
 
   <div class="box">
     <div class="tabs" role="tablist" aria-label="Code variants">
@@ -40,6 +41,14 @@
     line-height: 36px;
     letter-spacing: -0.04em;
     font-weight: 400;
+  }
+
+  .lead {
+    max-width: 560px;
+    margin: 12px 0 0;
+    font-size: 16px;
+    line-height: 1.45;
+    opacity: 0.7;
   }
 
   .box {

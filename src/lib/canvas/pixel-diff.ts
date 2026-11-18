@@ -12,12 +12,25 @@ export type DiffOptions = { cell?: number; threshold?: number };
 const DEFAULT_CELL = 16;
 const DEFAULT_THRESHOLD = 24;
 const RGB = 3;
+const PROBE = 8;
 const RGBA = 4;
 const WHOLE: Region = { x: 0, y: 0, w: 1, h: 1 };
 
-function pixelChanged(a: Uint8ClampedArray, b: Uint8ClampedArray, at: number, threshold: number): boolean {
+function blockMean(p: Pixels, left: number, top: number, size: number, channel: number): number {
+  let sum = 0;
+  let count = 0;
+  for (let y = top; y < Math.min(p.height, top + size); y++) {
+    for (let x = left; x < Math.min(p.width, left + size); x++) {
+      sum += p.data[(y * p.width + x) * RGBA + channel];
+      count++;
+    }
+  }
+  return sum / count;
+}
+
+function blockChanged(a: Pixels, b: Pixels, left: number, top: number, size: number, threshold: number): boolean {
   for (let c = 0; c < RGB; c++) {
-    if (Math.abs(a[at + c] - b[at + c]) > threshold) {
+    if (Math.abs(blockMean(a, left, top, size, c) - blockMean(b, left, top, size, c)) > threshold) {
       return true;
     }
   }
@@ -27,11 +40,12 @@ function pixelChanged(a: Uint8ClampedArray, b: Uint8ClampedArray, at: number, th
 function changedCells(a: Pixels, b: Pixels, cell: number, threshold: number): boolean[][] {
   const cols = Math.ceil(a.width / cell);
   const rows = Math.ceil(a.height / cell);
+  const probe = Math.min(PROBE, cell);
   const cells = Array.from({ length: rows }, () => new Array<boolean>(cols).fill(false));
-  for (let y = 0; y < a.height; y++) {
-    for (let x = 0; x < a.width; x++) {
-      if (pixelChanged(a.data, b.data, (y * a.width + x) * RGBA, threshold)) {
-        cells[Math.floor(y / cell)][Math.floor(x / cell)] = true;
+  for (let top = 0; top < a.height; top += probe) {
+    for (let left = 0; left < a.width; left += probe) {
+      if (blockChanged(a, b, left, top, probe, threshold)) {
+        cells[Math.floor(top / cell)][Math.floor(left / cell)] = true;
       }
     }
   }
@@ -82,4 +96,15 @@ export function changedRegions(a: Pixels, b: Pixels, options: DiffOptions = {}):
     })
   );
   return regions;
+}
+
+export function isBlank(p: Pixels, threshold = DEFAULT_THRESHOLD): boolean {
+  for (let at = 0; at < p.data.length; at += RGBA) {
+    for (let c = 0; c < RGB; c++) {
+      if (Math.abs(p.data[at + c] - p.data[c]) > threshold) {
+        return false;
+      }
+    }
+  }
+  return true;
 }

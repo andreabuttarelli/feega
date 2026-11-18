@@ -106,6 +106,7 @@
       "components": "Components",
       "history": "History",
       "styles": "Styles",
+      "ai": "AI generation",
       "materials": "Assets",
       "brands": "Brands",
       "influencers": "Influencers",
@@ -239,7 +240,14 @@
         "deleteConfirmLabel": "Type DELETE or your email to confirm",
         "deleteConfirmError": "Type DELETE or your email exactly.",
         "deleteReauth": "For safety, sign in again (within the last 15 minutes) and retry.",
-        "deleteTransfer": "You are the only owner of a workspace with other members. Make someone else owner, or remove the members, first."
+        "deleteTransfer": "You are the only owner of a workspace with other members. Make someone else owner, or remove the members, first.",
+        "memoryTitle": "Your memory",
+        "memoryDesc": "What the Feega chat knows about you: who you are, your taste, how you like to work. Paste what your AI already knows, or write it yourself.",
+        "memoryPlaceholder": "Copy the prompt, paste it into Claude, ChatGPT or Gemini, and paste what it writes here.",
+        "memoryCopy": "Copy the prompt",
+        "memoryCopied": "Copied",
+        "memorySaved": "Memory saved. The chat uses it from your next message.",
+        "memoryTooLong": "That is too long. Keep it under 20,000 characters."
       },
       "appearance": {
         "title": "Appearance",

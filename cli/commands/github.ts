@@ -20,10 +20,15 @@ async function print(path: string, init?: RequestInit) {
   }
 }
 
-type PushOpts = { name: string; title?: string; body?: string; base?: string; confirmSensitive?: boolean; main?: string[] };
+type PushOpts = { name: string; title?: string; body?: string; base?: string; confirmSensitive?: boolean; main?: string[]; variant?: string[] };
 
-export async function cmdGithubPush(projectId: string, nodeIds: string[], { main, ...opts }: PushOpts) {
-  await print(base(projectId), { method: 'POST', body: JSON.stringify({ ...opts, nodeIds, ...(main ? { mains: main } : {}) }) });
+const variantOf = (raw: string) => {
+  const [nodeId, choice, route] = raw.split(':');
+  return { nodeId, choice, ...(route ? { route } : {}) };
+};
+
+export async function cmdGithubPush(projectId: string, nodeIds: string[], { main, variant, ...opts }: PushOpts) {
+  await print(base(projectId), { method: 'POST', body: JSON.stringify({ ...opts, nodeIds, ...(main ? { mains: main } : {}), ...(variant ? { variants: variant.map(variantOf) } : {}) }) });
 }
 
 export async function cmdGithubStatus(projectId: string, nodeId: string) {
@@ -32,6 +37,18 @@ export async function cmdGithubStatus(projectId: string, nodeId: string) {
 
 export async function cmdGithubUndo(projectId: string, nodeId: string) {
   await print(`${base(projectId)}/undo`, { method: 'POST', body: JSON.stringify({ nodeId }) });
+}
+
+export async function cmdGithubVariant(projectId: string, canvasId: string, nodeId: string) {
+  await print(`${base(projectId)}/variant`, { method: 'POST', body: JSON.stringify({ canvasId, nodeId }) });
+}
+
+export async function cmdGithubConflicts(projectId: string, nodeId: string) {
+  await print(`${base(projectId)}/conflicts?${new URLSearchParams({ nodeId })}`);
+}
+
+export async function cmdGithubResolve(projectId: string, nodeId: string, choice: string) {
+  await print(`${base(projectId)}/conflicts`, { method: 'POST', body: JSON.stringify({ nodeId, choice }) });
 }
 
 export async function cmdGithubDetach(projectId: string, nodeId: string) {

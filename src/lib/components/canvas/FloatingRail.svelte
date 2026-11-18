@@ -104,8 +104,7 @@
   .rail {
     position: absolute;
     left: 12px;
-    top: calc((100% - var(--dock-lift, 0px)) / 2);
-    translate: 0 -50%;
+    top: 56px;
     z-index: 30;
     display: flex;
     flex-direction: column;

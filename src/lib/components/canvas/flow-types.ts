@@ -1,3 +1,4 @@
+import type { FrameMode } from '$lib/canvas/live-budget';
 import type { Revision } from '$lib/motion/frame-sync';
 import type { Tie } from '$lib/canvas/gpu/wire-magnet';
 import type { PlacedChange } from '$lib/canvas/place-many';
@@ -123,6 +124,7 @@ export type FlowProps = {
   onFigmaImport?: (at: { x: number; y: number }) => void;
   onUrlImport?: (at: { x: number; y: number }) => void;
   onCodeImport?: (at: { x: number; y: number }) => void;
+  onLiveFrame?: (at: { x: number; y: number }) => void;
   onNodeClicked?: (id: string) => void;
   onNodeDoubled?: (id: string) => void;
   barContext?: BarContext;
@@ -197,6 +199,6 @@ export type FlowProps = {
   onView?: (view: View) => void;
   onUserPan?: () => void;
   follow?: View | null;
-  tile: Snippet<[{ id: string; selected: boolean }]>;
+  tile: Snippet<[{ id: string; selected: boolean; live: FrameMode }]>;
   mode?: CanvasMode;
 };

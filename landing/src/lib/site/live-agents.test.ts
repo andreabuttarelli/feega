@@ -90,3 +90,19 @@ describe('size lock', () => {
     expect(el.style.height).toBe('541px');
   });
 });
+
+describe('where the crew works', () => {
+  const VIEWPORT = 900;
+
+  it('builds what the visitor sees when the page opens', () => {
+    expect(live.actOf({ top: 120, viewport: VIEWPORT, crew: 0 })).toBe(live.Act.Opening);
+  });
+
+  it('leaves everything below the opening alone, already in place', () => {
+    expect(live.actOf({ top: 2400, viewport: VIEWPORT, crew: 0 })).toBe(live.Act.Still);
+  });
+
+  it('keeps a crew on the footer wordmark, wherever it is', () => {
+    expect(live.actOf({ top: 12000, viewport: VIEWPORT, crew: 4 })).toBe(live.Act.Resident);
+  });
+});

@@ -6,6 +6,7 @@ import {
 } from '$lib/server/settings-actions';
 import { deleteAccountAction } from '$lib/server/account/account-server';
 import { cloudConnections, disconnectCloudAction } from '$lib/server/settings/cloud-actions';
+import { readMemory, saveMemory } from '$lib/server/settings/memory-actions';
 import { hasFigmaToken, removeFigmaToken, saveFigmaToken, testFigmaToken } from '$lib/server/settings/figma-actions';
 
 function splitName(full: string | null | undefined): { firstName: string; lastName: string } {
@@ -18,7 +19,7 @@ function splitName(full: string | null | undefined): { firstName: string; lastNa
 export const load = async ({ locals }: SettingsEvent) => {
   const { supabase, safeGetSession } = locals;
   const { user } = await safeGetSession();
-  if (!user) return { firstName: '', lastName: '', email: null, avatarUrl: null, hasCustomAvatar: false, hasFigmaToken: false, cloud: [] };
+  if (!user) return { firstName: '', lastName: '', email: null, avatarUrl: null, hasCustomAvatar: false, hasFigmaToken: false, cloud: [], memory: '' };
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -42,7 +43,8 @@ export const load = async ({ locals }: SettingsEvent) => {
     avatarUrl: customAvatar || oauthAvatar,
     hasCustomAvatar: !!customAvatar,
     hasFigmaToken: await hasFigmaToken(locals),
-    cloud: await cloudConnections(locals)
+    cloud: await cloudConnections(locals),
+    memory: await readMemory(locals)
   };
 };
 
@@ -53,6 +55,7 @@ export const actions: SettingsActions = {
   saveFigmaToken,
   testFigmaToken,
   removeFigmaToken,
+  saveMemory,
   disconnectCloud: disconnectCloudAction,
   deleteAccount: deleteAccountAction
 };

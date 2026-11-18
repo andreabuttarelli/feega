@@ -1,6 +1,8 @@
+import { extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const LOADER_PATH = fileURLToPath(new URL('./next-loader.ts', import.meta.url));
+const OWN_EXTENSION = extname(fileURLToPath(import.meta.url));
+const LOADER_PATH = fileURLToPath(new URL(`./next-loader${OWN_EXTENSION}`, import.meta.url));
 const BRIDGE_PATH = fileURLToPath(new URL('./bridge.js', import.meta.url));
 const CLIENT_ENTRIES = ['main-app', 'main'];
 

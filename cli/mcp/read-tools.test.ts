@@ -87,6 +87,8 @@ const RESTANO = [
   'team_op',
   'model_allowlist',
   'org_fonts',
+  'dev_server',
+  'live_edit',
   'spend_caps',
   'studio_quote',
   'studio_start',
