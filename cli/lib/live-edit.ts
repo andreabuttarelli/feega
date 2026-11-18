@@ -25,7 +25,7 @@ export type LiveEditAsk = { at: string; prop: LiveProp; value?: string; token?: 
 
 export type LiveEdited = { ok: true; sha: string; files: string[]; token: string | null; patch: string };
 
-export type LiveChanges = { branch: string; files: string[]; patch: string };
+export type LiveChanges = { branch: string | null; files: string[]; patch: string };
 
 export type LivePushed = { ok: true; branch: string; sha: string; pull: { url: string } | null };
 

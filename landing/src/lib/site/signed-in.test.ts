@@ -105,3 +105,14 @@ describe('the inline first-visit script', () => {
     expect(runInline({ path: '/', cookie: 'feega_signed_in=1', storage: 'broken' }).replaced).toEqual([]);
   });
 });
+
+describe('first-visit tag on the home page', () => {
+  it('is built in the module, so the page template never holds a script tag the compiler would parse', async () => {
+    const { FIRST_VISIT_TAG } = await import('./signed-in');
+    const { readFileSync } = await import('node:fs');
+    const home = readFileSync('src/routes/+page.svelte', 'utf8');
+
+    expect(FIRST_VISIT_TAG).toBe(`<script>${FIRST_VISIT_SCRIPT}</script>`);
+    expect(home).not.toMatch(/`<script>/);
+  });
+});

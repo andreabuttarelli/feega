@@ -196,3 +196,22 @@ describe('anteprima di ogni controllo', () => {
   });
 });
 
+describe('i controlli che l inspector salva come trasformazioni', () => {
+  const transformed = (doc: MotionDoc, patch: Record<string, number>) => tweaked(doc, { transform: { ...findClip(doc, LIVE_CLIP)!.clip.transform, ...patch } });
+
+  it('opacità, rotazione, scala e sfocatura dal pannello arrivano al file', () => {
+    const doc = liveDocOf(TITLE);
+
+    expect(classOf(doc, transformed(doc, { opacity: 0.6 }))).toEqual([{ family: ClassFamily.Opacity, token: 'opacity-[0.6]' }]);
+    expect(classOf(doc, transformed(doc, { rotateZ: 15 }))).toEqual([{ family: ClassFamily.Rotate, token: 'rotate-[15deg]' }]);
+    expect(classOf(doc, transformed(doc, { scale: 1.2 })).map((c) => c.token)).toEqual(['scale-[1.2]']);
+    expect(classOf(doc, transformed(doc, { blur: 4 })).map((c) => c.token)).toEqual(['blur-[4px]']);
+  });
+
+  it('l anteprima mostra subito l opacità del pannello', () => {
+    const doc = liveDocOf(TITLE);
+
+    expect(livePreviewOf(doc, transformed(doc, { opacity: 0.6 })).style).toMatchObject({ opacity: '0.6' });
+  });
+});
+

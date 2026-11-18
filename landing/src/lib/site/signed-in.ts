@@ -49,3 +49,5 @@ function enterAppOnce(go: typeof goesToApp, hinted: typeof hasSignedInHint, appU
 }
 
 export const FIRST_VISIT_SCRIPT = `(${enterAppOnce})(${goesToApp}, ${hasSignedInHint}, ${JSON.stringify(APP_URL)}, ${JSON.stringify(SEEN_KEY)})`;
+
+export const FIRST_VISIT_TAG = `<script>${FIRST_VISIT_SCRIPT}</script>`;

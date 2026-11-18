@@ -6,7 +6,7 @@ export type LiveAnswer = { ok: true; sha: string } | { ok: false; reason: string
 
 export type LiveApi = { edit: (body: LiveEditBody) => Promise<LiveAnswer>; undo: (sha: string) => Promise<LiveAnswer> };
 
-export type LiveChangesView = { branch: string; files: string[]; patch: string };
+export type LiveChangesView = { branch: string | null; files: string[]; patch: string };
 
 async function answered(res: Response): Promise<LiveAnswer> {
   const body = await res.json().catch(() => null);

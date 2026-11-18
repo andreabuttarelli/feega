@@ -51,7 +51,7 @@ const EVENT_STEPS = { download: Step.App, install: Step.App, start: Step.Start, 
 
 const FINISHED = new Set(['done', 'skipped']);
 
-const progressOf = (launch) => ({ steps: LAUNCH_STEPS[launch].map((id) => ({ id, state: State.Pending })), error: null });
+const progressOf = (launch) => ({ steps: LAUNCH_STEPS[launch].map((id, i) => ({ id, state: i === 0 ? State.Active : State.Pending })), error: null });
 
 const advance = (progress, event) => {
   const id = event.event === 'step' ? EVENT_STEPS[event.step] : null;
@@ -102,38 +102,114 @@ const lineEvent = (line) => {
 };
 
 const MARK_PETAL = '<path d="M61.87 142.25A57 57 0 1 1 136.13 142.25A69.5 69.5 0 0 0 61.87 142.25Z" transform="rotate(ANGLE 150 150)"/>';
-const MARK = `<svg width="48" height="48" viewBox="0 0 300 300" aria-hidden="true">${[0, 90, 180, 270].map((a) => MARK_PETAL.replace('ANGLE', a)).join('')}</svg>`;
+const MARK = `<svg class="mark" width="20" height="20" viewBox="0 0 300 300" aria-hidden="true">${[0, 90, 180, 270].map((a) => MARK_PETAL.replace('ANGLE', a)).join('')}</svg>`;
 
 const RETRY = 'retry';
 
-const shell = (body) => `<!doctype html>
+const ICONS = {
+  [State.Pending]: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.25" class="track"/></svg>',
+  [State.Active]: '<svg viewBox="0 0 16 16" class="spin"><circle cx="8" cy="8" r="6.25" class="track"/><circle cx="8" cy="8" r="6.25" class="arc"/></svg>',
+  [State.Done]: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" class="fill"/><path d="M5 8.2l2 2 4-4.2" class="tick"/></svg>',
+  [State.Error]: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" class="bad"/><path d="M8 4.6v4.2M8 11.1v.1" class="tick"/></svg>'
+};
+
+const Phase = { Working: 'working', Ready: 'ready', Failed: 'failed' };
+
+const HEADLINES = { [Phase.Working]: 'opening your canvas.', [Phase.Ready]: 'ready.', [Phase.Failed]: 'something went wrong.' };
+
+const phaseOf = (progress) => {
+  if (progress.error) {
+    return Phase.Failed;
+  }
+  return progress.steps.every((s) => s.state === State.Done) ? Phase.Ready : Phase.Working;
+};
+
+const FIELD = `<script>
+(() => {
+  const RAMP = ' .:-=+*#%@';
+  const STOPS = [[228,3,3],[255,140,0],[255,237,0],[0,128,38],[0,77,255],[117,7,135]];
+  const WAVES = [[0.11,0.07,1.6,0],[-0.06,0.13,1.2,1.7],[0.04,-0.09,2.1,3.1]];
+  const LOOP_MS = 24000;
+  const CELL = 13;
+  const canvas = document.getElementById('field');
+  const ctx = canvas.getContext('2d');
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const lift = (c) => { const g = Math.max(1, 200 / Math.max(...c)); return c.map((v) => Math.min(255, Math.round(v * g))); };
+  const tint = (t) => { const p = Math.min(1, Math.max(0, t)) * (STOPS.length - 1); const i = Math.min(STOPS.length - 2, Math.floor(p)); const f = p - i; return lift(STOPS[i].map((a, k) => a + (STOPS[i + 1][k] - a) * f)); };
+  const field = (x, y, phase) => { const a = phase * Math.PI * 2; let sum = 0; for (const [kx, ky, r, off] of WAVES) { const warp = Math.sin(y * 0.05 + r * Math.sin(a) + off) * 2; sum += Math.sin((x + warp) * kx + y * ky + r * Math.cos(a) + off); } return (sum / WAVES.length + 1) / 2; };
+  const envelope = (nx, ny) => { const r = Math.min(1, Math.hypot((nx - 0.5) * 2, (ny - 0.5) * 2) / Math.SQRT2); return 1 - r * r * (3 - 2 * r); };
+  let cols = 0, rows = 0;
+  const size = () => { const dpr = Math.min(devicePixelRatio || 1, 2); const { width, height } = canvas.getBoundingClientRect(); canvas.width = width * dpr; canvas.height = height * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.font = CELL + 'px ui-monospace, Menlo, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; cols = Math.ceil(width / CELL); rows = Math.ceil(height / CELL); };
+  const draw = () => {
+    const phase = (Date.now() % LOOP_MS) / LOOP_MS;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let c = 0; c < cols; c++) {
+      for (let r = 0; r < rows; r++) {
+        const e = envelope((c + 0.5) / cols, (r + 0.5) / rows);
+        const d = Math.sqrt(field(c * CELL * 0.09, r * CELL * 0.09, phase)) * (0.6 + 0.4 * e);
+        const glyph = RAMP[Math.round(Math.min(1, d) * (RAMP.length - 1))];
+        if (glyph === ' ') continue;
+        const [R, G, B] = tint(1 - e);
+        ctx.fillStyle = 'rgb(' + R + ',' + G + ',' + B + ')';
+        ctx.globalAlpha = 0.3 + d * 0.45;
+        ctx.fillText(glyph, c * CELL + CELL / 2, r * CELL + CELL / 2);
+      }
+    }
+  };
+  const tick = () => { draw(); if (!still) setTimeout(() => requestAnimationFrame(tick), 33); };
+  new ResizeObserver(() => { size(); draw(); }).observe(canvas);
+  size();
+  tick();
+})();
+</script>`;
+
+const shell = (progress, body) => `<!doctype html>
 <html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
 <style>
-:root{--bg:#fff;--fg:#141414;--muted:#6b6b6b;--track:color-mix(in srgb,#1d1d1f 10%,transparent);--panel:#f4f4f4}
-body.vscode-dark,body.vscode-high-contrast{--bg:#000;--fg:#f2f2f2;--muted:#9a9a9a;--track:color-mix(in srgb,#ededed 10%,transparent);--panel:#141414}
+:root{--bg:#fff;--fg:#141414;--muted:#6b6b6b;--faint:#a3a3a3;--track:color-mix(in srgb,#1d1d1f 12%,transparent);--panel:#f4f4f4;--accent:#ff5100;--bad:#e5484d}
+body.vscode-dark,body.vscode-high-contrast{--bg:#0b0b0b;--fg:#f2f2f2;--muted:#9a9a9a;--faint:#5c5c5c;--track:color-mix(in srgb,#ededed 14%,transparent);--panel:#161616}
+*{box-sizing:border-box}
 html,body{margin:0;height:100vh;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-main{height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:0 16px;box-sizing:border-box}
-svg{fill:#ff5100}
-.name{font-size:40px;font-weight:600;line-height:1;letter-spacing:-0.02em}
-.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;font-size:13px;min-width:220px}
-.steps li{display:flex;align-items:center;gap:10px;color:var(--muted)}
-.steps li i{width:10px;height:10px;border-radius:9999px;border:1.5px solid currentColor;box-sizing:border-box;flex:none}
-.steps li.active{color:var(--fg)}
-.steps li.active i{border-color:#ff5100;border-right-color:transparent;animation:spin .8s linear infinite}
-.steps li.done i{background:currentColor}
-.steps li.error{color:#e5484d}
-.steps li.error i{background:#e5484d;border-color:#e5484d}
+main{height:100vh;display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1fr);gap:0}
+.art{position:relative;margin:12px 0 12px 12px;border-radius:10px;overflow:hidden;background:#000}
+.art canvas{position:absolute;inset:0;width:100%;height:100%}
+.art::after{content:"";position:absolute;inset:0;background:linear-gradient(to bottom,rgb(0 0 0/.5),rgb(0 0 0/0) 30%,rgb(0 0 0/0) 55%,rgb(0 0 0/.85))}
+.art p{position:absolute;z-index:1;left:32px;right:32px;bottom:28px;margin:0;color:#fff;font-size:clamp(28px,3.4vw,52px);font-weight:600;letter-spacing:-.045em;line-height:.98}
+.side{display:grid;grid-template-rows:auto 1fr;min-height:0;overflow:auto}
+header{display:flex;align-items:center;gap:8px;padding:24px 40px 0;font-size:16px;font-weight:600;letter-spacing:-.03em}
+.mark{fill:var(--accent)}
+.body{align-self:safe center;width:min(380px,100%);margin:0 auto;padding:32px 24px 48px}
+h1{margin:0 0 8px;font-size:clamp(30px,3vw,44px);font-weight:600;letter-spacing:-.045em;line-height:.98}
+.count{margin:0 0 20px;font-size:13px;color:var(--muted)}
+.bar{height:3px;margin:0 0 24px;border-radius:9999px;background:var(--track);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:9999px;background:var(--fg);transition:width .5s cubic-bezier(.16,1,.3,1)}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.steps li{display:flex;align-items:center;gap:12px;min-height:36px;padding:0 12px;border-radius:6px;font-size:13px;color:var(--faint)}
+.steps li.active{background:var(--panel);color:var(--fg);font-weight:500}
+.steps li.done{color:var(--muted)}
+.steps li.error{background:color-mix(in srgb,var(--bad) 10%,transparent);color:var(--bad);font-weight:500}
+.steps svg{width:16px;height:16px;flex:none;overflow:visible}
+.track{fill:none;stroke:var(--track);stroke-width:1.5}
+.arc{fill:none;stroke:var(--accent);stroke-width:1.5;stroke-linecap:round;stroke-dasharray:12 40}
+.spin{animation:spin .9s linear infinite;transform-origin:50% 50%}
+.fill{fill:var(--muted)}
+.bad{fill:var(--bad)}
+.tick{fill:none;stroke:var(--bg);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 @keyframes spin{to{transform:rotate(360deg)}}
-@media (prefers-reduced-motion:reduce){.steps li.active i{animation:none}}
-.error{font-size:13px;max-width:560px;text-align:center}
-pre{max-width:min(720px,100%);max-height:40vh;overflow:auto;margin:0;padding:12px;border-radius:6px;background:var(--panel);color:var(--muted);font-size:11px;white-space:pre-wrap;word-break:break-all;box-sizing:border-box}
-button{font:inherit;font-size:13px;padding:6px 14px;border:0;border-radius:4px;background:var(--fg);color:var(--bg);cursor:pointer}
-</style></head><body><main>${MARK}<span class="name">feega</span>${body}</main></body></html>`;
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+.error{display:block;margin:16px 0 8px;font-size:13px;color:var(--bad)}
+pre{max-height:32vh;overflow:auto;margin:0 0 12px;padding:12px;border-radius:6px;background:var(--panel);color:var(--muted);font-size:11px;white-space:pre-wrap;word-break:break-all}
+button{font:inherit;font-size:13px;font-weight:600;min-height:36px;padding:0 18px;border:0;border-radius:9999px;background:var(--fg);color:var(--bg);cursor:pointer}
+@media (max-width:720px){main{grid-template-columns:minmax(0,1fr)}.art{display:none}header{padding:16px 20px 0}.body{align-self:start;padding:24px 20px}}
+</style></head><body><main>
+<div class="art" aria-hidden="true"><canvas id="field"></canvas><p>${HEADLINES[phaseOf(progress)]}</p></div>
+<div class="side"><header>${MARK}feega</header><div class="body">${body}</div></div>
+</main>${FIELD}</body></html>`;
 
 const escapeHtml = (text) => text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
-const row = (s) => `<li class="${s.state}"><i></i>${escapeHtml(LABELS[s.id](s))}</li>`;
+const row = (s) => `<li class="${s.state}">${ICONS[s.state]}${escapeHtml(LABELS[s.id](s))}</li>`;
 
 const failure = (error) =>
   error
@@ -141,7 +217,15 @@ const failure = (error) =>
 <script>const vscode = acquireVsCodeApi(); document.getElementById('retry').onclick = () => vscode.postMessage({ type: '${RETRY}' });</script>`
     : '';
 
-const stepsPage = (progress) => shell(`<ol class="steps">${progress.steps.map(row).join('')}</ol>${failure(progress.error)}`);
+const STEP_TITLES = { [Phase.Working]: 'setting up', [Phase.Ready]: 'all set', [Phase.Failed]: 'stopped' };
+
+const summary = (progress) => {
+  const done = progress.steps.filter((s) => s.state === State.Done).length;
+  const total = progress.steps.length;
+  return `<h1>${STEP_TITLES[phaseOf(progress)]}</h1><p class="count">${done} of ${total} done</p><div class="bar"><i style="width:${Math.round((done / total) * 100)}%"></i></div>`;
+};
+
+const stepsPage = (progress) => shell(progress, `${summary(progress)}<ol class="steps">${progress.steps.map(row).join('')}</ol>${failure(progress.error)}`);
 
 const logTail = (max) => {
   let kept = '';

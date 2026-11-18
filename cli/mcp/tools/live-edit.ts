@@ -20,7 +20,7 @@ export function registerLiveEditTools(server: McpServer) {
       title: 'Edit an element of the running app and write the change to its source file',
       description:
         'Local Feega only. `edit` (default) changes one property of the element at `at` (the `file:line:col` in its `data-feega-src`, set by `feega init`): text, color, fill, fontSize, fontWeight, padding, margin, gap or radius. ' +
-        'Only the one Tailwind class or text is rewritten, with a repo token when the value matches one; commits on the branch `feega/live`, which the live frames run from, never on the user branch. ' +
+        'Only the one Tailwind class or text is rewritten, with a repo token when the value matches one; written straight into the working folder (undo restores the file unless something changed it since; with FEEGA_LIVE_TARGET=branch it commits on `feega/live` instead). ' +
         '`side` (x, y, t, r, b, l) narrows padding, margin and gap. `viewport` is the page width the change is for: with `sm:`/`lg:` classes, the one that applies at that width is changed. `undo` reverts the commit `sha`. `changes` lists files and the diff. `push` sends them to a `feega/` branch. Free.',
       inputSchema: z.object({
         action: z.enum(LiveAction).optional(),
