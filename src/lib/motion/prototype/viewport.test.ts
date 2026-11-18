@@ -3,7 +3,7 @@ import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { addBreakpoint, BASE_BREAKPOINT, BreakpointPreset } from '@feega/motion-core/motion/breakpoints/model';
 import { resolveView } from '@feega/motion-core/motion/breakpoints/view';
 import { baseFixtures } from '@feega/motion-core/motion/codegen/fixtures/responsive';
-import { ViewportMode, WIDTH_PRESETS, WidthSource, activeView, clampWidth, docAtWidth, frameBox, parseViewport, shownWidth, viewChoices } from './viewport';
+import { ViewportMode, WIDTH_PRESETS, WidthSource, activeView, clampWidth, docAtWidth, docShown, frameBox, parseViewport, shownWidth, viewChoices } from './viewport';
 
 const stage = { w: 1000, h: 600 };
 const frame = { w: 1440, h: 3000 };
@@ -85,9 +85,9 @@ describe('clampWidth and parseViewport', () => {
 
   it('reads a stored choice and ignores junk', () => {
     expect(parseViewport('{"mode":"responsive","width":390,"source":"fixed"}')).toEqual({ mode: ViewportMode.Responsive, width: 390, source: WidthSource.Fixed });
-    expect(parseViewport('nope')).toEqual({ mode: ViewportMode.Responsive, width: WIDTH_PRESETS[0].width, source: WidthSource.Window });
+    expect(parseViewport('nope')).toEqual({ mode: ViewportMode.Responsive, width: WIDTH_PRESETS[0].width, source: WidthSource.Frame });
     expect(parseViewport('{"mode":"zzz","width":5}').mode).toBe(ViewportMode.Responsive);
-    expect(parseViewport(null).source).toBe(WidthSource.Window);
+    expect(parseViewport(null).source).toBe(WidthSource.Frame);
   });
 });
 
@@ -103,13 +103,23 @@ describe('responsive Play', () => {
     expect(choices.some((c) => c.label === 'Mobile')).toBe(true);
   });
 
-  it('follows the window width until a width is picked', () => {
-    expect(shownWidth({ mode: ViewportMode.Responsive, width: 390, source: WidthSource.Window }, 700)).toBe(700);
-    expect(shownWidth({ mode: ViewportMode.Responsive, width: 390, source: WidthSource.Fixed }, 700)).toBe(390);
+  it('opens at the frame own width, whatever the window', () => {
+    expect(shownWidth(parseViewport(null), 700, doc.width)).toBe(doc.width);
+    expect(shownWidth(parseViewport(null), 2400, doc.width)).toBe(doc.width);
+  });
+
+  it('opens on the doc the canvas draws, not a relayout of it', () => {
+    expect(docShown(doc, parseViewport(null), 1568)).toBe(doc);
+  });
+
+  it('follows the window width only when asked to', () => {
+    expect(shownWidth({ mode: ViewportMode.Responsive, width: 390, source: WidthSource.Window }, 700, doc.width)).toBe(700);
+    expect(shownWidth({ mode: ViewportMode.Responsive, width: 390, source: WidthSource.Fixed }, 700, doc.width)).toBe(390);
+    expect(docShown(doc, { mode: ViewportMode.Responsive, width: 0, source: WidthSource.Window }, 700).width).toBe(700);
   });
 
   it('picks the view by width as the window narrows', () => {
-    const at = (stage: number) => activeView(doc, shownWidth({ mode: ViewportMode.Responsive, width: 0, source: WidthSource.Window }, stage)).id;
+    const at = (stage: number) => activeView(doc, shownWidth({ mode: ViewportMode.Responsive, width: 0, source: WidthSource.Window }, stage, doc.width)).id;
 
     expect([at(1600), at(800), at(375)]).toEqual([BASE_BREAKPOINT, 'tablet', 'phone']);
   });
