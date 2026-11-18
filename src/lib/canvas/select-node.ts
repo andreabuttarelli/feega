@@ -65,7 +65,7 @@ export function clampIndex(index: number, length: number): number {
  * qui è ciò che tiene `listFeedingSelect` (client) e `listFeeding` (`upstream.ts`, server) d'accordo
  * su COSA conta come sorgente, senza due elenchi che divergono al primo tipo aggiunto.
  */
-export const SELECTABLE_SOURCE_TYPES = ['list', 'products', 'social_account_feed'] as const;
+export const SELECTABLE_SOURCE_TYPES = ['list', 'social_account_feed'] as const;
 
 export type SelectableSourceType = (typeof SELECTABLE_SOURCE_TYPES)[number];
 

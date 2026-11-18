@@ -23,7 +23,7 @@ import { z } from 'zod';
 import { CODE_ENTRY, Framework } from './code-frame';
 import { mergeNodeData, type NodeData } from './node-patch';
 import { SOCIAL_PLATFORMS } from './social-platforms';
-import { FEED_MEDIA, FEED_SORTS, PRODUCT_SORTS } from './source-filters';
+import { FEED_MEDIA, FEED_SORTS } from './source-filters';
 import { CUSTOM, EFFECTS } from './effects';
 import { nodeReferenceSchema } from './node-references';
 import type { EffectId, EffectParam } from './effects';
@@ -37,7 +37,6 @@ import { CALENDAR_SCOPES } from './calendar-node';
 import { elementNodeSchema, motionNodeSchema } from './motion-node';
 import { LAYOUT_KEYS, nodeLayoutSchema } from './node-layout';
 import { compositionTemplateSchema } from './composition-node';
-import { studioBatchNodeSchema } from './studio-batch-node';
 import { AUDIO_OPERATION_IDS, type AudioOperationId } from './audio-operations';
 import { MAX_CUSTOM_OUTPUTS, MAX_OUTPUT_LABEL } from './select-outputs';
 import { SOURCE_ITEM_FIELDS } from './select-sources';
@@ -56,13 +55,6 @@ const genState = {
   example: z.boolean().optional()
 };
 
-/**
- * Lo stato di una SINCRONIZZAZIONE: gli stessi campi per `products` e `social_account_feed`, i
- * due nodi che non generano ma scaricano. Non è `genState` — non c'è un `run_id` da rincorrere
- * su un provider asincrono, il giro finisce dentro la stessa richiesta — ma la forma "in corso /
- * fatto / fallito con un motivo leggibile" è la stessa idea, ed è per questo che vive qui accanto
- * e non duplicata due volte.
- */
 const syncState = {
   sync_status: z.enum(GEN_STATUS).optional(),
   sync_error: z.string().nullable().optional(),
@@ -189,18 +181,6 @@ const feedFiltersSchema = z.object({
   sort: z.enum(FEED_SORTS).optional()
 });
 
-const productFiltersSchema = z.object({
-  query: z.string().optional(),
-  price_min: z.number().nonnegative().nullable().optional(),
-  price_max: z.number().nonnegative().nullable().optional(),
-  in_stock_only: z.boolean().optional(),
-  on_sale_only: z.boolean().optional(),
-  tag: z.string().optional(),
-  vendor: z.string().optional(),
-  product_type: z.string().optional(),
-  sort: z.enum(PRODUCT_SORTS).optional()
-});
-
 const socialAccountFeedSchema = z.object({
   platform: z.enum(SOCIAL_PLATFORMS),
   handle: z.string(),
@@ -225,20 +205,6 @@ const socialPostMockupSchema = z.object({
     .optional(),
   x: z.object({ posts: z.array(mockupPost) }).optional(),
   threads: z.object({ posts: z.array(mockupPost) }).optional()
-});
-
-/** Gli stessi valori di `products_platform_check`. */
-const PRODUCT_PLATFORMS = ['shopify', 'woocommerce'] as const;
-
-const productsSchema = z.object({
-  type: z.enum(PRODUCT_PLATFORMS),
-  url: z.union([z.literal(''), z.string().url()]),
-  limit: z.number().int().positive().optional(),
-  after: z.string().nullable().optional(),
-  only_first_photo: z.boolean().optional(),
-  category: z.string().optional(),
-  filters: productFiltersSchema.optional(),
-  ...syncState
 });
 
 /**
@@ -272,13 +238,6 @@ const adsSchema = adsBase.superRefine((v, ctx) => {
   }
 });
 
-/**
- * `influencer`: nasce già pieno, come `products` — la riga in `influencers` esiste prima che il
- * nodo la referenzi, `influencer_id` è l'unico campo che il CHECK impone. `data` non porta le
- * viste (sarebbero decine di URL che viaggiano a ogni evento realtime, lo stesso motivo per cui
- * `products` non porta il catalogo): il server le legge da `influencer_views` e le passa come
- * prop a `InfluencerNode.svelte`, la stessa dottrina di `ProductsNode.svelte`.
- */
 const influencerSchema = z.object({
   influencer_id: z.string()
 });
@@ -483,7 +442,6 @@ export const NODE_DATA_SCHEMAS = {
   iframe: iframeSchema,
   social_account_feed: socialAccountFeedSchema,
   social_post_mockup: socialPostMockupSchema,
-  products: productsSchema,
   ads: adsSchema,
   influencer: influencerSchema,
   list: listSchema,
@@ -495,7 +453,6 @@ export const NODE_DATA_SCHEMAS = {
   model3d: model3dSchema,
   motion: motionNodeSchema,
   element: elementNodeSchema,
-  studio_batch: studioBatchNodeSchema,
   section: sectionSchema,
   technique: techniqueSchema
 } as const;

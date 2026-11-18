@@ -70,7 +70,7 @@ export function rebuildPorts(db: Db): RebuildPorts {
     input: async (at, doc) => {
       const [assets, tokens] = await Promise.all([
         motionAssets({ db, orgId: at.orgId, projectId: at.projectId, canvasId: at.canvasId, sign: serviceSigner(db) }, SIGNED_URL_TTL_S.agentPreview),
-        motionTokens(db, { orgId: at.orgId, brandId: at.brandId })
+        motionTokens()
       ]);
       return { doc, tokens, assetUrls: assetUrls(assets), title: at.title, fetchBlob };
     },

@@ -50,6 +50,6 @@ export const GET: RequestHandler = async ({ locals, params, request, url }) => {
     throw error(HTTP_NOT_FOUND, 'This canvas does not exist, or is not yours');
   }
 
-  const [sources, tokens] = await Promise.all([early ?? read(found.orgId), phases.time('tokens', motionTokens(db, { orgId: found.orgId, brandId: found.projectBrandId }))]);
+  const [sources, tokens] = await Promise.all([early ?? read(found.orgId), phases.time('tokens', motionTokens())]);
   return revalidated(request, phases.span('stringify', () => JSON.stringify({ tokens, frames: Object.fromEntries(sources.frames), signed: sources.signed })), phases);
 };

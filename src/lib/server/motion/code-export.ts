@@ -26,7 +26,7 @@ export async function frameCode(db: Db, input: { orgId: string; nodeId: string; 
 
   const [head, project] = await Promise.all([headOrNew(db, { orgId: input.orgId, nodeId: record.id }, node), findProjectById(db, { orgId: input.orgId, projectId: record.projectId })]);
   const scope = { db, orgId: input.orgId, projectId: record.projectId, canvasId: record.canvasId, sign: input.sign };
-  const [brand, assets] = await Promise.all([motionTokens(db, { orgId: input.orgId, brandId: project?.brandId ?? null }), assetsById(scope, codeAssetIds(head.doc))]);
+  const [brand, assets] = await Promise.all([motionTokens(), assetsById(scope, codeAssetIds(head.doc))]);
 
   const name = record.displayName?.trim() || FALLBACK_NAME;
   return { name, ...exportCode(head.doc, { target: input.target, name, assets, brand }) };

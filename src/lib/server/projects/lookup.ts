@@ -13,7 +13,7 @@ import { UncensoredLock } from '$lib/uncensored-lock';
  */
 export type OpenProject = { orgId: string; project: Project };
 
-const PROJECT_COLUMNS = 'id, name, slug, brand_id, archived_at, updated_at, mode';
+const PROJECT_COLUMNS = 'id, name, slug, archived_at, updated_at, mode';
 
 export async function findProjectForUser(
   db: Db,
@@ -41,7 +41,6 @@ export async function findProjectForUser(
         id: data.id,
         name: data.name,
         slug: data.slug,
-        brandId: data.brand_id,
         archivedAt: data.archived_at,
         lastActiveAt: data.updated_at,
         mode: modeOf(data.mode)

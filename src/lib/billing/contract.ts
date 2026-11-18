@@ -1,4 +1,4 @@
-// The billing contract: what "can this brand keep going" means, decoupled from who answers it.
+// The billing contract: what "can this org keep going" means, decoupled from who answers it.
 //
 // Two providers implement it — open-provider.ts (this file's neighbour, the default: permits
 // everything, for a self-hosted fork) and the paid product's actual credit/quota/payment logic,
@@ -10,13 +10,9 @@
 export type QuotaKind = 'credits' | 'posts';
 
 export type BillingContext = {
-  /** Absent on work asked for WITHOUT a brand — then `orgId` names who pays. One of the two is always set. */
-  brandId?: string;
-  /** The organization that pays when no brand does. Unread while a brandId is here: a brand reaches its own org. */
+  /** The organization that pays. */
   orgId?: string;
-  /** Not always known by the caller (e.g. the credits chokepoint only has a brandId) — optional. */
   plan?: string | null;
-  brandSlug?: string;
 };
 
 /** Mirrors server/credits.ts's CreditsUsage + server/usage.ts's post counters, provider-agnostic. */

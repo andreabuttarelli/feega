@@ -24,7 +24,6 @@ export const CANVAS_ADDABLE = [
   ...GEN_MEDIUMS,
   'iframe',
   'doc',
-  'products',
   'social_account_feed',
   'list',
   'select',
@@ -32,7 +31,6 @@ export const CANVAS_ADDABLE = [
   'composition',
   'calendar',
   'motion',
-  'studio_batch',
   'section'
 ] as const;
 
@@ -48,7 +46,7 @@ export const CANVAS_BAR_MORE = CANVAS_ADD_BAR.filter((w) => !CANVAS_BAR_MAIN.inc
 
 export const AI_ADDABLE: ReadonlySet<Addable> = new Set<Addable>(GEN_MEDIUMS);
 
-export const CLOUD_ADDABLE: ReadonlySet<Addable> = new Set<Addable>(['products', 'social_account_feed', 'studio_batch']);
+export const CLOUD_ADDABLE: ReadonlySet<Addable> = new Set<Addable>(['social_account_feed']);
 
 export function isAddable(x: string): x is Addable {
   return (CANVAS_ADDABLE as readonly string[]).includes(x);
@@ -74,7 +72,6 @@ export const ADDABLE_LABEL: Record<Addable, string> = {
   video: 'Generate video',
   iframe: 'Code frame',
   doc: 'Document',
-  products: 'Products',
   social_account_feed: 'Social feed',
   list: 'List',
   select: 'Select',
@@ -84,6 +81,5 @@ export const ADDABLE_LABEL: Record<Addable, string> = {
   audio: 'Generate audio',
   model3d: 'Generate 3D model',
   motion: 'Frame',
-  studio_batch: 'Studio batch',
   section: 'Section'
 };

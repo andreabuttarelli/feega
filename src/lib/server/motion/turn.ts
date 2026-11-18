@@ -118,7 +118,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
 
   const [head, tokens, threadId] = await Promise.all([
     headOrNew(db, nodeScope, motion.node),
-    motionTokens(db, { orgId, brandId: project.brandId }),
+    motionTokens(),
     openNodeThread(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, brandId: project.brandId })
   ]);
   const screened = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: promptTexts(message, head.doc), scope: { orgId, userId, projectId: project.id, nodeId: motion.record.id, actor: requester } });

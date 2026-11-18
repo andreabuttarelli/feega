@@ -39,5 +39,5 @@ export const GET: RequestHandler = async ({ locals, params, request }) => {
     return new Response(null, { status: HTTP_NO_CONTENT });
   }
   const brandId = (await listProjects(db, found.orgId)).find((p) => p.id === params.projectId)?.brandId ?? null;
-  return revalidated(request, JSON.stringify({ ...source, tokens: await motionTokens(db, { orgId: found.orgId, brandId }) }));
+  return revalidated(request, JSON.stringify({ ...source, tokens: await motionTokens() }));
 };

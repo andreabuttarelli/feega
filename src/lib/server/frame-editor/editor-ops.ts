@@ -273,7 +273,7 @@ export const EDITOR_OPS = {
         return denied;
       }
 
-      const [assets, tokens] = await Promise.all([motionAssets(placeOf(ctx), SIGNED_URL_TTL_S.render), motionTokens(ctx.db, { orgId: ctx.orgId, brandId: ctx.projectBrandId })]);
+      const [assets, tokens] = await Promise.all([motionAssets(placeOf(ctx), SIGNED_URL_TTL_S.render), motionTokens()]);
       const doc = await watermarked(ctx.db, ctx.orgId, head.doc);
       const rows = rowRequests({ version: head.version, doc }, rowsIn.rows, await withShapedText({ doc, tokens, assets: assetUrls(assets) }), settings.settings);
       if (!rows.ok) {
@@ -368,7 +368,7 @@ export const EDITOR_OPS = {
       }
       const [head, tokens, assets] = await Promise.all([
         headOrNew(ctx.db, nodeScope(ctx), ctx.motion.node),
-        motionTokens(ctx.db, { orgId: ctx.orgId, brandId: ctx.projectBrandId }),
+        motionTokens(),
         motionAssets(placeOf(ctx), SIGNED_URL_TTL_S.render)
       ]);
       const made = await exportStill(ctx.db, { orgId: ctx.orgId, projectId: ctx.canvas.projectId, nodeId: ctx.motion.record.id }, head.doc, stillExport(ask.data.format, ask.data.scale, docScaleOf(ctx.motion.record, head.doc)), { tokens, assets });

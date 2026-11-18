@@ -21,7 +21,7 @@ export async function startFarmRender(db: Db, input: FarmStart): Promise<RenderS
 
   const [assets, tokens] = await Promise.all([
     motionAssets({ db, orgId: input.orgId, projectId: input.projectId, canvasId: input.canvasId }, SIGNED_URL_TTL_S.render),
-    motionTokens(db, { orgId: input.orgId, brandId: input.brandId })
+    motionTokens()
   ]);
   const soundIds = clipsOf(input.head.doc).map((c) => String(c.props.assetId ?? ''));
   const analyses = await analyzeSounds(storageAnalysis(db), { orgId: input.orgId, projectId: input.projectId }, assets, soundIds);

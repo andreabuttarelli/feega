@@ -9,15 +9,13 @@ import { findAssets, type Asset } from '$lib/server/repos/assets';
 import { signKnowledgePaths } from '$lib/server/media-archive';
 import { signAssetFiles } from '$lib/server/repos/asset-storage';
 import type { ThumbnailPreset } from '$lib/server/media-thumbnails';
-import { listNodeProducts } from '$lib/server/repos/products';
 import { listNodeSocialPosts, type SocialPost } from '$lib/server/repos/social-posts';
 import { getInfluencer, listInfluencerViews, signInfluencerViewFiles } from '$lib/server/repos/influencers';
 import { nodeSize } from '$lib/canvas/node-size';
 import type { NodeType } from '$lib/canvas/node-data';
-import { feedFiltersOf, filterPosts, filterProducts, mediaKindOf, productFiltersOf } from '$lib/canvas/source-filters';
+import { feedFiltersOf, filterPosts, mediaKindOf } from '$lib/canvas/source-filters';
 import { ShareState, type SharedCanvas, type SharedFrameData, type SharedListItem, type SharedTile, type SharedView } from '$lib/canvas/shared-view';
 import { calendarOf } from '$lib/canvas/calendar-node';
-import { saleLabel } from '$lib/canvas/product-discount';
 import { Capability, modeAllows, modeOf } from '$lib/project-mode';
 import { audioOutputIds } from '$lib/canvas/node-media';
 import { mintedOr } from '$lib/canvas/share-token';
@@ -151,21 +149,6 @@ async function feedView({ db, orgId, node }: ViewInput): Promise<SharedView> {
   return { kind: 'grid', total: posts.length, tiles };
 }
 
-async function productsView({ db, orgId, node }: ViewInput): Promise<SharedView> {
-  const products = await listNodeProducts(db, { orgId, nodeId: node.id });
-  const tiles = filterProducts(products, productFiltersOf(node.data.filters)).map(
-    (p, i): SharedTile => ({
-      key: String(i),
-      thumb: p.images[0]?.url ?? null,
-      label: p.title,
-      caption: p.price === null ? null : `${p.currency ?? ''} ${p.price}`.trim(),
-      badge: null,
-      sale: saleLabel(p.price, p.compareAtPrice)
-    })
-  );
-  return { kind: 'grid', total: products.length, tiles };
-}
-
 function listView(input: ViewInput): SharedView {
   const items = list(input.node.data.items).map(record).map(
     (item): SharedListItem => {
@@ -242,7 +225,6 @@ export const SHARED_VIEW_OF: Record<NodeType, (input: ViewInput) => SharedView |
   iframe: frameView,
   social_account_feed: feedView,
   social_post_mockup: postView,
-  products: productsView,
   ads: adsView,
   influencer: influencerView,
   list: listView,
@@ -254,7 +236,6 @@ export const SHARED_VIEW_OF: Record<NodeType, (input: ViewInput) => SharedView |
   model3d: model3dView,
   motion: () => EMPTY,
   element: () => EMPTY,
-  studio_batch: () => EMPTY,
   section: () => EMPTY,
   technique: () => EMPTY
 };

@@ -3,7 +3,6 @@ import { isInteractive } from '@feega/motion-core/motion/interactive/settings';
 import type { Db } from '$lib/server/db/client';
 import { uploadName } from '$lib/motion/asset-name';
 import { findAssets, listFontAssets, listProjectAssets, type Asset, type AssetType } from '$lib/server/repos/assets';
-import { findBrandLook, findFirstBrandLook } from '$lib/server/repos/brands';
 import { DataCheck, findNode, moveNode, patchNodeData, resizeNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { appendRevision, readHead, RevisionOutcome, type Checkpoint, type MotionHead, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 import type { Actor } from '$lib/server/repos/actor';
@@ -13,11 +12,9 @@ import { Root } from '$lib/canvas/frame-select';
 import { settleElement, unsettled, type HostBox, type Settled } from '$lib/motion/element-host';
 import { formatOf, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { AssetKind } from '@feega/motion-core/motion/components';
-import { FEEGA_TOKENS, brandTokens, paletteFrom, type BrandTokens } from '@feega/motion-core/motion/brand';
+import { FEEGA_TOKENS, type BrandTokens } from '@feega/motion-core/motion/brand';
 import { mainHomesOf } from '$lib/motion/linked-mains';
 import { linkedHead, nudgeInstances } from './linked-mains';
-import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
-import { fontsFrom } from '@feega/motion-core/motion/fonts/model';
 import { fontFileOf } from '$lib/motion/fonts/library';
 
 export type MotionAsset = { id: string; kind: AssetKind; label: string; previewUrl: string; url: string | null; stored?: boolean; seconds?: number | null; width?: number | null; height?: number | null };
@@ -57,14 +54,7 @@ export async function headOrNew(db: Db, scope: { orgId: string; nodeId: string }
   return head ? linkedHead(db, { ...scope, head }) : newHead(node);
 }
 
-export async function motionTokens(db: Db, input: { orgId: string; brandId: string | null }): Promise<BrandTokens> {
-  const chosen = input.brandId ? await findBrandLook(db, { orgId: input.orgId, brandId: input.brandId }) : null;
-  const brand = chosen ?? (await findFirstBrandLook(db, input.orgId));
-  if (!brand) {
-    return FEEGA_TOKENS;
-  }
-  return { ...brandTokens({ name: brand.name, palette: paletteFrom(brand.content), logoUrl: brand.logoUrl }), fonts: fontsFrom(brand.content, GOOGLE_FONTS) };
-}
+export const motionTokens = (): BrandTokens => FEEGA_TOKENS;
 
 const GENERATED = 'generated';
 

@@ -1,24 +1,8 @@
-import { discountPercent } from './product-discount';
-
-export const PRODUCT_SORTS = ['newest', 'price_asc', 'price_desc', 'title'] as const;
 export const FEED_SORTS = ['newest', 'most_liked', 'most_viewed'] as const;
 export const FEED_MEDIA = ['all', 'image', 'video', 'carousel'] as const;
 
-export type ProductSort = (typeof PRODUCT_SORTS)[number];
 export type FeedSort = (typeof FEED_SORTS)[number];
 export type FeedMedia = (typeof FEED_MEDIA)[number];
-
-export type ProductFilters = {
-  query: string;
-  price_min: number | null;
-  price_max: number | null;
-  in_stock_only: boolean;
-  on_sale_only: boolean;
-  tag: string;
-  vendor: string;
-  product_type: string;
-  sort: ProductSort;
-};
 
 export type FeedFilters = {
   from: string | null;
@@ -29,18 +13,6 @@ export type FeedFilters = {
   include: string;
   exclude: string;
   sort: FeedSort;
-};
-
-export const DEFAULT_PRODUCT_FILTERS: ProductFilters = {
-  query: '',
-  price_min: null,
-  price_max: null,
-  in_stock_only: false,
-  on_sale_only: false,
-  tag: '',
-  vendor: '',
-  product_type: '',
-  sort: 'newest'
 };
 
 export const DEFAULT_FEED_FILTERS: FeedFilters = {
@@ -54,16 +26,6 @@ export const DEFAULT_FEED_FILTERS: FeedFilters = {
   sort: 'newest'
 };
 
-type FilterableProduct = {
-  title: string;
-  description: string | null;
-  price: number | null;
-  available: boolean | null;
-  compareAtPrice?: number | null;
-  tags?: string[];
-  vendor?: string | null;
-  productType?: string | null;
-};
 type FilterablePost = {
   caption: string | null;
   postedAt: string | null;
@@ -79,21 +41,6 @@ const day = (v: unknown): string | null => (typeof v === 'string' && /^\d{4}-\d{
 const oneOf = <T extends string>(values: readonly T[], v: unknown, fallback: T): T =>
   typeof v === 'string' && (values as readonly string[]).includes(v) ? (v as T) : fallback;
 
-export function productFiltersOf(raw: unknown): ProductFilters {
-  const f = record(raw);
-  return {
-    query: text(f.query),
-    price_min: amount(f.price_min),
-    price_max: amount(f.price_max),
-    in_stock_only: f.in_stock_only === true,
-    on_sale_only: f.on_sale_only === true,
-    tag: text(f.tag),
-    vendor: text(f.vendor),
-    product_type: text(f.product_type),
-    sort: oneOf(PRODUCT_SORTS, f.sort, DEFAULT_PRODUCT_FILTERS.sort)
-  };
-}
-
 export function feedFiltersOf(raw: unknown): FeedFilters {
   const f = record(raw);
   return {
@@ -106,59 +53,6 @@ export function feedFiltersOf(raw: unknown): FeedFilters {
     exclude: text(f.exclude),
     sort: oneOf(FEED_SORTS, f.sort, DEFAULT_FEED_FILTERS.sort)
   };
-}
-
-const withPriceLast = (a: number | null, b: number | null, direction: number): number => {
-  if (a === null) {
-    return b === null ? 0 : 1;
-  }
-  if (b === null) {
-    return -1;
-  }
-  return (a - b) * direction;
-};
-
-const PRODUCT_ORDER: Record<ProductSort, ((a: FilterableProduct, b: FilterableProduct) => number) | null> = {
-  newest: null,
-  price_asc: (a, b) => withPriceLast(a.price, b.price, 1),
-  price_desc: (a, b) => withPriceLast(a.price, b.price, -1),
-  title: (a, b) => a.title.localeCompare(b.title)
-};
-
-const same = (wanted: string) => {
-  const target = wanted.trim().toLowerCase();
-  return (value: string | null | undefined): boolean => !target || value?.trim().toLowerCase() === target;
-};
-
-export function filterProducts<T extends FilterableProduct>(items: T[], f: ProductFilters): T[] {
-  const query = f.query.trim().toLowerCase();
-  const tagMatches = same(f.tag);
-  const vendorMatches = same(f.vendor);
-  const typeMatches = same(f.product_type);
-  const kept = items.filter((p) => {
-    if (f.tag.trim() && !(p.tags ?? []).some(tagMatches)) {
-      return false;
-    }
-    if (!vendorMatches(p.vendor) || !typeMatches(p.productType)) {
-      return false;
-    }
-    if (f.on_sale_only && discountPercent(p.price, p.compareAtPrice) === null) {
-      return false;
-    }
-    if (query && !`${p.title}\n${p.description ?? ''}`.toLowerCase().includes(query)) {
-      return false;
-    }
-    if (f.price_min !== null && (p.price === null || p.price < f.price_min)) {
-      return false;
-    }
-    if (f.price_max !== null && (p.price === null || p.price > f.price_max)) {
-      return false;
-    }
-    return !(f.in_stock_only && p.available === false);
-  });
-
-  const order = PRODUCT_ORDER[f.sort];
-  return order ? kept.sort(order) : kept;
 }
 
 export function mediaKindOf(media: Record<string, unknown> | null): Exclude<FeedMedia, 'all'> {

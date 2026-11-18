@@ -52,5 +52,5 @@ export async function readSharedSource(db: Db, token: string, nodeId: string): P
   if (!source) {
     return null;
   }
-  return { ...source, tokens: await motionTokens(db, { orgId, brandId: await brandOf(db, canvas) }) };
+  return { ...source, tokens: await motionTokens() };
 }

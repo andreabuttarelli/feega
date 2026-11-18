@@ -158,7 +158,7 @@ export async function linkPayload(db: Db, run: NodeRun): Promise<LinkPayload | n
 
   const [assets, tokens] = await Promise.all([
     motionAssets({ db, orgId: run.orgId, projectId: project.id, canvasId: place.record.canvasId, sign: linkSigner(db) }, SIGNED_URL_TTL_S.render),
-    motionTokens(db, { orgId: run.orgId, brandId: project.brandId })
+    motionTokens()
   ]);
   const soundIds = clipsOf(head.doc).map((c) => String(c.props.assetId ?? ''));
   const analyses = await analyzeSounds(storageAnalysis(db), { orgId: run.orgId, projectId: project.id }, assets, soundIds);

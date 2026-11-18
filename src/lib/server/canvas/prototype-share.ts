@@ -62,7 +62,7 @@ export function sharedPrototypePorts(db: Db, isPublished: IsPublished): Prototyp
     doc: async (nodeId, orgId) => (await readHead(db, { orgId, nodeId }))?.doc ?? null,
     look: async (canvas, docs) => {
       const project = await findProjectById(db, { orgId: canvas.orgId, projectId: canvas.projectId });
-      const tokens = await motionTokens(db, { orgId: canvas.orgId, brandId: project?.brandId ?? null });
+      const tokens = await motionTokens();
       const wanted = [...new Set(docs.flatMap((doc) => doc.assets.map((a) => a.id)))];
       const rows = await findAssets(db, { orgId: canvas.orgId, assetIds: wanted });
       const shareable = [...rows.values()].filter((asset) => !asset.uncensored).map((asset) => asset.id);

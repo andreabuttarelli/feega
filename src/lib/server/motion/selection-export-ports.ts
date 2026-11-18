@@ -34,7 +34,7 @@ export async function playedDoc(store: Pick<FrameStore, 'read'>, doc: MotionDoc)
 export function selectionPorts(scope: SelectionScope): SelectionPorts {
   const { db, orgId, projectId } = scope;
   const frames = frameStore(db, { orgId, actor: scope.actor, projectId });
-  const tokens = motionTokens(db, { orgId, brandId: scope.brandId });
+  const tokens = motionTokens();
   const canvasOf = new Map<string, string>();
 
   const urlsOf = async (target: DrawTarget) => assetUrls(await motionAssets({ db, orgId, projectId, canvasId: canvasOf.get(target.nodeId)! }, SIGNED_URL_TTL_S.render));

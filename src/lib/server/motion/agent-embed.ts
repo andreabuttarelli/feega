@@ -65,7 +65,7 @@ export async function savedMotion(db: Db, scope: Scope): Promise<Saved | null> {
 
 async function bundleInput(db: Db, scope: PublishScope, saved: Saved) {
   const assets = await motionAssets({ db, orgId: scope.orgId, projectId: saved.project.id, canvasId: saved.record.canvasId, sign: scope.sign });
-  const tokens = await motionTokens(db, { orgId: scope.orgId, brandId: saved.project.brandId });
+  const tokens = await motionTokens();
   const sceneHead = async (nodeId: string) => {
     const head = await readHead(db, { orgId: scope.orgId, nodeId });
     return head ? { doc: head.doc, assets: {} } : null;
