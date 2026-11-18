@@ -179,6 +179,8 @@ function cacheKeyOf(url: string): { key: string; revision: number } | null {
 
 const forCache = ({ addresses, ...source }: FrameDoc): FrameDoc => ({ ...source, assets: addresses ?? source.assets });
 
+const whenIdle = (run: () => void) => (typeof requestIdleCallback === 'function' ? requestIdleCallback(run) : setTimeout(run, 0));
+
 function cached(fetcher: Fetcher, cacheOf: () => FrameCache | null): Fetcher {
   return async (url, init) => {
     const cache = cacheOf();
@@ -201,7 +203,7 @@ function cached(fetcher: Fetcher, cacheOf: () => FrameCache | null): Fetcher {
       return NOTHING;
     }
     if (source.revision === asked.revision) {
-      void cache.keep(asked.key, forCache(source)).catch(() => undefined);
+      whenIdle(() => void cache.keep(asked.key, forCache(source)).catch(() => undefined));
     }
     return answered(source);
   };

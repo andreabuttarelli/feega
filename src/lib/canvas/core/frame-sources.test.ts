@@ -17,6 +17,8 @@ const wired = (body: unknown): string =>
     ? writeSources({ tokens: (body as Batched).tokens, signed: (body as Batched).signed }, Object.entries((body as Batched).frames).map(([id, { doc, ...meta }]) => ({ meta: { id, ...meta }, docText: JSON.stringify(doc) })))
     : JSON.stringify(body);
 
+const idled = () => new Promise((done) => setTimeout(done, 0));
+
 const answerOf = (body: unknown) => ({ ok: true, status: 200, json: async () => JSON.parse(JSON.stringify(body)), text: async () => wired(body) }) as Response;
 
 describe('reading a frame source once for the whole canvas', () => {
@@ -265,6 +267,7 @@ describe('a frame kept from an earlier open is drawn only at the revision the ca
     const read = batchedSources(async () => frames(4, 'new'), undefined, () => cache);
 
     expect((await read(urlAt(4)))?.doc).toEqual({ tag: 'new' });
+    await idled();
     expect(await cache.take(`${C}/${A}@3@l1@`)).toBeNull();
     expect((await cache.take(`${C}/${A}@4@l1@`))?.doc).toEqual({ tag: 'new' });
   });
@@ -282,6 +285,7 @@ describe('a frame kept from an earlier open is drawn only at the revision the ca
     const read = batchedSources(async () => frames(5, 'remote'), undefined, () => cache);
 
     expect((await read(urlAt(4)))?.doc).toEqual({ tag: 'remote' });
+    await idled();
     expect(await cache.take(`${C}/${A}@4@l1@`)).toBeNull();
   });
 
@@ -303,8 +307,23 @@ describe('a frame kept from an earlier open is drawn only at the revision the ca
     const read = batchedSources(async () => json({ tokens: {}, signed: { [P]: 'https://signed/p' }, frames: { [A]: { revision: 3, doc: {}, assets: { [P]: `/a/${P}` } } } }), undefined, () => cache);
 
     await read(urlAt(3));
+    await idled();
 
     expect((await cache.take(`${C}/${A}@3@l1@`))?.assets).toEqual({ [P]: `/a/${P}` });
+  });
+
+  it('keeps the browser copy only after the frame is handed on, so the page does not parse a doc on its way to the build', async () => {
+    const cache = frameCache(memoryShelf());
+    const read = batchedSources(async () => frames(3, 'unparsed'), undefined, () => cache);
+    const parsed = vi.spyOn(JSON, 'parse');
+
+    await read(urlAt(3));
+    const docParses = parsed.mock.calls.filter(([value]) => typeof value === 'string' && value.includes('unparsed')).length;
+    parsed.mockRestore();
+    await idled();
+
+    expect(docParses).toBe(0);
+    expect((await cache.take(`${C}/${A}@3@l1@`))?.doc).toEqual({ tag: 'unparsed' });
   });
 
   it('caches nothing without a signed-in scope or a look', async () => {
@@ -314,6 +333,7 @@ describe('a frame kept from an earlier open is drawn only at the revision the ca
 
     await read(urlAt(3));
     await unlooked(`/p/p1/c/${C}/motion/${A}/source?revision=3&org=o1`);
+    await idled();
 
     expect(await cache.take(`${C}/${A}@3@l1@`)).toBeNull();
     expect(await cache.take(`${C}/${A}@3@@`)).toBeNull();
