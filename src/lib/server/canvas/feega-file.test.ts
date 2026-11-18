@@ -81,6 +81,22 @@ describe('importing a .feega file', () => {
     expect(fake.calls.some((c) => c.op === 'insert')).toBe(false);
   });
 
+  it('lands the frames it can and names the ones it could not', async () => {
+    const frame = (id: string, displayName: string) => ({ id, type: 'motion', displayName, position: { x: 0, y: 0, z: 0 }, size: { width: 100, height: 100 }, data: {} });
+    const [A, B, C] = ['77777777-7777-4777-8777-777777777771', '77777777-7777-4777-8777-777777777772', '77777777-7777-4777-8777-777777777773'];
+    const doc = newMotionDoc(MotionFormat.Square);
+    const frames: FeegaFile = {
+      ...file,
+      canvas: { nodes: [frame(A, 'Intro'), frame(B, 'Broken'), frame(C, 'Outro')], connections: [], heads: { [A]: { version: 1, doc }, [B]: { version: 1, doc: { ...doc, tracks: [{}] } }, [C]: { version: 1, doc } }, assets: [] }
+    };
+    const fake = world();
+
+    const out = await importCanvasFile(fake.db, { ...target, bytes: packFeega(frames, new Map()) });
+
+    expect(out).toMatchObject({ outcome: FeegaImport.Imported, unlanded: ['Broken'] });
+    expect(fake.calls.filter((c) => c.table === 'motion_revisions' && c.op === 'insert')).toHaveLength(2);
+  });
+
   it('reads only a file uploaded into the importing org, and removes it after', async () => {
     const fake = fakeDb({ canvases: [], nodes: [], nodes_connections: [], assets: [], canvas_events: [] }, { store: true, filter: true, files: { 'other-org/p9/x.feega': packed, 'org/imports/x.feega': packed } });
 

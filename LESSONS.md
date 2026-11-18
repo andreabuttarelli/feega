@@ -125,6 +125,10 @@ Signal: with the pointer still over a frame, a wheel zoom makes its hover outlin
 
 **Signal:** a fix in `packages/motion-core` passes its test but the browser on the worktree's dev server still shows the old behaviour. **Move:** the worktree has no `node_modules`, so `@feega/*` resolves to the main checkout's symlinks. Create `node_modules/@feega/*` in the worktree pointing at its own `packages/`, link the other top-level entries from the main `node_modules`, and start Vite with `server.fs.strict: false` (the Kit client lives outside the worktree's allow list).
 
+### A worktree `.env` turns generation tests red
+
+**Signal:** after copying `.env` into a worktree (`npm run check` needs it, or every `$env/static/public` read errors as `string | undefined`), `vitest run src/lib/server/canvas` fails ~20 cases in `generate*.test.ts` and `canvas-catalogue.test.ts` that pass in CI. **Move:** the tests read the real env when it exists. Keep `.env` in the worktree only while `npm run check` / `build:node` run; move it out for vitest.
+
 ### A snapcn port that works in tests throws in the player
 
 **Signal:** a port renders in a unit test of `port.draw` but the frame is empty in the browser, with `ReferenceError` in the player. **Move:** the player runs `draw.toString()`, so module-scope constants are gone. Keep every value inside `draw`; `sweep.test.ts` executes `snapcnSource` and catches it.
