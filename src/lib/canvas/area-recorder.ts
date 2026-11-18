@@ -44,7 +44,9 @@ export async function startRecording({ source, area, mic, onTick }: Start): Prom
   const chunks: Blob[] = [];
   recorder.ondataavailable = (event) => chunks.push(event.data);
 
-  const feed = Object.assign(document.createElement('video'), { srcObject: source.captureStream(FRAME_RATE), muted: true });
+  const feed: HTMLVideoElement = document.createElement('video');
+  feed.srcObject = source.captureStream(FRAME_RATE);
+  feed.muted = true;
   await feed.play();
 
   let raf = 0;
