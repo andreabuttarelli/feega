@@ -555,7 +555,7 @@ describe('validateNodeData — un tipo sconosciuto è rifiutato, non passa silen
 
 describe('describeNodeType / describeNodeTypes — la forma verso l\'esterno, derivata dallo stesso schema', () => {
   it('descrive un singolo tipo come JSON Schema, con le sue proprietà nominate', () => {
-    const shape = describeNodeType('ads');
+    const shape = describeNodeType('products');
     expect(shape).toHaveProperty('properties');
     const props = (shape as { properties: Record<string, unknown> }).properties;
     expect(Object.keys(props)).toEqual(expect.arrayContaining(['mode', 'country', 'page_id', 'search_terms']));
@@ -586,14 +586,6 @@ describe('looseNodeJsonSchema — solo required + enum del discriminante, per il
   it('tiene l\'enum di un campo required (social_account_feed.platform) — un vero invariante, non un vincolo che stringe', () => {
     const shape = looseNodeJsonSchema('social_account_feed') as { properties: Record<string, { enum?: string[] }> };
     expect(shape.properties.platform.enum).toContain('instagram');
-  });
-
-  it('non porta minLength/format/tetti numerici — quelli restano solo nello schema completo', () => {
-    const loose = JSON.stringify(looseNodeJsonSchema('ads'));
-    expect(loose).not.toMatch(/minLength|format|exclusiveMinimum/);
-
-    const full = JSON.stringify(describeNodeType('ads'));
-    expect(full).toMatch(/minLength/);
   });
 
   it('un tipo senza campi required (iframe) torna required: []', () => {

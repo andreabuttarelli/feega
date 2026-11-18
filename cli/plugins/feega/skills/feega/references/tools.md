@@ -104,8 +104,8 @@ anything goes, so a filter that hits eleven is refused whole and you are told ho
 
 `describe_node_types({ org, type? })` returns the JSON Schema `insert_row`/`update_row` actually
 enforce on `nodes.data`, per `type` (`text`, `image`, `video`, `doc`, `iframe`,
-`social_account_feed`, `social_post_mockup`, `influencer`, `list`, `select`,
-`effects`). Omit `type` for all twelve at once. Model/aspect-ratio/duration limits are NOT here
+`social_account_feed`, `social_post_mockup`, `products`, `ads`, `influencer`, `list`, `select`,
+`effects`). Omit `type` for all thirteen at once. Model/aspect-ratio/duration limits are NOT here
 — call `run_node_generation` and read its refusal, or check the model's own docs, since those are
 a fact of the model, not the node.
 
@@ -241,7 +241,7 @@ all three. `clone_voice` needs the user's consent (`attested: true`) and a 60-18
 `sampleBase64` (max 3MB).
 
 `import_feed_image { canvasId, nodeId, itemId, imageIndex?, x?, y?, toFrameId?, frameX?, frameY? }` pulls one
-picture out of a Social feed node (`itemId` is a post id from
+picture out of a Social feed or Products node (`itemId` is a post or product id from
 `canvas_snapshot`): the server copies it into the project, answers an image node and its asset,
 and keeps the source in `data.source`. With `toFrameId` it becomes an image layer of that Frame.
 

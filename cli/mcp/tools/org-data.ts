@@ -105,9 +105,9 @@ export function registerOrgDataTools(server: McpServer) {
         'name one to save tokens once you know which you need — an unknown `type` comes back as an ' +
         'error naming the ones that exist, so this list is never hand-maintained here. `list` holds ' +
         'N iteration values (images or text, never mixed); `select` picks exactly one item back out ' +
-        'of a connected `list` or `social_account_feed` by a 1-based `index` — a synced ' +
-        'feed is an ordered list too, so `select` can pull one post out ' +
-        'of it the same way, exposing named outputs (`out:images`, `out:text`, and ' +
+        'of a connected `list`, `products` or `social_account_feed` by a 1-based `index` — a synced ' +
+        'catalogue or feed is an ordered list too, so `select` can pull one product or one post out ' +
+        'of either the same way, exposing named outputs (`out:images`, `out:text`, and ' +
         '`out:field:<field>` for each entry of `data.outputs` — the fields per source are listed in ' +
         'its schema) that an edge picks with `source_handle`; `effects` holds a stack of image filters over an upstream ' +
         'image, each with its own params — set it with `update_row`, then render it with ' +

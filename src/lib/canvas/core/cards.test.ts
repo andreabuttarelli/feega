@@ -118,8 +118,8 @@ describe('cardItems', () => {
   });
 
   it('draws a kind with nothing to show as a dashed card with a badge, its name and what it waits for', () => {
-    const c = { ...card('ads', {}), w: 300, h: 200 };
-    const items = cardItems(c, theme, glyphs, glyphs, { ...icons, badge: new Map([['ads', [[0, 0, 4, 0, 4, 4]]]]) });
+    const c = { ...card('social_post_mockup', {}), w: 300, h: 200 };
+    const items = cardItems(c, theme, glyphs, glyphs, { ...icons, badge: new Map([['social_post_mockup', [[0, 0, 4, 0, 4, 4]]]]) });
 
     expect(paths(items, CardPart.Panel)[1].contours.length).toBeGreaterThan(10);
     expect(box(paths(items, CardPart.Badge)[0].contours)).toEqual([130, 38, 170, 78]);
@@ -199,7 +199,7 @@ describe('cardItems', () => {
 
   it('sets a title in the bold face', () => {
     const bold: Glyphs = () => ({ contours: [[0, 0, 1, 0, 1, 1]], width: 1, height: 1 });
-    const [title] = paths(cardItems(card('ads', {}), theme, glyphs, bold), CardPart.Title);
+    const [title] = paths(cardItems(card('social_post_mockup', {}), theme, glyphs, bold), CardPart.Title);
 
     expect(box(title.contours)[2] - box(title.contours)[0]).toBe(1);
   });

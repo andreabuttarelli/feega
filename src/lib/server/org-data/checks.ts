@@ -32,5 +32,11 @@ export const ORG_TABLE_CHECKS: Record<string, string> = {
     "type in ('text', 'image', 'video', 'doc', 'iframe', 'social_account_feed', 'social_post_mockup', 'products', 'ads', 'influencer', 'list', 'select', 'effects', 'composition', 'calendar', 'audio', 'model3d', 'motion', 'element', 'studio_batch', 'section', 'technique')",
   orgs_invites_role_check: "role in ('owner', 'admin', 'member', 'viewer')",
   orgs_members_role_check: "role in ('owner', 'admin', 'member', 'viewer')",
-  products_platform_check: "platform in ('shopify', 'woocommerce')"
+  post_sources_role_check: "role in ('caption', 'media', 'reference')",
+  posts_actor_kind_check: "actor_kind in ('user', 'agent', 'system')",
+  posts_status_check: "status in ('draft', 'ready', 'archived')",
+  products_platform_check: "platform in ('shopify', 'woocommerce')",
+  social_accounts_platform_check:
+    "platform in ('instagram', 'facebook', 'x', 'linkedin', 'tiktok', 'threads', 'youtube', 'reddit', 'pinterest')",
+  social_accounts_status_check: "status in ('connected', 'expired', 'revoked')"
 };

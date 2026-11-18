@@ -78,6 +78,7 @@ const CHROME_TAGS: ReadonlySet<string> = new Set(['script', 'style', 'noscript',
 
 export async function htmlToMarkdown(html: string): Promise<string> {
   const TurndownService = (await import('turndown')).default;
+  // @ts-expect-error no types
   const { gfm } = await import('turndown-plugin-gfm');
   const td = new TurndownService({
     headingStyle: 'atx',

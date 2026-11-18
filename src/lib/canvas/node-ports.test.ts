@@ -19,7 +19,6 @@ const EXPECTED: Record<(typeof NODE_TYPES)[number], { inputs: boolean; output: b
   iframe: { inputs: false, output: false },
   social_account_feed: { inputs: false, output: true },
   social_post_mockup: { inputs: false, output: false },
-  ads: { inputs: false, output: false },
   influencer: { inputs: false, output: true },
   list: { inputs: true, output: true },
   select: { inputs: true, output: true },

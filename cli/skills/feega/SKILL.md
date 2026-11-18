@@ -20,7 +20,7 @@ metadata:
 # feega
 
 Drive [feega](https://feega.app) — an infinite canvas of typed nodes (text, image, video, doc,
-iframe, social feed, social post mockup, ads) — through **MCP tools** (preferred) or the
+iframe, social feed, social post mockup, products, ads) — through **MCP tools** (preferred) or the
 **`feega` CLI**. Same OAuth identity. **No static API tokens.**
 
 ## Choose interface
@@ -65,7 +65,7 @@ Setup details: [references/mcp.md](references/mcp.md).
 ## Reading is one tool
 
 **`query` is the read.** Every table your org can see — projects, canvases, nodes, connections,
-assets — the request runs with your own session,
+assets, products — the request runs with your own session,
 so Postgres RLS returns exactly the rows you would see in the app and nothing more. Read only, no
 credits, no model. Omit `table` to list what you can name; ask for a table with no `columns` and
 the keys of a row are the schema.
