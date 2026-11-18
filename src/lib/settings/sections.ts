@@ -15,14 +15,21 @@ export enum SettingsSection {
 
 export const DASHBOARD_SETTINGS_API = '/api/v1/me/settings';
 
+export const BRANDS_SETTINGS_API = `${DASHBOARD_SETTINGS_API}/brands`;
+
+export function brandSettingsApi(brandId: string): string {
+  return `${BRANDS_SETTINGS_API}/${encodeURIComponent(brandId)}`;
+}
+
 export function canvasSettingsApi(projectId: string): string {
   return `/api/v1/me/projects/${encodeURIComponent(projectId)}/settings`;
 }
 
-type Surface = { pattern: RegExp; api: (projectId: string) => string };
+type Surface = { pattern: RegExp; api: (id: string) => string };
 
 const SURFACES: readonly Surface[] = [
-  { pattern: /^\/p\/(?<projectId>[^/]+)\/settings\/(?<section>[^/]+)\/?$/, api: canvasSettingsApi },
+  { pattern: /^\/p\/(?<id>[^/]+)\/settings\/(?<section>[^/]+)\/?$/, api: canvasSettingsApi },
+  { pattern: /^\/app\/settings\/brands\/(?<id>[^/]+)\/(?<section>[^/]+)\/?$/, api: brandSettingsApi },
   { pattern: /^\/app\/settings\/(?<section>[^/]+)\/?$/, api: () => DASHBOARD_SETTINGS_API }
 ];
 
@@ -40,7 +47,7 @@ export function sectionAt(pathname: string): { api: string; section: SettingsSec
   for (const { pattern, api } of SURFACES) {
     const groups = pattern.exec(pathname)?.groups;
     if (groups && isSettingsSection(groups.section)) {
-      return { api: api(groups.projectId ?? ''), section: groups.section };
+      return { api: api(groups.id ?? ''), section: groups.section };
     }
   }
   return null;

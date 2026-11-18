@@ -68,7 +68,7 @@ describe('the dashboard settings API', () => {
     const reply = await call('GET', '?path=/app/settings/profile');
 
     expect(reply.status).toBe(200);
-    expect(reply.body.data).toMatchObject({ isOwner: true, brandGate: false });
+    expect(reply.body.data).toMatchObject({ isOwner: true });
   });
 
   it('spend loads only the org member caps', async () => {

@@ -46,6 +46,25 @@ export async function listOrgBrands(db: Db, orgId: string): Promise<Brand[]> {
   return ((data ?? []) as unknown as BrandColumns[]).map(toBrand);
 }
 
+function slugify(name: string): string {
+  const base = name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return `${base || 'brand'}-${Date.now().toString(36)}`;
+}
+
+export async function createOrgBrand(db: Db, input: { orgId: string; name: string }): Promise<string> {
+  const { data, error } = await db
+    .from('brands')
+    .insert({ org_id: input.orgId, name: input.name, slug: slugify(input.name) })
+    .select('id')
+    .single();
+  if (error || !data) throw error ?? new Error('Could not create the brand');
+  return data.id;
+}
+
 export async function findBrand(db: Db, input: { orgId: string; brandId: string }): Promise<Brand | null> {
   const { data, error } = await db
     .from('brands')

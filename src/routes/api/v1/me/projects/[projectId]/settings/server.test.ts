@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestSupabase, type TestSupabase } from '$lib/testkit/supabase';
 import { SettingsSection } from '$lib/settings/sections';
+import { servedForBrand } from '$lib/components/settings/platforms';
 import { UncensoredLock } from '$lib/uncensored-lock';
 import { ProjectMode } from '$lib/project-mode';
 
@@ -117,6 +118,8 @@ function form(fields: Record<string, string>): FormData {
   return body;
 }
 
+const PROJECT_SECTIONS = Object.values(SettingsSection).filter((section) => !servedForBrand(section));
+
 const ACTIONS: Array<[SettingsSection, string, Record<string, string>]> = [
   [SettingsSection.Models, 'saveAllowlist', { medium: 'image' }],
   [SettingsSection.Spend, 'saveCap', { scope: 'org_member', cap_usd: '5' }],
@@ -126,29 +129,14 @@ const ACTIONS: Array<[SettingsSection, string, Record<string, string>]> = [
   [SettingsSection.Project, 'linkBrand', { brandId: 'b2' }],
   [SettingsSection.Project, 'linkBrand', { brandId: 'b2', returnTo: '/p/p1/settings/brand' }],
   [SettingsSection.Project, 'linkBrand', { brandId: 'nope' }],
+  [SettingsSection.Project, 'createBrand', { name: '' }],
+  [SettingsSection.Project, 'createBrand', { name: 'Fresh' }],
   [SettingsSection.Project, 'unlinkBrand', {}],
   [SettingsSection.Project, 'forgetAppAccount', {}],
   [SettingsSection.Project, 'saveAppAccount', { loginUrl: 'https://app.acme.example/login', email: 'qa@acme.example', password: 'fake-test-password' }],
   [SettingsSection.Project, 'saveAppAccount', { loginUrl: 'https://x.com/login', email: 'qa@acme.example', password: 'x' }],
   [SettingsSection.Project, 'setMode', { mode: 'uncensored' }],
   [SettingsSection.Project, 'delete', { confirmName: 'wrong' }],
-  [SettingsSection.Brand, 'update', { name: 'Acme 2', website: 'acme.example' }],
-  [SettingsSection.Brand, 'update', { name: '' }],
-  [SettingsSection.Brand, 'removeLogo', {}],
-  [SettingsSection.Brand, 'uploadLogo', {}],
-  [SettingsSection.Brand, 'saveKit', { palette: '#111111 Ink', tone: 'Warm' }],
-  [SettingsSection.Brand, 'saveKit', { palette: 'blue' }],
-  [SettingsSection.Brand, 'saveFonts', { font_heading: 'Inter' }],
-  [SettingsSection.Brand, 'uploadLogoVariant', { variant: 'dark' }],
-  [SettingsSection.Brand, 'removeLogoVariant', { variant: 'dark' }],
-  [SettingsSection.Brand, 'toggleApproved', { assetId: 'a1', approved: 'true' }],
-  [SettingsSection.Brand, 'selectBrand', { brandId: 'b2' }],
-  [SettingsSection.Brand, 'selectBrand', { brandId: '' }],
-  [SettingsSection.Brand, 'createBrand', { name: '' }],
-  [SettingsSection.Video, 'updateVideoInstructions', { instructions: 'slow' }],
-  [SettingsSection.Video, 'updateVideoDuration', { duration: '8' }],
-  [SettingsSection.Video, 'updateVideoResolution', { resolution: '1080p' }],
-  [SettingsSection.Video, 'updateMediaModel', { slot: 'image', model: '' }],
   [SettingsSection.Profile, 'updateProfile', { firstName: 'Ada', lastName: 'Byron' }],
   [SettingsSection.Profile, 'removeProfileAvatar', {}],
   [SettingsSection.Profile, 'saveFigmaToken', { token: '' }],
@@ -162,7 +150,6 @@ const ACTIONS: Array<[SettingsSection, string, Record<string, string>]> = [
   [SettingsSection.Content, 'persona', { influencerId: 'x', mark: 'on' }],
   [SettingsSection.ApiKeys, 'createApiKey', { name: 'deploy' }],
   [SettingsSection.ApiKeys, 'revokeApiKey', { key_id: 'k1' }],
-  [SettingsSection.Danger, 'deleteBrand', { confirm: 'wrong' }]
 ];
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
@@ -186,7 +173,7 @@ describe('settings over the API answer what the settings pages answer', () => {
     expect(await api('GET', `?path=${encodeURIComponent(`/p/${PROJECT.id}/settings/brand`)}`)).toEqual(expected);
   });
 
-  it.each(Object.values(SettingsSection))('the %s page load', async (section) => {
+  it.each(PROJECT_SECTIONS)('the %s page load', async (section) => {
     const route = await ROUTES[section]();
     const event = directEvent(`/p/${PROJECT.id}/settings/${section}`, 'GET');
     const expected = route.load ? await outcome(() => route.load!(event as never)) : { status: 200, body: { data: null } };
@@ -208,7 +195,7 @@ describe('settings over the API answer what the settings pages answer', () => {
   it('covers every action of every section', async () => {
     const covered = new Set(ACTIONS.map(([section, action]) => `${section}/${action}`));
     const missing: string[] = [];
-    for (const section of Object.values(SettingsSection)) {
+    for (const section of PROJECT_SECTIONS) {
       for (const action of Object.keys((await ROUTES[section]()).actions ?? {})) {
         if (!covered.has(`${section}/${action}`)) {
           missing.push(`${section}/${action}`);
@@ -224,6 +211,10 @@ describe('settings over the API answer what the settings pages answer', () => {
 
     expect((await api('POST', '/project?action=rename', form({ name: 'Hijacked' }))).status).toBe(404);
     expect(state.kit && (state.kit as TestSupabase).tables.get('projects')![0].name).toBe(PROJECT.name);
+  });
+
+  it.each(Object.values(SettingsSection).filter(servedForBrand))('the brand section %s lives on the dashboard, not here', async (section) => {
+    expect((await api('GET', `/${section}`)).status).toBe(404);
   });
 
   it('an unknown section or action is a 404, a missing or bad token a 401', async () => {

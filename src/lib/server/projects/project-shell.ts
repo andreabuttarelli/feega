@@ -6,7 +6,7 @@ import { listCanvases } from '$lib/server/repos/canvas';
 import { findProjectForUser } from '$lib/server/projects/lookup';
 import { LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
 import { ensureProfile } from '$lib/server/repos/profiles';
-import { PROJECT_BRAND_SHELL_SELECT, projectBrandShellOf, type ProjectBrandShell } from '$lib/server/projects/brand-shell';
+import { loadBrandShell } from '$lib/server/projects/brand-shell';
 import { orgCreditBalance } from '$lib/server/credits';
 import { env } from '$env/dynamic/private';
 import { ProjectMode } from '$lib/project-mode';
@@ -90,22 +90,6 @@ export const load = async ({ params, locals, depends, cookies }: Pick<ServerLoad
     flags: FLAGS
   };
 };
-
-async function loadBrandShell(db: Db, orgId: string, brandId: string | null): Promise<ProjectBrandShell | null> {
-  if (!brandId) {
-    return null;
-  }
-  const { data, error: brandError } = await db
-    .from('brands')
-    .select(PROJECT_BRAND_SHELL_SELECT)
-    .eq('id', brandId)
-    .eq('org_id', orgId)
-    .maybeSingle();
-  if (brandError) {
-    throw error(500, brandError.message);
-  }
-  return data ? projectBrandShellOf(data) : null;
-}
 
 export type ProjectShell = Awaited<ReturnType<typeof load>>;
 

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { CANVAS_SETTINGS_GROUPS, DASHBOARD_SETTINGS_GROUPS, SETTINGS_SECTIONS, sectionRequiresBrand } from './platforms';
+import { BRAND_SETTINGS_ITEMS, CANVAS_SETTINGS_GROUPS, DASHBOARD_SETTINGS_GROUPS, SETTINGS_SECTIONS } from './platforms';
 
 describe('la tabella di nav delle impostazioni', () => {
-  it('la tela raggruppa Progetto e Brand, il dashboard Account e Workspace', () => {
-    expect(CANVAS_SETTINGS_GROUPS.map((g) => g.labelKey)).toEqual(['app.nav.sectionProject', 'app.nav.sectionBrand']);
+  it('la tela raggruppa solo Progetto, il dashboard Account e Workspace', () => {
+    expect(CANVAS_SETTINGS_GROUPS.map((g) => g.labelKey)).toEqual(['app.nav.sectionProject']);
     expect(DASHBOARD_SETTINGS_GROUPS.map((g) => g.labelKey)).toEqual(['app.nav.sectionAccount', 'app.nav.workspace']);
   });
 
@@ -15,8 +15,12 @@ describe('la tabella di nav delle impostazioni', () => {
     expect(DASHBOARD_SETTINGS_GROUPS[0].items[0].section).toBe('profile');
   });
 
+  it('le sezioni del brand sono le voci di un brand, non di un gruppo statico', () => {
+    expect(BRAND_SETTINGS_ITEMS.map((i) => i.section)).toEqual(['brand', 'products', 'video', 'danger']);
+  });
+
   it('ogni sezione compare in una nav almeno', () => {
-    const shown = [...CANVAS_SETTINGS_GROUPS, ...DASHBOARD_SETTINGS_GROUPS].flatMap((g) => g.items.map((i) => i.section));
+    const shown = [...CANVAS_SETTINGS_GROUPS, ...DASHBOARD_SETTINGS_GROUPS, { items: BRAND_SETTINGS_ITEMS }].flatMap((g) => g.items.map((i) => i.section));
     expect(shown.toSorted()).toEqual([...SETTINGS_SECTIONS.map((s) => s.path), 'spend'].toSorted());
   });
 
@@ -29,27 +33,5 @@ describe('la tabella di nav delle impostazioni', () => {
     expect(sections).not.toContain('facebook');
     expect(sections).not.toContain('linkedin');
     expect(sections).not.toContain('connect/[platform]');
-  });
-});
-
-describe('sectionRequiresBrand', () => {
-  it('richiede un brand per le sezioni brand-scoped, tranne la pagina brand che lo collega', () => {
-    for (const s of SETTINGS_SECTIONS.filter((s) => s.scope === 'brand' && s.path !== 'brand')) {
-      expect(sectionRequiresBrand(`/p/proj-1/settings/${s.path}`), s.path).toBe(true);
-    }
-  });
-
-  it('la pagina brand non chiude il cancello: è lei a collegare o creare il brand', () => {
-    expect(sectionRequiresBrand('/p/proj-1/settings/brand')).toBe(false);
-  });
-
-  it('non richiede un brand per progetto, workspace o account', () => {
-    for (const s of SETTINGS_SECTIONS.filter((s) => s.scope !== 'brand')) {
-      expect(sectionRequiresBrand(`/p/proj-1/settings/${s.path}`), s.path).toBe(false);
-    }
-  });
-
-  it('ignora uno slash finale', () => {
-    expect(sectionRequiresBrand('/p/proj-1/settings/video/')).toBe(true);
   });
 });
