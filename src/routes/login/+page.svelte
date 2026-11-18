@@ -174,8 +174,7 @@
             <p class="sub">{$_('login.signup.sub')}</p>
           {/if}
         {:else}
-          <PageTitle size={TitleSize.Small} text={$_('login.signin.title')} />
-          <p class="sub">{$_('login.signin.sub')}</p>
+          <h1 class="hidden-title">{$_('login.signin.title')}</h1>
         {/if}
         {#if mode !== 'forgot'}
         {#if data.appleSignIn}
@@ -372,6 +371,16 @@
 {/if}
 
 <style>
+  .hidden-title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+
   .page {
     min-height: 100dvh;
     display: flex;
@@ -419,6 +428,9 @@
   }
   .oauth-form {
     margin-top: var(--ui-space-6);
+  }
+  .hidden-title + .oauth-form {
+    margin-top: 0;
   }
   .oauth-form + .oauth-form {
     margin-top: 8px;
