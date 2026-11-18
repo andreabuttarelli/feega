@@ -318,8 +318,10 @@ function clipProblem(doc: MotionDoc, clip: MotionClip): string | null {
   }
   clip.props = verdict.props;
   clip.keyframes = Object.fromEntries(Object.entries(clip.keyframes).map(([key, track]) => [key, byFrame(track)]));
-  return effectsProblem(clip.effects) ?? clipShadersProblem(clip.component, clip.shaders, doc.shaders) ?? keyframesProblem(withParams(doc, clip)) ?? expressionsProblem(withParams(doc, clip));
+  return effectsProblem(clip.effects) ?? clipShadersProblem(clip.component, clip.shaders, doc.shaders) ?? animationProblem(withParams(doc, clip));
 }
+
+const animationProblem = (clip: Parameters<typeof keyframesProblem>[0] & Parameters<typeof expressionsProblem>[0]) => keyframesProblem(clip) ?? expressionsProblem(clip);
 
 function propsProblem(doc: MotionDoc): string | null {
   for (const clip of everyClip(doc)) {

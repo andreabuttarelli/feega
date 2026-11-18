@@ -1754,7 +1754,7 @@ export const actions: Actions<CanvasParams> = {
     if (out.outcome === FeegaImport.Refused) {
       return fail(400, { error: FEEGA_REFUSAL_MESSAGE[out.refusal] });
     }
-    throw redirect(303, canvasPath(projectId, out.canvas.id));
+    return { location: canvasPath(projectId, out.canvas.id), unlanded: out.unlanded };
   },
 
   canvasComments: async ({ params, locals }) => {

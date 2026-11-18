@@ -993,6 +993,36 @@ github
   });
 
 github
+  .command('compare <projectId> <nodeId> <refs...>')
+  .description('Import a linked frame at up to 4 refs (branch, tag, sha, #<pr>) as read-only version frames beside it')
+  .action(async (projectId: string, nodeId: string, refs: string[]) => {
+    const { cmdGithubCompare } = await import('./commands/github.ts');
+    await cmdGithubCompare(projectId, nodeId, refs);
+  });
+
+github
+  .command('version-ref <projectId> <versionId> <ref>')
+  .description('Move a version frame to another commit, branch, tag or #<pr>, in the same place')
+  .action(async (projectId: string, versionId: string, ref: string) => {
+    const { cmdGithubVersionRef } = await import('./commands/github.ts');
+    await cmdGithubVersionRef(projectId, versionId, ref);
+  });
+
+for (const [name, action, description] of [
+  ['restore', 'restore', 'Turn a version frame into changes of its linked frame, to push through a PR'],
+  ['variant', 'variant', 'Copy a version frame into an editable, unlinked variant'],
+  ['code-diff', 'code_diff', 'Show the file diff between a version frame and the base branch']
+] as const) {
+  github
+    .command(`${name} <projectId> <versionId>`)
+    .description(description)
+    .action(async (projectId: string, versionId: string) => {
+      const { cmdGithubVersionAction } = await import('./commands/github.ts');
+      await cmdGithubVersionAction(projectId, versionId, action);
+    });
+}
+
+github
   .command('detach <projectId> <nodeId>')
   .description('Unlink a frame from its GitHub source; the frame stays on the canvas')
   .action(async (projectId: string, nodeId: string) => {

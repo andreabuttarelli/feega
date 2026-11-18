@@ -10,7 +10,8 @@
   import { ownsPress } from '$lib/canvas/press-owner';
   import { pressMenu } from '$lib/motion/press-menu';
   import { cardRadiusOf } from '$lib/canvas/core/gen-card';
-  import { LocalOff, isOff } from '$lib/local-user';
+  import { LocalOff, isOff, picturesWhileVectorsOwed } from '$lib/local-user';
+  import { env as publicEnv } from '$env/dynamic/public';
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { frameDrill } from '$lib/canvas/frame-drill';
   import { Depth, Gesture } from '$lib/motion/drill';
@@ -27,6 +28,9 @@
   import PrototypePlayerHost from '../PrototypePlayerHost.svelte';
   import FrameHeaderIcons from './FrameHeaderIcons.svelte';
   import SourceSyncPanel from './SourceSyncPanel.svelte';
+  import { comparedWith, versionMarkOf } from '$lib/canvas/version-frame';
+  import VersionCompare from './VersionCompare.svelte';
+  import { historyOf, moveVersion, timelineOf, type CommitStep } from '$lib/canvas/version-client';
   import { HeaderAction, headerBadges, headerHits, headerRow, type HeaderHit } from '$lib/canvas/core/frame-header';
   import { sourceStatus } from '$lib/canvas/source-status.svelte';
   import { linkedFrames } from '$lib/canvas/source-sync';
@@ -42,6 +46,10 @@
   import { frameLayers, frameMenuRun, frameSummaries } from '$lib/motion/frame-menu';
   import FrameSelection from '../FrameSelection.svelte';
   import FrameGuides from '../FrameGuides.svelte';
+  import CanvasRulers from './CanvasRulers.svelte';
+  import { canvasGuides } from '$lib/canvas/canvas-guides.svelte';
+  import { pullToGuides } from '$lib/canvas/canvas-rulers';
+  import { rulersPref } from '$lib/canvas/rulers-pref.svelte';
   import PixelGridCanvas from './PixelGridCanvas.svelte';
   import FrameTools from '../FrameTools.svelte';
   import { FrameView, contentViews } from '$lib/canvas/frame-view';
@@ -393,6 +401,33 @@
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
   const sources = sourceStatus(() => page.params.projectId ?? '', () => linkedFrames(props.nodeSummaries ?? []).map((id) => ({ id, name: byId.get(id)?.displayName ?? '' })));
   let sourceOpen = $state<{ id: string; left: number; top: number } | null>(null);
+  let versionOpen = $state<{ before: string; after: string } | null>(null);
+  const sideOf = (id: string) => {
+    const url = posterOf(id);
+    return url ? { url, label: byId.get(id)?.displayName ?? '' } : null;
+  };
+  let versionCommits = $state<CommitStep[]>([]);
+  let versionMoving = $state(false);
+  const versionShown = $derived(versionOpen ? versionMarkOf(summaries.get(versionOpen.after)?.data) : null);
+  $effect(() => {
+    const of = versionShown?.of;
+    versionCommits = [];
+    if (of) {
+      void historyOf(page.params.projectId ?? '', of).then((c) => (versionCommits = c));
+    }
+  });
+  const pickVersion = async (sha: string) => {
+    const open = versionOpen;
+    if (!open) {
+      return;
+    }
+    versionMoving = true;
+    const moved = await moveVersion(page.params.projectId ?? '', open.after, sha);
+    versionMoving = false;
+    versionOpen = moved ? { ...open, after: moved } : open;
+  };
+  const versionHistory = $derived(versionShown ? { line: timelineOf(versionCommits, versionShown.sha), busy: versionMoving, onpick: pickVersion } : null);
+  const versionSides = $derived(versionOpen ? { before: sideOf(versionOpen.before), after: sideOf(versionOpen.after) } : null);
   const posterOf = (id: string) => {
     const poster = (summaries.get(id)?.data as { posterAssetId?: string | null } | undefined)?.posterAssetId;
     return poster ? tierUrl(AssetSize.Full)(poster) : null;
@@ -643,7 +678,7 @@
     if (!text || kindOfNode(t.id) !== FrameKind.Frame) {
       return [];
     }
-    const facts = { breakpoints: Boolean(liveOf(t.id)?.doc.breakpoints?.length), component: isComponentSet(t.id), source: sources.of(t.id) };
+    const facts = { breakpoints: Boolean(liveOf(t.id)?.doc.breakpoints?.length), component: isComponentSet(t.id), version: isVersionFrame(t.id), source: sources.of(t.id) };
     return headerBadges(facts).map((key) => ({ key, contours: text.badges.get(key) ?? [] }));
   };
   const HEADER_PRESS: Record<HeaderAction, (id: string) => void> = {
@@ -652,7 +687,11 @@
       prototypePlayer.editing = id;
       prototypePlayer.play();
     },
-    [HeaderAction.Source]: (id) => select([id])
+    [HeaderAction.Source]: (id) => select([id]),
+    [HeaderAction.Version]: (id) => {
+      const mark = versionMarkOf(summaries.get(id)?.data);
+      versionOpen = mark ? { before: comparedWith(id, mark.of, selected), after: id } : null;
+    }
   };
   const SOURCE_POP_GAP = 6;
   const pressHeader = (hit: HeaderHit) => {
@@ -2137,6 +2176,8 @@
   }
 
   const onComponentsPage = $derived((page.data as { canvas?: { name?: string } }).canvas?.name === COMPONENTS_PAGE);
+
+  const isVersionFrame = (nodeId: string) => versionMarkOf(summaries.get(nodeId)?.data) !== null;
 
   const isComponentSet = (nodeId: string) => {
     const doc = onComponentsPage ? liveOf(nodeId)?.doc : null;
@@ -3698,6 +3739,16 @@
   let snapSpacing = $state<SpacingGap[]>([]);
   let altHeld = $state(false);
 
+  function jointOf(rects: { x: number; y: number; w: number; h: number }[]) {
+    const x = Math.min(...rects.map((r) => r.x));
+    const y = Math.min(...rects.map((r) => r.y));
+    return { x, y, w: Math.max(...rects.map((r) => r.x + r.w)) - x, h: Math.max(...rects.map((r) => r.y + r.h)) - y };
+  }
+
+  $effect(() => {
+    canvasGuides.load(page.params.canvasId ?? '');
+  });
+
   function snapMoves(raw: TileMove[]): TileMove[] {
     const ids = new Set(raw.map((m) => m.id));
     const rects = raw.flatMap((m) => (byId.get(m.id) ? [{ id: m.id, x: m.x, y: m.y, w: byId.get(m.id)!.w, h: byId.get(m.id)!.h }] : []));
@@ -3705,7 +3756,8 @@
     const snap = snapDrag(rects, others, SNAP_SCREEN_PX / view.zoom);
     snapGuides = snap.guides;
     snapSpacing = snap.spacing;
-    const at = new Map(snap.moves.map((m) => [m.id, m]));
+    const pull = rulersPref.on ? pullToGuides(jointOf(snap.moves.map((m) => ({ ...m, w: byId.get(m.id)!.w, h: byId.get(m.id)!.h }))), canvasGuides.list, SNAP_SCREEN_PX / view.zoom) : { dx: 0, dy: 0 };
+    const at = new Map(snap.moves.map((m) => [m.id, { ...m, x: m.x + pull.dx, y: m.y + pull.dy }]));
     return raw.map((m) => at.get(m.id) ?? m);
   }
 
@@ -4582,9 +4634,10 @@
   >
     {#if !failed}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} listenLive={(listener) => liveDocs.listen(listener)} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId, userId: (page.data as { session?: { user?: { id: string } } | null }).session?.user?.id, look: (page.data as { look?: string }).look }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} onbackend={(change) => track(GPU_FALLBACK_EVENT, change)} onevict={sendBackFrame} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} listenLive={(listener) => liveDocs.listen(listener)} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId, userId: (page.data as { session?: { user?: { id: string } } | null }).session?.user?.id, look: (page.data as { look?: string }).look }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} onbackend={(change) => track(GPU_FALLBACK_EVENT, change)} onevict={sendBackFrame} picturesWhileOwed={picturesWhileVectorsOwed(publicEnv)} />
       </svelte:boundary>
     {/if}
+    {#if rulersPref.on}<CanvasRulers {view} {area} />{/if}
     <PixelGridCanvas {view} {area} on={frameViews.isOn(FrameView.PixelGrid)} moving={cameraMotion === CameraMotion.Moving} />
     <div class="hover-rings" data-testid="node-hover-rings">
       {#each hoverRings as ring (ring.id)}
@@ -4665,6 +4718,9 @@
       <FrameSelection clip="" quad={manyQuad!} kind={SelectionKind.Many} ongrab={grabMany} />
     {/if}
     <FrameHeaderIcons {view} hits={headerHits(headerWorld, cameraMotion)} onpress={pressHeader} />
+    {#if versionSides?.before && versionSides.after}
+      <VersionCompare projectId={page.params.projectId ?? ''} versionId={versionOpen?.after ?? ''} before={versionSides.before} after={versionSides.after} history={versionHistory} onclose={() => (versionOpen = null)} onchanged={sources.refresh} />
+    {/if}
     <SourceSyncPanel projectId={page.params.projectId ?? ''} canvasId={page.params.canvasId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} assetUrl={tierUrl(AssetSize.Full)} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} />
     <PrototypePlayerHost frames={playerFrames} />
     {#if showsPrototype}

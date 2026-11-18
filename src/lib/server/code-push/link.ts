@@ -48,6 +48,7 @@ export const linkSchema = z.object({
   pushTouched: z.array(PATH).max(500).optional(),
   pullNumber: z.number().int().positive().optional(),
   writable: z.boolean().default(true),
+  restored: z.array(z.object({ path: PATH, content: z.string() })).max(500).optional(),
   beforePoster: z.string().max(200).optional(),
   variantOf: z.string().max(100).optional()
 });

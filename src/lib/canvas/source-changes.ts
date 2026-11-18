@@ -14,7 +14,7 @@ export enum CiState {
 
 export type PullView = { number: number; url: string; status: string; checks: { name: string; status: string; conclusion: string | null }[] };
 
-export type LinkView = { entry: string; appRoot: string; baseSha: string; baseBranch: string; writable: boolean; pushBranch?: string; pullNumber?: number; beforePoster?: string; variantOf?: string };
+export type LinkView = { entry: string; appRoot: string; baseSha: string; baseBranch: string; writable: boolean; route?: string; pushBranch?: string; pullNumber?: number; beforePoster?: string; variantOf?: string };
 
 export type Affected = { path: string; pages: number };
 
@@ -80,4 +80,35 @@ export function ciOf(pull: PullView): CiState {
     return CiState.Running;
   }
   return pull.checks.every((c) => GREEN.has(c.conclusion ?? '')) ? CiState.Passed : CiState.Failed;
+}
+
+export type ChangedFile = { path: string; diff: string };
+
+const FILE_HEADER = /^--- a\/(.+)\n\+\+\+ b\/.+\n/m;
+
+export function filesOfPatch(patch: string): ChangedFile[] {
+  return patch
+    .split(/(?=^--- a\/)/m)
+    .flatMap((chunk) => {
+      const header = chunk.match(FILE_HEADER);
+      return header ? [{ path: header[1], diff: chunk.slice(header[0].length) }] : [];
+    });
+}
+
+export const rowTitle = (s: FrameSync) => s.link.route ?? s.name ?? 'Frame';
+
+export function filesToPush(picked: ReadonlySet<string>, files: ReadonlyMap<string, ChangedFile[]>): string[] {
+  return [...new Set([...picked].flatMap((nodeId) => (files.get(nodeId) ?? []).map((f) => f.path)))].sort();
+}
+
+const NO_PULL = 'No PR opened: connect GitHub or set a token';
+
+export const pushedNote = (pushed: { branch: string; pull: PullView | null }) => (pushed.pull ? `Branch ${pushed.branch} pushed · PR #${pushed.pull.number}` : `Branch ${pushed.branch} pushed. ${NO_PULL}`);
+
+export function pushLabel(rows: readonly FrameSync[]): string {
+  const pushed = rows.find((r) => r.link.pushBranch)?.link;
+  if (!pushed) {
+    return 'Push and open PR';
+  }
+  return pushed.pullNumber ? 'Update PR' : 'Update branch';
 }
