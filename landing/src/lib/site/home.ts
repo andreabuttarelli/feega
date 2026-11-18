@@ -39,7 +39,7 @@ export const TICKER_VIDEOS = [
 export const FAQ = [
   {
     q: "What is Feega?",
-    a: `An open-source (Apache-2.0) canvas for design, motion and AI generation that you and your agents work on together, in the browser or locally. The code is on <a href="${GITHUB_URL}">GitHub</a>; Google Sign-In is used only to log in, never on your content.`
+    a: `An open-source (Apache-2.0) canvas for design, motion and AI generation that you and your agents work on together, in the browser or locally. The code is on <a href="${GITHUB_URL}">GitHub</a>.`
   },
   {
     q: "Can I use Feega for free?",
