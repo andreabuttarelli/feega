@@ -8,7 +8,8 @@ import { drawClip } from '$lib/motion/draw-create';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { setAutoLayout } from '$lib/motion/layout/ops';
 import { radiusShown, radiusStored } from '$lib/motion/radius-px';
-import { LiveProp, Side, type LiveEditBody, type LivePick, type LivePreview, type LiveRect } from './live-fields';
+import { LiveProp, Side, activeIndex, familyRule, utilityOf, type LiveEditBody, type LivePick, type LivePreview, type LiveRect } from './live-fields';
+import { DIRECT_ROWS, cssClassOf, cssOf, cssRows, directMake, type ClassCtx, type ClassRow } from './live-class-rows';
 
 export const LIVE_CLIP = 'live';
 
@@ -129,13 +130,71 @@ function merged(changes: Change[]): Change[] {
   return changes;
 }
 
+type ClassChange = { row: ClassRow; value: string | undefined; was: string | undefined; atOrigin: boolean };
+
+function ctxOf(doc: MotionDoc, origin: MotionClip): ClassCtx | null {
+  const clip = findClip(doc, LIVE_CLIP)?.clip;
+  return clip ? { clip, doc, origin, css: cssOf(doc, LIVE_CLIP) } : null;
+}
+
+const byFamily = (rows: ClassRow[]) => [...new Map(rows.map((r) => [r.family, r])).values()];
+
+function classChangesOf(before: MotionDoc, after: MotionDoc, origin: MotionDoc): ClassChange[] {
+  const first = findClip(origin, LIVE_CLIP)?.clip;
+  const was = first ? ctxOf(before, first) : null;
+  const now = first ? ctxOf(after, first) : null;
+  const start = first ? ctxOf(origin, first) : null;
+  if (!was || !now || !start) {
+    return [];
+  }
+  const rows = byFamily([...cssRows(was.css), ...cssRows(now.css), ...DIRECT_ROWS]);
+  return rows.flatMap((row) => {
+    const value = row.read(now);
+    const old = row.read(was);
+    return value === old ? [] : [{ row, value, was: old, atOrigin: value === row.read(start) }];
+  });
+}
+
+function originalToken(pick: LivePick, family: string): string {
+  const owns = familyRule(family)?.owns;
+  const parts = pick.classes.split(/\s+/);
+  const at = owns ? activeIndex(parts, (utility) => owns(utility, Side.All), pick.viewport ?? 0) : -1;
+  return at < 0 ? '' : utilityOf(parts[at]);
+}
+
+function classTokenOf(change: ClassChange, pick: LivePick): string {
+  if (change.atOrigin || change.value === undefined) {
+    return change.atOrigin ? originalToken(pick, change.row.family) : '';
+  }
+  return (directMake(change.row) ?? ((v: string) => cssClassOf(change.row, v)))(change.value);
+}
+
+const extras = (pick: LivePick) => ({ ...(pick.rem ? { rem: pick.rem } : {}), ...(pick.viewport ? { viewport: pick.viewport } : {}) });
+
 export function liveEditsOf(before: MotionDoc, after: MotionDoc, pick: LivePick): LiveEditBody[] {
-  return merged(changesOf(before, after)).map(({ row, value, was }) => ({ at: pick.source, prop: row.prop, ...(row.side ? { side: row.side } : {}), value, was, ...(pick.rem ? { rem: pick.rem } : {}), ...(pick.viewport ? { viewport: pick.viewport } : {}) }));
+  const style = merged(changesOf(before, after)).map(({ row, value, was }) => ({ at: pick.source, prop: row.prop, ...(row.side ? { side: row.side } : {}), value, was, ...extras(pick) }));
+  const classes = classChangesOf(before, after, liveDocOf(pick)).map((change) => ({ at: pick.source, prop: LiveProp.Class, family: change.row.family, value: classTokenOf(change, pick), was: change.was ?? '', ...extras(pick) }));
+  return [...style, ...classes];
+}
+
+export function unwrittenOf(before: MotionDoc, after: MotionDoc): boolean {
+  const was = findClip(before, LIVE_CLIP)?.clip;
+  const now = findClip(after, LIVE_CLIP)?.clip;
+  if (!was || !now || JSON.stringify(was) === JSON.stringify(now)) {
+    return false;
+  }
+  return !changesOf(before, after).length && !classChangesOf(before, after, before).length;
 }
 
 export function livePreviewOf(before: MotionDoc, after: MotionDoc): LivePreview {
   const changes = changesOf(before, after);
   const text = changes.find((c) => c.row.prop === LiveProp.Text)?.value;
-  const style = Object.fromEntries(changes.filter((c) => c.row.css).map((c) => [c.row.css, c.value]));
+  const classed = classChangesOf(before, after, before);
+  const now = findClip(before, LIVE_CLIP)?.clip;
+  const ctx = now ? ctxOf(after, now) : null;
+  const style = {
+    ...Object.fromEntries(changes.filter((c) => c.row.css).map((c) => [c.row.css, c.value])),
+    ...Object.assign({}, ...classed.map((c) => (ctx ? c.row.preview(c.value, ctx) : {})))
+  };
   return { ...(text === undefined ? {} : { text }), ...(Object.keys(style).length ? { style } : {}) };
 }

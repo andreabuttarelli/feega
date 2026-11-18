@@ -1,40 +1,24 @@
-import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { isSettingsSection, settingsPath } from '$lib/settings/sections';
-import { SETTINGS_PAGES, type SettingsPage } from '$lib/server/settings/pages';
-import { ACTION_PARAM, answerOf, bearerOf } from '$lib/server/api/bearer-page';
+import { settingsPath, type SettingsSection } from '$lib/settings/sections';
+import { servedForBrand } from '$lib/components/settings/platforms';
+import { ACTION_PARAM } from '$lib/server/api/bearer-page';
+import { actionPick, LOAD_PICK, serveSection, type SectionPick } from '$lib/server/settings/serve-section';
 import { settingsChain } from '../chain';
 
-const NOT_FOUND = 404;
+const notBrand = (section: string) => !servedForBrand(section);
 
-type Handler = (event: never) => unknown;
-
-const UNKNOWN = () => json({ error: 'not_found' }, { status: NOT_FOUND });
-const NOTHING = async () => null;
-
-async function serve(request: Request, url: URL, projectId: string, section: string, pick: (page: SettingsPage) => Handler | undefined): Promise<Response> {
-  if (!isSettingsSection(section)) {
-    return UNKNOWN();
-  }
-
-  const handler = pick(await SETTINGS_PAGES[section]());
-  if (!handler) {
-    return UNKNOWN();
-  }
-
-  const bearer = await bearerOf(request);
-  if (bearer instanceof Response) {
-    return bearer;
-  }
-
-  const { project, page } = settingsChain(bearer, request, url, settingsPath(projectId, section), projectId);
-  return answerOf(async () => {
-    await project();
-    return handler(page as never);
+const serve = (request: Request, url: URL, projectId: string, section: string, pick: SectionPick) =>
+  serveSection({
+    request,
+    section,
+    pick,
+    served: notBrand,
+    chain: (bearer) => {
+      const { project, page } = settingsChain(bearer, request, url, settingsPath(projectId, section as SettingsSection), projectId);
+      return { gate: project, page };
+    }
   });
-}
 
-export const GET: RequestHandler = ({ request, url, params }) => serve(request, url, params.projectId, params.section, (page) => page.load ?? NOTHING);
+export const GET: RequestHandler = ({ request, url, params }) => serve(request, url, params.projectId, params.section, LOAD_PICK);
 
-export const POST: RequestHandler = ({ request, url, params }) =>
-  serve(request, url, params.projectId, params.section, (page) => page.actions?.[url.searchParams.get(ACTION_PARAM) ?? '']);
+export const POST: RequestHandler = ({ request, url, params }) => serve(request, url, params.projectId, params.section, actionPick(url.searchParams.get(ACTION_PARAM) ?? ''));

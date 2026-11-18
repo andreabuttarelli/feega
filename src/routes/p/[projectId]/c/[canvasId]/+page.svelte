@@ -4650,7 +4650,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     </p>
   {/if}
   {#if figmaShown}
-    <FigmaNotice notice={figmaShown} settingsHref="/p/{data.projectId}/settings/profile" onclose={() => (figmaPaste = null)} />
+    <FigmaNotice notice={figmaShown} settingsHref="/app/settings/profile" onclose={() => (figmaPaste = null)} />
   {/if}
   {#if techniqueNotice}
     <p class="warning" role="status" data-testid="technique-notice">{techniqueNotice}</p>
@@ -4713,7 +4713,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     <UrlImportDialog projectId={data.projectId} canvasId={data.canvas.id} at={urlImportAt} {startUrl} onimported={siteImported} onclose={() => ((urlImportAt = null), (startUrl = null))} />
   {/if}
   {#if figmaImportAt}
-    <FigmaImportDialog projectId={data.projectId} canvasId={data.canvas.id} at={figmaImportAt} settingsHref="/p/{data.projectId}/settings/profile" onimported={figmaImported} onclose={() => (figmaImportAt = null)} />
+    <FigmaImportDialog projectId={data.projectId} canvasId={data.canvas.id} at={figmaImportAt} settingsHref="/app/settings/profile" onimported={figmaImported} onclose={() => (figmaImportAt = null)} />
   {/if}
   {#if formatsFor}
     <FormatsDialog oncreate={(targets) => createFormats(formatsFor!, targets)} onclose={() => (formatsFor = null)} />

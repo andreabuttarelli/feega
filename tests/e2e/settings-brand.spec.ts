@@ -1,31 +1,31 @@
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 
 /**
- * IMPOSTAZIONI DEL BRAND: un progetto nasce senza brand (`projects.brand_id` nullable, il caso
- * normale — vedi CLAUDE.md), e questa pagina deve mostrare lo stato vuoto scegli/crea, MAI un
- * 400. Poi crea un brand, controlla che il form abbia tutti i campi, salva e verifica che
- * persista dopo un reload.
+ * IMPOSTAZIONI DEL BRAND: vivono nel dashboard (`/app/settings/brands`), non nella tela. Un
+ * progetto senza brand (`projects.brand_id` nullable, il caso normale) che apre il vecchio URL
+ * della tela arriva all'elenco dei brand, mai a un 400. Da lì si crea un brand, si controlla che
+ * il form abbia tutti i campi, si salva e si verifica che persista dopo un reload.
  */
+const BRANDS = '/app/settings/brands';
 const EDIT = 'form[action="?/update"]';
 
 test.describe('settings brand @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
   test.setTimeout(120_000);
 
-  test('progetto senza brand: stato vuoto scegli/crea, non un 400', async ({ page, session }) => {
+  test('progetto senza brand: il vecchio URL porta all elenco, non a un 400', async ({ page, session }) => {
     await gotoHydrated(page, `/p/${session.projectId}/settings/brand`);
 
-    await expect(page.getByRole('heading', { name: 'No brand yet' })).toBeVisible();
-    await expect(page.locator('form[action="?/createBrand"]')).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`${BRANDS}$`));
     await expect(page.locator('input[name="name"]')).toBeVisible();
   });
 
   test('creare un brand porta al form con tutti i campi, editabile e persistente', async ({ page, session, admin }) => {
-    await gotoHydrated(page, `/p/${session.projectId}/settings/brand`);
+    await gotoHydrated(page, BRANDS);
 
     const brandName = `E2E brand ${Date.now().toString(36)}`;
-    await page.locator('form[action="?/createBrand"] input[name="name"]').fill(brandName);
-    await page.locator('form[action="?/createBrand"] button[type="submit"]').click();
+    await page.locator('input[name="name"]').fill(brandName);
+    await page.locator('button[type="submit"]').click();
 
     try {
       await expect(page.locator(EDIT)).toBeVisible({ timeout: 10_000 });
@@ -52,12 +52,11 @@ test.describe('settings brand @real', () => {
       expect((await saved).status()).toBe(200);
       await expect(page.getByText('Saved.')).toBeVisible({ timeout: 10_000 });
 
-      await gotoHydrated(page, `/p/${session.projectId}/settings/brand`);
+      await page.reload();
       await expect(page.locator(`${EDIT} input[name="name"]`)).toHaveValue(`${brandName} edited`, { timeout: 30_000 });
       await expect(page.locator(`${EDIT} input[name="website"]`)).toHaveValue('https://example.com');
       await expect(page.locator(`${EDIT} input[name="short_description"]`)).toHaveValue('A test brand, edited');
     } finally {
-      await admin.from('projects').update({ brand_id: null }).eq('id', session.projectId);
       await admin.from('brands').delete().eq('org_id', session.orgId).like('name', `${brandName}%`);
     }
   });

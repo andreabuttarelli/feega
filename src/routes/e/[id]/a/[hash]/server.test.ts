@@ -27,6 +27,13 @@ describe('/e/[id]/a/[hash]', () => {
     expect(Buffer.from(await res.arrayBuffer()).equals(BYTES)).toBe(true);
   });
 
+  it('serves every asset inert, whatever type the page declared', async () => {
+    const res = await asset(HASH);
+
+    expect(res.headers.get('content-security-policy')).toMatch(/^sandbox /);
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+  });
+
   it('answers a byte range, which Safari needs to play audio', async () => {
     const res = await asset(HASH, 'bytes=0-99');
 

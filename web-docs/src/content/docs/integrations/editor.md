@@ -9,8 +9,18 @@ The Feega extension opens `.feega` files as a canvas in an editor tab. It runs
 [local mode](/getting-started/local-mode/) for that file, so there is no account, and saves to the
 file as you work.
 
-Install it from the VS Code Marketplace or Open VSX (Cursor, Windsurf, VSCodium) once it is
-listed there: search **Feega**. It needs Node 22 or later on your machine.
+Install it from the extensions view: search **Feega**. It is published as
+`AndreaButtarelli.feega` on the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AndreaButtarelli.feega)
+for VS Code, and on [Open VSX](https://open-vsx.org/extension/AndreaButtarelli/feega) for
+Cursor, Windsurf and VSCodium. From a terminal:
+
+```bash
+code --install-extension AndreaButtarelli.feega
+cursor --install-extension AndreaButtarelli.feega
+```
+
+Each version is also attached to its GitHub release as a `.vsix` file, for editors that install
+from a file. The extension needs Node 22 or later on your machine.
 
 - **Open a `.feega` file**: it opens as a canvas. The first time, the app downloads once.
 - **Feega: New canvas** (command palette): picks where to save a new `.feega` file and opens it.

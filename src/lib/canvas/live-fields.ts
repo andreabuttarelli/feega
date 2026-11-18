@@ -7,7 +7,8 @@ export enum LiveProp {
   Padding = 'padding',
   Margin = 'margin',
   Gap = 'gap',
-  Radius = 'radius'
+  Radius = 'radius',
+  Class = 'class'
 }
 
 export enum Side {
@@ -39,7 +40,9 @@ const spacing = (letter: string): ClassRule => ({
   owns: (token, side) => token.replace(/^-/, '').startsWith(`${letter}${side}-`)
 });
 
-export const CLASS_RULE: Record<Exclude<LiveProp, LiveProp.Text>, ClassRule> = {
+export type StyleProp = Exclude<LiveProp, LiveProp.Text | LiveProp.Class>;
+
+export const CLASS_RULE: Record<StyleProp, ClassRule> = {
   [LiveProp.Color]: { make: (v) => `text-${v}`, owns: (t) => t.startsWith('text-') && !TEXT_SIZE.test(t) && !TEXT_NOT_COLOUR.test(t) },
   [LiveProp.Fill]: { make: (v) => `bg-${v}`, owns: (t) => t.startsWith('bg-') && !BG_NOT_COLOUR.test(t) },
   [LiveProp.FontSize]: { make: (v) => `text-${v}`, owns: (t) => TEXT_SIZE.test(t) },
@@ -49,6 +52,108 @@ export const CLASS_RULE: Record<Exclude<LiveProp, LiveProp.Text>, ClassRule> = {
   [LiveProp.Gap]: { make: (v, side) => `gap${side ? `-${side}` : ''}-${v}`, owns: (t, side) => t.startsWith(`gap${side ? `-${side}` : ''}-`) && (side !== Side.All || !/^gap-[xy]-/.test(t)) },
   [LiveProp.Radius]: { make: (v) => (v ? `rounded-${v}` : 'rounded'), owns: (t) => (t === 'rounded' || t.startsWith('rounded-')) && !RADIUS_SIDE.test(t) }
 };
+
+export enum ClassFamily {
+  Opacity = 'opacity',
+  Rotate = 'rotate',
+  TranslateX = 'translate-x',
+  TranslateY = 'translate-y',
+  Width = 'width',
+  Height = 'height',
+  Scale = 'scale',
+  FlipX = 'flip-x',
+  FlipY = 'flip-y',
+  Hidden = 'hidden',
+  Blend = 'blend',
+  FontFamily = 'font-family',
+  Tracking = 'tracking',
+  Leading = 'leading',
+  TextAlign = 'text-align',
+  Case = 'case',
+  Italic = 'italic',
+  Decoration = 'decoration',
+  Clamp = 'clamp',
+  Direction = 'direction',
+  Items = 'items',
+  Justify = 'justify',
+  Wrap = 'wrap',
+  Shadow = 'shadow',
+  Filter = 'filter',
+  Backdrop = 'backdrop',
+  Border = 'border'
+}
+
+const ARBITRARY_PROPERTY = /^\[([a-z-]+):/;
+
+const startsWith = (...prefixes: string[]) => (t: string) => prefixes.some((p) => t.startsWith(p));
+const oneOf = (...names: string[]) => (t: string) => names.includes(t);
+
+export const CLASS_FAMILY: Record<ClassFamily, (token: string) => boolean> = {
+  [ClassFamily.Opacity]: startsWith('opacity-'),
+  [ClassFamily.Rotate]: startsWith('rotate-', '-rotate-'),
+  [ClassFamily.TranslateX]: startsWith('translate-x-', '-translate-x-'),
+  [ClassFamily.TranslateY]: startsWith('translate-y-', '-translate-y-'),
+  [ClassFamily.Width]: startsWith('w-'),
+  [ClassFamily.Height]: startsWith('h-'),
+  [ClassFamily.Scale]: (t) => /^-?scale-(\d|\[)/.test(t),
+  [ClassFamily.FlipX]: startsWith('scale-x-', '-scale-x-'),
+  [ClassFamily.FlipY]: startsWith('scale-y-', '-scale-y-'),
+  [ClassFamily.Hidden]: oneOf('hidden', 'invisible', 'visible'),
+  [ClassFamily.Blend]: startsWith('mix-blend-'),
+  [ClassFamily.FontFamily]: (t) => /^font-(sans|serif|mono|\[['"])/.test(t),
+  [ClassFamily.Tracking]: startsWith('tracking-'),
+  [ClassFamily.Leading]: startsWith('leading-'),
+  [ClassFamily.TextAlign]: oneOf('text-left', 'text-center', 'text-right', 'text-justify', 'text-start', 'text-end'),
+  [ClassFamily.Case]: oneOf('uppercase', 'lowercase', 'capitalize', 'normal-case'),
+  [ClassFamily.Italic]: oneOf('italic', 'not-italic'),
+  [ClassFamily.Decoration]: oneOf('underline', 'line-through', 'overline', 'no-underline'),
+  [ClassFamily.Clamp]: (t) => t === 'truncate' || t.startsWith('line-clamp-'),
+  [ClassFamily.Direction]: oneOf('flex-row', 'flex-col', 'flex-row-reverse', 'flex-col-reverse'),
+  [ClassFamily.Items]: startsWith('items-'),
+  [ClassFamily.Justify]: (t) => t.startsWith('justify-') && !t.startsWith('justify-items-') && !t.startsWith('justify-self-'),
+  [ClassFamily.Wrap]: oneOf('flex-wrap', 'flex-nowrap', 'flex-wrap-reverse'),
+  [ClassFamily.Shadow]: (t) => t === 'shadow' || t.startsWith('shadow-'),
+  [ClassFamily.Filter]: (t) => t === 'blur' || t.startsWith('blur-') || t.startsWith('[filter:'),
+  [ClassFamily.Backdrop]: startsWith('backdrop-'),
+  [ClassFamily.Border]: (t) => t === 'border' || /^border-(\d|\[\d)/.test(t) || t.startsWith('[border')
+};
+
+const BASE_VARIANT = '';
+const MIN_WIDTH_PX: Record<string, number> = { [BASE_VARIANT]: 0, sm: 640, md: 768, lg: 1024, xl: 1280, '2xl': 1536 };
+
+export const variantOf = (token: string) => token.slice(0, Math.max(0, token.lastIndexOf(':')));
+export const utilityOf = (token: string) => token.slice(token.lastIndexOf(':') + 1);
+const appliesAt = (token: string, viewport: number) => (MIN_WIDTH_PX[variantOf(token)] ?? Infinity) <= viewport;
+
+export function activeIndex(parts: readonly string[], owns: (utility: string) => boolean, viewport: number): number {
+  let best = -1;
+  parts.forEach((token, at) => {
+    if (!token.trim() || !appliesAt(token, viewport) || !owns(utilityOf(token))) {
+      return;
+    }
+    if (best < 0 || MIN_WIDTH_PX[variantOf(token)] > MIN_WIDTH_PX[variantOf(parts[best])]) {
+      best = at;
+    }
+  });
+  return best;
+}
+
+const ARBITRARY_FAMILY = 'arbitrary:';
+
+export const arbitraryFamily = (property: string) => `${ARBITRARY_FAMILY}${property}`;
+
+const ownerOf = (family: string): ((token: string) => boolean) | null => {
+  if (family.startsWith(ARBITRARY_FAMILY)) {
+    const property = family.slice(ARBITRARY_FAMILY.length);
+    return (token) => token.match(ARBITRARY_PROPERTY)?.[1] === property;
+  }
+  return CLASS_FAMILY[family as ClassFamily] ?? null;
+};
+
+export function familyRule(family: string): ClassRule | null {
+  const owns = ownerOf(family);
+  return owns ? { make: (value) => value, owns: (token) => owns(token) } : null;
+}
 
 export type LiveRect = { x: number; y: number; width: number; height: number };
 
@@ -68,4 +173,4 @@ export function pickOf(result: InspectResult | null | undefined): LivePick | nul
 
 export type LivePreview = { text?: string; style?: Record<string, string> };
 
-export type LiveEditBody = { at: string; prop: LiveProp; side?: Side; value: string; was: string; rem?: number; viewport?: number };
+export type LiveEditBody = { at: string; prop: LiveProp; side?: Side; family?: string; value: string; was: string; rem?: number; viewport?: number };

@@ -35,6 +35,9 @@ const EXERCISED = ROWS.filter((r) => !PICKED || PICKED.test(r.id));
 const slug = (id: string) => id.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
 
 const CORE_PANIC = '[gpu-core] panic';
+const WEDGED_AFTER_UNREACHED_ROWS = 3;
+
+let unreachedRows = 0;
 
 let page: Page;
 const thrown: string[] = [];
@@ -102,13 +105,21 @@ test.describe('inspector audit', () => {
 
   for (const row of EXERCISED) {
     test(row.id, async () => {
+      expect(unreachedRows, 'the inspector stopped answering, rows not tried').toBeLessThan(WEDGED_AFTER_UNREACHED_ROWS);
       const unstable = row.known?.unstable ?? {};
       const expected = settled({ mouse: row.known?.mouse ?? [], keyboard: row.known?.keyboard ?? [] }, unstable);
-      let outcome = await attemptRow(row);
-      if (!sameChecks(settled(outcome, unstable), expected)) {
+      let outcome: Outcome;
+      try {
         outcome = await attemptRow(row);
-        outcome.notes.push('second attempt');
+        if (!sameChecks(settled(outcome, unstable), expected)) {
+          outcome = await attemptRow(row);
+          outcome.notes.push('second attempt');
+        }
+      } catch (unreached) {
+        unreachedRows++;
+        throw unreached;
       }
+      unreachedRows = 0;
       record(outcome);
       if (process.env.INSPECTOR_AUDIT_RECORD) {
         return;

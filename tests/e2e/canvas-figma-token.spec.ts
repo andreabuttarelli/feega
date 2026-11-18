@@ -78,7 +78,7 @@ test.describe('Figma token on the canvas @real', () => {
     await pasteFigma(page, figmaClipWithImage(HASH));
 
     await expect(page.getByTestId('figma-token-hint')).toContainText('Add a Figma token in Settings to import images', { timeout: 30_000 });
-    await expect(page.getByTestId('figma-token-hint').getByRole('link')).toHaveAttribute('href', `/p/${session.projectId}/settings/profile`);
+    await expect(page.getByTestId('figma-token-hint').getByRole('link')).toHaveAttribute('href', `/app/settings/profile`);
     expect((await allClips(admin, session.canvasId)).some(hasImageFill)).toBe(false);
     await shoot(page, '2-banner-no-token');
   });
@@ -104,7 +104,7 @@ test.describe('Figma token on the canvas @real', () => {
   });
 
   test('the settings page has a Figma section with a password field', async ({ page, session }) => {
-    await gotoHydrated(page, `/p/${session.projectId}/settings/profile`);
+    await gotoHydrated(page, `/app/settings/profile`);
 
     const field = page.getByTestId('figma-token-form').locator('input[name="token"]');
     await expect(field).toHaveAttribute('type', 'password');

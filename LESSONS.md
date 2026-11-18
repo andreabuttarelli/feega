@@ -86,6 +86,9 @@ Signal: with the pointer still over a frame, a wheel zoom makes its hover outlin
 ### Tiles turn sharp slowly after a zoom-in: count paints per tile, not ms per tile
 **Signal:** zoomed far in, every tile costs ~3 ms whatever its size (one tile or a 2×2 block cost the same), almost all in `layers::prepare_items`, and the layer cache never hits. **Move:** log, per `raster_batch`, the number of `Surface::paint` calls by `Reason` and the clip of each layer-worthy item. A tile paying for layers it does not show is the defect: on the landings fixture ten of twelve were groups emptied by `Laying::lay` that still carried an SVG effect filter (no bounds, so never culled, so a full-tile body, mask and filter). A cost fixed per draw also means bigger batches are nearly free on the CPU; measure the GPU side by frames over 11 ms before growing them.
 
+### A held drag drops in the wrong place only when the test takes a screenshot
+**Signal:** a headed e2e drags a stack child, takes a screenshot mid-drag, releases, and the saved doc shows the child left its stack (`parent` null) at a point far from the pointer; without the screenshot it passes. **Move:** log `clientX`, `buttons` and `isTrusted` of the last `pointermove`: Chrome sends a trusted move with `buttons: 0` from the OS cursor's real position when the page repaints. A drag handler must ignore moves with no button held.
+
 ### Resizing a frame runs at 1 fps and a CPU profile is all `found` → `syncStyle` → `commit`
 **Signal:** a frame resize stalls for seconds per pointer move; the profile's top inclusive entry is the `styleLibrary.found` effect, under it `syncStyle`, `commit`, `liveDocs.set` and the poster-frame scan of a fresh doc; the network shows `Updated the <name> style` saves while the corner is still held, and Cmd+Z after the resize undoes a style instead of the size. **Move:** a library reconcile that compares a doc's style in canvas pixels (`scaleOf(doc, box)`) must read settled state only: during a gesture the box moves on every pointer event and the doc on the next frame, so every style looks changed and is pushed back. Gate the effect on the gesture (`overrides`/`resizing` empty), and check the frame-ops POSTs of the gesture window, not just the frame rate.
 
@@ -1220,6 +1223,9 @@ legge dall'export (`x ?? fallback`), col `try/catch` a coprire solo il primo gir
 
 ### Un chunk sovradimensionato non è il colpevole del build che muore per memoria
 `index3.js` (5,4 MB, dieci volte il secondo chunk) era `simple-icons` intero, bundlato via `ssr.noExternal` per un motivo Vercel-only (nft duplica il pacchetto per funzione) che non vale per `DEPLOY_TARGET=node`. Rimuoverlo lo porta a 295 KB (-94,5%) — ma bisecando `--max-old-space-size` (4096/4608/5120) il build muore e riesce agli stessi tetti prima e dopo: zero spostamento. Strumentando `adapter-node`'s `adapt()` (scritture sincrone `appendFileSync`, non `console.error` — l'OOM abort salta il flush dei buffer stdio e perde l'ultimo log) l'heap è già a ~3,4 GB PRIMA che `adapt()` faccia alcunché di suo, durante la sola copia/compressione asset. Segnale: bisecare il tetto di memoria prima e dopo un fix e vedere la stessa soglia di crash — il chunk grande era un difetto reale (fix corretto, va tenuto) ma non la causa del crash. Mossa: non fidarsi della dimensione di un chunk come proxy del picco di memoria; misurare il picco stesso, e quando serve isolare DOVE cresce, strumentare con scritture sincrone perché un OOM non flush-a l'output normale.
+
+### CI `Build` dies with `heap out of memory` on PRs that touch nothing related
+**Signal:** the `test` job's Build step aborts with `Ineffective mark-compacts near heap limit`, exit 134, on a one-line PR, while a sibling PR on the same `dev` builds green; the last GCs read ~3.8 GB. **Move:** that is Node's default heap on the 16 GB `ubuntu-24.04` runner (about 4 GB), reached by the whole module graph growing, not by one import — a flaky edge, not a regression to bisect. The Build step sets `NODE_OPTIONS=--max-old-space-size=8192` like `build:node` does; peak RSS measured 6.9 GB (run 44319972532), so read it again with `/usr/bin/time -v` before raising the cap or adding another build to the same job.
 
 ### `git checkout --ours <file>` in un merge BUTTA anche le fusioni riuscite di quel file
 Un conflitto solo in `live.ts` fra il lease (dev) e la sandbox riusata (#96): risolto con
@@ -4015,12 +4021,19 @@ property reads on ~2,000 items (`src/lib/canvas/counted-list.testkit.ts`), not w
 
 **Signal:** a main with a mask layer pasted from Figma, its untouched instances come out as groups named after the component instead of instances. **Move:** `instanceOverrides` (`instance-diff.ts`) refuses a pair whose clip fields differ outside the ignored set; `matteFrom` holds a clip id, and the own copy and the main have different ids. Compare it through the clip pairs as `parent` is, never by value.
 
+## A CI audit matrix holds runners for hours when one row wedges the page
+
+**Signal:** `ci.yml` `test` sits queued while `audit (…)` jobs run past an hour; the audit log shows the same `locator.click: Timeout 3000ms exceeded ... waiting for element to be visible, enabled and stable` on every row, about 2 minutes apart. **Move:** a run that is not required must still be bounded: `timeout-minutes` from a measured run, `max-parallel` on the matrix, and a circuit breaker in the spec (`unreachedRows` in `inspector-audit.spec.ts`) so one wedged page fails the rest at once instead of timing out row by row.
+
 ## A 3D export scores 0.99 against the canvas though every number matches
 
 **Signal:** SSIM of an exported canvas against the composed canvas stays near 0.99 with thin rim differences, only on one layer. **Move:** the layer's width came out as a rounded percentage (`32.81%` of 1280 is 419.97 px); React Three Fiber sizes the renderer to the fractional width while a `clientWidth` read rounds it. Give the fixture a width that is an exact percentage (400 of 1280) before suspecting the scene.
 
 ## A service-role credential carries no role unless the request re-derives it
 **Signal:** a token row (`api_keys`) is checked for hash, revocation and expiry, then the request runs on the service-role client. RLS role rules (viewers read-only) do not apply, and a demotion or removal changes nothing for the token. **Move:** derive the effective scopes from the holder's current membership on every request (`scopesOfHolder`); never trust what was stored at mint time.
+
+## A route that serves user HTML is an XSS surface for every iframe that can name it
+**Signal:** an iframe takes a URL a member writes, with `allow-same-origin`, and the app serves member-uploaded HTML from its own origin (`/e/<id>`). **Move:** a route that serves a user-authored document sends `INERT_DOCUMENT_HEADERS` (`Content-Security-Policy: sandbox`, `nosniff`), and every iframe takes `IFRAME_SANDBOX`. Never write a sandbox string inline.
 
 ## Exported code text is about 5% wider than the canvas still
 

@@ -1,7 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { ProjectEvent, SettingsActions, SettingsEvent } from '../event';
 import { archiveProject, renameProject, setProjectBrand } from '$lib/server/repos/projects';
-import { findBrand, listOrgBrands } from '$lib/server/repos/brands';
+import { createOrgBrand, findBrand, listOrgBrands } from '$lib/server/repos/brands';
 import type { Db } from '$lib/server/db/client';
 import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
 import { modeOf, ProjectMode } from '$lib/project-mode';
@@ -119,6 +119,21 @@ export const actions: SettingsActions = {
     const back = returnPathWithin(projectId, fd.get('returnTo'));
     if (back) {
       throw redirect(303, back);
+    }
+    return { linked: true };
+  },
+
+  createBrand: async (event) => {
+    const { db, orgId, projectId } = await ownedProject(event);
+    const name = String((await event.request.formData()).get('name') ?? '').trim();
+    if (!name) {
+      return fail(HTTP_BAD_REQUEST, { error: 'name_required' });
+    }
+
+    try {
+      await setProjectBrand(db, { orgId, projectId, brandId: await createOrgBrand(db, { orgId, name }) });
+    } catch (e) {
+      return fail(HTTP_BAD_REQUEST, { error: e instanceof Error ? e.message : 'Could not create the brand' });
     }
     return { linked: true };
   },

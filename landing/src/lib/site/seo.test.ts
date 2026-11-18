@@ -63,7 +63,7 @@ describe('structured data', () => {
 
   it('answers what people ask assistants', () => {
     const q = FAQ.map((f) => f.q).join('\n');
-    for (const topic of [/open source/i, /locally/i, /pricing/i, /Figma/]) {
+    for (const topic of [/free/i, /agent/i, /credits/i, /cancel/i]) {
       expect(q).toMatch(topic);
     }
   });

@@ -3,10 +3,9 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { SETTINGS_SECTIONS, sectionEditable, SETTINGS_GROUPS } from '$lib/components/settings/platforms';
+  import { SETTINGS_SECTIONS, sectionEditable, CANVAS_SETTINGS_GROUPS } from '$lib/components/settings/platforms';
   import { Notice } from '$lib/components/ui/notice';
   import PageHead from '$lib/components/PageHead.svelte';
-  import BrandGate from '$lib/components/settings/BrandGate.svelte';
   import { _ } from 'svelte-i18n';
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import '$lib/styles/settings-shell.css';
@@ -27,10 +26,6 @@
   const isRoutePage = $derived($page.route.id?.startsWith(SETTINGS_ROUTE_PREFIX) ?? false);
   const activeSection = $derived(path.replace(/\/$/, '').slice(settingsBase.length + 1));
 
-  const isBrandKit = $derived(
-    ['brand', 'products'].some((s) => path.replace(/\/$/, '').endsWith(`/settings/${s}`))
-  );
-
   type SettingsHead = { title: string; subtitle?: string };
 
   const head = $derived.by((): SettingsHead => {
@@ -39,12 +34,6 @@
     const map: Record<string, SettingsHead> = {
       [`${base}/project`]: {
         title: $_('app.settings.project.title')
-      },
-      [`${base}/brand`]: {
-        title: $_('app.studio.tabs.brand')
-      },
-      [`${base}/products`]: {
-        title: $_('app.studio.tabs.productsTitle')
       },
       [`${base}/api-keys`]: {
         title: $_('app.settings.apiKeys.title')
@@ -72,9 +61,6 @@
       },
       [`${base}/content`]: {
         title: $_('app.settings.content.title')
-      },
-      [`${base}/danger`]: {
-        title: $_('app.settings.del.title')
       }
     };
     return map[p] ?? { title: $_('app.nav.settings') };
@@ -97,7 +83,7 @@
   <div class="settings-frame" class:has-nav={isRoutePage && !isIndex}>
   {#if isRoutePage && !isIndex}
     <nav class="settings-nav" aria-label={$_('app.nav.settings')}>
-      {#each SETTINGS_GROUPS as group (group.labelKey)}
+      {#each CANVAS_SETTINGS_GROUPS as group (group.labelKey)}
         <p class="nav-group">{$_(group.labelKey)}</p>
         {#each group.items as item (item.section)}
           <a
@@ -110,7 +96,7 @@
       {/each}
     </nav>
   {/if}
-  <div class="content settings-shell" class:brand-kit={isBrandKit}>
+  <div class="content settings-shell">
     <PageHead title={head.title} subtitle={head.subtitle ?? null} />
     <PageTitle text={head.title} />
     {#if !isIndex}
@@ -121,11 +107,7 @@
     {/if}
     {#if !editable}<Notice>View only: ask an admin of this organisation for edit access.</Notice>{/if}
     <div class="settings" inert={!editable}>
-      {#if data.brandGate}
-        <BrandGate projectId={data.project.id} returnTo={path} orgBrands={data.orgBrands} />
-      {:else}
-        {@render children()}
-      {/if}
+      {@render children()}
     </div>
   </div>
   </div>

@@ -1,16 +1,15 @@
 <script lang="ts">
-  import { pricingFaq, type CloudPlan } from './plan';
-
-  let { plan }: { plan: CloudPlan } = $props();
+  import { lower } from '../lower';
+  import { FAQ } from '../home';
 </script>
 
-<div class="faq">
-  <h3>Questions</h3>
+<div class="faq" id="faq">
+  <h3>questions</h3>
   <div class="list">
-    {#each pricingFaq(plan) as item (item.q)}
+    {#each FAQ as item (item.q)}
       <details>
-        <summary><span>{item.q}</span><span aria-hidden="true">+</span></summary>
-        <p>{item.a}</p>
+        <summary><span>{lower(item.q)}</span><span aria-hidden="true">+</span></summary>
+        <p>{@html lower(item.a)}</p>
       </details>
     {/each}
   </div>
@@ -68,6 +67,10 @@
     padding-bottom: 20px;
     max-width: 640px;
     opacity: 0.7;
+  }
+
+  details p :global(a) {
+    border-bottom: 1px solid currentColor;
   }
 
   @media (min-width: 810px) {

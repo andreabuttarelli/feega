@@ -67,7 +67,7 @@
           }
 
           ctx.fillStyle = colours[Math.round((1 - e) * (TINT_STEPS - 1))];
-          ctx.globalAlpha = 0.3 + d * 0.45;
+          ctx.globalAlpha = 0.2 + d * 0.3;
           ctx.fillText(glyph, c * cell + cell / 2, row * cell + cell / 2);
         }
       }
@@ -170,7 +170,7 @@
     position: absolute;
     inset: 0;
     background:
-      radial-gradient(ellipse 42% 22% at 50% 34%, rgb(0 0 0 / 0.6), rgb(0 0 0 / 0) 100%),
+      radial-gradient(ellipse 42% 22% at 50% 34%, rgb(0 0 0 / 0.75), rgb(0 0 0 / 0) 100%),
       linear-gradient(to bottom, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 0) 55%, #000 100%);
   }
 

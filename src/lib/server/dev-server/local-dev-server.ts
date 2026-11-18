@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
 import type { FeegaStore } from '$lib/server/local/feega-store';
 import { LOCAL_ORG_ID } from '$lib/local-user';
-import { liveCheckoutOf } from '$lib/server/live-edit/live-checkout';
+import { liveRootOf } from '$lib/server/live-edit/live-target';
 import { devServer, type DevServer } from './dev-server';
 import { answers, candidateUrls, findRunning, servesFolder } from './probe';
 import { superviseDev } from './supervisor';
@@ -45,7 +45,7 @@ function repoOf(folder: string) {
   };
 }
 
-export const devFolder = (store: FeegaStore) => liveCheckoutOf(realpathSync(process.env[DEV_DIR_ENV] ?? dirname(store.path)));
+export const devFolder = (store: FeegaStore) => liveRootOf(realpathSync(process.env[DEV_DIR_ENV] ?? dirname(store.path)));
 
 export function localDevServer(store: FeegaStore): DevServer {
   const folder = devFolder(store);
@@ -65,8 +65,19 @@ export function localDevServer(store: FeegaStore): DevServer {
   return server;
 }
 
+const PLAYWRIGHT = 'playwright';
+const PLAYWRIGHT_MISSING = 'Live poster needs Playwright, which is not installed in this build. Run: npm i playwright && npx playwright install chromium';
+
+async function chromiumOf() {
+  try {
+    return (await import(/* @vite-ignore */ PLAYWRIGHT)).chromium;
+  } catch {
+    throw new Error(PLAYWRIGHT_MISSING);
+  }
+}
+
 async function screenshot(url: string, width: number): Promise<Uint8Array> {
-  const { chromium } = await import('playwright');
+  const chromium = await chromiumOf();
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage({ viewport: { width, height: POSTER_HEIGHT } });

@@ -12,3 +12,8 @@ export const OG = {
   image: { url: `${SITE_URL}/og.png`, type: 'image/png', width: 1200, height: 630, alt: OG_IMAGE_ALT },
   video: { url: `${SITE_URL}/og.mp4`, type: 'video/mp4', width: 1200, height: 630 }
 } as const;
+
+export const PRICING_META = {
+  title: 'Pricing: free on your computer, Feega Cloud for teams | Feega',
+  description: 'Feega is free on your own computer. Feega Cloud adds real-time collaboration and AI models with no keys to manage, for €9 per editor a month.'
+} as const;

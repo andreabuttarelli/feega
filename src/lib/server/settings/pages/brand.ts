@@ -1,8 +1,6 @@
 import { error, fail } from '@sveltejs/kit';
-import type { SettingsActions, SettingsEvent } from '../event';
+import type { BrandActions, BrandEvent } from '../event';
 import { readUploadImage } from '$lib/server/raster-image';
-import { setProjectBrand } from '$lib/server/repos/projects';
-import { brandIdOf } from '$lib/server/tenancy/brand-slug';
 import { kitActions, loadKit, writeLogos } from './brand-kit';
 
 const BRAND_COLUMNS = 'id, name, slug, logo_url, website, short_description, content';
@@ -37,39 +35,10 @@ function toBrandSettings(row: {
   };
 }
 
-function slugify(name: string): string {
-  const base = name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  return `${base || 'brand'}-${Date.now().toString(36)}`;
-}
+export const load = async ({ parent, locals: { supabase } }: BrandEvent) => {
+  const { org, brand } = await parent();
 
-export const load = async ({ parent, locals: { supabase } }: SettingsEvent) => {
-  const { project, org, brand: brandOrNull } = await parent();
-
-  const orgBrands = await supabase
-    .from('brands')
-    .select(BRAND_COLUMNS)
-    .eq('org_id', org.id)
-    .order('name', { ascending: true });
-  if (orgBrands.error) {
-    throw error(500, orgBrands.error.message);
-  }
-
-  if (!brandOrNull) {
-    return {
-      brand: null,
-      orgBrands: (orgBrands.data ?? []).map(toBrandSettings)
-    };
-  }
-
-  const { data, error: dbError } = await supabase
-    .from('brands')
-    .select(BRAND_COLUMNS)
-    .eq('id', brandOrNull.id)
-    .maybeSingle();
+  const { data, error: dbError } = await supabase.from('brands').select(BRAND_COLUMNS).eq('id', brand.id).maybeSingle();
   if (dbError) {
     throw error(500, dbError.message);
   }
@@ -79,25 +48,15 @@ export const load = async ({ parent, locals: { supabase } }: SettingsEvent) => {
 
   return {
     brand: toBrandSettings(data),
-    kit: await loadKit(supabase, { projectId: project.id, orgId: org.id, brandId: data.id }),
-    orgBrands: (orgBrands.data ?? []).map(toBrandSettings)
+    kit: await loadKit(supabase, { orgId: org.id, brandId: data.id })
   };
 };
 
-async function orgIdOfProject(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any,
-  projectId: string
-): Promise<string | null> {
-  const { data } = await supabase.from('projects').select('org_id').eq('id', projectId).maybeSingle();
-  return data?.org_id ?? null;
-}
-
-export const actions: SettingsActions = {
+export const actions: BrandActions = {
   ...kitActions,
-  update: async ({ request, params, locals: { supabase } }) => {
-    const brandId = await brandIdOf(supabase, params.projectId!);
-    if (!brandId) return fail(400, { error: 'No brand selected for this project' });
+  update: async ({ request, parent, locals: { supabase } }) => {
+    const { brand } = await parent();
+    const brandId = brand.id;
 
     const fd = await request.formData();
     const name = String(fd.get('name') ?? '').trim();
@@ -119,9 +78,9 @@ export const actions: SettingsActions = {
     return { saved: true };
   },
 
-  uploadLogo: async ({ request, params, locals: { supabase } }) => {
-    const brandId = await brandIdOf(supabase, params.projectId!);
-    if (!brandId) return fail(400, { error: 'No brand selected for this project' });
+  uploadLogo: async ({ request, parent, locals: { supabase } }) => {
+    const { brand } = await parent();
+    const brandId = brand.id;
 
     const fd = await request.formData();
     const file = fd.get('file');
@@ -146,53 +105,12 @@ export const actions: SettingsActions = {
     return { saved: true };
   },
 
-  removeLogo: async ({ params, locals: { supabase } }) => {
-    const brandId = await brandIdOf(supabase, params.projectId!);
-    if (!brandId) return fail(400, { error: 'No brand selected for this project' });
+  removeLogo: async ({ parent, locals: { supabase } }) => {
+    const { brand } = await parent();
+    const brandId = brand.id;
 
     const { error: updateError } = await writeLogos(supabase, brandId, 'primary', null);
     if (updateError) return fail(400, { error: updateError.message });
-    return { saved: true };
-  },
-
-  selectBrand: async ({ request, params, locals: { supabase } }) => {
-    const fd = await request.formData();
-    const brandId = String(fd.get('brandId') ?? '').trim();
-    if (!brandId) return fail(400, { error: 'Pick a brand' });
-
-    const orgId = await orgIdOfProject(supabase, params.projectId!);
-    if (!orgId) return fail(404, { error: 'Project not found' });
-
-    try {
-      await setProjectBrand(supabase, { orgId, projectId: params.projectId!, brandId });
-    } catch (e) {
-      return fail(400, { error: e instanceof Error ? e.message : 'Could not assign the brand' });
-    }
-    return { saved: true };
-  },
-
-  createBrand: async ({ request, params, locals: { supabase } }) => {
-    const fd = await request.formData();
-    const name = String(fd.get('name') ?? '').trim();
-    if (!name) return fail(400, { error: 'Name is required' });
-
-    const orgId = await orgIdOfProject(supabase, params.projectId!);
-    if (!orgId) return fail(404, { error: 'Project not found' });
-
-    const { data: created, error: insertError } = await supabase
-      .from('brands')
-      .insert({ org_id: orgId, name, slug: slugify(name) })
-      .select('id')
-      .single();
-    if (insertError || !created) {
-      return fail(400, { error: insertError?.message ?? 'Could not create the brand' });
-    }
-
-    try {
-      await setProjectBrand(supabase, { orgId, projectId: params.projectId!, brandId: created.id });
-    } catch (e) {
-      return fail(400, { error: e instanceof Error ? e.message : 'Could not assign the brand' });
-    }
     return { saved: true };
   }
 };

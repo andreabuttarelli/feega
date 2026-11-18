@@ -17,7 +17,7 @@
 </script>
 
 <form class="field" novalidate onsubmit={submit}>
-  <label for={id} class="sr">Your website address</label>
+  <label for={id} class="sr">your website address</label>
   <div class="row">
     <div class="ring" class:invalid>
       <input {id} type="text" inputmode="url" autocomplete="url" autocapitalize="off" spellcheck="false" placeholder="yourwebsite.com" aria-invalid={invalid} bind:value oninput={() => (invalid = false)} />
@@ -28,7 +28,7 @@
       </svg>
     </button>
   </div>
-  <p class="helper">{invalid ? 'Type a website address, like yourwebsite.com' : ''}</p>
+  <p class="helper">{invalid ? 'type a website address, like yourwebsite.com' : ''}</p>
 </form>
 
 <style>

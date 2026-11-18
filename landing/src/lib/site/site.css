@@ -43,6 +43,8 @@
   --site-z-drawer: 11;
   --site-z-header: 12;
   --site-line: #4f4f4f;
+  --site-raised: #3d3d3d;
+  --site-title-wght: 400;
   --site-gutter: 12px;
   --site-text: 14px;
   --site-text-line: 16.8px;
@@ -62,8 +64,18 @@
   -webkit-font-smoothing: antialiased;
 }
 
+.site .site-display {
+  color: #fff;
+  font-family: 'Instrument Serif', serif;
+  font-variation-settings: normal;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  font-weight: 400;
+}
+
 .site :is(h1, h2, h3, h4) {
   font-family: inherit;
+  font-variation-settings: 'wght' var(--site-title-wght);
 }
 
 @media (min-width: 1200px) {
