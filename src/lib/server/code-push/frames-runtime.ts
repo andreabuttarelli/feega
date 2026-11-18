@@ -23,10 +23,10 @@ export const framesDeps = (db: Db, scope: Scope): FramesDeps => ({
 
 export const importLinker =
   (db: Db, scope: Scope): ImportLinker =>
-  async (nodeId, origin, listed) => {
+  async (nodeId, origin, listed, components) => {
     if (!listed.ok) {
       return null;
     }
     const deps = framesDeps(db, scope);
-    return linkImported({ host: deps.host, links: deps.links }, nodeId, origin, listed).catch(() => null);
+    return linkImported({ host: deps.host, links: deps.links }, nodeId, origin, listed, { components, poster: null }).catch(() => null);
   };

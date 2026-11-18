@@ -4,7 +4,18 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { createServer } from 'node:net';
-import { FolderImport, ImportStep, appDir, readyProbe, served, boundUrl, freePort, bundleSource, cachedVersions, folderApp, importAsk, discoverAsk, routePlan, importReport, importStep, isCached, latestAppVersion, markCached, mcpEnv, parseArgs, pickVersion, placeOf } from './launcher.mjs';
+import { FolderImport, ImportStep, appDir, readyProbe, served, boundUrl, freePort, bundleSource, cachedVersions, folderApp, importAsk, discoverAsk, routePlan, importReport, importStep, isCached, latestAppVersion, markCached, mcpEnv, parseArgs, pickVersion, placeOf, untilReady } from './launcher.mjs';
+
+describe('untilReady', () => {
+  it('fails loudly when the server exits before it serves', async () => {
+    await expect(untilReady(async () => false, Promise.resolve(0), 1)).rejects.toThrow('the app server exited (code 0) before it started');
+  });
+
+  it('resolves once the probe answers', async () => {
+    let calls = 0;
+    await expect(untilReady(async () => ++calls > 2, new Promise(() => {}), 1)).resolves.toBeUndefined();
+  });
+});
 
 describe('mcp', () => {
   it('mcp avvia il server MCP sulla porta 5173 di default', () => {

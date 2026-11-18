@@ -100,7 +100,7 @@ type Lane = { worker: BuildWorker; busy: number };
 
 const sourceText = ({ playhead: _playhead, ...rest }: FrameDoc): string => JSON.stringify(rest);
 
-export type FrameBuilder = ((source: FrameDoc, smoothing: Smoothing) => Promise<DisplayList | null>) & { release: () => void; shoot: (shot: ShotOf, smoothing: Smoothing) => Promise<Shot[] | null> };
+export type FrameBuilder = ((source: FrameDoc, smoothing: Smoothing) => Promise<DisplayList | null>) & { release: () => void; warm: () => void; shoot: (shot: ShotOf, smoothing: Smoothing) => Promise<Shot[] | null> };
 
 export function frameBuilder(spawn: () => BuildWorker | null, lanes = 1): FrameBuilder {
   const pool: Lane[] = [];
@@ -134,9 +134,13 @@ export function frameBuilder(spawn: () => BuildWorker | null, lanes = 1): FrameB
     if (idle || pool.length >= lanes) {
       return idle ?? pool.reduce((a, b) => (b.busy < a.busy ? b : a));
     }
+    return added() ?? pool[0] ?? null;
+  };
+
+  const added = (): Lane | null => {
     const worker = spawn();
     if (!worker) {
-      return pool[0] ?? null;
+      return null;
     }
     worker.onmessage = answer;
     worker.onerror = die;
@@ -166,5 +170,13 @@ export function frameBuilder(spawn: () => BuildWorker | null, lanes = 1): FrameB
 
   const shoot = (shot: ShotOf, smoothing: Smoothing) => ask<Shot[] | null>({ source: '', smoothing, shot });
 
-  return Object.assign(build, { release, shoot });
+  const warm = () => {
+    while (!dead && pool.length < lanes) {
+      if (!added()) {
+        return;
+      }
+    }
+  };
+
+  return Object.assign(build, { release, warm, shoot });
 }

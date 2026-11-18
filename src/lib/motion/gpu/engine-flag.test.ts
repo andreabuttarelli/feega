@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RenderEngine, drawableOn, engineFlag, killSwitch } from './engine-flag';
+import { RenderEngine, drawableOn, engineFlag, fallbackOf, killSwitch } from './engine-flag';
 
 const url = (q = '') => new URL(`https://feega.app/app/compose/x${q}`);
 
@@ -44,5 +44,14 @@ describe('drawableOn', () => {
     expect(drawableOn(RenderEngine.GpuCore, { width: 1338, height: 16382 })).toBe(RenderEngine.Html);
     expect(drawableOn(RenderEngine.GpuCore, { width: 1280, height: 8192 })).toBe(RenderEngine.GpuCore);
     expect(drawableOn(RenderEngine.Html, { width: 100, height: 100 })).toBe(RenderEngine.Html);
+  });
+});
+
+describe('fallbackOf', () => {
+  it('steps from WebGPU to the WebGL core before the HTML player, as the canvas does', () => {
+    expect(fallbackOf(RenderEngine.GpuCore)).toBe(RenderEngine.GpuCoreGl);
+    expect(fallbackOf(RenderEngine.GpuCoreGl)).toBe(RenderEngine.Html);
+    expect(fallbackOf(RenderEngine.GpuFull)).toBe(RenderEngine.Html);
+    expect(fallbackOf(RenderEngine.Html)).toBe(RenderEngine.Html);
   });
 });
