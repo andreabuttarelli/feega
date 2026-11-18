@@ -1,4 +1,5 @@
-import { AGENT_DOCS_URL, PLAN, agentAnswer, creditsAnswer } from './pricing/plan';
+import { AGENT_DOCS_URL, PLAN, agentAnswer, creditsAnswer, freeAnswer, runOutAnswer, seatAnswer } from './pricing/plan';
+import { GITHUB_URL } from './links';
 
 const VIDEO_BASE = 'https://klnswzhhgrqvbfjzioul.supabase.co/storage/v1/object/public/website';
 
@@ -35,102 +36,37 @@ export const TICKER_VIDEOS = [
   'media-cloud-white-16x9-720p.MP4'
 ].map((file) => `${VIDEO_BASE}/${file}`);
 
-const MCP_URL = 'https://mcp.feega.app/mcp';
-
-export const AGENT_SETUPS = [
-  { id: 'claude-code', label: 'Claude Code', code: `claude mcp add --transport http feega ${MCP_URL}` },
-  {
-    id: 'claude-app',
-    label: 'Claude Mobile & Desktop',
-    code: `Add Feega to Claude
-
-Feega is a remote MCP server, so there is nothing to install.
-
-Server URL: ${MCP_URL}
-
-- Open Claude on the web or desktop (mobile can't add new servers).
-- Go to Customize > Connectors (older versions: Settings > Connectors).
-- Click Add custom connector.
-- Paste the URL above, name it "Feega", and click Add.
-- Click Connect and sign in to your Feega account when the browser window opens.`
-  },
-  { id: 'codex', label: 'Codex', code: `codex mcp add feega --url ${MCP_URL}\ncodex mcp login feega` },
-  {
-    id: 'cursor',
-    label: 'Cursor',
-    code: `{
-  "mcpServers": {
-    "feega": {
-      "url": "${MCP_URL}"
-    }
-  }
-}`
-  }
-] as const;
-
 export const FAQ = [
   {
     q: "What is Feega?",
-    a: "Feega is one infinite canvas for design, motion and AI generation. It is open source: use it in the browser, or run it locally with npx feega. Google Sign-In is used only for authentication; no Google API is used to generate or edit content."
+    a: `An open-source (Apache-2.0) canvas for design, motion and AI generation that you and your agents work on together, in the browser or locally. The code is on <a href="${GITHUB_URL}">GitHub</a>; Google Sign-In is used only to log in, never on your content.`
   },
   {
-    q: "Is Feega open source?",
-    a: "Yes. Feega is open source under the Apache-2.0 license. The code is on <a href=\"https://github.com/andreabuttarelli/feega\">GitHub</a>."
+    q: "Can I use Feega for free?",
+    a: freeAnswer(PLAN)
   },
   {
-    q: "Can I run it locally?",
-    a: "Yes. Run npx feega: no account, no cloud. Your work is saved in one .feega file on your machine. You need Node 22."
+    q: "Can my AI agent use Feega?",
+    a: `${agentAnswer(PLAN)} See the <a href="${AGENT_DOCS_URL}">MCP guide</a>.`
   },
   {
-    q: "How does the canvas work?",
-    a: "Design in frames with layers and components, animate them on a motion timeline, and add AI nodes for text, images, video, 3D and audio. Wire nodes together so one output feeds the next, then run them to generate."
+    q: `Who counts as an ${PLAN.per}?`,
+    a: seatAnswer(PLAN)
   },
   {
-    q: "Which AI models can I use?",
-    a: "Images: Nano Banana (Google), GPT Image (OpenAI), Seedream (ByteDance) and Qwen. Video: Seedance (ByteDance), Kling and Grok Imagine (xAI). 3D: Trellis (Microsoft) and Hunyuan3D (Tencent). Voice, sound and music: ElevenLabs. You pick the model for each node."
+    q: "How do credits work?",
+    a: creditsAnswer(PLAN)
   },
   {
-    q: "Can I use my own AI keys?",
-    a: "Yes, in local mode. Add your keys for OpenRouter, Kie.ai, Higgsfield, Wiro, ElevenLabs and a text LLM provider, and generate from text with them. No plan or credits needed."
+    q: "What happens when I run out of credits?",
+    a: runOutAnswer(PLAN)
   },
   {
-    q: "What file formats can I import and export?",
-    a: "Import images, video, SVG and Lottie files, paste from Figma, or open a .feega file. Export stills as PNG, JPG, WebP, SVG or PDF, and motion as MP4, GIF, APNG or Lottie."
+    q: "Can I cancel?",
+    a: "Yes, any time from the billing portal on your team's Credits page. Credits you bought stay yours, and other editors become viewers."
   },
   {
-    q: "Can I bring my Figma designs?",
-    a: "Yes. Paste from Figma and your layers stay editable on the canvas."
-  },
-  {
-    q: "Can I collaborate with my team in real time?",
-    a: "Yes. Invite teammates to your workspace as members or admins: everyone works on the same canvas and sees changes and who is online live."
-  },
-  {
-    q: "Can AI agents use Feega?",
-    a: `${agentAnswer(PLAN)} Setup is in the <a href="${AGENT_DOCS_URL}">MCP guide</a>.`
-  },
-  {
-    q: "Are generated files marked as AI-generated?",
-    a: "Yes. Every image and video Feega renders carries a machine-readable AI-generated marker in the file. See <a href=\"/ai-transparency\">AI Transparency</a>."
-  },
-  {
-    q: "Who owns what I create?",
-    a: "You keep ownership of the content you bring, and you may use what you generate for your own business purposes, subject to our <a href=\"/terms\">Terms</a> and third-party rights."
-  },
-  {
-    q: "Is my content used to train AI?",
-    a: "No. We do not use your prompts, uploads or generated content to train AI models. See our <a href=\"/privacy\">Privacy Policy</a>."
-  },
-  {
-    q: "How is content kept safe?",
-    a: "Feega must never be used to create non-consensual intimate imagery (NCII), sexual deepfakes or any sexual content of real people. Sexual content involving minors is forbidden and reported to the authorities. Prompts and reference images are screened automatically, real or identifiable people are blocked in sensitive contexts, and AI outputs are labelled as AI-generated. Anyone can report content to <a href=\"mailto:support@feega.app\">support@feega.app</a>: we remove it and suspend the accounts responsible. Read our <a href=\"/acceptable-use\">Acceptable Use Policy</a>, <a href=\"/terms\">Terms</a> and <a href=\"/ai-transparency\">AI Transparency</a>."
-  },
-  {
-    q: "How do credits and pricing work?",
-    a: `${creditsAnswer(PLAN)} See <a href="#pricing">pricing</a>.`
-  },
-  {
-    q: "Who is behind Feega?",
-    a: "Feega is built in Italy by Andrea Buttarelli, a freelance designer who wanted a faster way to work. No VC money, no growth team: just a designer building the tool he needed, in the open. Company details are in the <a href=\"/legal-notice\">Legal Notice</a>, or write to <a href=\"mailto:hi@feega.app\">hi@feega.app</a>."
+    q: "Who owns my work, and is it used to train AI?",
+    a: 'You keep your content and may use what you generate for your business; we never train AI on it. Details are in our <a href="/terms">Terms</a>, <a href="/privacy">Privacy Policy</a>, <a href="/acceptable-use">Acceptable Use Policy</a> and <a href="/ai-transparency">AI Transparency</a>.'
   }
 ] as const;

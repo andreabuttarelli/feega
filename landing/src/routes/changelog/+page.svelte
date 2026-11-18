@@ -43,7 +43,7 @@
   .eyebrow {
     color: var(--site-accent);
     font-size: var(--site-text);
-    text-transform: uppercase;
+    text-transform: none;
     letter-spacing: 0.08em;
     margin: 0 0 12px;
   }

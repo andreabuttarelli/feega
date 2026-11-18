@@ -6,9 +6,7 @@
   import Extras from '$lib/site/home/Extras.svelte';
   import Pricing from '$lib/site/pricing/Pricing.svelte';
   import { PLAN } from '$lib/site/pricing/plan';
-  import Agents from '$lib/site/home/Agents.svelte';
-  import Story from '$lib/site/home/Story.svelte';
-  import Faq from '$lib/site/home/Faq.svelte';
+  import FreeSection from '$lib/site/home/FreeSection.svelte';
   import Modes from '$lib/site/home/Modes.svelte';
   import { HOME_JSON_LD } from '$lib/site/structured-data';
 
@@ -34,15 +32,14 @@
 </div>
 
 <div class="cool">
-  <Agents />
+  <FreeSection />
   <Pricing plan={PLAN} />
 </div>
 
-<Story />
-<Faq />
+
 
 <section class="closing site-wide">
-  <h2>Start designing in your code</h2>
+  <h2>start designing in your code</h2>
   <Modes id="closing-modes" />
 </section>
 </div>
@@ -90,6 +87,6 @@
   }
 
   .cool {
-    background: #3d3d3d;
+    background: var(--site-raised);
   }
 </style>

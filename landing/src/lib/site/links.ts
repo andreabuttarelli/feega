@@ -13,14 +13,14 @@ export const HEADER_LINKS = [
   { href: DOCS_URL, label: 'Documentation' },
   { href: GITHUB_URL, label: 'GitHub' },
   { href: DISCORD_URL, label: 'Community' },
-  { href: '/#pricing', label: 'Pricing' }
+  { href: '/pricing', label: 'Pricing' }
 ] as const;
 
 export const MENU_LINKS = [
   { href: DOCS_URL, label: 'Docs' },
   { href: GITHUB_URL, label: 'GitHub' },
   { href: DISCORD_URL, label: 'Community' },
-  { href: '/#pricing', label: 'Pricing' },
+  { href: '/pricing', label: 'Pricing' },
   { href: APP_URL, label: 'Let’s start' }
 ] as const;
 

@@ -160,7 +160,7 @@
     font-weight: 500;
     font-variation-settings: normal;
     letter-spacing: 0.04em;
-    text-transform: uppercase;
+    text-transform: none;
   }
 
   .tag.right {

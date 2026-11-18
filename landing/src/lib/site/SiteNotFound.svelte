@@ -21,8 +21,8 @@
         <span>404</span>
       {/each}
     </div>
-    <h1 class="sr-only">Page not found</h1>
-    <a class="home" href="/">Back to home</a>
+    <h1 class="sr-only">page not found</h1>
+    <a class="home" href="/">back to home</a>
   </main>
   <SiteFooter />
 </div>
