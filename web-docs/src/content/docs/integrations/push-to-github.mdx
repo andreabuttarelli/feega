@@ -131,6 +131,16 @@ An edit on a main component changes the component file: every page using it chan
 
 **Duplicate** gives an unlinked copy. **Make variant** (the GitHub popover, `github_variant`, `feega github variant <projectId> <canvasId> <nodeId>`) gives a copy linked as a variant of the original. Its first push answers `variant_choice` with a suggested route; pick **Replace original** (writes the original files), **New route** (writes the edited page at the new route's file, following the page's convention, e.g. `app/pricing-b/page.tsx`) or **Keep on canvas** (pushes nothing). The API and MCP take `variants: [{ nodeId, choice: replace | new_route | keep, route? }]`; the CLI takes `--variant <nodeId>:<choice>[:<route>]`.
 
+## Conflicts
+
+When a file you edited on the canvas also changed on GitHub, the frame shows a conflict. **Resolve** opens a split view with the canvas and GitHub versions of each file, and three ways out:
+
+- **Keep canvas**: the canvas version wins; the next push writes it over the GitHub change.
+- **Take GitHub**: runs **Update**, pulling GitHub's version into the frame.
+- **Resolve with agent**: copies a merge prompt holding the base, canvas and GitHub versions, to hand to the agent.
+
+API: `GET /api/v1/projects/:id/github/push/conflicts?nodeId=` and `POST` with `{ nodeId, choice: keep_canvas | agent }`. MCP: `github_conflicts`, `github_resolve`. CLI: `feega github conflicts`, `feega github resolve`. A property-level three-way merge, which would settle most conflicts on its own, is not built yet.
+
 ## Local folders
 
 A frame imported from a local folder (desktop app, local dev) pushes through git in that folder: Feega commits with a private index, so your current branch, uncommitted work and history stay untouched. The branch goes to `origin` with your git credentials; the pull request opens when a GitHub token is available, otherwise the answer carries `pull: null` and the branch is left for you. The live preview is your own dev server.

@@ -12,7 +12,7 @@
   const DEFAULT_NAME = 'canvas-edits';
   const PATCH_FILE = 'feega-changes.patch';
 
-  const ACTION_LABEL: Record<SourceAction, string> = { [SourceAction.Update]: 'Update', [SourceAction.ViewPr]: 'View PR', [SourceAction.MakeVariant]: 'Make variant', [SourceAction.Detach]: 'Detach' };
+  const ACTION_LABEL: Record<SourceAction, string> = { [SourceAction.Update]: 'Update', [SourceAction.Resolve]: 'Resolve', [SourceAction.ViewPr]: 'View PR', [SourceAction.MakeVariant]: 'Make variant', [SourceAction.Detach]: 'Detach' };
   const CHOICE_LABEL: Record<VariantChoice, string> = { [VariantChoice.Replace]: 'Replace original', [VariantChoice.NewRoute]: 'New route', [VariantChoice.Keep]: 'Keep on canvas' };
   const CI_LABEL: Record<CiState, string> = { [CiState.None]: 'no checks', [CiState.Running]: 'CI running', [CiState.Passed]: 'CI passed', [CiState.Failed]: 'CI failed' };
 
@@ -27,6 +27,7 @@
   const mains = new SvelteSet<string>();
   let asking = $state<{ nodeId: string; route: string }[]>([]);
   let answers = $state<VariantAnswer[]>([]);
+  let split = $state<{ nodeId: string; files: { path: string; canvas: string; github: string }[] } | null>(null);
   const files = new SvelteMap<string, ChangedFile[]>();
 
   const rows = $derived(changedRows(syncs));
@@ -65,6 +66,11 @@
   }
 
   const ACTION_RUN: Record<SourceAction, (s: FrameSync) => Promise<void>> = {
+    [SourceAction.Resolve]: async (s) => {
+      const body = await call(`${base}/conflicts?nodeId=${encodeURIComponent(s.nodeId)}`, { method: 'GET' });
+      split = body?.ok ? { nodeId: s.nodeId, files: (body.files as { path: string; canvas: string; github: string }[]) ?? [] } : null;
+      note = body?.ok ? '' : `Conflicts unavailable: ${String(body?.refusal ?? 'network')}`;
+    },
     [SourceAction.Update]: async (s) => {
       const body = await call(`/api/v1/projects/${projectId}/code-import/${s.nodeId}/pull`, { method: 'POST', body: '{}' });
       const conflicts = (body?.conflicts as string[] | undefined) ?? [];
@@ -128,6 +134,38 @@
     }
   }
 
+  async function keepCanvas() {
+    if (!split) {
+      return;
+    }
+    busy = true;
+    const body = await call(`${base}/conflicts`, { method: 'POST', body: JSON.stringify({ nodeId: split.nodeId, choice: 'keep_canvas' }) });
+    note = body?.ok ? 'Canvas kept: the next push writes it' : `Refused: ${String(body?.refusal ?? 'network')}`;
+    split = null;
+    await onchanged();
+    busy = false;
+  }
+
+  async function takeGithub() {
+    const s = syncs.find((x) => x.nodeId === split?.nodeId);
+    split = null;
+    if (s) {
+      busy = true;
+      await ACTION_RUN[SourceAction.Update](s);
+      await onchanged();
+      busy = false;
+    }
+  }
+
+  async function withAgent() {
+    if (!split) {
+      return;
+    }
+    const body = await call(`${base}/conflicts`, { method: 'POST', body: JSON.stringify({ nodeId: split.nodeId, choice: 'agent' }) });
+    await navigator.clipboard?.writeText(String(body?.prompt ?? '')).catch(() => null);
+    note = 'Merge prompt copied: paste it to the agent';
+  }
+
   async function undo() {
     const first = rows.find((r) => r.link.pushBranch) ?? syncs.find((s) => s.link.pushBranch);
     if (!first) {
@@ -158,6 +196,24 @@
       <button type="button" onclick={() => ((panel = true), onclose())}>Changes</button>
     </div>
   </div>
+{/if}
+
+{#if split}
+  <aside class="split" data-testid="conflict-split">
+    <header><strong>Conflicts</strong><button type="button" aria-label="Close" onclick={() => (split = null)}>×</button></header>
+    {#each split.files as f (f.path)}
+      <code>{f.path}</code>
+      <div class="sides">
+        <section><span class="label">Canvas</span><pre>{f.canvas}</pre></section>
+        <section><span class="label">GitHub</span><pre>{f.github}</pre></section>
+      </div>
+    {/each}
+    <footer>
+      <button type="button" disabled={busy} onclick={keepCanvas}>Keep canvas</button>
+      <button type="button" disabled={busy} onclick={takeGithub}>Take GitHub</button>
+      <button type="button" disabled={busy} onclick={withAgent}>Resolve with agent</button>
+    </footer>
+  </aside>
 {/if}
 
 {#if panel}
@@ -225,7 +281,8 @@
 
 <style>
   .source-pop,
-  .changes {
+  .changes,
+  .split {
     position: absolute;
     z-index: 30;
     background: var(--ui-surface, #fff);
@@ -248,6 +305,29 @@
     overflow: auto;
     padding: 12px;
     border-radius: var(--ui-radius-lg);
+  }
+  .split {
+    top: 56px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(960px, calc(100vw - 32px));
+    max-height: 80vh;
+    overflow: auto;
+    padding: 12px;
+    border-radius: var(--ui-radius-lg);
+  }
+  .sides {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 6px 0 12px;
+  }
+  .sides pre {
+    margin: 4px 0 0;
+    max-height: 40vh;
+    overflow: auto;
+    font-size: 11px;
+    white-space: pre-wrap;
   }
   .row {
     display: flex;

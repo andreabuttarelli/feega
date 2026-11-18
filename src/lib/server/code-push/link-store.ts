@@ -45,7 +45,8 @@ const COLUMN_OF: Record<keyof CodeLink, string> = {
   writable: 'writable',
   restored: 'restored',
   beforePoster: 'before_poster',
-  variantOf: 'variant_of'
+  variantOf: 'variant_of',
+  keptSha: 'kept_sha'
 };
 
 const FIELDS = Object.entries(COLUMN_OF) as [keyof CodeLink, string][];

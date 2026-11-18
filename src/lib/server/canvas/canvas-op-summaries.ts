@@ -55,6 +55,8 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   github_version_action: 'From a version frame: restore it onto the linked frame as changes to push, make an unlinked variant, or read the code diff.',
   github_undo: 'Undo the last push of a frame with a forward commit that restores only the files that push touched.',
   github_variant: 'Make a variant of a linked frame: a copy whose push asks to replace the original, become a new route or stay on the canvas.',
+  github_conflicts: 'Show the base, canvas and GitHub versions of every file a linked frame and GitHub both changed.',
+  github_resolve: 'Resolve a GitHub conflict: keep the canvas version, or get a prompt for the agent to merge both.',
   github_detach: 'Unlink a frame from its GitHub source; the frame stays on the canvas.',
   github_branches: 'The GitHub branches of one repository (owner/name) your connected account can read.',
   home_components: 'Move the main components of a frame to the project Components page, one frame per set, leaving linked instances in place.',

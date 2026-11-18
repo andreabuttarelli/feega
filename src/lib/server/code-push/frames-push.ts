@@ -161,7 +161,7 @@ export async function frameStatus(deps: FramesDeps, scope: CodeScope, nodeId: st
   }
 
   const writable = await writableOn(host, stored);
-  const upstream = writable ? await host.changedSince(stored.baseSha, stored.baseBranch) : [];
+  const upstream = writable ? await host.changedSince(stored.keptSha ?? stored.baseSha, stored.baseBranch) : [];
   const link = followRenames(stored, upstream);
   if (link.entry !== stored.entry || link.files.join() !== stored.files.join()) {
     await deps.links.save(nodeId, link);
@@ -223,6 +223,6 @@ export async function frameRebased(deps: Pick<FramesDeps, 'host' | 'links'>, nod
     return null;
   }
   const baseSha = await host.headOf(link.baseBranch);
-  await Promise.all((await deps.links.all(nodeId)).map((l) => deps.links.save(nodeId, { ...l, baseSha })));
+  await Promise.all((await deps.links.all(nodeId)).map((l) => deps.links.save(nodeId, { ...l, baseSha, keptSha: undefined })));
   return { ...link, baseSha };
 }

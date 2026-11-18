@@ -4,10 +4,11 @@ import { join } from 'node:path';
 import type { SourceEdit } from '$lib/server/code-import/write-back';
 import { FramesRefusal, framesPush, frameStatus, frameUndo, type FrameStatus } from './frames-push';
 import { makeVariant, VariantChoice } from './variants';
+import { ConflictChoice, frameConflicts, frameResolve } from './conflicts';
 import { linkImported } from './import-link';
-import { ComponentRole, EntryKind } from './link';
+import { ComponentRole, EntryKind, LinkState } from './link';
 import type { Pushed, Undone } from './push';
-import { BUTTON_COLUMN, BUTTON_LINE, fixtureDeps, fixtureWorld, H1_COLUMN, H1_LINE, memoryLinks, NO_SCOPE, ROUTES, USER_BRANCH, USER_DIRTY, type FrameEdits, type World } from './github-sync.fixture';
+import { BUTTON_COLUMN, BUTTON_LINE, FIXTURE, fixtureDeps, fixtureWorld, H1_COLUMN, H1_LINE, memoryLinks, NO_SCOPE, ROUTES, USER_BRANCH, USER_DIRTY, type FrameEdits, type World } from './github-sync.fixture';
 
 const FRAME = 'frame-shop';
 const VARIANT = 'frame-shop-b';
@@ -153,5 +154,36 @@ describe('GitHub sync su un repo Next.js 15 + Tailwind', () => {
 
     expect(kept).toMatchObject({ ok: false, refusal: 'no_files' });
     expect(await world.changed('main', replaced.branch)).toEqual(['app/page.tsx']);
+  });
+
+  it('un conflitto mostra canvas e GitHub affiancati; tenere la tela lo chiude senza perdere la modifica', async () => {
+    const deps = fixtureDeps(world, links, edits);
+    edits.set(FRAME, [h1({ text: 'Ship today' }, { text: 'Ship faster' })]);
+    await world.upstream('app/page.tsx', FIXTURE['app/page.tsx'].replace('Ship faster', 'Ship faster than ever'));
+
+    const before = (await frameStatus(deps, NO_SCOPE, FRAME)) as FrameStatus;
+    const split = await frameConflicts(deps, NO_SCOPE, FRAME);
+    const kept = await frameResolve(deps, NO_SCOPE, FRAME, ConflictChoice.KeepCanvas);
+    const after = (await frameStatus(deps, NO_SCOPE, FRAME)) as FrameStatus;
+
+    expect(before.state).toBe(LinkState.Conflict);
+    expect(split).toMatchObject({ ok: true, files: [{ path: 'app/page.tsx' }] });
+    const [file] = (split as { files: { canvas: string; github: string; base: string }[] }).files;
+    expect(file.canvas).toContain('Ship today');
+    expect(file.github).toContain('Ship faster than ever');
+    expect(file.base).toContain('Ship faster<');
+    expect(kept).toMatchObject({ ok: true });
+    expect(after.state).toBe(LinkState.Modified);
+  });
+
+  it('risolvere con l’agente senza agente lascia un promemoria con le tre versioni', async () => {
+    const deps = fixtureDeps(world, links, edits);
+    edits.set(FRAME, [h1({ text: 'Ship today' }, { text: 'Ship faster' })]);
+    await world.upstream('app/page.tsx', FIXTURE['app/page.tsx'].replace('Ship faster', 'Ship faster than ever'));
+
+    const asked = await frameResolve(deps, NO_SCOPE, FRAME, ConflictChoice.Agent);
+
+    expect(asked).toMatchObject({ ok: false, refusal: 'agent_unavailable' });
+    expect((asked as { prompt: string }).prompt).toContain('Ship faster than ever');
   });
 });
