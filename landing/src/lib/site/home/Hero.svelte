@@ -5,6 +5,8 @@
   import HeroPrompt from './HeroPrompt.svelte';
   import AsciiField from './AsciiField.svelte';
   import { FREE_EDITORS, PLAN } from '../pricing/plan';
+  import { DOWNLOAD_MAC_PATH } from '../links';
+  import { APPLE_ICON } from '../social-icons';
 
   const POSTER = '/site/home/canvas-poster.webp';
 </script>
@@ -26,8 +28,30 @@
   </div>
 
   <div class="modes" data-agent-id="hero-modes">
-    <p><strong>On your computer</strong> <span>Free, no account. Mac app or</span> <NpxChip /> <span>Works with Claude Code, Codex or Cursor.</span></p>
-    <p><strong>In the cloud</strong> <span>Free for {FREE_EDITORS} {PLAN.per}, then {PLAN.currency}{PLAN.price} per {PLAN.per} a {PLAN.period}. Work on the same canvas with your team.</span></p>
+    <div class="mode">
+      <div class="head">
+        <span class="kicker">On your computer</span>
+        <span class="price">Free</span>
+      </div>
+      <p>No account. Works with Claude Code, Codex or Cursor.</p>
+      <div class="ways">
+        <NpxChip />
+        <span class="or">or</span>
+        <a class="mac" href={DOWNLOAD_MAC_PATH} data-sveltekit-reload>{@html APPLE_ICON}Mac app</a>
+      </div>
+    </div>
+
+    <div class="mode">
+      <div class="head">
+        <span class="kicker">In the cloud</span>
+        <span class="price">Free for {FREE_EDITORS} {PLAN.per}</span>
+      </div>
+      <p>Your team on the same canvas, live. Then {PLAN.currency}{PLAN.price} per {PLAN.per} a {PLAN.period}.</p>
+      <div class="ways">
+        <span class="faces" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="live">3 editing now</span>
+      </div>
+    </div>
   </div>
 
   <video class="canvas" data-agent-id="hero-canvas" data-src={CANVAS_VIDEO} muted loop playsinline preload="none" poster={POSTER} width="1920" height="1080" aria-label="Feega canvas overview" use:lazyPlay></video>
@@ -83,28 +107,124 @@
 
   .modes {
     display: grid;
-    gap: 10px;
-    margin-top: 16px;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    width: calc(100% - 32px);
+    max-width: 680px;
+    margin-top: 12px;
+    color: #fff;
+    text-align: left;
+  }
+
+  .mode {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px 18px;
+    border-radius: 20px;
+    background: rgb(18 18 18 / 0.72);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.07);
+    backdrop-filter: blur(12px);
+  }
+
+  .head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .kicker {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .price {
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.08);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    letter-spacing: -0.02em;
+    color: rgb(255 255 255 / 0.85);
+    white-space: nowrap;
+  }
+
+  .mode p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.4;
+    color: rgb(255 255 255 / 0.6);
+  }
+
+  .ways {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: auto;
+    min-height: 28px;
+  }
+
+  .or {
+    font-size: 12px;
+    color: rgb(255 255 255 / 0.4);
+  }
+
+  .mac {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    background: #222;
     color: #fff;
     font-size: 14px;
-    line-height: 1.4;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.15s;
   }
 
-  .modes p {
+  .mac:hover {
+    background: #2e2e2e;
+  }
+
+  .mac :global(svg) {
+    width: 14px;
+    height: 14px;
+  }
+
+  .faces {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 4px 8px;
-    margin: 0;
   }
 
-  .modes strong {
-    font-weight: 600;
+  .faces i {
+    width: 22px;
+    height: 22px;
+    margin-right: -6px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px #121212;
   }
 
-  .modes span {
-    opacity: 0.75;
+  .faces i:nth-child(1) { background: #ff7373; }
+  .faces i:nth-child(2) { background: #0099ff; }
+  .faces i:nth-child(3) { background: #ffd84a; }
+
+  .live {
+    margin-left: 10px;
+    font-size: 12px;
+    color: rgb(255 255 255 / 0.6);
+  }
+
+  .live::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: #2fbf71;
+    vertical-align: 1px;
   }
 
   video {
@@ -155,6 +275,52 @@
 
     .lead {
       width: 550px;
+    }
+  }
+
+  @media (max-width: 809.98px) {
+    .modes {
+      grid-template-columns: 1fr;
+      gap: 0;
+      width: 100%;
+      overflow: hidden;
+      border-radius: 20px;
+      background: rgb(18 18 18 / 0.72);
+      box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.07);
+      backdrop-filter: blur(12px);
+    }
+
+    .mode {
+      gap: 6px;
+      padding: 14px 16px;
+      border-radius: 0;
+      background: none;
+      box-shadow: none;
+      backdrop-filter: none;
+    }
+
+    .mode + .mode {
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.07);
+    }
+
+    .kicker {
+      font-size: 14px;
+    }
+
+    .mode p {
+      font-size: 12.5px;
+    }
+
+    .ways:has(.faces) {
+      display: none;
+    }
+
+    .ways :global(.npx) {
+      font-size: 14px;
+    }
+
+    .mac {
+      font-size: 13px;
     }
   }
 </style>
