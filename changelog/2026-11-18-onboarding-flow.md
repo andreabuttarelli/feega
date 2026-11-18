@@ -30,6 +30,10 @@ The copy was tested on isolated readers (Haiku and Sonnet, no repo, only screens
 both got the two modes but not what the product makes, and stumbled on "agents" and "keys". The
 shipped copy says what Feega makes in the first sentence and calls agents "AI assistants".
 
+Existing users never see the first-run memory step, so the memory also lives in Settings › Profile
+(`memory-actions.ts`), which is also where the "not saved" notice sends people. Checked live on the
+test account: name from the flow and memory from Settings land in `profiles`, on desktop and phone.
+
 Not in this change: the agents step in the desktop app's cloud mode (needs a bridge in Electron;
 ADR 0036 keeps ACP out of the cloud), publishing a local file to the cloud from the flow, and a
 feature video.
