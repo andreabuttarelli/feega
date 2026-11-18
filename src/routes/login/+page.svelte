@@ -1,5 +1,7 @@
 <script lang="ts">
   import PageTitle from '$lib/components/PageTitle.svelte';
+  import FeegaMark from '$lib/components/FeegaMark.svelte';
+  import Wordmark from '$lib/components/app/Wordmark.svelte';
   import { TitleSize } from '$lib/components/page-title';
   import { onMount, tick } from 'svelte';
   import { enhance } from '$app/forms';
@@ -131,11 +133,10 @@
   </title>
 </svelte:head>
 
-<div class="split">
-  <section class="pane form-pane">
+<main class="page">
     <div class="form-inner">
-      <a class="brand" href="/">feega</a>
-
+      <a class="lockup" href="/" aria-label="feega"><FeegaMark size={24} /><Wordmark /></a>
+      <div class="card">
       {#if cliPort}
         <div class="cli-notice">
           <span class="cli-icon" aria-hidden="true">⌘</span>
@@ -173,8 +174,7 @@
             <p class="sub">{$_('login.signup.sub')}</p>
           {/if}
         {:else}
-          <PageTitle size={TitleSize.Small} text={$_('login.signin.title')} />
-          <p class="sub">{$_('login.signin.sub')}</p>
+          <h1 class="hidden-title">{$_('login.signin.title')}</h1>
         {/if}
         {#if mode !== 'forgot'}
         {#if data.appleSignIn}
@@ -332,11 +332,9 @@
           </p>
         {/if}
       {/if}
-
+      </div>
     </div>
-  </section>
-  <aside class="pane visual-pane" aria-hidden="true"></aside>
-</div>
+</main>
 
 {#if showOpenInBrowser && inApp}
   <div class="iab-overlay" role="dialog" aria-modal="true">
@@ -373,58 +371,66 @@
 {/if}
 
 <style>
-  .split {
-    min-height: 100dvh;
-    display: flex;
+  .hidden-title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
-  .pane {
+
+
+  .page {
+    min-height: 100dvh;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 48px 40px;
-  }
-
-  .form-pane {
-    flex: 1;
-    background: var(--ui-panel, #fff);
-  }
-  .visual-pane {
-    flex: 0 0 50%;
-    padding: 0;
-    background: #1a2bb0 url('/login-visual.webp') center / cover no-repeat;
+    padding: var(--ui-space-8) var(--ui-space-4);
+    box-sizing: border-box;
+    background: var(--ui-app);
   }
   .form-inner {
     width: 100%;
     max-width: 400px;
-    text-align: left;
+    text-align: center;
   }
-  .brand {
-    font-size: 22px;
-    font-weight: 600;
+  .card {
+    --field: var(--ui-wash);
+    --field-hover: var(--ui-divider);
+    padding: var(--ui-space-8);
+    background: var(--ui-panel);
+    border-radius: var(--ui-radius-lg);
+    box-shadow: var(--ui-shadow-raised);
+  }
+  .lockup {
+    display: flex;
+    line-height: 1;
+    width: fit-content;
+    align-items: center;
+    gap: var(--ui-space-2);
+    margin: 0 auto var(--ui-space-6);
     text-decoration: none;
-    color: var(--ui-text, #1d1d1f);
-    display: inline-block;
-    margin-bottom: 32px;
-  }
-  .brand .mid {
-    color: var(--ui-accent-text);
+    --wordmark-size: 22px;
   }
   .sub {
-    color: var(--ui-text-secondary, #6e6e73);
-    margin: 12px 0 0;
+    color: var(--ui-text-secondary);
+    margin: var(--ui-space-2) auto 0;
     max-width: 40ch;
     line-height: 1.5;
   }
   .form {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    margin-top: 28px;
+    gap: var(--ui-space-2);
+    margin-top: var(--ui-space-6);
     width: 100%;
   }
-  /* Social buttons lead; email form sits under the divider with tighter top spacing. */
   .oauth-form {
-    margin-top: 28px;
+    margin-top: var(--ui-space-6);
+  }
+  .hidden-title + .oauth-form {
+    margin-top: 0;
   }
   .oauth-form + .oauth-form {
     margin-top: 8px;
@@ -432,22 +438,27 @@
   .email-form {
     margin-top: 0;
   }
+  .sub + .email-form {
+    margin-top: var(--ui-space-6);
+  }
   input {
     width: 100%;
     box-sizing: border-box;
     font-size: 16px;
-    height: 44px;
-    padding: 0 14px;
+    height: 40px;
+    padding: 0 12px;
     border: 0;
     outline: none;
-    background: var(--ui-input);
+    background: var(--field);
     color: var(--ui-text);
-    border-radius: var(--ui-radius-sm);
-    transition: background var(--ui-dur-fast) var(--ui-ease);
+    border-radius: var(--ui-radius-md);
+    transition: background var(--ui-dur-fast) var(--ui-ease), box-shadow var(--ui-dur-fast) var(--ui-ease);
+  }
+  input:hover:not(:disabled) {
+    background: var(--field-hover);
   }
   input:focus {
-    border-color: var(--ui-accent-text);
-    box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.12);
+    box-shadow: var(--ui-ring);
   }
   button {
     display: inline-flex;
@@ -455,9 +466,9 @@
     justify-content: center;
     gap: 8px;
     border: none;
-    height: 44px;
+    height: 40px;
     padding: 0 22px;
-    border-radius: var(--ui-radius-sm);
+    border-radius: var(--ui-radius-md);
     font-size: var(--ui-text-lg);
     font-weight: var(--ui-weight-medium);
     cursor: pointer;
@@ -480,12 +491,12 @@
     opacity: 0.7;
   }
   .oauth {
-    background: var(--ui-input);
+    background: var(--field);
     color: var(--ui-text);
     border: 0;
   }
   .oauth:hover:not(:disabled) {
-    background: var(--ui-input-hover);
+    background: var(--field-hover);
   }
   .oauth.apple {
     background: #000;
@@ -509,8 +520,8 @@
     display: flex;
     align-items: center;
     gap: 14px;
-    margin: 18px 0;
-    color: var(--ui-text-secondary, #6e6e73);
+    margin: var(--ui-space-4) 0;
+    color: var(--ui-text-tertiary);
     font-size: 13px;
   }
   .divider::before,
@@ -536,12 +547,18 @@
     }
   }
   .err {
-    color: #c0392b;
+    color: var(--ui-danger);
+    background: color-mix(in srgb, var(--ui-danger) 10%, transparent);
+    border-radius: var(--ui-radius-md);
+    padding: var(--ui-space-2) var(--ui-space-3);
     font-size: 14px;
-    margin-top: 14px;
+    line-height: 1.4;
+    margin: var(--ui-space-3) 0 0;
+  }
+  .err:first-child {
+    margin: 0 0 var(--ui-space-4);
   }
 
-  /* password field with a reveal toggle (custom name to avoid the global .field rule) */
   .pwfield {
     position: relative;
   }
@@ -559,15 +576,14 @@
     padding: 6px 8px;
     cursor: pointer;
   }
-  /* "Forgot password?" row — right-aligned under the password field */
   .row {
     display: flex;
     justify-content: flex-end;
     margin-top: -4px;
   }
-  /* inline text links / mode toggles — reset the global button styles */
   .textlink {
     width: auto;
+    height: auto;
     background: transparent;
     border: none;
     padding: 0;
@@ -581,13 +597,13 @@
     text-decoration: underline;
   }
   .toggle {
-    margin-top: 22px;
+    margin: var(--ui-space-4) 0 0;
     font-size: 14px;
     color: var(--ui-text-secondary, #6e6e73);
   }
 
   .legal-notice {
-    margin-top: 16px;
+    margin: var(--ui-space-3) 0 0;
     font-size: 12px;
     line-height: 1.5;
     color: var(--ui-text-tertiary, #9a9a9e);
@@ -597,8 +613,6 @@
     text-decoration: underline;
   }
 
-
-  /* ---- CLI login notice ---- */
   .cli-notice {
     display: flex;
     align-items: center;
@@ -617,21 +631,12 @@
     flex: 0 0 auto;
   }
 
-  @media (max-width: 880px) {
-    .visual-pane {
-      display: none;
-    }
-    .form-inner {
-      text-align: center;
-      margin: 0 auto;
-    }
-    .sub {
-      margin-left: auto;
-      margin-right: auto;
+  @media (max-width: 480px) {
+    .card {
+      padding: var(--ui-space-6) var(--ui-space-4);
     }
   }
 
-  /* ---- in-app browser escape overlay ---- */
   .iab-overlay {
     position: fixed;
     inset: 0;
