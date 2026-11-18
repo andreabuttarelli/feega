@@ -4721,7 +4721,7 @@
     {#if versionSides?.before && versionSides.after}
       <VersionCompare projectId={page.params.projectId ?? ''} versionId={versionOpen?.after ?? ''} before={versionSides.before} after={versionSides.after} history={versionHistory} onclose={() => (versionOpen = null)} onchanged={sources.refresh} />
     {/if}
-    <SourceSyncPanel projectId={page.params.projectId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} assetUrl={tierUrl(AssetSize.Full)} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} />
+    <SourceSyncPanel projectId={page.params.projectId ?? ''} canvasId={page.params.canvasId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} assetUrl={tierUrl(AssetSize.Full)} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} />
     <PrototypePlayerHost frames={playerFrames} />
     {#if showsPrototype}
       <PrototypeArrows {view} frames={overlayFrames} links={arrowLinks} elements={linkElements()} handle={pickedHandle()} aimingFrom={prototypeLink.draft ? (inside?.nodeId ?? null) : null} onpick={openLink} ondrag={dragLink} />

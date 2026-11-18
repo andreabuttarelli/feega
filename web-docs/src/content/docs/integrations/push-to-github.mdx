@@ -127,6 +127,10 @@ An import links its frame to every page it captured, one link per route, each ca
 
 An edit on a main component changes the component file: every page using it changes, and the Changes panel says how many pages are affected before you push. An edit on an instance stays at that usage site: a text that comes from a prop rewrites that prop, a style becomes a `style` override when the component accepts one. When no prop fits, the edit is not written and the status lists it under `proposals`, for the agent to add the prop. Tick **Apply instance edits to main component** (or pass `mains` / `--main`) to write them to the component file instead.
 
+## Variants
+
+**Duplicate** gives an unlinked copy. **Make variant** (the GitHub popover, `github_variant`, `feega github variant <projectId> <canvasId> <nodeId>`) gives a copy linked as a variant of the original. Its first push answers `variant_choice` with a suggested route; pick **Replace original** (writes the original files), **New route** (writes the edited page at the new route's file, following the page's convention, e.g. `app/pricing-b/page.tsx`) or **Keep on canvas** (pushes nothing). The API and MCP take `variants: [{ nodeId, choice: replace | new_route | keep, route? }]`; the CLI takes `--variant <nodeId>:<choice>[:<route>]`.
+
 ## Local folders
 
 A frame imported from a local folder (desktop app, local dev) pushes through git in that folder: Feega commits with a private index, so your current branch, uncommitted work and history stay untouched. The branch goes to `origin` with your git credentials; the pull request opens when a GitHub token is available, otherwise the answer carries `pull: null` and the branch is left for you. The live preview is your own dev server.

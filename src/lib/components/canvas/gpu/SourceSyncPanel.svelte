@@ -1,18 +1,19 @@
 <script lang="ts">
   import { SvelteSet } from 'svelte/reactivity';
   import { SvelteMap } from 'svelte/reactivity';
-  import { SourceAction, changedRows, ciOf, CiState, filesOfPatch, filesToPush, impactOf, popoverOf, pushAskOf, pushedNote, pushLabel, rowTitle, type ChangedFile, type FrameSync, type PullView } from '$lib/canvas/source-changes';
+  import { SourceAction, changedRows, ciOf, CiState, filesOfPatch, filesToPush, impactOf, popoverOf, pushAskOf, pushedNote, pushLabel, rowTitle, VariantChoice, type ChangedFile, type FrameSync, type PullView, type VariantAnswer } from '$lib/canvas/source-changes';
   import { PushOutcome, pushOutcomeOf, editedFilesText } from '$lib/canvas/source-sync';
 
   type Anchor = { left: number; top: number };
   type Pushed = { branch: string; pull: PullView | null };
 
-  let { projectId, open, anchor, syncs, posterOf, assetUrl, onclose, onchanged }: { projectId: string; open: FrameSync | null; anchor: Anchor | null; syncs: FrameSync[]; posterOf: (nodeId: string) => string | null; assetUrl: (assetId: string) => string; onclose: () => void; onchanged: () => Promise<unknown> } = $props();
+  let { projectId, canvasId, open, anchor, syncs, posterOf, assetUrl, onclose, onchanged }: { projectId: string; canvasId: string; open: FrameSync | null; anchor: Anchor | null; syncs: FrameSync[]; posterOf: (nodeId: string) => string | null; assetUrl: (assetId: string) => string; onclose: () => void; onchanged: () => Promise<unknown> } = $props();
 
   const DEFAULT_NAME = 'canvas-edits';
   const PATCH_FILE = 'feega-changes.patch';
 
-  const ACTION_LABEL: Record<SourceAction, string> = { [SourceAction.Update]: 'Update', [SourceAction.ViewPr]: 'View PR', [SourceAction.Detach]: 'Detach' };
+  const ACTION_LABEL: Record<SourceAction, string> = { [SourceAction.Update]: 'Update', [SourceAction.ViewPr]: 'View PR', [SourceAction.MakeVariant]: 'Make variant', [SourceAction.Detach]: 'Detach' };
+  const CHOICE_LABEL: Record<VariantChoice, string> = { [VariantChoice.Replace]: 'Replace original', [VariantChoice.NewRoute]: 'New route', [VariantChoice.Keep]: 'Keep on canvas' };
   const CI_LABEL: Record<CiState, string> = { [CiState.None]: 'no checks', [CiState.Running]: 'CI running', [CiState.Passed]: 'CI passed', [CiState.Failed]: 'CI failed' };
 
   let panel = $state(false);
@@ -24,6 +25,8 @@
   let copied = $state(false);
   const picked = new SvelteSet<string>();
   const mains = new SvelteSet<string>();
+  let asking = $state<{ nodeId: string; route: string }[]>([]);
+  let answers = $state<VariantAnswer[]>([]);
   const files = new SvelteMap<string, ChangedFile[]>();
 
   const rows = $derived(changedRows(syncs));
@@ -70,6 +73,10 @@
     [SourceAction.ViewPr]: async (s) => {
       window.open(s.push?.pull?.url, '_blank', 'noopener');
     },
+    [SourceAction.MakeVariant]: async (s) => {
+      const body = await call(`${base}/variant`, { method: 'POST', body: JSON.stringify({ canvasId, nodeId: s.nodeId }) });
+      note = body?.ok ? 'Variant made: its push asks what to do with it' : `Variant refused: ${String(body?.refusal ?? 'network')}`;
+    },
     [SourceAction.Detach]: async (s) => {
       await call(`${base}?nodeId=${encodeURIComponent(s.nodeId)}`, { method: 'DELETE' });
       onclose();
@@ -87,7 +94,7 @@
   }
 
   async function push(confirmSensitive = false) {
-    const ask = pushAskOf(rows, picked, DEFAULT_NAME, mains);
+    const ask = pushAskOf(rows, picked, DEFAULT_NAME, mains, answers);
     if (!ask) {
       return;
     }
@@ -97,6 +104,7 @@
     const body = await call(base, { method: 'POST', body: JSON.stringify({ ...ask, confirmSensitive }) });
     const outcome = pushOutcomeOf(body as { ok?: boolean; refusal?: string } | null);
     confirming = outcome === PushOutcome.NeedsConfirm;
+    asking = outcome === PushOutcome.VariantChoice ? ((body?.suggested as { nodeId: string; route: string }[]) ?? []) : [];
     if (outcome === PushOutcome.ReadOnly) {
       download((body?.patch as { path: string; content: string }[]) ?? []);
     }
@@ -105,8 +113,19 @@
       await onchanged();
       pushed = { branch: String(body?.branch), pull: syncs.find((s) => ask.nodeIds.includes(s.nodeId))?.push?.pull ?? null };
     }
+    if (outcome === PushOutcome.Pushed) {
+      answers = [];
+    }
     note = outcome === PushOutcome.Failed ? `Push refused: ${String(body?.refusal ?? 'network')}` : '';
     busy = false;
+  }
+
+  function answer(v: { nodeId: string; route: string }, choice: VariantChoice) {
+    answers = [...answers.filter((a) => a.nodeId !== v.nodeId), { nodeId: v.nodeId, choice, route: v.route }];
+    asking = asking.filter((a) => a.nodeId !== v.nodeId);
+    if (!asking.length) {
+      void push();
+    }
   }
 
   async function undo() {
@@ -162,6 +181,15 @@
         <p class="muted">No prop on <code>{p.component}</code> for {p.props.join(', ')}: ask the agent to add one, or apply to the main component.</p>
       {/each}
       <label class="change"><input type="checkbox" checked={mains.has(row.nodeId)} onchange={(e) => (e.currentTarget.checked ? mains.add(row.nodeId) : mains.delete(row.nodeId))} /> Apply instance edits to main component</label>
+    {/each}
+    {#each asking as v (v.nodeId)}
+      <p class="note">{syncs.find((s) => s.nodeId === v.nodeId)?.name || 'Variant'} is a variant:</p>
+      <input aria-label="New route" bind:value={v.route} />
+      <div class="actions">
+        {#each Object.values(VariantChoice) as choice (choice)}
+          <button type="button" disabled={busy} onclick={() => answer(v, choice)}>{CHOICE_LABEL[choice]}</button>
+        {/each}
+      </div>
     {/each}
     {#if confirming}
       <p class="note">This push touches config, lockfiles or dotfiles.</p>

@@ -2,13 +2,15 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { SourceEdit } from '$lib/server/code-import/write-back';
-import { framesPush, frameStatus, frameUndo, type FrameStatus } from './frames-push';
+import { FramesRefusal, framesPush, frameStatus, frameUndo, type FrameStatus } from './frames-push';
+import { makeVariant, VariantChoice } from './variants';
 import { linkImported } from './import-link';
 import { ComponentRole, EntryKind } from './link';
 import type { Pushed, Undone } from './push';
 import { BUTTON_COLUMN, BUTTON_LINE, fixtureDeps, fixtureWorld, H1_COLUMN, H1_LINE, memoryLinks, NO_SCOPE, ROUTES, USER_BRANCH, USER_DIRTY, type FrameEdits, type World } from './github-sync.fixture';
 
 const FRAME = 'frame-shop';
+const VARIANT = 'frame-shop-b';
 
 const inButton = { file: 'components/Button.tsx', line: BUTTON_LINE, column: BUTTON_COLUMN };
 const pricingButton = { file: 'app/pricing/page.tsx', line: 7, column: 6 };
@@ -121,5 +123,35 @@ describe('GitHub sync su un repo Next.js 15 + Tailwind', () => {
 
     expect(status.proposals).toEqual([{ component: 'components/Button.tsx', usage: pricingButton, props: ['color'] }]);
     expect(await world.changed('main', out.branch)).toEqual(['components/Button.tsx']);
+  });
+
+  it('un duplicato resta una copia senza link', async () => {
+    expect(await links.all('frame-copy')).toEqual([]);
+  });
+
+  it('una variante chiede cosa farne alla spinta, e come nuova rotta scrive un file nuovo', async () => {
+    const deps = fixtureDeps(world, links, edits);
+    await makeVariant(deps, { from: FRAME, to: VARIANT });
+    edits.set(VARIANT, [h1({ text: 'Ship in a day' }, { text: 'Ship faster' })]);
+
+    const asked = await framesPush(deps, NO_SCOPE, { name: 'home b', nodeIds: [VARIANT] });
+    const out = (await framesPush(deps, NO_SCOPE, { name: 'home b', nodeIds: [VARIANT], variants: [{ nodeId: VARIANT, choice: VariantChoice.NewRoute, route: '/home-b' }] })) as Pushed;
+
+    expect(asked).toMatchObject({ ok: false, refusal: FramesRefusal.VariantChoice, suggested: [{ nodeId: VARIANT, route: '/home-variant' }] });
+    expect(await world.changed('main', out.branch)).toEqual(['app/home-b/page.tsx']);
+    expect(await world.at(out.branch, 'app/home-b/page.tsx')).toContain('Ship in a day');
+    expect(await world.at(out.branch, 'app/page.tsx')).toBe(await world.at('main', 'app/page.tsx'));
+  });
+
+  it('una variante tenuta sulla tela non spinge niente; sostituire scrive sull’originale', async () => {
+    const deps = fixtureDeps(world, links, edits);
+    await makeVariant(deps, { from: FRAME, to: VARIANT });
+    edits.set(VARIANT, [h1({ text: 'Ship in a day' }, { text: 'Ship faster' })]);
+
+    const kept = await framesPush(deps, NO_SCOPE, { name: 'keep', nodeIds: [VARIANT], variants: [{ nodeId: VARIANT, choice: VariantChoice.Keep }] });
+    const replaced = (await framesPush(deps, NO_SCOPE, { name: 'replace', nodeIds: [VARIANT], variants: [{ nodeId: VARIANT, choice: VariantChoice.Replace }] })) as Pushed;
+
+    expect(kept).toMatchObject({ ok: false, refusal: 'no_files' });
+    expect(await world.changed('main', replaced.branch)).toEqual(['app/page.tsx']);
   });
 });
