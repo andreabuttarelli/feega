@@ -29,6 +29,7 @@
   import { watchKeyboard } from '$lib/canvas/keyboard-inset';
   import DesktopPageBar from '$lib/components/canvas/DesktopPageBar.svelte';
   import { EDGE, fitted, shellLeftOf } from '$lib/shell-insets';
+  import { leftPanelRequest } from '$lib/canvas/left-panel-request.svelte';
   import { NAV_ENTRIES, sheetEntryForPath, directLoadMode, navHref, panelForShortcut, type NavEntry } from '$lib/shell-nav';
   import { goto } from '$app/navigation';
   import { INITIAL_MOBILE_VIEW, chatBadge, showView, turnEnded, type MobileView, type ChatTurn } from '$lib/canvas/mobile-view';
@@ -123,6 +124,12 @@
   $effect(() => {
     if (historyPanel.asked) {
       leftPanel = 'history';
+    }
+  });
+
+  $effect(() => {
+    if (leftPanelRequest.asked && leftPanelRequest.kind) {
+      leftPanel = leftPanelRequest.kind;
     }
   });
 
@@ -269,6 +276,13 @@
       <PhoneSheet name="canvas-chat" title={$_('app.shell.mobile.chat')} open={mobileView.view === 'chat'} onclose={() => onMobileView('canvas')} floorPx={typing ? 0 : PHONE_SWITCH_PX} opensAt={Detent.Full} testid="mobile-chat">
         <CanvasChatPanel open={true} />
         {#if $propertiesTarget}<span class="editing" data-testid="canvas-chat-editing">{editingLabel($propertiesTarget.name)}</span>{/if}
+      </PhoneSheet>
+      <PhoneSheet name="canvas-panel" title={$_(NAV_ENTRIES.find((entry) => entry.id === leftPanel)?.labelKey ?? 'app.nav2.history')} open={leftPanel !== null && leftPanel !== 'layers'} onclose={() => (leftPanel = null)} floorPx={PHONE_SWITCH_PX} opensAt={Detent.Full} testid="mobile-panel">
+        {#if browser && leftPanel && leftPanel !== 'layers'}
+          {#await CHROME_LOADERS.leftPanel() then { default: CanvasLeftPanel }}
+            <CanvasLeftPanel {projectId} kind={leftPanel} labelKey={NAV_ENTRIES.find((entry) => entry.id === leftPanel)?.labelKey ?? ''} pages={pagesProps} docked onclose={() => (leftPanel = null)} />
+          {/await}
+        {/if}
       </PhoneSheet>
       {#if onCanvasRoute}
         <PhoneSheet name="canvas-layers" title={$_('app.nav2.layers')} open={phoneSheets.shown === PhoneSheetKind.Layers} onclose={() => phoneSheets.close(PhoneSheetKind.Layers)} floorPx={PHONE_SWITCH_PX} testid="mobile-layers">

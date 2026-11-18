@@ -43,6 +43,7 @@
   import { frameLayers, frameMenuRun, frameSummaries } from '$lib/motion/frame-menu';
   import FrameSelection from '../FrameSelection.svelte';
   import FrameGuides from '../FrameGuides.svelte';
+  import PixelGridCanvas from './PixelGridCanvas.svelte';
   import FrameTools from '../FrameTools.svelte';
   import { FrameView, contentViews } from '$lib/canvas/frame-view';
   import { frameViews, zoomLevel, zoomRequest } from '$lib/canvas/view-menu.svelte';
@@ -638,13 +639,12 @@
   });
   let hoverChrome = $state<string | null>(null);
   const chromeIds = $derived(new Set([...selected, ...domIds, ...(hoverChrome ? [hoverChrome] : []), ...(ghost ? [ghost.from.nodeId] : [])]));
-  const prototypeFroms = $derived(new Set(arrowLinks.map((l) => l.from)));
   const headerOf = (t: Tile) => {
     const text = coreType;
     if (!text || kindOfNode(t.id) !== FrameKind.Frame) {
       return [];
     }
-    const facts = { breakpoints: Boolean(liveOf(t.id)?.doc.breakpoints?.length), component: isComponentSet(t.id), prototype: prototypeFroms.has(t.id), version: isVersionFrame(t.id), source: sources.of(t.id) };
+    const facts = { breakpoints: Boolean(liveOf(t.id)?.doc.breakpoints?.length), component: isComponentSet(t.id), version: isVersionFrame(t.id), source: sources.of(t.id) };
     return headerBadges(facts).map((key) => ({ key, contours: text.badges.get(key) ?? [] }));
   };
   const HEADER_PRESS: Record<HeaderAction, (id: string) => void> = {
@@ -1983,7 +1983,7 @@
   }
 
   onMount(() => {
-    styleLibrary.connect({ push: syncStyle, rename: syncRename, remove: syncRemove });
+    styleLibrary.connect({ push: syncStyle, rename: syncRename, remove: syncRemove }, paintThenIdle(afterPaint, whenIdle));
     const projectId = page.params.projectId;
     void styleLibrary.open(projectId ? projectLibraryStore(projectId, LibraryKind.Style) : null);
     return () => {
@@ -4589,6 +4589,7 @@
         <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} listenLive={(listener) => liveDocs.listen(listener)} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId, userId: (page.data as { session?: { user?: { id: string } } | null }).session?.user?.id, look: (page.data as { look?: string }).look }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} onbackend={(change) => track(GPU_FALLBACK_EVENT, change)} onevict={sendBackFrame} />
       </svelte:boundary>
     {/if}
+    <PixelGridCanvas {view} {area} on={frameViews.isOn(FrameView.PixelGrid)} moving={cameraMotion === CameraMotion.Moving} />
     <div class="hover-rings" data-testid="node-hover-rings">
       {#each hoverRings as ring (ring.id)}
         <div class="hover-ring" data-testid="node-hover-ring" data-node={ring.id} style={highlightStyle(HighlightKind.Node) + ';' + hoverRingStyle(view, ring)}></div>
@@ -4668,7 +4669,7 @@
       <FrameSelection clip="" quad={manyQuad!} kind={SelectionKind.Many} ongrab={grabMany} />
     {/if}
     <FrameHeaderIcons {view} hits={headerHits(headerWorld, cameraMotion)} onpress={pressHeader} />
-    <SourceSyncPanel projectId={page.params.projectId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} />
+    <SourceSyncPanel projectId={page.params.projectId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} assetUrl={tierUrl(AssetSize.Full)} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} />
     <PrototypePlayerHost frames={playerFrames} />
     {#if showsPrototype}
       <PrototypeArrows {view} frames={overlayFrames} links={arrowLinks} elements={linkElements()} handle={pickedHandle()} aimingFrom={prototypeLink.draft ? (inside?.nodeId ?? null) : null} onpick={openLink} ondrag={dragLink} />

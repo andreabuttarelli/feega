@@ -1,6 +1,8 @@
 <script lang="ts">
   import CompositionPlayer from './CompositionPlayer.svelte';
-  import { framePicker } from '$lib/canvas/frame-pick';
+  import { framePicker, shaped } from '$lib/canvas/frame-pick';
+  import { frameOfLive } from '$lib/canvas/core/frame-source';
+  import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
   import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
   import { hotspotsOf, isDrag, type Hotspot } from '$lib/motion/prototype/hotspots';
   import { TriggerKind } from '@feega/motion-core/motion/prototype/model';
@@ -17,7 +19,14 @@
   let swaps = $state<Swaps>({});
   let held = $state<Record<string, Swaps>>({});
   const current = $derived({ ...live, doc: withSwaps(live.doc, swaps) });
-  const picker = $derived(framePicker(current, () => 0));
+  const still = $derived(frameOfLive({ doc: live.doc }));
+  const estimated = $derived(framePicker(current, () => still));
+  let measured = $state.raw<ReturnType<typeof framePicker> | null>(null);
+  $effect(() => {
+    const made = framePicker(current, () => still, shaped(smoothingOf(navigator.userAgent)), () => (measured = made));
+    return () => (measured = null);
+  });
+  const picker = $derived(measured ?? estimated);
   const spots = $derived(hotspotsOf(current.doc, picker.frameSize(), (clip) => picker.frameRect(clip)));
   const variantSpots = $derived(interactive ? variantHotspotsOf(current.doc, picker.frameSize(), (path) => picker.pathRect(path)) : []);
   const percent = (fraction: number) => `${fraction * 100}%`;
@@ -139,7 +148,7 @@
 </script>
 
 <div class="view">
-  <CompositionPlayer doc={shown} assets={live.assets} tokens={live.tokens} {background} />
+  <CompositionPlayer doc={shown} assets={live.assets} tokens={live.tokens} active={false} restFrame={still} {background} />
   {#each stateSpots as spot (spot.path.join('/'))}
     <div
       class="state-spot"

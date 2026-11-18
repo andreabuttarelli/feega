@@ -10,6 +10,7 @@ import { OverrideKey, setOverride } from '@feega/motion-core/motion/breakpoints/
 import { askOf, APP } from './code-import.testkit';
 import { fixture } from '../../../../tests/fixtures/design-tokens/read';
 import { DESIGN_BOARD } from './design-board';
+import { discover } from './component-discovery';
 
 const WHITE = { r: 1, g: 1, b: 1, a: 1 };
 const BLUE = { r: 0, g: 0.4, b: 1, a: 1 };
@@ -52,6 +53,18 @@ const docOf = (docs: Map<string, { doc: unknown }>) => docs.get('frame-1')!.doc 
 const clipsOf = (doc: MotionDoc) => doc.tracks.flatMap((t) => t.clips) as MotionClip[];
 
 describe('code import at several widths of one page', () => {
+  it('draws no gallery, and says so for every library component no page captured: views give up components', async () => {
+    const library = discover({ 'src/components/Card.tsx': "export function Card({ tone }: { tone?: 'a' | 'b' }) { return <div />; }" });
+    const gallery = { pages: [{ label: 'Library', path: '/feega-gallery?page=0', components: ['Card'] }], left: [] };
+    const runner = async () => ({ ok: true as const, app: { url: APP, key: 'k3y', names: ['Card'], sha: null, stop: async () => undefined, library, gallery } });
+    const { ask, tab } = sized({ runner });
+
+    const done = await importCodeAt(ask);
+
+    expect(tab.goto.mock.calls.map(([url]) => url)).not.toContain(`${APP}/feega-gallery?page=0`);
+    expect('library' in done && done.library!.reasons).toEqual({ Card: 'a responsive import (views) draws no component gallery' });
+  });
+
   it('lands one frame whose narrower widths are breakpoint views of the widest', async () => {
     const { ask, docs } = sized();
 

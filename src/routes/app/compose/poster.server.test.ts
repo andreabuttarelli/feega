@@ -10,6 +10,7 @@ vi.mock('$lib/server/dashboard/tool-scope', () => ({ toolScope: async () => ({ d
 const insertAsset = vi.fn();
 const patchNodeData = vi.fn();
 const findNode = vi.fn();
+vi.mock('$lib/server/code-push/link-store', () => ({ keepBeforePoster: async () => undefined }));
 vi.mock('$lib/server/repos/assets', async (original) => ({ ...(await original<object>()), insertAsset }));
 vi.mock('$lib/server/repos/canvas', async (original) => ({ ...(await original<object>()), findNode, patchNodeData }));
 

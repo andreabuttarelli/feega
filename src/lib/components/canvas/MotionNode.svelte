@@ -6,6 +6,9 @@
   const posters = new SvelteMap<string, string>();
   const previews = new Map<string, Preview>();
   const shooting = new Set<string>();
+  const blankRetakes = new Map<string, number>();
+  const MAX_BLANK_RETAKES = 3;
+  const BLANK_RETAKE_MS = 2_000;
   let slots = $state<Slots>({ playing: null, capturing: null });
 </script>
 
@@ -23,6 +26,7 @@
   import { DRAWN_EVENT, TILE_PAINTED } from '@feega/motion-core/motion/hyperframes/measure';
   import { frameDocs, posterCurrent } from '$lib/canvas/frame-docs.svelte';
   import { posterDue, tiles } from '$lib/canvas/live-tiles.svelte';
+  import { isBlankImage } from '$lib/canvas/poster-blank';
   import { canvasLod } from '$lib/canvas/canvas-lod.svelte';
   import { POSTER_WIDTH, sendPoster } from '$lib/motion/poster-capture';
   import { coverFrame } from '@feega/motion-core/motion/still';
@@ -153,8 +157,9 @@
 
   $effect(() => {
     const key = posterKey;
-    const ask = { live: liveTile, drawn: ownDrawn, unsaved: frameDocs.unsaved(node.id, node.docHeadRevision), atHead: local ? local.version === node.docHeadRevision : previewRevision === node.docHeadRevision, hasPoster: !!posterUrl || posters.has(key), shooting: shooting.has(key) };
-    if (!player || !preview || !posterDue(ask)) {
+    const ask = { live: liveTile, drawn: ownDrawn, unsaved: frameDocs.unsaved(node.id, node.docHeadRevision), atHead: local ? local.version === node.docHeadRevision : previewRevision === node.docHeadRevision, hasPoster: !!posterUrl || posters.has(key), blankPoster: !!posterUrl && blankUrl === posterUrl, shooting: shooting.has(key) };
+    void retakeTick;
+    if (!player || !preview || !posterDue(ask) || (blankRetakes.get(key) ?? 0) >= MAX_BLANK_RETAKES) {
       return;
     }
     shooting.add(key);
@@ -237,11 +242,27 @@
     await img.decode().catch(() => undefined);
   }
 
+  let blankUrl = $state<string | null>(null);
+  let retakeTick = $state(0);
+
+  $effect(() => {
+    const url = posterUrl;
+    if (url) {
+      void isBlankImage(url).then((blank) => (blankUrl = blank ? url : blankUrl === url ? null : blankUrl));
+    }
+  });
+
   async function captureCover(shooter: NonNullable<typeof player>, source: Preview, key: string, revision: number) {
     const width = Math.min(POSTER_WIDTH, source.width);
     const shot = await shooter.still(coverFrame(source) / source.fps, width, chrome.poster).catch(() => '');
     if (shot) {
       await decoded(shot);
+    }
+    if (shot && (await isBlankImage(shot))) {
+      slots = releaseCapture(slots, node.id);
+      blankRetakes.set(key, (blankRetakes.get(key) ?? 0) + 1);
+      setTimeout(() => (retakeTick += 1), BLANK_RETAKE_MS);
+      return;
     }
     posters.set(key, shot);
     slots = releaseCapture(slots, node.id);
