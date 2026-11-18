@@ -158,39 +158,91 @@ function inSession(open: OpenAppBrowser, sign: SignIn): OpenAppBrowser {
   };
 }
 
-async function captured(open: OpenAppBrowser, pages: CodePage[], names: string[], window: Window, sign: SignIn): Promise<Captured> {
-  const captures: Capture[] = [];
-  const missed: MissedPage[] = [];
-  const locked: LockedRoute[] = [];
-  const links: string[] = [];
-  const until = window.now() + window.budgetMs;
-  let last: Refusal | null = null;
-  for (const page of pages) {
-    if (captures.length && window.now() > until) {
-      missed.push({ label: page.label, reason: Missed.OutOfTime });
-      continue;
-    }
-    const found: Found = { uses: [], links: [] };
-    const conditions = page.conditions ?? BASE_CONDITIONS;
-    const tab = await open();
-    await tab.scheme(conditions.scheme).catch(() => undefined);
-    await tab.viewport(conditions.width).catch(() => undefined);
-    const read = await pageTreeAt(tab, new URL(page.url), window.settleMs, marksPlanner(names, found, delayFor(window.delay, page.route ?? '', pages.length), page.ready ?? null))
-      .then(async (tree) => ({ tree, out: await lockedOut(tab, page.url, loginOf(sign)) }))
-      .finally(() => tab.close());
-    if (read.out) {
-      locked.push(lockedRoute(page.label, sign));
-      continue;
-    }
-    if ('outcome' in read.tree) {
-      missed.push({ label: page.label, reason: Missed.Unopened });
-      last = read.tree.outcome === UrlImportOutcome.Ok ? null : refused(FROM_URL_IMPORT[read.tree.outcome], read.tree.error);
-      continue;
-    }
-    captures.push({ label: page.label, tree: conditioned(read.tree, conditionKey(conditions)), uses: found.uses });
-    links.push(...found.links);
+const CAPTURE_TABS = 4;
+
+enum Shot {
+  Captured = 'captured',
+  Locked = 'locked',
+  Unopened = 'unopened',
+  OutOfTime = 'out_of_time'
+}
+
+type PageShot =
+  | { shot: Shot.Captured; capture: Capture; links: string[] }
+  | { shot: Shot.Locked }
+  | { shot: Shot.Unopened; refusal: Refusal | null }
+  | { shot: Shot.OutOfTime };
+
+type Clock = { until: number; anyCaptured: boolean };
+
+async function shotOf(open: OpenAppBrowser, page: CodePage, pages: CodePage[], names: string[], window: Window, sign: SignIn, clock: Clock): Promise<PageShot> {
+  if (clock.anyCaptured && window.now() > clock.until) {
+    return { shot: Shot.OutOfTime };
   }
-  return { captures, missed, locked, links, last };
+
+  const found: Found = { uses: [], links: [] };
+  const conditions = page.conditions ?? BASE_CONDITIONS;
+  const tab = await open();
+  await tab.scheme(conditions.scheme).catch(() => undefined);
+  await tab.viewport(conditions.width).catch(() => undefined);
+  const read = await pageTreeAt(tab, new URL(page.url), window.settleMs, marksPlanner(names, found, delayFor(window.delay, page.route ?? '', pages.length), page.ready ?? null))
+    .then(async (tree) => ({ tree, out: await lockedOut(tab, page.url, loginOf(sign)) }))
+    .finally(() => tab.close());
+
+  if (read.out) {
+    return { shot: Shot.Locked };
+  }
+  if ('outcome' in read.tree) {
+    return { shot: Shot.Unopened, refusal: read.tree.outcome === UrlImportOutcome.Ok ? null : refused(FROM_URL_IMPORT[read.tree.outcome], read.tree.error) };
+  }
+
+  clock.anyCaptured = true;
+  return { shot: Shot.Captured, capture: { label: page.label, tree: conditioned(read.tree, conditionKey(conditions)), uses: found.uses }, links: found.links };
+}
+
+async function inTabs<T, R>(items: T[], tabs: number, run: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+
+  const worker = async () => {
+    while (next < items.length) {
+      const at = next;
+      next += 1;
+      results[at] = await run(items[at]);
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(tabs, items.length) }, worker));
+  return results;
+}
+
+async function captured(open: OpenAppBrowser, pages: CodePage[], names: string[], window: Window, sign: SignIn): Promise<Captured> {
+  const clock: Clock = { until: window.now() + window.budgetMs, anyCaptured: false };
+  const shoot = (page: CodePage) => shotOf(open, page, pages, names, window, sign, clock);
+  const [first, ...rest] = pages;
+  const shots = first ? [await shoot(first), ...(await inTabs(rest, CAPTURE_TABS, shoot))] : [];
+  const out: Captured = { captures: [], missed: [], locked: [], links: [], last: null };
+
+  shots.forEach((shot, i) => {
+    const page = pages[i];
+    if (shot.shot === Shot.Captured) {
+      out.captures.push(shot.capture);
+      out.links.push(...shot.links);
+      return;
+    }
+    if (shot.shot === Shot.Locked) {
+      out.locked.push(lockedRoute(page.label, sign));
+      return;
+    }
+    if (shot.shot === Shot.Unopened) {
+      out.missed.push({ label: page.label, reason: Missed.Unopened });
+      out.last = shot.refusal;
+      return;
+    }
+    out.missed.push({ label: page.label, reason: Missed.OutOfTime });
+  });
+
+  return out;
 }
 
 export type Designer = (loaded: LoadedSheet[]) => Promise<Design | null>;
