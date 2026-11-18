@@ -2,6 +2,7 @@
   import { heldFrames } from '$lib/canvas/core/held-frames';
   import { baseNodeId, heldViews, viewAt, viewOf } from '$lib/canvas/breakpoint-views';
   import { posterUploads } from '$lib/canvas/core/poster-upload';
+  import { fullAssets } from '$lib/canvas/core/tiered-assets';
   import { POSTER_DEBOUNCE_MS } from '$lib/motion/poster-capture';
   import { postPageAction } from '$lib/api/page-action';
   import { motionNodePath } from '$lib/canvas/motion-node';
@@ -30,6 +31,7 @@
   import SourceSyncPanel from './SourceSyncPanel.svelte';
   import { comparedWith, versionMarkOf } from '$lib/canvas/version-frame';
   import VersionCompare from './VersionCompare.svelte';
+  import RefPicker from './RefPicker.svelte';
   import { historyOf, moveVersion, timelineOf, type CommitStep } from '$lib/canvas/version-client';
   import { HeaderAction, headerBadges, headerHits, headerRow, type HeaderHit } from '$lib/canvas/core/frame-header';
   import { sourceStatus } from '$lib/canvas/source-status.svelte';
@@ -126,7 +128,7 @@
   import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
   import { estimatedText, type TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
   import { stackFrame, stackPlaced } from '$lib/motion/layout/ops';
-  import { dragInStack, dropInStack, followCursor, stackLineAt, type DropLine } from '$lib/motion/layout/stack-drag';
+  import { dropInStack, holdInStack, stackLineAt, type DropLine } from '$lib/motion/layout/stack-drag';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
   import { commitScoped, doubledOn, textScope } from '$lib/canvas/scoped-text';
   import { mul2d } from '@feega/motion-core/motion/parent';
@@ -148,6 +150,7 @@
   import { frameDocs, type FrameDocEdit, type HeldDoc } from '$lib/canvas/frame-docs';
   import './flow-base.css';
   import CanvasAddBar from '../CanvasAddBar.svelte';
+  import { insertRequest } from '$lib/canvas/insert-request.svelte';
   import CanvasDrawLayer from '../CanvasDrawLayer.svelte';
   import { COLOUR_TAG_HEX, colourOf } from '$lib/canvas/node-colour';
   import { CloudMode } from '$lib/canvas/cloud-picker';
@@ -262,6 +265,8 @@
   import { panBy, toWorld, wheelPan, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
   import { WheelBatch } from '$lib/canvas/gpu/wheel-batch';
   import { isLiveCode } from '$lib/canvas/code-frame';
+  import { FrameMode, MAX_LIVE_FRAMES, liveFrameModes } from '$lib/canvas/live-budget';
+  import { liveFrameOf } from '$lib/canvas/live-frame';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
   import { WIRE_CURSOR, Wiring, typesMeet, atRest, bubbleColour, bubbleRadius, magnetPort, springTo, wireAim, throughPoint, tieAcross, type Spring, type Tie } from '$lib/canvas/gpu/wire-magnet';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, glidesAfterPan, marqueeBox, marqueePick, movedBy, resizedAt, rotateZoneAt, type Hit } from '$lib/canvas/gpu/gesture';
@@ -402,18 +407,18 @@
   const sources = sourceStatus(() => page.params.projectId ?? '', () => linkedFrames(props.nodeSummaries ?? []).map((id) => ({ id, name: byId.get(id)?.displayName ?? '' })));
   let sourceOpen = $state<{ id: string; left: number; top: number } | null>(null);
   let versionOpen = $state<{ before: string; after: string } | null>(null);
+  let pickerOpen = $state<{ id: string; left: number; top: number } | null>(null);
   const sideOf = (id: string) => {
-    const url = posterOf(id);
-    return url ? { url, label: byId.get(id)?.displayName ?? '' } : null;
+    return { url: posterOf(id), label: byId.get(id)?.displayName ?? '' };
   };
   let versionCommits = $state<CommitStep[]>([]);
   let versionMoving = $state(false);
   const versionShown = $derived(versionOpen ? versionMarkOf(summaries.get(versionOpen.after)?.data) : null);
   $effect(() => {
-    const of = versionShown?.of;
+    const shown = versionShown;
     versionCommits = [];
-    if (of) {
-      void historyOf(page.params.projectId ?? '', of).then((c) => (versionCommits = c));
+    if (shown) {
+      void historyOf(page.params.projectId ?? '', shown.of, shown.ref).then((c) => (versionCommits = c));
     }
   });
   const pickVersion = async (sha: string) => {
@@ -426,6 +431,17 @@
     versionMoving = false;
     versionOpen = moved ? { ...open, after: moved } : open;
   };
+  let versionFitted = '';
+  $effect(() => {
+    const open = versionOpen;
+    const tiles = open ? [byId.get(open.before), byId.get(open.after)] : [];
+    const key = open ? `${open.before}:${open.after}` : '';
+    if (!open || key === versionFitted || tiles.some((t) => !t)) {
+      return;
+    }
+    versionFitted = key;
+    fitTo(tiles as Tile[], FitPurpose.Command);
+  });
   const versionHistory = $derived(versionShown ? { line: timelineOf(versionCommits, versionShown.sha), busy: versionMoving, onpick: pickVersion } : null);
   const versionSides = $derived(versionOpen ? { before: sideOf(versionOpen.before), after: sideOf(versionOpen.after) } : null);
   const posterOf = (id: string) => {
@@ -453,12 +469,18 @@
       sticky = keep;
     }
   });
-  const LIVE_CODE_CAP = 4;
   const IFRAME_TYPE = 'iframe';
-  const liveCodeTiles = $derived(placed.filter((t) => t.kind === IFRAME_TYPE && isLiveCode(summaries.get(t.id)?.data)));
+  const isLive = (data: Record<string, unknown> | undefined) => isLiveCode(data) || liveFrameOf(data) !== null;
+  const liveCodeTiles = $derived(placed.filter((t) => t.kind === IFRAME_TYPE && isLive(summaries.get(t.id)?.data)));
   let liveCode = $state.raw(new Set<string>());
+  let liveModes = $state.raw<Record<string, FrameMode>>({});
   $effect(() => {
-    const next = new Set([...visibleIds(liveCodeTiles, view, area)].slice(0, LIVE_CODE_CAP));
+    const seen = visibleIds(liveCodeTiles, view, area);
+    const candidates = liveCodeTiles.map((t) => ({ id: t.id, visible: seen.has(t.id), area: t.w * t.h * view.zoom * view.zoom }));
+    const atRest = liveFrameModes(candidates, MAX_LIVE_FRAMES, CameraMotion.Still);
+    liveModes = liveFrameModes(candidates, MAX_LIVE_FRAMES, cameraMotion);
+    const posted = (id: string) => seen.has(id) && liveFrameOf(summaries.get(id)?.data) !== null;
+    const next = new Set(candidates.filter((c) => atRest[c.id] === FrameMode.Live || posted(c.id)).map((c) => c.id));
     if (!sameSet(untrack(() => liveCode), next)) {
       liveCode = next;
     }
@@ -507,7 +529,7 @@
   const shownOverlays = $derived(overlayFrames.filter((f) => seenIds.has(f.id) || keptOverlays.has(f.id)));
   const prototypeDocs = $derived(new Map(coreFrames.flatMap((f) => (liveOf(f.id) ? [[f.id, liveOf(f.id)!.doc] as const] : []))));
   const arrowLinks = $derived(prototypeLinks(prototypeDocs));
-  const playerFrames = $derived(coreFrames.filter((f) => kindOfNode(f.id) === FrameKind.Frame && liveOf(f.id)).map((f) => ({ id: f.id, name: tileLabel(byId.get(f.id)!), live: liveOf(f.id)! })));
+  const playerFrames = $derived(coreFrames.filter((f) => kindOfNode(f.id) === FrameKind.Frame && liveOf(f.id)).map((f) => ({ id: f.id, name: tileLabel(byId.get(f.id)!), live: { ...liveOf(f.id)!, assets: fullAssets(liveOf(f.id)!.assets) } })));
   $effect(() => {
     prototypePlayer.editing = inside?.nodeId ?? (selected.length === 1 && playerFrames.some((f) => f.id === selected[0]) ? selected[0] : null);
   });
@@ -694,9 +716,11 @@
     }
   };
   const SOURCE_POP_GAP = 6;
+  const POPOVER_ROOM = 340;
+  const PROPERTIES_PANEL_PX = 300;
   const pressHeader = (hit: HeaderHit) => {
     HEADER_PRESS[headerRow(hit.key).action](hit.id);
-    sourceOpen = headerRow(hit.key).action === HeaderAction.Source ? { id: hit.id, left: view.x + hit.x * view.zoom, top: view.y + (hit.y + hit.h) * view.zoom + SOURCE_POP_GAP } : null;
+    sourceOpen = headerRow(hit.key).action === HeaderAction.Source ? { id: hit.id, left: Math.min(view.x + hit.x * view.zoom, window.innerWidth - POPOVER_ROOM - PROPERTIES_PANEL_PX), top: view.y + (hit.y + hit.h) * view.zoom + SOURCE_POP_GAP } : null;
   };
   const labelOf = (t: Tile) => {
     const kind = t.kind && isNodeType(t.kind) ? t.kind : null;
@@ -2987,6 +3011,7 @@
 
     const carry = (ev: PointerEvent): Carry => carryOf({ down, now: local(ev), started, frame: edited, world: toWorld(view, local(ev)) });
     const stackChild = grip === Grip.Move && work.ids.length === 1 && stackPlaced(work.doc, work.ids[0]) ? work.ids[0] : null;
+    const held = stackChild ? holdInStack(work.doc, stackChild, boxes, measure) : null;
     const joinable = grip === Grip.Move && work.ids.length === 1 && !stackChild;
     const liftable = grip === Grip.Move && !stackChild && !shownView && work.doc === inScope.view && inScope.view === start;
     const lift = liftable ? { id: nodeId, key: ++liftKey, clips: subtreeOf(work.doc, work.ids), landing: false } : null;
@@ -3003,7 +3028,7 @@
 
     const move = (ev: PointerEvent) => {
       const now = carry(ev);
-      if (now === Carry.Held) {
+      if (now === Carry.Held || !ev.buttons) {
         return;
       }
       started = true;
@@ -3012,14 +3037,12 @@
         props.onElementOut?.(nodeId, out ?? { clipId: '', client: { x: ev.clientX, y: ev.clientY }, box: null }, out ? DragPhase.Over : DragPhase.Back);
         carried = !!out;
       }
-      if (stackChild) {
-        const to = framePt(ev);
-        const dropped = dragInStack(work.doc, stackChild, boxes, to);
+      if (held) {
+        const { dragged: dropped, shown: following } = held(from, framePt(ev));
         result = dropped.result.ok ? { ok: true, doc: lifted(inScope.merge(dropped.result.doc)) } : dropped.result;
         frameGuides = { nodeId, guides: [], gaps: [], drop: dropped.line };
-        const followed = followCursor(work.doc, stackChild, [to[0] - from[0], to[1] - from[1]]);
-        if (followed.ok) {
-          liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? at.live), doc: lifted(inScope.merge(followed.doc)) });
+        if (following.ok) {
+          liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? at.live), doc: lifted(inScope.merge(following.doc)) });
         }
         return;
       }
@@ -4420,6 +4443,17 @@
     props.onCreate?.(what, viewCentre());
   }
 
+  let insertsSeen = insertRequest.asked;
+
+  $effect(() => {
+    const asked = insertRequest.asked;
+    if (asked === insertsSeen || !insertRequest.what) {
+      return;
+    }
+    insertsSeen = asked;
+    untrack(() => addAtCentre(insertRequest.what!));
+  });
+
   function pickConnectMedium(medium: GenMedium) {
     if (connectPickerAt) {
       props.onConnectNew?.(selected, medium);
@@ -4718,10 +4752,13 @@
       <FrameSelection clip="" quad={manyQuad!} kind={SelectionKind.Many} ongrab={grabMany} />
     {/if}
     <FrameHeaderIcons {view} hits={headerHits(headerWorld, cameraMotion)} onpress={pressHeader} />
-    {#if versionSides?.before && versionSides.after}
+    {#if versionSides}
       <VersionCompare projectId={page.params.projectId ?? ''} versionId={versionOpen?.after ?? ''} before={versionSides.before} after={versionSides.after} history={versionHistory} onclose={() => (versionOpen = null)} onchanged={sources.refresh} />
     {/if}
-    <SourceSyncPanel projectId={page.params.projectId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} assetUrl={tierUrl(AssetSize.Full)} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} />
+    <SourceSyncPanel projectId={page.params.projectId ?? ''} canvasId={page.params.canvasId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} assetUrl={tierUrl(AssetSize.Full)} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} oncompare={(id) => ((pickerOpen = sourceOpen && { ...sourceOpen, id }), (sourceOpen = null))} />
+    {#if pickerOpen}
+      <RefPicker projectId={page.params.projectId ?? ''} nodeId={pickerOpen.id} anchor={pickerOpen} onclose={() => (pickerOpen = null)} oncompared={(frames) => ((versionOpen = { before: pickerOpen?.id ?? '', after: frames[0] }), (pickerOpen = null))} />
+    {/if}
     <PrototypePlayerHost frames={playerFrames} />
     {#if showsPrototype}
       <PrototypeArrows {view} frames={overlayFrames} links={arrowLinks} elements={linkElements()} handle={pickedHandle()} aimingFrom={prototypeLink.draft ? (inside?.nodeId ?? null) : null} onpick={openLink} ondrag={dragLink} />
@@ -4812,7 +4849,7 @@
           {#if domIds.has(t.id)}
             <div class="gpu-dom-node" class:unshown={!handedOver(t)} data-testid="gpu-dom-node" data-id={t.id}>
               <NodeBoundary>
-                {@render props.tile({ id: t.id, selected: on })}
+                {@render props.tile({ id: t.id, selected: on, live: liveModes[t.id] ?? FrameMode.Snapshot })}
               </NodeBoundary>
             </div>
           {/if}
@@ -4885,6 +4922,7 @@
       onfigma={props.onFigmaImport ? () => props.onFigmaImport?.(viewCentre()) : undefined}
       onurl={props.onUrlImport ? () => props.onUrlImport?.(viewCentre()) : undefined}
       oncode={props.onCodeImport ? () => props.onCodeImport?.(viewCentre()) : undefined}
+      onlive={props.onLiveFrame ? () => props.onLiveFrame?.(viewCentre()) : undefined}
       ontrailer={panelNodeId ? startTrailer : undefined}
       onimage={insertImageInFrame}
       oncomment={props.onCommenting ? () => props.onCommenting?.(!props.commenting) : undefined}

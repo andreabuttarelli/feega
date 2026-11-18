@@ -18,7 +18,7 @@ async function until(check) {
 exports.run = async () => {
   const file = vscode.Uri.file(process.env.FEEGA_TEST_FILE);
   await vscode.commands.executeCommand('vscode.openWith', file, 'feega.canvas');
-  const api = vscode.extensions.getExtension('feega.feega');
+  const api = vscode.extensions.getExtension('AndreaButtarelli.feega');
   assert.ok(api.isActive, 'the extension activates on a .feega file');
 
   const servers = await until(() => api.exports.runningCanvases().length && api.exports.runningCanvases());

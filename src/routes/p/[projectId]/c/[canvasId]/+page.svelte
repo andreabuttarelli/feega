@@ -266,6 +266,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import UrlImportDialog from '$lib/components/canvas/UrlImportDialog.svelte';
   import { START_URL_PARAM, startHost, startUrlOf } from '$lib/start-url';
   import CodeImportDialog from '$lib/components/canvas/CodeImportDialog.svelte';
+  import LiveFrameDialog from '$lib/components/canvas/LiveFrameDialog.svelte';
+  import LiveFrameNode from '$lib/components/canvas/LiveFrameNode.svelte';
+  import { LIVE_HEIGHT, liveFrameData, liveFrameOf, liveRoutes, type Breakpoint } from '$lib/canvas/live-frame';
+  import { captureLiveSnapshot, devServerAction, devServerStatus } from '$lib/canvas/dev-server-client';
+  import { isLocalMode } from '$lib/local-user';
+  import { env as livePublicEnv } from '$env/dynamic/public';
   import InpaintDialog from '$lib/components/canvas/InpaintDialog.svelte';
   import OutpaintDialog from '$lib/components/canvas/OutpaintDialog.svelte';
   import ReframeDialog from '$lib/components/canvas/ReframeDialog.svelte';
@@ -4125,6 +4131,48 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   let figmaImportAt = $state<{ x: number; y: number } | null>(null);
   let urlImportAt = $state<{ x: number; y: number } | null>(null);
   let codeImportAt = $state<{ x: number; y: number } | null>(null);
+  let liveFrameAt = $state<{ x: number; y: number } | null>(null);
+  let devOrigin = $state<string | null>(null);
+  const liveLocal = isLocalMode(livePublicEnv);
+  const LIVE_POLL_MS = 4000;
+  const LIVE_SHOT_GAP_MS = 8000;
+  const LIVE_NODE_SCALE = 0.5;
+  const liveShots = new Map<string, number>();
+
+  onMount(() => {
+    if (!liveLocal) {
+      return;
+    }
+    const poll = () => devServerStatus().then((s) => (devOrigin = s.url), () => (devOrigin = null));
+    void devServerAction('start').then((s) => (devOrigin = s.url), () => (devOrigin = null));
+    const timer = setInterval(poll, LIVE_POLL_MS);
+    return () => clearInterval(timer);
+  });
+
+  function shootLive(id: string) {
+    const now = Date.now();
+    if (now - (liveShots.get(id) ?? 0) < LIVE_SHOT_GAP_MS) {
+      return;
+    }
+    liveShots.set(id, now);
+    void captureLiveSnapshot(id);
+  }
+
+  async function addLiveFrame(route: string, breakpoint: Breakpoint) {
+    const at = liveFrameAt ?? { x: 0, y: 0 };
+    liveFrameAt = null;
+    const data = liveFrameData(route, breakpoint);
+    const size = { w: data.live.width * LIVE_NODE_SCALE, h: LIVE_HEIGHT * LIVE_NODE_SCALE };
+    const spot = placeNear(at, size, occupiedRects());
+    const res = await post('create', { type: 'iframe', x: spot.x, y: spot.y, width: size.w, height: size.h, data: JSON.stringify(data) });
+    const created = (res?.node ?? null) as CanvasNodeRecord | null;
+    if (!created) {
+      return;
+    }
+    nodes = [...nodes.filter((node) => node.id !== created.id), toTile(created, { select: true })];
+    pushGesture(createGesture(created));
+    focusOn([created.id]);
+  }
   let startUrl = $state<string | null>(null);
 
   function takeStartUrl() {
@@ -4602,7 +4650,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     </p>
   {/if}
   {#if figmaShown}
-    <FigmaNotice notice={figmaShown} settingsHref="/p/{data.projectId}/settings/profile" onclose={() => (figmaPaste = null)} />
+    <FigmaNotice notice={figmaShown} settingsHref="/app/settings/profile" onclose={() => (figmaPaste = null)} />
   {/if}
   {#if techniqueNotice}
     <p class="warning" role="status" data-testid="technique-notice">{techniqueNotice}</p>
@@ -4655,6 +4703,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {#if inpaintFor}
     <InpaintDialog src={assetUrl(sourceAssetIdOf(nodes.find((n) => n.id === inpaintFor)?.data ?? {}) ?? '') ?? ''} onapply={(prompt, mask) => inpaint(inpaintFor!, prompt, mask)} onclose={() => (inpaintFor = null)} />
   {/if}
+  {#if liveFrameAt}
+    <LiveFrameDialog routes={liveRoutes(nodes.map((n) => n.data ?? {}))} onadd={(route, breakpoint) => void addLiveFrame(route, breakpoint)} onclose={() => (liveFrameAt = null)} />
+  {/if}
   {#if codeImportAt}
     <CodeImportDialog projectId={data.projectId} canvasId={data.canvas.id} at={codeImportAt} onimported={landImported} onclose={() => (codeImportAt = null)} />
   {/if}
@@ -4662,7 +4713,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     <UrlImportDialog projectId={data.projectId} canvasId={data.canvas.id} at={urlImportAt} {startUrl} onimported={siteImported} onclose={() => ((urlImportAt = null), (startUrl = null))} />
   {/if}
   {#if figmaImportAt}
-    <FigmaImportDialog projectId={data.projectId} canvasId={data.canvas.id} at={figmaImportAt} settingsHref="/p/{data.projectId}/settings/profile" onimported={figmaImported} onclose={() => (figmaImportAt = null)} />
+    <FigmaImportDialog projectId={data.projectId} canvasId={data.canvas.id} at={figmaImportAt} settingsHref="/app/settings/profile" onimported={figmaImported} onclose={() => (figmaImportAt = null)} />
   {/if}
   {#if formatsFor}
     <FormatsDialog oncreate={(targets) => createFormats(formatsFor!, targets)} onclose={() => (formatsFor = null)} />
@@ -4773,6 +4824,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onFigmaImport={(at) => (figmaImportAt = at)}
     onUrlImport={(at) => (urlImportAt = at)}
     onCodeImport={(at) => (codeImportAt = at)}
+    onLiveFrame={liveLocal ? (at) => (liveFrameAt = at) : undefined}
     onUndo={() => inTurn(undo)}
     onFrameStep={(step: FrameStep) => undoStack.push({ source: 'frame', step })}
     onfail={(message: string) => (failed = message)}
@@ -4852,7 +4904,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       {#if body === TileBody.Standin && hoverGen?.refId && !hoverGen.running}<OutputDragHandle nodeId={id} />{/if}
       {#if overMotion}<FrameLiveControls nodeId={id} interactive={!!overMotion.interactive} src={motionLivePath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} />{/if}
     {/snippet}
-    {#snippet tile({ id, selected })}
+    {#snippet tile({ id, selected, live })}
       {@const row = nodeById.get(id)}
       {#if row}
         {@const gen = genOf(row)}
@@ -4990,6 +5042,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
               {/if}
             {/snippet}
           </GenNode>
+        {:else if liveFrameOf(row.data)}
+          {@const liveFrame = liveFrameOf(row.data)}
+          {#if liveFrame}
+            <LiveFrameNode {id} {selected} onstep={(step: FrameStep) => undoStack.push({ source: 'frame', step })} onfail={(message: string) => (failed = `Not written to the code: ${message}`)} live={liveFrame} mode={live} origin={devOrigin} poster={liveFrame.poster ? canvasAssetUrl(data.projectId, data.canvas.id, liveFrame.poster, AssetSize.Full) : null} onsnapshot={() => shootLive(id)} />
+          {/if}
         {:else if frame}
           {@const codeRow = frame.source === 'view' ? nodes.find((n) => n.id === frame.sourceNodeId) : null}
           {@const code = codeRow ? frameOf(codeRow) : null}

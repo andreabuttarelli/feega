@@ -3,20 +3,19 @@
   import Hero from '$lib/site/home/Hero.svelte';
   import OpenSource from '$lib/site/home/OpenSource.svelte';
   import Codebase from '$lib/site/home/Codebase.svelte';
-  import Motion from '$lib/site/home/Motion.svelte';
-  import Generate from '$lib/site/home/Generate.svelte';
+  import Extras from '$lib/site/home/Extras.svelte';
   import Pricing from '$lib/site/pricing/Pricing.svelte';
   import { PLAN } from '$lib/site/pricing/plan';
-  import Agents from '$lib/site/home/Agents.svelte';
-  import Story from '$lib/site/home/Story.svelte';
-  import Faq from '$lib/site/home/Faq.svelte';
+  import FreeSection from '$lib/site/home/FreeSection.svelte';
+  import Modes from '$lib/site/home/Modes.svelte';
   import { HOME_JSON_LD } from '$lib/site/structured-data';
+  import { FIRST_VISIT_TAG } from '$lib/site/signed-in';
 
   import { HOME_META } from '$lib/site/seo';
-  import PillarRail from '$lib/site/chapters/PillarRail.svelte';
 </script>
 
 <svelte:head>
+  {@html FIRST_VISIT_TAG}
   <title>{HOME_META.title}</title>
   <meta name="description" content={HOME_META.description} />
   <meta property="og:title" content={HOME_META.title} />
@@ -30,29 +29,66 @@
 <Hero />
 <OpenSource />
 <div class="chapters">
-  <PillarRail />
   <Codebase />
-  <Motion />
-  <Generate />
+  <Extras />
 </div>
 
 <div class="cool">
-  <Agents />
+  <FreeSection />
   <Pricing plan={PLAN} />
 </div>
 
-<Story />
-<Faq />
+
+
+<section class="closing site-wide">
+  <h2>start designing in your code</h2>
+  <Modes id="closing-modes" />
+</section>
 </div>
 
 <LiveAgents />
 
 <style>
+  .closing {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 32px;
+    padding: 96px 20px;
+    text-align: center;
+  }
+
+  .closing :global(.modes) {
+    width: 100%;
+    max-width: none;
+  }
+
+  .closing h2 {
+    margin: 0;
+    font-family: 'Instrument Serif', serif;
+    font-size: 48px;
+    font-weight: 400;
+    line-height: 0.95;
+    letter-spacing: -0.04em;
+    color: #fff;
+  }
+
+  @media (min-width: 810px) {
+    .closing :global(.modes) {
+    width: 100%;
+    max-width: none;
+  }
+
+  .closing h2 {
+      font-size: 72px;
+    }
+  }
+
   .site-home {
     background: linear-gradient(#161616 0%, #000 5.37446%);
   }
 
   .cool {
-    background: #3d3d3d;
+    background: var(--site-raised);
   }
 </style>

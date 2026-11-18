@@ -63,6 +63,15 @@ describe('i link creati all’import', () => {
     expect(link).toMatchObject({ entry: 'app/blog/[slug]/page.tsx', route: '/blog/[slug]', routeParams: { slug: 'hello' } });
   });
 
+  it('una pagina con il prefisso della lingua si lega alla sua rotta', async () => {
+    const links = pages(await importLinks({ ...imported, landed: ['/en/pricing', '/pt-BR/blog/ola'] }, read));
+
+    expect(links).toMatchObject([
+      { entry: 'app/pricing/page.tsx', route: '/pricing' },
+      { entry: 'app/blog/[slug]/page.tsx', route: '/blog/[slug]', routeParams: { slug: 'ola' } }
+    ]);
+  });
+
   it('nessuna pagina riconosciuta: nessun link', async () => {
     expect(await importLinks({ ...imported, landed: ['/missing'] }, read)).toEqual([]);
   });
@@ -78,7 +87,7 @@ describe('la chiave di un link', () => {
 
 const memoryLinks = () => {
   const saved = new Map<string, CodeLink>();
-  const links: LinkStore = { read: async (id) => saved.get(id) ?? null, all: async (id) => (saved.has(id) ? [saved.get(id)!] : []), save: async (id, l) => Boolean(l.entryKind === EntryKind.Page && saved.set(id, l)), remove: async (id) => saved.delete(id) };
+  const links: LinkStore = { read: async (id) => saved.get(id) ?? null, all: async (id) => (saved.has(id) ? [saved.get(id)!] : []), inProject: async () => [...saved.values()], save: async (id, l) => Boolean(l.entryKind === EntryKind.Page && saved.set(id, l)), remove: async (id) => saved.delete(id) };
   return { saved, links };
 };
 

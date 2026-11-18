@@ -1,0 +1,34 @@
+name: Source map release (feega-source-map)
+
+on:
+  push:
+    branches: [main]
+    paths: ['packages/source-map/**']
+    tags: ['source-map-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+      - name: Publish unless this version is already on npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cp -R packages/source-map "$RUNNER_TEMP/source-map"
+          cd "$RUNNER_TEMP/source-map"
+          V=$(node -p "require('./package.json').version")
+          if npm view "feega-source-map@$V" version >/dev/null 2>&1; then
+            echo "feega-source-map@$V is already on npm"
+            exit 0
+          fi
+          npm install --no-save --no-package-lock typescript@5.9.3 @types/node@22 vite@7
+          npm publish --access public

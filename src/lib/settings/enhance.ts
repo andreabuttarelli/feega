@@ -60,7 +60,7 @@ export function enhance(form: HTMLFormElement, submit?: SubmitFunction) {
       return;
     }
 
-    const result = await postSettingsAction(target.projectId, target.section, target.action, formData);
+    const result = await postSettingsAction(target.api,target.section, target.action, formData);
     const update = updater(form, result);
     if (typeof after === 'function') {
       await after({ action, formData, formElement: form, result, update });

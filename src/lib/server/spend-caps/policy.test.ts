@@ -1,10 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { CapReset, CapScope, applicableCaps, capSince, firstReached, type SpendCap } from './policy';
+import { CapReset, CapScope, applicableCaps, capScopesOn, capSince, editableCaps, firstReached, type SpendCap } from './policy';
 
 const member: SpendCap = { scope: CapScope.OrgMember, projectId: null, capUsd: 10, reset: CapReset.None };
 const inProject: SpendCap = { scope: CapScope.ProjectMember, projectId: 'p1', capUsd: 5, reset: CapReset.None };
 const total: SpendCap = { scope: CapScope.ProjectTotal, projectId: 'p1', capUsd: 50, reset: CapReset.Monthly };
 const elsewhere: SpendCap = { scope: CapScope.ProjectTotal, projectId: 'p2', capUsd: 1, reset: CapReset.None };
+
+describe('which caps a settings surface edits', () => {
+  it('the dashboard edits the org member cap only', () => {
+    expect(capScopesOn(null)).toEqual([CapScope.OrgMember]);
+  });
+
+  it('a project edits its own member and total caps, never the org one', () => {
+    expect(capScopesOn('p1')).toEqual([CapScope.ProjectMember, CapScope.ProjectTotal]);
+  });
+
+  it('shows only the caps of its surface', () => {
+    expect(editableCaps([member, inProject, total, elsewhere], null)).toEqual([member]);
+    expect(editableCaps([member, inProject, total, elsewhere], 'p1')).toEqual([inProject, total]);
+  });
+});
 
 describe('which caps a run answers to', () => {
   it('the member cap of the org and the caps of the project it runs in', () => {

@@ -61,15 +61,15 @@ describe('GET /api/v1/me/bootstrap: the dashboard layouts in one call', () => {
 
   it('returns the same terms and tour flags the root layout loads', async () => {
     const url = new URL('https://feega.test/app');
-    const root = (await (rootLoad as (e: unknown) => Promise<{ termsNoticeVersion: string | null; tour: TourState }>)({
+    const root = (await (rootLoad as (e: unknown) => Promise<{ termsNoticeVersion: string | null; tour: TourState; viewerName: string | null }>)({
       url,
       untrack: <T>(fn: () => T): T => fn(),
       locals
-    })) as { termsNoticeVersion: string | null; tour: TourState };
+    })) as { termsNoticeVersion: string | null; tour: TourState; viewerName: string | null };
 
     const { body } = await call({ authorization: 'Bearer jwt' });
 
-    expect(body.flags).toEqual({ termsNoticeVersion: root.termsNoticeVersion, tour: root.tour });
+    expect(body.flags).toEqual({ termsNoticeVersion: root.termsNoticeVersion, tour: root.tour, name: root.viewerName });
     expect(body.flags.termsNoticeVersion).not.toBeNull();
   });
 

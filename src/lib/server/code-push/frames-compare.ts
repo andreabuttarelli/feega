@@ -23,7 +23,7 @@ export type { VersionMark };
 
 export type Place = { canvasId: string; x: number; y: number; w: number; h: number };
 
-export type ImportAtAsk = { link: CodeLink; sha: string; canvasId: string; at: { x: number; y: number } };
+export type ImportAtAsk = { link: CodeLink; sha: string; canvasId: string; centre: { x: number; y: number } };
 
 export type CompareDeps = Pick<FramesDeps, 'host'> & {
   links: Pick<FramesDeps['links'], 'read'>;
@@ -94,7 +94,7 @@ async function landVersion(deps: CompareDeps, from: Opened & { of: string }, ref
     return sha;
   }
 
-  const landed = await deps.importAt({ link: from.link, sha, canvasId: from.place.canvasId, at });
+  const landed = await deps.importAt({ link: from.link, sha, canvasId: from.place.canvasId, centre: at });
   if ('error' in landed) {
     return { ok: false, refusal: IMPORT_FAILED, ref, error: landed.error };
   }
@@ -103,6 +103,8 @@ async function landVersion(deps: CompareDeps, from: Opened & { of: string }, ref
   await deps.mark(landed.frameId, mark);
   return { ...mark, frameId: landed.frameId };
 }
+
+const centreOf = (place: Place, shift: number) => ({ x: place.x + shift + place.w / 2, y: place.y + place.h / 2 });
 
 const isRefused = (v: VersionFrame | CompareRefused): v is CompareRefused => 'ok' in v;
 
@@ -114,7 +116,7 @@ export async function frameCompare(deps: CompareDeps, ask: CompareAsk): Promise<
 
   const versions: VersionFrame[] = [];
   for (const [i, ref] of ask.refs.entries()) {
-    const at = { x: from.place.x + (i + 1) * (from.place.w + VERSION_GAP), y: from.place.y };
+    const at = centreOf(from.place, (i + 1) * (from.place.w + VERSION_GAP));
     const landed = await landVersion(deps, { ...from, of: ask.nodeId }, ref, at);
     if (isRefused(landed)) {
       return landed;
@@ -134,7 +136,7 @@ export async function frameRetarget(deps: CompareDeps, ask: RetargetAsk): Promis
     return from;
   }
 
-  const landed = await landVersion(deps, { ...from, of: mark.of }, ask.ref, { x: from.place.x, y: from.place.y });
+  const landed = await landVersion(deps, { ...from, of: mark.of }, ask.ref, centreOf(from.place, 0));
   if (isRefused(landed)) {
     return landed;
   }

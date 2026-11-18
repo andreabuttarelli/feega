@@ -1,4 +1,5 @@
 import { error } from '@sveltejs/kit';
+import { INERT_DOCUMENT_HEADERS } from '$lib/canvas/iframe-node';
 import type { RequestHandler } from './$types';
 import { assertPublicUrl } from '$lib/server/tool-guard';
 import { registryBundle } from '$lib/server/registry-components/registry-item';
@@ -16,5 +17,5 @@ export const GET: RequestHandler = async ({ url }) => {
 
   const props = JSON.parse(url.searchParams.get('props') || '{}') as Record<string, unknown>;
   const bundle = await registryBundle(registry).catch((e: Error) => error(BAD_GATEWAY, e.message));
-  return new Response(previewPage(bundle, props), { headers: { 'content-type': 'text/html; charset=utf-8' } });
+  return new Response(previewPage(bundle, props), { headers: { ...INERT_DOCUMENT_HEADERS, 'content-type': 'text/html; charset=utf-8' } });
 };

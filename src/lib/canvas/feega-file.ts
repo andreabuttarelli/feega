@@ -31,7 +31,8 @@ const manifestSchema = z.object({
   exportedAt: z.string(),
   canvasName: z.string(),
   source: z.object({ projectId: z.string(), canvasId: z.string() }),
-  acpAgent: z.string().nullable().optional()
+  acpAgent: z.string().nullable().optional(),
+  acpModels: z.record(z.string(), z.string()).optional()
 });
 
 const canvasSchema = z.object({
@@ -69,7 +70,8 @@ const canvasSchema = z.object({
       url: z.string().nullable(),
       file: z.string().nullable()
     })
-  )
+  ),
+  codeLinks: z.array(z.record(z.string(), z.unknown())).optional()
 });
 
 export type FeegaManifest = z.infer<typeof manifestSchema>;

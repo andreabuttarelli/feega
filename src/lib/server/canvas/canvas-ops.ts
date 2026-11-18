@@ -105,7 +105,10 @@ import { frameVersions } from '$lib/server/code-push/frames-versions';
 import { frameCompare, frameRetarget, MAX_VERSIONS } from '$lib/server/code-push/frames-compare';
 import { actionDeps, compareDeps } from '$lib/server/code-push/compare-runtime';
 import { VersionAction, versionAction } from '$lib/server/code-push/frames-version-actions';
-import { framesDeps, importLinker } from '$lib/server/code-push/frames-runtime';
+import { framesDeps, importLinker, variantDeps } from '$lib/server/code-push/frames-runtime';
+import { frameVariant } from '$lib/server/code-push/variants';
+import { ConflictChoice, frameConflicts, frameResolve } from '$lib/server/code-push/conflicts';
+import { VariantChoice } from '$lib/canvas/source-changes';
 import { libsOrigin } from '$lib/server/motion/libs-origin';
 import { GithubRefusal } from '$lib/server/code-import/github-http';
 import { MAX_STORIES } from '$lib/server/code-import/storybook';
@@ -1151,7 +1154,7 @@ export const CANVAS_OPS = {
 
   github_push: op({
     access: Access.Write,
-    input: z.object({ name: z.string().min(1).max(100).describe('names the branch feega/<name>; later pushes update its pull request until it is merged, then a new branch opens'), nodeIds: z.array(z.string()).min(1).max(50).describe('code frames imported from one GitHub repo'), title: z.string().max(200).optional(), body: z.string().max(10_000).optional(), confirmSensitive: z.boolean().optional().describe('true after the user agreed to change config files, lockfiles or dotfiles') }).strict(),
+    input: z.object({ name: z.string().min(1).max(100).describe('names the branch feega/<name>; later pushes update its pull request until it is merged, then a new branch opens'), nodeIds: z.array(z.string()).min(1).max(50).describe('code frames imported from one GitHub repo'), title: z.string().max(200).optional(), body: z.string().max(10_000).optional(), confirmSensitive: z.boolean().optional().describe('true after the user agreed to change config files, lockfiles or dotfiles'), mains: z.array(z.string()).max(50).optional().describe('frames whose instance edits go to the main component file instead of props at the usage site'), variants: z.array(z.object({ nodeId: z.string(), choice: z.enum(VariantChoice).describe('replace the original files, push as a new route, or keep on canvas only'), route: z.string().max(300).optional() })).max(50).optional() }).strict(),
     run: async (ctx, input) => framesPush(framesDeps(ctx.db, ctx), figmaScope(ctx), input)
   }),
 
@@ -1165,6 +1168,24 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: z.object({ nodeId: z.string() }).strict(),
     run: async (ctx, input) => frameUndo(framesDeps(ctx.db, ctx), input.nodeId)
+  }),
+
+  github_variant: op({
+    access: Access.Write,
+    input: z.object({ canvasId: z.string(), nodeId: z.string() }).strict(),
+    run: async (ctx, input) => frameVariant(variantDeps(ctx.db, ctx, input.canvasId), input.nodeId)
+  }),
+
+  github_conflicts: op({
+    access: Access.Read,
+    input: z.object({ nodeId: z.string() }).strict(),
+    run: async (ctx, input) => frameConflicts(framesDeps(ctx.db, ctx), figmaScope(ctx), input.nodeId)
+  }),
+
+  github_resolve: op({
+    access: Access.Write,
+    input: z.object({ nodeId: z.string(), choice: z.enum(ConflictChoice).describe('keep_canvas: the canvas version wins on push; agent: answers a prompt with base, canvas and GitHub versions to merge') }).strict(),
+    run: async (ctx, input) => frameResolve(framesDeps(ctx.db, ctx), figmaScope(ctx), input.nodeId, input.choice)
   }),
 
   github_versions: op({

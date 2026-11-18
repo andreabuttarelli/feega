@@ -59,6 +59,8 @@ feega github versions <projectId> <nodeId> [--ref <branch|tag|sha>] [--limit 30]
 
 ## Compare versions
 
+Click the GitHub state icon on a linked frame or component and choose **Compare versions**. The picker lists branches, tags, open pull requests and recent commits with message and author; tick up to four and press **Compare**.
+
 Comparing imports the same page or component at up to four other refs — a branch, a tag, a commit sha, or `#12` for a pull request — and places each one beside the original as a **version frame**. Its header shows the ref (`main`, `feega/x`, `abc1234`, `PR #12`) with a git icon. A version frame is read-only: its layers are locked, it has no link, and it is never pushed.
 
 ```bash
@@ -89,7 +91,7 @@ feega github version-ref <projectId> <versionId> <ref>
 
 ```bash
 feega github restore <projectId> <versionId>
-feega github variant <projectId> <versionId>
+feega github version-variant <projectId> <versionId>
 feega github code-diff <projectId> <versionId>
 ```
 
@@ -122,6 +124,24 @@ Refusals answer `{ ok: false, refusal }`: `not_connected`, `read_only` (403, wit
 ## What a frame is linked to
 
 An import links its frame to every page it captured, one link per route, each carrying the route's whole import graph: a change upstream to any file a page imports marks that frame as newer. Components from your library that those pages use get a main link to their own file and one instance link per page that uses them. The first poster saved after import is kept as the "before" thumbnail, shown next to the current one in the Changes panel.
+
+## Main components and instances
+
+An edit on a main component changes the component file: every page using it changes, and the Changes panel says how many pages are affected before you push. An edit on an instance stays at that usage site: a text that comes from a prop rewrites that prop, a style becomes a `style` override when the component accepts one. When no prop fits, the edit is not written and the status lists it under `proposals`, for the agent to add the prop. Tick **Apply instance edits to main component** (or pass `mains` / `--main`) to write them to the component file instead.
+
+## Variants
+
+**Duplicate** gives an unlinked copy. **Make variant** (the GitHub popover, `github_variant`, `feega github variant <projectId> <canvasId> <nodeId>`) gives a copy linked as a variant of the original. Its first push answers `variant_choice` with a suggested route; pick **Replace original** (writes the original files), **New route** (writes the edited page at the new route's file, following the page's convention, e.g. `app/pricing-b/page.tsx`) or **Keep on canvas** (pushes nothing). The API and MCP take `variants: [{ nodeId, choice: replace | new_route | keep, route? }]`; the CLI takes `--variant <nodeId>:<choice>[:<route>]`.
+
+## Conflicts
+
+When a file you edited on the canvas also changed on GitHub, the frame shows a conflict. **Resolve** opens a split view with the canvas and GitHub versions of each file, and three ways out:
+
+- **Keep canvas**: the canvas version wins; the next push writes it over the GitHub change.
+- **Take GitHub**: runs **Update**, pulling GitHub's version into the frame.
+- **Resolve with agent**: copies a merge prompt holding the base, canvas and GitHub versions, to hand to the agent.
+
+API: `GET /api/v1/projects/:id/github/push/conflicts?nodeId=` and `POST` with `{ nodeId, choice: keep_canvas | agent }`. MCP: `github_conflicts`, `github_resolve`. CLI: `feega github conflicts`, `feega github resolve`. A property-level three-way merge, which would settle most conflicts on its own, is not built yet.
 
 ## Local folders
 

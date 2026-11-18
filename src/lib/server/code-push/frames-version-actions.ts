@@ -62,7 +62,8 @@ export async function frameCodeDiff(deps: ActionDeps, versionId: string): Promis
   if ('ok' in v) {
     return v;
   }
-  return { ok: true, from: v.mark.sha, to: v.link.baseBranch, files: await diffOf(v, v.link.baseBranch) };
+  const files = (await diffOf(v, v.link.baseBranch)).map((f) => ({ path: f.path, before: f.after, after: f.before }));
+  return { ok: true, from: v.link.baseBranch, to: v.mark.sha, files };
 }
 
 export { VersionAction };

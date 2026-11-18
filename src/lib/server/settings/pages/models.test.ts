@@ -23,7 +23,6 @@ function event(role: string, entries: [string, string][] = []) {
   const fake = fakeDb(
     {
       orgs_members: [{ org_id: 'org-1', user_id: 'user-1', role }],
-      projects: [{ id: 'p-1', org_id: 'org-1', brand_id: null, archived_at: null }],
       org_model_allowlist: [{ org_id: 'org-1', medium: 'image', model_id: 'img-a' }]
     },
     { filter: true }
@@ -32,7 +31,7 @@ function event(role: string, entries: [string, string][] = []) {
   return {
     fake,
     event: {
-      params: { projectId: 'p-1' },
+      params: {},
       parent: async () => shell(role),
       locals: { supabase: fake.db },
       request: { formData: async () => formOf(entries) }

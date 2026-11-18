@@ -6,7 +6,7 @@
   import { openSheet, closeSheet } from '$lib/canvas/sheet-nav';
   import { SHEET_PAGE_LOADERS, settingsSheetSection } from '$lib/canvas/sheet-pages';
   import { sheetEntryForPath } from '$lib/shell-nav';
-  import { SETTINGS_GROUPS, SETTINGS_HOME } from '$lib/components/settings/platforms';
+  import { CANVAS_SETTINGS_GROUPS, SETTINGS_HOME } from '$lib/components/settings/platforms';
   import { cn } from '$lib/utils';
 
   let { projectId }: { projectId: string } = $props();
@@ -21,7 +21,7 @@
    *
    * Settings ha 13 sezioni che cambiano nel tempo (Agent F ne aggiunge): `settingsPageLoader`
    * (`sheet-pages.ts`) le trova per cartella con `import.meta.glob`, una sezione nuova non
-   * richiede una riga qui, e lo switcher qui sotto legge lo stesso `SETTINGS_GROUPS` di Agent F —
+   * richiede una riga qui, e lo switcher qui sotto legge lo stesso `CANVAS_SETTINGS_GROUPS` di Agent F —
    * non un elenco duplicato. Calendar e Ads non hanno sotto-sezioni, quindi restano importate
    * dirette — la stessa asimmetria che ha già il filesystem delle rotte.
    */
@@ -55,7 +55,7 @@
         {#if entry.id === 'settings'}
           <div class="settings-shell">
             <nav class="settings-switcher" aria-label={$_('app.nav.settings')}>
-              {#each SETTINGS_GROUPS as group (group.labelKey)}
+              {#each CANVAS_SETTINGS_GROUPS as group (group.labelKey)}
                 <p class="switcher-group">{$_(group.labelKey)}</p>
                 {#each group.items as item (item.section)}
                   <button

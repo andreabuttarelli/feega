@@ -1,5 +1,6 @@
 <script lang="ts">
   import { CODEBASE } from '$lib/site/codebase';
+  import { lower } from '$lib/site/lower';
   import CodebaseStory from '$lib/site/codebase/CodebaseStory.svelte';
 </script>
 
@@ -16,8 +17,8 @@
   <CodebaseStory level="h1" />
 
   <section class="close">
-    <h2>Bring your codebase.</h2>
-    <a class="site-pill" href={CODEBASE.start.href}>{CODEBASE.start.label}</a>
+    <h2>bring your codebase.</h2>
+    <a class="site-pill" href={CODEBASE.start.href}>{lower(CODEBASE.start.label)}</a>
   </section>
 </article>
 

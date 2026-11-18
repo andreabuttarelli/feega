@@ -52,30 +52,7 @@ export const count = (credits: number): string => Math.ceil(credits).toLocaleStr
 
 export const money = (plan: CloudPlan, amount: number): string => `${plan.currency}${amount}`;
 
-export const topUpsFor = (plan: CloudPlan, gap: number): TopUp[] => {
-  const largest = plan.topUps[plan.topUps.length - 1];
-  const full = Math.floor(gap / largest.credits);
-  const rest = gap - full * largest.credits;
-  const parts: TopUp[] = Array(full).fill(largest);
-  if (rest === 0) {
-    return parts;
-  }
-
-  return [...parts, plan.topUps.find((t) => t.credits >= rest) ?? largest];
-};
-
-export const MAX_SEATS = 20;
-
-export const estimate = (plan: CloudPlan, seats: number, images: number, clips: number) => {
-  const included = seats * plan.includedCredits;
-  const credits = Math.ceil(creditsFor(IMAGE, images) + creditsFor(CLIP, clips));
-  const gap = Math.max(0, credits - included);
-  return { cost: seats * plan.price, included, credits, gap, topUps: topUpsFor(plan, gap) };
-};
-
 export const priceUnit = (plan: CloudPlan): string => `/ ${plan.per} / ${plan.period}`;
-
-export const seats = (plan: CloudPlan, n: number): string => `${n} ${plan.per}${n === 1 ? '' : 's'}`;
 
 export const SEAT_RULE = 'Only people who edit pay. Viewers and your AI agents are free.';
 
@@ -86,19 +63,27 @@ export const topUpPrices = (plan: CloudPlan): string => {
 
 export const CLOUD_FOR = 'For teams, and anyone who wants AI without managing keys.';
 
-export const CLOUD_BENEFITS = [
-  'Every AI model in one place, no keys to manage',
-  'The AI assistant inside the editor',
-  'Real-time collaboration with your whole team',
-  'Your agents connect through our hosted MCP',
-  'Unlimited agent edits',
-  'Import your brand, products and social posts'
+export const LOCAL_NOTE = 'No account, no card.';
+
+export const LOCAL_FOR = 'The open-source app on your own computer.';
+
+export const LOCAL_LINES = [
+  'One canvas in one .feega file',
+  'Open source, Apache-2.0',
+  'Your agents connect through local MCP',
+  'AI with your own provider keys'
 ] as const;
 
-export const CREDIT_RULES = 'Credits are spent only by AI. Designing, editing and exporting are free.';
+export const CLOUD_LINES = [
+  'The same editor, plus real-time collaboration',
+  'Every AI model, no keys to manage',
+  'Your agents via our hosted MCP, unlimited edits',
+  'Only editors pay, viewers are free'
+] as const;
 
-export const outOfCredits = (plan: CloudPlan): string =>
-  `Run out? AI pauses until next ${plan.period}'s credits arrive, or top up ${topUpPrices(plan)}. Credits never expire.`;
+export const freeStart = (plan: CloudPlan): string => `Start free: ${FREE_EDITORS} ${plan.per}, ${count(FREE_CREDITS)} credits, no card.`;
+
+export const creditsLine = (plan: CloudPlan): string => `${count(plan.includedCredits)} AI credits per ${plan.per} a ${plan.period}, carried over.`;
 
 export const getsYou = (plan: CloudPlan): string =>
   `${count(plan.includedCredits)} credits per ${plan.per} each ${plan.period}, shared by the team: about ${outcomesIn(plan.includedCredits, IMAGE)} images or ${outcomesIn(plan.includedCredits, CLIP)} short HD video clips per ${plan.per}. Unused credits carry over.`;
@@ -110,40 +95,19 @@ export const bringYourAgent = (plan: CloudPlan): string =>
   `Bring the agent you already pay for: ${agentList()} edits your canvas through our MCP server or CLI, up to ${count(plan.freeAgentLayersPerWeek)} agent-made layers in any 7 days for free.`;
 
 export const agentAnswer = (plan: CloudPlan): string =>
-  `Yes. Connect ${agentList()} through our MCP server or CLI and it works on your canvas with your permissions, on the subscription you already have. Free teams get up to ${count(plan.freeAgentLayersPerWeek)} agent-made layers in any 7 days; the paid plan has no limit. Feega's built-in AI is separate and uses credits. Edits you make by hand are never limited.`;
+  `Yes. ${agentList()} work on your canvas through our MCP server or CLI, on the subscription you already have. Free teams get ${count(plan.freeAgentLayersPerWeek)} agent-made layers in any 7 days; the paid plan has no limit.`;
 
 export const moreSeats = (plan: CloudPlan): string =>
   `More ${plan.per}s need the plan, and only the team owner can add one. Each is charged ${money(plan, plan.price)} a ${plan.period} from the day they accept, prorated to your renewal.`;
 
-export const seatCost = (plan: CloudPlan, n: number, cost: number, included: number): string =>
-  `${seats(plan, n)} ${n === 1 ? 'costs' : 'cost'} ${money(plan, cost)} and ${n === 1 ? 'includes' : 'include'} ${count(included)}.`;
+export const seatAnswer = (plan: CloudPlan): string =>
+  `Anyone who edits; viewers and AI agents are free. Extra ${plan.per}s are ${money(plan, plan.price)} a ${plan.period} each, prorated to your renewal, and only the team owner can add them.`;
 
 export const creditsAnswer = (plan: CloudPlan): string =>
-  `In the cloud, AI runs are paid in credits: 100 credits = ${money(plan, 1)}. A run costs ${CREDITS_PER_PROVIDER_USD} credits for every $1 the AI provider charges. The plan is ${money(plan, plan.price)} per ${plan.per} per ${plan.period}, and each ${plan.per} adds ${count(plan.includedCredits)} credits a ${plan.period} to a pool the team shares. Unused credits carry over. Viewers and AI agents are free. Top-ups of ${topUpPrices(plan)} never expire. Running locally with your own keys needs no credits.`;
+  `Only AI spends credits, at ${CREDITS_PER_PROVIDER_USD} credits for every $1 the AI provider charges (100 credits = ${money(plan, 1)}). Designing, editing and exporting are free, and each ${plan.per} adds ${count(plan.includedCredits)} credits a ${plan.period} to the team's pool, carried over.`;
 
-export const pricingFaq = (plan: CloudPlan) => [
-  {
-    q: 'Can I use Feega for free?',
-    a: `Yes. Run npx feega and the full editor is yours on your machine, free, with your own AI keys. In the cloud, a team with ${FREE_EDITORS} ${plan.per} is free, with unlimited viewers and ${count(FREE_CREDITS)} credits to try AI.`
-  },
-  {
-    q: `Who counts as an ${plan.per}?`,
-    a: `Anyone in your team who edits. A free team has ${FREE_EDITORS} ${plan.per} and unlimited viewers. More ${plan.per}s need the paid plan, and only the team owner can add one: each is charged ${money(plan, plan.price)} a ${plan.period} from the day they accept, prorated to your renewal, and adds ${count(plan.includedCredits)} credits to the team's pool. Removing an ${plan.per} doesn't refund their seat: it stays paid until renewal. Viewers, and AI agents working through MCP or the CLI, are always free.`
-  },
-  {
-    q: 'Can I use my own AI agent?',
-    a: agentAnswer(plan)
-  },
-  {
-    q: 'What is a credit?',
-    a: `What AI costs in the cloud. 100 credits = ${money(plan, 1)}, and a run costs ${CREDITS_PER_PROVIDER_USD} credits for every $1 the AI provider charges. Designing, editing and exporting cost nothing.`
-  },
-  {
-    q: 'What happens when I run out?',
-    a: `AI actions pause until next ${plan.period}'s credits arrive or you top up (${topUpPrices(plan)}). Everything else keeps working, and no credits expire.`
-  },
-  {
-    q: 'Can I cancel?',
-    a: "Yes, from the billing portal on your team's Credits page. Credits you bought stay yours. When the plan ends or goes unpaid, every editor except the owner becomes a viewer."
-  }
-];
+export const runOutAnswer = (plan: CloudPlan): string =>
+  `AI pauses until next ${plan.period}'s credits arrive or you top up with ${topUpPrices(plan)}; everything else keeps working. Credits never expire.`;
+
+export const freeAnswer = (plan: CloudPlan): string =>
+  `Yes. Run npx feega for the full editor on your computer with your own AI keys. In the cloud, ${FREE_EDITORS} ${plan.per} is free with unlimited viewers and ${count(FREE_CREDITS)} AI credits, no card.`;

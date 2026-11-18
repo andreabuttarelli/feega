@@ -2,8 +2,9 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { CodeScope } from '$lib/server/code-import/canvas-import';
-import { applyEdits, type SourceEdit } from '$lib/server/code-import/write-back';
-import { git } from './git-cli';
+import type { SourceEdit } from '$lib/server/code-import/write-back';
+import { EditTarget, routedEdits } from '$lib/server/code-import/instance-edits';
+import { commitTree, git } from './git-cli';
 import type { FramesDeps } from './frames-push';
 import { linkKey, type CodeLink } from './link';
 import type { LinkStore } from './link-store';
@@ -24,9 +25,9 @@ export default function Page() {
 
 export const BUTTON = `'use client';
 
-export function Button({ label, tone = 'primary' }: { label: string; tone?: 'primary' | 'ghost' }) {
+export function Button({ label }: { label: string }) {
   return (
-    <button className={tone === 'primary' ? 'rounded-md bg-blue-600 px-4 py-2 text-white' : 'rounded-md px-4 py-2'} onClick={() => console.log('clicked', label)}>
+    <button className="rounded-md bg-blue-600 px-4 py-2 text-white" onClick={() => console.log('clicked', label)}>
       {label}
     </button>
   );
@@ -67,7 +68,7 @@ const run = async (dir: string, args: string[]) => {
   return done.out.trim();
 };
 
-export type World = { origin: string; clone: string; at: (ref: string, path: string) => Promise<string | null>; changed: (from: string, to: string) => Promise<string[]>; run: (args: string[]) => Promise<string>; done: () => Promise<void> };
+export type World = { origin: string; clone: string; upstream: (path: string, content: string) => Promise<string>; at: (ref: string, path: string) => Promise<string | null>; changed: (from: string, to: string) => Promise<string[]>; run: (args: string[]) => Promise<string>; done: () => Promise<void> };
 
 export async function fixtureWorld(): Promise<World> {
   const origin = await mkdtemp(join(tmpdir(), 'feega-origin-'));
@@ -92,7 +93,13 @@ export async function fixtureWorld(): Promise<World> {
     return done.code ? null : done.out;
   };
   const changed = async (from: string, to: string) => (await run(origin, ['diff', '--name-only', from, to])).split('\n').filter(Boolean);
-  return { origin, clone, at, changed, run: (args) => run(clone, args), done: () => Promise.all([rm(origin, { recursive: true, force: true }), rm(clone, { recursive: true, force: true })]).then(() => undefined) };
+  const upstream = async (path: string, content: string) => {
+    const head = await run(origin, ['rev-parse', 'main']);
+    const made = await commitTree(origin, [{ path, content }], [head], 'upstream change');
+    await run(origin, ['update-ref', 'refs/heads/main', made.out.trim()]);
+    return made.out.trim();
+  };
+  return { origin, clone, upstream, at, changed, run: (args) => run(clone, args), done: () => Promise.all([rm(origin, { recursive: true, force: true }), rm(clone, { recursive: true, force: true })]).then(() => undefined) };
 }
 
 export function memoryLinks(): LinkStore & { every: () => { nodeId: string; link: CodeLink }[] } {
@@ -102,6 +109,7 @@ export function memoryLinks(): LinkStore & { every: () => { nodeId: string; link
     all: async (id) => [...of(id).values()],
     read: async (id) => [...of(id).values()][0] ?? null,
     save: async (id, link) => Boolean(of(id).set(linkKey(link), link)),
+    inProject: async () => [...saved.values()].flatMap((links) => [...links.values()]),
     remove: async (id) => saved.delete(id),
     every: () => [...saved].flatMap(([nodeId, links]) => [...links.values()].map((link) => ({ nodeId, link })))
   };
@@ -111,14 +119,14 @@ export type FrameEdits = Map<string, SourceEdit[]>;
 
 export function fixtureDeps(world: World, links: LinkStore, edits: FrameEdits): FramesDeps {
   const host = localGitHost(world.clone, { publish: Publish.Origin });
-  const read = (path: string) => host.readFile(path, 'main');
   return {
     host: async () => host,
     links,
     lock: memoryLock(),
-    edits: async (_scope, nodeId) => {
-      const done = await applyEdits(edits.get(nodeId) ?? [], read);
-      return { repo: world.clone, kind: 'folder', files: done.files.map((f) => ({ path: f.path, content: f.after })), skipped: done.skipped };
+    edits: async (_scope, nodeId, target = EditTarget.Instance) => {
+      const base = (await links.read(nodeId))?.baseSha ?? 'main';
+      const done = await routedEdits(edits.get(nodeId) ?? [], (path) => host.readFile(path, base), target);
+      return { repo: world.clone, kind: 'folder', files: done.files.map((f) => ({ path: f.path, content: f.after })), skipped: done.skipped, proposals: done.proposals };
     }
   };
 }

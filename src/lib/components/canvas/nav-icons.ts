@@ -7,6 +7,7 @@ import Layers from '@lucide/svelte/icons/layers';
 import Component from '@lucide/svelte/icons/component';
 import History from '@lucide/svelte/icons/history';
 import SwatchBook from '@lucide/svelte/icons/swatch-book';
+import Sparkles from '@lucide/svelte/icons/sparkles';
 import type { Component as SvelteComponent } from 'svelte';
 import type { NavEntry } from '$lib/shell-nav';
 
@@ -19,5 +20,6 @@ export const NAV_ICONS: Record<NavEntry['icon'], SvelteComponent<{ size?: number
   layers: Layers,
   components: Component,
   history: History,
-  styles: SwatchBook
+  styles: SwatchBook,
+  sparkles: Sparkles
 };

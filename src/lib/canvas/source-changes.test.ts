@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SourceAction, changedRows, popoverOf, pushAskOf, ciOf, CiState, type FrameSync } from './source-changes';
+import { SourceAction, pushLabel, changedRows, popoverOf, pushAskOf, ciOf, CiState, filesOfPatch, filesToPush, impactOf, pushedNote, rowTitle, type FrameSync } from './source-changes';
 
 const sync = (over: Partial<FrameSync> = {}): FrameSync => ({
   nodeId: 'n1',
@@ -14,9 +14,11 @@ const pull = (status: string, checks: { conclusion: string | null }[] = []) => (
 
 describe('il popover di un frame collegato', () => {
   it('dice file, commit corto e le azioni che lo stato permette', () => {
-    expect(popoverOf(sync({ state: 'in_sync' }))).toEqual({ file: 'app/page.tsx', commit: 'abcdef1', branch: 'main', actions: [SourceAction.Detach] });
-    expect(popoverOf(sync({ state: 'newer_upstream' })).actions).toEqual([SourceAction.Update, SourceAction.Detach]);
-    expect(popoverOf(sync({ state: 'in_pull', push: { pull: pull('open') } })).actions).toEqual([SourceAction.ViewPr, SourceAction.Detach]);
+    expect(popoverOf(sync({ state: 'in_sync' }))).toEqual({ file: 'app/page.tsx', commit: 'abcdef1', branch: 'main', actions: [SourceAction.MakeVariant, SourceAction.Detach] });
+    expect(popoverOf(sync({ state: 'newer_upstream' })).actions).toEqual([SourceAction.Update, SourceAction.MakeVariant, SourceAction.Detach]);
+    expect(popoverOf(sync({ state: 'conflict' })).actions).toEqual([SourceAction.Resolve, SourceAction.Update, SourceAction.MakeVariant, SourceAction.Detach]);
+    expect(popoverOf(sync({ state: 'in_pull', push: { pull: pull('open') } })).actions).toEqual([SourceAction.ViewPr, SourceAction.MakeVariant, SourceAction.Detach]);
+    expect(popoverOf(sync({ link: { ...sync().link, variantOf: 'n0' } })).actions).not.toContain(SourceAction.MakeVariant);
   });
 
   it('il file sta sotto la app root', () => {
@@ -47,5 +49,61 @@ describe('il pannello Changes', () => {
     expect(ciOf(pull('open', [{ conclusion: null }]))).toBe(CiState.Running);
     expect(ciOf(pull('open', [{ conclusion: 'success' }, { conclusion: 'failure' }]))).toBe(CiState.Failed);
     expect(ciOf(pull('open', [{ conclusion: 'success' }, { conclusion: 'skipped' }]))).toBe(CiState.Passed);
+  });
+
+  it('una modifica a un file condiviso dice quante pagine tocca', () => {
+    expect(impactOf(sync({ affected: [{ path: 'components/Button.tsx', pages: 3 }] }))).toBe('3 pages affected');
+    expect(impactOf(sync())).toBeNull();
+  });
+
+  it('"applica al componente main" manda il frame tra i main', () => {
+    expect(pushAskOf([sync({ nodeId: 'a' })], new Set(['a']), 'home', new Set(['a']))).toEqual({ name: 'home', nodeIds: ['a'], mains: ['a'] });
+  });
+
+  it('le varianti spuntate portano la scelta fatta', () => {
+    const rows = [sync({ nodeId: 'v', link: { ...sync().link, variantOf: 'a' } })];
+
+    expect(pushAskOf(rows, new Set(['v']), 'home', undefined, [{ nodeId: 'v', choice: 'new_route', route: '/home-b' }])).toEqual({ name: 'home', nodeIds: ['v'], variants: [{ nodeId: 'v', choice: 'new_route', route: '/home-b' }] });
+  });
+});
+
+describe('il pannello Changes non invita a push sbagliati', () => {
+  const PATCH = '--- a/src/app.css\n+++ b/src/app.css\n@@ -1,1 +1,1 @@\n-a\n+b\n--- a/src/routes/+page.svelte\n+++ b/src/routes/+page.svelte\n@@ -2,1 +2,1 @@\n-x\n+y\n';
+
+  it('ogni riga dice la pagina e i file cambiati, ognuno col suo diff', () => {
+    expect(filesOfPatch(PATCH)).toEqual([
+      { path: 'src/app.css', diff: '@@ -1,1 +1,1 @@\n-a\n+b\n' },
+      { path: 'src/routes/+page.svelte', diff: '@@ -2,1 +2,1 @@\n-x\n+y\n' }
+    ]);
+    expect(rowTitle(sync({ link: { ...sync().link, route: '/chi-siamo' } }))).toBe('/chi-siamo');
+    expect(rowTitle(sync())).toBe('Home');
+  });
+
+  it('la conferma elenca esattamente i file dei frame spuntati, una volta sola', () => {
+    const files = new Map([
+      ['a', filesOfPatch(PATCH)],
+      ['b', [{ path: 'src/app.css', diff: '' }]],
+      ['c', [{ path: 'src/lib/Other.svelte', diff: '' }]]
+    ]);
+    expect(filesToPush(new Set(['a', 'b']), files)).toEqual(['src/app.css', 'src/routes/+page.svelte']);
+  });
+});
+
+describe('dopo il push', () => {
+  it('senza PR lo dice, e dice come averla', () => {
+    expect(pushedNote({ branch: 'feega/x', pull: null })).toBe('Branch feega/x pushed. No PR opened: connect GitHub or set a token');
+  });
+
+  it('con la PR la nomina', () => {
+    expect(pushedNote({ branch: 'feega/x', pull: pull('open') })).toBe('Branch feega/x pushed · PR #4');
+  });
+});
+
+describe('il bottone del push', () => {
+  it('dice cosa farà davvero', () => {
+    const pushed = (pullNumber?: number) => sync({ link: { ...sync().link, pushBranch: 'feega/x', pullNumber } });
+    expect(pushLabel([sync()])).toBe('Push and open PR');
+    expect(pushLabel([pushed()])).toBe('Update branch');
+    expect(pushLabel([pushed(4)])).toBe('Update PR');
   });
 });

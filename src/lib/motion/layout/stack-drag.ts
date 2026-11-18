@@ -83,21 +83,34 @@ function leave(doc: MotionDoc, clipId: string, to: Pt): OpResult {
   return left.ok ? setProps(left.doc, clipId, { x: to[0] / doc.width, y: to[1] / doc.height }) : left;
 }
 
-export function dragInStack(doc: MotionDoc, clipId: string, boxes: Record<string, Box>, to: Pt): StackDragged {
+type Aim = { kind: StackDrop; stack: Stack | null; index: number; line: DropLine | null };
+
+function aimOf(doc: MotionDoc, clipId: string, boxes: Record<string, Box>, to: Pt): Aim | null {
   const child = findClip(doc, clipId)?.clip as MotionClip | undefined;
   const own = child ? layoutParent(doc, child) : null;
   if (!own) {
-    return { kind: StackDrop.Leave, result: { ok: false, error: `${clipId} is not in a stack` }, line: null };
+    return null;
   }
   const target = stackUnder(doc, clipId, own, boxes, to);
   if (!target) {
-    return { kind: StackDrop.Leave, result: leave(doc, clipId, to), line: null };
+    return { kind: StackDrop.Leave, stack: null, index: -1, line: null };
   }
   const { index, line } = slotOf(doc, target, clipId, boxes, to);
-  if (target.id === own.id) {
-    return { kind: StackDrop.Reorder, result: reorderChild(doc, own.id, clipId, index), line };
+  return { kind: target.id === own.id ? StackDrop.Reorder : StackDrop.Join, stack: target, index, line };
+}
+
+const LANDING: Record<StackDrop, (doc: MotionDoc, clipId: string, aim: Aim, to: Pt) => OpResult> = {
+  [StackDrop.Reorder]: (doc, clipId, aim) => reorderChild(doc, aim.stack!.id, clipId, aim.index),
+  [StackDrop.Join]: (doc, clipId, aim) => join(doc, clipId, aim.stack!, aim.index),
+  [StackDrop.Leave]: (doc, clipId, _, to) => leave(doc, clipId, to)
+};
+
+export function dragInStack(doc: MotionDoc, clipId: string, boxes: Record<string, Box>, to: Pt): StackDragged {
+  const aim = aimOf(doc, clipId, boxes, to);
+  if (!aim) {
+    return { kind: StackDrop.Leave, result: { ok: false, error: `${clipId} is not in a stack` }, line: null };
   }
-  return { kind: StackDrop.Join, result: join(doc, clipId, target, index), line };
+  return { kind: aim.kind, result: LANDING[aim.kind](doc, clipId, aim, to), line: aim.line };
 }
 
 export function dropInStack(doc: MotionDoc, clipId: string, boxes: Record<string, Box>, to: Pt): StackDragged | null {
@@ -128,4 +141,32 @@ export function followCursor(doc: MotionDoc, clipId: string, [dx, dy]: Pt): OpRe
     return { ok: false, error: `no clip ${clipId}` };
   }
   return setTransform(doc, clipId, { x: (clip.transform.x ?? 0) + dx / doc.width, y: (clip.transform.y ?? 0) + dy / doc.height });
+}
+
+export type StackHold = { dragged: StackDragged; shown: OpResult };
+
+const NOT_HELD = 'none';
+
+const slotKey = (aim: Aim | null) => (aim && aim.kind !== StackDrop.Leave ? `${aim.kind}:${aim.stack!.id}:${aim.index}` : NOT_HELD);
+
+export function holdInStack(doc: MotionDoc, clipId: string, boxes: Record<string, Box>, measure: TextMeasure = estimatedText): (from: Pt, to: Pt) => StackHold {
+  let held: { key: string; dragged: StackDragged; shift: Pt } | null = null;
+  return (from, to) => {
+    const aim = aimOf(doc, clipId, boxes, to);
+    const key = slotKey(aim);
+    if (key === NOT_HELD || !aim) {
+      held = null;
+      const dragged = dragInStack(doc, clipId, boxes, to);
+      return { dragged, shown: followCursor(doc, clipId, [to[0] - from[0], to[1] - from[1]]) };
+    }
+    if (held?.key !== key) {
+      const result = LANDING[aim.kind](doc, clipId, aim, to);
+      const laid = result.ok ? guessedBoxes(withAutoLayout(result.doc, measure))[clipId] : null;
+      const was = boxes[clipId];
+      held = { key, dragged: { kind: aim.kind, result, line: aim.line }, shift: laid && was ? [laid.left - was.left, laid.top - was.top] : [0, 0] };
+    }
+    const { dragged, shift } = held;
+    const shown = dragged.result.ok ? followCursor(dragged.result.doc, clipId, [to[0] - from[0] - shift[0], to[1] - from[1] - shift[1]]) : dragged.result;
+    return { dragged: { ...dragged, line: aim.line }, shown };
+  };
 }

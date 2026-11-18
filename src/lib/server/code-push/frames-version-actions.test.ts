@@ -59,13 +59,13 @@ describe('una variante da una versione', () => {
 });
 
 describe('il diff del codice tra una versione e il ramo del frame', () => {
-  it('ogni file cambiato col prima e il dopo', async () => {
-    expect(await frameCodeDiff(deps(), 'v1')).toEqual({ ok: true, from: oldSha, to: 'main', files: [{ path: 'src/Hero.tsx', before: 'old hero\n', after: 'new hero\n' }] });
+  it('ogni file cambiato, dal ramo del frame alla versione', async () => {
+    expect(await frameCodeDiff(deps(), 'v1')).toEqual({ ok: true, from: 'main', to: oldSha, files: [{ path: 'src/Hero.tsx', before: 'new hero\n', after: 'old hero\n' }] });
   });
 });
 
 describe('un ripristino passa da Changes e dalla PR', () => {
-  const pushDeps = () => ({ ...deps(), links: { ...deps().links, all: async (id: string) => (links.has(id) ? [links.get(id)!] : []), remove: async () => true }, edits: async () => SyncOutcome.NoChanges as const, lock: memoryLock() });
+  const pushDeps = () => ({ ...deps(), links: { ...deps().links, all: async (id: string) => (links.has(id) ? [links.get(id)!] : []), remove: async () => true, inProject: async () => [...links.values()] }, edits: async () => SyncOutcome.NoChanges as const, lock: memoryLock() });
 
   it('i file ripristinati vanno nella spinta del frame, anche senza altre modifiche, e poi il link li dimentica', async () => {
     await frameRestore(deps(), 'v1');

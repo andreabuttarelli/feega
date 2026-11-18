@@ -40,11 +40,21 @@ const widths = [1280, 768, 390];
 
 function sized(extra: Record<string, unknown> = {}) {
   const made = askOf({ routes: ['/'], responsive: Responsive.Views, ...extra, conditions: widths.map((width) => ({ scheme: Scheme.Light, width })) });
-  let width = BASE_CONDITIONS.width;
-  made.tab.viewport.mockImplementation(async (w: number) => {
-    width = w;
-  });
-  made.tab.tree.mockImplementation(async () => TREES[width]);
+  const tabAt = () => {
+    let width = BASE_CONDITIONS.width;
+    return {
+      ...made.tab,
+      viewport: async (w: number) => {
+        width = w;
+        await made.tab.viewport(w);
+      },
+      tree: async () => {
+        await made.tab.tree();
+        return TREES[width];
+      }
+    };
+  };
+  made.ask.open = async () => tabAt() as never;
   return made;
 }
 

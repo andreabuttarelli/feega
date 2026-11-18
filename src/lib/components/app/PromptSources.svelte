@@ -11,6 +11,7 @@
   import { githubConnect, githubStatus, uploadFolder } from '$lib/canvas/code-import-client';
   import { canPickDirectory, listedFolder, pickDirectory } from '$lib/code-upload/pick-folder';
   import { SNAPSHOT_MESSAGES, type Snapshot } from '$lib/code-upload/snapshot';
+  import { DASHBOARD_SETTINGS_HOME } from '$lib/settings/paths';
 
   let {
     pick = $bindable(null),
@@ -159,7 +160,7 @@
 
   const CONNECT_HREF: Record<Connect, (projectId: string) => string | null> = {
     [Connect.Github]: () => null,
-    [Connect.Figma]: (id) => `/p/${id}/settings/profile`,
+    [Connect.Figma]: () => DASHBOARD_SETTINGS_HOME,
     [Connect.None]: () => null
   };
 </script>

@@ -2,9 +2,9 @@ import { FAQ } from './home';
 import { LANDING_PAGES } from './landing';
 import { UPSCALER } from './landing/upscaler';
 import { CODEBASE, CODEBASE_PATH } from './codebase';
-import { HOME_META } from './seo';
+import { HOME_META, PRICING_META } from './seo';
 import { APP_URL, GITHUB_URL, SITE_URL } from './links';
-import { SITE_PATHS } from './paths';
+import { PRICING_PATH, SITE_PATHS } from './paths';
 import { LEGAL_DOCS } from './legal';
 import { COMPARE_INDEX, COMPARE_PATH, COMPARISONS, comparisonPath } from './compare';
 import { GUIDES, GUIDES_INDEX, GUIDES_PATH, guidePath } from './guides';
@@ -15,6 +15,7 @@ const SUMMARY = 'Feega lets you design inside your code with your agents and tea
 
 export const PAGE_TITLES: Record<string, string> = {
   '/': HOME_META.title,
+  [PRICING_PATH]: PRICING_META.title,
   '/changelog': 'Changelog',
   '/ai-video-upscaler': UPSCALER.title,
   [CODEBASE_PATH]: CODEBASE.title,

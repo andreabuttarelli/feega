@@ -24,10 +24,11 @@ export enum PushOutcome {
   Pushed = 'pushed',
   NeedsConfirm = 'needs_confirm',
   ReadOnly = 'read_only',
+  VariantChoice = 'variant_choice',
   Failed = 'failed'
 }
 
-const OUTCOME_OF_REFUSAL: Record<string, PushOutcome> = { needs_confirm: PushOutcome.NeedsConfirm, read_only: PushOutcome.ReadOnly };
+const OUTCOME_OF_REFUSAL: Record<string, PushOutcome> = { needs_confirm: PushOutcome.NeedsConfirm, read_only: PushOutcome.ReadOnly, variant_choice: PushOutcome.VariantChoice };
 
 export const pushOutcomeOf = (body: { ok?: boolean; refusal?: string } | null): PushOutcome => (body?.ok ? PushOutcome.Pushed : (OUTCOME_OF_REFUSAL[body?.refusal ?? ''] ?? PushOutcome.Failed));
 

@@ -7,7 +7,7 @@ export type NavFamily = 'panel' | 'sheet' | 'route';
 export type NavEntry = {
   id: string;
   labelKey: string;
-  icon: 'images' | 'palette' | 'users-round' | 'settings' | 'camera' | 'layers' | 'components' | 'history' | 'styles';
+  icon: 'images' | 'palette' | 'users-round' | 'settings' | 'camera' | 'layers' | 'components' | 'history' | 'styles' | 'sparkles';
   family: NavFamily;
   path: string;
   mobilePath?: string;
@@ -32,7 +32,8 @@ export const NAV_ENTRIES: NavEntry[] = [
   { id: 'layers', labelKey: 'app.nav2.layers', icon: 'layers', family: 'panel', path: '', group: 'canvas', local: true, shortcut: 'Alt+1' },
   { id: 'components', labelKey: 'app.nav2.components', icon: 'components', family: 'panel', path: '', group: 'panel', local: true, shortcut: 'Alt+5' },
   { id: 'history', labelKey: 'app.nav2.history', icon: 'history', family: 'panel', path: '', group: 'panel', local: true, shortcut: 'Alt+6' },
-  { id: 'styles', labelKey: 'app.nav2.styles', icon: 'styles', family: 'panel', path: '', group: 'panel', local: true, shortcut: 'Alt+7' }
+  { id: 'styles', labelKey: 'app.nav2.styles', icon: 'styles', family: 'panel', path: '', group: 'panel', local: true, shortcut: 'Alt+7' },
+  { id: 'ai', labelKey: 'app.nav2.ai', icon: 'sparkles', family: 'panel', path: '', group: 'panel', shortcut: 'Alt+8' }
 ];
 
 export const PANEL_WIDTHS: Record<string, number> = {
@@ -42,7 +43,8 @@ export const PANEL_WIDTHS: Record<string, number> = {
   styles: 300,
   assets: 320,
   brands: 320,
-  influencers: 320
+  influencers: 320,
+  ai: 280
 };
 
 export function navEntriesByGroup(group: NavEntry['group']): NavEntry[] {

@@ -19,7 +19,7 @@ export const DEVICE_ORDER = [Device.Desktop, Device.Tablet, Device.Phone];
 export const deviceForKey = (key: string): Device | null => DEVICE_ORDER.find((d) => DEVICES[d].key === key) ?? null;
 
 export function pressedDevice(view: Viewport): Device | null {
-  if (view.source === WidthSource.Window) {
+  if (view.source !== WidthSource.Fixed) {
     return null;
   }
   return DEVICE_ORDER.find((d) => DEVICES[d].width === view.width) ?? null;

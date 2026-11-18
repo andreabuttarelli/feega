@@ -6,6 +6,7 @@ describe('la risposta di una spinta', () => {
   it('ogni rifiuto che il pannello sa gestire ha il suo esito', () => {
     expect(pushOutcomeOf({ ok: true })).toBe(PushOutcome.Pushed);
     expect(pushOutcomeOf({ ok: false, refusal: 'needs_confirm' })).toBe(PushOutcome.NeedsConfirm);
+    expect(pushOutcomeOf({ ok: false, refusal: 'variant_choice' })).toBe(PushOutcome.VariantChoice);
     expect(pushOutcomeOf({ ok: false, refusal: 'read_only' })).toBe(PushOutcome.ReadOnly);
     expect(pushOutcomeOf({ ok: false, refusal: 'secret' })).toBe(PushOutcome.Failed);
     expect(pushOutcomeOf(null)).toBe(PushOutcome.Failed);

@@ -1,6 +1,8 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import type { AcpOption, AcpUpdate } from '$lib/acp/acp-events';
+import type { AgentModels } from '$lib/acp/agent-models';
+import { modelsOf, switchFor, type NewSession } from './models';
 
 export const ACP_PROTOCOL_VERSION = 1;
 
@@ -8,7 +10,7 @@ export type AgentCommand = { command: string; args: string[]; env?: Record<strin
 
 export type McpServer = { name: string; command: string; args: string[]; env: { name: string; value: string }[] };
 
-export type AcpTurnInput = { agent: AgentCommand; cwd: string; mcpServers: McpServer[]; prompt: string };
+export type AcpTurnInput = { agent: AgentCommand; cwd: string; mcpServers: McpServer[]; prompt: string; model?: string | null };
 
 export type AcpTurn = { text: string; toolCalls: string[]; stopReason: string };
 
@@ -121,17 +123,42 @@ class Connection {
   }
 }
 
-export async function runAcpTurn(input: AcpTurnInput, hooks: AcpTurnHooks): Promise<AcpTurn> {
-  const child = spawn(input.agent.command, input.agent.args, { cwd: input.cwd, env: { ...process.env, ...input.agent.env }, stdio: ['pipe', 'pipe', 'inherit'] }) as unknown as ChildProcessWithoutNullStreams;
+const INITIALIZE = { protocolVersion: ACP_PROTOCOL_VERSION, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false } };
+
+const SILENT: AcpTurnHooks = { onUpdate: () => {}, ask: async () => ({ outcome: 'cancelled' }) };
+
+type Session = { agent: AgentCommand; cwd: string; mcpServers: McpServer[] };
+
+async function withSession<T>(s: Session, hooks: AcpTurnHooks, work: (acp: Connection, session: NewSession) => Promise<T>): Promise<T> {
+  const child = spawn(s.agent.command, s.agent.args, { cwd: s.cwd, env: { ...process.env, ...s.agent.env }, stdio: ['pipe', 'pipe', 'inherit'] }) as unknown as ChildProcessWithoutNullStreams;
   const acp = new Connection(child, hooks);
 
   try {
-    await acp.request('initialize', { protocolVersion: ACP_PROTOCOL_VERSION, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false } });
-    const { sessionId } = (await acp.request('session/new', { cwd: input.cwd, mcpServers: input.mcpServers })) as { sessionId: string };
-    hooks.signal?.addEventListener('abort', () => acp.notify('session/cancel', { sessionId }), { once: true });
-    const { stopReason } = (await acp.request('session/prompt', { sessionId, prompt: [{ type: 'text', text: input.prompt }] })) as { stopReason: string };
-    return { ...acp.result(), stopReason };
+    await acp.request('initialize', INITIALIZE);
+    const session = (await acp.request('session/new', { cwd: s.cwd, mcpServers: s.mcpServers })) as NewSession;
+    return await work(acp, session);
   } finally {
     child.kill();
   }
+}
+
+export function listAcpModels(agent: AgentCommand, cwd: string): Promise<AgentModels | null> {
+  return withSession({ agent, cwd, mcpServers: [] }, SILENT, async (_, session) => {
+    const offered = modelsOf(session);
+    return offered && { current: offered.current, models: offered.models };
+  });
+}
+
+export function runAcpTurn(input: AcpTurnInput, hooks: AcpTurnHooks): Promise<AcpTurn> {
+  return withSession(input, hooks, async (acp, session) => {
+    const { sessionId } = session;
+    const change = switchFor(session, input.model ?? null);
+    if (change) {
+      await acp.request(change.method, change.params);
+    }
+
+    hooks.signal?.addEventListener('abort', () => acp.notify('session/cancel', { sessionId }), { once: true });
+    const { stopReason } = (await acp.request('session/prompt', { sessionId, prompt: [{ type: 'text', text: input.prompt }] })) as { stopReason: string };
+    return { ...acp.result(), stopReason };
+  });
 }
