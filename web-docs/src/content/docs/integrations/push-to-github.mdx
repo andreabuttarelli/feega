@@ -9,12 +9,42 @@ Frames imported from a GitHub repository ([Import from code](/integrations/impor
 
 ## How a push lands
 
-- **Never the default branch.** Every push goes to `feega/<name>` and opens one pull request against the base branch.
+- **Never the default branch, unless asked.** Every push goes to `feega/<name>` (or a branch you name) and opens one pull request against the base branch; only an explicit direct commit ([Branch options](#branch-options)) writes to the base branch.
 - **One pull request per merge cycle.** Later pushes update the same pull request. Once it is merged or closed, the next push opens `feega/<name>-2`.
 - **Never force-pushed.** If someone rewrote, deleted or protected the branch, the push goes to `feega/<name>-sync` and opens a pull request from there.
 - **One commit, all files.** The files of a push land in a single commit; if access is lost mid-push, no branch is created.
 - **One push at a time.** A second push on the same branch while one runs answers `busy`.
 - **Co-authors.** Pass co-authors and they are added to the commit.
+
+## Autosave
+
+Editing a frame linked to a GitHub repository writes code as you work. The first edit creates the working branch (`feega/canvas-edits`, or the branch you named) and opens a **draft** pull request. Later edits are committed to that branch in the background: edits are batched and committed after a few seconds idle, one commit per batch, never one per drag. A frame imported from a local folder already writes its files live and is not autosaved to GitHub.
+
+If someone rewrote the branch, nothing is overwritten: the commit goes to `<branch>-sync`; when even that fails autosave stops at `conflict`, and files both sides changed show up as a conflict on the frame (see [Conflicts](#conflicts)). Config files, secrets or a variant frame pause autosave until you push from **Changes**.
+
+**Ready for review** marks the draft pull request ready; it replaces the manual push as the main action. **Undo last push** still works on the last autosave commit.
+
+```bash
+feega github push <projectId> <nodeId> --name hero --draft
+feega github ready <projectId> <nodeId>
+```
+
+`POST /api/v1/projects/:id/github/push` with `pull: "draft"`; `POST /api/v1/projects/:id/github/push/ready` with `{ nodeId }` answers `{ ok, number }` (409 `not_pushed` without a pull request); MCP `github_push {…, pull: "draft"}` and `github_ready {nodeId}`.
+
+## Branch options
+
+In **Changes**, name the branch (any name, used as is instead of `feega/<name>`) or tick **Commit directly to `<base>`** to commit to the base branch with no pull request. GitHub refuses a direct commit on a protected branch: the push answers 403 `protected` and the panel says so; nothing is written.
+
+```bash
+feega github push <projectId> <nodeId> --name hero --branch design/hero
+feega github push <projectId> <nodeId> --name hero --direct
+```
+
+API and MCP: `branch: "design/hero"`, `target: "base"`.
+
+## Git status in the top bar
+
+When the canvas has frames linked to GitHub, the right side of the top bar shows the repository and the working branch (click for branch options), how many files changed upstream on the base branch, the autosave state (unsaved, saving, saved, conflict, paused), the pull request with its draft flag and CI state, **Ready for review** while it is a draft, and **Versions** to compare the frame with another branch, tag, commit or pull request. The same state is `feega github status <projectId> <nodeId>` (MCP `github_push_status`), where the pull request now carries `draft`.
 
 ## Safety
 
@@ -100,7 +130,8 @@ feega github code-diff <projectId> <versionId>
 ## CLI
 
 ```bash
-feega github push <projectId> <nodeId...> --name hero
+feega github push <projectId> <nodeId...> --name hero [--branch <branch>] [--direct] [--draft]
+feega github ready <projectId> <nodeId>
 feega github status <projectId> <nodeId>
 feega github undo <projectId> <nodeId>
 ```
@@ -109,17 +140,18 @@ feega github undo <projectId> <nodeId>
 
 | Method | Path | Body or query |
 |---|---|---|
-| `POST` | `/api/v1/projects/:id/github/push` | `{ name, nodeIds, title?, body?, base?, confirmSensitive? }` |
+| `POST` | `/api/v1/projects/:id/github/push` | `{ name, nodeIds, title?, body?, base?, confirmSensitive?, branch?, target?: session\|base, pull?: draft\|ready }` |
 | `GET` | `/api/v1/projects/:id/github/push?nodeId=` | — |
 | `POST` | `/api/v1/projects/:id/github/push/undo` | `{ nodeId }` |
+| `POST` | `/api/v1/projects/:id/github/push/ready` | `{ nodeId }` |
 | `POST` | `/api/v1/projects/:id/github/versions` | `{ nodeId, ref?, limit? }` |
 | `POST` | `/api/v1/projects/:id/github/compare` | `{ nodeId, refs }` |
 
-Refusals answer `{ ok: false, refusal }`: `not_connected`, `read_only` (403, with `patch`), `secret` and `env_file` (422), `needs_confirm` (428), `busy` (423), `unauthorized` (401), `forbidden` (403).
+Refusals answer `{ ok: false, refusal }`: `not_connected`, `read_only` (403, with `patch`), `secret` and `env_file` (422), `needs_confirm` (428), `busy` (423), `protected` (403, direct commit on a protected branch), `unauthorized` (401), `forbidden` (403).
 
 ## MCP
 
-`github_push`, `github_push_status`, `github_undo`, `github_versions` and `github_compare`, with the same inputs.
+`github_push`, `github_push_status`, `github_ready`, `github_undo`, `github_versions` and `github_compare`, with the same inputs.
 
 ## What a frame is linked to
 

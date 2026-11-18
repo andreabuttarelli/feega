@@ -29,6 +29,10 @@
   import PrototypePlayerHost from '../PrototypePlayerHost.svelte';
   import FrameHeaderIcons from './FrameHeaderIcons.svelte';
   import SourceSyncPanel from './SourceSyncPanel.svelte';
+  import GitStatus from './GitStatus.svelte';
+  import { Portal } from 'bits-ui';
+  import { AutosaveState, codeAutosave, outcomeOf } from '$lib/canvas/code-autosave';
+  import { autosaveAsk, BranchMode, gitSummary, type BranchOptions } from '$lib/canvas/git-status';
   import { comparedWith, versionMarkOf } from '$lib/canvas/version-frame';
   import VersionCompare from './VersionCompare.svelte';
   import RefPicker from './RefPicker.svelte';
@@ -403,6 +407,49 @@
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
   const sources = sourceStatus(() => page.params.projectId ?? '', () => linkedFrames(props.nodeSummaries ?? []).map((id) => ({ id, name: byId.get(id)?.displayName ?? '' })));
   let sourceOpen = $state<{ id: string; left: number; top: number } | null>(null);
+  let branchOptions = $state<BranchOptions>({ mode: BranchMode.Session, branch: '' });
+  let changesOpen = $state(false);
+  let autosaveState = $state(AutosaveState.Idle);
+  let gitSlot = $state<HTMLElement | null>(null);
+  const pushUrl = $derived(`/api/v1/projects/${page.params.projectId ?? ''}/github/push`);
+  const postJson = async (url: string, body: unknown) => {
+    const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).catch(() => null);
+    return (await res?.json().catch(() => null)) as { ok?: boolean; refusal?: string } | null;
+  };
+  const autosave = codeAutosave({
+    save: async (nodeIds) => {
+      const ask = autosaveAsk(sources.all(), nodeIds, branchOptions);
+      if (!ask) {
+        return AutosaveState.Saved;
+      }
+      const state = outcomeOf(await postJson(pushUrl, ask));
+      await sources.refresh();
+      return state;
+    },
+    onstate: (state) => (autosaveState = state)
+  });
+  const seenCode = new Map<string, unknown>();
+  $effect(() => {
+    const linked = new Set(linkedFrames(props.nodeSummaries ?? []));
+    for (const n of props.nodeSummaries ?? []) {
+      if (!linked.has(n.id)) {
+        continue;
+      }
+      if (seenCode.has(n.id) && seenCode.get(n.id) !== n.data) {
+        autosave.touch(n.id);
+      }
+      seenCode.set(n.id, n.data);
+    }
+  });
+  $effect(() => {
+    gitSlot = document.querySelector<HTMLElement>('[data-top-git]');
+    return () => autosave.stop();
+  });
+  const git = $derived(gitSummary(sources.all(), autosaveState));
+  async function markReady(nodeId: string) {
+    await postJson(`${pushUrl}/ready`, { nodeId });
+    await sources.refresh();
+  }
   let versionOpen = $state<{ before: string; after: string } | null>(null);
   let pickerOpen = $state<{ id: string; left: number; top: number } | null>(null);
   const sideOf = (id: string) => {
@@ -4750,7 +4797,10 @@
     {#if versionSides}
       <VersionCompare projectId={page.params.projectId ?? ''} versionId={versionOpen?.after ?? ''} before={versionSides.before} after={versionSides.after} history={versionHistory} onclose={() => (versionOpen = null)} onchanged={sources.refresh} />
     {/if}
-    <SourceSyncPanel projectId={page.params.projectId ?? ''} canvasId={page.params.canvasId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} assetUrl={tierUrl(AssetSize.Full)} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} oncompare={(id) => ((pickerOpen = sourceOpen && { ...sourceOpen, id }), (sourceOpen = null))} />
+    {#if gitSlot && git}
+      <Portal to={gitSlot}><GitStatus summary={git} onchanges={() => (changesOpen = true)} onversions={(id) => (pickerOpen = { id, left: window.innerWidth - 360, top: 56 })} onready={markReady} onresume={() => ((changesOpen = true), autosave.resume())} /></Portal>
+    {/if}
+    <SourceSyncPanel bind:options={branchOptions} bind:panel={changesOpen} projectId={page.params.projectId ?? ''} canvasId={page.params.canvasId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} assetUrl={tierUrl(AssetSize.Full)} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} oncompare={(id) => ((pickerOpen = sourceOpen && { ...sourceOpen, id }), (sourceOpen = null))} />
     {#if pickerOpen}
       <RefPicker projectId={page.params.projectId ?? ''} nodeId={pickerOpen.id} anchor={pickerOpen} onclose={() => (pickerOpen = null)} oncompared={(frames) => ((versionOpen = { before: pickerOpen?.id ?? '', after: frames[0] }), (pickerOpen = null))} />
     {/if}

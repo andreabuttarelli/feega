@@ -3,20 +3,21 @@
   import { SvelteMap } from 'svelte/reactivity';
   import { SourceAction, changedRows, ciOf, CiState, filesOfPatch, filesToPush, impactOf, popoverOf, pushAskOf, pushedNote, pushLabel, rowTitle, VariantChoice, type ChangedFile, type FrameSync, type PullView, type VariantAnswer } from '$lib/canvas/source-changes';
   import { PushOutcome, pushOutcomeOf, editedFilesText } from '$lib/canvas/source-sync';
+  import { BranchMode, branchFields, type BranchOptions } from '$lib/canvas/git-status';
 
   type Anchor = { left: number; top: number };
   type Pushed = { branch: string; pull: PullView | null };
 
-  let { projectId, canvasId, open, anchor, syncs, posterOf, assetUrl, onclose, onchanged, oncompare }: { projectId: string; canvasId: string; open: FrameSync | null; anchor: Anchor | null; syncs: FrameSync[]; posterOf: (nodeId: string) => string | null; assetUrl: (assetId: string) => string; onclose: () => void; onchanged: () => Promise<unknown>; oncompare: (nodeId: string) => void } = $props();
+  let { projectId, canvasId, open, anchor, syncs, posterOf, assetUrl, onclose, onchanged, oncompare, options = $bindable(), panel = $bindable(false) }: { options: BranchOptions; panel?: boolean; projectId: string; canvasId: string; open: FrameSync | null; anchor: Anchor | null; syncs: FrameSync[]; posterOf: (nodeId: string) => string | null; assetUrl: (assetId: string) => string; onclose: () => void; onchanged: () => Promise<unknown>; oncompare: (nodeId: string) => void } = $props();
 
   const DEFAULT_NAME = 'canvas-edits';
+  const PROTECTED = 'protected';
   const PATCH_FILE = 'feega-changes.patch';
 
   const ACTION_LABEL: Record<SourceAction, string> = { [SourceAction.Update]: 'Update', [SourceAction.Resolve]: 'Resolve', [SourceAction.ViewPr]: 'View PR', [SourceAction.MakeVariant]: 'Make variant', [SourceAction.Detach]: 'Detach' };
   const CHOICE_LABEL: Record<VariantChoice, string> = { [VariantChoice.Replace]: 'Replace original', [VariantChoice.NewRoute]: 'New route', [VariantChoice.Keep]: 'Keep on canvas' };
   const CI_LABEL: Record<CiState, string> = { [CiState.None]: 'no checks', [CiState.Running]: 'CI running', [CiState.Passed]: 'CI passed', [CiState.Failed]: 'CI failed' };
 
-  let panel = $state(false);
   let busy = $state(false);
   let note = $state('');
   let confirming = $state(false);
@@ -107,7 +108,7 @@
     busy = true;
     reviewing = false;
     copied = false;
-    const body = await call(base, { method: 'POST', body: JSON.stringify({ ...ask, confirmSensitive }) });
+    const body = await call(base, { method: 'POST', body: JSON.stringify({ ...ask, ...branchFields(options), confirmSensitive }) });
     const outcome = pushOutcomeOf(body as { ok?: boolean; refusal?: string } | null);
     confirming = outcome === PushOutcome.NeedsConfirm;
     asking = outcome === PushOutcome.VariantChoice ? ((body?.suggested as { nodeId: string; route: string }[]) ?? []) : [];
@@ -122,7 +123,20 @@
     if (outcome === PushOutcome.Pushed) {
       answers = [];
     }
-    note = outcome === PushOutcome.Failed ? `Push refused: ${String(body?.refusal ?? 'network')}` : '';
+    note = outcome === PushOutcome.Failed ? refusalNote(String(body?.refusal ?? 'network')) : '';
+    busy = false;
+  }
+
+  const refusalNote = (refusal: string) => (refusal === PROTECTED ? `GitHub refused the commit: ${rows[0]?.link.baseBranch ?? 'the base branch'} is protected. Turn off direct commit to open a pull request.` : `Push refused: ${refusal}`);
+
+  async function ready() {
+    if (!draft) {
+      return;
+    }
+    busy = true;
+    const body = await call(`${base}/ready`, { method: 'POST', body: JSON.stringify({ nodeId: draft.nodeId }) });
+    note = body?.ok ? 'Pull request ready for review' : `Ready refused: ${String(body?.refusal ?? 'network')}`;
+    await onchanged();
     busy = false;
   }
 
@@ -179,6 +193,7 @@
   }
 
   const hasPush = $derived(syncs.some((s) => s.link.pushBranch));
+  const draft = $derived(syncs.find((s) => s.push?.pull?.draft && s.push.pull.status === 'open') ?? null);
   const readOnly = $derived(rows.some((r) => !r.link.writable));
   const toPush = $derived(filesToPush(picked, files));
 </script>
@@ -252,7 +267,11 @@
       <p class="note">This push touches config, lockfiles or dotfiles.</p>
       <button type="button" disabled={busy} onclick={() => push(true)}>Push anyway</button>
     {/if}
-    {#if note}<p class="note">{note}</p>{/if}
+    <fieldset class="branch-options" data-testid="branch-options">
+      <input aria-label="Branch name" placeholder="branch (default: feega/canvas-edits)" bind:value={options.branch} disabled={options.mode === BranchMode.Direct} data-testid="branch-name" />
+      <label class="change"><input type="checkbox" checked={options.mode === BranchMode.Direct} onchange={(e) => (options.mode = e.currentTarget.checked ? BranchMode.Direct : BranchMode.Session)} data-testid="branch-direct" /> Commit directly to {rows[0]?.link.baseBranch ?? syncs[0]?.link.baseBranch ?? 'the base branch'}</label>
+    </fieldset>
+    {#if note}<p class="note" data-testid="changes-note">{note}</p>{/if}
     {#if pushed}
       <p class="pushed" data-testid="pushed-note">{pushedNote(pushed)}{#if pushed.pull} · <a href={pushed.pull.url} target="_blank" rel="noopener">open</a> · {CI_LABEL[ciOf(pushed.pull)]}{/if}</p>
       {#if !pushed.pull}
@@ -272,6 +291,9 @@
     <footer>
       {#if readOnly}
         <button type="button" disabled={busy || !picked.size} onclick={() => push()}>Download patch</button>
+      {:else if draft}
+        <button type="button" class="primary" disabled={busy} onclick={ready} data-testid="ready-for-review">Ready for review</button>
+        <button type="button" disabled={busy || !picked.size || reviewing} onclick={() => (reviewing = true)}>Push now</button>
       {:else}
         <button type="button" class="primary" disabled={busy || !picked.size || reviewing} onclick={() => (reviewing = true)}>{pushLabel(rows)}</button>
       {/if}
@@ -281,6 +303,20 @@
 {/if}
 
 <style>
+  .branch-options {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .branch-options input[aria-label='Branch name'] {
+    padding: 4px 6px;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-sm);
+    background: transparent;
+    color: inherit;
+  }
   .source-pop,
   .changes,
   .split {
