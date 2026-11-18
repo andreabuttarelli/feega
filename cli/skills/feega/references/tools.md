@@ -434,3 +434,5 @@ permissions. Refused with `uncensored_not_publishable`, `real_brand_not_publisha
 | `model_allowlist` | `feega allowlist [set <medium> [ids...]]` |
 | `org_fonts` | `feega fonts [upload <file>\|delete <family>]` |
 | `spend_caps` | `feega caps [set <scope> <usd\|off> [--project <id>] [--reset monthly]]` |
+| `dev_server` | `feega dev-server [status\|start\|stop]` |
+| `live_edit` | `feega live-edit <at> <prop> [value] [--side] [--token] [--was] [--viewport]` / `live-undo <sha>` / `live-changes` / `live-push` |

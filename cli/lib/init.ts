@@ -1,4 +1,4 @@
-export const SOURCE_MAP_PACKAGE = '@feega/source-map';
+export const SOURCE_MAP_PACKAGE = 'feega-source-map';
 const SOURCE_MAP_RANGE = '^0.1.0';
 const PACKAGE_JSON = 'package.json';
 

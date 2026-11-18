@@ -13,6 +13,17 @@
   import { Notice } from '$lib/components/ui/notice';
   import { openCookieSettings } from '$lib/consent';
   import LegalFooter from '$lib/components/LegalFooter.svelte';
+  import { MEMORY_MAX_CHARS } from '$lib/onboarding/limits';
+  import { MEMORY_PROMPT } from '$lib/onboarding/memory-prompt';
+
+  const COPIED_MS = 1800;
+  let promptCopied = $state(false);
+
+  async function copyPrompt() {
+    await navigator.clipboard.writeText(MEMORY_PROMPT).catch((e) => console.warn('[settings] prompt not copied', e));
+    promptCopied = true;
+    setTimeout(() => (promptCopied = false), COPIED_MS);
+  }
 
   let { data, form } = $props();
 
@@ -39,6 +50,14 @@
     };
   };
 
+  const keepText = (key: string) => () => {
+    busy.add(key);
+    return async ({ update }: { update: (options?: { reset?: boolean }) => Promise<void> }) => {
+      await update({ reset: false });
+      busy.delete(key);
+    };
+  };
+
   const initials = $derived(
     [data.firstName, data.lastName]
       .filter(Boolean)
@@ -55,6 +74,10 @@
   <Notice tone="success">{$_('app.settings.profile.avatarSaved')}</Notice>
 {:else if form?.avatarRemoved}
   <Notice tone="success">{$_('app.settings.profile.avatarRemoved')}</Notice>
+{:else if form?.memorySaved}
+  <Notice tone="success">{$_('app.settings.profile.memorySaved')}</Notice>
+{:else if form?.memoryError}
+  <Notice tone="error">{$_('app.settings.profile.memoryTooLong')}</Notice>
 {:else if form?.figmaSaved}
   <Notice tone="success">{$_('app.settings.profile.figmaSaved')}</Notice>
 {:else if form?.figmaTested !== undefined}
@@ -149,6 +172,16 @@
   </form>
 </Panel>
 
+<Panel title={$_('app.settings.profile.memoryTitle')} description={$_('app.settings.profile.memoryDesc')}>
+  <form method="POST" action="?/saveMemory" use:enhance={keepText('memory')} class="m-0 flex flex-col gap-3" data-testid="memory-form">
+    <textarea name="content" rows="8" maxlength={MEMORY_MAX_CHARS} value={data.memory} disabled={isBusy('memory')} placeholder={$_('app.settings.profile.memoryPlaceholder')} class="memory-field" data-testid="memory-field"></textarea>
+    <div class="flex flex-wrap items-center gap-2">
+      <Button type="submit" disabled={isBusy('memory')}>{$_('app.settings.save')}</Button>
+      <Button variant="secondary" type="button" onclick={copyPrompt}>{promptCopied ? $_('app.settings.profile.memoryCopied') : $_('app.settings.profile.memoryCopy')}</Button>
+    </div>
+  </form>
+</Panel>
+
 <Panel title={$_('app.settings.profile.figmaTitle')} description={$_('app.settings.profile.figmaDesc')}>
   <form method="POST" action="?/saveFigmaToken" use:enhance={withBusy('figma')} class="m-0 flex flex-col gap-3" data-testid="figma-token-form">
     <Field label={$_('app.settings.profile.figmaToken')} hint={data.hasFigmaToken ? $_('app.settings.profile.figmaTokenSet') : $_('app.settings.profile.figmaTokenHint')}>
@@ -215,6 +248,20 @@
 </div>
 
 <style>
+  .memory-field {
+    width: 100%;
+    min-height: 160px;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
+    color: var(--ui-text);
+    font-family: var(--ui-mono);
+    font-size: 12px;
+    line-height: 1.5;
+    resize: vertical;
+  }
+
   .legal-wrap {
     margin-top: 1.5rem;
   }

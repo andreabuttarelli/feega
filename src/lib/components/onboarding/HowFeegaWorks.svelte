@@ -1,24 +1,16 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { tick } from 'svelte';
     import { track } from '$lib/analytics';
-  import { MAKE_VIDEO_PATH, TOUR_SLIDES, TourEvent, TourScene, opensOnArrival, type TourState } from '$lib/onboarding/tour';
+  import { MAKE_VIDEO_PATH, TOUR_SLIDES, TourEvent } from '$lib/onboarding/tour';
   import { tourDialog } from '$lib/onboarding/tour-dialog.svelte';
-  import { rememberTourSeen, seenInBrowser } from '$lib/onboarding/tour-memory';
+  import { rememberTourSeen } from '$lib/onboarding/tour-memory';
   import TourStage from './TourStage.svelte';
-
-  let { tour }: { tour: TourState } = $props();
 
   let index = $state(0);
   let dialog = $state<HTMLElement | null>(null);
 
   const slide = $derived(TOUR_SLIDES[index]);
   const last = $derived(index === TOUR_SLIDES.length - 1);
-
-  onMount(() => {
-    if (opensOnArrival(tour, seenInBrowser())) {
-      tourDialog.open = true;
-    }
-  });
 
   $effect(() => {
     if (!tourDialog.open) {

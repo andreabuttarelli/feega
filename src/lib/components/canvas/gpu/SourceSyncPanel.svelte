@@ -1,18 +1,19 @@
 <script lang="ts">
   import { SvelteSet } from 'svelte/reactivity';
   import { SvelteMap } from 'svelte/reactivity';
-  import { SourceAction, changedRows, ciOf, CiState, filesOfPatch, filesToPush, impactOf, popoverOf, pushAskOf, pushedNote, pushLabel, rowTitle, type ChangedFile, type FrameSync, type PullView } from '$lib/canvas/source-changes';
+  import { SourceAction, changedRows, ciOf, CiState, filesOfPatch, filesToPush, impactOf, popoverOf, pushAskOf, pushedNote, pushLabel, rowTitle, VariantChoice, type ChangedFile, type FrameSync, type PullView, type VariantAnswer } from '$lib/canvas/source-changes';
   import { PushOutcome, pushOutcomeOf, editedFilesText } from '$lib/canvas/source-sync';
 
   type Anchor = { left: number; top: number };
   type Pushed = { branch: string; pull: PullView | null };
 
-  let { projectId, open, anchor, syncs, posterOf, assetUrl, onclose, onchanged }: { projectId: string; open: FrameSync | null; anchor: Anchor | null; syncs: FrameSync[]; posterOf: (nodeId: string) => string | null; assetUrl: (assetId: string) => string; onclose: () => void; onchanged: () => Promise<unknown> } = $props();
+  let { projectId, canvasId, open, anchor, syncs, posterOf, assetUrl, onclose, onchanged, oncompare }: { projectId: string; canvasId: string; open: FrameSync | null; anchor: Anchor | null; syncs: FrameSync[]; posterOf: (nodeId: string) => string | null; assetUrl: (assetId: string) => string; onclose: () => void; onchanged: () => Promise<unknown>; oncompare: (nodeId: string) => void } = $props();
 
   const DEFAULT_NAME = 'canvas-edits';
   const PATCH_FILE = 'feega-changes.patch';
 
-  const ACTION_LABEL: Record<SourceAction, string> = { [SourceAction.Update]: 'Update', [SourceAction.ViewPr]: 'View PR', [SourceAction.Detach]: 'Detach' };
+  const ACTION_LABEL: Record<SourceAction, string> = { [SourceAction.Update]: 'Update', [SourceAction.Resolve]: 'Resolve', [SourceAction.ViewPr]: 'View PR', [SourceAction.MakeVariant]: 'Make variant', [SourceAction.Detach]: 'Detach' };
+  const CHOICE_LABEL: Record<VariantChoice, string> = { [VariantChoice.Replace]: 'Replace original', [VariantChoice.NewRoute]: 'New route', [VariantChoice.Keep]: 'Keep on canvas' };
   const CI_LABEL: Record<CiState, string> = { [CiState.None]: 'no checks', [CiState.Running]: 'CI running', [CiState.Passed]: 'CI passed', [CiState.Failed]: 'CI failed' };
 
   let panel = $state(false);
@@ -24,6 +25,9 @@
   let copied = $state(false);
   const picked = new SvelteSet<string>();
   const mains = new SvelteSet<string>();
+  let asking = $state<{ nodeId: string; route: string }[]>([]);
+  let answers = $state<VariantAnswer[]>([]);
+  let split = $state<{ nodeId: string; files: { path: string; canvas: string; github: string }[] } | null>(null);
   const files = new SvelteMap<string, ChangedFile[]>();
 
   const rows = $derived(changedRows(syncs));
@@ -62,6 +66,11 @@
   }
 
   const ACTION_RUN: Record<SourceAction, (s: FrameSync) => Promise<void>> = {
+    [SourceAction.Resolve]: async (s) => {
+      const body = await call(`${base}/conflicts?nodeId=${encodeURIComponent(s.nodeId)}`, { method: 'GET' });
+      split = body?.ok ? { nodeId: s.nodeId, files: (body.files as { path: string; canvas: string; github: string }[]) ?? [] } : null;
+      note = body?.ok ? '' : `Conflicts unavailable: ${String(body?.refusal ?? 'network')}`;
+    },
     [SourceAction.Update]: async (s) => {
       const body = await call(`/api/v1/projects/${projectId}/code-import/${s.nodeId}/pull`, { method: 'POST', body: '{}' });
       const conflicts = (body?.conflicts as string[] | undefined) ?? [];
@@ -69,6 +78,10 @@
     },
     [SourceAction.ViewPr]: async (s) => {
       window.open(s.push?.pull?.url, '_blank', 'noopener');
+    },
+    [SourceAction.MakeVariant]: async (s) => {
+      const body = await call(`${base}/variant`, { method: 'POST', body: JSON.stringify({ canvasId, nodeId: s.nodeId }) });
+      note = body?.ok ? 'Variant made: its push asks what to do with it' : `Variant refused: ${String(body?.refusal ?? 'network')}`;
     },
     [SourceAction.Detach]: async (s) => {
       await call(`${base}?nodeId=${encodeURIComponent(s.nodeId)}`, { method: 'DELETE' });
@@ -87,7 +100,7 @@
   }
 
   async function push(confirmSensitive = false) {
-    const ask = pushAskOf(rows, picked, DEFAULT_NAME, mains);
+    const ask = pushAskOf(rows, picked, DEFAULT_NAME, mains, answers);
     if (!ask) {
       return;
     }
@@ -97,6 +110,7 @@
     const body = await call(base, { method: 'POST', body: JSON.stringify({ ...ask, confirmSensitive }) });
     const outcome = pushOutcomeOf(body as { ok?: boolean; refusal?: string } | null);
     confirming = outcome === PushOutcome.NeedsConfirm;
+    asking = outcome === PushOutcome.VariantChoice ? ((body?.suggested as { nodeId: string; route: string }[]) ?? []) : [];
     if (outcome === PushOutcome.ReadOnly) {
       download((body?.patch as { path: string; content: string }[]) ?? []);
     }
@@ -105,8 +119,51 @@
       await onchanged();
       pushed = { branch: String(body?.branch), pull: syncs.find((s) => ask.nodeIds.includes(s.nodeId))?.push?.pull ?? null };
     }
+    if (outcome === PushOutcome.Pushed) {
+      answers = [];
+    }
     note = outcome === PushOutcome.Failed ? `Push refused: ${String(body?.refusal ?? 'network')}` : '';
     busy = false;
+  }
+
+  function answer(v: { nodeId: string; route: string }, choice: VariantChoice) {
+    answers = [...answers.filter((a) => a.nodeId !== v.nodeId), { nodeId: v.nodeId, choice, route: v.route }];
+    asking = asking.filter((a) => a.nodeId !== v.nodeId);
+    if (!asking.length) {
+      void push();
+    }
+  }
+
+  async function keepCanvas() {
+    if (!split) {
+      return;
+    }
+    busy = true;
+    const body = await call(`${base}/conflicts`, { method: 'POST', body: JSON.stringify({ nodeId: split.nodeId, choice: 'keep_canvas' }) });
+    note = body?.ok ? 'Canvas kept: the next push writes it' : `Refused: ${String(body?.refusal ?? 'network')}`;
+    split = null;
+    await onchanged();
+    busy = false;
+  }
+
+  async function takeGithub() {
+    const s = syncs.find((x) => x.nodeId === split?.nodeId);
+    split = null;
+    if (s) {
+      busy = true;
+      await ACTION_RUN[SourceAction.Update](s);
+      await onchanged();
+      busy = false;
+    }
+  }
+
+  async function withAgent() {
+    if (!split) {
+      return;
+    }
+    const body = await call(`${base}/conflicts`, { method: 'POST', body: JSON.stringify({ nodeId: split.nodeId, choice: 'agent' }) });
+    await navigator.clipboard?.writeText(String(body?.prompt ?? '')).catch(() => null);
+    note = 'Merge prompt copied: paste it to the agent';
   }
 
   async function undo() {
@@ -137,8 +194,27 @@
         <button type="button" disabled={busy} onclick={() => act(action)}>{ACTION_LABEL[action]}</button>
       {/each}
       <button type="button" onclick={() => ((panel = true), onclose())}>Changes</button>
+      <button type="button" data-testid="compare-versions" onclick={() => oncompare(open.nodeId)}>Compare versions</button>
     </div>
   </div>
+{/if}
+
+{#if split}
+  <aside class="split" data-testid="conflict-split">
+    <header><strong>Conflicts</strong><button type="button" aria-label="Close" onclick={() => (split = null)}>×</button></header>
+    {#each split.files as f (f.path)}
+      <code>{f.path}</code>
+      <div class="sides">
+        <section><span class="label">Canvas</span><pre>{f.canvas}</pre></section>
+        <section><span class="label">GitHub</span><pre>{f.github}</pre></section>
+      </div>
+    {/each}
+    <footer>
+      <button type="button" disabled={busy} onclick={keepCanvas}>Keep canvas</button>
+      <button type="button" disabled={busy} onclick={takeGithub}>Take GitHub</button>
+      <button type="button" disabled={busy} onclick={withAgent}>Resolve with agent</button>
+    </footer>
+  </aside>
 {/if}
 
 {#if panel}
@@ -162,6 +238,15 @@
         <p class="muted">No prop on <code>{p.component}</code> for {p.props.join(', ')}: ask the agent to add one, or apply to the main component.</p>
       {/each}
       <label class="change"><input type="checkbox" checked={mains.has(row.nodeId)} onchange={(e) => (e.currentTarget.checked ? mains.add(row.nodeId) : mains.delete(row.nodeId))} /> Apply instance edits to main component</label>
+    {/each}
+    {#each asking as v (v.nodeId)}
+      <p class="note">{syncs.find((s) => s.nodeId === v.nodeId)?.name || 'Variant'} is a variant:</p>
+      <input aria-label="New route" bind:value={v.route} />
+      <div class="actions">
+        {#each Object.values(VariantChoice) as choice (choice)}
+          <button type="button" disabled={busy} onclick={() => answer(v, choice)}>{CHOICE_LABEL[choice]}</button>
+        {/each}
+      </div>
     {/each}
     {#if confirming}
       <p class="note">This push touches config, lockfiles or dotfiles.</p>
@@ -197,7 +282,8 @@
 
 <style>
   .source-pop,
-  .changes {
+  .changes,
+  .split {
     position: absolute;
     z-index: 30;
     background: var(--ui-surface, #fff);
@@ -220,6 +306,29 @@
     overflow: auto;
     padding: 12px;
     border-radius: var(--ui-radius-lg);
+  }
+  .split {
+    top: 56px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(960px, calc(100vw - 32px));
+    max-height: 80vh;
+    overflow: auto;
+    padding: 12px;
+    border-radius: var(--ui-radius-lg);
+  }
+  .sides {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 6px 0 12px;
+  }
+  .sides pre {
+    margin: 4px 0 0;
+    max-height: 40vh;
+    overflow: auto;
+    font-size: 11px;
+    white-space: pre-wrap;
   }
   .row {
     display: flex;

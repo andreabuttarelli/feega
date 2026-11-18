@@ -8,6 +8,7 @@ import { llmLanguageModel } from '$lib/server/llm';
 import { PromptCache } from '$lib/server/prompt-cache';
 import { reasoningProviderOptions } from '$lib/server/chat-model/catalogue';
 import { extractSdkUsage, logAiCall, withBrandContext, withOrgContext } from '$lib/server/ai-log';
+import { readAgentMemory } from '$lib/server/repos/profiles';
 import { saveTurn, type PromptTurn, type Turn } from '$lib/server/repos/chat';
 import { finishedTurn } from './finished-turn';
 import { openReply, ReplyStatus } from '$lib/server/repos/chat-reply';
@@ -131,6 +132,7 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
       void reply.finish(finishedTurn(steps), ReplyStatus.Done).then(() => cut.abort());
     }
   });
+  const memory = await readAgentMemory(db, userId).catch(() => null);
   const billedScope = <T>(fn: () => T): T => (brand ? withBrandContext(brand.id, fn) : withOrgContext(orgId, fn));
 
   const result = billedScope(() => streamText({
@@ -142,7 +144,8 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
       openCanvasId: canvasId,
       frame,
       selection,
-      frameGuidance: frames.guidance
+      frameGuidance: frames.guidance,
+      memory
     }),
     allowSystemInMessages: true,
     messages: [...history, { role: 'user', content: opening }] as ModelMessage[],

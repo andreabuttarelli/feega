@@ -28,7 +28,7 @@ function answer(permission: NonNullable<Body['permission']>): Response {
   return new Response(null, { status: NO_CONTENT });
 }
 
-function stream(agent: AgentCommand, prompt: string, signal: AbortSignal): Response {
+function stream(agent: AgentCommand, model: string | null, prompt: string, signal: AbortSignal): Response {
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
       const send = (event: AcpEvent) => controller.enqueue(new TextEncoder().encode(encodeAcpEvent(event)));
@@ -41,7 +41,7 @@ function stream(agent: AgentCommand, prompt: string, signal: AbortSignal): Respo
 
       try {
         const turn = await runAcpTurn(
-          { agent, cwd: process.cwd(), mcpServers: [feegaMcp(process.cwd(), process.env.PUBLIC_APP_URL ?? LOCAL_APP_URL)], prompt },
+          { agent, cwd: process.cwd(), mcpServers: [feegaMcp(process.cwd(), process.env.PUBLIC_APP_URL ?? LOCAL_APP_URL)], prompt, model },
           { onUpdate: (update) => send({ kind: AcpEventKind.Update, update }), ask, signal }
         );
         send({ kind: AcpEventKind.Done, stopReason: turn.stopReason });
@@ -57,7 +57,8 @@ function stream(agent: AgentCommand, prompt: string, signal: AbortSignal): Respo
 }
 
 export const POST: RequestHandler = async ({ request }) => {
-  if (localStore() === null) {
+  const opened = localStore();
+  if (opened === null) {
     error(NOT_FOUND, 'ACP agents run only in local mode');
   }
 
@@ -79,5 +80,5 @@ export const POST: RequestHandler = async ({ request }) => {
     error(CONFLICT, `${detected.agent.name} is not installed here, or cannot run over ACP`);
   }
 
-  return stream(detected.command, body.prompt, request.signal);
+  return stream(detected.command, opened.acpModel(body.agent), body.prompt, request.signal);
 };

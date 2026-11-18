@@ -13,7 +13,7 @@ export const load = async ({ url, untrack, cookies, locals: { safeGetSession, db
 
   // Chi ha già accettato una versione dei termini vede l'avviso solo quando la versione corrente
   // è cambiata — non sul primo accesso, dove `landingPath` registra già quella corrente.
-  const { termsNoticeVersion, tour } = await firstRunFlags(user ? await db() : null, user);
+  const { termsNoticeVersion, tour, name: viewerName } = await firstRunFlags(user ? await db() : null, user);
 
   // I due guard degli analytics, decisi qui una volta sola.
   //
@@ -51,7 +51,8 @@ export const load = async ({ url, untrack, cookies, locals: { safeGetSession, db
     internalViewer,
     planGo: isPlanGoEnabled(),
     termsNoticeVersion,
-    tour
+    tour,
+    viewerName
   };
 };
 

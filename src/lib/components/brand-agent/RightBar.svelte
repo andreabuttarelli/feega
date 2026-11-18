@@ -6,10 +6,16 @@
   import CanvasGuideTab from '$lib/components/canvas/CanvasGuideTab.svelte';
   import AcpChatPanel from '$lib/components/canvas/AcpChatPanel.svelte';
   import { LocalOff, isOff } from '$lib/local-user';
+  import { env as publicEnv } from '$env/dynamic/public';
+  import { createSupabaseBrowserClient } from '$lib/supabase/client';
+  import { AgentSurface, TRANSPORT_OF, agentFetch, surfaceOf, type LocalAgentsBridge } from '$lib/acp/agent-transport';
   import { anyChatRunning } from './chat-session.svelte';
   import { BarTab, moveKeepingScroll, restoreScroll, rightBar } from './right-bar-host.svelte';
 
   let { projectId, viewOnly = false }: { projectId: string; viewOnly?: boolean } = $props();
+
+  const DESKTOP_AGENTS_HINT = 'Run a coding agent installed on this computer on this canvas. It edits through Feega’s tools and asks before each one.';
+  const NOT_SIGNED_IN = 'Sign in to Feega to run a local agent.';
 
   const LABELS: Record<BarTab, () => string> = {
     [BarTab.Chat]: () => $_('app.shell.chatTab'),
@@ -22,9 +28,22 @@
     [BarTab.Properties]: 'side-tab-properties'
   };
 
+  async function turnContext() {
+    const { data } = await createSupabaseBrowserClient().auth.getSession();
+    if (!data.session) {
+      throw new Error(NOT_SIGNED_IN);
+    }
+
+    return { projectId, token: data.session.access_token };
+  }
+
+  const localAgents = typeof window === 'undefined' ? null : agentFetch(TRANSPORT_OF[surfaceOf(publicEnv, navigator.userAgent)], { bridge: (window as unknown as { feegaLocalAgents?: LocalAgentsBridge }).feegaLocalAgents, context: turnContext });
+  const desktopAgents = localAgents && surfaceOf(publicEnv, navigator.userAgent) === AgentSurface.DesktopHosted ? localAgents : null;
+
   let park = $state<HTMLDivElement | null>(null);
   let bar = $state<HTMLDivElement | null>(null);
   let guideSeen = $state(false);
+  let useLocalAgents = $state(false);
   const offsets = new Map<Element, number>();
 
   rightBar.select(readChatTab() as BarTab);
@@ -101,9 +120,19 @@
         {:else if viewOnly}
           <p class="chat-view-only" data-testid="chat-view-only">View only: the chat edits the canvas and spends credits. Ask an admin for edit access.</p>
         {:else}
+          {#if desktopAgents}
+            <div class="chat-source" role="group" aria-label="Chat source">
+              <button type="button" class:is-active={!useLocalAgents} data-testid="chat-source-cloud" onclick={() => (useLocalAgents = false)}>Feega</button>
+              <button type="button" class:is-active={useLocalAgents} data-testid="chat-source-local" onclick={() => (useLocalAgents = true)}>Local agents</button>
+            </div>
+          {/if}
+          {#if desktopAgents && useLocalAgents}
+            <AcpChatPanel fetcher={desktopAgents} hint={DESKTOP_AGENTS_HINT} />
+          {:else}
           {#await CHROME_LOADERS.chat() then { default: ChatPanel }}
             <ChatPanel {projectId} prefill={rightBar.prefill} reload={rightBar.reload} context={() => binding?.context?.() ?? {}} onturnend={() => binding?.onturnend?.()} ondata={(part) => binding?.ondata?.(part)} {onbusy} />
           {/await}
+          {/if}
         {/if}
       </div>
     {/if}
@@ -117,6 +146,24 @@
 </div>
 
 <style>
+  .chat-source {
+    display: flex;
+    gap: 4px;
+    padding: 8px 12px 0;
+  }
+
+  .chat-source button {
+    padding: 2px 8px;
+    font-size: 12px;
+    border-radius: var(--ui-radius-sm);
+    color: var(--muted-foreground);
+  }
+
+  .chat-source button.is-active {
+    color: var(--foreground);
+    background: var(--muted);
+  }
+
   .park {
     position: fixed;
     top: 0;

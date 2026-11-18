@@ -59,8 +59,8 @@ describe('una variante da una versione', () => {
 });
 
 describe('il diff del codice tra una versione e il ramo del frame', () => {
-  it('ogni file cambiato col prima e il dopo', async () => {
-    expect(await frameCodeDiff(deps(), 'v1')).toEqual({ ok: true, from: oldSha, to: 'main', files: [{ path: 'src/Hero.tsx', before: 'old hero\n', after: 'new hero\n' }] });
+  it('ogni file cambiato, dal ramo del frame alla versione', async () => {
+    expect(await frameCodeDiff(deps(), 'v1')).toEqual({ ok: true, from: 'main', to: oldSha, files: [{ path: 'src/Hero.tsx', before: 'new hero\n', after: 'old hero\n' }] });
   });
 });
 

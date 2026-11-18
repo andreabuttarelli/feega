@@ -4028,3 +4028,7 @@ property reads on ~2,000 items (`src/lib/canvas/counted-list.testkit.ts`), not w
 ## Exported code text is about 5% wider than the canvas still
 
 **Signal:** `npm run test:export-fidelity` names the first diverging layer with the same left/top but a width 5% off (hero headline 598px on the canvas, 629px in the export), and text the canvas wraps stays on one line in the export. **Move:** the deviating side is the canvas. `data-fit` text (`hyperframes/fit-runtime.ts`, `fitSize`) shrinks 5% per step until it fits the box laid out from the text-extent estimate (`layout/resolve.ts` `measure`); when the estimate is narrower than the browser's real text, the canvas shrinks text that fits. CSS cannot express it, so do not chase it in the exporter: fix the measurement, then raise the floors in the gate.
+
+## A freshly imported frame can keep a blank poster
+
+**Signal:** the version diff panel stays on "rendering…" (or, before the blank check, flags the whole poster as changed) while the frame itself paints fine on the canvas. `MotionNode` captures the cover once per head revision; a capture taken before the imported page painted is saved as a uniform poster and never retaken. **Move:** check the poster with `isBlank` before trusting it; to drive the flow in a test, run `tests/e2e/compare-versions.spec.ts` against a fresh local-mode `.feega` file and rerun once if the poster lost the race.

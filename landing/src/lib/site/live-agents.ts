@@ -151,3 +151,17 @@ export function claimTweak<T>(ledger: TweakLedger<T>, el: T, now: number, limit 
 export function releaseTweak<T>(ledger: TweakLedger<T>, el: T) {
   ledger.active.delete(el);
 }
+
+export enum Act {
+  Opening = 'opening',
+  Resident = 'resident',
+  Still = 'still'
+}
+
+export function actOf(input: { top: number; viewport: number; crew: number }): Act {
+  if (input.crew > 0) {
+    return Act.Resident;
+  }
+
+  return input.top < input.viewport ? Act.Opening : Act.Still;
+}

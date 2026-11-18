@@ -1,10 +1,12 @@
 const { app, BrowserWindow, ipcMain, shell, dialog, nativeTheme, Menu, session } = require('electron');
 const path = require('node:path');
-const { copyFileSync } = require('node:fs');
+const { copyFileSync, readFileSync, writeFileSync, mkdirSync } = require('node:fs');
 const { watchUpdates } = require('./updates.cjs');
 const { fileIn, withExtension, savedBounds, saveBounds, EXTENSION } = require('./files.cjs');
 const { startServer, freePort, LOOPBACK } = require('./server.cjs');
 const { frameless, overlay, offlinePage, unreachable } = require('./chrome.cjs');
+const localAgents = require('./local-agents.cjs');
+const { detect } = require('./acp-agents.cjs');
 const { start, browsable, heldLink, authReturn, staysInside, keepInside, settingsUrl, droppedCanvas, DEEP_LINK_SCHEME } = require('./routing.cjs');
 
 const START_URL_ENV = 'FEEGA_URL';
@@ -21,6 +23,11 @@ const DOCS_URL = 'https://docs.feega.app';
 const INSTALL_GUIDE_URL = `${DOCS_URL}/desktop/install-macos/`;
 const nativeCanvas = app.isPackaged ? null : require('./native-canvas.cjs');
 const NativeCanvas = nativeCanvas?.wanted(process.env, process.platform, app.isPackaged) ? nativeCanvas.loadAddon(__dirname) : null;
+const AGENTS_BRIDGE_FILE = 'agents-bridge.cjs';
+const MCP_URL_ENV = 'FEEGA_MCP_URL';
+const REMOTE_MCP_URL = 'https://mcp.feega.app/mcp';
+const agentsDir = () => path.join(app.getPath('userData'), 'agents');
+const agentChoicePath = () => path.join(app.getPath('userData'), 'agent.json');
 const userAgent = (window) => `${window.webContents.getUserAgent()} FeegaNative/${app.getVersion()}`;
 
 let home = hosted;
@@ -175,16 +182,40 @@ function leave(url) {
 
 function windowOptions() {
   const base = { width: 1440, height: 900, ...savedBounds(windowStatePath()), minWidth: 800, minHeight: 600, title: 'Feega', backgroundColor: '#0c0c0c', ...frameless(process.platform, nativeTheme.shouldUseDarkColors) };
+  const webPreferences = { ...SECURE_PREFERENCES, preload: path.join(__dirname, AGENTS_BRIDGE_FILE) };
   if (!NativeCanvas) {
-    return { ...base, webPreferences: SECURE_PREFERENCES };
+    return { ...base, webPreferences };
   }
-  return { ...base, transparent: true, backgroundColor: TRANSPARENT, webPreferences: { ...SECURE_PREFERENCES, preload: path.join(__dirname, PRELOAD_FILE) } };
+  return { ...base, transparent: true, backgroundColor: TRANSPARENT, webPreferences };
+}
+
+function readChoice() {
+  try {
+    return JSON.parse(readFileSync(agentChoicePath(), 'utf8')).agent ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function installLocalAgents() {
+  localAgents.install({
+    ipcMain,
+    trusted: (event) => !current && staysInside(event.senderFrame.url, hosted.href),
+    detect: () => detect({ ...process.env, HOME: app.getPath('home') }),
+    choices: { read: readChoice, write: (agent) => writeFileSync(agentChoicePath(), JSON.stringify({ agent })) },
+    mcpUrl: process.env[MCP_URL_ENV] || REMOTE_MCP_URL,
+    cwd: () => {
+      mkdirSync(agentsDir(), { recursive: true });
+      return agentsDir();
+    }
+  });
 }
 
 function installNativeCanvas() {
   if (!NativeCanvas) {
     return;
   }
+  session.defaultSession.setPreloads([path.join(__dirname, PRELOAD_FILE)]);
   nativeCanvas.install({
     ipcMain,
     NativeCanvas,
@@ -272,6 +303,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(() => {
     installNativeCanvas();
+    installLocalAgents();
     installMenu();
     saveDownloadsWithDialog();
     open();

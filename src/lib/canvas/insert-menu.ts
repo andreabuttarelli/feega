@@ -28,7 +28,7 @@ const SECTIONS: Record<BarContext, readonly InsertSection[]> = {
 
 const PINNED_SLOT: Partial<Record<InsertSection, BarSlot>> = {
   [InsertSection.Tools]: BarSlot.Draw,
-  [InsertSection.Generate]: BarSlot.Generate
+  [InsertSection.Generate]: BarSlot.Draw
 };
 
 const shownIn = (mode: EditorMode) => (section: InsertSection) => {

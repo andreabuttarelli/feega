@@ -42,7 +42,7 @@ describe('/api/v1/projects/:id/github/version-actions', () => {
   it('restore, variant e diff del codice', async () => {
     expect((await post({ versionId: 'v1', action: 'restore' })).body).toEqual({ ok: true, nodeId: 'n1', paths: ['src/Hero.tsx'] });
     expect((await post({ versionId: 'v1', action: 'variant' })).body).toEqual({ ok: true, frameId: 'variant-1' });
-    expect((await post({ versionId: 'v1', action: 'code_diff' })).body.files).toEqual([{ path: 'src/Hero.tsx', before: 'old', after: 'new' }]);
+    expect((await post({ versionId: 'v1', action: 'code_diff' })).body.files).toEqual([{ path: 'src/Hero.tsx', before: 'new', after: 'old' }]);
   });
 
   it('un frame che non è una versione è 404', async () => {

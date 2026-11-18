@@ -1,15 +1,14 @@
 <script lang="ts">
   import { AGENT_LOGOS } from '../home';
+  import { APP_URL } from '../links';
 </script>
 
 <section class="open site-wide">
-  <h2 data-agent-id="open-title">Open source. <br />Apache-2.0.<br />Works with Claude Code, <br class="wide" />Codex, Cursor.</h2>
-
-  <ul class="logos" data-agent-id="open-logos">
-    {#each AGENT_LOGOS as logo (logo.file)}
-      <li><img src="/site/home/{logo.file}" alt={logo.name} width={logo.width} height="32" /></li>
-    {/each}
-  </ul>
+  <h2 data-agent-id="open-title">
+    Open the Feega VS Code extension in your codebase, design directly in your real app with your
+    <span class="tail">agents<span class="logos" data-agent-id="open-logos">{#each AGENT_LOGOS as logo (logo.file)}<img src="/site/home/{logo.file}" alt={logo.name} width={logo.width} height="32" />{/each}</span>,</span>
+    then move to <a href={APP_URL}>Feega Cloud</a> to collaborate in real time.
+  </h2>
 </section>
 
 <style>
@@ -24,20 +23,32 @@
     letter-spacing: -0.04em;
     font-weight: 400;
     text-align: center;
-    white-space: pre-wrap;
+    text-wrap: balance;
+    max-width: 1000px;
+    margin-inline: auto;
     overflow-wrap: break-word;
   }
 
-  .wide {
-    display: none;
+  h2 a {
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+
+  .tail {
+    white-space: nowrap;
   }
 
   .logos {
-    display: flex;
-    justify-content: space-between;
-    margin: 40px 0 0;
-    padding: 0;
-    list-style: none;
+    display: inline-flex;
+    gap: 0.25em;
+    margin-left: 0.3em;
+    vertical-align: baseline;
+  }
+
+  .logos img {
+    height: 0.72em;
+    width: auto;
+    align-self: baseline;
   }
 
   @media (min-width: 810px) {
@@ -45,19 +56,9 @@
       padding: var(--site-section) 0 0;
     }
 
-    .wide {
-      display: inline;
-    }
-
     h2 {
       font-size: 30px;
       line-height: 36px;
-    }
-
-    .logos {
-      justify-content: space-around;
-      width: 400px;
-      margin: 40px auto 0;
     }
   }
 
