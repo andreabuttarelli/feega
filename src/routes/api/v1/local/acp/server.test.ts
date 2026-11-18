@@ -7,10 +7,16 @@ const local = vi.hoisted(() => ({ on: true }));
 
 vi.mock('$lib/server/local/local-mode', () => ({ localStore: () => (local.on ? {} : null) }));
 
-vi.mock('$lib/server/acp/agents', async (real) => {
-  const mod = await real<typeof import('$lib/server/acp/agents')>();
+vi.mock('$lib/server/acp/detect', async (real) => {
+  const mod = await real<typeof import('$lib/server/acp/detect')>();
   const fake = { command: process.execPath, args: [fileURLToPath(new URL('../../../../../lib/server/acp/fake-agent.mjs', import.meta.url))] };
-  return { ...mod, ACP_AGENTS: { ...mod.ACP_AGENTS, [mod.AcpAgent.Claude]: fake } };
+  return {
+    ...mod,
+    detectCached: async () => [
+      { agent: { id: 'claude' }, command: fake },
+      { agent: { id: 'goose' }, command: null }
+    ]
+  };
 });
 
 const { POST } = await import('./+server');
@@ -61,5 +67,9 @@ describe('POST /api/v1/local/acp', () => {
 
   it('refuses an unknown agent', async () => {
     await expect(post({ agent: 'nope', prompt: 'x' })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('refuses an agent that is not installed or cannot speak ACP here', async () => {
+    await expect(post({ agent: 'goose', prompt: 'x' })).rejects.toMatchObject({ status: 409 });
   });
 });

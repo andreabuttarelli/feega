@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { batchedSources, sourceReader } from './frame-sources';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { batchedSources as batchedWith, sourceReader, HOSTED_SOURCE_ASKS } from './frame-sources';
+
+const ASKS = { framesPerAsk: 2, open: 2 };
+const batchedSources: typeof batchedWith = (fetcher, kept, cacheOf) => batchedWith(fetcher, kept, cacheOf, () => ASKS);
 import { frameCache, memoryShelf } from './frame-cache';
 import { framesOnCanvas, frameSourceUrl } from './frame-source';
 import { adoptFrameHead } from '$lib/canvas/node-save';
@@ -110,7 +113,7 @@ describe('warming the sources of every frame on open', () => {
   const url = (id: string) => `/p/p1/c/c1/motion/${id}/source?revision=1`;
   const json = (body: unknown) => ({ ok: true, status: 200, json: async () => body }) as Response;
 
-  it('asks for all the frames in one request, even when only a few are built at once (the canvas asked six at a time, one request each)', async () => {
+  it('asks for every frame in the order given, a few per request', async () => {
     const asked: string[] = [];
     const read = batchedSources(async (u) => (asked.push(u), json({ tokens: {}, frames: Object.fromEntries(ids.map((id) => [id, { revision: 1, doc: { id }, assets: {} }])) })));
 
@@ -119,7 +122,50 @@ describe('warming the sources of every frame on open', () => {
       expect((await read(url(id)))?.doc).toEqual({ id });
     }
 
-    expect(asked).toEqual([`/p/p1/c/c1/motion/sources?ids=${ids.join(',')}`]);
+    expect(asked.flatMap((u) => new URLSearchParams(u.split('?')[1]).get('ids')!.split(','))).toEqual(ids);
+    expect(Math.max(...asked.map((u) => new URLSearchParams(u.split('?')[1]).get('ids')!.split(',').length))).toBeLessThanOrEqual(ASKS.framesPerAsk);
+  });
+
+  it('asks the hosted sizes when no route sized them', async () => {
+    const pending: (() => void)[] = [];
+    const many = Array.from({ length: 40 }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`);
+    const read = batchedWith((u) => new Promise<Response>((settle) => pending.push(() => settle(json({ tokens: {}, frames: Object.fromEntries(new URLSearchParams(u.split('?')[1]).get('ids')!.split(',').map((id) => [id, { revision: 1, doc: { id }, assets: {} }])) })))));
+
+    read.warm(many.map(url));
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(pending.length).toBe(HOSTED_SOURCE_ASKS.open);
+  });
+
+  it('passes a share-view source straight through, unbatched, so no sizing reaches it', async () => {
+    const asked: string[] = [];
+    const read = batchedWith(async (u) => (asked.push(u), json({ revision: 1, doc: { s: 1 }, assets: {}, tokens: {} })));
+
+    expect((await read('/s/tok/source/n1'))?.doc).toEqual({ s: 1 });
+    expect(asked).toEqual(['/s/tok/source/n1']);
+  });
+
+  it('hands the nearest frame its source without waiting for the rest (a 36-frame canvas waited 10 s for one 38 MB answer)', async () => {
+    const read = batchedSources((u) => (!u.includes(ids.at(-1)!) ? Promise.resolve(json({ tokens: {}, frames: { [ids[0]]: { revision: 1, doc: { id: ids[0] }, assets: {} } } })) : new Promise<Response>(() => {})));
+
+    read.warm(ids.map(url));
+
+    expect((await read(url(ids[0])))?.doc).toEqual({ id: ids[0] });
+  });
+
+  it('keeps only a few source requests open, so posters, fonts and pictures are not queued behind every frame (local mode answered posters at 13 s)', async () => {
+    const pending: (() => void)[] = [];
+    const read = batchedSources((u) => new Promise<Response>((settle) => pending.push(() => settle(json({ tokens: {}, frames: Object.fromEntries(new URLSearchParams(u.split('?')[1]).get('ids')!.split(',').map((id) => [id, { revision: 1, doc: { id }, assets: {} }])) })))));
+
+    read.warm(ids.map(url));
+    await new Promise((r) => setTimeout(r, 0));
+    const open = pending.length;
+    pending[0]();
+    await read(url(ids[0]));
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(open).toBe(ASKS.open);
+    expect(pending.length).toBe(ASKS.open + 1);
   });
 });
 
@@ -240,5 +286,53 @@ describe('a frame kept from an earlier open is drawn only at the revision the ca
 
     expect(await cache.take(`${C}/${A}@3@l1@`)).toBeNull();
     expect(await cache.take(`${C}/${A}@3@@`)).toBeNull();
+  });
+});
+
+describe('a frame whose source the server fails to answer', () => {
+  const C = '00000000-0000-4000-8000-0000000000c1';
+  const A = '00000000-0000-4000-8000-00000000000a';
+  const url = `/p/p1/c/${C}/motion/${A}/source?revision=3&org=o1&look=l1`;
+  const failing = { ok: false, status: 500, json: async () => ({ message: 'Internal Error' }) } as Response;
+  const json = (body: unknown) => ({ ok: true, status: 200, json: async () => body }) as Response;
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('asks again with a growing wait, and draws the frame once the server answers (a 500 left it blank for good)', async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    const read = sourceReader(async () => (calls++ < 2 ? failing : json({ doc: {} })));
+
+    const reading = read('/s?revision=2');
+    await vi.runAllTimersAsync();
+
+    expect(await reading).toEqual({ doc: {} });
+    expect(calls).toBe(3);
+  });
+
+  it('does not ask again for a frame that is not there (404)', async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    const read = sourceReader(async () => (calls++, { ok: false, status: 404, json: async () => null }) as unknown as Response);
+
+    const reading = read('/s?revision=2');
+    await vi.runAllTimersAsync();
+
+    expect(await reading).toBeNull();
+    expect(calls).toBe(1);
+  });
+
+  it('a 500 behind the batch and the cache still reaches the retry, not a silent "no source"', async () => {
+    vi.useFakeTimers();
+    const cache = frameCache(memoryShelf());
+    let calls = 0;
+    const read = batchedSources(async (u) => (calls++ < 2 ? failing : u.includes('/sources?') ? json({ tokens: {}, frames: { [A]: { revision: 3, doc: { back: 1 }, assets: {} } } }) : json({ revision: 3, doc: { back: 1 }, assets: {}, tokens: {} })), undefined, () => cache);
+
+    const reading = read(url);
+    await vi.runAllTimersAsync();
+
+    expect((await reading)?.doc).toEqual({ back: 1 });
   });
 });

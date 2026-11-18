@@ -1,6 +1,8 @@
 import type { ActionResult } from '@sveltejs/kit';
 import { goto } from '$app/navigation';
 import { postPageAction } from '$lib/api/page-action';
+import { carryNotice } from './staleness';
+import { Landing, unlandedNotice } from './unlanded-frames';
 import { FEEGA_MAX_BYTES, FEEGA_REFUSAL_MESSAGE, FeegaRefusal, isFeegaFile } from './feega-file';
 
 export const FEEGA_ACCEPT = '.feega';
@@ -40,10 +42,11 @@ export async function importFeega(page: string, file: File): Promise<string | nu
   }
 
   const imported = await post('import_canvas_file', formOf({ path: String(signed.data.path) }));
-  if (imported.type !== 'redirect') {
+  if (imported.type !== 'success' || !imported.data?.location) {
     return errorOf(imported, IMPORT_FAILED);
   }
-  await goto(imported.location);
+  carryNotice(unlandedNotice(Landing.Imported, (imported.data.unlanded as string[] | undefined) ?? []));
+  await goto(String(imported.data.location));
   return null;
 }
 

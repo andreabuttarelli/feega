@@ -4,6 +4,8 @@ import type { CodeFile } from '../model';
 import { BASE_CSS, fontFaceCss, fontLinks, lookupOf, mediaBlocks, ruleBlock, stateBlocks, tokensCss, type TokenLookup } from './css';
 import { escapeHtml, nodeLines, pad, type Dialect } from './markup';
 import { readme } from './project';
+import { scenesIn, scenesOf, sceneConsts, THREE_VERSION } from './scene-files';
+import { SCENE_RUNTIME } from './scene-three';
 import { animatedNodes, animationCss, inView, INVIEW_CLASS, INVIEW_SCRIPT, PROPERTY_RULES, translates } from './keyframes';
 
 type Ctx = { tokens: TokenLookup; root: ElementNode | null; file: string };
@@ -42,7 +44,7 @@ function useLines(node: UseNode, depth: number, ctx: Ctx): string[] {
 const svgOf = (node: SvgNode) => `<svg class="${node.className}"${inView(node) ? ' use:inview' : ''} width="${node.width}" height="${node.height}" viewBox="0 0 ${node.width} ${node.height}" fill="none" aria-hidden="true">${node.markup}</svg>`;
 
 const dialect: Dialect<Ctx> = {
-  openTag: (node, ctx) => `<${node.tag}${classAttr(node, ctx)}${attrs(node)}${styles(node)}${inView(node) ? ' use:inview' : ''}>`,
+  openTag: (node, ctx) => `<${node.tag}${classAttr(node, ctx)}${attrs(node)}${styles(node)}${inView(node) ? ' use:inview' : ''}${node.scene ? ` use:scene3d={${node.scene.name}}` : ''}>`,
   text: (value) => (isProp(value) ? `{${value.prop}}` : escapeText(value.literal)),
   lineBreak: '<br />',
   use: useLines,
@@ -69,8 +71,15 @@ const styleTag = (root: ElementNode, ctx: Ctx) => {
 };
 
 const INVIEW_MODULE = '$lib/inview';
+const SCENE_MODULE = '$lib/scene3d';
+const SCENES_MODULE = '$lib/scenes';
 
-const imports = (uses: readonly string[], from: string, root: ElementNode) => [...uses.map((u) => `  import ${u} from '${from}${u}.svelte';`), ...(animatedNodes(root).some(inView) ? [`  import { inview } from '${INVIEW_MODULE}';`] : [])];
+const sceneImports = (root: ElementNode) => {
+  const scenes = scenesIn(root);
+  return scenes.length ? [`  import { scene3d } from '${SCENE_MODULE}';`, `  import { ${scenes.map((s) => s.name).sort().join(', ')} } from '${SCENES_MODULE}';`] : [];
+};
+
+const imports = (uses: readonly string[], from: string, root: ElementNode) => [...uses.map((u) => `  import ${u} from '${from}${u}.svelte';`), ...(animatedNodes(root).some(inView) ? [`  import { inview } from '${INVIEW_MODULE}';`] : []), ...sceneImports(root)];
 
 const INVIEW_ACTION = ['export function inview(node: Element) {', ...INVIEW_SCRIPT.map((l) => (l ? `  ${l}` : l)).slice(0, -1), '  seen.observe(node);', '  return { destroy: () => seen.disconnect() };', '}', ''];
 
@@ -126,22 +135,24 @@ function pageFile(page: PageSpec, tokens: TokenLookup): CodeFile {
 
 const json = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;
 
-const PACKAGE = (name: string) => ({
+const PACKAGE = (name: string, three: boolean) => ({
   name,
   private: true,
   version: '0.0.0',
   type: 'module',
   scripts: { dev: 'vite dev', build: 'vite build', preview: 'vite preview' },
+  ...(three ? { dependencies: { three: THREE_VERSION } } : {}),
   devDependencies: { '@sveltejs/adapter-auto': '^6.0.0', '@sveltejs/kit': '^2.20.0', '@sveltejs/vite-plugin-svelte': '^5.0.0', svelte: '^5.0.0', typescript: '^5.6.0', vite: '^6.0.0' }
 });
 
 export function svelteProject(page: PageSpec, slug: string): CodeFile[] {
   const tokens = lookupOf(page.tokens);
+  const scenes = scenesOf(page);
   const animated = [page.root, ...page.components.map((c) => c.root)].flatMap(animatedNodes);
   const appHtml = ['<!doctype html>', '<html lang="en">', '  <head>', '    <meta charset="utf-8" />', '    <meta name="viewport" content="width=device-width, initial-scale=1" />', ...fontLinks(page).map((l) => `    ${l}`), '    %sveltekit.head%', '  </head>', '  <body>', '    <div style="display: contents">%sveltekit.body%</div>', '  </body>', '</html>', ''];
   return [
     { path: 'README.md', content: readme(page, 'SvelteKit (Svelte 5)', ['npm install', 'npm run dev'], 'src/lib/components/') },
-    { path: 'package.json', content: json(PACKAGE(slug)) },
+    { path: 'package.json', content: json(PACKAGE(slug, scenes.length > 0)) },
     { path: 'svelte.config.js', content: ["import adapter from '@sveltejs/adapter-auto';", '', 'export default { kit: { adapter: adapter() } };', ''].join('\n') },
     { path: 'vite.config.ts', content: ["import { sveltekit } from '@sveltejs/kit/vite';", "import { defineConfig } from 'vite';", '', 'export default defineConfig({ plugins: [sveltekit()] });', ''].join('\n') },
     { path: 'src/app.html', content: appHtml.join('\n') },
@@ -150,6 +161,7 @@ export function svelteProject(page: PageSpec, slug: string): CodeFile[] {
     ...(page.fonts.files.length ? [{ path: 'src/lib/styles/fonts.css', content: fontFaceCss(page.fonts.files) }] : []),
     { path: 'src/lib/styles/tokens.css', content: tokensCss(page.tokens) },
     { path: 'src/routes/+layout.svelte', content: ['<script lang="ts">', "  import '../app.css';", '', '  let { children } = $props();', '</script>', '', '{@render children()}', ''].join('\n') },
+    ...(scenes.length ? [{ path: 'src/lib/scenes.js', content: [...sceneConsts(scenes), ''].join('\n') }, { path: 'src/lib/scene3d.js', content: ["import * as THREE from 'three';", "import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';", '', SCENE_RUNTIME, 'export function scene3d(node, spec) {', '  const stop = mountScene(node, spec);', '  return { destroy: stop };', '}', ''].join('\n') }] : []),
     pageFile(page, tokens),
     ...page.components.map((c) => componentFile(c, tokens)),
     ...page.sets.map(setFile)

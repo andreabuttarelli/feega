@@ -10,7 +10,7 @@ const REPO = { owner: 'acme', repo: 'app', ref: null };
 describe('githubHost contro un GitHub finto', () => {
   gitHostContract(() => {
     const gh = fakeGithub();
-    return { host: githubHost(gh.call, REPO), files: gh.files, forcePush: gh.forcePush, seed: gh.seed, branches: gh.branches };
+    return { host: githubHost(gh.call, REPO), files: gh.files, forcePush: gh.forcePush, seed: gh.seed, branches: gh.branches, tag: gh.tag };
   });
 });
 

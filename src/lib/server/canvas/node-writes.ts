@@ -43,13 +43,13 @@ export async function resizeOnCanvas(db: Db, input: CanvasScope & { nodeId: stri
   return true;
 }
 
-export async function renameOnCanvas(db: Db, input: CanvasScope & { nodeId: string; name: string }): Promise<boolean> {
+export async function renameOnCanvas(db: Db, input: CanvasScope & { nodeId: string; name: string; actor?: Actor }): Promise<boolean> {
   const existing = (await listNodes(db, input)).find((node) => node.id === input.nodeId);
   if (!existing) {
     return false;
   }
 
-  await renameNode(db, { orgId: input.orgId, nodeId: input.nodeId, name: cleanNodeName(input.name) });
+  await renameNode(db, { orgId: input.orgId, nodeId: input.nodeId, name: cleanNodeName(input.name), actor: input.actor });
   return true;
 }
 

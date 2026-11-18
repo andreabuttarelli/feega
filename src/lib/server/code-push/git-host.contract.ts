@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { Access, FileMove, GitError, GitFailure, PullStatus, type GitHost } from './git-host';
+import { Access, FileMove, GitError, GitFailure, PullStatus, RefKind, type GitHost } from './git-host';
 
 export type HostWorld = {
   host: GitHost;
@@ -7,6 +7,7 @@ export type HostWorld = {
   forcePush: (branch: string, files: Record<string, string>) => unknown;
   seed: (branch: string, files: Record<string, string>) => unknown;
   branches: () => string[] | Promise<string[]>;
+  tag: (name: string, ref: string) => unknown;
 };
 
 const failureOf = async (work: Promise<unknown>) => {
@@ -107,6 +108,57 @@ export function gitHostContract(world: () => HostWorld | Promise<HostWorld>, pul
 
     expect(await host.lastPull('feega/none')).toBeNull();
     expect(await failureOf(host.upsertPull({ branch: 'feega/none', base: 'main', title: 't', body: '' }))).toBe(GitFailure.PullUnavailable);
+  });
+
+  it('elenca rami e tag col loro sha', async () => {
+    const { host, tag } = await world();
+    const { sha } = await onBranch(host, 'feega/r1', [{ path: 'a', content: 'a' }]);
+    await tag('v1', 'main');
+
+    const refs = await host.listRefs();
+
+    expect(refs).toContainEqual({ name: 'feega/r1', kind: RefKind.Branch, sha });
+    expect(refs).toContainEqual({ name: 'main', kind: RefKind.Branch, sha: await host.headOf('main') });
+    expect(refs).toContainEqual({ name: 'v1', kind: RefKind.Tag, sha: await host.headOf('main') });
+  });
+
+  it('la storia di un tag parte dal suo commit', async () => {
+    const { host, tag } = await world();
+    const base = await host.headOf('main');
+    const sha = await host.writeCommit({ parent: base, message: 'Tagged', files: [{ path: 'a', content: 'a' }] });
+    await host.createBranch('feega/t1', sha);
+    await tag('v2', 'feega/t1');
+
+    expect((await host.listCommits('v2', { limit: 1 }))[0]).toMatchObject({ sha, message: 'Tagged' });
+  });
+
+  it('elenca i commit di un ref dal più recente, con messaggio e autore, filtrabili per file', async () => {
+    const { host } = await world();
+    const base = await host.headOf('main');
+    const first = await host.writeCommit({ parent: base, message: 'First', files: [{ path: 'src/a.tsx', content: '1' }] });
+    const second = await host.writeCommit({ parent: first, message: 'Second', files: [{ path: 'src/b.tsx', content: '2' }] });
+    await host.createBranch('feega/h1', second);
+
+    const all = await host.listCommits('feega/h1', { limit: 10 });
+    const onA = await host.listCommits('feega/h1', { limit: 10, path: 'src/a.tsx' });
+
+    expect(all.slice(0, 3).map((c) => c.sha)).toEqual([second, first, base]);
+    expect(all[0].message).toBe('Second');
+    expect(all[0].author).not.toBe('');
+    expect(onA.map((c) => c.sha)).toEqual([first]);
+    expect(await host.listCommits('feega/h1', { limit: 1 })).toHaveLength(1);
+  });
+
+  it.skipIf(pulls === PullSupport.None)('elenca le PR aperte col ramo e lo sha di testa', async () => {
+    const { host } = await world();
+    const { sha } = await onBranch(host, 'feega/p1', [{ path: 'a', content: 'a' }]);
+    const pr = await host.upsertPull({ branch: 'feega/p1', base: 'main', title: 'Hero', body: '' });
+
+    expect(await host.listPulls()).toEqual([{ number: pr.number, title: 'Hero', branch: 'feega/p1', sha }]);
+  });
+
+  it.skipIf(pulls === PullSupport.Full)('senza un host di PR, nessuna PR aperta', async () => {
+    expect(await (await world()).host.listPulls()).toEqual([]);
   });
 
   it('chi può scrivere ha accesso write', async () => {

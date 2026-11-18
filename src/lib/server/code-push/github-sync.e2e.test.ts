@@ -1,0 +1,89 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import type { SourceEdit } from '$lib/server/code-import/write-back';
+import { framesPush, frameUndo } from './frames-push';
+import { linkImported } from './import-link';
+import { ComponentRole, EntryKind } from './link';
+import type { Pushed, Undone } from './push';
+import { fixtureDeps, fixtureWorld, H1_COLUMN, H1_LINE, memoryLinks, NO_SCOPE, ROUTES, USER_BRANCH, USER_DIRTY, type FrameEdits, type World } from './github-sync.fixture';
+
+const FRAME = 'frame-shop';
+
+const h1 = (look: SourceEdit['look'], was: SourceEdit['was']): SourceEdit => ({ at: { file: 'app/page.tsx', line: H1_LINE, column: H1_COLUMN }, look, was });
+
+let world: World;
+let links: ReturnType<typeof memoryLinks>;
+let edits: FrameEdits;
+
+beforeEach(async () => {
+  world = await fixtureWorld();
+  links = memoryLinks();
+  edits = new Map();
+  const deps = fixtureDeps(world, links, edits);
+  await linkImported({ host: deps.host, links }, FRAME, { kind: 'folder', repo: world.clone, branch: 'main', sha: null, routes: ROUTES.map((r) => r.path) }, { app: '', routes: ROUTES }, { components: [{ name: 'Button', file: 'components/Button.tsx' }], poster: null });
+});
+
+afterEach(async () => {
+  await world.done();
+});
+
+describe('GitHub sync su un repo Next.js 15 + Tailwind', () => {
+  it('l’import lega tre pagine, il componente main e un’istanza per pagina', () => {
+    const kinds = links.every().map(({ link }) => [link.entryKind, link.role ?? null, link.route ?? null, link.entry]);
+
+    expect(kinds).toEqual([
+      [EntryKind.Page, null, '/', 'app/page.tsx'],
+      [EntryKind.Page, null, '/pricing', 'app/pricing/page.tsx'],
+      [EntryKind.Page, null, '/about', 'app/about/page.tsx'],
+      [EntryKind.Component, ComponentRole.Main, null, 'components/Button.tsx'],
+      [EntryKind.Component, ComponentRole.Instance, '/', 'components/Button.tsx'],
+      [EntryKind.Component, ComponentRole.Instance, '/pricing', 'components/Button.tsx'],
+      [EntryKind.Component, ComponentRole.Instance, '/about', 'components/Button.tsx']
+    ]);
+  });
+
+  it('colore e testo arrivano su un ramo feega/ che contiene solo il diff voluto', async () => {
+    edits.set(FRAME, [h1({ color: '#e11d48', text: 'Ship today' }, { color: '#171717', text: 'Ship faster' })]);
+    const userHead = await world.run(['rev-parse', 'HEAD']);
+
+    const out = (await framesPush(fixtureDeps(world, links, edits), NO_SCOPE, { name: 'hero copy', nodeIds: [FRAME] })) as Pushed;
+
+    expect(out).toMatchObject({ ok: true, branch: 'feega/hero-copy' });
+    expect(await world.changed('main', out.branch)).toEqual(['app/page.tsx']);
+    const after = (await world.at(out.branch, 'app/page.tsx'))!;
+    expect(after).toContain('Ship today');
+    expect(after).toContain('#e11d48');
+    expect(after).not.toContain('Ship faster');
+    expect(await world.run(['rev-parse', '--abbrev-ref', 'HEAD'])).toBe(USER_BRANCH);
+    expect(await world.run(['rev-parse', 'HEAD'])).toBe(userHead);
+    expect(await readFile(join(world.clone, USER_DIRTY), 'utf8')).toBe('shop, half written\n');
+    expect(await world.at('main', 'app/page.tsx')).toContain('Ship faster');
+  });
+
+  it('l’onClick del titolo sopravvive al suo cambio di colore', async () => {
+    edits.set(FRAME, [h1({ color: '#e11d48' }, { color: '#171717' })]);
+
+    const out = (await framesPush(fixtureDeps(world, links, edits), NO_SCOPE, { name: 'colour', nodeIds: [FRAME] })) as Pushed;
+
+    const after = (await world.at(out.branch, 'app/page.tsx'))!;
+    expect(after).toContain('onClick={() => window.scrollTo(0, 0)}');
+    expect(after).toContain('#e11d48');
+    expect(after).toContain('<Button label="Start free" />');
+  });
+
+  it('annullare l’ultima spinta è un commit in avanti che ripristina solo i file toccati', async () => {
+    const deps = fixtureDeps(world, links, edits);
+    edits.set(FRAME, [h1({ text: 'Ship today' }, { text: 'Ship faster' })]);
+    const first = (await framesPush(deps, NO_SCOPE, { name: 'copy', nodeIds: [FRAME] })) as Pushed;
+    edits.set(FRAME, [h1({ text: 'Ship tonight' }, { text: 'Ship faster' })]);
+    const second = (await framesPush(deps, NO_SCOPE, { name: 'copy', nodeIds: [FRAME] })) as Pushed;
+
+    const undone = (await frameUndo(deps, FRAME)) as Undone;
+
+    expect(undone).toMatchObject({ ok: true, branch: first.branch });
+    expect(await world.run(['--git-dir', world.origin, 'rev-parse', `${undone.sha}^`]).catch(() => null)).toBe(second.sha);
+    expect(await world.changed(second.sha, undone.sha)).toEqual(['app/page.tsx']);
+    expect(await world.at(undone.sha, 'app/page.tsx')).toContain('Ship today');
+  });
+});

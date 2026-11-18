@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ItemKind } from '@feega/motion-core/motion/gpu-full/display-list';
-import { postersFor, showsPoster } from './frame-poster';
+import { postersFor, showsPoster, showsStage } from './frame-poster';
 
 const poster = (id: string) => ({ key: `poster:${id}`, frame: { id } });
 
@@ -21,5 +21,12 @@ describe('showsPoster', () => {
 
   it('una card vuota no', () => {
     expect(showsPoster({ items: [{ kind: ItemKind.Path }] })).toBe(false);
+  });
+});
+
+describe('showsStage', () => {
+  it('a frame card filled with its page colour has something to show even too small to read', () => {
+    expect(showsStage({ items: [{ clip: 'n:panel' }, { clip: 'n:stage' }] })).toBe(true);
+    expect(showsStage({ items: [{ clip: 'n:panel' }] })).toBe(false);
   });
 });

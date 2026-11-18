@@ -101,6 +101,10 @@ import { CAPTURE_DELAY_MAX_MS, delayOf } from '$lib/server/code-import/capture-w
 import { designSystemOf } from '$lib/server/code-import/design-system';
 import { githubFor } from '$lib/server/code-import/github-runtime';
 import { frameDetach, framesPush, frameStatus, frameUndo } from '$lib/server/code-push/frames-push';
+import { frameVersions } from '$lib/server/code-push/frames-versions';
+import { frameCompare, frameRetarget, MAX_VERSIONS } from '$lib/server/code-push/frames-compare';
+import { actionDeps, compareDeps } from '$lib/server/code-push/compare-runtime';
+import { VersionAction, versionAction } from '$lib/server/code-push/frames-version-actions';
 import { framesDeps, importLinker } from '$lib/server/code-push/frames-runtime';
 import { libsOrigin } from '$lib/server/motion/libs-origin';
 import { GithubRefusal } from '$lib/server/code-import/github-http';
@@ -1163,6 +1167,30 @@ export const CANVAS_OPS = {
     run: async (ctx, input) => frameUndo(framesDeps(ctx.db, ctx), input.nodeId)
   }),
 
+  github_versions: op({
+    access: Access.Read,
+    input: z.object({ nodeId: z.string(), ref: z.string().max(200).optional().describe('branch, tag or sha whose history to list; default the base branch of the link'), limit: z.number().int().positive().max(100).optional() }).strict(),
+    run: async (ctx, input) => frameVersions(framesDeps(ctx.db, ctx), { nodeId: input.nodeId, ref: input.ref, limit: input.limit ?? 30 })
+  }),
+
+  github_compare: op({
+    access: Access.Write,
+    input: z.object({ nodeId: z.string(), refs: z.array(z.string().min(1).max(200)).min(1).max(MAX_VERSIONS).describe('branch, tag, sha, or #<number> for a pull request') }).strict(),
+    run: async (ctx, input) => frameCompare(compareDeps(ctx.db, figmaScope(ctx)), input)
+  }),
+
+  github_version_ref: op({
+    access: Access.Write,
+    input: z.object({ versionId: z.string().describe('a version frame made by github_compare'), ref: z.string().min(1).max(200).describe('branch, tag, sha or #<number>') }).strict(),
+    run: async (ctx, input) => frameRetarget(compareDeps(ctx.db, figmaScope(ctx)), input)
+  }),
+
+  github_version_action: op({
+    access: Access.Write,
+    input: z.object({ versionId: z.string(), action: z.enum(VersionAction).describe('restore: the version files become changes of the linked frame, pushed through Changes and a PR; variant: an unlocked, unlinked copy; code_diff: the files that differ from the base branch') }).strict(),
+    run: async (ctx, input) => versionAction(actionDeps(ctx.db, figmaScope(ctx)), input.action, input.versionId)
+  }),
+
   github_detach: op({
     access: Access.Write,
     input: z.object({ nodeId: z.string() }).strict(),
@@ -1529,7 +1557,7 @@ export const CANVAS_OPS = {
       if (!node) {
         return NODE_NOT_FOUND;
       }
-      await renameOnCanvas(ctx.db, { orgId: ctx.orgId, canvasId: node.canvasId, ...input });
+      await renameOnCanvas(ctx.db, { orgId: ctx.orgId, canvasId: node.canvasId, ...input, actor: ctx.actor });
       return { renamed: true };
     }
   }),
@@ -1595,7 +1623,7 @@ export const CANVAS_OPS = {
     input: z.object({ path: z.string().describe('from request_canvas_import') }).strict(),
     run: async (ctx, input) => {
       const out = await importStoredCanvasFile(ctx.db, { orgId: ctx.orgId, projectFor: async () => ctx.projectId, path: input.path, actor: ctx.actor });
-      return out.outcome === FeegaImport.Imported ? { canvas: out.canvas, path: canvasPath(ctx.projectId, out.canvas.id) } : { error: out.refusal, message: FEEGA_REFUSAL_MESSAGE[out.refusal] };
+      return out.outcome === FeegaImport.Imported ? { canvas: out.canvas, path: canvasPath(ctx.projectId, out.canvas.id), unlanded: out.unlanded } : { error: out.refusal, message: FEEGA_REFUSAL_MESSAGE[out.refusal] };
     }
   }),
 

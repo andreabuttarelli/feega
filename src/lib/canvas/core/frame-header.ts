@@ -9,9 +9,11 @@ import CircleArrowDown from '@lucide/svelte/icons/circle-arrow-down';
 import Pencil from '@lucide/svelte/icons/pencil';
 import GitPullRequest from '@lucide/svelte/icons/git-pull-request';
 import CircleCheck from '@lucide/svelte/icons/circle-check';
+import GitBranch from '@lucide/svelte/icons/git-branch';
 import { shownAtRest, type CameraMotion } from './camera-motion';
 
 export enum FrameBadge {
+  Play = 'play',
   SourceConflict = 'source-conflict',
   SourceOrphan = 'source-orphan',
   SourceReadOnly = 'source-read-only',
@@ -21,7 +23,7 @@ export enum FrameBadge {
   SourceInSync = 'source-in-sync',
   Component = 'component',
   Breakpoint = 'breakpoint',
-  Prototype = 'prototype'
+  Version = 'version'
 }
 
 export enum SourceSync {
@@ -37,10 +39,11 @@ export enum SourceSync {
 export enum HeaderAction {
   Select = 'select',
   Play = 'play',
-  Source = 'source'
+  Source = 'source',
+  Version = 'version'
 }
 
-export type FrameFacts = { breakpoints: boolean; component: boolean; prototype: boolean; source: readonly SourceSync[] };
+export type FrameFacts = { breakpoints: boolean; component: boolean; version: boolean; source: readonly SourceSync[] };
 
 export type HeaderFlags = { sourceSync: boolean };
 
@@ -48,9 +51,11 @@ export const HEADER_FLAGS: HeaderFlags = { sourceSync: true };
 
 type HeaderRow = { badge: FrameBadge; icon: Component; tooltip: string; action: HeaderAction; shows: (f: FrameFacts) => boolean; source?: SourceSync };
 
-const sourceRow = (badge: FrameBadge, source: SourceSync, icon: Component, tooltip: string): HeaderRow => ({ badge, icon, tooltip, action: HeaderAction.Source, shows: (f) => f.source.includes(source), source });
+const sourceRow = (badge: FrameBadge, source: SourceSync, icon: Component, tooltip: string): HeaderRow => ({ badge, icon, tooltip, action: HeaderAction.Source, shows: (f) => !f.version && f.source.includes(source), source });
 
 export const frameHeaderIcons: readonly HeaderRow[] = [
+  { badge: FrameBadge.Play, icon: Play, tooltip: 'Play', action: HeaderAction.Play, shows: () => true },
+  { badge: FrameBadge.Version, icon: GitBranch, tooltip: 'Read-only version', action: HeaderAction.Version, shows: (f) => f.version },
   sourceRow(FrameBadge.SourceConflict, SourceSync.Conflict, TriangleAlert, 'Conflict with GitHub'),
   sourceRow(FrameBadge.SourceOrphan, SourceSync.Orphan, FileX, 'Source file gone'),
   sourceRow(FrameBadge.SourceReadOnly, SourceSync.ReadOnly, Lock, 'GitHub access lost, read-only'),
@@ -59,8 +64,7 @@ export const frameHeaderIcons: readonly HeaderRow[] = [
   sourceRow(FrameBadge.SourceInPr, SourceSync.InPr, GitPullRequest, 'In a pull request'),
   sourceRow(FrameBadge.SourceInSync, SourceSync.InSync, CircleCheck, 'In sync with GitHub'),
   { badge: FrameBadge.Component, icon: ComponentIcon, tooltip: 'Component set', action: HeaderAction.Select, shows: (f) => f.component },
-  { badge: FrameBadge.Breakpoint, icon: MonitorSmartphone, tooltip: 'Breakpoints', action: HeaderAction.Select, shows: (f) => f.breakpoints },
-  { badge: FrameBadge.Prototype, icon: Play, tooltip: 'Play prototype', action: HeaderAction.Play, shows: (f) => f.prototype }
+  { badge: FrameBadge.Breakpoint, icon: MonitorSmartphone, tooltip: 'Breakpoints', action: HeaderAction.Select, shows: (f) => f.breakpoints }
 ];
 
 export const headerRow = (badge: FrameBadge): HeaderRow => frameHeaderIcons.find((r) => r.badge === badge)!;

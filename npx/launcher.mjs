@@ -281,3 +281,17 @@ const HTTP_ERROR_MIN = 400;
 export const readyProbe = { redirect: 'manual' };
 
 export const served = (status) => status < HTTP_ERROR_MIN;
+
+export async function untilReady(probe, exited, pollMs) {
+  let exitCode;
+  exited.then((code) => {
+    exitCode = code ?? 'signal';
+  });
+
+  while (!(await probe())) {
+    await new Promise((r) => setTimeout(r, pollMs));
+    if (exitCode !== undefined) {
+      throw new Error(`the app server exited (code ${exitCode}) before it started`);
+    }
+  }
+}

@@ -2,7 +2,7 @@ import type { ProviderAnswer, ProviderCall } from '$lib/server/connections/accou
 import type { GithubCall } from '$lib/server/code-import/github';
 
 type Tree = Record<string, string>;
-type Commit = { tree: string; parents: string[] };
+type Commit = { tree: string; parents: string[]; message: string };
 type Pull = { number: number; head: string; base: string; title: string; body: string; state: 'open' | 'closed'; merged: boolean };
 type TreeEntry = { path: string; content?: string; sha?: string | null };
 
@@ -18,6 +18,7 @@ export type FakeGithub = {
   endPull: (number: number, merged: boolean) => void;
   failAfter: (count: number, status: number) => void;
   branches: () => string[];
+  tag: (name: string, ref: string) => void;
 };
 
 const answer = (status: number, data: unknown = null): ProviderAnswer => ({ status, data, headers: {}, file: null });
@@ -39,9 +40,10 @@ export function fakeGithub(opts: { owner?: string; repo?: string; push?: boolean
     trees.set(sha, { ...files });
     return sha;
   };
+  const tags = new Map<string, string>();
   const saveCommit = (files: Tree, parents: string[]) => {
     const sha = id('c');
-    commits.set(sha, { tree: saveTree(files), parents });
+    commits.set(sha, { tree: saveTree(files), parents, message: 'seed' });
     return sha;
   };
   const treeOf = (sha: string) => trees.get(commits.get(sha)?.tree ?? '') ?? {};
@@ -67,7 +69,7 @@ export function fakeGithub(opts: { owner?: string; repo?: string; push?: boolean
   };
   seed(defaultBranch, { 'README.md': 'hi' });
 
-  const pullJson = (p: Pull) => ({ number: p.number, html_url: `https://github.com${root.slice(6)}/pull/${p.number}`, state: p.state, merged: p.merged, head: { sha: refs.get(p.head) ?? '', ref: p.head } });
+  const pullJson = (p: Pull) => ({ number: p.number, title: p.title, html_url: `https://github.com${root.slice(6)}/pull/${p.number}`, state: p.state, merged: p.merged, head: { sha: refs.get(p.head) ?? '', ref: p.head } });
 
   let budget = Infinity;
   let failStatus = 0;
@@ -127,7 +129,7 @@ export function fakeGithub(opts: { owner?: string; repo?: string; push?: boolean
     }
     if (path === '/git/commits' && method === 'POST') {
       const sha = id('c');
-      commits.set(sha, { tree: String(body.tree), parents: body.parents as string[] });
+      commits.set(sha, { tree: String(body.tree), parents: body.parents as string[], message: String(body.message) });
       return answer(201, { sha, message: body.message });
     }
     m = path.match(/^\/compare\/(\w+)\.\.\.(.+)$/);
@@ -152,9 +154,28 @@ export function fakeGithub(opts: { owner?: string; repo?: string; push?: boolean
       return answer(200, { status, files });
     }
     if (path === '/pulls' && method === 'GET') {
-      const head = String(r.query?.head ?? '').split(':')[1];
+      const head = r.query?.head ? String(r.query.head).split(':')[1] : null;
       const state = r.query?.state ?? 'open';
-      return answer(200, pulls.filter((p) => p.head === head && (state === 'all' || p.state === state)).reverse().map(pullJson));
+      return answer(200, pulls.filter((p) => (head === null || p.head === head) && (state === 'all' || p.state === state)).reverse().map(pullJson));
+    }
+    if (path === '/branches' && method === 'GET') {
+      return answer(200, [...refs].map(([name, sha]) => ({ name, commit: { sha } })));
+    }
+    if (path === '/tags' && method === 'GET') {
+      return answer(200, [...tags].map(([name, sha]) => ({ name, commit: { sha } })));
+    }
+    if (path === '/commits' && method === 'GET') {
+      const touches = (sha: string) => {
+        const file = r.query?.path;
+        const parent = commits.get(sha)?.parents[0];
+        return !file || treeOf(sha)[file] !== (parent ? treeOf(parent)[file] : undefined);
+      };
+      const history: string[] = [];
+      for (let at = refs.get(String(r.query?.sha)) ?? tags.get(String(r.query?.sha)) ?? String(r.query?.sha); commits.has(at); at = commits.get(at)!.parents[0]) {
+        history.push(at);
+      }
+      const shown = history.filter(touches).slice(0, Number(r.query?.per_page ?? 30));
+      return answer(200, shown.map((sha) => ({ sha, commit: { message: commits.get(sha)!.message, author: { name: 'Feega', date: '2026-11-17T00:00:00Z' } } })));
     }
     m = path.match(/^\/contents\/(.+)$/);
     if (m && method === 'GET') {
@@ -208,6 +229,9 @@ export function fakeGithub(opts: { owner?: string; repo?: string; push?: boolean
       failStatus = status;
     },
     branches: () => [...refs.keys()],
+    tag: (name, ref) => {
+      tags.set(name, refs.get(ref) ?? ref);
+    },
     checks,
     pulls,
     calls
