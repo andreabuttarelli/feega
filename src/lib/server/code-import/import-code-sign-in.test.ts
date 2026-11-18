@@ -189,6 +189,6 @@ describe('capturing several routes', () => {
     expect(done.outcome).toBe(CodeImportOutcome.Ok);
     expect(peak).toBeGreaterThan(1);
     expect(peak).toBeLessThanOrEqual(4);
-    expect(done.pages).toEqual(routes);
+    expect(done.outcome === CodeImportOutcome.Ok && done.pages).toEqual(routes);
   });
 });
