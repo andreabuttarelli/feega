@@ -1,14 +1,14 @@
 <script lang="ts">
   import { SvelteSet } from 'svelte/reactivity';
   import { SvelteMap } from 'svelte/reactivity';
-  import { SourceAction, changedRows, ciOf, CiState, filesOfPatch, filesToPush, impactOf, popoverOf, pushAskOf, pushedNote, pushLabel, rowTitle, VariantChoice, type ChangedFile, type FrameSync, type PullView, type VariantAnswer } from '$lib/canvas/source-changes';
+  import { SourceAction, changedRows, ciOf, CiState, filesOfPatch, filesToPush, impactOf, popoverOf, pushAskOf, pushedNote, rowTitle, VariantChoice, type ChangedFile, type FrameSync, type PullView, type VariantAnswer } from '$lib/canvas/source-changes';
   import { PushOutcome, pushOutcomeOf, editedFilesText } from '$lib/canvas/source-sync';
   import { BranchMode, branchFields, type BranchOptions, type GitSummary } from '$lib/canvas/git-status';
   import X from '@lucide/svelte/icons/x';
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
-  import { Segmented, Switch } from '$lib/components/ui/control';
+  import { ControlLayout, ControlRow, Segmented, Switch } from '$lib/components/ui/control';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
   type Anchor = { left: number; top: number };
@@ -133,18 +133,7 @@
     busy = false;
   }
 
-  const refusalNote = (refusal: string) => (refusal === PROTECTED ? `GitHub refused the commit: ${rows[0]?.link.baseBranch ?? 'the base branch'} is protected. Turn off direct commit to open a pull request.` : `Push refused: ${refusal}`);
-
-  async function ready() {
-    if (!draft) {
-      return;
-    }
-    busy = true;
-    const body = await call(`${base}/ready`, { method: 'POST', body: JSON.stringify({ nodeId: draft.nodeId }) });
-    note = body?.ok ? 'Pull request ready for review' : `Ready refused: ${String(body?.refusal ?? 'network')}`;
-    await onchanged();
-    busy = false;
-  }
+  const refusalNote = (refusal: string) => (refusal === PROTECTED ? `GitHub refused the commit: ${target} is protected. Choose another branch or open a pull request.` : `Push refused: ${refusal}`);
 
   function answer(v: { nodeId: string; route: string }, choice: VariantChoice) {
     answers = [...answers.filter((a) => a.nodeId !== v.nodeId), { nodeId: v.nodeId, choice, route: v.route }];
@@ -200,22 +189,41 @@
 
   const hasPush = $derived(syncs.some((s) => s.link.pushBranch));
   const direct = $derived(options.mode === BranchMode.Direct);
+  type BranchPull = { number: number; branch: string };
+  let branches = $state<string[]>([]);
+  let branchPulls = $state<BranchPull[]>([]);
+  const target = $derived(options.commitTo.trim() || baseBranch);
+  const targetPull = $derived(branchPulls.find((p) => p.branch === target) ?? null);
+  $effect(() => {
+    if (!panel || !direct || branches.length || !syncs[0]) {
+      return;
+    }
+    void loadBranches(syncs[0].nodeId);
+  });
+  async function loadBranches(nodeId: string) {
+    const body = await call(`/api/v1/projects/${projectId}/github/versions`, { method: 'POST', body: JSON.stringify({ nodeId, limit: 1 }) });
+    const refs = (body?.refs as { name: string; kind: string }[] | undefined) ?? [];
+    branches = refs.filter((ref) => ref.kind === 'branch').map((ref) => ref.name);
+    branchPulls = (body?.pulls as BranchPull[] | undefined) ?? [];
+  }
   const baseBranch = $derived(git?.base ?? rows[0]?.link.baseBranch ?? syncs[0]?.link.baseBranch ?? 'main');
   const workBranch = $derived(options.branch.trim() || git?.branch || 'feega/canvas-edits');
-  const WHERE = $derived([{ value: BranchMode.Session, label: 'New branch + PR' }, { value: BranchMode.Direct, label: `Commit to ${baseBranch}` }]);
+  const WHERE = $derived([{ value: BranchMode.Session, label: 'New branch + PR' }, { value: BranchMode.Direct, label: 'Commit to branch' }]);
   const MINUTE_MS = 60_000;
   const savedAgo = (ms: number) => (ms < MINUTE_MS ? 'Saved just now' : `Saved ${Math.round(ms / MINUTE_MS)} min ago`);
   const offered = new Set<string>();
   $effect(() => {
     for (const r of rows) {
-      if (!offered.has(r.nodeId)) {
-        offered.add(r.nodeId);
+      if (offered.has(r.nodeId)) {
+        continue;
+      }
+      offered.add(r.nodeId);
+      if (autosaveOn) {
         picked.add(r.nodeId);
       }
     }
   });
   const savedLabel = $derived(!autosaveOn ? 'Off: push by hand' : savedAt ? savedAgo(Date.now() - savedAt) : 'Not saved yet');
-  const draft = $derived(syncs.find((s) => s.push?.pull?.draft && s.push.pull.status === 'open') ?? null);
   const readOnly = $derived(rows.some((r) => !r.link.writable));
   const toPush = $derived(filesToPush(picked, files));
 </script>
@@ -259,7 +267,7 @@
     <header class="head">
       <div class="title">
         <strong>{git?.repo ?? 'Changes'}</strong>
-        <span class="muted"><code>{baseBranch}</code> → <code>{direct ? baseBranch : workBranch}</code></span>
+        <span class="muted">{#if direct}→ <code>{target}</code>{:else}<code>{baseBranch}</code> → <code>{workBranch}</code>{/if}</span>
       </div>
       {#if git?.pull}<a class="pr" href={git.pull.url} target="_blank" rel="noopener">#{git.pull.number} · {git.draft ? 'Draft' : git.pull.status}</a>{/if}
       <Button variant="ghost" size="icon-sm" aria-label="Close" onclick={() => (panel = false)}><X size={14} /></Button>
@@ -324,27 +332,30 @@
       <p class="label">Where changes go</p>
       <Segmented label="Where changes go" value={options.mode} options={WHERE} onchange={(v) => (options.mode = v as BranchMode)} />
       {#if direct}
-        <p class="hint" data-testid="branch-direct-note">Commits land on <code>{baseBranch}</code> with no pull request. If it is protected, GitHub refuses them.</p>
+        <label class="label" for="commit-branch">Branch</label>
+        <Input id="commit-branch" list="commit-branches" placeholder={baseBranch} bind:value={options.commitTo} autocomplete="off" data-testid="commit-branch" />
+        <datalist id="commit-branches">
+          {#each branches as name (name)}<option value={name}></option>{/each}
+        </datalist>
+        {#if targetPull}<a class="pr" href="https://github.com/{git?.repo}/pull/{targetPull.number}" target="_blank" rel="noopener" data-testid="commit-branch-pull">Open PR #{targetPull.number} from {target}</a>{/if}
+        <p class="hint" data-testid="branch-direct-note">Commits land on <code>{target}</code> with no pull request. If it is protected, GitHub refuses them.</p>
       {:else}
         <label class="label" for="branch-name">Branch</label>
         <Input id="branch-name" placeholder="feega/canvas-edits" bind:value={options.branch} data-testid="branch-name" />
       {/if}
     </section>
 
-    <div class="autosave">
-      <Switch label="Autosave" value={autosaveOn} onchange={(v) => (autosaveOn = v === true)} />
-      <span>Autosave</span>
-      <span class="muted" data-testid="last-saved">{savedLabel}</span>
+    <div class="autosave" data-testid="last-saved">
+      <ControlRow label="Autosave" hint={savedLabel} layout={ControlLayout.Inline}>
+        <Switch label="Autosave" value={autosaveOn} onchange={(v) => (autosaveOn = v === true)} />
+      </ControlRow>
     </div>
 
     <footer>
       {#if readOnly}
         <Button size="sm" disabled={busy || !picked.size} onclick={() => push()}>Download patch</Button>
-      {:else if draft && !direct}
-        <Button size="sm" disabled={busy} onclick={ready} data-testid="ready-for-review">Ready for review</Button>
-        <Button size="sm" variant="secondary" disabled={busy || !picked.size || reviewing} onclick={() => (reviewing = true)}>Push now</Button>
       {:else}
-        <Button size="sm" disabled={busy || !picked.size || reviewing} onclick={() => (reviewing = true)}>{direct ? `Commit to ${baseBranch}` : pushLabel(rows)}</Button>
+        <Button size="sm" disabled={busy || !picked.size || reviewing} onclick={() => (reviewing = true)} data-testid="changes-primary">{direct ? `Commit to ${target}` : 'Push now'}</Button>
       {/if}
       <DropdownMenu.Root>
         <DropdownMenu.Trigger class="more" aria-label="More" data-testid="changes-more"><Ellipsis size={14} /></DropdownMenu.Trigger>
@@ -429,12 +440,7 @@
     color: var(--ui-text-secondary);
   }
   .autosave {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .autosave .muted {
-    margin-inline-start: auto;
+    margin: 0 -12px;
   }
   .changes footer {
     align-items: center;

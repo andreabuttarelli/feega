@@ -132,7 +132,7 @@ describe('/api/v1/projects/:id/github/push', () => {
   it('il commit diretto su un ramo protetto è 403 protected', async () => {
     gh.protect('main');
 
-    const { res, body } = await post(push.POST, { name: 'hero', nodeIds: ['n1'], target: 'base' });
+    const { res, body } = await post(push.POST, { name: 'hero', nodeIds: ['n1'], target: 'branch', branch: 'main' });
 
     expect(res.status).toBe(403);
     expect(body).toMatchObject({ ok: false, refusal: 'protected' });

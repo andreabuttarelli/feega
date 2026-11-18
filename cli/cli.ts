@@ -916,7 +916,7 @@ github
   .option('--main <nodeIds...>', 'Frames whose instance edits apply to the main component file instead of the usage site')
   .option('--variant <nodeId:choice[:route]...>', 'What a variant frame does on push: replace, new_route (with /route) or keep')
   .option('--branch <branch>', 'Exact branch to commit on instead of feega/<name>')
-  .option('--direct', 'Commit straight to the base branch, no pull request (refused on a protected branch)')
+  .option('--direct <branch>', 'Commit straight to <branch>, no pull request (refused on a protected branch)')
   .option('--draft', 'Open the pull request as a draft')
   .action(async (projectId: string, nodeIds: string[], opts) => {
     const { cmdGithubPush } = await import('./commands/github.ts');

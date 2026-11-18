@@ -8,14 +8,17 @@ wrote live; GitHub did not.
   i.e. after the optimistic write landed, so it rides the existing save path instead of a new one.
   Not a REGISTRY row: the git commit is downstream of the node write, not a canvas action.
 - `pushFiles` gained `pull: draft` (opens the PR as draft), `branch` (exact name instead of
-  `feega/<name>`) and `target: base` (commit straight to the base branch, no PR; a 403 from
-  GitHub is `protected`, never a `-sync` fallback). A session push whose `since` is the base
-  branch ignores it, so one direct commit does not turn later pushes into base commits.
+  `feega/<name>`) and `target: branch` + `branch` (commit straight to that branch, default the
+  base branch, no PR; a 403 from GitHub is `protected`, never a `-sync` fallback). A first
+  version committed to the base only (`target: base`); review asked for any branch, picked from
+  `listRefs` branches. A session push whose `since` is the base branch ignores it.
 - `GitHost.markReady`: GitHub has no REST call for it, so it uses the GraphQL mutation
   `markPullRequestReadyForReview` with the PR `node_id`. Local hosts delegate to their GitHub
   pulls host or answer `pull_unavailable`.
 - `POST …/github/push/ready`, `feega github ready`, MCP `github_ready`; `feega github push`
-  takes `--branch`, `--direct`, `--draft`.
+  takes `--branch`, `--direct <branch>`, `--draft`.
+- Changes panel: frames start ticked only while autosave is on (unticked, as before, when off);
+  Ready for review lives only in the top bar.
 - Top bar: `GitStatus.svelte` is portalled into `[data-top-git]` of `CanvasTopBar` (same pattern
   as peers): repo, branch, upstream files, autosave state, PR + CI, Ready for review, Versions
   (opens the existing ref picker). Branch options live in the existing Changes panel.

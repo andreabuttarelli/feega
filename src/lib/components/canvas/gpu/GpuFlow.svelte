@@ -407,7 +407,7 @@
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
   const sources = sourceStatus(() => page.params.projectId ?? '', () => linkedFrames(props.nodeSummaries ?? []).map((id) => ({ id, name: byId.get(id)?.displayName ?? '' })));
   let sourceOpen = $state<{ id: string; left: number; top: number } | null>(null);
-  let branchOptions = $state<BranchOptions>({ mode: BranchMode.Session, branch: '' });
+  let branchOptions = $state<BranchOptions>({ mode: BranchMode.Session, branch: '', commitTo: '' });
   let changesOpen = $state(false);
   let autosaveState = $state(AutosaveState.Idle);
   let autosaveOn = $state(true);

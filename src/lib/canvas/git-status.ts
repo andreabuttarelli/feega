@@ -5,22 +5,22 @@ export const AUTOSAVE_NAME = 'canvas-edits';
 
 const GITHUB = 'github';
 const DRAFT = 'draft';
-const BASE_TARGET = 'base';
+const BRANCH_TARGET = 'branch';
 
 export enum BranchMode {
   Session = 'session',
   Direct = 'direct'
 }
 
-export type BranchOptions = { mode: BranchMode; branch: string };
+export type BranchOptions = { mode: BranchMode; branch: string; commitTo: string };
 
 export type GitSummary = { repo: string; branch: string; base: string; upstream: number; pull: PullView | null; draft: boolean; ci: CiState; autosave: AutosaveState; nodeId: string };
 
 const onGithub = (rows: readonly FrameSync[]) => rows.filter((r) => r.link.source === GITHUB);
 
 export function branchFields(options: BranchOptions) {
-  const branch = options.branch.trim();
-  return { ...(branch ? { branch } : {}), ...(options.mode === BranchMode.Direct ? { target: BASE_TARGET } : {}) };
+  const branch = (options.mode === BranchMode.Direct ? options.commitTo : options.branch).trim();
+  return { ...(branch ? { branch } : {}), ...(options.mode === BranchMode.Direct ? { target: BRANCH_TARGET } : {}) };
 }
 
 export function autosaveAsk(rows: readonly FrameSync[], nodeIds: readonly string[], options: BranchOptions) {

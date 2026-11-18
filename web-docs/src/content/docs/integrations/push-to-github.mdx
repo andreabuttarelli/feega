@@ -9,7 +9,7 @@ Frames imported from a GitHub repository ([Import from code](/integrations/impor
 
 ## How a push lands
 
-- **Never the default branch, unless asked.** Every push goes to `feega/<name>` (or a branch you name) and opens one pull request against the base branch; only an explicit direct commit ([Branch options](#branch-options)) writes to the base branch.
+- **Never the default branch, unless asked.** Every push goes to `feega/<name>` (or a branch you name) and opens one pull request against the base branch; only an explicit **Commit to branch** ([Branch options](#branch-options)) writes straight to a branch you pick.
 - **One pull request per merge cycle.** Later pushes update the same pull request. Once it is merged or closed, the next push opens `feega/<name>-2`.
 - **Never force-pushed.** If someone rewrote, deleted or protected the branch, the push goes to `feega/<name>-sync` and opens a pull request from there.
 - **One commit, all files.** The files of a push land in a single commit; if access is lost mid-push, no branch is created.
@@ -33,14 +33,14 @@ feega github ready <projectId> <nodeId>
 
 ## Branch options
 
-In **Changes**, name the branch (any name, used as is instead of `feega/<name>`) or tick **Commit directly to `<base>`** to commit to the base branch with no pull request. GitHub refuses a direct commit on a protected branch: the push answers 403 `protected` and the panel says so; nothing is written.
+**Changes** drops from the git group in the top bar. **Where changes go** is either **New branch + PR** (name the branch, used as is instead of `feega/<name>`) or **Commit to branch**: pick any branch of the repository from a searchable list (default: the base branch) and commits go straight to it, with no pull request; if a pull request is already open from that branch, its link shows. GitHub refuses a commit on a protected branch: the push answers 403 `protected` and the panel says so; nothing is written. Frames start ticked for the next commit when autosave is on, unticked when it is off. The panel's primary action is **Push now**, or **Commit to `<branch>`**; **Ready for review** lives in the top bar; **Undo last push** is in the ⋯ menu.
 
 ```bash
 feega github push <projectId> <nodeId> --name hero --branch design/hero
-feega github push <projectId> <nodeId> --name hero --direct
+feega github push <projectId> <nodeId> --name hero --direct release
 ```
 
-API and MCP: `branch: "design/hero"`, `target: "base"`.
+API and MCP: `branch: "design/hero"`; to commit straight to a branch, `target: "branch", branch: "release"` (no `branch` = the base branch).
 
 ## Git status in the top bar
 
@@ -130,7 +130,7 @@ feega github code-diff <projectId> <versionId>
 ## CLI
 
 ```bash
-feega github push <projectId> <nodeId...> --name hero [--branch <branch>] [--direct] [--draft]
+feega github push <projectId> <nodeId...> --name hero [--branch <branch>] [--direct <branch>] [--draft]
 feega github ready <projectId> <nodeId>
 feega github status <projectId> <nodeId>
 feega github undo <projectId> <nodeId>
@@ -140,14 +140,14 @@ feega github undo <projectId> <nodeId>
 
 | Method | Path | Body or query |
 |---|---|---|
-| `POST` | `/api/v1/projects/:id/github/push` | `{ name, nodeIds, title?, body?, base?, confirmSensitive?, branch?, target?: session\|base, pull?: draft\|ready }` |
+| `POST` | `/api/v1/projects/:id/github/push` | `{ name, nodeIds, title?, body?, base?, confirmSensitive?, branch?, target?: session\|branch, pull?: draft\|ready }` |
 | `GET` | `/api/v1/projects/:id/github/push?nodeId=` | — |
 | `POST` | `/api/v1/projects/:id/github/push/undo` | `{ nodeId }` |
 | `POST` | `/api/v1/projects/:id/github/push/ready` | `{ nodeId }` |
 | `POST` | `/api/v1/projects/:id/github/versions` | `{ nodeId, ref?, limit? }` |
 | `POST` | `/api/v1/projects/:id/github/compare` | `{ nodeId, refs }` |
 
-Refusals answer `{ ok: false, refusal }`: `not_connected`, `read_only` (403, with `patch`), `secret` and `env_file` (422), `needs_confirm` (428), `busy` (423), `protected` (403, direct commit on a protected branch), `unauthorized` (401), `forbidden` (403).
+Refusals answer `{ ok: false, refusal }`: `not_connected`, `read_only` (403, with `patch`), `secret` and `env_file` (422), `needs_confirm` (428), `busy` (423), `protected` (403, commit to a protected branch), `unauthorized` (401), `forbidden` (403).
 
 ## MCP
 

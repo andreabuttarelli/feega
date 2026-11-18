@@ -54,7 +54,7 @@ describe('GitHub sync su un repo Next.js 15 + Tailwind', () => {
     const deps = fixtureDeps(world, links, edits);
 
     expect(await framesPush(deps, NO_SCOPE, { name: 'x', nodeIds: [FRAME], branch: 'design/hero' })).toMatchObject({ ok: true, branch: 'design/hero' });
-    expect(await framesPush(deps, NO_SCOPE, { name: 'x', nodeIds: [FRAME], target: PushTarget.Base })).toMatchObject({ ok: true, branch: 'main', pull: null });
+    expect(await framesPush(deps, NO_SCOPE, { name: 'x', nodeIds: [FRAME], target: PushTarget.Branch, branch: 'main' })).toMatchObject({ ok: true, branch: 'main', pull: null });
     expect(await world.at('main', 'app/page.tsx')).toContain('#e11d48');
   });
 

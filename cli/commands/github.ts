@@ -20,7 +20,7 @@ async function print(path: string, init?: RequestInit) {
   }
 }
 
-type PushOpts = { name: string; title?: string; body?: string; base?: string; confirmSensitive?: boolean; main?: string[]; variant?: string[]; branch?: string; direct?: boolean; draft?: boolean };
+type PushOpts = { name: string; title?: string; body?: string; base?: string; confirmSensitive?: boolean; main?: string[]; variant?: string[]; branch?: string; direct?: string; draft?: boolean };
 
 const variantOf = (raw: string) => {
   const [nodeId, choice, route] = raw.split(':');
@@ -28,7 +28,7 @@ const variantOf = (raw: string) => {
 };
 
 export async function cmdGithubPush(projectId: string, nodeIds: string[], { main, variant, direct, draft, ...opts }: PushOpts) {
-  await print(base(projectId), { method: 'POST', body: JSON.stringify({ ...opts, nodeIds, ...(direct ? { target: 'base' } : {}), ...(draft ? { pull: 'draft' } : {}), ...(main ? { mains: main } : {}), ...(variant ? { variants: variant.map(variantOf) } : {}) }) });
+  await print(base(projectId), { method: 'POST', body: JSON.stringify({ ...opts, nodeIds, ...(direct ? { target: 'branch', branch: direct } : {}), ...(draft ? { pull: 'draft' } : {}), ...(main ? { mains: main } : {}), ...(variant ? { variants: variant.map(variantOf) } : {}) }) });
 }
 
 export async function cmdGithubStatus(projectId: string, nodeId: string) {

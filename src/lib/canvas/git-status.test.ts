@@ -18,16 +18,16 @@ describe('autosave: cosa spinge', () => {
   it('solo i frame GitHub, come PR in bozza', () => {
     const rows = [sync(), sync({ nodeId: 'n2', link: { ...sync().link, source: 'folder' } })];
 
-    expect(autosaveAsk(rows, ['n1', 'n2'], { mode: BranchMode.Session, branch: '' })).toEqual({ name: 'canvas-edits', nodeIds: ['n1'], pull: 'draft' });
+    expect(autosaveAsk(rows, ['n1', 'n2'], { mode: BranchMode.Session, branch: '', commitTo: '' })).toEqual({ name: 'canvas-edits', nodeIds: ['n1'], pull: 'draft' });
   });
 
   it('un ramo scelto e il commit diretto passano al server', () => {
-    expect(autosaveAsk([sync()], ['n1'], { mode: BranchMode.Session, branch: 'design/hero' })).toMatchObject({ branch: 'design/hero' });
-    expect(autosaveAsk([sync()], ['n1'], { mode: BranchMode.Direct, branch: '' })).toMatchObject({ target: 'base' });
+    expect(autosaveAsk([sync()], ['n1'], { mode: BranchMode.Session, branch: 'design/hero', commitTo: '' })).toMatchObject({ branch: 'design/hero' });
+    expect(autosaveAsk([sync()], ['n1'], { mode: BranchMode.Direct, branch: 'ignored', commitTo: 'release' })).toMatchObject({ target: 'branch', branch: 'release' });
   });
 
   it('nulla da spingere è null', () => {
-    expect(autosaveAsk([sync({ link: { ...sync().link, source: 'folder' } })], ['n1'], { mode: BranchMode.Session, branch: '' })).toBeNull();
+    expect(autosaveAsk([sync({ link: { ...sync().link, source: 'folder' } })], ['n1'], { mode: BranchMode.Session, branch: '', commitTo: '' })).toBeNull();
   });
 });
 

@@ -22,7 +22,7 @@ export enum PushRefusal {
 
 export enum PushTarget {
   Session = 'session',
-  Base = 'base'
+  Branch = 'branch'
 }
 
 export enum PullKind {
@@ -130,9 +130,9 @@ async function withLock<T>(lock: PushLock, key: string, work: () => Promise<T>):
   }
 }
 
-async function commitDirect(host: GitHost, base: string, ask: PushAsk): Promise<Pushed | PushRefused> {
-  const since = ask.since?.branch === base ? ask.since.sha : null;
-  const done = await commitOn(host, base, base, ask.files, messageOf(ask.title, ask.coAuthors ?? []), since).catch((e: unknown) => {
+async function commitDirect(host: GitHost, branch: string, ask: PushAsk): Promise<Pushed | PushRefused> {
+  const since = ask.since?.branch === branch ? ask.since.sha : null;
+  const done = await commitOn(host, branch, branch, ask.files, messageOf(ask.title, ask.coAuthors ?? []), since).catch((e: unknown) => {
     if (e instanceof GitError && e.failure === GitFailure.Forbidden) {
       return null;
     }
@@ -141,7 +141,7 @@ async function commitDirect(host: GitHost, base: string, ask: PushAsk): Promise<
   if (!done) {
     return { ok: false, refusal: PushRefusal.Protected };
   }
-  return { ok: true, branch: base, sha: done.sha, parent: done.parent, touched: ask.files.map((f) => f.path), pull: null };
+  return { ok: true, branch, sha: done.sha, parent: done.parent, touched: ask.files.map((f) => f.path), pull: null };
 }
 
 export async function readyPull(host: GitHost, number: number): Promise<Readied | PushRefused> {
@@ -162,13 +162,13 @@ export async function pushFiles(host: GitHost, lock: PushLock, ask: PushAsk): Pr
     return refused;
   }
 
-  return withLock(lock, ask.target === PushTarget.Base ? (ask.base ?? '') : startBranch(ask), async () => {
+  return withLock(lock, ask.target === PushTarget.Branch ? (ask.branch ?? ask.base ?? '') : startBranch(ask), async () => {
     if ((await host.access()) === Access.Read) {
       return { ok: false, refusal: PushRefusal.ReadOnly } as PushRefused;
     }
     const base = ask.base ?? (await host.defaultBranch());
-    if (ask.target === PushTarget.Base) {
-      return commitDirect(host, base, ask);
+    if (ask.target === PushTarget.Branch) {
+      return commitDirect(host, ask.branch ?? base, ask);
     }
     const branch = await cycleBranch(host, ask.since?.branch === base ? { ...ask, since: undefined } : ask);
     const since = ask.since?.branch === branch ? ask.since.sha : null;

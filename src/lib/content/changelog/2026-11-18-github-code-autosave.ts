@@ -6,7 +6,7 @@ export default {
   items: [
     'Editing a frame imported from GitHub now commits the code as you work, to a draft pull request',
     'Ready for review replaces the manual push',
-    'Name the branch, or commit straight to the base branch',
+    'Name the branch, or commit straight to any branch you pick',
     'The top bar shows repo, branch, save state, pull request and CI'
   ]
 } satisfies ChangelogEntry;
