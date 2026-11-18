@@ -11,7 +11,7 @@ const LOCAL_SOURCE_ASKS: SourceAsks = { framesPerAsk: 2, open: 2 };
 
 export const sourceAsksFor = (env: Record<string, string | undefined>): SourceAsks => (isLocalMode(env) ? LOCAL_SOURCE_ASKS : HOSTED_SOURCE_ASKS);
 
-const LOCAL_PICTURES_WHILE_VECTORS_OWED = 1;
+const LOCAL_PICTURES_WHILE_VECTORS_OWED = 3;
 
 export const picturesWhileVectorsOwed = (env: Record<string, string | undefined>): number => (isLocalMode(env) ? LOCAL_PICTURES_WHILE_VECTORS_OWED : Infinity);
 

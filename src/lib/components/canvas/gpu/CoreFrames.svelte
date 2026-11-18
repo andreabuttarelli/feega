@@ -53,12 +53,12 @@
   import { backendLog, consoleSink, debugActive, debugStart, gestureLog, renderLog, teeSink, tierLog } from '$lib/canvas/core/debug-log';
   import { readClips, type CustomFrame, type CustomReads } from '@feega/motion-core/motion/gpu-full/dom/custom';
   import type { Picture, Pictures } from '@feega/motion-core/motion/gpu-full/raster';
-  import { Stand, drawable, missingPictures, fillOrder, firstDrawn, inView, layersOf, nearestFirst, onScreenFirst, placeholder, standIn, stopgaps, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
+  import { Stand, drawable, missingPictures, fillOrder, heldBox, sightRank, firstDrawn, inView, layersOf, nearestFirst, onScreenFirst, placeholder, standIn, stopgaps, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Stage, VectorGate, showStaged, shownBefore } from '$lib/canvas/core/staged-show';
   import { uploadWithin } from '$lib/canvas/core/picture-uploads';
   import { Step, markFrame, noteImages } from '$lib/canvas/core/frame-timeline';
   import { StartupStep, markStartup, reportFramesShown } from '$lib/canvas/core/startup-marks';
-  import { pictureTurns } from '$lib/canvas/core/picture-turns';
+  import { owesVectors, pictureTurns } from '$lib/canvas/core/picture-turns';
   import { NEAREST_FRAMES } from '$lib/canvas/core/startup-progress';
   import LoadTimeline from './LoadTimeline.svelte';
   import { editedLayers } from '$lib/canvas/core/edited-layers';
@@ -281,7 +281,7 @@
         return;
       }
       const list = retiered(built.list, tierSwap(fetched, place, built.at, to));
-      const done = await turns.take();
+      const done = await turns.take(() => sightRank(f.box, sight.view, area));
       const ready = await media.ready(list).finally(done);
       await whenQuiet(() => gesture.active());
       const group = keyOf(f);
@@ -348,16 +348,17 @@
       onsource(f.id, { ...read.source, revision: f.revision });
     }
     const key = keyOf(f);
-    const held = shownBefore({ thumb: thumbShown.has(f.id), drawn: presented.has(f.id) });
+    const held = shownBefore({ thumb: thumbShown.has(f.id), drawn: presented.has(f.id), poster: posterIds.has(f.id) });
     if (built.custom) {
       customPictures.set(key, built.custom.picture);
     }
     logGaps(f.id, built.list);
     asking.set(f.id, key);
+    untrack(weighOwed);
 
     noteImages(f.id, built.list);
     const picturesOnce = async () => {
-      const done = await turns.take();
+      const done = await turns.take(() => sightRank(f.box, sight.view, area));
       return media.ready(built.list).finally(done);
     };
     const firstPictures = picturesOnce();
@@ -851,9 +852,12 @@
     }
   });
 
+  const builtOrShown = (id: string) => asking.has(id) || loaded.has(id) || thumbShown.has(id);
+  const weighOwed = () => turns.owed(owesVectors(legible(withoutViews(frames), zoomStep, budget.readableWidth).map((f) => f.id), sight.onScreen, builtOrShown));
+
   $effect(() => {
     void lists;
-    turns.owed(legible(withoutViews(frames), zoomStep, budget.readableWidth).some((f) => sight.onScreen.has(f.id) && !loaded.has(f.id) && !thumbShown.has(f.id)));
+    weighOwed();
   });
 
   let cardLists = $state(new Map<string, DisplayList>());
@@ -875,7 +879,7 @@
     for (const [, list] of gone) {
       media.release(list, [...lists.values()]);
     }
-    for (const held of [loaded, asking, builtTiers, weights, drawnLast]) {
+    for (const held of [loaded, asking, builtTiers, weights, drawnLast, drawnFor]) {
       [...held.keys()].filter(owned).forEach((key) => held.delete(key));
     }
     for (const held of [asked, presented]) {
@@ -953,6 +957,7 @@
 
   const rebuilding = $derived(new Set([...shownCards.filter((c) => !cardLists.has(c.key)).map((c) => c.frame.id), ...frames.filter((f) => !lists.has(groupOf(f))).map((f) => f.id)]));
   const drawnLast = new Map<string, HeldFrame>();
+  const drawnFor = new Map<string, FrameAt['box']>();
   const lastSeen = new Map<string, number>();
   const placeIndex = $derived(new SpatialIndex([...placeholders.values()].map((p) => ({ id: p.id, ...p.box }))));
   const retained = (now: number) => {
@@ -969,21 +974,18 @@
     }
     return keep;
   };
-  const bledBox = (box: FrameAt['box'], group: string) => {
-    const list = listIfKnown(group);
-    return list ? stagedBox(box, list) : box;
-  };
   const chains = $derived.by(() => {
     const ready = new Map(real.map((f) => [f.id, f]));
     const holding = new Set([...rebuilding, ...retained(Date.now()), ...real.filter((f) => !pictured.has(f.group)).map((f) => f.id)]);
     for (const id of [...drawnLast.keys()].filter((id) => !placeholders.has(id) || !listIfKnown(drawnLast.get(id)!.group))) {
       drawnLast.delete(id);
+      drawnFor.delete(id);
     }
     return [...placeholders.values()].map((p) => {
       const before = holding.has(p.id) ? drawnLast.get(p.id) : undefined;
       const turned = p.turn ? { turn: p.turn } : {};
       const head = ready.get(p.id);
-      return layersOf<HeldFrame>({ ready: head && lists.has(head.group) ? head : null, poster: head && !lists.has(head.group) ? head : null, before: before && { ...before, box: bledBox(p.box, before.group), ...turned }, thumb: thumbShown.get(p.id), blocks: blocksById.get(p.id), placeholder: { id: p.id, group: p.group, box: p.box, size: { width: p.box.w, height: p.box.h }, bytes: 0, ...turned } });
+      return layersOf<HeldFrame>({ ready: head && lists.has(head.group) ? head : null, poster: head && !lists.has(head.group) ? head : null, before: before && { ...before, box: heldBox(before.box, drawnFor.get(p.id) ?? p.box, p.box), ...turned }, thumb: thumbShown.get(p.id), blocks: blocksById.get(p.id), placeholder: { id: p.id, group: p.group, box: p.box, size: { width: p.box.w, height: p.box.h }, bytes: 0, ...turned } });
     });
   });
   const held = $derived(chains.map((c) => c[0]));
@@ -1414,6 +1416,7 @@
           markStartup(StartupStep.FirstDrawn);
         }
         drawnLast.set(layer.id, layer);
+        drawnFor.set(layer.id, placeholders.get(layer.id)?.box ?? layer.box);
       }
     }
     const drawn = withLift(into, shown);
