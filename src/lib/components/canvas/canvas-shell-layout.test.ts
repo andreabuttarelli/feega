@@ -25,9 +25,9 @@ describe('the canvas shell: a full-bleed canvas under floating rounded groups (D
     expect(rail).toMatch(/border-radius:\s*var\(--ui-radius-full\)/);
   });
 
-  it('the left bar centres above the motion timeline, never over its controls', () => {
+  it('the left bar sits at the top, under the top bar', () => {
     const rail = rule(read('FloatingRail.svelte'), '.rail');
-    expect(rail).toMatch(/top:\s*calc\(\(100% - var\(--dock-lift, 0px\)\) \/ 2\)/);
+    expect(rail).toMatch(/top:\s*56px/);
   });
 
   it('a left panel floats over the canvas as a rounded card', () => {

@@ -8,6 +8,10 @@
   import { env as publicEnv } from '$env/dynamic/public';
   import TermsUpdateNotice from '$lib/components/TermsUpdateNotice.svelte';
   import HowFeegaWorks from '$lib/components/onboarding/HowFeegaWorks.svelte';
+  import Onboarding from '$lib/components/onboarding/Onboarding.svelte';
+  import { surfaceOf } from '$lib/onboarding/flow';
+  import { isLocalMode } from '$lib/local-user';
+  import { browser } from '$app/environment';
   import { TourState, tourShowsOn } from '$lib/onboarding/tour';
   import AppEntryShimmer from '$lib/components/AppEntryShimmer.svelte';
   import SocialPreview from '$lib/components/SocialPreview.svelte';
@@ -181,7 +185,8 @@
 {#if perfHud}{@const PerfHud = perfHud}<PerfHud />{/if}
 {#if !isBlog && !localOff(LocalOff.CookieBanner, publicEnv)}<CookieBanner />{/if}
 {#if !isBlog && data?.session && !localOff(LocalOff.TermsNotice, publicEnv)}<TermsUpdateNotice version={data.termsNoticeVersion ?? null} />{/if}
-{#if data?.session && tourShowsOn($page.url.pathname)}<HowFeegaWorks tour={data.tour ?? TourState.Seen} />{/if}
+{#if data?.session && tourShowsOn($page.url.pathname)}<HowFeegaWorks />{/if}
+{#if browser && data?.session && tourShowsOn($page.url.pathname)}<Onboarding surface={surfaceOf({ local: isLocalMode(publicEnv), userAgent: navigator.userAgent })} tour={data.tour ?? TourState.Seen} viewerName={data.viewerName ?? null} />{/if}
 
 <style>
   /* Indeterminate top progress bar: sprints to ~80% then crawls, so long loads still feel alive.

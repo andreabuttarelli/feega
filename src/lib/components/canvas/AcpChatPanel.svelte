@@ -10,8 +10,10 @@
 
   const CLOUD_HINT = 'Feega cloud chat spends credits and runs at feega.app: import this .feega file there, or pick an agent installed on this computer. It edits the canvas through Feega’s tools and asks before each one.';
   const OPTION_VARIANT: Record<string, ButtonVariant> = { allow_once: 'primary', allow_always: 'primary', reject_once: 'secondary', reject_always: 'secondary' };
-  const chat = new AcpChat();
-  const choices = new AgentChoices();
+  let { fetcher = fetch, hint = CLOUD_HINT }: { fetcher?: typeof fetch; hint?: string } = $props();
+
+  const chat = new AcpChat(fetcher);
+  const choices = new AgentChoices(fetcher);
   const model = new AgentModelChoice();
 
   let draft = $state('');
@@ -53,7 +55,7 @@
 
   <ol class="lines">
     {#if !agent}
-      <li class="hint">{CLOUD_HINT}</li>
+      <li class="hint">{hint}</li>
     {/if}
     {#each chat.lines as l, i (i)}
       {#if l.line === Line.User}

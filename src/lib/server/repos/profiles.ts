@@ -222,3 +222,39 @@ export async function moveOnboarding(db: Db, userId: string, input: { from: stri
   }
   return (data ?? []).length > 0;
 }
+
+type MemoryColumns = { agent_memory: string | null; agent_memory_updated_at: string | null };
+
+type MemoryTable = {
+  select(columns: string): { eq(column: string, value: string): { maybeSingle(): Promise<{ data: MemoryColumns | null; error: Error | null }> } };
+  update(values: Partial<MemoryColumns>): { eq(column: string, value: string): PromiseLike<{ error: Error | null }> };
+};
+
+const memoryTable = (db: Db): MemoryTable => db.from('profiles') as unknown as MemoryTable;
+
+export async function saveName(db: Db, userId: string, name: string): Promise<void> {
+  const { error } = await db.from('profiles').update({ name, updated_at: new Date().toISOString() }).eq('id', userId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function readAgentMemory(db: Db, userId: string): Promise<string | null> {
+  const { data, error } = await memoryTable(db).select('agent_memory').eq('id', userId).maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  return data?.agent_memory || null;
+}
+
+export async function saveAgentMemory(db: Db, userId: string, content: string): Promise<void> {
+  const { error } = await memoryTable(db)
+    .update({ agent_memory: content || null, agent_memory_updated_at: new Date().toISOString() })
+    .eq('id', userId);
+
+  if (error) {
+    throw error;
+  }
+}
