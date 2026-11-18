@@ -39,6 +39,8 @@ export class RightBarHost {
   propertiesPane = $state.raw<HTMLElement | null>(null);
   width = $state(readChatPanelPx());
 
+  #propertiesAsked = false;
+
   constructor(off: readonly BarTab[] = []) {
     this.#off = off;
     this.#picked = SHARED_TABS.find((t) => !off.includes(t)) ?? BarTab.Guide;
@@ -64,6 +66,10 @@ export class RightBarHost {
   claim(element: HTMLElement | null, binding: BarBinding): BarClaim {
     const claim = { element, binding };
     this.#claims = [...this.#claims, claim];
+    if (this.#propertiesAsked && binding.properties) {
+      this.#propertiesAsked = false;
+      binding.properties.onshow(true);
+    }
     return claim;
   }
 
@@ -74,9 +80,11 @@ export class RightBarHost {
   select(tab: BarTab) {
     const properties = this.active?.binding.properties;
     if (tab === BarTab.Properties) {
+      this.#propertiesAsked = !properties;
       properties?.onshow(true);
       return;
     }
+    this.#propertiesAsked = false;
     if (this.#off.includes(tab)) {
       return;
     }
