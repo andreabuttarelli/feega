@@ -35,6 +35,11 @@ export enum TimelineAccess {
   Edit = 'edit'
 }
 
+export enum ModeListing {
+  Offered = 'offered',
+  Hidden = 'hidden'
+}
+
 export enum SoundEntries {
   Hidden = 'hidden',
   Shown = 'shown'
@@ -56,13 +61,14 @@ type ModeSpec = {
   timeline: TimelineAccess;
   sounds: SoundEntries;
   reopens: EditorMode;
+  listing: ModeListing;
 };
 
 export const MODES: Record<EditorMode, ModeSpec> = {
-  [EditorMode.Design]: { label: 'Design', accent: { solid: '#0b6bcb', light: '#0b6bcb', dark: '#3ab0ff' }, icon: PenTool, edit: EditMode.Design, access: DocAccess.Write, inspector: ModeInspector.Properties, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Motion, onCodeKey: EditorMode.Code, chrome: ModeChrome.Plain, timeline: TimelineAccess.Scrub, sounds: SoundEntries.Hidden, reopens: EditorMode.Design },
-  [EditorMode.Motion]: { label: 'Motion', accent: { solid: '#c42b1c', light: '#c42b1c', dark: '#ff7366' }, icon: Diamond, edit: EditMode.Motion, access: DocAccess.Write, inspector: ModeInspector.Properties, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code, chrome: ModeChrome.Recording, timeline: TimelineAccess.Edit, sounds: SoundEntries.Shown, reopens: EditorMode.Design },
-  [EditorMode.Play]: { label: 'Play', accent: { solid: '#1a7f37', light: '#1a7f37', dark: '#3fb950' }, icon: Play, edit: EditMode.Design, access: DocAccess.Write, inspector: ModeInspector.Play, lines: CanvasLines.Prototype, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code, chrome: ModeChrome.Plain, timeline: TimelineAccess.Hidden, sounds: SoundEntries.Hidden, reopens: EditorMode.Play },
-  [EditorMode.Code]: { label: 'Code', accent: { solid: '#9a6700', light: '#9a6700', dark: '#e3b341' }, icon: CodeXml, edit: EditMode.Design, access: DocAccess.Read, inspector: ModeInspector.Code, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Design, chrome: ModeChrome.Plain, timeline: TimelineAccess.Hidden, sounds: SoundEntries.Hidden, reopens: EditorMode.Code }
+  [EditorMode.Design]: { label: 'Design', accent: { solid: '#0b6bcb', light: '#0b6bcb', dark: '#3ab0ff' }, icon: PenTool, edit: EditMode.Design, access: DocAccess.Write, inspector: ModeInspector.Properties, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Motion, onCodeKey: EditorMode.Code, chrome: ModeChrome.Plain, timeline: TimelineAccess.Scrub, sounds: SoundEntries.Hidden, reopens: EditorMode.Design, listing: ModeListing.Offered },
+  [EditorMode.Motion]: { label: 'Motion', accent: { solid: '#c42b1c', light: '#c42b1c', dark: '#ff7366' }, icon: Diamond, edit: EditMode.Motion, access: DocAccess.Write, inspector: ModeInspector.Properties, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code, chrome: ModeChrome.Recording, timeline: TimelineAccess.Edit, sounds: SoundEntries.Shown, reopens: EditorMode.Design, listing: ModeListing.Offered },
+  [EditorMode.Play]: { label: 'Play', accent: { solid: '#1a7f37', light: '#1a7f37', dark: '#3fb950' }, icon: Play, edit: EditMode.Design, access: DocAccess.Write, inspector: ModeInspector.Play, lines: CanvasLines.Prototype, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code, chrome: ModeChrome.Plain, timeline: TimelineAccess.Hidden, sounds: SoundEntries.Hidden, reopens: EditorMode.Play, listing: ModeListing.Hidden },
+  [EditorMode.Code]: { label: 'Code', accent: { solid: '#9a6700', light: '#9a6700', dark: '#e3b341' }, icon: CodeXml, edit: EditMode.Design, access: DocAccess.Read, inspector: ModeInspector.Code, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Design, chrome: ModeChrome.Plain, timeline: TimelineAccess.Hidden, sounds: SoundEntries.Hidden, reopens: EditorMode.Code, listing: ModeListing.Offered }
 };
 
 const FRAME_TIMELINE: Record<TimelineAccess, (kindHasTimeline: boolean, mode: EditMode) => boolean> = {
@@ -93,7 +99,9 @@ export const EDITOR_MODE_KEY = 'feega.editor-mode';
 
 type ModeStore = Pick<Storage, 'getItem' | 'setItem'>;
 
-export const readEditorMode = (stored: string | null): EditorMode => (Object.values(EditorMode) as string[]).includes(stored ?? '') ? (stored as EditorMode) : EditorMode.Design;
+export const listedModes = (): EditorMode[] => Object.values(EditorMode).filter((mode) => MODES[mode].listing === ModeListing.Offered);
+
+export const readEditorMode = (stored: string | null): EditorMode => (listedModes() as string[]).includes(stored ?? '') ? (stored as EditorMode) : EditorMode.Design;
 
 function recalled(store: ModeStore | null): string | null {
   try {

@@ -34,7 +34,7 @@
   import PhoneSheet from './PhoneSheet.svelte';
   import SegmentedControl, { type SegmentOption } from '$lib/components/ui/shell/SegmentedControl.svelte';
   import { SegmentedShape } from '$lib/components/ui/shell/segmented-shape';
-  import { EditorMode, MODES, editorMode } from '$lib/canvas/editor-mode.svelte';
+  import { EditorMode, MODES, listedModes, editorMode } from '$lib/canvas/editor-mode.svelte';
   import { readMode } from '$lib/motion/edit-mode';
   import { SlotPhase, slotTransition } from '$lib/canvas/slot-motion';
   import ProviderIcon from './ProviderIcon.svelte';
@@ -90,7 +90,7 @@
     [EditorMode.Motion]: 'E',
     [EditorMode.Code]: '⇧D'
   };
-  const MODE_OPTIONS: SegmentOption[] = Object.values(EditorMode).map((mode) => ({ value: mode, label: MODES[mode].label, icon: MODES[mode].icon, shortcut: MODE_SHORTCUT[mode] }));
+  const MODE_OPTIONS: SegmentOption[] = listedModes().map((mode) => ({ value: mode, label: MODES[mode].label, icon: MODES[mode].icon, shortcut: MODE_SHORTCUT[mode] }));
 
   let barEl = $state<HTMLElement | null>(null);
   let timelinePx = $state(0);

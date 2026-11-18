@@ -50,9 +50,9 @@ describe('editor mode', () => {
 
   it('remembers the mode across sessions', () => {
     const store = new MemoryStore();
-    new EditorModeState(store).set(EditorMode.Play);
-    expect(store.kept.get(EDITOR_MODE_KEY)).toBe(EditorMode.Play);
-    expect(new EditorModeState(store).current).toBe(EditorMode.Play);
+    new EditorModeState(store).set(EditorMode.Code);
+    expect(store.kept.get(EDITOR_MODE_KEY)).toBe(EditorMode.Code);
+    expect(new EditorModeState(store).current).toBe(EditorMode.Code);
   });
 
   it('reopens in Design after leaving the canvas in Motion, so a reload never starts keying edits', () => {
