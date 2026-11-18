@@ -1,5 +1,5 @@
 import { AssetKind } from '@feega/motion-core/motion/components';
-import { canvasAssetUrl, type AssetSize } from '$lib/canvas/asset-url';
+import { AssetSize, canvasAssetUrl, sized } from '$lib/canvas/asset-url';
 import type { FrameDoc } from './frame-build';
 
 type Hinted = FrameDoc & { media?: Record<string, { kind: AssetKind }> };
@@ -20,3 +20,5 @@ export function tierSwap(source: Hinted, place: Place, from: AssetSize, to: Asse
   const now = tieredAssets(source, place, to).assets;
   return new Map(Object.entries(now).flatMap(([id, url]) => (was[id] && was[id] !== url ? [[was[id], url] as const] : [])));
 }
+
+export const fullAssets = (assets: Record<string, string>): Record<string, string> => Object.fromEntries(Object.entries(assets).map(([id, url]) => [id, sized(url, AssetSize.Full)]));
