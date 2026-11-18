@@ -5,14 +5,21 @@
   import { APP_URL, MAC_GUIDE_URL, SOCIAL_LINKS, STORY_URL } from './links';
   import { COMPARE_PATH } from './compare';
   import { CODEBASE_PATH } from './codebase';
+  import { onMount } from 'svelte';
+  import { homeHref } from './signed-in';
 
   const legal = Object.entries(LEGAL_DOCS).map(([slug, doc]) => ({ href: `/${slug}`, label: doc.label }));
   const year = new Date().getFullYear();
+  let home = $state('/');
+
+  onMount(() => {
+    home = homeHref(document.cookie);
+  });
 </script>
 
 <footer class="site-foot">
   <div class="top">
-    <a class="brand" href="/">
+    <a class="brand" href={home}>
       <span class="name"><Mark size={28} />Feega</span>
       <span class="tagline">Design in your codebase</span>
     </a>

@@ -1,13 +1,20 @@
 <script lang="ts">
   import DownloadMac from './DownloadMac.svelte';
   import Mark from './Mark.svelte';
+  import { onMount } from 'svelte';
   import { APP_URL, HEADER_LINKS, MENU_LINKS, SOCIAL_LINKS } from './links';
+  import { homeHref } from './signed-in';
 
   let open = $state(false);
+  let home = $state('/');
+
+  onMount(() => {
+    home = homeHref(document.cookie);
+  });
 </script>
 
 <header class="bar">
-  <a class="chip brand" href="/" aria-label="Feega home"><Mark size={16} /><span>Feega</span></a>
+  <a class="chip brand" href={home} aria-label="Feega home"><Mark size={16} /><span>Feega</span></a>
 
   <nav class="links" aria-label="Main">
     {#each HEADER_LINKS as link (link.label)}
