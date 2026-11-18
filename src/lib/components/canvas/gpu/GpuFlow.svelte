@@ -262,6 +262,8 @@
   import { panBy, toWorld, wheelPan, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
   import { WheelBatch } from '$lib/canvas/gpu/wheel-batch';
   import { isLiveCode } from '$lib/canvas/code-frame';
+  import { FrameMode, MAX_LIVE_FRAMES, liveFrameModes } from '$lib/canvas/live-budget';
+  import { liveFrameOf } from '$lib/canvas/live-frame';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
   import { WIRE_CURSOR, Wiring, typesMeet, atRest, bubbleColour, bubbleRadius, magnetPort, springTo, wireAim, throughPoint, tieAcross, type Spring, type Tie } from '$lib/canvas/gpu/wire-magnet';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, glidesAfterPan, marqueeBox, marqueePick, movedBy, resizedAt, rotateZoneAt, type Hit } from '$lib/canvas/gpu/gesture';
@@ -453,12 +455,18 @@
       sticky = keep;
     }
   });
-  const LIVE_CODE_CAP = 4;
   const IFRAME_TYPE = 'iframe';
-  const liveCodeTiles = $derived(placed.filter((t) => t.kind === IFRAME_TYPE && isLiveCode(summaries.get(t.id)?.data)));
+  const isLive = (data: Record<string, unknown> | undefined) => isLiveCode(data) || liveFrameOf(data) !== null;
+  const liveCodeTiles = $derived(placed.filter((t) => t.kind === IFRAME_TYPE && isLive(summaries.get(t.id)?.data)));
   let liveCode = $state.raw(new Set<string>());
+  let liveModes = $state.raw<Record<string, FrameMode>>({});
   $effect(() => {
-    const next = new Set([...visibleIds(liveCodeTiles, view, area)].slice(0, LIVE_CODE_CAP));
+    const seen = visibleIds(liveCodeTiles, view, area);
+    const candidates = liveCodeTiles.map((t) => ({ id: t.id, visible: seen.has(t.id), area: t.w * t.h * view.zoom * view.zoom }));
+    const atRest = liveFrameModes(candidates, MAX_LIVE_FRAMES, CameraMotion.Still);
+    liveModes = liveFrameModes(candidates, MAX_LIVE_FRAMES, cameraMotion);
+    const posted = (id: string) => seen.has(id) && liveFrameOf(summaries.get(id)?.data) !== null;
+    const next = new Set(candidates.filter((c) => atRest[c.id] === FrameMode.Live || posted(c.id)).map((c) => c.id));
     if (!sameSet(untrack(() => liveCode), next)) {
       liveCode = next;
     }
@@ -4812,7 +4820,7 @@
           {#if domIds.has(t.id)}
             <div class="gpu-dom-node" class:unshown={!handedOver(t)} data-testid="gpu-dom-node" data-id={t.id}>
               <NodeBoundary>
-                {@render props.tile({ id: t.id, selected: on })}
+                {@render props.tile({ id: t.id, selected: on, live: liveModes[t.id] ?? FrameMode.Snapshot })}
               </NodeBoundary>
             </div>
           {/if}
@@ -4885,6 +4893,7 @@
       onfigma={props.onFigmaImport ? () => props.onFigmaImport?.(viewCentre()) : undefined}
       onurl={props.onUrlImport ? () => props.onUrlImport?.(viewCentre()) : undefined}
       oncode={props.onCodeImport ? () => props.onCodeImport?.(viewCentre()) : undefined}
+      onlive={props.onLiveFrame ? () => props.onLiveFrame?.(viewCentre()) : undefined}
       ontrailer={panelNodeId ? startTrailer : undefined}
       onimage={insertImageInFrame}
       oncomment={props.onCommenting ? () => props.onCommenting?.(!props.commenting) : undefined}
