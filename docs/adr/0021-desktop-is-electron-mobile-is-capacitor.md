@@ -1,6 +1,8 @@
 # Desktop is Electron, mobile is Capacitor; the canvas goes native through gpu-core
 
-Status: accepted 2026-10-25. Supersedes ADR 0009 for desktop; ADR 0018 stands for mobile.
+Status: accepted 2026-10-25. Supersedes ADR 0009 for desktop; ADR 0018 stands for mobile. The
+desktop canvas part is amended by ADR 0040 (proposed): one Rust canvas engine with its own native
+surface and input, not the web canvas under a native renderer.
 
 ## Decision
 

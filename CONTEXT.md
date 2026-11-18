@@ -89,3 +89,17 @@ The one colour a motion film adds to ink and paper. Read from the brand, never c
 | — | none | only neutrals: no accent, the neutral palette (ink, paper, muted, line) |
 
 _Avoid_: an invented accent, a colour the agent picks because it suits the sector.
+
+### The canvas
+
+**Canvas engine**:
+The one program that draws the infinite canvas and owns everything spatially tied to it: what is on screen, where the camera is, what a pointer hits, and every mark drawn over the canvas (selection, handles, names, caret). The same engine on the web and on the desktop.
+_Avoid_: renderer (the renderer is one part of it), core, native canvas.
+
+**Host**:
+What runs the canvas engine on one platform and lends it a surface, a clock, input, files and threads. Two exist: the web host (the browser page) and the native host (the desktop app).
+_Avoid_: shell, wrapper, addon.
+
+**Intent**:
+What the canvas engine reports when a gesture ends — "move these nodes", "select these" — for the app to turn into an edit of the document. The engine never edits the document itself.
+_Avoid_: event, callback, op.
