@@ -3,7 +3,7 @@ import { CONNECTOR_STYLE, type ConnectorType } from '$lib/canvas/connectors';
 import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import { dashes } from '@feega/motion-core/motion/gpu-full/stroke';
 import { FillRule } from '@feega/motion-core/motion/gpu-full/paint';
-import { HANDLE_SCREEN_PX, SELECT_SCREEN_PX, labelScale, labelShown, strokeWorld } from './label-size';
+import { HANDLE_SCREEN_PX, LABEL_SCREEN_PX, SELECT_SCREEN_PX, labelScale, labelScreenPx, labelShown, strokeWorld } from './label-size';
 import { circle, line, rect, reverse, roundRect, solid } from './shapes';
 
 export enum ChromePart {
@@ -15,7 +15,9 @@ export enum ChromePart {
   PortName = 'port-name',
   PortRing = 'port-ring',
   Icon = 'icon',
-  Tag = 'tag'
+  Tag = 'tag',
+  Badge = 'badge',
+  BadgeBox = 'badge-box'
 }
 
 export type TextSet = { width?: number; height?: number; leading?: number; tracking?: number };
@@ -31,6 +33,8 @@ export type PortMark = { type: ConnectorType; state: PortState; label?: string }
 
 export type Glyphs = (text: string, size: number, set?: TextSet) => { contours: number[][]; width: number; height: number };
 
+export type HeaderIcon = { key: string; contours: number[][] };
+
 export type ChromeTile = {
   id: string;
   x: number;
@@ -42,10 +46,12 @@ export type ChromeTile = {
   label: string | null;
   icon: number[][] | null;
   tag?: string | null;
+  badges?: readonly HeaderIcon[];
   addBeside?: boolean;
   radius?: number;
   zoom?: number;
   strokeZoom?: number;
+  perPx?: number;
 };
 
 export type ChromeState = { ring: NodeChrome; handles: boolean; ringColor: string; names: boolean };
@@ -68,6 +74,16 @@ const LABEL_COLOR = '#6e6e73';
 const ICON_SIZE = 12;
 const ICON_GAP = 5;
 const ELLIPSIS = '…';
+const NAME_MIN_CHARS = 3;
+const BADGE_GAP = 4;
+const SLOT_SIZE = 20;
+const SLOT_GAP = 2;
+const BOX_PAD = 3;
+const BOX_RADIUS = 4;
+const BOX_OPACITY = 0.14;
+const GLYPH_SCALE = 13 / ICON_SIZE;
+const BADGE_SLOT = SLOT_SIZE + SLOT_GAP;
+const BOX_EXTRA = 2 * BOX_PAD - SLOT_GAP;
 const NAME_SIZE = 11;
 const NAME_GAP = 16;
 export const ADD_BESIDE = { offset: 8, size: 24, gap: 8 };
@@ -85,9 +101,13 @@ const PORT_LOOK: Record<PortState, { opacity: number; ring: boolean; named: bool
 
 const item = (t: ChromeTile, part: ChromePart, contours: number[][], color: string, opacity = 1): PathItem => solid(`${t.id}:${part}`, contours, color, opacity);
 
-const unit = (t: ChromeTile, screenPx: number): number => screenPx / (t.strokeZoom ?? 1);
+const strokeZoomOf = (t: ChromeTile) => t.strokeZoom ?? 1;
 
-const widthOf = (t: ChromeTile, screenPx: number): number => strokeWorld(screenPx, t.strokeZoom ?? 1);
+const perPxOf = (t: ChromeTile, zoom: number) => t.perPx ?? 1 / zoom;
+
+const unit = (t: ChromeTile, screenPx: number): number => screenPx * perPxOf(t, strokeZoomOf(t));
+
+const widthOf = (t: ChromeTile, screenPx: number): number => strokeWorld(screenPx, strokeZoomOf(t)) * strokeZoomOf(t) * perPxOf(t, strokeZoomOf(t));
 
 function outline(t: ChromeTile, width: number): number[] {
   const inset = unit(t, RING_OFFSET) + width / 2;
@@ -108,8 +128,13 @@ const band = (t: ChromeTile, width: number) => (t.radius ? roundBand(t, width, t
 const RINGS: Record<NodeChrome, (t: StateTile) => PathItem[]> = {
   [NodeChrome.None]: () => [],
   [NodeChrome.Selected]: (t) => [item(t, ChromePart.Ring, band(t, widthOf(t, SELECT_SCREEN_PX)), t.ringColor)],
-  [NodeChrome.Editing]: (t) => [item(t, ChromePart.Ring, dashes(outline(t, unit(t, EDITING_SCREEN_PX)), true, [unit(t, DASH), unit(t, DASH)]).flatMap((d) => line(d, unit(t, EDITING_SCREEN_PX))), t.ringColor, EDITING_OPACITY)]
+  [NodeChrome.Editing]: (t) => editing({ ...t, perPx: undefined })
 };
+
+function editing(t: StateTile): PathItem[] {
+  const width = unit(t, EDITING_SCREEN_PX);
+  return [item(t, ChromePart.Ring, dashes(outline(t, width), true, [unit(t, DASH), unit(t, DASH)]).flatMap((d) => line(d, width)), t.ringColor, EDITING_OPACITY)];
+}
 
 const spaced = (t: ChromeTile, i: number, n: number) => t.y + ((i + 1) / (n + 1)) * t.height;
 
@@ -153,7 +178,7 @@ function handles(t: StateTile): PathItem[] {
 
 const shift = (contours: number[][], dx: number, dy: number) => contours.map((c) => c.map((v, i) => (i % 2 === 0 ? v + dx : v + dy)));
 
-const placed = (item: PathItem, k: number, x: number, y: number): PathItem => ({ ...item, matrix: [k, 0, 0, k, x, y] });
+const placed = (item: PathItem, k: number, x: number, y: number): PathItem => ({ ...item, contours: item.contours.map((c) => c.map((v, i) => v * k + (i % 2 === 0 ? x : y))) });
 
 const LABEL_SET: TextSet = { leading: LABEL_LEADING, tracking: 0 };
 
@@ -187,7 +212,11 @@ function fitted(text: string, room: number, glyphs: Glyphs) {
   return cut;
 }
 
-const labelK = (t: ChromeTile) => labelScale(t.zoom ?? 1);
+const labelZoomOf = (t: ChromeTile) => t.zoom ?? 1;
+
+const labelK = (t: ChromeTile) => (labelScreenPx(labelZoomOf(t)) / LABEL_SCREEN_PX) * perPxOf(t, labelZoomOf(t));
+
+const heldK = (t: ChromeTile) => labelScale(labelZoomOf(t));
 
 const labelHidden = (t: ChromeTile) => !labelShown(t.zoom ?? 1, t.width);
 
@@ -201,13 +230,31 @@ function tag(t: ChromeTile): PathItem[] {
   return [item(t, ChromePart.Tag, circle(t.x + t.width - TAG_RADIUS * k, centre, TAG_RADIUS * k), t.tag)];
 }
 
+export function badgesKept(room: number, count: number, slot: number, minName: number): number {
+  let kept = count;
+  while (kept > 0 && room - kept * slot < minName) {
+    kept -= 1;
+  }
+  return kept;
+}
+
+const shortest = (text: string, glyphs: Glyphs) => (text.length > NAME_MIN_CHARS ? shaped(text.slice(0, NAME_MIN_CHARS) + ELLIPSIS, glyphs).width : shaped(text, glyphs).width);
+
 function labelLayout(t: ChromeTile, glyphs: Glyphs) {
   const k = labelK(t);
   const line = LABEL_SIZE * LABEL_LEADING * k;
   const top = t.y - (LABEL_GAP + LABEL_PAD) * k - line;
-  const left = t.icon ? t.x + (ICON_SIZE + ICON_GAP) * k : t.x;
-  const unitText = fitted(t.label ?? '', (t.x + t.width - left) / k, glyphs);
-  return { k, line, top, left, unitText, width: unitText.width * k };
+  const lead = t.icon ? ICON_SIZE + ICON_GAP : 0;
+  const trail = t.tag ? 2 * TAG_RADIUS + BADGE_GAP : 0;
+  const left = t.x + lead * k;
+  const free = t.width / heldK(t) - lead - trail;
+  const all = t.badges ?? [];
+  const kept = all.length ? badgesKept(free - BOX_EXTRA, all.length, BADGE_SLOT, shortest(t.label ?? '', glyphs)) : 0;
+  const boxUnits = kept ? kept * BADGE_SLOT + BOX_EXTRA : 0;
+  const boxLeft = t.x + t.width - (trail + boxUnits) * k;
+  const badges = all.slice(0, kept).map((b, i) => ({ ...b, x: boxLeft + (BOX_PAD + i * BADGE_SLOT) * k }));
+  const unitText = fitted(t.label ?? '', free - boxUnits - (kept ? BADGE_GAP : 0), glyphs);
+  return { k, line, top, left, unitText, width: unitText.width * k, badges, boxLeft, boxWidth: boxUnits * k };
 }
 
 function label(t: ChromeTile, glyphs: Glyphs): PathItem[] {
@@ -218,6 +265,27 @@ function label(t: ChromeTile, glyphs: Glyphs): PathItem[] {
   const iconSize = ICON_SIZE * k;
   const icon = t.icon ? [{ ...placed(item(t, ChromePart.Icon, t.icon, LABEL_COLOR), k, t.x, top + (line - iconSize) / 2), rule: FillRule.Union }] : [];
   return [...icon, placed(item(t, ChromePart.Label, unitText.contours, LABEL_COLOR), k, left, top)];
+}
+
+function badges(t: ChromeTile, glyphs: Glyphs): PathItem[] {
+  if (!t.badges?.length || labelHidden(t)) {
+    return [];
+  }
+  const { k, line, top, badges: kept, boxLeft, boxWidth } = labelLayout(t, glyphs);
+  const centre = top + line / 2;
+  const side = (SLOT_SIZE + 2 * BOX_PAD) * k;
+  const box = item(t, ChromePart.BadgeBox, roundRect(boxLeft, centre - side / 2, boxWidth, side, BOX_RADIUS * k), LABEL_COLOR, BOX_OPACITY);
+  const drawn = kept.map((b) => ({ ...placed(item(t, `${ChromePart.Badge}:${b.key}` as ChromePart, b.contours, LABEL_COLOR), k * GLYPH_SCALE, b.x + ((SLOT_SIZE - ICON_SIZE * GLYPH_SCALE) / 2) * k, centre - (ICON_SIZE * GLYPH_SCALE * k) / 2), rule: FillRule.Union }));
+  return [box, ...drawn];
+}
+
+export function headerIconBoxes(t: ChromeTile, glyphs: Glyphs): (ChromeBox & { key: string })[] {
+  if (!t.badges?.length || labelHidden(t)) {
+    return [];
+  }
+  const { k, line, top, badges: kept } = labelLayout(t, glyphs);
+  const size = SLOT_SIZE * k;
+  return kept.map((b) => ({ key: b.key, x: b.x, y: top + (line - size) / 2, w: size, h: size }));
 }
 
 export type ChromeBox = { x: number; y: number; w: number; h: number };
@@ -250,8 +318,27 @@ const lit = (m: PortMark) => PORT_LOOK[m.state].named;
 
 export const portChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...ports(t), ...names(t, glyphs, lit)];
 
-export const labelChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...label(t, glyphs), ...tag(t)];
+export const labelChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...label(t, glyphs), ...badges(t, glyphs), ...tag(t)];
 
 export const tileChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...portChrome(t, glyphs), ...labelChrome(t, glyphs)];
 
 export const stateChrome = (t: StateTile, glyphs: Glyphs): PathItem[] => [...RINGS[t.ring](t), ...(t.names ? names(t, glyphs, (m) => !lit(m)) : []), ...handles(t)];
+
+const nudgeOf = (at: PathItem, by: PathItem): number[][] => by.contours.map((c, j) => c.map((v, i) => v - at.contours[j][i]));
+
+const sameShape = (a: PathItem[], b: PathItem[]) => a.length === b.length && a.every((x, i) => x.contours.length === b[i].contours.length && x.contours.every((c, j) => c.length === b[i].contours[j].length));
+
+export function pinned<T extends ChromeTile>(t: T, build: (t: T) => PathItem[]): PathItem[] {
+  const once = build({ ...t, perPx: 1 });
+  const twice = build({ ...t, perPx: 2 });
+  if (!sameShape(once, twice)) {
+    return build({ ...t, perPx: undefined });
+  }
+  return once.map((item, i) => {
+    const nudge = nudgeOf(item, twice[i]);
+    if (nudge.every((c) => c.every((v) => v === 0))) {
+      return item;
+    }
+    return { ...item, contours: item.contours.map((c, j) => c.map((v, k) => v - nudge[j][k])), nudge };
+  });
+}

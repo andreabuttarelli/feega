@@ -107,7 +107,23 @@ function followed(doc: MotionDoc, compId: string, home: string, homeDoc: MotionD
   return containsItself(comps, compId) ? doc : { ...doc, comps };
 }
 
+type Linked = { frameId: string; homes: [string, MotionDoc | null | undefined][]; doc: MotionDoc };
+
+const linkedOnce = new WeakMap<MotionDoc, Linked>();
+
+const sameHomes = (was: Linked, frameId: string, homes: HomeDocs) => was.frameId === frameId && was.homes.every(([home, doc]) => homes.get(home) === doc);
+
 export function linkedMains(doc: MotionDoc, frameId: string, homes: HomeDocs): MotionDoc {
+  const was = linkedOnce.get(doc);
+  if (was && sameHomes(was, frameId, homes)) {
+    return was.doc;
+  }
+  const linked = linkedFresh(doc, frameId, homes);
+  linkedOnce.set(doc, { frameId, homes: mainHomesOf(doc, frameId).map((home) => [home, homes.get(home)]), doc: linked });
+  return linked;
+}
+
+function linkedFresh(doc: MotionDoc, frameId: string, homes: HomeDocs): MotionDoc {
   const linked = Object.keys(doc.comps)
     .sort()
     .reduce((current, compId) => {

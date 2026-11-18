@@ -29,7 +29,8 @@ describe('cloud tokens are stored sealed, per user and provider', () => {
 
     const row = calls.find((c) => c.op === 'upsert')?.args[0] as { user_id: string; provider: string; tokens_sealed: string };
     expect(row).toMatchObject({ user_id: 'u1', provider: 'google_drive' });
-    expect(row.tokens_sealed).not.toContain('ya29');
+    expect(row.tokens_sealed).not.toContain(TOKENS.accessToken);
+    expect(row.tokens_sealed).not.toContain(TOKENS.refreshToken);
     expect(calls.find((c) => c.op === 'upsert')?.args[1]).toEqual({ onConflict: 'user_id,provider' });
   });
 

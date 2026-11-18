@@ -137,7 +137,7 @@ Rewrites a brief into the SHAPE the model you are about to render with wants —
 
 *Export a frame as code*
 
-Turn a frame (with its nested frames, text, images, vectors and component instances) into a code project a developer keeps: `target` react (React + Tailwind, default), html (HTML + CSS) or svelte (SvelteKit). Stacks (auto layout) become flex/grid, components become one file each with typed props for what differs between instances, colours and fonts become tokens. Returns `files` (path + content) and `notes` for what has no static code equivalent. Static only: animation is not exported. Reads only, free, no AI.
+Turn a frame (with its nested frames, text, images, vectors and component instances) into a code project a developer keeps: `target` react (React + Tailwind, default), html (HTML + CSS) or svelte (SvelteKit). Stacks (auto layout) become flex/grid, components become one file each with typed props for what differs between instances, colours and fonts become tokens. Returns `files` (path + content) and `notes` for what has no static code equivalent. Keyframed animation comes along (Motion for React, CSS keyframes) and every breakpoint becomes max-width media queries (max-[Npx]: variants in React); anything else is listed in `notes`. Reads only, free, no AI.
 
 | campo | tipo | |
 |---|---|---|

@@ -25,6 +25,7 @@ import { createUserDb, createServiceRoleDb, type Db } from '$lib/server/db/clien
 import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { can, OrgAction } from '$lib/org-roles';
+import { scopesOfHolder } from '$lib/server/api-key-holder';
 import type { OrgQueryAuthority } from './query-tool';
 
 export type OrgCaller = {
@@ -90,6 +91,11 @@ async function resolveApiKey(token: string): Promise<{ caller: OrgCaller } | { e
     return { error: { status: 401, body: { error: 'expired_api_key' } } };
   }
 
+  const scopes = await scopesOfHolder(admin, row);
+  if (!scopes) {
+    return { error: { status: 401, body: { error: 'invalid_api_key' } } };
+  }
+
   admin.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', row.id).then(
     () => {},
     () => {}
@@ -104,7 +110,7 @@ async function resolveApiKey(token: string): Promise<{ caller: OrgCaller } | { e
       orgId: row.org_id,
       userId: row.user_id,
       apiKeyId: row.id,
-      writeAllowed: (row.scopes ?? []).includes('write')
+      writeAllowed: scopes.includes('write')
     }
   };
 }

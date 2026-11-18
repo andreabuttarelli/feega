@@ -44,6 +44,14 @@ During a gesture they do not change, so now they are held still until it ends.
 
 Tile bakes are now sized to a 4 ms budget per frame, so baking never eats the frame. At 4× CPU uncapped, fps went from 122–136 to 143–147.
 
+The budget did not cover everything a gesture frame produces. The never-blurry fallback, which draws a region at full resolution when no sharp tile covers it, drew whole screen bands in one frame: 50–330 ms each on the real-sites canvas while zooming. Bakes, the fallback and the look-ahead now share one deadline per frame. During a gesture, tiles are baked one at a time and the fallback is drawn in 256 px blocks that carry on the next frame. Until a region is ready, the coarser level underneath is shown, stretched. Once the gesture stops, the canvas still sharpens fully.
+
+| Zoom across octaves, real-sites canvas, 120 Hz | Before | After |
+|---|---|---|
+| Presented fps | 88.8–93 | 115.4–119.9 |
+| Frames over 16.7 / 33 ms | 119 / 56 | 7 / 2 |
+| Longest presented gap | 342 ms | 108 ms |
+
 ## Edits
 
 The core has a fast patch path that redraws only the edited part. It declined every edit inside a component instance, so on a canvas built from components, every edit rebuilt the whole frame.

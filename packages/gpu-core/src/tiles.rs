@@ -231,6 +231,22 @@ pub struct TileFrame {
     pub beneath: Vec<TileKey>,
 }
 
+const ZOOM_SETTLE_MS: f64 = 120.0;
+
+pub fn bakes_in_gesture(since_zoom_ms: f64) -> bool {
+    since_zoom_ms >= ZOOM_SETTLE_MS
+}
+
+const GESTURE_STRETCH_MAX: f64 = 2.0;
+
+pub fn mid_gesture_level(zoom: f64, drawn: Option<i32>, aimed: Option<i32>) -> Option<i32> {
+    let drawn = drawn?;
+    if let Some(level) = aimed.filter(|level| *level > drawn) {
+        return Some(level);
+    }
+    (zoom / step_zoom(drawn) > GESTURE_STRETCH_MAX).then(|| step_of(zoom / HALF_OCTAVE))
+}
+
 pub fn sharp_at(zoom: f64, step: i32) -> bool {
     zoom / step_zoom(step) <= SHARP_STRETCH + STEP_SLACK
 }
@@ -298,6 +314,7 @@ pub struct Tiles {
     stale: FxHashSet<TileKey>,
     last_drawn: rustc_hash::FxHashMap<TileKey, u64>,
     tick: u64,
+    kept_levels: Vec<i32>,
 }
 
 fn seen_world(camera: Camera, (w, h): (u32, u32)) -> Rect {
@@ -364,10 +381,28 @@ impl Tiles {
         };
         let sharp: Vec<i32> = coarser.into_iter().chain(step + 1..=step + FINER_STEPS).collect();
         let bare = missing.iter().filter(|k| !self.held.contains(k) && !self.under_any(**k, &sharp)).copied().collect();
-        let beneath = (step - COARSER_STEPS..step).rev().filter(|s| !sharp.contains(s)).map(|s| self.held_over(world, s)).find(|keys| !keys.is_empty()).unwrap_or_default();
+        let beneath: Vec<TileKey> = (step - COARSER_STEPS..step).filter(|s| !sharp.contains(s)).flat_map(|s| self.held_over(world, s)).collect();
         let held_stale = (step - COARSER_STEPS..=step + FINER_STEPS).filter(|s| *s != step).flat_map(|s| self.held_over(world, s)).filter(|k| self.stale.contains(k));
         missing.extend(held_stale);
         TileFrame { draw, missing, bare, beneath }
+    }
+
+    pub fn gesture_frame(&self, camera: Camera, screen: (u32, u32)) -> TileFrame {
+        let step = self.step_for(camera);
+        let Some(world) = self.on_canvas(seen_world(camera, screen)).filter(|w| count_over(*w, step) <= FRAME_TILES_MAX) else { return self.frame(camera, screen) };
+        let whole = |s: i32| keys_over(world, s).filter(|k| self.paints(*k)).all(|k| self.held.contains(&k));
+        match (step - COARSER_STEPS..=step + FINER_STEPS).rev().find(|s| whole(*s)) {
+            Some(level) => TileFrame { draw: self.held_over(world, level), missing: Vec::new(), bare: Vec::new(), beneath: Vec::new() },
+            None => self.frame(camera, screen),
+        }
+    }
+
+    pub fn missing_over(&self, camera: Camera, screen: (u32, u32), step: i32) -> Vec<TileKey> {
+        let Some(world) = self.on_canvas(seen_world(camera, screen)) else { return Vec::new() };
+        let centre = world.center();
+        let mut missing: Vec<TileKey> = keys_over(world, step).filter(|k| self.paints(*k) && !self.held.contains(k)).collect();
+        missing.sort_by(|a, b| a.world().center().distance(centre).total_cmp(&b.world().center().distance(centre)));
+        missing
     }
 
     fn on_canvas(&self, world: Rect) -> Option<Rect> {
@@ -473,6 +508,10 @@ impl Tiles {
         }).collect()
     }
 
+    pub fn keep_levels(&mut self, levels: &[i32]) {
+        self.kept_levels = levels.to_vec();
+    }
+
     pub fn set_canvas(&mut self, extent: Rect) {
         self.canvas = Some(extent);
     }
@@ -546,7 +585,7 @@ impl Tiles {
         if self.plan.iter().any(|level| level.holds(key)) || self.overview().is_some_and(|overview| key.step <= overview) {
             return true;
         }
-        key.step == step && key.world().overlaps(near.inflate(key.side(), key.side()))
+        (key.step == step || self.kept_levels.contains(&key.step)) && key.world().overlaps(near.inflate(key.side(), key.side()))
     }
 
     pub fn evict_beyond(&mut self, camera: Camera, screen: (u32, u32), keep: usize) -> Vec<TileKey> {
@@ -666,6 +705,10 @@ impl Warmup {
 
     pub fn due(&self, now_ms: f64) -> bool {
         now_ms - self.stirred_at >= WARM_AFTER_MS
+    }
+
+    pub fn wait_ms(&self, now_ms: f64) -> f64 {
+        (WARM_AFTER_MS - (now_ms - self.stirred_at)).max(0.0)
     }
 
     pub fn due_when(&self, now_ms: f64, building: Building) -> bool {

@@ -30,13 +30,29 @@ export async function signMediaPaths(db: Db, paths: string[], ttlSeconds: number
     .filter((url): url is string => url !== null);
 }
 
+const FILTER_CHARS = 6000;
+
+const batchesOf = (paths: string[]): string[][] => {
+  const batches: string[][] = [[]];
+  let chars = 0;
+  for (const path of paths) {
+    if (chars + path.length > FILTER_CHARS && batches[batches.length - 1].length) {
+      batches.push([]);
+      chars = 0;
+    }
+    batches[batches.length - 1].push(path);
+    chars += path.length + 1;
+  }
+  return batches;
+};
+
 async function heldByOrg(db: Db, orgId: string, stored: string[]): Promise<Set<string>> {
   const held = new Set<string>();
   if (!stored.length) {
     return held;
   }
   const client = db as unknown as { from(t: string): { select(c: string): { eq(c: string, v: string): { in(c: string, v: string[]): Promise<{ data: unknown; error: unknown }> } } } };
-  const found = await Promise.all(SIGNED_COLUMNS.map((column) => client.from('assets').select('url, proxy_url').eq('org_id', orgId).in(column, stored)));
+  const found = await Promise.all(SIGNED_COLUMNS.flatMap((column) => batchesOf(stored).map((batch) => client.from('assets').select('url, proxy_url').eq('org_id', orgId).in(column, batch))));
   if (found.some((r) => r.error)) {
     throw new Error('signOrgMediaPaths: the asset rows are unreadable');
   }
@@ -83,22 +99,6 @@ const heldByClient = new WeakMap<object, HeldBy>();
 
 type PathRow = { url: string | null; proxy_url: string | null; org_id: string };
 
-const FILTER_CHARS = 6000;
-
-const batchesOf = (paths: string[]): string[][] => {
-  const batches: string[][] = [[]];
-  let chars = 0;
-  for (const path of paths) {
-    if (chars + path.length > FILTER_CHARS && batches[batches.length - 1].length) {
-      batches.push([]);
-      chars = 0;
-    }
-    batches[batches.length - 1].push(path);
-    chars += path.length + 1;
-  }
-  return batches;
-};
-
 async function orgsHolding(userDb: Db, paths: string[]): Promise<HeldBy> {
   const known = heldByClient.get(userDb) ?? new Map<string, string>();
   heldByClient.set(userDb, known);
@@ -112,10 +112,10 @@ async function orgsHolding(userDb: Db, paths: string[]): Promise<HeldBy> {
   const found = await Promise.all(asks);
   const failed = found.find((r) => r.error);
   if (failed) {
-    throw new Error(`signAssetPaths: the asset rows are unreadable (${(failed.error as { message?: string }).message ?? 'unknown'})`);
+    console.error(`signAssetPaths: some asset rows are unreadable, their pictures stay unsigned (${(failed.error as { message?: string }).message ?? 'unknown'})`);
   }
   const asked = new Set(unknown);
-  for (const row of found.flatMap((r) => (r.data ?? []) as PathRow[])) {
+  for (const row of found.flatMap((r) => (r.error ? [] : ((r.data ?? []) as PathRow[])))) {
     for (const column of SIGNED_COLUMNS) {
       const path = row[column];
       if (path && asked.has(path)) {

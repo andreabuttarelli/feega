@@ -18,7 +18,7 @@ vi.mock('$lib/server/nav-cache', async (original) => ({
   verifiedToken: async (_db: unknown, token: string) => (token === 'jwt' ? USER : null),
   invalidateBrandNav: vi.fn()
 }));
-vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: vi.fn(async () => [{ org: ORG, role: 'owner' }]) }));
+vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: vi.fn(async () => [{ org: ORG, role: 'owner' }]), memberRole: vi.fn(async () => 'owner') }));
 vi.mock('$lib/server/projects/lookup', () => ({ findProjectForUser: vi.fn(async () => ({ orgId: ORG.id, project: PROJECT })) }));
 vi.mock('$lib/server/repos/profiles', async (original) => ({ ...(await original<object>()), ensureProfile: vi.fn(async () => ({ name: 'Ada Lovelace', email: USER.email, avatarUrl: null })) }));
 vi.mock('$lib/server/credits', async (original) => ({ ...(await original<object>()), orgCreditBalance: vi.fn(async () => 42) }));

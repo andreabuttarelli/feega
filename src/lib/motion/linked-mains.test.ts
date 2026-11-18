@@ -78,6 +78,17 @@ describe('instances follow their main across frames', () => {
     expect(resolved.comps[compId].component?.home).toBe('A');
   });
 
+  it('links a frame once per state of its homes: the same homes give back the same doc, so nothing downstream walks it again', () => {
+    const { doc: main, compId } = mainFrame();
+    const { doc } = instanceFrame(main, compId);
+    const edited = relabel(main, compId, 'Order');
+
+    const first = linkedMains(doc, 'B', new Map([['A', edited]]));
+
+    expect(linkedMains(doc, 'B', new Map([['A', edited]]))).toBe(first);
+    expect(innerText(linkedMains(doc, 'B', new Map([['A', relabel(main, compId, 'Pay')]])), compId)).toBe('Pay');
+  });
+
   it('keeps the overrides of the instance on top of the edited main', () => {
     const { doc: main, compId } = mainFrame();
     const { doc, instanceId } = instanceFrame(main, compId);

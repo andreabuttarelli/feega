@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeDb, type FakeDb } from '$lib/server/db/fake-db';
 
-const state = vi.hoisted(() => ({ world: null as null | FakeDb }));
+const state = vi.hoisted(() => ({ world: null as null | FakeDb, role: 'member' as string | null }));
 
 vi.mock('$lib/server/cli-auth', async (original) => ({
   ...(await original<typeof import('$lib/server/cli-auth')>()),
@@ -15,8 +15,9 @@ const one = await import('./[id]/+server');
 const KEY = { id: 'k-1', user_id: 'u-1', name: 'Agent', key_prefix: 'feega_ab', scopes: ['read'], created_at: '2026-10-01', last_used_at: null };
 
 beforeEach(() => {
+  state.role = 'member';
   state.world = fakeDb(
-    { api_keys: [{ ...KEY, org_id: 'org-1' }, { ...KEY, id: 'k-2', org_id: 'org-2' }] },
+    { api_keys: [{ ...KEY, org_id: 'org-1' }, { ...KEY, id: 'k-2', org_id: 'org-2' }], orgs_members: [{ org_id: 'org-1', user_id: 'u-1', role: state.role }].filter((m) => m.role) },
     { filter: true, newId: () => 'k-new' }
   );
 });
@@ -48,5 +49,27 @@ describe('the brand api-keys API', () => {
 
     expect(other.status).toBe(404);
     expect(own.status).toBe(200);
+  });
+
+  it.each(['owner', 'admin', 'member'])('mints for a %s', async (role) => {
+    state.role = role;
+    state.world = fakeDb({ api_keys: [], orgs_members: [{ org_id: 'org-1', user_id: 'u-1', role }] }, { filter: true, newId: () => 'k-new' });
+
+    const res = await list.POST({ request: req('POST', { scopes: ['read', 'write'] }), params: { slug: 'b' } } as never);
+
+    expect(res.status).toBe(201);
+  });
+
+  it.each([
+    ['a viewer', 'viewer'],
+    ['a member demoted to viewer', 'viewer'],
+    ['a member removed from the org', null]
+  ])('refuses %s, and stores nothing', async (_who, role) => {
+    state.world = fakeDb({ api_keys: [], orgs_members: role ? [{ org_id: 'org-1', user_id: 'u-1', role }] : [] }, { filter: true, newId: () => 'k-new' });
+
+    const res = await list.POST({ request: req('POST', { scopes: ['read', 'write'] }), params: { slug: 'b' } } as never);
+
+    expect(res.status).toBe(403);
+    expect(state.world.calls.some((c) => c.table === 'api_keys' && c.op === 'insert')).toBe(false);
   });
 });

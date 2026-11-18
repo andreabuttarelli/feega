@@ -191,10 +191,10 @@ export function registerMotionTools(server: McpServer) {
     {
       title: 'Export a frame as code',
       description:
-        'Turn a frame (with its nested frames, text, images, vectors and component instances) into a code project a developer keeps: ' +
+        'Turn a frame (with its nested frames, text, images, 3D models, vectors and component instances) into a code project a developer keeps: ' +
         '`target` react (React + Tailwind, default), html (HTML + CSS) or svelte (SvelteKit). Stacks (auto layout) become flex/grid, components become one file each ' +
-        'with typed props for what differs between instances, colours and fonts become tokens; uploaded fonts ship as @font-face plus their files in `assets`. Returns `files` (path + content), `assets` (images and font files to download) and `notes` for what has no static ' +
-        'code equivalent. Static only: animation is not exported. Reads only, free, no AI.',
+        'with typed props for what differs between instances, colours and fonts become tokens; uploaded fonts ship as @font-face plus their files in `assets`. Returns `files` (path + content), `assets` (images, font files and 3D model files to download) and `notes` for what has no static ' +
+        'code equivalent. 3D model and shape layers become a three.js canvas (React Three Fiber in React) sized by the layer box. Keyframed animation comes along (Motion for React, CSS keyframes) and every breakpoint becomes max-width media queries (max-[Npx]: variants in React); anything else is listed in `notes`. Reads only, free, no AI.',
       inputSchema: z.object({ org, node_id: z.string(), target: z.enum(CODE_TARGETS).optional() }),
       annotations: { readOnlyHint: true }
     },

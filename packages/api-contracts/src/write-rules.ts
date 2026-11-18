@@ -77,6 +77,7 @@ export const TABLE_CHECKS: Record<string, string> = {
   "custom_voices_clone_needs_consent": "method <> 'instant_clone' or (consent_basis is not null and consent_attested_at is not null and (consent_basis = 'own_voice' or length(trim(coalesce(consent_speaker, ''))) > 0))",
   "custom_voices_method_check": "method in ('design', 'instant_clone', 'library')",
   "editorial_plans_source_check": "source = any (array['onboarding','revision','rollover','manual','analytics_review','autopilot'])",
+  "frame_code_links_entry_key_len": "length(entry_key) <= 1200",
   "gtm_plans_horizon_check": "horizon in ('90d', '6m')",
   "gtm_plans_source_check": "source = any (array['manual','revision','phase_review','onboarding','analytics_review','autopilot'])",
   "moderation_checks_stage_check": "stage in ('rules', 'jev', 'llm', 'identifiability')",

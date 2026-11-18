@@ -12,7 +12,13 @@ export enum ViewportMode {
 
 export type Size = { w: number; h: number };
 export type FrameBox = Size & { scale: number; scrolls: boolean };
-export type Viewport = { mode: ViewportMode; width: number };
+export enum WidthSource {
+  Window = 'window',
+  Fixed = 'fixed'
+}
+
+export type Viewport = { mode: ViewportMode; width: number; source: WidthSource };
+export type WidthChoice = { label: string; width: number };
 
 type ModeSpec = { label: string; scale: (stage: Size, box: Size) => number; scrolls: boolean };
 
@@ -31,18 +37,25 @@ export const MODE_ORDER = [ViewportMode.Fit, ViewportMode.FillWidth, ViewportMod
 export const WIDTH_PRESETS = [
   { label: 'Desktop', width: 1440 },
   { label: 'Tablet', width: 768 },
-  { label: 'Phone', width: 390 }
+  { label: 'Mobile', width: 390 }
 ];
 
 const MIN_WIDTH = 120;
 const MAX_WIDTH = 4096;
-const DEFAULT: Viewport = { mode: ViewportMode.Fit, width: WIDTH_PRESETS[0].width };
+const DEFAULT: Viewport = { mode: ViewportMode.Responsive, width: WIDTH_PRESETS[0].width, source: WidthSource.Window };
 
 export function clampWidth(width: number): number {
   if (!Number.isFinite(width)) {
     return DEFAULT.width;
   }
   return Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(width)));
+}
+
+export const shownWidth = (view: Viewport, stageWidth: number): number => (view.source === WidthSource.Window ? clampWidth(stageWidth) : view.width);
+
+export function viewChoices(doc: MotionDoc): WidthChoice[] {
+  const all = [...WIDTH_PRESETS, ...viewsOf(doc).map((v) => ({ label: v.name, width: v.width }))].sort((a, b) => b.width - a.width);
+  return all.filter((c, i) => all.findIndex((o) => o.width === c.width) === i);
 }
 
 export function frameBox(mode: ViewportMode, stage: Size, frame: Size, width: number): FrameBox {
@@ -57,14 +70,15 @@ export function activeView(doc: MotionDoc, width: number): Breakpoint {
 
 export function docAtWidth(doc: MotionDoc, width: number): MotionDoc {
   const resolved = resolveView(doc, activeView(doc, width).id);
-  return withContentHeight({ ...resolved, width, height: doc.height });
+  return resolved.width === width ? resolved : withContentHeight({ ...resolved, width });
 }
 
 export function parseViewport(raw: string | null): Viewport {
   try {
     const stored = JSON.parse(raw ?? '') as Partial<Viewport>;
     const mode = MODE_ORDER.find((m) => m === stored.mode) ?? DEFAULT.mode;
-    return { mode, width: clampWidth(stored.width ?? DEFAULT.width) };
+    const source = Object.values(WidthSource).find((w) => w === stored.source) ?? DEFAULT.source;
+    return { mode, width: clampWidth(stored.width ?? DEFAULT.width), source };
   } catch {
     return DEFAULT;
   }

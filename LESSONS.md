@@ -86,6 +86,19 @@ Signal: with the pointer still over a frame, a wheel zoom makes its hover outlin
 ### Tiles turn sharp slowly after a zoom-in: count paints per tile, not ms per tile
 **Signal:** zoomed far in, every tile costs ~3 ms whatever its size (one tile or a 2×2 block cost the same), almost all in `layers::prepare_items`, and the layer cache never hits. **Move:** log, per `raster_batch`, the number of `Surface::paint` calls by `Reason` and the clip of each layer-worthy item. A tile paying for layers it does not show is the defect: on the landings fixture ten of twelve were groups emptied by `Laying::lay` that still carried an SVG effect filter (no bounds, so never culled, so a full-tile body, mask and filter). A cost fixed per draw also means bigger batches are nearly free on the CPU; measure the GPU side by frames over 11 ms before growing them.
 
+### Resizing a frame runs at 1 fps and a CPU profile is all `found` → `syncStyle` → `commit`
+**Signal:** a frame resize stalls for seconds per pointer move; the profile's top inclusive entry is the `styleLibrary.found` effect, under it `syncStyle`, `commit`, `liveDocs.set` and the poster-frame scan of a fresh doc; the network shows `Updated the <name> style` saves while the corner is still held, and Cmd+Z after the resize undoes a style instead of the size. **Move:** a library reconcile that compares a doc's style in canvas pixels (`scaleOf(doc, box)`) must read settled state only: during a gesture the box moves on every pointer event and the doc on the next frame, so every style looks changed and is pushed back. Gate the effect on the gesture (`overrides`/`resizing` empty), and check the frame-ops POSTs of the gesture window, not just the frame rate.
+
+### A perf run on the landings fixture finds no frame to grab the second time
+**Signal:** `profile.mjs`/`measure.mjs` throw `Cannot read properties of undefined (reading 'x')` or report `resized=false` on a run after a resize. **Move:** local mode saves into the served `.feega` copy and the kit's Cmd+Z does not undo a whole resize, so the fixture drifts run to run; copy the original over the served file and restart the server before every resize run. On the hosted test canvas, another agent's cursor on screen means another run is editing the same rows: its numbers are not yours.
+
+### Zoom hitches whenever new tiles load: check every producer against the frame deadline, not only bakes
+
+**Signal:** pinch zoom across octaves presents 85–95 fps at 120 Hz, with 50–340 ms gaps, while the bake counters say each frame baked 0–1 tiles in a few ms. **Move:** read `fallbackMs` in `window.__gpuCanvas.frames`. Any producer that runs in `tiled_frame` must check the one frame deadline per unit of work: bake batches, `serve_bare`'s never-blurry fallback, `render_ahead`, and any future one. On 2026-11-16 the fallback drew whole screen bands with no budget and caused 180 of 204 long frames.
+
+### A frame you pan back to stays empty, then fills seconds later or never
+**Signal:** after a while away, frames at the far edge show the canvas background (not a card); `frame|dropped|<id>:…:vectors` lands before `frame|pictured|<id>:…` of the whole group, or no `pictured` comes at all. **Move:** a frame shows only *pictured* chain layers and the readable-frame placeholder draws nothing, so any gap between dropping the last drawn layer and picturing the head is an empty frame. Check `drawnLast` survives the frame leaving `holding`. To drive the camera, CDP `Input.synthesizePinchGesture` anchored near a screen corner fails with "Position out of bounds": pinch at the centre, then pan with `Input.synthesizeScrollGesture` in a closed loop on `data-view`.
+
 ## Providers
 
 ### Kie publishes its price list and its request schemas, you just have to find them
@@ -112,6 +125,10 @@ Signal: with the pointer still over a frame, a wheel zoom makes its hover outlin
 
 **Signal:** a fix in `packages/motion-core` passes its test but the browser on the worktree's dev server still shows the old behaviour. **Move:** the worktree has no `node_modules`, so `@feega/*` resolves to the main checkout's symlinks. Create `node_modules/@feega/*` in the worktree pointing at its own `packages/`, link the other top-level entries from the main `node_modules`, and start Vite with `server.fs.strict: false` (the Kit client lives outside the worktree's allow list).
 
+### A worktree `.env` turns generation tests red
+
+**Signal:** after copying `.env` into a worktree (`npm run check` needs it, or every `$env/static/public` read errors as `string | undefined`), `vitest run src/lib/server/canvas` fails ~20 cases in `generate*.test.ts` and `canvas-catalogue.test.ts` that pass in CI. **Move:** the tests read the real env when it exists. Keep `.env` in the worktree only while `npm run check` / `build:node` run; move it out for vitest.
+
 ### A snapcn port that works in tests throws in the player
 
 **Signal:** a port renders in a unit test of `port.draw` but the frame is empty in the browser, with `ReferenceError` in the player. **Move:** the player runs `draw.toString()`, so module-scope constants are gone. Keep every value inside `draw`; `sweep.test.ts` executes `snapcnSource` and catches it.
@@ -123,6 +140,14 @@ Signal: with the pointer still over a frame, a wheel zoom makes its hover outlin
 ### Parity's HTML side is not the truth for Google fonts
 
 **Signal:** parity SSIM 0.3–0.9 with the HTML frames in a serif fallback while the core frames look right. **Move:** the headless harness does not load the template's Google fonts; compare the sheets by eye before calling the core wrong.
+
+### A hugged Title renders one 0.95 step small in the HTML render only
+
+**Signal:** a server still or video shows a headline exactly 5% smaller than the canvas and the exported page, though its box hugs it. **Move:** check the fit inputs in Chromium (`offsetHeight` of the `[data-fit]` element against its `.box`). The lines' descender pad (`padding-bottom` with an equal negative margin) collapsed through the Title element, so fit saw it 0.08em too tall and shrank one step. `display: flow-root` on the Title keeps it inside; `text-metrics.browser.test.ts` guards it.
+
+### Server-side font shaping of a variable Google family comes out at the default weight
+
+**Signal:** text shaped in Node (fontkit via `fontLoader`) matches Chromium for static families but is ~5% narrow for a variable family at 700. **Move:** Google Fonts CSS2 answers a request with no browser user agent with one static TTF of the default instance. Fetch the stylesheet with a browser user agent (`browserFontReader` in `src/lib/server/motion/shaped-compose.ts`), so the server gets the same variable file the canvas does.
 
 ### A Playwright spec cannot import motion-core: build the page with vite-node first
 
@@ -3993,3 +4018,14 @@ property reads on ~2,000 items (`src/lib/canvas/counted-list.testkit.ts`), not w
 ## A CI audit matrix holds runners for hours when one row wedges the page
 
 **Signal:** `ci.yml` `test` sits queued while `audit (…)` jobs run past an hour; the audit log shows the same `locator.click: Timeout 3000ms exceeded ... waiting for element to be visible, enabled and stable` on every row, about 2 minutes apart. **Move:** a run that is not required must still be bounded: `timeout-minutes` from a measured run, `max-parallel` on the matrix, and a circuit breaker in the spec (`unreachedRows` in `inspector-audit.spec.ts`) so one wedged page fails the rest at once instead of timing out row by row.
+
+## A 3D export scores 0.99 against the canvas though every number matches
+
+**Signal:** SSIM of an exported canvas against the composed canvas stays near 0.99 with thin rim differences, only on one layer. **Move:** the layer's width came out as a rounded percentage (`32.81%` of 1280 is 419.97 px); React Three Fiber sizes the renderer to the fractional width while a `clientWidth` read rounds it. Give the fixture a width that is an exact percentage (400 of 1280) before suspecting the scene.
+
+## A service-role credential carries no role unless the request re-derives it
+**Signal:** a token row (`api_keys`) is checked for hash, revocation and expiry, then the request runs on the service-role client. RLS role rules (viewers read-only) do not apply, and a demotion or removal changes nothing for the token. **Move:** derive the effective scopes from the holder's current membership on every request (`scopesOfHolder`); never trust what was stored at mint time.
+
+## Exported code text is about 5% wider than the canvas still
+
+**Signal:** `npm run test:export-fidelity` names the first diverging layer with the same left/top but a width 5% off (hero headline 598px on the canvas, 629px in the export), and text the canvas wraps stays on one line in the export. **Move:** the deviating side is the canvas. `data-fit` text (`hyperframes/fit-runtime.ts`, `fitSize`) shrinks 5% per step until it fits the box laid out from the text-extent estimate (`layout/resolve.ts` `measure`); when the estimate is narrower than the browser's real text, the canvas shrinks text that fits. CSS cannot express it, so do not chase it in the exporter: fix the measurement, then raise the floors in the gate.
