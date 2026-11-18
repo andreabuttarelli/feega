@@ -15,6 +15,7 @@ type Row = Record<string, unknown>;
 export type LinkStore = {
   read: (nodeId: string) => Promise<CodeLink | null>;
   all: (nodeId: string) => Promise<CodeLink[]>;
+  inProject: () => Promise<CodeLink[]>;
   save: (nodeId: string, link: CodeLink) => Promise<boolean>;
   remove: (nodeId: string) => Promise<boolean>;
 };
@@ -43,7 +44,9 @@ const COLUMN_OF: Record<keyof CodeLink, string> = {
   pullNumber: 'pull_number',
   writable: 'writable',
   restored: 'restored',
-  beforePoster: 'before_poster'
+  beforePoster: 'before_poster',
+  variantOf: 'variant_of',
+  keptSha: 'kept_sha'
 };
 
 const FIELDS = Object.entries(COLUMN_OF) as [keyof CodeLink, string][];
@@ -73,8 +76,19 @@ export function linkStore(db: Db, scope: Scope): LinkStore {
     }
     return ((data ?? []) as Row[]).map(linkOf).filter((l): l is CodeLink => l !== null);
   };
+  const inProject = async () => {
+    const { data, error } = await table().select('*').eq('org_id', scope.orgId).eq('project_id', scope.projectId);
+    if (missing(error)) {
+      return [];
+    }
+    if (error) {
+      throw error;
+    }
+    return ((data ?? []) as Row[]).map(linkOf).filter((l): l is CodeLink => l !== null);
+  };
   return {
     all,
+    inProject,
     read: async (nodeId) => primaryOf(await all(nodeId)),
     save: async (nodeId, link) => {
       const row = { ...rowOf(link), entry_key: linkKey(link), node_id: nodeId, org_id: scope.orgId, project_id: scope.projectId, created_by: scope.userId, updated_at: new Date().toISOString() };

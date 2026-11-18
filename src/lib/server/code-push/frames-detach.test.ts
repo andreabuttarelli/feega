@@ -5,7 +5,7 @@ import { frameDetach, FramesRefusal } from './frames-push';
 
 const memoryLinks = (seed: Record<string, CodeLink>) => {
   const saved = new Map(Object.entries(seed));
-  const links: LinkStore = { read: async (id) => saved.get(id) ?? null, all: async (id) => (saved.has(id) ? [saved.get(id)!] : []), save: async (id, l) => Boolean(saved.set(id, l)), remove: async (id) => saved.delete(id) };
+  const links: LinkStore = { read: async (id) => saved.get(id) ?? null, all: async (id) => (saved.has(id) ? [saved.get(id)!] : []), inProject: async () => [...saved.values()], save: async (id, l) => Boolean(saved.set(id, l)), remove: async (id) => saved.delete(id) };
   return { saved, links };
 };
 

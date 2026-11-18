@@ -17,7 +17,7 @@ vi.mock('$lib/server/code-push/frames-runtime', () => ({
   framesDeps: () => ({
     host: async () => (connected ? githubHost(gh.call, { owner: 'acme', repo: 'app', ref: null }) : null),
     edits: (...args: unknown[]) => codeEdits(...args),
-    links: { read: async (id: string) => links.get(id) ?? null, all: async (id: string) => (links.has(id) ? [links.get(id)!] : []), save: async (id: string, l: CodeLink) => Boolean(links.set(id, l)), remove: async (id: string) => links.delete(id) },
+    links: { read: async (id: string) => links.get(id) ?? null, all: async (id: string) => (links.has(id) ? [links.get(id)!] : []), inProject: async () => [...links.values()], save: async (id: string, l: CodeLink) => Boolean(links.set(id, l)), remove: async (id: string) => links.delete(id) },
     lock
   })
 }));
@@ -53,7 +53,7 @@ describe('/api/v1/projects/:id/github/push', () => {
     expect(body).toMatchObject({ ok: true, branch: 'feega/hero', pull: { number: 1 } });
     expect(gh.files('feega/hero')['src/Hero.tsx']).toBe('v1');
     expect(links.get('n1')).toMatchObject({ pushBranch: 'feega/hero', pushSha: body.sha, pullNumber: 1, pushTouched: ['src/Hero.tsx'] });
-    expect(codeEdits).toHaveBeenCalledWith(expect.objectContaining({ orgId: 'o1', projectId: 'p1', userId: 'u1' }), 'n1');
+    expect(codeEdits).toHaveBeenCalledWith(expect.objectContaining({ orgId: 'o1', projectId: 'p1', userId: 'u1' }), 'n1', 'instance');
   });
 
   it('lo stato è calcolato: modificato con la PR aperta, poi più recente a monte', async () => {

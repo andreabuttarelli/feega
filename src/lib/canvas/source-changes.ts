@@ -1,6 +1,8 @@
 export enum SourceAction {
+  Resolve = 'resolve',
   Update = 'update',
   ViewPr = 'view-pr',
+  MakeVariant = 'make-variant',
   Detach = 'detach'
 }
 
@@ -13,9 +15,13 @@ export enum CiState {
 
 export type PullView = { number: number; url: string; status: string; checks: { name: string; status: string; conclusion: string | null }[] };
 
-export type LinkView = { entry: string; appRoot: string; baseSha: string; baseBranch: string; writable: boolean; route?: string; pushBranch?: string; pullNumber?: number; beforePoster?: string };
+export type LinkView = { entry: string; appRoot: string; baseSha: string; baseBranch: string; writable: boolean; route?: string; pushBranch?: string; pullNumber?: number; beforePoster?: string; variantOf?: string };
 
-export type FrameSync = { nodeId: string; name: string; state: string; link: LinkView; push: { pull?: PullView | null } | null };
+export type Affected = { path: string; pages: number };
+
+export type Proposal = { component: string; props: string[] };
+
+export type FrameSync = { nodeId: string; name: string; state: string; link: LinkView; push: { pull?: PullView | null } | null; affected?: Affected[]; proposals?: Proposal[] };
 
 export type Popover = { file: string; commit: string; branch: string; actions: SourceAction[] };
 
@@ -27,8 +33,10 @@ const GREEN = new Set(['success', 'skipped', 'neutral']);
 type ActionRule = { action: SourceAction; holds: (s: FrameSync) => boolean };
 
 const ACTION_RULES: ActionRule[] = [
+  { action: SourceAction.Resolve, holds: (s) => s.state === 'conflict' },
   { action: SourceAction.Update, holds: (s) => UPDATE_STATES.has(s.state) },
   { action: SourceAction.ViewPr, holds: (s) => Boolean(s.push?.pull?.url) },
+  { action: SourceAction.MakeVariant, holds: (s) => !s.link.variantOf },
   { action: SourceAction.Detach, holds: () => true }
 ];
 
@@ -40,13 +48,30 @@ export const changedRows = (syncs: readonly FrameSync[]) => syncs.filter((s) => 
 
 const PUSH_PREFIX = 'feega/';
 
-export function pushAskOf(rows: readonly FrameSync[], picked: ReadonlySet<string>, name: string) {
+const NO_MAINS: ReadonlySet<string> = new Set();
+
+export enum VariantChoice {
+  Replace = 'replace',
+  NewRoute = 'new_route',
+  Keep = 'keep'
+}
+
+export type VariantAnswer = { nodeId: string; choice: `${VariantChoice}`; route?: string };
+
+export function pushAskOf(rows: readonly FrameSync[], picked: ReadonlySet<string>, name: string, mains: ReadonlySet<string> = NO_MAINS, variants: readonly VariantAnswer[] = []) {
   const chosen = rows.filter((r) => picked.has(r.nodeId));
   if (!chosen.length) {
     return null;
   }
   const open = chosen.find((r) => r.link.pushBranch)?.link.pushBranch;
-  return { name: open ? open.slice(PUSH_PREFIX.length) : name, nodeIds: chosen.map((r) => r.nodeId) };
+  const toMain = chosen.filter((r) => mains.has(r.nodeId)).map((r) => r.nodeId);
+  const answered = variants.filter((v) => chosen.some((r) => r.nodeId === v.nodeId));
+  return { name: open ? open.slice(PUSH_PREFIX.length) : name, nodeIds: chosen.map((r) => r.nodeId), ...(toMain.length ? { mains: toMain } : {}), ...(answered.length ? { variants: answered } : {}) };
+}
+
+export function impactOf(row: FrameSync): string | null {
+  const pages = Math.max(0, ...(row.affected ?? []).map((a) => a.pages));
+  return pages ? `${pages} pages affected` : null;
 }
 
 export function ciOf(pull: PullView): CiState {

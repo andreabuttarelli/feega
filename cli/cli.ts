@@ -52,6 +52,50 @@ program
   });
 
 program
+  .command('dev-server [action]')
+  .description('Local mode: the dev server of the opened folder that live frames show — status (default), start or stop')
+  .action(async (action: string | undefined) => {
+    const { cmdDevServer } = await import('./commands/dev-server.ts');
+    await cmdDevServer(action ?? 'status');
+  });
+
+program
+  .command('live-edit <at> <prop> [value]')
+  .description('Local mode: change one property of the element at file:line:col in the running app and write it to its source, on the branch feega/live')
+  .option('--side <side>', 'x, y, t, r, b or l, for padding, margin and gap')
+  .option('--token <token>', 'exact Tailwind token instead of a value')
+  .option('--was <text>', 'current text, when prop is text')
+  .option('--viewport <px>', 'page width the change is for: the class with the breakpoint that applies there is the one changed')
+  .action(async (at: string, prop: string, value: string | undefined, options) => {
+    const { cmdLiveEdit } = await import('./commands/live-edit.ts');
+    await cmdLiveEdit(at, prop, value, options);
+  });
+
+program
+  .command('live-undo <sha>')
+  .description('Local mode: revert one live edit by the commit it returned')
+  .action(async (sha: string) => {
+    const { cmdLiveUndo } = await import('./commands/live-edit.ts');
+    await cmdLiveUndo(sha);
+  });
+
+program
+  .command('live-changes')
+  .description('Local mode: files and diff of the live edits on feega/live')
+  .action(async () => {
+    const { cmdLiveChanges } = await import('./commands/live-edit.ts');
+    await cmdLiveChanges();
+  });
+
+program
+  .command('live-push')
+  .description('Local mode: push the live edits to a feega/ branch')
+  .action(async () => {
+    const { cmdLivePush } = await import('./commands/live-edit.ts');
+    await cmdLivePush();
+  });
+
+program
   .command('init [dir]')
   .description('Tag every element of a Vite or Next.js app with its file:line in dev, so Feega can open the source behind what you click')
   .option('--dry-run', 'show the changes without writing them')
@@ -77,13 +121,24 @@ program
     await cmdLibrary(slug, tab ?? 'kit');
   });
 
-program
+const agents = program
   .command('agents')
   .description('List the coding agents a local Feega found on this computer and whether they can drive the chat over ACP')
   .option('--refresh', 'Detect again instead of using the cached result')
   .action(async (options: { refresh?: boolean }) => {
     const { cmdAgents } = await import('./commands/agents.ts');
     await cmdAgents(options);
+  });
+
+agents
+  .command('models <agent>')
+  .description('List the models an agent offers, read live from it; --set picks one for this .feega file')
+  .option('--set <model>', 'Use this model for the agent (an id from the list)')
+  .option('--clear', 'Go back to the agent default')
+  .option('--refresh', 'Ask the agent again instead of using the cached list')
+  .action(async (agent: string, options: { set?: string; clear?: boolean; refresh?: boolean }) => {
+    const { cmdAgentModels } = await import('./commands/agents.ts');
+    await cmdAgentModels(agent, options);
   });
 
 program
@@ -944,6 +999,30 @@ program
 const github = program.command('github').description('Push code edits of linked frames to GitHub as a branch and pull request');
 
 github
+  .command('conflicts <projectId> <nodeId>')
+  .description('Show base, canvas and GitHub versions of the files a frame and GitHub both changed')
+  .action(async (projectId: string, nodeId: string) => {
+    const { cmdGithubConflicts } = await import('./commands/github.ts');
+    await cmdGithubConflicts(projectId, nodeId);
+  });
+
+github
+  .command('resolve <projectId> <nodeId> <choice>')
+  .description('Resolve a conflict: keep_canvas (canvas wins on push) or agent (prints a merge prompt); to take GitHub, pull the frame')
+  .action(async (projectId: string, nodeId: string, choice: string) => {
+    const { cmdGithubResolve } = await import('./commands/github.ts');
+    await cmdGithubResolve(projectId, nodeId, choice);
+  });
+
+github
+  .command('variant <projectId> <canvasId> <nodeId>')
+  .description('Copy a linked frame as a variant of it; its push asks to replace the original, become a new route or stay on the canvas')
+  .action(async (projectId: string, canvasId: string, nodeId: string) => {
+    const { cmdGithubVariant } = await import('./commands/github.ts');
+    await cmdGithubVariant(projectId, canvasId, nodeId);
+  });
+
+github
   .command('push <projectId> <nodeIds...>')
   .description('Commit the code edits of the frames on feega/<name> and open or update its pull request')
   .requiredOption('--name <name>', 'Branch name; the branch is feega/<name>')
@@ -951,6 +1030,8 @@ github
   .option('--body <text>', 'Pull request body')
   .option('--base <branch>', 'Base branch (default: the repo default)')
   .option('--confirm-sensitive', 'Allow changes to config files, lockfiles and dotfiles')
+  .option('--main <nodeIds...>', 'Frames whose instance edits apply to the main component file instead of the usage site')
+  .option('--variant <nodeId:choice[:route]...>', 'What a variant frame does on push: replace, new_route (with /route) or keep')
   .action(async (projectId: string, nodeIds: string[], opts) => {
     const { cmdGithubPush } = await import('./commands/github.ts');
     await cmdGithubPush(projectId, nodeIds, opts);

@@ -103,6 +103,34 @@ From a terminal, `feega agents` prints the same list (`--refresh` to detect agai
 app reads your login shell's `PATH`, so agents installed by Homebrew, `npm` or an install script
 are found even when Feega is opened from the Dock.
 
+### Picking the agent's model
+
+Next to the picked agent, a **Model** menu lists the models that agent offers, read live from it
+over ACP: Feega keeps no list of its own. The choice is saved per agent in the `.feega` file and
+applied at the start of every turn; a saved model the agent no longer offers falls back to its
+default. Agents that don't let a client pick a model show no menu.
+
+| Agent | Model menu |
+|---|---|
+| Claude Code | yes (`configOptions`) |
+| Codex CLI | yes (`configOptions`) |
+| Gemini CLI | yes (`session/set_model`) |
+| OpenCode | yes (`configOptions`, every provider you configured) |
+| Cursor Agent | after `cursor-agent login`, if it offers one |
+
+From a terminal:
+
+```bash
+feega agents models claude            # list, * marks the one in use
+feega agents models claude --set opus # pick one for this file
+feega agents models claude --clear    # back to the agent's default
+feega agents models claude --refresh  # ask the agent again
+```
+
+The endpoint is `GET`/`PUT /api/v1/local/acp/agents/<agent>/models`: `GET` answers
+`{ models, current, chosen }` (`models` is `null` when the agent offers no choice, `?refresh=1`
+asks it again), `PUT { model }` saves one the agent offers, `{ model: null }` clears it.
+
 Each message starts the agent, hands it Feega's MCP server and streams its reply into the tab.
 The agent edits the canvas only through Feega's tools: it gets no file or terminal access from
 Feega. Before each tool call the tab shows what it wants to run with the agent's choices

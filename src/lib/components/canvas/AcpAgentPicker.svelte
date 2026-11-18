@@ -98,6 +98,10 @@
 
   .value {
     flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
     text-align: left;
   }
 

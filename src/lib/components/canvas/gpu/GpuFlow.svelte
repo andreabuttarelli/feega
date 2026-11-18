@@ -47,6 +47,7 @@
   import { frameLayers, frameMenuRun, frameSummaries } from '$lib/motion/frame-menu';
   import FrameSelection from '../FrameSelection.svelte';
   import FrameGuides from '../FrameGuides.svelte';
+  import RecordControl from './RecordControl.svelte';
   import CanvasRulers from './CanvasRulers.svelte';
   import { canvasGuides } from '$lib/canvas/canvas-guides.svelte';
   import { pullToGuides } from '$lib/canvas/canvas-rulers';
@@ -263,6 +264,8 @@
   import { panBy, toWorld, wheelPan, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
   import { WheelBatch } from '$lib/canvas/gpu/wheel-batch';
   import { isLiveCode } from '$lib/canvas/code-frame';
+  import { FrameMode, MAX_LIVE_FRAMES, liveFrameModes } from '$lib/canvas/live-budget';
+  import { liveFrameOf } from '$lib/canvas/live-frame';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
   import { WIRE_CURSOR, Wiring, typesMeet, atRest, bubbleColour, bubbleRadius, magnetPort, springTo, wireAim, throughPoint, tieAcross, type Spring, type Tie } from '$lib/canvas/gpu/wire-magnet';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, glidesAfterPan, marqueeBox, marqueePick, movedBy, resizedAt, rotateZoneAt, type Hit } from '$lib/canvas/gpu/gesture';
@@ -455,12 +458,18 @@
       sticky = keep;
     }
   });
-  const LIVE_CODE_CAP = 4;
   const IFRAME_TYPE = 'iframe';
-  const liveCodeTiles = $derived(placed.filter((t) => t.kind === IFRAME_TYPE && isLiveCode(summaries.get(t.id)?.data)));
+  const isLive = (data: Record<string, unknown> | undefined) => isLiveCode(data) || liveFrameOf(data) !== null;
+  const liveCodeTiles = $derived(placed.filter((t) => t.kind === IFRAME_TYPE && isLive(summaries.get(t.id)?.data)));
   let liveCode = $state.raw(new Set<string>());
+  let liveModes = $state.raw<Record<string, FrameMode>>({});
   $effect(() => {
-    const next = new Set([...visibleIds(liveCodeTiles, view, area)].slice(0, LIVE_CODE_CAP));
+    const seen = visibleIds(liveCodeTiles, view, area);
+    const candidates = liveCodeTiles.map((t) => ({ id: t.id, visible: seen.has(t.id), area: t.w * t.h * view.zoom * view.zoom }));
+    const atRest = liveFrameModes(candidates, MAX_LIVE_FRAMES, CameraMotion.Still);
+    liveModes = liveFrameModes(candidates, MAX_LIVE_FRAMES, cameraMotion);
+    const posted = (id: string) => seen.has(id) && liveFrameOf(summaries.get(id)?.data) !== null;
+    const next = new Set(candidates.filter((c) => atRest[c.id] === FrameMode.Live || posted(c.id)).map((c) => c.id));
     if (!sameSet(untrack(() => liveCode), next)) {
       liveCode = next;
     }
@@ -3712,6 +3721,20 @@
   }
 
 
+  const recordSource = () => surface?.querySelector<HTMLCanvasElement>('[data-testid="core-canvas"]') ?? null;
+
+  function recordArea() {
+    const whole = { x: 0, y: 0, width: surface?.clientWidth ?? 0, height: surface?.clientHeight ?? 0 };
+    if (!selectedBoxes.length) {
+      return whole;
+    }
+    const left = Math.min(...selectedBoxes.map((b) => b.x));
+    const top = Math.min(...selectedBoxes.map((b) => b.y));
+    const right = Math.max(...selectedBoxes.map((b) => b.x + b.w));
+    const bottom = Math.max(...selectedBoxes.map((b) => b.y + b.h));
+    return { x: view.x + left * view.zoom, y: view.y + top * view.zoom, width: (right - left) * view.zoom, height: (bottom - top) * view.zoom };
+  }
+
   const SNAP_SCREEN_PX = 6;
   let snapGuides = $state<SnapGuide[]>([]);
   const corePeers = $derived(coreType ? (props.peers ?? []).filter((p) => !p.chat) : []);
@@ -4639,6 +4662,7 @@
         <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} listenLive={(listener) => liveDocs.listen(listener)} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId, userId: (page.data as { session?: { user?: { id: string } } | null }).session?.user?.id, look: (page.data as { look?: string }).look }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} onbackend={(change) => track(GPU_FALLBACK_EVENT, change)} onevict={sendBackFrame} picturesWhileOwed={picturesWhileVectorsOwed(publicEnv)} />
       </svelte:boundary>
     {/if}
+    {#if props.onUpload}<RecordControl source={recordSource} areaOf={recordArea} onsaved={(file) => props.onUpload?.(file, viewCentre())} />{/if}
     {#if rulersPref.on}<CanvasRulers {view} {area} />{/if}
     <PixelGridCanvas {view} {area} on={frameViews.isOn(FrameView.PixelGrid)} moving={cameraMotion === CameraMotion.Moving} />
     <div class="hover-rings" data-testid="node-hover-rings">
@@ -4723,7 +4747,7 @@
     {#if versionSides?.before && versionSides.after}
       <VersionCompare projectId={page.params.projectId ?? ''} versionId={versionOpen?.after ?? ''} before={versionSides.before} after={versionSides.after} history={versionHistory} onclose={() => (versionOpen = null)} onchanged={sources.refresh} />
     {/if}
-    <SourceSyncPanel projectId={page.params.projectId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} assetUrl={tierUrl(AssetSize.Full)} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} oncompare={(id) => ((pickerOpen = sourceOpen && { ...sourceOpen, id }), (sourceOpen = null))} />
+    <SourceSyncPanel projectId={page.params.projectId ?? ''} canvasId={page.params.canvasId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} assetUrl={tierUrl(AssetSize.Full)} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} oncompare={(id) => ((pickerOpen = sourceOpen && { ...sourceOpen, id }), (sourceOpen = null))} />
     {#if pickerOpen}
       <RefPicker projectId={page.params.projectId ?? ''} nodeId={pickerOpen.id} anchor={pickerOpen} onclose={() => (pickerOpen = null)} oncompared={(frames) => ((versionOpen = { before: pickerOpen?.id ?? '', after: frames[0] }), (pickerOpen = null))} />
     {/if}
@@ -4817,7 +4841,7 @@
           {#if domIds.has(t.id)}
             <div class="gpu-dom-node" class:unshown={!handedOver(t)} data-testid="gpu-dom-node" data-id={t.id}>
               <NodeBoundary>
-                {@render props.tile({ id: t.id, selected: on })}
+                {@render props.tile({ id: t.id, selected: on, live: liveModes[t.id] ?? FrameMode.Snapshot })}
               </NodeBoundary>
             </div>
           {/if}
@@ -4890,6 +4914,7 @@
       onfigma={props.onFigmaImport ? () => props.onFigmaImport?.(viewCentre()) : undefined}
       onurl={props.onUrlImport ? () => props.onUrlImport?.(viewCentre()) : undefined}
       oncode={props.onCodeImport ? () => props.onCodeImport?.(viewCentre()) : undefined}
+      onlive={props.onLiveFrame ? () => props.onLiveFrame?.(viewCentre()) : undefined}
       ontrailer={panelNodeId ? startTrailer : undefined}
       onimage={insertImageInFrame}
       oncomment={props.onCommenting ? () => props.onCommenting?.(!props.commenting) : undefined}
