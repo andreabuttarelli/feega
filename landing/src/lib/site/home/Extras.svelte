@@ -1,19 +1,25 @@
 <script lang="ts">
   import { MOTION } from '../motion';
   import { GENERATE } from '../generate';
+  import MotionLoop from '../motion/MotionLoop.svelte';
+  import GenerateLoop from '../generate/GenerateLoop.svelte';
 
-  const EXTRAS = [MOTION, GENERATE];
+  const EXTRAS = [
+    { copy: MOTION, Art: MotionLoop },
+    { copy: GENERATE, Art: GenerateLoop }
+  ];
 </script>
 
 <section class="extras site-wide" id="extras" data-agent-id="extras">
   <h2>Also on the canvas</h2>
 
   <div class="boxes">
-    {#each EXTRAS as extra (extra.heading)}
-      <a class="box" href={extra.more.href}>
-        <span class="title">{extra.heading}</span>
-        <p>{extra.lead}</p>
-        <span class="more">{extra.more.label} →</span>
+    {#each EXTRAS as { copy, Art } (copy.heading)}
+      <a class="box" href={copy.more.href}>
+        <div class="art"><Art /></div>
+        <span class="title">{copy.heading}</span>
+        <p>{copy.lead}</p>
+        <span class="more">{copy.more.label} →</span>
       </a>
     {/each}
   </div>
@@ -55,6 +61,20 @@
 
   .box:hover {
     box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18);
+  }
+
+  .art {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 220px;
+    margin: 8px 0 12px;
+  }
+
+  .art :global(svg) {
+    width: auto;
+    max-width: 100%;
+    max-height: 100%;
   }
 
   .title {

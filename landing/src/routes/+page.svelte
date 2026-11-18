@@ -9,6 +9,7 @@
   import Agents from '$lib/site/home/Agents.svelte';
   import Story from '$lib/site/home/Story.svelte';
   import Faq from '$lib/site/home/Faq.svelte';
+  import Modes from '$lib/site/home/Modes.svelte';
   import { HOME_JSON_LD } from '$lib/site/structured-data';
 
   import { HOME_META } from '$lib/site/seo';
@@ -39,11 +40,21 @@
 
 <Story />
 <Faq />
+
+<section class="closing">
+  <Modes id="closing-modes" />
+</section>
 </div>
 
 <LiveAgents />
 
 <style>
+  .closing {
+    display: flex;
+    justify-content: center;
+    padding: 64px 20px 96px;
+  }
+
   .site-home {
     background: linear-gradient(#161616 0%, #000 5.37446%);
   }
