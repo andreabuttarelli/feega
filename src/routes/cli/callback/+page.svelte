@@ -1,7 +1,9 @@
 <script lang="ts">
+  import { CLIENT_COPY, clientOf } from '$lib/cli-client';
   import { HOME_PATH } from '$lib/home-path';
   let { data } = $props();
   const { accessToken, refreshToken, expiresAt, cliPort, cliState, userEmail } = data;
+  const copy = CLIENT_COPY[clientOf(cliState)];
 
   type Status = 'idle' | 'sending' | 'done' | 'error';
   let status = $state<Status>('idle');
@@ -25,12 +27,12 @@
       setTimeout(() => { window.location.href = HOME_PATH; }, 2500);
     } catch {
       status = 'error';
-      errorMsg = 'Could not reach the CLI. Make sure feega is running and try again.';
+      errorMsg = copy.unreachable;
     }
   }
 </script>
 
-<svelte:head><title>Authorize CLI — feega</title></svelte:head>
+<svelte:head><title>{copy.title}</title></svelte:head>
 
 <div class="wrap">
   <div class="card">
@@ -40,13 +42,13 @@
       <div class="done">
         <span class="check" aria-hidden="true">✓</span>
         <h2>Signed in</h2>
-        <p>Go back to the terminal. This page closes in a moment.</p>
+        <p>{copy.done}</p>
       </div>
     {:else}
-      <h2>feega CLI wants to access your account</h2>
+      <h2>{copy.heading}</h2>
       <p class="email">{userEmail}</p>
       <p class="desc">
-        The feega CLI will manage your brands and content from the terminal, with the same permissions as your account.
+        {copy.description}
       </p>
 
       {#if status === 'error'}

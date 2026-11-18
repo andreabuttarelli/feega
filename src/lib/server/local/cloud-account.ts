@@ -1,3 +1,4 @@
+import { appState } from '$lib/cli-client';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -151,7 +152,7 @@ async function callbackUser(deps: CloudDeps, accessToken: string): Promise<{ id:
 }
 
 export async function connect(deps = cloudDeps()): Promise<{ url: string }> {
-  const state = crypto.randomUUID();
+  const state = appState(crypto.randomUUID());
   const cors = {
     'access-control-allow-origin': new URL(deps.cloudUrl).origin,
     'access-control-allow-methods': 'POST, OPTIONS',
