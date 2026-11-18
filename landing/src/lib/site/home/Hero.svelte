@@ -61,7 +61,8 @@
   }
 
   .hero > :global(.modes) {
-    margin-top: 28px;
+    max-width: 800px;
+    margin-top: 32px;
   }
 
   video {
@@ -83,14 +84,14 @@
     }
 
     h1 {
-      font-size: 80px;
-      line-height: 64px;
+      font-size: 92px;
+      line-height: 74px;
     }
 
     .lead {
-      width: 600px;
-      font-size: 16px;
-      line-height: 19.2px;
+      width: 700px;
+      font-size: 18px;
+      line-height: 22px;
     }
   }
 
@@ -101,19 +102,21 @@
     }
 
     h1 {
-      font-size: 80px;
-      line-height: 64px;
+      font-size: 92px;
+      line-height: 74px;
     }
 
     .lead {
-      width: 550px;
+      width: 590px;
+      font-size: 17px;
+      line-height: 21px;
     }
   }
 
 
   @media (max-width: 809.98px) {
     .lead {
-      font-size: 16px;
+      font-size: 17px;
       line-height: 1.35;
     }
   }

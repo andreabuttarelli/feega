@@ -62,6 +62,10 @@
   -webkit-font-smoothing: antialiased;
 }
 
+.site p {
+  font-variation-settings: 'wght' 400;
+}
+
 .site :is(h1, h2, h3, h4) {
   font-family: inherit;
 }
