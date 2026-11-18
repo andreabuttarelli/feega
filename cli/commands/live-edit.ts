@@ -36,7 +36,7 @@ export async function cmdLiveUndo(sha: string) {
 
 export async function cmdLiveChanges() {
   const changes = await liveChangesApi(await token());
-  console.log(`${changes.files.length} file(s) on ${changes.branch}`);
+  console.log(`${changes.files.length} file(s) changed${changes.branch ? ` on ${changes.branch}` : ''}`);
   if (changes.patch) {
     console.log(changes.patch);
   }

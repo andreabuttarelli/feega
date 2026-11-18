@@ -30,12 +30,12 @@ describe('titolo di vista in mega type', () => {
     expect(body).toContain('>create a video</h1>');
   });
 
-  it('il login è l\'unica vista col titolo piccolo', () => {
+  it('il login è l\'unica vista col titolo piccolo, o solo per lo screen reader', () => {
     const source = readFileSync('src/routes/login/+page.svelte', 'utf8');
     const titles = source.match(/<PageTitle [^>]*>/g) ?? [];
 
     expect(titles.length).toBeGreaterThan(0);
-    expect(titles.every((t) => t.includes('size={TitleSize.Small}'))).toBe(true);
+    expect(titles.every((t) => t.includes('size={TitleSize.Small}') || t.includes('size={TitleSize.ScreenReader}'))).toBe(true);
   });
 
   it('il titolo piccolo non usa la mega type', () => {
