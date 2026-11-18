@@ -34,6 +34,9 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 **Signal:** `fastPatch` unit tests pass, but on the landings fixture 17 of 36 patched hides and 15 of 45 patched moves differed from the full build (filters origin left behind, a group's matrix moved instead of its items, a hidden parent's children losing their cut, comp instance items left in place). **Move:** run `fast-patch.landings.test.ts` (every visible clip, hide and three moves, compared with `drawFrame` within 0.01 px) before widening what the patch accepts. The tolerance is needed: the full build itself moves unrelated clips by up to 0.005 px on some hides.
 
+### Less main-thread work made the cold open slower
+**Signal:** a change that cuts main-thread busy by ~1 s (fewer pickers, live-edit measures later) shows all on-screen vectors later in 4/5 alternating runs, and the last font request moves from ~8 s to ~12 s. **Move:** the page's own font loads were warming the fonts the build workers wait on; check the font request timeline before trusting a busy-time drop, and measure vectors, not busy ms. Also: `Response.json()` parsing is native and does not show in V8 sample attribution, so a parse cost hides inside `(program)`.
+
 ### Perf numbers swing 6 to 57 fps on the same build: the machine is loaded
 **Signal:** zoom p5 at x4 reads 57, 29, 31, 56, 6 across five runs of one build; `uptime` load average is above 20 (other agents, Spotlight indexing a fresh build). **Move:** never compare a before batch with a later after batch. Serve both builds at once (two `vite preview` ports) and alternate before/after runs one at a time, so the load hits both alike; report the per-run values next to the median.
 
