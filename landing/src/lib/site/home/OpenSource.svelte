@@ -1,22 +1,11 @@
 <script lang="ts">
-  import { page } from '$app/state';
   import { AGENT_LOGOS } from '../home';
   import { APP_URL } from '../links';
-
-  type Copy = { before: string };
-
-  const COPY: Record<string, Copy> = {
-    '1': { before: 'Open the Feega VS Code extension in your codebase, design directly in your real app with your' },
-    '2': { before: 'Open the Feega VS Code extension in your codebase to design directly in your real app with your' },
-    '3': { before: 'Design directly in your real app from the Feega VS Code extension, with your' }
-  };
-
-  const copy = $derived(COPY[page.url.searchParams.get('copy') ?? '1'] ?? COPY['1']);
 </script>
 
 <section class="open site-wide">
   <h2 data-agent-id="open-title">
-    {copy.before}
+    Open the Feega VS Code extension in your codebase, design directly in your real app with your
     <span class="tail">agents<span class="logos" data-agent-id="open-logos">{#each AGENT_LOGOS as logo (logo.file)}<img src="/site/home/{logo.file}" alt={logo.name} width={logo.width} height="32" />{/each}</span>,</span>
     then move to <a href={APP_URL}>Feega Cloud</a> to collaborate in real time.
   </h2>
