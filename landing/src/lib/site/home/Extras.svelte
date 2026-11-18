@@ -101,4 +101,15 @@
       grid-template-columns: 1fr;
     }
   }
+
+  @media (max-width: 809.98px) {
+    p,
+    .more {
+      font-size: 15px;
+    }
+
+    .title {
+      font-size: 17px;
+    }
+  }
 </style>

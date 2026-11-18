@@ -75,4 +75,10 @@
       line-height: 36px;
     }
   }
+
+  @media (max-width: 809.98px) {
+    p {
+      font-size: 16px;
+    }
+  }
 </style>

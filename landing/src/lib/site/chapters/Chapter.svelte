@@ -247,4 +247,12 @@
       line-height: 24px;
     }
   }
+
+  @media (max-width: 809.98px) {
+    .lead,
+    .eyebrow,
+    .steps p {
+      font-size: 16px;
+    }
+  }
 </style>

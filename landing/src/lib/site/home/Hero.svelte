@@ -105,4 +105,11 @@
     }
   }
 
+
+  @media (max-width: 809.98px) {
+    .lead {
+      font-size: 16px;
+      line-height: 1.35;
+    }
+  }
 </style>

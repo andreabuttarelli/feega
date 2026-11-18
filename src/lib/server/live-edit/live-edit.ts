@@ -10,7 +10,7 @@ import { LiveProp, type Side } from '$lib/canvas/live-fields';
 import { livePatch, type LiveAt } from './live-patch';
 import { liveTheme, tokenFor } from './live-tokens';
 
-export type LiveEditAsk = { at: string; prop: LiveProp; value?: string; token?: string; side?: Side; was?: string; rem?: number; viewport?: number };
+export type LiveEditAsk = { at: string; prop: LiveProp; family?: string; value?: string; token?: string; side?: Side; was?: string; rem?: number; viewport?: number };
 
 export type LiveEdited = { ok: true; sha: string; files: string[]; token: string | null; patch: string };
 
@@ -42,6 +42,9 @@ const reader = (root: string) => async (path: string) => {
 async function tokenOf(root: string, ask: LiveEditAsk): Promise<string | null> {
   if (ask.prop === LiveProp.Text) {
     return null;
+  }
+  if (ask.prop === LiveProp.Class) {
+    return ask.token ?? ask.value ?? '';
   }
   return ask.token ?? tokenFor(ask.prop, ask.value ?? '', await liveTheme(reader(root), ask.rem));
 }
@@ -75,9 +78,12 @@ async function edited(root: string, ask: LiveEditAsk): Promise<LiveEdited | Live
 
   const token = await tokenOf(root, ask);
   const value = token ?? ask.value ?? '';
-  const out = await livePatch(reader(root), at, { prop: ask.prop, value, side: ask.side, was: ask.was, viewport: ask.viewport });
+  const out = await livePatch(reader(root), at, { prop: ask.prop, family: ask.family, value, side: ask.side, was: ask.was, viewport: ask.viewport });
+  if (out.skipped.length) {
+    return { ok: false, reason: out.skipped[0] };
+  }
   if (!out.files.length) {
-    return { ok: false, reason: out.skipped[0] ?? 'nothing changed' };
+    return { ok: true, sha: (await git(root, ['rev-parse', 'HEAD'])).out.trim(), files: [], token, patch: '' };
   }
 
   await Promise.all(out.files.map((f) => writeFile(inside(root, f.path)!, f.after)));

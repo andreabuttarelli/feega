@@ -368,4 +368,10 @@
       margin-top: 24px;
     }
   }
+
+  @media (max-width: 809.98px) {
+    .notice {
+      font-size: 13px;
+    }
+  }
 </style>
