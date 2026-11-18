@@ -4,6 +4,7 @@
   import NpxChip from './NpxChip.svelte';
   import HeroPrompt from './HeroPrompt.svelte';
   import AsciiField from './AsciiField.svelte';
+  import { FREE_EDITORS, PLAN } from '../pricing/plan';
 
   const POSTER = '/site/home/canvas-poster.webp';
 </script>
@@ -24,7 +25,10 @@
     <HeroPrompt />
   </div>
 
-  <p class="run"><span>or run it locally:</span> <NpxChip /></p>
+  <div class="modes" data-agent-id="hero-modes">
+    <p><strong>On your computer</strong> <span>Free, no account. Mac app or</span> <NpxChip /> <span>Works with Claude Code, Codex or Cursor.</span></p>
+    <p><strong>In the cloud</strong> <span>Free for {FREE_EDITORS} {PLAN.per}, then {PLAN.currency}{PLAN.price} per {PLAN.per} a {PLAN.period}. Work on the same canvas with your team.</span></p>
+  </div>
 
   <video class="canvas" data-agent-id="hero-canvas" data-src={CANVAS_VIDEO} muted loop playsinline preload="none" poster={POSTER} width="1920" height="1080" aria-label="Feega canvas overview" use:lazyPlay></video>
 </section>
@@ -77,16 +81,30 @@
     }
   }
 
-  .run {
-    display: flex;
-    align-items: center;
+  .modes {
+    display: grid;
     gap: 10px;
-    margin-top: 12px;
+    margin-top: 16px;
+    color: #fff;
+    font-size: 14px;
+    line-height: 1.4;
   }
 
-  .run span {
-    opacity: 0.8;
-    color: #fff;
+  .modes p {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 4px 8px;
+    margin: 0;
+  }
+
+  .modes strong {
+    font-weight: 600;
+  }
+
+  .modes span {
+    opacity: 0.75;
   }
 
   video {
