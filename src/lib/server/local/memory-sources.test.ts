@@ -34,7 +34,7 @@ describe('memory sources', () => {
 
     const content = await readSources(['claude', 'project-agents', '../../etc/passwd'], at);
 
-    expect(content).toBe('## Claude Code\n\nbe terse\n\n## Project AGENTS.md\n\nrepo rules');
+    expect(content).toBe('## Claude Code\n\nbe terse\n\n## This folder: AGENTS.md\n\nrepo rules');
   });
 
   it('caps the total length', async () => {
