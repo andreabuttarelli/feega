@@ -56,4 +56,10 @@ describe('GET motion live', () => {
     expect(body).toContain('<feega-gpu-player id="player" source="feega-source">');
     expect(body).toContain(LIVE_MESSAGE);
   });
+
+  it('serves the page inert', async () => {
+    const res = await GET({ locals: {}, params: { projectId: 'p-1', canvasId: 'c-1', nodeId: 'n-1' }, url: new URL('https://oh.feega.test/live') } as unknown as Parameters<typeof GET>[0]);
+
+    expect(res.headers.get('content-security-policy')).toMatch(/^sandbox /);
+  });
 });

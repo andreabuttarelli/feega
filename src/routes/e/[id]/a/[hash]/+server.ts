@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { readEmbedAsset } from '$lib/server/motion/embed';
+import { INERT_DOCUMENT_HEADERS } from '$lib/canvas/iframe-node';
 import type { RequestHandler } from './$types';
 
 const PARTIAL_CONTENT = 206;
@@ -23,7 +24,7 @@ export const GET: RequestHandler = async ({ params, fetch, request }) => {
     throw error(404, 'This asset is not published');
   }
 
-  const headers = { ...ASSET_HEADERS, 'content-type': asset.type };
+  const headers = { ...INERT_DOCUMENT_HEADERS, ...ASSET_HEADERS, 'content-type': asset.type };
   const part = slice(request.headers.get('range'), asset.bytes.length);
   if (!part) {
     return new Response(asset.bytes, { headers });

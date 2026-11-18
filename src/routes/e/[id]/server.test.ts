@@ -38,6 +38,14 @@ describe('/e/[id]', () => {
     expect(await res.text()).toBe('<html>clip</html>');
   });
 
+  it('serves the page inert: sandboxed without the app origin, never sniffed', async () => {
+    const res = await open(NODE, '<script>fetch("/api")</script>');
+
+    expect(res.headers.get('content-security-policy')).toMatch(/^sandbox /);
+    expect(res.headers.get('content-security-policy')).not.toContain('allow-same-origin');
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+  });
+
   it('serves an embed published with an older player through the current one', async () => {
     const cfg = { html: '<p>clip</p>', width: 1920, height: 1080, duration: 24, playback: 'scrub', loop: false };
     const legacy = `<!doctype html><html><head><title>Saturn</title></head><body><script>(function playerMain(cfg){})(${JSON.stringify(cfg).replace(/</g, '\\u003c')});</script></body></html>`;

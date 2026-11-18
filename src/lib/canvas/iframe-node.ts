@@ -74,6 +74,11 @@ export const IFRAME_SANDBOX = [
   'allow-popups-to-escape-sandbox'
 ].join(' ');
 
+export const INERT_DOCUMENT_HEADERS = {
+  'content-security-policy': `sandbox ${IFRAME_SANDBOX}`,
+  'x-content-type-options': 'nosniff'
+} as const;
+
 /**
  * Cosa il browser deve mandare al sito incorporato come mittente.
  *
