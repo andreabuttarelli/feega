@@ -1982,7 +1982,7 @@
   }
 
   onMount(() => {
-    styleLibrary.connect({ push: syncStyle, rename: syncRename, remove: syncRemove });
+    styleLibrary.connect({ push: syncStyle, rename: syncRename, remove: syncRemove }, paintThenIdle(afterPaint, whenIdle));
     const projectId = page.params.projectId;
     void styleLibrary.open(projectId ? projectLibraryStore(projectId, LibraryKind.Style) : null);
     return () => {
@@ -4666,7 +4666,7 @@
       <FrameSelection clip="" quad={manyQuad!} kind={SelectionKind.Many} ongrab={grabMany} />
     {/if}
     <FrameHeaderIcons {view} hits={headerHits(headerWorld, cameraMotion)} onpress={pressHeader} />
-    <SourceSyncPanel projectId={page.params.projectId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} />
+    <SourceSyncPanel projectId={page.params.projectId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} assetUrl={tierUrl(AssetSize.Full)} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} />
     <PrototypePlayerHost frames={playerFrames} />
     {#if showsPrototype}
       <PrototypeArrows {view} frames={overlayFrames} links={arrowLinks} elements={linkElements()} handle={pickedHandle()} aimingFrom={prototypeLink.draft ? (inside?.nodeId ?? null) : null} onpick={openLink} ondrag={dragLink} />

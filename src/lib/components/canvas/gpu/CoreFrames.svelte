@@ -59,6 +59,7 @@
   import { Step, markFrame, noteImages } from '$lib/canvas/core/frame-timeline';
   import { StartupStep, markStartup, reportFramesShown } from '$lib/canvas/core/startup-marks';
   import { pictureTurns } from '$lib/canvas/core/picture-turns';
+  import { NEAREST_FRAMES } from '$lib/canvas/core/startup-progress';
   import LoadTimeline from './LoadTimeline.svelte';
   import { editedLayers } from '$lib/canvas/core/edited-layers';
   import { editKindOf, editedClipId, fastPatch, readyPatch, reloaded, relinked } from '$lib/canvas/core/fast-patch';
@@ -169,6 +170,7 @@
   const lanes = buildLanes(currentDevice(), typeof navigator === 'object' ? navigator.hardwareConcurrency : 2);
   const turns = pictureTurns(picturesWhileOwed);
   const buildAway = frameBuilder(() => (typeof Worker === 'function' ? (markStartup(StartupStep.WorkerSpawned), new Worker(new URL('../../../canvas/core/frame-build.worker.ts', import.meta.url), { type: 'module' })) : null), lanes);
+  buildAway.warm();
 
   async function fetchScene(id: string): Promise<FrameDoc | null> {
     const res = await fetch(new URL(sourceUrl(id), location.href).href);
@@ -654,13 +656,15 @@
   const VECTORS_FIRST_MAX_MS = 8000;
   const vectorsFirst = new VectorGate();
   let lastShown = '';
-  function reportShownOnce(shown: number, total: number) {
-    const key = `${shown}/${total}`;
+  function reportShownOnce(onScreenIds: string[]) {
+    const near = onScreenIds.slice(0, NEAREST_FRAMES);
+    const counts = [vectorsFirst.shownOf(onScreenIds), onScreenIds.length, vectorsFirst.shownOf(near), near.length] as const;
+    const key = counts.join('/');
     if (key === lastShown) {
       return;
     }
     lastShown = key;
-    reportFramesShown(shown, total);
+    reportFramesShown(...counts);
   }
   setTimeout(() => vectorsFirst.settle([]), VECTORS_FIRST_MAX_MS);
   const shownOf = (f: FrameAt) => shownGroup(groupOf(f), loaded.get(f.id), (g) => lists.has(g));
@@ -932,7 +936,7 @@
     }
   });
 
-  const cardPuts = $derived(shownCards.flatMap((c): HeldFrame[] => (cardLists.has(c.key) ? [{ id: c.frame.id, group: c.key, box: c.frame.box, size: { width: c.frame.list.width, height: c.frame.list.height }, bytes: pictureBytes(c.frame.list.items), turn: c.turn }] : [])));
+  const cardPuts = $derived(shownCards.flatMap((c): HeldFrame[] => (cardLists.has(c.key) ? [{ id: c.frame.id, group: c.key, box: c.frame.box, size: { width: c.frame.list.width, height: c.frame.list.height }, bytes: pictureBytes(c.frame.list.items, (i) => pictures(i)?.size ?? null), turn: c.turn }] : [])));
 
   const whole = $derived([...cardPuts, ...framePuts]);
   const textureBytes = $derived(textureBudget(budget.textureBytes, { width: area.width * resolution, height: area.height * resolution }));
@@ -1442,7 +1446,7 @@
     sharpOwed = !sharpMarked;
     const onScreenIds = fillOrder(frames, view, area).map((f) => f.id);
     if (frames.length) {
-      reportShownOnce(vectorsFirst.shownOf(onScreenIds), onScreenIds.length);
+      reportShownOnce(onScreenIds);
     }
     if (frames.length && vectorsFirst.settle(onScreenIds)) {
       markFrame('all', Step.AllVectors);

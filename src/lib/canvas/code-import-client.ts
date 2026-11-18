@@ -6,7 +6,7 @@ const UNAVAILABLE = 'unavailable';
 
 export type DesignLanded = { tokens: number; byClass: number; byRule: number; byValue: number; unbound: number };
 
-export type LibraryLanded = { components: { name: string; file: string; axes: Record<string, { values: string[]; default: string | null }>; captured: boolean; cells: number }[]; uncaptured: string[] };
+export type LibraryLanded = { components: { name: string; file: string; axes: Record<string, { values: string[]; default: string | null }>; captured: boolean; drawn: boolean; cells: number }[]; uncaptured: string[]; reasons: Record<string, string> };
 
 export type LockedRoute = { label: string; reason: string; detail?: string };
 

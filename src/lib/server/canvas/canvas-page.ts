@@ -1079,7 +1079,7 @@ export const actions: Actions<CanvasParams> = {
       return fail(HTTP_BAD_REQUEST, { error: 'invalid rename' });
     }
 
-    if (!(await renameOnCanvas(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeId, name: String(fd.get('name') ?? '') }))) {
+    if (!(await renameOnCanvas(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeId, name: String(fd.get('name') ?? ''), actor: userActor(scope) }))) {
       return fail(404, { error: 'node not found' });
     }
     return { renamed: true };

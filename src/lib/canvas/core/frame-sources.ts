@@ -13,6 +13,21 @@ export function sizeSourceAsks(asks: SourceAsks) {
 
 const SOURCES_KEPT = 8;
 const HTTP_NO_CONTENT = 204;
+const HTTP_SERVER_ERROR = 500;
+const RETRY_WAITS_MS = [500, 2000, 8000];
+
+const transient = (res: Response | null) => !res || res.status >= HTTP_SERVER_ERROR;
+
+async function answerOf(fetcher: (url: string) => Promise<Response>, url: string): Promise<Response | null> {
+  for (const wait of RETRY_WAITS_MS) {
+    const res = await fetcher(url).catch(() => null);
+    if (!transient(res)) {
+      return res;
+    }
+    await new Promise((done) => setTimeout(done, wait));
+  }
+  return fetcher(url).catch(() => null);
+}
 
 export type ReadSource = ((url: string) => Promise<FrameDoc | null>) & { warm: (urls: string[]) => void; forget: (url: string) => void };
 
@@ -34,8 +49,8 @@ export function sourceReader(fetcher: (url: string) => Promise<Response>, kept =
       return known;
     }
 
-    const reading = fetcher(url)
-      .then((res) => (res.ok && res.status !== HTTP_NO_CONTENT ?(res.json() as Promise<FrameDoc>) : null))
+    const reading = answerOf(fetcher, url)
+      .then((res) => (res?.ok && res.status !== HTTP_NO_CONTENT ? (res.json() as Promise<FrameDoc>) : null))
       .catch(() => null)
       .then((source) => {
         if (!source) {
@@ -176,6 +191,9 @@ function cached(fetcher: Fetcher, cacheOf: () => FrameCache | null): Fetcher {
     }
 
     const res = await fetcher(url, init);
+    if (!res.ok) {
+      return res;
+    }
     const source = res.ok && res.status !== HTTP_NO_CONTENT ? ((await res.json().catch(() => null)) as FrameDoc | null) : null;
     if (!source) {
       return NOTHING;
