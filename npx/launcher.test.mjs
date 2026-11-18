@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { createServer } from 'node:net';
-import { FolderImport, ImportStep, appDir, readyProbe, served, boundUrl, freePort, bundleSource, cachedVersions, folderApp, importAsk, discoverAsk, routePlan, importReport, importStep, isCached, latestAppVersion, markCached, mcpEnv, parseArgs, pickVersion, placeOf, untilReady } from './launcher.mjs';
+import { FolderImport, ImportStep, appDir, readyProbe, served, boundUrl, freePort, bundleSource, cachedVersions, exitOf, folderApp, importAsk, discoverAsk, routePlan, importReport, importStep, isCached, latestAppVersion, markCached, mcpEnv, parseArgs, pickVersion, placeOf, untilReady } from './launcher.mjs';
 
 describe('untilReady', () => {
   it('fails loudly when the server exits before it serves', async () => {
@@ -301,3 +301,15 @@ describe('server pronto', () => {
     expect(served(502)).toBe(false);
   });
 });
+
+describe('exitOf', () => {
+  it('un server ucciso da un segnale lo dice e non esce con 0, così chi lo lancia non lo scambia per una chiusura voluta', () => {
+    expect(exitOf(null, 'SIGTERM')).toEqual({ code: 1, line: 'feega: the app server was stopped by SIGTERM' });
+  });
+
+  it('un codice di uscita passa com è', () => {
+    expect(exitOf(0, null)).toEqual({ code: 0, line: null });
+    expect(exitOf(3, null)).toEqual({ code: 3, line: 'feega: the app server exited with code 3' });
+  });
+});
+
