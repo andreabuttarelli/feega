@@ -348,6 +348,9 @@ optional monthly reset) and, for admins and only when the user asks, sets or rem
 [set <scope> <usd|off> [--project <id>] [--reset monthly]]`. A run a cap refuses answers `cap_reached`.
 `dev_server` (local Feega only) reads, starts or stops the dev server behind live frames: `feega
 dev-server [status|start|stop]`.
+`live_edit` (local Feega only) changes one property of an element of the running app at its
+`file:line:col` and writes the one class or text to source on the branch `feega/live`; also `undo`,
+`changes`, `push`: `feega live-edit <at> <prop> [value]`, `live-undo`, `live-changes`, `live-push`.
 
 ## References (load on demand)
 

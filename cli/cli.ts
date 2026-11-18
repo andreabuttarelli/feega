@@ -60,6 +60,42 @@ program
   });
 
 program
+  .command('live-edit <at> <prop> [value]')
+  .description('Local mode: change one property of the element at file:line:col in the running app and write it to its source, on the branch feega/live')
+  .option('--side <side>', 'x, y, t, r, b or l, for padding, margin and gap')
+  .option('--token <token>', 'exact Tailwind token instead of a value')
+  .option('--was <text>', 'current text, when prop is text')
+  .option('--viewport <px>', 'page width the change is for: the class with the breakpoint that applies there is the one changed')
+  .action(async (at: string, prop: string, value: string | undefined, options) => {
+    const { cmdLiveEdit } = await import('./commands/live-edit.ts');
+    await cmdLiveEdit(at, prop, value, options);
+  });
+
+program
+  .command('live-undo <sha>')
+  .description('Local mode: revert one live edit by the commit it returned')
+  .action(async (sha: string) => {
+    const { cmdLiveUndo } = await import('./commands/live-edit.ts');
+    await cmdLiveUndo(sha);
+  });
+
+program
+  .command('live-changes')
+  .description('Local mode: files and diff of the live edits on feega/live')
+  .action(async () => {
+    const { cmdLiveChanges } = await import('./commands/live-edit.ts');
+    await cmdLiveChanges();
+  });
+
+program
+  .command('live-push')
+  .description('Local mode: push the live edits to a feega/ branch')
+  .action(async () => {
+    const { cmdLivePush } = await import('./commands/live-edit.ts');
+    await cmdLivePush();
+  });
+
+program
   .command('init [dir]')
   .description('Tag every element of a Vite or Next.js app with its file:line in dev, so Feega can open the source behind what you click')
   .option('--dry-run', 'show the changes without writing them')

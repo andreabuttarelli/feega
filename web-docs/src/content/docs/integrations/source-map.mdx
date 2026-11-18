@@ -53,11 +53,14 @@ iframe.contentWindow.postMessage({ type: 'feega:inspect', id: 1, x: 120, y: 40 }
 // or { type: 'feega:inspect', id: 1, selector: '#cta' }
 ```
 
-and receives `{ type: 'feega:inspect:result', id: 1, result }`, where `result` holds `source` (`{ file, line, col }`), design-relevant computed `styles`, the element's `html` (truncated), and `component`: the nearest ancestor written in another file. The bridge announces itself with `{ type: 'feega:source-map:ready' }`.
+and receives `{ type: 'feega:inspect:result', id: 1, result }`, where `result` holds `source` (`{ file, line, col }`), design-relevant computed `styles`, the element's `html` (truncated), its `rect`, `classes`, `text` (when it has no child elements), the page's root font size `rem`, and `component`: the nearest ancestor written in another file. The bridge announces itself with `{ type: 'feega:source-map:ready' }`.
+
+`{ type: 'feega:preview', source: 'src/App.tsx:12:5', text, style }` shows a change on every element written at that position before the file is saved; the next hot reload replaces it.
+
+With Vite the bridge loads with Vite's own client module, so it also runs in frameworks without an `index.html`, such as SvelteKit.
 
 ## Limits
 
 - **Next.js with Turbopack** (`next dev --turbopack`): not tagged yet; use the default webpack dev server.
 - **Vue SFC** templates and **MDX**: not tagged yet.
-- **SvelteKit**: elements are tagged, but the bridge is not injected (SvelteKit does not use `index.html`); import `@feega/source-map/bridge` in a dev-only layout.
 - Elements created outside JSX or templates (`document.createElement`, `innerHTML`) climb to the nearest tagged ancestor.

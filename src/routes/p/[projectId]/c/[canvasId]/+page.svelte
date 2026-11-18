@@ -5045,7 +5045,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
         {:else if liveFrameOf(row.data)}
           {@const liveFrame = liveFrameOf(row.data)}
           {#if liveFrame}
-            <LiveFrameNode live={liveFrame} mode={live} origin={devOrigin} poster={liveFrame.poster ? canvasAssetUrl(data.projectId, data.canvas.id, liveFrame.poster, AssetSize.Full) : null} onsnapshot={() => shootLive(id)} />
+            <LiveFrameNode {id} {selected} onstep={(step: FrameStep) => undoStack.push({ source: 'frame', step })} onfail={(message: string) => (failed = `Not written to the code: ${message}`)} live={liveFrame} mode={live} origin={devOrigin} poster={liveFrame.poster ? canvasAssetUrl(data.projectId, data.canvas.id, liveFrame.poster, AssetSize.Full) : null} onsnapshot={() => shootLive(id)} />
           {/if}
         {:else if frame}
           {@const codeRow = frame.source === 'view' ? nodes.find((n) => n.id === frame.sourceNodeId) : null}

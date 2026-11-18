@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
 import type { FeegaStore } from '$lib/server/local/feega-store';
 import { LOCAL_ORG_ID } from '$lib/local-user';
+import { liveCheckoutOf } from '$lib/server/live-edit/live-checkout';
 import { devServer, type DevServer } from './dev-server';
 import { answers, candidateUrls, findRunning, servesFolder } from './probe';
 import { superviseDev } from './supervisor';
@@ -44,7 +45,7 @@ function repoOf(folder: string) {
   };
 }
 
-export const devFolder = (store: FeegaStore) => realpathSync(process.env[DEV_DIR_ENV] ?? dirname(store.path));
+export const devFolder = (store: FeegaStore) => liveCheckoutOf(realpathSync(process.env[DEV_DIR_ENV] ?? dirname(store.path)));
 
 export function localDevServer(store: FeegaStore): DevServer {
   const folder = devFolder(store);

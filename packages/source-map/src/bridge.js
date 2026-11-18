@@ -1,8 +1,9 @@
-import { inspectElement } from './runtime.js';
+import { inspectElement, previewEdit } from './runtime.js';
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';
 export const READY = 'feega:source-map:ready';
+export const PREVIEW = 'feega:preview';
 
 const INSTALLED = Symbol.for('feega.source-map.bridge');
 
@@ -14,6 +15,10 @@ export function installBridge(win) {
 
   win.addEventListener('message', (event) => {
     const request = event.data;
+    if (request?.type === PREVIEW) {
+      previewEdit(win.document, request);
+      return;
+    }
     if (!request || request.type !== INSPECT) {
       return;
     }
