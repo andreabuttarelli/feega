@@ -35,7 +35,14 @@ describe('titolo di vista in mega type', () => {
     const titles = source.match(/<PageTitle [^>]*>/g) ?? [];
 
     expect(titles.length).toBeGreaterThan(0);
-    expect(titles.every((t) => t.includes('size={TitleSize.Small}'))).toBe(true);
+    expect(titles.every((t) => /size=\{TitleSize\.(Small|Hidden)\}/.test(t))).toBe(true);
+  });
+
+  it('il titolo nascosto resta agli screen reader ma non si vede', () => {
+    const { body } = render(PageTitle, { props: { text: 'Sign in', size: TitleSize.Hidden } });
+
+    expect(body).toContain('hidden');
+    expect(body).toContain('>sign in</h1>');
   });
 
   it('il titolo piccolo non usa la mega type', () => {

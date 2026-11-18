@@ -22,6 +22,15 @@
     letter-spacing: var(--ui-mega-tracking);
   }
 
+  .hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
   .small {
     font-size: var(--ui-text-xl);
     line-height: 1.2;
