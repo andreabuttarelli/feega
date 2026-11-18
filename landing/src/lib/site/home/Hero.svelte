@@ -2,10 +2,9 @@
   import { CANVAS_VIDEO, HERO_HEADLINE } from '../home';
   import { lazyPlay } from '../lazy-video';
   import NpxChip from './NpxChip.svelte';
-  import HeroPrompt from './HeroPrompt.svelte';
   import AsciiField from './AsciiField.svelte';
   import { FREE_EDITORS, PLAN } from '../pricing/plan';
-  import { DOWNLOAD_MAC_PATH } from '../links';
+  import { APP_URL, DOWNLOAD_MAC_PATH } from '../links';
   import { APPLE_ICON } from '../social-icons';
 
   const POSTER = '/site/home/canvas-poster.webp';
@@ -22,10 +21,6 @@
   <h1><span data-agent-id="hero-title-a">{HERO_HEADLINE[0]}</span> <span data-agent-id="hero-title-b">{HERO_HEADLINE[1]}</span></h1>
 
   <p class="lead" data-agent-id="hero-lead">Paste your website or open your repo and every layer comes in editable. Change it by hand or ask your AI assistant, then export a video or send the code back.</p>
-
-  <div class="start" data-agent-id="hero-start">
-    <HeroPrompt />
-  </div>
 
   <div class="modes" data-agent-id="hero-modes">
     <div class="mode">
@@ -48,6 +43,7 @@
       </div>
       <p>Your team on the same canvas, live. Then {PLAN.currency}{PLAN.price} per {PLAN.per} a {PLAN.period}.</p>
       <div class="ways">
+        <a class="mac" href={APP_URL}>Open in browser</a>
         <span class="faces" aria-hidden="true"><i></i><i></i><i></i></span>
         <span class="live">3 editing now</span>
       </div>
@@ -93,25 +89,13 @@
     opacity: 0.8;
   }
 
-  .start {
-    width: calc(100% - 32px);
-    max-width: 680px;
-    margin-top: 28px;
-  }
-
-  @media (max-width: 809.98px) {
-    .start {
-      width: 100%;
-    }
-  }
-
   .modes {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
     width: calc(100% - 32px);
     max-width: 680px;
-    margin-top: 12px;
+    margin-top: 28px;
     color: #fff;
     text-align: left;
   }
@@ -238,11 +222,6 @@
     border-radius: 8px;
   }
 
-  @media (max-width: 809.98px) {
-    .start {
-      width: 100%;
-    }
-  }
 
   @media (min-width: 1200px) {
     .hero {
