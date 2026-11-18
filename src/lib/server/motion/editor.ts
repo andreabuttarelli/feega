@@ -10,7 +10,7 @@ import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-me
 import { docNodeSize, frameChrome, motionOf, type MotionNode } from '$lib/canvas/motion-node';
 import { Root } from '$lib/canvas/frame-select';
 import { settleElement, unsettled, type HostBox, type Settled } from '$lib/motion/element-host';
-import { formatOf, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { formatOf, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { AssetKind } from '@feega/motion-core/motion/components';
 import { FEEGA_TOKENS, brandTokens, paletteFrom, type BrandTokens } from '@feega/motion-core/motion/brand';
 import { mainHomesOf } from '$lib/motion/linked-mains';
@@ -144,10 +144,10 @@ export async function saveMotionDoc(
   db: Db,
   input: { orgId: string; nodeId: string; expectedVersion: number; doc: unknown; actor: Actor; summary?: string | null; known?: CanvasNodeRecord; checkpoint?: Checkpoint }
 ): Promise<RevisionWrite> {
-  const doc = input.doc as Partial<MotionDoc>;
-  const loose = Array.isArray(doc.tracks) && unsettled(doc as MotionDoc);
+  const parsed = parseMotionDoc(input.doc);
+  const loose = parsed.ok && unsettled(parsed.doc) ? parsed.doc : null;
   const known = loose ? ((input.known ?? (await findNode(db, { orgId: input.orgId, nodeId: input.nodeId }))) ?? undefined) : input.known;
-  const settled = loose && known ? hostSettle(known, doc as MotionDoc) : null;
+  const settled = loose && known ? hostSettle(known, loose) : null;
   const write = await appendRevision(db, { ...input, doc: settled?.doc ?? input.doc });
   if (write.outcome !== RevisionOutcome.Written) {
     return write;
