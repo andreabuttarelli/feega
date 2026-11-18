@@ -4,8 +4,11 @@ import { GUIDES, GUIDES_PATH, guidePath } from './guides';
 import { COMPARE_PATH, COMPARISONS, comparisonPath } from './compare';
 import { CODEBASE_PATH } from './codebase';
 
+export const PRICING_PATH = '/pricing';
+
 export const SITE_PATHS: readonly string[] = [
   '/',
+  PRICING_PATH,
   '/changelog',
   '/ai-video-upscaler',
   CODEBASE_PATH,

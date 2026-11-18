@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { lower } from './lower';
   import DownloadMac from './DownloadMac.svelte';
   import Mark from './Mark.svelte';
   import { onMount } from 'svelte';
@@ -18,17 +19,17 @@
 
   <nav class="links" aria-label="Main">
     {#each HEADER_LINKS as link (link.label)}
-      <a class="chip" href={link.href}>{link.label}</a>
+      <a class="chip" href={link.href}>{lower(link.label)}</a>
     {/each}
   </nav>
 
   <div class="actions">
     <DownloadMac class="chip star" />
-    <a class="chip cta" href={APP_URL}><span>Let’s start</span></a>
+    <a class="chip cta" href={APP_URL}><span>let’s start</span></a>
   </div>
 
   <button class="toggle" type="button" aria-expanded={open} onclick={() => (open = !open)}>
-    {open ? 'Close' : 'Menu'}
+    {open ? 'close' : 'menu'}
   </button>
 </header>
 
@@ -36,12 +37,12 @@
   <nav class="drawer" aria-label="Menu">
     <div class="menu">
       {#each MENU_LINKS as link (link.label)}
-        <a href={link.href} onclick={() => (open = false)}>{link.label}</a>
+        <a href={link.href} onclick={() => (open = false)}>{lower(link.label)}</a>
       {/each}
     </div>
 
     <div class="follow">
-      <p>Follow our open building</p>
+      <p>follow our open building</p>
       <div class="icons">
         {#each SOCIAL_LINKS as social (social.label)}
           <a href={social.href} aria-label={social.label}>{@html social.icon}</a>

@@ -10,10 +10,10 @@
 <div class="modes" data-agent-id={id}>
   <div class="mode">
     <div class="head">
-      <span class="kicker">On your computer</span>
-      <span class="price">Free</span>
+      <span class="kicker">on your computer</span>
+      <span class="price">free</span>
     </div>
-    <p>No account. Works with Claude Code, Codex or Cursor.</p>
+    <p>no account. works with Claude Code, Codex or Cursor.</p>
     <div class="ways">
       <NpxChip />
       <span class="or">or</span>
@@ -23,12 +23,12 @@
 
   <div class="mode">
     <div class="head">
-      <span class="kicker">In the cloud</span>
-      <span class="price">Free for {FREE_EDITORS} {PLAN.per}</span>
+      <span class="kicker">in the cloud</span>
+      <span class="price">free for {FREE_EDITORS} {PLAN.per}</span>
     </div>
-    <p>Your team on the same canvas, live. Then {PLAN.currency}{PLAN.price} per {PLAN.per} a {PLAN.period}.</p>
+    <p>your team on the same canvas, live. then {PLAN.currency}{PLAN.price} per {PLAN.per} a {PLAN.period}.</p>
     <div class="ways">
-      <a class="mac" href={APP_URL}>Open in browser</a>
+      <a class="mac" href={APP_URL}>open in browser</a>
       <span class="faces" aria-hidden="true"><i></i><i></i><i></i></span>
       <span class="live">3 editing now</span>
     </div>
@@ -196,6 +196,20 @@
 
     .mac {
       font-size: 13px;
+    }
+  }
+
+  @media (max-width: 809.98px) {
+    .mode p {
+      font-size: 15px;
+    }
+
+    .kicker {
+      font-size: 16px;
+    }
+
+    .live {
+      font-size: 14px;
     }
   }
 </style>

@@ -6,5 +6,5 @@
 </script>
 
 <a class={className} href={DOWNLOAD_MAC_PATH} aria-label="Download for macOS" data-sveltekit-reload>
-  {@html APPLE_ICON}<span>Download</span>
+  {@html APPLE_ICON}<span>download</span>
 </a>

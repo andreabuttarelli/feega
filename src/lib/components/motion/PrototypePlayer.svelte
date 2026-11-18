@@ -15,7 +15,7 @@
   import { ActionKind, DEFAULT_OVERLAY, TransitionKind, TriggerKind, type Overlay } from '@feega/motion-core/motion/prototype/model';
   import { Background } from '@feega/motion-core/motion/doc';
   import { overlayBox } from '$lib/motion/prototype/overlay-place';
-  import { MODES, MODE_ORDER, ViewportMode, WidthSource, activeView, clampWidth, docAtWidth, frameBox, shownWidth, viewChoices, type Viewport } from '$lib/motion/prototype/viewport';
+  import { MODES, MODE_ORDER, ViewportMode, WidthSource, activeView, clampWidth, docShown, frameBox, shownWidth, viewChoices, type Viewport } from '$lib/motion/prototype/viewport';
   import { readViewport, writeViewport } from '$lib/motion/prototype/viewport-pref';
   import { DEVICES, DEVICE_ORDER, Device, deviceForKey, pressedDevice } from '$lib/motion/prototype/device';
   import { IconButton, IconSize, Kbd, Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger, Side } from '$lib/components/ui/shell';
@@ -64,12 +64,13 @@
   let root = $state<HTMLElement>();
 
   const responsive = $derived(view.mode === ViewportMode.Responsive);
-  const width = $derived(shownWidth(view, stageW - STAGE_PAD_PX * 2));
+  const stageWidth = $derived(stageW - STAGE_PAD_PX * 2);
+  const baseFrame = $derived(byId.get(at.current));
+  const width = $derived(shownWidth(view, stageWidth, baseFrame?.live.doc.width ?? 0));
   const liveOf = (id: string) => {
     const live = byId.get(id)?.live;
-    return live && responsive ? { ...live, doc: docAtWidth(live.doc, width) } : live;
+    return live && { ...live, doc: docShown(live.doc, view, stageWidth) };
   };
-  const baseFrame = $derived(byId.get(at.current));
   const baseLive = $derived(liveOf(at.current));
   const box = $derived(
     baseLive ? frameBox(view.mode, { w: stageW - STAGE_PAD_PX * 2, h: stageH - STAGE_PAD_PX }, { w: baseLive.doc.width, h: baseLive.doc.height }, width) : null
@@ -319,6 +320,7 @@
             {/snippet}
           </MenuTrigger>
           <MenuContent class="z-[1001]" align="center">
+            <MenuItem label="Frame width" icon={responsive && view.source === WidthSource.Frame ? Check : undefined} data-testid="viewport-frame" onSelect={() => setView({ mode: ViewportMode.Responsive, source: WidthSource.Frame })} />
             <MenuItem label="Follow window" icon={responsive && view.source === WidthSource.Window ? Check : undefined} data-testid="viewport-window" onSelect={() => setView({ mode: ViewportMode.Responsive, source: WidthSource.Window })} />
             <MenuSeparator />
             <MenuLabel label="Views" />

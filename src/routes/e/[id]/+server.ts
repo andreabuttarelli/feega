@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { readHostedEmbed } from '$lib/server/motion/embed';
 import { scheduleRebuild } from '$lib/server/motion/embed-rebuild-db';
+import { INERT_DOCUMENT_HEADERS } from '$lib/canvas/iframe-node';
 import type { RequestHandler } from './$types';
 
 const EMBED_CACHE = 'public, max-age=60, s-maxage=60';
@@ -13,5 +14,5 @@ export const GET: RequestHandler = async ({ params, fetch, url }) => {
   if (embed.legacy) {
     scheduleRebuild(params.id, url.origin);
   }
-  return new Response(embed.html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': EMBED_CACHE } });
+  return new Response(embed.html, { headers: { ...INERT_DOCUMENT_HEADERS, 'content-type': 'text/html; charset=utf-8', 'cache-control': EMBED_CACHE } });
 };

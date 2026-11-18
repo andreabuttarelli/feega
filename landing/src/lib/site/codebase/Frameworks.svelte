@@ -1,5 +1,6 @@
 <script lang="ts">
   import { EARLY, EARLY_LABEL, TESTED } from '.';
+  import { lower } from '../lower';
   import { LOGO_PATHS } from './logos';
 </script>
 
@@ -14,7 +15,7 @@
   </ul>
 
   <div class="early">
-    <p>{EARLY_LABEL}</p>
+    <p>{lower(EARLY_LABEL)}</p>
     <ul aria-label="Frameworks in early support">
       {#each EARLY as framework (framework.name)}
         <li title={framework.name}>

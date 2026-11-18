@@ -81,7 +81,10 @@ test.describe('Play paints each view like the canvas @real', () => {
       }
 
       await openPlay(page, node.id, name);
-      const scores: Record<string, number> = {};
+      await page.waitForTimeout(SETTLE_MS);
+      const opened = await compared(canvasShots.get(viewsOf(doc)[0].id)!, await seen(page, page.locator('[data-testid="prototype-player"] .viewport'), STAGE.height));
+      save(`${name}-opened-play`, opened.b);
+      const scores: Record<string, number> = { opened: opened.score };
       for (const view of viewsOf(doc)) {
         await page.getByTestId('viewport-menu').click();
         await page.getByTestId(`viewport-${view.width}`).click();

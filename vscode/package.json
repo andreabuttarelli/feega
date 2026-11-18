@@ -3,7 +3,7 @@
   "displayName": "Feega",
   "description": "Open .feega canvases in your editor: motion video, UI and graphic design that your agent edits over MCP.",
   "version": "0.1.2",
-  "publisher": "feega",
+  "publisher": "AndreaButtarelli",
   "license": "Apache-2.0",
   "icon": "icon.png",
   "repository": {
@@ -66,7 +66,7 @@
     ]
   },
   "scripts": {
-    "test": "node --test",
+    "test": "node --test canvas-run.test.js",
     "package": "npx -y @vscode/vsce package --no-dependencies",
     "test:e2e": "node test/run.js"
   }

@@ -13,6 +13,7 @@ export enum ViewportMode {
 export type Size = { w: number; h: number };
 export type FrameBox = Size & { scale: number; scrolls: boolean };
 export enum WidthSource {
+  Frame = 'frame',
   Window = 'window',
   Fixed = 'fixed'
 }
@@ -42,7 +43,7 @@ export const WIDTH_PRESETS = [
 
 const MIN_WIDTH = 120;
 const MAX_WIDTH = 4096;
-const DEFAULT: Viewport = { mode: ViewportMode.Responsive, width: WIDTH_PRESETS[0].width, source: WidthSource.Window };
+const DEFAULT: Viewport = { mode: ViewportMode.Responsive, width: WIDTH_PRESETS[0].width, source: WidthSource.Frame };
 
 export function clampWidth(width: number): number {
   if (!Number.isFinite(width)) {
@@ -51,7 +52,13 @@ export function clampWidth(width: number): number {
   return Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(width)));
 }
 
-export const shownWidth = (view: Viewport, stageWidth: number): number => (view.source === WidthSource.Window ? clampWidth(stageWidth) : view.width);
+const WIDTH_OF: Record<WidthSource, (view: Viewport, stageWidth: number, frameWidth: number) => number> = {
+  [WidthSource.Frame]: (_view, _stage, frameWidth) => frameWidth,
+  [WidthSource.Window]: (_view, stageWidth) => clampWidth(stageWidth),
+  [WidthSource.Fixed]: (view) => view.width
+};
+
+export const shownWidth = (view: Viewport, stageWidth: number, frameWidth: number): number => WIDTH_OF[view.source](view, stageWidth, frameWidth);
 
 export function viewChoices(doc: MotionDoc): WidthChoice[] {
   const all = [...WIDTH_PRESETS, ...viewsOf(doc).map((v) => ({ label: v.name, width: v.width }))].sort((a, b) => b.width - a.width);
@@ -71,6 +78,13 @@ export function activeView(doc: MotionDoc, width: number): Breakpoint {
 export function docAtWidth(doc: MotionDoc, width: number): MotionDoc {
   const resolved = resolveView(doc, activeView(doc, width).id);
   return resolved.width === width ? resolved : withContentHeight({ ...resolved, width });
+}
+
+export function docShown(doc: MotionDoc, view: Viewport, stageWidth: number): MotionDoc {
+  if (view.mode !== ViewportMode.Responsive || view.source === WidthSource.Frame) {
+    return doc;
+  }
+  return docAtWidth(doc, shownWidth(view, stageWidth, doc.width));
 }
 
 export function parseViewport(raw: string | null): Viewport {

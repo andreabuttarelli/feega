@@ -1081,7 +1081,7 @@ github
 
 for (const [name, action, description] of [
   ['restore', 'restore', 'Turn a version frame into changes of its linked frame, to push through a PR'],
-  ['variant', 'variant', 'Copy a version frame into an editable, unlinked variant'],
+  ['version-variant', 'variant', 'Copy a version frame into an editable, unlinked variant'],
   ['code-diff', 'code_diff', 'Show the file diff between a version frame and the base branch']
 ] as const) {
   github

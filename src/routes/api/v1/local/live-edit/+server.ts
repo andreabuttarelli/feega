@@ -20,7 +20,7 @@ function liveRoot(): string {
   return devFolder(store);
 }
 
-type Body = { at?: unknown; prop?: unknown; value?: unknown; token?: unknown; side?: unknown; was?: unknown; rem?: unknown; viewport?: unknown; undo?: unknown };
+type Body = { family?: unknown; at?: unknown; prop?: unknown; value?: unknown; token?: unknown; side?: unknown; was?: unknown; rem?: unknown; viewport?: unknown; undo?: unknown };
 
 const positive = (v: unknown) => (typeof v === 'number' && v > 0 ? v : undefined);
 
@@ -36,7 +36,7 @@ function askOf(body: Body): LiveEditAsk {
   if (text(body.value) === undefined && text(body.token) === undefined) {
     error(BAD_REQUEST, 'value or token is required');
   }
-  return { at: body.at, prop: body.prop as LiveProp, value: text(body.value), token: text(body.token), side: body.side as Side | undefined, was: text(body.was), rem: positive(body.rem), viewport: positive(body.viewport) };
+  return { at: body.at, prop: body.prop as LiveProp, family: text(body.family), value: text(body.value), token: text(body.token), side: body.side as Side | undefined, was: text(body.was), rem: positive(body.rem), viewport: positive(body.viewport) };
 }
 
 export const GET: RequestHandler = async () => json(await liveChanges(liveRoot()));

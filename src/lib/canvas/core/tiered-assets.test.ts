@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { AssetKind } from '@feega/motion-core/motion/components';
 import { AssetSize } from '$lib/canvas/asset-url';
-import { tieredAssets } from './tiered-assets';
+import { fullAssets, tieredAssets } from './tiered-assets';
 import type { FrameDoc } from './frame-build';
 
 const place = { projectId: 'p1', canvasId: 'c1' };
@@ -26,5 +26,11 @@ describe('frame images sized by zoom', () => {
     const plain = { ...source({}), media: undefined } as FrameDoc;
 
     expect(tieredAssets(plain, place, AssetSize.Px256)).toBe(plain);
+  });
+
+  it('Play gets the originals back, not the tier the canvas zoom last needed', () => {
+    const tiered = tieredAssets(source({ img: { kind: AssetKind.Image, width: null, height: null } }), place, AssetSize.Px256);
+
+    expect(fullAssets(tiered.assets)).toEqual({ img: '/p/p1/c/c1/assets/img', vid: 'https://store/clip.mp4?sig=1' });
   });
 });

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { lower } from '../lower';
   import { MOTION } from '../motion';
   import { GENERATE } from '../generate';
   import MotionLoop from '../motion/MotionLoop.svelte';
@@ -11,15 +12,15 @@
 </script>
 
 <section class="extras site-wide" id="extras" data-agent-id="extras">
-  <h2>Also on the canvas</h2>
+  <h2>also on the canvas</h2>
 
   <div class="boxes">
     {#each EXTRAS as { copy, Art } (copy.heading)}
       <a class="box" href={copy.more.href}>
         <div class="art"><Art /></div>
-        <span class="title">{copy.heading}</span>
-        <p>{copy.lead}</p>
-        <span class="more">{copy.more.label} →</span>
+        <span class="title">{lower(copy.heading)}</span>
+        <p>{lower(copy.lead)}</p>
+        <span class="more">{lower(copy.more.label)} →</span>
       </a>
     {/each}
   </div>
@@ -98,6 +99,17 @@
   @media (max-width: 809.98px) {
     .boxes {
       grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 809.98px) {
+    p,
+    .more {
+      font-size: 15px;
+    }
+
+    .title {
+      font-size: 17px;
     }
   }
 </style>

@@ -13,7 +13,8 @@ describe('devices', () => {
     expect(pressedDevice(view)).toBe(Device.Tablet);
   });
 
-  it('presses nothing while following the window or on a custom width', () => {
+  it('presses nothing at the frame width, while following the window or on a custom width', () => {
+    expect(pressedDevice({ mode: ViewportMode.Responsive, width: DEVICES[Device.Desktop].width, source: WidthSource.Frame })).toBeNull();
     expect(pressedDevice({ mode: ViewportMode.Responsive, width: DEVICES[Device.Phone].width, source: WidthSource.Window })).toBeNull();
     expect(pressedDevice({ mode: ViewportMode.Responsive, width: 1000, source: WidthSource.Fixed })).toBeNull();
   });

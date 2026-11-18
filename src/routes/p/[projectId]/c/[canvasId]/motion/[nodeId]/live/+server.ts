@@ -1,6 +1,7 @@
 import { motionScope } from '$lib/server/motion/editor-scope';
 import { assetUrls, headOrNew, motionAssets, motionTokens } from '$lib/server/motion/editor';
 import { livePage } from '$lib/motion/interactive/bundle';
+import { INERT_DOCUMENT_HEADERS } from '$lib/canvas/iframe-node';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ locals, params, url }) => {
@@ -13,5 +14,5 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
   ]);
 
   const page = livePage({ doc: head.doc, tokens, assets: assetUrls(assets), title: scope.motion.record.displayName ?? 'Frame' }, url.origin);
-  return new Response(page, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+  return new Response(page, { headers: { ...INERT_DOCUMENT_HEADERS, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 };

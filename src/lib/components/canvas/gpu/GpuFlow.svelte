@@ -2,6 +2,7 @@
   import { heldFrames } from '$lib/canvas/core/held-frames';
   import { baseNodeId, heldViews, viewAt, viewOf } from '$lib/canvas/breakpoint-views';
   import { posterUploads } from '$lib/canvas/core/poster-upload';
+  import { fullAssets } from '$lib/canvas/core/tiered-assets';
   import { POSTER_DEBOUNCE_MS } from '$lib/motion/poster-capture';
   import { postPageAction } from '$lib/api/page-action';
   import { motionNodePath } from '$lib/canvas/motion-node';
@@ -128,7 +129,7 @@
   import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
   import { estimatedText, type TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
   import { stackFrame, stackPlaced } from '$lib/motion/layout/ops';
-  import { dragInStack, dropInStack, followCursor, stackLineAt, type DropLine } from '$lib/motion/layout/stack-drag';
+  import { dropInStack, holdInStack, stackLineAt, type DropLine } from '$lib/motion/layout/stack-drag';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
   import { commitScoped, doubledOn, textScope } from '$lib/canvas/scoped-text';
   import { mul2d } from '@feega/motion-core/motion/parent';
@@ -529,7 +530,7 @@
   const shownOverlays = $derived(overlayFrames.filter((f) => seenIds.has(f.id) || keptOverlays.has(f.id)));
   const prototypeDocs = $derived(new Map(coreFrames.flatMap((f) => (liveOf(f.id) ? [[f.id, liveOf(f.id)!.doc] as const] : []))));
   const arrowLinks = $derived(prototypeLinks(prototypeDocs));
-  const playerFrames = $derived(coreFrames.filter((f) => kindOfNode(f.id) === FrameKind.Frame && liveOf(f.id)).map((f) => ({ id: f.id, name: tileLabel(byId.get(f.id)!), live: liveOf(f.id)! })));
+  const playerFrames = $derived(coreFrames.filter((f) => kindOfNode(f.id) === FrameKind.Frame && liveOf(f.id)).map((f) => ({ id: f.id, name: tileLabel(byId.get(f.id)!), live: { ...liveOf(f.id)!, assets: fullAssets(liveOf(f.id)!.assets) } })));
   $effect(() => {
     prototypePlayer.editing = inside?.nodeId ?? (selected.length === 1 && playerFrames.some((f) => f.id === selected[0]) ? selected[0] : null);
   });
@@ -3011,6 +3012,7 @@
 
     const carry = (ev: PointerEvent): Carry => carryOf({ down, now: local(ev), started, frame: edited, world: toWorld(view, local(ev)) });
     const stackChild = grip === Grip.Move && work.ids.length === 1 && stackPlaced(work.doc, work.ids[0]) ? work.ids[0] : null;
+    const held = stackChild ? holdInStack(work.doc, stackChild, boxes, measure) : null;
     const joinable = grip === Grip.Move && work.ids.length === 1 && !stackChild;
     const liftable = grip === Grip.Move && !stackChild && !shownView && work.doc === inScope.view && inScope.view === start;
     const lift = liftable ? { id: nodeId, key: ++liftKey, clips: subtreeOf(work.doc, work.ids), landing: false } : null;
@@ -3027,7 +3029,7 @@
 
     const move = (ev: PointerEvent) => {
       const now = carry(ev);
-      if (now === Carry.Held) {
+      if (now === Carry.Held || !ev.buttons) {
         return;
       }
       started = true;
@@ -3036,14 +3038,12 @@
         props.onElementOut?.(nodeId, out ?? { clipId: '', client: { x: ev.clientX, y: ev.clientY }, box: null }, out ? DragPhase.Over : DragPhase.Back);
         carried = !!out;
       }
-      if (stackChild) {
-        const to = framePt(ev);
-        const dropped = dragInStack(work.doc, stackChild, boxes, to);
+      if (held) {
+        const { dragged: dropped, shown: following } = held(from, framePt(ev));
         result = dropped.result.ok ? { ok: true, doc: lifted(inScope.merge(dropped.result.doc)) } : dropped.result;
         frameGuides = { nodeId, guides: [], gaps: [], drop: dropped.line };
-        const followed = followCursor(work.doc, stackChild, [to[0] - from[0], to[1] - from[1]]);
-        if (followed.ok) {
-          liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? at.live), doc: lifted(inScope.merge(followed.doc)) });
+        if (following.ok) {
+          liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? at.live), doc: lifted(inScope.merge(following.doc)) });
         }
         return;
       }

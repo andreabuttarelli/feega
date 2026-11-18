@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { lower } from '../lower';
   import Modes from './Modes.svelte';
   import { CANVAS_VIDEO, HERO_HEADLINE } from '../home';
   import { lazyPlay } from '../lazy-video';
@@ -15,9 +16,9 @@
 <section class="hero" id="hero">
   <AsciiField />
 
-  <h1><span data-agent-id="hero-title-a">{HERO_HEADLINE[0]}</span> <span data-agent-id="hero-title-b">{HERO_HEADLINE[1]}</span></h1>
+  <h1 class="site-display"><span data-agent-id="hero-title-a">{lower(HERO_HEADLINE[0])}</span> <span data-agent-id="hero-title-b">{lower(HERO_HEADLINE[1])}</span></h1>
 
-  <p class="lead" data-agent-id="hero-lead">Paste your website or open your repo and every layer comes in editable. Change it by hand or ask your AI assistant, then export a video or send the code back.</p>
+  <p class="lead" data-agent-id="hero-lead">paste your website or open your repo and every layer comes in editable. change it by hand or ask your AI assistant, then export a video or send the code back.</p>
 
   <Modes id="hero-modes" />
 
@@ -42,13 +43,7 @@
   }
 
   h1 {
-    color: #fff;
-    font-family: 'Instrument Serif', serif;
-    font-variation-settings: normal;
     font-size: 48px;
-    line-height: 0.95;
-    letter-spacing: -0.04em;
-    font-weight: 400;
   }
 
   h1 span {
@@ -110,4 +105,11 @@
     }
   }
 
+
+  @media (max-width: 809.98px) {
+    .lead {
+      font-size: 16px;
+      line-height: 1.35;
+    }
+  }
 </style>

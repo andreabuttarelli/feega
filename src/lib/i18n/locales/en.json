@@ -17,7 +17,6 @@
     },
     "signin": {
       "title": "Sign in",
-      "sub": "Enter your email and password to sign in.",
       "forgot": "Forgot password?",
       "noAccount": "Don't have an account?",
       "createLink": "Create one"
