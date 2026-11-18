@@ -53,7 +53,7 @@ export const URL_IMPORT_STATUS: Record<Exclude<UrlImportOutcome, UrlImportOutcom
   [UrlImportOutcome.Rejected]: 422
 };
 
-export type UrlImported = { outcome: UrlImportOutcome.Ok; frameId: string; name: string; undo: UndoItem[]; skipped: string[]; truncated: boolean } | { outcome: Exclude<UrlImportOutcome, UrlImportOutcome.Ok>; error?: string };
+export type UrlImported = { outcome: UrlImportOutcome.Ok; frameId: string; parts?: string[]; name: string; undo: UndoItem[]; skipped: string[]; truncated: boolean } | { outcome: Exclude<UrlImportOutcome, UrlImportOutcome.Ok>; error?: string };
 
 export type Planner = { prepare: (tab: AppTab) => Promise<void>; plan: (tree: PageTree, newId: () => string, fonts: FontAssets, shape: PageShape, views: ViewRead[]) => UrlPlan | null };
 
@@ -340,7 +340,7 @@ export async function landPlan(ask: LandAsk, made: UrlPlan | null, truncated: bo
     const kept = setIds.map((id) => (landed.includes(id) ? id : ''));
     const placed = await placeFigmaPlan(ask.store, ask.place, { ...made.plan, items: homedItems(made.plan.items, made.homes, kept, assets) }, ask.at);
     landed.push(...placed.frameIds);
-    return { outcome: UrlImportOutcome.Ok, frameId: placed.frameIds[0], name: made.name, undo: [...placed.undo, ...sets.undo], skipped: [...placed.skipped, ...sets.skipped], truncated };
+    return { outcome: UrlImportOutcome.Ok, frameId: placed.frameIds[0], parts: placed.frameIds.slice(1), name: made.name, undo: [...placed.undo, ...sets.undo], skipped: [...placed.skipped, ...sets.skipped], truncated };
   } catch (e) {
     await Promise.all(landed.map((id) => ask.store.remove(id).catch(() => undefined)));
     throw e;
