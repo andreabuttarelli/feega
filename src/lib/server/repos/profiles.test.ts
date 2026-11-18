@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TourWrite, ensureProfile, markTourSeen, profileFromAuthUser, readTourSeen, recordTermsAcceptance } from '$lib/server/repos/profiles';
+import { TourWrite, ensureProfile, markTourSeen, profileFromAuthUser, readAgentMemory, readTourSeen, recordTermsAcceptance, saveAgentMemory, saveName } from '$lib/server/repos/profiles';
 import { fakeDb } from '$lib/server/db/fake-db';
 import { createTestSupabase } from '$lib/testkit/supabase';
 import type { Db } from '$lib/server/db/client';
@@ -153,5 +153,47 @@ describe('il tour si ricorda per persona', () => {
 
   it('senza colonna segnarlo dice che non è stato salvato', async () => {
     expect(await markTourSeen(answering({ error: NOT_IN_CACHE }).db, USER)).toBe(TourWrite.NoColumn);
+  });
+});
+
+describe('il nome e la memoria dell agente sono della persona', () => {
+  it('saveName scrive il nome sulla riga di chi è in sessione', async () => {
+    const kit = createTestSupabase({ profiles: [{ ...row, name: null }] });
+
+    await saveName(kit.client as unknown as Db, USER, 'Ada');
+
+    expect(kit.tables.get('profiles')?.[0].name).toBe('Ada');
+  });
+
+  it('saveAgentMemory salva il testo e la data', async () => {
+    const kit = createTestSupabase({ profiles: [{ ...row }] });
+
+    await saveAgentMemory(kit.client as unknown as Db, USER, 'Preferisco video corti');
+
+    expect(kit.tables.get('profiles')?.[0].agent_memory).toBe('Preferisco video corti');
+    expect(kit.tables.get('profiles')?.[0].agent_memory_updated_at).toEqual(expect.any(String));
+  });
+
+  it('una memoria vuota si salva come null', async () => {
+    const kit = createTestSupabase({ profiles: [{ ...row, agent_memory: 'vecchia' }] });
+
+    await saveAgentMemory(kit.client as unknown as Db, USER, '');
+
+    expect(kit.tables.get('profiles')?.[0].agent_memory).toBeNull();
+  });
+
+  it('readAgentMemory restituisce il testo, o null se non c è', async () => {
+    const kit = createTestSupabase({ profiles: [{ ...row, agent_memory: 'ciao' }] });
+    const empty = createTestSupabase({ profiles: [{ ...row }] });
+
+    expect(await readAgentMemory(kit.client as unknown as Db, USER)).toBe('ciao');
+    expect(await readAgentMemory(empty.client as unknown as Db, USER)).toBeNull();
+  });
+
+  it('un errore del database non viene inghiottito', async () => {
+    const kit = createTestSupabase({ profiles: [{ ...row }] });
+    kit.failNext('profiles', 'boom');
+
+    await expect(saveAgentMemory(kit.client as unknown as Db, USER, 'x')).rejects.toThrow();
   });
 });

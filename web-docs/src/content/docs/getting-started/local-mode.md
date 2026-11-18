@@ -145,6 +145,16 @@ your provider, and what you generate is your responsibility. At start the termin
 Wiro's image and video models are for uncensored projects, which local mode does not have, so
 locally Wiro runs the 3D nodes only.
 
+## First run
+
+The first time Feega runs on your computer it shows a short setup:
+
+1. **Where it runs.** Stay on this computer (free, no account) or connect a Feega Cloud account. Connecting opens the same browser sign-in as `feega login`; your file stays on your disk either way.
+2. **Your AI.** The coding assistants found on this computer, with the command to install or sign in to the ones that are not ready. Pick one to use in the chat.
+3. **Your memory**, only with a connected account. Feega lists the instruction files it found (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`, and `CLAUDE.md` / `AGENTS.md` in the folder you started from). Nothing is read until you press *read these files*, and you can edit the text before saving. It is stored on your account and given to the Feega Cloud chat.
+
+Skip closes the setup. It does not come back: the flag lives in `~/.feega/onboarding.json`.
+
 ## What needs the cloud
 
 Sharing, comments and saved versions answer with a message instead of running. Import the
