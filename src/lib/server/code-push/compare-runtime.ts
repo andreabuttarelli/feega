@@ -6,7 +6,8 @@ import { CodeImportOutcome } from '$lib/server/code-import/import-code';
 import { folderOf } from '$lib/server/code-import/folder-source';
 import { localModeRefusal } from '$lib/server/local/local-mode';
 import { frameStore } from '$lib/server/motion/move-element';
-import { DataCheck, findNode, patchNodeData, renameNode } from '$lib/server/repos/canvas';
+import { DataCheck, deleteNode, findNode, patchNodeData, renameNode } from '$lib/server/repos/canvas';
+import { versionMarkOf } from '$lib/canvas/version-frame';
 import type { CompareDeps, ImportAtAsk } from './frames-compare';
 import { framesDeps } from './frames-runtime';
 import { CodeSourceKind } from './link';
@@ -47,6 +48,8 @@ export function compareDeps(db: Db, scope: CodeScope): CompareDeps {
       const done = await importCodeInto(scope, ask.canvasId, { ...source, app: ask.link.appRoot || undefined, routes: [ask.link.route ?? '/'], at: ask.at });
       return done.outcome === CodeImportOutcome.Ok ? { frameId: done.frameId } : { error: done.error ?? done.outcome };
     },
+    markOf: async (nodeId) => versionMarkOf((await findNode(db, { orgId: scope.orgId, nodeId }))?.data),
+    remove: (nodeId) => deleteNode(db, { orgId: scope.orgId, nodeId, actor: scope.actor }),
     mark: async (frameId, mark) => {
       await patchNodeData(db, { orgId: scope.orgId, nodeId: frameId, patch: { version: mark }, check: DataCheck.None, actor: scope.actor });
       await renameNode(db, { orgId: scope.orgId, nodeId: frameId, name: mark.label });

@@ -991,6 +991,14 @@ github
   });
 
 github
+  .command('version-ref <projectId> <versionId> <ref>')
+  .description('Move a version frame to another commit, branch, tag or #<pr>, in the same place')
+  .action(async (projectId: string, versionId: string, ref: string) => {
+    const { cmdGithubVersionRef } = await import('./commands/github.ts');
+    await cmdGithubVersionRef(projectId, versionId, ref);
+  });
+
+github
   .command('detach <projectId> <nodeId>')
   .description('Unlink a frame from its GitHub source; the frame stays on the canvas')
   .action(async (projectId: string, nodeId: string) => {

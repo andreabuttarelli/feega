@@ -30,7 +30,11 @@ export type CompareDeps = Pick<FramesDeps, 'host'> & {
   placeOf: (nodeId: string) => Promise<Place | null>;
   importAt: (ask: ImportAtAsk) => Promise<{ frameId: string } | { error: string }>;
   mark: (frameId: string, mark: VersionMark) => Promise<void>;
+  markOf: (nodeId: string) => Promise<VersionMark | null>;
+  remove: (nodeId: string) => Promise<unknown>;
 };
+
+export type RetargetAsk = { versionId: string; ref: string };
 
 export type CompareAsk = { nodeId: string; refs: string[] };
 
@@ -71,34 +75,69 @@ const failureOf = (e: unknown, ref: string): CompareRefused => {
   throw e;
 };
 
-export async function frameCompare(deps: CompareDeps, ask: CompareAsk): Promise<Compared | CompareRefused> {
-  const link = await deps.links.read(ask.nodeId);
-  const place = await deps.placeOf(ask.nodeId);
+type Opened = { link: CodeLink; host: GitHost; place: Place };
+
+async function opened(deps: CompareDeps, linkedId: string, placedId: string): Promise<Opened | FramesRefused> {
+  const link = await deps.links.read(linkedId);
+  const place = await deps.placeOf(placedId);
   if (!link || !place) {
     return { ok: false, refusal: FramesRefusal.NotLinked };
   }
   const host = await deps.host(link.source, link.repo);
-  if (!host) {
-    return { ok: false, refusal: FramesRefusal.NotConnected };
+  return host ? { link, host, place } : { ok: false, refusal: FramesRefusal.NotConnected };
+}
+
+async function landVersion(deps: CompareDeps, from: Opened & { of: string }, ref: string, at: { x: number; y: number }): Promise<VersionFrame | CompareRefused> {
+  const version = versionOf(ref);
+  const sha = await shaOf(from.host, version).catch((e: unknown) => failureOf(e, ref));
+  if (typeof sha !== 'string') {
+    return sha;
+  }
+
+  const landed = await deps.importAt({ link: from.link, sha, canvasId: from.place.canvasId, at });
+  if ('error' in landed) {
+    return { ok: false, refusal: IMPORT_FAILED, ref, error: landed.error };
+  }
+
+  const mark = { of: from.of, ref, label: version.label, sha, entry: entryPath(from.link) };
+  await deps.mark(landed.frameId, mark);
+  return { ...mark, frameId: landed.frameId };
+}
+
+const isRefused = (v: VersionFrame | CompareRefused): v is CompareRefused => 'ok' in v;
+
+export async function frameCompare(deps: CompareDeps, ask: CompareAsk): Promise<Compared | CompareRefused> {
+  const from = await opened(deps, ask.nodeId, ask.nodeId);
+  if ('ok' in from) {
+    return from;
   }
 
   const versions: VersionFrame[] = [];
   for (const [i, ref] of ask.refs.entries()) {
-    const version = versionOf(ref);
-    const sha = await shaOf(host, version).catch((e: unknown) => failureOf(e, ref));
-    if (typeof sha !== 'string') {
-      return sha;
+    const at = { x: from.place.x + (i + 1) * (from.place.w + VERSION_GAP), y: from.place.y };
+    const landed = await landVersion(deps, { ...from, of: ask.nodeId }, ref, at);
+    if (isRefused(landed)) {
+      return landed;
     }
-
-    const at = { x: place.x + (i + 1) * (place.w + VERSION_GAP), y: place.y };
-    const landed = await deps.importAt({ link, sha, canvasId: place.canvasId, at });
-    if ('error' in landed) {
-      return { ok: false, refusal: IMPORT_FAILED, ref, error: landed.error };
-    }
-
-    const mark = { of: ask.nodeId, ref, label: version.label, sha, entry: entryPath(link) };
-    await deps.mark(landed.frameId, mark);
-    versions.push({ ...mark, frameId: landed.frameId });
+    versions.push(landed);
   }
   return { ok: true, versions };
+}
+
+export async function frameRetarget(deps: CompareDeps, ask: RetargetAsk): Promise<Compared | CompareRefused> {
+  const mark = await deps.markOf(ask.versionId);
+  if (!mark) {
+    return { ok: false, refusal: FramesRefusal.NotLinked };
+  }
+  const from = await opened(deps, mark.of, ask.versionId);
+  if ('ok' in from) {
+    return from;
+  }
+
+  const landed = await landVersion(deps, { ...from, of: mark.of }, ask.ref, { x: from.place.x, y: from.place.y });
+  if (isRefused(landed)) {
+    return landed;
+  }
+  await deps.remove(ask.versionId);
+  return { ok: true, versions: [landed] };
 }

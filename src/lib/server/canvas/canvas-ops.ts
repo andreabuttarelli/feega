@@ -102,7 +102,7 @@ import { designSystemOf } from '$lib/server/code-import/design-system';
 import { githubFor } from '$lib/server/code-import/github-runtime';
 import { frameDetach, framesPush, frameStatus, frameUndo } from '$lib/server/code-push/frames-push';
 import { frameVersions } from '$lib/server/code-push/frames-versions';
-import { frameCompare, MAX_VERSIONS } from '$lib/server/code-push/frames-compare';
+import { frameCompare, frameRetarget, MAX_VERSIONS } from '$lib/server/code-push/frames-compare';
 import { compareDeps } from '$lib/server/code-push/compare-runtime';
 import { framesDeps, importLinker } from '$lib/server/code-push/frames-runtime';
 import { libsOrigin } from '$lib/server/motion/libs-origin';
@@ -1176,6 +1176,12 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: z.object({ nodeId: z.string(), refs: z.array(z.string().min(1).max(200)).min(1).max(MAX_VERSIONS).describe('branch, tag, sha, or #<number> for a pull request') }).strict(),
     run: async (ctx, input) => frameCompare(compareDeps(ctx.db, figmaScope(ctx)), input)
+  }),
+
+  github_version_ref: op({
+    access: Access.Write,
+    input: z.object({ versionId: z.string().describe('a version frame made by github_compare'), ref: z.string().min(1).max(200).describe('branch, tag, sha or #<number>') }).strict(),
+    run: async (ctx, input) => frameRetarget(compareDeps(ctx.db, figmaScope(ctx)), input)
   }),
 
   github_detach: op({

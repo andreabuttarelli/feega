@@ -71,6 +71,16 @@ feega github compare <projectId> <nodeId> main feega/x '#12'
 
 Click the git icon on a version frame to compare it with the frame it came from, or select two frames first to compare those two. **Overlay** shows the version with the changed regions outlined, found by comparing the two posters pixel by pixel. **Slider** puts one over the other with a handle to wipe between before and after.
 
+### Timeline
+
+Above the diff, a scrubber runs over the commits that touched the frame's file, oldest on the left. Releasing it on a commit moves the version frame to that commit, in the same place.
+
+```bash
+feega github version-ref <projectId> <versionId> <ref>
+```
+
+`POST /api/v1/projects/:id/github/compare` with `{ versionId, ref }`; MCP `github_version_ref {versionId,ref}`.
+
 ## CLI
 
 ```bash

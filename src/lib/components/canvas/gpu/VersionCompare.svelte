@@ -1,9 +1,19 @@
 <script lang="ts">
   import { changedRegions, DiffMode, type Pixels, type Region } from '$lib/canvas/pixel-diff';
+  import type { Timeline } from '$lib/canvas/version-client';
 
   type Side = { url: string; label: string };
 
-  let { before, after, onclose }: { before: Side; after: Side; onclose: () => void } = $props();
+  type History = { line: Timeline; busy: boolean; onpick: (sha: string) => void };
+
+  let { before, after, history = null, onclose }: { before: Side; after: Side; history?: History | null; onclose: () => void } = $props();
+
+  let scrub = $state(0);
+  $effect(() => {
+    scrub = history?.line.at ?? 0;
+  });
+  const shown = $derived(history?.line.steps[scrub] ?? null);
+  const SHORT_SHA = 7;
 
   const MAX_SIDE = 900;
   const MODE_LABEL: Record<DiffMode, string> = { [DiffMode.Overlay]: 'Overlay', [DiffMode.Slider]: 'Slider' };
@@ -57,6 +67,15 @@
     <span class="count" data-testid="diff-count">{failed ? 'posters unavailable' : regions === null ? 'comparing…' : `${regions.length} changed`}</span>
     <button type="button" class="close" aria-label="Close" onclick={onclose}>×</button>
   </header>
+
+  {#if history && history.line.steps.length > 1}
+    <div class="timeline" data-testid="version-timeline">
+      <input type="range" min="0" max={history.line.steps.length - 1} step="1" bind:value={scrub} disabled={history.busy} aria-label="Commit history" data-testid="version-scrubber" onchange={() => shown && history.onpick(shown.sha)} />
+      {#if shown}
+        <span class="commit">{shown.sha.slice(0, SHORT_SHA)} · {shown.message} · {shown.author}</span>
+      {/if}
+    </div>
+  {/if}
 
   <div class="stage">
     {#if mode === DiffMode.Overlay}
@@ -123,6 +142,23 @@
   }
   .count {
     color: var(--ui-muted);
+  }
+  .timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--ui-line);
+    font-size: 11px;
+  }
+  .timeline input {
+    width: 100%;
+  }
+  .commit {
+    color: var(--ui-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .stage {
     position: relative;

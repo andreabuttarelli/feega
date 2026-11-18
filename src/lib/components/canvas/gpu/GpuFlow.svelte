@@ -30,6 +30,7 @@
   import SourceSyncPanel from './SourceSyncPanel.svelte';
   import { comparedWith, versionMarkOf } from '$lib/canvas/version-frame';
   import VersionCompare from './VersionCompare.svelte';
+  import { historyOf, moveVersion, timelineOf, type CommitStep } from '$lib/canvas/version-client';
   import { HeaderAction, headerBadges, headerHits, headerRow, type HeaderHit } from '$lib/canvas/core/frame-header';
   import { sourceStatus } from '$lib/canvas/source-status.svelte';
   import { linkedFrames } from '$lib/canvas/source-sync';
@@ -405,6 +406,27 @@
     const url = posterOf(id);
     return url ? { url, label: byId.get(id)?.displayName ?? '' } : null;
   };
+  let versionCommits = $state<CommitStep[]>([]);
+  let versionMoving = $state(false);
+  const versionShown = $derived(versionOpen ? versionMarkOf(summaries.get(versionOpen.after)?.data) : null);
+  $effect(() => {
+    const of = versionShown?.of;
+    versionCommits = [];
+    if (of) {
+      void historyOf(page.params.projectId ?? '', of).then((c) => (versionCommits = c));
+    }
+  });
+  const pickVersion = async (sha: string) => {
+    const open = versionOpen;
+    if (!open) {
+      return;
+    }
+    versionMoving = true;
+    const moved = await moveVersion(page.params.projectId ?? '', open.after, sha);
+    versionMoving = false;
+    versionOpen = moved ? { ...open, after: moved } : open;
+  };
+  const versionHistory = $derived(versionShown ? { line: timelineOf(versionCommits, versionShown.sha), busy: versionMoving, onpick: pickVersion } : null);
   const versionSides = $derived(versionOpen ? { before: sideOf(versionOpen.before), after: sideOf(versionOpen.after) } : null);
   const posterOf = (id: string) => {
     const poster = (summaries.get(id)?.data as { posterAssetId?: string | null } | undefined)?.posterAssetId;
@@ -4697,7 +4719,7 @@
     {/if}
     <FrameHeaderIcons {view} hits={headerHits(headerWorld, cameraMotion)} onpress={pressHeader} />
     {#if versionSides?.before && versionSides.after}
-      <VersionCompare before={versionSides.before} after={versionSides.after} onclose={() => (versionOpen = null)} />
+      <VersionCompare before={versionSides.before} after={versionSides.after} history={versionHistory} onclose={() => (versionOpen = null)} />
     {/if}
     <SourceSyncPanel projectId={page.params.projectId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} assetUrl={tierUrl(AssetSize.Full)} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} />
     <PrototypePlayerHost frames={playerFrames} />

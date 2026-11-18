@@ -15,6 +15,8 @@ vi.mock('$lib/server/code-push/compare-runtime', () => ({
     host: async () => githubHost(gh.call, { owner: 'acme', repo: 'app', ref: null }),
     links: { read: async (id: string) => links.get(id) ?? null },
     placeOf: async () => ({ canvasId: 'c1', x: 0, y: 0, w: 100, h: 100 }),
+    markOf: async (id: string) => marks.get(id) ?? null,
+    remove: async (id: string) => marks.delete(id),
     importAt: async () => ({ frameId: `v${marks.size + 1}` }),
     mark: async (id: string, mark: unknown) => {
       marks.set(id, mark);
@@ -49,6 +51,16 @@ describe('/api/v1/projects/:id/github/compare', () => {
     expect(res.status).toBe(200);
     expect(body.versions.map((v: { label: string }) => v.label)).toEqual(['main', 'feega/x']);
     expect(marks.size).toBe(2);
+  });
+
+  it('una versione passa a un altro ref', async () => {
+    await post({ nodeId: 'n1', refs: ['main'] });
+
+    const { res, body } = await post({ versionId: 'v1', ref: 'feega/x' });
+
+    expect(res.status).toBe(200);
+    expect(body.versions[0]).toMatchObject({ label: 'feega/x', of: 'n1' });
+    expect([...marks.keys()]).toEqual(['v2']);
   });
 
   it('un ref sconosciuto è 404', async () => {

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { fakeGithub, type FakeGithub } from './fake-github.testkit';
 import { githubHost } from './github-host';
 import { EntryKind, linkSchema, type CodeLink } from './link';
-import { frameCompare, versionOf, type CompareDeps, type VersionMark } from './frames-compare';
+import { frameCompare, frameRetarget, versionOf, type CompareDeps, type VersionMark } from './frames-compare';
 import { FramesRefusal } from './frames-push';
 
 const REPO = { owner: 'acme', repo: 'app', ref: null };
@@ -11,13 +11,19 @@ let gh: FakeGithub;
 let links: Map<string, CodeLink>;
 let imported: { ref: string; at: { x: number; y: number }; entry: string }[];
 let marks: Map<string, VersionMark>;
+let removed: string[];
 let mainSha: string;
 let branchSha: string;
 
 const deps = (): CompareDeps => ({
   host: async () => githubHost(gh.call, REPO),
   links: { read: async (id) => links.get(id) ?? null },
-  placeOf: async (id) => (id === 'n1' ? { canvasId: 'c1', x: 100, y: 50, w: 400, h: 300 } : null),
+  placeOf: async (id) => (id === 'n1' || marks.has(id) ? { canvasId: 'c1', x: id === 'n1' ? 100 : 580, y: 50, w: 400, h: 300 } : null),
+  markOf: async (id) => marks.get(id) ?? null,
+  remove: async (id) => {
+    removed.push(id);
+    marks.delete(id);
+  },
   importAt: async (ask) => {
     imported.push({ ref: ask.sha, at: ask.at, entry: ask.link.entry });
     return { frameId: `v${imported.length}` };
@@ -31,6 +37,7 @@ beforeEach(() => {
   gh = fakeGithub();
   imported = [];
   marks = new Map();
+  removed = [];
   mainSha = gh.seed('main', { 'src/Hero.tsx': 'v0' });
   branchSha = gh.seed('feega/x', { 'src/Hero.tsx': 'v1' });
   gh.tag('v1', 'main');
@@ -82,5 +89,21 @@ describe('confrontare le versioni di un frame', () => {
 
     expect(out).toMatchObject({ ok: false });
     expect(imported).toEqual([]);
+  });
+});
+
+describe('scorrere la storia di una versione', () => {
+  it('il frame versione passa a un altro commit nello stesso posto', async () => {
+    await frameCompare(deps(), { nodeId: 'n1', refs: ['main'] });
+
+    const out = await frameRetarget(deps(), { versionId: 'v1', ref: branchSha });
+
+    expect(out).toMatchObject({ ok: true, versions: [{ frameId: 'v2', label: branchSha.slice(0, 7), of: 'n1' }] });
+    expect(imported[1]).toMatchObject({ ref: branchSha, at: { x: 580, y: 50 } });
+    expect(removed).toEqual(['v1']);
+  });
+
+  it('un frame che non è una versione è not_linked', async () => {
+    expect(await frameRetarget(deps(), { versionId: 'n1', ref: 'main' })).toEqual({ ok: false, refusal: FramesRefusal.NotLinked });
   });
 });
