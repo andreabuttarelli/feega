@@ -19,7 +19,7 @@ export type Token = { name: string; kind: TokenKind; values: Record<string, Toke
 
 export type TokenSet = { tokens: Token[]; modes: string[]; skipped: string[] };
 
-export type TokenEntry = { name: string; origins: Record<string, string>; raw: Record<string, string>; scale?: number; orphan?: boolean; factor?: number; style?: string; field?: string; rule?: string };
+export type TokenEntry = { name: string; origins: Record<string, string>; raw: Record<string, string>; scale?: number; side?: number; orphan?: boolean; factor?: number; style?: string; field?: string; rule?: string };
 
 export const SPACING_BASE = '--spacing';
 

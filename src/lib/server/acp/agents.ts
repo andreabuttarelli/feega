@@ -1,14 +1,5 @@
 import { dirname, join, resolve } from 'node:path';
-import { AcpAgent, isAcpAgent } from '$lib/acp/agent-choices';
-import type { AgentCommand, McpServer } from './client';
-
-export { AcpAgent, isAcpAgent };
-
-export const ACP_AGENTS: Readonly<Record<AcpAgent, AgentCommand>> = {
-  [AcpAgent.Claude]: { command: 'npx', args: ['-y', '@agentclientprotocol/claude-agent-acp'] },
-  [AcpAgent.Codex]: { command: 'npx', args: ['-y', '@agentclientprotocol/codex-acp'] },
-  [AcpAgent.Gemini]: { command: 'gemini', args: ['--experimental-acp'] }
-};
+import type { McpServer } from './client';
 
 const FEEGA_MCP_ENTRY = 'cli/mcp/stdio.ts';
 

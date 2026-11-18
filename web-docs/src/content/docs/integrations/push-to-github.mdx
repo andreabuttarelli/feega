@@ -119,6 +119,10 @@ Refusals answer `{ ok: false, refusal }`: `not_connected`, `read_only` (403, wit
 
 `github_push`, `github_push_status`, `github_undo`, `github_versions` and `github_compare`, with the same inputs.
 
+## What a frame is linked to
+
+An import links its frame to every page it captured, one link per route, each carrying the route's whole import graph: a change upstream to any file a page imports marks that frame as newer. Components from your library that those pages use get a main link to their own file and one instance link per page that uses them. The first poster saved after import is kept as the "before" thumbnail, shown next to the current one in the Changes panel.
+
 ## Local folders
 
 A frame imported from a local folder (desktop app, local dev) pushes through git in that folder: Feega commits with a private index, so your current branch, uncommitted work and history stay untouched. The branch goes to `origin` with your git credentials; the pull request opens when a GitHub token is available, otherwise the answer carries `pull: null` and the branch is left for you. The live preview is your own dev server.

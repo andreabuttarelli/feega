@@ -222,7 +222,7 @@
           <p class="muted" data-testid="import-map-components">{read.map.library.captured.length} on canvas · {read.map.library.uncaptured.length} in code only</p>
           {#if read.map.library.uncaptured.length}
             <ul class="names" aria-label="Components in code only">
-              {#each read.map.library.uncaptured as name (name)}<li>{name}</li>{/each}
+              {#each read.map.library.uncaptured as name (name)}<li>{name}{#if read.map.library.reasons?.[name]}<span class="muted"> — {read.map.library.reasons[name]}</span>{/if}</li>{/each}
             </ul>
           {/if}
         {:else}
