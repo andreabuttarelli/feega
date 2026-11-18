@@ -21,7 +21,7 @@
 
   <h1><span data-agent-id="hero-title-a">{HERO_HEADLINE[0]}</span> <span data-agent-id="hero-title-b">{HERO_HEADLINE[1]}</span></h1>
 
-  <p class="lead" data-agent-id="hero-lead">Feega is an open-source canvas to design, animate and generate. Start from your repo, Figma or any website.</p>
+  <p class="lead" data-agent-id="hero-lead">Paste your website or open your repo and every layer comes in editable. Change it by hand or ask your AI assistant, then export a video or send the code back.</p>
 
   <div class="start" data-agent-id="hero-start">
     <HeroPrompt />
