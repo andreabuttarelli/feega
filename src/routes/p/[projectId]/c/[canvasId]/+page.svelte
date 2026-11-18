@@ -4861,7 +4861,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }}
     onUserPan={() => (following = null)}
     commenting={commentsPanel.placing}
-    onCommenting={isOff(LocalOff.Comments) ? undefined : (on) => commentsPanel.place(on)}
     onComment={(at) => commentsPanel.drop(at)}
     commentMarks={(nodeId, fps) => marksFor(commentThreads ?? [], nodeId, fps)}
     onMark={(id) => commentsPanel.focus(id)}
