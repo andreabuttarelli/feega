@@ -1,10 +1,10 @@
-import type { SettingsEvent } from './event';
+import type { SharedEvent } from './event';
 import { listOrgBrands } from '$lib/server/repos/brands';
 import { sectionRequiresBrand } from '$lib/components/settings/platforms';
 
 const ORG_OWNER_ROLE = 'owner';
 
-export const load = async ({ parent, url, locals: { supabase } }: SettingsEvent) => {
+export const load = async ({ parent, url, locals: { supabase } }: SharedEvent) => {
   const { brand, org } = await parent();
   const brandGate = !brand && sectionRequiresBrand(url.pathname);
 

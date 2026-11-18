@@ -144,6 +144,10 @@ export function canvasRedirectOf(pathname: string): string | null {
   return dashboardSettingsHref(section.path);
 }
 
+export function servedOnDashboard(section: string): boolean {
+  return SETTINGS_SECTIONS.some((s) => s.path === section && SCOPE_HOME[s.scope] === SettingsHome.Dashboard);
+}
+
 export function movedToDashboard(section: string): boolean {
   return SETTINGS_SECTIONS.some((s) => s.path === section && !shownOn(s, SettingsHome.Canvas));
 }
