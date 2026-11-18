@@ -5,8 +5,18 @@ vi.mock('$lib/settings/api', () => ({ loadSettingsShell }));
 
 const { load } = await import('./+layout');
 
+function loadUrl(path: string) {
+  const url = new URL(`https://feega.test${path}`);
+  Object.defineProperty(url, 'hash', {
+    get() {
+      throw new Error('Cannot access event.url.hash');
+    }
+  });
+  return url;
+}
+
 function run(path: string) {
-  return (load as (e: unknown) => unknown)({ params: { projectId: 'p1' }, url: new URL(`https://feega.test${path}`), depends: () => {} });
+  return (load as (e: unknown) => unknown)({ params: { projectId: 'p1' }, url: loadUrl(path), depends: () => {} });
 }
 
 describe('an old canvas settings URL', () => {

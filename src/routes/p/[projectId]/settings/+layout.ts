@@ -11,7 +11,7 @@ export const ssr = false;
 export const load: LayoutLoad = ({ params, url, depends }) => {
   const moved = canvasRedirectOf(url.pathname);
   if (moved) {
-    throw redirect(TEMPORARY_REDIRECT, `${moved}${url.search}${url.hash}`);
+    throw redirect(TEMPORARY_REDIRECT, `${moved}${url.search}`);
   }
   return loadSettingsShell<Awaited<ReturnType<typeof shellLoad>>>(params.projectId, url, depends);
 };
