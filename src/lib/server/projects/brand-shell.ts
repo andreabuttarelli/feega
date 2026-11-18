@@ -1,4 +1,5 @@
 import { error } from '@sveltejs/kit';
+import type { Db } from '$lib/server/db/client';
 
 /**
  * LE COLONNE DI `brands` SULLO SCHEMA NUOVO — vedi `database.types.ts`. `status`, `plan`,
@@ -63,4 +64,20 @@ export function requireBrand(brand: ProjectBrandShell | null): ProjectBrandShell
     throw error(400, 'questo progetto non ha un brand');
   }
   return brand;
+}
+
+export async function loadBrandShell(db: Db, orgId: string, brandId: string | null): Promise<ProjectBrandShell | null> {
+  if (!brandId) {
+    return null;
+  }
+  const { data, error: brandError } = await db
+    .from('brands')
+    .select(PROJECT_BRAND_SHELL_SELECT)
+    .eq('id', brandId)
+    .eq('org_id', orgId)
+    .maybeSingle();
+  if (brandError) {
+    throw error(500, brandError.message);
+  }
+  return data ? projectBrandShellOf(data) : null;
 }
