@@ -41,13 +41,31 @@ export const GET: RequestHandler = async ({ params, url }) => {
   const opened = store();
   const refresh = url.searchParams.has('refresh') ? Refresh.Fresh : Refresh.Cached;
   const live = await liveModels(params.agent, refresh);
-  const listing: ModelListing = { models: live?.models ?? null, current: live?.current ?? null, chosen: opened.acpModel(params.agent) };
+  const listing: ModelListing = { models: live?.models ?? null, current: live?.current ?? null, chosen: opened.acpModel(params.agent), effort: live?.effort ?? null, chosenEffort: opened.acpEffort(params.agent) };
   return json(listing);
 };
 
+async function saveEffort(agent: string, effort: unknown): Promise<Response> {
+  const opened = store();
+  if (effort !== null) {
+    const live = await liveModels(agent, Refresh.Cached);
+    if (!live?.models.some((m) => m.efforts?.includes(effort as string))) {
+      error(BAD_REQUEST, 'effort must be one the agent offers, or null');
+    }
+  }
+
+  opened.chooseAcpEffort(agent, effort as string | null);
+  return new Response(null, { status: NO_CONTENT });
+}
+
 export const PUT: RequestHandler = async ({ params, request }) => {
   const opened = store();
-  const { model } = (await request.json()) as { model?: unknown };
+  const body = (await request.json()) as { model?: unknown; effort?: unknown };
+  if ('effort' in body) {
+    return saveEffort(params.agent, body.effort);
+  }
+
+  const { model } = body;
   if (model === null) {
     opened.chooseAcpModel(params.agent, null);
     return new Response(null, { status: NO_CONTENT });

@@ -103,7 +103,16 @@ const live = (row: Row) => row.deleted_at === null || row.deleted_at === undefin
 const ASSET_DIR = 'assets/';
 const assetFileName = (url: string) => `${ASSET_DIR}${url.split('/').map((part) => part.replace(UNSAFE_NAME, '_')).join('/')}`;
 
-type AcpChoice = { acpAgent: string | null; acpModels: Record<string, string> };
+type AcpChoice = { acpAgent: string | null; acpModels: Record<string, string>; acpEfforts: Record<string, string> };
+
+function remember(choices: Record<string, string>, agent: string, value: string | null) {
+  if (value === null) {
+    delete choices[agent];
+    return;
+  }
+
+  choices[agent] = value;
+}
 
 const withoutScope = (row: Row) => Object.fromEntries(Object.entries(row).filter(([column]) => !LINK_SCOPE_COLUMNS.has(column)));
 
@@ -157,7 +166,7 @@ export function openFeegaStore(path: string, options: FeegaStoreOptions) {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let dirty = !existsSync(path);
   let saving: Promise<void> = Promise.resolve();
-  const acp: AcpChoice = { acpAgent: file.manifest.acpAgent ?? null, acpModels: { ...file.manifest.acpModels } };
+  const acp: AcpChoice = { acpAgent: file.manifest.acpAgent ?? null, acpModels: { ...file.manifest.acpModels }, acpEfforts: { ...file.manifest.acpEfforts } };
   const packer = createPacker();
 
   const write = async () => {
@@ -214,11 +223,12 @@ export function openFeegaStore(path: string, options: FeegaStoreOptions) {
     },
     acpModel: (agent: string) => acp.acpModels[agent] ?? null,
     chooseAcpModel(agent: string, model: string | null) {
-      if (model === null) {
-        delete acp.acpModels[agent];
-      } else {
-        acp.acpModels[agent] = model;
-      }
+      remember(acp.acpModels, agent, model);
+      schedule();
+    },
+    acpEffort: (agent: string) => acp.acpEfforts[agent] ?? null,
+    chooseAcpEffort(agent: string, effort: string | null) {
+      remember(acp.acpEfforts, agent, effort);
       schedule();
     },
     subscribe(listen: (change: Change) => void) {

@@ -81,9 +81,10 @@ describe('listAcpModels', () => {
     expect(await listAcpModels(fakeWith('config'), process.cwd())).toEqual({
       current: 'fast',
       models: [
-        { id: 'fast', name: 'Fast', description: 'Quick answers' },
-        { id: 'deep', name: 'Deep', description: null }
-      ]
+        { id: 'fast', name: 'Fast', description: 'Quick answers', efforts: [] },
+        { id: 'deep', name: 'Deep', description: null, efforts: [] }
+      ],
+      effort: null
     });
   });
 
@@ -100,7 +101,7 @@ describe('listAcpModels', () => {
 });
 
 describe('runAcpTurn with a model', () => {
-  const run = (models: string, model: string | null) => runAcpTurn({ agent: fakeWith(models), cwd: process.cwd(), mcpServers: [], prompt: 'hi', model }, { onUpdate: () => {}, ask: choose('yes') });
+  const run = (models: string, model: string | null, effort: string | null = null) => runAcpTurn({ agent: fakeWith(models), cwd: process.cwd(), mcpServers: [], prompt: 'hi', choice: { model, effort } }, { onUpdate: () => {}, ask: choose('yes') });
 
   it('switches the model through the config option before prompting', async () => {
     expect((await run('config', 'deep')).text).toBe('heard: hi on deep');
@@ -108,6 +109,18 @@ describe('runAcpTurn with a model', () => {
 
   it('switches the model through session/set_model when that is all the agent has', async () => {
     expect((await run('models', 'deep')).text).toBe('heard: hi on deep');
+  });
+
+  it('sets the effort the user chose, with or without a model change', async () => {
+    expect((await run('effort', null, 'max')).text).toBe('heard: hi on fast/max');
+    expect((await run('effort', 'deep', 'low')).text).toBe('heard: hi on deep/low');
+  });
+
+  it('lists the efforts next to the models', async () => {
+    const listed = await listAcpModels(fakeWith('effort'), process.cwd());
+
+    expect(listed?.effort).toBe('mid');
+    expect(listed?.models[0].efforts).toEqual(['low', 'mid', 'max']);
   });
 
   it('keeps the agent default when the saved model no longer exists', async () => {

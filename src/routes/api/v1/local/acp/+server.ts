@@ -16,7 +16,7 @@ const SSE_HEADERS = { 'content-type': 'text/event-stream', 'cache-control': 'no-
 
 type Body = { thread?: unknown; agent?: unknown; prompt?: unknown; cancel?: unknown; permission?: { id?: unknown; optionId?: unknown } };
 
-type Turn = { thread: string; agentId: string; agent: AgentCommand; model: string | null; prompt: string };
+type Turn = { thread: string; agentId: string; agent: AgentCommand; choice: { model: string | null; effort: string | null }; prompt: string };
 
 function answer(permission: NonNullable<Body['permission']>): Response {
   if (typeof permission.id !== 'string' || typeof permission.optionId !== 'string') {
@@ -107,5 +107,5 @@ export const POST: RequestHandler = async ({ request }) => {
     error(CONFLICT, `${detected.agent.name} is not installed here, or cannot run over ACP`);
   }
 
-  return stream({ thread: body.thread, agentId: body.agent, agent: detected.command, model: opened.acpModel(body.agent), prompt: body.prompt }, request.signal);
+  return stream({ thread: body.thread, agentId: body.agent, agent: detected.command, choice: { model: opened.acpModel(body.agent), effort: opened.acpEffort(body.agent) }, prompt: body.prompt }, request.signal);
 };

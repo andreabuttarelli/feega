@@ -58,6 +58,21 @@ describe('il file .feega è il database della modalità locale', () => {
     expect(reopened.acpModel('claude')).toBeNull();
   });
 
+  it('ricorda lo sforzo scelto per ogni agente, anche dopo la riapertura', async () => {
+    const path = tempFile();
+    const first = openFeegaStore(path, { origin: ORIGIN });
+    expect(first.acpEffort('claude')).toBeNull();
+
+    first.chooseAcpEffort('claude', 'max');
+    first.chooseAcpEffort('codex', 'low');
+    first.chooseAcpEffort('codex', null);
+    await first.flush();
+
+    const reopened = openFeegaStore(path, { origin: ORIGIN });
+    expect(reopened.acpEffort('claude')).toBe('max');
+    expect(reopened.acpEffort('codex')).toBeNull();
+  });
+
   it('un file che non esiste nasce vuoto e viene scritto sul disco', async () => {
     const path = tempFile();
     const store = openFeegaStore(path, { origin: ORIGIN });

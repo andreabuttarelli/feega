@@ -1,10 +1,10 @@
 import { ACP_AGENTS_ENDPOINT } from './detected-agent';
 
-export type AgentModel = { id: string; name: string; description: string | null };
+export type AgentModel = { id: string; name: string; description: string | null; efforts?: string[] };
 
-export type AgentModels = { current: string; models: AgentModel[] };
+export type AgentModels = { current: string; effort?: string | null; models: AgentModel[] };
 
-export type ModelListing = { models: AgentModel[] | null; current: string | null; chosen: string | null };
+export type ModelListing = { models: AgentModel[] | null; current: string | null; chosen: string | null; effort?: string | null; chosenEffort?: string | null };
 
 export type ModelGroup = { provider: string | null; models: AgentModel[] };
 

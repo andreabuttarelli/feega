@@ -9,7 +9,9 @@ import { readAcpEvents, AcpEventKind, type AcpEvent } from '$lib/acp/acp-events'
 const local = vi.hoisted(() => ({ on: true }));
 const cancelLog = vi.hoisted(() => ({ path: '' }));
 
-vi.mock('$lib/server/local/local-mode', () => ({ localStore: () => (local.on ? { acpModel: (agent: string) => (agent === 'codex' ? 'deep' : null) } : null) }));
+vi.mock('$lib/server/local/local-mode', () => ({
+  localStore: () => (local.on ? { acpModel: (agent: string) => (agent === 'codex' ? 'deep' : null), acpEffort: (agent: string) => (agent === 'codex' ? 'max' : null) } : null)
+}));
 
 vi.mock('$lib/server/acp/detect', async (real) => {
   const mod = await real<typeof import('$lib/server/acp/detect')>();
@@ -18,7 +20,7 @@ vi.mock('$lib/server/acp/detect', async (real) => {
     ...mod,
     detectCached: async () => [
       { agent: { id: 'claude' }, command: fake },
-      { agent: { id: 'codex' }, command: { ...fake, env: { FAKE_ACP_MODELS: 'config' } } },
+      { agent: { id: 'codex' }, command: { ...fake, env: { FAKE_ACP_MODELS: 'effort' } } },
       { agent: { id: 'chatty' }, command: { ...fake, env: { FAKE_ACP_CHATTY: '1', FAKE_ACP_LOG: cancelLog.path } } },
       { agent: { id: 'goose' }, command: null }
     ]
@@ -56,10 +58,10 @@ describe('POST /api/v1/local/acp', () => {
     expect(events[3]).toEqual({ kind: AcpEventKind.Done, stopReason: 'end_turn' });
   });
 
-  it('runs the turn on the model this file saved for the agent', async () => {
+  it('runs the turn on the model and effort this file saved for the agent', async () => {
     const events = (await runTurn((e) => ({ permission: { id: e.id, optionId: 'yes' } }), undefined, 'codex')).slice(1);
 
-    expect(events[0]).toMatchObject({ update: { content: { text: 'heard: add a title on deep' } } });
+    expect(events[0]).toMatchObject({ update: { content: { text: 'heard: add a title on deep/max' } } });
   });
 
   it('passes a rejection to the agent', async () => {

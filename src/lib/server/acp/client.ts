@@ -2,7 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import type { AcpOption, AcpUpdate } from '$lib/acp/acp-events';
 import type { AgentModels } from '$lib/acp/agent-models';
-import { modelsOf, switchFor, type NewSession } from './models';
+import { modelsOf, switchesFor, type Choice, type NewSession } from './models';
 
 export const ACP_PROTOCOL_VERSION = 1;
 
@@ -10,7 +10,7 @@ export type AgentCommand = { command: string; args: string[]; env?: Record<strin
 
 export type McpServer = { name: string; command: string; args: string[]; env: { name: string; value: string }[] };
 
-export type AcpTurnInput = { agent: AgentCommand; cwd: string; mcpServers: McpServer[]; prompt: string; model?: string | null };
+export type AcpTurnInput = { agent: AgentCommand; cwd: string; mcpServers: McpServer[]; prompt: string; choice?: Choice };
 
 export type AcpTurn = { text: string; toolCalls: string[]; stopReason: string };
 
@@ -184,13 +184,10 @@ async function withSession<T>(s: Session, hooks: AcpTurnHooks, work: (acp: Conne
 }
 
 export function listAcpModels(agent: AgentCommand, cwd: string): Promise<AgentModels | null> {
-  return withSession({ agent, cwd, mcpServers: [] }, SILENT, async (_, session) => {
-    const offered = modelsOf(session);
-    return offered && { current: offered.current, models: offered.models };
-  });
+  return withSession({ agent, cwd, mcpServers: [] }, SILENT, async (_, session) => modelsOf(session));
 }
 
-type Live = { agentId: string; acp: Connection; session: NewSession; model: string | null; idle: ReturnType<typeof setTimeout> | null };
+type Live = { agentId: string; acp: Connection; session: NewSession; choice: Choice; idle: ReturnType<typeof setTimeout> | null };
 
 function launch(s: Session): Promise<{ acp: Connection; session: NewSession }> {
   const child = spawn(s.agent.command, s.agent.args, { cwd: s.cwd, env: { ...process.env, ...s.agent.env }, stdio: ['pipe', 'pipe', 'inherit'] }) as unknown as ChildProcessWithoutNullStreams;
@@ -226,7 +223,7 @@ export function createAcpSessions(idleMs = IDLE_MS) {
 
     close(input.thread);
     hooks.onStarting?.();
-    const opening = launch(input).then(({ acp, session }): Live => ({ agentId: input.agentId, acp, session, model: modelsOf(session)?.current ?? null, idle: null }));
+    const opening = launch(input).then(({ acp, session }): Live => ({ agentId: input.agentId, acp, session, choice: { model: modelsOf(session)?.current ?? null, effort: modelsOf(session)?.effort ?? null }, idle: null }));
     threads.set(input.thread, opening);
     opening.catch(() => threads.delete(input.thread));
     return opening;
@@ -235,11 +232,11 @@ export function createAcpSessions(idleMs = IDLE_MS) {
   async function prompt(live: Live, input: ThreadTurn, stop: AbortSignal): Promise<AcpTurn> {
     const { acp, session } = live;
     const { sessionId } = session;
-    const change = switchFor(session, live.model, input.model ?? null);
-    if (change) {
+    const { switches, now } = switchesFor(session, live.choice, input.choice ?? { model: null, effort: null });
+    for (const change of switches) {
       await acp.request(change.method, change.params);
-      live.model = input.model ?? live.model;
     }
+    live.choice = now;
 
     if (stop.aborted) {
       return { ...acp.result(), stopReason: CANCELLED.outcome };

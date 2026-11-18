@@ -1,15 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentModels } from '$lib/acp/agent-models';
 
-const SOL_MODELS: AgentModels = { current: 'sol', models: [{ id: 'sol', name: 'Sol', description: null }, { id: 'luna', name: 'Luna', description: 'Fast' }] };
+const SOL_MODELS: AgentModels = { current: 'sol', effort: 'high', models: [{ id: 'sol', name: 'Sol', description: null, efforts: ['low', 'high'] }, { id: 'luna', name: 'Luna', description: 'Fast', efforts: [] }] };
 
-const state = vi.hoisted(() => ({ on: true, saved: {} as Record<string, string>, refreshes: [] as string[], fails: false }));
+const state = vi.hoisted(() => ({ on: true, saved: {} as Record<string, string>, efforts: {} as Record<string, string>, refreshes: [] as string[], fails: false }));
 
 vi.mock('$lib/server/local/local-mode', () => ({
   localStore: () =>
     state.on
       ? {
           acpModel: (agent: string) => state.saved[agent] ?? null,
+          acpEffort: (agent: string) => state.efforts[agent] ?? null,
+          chooseAcpEffort: (agent: string, effort: string | null) => {
+            if (effort === null) {
+              delete state.efforts[agent];
+              return;
+            }
+            state.efforts[agent] = effort;
+          },
           chooseAcpModel: (agent: string, model: string | null) => {
             if (model === null) {
               delete state.saved[agent];
@@ -54,6 +62,7 @@ describe('/api/v1/local/acp/agents/[agent]/models', () => {
   beforeEach(() => {
     state.on = true;
     state.saved = {};
+    state.efforts = {};
     state.refreshes = [];
     state.fails = false;
   });
@@ -61,7 +70,9 @@ describe('/api/v1/local/acp/agents/[agent]/models', () => {
   it('lists the models the live agent offers, its default and the saved choice', async () => {
     state.saved.codex = 'luna';
 
-    expect(await (await get('codex')).json()).toEqual({ models: SOL_MODELS.models, current: 'sol', chosen: 'luna' });
+    state.efforts.codex = 'low';
+
+    expect(await (await get('codex')).json()).toEqual({ models: SOL_MODELS.models, current: 'sol', chosen: 'luna', effort: 'high', chosenEffort: 'low' });
     expect(state.refreshes).toEqual(['cached']);
   });
 
@@ -72,7 +83,7 @@ describe('/api/v1/local/acp/agents/[agent]/models', () => {
   });
 
   it('answers no models for an agent without a model choice', async () => {
-    expect(await (await get('amp')).json()).toEqual({ models: null, current: null, chosen: null });
+    expect(await (await get('amp')).json()).toEqual({ models: null, current: null, chosen: null, effort: null, chosenEffort: null });
   });
 
   it('reports an agent that cannot start a session', async () => {
@@ -87,6 +98,18 @@ describe('/api/v1/local/acp/agents/[agent]/models', () => {
 
     await put('codex', { model: null });
     expect(state.saved.codex).toBeUndefined();
+  });
+
+  it('saves an effort some model of the agent offers, and clears it with null', async () => {
+    await put('codex', { effort: 'low' });
+    expect(state.efforts.codex).toBe('low');
+
+    await put('codex', { effort: null });
+    expect(state.efforts.codex).toBeUndefined();
+  });
+
+  it('refuses an effort no model of the agent offers', async () => {
+    await expect(put('codex', { effort: 'ultra' })).rejects.toMatchObject({ status: 400 });
   });
 
   it('refuses a model the agent does not offer', async () => {
