@@ -3,7 +3,8 @@
   import DownloadMac from './DownloadMac.svelte';
   import Mark from './Mark.svelte';
   import { onMount } from 'svelte';
-  import { APP_URL, HEADER_LINKS, MENU_LINKS, SOCIAL_LINKS } from './links';
+  import { APP_URL, GITHUB_URL, HEADER_LINKS, MENU_LINKS, SOCIAL_LINKS } from './links';
+  import { GITHUB_ICON } from './social-icons';
   import { homeHref } from './signed-in';
 
   let open = $state(false);
@@ -28,9 +29,18 @@
     <a class="chip cta" href={APP_URL}><span>let’s start</span></a>
   </div>
 
-  <button class="toggle" type="button" aria-expanded={open} onclick={() => (open = !open)}>
-    {open ? 'close' : 'menu'}
-  </button>
+  <div class="mobile">
+    <a class="github" href={GITHUB_URL} aria-label="Feega on GitHub">{@html GITHUB_ICON}</a>
+    <button class="toggle" type="button" aria-expanded={open} aria-label={open ? 'Close menu' : 'Open menu'} onclick={() => (open = !open)}>
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+        {#if open}
+          <path d="M6 6l12 12M18 6L6 18" />
+        {:else}
+          <path d="M4 8h16M4 16h16" />
+        {/if}
+      </svg>
+    </button>
+  </div>
 </header>
 
 {#if open}
@@ -95,18 +105,29 @@
     display: none;
   }
 
+  .mobile {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .github,
   .toggle {
-    margin-top: 10px;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
     padding: 0;
     border: 0;
     background: none;
     color: var(--site-ink);
-    font-family: 'BDO Grotesk', sans-serif;
-    font-variation-settings: 'wght' 500;
-    font-size: 14px;
-    line-height: 16.8px;
-    letter-spacing: -0.02em;
     cursor: pointer;
+  }
+
+  .github :global(svg),
+  .toggle svg {
+    width: 22px;
+    height: 22px;
   }
 
   .drawer {
@@ -182,7 +203,7 @@
       border-bottom: 1px solid currentColor;
     }
 
-    .toggle,
+    .mobile,
     .drawer {
       display: none;
     }
@@ -223,7 +244,7 @@
       border-bottom: 1px solid currentColor;
     }
 
-    .toggle,
+    .mobile,
     .drawer {
       display: none;
     }

@@ -69,7 +69,13 @@ describe('element rules', () => {
     const inMain = live.BUILD_TARGETS.filter((selector) => selector.startsWith('main'));
     expect(inMain.length).toBeGreaterThan(0);
     for (const selector of inMain) {
-      expect(selector.endsWith(`:not(${live.CHAPTER_SELECTOR} *)`)).toBe(true);
+      expect(selector).toContain(`:not(${live.CHAPTER_SELECTOR} *)`);
+    }
+  });
+
+  it('leaves the FAQ alone, so opening an answer never brings a new cursor', () => {
+    for (const selector of live.BUILD_TARGETS.filter((s) => s.startsWith('main'))) {
+      expect(selector).toContain('.faq');
     }
   });
 
