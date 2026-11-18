@@ -19,8 +19,6 @@ export const MARKETING_PATHS = [
   '/docs/cli',
   '/docs/mcp',
   '/docs/api',
-  '/docs/api/brands',
-  '/docs/api/products',
   '/docs/agents'
 ] as const;
 

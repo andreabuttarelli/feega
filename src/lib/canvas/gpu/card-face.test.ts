@@ -80,22 +80,18 @@ describe('faceOf — what a GPU card draws, one row per node type', () => {
 
   it('a source says what it waits for, syncs, or failed at', () => {
     const feed = (data: Record<string, unknown>, total = 0) => faceOf({ id: 'f', kind: 'social_account_feed' }, data, asset, { source: { tiles: [], total, name: null } });
-    const store = (data: Record<string, unknown>) => faceOf({ id: 'p', kind: 'products' }, data, asset);
 
     expect(feed({})).toMatchObject({ title: 'Feed social', empty: 'Select the node to choose the account.' });
     expect(feed({ handle: 'a' }).empty).toBe('No posts yet. Select the node to sync.');
     expect(feed({ handle: 'a' }, 4).empty).toBe('No results with these filters.');
     expect(feed({ handle: 'a', sync_status: 'running' }).count).toBe('syncing…');
     expect(feed({ handle: 'a', sync_status: 'failed', sync_error: 'rate limited' }).error).toBe('rate limited');
-    expect(store({ url: 'https://shop.example.com/' })).toMatchObject({ title: 'shop.example.com', empty: 'No products yet. Select the node to sync.' });
-    expect(store({})).toMatchObject({ title: 'Products', empty: 'Select the node to enter the store address.' });
   });
 
   it('kinds the default canvas draws as an empty node carry their name and what they wait for', () => {
     expect(faceOf({ id: 'a', kind: 'ads' }, { page_name: 'x' }, asset)).toMatchObject({ surface: Surface.Empty, title: 'Ads', subtitle: 'Search a brand or a keyword to see its ads.' });
     expect(faceOf({ id: 'c', kind: 'calendar' }, {}, asset)).toMatchObject({ surface: Surface.Empty, title: 'Calendar' });
     expect(faceOf({ id: 'p', kind: 'social_post_mockup' }, { general: { caption: 'x' } }, asset)).toMatchObject({ surface: Surface.Empty, title: 'Post preview' });
-    expect(faceOf({ id: 's', kind: 'studio_batch' }, {}, asset)).toMatchObject({ surface: Surface.Pick, title: 'Open Photo studio' });
   });
 
   it('an influencer carries its name, its cover and its number of views', () => {

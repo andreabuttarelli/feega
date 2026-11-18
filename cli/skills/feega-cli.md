@@ -15,7 +15,7 @@ Details: [feega/references/mcp.md](./feega/references/mcp.md) · [tools.md](./fe
 
 - Local: `feega login` (terminal) → `~/.config/feega/session.json`, shared with the MCP server
 - Remote MCP (`https://mcp.feega.app/mcp`): `Authorization: Bearer <access_token>`
-- Confirm with a `query` on `brands` (MCP) or `feega brands` (CLI) — never guess a brand or org
+- Confirm with a `query` on `projects` (MCP) or `feega projects` (CLI) — never guess an org or project
 
 ## Cursor MCP (stdio)
 
@@ -45,7 +45,6 @@ Details: [feega/references/mcp.md](./feega/references/mcp.md) · [tools.md](./fe
 ```bash
 curl -sSL https://raw.githubusercontent.com/andreabuttarelli/feega/main/cli/scripts/install.sh | bash
 feega login
-feega brands
-feega content <slug> --status pending_user
-feega approve <slug> --all
+feega projects
+feega motion list
 ```

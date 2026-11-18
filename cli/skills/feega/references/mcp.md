@@ -7,7 +7,7 @@ Model Context Protocol server for feega. Same HTTPS client and OAuth as the CLI.
 Host (Cursor / Claude / …)
   ├─ stdio  → bun run mcp / feega-mcp
   └─ HTTPS  → https://mcp.feega.app/mcp  (+ Bearer on remote)
-         └─ feega API /api/v1/org/* and /api/v1/brands/:slug/*
+         └─ feega API /api/v1/org/*
 ```
 
 ## 1. Pick a transport
@@ -84,7 +84,7 @@ bun run mcp:http     # http://localhost:8787/mcp
 
 1. Run `feega login` in a terminal — it opens the browser.
 2. Session is stored at `~/.config/feega/session.json` and shared with the CLI.
-3. Confirm with a `query` on `brands` — rows come back, or you are not signed in.
+3. Confirm with a `query` on `projects` — rows come back, or you are not signed in.
 
 **Remote HTTP**
 
@@ -101,8 +101,8 @@ There is **no** `FEEGA_TOKEN` / API-key path by design.
 
 ## 4. First calls
 
-1. `query({ table: "brands", columns: ["id","slug","name","plan","status"] })` — confirm auth and
-   learn which brands/orgs this session can see.
+1. `query({ table: "projects", columns: ["id","name"] })` — confirm auth and
+   learn which projects this session can see.
 2. `query({ table: "canvases", columns: ["id","name","project_id"] })`
    — the canvases of the org (add a `project_id` filter once you have one).
 

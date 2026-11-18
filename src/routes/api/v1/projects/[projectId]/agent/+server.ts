@@ -1,12 +1,11 @@
 import { json } from '@sveltejs/kit';
 import { agentEditRefusal } from '$lib/server/agent-edits/cap';
-import type { Db } from '$lib/server/db/client';
 import { pickOf } from '$lib/server/project-agent/model-route';
 import { planModel } from '$lib/server/project-agent/agent-plan';
 import { ProductEvent, track } from '$lib/server/product-events/track';
-import { startProjectTurn, type BriefBrand } from '$lib/server/project-agent/turn';
+import { startProjectTurn } from '$lib/server/project-agent/turn';
 import { offeredChatModels, resolveChoice } from '$lib/server/chat-model/catalogue';
-import { gateAiAction, gateOrgAiAction } from '$lib/server/cli-auth';
+import { gateOrgAiAction } from '$lib/server/cli-auth';
 import { CAP_REACHED, capRefusal, liveCapReader } from '$lib/server/spend-caps/gate';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { listCanvases } from '$lib/server/repos/canvas';
@@ -23,33 +22,9 @@ import { stopTurn } from '$lib/server/repos/chat-reply';
 import { readChips } from '$lib/chat-selection';
 import type { RequestHandler } from './$types';
 
-/**
- * LA CHAT DI PROGETTO: agnostica al brand.
- *
- * Il progetto è il contenitore; il brand è una PROPRIETÀ nullable. Con zero brand il turno parte
- * lo stesso — i tool di tela ci sono, quelli di brand no. Con un brand attaccato la superficie
- * cresce e il prompt lo dice.
- *
- * Contratto stabile per la sidebar:
- *   POST { message }  →  stream UI messages (stessa forma della vecchia chat di brand)
- *   GET               →  { threadId, messages: [{ role, content }] }
- */
 const HTTP_FORBIDDEN = 403;
 
 export const config = { maxDuration: AGENT_MAX_DURATION_S };
-
-async function loadBriefBrand(
-  db: Db,
-  input: { orgId: string; brandId: string }
-): Promise<BriefBrand | null> {
-  const { data } = await db
-    .from('brands')
-    .select('id, name, slug')
-    .eq('id', input.brandId)
-    .eq('org_id', input.orgId)
-    .maybeSingle();
-  return (data as BriefBrand | null) ?? null;
-}
 
 export const POST: RequestHandler = async ({ request, url, params, locals }) => {
   const { session, user } = await locals.safeGetSession();
@@ -69,9 +44,8 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   }
 
   const { orgId, project } = found;
-  const brand = project.brandId ? await loadBriefBrand(db, { orgId, brandId: project.brandId }) : null;
 
-  const gated = brand ? await gateAiAction(brand, undefined) : await gateOrgAiAction(orgId, undefined);
+  const gated = await gateOrgAiAction(orgId, undefined);
   const actor = { userId: user.id, orgId };
   if (gated) {
     await track(ProductEvent.CreditsExhausted, actor, {});
@@ -116,12 +90,7 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
 
   const canvases = await listCanvases(db, { orgId, projectId: project.id });
   const canvasId = canvases.find((c) => c.id === openCanvas)?.id ?? null;
-  const threadId = await openThread(db, {
-    orgId,
-    projectId: project.id,
-    userId: user.id,
-    brandId: brand?.id ?? null
-  });
+  const threadId = await openThread(db, { orgId, projectId: project.id, userId: user.id });
   const turns = await loadTurns(db, { orgId, threadId });
   const history = promptHistory(turns);
   const pick = readAnswer(text) ?? latestAnswer(turns);
@@ -133,7 +102,7 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   }
 
   await track(ProductEvent.AgentStarted, actor, { model });
-  return startProjectTurn({ db, userId: user.id, accessToken: session.access_token, origin: url.origin, orgId, project, brand, text, attachments, model, reasoning, frame, selection, canvases, canvasId, threadId, turns, history, pick });
+  return startProjectTurn({ db, userId: user.id, origin: url.origin, orgId, project, text, attachments, model, reasoning, frame, selection, canvases, canvasId, threadId, turns, history, pick });
 };
 
 export const GET: RequestHandler = async ({ params, locals }) => {
@@ -152,12 +121,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
   }
 
   const { orgId, project } = found;
-  const threadId = await openThread(db, {
-    orgId,
-    projectId: project.id,
-    userId: user.id,
-    brandId: project.brandId
-  });
+  const threadId = await openThread(db, { orgId, projectId: project.id, userId: user.id });
 
   const [messages, running] = await Promise.all([loadTurns(db, { orgId, threadId }), turnRunning(db, { orgId, threadId })]);
   return json({ threadId, messages, running });
@@ -179,7 +143,7 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
   }
 
   const { orgId, project } = found;
-  const threadId = await openThread(db, { orgId, projectId: project.id, userId: user.id, brandId: project.brandId });
+  const threadId = await openThread(db, { orgId, projectId: project.id, userId: user.id });
   await stopTurn(db, { orgId, threadId });
   return json({ stopped: true });
 };

@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { NarrowedDatabase } from './typed-database';
 
 type NodeInsert = NarrowedDatabase['public']['Tables']['nodes']['Insert'];
-type PostsInsert = NarrowedDatabase['public']['Tables']['posts']['Insert'];
-type AdCampaignsInsert = NarrowedDatabase['public']['Tables']['ad_campaigns']['Insert'];
 type CanvasesInsert = NarrowedDatabase['public']['Tables']['canvases']['Insert'];
 
 describe('NarrowedDatabase rejects a wrong jsonb shape at compile time', () => {
@@ -46,34 +44,6 @@ describe('NarrowedDatabase rejects a wrong jsonb shape at compile time', () => {
     };
 
     expect(missingPrompt.type).toBe('image');
-  });
-
-  it('posts.media must be the assetId/order/role shape, not an arbitrary object', () => {
-    const wrongMedia: PostsInsert = {
-      org_id: 'org_1',
-      brand_id: 'brand_1',
-      caption: 'caption',
-      // @ts-expect-error media items need assetId and order, not url
-      media: [{ url: 'https://example.com/a.png' }]
-    };
-
-    expect(wrongMedia.caption).toBe('caption');
-  });
-
-  it('ad_campaigns.targeting rejects a field the schema does not declare', () => {
-    const wrongTargeting: AdCampaignsInsert = {
-      org_id: 'org_1',
-      brand_id: 'brand_1',
-      ad_account_id: 'acct_1',
-      name: 'campaign',
-      objective: 'traffic',
-      budget_type: 'daily',
-      budget_amount: 10,
-      // @ts-expect-error budget is not part of AdTargeting
-      targeting: { budget: 10 }
-    };
-
-    expect(wrongTargeting.name).toBe('campaign');
   });
 
   it('canvases.viewport requires x, y and zoom as numbers', () => {

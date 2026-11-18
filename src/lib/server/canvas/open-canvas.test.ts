@@ -9,7 +9,7 @@ const CANVAS = '33333333-3333-3333-3333-333333333333';
 const PROJECT = '44444444-4444-4444-4444-444444444444';
 
 const member = (orgId: string) => ({ role: 'owner', created_at: '2026-01-01', user_id: USER, orgs: { id: orgId, name: 'Acme', slug: 'acme' }, profiles: { active_org_id: orgId } });
-const canvas = (orgId: string) => ({ id: CANVAS, org_id: orgId, project_id: PROJECT, name: 'Untitled', viewport: null, projects: { mode: 'standard', brand_id: null } });
+const canvas = (orgId: string) => ({ id: CANVAS, org_id: orgId, project_id: PROJECT, name: 'Untitled', viewport: null, projects: { mode: 'standard', } });
 
 function watched(rows: Record<string, unknown[]>) {
   const fake = fakeDb(rows);
@@ -36,7 +36,7 @@ describe('aprire una tela per una persona', () => {
 
     const opened = await openCanvasForUser(db, { userId: USER, canvasId: CANVAS });
 
-    expect(opened.found).toEqual({ orgId: ORG, canvas: { id: CANVAS, projectId: PROJECT, name: 'Untitled', viewport: null }, mode: 'standard', projectBrandId: null });
+    expect(opened.found).toEqual({ orgId: ORG, canvas: { id: CANVAS, projectId: PROJECT, name: 'Untitled', viewport: null }, mode: 'standard', });
   });
 
   it("una tela di un'org di cui non è membro non si apre, anche se il database la restituisce", async () => {

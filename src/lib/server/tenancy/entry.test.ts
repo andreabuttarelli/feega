@@ -28,7 +28,7 @@ const CANVAS = '44444444-4444-4444-4444-444444444444';
 const user = { id: USER, email: 'chi@esempio.it', user_metadata: {} } as unknown as User;
 
 const membership: Membership = { org: { id: ORG, name: 'chi', slug: 'chi-abcd' }, role: 'owner' };
-const project = { id: PROJECT, name: DEFAULT_PROJECT_NAME, slug: 'untitled', brandId: null, archivedAt: null, lastActiveAt: '2026-09-21T00:00:00Z', mode: ProjectMode.Standard };
+const project = { id: PROJECT, name: DEFAULT_PROJECT_NAME, slug: 'untitled', archivedAt: null, lastActiveAt: '2026-09-21T00:00:00Z', mode: ProjectMode.Standard };
 const canvas = { id: CANVAS, projectId: PROJECT, name: DEFAULT_CANVAS_NAME, viewport: null };
 
 /** I collaboratori del bootstrap, sostituiti uno per uno: il test guarda QUANTE volte si crea. */
@@ -81,12 +81,12 @@ describe('entrare la prima volta crea tutto, una volta sola', () => {
     expect(d.ensureProfile).toHaveBeenCalledOnce();
   });
 
-  it('un progetto nasce senza brand: è il caso normale', async () => {
+  it('il primo progetto nasce nell\'org appena creata', async () => {
     const d = deps({ listMemberships: vi.fn(async () => []), listProjects: vi.fn(async () => []) });
 
     await enterApp(db, d, user);
 
-    expect(d.createProject).toHaveBeenCalledWith(db, expect.objectContaining({ orgId: ORG, brandId: null }));
+    expect(d.createProject).toHaveBeenCalledWith(db, expect.objectContaining({ orgId: ORG }));
   });
 
   it('due schede sulla stessa org vuota non creano due progetti "Untitled"', async () => {
@@ -153,7 +153,6 @@ describe('con più progetti, atterra su quello usato per ultimo', () => {
     id: '66666666-6666-6666-6666-666666666666',
     name: DEFAULT_PROJECT_NAME,
     slug: 'untitled',
-    brandId: null,
     archivedAt: null,
     lastActiveAt: '2026-09-24T10:00:00Z',
     mode: ProjectMode.Standard
@@ -176,8 +175,8 @@ describe('con più progetti, atterra su quello usato per ultimo', () => {
   });
 });
 
-describe('la tela ha un indirizzo, e non è quello del brand', () => {
-  it('il percorso è scopato sulla tela, non sul brand', () => {
+describe('la tela ha un indirizzo scopato sulla tela', () => {
+  it('il percorso è scopato sulla tela', () => {
     expect(canvasPath(PROJECT, CANVAS)).toBe(`/p/${PROJECT}/c/${CANVAS}`);
   });
 });
@@ -280,7 +279,7 @@ describe('arriving from the website opens a new project with the site on it', ()
 
     const made = await startProject(db, d, user, null, 'https://www.stripe.com/');
 
-    expect(d.createProject).toHaveBeenCalledWith(db, expect.objectContaining({ orgId: ORG, name: 'stripe.com', brandId: null }));
+    expect(d.createProject).toHaveBeenCalledWith(db, expect.objectContaining({ orgId: ORG, name: 'stripe.com' }));
     expect(d.createCanvas).toHaveBeenCalledWith(db, { orgId: ORG, projectId: site.id, name: DEFAULT_CANVAS_NAME });
     expect(made).toEqual({ projectId: site.id, canvasId: 'site-canvas' });
   });

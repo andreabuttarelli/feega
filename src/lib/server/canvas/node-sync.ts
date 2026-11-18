@@ -2,14 +2,38 @@ import { withOrgContext } from '$lib/server/ai-log';
 import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
 import { DataCheck, findNode, patchNodeData, writeNodeData, type PatchWrite } from '$lib/server/repos/canvas';
-import { socialFeedOf } from '$lib/canvas-node-data';
+import { productsOf, socialFeedOf } from '$lib/canvas-node-data';
+import { normalizeUrl } from '$lib/ads-fee';
 import { normalizeHandle } from '$lib/canvas/source-filters';
+import { isProductPlatform } from '$lib/canvas/products-node';
 import { isSocialFeedPlatform } from '$lib/canvas/social-feed-node';
+import { syncProductsNode } from './products-sync';
 import { syncSocialFeedNode, syncSocialFeedEntries } from './social-feed-sync';
 
 type SyncNodeOutcome = { ok: true; synced: number; extra?: Record<string, unknown> } | { ok: false; error: string };
 
 type SyncedNode = { id: string; data: Record<string, unknown> };
+
+async function syncProducts(db: Db, orgId: string, projectId: string | null, node: SyncedNode): Promise<SyncNodeOutcome> {
+  const parsed = productsOf({ id: node.id, type: 'products', data: node.data });
+  const storeUrl = normalizeUrl(parsed?.url);
+  if (!parsed || !isProductPlatform(parsed.platform) || !storeUrl) {
+    return { ok: false, error: 'invalid_url: this node has no store URL to sync' };
+  }
+
+  const outcome = await syncProductsNode(db, {
+    orgId,
+    projectId,
+    nodeId: node.id,
+    platform: parsed.platform,
+    storeUrl,
+    limit: parsed.limit,
+    onlyFirstPhoto: parsed.onlyFirstPhoto,
+    category: parsed.category
+  });
+
+  return outcome.ok ? { ok: true, synced: outcome.synced, extra: { sync_summary: outcome.summary } } : outcome;
+}
 
 const PLATFORM_LABELS: Record<string, string> = {
   instagram: 'Instagram',
@@ -51,6 +75,7 @@ async function syncSocialFeed(db: Db, orgId: string, projectId: string | null, n
 }
 
 const SYNC_OF: Record<string, (db: Db, orgId: string, projectId: string | null, node: SyncedNode) => Promise<SyncNodeOutcome>> = {
+  products: syncProducts,
   social_account_feed: syncSocialFeed
 };
 

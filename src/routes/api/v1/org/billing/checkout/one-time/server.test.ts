@@ -110,7 +110,7 @@ describe('POST /api/v1/org/billing/checkout/one-time', () => {
 		expect(createOneTimeCreditCheckout).not.toHaveBeenCalled();
 	});
 
-	it('checks the owner against the caller's org', async () => {
+	it('checks the owner against the org of the caller', async () => {
 		await call({ credits: 2000 });
 		expect(isOrgOwner).toHaveBeenCalledWith(expect.anything(), 'org-1', 'user-1');
 	});

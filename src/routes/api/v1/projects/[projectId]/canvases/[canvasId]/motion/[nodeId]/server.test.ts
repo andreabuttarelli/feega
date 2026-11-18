@@ -10,7 +10,7 @@ const { USER, current } = vi.hoisted(() => ({ USER: { id: 'u1', email: 'ada@x.it
 vi.mock('$lib/server/db/client', () => ({ createUserDb: () => current.db }));
 vi.mock('$lib/server/nav-cache', () => ({ verifiedToken: async (_db: unknown, token: string) => (token === 'jwt' ? USER : null) }));
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
-const lookupFound = () => ({ orgId: 'org-a', canvas: { id: 'c1', projectId: 'p1', name: 'C' }, projectBrandId: null });
+const lookupFound = () => ({ orgId: 'org-a', canvas: { id: 'c1', projectId: 'p1', name: 'C' }, });
 vi.mock('$lib/server/canvas/lookup', () => ({ findCanvasForUser: async () => lookupFound(), openCanvasForUser: async () => ({ memberships: [], found: lookupFound() }) }));
 vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ canvasReachable: async () => true }));
 vi.mock('$lib/server/repos/canvas', async (real) => ({ ...(await real<object>()), patchNodeData: vi.fn(async () => ({ ok: true })), findNode: vi.fn(async () => null) }));

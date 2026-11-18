@@ -1,8 +1,9 @@
 import { normalizeUrl } from '$lib/ads-fee';
-import { socialFeedData, socialFeedOf, type NodeRow } from '$lib/canvas-node-data';
+import { productsData, productsOf, socialFeedData, socialFeedOf, type NodeRow } from '$lib/canvas-node-data';
+import { PRODUCT_PLATFORMS } from './products-node';
 import { isSocialFeedPlatform, SOCIAL_FEED_PLATFORMS, type SocialFeedPlatform } from './social-feed-node';
 import { canStartSync, type SyncNode } from './sync-state';
-import { FEED_MEDIA, FEED_SORTS, normalizeHandle } from './source-filters';
+import { FEED_MEDIA, FEED_SORTS, PRODUCT_SORTS, normalizeHandle } from './source-filters';
 import { classifySocialLines } from './social-url-classifier';
 
 export enum FieldKind {
@@ -60,6 +61,23 @@ const OPTION_LABELS: Record<string, string> = {
 
 const options = (values: readonly string[], labels: Record<string, string>): Option[] =>
   values.map((value) => ({ value, label: labels[value] ?? value }));
+
+export const PRODUCT_FIELDS: readonly FieldSpec[] = [
+  { path: 'platform', label: 'Platform', kind: FieldKind.Select, appliesAt: AppliesAt.Fetch, options: options(PRODUCT_PLATFORMS, PLATFORM_LABELS) },
+  { path: 'url', label: 'Store address', kind: FieldKind.Text, appliesAt: AppliesAt.Fetch, placeholder: 'store.example.com', normalize: normalizeUrl },
+  { path: 'limit', label: 'Number of products', kind: FieldKind.Number, appliesAt: AppliesAt.Fetch, required: true },
+  { path: 'onlyFirstPhoto', label: 'First photo only', kind: FieldKind.Toggle, appliesAt: AppliesAt.Fetch },
+  { path: 'category', label: 'Category / collection', kind: FieldKind.Text, appliesAt: AppliesAt.Fetch, placeholder: 'e.g. summer-sale' },
+  { path: 'filters.query', label: 'Title or description contains', kind: FieldKind.Text, appliesAt: AppliesAt.Read },
+  { path: 'filters.price_min', label: 'Minimum price', kind: FieldKind.Number, appliesAt: AppliesAt.Read },
+  { path: 'filters.price_max', label: 'Maximum price', kind: FieldKind.Number, appliesAt: AppliesAt.Read },
+  { path: 'filters.in_stock_only', label: 'In stock only', kind: FieldKind.Toggle, appliesAt: AppliesAt.Read },
+  { path: 'filters.on_sale_only', label: 'On sale only', kind: FieldKind.Toggle, appliesAt: AppliesAt.Read },
+  { path: 'filters.tag', label: 'Tag', kind: FieldKind.Text, appliesAt: AppliesAt.Read, placeholder: 'e.g. summer' },
+  { path: 'filters.vendor', label: 'Vendor', kind: FieldKind.Text, appliesAt: AppliesAt.Read },
+  { path: 'filters.product_type', label: 'Product type', kind: FieldKind.Text, appliesAt: AppliesAt.Read },
+  { path: 'filters.sort', label: 'Sort by', kind: FieldKind.Select, appliesAt: AppliesAt.Read, options: options(PRODUCT_SORTS, OPTION_LABELS) }
+];
 
 export const FEED_FIELDS: readonly FieldSpec[] = [
   { path: 'platform', label: 'Platform', kind: FieldKind.Select, appliesAt: AppliesAt.Fetch, options: options(SOCIAL_FEED_PLATFORMS, PLATFORM_LABELS) },
@@ -146,6 +164,10 @@ function view<N extends SyncNode>(
 }
 
 const INSPECTORS: Record<string, (row: NodeRow) => InspectorView | null> = {
+  products: (row) => {
+    const node = productsOf(row);
+    return node && view('Products', PRODUCT_FIELDS, node, node.url.trim().length > 0, productsData, node.syncSummary);
+  },
   social_account_feed: (row) => {
     const node = socialFeedOf(row);
     return node && view('Social feed', FEED_FIELDS, node, node.handle.trim().length > 0, socialFeedData, node.syncSummary);

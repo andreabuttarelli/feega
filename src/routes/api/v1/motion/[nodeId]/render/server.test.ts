@@ -24,7 +24,7 @@ vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
   findNode: async (_db: unknown, input: { orgId: string; nodeId: string }) =>
     input.orgId === ORG && input.nodeId === NODE ? { id: NODE, orgId: ORG, projectId: 'project-1', canvasId: 'canvas-1', type: 'motion', displayName: 'Launch', data: { format: '16:9', docHeadRevision: store.head, posterAssetId: null, lastRenderAssetId: null } } : null
 }));
-vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async () => ({ id: 'project-1', brandId: null }) }));
+vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async () => ({ id: 'project-1', }) }));
 vi.mock('$lib/server/repos/motion-revisions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/repos/motion-revisions')>()),
   readHead: async () => {

@@ -65,8 +65,6 @@ Web fonts the page loads are copied into your workspace's uploaded fonts and use
 
 Colours become variables in a collection named after the site (`Stripe/Primary`), type, shadows and gradients become styles (`Stripe Body`), and the layers that use them are bound. **Primary** is the fill of the page's main buttons, picked by how much they stand out from the page; when no button is coloured, the brand colour of the site wins if the page uses it. Other colours are named by role (Background, Text, Surface, Border, Accent), then by lightness (`Navy`, `Ink` for very dark tints, `Tint` for very light ones), by hue (`Green`) or by what they paint (`Surface 2`). The page's `h1` style is **H1**. Text colours, fills, single solid borders and plain rounded corners are bound; a corner radius is a number variable in px (`Radius M`), so changing it re-rounds every layer bound to it.
 
-Starting from a website on `/start` makes the brand first, so the first import already follows its palette.
-
 ## Components
 
 The import turns the parts of a page a designer would make into components: buttons, badges, nav links, footer links, inputs, tabs, avatars, logos, icons, cards, feature tiles, testimonials, pricing tiers, accordion items and list items. A part that is obviously a component (a button, a badge, an input, a small card) becomes one even when the page shows it once; a plain block becomes one when it repeats. A footer column is a frame of Footer link instances, not a component of its own, and a card as wide as a section or holding more than eight texts stays a block. What a block is comes from the page itself: the element (`<button>`, a link, a list item), its role, the word its class uses (`Button_root`), where it sits (nav, footer) and its shape.

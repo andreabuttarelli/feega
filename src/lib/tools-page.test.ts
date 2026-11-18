@@ -7,11 +7,11 @@ describe('the tools page lists what left the sidebar', () => {
     const entries = toolEntries('p1');
 
     expect(entries.map((e) => e.id)).toEqual([...TOOLS.filter((t) => t.route).map((t) => t.id), 'gallery']);
-    expect(entries.find((e) => e.id === 'studio')?.href).toBe('/app/studio?project=p1');
+    expect(entries.find((e) => e.id === 'motion')?.href).toBe('/app/motion?project=p1');
     expect(entries.at(-1)?.href).toBe('/gallery');
   });
 
   it('keeps the beta label here, where the sidebar no longer shows it', () => {
-    expect(toolEntries(null).find((e) => e.id === 'studio')?.badge).toBe('Beta');
+    expect(toolEntries(null).find((e) => e.id === 'motion')?.badge).toBe('Beta');
   });
 });

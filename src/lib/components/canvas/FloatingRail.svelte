@@ -11,7 +11,7 @@
 
   /**
    * LA RAIL FLOTTANTE: due gruppi separati da un divisore, e il divisore stesso dice il
-   * comportamento — sopra apre un pannello accanto alla tela (Assets/Brands), sotto un foglio al
+   * comportamento — sopra apre un pannello accanto alla tela (Assets), sotto un foglio al
    * posto della tela (Ads/Settings). Nessun `if` per voce: `shell-nav.ts` è l'unica tabella, qui
    * si legge e basta.
    */

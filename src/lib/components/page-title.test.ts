@@ -9,8 +9,6 @@ const VIEWS = [
   'src/routes/gallery/[id]/+page.svelte',
   'src/routes/app/motion/+page.svelte',
   'src/routes/app/compose/+page.svelte',
-  'src/routes/app/studio/+page.svelte',
-  'src/routes/app/studio/[batchId]/+page.svelte',
   'src/routes/app/upscale/+page.svelte',
   'src/routes/p/[projectId]/settings/+layout.svelte',
   'src/routes/login/+page.svelte'

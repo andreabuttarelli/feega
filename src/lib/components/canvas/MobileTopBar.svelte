@@ -25,7 +25,6 @@
     org,
     share = null,
     projectName,
-    brandName = null,
     projects,
     canvasName,
     canvasHref,
@@ -39,7 +38,6 @@
     org: { name: string } | null;
     share?: CanvasShareProps | null;
     projectName: string;
-    brandName?: string | null;
     projects: ProjectRow[];
     canvasName: string;
     canvasHref: string | null;
@@ -68,7 +66,6 @@
     open={switcherOpen}
     onOpenChange={(open) => (switcherOpen = open)}
     {projectName}
-    {brandName}
     {projects}
     {canvasName}
     {canvasHref}

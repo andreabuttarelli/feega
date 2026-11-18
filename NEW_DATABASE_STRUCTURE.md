@@ -1,3 +1,5 @@
+> Brands and products were removed on 2026-11-18: the sections about them are historical. See `docs/adr/0040-remove-brands.md`.
+
 # New database schema
 
 Convenzioni valide ovunque, per non ripeterle su ogni tabella:

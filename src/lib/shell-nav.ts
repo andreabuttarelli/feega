@@ -7,7 +7,7 @@ export type NavFamily = 'panel' | 'sheet' | 'route';
 export type NavEntry = {
   id: string;
   labelKey: string;
-  icon: 'images' | 'palette' | 'users-round' | 'settings' | 'camera' | 'layers' | 'components' | 'history' | 'styles' | 'sparkles';
+  icon: 'images' | 'users-round' | 'settings' | 'layers' | 'components' | 'history' | 'styles' | 'sparkles';
   family: NavFamily;
   path: string;
   mobilePath?: string;
@@ -19,21 +19,19 @@ export type NavEntry = {
 
 /**
  * OGNI VOCE DELLA RAIL, IN UNA TABELLA SOLA. `family` decide come si apre — `panel` accanto alla
- * tela (Assets/Brands, un pannello alla volta), `sheet` al posto della tela (Calendar/Ads/
+ * tela (Assets, un pannello alla volta), `sheet` al posto della tela (Calendar/Ads/
  * Settings, un foglio SvelteKit shallow-routed sopra). La rail li separa in due gruppi con un
  * divisore: il raggruppamento stesso dice il comportamento, senza un `if` per voce altrove.
  */
 export const NAV_ENTRIES: NavEntry[] = [
   { id: 'assets', labelKey: 'app.nav2.materials', icon: 'images', family: 'panel', path: '/assets', group: 'panel', local: true, shortcut: 'Alt+2' },
-  { id: 'brands', labelKey: 'app.nav2.brands', icon: 'palette', family: 'panel', path: '/brands', group: 'panel', shortcut: 'Alt+3' },
-  { id: 'influencers', labelKey: 'app.nav2.influencers', icon: 'users-round', family: 'panel', path: '/influencers', group: 'panel', shortcut: 'Alt+4' },
-  { id: 'studio', labelKey: 'app.nav2.studio', icon: 'camera', family: 'route', path: '/app/studio', group: 'workbench', offRail: true },
+  { id: 'influencers', labelKey: 'app.nav2.influencers', icon: 'users-round', family: 'panel', path: '/influencers', group: 'panel', shortcut: 'Alt+3' },
   { id: 'settings', labelKey: 'app.nav.settings', icon: 'settings', family: 'sheet', path: '/settings/project', mobilePath: '/settings', group: 'workbench' },
   { id: 'layers', labelKey: 'app.nav2.layers', icon: 'layers', family: 'panel', path: '', group: 'canvas', local: true, shortcut: 'Alt+1' },
-  { id: 'components', labelKey: 'app.nav2.components', icon: 'components', family: 'panel', path: '', group: 'panel', local: true, shortcut: 'Alt+5' },
-  { id: 'history', labelKey: 'app.nav2.history', icon: 'history', family: 'panel', path: '', group: 'panel', local: true, shortcut: 'Alt+6' },
-  { id: 'styles', labelKey: 'app.nav2.styles', icon: 'styles', family: 'panel', path: '', group: 'panel', local: true, shortcut: 'Alt+7' },
-  { id: 'ai', labelKey: 'app.nav2.ai', icon: 'sparkles', family: 'panel', path: '', group: 'panel', shortcut: 'Alt+8' }
+  { id: 'components', labelKey: 'app.nav2.components', icon: 'components', family: 'panel', path: '', group: 'panel', local: true, shortcut: 'Alt+4' },
+  { id: 'history', labelKey: 'app.nav2.history', icon: 'history', family: 'panel', path: '', group: 'panel', local: true, shortcut: 'Alt+5' },
+  { id: 'styles', labelKey: 'app.nav2.styles', icon: 'styles', family: 'panel', path: '', group: 'panel', local: true, shortcut: 'Alt+6' },
+  { id: 'ai', labelKey: 'app.nav2.ai', icon: 'sparkles', family: 'panel', path: '', group: 'panel', shortcut: 'Alt+7' }
 ];
 
 export const PANEL_WIDTHS: Record<string, number> = {
@@ -42,7 +40,6 @@ export const PANEL_WIDTHS: Record<string, number> = {
   history: 300,
   styles: 300,
   assets: 320,
-  brands: 320,
   influencers: 320,
   ai: 280
 };
@@ -71,7 +68,7 @@ export function mobileNavHref(projectId: string, entry: NavEntry): string {
 
 /**
  * LA RADICE DI UNA VOCE `sheet` è il suo primo segmento (`/settings`): il
- * foglio Settings deve restare aperto anche su `/settings/brand`, non solo sull'esatto
+ * foglio Settings deve restare aperto anche su `/settings/spend`, non solo sull'esatto
  * `/settings/project` a cui la rail porta di default — la sezione dentro cambia, la
  * famiglia no. Una sola regola invece di un elenco di prefissi sparso fra layout e componenti.
  */

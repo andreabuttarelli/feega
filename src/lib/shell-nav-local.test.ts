@@ -11,7 +11,6 @@ describe('la rail in modalita locale', () => {
 
   it('tiene fuori dalla rail le voci che servono il cloud', () => {
     const ids = railEntries('panel').map((e) => e.id);
-    expect(ids).not.toContain('brands');
     expect(ids).not.toContain('influencers');
   });
 });

@@ -282,11 +282,11 @@ describe('insert_row su nodes: data si giudica contro il suo type, prima di scri
 
     const out = await tools(supabase, 'org-mine').insertRow({
       table: 'nodes',
-      values: { canvas_id: 'c1', project_id: 'p1', type: 'ads', x: 0, y: 0, data: { mode: 'page', country: 'IT' } }
+      values: { canvas_id: 'c1', project_id: 'p1', type: 'influencer', x: 0, y: 0, data: {} }
     });
 
     expect(out.error).toBe('invalid_node_data');
-    expect(out.message).toMatch(/page_id/);
+    expect(out.message).toMatch(/influencer_id/);
     expect(calls.filter((c) => c.op === 'insert')).toHaveLength(0);
   });
 
@@ -521,64 +521,16 @@ describe('insert_row/update_row on nodes: model must be one the canvas offers', 
 });
 
 describe('insert_row/update_row: le colonne jsonb registrate si giudicano, non solo nodes.data', () => {
-  it('insert: rifiuta posts.media che non è un array di { assetId, order }', async () => {
+  it('insert: rifiuta chat_messages.attachments che non è un array di allegati', async () => {
     const { calls, supabase } = fakeAuthority({});
 
     const out = await tools(supabase, 'org-mine').insertRow({
-      table: 'posts',
-      values: { brand_id: 'b1', caption: 'x', media: { assetId: 'a1' } }
+      table: 'chat_messages',
+      values: { thread_id: 't1', role: 'user', attachments: { assetId: 'a1' } }
     });
 
     expect(out.error).toBe('invalid_jsonb_column');
-    expect(out.message).toMatch(/posts\.media/);
-    expect(calls.filter((c) => c.op === 'insert')).toHaveLength(0);
-  });
-
-  it('insert: accetta posts.media valido', async () => {
-    const { calls, supabase } = fakeAuthority({ writeRows: [{ id: 'p1' }] });
-
-    const out = await tools(supabase, 'org-mine').insertRow({
-      table: 'posts',
-      values: { brand_id: 'b1', caption: 'x', media: [{ assetId: 'a1', order: 0 }] }
-    });
-
-    expect(out.error).toBeUndefined();
-    expect(calls.filter((c) => c.op === 'insert')).toHaveLength(1);
-  });
-
-  it('insert: rifiuta ad_campaigns.targeting con un campo del tipo sbagliato', async () => {
-    const { supabase } = fakeAuthority({});
-
-    const out = await tools(supabase, 'org-mine').insertRow({
-      table: 'ad_campaigns',
-      values: { brand_id: 'b1', ad_account_id: 'acc1', name: 'x', targeting: { age_min: 'diciotto' } }
-    });
-
-    expect(out.error).toBe('invalid_jsonb_column');
-    expect(out.message).toMatch(/targeting/);
-  });
-
-  it('insert: una colonna jsonb intenzionalmente libera (brands.target) non blocca mai', async () => {
-    const { calls, supabase } = fakeAuthority({ writeRows: [{ id: 'b1' }] });
-
-    const out = await tools(supabase, 'org-mine').insertRow({
-      table: 'brands',
-      values: { name: 'x', slug: 'x', target: { qualunque: 'cosa' } }
-    });
-
-    expect(out.error).toBeUndefined();
-    expect(calls.filter((c) => c.op === 'insert')).toHaveLength(1);
-  });
-
-  it('insert: a brand palette that is not hex swatches is refused before writing', async () => {
-    const { calls, supabase } = fakeAuthority({ writeRows: [{ id: 'b1' }] });
-
-    const out = await tools(supabase, 'org-mine').insertRow({
-      table: 'brands',
-      values: { name: 'x', slug: 'x', palette: [{ hex: 'blue' }] }
-    });
-
-    expect(out.error).toBeDefined();
+    expect(out.message).toMatch(/chat_messages\.attachments/);
     expect(calls.filter((c) => c.op === 'insert')).toHaveLength(0);
   });
 

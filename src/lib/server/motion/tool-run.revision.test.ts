@@ -29,7 +29,7 @@ const head = retimed(base, 'title', 24);
 const commitDoc = vi.fn();
 
 vi.mock('./agent-embed', () => ({
-  savedMotionWith: async () => ({ record: { projectId: 'p', canvasId: 'c', displayName: null }, node: { format: MotionFormat.Landscape }, project: { id: 'p', brandId: null, mode: 'normal' }, version: HEAD, doc: head, alongside: [] })
+  savedMotionWith: async () => ({ record: { projectId: 'p', canvasId: 'c', displayName: null }, node: { format: MotionFormat.Landscape }, project: { id: 'p', mode: 'normal' }, version: HEAD, doc: head, alongside: [] })
 }));
 vi.mock('$lib/server/repos/motion-revisions', async (real) => ({ ...(await real<object>()), readRevision: async (_db: unknown, ask: { version: number }) => (ask.version === READ ? { version: READ, doc: base } : null) }));
 vi.mock('./frame-ops', async (real) => ({ ...(await real<object>()), commitDoc: (...a: unknown[]) => commitDoc(...a) }));

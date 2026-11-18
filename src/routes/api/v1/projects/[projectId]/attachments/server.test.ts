@@ -5,7 +5,7 @@ import { CHAT_ATTACHMENT_MAX_BYTES, chatAttachmentPrefix } from '$lib/chat-attac
 const reach = vi.hoisted(() => ({ found: true as boolean }));
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
 vi.mock('$lib/server/projects/lookup', () => ({
-  findReachableProject: async () => (reach.found ? { orgId: 'org-1', project: { id: 'p-1', name: 'P', brandId: null, mode: 'standard' } } : null)
+  findReachableProject: async () => (reach.found ? { orgId: 'org-1', project: { id: 'p-1', name: 'P', mode: 'standard' } } : null)
 }));
 const screen = vi.hoisted(() => ({ outcome: { ok: true } as { ok: boolean; error?: string } }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelReferences: async () => screen.outcome }));

@@ -16,7 +16,6 @@ const M = vi.hoisted(() => ({
 vi.mock('$env/dynamic/private', () => ({ env: M.env }));
 vi.mock('$lib/server/ai-log', () => ({
   logAiCall: (e: Record<string, unknown>) => void M.logged.push(e),
-  getBrandContext: () => null
 }));
 
 let submits: number;

@@ -37,7 +37,7 @@ const nodeRow = (id: string, version: number, type = 'text', data: Record<string
 function seed(): Db {
   let n = 0;
   const rows: Record<string, unknown[]> = {
-    projects: [{ id: PROJECT, org_id: ORG, name: 'p', slug: 'p', brand_id: null, archived_at: null, mode: null }],
+    projects: [{ id: PROJECT, org_id: ORG, name: 'p', slug: 'p', archived_at: null, mode: null }],
     canvases: [canvasRow],
     nodes: [nodeRow(NODE, 2), nodeRow(OTHER, 5, 'image', { prompt: 'b', status: 'idle' })],
     nodes_connections: [],
@@ -98,7 +98,7 @@ async function viaEndpoint(name: string, fields: Record<string, string>, token =
 
 beforeEach(() => {
   vi.clearAllMocks();
-  findCanvasForUser.mockResolvedValue({ orgId: ORG, canvas: { id: CANVAS, projectId: PROJECT, name: 'One' }, mode: null, projectBrandId: null });
+  findCanvasForUser.mockResolvedValue({ orgId: ORG, canvas: { id: CANVAS, projectId: PROJECT, name: 'One' }, mode: null, });
 });
 
 const DRAWN = { tool: 'rectangle', box: { left: 0, top: 0, width: 100, height: 80 } };

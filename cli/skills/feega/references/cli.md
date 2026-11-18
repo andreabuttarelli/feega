@@ -1,7 +1,7 @@
 # feega CLI (fallback)
 
 Use when MCP is not connected. Same OAuth session as MCP (`~/.config/feega/session.json`).
-Every command is brand-scoped (`feega <command> <slug>`).
+Commands act on your active organisation; `--org <id>` picks another.
 
 ## Install
 
@@ -21,12 +21,11 @@ bun run cli.ts --help
 ## Commands
 
 ```bash
-feega brands                                    # List brands
+feega projects                                  # List projects
 feega health                                     # Check Supabase / Gemini
 feega agents [--refresh]                         # Local Feega: coding agents found on this machine
-feega products <slug> [sync]                    # List, or re-import from the connected store
-feega upgrade <slug>                            # Checkout the plan (€9 / editor / month, 500 credits)
-feega upgrade <slug> --top-up 1000              # One-time top-up (1000/2000/5000), never expires
+feega upgrade                                    # Checkout the plan (€9 / editor / month, 500 credits)
+feega upgrade --top-up 1000              # One-time top-up (1000/2000/5000), never expires
 feega update                                    # Update the CLI itself
 ```
 

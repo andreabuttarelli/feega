@@ -1,22 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-/**
- * settings/+layout.server.ts leggeva social_accounts.username (reale: handle), api_keys.permissions
- * (reale: scopes) e brand_invites (reale: orgs_invites, org-level, senza brand_id). Ogni pagina
- * sotto /settings caricava questi tre nomi sbagliati: le prove qui sono sui nomi di colonna reali,
- * non sul comportamento a valle (quello lo copre settings-actions.test.ts).
- */
-
-const orgBillingForBrand = vi.fn();
-
-vi.mock('$lib/server/plans', () => ({
-	accountLimit: () => 5,
-	plansAbove: () => [],
-	isTopPlan: () => false
-}));
-vi.mock('$lib/server/org-billing', () => ({
-	orgBillingForBrand: (...a: unknown[]) => orgBillingForBrand(...a)
-}));
 
 import { load } from '$lib/server/settings/shell';
 
@@ -43,11 +26,10 @@ function fakeSupabase(rows: Record<string, unknown[]>) {
 
 beforeEach(() => {
 	vi.clearAllMocks();
-	orgBillingForBrand.mockResolvedValue(null);
 });
 
 describe('settings +layout.server load', () => {
-	it('reads org-level orgs_invites for the brand org, not a non-existent brand_invites', async () => {
+	it('reads org-level orgs_invites', async () => {
 		const supabase = fakeSupabase({
 			social_accounts: [],
 			api_keys: [],
@@ -55,7 +37,7 @@ describe('settings +layout.server load', () => {
 		});
 
 		const data = await (load as (e: unknown) => Promise<Record<string, unknown>>)({
-			parent: async () => ({ org: ORG, brand: { id: 'brand-1', slug: 'demo', org_id: 'org-1' } }),
+			parent: async () => ({ org: ORG }),
 			url: new URL('https://feega.test/p/x/settings/team'),
 			locals: { supabase }
 		});
@@ -67,36 +49,18 @@ describe('settings +layout.server load', () => {
 		expect(data.invites).toEqual([{ id: 'inv-1', email: 'a@b.com', accepted_at: null, created_at: '2026-01-01' }]);
 	});
 
-	it('non lancia quando il progetto non ha un brand', async () => {
-		const supabase = fakeSupabase({});
-
-		const data = await (load as (e: unknown) => Promise<Record<string, unknown>>)({
-			parent: async () => ({ org: ORG, brand: null }),
-			url: new URL('https://feega.test/p/x/settings/video'),
-			locals: { supabase }
-		});
-
-		expect(data.brand).toBeNull();
-	});
-
-	async function loadWithoutBrand(section: string, rows: Record<string, unknown[]> = {}) {
+	async function loadSection(section: string, rows: Record<string, unknown[]> = {}) {
 		const supabase = fakeSupabase(rows);
 		const data = await (load as (e: unknown) => Promise<Record<string, unknown>>)({
-			parent: async () => ({ org: ORG, brand: null }),
+			parent: async () => ({ org: ORG }),
 			url: new URL(`https://feega.test/p/x/settings/${section}`),
 			locals: { supabase }
 		});
 		return { data, ops: (supabase as unknown as { __ops: any[] }).__ops };
 	}
 
-	it('elenca i brand dell org, per la barra laterale del dashboard', async () => {
-		const { data } = await loadWithoutBrand('api-keys', { brands: [{ id: 'b-1', org_id: 'org-1', name: 'Acme', slug: 'acme' }] });
-
-		expect(data.orgBrands).toEqual([{ id: 'b-1', name: 'Acme' }]);
-	});
-
-	it('le chiavi API e gli inviti si leggono per org anche senza brand', async () => {
-		const { data, ops } = await loadWithoutBrand('api-keys', {
+	it('le chiavi API e gli inviti si leggono per org', async () => {
+		const { data, ops } = await loadSection('api-keys', {
 			api_keys: [{ id: 'k-1' }],
 			orgs_invites: [{ id: 'inv-1' }]
 		});

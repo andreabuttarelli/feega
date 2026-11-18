@@ -17,7 +17,7 @@ vi.mock('./renderer', () => ({
 const { startFarmBatch, startFarmRender } = await import('./render-start');
 
 const head = { version: 3, doc: newMotionDoc(MotionFormat.Landscape) };
-const scope = { orgId: 'org-1', projectId: 'p1', canvasId: 'c1', nodeId: 'n1', userId: 'u1', brandId: null, editorUrl: '/e' };
+const scope = { orgId: 'org-1', projectId: 'p1', canvasId: 'c1', nodeId: 'n1', userId: 'u1', editorUrl: '/e' };
 const closed = { ok: false, error: RenderRefusal.Closed, detail: SERVER_RENDER_UNAVAILABLE };
 
 describe('server rendering is closed for everyone', () => {

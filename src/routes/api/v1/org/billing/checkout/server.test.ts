@@ -16,7 +16,7 @@ const billingGrantsReady = vi.fn();
 vi.mock('$lib/server/cli-auth', () => ({
 	openOrg: vi.fn(),
 	checkApiKeyWriteAccess: vi.fn(() => undefined),
-	gateAiAction: vi.fn()
+	gateOrgAiAction: vi.fn()
 }));
 vi.mock('$lib/server/org-billing', () => ({
 	orgBillingById: (...args: unknown[]) => orgBillingById(...args),
@@ -44,7 +44,7 @@ vi.mock('$lib/server/app-url', () => ({ appOrigin: () => 'https://feega.test' })
 vi.mock('$lib/server/feature-flags', () => ({ isPlanGoEnabled: () => false }));
 
 import { POST } from './+server';
-import { openOrg, checkApiKeyWriteAccess, gateAiAction } from '$lib/server/cli-auth';
+import { openOrg, checkApiKeyWriteAccess, gateOrgAiAction } from '$lib/server/cli-auth';
 
 const CHECKOUT_URL = 'https://checkout.stripe.com/c/pay/cs_live_plan';
 const PLANS = [{ credits: 500, label: '€9 / editor / month' }];
@@ -135,7 +135,7 @@ describe('POST /api/v1/org/billing/checkout', () => {
 		expect(createBillingPortalSession).not.toHaveBeenCalled();
 	});
 
-	it('checks the owner against the caller's org', async () => {
+	it('checks the owner against the org of the caller', async () => {
 		await call();
 
 		expect(isOrgOwner).toHaveBeenCalledWith(expect.anything(), 'org-1', 'user-1');
@@ -152,7 +152,7 @@ describe('POST /api/v1/org/billing/checkout', () => {
 	it('never gates on credits: whoever ran out is exactly who needs this link', async () => {
 		await call();
 
-		expect(gateAiAction).not.toHaveBeenCalled();
+		expect(gateOrgAiAction).not.toHaveBeenCalled();
 		expect(gateCredits).not.toHaveBeenCalled();
 		expect(structured).not.toHaveBeenCalled();
 	});

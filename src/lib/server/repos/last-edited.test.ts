@@ -26,7 +26,7 @@ function fakeDb(rows: Record<string, unknown>[]) {
   return { db: { from: () => chain } as unknown as Db, call };
 }
 
-const row = { id: 'b', project_id: 'p', name: 'B', slug: 'b', brand_id: null, archived_at: null, mode: 'standard', updated_at: '2026-01-01T00:00:00Z', last_edited_at: '2026-10-15T10:00:00Z' };
+const row = { id: 'b', project_id: 'p', name: 'B', slug: 'b', archived_at: null, mode: 'standard', updated_at: '2026-01-01T00:00:00Z', last_edited_at: '2026-10-15T10:00:00Z' };
 
 describe('le liste recenti seguono l’ultima modifica, non la nascita', () => {
   it('una tela modificata sale in cima ai recenti', async () => {

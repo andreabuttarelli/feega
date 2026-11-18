@@ -2,6 +2,7 @@ import { isNodeType, type NodeType } from './node-data';
 import { genNodeSize } from './gen-node';
 import { iframeNodeSize } from './iframe-node';
 import { docNodeSize } from './doc-node';
+import { productsNodeSize } from './products-node';
 import { socialFeedNodeSize } from './social-feed-node';
 import { influencerNodeSize } from './influencer-node';
 import { listNodeSize } from './list-node';
@@ -10,6 +11,7 @@ import { effectsNodeSize } from './effects-node';
 import { compositionNodeSize } from './composition-node';
 import { calendarNodeSize } from './calendar-node';
 import { DocNodeType, frameDefaultSize, frameMinSize } from './motion-node';
+import { studioBatchNodeSize } from './studio-batch-node';
 
 type Size = { w: number; h: number };
 
@@ -25,6 +27,7 @@ const NODE_SIZE: Record<NodeType, (data: Record<string, unknown>) => Size> = {
   iframe: iframeNodeSize,
   social_account_feed: socialFeedNodeSize,
   social_post_mockup: () => FALLBACK_SIZE,
+  products: productsNodeSize,
   ads: () => FALLBACK_SIZE,
   influencer: influencerNodeSize,
   list: listNodeSize,
@@ -36,6 +39,7 @@ const NODE_SIZE: Record<NodeType, (data: Record<string, unknown>) => Size> = {
   model3d: () => genNodeSize('model3d'),
   motion: frameDefaultSize,
   element: (data) => frameDefaultSize(data, DocNodeType.Element),
+  studio_batch: studioBatchNodeSize,
   section: () => SECTION_SIZE,
   technique: () => TECHNIQUE_SIZE
 };

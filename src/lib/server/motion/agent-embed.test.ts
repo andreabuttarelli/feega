@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 const motionAssets = vi.fn(async () => []);
 
 vi.mock('$lib/server/repos/canvas', () => ({ findNode: async () => ({ id: 'n1', projectId: 'p1', canvasId: 'c1', displayName: 'Cut', type: 'motion', data: {} }) }));
-vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async () => ({ id: 'p1', brandId: null, mode: 'standard' }) }));
+vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async () => ({ id: 'p1', mode: 'standard' }) }));
 vi.mock('$lib/canvas/motion-node', () => ({ motionOf: () => ({ format: 'landscape' }) }));
 vi.mock('./editor', () => ({
   motionAssets,

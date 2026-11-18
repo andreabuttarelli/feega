@@ -1,4 +1,6 @@
 import type { ConnectorType } from './connectors';
+import { discountPercent } from './product-discount';
+import type { ProductOptions, ProductVariant } from './product-shape';
 
 export type SelectableItem = {
   text: string | null;
@@ -6,6 +8,24 @@ export type SelectableItem = {
 };
 
 export type FieldValue = SelectableItem;
+
+export type ProductRow = {
+  title: string;
+  description: string | null;
+  images: Array<{ url: string }>;
+  price?: number | null;
+  currency?: string | null;
+  url?: string | null;
+  handle?: string | null;
+  available?: boolean | null;
+  compareAtPrice?: number | null;
+  tags?: string[];
+  vendor?: string | null;
+  productType?: string | null;
+  sku?: string | null;
+  variants?: ProductVariant[];
+  options?: ProductOptions;
+};
 
 export type PostRow = {
   caption: string | null;
@@ -16,9 +36,9 @@ export type PostRow = {
   handle?: string | null;
 };
 
-export type SyncedSourceType = 'social_account_feed';
+export type SyncedSourceType = 'products' | 'social_account_feed';
 
-type RowOf = { social_account_feed: PostRow };
+type RowOf = { products: ProductRow; social_account_feed: PostRow };
 
 export type OutputPort = Extract<ConnectorType, 'text' | 'images' | 'videos' | 'audios'>;
 
@@ -86,7 +106,38 @@ const metric = (key: string) => (row: PostRow) => text(row.metrics?.[key]);
 const joined = (...parts: Array<string | null | undefined>) =>
   text(parts.filter((part): part is string => Boolean(part?.trim())).join('\n\n'));
 
+const variantLabel = (v: ProductVariant): string => (v.available === false ? `${v.title} (sold out)` : v.title);
+
+const variantsOf = (p: ProductRow): FieldValue => text((p.variants ?? []).map(variantLabel).join(', '));
+
+const optionsOf = (p: ProductRow): FieldValue =>
+  text(
+    Object.entries(p.options ?? {})
+      .map(([name, values]) => `${name}: ${values.join(', ')}`)
+      .join('\n')
+  );
+
 export const SOURCE_ITEM_FIELDS: { [T in SyncedSourceType]: readonly SourceField<RowOf[T]>[] } = {
+  products: [
+    { key: 'images', label: 'Images', port: 'images', extract: (p) => media(p.images.map((i) => i.url)) },
+    { key: 'first_image', label: 'First image', port: 'images', extract: (p) => media(p.images.slice(0, 1).map((i) => i.url)) },
+    { key: 'title_description', label: 'Title + description', port: 'text', extract: (p) => joined(p.title, p.description) },
+    { key: 'title', label: 'Title', port: 'text', extract: (p) => text(p.title) },
+    { key: 'description', label: 'Description', port: 'text', extract: (p) => text(p.description) },
+    { key: 'price', label: 'Price', port: 'text', extract: (p) => text(p.price) },
+    { key: 'currency', label: 'Currency', port: 'text', extract: (p) => text(p.currency) },
+    { key: 'url', label: 'URL', port: 'text', extract: (p) => text(p.url) },
+    { key: 'handle', label: 'Handle', port: 'text', extract: (p) => text(p.handle) },
+    { key: 'available', label: 'Availability', port: 'text', extract: (p) => text(p.available == null ? null : p.available ? 'In stock' : 'Sold out') },
+    { key: 'compare_at_price', label: 'Compare-at price', port: 'text', extract: (p) => text(p.compareAtPrice) },
+    { key: 'discount_percent', label: 'Discount %', port: 'text', extract: (p) => text(discountPercent(p.price, p.compareAtPrice)) },
+    { key: 'tags', label: 'Tags', port: 'text', extract: (p) => text((p.tags ?? []).join(', ')) },
+    { key: 'vendor', label: 'Vendor', port: 'text', extract: (p) => text(p.vendor) },
+    { key: 'product_type', label: 'Product type', port: 'text', extract: (p) => text(p.productType) },
+    { key: 'sku', label: 'SKU', port: 'text', extract: (p) => text(p.sku) },
+    { key: 'variants', label: 'Variants', port: 'text', extract: variantsOf },
+    { key: 'options', label: 'Options', port: 'text', extract: optionsOf }
+  ],
   social_account_feed: [
     { key: 'media', label: 'Media', port: 'images', extract: (p) => media(stillsOf(p)) },
     { key: 'first_slide', label: 'First slide', port: 'images', extract: (p) => media(stillsOf(p).slice(0, 1)) },
@@ -103,7 +154,7 @@ export const SOURCE_ITEM_FIELDS: { [T in SyncedSourceType]: readonly SourceField
 };
 
 export function isSyncedSourceType(type: string | null | undefined): type is SyncedSourceType {
-  return type === 'social_account_feed';
+  return type === 'products' || type === 'social_account_feed';
 }
 
 export function fieldOf<T extends SyncedSourceType>(type: T, key: string): SourceField<RowOf[T]> | null {
@@ -116,12 +167,17 @@ export function fieldValue<T extends SyncedSourceType>(type: T, key: string, row
 }
 
 export const DEFAULT_FIELDS: Record<SyncedSourceType, { images: string; text: string; videos?: string }> = {
+  products: { images: 'images', text: 'title_description' },
   social_account_feed: { images: 'media', text: 'caption', videos: 'video' }
 };
 
 function itemOf<T extends SyncedSourceType>(type: T, row: RowOf[T]): SelectableItem {
   const fields = DEFAULT_FIELDS[type];
   return { text: fieldValue(type, fields.text, row)!.text, mediaUrls: fieldValue(type, fields.images, row)!.mediaUrls };
+}
+
+export function productItem(product: ProductRow): SelectableItem {
+  return itemOf('products', product);
 }
 
 export function socialPostItem(post: PostRow): SelectableItem {

@@ -12,7 +12,7 @@ const memberships = [{ org: { id: ORG, name: 'Acme', slug: 'acme' }, role: 'owne
 
 function seed(verified: boolean) {
   return {
-    projects: [{ id: 'p-n', org_id: ORG, name: 'Night', slug: 'n', brand_id: null, archived_at: null, mode: 'uncensored' }],
+    projects: [{ id: 'p-n', org_id: ORG, name: 'Night', slug: 'n', archived_at: null, mode: 'uncensored' }],
     orgs: [{ id: ORG, stripe_subscription_id: 'sub_1' }],
     org_uncensored_optins: [{ org_id: ORG, enabled_by: USER, enabled_at: '2026-09-29T00:00:00Z', disabled_at: null }],
     user_age_verifications: verified ? [{ id: 'v', user_id: USER }] : []

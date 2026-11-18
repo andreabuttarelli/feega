@@ -73,7 +73,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
   }
   const { db, user, orgId, project, motion } = scope;
 
-  const threadId = await openNodeThread(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId: user.id, brandId: project.brandId });
+  const threadId = await openNodeThread(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId: user.id });
   const [messages, running, head] = await Promise.all([loadTurns(db, { orgId, threadId }), turnRunning(db, { orgId, threadId }), headOrNew(db, { orgId, nodeId: motion.record.id }, motion.node)]);
   const bucket = db.storage.from(CANVAS_ASSET_BUCKET) as unknown as FrameBucket;
   const working = running ? await readWorkingDoc({ orgId, projectId: project.id, nodeId: motion.record.id, bucket }) : null;
@@ -88,7 +88,7 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
   }
   const { db, user, orgId, project, motion } = scope;
 
-  const threadId = await openNodeThread(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId: user.id, brandId: project.brandId });
+  const threadId = await openNodeThread(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId: user.id });
   await stopTurn(db, { orgId, threadId });
   return json({ stopped: true });
 };

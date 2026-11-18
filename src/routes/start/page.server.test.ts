@@ -30,7 +30,7 @@ async function run(path: string, signedIn = true) {
 describe('/start', () => {
   it('opens a new canvas for the site, carrying the url so the canvas imports it', async () => {
     expect(await run('/start?start_url=https%3A%2F%2Fwww.stripe.com')).toEqual({ location: `/p/p1/c/c1?start_url=${encodeURIComponent('https://www.stripe.com/')}` });
-    expect(createProject).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ orgId: 'o1', name: 'stripe.com', brandId: null }));
+    expect(createProject).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ orgId: 'o1', name: 'stripe.com' }));
     expect(createCanvas).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ projectId: 'p1' }));
   });
 

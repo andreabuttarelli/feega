@@ -26,7 +26,6 @@ const bucket = {
   list: async () => ({ data: [...store.files.keys()].map((name) => ({ name })) })
 };
 
-vi.mock('$lib/server/repos/brands', () => ({ findBrandLook: async () => null, findFirstBrandLook: async () => null }));
 vi.mock('$lib/server/uncensored-workspace/hidden-scope', async (importOriginal) => {
   const real = await importOriginal<typeof import('$lib/server/uncensored-workspace/hidden-scope')>();
   return { ...real, hiddenFor: async () => real.NOTHING_HIDDEN };
@@ -39,7 +38,7 @@ vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
       ? { id: NODE, projectId: 'p-1', canvasId: 'c-1', type: 'motion', displayName: 'Launch', data: { format: '16:9', docHeadRevision: store.head ?? 0, posterAssetId: null, lastRenderAssetId: null } }
       : null
 }));
-vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async () => ({ id: 'p-1', brandId: null, mode: store.mode }) }));
+vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async () => ({ id: 'p-1', mode: store.mode }) }));
 vi.mock('$lib/server/repos/assets', () => ({
   listFontAssets: async () => [], listProjectAssets: async () => store.projectAssets }));
 vi.mock('$lib/server/canvas/sign-media', () => ({ createAssetSigningDb: () => ({}), signAssetPaths: async () => new Map() }));

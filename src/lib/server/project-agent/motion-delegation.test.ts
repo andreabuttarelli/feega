@@ -68,7 +68,6 @@ const store = vi.hoisted(() => ({
   history: [] as unknown[]
 }));
 
-vi.mock('$lib/server/repos/brands', () => ({ findBrandLook: async () => null, findFirstBrandLook: async () => null }));
 vi.mock('$lib/server/web/view-images', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/web/view-images')>()),
   viewImages: async (urls: string[], _detail: unknown, prefix: string) => ({ images: urls.map((url, i) => ({ url, path: `${prefix}/${i}.jpg`, width: 1, height: 1 })), parts: [] })
@@ -83,7 +82,7 @@ vi.mock('$lib/server/chat-model/catalogue', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/chat-model/catalogue')>()),
   offeredChatModels: async () => [{ id: 'anthropic/claude-opus-5.5', label: 'S', provider: 'anthropic', costTier: '$$$', inputUsdPerM: 2, outputUsdPerM: 10, efforts: ['low'], defaultEffort: 'low' }, { id: 'anthropic/claude-sonnet-5.5', label: 'S5', provider: 'anthropic', costTier: '$$', inputUsdPerM: 1, outputUsdPerM: 5, efforts: [], defaultEffort: null }, { id: 'cheap/model', label: 'C', provider: 'cheap', costTier: '$', inputUsdPerM: 0.1, outputUsdPerM: 0.4, efforts: [], defaultEffort: null }]
 }));
-vi.mock('$lib/server/ai-log', () => ({ extractSdkUsage: () => ({ inputTokens: 10, outputTokens: 5 }), logAiCall: vi.fn(), billingScope: () => ({ run: (fn: () => unknown) => fn(), gatewayUsd: () => 0 }), withOrgContext: (_id: string, fn: () => unknown) => fn(), withNodeContext: (_n: string, fn: () => unknown) => fn(), withBrandContext: (_id: string, fn: () => unknown) => fn() }));
+vi.mock('$lib/server/ai-log', () => ({ extractSdkUsage: () => ({ inputTokens: 10, outputTokens: 5 }), logAiCall: vi.fn(), billingScope: () => ({ run: (fn: () => unknown) => fn(), gatewayUsd: () => 0 }), withOrgContext: (_id: string, fn: () => unknown) => fn(), withNodeContext: (_n: string, fn: () => unknown) => fn() }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput: async () => (store.blocked ? { ok: false, error: 'prompt_refused' } : { ok: true }) }));
 vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/repos/canvas')>()),
@@ -100,7 +99,7 @@ vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
   patchNodeData: async (_db: unknown, input: { nodeId: string }) => ({ outcome: 'written', node: store.nodes.find((n) => n.id === input.nodeId) }),
   resizeNode: async () => undefined
 }));
-vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async (_db: unknown, input: { orgId: string }) => (input.orgId === ORG ? { id: PROJECT, brandId: null, mode: 'standard' } : null) }));
+vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async (_db: unknown, input: { orgId: string }) => (input.orgId === ORG ? { id: PROJECT, mode: 'standard' } : null) }));
 vi.mock('$lib/server/repos/assets', () => ({
   listFontAssets: async () => [],
   listProjectAssets: async () => [{ id: 'asset-1', projectId: PROJECT, type: 'image', url: 'org/p/a.png', content: null, mimeType: 'image/png', bytes: 1, width: 1, height: 1, durationS: null, source: 'generated', sourceNodeId: IMAGE, uncensored: false, createdAt: '2026-10-08T00:00:00Z' }],

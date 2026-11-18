@@ -1,30 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { JSONB_COLUMN_SCHEMAS, validateJsonbColumn, jsonbColumnsOf } from './jsonb-schemas';
 
-describe('JSONB_COLUMN_SCHEMAS — un posto solo per le 20 colonne jsonb raggiungibili da insert_row/update_row', () => {
+describe('JSONB_COLUMN_SCHEMAS — un posto solo per le colonne jsonb raggiungibili da insert_row/update_row', () => {
   it('elenca ogni colonna trovata sul database vero (klnswzhhgrqvbfjzioul), tabella.colonna', () => {
     const keys = Object.keys(JSONB_COLUMN_SCHEMAS).sort();
     expect(keys).toEqual(
       [
-        'ad_campaigns.placements',
-        'ad_campaigns.targeting',
-        'ad_creatives.media',
-        'brands.logos',
-        'brands.palette',
-        'brands.target',
-        'brands.voice',
         'canvas_events.after',
         'canvas_events.before',
         'canvases.viewport',
         'chat_messages.attachments',
         'chat_messages.selection',
         'chat_messages.tool_calls',
-        'competitor_ads.media',
-        'competitor_ads.raw',
         'node_runs.params',
         'nodes.data',
-        'posts.media',
-        'posts.per_platform',
         'products.images',
         'social_posts.media',
         'social_posts.metrics'
@@ -48,67 +37,8 @@ describe('jsonbColumnsOf — quali colonne jsonb ha una tabella, per attivare la
     expect(jsonbColumnsOf('nodes')).toEqual(['data']);
   });
 
-  it('posts ha media e per_platform', () => {
-    expect(jsonbColumnsOf('posts').sort()).toEqual(['media', 'per_platform']);
-  });
-
   it('una tabella senza colonne jsonb registrate torna vuota', () => {
     expect(jsonbColumnsOf('orgs')).toEqual([]);
-  });
-});
-
-describe('validateJsonbColumn — posts.media: PostMedia[], la stessa forma di create_post', () => {
-  it('accetta un array di { assetId, order }', () => {
-    const out = validateJsonbColumn('posts', 'media', [{ assetId: 'a1', order: 0 }]);
-    expect(out.ok).toBe(true);
-  });
-
-  it('rifiuta un oggetto invece di un array, e nomina la colonna', () => {
-    const out = validateJsonbColumn('posts', 'media', { assetId: 'a1' });
-    expect(out.ok).toBe(false);
-    if (!out.ok) expect(out.error).toMatch(/posts\.media/);
-  });
-
-  it('rifiuta un elemento senza assetId', () => {
-    const out = validateJsonbColumn('posts', 'media', [{ order: 0 }]);
-    expect(out.ok).toBe(false);
-    if (!out.ok) expect(out.error).toMatch(/assetId/);
-  });
-});
-
-describe('validateJsonbColumn — ad_campaigns.targeting: la stessa forma che il prodotto già manda a Zernio', () => {
-  it('accetta age/genders/countries/interests', () => {
-    const out = validateJsonbColumn('ad_campaigns', 'targeting', {
-      age_min: 18,
-      age_max: 45,
-      genders: ['female'],
-      countries: ['IT'],
-      interests: [{ id: '123', name: 'running' }]
-    });
-    expect(out.ok).toBe(true);
-  });
-
-  it('rifiuta age_min non numerico', () => {
-    const out = validateJsonbColumn('ad_campaigns', 'targeting', { age_min: 'eighteen' });
-    expect(out.ok).toBe(false);
-    if (!out.ok) expect(out.error).toMatch(/age_min/);
-  });
-
-  it('un targeting vuoto è ammesso: nessun filtro è una scelta legittima', () => {
-    const out = validateJsonbColumn('ad_campaigns', 'targeting', {});
-    expect(out.ok).toBe(true);
-  });
-});
-
-describe('validateJsonbColumn — ad_campaigns.placements: string[]', () => {
-  it('accetta un elenco di piattaforme', () => {
-    const out = validateJsonbColumn('ad_campaigns', 'placements', ['feed', 'stories']);
-    expect(out.ok).toBe(true);
-  });
-
-  it('rifiuta un elemento non stringa', () => {
-    const out = validateJsonbColumn('ad_campaigns', 'placements', ['feed', 42]);
-    expect(out.ok).toBe(false);
   });
 });
 
@@ -127,16 +57,10 @@ describe('validateJsonbColumn — canvases.viewport: la stessa forma di repos/ca
 
 describe('validateJsonbColumn — colonne intenzionalmente libere: passano sempre, per costruzione', () => {
   const FREE_FORM: Array<[string, string]> = [
-    ['competitor_ads', 'raw'],
     ['canvas_events', 'before'],
     ['canvas_events', 'after'],
     ['chat_messages', 'tool_calls'],
-    ['brands', 'target'],
     ['node_runs', 'params'],
-    ['ad_creatives', 'media'],
-    ['social_posts', 'media'],
-    ['social_posts', 'metrics'],
-    ['competitor_ads', 'media'],
     ['products', 'images']
   ];
 
@@ -160,22 +84,5 @@ describe('validateJsonbColumn — chat_messages.attachments', () => {
   it('accetta la forma che saveTurn scrive e rifiuta il resto', () => {
     expect(validateJsonbColumn('chat_messages', 'attachments', [{ assetId: 'a', kind: 'image', name: 'l.png', mimeType: 'image/png', bytes: 1 }]).ok).toBe(true);
     expect(validateJsonbColumn('chat_messages', 'attachments', [{ name: 'l.png' }]).ok).toBe(false);
-  });
-});
-
-describe('the brand kit columns are validated, not free form', () => {
-  it('palette is a list of hex swatches', () => {
-    expect(validateJsonbColumn('brands', 'palette', [{ hex: '#1A2B3C', name: 'Ink' }]).ok).toBe(true);
-    expect(validateJsonbColumn('brands', 'palette', [{ hex: 'blue' }]).ok).toBe(false);
-  });
-
-  it('voice has a tone and do/don\'t lists', () => {
-    expect(validateJsonbColumn('brands', 'voice', { tone: 'Warm', do: ['Short'], dont: ['Puns'] }).ok).toBe(true);
-    expect(validateJsonbColumn('brands', 'voice', { tone: 3 }).ok).toBe(false);
-  });
-
-  it('logos are variants with a url', () => {
-    expect(validateJsonbColumn('brands', 'logos', [{ variant: 'dark', url: 'https://x/l.png' }]).ok).toBe(true);
-    expect(validateJsonbColumn('brands', 'logos', [{ variant: 'huge', url: 'https://x/l.png' }]).ok).toBe(false);
   });
 });

@@ -19,7 +19,7 @@ vi.mock('$lib/server/repos/assets', async (importOriginal) => ({ ...(await impor
 vi.mock('$lib/server/canvas/sign-media', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/canvas/sign-media')>()), signAssetPaths: async () => new Map(), createAssetSigningDb: () => ({}) }));
 vi.mock('$lib/server/repos/projects', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/repos/projects')>()),
-  findProjectById: async () => (await state.projectAfter, { id: 'p-1', brandId: null, mode: 'standard' })
+  findProjectById: async () => (await state.projectAfter, { id: 'p-1', mode: 'standard' })
 }));
 vi.mock('$lib/server/moderation/model-input', () => ({
   screenModelInput: async (_db: unknown, input: { texts: string[] }) => (state.screened.push(input.texts), input.texts.some((t) => t.includes(BLOCKED_WORD)) ? { ok: false, error: 'blocked' } : { ok: true })

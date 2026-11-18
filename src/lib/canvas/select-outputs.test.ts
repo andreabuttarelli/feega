@@ -19,21 +19,17 @@ describe('selectOutputs — le porte di un select', () => {
     ]);
   });
 
-  it('un catalogo dà Images e Text di default', () => {
-    expect(selectOutputs('products', []).map((o) => o.handle)).toEqual(['out:images', 'out:text']);
-  });
-
   it("una lista resta com'era: nessuna porta nominata", () => {
     expect(selectOutputs('list', [])).toEqual([]);
   });
 
   it('un output personalizzato si aggiunge dopo i default, con la porta del suo campo', () => {
-    const outputs = selectOutputs('products', [{ id: 'o1', field: 'price', label: 'Prezzo' }]);
-    expect(outputs[2]).toMatchObject({ handle: 'out:field:price', port: 'text', label: 'Prezzo', incompatible: false });
+    const outputs = selectOutputs('social_account_feed', [{ id: 'o1', field: 'likes', label: 'Mi piace' }]);
+    expect(outputs[2]).toMatchObject({ handle: 'out:field:likes', port: 'text', label: 'Mi piace', incompatible: false });
   });
 
   it("senza etichetta prende quella del campo", () => {
-    expect(selectOutputs('products', [{ id: 'o1', field: 'first_image' }])[2]).toMatchObject({ port: 'images', label: 'First image' });
+    expect(selectOutputs('social_account_feed', [{ id: 'o1', field: 'first_slide' }])[2]).toMatchObject({ port: 'images', label: 'First slide' });
   });
 
   it('un campo che la sorgente non ha è segnalato, non tolto', () => {
@@ -72,11 +68,11 @@ describe('modifica della lista di output', () => {
 });
 
 describe('porta di una maniglia', () => {
-  const tile = { output: null, outputs: selectOutputs('products', [{ id: 'o1', field: 'first_image' }, { id: 'o2', field: 'likes' }]) };
+  const tile = { output: null, outputs: selectOutputs('social_account_feed', [{ id: 'o1', field: 'first_slide' }, { id: 'o2', field: 'price' }]) };
 
   it('la porta viene dalla maniglia tirata, non dal nodo', () => {
     expect(portOfHandle(tile, 'out:text')).toBe('text');
-    expect(portOfHandle(tile, 'out:field:first_image')).toBe('images');
+    expect(portOfHandle(tile, 'out:field:first_slide')).toBe('images');
   });
 
   it('senza porte nominate resta quella del nodo', () => {
@@ -84,7 +80,7 @@ describe('porta di una maniglia', () => {
   });
 
   it('una porta segnalata non si collega', () => {
-    expect(unavailableOutput(tile, 'out:field:likes')).toBe(true);
+    expect(unavailableOutput(tile, 'out:field:price')).toBe(true);
     expect(unavailableOutput(tile, 'out:text')).toBe(false);
   });
 });
@@ -95,9 +91,5 @@ describe('sourceOutputs — the ports a synced source itself offers', () => {
       ['out:images', 'images'],
       ['out:videos', 'videos']
     ]);
-  });
-
-  it('a catalogue has only images: one plain port, no named outputs', () => {
-    expect(sourceOutputs('products')).toEqual([]);
   });
 });

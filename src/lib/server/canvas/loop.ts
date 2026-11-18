@@ -105,7 +105,7 @@ async function itemCountOf(
   if (source.type === 'list') {
     return (await resolvedListValues(db, orgId, source, connections, canvasNodes)).values.length;
   }
-  if (source.type === 'social_account_feed') {
+  if (source.type === 'products' || source.type === 'social_account_feed') {
     return (await syncedSourceItems(db, orgId, source)).length;
   }
   return 0;

@@ -3,10 +3,10 @@ import { ARCHIVE_USER_AGENT, safeFetchBytes } from '$lib/server/tool-guard';
 import { signThumbnailUrls, type ThumbnailPreset } from '$lib/server/media-thumbnails';
 
 // Tiny, dependency-free media archival helpers (deliberately imports nothing from the AI modules,
-// so scrapecreators/content-preview/brand-context can all use it without import cycles).
+// so scrapecreators and the canvas feed sync can use it without import cycles).
 //
 // Why this exists: every scraped thumbnail is a SIGNED platform-CDN URL that expires within days.
-// Anything that must survive (history thumbs, competitor reference posts) gets downloaded into the
+// Anything that must survive (feed thumbnails) gets downloaded into the
 // private brand-knowledge bucket WHILE the link is alive; consumers then sign our copy.
 
 const DEFAULT_BUCKET = 'brand-knowledge';

@@ -49,7 +49,7 @@ vi.mock('$lib/server/motion/editor', () => ({
   saveMotionDoc: async () => null
 }));
 vi.mock('$lib/server/motion/templates', () => ({ templateLibrary: () => ({ list: async () => [] }) }));
-vi.mock('$lib/server/motion/brand-sources', () => ({ brandSources: () => ({}) }));
+vi.mock('$lib/server/motion/site-sources', () => ({ siteSources: () => ({}) }));
 
 const { startMotionTurn, Browser } = await import('./turn');
 
@@ -63,7 +63,7 @@ describe('a motion turn with attachments', () => {
     const logo = { assetId: 'a-img', kind: AttachmentKind.Image, name: 'logo.png', mimeType: 'image/png', bytes: 5 };
     const motion = { record: { id: 'n-1', canvasId: 'c-1' }, node: { id: 'n-1', format: MotionFormat.Landscape, docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null } } as never;
 
-    const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', brandId: null } as never, motion, message: 'use this logo', attachments: [logo], selection: [], model: 'm', reasoning: null, requester: { kind: 'user', id: 'u-1' }, browser: Browser.Absent });
+    const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', } as never, motion, message: 'use this logo', attachments: [logo], selection: [], model: 'm', reasoning: null, requester: { kind: 'user', id: 'u-1' }, browser: Browser.Absent });
     if (started instanceof Response) {
       throw new Error('turn refused');
     }

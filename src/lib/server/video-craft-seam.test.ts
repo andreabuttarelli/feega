@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('$env/dynamic/private', () => ({ env: { OPENROUTER_API_KEY: 'test-key' } }));
 vi.mock('$lib/server/ai-log', () => ({
-  getBrandContext: () => undefined,
   getOrgContext: () => undefined,
   logAiCall: vi.fn()
 }));

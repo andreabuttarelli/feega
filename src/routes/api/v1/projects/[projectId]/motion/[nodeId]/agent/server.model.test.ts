@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 const spent = vi.hoisted(() => ({ screened: 0 }));
 
 vi.mock('$lib/server/motion/agent-scope', () => ({
-  motionAgentScope: async () => ({ db: {}, user: { id: 'u-1' }, orgId: 'org-1', project: { id: 'p-1', brandId: null }, motion: { record: { id: 'n-1' } } })
+  motionAgentScope: async () => ({ db: {}, user: { id: 'u-1' }, orgId: 'org-1', project: { id: 'p-1', }, motion: { record: { id: 'n-1' } } })
 }));
 vi.mock('$lib/server/cli-auth', () => ({ gateOrgAiAction: async () => null }));
 vi.mock('$lib/server/chat-model/catalogue', async (importOriginal) => ({

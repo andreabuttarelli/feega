@@ -1,6 +1,5 @@
 /**
- * RIPARA I NODI CON UN URL FIRMATO SCRITTO IN `data` — il bug: `assetDrag`/`brandFieldDrag`/
- * `colourDrag` (`src/lib/canvas/drag-payload.ts`) scrivevano `data.url` con l'URL firmato del
+ * RIPARA I NODI CON UN URL FIRMATO SCRITTO IN `data` — il bug: `assetDrag` (`src/lib/canvas/drag-payload.ts`) scriveva `data.url` con l'URL firmato del
  * momento invece del solo `assetId`. L'URL scade (due ore su Supabase Storage) e il nodo appare
  * rotto da lì in poi — i byte restano nello storage, solo il riferimento persistito è marcio.
  *

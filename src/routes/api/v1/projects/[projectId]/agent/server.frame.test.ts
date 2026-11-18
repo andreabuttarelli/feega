@@ -50,12 +50,11 @@ vi.mock('$lib/server/ai-log', () => ({
   logAiCall: () => {
     calls.logged++;
   },
-  withBrandContext: (_id: string, fn: () => void) => fn(),
   withOrgContext: (_id: string, fn: () => void) => fn()
 }));
 vi.mock('$lib/server/cli-auth', () => ({ gateAiAction: async () => null, gateOrgAiAction: async () => null }));
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
-vi.mock('$lib/server/projects/lookup', () => ({ findReachableProject: async () => ({ orgId: ORG, project: { id: PROJECT, name: 'P', brandId: null } }) }));
+vi.mock('$lib/server/projects/lookup', () => ({ findReachableProject: async () => ({ orgId: ORG, project: { id: PROJECT, name: 'P', } }) }));
 vi.mock('$lib/server/repos/chat', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/repos/chat')>()),
   openThread: async (_db: unknown, input: unknown) => {
@@ -70,11 +69,10 @@ vi.mock('$lib/server/repos/chat-reply', async (importOriginal) => ({
   openReply: async () => ({ progress: async () => undefined, finish: async () => undefined })
 }));
 vi.mock('$lib/server/project-agent/project-tools', () => ({ createProjectTools: () => ({}) }));
-vi.mock('$lib/server/project-agent/tool-surface', () => ({ openAgentTools: async (input: { projectTools: object }) => ({ tools: input.projectTools, close: async () => undefined }) }));
 vi.mock('$lib/server/repos/motion-templates', () => ({ listOrgTemplates: async () => [], insertOrgTemplate: vi.fn(), deleteOrgTemplate: vi.fn() }));
 vi.mock('$lib/server/repos/assets', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/repos/assets')>()), listFontAssets: async () => [], listProjectAssets: async () => [] }));
 vi.mock('$lib/server/canvas/sign-media', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/canvas/sign-media')>()), signAssetPaths: async () => new Map(), createAssetSigningDb: () => ({}) }));
-vi.mock('$lib/server/repos/projects', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/repos/projects')>()), findProjectById: async () => ({ id: PROJECT, brandId: null, mode: 'standard' }) }));
+vi.mock('$lib/server/repos/projects', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/repos/projects')>()), findProjectById: async () => ({ id: PROJECT, mode: 'standard' }) }));
 vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/repos/canvas')>()),
   listCanvases: async () => [],

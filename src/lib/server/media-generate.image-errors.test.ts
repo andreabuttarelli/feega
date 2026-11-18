@@ -6,8 +6,7 @@ vi.mock('$lib/server/media-generate.images', () => ({
   renderPostImage: async () => {
     throw new CreditsExhaustedError({ quota: 0, used: 0, remaining: 0 } as never);
   },
-  buildImageRequest: () => ({ model: null }),
-  loadBrandVisualContext: async () => ({})
+  buildImageRequest: () => ({ model: null })
 }));
 
 describe('an image render that throws carries its cause, not a bare render_failed', () => {

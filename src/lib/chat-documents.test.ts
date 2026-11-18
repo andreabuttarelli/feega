@@ -1,15 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   attachedDocNamesFromContent,
-  chatConvertMarkdownPath,
-  chatConvertStoragePrefix,
   chatDocumentRefs,
   formatAttachedDocsBlock,
   formatAttachedDocsForModel,
   attachmentOutline,
   summarizeAttachmentMarkdown,
-  isChatConvertMarkdownPath,
-  isChatConvertStoragePath,
   isConvertibleDocument,
   isImageOrMediaFile,
   isReadyChatDoc,
@@ -34,20 +30,6 @@ describe('isConvertibleDocument', () => {
     expect(isConvertibleDocument('image/jpeg', 'pic.jpg')).toBe(false);
     expect(isConvertibleDocument('video/mp4', 'clip.mp4')).toBe(false);
     expect(isImageOrMediaFile('image/png', 'x.png')).toBe(true);
-  });
-});
-
-describe('chat convert storage path', () => {
-  it('only accepts this user/brand chat-convert prefix', () => {
-    expect(chatConvertStoragePrefix('u1', 'b1')).toBe('u1/b1/chat-convert/');
-    expect(isChatConvertStoragePath('u1/b1/chat-convert/abc.pdf', 'u1', 'b1')).toBe(true);
-    expect(isChatConvertStoragePath('u1/b1/other/abc.pdf', 'u1', 'b1')).toBe(false);
-    expect(isChatConvertStoragePath('u2/b1/chat-convert/abc.pdf', 'u1', 'b1')).toBe(false);
-    expect(isChatConvertStoragePath('u1/b1/chat-convert/', 'u1', 'b1')).toBe(false);
-    expect(isChatConvertStoragePath('u1/b1/chat-convert/../x.pdf', 'u1', 'b1')).toBe(false);
-    expect(chatConvertMarkdownPath('u1/b1/chat-convert/abc.pdf')).toBe('u1/b1/chat-convert/abc.pdf.md');
-    expect(isChatConvertMarkdownPath('u1/b1/chat-convert/abc.pdf.md', 'u1', 'b1')).toBe(true);
-    expect(isChatConvertMarkdownPath('u1/b1/chat-convert/abc.pdf', 'u1', 'b1')).toBe(false);
   });
 });
 

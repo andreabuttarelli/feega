@@ -19,8 +19,6 @@ export const ORG_TABLE_CHECKS: Record<string, string> = {
   chat_messages_actor_kind_check: "actor_kind in ('user', 'agent', 'system')",
   chat_messages_role_check: "role in ('user', 'assistant', 'tool', 'system')",
   chat_threads_surface_check: "surface in ('sidebar', 'mcp', 'cli', 'motion')",
-  competitor_ads_found_via_check: "found_via in ('page', 'search')",
-  competitor_ads_platform_check: "platform = 'meta'",
   influencers_source_check: "source in ('catalogue', 'generated', 'upload')",
   influencers_actor_kind_check: "actor_kind in ('user', 'agent', 'system')",
   node_runs_actor_kind_check: "actor_kind in ('user', 'agent', 'system')",
@@ -33,5 +31,6 @@ export const ORG_TABLE_CHECKS: Record<string, string> = {
   nodes_type_check:
     "type in ('text', 'image', 'video', 'doc', 'iframe', 'social_account_feed', 'social_post_mockup', 'products', 'ads', 'influencer', 'list', 'select', 'effects', 'composition', 'calendar', 'audio', 'model3d', 'motion', 'element', 'studio_batch', 'section', 'technique')",
   orgs_invites_role_check: "role in ('owner', 'admin', 'member', 'viewer')",
-  orgs_members_role_check: "role in ('owner', 'admin', 'member', 'viewer')"
+  orgs_members_role_check: "role in ('owner', 'admin', 'member', 'viewer')",
+  products_platform_check: "platform in ('shopify', 'woocommerce')"
 };

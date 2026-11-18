@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { productionCredits } from './plan-budget';
 import {
   creditQuota,
-  currentBillingPeriod,
   CreditsExhaustedError,
   assertCreditsAvailable,
   type CreditsUsage
@@ -35,54 +34,6 @@ describe('creditQuota', () => {
 
   it('gives the free plan no credits', () => {
     expect(creditQuota(null)).toBe(0);
-  });
-});
-
-describe('currentBillingPeriod', () => {
-  it('uses the Stripe period start as anchor', () => {
-    const brand = { activated_at: null };
-    const { start, end } = currentBillingPeriod(brand, new Date('2026-07-15T00:00:00Z'));
-    // start should be the most recent 15th <= now
-    expect(start.getUTCDate()).toBe(15);
-    // end should be 1 month later
-    expect(end.getUTCFullYear()).toBe(start.getUTCFullYear());
-    expect(end.getUTCMonth()).toBe((start.getUTCMonth() + 1) % 12);
-    expect(end.getUTCDate()).toBe(15);
-    // Period should be ~30 days
-    const days = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
-    expect(days).toBeGreaterThanOrEqual(28);
-    expect(days).toBeLessThanOrEqual(32);
-  });
-
-  it('falls back to activated_at when the Stripe period is null', () => {
-    const brand = { activated_at: '2026-06-01T10:00:00Z' };
-    const { start } = currentBillingPeriod(brand, null);
-    expect(start.getUTCDate()).toBe(1);
-  });
-
-  it('falls back to calendar month start when both are null', () => {
-    const brand = { activated_at: null };
-    const { start } = currentBillingPeriod(brand, null);
-    expect(start.getUTCDate()).toBe(1);
-    const now = new Date();
-    expect(start.getUTCMonth()).toBe(now.getUTCMonth());
-    expect(start.getUTCFullYear()).toBe(now.getUTCFullYear());
-  });
-
-  it('anchor day 15 produces periods 15→14', () => {
-    // Simulate anchor on the 15th
-    const brand = { activated_at: null };
-    const { start, end } = currentBillingPeriod(brand, new Date('2026-01-15T00:00:00Z'));
-    expect(start.getUTCDate()).toBe(15);
-    expect(end.getUTCDate()).toBe(15);
-    // end is exactly 1 month after start
-    expect(end.getUTCMonth()).toBe((start.getUTCMonth() + 1) % 12);
-  });
-
-  it('period is in the past or current (start <= now)', () => {
-    const brand = { activated_at: null };
-    const { start } = currentBillingPeriod(brand, new Date('2026-07-15T00:00:00Z'));
-    expect(start.getTime()).toBeLessThanOrEqual(Date.now());
   });
 });
 

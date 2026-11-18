@@ -20,7 +20,7 @@ vi.mock('./credits', () => ({
   CreditsExhaustedError: class CreditsExhaustedError extends Error {}
 }));
 
-import { orgScopeFor, brandStyleRefusal, apiKeyIsBrandScoped, type ApiKeyInfo } from './cli-auth';
+import { orgScopeFor, type ApiKeyInfo } from './cli-auth';
 
 function supabaseNaming(name: string | null) {
   return {
@@ -124,31 +124,5 @@ describe('orgScopeFor', () => {
 
     expect(error?.status).toBe(401);
     expect(ensureOrgForUser).not.toHaveBeenCalled();
-  });
-});
-
-describe('apiKeyIsBrandScoped', () => {
-  it('una chiave assente non è ristretta a niente', () => {
-    expect(apiKeyIsBrandScoped(undefined)).toBe(false);
-  });
-});
-
-describe('brandStyleRefusal', () => {
-  it('senza brand_style non c è niente da rifiutare', () => {
-    expect(brandStyleRefusal(undefined)).toBeUndefined();
-  });
-
-  it('chiedere lo stile di un brand che non c è dice la mossa, non viene ignorato', async () => {
-    const refusal = brandStyleRefusal('apply');
-
-    expect(refusal?.status).toBe(400);
-    expect(await refusal?.json()).toMatchObject({
-      error: 'brand_style_needs_a_brand',
-      reason: expect.stringMatching(/pass a slug, or drop brand_style/)
-    });
-  });
-
-  it('anche ignore è una risposta su un brand che non c è', () => {
-    expect(brandStyleRefusal('ignore')?.status).toBe(400);
   });
 });

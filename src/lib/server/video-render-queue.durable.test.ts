@@ -11,11 +11,7 @@ vi.mock('$lib/server/video', () => ({
 	finishVideoRender: (...args: unknown[]) => finishVideoRender(...args)
 }));
 vi.mock('$lib/server/ai-log', () => ({
-	withBrandContext: <T>(_id: string, fn: () => T) => fn(),
 	withOrgContext: <T>(_id: string, fn: () => T) => fn()
-}));
-vi.mock('$lib/server/brand-media', () => ({
-	saveRenderedVideoToLibrary: async () => ({ mediaId: 'media-1' })
 }));
 
 const TIMEOUT = { message: 'canceling statement due to statement timeout' };
@@ -104,7 +100,6 @@ async function track(client: unknown) {
 	const { submitAndTrackVideoRender } = await import('./video-render-queue');
 	return submitAndTrackVideoRender({
 		admin: client as never,
-		brandId: 'brand-1',
 		userId: 'user-1',
 		imagePrompt: 'a clip',
 		render: {},

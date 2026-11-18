@@ -35,7 +35,6 @@ const AGENT_NAMES: Record<string, string> = {
   mcp: 'MCP agent',
   motion: 'Claude · motion',
   compose: 'Claude · layout',
-  studio: 'Studio',
   api: 'API agent'
 };
 

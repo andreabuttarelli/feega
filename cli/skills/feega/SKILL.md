@@ -4,7 +4,7 @@ description: >-
   Operate feega (motion videos on an infinite canvas) via MCP tools or the
   feega CLI: motion videos, canvas nodes, generation, gallery.
   Use when the user mentions feega, feega.app, a feega canvas or video, or
-  managing brand content and ads from an agent.
+  managing canvases and ads from an agent.
 license: Apache-2.0
 compatibility: >-
   Requires network access to feega.app (or PUBLIC_APP_URL). Prefer feega MCP
@@ -20,7 +20,7 @@ metadata:
 # feega
 
 Drive [feega](https://feega.app) — an infinite canvas of typed nodes (text, image, video, doc,
-iframe, social feed, social post mockup, products, ads) — through **MCP tools** (preferred) or the
+iframe, social feed, social post mockup, ads) — through **MCP tools** (preferred) or the
 **`feega` CLI**. Same OAuth identity. **No static API tokens.**
 
 ## Choose interface
@@ -46,15 +46,15 @@ agent. Never invent REST endpoints or API keys.
    `/.well-known/oauth-protected-resource` and answers the `401 WWW-Authenticate: Bearer`
    challenge. Nothing for you to do; a missing Bearer is a 401, not a broken server.
 
-Confirm it worked with `query` on `projects` or `feega brands`: rows come back, or you are not
+Confirm it worked with `query` on `projects` or `feega projects`: rows come back, or you are not
 signed in.
 
 Setup details: [references/mcp.md](references/mcp.md).
 
 ## Operating rules
 
-1. **Never guess an org, a brand or a project.** Most calls default to the caller's own org and
-   need nothing named; the tools that DO need a `brand_id` or `project_id` take it as an input —
+1. **Never guess an org or a project.** Most calls default to the caller's own org and
+   need nothing named; the tools that DO need a `project_id` take it as an input —
    read it back with `query` first (recipe below), never invent one. Guessing spends a real
    organisation's credits and writes into a real client's canvas.
 2. `run_node_generation` needs the node's current `version` (optimistic concurrency): read the
@@ -65,7 +65,7 @@ Setup details: [references/mcp.md](references/mcp.md).
 ## Reading is one tool
 
 **`query` is the read.** Every table your org can see — projects, canvases, nodes, connections,
-assets, products — the request runs with your own session,
+assets — the request runs with your own session,
 so Postgres RLS returns exactly the rows you would see in the app and nothing more. Read only, no
 credits, no model. Omit `table` to list what you can name; ask for a table with no `columns` and
 the keys of a row are the schema.
@@ -85,11 +85,10 @@ are cut at 2 000 chars and `limits` says in which columns.
 
 | you want | call |
 |---|---|
-| which projects/brands you have | `query({table:"brands", columns:["id","slug","name","plan","status"]})` |
+| which projects you have | `query({table:"projects", columns:["id","name"]})` |
 | a project's canvases | `query({table:"canvases", columns:["id","name","project_id"], where:[{column:"project_id",op:"eq",value:"…"}]})` |
 | the nodes on a canvas | `query({table:"nodes", columns:["id","type","data","version","canvas_id"], where:[{column:"canvas_id",op:"eq",value:"…"},{column:"deleted_at",op:"is",value:null}]})` |
 | a node's current version (before generating into it) | same read, `limit:1` on the node's `id`, read back `version` |
-| what a brand sells | `query({table:"products", columns:["id","title","pricing","url","featured"]})` |
 
 **A row in a table nothing else writes** → `insert_row`, `update_row` and `delete_row`, `query`
 turned around. `insert_row({table, values})` adds one row; `org_id` is filled in for you, and a
@@ -134,15 +133,10 @@ Custom effects: `write_effect` writes a GLSL shader effect for the whole workspa
 and returns its check; `patch_effect` edits it by find/replace at its `version`. `list_effects` shows
 them under `custom`, each with the `step` to put in an `apply_effects` stack. On motion clips, add it with frame ops through `edit`.
 
-The canvas and motion agents browse the web themselves (`web_search`, `read_page`, `read_store`, `view_images`, `screenshot_page`, `import_image`, `import_products`). As an external agent, browse with your own web tools; feega does not proxy search.
+The canvas and motion agents browse the web themselves (`web_search`, `read_page`, `read_store`, `view_images`, `screenshot_page`, `import_image`). As an external agent, browse with your own web tools; feega does not proxy search.
 
 Custom composition layouts: `write_layout` writes a spec layout (placement, slots, animation) for the
 workspace, `patch_layout` replaces its spec at a `version`, `list_layouts` lists them.
-
-Photo studio batches: `studio_quote` prices a selection (count, credits, a `quoteId`), `studio_start` starts it
-and spends credits only with that `quoteId` (a changed selection or price is a 409), `studio_status` follows the batch.
-`studio_run`, `studio_more` (`variations`), `studio_cancel`, `studio_retry`, `studio_regenerate`,
-`studio_approve` and `studio_reject` act on a batch (`batch_id`, `item_ids`); run, more, retry and regenerate spend credits.
 
 Test app account: the project chat logs in to the user's own app with a TEST account, and photographs its screens; code import signs in with it to capture routes behind a login. The user gives it in chat, in project settings, or through `set_app_account`. `get_app_account` shows that account (never the password), `forget_app_account` drops it and its session.
 
@@ -318,7 +312,7 @@ edits included, and the clips each card plays), `write_storyboard` writes it fro
 The public gallery holds free motion videos and compositions anyone can remix, many by Feega.
 `search_gallery` finds them by title words, `kind`, `format`, `duration` (short, medium, long) or
 `tag`. `remix_gallery_item` copies one into a project as a new `motion` node with its texts,
-colours, logo and media exposed as fields; then offer to put the user's brand on it with frame ops. `publish_to_gallery` shares a `motion` node, only when the user asks: it is
+colours, logo and media exposed as fields; then offer to adapt it with frame ops. `publish_to_gallery` shares a `motion` node, only when the user asks: it is
 refused for uncensored projects, real brands (their logo, a real-brand script, logos or pictures
 imported from a website) and content the moderation refuses. Free. CLI: `feega gallery [query]`,
 `feega gallery remix <itemId> --project <id>`, `feega gallery publish <nodeId> --title "…"`.

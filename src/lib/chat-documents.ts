@@ -15,13 +15,10 @@ export const ATTACH_READ_MAX_CHARS = 12_000;
 export const ATTACH_OUTLINE_MAX = 40;
 /** Chat attach cap — bytes go through Storage, not the function body. */
 export const MAX_CHAT_CONVERT_BYTES = 100 * 1024 * 1024;
-/** Knowledge ingest stays tighter: embedding/chunking a 100 MB dump is a different job. */
-export const MAX_KNOWLEDGE_FILE_BYTES = 20 * 1024 * 1024;
 
 export const ATTACHED_DOCS_MARKER = '<!--feega-attached-docs-->';
-export const CHAT_CONVERT_FOLDER = 'chat-convert';
 
-/** Formats markitdown-ts (and the knowledge ingest) can turn into markdown. */
+/** Formats markitdown-ts can turn into markdown. */
 export const CONVERTIBLE_EXTS = new Set([
   'pdf',
   'docx',
@@ -39,11 +36,6 @@ export const CONVERTIBLE_EXTS = new Set([
   'ipynb',
   'zip'
 ]);
-
-/** Knowledge ingest: same as chat convert, minus zip (unbounded corpus dump). */
-export const KNOWLEDGE_DOC_EXTS = new Set(
-  [...CONVERTIBLE_EXTS].filter((e) => e !== 'zip')
-);
 
 const MIME_TO_EXT: Record<string, string> = {
   'application/pdf': 'pdf',
@@ -141,30 +133,6 @@ export function isConvertibleDocument(mimeType: string, fileName: string): boole
   if (isImageOrMediaFile(mimeType, fileName)) return false;
   const e = fileExt(fileName) || extFromMime(mimeType);
   return CONVERTIBLE_EXTS.has(e);
-}
-
-export function isSupportedKnowledgeFile(mimeType: string, fileName: string): boolean {
-  if (isImageOrMediaFile(mimeType, fileName)) return false;
-  const e = fileExt(fileName) || extFromMime(mimeType);
-  return KNOWLEDGE_DOC_EXTS.has(e);
-}
-
-/** `${userId}/${brandId}/chat-convert/` — binaries deleted after conversion; `.md` kept until the turn. */
-export function chatConvertStoragePrefix(userId: string, brandId: string): string {
-  return `${userId}/${brandId}/${CHAT_CONVERT_FOLDER}/`;
-}
-
-export function isChatConvertStoragePath(path: string, userId: string, brandId: string): boolean {
-  const prefix = chatConvertStoragePrefix(userId, brandId);
-  return path.startsWith(prefix) && path.length > prefix.length && !path.includes('..');
-}
-
-export function chatConvertMarkdownPath(originalPath: string): string {
-  return `${originalPath}.md`;
-}
-
-export function isChatConvertMarkdownPath(path: string, userId: string, brandId: string): boolean {
-  return isChatConvertStoragePath(path, userId, brandId) && path.endsWith('.md');
 }
 
 export function truncateMarkdown(
@@ -283,7 +251,7 @@ export function formatAttachedDocsBlock(docs: ChatDocument[], cap: number): stri
     const packed = packChatChunks(chunks, cap);
     let note = '';
     if (packed.chunkCount > 1 && packed.shortened) {
-      note = `\n\n_Split into ${packed.chunkCount} ordered chunks covering the whole file (${packed.originalChars.toLocaleString()} chars). Every chunk is included; some were shortened to fit context. Full text: add_document with from_attachment._`;
+      note = `\n\n_Split into ${packed.chunkCount} ordered chunks covering the whole file (${packed.originalChars.toLocaleString()} chars). Every chunk is included; some were shortened to fit context._`;
     } else if (packed.chunkCount > 1) {
       note = `\n\n_Split into ${packed.chunkCount} ordered chunks covering the full text._`;
     } else if (packed.shortened) {
@@ -291,7 +259,7 @@ export function formatAttachedDocsBlock(docs: ChatDocument[], cap: number): stri
     }
     return `### ${d.name}\n\n${packed.markdown}${note}`;
   });
-  return `\n\n${ATTACHED_DOCS_MARKER}\n## Attached documents (converted to markdown)\nThese files are for THIS turn. They are NOT brand knowledge unless you save them with add_document (prefer from_attachment = the filename so the full text is stored).\n\n${parts.join('\n\n')}`;
+  return `\n\n${ATTACHED_DOCS_MARKER}\n## Attached documents (converted to markdown)\nThese files are for THIS turn.\n\n${parts.join('\n\n')}`;
 }
 
 export type AttachmentHeading = { heading: string; index: number; chars: number };
@@ -362,8 +330,8 @@ export function formatAttachedDocsForModel(docs: ChatDocument[]): string {
       .join('\n');
     return `### ${d.name}\n${d.title ? `Title: ${d.title}\n` : ''}${d.markdown.length.toLocaleString()} characters — too large to dump. grep_attachment / read_attachment (start_from = heading @index, max_chars ≤ ${ATTACH_READ_MAX_CHARS}) / summarize_attachment with file="${d.name}".\n\nHeadings:\n${lines}`;
   });
-  return `\n\n${ATTACHED_DOCS_MARKER}\n## Attached documents (this turn, not knowledge)
-Small files are inlined. Large files: summarize_attachment → grep_attachment → read_attachment. Do not guess unread pages. Save with add_document from_attachment = filename (full text, not a slice).
+  return `\n\n${ATTACHED_DOCS_MARKER}\n## Attached documents (this turn)
+Small files are inlined. Large files: summarize_attachment → grep_attachment → read_attachment. Do not guess unread pages.
 
 ${parts.join('\n\n')}`;
 }

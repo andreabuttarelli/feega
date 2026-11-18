@@ -30,8 +30,8 @@
 </p>
 
 <h2>{$_('docs.cli.s10')}</h2>
-<pre><code>feega brands                          # List brands
-feega products &lt;slug&gt; sync            # Re-import the store catalog</code></pre>
+<pre><code>feega projects                        # List projects
+feega canvases &lt;projectId&gt;           # List a project's canvases</code></pre>
 
 <h2>{$_('docs.cli.s11')}</h2>
 <pre><code>feega update</code></pre>

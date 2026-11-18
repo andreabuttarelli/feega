@@ -46,7 +46,7 @@ function event(signedIn: boolean, form: Record<string, string> = {}) {
 
 beforeEach(() => {
   let n = 0;
-  state.world = fakeDb({ gallery_items: [item()], canvases: [{ id: 'c-9', org_id: 'org-2', project_id: 'p-2', name: 'Motion', viewport: null }], nodes: [], assets: [], gallery_remixes: [], orgs_members: [], projects: [{ id: 'p-2', org_id: 'org-2', name: 'Mine', slug: 'mine', brand_id: null, archived_at: null, updated_at: '2026-10-08', mode: 'standard' }] }, { filter: true, newId: () => `new-${++n}` });
+  state.world = fakeDb({ gallery_items: [item()], canvases: [{ id: 'c-9', org_id: 'org-2', project_id: 'p-2', name: 'Motion', viewport: null }], nodes: [], assets: [], gallery_remixes: [], orgs_members: [], projects: [{ id: 'p-2', org_id: 'org-2', name: 'Mine', slug: 'mine', archived_at: null, updated_at: '2026-10-08', mode: 'standard' }] }, { filter: true, newId: () => `new-${++n}` });
   state.userId = null;
   vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array([0x89, 0x50, 0x4e, 0x47]), { headers: { 'content-type': 'image/png' } })));
 });

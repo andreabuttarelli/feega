@@ -1,7 +1,7 @@
 import { env } from '$env/dynamic/private';
 import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import type { Db } from '$lib/server/db/client';
-import { logAiCall, withBrandContext, withOrgContext } from '$lib/server/ai-log';
+import { logAiCall, withOrgContext } from '$lib/server/ai-log';
 import { SCRAPECREATORS_COST_USD, fetchProfileHistory, fetchSinglePost, scrapeCreatorsGet } from '$lib/server/scrapecreators';
 import { ensureFfmpegPath } from '$lib/server/ffmpeg-bin';
 import { classifySocialInput } from '$lib/canvas/social-url-classifier';
@@ -40,7 +40,7 @@ import type { AssetImport } from '$lib/server/motion/motion-tools';
 import type { MotionAsset } from '$lib/server/motion/editor';
 import type { AppPort, ImageImport, ItemsRead, PinterestPort, ProductsImport, SocialPort, WebToolDeps } from './web-tools';
 
-export type WebScope = { orgId: string; userId: string; projectId: string; brandId?: string | null; mode: ProjectMode };
+export type WebScope = { orgId: string; userId: string; projectId: string; mode: ProjectMode };
 
 export const WEB_VIEWS_DIR = 'web-views';
 
@@ -86,7 +86,6 @@ export function loggedSearch(scope: Omit<WebScope, 'mode'>, engine: SearchEngine
       ok: found.ok,
       ...(found.ok ? { flatCostUsd: found.costUsd } : { error: found.error }),
       orgId: scope.orgId,
-      brandId: scope.brandId ?? undefined,
       userId: scope.userId,
       projectId: scope.projectId,
       actorKind: 'agent',
@@ -157,7 +156,6 @@ function logged(scope: Metered, entry: { label: string; provider: 'browserless' 
     flatCostUsd: entry.usd,
     ...(entry.units ? { providerCredits: entry.units } : {}),
     orgId: scope.orgId,
-    brandId: scope.brandId ?? undefined,
     userId: scope.userId,
     projectId: scope.projectId,
     actorKind: 'agent',
@@ -308,7 +306,7 @@ function scrapeBilling(scope: Metered): Billed | undefined {
   if (!env.SCRAPECREATORS_API_KEY?.trim()) {
     return undefined;
   }
-  return (fn) => (scope.brandId ? withBrandContext(scope.brandId, fn) : withOrgContext(scope.orgId, fn));
+  return (fn) => withOrgContext(scope.orgId, fn);
 }
 
 function liveSocial(billed: Billed): SocialPort {

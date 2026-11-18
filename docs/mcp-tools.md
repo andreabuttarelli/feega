@@ -3,12 +3,12 @@
 > Generato da `node scripts/mcp-inventory.mjs --write`, leggendo `tools/list` dal server vero.
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
-**75 tool** — 29 in lettura, 37 in scrittura, 9 che distruggono.
-Una sessione nuova ne lista 10 (`query`, `view`, `edit`, `describe`, `render_video`, `get_render`, `list_orgs`, `find_tools`, `load_tools`, `unload_tools`): `tools/list` pesa **3774 caratteri**, circa **944 token**. Gli altri si caricano con `find_tools`/`load_tools` o si chiamano via `edit` {op, input}; tutti insieme peserebbero 80.687 caratteri.
+**67 tool** — 27 in lettura, 32 in scrittura, 8 che distruggono.
+Una sessione nuova ne lista 10 (`query`, `view`, `edit`, `describe`, `render_video`, `get_render`, `list_orgs`, `find_tools`, `load_tools`, `unload_tools`): `tools/list` pesa **3774 caratteri**, circa **944 token**. Gli altri si caricano con `find_tools`/`load_tools` o si chiamano via `edit` {op, input}; tutti insieme peserebbero 80.322 caratteri.
 
 | gruppo | tool |
 |---|---:|
-| Altro | 47 |
+| Altro | 39 |
 | Video motion | 16 |
 | Accesso diretto al database | 5 |
 | Nodi e generazione | 4 |
@@ -48,7 +48,7 @@ A canvas as a local .feega file, to carry work from a local feega to feega.app. 
 
 *Work a project canvas*
 
-Deprecated, use `edit`. The canvas ops of the project chat, on one project (`project_id`), with `input` in camelCase. First call op "describe" with {} for every op with one line, or {op} for its strict JSON input schema. Frames and stills: draw_frame, then edit inside with motion_tool. Reads: list_canvases {}, list_project_components {} (main components of every canvas, grouped by canvas), estimate_text_cost {canvasId,nodeId,prompt?,model?} (token estimate of a text run), suggest_next_steps {canvasId,nodeId}, list_nodes {canvasId}, canvas_snapshot {canvasId} (nodes, connections, runs, products, socialPosts, influencers, revision), canvas_revision {canvasId} (live revision, or canvas/project gone), get_selection {canvasId} (what the user has selected on the open canvas + view {cx,cy,zoom}, per open session; waits up to 3.5 s; reason no_open_session when the canvas is not open), list_runs {nodeId} (versions of a node), compare_runs {nodeId,runA,runB} (prompt/model/settings that differ), list_models {medium} (models this project can run: provider, credits, uncensored, and routes[] — one per provider that serves it, for run_node provider), preview_node_loop {nodeId}, preview_run_graph {graph:"downstream",nodeId} | {graph:"stale",canvasId,nodeIds?} (ordered steps + credits: quote before run_graph). Writes, free: create_node {canvasId,type,x,y,displayName?,data?} (data per describe_node_types), update_node {nodeId,data} (only changed fields, null removes), move_node {nodeId,x,y,z?}, resize_node {nodeId,width,height}, rename_node {nodeId,name} (empty = default name), set_node_color {nodeId,color: red|orange|yellow|green|blue|purple|grey|null}, connect_nodes {canvasId,sourceNodeId,targetNodeId,sourceHandle?,targetHandle?} (a frame takes no inputs: use place_in_frame; a free image element is a source, output images, refused when it holds no single image), delete_node {nodeId} (soft, drops its lines), cancel_node_loop {nodeId}, cancel_run {nodeId} (stop one running generation), duplicate_nodes {canvasId,nodeIds}, layers_to_frame {nodeId} (a split image into a frame of image elements), video_reframe {nodeId,aspect,focus?:{x,y}} (free: crops a video to aspect around the focus point, default centre, into a new video node), write_nodes {canvasId,items:[{node_id,version,patch}]} (merge each patch, per-node written|conflict|not_found), paste_nodes {canvasId,nodes:[{type,data,x,y}],edges?:[{sourceIndex,targetIndex,sourceHandle?,targetHandle?}]}, list_connections {canvasId}, disconnect_nodes {connectionId}, set_edge_mode {connectionId,mode:fixed|iterate}, undo_gesture {canvasId,items} (replay a recorded gesture inverse; refused when the canvas moved on), undo_last {canvasId} (revert your last write on the canvas, with those made in the same instant; moves are not undone), revert_change {canvasId,entryId,choices?:[{path,keep:mine|reject,eventId?}],confirm?} (revert one change or session from list_history, any author, keeping later edits; conflict per field edited since), align_nodes {canvasId,nodeIds,edge: left|center|right|top|middle|bottom}, distribute_nodes {canvasId,nodeIds (3+),axis: x|y} (equal gaps, outer two stay), tidy_nodes {canvasId,nodeIds} (untangle overlaps), stack_nodes {canvasId,nodeIds,gap?} (row or column), run_demo {canvasId} (first-run example chain), end_onboarding {status:dismissed|completed}, create_canvas {}, rename_canvas {canvasId,name}, delete_canvas {canvasId}, rename_project {name}, share_canvas {canvasId,on} (view-only link), share_doc {nodeId,on}, list_templates {}, insert_template {canvasId,templateId,x,y}, list_techniques {} (saved flows of the workspace with their input and output slots), save_technique {canvasId,nodeIds,name} (package a connected selection, 2+ nodes, as a reusable technique), place_technique {canvasId,techniqueId,x,y} (a live node that references the technique: editing the technique updates it), run_technique_node {nodeId} (runs the saved graph of the technique with the texts wired into the node; spends credits), preview_technique_rows {techniqueId,rows,mapping?} (credits for one run per row, quote before run_technique_rows; rows are arrays of cells, mapping gives per input slot the cell it takes, default in order, image slots take a URL, at most 50 rows), run_technique_rows (same input; one output group per row on the Technique runs canvas; answers workflowIds and runIds), technique_rows_progress {runIds} (done, failed, running), cancel_technique_rows {workflowIds} (stops the rows not started), detach_technique {canvasId,nodeId} (swaps the node for a copy of the graph), open_technique {techniqueId} (writes the graph on its own canvas to edit; save_technique with the same name bumps the version), run_technique {canvasId,techniqueId,x,y,inputs?:[{node,value}],run?} (places a copy of the flow, sets the prompt of each input slot, runs the inner graph; run:false only places it), delete_technique {techniqueId}, add_frame_from_template {canvasId,templateId,format?,values?,x,y}, move_frame_element {frameId,elementId,toFrameId?,x?,y?,canvasX?,canvasY?}, copy_frame_element {same input as move_frame_element; copies, the source keeps the element}, create_formats {frameId,targets:[{format:1:1|4:5|9:16|16:9}|{size:{width,height}}]} (editable copies of a frame in other formats, content refitted, placed to its right), export_selection {frameIds?,elements?:[{frameId,elementId}],rows:[{format:png|jpg|webp|svg|pdf|lottie|dotlottie,by:scale|width|height,value,suffix?,quality?,transparent?}],name?} (one file or a zip; a pdf row is one file, a page per frame; svg/pdf are true vector, with shapes as paths and text as outlines; lottie (.json) and dotlottie (.lottie) are the frame animation, up to 30 s, text as shapes, no browser needed; answers url, and skipped = what a vector or Lottie file could not draw), place_in_frame {nodeId,toFrameId?,x?,y?}, list_figma_frames {url} (the frames of a figma.com file; needs the Figma token saved in Settings), import_figma {canvasId,url,frameIds?,x,y} (draws Figma frames with layers, auto layout and images; a node-id in the link picks the frame when frameIds is left out), draw_frame {canvasId,x,y,w,h?,format?,still?} (an empty frame, like the frame tool; a preset format sets h from w; still? = seconds to keep, making it a still graphic such as a post or poster), discover_routes {repo|folder,app?} (the pages of an app read from its file router — Next, SvelteKit, Nuxt, Vue pages, Astro, Remix/React Router, TanStack Router — without running it: path, file, static or dynamic with params, values found in the code; routes defined in code answer routes_in_code), import_code {canvasId,repo,app?,route?,routes?,conditions?:[{scheme:light|dark,width}],responsive?:boards|views (default boards: a board per width, components and the Design system board kept; views = one page at several widths of one theme becomes one frame with breakpoint views, giving up components and the Design system board),captureDelayMs? (extra wait before capture, default 0),routeDelayMs?:{route:ms},designSystem?,x,y} (conditions render every page under each theme and width, side by side; default light at 1280; the CSS tokens of the repo (@theme, :root, .dark) become variables with Light/Dark modes bound to the layers, plus a Design system board, designSystem:false skips them; app = the folder of one app in a monorepo, also read from a /tree/<branch>/<folder> link; several apps and none chosen answers choose_app with apps to pick from) or {canvasId,storybook,stories?,x,y} (a GitHub React/Vue/Svelte app runs in a sandbox and its pages, default /, up to 20 in routes (more is refused; routes:"all" = every static page discover_routes finds; a dynamic page as a concrete path), become one frame with a board per page; or the stories of a public Storybook, up to 12, become boards with no app to run; each code component is a main component shared across boards, each usage an instance, props are variants; answers frameId, pages, components, variants, instances, design) or {canvasId,into,routes,conditions?,x,y} (adds the routes, each under the conditions, to a frame made by import_code, from the same code: new boards below the others, its components, variables and styles reused; at most 20 boards per frame, frame_full past that), code_map {nodeId} (the import map of a code frame: every page the code has with its state — imported with its conditions and boards, not_selected, needs_value with values seen in links, failed with the reason, locked behind a sign-in — components on canvas vs in code only, token counts, the revision, used of limit boards), github_status {}, github_connect {} (answers a link the user opens to connect GitHub; private repos import after that), github_repos {}, github_branches {repo:owner/name}, github_disconnect {}, import_url {canvasId,url,x,y,sections?,tokens?} (a public web page becomes an editable frame centred on x,y: text, auto layout, images, icons; its direct children are named sections stacked top to bottom (Nav, Hero, Logos, Features, Testimonials, Pricing, FAQ, CTA, Footer, or Section N), sections:false keeps one layer tree; colours become shared variables and type, effects and gradients shared styles (Primary, Text, Body, H1…) bound to the layers, tokens:false keeps raw values; answers frame_id and truncated when the page hit the node or height cap), import_lottie {canvasId,x,y,lottie?|url?} (a Lottie animation, as JSON or an https url of a .json/.lottie file, becomes an editable frame centred on x,y; answers frame_id and skipped = what it could not carry over: trim paths, repeaters, animated paths, effects, time remap), draw_element {canvasId,drawn:{tool:text|rectangle|ellipse,box:{left,top,width,height}}|{tool:pen,path}} (a free Text/Box/Ellipse/Path on the canvas, outside any frame), group_elements {canvasId,nodeIds} (2+ free elements into one Group), stack_elements {canvasId,nodeIds} (1+ free elements into one free Stack, a flexbox container), frame_elements {canvasId,nodeIds} (1+ free elements into one Frame at their bounds, like Figma Frame selection), ungroup_element {canvasId,nodeId}, rotate_group {canvasId,nodeId,degrees} (turns the Group and its members around its centre), move_group {canvasId,nodeId,x,y} (moves the Group and its members), scale_group {canvasId,nodeId,width,height} (resizes the Group and scales its members), show_run {nodeId,runId} (pin an older version as the node output; downstream reruns use it), sync_node {nodeId} (products, social feed), preview_workflow {canvasId,nodeIds}, cancel_workflow {workflowId}, cancel_render {nodeId}, withdraw_from_gallery {itemId}. Upload a file into a new node: request_upload {fileName,mimeType,bytes} (checked like the canvas upload: image/document 4MB, video 200MB) answers path + uploadUrl; PUT the bytes there with the Content-Type, then register_upload {canvasId,path,fileName,mimeType,bytes,x?,y?} answers node + asset. Copy a picture or video from a link into the project library: import_link {url} answers asset (use its id in a media prop; a raw link does not render in frames). Pull one picture out of a social feed or products node: import_feed_image {canvasId,nodeId,itemId,imageIndex?,x?,y?,toFrameId?,frameX?,frameY?} (itemId is a post or product id from canvas_snapshot; copies the picture into the project and answers an image node + asset at x,y, with its source kept in data.source; with toFrameId it becomes an image layer in that Frame instead). Custom voices: list_voices {}, voice_library {search?,language?,gender?,accent?,useCase?,page?}, use_library_voice {ownerId,voiceId,name}, save_voice {generatedVoiceId,name,description?}, delete_voice {id}. Spends credits: run_node {nodeId,medium,prompt?,model?,params?,provider?,expectedVersion}, image_tool {nodeId,tool:remove_background|upscale|split_layers|inpaint|outpaint|reframe,prompt?,mask?,extend?,aspect?} (upscale doubles the size, any image node holding an asset works, uploads too; split_layers makes base + layers kept on the node; inpaint repaints a mask of strokes/regions as fractions, needs prompt and mask; reframe grows an image to aspect (w:h, like 9:16, 1:1, 4:5, 16:9) and paints the new area, no prompt needed; outpaint grows sides by extend {left,top,right,bottom} fractions, needs prompt), run_node_loop {nodeId,confirm?}, retry_loop_combination {nodeId,outputListNodeId,label,runId?}, run_workflow {canvasId,nodeIds}, run_graph (same input as preview_run_graph; queued, each step after its inputs; cycles refused), design_voice {description} (previews to save_voice), read_video_reference {assetId} (a video asset into transcript, scenes with durations, on-screen text, UI, camera, transitions, pacing, palette, type; spends only on the first read), clone_voice {name,consentBasis:own_voice|consented_speaker,speaker?,attested:true,seconds:60-180,sampleBase64 (max 3MB),mimeType?} (only with the user's consent). Unknown op answers the list; bad input answers the issues.
+Deprecated, use `edit`. The canvas ops of the project chat, on one project (`project_id`), with `input` in camelCase. First call op "describe" with {} for every op with one line, or {op} for its strict JSON input schema. Frames and stills: draw_frame, then edit inside with motion_tool. Reads: list_canvases {}, list_project_components {} (main components of every canvas, grouped by canvas), estimate_text_cost {canvasId,nodeId,prompt?,model?} (token estimate of a text run), suggest_next_steps {canvasId,nodeId}, list_nodes {canvasId}, canvas_snapshot {canvasId} (nodes, connections, runs, socialPosts, influencers, revision), canvas_revision {canvasId} (live revision, or canvas/project gone), get_selection {canvasId} (what the user has selected on the open canvas + view {cx,cy,zoom}, per open session; waits up to 3.5 s; reason no_open_session when the canvas is not open), list_runs {nodeId} (versions of a node), compare_runs {nodeId,runA,runB} (prompt/model/settings that differ), list_models {medium} (models this project can run: provider, credits, uncensored, and routes[] — one per provider that serves it, for run_node provider), preview_node_loop {nodeId}, preview_run_graph {graph:"downstream",nodeId} | {graph:"stale",canvasId,nodeIds?} (ordered steps + credits: quote before run_graph). Writes, free: create_node {canvasId,type,x,y,displayName?,data?} (data per describe_node_types), update_node {nodeId,data} (only changed fields, null removes), move_node {nodeId,x,y,z?}, resize_node {nodeId,width,height}, rename_node {nodeId,name} (empty = default name), set_node_color {nodeId,color: red|orange|yellow|green|blue|purple|grey|null}, connect_nodes {canvasId,sourceNodeId,targetNodeId,sourceHandle?,targetHandle?} (a frame takes no inputs: use place_in_frame; a free image element is a source, output images, refused when it holds no single image), delete_node {nodeId} (soft, drops its lines), cancel_node_loop {nodeId}, cancel_run {nodeId} (stop one running generation), duplicate_nodes {canvasId,nodeIds}, layers_to_frame {nodeId} (a split image into a frame of image elements), video_reframe {nodeId,aspect,focus?:{x,y}} (free: crops a video to aspect around the focus point, default centre, into a new video node), write_nodes {canvasId,items:[{node_id,version,patch}]} (merge each patch, per-node written|conflict|not_found), paste_nodes {canvasId,nodes:[{type,data,x,y}],edges?:[{sourceIndex,targetIndex,sourceHandle?,targetHandle?}]}, list_connections {canvasId}, disconnect_nodes {connectionId}, set_edge_mode {connectionId,mode:fixed|iterate}, undo_gesture {canvasId,items} (replay a recorded gesture inverse; refused when the canvas moved on), undo_last {canvasId} (revert your last write on the canvas, with those made in the same instant; moves are not undone), revert_change {canvasId,entryId,choices?:[{path,keep:mine|reject,eventId?}],confirm?} (revert one change or session from list_history, any author, keeping later edits; conflict per field edited since), align_nodes {canvasId,nodeIds,edge: left|center|right|top|middle|bottom}, distribute_nodes {canvasId,nodeIds (3+),axis: x|y} (equal gaps, outer two stay), tidy_nodes {canvasId,nodeIds} (untangle overlaps), stack_nodes {canvasId,nodeIds,gap?} (row or column), run_demo {canvasId} (first-run example chain), end_onboarding {status:dismissed|completed}, create_canvas {}, rename_canvas {canvasId,name}, delete_canvas {canvasId}, rename_project {name}, share_canvas {canvasId,on} (view-only link), share_doc {nodeId,on}, list_templates {}, insert_template {canvasId,templateId,x,y}, list_techniques {} (saved flows of the workspace with their input and output slots), save_technique {canvasId,nodeIds,name} (package a connected selection, 2+ nodes, as a reusable technique), place_technique {canvasId,techniqueId,x,y} (a live node that references the technique: editing the technique updates it), run_technique_node {nodeId} (runs the saved graph of the technique with the texts wired into the node; spends credits), preview_technique_rows {techniqueId,rows,mapping?} (credits for one run per row, quote before run_technique_rows; rows are arrays of cells, mapping gives per input slot the cell it takes, default in order, image slots take a URL, at most 50 rows), run_technique_rows (same input; one output group per row on the Technique runs canvas; answers workflowIds and runIds), technique_rows_progress {runIds} (done, failed, running), cancel_technique_rows {workflowIds} (stops the rows not started), detach_technique {canvasId,nodeId} (swaps the node for a copy of the graph), open_technique {techniqueId} (writes the graph on its own canvas to edit; save_technique with the same name bumps the version), run_technique {canvasId,techniqueId,x,y,inputs?:[{node,value}],run?} (places a copy of the flow, sets the prompt of each input slot, runs the inner graph; run:false only places it), delete_technique {techniqueId}, add_frame_from_template {canvasId,templateId,format?,values?,x,y}, move_frame_element {frameId,elementId,toFrameId?,x?,y?,canvasX?,canvasY?}, copy_frame_element {same input as move_frame_element; copies, the source keeps the element}, create_formats {frameId,targets:[{format:1:1|4:5|9:16|16:9}|{size:{width,height}}]} (editable copies of a frame in other formats, content refitted, placed to its right), export_selection {frameIds?,elements?:[{frameId,elementId}],rows:[{format:png|jpg|webp|svg|pdf|lottie|dotlottie,by:scale|width|height,value,suffix?,quality?,transparent?}],name?} (one file or a zip; a pdf row is one file, a page per frame; svg/pdf are true vector, with shapes as paths and text as outlines; lottie (.json) and dotlottie (.lottie) are the frame animation, up to 30 s, text as shapes, no browser needed; answers url, and skipped = what a vector or Lottie file could not draw), place_in_frame {nodeId,toFrameId?,x?,y?}, list_figma_frames {url} (the frames of a figma.com file; needs the Figma token saved in Settings), import_figma {canvasId,url,frameIds?,x,y} (draws Figma frames with layers, auto layout and images; a node-id in the link picks the frame when frameIds is left out), draw_frame {canvasId,x,y,w,h?,format?,still?} (an empty frame, like the frame tool; a preset format sets h from w; still? = seconds to keep, making it a still graphic such as a post or poster), discover_routes {repo|folder,app?} (the pages of an app read from its file router — Next, SvelteKit, Nuxt, Vue pages, Astro, Remix/React Router, TanStack Router — without running it: path, file, static or dynamic with params, values found in the code; routes defined in code answer routes_in_code), import_code {canvasId,repo,app?,route?,routes?,conditions?:[{scheme:light|dark,width}],captureDelayMs? (extra wait before capture, default 0),routeDelayMs?:{route:ms},designSystem?,x,y} (conditions render every page under each theme and width, side by side; default light at 1280; the CSS tokens of the repo (@theme, :root, .dark) become variables with Light/Dark modes bound to the layers, plus a Design system board, designSystem:false skips them; app = the folder of one app in a monorepo, also read from a /tree/<branch>/<folder> link; several apps and none chosen answers choose_app with apps to pick from) or {canvasId,storybook,stories?,x,y} (a GitHub React/Vue/Svelte app runs in a sandbox and its pages, default /, up to 20 in routes (more is refused; routes:"all" = every static page discover_routes finds; a dynamic page as a concrete path), become one frame with a board per page; or the stories of a public Storybook, up to 12, become boards with no app to run; each code component is a main component shared across boards, each usage an instance, props are variants; in a Next or Vite React app every component the code declares is also drawn on Library boards across its declared variants, and library.reasons says why any could not be; answers frameId, pages, components, variants, instances, design, library) or {canvasId,into,routes,conditions?,x,y} (adds the routes, each under the conditions, to a frame made by import_code, from the same code: new boards below the others, its components, variables and styles reused; at most 20 boards per frame, frame_full past that), code_map {nodeId} (the import map of a code frame: every page the code has with its state — imported with its conditions and boards, not_selected, needs_value with values seen in links, failed with the reason, locked behind a sign-in — components on canvas vs in code only, token counts, the revision, used of limit boards), github_status {}, github_connect {} (answers a link the user opens to connect GitHub; private repos import after that), github_repos {}, github_branches {repo:owner/name}, github_disconnect {}, github_push {name,nodeIds,title?,body?,confirmSensitive?,mains?,variants?:[{nodeId,choice:replace|new_route|keep,route?}]} (code edits of linked frames become one commit on feega/<name> and one pull request per merge cycle; never the default branch, never force-pushed; a rewritten or protected branch falls back to <branch>-sync; read_only answers the patch; .env files and secrets are refused; config, lockfiles and dotfiles answer needs_confirm until confirmSensitive; busy while another push runs; an edit on a component instance becomes props at that usage site, mains lists frames whose instance edits go to the component file instead; a variant answers variant_choice with a suggested route until variants says what to do with it), github_push_status {nodeId} (computed state: conflict, orphan, access_lost, newer_upstream, modified, in_pull, in_sync; pull request and CI checks; follows upstream renames; affected = shared files with the number of pages using them; proposals = instance edits with no fitting prop, for the agent to add one), github_undo {nodeId} (a forward commit restoring only the files the last push touched), github_variant {canvasId,nodeId} (a copy of a linked frame, linked as a variant of it; Duplicate gives an unlinked copy), github_versions {nodeId,ref?,limit?} (branches, tags, open pull requests and the commits that touched the file of a linked frame, newest first, with message and author), github_compare {nodeId,refs} (up to 4 refs: branch, tag, sha or #<pr>; each imports the page of the frame at that ref as a read-only version frame beside it, named after the ref, never linked or pushed), github_version_ref {versionId,ref} (moves a version frame to another commit, branch, tag or #<pr> in the same place; github_versions {nodeId} lists the commits to scrub through), github_version_action {versionId,action:restore|variant|code_diff} (restore: the files of the version become changes of the linked frame, pushed with github_push like any edit; variant: an unlocked unlinked copy below it; code_diff: before and after of each changed file against the base branch), github_conflicts {nodeId} (files both the frame and GitHub changed, with base, canvas and github versions), github_resolve {nodeId,choice:keep_canvas|agent} (keep_canvas: the canvas version wins on the next push; agent: answers agent_unavailable with a prompt holding the three versions; to take GitHub, pull the frame), github_detach {nodeId} (unlinks the frame from its source; the frame stays), import_url {canvasId,url,x,y,sections?,tokens?} (a public web page becomes an editable frame centred on x,y: text, auto layout, images, icons; its direct children are named sections stacked top to bottom (Nav, Hero, Logos, Features, Testimonials, Pricing, FAQ, CTA, Footer, or Section N), sections:false keeps one layer tree; colours become shared variables and type, effects and gradients shared styles (Primary, Text, Body, H1…) bound to the layers, tokens:false keeps raw values; answers frame_id and truncated when the page hit the node or height cap), import_lottie {canvasId,x,y,lottie?|url?} (a Lottie animation, as JSON or an https url of a .json/.lottie file, becomes an editable frame centred on x,y; answers frame_id and skipped = what it could not carry over: trim paths, repeaters, animated paths, effects, time remap), draw_element {canvasId,drawn:{tool:text|rectangle|ellipse,box:{left,top,width,height}}|{tool:pen,path}} (a free Text/Box/Ellipse/Path on the canvas, outside any frame), group_elements {canvasId,nodeIds} (2+ free elements into one Group), stack_elements {canvasId,nodeIds} (1+ free elements into one free Stack, a flexbox container), frame_elements {canvasId,nodeIds} (1+ free elements into one Frame at their bounds, like Figma Frame selection), ungroup_element {canvasId,nodeId}, rotate_group {canvasId,nodeId,degrees} (turns the Group and its members around its centre), move_group {canvasId,nodeId,x,y} (moves the Group and its members), scale_group {canvasId,nodeId,width,height} (resizes the Group and scales its members), show_run {nodeId,runId} (pin an older version as the node output; downstream reruns use it), sync_node {nodeId} (social feed), preview_workflow {canvasId,nodeIds}, cancel_workflow {workflowId}, cancel_render {nodeId}, withdraw_from_gallery {itemId}. Upload a file into a new node: request_upload {fileName,mimeType,bytes} (checked like the canvas upload: image/document 4MB, video 200MB) answers path + uploadUrl; PUT the bytes there with the Content-Type, then register_upload {canvasId,path,fileName,mimeType,bytes,x?,y?} answers node + asset. Copy a picture or video from a link into the project library: import_link {url} answers asset (use its id in a media prop; a raw link does not render in frames). Pull one picture out of a social feed node: import_feed_image {canvasId,nodeId,itemId,imageIndex?,x?,y?,toFrameId?,frameX?,frameY?} (itemId is a post or product id from canvas_snapshot; copies the picture into the project and answers an image node + asset at x,y, with its source kept in data.source; with toFrameId it becomes an image layer in that Frame instead). Custom voices: list_voices {}, voice_library {search?,language?,gender?,accent?,useCase?,page?}, use_library_voice {ownerId,voiceId,name}, save_voice {generatedVoiceId,name,description?}, delete_voice {id}. Spends credits: run_node {nodeId,medium,prompt?,model?,params?,provider?,expectedVersion}, image_tool {nodeId,tool:remove_background|upscale|split_layers|inpaint|outpaint|reframe,prompt?,mask?,extend?,aspect?} (upscale doubles the size, any image node holding an asset works, uploads too; split_layers makes base + layers kept on the node; inpaint repaints a mask of strokes/regions as fractions, needs prompt and mask; reframe grows an image to aspect (w:h, like 9:16, 1:1, 4:5, 16:9) and paints the new area, no prompt needed; outpaint grows sides by extend {left,top,right,bottom} fractions, needs prompt), run_node_loop {nodeId,confirm?}, retry_loop_combination {nodeId,outputListNodeId,label,runId?}, run_workflow {canvasId,nodeIds}, run_graph (same input as preview_run_graph; queued, each step after its inputs; cycles refused), design_voice {description} (previews to save_voice), read_video_reference {assetId} (a video asset into transcript, scenes with durations, on-screen text, UI, camera, transitions, pacing, palette, type; spends only on the first read), clone_voice {name,consentBasis:own_voice|consented_speaker,speaker?,attested:true,seconds:60-180,sampleBase64 (max 3MB),mimeType?} (only with the user's consent). Unknown op answers the list; bad input answers the issues.
 
 | campo | tipo | |
 |---|---|---|
@@ -88,6 +88,16 @@ Families, op names, or exact input schemas.
 | `family`? | `canvas` \| `frame` \| `editor` |  |
 | `op`? | string |  |
 | `ops`? | string[] |  |
+
+### `dev_server` · W
+
+*Status, start or stop the local dev server behind live frames*
+
+Local Feega only. Live frames show routes of the dev server of the opened folder. `status` (default) says whether one runs, its url, whether it was found already running or started by Feega, and recent logs. `start` reuses one already running, else runs the project dev script and restarts it if it crashes. `stop` stops the one Feega started. Free.
+
+| campo | tipo | |
+|---|---|---|
+| `action`? | `status` \| `start` \| `stop` |  |
 
 ### `edit` · D
 
@@ -137,7 +147,7 @@ Rewrites a brief into the SHAPE the model you are about to render with wants —
 
 *Export a frame as code*
 
-Turn a frame (with its nested frames, text, images, vectors and component instances) into a code project a developer keeps: `target` react (React + Tailwind, default), html (HTML + CSS) or svelte (SvelteKit). Stacks (auto layout) become flex/grid, components become one file each with typed props for what differs between instances, colours and fonts become tokens. Returns `files` (path + content) and `notes` for what has no static code equivalent. Keyframed animation comes along (Motion for React, CSS keyframes) and every breakpoint becomes max-width media queries (max-[Npx]: variants in React); anything else is listed in `notes`. Reads only, free, no AI.
+Turn a frame (with its nested frames, text, images, 3D models, vectors and component instances) into a code project a developer keeps: `target` react (React + Tailwind, default), html (HTML + CSS) or svelte (SvelteKit). Stacks (auto layout) become flex/grid, components become one file each with typed props for what differs between instances, colours and fonts become tokens; uploaded fonts ship as @font-face plus their files in `assets`. Returns `files` (path + content), `assets` (images, font files and 3D model files to download) and `notes` for what has no static code equivalent. 3D model and shape layers become a three.js canvas (React Three Fiber in React) sized by the layer box. Keyframed animation comes along (Motion for React, CSS keyframes) and every breakpoint becomes max-width media queries (max-[Npx]: variants in React); anything else is listed in `notes`. Reads only, free, no AI.
 
 | campo | tipo | |
 |---|---|---|
@@ -280,6 +290,24 @@ Members with role, pending invites and whether the invite link is on, for `org_i
 |---|---|---|
 | `org_id`? | string |  |
 
+### `live_edit` · W
+
+*Edit an element of the running app and write the change to its source file*
+
+Local Feega only. `edit` (default) changes one property of the element at `at` (the `file:line:col` in its `data-feega-src`, set by `feega init`): text, color, fill, fontSize, fontWeight, padding, margin, gap or radius. Only the one Tailwind class or text is rewritten, with a repo token when the value matches one; written straight into the working folder (undo restores the file unless something changed it since; with FEEGA_LIVE_TARGET=branch it commits on `feega/live` instead). `side` (x, y, t, r, b, l) narrows padding, margin and gap. `viewport` is the page width the change is for: with `sm:`/`lg:` classes, the one that applies at that width is changed. `undo` reverts the commit `sha`. `changes` lists files and the diff. `push` sends them to a `feega/` branch. Free.
+
+| campo | tipo | |
+|---|---|---|
+| `action`? | `edit` \| `undo` \| `changes` \| `push` |  |
+| `at`? | string |  |
+| `prop`? | `text` \| `color` \| `fill` \| `fontSize` \| `fontWeight` \| `padding` \| `margin` \| `gap` \| `radius` |  |
+| `value`? | string |  |
+| `token`? | string |  |
+| `side`? | `x` \| `y` \| `t` \| `r` \| `b` \| `l` |  |
+| `was`? | string |  |
+| `viewport`? | number |  |
+| `sha`? | string |  |
+
 ### `load_tools` · R
 
 
@@ -397,123 +425,6 @@ The spend caps of the org. Without `scope` it reads them. With `scope` (org_memb
 | `project_id`? | string |  |
 | `cap_usd`? | number \| null |  |
 | `reset`? | `none` \| `monthly` |  |
-
-### `studio_approve` · W
-
-*Approve a photo studio item*
-
-Approves the first of `item_ids` in a Photo studio batch. Free. Follow with `studio_status`.
-
-| campo | tipo | |
-|---|---|---|
-| `batch_id` | string |  |
-| `item_ids`? | string[] |  |
-| `variations`? | integer |  |
-
-### `studio_cancel` · D
-
-*Cancel a photo studio batch*
-
-Stops the items of a Photo studio batch still queued; finished ones stay. Returns how many it stopped. Follow with `studio_status`.
-
-| campo | tipo | |
-|---|---|---|
-| `batch_id` | string |  |
-| `item_ids`? | string[] |  |
-| `variations`? | integer |  |
-
-### `studio_more` · W
-
-*Add photo studio variations*
-
-Adds `variations` per cell to a Photo studio batch and renders them. Spends credits. Follow with `studio_status`.
-
-| campo | tipo | |
-|---|---|---|
-| `batch_id` | string |  |
-| `item_ids`? | string[] |  |
-| `variations`? | integer |  |
-
-### `studio_quote` · R
-
-*Quote a photo studio batch*
-
-Prices a Photo studio batch before it starts: image count, credits per image and in total, skipped combinations, and a `quoteId`. Pass that `quoteId` to `studio_start`. Free, spends nothing.
-
-| campo | tipo | |
-|---|---|---|
-| `selection` | object | `{ name, productIds, modelIds?, environments, shots, variations, model, styleRefs?, noPeopleConfirmed? }`, the same selection the Photo studio page builds. |
-| `project`? | string | Which project; the most recent one when omitted. |
-
-### `studio_regenerate` · W
-
-*Regenerate photo studio items*
-
-Requeues finished `item_ids` of a Photo studio batch for a new render. Spends credits. Follow with `studio_status`.
-
-| campo | tipo | |
-|---|---|---|
-| `batch_id` | string |  |
-| `item_ids`? | string[] |  |
-| `variations`? | integer |  |
-
-### `studio_reject` · W
-
-*Reject a photo studio item*
-
-Rejects the first of `item_ids` in a Photo studio batch. Free. Follow with `studio_status`.
-
-| campo | tipo | |
-|---|---|---|
-| `batch_id` | string |  |
-| `item_ids`? | string[] |  |
-| `variations`? | integer |  |
-
-### `studio_retry` · W
-
-*Retry photo studio items*
-
-Requeues the failed or cancelled `item_ids` of a Photo studio batch. Spends credits. Follow with `studio_status`.
-
-| campo | tipo | |
-|---|---|---|
-| `batch_id` | string |  |
-| `item_ids`? | string[] |  |
-| `variations`? | integer |  |
-
-### `studio_run` · W
-
-*Run a photo studio batch*
-
-Renders the rest of a Photo studio batch after its previews. Spends credits. Follow with `studio_status`.
-
-| campo | tipo | |
-|---|---|---|
-| `batch_id` | string |  |
-| `item_ids`? | string[] |  |
-| `variations`? | integer |  |
-
-### `studio_start` · W
-
-*Start a photo studio batch*
-
-Starts a Photo studio batch and spends credits. Needs the `quoteId` of `studio_quote` for the SAME selection: a changed selection or price is a 409, ask the person again with a new quote. Returns the `batchId`; follow it with `studio_status`.
-
-| campo | tipo | |
-|---|---|---|
-| `selection` | object | `{ name, productIds, modelIds?, environments, shots, variations, model, styleRefs?, noPeopleConfirmed? }`, the same selection the Photo studio page builds. |
-| `quoteId` | string |  |
-| `project`? | string | Which project; the most recent one when omitted. |
-
-### `studio_status` · R
-
-*Photo studio batch status*
-
-The items of a Photo studio batch and their state. Free, reads only.
-
-| campo | tipo | |
-|---|---|---|
-| `batch_id` | string |  |
 
 ### `team_op` · W
 
@@ -805,7 +716,7 @@ Remove rows that exist, in your org. `where` is required — a delete with no fi
 
 *Node data shapes*
 
-What `data` must look like on a `nodes` row, per `type` — the JSON Schema `insert_row`/`update_row` actually enforce on `nodes`, not a guess. Omit `type` for every type at once; name one to save tokens once you know which you need — an unknown `type` comes back as an error naming the ones that exist, so this list is never hand-maintained here. `list` holds N iteration values (images or text, never mixed); `select` picks exactly one item back out of a connected `list`, `products` or `social_account_feed` by a 1-based `index` — a synced catalogue or feed is an ordered list too, so `select` can pull one product or one post out of either the same way, exposing named outputs (`out:images`, `out:text`, and `out:field:<field>` for each entry of `data.outputs` — the fields per source are listed in its schema) that an edge picks with `source_handle`; `effects` holds a stack of image filters over an upstream image, each with its own params — set it with `update_row`, then render it with `apply_effects`; `audio` runs one ElevenLabs operation — `audio_operations` lists each one's inputs, default model and price. Also returns `recommended_models` per medium (best, balanced, cheapest-good, each with price and release month) — prefer these over older models. Limits (aspect ratios, durations, prompt length) are NOT here — those come from `get_media_models`, because they are a fact of the model, not the node. Free.
+What `data` must look like on a `nodes` row, per `type` — the JSON Schema `insert_row`/`update_row` actually enforce on `nodes`, not a guess. Omit `type` for every type at once; name one to save tokens once you know which you need — an unknown `type` comes back as an error naming the ones that exist, so this list is never hand-maintained here. `list` holds N iteration values (images or text, never mixed); `select` picks exactly one item back out of a connected `list` or `social_account_feed` by a 1-based `index` — a synced feed is an ordered list too, so `select` can pull one post out of it the same way, exposing named outputs (`out:images`, `out:text`, and `out:field:<field>` for each entry of `data.outputs` — the fields per source are listed in its schema) that an edge picks with `source_handle`; `effects` holds a stack of image filters over an upstream image, each with its own params — set it with `update_row`, then render it with `apply_effects`; `audio` runs one ElevenLabs operation — `audio_operations` lists each one's inputs, default model and price. Also returns `recommended_models` per medium (best, balanced, cheapest-good, each with price and release month) — prefer these over older models. Limits (aspect ratios, durations, prompt length) are NOT here — those come from `get_media_models`, because they are a fact of the model, not the node. Free.
 
 | campo | tipo | |
 |---|---|---|
@@ -829,7 +740,7 @@ Add ONE row to a table in your org. `orgs`, `orgs_members`, `orgs_invites`, `api
 
 *Query the database*
 
-READ ANYTHING in your org: projects, canvases, nodes, connections, assets, posts, ads, products, social accounts — every table, scoped to your org and nothing else. No SQL: name a table, columns and `where` filters, and it issues one PostgREST read. Omit `table` to list every name. A project has no brand until one is attached (`projects.brand_id` is nullable, and that is the normal case). A canvas belongs to a project; nodes and their connections belong to a canvas. A post (`posts` table) is the promoted artifact — caption, media, brand — different from a node, which is raw canvas material; `post_sources` links a post back to the nodes it came from. Free.
+READ ANYTHING in your org: projects, canvases, nodes, connections, assets, posts, ads, social accounts — every table, scoped to your org and nothing else. No SQL: name a table, columns and `where` filters, and it issues one PostgREST read. Omit `table` to list every name. A canvas belongs to a project; nodes and their connections belong to a canvas. A post (`posts` table) is the promoted artifact — caption and media — different from a node, which is raw canvas material; `post_sources` links a post back to the nodes it came from. Free.
 
 | campo | tipo | |
 |---|---|---|
@@ -934,7 +845,7 @@ Publish a `motion` node to the public gallery, free, so anyone can remix it. Onl
 
 *Remix a gallery item*
 
-Remix a gallery item, free: copies its video and files into a new `motion` node of `project_id` (on `canvas_id`, or on the Motion canvas), with its main texts, colours, logo and media exposed as fields. Returns `node_id` and `editor_url`. Then offer to put the user brand on it with `ask_motion_agent`.
+Remix a gallery item, free: copies its video and files into a new `motion` node of `project_id` (on `canvas_id`, or on the Motion canvas), with its main texts, colours, logo and media exposed as fields. Returns `node_id` and `editor_url`. Then offer to adapt it to the user with `ask_motion_agent`.
 
 | campo | tipo | |
 |---|---|---|

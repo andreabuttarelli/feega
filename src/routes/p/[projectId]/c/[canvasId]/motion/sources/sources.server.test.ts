@@ -38,7 +38,7 @@ function ask(ids: string[] | string, headers: Record<string, string> = {}) {
   return { run: () => GET(event), calls };
 }
 
-beforeEach(() => lookup.mockResolvedValue({ orgId: 'org-a', canvas: { id: 'c1', projectId: 'p1', name: 'C' }, projectBrandId: null }));
+beforeEach(() => lookup.mockResolvedValue({ orgId: 'org-a', canvas: { id: 'c1', projectId: 'p1', name: 'C' }, }));
 
 describe('GET the sources of every frame on a canvas at once', () => {
   it('answers each frame with its head, and the brand tokens once', async () => {

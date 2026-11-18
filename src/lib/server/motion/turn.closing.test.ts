@@ -214,7 +214,6 @@ vi.mock('$lib/server/llm', () => ({
     return world.critic;
   }
 }));
-vi.mock('$lib/server/motion/studio-memory', () => ({ projectMemory: async () => 'Studio memory, from the last video made in this project: shots ShotKineticTitle.' }));
 vi.mock('$lib/server/repos/video-spend', () => ({ videoSpentUsd: async () => world.videoSpent }));
 vi.mock('$lib/server/motion/contact-sheet', () => ({ tileSheet: async () => Buffer.from('sheet') }));
 vi.mock('$lib/server/openrouter-models', () => ({
@@ -276,13 +275,13 @@ vi.mock('$lib/server/motion/frame-stats', () => ({
   }
 }));
 vi.mock('$lib/server/motion/templates', () => ({ templateLibrary: () => ({ list: async () => [] }) }));
-vi.mock('$lib/server/motion/brand-sources', async () => {
+vi.mock('$lib/server/motion/site-sources', async () => {
   const { pageOf } = await import('./site-copy');
   const importAsset = async (url: string) => {
     world.imported.push(url);
     return { ok: true, asset: { id: `asset-${world.imported.length}`, kind: 'image', label: url, previewUrl: '', url }, width: 10, height: 10 };
   };
-  return { brandSources: () => (world.scripting ? { importAsset, site: async () => ({ ok: true, site: { url: SITE, logos: [], pages: [pageOf(SITE, `<h1>${PROMISE}</h1>`)] } }) } : { importAsset }) };
+  return { siteSources: () => (world.scripting ? { importAsset, site: async () => ({ ok: true, site: { url: SITE, logos: [], pages: [pageOf(SITE, `<h1>${PROMISE}</h1>`)] } }) } : { importAsset }) };
 });
 
 const { startMotionTurn, Browser, MAX_DELIVERY_ATTEMPTS, RESEARCH_BRIEF } = await import('./turn');
@@ -293,7 +292,7 @@ type DocEdited = import('$lib/motion/frames-request').DocEdited;
 async function turn(reasoning: string | null = 'low', browser = Browser.Attached, landingMs?: number, stopPollMs = 3000) {
   const db = { storage: { from: () => draftBucket } } as never;
   const motion = { record: { id: 'n-1', canvasId: 'c-1' }, node: { id: 'n-1', format: MotionFormat.Landscape, docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null, budgetRaisedUsd: world.raised } } as never;
-  const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', brandId: null, mode: ProjectMode.Standard }, motion, message: world.message, selection: [], model: 'anthropic/claude-opus-5.5', reasoning, requester: { kind: 'user', id: 'u-1' }, browser, ...(landingMs === undefined ? {} : { timing: { landingMs, stopPollMs } }) });
+  const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', mode: ProjectMode.Standard }, motion, message: world.message, selection: [], model: 'anthropic/claude-opus-5.5', reasoning, requester: { kind: 'user', id: 'u-1' }, browser, ...(landingMs === undefined ? {} : { timing: { landingMs, stopPollMs } }) });
   if (started instanceof Response) {
     throw new Error('turn refused');
   }
@@ -311,7 +310,7 @@ async function turn(reasoning: string | null = 'low', browser = Browser.Attached
 async function leftAfterFirstChunk(browser = Browser.Absent) {
   const db = { storage: { from: () => ({}) } } as never;
   const motion = { record: { id: 'n-1', canvasId: 'c-1' }, node: { id: 'n-1', format: MotionFormat.Landscape, docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null } } as never;
-  const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', brandId: null, mode: ProjectMode.Standard }, motion, message: 'make it pop', selection: [], model: 'anthropic/claude-opus-5.5', reasoning: 'low', requester: { kind: 'user', id: 'u-1' }, browser });
+  const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', mode: ProjectMode.Standard }, motion, message: 'make it pop', selection: [], model: 'anthropic/claude-opus-5.5', reasoning: 'low', requester: { kind: 'user', id: 'u-1' }, browser });
   if (started instanceof Response) {
     throw new Error('turn refused');
   }
@@ -420,13 +419,6 @@ describe('a motion turn closes on a look and a summary', () => {
 
     expect(world.tools.some((t) => t.includes('write_script'))).toBe(true);
     expect(world.tools.some((t) => t.includes('add_clip'))).toBe(false);
-    expect(JSON.stringify(world.calls[0].prompt)).toContain('Studio memory');
-  });
-
-  it('a builder turn is not told the last video memory: it already has its own doc', async () => {
-    await turn();
-
-    expect(world.calls.some((c) => JSON.stringify(c.prompt).includes('Studio memory'))).toBe(false);
   });
 
   it('a small edit on a blank doc goes straight to the builder', async () => {

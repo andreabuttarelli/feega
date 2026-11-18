@@ -1,16 +1,3 @@
-/**
- * Un clip chiesto senza nominare un brand: dove atterra, e su quale conto.
- *
- * L'immagine risponde subito e consegna un percorso, quindi non deve ricordarsi di niente. Il clip
- * no: kie ci mette minuti, la richiesta è finita da un pezzo, e a chiuderlo è un cron che ha in
- * mano la sola riga. Finché ogni risposta di quella riga era un brand, un clip senza brand non
- * aveva un posto dove atterrare.
- *
- * Il test che conta di più è il terzo: uno scope sbagliato scrive una riga in `ai_calls` che nessuna
- * organizzazione somma, e una generazione che non viene contata è denaro che esce senza che nessuno
- * lo veda. È la forma esatta del difetto DataForSEO — il fornitore non addebitava, quindi nessuna
- * fattura segnalava niente.
- */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -26,26 +13,17 @@ const submittedFake = {
   persistOpts: { captions: false, tighten: false },
   submittedAt: Date.now()
 };
-const withBrandContext = vi.fn();
 const withOrgContext = vi.fn();
-const saveRenderedVideoToLibrary = vi.fn();
 
 vi.mock('$lib/server/video', () => ({
   submitVideoRender: async () => submittedFake,
   finishVideoRender: (...args: unknown[]) => finishVideoRender(...args)
 }));
 vi.mock('$lib/server/ai-log', () => ({
-  withBrandContext: <T>(brandId: string, fn: () => T) => {
-    withBrandContext(brandId);
-    return fn();
-  },
   withOrgContext: <T>(orgId: string, fn: () => T) => {
     withOrgContext(orgId);
     return fn();
   }
-}));
-vi.mock('$lib/server/brand-media', () => ({
-  saveRenderedVideoToLibrary: (...args: unknown[]) => saveRenderedVideoToLibrary(...args)
 }));
 
 function makeDb(seed: Record<string, Row[]>) {
@@ -105,7 +83,6 @@ function makeDb(seed: Record<string, Row[]>) {
 function orgRow(over: Row = {}): Row {
   return {
     id: 'render-1',
-    brand_id: null,
     org_id: 'org-1',
     user_id: 'user-1',
     post_id: null,
@@ -140,10 +117,9 @@ const LANDED = {
 beforeEach(() => {
   vi.clearAllMocks();
   finishVideoRender.mockResolvedValue(LANDED);
-  saveRenderedVideoToLibrary.mockResolvedValue({ mediaId: 'media-1' });
 });
 
-describe('un clip senza brand', () => {
+describe('un clip pagato da un\'organizzazione', () => {
   it('atterra sulla riga stessa: è lì che il clip si ritrova', async () => {
     const { tables, client } = makeDb({ video_renders: [orgRow()] });
 
@@ -155,30 +131,16 @@ describe('un clip senza brand', () => {
   });
 
   /**
-   * `brand_media` dice `brand_id in (select auth_brand_ids())`, e `NULL in (…)` vale NULL: una riga
-   * senza brand sarebbe invisibile a tutti, non visibile a tutti. Lo stesso motivo per cui il
-   * disegno senza brand consegna un percorso invece di un id.
-   */
-  it('non deposita niente in una libreria che non esiste', async () => {
-    const { client } = makeDb({ video_renders: [orgRow()] });
-
-    await reconcile(client);
-
-    expect(saveRenderedVideoToLibrary).not.toHaveBeenCalled();
-  });
-
-  /**
    * IL TEST CHE CONTA. Lo scope decide dove finisce la riga di `ai_calls` che `finishVideoRender`
-   * scrive: col brand sbagliato o senza scope, `sum_org_ai_cost_usd` non la vede e il cancello dei
+   * scrive: senza scope, `sum_org_ai_cost_usd` non la vede e il cancello dei
    * crediti passa per sempre su una spesa vera.
    */
-  it('addebita all organizzazione, che è chi paga quando nessun brand paga', async () => {
+  it('addebita all organizzazione, che è chi paga', async () => {
     const { client } = makeDb({ video_renders: [orgRow()] });
 
     await reconcile(client);
 
     expect(withOrgContext).toHaveBeenCalledWith('org-1');
-    expect(withBrandContext).not.toHaveBeenCalled();
   });
 
   it('un fallimento resta un fallimento, con il motivo scritto sulla riga', async () => {
@@ -190,29 +152,8 @@ describe('un clip senza brand', () => {
   });
 });
 
-describe('con un brand, niente è cambiato', () => {
-  const branded = orgRow({ brand_id: 'brand-1', org_id: null });
-
-  it('deposita in libreria', async () => {
-    const { client } = makeDb({ video_renders: [branded], brands: [{ id: 'brand-1', timezone: 'Europe/Rome' }] });
-
-    await reconcile(client);
-
-    expect(saveRenderedVideoToLibrary).toHaveBeenCalled();
-  });
-
-  it('resta nello scope del brand: è così che la spesa gli arriva', async () => {
-    const { client } = makeDb({ video_renders: [branded], brands: [{ id: 'brand-1', timezone: 'Europe/Rome' }] });
-
-    await reconcile(client);
-
-    expect(withBrandContext).toHaveBeenCalledWith('brand-1');
-    expect(withOrgContext).not.toHaveBeenCalled();
-  });
-});
-
 describe('submitAndTrackVideoRender', () => {
-  async function track(client: unknown, owner: { brandId: string | null; orgId?: string }) {
+  async function track(client: unknown, owner: { orgId?: string }) {
     const { submitAndTrackVideoRender } = await import('./video-render-queue');
     return submitAndTrackVideoRender({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -224,19 +165,11 @@ describe('submitAndTrackVideoRender', () => {
     });
   }
 
-  it('scrive l organizzazione e lascia il brand vuoto', async () => {
+  it('scrive l organizzazione', async () => {
     const { tables, client } = makeDb({ video_renders: [] });
 
-    await track(client, { brandId: null, orgId: 'org-1' });
+    await track(client, { orgId: 'org-1' });
 
-    expect(tables.video_renders[0]).toMatchObject({ brand_id: null, org_id: 'org-1', task_id: 'kie-task-9' });
-  });
-
-  it('col brand continua a scrivere il brand, e nessuna organizzazione', async () => {
-    const { tables, client } = makeDb({ video_renders: [] });
-
-    await track(client, { brandId: 'brand-1' });
-
-    expect(tables.video_renders[0]).toMatchObject({ brand_id: 'brand-1', org_id: null });
+    expect(tables.video_renders[0]).toMatchObject({ org_id: 'org-1', task_id: 'kie-task-9' });
   });
 });

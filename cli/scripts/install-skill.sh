@@ -54,7 +54,7 @@ Start with `query`. Use specific tools; chat for open-ended work.
 
 ```bash
 feega login
-feega brands
+feega projects
 feega motion list
 feega motion ask <nodeId> "..."
 feega motion render <nodeId>
@@ -285,7 +285,7 @@ fi
 
 echo ""
 echo "  Ora puoi dire alla tua AI:"
-echo -e "  ${BOLD}\"Usa feega MCP (o la CLI) per elencare i brand\"${NC}"
+echo -e "  ${BOLD}\"Usa feega MCP (o la CLI) per elencare i progetti\"${NC}"
 echo ""
 echo "  Cursor Agent Skill: skills/feega/SKILL.md"
 echo "  Directory install:  npx skills add andreabuttarelli/feega --skill feega"

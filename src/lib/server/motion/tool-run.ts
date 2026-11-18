@@ -167,7 +167,7 @@ async function prepare(db: Db, scope: ToolRunScope, version: number | undefined,
 
   const actor = agentActor(scope.userId, scope.agentKey ?? TOOL_RUN_AGENT_KEY, scope.sessionId);
   const assets = saved.alongside;
-  const tokens = once(() => motionTokens());
+  const tokens = once(async () => motionTokens());
   const session = carried(turn, scope.nodeId, saved.doc, saved.version);
   const editor = turn?.editor;
   const server = async (times: number[]) => (serverFramesOpen() ? drawFrames(chromiumFrames, { compose: { doc: session.doc, tokens: await tokens(), assets: assetUrls(assets) }, times }) : null);

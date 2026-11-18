@@ -32,10 +32,7 @@ The surface changes with the app. Prefer the MCP tools or the CLI; the routes be
 | `GET` | `/api/v1/org/effects` | Image effects |
 | `GET` `POST` | `/api/v1/org/custom-effects` | Custom shader effects (`PATCH`/`DELETE` on `/{id}`) |
 | `GET` `POST` | `/api/v1/org/layouts` | Composition layouts (`PATCH`/`DELETE` on `/{id}`) |
-| `POST` | `/api/v1/studio/quote` | Price a Photo studio batch: count, credits, `quoteId` |
-| `POST` | `/api/v1/studio/start` | Start a batch; needs the `quoteId` of the same selection, 409 if stale |
 | `GET` | `/api/v1/studio/{batchId}` | Batch items and state |
-| `POST` | `/api/v1/studio/{batchId}?action=` | `run`, `more`, `cancel`, `retry`, `regenerate`, `approve`, `reject` on a batch; body `{itemIds?, variations?}` |
 | `POST` | `/api/v1/prompts/enhance` | Rewrite a prompt for a model |
 | `GET` | `/api/v1/org/media` | Signed media links |
 
@@ -61,6 +58,10 @@ The surface changes with the app. Prefer the MCP tools or the CLI; the routes be
 | `GET` `POST` `DELETE` | `/api/v1/org/fonts` | [Uploaded fonts](/canvas/fonts/) |
 | `GET` `PUT` | `/api/v1/org/spend-caps` | [Spend limits](/ai/spend-limits/) |
 | `GET` | `/api/v1/gallery` | Public gallery; `POST /api/v1/gallery/{id}/remix`, `POST /api/v1/gallery/publish` |
+| `GET` `POST` | `/api/v1/org/api-keys` | List your API keys; create one (`name`, `scopes`: `read` or `write`). `DELETE /api/v1/org/api-keys/{id}` revokes. Sign in with the CLI to create: a key cannot create keys |
+| `POST` | `/api/v1/org/billing/checkout` | Stripe checkout for the plan (€9 per editor per month, 500 credits). Organization owners only |
+| `POST` | `/api/v1/org/billing/checkout/one-time` | One-time top-up: `credits` 1000, 2000 or 5000 |
+| `POST` | `/api/v1/org/billing/portal` | Stripe billing portal: invoices, card, cancellation |
 | `GET` | `/api/v1/version` | Server version |
 
 Input fields per operation: the [MCP tools](/reference/generated/mcp-tools/) page, generated from the server.

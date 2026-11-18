@@ -17,13 +17,7 @@ vi.mock('$lib/server/video', () => ({
 	finishVideoRender: (...args: unknown[]) => finishVideoRender(...args)
 }));
 vi.mock('$lib/server/ai-log', () => ({
-	withBrandContext: <T>(_brandId: string, fn: () => T) => fn()
-}));
-
-const saveRenderedVideoToLibrary = vi.fn();
-
-vi.mock('$lib/server/brand-media', () => ({
-	saveRenderedVideoToLibrary: (...args: unknown[]) => saveRenderedVideoToLibrary(...args)
+	withOrgContext: <T>(_orgId: string, fn: () => T) => fn()
 }));
 
 /** In-memory tables where a conditional UPDATE really re-checks the row it matched. */
@@ -86,7 +80,7 @@ function makeDb(seed: Record<string, Row[]>) {
 function renderRow(over: Row = {}): Row {
 	return {
 		id: 'render-1',
-		brand_id: 'brand-1',
+		org_id: 'org-1',
 		user_id: 'user-1',
 		post_id: 'post-1',
 		thread_id: null,
@@ -112,12 +106,10 @@ async function reconcile(client: unknown) {
 
 beforeEach(() => {
 	finishVideoRender.mockReset();
-	saveRenderedVideoToLibrary.mockReset();
-	saveRenderedVideoToLibrary.mockResolvedValue({ mediaId: 'media-1' });
 });
 
 describe('reconcileVideoRenders', () => {
-	it('attaches a finished clip to its post and closes the render', async () => {
+	it('closes a finished render with its clip url', async () => {
 		finishVideoRender.mockResolvedValue({
 			status: 'done',
 			url: 'https://cdn/clip.mp4',
@@ -126,26 +118,18 @@ describe('reconcileVideoRenders', () => {
 			thumbnailUrl: 'https://cdn/cover.jpg'
 		});
 		const { tables, client } = makeDb({
-			video_renders: [renderRow()],
-			posts: [{ id: 'post-1', media_url: 'https://cdn/cover.jpg', content_type: 'generated_image' }]
+			video_renders: [renderRow()]
 		});
 
 		expect(await reconcile(client)).toMatchObject({ done: 1, failed: 0, expired: 0 });
 
 		expect(tables.video_renders[0].status).toBe('done');
 		expect(tables.video_renders[0].media_url).toBe('https://cdn/clip.mp4');
-		// The post must stop advertising a cover as if it were the clip.
-		expect(tables.posts[0]).toMatchObject({
-			media_url: 'https://cdn/clip.mp4',
-			content_type: 'generated_video',
-			video_render_status: 'done',
-			video_task_id: 'openrouter:task-1'
-		});
 	});
 
 	it('hands an unfinished render straight back instead of holding it', async () => {
 		finishVideoRender.mockResolvedValue({ status: 'pending' });
-		const { tables, client } = makeDb({ video_renders: [renderRow()], posts: [] });
+		const { tables, client } = makeDb({ video_renders: [renderRow()] });
 
 		expect(await reconcile(client)).toMatchObject({ done: 0, failed: 0 });
 
@@ -159,7 +143,7 @@ describe('reconcileVideoRenders', () => {
 
 	it('only spends an attempt on a real failure', async () => {
 		finishVideoRender.mockRejectedValue(new Error('storage unreachable'));
-		const { tables, client } = makeDb({ video_renders: [renderRow()], posts: [] });
+		const { tables, client } = makeDb({ video_renders: [renderRow()] });
 
 		await reconcile(client);
 
@@ -169,7 +153,7 @@ describe('reconcileVideoRenders', () => {
 	it('survives many pending checks without exhausting its attempts', async () => {
 		const { VIDEO_RENDER_MAX_ATTEMPTS } = await import('./video-render-queue');
 		finishVideoRender.mockResolvedValue({ status: 'pending' });
-		const { tables, client } = makeDb({ video_renders: [renderRow()], posts: [] });
+		const { tables, client } = makeDb({ video_renders: [renderRow()] });
 
 		// A twenty-minute render gets checked twenty-odd times. None of those is a failure.
 		for (let i = 0; i < VIDEO_RENDER_MAX_ATTEMPTS + 5; i++) await reconcile(client);
@@ -188,7 +172,7 @@ describe('reconcileVideoRenders', () => {
 			concurrent -= 1;
 			return { status: 'done', url: 'https://cdn/clip.mp4', durationSeconds: 12, resolution: '720p' };
 		});
-		const { client } = makeDb({ video_renders: [renderRow()], posts: [{ id: 'post-1' }] });
+		const { client } = makeDb({ video_renders: [renderRow()] });
 
 		await Promise.all([reconcile(client), reconcile(client)]);
 
@@ -197,18 +181,16 @@ describe('reconcileVideoRenders', () => {
 		expect(overlapped).toBe(false);
 	});
 
-	it('marks the post failed when the provider reports a failed render', async () => {
+	it('fails a render the provider reports failed', async () => {
 		finishVideoRender.mockResolvedValue({ status: 'failed', error: 'moderation rejected' });
 		const { tables, client } = makeDb({
-			video_renders: [renderRow()],
-			posts: [{ id: 'post-1' }]
+			video_renders: [renderRow()]
 		});
 
 		expect(await reconcile(client)).toMatchObject({ failed: 1 });
 
 		expect(tables.video_renders[0].status).toBe('failed');
 		expect(tables.video_renders[0].error).toBe('moderation rejected');
-		expect(tables.posts[0].video_render_status).toBe('failed');
 	});
 
 	it('gives up on a task the provider never resolves, without calling out again', async () => {
@@ -218,22 +200,19 @@ describe('reconcileVideoRenders', () => {
 				renderRow({
 					submitted_at: new Date(Date.now() - VIDEO_RENDER_MAX_AGE_MS - 60_000).toISOString()
 				})
-			],
-			posts: [{ id: 'post-1' }]
+			]
 		});
 
 		expect(await reconcile(client)).toMatchObject({ expired: 1 });
 
 		expect(finishVideoRender).not.toHaveBeenCalled();
 		expect(tables.video_renders[0].status).toBe('expired');
-		expect(tables.posts[0].video_render_status).toBe('failed');
 	});
 
 	it('closes a render on finished_at, the column the live table has', async () => {
 		const { VIDEO_RENDER_MAX_AGE_MS } = await import('./video-render-queue');
 		const { tables, client } = makeDb({
-			video_renders: [renderRow({ submitted_at: new Date(Date.now() - VIDEO_RENDER_MAX_AGE_MS - 60_000).toISOString() })],
-			posts: [{ id: 'post-1' }]
+			video_renders: [renderRow({ submitted_at: new Date(Date.now() - VIDEO_RENDER_MAX_AGE_MS - 60_000).toISOString() })]
 		});
 
 		await reconcile(client);
@@ -252,8 +231,7 @@ describe('reconcileVideoRenders', () => {
 					task_id: 'openrouter:job-9',
 					submitted_at: new Date(Date.now() - VIDEO_RENDER_MAX_AGE_MS - 60_000).toISOString()
 				})
-			],
-			posts: [{ id: 'post-1' }]
+			]
 		});
 
 		expect(await reconcile(client)).toMatchObject({ expired: 1 });
@@ -275,8 +253,7 @@ describe('reconcileVideoRenders', () => {
 					status: 'finishing',
 					claimed_at: new Date(Date.now() - VIDEO_RENDER_CLAIM_STALE_MS - 60_000).toISOString()
 				})
-			],
-			posts: [{ id: 'post-1' }]
+			]
 		});
 
 		// Without the sweep this row is stranded forever: the clip exists at the provider and nobody collects it.
@@ -286,8 +263,7 @@ describe('reconcileVideoRenders', () => {
 
 	it('leaves a fresh claim alone — another process is working on it', async () => {
 		const { tables, client } = makeDb({
-			video_renders: [renderRow({ status: 'finishing', claimed_at: new Date().toISOString() })],
-			posts: []
+			video_renders: [renderRow({ status: 'finishing', claimed_at: new Date().toISOString() })]
 		});
 
 		expect(await reconcile(client)).toMatchObject({ checked: 0, done: 0 });
@@ -295,43 +271,10 @@ describe('reconcileVideoRenders', () => {
 		expect(tables.video_renders[0].status).toBe('finishing');
 	});
 
-	// The clip is stored and paid for by the time applyToPost runs. Settling `done` when the post
-	// write failed would strand it: nothing in this module ever re-reads a done row.
-	it('keeps a render queued when the post cannot be updated', async () => {
-		finishVideoRender.mockResolvedValue({
-			status: 'done',
-			url: 'https://cdn/clip.mp4',
-			durationSeconds: 12,
-			resolution: '720p'
-		});
-		const { tables, client } = makeDb({ video_renders: [renderRow()], posts: [] });
-		// The post write errors — an unmigrated column, say. applyToPost chains .select('id') so
-		// the stub has to answer that shape too.
-		const realFrom = client.from.bind(client);
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		(client as any).from = (name: string) =>
-			name === 'posts'
-				? {
-						update: () => ({
-							eq: () => ({
-								select: async () => ({ data: null, error: { message: 'column missing' } })
-							})
-						})
-					}
-				: realFrom(name);
-
-		expect(await reconcile(client)).toMatchObject({ done: 0 });
-
-		expect(tables.video_renders[0].status).toBe('rendering');
-		// The stored url is kept so the retry does not have to download it again.
-		expect(tables.video_renders[0].media_url).toBe('https://cdn/clip.mp4');
-	});
-
 	it('stops retrying a render that keeps failing, instead of downloading it sixty times', async () => {
 		const { VIDEO_RENDER_MAX_ATTEMPTS } = await import('./video-render-queue');
 		const { tables, client } = makeDb({
-			video_renders: [renderRow({ attempts: VIDEO_RENDER_MAX_ATTEMPTS, error: 'storage down' })],
-			posts: [{ id: 'post-1' }]
+			video_renders: [renderRow({ attempts: VIDEO_RENDER_MAX_ATTEMPTS, error: 'storage down' })]
 		});
 
 		expect(await reconcile(client)).toMatchObject({ expired: 1 });
@@ -350,117 +293,12 @@ describe('reconcileVideoRenders', () => {
 
 	it('returns a row to the queue when finishing throws, rather than burying it', async () => {
 		finishVideoRender.mockRejectedValue(new Error('storage unreachable'));
-		const { tables, client } = makeDb({ video_renders: [renderRow()], posts: [] });
+		const { tables, client } = makeDb({ video_renders: [renderRow()] });
 
 		await reconcile(client);
 
 		expect(tables.video_renders[0].status).toBe('rendering');
 		expect(tables.video_renders[0].error).toBe('storage unreachable');
-	});
-
-	// Un clip generato VERSO LA LIBRERIA non ha un post a cui attaccarsi: senza questo ramo
-	// finirebbe `done` con la sua url e nessun id che create_post sappia accettare — pagato e
-	// irraggiungibile. `source_ref` porta l'id del lavoro, ed è così che check_media_job lo ritrova.
-	it('deposita in libreria un clip che non appartiene a nessun post', async () => {
-		finishVideoRender.mockResolvedValue({
-			status: 'done',
-			url: 'https://cdn/clip.mp4',
-			durationSeconds: 12,
-			resolution: '720p'
-		});
-		const { tables, client } = makeDb({ video_renders: [renderRow({ post_id: null })] });
-
-		expect(await reconcile(client)).toMatchObject({ done: 1 });
-
-		expect(saveRenderedVideoToLibrary).toHaveBeenCalledWith(
-			expect.anything(),
-			expect.objectContaining({
-				brandId: 'brand-1',
-				userId: 'user-1',
-				url: 'https://cdn/clip.mp4',
-				sourceRef: 'render-1'
-			})
-		);
-		expect(tables.video_renders[0].status).toBe('done');
-	});
-
-	it('non deposita in libreria un clip che un post ha gia preso', async () => {
-		finishVideoRender.mockResolvedValue({
-			status: 'done',
-			url: 'https://cdn/clip.mp4',
-			durationSeconds: 12,
-			resolution: '720p'
-		});
-		const { client } = makeDb({
-			video_renders: [renderRow()],
-			posts: [{ id: 'post-1' }]
-		});
-
-		await reconcile(client);
-
-		expect(saveRenderedVideoToLibrary).not.toHaveBeenCalled();
-	});
-
-	// L'invariante che `check_media_job` promette: `done` vuol dire «il media è in libreria». Un
-	// lavoro chiuso done che nessun asset reclama arriva a un agente esterno come
-	// { status: 'done', media_id: null } — una contraddizione su cui non c'è niente da fare, e il
-	// clip è già pagato. Detta come proprietà su tutte le righe, non come percorso felice.
-	it('nessun lavoro chiuso done resta senza un asset che lo reclama', async () => {
-		finishVideoRender.mockResolvedValue({
-			status: 'done',
-			url: 'https://cdn/clip.mp4',
-			durationSeconds: 12,
-			resolution: '720p'
-		});
-		const { tables, client } = makeDb({
-			video_renders: [
-				renderRow({ id: 'render-lib', post_id: null }),
-				renderRow({ id: 'render-lib-ko', post_id: null }),
-				renderRow({ id: 'render-post', post_id: 'post-1' })
-			],
-			posts: [{ id: 'post-1' }],
-			brand_media: []
-		});
-		saveRenderedVideoToLibrary.mockImplementation(async (_admin: unknown, opts: Row) => {
-			if (opts.sourceRef === 'render-lib-ko') return { error: 'could not read the rendered clip (403)' };
-			tables.brand_media.push({
-				id: `media-${opts.sourceRef}`,
-				brand_id: opts.brandId,
-				source_ref: opts.sourceRef
-			});
-			return { mediaId: `media-${opts.sourceRef}` };
-		});
-
-		await reconcile(client);
-
-		// La stessa coppia con cui listMediaJobs risolve l'asset: brand_id filtrato, source_ref in.
-		const claimed = new Set(tables.brand_media.map((m) => `${m.brand_id}:${m.source_ref}`));
-		const stranded = tables.video_renders
-			.filter((r) => r.status === 'done' && r.post_id === null)
-			.filter((r) => !claimed.has(`${r.brand_id}:${r.id}`))
-			.map((r) => r.id);
-
-		expect(stranded).toEqual([]);
-	});
-
-	// Il motivo vero arriva già da saveRenderedVideoToLibrary e veniva buttato via al ritorno: la
-	// riga ereditava «il post non si è potuto aggiornare» su un lavoro che un post non ce l'ha, ed
-	// è la colonna `error` che check_media_job mostra verbatim a un agente esterno.
-	it('registra perche il deposito in libreria e fallito, non un post che non esiste', async () => {
-		finishVideoRender.mockResolvedValue({
-			status: 'done',
-			url: 'https://cdn/clip.mp4',
-			durationSeconds: 12,
-			resolution: '720p'
-		});
-		saveRenderedVideoToLibrary.mockResolvedValue({ error: 'could not read the rendered clip (403)' });
-		const { tables, client } = makeDb({ video_renders: [renderRow({ post_id: null })] });
-
-		expect(await reconcile(client)).toMatchObject({ done: 0 });
-
-		expect(tables.video_renders[0].status).toBe('rendering');
-		expect(tables.video_renders[0].attempts).toBe(1);
-		expect(tables.video_renders[0].error).toBe('could not read the rendered clip (403)');
 	});
 });
 
@@ -481,7 +319,6 @@ describe('submitAndTrackVideoRender', () => {
 
 		const tracked = await submitAndTrackVideoRender({
 			admin: client as never,
-			brandId: 'brand-1',
 			userId: 'user-1',
 			postId: 'post-1',
 			threadId: 'thread-1',
@@ -502,7 +339,7 @@ describe('submitAndTrackVideoRender', () => {
 		const { tables, client } = makeDb({ video_renders: [] });
 		submitVideoRender.mockRejectedValue(new Error('duration 13s is not supported by this model'));
 
-		const tracked = await submitAndTrackVideoRender({ admin: client as never, brandId: 'brand-1', userId: 'user-1', imagePrompt: 'a clip', render: {} });
+		const tracked = await submitAndTrackVideoRender({ admin: client as never, userId: 'user-1', imagePrompt: 'a clip', render: {} });
 
 		expect(tracked).toBeNull();
 		expect(tables.video_renders[0]).toMatchObject({ status: 'failed', error: 'provider refused: duration 13s is not supported by this model' });

@@ -22,7 +22,6 @@ export const ORG_TABLES = [
   'canvases',
   'chat_messages',
   'chat_threads',
-  'competitor_ads',
   'influencer_views',
   'influencers',
   'node_runs',
@@ -31,6 +30,7 @@ export const ORG_TABLES = [
   'orgs',
   'orgs_invites',
   'orgs_members',
+  'products',
   'profiles',
   'projects',
   'social_posts'

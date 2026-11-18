@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { videoModel } from '$lib/server/model-routing';
 import { OPENROUTER_UPSCALE_MODEL, upscaleLimitsOf } from '$lib/video-models';
 import { videoCraftFor } from '$lib/design/video-craft';
-import { getBrandContext, getOrgContext, logAiCall } from '$lib/server/ai-log';
+import { getOrgContext, logAiCall } from '$lib/server/ai-log';
 import { isVideoUrl } from '$lib/content-formats';
 import {
   VIDEO_MODEL_CHOICES as SHARED_VIDEO_MODEL_CHOICES,
@@ -93,21 +93,11 @@ export function pairedTextToVideoModel(model: string): string {
   return model;
 }
 
-/**
- * Precedenza: modello esplicito del tool → scelta del brand PER QUESTO LAVORO → default d'ambiente.
- *
- * `hasCover` non e' un dettaglio di implementazione: e' cio' che distingue i due mestieri. Con una
- * cover il modello ANIMA una immagine che esiste, senza scrive dal nulla, e il brand puo' aver
- * scelto due modelli diversi. Chi chiama non sa ancora quale dei due sara' — la cover si scopre
- * qui — quindi passa le preferenze intere e il ruolo lo decide questa funzione.
- */
 export function resolveVideoModel(opts: {
   model?: string | null;
-  prefs?: Record<string, unknown> | null;
   hasCover: boolean;
 }): string {
-  const preferred =
-    opts.model?.trim() || videoModelForRole(opts.prefs, opts.hasCover ? 'image' : 'text');
+  const preferred = opts.model?.trim() || videoModelForRole(undefined, opts.hasCover ? 'image' : 'text');
   if (preferred) {
     if (!opts.hasCover) return pairedTextToVideoModel(preferred);
     return preferred;
@@ -218,21 +208,12 @@ export function clampVideoAspectRatio(ratio: unknown, model?: string | null): st
 // timing out, move the upscale to a `videos/work` cron like knowledge already uses.
 const UPSCALE_TIMEOUT_MS = 60000;
 
-/**
- * Il cancello dei crediti di CHI paga questo scope: il brand quando c'è, l'organizzazione quando
- * nessun brand è stato nominato. Scritto una volta perché i tre punti che spendono qui sotto
- * facevano la stessa domanda, e uno solo dei tre che dimentica l'organizzazione è una clip pagata
- * da un saldo che nessuno ha guardato.
- *
- * L'import dinamico evita il ciclo crediti↔ai-log.
- */
 async function gateScopedCredits(): Promise<void> {
-  const brandId = getBrandContext();
-  const orgId = brandId ? null : getOrgContext();
-  if (!brandId && !orgId) return;
+  const orgId = getOrgContext();
+  if (!orgId) return;
 
-  const { gateCredits, gateOrgCredits } = await import('$lib/server/credits');
-  await (brandId ? gateCredits(brandId) : gateOrgCredits(orgId as string));
+  const { gateOrgCredits } = await import('$lib/server/credits');
+  await gateOrgCredits(orgId);
 }
 
 export type RenderVideoOpts = {
@@ -244,16 +225,13 @@ export type RenderVideoOpts = {
   // Presente → IMAGE-TO-VIDEO: la cover fissa soggetto, scena e stile, e il prompt dirige solo il
   // movimento.
   imageUrl?: string;
-  // Brand's free-text clip direction (content_prefs.videoInstructions, Settings → Video).
-  instructions?: string | null;
   // Solo nel prompt di ripiego TEXT-TO-VIDEO: con una cover allegata lo stile è già nei pixel.
   visualStyle?: string | null;
-  // Font dei sottotitoli impressi: quello del brand vale solo se libass ce l'ha sull'host di render.
   captionFont?: string;
   // Presente → clip PARLATA: audio e lip-sync nativi si pilotano CITANDO la riga dentro il prompt.
   // Assente → b-roll muto.
   script?: string | null;
-  // Shipping resolution from the brand's Settings → Video ('480p' | '720p'). Unset → 480p.
+  // '480p' | '720p'. Unset → 480p.
   resolution?: string | null;
   /**
    * AI-authored creative brief for THIS clip. When set, replaces the hardcoded cinematic MOTION
@@ -261,10 +239,8 @@ export type RenderVideoOpts = {
    * line lock, cover anchor) still apply.
    */
   prompt?: string | null;
-  // Model id override (brand Settings → Video, or an AI tool choice). Unset → env default.
+  // Model id override. Unset → env default.
   // Duration is clamped against THIS model's caps, not a global ceiling.
-  /** Le preferenze del brand: `resolveVideoModel` ne legge quella del mestiere che questo job e'. */
-  prefs?: Record<string, unknown> | null;
   model?: string | null;
   /** Seedance first-frame URL (alias of imageUrl when both set — firstFrameUrl wins). */
   firstFrameUrl?: string | null;
@@ -375,8 +351,6 @@ function composeVideoPrompt(
     hasCover: boolean;
     visualStyle?: string | null;
     script?: string | null;
-    /** Brand / AI free-text clip direction. Trimmed to the stored ceiling. */
-    instructions?: string | null;
     /**
      * AI-authored creative brief. When non-empty, replaces the hardcoded cinematic MOTION
      * template so chat can choose look, camera, energy freely.
@@ -394,10 +368,6 @@ function composeVideoPrompt(
   const scene = imagePrompt.replace(/\s+/g, ' ').trim().slice(0, 600);
   const line = opts.script?.replace(/\s+/g, ' ').trim() ?? '';
   const free = opts.prompt?.trim().replace(/\s+/g, ' ').slice(0, 1200) ?? '';
-  // Indirizzo morbido: in freeform il prompt AI è primario, questo si aggiunge.
-  const brandDirection = opts.instructions?.trim()
-    ? `${free ? 'EXTRA DIRECTION' : 'BRAND DIRECTION'} (follow for delivery, energy and behaviour on camera, but never at the cost of the clean-frame rule): ${opts.instructions.trim().replace(/\s+/g, ' ').slice(0, 600)}`
-    : '';
   const clean = CLEAN_FRAME_RULE;
   const speech = line
     ? `SPOKEN LINE — the person says exactly this, and nothing else: "${line}"`
@@ -411,7 +381,7 @@ function composeVideoPrompt(
       ? `The attached photograph is the first frame. Keep subject identity, wardrobe and location unless the brief below says otherwise. Framing: chest-up with clear headroom above the hair — never crop the top of the head.\nSCENE (from the cover — do not invent a different subject): ${scene}`
       : `Photorealistic short social-media clip: ${scene}${
           opts.visualStyle?.trim()
-            ? `\n\nBRAND VISUAL STYLE to match: ${opts.visualStyle.trim().replace(/\s+/g, ' ').slice(0, 500)}`
+            ? `\n\nVISUAL STYLE to match: ${opts.visualStyle.trim().replace(/\s+/g, ' ').slice(0, 500)}`
             : ''
         }`;
     return [
@@ -420,7 +390,6 @@ function composeVideoPrompt(
       `CREATIVE BRIEF (follow this — it overrides the default motion template):\n${free}`,
       speech,
       pronunciation,
-      brandDirection,
       // Il frame pulito si ripete per ultimo: col dialogo il modello tende ai sottotitoli.
       line || free ? clean : ''
     ]
@@ -448,16 +417,15 @@ function composeVideoPrompt(
       `SCENE (already fixed by the attached image — do not change it): ${scene}`,
       motion,
       speechBlock,
-      fidelity,
-      brandDirection
+      fidelity
     ]
       .filter(Boolean)
       .join('\n\n');
   }
   const style = opts.visualStyle?.trim()
-    ? `\n\nBRAND VISUAL STYLE to match: ${opts.visualStyle.trim().replace(/\s+/g, ' ').slice(0, 500)}`
+    ? `\n\nVISUAL STYLE to match: ${opts.visualStyle.trim().replace(/\s+/g, ' ').slice(0, 500)}`
     : '';
-  return [`Photorealistic, premium short social-media clip: ${scene}`, motion, speechBlock, `${fidelity}${style}`, brandDirection]
+  return [`Photorealistic, premium short social-media clip: ${scene}`, motion, speechBlock, `${fidelity}${style}`]
     .filter(Boolean)
     .join('\n\n');
 }
@@ -618,7 +586,7 @@ export async function prepareVideoRender(
   const hasRefs =
     referenceVideoUrls.length > 0 || referenceAudioUrls.length > 0 || referenceImageUrls.length > 0;
   // Prima il modello: i tetti di durata e ratio sono proprietà di QUESTO modello, non globali.
-  const model = resolveVideoModel({ model: opts.model, prefs: opts.prefs, hasCover: !!cover || hasRefs });
+  const model = resolveVideoModel({ model: opts.model, hasCover: !!cover || hasRefs });
 
   const durationSeconds = resolveVideoDuration(opts.duration, opts.script, model);
   const aspectRatio = clampVideoAspectRatio(opts.aspectRatio ?? '9:16', model);
@@ -630,7 +598,6 @@ export async function prepareVideoRender(
     hasCover: !!cover || hasRefs,
     visualStyle: opts.visualStyle,
     script,
-    instructions: opts.instructions,
     prompt: opts.prompt,
     model
   });
@@ -715,10 +682,9 @@ export async function transformVideo(opts: {
   aspectRatio?: string;
   mode?: 'std' | 'pro';
   model?: string | null;
-  prefs?: Record<string, unknown> | null;
   abortSignal?: AbortSignal;
 }): Promise<{ url: string; taskId: string; model: string } | undefined> {
-  const model = opts.model?.trim() || videoModelForRole(opts.prefs, opts.role);
+  const model = opts.model?.trim() || videoModelForRole(undefined, opts.role);
   if (!model) return undefined;
 
   // Un modello che non dichiara questo mestiere non deve raggiungere il fornitore: sarebbe un

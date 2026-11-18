@@ -217,7 +217,7 @@ function listFeeding(node: CanvasNodeRecord, connections: Connection[], nodesByI
   return null;
 }
 
-/** L'item scelto (1-based) di un `social_account_feed`, come lo legge sia un `select`
+/** L'item scelto (1-based) di un `products`/`social_account_feed`, come lo legge sia un `select`
  *  che un'iterazione di loop su quello stesso nodo — la stessa domanda di `itemAt` per una `list`,
  *  sulla stessa `SelectableItem[]` che `syncedSourceItems` costruisce. */
 function syncedItemAt(items: SelectableItem[], index: number): SelectableItem | null {
@@ -277,7 +277,7 @@ async function toUpstreamNode(
     return { id: node.id, type: node.type, medium, model: null, text: null, mediaUrl: null, mediaUrls: await listMediaUrls(db, orgId, values) };
   }
 
-  if (node.type === 'social_account_feed') {
+  if (node.type === 'products' || node.type === 'social_account_feed') {
     const synced = await syncedSourceRows(db, orgId, node);
     const items = itemsOf(synced);
 
@@ -314,7 +314,7 @@ async function toUpstreamNode(
 
     const index = source.id in iterateSelection ? iterateSelection[source.id] : typeof node.data.index === 'number' ? node.data.index : 0;
 
-    if (source.type === 'social_account_feed') {
+    if (source.type === 'products' || source.type === 'social_account_feed') {
       const synced = await syncedSourceRows(db, orgId, source);
       const item = syncedItemAt(itemsOf(synced), index);
       const medium = item?.mediaUrls.length ? 'image' : 'text';

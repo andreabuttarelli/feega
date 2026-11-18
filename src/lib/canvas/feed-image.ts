@@ -3,11 +3,13 @@ export const CANVAS_DRAG_FEED_IMAGE = 'application/x-feega-feed-image';
 export const FEED_IMAGE_LONG_SIDE = 360;
 
 export enum FeedSource {
-  Post = 'post'
+  Post = 'post',
+  Product = 'product'
 }
 
 export const FEED_SOURCE_OF_NODE: Record<string, FeedSource | undefined> = {
-  social_account_feed: FeedSource.Post
+  social_account_feed: FeedSource.Post,
+  products: FeedSource.Product
 };
 
 export type FeedImageDrag = {
@@ -62,4 +64,8 @@ export function postImageUrl(post: { media?: { items?: unknown; thumbnailUrl?: u
     return null;
   }
   return item.type === 'video' ? text(item.thumbnailUrl) : (text(item.url) ?? text(item.thumbnailUrl));
+}
+
+export function productImageUrl(product: { images: { url: string }[] }, index: number): string | null {
+  return text(product.images[index]?.url);
 }

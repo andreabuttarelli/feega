@@ -12,7 +12,7 @@ import { projectRows } from '$lib/server/edit/project-rows';
 import { Surface, compactWrite, touchedOf } from '$lib/server/edit/compact-result';
 
 /**
- * I TOOL DI PROGETTO E TELA. Sempre presenti, anche senza brand.
+ * I TOOL DI PROGETTO E TELA. Sempre presenti.
  *
  * Ogni tool parla solo ai repository, e i repository portano `org_id` su ogni query: è lì che
  * sta il tenant, non qui. Le descrizioni sono product copy per il modello — dicono il confine
@@ -22,7 +22,7 @@ export type ProjectToolDeps = CanvasDeps;
 
 const CHAT_TOOL_OPS: Partial<Record<CanvasOpName, string>> = {
   list_canvases:
-    'List the canvases of THIS project. One project only — never other projects, never a brand.',
+    'List the canvases of THIS project. One project only — never other projects.',
   list_nodes:
     'List live nodes on one canvas of THIS project (id, type, position, data, version). Read this before update_node or run_node: the version is required and the data is what you must resend.',
   get_selection:

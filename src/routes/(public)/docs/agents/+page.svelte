@@ -80,7 +80,7 @@ codex plugin marketplace add andreabuttarelli/feega</code></pre>
 </ol>
 
 <h2 id="examples">{$_('docs.agents.s25')}</h2>
-<pre><code>"Show me my brands"
+<pre><code>"Show me my projects"
 "Run the video node in my project"</code></pre>
 
 <h2 id="supported-agents">{$_('docs.agents.s10')}</h2>
@@ -95,7 +95,7 @@ codex plugin marketplace add andreabuttarelli/feega</code></pre>
 <p>{$_('docs.agents.s65')}</p>
 <pre><code>curl -sSL https://raw.githubusercontent.com/andreabuttarelli/feega/main/cli/scripts/install.sh | bash
 feega login
-feega brands</code></pre>
+feega projects</code></pre>
 
 <hr />
 

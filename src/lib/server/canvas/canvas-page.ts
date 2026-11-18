@@ -88,7 +88,6 @@ import { pasteNodes, type PastedEdge, type PastedNode } from '$lib/server/canvas
 import { parseUndoItem, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { canvasSnapshot, loadDownloaded, loadGenRuns } from '$lib/server/canvas/snapshot';
-import { listSourcesForNodes } from '$lib/server/repos/posts';
 import { nextStepsFor, nodeTextCost } from '$lib/server/canvas/node-hints';
 import { applyEffectsNode } from '$lib/server/canvas/apply-effects';
 import { makeEffectsPair } from '$lib/server/canvas/effects-actions';
@@ -272,15 +271,12 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
     cardPreviews(db, { orgId, projectId: canvas.projectId }).catch(() => ({}))
   ]);
 
-  const [connections, runs, { socialPosts, influencers }, sources, onboarding] = await Promise.all([
+  const [connections, runs, { products, socialPosts, influencers }, onboarding] = await Promise.all([
     canvasFrameInputs(db, { orgId, actor: userActor({ userId }), projectId: canvas.projectId }, nodes, listed),
     loadGenRuns(db, { orgId, nodes }),
     loadDownloaded(db, { orgId, canvasId, nodes }),
-    listSourcesForNodes(db, nodes.map((node) => node.id)),
     firstRunFor(db, { userId, orgId, accountCreatedAt, nodeCount: nodes.length })
   ]);
-
-  const nodeIdsInPost = [...new Set(sources.map((source) => source.nodeId))];
 
   coreEvent(userId, CoreEvent.CanvasOpened, { canvas_id: canvasId }, orgId);
   return {
@@ -291,11 +287,11 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
     revision: recordsRevision(nodes, connections),
     catalogue,
     runs,
+    products,
     socialPosts,
     influencers,
     projectId: params.projectId,
     orgId,
-    nodeIdsInPost,
     shareToken,
     references,
     mode,
@@ -920,12 +916,13 @@ export const actions: Actions<CanvasParams> = {
   },
 
   /**
-   * SINCRONIZZARE UN NODO `social_account_feed`. Non è `run`: non c'è un provider
+   * SINCRONIZZARE UN NODO `products` O `social_account_feed`. Non è `run`: non c'è un provider
    * asincrono da rincorrere, il giro finisce dentro questa stessa richiesta — quindi lo stato si
    * scrive due volte, "sta scaricando" prima di chiamare il fetcher e il risultato dopo, invece
    * di aprire una `node_runs` per un giro che non ha bisogno di sopravvivere alla richiesta.
    *
-   * `projectId` PASSA AL REPO ANCHE QUANDO NULLO: `social_posts` restano del progetto che le ha scaricate — un `project_id` nullo è una riga che
+   * `projectId` PASSA AL REPO ANCHE QUANDO NULLO: `products`/`social_posts` sono indipendenti da
+   * un brand, ma restano del progetto che le ha scaricate — un `project_id` nullo è una riga che
    * la libreria del progetto non trova più.
    */
   sync: async ({ request, params, locals }) => {

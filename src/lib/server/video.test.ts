@@ -40,7 +40,7 @@ describe('buildVideoPrompt', () => {
   it('text-to-video fallback: keeps the scene and folds in the brand visual style', () => {
     const p = buildVideoPrompt(IMAGE_PROMPT, { hasCover: false, visualStyle: 'Moody monochrome, hard shadows' });
     expect(p).toContain('Capy60');
-    expect(p).toContain('BRAND VISUAL STYLE to match: Moody monochrome, hard shadows');
+    expect(p).toContain('VISUAL STYLE to match: Moody monochrome, hard shadows');
     expect(p).toContain('MOTION:');
     expect(p).toContain('FIDELITY:');
     expect(p).not.toContain('attached image');
@@ -83,7 +83,7 @@ describe('buildVideoPrompt — talking clips', () => {
   it('works in the text-to-video fallback too (no cover)', () => {
     const p = buildVideoPrompt(IMAGE_PROMPT, { hasCover: false, script: 'Hello there.', visualStyle: 'Moody' });
     expect(p).toContain('"Hello there."');
-    expect(p).toContain('BRAND VISUAL STYLE to match: Moody');
+    expect(p).toContain('VISUAL STYLE to match: Moody');
   });
 });
 
@@ -111,18 +111,6 @@ describe('buildVideoPrompt — freeform (AI prompt)', () => {
     });
     expect(p).toContain('Capy60 keyboard on walnut');
     expect(p).toContain('first frame');
-  });
-
-  it('folds instructions without forcing a hardcoded delivery style', () => {
-    const p = buildVideoPrompt('a man', {
-      hasCover: true,
-      prompt: 'Documentary medium shot, calm',
-      instructions: 'Italian accent, quiet'
-    });
-    expect(p).toContain('Documentary medium shot');
-    expect(p).toContain('Italian accent');
-    expect(p).not.toContain('heated, argumentative');
-    expect(p).not.toMatch(/ONE IMPOSSIBLE THING/i);
   });
 });
 
@@ -262,26 +250,6 @@ describe('suggestVideoDuration / resolveVideoDuration', () => {
     expect(fitted.toLowerCase()).toMatch(/feega/);
     expect(fitted.toLowerCase()).toMatch(/tell me i'm wrong|try it/);
     expect(spokenWordCount(fitted)).toBeLessThanOrEqual(48);
-  });
-});
-
-describe('resolveVideoModel reads the job, not one setting', () => {
-  it('animates a cover with the animate model and writes from text with the clip model', () => {
-    const prefs = { videoModel: 'bytedance/seedance-2', videoImageModel: 'grok-imagine/image-to-video' };
-    expect(resolveVideoModel({ prefs, hasCover: true })).toBe('grok-imagine/image-to-video');
-    expect(resolveVideoModel({ prefs, hasCover: false })).toBe('bytedance/seedance-2');
-  });
-
-  it('keeps using the clip model for both when no animate model was chosen', () => {
-    // Every brand from before the split had one setting covering both directions.
-    const prefs = { videoModel: 'bytedance/seedance-2-5' };
-    expect(resolveVideoModel({ prefs, hasCover: true })).toBe('bytedance/seedance-2-5');
-    expect(resolveVideoModel({ prefs, hasCover: false })).toBe('bytedance/seedance-2-5');
-  });
-
-  it('lets an explicit model from the tool beat both settings', () => {
-    const prefs = { videoModel: 'bytedance/seedance-2', videoImageModel: 'bytedance/seedance-2-mini' };
-    expect(resolveVideoModel({ model: 'bytedance/seedance-2-5', prefs, hasCover: true })).toBe('bytedance/seedance-2-5');
   });
 });
 

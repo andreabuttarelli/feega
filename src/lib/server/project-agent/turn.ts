@@ -7,7 +7,7 @@ import type { Db } from '$lib/server/db/client';
 import { llmLanguageModel } from '$lib/server/llm';
 import { PromptCache } from '$lib/server/prompt-cache';
 import { reasoningProviderOptions } from '$lib/server/chat-model/catalogue';
-import { extractSdkUsage, logAiCall, withBrandContext, withOrgContext } from '$lib/server/ai-log';
+import { extractSdkUsage, logAiCall, withOrgContext } from '$lib/server/ai-log';
 import { readAgentMemory } from '$lib/server/repos/profiles';
 import { saveTurn, type PromptTurn, type Turn } from '$lib/server/repos/chat';
 import { finishedTurn } from './finished-turn';
@@ -21,9 +21,8 @@ import { env } from '$env/dynamic/private';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { FRAMES_REQUEST, type FramesRequest } from '$lib/motion/frames-request';
 import type { FrameBucket } from '$lib/server/motion/frame-store';
-import { openAgentTools } from './tool-surface';
 import { createWebTools } from '$lib/server/web/web-tools';
-import { liveWebDeps, productImport, productsNodePlacer, webImageImport } from '$lib/server/web/live';
+import { liveWebDeps, webImageImport } from '$lib/server/web/live';
 import { projectAgentPrompt } from './system-prompt';
 import { AGENT_TURN_CAP_USD, agentStopWhen, overTurnCap } from './limits';
 import { spentUsd } from '$lib/server/motion/model-route';
@@ -39,11 +38,9 @@ import type { OpenProject } from '$lib/server/projects/lookup';
 export type ProjectTurnInput = {
   db: Db;
   userId: string;
-  accessToken: string;
   origin: string;
   orgId: string;
   project: OpenProject['project'];
-  brand: BriefBrand | null;
   text: string;
   attachments: ChatAttachment[];
   model: string;
@@ -58,10 +55,8 @@ export type ProjectTurnInput = {
   pick: PickAnswer | null;
 };
 
-export type BriefBrand = { id: string; name: string; slug: string };
-
 export async function startProjectTurn(input: ProjectTurnInput): Promise<Response> {
-  const { db, userId, accessToken, origin, orgId, project, brand, text, attachments, model, reasoning, frame, selection, canvases, canvasId, threadId, turns, history, pick } = input;
+  const { db, userId, origin, orgId, project, text, attachments, model, reasoning, frame, selection, canvases, canvasId, threadId, turns, history, pick } = input;
   const sessionId = crypto.randomUUID();
   const actor = agentActor(userId, SIDEBAR_AGENT_KEY, sessionId);
   const userActor = { kind: 'user' as const, id: userId };
@@ -73,11 +68,10 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
   let spent = 0;
   let askEditor: (request: FramesRequest) => void = () => {};
   const webTools = createWebTools({
-    ...liveWebDeps(db, { orgId, userId: userId, projectId: project.id, brandId: brand?.id ?? null, mode: project.mode }, (usd) => {
+    ...liveWebDeps(db, { orgId, userId: userId, projectId: project.id, mode: project.mode }, (usd) => {
       spent += usd;
     }),
     importImage: webImageImport(db, { orgId, projectId: project.id, mode: project.mode }),
-    importProducts: productImport(webImageImport(db, { orgId, projectId: project.id, mode: project.mode }), canvasId ? productsNodePlacer(db, { orgId, projectId: project.id, canvasId, actor }) : undefined),
     avoid: avoidedImages(pick),
       shown: shownRefs(turns),
       rejections: rejectedRounds([...turns, { role: 'user', content: text }])
@@ -86,7 +80,7 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
     delete webTools[ASK_REFERENCE_PICK];
   }
   const core: Record<string, Tool> = {
-    ...createProjectTools({ db, orgId, projectId: project.id, userId: userId, brandId: brand?.id ?? null, sessionId }),
+    ...createProjectTools({ db, orgId, projectId: project.id, userId: userId, sessionId }),
     ...createMotionDelegation({ db, orgId, projectId: project.id, userId: userId, sessionId, origin, model, canvasId }),
     ...webTools
   };
@@ -106,7 +100,7 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
           },
           changes: () => 0,
           changedSince: () => [],
-          log: (e) => logAiCall({ label: `project-spawned-${e.label}`, provider: 'llm', model: e.model, ms: 0, ok: true, brandId: brand?.id, orgId, userId: userId, threadId, projectId: project.id, actorKind: 'agent', actorId: userId, agentKey: e.agentKey, ...e.usage })
+          log: (e) => logAiCall({ label: `project-spawned-${e.label}`, provider: 'llm', model: e.model, ms: 0, ok: true, orgId, userId: userId, threadId, projectId: project.id, actorKind: 'agent', actorId: userId, agentKey: e.agentKey, ...e.usage })
         },
         spawnOffers()
       )
@@ -114,12 +108,6 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
   });
   const frames = await frameSurface(toolLoadingOf(env.TOOL_LOADING), frameDeps, frameRunner(frameDeps), core, turns, { ...webTools, [SPAWN_AGENT]: core[SPAWN_AGENT] });
   const projectTools = { ...core, ...frames.tools };
-  const agent = await openAgentTools({
-    projectTools,
-    brand,
-    accessToken
-  });
-
   await ensureGatewayModels();
   const t0 = Date.now();
   const cut = new AbortController();
@@ -133,14 +121,12 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
     }
   });
   const memory = await readAgentMemory(db, userId).catch(() => null);
-  const billedScope = <T>(fn: () => T): T => (brand ? withBrandContext(brand.id, fn) : withOrgContext(orgId, fn));
 
-  const result = billedScope(() => streamText({
+  const result = withOrgContext(orgId, () => streamText({
     model: llmLanguageModel(model, PromptCache.On),
     system: projectAgentPrompt({
       project: { id: project.id, name: project.name },
       canvases: canvases.map((c) => ({ id: c.id, name: c.name })),
-      brand: brand ? { name: brand.name, slug: brand.slug } : null,
       openCanvasId: canvasId,
       frame,
       selection,
@@ -149,10 +135,10 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
     }),
     allowSystemInMessages: true,
     messages: [...history, { role: 'user', content: opening }] as ModelMessage[],
-    tools: agent.tools,
+    tools: projectTools,
     prepareStep: () => {
       const active = frames.active();
-      return active ? { activeTools: [...active, ...Object.keys(agent.tools).filter((name) => !(name in projectTools))] } : {};
+      return active ? { activeTools: [...active] } : {};
     },
     providerOptions: reasoningProviderOptions(reasoning),
     abortSignal: cut.signal,
@@ -167,8 +153,6 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
     },
     onFinish: async ({ steps: finished, totalUsage }) => {
       watch.stop();
-      await agent.close().catch((e) => console.error('[project-agent] tools not closed:', e));
-
       await reply.finish(finishedTurn(finished), ReplyStatus.Done);
 
       logAiCall({
@@ -177,7 +161,6 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
         model,
         ms: Date.now() - t0,
         ok: true,
-        brandId: brand?.id,
         orgId,
         userId: userId,
         threadId,

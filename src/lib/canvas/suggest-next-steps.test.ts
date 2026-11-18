@@ -16,7 +16,7 @@ describe('rankedFallback', () => {
   });
 
   it('returns nothing for a node type with no actions', () => {
-    expect(rankedFallback('ads', {})).toEqual([]);
+    expect(rankedFallback('calendar', {})).toEqual([]);
   });
 });
 

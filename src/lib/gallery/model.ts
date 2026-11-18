@@ -44,8 +44,6 @@ export const TAGS_MAX = 8;
 export const TAG_MAX = 24;
 export const PAGE_SIZE = 48;
 export const SECONDS_CEILING = 180;
-export const BRAND_PARAM = 'brand';
-export const BRAND_REMIX_PROMPT = 'Put my brand on this video: logo, colours, fonts and copy. Keep its motion and pacing.';
 
 export type GalleryAsset = { id: string; kind: AssetRef['kind']; name: string; url: string };
 

@@ -10,7 +10,6 @@ vi.mock('$env/dynamic/private', () => ({ env: { UNCENSORED_DEV_MANUAL_VERIFICATI
 
 const ORG = 'org-1';
 const PROJECT = 'proj-1';
-const BRAND = 'brand-1';
 const NAME = 'Spring launch';
 const OTHER = 'proj-2';
 const CANVAS = 'canvas-2';
@@ -18,8 +17,7 @@ const USER = { id: 'user-1', email: 'u@example.com', user_metadata: {} };
 
 function seed() {
   return {
-    projects: [{ id: PROJECT, org_id: ORG, name: NAME }],
-    brands: [{ id: BRAND, org_id: ORG, name: 'Acme', slug: 'acme', website: null }]
+    projects: [{ id: PROJECT, org_id: ORG, name: NAME }]
   };
 }
 
@@ -104,43 +102,6 @@ describe('settings/project actions', () => {
 
     expect(result.status).toBe(400);
     expect(projectUpdate(calls)).toBeUndefined();
-  });
-
-  it('linkBrand collega un brand della stessa org e torna alla sezione di partenza', async () => {
-    const { db, calls } = fakeDb(seed(), { filter: true });
-
-    const result = await run('linkBrand', { brandId: BRAND, returnTo: `/p/${PROJECT}/settings/video` }, db);
-
-    expect(isRedirect(result)).toBe(true);
-    expect((result as { location: string }).location).toBe(`/p/${PROJECT}/settings/video`);
-    expect(projectUpdate(calls)?.payload).toMatchObject({ brand_id: BRAND });
-  });
-
-  it('linkBrand rifiuta un brand di un\'altra org', async () => {
-    const { db, calls } = fakeDb(seed(), { filter: true });
-
-    const result = (await run('linkBrand', { brandId: 'foreign' }, db)) as { status: number };
-
-    expect(result.status).toBe(404);
-    expect(projectUpdate(calls)).toBeUndefined();
-  });
-
-  it('linkBrand ignora un returnTo fuori dal progetto', async () => {
-    const { db } = fakeDb(seed(), { filter: true });
-
-    const result = await run('linkBrand', { brandId: BRAND, returnTo: 'https://evil.example' }, db);
-
-    expect(isRedirect(result)).toBe(false);
-    expect(result).toMatchObject({ linked: true });
-  });
-
-  it('unlinkBrand riporta brand_id a null', async () => {
-    const { db, calls } = fakeDb(seed(), { filter: true });
-
-    const result = (await run('unlinkBrand', {}, db)) as { unlinked: boolean };
-
-    expect(result.unlinked).toBe(true);
-    expect(projectUpdate(calls)?.payload).toMatchObject({ brand_id: null });
   });
 
   it('delete senza il nome esatto non archivia niente', async () => {

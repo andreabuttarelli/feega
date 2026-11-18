@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const dir = dirname(fileURLToPath(import.meta.url));
-const NODE_FILES = ['TieredImage', 'GenNode', 'InfluencerNode', 'StudioBatchNode', 'SelectNode', 'OutputViewer', 'MotionNode'];
+const NODE_FILES = ['TieredImage', 'GenNode', 'InfluencerNode', 'SelectNode', 'OutputViewer', 'MotionNode'];
 
 function images(file: string): string[] {
   const source = readFileSync(join(dir, `${file}.svelte`), 'utf8');

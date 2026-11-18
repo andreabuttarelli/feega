@@ -32,7 +32,7 @@ describe('openThread — un thread per progetto e utente, sempre dentro la org',
   it('l insert porta org_id — senza, la service role scriverebbe nel tenant sbagliato', async () => {
     const { db, calls } = fakeDb({ chat_threads: [] });
 
-    await openThread(db, { orgId: ORG, projectId: PROJECT, userId: USER, brandId: null });
+    await openThread(db, { orgId: ORG, projectId: PROJECT, userId: USER });
 
     const insert = calls.find((c) => c.op === 'insert')!;
     expect(insert.payload).toMatchObject({

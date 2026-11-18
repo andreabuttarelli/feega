@@ -6,7 +6,7 @@ import { ProjectMode } from '$lib/project-mode';
 const { USER } = vi.hoisted(() => ({ USER: { id: 'u1', email: 'ada@x.it', user_metadata: {}, created_at: '2020-01-01T00:00:00Z' } }));
 
 const ORG = { id: 'org-a', name: 'Acme', slug: 'acme' };
-const PROJECT = { id: 'p1', name: 'Launch', slug: 'launch', brandId: null, archivedAt: null, lastActiveAt: '2026-10-01', mode: ProjectMode.Standard };
+const PROJECT = { id: 'p1', name: 'Launch', slug: 'launch', archivedAt: null, lastActiveAt: '2026-10-01', mode: ProjectMode.Standard };
 
 vi.mock('$lib/server/db/client', async (original) => ({ ...(await original<object>()), createUserDb: () => fakeDb({}).db }));
 vi.mock('$lib/server/nav-cache', async (original) => ({ ...(await original<object>()), verifiedToken: async (_db: unknown, token: string) => (token === 'jwt' ? USER : null) }));

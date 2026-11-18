@@ -31,7 +31,7 @@ const rows = {
     { user_id: 'u1', role: 'owner', created_at: '2026-01-01', orgs: { id: 'org-b', name: 'B', slug: 'b' }, profiles: { active_org_id: 'org-b' } },
     { user_id: 'u1', role: 'owner', created_at: '2026-01-02', orgs: { id: 'org-a', name: 'A', slug: 'a' }, profiles: { active_org_id: 'org-b' } }
   ],
-  canvases: [{ id: 'c1', org_id: 'org-a', project_id: 'p1', name: 'C', viewport: null, deleted_at: null, projects: { mode: 'standard', brand_id: null } }],
+  canvases: [{ id: 'c1', org_id: 'org-a', project_id: 'p1', name: 'C', viewport: null, deleted_at: null, projects: { mode: 'standard', } }],
   assets: [{ id: PHOTO, org_id: 'org-a', project_id: 'p1', type: 'image', url: 'org-a/p1/photo.png', mime_type: 'image/png', width: 640, height: 480, source: 'upload', created_at: '2026-11-09' }],
   brands: [],
   nodes: Array.from({ length: FRAMES }, (_, i) => ({ id: frameId(i), org_id: 'org-a', canvas_id: 'c1', project_id: 'p1', deleted_at: null, type: 'motion', data: { format: 'landscape', docHeadRevision: 3 }, position: { x: 0, y: 0 } })),

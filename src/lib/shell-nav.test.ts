@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { NAV_ENTRIES, navEntriesByGroup, railEntries, navHref, sheetEntryForPath, BURGER_ENTRIES, mobileNavHref, directLoadMode, panelForShortcut } from './shell-nav';
 
 describe('la rail: due gruppi, un comportamento a testa', () => {
-  it('the "panel" group is Assets, Brands, Influencers, Components, History, Styles and AI, in this order', () => {
-    expect(navEntriesByGroup('panel').map((e) => e.id)).toEqual(['assets', 'brands', 'influencers', 'components', 'history', 'styles', 'ai']);
+  it('the "panel" group is Assets, Influencers, Components, History, Styles and AI, in this order', () => {
+    expect(navEntriesByGroup('panel').map((e) => e.id)).toEqual(['assets', 'influencers', 'components', 'history', 'styles', 'ai']);
   });
 
   it('the "canvas" group is Layers: a panel beside the canvas, never a burger link to a page that does not exist', () => {
@@ -11,20 +11,19 @@ describe('la rail: due gruppi, un comportamento a testa', () => {
     expect(BURGER_ENTRIES.map((e) => e.id)).not.toContain('layers');
   });
 
-  it('the rail leaves the photo studio out, the burger menu still reaches it', () => {
+  it('the workbench rail is Settings alone', () => {
     expect(railEntries('workbench').map((e) => e.id)).toEqual(['settings']);
-    expect(BURGER_ENTRIES.map((e) => e.id)).toContain('studio');
   });
 
   it('every rail panel has an Alt+digit shortcut, in rail order', () => {
     const rail = [...navEntriesByGroup('canvas'), ...navEntriesByGroup('panel')];
-    expect(rail.map((e) => e.shortcut)).toEqual(['Alt+1', 'Alt+2', 'Alt+3', 'Alt+4', 'Alt+5', 'Alt+6', 'Alt+7', 'Alt+8']);
+    expect(rail.map((e) => e.shortcut)).toEqual(['Alt+1', 'Alt+2', 'Alt+3', 'Alt+4', 'Alt+5', 'Alt+6', 'Alt+7']);
   });
 
   it('Alt+digit resolves to the panel that carries it, nothing else does', () => {
     const key = (code: string, altKey = true) => ({ code, altKey, metaKey: false, ctrlKey: false, shiftKey: false }) as KeyboardEvent;
     expect(panelForShortcut(key('Digit1'))?.id).toBe('layers');
-    expect(panelForShortcut(key('Digit3'))?.id).toBe('brands');
+    expect(panelForShortcut(key('Digit3'))?.id).toBe('influencers');
     expect(panelForShortcut(key('Digit1', false))).toBeNull();
     expect(panelForShortcut(key('Digit9'))).toBeNull();
   });
@@ -38,13 +37,6 @@ describe('la rail: due gruppi, un comportamento a testa', () => {
     }
   });
 
-  it('the photo studio is its own page, carrying the project as its source', () => {
-    const studio = NAV_ENTRIES.find((e) => e.id === 'studio')!;
-    expect(studio.family).toBe('route');
-    expect(navHref('proj1', studio)).toBe('/app/studio?project=proj1');
-    expect(mobileNavHref('proj1', studio)).toBe('/app/studio?project=proj1');
-  });
-
   it('navHref antepone il progetto al path della voce', () => {
     expect(navHref('proj1', NAV_ENTRIES[0])).toBe('/p/proj1/assets');
   });
@@ -56,8 +48,8 @@ describe('sheetEntryForPath: quale voce apre il foglio', () => {
   });
 
   it('una sezione diversa dello stesso foglio apre comunque lo stesso foglio', () => {
-    expect(sheetEntryForPath('/settings/brand')?.id).toBe('settings');
-    expect(sheetEntryForPath('/settings/brand/logo')?.id).toBe('settings');
+    expect(sheetEntryForPath('/settings/spend')?.id).toBe('settings');
+    expect(sheetEntryForPath('/settings/spend/limits')?.id).toBe('settings');
   });
 
   it('un path fuori famiglia sheet non apre niente', () => {
@@ -105,9 +97,7 @@ describe('un link diretto a un foglio su desktop apre la tela con il foglio', ()
     ['/settings/project', 'desktop', 'sheet'],
     ['/settings/billing', 'mobile', 'page'],
     ['/assets', 'desktop', 'page'],
-    ['/brands/new', 'desktop', 'page'],
-    ['/c/abc', 'desktop', 'page'],
-    ['/studio', 'desktop', 'page']
+    ['/c/abc', 'desktop', 'page']
   ];
 
   it.each(cases)('%s su %s → %s', (path, viewport, expected) => {

@@ -2,10 +2,8 @@
   /**
    * IL NODO `influencer`, disegnato: il volto, il nome, quante viste porta.
    *
-   * Sempre pieno, mai in modifica — a differenza di `ProductsNode` non c'è un campo da scrivere
-   * sulla tile: `influencer_id` non cambia dopo la nascita. `views` arriva da fuori (il server le
-   * legge da `influencer_views`), mai da `nodes.data` — la stessa dottrina di `ProductsNode` per i
-   * prodotti, qui applicata alle immagini di un volto.
+   * Sempre pieno, mai in modifica — non c'è un campo da scrivere sulla tile: `influencer_id` non cambia dopo la nascita. `views` arriva da fuori (il server le
+   * legge da `influencer_views`), mai da `nodes.data`.
    */
   import UserRound from '@lucide/svelte/icons/user-round';
 

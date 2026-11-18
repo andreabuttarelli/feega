@@ -8,15 +8,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  */
 
 const gateOrgCredits = vi.fn();
-const gateCredits = vi.fn();
 
 vi.mock('./credits', () => ({
 	gateOrgCredits: (...a: unknown[]) => gateOrgCredits(...a),
-	gateCredits: (...a: unknown[]) => gateCredits(...a),
 	CreditsExhaustedError: class CreditsExhaustedError extends Error {}
 }));
 
-import { gateOrgAiActionForForm, gateAiActionForForm } from './cli-auth';
+import { gateOrgAiActionForForm } from './cli-auth';
 import { CreditsExhaustedError, type CreditsUsage } from './credits';
 
 const EXHAUSTED: CreditsUsage = { used: 100, quota: 100, bonus: 0, remaining: 0, periodStart: new Date(0), periodEnd: new Date(0), percent: 100 };
@@ -52,17 +50,17 @@ describe('gateOrgAiActionForForm', () => {
 	});
 });
 
-describe('gateAiActionForForm', () => {
+describe('gateOrgAiActionForForm', () => {
 	it('returns undefined when credits are available', async () => {
-		gateCredits.mockResolvedValue(undefined);
+		gateOrgCredits.mockResolvedValue(undefined);
 
-		expect(await gateAiActionForForm('brand-1')).toBeUndefined();
+		expect(await gateOrgAiActionForForm('org-1')).toBeUndefined();
 	});
 
 	it('returns a fail()-shaped outcome when credits are exhausted', async () => {
-		gateCredits.mockRejectedValue(new CreditsExhaustedError(EXHAUSTED));
+		gateOrgCredits.mockRejectedValue(new CreditsExhaustedError(EXHAUSTED));
 
-		const denied = await gateAiActionForForm('brand-1');
+		const denied = await gateOrgAiActionForForm('org-1');
 
 		expect(denied?.status).toBe(402);
 		expect(denied?.data).toMatchObject({ error: 'credits_exhausted' });

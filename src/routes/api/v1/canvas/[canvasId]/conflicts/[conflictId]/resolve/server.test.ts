@@ -8,7 +8,7 @@ const MARCO = 'u-marco';
 const state = vi.hoisted(() => ({ db: null as unknown, calls: [] as unknown[] }));
 
 vi.mock('$lib/server/org-data/auth', () => ({ resolveOrgCaller: async (bearer?: string) => (bearer ? { caller: { db: state.db, orgId: ORG, userId: MARCO, writeAllowed: true } } : { error: { status: 401, body: { error: 'unauthorized' } } }) }));
-vi.mock('$lib/server/canvas/lookup', () => ({ openCanvasForUser: async (_db: unknown, i: { canvasId: string }) => ({ memberships: [], found: i.canvasId === CANVAS ? { orgId: ORG, canvas: { id: CANVAS, projectId: 'p-1' }, mode: 'standard', projectBrandId: null } : null }) }));
+vi.mock('$lib/server/canvas/lookup', () => ({ openCanvasForUser: async (_db: unknown, i: { canvasId: string }) => ({ memberships: [], found: i.canvasId === CANVAS ? { orgId: ORG, canvas: { id: CANVAS, projectId: 'p-1' }, mode: 'standard', } : null }) }));
 vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ canvasReachable: async () => true }));
 
 const { POST } = await import('./+server');
@@ -16,7 +16,7 @@ const { POST } = await import('./+server');
 const seed = () => {
   const fake = fakeDb(
     {
-      projects: [{ id: 'p-1', org_id: ORG, name: 'P', brand_id: null, mode: 'standard' }],
+      projects: [{ id: 'p-1', org_id: ORG, name: 'P', mode: 'standard' }],
       canvases: [{ id: CANVAS, org_id: ORG, project_id: 'p-1', name: 'C', viewport: null }],
       canvas_conflicts: [{ id: 'k-1', org_id: ORG, canvas_id: CANVAS, node_id: 'n-1', expected_version: 3, actual_version: 5, attempt: 'replace', attempted: { prompt: 'mine' }, winning_event_id: 41, actor_kind: 'user', actor_id: MARCO, agent_key: null, resolution: null, resolved_at: null, created_at: '2026-10-29T10:00:00Z' }]
     },

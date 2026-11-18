@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-const loadSettingsShell = vi.fn(async (): Promise<{ shell: boolean; brand: { id: string } | null }> => ({ shell: true, brand: { id: 'b1' } }));
+const loadSettingsShell = vi.fn(async (): Promise<{ shell: boolean }> => ({ shell: true }));
 vi.mock('$lib/settings/api', () => ({ loadSettingsShell }));
 
 const { load } = await import('./+layout');
@@ -26,17 +26,6 @@ describe('an old canvas settings URL', () => {
 
   it('redirects team to the existing team page', async () => {
     await expect(run('/p/p1/settings/team')).rejects.toMatchObject({ location: '/app/team' });
-  });
-
-  it('sends a brand section to the dashboard page of the project brand', async () => {
-    await expect(run('/p/p1/settings/video?x=1')).rejects.toMatchObject({ status: 307, location: '/app/settings/brands/b1/video?x=1' });
-    await expect(run('/p/p1/settings/brand')).rejects.toMatchObject({ location: '/app/settings/brands/b1/brand' });
-  });
-
-  it('sends a brand section to the brand list when the project has no brand', async () => {
-    loadSettingsShell.mockResolvedValueOnce({ shell: true, brand: null });
-
-    await expect(run('/p/p1/settings/danger')).rejects.toMatchObject({ status: 307, location: '/app/settings/brands' });
   });
 
   it('keeps a project section on the canvas', async () => {

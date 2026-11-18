@@ -1,7 +1,7 @@
 # feega CLI — infinite-canvas CLI, MCP Server & Agent Skill
 
 [feega](https://feega.app) is an infinite canvas of typed nodes (text, image, video, doc,
-iframe, social feed, social post mockup, products) for producing motion videos and images. This repository is its command-line client, [MCP server](docs/mcp.md) (Model Context
+iframe, social feed, social post mockup) for producing motion videos and images. This repository is its command-line client, [MCP server](docs/mcp.md) (Model Context
 Protocol — `stdio` + HTTP) and agent skill: everything you need to read and write the canvas
 and drive motion videos from a terminal or an AI agent.
 
@@ -9,15 +9,14 @@ This repository ships **three ways** to drive the same product (same OAuth, same
 
 | | What | Who it’s for |
 |---|------|----------------|
-| **CLI** | `feega` terminal commands, brand-scoped | Humans & scripts |
+| **CLI** | `feega` terminal commands | Humans & scripts |
 | **MCP** | Model Context Protocol server (`stdio` + HTTP), org-scoped | Cursor, Claude, other MCP hosts |
 | **Skill** | Agent Skill (`skills/feega/`) | Coding agents / skills.sh / `npx skills` |
 
 > **You need a feega account.** This is a client, not a standalone tool: every call talks to
 > the feega API over HTTPS. Without an account there is nothing to drive.
 
-With the feega CLI you can browse brands, ask the motion agent to edit a video, render it,
-and re-sync a connected store's product catalog —
+With the feega CLI you can list projects, ask the motion agent to edit a video and render it —
 from the terminal **or** from an AI agent like Cursor or Claude talking to the MCP server.
 
 ```text
@@ -75,19 +74,18 @@ Update later with `feega update`, or `npm install -g feega-cli@latest` / `brew u
 ### Quick start
 
 ```bash
-feega brands
+feega projects
 feega motion list
 feega motion render <nodeId>
 ```
 
-Brand commands take the brand slug as their first argument. `feega --help` lists them all;
+`feega --help` lists every command;
 `feega <command> --help` details one. Short id prefixes from tables are accepted; ambiguous
 prefixes error instead of guessing.
 
 | Area | Commands |
 |------|----------|
 | Motion | `motion list`, `motion ask`, `motion render`, `motion embed`, `gallery`, `remix`, `publish` |
-| Brand | `products [sync]` |
 | Insight | `health` |
 | Account | `upgrade`, `update`, `login`, `logout` |
 

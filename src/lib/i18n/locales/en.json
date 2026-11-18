@@ -12,8 +12,8 @@
     "start": {
       "title": "Welcome",
       "titlePlan": "Welcome",
-      "sub": "Create your account with an email and password. Right after, you'll set up your first brand.",
-      "subPlan": "Create your account with an email and password. Right after, you'll set up your first brand on {plan}."
+      "sub": "Create your account with an email and password.",
+      "subPlan": "Create your account with an email and password. You start on {plan}."
     },
     "signin": {
       "title": "Sign in",
@@ -51,7 +51,7 @@
       "saving": "Saving…"
     },
     "form": {
-      "emailPlaceholder": "you@yourbrand.com",
+      "emailPlaceholder": "you@company.com",
       "passwordPlaceholder": "Password",
       "show": "Show",
       "hide": "Hide",
@@ -107,25 +107,13 @@
       "styles": "Styles",
       "ai": "AI generation",
       "materials": "Assets",
-      "brands": "Brands",
-      "influencers": "Influencers",
-      "studio": "Photo studio"
+      "influencers": "Influencers"
     },
     "nav": {
       "settings": "Settings",
       "workspace": "Workspace",
       "sectionAccount": "Account",
-      "sectionBrand": "Brand",
-      "sectionBrands": "Brands",
-      "allBrands": "All brands",
       "sectionProject": "Project"
-    },
-    "hub": {
-      "overview": {
-        "brand": {
-          "products": "Products"
-        }
-      }
     },
     "shell": {
       "rail": "Sections",
@@ -264,24 +252,6 @@
         "invoices": "Invoices",
         "changePayment": "Change payment method"
       },
-      "cancel": {
-        "back": "Back"
-      },
-      "del": {
-        "title": "Danger zone",
-        "heading": "Delete this brand",
-        "desc": "Permanently delete this brand and everything tied to it. Only possible once the paid plan has been canceled.",
-        "cta": "Delete brand",
-        "confirmTitle": "Delete {brand} forever?",
-        "confirmBody": "This can't be undone: every piece of project data will be lost forever. Type <b>{brand}</b> below to confirm.",
-        "confirmCta": "Delete forever",
-        "deleting": "Deleting…",
-        "errors": {
-          "activePlan": "The paid plan is still active. Cancel the plan first, then you can delete the brand.",
-          "nameMismatch": "The name doesn't match.",
-          "failed": "We couldn't delete the brand. Please try again."
-        }
-      },
       "models": {
         "title": "Models",
         "subtitle": "Choose which image, video and 3D models your organization can generate with. A medium with nothing checked offers every model.",
@@ -337,51 +307,17 @@
         "keyNamePlaceholder": "e.g. My CI pipeline",
         "read": "Read",
         "write": "Write",
-        "allBrands": "All my brands",
         "keyRevoked": "API key revoked.",
         "copyKey": "Copy key",
         "copied": "Copied!",
         "warning": "This is the only time the full key will be shown. Store it securely.",
         "noKeys": "No API keys yet. Create one to get started with the API."
       },
-      "video": {
-        "title": "Images & video",
-        "modelDefault": "Platform default",
-        "clipLength": "Clip length",
-        "clipLengthDesc": "Fixed length for every generated clip, or Auto so chat / batch generation picks a length per reel from the spoken script. Billed per second. The longest option depends on the video model above; clips shorter than 10s cannot carry a hook, a point and a call to action.",
-        "clipLengthAuto": "Auto — AI chooses per clip",
-        "saved": "Saved.",
-        "instructions": "Video direction",
-        "instructionsDesc": "How the person on camera should perform: tone, energy, accent, what to never do. Steers the clip itself — captions are set per platform.",
-        "instructionsPlaceholder": "e.g. Speak fast and informally, like talking to a friend. Never sound like an ad. Italian accent, no corporate jargon.",
-        "resolution": "Video quality",
-        "resolutionDesc": "480p is recommended: 720p costs exactly double per second, and every clip is billed whether or not you publish it. On a phone feed the difference is small.",
-        "recommended": "recommended",
-        "slots": {
-          "imageGenerate": "Image generation",
-          "imageGenerateDesc": "Which model draws a new photo from a prompt. The default is GPT Image 2.5 Sunburst, about a tenth of the previous cost at the same speed. Seedream and Qwen frame Instagram posts at 3:4 instead of 4:5.",
-          "imageRefine": "Image refine",
-          "imageRefineDesc": "Which model edits a photo that already exists — adding a logo, restyling, changing one detail. Reproducing an image faithfully is a different job from inventing one, and the best family at one is not always the best at the other. Empty follows the generation model.",
-          "videoGenerate": "Video generation",
-          "videoGenerateDesc": "Which model writes a clip from words alone. Clip length options follow this pick — Seedance 2.5 goes to 30 seconds.",
-          "videoAnimate": "Video generation (image)",
-          "videoAnimateDesc": "Which model animates a still that already exists, usually the rendered cover. Empty follows the video generation model, which is what every brand had before this split.",
-          "videoRefine": "Video refine",
-          "videoRefineDesc": "Which model rewrites a finished clip — swapping a subject, changing the setting or the styling — while keeping the original motion. Only models that read a video appear here.",
-          "videoMotion": "Video motion",
-          "videoMotionDesc": "Which model takes the movement from a reference video and applies it to a subject in your image. Not the same as motion videos, which are rendered from code and use no generative model."
-        }
-      },
       "project": {
         "title": "Project"
       },
       "content": {
         "title": "Content policy"
-      }
-    },
-    "studio": {
-      "tabs": {
-        "brand": "Brand Kit"
       }
     },
     "account": {
@@ -615,11 +551,9 @@
       "generate_person": "Person",
       "generate_strategy": "Strategy",
       "produce_week": "Week's drafts",
-      "reanalyze_brand": "Site analysis",
       "seo_add_initiatives": "SEO initiatives",
       "seo_geo_audit": "SEO & GEO audit",
       "seo_plan": "SEO plan",
-      "sync_products": "Product sync",
       "sync_social_history": "Social sync"
     }
   },

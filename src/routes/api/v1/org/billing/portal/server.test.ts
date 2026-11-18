@@ -12,7 +12,7 @@ const structured = vi.fn();
 vi.mock('$lib/server/cli-auth', () => ({
 	openOrg: vi.fn(),
 	checkApiKeyWriteAccess: vi.fn(() => undefined),
-	gateAiAction: vi.fn()
+	gateOrgAiAction: vi.fn()
 }));
 vi.mock('$lib/server/org-billing', () => ({
 	orgBillingById: (...args: unknown[]) => orgBillingById(...args),
@@ -32,7 +32,7 @@ vi.mock('$lib/server/research', () => ({ structured: (...args: unknown[]) => str
 vi.mock('$lib/server/app-url', () => ({ appOrigin: () => 'https://feega.test' }));
 
 import { POST } from './+server';
-import { openOrg, checkApiKeyWriteAccess, gateAiAction } from '$lib/server/cli-auth';
+import { openOrg, checkApiKeyWriteAccess, gateOrgAiAction } from '$lib/server/cli-auth';
 
 const PORTAL_URL = 'https://billing.stripe.com/p/session/live_xyz';
 
@@ -82,7 +82,7 @@ describe('POST /api/v1/org/billing/portal', () => {
 		});
 	});
 
-	it('checks the owner against the caller's org', async () => {
+	it('checks the owner against the org of the caller', async () => {
 		await call();
 
 		expect(isOrgOwner).toHaveBeenCalledWith(expect.anything(), 'org-1', 'user-1');
@@ -99,7 +99,7 @@ describe('POST /api/v1/org/billing/portal', () => {
 	it('never gates on credits: whoever ran out is exactly who needs this link', async () => {
 		await call();
 
-		expect(gateAiAction).not.toHaveBeenCalled();
+		expect(gateOrgAiAction).not.toHaveBeenCalled();
 		expect(gateCredits).not.toHaveBeenCalled();
 		expect(structured).not.toHaveBeenCalled();
 	});

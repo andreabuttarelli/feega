@@ -6,12 +6,11 @@ vi.mock('$lib/server/dashboard/tool-scope', () => ({ toolScope }));
 
 vi.mock('$lib/server/repos/projects', () => ({
   createProject: vi.fn(),
-  listProjects: vi.fn(async () => [{ id: 'p1', name: 'Launch', slug: 'l', brandId: null, archivedAt: null, lastActiveAt: '2026-10-03', mode: ProjectMode.Standard }])
+  listProjects: vi.fn(async () => [{ id: 'p1', name: 'Launch', slug: 'l', archivedAt: null, lastActiveAt: '2026-10-03', mode: ProjectMode.Standard }])
 }));
 vi.mock('$lib/server/repos/dashboard', () => ({
   listRecentCanvases: vi.fn(async () => []),
   listRecentImages: vi.fn(async () => []),
-  listRecentBatches: vi.fn(async () => []),
   listRecentNodes: vi.fn(async () => [{ id: 'm1', projectId: 'p1', canvasId: 'c1', name: 'Teaser', data: {}, updatedAt: '2026-10-03' }])
 }));
 vi.mock('$lib/server/dashboard/signed-assets', () => ({ signedAssets: vi.fn(async () => ({ assets: new Map(), urls: {} })) }));

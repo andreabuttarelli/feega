@@ -4,9 +4,10 @@ import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
 import { findNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import type { Asset } from '$lib/server/repos/assets';
+import { listNodeProducts } from '$lib/server/repos/products';
 import { listNodeSocialPosts } from '$lib/server/repos/social-posts';
 import { UPLOAD_MAX_BYTES } from '$lib/canvas/upload-kind';
-import { FEED_SOURCE_OF_NODE, FeedSource, feedImageSize, postImageUrl } from '$lib/canvas/feed-image';
+import { FEED_SOURCE_OF_NODE, FeedSource, feedImageSize, postImageUrl, productImageUrl } from '$lib/canvas/feed-image';
 import { DropOn, OutputKind, type Drop } from '$lib/motion/move-element';
 import { dropSchema, placeMedia, type FrameStore, type Moved } from '$lib/server/motion/move-element';
 import { UploadError, fetchCanvasLink, importCanvasBytes, type PictureSize } from './upload';
@@ -30,8 +31,18 @@ async function pickPost(db: Db, ask: Ask): Promise<Picked | null> {
   return { imageUrl, source: { kind: FeedSource.Post, nodeId: ask.nodeId, itemId: post.id, externalId: post.externalId, imageUrl, pageUrl: post.permalink } };
 }
 
+async function pickProduct(db: Db, ask: Ask): Promise<Picked | null> {
+  const product = (await listNodeProducts(db, ask)).find((p) => p.id === ask.itemId);
+  const imageUrl = product ? productImageUrl(product, ask.imageIndex) : null;
+  if (!product || !imageUrl) {
+    return null;
+  }
+  return { imageUrl, source: { kind: FeedSource.Product, nodeId: ask.nodeId, itemId: product.id, externalId: product.externalId, imageUrl, pageUrl: product.url } };
+}
+
 const PICKERS: Record<FeedSource, (db: Db, ask: Ask) => Promise<Picked | null>> = {
-  [FeedSource.Post]: pickPost
+  [FeedSource.Post]: pickPost,
+  [FeedSource.Product]: pickProduct
 };
 
 async function pixelsOf(bytes: Uint8Array): Promise<PictureSize | null> {

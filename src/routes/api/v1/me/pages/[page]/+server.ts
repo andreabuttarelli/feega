@@ -15,8 +15,7 @@ const MODULES: Record<DashboardPage, () => Promise<PageModule>> = {
   [DashboardPage.Motion]: () => import('$lib/server/dashboard/pages/motion'),
   [DashboardPage.Credits]: () => import('$lib/server/dashboard/pages/credits'),
   [DashboardPage.Compose]: () => import('$lib/server/dashboard/pages/compose'),
-  [DashboardPage.Upscale]: () => import('$lib/server/dashboard/pages/upscale'),
-  [DashboardPage.Studio]: () => import('$lib/server/dashboard/pages/studio')
+  [DashboardPage.Upscale]: () => import('$lib/server/dashboard/pages/upscale')
 };
 
 const UNKNOWN = () => json({ error: 'not_found' }, { status: NOT_FOUND });

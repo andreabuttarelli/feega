@@ -11,18 +11,17 @@ describe('settingsSectionOf: quale cartella sotto settings/ risponde a questo pa
   });
 
   it('ogni sezione usa il suo primo segmento', () => {
-    expect(settingsSectionOf('/settings/brand')).toBe('brand');
     expect(settingsSectionOf('/settings/spend')).toBe('spend');
   });
 
   it('una sottopagina di una sezione resta nella sezione', () => {
-    expect(settingsSectionOf('/settings/brand/logo')).toBe('brand');
+    expect(settingsSectionOf('/settings/spend/limits')).toBe('spend');
   });
 });
 
 describe('settingsPageLoader: la sezione trova la sua pagina reale', () => {
   it('ogni sezione esistente sotto settings/ ha un loader', () => {
-    for (const section of ['brand', 'spend', 'danger', 'products']) {
+    for (const section of ['project', 'spend']) {
       expect(settingsPageLoader(`/settings/${section}`), `manca la pagina per ${section}`).not.toBeNull();
     }
   });
@@ -46,12 +45,12 @@ describe('settingsSheetSection: la pagina arriva insieme ai dati della sua sezio
   it('la pagina delle spese non riceve mai i dati dei font', async () => {
     const [spend, fonts] = await Promise.all([
       settingsSheetSection('/settings/spend', { caps: [] }),
-      settingsSheetSection('/settings/brand', { brand: [] })
+      settingsSheetSection('/settings/project', { project: [] })
     ]);
 
     expect(spend?.data).toEqual({ caps: [] });
     expect(spend?.Page).toBe((await settingsPageLoader('/settings/spend')!()).default);
-    expect(fonts?.data).toEqual({ brand: [] });
+    expect(fonts?.data).toEqual({ project: [] });
   });
 
   it('una sezione inesistente non trova niente', () => {

@@ -39,7 +39,7 @@ vi.mock('./supabase-admin', () => ({
 	})
 }));
 
-import { logAiCall, withBrandContext } from './ai-log';
+import { logAiCall, withOrgContext } from './ai-log';
 import { CHAT_MULTIPLIER, CREDITS_PER_USD_GRANT } from '$lib/credit-ladder';
 import { RENDER_CALL_LABEL, RENDER_MULTIPLIER } from '$lib/motion/render-quote';
 import { GEMINI_FLASH } from './google-models';
@@ -56,7 +56,7 @@ beforeEach(() => {
 
 describe('logAiCall debita credit_ledger per una chiamata prezzata', () => {
 	it('scrive un debit agganciato con ai_call_id, sull\'org della riga', async () => {
-		withBrandContext('brand-1', () => {
+		withOrgContext('org-1', () => {
 			logAiCall({
 				label: 'renderImage',
 				provider: 'llm',
@@ -81,7 +81,7 @@ describe('logAiCall debita credit_ledger per una chiamata prezzata', () => {
 	});
 
 	it('non debita una riga senza prezzo (cost_usd null)', async () => {
-		withBrandContext('brand-1', () => {
+		withOrgContext('org-1', () => {
 			logAiCall({ label: 'internal_event', provider: 'internal', ms: 1, ok: true, orgId: 'org-1' });
 		});
 
@@ -90,7 +90,7 @@ describe('logAiCall debita credit_ledger per una chiamata prezzata', () => {
 	});
 
 	it('non debita una chiamata fallita', async () => {
-		withBrandContext('brand-1', () => {
+		withOrgContext('org-1', () => {
 			logAiCall({ label: 'chat', provider: 'llm', ms: 5, ok: false, error: 'boom', orgId: 'org-1' });
 		});
 

@@ -27,7 +27,7 @@ vi.mock('./supabase-admin', () => ({
   })
 }));
 
-import { logAiCall, withBrandContext, withToolContext } from './ai-log';
+import { logAiCall, withOrgContext, withToolContext } from './ai-log';
 
 const A_CALL = { label: 'planStrategy', provider: 'internal', ms: 12, ok: true, orgId: 'org-1' } as const;
 
@@ -75,7 +75,7 @@ describe('il tool che ha causato la chiamata', () => {
   });
 
   it('un brand senza orgId esplicito prende org_id dal brand', async () => {
-    withBrandContext('brand-1', () => logAiCall({ label: 'planStrategy', provider: 'internal', ms: 12, ok: true }));
+    withOrgContext('org-1', () => logAiCall({ label: 'planStrategy', provider: 'internal', ms: 12, ok: true }));
 
     // No brands lookup mocked here: org_id resolves to null, and an unresolved org means the
     // row is NOT written (NOT NULL) — proving the guard, not the resolution itself.

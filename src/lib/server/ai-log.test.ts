@@ -6,13 +6,11 @@ import {
   billedUsdInScope,
   computeCostUsd,
   extractSdkUsage,
-  getBrandContext,
   getOrgContext,
   logAiCall,
   noteLlmCost,
   takeLlmCost,
   billingScope,
-  withBrandContext,
   withOrgContext
 } from './ai-log';
 import { GEMINI_FLASH, NANO_BANANA_PRO } from './google-models';
@@ -214,24 +212,6 @@ describe('computeCostUsd', () => {
     }
   });
 
-  it('reads the plan from withBrandContext when computeCostUsd is not passed one', () => {
-    const cost = withBrandContext(
-      'brand-1',
-      () =>
-        computeCostUsd({
-          label: 'grounded',
-          provider: 'llm',
-          model: GEMINI_FLASH,
-          ms: 0,
-          ok: true,
-          inputTokens: 1000,
-          outputTokens: 1000
-        }),
-      'starter'
-    );
-    expect(cost).toBeCloseTo(0.009, 6); // full list, whatever the plan in context says
-  });
-
   it('returns null when usage is missing or the model has no price list', () => {
     expect(computeCostUsd({ label: 'x', provider: 'llm', ms: 0, ok: false })).toBeNull();
     expect(computeCostUsd({ label: 'x', provider: 'llm', model: 'lyria-3-clip-preview', ms: 0, ok: true, inputTokens: 10, outputTokens: 10 })).toBeNull();
@@ -327,7 +307,7 @@ describe('extractSdkUsage', () => {
  */
 describe('fatture del gateway nello scope', () => {
   it('somma i passi del turno e li consegna una volta sola', async () => {
-    await withBrandContext('brand-1', async () => {
+    await withOrgContext('org-1', async () => {
       noteLlmCost(0.001);
       noteLlmCost(0.002);
       expect(takeLlmCost()).toBeCloseTo(0.003, 10);
@@ -337,12 +317,12 @@ describe('fatture del gateway nello scope', () => {
 
   it('due turni paralleli non si mescolano i costi', async () => {
     await Promise.all([
-      withBrandContext('brand-1', async () => {
+      withOrgContext('org-1', async () => {
         noteLlmCost(1);
         await new Promise((r) => setTimeout(r, 5));
         expect(takeLlmCost()).toBe(1);
       }),
-      withBrandContext('brand-2', async () => {
+      withOrgContext('org-1', async () => {
         noteLlmCost(2);
         await new Promise((r) => setTimeout(r, 5));
         expect(takeLlmCost()).toBe(2);
@@ -362,7 +342,7 @@ describe('fatture del gateway nello scope', () => {
    * un listino accanto alla riga, che è la cosa da cui si sta scappando. Adesso deposita chi scrive.
    */
   it('quello che e` finito nella riga resta leggibile: e` il numero della riga', async () => {
-    await withBrandContext('brand-1', async () => {
+    await withOrgContext('org-1', async () => {
       expect(billedUsdInScope()).toBeUndefined();
 
       noteLlmCost(0.004);
@@ -373,7 +353,7 @@ describe('fatture del gateway nello scope', () => {
   });
 
   it('somma le fatture di piu` chiamate nello stesso scope', async () => {
-    await withBrandContext('brand-1', async () => {
+    await withOrgContext('org-1', async () => {
       noteLlmCost(0.001);
       logAiCall({ label: 'turn', provider: 'llm', model: 'x', ms: 1, ok: true });
       noteLlmCost(0.002);
@@ -384,7 +364,7 @@ describe('fatture del gateway nello scope', () => {
   });
 
   it('un turno fallito non lascia una fattura che nessuna riga porta', async () => {
-    await withBrandContext('brand-1', async () => {
+    await withOrgContext('org-1', async () => {
       noteLlmCost(0.004);
       logAiCall({ label: 'turn', provider: 'llm', model: 'x', ms: 1, ok: false, error: 'boom' });
 
@@ -393,30 +373,17 @@ describe('fatture del gateway nello scope', () => {
   });
 
   it('senza fattura del gateway non inventa uno zero: resta sconosciuto', async () => {
-    await withBrandContext('brand-1', async () => {
+    await withOrgContext('org-1', async () => {
       takeLlmCost();
       expect(billedUsdInScope()).toBeUndefined();
     });
   });
 });
 
-/**
- * Chi paga, quando non c'è un brand a pagare. `sum_org_ai_cost_usd` sommava passando da `brands`:
- * una riga senza brand valeva zero per ogni organizzazione, quindi il cancello sopra sarebbe
- * passato per sempre e quelle generazioni sarebbero state gratis in permanenza — con la suite
- * verde, perché il database finto non somma niente.
- */
-describe('lo scope di un lavoro senza brand', () => {
-  it('porta l organizzazione, e nessun brand da attribuire', () => {
+describe('lo scope di un lavoro', () => {
+  it('porta l organizzazione che paga', () => {
     withOrgContext('org-1', () => {
       expect(getOrgContext()).toBe('org-1');
-      expect(getBrandContext()).toBeNull();
-    });
-  });
-
-  it('uno scope di brand non porta un organizzazione: la riga ci arriva dal brand', () => {
-    withBrandContext('brand-1', () => {
-      expect(getOrgContext()).toBeNull();
     });
   });
 
@@ -442,7 +409,7 @@ describe('lo scope di un lavoro senza brand', () => {
  */
 describe('la fattura che è finita nella riga si rilegge nello scope', () => {
   it('un render prezzato dal fornitore è leggibile subito, senza aspettare la insert', () => {
-    withBrandContext('brand-1', () => {
+    withOrgContext('org-1', () => {
       logAiCall({ label: 'image', provider: 'openrouter', model: 'x', ms: 1, ok: true, flatCostUsd: 0.0336 });
 
       expect(billedUsdInScope()).toBeCloseTo(0.0336, 10);
@@ -450,7 +417,7 @@ describe('la fattura che è finita nella riga si rilegge nello scope', () => {
   });
 
   it('somma i render dello stesso turno', () => {
-    withBrandContext('brand-1', () => {
+    withOrgContext('org-1', () => {
       logAiCall({ label: 'image', provider: 'openrouter', model: 'x', ms: 1, ok: true, flatCostUsd: 0.03 });
       logAiCall({ label: 'image', provider: 'openrouter', model: 'x', ms: 1, ok: true, flatCostUsd: 0.02 });
 
@@ -459,7 +426,7 @@ describe('la fattura che è finita nella riga si rilegge nello scope', () => {
   });
 
   it('un render fallito non ha una fattura: resta undefined, non zero', () => {
-    withBrandContext('brand-1', () => {
+    withOrgContext('org-1', () => {
       logAiCall({ label: 'image', provider: 'openrouter', model: 'x', ms: 1, ok: false, error: 'boom', flatCostUsd: 0.03 });
 
       expect(billedUsdInScope()).toBeUndefined();
@@ -467,7 +434,7 @@ describe('la fattura che è finita nella riga si rilegge nello scope', () => {
   });
 
   it('la fattura del gateway continua a contarsi una volta sola', () => {
-    withBrandContext('brand-1', () => {
+    withOrgContext('org-1', () => {
       noteLlmCost(0.004);
       logAiCall({ label: 'turn', provider: 'llm', model: 'x', ms: 1, ok: true });
 

@@ -13,7 +13,7 @@ Summary of the schema notes in `CLAUDE.md`. The full design, with the reasons fo
 | Canvas | `projects`, `canvases`, `nodes`, `nodes_connections`, `node_runs`, `assets`, `canvas_events` |
 | Agents | `chat_threads`, `chat_messages`, `ai_calls` |
 
-The canvas Brands panel reads `brands` (with `palette`, `voice` and `logos`), `brand_fonts` (a role per brand, pointing at an uploaded `org_fonts` row or a Google Fonts family), `brand_pins` (each user's pinned brands), `assets.brand_id`/`approved_at` (approved assets), `products`, `posts`, `social_accounts`, `social_posts` (linked with `brand_id`) and `competitor_ads`. The other tables of the earlier social product (`post_sources`, the remaining `ad_*` tables, `influencers`) are not documented here. `scheduled_posts` was dropped: Zernio holds the schedule.
+Brands and products were removed from the product on 2026-11-18: a project has no brand and the canvas reads no brand or product table. The tables are dropped by a separate migration after the deploy. The other tables of the earlier social product (`influencers`) are not documented here.
 
 ## Constraints worth knowing
 

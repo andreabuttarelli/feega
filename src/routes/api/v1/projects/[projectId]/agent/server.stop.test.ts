@@ -29,10 +29,10 @@ vi.mock('$lib/server/agents/turn-core', async (importOriginal) => ({ ...(await i
 vi.mock('$lib/server/chat-model/catalogue', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/chat-model/catalogue')>()), offeredChatModels: async () => OFFERED }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput: async () => ({ ok: true }) }));
 vi.mock('$lib/server/llm', () => ({ llmLanguageModel: () => hangingModel() }));
-vi.mock('$lib/server/ai-log', () => ({ extractSdkUsage: () => ({}), logAiCall: () => undefined, withBrandContext: (_id: string, fn: () => void) => fn(), withOrgContext: (_id: string, fn: () => void) => fn() }));
+vi.mock('$lib/server/ai-log', () => ({ extractSdkUsage: () => ({}), logAiCall: () => undefined, withOrgContext: (_id: string, fn: () => void) => fn() }));
 vi.mock('$lib/server/cli-auth', () => ({ gateAiAction: async () => null, gateOrgAiAction: async () => null }));
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
-vi.mock('$lib/server/projects/lookup', () => ({ findReachableProject: async () => ({ orgId: ORG, project: { id: PROJECT, name: 'P', brandId: null, mode: 'standard' } }) }));
+vi.mock('$lib/server/projects/lookup', () => ({ findReachableProject: async () => ({ orgId: ORG, project: { id: PROJECT, name: 'P', mode: 'standard' } }) }));
 vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/repos/canvas')>()), listCanvases: async () => [] }));
 vi.mock('$lib/server/repos/chat', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/repos/chat')>()),
@@ -54,7 +54,6 @@ vi.mock('$lib/server/repos/chat-reply', async (importOriginal) => ({
   }
 }));
 vi.mock('$lib/server/project-agent/project-tools', () => ({ createProjectTools: () => ({}) }));
-vi.mock('$lib/server/project-agent/tool-surface', () => ({ openAgentTools: async (input: { projectTools: object }) => ({ tools: input.projectTools, close: async () => undefined }) }));
 
 const { POST, DELETE } = await import('./+server');
 

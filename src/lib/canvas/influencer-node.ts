@@ -2,9 +2,8 @@
  * IL NODO `influencer`: un riferimento a una riga di `influencers`, non un carattere generato qui.
  *
  * Nasce sempre pieno — trascinato dal pannello Influencers (`influencerDrag` in `drag-payload.ts`)
- * — e non cambia mai dopo: non c'è un `onchange` che riscrive `influencer_id`, la stessa dottrina
- * di `ProductsNode` per la query ma più stretta, perché qui non c'è nemmeno un campo da editare
- * sulla tile. Le viste (nome, foto, quante sono) arrivano da fuori — il server le legge da
+ * — e non cambia mai dopo: non c'è un `onchange` che riscrive `influencer_id`, né un campo da
+ * editare sulla tile. Le viste (nome, foto, quante sono) arrivano da fuori — il server le legge da
  * `influencer_views` e le passa come prop, mai dentro `nodes.data`.
  */
 

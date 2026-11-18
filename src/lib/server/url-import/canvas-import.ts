@@ -13,9 +13,6 @@ import { liveBrowser } from '$lib/server/web/live';
 import { importPageAt, UrlImportOutcome, type UrlImported } from './import-url';
 import type { PageView } from './page-views';
 import { Tokening, type PageShape } from './url-doc';
-import type { SiteBrand } from './page-tokens';
-import { findSiteBrand } from '$lib/server/start/site-brand';
-import { startHost } from '$lib/start-url';
 import { componentsPage } from '$lib/server/canvas/components-page';
 import { savePoster } from '$lib/server/motion/poster';
 import type { PagePoster } from '$lib/server/web/browser';
@@ -50,22 +47,6 @@ export function pageAssets(scope: Pick<UrlScope, 'db' | 'orgId' | 'userId' | 'pr
   };
 }
 
-async function brandOf(scope: UrlScope, url: string): Promise<SiteBrand | undefined> {
-  if (!URL.canParse(url)) {
-    return undefined;
-  }
-  const brand = await findSiteBrand(scope.db, scope.orgId, startHost(url)).catch(() => null);
-  return brand ? { palette: brand.kit.palette.map((swatch) => swatch.hex) } : undefined;
-}
-
-async function shapeFor(scope: UrlScope, url: string, shape: PageShape | undefined): Promise<PageShape | undefined> {
-  if (shape?.tokening !== Tokening.On) {
-    return shape;
-  }
-  const brand = await brandOf(scope, url);
-  return brand ? { ...shape, brand } : shape;
-}
-
 async function keepPoster(scope: UrlScope, store: FrameStore, frameId: string, poster: PagePoster): Promise<void> {
   const head = await store.read(frameId);
   if (!head) {
@@ -87,7 +68,7 @@ export async function importUrlInto(scope: UrlScope, canvasId: string, ask: { ur
   const store = frameStore(scope.db, { orgId: scope.orgId, actor: scope.actor, projectId: scope.projectId });
   const imported = await importPageAt({
     ...ask,
-    shape: await shapeFor(scope, ask.url, ask.shape),
+    shape: ask.shape,
     store,
     place: { projectId: scope.projectId, canvasId },
     open: liveBrowser({ orgId: scope.orgId, userId: scope.userId, projectId: scope.projectId }),

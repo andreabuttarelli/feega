@@ -4,10 +4,13 @@ import { sourceOf, type IframeNode } from '$lib/canvas/iframe-node';
 import { Framework, isCodeFiles, isFramework, isVarValues, starterFiles } from '$lib/canvas/code-frame';
 import type { DocNode } from '$lib/canvas/doc-node';
 import type { Addable } from '$lib/canvas/addable';
+import { isProductPlatform, type ProductsNode } from '$lib/canvas/products-node';
 import { isSocialFeedPlatform, type SocialFeedNode } from '$lib/canvas/social-feed-node';
 import {
   DEFAULT_FEED_FILTERS,
-  feedFiltersOf
+  DEFAULT_PRODUCT_FILTERS,
+  feedFiltersOf,
+  productFiltersOf
 } from '$lib/canvas/source-filters';
 import { SYNC_STATUSES, type SyncStatus } from '$lib/canvas/sync-state';
 import { isListItemKind, type ListItem, type ListNode } from '$lib/canvas/list-node';
@@ -49,6 +52,7 @@ export const NODE_TYPES = [
   'video',
   'iframe',
   'doc',
+  'products',
   'social_account_feed',
   'influencer',
   'list',
@@ -144,6 +148,31 @@ export function docOf(row: NodeRow): DocNode | null {
     content: str(row.data.content),
     public: row.data.public === true,
     ...playOf(row.data)
+  };
+}
+
+/** Il nodo `products` dietro una riga, o null quando quella riga è un'altra cosa. */
+export function productsOf(row: NodeRow): ProductsNode | null {
+  if (row.type !== 'products') {
+    return null;
+  }
+
+  const platform = row.data.type;
+
+  return {
+    id: row.id,
+    platform: typeof platform === 'string' && isProductPlatform(platform) ? platform : 'shopify',
+    url: str(row.data.url),
+    limit: num(row.data.limit, 20),
+    after: nullableStr(row.data.after),
+    onlyFirstPhoto: row.data.only_first_photo === true,
+    category: str(row.data.category),
+    filters: productFiltersOf(row.data.filters),
+    syncStatus: syncStatusOf(row.data.sync_status),
+    syncError: nullableStr(row.data.sync_error),
+    syncedCount: num(row.data.synced_count, 0),
+    syncedAt: nullableStr(row.data.synced_at),
+    syncSummary: nullableStr(row.data.sync_summary)
   };
 }
 
@@ -339,6 +368,18 @@ export function newNodeRow(what: Addable): Record<string, unknown> {
     return { content: '', public: false };
   }
 
+  if (what === 'products') {
+    return {
+      type: 'shopify',
+      url: '',
+      limit: 20,
+      after: null,
+      only_first_photo: false,
+      category: '',
+      filters: DEFAULT_PRODUCT_FILTERS
+    };
+  }
+
   if (what === 'social_account_feed') {
     return { platform: 'instagram', handle: '', limit: 20, filters: DEFAULT_FEED_FILTERS };
   }
@@ -409,6 +450,29 @@ export function frameData(node: IframeNode): Record<string, unknown> {
 
 export function docData(node: DocNode): Record<string, unknown> {
   return { content: node.content, public: node.public };
+}
+
+/**
+ * Quel che di un nodo `products` si scrive. Lo stato di sincronizzazione (`syncStatus`…) VIAGGIA
+ * col resto — a differenza di `runs` sul nodo che produce, qui non c'è una tabella `node_runs`
+ * separata per questi due tipi: un solo giro alla volta, il risultato precedente non è "storia"
+ * da tenere, è lo stato corrente che il prossimo giro sovrascrive.
+ */
+export function productsData(node: ProductsNode): Record<string, unknown> {
+  return {
+    type: node.platform,
+    url: node.url,
+    limit: node.limit,
+    after: node.after,
+    only_first_photo: node.onlyFirstPhoto,
+    category: node.category,
+    filters: node.filters,
+    sync_status: node.syncStatus,
+    sync_error: node.syncError,
+    synced_count: node.syncedCount,
+    synced_at: node.syncedAt,
+    sync_summary: node.syncSummary
+  };
 }
 
 export function socialFeedData(node: SocialFeedNode): Record<string, unknown> {

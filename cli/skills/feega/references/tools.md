@@ -1,25 +1,25 @@
 # feega MCP tools ↔ CLI
 
 Twelve tools, all reachable through the org you belong to — no `slug` required on any of them,
-because the canvas is org-scoped and a brand is only a `brand_id` value inside it. Ids accept short
+because the canvas is org-scoped. Ids accept short
 unambiguous prefixes on list-derived reads; a `where` on `id` in `delete_row` and `update_row`
 takes the full id, because an ambiguous prefix would touch the wrong row and neither comes back.
 
-The CLI is narrower: it is brand-scoped (`feega <command> <slug>`) and does not expose `query`,
+The CLI is narrower: it acts on your active organisation and does not expose `query`,
 `insert_row`, `update_row`, `delete_row`, `describe_node_types` or `run_node_generation` — those
 are MCP only, because they reach the whole database directly, which the CLI's fixed set of
-brand-scoped REST endpoints does not.
+REST endpoints does not.
 
 ## Auth
 
 | MCP | CLI |
 |-----|-----|
 | (none — the host does OAuth on HTTP, `feega login` locally) | `feega login` / `feega logout` |
-| — | `feega brands` |
+| — | `feega projects` |
 
 There is no sign-in tool. On remote HTTP the host walks the OAuth round itself; on stdio the
 session is the CLI's, so `feega login` in a terminal covers both. Confirm with `query` on
-`brands` (MCP) or `feega brands` (CLI): rows come back, or nobody is signed in.
+`projects` (MCP) or `feega projects` (CLI): rows come back, or nobody is signed in.
 
 ## Reading is one tool
 
@@ -67,11 +67,10 @@ read why and change your call.
 
 | you want | how |
 |---|---|
-| your projects/brands | `query` on `brands` — `id`, `slug`, `name`, `plan`, `status`; CLI `feega brands` |
+| your projects | `query` on `projects` — `id`, `name`; CLI `feega projects` |
 | a project's canvases | `query` on `canvases` — `id`, `name`, `project_id`, `viewport`, filtered `project_id` `eq` |
 | the nodes on a canvas | `query` on `nodes` — `id`, `type`, `data`, `version`, filtered `canvas_id` `eq` and `deleted_at` `is` null |
 | a node's connections | `query` on `nodes_connections` — `source_node_id`, `target_node_id`, `target_handle`, filtered on the canvas's node ids |
-| products | `query` on `products` — `id`, `title`, `pricing`, `url`, `featured`, `images`; CLI `feega products <slug>` |
 | what `nodes.data` must look like | `describe_node_types` — not a `query`, since it reads a schema, not a table |
 
 ## Writing a row that has no tool of its own
@@ -91,8 +90,7 @@ happen. There is no upsert.
 different one is refused rather than quietly corrected. It never replaces anything: a row that is
 already there comes back as a collision naming the key you hit, and changing it is `update_row`.
 Several jsonb columns are checked against a real shape before writing — `nodes.data` by `type`
-(call `describe_node_types` first), `posts.media`, `ad_campaigns.targeting`/`placements`,
-`canvases.viewport` — a rejection names the exact field.
+(call `describe_node_types` first), `canvases.viewport` — a rejection names the exact field.
 
 `update_row({ org, table, where, values })` changes rows that exist. **Only the columns you send
 are touched** — everything else in the row is left exactly as it was. `where` is required and may
@@ -106,8 +104,8 @@ anything goes, so a filter that hits eleven is refused whole and you are told ho
 
 `describe_node_types({ org, type? })` returns the JSON Schema `insert_row`/`update_row` actually
 enforce on `nodes.data`, per `type` (`text`, `image`, `video`, `doc`, `iframe`,
-`social_account_feed`, `social_post_mockup`, `products`, `ads`, `influencer`, `list`, `select`,
-`effects`). Omit `type` for all thirteen at once. Model/aspect-ratio/duration limits are NOT here
+`social_account_feed`, `social_post_mockup`, `influencer`, `list`, `select`,
+`effects`). Omit `type` for all twelve at once. Model/aspect-ratio/duration limits are NOT here
 — call `run_node_generation` and read its refusal, or check the model's own docs, since those are
 a fact of the model, not the node.
 
@@ -140,7 +138,7 @@ ranges/options/defaults (`list_effects` gives the same list). `apply_effects` se
 model wants — labelled sections, one paragraph, a command when editing, whatever that model's
 craft calls for. It rewrites, it never invents: a rewrite that adds a subject, asks for readable
 text or states an aspect ratio is thrown away, and the original comes back with `changed: false`
-and why in `notes`, same as a model with no guide. No brand, no draw, no file — spends credits.
+and why in `notes`, same as a model with no guide. No draw, no file — spends credits.
 
 `run_node_generation({ org, node_id, medium, prompt, model, version, params? })` fills an existing
 canvas node — it never creates one (`insert_row` does that). `medium` (`text`, `image` or `video`)
@@ -185,14 +183,6 @@ applies `[{ find, replace }]` edits; a stale `version` is a 409. `list_effects` 
 slots, place, camera?, motion?, params?, tilt?, scale?, animate? }` with `place` a grid, ring, line or
 scatter. `patch_layout` (`{ org, layout_id, version, spec }`) replaces it; `list_layouts` lists them.
 Free.
-
-`studio_quote` (`{ selection, project? }`) prices a Photo studio batch: `count`, `perImage`, `total`, skipped
-combinations and a `quoteId`. Free. `studio_start` (`{ selection, quoteId, project? }`) starts it and spends
-credits; the `quoteId` must belong to the same selection and price, else 409. `studio_status` (`{ batch_id }`)
-reads the batch. CLI: `feega studio quote|start|status`.
-`studio_run`, `studio_more` (`variations`), `studio_cancel`, `studio_retry`, `studio_regenerate`,
-`studio_approve` and `studio_reject` act on a batch (`batch_id`, `item_ids`); run, more, retry and regenerate spend credits.
-CLI: `feega studio run|more|cancel|retry|regenerate|approve|reject <batchId>`.
 
 `get_app_account` (`{ project_id }`) shows the TEST login of the user's app the project chat remembers
 (login url, email, session expiry; never the password). `set_app_account` (`{ project_id, login_url, email,
@@ -251,7 +241,7 @@ all three. `clone_voice` needs the user's consent (`attested: true`) and a 60-18
 `sampleBase64` (max 3MB).
 
 `import_feed_image { canvasId, nodeId, itemId, imageIndex?, x?, y?, toFrameId?, frameX?, frameY? }` pulls one
-picture out of a Social feed or Products node (`itemId` is a post or product id from
+picture out of a Social feed node (`itemId` is a post id from
 `canvas_snapshot`): the server copies it into the project, answers an image node and its asset,
 and keeps the source in `data.source`. With `toFrameId` it becomes an image layer of that Frame.
 

@@ -17,7 +17,7 @@ import {
 	type SubmittedVideoRender,
 	type VideoPersistOpts
 } from '$lib/server/video';
-import { withBrandContext, withOrgContext } from '$lib/server/ai-log';
+import { withOrgContext } from '$lib/server/ai-log';
 
 /** Il nome del trasporto nei messaggi di resa: chi apre il registro deve sapere dove guardare. */
 const VIDEO_TRANSPORT = 'openrouter';
@@ -46,8 +46,6 @@ export const VIDEO_RENDER_MAX_ATTEMPTS = 8;
 
 export type VideoRenderRow = {
 	id: string;
-	/** `null` su un clip chiesto senza nominare un brand: allora paga `org_id`, e la libreria non c'è. */
-	brand_id: string | null;
 	org_id: string | null;
 	user_id: string;
 	post_id: string | null;
@@ -87,7 +85,6 @@ async function retrying<T extends DbResult>(
 }
 
 type RenderOwner = {
-	brandId: string | null;
 	orgId?: string | null;
 	userId: string;
 	postId?: string | null;
@@ -105,8 +102,7 @@ async function reserveVideoRender(
 			admin
 				.from('video_renders')
 				.insert({
-					brand_id: owner.brandId,
-					org_id: owner.brandId ? null : (owner.orgId ?? null),
+					org_id: owner.orgId ?? null,
 					user_id: owner.userId,
 					post_id: owner.postId ?? null,
 					thread_id: owner.threadId ?? null,
@@ -207,39 +203,7 @@ export async function submitAndTrackVideoRender(
 	return { ...submitted, jobId };
 }
 
-/**
- * Renders this brand has in flight, so a quota gate can see them.
- *
- * The monthly video count is only charged when a clip LANDS — charging at submit would let a run of
- * rejected renders eat the month. But that leaves a window where usage says zero and N submissions
- * have already happened, so a one-video allowance can be spent many times over. Callers must gate
- * on remaining budget MINUS this.
- */
-export async function countOutstandingVideoRenders(
-	admin: SupabaseClient,
-	brandId: string
-): Promise<number> {
-	const { count, error } = await admin
-		.from('video_renders')
-		.select('id', { count: 'exact', head: true })
-		.eq('brand_id', brandId)
-		.in('status', ['rendering', 'finishing']);
-	// Fail closed on error: treating an unknown number of in-flight renders as zero is exactly the
-	// over-spend this function exists to prevent.
-	if (error) {
-		console.error('[video-render] outstanding count failed:', error.message);
-		return Number.MAX_SAFE_INTEGER;
-	}
-	return count ?? 0;
-}
-
-/**
- * Chi paga questa riga. Esattamente uno dei due è scritto — `video_renders_one_payer` lo impone —
- * e un brand nomina la sua organizzazione da sé, mentre una riga senza brand la porta addosso.
- */
 function inPayerScope<T>(row: VideoRenderRow, fn: () => Promise<T>): Promise<T> {
-	if (row.brand_id) return withBrandContext(row.brand_id, fn);
-
 	return withOrgContext(String(row.org_id), fn);
 }
 
@@ -295,71 +259,6 @@ async function settle(
 }
 
 /**
- * Il clip che nessun post reclama va nella LIBRERIA del brand, o resta un file pagato che nessun
- * tool sa raggiungere: `create_post` accetta `media_ids`, e questo è l'id che glielo procura.
- * `source_ref` porta l'id del lavoro, così `check_media_job` ritrova l'asset senza una colonna in
- * più su `video_renders`.
- */
-async function applyToLibrary(
-	admin: SupabaseClient,
-	row: VideoRenderRow,
-	url: string
-): Promise<string | null> {
-	const { saveRenderedVideoToLibrary } = await import('$lib/server/brand-media');
-	const saved = await saveRenderedVideoToLibrary(admin, {
-		brandId: String(row.brand_id),
-		userId: row.user_id,
-		url,
-		title: row.prompt?.trim().slice(0, 80) || 'Generated clip',
-		durationSeconds: row.duration_seconds ?? undefined,
-		sourceRef: row.id
-	});
-
-	return 'error' in saved ? saved.error : null;
-}
-
-/**
- * Dove si reclama un clip atterrato, una riga per padrone. Senza brand non c'è una libreria in cui
- * depositarlo — `brand_media` dice `brand_id in (select auth_brand_ids())`, e `NULL in (…)` vale
- * NULL — quindi il clip si ritrova sulla riga stessa, che `settle` chiude con `media_url`.
- */
-async function landClip(
-	admin: SupabaseClient,
-	row: VideoRenderRow,
-	url: string,
-	thumbnailUrl?: string
-): Promise<string | null> {
-	if (!row.post_id) return row.brand_id ? applyToLibrary(admin, row, url) : null;
-	// `.select('id')` so a zero-row match is visible: an UPDATE that hits nothing reports no error,
-	// so without this an orphaned render — post insert rolled back, post since deleted — would be
-	// billed, settled `done`, and reported to the user as attached to a post that does not exist.
-	const { data: touched, error } = await admin
-		.from('posts')
-		.update({
-			media_url: url,
-			content_type: 'generated_video',
-			// Set here, with media_url and content_type, so a post is never labelled a reel while
-			// its media is still a still frame.
-			format: 'video',
-			video_task_id: row.task_id,
-			video_resolution: row.resolution,
-			video_duration_seconds: row.duration_seconds,
-			video_render_status: 'done',
-			...(thumbnailUrl ? { video_thumbnail_url: thumbnailUrl } : {})
-		})
-		.eq('id', row.post_id)
-		.select('id');
-	if (error) {
-		return `the clip is stored but post ${row.post_id} could not be updated: ${error.message}`;
-	}
-	if (!touched?.length) {
-		return `the clip is stored but post ${row.post_id} no longer exists`;
-	}
-
-	return null;
-}
-
-/**
  * One pass: check every outstanding render once and finish whichever the provider has completed.
  *
  * No loop, no sleep, no per-render budget — a tick is a handful of HTTP calls, which is exactly
@@ -375,7 +274,7 @@ export async function reconcileVideoRenders(
 	const { data: rows } = await admin
 		.from('video_renders')
 		.select(
-			'id, brand_id, org_id, user_id, post_id, thread_id, task_id, model, status, duration_seconds, resolution, cover_url, prompt, persist_opts, submitted_at, attempts, error'
+			'id, org_id, user_id, post_id, thread_id, task_id, model, status, duration_seconds, resolution, cover_url, prompt, persist_opts, submitted_at, attempts, error'
 		)
 		.eq('status', 'rendering')
 		.not('task_id', 'like', `${PENDING_TASK_PREFIX}%`)
@@ -395,19 +294,12 @@ export async function reconcileVideoRenders(
 				? `gave up after ${raw.attempts} attempts (${raw.error ?? 'repeated failures'})`
 				: `${VIDEO_TRANSPORT} never resolved this task`;
 			await settle(admin, raw, { status: 'expired', error: why });
-			if (raw.post_id) {
-				await admin
-					.from('posts')
-					.update({ video_render_status: 'failed' })
-					.eq('id', raw.post_id)
-					.then(undefined, () => {});
-			}
 			expired += 1;
 			continue;
 		}
 
 		// Claim before doing anything non-idempotent: persistMp4 writes a file and the billing call
-		// charges the brand, and two overlapping ticks must not do either twice.
+		// charges the payer, and two overlapping ticks must not do either twice.
 		// Note: attempts is NOT bumped here. Most claims are "is it done yet?" checks against a
 		// perfectly healthy render, and counting those turns the retry cap into a deadline of
 		// MAX_ATTEMPTS minutes. Only real failures below increment it.
@@ -440,36 +332,10 @@ export async function reconcileVideoRenders(
 
 			if (outcome.status === 'failed') {
 				await settle(admin, raw, { status: 'failed', error: outcome.error.slice(0, 2000) });
-				if (raw.post_id) {
-					await admin
-						.from('posts')
-						.update({ video_render_status: 'failed' })
-						.eq('id', raw.post_id)
-						.then(undefined, () => {});
-				}
 				failed += 1;
 				continue;
 			}
 
-			// Post first, settle second. Settling `done` before the post has the url strands a paid
-			// clip nowhere: nothing re-reads a done row. If the post write fails the row goes back
-			// to the queue, where the attempt cap eventually stops it.
-			const notLanded = await landClip(admin, raw, outcome.url, outcome.thumbnailUrl);
-			if (notLanded) {
-				console.error(`[video-render] clip did not land id=${raw.id}:`, notLanded);
-				await admin
-					.from('video_renders')
-					.update({
-						status: 'rendering',
-						claimed_at: null,
-						attempts: raw.attempts + 1,
-						media_url: outcome.url,
-						error: notLanded.slice(0, 2000)
-					})
-					.eq('id', raw.id)
-					.then(undefined, () => {});
-				continue;
-			}
 			await settle(admin, raw, { status: 'done', media_url: outcome.url });
 			done += 1;
 		} catch (e) {

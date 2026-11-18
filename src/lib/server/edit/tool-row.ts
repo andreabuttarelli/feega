@@ -8,8 +8,7 @@ export enum ToolFamily {
   Gallery = 'gallery',
   Motion = 'motion',
   Frame = 'frame',
-  Web = 'web',
-  Brand = 'brand'
+  Web = 'web'
 }
 
 export enum ToolAccess {

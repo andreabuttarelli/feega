@@ -6,13 +6,12 @@ import {
   feedImageSize,
   parseFeedImageDrag,
   postImageUrl,
-  productImageUrl,
   serializeFeedImageDrag
 } from './feed-image';
 
 const DRAG = { nodeId: 'n1', itemId: 'p1', imageIndex: 0, thumb: 'https://cdn.test/t.jpg', w: 1080, h: 1350 };
 
-describe('the drag of a feed or product picture', () => {
+describe('the drag of a feed picture', () => {
   it('travels under its own mime type', () => {
     expect(CANVAS_DRAG_FEED_IMAGE).toBe('application/x-feega-feed-image');
   });
@@ -40,7 +39,7 @@ describe('the size of the node a picture becomes', () => {
   });
 });
 
-describe('which url a post or a product gives', () => {
+describe('which url a post gives', () => {
   it('takes the full still of an image post', () => {
     const media = { items: [{ type: 'image', url: 'https://cdn.test/full.jpg', thumbnailUrl: 'https://cdn.test/t.jpg' }] };
     expect(postImageUrl({ media }, 0)).toBe('https://cdn.test/full.jpg');
@@ -62,13 +61,7 @@ describe('which url a post or a product gives', () => {
     expect(postImageUrl({ media: null }, 0)).toBeNull();
   });
 
-  it('takes the product image at the index', () => {
-    const images = [{ url: 'https://shop.test/a.jpg' }, { url: 'https://shop.test/b.jpg' }];
-    expect(productImageUrl({ images }, 1)).toBe('https://shop.test/b.jpg');
-    expect(productImageUrl({ images }, 5)).toBeNull();
-  });
-
-  it('names the two sources', () => {
-    expect(Object.values(FeedSource)).toEqual(['post', 'product']);
+  it('names the source', () => {
+    expect(Object.values(FeedSource)).toEqual(['post']);
   });
 });

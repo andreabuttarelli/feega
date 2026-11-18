@@ -9,7 +9,6 @@ export const ENTRY_PREFETCH: Record<string, () => Promise<{ default: unknown }>>
   layers: CHROME_LOADERS.leftPanel,
   components: CHROME_LOADERS.leftPanel,
   assets: CHROME_LOADERS.leftPanel,
-  brands: CHROME_LOADERS.leftPanel,
   influencers: CHROME_LOADERS.leftPanel,
   history: CHROME_LOADERS.leftPanel,
   styles: CHROME_LOADERS.leftPanel,

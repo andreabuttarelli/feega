@@ -1104,7 +1104,6 @@ export async function reconcileVideoNodeRuns(db: Db): Promise<VideoReconcileOutc
 
       const submitted = rowToSubmitted({
         id: row.id,
-        brand_id: null,
         org_id: run.orgId,
         user_id: startRunShape.userId,
         post_id: null,

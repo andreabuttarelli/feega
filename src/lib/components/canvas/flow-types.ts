@@ -60,7 +60,6 @@ export type Tile = {
   outputs?: SelectOutput[];
   kind?: string;
   displayName?: string | null;
-  inPost?: boolean;
   select?: boolean;
   settings?: boolean;
   poster?: Poster;

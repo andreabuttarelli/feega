@@ -4,7 +4,7 @@
  * `nodes.data` non è l'unica: il database ha 20 colonne jsonb su 11 tabelle (lette dal database
  * vero, klnswzhhgrqvbfjzioul, lo stesso motivo per cui `checks.ts` accanto non è generato dalle
  * migration). Ognuna è raggiungibile dagli stessi tre tool generici — un agente che scrive
- * `insert_row('ad_campaigns', {targeting: …})` indovina la forma esattamente come indovinava
+ * `insert_row('canvases', {viewport: …})` indovina la forma esattamente come indovinava
  * `nodes.data` prima di questo giro.
  *
  * STESSA REGOLA DI `checks.ts` e `node-data.ts`: un `if` per tabella sarebbe la stessa colonna
@@ -56,16 +56,6 @@ export const JSONB_COLUMN_SCHEMAS: Record<string, JsonbEntry> = {
 
   'canvases.viewport': validated(canvasViewportSchema),
 
-  'competitor_ads.raw': freeForm(
-    'la risposta INTERA della Meta Ad Library, tenuta verbatim apposta: quella libreria cambia ' +
-      'forma senza preavviso, e validarla vorrebbe dire rompere l\'ingest a ogni cambiamento del ' +
-      'provider invece di limitarsi a registrarlo.'
-  ),
-  'competitor_ads.media': freeForm(
-    'nessun repository del nuovo schema scrive ancora questa tabella (solo la FK verso nodes esiste ' +
-      'in database.types.ts) — nessuna forma reale da cui derivare uno schema onesto.'
-  ),
-
   'canvas_events.before': freeForm(
     'l\'istantanea di una riga qualunque prima della modifica, per uno storico/undo — la forma È ' +
       'la riga che cambia volta per volta, non un tipo suo. Validarla vorrebbe dire ridichiarare ' +
@@ -91,11 +81,11 @@ export const JSONB_COLUMN_SCHEMAS: Record<string, JsonbEntry> = {
       'imporre una forma qui darebbe due verità con `media-model-slots`.'
   ),
 
-  'social_posts.media': freeForm(
-    'nessun repository del nuovo schema scrive ancora `social_posts` — la tabella dei post scaricati ' +
-      'dai feed social (§ `social_account_feed` in NEW_DATABASE_STRUCTURE.md) non ha ancora un ingest.'
-  ),
-  'social_posts.metrics': freeForm('stesso motivo di social_posts.media: nessun ingest reale da cui derivare la forma.')
+  'products.images': freeForm(
+    'la fonte è uno scraper su store che non controlliamo: `store-product.ts` normalizza le immagini ' +
+      'in ingresso, ma la tolleranza sulla forma è una scelta del prodotto, non una lacuna da chiudere ' +
+      'con uno schema stretto.'
+  )
 };
 
 export function jsonbColumnsOf(table: string): string[] {

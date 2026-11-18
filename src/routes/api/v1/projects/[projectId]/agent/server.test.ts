@@ -100,7 +100,6 @@ vi.mock('$lib/server/chat-model/catalogue', async (importOriginal) => ({
 vi.mock('$lib/server/ai-log', () => ({
   extractSdkUsage: () => ({ inputTokens: 1, outputTokens: 1 }),
   logAiCall: vi.fn(),
-  withBrandContext: (_id: string, fn: () => void) => fn(),
   withOrgContext: (_id: string, fn: () => void) => fn()
 }));
 vi.mock('$lib/server/cli-auth', () => ({
@@ -121,7 +120,7 @@ vi.mock('$lib/server/project-agent/motion-delegation', async (importOriginal) =>
   };
 });
 vi.mock('$lib/server/projects/lookup', () => ({
-  findReachableProject: async () => ({ orgId: 'org-1', project: { id: 'p-1', name: 'P', brandId: null } })
+  findReachableProject: async () => ({ orgId: 'org-1', project: { id: 'p-1', name: 'P', } })
 }));
 vi.mock('$lib/server/repos/chat', () => ({
   openThread: async () => 'thread-1',
@@ -130,16 +129,9 @@ vi.mock('$lib/server/repos/chat', () => ({
   turnRunning: async () => true,
   saveTurn: (db: unknown, turn: { role: string; attachments?: unknown[]; selection?: unknown[] }) => saveTurn(db, turn)
 }));
-vi.mock('$lib/server/project-agent/project-tools', () => ({ createProjectTools: () => ({}) }));
-const offeredProjectTools = vi.hoisted(() => ({ names: [] as string[] }));
-vi.mock('$lib/server/project-agent/tool-surface', () => ({
-  openAgentTools: async (input: { projectTools: Record<string, unknown> }) => {
-    offeredProjectTools.names = Object.keys(input.projectTools);
-    return { tools: { list_nodes: tool({ inputSchema: z.object({}), execute: async () => ({ n: 2 }) }) }, close: async () => undefined };
-  }
-}));
-
+vi.mock('$lib/server/project-agent/project-tools', () => ({ createProjectTools: () => ({ list_nodes: tool({ inputSchema: z.object({}), execute: async () => ({ n: 2 }) }) }) }));
 const { GET, POST } = await import('./+server');
+const offeredTools = () => ((streamed.mock.calls[0][0] as { tools: { name: string }[] }).tools ?? []).map((t) => t.name);
 const { MOTION_DELEGATION_TOOLS } = await import('$lib/server/project-agent/motion-delegation');
 
 function postEvent(extra: Record<string, unknown> = {}) {
@@ -236,27 +228,27 @@ describe('POST /api/v1/projects/[projectId]/agent', () => {
   it('hands the canvas agent the motion delegation tools', async () => {
     await POST(postEvent());
 
-    expect(offeredProjectTools.names).toEqual(expect.arrayContaining([...MOTION_DELEGATION_TOOLS]));
+    expect(offeredTools()).toEqual(expect.arrayContaining([...MOTION_DELEGATION_TOOLS]));
   });
 
   it('lets the canvas agent spawn sub-agents', async () => {
     await POST(postEvent());
 
-    expect(offeredProjectTools.names).toContain('spawn_agent');
+    expect(offeredTools()).toContain('spawn_agent');
   });
 
   it('hands the canvas agent the web tools', async () => {
     await POST(postEvent());
 
-    expect(offeredProjectTools.names).toEqual(expect.arrayContaining(['web_search', 'read_page', 'read_store', 'view_images', 'import_image', 'import_products']));
+    expect(offeredTools()).toEqual(expect.arrayContaining(['web_search', 'read_page', 'view_images', 'import_image']));
   });
 
   it('asks the user to pick references, unless they said to choose for them', async () => {
     await POST(postEvent());
-    expect(offeredProjectTools.names).toContain('ask_reference_pick');
+    expect(offeredTools()).toContain('ask_reference_pick');
 
     await POST(postEvent({ message: 'trova riferimenti su pinterest, scegli tu' }));
-    expect(offeredProjectTools.names).not.toContain('ask_reference_pick');
+    expect(offeredTools()).not.toContain('ask_reference_pick');
   });
 
   it('hands the motion delegation the canvas the user has open', async () => {

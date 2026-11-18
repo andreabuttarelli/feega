@@ -67,7 +67,7 @@ With nothing inside the frame selected, the right bar shows the frame's own look
 - **Stroke**: colour, width, inside/center/outside, per side.
 - **Effects**: drop and inner shadows, layer and background blur.
 
-The first edit gives the frame a surface: a locked full-frame layer under every other, named `Frame`, that replaces the brand background. It is not listed in Layers and a click on it selects nothing. **Clip content** is on by default: layers are cut to the frame's rounded corners in the editor, the player and exports. Code export paints the page root with it. Agents add it with `set_canvas` `surface: true` and style it with `set_props`.
+The first edit gives the frame a surface: a locked full-frame layer under every other, named `Frame`, that replaces the default background. It is not listed in Layers and a click on it selects nothing. **Clip content** is on by default: layers are cut to the frame's rounded corners in the editor, the player and exports. Code export paints the page root with it. Agents add it with `set_canvas` `surface: true` and style it with `set_props`.
 
 Scenes, camera, breakpoints, prototype flow, styles and variables sit in the folded **Frame settings** group below.
 

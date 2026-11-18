@@ -6,7 +6,7 @@ import { NODE_PORTS } from '$lib/canvas/node-ports';
 import { CardPart, cardItems, type CoreCard } from './cards';
 import type { CardIcons } from './card-kit';
 import { TileBadge } from '$lib/canvas/source-thumbs';
-import { SelectBody, batchOf, type NodeView } from '$lib/canvas/node-view';
+import { SelectBody, type NodeView } from '$lib/canvas/node-view';
 import type { CoreTheme } from './overlay';
 import type { Glyphs } from './chrome';
 
@@ -91,7 +91,7 @@ describe('cardItems', () => {
   });
 
   it('puts a rule under the header and the count at its right edge', () => {
-    const c = { ...card('products', { url: 'shop.io' }), face: faceOf({ id: 'n', kind: 'products' }, { url: 'shop.io' }, asset, view(['t1'], 9)), w: 300, h: 300 };
+    const c = { ...card('social_account_feed', { handle: 'x' }), face: faceOf({ id: 'n', kind: 'social_account_feed' }, { handle: 'x' }, asset, view(['t1'], 9)), w: 300, h: 300 };
     const [rule] = paths(cardItems(c, theme, glyphs), CardPart.Head).slice(-1);
     const [count] = paths(cardItems(c, theme, glyphs), CardPart.Head).filter((p) => p !== rule);
 
@@ -101,7 +101,7 @@ describe('cardItems', () => {
 
   it('marks a tile with its badge, its sale and its caption only when the whole tile shows', () => {
     const tile = { thumb: 't', caption: '9.00 EUR', badge: TileBadge.Carousel, sale: '−20%' };
-    const draw = (h: number) => cardItems({ ...card('products', { url: 'x' }), face: faceOf({ id: 'n', kind: 'products' }, { url: 'x' }, asset, { source: { tiles: [tile], total: 1, name: null } }), w: 300, h }, theme, glyphs, glyphs, icons);
+    const draw = (h: number) => cardItems({ ...card('social_account_feed', { handle: 'x' }), face: faceOf({ id: 'n', kind: 'social_account_feed' }, { handle: 'x' }, asset, { source: { tiles: [tile], total: 1, name: null } }), w: 300, h }, theme, glyphs, glyphs, icons);
 
     expect(paths(draw(300), CardPart.Badge)).toHaveLength(2);
     expect(paths(draw(300), CardPart.Sale)).toHaveLength(2);
@@ -110,8 +110,8 @@ describe('cardItems', () => {
   });
 
   it('shows the failure instead of the grid when the sync failed', () => {
-    const f = faceOf({ id: 'n', kind: 'products' }, { url: 'x', sync_status: 'failed', sync_error: 'boom' }, asset, view(['t1']));
-    const items = cardItems({ ...card('products', {}), face: f, w: 300, h: 300 }, theme, glyphs);
+    const f = faceOf({ id: 'n', kind: 'social_account_feed' }, { handle: 'x', sync_status: 'failed', sync_error: 'boom' }, asset, view(['t1']));
+    const items = cardItems({ ...card('social_account_feed', {}), face: f, w: 300, h: 300 }, theme, glyphs);
 
     expect(part(items, CardPart.Thumb)).toHaveLength(0);
     expect(part(items, CardPart.Empty)).toHaveLength(1);
@@ -133,14 +133,6 @@ describe('cardItems', () => {
 
     expect(rows.length).toBeGreaterThan(1);
     rows.forEach((r) => expect(box(r.contours)[0] + box(r.contours)[2]).toBeCloseTo(600, -1));
-  });
-
-  it('draws the studio batch pick state as an icon over an underlined link', () => {
-    const c = { ...card('studio_batch', {}), w: 300, h: 200 };
-    const items = cardItems(c, theme, glyphs, glyphs, { ...icons, badge: new Map([['studio_batch', [[0, 0, 4, 0, 4, 4]]]]) });
-
-    expect(paths(items, CardPart.Badge)).toHaveLength(1);
-    expect(paths(items, CardPart.Empty)).toHaveLength(2);
   });
 
   it('draws an embedded page as a mode switch and an address field over a blank page', () => {
@@ -178,14 +170,6 @@ describe('cardItems', () => {
     expect(paths(items, CardPart.Badge)).toHaveLength(2);
     expect(paths(items, CardPart.Button).length).toBeGreaterThan(1);
     expect(paths(cardItems({ ...card('effects', {}), w: 300, h: 300 }, theme, glyphs), CardPart.Empty)).toHaveLength(1);
-  });
-
-  it('draws a picked studio batch as a thumbnail grid over its counts', () => {
-    const view: NodeView = { batch: batchOf({ approved: 3, done: 5, total: 8, running: 1, failed: 0, thumbs: ['a', 'b', 'c', 'd'] }) };
-    const items = cardItems({ ...card('studio_batch', {}), face: faceOf({ id: 'n', kind: 'studio_batch' }, {}, asset, view), w: 300, h: 300 }, theme, glyphs);
-
-    expect((part(items, CardPart.Thumb) as ImageItem[]).filter((i) => i.kind === ItemKind.Image).map((i) => i.src)).toEqual(['a', 'b', 'c', 'd']);
-    expect(paths(items, CardPart.Footer).length).toBeGreaterThan(1);
   });
 
   it('draws an influencer as a cover over a name and views band', () => {

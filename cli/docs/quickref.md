@@ -4,16 +4,12 @@
 
 ```bash
 # Panoramica
-feega brands                              # Lista brand
+feega projects                            # Lista progetti
 feega health                              # Stato API (Supabase, Gemini)
 feega agents [--refresh]                  # Feega locale: agenti installati su questa macchina
 
-# Prodotti
-feega products <slug>                     # Lista
-feega products <slug> sync                # Re-importa dallo store collegato
-
 # Account e billing
-feega upgrade <slug>                      # Checkout del piano (--top-up 1000|2000|5000: ricarica)
+feega upgrade                             # Checkout del piano (--top-up 1000|2000|5000: ricarica)
 feega update                              # Aggiorna la CLI
 ```
 

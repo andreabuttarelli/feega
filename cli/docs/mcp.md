@@ -36,7 +36,7 @@ feega login
 }
 ```
 
-4. Restart Cursor / reload MCP. Call `query` on `brands` to confirm auth and see what you can see.
+4. Restart Cursor / reload MCP. Call `query` on `projects` to confirm auth and see what you can see.
 
 Session file (shared with the CLI): `~/.config/feega/session.json`.
 
@@ -81,7 +81,7 @@ Auth: Bearer **or** the local session file.
 
 ## What to call first
 
-1. `query` on `brands` — confirm auth, see what you can see
+1. `query` on `projects` — confirm auth, see what you can see
 2. `list_motion_videos` to find a video's node id
 
 ## Tool areas

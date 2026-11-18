@@ -12,14 +12,12 @@ const ORG = { id: 'org-a', name: 'Acme', slug: 'acme' };
 vi.mock('$lib/server/db/client', async (original) => ({ ...(await original<object>()), createUserDb: () => state.kit.client }));
 vi.mock('$lib/server/nav-cache', async (original) => ({
   ...(await original<object>()),
-  verifiedToken: async (_db: unknown, token: string) => (token === 'jwt' ? USER : null),
-  invalidateBrandNav: vi.fn()
+  verifiedToken: async (_db: unknown, token: string) => (token === 'jwt' ? USER : null)
 }));
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: vi.fn(async () => [{ org: ORG, role: 'owner' }]), memberRole: vi.fn(async () => 'owner') }));
 vi.mock('$lib/server/repos/profiles', async (original) => ({ ...(await original<object>()), ensureProfile: vi.fn(async () => ({ name: 'Ada Lovelace', email: USER.email, avatarUrl: null })) }));
 vi.mock('$lib/server/credits', async (original) => ({ ...(await original<object>()), orgCreditBalance: vi.fn(async () => 42) }));
 vi.mock('$lib/server/repos/projects', async (original) => ({ ...(await original<object>()), listProjects: vi.fn(async () => []) }));
-vi.mock('$lib/server/tenancy', async (original) => ({ ...(await original<object>()), hasManyTenants: () => true }));
 vi.mock('$lib/server/cli-auth', async (original) => ({ ...(await original<object>()), generateApiKey: () => ({ key: 'feega_k', hash: 'h', prefix: 'feega_k' }) }));
 vi.mock('$lib/server/offerable-models', () => ({ offerableSlotChoices: vi.fn(async () => ({ choices: [], synced: true })), offerableModels: vi.fn(async () => ({ choices: [], synced: true })) }));
 

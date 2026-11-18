@@ -14,7 +14,7 @@ import { sectionFramed } from './section-frames';
 import { stacksOf } from './page-stacks';
 import { joinedTree, narrowCuts, withViews, type PageView, type ViewRead } from './page-views';
 import { flattened } from './page-flatten';
-import { tokensOf, type SiteBrand } from './page-tokens';
+import { tokensOf } from './page-tokens';
 import { samplesOf, siteName, tokenised } from './token-bind';
 import { componentKit } from './component-kit';
 import { componentPages, type ComponentPages } from './component-sheet';
@@ -241,7 +241,7 @@ export enum Tokening {
 
 export const tokeningOf = (tokens: boolean) => (tokens ? Tokening.On : Tokening.Off);
 
-export type PageShape = { sectioning: Sectioning; tokening?: Tokening; brand?: SiteBrand; site?: string };
+export type PageShape = { sectioning: Sectioning; tokening?: Tokening; site?: string };
 
 export const PLAIN_SHAPE: PageShape = { sectioning: Sectioning.Off, tokening: Tokening.Off };
 
@@ -253,7 +253,7 @@ function withTokens(plan: FigmaPlan, tree: PageTree, root: RestNode, shape: Page
   const docs = plan.items.map((item) => item.doc);
   const images = new Set(plan.items.flatMap((item) => item.images.flatMap((image) => [image.clipId, ...(image.innerId ? [image.innerId] : [])])));
   const units = { docPerPx: (docs[0]?.width ?? tree.width) / tree.width, images };
-  const tokens = tokensOf(samplesOf(docs, root, units), shape.brand);
+  const tokens = tokensOf(samplesOf(docs, root, units));
   const site = shape.site ?? siteName(tree.url);
   return { ...plan, items: plan.items.map((item) => ({ ...item, doc: componentKit(tokenised(item.doc, tokens, site, units), site, newId) })) };
 }
