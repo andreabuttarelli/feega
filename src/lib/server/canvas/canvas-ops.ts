@@ -1623,7 +1623,7 @@ export const CANVAS_OPS = {
     input: z.object({ path: z.string().describe('from request_canvas_import') }).strict(),
     run: async (ctx, input) => {
       const out = await importStoredCanvasFile(ctx.db, { orgId: ctx.orgId, projectFor: async () => ctx.projectId, path: input.path, actor: ctx.actor });
-      return out.outcome === FeegaImport.Imported ? { canvas: out.canvas, path: canvasPath(ctx.projectId, out.canvas.id) } : { error: out.refusal, message: FEEGA_REFUSAL_MESSAGE[out.refusal] };
+      return out.outcome === FeegaImport.Imported ? { canvas: out.canvas, path: canvasPath(ctx.projectId, out.canvas.id), unlanded: out.unlanded } : { error: out.refusal, message: FEEGA_REFUSAL_MESSAGE[out.refusal] };
     }
   }),
 

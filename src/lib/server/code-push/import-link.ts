@@ -39,11 +39,17 @@ function matched(route: RouteFile, landed: string): Matched | null {
 
 const exactFirst = (a: RouteFile, b: RouteFile) => a.params.length - b.params.length;
 
-const matchOf = (routes: RouteFile[], landed: string) =>
+const LOCALE_PREFIX = /^\/[a-z]{2}(?:-[A-Za-z]{2,4})?(?=\/|$)/;
+
+const delocalized = (landed: string) => landed.replace(LOCALE_PREFIX, '') || '/';
+
+const firstMatch = (routes: RouteFile[], landed: string) =>
   [...routes]
     .sort(exactFirst)
     .map((r) => matched(r, landed))
     .find((m) => m !== null) ?? null;
+
+const matchOf = (routes: RouteFile[], landed: string) => firstMatch(routes, landed) ?? firstMatch(routes, delocalized(landed));
 
 type Base = Omit<CodeLink, 'entryKind' | 'entry' | 'role' | 'route' | 'routeParams' | 'files'>;
 

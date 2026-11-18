@@ -10,7 +10,8 @@
   import { ownsPress } from '$lib/canvas/press-owner';
   import { pressMenu } from '$lib/motion/press-menu';
   import { cardRadiusOf } from '$lib/canvas/core/gen-card';
-  import { LocalOff, isOff } from '$lib/local-user';
+  import { LocalOff, isOff, picturesWhileVectorsOwed } from '$lib/local-user';
+  import { env as publicEnv } from '$env/dynamic/public';
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { frameDrill } from '$lib/canvas/frame-drill';
   import { Depth, Gesture } from '$lib/motion/drill';
@@ -46,6 +47,10 @@
   import { frameLayers, frameMenuRun, frameSummaries } from '$lib/motion/frame-menu';
   import FrameSelection from '../FrameSelection.svelte';
   import FrameGuides from '../FrameGuides.svelte';
+  import CanvasRulers from './CanvasRulers.svelte';
+  import { canvasGuides } from '$lib/canvas/canvas-guides.svelte';
+  import { pullToGuides } from '$lib/canvas/canvas-rulers';
+  import { rulersPref } from '$lib/canvas/rulers-pref.svelte';
   import PixelGridCanvas from './PixelGridCanvas.svelte';
   import FrameTools from '../FrameTools.svelte';
   import { FrameView, contentViews } from '$lib/canvas/frame-view';
@@ -3736,6 +3741,16 @@
   let snapSpacing = $state<SpacingGap[]>([]);
   let altHeld = $state(false);
 
+  function jointOf(rects: { x: number; y: number; w: number; h: number }[]) {
+    const x = Math.min(...rects.map((r) => r.x));
+    const y = Math.min(...rects.map((r) => r.y));
+    return { x, y, w: Math.max(...rects.map((r) => r.x + r.w)) - x, h: Math.max(...rects.map((r) => r.y + r.h)) - y };
+  }
+
+  $effect(() => {
+    canvasGuides.load(page.params.canvasId ?? '');
+  });
+
   function snapMoves(raw: TileMove[]): TileMove[] {
     const ids = new Set(raw.map((m) => m.id));
     const rects = raw.flatMap((m) => (byId.get(m.id) ? [{ id: m.id, x: m.x, y: m.y, w: byId.get(m.id)!.w, h: byId.get(m.id)!.h }] : []));
@@ -3743,7 +3758,8 @@
     const snap = snapDrag(rects, others, SNAP_SCREEN_PX / view.zoom);
     snapGuides = snap.guides;
     snapSpacing = snap.spacing;
-    const at = new Map(snap.moves.map((m) => [m.id, m]));
+    const pull = rulersPref.on ? pullToGuides(jointOf(snap.moves.map((m) => ({ ...m, w: byId.get(m.id)!.w, h: byId.get(m.id)!.h }))), canvasGuides.list, SNAP_SCREEN_PX / view.zoom) : { dx: 0, dy: 0 };
+    const at = new Map(snap.moves.map((m) => [m.id, { ...m, x: m.x + pull.dx, y: m.y + pull.dy }]));
     return raw.map((m) => at.get(m.id) ?? m);
   }
 
@@ -4620,9 +4636,10 @@
   >
     {#if !failed}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} listenLive={(listener) => liveDocs.listen(listener)} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId, userId: (page.data as { session?: { user?: { id: string } } | null }).session?.user?.id, look: (page.data as { look?: string }).look }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} onbackend={(change) => track(GPU_FALLBACK_EVENT, change)} onevict={sendBackFrame} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} listenLive={(listener) => liveDocs.listen(listener)} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId, userId: (page.data as { session?: { user?: { id: string } } | null }).session?.user?.id, look: (page.data as { look?: string }).look }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} onbackend={(change) => track(GPU_FALLBACK_EVENT, change)} onevict={sendBackFrame} picturesWhileOwed={picturesWhileVectorsOwed(publicEnv)} />
       </svelte:boundary>
     {/if}
+    {#if rulersPref.on}<CanvasRulers {view} {area} />{/if}
     <PixelGridCanvas {view} {area} on={frameViews.isOn(FrameView.PixelGrid)} moving={cameraMotion === CameraMotion.Moving} />
     <div class="hover-rings" data-testid="node-hover-rings">
       {#each hoverRings as ring (ring.id)}
