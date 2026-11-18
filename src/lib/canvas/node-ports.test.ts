@@ -19,6 +19,7 @@ const EXPECTED: Record<(typeof NODE_TYPES)[number], { inputs: boolean; output: b
   iframe: { inputs: false, output: false },
   social_account_feed: { inputs: false, output: true },
   social_post_mockup: { inputs: false, output: false },
+  products: { inputs: false, output: true },
   influencer: { inputs: false, output: true },
   list: { inputs: true, output: true },
   select: { inputs: true, output: true },
@@ -102,7 +103,8 @@ describe('ogni tipo di nodo disegna le porte che la sua riga dichiara', () => {
     expect(portsOf('audio', audioCtx)).toEqual({ inputs: ['videos', 'audios'], output: 'audios' });
   });
 
-  it('il feed esce come una lista di immagini', () => {
+  it('prodotti e feed escono come una lista di immagini', () => {
+    expect(portsOf('products', ctx).output).toBe('images');
     expect(portsOf('social_account_feed', ctx).output).toBe('images');
   });
 
@@ -128,6 +130,7 @@ describe('ogni tipo di nodo disegna le porte che la sua riga dichiara', () => {
   it('un select accetta solo sorgenti che sono liste', () => {
     const pick = { id: 's', kind: 'select' as const };
     expect(canConnect({ id: 'f', kind: 'social_account_feed' }, pick).ok).toBe(true);
+    expect(canConnect({ id: 'p', kind: 'products' }, pick).ok).toBe(true);
     expect(canConnect({ id: 'l', kind: 'list' }, pick).ok).toBe(true);
     expect(canConnect({ id: 't', kind: 'text' }, pick).ok).toBe(false);
   });

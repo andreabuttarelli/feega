@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import InspectorFields from './InspectorFields.svelte';
-import { inspectorOf, FEED_FIELDS } from '$lib/canvas/node-inspector';
+import { inspectorOf, FEED_FIELDS, PRODUCT_FIELDS } from '$lib/canvas/node-inspector';
 
 const noop = () => {};
 
@@ -16,6 +16,13 @@ describe('InspectorFields disegna i campi dalla tabella, non a mano', () => {
     for (const field of FEED_FIELDS) {
       expect(body).toContain(`name="${field.path}"`);
       expect(body).toContain(field.label);
+    }
+  });
+
+  it('ogni campo dei prodotti ha il suo controllo', () => {
+    const body = html('products', { type: 'shopify', url: 'https://s.com' });
+    for (const field of PRODUCT_FIELDS) {
+      expect(body).toContain(`name="${field.path}"`);
     }
   });
 

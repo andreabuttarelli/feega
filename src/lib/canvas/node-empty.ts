@@ -8,7 +8,7 @@ export const NODE_EMPTY_HINT: Record<NodeType, string> = {
   iframe: 'Add a URL or some HTML.',
   social_account_feed: 'Pick an account to sync its posts.',
   social_post_mockup: 'Connect an image or a text to preview the post.',
-  ads: 'Search a brand or a keyword to see its ads.',
+  products: 'Add a store URL to import products.',
   influencer: 'Pick someone from the Influencers panel.',
   list: 'Add items to the list.',
   select: 'Connect a list to pick one item.',

@@ -17,6 +17,7 @@ import GenerateVideo from '$lib/components/canvas/icons/GenerateVideo.svelte';
 import CodeXml from '@lucide/svelte/icons/code-xml';
 import FileText from '@lucide/svelte/icons/file-text';
 import Rss from '@lucide/svelte/icons/rss';
+import ShoppingBag from '@lucide/svelte/icons/shopping-bag';
 import List from '@lucide/svelte/icons/list';
 import MousePointerClick from '@lucide/svelte/icons/mouse-pointer-click';
 import WandSparkles from '@lucide/svelte/icons/wand-sparkles';
@@ -35,6 +36,7 @@ export const ADDABLE_ICON: Record<Addable, Component> = {
   video: GenerateVideo,
   iframe: CodeXml,
   doc: FileText,
+  products: ShoppingBag,
   social_account_feed: Rss,
   list: List,
   select: MousePointerClick,

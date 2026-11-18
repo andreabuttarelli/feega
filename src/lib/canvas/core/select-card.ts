@@ -16,7 +16,7 @@ const ROW = { padX: 8, padY: 4, size: 11, gap: 6, swatch: 8, label: 84, thumb: 1
 const OUTPUTS_MAX = 120;
 const ADD = { margin: [4, 8, 6] as const, padX: 6, padY: 2, size: 11, gap: 4, icon: 12, label: 'Output' };
 const TEXT = { size: 12.5, pad: 12 };
-const EMPTY = { size: 11.5, pad: 10, lines: ['Picks one item from a connected list, by number.', 'Connect a list or a feed'] };
+const EMPTY = { size: 11.5, pad: 10, lines: ['Picks one item from a connected list, by number.', 'Connect a list, products or a feed'] };
 const ICON_SIZE = 22;
 
 const rowH = (r: SelectRow) => ROW.padY * 2 + Math.max(ROW.size * LEADING, r.thumb ? ROW.thumb : 0);

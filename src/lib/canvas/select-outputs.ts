@@ -8,6 +8,7 @@ import {
   type FieldValue,
   type OutputPort,
   type PostRow,
+  type ProductRow,
   type SyncedSourceType
 } from './select-sources';
 
@@ -95,7 +96,7 @@ export function selectOutputs(sourceType: string | null | undefined, custom: rea
   return [...defaults, ...customs];
 }
 
-type RowFor = { social_account_feed: PostRow };
+type RowFor = { products: ProductRow; social_account_feed: PostRow };
 
 const SOURCE_MEDIA_PORTS = [
   { port: 'images', label: 'Images' },

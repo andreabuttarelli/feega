@@ -1,16 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import { newNodeRow } from '$lib/canvas-node-data';
-import { FieldKind, inputValueOf, inspectorOf, parseFieldInput, commitHandleField, FEED_FIELDS } from './node-inspector';
+import { FieldKind, inputValueOf, inspectorOf, parseFieldInput, commitHandleField, FEED_FIELDS, PRODUCT_FIELDS } from './node-inspector';
 
 const row = (type: string, data: Record<string, unknown>) => ({ id: 'n', type, data });
 
 describe('inspectorOf: una riga per tipo, nessun if sparso', () => {
-  it('social_account_feed ha un inspector, gli altri tipi no', () => {
+  it('products e social_account_feed hanno un inspector, gli altri tipi no', () => {
+    expect(inspectorOf(row('products', newNodeRow('products')))?.fields).toBe(PRODUCT_FIELDS);
     expect(inspectorOf(row('social_account_feed', newNodeRow('social_account_feed')))?.fields).toBe(FEED_FIELDS);
     expect(inspectorOf(row('image', newNodeRow('image')))).toBeNull();
   });
 
   it('i campi chiesti ci sono tutti', () => {
+    expect(PRODUCT_FIELDS.map((f) => f.path)).toEqual([
+      'platform',
+      'url',
+      'limit',
+      'onlyFirstPhoto',
+      'category',
+      'filters.query',
+      'filters.price_min',
+      'filters.price_max',
+      'filters.in_stock_only',
+      'filters.on_sale_only',
+      'filters.tag',
+      'filters.vendor',
+      'filters.product_type',
+      'filters.sort'
+    ]);
     expect(FEED_FIELDS.map((f) => f.path)).toEqual([
       'platform',
       'handle',
@@ -34,28 +51,33 @@ describe('inspectorOf: una riga per tipo, nessun if sparso', () => {
   });
 
   it('legge il valore corrente per il campo', () => {
-    const view = inspectorOf(row('social_account_feed', { platform: 'tiktok', handle: 'nike', filters: { min_likes: 4 } }))!;
-    expect(inputValueOf(view.values, 'platform')).toBe('tiktok');
-    expect(inputValueOf(view.values, 'filters.min_likes')).toBe(4);
+    const view = inspectorOf(row('products', { type: 'woocommerce', url: 'https://s.com', filters: { price_min: 4 } }))!;
+    expect(inputValueOf(view.values, 'platform')).toBe('woocommerce');
+    expect(inputValueOf(view.values, 'filters.price_min')).toBe(4);
   });
 
   it('sincronizzare non parte senza handle o url', () => {
     expect(inspectorOf(row('social_account_feed', { platform: 'instagram', handle: '' }))?.canSync).toBe(false);
     expect(inspectorOf(row('social_account_feed', { platform: 'instagram', handle: 'nike' }))?.canSync).toBe(true);
+    expect(inspectorOf(row('products', { type: 'shopify', url: '' }))?.canSync).toBe(false);
   });
 });
 
 describe('parseFieldInput', () => {
-  const field = (path: string) => FEED_FIELDS.find((f) => f.path === path)!;
+  const field = (path: string, list = PRODUCT_FIELDS) => list.find((f) => f.path === path)!;
+
+  it('un URL di store senza schema diventa https', () => {
+    expect(parseFieldInput(field('url'), 'shop.example.com')).toBe('https://shop.example.com/');
+  });
 
   it('un handle incollato come URL diventa il nome utente', () => {
-    expect(parseFieldInput(field('handle'), 'https://www.tiktok.com/@nike')).toBe('nike');
+    expect(parseFieldInput(field('handle', FEED_FIELDS), 'https://www.tiktok.com/@nike')).toBe('nike');
   });
 
   it('un filtro numerico vuoto si toglie, un numero si legge', () => {
-    expect(parseFieldInput(field('filters.min_likes'), '')).toBeNull();
-    expect(parseFieldInput(field('filters.min_likes'), '12')).toBe(12);
-    expect(parseFieldInput(field('filters.min_likes'), 'abc')).toBeUndefined();
+    expect(parseFieldInput(field('filters.price_min'), '')).toBeNull();
+    expect(parseFieldInput(field('filters.price_min'), '12.5')).toBe(12.5);
+    expect(parseFieldInput(field('filters.price_min'), 'abc')).toBeUndefined();
   });
 
   it('il limite è obbligatorio e positivo', () => {
@@ -126,15 +148,15 @@ describe('commitHandleField: incollare un URL del feed capisce piattaforma e tip
 });
 
 describe('patchWith: a field edit sends only what it changed', () => {
-  it('editing the limit of a feed node leaves the filters out of the patch', () => {
-    const data = { ...newNodeRow('social_account_feed'), limit: 3, filters: { include: 'stale here' } };
-    const patch = inspectorOf(row('social_account_feed', data))?.patchWith('limit', 9);
+  it('editing the limit of a products node leaves the filters out of the patch', () => {
+    const data = { ...newNodeRow('products'), limit: 3, filters: { query: 'stale here' } };
+    const patch = inspectorOf(row('products', data))?.patchWith('limit', 9);
 
     expect(patch).toEqual({ limit: 9 });
   });
 
   it('editing a filter sends the filters, nothing else', () => {
-    const patch = inspectorOf(row('social_account_feed', { ...newNodeRow('social_account_feed'), limit: 3 }))?.patchWith('filters.include', 'shoes');
+    const patch = inspectorOf(row('products', { ...newNodeRow('products'), limit: 3 }))?.patchWith('filters.query', 'shoes');
 
     expect(Object.keys(patch ?? {})).toEqual(['filters']);
   });

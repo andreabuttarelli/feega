@@ -115,6 +115,7 @@ function embedFace(d: Data): Partial<CardFace> {
 
 const feedTitle = (d: Data): string => (str(d.handle).trim() ? `@${str(d.handle)} · ${str(d.platform) || 'instagram'}` : 'Feed social');
 
+const productsTitle = (d: Data): string => (str(d.url).trim() ? str(d.url).replace(/^https?:\/\//, '').replace(/\/$/, '') : 'Products');
 
 const SYNCING = 'syncing…';
 
@@ -169,7 +170,7 @@ const FACES: Record<NodeType, Draw> = {
   iframe: embedFace,
   social_account_feed: preview(feedTitle, 'Select the node to choose the account.', 'No posts yet. Select the node to sync.', (d) => str(d.handle).trim() !== ''),
   social_post_mockup: hollow('social_post_mockup'),
-  ads: hollow('ads'),
+  products: preview(productsTitle, 'Select the node to enter the store address.', 'No products yet. Select the node to sync.', (d) => str(d.url).trim() !== ''),
   influencer: (_d, _a, _t, view) => ({ surface: Surface.Person, title: view?.source?.name ?? '', tiles: view?.source?.tiles.slice(0, 1) ?? [], count: String(view?.source?.total ?? 0) }),
   list: listFace,
   select: (d, _a, _t, view) => ({ surface: Surface.Select, select: view?.select ?? selectView(typeof d.index === 'number' ? d.index : 1, null, [], {}, false), count: String(typeof d.index === 'number' ? d.index : 1) }),

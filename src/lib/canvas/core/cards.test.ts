@@ -91,7 +91,7 @@ describe('cardItems', () => {
   });
 
   it('puts a rule under the header and the count at its right edge', () => {
-    const c = { ...card('social_account_feed', { handle: 'x' }), face: faceOf({ id: 'n', kind: 'social_account_feed' }, { handle: 'x' }, asset, view(['t1'], 9)), w: 300, h: 300 };
+    const c = { ...card('products', { url: 'shop.io' }), face: faceOf({ id: 'n', kind: 'products' }, { url: 'shop.io' }, asset, view(['t1'], 9)), w: 300, h: 300 };
     const [rule] = paths(cardItems(c, theme, glyphs), CardPart.Head).slice(-1);
     const [count] = paths(cardItems(c, theme, glyphs), CardPart.Head).filter((p) => p !== rule);
 
@@ -101,7 +101,7 @@ describe('cardItems', () => {
 
   it('marks a tile with its badge, its sale and its caption only when the whole tile shows', () => {
     const tile = { thumb: 't', caption: '9.00 EUR', badge: TileBadge.Carousel, sale: '−20%' };
-    const draw = (h: number) => cardItems({ ...card('social_account_feed', { handle: 'x' }), face: faceOf({ id: 'n', kind: 'social_account_feed' }, { handle: 'x' }, asset, { source: { tiles: [tile], total: 1, name: null } }), w: 300, h }, theme, glyphs, glyphs, icons);
+    const draw = (h: number) => cardItems({ ...card('products', { url: 'x' }), face: faceOf({ id: 'n', kind: 'products' }, { url: 'x' }, asset, { source: { tiles: [tile], total: 1, name: null } }), w: 300, h }, theme, glyphs, glyphs, icons);
 
     expect(paths(draw(300), CardPart.Badge)).toHaveLength(2);
     expect(paths(draw(300), CardPart.Sale)).toHaveLength(2);
@@ -110,8 +110,8 @@ describe('cardItems', () => {
   });
 
   it('shows the failure instead of the grid when the sync failed', () => {
-    const f = faceOf({ id: 'n', kind: 'social_account_feed' }, { handle: 'x', sync_status: 'failed', sync_error: 'boom' }, asset, view(['t1']));
-    const items = cardItems({ ...card('social_account_feed', {}), face: f, w: 300, h: 300 }, theme, glyphs);
+    const f = faceOf({ id: 'n', kind: 'products' }, { url: 'x', sync_status: 'failed', sync_error: 'boom' }, asset, view(['t1']));
+    const items = cardItems({ ...card('products', {}), face: f, w: 300, h: 300 }, theme, glyphs);
 
     expect(part(items, CardPart.Thumb)).toHaveLength(0);
     expect(part(items, CardPart.Empty)).toHaveLength(1);

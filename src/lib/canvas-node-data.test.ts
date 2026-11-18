@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_FEED_FILTERS } from '$lib/canvas/source-filters';
+import { DEFAULT_FEED_FILTERS, DEFAULT_PRODUCT_FILTERS } from '$lib/canvas/source-filters';
 import {
   NODE_TYPES,
   docData,
@@ -12,6 +12,8 @@ import {
   listData,
   listOf,
   newNodeRow,
+  productsData,
+  productsOf,
   selectData,
   selectOf,
   effectsData,
@@ -30,6 +32,7 @@ describe('cosa una riga di `nodes` può essere', () => {
       'video',
       'iframe',
       'doc',
+      'products',
       'social_account_feed',
       'influencer',
       'list',
@@ -184,6 +187,18 @@ describe('con che `data` nasce una riga', () => {
     expect(newNodeRow('doc')).toEqual({ content: '', public: false });
   });
 
+  it('un nodo products nasce su shopify e senza url: la query è da scrivere', () => {
+    expect(newNodeRow('products')).toEqual({
+      type: 'shopify',
+      url: '',
+      limit: 20,
+      after: null,
+      only_first_photo: false,
+      category: '',
+      filters: DEFAULT_PRODUCT_FILTERS
+    });
+  });
+
   it('una lista nasce vuota, senza item_kind ancora deciso', () => {
     expect(newNodeRow('list')).toEqual({ item_kind: 'image', items: [] });
   });
@@ -194,6 +209,65 @@ describe('con che `data` nasce una riga', () => {
 
   it('un nodo social_account_feed nasce su instagram e senza handle', () => {
     expect(newNodeRow('social_account_feed')).toEqual({ platform: 'instagram', handle: '', limit: 20, filters: DEFAULT_FEED_FILTERS });
+  });
+});
+
+describe('un nodo products, letto dalla riga', () => {
+  it('platform, url e parametri vengono da `data`', () => {
+    const node = productsOf({
+      id: 'n1',
+      type: 'products',
+      data: { type: 'woocommerce', url: 'https://shop.example.com', limit: 50, only_first_photo: true }
+    });
+
+    expect(node).toMatchObject({
+      id: 'n1',
+      platform: 'woocommerce',
+      url: 'https://shop.example.com',
+      limit: 50,
+      onlyFirstPhoto: true
+    });
+  });
+
+  it('una riga appena nata non è una riga rotta: si legge coi suoi vuoti', () => {
+    expect(productsOf({ id: 'n1', type: 'products', data: {} })).toEqual({
+      id: 'n1',
+      platform: 'shopify',
+      url: '',
+      limit: 20,
+      after: null,
+      onlyFirstPhoto: false,
+      category: '',
+      filters: DEFAULT_PRODUCT_FILTERS,
+      syncStatus: 'idle',
+      syncError: null,
+      syncedCount: 0,
+      syncedAt: null,
+      syncSummary: null
+    });
+  });
+
+  it('legge lo stato di un giro fallito', () => {
+    const node = productsOf({
+      id: 'n1',
+      type: 'products',
+      data: { type: 'shopify', url: 'https://x.com', sync_status: 'failed', sync_error: 'store_unreachable: 404' }
+    });
+    expect(node).toMatchObject({ syncStatus: 'failed', syncError: 'store_unreachable: 404' });
+  });
+
+  it('un nodo che non è products non si legge come tale', () => {
+    expect(productsOf({ id: 'n1', type: 'doc', data: {} })).toBeNull();
+  });
+
+  it('fa il giro di andata e ritorno', () => {
+    const node = productsOf({
+      id: 'n1',
+      type: 'products',
+      data: { type: 'shopify', url: 'https://x.com', limit: 10, sync_status: 'done', synced_count: 3 }
+    })!;
+    const written = productsData(node);
+    expect(productsOf({ id: 'n1', type: 'products', data: written })).toEqual(node);
   });
 });
 
@@ -236,7 +310,7 @@ describe('un nodo social_account_feed, letto dalla riga', () => {
   });
 
   it('un nodo che non è social_account_feed non si legge come tale', () => {
-    expect(socialFeedOf({ id: 'n1', type: 'doc', data: {} })).toBeNull();
+    expect(socialFeedOf({ id: 'n1', type: 'products', data: {} })).toBeNull();
   });
 
   it('fa il giro di andata e ritorno', () => {

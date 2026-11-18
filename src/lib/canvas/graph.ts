@@ -53,6 +53,7 @@ export const NODE_KINDS = [
   'iframe',
   'list',
   'select',
+  'products',
   'social_account_feed',
   'effects',
   'composition',
@@ -127,11 +128,16 @@ export const CANVAS_NODE_SPECS: Record<NodeKind, NodeSpec> = {
   // Una lista raccoglie immagini o testo dai nodi collegati. Quale dei due lo decide la sua porta
   // (`list-node.ts::listConnectors`), non questa riga: qui non si sa ancora cosa contiene.
   list: { medium: null, generated: true, accepts: ['text', 'image'], requires: [] },
-  // `select` sceglie un item da una sorgente intrinsecamente lista — `list`,
+  // `select` sceglie un item da una sorgente intrinsecamente lista — `list`, `products`,
   // `social_account_feed` (`select-node.ts::SELECTABLE_SOURCE_TYPES`, la tabella unica) — quindi
   // accetta le stesse due porte di `list`. Non richiede niente: senza sorgente collegata mostra
   // solo il numero scritto a mano, la stessa dottrina di un `text` mai collegato.
   select: { medium: null, generated: true, accepts: ['text', 'image'], requires: [], sources: SELECTABLE_SOURCE_TYPES },
+  // Un catalogo prodotti sincronizzato: esiste già (`products` table), niente lo genera da un
+  // arco — è una sorgente come `media`/`document`, ma porta immagine E testo insieme (titolo,
+  // descrizione), quindi il suo medium non è fisso: lo decide chi lo consuma a valle
+  // (`select-node.ts`), la stessa idea di `list`.
+  products: { medium: null, generated: false, accepts: [], requires: [] },
   // Un feed scaricato: stessa dottrina di `products`, una riga per post con media e didascalia.
   social_account_feed: { medium: null, generated: false, accepts: [], requires: [] },
   // Un nodo `effects` applica una pila di filtri a un solo media e ne conserva il tipo.
@@ -185,7 +191,7 @@ export function canConnect(from: CanvasNode, to: CanvasNode, fromMedium: Medium 
     return { ok: false, why: 'Uncensored models take no reference: switch model to connect inputs' };
   }
   if (target.sources && !target.sources.includes(from.kind)) {
-    return { ok: false, why: target.sourcesWhy ?? `A ${to.kind} node takes a list or a social feed` };
+    return { ok: false, why: target.sourcesWhy ?? `A ${to.kind} node takes a list, products or a social feed` };
   }
   const medium = fromMedium;
   if (!acceptsOf(to).includes(medium)) {

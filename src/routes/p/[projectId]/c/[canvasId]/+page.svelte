@@ -101,7 +101,7 @@ import { ElementPaste, elementPaste, pasteTargets } from '$lib/canvas/paste-into
   import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
   import { onMount, untrack } from 'svelte';
-  import { feedView, personView } from '$lib/canvas/source-thumbs';
+  import { feedView, personView, productsView } from '$lib/canvas/source-thumbs';
 import { selectView, type NodeView } from '$lib/canvas/node-view';
   import type GpuFlow from '$lib/components/canvas/gpu/GpuFlow.svelte';
   import { CanvasContent } from '$lib/canvas/core/startup-progress';
@@ -111,6 +111,7 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
   import IframeNode from '$lib/components/canvas/IframeNode.svelte';
   import type { ExportMode } from '$lib/canvas/code-frame';
   import DocNode from '$lib/components/canvas/DocNode.svelte';
+  import ProductsNode from '$lib/components/canvas/ProductsNode.svelte';
   import SocialFeedNode from '$lib/components/canvas/SocialFeedNode.svelte';
   import InfluencerNode from '$lib/components/canvas/InfluencerNode.svelte';
   import EmptyNode from '$lib/components/canvas/EmptyNode.svelte';
@@ -196,9 +197,9 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
   import { hasCutout } from '$lib/canvas/effects/shape-cutout';
   import { upstreamCards as compositionCards, cardAssetIds } from '$lib/canvas/composition-node';
   import { listFeedingSelect } from '$lib/canvas/select-node';
-  import { fieldValue, socialPostItem } from '$lib/canvas/select-sources';
+  import { fieldValue, productItem, socialPostItem } from '$lib/canvas/select-sources';
   import { fieldsFor, isOutputHandle, outputValues, portOfOutputHandle, selectOutputs, sourceOutputs, type OutputValue, type SelectOutput } from '$lib/canvas/select-outputs';
-  import { feedFiltersOf, filterPosts } from '$lib/canvas/source-filters';
+  import { feedFiltersOf, filterPosts, filterProducts, productFiltersOf } from '$lib/canvas/source-filters';
   import { hasInspector, inspectorOf } from '$lib/canvas/node-inspector';
   import SourceSettingsFrame from '$lib/components/canvas/SourceSettingsFrame.svelte';
   import {
@@ -292,6 +293,7 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
     listData,
     listOf,
     newNodeRow,
+    productsOf,
     selectData,
     selectOf,
     effectsOf,
@@ -307,6 +309,7 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
   } from '$lib/canvas-edges';
   import { loopAffordance, type LoopSourceNode } from '$lib/canvas/loop-axes';
   import type { CanvasNodeRecord, Connection } from '$lib/server/repos/canvas';
+  import type { Product } from '$lib/server/repos/products';
   import type { SocialPost } from '$lib/server/repos/social-posts';
   import { BILLING_PATH } from '$lib/billing-path';
   import type { FigmaImage } from '$lib/canvas/figma/figma-doc';
@@ -1190,10 +1193,11 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
   const nodesById = $derived(new Map(nodes.map((n) => [n.id, { id: n.id, type: n.type }])));
 
   /** Quanti item porta un nodo, qualunque sia la sua sorgente — una `list` conta i suoi valori
-   *  risolti, `social_account_feed` contano le righe sincronizzate che la pagina ha già
-   *  in mano (`data.socialPosts`, lette da `load`): la stessa tabella di
+   *  risolti, `products`/`social_account_feed` contano le righe sincronizzate che la pagina ha già
+   *  in mano (`data.products`/`data.socialPosts`, lette da `load`): la stessa tabella di
    *  `select-node.ts::SELECTABLE_SOURCE_TYPES`, qui applicata al conteggio invece che al filtro. */
   function itemCountOf(n: Tile): number {
+    if (n.type === 'products') return shownProducts[n.id]?.length ?? 0;
     if (n.type === 'social_account_feed') return shownPosts[n.id]?.length ?? 0;
     return listValuesByNode[n.id]?.values.length ?? 0;
   }
@@ -1219,12 +1223,12 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
     )
   );
 
-  /** Un `social_account_feed` come `ListNodeState` — la stessa forma che `SelectNode`
-   *  già disegna per una `list`, con `socialPostItem` (`select-sources.ts`) a
+  /** Un `products`/`social_account_feed` come `ListNodeState` — la stessa forma che `SelectNode`
+   *  già disegna per una `list`, con `productItem`/`socialPostItem` (`select-sources.ts`) a
    *  tradurre ogni riga sincronizzata in un item: la stessa tabella per tipo che `upstream.ts`
    *  usa lato server, qui applicata all'anteprima invece che alla generazione. */
   function syncedSourceListOf(source: { id: string; type: string }): ListNodeState {
-    const rows = (shownPosts[source.id] ?? []).map(socialPostItem);
+    const rows = source.type === 'products' ? (shownProducts[source.id] ?? []).map(productItem) : (shownPosts[source.id] ?? []).map(socialPostItem);
 
     return {
       id: source.id,
@@ -1240,7 +1244,7 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
     const upstreamEdges = edges.map((e) => ({ sourceNodeId: e.source, targetNodeId: e.target }));
     const source = listFeedingSelect(selectId, upstreamEdges, nodesById);
     if (!source) return null;
-    if (source.type === 'social_account_feed') return syncedSourceListOf(source);
+    if (source.type === 'products' || source.type === 'social_account_feed') return syncedSourceListOf(source);
     const values = listValuesByNode[source.id];
     return values ? { id: source.id, itemKind: values.itemKind, items: values.values.map((v) => v.item) } : null;
   }
@@ -1251,7 +1255,7 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
   }
 
   function syncedRowAt(source: { id: string; type: string }, index: number) {
-    const rows = source.type === 'social_account_feed' ? shownPosts[source.id] : undefined;
+    const rows = source.type === 'products' ? shownProducts[source.id] : source.type === 'social_account_feed' ? shownPosts[source.id] : undefined;
     return rows?.[index - 1] ?? null;
   }
 
@@ -1267,7 +1271,9 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
     if (!select || !source || !row) {
       return undefined;
     }
-    return outputValues('social_account_feed', row as SocialPost, select.outputs);
+    return source.type === 'products'
+      ? outputValues('products', row as Product, select.outputs)
+      : outputValues('social_account_feed', row as SocialPost, select.outputs);
   }
 
   function selectFieldPreview(selectId: string, index: number, field: string) {
@@ -1276,7 +1282,7 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
     if (!source || !row) {
       return null;
     }
-    return fieldValue('social_account_feed', field, row as SocialPost);
+    return source.type === 'products' ? fieldValue('products', field, row as Product) : fieldValue('social_account_feed', field, row as SocialPost);
   }
 
   function upstreamEffectsMediaOf(effectsId: string) {
@@ -1319,10 +1325,11 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
   );
 
   /**
-   * IL CATALOGO E IL FEED SCARICATI, per nodo. Come `runsByNode`: `social_account_feed`
-   * non porta il contenuto in `data.data` — vive in `social_posts` — quindi arriva
+   * IL CATALOGO E IL FEED SCARICATI, per nodo. Come `runsByNode`: `products`/`social_account_feed`
+   * non portano il contenuto in `data.data` — vive in `products`/`social_posts` — quindi arriva
    * qui, letto dal server in `load` e riletto a ogni `refresh()`.
    */
+  const productsByNode = $derived((data.products ?? {}) as Record<string, Product[]>);
   const socialPostsByNode = $derived((data.socialPosts ?? {}) as Record<string, SocialPost[]>);
   type InfluencerTile = { name: string; views: { id: string; label: string; url: string | null }[] };
   let influencersOverride = $state<Record<string, InfluencerTile> | null>(null);
@@ -1438,7 +1445,6 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
       rotatable: !!motionOf(n),
       behind: paintsBehind(n),
       members: paintsBehind(n) ? nodes.filter((m) => layoutOf(m.data).groupId === n.id).map((m) => m.id) : undefined,
-      inPost: data.nodeIdsInPost.includes(n.id),
       select: n.select,
       settings: hasInspector(n.type),
       poster: tilePoster(n) ?? undefined,
@@ -1448,7 +1454,7 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
         ? { id: n.id, kind: 'effects' as const, mediaKind: n.data.mediaKind === 'video' ? 'video' as const : 'image' as const }
         : tileNode({
         id: n.id,
-        medium: n.type === 'iframe' || n.type === 'document' || n.type === 'doc' ? null : (n.type as 'text' | 'image' | 'video' | 'audio' | 'list' | 'select' | 'social_account_feed'),
+        medium: n.type === 'iframe' || n.type === 'document' || n.type === 'doc' ? null : (n.type as 'text' | 'image' | 'video' | 'audio' | 'list' | 'select' | 'products' | 'social_account_feed'),
         model: typeof n.data.model === 'string' ? n.data.model : null,
         uncensored: uncensoredModelOf(n),
         operation: n.type === 'audio' ? audioOperationOfTile(n) : undefined
@@ -1480,6 +1486,9 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
   function sourceView(id: string): NodeView | null {
     if (shownPosts[id]) {
       return { source: feedView(shownPosts[id], socialPosts[id]?.length ?? 0) };
+    }
+    if (shownProducts[id]) {
+      return { source: productsView(shownProducts[id], products[id]?.length ?? 0) };
     }
     const person = influencersByNode[id];
     if (person) {
@@ -1864,8 +1873,15 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
     })).finally(() => sent.drop(kept.id));
   }
 
+  let productsOverride = $state<Record<string, Product[]> | null>(null);
   let socialPostsOverride = $state<Record<string, SocialPost[]> | null>(null);
+  const products = $derived(productsOverride ?? productsByNode);
   const socialPosts = $derived(socialPostsOverride ?? socialPostsByNode);
+  const shownProducts = $derived(
+    Object.fromEntries(
+      nodes.filter((n) => n.type === 'products').map((n) => [n.id, filterProducts(products[n.id] ?? [], productFiltersOf(n.data.filters))])
+    ) as Record<string, Product[]>
+  );
   const shownPosts = $derived(
     Object.fromEntries(
       nodes
@@ -2041,6 +2057,7 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
     const before = nodes;
     nodes = keepSame(nodes, keepDrawn(keepPending((snapshot.nodes as CanvasNodeRecord[]).map((n) => toTile(n)), nodes, saves.dirtyKeys, (id) => places.dirty(id) || places.placedAfter(id, asked)), nodes, draws.pending()), now);
     edges = keepSame(edges, keepLines((snapshot.connections as Connection[]).map(toEdge), edges, lines.pending()), now);
+    productsOverride = keepSame(products, (snapshot.products ?? {}) as Record<string, Product[]>, now);
     socialPostsOverride = keepSame(socialPosts, (snapshot.socialPosts ?? {}) as Record<string, SocialPost[]>, now);
     influencersOverride = keepSame(influencersByNode, (snapshot.influencers ?? {}) as Record<string, InfluencerTile>, now);
     return changedElsewhere(before, nodes);
@@ -2958,7 +2975,7 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
   }
 
   /**
-   * SINCRONIZZARE UN NODO `social_account_feed`. Ottimista sullo stato — "sta
+   * SINCRONIZZARE UN NODO `products` O `social_account_feed`. Ottimista sullo stato — "sta
    * scaricando" appare subito — ma il risultato lo scrive il server: qui non c'è modo di sapere
    * quanti prodotti o post sono arrivati prima che risponda.
    */
@@ -4857,6 +4874,7 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
         {@const gen = genOf(row)}
         {@const frame = frameOf(row)}
         {@const doc = docOf(row)}
+        {@const catalog = productsOf(row)}
         {@const feed = socialFeedOf(row)}
         {@const influencer = influencerOf(row)}
         {@const list = listOf(row)}
@@ -5011,6 +5029,16 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
             onchange={(patch) => write(id, docData({ ...doc, ...patch }))}
             onshare={(on) => share(id, on)}
           />
+        {:else if catalog}
+          <SourceSettingsFrame
+            {selected}
+            view={selected ? inspectorOf(row) : null}
+            shown={shownProducts[id]?.length ?? 0}
+            onfield={(patch) => write(id, patch)}
+            onsync={() => sync(id)}
+          >
+            <ProductsNode node={catalog} nodeId={id} products={shownProducts[id] ?? []} total={products[id]?.length ?? 0} />
+          </SourceSettingsFrame>
         {:else if feed}
           <SourceSettingsFrame
             {selected}

@@ -1,5 +1,5 @@
 /**
- * LO STATO DI UN NODO CHE SCARICA, in un posto solo: `social_account_feed` lo
+ * LO STATO DI UN NODO CHE SCARICA, in un posto solo: `products` e `social_account_feed` lo
  * condividono, ed è per questo che non vive dentro nessuno dei due — un `if` sullo stato scritto
  * due volte diverge al primo cambio, in silenzio e solo su uno dei due nodi.
  *

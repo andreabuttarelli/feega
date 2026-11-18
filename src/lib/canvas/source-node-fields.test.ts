@@ -1,7 +1,38 @@
 import { describe, expect, it } from 'vitest';
-import { newNodeRow, socialFeedData, socialFeedOf } from '$lib/canvas-node-data';
+import { newNodeRow, productsData, productsOf, socialFeedData, socialFeedOf } from '$lib/canvas-node-data';
 import { NODE_DATA_SCHEMAS, describeNodeType } from './node-data';
-import { DEFAULT_FEED_FILTERS } from './source-filters';
+import { DEFAULT_FEED_FILTERS, DEFAULT_PRODUCT_FILTERS } from './source-filters';
+
+describe('products: categoria e filtri', () => {
+  it('una riga di prima, senza filtri, si legge coi default', () => {
+    const node = productsOf({ id: 'p', type: 'products', data: { type: 'shopify', url: 'https://s.com', limit: 20 } });
+    expect(node?.category).toBe('');
+    expect(node?.filters).toEqual(DEFAULT_PRODUCT_FILTERS);
+    expect(NODE_DATA_SCHEMAS.products.safeParse({ type: 'shopify', url: '' }).success).toBe(true);
+  });
+
+  it('filtri e categoria fanno andata e ritorno', () => {
+    const filters = { ...DEFAULT_PRODUCT_FILTERS, query: 'shoe', price_max: 90, sort: 'price_asc' as const };
+    const node = productsOf({ id: 'p', type: 'products', data: { type: 'shopify', url: '', category: 'sale', filters } })!;
+    const data = productsData(node);
+    expect(data.filters).toEqual(filters);
+    expect(data.category).toBe('sale');
+    expect(NODE_DATA_SCHEMAS.products.safeParse(data).success).toBe(true);
+  });
+
+  it('lo schema rifiuta un ordinamento inesistente', () => {
+    expect(NODE_DATA_SCHEMAS.products.safeParse({ type: 'shopify', url: '', filters: { sort: 'random' } }).success).toBe(false);
+  });
+
+  it('un nodo nuovo nasce valido', () => {
+    expect(NODE_DATA_SCHEMAS.products.safeParse(newNodeRow('products')).success).toBe(true);
+  });
+
+  it('describe_node_types mostra i filtri', () => {
+    expect(JSON.stringify(describeNodeType('products'))).toContain('in_stock_only');
+    expect(JSON.stringify(describeNodeType('products'))).toContain('category');
+  });
+});
 
 describe('social_account_feed: filtri', () => {
   it('una riga di prima si legge coi default', () => {

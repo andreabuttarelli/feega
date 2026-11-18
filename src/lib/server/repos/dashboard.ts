@@ -44,6 +44,7 @@ export async function listRecentImages(db: Db, scope: Scope): Promise<RecentImag
   return rowsOf<{ id: string; project_id: string }>(result).map((r) => ({ id: r.id, projectId: r.project_id }));
 }
 
+
 export async function listRecentNodes(db: Db, scope: Scope & { type: NodeType; before?: string }): Promise<RecentNode[]> {
   const query = db
     .from('nodes')

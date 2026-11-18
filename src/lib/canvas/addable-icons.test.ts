@@ -45,7 +45,7 @@ describe('le superfici che li mostrano', () => {
   });
 
   it('nessun nodo disegna una propria targhetta', () => {
-    for (const name of ['GenNode.svelte', 'IframeNode.svelte', 'DocNode.svelte', 'SocialFeedNode.svelte', 'InfluencerNode.svelte', 'UploadedNode.svelte']) {
+    for (const name of ['GenNode.svelte', 'IframeNode.svelte', 'DocNode.svelte', 'ProductsNode.svelte', 'SocialFeedNode.svelte', 'InfluencerNode.svelte', 'UploadedNode.svelte']) {
       expect(read(name)).not.toMatch(/-tag/);
     }
   });

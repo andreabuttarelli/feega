@@ -25,6 +25,7 @@ describe('NODE_DATA_SCHEMAS — una riga per tipo, tutti i 10 valori di nodes_ty
         'composition',
         'calendar',
         'list',
+        'products',
         'select',
         'social_account_feed',
         'social_post_mockup',
@@ -232,6 +233,36 @@ describe('validateNodeData — social_post_mockup', () => {
   });
 });
 
+describe('validateNodeData — products', () => {
+  it('accetta shopify', () => {
+    const out = validateNodeData('products', { type: 'shopify', url: 'https://shop.example.com' });
+    expect(out.ok).toBe(true);
+  });
+
+  it('accetta woocommerce', () => {
+    const out = validateNodeData('products', { type: 'woocommerce', url: 'https://shop.example.com' });
+    expect(out.ok).toBe(true);
+  });
+
+  it('rifiuta una piattaforma fuori da products_platform_check', () => {
+    const out = validateNodeData('products', { type: 'magento', url: 'https://shop.example.com' });
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.error).toMatch(/type/);
+  });
+
+  it('accetta lo stato di sincronizzazione scritto dal giro (sync_status, sync_error, synced_count, synced_at)', () => {
+    const out = validateNodeData('products', {
+      type: 'shopify',
+      url: 'https://shop.example.com',
+      sync_status: 'failed',
+      sync_error: 'store_unreachable: /products.json returned 404',
+      synced_count: 0,
+      synced_at: null
+    });
+    expect(out.ok).toBe(true);
+  });
+});
+
 describe('validateNodeData — ads: country obbligatorio, due modi mutuamente esclusivi', () => {
   it('accetta mode=page con page_id e country', () => {
     const out = validateNodeData('ads', { mode: 'page', page_id: '1234567', country: 'IT' });
@@ -346,6 +377,8 @@ describe('validateNodeData — select', () => {
 
   it('describe_node_types elenca i campi di ogni sorgente dalla tabella, con la loro porta', () => {
     const text = JSON.stringify(describeNodeType('select'));
+    expect(text).toContain('products: images (images)');
+    expect(text).toContain('price (text)');
     expect(text).toContain('social_account_feed: media (images)');
     expect(text).toContain('likes (text)');
   });
@@ -571,8 +604,10 @@ describe('describeNodeType / describeNodeTypes — la forma verso l\'esterno, de
     expect(Object.keys(all).sort()).toEqual([...NODE_TYPES].sort());
   });
 
-  it('sync_summary è nello schema di social_account_feed, non solo nel codice', () => {
+  it('sync_summary — condiviso da products e social_account_feed — è nello schema, non solo nel codice', () => {
+    const products = describeNodeType('products') as { properties: Record<string, unknown> };
     const feed = describeNodeType('social_account_feed') as { properties: Record<string, unknown> };
+    expect(products.properties).toHaveProperty('sync_summary');
     expect(feed.properties).toHaveProperty('sync_summary');
   });
 });
@@ -583,9 +618,9 @@ describe('looseNodeJsonSchema — solo required + enum del discriminante, per il
     expect(Object.keys((shape as { properties: Record<string, unknown> }).properties)).toEqual(['prompt']);
   });
 
-  it('tiene l\'enum di un campo required (social_account_feed.platform) — un vero invariante, non un vincolo che stringe', () => {
-    const shape = looseNodeJsonSchema('social_account_feed') as { properties: Record<string, { enum?: string[] }> };
-    expect(shape.properties.platform.enum).toContain('instagram');
+  it('tiene l\'enum di un campo required (products.type) — un vero invariante, non un vincolo che stringe', () => {
+    const shape = looseNodeJsonSchema('products') as { properties: Record<string, { enum?: string[] }> };
+    expect(shape.properties.type.enum).toEqual(['shopify', 'woocommerce']);
   });
 
   it('un tipo senza campi required (iframe) torna required: []', () => {
