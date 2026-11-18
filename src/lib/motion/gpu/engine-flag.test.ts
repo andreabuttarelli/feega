@@ -40,9 +40,15 @@ describe('killSwitch', () => {
 });
 
 describe('drawableOn', () => {
-  it('feega.app imported whole is 16 382 px tall: past the GPU surface limit the frame draws in HTML instead of black', () => {
-    expect(drawableOn(RenderEngine.GpuCore, { width: 1338, height: 16382 })).toBe(RenderEngine.Html);
-    expect(drawableOn(RenderEngine.GpuCore, { width: 1280, height: 8192 })).toBe(RenderEngine.GpuCore);
+  it('a core draws a page of any height in strips: feega.app imported whole, 16 382 px tall, stays on the engine', () => {
+    expect(drawableOn(RenderEngine.GpuCore, { width: 1338, height: 16382 })).toBe(RenderEngine.GpuCore);
+    expect(drawableOn(RenderEngine.GpuCoreGl, { width: 1280, height: 15354 })).toBe(RenderEngine.GpuCoreGl);
+  });
+
+  it('past the GPU surface limit in width, or on a backend without strips, the frame draws in HTML instead of black', () => {
+    expect(drawableOn(RenderEngine.GpuCore, { width: 9000, height: 600 })).toBe(RenderEngine.Html);
+    expect(drawableOn(RenderEngine.GpuFull, { width: 1338, height: 16382 })).toBe(RenderEngine.Html);
+    expect(drawableOn(RenderEngine.GpuFull, { width: 1280, height: 8192 })).toBe(RenderEngine.GpuFull);
     expect(drawableOn(RenderEngine.Html, { width: 100, height: 100 })).toBe(RenderEngine.Html);
   });
 });

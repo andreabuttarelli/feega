@@ -11,11 +11,16 @@ const STAGE = { width: 2400, height: 1300 };
 const SETTLE_MS = 5000;
 const MIN_SSIM = 0.98;
 const TOOLBAR_PX = 80;
-const CASES = (process.env.PLAY_CASES ?? 'hero-phone,features-grid,view-only-layers,component-main-override,landing').split(',');
+const CASES = (process.env.PLAY_CASES ?? 'hero-phone,features-grid,view-only-layers,component-main-override,landing,landing-tall').split(',');
 const DATA = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 const NODE_SCALE = 1;
 
-const fixtureDoc = (name: string) => baseFixtures().find((f) => f.name === name)!.doc;
+const TALL = '-tall';
+const TALL_PX = 9600;
+const fixtureDoc = (name: string) => {
+  const doc = baseFixtures().find((f) => f.name === name.replace(TALL, ''))!.doc;
+  return name.endsWith(TALL) ? { ...doc, height: TALL_PX } : doc;
+};
 
 type Seen = { png: Buffer; shown: number; width: number };
 
@@ -102,6 +107,7 @@ test.describe('Play paints each view like the canvas @real', () => {
       for (const view of viewsOf(doc)) {
         await page.getByTestId(`viewport-${view.width}`).click();
         await page.waitForTimeout(SETTLE_MS);
+        await expect(page.locator('[data-testid="prototype-player"] [data-testid="motion-preview"]').first()).not.toHaveAttribute('data-engine', 'html');
         const played = await seen(page, page.locator('[data-testid="prototype-player"] .viewport'), STAGE.height);
         const { a, b, score } = await compared(canvasShots.get(view.id)!, played);
         save(`${name}-${view.id}-canvas`, a);

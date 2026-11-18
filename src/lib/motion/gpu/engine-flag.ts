@@ -28,8 +28,11 @@ export function engineFlag(url: URL, killed: boolean): RenderEngine {
 
 export const GPU_SURFACE_MAX_SIDE = 8192;
 
-export const drawableOn = (engine: RenderEngine, size: { width: number; height: number }): RenderEngine =>
-  Math.max(size.width, size.height) > GPU_SURFACE_MAX_SIDE ? RenderEngine.Html : engine;
+const DRAWS_IN_STRIPS: ReadonlySet<RenderEngine> = new Set([RenderEngine.GpuCore, RenderEngine.GpuCoreGl]);
+
+const limitedSide = (engine: RenderEngine, size: { width: number; height: number }) => (DRAWS_IN_STRIPS.has(engine) ? size.width : Math.max(size.width, size.height));
+
+export const drawableOn = (engine: RenderEngine, size: { width: number; height: number }): RenderEngine => (limitedSide(engine, size) > GPU_SURFACE_MAX_SIDE ? RenderEngine.Html : engine);
 
 const FALLBACK: Record<RenderEngine, RenderEngine> = {
   [RenderEngine.GpuCore]: RenderEngine.GpuCoreGl,
