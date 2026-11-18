@@ -30,6 +30,10 @@ jobs:
 
       - run: npm ci
 
+      - name: Install CLI dependencies
+        working-directory: cli
+        run: bun install --frozen-lockfile
+
       - name: Billing SQL harnesses (pglite)
         run: npm run test:credit-expiry && npm run test:seat-billing && npm run test:agent-edits && npm run test:billing-rls
 

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { CANVAS_SETTINGS_GROUPS } from '$lib/components/settings/platforms';
 import { SHEET_PAGE_LOADERS, settingsPageLoader, settingsSectionOf, settingsSheetSection } from './sheet-pages';
 
 describe('settingsSectionOf: quale cartella sotto settings/ risponde a questo path', () => {
@@ -21,8 +22,11 @@ describe('settingsSectionOf: quale cartella sotto settings/ risponde a questo pa
 });
 
 describe('settingsPageLoader: la sezione trova la sua pagina reale', () => {
-  it('ogni sezione esistente sotto settings/ ha un loader', () => {
-    for (const section of ['brand', 'spend', 'danger', 'products']) {
+  it('ogni sezione che la tela mostra sotto settings/ ha un loader', () => {
+    const sections = CANVAS_SETTINGS_GROUPS.flatMap((group) => group.items.map((item) => item.section));
+
+    expect(sections.length).toBeGreaterThan(0);
+    for (const section of sections) {
       expect(settingsPageLoader(`/settings/${section}`), `manca la pagina per ${section}`).not.toBeNull();
     }
   });
@@ -44,14 +48,14 @@ describe('SHEET_PAGE_LOADERS: il foglio scarica le sue pagine solo quando si apr
 
 describe('settingsSheetSection: la pagina arriva insieme ai dati della sua sezione', () => {
   it('la pagina delle spese non riceve mai i dati dei font', async () => {
-    const [spend, fonts] = await Promise.all([
+    const [spend, project] = await Promise.all([
       settingsSheetSection('/settings/spend', { caps: [] }),
-      settingsSheetSection('/settings/brand', { brand: [] })
+      settingsSheetSection('/settings/project', { fonts: [] })
     ]);
 
     expect(spend?.data).toEqual({ caps: [] });
     expect(spend?.Page).toBe((await settingsPageLoader('/settings/spend')!()).default);
-    expect(fonts?.data).toEqual({ brand: [] });
+    expect(project?.data).toEqual({ fonts: [] });
   });
 
   it('una sezione inesistente non trova niente', () => {
