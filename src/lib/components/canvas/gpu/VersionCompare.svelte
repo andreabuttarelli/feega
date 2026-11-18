@@ -1,12 +1,44 @@
 <script lang="ts">
   import { changedRegions, DiffMode, type Pixels, type Region } from '$lib/canvas/pixel-diff';
-  import type { Timeline } from '$lib/canvas/version-client';
+  import { VersionAction, versionAction, type FileDiff, type Timeline } from '$lib/canvas/version-client';
+  import { LineMove, lineDiff } from '$lib/canvas/line-diff';
 
   type Side = { url: string; label: string };
 
   type History = { line: Timeline; busy: boolean; onpick: (sha: string) => void };
 
-  let { before, after, history = null, onclose }: { before: Side; after: Side; history?: History | null; onclose: () => void } = $props();
+  let { projectId, versionId, before, after, history = null, onclose, onchanged }: { projectId: string; versionId: string; before: Side; after: Side; history?: History | null; onclose: () => void; onchanged: () => unknown } = $props();
+
+  const ACTION_LABEL: Record<VersionAction, string> = { [VersionAction.Restore]: 'Restore this version', [VersionAction.Variant]: 'Make variant', [VersionAction.CodeDiff]: 'Open code diff' };
+  const LINE_MARK: Record<LineMove, string> = { [LineMove.Same]: ' ', [LineMove.Removed]: '-', [LineMove.Added]: '+' };
+
+  let note = $state('');
+  let acting = $state(false);
+  let codeDiff = $state<FileDiff[] | null>(null);
+
+  const ACTION_DONE: Record<VersionAction, (body: Record<string, unknown>) => void> = {
+    [VersionAction.Restore]: (body) => {
+      note = `${(body.paths as string[]).length} files restored; push them from Changes`;
+      onchanged();
+    },
+    [VersionAction.Variant]: () => {
+      note = 'Variant placed below the version';
+    },
+    [VersionAction.CodeDiff]: (body) => {
+      codeDiff = body.files as FileDiff[];
+    }
+  };
+
+  async function act(action: VersionAction) {
+    acting = true;
+    const body = await versionAction(projectId, versionId, action);
+    acting = false;
+    if (!body) {
+      note = 'That did not work, try again';
+      return;
+    }
+    ACTION_DONE[action](body);
+  }
 
   let scrub = $state(0);
   $effect(() => {
@@ -77,6 +109,27 @@
     </div>
   {/if}
 
+  <div class="actions">
+    {#each Object.values(VersionAction) as a (a)}
+      <button type="button" disabled={acting} data-testid="version-action-{a}" onclick={() => act(a)}>{ACTION_LABEL[a]}</button>
+    {/each}
+    {#if note}
+      <span class="note" data-testid="version-note">{note}</span>
+    {/if}
+  </div>
+
+  {#if codeDiff}
+    <div class="code" data-testid="version-code-diff">
+      <button type="button" class="back" onclick={() => (codeDiff = null)}>Back to visual diff</button>
+      {#each codeDiff as file (file.path)}
+        <div class="file">{file.path}</div>
+        <pre>{#each lineDiff(file.before, file.after) as line, i (i)}<span class={line.move}>{LINE_MARK[line.move]} {line.text}
+</span>{/each}</pre>
+      {:else}
+        <p class="note">No code changes between these versions.</p>
+      {/each}
+    </div>
+  {:else}
   <div class="stage">
     {#if mode === DiffMode.Overlay}
       <img src={after.url} alt={after.label} />
@@ -90,9 +143,51 @@
       <input class="slider" type="range" min="0" max="100" bind:value={split} aria-label="Before and after" data-testid="diff-slider" />
     {/if}
   </div>
+  {/if}
 </div>
 
 <style>
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--ui-line);
+    font-size: 12px;
+  }
+  .actions button,
+  .back {
+    border: 1px solid var(--ui-line);
+    background: transparent;
+    color: inherit;
+    padding: 3px 8px;
+    border-radius: var(--ui-radius-sm);
+    cursor: pointer;
+  }
+  .note {
+    color: var(--ui-muted);
+  }
+  .code {
+    overflow: auto;
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+  .file {
+    margin: 8px 0 4px;
+    font-weight: 600;
+  }
+  pre {
+    margin: 0;
+    font-family: ui-monospace, monospace;
+    white-space: pre-wrap;
+  }
+  pre .removed {
+    background: rgb(255 59 92 / 0.15);
+  }
+  pre .added {
+    background: rgb(52 199 89 / 0.18);
+  }
   .version-compare {
     position: absolute;
     right: 16px;

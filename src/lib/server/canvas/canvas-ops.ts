@@ -103,7 +103,8 @@ import { githubFor } from '$lib/server/code-import/github-runtime';
 import { frameDetach, framesPush, frameStatus, frameUndo } from '$lib/server/code-push/frames-push';
 import { frameVersions } from '$lib/server/code-push/frames-versions';
 import { frameCompare, frameRetarget, MAX_VERSIONS } from '$lib/server/code-push/frames-compare';
-import { compareDeps } from '$lib/server/code-push/compare-runtime';
+import { actionDeps, compareDeps } from '$lib/server/code-push/compare-runtime';
+import { VersionAction, versionAction } from '$lib/server/code-push/frames-version-actions';
 import { framesDeps, importLinker } from '$lib/server/code-push/frames-runtime';
 import { libsOrigin } from '$lib/server/motion/libs-origin';
 import { GithubRefusal } from '$lib/server/code-import/github-http';
@@ -1182,6 +1183,12 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: z.object({ versionId: z.string().describe('a version frame made by github_compare'), ref: z.string().min(1).max(200).describe('branch, tag, sha or #<number>') }).strict(),
     run: async (ctx, input) => frameRetarget(compareDeps(ctx.db, figmaScope(ctx)), input)
+  }),
+
+  github_version_action: op({
+    access: Access.Write,
+    input: z.object({ versionId: z.string(), action: z.enum(VersionAction).describe('restore: the version files become changes of the linked frame, pushed through Changes and a PR; variant: an unlocked, unlinked copy; code_diff: the files that differ from the base branch') }).strict(),
+    run: async (ctx, input) => versionAction(actionDeps(ctx.db, figmaScope(ctx)), input.action, input.versionId)
   }),
 
   github_detach: op({

@@ -4719,7 +4719,7 @@
     {/if}
     <FrameHeaderIcons {view} hits={headerHits(headerWorld, cameraMotion)} onpress={pressHeader} />
     {#if versionSides?.before && versionSides.after}
-      <VersionCompare before={versionSides.before} after={versionSides.after} history={versionHistory} onclose={() => (versionOpen = null)} />
+      <VersionCompare projectId={page.params.projectId ?? ''} versionId={versionOpen?.after ?? ''} before={versionSides.before} after={versionSides.after} history={versionHistory} onclose={() => (versionOpen = null)} onchanged={sources.refresh} />
     {/if}
     <SourceSyncPanel projectId={page.params.projectId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} assetUrl={tierUrl(AssetSize.Full)} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} />
     <PrototypePlayerHost frames={playerFrames} />

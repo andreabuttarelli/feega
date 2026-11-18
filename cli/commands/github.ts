@@ -50,3 +50,7 @@ export async function cmdGithubCompare(projectId: string, nodeId: string, refs: 
 export async function cmdGithubVersionRef(projectId: string, versionId: string, ref: string) {
   await print(`/api/v1/projects/${encodeURIComponent(projectId)}/github/compare`, { method: 'POST', body: JSON.stringify({ versionId, ref }) });
 }
+
+export async function cmdGithubVersionAction(projectId: string, versionId: string, action: string) {
+  await print(`/api/v1/projects/${encodeURIComponent(projectId)}/github/version-actions`, { method: 'POST', body: JSON.stringify({ versionId, action }) });
+}
