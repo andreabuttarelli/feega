@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { batchedSources, sourceReader } from './frame-sources';
+import { batchedSources as batchedWith, sourceReader, HOSTED_SOURCE_ASKS } from './frame-sources';
+
+const ASKS = { framesPerAsk: 2, open: 2 };
+const batchedSources: typeof batchedWith = (fetcher, kept, cacheOf) => batchedWith(fetcher, kept, cacheOf, () => ASKS);
 import { frameCache, memoryShelf } from './frame-cache';
 import { framesOnCanvas, frameSourceUrl } from './frame-source';
 import { adoptFrameHead } from '$lib/canvas/node-save';
@@ -110,7 +113,7 @@ describe('warming the sources of every frame on open', () => {
   const url = (id: string) => `/p/p1/c/c1/motion/${id}/source?revision=1`;
   const json = (body: unknown) => ({ ok: true, status: 200, json: async () => body }) as Response;
 
-  it('asks for all the frames in one request, even when only a few are built at once (the canvas asked six at a time, one request each)', async () => {
+  it('asks for every frame in the order given, a few per request', async () => {
     const asked: string[] = [];
     const read = batchedSources(async (u) => (asked.push(u), json({ tokens: {}, frames: Object.fromEntries(ids.map((id) => [id, { revision: 1, doc: { id }, assets: {} }])) })));
 
@@ -119,7 +122,50 @@ describe('warming the sources of every frame on open', () => {
       expect((await read(url(id)))?.doc).toEqual({ id });
     }
 
-    expect(asked).toEqual([`/p/p1/c/c1/motion/sources?ids=${ids.join(',')}`]);
+    expect(asked.flatMap((u) => new URLSearchParams(u.split('?')[1]).get('ids')!.split(','))).toEqual(ids);
+    expect(Math.max(...asked.map((u) => new URLSearchParams(u.split('?')[1]).get('ids')!.split(',').length))).toBeLessThanOrEqual(ASKS.framesPerAsk);
+  });
+
+  it('asks the hosted sizes when no route sized them', async () => {
+    const pending: (() => void)[] = [];
+    const many = Array.from({ length: 40 }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`);
+    const read = batchedWith((u) => new Promise<Response>((settle) => pending.push(() => settle(json({ tokens: {}, frames: Object.fromEntries(new URLSearchParams(u.split('?')[1]).get('ids')!.split(',').map((id) => [id, { revision: 1, doc: { id }, assets: {} }])) })))));
+
+    read.warm(many.map(url));
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(pending.length).toBe(HOSTED_SOURCE_ASKS.open);
+  });
+
+  it('passes a share-view source straight through, unbatched, so no sizing reaches it', async () => {
+    const asked: string[] = [];
+    const read = batchedWith(async (u) => (asked.push(u), json({ revision: 1, doc: { s: 1 }, assets: {}, tokens: {} })));
+
+    expect((await read('/s/tok/source/n1'))?.doc).toEqual({ s: 1 });
+    expect(asked).toEqual(['/s/tok/source/n1']);
+  });
+
+  it('hands the nearest frame its source without waiting for the rest (a 36-frame canvas waited 10 s for one 38 MB answer)', async () => {
+    const read = batchedSources((u) => (!u.includes(ids.at(-1)!) ? Promise.resolve(json({ tokens: {}, frames: { [ids[0]]: { revision: 1, doc: { id: ids[0] }, assets: {} } } })) : new Promise<Response>(() => {})));
+
+    read.warm(ids.map(url));
+
+    expect((await read(url(ids[0])))?.doc).toEqual({ id: ids[0] });
+  });
+
+  it('keeps only a few source requests open, so posters, fonts and pictures are not queued behind every frame (local mode answered posters at 13 s)', async () => {
+    const pending: (() => void)[] = [];
+    const read = batchedSources((u) => new Promise<Response>((settle) => pending.push(() => settle(json({ tokens: {}, frames: Object.fromEntries(new URLSearchParams(u.split('?')[1]).get('ids')!.split(',').map((id) => [id, { revision: 1, doc: { id }, assets: {} }])) })))));
+
+    read.warm(ids.map(url));
+    await new Promise((r) => setTimeout(r, 0));
+    const open = pending.length;
+    pending[0]();
+    await read(url(ids[0]));
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(open).toBe(ASKS.open);
+    expect(pending.length).toBe(ASKS.open + 1);
   });
 });
 

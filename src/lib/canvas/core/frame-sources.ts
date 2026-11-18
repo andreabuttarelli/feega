@@ -2,6 +2,15 @@ import type { FrameDoc } from './frame-build';
 import { StartupStep, markStartup } from './startup-marks';
 import { keptKey, scopedCache, type CacheScope, type FrameCache } from './frame-cache';
 
+export type SourceAsks = { framesPerAsk: number; open: number };
+
+export const HOSTED_SOURCE_ASKS: SourceAsks = { framesPerAsk: 3, open: 6 };
+let sized = HOSTED_SOURCE_ASKS;
+
+export function sizeSourceAsks(asks: SourceAsks) {
+  sized = asks;
+}
+
 const SOURCES_KEPT = 8;
 const HTTP_NO_CONTENT = 204;
 const HTTP_SERVER_ERROR = 500;
@@ -83,7 +92,6 @@ const signedFrame = (batch: Batch, frame: Omit<FrameDoc, 'tokens'>): FrameDoc =>
 
 const FRAME_SOURCE = /^(\/p\/[^/]+\/c\/[^/]+\/motion)\/([0-9a-f-]{36})\/source(?:\?|$)/i;
 const HTTP_OK = 200;
-const BATCH_MAX = 100;
 
 const answered = (body: FrameDoc): Response => ({ ok: true, status: HTTP_OK, json: async () => body }) as unknown as Response;
 
@@ -99,8 +107,10 @@ function batchUrl(base: string, waiting: Waiting[]): string {
   return `${base}/sources?ids=${ids.join(',')}${held}`;
 }
 
-function frameBatcher(fetcher: Fetcher): Fetcher {
+function frameBatcher(fetcher: Fetcher, asksOf: () => SourceAsks): Fetcher {
   const queues = new Map<string, Waiting[]>();
+  const due: { base: string; waiting: Waiting[] }[] = [];
+  let open = 0;
 
   const ask = async (base: string, waiting: Waiting[]) => {
     markStartup(StartupStep.SourcesAsked);
@@ -115,12 +125,25 @@ function frameBatcher(fetcher: Fetcher): Fetcher {
     }
   };
 
+  const next = () => {
+    while (open < asksOf().open && due.length) {
+      const { base, waiting } = due.shift()!;
+      open++;
+      void ask(base, waiting).finally(() => {
+        open--;
+        next();
+      });
+    }
+  };
+
   const flush = (base: string) => {
     const waiting = queues.get(base) ?? [];
     queues.delete(base);
-    for (let at = 0; at < waiting.length; at += BATCH_MAX) {
-      void ask(base, waiting.slice(at, at + BATCH_MAX));
+    const { framesPerAsk } = asksOf();
+    for (let at = 0; at < waiting.length; at += framesPerAsk) {
+      due.push({ base, waiting: waiting.slice(at, at + framesPerAsk) });
     }
+    next();
   };
 
   return (url, init) => {
@@ -182,7 +205,7 @@ function cached(fetcher: Fetcher, cacheOf: () => FrameCache | null): Fetcher {
   };
 }
 
-export const batchedSources = (fetcher: Fetcher, kept = SOURCES_KEPT, cacheOf: () => FrameCache | null = () => null): ReadSource => sourceReader(cached(frameBatcher(fetcher), cacheOf), kept);
+export const batchedSources = (fetcher: Fetcher, kept = SOURCES_KEPT, cacheOf: () => FrameCache | null = () => null, asksOf: () => SourceAsks = () => sized): ReadSource => sourceReader(cached(frameBatcher(fetcher, asksOf), cacheOf), kept);
 
 let scoped: FrameCache | null = null;
 

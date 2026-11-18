@@ -58,6 +58,7 @@
   import { uploadWithin } from '$lib/canvas/core/picture-uploads';
   import { Step, markFrame, noteImages } from '$lib/canvas/core/frame-timeline';
   import { StartupStep, markStartup, reportFramesShown } from '$lib/canvas/core/startup-marks';
+  import { pictureTurns } from '$lib/canvas/core/picture-turns';
   import { NEAREST_FRAMES } from '$lib/canvas/core/startup-progress';
   import LoadTimeline from './LoadTimeline.svelte';
   import { editedLayers } from '$lib/canvas/core/edited-layers';
@@ -83,7 +84,7 @@
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
 
-  let { frames, edited = new Set(), order = [], live = new Map(), listenLive = () => () => {}, known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, lift = null, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, place = null, sourceUrl, onready, onsource = () => {}, onthumb = () => {}, onfallback, onbackend = () => {}, onevict = () => {} }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; listenLive?: (listener: LiveListener) => () => void; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; lift?: Lift | null; look?: Look; view: Viewport; area: { width: number; height: number }; place?: { projectId: string; canvasId: string; orgId?: string; userId?: string; look?: string } | null; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onthumb?: (id: string, revision: number, blob: Blob, size: { width: number; height: number }) => void; onfallback: (why: string) => void; onbackend?: (change: BackendSwitch) => void; onevict?: (id: string) => void } = $props();
+  let { frames, edited = new Set(), order = [], live = new Map(), listenLive = () => () => {}, known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, lift = null, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, place = null, sourceUrl, onready, onsource = () => {}, onthumb = () => {}, onfallback, onbackend = () => {}, onevict = () => {}, picturesWhileOwed = Infinity }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; listenLive?: (listener: LiveListener) => () => void; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; lift?: Lift | null; look?: Look; view: Viewport; area: { width: number; height: number }; place?: { projectId: string; canvasId: string; orgId?: string; userId?: string; look?: string } | null; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onthumb?: (id: string, revision: number, blob: Blob, size: { width: number; height: number }) => void; onfallback: (why: string) => void; onbackend?: (change: BackendSwitch) => void; onevict?: (id: string) => void; picturesWhileOwed?: number } = $props();
 
   markStartup(StartupStep.Mounted);
 
@@ -167,6 +168,7 @@
 
   const smoothing = smoothingOf(navigator.userAgent);
   const lanes = buildLanes(currentDevice(), typeof navigator === 'object' ? navigator.hardwareConcurrency : 2);
+  const turns = pictureTurns(picturesWhileOwed);
   const buildAway = frameBuilder(() => (typeof Worker === 'function' ? (markStartup(StartupStep.WorkerSpawned), new Worker(new URL('../../../canvas/core/frame-build.worker.ts', import.meta.url), { type: 'module' })) : null), lanes);
   buildAway.warm();
 
@@ -279,7 +281,8 @@
         return;
       }
       const list = retiered(built.list, tierSwap(fetched, place, built.at, to));
-      const ready = await media.ready(list);
+      const done = await turns.take();
+      const ready = await media.ready(list).finally(done);
       await whenQuiet(() => gesture.active());
       const group = keyOf(f);
       if (ready !== Readiness.Whole || builtTiers.get(f.id) !== built || loaded.get(f.id) !== group) {
@@ -353,9 +356,15 @@
     asking.set(f.id, key);
 
     noteImages(f.id, built.list);
+    const picturesOnce = async () => {
+      const done = await turns.take();
+      return media.ready(built.list).finally(done);
+    };
+    const firstPictures = picturesOnce();
+    let tries = 0;
     const seed = f.scenes ? null : (given ?? read?.source ?? null);
     if (seed) {
-      seedLive(f, seed, built.list);
+      seedLive(f, seed, built.list, firstPictures);
     }
     const present = (ready: Readiness, stage: Stage) => {
       if (asking.get(f.id) !== key) {
@@ -370,7 +379,12 @@
       markFrame(f.id, ready === Readiness.Whole ? Step.Whole : Step.Vectors);
       lists = listed(lists, f.id, group, onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), shown, drawnLast.get(f.id)?.group]);
     };
-    void showStaged(() => media.ready(built.list), held, (ready, stage) => (stage === Stage.Settled ? vectorsFirst.after(() => present(ready, stage)) : present(ready, stage)), atRestAfter);
+    void showStaged(
+      () => (tries++ === 0 ? firstPictures : picturesOnce()),
+      held,
+      (ready, stage) => (stage === Stage.Settled ? vectorsFirst.after(() => present(ready, stage)) : present(ready, stage)),
+      atRestAfter
+    );
   }
 
   const MISSING = ':missing';
@@ -701,8 +715,8 @@
     );
   }
 
-  function seedLive(f: FrameAt, source: LiveDoc, list: DisplayList) {
-    void media.ready(list).then((ready) => {
+  function seedLive(f: FrameAt, source: LiveDoc, list: DisplayList, pictured: Promise<Readiness>) {
+    void pictured.then((ready) => {
       if (liveShown.has(f.id)) {
         return;
       }
@@ -835,6 +849,11 @@
           settledFrames = new Set(settledFrames).add(f.id);
         });
     }
+  });
+
+  $effect(() => {
+    void lists;
+    turns.owed(legible(withoutViews(frames), zoomStep, budget.readableWidth).some((f) => sight.onScreen.has(f.id) && !loaded.has(f.id) && !thumbShown.has(f.id)));
   });
 
   let cardLists = $state(new Map<string, DisplayList>());
