@@ -47,6 +47,15 @@ export function revealPage(mode: RevealMode): Revealed {
   ];
   const carousels = [...CAROUSELS.map((c) => c.selector), '.w-slider'].join(', ');
   const state = window as StillWindow;
+  const onScreen = (el: Element | null | undefined) => {
+    for (let at = el; at; at = at.parentElement) {
+      if (getComputedStyle(at).position === 'fixed') {
+        return true;
+      }
+    }
+    return false;
+  };
+  const scrolledOnScreen = (animation: Animation) => animation.timeline !== document.timeline && onScreen((animation.effect as KeyframeEffect | null)?.target);
 
   for (const img of document.querySelectorAll<HTMLImageElement>('img[loading="lazy"]')) {
     img.loading = 'eager';
@@ -77,6 +86,9 @@ export function revealPage(mode: RevealMode): Revealed {
     looping.pause(0);
   }
   for (const animation of settling ? document.getAnimations() : []) {
+    if (scrolledOnScreen(animation)) {
+      continue;
+    }
     try {
       if (animation.effect?.getComputedTiming().iterations === Infinity) {
         animation.pause();
@@ -116,7 +128,7 @@ export function revealPage(mode: RevealMode): Revealed {
     instant.replaceSync(`*,*::before,*::after{transition:none!important}${CONSENT_ROOTS}{display:none!important}`);
     document.adoptedStyleSheets = [...document.adoptedStyleSheets, instant];
     for (const [el, { values, restless }] of state.__feegaInView ?? []) {
-      if (restless || !el.isConnected || el.closest(carousels)) {
+      if (restless || !el.isConnected || el.closest(carousels) || onScreen(el)) {
         continue;
       }
       const now = getComputedStyle(el);
