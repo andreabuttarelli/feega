@@ -1,18 +1,20 @@
 import { readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { MEMORY_MAX_CHARS } from '$lib/onboarding/limits';
 
 enum Root {
   Home = 'home',
-  Cwd = 'cwd'
+  Project = 'project'
 }
 
 type Source = { id: string; label: string; root: Root; path: string };
 
 export type FoundSource = { id: string; label: string; path: string; bytes: number };
 
-export type Places = { home: string; cwd: string };
+export type Places = { home: string; project: string };
+
+const LOCAL_FILE_ENV = 'FEEGA_LOCAL_FILE';
 
 const SOURCE_MAX_BYTES = 200 * 1024;
 
@@ -22,13 +24,20 @@ const SOURCES: readonly Source[] = [
   { id: 'gemini', label: 'Gemini CLI', root: Root.Home, path: '.gemini/GEMINI.md' },
   { id: 'opencode', label: 'opencode', root: Root.Home, path: '.config/opencode/AGENTS.md' },
   { id: 'cursor', label: 'Cursor', root: Root.Home, path: '.cursor/rules' },
-  { id: 'project-claude', label: 'Project CLAUDE.md', root: Root.Cwd, path: 'CLAUDE.md' },
-  { id: 'project-agents', label: 'Project AGENTS.md', root: Root.Cwd, path: 'AGENTS.md' }
+  { id: 'project-claude', label: 'This folder: CLAUDE.md', root: Root.Project, path: 'CLAUDE.md' },
+  { id: 'project-claude-local', label: 'This folder: CLAUDE.local.md', root: Root.Project, path: 'CLAUDE.local.md' },
+  { id: 'project-claude-dir', label: 'This folder: .claude/CLAUDE.md', root: Root.Project, path: '.claude/CLAUDE.md' },
+  { id: 'project-agents', label: 'This folder: AGENTS.md', root: Root.Project, path: 'AGENTS.md' }
 ];
 
-const defaultPlaces = (): Places => ({ home: homedir(), cwd: process.cwd() });
+export function projectOf(env: Record<string, string | undefined>, fallback: string): string {
+  const file = env[LOCAL_FILE_ENV];
+  return file ? dirname(file) : fallback;
+}
 
-const absolute = (source: Source, places: Places) => join(source.root === Root.Home ? places.home : places.cwd, source.path);
+const defaultPlaces = (): Places => ({ home: homedir(), project: projectOf(process.env, process.cwd()) });
+
+const absolute = (source: Source, places: Places) => join(source.root === Root.Home ? places.home : places.project, source.path);
 
 async function usableBytes(file: string): Promise<number> {
   try {

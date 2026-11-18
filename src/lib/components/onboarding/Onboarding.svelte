@@ -360,8 +360,7 @@
     }
 
     .art {
-      height: 176px;
-      padding: 8px 8px 0;
+      display: none;
     }
 
     .side {
