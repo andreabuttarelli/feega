@@ -35,6 +35,12 @@ describe('settingsPageLoader: la sezione trova la sua pagina reale', () => {
     expect(settingsPageLoader('/settings/does-not-exist')).toBeNull();
   });
 
+  it('le sezioni del brand, passate alla dashboard, non hanno più una pagina nel foglio del progetto', () => {
+    for (const section of ['brand', 'danger', 'products']) {
+      expect(settingsPageLoader(`/settings/${section}`)).toBeNull();
+    }
+  });
+
   it('la radice di settings trova la stessa pagina del progetto', () => {
     expect(settingsPageLoader('/settings')).toBe(settingsPageLoader('/settings/project'));
   });
@@ -48,14 +54,14 @@ describe('SHEET_PAGE_LOADERS: il foglio scarica le sue pagine solo quando si apr
 
 describe('settingsSheetSection: la pagina arriva insieme ai dati della sua sezione', () => {
   it('la pagina delle spese non riceve mai i dati dei font', async () => {
-    const [spend, project] = await Promise.all([
+    const [spend, fonts] = await Promise.all([
       settingsSheetSection('/settings/spend', { caps: [] }),
-      settingsSheetSection('/settings/project', { fonts: [] })
+      settingsSheetSection('/settings/project', { brand: [] })
     ]);
 
     expect(spend?.data).toEqual({ caps: [] });
     expect(spend?.Page).toBe((await settingsPageLoader('/settings/spend')!()).default);
-    expect(project?.data).toEqual({ fonts: [] });
+    expect(fonts?.data).toEqual({ brand: [] });
   });
 
   it('una sezione inesistente non trova niente', () => {
