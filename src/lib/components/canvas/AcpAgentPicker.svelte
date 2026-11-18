@@ -14,8 +14,7 @@
 
   let { agents, chosen, open = $bindable(false), refreshing = false, onchoose, onrefresh }: Props = $props();
 
-  const CLOUD_LABEL = 'Feega cloud';
-  const CLOUD_ID = 'cloud';
+  const NONE_LABEL = 'none picked';
 
   const current = $derived(agents.find((a) => a.id === chosen) ?? null);
   const ordered = $derived(readyFirst(agents));
@@ -39,19 +38,13 @@
 <div class="picker" data-testid="acp-agent-picker">
   <button type="button" class="trigger" aria-haspopup="listbox" aria-expanded={open} onclick={() => (open = !open)} data-testid="acp-agent-trigger">
     <span class="label">Agent</span>
-    <span class="value">{current ? current.name : CLOUD_LABEL}</span>
+    <span class="value">{current ? current.name : NONE_LABEL}</span>
     <span class="caret" aria-hidden="true">▾</span>
   </button>
 
   {#if open}
     <div class="menu" role="listbox" aria-label="Agent">
       <ul class="grid">
-        <li class="row" data-agent="cloud">
-          <button type="button" class="tile" role="option" aria-checked={chosen === null} aria-selected={chosen === null} onclick={() => choose(null)} data-testid="acp-agent-cloud">
-            {@render mark(markOf(CLOUD_ID), CLOUD_LABEL)}
-            <span class="name">{CLOUD_LABEL}</span>
-          </button>
-        </li>
         {#each ordered as a (a.id)}
           {@const row = AGENT_STATUS[statusOf(a)]}
           <li class="row" class:is-off={!row.usable} data-agent={a.id}>

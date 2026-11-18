@@ -12,11 +12,17 @@ const html = (agents: DetectedAgent[], chosen: string | null = null) => render(A
 const row = (body: string, id: string) => body.slice(body.indexOf(`data-agent="${id}"`), body.indexOf('</li>', body.indexOf(`data-agent="${id}"`)));
 
 describe('the agent picker', () => {
-  it('offers Feega cloud first, then each agent', () => {
+  it('offers only the agents on this computer: the cloud chat does not run here', () => {
     const body = html([agent({}), agent({ id: 'codex', name: 'Codex CLI' })]);
 
-    expect(body.indexOf('Feega cloud')).toBeLessThan(body.indexOf('Claude Code'));
+    expect(body).not.toContain('Feega cloud');
     expect(body.indexOf('Claude Code')).toBeLessThan(body.indexOf('Codex CLI'));
+  });
+
+  it('says no agent is picked yet instead of naming the cloud', () => {
+    const body = render(AcpAgentPicker, { props: { agents: [agent({})], chosen: null, onchoose: () => {}, onrefresh: () => {} } }).body;
+
+    expect(body).toContain('none picked');
   });
 
   it('shows a ready agent as a tile with its mark and no version or badge', () => {

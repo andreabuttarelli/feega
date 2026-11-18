@@ -1,56 +1,49 @@
 <script lang="ts" module>
-  const CLOUD_ADDS = ['work on the same canvas with other people, live', 'share a link, leave comments, go back to older versions', 'a built-in AI that designs and generates images and video for you'] as const;
+  const CLOUD_ADDS = ['work on the same canvas with other people, live', 'share a link, leave comments, go back to older versions', 'the built-in AI chat and image and video generation, on your plan’s credits'] as const;
 </script>
 
 <script lang="ts">
-  import { Connection } from '$lib/onboarding/session.svelte';
   import { Place } from '$lib/onboarding/flow';
 
-  type Props = { place: Place; email: string | null; connection: Connection; onconnect: () => void; oncontinue: () => void };
+  type Props = { place: Place; email: string; oncontinue: () => void; oncloud: () => void };
 
-  let { place = $bindable(Place.Computer), email, connection, onconnect, oncontinue }: Props = $props();
+  let { place = $bindable(Place.Computer), email, oncontinue, oncloud }: Props = $props();
 
-  const CONNECT_LABEL: Readonly<Record<Connection, string>> = {
-    [Connection.Idle]: 'connect your account',
-    [Connection.Waiting]: 'finish in your browser…',
-    [Connection.Failed]: 'try connecting again'
+  const GO: Readonly<Record<Place, { label: string; run: () => void }>> = {
+    [Place.Computer]: { label: 'continue on this computer', run: () => oncontinue() },
+    [Place.Cloud]: { label: 'open feega cloud', run: () => oncloud() }
   };
 </script>
 
 <h1 id="ob-title" class="ob-title">where should your work live?</h1>
-<p class="ob-sub">feega is a canvas where you design screens and turn them into animated videos, by hand or by asking an AI. you are running it on your own computer.</p>
+<p class="ob-sub" data-testid="onboarding-connected">connected as {email}. keep working on this computer, or open feega cloud in your browser.</p>
 
 <div class="places">
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="place" class:chosen={place === Place.Computer} onmouseenter={() => (place = Place.Computer)} data-testid="onboarding-home-computer">
+  <label class="place" class:chosen={place === Place.Computer} data-testid="onboarding-home-computer">
+    <input class="pick" type="radio" name="place" value={Place.Computer} bind:group={place} />
     <div class="head">
       <strong>this computer</strong>
-      <span class="price">free · no account</span>
+      <span class="price">free · offline</span>
     </div>
-    <p>your work is one file on your disk and works offline. the AI is the assistant you already have, like Claude Code or Cursor.</p>
-  </div>
+    <p>your work is one file on your disk. the AI chat is the assistant you already have, like Claude Code or Codex, on your plan with it.</p>
+  </label>
 
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="place" class:chosen={place === Place.Cloud} onmouseenter={() => (place = Place.Cloud)} data-testid="onboarding-home-cloud">
+  <label class="place" class:chosen={place === Place.Cloud} data-testid="onboarding-home-cloud">
+    <input class="pick" type="radio" name="place" value={Place.Cloud} bind:group={place} />
     <div class="head">
       <strong>Feega Cloud</strong>
-      <span class="price">free plan · needs an account</span>
+      <span class="price">your account</span>
     </div>
     <ul>
       {#each CLOUD_ADDS as line (line)}
         <li>{line}</li>
       {/each}
     </ul>
-    {#if email}
-      <p class="linked" data-testid="onboarding-connected">connected as {email}</p>
-    {:else}
-      <button type="button" class="ob-secondary" disabled={connection === Connection.Waiting} onfocus={() => (place = Place.Cloud)} onclick={onconnect} data-testid="onboarding-connect">{CONNECT_LABEL[connection]}</button>
-    {/if}
-  </div>
+    <p>to move this canvas there, import its .feega file.</p>
+  </label>
 </div>
 
-<button type="button" class="ob-primary" onclick={oncontinue} data-testid="onboarding-continue">{email ? 'continue' : 'continue on this computer'}</button>
-<p class="ob-foot">you can connect an account later. nothing leaves this computer until you choose to upload it.</p>
+<button type="button" class="ob-primary" onclick={GO[place].run} data-testid="onboarding-continue">{GO[place].label}</button>
 
 <style>
   .places {
@@ -60,10 +53,27 @@
   }
 
   .place {
+    position: relative;
     padding: 16px;
     border-radius: var(--ui-radius-lg);
     background: var(--ui-input);
     transition: box-shadow 200ms var(--ui-ease), background 200ms var(--ui-ease);
+  }
+
+  .place {
+    display: block;
+    cursor: pointer;
+  }
+
+  .pick {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .place:has(.pick:focus-visible) {
+    outline: 2px solid var(--ui-ring);
+    outline-offset: 2px;
   }
 
   .place.chosen {
@@ -117,13 +127,4 @@
     transform: rotate(-45deg);
   }
 
-  .place :global(.ob-secondary) {
-    margin-top: 12px;
-  }
-
-  .linked {
-    margin-top: 12px;
-    color: var(--ui-text);
-    font-weight: 500;
-  }
 </style>

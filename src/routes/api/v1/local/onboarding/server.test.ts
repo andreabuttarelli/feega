@@ -7,7 +7,7 @@ vi.mock('$lib/server/local/onboarding-state', () => ({
   onboardingState: async () => ({ seenAt: state.seen }),
   markSeen: async () => (state.seen = 'now')
 }));
-vi.mock('$lib/server/local/cloud-account', () => ({ account: async () => ({ email: 'me@x.io', name: null }) }));
+vi.mock('$lib/server/local/cloud-account', () => ({ account: async () => ({ email: 'me@x.io', name: null }), cloudDeps: () => ({ cloudUrl: 'https://cloud.example' }) }));
 
 const { GET, PUT } = await import('./+server');
 
@@ -18,7 +18,7 @@ describe('/api/v1/local/onboarding', () => {
   });
 
   it('reports seen state and account, then marks it seen', async () => {
-    expect(await (await GET({} as never)).json()).toEqual({ seenAt: null, account: { email: 'me@x.io', name: null } });
+    expect(await (await GET({} as never)).json()).toEqual({ seenAt: null, account: { email: 'me@x.io', name: null }, cloud: 'https://cloud.example' });
 
     expect((await PUT({} as never)).status).toBe(204);
     expect(state.seen).toBe('now');

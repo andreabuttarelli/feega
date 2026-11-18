@@ -5,6 +5,7 @@ export enum Surface {
 }
 
 export enum Step {
+  Account = 'account',
   Home = 'home',
   Name = 'name',
   Agents = 'agents',
@@ -38,7 +39,8 @@ const onThisComputer = (viewer: Viewer) => viewer.surface === Surface.Local;
 type StepRow = { step: Step; label: string; shows: (viewer: Viewer) => boolean };
 
 export const STEPS: readonly StepRow[] = [
-  { step: Step.Home, label: 'where it runs', shows: (viewer) => firstRun(viewer) && onThisComputer(viewer) },
+  { step: Step.Account, label: 'your account', shows: (viewer) => firstRun(viewer) && onThisComputer(viewer) && !signedIn(viewer) },
+  { step: Step.Home, label: 'where it runs', shows: (viewer) => firstRun(viewer) && onThisComputer(viewer) && signedIn(viewer) },
   { step: Step.Name, label: 'your name', shows: (viewer) => signedIn(viewer) && !viewer.name?.trim() },
   { step: Step.Agents, label: 'your AI', shows: (viewer) => firstRun(viewer) && onThisComputer(viewer) },
   { step: Step.Memory, label: 'your memory', shows: (viewer) => firstRun(viewer) && signedIn(viewer) }
@@ -75,11 +77,11 @@ export const LOCAL_ONBOARDING_PATH = '/api/v1/local/onboarding';
 export const LOCAL_ACCOUNT_PATH = '/api/v1/local/account';
 export const LOCAL_SOURCES_PATH = '/api/v1/local/memory-sources';
 
-export type LocalOnboarding = { seenAt: string | null; account: { email: string; name: string | null } | null };
+export type LocalOnboarding = { seenAt: string | null; account: { email: string; name: string | null } | null; cloud: string };
 
 export type MemorySource = { id: string; label: string; path: string; bytes: number };
 
-export function localViewer(state: LocalOnboarding): Viewer {
+export function localViewer(state: Pick<LocalOnboarding, 'seenAt' | 'account'>): Viewer {
   return {
     surface: Surface.Local,
     arrival: state.seenAt ? Arrival.Returning : Arrival.FirstRun,

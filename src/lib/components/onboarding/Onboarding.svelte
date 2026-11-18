@@ -10,6 +10,7 @@
   import { rememberTourSeen, seenInBrowser } from '$lib/onboarding/tour-memory';
   import FeegaMark from '$lib/components/FeegaMark.svelte';
   import OnboardingArt from './OnboardingArt.svelte';
+  import StepAccount from './StepAccount.svelte';
   import StepAgents from './StepAgents.svelte';
   import StepHome from './StepHome.svelte';
   import StepMemory from './StepMemory.svelte';
@@ -100,8 +101,10 @@
           <section class="step">
             {#if step === Step.Name}
               <StepName bind:name onsave={(value) => session.saveName(value)} />
+            {:else if step === Step.Account}
+              <StepAccount email={session.email} connection={session.connection} onconnect={() => session.connect()} oncontinue={() => session.next()} />
             {:else if step === Step.Home}
-              <StepHome bind:place email={session.email} connection={session.connection} onconnect={() => session.connect()} oncontinue={() => session.next()} />
+              <StepHome bind:place email={session.email ?? ''} oncontinue={() => session.next()} oncloud={() => session.openCloud()} />
             {:else if step === Step.Agents}
               <StepAgents agents={choices.agents} chosen={choices.chosen} refreshing={choices.refreshing} onchoose={(id) => choices.choose(id)} onrefresh={() => choices.refresh()} oncontinue={() => session.next()} />
             {:else}

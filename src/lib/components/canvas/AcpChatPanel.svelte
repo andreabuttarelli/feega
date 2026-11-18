@@ -8,9 +8,9 @@
   import ChatComposer from '$lib/components/brand-agent/ChatComposer.svelte';
   import ChatMessage from '$lib/components/brand-agent/ChatMessage.svelte';
 
-  const CLOUD_HINT = 'Feega cloud chat spends credits and runs at feega.app: import this .feega file there, or pick an agent installed on this computer. It edits the canvas through Feega’s tools and asks before each one.';
+  const AGENT_HINT = 'Pick an agent installed on this computer, like Claude Code or Codex: it runs on your plan with it, no feega credits. None here? Install one, then Detect again. It edits the canvas through Feega’s tools and asks before each one.';
   const OPTION_VARIANT: Record<string, ButtonVariant> = { allow_once: 'primary', allow_always: 'primary', reject_once: 'secondary', reject_always: 'secondary' };
-  let { fetcher = fetch, hint = CLOUD_HINT }: { fetcher?: typeof fetch; hint?: string } = $props();
+  let { fetcher = fetch, hint = AGENT_HINT }: { fetcher?: typeof fetch; hint?: string } = $props();
 
   const chat = new AcpChat(fetcher);
   const choices = new AgentChoices(fetcher);

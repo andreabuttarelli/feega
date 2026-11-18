@@ -67,8 +67,9 @@ machine when the tab opens: on your `PATH`, in `~/.local/bin`, `/opt/homebrew/bi
 `~/.npm-global/bin`, `~/.bun/bin` and the `npx` cache. It only runs each agent's `--version`;
 it never installs anything.
 
-The **Agent** menu at the top of the tab lists **Feega cloud (credits)** first, then every agent
-it knows, with the installed version and a badge:
+The chat in local mode never spends Feega credits, with or without a connected account: it runs
+the agent you pick, on your plan with it. Until you pick one the menu reads *none picked* and the
+message box stays off. The **Agent** menu at the top of the tab lists every agent it knows, with the installed version and a badge:
 
 | Badge | Means |
 |---|---|
@@ -177,9 +178,10 @@ locally Wiro runs the 3D nodes only.
 
 The first time Feega runs on your computer it shows a short setup:
 
-1. **Where it runs.** Stay on this computer (free, no account) or connect a Feega Cloud account. Connecting opens the same browser sign-in as `feega login`; your file stays on your disk either way.
-2. **Your AI.** The coding assistants found on this computer, with the command to install or sign in to the ones that are not ready. Pick one to use in the chat.
-3. **Your memory**, only with a connected account. Feega lists the instruction files it found (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`, and `CLAUDE.md` / `AGENTS.md` in the folder you started from). Nothing is read until you press *read these files*, and you can edit the text before saving. It is stored on your account and given to the Feega Cloud chat.
+1. **Your account**, optional, shown only without a connected account. Feega runs on this computer without one. **Connect your account** opens the same browser sign-in as `feega login`; **Continue without an account** skips it. Your file stays on your disk either way.
+1. **Where it runs**, only with a connected account: stay on this computer, or pick Feega Cloud and **Open feega cloud** in your browser, where you import the `.feega` file. Without an account Feega Cloud is not offered.
+1. **Your AI.** The coding assistants found on this computer, with the command to install or sign in to the ones that are not ready. Pick one to use in the chat.
+1. **Your memory**, only with a connected account. Feega lists the instruction files it found (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`, and `CLAUDE.md` / `AGENTS.md` in the folder you started from). Nothing is read until you press *read these files*, and you can edit the text before saving. It is stored on your account and given to the Feega Cloud chat.
 
 Skip closes the setup. It does not come back: the flag lives in `~/.feega/onboarding.json`.
 

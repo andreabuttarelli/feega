@@ -39,6 +39,7 @@ export class OnboardingSession {
   sources = $state<MemorySource[]>([]);
   unsaved = $state<Unsaved | null>(null);
   email = $state<string | null>(null);
+  cloud = $state<string | null>(null);
 
   index = $derived(this.step ? this.plan.indexOf(this.step) : -1);
   progress = $derived(progressOf(this.index, this.plan.length));
@@ -59,6 +60,7 @@ export class OnboardingSession {
     }
 
     this.email = state.account?.email ?? null;
+    this.cloud = state.cloud;
     this.begin(localViewer(state));
     void this.findSources();
   }
@@ -114,6 +116,13 @@ export class OnboardingSession {
 
     this.ports.open(url);
     this.connection = (await this.awaitAccount()) ? Connection.Idle : Connection.Failed;
+  }
+
+  openCloud() {
+    if (this.cloud) {
+      this.ports.open(this.cloud);
+    }
+    this.next();
   }
 
   async readSources(ids: string[]): Promise<string> {

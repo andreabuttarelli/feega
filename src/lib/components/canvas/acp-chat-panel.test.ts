@@ -26,6 +26,11 @@ describe('the local chat composer', () => {
   it('asks for an agent first when none is chosen', () => {
     expect(panel()).toContain('placeholder="Pick an agent first"');
   });
+
+  it('promises no cloud credits: the chat runs on the agent you pick', () => {
+    expect(panel()).not.toMatch(/spends credits/i);
+    expect(panel()).toContain('no feega credits');
+  });
 });
 
 describe('the shared composer', () => {

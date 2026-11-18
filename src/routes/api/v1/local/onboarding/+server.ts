@@ -1,7 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import { localStore } from '$lib/server/local/local-mode';
 import { markSeen, onboardingState } from '$lib/server/local/onboarding-state';
-import { account } from '$lib/server/local/cloud-account';
+import { account, cloudDeps } from '$lib/server/local/cloud-account';
 import type { RequestHandler } from './$types';
 
 const NOT_FOUND = 404;
@@ -16,7 +16,7 @@ function requireLocal() {
 export const GET: RequestHandler = async () => {
   requireLocal();
   const [state, linked] = await Promise.all([onboardingState(), account()]);
-  return json({ seenAt: state.seenAt, account: linked });
+  return json({ seenAt: state.seenAt, account: linked, cloud: cloudDeps().cloudUrl });
 };
 
 export const PUT: RequestHandler = async () => {

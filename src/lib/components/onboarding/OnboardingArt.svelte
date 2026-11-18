@@ -12,11 +12,12 @@
   const firstName = $derived(name.trim().split(/\s+/)[0] ?? '');
 
   const PLACE_LINE: Readonly<Record<Place, string>> = {
-    [Place.Computer]: 'your file. your computer. no account.',
+    [Place.Computer]: 'your file. your computer.',
     [Place.Cloud]: 'everyone on the same canvas.'
   };
 
   const LINES: Readonly<Record<Step, () => string>> = {
+    [Step.Account]: () => 'your file. your computer. no account.',
     [Step.Home]: () => PLACE_LINE[place],
     [Step.Name]: () => (firstName ? `hi, ${firstName.toLowerCase()}.` : 'hi.'),
     [Step.Agents]: () => (agents.length ? `${agents.length} ready to design with you.` : 'design by hand, or add an AI.'),

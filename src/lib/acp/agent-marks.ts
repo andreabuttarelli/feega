@@ -1,11 +1,6 @@
 export type AgentMark = { viewBox: string; paths: string[]; evenodd: boolean };
 
 export const AGENT_MARKS: Readonly<Record<string, AgentMark>> = {
-  cloud: {
-    viewBox: '36 36 228 228',
-    paths: ['M61.87 142.25A57 57 0 1 1 136.13 142.25A69.5 69.5 0 0 0 61.87 142.25Z', 'M157.75 61.87A57 57 0 1 1 157.75 136.13A69.5 69.5 0 0 0 157.75 61.87Z', 'M238.13 157.75A57 57 0 1 1 163.87 157.75A69.5 69.5 0 0 0 238.13 157.75Z', 'M142.25 238.13A57 57 0 1 1 142.25 163.87A69.5 69.5 0 0 0 142.25 238.13Z'],
-    evenodd: false
-  },
   claude: {
     viewBox: '0 0 24 24',
     paths: [
