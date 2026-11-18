@@ -7,6 +7,7 @@
   import AcpModelPicker from './AcpModelPicker.svelte';
   import ChatComposer from '$lib/components/brand-agent/ChatComposer.svelte';
   import ChatMessage from '$lib/components/brand-agent/ChatMessage.svelte';
+  import ChatEffortPicker from '$lib/components/brand-agent/ChatEffortPicker.svelte';
 
   const CLOUD_HINT = 'Feega cloud chat spends credits and runs at feega.app: import this .feega file there, or pick an agent installed on this computer. It edits the canvas through Feega’s tools and asks before each one.';
   const OPTION_VARIANT: Record<string, ButtonVariant> = { allow_once: 'primary', allow_always: 'primary', reject_once: 'secondary', reject_always: 'secondary' };
@@ -112,6 +113,9 @@
       {#snippet controls()}
         <span class="model-slot" data-testid="acp-model-slot">
           <AcpModelPicker models={model.models} selected={model.selected} onchoose={(id) => void model.choose(id)} />
+        </span>
+        <span class="effort-slot" data-testid="acp-effort-slot">
+          <ChatEffortPicker efforts={model.efforts} value={model.effort} onchoose={(effort) => void model.chooseEffort(effort)} />
         </span>
       {/snippet}
     </ChatComposer>

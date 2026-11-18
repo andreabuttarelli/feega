@@ -83,4 +83,43 @@ describe('AgentModelChoice', () => {
     expect(choice.selected).toBe('sol');
     expect(choice.failed).toBe(true);
   });
+
+  const WITH_EFFORT: ModelListing = { models: [{ id: 'sol', name: 'Sol', description: null, efforts: ['low', 'high'] }, { id: 'luna', name: 'Luna', description: null, efforts: [] }], current: 'sol', chosen: null, effort: 'high', chosenEffort: null };
+
+  it('offers the efforts of the selected model, starting from the saved one or the agent default', async () => {
+    const choice = new AgentModelChoice(server(WITH_EFFORT).fetcher);
+    await choice.load('claude');
+
+    expect(choice.efforts).toEqual(['low', 'high']);
+    expect(choice.effort).toBe('high');
+
+    const saved = new AgentModelChoice(server({ ...WITH_EFFORT, chosenEffort: 'low' }).fetcher);
+    await saved.load('claude');
+    expect(saved.effort).toBe('low');
+  });
+
+  it('offers no effort for a model without any', async () => {
+    const choice = new AgentModelChoice(server(WITH_EFFORT).fetcher);
+    await choice.load('codex');
+    await choice.choose('luna');
+
+    expect(choice.efforts).toEqual([]);
+  });
+
+  it('switches the effort at once, saves it, and goes back if the save fails', async () => {
+    const { calls, fetcher } = server(WITH_EFFORT);
+    const choice = new AgentModelChoice(fetcher);
+    await choice.load('claude');
+
+    const saved = choice.chooseEffort('low');
+    expect(choice.effort).toBe('low');
+    await saved;
+    expect(calls.at(-1)).toEqual({ url: '/api/v1/local/acp/agents/claude/models', method: 'PUT', body: { effort: 'low' } });
+
+    const failing = new AgentModelChoice(server(WITH_EFFORT, 'fail').fetcher);
+    await failing.load('claude');
+    await failing.chooseEffort('low');
+    expect(failing.effort).toBe('high');
+    expect(failing.failed).toBe(true);
+  });
 });
