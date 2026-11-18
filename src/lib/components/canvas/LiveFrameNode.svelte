@@ -1,7 +1,7 @@
 <script lang="ts">
   import { FrameMode } from '$lib/canvas/live-budget';
   import { liveUrl, type LiveFrame } from '$lib/canvas/live-frame';
-  import { LiveAsk as Ask, pickOf, type LivePreview, type LiveRect } from '$lib/canvas/live-fields';
+  import { LiveAsk as Ask, pickOf, type LivePick, type LivePreview, type LiveRect } from '$lib/canvas/live-fields';
   import { dropLive, liveSelection, selectLive } from '$lib/canvas/live-selection.svelte';
   import { liveSession } from '$lib/canvas/live-session';
   import { liveApi, liveChanges, livePush, type LiveChangesView } from '$lib/canvas/live-edit-client';
@@ -20,7 +20,7 @@
   let box = $state(0);
   let mounted = $state(false);
   let frame = $state<HTMLIFrameElement | undefined>();
-  let hover = $state<LiveRect | null>(null);
+  let hovered = $state<LivePick | null>(null);
   let seq = 0;
   let moving = false;
   const asks = new Map<number, Ask>();
@@ -29,6 +29,15 @@
   const editing = $derived(selected && showsLive);
   const picked = $derived(liveSelection.current?.nodeId === id ? liveSelection.current : null);
   const source = $derived(picked?.pick?.source ?? null);
+  const hover = $derived(hovered && hovered.source !== source ? hovered.rect : null);
+
+  $effect(() => {
+    if (!source) {
+      return;
+    }
+    const following = setInterval(refresh, REFRESH_MS);
+    return () => clearInterval(following);
+  });
   let changes = $state<LiveChangesView | null>(null);
   let pushNote = $state('');
 
@@ -74,7 +83,7 @@
 
   $effect(() => {
     if (!editing) {
-      hover = null;
+      hovered = null;
       dropLive(id);
     }
   });
@@ -116,7 +125,6 @@
       return;
     }
     frame?.contentWindow?.postMessage({ type: PREVIEW, source, ...next }, '*');
-    setTimeout(refresh, REFRESH_MS);
   }
 
   function onmessage(e: MessageEvent) {
@@ -127,10 +135,10 @@
     asks.delete(e.data.id);
     const pick = pickOf(e.data.result);
     if (kind === Ask.Hover) {
-      hover = pick?.rect ?? null;
+      hovered = pick;
       return;
     }
-    if (kind === Ask.Pick || (kind === Ask.Refresh && pick)) {
+    if (kind === Ask.Pick || (kind === Ask.Refresh && pick?.source === source)) {
       selectLive({ nodeId: id, pick, untagged: pick === null, preview });
     }
   }
@@ -156,9 +164,9 @@
     ></iframe>
   {/if}
   {#if editing}
-    <div class="edit nodrag" role="presentation" data-testid="live-frame-edit" onpointermove={onmove} onpointerleave={() => (hover = null)} onclick={(e) => ask(Ask.Pick, pointAt(e))}>
+    <div class="edit nodrag" role="presentation" data-testid="live-frame-edit" onpointermove={onmove} onpointerleave={() => (hovered = null)} onclick={(e) => ask(Ask.Pick, pointAt(e))}>
       {#if hover}
-        <div class="outline hover" style={boxStyle(hover)}></div>
+        <div class="outline hover" style={boxStyle(hover)} data-testid="live-frame-hover"></div>
       {/if}
       {#if picked?.pick}
         <div class="outline picked" style={boxStyle(picked.pick.rect)} data-testid="live-frame-picked" data-source={picked.pick.source}></div>
