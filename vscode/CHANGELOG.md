@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4
+
+- Screenshot and banner on the marketplace page.
+
 ## 0.1.3
 
 - Also published on Open VSX, for Cursor, Windsurf and VSCodium.
