@@ -1,9 +1,7 @@
 import { fail } from '@sveltejs/kit';
-import type { RequestEvent } from '@sveltejs/kit';
-import type { SettingsActions, SettingsEvent } from '../event';
+import type { SharedActions, SharedEvent } from '../event';
 import type { Db } from '$lib/server/db/client';
 import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
-import { settingsScope } from '$lib/server/settings-actions';
 import { ALLOWLIST_MEDIA_LIST, isOrgAdmin, readAllowlist, setAllowlist, type Allowlists } from '$lib/server/model-allowlist/admin';
 import { can, OrgAction, type OrgRole } from '$lib/org-roles';
 
@@ -13,7 +11,7 @@ const HTTP_UNAVAILABLE = 503;
 
 const NONE: Allowlists = { image: [], video: [], model3d: [] };
 
-export const load = async ({ parent, locals }: SettingsEvent) => {
+export const load = async ({ parent, locals }: SharedEvent) => {
   const { org } = await parent();
   const catalogue = await canvasModelCatalogue();
   const models = Object.fromEntries(ALLOWLIST_MEDIA_LIST.map((medium) => [medium, catalogue[medium].choices.map(({ id, label }) => ({ id, label }))]));
@@ -25,11 +23,11 @@ export const load = async ({ parent, locals }: SettingsEvent) => {
   };
 };
 
-async function saveAllowlist(event: RequestEvent<{ projectId: string }>) {
+async function saveAllowlist(event: SharedEvent) {
   const { supabase } = event.locals;
-  const scope = await settingsScope(supabase, event.params.projectId);
+  const { org } = await event.parent();
   const { data } = await supabase.auth.getUser();
-  if (!scope || !data.user || !(await isOrgAdmin(supabase as unknown as Db, scope.orgId, data.user.id))) {
+  if (!data.user || !(await isOrgAdmin(supabase as unknown as Db, org.id, data.user.id))) {
     return fail(HTTP_FORBIDDEN, { allowlistError: 'forbidden' });
   }
 
@@ -40,11 +38,11 @@ async function saveAllowlist(event: RequestEvent<{ projectId: string }>) {
   }
 
   const saved = await setAllowlist(supabase as unknown as Db, {
-    orgId: scope.orgId,
+    orgId: org.id,
     medium: medium as (typeof ALLOWLIST_MEDIA_LIST)[number],
     modelIds: form.getAll('model_ids').map(String)
   });
   return saved ? { allowlistSaved: medium } : fail(HTTP_UNAVAILABLE, { allowlistError: 'unavailable' });
 }
 
-export const actions: SettingsActions = { saveAllowlist };
+export const actions: SharedActions ={ saveAllowlist };

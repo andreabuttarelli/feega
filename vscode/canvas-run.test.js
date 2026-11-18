@@ -139,3 +139,10 @@ test('la coda del log tiene le ultime righe', () => {
   assert.doesNotMatch(text, /line 10\n/);
   assert.equal(text.trim().split('\n').length, 40);
 });
+
+test('appena aperta, la schermata mostra già il primo passo in corso, prima di qualunque evento', () => {
+  const steps = progressOf(Launch.ImportFolder).steps;
+  assert.equal(steps[0].state, 'active');
+  assert.ok(steps.slice(1).every((s) => s.state === 'pending'));
+  assert.match(stepsPage(progressOf(Launch.Open)), /<li class="active"/);
+});

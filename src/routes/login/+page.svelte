@@ -174,7 +174,7 @@
             <p class="sub">{$_('login.signup.sub')}</p>
           {/if}
         {:else}
-          <h1 class="hidden-title">{$_('login.signin.title')}</h1>
+          <PageTitle size={TitleSize.ScreenReader} text={$_('login.signin.title')} />
         {/if}
         {#if mode !== 'forgot'}
         {#if data.appleSignIn}
@@ -371,14 +371,6 @@
 {/if}
 
 <style>
-  .hidden-title {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
 
 
   .page {
@@ -429,7 +421,7 @@
   .oauth-form {
     margin-top: var(--ui-space-6);
   }
-  .hidden-title + .oauth-form {
+  :global(.screen-reader) + .oauth-form {
     margin-top: 0;
   }
   .oauth-form + .oauth-form {

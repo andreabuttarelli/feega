@@ -1,12 +1,9 @@
-import type { SettingsEvent } from '../event';
+import type { BrandEvent } from '../event';
 
 const PRODUCT_COLUMNS = 'id, title, price, currency, images, available, store_url, platform';
 
-export const load = async ({ parent, locals: { supabase } }: SettingsEvent) => {
+export const load = async ({ parent, locals: { supabase } }: BrandEvent) => {
   const { brand } = await parent();
-  if (!brand) {
-    return { products: [] };
-  }
 
   const { data } = await supabase
     .from('products')

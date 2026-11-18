@@ -1,7 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { SETTINGS_GROUPS, SETTINGS_SECTIONS } from './platforms';
+import { CANVAS_SETTINGS_GROUPS, SETTINGS_SECTIONS } from './platforms';
+
+const BRAND_PAGE = '../../../routes/app/settings/brands/[brandId]/brand/+page.svelte';
 
 const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 const routeDir = (section: string) =>
@@ -25,7 +27,7 @@ describe('la pagina brand mostra solo le colonne vere', () => {
   it('non le lascia nemmeno negli elenchi che disegnano la navigazione', () => {
     const listed = [
       ...SETTINGS_SECTIONS.map((s) => s.path),
-      ...SETTINGS_GROUPS.flatMap((g) => g.items.map((i) => i.section))
+      ...CANVAS_SETTINGS_GROUPS.flatMap((g) => g.items.map((i) => i.section))
     ];
     for (const section of REMOVED) {
       expect(listed, `${section} è ancora in nav`).not.toContain(section);
@@ -33,7 +35,7 @@ describe('la pagina brand mostra solo le colonne vere', () => {
   });
 
   it('la pagina brand edita solo i campi reali di brands', () => {
-    const page = read('../../../routes/p/[projectId]/settings/brand/+page.svelte');
+    const page = read(BRAND_PAGE);
 
     for (const field of ['name', 'website', 'short_description', 'content']) {
       expect(page, `manca il campo ${field}`).toContain(`name="${field}"`);
@@ -42,8 +44,8 @@ describe('la pagina brand mostra solo le colonne vere', () => {
     expect(page).not.toContain('BrandTimezone');
   });
 
-  it('mostra uno stato vuoto quando il progetto non ha un brand', () => {
-    const page = read('../../../routes/p/[projectId]/settings/brand/+page.svelte');
-    expect(page).toContain('!data.brand');
+  it('la pagina brand vive nel dashboard, non nella tela, e non ha uno stato vuoto', () => {
+    expect(existsSync(routeDir('brand'))).toBe(false);
+    expect(read(BRAND_PAGE)).not.toContain('No brand yet');
   });
 });

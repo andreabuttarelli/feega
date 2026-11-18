@@ -9,13 +9,13 @@
   import FreeSection from '$lib/site/home/FreeSection.svelte';
   import Modes from '$lib/site/home/Modes.svelte';
   import { HOME_JSON_LD } from '$lib/site/structured-data';
-  import { FIRST_VISIT_SCRIPT } from '$lib/site/signed-in';
+  import { FIRST_VISIT_TAG } from '$lib/site/signed-in';
 
   import { HOME_META } from '$lib/site/seo';
 </script>
 
 <svelte:head>
-  {@html `<script>${FIRST_VISIT_SCRIPT}</script>`}
+  {@html FIRST_VISIT_TAG}
   <title>{HOME_META.title}</title>
   <meta name="description" content={HOME_META.description} />
   <meta property="og:title" content={HOME_META.title} />

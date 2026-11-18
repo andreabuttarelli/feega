@@ -1,8 +1,7 @@
 import { fail } from '@sveltejs/kit';
-import type { Actions } from '@sveltejs/kit';
 import { invalidateBrandNav } from '$lib/server/nav-cache';
 import { withBrandContext } from '$lib/server/ai-log';
-import { brandSlugOf } from '$lib/server/tenancy/brand-slug';
+import type { BrandEvent } from '$lib/server/settings/event';
 import { safeFetchBytes, SafeFetchError, type SafeFetchReason } from '$lib/server/tool-guard';
 
 // Ceiling on the brand's free-text video direction. The video prompt is a stack of structural
@@ -11,21 +10,9 @@ import { safeFetchBytes, SafeFetchError, type SafeFetchReason } from '$lib/serve
 export const VIDEO_INSTRUCTIONS_MAX = 600;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function brandOfProject(supabase: any, projectId: string) {
-  const slug = await brandSlugOf(supabase, projectId);
-  if (!slug) return null;
-  const { data } = await supabase
-    .from('brands')
-    .select('id, slug, content_prefs')
-    .eq('slug', slug)
-    .maybeSingle();
-  return data;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function withBrand<T>(supabase: any, projectId: string | undefined, fn: (brand: any) => Promise<T>): Promise<T> {
-  if (!projectId) return fail(404, { error: 'Brand not found' }) as T;
-  const brand = await brandOfProject(supabase, projectId);
+async function withBrand<T>({ parent, locals: { supabase } }: BrandEvent, fn: (brand: any) => Promise<T>): Promise<T> {
+  const { brand: shell } = await parent();
+  const { data: brand } = await supabase.from('brands').select('id, slug, content_prefs').eq('id', shell.id).maybeSingle();
   if (!brand) return fail(404, { error: 'Brand not found' }) as T;
   return withBrandContext(brand.id, async () => {
     try {
@@ -98,14 +85,15 @@ export async function storeBrandLogoFromUrl(
   return { url };
 }
 
-export const studioActions: Actions = {
+export const studioActions = {
 
   // Clip length for generated videos (Settings → Video). Stored on content_prefs.videoDuration so
   // it needs no migration and travels with the other generation preferences. Clamped against the
   // brand's chosen (or env-default) model — the ceiling is that model's maxDuration, never a
   // global constant.
-  updateVideoDuration: async ({ request, params, locals: { supabase } }) => {
-    return withBrand(supabase, params.projectId, async (brand) => {
+  updateVideoDuration: async (event: BrandEvent) => {
+    const { request, locals: { supabase } } = event;
+    return withBrand(event, async (brand) => {
       const fd = await request.formData();
       const { clampVideoDuration, isKnownVideoModel } = await import('$lib/server/video');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -125,8 +113,9 @@ export const studioActions: Actions = {
   // Quale modello serve quale mestiere (Settings -> Images & video). Una sola azione per tutti e
   // sei gli slot: la regola che un modello deve saper fare il lavoro in cui viene salvato vale
   // ovunque, e scritta sei volte divergerebbe al primo cambio.
-  updateMediaModel: async ({ request, params, locals: { supabase } }) => {
-    return withBrand(supabase, params.projectId, async (brand) => {
+  updateMediaModel: async (event: BrandEvent) => {
+    const { request, locals: { supabase } } = event;
+    return withBrand(event, async (brand) => {
       const fd = await request.formData();
       const { mediaModelSlot } = await import('$lib/media-model-slots');
       const slot = mediaModelSlot(fd.get('slot'));
@@ -152,8 +141,9 @@ export const studioActions: Actions = {
   // second, and every draft is paid for whether or not it ever ships — which is why 480p is the
   // recommended default and this is an explicit opt-in rather than a quality ladder we climb for
   // the brand. Same storage shape as videoDuration: on content_prefs, no migration.
-  updateVideoResolution: async ({ request, params, locals: { supabase } }) => {
-    return withBrand(supabase, params.projectId, async (brand) => {
+  updateVideoResolution: async (event: BrandEvent) => {
+    const { request, locals: { supabase } } = event;
+    return withBrand(event, async (brand) => {
       const fd = await request.formData();
       const { clampVideoResolution } = await import('$lib/server/video');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -172,8 +162,9 @@ export const studioActions: Actions = {
   // what the person on camera must never do — as opposed to platformInstructions, which steers the
   // caption. Capped so a pasted essay can't crowd out the structural parts of the video prompt;
   // blank clears the override rather than storing an empty string.
-  updateVideoInstructions: async ({ request, params, locals: { supabase } }) => {
-    return withBrand(supabase, params.projectId, async (brand) => {
+  updateVideoInstructions: async (event: BrandEvent) => {
+    const { request, locals: { supabase } } = event;
+    return withBrand(event, async (brand) => {
       const fd = await request.formData();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const prefs: Record<string, any> = { ...(brand.content_prefs ?? {}) };

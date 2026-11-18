@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+process.env.FEEGA_LIVE_TARGET = 'branch';
 import { describe, expect, it } from 'vitest';
 import { LIVE_BRANCH, LIVE_DIR_ENV, liveCheckoutOf } from './live-checkout';
 import { Publish, localGitHost } from '$lib/server/code-push/local-git-host';

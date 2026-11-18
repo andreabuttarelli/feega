@@ -1,5 +1,47 @@
 <script lang="ts">
-  import entries from 'virtual:changelog-entries';
+  import { changelogPagePath, type ChangelogEntry } from '$lib/site/changelog-pages';
+
+  const AHEAD_PX = 800;
+
+  let { data } = $props();
+
+  let shown = $state<ChangelogEntry[]>([]);
+  let page = $state(1);
+  let loading = $state(false);
+  let failed = $state(false);
+  let sentinel = $state<HTMLElement | null>(null);
+
+  const entries = $derived([...data.entries, ...shown]);
+  const more = $derived(page < data.pages);
+
+  async function loadMore() {
+    if (loading || !more) {
+      return;
+    }
+
+    loading = true;
+    failed = false;
+    const res = await fetch(changelogPagePath(page + 1)).catch(() => null);
+    if (!res?.ok) {
+      loading = false;
+      failed = true;
+      return;
+    }
+
+    shown = [...shown, ...((await res.json()) as ChangelogEntry[])];
+    page += 1;
+    loading = false;
+  }
+
+  $effect(() => {
+    if (!sentinel || failed || loading || !page) {
+      return;
+    }
+
+    const watcher = new IntersectionObserver(([hit]) => hit.isIntersecting && void loadMore(), { rootMargin: `${AHEAD_PX}px` });
+    watcher.observe(sentinel);
+    return () => watcher.disconnect();
+  });
 </script>
 
 <svelte:head>
@@ -28,6 +70,12 @@
       </div>
     </article>
   {/each}
+
+  {#if more}
+    <div class="more" bind:this={sentinel}>
+      <button type="button" onclick={loadMore} disabled={loading}>{loading ? 'Loading…' : failed ? 'Try again' : 'Show more'}</button>
+    </div>
+  {/if}
 </section>
 
 <style>
@@ -76,6 +124,27 @@
     font-size: 15px;
     line-height: 1.6;
     opacity: 0.8;
+  }
+  .more {
+    display: flex;
+    justify-content: center;
+    padding: 32px 0 0;
+    border-top: 1px solid var(--site-line);
+  }
+  .more button {
+    min-height: 44px;
+    padding: 0 22px;
+    border: 1px solid var(--site-line);
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 15px;
+    cursor: pointer;
+  }
+  .more button:disabled {
+    opacity: 0.6;
+    cursor: default;
   }
   @media (max-width: 640px) {
     article {

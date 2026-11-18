@@ -1,8 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { SettingsActions } from '../event';
+import type { BrandActions, BrandEvent } from '../event';
 import { readUploadImage } from '$lib/server/raster-image';
-import { brandIdOf } from '$lib/server/tenancy/brand-slug';
 import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
 import {
   FONT_ROLES,
@@ -23,11 +22,10 @@ const BAD_REQUEST = 400;
 const MAX_LOGO_BYTES = 4_000_000;
 const RECENT_ASSETS = 48;
 const LOGO_BUCKET = 'media';
-const NO_BRAND = 'No brand selected for this project';
 
 const EXTENSION: Record<string, string> = { 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp' };
 
-type Scope = { projectId: string; orgId: string; brandId: string };
+type Scope = { orgId: string; brandId: string };
 type FontPick = { google_family: string | null; org_font_id: string | null };
 
 export type BrandKitView = {
@@ -43,12 +41,26 @@ async function orgFontsOf(supabase: SupabaseClient, orgId: string): Promise<Arra
   return error ? [] : (data ?? []);
 }
 
+async function firstCanvasPerProject(supabase: SupabaseClient, projectIds: Array<string | null>): Promise<Map<string, string>> {
+  const ids = [...new Set(projectIds.filter((id): id is string => id !== null))];
+  if (!ids.length) {
+    return new Map();
+  }
+  const { data } = await supabase.from('canvases').select('id, project_id').in('project_id', ids);
+  const first = new Map<string, string>();
+  for (const row of data ?? []) {
+    if (!first.has(row.project_id)) {
+      first.set(row.project_id, row.id);
+    }
+  }
+  return first;
+}
+
 export async function loadKit(supabase: SupabaseClient, scope: Scope): Promise<BrandKitView> {
-  const [brandRes, fontsRes, assetsRes, canvasRes, orgFonts] = await Promise.all([
+  const [brandRes, fontsRes, assetsRes, orgFonts] = await Promise.all([
     supabase.from('brands').select('palette, voice, logos').eq('id', scope.brandId).maybeSingle(),
     supabase.from('brand_fonts').select('role, google_family, org_font_id').eq('brand_id', scope.brandId),
-    supabase.from('assets').select('id, brand_id, approved_at').eq('org_id', scope.orgId).eq('type', 'image').order('created_at', { ascending: false }).limit(RECENT_ASSETS),
-    supabase.from('canvases').select('id').eq('project_id', scope.projectId).limit(1).maybeSingle(),
+    supabase.from('assets').select('id, brand_id, approved_at, project_id').eq('org_id', scope.orgId).eq('type', 'image').order('created_at', { ascending: false }).limit(RECENT_ASSETS),
     orgFontsOf(supabase, scope.orgId)
   ]);
 
@@ -62,28 +74,25 @@ export async function loadKit(supabase: SupabaseClient, scope: Scope): Promise<B
     fonts[row.role as FontRole] = { google_family: row.google_family, org_font_id: row.org_font_id };
   }
 
-  const canvasId = canvasRes.data?.id ?? null;
+  const assetRows = assetsRes.data ?? [];
+  const canvasOf = await firstCanvasPerProject(supabase, assetRows.map((a) => a.project_id));
 
   return {
     fields: kitToForm({ palette: palette.success ? palette.data : [], voice: voice.success ? voice.data : {} }),
     logos: logos.success ? logos.data : [],
     fonts,
     orgFonts,
-    assets: (assetsRes.data ?? []).map((a) => ({
+    assets: assetRows.map((a) => ({
       id: a.id,
       approved: a.brand_id === scope.brandId && Boolean(a.approved_at),
-      thumb: canvasId ? canvasAssetUrl(scope.projectId, canvasId, a.id, AssetSize.Thumb) : null
+      thumb: a.project_id && canvasOf.has(a.project_id) ? canvasAssetUrl(a.project_id, canvasOf.get(a.project_id)!, a.id, AssetSize.Thumb) : null
     }))
   };
 }
 
-async function brandScope(supabase: SupabaseClient, projectId: string): Promise<{ brandId: string; orgId: string } | null> {
-  const brandId = await brandIdOf(supabase, projectId);
-  if (!brandId) {
-    return null;
-  }
-  const { data } = await supabase.from('brands').select('org_id').eq('id', brandId).maybeSingle();
-  return data ? { brandId, orgId: data.org_id } : null;
+async function brandScope({ parent }: BrandEvent): Promise<{ brandId: string; orgId: string }> {
+  const { brand } = await parent();
+  return { brandId: brand.id, orgId: brand.org_id };
 }
 
 async function currentLogos(supabase: SupabaseClient, brandId: string): Promise<Logos> {
@@ -104,9 +113,9 @@ export async function writeLogos(supabase: SupabaseClient, brandId: string, vari
 }
 
 export const kitActions = {
-  saveKit: async ({ request, params, locals: { supabase } }) => {
-    const scope = await brandScope(supabase, params.projectId!);
-    if (!scope) return fail(BAD_REQUEST, { error: NO_BRAND });
+  saveKit: async (event) => {
+    const { request, locals: { supabase } } = event;
+    const scope = await brandScope(event);
 
     const kit = kitFromForm(await request.formData());
     if (!kit.ok) return fail(BAD_REQUEST, { error: kit.error });
@@ -119,9 +128,9 @@ export const kitActions = {
     return { saved: true };
   },
 
-  saveFonts: async ({ request, params, locals: { supabase } }) => {
-    const scope = await brandScope(supabase, params.projectId!);
-    if (!scope) return fail(BAD_REQUEST, { error: NO_BRAND });
+  saveFonts: async (event) => {
+    const { request, locals: { supabase } } = event;
+    const scope = await brandScope(event);
 
     const choices = fontsFromForm(await request.formData());
     const chosen = choices.filter((c) => c.org_font_id || c.google_family);
@@ -139,9 +148,9 @@ export const kitActions = {
     return { saved: true };
   },
 
-  uploadLogoVariant: async ({ request, params, locals: { supabase } }) => {
-    const scope = await brandScope(supabase, params.projectId!);
-    if (!scope) return fail(BAD_REQUEST, { error: NO_BRAND });
+  uploadLogoVariant: async (event) => {
+    const { request, locals: { supabase } } = event;
+    const scope = await brandScope(event);
 
     const fd = await request.formData();
     const variant = variantOf(fd);
@@ -162,9 +171,9 @@ export const kitActions = {
     return { saved: true };
   },
 
-  removeLogoVariant: async ({ request, params, locals: { supabase } }) => {
-    const scope = await brandScope(supabase, params.projectId!);
-    if (!scope) return fail(BAD_REQUEST, { error: NO_BRAND });
+  removeLogoVariant: async (event) => {
+    const { request, locals: { supabase } } = event;
+    const scope = await brandScope(event);
 
     const variant = variantOf(await request.formData());
     if (!variant) return fail(BAD_REQUEST, { error: 'Unknown logo variant' });
@@ -174,9 +183,9 @@ export const kitActions = {
     return { saved: true };
   },
 
-  toggleApproved: async ({ request, params, locals: { supabase } }) => {
-    const scope = await brandScope(supabase, params.projectId!);
-    if (!scope) return fail(BAD_REQUEST, { error: NO_BRAND });
+  toggleApproved: async (event) => {
+    const { request, locals: { supabase } } = event;
+    const scope = await brandScope(event);
 
     const fd = await request.formData();
     const assetId = String(fd.get('assetId') ?? '');
@@ -187,4 +196,4 @@ export const kitActions = {
     if (error) return fail(BAD_REQUEST, { error: error.message });
     return { saved: true };
   }
-} satisfies SettingsActions;
+} satisfies BrandActions;

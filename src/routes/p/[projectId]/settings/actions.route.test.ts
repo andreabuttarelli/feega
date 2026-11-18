@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeDb, type Call } from '$lib/server/db/fake-db';
 
 vi.mock('$lib/server/tenancy', () => ({ hasManyTenants: () => true }));
+vi.mock('$lib/server/repos/orgs', async (original) => ({
+  ...(await original<object>()),
+  listMemberships: async () => [{ org: { id: 'org-1', name: 'Org', slug: 'org' }, role: 'owner' }]
+}));
 vi.mock('$lib/server/email', () => ({
   sendEmail: vi.fn(),
   brandInviteEmailSubject: () => 's',
@@ -68,6 +72,16 @@ describe('le azioni delle impostazioni leggono il progetto, non un params.brand 
     expect(writes(calls, 'api_keys', 'insert')[0].payload).toMatchObject({ org_id: ORG, user_id: USER });
   });
 
+  it('crea una chiave API per l org scelta quando il percorso non ha un progetto', async () => {
+    const { ev, calls } = event(baseRows(null), { key_name: 'CI' });
+    const dashboard = { ...ev, params: {} };
+
+    const result = await run(apiKeyActions.createApiKey, dashboard);
+
+    expect(result).toMatchObject({ apiKeyCreated: true });
+    expect(writes(calls, 'api_keys', 'insert')[0].payload).toMatchObject({ org_id: ORG, user_id: USER });
+  });
+
   it('revoca una chiave API dentro l org del progetto', async () => {
     const { ev, calls } = event(baseRows(null), { key_id: 'k-1' });
 
@@ -85,14 +99,15 @@ describe('le azioni delle impostazioni leggono il progetto, non un params.brand 
     expect(result).toMatchObject({ status: 404, data: { apiKeyError: 'Key not found, or not yours to revoke' } });
   });
 
-  it('cancella il brand del progetto quando il nome combacia', async () => {
+  it('cancella il brand dell URL quando il nome combacia, e torna all elenco dei brand', async () => {
     const { ev, calls } = event(baseRows(BRAND.id), { confirm: 'Acme' });
+    const withBrand = { ...ev, parent: async () => ({ brand: BRAND }) };
 
-    const outcome = await run(dangerActions.deleteBrand, ev).catch((e: unknown) => e);
+    const outcome = await run(dangerActions.deleteBrand, withBrand).catch((e: unknown) => e);
 
     expect(outcome).toMatchObject({ status: 303 });
     expect(writes(calls, 'brands', 'delete')[0].filters).toContainEqual(['id', BRAND.id]);
-    expect((outcome as { location: string }).location).toBe(`/p/${PROJECT}/settings/brand`);
+    expect((outcome as { location: string }).location).toBe('/app/settings/brands');
   });
 
   it('un progetto di un altra org non si raggiunge', async () => {

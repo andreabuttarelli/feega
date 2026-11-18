@@ -116,6 +116,8 @@
       "workspace": "Workspace",
       "sectionAccount": "Account",
       "sectionBrand": "Brand",
+      "sectionBrands": "Brands",
+      "allBrands": "All brands",
       "sectionProject": "Project"
     },
     "hub": {
@@ -379,8 +381,7 @@
     },
     "studio": {
       "tabs": {
-        "brand": "Brand Kit",
-        "productsTitle": "Products"
+        "brand": "Brand Kit"
       }
     },
     "account": {

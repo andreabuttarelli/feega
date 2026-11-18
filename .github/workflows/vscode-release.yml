@@ -23,7 +23,7 @@ jobs:
       - name: Version from the tag
         if: startsWith(github.ref, 'refs/tags/vscode-v')
         run: npm version --no-git-tag-version --allow-same-version "${GITHUB_REF_NAME#vscode-v}"
-      - run: npx -y @vscode/vsce@3 package --no-dependencies -o feega.vsix
+      - run: npx -y @vscode/vsce@3 package --no-dependencies -o feega.vsix --baseImagesUrl "https://raw.githubusercontent.com/andreabuttarelli/feega/${GITHUB_REF_NAME}/vscode"
       - name: Visual Studio Marketplace
         if: startsWith(github.ref, 'refs/tags/vscode-v')
         env:

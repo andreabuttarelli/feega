@@ -6,7 +6,7 @@ const DUMMY_SECRET = 'xxxxxxxxxxxxxxxxxxxxxxxx';
 
 test('connect figma', async ({ page, session }) => {
   await installCursor(page);
-  await gotoHydrated(page, `/p/${session.projectId}/settings/profile`);
+  await gotoHydrated(page, `/app/settings/profile`);
   const form = page.getByTestId('figma-token-form');
   await expect(form).toBeVisible({ timeout: 30_000 });
   await form.scrollIntoViewIfNeeded();

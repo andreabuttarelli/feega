@@ -60,7 +60,7 @@ describe('app sidebar', () => {
 
   it('keeps account entries: settings, billing, changelog, report, legal, theme, sign out', () => {
     const body = html();
-    expect(body).toContain('href="/p/p1/settings/project"');
+    expect(body).toContain('href="/app/settings/profile"');
     expect(body).toContain('href="/app/credits"');
     expect(body).toContain('href="https://feega.app/changelog"');
     expect(body).toContain('href="/report"');
@@ -100,7 +100,7 @@ describe('account menu at the foot of the sidebar', () => {
   it('every account entry lives in the menu, after New project', () => {
     const body = html();
     const inside = menu(body);
-    for (const needle of ['href="/p/p1/settings/project"', 'href="/app/credits"', 'href="https://feega.app/changelog"', 'href="/report"', 'data-testid="open-tour"', 'href="https://feega.app/terms"', 'data-testid="theme-switch"', 'action="/auth/signout"']) {
+    for (const needle of ['href="/app/settings/profile"', 'href="/app/credits"', 'href="https://feega.app/changelog"', 'href="/report"', 'data-testid="open-tour"', 'href="https://feega.app/terms"', 'data-testid="theme-switch"', 'action="/auth/signout"']) {
       expect(inside).toContain(needle);
     }
     expect(body.indexOf('New project')).toBeLessThan(body.indexOf('data-testid="account-menu"'));

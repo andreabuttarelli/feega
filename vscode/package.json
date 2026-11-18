@@ -69,5 +69,12 @@
     "test": "node --test canvas-run.test.js",
     "package": "npx -y @vscode/vsce package --no-dependencies",
     "test:e2e": "node test/run.js"
+  },
+  "galleryBanner": {
+    "color": "#0b0b0c",
+    "theme": "dark"
+  },
+  "bugs": {
+    "url": "https://github.com/andreabuttarelli/feega/issues"
   }
 }

@@ -175,7 +175,7 @@
         <span class="badge rounded-full" data-testid="live-frame-untagged">Not tagged · run feega init</span>
       {:else if changes?.files.length}
         <span class="badge changes rounded-full" data-testid="live-changes">
-          {pushNote || `${changes.files.length} file${changes.files.length === 1 ? '' : 's'} on ${changes.branch}`}
+          {pushNote || `${changes.files.length} file${changes.files.length === 1 ? '' : 's'} changed${changes.branch ? ` on ${changes.branch}` : ''}`}
           <button type="button" class="rounded-full" data-testid="live-push" onclick={(e) => (e.stopPropagation(), void push())}>Push</button>
         </span>
       {/if}
