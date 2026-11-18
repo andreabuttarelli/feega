@@ -369,7 +369,8 @@ describe('readSharedCanvas — i nodi sorgente', () => {
       outputs: [
         { label: 'Images', port: 'images', incompatible: false },
         { label: 'Text', port: 'text', incompatible: false },
-        { label: 'Likes', port: 'text', incompatible: false }
+        { label: 'Price', port: 'text', incompatible: false },
+        { label: 'Likes', port: 'text', incompatible: true }
       ]
     });
   });
@@ -431,30 +432,26 @@ describe('readSharedCanvas — i nodi sorgente', () => {
     expect(calls.some((c) => c.table === 'posts')).toBe(false);
   });
 
-  it('social_post_mockup e ads mostrano il contenuto, non gli id', async () => {
+  it('social_post_mockup mostra il contenuto, non gli id', async () => {
     const { db } = sourceDb([
-      node('n-mock', 'social_post_mockup', { general: { caption: 'Hello', media: ['https://cdn.example/m.jpg', { url: 'https://cdn.example/n.jpg' }] } }),
-      node('n-ads', 'ads', { mode: 'page', page_id: '123', page_name: 'Nike', country: 'IT' })
+      node('n-mock', 'social_post_mockup', { general: { caption: 'Hello', media: ['https://cdn.example/m.jpg', { url: 'https://cdn.example/n.jpg' }] } })
     ]);
 
     const shared = await readSharedCanvas(db, 'tok-live', sign);
 
     expect(shared?.nodes[0].view).toEqual({ kind: 'post', caption: 'Hello', media: ['https://cdn.example/m.jpg', 'https://cdn.example/n.jpg'] });
-    expect(shared?.nodes[1].view).toEqual({ kind: 'ads', query: 'Nike', country: 'IT' });
-    expect(JSON.stringify(shared)).not.toContain('123');
   });
 
-  it('a post, ads, embed or document with nothing in it reads as empty, not as a blank frame', async () => {
+  it('a post, embed or document with nothing in it reads as empty, not as a blank frame', async () => {
     const { db } = sourceDb([
       node('n-mock', 'social_post_mockup', {}),
-      node('n-ads', 'ads', {}),
       node('n-frame', 'iframe', {}),
       node('n-doc', 'doc', {})
     ]);
 
     const shared = await readSharedCanvas(db, 'tok-live', sign);
 
-    expect(shared?.nodes.map((n) => n.view)).toEqual([{ kind: 'empty' }, { kind: 'empty' }, { kind: 'empty' }, { kind: 'empty' }]);
+    expect(shared?.nodes.map((n) => n.view)).toEqual([{ kind: 'empty' }, { kind: 'empty' }, { kind: 'empty' }]);
   });
 });
 

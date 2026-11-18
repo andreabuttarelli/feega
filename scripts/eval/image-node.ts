@@ -10,7 +10,7 @@ import { GPT_IMAGE_25_FLARE_MODEL } from '$lib/image-models';
  * LA PROVA CHE UN'IMMAGINE ATTERRA DAVVERO, NON SOLO CHE IL BUCKET ESISTE.
  *
  * `eval:canvas.ts` prova che il realtime funziona; questo prova che il motore che i nodi
- * immagine chiamano (`runGenNode` → `generateImagesWithoutBrand` → il bucket `brand-knowledge`)
+ * immagine chiamano (`runGenNode` → `generateImages` → il bucket `brand-knowledge`)
  * produce un file vero. Un bucket creato e una policy scritta non bastano: `store_failed` può
  * ancora tornare se il modello non risponde, se `storage.upload` viene respinto per un motivo che
  * la policy non dice, o se la riga in `assets` nasce senza un file dietro. Solo scaricare

@@ -88,8 +88,12 @@ describe('parseFieldInput', () => {
   });
 
   it('una data vuota si toglie', () => {
-    expect(parseFieldInput(field('filters.from'), '')).toBeNull();
-    expect(parseFieldInput(field('filters.from'), '2026-01-02')).toBe('2026-01-02');
+    expect(parseFieldInput(field('filters.from', FEED_FIELDS), '')).toBeNull();
+    expect(parseFieldInput(field('filters.from', FEED_FIELDS), '2026-01-02')).toBe('2026-01-02');
+  });
+
+  it('un interruttore resta un booleano', () => {
+    expect(parseFieldInput(field('filters.in_stock_only'), true)).toBe(true);
   });
 });
 

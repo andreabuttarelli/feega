@@ -84,7 +84,7 @@ describe('porta di una maniglia', () => {
   });
 
   it('una porta segnalata non si collega', () => {
-    expect(unavailableOutput(tile, 'out:field:price')).toBe(true);
+    expect(unavailableOutput(tile, 'out:field:likes')).toBe(true);
     expect(unavailableOutput(tile, 'out:text')).toBe(false);
   });
 });

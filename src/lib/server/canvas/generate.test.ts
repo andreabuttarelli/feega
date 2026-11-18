@@ -68,11 +68,11 @@ const freshNodeRow = {
   version: 1
 };
 
-const { generateImagesWithoutBrand, generateVideoWithoutBrand } = vi.hoisted(() => ({
-  generateImagesWithoutBrand: vi.fn(),
-  generateVideoWithoutBrand: vi.fn()
+const { generateImages, generateVideo } = vi.hoisted(() => ({
+  generateImages: vi.fn(),
+  generateVideo: vi.fn()
 }));
-vi.mock('$lib/server/media-generate', () => ({ generateImagesWithoutBrand, generateVideoWithoutBrand }));
+vi.mock('$lib/server/media-generate', () => ({ generateImages, generateVideo }));
 
 const { llmText } = vi.hoisted(() => ({ llmText: vi.fn() }));
 vi.mock('$lib/server/llm', () => ({ llmText }));
@@ -146,8 +146,8 @@ describe('runGenNode resolves the model the same way for every entry point', () 
 
   beforeEach(() => {
     canvasModelCatalogue.mockResolvedValue({ text: EMPTY_OFFER, image: imageOffer, video: EMPTY_OFFER });
-    generateImagesWithoutBrand.mockReset();
-    generateImagesWithoutBrand.mockResolvedValue({ ok: false, error: 'provider_down' });
+    generateImages.mockReset();
+    generateImages.mockResolvedValue({ ok: false, error: 'provider_down' });
   });
 
   it('a node without a model runs on the balanced recommendation', async () => {
@@ -181,7 +181,7 @@ describe('runGenNode resolves the model the same way for every entry point', () 
 /**
  * IL DIFETTO VERO: `store_failed` senza dire perché.
  *
- * Il modello RISPONDE — `generateImagesWithoutBrand` torna `ok:false` con una `reason` presa dal
+ * Il modello RISPONDE — `generateImages` torna `ok:false` con una `reason` presa dal
  * bucket che rifiuta la scrittura — ma prima di questa correzione `runGenNode` schiacciava tutto
  * su `store_failed`, un token che non dice se manca un bucket, se la scrittura è stata respinta o
  * se il campo che porta il percorso è semplicemente assente. L'utente vedeva un nodo spento e
@@ -189,11 +189,11 @@ describe('runGenNode resolves the model the same way for every entry point', () 
  */
 describe('un giro immagine che fallisce a depositare dice IL MOTIVO, non un token muto', () => {
   beforeEach(() => {
-    generateImagesWithoutBrand.mockReset();
+    generateImages.mockReset();
   });
 
   it('porta la reason del fornitore di storage nell\'errore del nodo', async () => {
-    generateImagesWithoutBrand.mockResolvedValue({
+    generateImages.mockResolvedValue({
       ok: false,
       error: 'store_failed',
       reason: 'Bucket not found'
@@ -237,8 +237,8 @@ describe('un nodo senza prompt proprio ma con un testo a monte collegato gira lo
   const TEXT_NODE = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
   beforeEach(() => {
-    generateImagesWithoutBrand.mockReset();
-    generateImagesWithoutBrand.mockResolvedValue({
+    generateImages.mockReset();
+    generateImages.mockResolvedValue({
       ok: true,
       media: [{ storage_path: 'u/media/generated.png', mime: 'image/png', width: 1024, height: 1024, ai_marked: true }],
       costUsd: 0.02
@@ -281,7 +281,7 @@ describe('un nodo senza prompt proprio ma con un testo a monte collegato gira lo
     });
 
     expect(result.kind).toBe('done');
-    expect(generateImagesWithoutBrand).toHaveBeenCalledWith(
+    expect(generateImages).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ prompt: 'a cat wearing a hat' })
     );
@@ -308,7 +308,7 @@ describe('un nodo senza prompt proprio ma con un testo a monte collegato gira lo
     });
 
     expect(result).toMatchObject({ kind: 'refused', error: 'prompt_required' });
-    expect(generateImagesWithoutBrand).not.toHaveBeenCalled();
+    expect(generateImages).not.toHaveBeenCalled();
   });
 
   it('un video senza prompt proprio ma wired a un testo gira lo stesso', () => {
@@ -349,7 +349,7 @@ describe('un nodo senza prompt proprio ma con un testo a monte collegato gira lo
     });
 
     expect(result.kind).toBe('done');
-    expect(generateImagesWithoutBrand).toHaveBeenCalledWith(
+    expect(generateImages).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ prompt: 'note del brand' })
     );
@@ -364,8 +364,8 @@ describe('un nodo senza prompt proprio ma con un testo a monte collegato gira lo
     sourceData: Record<string, unknown>,
     expectedPrompt = 'a slow pan over the mountains'
   ) {
-    generateVideoWithoutBrand.mockReset();
-    generateVideoWithoutBrand.mockResolvedValue({ ok: true, jobId: 'job-1' });
+    generateVideo.mockReset();
+    generateVideo.mockResolvedValue({ ok: true, jobId: 'job-1' });
 
     const SOURCE_NODE = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
     const videoNodeRow = { ...freshNodeRow, type: 'video' };
@@ -401,14 +401,14 @@ describe('un nodo senza prompt proprio ma con un testo a monte collegato gira lo
     });
 
     expect(result.kind).toBe('queued');
-    expect(generateVideoWithoutBrand).toHaveBeenCalledWith(
+    expect(generateVideo).toHaveBeenCalledWith(
       expect.objectContaining({ prompt: expectedPrompt })
     );
   }
 
   it("a video the provider refuses carries the provider's reason onto the node", async () => {
-    generateVideoWithoutBrand.mockReset();
-    generateVideoWithoutBrand.mockResolvedValue({
+    generateVideo.mockReset();
+    generateVideo.mockResolvedValue({
       ok: false,
       error: 'render_failed',
       reason: '`input_references` is not supported for this model.'
@@ -436,9 +436,9 @@ describe('un nodo senza prompt proprio ma con un testo a monte collegato gira lo
     expect(result).toMatchObject({ kind: 'refused', error: expect.stringContaining('input_references') });
   });
 
-  it('params.resolution scelto nella barra raggiunge generateVideoWithoutBrand', async () => {
-    generateVideoWithoutBrand.mockReset();
-    generateVideoWithoutBrand.mockResolvedValue({ ok: true, jobId: 'job-1' });
+  it('params.resolution scelto nella barra raggiunge generateVideo', async () => {
+    generateVideo.mockReset();
+    generateVideo.mockResolvedValue({ ok: true, jobId: 'job-1' });
 
     const videoNodeRow = { ...freshNodeRow, type: 'video' };
     const { db } = fakeDb(
@@ -460,7 +460,7 @@ describe('un nodo senza prompt proprio ma con un testo a monte collegato gira lo
     });
 
     expect(result.kind).toBe('queued');
-    expect(generateVideoWithoutBrand).toHaveBeenCalledWith(
+    expect(generateVideo).toHaveBeenCalledWith(
       expect.objectContaining({ resolution: '720p' })
     );
   });
@@ -469,8 +469,8 @@ describe('un nodo senza prompt proprio ma con un testo a monte collegato gira lo
     [{}, 5],
     [{ duration: 13 }, 10]
   ])('la durata che arriva al fornitore è quella che la barra mostra per il modello scelto (%o → %is)', async (params, sent) => {
-    generateVideoWithoutBrand.mockReset();
-    generateVideoWithoutBrand.mockResolvedValue({ ok: true, jobId: 'job-1' });
+    generateVideo.mockReset();
+    generateVideo.mockResolvedValue({ ok: true, jobId: 'job-1' });
     offerableSpy.mockResolvedValueOnce({
       choices: [{ id: 'alibaba/wan-2.6', label: 'Wan 2.6', durationOptions: [5, 10], params: [] }],
       recommended: []
@@ -495,12 +495,12 @@ describe('un nodo senza prompt proprio ma con un testo a monte collegato gira lo
       expectedVersion: 1
     });
 
-    expect(generateVideoWithoutBrand).toHaveBeenCalledWith(expect.objectContaining({ durationSeconds: sent }));
+    expect(generateVideo).toHaveBeenCalledWith(expect.objectContaining({ durationSeconds: sent }));
   });
 
-  it('params.resolution scelto nella barra raggiunge generateImagesWithoutBrand', async () => {
-    generateImagesWithoutBrand.mockReset();
-    generateImagesWithoutBrand.mockResolvedValue({
+  it('params.resolution scelto nella barra raggiunge generateImages', async () => {
+    generateImages.mockReset();
+    generateImages.mockResolvedValue({
       ok: true,
       media: [{ id: null, kind: 'image', mime: 'image/png', width: 1024, height: 1024, url: 'https://x/y.png' }],
       model: 'bytedance-seed/seedream-4.5',
@@ -527,7 +527,7 @@ describe('un nodo senza prompt proprio ma con un testo a monte collegato gira lo
       expectedVersion: 1
     });
 
-    expect(generateImagesWithoutBrand).toHaveBeenCalledWith(
+    expect(generateImages).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ resolution: '2K' })
     );
@@ -536,8 +536,8 @@ describe('un nodo senza prompt proprio ma con un testo a monte collegato gira lo
   it('an image that lands is node_generated as image, for the user who ran it', async () => {
     const { useCoreSink } = await import('$lib/server/core-usage');
     const sent: { event: string; distinct_id: string; properties: Record<string, unknown> }[] = [];
-    generateImagesWithoutBrand.mockReset();
-    generateImagesWithoutBrand.mockResolvedValue({ ok: true, media: [{ storage_path: 'u/media/generated.png', mime: 'image/png', width: 1024, height: 1024 }], costUsd: 0.02 });
+    generateImages.mockReset();
+    generateImages.mockResolvedValue({ ok: true, media: [{ storage_path: 'u/media/generated.png', mime: 'image/png', width: 1024, height: 1024 }], costUsd: 0.02 });
     const imageNodeRow = { ...freshNodeRow, type: 'image' };
     const { db } = fakeDb({ nodes: [imageNodeRow], assets: [] }, { updateRows: { nodes: [{ ...imageNodeRow, version: 2 }] } });
     useCoreSink((b) => sent.push(b));
@@ -557,8 +557,8 @@ describe('un nodo senza prompt proprio ma con un testo a monte collegato gira lo
  */
 describe('params.enhancePrompt riscrive il prompt prima di generare', () => {
   beforeEach(() => {
-    generateImagesWithoutBrand.mockReset();
-    generateImagesWithoutBrand.mockResolvedValue({
+    generateImages.mockReset();
+    generateImages.mockResolvedValue({
       ok: true,
       media: [{ storage_path: 'u/media/generated.png', mime: 'image/png', width: 1024, height: 1024 }],
       costUsd: 0.02
@@ -597,7 +597,7 @@ describe('params.enhancePrompt riscrive il prompt prima di generare', () => {
     });
 
     expect(enhancePrompt).toHaveBeenCalledWith({ prompt: 'a cat', model: 'openai/gpt-image' });
-    expect(generateImagesWithoutBrand).toHaveBeenCalledWith(
+    expect(generateImages).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ prompt: 'a photorealistic cat, studio lighting' })
     );
@@ -624,7 +624,7 @@ describe('params.enhancePrompt riscrive il prompt prima di generare', () => {
     });
 
     expect(enhancePrompt).not.toHaveBeenCalled();
-    expect(generateImagesWithoutBrand).toHaveBeenCalledWith(
+    expect(generateImages).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ prompt: 'a cat' })
     );
@@ -653,7 +653,7 @@ describe('params.enhancePrompt riscrive il prompt prima di generare', () => {
     });
 
     expect(result.kind).toBe('done');
-    expect(generateImagesWithoutBrand).toHaveBeenCalledWith(
+    expect(generateImages).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ prompt: 'a cat' })
     );
@@ -767,7 +767,7 @@ describe('un modello sparito da ai_models blocca il nodo senza toccare il suo st
   beforeEach(() => {
     modalitiesOf.mockReset();
     modalitiesOf.mockResolvedValue(null);
-    generateImagesWithoutBrand.mockReset();
+    generateImages.mockReset();
   });
 
   it('rifiuta con una ragione che nomina il modello, e non spende nulla', async () => {
@@ -792,7 +792,7 @@ describe('un modello sparito da ai_models blocca il nodo senza toccare il suo st
     });
 
     expect(result).toMatchObject({ kind: 'refused', error: expect.stringContaining('openai/gpt-image') });
-    expect(generateImagesWithoutBrand).not.toHaveBeenCalled();
+    expect(generateImages).not.toHaveBeenCalled();
 
     const nodeUpdates = calls.filter((c) => c.table === 'nodes' && c.op === 'update');
     const lastUpdate = nodeUpdates[nodeUpdates.length - 1];
@@ -1208,7 +1208,7 @@ function statefulNodesDb(initial: { id: string; orgId: string; data: Record<stri
  */
 describe('un giro fallito non perde la sua chiusura a un conflitto di versione', () => {
   beforeEach(() => {
-    generateImagesWithoutBrand.mockReset();
+    generateImages.mockReset();
   });
 
   it('il nodo esce da running:true anche se la versione è cambiata nel frattempo', async () => {
@@ -1217,7 +1217,7 @@ describe('un giro fallito non perde la sua chiusura a un conflitto di versione',
     // La corsa vera: la scrittura concorrente arriva DOPO che `runGenNode` ha già segnato il nodo
     // `running:true` (quindi già alla versione 2) e PRIMA che la generazione fallisca — proprio la
     // finestra in cui `giveUp()` porta ancora in mano la versione del click.
-    generateImagesWithoutBrand.mockImplementation(async () => {
+    generateImages.mockImplementation(async () => {
       bumpVersion({ ...currentNode().data, note: 'a concurrent drag landed mid-generation' });
       return { ok: false, error: 'render_failed' };
     });
@@ -1248,13 +1248,13 @@ describe('un giro fallito non perde la sua chiusura a un conflitto di versione',
 
 describe('un giro riuscito arriva sul nodo anche se la versione è cambiata nel frattempo', () => {
   beforeEach(() => {
-    generateImagesWithoutBrand.mockReset();
+    generateImages.mockReset();
   });
 
   it('refId del render nuovo atterra e la scrittura concorrente resta', async () => {
     const { db, bumpVersion, currentNode } = statefulNodesDb({ id: NODE, orgId: ORG, data: {}, version: 1 });
 
-    generateImagesWithoutBrand.mockImplementation(async () => {
+    generateImages.mockImplementation(async () => {
       bumpVersion({ ...currentNode().data, running: false, note: 'a concurrent save landed mid-generation' });
       return { ok: true, media: [{ storage_path: 'u/media/generated.png', mime: 'image/png', width: 1024, height: 1024 }], costUsd: 0.04 };
     });
@@ -1292,7 +1292,7 @@ describe('un giro riuscito arriva sul nodo anche se la versione è cambiata nel 
  */
 describe('rigenerare un nodo che ha già un risultato non lo perde se il nuovo giro fallisce', () => {
   beforeEach(() => {
-    generateImagesWithoutBrand.mockReset();
+    generateImages.mockReset();
   });
 
   it('refId di prima sopravvive a un giro che fallisce', async () => {
@@ -1303,7 +1303,7 @@ describe('rigenerare un nodo che ha già un risultato non lo perde se il nuovo g
       version: 1
     });
 
-    generateImagesWithoutBrand.mockResolvedValue({ ok: false, error: 'render_failed' });
+    generateImages.mockResolvedValue({ ok: false, error: 'render_failed' });
 
     const result = await runGenNode(db, {
       orgId: ORG,
@@ -1744,8 +1744,8 @@ describe('i riferimenti scelti sul nodo arrivano al render immagine', () => {
   const CATALOGUE_ID = '77777777-7777-7777-7777-777777777777';
 
   beforeEach(() => {
-    generateImagesWithoutBrand.mockReset();
-    generateImagesWithoutBrand.mockResolvedValue({
+    generateImages.mockReset();
+    generateImages.mockResolvedValue({
       ok: true,
       media: [{ storage_path: 'u/media/generated.png', mime: 'image/png', width: 1024, height: 1024 }],
       costUsd: 0.02
@@ -1778,7 +1778,7 @@ describe('i riferimenti scelti sul nodo arrivano al render immagine', () => {
     });
 
     expect(result.kind).toBe('done');
-    expect(generateImagesWithoutBrand).toHaveBeenCalledWith(
+    expect(generateImages).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
         baseMediaId: undefined,
@@ -1794,8 +1794,8 @@ describe('la foto di un prodotto del negozio arriva al render immagine', () => {
   const SHOP_PHOTO = 'https://cdn.shop.example/tee.jpg';
 
   beforeEach(() => {
-    generateImagesWithoutBrand.mockReset();
-    generateImagesWithoutBrand.mockResolvedValue({
+    generateImages.mockReset();
+    generateImages.mockResolvedValue({
       ok: true,
       media: [{ storage_path: 'u/media/generated.png', mime: 'image/png', width: 1024, height: 1024 }],
       costUsd: 0.02
@@ -1836,7 +1836,7 @@ describe('la foto di un prodotto del negozio arriva al render immagine', () => {
     });
 
     expect(result.kind).toBe('done');
-    expect(generateImagesWithoutBrand).toHaveBeenCalledWith(
+    expect(generateImages).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
         baseMediaId: undefined,
@@ -1873,7 +1873,7 @@ describe('la foto di un prodotto del negozio arriva al render immagine', () => {
     });
 
     expect(result.kind).toBe('done');
-    expect(generateImagesWithoutBrand).toHaveBeenCalledWith(
+    expect(generateImages).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
         baseMediaId: undefined,
@@ -1910,8 +1910,8 @@ describe('a free image element wired into a generative node', () => {
   };
 
   beforeEach(() => {
-    generateImagesWithoutBrand.mockReset();
-    generateImagesWithoutBrand.mockResolvedValue({
+    generateImages.mockReset();
+    generateImages.mockResolvedValue({
       ok: true,
       media: [{ storage_path: 'u/media/generated.png', mime: 'image/png', width: 1024, height: 1024 }],
       costUsd: 0.02
@@ -1922,7 +1922,7 @@ describe('a free image element wired into a generative node', () => {
     const result = await runWith('images');
 
     expect(result.kind).toBe('done');
-    expect(generateImagesWithoutBrand).toHaveBeenCalledWith(
+    expect(generateImages).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ referenceImageUrls: [expect.stringMatching(new RegExp(`^https://signed\\.example/.+/${FREE_PATH}$`))] })
     );
@@ -1936,7 +1936,7 @@ describe('a standard generation is screened before anything reaches the provider
   beforeEach(() => {
     llmText.mockReset();
     llmText.mockResolvedValue({ text: 'ok', citations: [] });
-    generateImagesWithoutBrand.mockReset();
+    generateImages.mockReset();
     enhancePrompt.mockReset();
     screenModelInput.mockResolvedValue({ ok: false, error: GORE });
   });
@@ -1960,7 +1960,7 @@ describe('a standard generation is screened before anything reaches the provider
     const out = await runGenNode(db, start('image', 'a man dismembered', { enhancePrompt: true }));
 
     expect(out).toEqual({ kind: 'refused', error: GORE });
-    expect(generateImagesWithoutBrand).not.toHaveBeenCalled();
+    expect(generateImages).not.toHaveBeenCalled();
     expect(enhancePrompt).not.toHaveBeenCalled();
     const updated = (table: string) => calls.filter((c) => c.table === table && c.op === 'update').at(-1)?.payload as Record<string, unknown>;
     expect(updated('nodes').data).toMatchObject({ running: false, error: GORE });
@@ -2005,8 +2005,8 @@ describe('a video node on the upscale model upscales the clip wired into it', ()
       choices: [{ id: UPSCALER, params: [{ name: 'upscale_factor', label: 'Upscale factor', kind: 'number', min: 1.5, max: 3 }, { name: 'creativity', label: 'Creativity', kind: 'number', min: 0, max: 1 }] }],
       recommended: []
     });
-    generateVideoWithoutBrand.mockReset();
-    generateVideoWithoutBrand.mockResolvedValue({ ok: true, jobId: 'job-up' });
+    generateVideo.mockReset();
+    generateVideo.mockResolvedValue({ ok: true, jobId: 'job-up' });
     modalitiesOf.mockResolvedValue({ input: ['text', 'video'], output: ['video'], synced_at: 'now' });
     canvasModelCatalogue.mockResolvedValue({
       text: EMPTY_OFFER,
@@ -2045,7 +2045,7 @@ describe('a video node on the upscale model upscales the clip wired into it', ()
     const result = await run(db);
 
     expect(result).toMatchObject({ kind: 'queued' });
-    expect(generateVideoWithoutBrand).toHaveBeenCalledWith(
+    expect(generateVideo).toHaveBeenCalledWith(
       expect.objectContaining({
         model: UPSCALER,
         referenceVideoUrls: ['https://cdn.example/source.mp4'],
@@ -2058,7 +2058,7 @@ describe('a video node on the upscale model upscales the clip wired into it', ()
     const { db } = fakeDb({ nodes: [upscaleNode], nodes_connections: [], assets: [] }, { updateRows: { nodes: [{ ...upscaleNode, version: 2 }] } });
 
     expect(await run(db)).toMatchObject({ kind: 'refused', error: 'source_video_required' });
-    expect(generateVideoWithoutBrand).not.toHaveBeenCalled();
+    expect(generateVideo).not.toHaveBeenCalled();
   });
 });
 

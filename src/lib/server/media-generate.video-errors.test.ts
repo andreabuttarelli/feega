@@ -47,8 +47,8 @@ beforeEach(() => {
 });
 
 const run = async (over: Record<string, unknown> = {}) => {
-  const { generateVideoWithoutBrand } = await import('./media-generate');
-  return generateVideoWithoutBrand({
+  const { generateVideo } = await import('./media-generate');
+  return generateVideo({
     orgId: 'org-1',
     userId: 'user-1',
     prompt: 'un carrello lento',

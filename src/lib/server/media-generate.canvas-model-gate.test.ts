@@ -54,7 +54,7 @@ vi.mock('$lib/server/video-render-queue', () => ({
   submitAndTrackVideoRender: (...a: unknown[]) => submitAndTrackVideoRender(...a)
 }));
 
-import { generateImagesWithoutBrand, generateVideoWithoutBrand } from './media-generate';
+import { generateImages, generateVideo } from './media-generate';
 
 const NANO_BANANA_UNSPECCED = 'google/gemini-2.5-flash-image';
 
@@ -72,7 +72,7 @@ describe('il canvas valida contro cio che il menu ha offerto, non contro uno slo
   it('un modello sincronizzato senza spec nostro genera davvero, con il suo id sul filo', async () => {
     offerableModels.mockResolvedValue({ synced: true, choices: [{ id: NANO_BANANA_UNSPECCED }] });
 
-    const out = await generateImagesWithoutBrand(db, {
+    const out = await generateImages(db, {
       orgId: 'org-1',
       userId: 'user-1',
       prompt: 'un gatto',
@@ -88,7 +88,7 @@ describe('il canvas valida contro cio che il menu ha offerto, non contro uno slo
   it('un modello che il sync NON conferma resta rifiutato', async () => {
     offerableModels.mockResolvedValue({ synced: true, choices: [{ id: 'some/other-model' }] });
 
-    const out = await generateImagesWithoutBrand(db, {
+    const out = await generateImages(db, {
       orgId: 'org-1',
       userId: 'user-1',
       prompt: 'un gatto',
@@ -102,7 +102,7 @@ describe('il canvas valida contro cio che il menu ha offerto, non contro uno slo
   it('stessa cosa per il video: un modello sincronizzato senza spec parte davvero', async () => {
     offerableModels.mockResolvedValue({ synced: true, choices: [{ id: NANO_BANANA_UNSPECCED }] });
 
-    const out = await generateVideoWithoutBrand({
+    const out = await generateVideo({
       orgId: 'org-1',
       userId: 'user-1',
       prompt: 'un carrello lento',
@@ -117,7 +117,7 @@ describe('il canvas valida contro cio che il menu ha offerto, non contro uno slo
   it('il video rifiuta un modello che il sync non conferma, senza sottometterlo al fornitore', async () => {
     offerableModels.mockResolvedValue({ synced: true, choices: [] });
 
-    const out = await generateVideoWithoutBrand({
+    const out = await generateVideo({
       orgId: 'org-1',
       userId: 'user-1',
       prompt: 'un carrello lento',

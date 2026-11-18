@@ -29,7 +29,7 @@ vi.mock('$lib/server/ai-log', () => ({
   }
 }));
 
-import { generateImagesWithoutBrand } from './media-generate';
+import { generateImages } from './media-generate';
 
 const SIGNED = 'https://storage.test/signed?token=abc';
 
@@ -50,26 +50,26 @@ describe('disegnare un\'immagine', () => {
   const job = { orgId: 'org-1', userId: 'user-1', prompt: 'un gatto' };
 
   it('addebita all organizzazione, che è chi paga', async () => {
-    await generateImagesWithoutBrand(db, job);
+    await generateImages(db, job);
 
     expect(withOrgContext).toHaveBeenCalledWith('org-1');
   });
 
   it('non ha un id: il file si ritrova dal percorso', async () => {
-    const out = await generateImagesWithoutBrand(db, job);
+    const out = await generateImages(db, job);
 
     expect(out.ok && out.media[0].id).toBeNull();
   });
 
   it('il file sta sotto lo user, dove la policy dello storage lo trova', async () => {
-    await generateImagesWithoutBrand(db, job);
+    await generateImages(db, job);
 
     const [, path] = upload.mock.calls[0];
     expect(String(path).split('/')[0]).toBe('user-1');
   });
 
   it('torna un link firmato e il percorso, perché non c è un id con cui ritrovarlo', async () => {
-    const out = await generateImagesWithoutBrand(db, job);
+    const out = await generateImages(db, job);
 
     expect(out.ok && out.media[0].url).toBe(SIGNED);
     expect(out.ok && out.media[0].storage_path).toMatch(/^user-1\/media\//);
@@ -78,7 +78,7 @@ describe('disegnare un\'immagine', () => {
   it('marca il disegno col modello che lo ha fatto, e dice se la marcatura è riuscita', async () => {
     markGenerated.mockImplementation(async (bytes: Buffer) => ({ bytes, marked: false }));
 
-    const out = await generateImagesWithoutBrand(db, job);
+    const out = await generateImages(db, job);
 
     expect(markGenerated).toHaveBeenCalledWith(expect.any(Buffer), 'image/png', { model: out.ok && out.model, provider: 'openrouter' });
     expect(out.ok && out.media[0].ai_marked).toBe(false);
@@ -86,14 +86,14 @@ describe('disegnare un\'immagine', () => {
   });
 
   it('più alternative, più render pagati, e il conto lo dice', async () => {
-    const out = await generateImagesWithoutBrand(db, { ...job, count: 3 });
+    const out = await generateImages(db, { ...job, count: 3 });
 
     expect(renderPostImage).toHaveBeenCalledTimes(3);
     expect(out.ok && out.renders).toBe(3);
   });
 
   it('dice quanto è costato leggendolo dalle righe, non da un listino accanto', async () => {
-    const out = await generateImagesWithoutBrand(db, job);
+    const out = await generateImages(db, job);
 
     expect(out.ok && out.costUsd).toBe(0.0336);
   });
@@ -101,7 +101,7 @@ describe('disegnare un\'immagine', () => {
   it('una fattura che non è arrivata resta sconosciuta, non zero', async () => {
     billedUsd = undefined;
 
-    const out = await generateImagesWithoutBrand(db, job);
+    const out = await generateImages(db, job);
 
     expect(out.ok && out.costUsd).toBeNull();
   });
@@ -109,7 +109,7 @@ describe('disegnare un\'immagine', () => {
   it('una firma che non arriva è un fallimento, non una url nulla', async () => {
     signKnowledgePaths.mockResolvedValue(new Map());
 
-    const out = await generateImagesWithoutBrand(db, job);
+    const out = await generateImages(db, job);
 
     expect(out).toMatchObject({ ok: false, error: 'store_failed' });
   });
@@ -117,7 +117,7 @@ describe('disegnare un\'immagine', () => {
   it('un bucket assente porta il SUO motivo, non il token generico e basta', async () => {
     upload.mockResolvedValue({ error: { message: 'Bucket not found' } });
 
-    const out = await generateImagesWithoutBrand(db, job);
+    const out = await generateImages(db, job);
 
     expect(out).toMatchObject({ ok: false, error: 'store_failed', reason: 'Bucket not found' });
   });
@@ -125,7 +125,7 @@ describe('disegnare un\'immagine', () => {
   it('un render che non torna niente è un fallimento, non un successo vuoto', async () => {
     renderPostImage.mockResolvedValue(undefined);
 
-    const out = await generateImagesWithoutBrand(db, job);
+    const out = await generateImages(db, job);
 
     expect(out).toEqual({ ok: false, error: 'render_failed' });
   });

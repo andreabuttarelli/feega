@@ -10,9 +10,9 @@ const CANVAS = '66666666-6666-6666-6666-666666666666';
 const MODEL = 'nano-banana-2';
 const GROUP = 'group-1';
 
-const generateImagesWithoutBrand = vi.hoisted(() => vi.fn());
+const generateImages = vi.hoisted(() => vi.fn());
 
-vi.mock('$lib/server/media-generate', () => ({ generateImagesWithoutBrand, generateVideoWithoutBrand: vi.fn() }));
+vi.mock('$lib/server/media-generate', () => ({ generateImages, generateVideo: vi.fn() }));
 vi.mock('$lib/server/generation/discount-routes', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/generation/discount-routes')>()),
   discountBook: async () => null
@@ -82,12 +82,12 @@ const world = () =>
   );
 
 beforeEach(() => {
-  generateImagesWithoutBrand.mockReset();
+  generateImages.mockReset();
 });
 
 describe('variants into one node history', () => {
   it('lets runs started on the same node version both begin', async () => {
-    generateImagesWithoutBrand.mockResolvedValueOnce(landing(1)).mockResolvedValueOnce(landing(2));
+    generateImages.mockResolvedValueOnce(landing(1)).mockResolvedValueOnce(landing(2));
     const { db } = world();
 
     const outs = await Promise.all([runGenNode(db, start(sharing)), runGenNode(db, start(sharing))]);
@@ -96,7 +96,7 @@ describe('variants into one node history', () => {
   });
 
   it('a plain second run on a stale version still conflicts', async () => {
-    generateImagesWithoutBrand.mockResolvedValue(landing(1));
+    generateImages.mockResolvedValue(landing(1));
     const { db } = world();
 
     const outs = await Promise.all([runGenNode(db, start()), runGenNode(db, start())]);
@@ -106,7 +106,7 @@ describe('variants into one node history', () => {
 
   it('keeps the node running until the last sibling lands', async () => {
     const release: Array<() => void> = [];
-    generateImagesWithoutBrand.mockImplementation(
+    generateImages.mockImplementation(
       () => new Promise((resolve) => release.push(() => resolve(landing(release.length))))
     );
     const { db } = world();
@@ -126,7 +126,7 @@ describe('variants into one node history', () => {
   });
 
   it('tags every run with its group so a cancel can find them', async () => {
-    generateImagesWithoutBrand.mockResolvedValue(landing(1));
+    generateImages.mockResolvedValue(landing(1));
     const { db, calls } = world();
 
     await runGenNode(db, start(sharing));

@@ -2929,7 +2929,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_ui: tool({
-      description: `Recreate a piece of product UI live, as vector UI in the brand style, instead of a screenshot: ${UI_KINDS.map((k) => `${k} (${UI_KIT[k].about})`).join(' ')} Every piece also takes font, ink, muted, paper, line, accent (colours from analyze_site or use_brand), radius (px, the site's corners), zoom (size) and speed (1 = default timing). It animates itself across its duration; give it at least 2.5 s. Move, scale and keyframe the clip like any other (camera following the action). Each kind's own props, typed: list_ui_kinds.`,
+      description: `Recreate a piece of product UI live, as vector UI in the brand style, instead of a screenshot: ${UI_KINDS.map((k) => `${k} (${UI_KIT[k].about})`).join(' ')} Every piece also takes font, ink, muted, paper, line, accent (colours from analyze_site), radius (px, the site's corners), zoom (size) and speed (1 = default timing). It animates itself across its duration; give it at least 2.5 s. Move, scale and keyframe the clip like any other (camera following the action). Each kind's own props, typed: list_ui_kinds.`,
       inputSchema: z.object({ kind: z.enum(UI_KINDS), start: z.number().min(0), duration: z.number().positive(), props: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(), track_id: z.string().optional() }),
       execute: async (input) => {
         const piece = UI_KIT[input.kind];

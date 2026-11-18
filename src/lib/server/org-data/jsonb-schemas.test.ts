@@ -61,7 +61,9 @@ describe('validateJsonbColumn — colonne intenzionalmente libere: passano sempr
     ['canvas_events', 'after'],
     ['chat_messages', 'tool_calls'],
     ['node_runs', 'params'],
-    ['products', 'images']
+    ['products', 'images'],
+    ['social_posts', 'media'],
+    ['social_posts', 'metrics']
   ];
 
   for (const [table, column] of FREE_FORM) {

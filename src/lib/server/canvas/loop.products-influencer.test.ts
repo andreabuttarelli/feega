@@ -18,8 +18,8 @@ vi.mock('$lib/server/supabase-admin', () => ({ createAdminClient: () => ({}) }))
 const { orgCreditBalance } = vi.hoisted(() => ({ orgCreditBalance: vi.fn() }));
 vi.mock('$lib/server/credits', () => ({ orgCreditBalance }));
 
-const { generateImagesWithoutBrand } = vi.hoisted(() => ({ generateImagesWithoutBrand: vi.fn() }));
-vi.mock('$lib/server/media-generate', () => ({ generateImagesWithoutBrand }));
+const { generateImages } = vi.hoisted(() => ({ generateImages: vi.fn() }));
+vi.mock('$lib/server/media-generate', () => ({ generateImages }));
 
 const { screenModelInput } = vi.hoisted(() => ({ screenModelInput: vi.fn() }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput }));
@@ -66,8 +66,8 @@ beforeEach(() => {
   screenModelInput.mockResolvedValue({ ok: true });
   modalitiesOf.mockReset();
   modalitiesOf.mockResolvedValue({ input: ['text', 'image'], output: ['image'], synced_at: 'now' });
-  generateImagesWithoutBrand.mockReset();
-  generateImagesWithoutBrand.mockImplementation(async () => ({
+  generateImages.mockReset();
+  generateImages.mockImplementation(async () => ({
     ok: true,
     media: [{ storage_path: 'out.png', mime: 'image/png', width: 1, height: 1 }],
     costUsd: 0.01
@@ -100,8 +100,8 @@ describe('loop over a products node with an influencer wired fixed', () => {
 
     await drainLoopQueue(db, { limit: 10 });
 
-    expect(generateImagesWithoutBrand).toHaveBeenCalledTimes(3);
-    const sent = generateImagesWithoutBrand.mock.calls.map(([, job]) => JSON.stringify(job));
+    expect(generateImages).toHaveBeenCalledTimes(3);
+    const sent = generateImages.mock.calls.map(([, job]) => JSON.stringify(job));
     for (const [i, job] of sent.entries()) {
       expect(job).toContain(`p${i + 1}.jpg`);
       expect(job).toContain('front.png');
@@ -132,6 +132,6 @@ describe('loop over a products node with an influencer wired fixed', () => {
     const drained = await drainLoopQueue(db, { limit: 10 });
 
     expect(drained).toEqual({ claimed: 3, done: 3, failed: 0 });
-    expect(generateImagesWithoutBrand.mock.calls.map(([, job]) => job.model)).toEqual(['nano-banana-2-lite', 'nano-banana-2-lite', 'nano-banana-2-lite']);
+    expect(generateImages.mock.calls.map(([, job]) => job.model)).toEqual(['nano-banana-2-lite', 'nano-banana-2-lite', 'nano-banana-2-lite']);
   });
 });

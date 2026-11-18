@@ -83,6 +83,17 @@ function toProduct(row: ProductColumns): Product {
   };
 }
 
+const fetchedColumns = (p: FetchedProduct) => ({
+  handle: p.handle,
+  title: p.title,
+  description: p.description,
+  price: p.price,
+  currency: p.currency,
+  url: p.url,
+  images: p.images as Json,
+  available: p.available
+});
+
 const richColumns = (p: FetchedProduct) => ({
   compare_at_price: p.compareAtPrice,
   tags: p.tags,
@@ -131,14 +142,7 @@ export async function upsertNodeProducts(
     node_id: input.nodeId,
     platform: input.platform,
     external_id: p.externalId,
-    handle: p.handle,
-    title: p.title,
-    description: p.description,
-    price: p.price,
-    currency: p.currency,
-    url: p.url,
-    images: p.images as Json,
-    available: p.available,
+    ...fetchedColumns(p),
     ...richColumns(p),
     synced_at: syncedAt
   }));

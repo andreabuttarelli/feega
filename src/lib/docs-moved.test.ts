@@ -6,7 +6,7 @@ describe('removed in-app docs pages', () => {
     ['/docs', 'https://docs.feega.app'],
     ['/docs/', 'https://docs.feega.app'],
     ['/docs/getting-started', 'https://docs.feega.app/getting-started/'],
-    ['/docs/brands', 'https://docs.feega.app/canvas/brands/'],
+    ['/docs/brands', 'https://docs.feega.app'],
     ['/docs/shopify', 'https://docs.feega.app'],
     ['/docs/webflow', 'https://docs.feega.app'],
     ['/docs/wix', 'https://docs.feega.app'],

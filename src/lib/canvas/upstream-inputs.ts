@@ -22,7 +22,7 @@
  *
  * QUESTO FILE PUÒ DIRE «IL MODELLO NE ACCETTA N» ANCHE QUANDO IL TRASPORTO DI OGGI NE MANDA UNA
  * SOLA. `referenceImageUrls` porta TUTTE le immagini che il catalogo accetta; `referenceImageUrl`
- * è la prima, la sola che `generateImagesWithoutBrand` sa spedire oggi (`ImageJob.baseMediaId`, un
+ * è la prima, la sola che `generateImages` sa spedire oggi (`ImageJob.baseMediaId`, un
  * campo, non una lista). La separazione è voluta: quando quel trasporto imparerà a portarne più di
  * una, il chiamante smette di leggere `referenceImageUrl` e legge la lista — senza toccare questo
  * file, che la lista la calcola già.

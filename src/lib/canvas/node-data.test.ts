@@ -16,7 +16,6 @@ describe('NODE_DATA_SCHEMAS — una riga per tipo, tutti i 10 valori di nodes_ty
     const types = Object.keys(NODE_DATA_SCHEMAS).sort();
     expect(types).toEqual(
       [
-        'ads',
         'doc',
         'iframe',
         'image',
@@ -260,45 +259,6 @@ describe('validateNodeData — products', () => {
       synced_at: null
     });
     expect(out.ok).toBe(true);
-  });
-});
-
-describe('validateNodeData — ads: country obbligatorio, due modi mutuamente esclusivi', () => {
-  it('accetta mode=page con page_id e country', () => {
-    const out = validateNodeData('ads', { mode: 'page', page_id: '1234567', country: 'IT' });
-    expect(out.ok).toBe(true);
-  });
-
-  it('accetta mode=search con search_terms e country', () => {
-    const out = validateNodeData('ads', { mode: 'search', search_terms: 'scarpe running', country: 'IT' });
-    expect(out.ok).toBe(true);
-  });
-
-  it('rifiuta country mancante, in ENTRAMBI i modi', () => {
-    const page = validateNodeData('ads', { mode: 'page', page_id: '123' });
-    expect(page.ok).toBe(false);
-    if (!page.ok) expect(page.error).toMatch(/country/);
-
-    const search = validateNodeData('ads', { mode: 'search', search_terms: 'x' });
-    expect(search.ok).toBe(false);
-    if (!search.ok) expect(search.error).toMatch(/country/);
-  });
-
-  it('rifiuta mode=page senza page_id', () => {
-    const out = validateNodeData('ads', { mode: 'page', country: 'IT' });
-    expect(out.ok).toBe(false);
-    if (!out.ok) expect(out.error).toMatch(/page_id/);
-  });
-
-  it('rifiuta mode=search senza search_terms', () => {
-    const out = validateNodeData('ads', { mode: 'search', country: 'IT' });
-    expect(out.ok).toBe(false);
-    if (!out.ok) expect(out.error).toMatch(/search_terms/);
-  });
-
-  it('rifiuta mode=page con search_terms valorizzato: i due modi sono mutuamente esclusivi', () => {
-    const out = validateNodeData('ads', { mode: 'page', page_id: '123', search_terms: 'x', country: 'IT' });
-    expect(out.ok).toBe(false);
   });
 });
 
@@ -591,7 +551,7 @@ describe('describeNodeType / describeNodeTypes — la forma verso l\'esterno, de
     const shape = describeNodeType('products');
     expect(shape).toHaveProperty('properties');
     const props = (shape as { properties: Record<string, unknown> }).properties;
-    expect(Object.keys(props)).toEqual(expect.arrayContaining(['mode', 'country', 'page_id', 'search_terms']));
+    expect(Object.keys(props)).toEqual(expect.arrayContaining(['type', 'url', 'limit']));
   });
 
   it('non ripete $schema — nessun client lo legge, come tool-surface-cost.test.ts chiede altrove', () => {

@@ -41,7 +41,7 @@ function ask(ids: string[] | string, headers: Record<string, string> = {}) {
 beforeEach(() => lookup.mockResolvedValue({ orgId: 'org-a', canvas: { id: 'c1', projectId: 'p1', name: 'C' }, }));
 
 describe('GET the sources of every frame on a canvas at once', () => {
-  it('answers each frame with its head, and the brand tokens once', async () => {
+  it('answers each frame with its head, and the tokens once', async () => {
     const body = await (await ask([M1, M2]).run()).json();
 
     expect(Object.keys(body.frames).sort()).toEqual([M1, M2]);
@@ -93,6 +93,6 @@ describe('GET the sources of every frame on a canvas at once', () => {
     const res = await ask([M1, M2], { 'accept-encoding': 'br' }).run();
 
     const phases = (res.headers.get('server-timing') ?? '').split(', ').map((p) => p.split(';')[0]);
-    expect(phases).toEqual(expect.arrayContaining(['auth', 'canvas', 'heads', 'linked', 'assets', 'named', 'tokens', 'stringify', 'etag', 'compress']));
+    expect(phases).toEqual(expect.arrayContaining(['auth', 'canvas', 'heads', 'linked', 'assets', 'named', 'stringify', 'etag', 'compress']));
   });
 });

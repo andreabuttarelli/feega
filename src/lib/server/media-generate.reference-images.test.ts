@@ -30,7 +30,7 @@ vi.mock('$lib/server/ai-log', () => ({
   }
 }));
 
-import { generateImagesWithoutBrand } from './media-generate';
+import { generateImages } from './media-generate';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -47,7 +47,7 @@ describe('riferimenti scelti sul nodo, verso il renderer', () => {
     );
     const supabase = { storage: { from: () => ({ upload: async () => ({ error: null }) }) } } as never;
 
-    await generateImagesWithoutBrand(supabase, {
+    await generateImages(supabase, {
       orgId: 'org-1',
       userId: 'user-1',
       prompt: 'un vaso',

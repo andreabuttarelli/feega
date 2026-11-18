@@ -331,7 +331,7 @@ async function runImageJob(
   return { ok: true, media, model: chosen, renders, costUsd: billedUsdInScope() ?? null };
 }
 
-export async function generateImagesWithoutBrand(
+export async function generateImages(
   supabase: SupabaseClient,
   job: ImageJob & { orgId: string }
 ): Promise<ImageJobResult> {
@@ -449,7 +449,7 @@ async function startVideo(opts: GenerateMediaOpts): Promise<VideoJobResult> {
   };
 }
 
-export async function generateVideoWithoutBrand(
+export async function generateVideo(
   opts: Omit<GenerateMediaOpts, 'kind' | 'title'> & { orgId: string }
 ): Promise<VideoJobResult> {
   const { withOrgContext } = await import('$lib/server/ai-log');

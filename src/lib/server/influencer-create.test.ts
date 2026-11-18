@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-const { generateImagesWithoutBrand, screenModelInput, createInfluencer } = vi.hoisted(() => ({
-  generateImagesWithoutBrand: vi.fn(),
+const { generateImages, screenModelInput, createInfluencer } = vi.hoisted(() => ({
+  generateImages: vi.fn(),
   screenModelInput: vi.fn(),
   createInfluencer: vi.fn()
 }));
-vi.mock('$lib/server/media-generate', () => ({ generateImagesWithoutBrand }));
+vi.mock('$lib/server/media-generate', () => ({ generateImages }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput }));
 vi.mock('$lib/server/repos/influencers', () => ({ createInfluencer, insertInfluencerViews: vi.fn() }));
 
@@ -37,7 +37,7 @@ describe('the influencer builder screens its prompt before any render', () => {
     screenModelInput.mockResolvedValue({ ok: false, error: blocked });
 
     expect(await generateInfluencer({} as SupabaseClient, input)).toEqual({ ok: false, error: blocked });
-    expect(generateImagesWithoutBrand).not.toHaveBeenCalled();
+    expect(generateImages).not.toHaveBeenCalled();
     expect(createInfluencer).not.toHaveBeenCalled();
     expect(screenModelInput.mock.calls[0][1]).toMatchObject({ profile: 'standard', texts: ['a nude woman, explicit'], scope: { orgId: 'org-1', userId: 'user-1' } });
   });

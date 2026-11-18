@@ -29,10 +29,11 @@ const ORG_IN_PAYLOAD = /org_id:/;
  * `org_id` qui vorrebbe dire una colonna che non esiste, quindi la regola lo dichiara invece di
  * inciampare. Una tabella nuova senza `org_id` è una riga in più QUI, e una decisione presa.
  *
+ *   post_sources  il genitore: chiave primaria fatta delle due FK, e una policy difende il post
  *   profiles      l'utente: la policy è `id = auth.uid()`, il tenant è la persona, non l'org
  *   orgs          sé stessa: la policy è `id in auth_org_ids()`, la colonna org_id sarebbe id
  */
-const TENANT_BY_OTHER_MEANS = new Set(['profiles', 'orgs']);
+const TENANT_BY_OTHER_MEANS = new Set(['post_sources', 'profiles', 'orgs']);
 const TABLE = /\.from\(\s*['"]([a-z_]+)['"]/;
 
 function tableOf(chain: string): string {
@@ -192,14 +193,14 @@ describe('la regola riconosce il difetto', () => {
     expect(writesAcrossOrgs('canvas.ts', src)).toHaveLength(1);
   });
 
-  it('lascia stare una tabella senza org_id', () => {
-    const src = "await db.from('profiles').select('id').eq('project_id', projectId);";
+  it('lascia stare una tabella ponte, che org_id non ce l ha', () => {
+    const src = "await db.from('post_sources').select('post_id, node_id, role').eq('post_id', postId);";
 
-    expect(readsAcrossOrgs('profiles.ts', src)).toEqual([]);
+    expect(readsAcrossOrgs('posts.ts', src)).toEqual([]);
   });
 
   it('l eccezione vale solo per le tabelle dichiarate', () => {
-    const src = "await db.from('assets').select('*').eq('project_id', projectId);";
+    const src = "await db.from('scheduled_posts').select('*').eq('post_id', postId);";
 
     expect(readsAcrossOrgs('publishing.ts', src)).toHaveLength(1);
   });

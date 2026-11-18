@@ -39,7 +39,9 @@ export type Addable = (typeof CANVAS_ADDABLE)[number];
 
 const NOT_READY: readonly Addable[] = ['calendar'];
 
-export const CANVAS_ADD_BAR = CANVAS_ADDABLE.filter((w) => !NOT_READY.includes(w));
+const AI_PANEL_ONLY: readonly Addable[] = ['products', 'social_account_feed'];
+
+export const CANVAS_ADD_BAR = CANVAS_ADDABLE.filter((w) => !NOT_READY.includes(w) && !AI_PANEL_ONLY.includes(w));
 
 export const CANVAS_BAR_MAIN: readonly Addable[] = [...GEN_MEDIUMS];
 

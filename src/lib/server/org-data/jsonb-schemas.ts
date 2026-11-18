@@ -81,6 +81,12 @@ export const JSONB_COLUMN_SCHEMAS: Record<string, JsonbEntry> = {
       'imporre una forma qui darebbe due verità con `media-model-slots`.'
   ),
 
+  'social_posts.media': freeForm(
+    'nessun repository del nuovo schema scrive ancora `social_posts` — la tabella dei post scaricati ' +
+      'dai feed social (§ `social_account_feed` in NEW_DATABASE_STRUCTURE.md) non ha ancora un ingest.'
+  ),
+  'social_posts.metrics': freeForm('stesso motivo di social_posts.media: nessun ingest reale da cui derivare la forma.'),
+
   'products.images': freeForm(
     'la fonte è uno scraper su store che non controlliamo: `store-product.ts` normalizza le immagini ' +
       'in ingresso, ma la tolleranza sulla forma è una scelta del prodotto, non una lacuna da chiudere ' +

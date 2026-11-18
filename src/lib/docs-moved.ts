@@ -1,8 +1,7 @@
 import { DOCS_ORIGIN } from '$lib/docs-guides';
 
 const TARGET_BY_PATH: Readonly<Record<string, string>> = {
-  '/docs/getting-started': `${DOCS_ORIGIN}/getting-started/`,
-  '/docs/brands': `${DOCS_ORIGIN}/canvas/brands/`
+  '/docs/getting-started': `${DOCS_ORIGIN}/getting-started/`
 };
 
 export function movedDocsTarget(pathname: string): string {

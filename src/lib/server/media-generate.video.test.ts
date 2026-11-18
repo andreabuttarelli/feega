@@ -33,7 +33,7 @@ vi.mock('$lib/server/video', () => ({
 }));
 vi.mock('$lib/server/supabase-admin', () => ({ createAdminClient: () => adminClient }));
 
-import { generateVideoWithoutBrand } from './media-generate';
+import { generateVideo } from './media-generate';
 
 function adminForVideo() {
   return {
@@ -72,13 +72,13 @@ describe('un video', () => {
   const job = { orgId: ORG, userId: USER, prompt: 'un gatto che salta' };
 
   it('addebita all organizzazione, che è chi paga', async () => {
-    await generateVideoWithoutBrand(job);
+    await generateVideo(job);
 
     expect(withOrgContext).toHaveBeenCalledWith(ORG);
   });
 
   it('scrive l organizzazione sulla riga della coda', async () => {
-    await generateVideoWithoutBrand(job);
+    await generateVideo(job);
 
     expect(submitAndTrackVideoRender).toHaveBeenCalledWith(
       expect.objectContaining({ orgId: ORG })
@@ -86,7 +86,7 @@ describe('un video', () => {
   });
 
   it('anima il percorso che il generatore ha consegnato', async () => {
-    await generateVideoWithoutBrand({ ...job, baseMediaId: OWN_IMAGE });
+    await generateVideo({ ...job, baseMediaId: OWN_IMAGE });
 
     expect(submitAndTrackVideoRender).toHaveBeenCalledWith(
       expect.objectContaining({ render: expect.objectContaining({ imageUrl: SIGNED }) })
@@ -94,21 +94,21 @@ describe('un video', () => {
   });
 
   it('il percorso di un altro utente non risolve, e il render non parte', async () => {
-    const out = await generateVideoWithoutBrand({ ...job, baseMediaId: SOMEONE_ELSE });
+    const out = await generateVideo({ ...job, baseMediaId: SOMEONE_ELSE });
 
     expect(out).toMatchObject({ ok: false, error: 'source_not_found' });
     expect(submitAndTrackVideoRender).not.toHaveBeenCalled();
   });
 
   it('un indirizzo scelto da chi chiama non è una sorgente', async () => {
-    const out = await generateVideoWithoutBrand({ ...job, baseMediaId: 'https://evil.test/a.png' });
+    const out = await generateVideo({ ...job, baseMediaId: 'https://evil.test/a.png' });
 
     expect(out).toMatchObject({ ok: false, error: 'source_not_found' });
     expect(submitAndTrackVideoRender).not.toHaveBeenCalled();
   });
 
   it('torna un job da seguire, perché un clip non è mai pronto subito', async () => {
-    const out = await generateVideoWithoutBrand(job);
+    const out = await generateVideo(job);
 
     expect(out.ok && out.status).toBe('rendering');
     expect(out.ok && out.jobId).toBeTruthy();
