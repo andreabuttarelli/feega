@@ -43,7 +43,7 @@
     <a class="nav-item" class:is-active={brandList} aria-current={brandList ? 'page' : undefined} href={BRANDS_SETTINGS_PATH}>{$_('app.nav.allBrands')}</a>
     {#each data.orgBrands as brand (brand.id)}
       {@const current = brandPage?.brandId === brand.id}
-      <a class="nav-item" class:is-active={current} aria-current={current ? 'page' : undefined} href={brandSettingsHref(brand.id, FIRST_BRAND_SECTION)}>{brand.name}</a>
+      <a class="nav-item brand-item" class:is-active={current} aria-current={current ? 'page' : undefined} href={brandSettingsHref(brand.id, FIRST_BRAND_SECTION)}>{brand.name}</a>
     {/each}
   </nav>
   <div class="content settings-shell">
@@ -138,7 +138,8 @@
       padding: 12px var(--content-pad-x) 0;
     }
 
-    .nav-group {
+    .nav-group,
+    .brand-item:not(.is-active) {
       display: none;
     }
   }
