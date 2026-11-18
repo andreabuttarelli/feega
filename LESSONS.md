@@ -30,6 +30,9 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Canvas performance
 
+### Perf fixtures and bench scripts vanish after a reboot
+**Signal:** `stress36.feega`, `posters36.feega` and the bench runners that every perf agent used are gone; they lived in a session scratchpad under `/private/tmp`, which macOS empties on reboot. **Move:** fixtures live in `~/Documents/feega-videos/perf/` (read-only, with a README saying how they were built: `scripts/perf/stress36-fixture.mjs`), bench tools in `scripts/perf/kit/`. Nothing a second agent needs goes in a scratchpad.
+
 ### A display-list patch "equal to the build" on a few hand-made docs is wrong on real pages
 
 **Signal:** `fastPatch` unit tests pass, but on the landings fixture 17 of 36 patched hides and 15 of 45 patched moves differed from the full build (filters origin left behind, a group's matrix moved instead of its items, a hidden parent's children losing their cut, comp instance items left in place). **Move:** run `fast-patch.landings.test.ts` (every visible clip, hide and three moves, compared with `drawFrame` within 0.01 px) before widening what the patch accepts. The tolerance is needed: the full build itself moves unrelated clips by up to 0.005 px on some hides.
