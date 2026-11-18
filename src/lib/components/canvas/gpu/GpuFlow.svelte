@@ -150,6 +150,7 @@
   import { frameDocs, type FrameDocEdit, type HeldDoc } from '$lib/canvas/frame-docs';
   import './flow-base.css';
   import CanvasAddBar from '../CanvasAddBar.svelte';
+  import { insertRequest } from '$lib/canvas/insert-request.svelte';
   import CanvasDrawLayer from '../CanvasDrawLayer.svelte';
   import { COLOUR_TAG_HEX, colourOf } from '$lib/canvas/node-colour';
   import { CloudMode } from '$lib/canvas/cloud-picker';
@@ -4456,6 +4457,17 @@
   function addAtCentre(what: Addable) {
     props.onCreate?.(what, viewCentre());
   }
+
+  let insertsSeen = insertRequest.asked;
+
+  $effect(() => {
+    const asked = insertRequest.asked;
+    if (asked === insertsSeen || !insertRequest.what) {
+      return;
+    }
+    insertsSeen = asked;
+    untrack(() => addAtCentre(insertRequest.what!));
+  });
 
   function pickConnectMedium(medium: GenMedium) {
     if (connectPickerAt) {
