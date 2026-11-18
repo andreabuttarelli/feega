@@ -92,7 +92,7 @@ function streamTurn(bridge: LocalAgentsBridge, turnId: string, begin: () => Prom
   return new Response(stream, { headers: { 'content-type': 'text/event-stream' } });
 }
 
-function ipcFetch({ bridge, context }: Required<Deps>): typeof fetch {
+function ipcFetch({ bridge, context }: { bridge: LocalAgentsBridge; context: Deps['context'] }): typeof fetch {
   let current = '';
 
   return async (input, init) => {
