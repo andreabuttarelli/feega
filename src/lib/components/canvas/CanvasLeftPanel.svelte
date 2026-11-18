@@ -1,5 +1,5 @@
 <script lang="ts" module>
-  export type LeftPanelKind = 'layers' | 'assets' | 'brands' | 'influencers' | 'components' | 'history' | 'styles';
+  export type LeftPanelKind = 'layers' | 'assets' | 'brands' | 'influencers' | 'components' | 'history' | 'styles' | 'ai';
 </script>
 
 <script lang="ts">
@@ -11,6 +11,7 @@
   import PagesList from './PagesList.svelte';
   import type { ComponentProps } from 'svelte';
   import ProjectComponentsPanel from './ProjectComponentsPanel.svelte';
+  import AiNodesPanel from './AiNodesPanel.svelte';
   import HistoryPanel from './HistoryPanel.svelte';
   import StyleLibrarySection from '$lib/components/motion/StyleLibrarySection.svelte';
   import { StyleLayout } from '$lib/components/motion/style-layout';
@@ -91,6 +92,8 @@
         {#if pages.currentId}
           <HistoryPanel {projectId} canvasId={pages.currentId} />
         {/if}
+      {:else if kind === 'ai'}
+        <AiNodesPanel />
       {:else if kind === 'brands'}
         <BrandsPanel {projectId} />
       {:else}
