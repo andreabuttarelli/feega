@@ -8,3 +8,10 @@ export function versionMarkOf(data: Record<string, unknown> | null | undefined):
   const parsed = versionMarkSchema.safeParse(data?.version);
   return parsed.success ? parsed.data : null;
 }
+
+const PAIR = 2;
+
+export function comparedWith(versionId: string, originalId: string, selected: readonly string[]): string {
+  const other = selected.length === PAIR && selected.includes(versionId) ? selected.find((id) => id !== versionId) : undefined;
+  return other ?? originalId;
+}
