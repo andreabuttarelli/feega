@@ -87,7 +87,7 @@ describe('la chiave di un link', () => {
 
 const memoryLinks = () => {
   const saved = new Map<string, CodeLink>();
-  const links: LinkStore = { read: async (id) => saved.get(id) ?? null, all: async (id) => (saved.has(id) ? [saved.get(id)!] : []), save: async (id, l) => Boolean(l.entryKind === EntryKind.Page && saved.set(id, l)), remove: async (id) => saved.delete(id) };
+  const links: LinkStore = { read: async (id) => saved.get(id) ?? null, all: async (id) => (saved.has(id) ? [saved.get(id)!] : []), inProject: async () => [...saved.values()], save: async (id, l) => Boolean(l.entryKind === EntryKind.Page && saved.set(id, l)), remove: async (id) => saved.delete(id) };
   return { saved, links };
 };
 

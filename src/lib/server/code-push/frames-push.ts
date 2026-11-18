@@ -1,7 +1,8 @@
 import type { CodeScope } from '$lib/server/code-import/canvas-import';
 import { SyncOutcome, type CodeEdits, type SyncRefusal } from '$lib/server/code-import/code-sync';
+import { EditTarget, type PropProposal } from '$lib/server/code-import/instance-edits';
 import { Access, GitError, GitFailure, PullStatus, type GitHost } from './git-host';
-import { CodeSourceKind, followRenames, isPushable, linkStatus, type CodeLink, type LinkState } from './link';
+import { CodeSourceKind, EntryKind, followRenames, isPushable, linkStatus, type CodeLink, type LinkState } from './link';
 import type { LinkStore } from './link-store';
 import type { PushLock } from './push-lock';
 import { PushRefusal, pushFiles, pushStatus, undoPush, type LastPush, type PushRefused, type PushState, type Pushed, type Undone } from './push';
@@ -18,22 +19,26 @@ export type FramesRefused = { ok: false; refusal: FramesRefusal | SyncRefusal | 
 
 export type FramesDeps = {
   host: (source: CodeSourceKind, repo: string) => Promise<GitHost | null>;
-  edits: (scope: CodeScope, nodeId: string) => Promise<CodeEdits | SyncRefusal>;
+  edits: (scope: CodeScope, nodeId: string, target?: EditTarget) => Promise<CodeEdits | SyncRefusal>;
   links: LinkStore;
   lock: PushLock;
 };
 
-export type FramesPushAsk = { name: string; nodeIds: string[]; title?: string; body?: string; since?: LastPush; base?: string; coAuthors?: string[]; confirmSensitive?: boolean };
+export type FramesPushAsk = { name: string; nodeIds: string[]; title?: string; body?: string; since?: LastPush; base?: string; coAuthors?: string[]; confirmSensitive?: boolean; mains?: string[] };
 
-export type FrameStatus = { ok: true; state: LinkState; link: CodeLink; push: PushState | null };
+export type Affected = { path: string; pages: number };
+
+export type FrameStatus = { ok: true; state: LinkState; link: CodeLink; push: PushState | null; affected: Affected[]; proposals: PropProposal[] };
 
 const DEFAULT_TITLE = 'UI edits from Feega';
 const DEFAULT_BODY = 'Edited on the Feega canvas.';
 
 const refused = (refusal: FramesRefused['refusal']): FramesRefused => ({ ok: false, refusal });
 
-async function frameEdits(deps: Pick<FramesDeps, 'edits' | 'links'>, scope: CodeScope, nodeId: string): Promise<CodeEdits | SyncRefusal> {
-  const [got, link] = await Promise.all([deps.edits(scope, nodeId), deps.links.read(nodeId)]);
+const targetOf = (mains: string[] | undefined, nodeId: string) => (mains?.includes(nodeId) ? EditTarget.Main : EditTarget.Instance);
+
+async function frameEdits(deps: Pick<FramesDeps, 'edits' | 'links'>, scope: CodeScope, nodeId: string, target?: EditTarget): Promise<CodeEdits | SyncRefusal> {
+  const [got, link] = await Promise.all([deps.edits(scope, nodeId, target), deps.links.read(nodeId)]);
   const restored = link?.restored ?? [];
   if (!link || !restored.length || (typeof got === 'string' && got !== SyncOutcome.NoChanges)) {
     return got;
@@ -43,10 +48,10 @@ async function frameEdits(deps: Pick<FramesDeps, 'edits' | 'links'>, scope: Code
   return { ...base, files: [...byPath.values()] };
 }
 
-async function editsOf(deps: FramesDeps, scope: CodeScope, nodeIds: string[]): Promise<{ source: CodeSourceKind; repo: string; files: { path: string; content: string }[] } | FramesRefused> {
+async function editsOf(deps: FramesDeps, scope: CodeScope, nodeIds: string[], mains?: string[]): Promise<{ source: CodeSourceKind; repo: string; files: { path: string; content: string }[] } | FramesRefused> {
   const all: CodeEdits[] = [];
   for (const nodeId of nodeIds) {
-    const got = await frameEdits(deps, scope, nodeId);
+    const got = await frameEdits(deps, scope, nodeId, targetOf(mains, nodeId));
     if (typeof got === 'string') {
       return refused(got);
     }
@@ -66,7 +71,7 @@ async function editsOf(deps: FramesDeps, scope: CodeScope, nodeIds: string[]): P
 const lastPushOf = (link: CodeLink | null): LastPush | undefined => (link?.pushBranch && link.pushSha ? { branch: link.pushBranch, sha: link.pushSha } : undefined);
 
 export async function framesPush(deps: FramesDeps, scope: CodeScope, ask: FramesPushAsk): Promise<Pushed | FramesRefused> {
-  const edits = await editsOf(deps, scope, ask.nodeIds);
+  const edits = await editsOf(deps, scope, ask.nodeIds, ask.mains);
   if ('ok' in edits) {
     return edits;
   }
@@ -86,6 +91,14 @@ export async function framesPush(deps: FramesDeps, scope: CodeScope, ask: Frames
   const every = (await Promise.all(ask.nodeIds.map(async (nodeId) => (await deps.links.all(nodeId)).map((link) => ({ nodeId, link }))))).flat();
   await Promise.all(every.map((l) => deps.links.save(l.nodeId, { ...l.link, ...pushed, ...(l.link.restored ? { restored: [] } : {}) })));
   return out;
+}
+
+const SINGLE_PAGE = 1;
+
+export function affectedBy(links: CodeLink[], modified: string[], appRoot: string): Affected[] {
+  const pages = links.filter((l) => l.entryKind === EntryKind.Page && l.appRoot === appRoot);
+  const inApp = (path: string) => (appRoot ? path.slice(appRoot.replace(/\/$/, '').length + 1) : path);
+  return modified.map((path) => ({ path, pages: pages.filter((l) => l.files.includes(inApp(path))).length })).filter((a) => a.pages > SINGLE_PAGE);
 }
 
 async function writableOn(host: GitHost, link: CodeLink): Promise<boolean> {
@@ -121,10 +134,11 @@ export async function frameStatus(deps: FramesDeps, scope: CodeScope, nodeId: st
   }
   const edits = await frameEdits(deps, scope, nodeId);
   const modified = typeof edits === 'string' ? [] : edits.files.map((f) => f.path);
+  const affected = affectedBy(await deps.links.inProject(), modified, link.appRoot);
   const push = writable && link.pushBranch && link.pushSha ? await pushStatus(host, { branch: link.pushBranch, sha: link.pushSha, baseSha: link.baseSha, base: link.baseBranch }) : null;
   const state = push && push.ok ? push : null;
   const inPull = state?.pull?.status === PullStatus.Open;
-  return { ok: true, state: linkStatus({ link, upstream, modified, writable, inPull }), link, push: state };
+  return { ok: true, state: linkStatus({ link, upstream, modified, writable, inPull }), link, push: state, affected, proposals: typeof edits === 'string' ? [] : (edits.proposals ?? []) };
 }
 
 export async function frameUndo(deps: FramesDeps, nodeId: string): Promise<Undone | FramesRefused> {

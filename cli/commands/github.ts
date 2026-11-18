@@ -20,10 +20,10 @@ async function print(path: string, init?: RequestInit) {
   }
 }
 
-type PushOpts = { name: string; title?: string; body?: string; base?: string; confirmSensitive?: boolean };
+type PushOpts = { name: string; title?: string; body?: string; base?: string; confirmSensitive?: boolean; main?: string[] };
 
-export async function cmdGithubPush(projectId: string, nodeIds: string[], opts: PushOpts) {
-  await print(base(projectId), { method: 'POST', body: JSON.stringify({ ...opts, nodeIds }) });
+export async function cmdGithubPush(projectId: string, nodeIds: string[], { main, ...opts }: PushOpts) {
+  await print(base(projectId), { method: 'POST', body: JSON.stringify({ ...opts, nodeIds, ...(main ? { mains: main } : {}) }) });
 }
 
 export async function cmdGithubStatus(projectId: string, nodeId: string) {
