@@ -64,6 +64,7 @@
 
 <style>
   .bar {
+    --nav-chip: 38px;
     position: fixed;
     inset: 0 0 auto;
     z-index: var(--site-z-header);
@@ -97,7 +98,8 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 10px 10px;
+    height: var(--nav-chip);
+    padding: 0 10px 2px;
   }
 
   .links,
@@ -107,27 +109,28 @@
 
   .mobile {
     display: flex;
-    align-items: center;
-    gap: 16px;
+    flex-shrink: 0;
+    gap: 8px;
   }
 
   .github,
   .toggle {
     display: grid;
     place-items: center;
-    width: 32px;
-    height: 32px;
+    width: var(--nav-chip);
+    height: var(--nav-chip);
     padding: 0;
     border: 0;
-    background: none;
-    color: var(--site-ink);
+    border-radius: 50%;
+    background: #000;
+    color: #fff;
     cursor: pointer;
   }
 
   .github :global(svg),
   .toggle svg {
-    width: 22px;
-    height: 22px;
+    width: 18px;
+    height: 18px;
   }
 
   .drawer {
