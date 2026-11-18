@@ -60,6 +60,8 @@
   import { alignSpace, distributeSpace, propBoxes, type Axis, type Edge } from '$lib/motion/space';
   import { scaleOf } from '$lib/motion/units';
 
+  import { selected } from '@feega/motion-core/motion/codegen/selection';
+
   const FIRST_FRAME = 0;
   const SURFACE_ID = 'frame-surface';
 
@@ -85,6 +87,7 @@
 
   const source = $derived(session?.history.present ?? null);
   const doc = $derived(source && session ? inView(source, session.breakpoint) : source);
+  const codeOf = $derived(source && session ? selected(source, session.selection, frameProperties.name) : null);
   const surfaced = $derived(doc ? withSurface(doc, SURFACE_ID) : null);
   const surface = $derived(surfaced ? frameSurface(surfaced) : null);
   const inspected = $derived(session && doc ? inspectorOf(doc, session.selection) : null);
@@ -132,7 +135,7 @@
       <DevInspector doc={shownDoc!} clipId={shown.clip.id} brand={tokens} onexport={frameProperties.exportPicks} />
     {/if}
     {#if tokens}
-      <DevCode doc={source!} name={frameProperties.name} assets={frameProperties.extras?.assetUrls ?? {}} {tokens} />
+      <DevCode doc={codeOf!.doc} name={codeOf!.name} selection={codeOf!.label} assets={frameProperties.extras?.assetUrls ?? {}} {tokens} />
     {:else if !shown?.clip}
       <p class="empty" data-testid="dev-empty">Select one layer to read its CSS.</p>
     {/if}

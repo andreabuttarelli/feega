@@ -43,12 +43,14 @@ describe('code mode', () => {
   });
 
   it('exports the source doc with every view, not the one being edited', () => {
-    expect(panel).toMatch(/<DevCode doc=\{source!\}/);
+    expect(panel).toMatch(/<DevCode doc=\{codeOf!\.doc\}/);
+    expect(panel).toContain('selected(source, ');
     expect(panel).not.toMatch(/<DevCode \{doc\}/);
   });
 
   it('exports under the real frame name', () => {
-    expect(panel).toContain('name={frameProperties.name}');
+    expect(panel).toContain('selected(source, session.selection, frameProperties.name)');
+    expect(panel).toContain('name={codeOf!.name}');
     expect(panel).not.toContain('name="Frame"');
   });
 

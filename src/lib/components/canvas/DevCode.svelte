@@ -14,7 +14,7 @@
   import { Select } from '$lib/components/ui/select';
   import CodeBlock from './CodeBlock.svelte';
 
-  let { doc, name, assets, tokens }: { doc: MotionDoc; name: string; assets: Record<string, string>; tokens: BrandTokens } = $props();
+  let { doc, name, selection = null, assets, tokens }: { doc: MotionDoc; name: string; selection?: string | null; assets: Record<string, string>; tokens: BrandTokens } = $props();
 
   const COPIED_MS = 1200;
   const ZIP_MIME = 'application/zip';
@@ -56,7 +56,7 @@
 
 <section class="code" data-testid="dev-code" aria-label="Frame code">
   <header>
-    <strong title={name}>{name}</strong>
+    <strong title={name}>{selection ? `Selection: ${selection}` : name}</strong>
     <div class="actions">
       <IconButton label={copied ? 'Copied' : 'Copy file'} size={IconSize.Sm} data-testid="dev-code-copy-file" onclick={copy}>
         {#if copied}<Check />{:else}<Copy />{/if}
