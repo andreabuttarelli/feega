@@ -198,4 +198,18 @@
       font-size: 13px;
     }
   }
+
+  @media (max-width: 809.98px) {
+    .mode p {
+      font-size: 15px;
+    }
+
+    .kicker {
+      font-size: 16px;
+    }
+
+    .live {
+      font-size: 14px;
+    }
+  }
 </style>
