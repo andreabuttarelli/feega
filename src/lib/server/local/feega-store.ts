@@ -17,7 +17,9 @@ const SAVE_DELAY_MS = 300;
 const ASSET_BUCKET = 'canvas-assets';
 const ABSOLUTE_URL = /^https?:\/\//;
 const UNSAFE_NAME = /[^\w.-]+/g;
-const PERSISTED = new Set(['canvases', 'nodes', 'nodes_connections', 'motion_revisions', 'canvas_events', 'assets', 'storage.objects']);
+const CODE_LINKS = 'frame_code_links';
+const LINK_SCOPE_COLUMNS = new Set(['org_id', 'project_id']);
+const PERSISTED = new Set(['canvases', 'nodes', 'nodes_connections', 'motion_revisions', 'canvas_events', 'assets', CODE_LINKS, 'storage.objects']);
 export const MAX_PERSISTED_EVENTS = 1000;
 const BUCKETS = [ASSET_BUCKET, 'brand-knowledge', 'media'];
 
@@ -76,6 +78,7 @@ function seed(file: FeegaFile, blobs: FeegaBlobs): { tables: Tables; storage: Bl
     ['motion_revisions', Object.entries(file.canvas.heads).map(([nodeId, head]) => ({ ...org, id: crypto.randomUUID(), node_id: nodeId, version: head.version, doc: head.doc, summary: null, actor_kind: 'system', actor_id: null, agent_key: null, sealed: true, created_at: file.manifest.exportedAt }))],
     ['canvas_events', (file.canvas.events ?? []).map((e) => ({ ...e, org_id: LOCAL_ORG_ID, canvas_id: place.canvasId }))],
     ['assets', assets],
+    [CODE_LINKS, (file.canvas.codeLinks ?? []).map((link) => ({ ...link, ...org, project_id: place.projectId }))],
     ['org_fonts', assets.filter((a) => isFont(a.mime_type) && a.url).map((a) => orgFontRow(a, at))]
   ]);
   return { tables, storage, place };
@@ -100,6 +103,8 @@ const live = (row: Row) => row.deleted_at === null || row.deleted_at === undefin
 const ASSET_DIR = 'assets/';
 const assetFileName = (url: string) => `${ASSET_DIR}${url.split('/').map((part) => part.replace(UNSAFE_NAME, '_')).join('/')}`;
 
+const withoutScope = (row: Row) => Object.fromEntries(Object.entries(row).filter(([column]) => !LINK_SCOPE_COLUMNS.has(column)));
+
 function packJob(tables: Tables, storage: Blobs, place: LocalPlace, acpAgent: string | null): PackJob {
   const rows = (table: string) => tables.get(table) ?? [];
   const canvas = rows('canvases').find((c) => c.id === place.canvasId);
@@ -117,6 +122,7 @@ function packJob(tables: Tables, storage: Blobs, place: LocalPlace, acpAgent: st
     nodes: nodes.map((n) => ({ id: String(n.id), type: String(n.type), displayName: (n.display_name as string | null) ?? null, position: { x: Number(n.x), y: Number(n.y), z: Number(n.z ?? 0) }, size: { width: n.width == null ? null : Number(n.width), height: n.height == null ? null : Number(n.height) }, data: (n.data ?? {}) as Record<string, unknown> })),
     connections: rows('nodes_connections').filter((c) => c.canvas_id === place.canvasId && live(c) && nodeIds.has(c.source_node_id) && nodeIds.has(c.target_node_id)).map((c) => ({ id: String(c.id), sourceNodeId: String(c.source_node_id), targetNodeId: String(c.target_node_id), sourceHandle: (c.source_handle as string | null) ?? null, targetHandle: (c.target_handle as string | null) ?? null, mode: c.mode === 'iterate' ? 'iterate' : 'fixed' })),
     heads: Object.fromEntries([...heads].map(([id, r]) => [id, { version: Number(r.version), doc: r.doc }])),
+    codeLinks: rows(CODE_LINKS).filter((l) => nodeIds.has(l.node_id)).map(withoutScope),
     events: rows('canvas_events').filter((e) => e.canvas_id === place.canvasId).sort((a, b) => Number(a.id) - Number(b.id)).slice(-MAX_PERSISTED_EVENTS).map(({ org_id: _org, canvas_id: _canvas, ...event }) => event)
   };
 
