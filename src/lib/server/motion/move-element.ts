@@ -1,3 +1,4 @@
+import { standInFill } from '$lib/motion/stand-in-fill';
 import { z } from 'zod';
 import { TEXT_SIZINGS } from '@feega/motion-core/motion/text-sizing';
 import { formatOf, type MotionDoc, type MotionFormat } from '@feega/motion-core/motion/doc';
@@ -418,7 +419,7 @@ export function frameStore(db: Db, scope: { orgId: string; actor: Actor; project
     write: (nodeId, expectedVersion, doc, summary) => commitOnto(db, { orgId, nodeId, expectedVersion, doc, actor, summary }),
     create: async (at, doc, shape) => {
       const { type, data, ...size } = shape ?? frameShape(doc);
-      const node = await createNode(db, { id: at.id, orgId, projectId: at.projectId, canvasId: at.canvasId, type, x: at.x, y: at.y, displayName: ADDABLE_LABEL.motion, ...size, data: { ...atFirstRevision(data), format: formatOf(doc) }, actor });
+      const node = await createNode(db, { id: at.id, orgId, projectId: at.projectId, canvasId: at.canvasId, type, x: at.x, y: at.y, displayName: ADDABLE_LABEL.motion, ...size, data: { ...atFirstRevision(data), format: formatOf(doc), standInFill: standInFill(doc) ?? undefined }, actor });
       const written = await appendRevision(db, { orgId, nodeId: node.id, expectedVersion: 0, doc, actor, summary: SUMMARY.movedIn });
       if (written.outcome === RevisionOutcome.Written) {
         return node.id;

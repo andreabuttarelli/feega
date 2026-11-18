@@ -81,7 +81,7 @@ export type CodeOrigin = { repo: string; branch: string | null; sha: string | nu
 
 export type LandedBoard = { label: string; route: string; cond: string; clip: string; view?: string };
 
-export type CodeImported = ({ outcome: CodeImportOutcome.Ok; frameId: string; origin?: CodeOrigin; name: string; undo: unknown[]; skipped: string[]; locked: LockedRoute[]; missed?: MissedPage[]; boards?: LandedBoard[]; truncated: boolean; pages: string[]; links?: string[]; design?: DesignReport; tokenMap?: TokenMap; library?: LibraryReport } & ComponentCount) | Refusal;
+export type CodeImported = ({ outcome: CodeImportOutcome.Ok; frameId: string; parts?: string[]; origin?: CodeOrigin; name: string; undo: unknown[]; skipped: string[]; locked: LockedRoute[]; missed?: MissedPage[]; boards?: LandedBoard[]; truncated: boolean; pages: string[]; links?: string[]; design?: DesignReport; tokenMap?: TokenMap; library?: LibraryReport } & ComponentCount) | Refusal;
 
 export type CodePage = { label: string; url: string; route?: string; conditions?: RenderConditions; ready?: string };
 

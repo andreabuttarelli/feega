@@ -44,6 +44,20 @@ describe('canvas versions', () => {
     expect(Object.keys((insert?.payload as { snapshot: { heads: object } }).snapshot.heads).sort()).toEqual(['e', 'm']);
   });
 
+  it('restores the frames it can and names the ones it could not', async () => {
+    const doc = newMotionDoc(MotionFormat.Square);
+    const frame = (id: string) => ({ id, type: 'motion', position: { x: 0, y: 0, z: 0 }, size: { width: 100, height: 100 }, data: {} });
+    const snapshot = { nodes: [frame('a'), frame('b'), frame('c')], connections: [], heads: { a: { version: 1, doc }, b: { version: 1, doc: { ...doc, tracks: [{}] } }, c: { version: 1, doc } } };
+    const named = (id: string, name: string) => ({ ...row(id, 0), type: 'motion', display_name: name, data: {} });
+    const fake = fakeDb(
+      { nodes: [named('a', 'Intro'), named('b', 'Broken'), named('c', 'Outro')], nodes_connections: [], motion_revisions: [], canvas_events: [], canvas_versions: [{ id: 'v1', org_id: 'org', canvas_id: 'c', name: 'Start', created_at: '2026-10-18', snapshot }] },
+      { filter: true, store: true }
+    );
+
+    expect(await restoreCanvasVersion(fake.db, { ...scope, versionId: 'v1', actor: user })).toMatchObject({ outcome: RestoreOutcome.Restored, unlanded: ['Broken'] });
+    expect(fake.calls.filter((c) => c.table === 'motion_revisions' && c.op === 'insert')).toHaveLength(2);
+  });
+
   it('a version that is not there is refused', async () => {
     const fake = fakeDb({ canvas_versions: [] }, { filter: true });
     expect((await restoreCanvasVersion(fake.db, { ...scope, versionId: 'nope', actor: user })).outcome).toBe(RestoreOutcome.Missing);
