@@ -311,10 +311,6 @@
       font-size: 12.5px;
     }
 
-    .ways:has(.faces) {
-      display: none;
-    }
-
     .ways :global(.npx) {
       font-size: 14px;
     }
