@@ -6,8 +6,8 @@
 
 <section class="start">
   <div class="text">
-    <h3 data-agent-id="start-title">Start from any site</h3>
-    <p data-agent-id="start-lead">Every layer, colour and font comes in editable - colours become variables, type becomes styles, all bound.</p>
+    <h3 data-agent-id="start-title">start from any site</h3>
+    <p data-agent-id="start-lead">every layer, colour and font comes in editable - colours become variables, type becomes styles, all bound.</p>
     <div class="field">
       <UrlField id="start-url" />
     </div>

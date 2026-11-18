@@ -1,8 +1,11 @@
 <script lang="ts">
+  import { lower } from './lower';
   import { LEGAL_DOCS } from './legal';
   import DownloadMac from './DownloadMac.svelte';
   import Mark from './Mark.svelte';
-  import { APP_URL, MAC_GUIDE_URL, SOCIAL_LINKS, STORY_URL } from './links';
+  import { APP_URL, DOCS_URL, MAC_GUIDE_URL, SOCIAL_LINKS, STORY_URL } from './links';
+  import { GUIDES_PATH } from './guides';
+  import { PRICING_PATH } from './paths';
   import { COMPARE_PATH } from './compare';
   import { CODEBASE_PATH } from './codebase';
 
@@ -12,30 +15,45 @@
 
 <footer class="site-foot">
   <div class="top">
-    <a class="brand" href="/">
-      <span class="name"><Mark size={28} />Feega</span>
-      <span class="tagline">Design in your codebase</span>
-    </a>
-
-    <div class="col">
-      <p>( Navigate )</p>
-      <a href="/">Product</a>
-      <a href={CODEBASE_PATH}>Codebase</a>
-      <a href={APP_URL}>Sign In</a>
-      <a href={COMPARE_PATH}>Compare</a>
-      <a href={STORY_URL}>Blog</a>
-      <DownloadMac class="dl" />
-      <a class="dl-guide" href={MAC_GUIDE_URL}>Unsigned app: how to open it</a>
-    </div>
-
-    <div class="col">
-      <p>( Open building )</p>
+    <div class="about">
+      <a class="brand" href="/">
+        <span class="name"><Mark size={28} />Feega</span>
+        <span class="tagline">design in your codebase</span>
+      </a>
       <div class="icons">
         {#each SOCIAL_LINKS as social (social.label)}
-          <a href={social.href} aria-label={social.label}>{@html social.icon}</a>
+          <a href={social.href} aria-label={social.label} title={social.label}>{@html social.icon}</a>
         {/each}
       </div>
     </div>
+
+    <nav class="col" aria-label="Product">
+      <p class="head">product</p>
+      <a href="/">home</a>
+      <a href={PRICING_PATH}>pricing</a>
+      <a href={CODEBASE_PATH}>codebase</a>
+      <a href="/changelog">changelog</a>
+      <span class="dl-wrap">
+        <DownloadMac class="dl" />
+        <a class="dl-guide" href={MAC_GUIDE_URL}>unsigned app? how to open it</a>
+      </span>
+      <a href={APP_URL}>sign in</a>
+    </nav>
+
+    <nav class="col" aria-label="Learn">
+      <p class="head">learn</p>
+      <a href={DOCS_URL}>docs</a>
+      <a href={GUIDES_PATH}>guides</a>
+      <a href={COMPARE_PATH}>compare</a>
+      <a href={STORY_URL}>blog</a>
+    </nav>
+
+    <nav class="col" aria-label="Legal">
+      <p class="head">legal</p>
+      {#each legal as link (link.href)}
+        <a href={link.href}>{lower(link.label)}</a>
+      {/each}
+    </nav>
   </div>
 
   <div class="mark-box" aria-hidden="true"><p class="mark">feega</p></div>
@@ -44,25 +62,20 @@
     <div class="sign">
       <Mark size={28} label="Feega" />
       <p class="copy">
-        <span class="rights"><span>© {year} Feega.</span> <span>All rights reserved.</span></span>
-        <span class="made"><span>Made in Italy,</span> <span>by Andrea Buttarelli.</span></span>
+        <span class="rights"><span>© {year} Feega.</span> <span>all rights reserved.</span></span>
+        <span class="made"><span>made in Italy,</span> <span>by Andrea Buttarelli.</span></span>
       </p>
     </div>
-    <a class="to-top" href="#top">Back to top ↑</a>
+    <a class="to-top" href="#top">back to top ↑</a>
   </div>
 
   <div class="legal">
     <p>IT16090491008, Roma, Italy</p>
-    <nav aria-label="Legal">
-      {#each legal as link (link.href)}
-        <a href={link.href}>{link.label}</a>
-      {/each}
-    </nav>
   </div>
 
   <p class="notice">
     Feega must never be used to create illegal content, such as CSAM, non-consensual intimate imagery (NCII) or sexual
-    deepfakes. Feega does not use Google APIs or Google user data to generate content: Google and GitHub Sign-In data is
+    deepfakes. Feega does not use Google APIs or Google user data to generate content: Google and GitHub sign-in data is
     used only to authenticate your account.
   </p>
 </footer>
@@ -77,12 +90,42 @@
 
   .top {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    column-gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 48px 20px;
+  }
+
+  .top > * {
+    min-width: 0;
+    overflow-wrap: break-word;
+  }
+
+  .about {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 24px;
+  }
+
+  @media (min-width: 600px) {
+    .top {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .top {
+      grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr));
+      gap: 32px;
+    }
+
+    .about {
+      grid-column: auto;
+    }
   }
 
   .brand {
-    grid-column: 1 / -1;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -115,22 +158,32 @@
     vertical-align: -1px;
   }
 
-  .dl-guide {
-    display: block;
-    font-size: 14px;
-    line-height: 16.8px;
+  .dl-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .col .dl-guide {
+    font-size: 12px;
+    line-height: 16px;
+    color: rgb(255 255 255 / 0.45);
+    text-wrap: balance;
   }
 
   .col {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 6px;
-    margin-top: 78px;
+    gap: 10px;
   }
 
-  .col p {
-    margin-bottom: 18px;
+  .col .head {
+    margin-bottom: 6px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    line-height: 16px;
+    color: rgb(255 255 255 / 0.45);
   }
 
   .col a,
@@ -141,7 +194,7 @@
 
   .icons {
     display: flex;
-    gap: 8px;
+    gap: 12px;
   }
 
   .icons a {
@@ -224,24 +277,6 @@
       padding: 41px 20px 20px;
     }
 
-    .top {
-      grid-template-columns: 520px 160px 1fr;
-      column-gap: 20px;
-    }
-
-    .brand {
-      grid-column: 1;
-    }
-
-    .col {
-      margin-top: 3px;
-      gap: 7px;
-    }
-
-    .col p {
-      margin-bottom: 17px;
-    }
-
     .copy {
       max-width: none;
     }
@@ -283,23 +318,6 @@
     .site-foot {
       max-width: 810px;
       padding: 41px 16px 16px;
-    }
-
-    .top {
-      grid-template-columns: 379px 178px 1fr;
-      column-gap: 20px;
-    }
-
-    .brand {
-      grid-column: 1;
-    }
-
-    .col {
-      margin-top: -1px;
-    }
-
-    .col p {
-      margin-bottom: 18px;
     }
 
     .mark-box {

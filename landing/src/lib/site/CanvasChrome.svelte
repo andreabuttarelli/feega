@@ -35,8 +35,6 @@
     { name: 'Generate on the canvas', icon: 'stretch-horizontal', depth: 1 },
     { name: 'Agents', icon: 'stretch-horizontal', depth: 1 },
     { name: 'Pricing', icon: 'stretch-horizontal', depth: 1 },
-    { name: 'Story', icon: 'stretch-horizontal', depth: 1 },
-    { name: 'FAQ', icon: 'stretch-horizontal', depth: 1 },
     { name: 'Footer', icon: 'stretch-horizontal', depth: 1, open: true },
     { name: 'Ready?', icon: 'type', depth: 2 },
     { name: 'Navigate', icon: 'stretch-horizontal', depth: 2 },

@@ -1,4 +1,5 @@
 <script lang="ts" generics="G extends string">
+  import { lower } from '../lower';
   import type { Snippet } from 'svelte';
   import { Side, type ChapterCopy, type Step } from '.';
   import AsciiField from '../home/AsciiField.svelte';
@@ -23,13 +24,13 @@
     <div class="text">
       <p class="eyebrow">
         {#if number}<span class="number">{number}</span>{/if}
-        {copy.eyebrow}
+        {lower(copy.eyebrow)}
       </p>
-      <svelte:element this={level} class="heading">{copy.heading}</svelte:element>
-      <p class="lead">{copy.lead}</p>
+      <svelte:element this={level} class="heading">{lower(copy.heading)}</svelte:element>
+      <p class="lead">{lower(copy.lead)}</p>
       <div class="actions">
-        <a class="site-pill start" href={copy.start.href}>{copy.start.label}</a>
-        <a class="more" href={copy.more.href}><span>{copy.more.label}</span> →</a>
+        <a class="site-pill start" href={copy.start.href}>{lower(copy.start.label)}</a>
+        <a class="more" href={copy.more.href}><span>{lower(copy.more.label)}</span> →</a>
       </div>
     </div>
 
@@ -44,8 +45,8 @@
       <li>
         <div class="glyph">{@render glyph(step.glyph)}</div>
         <div>
-          <h3>{step.title}</h3>
-          <p>{step.text}</p>
+          <h3>{lower(step.title)}</h3>
+          <p>{lower(step.text)}</p>
         </div>
       </li>
     {/each}
