@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import { unzipSync } from 'fflate';
 import { mkdtempSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createConnection, createNode, listConnections, listNodes, renameNode } from '$lib/server/repos/canvas';
+import { createConnection, createNode, listConnections, listNodes, moveNode, renameNode } from '$lib/server/repos/canvas';
 import { appendRevision, readHead } from '$lib/server/repos/motion-revisions';
 import { MotionFormat, newClip, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { unpackFeega } from '$lib/canvas/feega-file';
 import { snapshotSchema } from '$lib/canvas/canvas-version';
-import { LOCAL_ORG_ID, LOCAL_USER, openFeegaStore, writeAtomically, type FeegaStore } from './feega-store';
+import { LOCAL_ORG_ID, LOCAL_USER, openFeegaStore, type FeegaStore } from './feega-store';
 import { orgFontFamilies, storeFontFile } from '$lib/server/motion/font-upload';
 import { listOrgFonts } from '$lib/server/repos/org-fonts';
 import { listCanvasEvents, recordEvent } from '$lib/server/repos/canvas-events';
@@ -15,6 +16,7 @@ import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import { MAX_PERSISTED_EVENTS } from './feega-store';
 
 const ORIGIN = 'http://127.0.0.1:5173';
+const ZIP_STORED = 0;
 const actor = { kind: 'user' as const, id: null };
 
 const tempFile = () => join(mkdtempSync(join(tmpdir(), 'feega-store-')), 'work.feega');
@@ -84,11 +86,11 @@ describe('il file .feega è il database della modalità locale', () => {
   it('un frame di un file aperto ha già il colore della sua pagina, prima che arrivi il documento', async () => {
     const path = tempFile();
     const first = openFeegaStore(path, { origin: ORIGIN });
-    const node = await createNode(first.db, { ...scopeOf(first), type: 'motion', x: 0, y: 0, data: { docHeadRevision: 1 }, actor });
+    const node = await createNode(first.db, { ...scopeOf(first), type: 'motion', x: 0, y: 0, data: { docHeadRevision: 1, interactive: false }, actor });
     const doc = newMotionDoc(MotionFormat.Square);
     const page = { ...doc, tracks: [{ ...doc.tracks[0], clips: [newClip({ id: 'bg', from: 0, durationInFrames: 30, component: 'Shape', props: { x: 0.5, y: 0.5, width: 1, height: 1, fill: '#13111c' } })] }, ...doc.tracks.slice(1)] };
     await appendRevision(first.db, { orgId: LOCAL_ORG_ID, nodeId: node.id, expectedVersion: 0, doc: page, actor });
-    await first.db.from('nodes').update({ data: { docHeadRevision: 1 } }).eq('id', node.id);
+    await first.db.from('nodes').update({ data: { docHeadRevision: 1, interactive: false } }).eq('id', node.id);
     await first.flush();
 
     const [opened] = await listNodes(openFeegaStore(path, { origin: ORIGIN }).db, scopeOf(first));
@@ -121,6 +123,21 @@ describe('il file .feega è il database della modalità locale', () => {
     expect(new Uint8Array(await (data as Blob).arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
   });
 
+  it('le immagini entrano nello zip così come sono, senza ricomprimerle', async () => {
+    const path = tempFile();
+    const store = openFeegaStore(path, { origin: ORIGIN });
+    const stored = `${LOCAL_ORG_ID}/${store.place.projectId}/photo.png`;
+    await store.db.storage.from('canvas-assets').upload(stored, new Uint8Array(4096).fill(7), { contentType: 'image/png' });
+    const { data: asset } = await store.db.from('assets').insert({ org_id: LOCAL_ORG_ID, project_id: store.place.projectId, type: 'image', source: 'upload', url: stored, mime_type: 'image/png' }).select('id').single();
+    await addText(store, `see ${(asset as { id: string }).id}`);
+    await store.flush();
+
+    const methods: Record<string, number> = {};
+    unzipSync(new Uint8Array(readFileSync(path)), { filter: (f) => ((methods[f.name] = f.compression), false) });
+
+    expect(Object.entries(methods).filter(([name]) => name.startsWith('assets/')).map(([, method]) => method)).toEqual([ZIP_STORED]);
+  });
+
   it('ogni scrittura arriva a chi ascolta, con la forma del realtime', async () => {
     const store = openFeegaStore(tempFile(), { origin: ORIGIN });
     const heard: { table: string; eventType: string; id: unknown }[] = [];
@@ -142,16 +159,17 @@ describe('il file .feega è il database della modalità locale', () => {
 });
 
 describe('scrittura atomica', () => {
-  it('scrive su un file temporaneo e poi lo rinomina sopra l’originale', async () => {
-    const calls: string[] = [];
-    const fs = {
-      writeFile: async (path: string) => void calls.push(`write ${path}`),
-      rename: async (from: string, to: string) => void calls.push(`rename ${from} -> ${to}`)
-    };
+  it('un salvataggio rimasto a metà da un processo ucciso viene tolto alla riapertura', async () => {
+    const path = tempFile();
+    const store = openFeegaStore(path, { origin: ORIGIN });
+    await addText(store, 'x');
+    await store.flush();
+    const { writeFileSync } = await import('node:fs');
+    writeFileSync(`${path}.saving`, 'half a zip');
 
-    await writeAtomically('/x/work.feega', new Uint8Array([1]), fs);
+    openFeegaStore(path, { origin: ORIGIN });
 
-    expect(calls).toEqual(['write /x/work.feega.tmp', 'rename /x/work.feega.tmp -> /x/work.feega']);
+    expect(readdirSync(join(path, '..'))).toEqual(['work.feega']);
   });
 
   it('dopo il salvataggio non resta nessun file temporaneo', async () => {
@@ -237,6 +255,20 @@ describe('scrittura atomica', () => {
     const events = await listCanvasEvents(store.db, { orgId: LOCAL_ORG_ID, canvasId: store.place.canvasId });
 
     expect(events[0]).toMatchObject({ kind: 'node.update', nodeId: node.id, actorKind: 'agent', agentKey: 'mcp', after: { displayName: 'Hero' } });
+  });
+
+  it('spostare un nodo a mano lascia un evento di chi lo ha fatto, e restare fermi non ne lascia', async () => {
+    const store = openFeegaStore(tempFile(), { origin: ORIGIN });
+    const node = await addText(store, 'drag me');
+    const scope = { orgId: LOCAL_ORG_ID, canvasId: store.place.canvasId };
+    const person = { kind: 'user' as const, id: LOCAL_USER.id };
+
+    await moveNode(store.db, { orgId: LOCAL_ORG_ID, nodeId: node.id, x: 40, y: 50, actor: person });
+    await moveNode(store.db, { orgId: LOCAL_ORG_ID, nodeId: node.id, x: 40, y: 50, actor: person });
+    const moves = (await listCanvasEvents(store.db, scope)).filter((e) => e.kind === 'node.update');
+
+    expect(moves).toHaveLength(1);
+    expect(moves[0]).toMatchObject({ nodeId: node.id, actorKind: 'user', before: { position: { x: 0, y: 0 } }, after: { position: { x: 40, y: 50 } } });
   });
 
 });

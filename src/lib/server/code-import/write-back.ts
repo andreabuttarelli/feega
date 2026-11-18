@@ -2,6 +2,7 @@ import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 import { changedLook, LOOK, LookKey, minSideOf, type Look, type LookValue } from '$lib/canvas/code-look';
 import { BASE_CONDITIONS, parseKey, Scheme } from './render-conditions';
 import { viewChanges } from './view-look';
+import { isGalleryFile } from './gallery';
 
 export type SourceAt = { file: string; line: number; column: number };
 
@@ -49,7 +50,7 @@ export function editsOf(doc: MotionDoc): SourceEdit[] {
     const at = clip.source ? atOf(clip.source.at) : null;
     const look = at ? unbound(clip, changedLook(clip, side)) : {};
     const key = `${clip.source?.at}|${clip.source?.cond ?? ''}`;
-    if (!at || !Object.keys(look).length || byAt.has(key)) {
+    if (!at || isGalleryFile(at.file) || !Object.keys(look).length || byAt.has(key)) {
       continue;
     }
     const { tag, cls, cond } = clip.source!;
@@ -235,11 +236,17 @@ const sameFamily = (token: string, key: LookKey, prefix: string) => {
   }
   const bare = token.slice(prefix.length);
   const rule = CLASS_OF[key]!;
-  const isColor = key === LookKey.Color && !TEXT_SIZES.test(bare) && !TEXT_OTHER.test(bare);
-  return !bare.includes(':') && (key === LookKey.Color ? isColor : rule.family.test(bare));
+  const isColor = !TEXT_SIZES.test(bare) && !TEXT_OTHER.test(bare);
+  return !bare.includes(':') && rule.family.test(bare) && (key !== LookKey.Color || isColor);
 };
 
 const CLASS_LITERAL = /(\s(?:class|className)=")([^"{}]*)"/;
+
+function replacedClass(tokens: string[], same: (token: string) => boolean, made: string): string[] {
+  const at = tokens.findIndex(same);
+  const kept = tokens.filter((t) => !same(t));
+  return at === -1 ? [...kept, made] : [...kept.slice(0, at), made, ...kept.slice(at)];
+}
 
 function classed(text: string, tag: Tag, look: Look, prefix: string): string | null {
   const open = text.slice(tag.start, tag.end + 1);
@@ -249,7 +256,7 @@ function classed(text: string, tag: Tag, look: Look, prefix: string): string | n
   }
   let tokens = found[2].split(/\s+/).filter(Boolean);
   for (const [key, value] of Object.entries(look)) {
-    tokens = [...tokens.filter((t) => !sameFamily(t, key as LookKey, prefix)), `${prefix}${CLASS_OF[key as LookKey]!.make(value)}`];
+    tokens = replacedClass(tokens, (t) => sameFamily(t, key as LookKey, prefix), `${prefix}${CLASS_OF[key as LookKey]!.make(value)}`);
   }
   const next = open.replace(CLASS_LITERAL, `$1${tokens.join(' ')}"`);
   return text.slice(0, tag.start) + next + text.slice(tag.end + 1);

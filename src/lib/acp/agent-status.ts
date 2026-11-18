@@ -8,14 +8,14 @@ export enum AgentStatus {
   NotInstalled = 'not_installed'
 }
 
-type StatusRow = { label: string; usable: boolean; copy: (agent: DetectedAgent) => string | null };
+type StatusRow = { tip: string | null; usable: boolean; rank: number };
 
 export const AGENT_STATUS: Readonly<Record<AgentStatus, StatusRow>> = {
-  [AgentStatus.Ready]: { label: 'Ready', usable: true, copy: () => null },
-  [AgentStatus.SignInUnknown]: { label: 'Installed', usable: true, copy: () => null },
-  [AgentStatus.NeedsLogin]: { label: 'Needs login', usable: true, copy: (a) => a.login },
-  [AgentStatus.NoAcp]: { label: 'Needs npx', usable: false, copy: () => null },
-  [AgentStatus.NotInstalled]: { label: 'Not installed', usable: false, copy: (a) => a.install }
+  [AgentStatus.Ready]: { tip: null, usable: true, rank: 0 },
+  [AgentStatus.SignInUnknown]: { tip: null, usable: true, rank: 0 },
+  [AgentStatus.NeedsLogin]: { tip: 'Sign in from your terminal', usable: true, rank: 1 },
+  [AgentStatus.NoAcp]: { tip: 'Needs npx', usable: false, rank: 2 },
+  [AgentStatus.NotInstalled]: { tip: 'Not installed', usable: false, rank: 3 }
 };
 
 const AUTH_STATUS: Readonly<Record<AgentAuth, AgentStatus>> = {
@@ -34,4 +34,8 @@ export function statusOf(agent: DetectedAgent): AgentStatus {
   }
 
   return AUTH_STATUS[agent.auth];
+}
+
+export function readyFirst(agents: DetectedAgent[]): DetectedAgent[] {
+  return [...agents].sort((a, b) => AGENT_STATUS[statusOf(a)].rank - AGENT_STATUS[statusOf(b)].rank);
 }

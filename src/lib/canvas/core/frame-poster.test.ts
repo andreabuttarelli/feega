@@ -26,7 +26,7 @@ describe('showsPoster', () => {
 
 describe('showsStage', () => {
   it('a frame card filled with its page colour has something to show even too small to read', () => {
-    expect(showsStage({ items: [{ kind: ItemKind.Path, clip: 'n:panel' }, { kind: ItemKind.Path, clip: 'n:stage' }] })).toBe(true);
-    expect(showsStage({ items: [{ kind: ItemKind.Path, clip: 'n:panel' }] })).toBe(false);
+    expect(showsStage({ items: [{ clip: 'n:panel' }, { clip: 'n:stage' }] })).toBe(true);
+    expect(showsStage({ items: [{ clip: 'n:panel' }] })).toBe(false);
   });
 });

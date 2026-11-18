@@ -16,7 +16,7 @@ newest first, in one place.
 - **Branches** of a frame.
 - **Conflicts**, in red: a write refused because someone else changed the same node or frame first.
 
-Moves are not recorded.
+A drag is recorded once, when you let go. Renames are recorded too.
 
 In a local `.feega` file the same panel is in the rail. It is saved inside the file (the latest
 1000 changes), so it is there when you reopen it. There are no named versions.
