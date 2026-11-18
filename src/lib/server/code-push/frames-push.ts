@@ -1,5 +1,5 @@
 import type { CodeScope } from '$lib/server/code-import/canvas-import';
-import type { CodeEdits, SyncRefusal } from '$lib/server/code-import/code-sync';
+import { SyncOutcome, type CodeEdits, type SyncRefusal } from '$lib/server/code-import/code-sync';
 import { EditTarget, type PropProposal } from '$lib/server/code-import/instance-edits';
 import { Access, GitError, GitFailure, PullStatus, type GitHost } from './git-host';
 import { CodeSourceKind, EntryKind, followRenames, isPushable, linkStatus, type CodeLink, type LinkState } from './link';
@@ -37,10 +37,21 @@ const refused = (refusal: FramesRefused['refusal']): FramesRefused => ({ ok: fal
 
 const targetOf = (mains: string[] | undefined, nodeId: string) => (mains?.includes(nodeId) ? EditTarget.Main : EditTarget.Instance);
 
+async function frameEdits(deps: Pick<FramesDeps, 'edits' | 'links'>, scope: CodeScope, nodeId: string, target?: EditTarget): Promise<CodeEdits | SyncRefusal> {
+  const [got, link] = await Promise.all([deps.edits(scope, nodeId, target), deps.links.read(nodeId)]);
+  const restored = link?.restored ?? [];
+  if (!link || !restored.length || (typeof got === 'string' && got !== SyncOutcome.NoChanges)) {
+    return got;
+  }
+  const base = typeof got === 'string' ? { repo: link.repo, kind: link.source, files: [], skipped: [] } : got;
+  const byPath = new Map([...base.files, ...restored].map((f) => [f.path, f]));
+  return { ...base, files: [...byPath.values()] };
+}
+
 async function editsOf(deps: FramesDeps, scope: CodeScope, nodeIds: string[], mains?: string[]): Promise<{ source: CodeSourceKind; repo: string; files: { path: string; content: string }[] } | FramesRefused> {
   const all: CodeEdits[] = [];
   for (const nodeId of nodeIds) {
-    const got = await deps.edits(scope, nodeId, targetOf(mains, nodeId));
+    const got = await frameEdits(deps, scope, nodeId, targetOf(mains, nodeId));
     if (typeof got === 'string') {
       return refused(got);
     }
@@ -78,7 +89,7 @@ export async function framesPush(deps: FramesDeps, scope: CodeScope, ask: Frames
 
   const pushed = { pushBranch: out.branch, pushSha: out.sha, pushParent: out.parent, pushTouched: out.touched, pullNumber: out.pull?.number };
   const every = (await Promise.all(ask.nodeIds.map(async (nodeId) => (await deps.links.all(nodeId)).map((link) => ({ nodeId, link }))))).flat();
-  await Promise.all(every.map((l) => deps.links.save(l.nodeId, { ...l.link, ...pushed })));
+  await Promise.all(every.map((l) => deps.links.save(l.nodeId, { ...l.link, ...pushed, ...(l.link.restored ? { restored: [] } : {}) })));
   return out;
 }
 
@@ -121,7 +132,7 @@ export async function frameStatus(deps: FramesDeps, scope: CodeScope, nodeId: st
   if (link.entry !== stored.entry || link.files.join() !== stored.files.join()) {
     await deps.links.save(nodeId, link);
   }
-  const edits = await deps.edits(scope, nodeId);
+  const edits = await frameEdits(deps, scope, nodeId);
   const modified = typeof edits === 'string' ? [] : edits.files.map((f) => f.path);
   const affected = affectedBy(await deps.links.inProject(), modified, link.appRoot);
   const push = writable && link.pushBranch && link.pushSha ? await pushStatus(host, { branch: link.pushBranch, sha: link.pushSha, baseSha: link.baseSha, base: link.baseBranch }) : null;
@@ -164,7 +175,7 @@ const HTTP_STATUS: Record<string, number> = {
 
 const CONFLICT = 409;
 
-export const httpStatusOf = (refusal: FramesRefused['refusal']) => HTTP_STATUS[refusal] ?? CONFLICT;
+export const httpStatusOf = (refusal: string) => HTTP_STATUS[refusal] ?? CONFLICT;
 
 export async function frameDetach(deps: Pick<FramesDeps, 'links'>, nodeId: string): Promise<{ ok: true } | FramesRefused> {
   return (await deps.links.remove(nodeId)) ? { ok: true } : refused(FramesRefusal.NotLinked);

@@ -155,7 +155,8 @@ const docFace = (type: DocNodeType): Draw => (d, _asset, t) => {
   return {
     surface: kind === FrameKind.Frame ? Surface.Frame : Surface.Graphic,
     subtitle: head ? `Rev ${head}` : 'Empty',
-    media: t.poster && posterFresh({ docHeadRevision: head, posterRevision }) ? { url: t.poster.url, video: false } : null
+    media: t.poster && posterFresh({ docHeadRevision: head, posterRevision }) ? { url: t.poster.url, video: false } : null,
+    tint: str(d.standInFill) || null
   };
 };
 
