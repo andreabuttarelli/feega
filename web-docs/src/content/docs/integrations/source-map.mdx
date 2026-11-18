@@ -5,7 +5,7 @@ sidebar:
   order: 7
 ---
 
-In development, `@feega/source-map` adds `data-feega-src="path/to/file.tsx:line:col"` to every HTML element your code writes. Feega reads it from a live frame and knows which file and line to change. Production builds are left untouched.
+In development, `feega-source-map` adds `data-feega-src="path/to/file.tsx:line:col"` to every HTML element your code writes. Feega reads it from a live frame and knows which file and line to change. Production builds are left untouched.
 
 ## Set it up
 
@@ -16,12 +16,14 @@ npx feega init --dry-run   # show the changes
 npx feega init             # show them, ask, apply
 ```
 
-`init` detects Vite or Next.js, adds the plugin to `vite.config.*` or wraps `next.config.*` with `withFeegaSource`, and adds `@feega/source-map` to `devDependencies`. Running it again changes nothing. `-y` applies without asking.
+`init` detects Vite or Next.js, adds the plugin to `vite.config.*` or wraps `next.config.*` with `withFeegaSource`, and adds `feega-source-map` to `devDependencies`. Running it again changes nothing. `-y` applies without asking.
+
+Then install dependencies (`npm install`, `pnpm install`, …) and restart the dev server. The package is [`feega-source-map` on npm](https://www.npmjs.com/package/feega-source-map).
 
 By hand, Vite:
 
 ```ts
-import { feegaSource } from '@feega/source-map/vite';
+import { feegaSource } from 'feega-source-map/vite';
 
 export default defineConfig({ plugins: [feegaSource(), react()] });
 ```
@@ -29,7 +31,7 @@ export default defineConfig({ plugins: [feegaSource(), react()] });
 Next.js:
 
 ```ts
-import { withFeegaSource } from '@feega/source-map/next';
+import { withFeegaSource } from 'feega-source-map/next';
 
 export default withFeegaSource(nextConfig);
 ```
