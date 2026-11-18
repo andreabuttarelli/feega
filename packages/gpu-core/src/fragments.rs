@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
 use vello::kurbo::{Affine, Point, Rect, Shape};
@@ -27,10 +27,10 @@ pub struct Encoded {
 }
 
 #[derive(Clone, Default)]
-pub struct Fragments(Arc<HashMap<String, Arc<Encoded>>>);
+pub struct Fragments(Arc<FxHashMap<String, Arc<Encoded>>>);
 
 impl Fragments {
-    pub fn new(encoded: HashMap<String, Arc<Encoded>>) -> Self {
+    pub fn new(encoded: FxHashMap<String, Arc<Encoded>>) -> Self {
         Fragments(Arc::new(encoded))
     }
 

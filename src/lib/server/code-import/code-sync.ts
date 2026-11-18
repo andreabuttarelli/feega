@@ -19,10 +19,12 @@ import { githubSource, SourceKind, type CodeSource, type GithubCalls } from './c
 import { folderOf, folderSource } from './folder-source';
 import { uploadedArchive, uploadOf, uploadSource } from './upload-source';
 import { BASE_CONDITIONS, conditionsOf, labelOf, type RenderConditions, type Variant } from './render-conditions';
+import { responsiveOf } from './code-views';
 import { addBoards, AddRefusal, boardParent } from '$lib/canvas/code-boards';
 import { boardsUsed, condOf, MAX_FRAME_BOARDS, mergedMap, PageState, type ImportMap } from '$lib/canvas/import-map';
 import { routesFound } from './canvas-import';
 import { mapOf } from './import-map-of';
+import { EditTarget, type PropProposal } from './instance-edits';
 import { UNREADABLE, type RoutesFound } from './routes-found';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 
@@ -94,9 +96,9 @@ async function linkedOf(scope: CodeScope, nodeId: string): Promise<Linked | null
   return parsed?.success ? SOURCES[parsed.data.kind as SourceKind](scope, parsed.data) : null;
 }
 
-type Changed = { linked: Linked; rev: string; files: FileChange[]; skipped: string[]; tokens: TokenMap };
+type Changed = { linked: Linked; rev: string; files: FileChange[]; skipped: string[]; tokens: TokenMap; proposals: PropProposal[] };
 
-async function changed(scope: CodeScope, nodeId: string): Promise<Changed | SyncRefusal> {
+async function changed(scope: CodeScope, nodeId: string, target: EditTarget = EditTarget.Instance): Promise<Changed | SyncRefusal> {
   const linked = await linkedOf(scope, nodeId);
   const frame = linked ? await frameStore(scope.db, scope).read(nodeId) : null;
   if (!linked || !frame) {
@@ -106,8 +108,8 @@ async function changed(scope: CodeScope, nodeId: string): Promise<Changed | Sync
   if (!rev) {
     return SyncOutcome.Unreachable;
   }
-  const done = await frameEdits(frame.doc, linked.origin.tokens, linked.source.read(rev));
-  return { linked, rev, files: done.files, skipped: done.skipped, tokens: done.map };
+  const done = await frameEdits(frame.doc, linked.origin.tokens, linked.source.read(rev), target);
+  return { linked, rev, files: done.files, skipped: done.skipped, tokens: done.map, proposals: done.proposals };
 }
 
 export type CodeChanges = { outcome: SyncOutcome.Ok; kind: string; repo: string; sha: string; patch: string; files: string[]; skipped: string[] };
@@ -120,7 +122,17 @@ export async function codeChanges(scope: CodeScope, nodeId: string): Promise<Cod
   return { outcome: SyncOutcome.Ok, kind: done.linked.origin.kind, repo: done.linked.origin.repo, sha: done.rev, patch: patchOf(done.files), files: done.files.map((f) => f.path), skipped: done.skipped };
 }
 
-export type CodePublished = { outcome: SyncOutcome.Ok; url: string | null; branch: string | null; files: string[]; skipped: string[] };
+export type CodeEdits = { repo: string; kind: string; files: { path: string; content: string }[]; skipped: string[]; proposals?: PropProposal[] };
+
+export async function codeEdits(scope: CodeScope, nodeId: string, target: EditTarget = EditTarget.Instance): Promise<CodeEdits | SyncRefusal> {
+  const done = await changed(scope, nodeId, target);
+  if (typeof done === 'string') {
+    return done;
+  }
+  return { repo: done.linked.origin.repo, kind: done.linked.origin.kind, files: done.files.map((f) => ({ path: f.path, content: f.after })), skipped: done.skipped, proposals: done.proposals };
+}
+
+export type CodePublished ={ outcome: SyncOutcome.Ok; url: string | null; branch: string | null; files: string[]; skipped: string[] };
 
 export async function codePublish(scope: CodeScope, nodeId: string, now = Date.now()): Promise<CodePublished | { outcome: SyncRefusal }> {
   const done = await changed(scope, nodeId);
@@ -173,7 +185,7 @@ export async function codePull(scope: CodeScope, nodeId: string, branch?: string
 
   const origin = linked.origin;
   const [fresh, listed] = await Promise.all([
-    importCodeInto(scope, local.canvasId, { ...linked.link(rev), app: origin.app, routes: origin.routes, conditions: conditionsOf(origin.conditions), variants: pulledVariants(origin), delay: origin.delay, at: local.at ?? { x: 0, y: 0 } }),
+    importCodeInto(scope, local.canvasId, { ...linked.link(rev), app: origin.app, routes: origin.routes, conditions: conditionsOf(origin.conditions), variants: pulledVariants(origin), responsive: responsiveOf(origin), delay: origin.delay, at: local.at ?? { x: 0, y: 0 } }),
     routesFound(scope, { ...WHERE[origin.kind as SourceKind](origin), app: origin.app }).catch(() => null)
   ]);
   if (fresh.outcome !== CodeImportOutcome.Ok) {
@@ -246,6 +258,9 @@ export async function codeAdd(scope: CodeScope, nodeId: string, ask: AddAsk): Pr
   const local = linked ? await store.read(nodeId) : null;
   if (!linked || !local) {
     return { outcome: SyncOutcome.NotFromCode };
+  }
+  if (local.doc.breakpoints?.length) {
+    return { outcome: SyncOutcome.NoRoom, error: 'this frame is one page with views; import more pages as a new frame' };
   }
   const variants = variantsOfAsk(ask);
   const room = MAX_FRAME_BOARDS - boardsUsed(linked.origin.map, (id) => clipIds(local.doc).has(id));

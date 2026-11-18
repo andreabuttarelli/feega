@@ -551,6 +551,11 @@ impl Renderer {
         }
     }
 
+    /// Caps the side of the image atlas texture, shrinking it now if it is larger.
+    pub fn set_image_atlas_max(&mut self, side: u32) {
+        self.resolver.set_image_atlas_max(side);
+    }
+
     /// Marks `image` as dirty in the atlas cache, so its override texture will be recopied on
     /// the next render that uses it.
     ///

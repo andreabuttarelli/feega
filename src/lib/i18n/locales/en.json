@@ -261,10 +261,10 @@
       "del": {
         "title": "Danger zone",
         "heading": "Delete this brand",
-        "desc": "Permanently delete this brand and everything tied to it: posts, plans, articles, connected accounts. Only possible once the paid plan has been canceled.",
+        "desc": "Permanently delete this brand and everything tied to it. Only possible once the paid plan has been canceled.",
         "cta": "Delete brand",
         "confirmTitle": "Delete {brand} forever?",
-        "confirmBody": "This can't be undone: every piece of project data — posts, editorial plans, articles, connected social accounts — will be lost forever. Type <b>{brand}</b> below to confirm.",
+        "confirmBody": "This can't be undone: every piece of project data will be lost forever. Type <b>{brand}</b> below to confirm.",
         "confirmCta": "Delete forever",
         "deleting": "Deleting…",
         "errors": {

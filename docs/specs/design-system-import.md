@@ -17,20 +17,20 @@ Design system board, and the same branch/PR round trip for tokens that layers al
 | Modes (theme = mode) | **Yes**, per collection; the frame's mode is `collection.active`, and any clip may override it for its subtree (`clip.modes`, stage 2); instances under an override carry `props.modeValues` | same; `resolveVariables` in `src/lib/motion/variables.ts` |
 | Aliases (semantic → primitive) | **Yes**: a mode value may be `{ alias: "Collection/var" }`, across collections, resolved with a cycle guard | `variables-model.ts`, `valueOf` in `src/lib/motion/variables.ts` |
 | Layer property → variable | **Yes**: `clip.bind[target] = "Collection/var"`; the literal stays in `props`, rewritten on resolve; a bound field refuses a direct patch | `doc.ts` `bind`, `timeline.ts` (`unbind it first`), `bindableTargets` |
-| Bindable targets | Colour/number/text/toggle fields, `fill`, `stroke`, `autoLayout.gap`/`crossGap`/`padding` (one value, all sides), `radius` (rect shapes). **Not** font family (`Control.Font`), border width, opacity, effects, text size in px (props are frame-relative) | `src/lib/motion/variables.ts` |
+| Bindable targets | Colour/number/text/toggle fields, `fill`, `stroke`, `autoLayout.gap`/`crossGap`/`padding` (one value, all sides), `radius` (rect shapes). **Not** opacity, effects, text size in px (props are frame-relative) | `src/lib/motion/variables.ts` |
 | Project-wide sharing of variables and styles | **Yes**: `project_library` (kind `style`/`variables`), adopted by every frame of the project | `supabase/migrations/20261031100000_project_library.sql`, `src/lib/server/motion/canvas-variables.ts`, `src/lib/motion/project-library-ops.ts` |
-| Limits | 8 collections × 64 variables × 8 modes; names `^[A-Za-z0-9][A-Za-z0-9 _-]{0,39}$` (no `.` `/`) | `variables-model.ts` |
-| Typography tokens | **Partial**: text styles (font, size, weight, tracking, leading, case, colour) hold literals, cannot reference variables; 40 styles max | `styles-model.ts` |
+| Limits | 16 collections × 512 variables × 8 modes, 200 styles; names `^[A-Za-z0-9][A-Za-z0-9 _-]{0,39}$` (no `.` `/`) | `variables-model.ts` |
+| Typography tokens | **Partial**: text styles (font, size, weight, tracking, leading, case, colour) hold literals, cannot reference variables; 200 styles max | `styles-model.ts` |
 | Shadow tokens | **Partial**: effect styles (literal) | `styles-model.ts` |
 | Spacing, radius tokens | **Yes** as number variables bound to gap/padding/radius | `variables.ts` |
 | Border, breakpoint, motion tokens | **Missing** as bindable things. Frames have breakpoints (`breakpoints/model.ts`) but not from variables | — |
 | Fonts | **Yes**: `@font-face` read in the page, files imported as assets, ≤24 faces per doc | `page-tree.ts` (`readSheet`), `fonts/model.ts`, `fontsFor` |
 | Components, variant sets, instances | **Yes**: `comp.component = { name, set, variant, properties, home }`; code import makes one main per observed variant, instances elsewhere, homed on the Components page | `doc.ts` `mainComponentSchema`, `code-sets.ts`, `component-sheet.ts` |
 | Components across frames | **Missing**: an instance cannot point at another frame's main; all boards of an import share one frame | `code-import.md` "Several routes" |
-| Variant axes from code | **Partial**: declared axes are read statically (`component-discovery.ts`: cva/tv, unions, enums, booleans, Svelte `$props()`/`export let`, Vue `defineProps`, Storybook `argTypes`) and listed per import with captured / not captured; a declared union keeps `type`/`name`/`value` and numeric props as axes in `code-sets.ts`. Mains still come only from props *observed* on captured routes; no gallery yet, so uncaptured components and Svelte variants are not drawn | `code-import.md` |
+| Variant axes from code | **Partial**: declared axes are read statically (`component-discovery.ts`) and, for React apps (Next App/Pages Router, Vite + React), drawn by the stage 3 gallery (`gallery.ts`, route `feega-gallery`: Next does not route `_` folders). Svelte, Vue and other frameworks: listed only | `gallery.ts`, `code-import.md` |
 | Storybook | **Partial**: up to 12 stories, rendered args only, no controls matrix | `import-storybook.ts` |
 | Icons | **Partial**: drawn as vectors; library components (lucide, Radix) stay plain layers | `component-marks.ts` |
-| Token write-back | **Missing**. Layer write-back exists: inline `style`, or Tailwind arbitrary classes (`bg-[#…]`, `dark:` for the dark board) | `write-back.ts` `CLASS_OF`, `classed` |
+| Token write-back | **Yes**: a variable or style edit rewrites its declaration in CSS, token JSON, `tailwind.config.*` literals and SCSS/LESS variables (`token-write.ts`); a changed line or a doubled literal is skipped, the code wins. Layer write-back: inline `style`, or Tailwind arbitrary classes (`bg-[#…]`, `dark:` for the dark board) | `write-back.ts` `CLASS_OF`, `classed` |
 | Pull / rebase | **Yes** for layers: `rebased` matches by file + original look, code wins on conflict | `repo-sync.ts` |
 | Light/dark capture | **Yes**, but as separate boards (render conditions), not as modes of one board | `render-conditions.ts`, `boards.ts` |
 
@@ -140,7 +140,7 @@ and the config's structure; the CSSOM keeps custom-property text but not files.
 | CSS custom properties in `:root`, `.dark`, `[data-theme=x]`, `@media (prefers-color-scheme)` | a CSS tokenizer on the text (no build) | selector → mode; unknown selectors reported |
 | Tailwind v4 `@theme` / `@theme inline` | same | `--color-*`, `--spacing*`, `--radius-*`, `--text-*`, `--font-*`, `--shadow-*`, `--breakpoint-*`, `--ease-*`, `--animate-*` |
 | shadcn `components.json` | JSON | gives `tailwind.css` path, `cssVariables`, `aliases.ui` (components dir), base colour |
-| Tailwind v3 `tailwind.config.{js,ts,cjs,mjs}` | **evaluated inside the sandbox** (`resolveConfig`, JSON out, 1 MB cap) | it is code: never on our server. Folder source (local mode): a child process on the user's machine, same trust as their dev server |
+| Tailwind v3 `tailwind.config.{js,ts,cjs,mjs}` | **read as text** (`tailwind-config.ts`: the theme literal found with the TS parser, `extend` merged; a spread, reference or function is listed as left out). Defaults Tailwind adds (`defaultTheme`) are not tokens of the repo and are not imported | it is code: never run. Evaluating it in the sandbox would add the defaults and computed values, at the cost of a run |
 | Component files | TS compiler API (`.tsx`), `svelte/compiler` parse (`.svelte`) | `cva(…, { variants })`, `tv({ variants })`, union-typed props, `$props()` types |
 
 **Bindings are decided per layer at runtime**, in the existing capture, from this evidence in
@@ -242,7 +242,7 @@ like layer edits: one branch, one PR.
 | SvelteKit + Tailwind | stage 1–3 | same token path; variants from `$props()` types |
 | Any framework with plain CSS custom properties (Vue, Nuxt, Astro, CSS Modules, Chakra v3, MUI CSS-vars mode) | tokens: stage 1; components: what runtime import already reads | tokens are framework-independent |
 | W3C design-tokens JSON | stage 5 | static JSON, write-back trivial; bindings only through the CSS it generates |
-| SCSS / LESS variables | tokens read-only, no bindings | compiled away: the page holds literals, nothing to trace a layer back to |
+| SCSS / LESS variables | **read** (`sass-vars.ts`: `$name: literal`, `@name: literal`, references as aliases; functions and arithmetic left out) and written back; bound like any token | compiled away: the page holds literals, nothing to trace a layer back to |
 | JS/TS theme objects (styled-components, Emotion, MUI `createTheme`) | literal object exports only, read-only | values computed at runtime; evaluating them means running app code outside the sandbox's dev server |
 | vanilla-extract, Panda, Stitches, UnoCSS | via plain CSS variables if they emit them | the source of truth is generated code |
 | Plain-CSS rules with descendant selectors (`article .prose h2 { color: var(--x) }`) | not traced | `el.matches()` on our static selectors is deterministic, but choosing the winning declaration needs the full cascade (specificity, order, `@layer`, `!important`, inline); the consistency check cannot catch a wrong winner when tokens share a value (traidue's `primary`/`success`). CDP `CSS.getMatchedStylesForNode` gives the true cascade but costs a round trip per node (~1 500 per page) inside the capture budget. On traidue those elements are `{@html}` output with no source location anyway |
@@ -273,9 +273,9 @@ Each is a question; the recommendation is the default if nobody answers.
    Light and Dark cannot sit side by side. *Recommendation:* `clip.modes?: Record<collection,
    mode>` on any container, inherited by descendants (Figma's model). Needed by stage 2; stage 1
    ships with the frame-level switch.
-2. **Limits.** 64 variables per collection and 8 collections fit shadcn (~30 colours) and
-   traidue (15), not a full Tailwind theme. *Recommendation:* import only used/declared tokens
-   (above); raise to 256 per collection only when a real repo hits it.
+2. **Limits.** Raised to 512 variables per collection, 16 collections and 200 styles: a 242-colour
+   Tailwind palette hit the old 64. Modes stay at 8. The variables panel lists every row without
+   virtualisation.
 3. **Font family as a variable?** `Control.Font` is not bindable. *Recommendation:* make it
    bindable to string variables (font names already are strings); otherwise families are listed
    only.

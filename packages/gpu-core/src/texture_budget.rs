@@ -1,4 +1,5 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
+use rustc_hash::FxHashMap;
 
 pub type Side = (u32, u32);
 
@@ -26,7 +27,7 @@ pub fn split(budget: u64, screen: Side) -> Split {
 }
 
 pub struct Shelves<T> {
-    kept: HashMap<Side, Vec<T>>,
+    kept: FxHashMap<Side, Vec<T>>,
     order: VecDeque<Side>,
     bytes: u64,
     cap: u64,
@@ -34,7 +35,7 @@ pub struct Shelves<T> {
 
 impl<T> Shelves<T> {
     pub fn new(cap: u64) -> Self {
-        Shelves { kept: HashMap::new(), order: VecDeque::new(), bytes: 0, cap }
+        Shelves { kept: FxHashMap::default(), order: VecDeque::new(), bytes: 0, cap }
     }
 
     pub fn bytes(&self) -> u64 {

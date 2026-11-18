@@ -1,4 +1,4 @@
-use vello::kurbo::Rect;
+use vello::kurbo::{Point, Rect};
 
 use crate::canvas::Canvas;
 use crate::display_list::{Cover, DisplayList, Item, Lens, Look, MaskMode, Rgba};
@@ -6,11 +6,20 @@ use crate::fragments::Fragments;
 use crate::filters::{paints_from_nothing, reach as filter_reach, Fold, Fx, Reach, Runner};
 use crate::canvas::shader_only;
 use crate::tally::Reason;
-use crate::scene::{alone, bounds, build_items, cover, layer_worthy, plain, silhouette, unblended, Layers, Placed, Shelf};
+use crate::zoomless::{zoomless, Zoomless};
+use crate::scene::{alone, bounds, build_items, build_where, cover, layer_worthy, plain, silhouette, unblended, Layers, Placed, Shelf};
 
 const UNIT_SPACE: [f64; 4] = [1.0, 0.0, 0.0, 1.0];
 const REACH: f64 = 3.0;
 const SLACK: f64 = 2.0;
+const HELD_SIDE: f64 = 4096.0;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Effects {
+    #[default]
+    Screen,
+    Zoomless,
+}
 
 pub type Tex<S> = <<S as Surface>::Runner as Runner>::Tex;
 pub type Pic<S> = <<S as Surface>::Canvas as Canvas>::Picture;
@@ -30,6 +39,22 @@ pub trait Surface {
     }
 
     fn remember(&mut self, _item: &Item, _placed: &Placed<Pic<Self>>) {}
+
+    fn effects(&self) -> Effects {
+        Effects::Screen
+    }
+
+    fn set_frame(&mut self, _frame: Option<Rect>) {}
+
+    fn zoomless(&mut self, item: &Item) -> Option<Zoomless> {
+        zoomless(item)
+    }
+
+    fn recall_held(&mut self, _key: &str) -> Option<Placed<Pic<Self>>> {
+        None
+    }
+
+    fn remember_held(&mut self, _key: &str, _placed: &Placed<Pic<Self>>) {}
 }
 
 fn reach(sigma: f64) -> f64 {
@@ -63,6 +88,8 @@ fn composited_blend(item: &Item, blending: Blending) -> bool {
 fn prepare_items<S: Surface>(surface: &mut S, items: &[Item], background: Option<Rgba>, pictures: &Shelf<Pic<S>>, blending: Blending, fragments: &Fragments) -> Result<Layers<Pic<S>>, S::Error> {
     let mut layers = Layers::new();
     layers.fragments = fragments.clone();
+    let measured = std::cell::OnceCell::new();
+    let spreads = || measured.get_or_init(|| items.iter().map(|item| spread::<S::Canvas>(item, pictures)).collect::<Vec<_>>()).as_slice();
     for (i, item) in items.iter().enumerate() {
         if let Item::Lens(lens) = item {
             let layer = refracted(surface, &items[lens.under.min(i)..i], &layers, pictures, &lens.lens)?;
@@ -70,12 +97,18 @@ fn prepare_items<S: Surface>(surface: &mut S, items: &[Item], background: Option
             continue;
         }
         if let Some(sigma) = item.look().and_then(|l| l.backdrop) {
-            let layer = behind(surface, items, i, background, &layers, pictures, sigma)?;
+            let layer = behind(surface, items, spreads(), i, background, &layers, pictures, sigma)?;
             layers.behind.insert(i, layer);
         }
         if layer_worthy(item) && !composited_blend(item, blending) && (off_frame(surface, item, pictures) || shades_nothing(item)) {
             layers.culled.insert(i);
             continue;
+        }
+        if layer_worthy(item) && !composited_blend(item, blending) && surface.effects() == Effects::Zoomless {
+            if let Some(layer) = held_body(surface, item, pictures, blending, fragments)? {
+                layers.bodies.insert(i, layer);
+                continue;
+            }
         }
         let recalled = if layer_worthy(item) { surface.recall(item) } else { None };
         if let (Item::Group(group), None) = (item, &recalled) {
@@ -94,19 +127,50 @@ fn prepare_items<S: Surface>(surface: &mut S, items: &[Item], background: Option
             layers.bodies.insert(i, layer);
         }
         if composited_blend(item, blending) {
-            let layer = composited(surface, items, i, background, &layers, pictures)?;
+            let layer = composited(surface, items, spreads(), i, background, &layers, pictures)?;
             layers.blended.insert(i, layer);
         }
     }
     Ok(layers)
 }
 
-fn composited<S: Surface>(surface: &mut S, items: &[Item], at: usize, background: Option<Rgba>, layers: &Layers<Pic<S>>, pictures: &Shelf<Pic<S>>) -> Result<Placed<Pic<S>>, S::Error> {
+fn held_body<S: Surface>(surface: &mut S, item: &Item, pictures: &Shelf<Pic<S>>, blending: Blending, fragments: &Fragments) -> Result<Option<Placed<Pic<S>>>, S::Error> {
+    let Some(z) = surface.zoomless(item) else { return Ok(None) };
+    let held = match surface.recall_held(&z.key) {
+        Some(held) => held,
+        None => {
+            let at_held = z.item(item);
+            let Some(look) = at_held.look() else { return Ok(None) };
+            let Some(spread) = inflated::<S::Canvas>(&at_held, look, pictures) else { return Ok(None) };
+            if spread.width() > HELD_SIDE || spread.height() > HELD_SIDE {
+                return Ok(None);
+            }
+            surface.set_frame(Some(Rect::new(spread.x0.floor(), spread.y0.floor(), spread.x1.ceil(), spread.y1.ceil())));
+            let made = held_made(surface, &at_held, pictures, blending, fragments);
+            surface.set_frame(None);
+            let made = made?;
+            surface.remember_held(&z.key, &made);
+            made
+        }
+    };
+    let origin = Point::new(z.shift.x + held.origin.x * z.scale, z.shift.y + held.origin.y * z.scale);
+    Ok(Some(Placed { image: held.image, origin, scale: z.scale }))
+}
+
+fn held_made<S: Surface>(surface: &mut S, item: &Item, pictures: &Shelf<Pic<S>>, blending: Blending, fragments: &Fragments) -> Result<Placed<Pic<S>>, S::Error> {
+    let inner = match item {
+        Item::Group(group) => Some(prepare_items(surface, &group.items, None, pictures, blending, fragments)?),
+        _ => None,
+    };
+    body(surface, item, pictures, inner.as_ref())
+}
+
+fn composited<S: Surface>(surface: &mut S, items: &[Item], spreads: &[Option<Rect>], at: usize, background: Option<Rgba>, layers: &Layers<Pic<S>>, pictures: &Shelf<Pic<S>>) -> Result<Placed<Pic<S>>, S::Error> {
     let frame = surface.frame();
     let look = items[at].look().expect("a drawable item");
     let region = region(surface, &items[at], look, pictures);
     let below = surface.paint(Reason::Composited, region, background, &|c| {
-        build_items(c, &items[..at], frame, pictures, layers);
+        build_where(c, &items[..at], frame, pictures, layers, |i| spreads[i].is_none_or(|r| r.overlaps(region)));
     })?;
     let top = surface.paint(Reason::Composited, region, None, &|c| unblended(c, items, at, frame, pictures, layers))?;
     let fx = Fx { runner: surface.runner() };
@@ -114,13 +178,13 @@ fn composited<S: Surface>(surface: &mut S, items: &[Item], at: usize, background
     Ok(surface.place(texture, region))
 }
 
-fn behind<S: Surface>(surface: &mut S, items: &[Item], at: usize, background: Option<Rgba>, layers: &Layers<Pic<S>>, pictures: &Shelf<Pic<S>>, sigma: f64) -> Result<Placed<Pic<S>>, S::Error> {
+fn behind<S: Surface>(surface: &mut S, items: &[Item], spreads: &[Option<Rect>], at: usize, background: Option<Rgba>, layers: &Layers<Pic<S>>, pictures: &Shelf<Pic<S>>, sigma: f64) -> Result<Placed<Pic<S>>, S::Error> {
     let frame = surface.frame();
     let item = &items[at];
     let margin = reach(sigma);
     let region = snapped(bounds::<S::Canvas>(item, pictures).unwrap_or(frame).inflate(margin, margin), frame);
     let below = surface.paint(Reason::Backdrop, region, background, &|c| {
-        build_items(c, &items[..at], frame, pictures, layers);
+        build_where(c, &items[..at], frame, pictures, layers, |i| spreads[i].is_none_or(|r| r.overlaps(region)));
     })?;
     let shape = surface.paint(Reason::Backdrop, region, None, &|c| silhouette(c, item, pictures, frame))?;
     let fx = Fx { runner: surface.runner() };
@@ -146,6 +210,13 @@ fn inflated<C: Canvas>(item: &Item, look: &Look, pictures: &Shelf<C::Picture>) -
     let feather = look.masks.iter().flatten().map(|m| m.feather).fold(0.0, f64::max);
     let margin = reach(look.blur) + reach(feather) + filtered.px;
     Some(own.inflate(margin + own.width() * filtered.share, margin + own.height() * filtered.share))
+}
+
+fn spread<C: Canvas>(item: &Item, pictures: &Shelf<C::Picture>) -> Option<Rect> {
+    match item.look() {
+        Some(look) => inflated::<C>(item, look, pictures),
+        None => bounds::<C>(item, pictures),
+    }
 }
 
 fn region<S: Surface>(surface: &S, item: &Item, look: &Look, pictures: &Shelf<Pic<S>>) -> Rect {

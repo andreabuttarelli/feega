@@ -23,7 +23,7 @@ import { fillsSchema } from './fill/model';
 import { strokesSchema } from './stroke/model';
 import { runsSchema } from './text-runs';
 import { listsSchema } from './text-lists';
-import { AXES, LETTER_SPACING, LINE_HEIGHT } from './type-units';
+import { AXES, LETTER_SPACING, LINE_HEIGHT, TYPE_SIZE } from './type-units';
 import { DECORATION_STYLES, DECORATIONS, FEATURES, RULE } from './decoration';
 import { counterSchema } from './text-counter';
 import { BooleanOp } from './shape/boolean-op';
@@ -153,7 +153,7 @@ export const TYPE = {
 
 type Look = { weight?: number; tracking: number; leading: number };
 
-export const TYPE_SIZE = { min: 0.001, max: 4 } as const;
+export { TYPE_SIZE };
 
 const typography = (size: number, fallbackColor: string, look: Look) => ({
   color: color(fallbackColor, 'Colour'),
@@ -685,13 +685,28 @@ export type PropsVerdict = { ok: true; props: Record<string, unknown> } | { ok: 
 
 const TITLED: readonly ComponentId[] = ['Title', 'Text'];
 
+const titledSizes = new Map<ComponentId, number>();
+
+function defaultSize(id: ComponentId): number {
+  const known = titledSizes.get(id);
+  if (known !== undefined) {
+    return known;
+  }
+  const size = Number(defaultProps(id).size ?? 0);
+  titledSizes.set(id, size);
+  return size;
+}
+
 function titleLook(id: ComponentId, props: unknown): unknown {
   if (typeof (props ?? {}) !== 'object') {
     return props;
   }
   const raw = (props ?? {}) as Record<string, unknown>;
-  const size = Number(raw.size ?? defaultProps(id).size ?? 0);
-  if (!TITLED.includes(id) || size < HEADLINE_SIZE) {
+  if (!TITLED.includes(id)) {
+    return raw;
+  }
+  const size = raw.size === undefined || raw.size === null ? defaultSize(id) : Number(raw.size);
+  if (size < HEADLINE_SIZE) {
     return raw;
   }
   return { ...TITLE_LOOK, ...raw };

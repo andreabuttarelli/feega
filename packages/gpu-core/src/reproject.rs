@@ -4,7 +4,7 @@ use vello::wgpu;
 use crate::retained::Lookup;
 
 const SHADER: &str = "
-struct Look { scale: vec2<f32>, offset: vec2<f32>, size: vec2<f32>, unused: vec2<f32> };
+struct Look { scale: vec2<f32>, offset: vec2<f32>, size: vec2<f32>, opacity: f32, pad: f32 };
 @group(0) @binding(0) var source: texture_2d<f32>;
 @group(0) @binding(1) var blend_sampler: sampler;
 @group(0) @binding(2) var<uniform> look: Look;
@@ -19,7 +19,7 @@ fn seen_at(at: vec4<f32>) -> vec4<f32> {
   let px = at.xy * look.scale + look.offset;
   let seen = textureSampleLevel(source, blend_sampler, px / look.size, 0.0);
   let inside = all(px >= vec2<f32>(0.0)) && all(px <= look.size);
-  return select(vec4<f32>(0.0), seen, inside);
+  return select(vec4<f32>(0.0), vec4<f32>(seen.rgb, seen.a * look.opacity), inside);
 }
 
 @fragment
@@ -35,6 +35,7 @@ fn premultiplied(@builtin(position) at: vec4<f32>) -> @location(0) vec4<f32> {
 ";
 
 const UNIFORM_BYTES: u64 = 32;
+pub const OPAQUE: f32 = 1.0;
 const IN_FLIGHT_SLOTS: usize = 4;
 const TILE_UNIFORM_STRIDE: u64 = 256;
 
@@ -71,7 +72,8 @@ pub struct Reprojector {
     next: usize,
     tiles: Option<wgpu::Buffer>,
     layout: wgpu::BindGroupLayout,
-    bound: std::collections::HashMap<wgpu::Texture, wgpu::BindGroup>,
+    bound: rustc_hash::FxHashMap<wgpu::Texture, wgpu::BindGroup>,
+    earlier: rustc_hash::FxHashMap<wgpu::Texture, wgpu::BindGroup>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -85,6 +87,7 @@ pub struct Tile<'a> {
     pub source: &'a wgpu::Texture,
     pub look: Lookup,
     pub within: Rect,
+    pub opacity: f32,
 }
 
 pub struct Draw<'a> {
@@ -110,7 +113,7 @@ impl Reprojector {
                 entry(2, wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: wgpu::BufferSize::new(UNIFORM_BYTES) }),
             ],
         });
-        Reprojector { pipelines: Vec::new(), sampler, module, uniforms, next: 0, tiles: None, layout, bound: Default::default() }
+        Reprojector { pipelines: Vec::new(), sampler, module, uniforms, next: 0, tiles: None, layout, bound: Default::default(), earlier: Default::default() }
     }
 
     fn bind(&self, device: &wgpu::Device, source: &wgpu::Texture, uniform: &wgpu::Buffer) -> wgpu::BindGroup {
@@ -159,11 +162,12 @@ impl Reprojector {
     }
 
     fn tile_uniforms(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, tiles: &[Tile]) -> wgpu::Buffer {
-        let looks: Vec<[f32; 8]> = tiles.iter().map(|t| [t.look.scale as f32, t.look.scale as f32, t.look.x as f32, t.look.y as f32, t.source.width() as f32, t.source.height() as f32, 0.0, 0.0]).collect();
+        let looks: Vec<[f32; 8]> = tiles.iter().map(|t| [t.look.scale as f32, t.look.scale as f32, t.look.x as f32, t.look.y as f32, t.source.width() as f32, t.source.height() as f32, t.opacity, 0.0]).collect();
         let bytes = tile_slots(&looks);
         let fits = self.tiles.as_ref().is_some_and(|b| b.size() >= bytes.len() as u64);
         if !fits {
             self.bound.clear();
+            self.earlier.clear();
             self.tiles = Some(device.create_buffer(&wgpu::BufferDescriptor { label: None, size: (bytes.len() as u64).next_power_of_two(), usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false }));
         }
         let buffer = self.tiles.clone().expect("just sized");
@@ -177,8 +181,9 @@ impl Reprojector {
         }
         let buffer = self.tile_uniforms(device, queue, tiles);
         let pipeline = self.pipeline(device, format, output).clone();
-        let mut bound = std::mem::take(&mut self.bound);
-        let groups: Vec<wgpu::BindGroup> = tiles.iter().map(|t| bound.remove(t.source).unwrap_or_else(|| self.bind(device, t.source, &buffer))).collect();
+        let mut recent = std::mem::take(&mut self.bound);
+        let mut older = std::mem::take(&mut self.earlier);
+        let groups: Vec<wgpu::BindGroup> = tiles.iter().map(|t| recent.remove(t.source).or_else(|| older.remove(t.source)).unwrap_or_else(|| self.bind(device, t.source, &buffer))).collect();
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
             color_attachments: &[Some(wgpu::RenderPassColorAttachment { view: target, depth_slice: None, resolve_target: None, ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store } })],
@@ -196,11 +201,12 @@ impl Reprojector {
         }
         drop(pass);
         self.bound = tiles.iter().zip(groups).map(|(t, g)| (t.source.clone(), g)).collect();
+        self.earlier = recent;
     }
 
     pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, encoder: &mut wgpu::CommandEncoder, d: Draw) {
         let size = [d.source.width() as f32, d.source.height() as f32];
-        let values: [f32; 8] = [d.look.scale as f32, d.look.scale as f32, d.look.x as f32, d.look.y as f32, size[0], size[1], 0.0, 0.0];
+        let values: [f32; 8] = [d.look.scale as f32, d.look.scale as f32, d.look.x as f32, d.look.y as f32, size[0], size[1], OPAQUE, 0.0];
         let bytes: Vec<u8> = values.iter().flat_map(|v| v.to_le_bytes()).collect();
         let uniform = self.uniform(queue, &bytes);
         let pipeline = self.pipeline(device, d.format, d.output).clone();

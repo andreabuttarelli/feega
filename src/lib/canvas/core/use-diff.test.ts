@@ -1,7 +1,23 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Use } from '@feega/motion-core/motion/gpu-full/core-web';
 import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
-import { SentOverlay, SentUses } from './use-diff';
+import { OverlayPart } from '@feega/motion-core/motion/gpu-full/core-overlay';
+import { CoreMotion } from '@feega/motion-core/motion/gpu-full/core-web';
+import type { CoreOverlay } from './world-overlay';
+import { SentOverlay, SentParts, SentUses } from './use-diff';
+
+describe('sent parts during a gesture', () => {
+  const item = (id: string) => ({ id }) as unknown as PathItem;
+  const overlay = (fixed: PathItem[], live: PathItem[]): CoreOverlay => ({ fixed, selected: [], live });
+
+  it('sends the labels part but holds the live part while the camera moves', () => {
+    const sent = new SentParts();
+    sent.changed(overlay([item('a')], [item('g')]), CoreMotion.Gesture);
+
+    expect(sent.changed(overlay([item('b')], [item('h')]), CoreMotion.Gesture)).toEqual([OverlayPart.Fixed]);
+    expect(sent.changed(overlay([item('b')], [item('h')]), CoreMotion.Still)).toEqual([OverlayPart.Live]);
+  });
+});
 
 describe('sent overlay', () => {
   it('counts a new array with the same items as unchanged', () => {

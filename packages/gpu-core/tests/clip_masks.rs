@@ -82,7 +82,7 @@ fn a_clip_mask_draws_inside_balanced_clips_and_skips_nothing() {
     let list = list_with(&[mask("intersect", ""), mask("intersect", "")], "");
     let mut canvas = Counting::default();
 
-    let skipped = build_into(&mut canvas, &list, &Shelf::new(), &Layers::new());
+    let skipped = build_into(&mut canvas, &list, &Shelf::default(), &Layers::new());
 
     assert!(skipped.is_empty());
     assert_eq!(canvas.fills, 1);
@@ -100,7 +100,7 @@ mod pixels {
     const EDGE_PIXELS_ALLOWED: usize = 12;
 
     fn render(list: &DisplayList) -> Vec<u8> {
-        gpu_core::render::Renderer::new().expect("a GPU adapter").render(list, &Pictures::new()).unwrap().pixels
+        gpu_core::render::Renderer::new().expect("a GPU adapter").render(list, &Pictures::default()).unwrap().pixels
     }
 
     fn triangle(masks: &[String]) -> DisplayList {
@@ -146,7 +146,7 @@ fn neighbours_clipped_by_the_same_box_share_one_clip() {
     let list = parse(&format!(r#"{{ "width": 64, "height": 64, "background": null, "items": [{}, {}, {}] }}"#, item(0), item(8), item(16))).unwrap();
     let mut canvas = Counting::default();
 
-    build_into(&mut canvas, &list, &Shelf::new(), &Layers::new());
+    build_into(&mut canvas, &list, &Shelf::default(), &Layers::new());
 
     assert_eq!((canvas.clips, canvas.pops, canvas.fills), (1, 1, 3));
 }

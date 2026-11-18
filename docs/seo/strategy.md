@@ -29,7 +29,7 @@ code (`src/lib/video-models.ts`, `src/lib/image-models.ts`, `src/lib/canvas/audi
 
 | Cluster | Queries | Clicks | Impr. | Best pos. | Intent | feega today | Target page |
 |---|---|---|---|---|---|---|---|
-| AI commercial / ad maker | ~125 | 1 | ~1,500 | 38 (tv commercial maker) | make product video ads | Served: products node, image+video gen, voice-over/music, Meta ads (Meta only) | `/ai-commercial-maker` |
+| AI commercial / ad maker | ~125 | 1 | ~1,500 | 38 (tv commercial maker) | make product video ads | Served: products node, image+video gen, voice-over/music | `/ai-commercial-maker` |
 | Video upscale / enhance | 167 | 13 | 937 | 14 | upscale a clip, sharpen, "4k" | Served: `/app/upscale` + canvas, FLUX Video Upscale, MP4 ≤ 20 s, ≤ 1440p in, 2× or 4K out. Not served: denoise, stabilise, colourise, fps | `/ai-video-upscaler` |
 | 3D animation | 75 | 4 | 742 | 10 (pixar 3d) | 3D-looking animated video | Served as video (Seedance/Kling). Not served: 3D model export | `/3d-animation-maker` |
 | Paper cutout / stop motion | 47 | 0 | 392 | 23 | paper stop-motion style | Served (style prompt + first frame) | `/paper-cutout-animation` |

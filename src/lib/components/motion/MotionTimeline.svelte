@@ -136,7 +136,11 @@
     return keyLanes(withParams(shown, clip), reveal).map((l) => ({ prop: l.prop, label: l.source === Source.Mask ? `Mask · ${l.label}` : l.label }));
   }
 
-  const isOpen = (clip: MotionClip) => open.includes(clip.id) || (reveal !== Reveal.Animated && selection.includes(clip.id));
+  const openIds = $derived(new Set(open));
+  const selectedIds = $derived(new Set(selection));
+  const foldedIds = $derived(new Set(folded));
+  const trackIndexes = $derived(new Map(shown.tracks.map((t, i) => [t.id, i])));
+  const isOpen = (clip: MotionClip) => openIds.has(clip.id) || (reveal !== Reveal.Animated && selectedIds.has(clip.id));
   const rows = $derived(layerRows(tracks, { folded, open: tracks.flatMap((t) => (t.clips as MotionClip[]).filter(isOpen).map((c) => c.id)), lanes: lanesOf }));
 
   const OVERSCAN_ROWS = 6;
@@ -917,11 +921,11 @@
       {#if row.kind === RowKind.Group}
         {@const track = row.track}
         {@const family = trackFamily(track)}
-        {@const index = shown.tracks.findIndex((t) => t.id === track.id)}
-        <div class="row group" data-track-id={track.id} class:folded={folded.includes(track.id)} style={hueOf(family)}>
+        {@const index = trackIndexes.get(track.id) ?? -1}
+        <div class="row group" data-track-id={track.id} class:folded={foldedIds.has(track.id)} style={hueOf(family)}>
           <div class="head">
-            <button type="button" class="twirl" aria-label={folded.includes(track.id) ? 'Expand track' : 'Collapse track'} aria-expanded={!folded.includes(track.id)} onclick={() => toggleFold(track.id)}>
-              {#if folded.includes(track.id)}<ChevronRight size={12} />{:else}<ChevronDown size={12} />{/if}
+            <button type="button" class="twirl" aria-label={foldedIds.has(track.id) ? 'Expand track' : 'Collapse track'} aria-expanded={!foldedIds.has(track.id)} onclick={() => toggleFold(track.id)}>
+              {#if foldedIds.has(track.id)}<ChevronRight size={12} />{:else}<ChevronDown size={12} />{/if}
             </button>
             <span class="group-name">{track.name || track.id}</span>
             <span class="count">{track.clips.length}</span>
@@ -948,7 +952,7 @@
         {@const url = assetOf(clip)}
         {@const wave = waveOf(clip)}
         {@const twirlable = lanesOf(clip).length > 0}
-        <div class="row layer" data-layer={clip.id} data-track-id={track.id} class:selected={selection.includes(clip.id)} style={hueOf(clipFamily)}>
+        <div class="row layer" data-layer={clip.id} data-track-id={track.id} class:selected={selectedIds.has(clip.id)} style={hueOf(clipFamily)}>
           <div class="head" role="button" tabindex="-1" aria-label={`Select ${layerLabel(clip, doc.comps)}`} onpointerdown={(e) => pickLayer(e, clip)}>
             <span class="indent" style={`width: ${12 + INDENT_PX * ancestorsOf(shown, clip.id).length}px;`}></span>
             {#if twirlable}
@@ -969,7 +973,7 @@
           <div class="lane" data-track-id={track.id}>
             <div
               class="bar"
-              class:selected={selection.includes(clip.id)}
+              class:selected={selectedIds.has(clip.id)}
               class:muted={track.hidden || clip.hidden}
               class:locked={track.locked || clip.locked}
               data-clip-id={clip.id}
@@ -999,7 +1003,7 @@
                 {#each keyFrames(clip) as at (at)}<span class="key-dot" style={`left: ${at * ppf - 3}px;`}></span>{/each}
               {/if}
             </div>
-            {#if selection.includes(clip.id)}
+            {#if selectedIds.has(clip.id)}
               {@const fades = fadeHandles(clip, shown.fps, ppf)}
               {#if fades.length}
                 <svg class="fade-ramp" style={`left: ${clip.from * ppf}px; width: ${clip.durationInFrames * ppf}px;`} viewBox={`0 0 ${clip.durationInFrames * ppf} 1`} preserveAspectRatio="none" aria-hidden="true">
@@ -1023,7 +1027,7 @@
             {#each edgeHandles([clip], ppf, selection) as handle (handle.grip)}
               <div
                 class="grip"
-                class:selected={selection.includes(clip.id)}
+                class:selected={selectedIds.has(clip.id)}
                 data-grip={handle.grip}
                 data-grip-clip={handle.clipId}
                 role="separator"

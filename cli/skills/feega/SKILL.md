@@ -57,12 +57,10 @@ Setup details: [references/mcp.md](references/mcp.md).
    need nothing named; the tools that DO need a `brand_id` or `project_id` take it as an input —
    read it back with `query` first (recipe below), never invent one. Guessing spends a real
    organisation's credits and writes into a real client's canvas.
-2. Ad campaign ids accept short unambiguous prefixes from list output — never guess
-   if ambiguous.
-3. `run_node_generation` needs the node's current `version` (optimistic concurrency): read the
+2. `run_node_generation` needs the node's current `version` (optimistic concurrency): read the
    node with `query` first, pass that number, and if the call comes back `conflict`, re-read and
    retry — never assume your write landed.
-4. Confirm before deleting unless the user clearly asked: `delete_row` does not come back.
+3. Confirm before deleting unless the user clearly asked: `delete_row` does not come back.
 
 ## Reading is one tool
 
@@ -245,7 +243,7 @@ real font file; `approximate: true` when the font could not be read) to place th
 
 A frame becomes a code project with `export_code` ({node_id, target?}): react (React + Tailwind,
 default), html or svelte. Stacks (auto layout) become flex/grid, each component one file with typed props
-for what differs between instances, colours and fonts a tokens file. Static only, free, no AI.
+for what differs between instances, colours and fonts a tokens file. Animation and breakpoints come along; the rest is listed in `notes`. Free, no AI.
 CLI: `feega motion code <nodeId> [--target svelte] [--out ./site]`.
 
 Every save is a revision. `list_motion_revisions` lists them (who saved, clip count);
@@ -303,7 +301,7 @@ batch status) run through `motion_editor_op` `{ node_id, op, input }` with the s
 the page. CLI: `feega motion op <nodeId> <op> --input '{...}'`.
 
 Graphic elements (Text, Box, Ellipse, Path, Image) live in frames or free on the canvas; Generate
-text/image/video nodes generate. `canvas_tool` ops `draw_frame` draws an empty frame (`feega canvas frame`), `draw_element` draws a free element, `import_url` turns a public web page into an editable frame split into named sections, Nav, Hero, Features, Footer… (`feega canvas import-url`, `--no-sections` for one layer tree; colours become variables and type, effects, gradients styles, named Primary, Text, Body, H1…, `--no-tokens` for raw values), `import_code` turns pages of a GitHub React, Vue or Svelte app (private once `github_connect` is done: `feega canvas github <project> connect`), or the stories of a public Storybook (`feega canvas import-storybook`), into one frame, a board per page or story, whose code components are main components with variants shared across boards (`feega canvas import-code --route / /settings`; `--routes discover` (op `discover_routes`) lists the pages the file router declares without running the app, `--routes all` imports every static one, at most 20 per import; `--scheme light dark --width 1280 390` renders each page under every theme and width, side by side; the repo's CSS tokens become variables with Light/Dark modes bound to the layers plus a Design system board, `--no-design-system` skips them; `--delay <ms>` and `--route-delay /path=ms` add a wait before capture for late content; in a monorepo `--app apps/web` picks the app, and with several apps and none chosen the answer is `choose_app` with the list; `feega canvas code-map <project> <frame>` (op `code_map`) shows the import map, what the code has and what is on the frame, and `--into <frame> --routes /pricing` (op `import_code` with `into`) adds pages or `--scheme dark` boards to that frame, at most 20 boards per frame), `import_lottie` turns a Lottie (JSON or https URL) into an editable frame,
+text/image/video nodes generate. `canvas_tool` ops `draw_frame` draws an empty frame (`feega canvas frame`), `draw_element` draws a free element, `import_url` turns a public web page into an editable frame split into named sections, Nav, Hero, Features, Footer… (`feega canvas import-url`, `--no-sections` for one layer tree; colours become variables and type, effects, gradients styles, named Primary, Text, Body, H1…, `--no-tokens` for raw values), `import_code` turns pages of a GitHub React, Vue or Svelte app (private once `github_connect` is done: `feega canvas github <project> connect`), or the stories of a public Storybook (`feega canvas import-storybook`), into one frame, a board per page or story, whose code components are main components with variants shared across boards, and in a Next or Vite React app every component the code declares is drawn on Library boards with all its declared variants (`feega canvas import-code --route / /settings`; `--routes discover` (op `discover_routes`) lists the pages the file router declares without running the app, `--routes all` imports every static one, at most 20 per import; `--scheme light dark --width 1280 390` renders each page under every theme and width, side by side (each width is its own board; `--views` turns one page at several widths of one theme into one frame with breakpoint views, giving up components and the Design system board); the repo's CSS tokens become variables with Light/Dark modes bound to the layers plus a Design system board, `--no-design-system` skips them; `--delay <ms>` and `--route-delay /path=ms` add a wait before capture for late content; in a monorepo `--app apps/web` picks the app, and with several apps and none chosen the answer is `choose_app` with the list; `feega canvas code-map <project> <frame>` (op `code_map`) shows the import map, what the code has and what is on the frame, and `--into <frame> --routes /pricing` (op `import_code` with `into`) adds pages or `--scheme dark` boards to that frame, at most 20 boards per frame), `import_lottie` turns a Lottie (JSON or https URL) into an editable frame,
 `group_elements` / `ungroup_element` group free elements, `frame_elements` wraps them in a Frame at their bounds; `move_frame_element` moves an element
 into another frame (or onto the canvas as a free element) keeping props and keyframes; op `place_in_frame` puts a generative node's output into a frame as an element; the
 motion `motion_tool` `move_to_frame` does the same from inside a video. A frame takes no inputs: a line into it is refused. CLI:
@@ -348,6 +346,11 @@ uploads a local TTF/OTF/WOFF/WOFF2 file and, only when the user asks, deletes a 
 `spend_caps` reads the org's spend caps (`org_member`, `project_member`, `project_total`, each with an
 optional monthly reset) and, for admins and only when the user asks, sets or removes one: `feega caps
 [set <scope> <usd|off> [--project <id>] [--reset monthly]]`. A run a cap refuses answers `cap_reached`.
+`dev_server` (local Feega only) reads, starts or stops the dev server behind live frames: `feega
+dev-server [status|start|stop]`.
+`live_edit` (local Feega only) changes one property of an element of the running app at its
+`file:line:col` and writes the one class or text to source on the branch `feega/live`; also `undo`,
+`changes`, `push`: `feega live-edit <at> <prop> [value]`, `live-undo`, `live-changes`, `live-push`.
 
 ## References (load on demand)
 

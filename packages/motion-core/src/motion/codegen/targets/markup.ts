@@ -9,6 +9,7 @@ export type Dialect<C> = {
   shown: (prop: string, lines: string[], depth: number, ctx: C) => string[];
   selfClosing: boolean;
   tagOf?: (node: ElementNode) => string;
+  inner?: (node: ElementNode, ctx: C) => string[];
 };
 
 const tagName = <C>(node: ElementNode, dialect: Dialect<C>) => dialect.tagOf?.(node) ?? node.tag;
@@ -37,6 +38,10 @@ function elementLines<C>(node: ElementNode, depth: number, dialect: Dialect<C>, 
   const open = dialect.openTag(node, ctx);
   if (VOID_TAGS.has(node.tag)) {
     return [`${pad(depth)}${dialect.selfClosing ? open.replace(/>$/, ' />') : open}`];
+  }
+  const inner = dialect.inner?.(node, ctx) ?? [];
+  if (inner.length) {
+    return [`${pad(depth)}${open}`, ...inner.map((l) => `${pad(depth + 1)}${l}`), `${pad(depth)}</${tagName(node, dialect)}>`];
   }
   if (!node.children.length) {
     return [`${pad(depth)}${dialect.selfClosing ? open.replace(/>$/, ' />') : `${open}</${tagName(node, dialect)}>`}`];
@@ -82,17 +87,27 @@ const SVG_ATTR = /\s([a-z]+(?:-[a-z]+)+)=/g;
 
 const STYLE_ATTR = /\sstyle="([^"]*)"/g;
 
-const asAttributes = (style: string) =>
-  style
-    .split(';')
-    .map((d) => d.split(':').map((part) => part.trim()))
+const DECLARATION_BREAK = /;(?![^(]*\))/;
+
+const VOID_ELEMENT = /<(img|br|hr|input|source|track|wbr|col|embed)(\s[^>]*?)?(?<!\/)>/g;
+
+const styleKey = (name: string) => (name.startsWith('--') ? `'${name}'` : camelProperty(name));
+
+const quoted = (value: string) => `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+
+const asStyleObject = (style: string) => {
+  const declarations = style
+    .split(DECLARATION_BREAK)
+    .map((d) => [d.slice(0, d.indexOf(':')).trim(), d.slice(d.indexOf(':') + 1).trim()])
     .filter(([name, value]) => name && value)
-    .map(([name, value]) => ` ${name}="${value}"`)
-    .join('');
+    .map(([name, value]) => `${styleKey(name)}: ${quoted(value)}`);
+  return declarations.length ? ` style={{ ${declarations.join(', ')} }}` : '';
+};
 
 export const jsxSvg = (markup: string) =>
   markup
-    .replace(STYLE_ATTR, (_, style: string) => asAttributes(style))
+    .replace(STYLE_ATTR, (_, style: string) => asStyleObject(style))
     .replace(SVG_ATTR, (_, name: string) => ` ${camelProperty(name)}=`)
     .replace(/\sclass=/g, ' className=')
+    .replace(VOID_ELEMENT, (_, tag: string, attrs = '') => `<${tag}${attrs} />`)
     .replace(/xlink:href=/g, 'xlinkHref=');

@@ -12,6 +12,9 @@ export type RestPaint = {
   imageRef?: string;
   scaleMode?: string;
   imageFocus?: Vec;
+  imageTransform?: number[][];
+  scalingFactor?: number;
+  rotation?: number;
   gradientHandlePositions?: Vec[];
   gradientStops?: { position: number; color: RestColor }[];
 };
@@ -22,6 +25,9 @@ export type RestStyle = {
   italic?: boolean;
   fontSize?: number;
   textAlignHorizontal?: string;
+  textAlignVertical?: string;
+  paragraphSpacing?: number;
+  paragraphIndent?: number;
   letterSpacing?: number;
   lineHeightUnit?: string;
   lineHeightPx?: number;
@@ -48,6 +54,16 @@ export type RestNode = {
   strokeWeight?: number;
   strokeAlign?: string;
   strokeDashes?: number[];
+  strokeCap?: string;
+  strokeJoin?: string;
+  strokeMiterAngle?: number;
+  individualStrokeWeights?: { top: number; right: number; bottom: number; left: number };
+  isMask?: boolean;
+  maskType?: string;
+  constraints?: { horizontal: string; vertical: string };
+  minWidth?: number;
+  minHeight?: number;
+  maxHeight?: number;
   blendMode?: string;
   maskGradient?: RestPaint;
   effects?: (Omit<Effect, 'color'> & { color?: RestColor })[];
@@ -74,6 +90,7 @@ export type RestNode = {
   strokeGeometry?: { path: string; windingRule?: string }[];
   characters?: string;
   textAutoResize?: string;
+  maxLines?: number;
   style?: RestStyle;
   characterStyleOverrides?: number[];
   styleOverrideTable?: Record<string, RestStyle>;
@@ -110,6 +127,12 @@ const WEIGHT_NAMES: Record<number, string> = { 100: 'Thin', 200: 'ExtraLight', 3
 const DEFAULT_WEIGHT = 400;
 
 const IDENTITY: Matrix = { m00: 1, m01: 0, m02: 0, m10: 0, m11: 1, m12: 0 };
+
+const CONSTRAINT: Record<string, string> = { LEFT: 'MIN', TOP: 'MIN', RIGHT: 'MAX', BOTTOM: 'MAX', CENTER: 'CENTER', LEFT_RIGHT: 'STRETCH', TOP_BOTTOM: 'STRETCH', SCALE: 'SCALE' };
+
+const MASK_TYPE: Record<string, string> = { ALPHA: 'ALPHA', VECTOR: 'OUTLINE', LUMINANCE: 'LUMINANCE' };
+
+const SIDES = ['top', 'right', 'bottom', 'left'] as const;
 
 const rgba = (c: RestColor | undefined): Rgba => ({ r: c?.r ?? 0, g: c?.g ?? 0, b: c?.b ?? 0, a: c?.a ?? 1 });
 
@@ -179,6 +202,8 @@ function gradientTransform(type: string, handles: Vec[] | undefined): Matrix {
   return frame && handles && handles.length >= 3 ? frame(handles) : IDENTITY;
 }
 
+const matrixOf = (rows: number[][] | undefined): Matrix | undefined => (rows ? { m00: rows[0][0], m01: rows[0][1], m02: rows[0][2], m10: rows[1][0], m11: rows[1][1], m12: rows[1][2] } : undefined);
+
 function paintOf(p: RestPaint): Paint {
   const stops: ColorStop[] | undefined = p.gradientStops?.map((s) => ({ position: s.position, color: rgba(s.color) }));
   return {
@@ -187,7 +212,9 @@ function paintOf(p: RestPaint): Paint {
     opacity: p.opacity,
     color: p.color ? rgba(p.color) : undefined,
     stops,
-    transform: stops ? gradientTransform(p.type, p.gradientHandlePositions) : undefined,
+    transform: stops ? gradientTransform(p.type, p.gradientHandlePositions) : matrixOf(p.imageTransform),
+    scale: p.scalingFactor,
+    rotation: p.rotation,
     image: p.imageRef ? { hash: bytesOf(p.imageRef) } : undefined,
     imageScaleMode: p.scaleMode,
     focus: p.imageFocus
@@ -233,7 +260,11 @@ function textOf(n: RestNode): Partial<FigmaRawNode> {
     lineHeight: lineHeightOf(style),
     letterSpacing: style?.letterSpacing ? { value: style.letterSpacing, units: 'PIXELS' } : undefined,
     textAlignHorizontal: style?.textAlignHorizontal,
+    textAlignVertical: style?.textAlignVertical,
+    paragraphSpacing: style?.paragraphSpacing,
+    paragraphIndent: style?.paragraphIndent,
     textAutoResize: n.textAutoResize,
+    maxLines: n.maxLines,
     textDecoration: style?.textDecoration,
     fontAxes: style?.fontAxes,
     fontFeatures: style?.fontFeatures,
@@ -257,9 +288,25 @@ function layoutOf(n: RestNode): Partial<FigmaRawNode> {
     stackCounterSizing: sizing(n.counterAxisSizingMode),
     stackChildPrimaryGrow: n.layoutGrow,
     stackChildAlignSelf: n.layoutAlign,
-    maxWidth: n.maxWidth,
     stackPositioning: n.layoutPositioning
   };
+}
+
+function sizeLimitsOf(n: RestNode): Partial<FigmaRawNode> {
+  return { minWidth: n.minWidth, minHeight: n.minHeight, maxWidth: n.maxWidth, maxHeight: n.maxHeight };
+}
+
+function constraintsOf(n: RestNode): Partial<FigmaRawNode> {
+  return { horizontalConstraint: CONSTRAINT[n.constraints?.horizontal ?? ''], verticalConstraint: CONSTRAINT[n.constraints?.vertical ?? ''] };
+}
+
+function strokeSidesOf(n: RestNode): Partial<FigmaRawNode> {
+  const sides = n.individualStrokeWeights;
+  if (!sides) {
+    return {};
+  }
+  const [top, right, bottom, left] = SIDES.map((side) => sides[side]);
+  return { borderStrokeWeightsIndependent: true, borderTopWeight: top, borderRightWeight: right, borderBottomWeight: bottom, borderLeftWeight: left };
 }
 
 function cornersOf(n: RestNode): Partial<FigmaRawNode> {
@@ -313,6 +360,11 @@ function add(n: RestNode, parent: { rest: RestNode | null; guid: Guid }, index: 
     strokeWeight: n.strokeWeight,
     strokeAlign: n.strokeAlign,
     dashPattern: n.strokeDashes,
+    strokeCap: n.strokeCap,
+    strokeJoin: n.strokeJoin,
+    miterLimit: n.strokeMiterAngle ? 1 / Math.sin((n.strokeMiterAngle * Math.PI) / 360) : undefined,
+    mask: n.isMask,
+    maskType: n.maskType ? MASK_TYPE[n.maskType] : undefined,
     blendMode: n.blendMode,
     maskGradient: n.maskGradient?.gradientHandlePositions && n.maskGradient.gradientStops ? { handles: n.maskGradient.gradientHandlePositions, stops: n.maskGradient.gradientStops.map((s) => ({ position: s.position, alpha: s.color.a ?? 1 })) } : undefined,
     effects: n.effects?.map((e) => ({ ...e, color: e.color ? rgba(e.color) : undefined })),
@@ -321,6 +373,9 @@ function add(n: RestNode, parent: { rest: RestNode | null; guid: Guid }, index: 
     strokeGeometry: geometryOf(n.strokeGeometry, build),
     ...cornersOf(n),
     ...layoutOf(n),
+    ...sizeLimitsOf(n),
+    ...constraintsOf(n),
+    ...strokeSidesOf(n),
     ...(n.type === 'TEXT' ? textOf(n) : {}),
     ...(symbolID ? { symbolData: { symbolID } } : {}),
     ...(n.codeComponent ? { codeComponent: n.codeComponent } : {}),

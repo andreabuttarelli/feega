@@ -6,7 +6,7 @@ const UNAVAILABLE = 'unavailable';
 
 export type DesignLanded = { tokens: number; byClass: number; byRule: number; byValue: number; unbound: number };
 
-export type LibraryLanded = { components: { name: string; file: string; axes: Record<string, { values: string[]; default: string | null }>; captured: boolean; cells: number }[]; uncaptured: string[] };
+export type LibraryLanded = { components: { name: string; file: string; axes: Record<string, { values: string[]; default: string | null }>; captured: boolean; drawn: boolean; cells: number }[]; uncaptured: string[]; reasons: Record<string, string> };
 
 export type LockedRoute = { label: string; reason: string; detail?: string };
 
@@ -16,7 +16,7 @@ export type RenderCondition = { scheme: 'light' | 'dark'; width: number };
 
 export type CaptureWait = { captureDelayMs?: number; routeDelayMs?: Record<string, number> };
 
-export type CodeTarget = ({ repo: string; app?: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean } & CaptureWait) | ({ folder: string; app?: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean } & CaptureWait) | ({ upload: string; app?: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean } & CaptureWait) | { storybook: string };
+export type CodeTarget = ({ repo: string; app?: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean; responsive?: 'views' | 'boards' } & CaptureWait) | ({ folder: string; app?: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean; responsive?: 'views' | 'boards' } & CaptureWait) | ({ upload: string; app?: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean; responsive?: 'views' | 'boards' } & CaptureWait) | { storybook: string };
 
 export type CodeAsk = { projectId: string; canvasId: string; target: CodeTarget; at: { x: number; y: number } };
 

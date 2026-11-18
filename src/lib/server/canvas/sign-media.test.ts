@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Db } from '$lib/server/db/client';
 import { markRlsScoped } from '$lib/server/rls-client';
 import { signAssetPaths, signMediaPaths, signOrgMediaPaths } from './sign-media';
+
+const URL_FILTER_LIMIT = 8000;
 
 function storageWith(buckets: Record<string, string[]>): Db {
   return {
@@ -125,6 +127,46 @@ describe('un asset è visibile a chiunque legga la sua riga, non solo a chi lo h
     expect((userDb as unknown as { asked: { rows: number } }).asked.rows).toBe(first);
   });
 
+  it('firma i 577 asset di un progetto grande senza chiedere un URL che il server rifiuta', async () => {
+    const paths = Array.from({ length: 577 }, (_, i) => `o/p/${'x'.repeat(120)}-${i}.png`);
+    const db = rowsOf('o', paths);
+    const tooLong = (wanted: string[]) => wanted.join(',').length > URL_FILTER_LIMIT;
+    const userDb = markRlsScoped(Object.assign(db, {
+      from: () => ({
+        select: () => ({
+          in: async (_column: string, wanted: string[]) => (tooLong(wanted) ? { data: null, error: { message: 'URI too long' } } : { data: wanted.map((url) => ({ url, org_id: 'o' })), error: null })
+        })
+      })
+    }));
+    const serviceDb = storageWith({ 'canvas-assets': paths });
+
+    const urls = await signAssetPaths(userDb, serviceDb, { generated: [], uploaded: paths });
+
+    expect(urls.size).toBe(577);
+  });
+
+  it('a batch the server refuses leaves only its own pictures unsigned, and says why once', async () => {
+    const paths = Array.from({ length: 200 }, (_, i) => `o/p/${'x'.repeat(120)}-${i}.png`);
+    const refused = paths[0];
+    const userDb = markRlsScoped(Object.assign(rowsOf('o', paths), {
+      from: () => ({
+        select: () => ({
+          in: async (_column: string, wanted: string[]) => (wanted.includes(refused) ? { data: null, error: { message: 'canceling statement due to statement timeout' } } : { data: wanted.map((url) => ({ url, org_id: 'o' })), error: null })
+        })
+      })
+    }));
+    const serviceDb = storageWith({ 'canvas-assets': paths });
+    const said = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const urls = await signAssetPaths(userDb, serviceDb, { generated: [], uploaded: paths });
+
+    expect(urls.has(refused)).toBe(false);
+    expect(urls.size).toBeGreaterThan(0);
+    expect(said).toHaveBeenCalledTimes(1);
+    expect(String(said.mock.calls[0])).toContain('statement timeout');
+    said.mockRestore();
+  });
+
   it('rifiuta un client utente non marchiato RLS, per non far passare un service client al posto suo', async () => {
     const notRlsScoped = storageWith({});
     const serviceDb = storageWith({ 'brand-knowledge': ['x/media/y.png'] });
@@ -152,5 +194,17 @@ describe('a run sends a provider only files its org holds', () => {
 
     expect(urls).toEqual(['https://cdn.example/a.png', 'https://signed/canvas-assets/o/p/mine.png']);
     expect(filters).toContainEqual(['org_id', 'o']);
+  });
+  it('checks the files of a run with hundreds of inputs without asking for a URL the server refuses', async () => {
+    const paths = Array.from({ length: 577 }, (_, i) => `o/p/${'x'.repeat(120)}-${i}.png`);
+    const query = {
+      eq: () => query,
+      in: async (_c: string, wanted: string[]) => (wanted.join(',').length > URL_FILTER_LIMIT ? { data: null, error: { message: 'URI too long' } } : { data: wanted.map((url) => ({ url, proxy_url: null })), error: null })
+    };
+    const db = Object.assign(storageWith({ 'canvas-assets': paths }), { from: () => ({ select: () => query }) }) as unknown as Db;
+
+    const urls = await signOrgMediaPaths(db, 'o', paths);
+
+    expect(urls).toHaveLength(577);
   });
 });

@@ -387,7 +387,7 @@ fn every_plan_counts_itself_and_the_uses_it_walked() {
     c.patch(parse_patch(r#"{ "put": [{ "kind": "use", "clip": "far", "group": "g", "matrix": [1, 0, 0, 1, 100000, 0] }], "drop": [] }"#).unwrap(), &lib);
     let limits = Limits { side: 4096, rasters: 1, items: 1000 };
     c.plan_at(&mut lib, at(0.0, 0.0, 1.0), (256, 256), limits);
-    c.overlay_at(&mut lib, at(0.0, 0.0, 1.0), (256, 256), limits);
+    c.overlay_at(&mut lib, at(0.0, 0.0, 1.0), (256, 256), limits, 1.0);
 
     let planned = c.take_planned();
 
@@ -428,4 +428,55 @@ fn a_change_the_tiles_take_lets_go_of_the_held_picture_under_them() {
 
     assert!(c.stirred());
     assert!(c.held_look(at(0.0, 0.0, 1.0)).is_none());
+}
+
+fn bar_at(i: usize, red: f32) -> String {
+    let x = 100 + i * 50;
+    format!(r#"{{ "kind": "path", "clip": "bar{i}", "contours": [[{x}, 100, {r}, 100, {r}, 120, {x}, 120]], "rule": "nonzero", "paint": {{ "kind": "solid", "color": [{red}, 0, 0, 1] }}, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blend": "normal" }}"#, r = x + 10)
+}
+
+fn three_bars() -> String {
+    let items: Vec<String> = (0..3).map(|i| bar_at(i, 1.0)).collect();
+    format!(r#"{{ "width": 800, "height": 600, "background": [0, 0, 1, 1], "items": [{}] }}"#, items.join(","))
+}
+
+fn damaged_area(damage: gpu_core::retained::Damage) -> f64 {
+    match damage {
+        gpu_core::retained::Damage::Rects(rects) => rects.iter().map(|r| r.area()).sum(),
+        gpu_core::retained::Damage::All => f64::INFINITY,
+    }
+}
+
+const BAR_AREA_WITH_SLACK: f64 = 20.0 * 30.0;
+
+fn bars_on_screen() -> (Compositor, Library, impl Fn(&str) -> gpu_core::world::Patch) {
+    let mut library = Library::new();
+    library.put_group("v1", &parse(&three_bars()).unwrap());
+    let mut c = Compositor::new(800, 600);
+    let use_of = |group: &str| parse_patch(&format!(r#"{{ "put": [{{ "kind": "use", "clip": "a", "group": "{group}", "matrix": [1, 0, 0, 1, 40, 30] }}], "drop": [] }}"#)).unwrap();
+    c.patch(use_of("v1"), &library);
+    c.take_damage();
+    c.take_tile_damage();
+    (c, library, use_of)
+}
+
+#[test]
+fn a_patched_item_damages_only_its_own_bounds_not_the_whole_frame() {
+    let (mut c, mut library, use_of) = bars_on_screen();
+
+    let middle = gpu_core::display_list::parse_splice(&format!(r#"{{ "head": 1, "tail": 1, "items": [{}] }}"#, bar_at(1, 0.5))).unwrap();
+    assert!(library.patch_group("v1", "v2", &middle));
+    c.patch(use_of("v2"), &library);
+
+    assert!(damaged_area(c.take_tile_damage()) <= BAR_AREA_WITH_SLACK);
+}
+
+#[test]
+fn a_frame_swapped_to_an_unrelated_group_still_damages_the_whole_frame() {
+    let (mut c, mut library, use_of) = bars_on_screen();
+
+    library.put_group("other", &parse(&three_bars()).unwrap());
+    c.patch(use_of("other"), &library);
+
+    assert!(damaged_area(c.take_tile_damage()) >= 800.0 * 600.0);
 }

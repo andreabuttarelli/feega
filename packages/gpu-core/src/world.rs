@@ -1,3 +1,4 @@
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::Cell;
 
 use serde::Deserialize;
@@ -5,6 +6,7 @@ use vello::kurbo::{Affine as Matrix, Point, Rect};
 
 use crate::display_list::{Affine, DisplayList, Item, Look, PathItem, UseItem};
 use crate::lod::{BLUR_REACH, VIEW_SLACK_PX};
+use crate::pinned::PinnedPieces;
 use crate::retained::Damage;
 use crate::uses::{Plus, Uses};
 
@@ -61,6 +63,7 @@ impl OverlayPart {
 struct Overlay {
     items: Vec<Item>,
     at: Option<UseItem>,
+    pinned: Option<PinnedPieces>,
 }
 
 pub struct Lift {
@@ -74,14 +77,16 @@ pub struct World {
     overlays: [Overlay; 3],
     damage: Damage,
     scene_damage: Damage,
-    rest: std::collections::HashMap<String, (String, Affine)>,
-    covering: std::collections::HashSet<String>,
+    rest: FxHashMap<String, (String, Affine)>,
+    covering: FxHashSet<String>,
     visited: Cell<usize>,
+    pixel_ratio: f64,
+    per_px: Cell<f64>,
 }
 
 impl Default for World {
     fn default() -> Self {
-        World { uses: Uses::default(), overlays: Default::default(), damage: Damage::none(), scene_damage: Damage::none(), rest: Default::default(), covering: Default::default(), visited: Cell::new(0) }
+        World { uses: Uses::default(), overlays: Default::default(), damage: Damage::none(), scene_damage: Damage::none(), rest: Default::default(), covering: Default::default(), visited: Cell::new(0), pixel_ratio: 1.0, per_px: Cell::new(1.0) }
     }
 }
 
@@ -92,6 +97,10 @@ fn times(m: Affine, by: Affine) -> Affine {
 fn hull(m: Affine, points: impl Iterator<Item = (f64, f64)>) -> Option<Rect> {
     let t = Matrix::new(m);
     points.map(|(x, y)| t * Point::new(x, y)).fold(None, |acc: Option<Rect>, p| Some(acc.map_or(Rect::from_points(p, p), |r| r.union_pt(p))))
+}
+
+fn corners(r: Rect) -> impl Iterator<Item = (f64, f64)> {
+    [(r.x0, r.y0), (r.x1, r.y0), (r.x1, r.y1), (r.x0, r.y1)].into_iter()
 }
 
 fn reach(u: &UseItem, size: Option<(f64, f64)>) -> Option<Rect> {
@@ -130,7 +139,21 @@ fn through(item: &Item, camera: Affine) -> Item {
     }
 }
 
-fn steady(was: &[usize]) -> std::collections::HashSet<usize> {
+pub fn pinned(item: &Item, per_px: f64) -> Item {
+    match item {
+        Item::Path(p) if !p.nudge.is_empty() => {
+            let contours = p.contours.iter().zip(&p.nudge).map(|(c, n)| c.iter().zip(n).map(|(at, by)| at + by * per_px).collect()).collect();
+            Item::Path(PathItem { contours, nudge: Vec::new(), ..p.clone() })
+        }
+        other => other.clone(),
+    }
+}
+
+fn nudged(item: &Item) -> bool {
+    matches!(item, Item::Path(p) if !p.nudge.is_empty())
+}
+
+fn steady(was: &[usize]) -> FxHashSet<usize> {
     let mut tails: Vec<usize> = Vec::new();
     let mut back: Vec<Option<usize>> = vec![None; was.len()];
     for (i, v) in was.iter().enumerate() {
@@ -203,7 +226,7 @@ impl World {
     }
 
     fn cover(&mut self, sizes: impl Fn(&str) -> Option<(f64, f64)>) {
-        let mut next = std::collections::HashSet::new();
+        let mut next = FxHashSet::default();
         if self.holding() {
             for u in self.uses.flagged().into_iter().filter(|u| self.shifted_from_rest(u).is_some()) {
                 let at = self.rest.get(&u.clip).map_or(u.matrix, |(_, m)| *m);
@@ -226,6 +249,10 @@ impl World {
     }
 
     pub fn patch(&mut self, patch: Patch, sizes: impl Fn(&str) -> Option<(f64, f64)>) {
+        self.patch_edited(patch, sizes, |_, _| None);
+    }
+
+    pub fn patch_edited(&mut self, patch: Patch, sizes: impl Fn(&str) -> Option<(f64, f64)>, edited: impl Fn(&str, &str) -> Option<Rect>) {
         for gone in &patch.drop {
             let Some(old) = self.uses.get(gone) else { continue };
             let was_scene = self.in_scene(old);
@@ -240,14 +267,17 @@ impl World {
             if !u.hold {
                 self.rest.insert(u.clip.clone(), (u.group.clone(), u.matrix));
             }
-            let clip = u.clip.clone();
+            let (clip, group, matrix) = (u.clip.clone(), u.group.clone(), u.matrix);
             let old = self.uses.put(u, fresh);
             let now_scene = self.in_scene(self.uses.get(&clip).expect("just put"));
             let Some((old, was_scene)) = old.zip(was_scene) else {
                 self.mark_use(fresh, now_scene);
                 continue;
             };
-            let stale = reach(&old, sizes(&old.group));
+            let (stale, fresh) = match edited(&old.group, &group).filter(|_| old.matrix == matrix) {
+                Some(local) => (hull(matrix, corners(local)), None),
+                None => (reach(&old, sizes(&old.group)), fresh),
+            };
             if moved {
                 self.damage.join(Damage::Rects(stale.into_iter().chain(fresh).collect()));
             }
@@ -255,7 +285,7 @@ impl World {
                 self.mark_scene(stale);
             }
             if now_scene && (moved || !was_scene) {
-                self.mark_scene(fresh);
+                self.mark_scene(if was_scene { fresh } else { fresh.or(stale) });
             }
         }
         if let Some(order) = patch.order {
@@ -273,24 +303,53 @@ impl World {
         reaches.into_iter().for_each(|r| self.mark_if_sized(r));
     }
 
+    pub fn set_pixel_ratio(&mut self, ratio: f64) {
+        self.pixel_ratio = ratio;
+    }
+
+    fn seen_through(&self, camera: Affine, drawn: f64) -> f64 {
+        let zoom = (camera[0] * camera[3] - camera[1] * camera[2]).abs().sqrt();
+        let per_px = self.pixel_ratio * drawn / zoom;
+        self.per_px.set(per_px);
+        per_px
+    }
+
+    fn part_items(&self, part: &Overlay, camera: Affine, per_px: f64) -> Vec<Item> {
+        match &part.at {
+            Some(at) => vec![Item::Use(UseItem { matrix: times(camera, at.matrix), ..at.clone() })],
+            None => part.items.iter().map(|i| through(&pinned(i, per_px), camera)).collect(),
+        }
+    }
+
+    pub fn pinned_at_in(&self, camera: Affine, drawn: f64, view: (u32, u32)) -> Vec<(std::rc::Rc<vello::Scene>, Affine)> {
+        let per_px = self.seen_through(camera, drawn);
+        self.overlays.iter().filter_map(|o| o.pinned.as_ref()).flat_map(|p| p.seen(camera, per_px, view)).map(|s| (s, camera)).collect()
+    }
+
     pub fn set_overlay(&mut self, part: OverlayPart, items: Vec<Item>) {
+        let cached = items.iter().any(nudged).then(|| PinnedPieces::new(&items)).flatten();
+        self.overlays[part.index()].pinned = cached;
         let old = std::mem::replace(&mut self.overlays[part.index()].items, items);
         let new = &self.overlays[part.index()].items;
         let by_clip = |items: &[Item]| {
-            let mut m: std::collections::HashMap<String, Vec<usize>> = std::collections::HashMap::new();
+            let mut m: FxHashMap<String, Vec<usize>> = FxHashMap::default();
             items.iter().enumerate().for_each(|(i, item)| m.entry(item.clip().to_string()).or_default().push(i));
             m
         };
         let (was, now) = (by_clip(&old), by_clip(new));
-        let kept = |item: &Item, other: &[Item], index: &std::collections::HashMap<String, Vec<usize>>| index.get(item.clip()).is_some_and(|at| at.iter().any(|&i| same(item, &other[i])));
+        let kept = |item: &Item, other: &[Item], index: &FxHashMap<String, Vec<usize>>| index.get(item.clip()).is_some_and(|at| at.iter().any(|&i| same(item, &other[i])));
         let gone = old.iter().filter(|i| !kept(i, new, &now));
         let came = new.iter().filter(|i| !kept(i, &old, &was));
-        let bounds: Vec<Option<Rect>> = gone.chain(came).map(extent).collect();
+        let per_px = self.per_px.get();
+        let bounds: Vec<Option<Rect>> = gone.chain(came).map(|i| extent(&pinned(i, per_px))).collect();
         bounds.into_iter().for_each(|b| self.mark(b));
     }
 
     pub fn overlay_group(&self, part: OverlayPart) -> Option<(DisplayList, UseItem)> {
         let overlay = &self.overlays[part.index()].items;
+        if overlay.iter().any(nudged) {
+            return None;
+        }
         let reach = overlay.iter().map(extent).collect::<Option<Vec<Rect>>>()?.into_iter().reduce(|a, b| a.union(b))?;
         let blur = overlay.iter().filter_map(|i| i.look()).map(|l| l.blur).fold(0.0, f64::max);
         let pad = blur * BLUR_REACH + OVERLAY_SLACK_PX;
@@ -336,26 +395,20 @@ impl World {
     }
 
     pub fn overlay(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
+        self.overlay_drawn(camera, width, height, 1.0)
+    }
+
+    pub fn overlay_drawn(&self, camera: Affine, width: u32, height: u32, drawn: f64) -> DisplayList {
+        let per_px = self.seen_through(camera, drawn);
         let held = self.visit(self.uses.flagged()).into_iter().filter(|u| self.lifted(u) && self.shifted_from_rest(u).is_none()).map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
-        let items = held.chain(OVERLAY_PARTS.iter().flat_map(|p| {
-            let part = &self.overlays[p.index()];
-            match &part.at {
-                Some(at) => vec![Item::Use(UseItem { matrix: times(camera, at.matrix), ..at.clone() })],
-                None => part.items.iter().map(|i| through(i, camera)).collect(),
-            }
-        }));
+        let items = held.chain(OVERLAY_PARTS.iter().map(|p| &self.overlays[p.index()]).filter(|o| o.pinned.is_none()).flat_map(|o| self.part_items(o, camera, per_px)));
         DisplayList { width, height, background: None, items: items.collect(), faces: Vec::new(), fragments: Default::default() }
     }
 
     pub fn screen(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
+        let per_px = self.seen_through(camera, 1.0);
         let uses = self.visit(self.uses.meeting(sighted(camera, width, height), Plus::Flagged)).into_iter().map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
-        let overlay = OVERLAY_PARTS.iter().flat_map(|p| {
-            let part = &self.overlays[p.index()];
-            match &part.at {
-                Some(at) => vec![Item::Use(UseItem { matrix: times(camera, at.matrix), ..at.clone() })],
-                None => part.items.iter().map(|i| through(i, camera)).collect(),
-            }
-        });
+        let overlay = OVERLAY_PARTS.iter().flat_map(|p| self.part_items(&self.overlays[p.index()], camera, per_px));
         DisplayList { width, height, background: None, items: uses.chain(overlay).collect(), faces: Vec::new(), fragments: Default::default() }
     }
 }

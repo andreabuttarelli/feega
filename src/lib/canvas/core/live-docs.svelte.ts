@@ -1,10 +1,13 @@
 import { untrack } from 'svelte';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import type { BrandTokens } from '@feega/motion-core/motion/brand';
+import { traceSinceInput } from './edit-trace';
 
 export type LiveDoc = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; playhead?: number };
 
 export type LiveListener = (id: string, live: LiveDoc) => void;
+
+const sameLive = (a: LiveDoc | undefined, b: LiveDoc) => a?.doc === b.doc && a.tokens === b.tokens && a.assets === b.assets && a.playhead === b.playhead;
 
 class LiveDocs {
   map = $state(new Map<string, LiveDoc>());
@@ -17,7 +20,11 @@ class LiveDocs {
   }
 
   set(id: string, live: LiveDoc) {
+    traceSinceInput('edit:to-live-set');
     const before = untrack(() => this.map).get(id);
+    if (sameLive(before, live)) {
+      return;
+    }
     this.map = new Map(untrack(() => this.map)).set(id, live);
     for (const listener of this.#listeners) {
       listener(id, live);

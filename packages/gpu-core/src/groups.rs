@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
@@ -13,7 +12,7 @@ use crate::glyphs::{outline, Fonts};
 use crate::text::typeset;
 use crate::pictures::Pictures;
 use crate::fragments::{Encoded, Fragments, Kept};
-use crate::lod::{backdrop_px, blur_px, detail, Detail, BLUR_REACH, SPLIT_DESCENDANTS};
+use crate::lod::{backdrop_px, blur_px, detail, plain_when_tiny, Detail, BLUR_REACH, SPLIT_DESCENDANTS};
 use crate::scene::{bounds, build_items, needs_layer, Layers};
 use crate::Skipped;
 
@@ -128,7 +127,7 @@ fn placed_look(look: &Look, m: Affine, frame: Rect, scale: f64) -> Look {
     Look { matrix: times(m, look.matrix), blur: look.blur * scale, backdrop: look.backdrop.map(|b| b * scale), scissor: Some(scissor_of(clip)), masks, matte, space, origin, ..look.clone() }
 }
 
-fn placed(item: &Item, m: Affine, frame: Rect, scale: f64) -> Item {
+pub(crate) fn placed(item: &Item, m: Affine, frame: Rect, scale: f64) -> Item {
     let look = |look: &Look| placed_look(look, m, frame, scale);
     match item {
         Item::Path(p) => Item::Path(PathItem { look: look(&p.look), ..p.clone() }),
@@ -152,6 +151,7 @@ fn background(clip: &str, colour: crate::display_list::Rgba, frame: Rect, contou
     Item::Path(PathItem {
         clip: format!("frame:{clip}"),
         contours: vec![contour],
+        nudge: Vec::new(),
         rule: FillRule::NonZero,
         paint: Paint::Solid { color: colour },
         within: None,
@@ -172,7 +172,7 @@ fn used_within(u: &UseItem, group: &DisplayList, start: usize, view: Rect) -> Ve
 }
 
 fn reaches(item: &Item, m: Affine, scale: f64, view: Rect) -> bool {
-    reaches_bounds(item, bounds::<Scene>(item, &Pictures::new()), m, scale, view)
+    reaches_bounds(item, bounds::<Scene>(item, &Pictures::default()), m, scale, view)
 }
 
 fn reaches_bounds(item: &Item, own: Option<Rect>, m: Affine, scale: f64, view: Rect) -> bool {
@@ -359,7 +359,7 @@ fn standalone(item: &Item) -> bool {
 }
 
 fn visible(item: &Item, view: Rect) -> bool {
-    visible_bounds(item, bounds::<Scene>(item, &Pictures::new()), item.look().map_or(0.0, |l| l.blur), view)
+    visible_bounds(item, bounds::<Scene>(item, &Pictures::default()), item.look().map_or(0.0, |l| l.blur), view)
 }
 
 fn visible_bounds(item: &Item, own: Option<Rect>, blur: f64, view: Rect) -> bool {
@@ -372,12 +372,42 @@ fn visible_bounds(item: &Item, own: Option<Rect>, blur: f64, view: Rect) -> bool
 }
 
 fn softened(item: Item) -> Item {
-    let soften = |look: &Look| Look { blur: blur_px(look.blur), backdrop: backdrop_px(look.backdrop), ..look.clone() };
+    let extent = bounds::<Scene>(&item, &Pictures::default()).map_or(f64::INFINITY, |b| b.width().max(b.height()));
+    let soften = |look: &Look| plain_when_tiny(&Look { blur: blur_px(look.blur), backdrop: backdrop_px(look.backdrop), ..look.clone() }, extent);
     match item {
         Item::Path(p) => Item::Path(PathItem { look: soften(&p.look), ..p }),
         Item::Group(g) => Item::Group(Box::new(GroupItem { look: soften(&g.look), ..*g })),
         other => other,
     }
+}
+
+struct Edit {
+    from: String,
+    reach: Option<Rect>,
+}
+
+const EDIT_SLACK_PX: f64 = 2.0;
+
+fn self_contained(item: &Item) -> bool {
+    let Some(look) = item.look() else { return false };
+    let alone = look.filters.is_none() && look.backdrop.is_none() && look.matte.is_none() && look.masks.is_none();
+    match item {
+        Item::Path(_) => alone,
+        Item::Group(g) => alone && g.items.iter().all(self_contained),
+        _ => false,
+    }
+}
+
+fn item_reach(item: &Item) -> Option<Rect> {
+    if !self_contained(item) {
+        return None;
+    }
+    let pad = item.look().map_or(0.0, |l| l.blur) * BLUR_REACH + EDIT_SLACK_PX;
+    bounds::<Scene>(item, &Pictures::default()).map(|r| r.inflate(pad, pad))
+}
+
+fn reach_of<'a>(items: impl Iterator<Item = &'a Item>) -> Option<Rect> {
+    items.map(item_reach).try_fold(None, |acc: Option<Rect>, r| r.map(|r| Some(acc.map_or(r, |a| a.union(r)))))?
 }
 
 struct Seed {
@@ -500,10 +530,10 @@ fn span_of(row: &Row, range: std::ops::Range<usize>, key: String, frame: Rect, b
     }
     let paint = |items: &[Item]| {
         let mut scene = Scene::new();
-        build_items(&mut scene, items, frame, &Pictures::new(), &Layers::new());
+        build_items(&mut scene, items, frame, &Pictures::default(), &Layers::new());
         scene
     };
-    let encoded = Arc::new(Encoded::reusing(base.map(|o| kept(o, &local)), &local, frame, |i| bounds::<Scene>(i, &Pictures::new()), paint));
+    let encoded = Arc::new(Encoded::reusing(base.map(|o| kept(o, &local)), &local, frame, |i| bounds::<Scene>(i, &Pictures::default()), paint));
     let bounds = encoded.runs.iter().map(|r| r.bounds).reduce(|a, b| a.union(b)).unwrap_or(frame);
     Span { key, encoded, bounds, local, frame }
 }
@@ -524,7 +554,7 @@ fn pieces_of(row: &Row, path: &str, frame: Rect, before: Option<&Before>) -> Vec
             at = end;
             continue;
         }
-        let own = bounds::<Scene>(item, &Pictures::new());
+        let own = bounds::<Scene>(item, &Pictures::default());
         match item {
             Item::Group(g) if g.look.backdrop.is_none() => {
                 let inside = pieces_of(&Row::plain(&g.items), &here, frame, before);
@@ -556,7 +586,7 @@ struct Laying<'a> {
     frame: Rect,
     scale: f64,
     view: Rect,
-    encoded: &'a mut HashMap<String, Arc<Encoded>>,
+    encoded: &'a mut FxHashMap<String, Arc<Encoded>>,
 }
 
 impl Laying<'_> {
@@ -611,9 +641,9 @@ fn shade_reach(look: &Look, own: Option<Rect>, scale: f64) -> Option<f64> {
     Some((soft + reach.px + side * reach.share) * scale)
 }
 
-fn laid(u: &UseItem, group: &DisplayList, cast: &Cast, view: Rect) -> (Vec<Item>, HashMap<String, Arc<Encoded>>) {
+fn laid(u: &UseItem, group: &DisplayList, cast: &Cast, view: Rect) -> (Vec<Item>, FxHashMap<String, Arc<Encoded>>) {
     let frame = screen_rect(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64));
-    let mut encoded = HashMap::new();
+    let mut encoded = FxHashMap::default();
     let items = Laying { u, frame, scale: scale_of(u.matrix), view, encoded: &mut encoded }.lay(&cast.pieces, &group.items);
     (items, encoded)
 }
@@ -623,12 +653,14 @@ pub struct Library {
     groups: Groups,
     encodings: FxHashMap<String, Option<Arc<Cast>>>,
     seeds: FxHashMap<String, Seed>,
+    edits: FxHashMap<String, Edit>,
     composes: bool,
     held: FxHashMap<String, Held>,
     building: FxHashMap<String, Building>,
     stale: Vec<String>,
     retiring: Vec<String>,
     motion: Motion,
+    native: Native,
     budget: Option<u64>,
     #[cfg(not(target_arch = "wasm32"))]
     fonts: Fonts,
@@ -638,6 +670,13 @@ pub struct Library {
 pub enum Sweep {
     Evict,
     Keep,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Native {
+    #[default]
+    Textures,
+    Vectors,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -742,12 +781,19 @@ impl Library {
         }
         let (drawn, _) = self.drawable(&DisplayList { items: splice.items.clone(), ..base.clone_empty() });
         let before = self.encodings.get(from).cloned().flatten();
+        let gone = &base.items[splice.head..base.items.len() - splice.tail];
+        let edit = Edit { from: from.to_string(), reach: reach_of(gone.iter().chain(&drawn.items)) };
         self.groups.splice(from, to, splice.head, splice.tail, drawn.items);
         self.forget(to);
+        self.edits.insert(to.to_string(), edit);
         if let Some(before) = before {
             self.seeds.insert(to.to_string(), Seed { before, group: from.to_string() });
         }
         true
+    }
+
+    pub fn edit_reach(&self, from: &str, to: &str) -> Option<Rect> {
+        self.edits.get(to).filter(|e| e.from == from).and_then(|e| e.reach)
     }
 
     pub fn items_in(&self, group: &str) -> Option<usize> {
@@ -774,7 +820,7 @@ impl Library {
         used(u, group, start)
     }
 
-    fn live(&self, u: &UseItem, group: &DisplayList, cast: Option<&Cast>, view: Rect, items: &mut Vec<Item>, encoded: &mut HashMap<String, Arc<Encoded>>) {
+    fn live(&self, u: &UseItem, group: &DisplayList, cast: Option<&Cast>, view: Rect, items: &mut Vec<Item>, encoded: &mut FxHashMap<String, Arc<Encoded>>) {
         let start = items.len();
         match cast {
             Some(cast) => {
@@ -796,6 +842,7 @@ impl Library {
     fn forget(&mut self, key: &str) {
         self.encodings.remove(key);
         self.seeds.remove(key);
+        self.edits.remove(key);
         if self.held.remove(key).is_some() {
             self.stale.push(cache_clip(key));
         }
@@ -818,6 +865,10 @@ impl Library {
 
     pub fn set_motion(&mut self, motion: Motion) {
         self.motion = motion;
+    }
+
+    pub fn set_native(&mut self, native: Native) {
+        self.native = native;
     }
 
     pub fn set_budget(&mut self, bytes: u64) {
@@ -889,7 +940,7 @@ impl Library {
         let mut finished = Vec::new();
         let mut waiting = Vec::new();
         let mut items = Vec::with_capacity(list.items.len());
-        let mut encoded: HashMap<String, Arc<Encoded>> = HashMap::new();
+        let mut encoded: FxHashMap<String, Arc<Encoded>> = FxHashMap::default();
         let view = Rect::new(0.0, 0.0, list.width as f64, list.height as f64);
         let first = self.sharpened_first(list, limits.side);
         let mut off_screen = Vec::new();
@@ -912,6 +963,15 @@ impl Library {
                     let (laid, spans) = laid(u, group, whole, view);
                     items.extend(laid);
                     encoded.extend(spans);
+                }
+                continue;
+            }
+            if self.native == Native::Vectors && !moved_as_texture {
+                if u.cache {
+                    seen.insert(u.group.clone());
+                }
+                if on_screen {
+                    self.live(u, group, cast.as_deref(), view, &mut items, &mut encoded);
                 }
                 continue;
             }

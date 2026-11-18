@@ -1,6 +1,7 @@
 import type { StateStyle } from './states';
 import { DEFAULT_VARIANT } from '../doc';
 import type { CodeEase } from './ease';
+import type { SceneSpec } from './scene3d';
 
 export enum TokenKind {
   Colour = 'color',
@@ -42,6 +43,7 @@ export type ElementNode = {
   animation?: Animation;
   states?: StateStyle;
   media?: MediaRules[];
+  scene?: { name: string; spec: SceneSpec };
 };
 
 export type StyleBind = { property: string; prop: string };
@@ -90,7 +92,11 @@ export type SetSpec = { name: string; axes: { name: string; values: string[] }[]
 
 export type Token = { kind: TokenKind; name: string; raw: string; value: string };
 
-export type PageSpec = { name: string; root: ElementNode; uses: string[]; components: ComponentSpec[]; sets: SetSpec[]; tokens: Token[]; assets: { id: string; url: string | null; ref: string }[]; notes: string[] };
+export type FontFile = { family: string; ref: string; weight: string; italic: boolean };
+
+export type PageFonts = { files: FontFile[]; google: string | null; handled: string[] };
+
+export type PageSpec = { name: string; root: ElementNode; uses: string[]; components: ComponentSpec[]; sets: SetSpec[]; tokens: Token[]; fonts: PageFonts; assets: { id: string; url: string | null; ref: string }[]; notes: string[] };
 
 const FLAGS = new Set(['true', 'false']);
 

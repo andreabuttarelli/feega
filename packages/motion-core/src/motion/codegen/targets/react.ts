@@ -2,10 +2,12 @@ import { axisCondition, axisType, fallbackMember, isFlagAxis, isProp, PropType, 
 import { camel, pascal } from '../naming';
 import { MOTION_IMPORT, MOTION_VERSION, motionFiles } from './react-motion';
 import type { CodeFile } from '../model';
-import { fontLinks, lookupOf, type TokenLookup } from './css';
+import { fontFaceCss, fontLinks, lookupOf, type TokenLookup } from './css';
 import { tailwindOf } from './tailwind';
 import { bindsOf, camelProperty, jsxSvg, nodeLines, pad, type Dialect } from './markup';
 import { readme, themeCss } from './project';
+import { scenesIn, scenesOf, sceneConsts, THREE_TYPES_VERSION, THREE_VERSION } from './scene-files';
+import { SCENE_COMPONENT } from './scene-r3f';
 
 type Ctx = { tokens: TokenLookup; root: ElementNode | null; file: string; anims: Map<string, Animation> };
 
@@ -75,10 +77,16 @@ const dialect: Dialect<Ctx> = {
   use: useLines,
   svg: svgOf,
   shown: (prop, lines, depth) => [`${pad(depth)}{${prop} && (`, ...lines.map((l) => `  ${l}`), `${pad(depth)})}`],
-  selfClosing: true
+  selfClosing: true,
+  inner: (node) => (node.scene ? [`<Scene3D scene={${node.scene.name}} />`] : [])
 };
 
 const importsOf = (uses: readonly string[], from: string) => uses.map((u) => `import { ${u} } from '${from}${u}';`);
+
+const sceneImports = (root: ElementNode, from: string) => {
+  const scenes = scenesIn(root);
+  return scenes.length ? [`import { Scene3D } from '${from}components/Scene3D';`, `import { ${scenes.map((s) => s.name).sort().join(', ')} } from '${from}scenes';`] : [];
+};
 
 const motionImports = (own: Map<string, Animation>, from: string) => (own.size ? [MOTION_IMPORT, `import { ${[...own.keys()].sort().join(', ')} } from '${from}animations';`] : []);
 
@@ -98,6 +106,7 @@ function componentFile(spec: ComponentSpec, tokens: TokenLookup, anims: Map<stri
     ...motionImports(own, '../'),
     "import { cx } from '../lib/cx';",
     ...importsOf(spec.uses, './'),
+    ...sceneImports(spec.root, '../'),
     '',
     ...propType(spec),
     '',
@@ -135,21 +144,21 @@ function pageFile(page: PageSpec, name: string, tokens: TokenLookup, anims: Map<
   const own = new Map<string, Animation>();
   const body = nodeLines(page.root, 2, dialect, { tokens, root: null, file: name, anims: own });
   own.forEach((a, n) => anims.set(n, a));
-  const imports = [...motionImports(own, '../'), ...importsOf(page.uses, '../components/')];
+  const imports = [...motionImports(own, '../'), ...importsOf(page.uses, '../components/'), ...sceneImports(page.root, '../')];
   const content = [...imports, ...(imports.length ? [''] : []), `export function ${name}() {`, '  return (', ...body, '  );', '}', ''].join('\n');
   return { path: `src/pages/${name}.tsx`, content };
 }
 
 const json = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;
 
-const PACKAGE = (name: string, animated: boolean) => ({
+const PACKAGE = (name: string, animated: boolean, three: boolean) => ({
   name,
   private: true,
   version: '0.0.0',
   type: 'module',
   scripts: { dev: 'vite', build: 'tsc -b && vite build', preview: 'vite preview' },
-  dependencies: { ...(animated ? { motion: MOTION_VERSION } : {}), react: '^19.0.0', 'react-dom': '^19.0.0' },
-  devDependencies: { '@tailwindcss/vite': '^4.0.0', '@types/react': '^19.0.0', '@types/react-dom': '^19.0.0', '@vitejs/plugin-react': '^4.3.0', tailwindcss: '^4.0.0', typescript: '^5.6.0', vite: '^6.0.0' }
+  dependencies: { ...(animated ? { motion: MOTION_VERSION } : {}), ...(three ? { '@react-three/fiber': '^9.8.2', three: THREE_VERSION } : {}), react: '^19.0.0', 'react-dom': '^19.0.0' },
+  devDependencies: { ...(three ? { '@types/three': THREE_TYPES_VERSION } : {}), '@tailwindcss/vite': '^4.0.0', '@types/react': '^19.0.0', '@types/react-dom': '^19.0.0', '@vitejs/plugin-react': '^4.3.0', tailwindcss: '^4.0.0', typescript: '^5.6.0', vite: '^6.0.0' }
 });
 
 const TSCONFIG = { compilerOptions: { target: 'ES2022', lib: ['ES2022', 'DOM', 'DOM.Iterable'], module: 'ESNext', moduleResolution: 'bundler', jsx: 'react-jsx', strict: true, noEmit: true, skipLibCheck: true }, include: ['src'] };
@@ -158,19 +167,22 @@ export function reactProject(page: PageSpec, slug: string): CodeFile[] {
   const tokens = lookupOf(page.tokens);
   const name = pascal(page.name);
   const anims = new Map<string, Animation>();
+  const scenes = scenesOf(page);
   const sources = [pageFile(page, name, tokens, anims), ...page.components.map((c) => componentFile(c, tokens, anims)), ...page.sets.map(setFile)];
-  const head = ['<!doctype html>', '<html lang="en">', '  <head>', '    <meta charset="UTF-8" />', '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />', `    <title>${page.name}</title>`, ...fontLinks(page.tokens).map((l) => `    ${l}`), '  </head>', '  <body>', '    <div id="root"></div>', '    <script type="module" src="/src/main.tsx"></script>', '  </body>', '</html>', ''];
+  const head = ['<!doctype html>', '<html lang="en">', '  <head>', '    <meta charset="UTF-8" />', '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />', `    <title>${page.name}</title>`, ...fontLinks(page).map((l) => `    ${l}`), '  </head>', '  <body>', '    <div id="root"></div>', '    <script type="module" src="/src/main.tsx"></script>', '  </body>', '</html>', ''];
   return [
     { path: 'README.md', content: readme(page, 'React + Tailwind CSS', ['npm install', 'npm run dev'], 'src/components/') },
-    { path: 'package.json', content: json(PACKAGE(slug, anims.size > 0)) },
+    { path: 'package.json', content: json(PACKAGE(slug, anims.size > 0, scenes.length > 0)) },
     { path: 'tsconfig.json', content: json(TSCONFIG) },
     { path: 'vite.config.ts', content: ["import { defineConfig } from 'vite';", "import react from '@vitejs/plugin-react';", "import tailwindcss from '@tailwindcss/vite';", '', 'export default defineConfig({ plugins: [react(), tailwindcss()] });', ''].join('\n') },
     { path: 'index.html', content: head.join('\n') },
     { path: 'src/main.tsx', content: ["import { StrictMode } from 'react';", "import { createRoot } from 'react-dom/client';", "import './index.css';", `import { ${name} } from './pages/${name}';`, '', "createRoot(document.getElementById('root')!).render(", '  <StrictMode>', `    <${name} />`, '  </StrictMode>', ');', ''].join('\n') },
-    { path: 'src/index.css', content: ['@import "tailwindcss";', '@import "./tokens.css";', ''].join('\n') },
+    { path: 'src/index.css', content: ['@import "tailwindcss";', ...(page.fonts.files.length ? ['@import "./fonts.css";'] : []), '@import "./tokens.css";', ''].join('\n') },
+    ...(page.fonts.files.length ? [{ path: 'src/fonts.css', content: fontFaceCss(page.fonts.files) }] : []),
     { path: 'src/tokens.css', content: themeCss(page.tokens) },
     { path: 'src/lib/cx.ts', content: "export const cx = (...classes: (string | false | null | undefined)[]) => classes.filter(Boolean).join(' ');\n" },
     ...sources,
+    ...(scenes.length ? [{ path: 'src/components/Scene3D.tsx', content: SCENE_COMPONENT }, { path: 'src/scenes.ts', content: ["import type { SceneSpec } from './components/Scene3D';", '', ...sceneConsts(scenes, ': SceneSpec'), ''].join('\n\n') }] : []),
     ...motionFiles(anims)
   ];
 }

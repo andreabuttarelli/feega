@@ -109,6 +109,16 @@ connection) in `.env`, and run `npm run setup`. The baseline needs the `pgcrypto
 `vector` extensions, and `pg_jsonschema` when your plan offers it (without it the JSON shape checks are
 skipped and the app still works).
 
+## Pushing designs to GitHub
+
+Frames imported from code can push their edits back as a `feega/<name>` branch and a pull request. Three ways to give the server write access, tried in this order:
+
+1. **A connected account** (Composio, `COMPOSIO_API_KEY`). Register your own GitHub App, installed on the repositories you choose, with **Contents: read and write**, **Pull requests: read and write**, **Checks: read**, **Metadata: read**, and set it as the GitHub auth config in Composio. Tokens last one hour.
+2. **A token from env**, when no account is connected: `GITHUB_PUSH_TOKEN` (a fine-grained personal access token or a GitHub App installation token, same permissions as above, limited to the repositories you choose).
+3. **GitHub Enterprise**: add `GITHUB_API_URL`, e.g. `https://github.acme.dev/api/v3`.
+
+In local mode a frame imported from a folder pushes through the git CLI of that folder: Feega writes its commits with a private index, so your current branch, your uncommitted work and your history are never touched. The branch goes to `origin` when there is one (your git credentials), and the pull request opens when one of the three options above is set; otherwise the branch stays pushed or local and the answer says `pull: null`.
+
 ## Required environment
 
 | Variable | Why |

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 use serde_json::{Map, Value};
 
@@ -355,7 +355,7 @@ impl<R: Runner> Fx<'_, R> {
     }
 
     fn svg_graph(&self, source: Img<R::Tex>, filter: &SvgNode, space: Linear, origin: [f64; 2]) -> Img<R::Tex> {
-        let mut results: HashMap<String, Img<R::Tex>> = HashMap::new();
+        let mut results: FxHashMap<String, Img<R::Tex>> = FxHashMap::default();
         let mut last = source.clone();
         let s = scale(space);
         let colour_of = |node: &SvgNode| {
@@ -607,7 +607,7 @@ fn ink_of(node: &SvgNode, space: Linear, input: impl Fn(Option<&Value>) -> Ink) 
 }
 
 fn svg_ink(filter: &SvgNode, space: Linear, source: Ink) -> Ink {
-    let mut results: HashMap<String, Ink> = HashMap::new();
+    let mut results: FxHashMap<String, Ink> = FxHashMap::default();
     let mut last = source;
     for node in &filter.children {
         let input = |name: Option<&Value>| match name.map(|v| text(Some(v))) {

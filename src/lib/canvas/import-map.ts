@@ -38,7 +38,7 @@ export const COND_CHOICES: Cond[] = [Scheme.Light, Scheme.Dark].flatMap((scheme)
 
 export const condLabel = (c: Cond): string => `${c.scheme === Scheme.Dark ? 'Dark' : 'Light'} · ${c.width}`;
 
-const boardSchema = z.object({ cond: z.string().max(24), clip: z.string().min(1).max(64) });
+const boardSchema = z.object({ cond: z.string().max(24), clip: z.string().min(1).max(64), view: z.string().max(40).optional() });
 
 const pageSchema = z.object({
   path: z.string().max(PATH_MAX),
@@ -54,7 +54,7 @@ const count = z.number().int().min(0);
 export const importMapSchema = z.object({
   rev: z.string().max(64).nullable().optional(),
   pages: z.array(pageSchema).max(MAX_MAP_PAGES),
-  library: z.object({ captured: names, uncaptured: names }).optional(),
+  library: z.object({ captured: names, uncaptured: names, reasons: z.record(z.string().max(NAME_MAX), z.string().max(PATH_MAX)).optional() }).optional(),
   design: z.object({ tokens: count, styles: count, bound: count, unbound: count }).optional(),
   unrun: z.string().max(PATH_MAX).optional()
 });
@@ -143,7 +143,7 @@ export function mergedMap(before: ImportMap | undefined, after: ImportMap): Impo
   const now = new Map(after.pages.map((p) => [p.path, p]));
   const paths = [...new Set([...was.keys(), ...now.keys()])];
   const pages = paths.map((path) => (now.has(path) ? mergedPage(was.get(path), now.get(path)!) : was.get(path)!));
-  const library = before?.library && after.library ? { captured: [...new Set([...before.library.captured, ...after.library.captured])], uncaptured: after.library.uncaptured.filter((n) => !before.library!.captured.includes(n)) } : (after.library ?? before?.library);
+  const library = before?.library && after.library ? { captured: [...new Set([...before.library.captured, ...after.library.captured])], uncaptured: after.library.uncaptured.filter((n) => !before.library!.captured.includes(n)), ...(after.library.reasons ? { reasons: after.library.reasons } : {}) } : (after.library ?? before?.library);
   const design = before?.design && after.design ? { ...before.design, bound: before.design.bound + after.design.bound, unbound: before.design.unbound + after.design.unbound } : (after.design ?? before?.design);
   return { rev: after.rev ?? before?.rev ?? null, pages, ...(library ? { library } : {}), ...(design ? { design } : {}) };
 }

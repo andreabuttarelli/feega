@@ -69,7 +69,7 @@ impl Surface for Counting {
     }
 
     fn place(&mut self, _: (u32, u32), region: Rect) -> Placed<()> {
-        Placed { image: (), origin: Point::new(region.x0, region.y0) }
+        Placed { image: (), origin: Point::new(region.x0, region.y0), scale: 1.0 }
     }
 }
 
@@ -93,7 +93,7 @@ fn a_masked_item_outside_the_frame_costs_no_layer() {
     let mut surface = Counting::default();
     let list = list_of(&[10.0, 5000.0, -5000.0, 40.0]);
 
-    let layers = prepare(&mut surface, &list, &Shelf::new(), Blending::Native).unwrap();
+    let layers = prepare(&mut surface, &list, &Shelf::default(), Blending::Native).unwrap();
 
     let frame = surface.frame();
     assert!(surface.painted.iter().all(|r| r.overlaps(frame)));
@@ -105,9 +105,9 @@ fn a_masked_item_outside_the_frame_costs_no_layer() {
 fn a_culled_item_is_not_reported_as_skipped() {
     let mut surface = Counting::default();
     let list = list_of(&[10.0, 5000.0]);
-    let layers = prepare(&mut surface, &list, &Shelf::new(), Blending::Native).unwrap();
+    let layers = prepare(&mut surface, &list, &Shelf::default(), Blending::Native).unwrap();
 
-    let skipped = build_into(&mut Nothing, &list, &Shelf::new(), &layers);
+    let skipped = build_into(&mut Nothing, &list, &Shelf::default(), &layers);
 
     assert!(skipped.is_empty());
 }
@@ -125,7 +125,7 @@ fn an_empty_group_whose_filters_only_shade_its_content_costs_no_layer() {
     let mut surface = Counting::default();
     let list = empty_group(r#"{ "kind": "css", "fns": [{ "name": "drop-shadow", "args": ["0px", "15px", "35px", "rgba(0,0,0,0.08)"] }] }"#);
 
-    let layers = prepare(&mut surface, &list, &Shelf::new(), Blending::Native).unwrap();
+    let layers = prepare(&mut surface, &list, &Shelf::default(), Blending::Native).unwrap();
 
     assert!(surface.painted.is_empty());
     assert!(layers.bodies.is_empty());
@@ -136,7 +136,7 @@ fn an_empty_group_with_an_svg_filter_still_gets_a_layer() {
     let mut surface = Counting::default();
     let list = empty_group(r#"{ "kind": "svg", "nodes": [{ "tag": "filter", "attrs": {}, "children": [{ "tag": "feFlood", "attrs": { "flood-color": "red" }, "children": [] }] }] }"#);
 
-    let layers = prepare(&mut surface, &list, &Shelf::new(), Blending::Native).unwrap();
+    let layers = prepare(&mut surface, &list, &Shelf::default(), Blending::Native).unwrap();
 
     assert_eq!(layers.bodies.len(), 1);
 }
@@ -167,7 +167,7 @@ const ALPHA_LIFT: &str = r#"{ "kind": "svg", "nodes": [{ "tag": "filter", "attrs
 fn an_empty_group_whose_svg_filter_strokes_its_content_costs_no_layer() {
     let mut surface = Counting::default();
 
-    let layers = prepare(&mut surface, &empty_group(STROKE), &Shelf::new(), Blending::Native).unwrap();
+    let layers = prepare(&mut surface, &empty_group(STROKE), &Shelf::default(), Blending::Native).unwrap();
 
     assert!(surface.painted.is_empty());
     assert!(layers.bodies.is_empty());
@@ -177,7 +177,7 @@ fn an_empty_group_whose_svg_filter_strokes_its_content_costs_no_layer() {
 fn an_empty_group_whose_svg_filter_shadows_its_content_costs_no_layer() {
     let mut surface = Counting::default();
 
-    let layers = prepare(&mut surface, &empty_group(SHADOW), &Shelf::new(), Blending::Native).unwrap();
+    let layers = prepare(&mut surface, &empty_group(SHADOW), &Shelf::default(), Blending::Native).unwrap();
 
     assert!(surface.painted.is_empty());
     assert!(layers.bodies.is_empty());
@@ -187,7 +187,7 @@ fn an_empty_group_whose_svg_filter_shadows_its_content_costs_no_layer() {
 fn an_empty_group_whose_svg_filter_floods_under_it_still_gets_a_layer() {
     let mut surface = Counting::default();
 
-    let layers = prepare(&mut surface, &empty_group(FLOOD_UNDER), &Shelf::new(), Blending::Native).unwrap();
+    let layers = prepare(&mut surface, &empty_group(FLOOD_UNDER), &Shelf::default(), Blending::Native).unwrap();
 
     assert_eq!(layers.bodies.len(), 1);
 }
@@ -196,7 +196,7 @@ fn an_empty_group_whose_svg_filter_floods_under_it_still_gets_a_layer() {
 fn an_empty_group_whose_colour_matrix_lifts_alpha_still_gets_a_layer() {
     let mut surface = Counting::default();
 
-    let layers = prepare(&mut surface, &empty_group(ALPHA_LIFT), &Shelf::new(), Blending::Native).unwrap();
+    let layers = prepare(&mut surface, &empty_group(ALPHA_LIFT), &Shelf::default(), Blending::Native).unwrap();
 
     assert_eq!(layers.bodies.len(), 1);
 }
@@ -220,8 +220,8 @@ fn an_item_stroked_by_a_filter_with_its_own_region_costs_no_layer_off_the_frame(
     let mut off = Counting::default();
     let mut on = Counting::default();
 
-    let culled = prepare(&mut off, &stroked_square(5000.0), &Shelf::new(), Blending::Native).unwrap();
-    prepare(&mut on, &stroked_square(10.0), &Shelf::new(), Blending::Native).unwrap();
+    let culled = prepare(&mut off, &stroked_square(5000.0), &Shelf::default(), Blending::Native).unwrap();
+    prepare(&mut on, &stroked_square(10.0), &Shelf::default(), Blending::Native).unwrap();
 
     assert_eq!(culled.culled.len(), 1);
     assert!(off.painted.is_empty());

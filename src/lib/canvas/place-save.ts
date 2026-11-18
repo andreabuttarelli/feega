@@ -135,15 +135,28 @@ const PLACED: Record<Placement, (owner: Boxed, fields: Record<string, number>) =
 };
 
 export function placedRows<T extends Boxed>(rows: T[], entries: readonly PlaceEntry[], membersOf: (id: string) => ReadonlySet<string>): T[] {
-  return entries.reduce((current, entry) => {
+  const placed = [...rows];
+  const at = new Map<string, number>();
+  placed.forEach((row, i) => at.has(row.id) || at.set(row.id, i));
+  let landed = false;
+
+  for (const entry of entries) {
     const land = PLACED[entry.action as Placement];
-    const owner = current.find((row) => row.id === entry.id);
-    if (!land || !owner) {
-      return current;
+    const index = at.get(entry.id);
+    if (!land || index === undefined) {
+      continue;
     }
 
-    const { own, carry } = land(owner, entry.fields);
-    const members = membersOf(entry.id);
-    return current.map((row) => (row.id === entry.id ? { ...row, ...own } : members.has(row.id) ? { ...row, x: row.x + carry.dx, y: row.y + carry.dy } : row));
-  }, rows);
+    const { own, carry } = land(placed[index], entry.fields);
+    placed[index] = { ...placed[index], ...own };
+    for (const id of membersOf(entry.id)) {
+      const member = at.get(id);
+      if (member !== undefined && member !== index) {
+        placed[member] = { ...placed[member], x: placed[member].x + carry.dx, y: placed[member].y + carry.dy };
+      }
+    }
+    landed = true;
+  }
+
+  return landed ? placed : rows;
 }

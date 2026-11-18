@@ -86,6 +86,8 @@ export function computedSheet(vars: Record<string, string>, mode: string): Loade
 }
 
 const SCHEME_MEDIA = /^@media\s*\(\s*prefers-color-scheme\s*:\s*(light|dark)\s*\)$/i;
+const WIDTH_MEDIA = /^@media\b.*\b(min|max)-width\b/i;
+const RESPONSIVE = 'is a responsive value: variables have modes, not breakpoints';
 const THEME_AT = /^@theme\b/;
 const TRANSPARENT_AT = /^@(layer|supports)\b/;
 
@@ -189,7 +191,8 @@ function declare(out: Collected, stack: Block[], text: string, start: number, en
 
   if (context.outside || !context.mode) {
     const where = [context.outside?.label, context.rule?.label].filter(Boolean).join(' ');
-    out.skipped.push(`${name} under ${where} is not a theme`);
+    const why = context.outside && WIDTH_MEDIA.test(context.outside.label) ? RESPONSIVE : 'is not a theme';
+    out.skipped.push(`${name} under ${where} ${why}`);
     return;
   }
   out.declared.push({ name, raw, mode: context.mode, at: place(start + lead) });

@@ -1,3 +1,4 @@
+pub mod atlas;
 pub mod canvas;
 pub mod colour;
 pub mod compositor;
@@ -17,15 +18,21 @@ pub mod gl_state;
 pub mod glyphs;
 pub mod fragments;
 pub mod groups;
+pub mod held_view;
 pub mod kernel;
 pub mod layers;
 pub mod lod;
+pub mod overlay_hold;
+pub mod overlay_seen;
 pub mod pictures;
+pub mod pinned;
 pub mod reproject;
 pub mod retained;
+pub mod screen_fit;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod render;
 pub mod scene;
+pub mod zoomless;
 pub mod shades;
 pub mod tally;
 #[cfg(not(target_arch = "wasm32"))]
@@ -36,6 +43,8 @@ pub mod texture_budget;
 pub mod tiles;
 pub mod turbulence;
 pub mod uses;
+#[cfg(target_arch = "wasm32")]
+pub mod panic_log;
 #[cfg(target_arch = "wasm32")]
 pub mod web;
 #[cfg(all(target_arch = "wasm32", feature = "webgl"))]

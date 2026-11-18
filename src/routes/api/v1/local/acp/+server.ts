@@ -1,7 +1,8 @@
 import { error } from '@sveltejs/kit';
 import { localStore } from '$lib/server/local/local-mode';
-import { ACP_AGENTS, feegaMcp, isAcpAgent } from '$lib/server/acp/agents';
-import { runAcpTurn } from '$lib/server/acp/client';
+import { feegaMcp } from '$lib/server/acp/agents';
+import { runAcpTurn, type AgentCommand } from '$lib/server/acp/client';
+import { Refresh, detectCached } from '$lib/server/acp/detect';
 import { awaitChoice, choose } from '$lib/server/acp/permissions';
 import { AcpEventKind, encodeAcpEvent, type AcpEvent } from '$lib/acp/acp-events';
 import type { RequestHandler } from './$types';
@@ -9,6 +10,7 @@ import type { RequestHandler } from './$types';
 const NOT_FOUND = 404;
 const BAD_REQUEST = 400;
 const NO_CONTENT = 204;
+const CONFLICT = 409;
 const LOCAL_APP_URL = 'http://127.0.0.1:5173';
 const SSE_HEADERS = { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' };
 
@@ -26,7 +28,7 @@ function answer(permission: NonNullable<Body['permission']>): Response {
   return new Response(null, { status: NO_CONTENT });
 }
 
-function stream(agent: keyof typeof ACP_AGENTS, prompt: string, signal: AbortSignal): Response {
+function stream(agent: AgentCommand, model: string | null, prompt: string, signal: AbortSignal): Response {
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
       const send = (event: AcpEvent) => controller.enqueue(new TextEncoder().encode(encodeAcpEvent(event)));
@@ -39,7 +41,7 @@ function stream(agent: keyof typeof ACP_AGENTS, prompt: string, signal: AbortSig
 
       try {
         const turn = await runAcpTurn(
-          { agent: ACP_AGENTS[agent], cwd: process.cwd(), mcpServers: [feegaMcp(process.cwd(), process.env.PUBLIC_APP_URL ?? LOCAL_APP_URL)], prompt },
+          { agent, cwd: process.cwd(), mcpServers: [feegaMcp(process.cwd(), process.env.PUBLIC_APP_URL ?? LOCAL_APP_URL)], prompt, model },
           { onUpdate: (update) => send({ kind: AcpEventKind.Update, update }), ask, signal }
         );
         send({ kind: AcpEventKind.Done, stopReason: turn.stopReason });
@@ -55,7 +57,8 @@ function stream(agent: keyof typeof ACP_AGENTS, prompt: string, signal: AbortSig
 }
 
 export const POST: RequestHandler = async ({ request }) => {
-  if (localStore() === null) {
+  const opened = localStore();
+  if (opened === null) {
     error(NOT_FOUND, 'ACP agents run only in local mode');
   }
 
@@ -64,9 +67,18 @@ export const POST: RequestHandler = async ({ request }) => {
     return answer(body.permission);
   }
 
-  if (!isAcpAgent(body.agent) || typeof body.prompt !== 'string') {
+  if (typeof body.agent !== 'string' || typeof body.prompt !== 'string') {
     error(BAD_REQUEST, 'agent and prompt are required');
   }
 
-  return stream(body.agent, body.prompt, request.signal);
+  const detected = (await detectCached(Refresh.Cached)).find((d) => d.agent.id === body.agent);
+  if (!detected) {
+    error(BAD_REQUEST, 'Unknown agent');
+  }
+
+  if (!detected.command) {
+    error(CONFLICT, `${detected.agent.name} is not installed here, or cannot run over ACP`);
+  }
+
+  return stream(detected.command, opened.acpModel(body.agent), body.prompt, request.signal);
 };

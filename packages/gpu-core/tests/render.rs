@@ -18,7 +18,7 @@ fn parses_the_display_list_the_web_engine_writes() {
 
 #[test]
 fn names_a_layer_whose_picture_never_arrived() {
-    let (_, skipped) = build(&parse(SQUARE).unwrap(), &Pictures::new(), &Layers::new());
+    let (_, skipped) = build(&parse(SQUARE).unwrap(), &Pictures::default(), &Layers::new());
 
     assert_eq!(skipped, vec![Skipped { clip: "pic".into(), what: "layer".into() }]);
 }
@@ -28,7 +28,7 @@ fn names_a_layer_whose_picture_never_arrived() {
 fn paints_a_square_over_the_background() {
     let list = parse(SQUARE).unwrap();
     let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
-    let pixels = renderer.render(&list, &Pictures::new()).unwrap().pixels;
+    let pixels = renderer.render(&list, &Pictures::default()).unwrap().pixels;
     let at = |x: usize, y: usize| &pixels[(y * 64 + x) * 4..(y * 64 + x) * 4 + 4];
 
     assert_eq!(at(32, 32), &[255, 0, 0, 255]);
@@ -58,7 +58,7 @@ fn thousands_of_dashes_in_one_frame_still_draw() {
     let side = 1600;
     let list = parse(&dashes_in_one_frame(3000, side)).unwrap();
     let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
-    let pixels = renderer.render(&list, &Pictures::new()).unwrap().pixels;
+    let pixels = renderer.render(&list, &Pictures::default()).unwrap().pixels;
     let at = |x: usize, y: usize| &pixels[(y * side as usize + x) * 4..(y * side as usize + x) * 4 + 4];
 
     assert_eq!(at(1, 1), &[255, 0, 0, 255]);
@@ -74,7 +74,7 @@ fn shaded(paint: &str) -> Vec<u8> {
     ))
     .unwrap();
     let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
-    renderer.render(&list, &Pictures::new()).unwrap().pixels
+    renderer.render(&list, &Pictures::default()).unwrap().pixels
 }
 
 #[cfg(feature = "gpu")]
@@ -117,7 +117,7 @@ fn a_frame_with_more_tiles_than_the_default_budget_still_paints() {
     items.push(rect("[1, 0, 0, 1]"));
     let list = parse(&format!(r#"{{ "width": {w}, "height": {h}, "background": [0, 0, 0, 1], "items": [{}] }}"#, items.join(","))).unwrap();
     let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
-    let pixels = renderer.render(&list, &Pictures::new()).unwrap().pixels;
+    let pixels = renderer.render(&list, &Pictures::default()).unwrap().pixels;
     let centre = ((h as usize / 2) * w as usize + w as usize / 2) * 4;
 
     assert_eq!(&pixels[centre..centre + 4], &[255, 0, 0, 255]);

@@ -1,7 +1,7 @@
 // Copyright 2022 the Vello Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
 use super::{Encoding, FontEmbolden, StreamOffsets};
@@ -18,7 +18,7 @@ use skrifa::{GlyphId, MetadataProvider, OutlineGlyphCollection};
 pub(crate) struct GlyphCache {
     free_list: Vec<Arc<Encoding>>,
     map: GlyphMap,
-    var_map: HashMap<VarKey, GlyphMap>,
+    var_map: FxHashMap<VarKey, GlyphMap>,
     cached_count: usize,
     hinting: HintCache,
     serial: u64,
@@ -308,7 +308,7 @@ impl OutlinePen for BezPathOutline<'_> {
 /// Inline size of 8 maximizes the internal storage of the small vec.
 type VarKey = smallvec::SmallVec<[NormalizedCoord; 8]>;
 
-type GlyphMap = HashMap<GlyphKey, GlyphEntry>;
+type GlyphMap = FxHashMap<GlyphKey, GlyphEntry>;
 
 #[derive(Clone, Default)]
 struct GlyphEntry {

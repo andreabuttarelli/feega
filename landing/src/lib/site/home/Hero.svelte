@@ -1,8 +1,7 @@
 <script lang="ts">
+  import Modes from './Modes.svelte';
   import { CANVAS_VIDEO, HERO_HEADLINE } from '../home';
   import { lazyPlay } from '../lazy-video';
-  import NpxChip from './NpxChip.svelte';
-  import HeroPrompt from './HeroPrompt.svelte';
   import AsciiField from './AsciiField.svelte';
 
   const POSTER = '/site/home/canvas-poster.webp';
@@ -18,13 +17,9 @@
 
   <h1><span data-agent-id="hero-title-a">{HERO_HEADLINE[0]}</span> <span data-agent-id="hero-title-b">{HERO_HEADLINE[1]}</span></h1>
 
-  <p class="lead" data-agent-id="hero-lead">Feega is an open-source canvas to design, animate and generate. Start from your repo, Figma or any website.</p>
+  <p class="lead" data-agent-id="hero-lead">Paste your website or open your repo and every layer comes in editable. Change it by hand or ask your AI assistant, then export a video or send the code back.</p>
 
-  <div class="start" data-agent-id="hero-start">
-    <HeroPrompt />
-  </div>
-
-  <p class="run"><span>or run it locally:</span> <NpxChip /></p>
+  <Modes id="hero-modes" />
 
   <video class="canvas" data-agent-id="hero-canvas" data-src={CANVAS_VIDEO} muted loop playsinline preload="none" poster={POSTER} width="1920" height="1080" aria-label="Feega canvas overview" use:lazyPlay></video>
 </section>
@@ -65,28 +60,8 @@
     opacity: 0.8;
   }
 
-  .start {
-    width: calc(100% - 32px);
-    max-width: 680px;
+  .hero > :global(.modes) {
     margin-top: 28px;
-  }
-
-  @media (max-width: 809.98px) {
-    .start {
-      width: 100%;
-    }
-  }
-
-  .run {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-top: 12px;
-  }
-
-  .run span {
-    opacity: 0.8;
-    color: #fff;
   }
 
   video {
@@ -100,11 +75,6 @@
     border-radius: 8px;
   }
 
-  @media (max-width: 809.98px) {
-    .start {
-      width: 100%;
-    }
-  }
 
   @media (min-width: 1200px) {
     .hero {
@@ -139,4 +109,5 @@
       width: 550px;
     }
   }
+
 </style>

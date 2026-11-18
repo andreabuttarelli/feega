@@ -3,7 +3,7 @@
 
 use guillotiere::{AllocId, AtlasAllocator, size2};
 use peniko::ImageData;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::collections::hash_map::Entry;
 
 const DEFAULT_ATLAS_SIZE: i32 = 1024;
@@ -46,7 +46,7 @@ pub(crate) struct ImageCache {
     /// prevents repeated stale-eviction scans during the same resolve pass.
     evicted_in_resolve: usize,
     /// Map from image blob id to atlas residency.
-    map: HashMap<u64, ResidentImage>,
+    map: FxHashMap<u64, ResidentImage>,
     /// Images that must be uploaded in the current resolve pass, with atlas locations.
     images: Vec<(ImageData, u32, u32)>,
 }
@@ -68,7 +68,7 @@ impl ImageCache {
             max_size,
             generation: 0,
             evicted_in_resolve: 0,
-            map: HashMap::default(),
+            map: FxHashMap::default(),
             images: Vec::default(),
         }
     }
@@ -108,6 +108,16 @@ impl ImageCache {
             new_size *= 2;
         }
         false
+    }
+
+    pub(crate) fn set_max_size(&mut self, size: i32) {
+        self.max_size = size;
+        if self.atlas.size().width <= size || self.repack_to_size(size) {
+            return;
+        }
+        self.map.clear();
+        self.images.clear();
+        self.atlas = AtlasAllocator::new(size2(size, size));
     }
 
     pub(crate) fn get_or_insert(&mut self, image: &ImageData) -> Option<(u32, u32)> {
@@ -185,7 +195,7 @@ impl ImageCache {
         let mut atlas = AtlasAllocator::new(size2(size, size));
         let mut entries: Vec<_> = self.map.iter().collect();
         entries.sort_by_key(|(id, _)| *id);
-        let mut map = HashMap::with_capacity(self.map.len());
+        let mut map = FxHashMap::with_capacity_and_hasher(self.map.len(), Default::default());
         for (id, resident) in entries {
             let Some(alloc) =
                 atlas.allocate(size2(resident.image.width as _, resident.image.height as _))
@@ -343,5 +353,33 @@ mod tests {
         assert_eq!(cache.atlas.size().width, 16);
         assert_eq!(cache.get_or_insert(&image), Some(xy));
         assert_eq!(cache.map.len(), 1);
+    }
+
+    #[test]
+    fn a_capped_atlas_shrinks_back_and_never_grows_past_the_cap() {
+        let mut cache = ImageCache::new_with_sizes(16, 64);
+        cache.begin_resolve();
+        cache.get_or_insert(&image(1, 12, 12)).unwrap();
+        assert!(cache.bump_size());
+        assert!(cache.bump_size());
+        assert_eq!(cache.atlas.size().width, 64);
+
+        cache.set_max_size(32);
+
+        assert_eq!(cache.atlas.size().width, 32);
+        assert!(!cache.bump_size());
+        assert_eq!(cache.atlas.size().width, 32);
+    }
+
+    #[test]
+    fn a_cap_too_small_for_the_residents_drops_them_to_be_uploaded_again() {
+        let mut cache = ImageCache::new_with_sizes(64, 64);
+        cache.begin_resolve();
+        cache.get_or_insert(&image(1, 40, 40)).unwrap();
+
+        cache.set_max_size(32);
+
+        assert_eq!(cache.atlas.size().width, 32);
+        assert!(cache.map.is_empty());
     }
 }

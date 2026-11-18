@@ -53,7 +53,10 @@ export type AppTab = Tab & {
   press: (key: string) => Promise<void>;
   paint: (html: string, size: { width: number; height: number }) => Promise<Buffer>;
   beside: () => Promise<AppTab>;
+  poster: (width: number, height: number) => Promise<PagePoster>;
 };
+
+export type PagePoster = { bytes: Uint8Array<ArrayBuffer>; width: number; height: number };
 
 export type OpenBrowser = () => Promise<Tab>;
 export type OpenAppBrowser = () => Promise<AppTab>;
@@ -78,6 +81,8 @@ const RETRYABLE = /\b(429|503)\b|too many|rate limit/i;
 const VIEWPORT = { width: 1280, height: 800 };
 const NAV_TIMEOUT_MS = 20_000;
 const JPEG_QUALITY = 70;
+const POSTER_WIDTH_PX = 512;
+const POSTER_QUALITY = 80;
 const REDACTED = '[redacted]';
 
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -270,6 +275,17 @@ const LONG_LIVED_MS = 4_000;
 const QUIET_POLL_MS = 100;
 const FONTS_MS = 3_000;
 const DOM_QUIET = { quietMs: 300, maxMs: 3_000 };
+const HYDRATION_QUIET = { quietMs: 1_000, maxMs: 6_000 };
+const IMAGES_MS = 5_000;
+
+function imagesLoaded(maxMs: number): Promise<void> {
+  const images = [...document.images];
+  images.forEach((img) => {
+    img.loading = 'eager';
+  });
+  const each = images.map((img) => (img.complete ? Promise.resolve() : img.decode().catch(() => undefined)));
+  return Promise.race([Promise.all(each).then(() => undefined), new Promise<void>((done) => setTimeout(done, maxMs))]);
+}
 
 function domStill(wait: { quietMs: number; maxMs: number }): Promise<void> {
   return new Promise((resolve) => {
@@ -447,10 +463,14 @@ function camera(page: Page): { shoot: Shoot; done: () => Promise<void> } {
   return { shoot, done };
 }
 
+const OFF_PAGE = { x: -1, y: -1 };
+
 function tabOf(page: Page, close: () => Promise<number>, left: () => number): AppTab {
   const quiet = quietOf(page);
+  let hydrated = false;
   return {
     goto: async (url) => {
+      hydrated = false;
       const until = Date.now() + NAV_TIMEOUT_MS;
       const response = await page.goto(url, { waitUntil: 'load', timeout: NAV_TIMEOUT_MS });
       await quiet(until - Date.now());
@@ -459,7 +479,10 @@ function tabOf(page: Page, close: () => Promise<number>, left: () => number): Ap
     url: () => page.url(),
     html: () => page.content(),
     look: () => page.evaluate(lookOf),
-    click: (target) => page.locator(locator(target)).click(),
+    click: async (target) => {
+      await page.locator(locator(target)).click();
+      await page.mouse.move(OFF_PAGE.x, OFF_PAGE.y);
+    },
     type: (selector, text) => page.locator(selector).fill(text),
     scroll: (to) => page.evaluate((s) => window.scrollTo(0, s.to === 'bottom' ? document.body.scrollHeight : s.to === 'top' ? 0 : window.scrollY + (s.px ?? 0)), to),
     waitFor: async (selector, ms) => {
@@ -511,7 +534,9 @@ function tabOf(page: Page, close: () => Promise<number>, left: () => number): Ap
     settle: async (ms) => {
       await quiet(ms);
       await page.evaluate((fontsMs) => Promise.race([document.fonts.ready, new Promise((done) => setTimeout(done, fontsMs))]), FONTS_MS).catch(() => undefined);
-      await page.evaluate(domStill, DOM_QUIET).catch(() => undefined);
+      await page.evaluate(imagesLoaded, IMAGES_MS).catch(() => undefined);
+      await page.evaluate(domStill, hydrated ? DOM_QUIET : HYDRATION_QUIET).catch(() => undefined);
+      hydrated = true;
     },
     marks: (names) => page.evaluate(componentMarksOf, { names, limits: MARK_LIMITS, attr: TREE_LIMITS.useAttr }),
     overlay: () => page.evaluate(overlayOf, OVERLAY_SELECTOR),
@@ -527,6 +552,11 @@ function tabOf(page: Page, close: () => Promise<number>, left: () => number): Ap
         },
         left
       );
+    },
+    poster: async (width, height) => {
+      const scale = Math.min(1, POSTER_WIDTH_PX / width);
+      const bytes = await page.screenshot({ type: 'webp', quality: POSTER_QUALITY, clip: { x: 0, y: 0, width, height, scale }, captureBeyondViewport: true });
+      return { bytes: new Uint8Array(bytes), width: Math.round(width * scale), height: Math.round(height * scale) };
     },
     paint: async (html, size) => {
       await page.setContent(html, { waitUntil: 'load', timeout: NAV_TIMEOUT_MS });

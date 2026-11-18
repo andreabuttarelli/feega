@@ -88,7 +88,7 @@
       enterFrame(nodeId, FRAME_TYPE);
       await tick();
     }
-    layersSource.video?.select(row.boards.map((b) => b.clip));
+    layersSource.video?.select([...new Set(row.boards.map((b) => b.clip))]);
     await tick();
     zoomRequest.ask(Command.PreviewSelection);
   }
@@ -192,7 +192,7 @@
               </div>
               {#if row.boards.length}
                 <div class="conds">
-                  {#each row.boards as board (board.clip)}<span class="cond">{condLabel(condOf(board.cond))}</span>{/each}
+                  {#each row.boards as board (board.cond)}<span class="cond">{condLabel(condOf(board.cond))}{board.view ? ' · view' : ''}</span>{/each}
                   {#if room > 0}
                     <select class="add" aria-label="Add width or theme to {row.path}" disabled={!!busy} onchange={(e) => (addCondition(row, e.currentTarget.value), (e.currentTarget.value = ''))} data-testid="import-map-add">
                       <option value="">Add width/theme…</option>
@@ -222,7 +222,7 @@
           <p class="muted" data-testid="import-map-components">{read.map.library.captured.length} on canvas · {read.map.library.uncaptured.length} in code only</p>
           {#if read.map.library.uncaptured.length}
             <ul class="names" aria-label="Components in code only">
-              {#each read.map.library.uncaptured as name (name)}<li>{name}</li>{/each}
+              {#each read.map.library.uncaptured as name (name)}<li>{name}{#if read.map.library.reasons?.[name]}<span class="muted"> — {read.map.library.reasons[name]}</span>{/if}</li>{/each}
             </ul>
           {/if}
         {:else}

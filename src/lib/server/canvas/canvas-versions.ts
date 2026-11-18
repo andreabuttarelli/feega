@@ -1,9 +1,10 @@
 import type { Db } from '$lib/server/db/client';
 import type { Actor, RecordedActor } from '$lib/server/repos/actor';
-import { deleteConnection, deleteNode, listConnections, listNodes, restoreConnection, restoreNode } from '$lib/server/repos/canvas';
-import { readHead } from '$lib/server/repos/motion-revisions';
+import { deleteConnection, deleteNode, findNode, listConnections, listNodes, restoreConnection, restoreNode } from '$lib/server/repos/canvas';
+import { readHead, RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { saveMotionDoc } from '$lib/server/motion/editor';
 import { holdsDoc } from '$lib/canvas/motion-node';
+import { frameName } from '$lib/canvas/unlanded-frames';
 import { MAX_VERSION_NAME, planCanvasRestore, snapshotSchema, type CanvasSnapshot } from '$lib/canvas/canvas-version';
 
 type Scope = { orgId: string; canvasId: string };
@@ -83,7 +84,7 @@ export async function readCanvasVersion(db: Db, input: Scope & { versionId: stri
   return data && parsed?.success ? { name: data.name, snapshot: parsed.data } : null;
 }
 
-export async function restoreCanvasVersion(db: Db, input: Scope & { versionId: string; actor: Actor }): Promise<{ outcome: RestoreOutcome; changed?: number }> {
+export async function restoreCanvasVersion(db: Db, input: Scope & { versionId: string; actor: Actor }): Promise<{ outcome: RestoreOutcome; changed?: number; unlanded?: string[] }> {
   const saved = await readCanvasVersion(db, input);
   if (!saved) {
     return { outcome: RestoreOutcome.Missing };
@@ -106,9 +107,13 @@ export async function restoreCanvasVersion(db: Db, input: Scope & { versionId: s
   for (const id of plan.reconnect) {
     await restoreConnection(db, { orgId: input.orgId, connectionId: id, actor });
   }
+  const unlanded: string[] = [];
   for (const d of plan.docs) {
     const head = await readHead(db, { orgId: input.orgId, nodeId: d.nodeId });
-    await saveMotionDoc(db, { orgId: input.orgId, nodeId: d.nodeId, expectedVersion: head?.version ?? 0, doc: d.doc, actor, summary: `Restored canvas version ${saved.name}` });
+    const write = await saveMotionDoc(db, { orgId: input.orgId, nodeId: d.nodeId, expectedVersion: head?.version ?? 0, doc: d.doc, actor, summary: `Restored canvas version ${saved.name}` });
+    if (write.outcome !== RevisionOutcome.Written) {
+      unlanded.push(frameName((await findNode(db, { orgId: input.orgId, nodeId: d.nodeId }))?.displayName));
+    }
   }
-  return { outcome: RestoreOutcome.Restored, changed: plan.put.length + plan.remove.length + plan.reconnect.length + plan.disconnect.length + plan.docs.length };
+  return { outcome: RestoreOutcome.Restored, changed: plan.put.length + plan.remove.length + plan.reconnect.length + plan.disconnect.length + plan.docs.length, unlanded };
 }

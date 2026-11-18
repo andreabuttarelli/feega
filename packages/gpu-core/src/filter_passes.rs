@@ -670,7 +670,7 @@ pub fn layer_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu::Te
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
         format: wgpu::TextureFormat::Rgba8Unorm,
-        usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_SRC,
+        usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_SRC | wgpu::TextureUsages::COPY_DST,
         view_formats: &[],
     })
 }
@@ -768,6 +768,16 @@ impl FilterPasses {
         }
         pending.buffers.push(buffer);
         out
+    }
+
+    pub fn copy(&self, device: &wgpu::Device, from: &wgpu::Texture, at: (u32, u32), into: &wgpu::Texture) {
+        let mut pending = self.pending.borrow_mut();
+        let encoder = pending.encoder.get_or_insert_with(|| device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default()));
+        encoder.copy_texture_to_texture(
+            wgpu::TexelCopyTextureInfo { texture: from, mip_level: 0, origin: wgpu::Origin3d { x: at.0, y: at.1, z: 0 }, aspect: wgpu::TextureAspect::All },
+            wgpu::TexelCopyTextureInfo { texture: into, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+            wgpu::Extent3d { width: into.width(), height: into.height(), depth_or_array_layers: 1 },
+        );
     }
 
     pub fn flush(&self, queue: &wgpu::Queue) {

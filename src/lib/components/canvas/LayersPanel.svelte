@@ -269,8 +269,12 @@
 
   function onKey(e: KeyboardEvent) {
     const action = layerKey({ key: e.key, mod: e.metaKey || e.ctrlKey });
-    const targets = picked.filter((id) => rows.some((r) => r.id === id && editable(r)));
-    if (!action || !targets.length) {
+    if (!action) {
+      return;
+    }
+    const editableIds = new Set(rows.filter(editable).map((r) => r.id));
+    const targets = picked.filter((id) => editableIds.has(id));
+    if (!targets.length) {
       return;
     }
     e.preventDefault();

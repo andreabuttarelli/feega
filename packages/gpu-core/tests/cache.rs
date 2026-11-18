@@ -165,7 +165,7 @@ fn frame_at(scale: f64, cache: bool) -> Vec<u8> {
     let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
     renderer.put_group("a", parse(FRAME).unwrap());
     let list = parse(&format!(r#"{{ "width": 400, "height": 300, "background": [0, 0, 0, 1], "items": [{{ "kind": "use", "clip": "a", "group": "a", "matrix": [{scale}, 0, 0, {scale}, 20, 30], "cache": {cache} }}] }}"#)).unwrap();
-    renderer.render(&list, &gpu_core::pictures::Pictures::new()).unwrap().pixels
+    renderer.render(&list, &gpu_core::pictures::Pictures::default()).unwrap().pixels
 }
 
 #[cfg(feature = "gpu")]
@@ -259,7 +259,7 @@ fn a_frame_rastered_in_chunks_draws_the_same_pixels_as_one_raster() {
     let draw = |items: usize| {
         let mut renderer = gpu_core::render::Renderer::with_limits(Limits { side: 4096, rasters: 1, items }).expect("a GPU adapter");
         renderer.put_group("a", parse(two).unwrap());
-        let pictures = gpu_core::pictures::Pictures::new();
+        let pictures = gpu_core::pictures::Pictures::default();
         (0..4).map(|_| renderer.render(&list, &pictures).unwrap().pixels).last().unwrap()
     };
     let (whole, chunked) = (draw(1000), draw(1));
@@ -382,4 +382,30 @@ fn a_tile_planned_beside_a_held_texture_leaves_that_texture_alone() {
 
     assert!(tile.evicted.is_empty());
     assert!(lib.cache_bytes() > 0);
+}
+
+#[test]
+fn a_native_gesture_draws_a_cached_page_live_instead_of_its_magnified_texture() {
+    use gpu_core::groups::{Motion, Native};
+    let mut lib = library(&["a"]);
+    lib.compose_encodings();
+    lib.plan(&screen(&[("a", 1.0, 0.0)]), LIMITS);
+    lib.set_motion(Motion::Gesture);
+    lib.set_native(Native::Vectors);
+
+    let zoomed = lib.plan(&screen(&[("a", 1.3, 0.0)]), LIMITS);
+
+    assert!(zoomed.rasters.is_empty());
+    assert!(!kinds(&zoomed.screen).contains(&"image"));
+    assert!(!zoomed.pending);
+}
+
+#[test]
+fn a_held_node_being_resized_keeps_its_texture_even_when_native() {
+    use gpu_core::groups::Native;
+    let mut lib = library(&["a"]);
+    lib.plan(&screen(&[("a", 1.0, 0.0)]), LIMITS);
+    lib.set_native(Native::Vectors);
+
+    assert_eq!(kinds(&lib.plan(&held("a", 2.0, 1.5), LIMITS).screen), vec!["image"]);
 }

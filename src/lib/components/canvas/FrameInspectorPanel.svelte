@@ -132,7 +132,7 @@
       <DevInspector doc={shownDoc!} clipId={shown.clip.id} brand={tokens} onexport={frameProperties.exportPicks} />
     {/if}
     {#if tokens}
-      <DevCode {doc} name={frameProperties.name} assets={frameProperties.extras?.assetUrls ?? {}} {tokens} />
+      <DevCode doc={source!} name={frameProperties.name} assets={frameProperties.extras?.assetUrls ?? {}} {tokens} />
     {:else if !shown?.clip}
       <p class="empty" data-testid="dev-empty">Select one layer to read its CSS.</p>
     {/if}

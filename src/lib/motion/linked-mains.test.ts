@@ -78,6 +78,17 @@ describe('instances follow their main across frames', () => {
     expect(resolved.comps[compId].component?.home).toBe('A');
   });
 
+  it('links a frame once per state of its homes: the same homes give back the same doc, so nothing downstream walks it again', () => {
+    const { doc: main, compId } = mainFrame();
+    const { doc } = instanceFrame(main, compId);
+    const edited = relabel(main, compId, 'Order');
+
+    const first = linkedMains(doc, 'B', new Map([['A', edited]]));
+
+    expect(linkedMains(doc, 'B', new Map([['A', edited]]))).toBe(first);
+    expect(innerText(linkedMains(doc, 'B', new Map([['A', relabel(main, compId, 'Pay')]])), compId)).toBe('Pay');
+  });
+
   it('keeps the overrides of the instance on top of the edited main', () => {
     const { doc: main, compId } = mainFrame();
     const { doc, instanceId } = instanceFrame(main, compId);
@@ -180,5 +191,30 @@ describe('a followed main resolves in the variables of the frame that shows it',
     const followed = linkedMains(mine, 'B', new Map([['A', home]]));
 
     expect((followed.comps[compId].tracks[0].clips[0] as MotionClip).props.color).toBe('#1565c0');
+  });
+});
+
+describe('a main that holds an instance of another main', () => {
+  const box = (id: string, x: number, extra: Partial<MotionClip> = {}) => ({ id, name: id, from: 0, durationInFrames: 90, trimStart: 0, component: 'Shape', props: { x, y: 0.5, width: 0.1, height: 0.1 }, transform: {}, keyframes: {}, ...extra }) as unknown as MotionClip;
+  const host = (comp: string) => ({ id: 'nested', name: 'nested', from: 0, durationInFrames: 90, trimStart: 0, component: 'Precomp', parent: 'frame', props: { comp }, transform: {}, keyframes: {} }) as unknown as MotionClip;
+  const at = (x: number): MotionDoc => {
+    const doc = { ...newMotionDoc(MotionFormat.Square), width: 1000, height: 1000 } as MotionDoc;
+    const track = (clips: MotionClip[]) => [{ ...doc.tracks[0], clips }];
+    return {
+      ...doc,
+      comps: {
+        inner: { name: 'Search', durationInFrames: 90, component: { name: 'Search', home: 'H' }, tracks: track([box('field', x)]) },
+        outer: { name: 'Navbar', durationInFrames: 90, component: { name: 'Navbar', home: 'H' }, tracks: track([box('frame', x), host('inner')]) }
+      }
+    } as MotionDoc;
+  };
+
+  it('keeps the inner instance on its frame when both mains follow a home where they sit elsewhere (traidue: the navbar search input drew 2045 px off its place)', () => {
+    const resolved = linkedMains(at(0.2), 'P', new Map([['H', at(0.7)]]));
+    const nested = resolved.comps.outer.tracks.flatMap((t) => t.clips as MotionClip[]).find((c) => c.id === 'nested')!;
+    const frame = resolved.comps.outer.tracks.flatMap((t) => t.clips as MotionClip[]).find((c) => c.id === 'frame')!;
+    const field = resolved.comps.inner.tracks.flatMap((t) => t.clips as MotionClip[])[0];
+
+    expect(Number(field.props.x) + Number(nested.transform.x ?? 0)).toBeCloseTo(Number(frame.props.x), 6);
   });
 });

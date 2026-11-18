@@ -7,9 +7,9 @@ export enum VarType {
   Boolean = 'boolean'
 }
 
-export const MAX_COLLECTIONS = 8;
+export const MAX_COLLECTIONS = 16;
 export const MAX_MODES = 8;
-export const MAX_VARIABLES = 64;
+export const MAX_VARIABLES = 512;
 export const MAX_VAR_TEXT = 500;
 export const VARIABLE_NAME = /^[A-Za-z0-9][A-Za-z0-9 _-]{0,39}$/;
 export const DEFAULT_MODE = 'Default';

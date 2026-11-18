@@ -166,9 +166,10 @@ const iframeSchema = z
     files: z.record(z.string(), z.string()).optional(),
     vars: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
     sourceNodeId: z.string().optional(),
-    route: z.string().optional()
+    route: z.string().optional(),
+    live: z.object({ route: z.string(), width: z.number().positive(), poster: z.string().nullable() }).optional()
   })
-  .refine((v) => Boolean(v.url) || Boolean(v.content) || Boolean(v.html) || Boolean(v.files) || Boolean(v.sourceNodeId), {
+  .refine((v) => Boolean(v.url) || Boolean(v.content) || Boolean(v.html) || Boolean(v.files) || Boolean(v.sourceNodeId) || Boolean(v.live), {
     message: 'needs a url, html or files: an embed with none shows nothing'
   })
   .refine((v) => !v.files || (v.framework !== undefined && CODE_ENTRY[v.framework] in v.files), {

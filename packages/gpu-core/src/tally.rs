@@ -10,9 +10,10 @@ pub enum Reason {
     Backdrop,
     Lens,
     Composited,
+    Atlas,
 }
 
-const REASONS: [Reason; 8] = [Reason::Screen, Reason::Raster, Reason::Body, Reason::Mask, Reason::Matte, Reason::Backdrop, Reason::Lens, Reason::Composited];
+const REASONS: [Reason; 9] = [Reason::Screen, Reason::Raster, Reason::Body, Reason::Mask, Reason::Matte, Reason::Backdrop, Reason::Lens, Reason::Composited, Reason::Atlas];
 
 impl Reason {
     fn name(self) -> &'static str {
@@ -25,6 +26,7 @@ impl Reason {
             Reason::Backdrop => "backdrop",
             Reason::Lens => "lens",
             Reason::Composited => "composited",
+            Reason::Atlas => "atlas",
         }
     }
 

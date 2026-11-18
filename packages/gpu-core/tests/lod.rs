@@ -1,4 +1,37 @@
 use gpu_core::canvas::Canvas;
+
+fn effects_on(side: f64) -> gpu_core::display_list::Look {
+    let json = format!(
+        r#"{{ "width": 64, "height": 64, "background": null, "items": [
+    {{ "kind": "path", "clip": "e", "contours": [[0, 0, {side}, 0, {side}, {side}, 0, {side}]], "rule": "nonzero",
+      "paint": {{ "kind": "solid", "color": [1, 1, 1, 1] }}, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blend": "normal",
+      "blur": 3, "backdrop": 4, "masks": [{{ "mode": "add", "invert": false, "level": 1, "feather": 0,
+      "cover": {{ "kind": "path", "contours": [[0, 0, 1, 0, 1, 1, 0, 1]], "matrix": [9, 0, 0, 9, 1, 1] }} }}] }} ] }}"#
+    );
+    let Item::Path(p) = parse(&json).unwrap().items.remove(0) else { panic!() };
+    p.look
+}
+
+#[test]
+fn a_few_pixel_layer_drops_its_effects_and_draws_plain() {
+    let tiny = gpu_core::lod::plain_when_tiny(&effects_on(3.0), 3.0);
+
+    assert!(tiny.masks.is_none() && tiny.backdrop.is_none() && tiny.blur == 0.0);
+}
+
+#[test]
+fn a_layer_big_on_screen_keeps_its_effects() {
+    let big = gpu_core::lod::plain_when_tiny(&effects_on(80.0), 80.0);
+
+    assert!(big.masks.is_some() && big.backdrop.is_some() && big.blur == 3.0);
+}
+
+#[test]
+fn glass_goes_before_masks_as_a_layer_shrinks() {
+    let mid = gpu_core::lod::plain_when_tiny(&effects_on(10.0), 10.0);
+
+    assert!(mid.backdrop.is_none() && mid.masks.is_some());
+}
 use gpu_core::display_list::{parse, DisplayList, Item, Paint, Size};
 use gpu_core::fragments::compose;
 use gpu_core::groups::{Library, Limits};
@@ -168,4 +201,17 @@ fn backdrop_at(scale: f64) -> Option<f64> {
 fn a_backdrop_blur_too_small_to_see_is_dropped_and_a_visible_one_scales() {
     assert_eq!(backdrop_at(0.05), None);
     assert_eq!(backdrop_at(0.5), Some(10.0));
+}
+
+#[test]
+fn a_coarser_pass_draws_small_text_as_bars_and_drops_small_effects() {
+    use gpu_core::lod::{coarser, detail, plain_when_tiny, Detail, Floors};
+    let floors = Floors { text: 3.0, effects: 3.0 };
+    assert_eq!(detail(3.0, true), Detail::Full);
+    assert_eq!(coarser(floors, || detail(3.0, true)), Detail::Bar);
+    assert_eq!(detail(3.0, true), Detail::Full);
+
+    let look = effects_on(8.0);
+    assert!(plain_when_tiny(&look, 8.0).blur > 0.0);
+    assert_eq!(coarser(floors, || plain_when_tiny(&look, 8.0)).blur, 0.0);
 }

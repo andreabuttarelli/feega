@@ -21,6 +21,7 @@ pub struct Renderer {
     cached: Pictures,
     limits: Limits,
     textures: HashMap<String, (wgpu::Texture, ImageData)>,
+    held: Option<(crate::engine::HeldScene, Option<crate::display_list::Rgba>)>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,7 +52,7 @@ impl Renderer {
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default())).map_err(failed)?;
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default())).map_err(failed)?;
         let engine = Engine::new(&device).map_err(failed)?;
-        Ok(Self { device, queue, engine, library: Library::new(), cached: Pictures::new(), limits, textures: HashMap::new() })
+        Ok(Self { device, queue, engine, library: Library::new(), cached: Pictures::default(), limits, textures: HashMap::new(), held: None })
     }
 
     pub fn blending(mut self, blending: crate::layers::Blending) -> Self {
@@ -61,6 +62,15 @@ impl Renderer {
 
     pub fn ramp_uploads(&self) -> u64 {
         self.engine.vello.ramp_uploads()
+    }
+
+    pub fn effects(mut self, effects: crate::layers::Effects) -> Self {
+        self.engine.effects = effects;
+        self
+    }
+
+    pub fn zoomless_layers(&self) -> usize {
+        self.engine.held_effects()
     }
 
     pub fn cached_layers(&self) -> usize {
@@ -123,6 +133,26 @@ impl Renderer {
         let view = target.create_view(&wgpu::TextureViewDescriptor::default());
         let skipped = self.engine.draw(&self.device, &self.queue, list, pictures, &view).map_err(failed)?;
         Ok(Rendered { pixels: self.read(&target, size)?, skipped: [skipped, missing].concat() })
+    }
+
+    pub fn hold_scene(&mut self, list: &DisplayList, pictures: &Pictures) -> Result<(), RenderError> {
+        let plan = self.library.plan(list, self.limits);
+        let (list, _) = self.engine.hold(&mut self.cached, plan, pictures, &self.device, &self.queue).map_err(failed)?;
+        let pictures = &pictures.iter().chain(&self.cached).map(|(k, v)| (k.clone(), v.clone())).collect();
+        let (held, _) = self.engine.build_held(&self.device, &self.queue, &list, pictures).map_err(failed)?;
+        if let Some((old, _)) = self.held.replace((held, list.background)) {
+            self.engine.drop_held(old);
+        }
+        Ok(())
+    }
+
+    pub fn render_held(&mut self, transform: vello::kurbo::Affine, (width, height): (u32, u32)) -> Result<Vec<u8>, RenderError> {
+        let size = wgpu::Extent3d { width, height, depth_or_array_layers: 1 };
+        let target = self.device.create_texture(&wgpu::TextureDescriptor { label: None, size, mip_level_count: 1, sample_count: 1, dimension: wgpu::TextureDimension::D2, format: wgpu::TextureFormat::Rgba8Unorm, usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::COPY_SRC, view_formats: &[] });
+        let view = target.create_view(&wgpu::TextureViewDescriptor::default());
+        let (held, background) = self.held.as_ref().ok_or_else(|| RenderError("no held scene".into()))?;
+        self.engine.draw_held(&self.device, &self.queue, held, transform, *background, &view, (width, height)).map_err(failed)?;
+        self.read(&target, size)
     }
 
     pub fn draw_and_wait(&mut self, list: &DisplayList, pictures: &Pictures) -> Result<(), RenderError> {

@@ -1,12 +1,14 @@
 import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 import { changedLook, LOOK, LookKey, minSideOf, type Look, type LookValue } from '$lib/canvas/code-look';
 import { BASE_CONDITIONS, parseKey, Scheme } from './render-conditions';
+import { viewChanges } from './view-look';
+import { isGalleryFile } from './gallery';
 
 export type SourceAt = { file: string; line: number; column: number };
 
 export type Spot = { tag: string; cls: string };
 
-export type SourceEdit = { at: SourceAt; look: Look; was: Look; spot?: Spot; cond?: string };
+export type SourceEdit = { at: SourceAt; look: Look; was: Look; spot?: Spot; cond?: string; view?: string; usage?: SourceAt };
 
 export type FileChange = { path: string; before: string; after: string };
 
@@ -47,14 +49,23 @@ export function editsOf(doc: MotionDoc): SourceEdit[] {
   for (const clip of allClips(doc)) {
     const at = clip.source ? atOf(clip.source.at) : null;
     const look = at ? unbound(clip, changedLook(clip, side)) : {};
-    const key = `${clip.source?.at}|${clip.source?.cond ?? ''}`;
-    if (!at || !Object.keys(look).length || byAt.has(key)) {
+    const key = `${clip.source?.at}|${clip.source?.via ?? ''}|${clip.source?.cond ?? ''}`;
+    if (!at || isGalleryFile(at.file) || !Object.keys(look).length || byAt.has(key)) {
       continue;
     }
-    const { tag, cls, cond } = clip.source!;
-    byAt.set(key, { at, look, was: clip.source!.was, ...(tag ? { spot: { tag, cls: cls ?? '' } } : {}), ...(cond ? { cond } : {}) });
+    const { tag, cls, cond, via } = clip.source!;
+    const usage = via ? atOf(via) : null;
+    byAt.set(key, { at, look, was: clip.source!.was, ...(tag ? { spot: { tag, cls: cls ?? '' } } : {}), ...(cond ? { cond } : {}), ...(usage ? { usage } : {}) });
   }
-  return [...byAt.values()];
+  return [...byAt.values(), ...viewEditsOf(doc)];
+}
+
+function viewEditsOf(doc: MotionDoc): SourceEdit[] {
+  return viewChanges(doc).flatMap(({ clip, view, look, was }) => {
+    const at = clip.source ? atOf(clip.source.at) : null;
+    const { tag, cls, cond } = clip.source!;
+    return at ? [{ at, look, was, view: view.name, ...(tag ? { spot: { tag, cls: cls ?? '' } } : {}), ...(cond ? { cond } : {}) }] : [];
+  });
 }
 
 function offsetOf(text: string, at: SourceAt): number {
@@ -226,11 +237,17 @@ const sameFamily = (token: string, key: LookKey, prefix: string) => {
   }
   const bare = token.slice(prefix.length);
   const rule = CLASS_OF[key]!;
-  const isColor = key === LookKey.Color && !TEXT_SIZES.test(bare) && !TEXT_OTHER.test(bare);
-  return !bare.includes(':') && (key === LookKey.Color ? isColor : rule.family.test(bare));
+  const isColor = !TEXT_SIZES.test(bare) && !TEXT_OTHER.test(bare);
+  return !bare.includes(':') && rule.family.test(bare) && (key !== LookKey.Color || isColor);
 };
 
 const CLASS_LITERAL = /(\s(?:class|className)=")([^"{}]*)"/;
+
+function replacedClass(tokens: string[], same: (token: string) => boolean, made: string): string[] {
+  const at = tokens.findIndex(same);
+  const kept = tokens.filter((t) => !same(t));
+  return at === -1 ? [...kept, made] : [...kept.slice(0, at), made, ...kept.slice(at)];
+}
 
 function classed(text: string, tag: Tag, look: Look, prefix: string): string | null {
   const open = text.slice(tag.start, tag.end + 1);
@@ -240,7 +257,7 @@ function classed(text: string, tag: Tag, look: Look, prefix: string): string | n
   }
   let tokens = found[2].split(/\s+/).filter(Boolean);
   for (const [key, value] of Object.entries(look)) {
-    tokens = [...tokens.filter((t) => !sameFamily(t, key as LookKey, prefix)), `${prefix}${CLASS_OF[key as LookKey]!.make(value)}`];
+    tokens = replacedClass(tokens, (t) => sameFamily(t, key as LookKey, prefix), `${prefix}${CLASS_OF[key as LookKey]!.make(value)}`);
   }
   const next = open.replace(CLASS_LITERAL, `$1${tokens.join(' ')}"`);
   return text.slice(0, tag.start) + next + text.slice(tag.end + 1);
@@ -261,6 +278,10 @@ const cssOf = (look: Look): [string, string][] =>
 async function styledFor(files: Files, text: string, tag: Tag, edit: SourceEdit, skipped: string[]): Promise<string> {
   const cond = parseKey(edit.cond);
   const where = label(edit.at);
+  if (edit.view) {
+    skipped.push(`${where}: edited in the ${edit.view} view, a rule for one width is not written`);
+    return text;
+  }
   if (cond.width !== BASE_CONDITIONS.width) {
     skipped.push(`${where}: edited at ${cond.width}px, a rule for one width is not written`);
     return text;

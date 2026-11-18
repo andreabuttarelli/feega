@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use vello::kurbo::{Affine, BezPath, Point, Rect, Shape};
 use vello::peniko::{Fill, ImageData};
@@ -11,7 +11,7 @@ use crate::shades::{shade_of, Side};
 use crate::pictures::{crop_rect, image_rect, tile_cells, Pictures, Placed as Window};
 use crate::Skipped;
 
-pub type Shelf<P> = HashMap<String, P>;
+pub type Shelf<P> = FxHashMap<String, P>;
 
 fn polygon(points: &[f64]) -> BezPath {
     let mut path = BezPath::new();
@@ -266,20 +266,21 @@ pub fn plain<C: Canvas>(scene: &mut C, items: &[Item], pictures: &Shelf<C::Pictu
 pub struct Placed<P = ImageData> {
     pub image: P,
     pub origin: Point,
+    pub scale: f64,
 }
 
 pub struct Layers<P = ImageData> {
-    pub bodies: HashMap<usize, Placed<P>>,
-    pub behind: HashMap<usize, Placed<P>>,
-    pub groups: HashMap<usize, Layers<P>>,
-    pub blended: HashMap<usize, Placed<P>>,
-    pub culled: HashSet<usize>,
+    pub bodies: FxHashMap<usize, Placed<P>>,
+    pub behind: FxHashMap<usize, Placed<P>>,
+    pub groups: FxHashMap<usize, Layers<P>>,
+    pub blended: FxHashMap<usize, Placed<P>>,
+    pub culled: FxHashSet<usize>,
     pub fragments: Fragments,
 }
 
 impl<P> Default for Layers<P> {
     fn default() -> Self {
-        Self { bodies: HashMap::new(), behind: HashMap::new(), groups: HashMap::new(), blended: HashMap::new(), culled: HashSet::new(), fragments: Fragments::default() }
+        Self { bodies: FxHashMap::default(), behind: FxHashMap::default(), groups: FxHashMap::default(), blended: FxHashMap::default(), culled: FxHashSet::default(), fragments: Fragments::default() }
     }
 }
 
@@ -296,7 +297,7 @@ impl<P> Layers<P> {
 
 fn placed<C: Canvas>(scene: &mut C, layer: &Placed<C::Picture>) {
     let size = C::size(&layer.image);
-    scene.picture(Affine::translate(layer.origin.to_vec2()), &layer.image, Affine::IDENTITY, Rect::new(0.0, 0.0, size.width, size.height));
+    scene.picture(Affine::translate(layer.origin.to_vec2()) * Affine::scale(layer.scale), &layer.image, Affine::IDENTITY, Rect::new(0.0, 0.0, size.width, size.height));
 }
 
 fn corners(m: Affine, r: Rect) -> impl Iterator<Item = Point> {
@@ -401,10 +402,17 @@ impl<'a> SharedClips<'a> {
 }
 
 pub fn build_items<C: Canvas>(scene: &mut C, items: &[Item], frame: Rect, pictures: &Shelf<C::Picture>, layers: &Layers<C::Picture>) -> Vec<Skipped> {
+    build_where(scene, items, frame, pictures, layers, |_: usize| true)
+}
+
+pub fn build_where<C: Canvas>(scene: &mut C, items: &[Item], frame: Rect, pictures: &Shelf<C::Picture>, layers: &Layers<C::Picture>, keep: impl Fn(usize) -> bool) -> Vec<Skipped> {
     let mut skipped = Vec::new();
     let mut shared = SharedScissor { open: None };
     let mut clips = SharedClips { open: Vec::new() };
     for (i, item) in items.iter().enumerate() {
+        if !keep(i) {
+            continue;
+        }
         if !matches!(item, Item::Path(_) | Item::Image(_) | Item::Layer(_)) || layer_worthy(item) || item.look().is_some_and(|l| l.backdrop.is_some()) || layers.blended.contains_key(&i) {
             clips.close(scene);
             shared.close(scene);

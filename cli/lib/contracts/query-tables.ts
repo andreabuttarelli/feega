@@ -20,15 +20,15 @@ export const QUERY_TABLES =
   'brands canvas_comments canvas_conflicts canvas_debug_logs canvas_versions chat_artifacts chat_jobs ' +
   'chat_messages chat_model_catalog chat_threads competitors content_plans content_quality_samples content_reports ' +
   'credit_grants custom_voices disruptive_ideas editorial_plans effects element_node_migration expert_requests ' +
-  'feature_flags gallery_items gallery_remixes graphic_designs gtm_plans incidents layouts lifecycle_emails ' +
-  'loop_cursors loop_ticks market_account_baselines market_account_fetch_attempts market_harvest_errors ' +
-  'market_harvest_runs market_post_observations market_posts market_teardowns market_video_analyses media_generator_items ' +
-  'media_generator_prompts moderation_checks motion_craft_scores motion_reference_specs motion_video_prompts ' +
-  'motion_video_references motion_videos onboarding_drafts onboarding_errors onboarding_jobs onboarding_step_jobs ' +
-  'org_fonts org_members org_model_allowlist org_spend_caps org_uncensored_optins org_usage organizations ' +
-  'people post_links post_revisions post_verdicts post_visual_meta posts product_batch_items product_batches ' +
-  'product_events products profiles project_library project_members prompt_skills publish_logs push_subscriptions ' +
-  'reference_images rubrics scheduler_runs scrapecreators_cache shared_views social_accounts social_post_history ' +
-  'social_thumb_cache store_events talent_views talents techniques thread_events tool_usage user_age_verifications ' +
-  'user_cloud_tokens user_connected_accounts user_figma_tokens video_renders video_requests video_reviews ' +
-  'webhook_deliveries zernio_ad_accounts';
+  'feature_flags frame_code_links gallery_items gallery_remixes git_push_locks graphic_designs gtm_plans ' +
+  'incidents layouts lifecycle_emails loop_cursors loop_ticks market_account_baselines market_account_fetch_attempts ' +
+  'market_harvest_errors market_harvest_runs market_post_observations market_posts market_teardowns market_video_analyses ' +
+  'media_generator_items media_generator_prompts moderation_checks motion_craft_scores motion_reference_specs ' +
+  'motion_video_prompts motion_video_references motion_videos onboarding_drafts onboarding_errors onboarding_jobs ' +
+  'onboarding_step_jobs org_fonts org_members org_model_allowlist org_spend_caps org_uncensored_optins ' +
+  'org_usage organizations people post_links post_revisions post_verdicts post_visual_meta posts product_batch_items ' +
+  'product_batches product_events products profiles project_library project_members prompt_skills publish_logs ' +
+  'push_subscriptions reference_images rubrics scheduler_runs scrapecreators_cache shared_views social_accounts ' +
+  'social_post_history social_thumb_cache store_events talent_views talents techniques thread_events ' +
+  'tool_usage user_age_verifications user_cloud_tokens user_connected_accounts user_figma_tokens video_renders ' +
+  'video_requests video_reviews webhook_deliveries zernio_ad_accounts';

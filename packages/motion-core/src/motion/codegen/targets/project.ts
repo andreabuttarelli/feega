@@ -15,7 +15,7 @@ function assetLines(page: PageSpec): string[] {
   return [
     '## Assets',
     '',
-    'Images ship inside the project. One that could not be downloaded at export time points at its original link instead.',
+    'Images and fonts ship inside the project. One that could not be downloaded at export time points at its original link instead.',
     '',
     ...page.assets.map((a) => `- \`${a.ref}\`${a.url ? '' : ': no URL at export time'}`),
     ''

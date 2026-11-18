@@ -184,7 +184,7 @@ describe('adding pages to a frame imported from code', () => {
 
   it('refuses when growing would push a small text under the engine minimum, instead of saving a frame that cannot be read back', async () => {
     const base = await imported(['/', '/settings']);
-    const tiny = { ...base, width: 16_300, styles: { 'app Text/xs': { kind: 'text', size: 0.0011 } } } as MotionDoc;
+    const tiny = { ...base, width: 16_300, styles: { 'app Text/xs': { kind: 'text', size: 0.00011 } } } as MotionDoc;
     const piece = await imported(['/pricing']);
 
     const added = addBoards(tiny, piece, ['n1'], 'n1', counter());

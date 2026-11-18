@@ -8,8 +8,10 @@ import { assertPublicUrl } from '$lib/server/tool-guard';
 import { rateWindow } from '$lib/server/figma/rate-window';
 import { liveBrowser } from '$lib/server/web/live';
 import { pageAssets } from '$lib/server/url-import/canvas-import';
+import { adoptDocLibrary } from '$lib/server/canvas/project-library';
 import { CodeImportOutcome, Crop, designFor, importBoards, importCodeAt, importRepoAt, type BranchList, type CodeImported, type CodeReader, type LandAsk } from './import-code';
 import { DesignSystem, tokenCount } from './design-system';
+import type { Responsive } from './code-views';
 import { rawReader } from './repo-sync';
 import { basename } from 'node:path';
 import { localModeRefusal } from '$lib/server/local/local-mode';
@@ -49,7 +51,7 @@ const limiter = rateWindow({ limit: IMPORTS_PER_WINDOW, windowMs: IMPORT_WINDOW_
 
 export type CodeScope = { db: Db; orgId: string; userId: string; projectId: string; actor: Actor };
 
-export type CodeImportAsk = { repo?: string; folder?: string; upload?: string; app?: string; routes: string[]; conditions?: RenderConditions[]; variants?: Variant[]; delay?: CaptureDelay; designSystem?: DesignSystem; storybook?: string; stories?: string[]; at: { x: number; y: number } };
+export type CodeImportAsk = { repo?: string; folder?: string; upload?: string; app?: string; routes: string[]; conditions?: RenderConditions[]; variants?: Variant[]; delay?: CaptureDelay; designSystem?: DesignSystem; responsive?: Responsive; storybook?: string; stories?: string[]; at: { x: number; y: number } };
 
 async function githubReader(scope: CodeScope, repo: string): Promise<CodeReader | null> {
   const ref = repoOf(repo);
@@ -92,7 +94,22 @@ function landing(scope: CodeScope, canvasId: string, at: { x: number; y: number 
 
 export type CodeLanded = CodeImported & { code?: CodeOriginData };
 
+export async function adoptedLibrary(scope: CodeScope, done: CodeLanded): Promise<CodeLanded> {
+  if (done.outcome !== CodeImportOutcome.Ok || !done.design) {
+    return done;
+  }
+  const head = await frameStore(scope.db, { orgId: scope.orgId, actor: scope.actor, projectId: scope.projectId }).read(done.frameId);
+  if (head) {
+    await adoptDocLibrary(scope.db, scope, head.doc);
+  }
+  return done;
+}
+
 export async function importCodeInto(scope: CodeScope, canvasId: string, ask: CodeImportAsk): Promise<CodeLanded> {
+  return adoptedLibrary(scope, await landedCode(scope, canvasId, ask));
+}
+
+async function landedCode(scope: CodeScope, canvasId: string, ask: CodeImportAsk): Promise<CodeLanded> {
   const land = landing(scope, canvasId, ask.at);
   if (ask.folder !== undefined) {
     return importFolderInto(scope, land, ask);
@@ -112,7 +129,7 @@ export async function importCodeInto(scope: CodeScope, canvasId: string, ask: Co
   const code = await githubReader(scope, ask.repo ?? '');
   const github = githubFor(scope.db, scope);
   const branches: BranchList = async (repo) => (await github.branches(repo)) ?? branchesOf(publicCall(), repo);
-  const done = await importCodeAt({ ...land, repo: ask.repo ?? '', app: ask.app, routes: ask.routes, conditions: ask.conditions, variants: ask.variants, delay: ask.delay, runner: sandboxOf(scope), archive: github.archive, branches, code, designSystem: ask.designSystem, account: await testAccountOf(scope) });
+  const done = await importCodeAt({ ...land, repo: ask.repo ?? '', app: ask.app, routes: ask.routes, conditions: ask.conditions, variants: ask.variants, delay: ask.delay, runner: sandboxOf(scope), archive: github.archive, branches, code, designSystem: ask.designSystem, responsive: ask.responsive, account: await testAccountOf(scope) });
   if (done.outcome !== CodeImportOutcome.Ok || !done.origin) {
     return done;
   }
@@ -147,7 +164,7 @@ async function importUploadInto(scope: CodeScope, land: LandAsk, ask: CodeImport
   }
 
   const code = () => uploadSource(archive).read('');
-  const done = await importRepoAt({ ...land, repo: { owner: UPLOAD_OWNER, repo: upload.name, ref: null }, app, routes, conditions: ask.conditions, variants: ask.variants, delay: ask.delay, runner: sandboxOf(scope), archive, code, designSystem: ask.designSystem, account: await testAccountOf(scope) });
+  const done = await importRepoAt({ ...land, repo: { owner: UPLOAD_OWNER, repo: upload.name, ref: null }, app, routes, conditions: ask.conditions, variants: ask.variants, delay: ask.delay, runner: sandboxOf(scope), archive, code, designSystem: ask.designSystem, responsive: ask.responsive, account: await testAccountOf(scope) });
   return done.outcome === CodeImportOutcome.Ok ? { ...done, code: { kind: SourceKind.Upload, repo: upload.path, branch: null, sha: snapshotSha(archive), ...(app ? { app } : {}), routes, ...(ask.conditions ? { conditions: ask.conditions } : {}), ...delayOf(ask), ...tokensOf(done) } } : done;
 }
 
@@ -175,6 +192,8 @@ function unstarted(e: unknown): DevServerFailed {
   throw e;
 }
 
+const FOLDER_GALLERY = { unrun: 'a folder import draws no gallery: it would write into your folder' };
+
 async function importServed(land: LandAsk, ask: CodeImportAsk, { root, routes, url }: { root: string; routes: string[]; url: string }): Promise<CodeImported> {
   const origin = new URL(url).origin;
   const only = async (at: URL) => {
@@ -184,7 +203,7 @@ async function importServed(land: LandAsk, ask: CodeImportAsk, { root, routes, u
   };
   const pages = (ask.variants ?? variantsOf(routes, ask.conditions ?? [BASE_CONDITIONS])).map((v) => ({ label: v.label, url: new URL(v.route, url).toString(), route: v.route, conditions: v.conditions }));
   const design = await designFor({ code: () => folderSource(root).read(''), designSystem: ask.designSystem }, null);
-  return importBoards({ ...land, open: pagesCounted(localBrowser(chromiumPage, origin), pages.length), guard: only, name: basename(root), pages, names: await folderNames(root), crop: Crop.Page, design, library: await folderLibrary(root).catch(() => undefined), delay: ask.delay });
+  return importBoards({ ...land, open: pagesCounted(localBrowser(chromiumPage, origin), pages.length), guard: only, name: basename(root), pages, names: await folderNames(root), crop: Crop.Page, design, library: await folderLibrary(root).catch(() => undefined), gallery: FOLDER_GALLERY, delay: ask.delay, responsive: ask.responsive });
 }
 
 export async function rememberOrigin(scope: CodeScope, nodeId: string, origin: CodeOriginData): Promise<void> {
@@ -264,7 +283,13 @@ function reportOf(found: RoutesFound, asked: string[], done: CodeImported): Rout
   return { discovered: found.routes.length, leftOut: leftOut(found.routes, { asked: asked.length ? asked : ['/'], landed: done.pages, links: done.links ?? [] }) };
 }
 
-export async function importRoutesInto(scope: CodeScope, canvasId: string, ask: RoutesAsk): Promise<RoutedImport> {
+export const importedFrames = (done: { frameId: string; parts?: string[] }) => [done.frameId, ...(done.parts ?? [])];
+
+export type ImportLinker = (nodeId: string, origin: CodeOriginData, listed: RoutesFound, components: { name: string; file: string }[]) => Promise<unknown>;
+
+const unlinked: ImportLinker = async () => null;
+
+export async function importRoutesInto(scope: CodeScope, canvasId: string, ask: RoutesAsk, link: ImportLinker = unlinked): Promise<RoutedImport> {
   if (ask.storybook) {
     return importCodeInto(scope, canvasId, { ...ask, routes: [] });
   }
@@ -287,7 +312,12 @@ export async function importRoutesInto(scope: CodeScope, canvasId: string, ask: 
   }
   const listed = await discovering;
   if (done.code) {
-    await rememberOrigin(scope, done.frameId, { ...done.code, map: mapOf(listed, done, { asked: routes.length ? routes : ['/'], rev: done.code.sha }) });
+    const origin = { ...done.code, map: mapOf(listed, done, { asked: routes.length ? routes : ['/'], rev: done.code.sha }) };
+    const components = (done.library?.components ?? []).map((c) => ({ name: c.name, file: c.file }));
+    for (const frameId of importedFrames(done)) {
+      await rememberOrigin(scope, frameId, origin);
+      await link(frameId, { ...done.code, routes: done.pages.length ? done.pages : done.code.routes }, listed, components);
+    }
   }
   return { ...done, routes: reportOf(listed, routes, done) };
 }

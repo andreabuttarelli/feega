@@ -62,6 +62,7 @@ const mediaHints = (assets: MotionAsset[]): Record<string, MediaHint> =>
 export async function motionSources(scope: FramesScope): Promise<BatchedSources> {
   const phases = scope.phases ?? serverTiming();
   const assets = phases.time('assets', motionAssets(scope));
+  assets.catch(() => undefined);
   const mine = await phases.time('heads', ownHeads(scope));
   const namedFor = async (docs: MotionDoc[], skip: readonly MotionAsset[]) => {
     const library = await assets;

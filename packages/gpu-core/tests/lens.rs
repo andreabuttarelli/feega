@@ -29,7 +29,7 @@ fn grey(pixels: &[u8], x: usize, y: usize) -> u8 {
 #[cfg(feature = "gpu")]
 fn render(json: &str) -> Vec<u8> {
     let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
-    renderer.render(&parse(json).unwrap(), &Pictures::new()).unwrap().pixels
+    renderer.render(&parse(json).unwrap(), &Pictures::default()).unwrap().pixels
 }
 
 #[test]

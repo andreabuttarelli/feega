@@ -22,7 +22,7 @@ const coreUrl = (build: CoreBuild) => `/gpu-core/${build}.js?v=${BUILD_VERSIONS[
 const wasmUrl = (build: CoreBuild) => `/gpu-core/${build}_bg.wasm?v=${BUILD_VERSIONS[build]}`;
 
 type Size = { width: number; height: number };
-export type Attached = { draw: (list: string) => string; set_camera: (x: number, y: number, zoom: number) => void; patch_uses: (patch: string) => void; set_overlay: (items: string) => void; set_selected_overlay: (items: string) => void; set_live_overlay: (items: string) => void; frame: (now: number) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; picture_rows?: (clip: string, source: unknown, width: number, height: number, top: number, rows: number) => boolean; put_group: (key: string, list: string) => void; patch_group: (from: string, to: string, splice: string) => boolean; drop_group: (key: string) => void; append_group: (key: string, list: string) => void; put_group_packed?: (key: string, list: string, floats: Float64Array, ends: Uint32Array) => void; append_group_packed?: (key: string, list: string, floats: Float64Array, ends: Uint32Array) => void; cache_pending: () => boolean; cache_bytes: () => number; render_tally?: () => string; frame_counts?: () => Float64Array; warming?: () => boolean; scratch_bytes?: () => number; forget_picture: (clip: string) => void; picture_bytes: () => number; lost: () => boolean; busy?: () => boolean; set_motion?: (motion: CoreMotion) => void; set_budget?: (bytes: number) => void; set_tiles?: (on: boolean) => void; set_tile_budget?: (bytes: number) => void; set_canvas_tiles?: (allowed: number) => void; set_pixel_ratio?: (ratio: number) => void; poster?: (group: string, width: number, height: number, scale: number) => Promise<Uint8Array>; free: () => void };
+export type Attached = { draw: (list: string) => string; set_camera: (x: number, y: number, zoom: number) => void; patch_uses: (patch: string) => void; set_overlay: (items: string) => void; set_selected_overlay: (items: string) => void; set_live_overlay: (items: string) => void; frame: (now: number) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; picture_rows?: (clip: string, source: unknown, width: number, height: number, top: number, rows: number) => boolean; put_group: (key: string, list: string) => void; patch_group: (from: string, to: string, splice: string) => boolean; drop_group: (key: string) => void; append_group: (key: string, list: string) => void; put_group_packed?: (key: string, list: string, floats: Float64Array, ends: Uint32Array) => void; append_group_packed?: (key: string, list: string, floats: Float64Array, ends: Uint32Array) => void; cache_pending: () => boolean; cache_bytes: () => number; render_tally?: () => string; frame_counts?: () => Float64Array; warming?: () => boolean; warm_wait?: () => number; scratch_bytes?: () => number; forget_picture: (clip: string) => void; picture_bytes: () => number; lost: () => boolean; busy?: () => boolean; set_motion?: (motion: CoreMotion) => void; set_budget?: (bytes: number) => void; set_tiles?: (on: boolean) => void; set_direct_gesture?: (on: boolean) => void; set_tile_budget?: (bytes: number) => void; set_image_atlas?: (side: number) => void; set_effect_budget?: (bytes: number) => void; set_canvas_tiles?: (allowed: number) => void; set_pixel_ratio?: (ratio: number) => void; poster?: (group: string, width: number, height: number, scale: number) => Promise<Uint8Array<ArrayBuffer>>; free: () => void };
 
 export enum CoreMotion {
   Still = 0,
@@ -32,7 +32,7 @@ export enum CoreMotion {
 export type Use = { kind: 'use'; clip: string; group: string; matrix: Affine; cache?: boolean; hold?: boolean };
 export type UsePatch = { put: Use[]; drop: string[]; order?: string[] };
 export type Painted = { outcome: Outcome; pending: boolean; skipped: string[] };
-export type CoreRaster = Omit<Raster, 'draw'> & { draw: (list: DisplayList, pictures?: Pictures) => string[]; putGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; appendGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; patchGroup: (from: string, to: string, splice: Splice, pictures?: Pictures) => boolean; dropGroup: (key: string) => void; setCamera: (x: number, y: number, zoom: number) => void; patchUses: (patch: UsePatch) => void; setOverlay: (part: OverlayPart, items: readonly Item[]) => void; frame: (now: number) => Painted; upload: (list: DisplayList, pictures: Pictures, most: number) => boolean; cacheBytes: () => number; renderTally?: () => string; frameCounts?: () => Float64Array; warming?: () => boolean; pictureBytes: () => number; scratchBytes?: () => number; wasmBytes?: () => number; lost: () => boolean; busy?: () => boolean; setMotion?: (motion: CoreMotion) => void; setBudget?: (bytes: number) => void; setTiles?: (on: boolean) => void; setTileBudget?: (bytes: number) => void; setCanvasTiles?: (allowed: number) => void; setPixelRatio?: (ratio: number) => void; poster?: (group: string, size: { width: number; height: number }, scale: number) => Promise<ImageData>; behindPage?: boolean };
+export type CoreRaster = Omit<Raster, 'draw'> & { draw: (list: DisplayList, pictures?: Pictures) => string[]; putGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; appendGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; patchGroup: (from: string, to: string, splice: Splice, pictures?: Pictures) => boolean; dropGroup: (key: string) => void; setCamera: (x: number, y: number, zoom: number) => void; patchUses: (patch: UsePatch) => void; setOverlay: (part: OverlayPart, items: readonly Item[]) => void; frame: (now: number) => Painted; upload: (list: DisplayList, pictures: Pictures, most: number) => boolean; cacheBytes: () => number; renderTally?: () => string; frameCounts?: () => Float64Array; warming?: () => boolean; warmWait?: () => number; pictureBytes: () => number; scratchBytes?: () => number; wasmBytes?: () => number; lost: () => boolean; busy?: () => boolean; setMotion?: (motion: CoreMotion) => void; setBudget?: (bytes: number) => void; setTiles?: (on: boolean) => void; setDirectGesture?: (on: boolean) => void; setTileBudget?: (bytes: number) => void; setImageAtlas?: (side: number) => void; setEffectBudget?: (bytes: number) => void; setCanvasTiles?: (allowed: number) => void; setPixelRatio?: (ratio: number) => void; poster?: (group: string, size: { width: number; height: number }, scale: number) => Promise<ImageData>; behindPage?: boolean };
 type Attach<T> = (canvas: HTMLCanvasElement, width: number, height: number) => T;
 type CoreModule = { default: (init?: { module_or_path: WebAssembly.Module | URL }) => Promise<unknown>; WebCore: { attach: Attach<Promise<object>> }; WebGlCore: { attach: Attach<object> } };
 
@@ -122,20 +122,51 @@ const utf8 = new TextEncoder();
 const WIRED_PACKED = new Set(['put_group_packed', 'append_group_packed']);
 const WIRED_LAST = new Set(['draw', 'patch_uses', 'set_overlay', 'set_selected_overlay', 'set_live_overlay', 'put_group', 'append_group', 'patch_group']);
 
+const BORROW_LEFT = 'recursive use of an object detected';
+
+const poisons = (e: unknown): boolean => e instanceof WebAssembly.RuntimeError || (e instanceof Error && e.message.includes(BORROW_LEFT));
+
+const POISONED_ANSWERS: Record<string, () => unknown> = {
+  lost: () => true,
+  poster: () => Promise.reject(new Error('core poisoned'))
+};
+
+function bytesCall(target: object, name: string | symbol, member: (...args: unknown[]) => unknown): (...args: unknown[]) => unknown {
+  if (typeof name === 'string' && WIRED_PACKED.has(name)) {
+    return (key, list, floats, ends) => member.apply(target, [key, utf8.encode(list as string), floats, ends]);
+  }
+  if (typeof name !== 'string' || !WIRED_LAST.has(name)) {
+    return member.bind(target);
+  }
+  return (...args) => member.apply(target, [...args.slice(0, -1), utf8.encode(args.at(-1) as string)]);
+}
+
 export function overBytes(core: object): Attached {
+  let poisoned = false;
+
+  const guarded = (name: string | symbol, call: (...args: unknown[]) => unknown) => (...args: unknown[]) => {
+    if (poisoned) {
+      return POISONED_ANSWERS[name as string]?.();
+    }
+    try {
+      return call(...args);
+    } catch (e) {
+      if (!poisons(e)) {
+        throw e;
+      }
+      poisoned = true;
+      dropCore();
+      throw e;
+    }
+  };
+
   return new Proxy(core, {
     get(target, name) {
       const member = Reflect.get(target, name) as unknown;
       if (typeof member !== 'function') {
         return member;
       }
-      if (typeof name === 'string' && WIRED_PACKED.has(name)) {
-        return (key: string, list: string, floats: Float64Array, ends: Uint32Array) => member.apply(target, [key, utf8.encode(list), floats, ends]);
-      }
-      if (typeof name !== 'string' || !WIRED_LAST.has(name)) {
-        return member.bind(target);
-      }
-      return (...args: unknown[]) => member.apply(target, [...args.slice(0, -1), utf8.encode(args.at(-1) as string)]);
+      return guarded(name, bytesCall(target, name, member as (...args: unknown[]) => unknown));
     }
   }) as Attached;
 }
@@ -285,29 +316,33 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
     },
     upload: (list: DisplayList, pictures: Pictures, most: number) => {
       const queue = queues.get(list) ?? queues.set(list, wantedPictures(list.items)).get(list)!;
+      const waiting: PictureItem[] = [];
       let sent = 0;
-      for (const item of [...queue]) {
+      for (const [at, item] of queue.entries()) {
         if (sent >= most) {
+          queue.slice(at).forEach((item) => waiting.push(item));
           break;
         }
         const picture = pictures(item);
         const bitmap = picture && !moving(picture) ? decodedOf(picture) : undefined;
         if (bitmap === null) {
+          waiting.push(item);
           continue;
         }
         const key = pictureKey(item);
         if (bitmap && uploaded.get(key) !== picture!.source) {
           sent++;
           if (!sendRows(key, bitmap)) {
+            waiting.push(item);
             continue;
           }
-          queue.splice(queue.indexOf(item), 1);
           uploaded.set(key, picture!.source);
           continue;
         }
-        queue.splice(queue.indexOf(item), 1);
         sent += upload(item, pictures) ? 1 : 0;
       }
+      queue.length = 0;
+      waiting.forEach((item) => queue.push(item));
       return queue.length === 0;
     },
     setCamera: (x: number, y: number, zoom: number) => attached.set_camera(x, y, zoom),
@@ -317,11 +352,12 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
       const [outcome, ...skipped] = attached.frame(now).split('\n');
       return { outcome: outcome as Outcome, pending: attached.cache_pending(), skipped: skipped.filter(Boolean) };
     },
-    ...(attached.poster ? { poster: (group: string, size: { width: number; height: number }, scale: number) => attached.poster!(group, size.width, size.height, scale).then((bytes) => new ImageData(Uint8ClampedArray.from(bytes), size.width, size.height)) } : {}),
+    ...(attached.poster ? { poster: (group: string, size: { width: number; height: number }, scale: number) => attached.poster!(group, size.width, size.height, scale).then((bytes) => new ImageData(new Uint8ClampedArray(bytes.buffer, bytes.byteOffset, bytes.byteLength), size.width, size.height)) } : {}),
     cacheBytes: () => attached.cache_bytes(),
     renderTally: () => attached.render_tally?.() ?? '{}',
     frameCounts: () => attached.frame_counts?.() ?? new Float64Array(),
     warming: () => attached.warming?.() ?? false,
+    warmWait: () => attached.warm_wait?.() ?? 0,
     pictureBytes: () => attached.picture_bytes(),
     scratchBytes: () => attached.scratch_bytes?.() ?? 0,
     wasmBytes: () => wasmMemory?.buffer.byteLength ?? 0,
@@ -329,7 +365,10 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
     busy: () => attached.busy?.() ?? false,
     setMotion: (motion: CoreMotion) => attached.set_motion?.(motion),
     setTiles: (on: boolean) => attached.set_tiles?.(on),
+    setDirectGesture: (on: boolean) => attached.set_direct_gesture?.(on),
     setTileBudget: (bytes: number) => attached.set_tile_budget?.(bytes),
+    setImageAtlas: (side: number) => attached.set_image_atlas?.(side),
+    setEffectBudget: (bytes: number) => attached.set_effect_budget?.(bytes),
     setCanvasTiles: (allowed: number) => attached.set_canvas_tiles?.(allowed),
     setPixelRatio: (ratio: number) => attached.set_pixel_ratio?.(ratio),
     setBudget: (bytes: number) => attached.set_budget?.(bytes),

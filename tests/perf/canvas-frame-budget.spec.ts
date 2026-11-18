@@ -5,14 +5,15 @@ import { loadavg } from 'node:os';
 import { test, expect, chromium, type Browser, type CDPSession, type Page } from '@playwright/test';
 import { instrument, wheelPan } from '../e2e/fixtures/frame-sweeps';
 import { LANDINGS_FIXTURE_PLACE } from '../../scripts/perf/landings-fixture.mjs';
-import { budgetOf, editBudgetOf, EDIT_BUDGET_MS, FRAME_BUDGET_MS, Rate } from '../../scripts/perf/frame-budget';
+import { budgetMs, budgetOf, editBudgetOf, EDIT_BUDGET_MS, FRAME_BUDGET_MS, Rate } from '../../scripts/perf/frame-budget';
 
 enum Gesture {
   Pan = 'pan',
   Zoom = 'zoom',
   Fit = 'fit',
   Drag = 'drag',
-  DragElement = 'drag-element'
+  DragElement = 'drag-element',
+  Resize = 'resize'
 }
 
 enum Edit {
@@ -23,7 +24,8 @@ enum Edit {
   NudgeLeaf = 'nudge-leaf',
   HideLeaf = 'hide-leaf',
   HideTextLeaf = 'hide-text-leaf',
-  Text = 'text'
+  Text = 'text',
+  Colour = 'colour'
 }
 
 enum Target {
@@ -34,7 +36,12 @@ enum Target {
 type Place = { projectId: string; canvasId: string };
 type Box = { x: number; y: number; w: number; h: number };
 
-const HEAVY_PLACE: Place = { projectId: '9af789a4-da22-4231-bf6c-68bcb10b0377', canvasId: 'bf55d313-9155-4de3-a5ef-c3c0259e98e2' };
+const probedPlace = (pair: string | undefined): Place | null => {
+  const [projectId, canvasId] = pair?.split(':') ?? [];
+  return projectId && canvasId ? { projectId, canvasId } : null;
+};
+
+const HEAVY_PLACE: Place = probedPlace(process.env.PROBE_PLACE) ?? { projectId: '9af789a4-da22-4231-bf6c-68bcb10b0377', canvasId: 'bf55d313-9155-4de3-a5ef-c3c0259e98e2' };
 const MS_PER_S = 1000;
 const RUNS = Number(process.env.BUDGET_RUNS ?? 3);
 const OUT = process.env.BUDGET_OUT ?? 'perf-results';
@@ -63,10 +70,12 @@ const PROFILED = process.env.BUDGET_PROFILE === '1';
 const PROFILE_SAMPLE_US = 100;
 const EDIT_KINDS = process.env.BUDGET_EDIT_KINDS?.split(',') ?? null;
 const SHOTS = process.env.BUDGET_SHOTS === '1';
+const CPU_SLOWDOWN = Number(process.env.BUDGET_CPU ?? 1);
 const SHOT_SETTLE_MS = 1500;
 const PIXEL_TOLERANCE = 8;
 const PERCENT = 100;
-const UNCAPPED = ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--disable-gpu-vsync', '--disable-frame-rate-limit'];
+const GPU_FLAGS = ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist'];
+const UNCAPPED = process.env.BUDGET_VSYNC === '1' ? GPU_FLAGS : [...GPU_FLAGS, '--disable-gpu-vsync', '--disable-frame-rate-limit'];
 
 const PLACES: Record<Target, { base: string; place: Place; login: boolean }> = {
   [Target.Landings]: { base: LANDINGS_BASE, place: LANDINGS_FIXTURE_PLACE, login: false },
@@ -215,12 +224,41 @@ async function dragElement(page: Page, until: number) {
   return moves;
 }
 
+const SELECT_SETTLE_MS = 400;
+const UNDO_SETTLE_MS = 300;
+
+async function selectFrame(page: Page): Promise<string> {
+  const id = await zoomOntoFrame(page);
+  const box = (await tiles(page)).find((t) => t.id === id)!;
+  const at = labelAt(box);
+  await page.mouse.click(at.x, at.y);
+  await page.waitForTimeout(SELECT_SETTLE_MS);
+  return id;
+}
+
+async function resize(page: Page, until: number, aim?: string) {
+  const box = (await tiles(page)).find((t) => t.id === aim)!;
+  const bottom = box.y + box.h;
+  const corner = { x: box.x + box.w, y: bottom < VIEWPORT.height - SCREEN_MARGIN_PX ? bottom : box.y };
+  const moves = await swing(page, corner, until);
+  const resized = (await placeOf(page, box.id)) !== box.at;
+  console.log(`resize: ${moves} moves on ${box.id}`);
+  await release(page, corner);
+  await page.keyboard.press('ControlOrMeta+z');
+  await page.waitForTimeout(UNDO_SETTLE_MS);
+  if (!resized) {
+    throw new Error(`resize: frame ${box.id} did not change size`);
+  }
+  return moves;
+}
+
 const GESTURES: Record<Gesture, (page: Page, until: number, aim?: string) => Promise<number | void>> = {
   [Gesture.Pan]: wheelPan,
   [Gesture.Zoom]: zoom,
   [Gesture.Fit]: fit,
   [Gesture.Drag]: drag,
-  [Gesture.DragElement]: dragElement
+  [Gesture.DragElement]: dragElement,
+  [Gesture.Resize]: resize
 };
 
 type Seen = { gaps: number[]; taskMs: number; moves: number };
@@ -232,7 +270,8 @@ async function taskSeconds(cdp: CDPSession): Promise<number> {
 
 const SETUP: Partial<Record<Gesture, (page: Page) => Promise<string>>> = {
   [Gesture.Drag]: zoomOntoFrame,
-  [Gesture.DragElement]: selectContainer
+  [Gesture.DragElement]: selectContainer,
+  [Gesture.Resize]: selectFrame
 };
 
 async function gaps(page: Page, cdp: CDPSession, gesture: Gesture): Promise<Seen> {
@@ -305,15 +344,99 @@ for (const target of TARGETS) {
   });
 }
 
+const LOADING_GESTURES = [Gesture.Zoom, Gesture.Pan];
+const ONE_MISSED_VSYNC_MS = 2 * budgetMs(Rate.ProMotion);
+
+for (const target of TARGETS) {
+  test(`zoom and pan while tiles load never miss two vsyncs at 120 Hz on ${target}`, async () => {
+    const browser = await chromium.launch({ headless: false, args: UNCAPPED });
+    const worst: Record<string, number[]> = {};
+    for (let i = 0; i < RUNS; i++) {
+      const { base, place, login: needsLogin } = PLACES[target];
+      const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 2, serviceWorkers: 'block' });
+      const page = await context.newPage();
+      const cdp = await context.newCDPSession(page);
+      await cdp.send('Performance.enable');
+      await page.addInitScript(instrument);
+      if (needsLogin) {
+        await login(page, base);
+      }
+      await page.goto(`${base}/p/${place.projectId}/c/${place.canvasId}`, { waitUntil: 'commit' });
+      await page.locator('[data-canvas-surface]').first().waitFor({ timeout: 120_000 });
+      await page.waitForTimeout(SETTLE_MS);
+      for (const gesture of LOADING_GESTURES) {
+        const { gaps: seen } = await gaps(page, cdp, gesture);
+        (worst[gesture] ??= []).push(Math.round(Math.max(...seen)));
+      }
+      await context.close();
+    }
+    await browser.close();
+    console.log(`worst gap per run on ${target}: ${JSON.stringify(worst)}`);
+    expect(Object.values(worst).flat().filter((ms) => ms > ONE_MISSED_VSYNC_MS)).toEqual([]);
+  });
+}
+
 const EDITS_EACH = Number(process.env.BUDGET_EDITS ?? 8);
 const EDIT_GIVE_UP_MS = 3000;
-const EDIT_PAUSE_MS = 250;
+const EDIT_PAUSE_MS = Number(process.env.BUDGET_EDIT_PAUSE ?? 250);
 const RESIZE_STEP_PX = 6;
 const CHILD_AT = { x: 0.07, y: 0.032 };
 const TEXT_AT = { x: 0.51, y: 0.032 };
 const TEXT_DESCENTS = 4;
 
-type Stages = { total: number; effect: number; build: number; media: number; upload: number; draw: number; patched: boolean };
+type Stages = { total: number; effect: number; build: number; media: number; upload: number; draw: number; patched: boolean; pixel: number | null };
+
+const PIXEL_MARGIN_PX = 24;
+const PIXEL_SAMPLE = 96;
+const PIXEL_CHANGE = 16;
+const PIXEL_GIVE_UP_MS = 500;
+
+function armPixels({ rect, side, change }: { rect: Box; side: number; change: number }) {
+  const probe = window as unknown as { __pixelAt: number | null; __pixelArmed: number };
+  const canvas = document.querySelector<HTMLCanvasElement>('[data-testid="core-canvas"]')!;
+  const at = canvas.getBoundingClientRect();
+  const scale = canvas.width / at.width;
+  const sampler = Object.assign(document.createElement('canvas'), { width: side, height: side }).getContext('2d', { willReadFrequently: true })!;
+  const read = () => {
+    sampler.clearRect(0, 0, side, side);
+    sampler.drawImage(canvas, (rect.x - at.x) * scale, (rect.y - at.y) * scale, rect.w * scale, rect.h * scale, 0, 0, side, side);
+    return sampler.getImageData(0, 0, side, side).data;
+  };
+  const base = read();
+  const armed = ++probe.__pixelArmed || (probe.__pixelArmed = 1);
+  probe.__pixelAt = null;
+  const tick = (t: number) => {
+    if (probe.__pixelArmed !== armed || probe.__pixelAt !== null) {
+      return;
+    }
+    const now = read();
+    for (let i = 0; i < now.length; i++) {
+      if (Math.abs(now[i] - base[i]) > change) {
+        probe.__pixelAt = t;
+        return;
+      }
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+async function pixelRect(page: Page): Promise<Box | null> {
+  const body = await page.getByTestId('frame-selection-body').first().boundingBox({ timeout: PIXEL_GIVE_UP_MS }).catch(() => null);
+  return body && { x: body.x - PIXEL_MARGIN_PX, y: body.y - PIXEL_MARGIN_PX, w: body.width + 2 * PIXEL_MARGIN_PX, h: body.height + 2 * PIXEL_MARGIN_PX };
+}
+
+const PIXELS = process.env.BUDGET_PIXELS !== '0';
+
+async function arm(page: Page) {
+  if (!PIXELS) {
+    return;
+  }
+  const rect = await pixelRect(page);
+  if (rect) {
+    await page.evaluate(armPixels, { rect, side: PIXEL_SAMPLE, change: PIXEL_CHANGE });
+  }
+}
 
 function listenInput() {
   const probe = window as unknown as { __editAt: number; __editInputs: number[] };
@@ -327,7 +450,7 @@ function listenInput() {
 }
 
 async function stagesAfter(page: Page): Promise<Stages | null> {
-  return page.evaluate(async (giveUp) => {
+  return page.evaluate(async ([giveUp, pixelGiveUp]) => {
     const at = (window as unknown as { __editAt: number }).__editAt;
     const started = performance.now();
     const LIVE = /^frame\|drawn\|(.+:live\d+)$/;
@@ -342,10 +465,16 @@ async function stagesAfter(page: Page): Promise<Stages | null> {
       const of = (step: string) => marks.find((m) => m.name === `frame|${step}|${group}`)?.startTime ?? drawn.startTime;
       const [asked, built, ready, put] = [of('live-asked'), of('live-built'), of('live-ready'), Math.min(of('put'), of('patched'))];
       const patched = !marks.some((m) => m.name === `frame|live-built|${group}`);
-      return { total: drawn.startTime - at, effect: asked - at, build: built - asked, media: ready - built, upload: put - ready, draw: drawn.startTime - put, patched };
+      const probe = window as unknown as { __pixelAt: number | null };
+      const pixelStarted = performance.now();
+      while (probe.__pixelAt === null && performance.now() - pixelStarted < pixelGiveUp) {
+        await new Promise((done) => requestAnimationFrame(done));
+      }
+      const pixel = probe.__pixelAt === null || probe.__pixelAt < at ? null : probe.__pixelAt - at;
+      return { total: drawn.startTime - at, effect: asked - at, build: built - asked, media: ready - built, upload: put - ready, draw: drawn.startTime - put, patched, pixel };
     }
     return null;
-  }, EDIT_GIVE_UP_MS);
+  }, [EDIT_GIVE_UP_MS, PIXEL_GIVE_UP_MS]);
 }
 
 enum Depth {
@@ -355,7 +484,69 @@ enum Depth {
 
 type Pick = { at: { x: number; y: number }; depth: Depth };
 
-const PICKS: Record<Exclude<Edit, Edit.Resize | Edit.Text>, Pick> = {
+type FieldEdit = Edit.Colour;
+
+const PROPERTIES_TAB = 'Properties';
+const EMPTY_AT = { x: 300, y: 300 };
+
+const FIELDS: Record<FieldEdit, { selector: string; values: [string, string] | null }> = {
+  [Edit.Colour]: { selector: '[data-testid="fill-eye"]', values: null }
+};
+
+function fieldEdit({ selector, value }: { selector: string; value: string | null }) {
+  const el = document.querySelector<HTMLInputElement>(selector);
+  if (!el) {
+    throw new Error(`${selector} not on screen`);
+  }
+  (window as unknown as { __editAt: number }).__editAt = performance.now();
+  if (value === null) {
+    el.click();
+    return;
+  }
+  el.value = value;
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+type Busy = { toPatch: number[]; cycle: number[]; frames: number[]; idle: number[] };
+
+const paintedFrames = (page: Page) => page.evaluate(() => (document.querySelector<HTMLCanvasElement>('[data-testid="core-canvas"]')?.dataset.painted ?? '0').split(',').reduce((a, b) => a + Number(b), 0));
+
+const busyOf: Record<string, Busy> = {};
+let metrics: CDPSession | null = null;
+
+const taskMs = async (): Promise<number> => (metrics ? (await taskSeconds(metrics)) * MS_PER_S : 0);
+
+async function busyEdit(page: Page, edit: string, act: () => Promise<void>): Promise<Stages | null> {
+  const quiet = await taskMs();
+  await page.waitForTimeout(EDIT_PAUSE_MS);
+  const framesBefore = await paintedFrames(page);
+  const start = await taskMs();
+  await act();
+  const stages = await stagesAfter(page);
+  const patched = await taskMs();
+  await page.waitForTimeout(EDIT_PAUSE_MS);
+  const settled = await taskMs();
+  const busy = (busyOf[edit] ??= { toPatch: [], cycle: [], frames: [], idle: [] });
+  busy.idle.push(start - quiet);
+  busy.frames.push((await paintedFrames(page)) - framesBefore);
+  busy.toPatch.push(patched - start);
+  busy.cycle.push(settled - start);
+  return stages;
+}
+
+async function fieldEdits(page: Page, edit: FieldEdit, count: number): Promise<(Stages | null)[]> {
+  const { selector, values } = FIELDS[edit];
+  await page.getByText(PROPERTIES_TAB, { exact: true }).first().click();
+  await page.locator(selector).first().waitFor({ state: 'attached', timeout: 10_000 });
+  const seen: (Stages | null)[] = [];
+  for (let i = 0; i < count; i++) {
+    await arm(page);
+    seen.push(await busyEdit(page, edit, () => page.evaluate(fieldEdit, { selector, value: values ? values[i % 2] : null })));
+  }
+  return seen;
+}
+
+const PICKS: Record<Exclude<Edit, Edit.Resize | Edit.Text | FieldEdit>, Pick> = {
   [Edit.Nudge]: { at: CHILD_AT, depth: Depth.Top },
   [Edit.Opacity]: { at: CHILD_AT, depth: Depth.Top },
   [Edit.Hide]: { at: CHILD_AT, depth: Depth.Top },
@@ -384,6 +575,7 @@ async function resizeEdits(page: Page, count: number): Promise<(Stages | null)[]
   await page.mouse.down();
   const seen: (Stages | null)[] = [];
   for (let i = 1; i <= count; i++) {
+    await arm(page);
     await page.mouse.move(from.x + i * RESIZE_STEP_PX, from.y);
     seen.push(await stagesAfter(page));
   }
@@ -391,7 +583,7 @@ async function resizeEdits(page: Page, count: number): Promise<(Stages | null)[]
   return seen;
 }
 
-const KEYS: Record<Exclude<Edit, Edit.Resize | Edit.Text>, [string, string]> = {
+const KEYS: Record<Exclude<Edit, Edit.Resize | Edit.Text | FieldEdit>, [string, string]> = {
   [Edit.Nudge]: ['ArrowRight', 'ArrowLeft'],
   [Edit.Opacity]: ['Digit5', 'Digit0'],
   [Edit.Hide]: ['ControlOrMeta+Shift+KeyH', 'ControlOrMeta+Shift+KeyH'],
@@ -473,9 +665,8 @@ async function keyEdits(page: Page, keys: [string, string], count: number, edit:
       seen.push(await shotEdit(page, keys[i % 2], edit));
       continue;
     }
-    await page.keyboard.press(keys[i % 2]);
-    seen.push(await stagesAfter(page));
-    await page.waitForTimeout(EDIT_PAUSE_MS);
+    await arm(page);
+    seen.push(await busyEdit(page, edit, () => page.keyboard.press(keys[i % 2])));
   }
   return seen;
 }
@@ -496,7 +687,7 @@ async function textEdits(page: Page, count: number): Promise<(Stages | null)[]> 
         setTimeout(() => done(null), giveUp);
         el.addEventListener('input', (e) => requestAnimationFrame(() => {
           const at = (window as unknown as { __editAt: number }).__editAt;
-          done({ total: performance.now() - at, effect: e.timeStamp - at, build: 0, media: 0, upload: 0, draw: performance.now() - e.timeStamp, patched: false });
+          done({ total: performance.now() - at, effect: e.timeStamp - at, build: 0, media: 0, upload: 0, draw: performance.now() - e.timeStamp, patched: false, pixel: null });
         }), { once: true });
       });
     }, EDIT_GIVE_UP_MS);
@@ -516,6 +707,14 @@ async function edits(page: Page, edit: Edit): Promise<(Stages | null)[]> {
     await selectChild(page);
     return resizeEdits(page, EDITS_EACH);
   }
+  if (edit === Edit.Colour) {
+    await page.mouse.click(EMPTY_AT.x, EMPTY_AT.y);
+    await selectChild(page, { at: CHILD_AT, depth: Depth.Leaf });
+    return fieldEdits(page, edit, EDITS_EACH).catch(async (e: unknown) => {
+      await page.screenshot({ path: join(OUT, `edit-${edit}-missing.png`) });
+      throw e;
+    });
+  }
   await selectChild(page, PICKS[edit]);
   return keyEdits(page, KEYS[edit], EDITS_EACH, edit);
 }
@@ -523,8 +722,10 @@ async function edits(page: Page, edit: Edit): Promise<(Stages | null)[]> {
 const mean = (xs: number[]) => (xs.length ? Math.round((10 * xs.reduce((a, b) => a + b, 0)) / xs.length) / 10 : 0);
 
 function breakdown(seen: Stages[]) {
-  const stage = (k: Exclude<keyof Stages, 'patched'>) => mean(seen.map((s) => s[k]));
-  return { effect: stage('effect'), build: stage('build'), media: stage('media'), upload: stage('upload'), draw: stage('draw'), patched: seen.filter((s) => s.patched).length };
+  const stage = (k: Exclude<keyof Stages, 'patched' | 'pixel'>) => mean(seen.map((s) => s[k]));
+  const pixels = seen.flatMap((s) => (s.pixel === null ? [] : [s.pixel]));
+  const px = editBudgetOf(pixels);
+  return { pixelP50: px.p50, pixelP95: px.p95, pixelSeen: pixels.length, effect: stage('effect'), build: stage('build'), media: stage('media'), upload: stage('upload'), draw: stage('draw'), patched: seen.filter((s) => s.patched).length };
 }
 
 
@@ -541,6 +742,7 @@ async function editRun(browser: Browser, target: Target): Promise<Record<Edit, (
   const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 2, serviceWorkers: 'block' });
   const page = await context.newPage();
   await page.addInitScript(listenInput);
+  await page.addInitScript(() => Object.assign(globalThis, { __editTrace: true }));
   if (SHOTS) {
     await page.addInitScript(holdBuilds);
   }
@@ -550,7 +752,13 @@ async function editRun(browser: Browser, target: Target): Promise<Record<Edit, (
   await page.goto(`${base}/p/${place.projectId}/c/${place.canvasId}`, { waitUntil: 'commit' });
   await page.locator('[data-canvas-surface]').first().waitFor({ timeout: 120_000 });
   await page.waitForTimeout(SETTLE_MS);
+  if (CPU_SLOWDOWN > 1) {
+    await (await context.newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: CPU_SLOWDOWN });
+  }
+  metrics = await context.newCDPSession(page);
+  await metrics.send('Performance.enable');
   const seen = {} as Record<Edit, (Stages | null)[]>;
+  const phases = {} as Record<string, [string, number][]>;
   for (const edit of Object.values(Edit).filter((e) => !EDIT_KINDS || EDIT_KINDS.includes(e))) {
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
@@ -559,7 +767,9 @@ async function editRun(browser: Browser, target: Target): Promise<Record<Edit, (
     await zoomOntoFrame(page);
     const cdp = PROFILED ? await profiling(page) : null;
     const startedAt = await page.evaluate(() => performance.now());
+    await page.evaluate(() => performance.clearMeasures());
     seen[edit] = await edits(page, edit).catch((e: unknown) => (console.log(`${edit}: ${e}`), []));
+    phases[edit] = await page.evaluate(() => performance.getEntriesByType('measure').filter((m) => m.name.startsWith('patch:') || m.name.startsWith('edit:')).map((m) => [m.name, m.duration] as [string, number]));
     if (cdp) {
       const { profile } = await cdp.send('Profiler.stop');
       writeFileSync(join(OUT, `edit-${target}-${edit}.cpuprofile`), JSON.stringify(profile));
@@ -571,6 +781,8 @@ async function editRun(browser: Browser, target: Target): Promise<Record<Edit, (
     }
   }
   await context.close();
+  writeFileSync(join(OUT, `edit-phases-${target}.json`), JSON.stringify(phases, null, 2));
+  writeFileSync(join(OUT, `edit-busy-${target}.json`), JSON.stringify(busyOf, null, 2));
   return seen;
 }
 

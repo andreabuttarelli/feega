@@ -1,9 +1,11 @@
 import { isProp, NodeKind, type Bound, type CodeNode, type ComponentSpec, type ElementNode, type PageSpec, type Rule, type SvgNode, type UseNode } from '../ir';
 import { kebab } from '../naming';
 import type { CodeFile } from '../model';
-import { BASE_CSS, fontLinks, lookupOf, mediaBlocks, ruleBlock, stateBlocks, tokensCss, type TokenLookup } from './css';
+import { BASE_CSS, fontFaceCss, fontLinks, lookupOf, mediaBlocks, ruleBlock, stateBlocks, tokensCss, type TokenLookup } from './css';
 import { escapeHtml, nodeLines, type Dialect } from './markup';
 import { readme } from './project';
+import { scenesOf, sceneConsts, THREE_VERSION } from './scene-files';
+import { SCENE_RUNTIME } from './scene-three';
 import { animatedNodes, animationCss, inView, INVIEW_CLASS, INVIEW_SCRIPT, PROPERTY_RULES, translates } from './keyframes';
 
 type Ctx = { tokens: TokenLookup; block: string | null; values: Map<string, string | boolean>; components: Map<string, ComponentSpec>; extraClass: string | null; root: ElementNode | null };
@@ -51,7 +53,7 @@ function svgOf(node: SvgNode, ctx: Ctx): string {
 }
 
 const dialect: Dialect<Ctx> = {
-  openTag: (node, ctx) => `<${node.tag}${classList(node, ctx)}${attrs(node, ctx)}${styleOf(node, ctx)}${inView(node) ? ` ${INVIEW_ATTR}` : ''}>`,
+  openTag: (node, ctx) => `<${node.tag}${classList(node, ctx)}${attrs(node, ctx)}${styleOf(node, ctx)}${inView(node) ? ` ${INVIEW_ATTR}` : ''}${node.scene ? ` data-scene="${node.scene.name}"` : ''}>`,
   text: (value, ctx) => escapeHtml(valueOf(value, ctx)).replace(/\n/g, '<br>'),
   lineBreak: '<br>',
   use: expand,
@@ -92,6 +94,11 @@ function animationFiles(page: PageSpec): CodeFile[] {
 
 const ANIMATIONS_CSS = 'styles/animations.css';
 const INVIEW_JS = 'scripts/inview.js';
+const SCENES_JS = 'scripts/scenes.js';
+const THREE_CDN = `https://cdn.jsdelivr.net/npm/three@${THREE_VERSION}/`;
+const IMPORT_MAP = { imports: { three: `${THREE_CDN}build/three.module.js`, 'three/addons/': `${THREE_CDN}examples/jsm/` } };
+
+const scenesScript = (scenes: ReturnType<typeof scenesOf>) => ["import * as THREE from 'three';", "import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';", '', ...sceneConsts(scenes), '', SCENE_RUNTIME, `const SCENES = { ${scenes.map((s) => s.name).join(', ')} };`, "document.querySelectorAll('[data-scene]').forEach((el) => mountScene(el, SCENES[el.dataset.scene]));", ''].join('\n');
 
 export function htmlProject(page: PageSpec): CodeFile[] {
   const tokens = lookupOf(page.tokens);
@@ -100,16 +107,21 @@ export function htmlProject(page: PageSpec): CodeFile[] {
   const componentCss = page.components.map((c) => ({ path: `styles/components/${kebab(c.name)}.css`, content: stylesheet(c.root, kebab(c.name), tokens) }));
   const animations = animationFiles(page);
   const has = (path: string) => animations.some((f) => f.path === path);
-  const scripts = has(INVIEW_JS) ? [`    <script src="${INVIEW_JS}" defer></script>`] : [];
-  const links = ['styles/tokens.css', 'styles/base.css', ...componentCss.map((c) => c.path), 'styles/page.css', ...(has(ANIMATIONS_CSS) ? [ANIMATIONS_CSS] : [])].map((href) => `    <link rel="stylesheet" href="${href}" />`);
-  const html = ['<!doctype html>', '<html lang="en">', '  <head>', '    <meta charset="UTF-8" />', '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />', `    <title>${escapeHtml(page.name)}</title>`, ...fontLinks(page.tokens).map((l) => `    ${l}`), ...links, ...scripts, '  </head>', '  <body>', ...body, '  </body>', '</html>', ''];
+  const scenes = scenesOf(page);
+  const three = scenes.length ? [`    <script type="importmap">${JSON.stringify(IMPORT_MAP)}</script>`, `    <script type="module" src="${SCENES_JS}"></script>`] : [];
+  const scripts = [...(has(INVIEW_JS) ? [`    <script src="${INVIEW_JS}" defer></script>`] : []), ...three];
+  const fontCss = page.fonts.files.length ? ['styles/fonts.css'] : [];
+  const links = [...fontCss, 'styles/tokens.css', 'styles/base.css', ...componentCss.map((c) => c.path), 'styles/page.css', ...(has(ANIMATIONS_CSS) ? [ANIMATIONS_CSS] : [])].map((href) => `    <link rel="stylesheet" href="${href}" />`);
+  const html = ['<!doctype html>', '<html lang="en">', '  <head>', '    <meta charset="UTF-8" />', '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />', `    <title>${escapeHtml(page.name)}</title>`, ...fontLinks(page).map((l) => `    ${l}`), ...links, ...scripts, '  </head>', '  <body>', ...body, '  </body>', '</html>', ''];
   return [
     { path: 'README.md', content: readme(page, 'HTML + CSS', ['npx serve .'], 'styles/components/') },
     { path: 'index.html', content: html.join('\n') },
+    ...(page.fonts.files.length ? [{ path: 'styles/fonts.css', content: fontFaceCss(page.fonts.files, (ref) => `../${ref}`) }] : []),
     { path: 'styles/tokens.css', content: tokensCss(page.tokens) },
     { path: 'styles/base.css', content: BASE_CSS },
     ...componentCss,
     { path: 'styles/page.css', content: stylesheet(page.root, null, tokens) },
-    ...animations
+    ...animations,
+    ...(scenes.length ? [{ path: SCENES_JS, content: scenesScript(scenes) }] : [])
   ];
 }

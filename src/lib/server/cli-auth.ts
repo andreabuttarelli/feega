@@ -7,6 +7,7 @@ import { markRlsScoped } from '$lib/server/rls-client';
 import { LOCAL_AI_MESSAGE, localStore } from '$lib/server/local/local-mode';
 import { hasAiKey } from '$lib/local-ai-keys';
 import { ProductEvent, track } from '$lib/server/product-events/track';
+import { scopesOfHolder } from '$lib/server/api-key-holder';
 
 /**
  * The new `api_keys` (org_id NOT NULL, scopes: string[]) has no per-brand scoping column — a key
@@ -115,6 +116,11 @@ async function authenticateApiKey(token: string) {
     return { error: json({ error: 'Invalid API key' }, { status: 401 }) };
   }
 
+  const scopes = await scopesOfHolder(admin, keyRow);
+  if (!scopes) {
+    return { error: json({ error: 'Invalid API key' }, { status: 401 }) };
+  }
+
   // Fire-and-forget: update last_used_at
   admin.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', keyRow.id);
   if (!keyRow.last_used_at) {
@@ -126,7 +132,7 @@ async function authenticateApiKey(token: string) {
     name: keyRow.name,
     user_id: keyRow.user_id,
     org_id: keyRow.org_id,
-    scopes: keyRow.scopes ?? []
+    scopes
   };
 
   // Service-role client: it bypasses RLS, so the ownership check RLS would have done has to be

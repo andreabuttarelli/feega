@@ -52,6 +52,60 @@ program
   });
 
 program
+  .command('dev-server [action]')
+  .description('Local mode: the dev server of the opened folder that live frames show — status (default), start or stop')
+  .action(async (action: string | undefined) => {
+    const { cmdDevServer } = await import('./commands/dev-server.ts');
+    await cmdDevServer(action ?? 'status');
+  });
+
+program
+  .command('live-edit <at> <prop> [value]')
+  .description('Local mode: change one property of the element at file:line:col in the running app and write it to its source, on the branch feega/live')
+  .option('--side <side>', 'x, y, t, r, b or l, for padding, margin and gap')
+  .option('--token <token>', 'exact Tailwind token instead of a value')
+  .option('--was <text>', 'current text, when prop is text')
+  .option('--viewport <px>', 'page width the change is for: the class with the breakpoint that applies there is the one changed')
+  .action(async (at: string, prop: string, value: string | undefined, options) => {
+    const { cmdLiveEdit } = await import('./commands/live-edit.ts');
+    await cmdLiveEdit(at, prop, value, options);
+  });
+
+program
+  .command('live-undo <sha>')
+  .description('Local mode: revert one live edit by the commit it returned')
+  .action(async (sha: string) => {
+    const { cmdLiveUndo } = await import('./commands/live-edit.ts');
+    await cmdLiveUndo(sha);
+  });
+
+program
+  .command('live-changes')
+  .description('Local mode: files and diff of the live edits on feega/live')
+  .action(async () => {
+    const { cmdLiveChanges } = await import('./commands/live-edit.ts');
+    await cmdLiveChanges();
+  });
+
+program
+  .command('live-push')
+  .description('Local mode: push the live edits to a feega/ branch')
+  .action(async () => {
+    const { cmdLivePush } = await import('./commands/live-edit.ts');
+    await cmdLivePush();
+  });
+
+program
+  .command('init [dir]')
+  .description('Tag every element of a Vite or Next.js app with its file:line in dev, so Feega can open the source behind what you click')
+  .option('--dry-run', 'show the changes without writing them')
+  .option('-y, --yes', 'apply without asking')
+  .action(async (dir, options) => {
+    const { cmdInit } = await import('./commands/init.ts');
+    await cmdInit(dir ?? '.', options);
+  });
+
+program
   .command('brands')
   .description('Elenca tutti i brand')
   .action(async () => {
@@ -65,6 +119,26 @@ program
   .action(async (slug: string, tab: string | undefined) => {
     const { cmdLibrary } = await import('./commands/library.ts');
     await cmdLibrary(slug, tab ?? 'kit');
+  });
+
+const agents = program
+  .command('agents')
+  .description('List the coding agents a local Feega found on this computer and whether they can drive the chat over ACP')
+  .option('--refresh', 'Detect again instead of using the cached result')
+  .action(async (options: { refresh?: boolean }) => {
+    const { cmdAgents } = await import('./commands/agents.ts');
+    await cmdAgents(options);
+  });
+
+agents
+  .command('models <agent>')
+  .description('List the models an agent offers, read live from it; --set picks one for this .feega file')
+  .option('--set <model>', 'Use this model for the agent (an id from the list)')
+  .option('--clear', 'Go back to the agent default')
+  .option('--refresh', 'Ask the agent again instead of using the cached list')
+  .action(async (agent: string, options: { set?: string; clear?: boolean; refresh?: boolean }) => {
+    const { cmdAgentModels } = await import('./commands/agents.ts');
+    await cmdAgentModels(agent, options);
   });
 
 program
@@ -611,7 +685,8 @@ canvas
   .option('--route <paths...>', 'The pages of the app to import (up to 20): one frame, a board per page, components shared', ['/'])
   .option('--routes <spec>', 'discover = list the pages the file router declares, without running the app; all = import every static page found; or a list "/ /pricing /blog/hello"')
   .option('--scheme <schemes...>', 'Render each page under these themes: light, dark (default light)')
-  .option('--width <px...>', 'Render each page at these widths in px (default 1280); with --scheme, one board per combination')
+  .option('--width <px...>', 'Render each page at these widths in px (default 1280); one page at several widths of one theme becomes breakpoint views of the widest, otherwise one board per combination')
+  .option('--views', 'Several widths of one page in one theme become ONE frame with the narrower widths as breakpoint views, instead of a board per width. Gives up component extraction and the Design system board')
   .option('--no-design-system', 'Skip the design system: no variables from the CSS tokens, no Design system board')
   .option('--delay <ms>', 'Extra wait in ms before each page is captured, for content that arrives late (default 0, at most 10000)', Number)
   .option('--route-delay <route=ms...>', 'Extra wait for one route, wins over --delay, e.g. /blog/post=3000')
@@ -919,6 +994,111 @@ program
   .action(async (projectId: string, opts) => {
     const { cmdAppAccount } = await import('./commands/app-account.ts');
     await cmdAppAccount(projectId, opts);
+  });
+
+const github = program.command('github').description('Push code edits of linked frames to GitHub as a branch and pull request');
+
+github
+  .command('conflicts <projectId> <nodeId>')
+  .description('Show base, canvas and GitHub versions of the files a frame and GitHub both changed')
+  .action(async (projectId: string, nodeId: string) => {
+    const { cmdGithubConflicts } = await import('./commands/github.ts');
+    await cmdGithubConflicts(projectId, nodeId);
+  });
+
+github
+  .command('resolve <projectId> <nodeId> <choice>')
+  .description('Resolve a conflict: keep_canvas (canvas wins on push) or agent (prints a merge prompt); to take GitHub, pull the frame')
+  .action(async (projectId: string, nodeId: string, choice: string) => {
+    const { cmdGithubResolve } = await import('./commands/github.ts');
+    await cmdGithubResolve(projectId, nodeId, choice);
+  });
+
+github
+  .command('variant <projectId> <canvasId> <nodeId>')
+  .description('Copy a linked frame as a variant of it; its push asks to replace the original, become a new route or stay on the canvas')
+  .action(async (projectId: string, canvasId: string, nodeId: string) => {
+    const { cmdGithubVariant } = await import('./commands/github.ts');
+    await cmdGithubVariant(projectId, canvasId, nodeId);
+  });
+
+github
+  .command('push <projectId> <nodeIds...>')
+  .description('Commit the code edits of the frames on feega/<name> and open or update its pull request')
+  .requiredOption('--name <name>', 'Branch name; the branch is feega/<name>')
+  .option('--title <text>', 'Pull request title')
+  .option('--body <text>', 'Pull request body')
+  .option('--base <branch>', 'Base branch (default: the repo default)')
+  .option('--confirm-sensitive', 'Allow changes to config files, lockfiles and dotfiles')
+  .option('--main <nodeIds...>', 'Frames whose instance edits apply to the main component file instead of the usage site')
+  .option('--variant <nodeId:choice[:route]...>', 'What a variant frame does on push: replace, new_route (with /route) or keep')
+  .action(async (projectId: string, nodeIds: string[], opts) => {
+    const { cmdGithubPush } = await import('./commands/github.ts');
+    await cmdGithubPush(projectId, nodeIds, opts);
+  });
+
+github
+  .command('status <projectId> <nodeId>')
+  .description('Computed GitHub state of a linked frame, its pull request and CI checks')
+  .action(async (projectId: string, nodeId: string) => {
+    const { cmdGithubStatus } = await import('./commands/github.ts');
+    await cmdGithubStatus(projectId, nodeId);
+  });
+
+github
+  .command('undo <projectId> <nodeId>')
+  .description('Undo the last push of a frame with a forward commit restoring the files it touched')
+  .action(async (projectId: string, nodeId: string) => {
+    const { cmdGithubUndo } = await import('./commands/github.ts');
+    await cmdGithubUndo(projectId, nodeId);
+  });
+
+github
+  .command('versions <projectId> <nodeId>')
+  .description('Branches, tags, open pull requests and the commits that touched the file of a linked frame')
+  .option('--ref <ref>', 'Branch, tag or sha whose history to list (default: the base branch)')
+  .option('--limit <n>', 'How many commits, at most 100')
+  .action(async (projectId: string, nodeId: string, opts) => {
+    const { cmdGithubVersions } = await import('./commands/github.ts');
+    await cmdGithubVersions(projectId, nodeId, opts);
+  });
+
+github
+  .command('compare <projectId> <nodeId> <refs...>')
+  .description('Import a linked frame at up to 4 refs (branch, tag, sha, #<pr>) as read-only version frames beside it')
+  .action(async (projectId: string, nodeId: string, refs: string[]) => {
+    const { cmdGithubCompare } = await import('./commands/github.ts');
+    await cmdGithubCompare(projectId, nodeId, refs);
+  });
+
+github
+  .command('version-ref <projectId> <versionId> <ref>')
+  .description('Move a version frame to another commit, branch, tag or #<pr>, in the same place')
+  .action(async (projectId: string, versionId: string, ref: string) => {
+    const { cmdGithubVersionRef } = await import('./commands/github.ts');
+    await cmdGithubVersionRef(projectId, versionId, ref);
+  });
+
+for (const [name, action, description] of [
+  ['restore', 'restore', 'Turn a version frame into changes of its linked frame, to push through a PR'],
+  ['variant', 'variant', 'Copy a version frame into an editable, unlinked variant'],
+  ['code-diff', 'code_diff', 'Show the file diff between a version frame and the base branch']
+] as const) {
+  github
+    .command(`${name} <projectId> <versionId>`)
+    .description(description)
+    .action(async (projectId: string, versionId: string) => {
+      const { cmdGithubVersionAction } = await import('./commands/github.ts');
+      await cmdGithubVersionAction(projectId, versionId, action);
+    });
+}
+
+github
+  .command('detach <projectId> <nodeId>')
+  .description('Unlink a frame from its GitHub source; the frame stays on the canvas')
+  .action(async (projectId: string, nodeId: string) => {
+    const { cmdGithubDetach } = await import('./commands/github.ts');
+    await cmdGithubDetach(projectId, nodeId);
   });
 
 const cloud = program.command('cloud').description('Google Drive and Dropbox files of a project');

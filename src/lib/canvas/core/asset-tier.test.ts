@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { AssetSize } from '$lib/canvas/asset-url';
 import { Reach, assetTier, keptTier, reachOf } from './asset-tier';
+import { Motion } from '$lib/canvas/gpu/crash-watch';
 
 describe('card image size on the core canvas', () => {
   it('far away a card fetches the 256 px rendition, as the Pixi canvas did', () => {
@@ -16,15 +17,24 @@ describe('card image size on the core canvas', () => {
 
 describe('keptTier', () => {
   it('allontanandosi un frame tiene le immagini grandi già caricate', () => {
-    expect(keptTier(AssetSize.Px256, AssetSize.Px1024, Reach.Near)).toBe(AssetSize.Px1024);
+    expect(keptTier(AssetSize.Px256, AssetSize.Px1024, Reach.Near, Motion.Still)).toBe(AssetSize.Px1024);
   });
 
   it('avvicinandosi passa alle immagini grandi', () => {
-    expect(keptTier(AssetSize.Px1024, AssetSize.Px256, Reach.Near)).toBe(AssetSize.Px1024);
+    expect(keptTier(AssetSize.Px1024, AssetSize.Px256, Reach.Near, Motion.Still)).toBe(AssetSize.Px1024);
   });
 
   it('senza nulla caricato segue lo zoom', () => {
-    expect(keptTier(AssetSize.Px256, undefined, Reach.Near)).toBe(AssetSize.Px256);
+    expect(keptTier(AssetSize.Px256, undefined, Reach.Near, Motion.Still)).toBe(AssetSize.Px256);
+  });
+
+  it('during a zoom or pan a loaded frame keeps its pictures, whatever zoom and distance ask (lateral frames reloaded mid-gesture)', () => {
+    expect(keptTier(AssetSize.Px1024, AssetSize.Px256, Reach.Near, Motion.Moving)).toBe(AssetSize.Px256);
+    expect(keptTier(AssetSize.Px256, AssetSize.Px1024, Reach.Far, Motion.Moving)).toBe(AssetSize.Px1024);
+  });
+
+  it('a far frame never upgrades when the camera comes close to another one', () => {
+    expect(keptTier(AssetSize.Px1024, AssetSize.Px256, Reach.Far, Motion.Still)).toBe(AssetSize.Px256);
   });
 });
 
@@ -33,7 +43,7 @@ describe('tier cap', () => {
   const screen = { width: 1000, height: 800 };
 
   it('un frame lontano torna alle immagini piccole', () => {
-    expect(keptTier(AssetSize.Px256, AssetSize.Px1024, Reach.Far)).toBe(AssetSize.Px256);
+    expect(keptTier(AssetSize.Px256, AssetSize.Px1024, Reach.Far, Motion.Still)).toBe(AssetSize.Px256);
   });
 
   it('vicino è dentro uno schermo di margine, lontano oltre', () => {

@@ -150,7 +150,7 @@ mod gpu {
 
     fn render(json: &str) -> Vec<u8> {
         let mut renderer = Renderer::new().expect("a GPU adapter");
-        renderer.render(&parse(json).unwrap(), &Pictures::new()).unwrap().pixels
+        renderer.render(&parse(json).unwrap(), &Pictures::default()).unwrap().pixels
     }
 
     fn worst(a: &[u8], b: &[u8]) -> u8 {

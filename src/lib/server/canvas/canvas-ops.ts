@@ -95,10 +95,20 @@ import { MAX_LISTED_ROUTES } from '$lib/server/code-import/routes-discover';
 import { codeAdd, codeChanges, codeMap, codePublish, codePull, Land, SyncOutcome } from '$lib/server/code-import/code-sync';
 import { MAX_FRAME_BOARDS } from '$lib/canvas/import-map';
 import { askedRoutes, MAX_ROUTES, repoOf } from '$lib/server/code-import/repo';
+import { Responsive } from '$lib/server/code-import/code-views';
 import { conditionsOf, MAX_CONDITIONS } from '$lib/server/code-import/render-conditions';
 import { CAPTURE_DELAY_MAX_MS, delayOf } from '$lib/server/code-import/capture-wait';
 import { designSystemOf } from '$lib/server/code-import/design-system';
 import { githubFor } from '$lib/server/code-import/github-runtime';
+import { frameDetach, framesPush, frameStatus, frameUndo } from '$lib/server/code-push/frames-push';
+import { frameVersions } from '$lib/server/code-push/frames-versions';
+import { frameCompare, frameRetarget, MAX_VERSIONS } from '$lib/server/code-push/frames-compare';
+import { actionDeps, compareDeps } from '$lib/server/code-push/compare-runtime';
+import { VersionAction, versionAction } from '$lib/server/code-push/frames-version-actions';
+import { framesDeps, importLinker, variantDeps } from '$lib/server/code-push/frames-runtime';
+import { frameVariant } from '$lib/server/code-push/variants';
+import { ConflictChoice, frameConflicts, frameResolve } from '$lib/server/code-push/conflicts';
+import { VariantChoice } from '$lib/canvas/source-changes';
 import { libsOrigin } from '$lib/server/motion/libs-origin';
 import { GithubRefusal } from '$lib/server/code-import/github-http';
 import { MAX_STORIES } from '$lib/server/code-import/storybook';
@@ -279,7 +289,8 @@ const importFigmaInput = z
   })
   .strict();
 
-const importCodeInput = z.object({ canvasId: z.string(), repo: z.string().max(300).optional().describe('a https://github.com/<owner>/<repo> link, optionally /tree/<ref>; private repos need GitHub connected (github_connect)'), folder: z.string().max(1000).optional().describe('local mode only: an absolute path to a project folder on this computer; its dev server runs here and code_publish writes back to its files'), storybook: z.string().max(500).optional().describe('instead of repo: a public Storybook link; its stories become boards, no app to run'), stories: z.array(z.string().max(200)).max(MAX_STORIES).optional().describe('Storybook story ids to import, default the first stories across components'), app: z.string().max(200).optional().describe('in a monorepo, the folder of the app to run, e.g. apps/web; a /tree/<branch>/<folder> link picks it too; when several apps exist and none is chosen the answer is choose_app with apps to pick from'), route: z.string().max(300).optional().describe('the page of the app to import, default /'), routes: z.union([z.array(z.string().max(300)).max(MAX_LISTED_ROUTES), z.literal(ALL_ROUTES)]).optional().describe(`several pages in one run (at most ${MAX_ROUTES}, more is refused): one frame, a board per page, components shared; "all" = every static page discover_routes lists; a dynamic page is a concrete path, e.g. /blog/hello for /blog/[slug]`), conditions: z.array(z.object({ scheme: z.enum(['light', 'dark']), width: z.number().int().min(240).max(3840) })).max(MAX_CONDITIONS).optional().describe('render each page under these conditions, side by side: {scheme: light|dark, width in px}, e.g. dark at 390; default light at 1280'), captureDelayMs: z.number().int().min(0).optional().describe(`extra wait in ms before each page is captured, default 0, at most ${CAPTURE_DELAY_MAX_MS}; the page already waits for the DOM to stop changing`), routeDelayMs: z.record(z.string().max(300), z.number().int().min(0)).optional().describe('extra wait in ms per route, e.g. {"/blog/post": 3000}; wins over captureDelayMs for that route'), designSystem: z.boolean().optional().describe('default true: the CSS tokens the repo declares (@theme, :root, .dark, [data-theme]) become variables with Light/Dark modes, bound to the layers by class, var() rule or unique value, plus a Design system board; edits write back to the token declarations'), into: z.string().max(64).optional().describe(`instead of repo/folder/storybook: a frame made by import_code; the routes (each under the conditions) are captured from the code that frame came from and added to it as new boards, reusing its components, variables and styles; at most ${MAX_FRAME_BOARDS} boards per frame; code_map lists what is missing`), x: z.number().finite(), y: z.number().finite() }).strict();
+const importCodeInput = z.object({ canvasId: z.string(), repo: z.string().max(300).optional().describe('a https://github.com/<owner>/<repo> link, optionally /tree/<ref>; private repos need GitHub connected (github_connect)'), folder: z.string().max(1000).optional().describe('local mode only: an absolute path to a project folder on this computer; its dev server runs here and code_publish writes back to its files'), storybook: z.string().max(500).optional().describe('instead of repo: a public Storybook link; its stories become boards, no app to run'), stories: z.array(z.string().max(200)).max(MAX_STORIES).optional().describe('Storybook story ids to import, default the first stories across components'), app: z.string().max(200).optional().describe('in a monorepo, the folder of the app to run, e.g. apps/web; a /tree/<branch>/<folder> link picks it too; when several apps exist and none is chosen the answer is choose_app with apps to pick from'), route: z.string().max(300).optional().describe('the page of the app to import, default /'), routes: z.union([z.array(z.string().max(300)).max(MAX_LISTED_ROUTES), z.literal(ALL_ROUTES)]).optional().describe(`several pages in one run (at most ${MAX_ROUTES}, more is refused): one frame, a board per page, components shared; "all" = every static page discover_routes lists; a dynamic page is a concrete path, e.g. /blog/hello for /blog/[slug]`), conditions: z.array(z.object({ scheme: z.enum(['light', 'dark']), width: z.number().int().min(240).max(3840) })).max(MAX_CONDITIONS).optional().describe('render each page under these conditions, side by side: {scheme: light|dark, width in px}, e.g. dark at 390; default light at 1280'), captureDelayMs: z.number().int().min(0).optional().describe(`extra wait in ms before each page is captured, default 0, at most ${CAPTURE_DELAY_MAX_MS}; the page already waits for the DOM to stop changing`), routeDelayMs: z.record(z.string().max(300), z.number().int().min(0)).optional().describe('extra wait in ms per route, e.g. {"/blog/post": 3000}; wins over captureDelayMs for that route'), responsive: z.enum(Responsive).optional().describe('default boards: each width of a page is its own board, components extracted, Design system board kept. views is a choice: several widths of one page in one theme become one frame whose narrower widths are breakpoint views of the widest (an edit in a view is not written back), and it gives up component extraction (listed in skipped) and the Design system board. Several pages or themes in one run always come as boards'),
+ designSystem: z.boolean().optional().describe('default true: the CSS tokens the repo declares (@theme, :root, .dark, [data-theme]) become variables with Light/Dark modes, bound to the layers by class, var() rule or unique value, plus a Design system board; edits write back to the token declarations'), into: z.string().max(64).optional().describe(`instead of repo/folder/storybook: a frame made by import_code; the routes (each under the conditions) are captured from the code that frame came from and added to it as new boards, reusing its components, variables and styles; at most ${MAX_FRAME_BOARDS} boards per frame; code_map lists what is missing`), x: z.number().finite(), y: z.number().finite() }).strict();
 
 const discoverRoutesInput = z.object({ repo: z.string().max(300).optional().describe('a https://github.com/<owner>/<repo> link, optionally /tree/<ref>/<folder>'), folder: z.string().max(1000).optional().describe('local mode only: an absolute path to a project folder'), app: z.string().max(200).optional().describe('in a monorepo, the folder of the app') }).strict().refine((a) => Boolean(a.repo) !== Boolean(a.folder));
 
@@ -1075,7 +1086,7 @@ export const CANVAS_OPS = {
   import_code: op({
     access: Access.Write,
     input: importCodeInput,
-    run: async (ctx, input) => (input.into && input.routes !== ALL_ROUTES ? codeAdd(figmaScope(ctx), input.into, { routes: askedRoutes(input.route, input.routes) ?? [], conditions: input.conditions ? conditionsOf(input.conditions) : undefined, land: Land.Frame }) : importRoutesInto(figmaScope(ctx), input.canvasId, { repo: input.repo, folder: input.folder, app: input.app, routes: input.routes === ALL_ROUTES ? ALL_ROUTES : askedRoutes(input.route, input.routes), conditions: input.conditions ? conditionsOf(input.conditions) : undefined, delay: delayOf({ ms: input.captureDelayMs, routes: input.routeDelayMs }), designSystem: designSystemOf(input.designSystem), storybook: input.storybook, stories: input.stories, at: { x: input.x, y: input.y } }))
+    run: async (ctx, input) => (input.into && input.routes !== ALL_ROUTES ? codeAdd(figmaScope(ctx), input.into, { routes: askedRoutes(input.route, input.routes) ?? [], conditions: input.conditions ? conditionsOf(input.conditions) : undefined, land: Land.Frame }) : importRoutesInto(figmaScope(ctx), input.canvasId, { repo: input.repo, folder: input.folder, app: input.app, routes: input.routes === ALL_ROUTES ? ALL_ROUTES : askedRoutes(input.route, input.routes), conditions: input.conditions ? conditionsOf(input.conditions) : undefined, delay: delayOf({ ms: input.captureDelayMs, routes: input.routeDelayMs }), designSystem: designSystemOf(input.designSystem), responsive: input.responsive, storybook: input.storybook, stories: input.stories, at: { x: input.x, y: input.y } }, importLinker(ctx.db, figmaScope(ctx))))
   }),
 
   code_map: op({
@@ -1139,6 +1150,72 @@ export const CANVAS_OPS = {
       const repos = await githubFor(ctx.db, ctx).repos();
       return repos ? { repos } : { error: GithubRefusal.NotConnected };
     }
+  }),
+
+  github_push: op({
+    access: Access.Write,
+    input: z.object({ name: z.string().min(1).max(100).describe('names the branch feega/<name>; later pushes update its pull request until it is merged, then a new branch opens'), nodeIds: z.array(z.string()).min(1).max(50).describe('code frames imported from one GitHub repo'), title: z.string().max(200).optional(), body: z.string().max(10_000).optional(), confirmSensitive: z.boolean().optional().describe('true after the user agreed to change config files, lockfiles or dotfiles'), mains: z.array(z.string()).max(50).optional().describe('frames whose instance edits go to the main component file instead of props at the usage site'), variants: z.array(z.object({ nodeId: z.string(), choice: z.enum(VariantChoice).describe('replace the original files, push as a new route, or keep on canvas only'), route: z.string().max(300).optional() })).max(50).optional() }).strict(),
+    run: async (ctx, input) => framesPush(framesDeps(ctx.db, ctx), figmaScope(ctx), input)
+  }),
+
+  github_push_status: op({
+    access: Access.Read,
+    input: z.object({ nodeId: z.string() }).strict(),
+    run: async (ctx, input) => frameStatus(framesDeps(ctx.db, ctx), figmaScope(ctx), input.nodeId)
+  }),
+
+  github_undo: op({
+    access: Access.Write,
+    input: z.object({ nodeId: z.string() }).strict(),
+    run: async (ctx, input) => frameUndo(framesDeps(ctx.db, ctx), input.nodeId)
+  }),
+
+  github_variant: op({
+    access: Access.Write,
+    input: z.object({ canvasId: z.string(), nodeId: z.string() }).strict(),
+    run: async (ctx, input) => frameVariant(variantDeps(ctx.db, ctx, input.canvasId), input.nodeId)
+  }),
+
+  github_conflicts: op({
+    access: Access.Read,
+    input: z.object({ nodeId: z.string() }).strict(),
+    run: async (ctx, input) => frameConflicts(framesDeps(ctx.db, ctx), figmaScope(ctx), input.nodeId)
+  }),
+
+  github_resolve: op({
+    access: Access.Write,
+    input: z.object({ nodeId: z.string(), choice: z.enum(ConflictChoice).describe('keep_canvas: the canvas version wins on push; agent: answers a prompt with base, canvas and GitHub versions to merge') }).strict(),
+    run: async (ctx, input) => frameResolve(framesDeps(ctx.db, ctx), figmaScope(ctx), input.nodeId, input.choice)
+  }),
+
+  github_versions: op({
+    access: Access.Read,
+    input: z.object({ nodeId: z.string(), ref: z.string().max(200).optional().describe('branch, tag or sha whose history to list; default the base branch of the link'), limit: z.number().int().positive().max(100).optional() }).strict(),
+    run: async (ctx, input) => frameVersions(framesDeps(ctx.db, ctx), { nodeId: input.nodeId, ref: input.ref, limit: input.limit ?? 30 })
+  }),
+
+  github_compare: op({
+    access: Access.Write,
+    input: z.object({ nodeId: z.string(), refs: z.array(z.string().min(1).max(200)).min(1).max(MAX_VERSIONS).describe('branch, tag, sha, or #<number> for a pull request') }).strict(),
+    run: async (ctx, input) => frameCompare(compareDeps(ctx.db, figmaScope(ctx)), input)
+  }),
+
+  github_version_ref: op({
+    access: Access.Write,
+    input: z.object({ versionId: z.string().describe('a version frame made by github_compare'), ref: z.string().min(1).max(200).describe('branch, tag, sha or #<number>') }).strict(),
+    run: async (ctx, input) => frameRetarget(compareDeps(ctx.db, figmaScope(ctx)), input)
+  }),
+
+  github_version_action: op({
+    access: Access.Write,
+    input: z.object({ versionId: z.string(), action: z.enum(VersionAction).describe('restore: the version files become changes of the linked frame, pushed through Changes and a PR; variant: an unlocked, unlinked copy; code_diff: the files that differ from the base branch') }).strict(),
+    run: async (ctx, input) => versionAction(actionDeps(ctx.db, figmaScope(ctx)), input.action, input.versionId)
+  }),
+
+  github_detach: op({
+    access: Access.Write,
+    input: z.object({ nodeId: z.string() }).strict(),
+    run: async (ctx, input) => frameDetach(framesDeps(ctx.db, ctx), input.nodeId)
   }),
 
   github_branches: op({
@@ -1501,7 +1578,7 @@ export const CANVAS_OPS = {
       if (!node) {
         return NODE_NOT_FOUND;
       }
-      await renameOnCanvas(ctx.db, { orgId: ctx.orgId, canvasId: node.canvasId, ...input });
+      await renameOnCanvas(ctx.db, { orgId: ctx.orgId, canvasId: node.canvasId, ...input, actor: ctx.actor });
       return { renamed: true };
     }
   }),
@@ -1567,7 +1644,7 @@ export const CANVAS_OPS = {
     input: z.object({ path: z.string().describe('from request_canvas_import') }).strict(),
     run: async (ctx, input) => {
       const out = await importStoredCanvasFile(ctx.db, { orgId: ctx.orgId, projectFor: async () => ctx.projectId, path: input.path, actor: ctx.actor });
-      return out.outcome === FeegaImport.Imported ? { canvas: out.canvas, path: canvasPath(ctx.projectId, out.canvas.id) } : { error: out.refusal, message: FEEGA_REFUSAL_MESSAGE[out.refusal] };
+      return out.outcome === FeegaImport.Imported ? { canvas: out.canvas, path: canvasPath(ctx.projectId, out.canvas.id), unlanded: out.unlanded } : { error: out.refusal, message: FEEGA_REFUSAL_MESSAGE[out.refusal] };
     }
   }),
 

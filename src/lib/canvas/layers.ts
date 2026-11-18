@@ -133,12 +133,31 @@ function masksOf(doc: MotionDoc): { masks: Masks; masked: ReadonlySet<string> } 
 
 const groupsTrack = (track: Track, mode: EditMode) => mode === EditMode.Motion && track.clips.length > 1;
 
-function kidsOf(walk: Walk, clip: Clip): Clip[] {
-  const scope = walk.scope ?? [];
-  if (clip.autoLayout) {
-    return childrenInOrder(scope as MotionClip[], clip as MotionClip & { autoLayout: AutoLayout });
+const kidIndexes = new WeakMap<readonly Clip[], Map<string, Clip[]>>();
+
+function kidIndex(scope: readonly Clip[]): Map<string, Clip[]> {
+  const known = kidIndexes.get(scope);
+  if (known) {
+    return known;
   }
-  return scope.filter((c) => c.parent === clip.id);
+  const index = new Map<string, Clip[]>();
+  for (const c of scope) {
+    if (c.parent) {
+      const siblings = index.get(c.parent) ?? [];
+      siblings.push(c);
+      index.set(c.parent, siblings);
+    }
+  }
+  kidIndexes.set(scope, index);
+  return index;
+}
+
+function kidsOf(walk: Walk, clip: Clip): Clip[] {
+  const kids = kidIndex(walk.scope ?? []).get(clip.id) ?? [];
+  if (clip.autoLayout) {
+    return childrenInOrder(kids as MotionClip[], clip as MotionClip & { autoLayout: AutoLayout });
+  }
+  return kids;
 }
 
 const frontFirst = (track: Track): Clip[] => [...track.clips].reverse();
@@ -178,6 +197,23 @@ function onlyIn(doc: MotionDoc, clip: Clip): { only?: string } {
   return ids.length ? { only: viewsOf(doc).filter((v) => ids.includes(v.id)).map((v) => v.name).join(VIEW_JOIN) } : {};
 }
 
+const rowsOf = new WeakMap<Clip, Map<string, LayerRow>>();
+
+const sameRow = (a: LayerRow, b: LayerRow) => {
+  const keys = Object.keys(a) as (keyof LayerRow)[];
+  return keys.length === Object.keys(b).length && keys.every((k) => a[k] === b[k]);
+};
+
+function keptRow(clip: Clip, row: LayerRow): LayerRow {
+  const byKey = rowsOf.get(clip) ?? rowsOf.set(clip, new Map()).get(clip)!;
+  const known = byKey.get(row.key);
+  if (known && sameRow(known, row)) {
+    return known;
+  }
+  byKey.set(row.key, row);
+  return row;
+}
+
 function layerTree(walk: Walk, clip: Clip, depth: number): LayerRow[] {
   const { doc, nodeId, nested, parts, path } = walk;
   const comp = clip.component === 'Precomp' ? String((clip.props as { comp?: string }).comp ?? '') : '';
@@ -202,12 +238,13 @@ function layerTree(walk: Walk, clip: Clip, depth: number): LayerRow[] {
   const nests = comp !== '' && !template;
   const kids = kidsOf(walk, clip);
   row.foldable = nests || kids.length > 0 || undefined;
+  const kept = keptRow(clip, row);
   const open = !walk.folded.has(key);
   const inside = nests && open ? (doc.comps[comp]?.tracks ?? []) : [];
   const own = (parts[clip.id] ?? []).map((part) => partRow(doc, clip, part, nodeId, depth + 1, key));
   const held = open ? kids.flatMap((kid) => clipRows(walk, kid, depth + 1)) : [];
   const compRows = trackRows({ ...walk, ...NO_MASKS, nested: true, parts: {}, path: `${key}${KEY_SEP}`, scene: `${walk.scene ?? ''}${clip.id}${SEPARATOR}${FIRST_LOOP}${SEPARATOR}` }, inside, depth + 1);
-  return [row, ...own, ...held, ...withoutFrame(compRows, doc.comps[comp] ? soleFrame(doc.comps[comp]) : null), ...maskedRows(walk, clip.id, depth + 1)];
+  return [kept, ...own, ...held, ...withoutFrame(compRows, doc.comps[comp] ? soleFrame(doc.comps[comp]) : null), ...maskedRows(walk, clip.id, depth + 1)];
 }
 
 function withoutFrame(rows: LayerRow[], frame: string | null): LayerRow[] {
@@ -456,7 +493,8 @@ export function dropTool(doc: MotionDoc, tool: DrawTool, target: string, place: 
 }
 
 export function dropLayers(doc: MotionDoc, dragged: readonly string[], target: string, place: Place, topFirst: readonly string[], here: string | null = null, newId: NewId = newTrackId): OpResult {
-  const block = topFirst.filter((id) => dragged.includes(id) && id !== target);
+  const moving = new Set(dragged);
+  const block = topFirst.filter((id) => moving.has(id) && id !== target);
   const sequence = place === Place.Below ? [...block].reverse() : block;
   return sequence.reduce<OpResult>((result, id) => (result.ok ? dropLayer(result.doc, id, target, place, newId, here) : result), { ok: true, doc });
 }

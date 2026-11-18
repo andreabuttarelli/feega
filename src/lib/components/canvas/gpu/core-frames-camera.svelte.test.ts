@@ -7,6 +7,7 @@ import type { Item } from '@feega/motion-core/motion/gpu-full/display-list';
 const calls = vi.hoisted(() => ({ cameras: [] as number[][], patches: [] as unknown[], overlays: 0, parts: [] as string[], frames: 0, puts: [] as string[], attached: 0, open: 0, overlapped: 0, lose: false, decoding: false, splices: [] as { from: string; to: string; items: number }[] }));
 
 vi.mock('@feega/motion-core/motion/gpu-full/core-web', () => ({
+  CoreMotion: { Still: 'still', Gesture: 'gesture' },
   createCore: () => {
     calls.attached++;
     calls.overlapped = Math.max(calls.overlapped, calls.open);
