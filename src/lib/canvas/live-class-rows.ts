@@ -59,15 +59,12 @@ const fromCss = (property: string, family: string, make: (value: string) => stri
   preview: (value) => ({ [previewAs]: value ?? '' })
 });
 
-const ROTATE = /rotate\((-?[\d.]+deg)\)/;
 const ALIGN: Record<string, string> = { 'flex-start': 'start', start: 'start', center: 'center', 'flex-end': 'end', end: 'end', stretch: 'stretch', baseline: 'baseline' };
 const JUSTIFY: Record<string, string> = { 'flex-start': 'start', start: 'start', center: 'center', 'flex-end': 'end', end: 'end', 'space-between': 'between', 'space-around': 'around', 'space-evenly': 'evenly' };
 const CASE: Record<string, string> = { uppercase: 'uppercase', lowercase: 'lowercase', capitalize: 'capitalize', none: 'normal-case' };
 const DIRECTION: Record<string, string> = { row: 'flex-row', column: 'flex-col', 'row-reverse': 'flex-row-reverse', 'column-reverse': 'flex-col-reverse' };
 
 const CSS_ROWS = [
-  fromCss('opacity', ClassFamily.Opacity, (v) => `opacity-[${v}]`),
-  { ...fromCss('transform', ClassFamily.Rotate, (v) => `rotate-[${v.match(ROTATE)?.[1] ?? '0deg'}]`), preview: (v: string | undefined) => ({ rotate: v?.match(ROTATE)?.[1] ?? '' }) },
   fromCss('mix-blend-mode', ClassFamily.Blend, (v) => `mix-blend-${v}`),
   fromCss('letter-spacing', ClassFamily.Tracking, (v) => `tracking-[${v}]`),
   fromCss('line-height', ClassFamily.Leading, (v) => `leading-[${v}]`),
@@ -82,7 +79,9 @@ const CSS_ROWS = [
   fromCss('box-shadow', ClassFamily.Shadow, (v) => `shadow-[${arbitrary(v)}]`)
 ];
 
-const KNOWN_CSS = new Set([...CSS_OWNED_ELSEWHERE, ...CSS_ROWS.map((r) => r.property)]);
+const FROM_CLIP_CSS = ['opacity', 'transform', 'filter', 'scale', 'rotate'];
+
+const KNOWN_CSS = new Set([...CSS_OWNED_ELSEWHERE, ...FROM_CLIP_CSS, ...CSS_ROWS.map((r) => r.property)]);
 
 export function cssClassOf(row: ClassRow, value: string): string {
   const known = CSS_ROWS.find((r) => r.family === row.family);
@@ -107,6 +106,35 @@ const signed = (prefix: string, px: string) => (px.startsWith('-') ? `-${prefix}
 
 const scaleOf = (clip: MotionClip, key: 'scaleX' | 'scaleY') => Number((clip.transform as Record<string, number | undefined>)[key] ?? NO_FLIP);
 
+const HUNDREDTHS = 100;
+const fine = (n: number) => String(Math.round(n * HUNDREDTHS) / HUNDREDTHS);
+
+const transformOf = (clip: MotionClip, key: string, fallback: number) => Number((clip.transform as Record<string, number | undefined>)[key] ?? fallback);
+const propOf = (clip: MotionClip, key: string, fallback: number) => (typeof clip.props[key] === 'number' ? (clip.props[key] as number) : fallback);
+
+const FULL = 1;
+const NONE = 0;
+
+const opacityOf = (ctx: ClassCtx) => {
+  const value = propOf(ctx.clip, 'opacity', FULL) * transformOf(ctx.clip, 'opacity', FULL);
+  return value === FULL ? undefined : fine(value);
+};
+
+const rotationOf = (ctx: ClassCtx) => {
+  const degrees = propOf(ctx.clip, 'rotation', NONE) + transformOf(ctx.clip, 'rotateZ', NONE);
+  return degrees === NONE ? undefined : fine(degrees);
+};
+
+const scaleAll = (ctx: ClassCtx) => {
+  const value = propOf(ctx.clip, 'scale', FULL) * transformOf(ctx.clip, 'scale', FULL);
+  return value === FULL ? undefined : fine(value);
+};
+
+const blurOf = (ctx: ClassCtx) => {
+  const px = transformOf(ctx.clip, 'blur', NONE);
+  return px === NONE ? undefined : fine(px);
+};
+
 const DECORATION: Record<string, string> = { underline: 'underline', strikethrough: 'line-through', 'line-through': 'line-through', overline: 'overline' };
 
 const translate = (ctx: ClassCtx) => `${offset('x', 'width')(ctx) ?? 0}px ${offset('y', 'height')(ctx) ?? 0}px`;
@@ -114,6 +142,10 @@ const translate = (ctx: ClassCtx) => `${offset('x', 'width')(ctx) ?? 0}px ${offs
 export type DirectRow = ClassRow & { make: (value: string) => string };
 
 export const DIRECT_ROWS: DirectRow[] = [
+  { family: ClassFamily.Opacity, read: opacityOf, make: (v) => `opacity-[${v}]`, preview: (v) => ({ opacity: v ?? '' }) },
+  { family: ClassFamily.Rotate, read: rotationOf, make: (v) => (v.startsWith('-') ? `-rotate-[${v.slice(1)}deg]` : `rotate-[${v}deg]`), preview: (v) => ({ rotate: v ? `${v}deg` : '' }) },
+  { family: ClassFamily.Scale, read: scaleAll, make: (v) => `scale-[${v}]`, preview: (v) => ({ scale: v ?? '' }) },
+  { family: ClassFamily.Filter, read: blurOf, make: (v) => `blur-[${v}px]`, preview: (v) => ({ filter: v ? `blur(${v}px)` : '' }) },
   { family: ClassFamily.TranslateX, read: offset('x', 'width'), make: (v) => signed('translate-x', v), preview: (_, ctx) => ({ translate: translate(ctx) }) },
   { family: ClassFamily.TranslateY, read: offset('y', 'height'), make: (v) => signed('translate-y', v), preview: (_, ctx) => ({ translate: translate(ctx) }) },
   { family: ClassFamily.Width, read: size('width'), make: (v) => `w-[${v}px]`, preview: (v) => ({ width: v ? `${v}px` : '' }) },
