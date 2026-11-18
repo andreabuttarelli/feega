@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { localStore } from '$lib/server/local/local-mode';
 import { feegaMcp } from '$lib/server/acp/agents';
+import { agentCwd } from '$lib/server/acp/agent-cwd';
 import { acpSessions, type AgentCommand } from '$lib/server/acp/client';
 import { Refresh, detectCached } from '$lib/server/acp/detect';
 import { awaitChoice, choose } from '$lib/server/acp/permissions';
@@ -16,7 +17,7 @@ const SSE_HEADERS = { 'content-type': 'text/event-stream', 'cache-control': 'no-
 
 type Body = { thread?: unknown; agent?: unknown; prompt?: unknown; cancel?: unknown; permission?: { id?: unknown; optionId?: unknown } };
 
-type Turn = { thread: string; agentId: string; agent: AgentCommand; choice: { model: string | null; effort: string | null }; prompt: string };
+type Turn = { cwd: string; thread: string; agentId: string; agent: AgentCommand; choice: { model: string | null; effort: string | null }; prompt: string };
 
 function answer(permission: NonNullable<Body['permission']>): Response {
   if (typeof permission.id !== 'string' || typeof permission.optionId !== 'string') {
@@ -59,7 +60,7 @@ function stream(turn: Turn, signal: AbortSignal): Response {
 
       try {
         const done = await acpSessions.turn(
-          { ...turn, cwd: process.cwd(), mcpServers: [feegaMcp(process.cwd(), process.env.PUBLIC_APP_URL ?? LOCAL_APP_URL)] },
+          { ...turn, mcpServers: [feegaMcp(process.cwd(), process.env.PUBLIC_APP_URL ?? LOCAL_APP_URL)] },
           { onStarting: () => send({ kind: AcpEventKind.Starting }), onUpdate: (update) => send({ kind: AcpEventKind.Update, update }), ask, signal: gone.signal }
         );
         send({ kind: AcpEventKind.Done, stopReason: done.stopReason });
@@ -107,5 +108,5 @@ export const POST: RequestHandler = async ({ request }) => {
     error(CONFLICT, `${detected.agent.name} is not installed here, or cannot run over ACP`);
   }
 
-  return stream({ thread: body.thread, agentId: body.agent, agent: detected.command, choice: { model: opened.acpModel(body.agent), effort: opened.acpEffort(body.agent) }, prompt: body.prompt }, request.signal);
+  return stream({ cwd: agentCwd(opened.path, opened.codes()), thread: body.thread, agentId: body.agent, agent: detected.command, choice: { model: opened.acpModel(body.agent), effort: opened.acpEffort(body.agent) }, prompt: body.prompt }, request.signal);
 };

@@ -4,6 +4,7 @@ import { createInterface } from 'node:readline';
 const send = (msg) => process.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', ...msg })}\n`);
 const pending = new Map();
 let servers = [];
+let sessionCwd = '';
 let nextId = 1000;
 let cancelled = false;
 let turns = 0;
@@ -41,6 +42,7 @@ const HANDLERS = {
   initialize: () => ({ protocolVersion: 1, agentCapabilities: {} }),
   'session/new': (p) => {
     servers = p.mcpServers;
+    sessionCwd = p.cwd;
     return { sessionId: 'fake-session', ...shape() };
   },
   'session/set_config_option': (p) => {
@@ -64,6 +66,11 @@ const HANDLERS = {
         await new Promise((r) => setTimeout(r, 5));
       }
       return { stopReason: 'cancelled' };
+    }
+
+    if (process.env.FAKE_ACP_CWD) {
+      update(p.sessionId, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: `${process.cwd()}|${sessionCwd}` } });
+      return { stopReason: 'end_turn' };
     }
 
     if (process.env.FAKE_ACP_MEMORY) {

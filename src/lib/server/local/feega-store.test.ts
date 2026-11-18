@@ -148,6 +148,16 @@ describe('il file .feega è il database della modalità locale', () => {
     expect(opened.data).not.toHaveProperty('standInFill');
   });
 
+  it('dice da quali codebase vengono i nodi vivi, per far lavorare lì l agente locale', async () => {
+    const store = openFeegaStore(tempFile(), { origin: ORIGIN });
+    const code = { kind: 'folder', repo: '/work/app', branch: null, sha: null, routes: [] };
+    await createNode(store.db, { ...scopeOf(store), type: 'motion', x: 0, y: 0, data: { docHeadRevision: 0, interactive: false, code }, actor });
+    const gone = await createNode(store.db, { ...scopeOf(store), type: 'motion', x: 0, y: 0, data: { docHeadRevision: 0, interactive: false, code: { ...code, repo: '/work/old' } }, actor });
+    await store.db.from('nodes').update({ deleted_at: new Date().toISOString() }).eq('id', gone.id);
+
+    expect(store.codes().filter(Boolean)).toEqual([code]);
+  });
+
   it('un nodo cancellato non torna alla riapertura', async () => {
     const path = tempFile();
     const store = openFeegaStore(path, { origin: ORIGIN });

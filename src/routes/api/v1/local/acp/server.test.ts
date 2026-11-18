@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, readFileSync, existsSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,9 +8,10 @@ import { readAcpEvents, AcpEventKind, type AcpEvent } from '$lib/acp/acp-events'
 
 const local = vi.hoisted(() => ({ on: true }));
 const cancelLog = vi.hoisted(() => ({ path: '' }));
+const project = vi.hoisted(() => ({ file: '/nowhere/canvas.feega', codes: [] as unknown[] }));
 
 vi.mock('$lib/server/local/local-mode', () => ({
-  localStore: () => (local.on ? { acpModel: (agent: string) => (agent === 'codex' ? 'deep' : null), acpEffort: (agent: string) => (agent === 'codex' ? 'max' : null) } : null)
+  localStore: () => (local.on ? { path: project.file, codes: () => project.codes, acpModel: (agent: string) => (agent === 'codex' ? 'deep' : null), acpEffort: (agent: string) => (agent === 'codex' ? 'max' : null) } : null)
 }));
 
 vi.mock('$lib/server/acp/detect', async (real) => {
@@ -22,6 +23,7 @@ vi.mock('$lib/server/acp/detect', async (real) => {
       { agent: { id: 'claude' }, command: fake },
       { agent: { id: 'codex' }, command: { ...fake, env: { FAKE_ACP_MODELS: 'effort' } } },
       { agent: { id: 'chatty' }, command: { ...fake, env: { FAKE_ACP_CHATTY: '1', FAKE_ACP_LOG: cancelLog.path } } },
+      { agent: { id: 'where' }, command: { ...fake, env: { FAKE_ACP_CWD: '1' } } },
       { agent: { id: 'goose' }, command: null }
     ]
   };
@@ -46,6 +48,7 @@ async function runTurn(answer: (e: Extract<AcpEvent, { kind: AcpEventKind.Permis
 describe('POST /api/v1/local/acp', () => {
   beforeEach(() => {
     local.on = true;
+    project.file = join(tmpdir(), 'canvas.feega');
   });
 
   it('streams the turn and waits for the user to allow the tool call', async () => {
@@ -139,5 +142,19 @@ describe('POST /api/v1/local/acp', () => {
     await vi.waitFor(() => expect(existsSync(cancelLog.path) && readFileSync(cancelLog.path, 'utf8')).toContain('cancel'), { timeout: 3000 });
     await new Promise((r) => setTimeout(r, 100));
     await expect(post({ thread: 't', agent: 'nope', prompt: 'x' })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('runs the agent in the folder of the opened .feega file, whatever the client asks', async () => {
+    const home = realpathSync(mkdtempSync(join(tmpdir(), 'acp-home-')));
+    project.file = join(home, 'canvas.feega');
+    const res = await post({ thread: crypto.randomUUID(), agent: 'where', prompt: 'x', cwd: '/' });
+    const said: string[] = [];
+    for await (const e of readAcpEvents(res.body!)) {
+      if (e.kind === AcpEventKind.Update && e.update.content?.text) {
+        said.push(e.update.content.text);
+      }
+    }
+
+    expect(said.join('')).toBe(`${home}|${home}`);
   });
 });

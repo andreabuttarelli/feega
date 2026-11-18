@@ -29,4 +29,10 @@ Left out: attachments (both agents accept ACP image blocks, but local mode has n
 hand them over yet), a thread list (threads are not persisted; reload starts a new one), copy and
 regenerate (the cloud panel has neither). The desktop IPC path keeps one process per turn: it
 has its own CJS client (`apps/desktop/acp-client.cjs`); stop works there through the same
-`cancel` body. The agent's cwd is still the server's working directory.
+`cancel` body.
+
+The agent's working directory was the server checkout (it listed Feega's own repo). `agentCwd`
+now picks the folder that holds the opened `.feega` file, or the single codebase folder the canvas
+imported (`nodes.data.code`, kind `folder`, still on disk); several imported folders fall back to
+the file's folder. It is computed on the server from the store; a `cwd` in the request body is
+ignored.

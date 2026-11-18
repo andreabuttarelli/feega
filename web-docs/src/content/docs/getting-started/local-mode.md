@@ -139,6 +139,10 @@ The endpoint is `GET`/`PUT /api/v1/local/acp/agents/<agent>/models`: `GET` answe
 choice, each model lists its `efforts`, `?refresh=1` asks it again), `PUT { model }` saves one the
 agent offers, `PUT { effort }` saves an effort, and `null` clears either.
 
+The agent works in your project: the folder that holds the opened `.feega` file, or, when the
+canvas imported exactly one codebase folder, that folder. Feega decides it on the server; the tab
+cannot point the agent anywhere else.
+
 The first message of a chat starts the agent (the tab says so: it can take a while, since the
 agent loads its own settings and Feega's MCP server), and later messages reuse the same agent
 session, so it remembers the conversation and answers at once. A chat's agent is closed after

@@ -216,6 +216,7 @@ export function openFeegaStore(path: string, options: FeegaStoreOptions) {
     place,
     db: db as unknown as Db,
     blob: (bucket: string, key: string) => storage.get(`${bucket}/${key}`),
+    codes: () => (tables.get('nodes') ?? []).filter(live).map((n) => (n.data as { code?: unknown } | null)?.code),
     acpAgent: () => acp.acpAgent,
     chooseAcpAgent(id: string | null) {
       acp.acpAgent = id;
