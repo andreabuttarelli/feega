@@ -575,6 +575,7 @@
       "reasoningTrace": "Thinking",
       "price": "${input} in · ${output} out per 1M tokens",
       "effort": {
+        "default": "Default",
         "none": "Off",
         "minimal": "Minimal",
         "low": "Low",

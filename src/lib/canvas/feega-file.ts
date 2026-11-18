@@ -32,7 +32,8 @@ const manifestSchema = z.object({
   canvasName: z.string(),
   source: z.object({ projectId: z.string(), canvasId: z.string() }),
   acpAgent: z.string().nullable().optional(),
-  acpModels: z.record(z.string(), z.string()).optional()
+  acpModels: z.record(z.string(), z.string()).optional(),
+  acpEfforts: z.record(z.string(), z.string()).optional()
 });
 
 const canvasSchema = z.object({

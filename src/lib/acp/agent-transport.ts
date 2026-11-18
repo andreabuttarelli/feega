@@ -115,6 +115,11 @@ function ipcFetch({ bridge, context }: { bridge: LocalAgentsBridge; context: Dep
         return status(ok ? NO_CONTENT : NOT_FOUND);
       }
 
+      if (body.cancel) {
+        await bridge.cancel(current);
+        return status(NO_CONTENT);
+      }
+
       current = crypto.randomUUID();
       const start = async () => bridge.start({ turnId: current, agent: body.agent, prompt: body.prompt, ...(await context()) });
       return streamTurn(bridge, current, start, init?.signal ?? undefined);

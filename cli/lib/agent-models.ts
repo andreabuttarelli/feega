@@ -1,8 +1,8 @@
 import { appUrl, LOCAL_MODE_TOKEN } from './config.ts';
 
-export type AgentModel = { id: string; name: string; description: string | null };
+export type AgentModel = { id: string; name: string; description: string | null; efforts?: string[] };
 
-export type ModelListing = { models: AgentModel[] | null; current: string | null; chosen: string | null };
+export type ModelListing = { models: AgentModel[] | null; current: string | null; chosen: string | null; effort?: string | null; chosenEffort?: string | null };
 
 const ID_WIDTH = 32;
 const NAME_WIDTH = 28;
@@ -24,11 +24,26 @@ export async function listModels(agent: string, { refresh }: { refresh: boolean 
   return (await res.json()) as ModelListing;
 }
 
+const save = (agent: string, choice: { model: string | null } | { effort: string | null }) =>
+  call(endpoint(agent), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(choice) });
+
 export async function setModel(agent: string, model: string | null): Promise<void> {
-  await call(endpoint(agent), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ model }) });
+  await save(agent, { model });
 }
 
-export function modelLines({ models, current, chosen }: ModelListing): string[] {
+export async function setEffort(agent: string, effort: string | null): Promise<void> {
+  await save(agent, { effort });
+}
+
+function effortNote(efforts: string[] | undefined, picked: string | null): string {
+  if (!efforts?.length) {
+    return '';
+  }
+
+  return `effort: ${efforts.map((e) => (e === picked ? `*${e}` : e)).join(' ')}`;
+}
+
+export function modelLines({ models, current, chosen, effort = null, chosenEffort = null }: ModelListing): string[] {
   if (!models) {
     return [NO_CHOICE];
   }
@@ -36,7 +51,7 @@ export function modelLines({ models, current, chosen }: ModelListing): string[] 
   const picked = chosen ?? current;
   return models.map((m) => {
     const mark = m.id === picked ? '*' : ' ';
-    const note = m.id === current ? 'agent default' : '';
+    const note = [m.id === current ? 'agent default' : '', effortNote(m.efforts, chosenEffort ?? effort)].filter(Boolean).join('  ');
     return `${mark} ${m.id.padEnd(ID_WIDTH)} ${m.name.padEnd(NAME_WIDTH)} ${note}`.trimEnd();
   });
 }
