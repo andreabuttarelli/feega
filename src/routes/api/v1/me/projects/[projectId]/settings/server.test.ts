@@ -154,6 +154,7 @@ const ACTIONS: Array<[SettingsSection, string, Record<string, string>]> = [
   [SettingsSection.Profile, 'saveFigmaToken', { token: '' }],
   [SettingsSection.Profile, 'testFigmaToken', {}],
   [SettingsSection.Profile, 'removeFigmaToken', {}],
+  [SettingsSection.Profile, 'saveMemory', { content: 'Prefers short copy.' }],
   [SettingsSection.Profile, 'disconnectCloud', { provider: 'dropbox' }],
   [SettingsSection.Profile, 'uploadProfileAvatar', {}],
   [SettingsSection.Content, 'enable', {}],
