@@ -16,3 +16,9 @@ export type ProjectEvent = RequestEvent<ProjectParams>;
 export type SettingsEvent = ProjectEvent & { parent: () => Promise<ProjectShell> };
 
 export type SettingsActions = Actions<ProjectParams>;
+
+export type SharedShell = Pick<ProjectShell, 'org' | 'brand'> & { project: Pick<ProjectShell['project'], 'id'> | null };
+
+export type SharedEvent = RequestEvent<Partial<ProjectParams>> & { parent: () => Promise<SharedShell> };
+
+export type SharedActions = Actions<Partial<ProjectParams>>;

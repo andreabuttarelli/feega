@@ -1,4 +1,5 @@
 import { can, OrgAction, type OrgRole } from '$lib/org-roles';
+import { DASHBOARD_SETTINGS_PATH, TEAM_PATH } from '$lib/settings/paths';
 import { siInstagram, siTiktok, siFacebook, siX, siThreads, siYoutube, siBluesky, siReddit } from 'simple-icons';
 
 export const PLATFORMS = [
@@ -39,6 +40,20 @@ export type SettingsSection = {
   labelKey: string;
   scope: SettingsScope;
   requiresBrand: boolean;
+  alsoOnCanvas?: true;
+  elsewhere?: string;
+};
+
+export enum SettingsHome {
+  Canvas = 'canvas',
+  Dashboard = 'dashboard'
+}
+
+export const SCOPE_HOME: Record<SettingsScope, SettingsHome> = {
+  project: SettingsHome.Canvas,
+  brand: SettingsHome.Canvas,
+  workspace: SettingsHome.Dashboard,
+  account: SettingsHome.Dashboard
 };
 
 export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
@@ -60,8 +75,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   },
   { path: 'models', labelKey: 'app.settings.models.title', scope: 'workspace', requiresBrand: false },
   { path: 'fonts', labelKey: 'app.settings.fonts.title', scope: 'workspace', requiresBrand: false },
-  { path: 'spend', labelKey: 'app.settings.spend.title', scope: 'workspace', requiresBrand: false },
-  { path: 'team', labelKey: 'app.settings.team.title', scope: 'workspace', requiresBrand: false },
+  { path: 'spend', labelKey: 'app.settings.spend.title', scope: 'workspace', requiresBrand: false, alsoOnCanvas: true },
+  { path: 'team', labelKey: 'app.settings.team.title', scope: 'workspace', requiresBrand: false, elsewhere: TEAM_PATH },
   {
     path: 'content',
     labelKey: 'app.settings.content.title',
@@ -89,20 +104,49 @@ const SCOPE_LABEL_KEYS: Record<SettingsScope, string> = {
   account: 'app.nav.sectionAccount'
 };
 
-const SCOPE_ORDER: readonly SettingsScope[] = ['project', 'workspace', 'brand', 'account'];
-
+const GROUP_ORDER: Record<SettingsHome, readonly SettingsScope[]> = {
+  [SettingsHome.Canvas]: ['project', 'brand'],
+  [SettingsHome.Dashboard]: ['account', 'workspace']
+};
 
 export type SettingsNavEntry = { section: string; labelKey: string };
 
-export const SETTINGS_GROUPS: readonly {
-  labelKey: string;
-  items: readonly SettingsNavEntry[];
-}[] = SCOPE_ORDER.map((scope) => ({
-  labelKey: SCOPE_LABEL_KEYS[scope],
-  items: SETTINGS_SECTIONS.filter((s) => s.scope === scope).map(
-    (s) => ({ section: s.path, labelKey: s.labelKey })
-  )
-})).filter((group) => group.items.length > 0);
+function shownOn(section: SettingsSection, home: SettingsHome): boolean {
+  return SCOPE_HOME[section.scope] === home || (home === SettingsHome.Canvas && section.alsoOnCanvas === true);
+}
+
+function groupScopeOf(section: SettingsSection, home: SettingsHome): SettingsScope {
+  return home === SettingsHome.Canvas && section.alsoOnCanvas ? 'project' : section.scope;
+}
+
+function groupsOn(home: SettingsHome): readonly { labelKey: string; items: readonly SettingsNavEntry[] }[] {
+  return GROUP_ORDER[home]
+    .map((scope) => ({
+      labelKey: SCOPE_LABEL_KEYS[scope],
+      items: SETTINGS_SECTIONS.filter((s) => shownOn(s, home) && groupScopeOf(s, home) === scope).map((s) => ({ section: s.path, labelKey: s.labelKey }))
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
+export const CANVAS_SETTINGS_GROUPS = groupsOn(SettingsHome.Canvas);
+
+export const DASHBOARD_SETTINGS_GROUPS = groupsOn(SettingsHome.Dashboard);
+
+export function dashboardSettingsHref(section: string): string {
+  return SETTINGS_SECTIONS.find((s) => s.path === section)?.elsewhere ?? `${DASHBOARD_SETTINGS_PATH}/${section}`;
+}
+
+export function canvasRedirectOf(pathname: string): string | null {
+  const section = SETTINGS_SECTIONS.find((s) => pathname.replace(/\/$/, '').endsWith(`/settings/${s.path}`));
+  if (!section || shownOn(section, SettingsHome.Canvas)) {
+    return null;
+  }
+  return dashboardSettingsHref(section.path);
+}
+
+export function movedToDashboard(section: string): boolean {
+  return SETTINGS_SECTIONS.some((s) => s.path === section && !shownOn(s, SettingsHome.Canvas));
+}
 
 /** True quando `pathname` (es. `/p/x/settings/video`) è una sezione che richiede un brand. */
 const PERSONAL_SCOPE: SettingsScope = 'account';

@@ -1,7 +1,6 @@
-import { error, fail, redirect } from '@sveltejs/kit';
-import type { ProjectEvent, SettingsActions, SettingsEvent } from '../event';
+import { fail, redirect } from '@sveltejs/kit';
+import type { SharedActions, SharedEvent } from '../event';
 import type { Db } from '$lib/server/db/client';
-import { settingsScope } from '$lib/server/settings-actions';
 import {
   disableUncensored,
   enableUncensored,
@@ -23,19 +22,16 @@ const OPT_IN_ERRORS: Readonly<Record<string, string>> = {
   not_an_adult: 'Only influencers declared 18 or older can be marked.'
 };
 
-async function scopeOf(event: ProjectEvent) {
+async function scopeOf(event: SharedEvent) {
   const { data: { user } } = await event.locals.supabase.auth.getUser();
   if (!user) {
     throw redirect(303, '/login');
   }
-  const scope = await settingsScope(event.locals.supabase, event.params.projectId ?? '');
-  if (!scope) {
-    throw error(404, 'No organization');
-  }
-  return { db: event.locals.supabase as unknown as Db, orgId: scope.orgId, userId: user.id };
+  const { org } = await event.parent();
+  return { db: event.locals.supabase as unknown as Db, orgId: org.id, userId: user.id };
 }
 
-export const load = async (event: SettingsEvent) => {
+export const load = async (event: SharedEvent) => {
   const { db, orgId } = await scopeOf(event);
   const { data: personas } = await event.locals.supabase
     .from('influencers')
@@ -56,7 +52,7 @@ function answer(outcome: OptInOutcome) {
   return outcome.ok ? { saved: true } : fail(400, { error: OPT_IN_ERRORS[outcome.error] ?? outcome.error });
 }
 
-export const actions: SettingsActions = {
+export const actions: SharedActions = {
   enable: async (event) => {
     const { db, orgId, userId } = await scopeOf(event);
     const fd = await event.request.formData();

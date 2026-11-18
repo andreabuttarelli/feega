@@ -19,6 +19,18 @@ const NARROWEST_FIRST: Record<CapScope, number> = {
   [CapScope.OrgMember]: 2
 };
 
+const SCOPES_ON_DASHBOARD: readonly CapScope[] = [CapScope.OrgMember];
+const SCOPES_IN_PROJECT: readonly CapScope[] = [CapScope.ProjectMember, CapScope.ProjectTotal];
+
+export function capScopesOn(projectId: string | null): readonly CapScope[] {
+  return projectId === null ? SCOPES_ON_DASHBOARD : SCOPES_IN_PROJECT;
+}
+
+export function editableCaps(caps: SpendCap[], projectId: string | null): SpendCap[] {
+  const scopes = capScopesOn(projectId);
+  return caps.filter((cap) => scopes.includes(cap.scope) && cap.projectId === projectId);
+}
+
 export function applicableCaps(caps: SpendCap[], projectId: string | null): SpendCap[] {
   return caps.filter((cap) => cap.scope === CapScope.OrgMember || cap.projectId === projectId);
 }

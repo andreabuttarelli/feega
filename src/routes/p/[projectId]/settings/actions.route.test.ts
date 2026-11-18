@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeDb, type Call } from '$lib/server/db/fake-db';
 
 vi.mock('$lib/server/tenancy', () => ({ hasManyTenants: () => true }));
+vi.mock('$lib/server/repos/orgs', async (original) => ({
+  ...(await original<object>()),
+  listMemberships: async () => [{ org: { id: 'org-1', name: 'Org', slug: 'org' }, role: 'owner' }]
+}));
 vi.mock('$lib/server/email', () => ({
   sendEmail: vi.fn(),
   brandInviteEmailSubject: () => 's',
@@ -63,6 +67,16 @@ describe('le azioni delle impostazioni leggono il progetto, non un params.brand 
     const { ev, calls } = event(baseRows(brandId), { key_name: 'CI' });
 
     const result = await run(apiKeyActions.createApiKey, ev);
+
+    expect(result).toMatchObject({ apiKeyCreated: true });
+    expect(writes(calls, 'api_keys', 'insert')[0].payload).toMatchObject({ org_id: ORG, user_id: USER });
+  });
+
+  it('crea una chiave API per l org scelta quando il percorso non ha un progetto', async () => {
+    const { ev, calls } = event(baseRows(null), { key_name: 'CI' });
+    const dashboard = { ...ev, params: {} };
+
+    const result = await run(apiKeyActions.createApiKey, dashboard);
 
     expect(result).toMatchObject({ apiKeyCreated: true });
     expect(writes(calls, 'api_keys', 'insert')[0].payload).toMatchObject({ org_id: ORG, user_id: USER });
