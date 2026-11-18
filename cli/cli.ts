@@ -983,6 +983,14 @@ github
   });
 
 github
+  .command('compare <projectId> <nodeId> <refs...>')
+  .description('Import a linked frame at up to 4 refs (branch, tag, sha, #<pr>) as read-only version frames beside it')
+  .action(async (projectId: string, nodeId: string, refs: string[]) => {
+    const { cmdGithubCompare } = await import('./commands/github.ts');
+    await cmdGithubCompare(projectId, nodeId, refs);
+  });
+
+github
   .command('detach <projectId> <nodeId>')
   .description('Unlink a frame from its GitHub source; the frame stays on the canvas')
   .action(async (projectId: string, nodeId: string) => {

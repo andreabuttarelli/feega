@@ -57,6 +57,16 @@ feega github versions <projectId> <nodeId> [--ref <branch|tag|sha>] [--limit 30]
 
 `POST /api/v1/projects/:id/github/versions` with `{ nodeId, ref?, limit? }` answers `{ ok, entry, refs, commits, pulls }`; MCP `github_versions {nodeId,ref?,limit?}`. A local folder lists its own branches and tags; pull requests appear when its `origin` is on GitHub and a token is available.
 
+## Compare versions
+
+Comparing imports the same page or component at up to four other refs — a branch, a tag, a commit sha, or `#12` for a pull request — and places each one beside the original as a **version frame**. Its header shows the ref (`main`, `feega/x`, `abc1234`, `PR #12`) with a git icon. A version frame is read-only: its layers are locked, it has no link, and it is never pushed.
+
+```bash
+feega github compare <projectId> <nodeId> main feega/x '#12'
+```
+
+`POST /api/v1/projects/:id/github/compare` with `{ nodeId, refs }` answers `{ ok, versions: [{ frameId, ref, label, sha, entry }] }`; MCP `github_compare {nodeId,refs}`. A ref that does not exist answers 404 `not_found`. A local folder is checked out at that commit in a separate temporary git worktree, so your branch and uncommitted work stay as they are.
+
 ## CLI
 
 ```bash
@@ -73,12 +83,13 @@ feega github undo <projectId> <nodeId>
 | `GET` | `/api/v1/projects/:id/github/push?nodeId=` | — |
 | `POST` | `/api/v1/projects/:id/github/push/undo` | `{ nodeId }` |
 | `POST` | `/api/v1/projects/:id/github/versions` | `{ nodeId, ref?, limit? }` |
+| `POST` | `/api/v1/projects/:id/github/compare` | `{ nodeId, refs }` |
 
 Refusals answer `{ ok: false, refusal }`: `not_connected`, `read_only` (403, with `patch`), `secret` and `env_file` (422), `needs_confirm` (428), `busy` (423), `unauthorized` (401), `forbidden` (403).
 
 ## MCP
 
-`github_push`, `github_push_status`, `github_undo` and `github_versions`, with the same inputs.
+`github_push`, `github_push_status`, `github_undo`, `github_versions` and `github_compare`, with the same inputs.
 
 ## What a frame is linked to
 

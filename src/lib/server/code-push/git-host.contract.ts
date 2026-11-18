@@ -122,6 +122,16 @@ export function gitHostContract(world: () => HostWorld | Promise<HostWorld>, pul
     expect(refs).toContainEqual({ name: 'v1', kind: RefKind.Tag, sha: await host.headOf('main') });
   });
 
+  it('la storia di un tag parte dal suo commit', async () => {
+    const { host, tag } = await world();
+    const base = await host.headOf('main');
+    const sha = await host.writeCommit({ parent: base, message: 'Tagged', files: [{ path: 'a', content: 'a' }] });
+    await host.createBranch('feega/t1', sha);
+    await tag('v2', 'feega/t1');
+
+    expect((await host.listCommits('v2', { limit: 1 }))[0]).toMatchObject({ sha, message: 'Tagged' });
+  });
+
   it('elenca i commit di un ref dal più recente, con messaggio e autore, filtrabili per file', async () => {
     const { host } = await world();
     const base = await host.headOf('main');
