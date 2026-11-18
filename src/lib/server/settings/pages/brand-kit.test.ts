@@ -10,11 +10,11 @@ const { kitActions, loadKit } = await import('./brand-kit');
 const BRAND = { id: 'b1', org_id: 'org-1', logo_url: null, palette: [], voice: {}, logos: [] };
 
 function setup(over: Record<string, unknown[]> = {}) {
-  const fake = fakeDb({ projects: [{ id: 'p1', brand_id: 'b1', org_id: 'org-1' }], brands: [{ ...BRAND }], brand_fonts: [], assets: [], canvases: [{ id: 'c1', project_id: 'p1' }], ...over }, { filter: true });
+  const fake = fakeDb({ brands: [{ ...BRAND }], brand_fonts: [], assets: [], canvases: [{ id: 'c1', project_id: 'p1' }], ...over }, { filter: true });
   const event = (fields: Record<string, string | File>) => {
     const fd = new FormData();
     for (const [k, v] of Object.entries(fields)) fd.set(k, v);
-    return { request: new Request('http://x', { method: 'POST', body: fd }), params: { projectId: 'p1' }, locals: { supabase: fake.db } } as never;
+    return { request: new Request('http://x', { method: 'POST', body: fd }), parent: async () => ({ brand: BRAND }), locals: { supabase: fake.db } } as never;
   };
   const updates = (table: string) => fake.calls.filter((c) => c.table === table && c.op === 'update').map((c) => c.payload);
   return { fake, event, updates };
@@ -63,13 +63,13 @@ describe('brand kit settings actions', () => {
     expect(off).toEqual({ brand_id: null, approved_at: null });
   });
 
-  it('loadKit returns the form fields, logos, fonts and recent assets with their approval', async () => {
+  it('loadKit returns the form fields, logos, fonts and recent assets, each thumb on the canvas of the asset own project', async () => {
     const { fake } = setup({
       brands: [{ ...BRAND, palette: [{ hex: '#111111' }], logos: [{ variant: 'dark', url: 'https://x/d.png' }] }],
       brand_fonts: [{ org_id: 'org-1', brand_id: 'b1', role: 'body', google_family: 'Lora', org_font_id: null }],
-      assets: [{ id: 'a1', org_id: 'org-1', type: 'image', brand_id: 'b1', approved_at: '2026-10-01', created_at: '2026-10-01' }]
+      assets: [{ id: 'a1', org_id: 'org-1', type: 'image', brand_id: 'b1', project_id: 'p1', approved_at: '2026-10-01', created_at: '2026-10-01' }]
     });
-    const kit = await loadKit(fake.db, { projectId: 'p1', orgId: 'org-1', brandId: 'b1' });
+    const kit = await loadKit(fake.db, { orgId: 'org-1', brandId: 'b1' });
     expect(kit.fields.palette).toBe('#111111');
     expect(kit.logos).toEqual([{ variant: 'dark', url: 'https://x/d.png' }]);
     expect(kit.fonts.body).toEqual({ google_family: 'Lora', org_font_id: null });

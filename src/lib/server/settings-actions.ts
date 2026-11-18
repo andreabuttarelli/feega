@@ -17,34 +17,14 @@ import { chooseOrg, ORG_COOKIE } from '$lib/server/tenancy/context';
 import type { Db } from '$lib/server/db/client';
 import { appOrigin } from '$lib/server/app-url';
 import { editorCount } from '$lib/server/team/seat-billing';
+import { BRANDS_SETTINGS_PATH } from '$lib/settings/paths';
+import type { BrandEvent } from '$lib/server/settings/event';
 
 const stripeApi = () => import('$lib/server/stripe');
 
-type SettingsBrand = { id: string; slug: string; name: string; org_id: string; zernio_profile_id: string | null };
-
-export type SettingsScope = { projectId: string; orgId: string; brand: SettingsBrand | null };
-
-export async function settingsScope(supabase: SupabaseClient, projectId: string): Promise<SettingsScope | null> {
-  const { data: project } = await supabase
-    .from('projects')
-    .select('org_id, brand_id')
-    .eq('id', projectId)
-    .is('archived_at', null)
-    .maybeSingle();
-  if (!project) return null;
-  if (!project.brand_id) return { projectId, orgId: project.org_id, brand: null };
-
-  const { data: brand } = await supabase
-    .from('brands')
-    .select('id, slug, name, org_id, zernio_profile_id')
-    .eq('id', project.brand_id)
-    .eq('org_id', project.org_id)
-    .maybeSingle();
-  return { projectId, orgId: project.org_id, brand: (brand as SettingsBrand | null) ?? null };
-}
-
-async function scopeOf({ params, locals: { supabase } }: RequestEvent) {
-  return settingsScope(supabase, params.projectId ?? '');
+async function projectOrgId(supabase: SupabaseClient, projectId: string): Promise<string | null> {
+  const { data } = await supabase.from('projects').select('org_id').eq('id', projectId).is('archived_at', null).maybeSingle();
+  return data?.org_id ?? null;
 }
 
 async function isOwnerOf(supabase: SupabaseClient, orgId: string): Promise<boolean> {
@@ -53,12 +33,6 @@ async function isOwnerOf(supabase: SupabaseClient, orgId: string): Promise<boole
   } = await supabase.auth.getUser();
   if (!user) return false;
   return isOrgOwner(supabase, orgId, user.id);
-}
-
-async function ownedScope(event: RequestEvent): Promise<SettingsScope | null> {
-  const scope = await scopeOf(event);
-  if (!scope) return null;
-  return (await isOwnerOf(event.locals.supabase, scope.orgId)) ? scope : null;
 }
 
 const OWNER_ROLE = 'owner';
@@ -77,7 +51,7 @@ async function chosenMembership({ cookies, locals: { supabase } }: RequestEvent)
 
 async function orgIdOf(event: RequestEvent): Promise<string | null> {
   const { projectId } = event.params;
-  if (projectId) return (await settingsScope(event.locals.supabase, projectId))?.orgId ?? null;
+  if (projectId) return projectOrgId(event.locals.supabase, projectId);
   return (await chosenMembership(event))?.membership.org.id ?? null;
 }
 
@@ -241,16 +215,14 @@ export async function buyOneTime(event: Ev) {
   throw redirect(303, checkoutUrl);
 }
 
-export async function deleteBrand(event: Ev) {
-  const scope = await ownedScope(event);
-  if (!scope) return fail(403, { deleteError: 'failed' });
-  const brand = scope.brand;
-  if (!brand) return fail(404, { deleteError: 'failed' });
+export async function deleteBrand(event: BrandEvent) {
+  const { brand } = await event.parent();
   const { supabase } = event.locals;
+  if (!(await isOwnerOf(supabase, brand.org_id))) return fail(403, { deleteError: 'failed' });
   const confirm = String((await event.request.formData()).get('confirm') ?? '').trim();
   if (confirm !== brand.name) return fail(400, { deleteError: 'nameMismatch' });
 
-  const billing = await orgBillingById(supabase, scope.orgId);
+  const billing = await orgBillingById(supabase, brand.org_id);
   if (billing?.subscriptionId && billing.brandCount <= 1) {
     try {
       const { ensureSubscriptionCanceled } = await stripeApi();
@@ -264,10 +236,10 @@ export async function deleteBrand(event: Ev) {
 
   if (!hasManyTenants()) return fail(404, { deleteError: 'not_found' });
 
-  const { error } = await supabase.from('brands').delete().eq('id', brand.id).eq('org_id', scope.orgId);
+  const { error } = await supabase.from('brands').delete().eq('id', brand.id).eq('org_id', brand.org_id);
   if (error) return fail(500, { deleteError: 'failed' });
   invalidateBrandNav(brand.slug);
-  throw redirect(303, `/p/${scope.projectId}/settings/brand`);
+  throw redirect(303, BRANDS_SETTINGS_PATH);
 }
 
 export async function createApiKey(event: Ev) {

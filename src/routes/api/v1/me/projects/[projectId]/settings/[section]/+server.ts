@@ -1,17 +1,18 @@
 import type { RequestHandler } from './$types';
 import { settingsPath, type SettingsSection } from '$lib/settings/sections';
+import { servedForBrand } from '$lib/components/settings/platforms';
 import { ACTION_PARAM } from '$lib/server/api/bearer-page';
 import { actionPick, LOAD_PICK, serveSection, type SectionPick } from '$lib/server/settings/serve-section';
 import { settingsChain } from '../chain';
 
-const everySection = () => true;
+const notBrand = (section: string) => !servedForBrand(section);
 
 const serve = (request: Request, url: URL, projectId: string, section: string, pick: SectionPick) =>
   serveSection({
     request,
     section,
     pick,
-    served: everySection,
+    served: notBrand,
     chain: (bearer) => {
       const { project, page } = settingsChain(bearer, request, url, settingsPath(projectId, section as SettingsSection), projectId);
       return { gate: project, page };

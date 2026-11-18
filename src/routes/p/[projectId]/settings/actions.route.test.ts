@@ -99,14 +99,15 @@ describe('le azioni delle impostazioni leggono il progetto, non un params.brand 
     expect(result).toMatchObject({ status: 404, data: { apiKeyError: 'Key not found, or not yours to revoke' } });
   });
 
-  it('cancella il brand del progetto quando il nome combacia', async () => {
+  it('cancella il brand dell URL quando il nome combacia, e torna all elenco dei brand', async () => {
     const { ev, calls } = event(baseRows(BRAND.id), { confirm: 'Acme' });
+    const withBrand = { ...ev, parent: async () => ({ brand: BRAND }) };
 
-    const outcome = await run(dangerActions.deleteBrand, ev).catch((e: unknown) => e);
+    const outcome = await run(dangerActions.deleteBrand, withBrand).catch((e: unknown) => e);
 
     expect(outcome).toMatchObject({ status: 303 });
     expect(writes(calls, 'brands', 'delete')[0].filters).toContainEqual(['id', BRAND.id]);
-    expect((outcome as { location: string }).location).toBe(`/p/${PROJECT}/settings/brand`);
+    expect((outcome as { location: string }).location).toBe('/app/settings/brands');
   });
 
   it('un progetto di un altra org non si raggiunge', async () => {

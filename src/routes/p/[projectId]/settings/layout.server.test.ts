@@ -89,24 +89,11 @@ describe('settings +layout.server load', () => {
 		return { data, ops: (supabase as unknown as { __ops: any[] }).__ops };
 	}
 
-	it.each(['video', 'danger', 'products'])(
-		'senza brand, la sezione di brand %s chiude il cancello',
-		async (section) => {
-			const { data } = await loadWithoutBrand(section, { brands: [{ id: 'b-1', name: 'Acme', slug: 'acme' }] });
+	it('elenca i brand dell org, per la barra laterale del dashboard', async () => {
+		const { data } = await loadWithoutBrand('api-keys', { brands: [{ id: 'b-1', org_id: 'org-1', name: 'Acme', slug: 'acme' }] });
 
-			expect(data.brandGate).toBe(true);
-			expect(data.orgBrands).toEqual([expect.objectContaining({ id: 'b-1', name: 'Acme' })]);
-		}
-	);
-
-	it.each(['api-keys', 'team', 'profile', 'appearance', 'project', 'brand'])(
-		'senza brand, la sezione %s resta aperta',
-		async (section) => {
-			const { data } = await loadWithoutBrand(section);
-
-			expect(data.brandGate).toBe(false);
-		}
-	);
+		expect(data.orgBrands).toEqual([{ id: 'b-1', name: 'Acme' }]);
+	});
 
 	it('le chiavi API e gli inviti si leggono per org anche senza brand', async () => {
 		const { data, ops } = await loadWithoutBrand('api-keys', {

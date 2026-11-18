@@ -7,6 +7,7 @@
   import { Select } from '$lib/components/ui/select';
   import { Button } from '$lib/components/ui/button';
   import { Notice } from '$lib/components/ui/notice';
+  import { brandSettingsHref } from '$lib/components/settings/platforms';
   import { legalHref } from '$lib/legal-links';
   import { ProjectMode } from '$lib/project-mode';
   import { UNCENSORED_NOTICE, UncensoredLock } from '$lib/uncensored-lock';
@@ -22,6 +23,7 @@
 
   let confirmName = $state('');
   const canDelete = $derived(confirmName === data.project.name);
+  const EDIT_SECTION = 'brand';
   const createHref = $derived(
     `/p/${data.project.id}/brands/new?returnTo=${encodeURIComponent(page.url.pathname)}`
   );
@@ -55,9 +57,15 @@
     </form>
   {/if}
 
+  <form method="POST" action="?/createBrand" use:enhance class="flex gap-2">
+    <Input name="name" type="text" required placeholder="New brand name" aria-label="New brand name" class="h-9" />
+    <Button variant="secondary" type="submit">Create and link</Button>
+  </form>
+
   <div class="flex flex-wrap items-center gap-2">
-    <Button variant="secondary" href={createHref}>Create brand</Button>
+    <Button variant="secondary" href={createHref}>Create brand with the wizard</Button>
     {#if data.linkedBrand}
+      <Button variant="secondary" href={brandSettingsHref(data.linkedBrand.id, EDIT_SECTION)}>Edit this brand</Button>
       <form method="POST" action="?/unlinkBrand" use:enhance>
         <Button variant="ghost" type="submit">Unlink brand</Button>
       </form>

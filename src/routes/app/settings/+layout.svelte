@@ -5,15 +5,25 @@
   import PageTitle from '$lib/components/PageTitle.svelte';
   import PageHead from '$lib/components/PageHead.svelte';
   import { Notice } from '$lib/components/ui/notice';
-  import { DASHBOARD_SETTINGS_GROUPS, dashboardSettingsHref, sectionEditable, SETTINGS_SECTIONS } from '$lib/components/settings/platforms';
+  import { brandPageAt, brandSettingsHref, BRAND_SETTINGS_ITEMS, DASHBOARD_SETTINGS_GROUPS, dashboardSettingsHref, sectionEditable, SETTINGS_SECTIONS } from '$lib/components/settings/platforms';
+  import { BRANDS_SETTINGS_PATH } from '$lib/settings/paths';
   import '$lib/styles/settings-shell.css';
 
   let { data, children } = $props();
 
   const path = $derived($page.url.pathname.replace(/\/$/, ''));
   const editable = $derived(sectionEditable(path, data.org.role as OrgRole));
-  const activeSection = $derived(SETTINGS_SECTIONS.find((s) => path.endsWith(`/settings/${s.path}`))?.path ?? '');
-  const title = $derived($_(SETTINGS_SECTIONS.find((s) => s.path === activeSection)?.labelKey ?? 'app.nav.settings'));
+  const FIRST_BRAND_SECTION = 'brand';
+  const brandPage = $derived(brandPageAt(path));
+  const brandList = $derived(path === BRANDS_SETTINGS_PATH);
+  const activeSection = $derived(brandPage || brandList ? '' : (SETTINGS_SECTIONS.find((s) => path.endsWith(`/settings/${s.path}`))?.path ?? ''));
+  const titleKey = $derived.by(() => {
+    if (brandPage) {
+      return BRAND_SETTINGS_ITEMS.find((i) => i.section === brandPage.section)?.labelKey;
+    }
+    return brandList ? 'app.nav.sectionBrands' : SETTINGS_SECTIONS.find((s) => s.path === activeSection)?.labelKey;
+  });
+  const title = $derived($_(titleKey ?? 'app.nav.settings'));
 </script>
 
 <div class="settings-frame has-nav">
@@ -28,6 +38,12 @@
           href={dashboardSettingsHref(item.section)}>{$_(item.labelKey)}</a
         >
       {/each}
+    {/each}
+    <p class="nav-group">{$_('app.nav.sectionBrands')}</p>
+    <a class="nav-item" class:is-active={brandList} aria-current={brandList ? 'page' : undefined} href={BRANDS_SETTINGS_PATH}>{$_('app.nav.allBrands')}</a>
+    {#each data.orgBrands as brand (brand.id)}
+      {@const current = brandPage?.brandId === brand.id}
+      <a class="nav-item" class:is-active={current} aria-current={current ? 'page' : undefined} href={brandSettingsHref(brand.id, FIRST_BRAND_SECTION)}>{brand.name}</a>
     {/each}
   </nav>
   <div class="content settings-shell">
@@ -86,6 +102,9 @@
     border-radius: var(--ui-radius-sm);
     font-size: var(--ui-type-body);
     text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     transition: background var(--ui-dur-fast) var(--ui-ease);
     color: var(--ui-text-secondary, #6e6e73);
   }

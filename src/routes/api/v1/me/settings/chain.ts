@@ -2,7 +2,7 @@ import { load as settingsShell } from '$lib/server/settings/shell';
 import { appShell } from '$lib/server/dashboard/app-shell';
 import { bearerEvent, type Bearer } from '$lib/server/api/bearer-page';
 
-function once<T>(run: () => Promise<T>): () => Promise<T> {
+export function once<T>(run: () => Promise<T>): () => Promise<T> {
   let pending: Promise<T> | null = null;
   return () => (pending ??= run());
 }
