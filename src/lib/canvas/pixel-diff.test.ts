@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changedRegions, type Pixels } from './pixel-diff';
+import { changedRegions, isBlank, type Pixels } from './pixel-diff';
 
 const W = 64;
 const H = 64;
@@ -15,6 +15,13 @@ function paint(p: Pixels, box: { x: number; y: number; w: number; h: number }): 
   }
   return { ...p, data };
 }
+
+describe('un poster vuoto', () => {
+  it('un colore solo è vuoto, un disegno no', () => {
+    expect(isBlank(blank())).toBe(true);
+    expect(isBlank(paint(blank(), { x: 8, y: 8, w: 4, h: 4 }))).toBe(false);
+  });
+});
 
 describe('le regioni cambiate tra due poster', () => {
   it('due immagini uguali non hanno regioni', () => {
@@ -38,6 +45,18 @@ describe('le regioni cambiate tra due poster', () => {
     const noisy = { ...blank(), data: blank().data.map((v, i) => (i % 4 === 3 ? v : v - 3)) };
 
     expect(changedRegions(blank(), noisy)).toEqual([]);
+  });
+
+  it('lo stesso disegno con i bordi resi in modo diverso non conta', () => {
+    const sharp = paint(blank(), { x: 16, y: 16, w: 16, h: 16 });
+    const soft = { ...sharp, data: new Uint8ClampedArray(sharp.data) };
+    for (let y = 15; y <= 32; y++) {
+      for (const x of [15, 32]) {
+        soft.data.set([128, 128, 128, 255], (y * W + x) * 4);
+      }
+    }
+
+    expect(changedRegions(sharp, soft)).toEqual([]);
   });
 
   it('dimensioni diverse sono un cambiamento su tutto il poster', () => {
