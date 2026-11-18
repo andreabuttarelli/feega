@@ -188,6 +188,39 @@ describe('importPageAt', () => {
     expect(docs.get('frame-1')?.name).toBe('Acme — ship faster');
   });
 
+  it('the frame of an imported page gets a picture of the page it was read from, taken in the same tab', async () => {
+    const shot = { bytes: new Uint8Array([1, 2, 3]), width: 512, height: 360 };
+    const { ask, tab } = askOf();
+    (tab as unknown as { poster: unknown }).poster = vi.fn(async () => shot);
+    const keepPoster = vi.fn(async () => undefined);
+
+    const done = await importPageAt({ ...ask, keepPoster });
+
+    expect(done.outcome).toBe(UrlImportOutcome.Ok);
+    expect(keepPoster).toHaveBeenCalledWith('frame-1', shot);
+    expect(tab.close).toHaveBeenCalled();
+  });
+
+  it('a page picture that cannot be taken or kept does not fail the import', async () => {
+    const { ask, tab } = askOf();
+    (tab as unknown as { poster: unknown }).poster = vi.fn(async () => {
+      throw new Error('screenshot failed');
+    });
+    const failing = askOf();
+    (failing.tab as unknown as { poster: unknown }).poster = vi.fn(async () => ({ bytes: new Uint8Array([1]), width: 512, height: 360 }));
+
+    const shotFailed = await importPageAt({ ...ask, keepPoster: vi.fn(async () => undefined) });
+    const keepFailed = await importPageAt({
+      ...failing.ask,
+      keepPoster: vi.fn(async () => {
+        throw new Error('storage down');
+      })
+    });
+
+    expect(shotFailed.outcome).toBe(UrlImportOutcome.Ok);
+    expect(keepFailed.outcome).toBe(UrlImportOutcome.Ok);
+  });
+
   it('un indirizzo privato è rifiutato prima di aprire il browser', async () => {
     const open = vi.fn();
     const { ask } = askOf({ guard: PRIVATE, open });

@@ -219,7 +219,7 @@ export const actions: Actions = {
     if (out.outcome === FeegaImport.Refused) {
       return fail(HTTP_BAD_REQUEST, { error: FEEGA_REFUSAL_MESSAGE[out.refusal] });
     }
-    throw redirect(HTTP_SEE_OTHER, canvasPath(out.canvas.projectId, out.canvas.id));
+    return { location: canvasPath(out.canvas.projectId, out.canvas.id), unlanded: out.unlanded };
   },
 
   workspace: async (event) => {
