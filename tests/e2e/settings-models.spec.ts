@@ -7,7 +7,7 @@ test.describe('settings models @real', () => {
   test.setTimeout(120_000);
 
   test('lists models per medium with the allow-list form', async ({ page, session }) => {
-    await gotoHydrated(page, `/p/${session.projectId}/settings/models`);
+    await gotoHydrated(page, `/app/settings/models`);
 
     for (const medium of ['image', 'video', 'model3d']) {
       await expect(page.getByTestId(`allowlist-${medium}`)).toBeVisible();

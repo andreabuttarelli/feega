@@ -22,10 +22,12 @@ describe('app sidebar table', () => {
     expect(ids).toEqual(expect.arrayContaining(['home', 'settings', 'billing', 'changelog', 'report', 'legal', 'theme', 'logout']));
   });
 
-  it('hides project-bound entries when there is no project', () => {
+  it('shows settings without a project and sends it to the dashboard profile', () => {
     const ids = visibleNav(null).map((item) => item.id);
-    expect(ids).not.toContain('settings');
-    expect(ids).toContain('billing');
+    const settings = APP_NAV.find((item) => item.id === 'settings')!;
+    expect(ids).toContain('settings');
+    expect(navHref(settings, null)).toBe('/app/settings/profile');
+    expect(navHref(settings, PROJECT)).toBe('/app/settings/profile');
   });
 
   it('links credits to the workspace page, with or without a project', () => {

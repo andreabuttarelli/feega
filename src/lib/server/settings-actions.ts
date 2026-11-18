@@ -65,14 +65,28 @@ const OWNER_ROLE = 'owner';
 
 type OwnerScope = { orgId: string; email: string | undefined };
 
-async function ownerScope({ cookies, locals: { supabase } }: RequestEvent): Promise<OwnerScope | null> {
+async function chosenMembership({ cookies, locals: { supabase } }: RequestEvent) {
   const {
     data: { user }
   } = await supabase.auth.getUser();
   if (!user) return null;
 
   const membership = chooseOrg(await listMemberships(supabase as Db, user.id), cookies.get(ORG_COOKIE) ?? null);
-  if (membership?.role !== OWNER_ROLE) return null;
+  return membership ? { membership, user } : null;
+}
+
+async function orgIdOf(event: RequestEvent): Promise<string | null> {
+  const { projectId } = event.params;
+  if (projectId) return (await settingsScope(event.locals.supabase, projectId))?.orgId ?? null;
+  return (await chosenMembership(event))?.membership.org.id ?? null;
+}
+
+async function ownerScope(event: RequestEvent): Promise<OwnerScope | null> {
+  const chosen = await chosenMembership(event);
+  if (!chosen) return null;
+
+  const { membership, user } = chosen;
+  if (membership.role !== OWNER_ROLE) return null;
 
   return { orgId: membership.org.id, email: user.email };
 }
@@ -261,8 +275,8 @@ export async function createApiKey(event: Ev) {
   const name = String(data.get('key_name') ?? '').trim() || 'API Key';
   const writeAccess = String(data.get('write') ?? '') === 'true';
 
-  const scope = await scopeOf(event);
-  if (!scope) return fail(404, { apiKeyError: 'Project not found' });
+  const orgId = await orgIdOf(event);
+  if (!orgId) return fail(404, { apiKeyError: 'Project not found' });
   const { supabase } = event.locals;
 
   const { raw, hash, prefix } = await generateApiKey();
@@ -273,12 +287,12 @@ export async function createApiKey(event: Ev) {
   } = await supabase.auth.getUser();
   if (!user) return fail(401, { apiKeyError: 'Not authenticated' });
 
-  const role = await memberRole(supabase as Db, { orgId: scope.orgId, userId: user.id });
+  const role = await memberRole(supabase as Db, { orgId, userId: user.id });
   if (!role || !can(role, OrgAction.ManageApiKeys)) return fail(403, { apiKeyError: 'Your role cannot create API keys' });
 
   const { error } = await supabase
     .from('api_keys')
-    .insert({ org_id: scope.orgId, user_id: user.id, name, key_hash: hash, key_prefix: prefix, scopes });
+    .insert({ org_id: orgId, user_id: user.id, name, key_hash: hash, key_prefix: prefix, scopes });
 
   if (error) return fail(500, { apiKeyError: error.message });
 
@@ -289,10 +303,10 @@ export async function revokeApiKey(event: Ev) {
   const id = String((await event.request.formData()).get('key_id') ?? '');
   if (!id) return fail(400, { apiKeyError: 'Missing key ID' });
 
-  const scope = await scopeOf(event);
-  if (!scope) return fail(404, { apiKeyError: 'Project not found' });
+  const orgId = await orgIdOf(event);
+  if (!orgId) return fail(404, { apiKeyError: 'Project not found' });
 
-  const { data: revoked, error } = await event.locals.supabase.from('api_keys').delete().eq('id', id).eq('org_id', scope.orgId).select('id');
+  const { data: revoked, error } = await event.locals.supabase.from('api_keys').delete().eq('id', id).eq('org_id', orgId).select('id');
   if (error) return fail(500, { apiKeyError: error.message });
   if (!revoked?.length) return fail(404, { apiKeyError: 'Key not found, or not yours to revoke' });
 

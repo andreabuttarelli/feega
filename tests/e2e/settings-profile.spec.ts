@@ -4,7 +4,7 @@ import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 const SHEET_MS = 30_000;
 
 async function openProfile(page: Page, projectId: string) {
-  await gotoHydrated(page, `/p/${projectId}/settings/profile`);
+  await gotoHydrated(page, `/app/settings/profile`);
   const sheet = page.locator('.canvas-sheet');
   await expect(sheet.locator('#profile-first-name')).toBeEditable({ timeout: SHEET_MS });
   return sheet;

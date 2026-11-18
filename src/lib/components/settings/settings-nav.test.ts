@@ -1,25 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { SETTINGS_GROUPS, SETTINGS_SECTIONS, sectionRequiresBrand } from './platforms';
+import { CANVAS_SETTINGS_GROUPS, DASHBOARD_SETTINGS_GROUPS, SETTINGS_SECTIONS, sectionRequiresBrand } from './platforms';
 
 describe('la tabella di nav delle impostazioni', () => {
-  it('raggruppa per scope nell\'ordine Progetto, Workspace, Brand, Account', () => {
-    const labels = SETTINGS_GROUPS.map((g) => g.labelKey);
-    expect(labels).toEqual([
-      'app.nav.sectionProject',
-      'app.nav.workspace',
-      'app.nav.sectionBrand',
-      'app.nav.sectionAccount'
-    ]);
+  it('la tela raggruppa Progetto e Brand, il dashboard Account e Workspace', () => {
+    expect(CANVAS_SETTINGS_GROUPS.map((g) => g.labelKey)).toEqual(['app.nav.sectionProject', 'app.nav.sectionBrand']);
+    expect(DASHBOARD_SETTINGS_GROUPS.map((g) => g.labelKey)).toEqual(['app.nav.sectionAccount', 'app.nav.workspace']);
   });
 
-  it('il gruppo Progetto contiene la pagina del progetto', () => {
-    expect(SETTINGS_GROUPS[0].items.map((i) => i.section)).toEqual(['project']);
+  it('il gruppo Progetto contiene la pagina del progetto e i limiti di spesa del progetto', () => {
+    expect(CANVAS_SETTINGS_GROUPS[0].items.map((i) => i.section)).toEqual(['project', 'spend']);
   });
 
-  it('mostra gli stessi gruppi con o senza un brand: la nav non dipende dal brand', () => {
-    const withBrand = SETTINGS_GROUPS.map((g) => g.items.map((i) => i.section));
-    const withoutBrand = SETTINGS_GROUPS.map((g) => g.items.map((i) => i.section));
-    expect(withBrand).toEqual(withoutBrand);
+  it('il profilo è la prima voce del dashboard', () => {
+    expect(DASHBOARD_SETTINGS_GROUPS[0].items[0].section).toBe('profile');
+  });
+
+  it('ogni sezione compare in una nav almeno', () => {
+    const shown = [...CANVAS_SETTINGS_GROUPS, ...DASHBOARD_SETTINGS_GROUPS].flatMap((g) => g.items.map((i) => i.section));
+    expect(shown.toSorted()).toEqual([...SETTINGS_SECTIONS.map((s) => s.path), 'spend'].toSorted());
   });
 
   it('non offre i referral: referrals e referral_codes non esistono nello schema', () => {
@@ -27,7 +25,7 @@ describe('la tabella di nav delle impostazioni', () => {
   });
 
   it('non elenca le sotto-rotte come voci separate', () => {
-    const sections = SETTINGS_GROUPS.flatMap((g) => g.items.map((i) => i.section));
+    const sections = [...CANVAS_SETTINGS_GROUPS, ...DASHBOARD_SETTINGS_GROUPS].flatMap((g) => g.items.map((i) => i.section));
     expect(sections).not.toContain('facebook');
     expect(sections).not.toContain('linkedin');
     expect(sections).not.toContain('connect/[platform]');

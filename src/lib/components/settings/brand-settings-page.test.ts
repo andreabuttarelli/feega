@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { SETTINGS_GROUPS, SETTINGS_SECTIONS } from './platforms';
+import { CANVAS_SETTINGS_GROUPS, SETTINGS_SECTIONS } from './platforms';
 
 const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 const routeDir = (section: string) =>
@@ -25,7 +25,7 @@ describe('la pagina brand mostra solo le colonne vere', () => {
   it('non le lascia nemmeno negli elenchi che disegnano la navigazione', () => {
     const listed = [
       ...SETTINGS_SECTIONS.map((s) => s.path),
-      ...SETTINGS_GROUPS.flatMap((g) => g.items.map((i) => i.section))
+      ...CANVAS_SETTINGS_GROUPS.flatMap((g) => g.items.map((i) => i.section))
     ];
     for (const section of REMOVED) {
       expect(listed, `${section} è ancora in nav`).not.toContain(section);
