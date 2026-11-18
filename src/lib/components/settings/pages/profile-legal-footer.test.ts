@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const page = readFileSync(fileURLToPath(new URL('./+page.svelte', import.meta.url)), 'utf8');
+const page = readFileSync(fileURLToPath(new URL('./ProfilePage.svelte', import.meta.url)), 'utf8');
 
 describe('il profilo mostra il footer legale accanto alle impostazioni cookie', () => {
   it('monta LegalFooter, che porta anche Cookie settings', () => {
