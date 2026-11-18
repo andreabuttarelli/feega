@@ -11,6 +11,8 @@ import { snapshotSchema } from '$lib/canvas/canvas-version';
 import { LOCAL_ORG_ID, LOCAL_USER, openFeegaStore, type FeegaStore } from './feega-store';
 import { orgFontFamilies, storeFontFile } from '$lib/server/motion/font-upload';
 import { listOrgFonts } from '$lib/server/repos/org-fonts';
+import { linkStore } from '$lib/server/code-push/link-store';
+import { linkSchema } from '$lib/server/code-push/link';
 import { listCanvasEvents, recordEvent } from '$lib/server/repos/canvas-events';
 import { agentActor, AgentKey } from '$lib/server/repos/actor';
 import { MAX_PERSISTED_EVENTS } from './feega-store';
@@ -39,6 +41,21 @@ describe('il file .feega è il database della modalità locale', () => {
     await first.flush();
 
     expect(openFeegaStore(path, { origin: ORIGIN }).acpAgent()).toBe('codex');
+  });
+
+  it('il modello scelto per ogni agente resta nel file e torna alla riapertura', async () => {
+    const path = tempFile();
+    const first = openFeegaStore(path, { origin: ORIGIN });
+    expect(first.acpModel('codex')).toBeNull();
+
+    first.chooseAcpModel('codex', 'gpt-5.6-sol');
+    first.chooseAcpModel('claude', 'opus');
+    first.chooseAcpModel('claude', null);
+    await first.flush();
+
+    const reopened = openFeegaStore(path, { origin: ORIGIN });
+    expect(reopened.acpModel('codex')).toBe('gpt-5.6-sol');
+    expect(reopened.acpModel('claude')).toBeNull();
   });
 
   it('un file che non esiste nasce vuoto e viene scritto sul disco', async () => {
@@ -173,6 +190,22 @@ describe('il file .feega è il database della modalità locale', () => {
 
     expect(() => openFeegaStore(path, { origin: ORIGIN })).toThrow(/not a .feega file/i);
     expect(readFileSync(path, 'utf8')).toBe('not a zip');
+  });
+});
+
+describe('i collegamenti al codice stanno nel file .feega', () => {
+  it('collegamento e storia del push sopravvivono alla riapertura', async () => {
+    const path = tempFile();
+    const first = openFeegaStore(path, { origin: ORIGIN });
+    const frame = await addText(first, 'Home');
+    const link = linkSchema.parse({ source: 'folder', repo: '/clones/traidue', entryKind: 'page', entry: 'src/routes/+page.svelte', route: '/', baseBranch: 'main', baseSha: 'abc123', files: ['src/app.css'], pushBranch: 'feega/home', pushSha: 'def456', pushParent: 'abc123', pushTouched: ['src/app.css'] });
+    const scope = (store: FeegaStore) => ({ orgId: LOCAL_ORG_ID, userId: LOCAL_USER.id, projectId: store.place.projectId });
+    await linkStore(first.db, scope(first)).save(frame.id, link);
+    await first.flush();
+
+    const second = openFeegaStore(path, { origin: ORIGIN });
+
+    expect(await linkStore(second.db, scope(second)).read(frame.id)).toEqual(link);
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SourceAction, pushLabel, changedRows, popoverOf, pushAskOf, ciOf, CiState, filesOfPatch, filesToPush, pushedNote, rowTitle, type FrameSync } from './source-changes';
+import { SourceAction, pushLabel, changedRows, popoverOf, pushAskOf, ciOf, CiState, filesOfPatch, filesToPush, impactOf, pushedNote, rowTitle, type FrameSync } from './source-changes';
 
 const sync = (over: Partial<FrameSync> = {}): FrameSync => ({
   nodeId: 'n1',
@@ -14,9 +14,11 @@ const pull = (status: string, checks: { conclusion: string | null }[] = []) => (
 
 describe('il popover di un frame collegato', () => {
   it('dice file, commit corto e le azioni che lo stato permette', () => {
-    expect(popoverOf(sync({ state: 'in_sync' }))).toEqual({ file: 'app/page.tsx', commit: 'abcdef1', branch: 'main', actions: [SourceAction.Detach] });
-    expect(popoverOf(sync({ state: 'newer_upstream' })).actions).toEqual([SourceAction.Update, SourceAction.Detach]);
-    expect(popoverOf(sync({ state: 'in_pull', push: { pull: pull('open') } })).actions).toEqual([SourceAction.ViewPr, SourceAction.Detach]);
+    expect(popoverOf(sync({ state: 'in_sync' }))).toEqual({ file: 'app/page.tsx', commit: 'abcdef1', branch: 'main', actions: [SourceAction.MakeVariant, SourceAction.Detach] });
+    expect(popoverOf(sync({ state: 'newer_upstream' })).actions).toEqual([SourceAction.Update, SourceAction.MakeVariant, SourceAction.Detach]);
+    expect(popoverOf(sync({ state: 'conflict' })).actions).toEqual([SourceAction.Resolve, SourceAction.Update, SourceAction.MakeVariant, SourceAction.Detach]);
+    expect(popoverOf(sync({ state: 'in_pull', push: { pull: pull('open') } })).actions).toEqual([SourceAction.ViewPr, SourceAction.MakeVariant, SourceAction.Detach]);
+    expect(popoverOf(sync({ link: { ...sync().link, variantOf: 'n0' } })).actions).not.toContain(SourceAction.MakeVariant);
   });
 
   it('il file sta sotto la app root', () => {
@@ -47,6 +49,21 @@ describe('il pannello Changes', () => {
     expect(ciOf(pull('open', [{ conclusion: null }]))).toBe(CiState.Running);
     expect(ciOf(pull('open', [{ conclusion: 'success' }, { conclusion: 'failure' }]))).toBe(CiState.Failed);
     expect(ciOf(pull('open', [{ conclusion: 'success' }, { conclusion: 'skipped' }]))).toBe(CiState.Passed);
+  });
+
+  it('una modifica a un file condiviso dice quante pagine tocca', () => {
+    expect(impactOf(sync({ affected: [{ path: 'components/Button.tsx', pages: 3 }] }))).toBe('3 pages affected');
+    expect(impactOf(sync())).toBeNull();
+  });
+
+  it('"applica al componente main" manda il frame tra i main', () => {
+    expect(pushAskOf([sync({ nodeId: 'a' })], new Set(['a']), 'home', new Set(['a']))).toEqual({ name: 'home', nodeIds: ['a'], mains: ['a'] });
+  });
+
+  it('le varianti spuntate portano la scelta fatta', () => {
+    const rows = [sync({ nodeId: 'v', link: { ...sync().link, variantOf: 'a' } })];
+
+    expect(pushAskOf(rows, new Set(['v']), 'home', undefined, [{ nodeId: 'v', choice: 'new_route', route: '/home-b' }])).toEqual({ name: 'home', nodeIds: ['v'], variants: [{ nodeId: 'v', choice: 'new_route', route: '/home-b' }] });
   });
 });
 

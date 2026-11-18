@@ -16,9 +16,11 @@
     "magic-string": "^0.30.0"
   },
   "peerDependencies": {
-    "svelte": ">=5"
+    "svelte": ">=5",
+    "vite": ">=5"
   },
   "peerDependenciesMeta": {
-    "svelte": { "optional": true }
+    "svelte": { "optional": true },
+    "vite": { "optional": true }
   }
 }

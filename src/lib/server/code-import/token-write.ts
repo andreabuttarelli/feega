@@ -3,7 +3,8 @@ import { VarType, splitKey, type VarAlias, type VarLiteral, type Variable, type 
 import { aliasOf, lengthPx, type TokenEntry, type TokenMap } from './design-tokens';
 import { colourOf, writtenLike } from './token-colour';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
-import { applyEdits, atOf, editsOf, type FileChange, type ReadFile } from './write-back';
+import { atOf, editsOf, type FileChange, type ReadFile } from './write-back';
+import { EditTarget, routedEdits, type PropProposal } from './instance-edits';
 import { LIGHT, READ_ONLY, fromPage, parseSheets } from './css-tokens';
 import { parseTokenFile } from './json-tokens';
 import { CONFIG_FILE, readConfigText } from './tailwind-config';
@@ -344,6 +345,8 @@ export async function writeTokens(variables: Variables | undefined, map: TokenMa
   return { files, skipped, map: next };
 }
 
+export type FrameWritten = TokensWritten & { proposals: PropProposal[] };
+
 const importSide = (tokens: TokenMap) => Object.values(tokens).find((entry) => entry.side)?.side;
 
 function stylesAtImport(doc: MotionDoc, tokens: TokenMap): Record<string, Style> {
@@ -356,14 +359,14 @@ function stylesAtImport(doc: MotionDoc, tokens: TokenMap): Record<string, Style>
   return Object.fromEntries(Object.entries(styles).map(([name, style]) => [name, inDoc(inLibrary(style, doc), square)]));
 }
 
-export async function frameEdits(doc: MotionDoc, tokens: TokenMap | undefined, read: ReadFile): Promise<TokensWritten> {
-  const layers = await applyEdits(editsOf(doc), read);
+export async function frameEdits(doc: MotionDoc, tokens: TokenMap | undefined, read: ReadFile, target: EditTarget = EditTarget.Instance): Promise<FrameWritten> {
+  const { proposals, ...layers } = await routedEdits(editsOf(doc), read, target);
   if (!tokens) {
-    return { ...layers, map: {} };
+    return { ...layers, map: {}, proposals };
   }
   const layered = new Map(layers.files.map((f) => [f.path, f]));
   const written = await writeTokens(doc.variables, tokens, async (path) => layered.get(path)?.after ?? read(path), stylesAtImport(doc, tokens));
   const touched = new Set(written.files.map((f) => f.path));
   const files = [...layers.files.filter((f) => !touched.has(f.path)), ...written.files.map((f) => ({ ...f, before: layered.get(f.path)?.before ?? f.before }))];
-  return { files, skipped: [...layers.skipped, ...written.skipped], map: written.map };
+  return { files, skipped: [...layers.skipped, ...written.skipped], map: written.map, proposals };
 }
