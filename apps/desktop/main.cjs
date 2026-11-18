@@ -23,7 +23,7 @@ const DOCS_URL = 'https://docs.feega.app';
 const INSTALL_GUIDE_URL = `${DOCS_URL}/desktop/install-macos/`;
 const nativeCanvas = app.isPackaged ? null : require('./native-canvas.cjs');
 const NativeCanvas = nativeCanvas?.wanted(process.env, process.platform, app.isPackaged) ? nativeCanvas.loadAddon(__dirname) : null;
-const NATIVE_CANVAS_AVAILABLE = 'native-canvas:available';
+const AGENTS_BRIDGE_FILE = 'agents-bridge.cjs';
 const MCP_URL_ENV = 'FEEGA_MCP_URL';
 const REMOTE_MCP_URL = 'https://mcp.feega.app/mcp';
 const agentsDir = () => path.join(app.getPath('userData'), 'agents');
@@ -182,7 +182,7 @@ function leave(url) {
 
 function windowOptions() {
   const base = { width: 1440, height: 900, ...savedBounds(windowStatePath()), minWidth: 800, minHeight: 600, title: 'Feega', backgroundColor: '#0c0c0c', ...frameless(process.platform, nativeTheme.shouldUseDarkColors) };
-  const webPreferences = { ...SECURE_PREFERENCES, preload: path.join(__dirname, PRELOAD_FILE) };
+  const webPreferences = { ...SECURE_PREFERENCES, preload: path.join(__dirname, AGENTS_BRIDGE_FILE) };
   if (!NativeCanvas) {
     return { ...base, webPreferences };
   }
@@ -212,12 +212,10 @@ function installLocalAgents() {
 }
 
 function installNativeCanvas() {
-  ipcMain.on(NATIVE_CANVAS_AVAILABLE, (event) => {
-    event.returnValue = Boolean(NativeCanvas);
-  });
   if (!NativeCanvas) {
     return;
   }
+  session.defaultSession.setPreloads([path.join(__dirname, PRELOAD_FILE)]);
   nativeCanvas.install({
     ipcMain,
     NativeCanvas,

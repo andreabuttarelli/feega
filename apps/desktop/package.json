@@ -26,7 +26,7 @@
       "files.cjs",
       "server.cjs",
       "chrome.cjs",
-      "preload.cjs",
+      "agents-bridge.cjs",
       "local-agents.cjs",
       "acp-agents.cjs",
       "acp-client.cjs"
