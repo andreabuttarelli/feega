@@ -131,7 +131,7 @@ export const DIRECT_ROWS: DirectRow[] = [
     family: ClassFamily.Clamp,
     read: (ctx) => (ctx.clip.props.truncate ? (ctx.clip.props.maxLines ? `line-clamp-${ctx.clip.props.maxLines}` : 'truncate') : undefined),
     make: (v) => v,
-    preview: (v) => (v ? { overflow: 'hidden', display: '-webkit-box', '-webkit-box-orient': 'vertical', '-webkit-line-clamp': v.replace(/\D/g, '') || '1' } : { overflow: '', display: '', '-webkit-line-clamp': '' })
+    preview: (v) => (v ? { overflow: 'hidden', display: '-webkit-box', '-webkit-box-orient': 'vertical', '-webkit-line-clamp': v.replace(/\D/g, '') || '1' } : { overflow: '', display: '', '-webkit-box-orient': '', '-webkit-line-clamp': '' })
   }
 ];
 
