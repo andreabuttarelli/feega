@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { CANVAS_SETTINGS_GROUPS } from '$lib/components/settings/platforms';
 import { SHEET_PAGE_LOADERS, settingsPageLoader, settingsSectionOf, settingsSheetSection } from './sheet-pages';
 
 describe('settingsSectionOf: quale cartella sotto settings/ risponde a questo path', () => {
@@ -21,8 +22,11 @@ describe('settingsSectionOf: quale cartella sotto settings/ risponde a questo pa
 });
 
 describe('settingsPageLoader: la sezione trova la sua pagina reale', () => {
-  it('ogni sezione esistente sotto settings/ ha un loader', () => {
-    for (const section of ['project', 'spend']) {
+  it('ogni sezione che la tela mostra sotto settings/ ha un loader', () => {
+    const sections = CANVAS_SETTINGS_GROUPS.flatMap((group) => group.items.map((item) => item.section));
+
+    expect(sections.length).toBeGreaterThan(0);
+    for (const section of sections) {
       expect(settingsPageLoader(`/settings/${section}`), `manca la pagina per ${section}`).not.toBeNull();
     }
   });
