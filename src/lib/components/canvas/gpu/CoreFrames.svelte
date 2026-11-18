@@ -267,7 +267,6 @@
     }
     markFrame(f.id, Step.Source);
     const source = place ? tieredAssets(fetched, place, at) : fetched;
-    onsource(f.id, { ...source, revision: f.revision });
     const built = await builtOff(f, source);
     builtTiers.set(f.id, { revision: f.revision, at, list: built.list, custom: built.custom !== null });
     return { ...built, source };
@@ -345,7 +344,7 @@
     markFrame(f.id, Step.Built);
     markStartup(StartupStep.FirstBuilt);
     if (read) {
-      onsource(f.id, { ...read.source, revision: f.revision });
+      idle(() => onsource(f.id, { ...read.source, revision: f.revision }));
     }
     const key = keyOf(f);
     const held = shownBefore({ thumb: thumbShown.has(f.id), drawn: presented.has(f.id) });
@@ -716,13 +715,15 @@
   }
 
   function seedLive(f: FrameAt, source: LiveDoc, list: DisplayList, pictured: Promise<Readiness>) {
-    void pictured.then((ready) => {
-      if (liveShown.has(f.id)) {
-        return;
-      }
-      liveShown.set(f.id, { doc: source.doc, list, ready });
-      measureLive(f, source);
-    });
+    void pictured.then((ready) =>
+      idle(() => {
+        if (liveShown.has(f.id)) {
+          return;
+        }
+        liveShown.set(f.id, { doc: source.doc, list, ready });
+        measureLive(f, source);
+      })
+    );
   }
 
   type ShownLive = { doc: MotionDoc; list: DisplayList; ready: Awaited<ReturnType<typeof media.ready>> };
