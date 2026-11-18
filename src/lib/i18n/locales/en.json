@@ -377,6 +377,11 @@
       },
       "content": {
         "title": "Content policy"
+      },
+      "history": {
+        "desc": "Saved versions of a canvas. Open one to compare it or bring it back.",
+        "canvas": "Canvas",
+        "empty": "This project has no canvas yet."
       }
     },
     "studio": {

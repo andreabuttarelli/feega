@@ -1,18 +1,16 @@
 <script lang="ts" module>
-  export type LeftPanelKind = 'layers' | 'assets' | 'brands' | 'influencers' | 'components' | 'history' | 'styles' | 'ai';
+  export type LeftPanelKind = 'layers' | 'assets' | 'brands' | 'components' | 'styles' | 'ai';
 </script>
 
 <script lang="ts">
   import { _ } from 'svelte-i18n';
   import ProjectDragPanel from './ProjectDragPanel.svelte';
-  import InfluencersPanel from './InfluencersPanel.svelte';
   import BrandsPanel from './BrandsPanel.svelte';
   import LayersPanel from './LayersPanel.svelte';
   import PagesList from './PagesList.svelte';
   import type { ComponentProps } from 'svelte';
   import ProjectComponentsPanel from './ProjectComponentsPanel.svelte';
   import AiNodesPanel from './AiNodesPanel.svelte';
-  import HistoryPanel from './HistoryPanel.svelte';
   import StyleLibrarySection from '$lib/components/motion/StyleLibrarySection.svelte';
   import { StyleLayout } from '$lib/components/motion/style-layout';
   import ColourTokensSection from '$lib/components/motion/ColourTokensSection.svelte';
@@ -55,11 +53,7 @@
   const widthStyle = $derived(docked ? undefined : `width: min(${panelWidth}px, calc(100vw - 92px));`);
 </script>
 
-{#if kind === 'influencers'}
-  <div class="left-panel" style={widthStyle} class:is-docked={docked}>
-    <InfluencersPanel {projectId} {onclose} />
-  </div>
-{:else if kind === 'layers'}
+{#if kind === 'layers'}
   <div class="left-panel is-tree" class:is-docked={docked} style={widthStyle} data-testid="pages-layers">
     <PagesList {...pages} />
     <div class="section-head">
@@ -88,12 +82,8 @@
       {:else if kind === 'styles'}
         <StyleLibrarySection tokens={FEEGA_TOKENS} layout={StyleLayout.Split} />
         <div class="tokens-region"><ColourTokensSection /></div>
-      {:else if kind === 'history'}
-        {#if pages.currentId}
-          <HistoryPanel {projectId} canvasId={pages.currentId} />
-        {/if}
       {:else if kind === 'ai'}
-        <AiNodesPanel />
+        <AiNodesPanel {projectId} />
       {:else if kind === 'brands'}
         <BrandsPanel {projectId} />
       {:else}

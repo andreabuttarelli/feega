@@ -5,6 +5,9 @@
   import { AI_PANEL_NODES } from '$lib/canvas/ai-panel';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
   import { insertRequest } from '$lib/canvas/insert-request.svelte';
+  import InfluencersPanel from './InfluencersPanel.svelte';
+
+  let { projectId }: { projectId: string } = $props();
 
   const nodes = AI_PANEL_NODES.filter(() => !isOff(LocalOff.AiNodes));
 
@@ -23,11 +26,20 @@
   {/each}
 </div>
 
+<section class="influencers" data-testid="ai-panel-influencers">
+  <InfluencersPanel {projectId} />
+</section>
+
 <style>
   .list {
     display: flex;
     flex-direction: column;
     gap: 2px;
+  }
+
+  .influencers {
+    margin-top: 12px;
+    border-top: 1px solid var(--ui-divider);
   }
 
   .row {

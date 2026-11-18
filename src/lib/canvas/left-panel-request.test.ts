@@ -8,10 +8,10 @@ const read = (name: string) => readFileSync(fileURLToPath(new URL(name, import.m
 describe('chiedere un pannello a sinistra da fuori del layout', () => {
   it('ogni richiesta porta il pannello voluto e conta come nuova, anche se uguale alla precedente', () => {
     const before = leftPanelRequest.asked;
-    leftPanelRequest.ask('history');
-    leftPanelRequest.ask('history');
+    leftPanelRequest.ask('styles');
+    leftPanelRequest.ask('styles');
 
-    expect(leftPanelRequest.kind).toBe('history');
+    expect(leftPanelRequest.kind).toBe('styles');
     expect(leftPanelRequest.asked).toBe(before + 2);
   });
 

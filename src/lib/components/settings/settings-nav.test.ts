@@ -8,7 +8,7 @@ describe('la tabella di nav delle impostazioni', () => {
   });
 
   it('il gruppo Progetto contiene la pagina del progetto e i limiti di spesa del progetto', () => {
-    expect(CANVAS_SETTINGS_GROUPS[0].items.map((i) => i.section)).toEqual(['project', 'spend']);
+    expect(CANVAS_SETTINGS_GROUPS[0].items.map((i) => i.section)).toEqual(['project', 'history', 'spend']);
   });
 
   it('il profilo è la prima voce del dashboard', () => {

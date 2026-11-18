@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { NAV_ENTRIES, navEntriesByGroup, railEntries, navHref, sheetEntryForPath, BURGER_ENTRIES, mobileNavHref, directLoadMode, panelForShortcut } from './shell-nav';
 
 describe('la rail: due gruppi, un comportamento a testa', () => {
-  it('the "panel" group is Assets, Brands, Influencers, Components, History, Styles and AI, in this order', () => {
-    expect(navEntriesByGroup('panel').map((e) => e.id)).toEqual(['assets', 'brands', 'influencers', 'components', 'history', 'styles', 'ai']);
+  it('the "panel" group is Assets, Brands, Components, Styles and AI, in this order: Influencers live inside AI, History inside the project settings', () => {
+    expect(navEntriesByGroup('panel').map((e) => e.id)).toEqual(['assets', 'brands', 'components', 'styles', 'ai']);
   });
 
   it('the "canvas" group is Layers: a panel beside the canvas, never a burger link to a page that does not exist', () => {
@@ -18,7 +18,7 @@ describe('la rail: due gruppi, un comportamento a testa', () => {
 
   it('every rail panel has an Alt+digit shortcut, in rail order', () => {
     const rail = [...navEntriesByGroup('canvas'), ...navEntriesByGroup('panel')];
-    expect(rail.map((e) => e.shortcut)).toEqual(['Alt+1', 'Alt+2', 'Alt+3', 'Alt+4', 'Alt+5', 'Alt+6', 'Alt+7', 'Alt+8']);
+    expect(rail.map((e) => e.shortcut)).toEqual(['Alt+1', 'Alt+2', 'Alt+3', 'Alt+4', 'Alt+5', 'Alt+6']);
   });
 
   it('Alt+digit resolves to the panel that carries it, nothing else does', () => {
@@ -26,7 +26,7 @@ describe('la rail: due gruppi, un comportamento a testa', () => {
     expect(panelForShortcut(key('Digit1'))?.id).toBe('layers');
     expect(panelForShortcut(key('Digit3'))?.id).toBe('brands');
     expect(panelForShortcut(key('Digit1', false))).toBeNull();
-    expect(panelForShortcut(key('Digit9'))).toBeNull();
+    expect(panelForShortcut(key('Digit7'))).toBeNull();
   });
 
   it('ogni voce del gruppo panel apre un pannello, ogni voce workbench un foglio o una pagina sua', () => {

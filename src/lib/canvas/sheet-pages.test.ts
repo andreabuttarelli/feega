@@ -22,7 +22,7 @@ describe('settingsSectionOf: quale cartella sotto settings/ risponde a questo pa
 
 describe('settingsPageLoader: la sezione trova la sua pagina reale', () => {
   it('ogni sezione esistente sotto settings/ ha un loader', () => {
-    for (const section of ['brand', 'spend', 'danger', 'products']) {
+    for (const section of ['project', 'history', 'spend']) {
       expect(settingsPageLoader(`/settings/${section}`), `manca la pagina per ${section}`).not.toBeNull();
     }
   });
@@ -43,15 +43,15 @@ describe('SHEET_PAGE_LOADERS: il foglio scarica le sue pagine solo quando si apr
 });
 
 describe('settingsSheetSection: la pagina arriva insieme ai dati della sua sezione', () => {
-  it('la pagina delle spese non riceve mai i dati dei font', async () => {
-    const [spend, fonts] = await Promise.all([
+  it('la pagina delle spese non riceve mai i dati del progetto', async () => {
+    const [spend, project] = await Promise.all([
       settingsSheetSection('/settings/spend', { caps: [] }),
-      settingsSheetSection('/settings/brand', { brand: [] })
+      settingsSheetSection('/settings/project', { project: [] })
     ]);
 
     expect(spend?.data).toEqual({ caps: [] });
     expect(spend?.Page).toBe((await settingsPageLoader('/settings/spend')!()).default);
-    expect(fonts?.data).toEqual({ brand: [] });
+    expect(project?.data).toEqual({ project: [] });
   });
 
   it('una sezione inesistente non trova niente', () => {

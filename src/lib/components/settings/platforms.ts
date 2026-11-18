@@ -54,6 +54,7 @@ export const SCOPE_HOME: Record<SettingsScope, SettingsHome> = {
 
 export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   { path: 'project', labelKey: 'app.settings.project.title', scope: 'project' },
+  { path: 'history', labelKey: 'app.nav2.history', scope: 'project' },
   { path: 'brand', labelKey: 'app.studio.tabs.brand', scope: 'brand' },
   {
     path: 'products',

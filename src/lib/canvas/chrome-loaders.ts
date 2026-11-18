@@ -10,8 +10,6 @@ export const ENTRY_PREFETCH: Record<string, () => Promise<{ default: unknown }>>
   components: CHROME_LOADERS.leftPanel,
   assets: CHROME_LOADERS.leftPanel,
   brands: CHROME_LOADERS.leftPanel,
-  influencers: CHROME_LOADERS.leftPanel,
-  history: CHROME_LOADERS.leftPanel,
   styles: CHROME_LOADERS.leftPanel,
   ai: CHROME_LOADERS.leftPanel,
   settings: SHEET_PAGE_LOADERS.settingsLayout

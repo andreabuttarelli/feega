@@ -2,12 +2,10 @@
   import { _ } from 'svelte-i18n';
   import { historyPanel } from '$lib/canvas/history-panel.svelte';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
-  import { commentsPanel } from '$lib/canvas/comments-panel.svelte';
   import { modeOf, ProjectMode } from '$lib/project-mode';
   import '$lib/styles/tailwind.css';
   import { page } from '$app/state';
   import { onDestroy, untrack } from 'svelte';
-  import { LocalOff, isOff } from '$lib/local-user';
   import CanvasTopBar from '$lib/components/canvas/CanvasTopBar.svelte';
   import FloatingRail from '$lib/components/canvas/FloatingRail.svelte';
   import type { LeftPanelKind } from '$lib/components/canvas/CanvasLeftPanel.svelte';
@@ -50,6 +48,8 @@
   import { PhoneSheetKind, phoneSheets } from '$lib/canvas/phone-sheets.svelte';
   import { Detent } from '$lib/motion/sheet-detents';
 
+  const HISTORY_SETTINGS_PATH = '/settings/history';
+
   let { data, children } = $props();
 
   const PHONE_SWITCH_PX = 64;
@@ -63,8 +63,7 @@
     canvases: data.canvases,
     currentId: canvasId,
     onHistory: () => historyPanel.show(),
-    onComments: isOff(LocalOff.Comments) ? null : () => commentsPanel.show(),
-    commentsUnseen: commentsPanel.unseen
+    onComments: null
   });
   const activeSheetId = $derived(page.state.sheet ? sheetEntryForPath(page.state.sheet.path)?.id ?? null : null);
 
@@ -123,7 +122,7 @@
 
   $effect(() => {
     if (historyPanel.asked) {
-      leftPanel = 'history';
+      void openSheet(projectId, HISTORY_SETTINGS_PATH);
     }
   });
 
