@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3
+
+- Also published on Open VSX, for Cursor, Windsurf and VSCodium.
+
 ## 0.1.2
 
 - Open `.feega` canvases in the editor: motion video, UI and graphic design on one canvas.
