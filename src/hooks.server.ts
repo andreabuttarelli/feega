@@ -32,6 +32,7 @@ import { THEME_COOKIE, THEME_COOKIE_MAX_AGE_S, THEME_METADATA_KEY, ThemePref, ht
 import { HANDOFF_NONCE, HANDOFF_RESUMED, handoffOf } from '$lib/home/handoff';
 import { ProductEvent, track } from '$lib/server/product-events/track';
 import { HOME_DRAFT_COOKIE, HOME_DRAFT_MAX_AGE_S } from '$lib/home/home-draft';
+import { Session, syncSignedInHint } from '$lib/server/signed-in-hint';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
@@ -228,6 +229,8 @@ export const handle: Handle = sequence(cors, hostRedirect, marketingRedirect, cs
   // Marchiato come RLS-scoped: chiave anon, quindi Postgres valuta le policy dell'utente. È la
   // dichiarazione su cui `query` decide di leggere — vedi $lib/server/rls-client.
   staleSessionCookieNames(event.cookies.getAll().map(({ name }) => name), SESSION_COOKIE_NAME).forEach((name) => event.cookies.delete(name, { path: '/' }));
+  const hasSessionCookie = validSessionCookies(event.cookies.getAll()).some(({ name }) => isSessionCookie(name));
+  syncSignedInHint(event.cookies, event.url.hostname, hasSessionCookie ? Session.Present : Session.Absent);
   const requestBearer = bearerTokenOf(event.request) ?? grantBearerOf(event.request);
   const source = sessionSourceOf(event.request, event.url);
   event.locals.supabase = markRlsScoped(createServerClient(publicEnv.PUBLIC_SUPABASE_URL, publicEnv.PUBLIC_SUPABASE_ANON_KEY, {
