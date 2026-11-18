@@ -6,7 +6,7 @@ const FIRST = () => 0;
 
 describe('pictures wait for the vectors still owed on screen', () => {
   it('lets only a few frames fetch pictures while an on-screen frame still lacks its vectors (sources queued behind 800 pictures)', async () => {
-    const turns = pictureTurns(1);
+    const turns = pictureTurns({ whileOwed: 1, open: Infinity });
     turns.owed(true);
     const started: number[] = [];
 
@@ -18,7 +18,7 @@ describe('pictures wait for the vectors still owed on screen', () => {
   });
 
   it('hands the next turn when one is done', async () => {
-    const turns = pictureTurns(1);
+    const turns = pictureTurns({ whileOwed: 1, open: Infinity });
     turns.owed(true);
     const started: number[] = [];
 
@@ -31,7 +31,7 @@ describe('pictures wait for the vectors still owed on screen', () => {
   });
 
   it('opens every waiting frame once nothing on screen owes vectors', async () => {
-    const turns = pictureTurns(1);
+    const turns = pictureTurns({ whileOwed: 1, open: Infinity });
     turns.owed(true);
     const started: number[] = [];
 
@@ -45,7 +45,7 @@ describe('pictures wait for the vectors still owed on screen', () => {
   });
 
   it('never holds a frame when the limit is unbounded (hosted: pictures come from another host)', async () => {
-    const turns = pictureTurns(Infinity);
+    const turns = pictureTurns({ whileOwed: Infinity, open: Infinity });
     turns.owed(true);
     const started: number[] = [];
 
@@ -57,7 +57,7 @@ describe('pictures wait for the vectors still owed on screen', () => {
   });
 
   it('hands the next turn to the frame nearest the centre, not to the first that asked', async () => {
-    const turns = pictureTurns(1);
+    const turns = pictureTurns({ whileOwed: 1, open: Infinity });
     turns.owed(true);
     const started: string[] = [];
 
@@ -71,7 +71,7 @@ describe('pictures wait for the vectors still owed on screen', () => {
   });
 
   it('ranks at hand-out time, so a frame the camera moved to goes first', async () => {
-    const turns = pictureTurns(1);
+    const turns = pictureTurns({ whileOwed: 1, open: Infinity });
     turns.owed(true);
     const started: string[] = [];
     const rank = { a: 10, b: 900 };
@@ -85,6 +85,23 @@ describe('pictures wait for the vectors still owed on screen', () => {
     await settled();
 
     expect(started).toEqual(['b']);
+  });
+});
+
+describe('pictures once nothing on screen owes vectors', () => {
+  it('still caps the frames fetching at once, so an on-screen frame built later is not queued behind every off-screen one', async () => {
+    const turns = pictureTurns({ whileOwed: 1, open: 2 });
+    const started: string[] = [];
+
+    const first = await turns.take(() => 0);
+    void turns.take(() => 0).then(() => started.push('second'));
+    void turns.take(() => 5000).then(() => started.push('off-screen'));
+    void turns.take(() => 10).then(() => started.push('on-screen'));
+    await settled();
+    first();
+    await settled();
+
+    expect(started).toEqual(['second', 'on-screen']);
   });
 });
 

@@ -6,12 +6,14 @@ export type PictureTurns = { take: (rank: Rank) => Promise<Done>; owed: (vectors
 
 type Waiting = { rank: Rank; start: (done: Done) => void };
 
-export function pictureTurns(whileOwed: number): PictureTurns {
+export type PictureLimits = { whileOwed: number; open: number };
+
+export function pictureTurns({ whileOwed, open }: PictureLimits): PictureTurns {
   const waiting: Waiting[] = [];
   let taken = 0;
   let held = false;
 
-  const room = () => !held || taken < whileOwed;
+  const room = () => taken < (held ? whileOwed : open);
 
   const done = () => {
     taken--;

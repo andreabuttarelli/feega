@@ -1,5 +1,6 @@
 import { env as publicEnv } from '$env/dynamic/public';
 import { HOSTED_SOURCE_ASKS, type SourceAsks } from '$lib/canvas/core/frame-sources';
+import type { PictureLimits } from '$lib/canvas/core/picture-turns';
 
 export const LOCAL_ORG_ID = '00000000-0000-4000-8000-00000000f001';
 export const LOCAL_USER_ID = '00000000-0000-4000-8000-00000000f002';
@@ -11,9 +12,10 @@ const LOCAL_SOURCE_ASKS: SourceAsks = { framesPerAsk: 2, open: 2 };
 
 export const sourceAsksFor = (env: Record<string, string | undefined>): SourceAsks => (isLocalMode(env) ? LOCAL_SOURCE_ASKS : HOSTED_SOURCE_ASKS);
 
-const LOCAL_PICTURES_WHILE_VECTORS_OWED = 3;
+const LOCAL_PICTURE_LIMITS: PictureLimits = { whileOwed: 3, open: 6 };
+const HOSTED_PICTURE_LIMITS: PictureLimits = { whileOwed: Infinity, open: Infinity };
 
-export const picturesWhileVectorsOwed = (env: Record<string, string | undefined>): number => (isLocalMode(env) ? LOCAL_PICTURES_WHILE_VECTORS_OWED : Infinity);
+export const pictureLimitsFor = (env: Record<string, string | undefined>): PictureLimits => (isLocalMode(env) ? LOCAL_PICTURE_LIMITS : HOSTED_PICTURE_LIMITS);
 
 export enum LocalOff {
   CookieBanner = 'cookie_banner',
