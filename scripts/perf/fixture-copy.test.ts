@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { accessSync, chmodSync, constants, existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -14,5 +14,15 @@ describe('a bench fixture copy', () => {
 
     copy.dispose();
     expect(existsSync(dirname(copy.file))).toBe(false);
+  });
+
+  it('can be saved into when the source fixture is read-only', () => {
+    const source = join(mkdtempSync(join(tmpdir(), 'fixture-src-')), 'a.feega');
+    writeFileSync(source, 'x');
+    chmodSync(source, 0o444);
+
+    const copy = fixtureCopy(source);
+    expect(() => accessSync(copy.file, constants.W_OK)).not.toThrow();
+    copy.dispose();
   });
 });
