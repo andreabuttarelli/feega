@@ -59,7 +59,7 @@ function frame(x: Ctx): Item[] {
   const stage = { x: 0, y: 0, w: c.w, h: Math.max(1, c.h - MOTION_NODE_BAR_H) };
   const media = c.face.media;
   if (!media) {
-    return panel(x, false);
+    return c.face.tint ? [...panel(x, false), solid(x.clip(CardPart.Stage), at(c, [rect(stage.x, stage.y, stage.w, stage.h)]), c.face.tint)] : panel(x, false);
   }
   return [...panel(x, false), solid(x.clip(CardPart.Stage), at(c, [rect(stage.x, stage.y, stage.w, stage.h)]), STAGE), image(x, CardPart.Media, media, stage, Fit.Contain)];
 }
