@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { RunListing } from '$lib/canvas/run-graph';
-  import History from '@lucide/svelte/icons/history';
+  import WandSparkles from '@lucide/svelte/icons/wand-sparkles';
   import { tip } from '$lib/motion/tooltip';
   import type { Snippet } from 'svelte';
 
@@ -32,7 +32,7 @@
       <button type="button" data-testid="run-all-stale" onclick={onrunstale}>Run all out of date ({staleCount})</button>
     {/if}
     <button type="button" class="runs-toggle" aria-label={RUNS_LABEL} aria-expanded={open} use:tip={{ name: RUNS_LABEL, keys: '' }} onclick={() => (open = !open)}>
-      <History size={16} />
+      <WandSparkles size={16} />
       {#if activeCount}<span class="count" data-testid="runs-active">{activeCount}</span>{/if}
     </button>
   </div>

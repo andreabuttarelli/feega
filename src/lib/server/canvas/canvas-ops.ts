@@ -1550,7 +1550,7 @@ export const CANVAS_OPS = {
       if (!node) {
         return NODE_NOT_FOUND;
       }
-      await renameOnCanvas(ctx.db, { orgId: ctx.orgId, canvasId: node.canvasId, ...input });
+      await renameOnCanvas(ctx.db, { orgId: ctx.orgId, canvasId: node.canvasId, ...input, actor: ctx.actor });
       return { renamed: true };
     }
   }),

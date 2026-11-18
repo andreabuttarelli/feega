@@ -1,8 +1,8 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { parseEnv } from 'node:util';
 import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { hasAiKey } from '../src/lib/local-ai-keys.js';
 
@@ -62,6 +62,6 @@ function run() {
   server.on('exit', (code) => process.exit(code ?? 0));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   run();
 }
