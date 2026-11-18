@@ -94,13 +94,15 @@ async function readFullHead(db: Db, input: { orgId: string; nodeId: string }): P
 
 const PARSED_KEPT = 32;
 
+let parsedKept = PARSED_KEPT;
+
 const parsedRevisions = new Map<string, MotionHead>();
 
 const revisionKey = (orgId: string, head: { nodeId: string; version: number }) => `${orgId}:${head.nodeId}:${head.version}`;
 
 function keepParsed(key: string, head: MotionHead) {
   parsedRevisions.set(key, head);
-  if (parsedRevisions.size > PARSED_KEPT) {
+  if (parsedRevisions.size > parsedKept) {
     parsedRevisions.delete(parsedRevisions.keys().next().value!);
   }
 }
@@ -133,6 +135,14 @@ export async function readHeads(db: Db, input: { orgId: string; heads: { nodeId:
     return [[row.node_id, head] as const];
   });
   return new Map([...known, ...read]);
+}
+
+export async function warmHeads(db: Db, input: { orgId: string; heads: { nodeId: string; version: number }[] }): Promise<void> {
+  parsedKept = Math.max(parsedKept, input.heads.length + PARSED_KEPT);
+  for (const head of input.heads) {
+    await readHeads(db, { orgId: input.orgId, heads: [head] });
+    await new Promise((resolve) => setImmediate(resolve));
+  }
 }
 
 export type HeadPointer = { nodeId: string; version: number | null };

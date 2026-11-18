@@ -68,6 +68,18 @@ describe('an editor following a frame others edit too', () => {
     expect(next.present).toBe(sent);
   });
 
+  it('takes the sent doc as its new base when the save landed on its own base, so the next diff shares structure', () => {
+    const base = { version: 1, doc: start() };
+    const sent = retext(start(), 'a', 'sent');
+    const typedSince = retext(sent, 'b', 'typed');
+
+    const next = landed(base, sent, typedSince, { version: 2, doc: structuredClone(sent) });
+
+    expect(next.base).toEqual({ version: 2, doc: sent });
+    expect(next.base.doc).toBe(sent);
+    expect(next.present).toBe(typedSince);
+  });
+
   it('two editors converge on different and on the same field', () => {
     const server = new Server();
     let ana = { base: { version: 1, doc: start() }, present: start() };

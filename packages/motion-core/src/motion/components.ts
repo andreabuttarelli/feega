@@ -685,13 +685,28 @@ export type PropsVerdict = { ok: true; props: Record<string, unknown> } | { ok: 
 
 const TITLED: readonly ComponentId[] = ['Title', 'Text'];
 
+const titledSizes = new Map<ComponentId, number>();
+
+function defaultSize(id: ComponentId): number {
+  const known = titledSizes.get(id);
+  if (known !== undefined) {
+    return known;
+  }
+  const size = Number(defaultProps(id).size ?? 0);
+  titledSizes.set(id, size);
+  return size;
+}
+
 function titleLook(id: ComponentId, props: unknown): unknown {
   if (typeof (props ?? {}) !== 'object') {
     return props;
   }
   const raw = (props ?? {}) as Record<string, unknown>;
-  const size = Number(raw.size ?? defaultProps(id).size ?? 0);
-  if (!TITLED.includes(id) || size < HEADLINE_SIZE) {
+  if (!TITLED.includes(id)) {
+    return raw;
+  }
+  const size = raw.size === undefined || raw.size === null ? defaultSize(id) : Number(raw.size);
+  if (size < HEADLINE_SIZE) {
     return raw;
   }
   return { ...TITLE_LOOK, ...raw };

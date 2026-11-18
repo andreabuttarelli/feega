@@ -29,7 +29,7 @@ export type HistoryPreview = CanvasPreview | FramePreview;
 
 export type Previewed = { outcome: HistoryOutcome.Done; preview: HistoryPreview } | { outcome: Exclude<HistoryOutcome, HistoryOutcome.Done> };
 
-export type Acted = { outcome: HistoryOutcome; conflicts?: string[] };
+export type Acted = { outcome: HistoryOutcome; conflicts?: string[]; unlanded?: string[] };
 
 export type Ask = { actor: Actor; name?: string; keep?: Side };
 
@@ -64,7 +64,7 @@ async function previewRevision(at: At): Promise<Previewed> {
 
 async function restoreVersion(at: At, ask: Ask): Promise<Acted> {
   const out = await restoreCanvasVersion(at.db, { orgId: at.scope.orgId, canvasId: at.scope.canvasId, versionId: at.ref.key, actor: ask.actor });
-  return out.outcome === RestoreOutcome.Restored ? { outcome: HistoryOutcome.Done } : MISSING;
+  return out.outcome === RestoreOutcome.Restored ? { outcome: HistoryOutcome.Done, unlanded: out.unlanded } : MISSING;
 }
 
 const RESTORED: Record<Restore, HistoryOutcome> = { [Restore.Restored]: HistoryOutcome.Done, [Restore.Missing]: HistoryOutcome.Missing, [Restore.Conflict]: HistoryOutcome.Conflict };

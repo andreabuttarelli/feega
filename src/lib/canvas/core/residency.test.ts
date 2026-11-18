@@ -123,4 +123,11 @@ describe('picture bytes', () => {
     pictureBytes(items);
     expect(reads.n).toBe(1);
   });
+
+  it('a poster drawn over a whole page costs the pixels of its picture, not of the page it covers', () => {
+    const poster = { kind: ItemKind.Image, size: { width: 1280, height: 10000 } } as Item;
+
+    expect(pictureBytes([poster], () => ({ width: 480, height: 4096 }))).toBe(480 * 4096 * 4);
+    expect(pictureBytes([{ ...poster } as Item], () => null)).toBe(1280 * 10000 * 4);
+  });
 });

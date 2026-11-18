@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AttachStep, FRESH_CORES, LOSSES_PER_BACKEND, afterAttachFailure, backendAfterLoss } from './gpu-loss';
+import { AttachStep, FRESH_CORES, LOSSES_PER_BACKEND, afterAttachFailure, backendAfterLoss, lossesExhausted } from './gpu-loss';
 
 const BACKENDS = 3;
 
@@ -14,6 +14,12 @@ describe('the canvas after a lost GPU', () => {
 
   it('stays on the last backend, it has nowhere lower to go', () => {
     expect(backendAfterLoss(BACKENDS - 1, LOSSES_PER_BACKEND, BACKENDS)).toBe(BACKENDS - 1);
+  });
+
+  it('gives up instead of attaching again forever once the last backend keeps losing', () => {
+    expect(lossesExhausted(BACKENDS - 1, LOSSES_PER_BACKEND, BACKENDS)).toBe(true);
+    expect(lossesExhausted(BACKENDS - 1, LOSSES_PER_BACKEND - 1, BACKENDS)).toBe(false);
+    expect(lossesExhausted(0, LOSSES_PER_BACKEND, BACKENDS)).toBe(false);
   });
 });
 

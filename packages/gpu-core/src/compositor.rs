@@ -81,6 +81,10 @@ impl Compositor {
         }
     }
 
+    pub fn set_pixel_ratio(&mut self, ratio: f64) {
+        self.world.set_pixel_ratio(ratio);
+    }
+
     pub fn touch(&mut self, group: &str, library: &Library) {
         self.world.touch(group, library.size_of(group));
     }
@@ -193,9 +197,13 @@ impl Compositor {
         plan
     }
 
-    pub fn overlay_at(&mut self, library: &mut Library, camera: Camera, (w, h): (u32, u32), limits: Limits) -> Plan {
+    pub fn pinned_at(&self, camera: Camera, drawn: f64, view: (u32, u32)) -> Vec<(std::rc::Rc<vello::Scene>, crate::display_list::Affine)> {
+        self.world.pinned_at_in(camera.matrix(), drawn, view)
+    }
+
+    pub fn overlay_at(&mut self, library: &mut Library, camera: Camera, (w, h): (u32, u32), limits: Limits, drawn: f64) -> Plan {
         let started = now_ms();
-        let plan = library.plan(&self.world.overlay(camera.matrix(), w, h), limits);
+        let plan = library.plan(&self.world.overlay_drawn(camera.matrix(), w, h, drawn), limits);
         self.count_plan(started);
         plan
     }

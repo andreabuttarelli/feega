@@ -18,7 +18,17 @@ export function loadOnce(load: LoadScene): LoadScene {
   };
 }
 
-const uniqueScenes = (doc: MotionDoc) => [...new Set(sceneNodeIds(doc))];
+const scenesOfDoc = new WeakMap<MotionDoc, string[]>();
+
+function uniqueScenes(doc: MotionDoc): string[] {
+  const held = scenesOfDoc.get(doc);
+  if (held) {
+    return held;
+  }
+  const found = [...new Set(sceneNodeIds(doc))];
+  scenesOfDoc.set(doc, found);
+  return found;
+}
 
 export type LoadedScenes = { docs: Record<string, MotionDoc>; assets: Record<string, string> };
 

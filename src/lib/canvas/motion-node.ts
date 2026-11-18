@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { versionNamesSchema, type VersionNames } from '$lib/motion/version-names';
-import { FORMATS, MOTION_FORMATS, MotionFormat, formatOf as docFormat, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { FORMATS, MOTION_FORMATS, MotionFormat, formatOf as docFormat, sideRange, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { presetOf } from '$lib/motion/frame-presets';
 import { NodeMode, Opening } from './inline-motion';
 import { FrameFormat } from '@feega/motion-core/motion/hyperframes/capture';
@@ -105,7 +105,7 @@ const linkSchema = z.object({ canvasId: z.string().min(1), placed: z.array(z.str
 
 const TOKEN_TEXT = 500;
 const modeRecord = z.record(z.string().max(40), z.string().max(TOKEN_TEXT));
-const codeTokensSchema = z.record(z.string().max(81), z.object({ name: z.string().max(200), origins: modeRecord, raw: modeRecord, scale: z.number().positive().optional(), orphan: z.boolean().optional(), factor: z.number().optional(), style: z.string().max(TOKEN_TEXT).optional(), field: z.string().max(40).optional(), rule: z.string().max(TOKEN_TEXT).optional() })).refine((m) => Object.keys(m).length <= 512);
+const codeTokensSchema = z.record(z.string().max(81), z.object({ name: z.string().max(200), origins: modeRecord, raw: modeRecord, scale: z.number().positive().optional(), side: z.number().positive().optional(), orphan: z.boolean().optional(), factor: z.number().optional(), style: z.string().max(TOKEN_TEXT).optional(), field: z.string().max(40).optional(), rule: z.string().max(TOKEN_TEXT).optional() })).refine((m) => Object.keys(m).length <= 512);
 
 export const codeOriginSchema = z.object({ kind: z.enum(['github', 'folder', 'upload']).default('github'), repo: z.string().min(3).max(500), branch: z.string().max(200).nullable(), sha: z.string().max(64).nullable(), app: z.string().max(200).optional(), routes: z.array(z.string().max(300)).max(MAX_FRAME_BOARDS), conditions: z.array(z.object({ scheme: z.enum(['light', 'dark']), width: z.number().int().min(240).max(3840) })).max(12).optional(), delay: z.object({ ms: z.number().int().min(0).max(10_000), routes: z.record(z.string().max(300), z.number().int().min(0).max(10_000)) }).optional(), tokens: codeTokensSchema.optional(), map: importMapSchema.optional() });
 
@@ -124,7 +124,8 @@ export const motionNodeSchema = z.object({
   interactive: z.boolean().default(false),
   mainHomes: z.array(z.string()).optional(),
   linked: z.record(z.string(), z.string()).optional(),
-  code: codeOriginSchema.optional()
+  code: codeOriginSchema.optional(),
+  standInFill: z.string().max(64).optional()
 });
 
 export const elementNodeSchema = z.object({
@@ -170,7 +171,7 @@ export function frameNodeSize(width: number, picture: { width: number; height: n
   return { w, h: Math.round((w * picture.height) / picture.width) + BAR_H[kind][mode] };
 }
 
-type Picture = { width: number; height: number };
+type Picture = { width: number; height: number; still?: unknown };
 
 type NodeBox = { kind: FrameKind; width: number | null; height: number | null };
 
@@ -198,10 +199,17 @@ export const tileFollowsDoc = (node: Pick<MotionNode, 'kind' | 'format'>, doc: P
 
 export type FrameResize = { w: number; h: number; picture: Picture | null };
 
+const LEAST_SIDE: Record<FrameKind, (doc: Picture) => number> = {
+  [FrameKind.Frame]: (doc) => sideRange(doc).min,
+  [FrameKind.Element]: () => 1,
+  [FrameKind.Group]: () => 1
+};
+
 const RESIZE: Record<Sizing, (node: MotionNode, asked: { w: number; h: number }, picture: Picture, mode: NodeMode) => FrameResize> = {
   [Sizing.Fixed]: (node, asked, picture, mode) => ({ ...frameNodeSize(asked.w, picture, mode, node.kind), picture: null }),
-  [Sizing.Free]: (node, asked, _, mode) => {
-    const picture = { width: Math.round(asked.w), height: Math.round(asked.h) - BAR_H[node.kind][mode] };
+  [Sizing.Free]: (node, asked, doc, mode) => {
+    const least = LEAST_SIDE[node.kind](doc);
+    const picture = { width: Math.max(least, Math.round(asked.w)), height: Math.max(least, Math.round(asked.h) - BAR_H[node.kind][mode]) };
     return { w: picture.width, h: picture.height + BAR_H[node.kind][NodeMode.Preview], picture };
   }
 };

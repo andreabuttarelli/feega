@@ -100,6 +100,12 @@ import { conditionsOf, MAX_CONDITIONS } from '$lib/server/code-import/render-con
 import { CAPTURE_DELAY_MAX_MS, delayOf } from '$lib/server/code-import/capture-wait';
 import { designSystemOf } from '$lib/server/code-import/design-system';
 import { githubFor } from '$lib/server/code-import/github-runtime';
+import { frameDetach, framesPush, frameStatus, frameUndo } from '$lib/server/code-push/frames-push';
+import { frameVersions } from '$lib/server/code-push/frames-versions';
+import { frameCompare, frameRetarget, MAX_VERSIONS } from '$lib/server/code-push/frames-compare';
+import { actionDeps, compareDeps } from '$lib/server/code-push/compare-runtime';
+import { VersionAction, versionAction } from '$lib/server/code-push/frames-version-actions';
+import { framesDeps, importLinker } from '$lib/server/code-push/frames-runtime';
 import { libsOrigin } from '$lib/server/motion/libs-origin';
 import { GithubRefusal } from '$lib/server/code-import/github-http';
 import { MAX_STORIES } from '$lib/server/code-import/storybook';
@@ -1077,7 +1083,7 @@ export const CANVAS_OPS = {
   import_code: op({
     access: Access.Write,
     input: importCodeInput,
-    run: async (ctx, input) => (input.into && input.routes !== ALL_ROUTES ? codeAdd(figmaScope(ctx), input.into, { routes: askedRoutes(input.route, input.routes) ?? [], conditions: input.conditions ? conditionsOf(input.conditions) : undefined, land: Land.Frame }) : importRoutesInto(figmaScope(ctx), input.canvasId, { repo: input.repo, folder: input.folder, app: input.app, routes: input.routes === ALL_ROUTES ? ALL_ROUTES : askedRoutes(input.route, input.routes), conditions: input.conditions ? conditionsOf(input.conditions) : undefined, delay: delayOf({ ms: input.captureDelayMs, routes: input.routeDelayMs }), designSystem: designSystemOf(input.designSystem), responsive: input.responsive, storybook: input.storybook, stories: input.stories, at: { x: input.x, y: input.y } }))
+    run: async (ctx, input) => (input.into && input.routes !== ALL_ROUTES ? codeAdd(figmaScope(ctx), input.into, { routes: askedRoutes(input.route, input.routes) ?? [], conditions: input.conditions ? conditionsOf(input.conditions) : undefined, land: Land.Frame }) : importRoutesInto(figmaScope(ctx), input.canvasId, { repo: input.repo, folder: input.folder, app: input.app, routes: input.routes === ALL_ROUTES ? ALL_ROUTES : askedRoutes(input.route, input.routes), conditions: input.conditions ? conditionsOf(input.conditions) : undefined, delay: delayOf({ ms: input.captureDelayMs, routes: input.routeDelayMs }), designSystem: designSystemOf(input.designSystem), responsive: input.responsive, storybook: input.storybook, stories: input.stories, at: { x: input.x, y: input.y } }, importLinker(ctx.db, figmaScope(ctx))))
   }),
 
   code_map: op({
@@ -1141,6 +1147,54 @@ export const CANVAS_OPS = {
       const repos = await githubFor(ctx.db, ctx).repos();
       return repos ? { repos } : { error: GithubRefusal.NotConnected };
     }
+  }),
+
+  github_push: op({
+    access: Access.Write,
+    input: z.object({ name: z.string().min(1).max(100).describe('names the branch feega/<name>; later pushes update its pull request until it is merged, then a new branch opens'), nodeIds: z.array(z.string()).min(1).max(50).describe('code frames imported from one GitHub repo'), title: z.string().max(200).optional(), body: z.string().max(10_000).optional(), confirmSensitive: z.boolean().optional().describe('true after the user agreed to change config files, lockfiles or dotfiles'), mains: z.array(z.string()).max(50).optional().describe('frames whose instance edits go to the main component file instead of props at the usage site') }).strict(),
+    run: async (ctx, input) => framesPush(framesDeps(ctx.db, ctx), figmaScope(ctx), input)
+  }),
+
+  github_push_status: op({
+    access: Access.Read,
+    input: z.object({ nodeId: z.string() }).strict(),
+    run: async (ctx, input) => frameStatus(framesDeps(ctx.db, ctx), figmaScope(ctx), input.nodeId)
+  }),
+
+  github_undo: op({
+    access: Access.Write,
+    input: z.object({ nodeId: z.string() }).strict(),
+    run: async (ctx, input) => frameUndo(framesDeps(ctx.db, ctx), input.nodeId)
+  }),
+
+  github_versions: op({
+    access: Access.Read,
+    input: z.object({ nodeId: z.string(), ref: z.string().max(200).optional().describe('branch, tag or sha whose history to list; default the base branch of the link'), limit: z.number().int().positive().max(100).optional() }).strict(),
+    run: async (ctx, input) => frameVersions(framesDeps(ctx.db, ctx), { nodeId: input.nodeId, ref: input.ref, limit: input.limit ?? 30 })
+  }),
+
+  github_compare: op({
+    access: Access.Write,
+    input: z.object({ nodeId: z.string(), refs: z.array(z.string().min(1).max(200)).min(1).max(MAX_VERSIONS).describe('branch, tag, sha, or #<number> for a pull request') }).strict(),
+    run: async (ctx, input) => frameCompare(compareDeps(ctx.db, figmaScope(ctx)), input)
+  }),
+
+  github_version_ref: op({
+    access: Access.Write,
+    input: z.object({ versionId: z.string().describe('a version frame made by github_compare'), ref: z.string().min(1).max(200).describe('branch, tag, sha or #<number>') }).strict(),
+    run: async (ctx, input) => frameRetarget(compareDeps(ctx.db, figmaScope(ctx)), input)
+  }),
+
+  github_version_action: op({
+    access: Access.Write,
+    input: z.object({ versionId: z.string(), action: z.enum(VersionAction).describe('restore: the version files become changes of the linked frame, pushed through Changes and a PR; variant: an unlocked, unlinked copy; code_diff: the files that differ from the base branch') }).strict(),
+    run: async (ctx, input) => versionAction(actionDeps(ctx.db, figmaScope(ctx)), input.action, input.versionId)
+  }),
+
+  github_detach: op({
+    access: Access.Write,
+    input: z.object({ nodeId: z.string() }).strict(),
+    run: async (ctx, input) => frameDetach(framesDeps(ctx.db, ctx), input.nodeId)
   }),
 
   github_branches: op({
@@ -1503,7 +1557,7 @@ export const CANVAS_OPS = {
       if (!node) {
         return NODE_NOT_FOUND;
       }
-      await renameOnCanvas(ctx.db, { orgId: ctx.orgId, canvasId: node.canvasId, ...input });
+      await renameOnCanvas(ctx.db, { orgId: ctx.orgId, canvasId: node.canvasId, ...input, actor: ctx.actor });
       return { renamed: true };
     }
   }),
@@ -1569,7 +1623,7 @@ export const CANVAS_OPS = {
     input: z.object({ path: z.string().describe('from request_canvas_import') }).strict(),
     run: async (ctx, input) => {
       const out = await importStoredCanvasFile(ctx.db, { orgId: ctx.orgId, projectFor: async () => ctx.projectId, path: input.path, actor: ctx.actor });
-      return out.outcome === FeegaImport.Imported ? { canvas: out.canvas, path: canvasPath(ctx.projectId, out.canvas.id) } : { error: out.refusal, message: FEEGA_REFUSAL_MESSAGE[out.refusal] };
+      return out.outcome === FeegaImport.Imported ? { canvas: out.canvas, path: canvasPath(ctx.projectId, out.canvas.id), unlanded: out.unlanded } : { error: out.refusal, message: FEEGA_REFUSAL_MESSAGE[out.refusal] };
     }
   }),
 

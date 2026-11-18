@@ -33,6 +33,8 @@ export function placeholder(stand: Stand, size: Size, look: Look): { group: stri
 
 export const standIn = <T>(layers: readonly (T | null | undefined)[]): T | null => layers.find((l) => l != null) ?? null;
 
+export const stopgaps = <T extends { group: string }>(chains: readonly (readonly T[])[], drawn: ReadonlySet<string>, standsIn: (layer: T) => boolean): T[] => chains.flatMap((c) => (drawn.has(c[0].group) ? [] : c.filter(standsIn)));
+
 export const firstDrawn = <T extends { group: string }>(chain: readonly T[], drawn: ReadonlySet<string>): T | null => chain.find((l) => drawn.has(l.group)) ?? null;
 
 const centreOf = (view: Viewport, screen: Screen) => ({ x: (screen.width / 2 - view.x) / view.zoom, y: (screen.height / 2 - view.y) / view.zoom });
@@ -80,6 +82,10 @@ const blocked = (items: readonly Item[], look: Look, missing: Missing): Item[] =
     }
     return i;
   });
+
+const imagesIn = (items: readonly Item[]): ImageItem[] => items.flatMap((i) => (i.kind === ItemKind.Image ? [i] : i.kind === ItemKind.Group ? imagesIn(i.items) : []));
+
+export const missingPictures = (list: DisplayList, missing: Missing): ImageItem[] => imagesIn(list.items).filter(missing);
 
 export const withoutPictures = (list: DisplayList, look: Look, missing: Missing = ALL): DisplayList => ({ ...list, items: blocked(list.items, look, missing) });
 

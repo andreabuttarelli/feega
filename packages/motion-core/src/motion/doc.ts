@@ -138,7 +138,7 @@ const clipSchema = z.object({
   effectStyleRef: z.string().min(1).optional(),
   bind: bindSchema,
   modes: layerModesSchema,
-  source: z.object({ at: z.string().min(1).max(300), tag: z.string().max(40).optional(), cls: z.string().max(1000).optional(), cond: z.string().max(20).optional(), was: z.record(z.string().max(20), z.union([z.string().max(2000), z.number()])) }).optional()
+  source: z.object({ at: z.string().min(1).max(300), via: z.string().min(1).max(300).optional(), tag: z.string().max(40).optional(), cls: z.string().max(1000).optional(), cond: z.string().max(20).optional(), was: z.record(z.string().max(20), z.union([z.string().max(2000), z.number()])) }).optional()
 });
 
 const trackSchema = z.object({
@@ -318,8 +318,10 @@ function clipProblem(doc: MotionDoc, clip: MotionClip): string | null {
   }
   clip.props = verdict.props;
   clip.keyframes = Object.fromEntries(Object.entries(clip.keyframes).map(([key, track]) => [key, byFrame(track)]));
-  return effectsProblem(clip.effects) ?? clipShadersProblem(clip.component, clip.shaders, doc.shaders) ?? keyframesProblem(withParams(doc, clip)) ?? expressionsProblem(withParams(doc, clip));
+  return effectsProblem(clip.effects) ?? clipShadersProblem(clip.component, clip.shaders, doc.shaders) ?? animationProblem(withParams(doc, clip));
 }
+
+const animationProblem = (clip: Parameters<typeof keyframesProblem>[0] & Parameters<typeof expressionsProblem>[0]) => keyframesProblem(clip) ?? expressionsProblem(clip);
 
 function propsProblem(doc: MotionDoc): string | null {
   for (const clip of everyClip(doc)) {

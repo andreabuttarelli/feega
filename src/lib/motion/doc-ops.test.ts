@@ -218,6 +218,28 @@ describe('diffDoc on an edit of one clip', () => {
     expect(diffDoc(before, after)).toEqual([{ kind: OpKind.ClipEntry, clipId: 'a', field: 'props', key: 'x', value: 0.3 }]);
     expect(calls).toBeLessThan(UNTOUCHED_CLIP_CALLS);
   });
+
+  it('compares an edited comp without serialising it', () => {
+    const inner = base();
+    const before = { ...base(), comps: { card: { durationInFrames: 60, tracks: inner.tracks } } } as unknown as MotionDoc;
+    const moved = withProp(inner, 'a', 'x', 0.3);
+    const after = { ...before, comps: { card: { durationInFrames: 60, tracks: moved.tracks } } } as unknown as MotionDoc;
+    const stringify = vi.spyOn(JSON, 'stringify');
+
+    const ops = diffDoc(before, after);
+
+    const calls = stringify.mock.calls.length;
+    stringify.mockRestore();
+    expect(ops.map((op) => op.kind)).toEqual([OpKind.DocEntry]);
+    expect(calls).toBe(0);
+  });
+
+  it('finds no op when a comp is rebuilt with the same content', () => {
+    const before = { ...base(), comps: { card: { durationInFrames: 60, tracks: base().tracks } } } as unknown as MotionDoc;
+    const after = { ...before, comps: { card: { durationInFrames: 60, tracks: base().tracks } } } as unknown as MotionDoc;
+
+    expect(diffDoc(before, after)).toEqual([]);
+  });
 });
 
 describe('applying ops to a big doc', () => {

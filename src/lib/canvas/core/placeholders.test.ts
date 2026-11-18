@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ItemKind, type DisplayList, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import { BlendMode } from '@feega/motion-core/motion/blend';
-import { Stand, drawable, fillOrder, firstDrawn, layersOf, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from './placeholders';
+import { Stand, drawable, fillOrder, firstDrawn, layersOf, onScreenFirst, placeholder, standIn, stopgaps, withoutPictures, type Look } from './placeholders';
 import { Readiness } from '@feega/motion-core/motion/gpu-full/media';
 
 const LOOK: Look = { paper: '#ffffff', line: '#e5e5e5' };
@@ -125,5 +125,23 @@ describe('layersOf con un poster pronto', () => {
 
     expect(firstDrawn(chain, new Set(['f:[poster]', 'f:1:thumb', 'placeholder']))?.group).toBe('f:1:thumb');
     expect(firstDrawn(chain, new Set(['f:[poster]', 'placeholder']))?.group).toBe('f:[poster]');
+  });
+});
+
+describe('stopgaps', () => {
+  const layer = (id: string, group: string) => ({ id, group });
+  const lastDrawn = new Map([['a', 'a:vectors']]);
+  const standsIn = (l: { id: string; group: string }) => lastDrawn.get(l.id) === l.group;
+
+  it('a frame back on screen draws the layer it last drew while its whole page waits for pictures, never nothing', () => {
+    const chain = [layer('a', 'a:whole'), layer('a', 'a:vectors'), layer('a', 'placeholder:frame')];
+
+    expect(stopgaps([chain], new Set(), standsIn).map((l) => l.group)).toEqual(['a:vectors']);
+  });
+
+  it('a frame whose head is drawn needs no stopgap', () => {
+    const chain = [layer('a', 'a:whole'), layer('a', 'a:vectors')];
+
+    expect(stopgaps([chain], new Set(['a:whole']), standsIn)).toEqual([]);
   });
 });

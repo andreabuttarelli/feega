@@ -22,9 +22,15 @@ function freePort() {
   });
 }
 
-function loginPath(env) {
+const PATH_MARK = '__FEEGA_PATH__';
+const MARKED_PATH = new RegExp(`${PATH_MARK}(.*)${PATH_MARK}`);
+
+const runShell = (shell, args) => execFileSync(shell, args, { encoding: 'utf8', timeout: SHELL_TIMEOUT_MS });
+
+function loginPath(env, run = runShell) {
   try {
-    return execFileSync(env.SHELL || '/bin/zsh', ['-ilc', 'printf %s "$PATH"'], { encoding: 'utf8', timeout: SHELL_TIMEOUT_MS }).trim() || env.PATH;
+    const printed = run(env.SHELL || '/bin/zsh', ['-ilc', `printf '%s%s%s' ${PATH_MARK} "$PATH" ${PATH_MARK}`]);
+    return MARKED_PATH.exec(printed)?.[1] || env.PATH;
   } catch {
     return env.PATH;
   }
@@ -74,4 +80,4 @@ async function startServer({ root, file, port, env }) {
   return { url, stop };
 }
 
-module.exports = { startServer, freePort, stopper, LOOPBACK };
+module.exports = { startServer, freePort, stopper, loginPath, LOOPBACK };
