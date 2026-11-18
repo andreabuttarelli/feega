@@ -46,6 +46,7 @@
   import { frameLayers, frameMenuRun, frameSummaries } from '$lib/motion/frame-menu';
   import FrameSelection from '../FrameSelection.svelte';
   import FrameGuides from '../FrameGuides.svelte';
+  import RecordControl from './RecordControl.svelte';
   import CanvasRulers from './CanvasRulers.svelte';
   import { canvasGuides } from '$lib/canvas/canvas-guides.svelte';
   import { pullToGuides } from '$lib/canvas/canvas-rulers';
@@ -3718,6 +3719,20 @@
   }
 
 
+  const recordSource = () => surface?.querySelector<HTMLCanvasElement>('[data-testid="core-canvas"]') ?? null;
+
+  function recordArea() {
+    const whole = { x: 0, y: 0, width: surface?.clientWidth ?? 0, height: surface?.clientHeight ?? 0 };
+    if (!selectedBoxes.length) {
+      return whole;
+    }
+    const left = Math.min(...selectedBoxes.map((b) => b.x));
+    const top = Math.min(...selectedBoxes.map((b) => b.y));
+    const right = Math.max(...selectedBoxes.map((b) => b.x + b.w));
+    const bottom = Math.max(...selectedBoxes.map((b) => b.y + b.h));
+    return { x: view.x + left * view.zoom, y: view.y + top * view.zoom, width: (right - left) * view.zoom, height: (bottom - top) * view.zoom };
+  }
+
   const SNAP_SCREEN_PX = 6;
   let snapGuides = $state<SnapGuide[]>([]);
   const corePeers = $derived(coreType ? (props.peers ?? []).filter((p) => !p.chat) : []);
@@ -4645,6 +4660,7 @@
         <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} listenLive={(listener) => liveDocs.listen(listener)} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId, userId: (page.data as { session?: { user?: { id: string } } | null }).session?.user?.id, look: (page.data as { look?: string }).look }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} onbackend={(change) => track(GPU_FALLBACK_EVENT, change)} onevict={sendBackFrame} picturesWhileOwed={picturesWhileVectorsOwed(publicEnv)} />
       </svelte:boundary>
     {/if}
+    {#if props.onUpload}<RecordControl source={recordSource} areaOf={recordArea} onsaved={(file) => props.onUpload?.(file, viewCentre())} />{/if}
     {#if rulersPref.on}<CanvasRulers {view} {area} />{/if}
     <PixelGridCanvas {view} {area} on={frameViews.isOn(FrameView.PixelGrid)} moving={cameraMotion === CameraMotion.Moving} />
     <div class="hover-rings" data-testid="node-hover-rings">
