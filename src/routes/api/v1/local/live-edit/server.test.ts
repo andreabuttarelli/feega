@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+process.env.FEEGA_LIVE_TARGET = 'branch';
 import { describe, expect, it, vi } from 'vitest';
 
 const HERO = `export function Hero() {
