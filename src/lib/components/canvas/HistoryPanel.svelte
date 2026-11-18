@@ -27,6 +27,7 @@
   import { watchHistory } from '$lib/realtime/history-channel';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { Keep, RejectOutcome, type EventConflict } from '$lib/canvas/reject-plan';
+  import { Landing, unlandedNotice } from '$lib/canvas/unlanded-frames';
 
   let { projectId, canvasId }: { projectId: string; canvasId: string } = $props();
 
@@ -149,9 +150,9 @@
 
   async function write(entry: HistoryEntry, body: Record<string, string>) {
     const res = await fetch(pointUrl(entry), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-    const read = (await res.json().catch(() => ({}))) as { conflicts?: string[] };
+    const read = (await res.json().catch(() => ({}))) as { conflicts?: string[]; unlanded?: string[] };
     conflicts = read.conflicts ?? null;
-    notice = res.ok || conflicts ? '' : ACTION_FAILED;
+    notice = res.ok || conflicts ? (unlandedNotice(Landing.Restored, read.unlanded ?? []) ?? '') : ACTION_FAILED;
     reads += 1;
   }
 
