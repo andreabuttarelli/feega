@@ -7,7 +7,7 @@
   type Anchor = { left: number; top: number };
   type Pushed = { branch: string; pull: PullView | null };
 
-  let { projectId, canvasId, open, anchor, syncs, posterOf, assetUrl, onclose, onchanged }: { projectId: string; canvasId: string; open: FrameSync | null; anchor: Anchor | null; syncs: FrameSync[]; posterOf: (nodeId: string) => string | null; assetUrl: (assetId: string) => string; onclose: () => void; onchanged: () => Promise<unknown> } = $props();
+  let { projectId, canvasId, open, anchor, syncs, posterOf, assetUrl, onclose, onchanged, oncompare }: { projectId: string; canvasId: string; open: FrameSync | null; anchor: Anchor | null; syncs: FrameSync[]; posterOf: (nodeId: string) => string | null; assetUrl: (assetId: string) => string; onclose: () => void; onchanged: () => Promise<unknown>; oncompare: (nodeId: string) => void } = $props();
 
   const DEFAULT_NAME = 'canvas-edits';
   const PATCH_FILE = 'feega-changes.patch';
@@ -194,6 +194,7 @@
         <button type="button" disabled={busy} onclick={() => act(action)}>{ACTION_LABEL[action]}</button>
       {/each}
       <button type="button" onclick={() => ((panel = true), onclose())}>Changes</button>
+      <button type="button" data-testid="compare-versions" onclick={() => oncompare(open.nodeId)}>Compare versions</button>
     </div>
   </div>
 {/if}
