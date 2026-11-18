@@ -2,24 +2,22 @@
   import { page } from '$app/state';
   import { AGENT_LOGOS } from '../home';
 
-  const COPY: Record<string, string> = {
-    a: 'Edits land the same frame. Your agent draws, animates and generates on the canvas while you watch. Open source.',
-    b: 'Import your code. Design on the canvas. Export React, Svelte or HTML back to your repo. Open source, Apache-2.0.',
-    c: 'Ask your agent for a motion video. It edits the canvas, generates the images and renders the MP4.',
-    d: 'Runs on your machine from one file. No account, no database. Open source, Apache-2.0.'
+  type Copy = { first: string; second: string; agents: string };
+
+  const COPY: Record<string, Copy> = {
+    '1': { first: 'Open the Feega VS Code extension in your codebase →', second: 'start designing directly in your real app.', agents: 'Use it with your' },
+    '2': { first: 'Open the Feega VS Code extension in your codebase.', second: 'Start designing directly in your real app.', agents: 'Use it with your' },
+    '3': { first: 'Open the Feega VS Code extension in your codebase →', second: 'start designing directly in real app.', agents: 'Use with your' }
   };
 
-  const text = $derived(COPY[page.url.searchParams.get('copy') ?? 'a'] ?? COPY.a);
+  const copy = $derived(COPY[page.url.searchParams.get('copy') ?? '1'] ?? COPY['1']);
 </script>
 
 <section class="open site-wide">
-  <h2 data-agent-id="open-title">{text}</h2>
-
-  <ul class="logos" data-agent-id="open-logos">
-    {#each AGENT_LOGOS as logo (logo.file)}
-      <li><img src="/site/home/{logo.file}" alt={logo.name} width={logo.width} height="32" /></li>
-    {/each}
-  </ul>
+  <h2 data-agent-id="open-title">
+    {copy.first}<br />{copy.second}<br />{copy.agents}
+    <span class="tail">agents<span class="logos" data-agent-id="open-logos">{#each AGENT_LOGOS as logo (logo.file)}<img src="/site/home/{logo.file}" alt={logo.name} width={logo.width} height="32" />{/each}</span></span>
+  </h2>
 </section>
 
 <style>
@@ -34,19 +32,27 @@
     letter-spacing: -0.04em;
     font-weight: 400;
     text-align: center;
-    white-space: pre-wrap;
     text-wrap: balance;
     max-width: 1000px;
     margin-inline: auto;
     overflow-wrap: break-word;
   }
 
+  .tail {
+    white-space: nowrap;
+  }
+
   .logos {
-    display: flex;
-    justify-content: space-between;
-    margin: 40px 0 0;
-    padding: 0;
-    list-style: none;
+    display: inline-flex;
+    gap: 0.25em;
+    margin-left: 0.3em;
+    vertical-align: baseline;
+  }
+
+  .logos img {
+    height: 0.72em;
+    width: auto;
+    align-self: baseline;
   }
 
   @media (min-width: 810px) {
@@ -57,12 +63,6 @@
     h2 {
       font-size: 30px;
       line-height: 36px;
-    }
-
-    .logos {
-      justify-content: space-around;
-      width: 400px;
-      margin: 40px auto 0;
     }
   }
 
