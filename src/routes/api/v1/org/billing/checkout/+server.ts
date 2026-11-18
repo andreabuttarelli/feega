@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { authenticate, checkApiKeyWriteAccess, loadBrandForUser } from '$lib/server/cli-auth';
-import { isOrgOwner, orgBillingForBrand } from '$lib/server/org-billing';
+import { checkApiKeyWriteAccess, openOrg } from '$lib/server/cli-auth';
+import { isOrgOwner, orgBillingById } from '$lib/server/org-billing';
 import { billingGrantsReady } from '$lib/server/billing-readiness';
 import { PLAN } from '$lib/credit-ladder';
 import { BILLING_PATH, checkoutReturnUrls } from '$lib/billing-path';
@@ -16,12 +16,11 @@ const PLANS = [{ credits: PLAN.credits, label: `€${PLAN.price} / editor / mont
 const refuse = (error: string, extra: Record<string, unknown> = {}) =>
   json({ error, ...extra }, { status: statusForFailure(CHECKOUT_LINK, error) });
 
-export const POST: RequestHandler = async ({ request, params, url }) => {
-  const { supabase, user, apiKey, error } = await authenticate(request);
+export const POST: RequestHandler = async ({ request, url }) => {
+  const { call, error } = await openOrg(request);
   if (error) return error;
 
-  const { brand, error: brandError } = await loadBrandForUser(supabase, params.slug, apiKey);
-  if (brandError) return brandError;
+  const { supabase, user, orgId, apiKey } = call;
 
   const readOnly = checkApiKeyWriteAccess(apiKey);
   if (readOnly) return readOnly;
@@ -37,7 +36,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
 
   const appBillingUrl = `${appOrigin(url)}${BILLING_PATH}`;
 
-  if (!(await isOrgOwner(supabase, brand.org_id, user.id))) {
+  if (!(await isOrgOwner(supabase, orgId, user.id))) {
     return refuse('not_org_owner');
   }
 
@@ -46,7 +45,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
     return refuse('unknown_plan', { plans: PLANS });
   }
 
-  const billing = await orgBillingForBrand(supabase, { slug: params.slug });
+  const billing = await orgBillingById(supabase, orgId);
   if (!billing) {
     return refuse('no_org_billing');
   }

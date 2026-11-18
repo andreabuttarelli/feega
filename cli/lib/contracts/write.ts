@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { BrandEndpoint } from './index';
+import type { OrgEndpoint } from './index';
 import { QUERY_OPS } from './query';
 
 /**
@@ -39,7 +39,7 @@ const Values = z
  * QUI IL VERBO STA NEL NOME, E NON È ESTETICA.
  *
  * `destructiveHint` è un'annotazione PER TOOL — `destructiveHint: endpoint.destructive` in
- * `cli/mcp/tools/brand-content.ts` — e il protocollo non sa dire «distruttivo solo quando
+ * `cli/mcp/tools/org-data.ts` — e il protocollo non sa dire «distruttivo solo quando
  * `op = update`». Un solo `write(op: 'insert' | 'update')` avrebbe quindi due sole scelte, e
  * mentono entrambe: marcato distruttivo avvisa anche sugli insert, che non tolgono niente a
  * nessuno, e la gente impara a cliccare via l'avviso; marcato non distruttivo tace proprio sugli
@@ -53,16 +53,15 @@ export const INSERT_ROW = {
   title: 'Insert a row',
   description:
     'Add ONE row to any table, AS YOU: anon key plus your own session, so Postgres RLS decides ' +
-    'whether that row may exist at all — there is no way to write into a brand you do not belong ' +
+    'whether that row may exist at all — there is no way to write into an org you do not belong ' +
     'to. Table names are the ones `query` takes: call `query` with no `table` to list them, and ' +
     'with only a `table` to get a real row back, whose keys are the columns you can name here. ' +
-    '`brand_id` is filled in with this brand for you; naming a different one is refused, not ' +
-    'quietly corrected. It NEVER replaces anything: a row that already exists comes back as a ' +
+    'It NEVER replaces anything: a row that already exists comes back as a ' +
     'collision that names the key you hit, and changing it is `update_row`. Use it for the things ' +
     'that have no tool of their own — an idea, a note, a row in a table nothing else writes. ' +
     'Free, and nothing is published.',
   method: 'POST',
-  pathUnderBrand: '/rows',
+  path: '/org/rows',
   input: z
     .object({
       table: z.string().describe('Table name, bare. The same names `query` reads.'),
@@ -82,7 +81,7 @@ export const INSERT_ROW = {
   }),
   failures: [],
   destructive: false
-} satisfies BrandEndpoint;
+} satisfies OrgEndpoint;
 
 export const UPDATE_ROW = {
   tool: 'update_row',
@@ -97,7 +96,7 @@ export const UPDATE_ROW = {
     'which ones you are about to hit. It cannot delete a row: deleting has its own named tools. ' +
     'Free.',
   method: 'PUT',
-  pathUnderBrand: '/rows',
+  path: '/org/rows',
   input: z
     .object({
       table: z.string().describe('Table name, bare. The same names `query` reads.'),
@@ -122,7 +121,7 @@ export const UPDATE_ROW = {
   }),
   failures: [],
   destructive: true
-} satisfies BrandEndpoint;
+} satisfies OrgEndpoint;
 
 
 export const DELETE_ROW = {
@@ -130,7 +129,7 @@ export const DELETE_ROW = {
   title: 'Delete rows',
   description:
     'Remove rows that exist, as you: anon key plus your own session, so Postgres RLS decides ' +
-    'what you can reach and a row in a brand you do not belong to is not yours to delete. ' +
+    'what you can reach and a row in an org you do not belong to is not yours to delete. ' +
     '`where` is REQUIRED and may not be empty — a delete with no filter empties every row you ' +
     `can reach. At most ${DELETE_MAX_ROWS} rows per call, counted BEFORE anything is removed ` +
     'and reported back to you: a filter that matches more is refused whole, so nothing is ' +
@@ -139,7 +138,7 @@ export const DELETE_ROW = {
     'is how the wrong row goes. To stop using something without losing it, prefer update_row on ' +
     'the column that marks it inactive, where the table has one. Free.',
   method: 'DELETE',
-  pathUnderBrand: '/rows',
+  path: '/org/rows',
   input: z
     .object({
       table: z.string().describe('Table name, bare. The same names `query` reads.'),
@@ -159,4 +158,4 @@ export const DELETE_ROW = {
   }),
   failures: [],
   destructive: true
-} satisfies BrandEndpoint;
+} satisfies OrgEndpoint;

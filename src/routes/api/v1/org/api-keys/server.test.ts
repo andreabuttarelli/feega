@@ -5,8 +5,7 @@ const state = vi.hoisted(() => ({ world: null as null | FakeDb, role: 'member' a
 
 vi.mock('$lib/server/cli-auth', async (original) => ({
   ...(await original<typeof import('$lib/server/cli-auth')>()),
-  authenticate: async () => ({ supabase: state.world!.db, user: { id: 'u-1' } }),
-  loadBrandForUser: async () => ({ brand: { id: 'b-1', org_id: 'org-1', name: 'B', slug: 'b' } })
+  openOrg: async () => ({ call: { supabase: state.world!.db, user: { id: 'u-1' }, orgId: 'org-1' } })
 }));
 
 const list = await import('./+server');
@@ -23,11 +22,11 @@ beforeEach(() => {
 });
 
 const req = (method: string, body?: unknown) =>
-  new Request('https://feega.app/api/v1/brands/b/api-keys', { method, body: body ? JSON.stringify(body) : undefined, headers: { authorization: 'Bearer t' } });
+  new Request('https://feega.app/api/v1/org/api-keys', { method, body: body ? JSON.stringify(body) : undefined, headers: { authorization: 'Bearer t' } });
 
-describe('the brand api-keys API', () => {
-  it('lists the keys of the brand org, with their scopes', async () => {
-    const res = await list.GET({ request: req('GET'), params: { slug: 'b' } } as never);
+describe('the org api-keys API', () => {
+  it('lists the keys of the org, with their scopes', async () => {
+    const res = await list.GET({ request: req('GET') } as never);
     const body = await res.json();
 
     expect(res.status).toBe(200);
@@ -35,17 +34,17 @@ describe('the brand api-keys API', () => {
     expect(body.keys[0].scopes).toEqual(['read']);
   });
 
-  it('mints a key on the brand org with the requested scopes', async () => {
-    const res = await list.POST({ request: req('POST', { name: 'CI', scopes: ['read', 'write'] }), params: { slug: 'b' } } as never);
+  it('mints a key on the org with the requested scopes', async () => {
+    const res = await list.POST({ request: req('POST', { name: 'CI', scopes: ['read', 'write'] }) } as never);
 
     expect(res.status).toBe(201);
     const insert = state.world!.calls.find((c) => c.table === 'api_keys' && c.op === 'insert');
     expect(insert?.payload).toMatchObject({ org_id: 'org-1', user_id: 'u-1', name: 'CI', scopes: ['read', 'write'] });
   });
 
-  it('revokes a key of the brand org, and refuses one of another org', async () => {
-    const other = await one.DELETE({ request: req('DELETE'), params: { slug: 'b', id: 'k-2' } } as never);
-    const own = await one.DELETE({ request: req('DELETE'), params: { slug: 'b', id: 'k-1' } } as never);
+  it('revokes a key of the org, and refuses one of another org', async () => {
+    const other = await one.DELETE({ request: req('DELETE'), params: { id: 'k-2' } } as never);
+    const own = await one.DELETE({ request: req('DELETE'), params: { id: 'k-1' } } as never);
 
     expect(other.status).toBe(404);
     expect(own.status).toBe(200);
@@ -55,7 +54,7 @@ describe('the brand api-keys API', () => {
     state.role = role;
     state.world = fakeDb({ api_keys: [], orgs_members: [{ org_id: 'org-1', user_id: 'u-1', role }] }, { filter: true, newId: () => 'k-new' });
 
-    const res = await list.POST({ request: req('POST', { scopes: ['read', 'write'] }), params: { slug: 'b' } } as never);
+    const res = await list.POST({ request: req('POST', { scopes: ['read', 'write'] }) } as never);
 
     expect(res.status).toBe(201);
   });
@@ -67,7 +66,7 @@ describe('the brand api-keys API', () => {
   ])('refuses %s, and stores nothing', async (_who, role) => {
     state.world = fakeDb({ api_keys: [], orgs_members: role ? [{ org_id: 'org-1', user_id: 'u-1', role }] : [] }, { filter: true, newId: () => 'k-new' });
 
-    const res = await list.POST({ request: req('POST', { scopes: ['read', 'write'] }), params: { slug: 'b' } } as never);
+    const res = await list.POST({ request: req('POST', { scopes: ['read', 'write'] }) } as never);
 
     expect(res.status).toBe(403);
     expect(state.world.calls.some((c) => c.table === 'api_keys' && c.op === 'insert')).toBe(false);

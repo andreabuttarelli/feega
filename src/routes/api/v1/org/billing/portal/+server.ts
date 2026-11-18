@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { authenticate, checkApiKeyWriteAccess, loadBrandForUser } from '$lib/server/cli-auth';
+import { checkApiKeyWriteAccess, openOrg } from '$lib/server/cli-auth';
 import { billingLink } from '$lib/server/billing-links';
 import { isOrgOwner } from '$lib/server/org-billing';
 import { appOrigin } from '$lib/server/app-url';
@@ -12,12 +12,11 @@ import { BILLING_PORTAL_LINK, statusForFailure } from '@feega/api-contracts';
  * The URL is a bearer capability over the customer's billing, so it is minted, returned once and
  * never written anywhere: not a log line, not a row, not the error body.
  */
-export const POST: RequestHandler = async ({ request, params, url }) => {
-  const { supabase, user, apiKey, error } = await authenticate(request);
+export const POST: RequestHandler = async ({ request, url }) => {
+  const { call, error } = await openOrg(request);
   if (error) return error;
 
-  const { brand, error: brandError } = await loadBrandForUser(supabase, params.slug, apiKey);
-  if (brandError) return brandError;
+  const { supabase, user, orgId, apiKey } = call;
 
   const readOnly = checkApiKeyWriteAccess(apiKey);
   if (readOnly) return readOnly;
@@ -29,14 +28,14 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
 
   const appBillingUrl = `${appOrigin(url)}${BILLING_PATH}`;
 
-  if (!(await isOrgOwner(supabase, brand.org_id, user.id))) {
+  if (!(await isOrgOwner(supabase, orgId, user.id))) {
     return json(
       { error: 'not_org_owner' },
       { status: statusForFailure(BILLING_PORTAL_LINK, 'not_org_owner') }
     );
   }
 
-  const link = await billingLink(supabase, { slug: params.slug, returnUrl: appBillingUrl });
+  const link = await billingLink(supabase, { orgId, returnUrl: appBillingUrl });
   if (link.refusal) {
     return json(
       { error: link.refusal, message: link.message || undefined, app_billing_url: appBillingUrl },

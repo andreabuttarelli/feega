@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const orgBillingForBrand = vi.fn();
+const orgBillingById = vi.fn();
 const isOrgOwner = vi.fn();
 const createBillingPortalSession = vi.fn();
 const applyRetentionCoupon = vi.fn();
@@ -9,17 +9,13 @@ const ensureSubscriptionCanceled = vi.fn();
 const gateCredits = vi.fn();
 const structured = vi.fn();
 
-vi.mock('$lib/server/tenancy/brand-slug', () => ({
-	appPathForBrand: async (_db: unknown, _brandId: string, path: string) => `/p/p1${path}`
-}));
 vi.mock('$lib/server/cli-auth', () => ({
-	authenticate: vi.fn(),
-	loadBrandForUser: vi.fn(),
+	openOrg: vi.fn(),
 	checkApiKeyWriteAccess: vi.fn(() => undefined),
 	gateAiAction: vi.fn()
 }));
 vi.mock('$lib/server/org-billing', () => ({
-	orgBillingForBrand: (...args: unknown[]) => orgBillingForBrand(...args),
+	orgBillingById: (...args: unknown[]) => orgBillingById(...args),
 	isOrgOwner: (...args: unknown[]) => isOrgOwner(...args)
 }));
 vi.mock('$lib/server/stripe', () => ({
@@ -36,7 +32,7 @@ vi.mock('$lib/server/research', () => ({ structured: (...args: unknown[]) => str
 vi.mock('$lib/server/app-url', () => ({ appOrigin: () => 'https://feega.test' }));
 
 import { POST } from './+server';
-import { authenticate, loadBrandForUser, checkApiKeyWriteAccess, gateAiAction } from '$lib/server/cli-auth';
+import { openOrg, checkApiKeyWriteAccess, gateAiAction } from '$lib/server/cli-auth';
 
 const PORTAL_URL = 'https://billing.stripe.com/p/session/live_xyz';
 
@@ -44,38 +40,29 @@ const ORG_BILLING = {
 	orgId: 'org-1',
 	customerId: 'cus_org',
 	subscriptionId: 'sub_org',
-	plan: 'starter',
-	brandCount: 2
+	plan: 'starter'
 };
 
-function call(body: unknown = {}, slug = 'demo') {
-	const url = new URL(`https://feega.test/api/v1/brands/${slug}/billing/portal`);
+function call(body: unknown = {}) {
+	const url = new URL(`https://feega.test/api/v1/org/billing/portal`);
 	return (POST as (event: unknown) => Promise<Response>)({
 		request: new Request(url, { method: 'POST', body: JSON.stringify(body) }),
-		params: { slug },
 		url
 	}).then(async (res) => ({ res, body: await res.json().catch(() => null) }));
 }
 
 beforeEach(() => {
 	vi.clearAllMocks();
-	vi.mocked(authenticate).mockResolvedValue({
-		supabase: {},
-		user: { id: 'user-1' },
-		apiKey: undefined,
-		error: null
-	} as never);
-	vi.mocked(loadBrandForUser).mockResolvedValue({
-		brand: { id: 'brand-1', org_id: 'org-1', slug: 'demo' },
-		error: null
+	vi.mocked(openOrg).mockResolvedValue({
+		call: { supabase: {}, user: { id: 'user-1' }, orgId: 'org-1', apiKey: undefined }
 	} as never);
 	vi.mocked(checkApiKeyWriteAccess).mockReturnValue(undefined);
 	isOrgOwner.mockResolvedValue(true);
-	orgBillingForBrand.mockResolvedValue(ORG_BILLING);
+	orgBillingById.mockResolvedValue(ORG_BILLING);
 	createBillingPortalSession.mockResolvedValue(PORTAL_URL);
 });
 
-describe('POST /api/v1/brands/:slug/billing/portal', () => {
+describe('POST /api/v1/org/billing/portal', () => {
 	it('hands back the portal url instead of redirecting to it', async () => {
 		const { res, body } = await call();
 
@@ -84,10 +71,10 @@ describe('POST /api/v1/brands/:slug/billing/portal', () => {
 		expect(body).toEqual({ ok: true, url: PORTAL_URL });
 	});
 
-	it('opens the portal of the ORG customer, not of the brand in the url', async () => {
+	it('opens the portal of the ORG customer, not of anything in the url', async () => {
 		await call();
 
-		expect(orgBillingForBrand).toHaveBeenCalledWith(expect.anything(), { slug: 'demo' });
+		expect(orgBillingById).toHaveBeenCalledWith(expect.anything(), 'org-1');
 		expect(createBillingPortalSession).toHaveBeenCalledWith({
 			customerId: 'cus_org',
 			returnUrl: 'https://feega.test/app/credits',
@@ -95,7 +82,7 @@ describe('POST /api/v1/brands/:slug/billing/portal', () => {
 		});
 	});
 
-	it('checks the owner against the org the brand belongs to', async () => {
+	it('checks the owner against the caller's org', async () => {
 		await call();
 
 		expect(isOrgOwner).toHaveBeenCalledWith(expect.anything(), 'org-1', 'user-1');
@@ -117,7 +104,7 @@ describe('POST /api/v1/brands/:slug/billing/portal', () => {
 		expect(structured).not.toHaveBeenCalled();
 	});
 
-	it('refuses a caller who reaches the brand but does not own the org billing', async () => {
+	it('refuses a caller who does not own the org billing', async () => {
 		isOrgOwner.mockResolvedValue(false);
 
 		const { res, body } = await call();
@@ -128,7 +115,7 @@ describe('POST /api/v1/brands/:slug/billing/portal', () => {
 	});
 
 	it('says no_customer, and where the human subscribes, when nobody ever paid', async () => {
-		orgBillingForBrand.mockResolvedValue({ ...ORG_BILLING, customerId: null, subscriptionId: null });
+		orgBillingById.mockResolvedValue({ ...ORG_BILLING, customerId: null, subscriptionId: null });
 
 		const { res, body } = await call();
 
@@ -147,8 +134,8 @@ describe('POST /api/v1/brands/:slug/billing/portal', () => {
 		expect(body.error).toBe('stripe_unavailable');
 	});
 
-	it('an org we cannot resolve is ours too: 500, not a 404 about the brand', async () => {
-		orgBillingForBrand.mockResolvedValue(null);
+	it('an org we cannot resolve is ours too: 500, not a 404', async () => {
+		orgBillingById.mockResolvedValue(null);
 
 		const { res, body } = await call();
 
@@ -157,7 +144,7 @@ describe('POST /api/v1/brands/:slug/billing/portal', () => {
 	});
 
 	it('rejects a request without authentication', async () => {
-		vi.mocked(authenticate).mockResolvedValue({
+		vi.mocked(openOrg).mockResolvedValue({
 			error: new Response('Unauthorized', { status: 401 })
 		} as never);
 
@@ -167,16 +154,6 @@ describe('POST /api/v1/brands/:slug/billing/portal', () => {
 		expect(createBillingPortalSession).not.toHaveBeenCalled();
 	});
 
-	it('rejects a brand the caller cannot reach', async () => {
-		vi.mocked(loadBrandForUser).mockResolvedValue({
-			error: new Response(JSON.stringify({ error: 'Brand not found' }), { status: 404 })
-		} as never);
-
-		const { res } = await call({}, 'altrui');
-
-		expect(res.status).toBe(404);
-		expect(createBillingPortalSession).not.toHaveBeenCalled();
-	});
 
 	it('rejects a read-only API key: this link leads to a cancel button', async () => {
 		vi.mocked(checkApiKeyWriteAccess).mockReturnValue(

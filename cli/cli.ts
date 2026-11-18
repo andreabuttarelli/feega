@@ -15,8 +15,6 @@ program
   .version('0.1.0')
   .addHelpText('after', `
 Esempi:
-  $ feega brands                   Lista tutti i brand
-  $ feega library <slug> [tab]     Kit, prodotti, post e ads di un brand
   $ feega motion list              Lista i video
 
 Documentazione completa: cli/README.md
@@ -105,22 +103,6 @@ program
     await cmdInit(dir ?? '.', options);
   });
 
-program
-  .command('brands')
-  .description('Elenca tutti i brand')
-  .action(async () => {
-    const { cmdBrands } = await import('./commands/brands.ts');
-    await cmdBrands();
-  });
-
-program
-  .command('library <slug> [tab]')
-  .description('Materiale del brand trascinabile sulla tela: kit, products, posts, ads')
-  .action(async (slug: string, tab: string | undefined) => {
-    const { cmdLibrary } = await import('./commands/library.ts');
-    await cmdLibrary(slug, tab ?? 'kit');
-  });
-
 const agents = program
   .command('agents')
   .description('List the coding agents a local Feega found on this computer and whether they can drive the chat over ACP')
@@ -147,14 +129,6 @@ program
   .action(async () => {
     const { cmdHealth } = await import('./commands/health.ts');
     await cmdHealth();
-  });
-
-program
-  .command('products <slug> [action]')
-  .description('Prodotti: list (elenca), sync (reimporta dal sito e-commerce)')
-  .action(async (slug: string, action: string | undefined) => {
-    const { cmdProducts } = await import('./commands/products.ts');
-    await cmdProducts(slug, { action: action ?? 'list' });
   });
 
 program
@@ -1159,12 +1133,12 @@ program
   });
 
 program
-  .command('upgrade <slug>')
+  .command('upgrade')
   .description('Open Stripe checkout: the plan (€9 / editor / month, 500 credits) or a one-time top-up (--top-up 1000|2000|5000)')
   .option('--top-up <credits>', 'One-time top-up: 1000 (€10), 2000 (€20) or 5000 (€50) credits')
-  .action(async (slug: string, opts) => {
+  .action(async (opts) => {
     const { cmdUpgrade } = await import('./commands/upgrade.ts');
-    await cmdUpgrade(slug, opts);
+    await cmdUpgrade(opts);
   });
 
 program

@@ -2,22 +2,9 @@ import type { z } from 'zod';
 import { BILLING_PORTAL_LINK, CHECKOUT_LINK, ONE_TIME_CHECKOUT_LINK } from './billing';
 import { QUERY_DATABASE } from './query';
 import { INSERT_ROW, UPDATE_ROW, DELETE_ROW } from './write';
-import { IMPORT_MEDIA_URL } from './posts';
-import { GET_BRAND_LIBRARY } from './library';
-import { GET_MEDIA_MODELS, SET_MEDIA_MODEL } from './media-models';
 import { ENHANCE_PROMPT } from './prompts';
-import { UPDATE_PRODUCT } from './studio';
 
 export type EndpointFailure = { readonly error: string; readonly status: number };
-
-export const BRAND_RESOURCES = {
-  post: 'Post',
-  product: 'Product'
-} as const;
-
-export type BrandResource = keyof typeof BRAND_RESOURCES;
-
-export const RESOURCE_SEGMENT = ':id';
 
 /**
  * L'intestazione con cui un client dice QUALE tool sta chiamando. `ai_calls` registra la chiamata
@@ -55,61 +42,23 @@ type EndpointShape = {
   readonly openWorld?: boolean;
 };
 
-export type ResourcelessEndpoint = EndpointShape & {
-  readonly pathUnderBrand: string;
-  /**
-   * The same tool, reachable without naming a brand. Declaring it is what makes `slug` optional
-   * and what tells the caller a second route exists — an endpoint that omits this one has no way
-   * of running outside a brand, and asking for one is an error rather than a silent fallback.
-   */
-  readonly pathWithoutBrand?: string;
-  readonly resource?: undefined;
+export type OrgEndpoint = EndpointShape & {
+  readonly path: string;
 };
 
-export type ResourceEndpoint = EndpointShape & {
-  readonly pathUnderBrand: `${string}/${typeof RESOURCE_SEGMENT}${string}`;
-  readonly pathWithoutBrand?: undefined;
-  readonly resource: BrandResource;
-};
-
-export type BrandEndpoint = ResourcelessEndpoint | ResourceEndpoint;
-
-export const BRAND_ENDPOINTS: readonly BrandEndpoint[] = [
+export const ORG_ENDPOINTS: readonly OrgEndpoint[] = [
   BILLING_PORTAL_LINK,
   CHECKOUT_LINK,
   ONE_TIME_CHECKOUT_LINK,
   ENHANCE_PROMPT,
-  GET_BRAND_LIBRARY,
-  GET_MEDIA_MODELS,
-  IMPORT_MEDIA_URL,
   DELETE_ROW,
   INSERT_ROW,
   QUERY_DATABASE,
-  SET_MEDIA_MODEL,
   UPDATE_ROW,
 ];
 
-export const OWN_TOOL_ENDPOINTS: readonly BrandEndpoint[] = BRAND_ENDPOINTS;
-
-export function pathFor(endpoint: ResourcelessEndpoint, slug: string): string;
-export function pathFor(endpoint: ResourceEndpoint, slug: string, id: string): string;
-export function pathFor(endpoint: BrandEndpoint, slug: string, id?: string): string {
-  const base = `/api/v1/brands/${encodeURIComponent(slug)}`;
-  if (endpoint.resource === undefined) return `${base}${endpoint.pathUnderBrand}`;
-  if (!id) throw new Error(`${endpoint.tool} needs a ${endpoint.resource} id`);
-  return `${base}${endpoint.pathUnderBrand.replace(RESOURCE_SEGMENT, encodeURIComponent(id))}`;
-}
-
-/** Where this tool runs when no brand is named — `null` when it only exists under one. */
-export function pathWithoutBrand(endpoint: BrandEndpoint): string | null {
-  return endpoint.pathWithoutBrand ? `/api/v1${endpoint.pathWithoutBrand}` : null;
-}
-
-// Un id accorciato è una comodità di lettura: la lista dice quale riga, il prefisso basta a
-// indicarla. Su una cancellazione non basta — il prefisso ambiguo colpisce la riga sbagliata e
-// non si torna indietro — quindi la DELETE prende l'id che il contratto dichiara, per intero.
-export function acceptsIdPrefix(endpoint: BrandEndpoint): endpoint is ResourceEndpoint {
-  return endpoint.resource !== undefined && endpoint.method !== 'DELETE';
+export function pathFor(endpoint: OrgEndpoint): string {
+  return `/api/v1${endpoint.path}`;
 }
 
 export function statusForFailure(
@@ -119,27 +68,9 @@ export function statusForFailure(
   return endpoint.failures.find((f) => f.error === error)?.status ?? 500;
 }
 
-export {
-  IMPORT_MEDIA_URL,
-  GET_BRAND_LIBRARY,
-};
-/**
- * Gli schemi delle letture ritirate da MCP. La rotta REST resta e continua a validare con questi;
- * nessuno di essi e' un endpoint del registry, quindi nessuno diventa un tool.
- */
-export { LIST_MEDIA_READ } from './posts';
-
 export { QUERY_DATABASE, QUERY_OPS, QUERY_TABLE_NAMES, QUERY_DEFAULT_ROWS, QUERY_MAX_ROWS } from './query';
 export { QUERY_TABLES } from './query-tables';
-export {
-  GET_MEDIA_MODELS,
-  MEDIA_MODEL_JOBS,
-  MEDIA_MODEL_SLOT_IDS,
-  SET_MEDIA_MODEL
-} from './media-models';
-export type { MediaModelSlotId } from './media-models';
 export { ENHANCE_PROMPT } from './prompts';
-export { UPDATE_PRODUCT } from './studio';
 export {
   AUTOMATION_CADENCES,
   AUTOMATION_JOBS,
@@ -156,12 +87,3 @@ export type {
 } from './billing';
 export { INSERT_ROW, UPDATE_ROW, DELETE_ROW, UPDATE_MAX_ROWS, DELETE_MAX_ROWS } from './write';
 export { TABLE_CHECKS, WRITABLE_COLUMNS } from './write-rules';
-
-/**
- * I CONTRATTI DEI TOOL RITIRATI, che restano esportati.
- *
- * Ritirare un tool vuol dire toglierlo da `BRAND_ENDPOINTS`, cioè smettere di esporlo su MCP. La
- * rotta REST resta, il CLI la chiama, e il contratto è la forma con cui la chiama: toglierlo anche
- * di qui fa smettere di compilare una rotta, con un errore di TIPO che il codice in esecuzione non
- * mostra e che si perde fra i preesistenti.
- */

@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { authenticate, checkApiKeyWriteAccess, loadBrandForUser } from '$lib/server/cli-auth';
-import { isOrgOwner, orgBillingForBrand } from '$lib/server/org-billing';
+import { checkApiKeyWriteAccess, openOrg } from '$lib/server/cli-auth';
+import { isOrgOwner, orgBillingById } from '$lib/server/org-billing';
 import { billingGrantsReady } from '$lib/server/billing-readiness';
 import { topUpFor } from '$lib/credit-ladder';
 import { BILLING_PATH, checkoutReturnUrls } from '$lib/billing-path';
@@ -9,12 +9,11 @@ import { appOrigin } from '$lib/server/app-url';
 
 import { ONE_TIME_CHECKOUT_LINK, statusForFailure } from '@feega/api-contracts';
 
-export const POST: RequestHandler = async ({ request, params, url }) => {
-  const { supabase, user, apiKey, error } = await authenticate(request);
+export const POST: RequestHandler = async ({ request, url }) => {
+  const { call, error } = await openOrg(request);
   if (error) return error;
 
-  const { brand, error: brandError } = await loadBrandForUser(supabase, params.slug, apiKey);
-  if (brandError) return brandError;
+  const { supabase, user, orgId, apiKey } = call;
 
   const readOnly = checkApiKeyWriteAccess(apiKey);
   if (readOnly) return readOnly;
@@ -31,7 +30,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
     return json({ error: 'invalid_input', details: parsed.error.issues }, { status: 400 });
   }
 
-  if (!(await isOrgOwner(supabase, brand.org_id, user.id))) {
+  if (!(await isOrgOwner(supabase, orgId, user.id))) {
     return json(
       { error: 'not_org_owner' },
       { status: statusForFailure(ONE_TIME_CHECKOUT_LINK, 'not_org_owner') }
@@ -46,7 +45,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
     );
   }
 
-  const billing = await orgBillingForBrand(supabase, { slug: params.slug });
+  const billing = await orgBillingById(supabase, orgId);
   if (!billing) {
     return json(
       { error: 'no_org_billing' },
