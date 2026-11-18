@@ -83,10 +83,10 @@ describe('frame sources asked per mode', () => {
   });
 });
 
-describe('pictures fetched while on-screen vectors are owed, per mode', () => {
-  it('local lets one frame fetch pictures at a time until every on-screen frame has vectors; hosted never holds them', async () => {
-    const { picturesWhileVectorsOwed } = await import('./local-user');
-    expect(picturesWhileVectorsOwed({ PUBLIC_FEEGA_LOCAL: '1' })).toBe(1);
-    expect(picturesWhileVectorsOwed({})).toBe(Infinity);
+describe('pictures fetched at once, per mode', () => {
+  it('local lets a few frames fetch pictures while on-screen vectors are owed and caps them after, so the nearest go first; hosted never holds them', async () => {
+    const { pictureLimitsFor } = await import('./local-user');
+    expect(pictureLimitsFor({ PUBLIC_FEEGA_LOCAL: '1' })).toEqual({ whileOwed: 3, open: 6 });
+    expect(pictureLimitsFor({})).toEqual({ whileOwed: Infinity, open: Infinity });
   });
 });

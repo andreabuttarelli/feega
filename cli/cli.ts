@@ -114,11 +114,12 @@ const agents = program
 
 agents
   .command('models <agent>')
-  .description('List the models an agent offers, read live from it; --set picks one for this .feega file')
+  .description('List the models and efforts an agent offers, read live from it; --set and --effort pick them for this .feega file')
   .option('--set <model>', 'Use this model for the agent (an id from the list)')
-  .option('--clear', 'Go back to the agent default')
+  .option('--effort <level>', 'Use this reasoning effort (one listed after the model)')
+  .option('--clear', 'Go back to the agent default model and effort')
   .option('--refresh', 'Ask the agent again instead of using the cached list')
-  .action(async (agent: string, options: { set?: string; clear?: boolean; refresh?: boolean }) => {
+  .action(async (agent: string, options: { set?: string; clear?: boolean; effort?: string; refresh?: boolean }) => {
     const { cmdAgentModels } = await import('./commands/agents.ts');
     await cmdAgentModels(agent, options);
   });

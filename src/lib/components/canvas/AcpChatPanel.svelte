@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { tick } from 'svelte';
+  import { nearBottom } from '$lib/chat-scroll';
+  import { nextFollow, type Follow } from '$lib/components/brand-agent/chat-follow';
   import { Button, type ButtonVariant } from '$lib/components/ui/button';
   import { AcpChat, Line } from '$lib/acp/acp-chat.svelte';
   import { AgentChoices } from '$lib/acp/agent-choices.svelte';
@@ -7,6 +10,7 @@
   import AcpModelPicker from './AcpModelPicker.svelte';
   import ChatComposer from '$lib/components/brand-agent/ChatComposer.svelte';
   import ChatMessage from '$lib/components/brand-agent/ChatMessage.svelte';
+  import ChatEffortPicker from '$lib/components/brand-agent/ChatEffortPicker.svelte';
 
   const CLOUD_HINT = 'Feega cloud chat spends credits and runs at feega.app: import this .feega file there, or pick an agent installed on this computer. It edits the canvas through Feega’s tools and asks before each one.';
   const OPTION_VARIANT: Record<string, ButtonVariant> = { allow_once: 'primary', allow_always: 'primary', reject_once: 'secondary', reject_always: 'secondary' };
@@ -17,6 +21,17 @@
   const model = new AgentModelChoice();
 
   let draft = $state('');
+  let scroller = $state<HTMLOListElement | null>(null);
+  let follow = $state<Follow>('following');
+
+  $effect(() => {
+    void chat.revision;
+    void tick().then(() => {
+      if (scroller && follow === 'following') {
+        scroller.scrollTo({ top: scroller.scrollHeight });
+      }
+    });
+  });
 
   const agent = $derived(choices.current);
 
@@ -29,7 +44,8 @@
   });
 
   const lastLine = $derived(chat.lines.at(-1));
-  const awaiting = $derived(chat.busy && lastLine?.line === Line.User);
+  const awaiting = $derived(chat.busy && !chat.starting && lastLine?.line === Line.User);
+  const PLAN_MARK: Record<string, string> = { completed: '✓', in_progress: '›', pending: '·' };
 
   function send() {
     const prompt = draft.trim();
@@ -38,7 +54,17 @@
     }
 
     draft = '';
+    follow = nextFollow(follow, { kind: 'sent' });
     void chat.send(agent.id, prompt);
+  }
+
+  function retry() {
+    const asked = chat.lines.findLast((l) => l.line === Line.User);
+    if (!agent || !asked || asked.line !== Line.User || chat.busy) {
+      return;
+    }
+
+    void chat.send(agent.id, asked.text);
   }
 
   function startsRun(i: number) {
@@ -53,7 +79,7 @@
 <section class="acp" data-testid="acp-chat">
   <AcpAgentPicker agents={choices.agents} chosen={choices.chosen} refreshing={choices.refreshing} onchoose={(id) => void choices.choose(id)} onrefresh={() => void Promise.all([choices.refresh(), model.refresh()])} />
 
-  <ol class="lines">
+  <ol class="lines" bind:this={scroller} onscroll={() => (follow = nextFollow(follow, { kind: 'scrolled', atBottom: nearBottom(scroller) }))}>
     {#if !agent}
       <li class="hint">{hint}</li>
     {/if}
@@ -61,11 +87,24 @@
       {#if l.line === Line.User}
         <li><ChatMessage role="user" content={l.text} projectId="" /></li>
       {:else if l.line === Line.Agent}
-        <li><ChatMessage role="assistant" content={l.text} projectId="" first={startsRun(i)} live={isLive(i)} /></li>
-      {:else if l.line === Line.Tool}
-        <li class="tool">{l.title}</li>
+        <li><ChatMessage role="assistant" content={l.text} reasoning={l.reasoning} tools={l.tools} projectId="" first={startsRun(i)} live={isLive(i)} /></li>
+      {:else if l.line === Line.Plan}
+        <li class="plan" data-testid="acp-plan">
+          <ol>
+            {#each l.entries as e, n (n)}
+              <li data-status={e.status}><span aria-hidden="true">{PLAN_MARK[e.status] ?? '·'}</span> {e.content}</li>
+            {/each}
+          </ol>
+        </li>
+      {:else if l.line === Line.Stopped}
+        <li class="note" data-testid="acp-stopped">Stopped</li>
       {:else if l.line === Line.Error}
-        <li class="error" role="alert">{l.text}</li>
+        <li class="error" role="alert">
+          {l.text}
+          {#if i === chat.lines.length - 1 && !chat.busy}
+            <Button size="sm" variant="secondary" onclick={retry} data-testid="acp-retry">Retry</Button>
+          {/if}
+        </li>
       {:else if l.line === Line.Permission}
         <li class="permission" data-testid="acp-permission">
           <p>{agent?.name ?? 'The agent'} wants to run <strong>{l.title}</strong></p>
@@ -77,17 +116,24 @@
         </li>
       {/if}
     {/each}
-    {#if awaiting}
+    {#if chat.starting}
+      <li class="note" data-testid="acp-starting">Starting {agent?.name ?? 'the agent'}… the first message of a chat launches it, later ones reuse it.</li>
+    {:else if awaiting}
       <li><ChatMessage role="assistant" content="" projectId="" pending live /></li>
     {/if}
   </ol>
 
   <div class="dock">
-    <ChatComposer bind:value={draft} busy={chat.busy} enabled={!!agent} placeholder={agent ? `Ask ${agent.name}` : 'Pick an agent first'} onsend={send} onstop={() => chat.stop()}>
+    <ChatComposer bind:value={draft} busy={chat.busy} enabled={!!agent} placeholder={agent ? `Ask ${agent.name}` : 'Pick an agent first'} onsend={send} onstop={() => void chat.stop()}>
       {#snippet controls()}
+        <div class="pickers">
         <span class="model-slot" data-testid="acp-model-slot">
           <AcpModelPicker models={model.models} selected={model.selected} onchoose={(id) => void model.choose(id)} />
         </span>
+        <span class="effort-slot" data-testid="acp-effort-slot">
+          <ChatEffortPicker efforts={model.efforts} value={model.effort} onchoose={(effort) => void model.chooseEffort(effort)} />
+        </span>
+        </div>
       {/snippet}
     </ChatComposer>
   </div>
@@ -117,19 +163,29 @@
   }
 
   .hint,
-  .tool,
   .error {
     white-space: pre-wrap;
   }
 
   .hint,
-  .tool {
+  .note,
+  .plan {
     color: var(--ui-text-secondary);
     font-size: var(--ui-type-caption);
   }
 
   .error {
     color: var(--ui-danger);
+  }
+
+  .plan ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .plan [data-status='completed'] {
+    text-decoration: line-through;
   }
 
   .permission {
@@ -145,6 +201,18 @@
   .options {
     display: flex;
     gap: var(--ui-space-2);
+  }
+
+  .pickers {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-1);
+    min-width: 0;
+  }
+
+  .model-slot {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   .dock {

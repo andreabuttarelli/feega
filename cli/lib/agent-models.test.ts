@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { listModels, modelLines, setModel, type ModelListing } from './agent-models.ts';
+import { listModels, modelLines, setEffort, setModel, type ModelListing } from './agent-models.ts';
 
 const LISTING: ModelListing = {
   models: [
@@ -61,7 +61,30 @@ describe('setModel', () => {
   });
 });
 
+describe('setEffort', () => {
+  it('saves the effort for the agent, and clears it with null', async () => {
+    await setEffort('claude', 'high');
+    expect(seen.at(-1)).toEqual({ method: 'PUT', url: '/api/v1/local/acp/agents/claude/models', body: JSON.stringify({ effort: 'high' }) });
+
+    await setEffort('claude', null);
+    expect(seen.at(-1)?.body).toBe(JSON.stringify({ effort: null }));
+  });
+});
+
 describe('modelLines', () => {
+  it('lists the efforts of each model and marks the one in use', () => {
+    const lines = modelLines({
+      models: [{ id: 'opus', name: 'Opus', description: null, efforts: ['low', 'high'] }, { id: 'haiku', name: 'Haiku', description: null, efforts: [] }],
+      current: 'opus',
+      chosen: null,
+      effort: 'high',
+      chosenEffort: 'low'
+    });
+
+    expect(lines[0]).toContain('effort: *low high');
+    expect(lines[1]).not.toContain('effort');
+  });
+
   it('marks the chosen model and the agent default', () => {
     const lines = modelLines(LISTING);
 

@@ -75,7 +75,9 @@ export function lockHeight(el: HTMLElement) {
 
 export const CHAPTER_SELECTOR = '.chapter';
 
-const outsideChapters = (selector: string) => `${selector}:not(${CHAPTER_SELECTOR} *)`;
+const FAQ_SELECTOR = '.faq';
+
+const outsideChapters = (selector: string) => `${selector}:not(${CHAPTER_SELECTOR} *):not(${FAQ_SELECTOR} *)`;
 
 export const BUILD_TARGETS = [
   '.bar > a:not(.brand)',

@@ -103,12 +103,18 @@ From a terminal, `feega agents` prints the same list (`--refresh` to detect agai
 app reads your login shell's `PATH`, so agents installed by Homebrew, `npm` or an install script
 are found even when Feega is opened from the Dock.
 
-### Picking the agent's model
+### Picking the agent's model and effort
 
 Next to the picked agent, a **Model** menu lists the models that agent offers, read live from it
-over ACP: Feega keeps no list of its own. The choice is saved per agent in the `.feega` file and
-applied at the start of every turn; a saved model the agent no longer offers falls back to its
-default. Agents that don't let a client pick a model show no menu.
+over ACP: Feega keeps no list of its own. Beside it, the same **effort** menu as the cloud chat
+lists the reasoning efforts the chosen model offers, and is absent when it offers none. Both
+choices are saved per agent in the `.feega` file and applied at the start of every turn; a saved
+model or effort the agent no longer offers falls back to its default. Agents that don't let a
+client pick a model show no menu.
+
+Claude Code offers its efforts as an ACP `thought_level` option (`default`, `low` … `max`) for
+every model; Codex CLI offers them per model, as `model[effort]` variants, so some Codex models
+show no effort menu.
 
 | Agent | Model menu |
 |---|---|
@@ -123,22 +129,36 @@ From a terminal:
 ```bash
 feega agents models claude            # list, * marks the one in use
 feega agents models claude --set opus # pick one for this file
-feega agents models claude --clear    # back to the agent's default
+feega agents models claude --effort low  # pick the reasoning effort
+feega agents models claude --clear    # back to the agent's default model and effort
 feega agents models claude --refresh  # ask the agent again
 ```
 
 The endpoint is `GET`/`PUT /api/v1/local/acp/agents/<agent>/models`: `GET` answers
-`{ models, current, chosen }` (`models` is `null` when the agent offers no choice, `?refresh=1`
-asks it again), `PUT { model }` saves one the agent offers, `{ model: null }` clears it.
+`{ models, current, chosen, effort, chosenEffort }` (`models` is `null` when the agent offers no
+choice, each model lists its `efforts`, `?refresh=1` asks it again), `PUT { model }` saves one the
+agent offers, `PUT { effort }` saves an effort, and `null` clears either.
 
-Each message starts the agent, hands it Feega's MCP server and streams its reply into the tab.
+The agent works in your project: the folder that holds the opened `.feega` file, or, when the
+canvas imported exactly one codebase folder, that folder. Feega decides it on the server; the tab
+cannot point the agent anywhere else.
+
+The first message of a chat starts the agent (the tab says so: it can take a while, since the
+agent loads its own settings and Feega's MCP server), and later messages reuse the same agent
+session, so it remembers the conversation and answers at once. A chat's agent is closed after
+15 minutes idle; reloading the page starts a new chat. The tab streams the reply, the agent's
+thinking, each tool call with its status and the agent's plan. While it works, the send button
+becomes **Stop**: the agent is told to cancel (`session/cancel`), what it wrote stays, and the
+turn is marked **Stopped**. A failed turn has **Retry**.
 The agent edits the canvas only through Feega's tools: it gets no file or terminal access from
 Feega. Before each tool call the tab shows what it wants to run with the agent's choices
 (**Allow**, **Reject**, ...); nothing runs until you pick one. Usage is billed to your agent's own
 account, never to Feega.
 
-The endpoint behind it is `POST /api/v1/local/acp`, local mode only: `{ agent, prompt }` answers
-with a `text/event-stream` of `update`, `permission`, `done` and `failed` events, and
+The endpoint behind it is `POST /api/v1/local/acp`, local mode only: `{ thread, agent, prompt }`
+answers with a `text/event-stream` of `starting`, `update`, `permission`, `done` and `failed`
+events (`thread` is an id the tab picks per chat; the same id reuses the agent session),
+`{ cancel: thread }` stops the running turn (`404` when nothing runs), and
 `{ permission: { id, optionId } }` answers a pending permission. An agent that isn't installed,
 or can't run over ACP here, answers `409`. `GET /api/v1/local/acp/agents` (add `?refresh=1` to
 detect again) returns `{ agents, chosen }`; `PUT` with `{ agent }` (an id, or `null` for Feega

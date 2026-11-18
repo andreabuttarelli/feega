@@ -81,6 +81,25 @@ describe('showStaged', () => {
   });
 });
 
+describe('a frame showing its poster', () => {
+  it('keeps the poster until the frame is whole: no vectors-with-blocks step in between', async () => {
+    const shown: [Readiness, Stage][] = [];
+    const answers = [Readiness.Partial, Readiness.Whole];
+
+    await showStaged(async () => answers.shift()!, OnScreen.Poster, (r, stage) => shown.push([r, stage]), async () => {});
+
+    expect(shown).toEqual([[Readiness.Whole, Stage.Settled]]);
+  });
+
+  it('shows what it has after the last attempt, so a broken picture cannot pin the poster forever', async () => {
+    const shown: Readiness[] = [];
+
+    await showStaged(async () => Readiness.Partial, OnScreen.Poster, (r) => shown.push(r), async () => {});
+
+    expect(shown).toEqual([Readiness.Partial]);
+  });
+});
+
 describe('VectorGate', () => {
   it('le immagini aspettano che ogni frame visibile abbia mostrato i vettori', () => {
     const gate = new VectorGate();
@@ -115,6 +134,14 @@ describe('shownBefore', () => {
 
   it('un frame mai mostrato parte dai vettori', () => {
     expect(shownBefore({ thumb: false, drawn: false })).toBe(OnScreen.Nothing);
+  });
+
+  it('a frame with a poster waits for the whole frame instead of the vectors', () => {
+    expect(shownBefore({ thumb: false, drawn: false, poster: true })).toBe(OnScreen.Poster);
+  });
+
+  it('a frame already drawn keeps showing every settled step even with a poster', () => {
+    expect(shownBefore({ thumb: false, drawn: true, poster: true })).toBe(OnScreen.Thumb);
   });
 });
 

@@ -48,7 +48,10 @@ function fakeBridge(events: AcpEvent[]) {
       calls.push({ method: 'answer', input: answer });
       return true;
     },
-    cancel: async (turnId) => void calls.push({ method: 'cancel', input: turnId }),
+    cancel: async (turnId) => {
+      calls.push({ method: 'cancel', input: turnId });
+      queueMicrotask(() => listener(turnId, { kind: AcpEventKind.Done, stopReason: 'cancelled' }));
+    },
     onEvent: (fn) => {
       listener = fn;
       return () => {};
@@ -94,10 +97,11 @@ describe('the IPC transport speaks the same port as HTTP', () => {
     const chat = new AcpChat(agentFetch(AgentTransport.Ipc, { bridge, context })!);
     const turn = chat.send('claude', 'go');
     await new Promise((r) => setTimeout(r));
-    chat.stop();
+    await chat.stop();
     await turn;
 
     expect(calls.map((c) => c.method)).toEqual(['start', 'cancel']);
     expect(chat.busy).toBe(false);
+    expect(chat.lines.at(-1)).toEqual({ line: Line.Stopped });
   });
 });

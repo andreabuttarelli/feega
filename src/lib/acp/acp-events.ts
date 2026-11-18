@@ -1,4 +1,5 @@
 export enum AcpEventKind {
+  Starting = 'starting',
   Update = 'update',
   Permission = 'permission',
   Done = 'done',
@@ -7,9 +8,21 @@ export enum AcpEventKind {
 
 export type AcpOption = { optionId: string; name: string; kind: string };
 
-export type AcpUpdate = { sessionUpdate: string; content?: { type: string; text?: string }; title?: string };
+export type AcpPlanEntry = { content: string; status: string; priority?: string };
+
+export type AcpUpdate = {
+  sessionUpdate: string;
+  content?: { type: string; text?: string };
+  title?: string;
+  toolCallId?: string;
+  status?: string;
+  rawInput?: unknown;
+  rawOutput?: unknown;
+  entries?: AcpPlanEntry[];
+};
 
 export type AcpEvent =
+  | { kind: AcpEventKind.Starting }
   | { kind: AcpEventKind.Update; update: AcpUpdate }
   | { kind: AcpEventKind.Permission; id: string; title: string; options: AcpOption[] }
   | { kind: AcpEventKind.Done; stopReason: string }

@@ -4042,3 +4042,11 @@ property reads on ~2,000 items (`src/lib/canvas/counted-list.testkit.ts`), not w
 ## A freshly imported frame can keep a blank poster
 
 **Signal:** the version diff panel stays on "rendering…" (or, before the blank check, flags the whole poster as changed) while the frame itself paints fine on the canvas. `MotionNode` captures the cover once per head revision; a capture taken before the imported page painted is saved as a uniform poster and never retaken. **Move:** check the poster with `isBlank` before trusting it; to drive the flow in a test, run `tests/e2e/compare-versions.spec.ts` against a fresh local-mode `.feega` file and rerun once if the poster lost the race.
+
+## Leaving a streaming page kills the whole local server
+
+**Signal:** the local server exits with `TypeError [ERR_INVALID_STATE]: Controller is already closed` at `controller.enqueue`, called from a child process's readline `line` handler, right after a browser tab closed or stopped an SSE response. **Move:** a stream fed by events that outlive the request (an agent's stdout, a timer) guards every `enqueue` on a flag set in the stream's `cancel()` and on `request.signal`, and that same flag tells the producer to stop (`session/cancel`). An exception in an event-emitter handler is uncaught, so it ends the process, not the request.
+
+## "Working…" forever on a local agent is its startup, not a dead request
+
+**Signal:** the local ACP chat shows no event for 30-50 s after a prompt. **Move:** read the agent's own logs before the network tab: `~/.claude/projects/<cwd>/<session>.jsonl` (when the model was first called) and `~/Library/Caches/claude-cli-nodejs/<cwd>/mcp-logs-feega/` (an MCP server timing out at 30 s). Codex writes `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` with the `model` and `effort` of every turn: the place to prove a model or effort switch took effect.

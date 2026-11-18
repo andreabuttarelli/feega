@@ -2,7 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import type { AcpOption, AcpUpdate } from '$lib/acp/acp-events';
 import type { AgentModels } from '$lib/acp/agent-models';
-import { modelsOf, switchFor, type NewSession } from './models';
+import { modelsOf, switchesFor, type Choice, type NewSession } from './models';
 
 export const ACP_PROTOCOL_VERSION = 1;
 
@@ -10,7 +10,7 @@ export type AgentCommand = { command: string; args: string[]; env?: Record<strin
 
 export type McpServer = { name: string; command: string; args: string[]; env: { name: string; value: string }[] };
 
-export type AcpTurnInput = { agent: AgentCommand; cwd: string; mcpServers: McpServer[]; prompt: string; model?: string | null };
+export type AcpTurnInput = { agent: AgentCommand; cwd: string; mcpServers: McpServer[]; prompt: string; choice?: Choice };
 
 export type AcpTurn = { text: string; toolCalls: string[]; stopReason: string };
 
@@ -20,24 +20,61 @@ export type PermissionAsk = { title: string; options: AcpOption[] };
 
 export type PermissionOutcome = { outcome: 'selected'; optionId: string } | { outcome: 'cancelled' };
 
-export type AcpTurnHooks = { onUpdate: (update: AcpUpdate) => void; ask: (permission: PermissionAsk) => Promise<PermissionOutcome>; signal?: AbortSignal };
+export type AcpTurnHooks = {
+  onUpdate: (update: AcpUpdate) => void;
+  ask: (permission: PermissionAsk, signal: AbortSignal) => Promise<PermissionOutcome>;
+  onStarting?: () => void;
+  signal?: AbortSignal;
+};
+
+export type ThreadTurn = AcpTurnInput & { thread: string; agentId: string };
 
 const METHOD_NOT_FOUND = -32601;
 
 type PermissionParams = { toolCall: { title?: string }; options: AcpOption[] };
 
+const NEVER_ABORTED = new AbortController().signal;
+
+function parsed(line: string): Message | null {
+  try {
+    return JSON.parse(line) as Message;
+  } catch {
+    return null;
+  }
+}
+
 class Connection {
   private nextId = 1;
   private readonly waiting = new Map<number, { done: (v: unknown) => void; fail: (e: Error) => void }>();
-  private readonly turn: AcpTurn = { text: '', toolCalls: [], stopReason: '' };
+  private turn: AcpTurn = { text: '', toolCalls: [], stopReason: '' };
+  private stop: AbortSignal = NEVER_ABORTED;
+  exited = false;
 
   constructor(
     private readonly child: ChildProcessWithoutNullStreams,
-    private readonly hooks: AcpTurnHooks
+    private hooks: AcpTurnHooks
   ) {
-    createInterface({ input: child.stdout }).on('line', (line) => this.receive(JSON.parse(line) as Message));
+    createInterface({ input: child.stdout }).on('line', (line) => {
+      const msg = parsed(line);
+      if (msg) {
+        this.receive(msg);
+      }
+    });
     child.on('error', (e) => this.failAll(e));
-    child.on('exit', (code) => this.failAll(new Error(`ACP agent exited with code ${code}`)));
+    child.on('exit', (code) => {
+      this.exited = true;
+      this.failAll(new Error(`ACP agent exited with code ${code}`));
+    });
+  }
+
+  begin(hooks: AcpTurnHooks, stop: AbortSignal) {
+    this.hooks = hooks;
+    this.stop = stop;
+    this.turn = { text: '', toolCalls: [], stopReason: '' };
+  }
+
+  close() {
+    this.child.kill();
   }
 
   request(method: string, params: unknown): Promise<unknown> {
@@ -82,7 +119,7 @@ class Connection {
   }
 
   private async askUser(id: number, params: PermissionParams) {
-    const outcome = await this.hooks.ask({ title: params.toolCall.title ?? '', options: params.options });
+    const outcome = this.stop.aborted ? CANCELLED : await this.hooks.ask({ title: params.toolCall.title ?? '', options: params.options }, this.stop);
     this.write({ id, result: { outcome } });
   }
 
@@ -125,7 +162,11 @@ class Connection {
 
 const INITIALIZE = { protocolVersion: ACP_PROTOCOL_VERSION, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false } };
 
-const SILENT: AcpTurnHooks = { onUpdate: () => {}, ask: async () => ({ outcome: 'cancelled' }) };
+const CANCELLED: PermissionOutcome = { outcome: 'cancelled' };
+
+const SILENT: AcpTurnHooks = { onUpdate: () => {}, ask: async () => CANCELLED };
+
+const IDLE_MS = 15 * 60 * 1000;
 
 type Session = { agent: AgentCommand; cwd: string; mcpServers: McpServer[] };
 
@@ -143,22 +184,104 @@ async function withSession<T>(s: Session, hooks: AcpTurnHooks, work: (acp: Conne
 }
 
 export function listAcpModels(agent: AgentCommand, cwd: string): Promise<AgentModels | null> {
-  return withSession({ agent, cwd, mcpServers: [] }, SILENT, async (_, session) => {
-    const offered = modelsOf(session);
-    return offered && { current: offered.current, models: offered.models };
-  });
+  return withSession({ agent, cwd, mcpServers: [] }, SILENT, async (_, session) => modelsOf(session));
 }
 
-export function runAcpTurn(input: AcpTurnInput, hooks: AcpTurnHooks): Promise<AcpTurn> {
-  return withSession(input, hooks, async (acp, session) => {
-    const { sessionId } = session;
-    const change = switchFor(session, input.model ?? null);
-    if (change) {
-      await acp.request(change.method, change.params);
+type Live = { agentId: string; acp: Connection; session: NewSession; choice: Choice; idle: ReturnType<typeof setTimeout> | null };
+
+function launch(s: Session): Promise<{ acp: Connection; session: NewSession }> {
+  const child = spawn(s.agent.command, s.agent.args, { cwd: s.cwd, env: { ...process.env, ...s.agent.env }, stdio: ['pipe', 'pipe', 'inherit'] }) as unknown as ChildProcessWithoutNullStreams;
+  const acp = new Connection(child, SILENT);
+
+  return (async () => {
+    try {
+      await acp.request('initialize', INITIALIZE);
+      const session = (await acp.request('session/new', { cwd: s.cwd, mcpServers: s.mcpServers })) as NewSession;
+      return { acp, session };
+    } catch (e) {
+      acp.close();
+      throw e;
+    }
+  })();
+}
+
+export function createAcpSessions(idleMs = IDLE_MS) {
+  const threads = new Map<string, Promise<Live>>();
+  const running = new Map<string, AbortController>();
+
+  const close = (thread: string) => {
+    const live = threads.get(thread);
+    threads.delete(thread);
+    void live?.then((l) => l.acp.close(), () => {});
+  };
+
+  async function open(input: ThreadTurn, hooks: AcpTurnHooks): Promise<Live> {
+    const known = await threads.get(input.thread)?.catch(() => null);
+    if (known && known.agentId === input.agentId && !known.acp.exited) {
+      return known;
     }
 
-    hooks.signal?.addEventListener('abort', () => acp.notify('session/cancel', { sessionId }), { once: true });
+    close(input.thread);
+    hooks.onStarting?.();
+    const opening = launch(input).then(({ acp, session }): Live => ({ agentId: input.agentId, acp, session, choice: { model: modelsOf(session)?.current ?? null, effort: modelsOf(session)?.effort ?? null }, idle: null }));
+    threads.set(input.thread, opening);
+    opening.catch(() => threads.delete(input.thread));
+    return opening;
+  }
+
+  async function prompt(live: Live, input: ThreadTurn, stop: AbortSignal): Promise<AcpTurn> {
+    const { acp, session } = live;
+    const { sessionId } = session;
+    const { switches, now } = switchesFor(session, live.choice, input.choice ?? { model: null, effort: null });
+    for (const change of switches) {
+      await acp.request(change.method, change.params);
+    }
+    live.choice = now;
+
+    if (stop.aborted) {
+      return { ...acp.result(), stopReason: CANCELLED.outcome };
+    }
+
+    stop.addEventListener('abort', () => acp.notify('session/cancel', { sessionId }), { once: true });
     const { stopReason } = (await acp.request('session/prompt', { sessionId, prompt: [{ type: 'text', text: input.prompt }] })) as { stopReason: string };
     return { ...acp.result(), stopReason };
-  });
+  }
+
+  return {
+    async turn(input: ThreadTurn, hooks: AcpTurnHooks): Promise<AcpTurn> {
+      const stop = new AbortController();
+      running.set(input.thread, stop);
+      hooks.signal?.addEventListener('abort', () => stop.abort(), { once: true });
+
+      try {
+        const live = await open(input, hooks);
+        if (live.idle) {
+          clearTimeout(live.idle);
+        }
+
+        live.acp.begin(hooks, stop.signal);
+        try {
+          return await prompt(live, input, stop.signal);
+        } finally {
+          live.acp.begin(SILENT, NEVER_ABORTED);
+          live.idle = setTimeout(() => close(input.thread), idleMs);
+          live.idle.unref();
+        }
+      } finally {
+        running.delete(input.thread);
+      }
+    },
+
+    cancel(thread: string): boolean {
+      const stop = running.get(thread);
+      stop?.abort();
+      return !!stop;
+    },
+
+    closeAll() {
+      [...threads.keys()].forEach(close);
+    }
+  };
 }
+
+export const acpSessions = createAcpSessions();
