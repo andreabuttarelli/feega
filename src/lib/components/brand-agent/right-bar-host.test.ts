@@ -4,6 +4,28 @@ import { BarTab, RightBarHost, moveKeepingScroll, portalInto } from './right-bar
 const el = (name: string) => ({ name }) as unknown as HTMLElement;
 
 describe('one right bar, claimed by whichever surface is showing it', () => {
+  it('asking for Properties before the surface that has them claims the bar still opens them', () => {
+    const host = new RightBarHost();
+    host.claim(el('shell'), {});
+    const shown: boolean[] = [];
+
+    host.select(BarTab.Properties);
+    host.claim(el('canvas'), { properties: { shown: false, onshow: (on) => shown.push(on) } });
+
+    expect(shown).toEqual([true]);
+  });
+
+  it('a later tab choice cancels the Properties request that was waiting', () => {
+    const host = new RightBarHost();
+    const shown: boolean[] = [];
+
+    host.select(BarTab.Properties);
+    host.select(BarTab.Guide);
+    host.claim(el('canvas'), { properties: { shown: false, onshow: (on) => shown.push(on) } });
+
+    expect(shown).toEqual([]);
+  });
+
   it('the last surface to claim the bar holds it, and releasing it hands it back', () => {
     const host = new RightBarHost();
     const canvas = host.claim(el('canvas'), {});
