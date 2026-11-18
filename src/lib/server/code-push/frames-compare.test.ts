@@ -25,7 +25,7 @@ const deps = (): CompareDeps => ({
     marks.delete(id);
   },
   importAt: async (ask) => {
-    imported.push({ ref: ask.sha, at: ask.at, entry: ask.link.entry });
+    imported.push({ ref: ask.sha, at: ask.centre, entry: ask.link.entry });
     return { frameId: `v${imported.length}` };
   },
   mark: async (frameId, mark) => {
@@ -57,15 +57,15 @@ describe('il nome di una versione', () => {
 });
 
 describe('confrontare le versioni di un frame', () => {
-  it('ogni ref diventa un frame versione accanto all’originale, allo sha del ref, senza link', async () => {
+  it('ogni ref diventa un frame versione centrato accanto all’originale, allo sha del ref, senza link', async () => {
     const out = await frameCompare(deps(), { nodeId: 'n1', refs: ['main', 'feega/x', 'v1'] });
 
     expect(out).toMatchObject({ ok: true });
     expect(imported.map((i) => i.ref)).toEqual([mainSha, branchSha, mainSha]);
     expect(imported.map((i) => i.at)).toEqual([
-      { x: 100 + 1 * (400 + 80), y: 50 },
-      { x: 100 + 2 * (400 + 80), y: 50 },
-      { x: 100 + 3 * (400 + 80), y: 50 }
+      { x: 100 + 1 * (400 + 80) + 200, y: 50 + 150 },
+      { x: 100 + 2 * (400 + 80) + 200, y: 50 + 150 },
+      { x: 100 + 3 * (400 + 80) + 200, y: 50 + 150 }
     ]);
     expect(marks.get('v2')).toEqual({ of: 'n1', ref: 'feega/x', label: 'feega/x', sha: branchSha, entry: 'src/Hero.tsx' });
     expect(links.size).toBe(1);
@@ -99,7 +99,7 @@ describe('scorrere la storia di una versione', () => {
     const out = await frameRetarget(deps(), { versionId: 'v1', ref: branchSha });
 
     expect(out).toMatchObject({ ok: true, versions: [{ frameId: 'v2', label: branchSha.slice(0, 7), of: 'n1' }] });
-    expect(imported[1]).toMatchObject({ ref: branchSha, at: { x: 580, y: 50 } });
+    expect(imported[1]).toMatchObject({ ref: branchSha, at: { x: 580 + 200, y: 50 + 150 } });
     expect(removed).toEqual(['v1']);
   });
 

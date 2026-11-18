@@ -346,6 +346,11 @@ uploads a local TTF/OTF/WOFF/WOFF2 file and, only when the user asks, deletes a 
 `spend_caps` reads the org's spend caps (`org_member`, `project_member`, `project_total`, each with an
 optional monthly reset) and, for admins and only when the user asks, sets or removes one: `feega caps
 [set <scope> <usd|off> [--project <id>] [--reset monthly]]`. A run a cap refuses answers `cap_reached`.
+`dev_server` (local Feega only) reads, starts or stops the dev server behind live frames: `feega
+dev-server [status|start|stop]`.
+`live_edit` (local Feega only) changes one property of an element of the running app at its
+`file:line:col` and writes the one class or text to source on the branch `feega/live`; also `undo`,
+`changes`, `push`: `feega live-edit <at> <prop> [value]`, `live-undo`, `live-changes`, `live-push`.
 
 ## References (load on demand)
 

@@ -52,7 +52,7 @@ export function compareDeps(db: Db, scope: CodeScope): CompareDeps {
       if (!source) {
         return { error: 'source_unavailable' };
       }
-      const done = await importCodeInto(scope, ask.canvasId, { ...source, app: ask.link.appRoot || undefined, routes: [ask.link.route ?? '/'], at: ask.at });
+      const done = await importCodeInto(scope, ask.canvasId, { ...source, app: ask.link.appRoot || undefined, routes: [ask.link.route ?? '/'], at: ask.centre });
       return done.outcome === CodeImportOutcome.Ok ? { frameId: done.frameId } : { error: done.error ?? done.outcome };
     },
     markOf: async (nodeId) => versionMarkOf((await findNode(db, { orgId: scope.orgId, nodeId }))?.data),

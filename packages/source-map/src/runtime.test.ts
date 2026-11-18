@@ -72,4 +72,37 @@ describe('bridge', () => {
       })
     ]);
   });
+
+  it('previews an edit on every element with that source, before the file changes', () => {
+    const win = domOf();
+    installBridge(win as unknown as Window);
+
+    win.dispatchEvent(
+      new win.MessageEvent('message', {
+        data: { type: 'feega:preview', source: 'components/Card.tsx:3:5', text: 'New title', style: { color: 'rgb(0, 0, 255)' } }
+      })
+    );
+
+    const h1 = win.document.querySelector('h1')!;
+    expect(h1.textContent).toBe('New title');
+    expect(h1.style.color).toBe('rgb(0, 0, 255)');
+  });
+});
+
+describe('inspectElement for editing', () => {
+  it('gives the box, the classes and the own text of a leaf element', () => {
+    const win = domOf();
+
+    const info = inspectElement(win.document.querySelector('h1')!)!;
+
+    expect(info.rect).toEqual({ x: 0, y: 0, width: 0, height: 0 });
+    expect(info.text?.startsWith('Title Title')).toBe(true);
+    expect(info.classes).toBe('');
+  });
+
+  it('has no text for an element with element children', () => {
+    const win = domOf();
+
+    expect(inspectElement(win.document.querySelector('section')!)!.text).toBeNull();
+  });
 });
