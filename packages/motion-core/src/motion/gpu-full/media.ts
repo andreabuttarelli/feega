@@ -14,7 +14,7 @@ export enum VideoPreload {
   Metadata = 'metadata'
 }
 
-export type Media = { ready: (list: DisplayList) => Promise<Readiness>; pictures: Pictures; release: (gone: DisplayList, kept: readonly DisplayList[]) => void; dispose: () => void };
+export type Media = { ready: (list: DisplayList) => Promise<Readiness>; pictures: Pictures; release: (gone: DisplayList, kept: readonly DisplayList[]) => void; failure: (src: string) => string | null; dispose: () => void };
 
 function loadImage(src: string): Promise<Picture> {
   const img = new Image();
@@ -32,7 +32,7 @@ async function decodeBytes(src: string): Promise<Picture> {
   return { source: bitmap, size: { width: bitmap.width, height: bitmap.height } };
 }
 
-const loadStill = (src: string): Promise<Picture> => decodeBytes(src).catch(() => loadImage(src));
+const loadStill = (src: string): Promise<Picture> => decodeBytes(src).catch((first: unknown) => loadImage(src).catch(() => Promise.reject(first)));
 
 function loadVideo(src: string, preload: VideoPreload): Promise<HTMLVideoElement> {
   const video = document.createElement('video');
@@ -75,6 +75,7 @@ export function createMedia({ videoPreload = VideoPreload.Auto, frames }: Option
   const images = new Map<string, Promise<Picture>>();
   const videos = new Map<string, Promise<HTMLVideoElement>>();
   const loaded = new Map<string, Picture>();
+  const failures = new Map<string, string>();
 
   const imageOf = (src: string) => images.get(src) ?? images.set(src, loadStill(src)).get(src)!;
   const videoOf = (clip: string, src: string) => videos.get(clip) ?? videos.set(clip, loadVideo(src, videoPreload)).get(clip)!;
@@ -94,9 +95,16 @@ export function createMedia({ videoPreload = VideoPreload.Auto, frames }: Option
     loaded.set(item.clip, { source: video, size: { width: video.videoWidth, height: video.videoHeight } });
   }
 
+  function failed(item: ImageItem, error: unknown) {
+    loaded.delete(item.clip);
+    images.delete(item.src);
+    videos.delete(item.clip);
+    failures.set(item.src, error instanceof Error ? error.message : String(error));
+  }
+
   async function ready(list: DisplayList): Promise<Readiness> {
     const pictures = needed(list.items);
-    await Promise.all(pictures.map((p) => readyOne(p).catch(() => loaded.delete(p.clip))));
+    await Promise.all(pictures.map((p) => readyOne(p).then(() => failures.delete(p.src), (e: unknown) => failed(p, e))));
     return pictures.every((p) => loaded.has(p.clip)) ? Readiness.Whole : Readiness.Partial;
   }
 
@@ -118,5 +126,5 @@ export function createMedia({ videoPreload = VideoPreload.Auto, frames }: Option
     }
   }
 
-  return { ready, pictures: (item) => loaded.get(item.clip) ?? null, release, dispose };
+  return { ready, pictures: (item) => loaded.get(item.clip) ?? null, release, failure: (src) => failures.get(src) ?? null, dispose };
 }

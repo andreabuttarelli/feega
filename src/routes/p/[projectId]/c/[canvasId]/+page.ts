@@ -4,7 +4,9 @@ import type { CanvasPageData } from '$lib/server/canvas/canvas-page';
 import { openCanvasOutbox } from '$lib/canvas/outbox';
 import { StartupStep, markStartup } from '$lib/canvas/core/startup-marks';
 import { earlySourceUrls } from '$lib/canvas/core/early-sources';
-import { frameSources, scopeFrameCache } from '$lib/canvas/core/frame-sources';
+import { frameSources, scopeFrameCache, sizeSourceAsks } from '$lib/canvas/core/frame-sources';
+import { sourceAsksFor } from '$lib/local-user';
+import { env as publicEnv } from '$env/dynamic/public';
 import { loadViewport } from '$lib/canvas/viewport-memory';
 import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
 
@@ -29,6 +31,7 @@ function warmSources(page: CanvasPageData, params: { projectId: string; canvasId
     return;
   }
   scopeFrameCache(userId ? { userId, orgId: page.orgId } : null);
+  sizeSourceAsks(sourceAsksFor(publicEnv));
   const saved = userId ? loadViewport(userId, params.canvasId) : null;
   const screen = { width: window.innerWidth, height: window.innerHeight };
   frameSources.warm(earlySourceUrls(page.nodes, { ...params, orgId: page.orgId, look: page.look }, saved, screen, BUDGET[currentDevice()].readableWidth));

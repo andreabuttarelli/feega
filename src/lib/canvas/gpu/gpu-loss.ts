@@ -14,6 +14,8 @@ export const FRESH_CORES = 2;
 
 export const backendAfterLoss = (backend: number, losses: number, backends: number): number => (losses >= LOSSES_PER_BACKEND && backend + 1 < backends ? backend + 1 : backend);
 
+export const lossesExhausted = (backend: number, losses: number, backends: number): boolean => losses >= LOSSES_PER_BACKEND && backend + 1 >= backends;
+
 export enum AttachStep {
   FreshCore = 'fresh-core',
   NextBackend = 'next-backend',

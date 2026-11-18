@@ -68,3 +68,25 @@ describe('in locale niente nodi che chiedono il cloud', () => {
     }
   });
 });
+
+describe('frame sources asked per mode', () => {
+  it('local keeps two small asks open: one server thread, six browser connections shared with posters and fonts', async () => {
+    const { sourceAsksFor } = await import('./local-user');
+    expect(sourceAsksFor({ PUBLIC_FEEGA_LOCAL: '1' })).toEqual({ framesPerAsk: 2, open: 2 });
+  });
+
+  it('hosted asks wider, so separate instances parse in parallel', async () => {
+    const { sourceAsksFor } = await import('./local-user');
+    const hosted = sourceAsksFor({});
+    expect(hosted.open).toBeGreaterThan(sourceAsksFor({ PUBLIC_FEEGA_LOCAL: '1' }).open);
+    expect(hosted.framesPerAsk).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('pictures fetched while on-screen vectors are owed, per mode', () => {
+  it('local lets one frame fetch pictures at a time until every on-screen frame has vectors; hosted never holds them', async () => {
+    const { picturesWhileVectorsOwed } = await import('./local-user');
+    expect(picturesWhileVectorsOwed({ PUBLIC_FEEGA_LOCAL: '1' })).toBe(1);
+    expect(picturesWhileVectorsOwed({})).toBe(Infinity);
+  });
+});

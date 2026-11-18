@@ -35,7 +35,7 @@ const DONE = {
   variants: 3,
   instances: 4,
   design: { tokens: 10, styles: 2, byClass: 5, byRule: 3, byValue: 1, unbound: 4 },
-  library: { components: [{ name: 'Button', captured: true }, { name: 'Callout', captured: false }], uncaptured: ['Callout'] }
+  library: { components: [{ name: 'Button', captured: true, drawn: true }, { name: 'Card', captured: false, drawn: true }, { name: 'Callout', captured: false, drawn: false }], uncaptured: ['Callout'], reasons: { Callout: 'needs a provider' } }
 } as unknown as CodeImported & { outcome: CodeImportOutcome.Ok };
 
 describe('the import map of one import', () => {
@@ -63,7 +63,7 @@ describe('the import map of one import', () => {
     const map = mapOf(FOUND, DONE, { asked: ['/'], rev: null });
 
     expect(map.design).toEqual({ tokens: 10, styles: 2, bound: 9, unbound: 4 });
-    expect(map.library).toEqual({ captured: ['Button'], uncaptured: ['Callout'] });
+    expect(map.library).toEqual({ captured: ['Button', 'Card'], uncaptured: ['Callout'], reasons: { Callout: 'needs a provider' } });
   });
 
   it('says why the route list is missing when discovery could not run', () => {

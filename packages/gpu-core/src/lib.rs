@@ -22,10 +22,13 @@ pub mod held_view;
 pub mod kernel;
 pub mod layers;
 pub mod lod;
+pub mod overlay_hold;
 pub mod overlay_seen;
 pub mod pictures;
+pub mod pinned;
 pub mod reproject;
 pub mod retained;
+pub mod screen_fit;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod render;
 pub mod scene;

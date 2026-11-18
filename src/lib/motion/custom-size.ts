@@ -4,6 +4,9 @@ import { Horizontal, Vertical, resizeFrame } from './constraints/constraints';
 import { keepTextSize, resizedFreeText } from './text-fit';
 import { stackElementResized } from './layout/stack-fit';
 import { heldPixels } from '@feega/motion-core/motion/breakpoints/model';
+import { inDoc, inLibrary } from './style-library';
+import { StyleKind, type Style } from '@feega/motion-core/motion/styles-model';
+import { TYPE_SIZE } from '@feega/motion-core/motion/type-units';
 
 const FRAME_LIMIT_NOTE = `A frame is at most ${DESIGN_MAX_SIDE} px a side: resized to fit`;
 
@@ -59,7 +62,16 @@ function heldRadii(doc: MotionDoc, before: MotionDoc): MotionDoc {
   return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => radiusHeld(c as MotionClip, was.get(c.id), before, doc)) })) };
 }
 
-const kept = (sized: OpResult, before: MotionDoc): OpResult => (sized.ok ? { ok: true, doc: heldRadii(heldPixels(sized.doc, before), before) } : sized);
+const withinType = (style: Style): Style => (style.kind === StyleKind.Text && style.size !== undefined ? { ...style, size: Math.min(TYPE_SIZE.max, Math.max(TYPE_SIZE.min, style.size)) } : style);
+
+function heldStyles(doc: MotionDoc, before: MotionDoc): MotionDoc {
+  if (!doc.styles) {
+    return doc;
+  }
+  return { ...doc, styles: Object.fromEntries(Object.entries(doc.styles).map(([name, style]) => [name, withinType(inDoc(inLibrary(style, before), doc))])) };
+}
+
+const kept = (sized: OpResult, before: MotionDoc): OpResult => (sized.ok ? { ok: true, doc: heldStyles(heldRadii(heldPixels(sized.doc, before), before), before) } : sized);
 
 const fittedWith = (doc: MotionDoc, node: CanvasSize, pinning: MotionClip['constraints']): OpResult => {
   const own = new Map(doc.tracks.flatMap((t) => t.clips.map((c) => [c.id, (c as MotionClip).constraints] as const)));

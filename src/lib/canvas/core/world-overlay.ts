@@ -4,7 +4,7 @@ import type { Box, Curve } from '$lib/canvas/gpu/geometry';
 import type { SnapGuide } from '$lib/canvas/snap';
 import { EdgeLook, edgeItems, ghostItems, guideItems, marqueeItems, runningItems, peerItems, type CorePeer, type CoreTheme } from './overlay';
 import { NodeChrome } from '$lib/canvas/selection-chrome';
-import { ports, stateChrome, tileChrome, type Glyphs, type StateTile } from './chrome';
+import { pinned, ports, stateChrome, tileChrome, type Glyphs, type StateTile } from './chrome';
 import { turned, type Turn } from './screen-uses';
 import { line, rect, solid } from './shapes';
 
@@ -99,8 +99,8 @@ function zoomFree(o: Fixed): Settled {
   }
   for (const t of o.chrome) {
     const into = parts[picked.has(t.id) ? 'selected' : 'fixed'];
-    into.push(once(`chrome:${t.id}`, tileFields(t), () => turnedBy(layersOf(t).tile(t, o.glyphs), t.turn)));
-    into.push(drawsState(t) ? once(`state:${t.id}`, t, () => turnedBy(stateChrome(t, o.glyphs), t.turn)) : NO_ITEMS);
+    into.push(once(`chrome:${t.id}`, tileFields(t), () => turnedBy(pinned(t, (u) => layersOf(u).tile(u, o.glyphs)), t.turn)));
+    into.push(drawsState(t) ? once(`state:${t.id}`, t, () => turnedBy(pinned(t, (u) => stateChrome(u, o.glyphs)), t.turn)) : NO_ITEMS);
   }
   built = next;
   settled = { fixed: flatOnChange(parts.fixed, settledParts.fixed, settled.fixed), selected: flatOnChange(parts.selected, settledParts.selected, settled.selected) };
