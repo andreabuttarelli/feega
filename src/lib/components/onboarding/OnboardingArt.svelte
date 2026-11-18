@@ -139,9 +139,11 @@
   }
 
   @media (max-width: 860px) {
-    .step-chip { top: 20px; left: 20px; }
-    .foot { left: 20px; right: 20px; bottom: 20px; }
-    .marks { margin-bottom: 12px; }
+    .step-chip { top: 16px; left: 16px; }
+    .foot { left: 16px; right: 16px; bottom: 16px; }
+    .marks { gap: 10px; margin-bottom: 10px; }
+    .marks svg { width: 18px; height: 18px; }
+    .line { font-size: 26px; }
   }
 
   @media (prefers-reduced-motion: reduce) {

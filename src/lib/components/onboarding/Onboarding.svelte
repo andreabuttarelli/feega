@@ -40,7 +40,8 @@
   });
   const choices = new AgentChoices();
 
-  let name = $state(viewerName ?? '');
+  let name = $state(surface === Surface.Local ? '' : (viewerName ?? ''));
+  let sheet = $state<HTMLElement | null>(null);
   let place = $state(Place.Computer);
 
   const ready = $derived(choices.agents.filter((agent) => AGENT_STATUS[statusOf(agent)].rank === 0));
@@ -60,6 +61,12 @@
     });
   });
 
+  $effect(() => {
+    if (session.step) {
+      sheet?.scrollTo({ top: 0 });
+    }
+  });
+
   function onkeydown(event: KeyboardEvent) {
     if (event.key === 'Escape' && session.step && session.step !== Step.Name) {
       session.skip();
@@ -71,7 +78,7 @@
 
 {#if session.step}
   {@const step = session.step}
-  <div class="onboarding" role="dialog" aria-modal="true" aria-labelledby="ob-title" data-testid="onboarding" data-step={step}>
+  <div class="onboarding" bind:this={sheet} role="dialog" aria-modal="true" aria-labelledby="ob-title" data-testid="onboarding" data-step={step}>
     <div class="art">
       <OnboardingArt {step} number={session.index + 1} label={labelOf(step)} {name} {place} agents={ready.map((agent) => ({ id: agent.id, name: agent.name.toLowerCase() }))} />
     </div>
@@ -152,6 +159,7 @@
 
   .brand {
     display: inline-flex;
+    line-height: 1;
     align-items: center;
     gap: 8px;
     font-size: 17px;
@@ -160,7 +168,7 @@
   }
 
   main {
-    align-self: center;
+    align-self: safe center;
     width: min(440px, 100%);
     margin: 0 auto;
     padding: 32px 24px 64px;
@@ -346,12 +354,19 @@
 
   @media (max-width: 860px) {
     .onboarding {
-      grid-template-columns: minmax(0, 1fr);
-      grid-template-rows: 34dvh minmax(0, 1fr);
+      display: block;
+      overflow-y: auto;
+      overscroll-behavior: contain;
     }
 
     .art {
+      height: 176px;
       padding: 8px 8px 0;
+    }
+
+    .side {
+      display: block;
+      overflow: visible;
     }
 
     header {
