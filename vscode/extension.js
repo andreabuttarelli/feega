@@ -1,21 +1,18 @@
 const vscode = require('vscode');
 const { spawn } = require('node:child_process');
-const { readFile, writeFile } = require('node:fs/promises');
-const { Launch, launchArgs, mcpServers, canvasFileFor, canvasPage, eventReader, importMessage, gitignoreWith, progressOf, advance, failedAt, finishedAll, stepsPage, logTail, spawnOptions, RETRY, localUrl, freePort, readyProbe, served } = require('./canvas-run');
+const { existsSync, renameSync, statSync } = require('node:fs');
+const { dirname } = require('node:path');
+const { Launch, launcherOf, legacyMove, mcpServers, canvasPage, eventReader, importMessage, progressOf, advance, failedAt, finishedAll, stepsPage, logTail, spawnOptions, RETRY, localUrl, freePort, readyProbe, served } = require('./canvas-run');
 
 const READY_POLL_MS = 400;
 const QUIET_TIMEOUT_MS = 180_000;
 const LOG_TAIL_LINES = 40;
-const NEW_CANVAS = 'canvas.feega';
 
 const running = new Map();
 const attempts = new WeakMap();
 const mcpChanged = new vscode.EventEmitter();
 const cursorServers = new Map();
 const children = new Set();
-const GITIGNORE_ASKED = 'feega.gitignoreAsked';
-const ADD = 'Add to .gitignore';
-let state = null;
 
 async function ready(url, launch) {
   while (!launch.ended && Date.now() - launch.lastOutput < QUIET_TIMEOUT_MS) {
@@ -54,25 +51,6 @@ async function chooseApp(apps, child) {
   child.stdin.write(`${picked ?? ''}\n`);
 }
 
-async function offerGitignore(folder) {
-  if (state.get(GITIGNORE_ASKED)) {
-    return;
-  }
-
-  await state.update(GITIGNORE_ASKED, true);
-  const path = `${folder}/.gitignore`;
-  const current = await readFile(path, 'utf8').catch(() => '');
-  const next = gitignoreWith(current);
-  if (next === null) {
-    return;
-  }
-
-  const answer = await vscode.window.showInformationMessage('The canvas file lives inside this folder. Add *.feega to .gitignore?', ADD, 'Not now');
-  if (answer === ADD) {
-    await writeFile(path, next);
-  }
-}
-
 async function onEvent(event, child, file) {
   if (event.event === 'choose-app') {
     return chooseApp(event.apps, child);
@@ -80,7 +58,6 @@ async function onEvent(event, child, file) {
 
   if (event.event === 'imported') {
     await vscode.window.showInformationMessage(importMessage(event, file));
-    return offerGitignore(file.replace(/[\\/][^\\/]*$/, ''));
   }
 }
 
@@ -112,7 +89,9 @@ async function startCanvas(panel, file, launch, output) {
   const tail = logTail(LOG_TAIL_LINES);
   const attempt = { ended: false, lastOutput: Date.now(), failed: false, served: null, imported: launch !== Launch.ImportFolder };
   attempts.set(panel, attempt);
-  const child = spawn('npx', launchArgs(file, port, launch), spawnOptions(file, process.platform, process.env));
+  const { command, args } = launcherOf(devServerPath(), file, port, launch);
+  output.appendLine(`feega: ${command} ${args.join(' ')}`);
+  const child = spawn(command, args, spawnOptions(projectDir(file), process.platform, process.env));
   children.add(child);
 
   const current = () => attempts.get(panel) === attempt && !attempt.failed;
@@ -169,7 +148,7 @@ async function startCanvas(panel, file, launch, output) {
   });
   child.on('error', (error) => {
     attempt.ended = true;
-    fail(`Could not run npx: ${error.message}. Is Node.js 22+ installed?`);
+    fail(`Could not run ${command}: ${error.message}. Is Node.js 22+ installed?`);
   });
   child.on('exit', (code, signal) => {
     attempt.ended = true;
@@ -208,6 +187,20 @@ function canvasEditor(output) {
   };
 }
 
+const devServerPath = () => vscode.workspace.getConfiguration('feega').get('devServerPath', '').trim();
+
+const projectDir = (target) => (statSync(target, { throwIfNoEntry: false })?.isDirectory() ? target : dirname(target));
+
+function migrateLegacy(folder, output) {
+  const move = legacyMove(folder, existsSync);
+  if (!move) {
+    return;
+  }
+
+  renameSync(move.from, move.to);
+  output.appendLine(`feega: ${move.from} moved to ${move.to}; Feega turns it into the .feega/ folder`);
+}
+
 function workspaceFolder() {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (!folder) {
@@ -222,37 +215,23 @@ function canvasPanel(file, launch, output) {
   return openCanvas(panel, file, launch, output);
 }
 
-async function newCanvas(output) {
+function openFolder(output, launch) {
   const folder = workspaceFolder();
   if (!folder) {
     return;
   }
 
-  const target = await vscode.window.showSaveDialog({ defaultUri: vscode.Uri.file(`${folder}/${NEW_CANVAS}`), filters: { Feega: ['feega'] } });
-  if (!target) {
-    return;
-  }
-
-  return canvasPanel(target.fsPath, Launch.Open, output);
-}
-
-function importFolder(output) {
-  const folder = workspaceFolder();
-  if (!folder) {
-    return;
-  }
-
-  return canvasPanel(canvasFileFor(folder), Launch.ImportFolder, output);
+  migrateLegacy(folder, output);
+  return canvasPanel(folder, launch, output);
 }
 
 function activate(context) {
-  state = context.workspaceState;
   const output = vscode.window.createOutputChannel('Feega');
   context.subscriptions.push(
     output,
     vscode.window.registerCustomEditorProvider('feega.canvas', canvasEditor(output), { webviewOptions: { retainContextWhenHidden: true } }),
-    vscode.commands.registerCommand('feega.newCanvas', () => newCanvas(output)),
-    vscode.commands.registerCommand('feega.importFolder', () => importFolder(output))
+    vscode.commands.registerCommand('feega.openProject', () => openFolder(output, Launch.Open)),
+    vscode.commands.registerCommand('feega.importFolder', () => openFolder(output, Launch.ImportFolder))
   );
 
   if (vscode.lm?.registerMcpServerDefinitionProvider) {

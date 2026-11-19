@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { Launch, launchArgs, mcpServers, canvasFileFor, canvasPage, eventReader, importMessage, gitignoreWith, readyProbe, served, spawnOptions, Step, progressOf, advance, failedAt, stepsPage, lineEvent, logTail, RETRY } = require('./canvas-run');
+const { Launch, launchArgs, launcherOf, legacyMove, mcpServers, canvasPage, eventReader, importMessage, readyProbe, served, spawnOptions, Step, progressOf, advance, failedAt, stepsPage, lineEvent, logTail, RETRY } = require('./canvas-run');
 
 test('apre il file senza browser e senza flag di import: senza terminale il launcher non chiede, e i launcher vecchi non conoscono --no-import', () => {
   assert.deepEqual(launchArgs('/w/a.feega', 61000, Launch.Open), ['-y', 'feega@latest', '/w/a.feega', '--port', '61000', '--no-open']);
@@ -11,15 +11,28 @@ test('importare la cartella passa --import', () => {
 });
 
 test('un server MCP per ogni tela aperta, sulla sua porta', () => {
-  const running = new Map([['/w/a.feega', 61000], ['/w/b.feega', 61001]]);
+  const running = new Map([['/w/a', 61000], ['/w/b.feega', 61001]]);
   assert.deepEqual(mcpServers(running), [
     { label: 'feega a', command: 'npx', args: ['-y', 'feega@latest', 'mcp', '--port', '61000'] },
     { label: 'feega b', command: 'npx', args: ['-y', 'feega@latest', 'mcp', '--port', '61001'] }
   ]);
 });
 
-test('la tela di una cartella prende il nome della cartella', () => {
-  assert.equal(canvasFileFor('/code/my-app'), '/code/my-app/my-app.feega');
+test('il vecchio <cartella>.feega diventa .feega, che il server migra nel formato a cartella', () => {
+  assert.deepEqual(legacyMove('/code/my-app', (p) => p === '/code/my-app/my-app.feega'), { from: '/code/my-app/my-app.feega', to: '/code/my-app/.feega' });
+});
+
+test('niente da migrare se .feega esiste già o il vecchio file non c\'è', () => {
+  assert.equal(legacyMove('/code/my-app', () => true), null);
+  assert.equal(legacyMove('/code/my-app', () => false), null);
+});
+
+test('senza percorso di sviluppo parte il pacchetto pubblicato', () => {
+  assert.deepEqual(launcherOf('', '/w/site', 61000, Launch.Open), { command: 'npx', args: ['-y', 'feega@latest', '/w/site', '--port', '61000', '--no-open'] });
+});
+
+test('in modalità sviluppo parte scripts/local.mjs di questo repo, sulla cartella', () => {
+  assert.deepEqual(launcherOf('/repo/feega', '/w/site', 61000, Launch.Open), { command: 'node', args: ['/repo/feega/scripts/local.mjs', '/w/site', '--port=61000'] });
 });
 
 test('la pagina della tela incornicia il server locale', () => {
@@ -54,15 +67,8 @@ test('il messaggio finale dice quante pagine e quante servono di un valore, e do
   assert.equal(importMessage({ pages: 5, needsValue: 0, leftOut: 2 }, '/w/app.feega'), 'Imported 5 pages; 2 left out (see the Feega output). Canvas: /w/app.feega');
 });
 
-test('gitignore: aggiunge *.feega una volta sola, senza toccare il resto', () => {
-  assert.equal(gitignoreWith('node_modules\n'), 'node_modules\n*.feega\n');
-  assert.equal(gitignoreWith('node_modules'), 'node_modules\n*.feega\n');
-  assert.equal(gitignoreWith(''), '*.feega\n');
-  assert.equal(gitignoreWith('a\n*.feega\n'), null);
-});
-
-test('npx parte dalla cartella della tela: da lì il launcher trova il package.json da importare', () => {
-  assert.equal(spawnOptions('/code/my-app/my-app.feega', 'darwin', {}).cwd, '/code/my-app');
+test('npx parte dalla cartella del progetto: da lì il launcher trova il package.json da importare', () => {
+  assert.equal(spawnOptions('/code/my-app', 'darwin', {}).cwd, '/code/my-app');
 });
 
 const states = (progress) => progress.steps.map((s) => `${s.id}:${s.state}`);

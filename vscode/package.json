@@ -31,7 +31,8 @@
   ],
   "main": "./extension.js",
   "activationEvents": [
-    "workspaceContains:**/*.feega"
+    "workspaceContains:**/*.feega",
+    "workspaceContains:.feega/**"
   ],
   "contributes": {
     "customEditors": [
@@ -48,8 +49,8 @@
     ],
     "commands": [
       {
-        "command": "feega.newCanvas",
-        "title": "New canvas",
+        "command": "feega.openProject",
+        "title": "Open this folder as a project",
         "category": "Feega"
       },
       {
@@ -63,7 +64,17 @@
         "id": "feega.local",
         "label": "Feega (local canvas)"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Feega",
+      "properties": {
+        "feega.devServerPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to a local clone of the Feega repo. When set, the canvas runs that clone's `scripts/local.mjs` instead of `npx feega@latest`, to try unreleased code."
+        }
+      }
+    }
   },
   "scripts": {
     "test": "node --test canvas-run.test.js",

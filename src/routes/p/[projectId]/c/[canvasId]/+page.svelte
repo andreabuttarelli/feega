@@ -319,6 +319,7 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
   import { figmaNotice } from '$lib/canvas/figma/notice';
   import FigmaNotice from '$lib/components/canvas/FigmaNotice.svelte';
   import FolderSyncNotice from '$lib/components/canvas/FolderSyncNotice.svelte';
+  import ProjectGit from '$lib/components/canvas/ProjectGit.svelte';
   import { connectionMessage } from '$lib/canvas/connection-messages';
 
 
@@ -4616,6 +4617,7 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
   {/if}
   {#if liveLocal}
     <FolderSyncNotice nodes={Object.fromEntries(nodes.map((n) => [n.id, { name: n.displayName, type: n.type }]))} />
+    <ProjectGit />
   {/if}
   {#if figmaShown}
     <FigmaNotice notice={figmaShown} settingsHref="/app/settings/profile" onclose={() => (figmaPaste = null)} />
