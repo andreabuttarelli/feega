@@ -37,6 +37,11 @@
   },
   "redirects": [
     {
+      "source": "/refunds",
+      "destination": "/terms#refunds",
+      "statusCode": 301
+    },
+    {
       "source": "/:page(acceptable-use|ai-transparency|dpa|subprocessors|legal-notice)",
       "destination": "/terms",
       "statusCode": 301
