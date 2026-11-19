@@ -38,7 +38,24 @@ export type Fit = { width: number; height: number; scale: number };
 
 export const sizeForKey = (key: string): Size | null => PRESETS.find((s) => SIZES[s].key === key) ?? null;
 
-export function snapped(width: number): number {
+export enum Snap {
+  Magnet = 'magnet',
+  Coarse = 'coarse'
+}
+
+const COARSE_PX = 10;
+
+const ROTATIONS: Partial<Record<Size, Size>> = {
+  [Size.Tablet]: Size.TabletLandscape,
+  [Size.TabletLandscape]: Size.Tablet
+};
+
+export const rotated = (size: Size): Size | null => ROTATIONS[size] ?? null;
+
+export function snapped(width: number, snap = Snap.Magnet): number {
+  if (snap === Snap.Coarse) {
+    return clampWidth(Math.round(width / COARSE_PX) * COARSE_PX);
+  }
   const near = PRESETS.map((s) => SIZES[s].width).find((w) => w !== null && Math.abs(w - width) <= SNAP_PX);
   return near ?? clampWidth(width);
 }

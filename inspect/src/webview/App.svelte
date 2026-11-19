@@ -17,6 +17,7 @@
   import ServerPopover from './ServerPopover.svelte';
   import LayersTree from './LayersTree.svelte';
   import ChangesList from './ChangesList.svelte';
+  import DeviceBar from './DeviceBar.svelte';
   import Redo2 from '@lucide/svelte/icons/redo-2';
   import { Scope } from '@feega/live-edit/scoped-rule';
   import { Tabs } from 'bits-ui';
@@ -32,7 +33,7 @@
   import { modeOfKey } from './modes';
   import { browseHistory } from './history';
   import { DEFAULT_ANCHOR, anchorBox, isAnchor, nearestAnchor, nextAnchor, type Anchor } from './anchors';
-  import { PRESETS, SIZES, Size, fitOf, sizeForKey, snapped } from './sizes';
+  import { PRESETS, SIZES, Size, Snap, fitOf, sizeForKey, snapped } from './sizes';
 
   const SETTLE_MS = 1200;
   const BAR_DEFAULT_PX = 300;
@@ -434,14 +435,15 @@
   function startDrag(e: PointerEvent, side: number) {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     dragging = { x: e.clientX, width: fit.width, side };
+    custom = fit.width;
+    size = Size.Custom;
   }
 
   function resizeFrame(e: PointerEvent) {
     if (!dragging) {
       return;
     }
-    custom = snapped(dragging.width + ((e.clientX - dragging.x) * 2 * dragging.side) / fit.scale);
-    size = Size.Custom;
+    custom = snapped(dragging.width + ((e.clientX - dragging.x) * 2 * dragging.side) / fit.scale, e.shiftKey ? Snap.Coarse : Snap.Magnet);
   }
 
   function endDrag() {
@@ -547,11 +549,7 @@
         <ServerPopover state={server} reason={serverReason} info={serverInfo} onopen={(link) => toHost({ kind: ToHost.External, url: link })} onaction={(action) => (action === ServerAction.ReloadPage ? go(route) : toHost({ kind: ToHost.Server, action }))} />
         <input bind:value={address} aria-label="Route" data-testid="address" spellcheck="false" />
       </form>
-      <select class="device" value={size} onchange={(e) => pickSize(e.currentTarget.value as Size)} aria-label="Device" data-testid="device">
-        {#each PRESETS as preset (preset)}<option value={preset}>{SIZES[preset].label}{SIZES[preset].width ? ` ${SIZES[preset].width}` : ''}{SIZES[preset].key ? ` (${SIZES[preset].key})` : ''}</option>{/each}
-        {#if size === Size.Custom}<option value={Size.Custom}>Custom</option>{/if}
-      </select>
-      <input class="width" type="number" value={fit.width} aria-label="Width" onchange={(e) => ((custom = snapped(Number(e.currentTarget.value))), (size = Size.Custom), savePrefs())} />
+      <DeviceBar {size} {fit} onsize={pickSize} onwidth={(w) => ((custom = snapped(w)), (size = Size.Custom), savePrefs())} />
       {#if fit.scale < 1}<span class="zoom" data-testid="zoom">{Math.round(fit.scale * 100)}%</span>{/if}
       <button type="button" class="icon" title="Open in browser" onclick={() => toHost({ kind: ToHost.External, url: new URL(route, url).toString() })}><ExternalLink size={14} /></button>
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
@@ -569,8 +567,8 @@
           </div>
         {/if}
         {#if size !== Size.Full}
-          <span class="handle left" role="separator" aria-label="Resize" onpointerdown={(e) => startDrag(e, -1)}></span>
-          <span class="handle right" role="separator" aria-label="Resize" onpointerdown={(e) => startDrag(e, 1)}></span>
+          <span class="handle left" role="separator" aria-label="Resize" title="Drag to resize, Shift for 10px, double-click for Full" onpointerdown={(e) => startDrag(e, -1)} ondblclick={() => pickSize(Size.Full)}></span>
+          <span class="handle right" role="separator" aria-label="Resize" title="Drag to resize, Shift for 10px, double-click for Full" onpointerdown={(e) => startDrag(e, 1)} ondblclick={() => pickSize(Size.Full)}></span>
           {#if dragging}<span class="width-label live">{fit.width} × {fit.height}</span>{/if}
         {/if}
       </div>
@@ -834,16 +832,18 @@
   .handle {
     position: absolute;
     top: 50%;
-    width: 6px;
-    height: 48px;
-    margin-top: -24px;
+    width: 8px;
+    height: 40px;
+    margin-top: -20px;
     border-radius: var(--ui-radius-full);
     background: var(--ui-line-strong);
-    cursor: ew-resize;
+    opacity: 0.7;
+    cursor: col-resize;
   }
 
   .handle:hover {
-    background: var(--ui-accent);
+    background: var(--ui-text-2);
+    opacity: 1;
   }
 
   .handle.left {
@@ -857,7 +857,8 @@
   .width-label {
     position: absolute;
     top: 8px;
-    right: 8px;
+    left: 50%;
+    transform: translateX(-50%);
     padding: 2px 6px;
     border-radius: var(--ui-radius-xs);
     background: var(--ui-float);

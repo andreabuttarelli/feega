@@ -16,6 +16,7 @@ export default {
     'The selection outline follows the element as it resizes, scrolls or reloads.',
     'Showing a hidden element removes exactly what hiding added.',
     'Icons inside links and buttons can be selected and resized on their own.',
-    'Gradient stops and shadows use the same colour picker and palette as fills.'
+    'Gradient stops and shadows use the same colour picker and palette as fills.',
+    'Pick a device from icons or the full preset list, rotate tablets, and drag the frame edges to any width.'
   ]
 } satisfies ChangelogEntry;

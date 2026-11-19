@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Size, SIZES, fitOf, sizeForKey, snapped } from './sizes';
+import { Size, SIZES, Snap, fitOf, rotated, sizeForKey, snapped } from './sizes';
 
 describe('preview sizes', () => {
   it('full fills the panel at 100%', () => {
@@ -33,5 +33,18 @@ describe('preview sizes', () => {
 
   it('desktop, tablet and phone are the play bar widths', () => {
     expect([SIZES[Size.Desktop].width, SIZES[Size.Tablet].width, SIZES[Size.Phone].width]).toEqual([1440, 768, 390]);
+  });
+});
+
+describe('resizing by hand', () => {
+  it('shift moves in 10px steps, without the preset magnet', () => {
+    expect(snapped(393, Snap.Coarse)).toBe(390);
+    expect(snapped(397, Snap.Coarse)).toBe(400);
+  });
+
+  it('rotate swaps tablet and tablet landscape, other sizes have no rotation', () => {
+    expect(rotated(Size.Tablet)).toBe(Size.TabletLandscape);
+    expect(rotated(Size.TabletLandscape)).toBe(Size.Tablet);
+    expect(rotated(Size.Full)).toBe(null);
   });
 });

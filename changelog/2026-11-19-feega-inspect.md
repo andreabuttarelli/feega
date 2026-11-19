@@ -95,3 +95,9 @@ edit inline until reload); the colour control is a native picker, not the app's 
   parent's own class. Tailwind refuses it with a reason. Not done: Cmd-click / double-click drill.
 - **One colour picker.** Gradient stops and shadow colour used the native input; both open the
   shared ColorPicker with the palette now (`ColourSwatch.svelte`).
+- **Device bar.** The native select + bare width box became a segmented of device icons (Full,
+  desktop, tablet, phone; keys 1–4), a grouped Bits dropdown with every preset and its W × H, a
+  W × H readout (width editable), and rotate for tablets (`rotated` in `sizes.ts`). Handles are
+  8×40 pills, col-resize, Shift for 10 px steps (`Snap.Coarse`), double-click back to Full.
+  Not done: bottom height handle, phone rotation. One shared input reset (`.field input`) removes
+  the nested input border.
