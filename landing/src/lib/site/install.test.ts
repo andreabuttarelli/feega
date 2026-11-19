@@ -19,9 +19,9 @@ const rig = (over: Partial<Env> = {}) => {
 
 describe('install CTAs', () => {
   it('every download CTA is a plain link to the download page', () => {
-    expect(primaryCta()).toEqual({ label: 'Download for free', href: DOWNLOAD_PATH });
-    expect(starCta).toEqual({ label: 'Star on GitHub', href: GITHUB_URL });
-    expect(secondaryCtas().map((c) => c.label)).toEqual(['Support with a coffee']);
+    expect(primaryCta()).toEqual({ label: 'download for free', href: DOWNLOAD_PATH });
+    expect(starCta).toEqual({ label: 'star on github', href: GITHUB_URL });
+    expect(secondaryCtas().map((c) => c.label)).toEqual(['support with a coffee']);
   });
 });
 

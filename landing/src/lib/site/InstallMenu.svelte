@@ -42,7 +42,7 @@
       {#each options as option (option.label)}
         <button role="menuitem" type="button" onclick={() => choose(option)}>
           <span class="logo">{@html EDITOR_ICONS[option.label] ?? ''}</span>
-          <span>{option.command ?? option.label}</span>
+          <span>{(option.command ?? option.label).toLowerCase()}</span>
           {#if option.command && copied}<span class="done">copied</span>{/if}
         </button>
       {/each}
