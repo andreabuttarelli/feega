@@ -1,7 +1,8 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
 
-  const EXTENSION_DOCS_URL = 'https://docs.feega.app/integrations/editor/';
+  const EXTENSION_URL = 'https://marketplace.visualstudio.com/items?itemName=andreabuttarelli.feega';
+  const GITHUB_URL = 'https://github.com/andreabuttarelli/feega';
 
   let { data } = $props();
 
@@ -14,8 +15,8 @@
   <h1>{first ? $_('app.dashboard.greeting', { values: { name: first } }) : $_('app.dashboard.greetingAnon')}</h1>
   <p class="lead">{$_('app.dashboard.cloud')}</p>
   <p class="aside">
-    {$_('app.dashboard.extension')}
-    <a href={EXTENSION_DOCS_URL}>{$_('app.dashboard.docs')}</a>
+    <a href={EXTENSION_URL}>{$_('app.dashboard.extension')}</a>
+    <a href={GITHUB_URL}>{$_('app.dashboard.github')}</a>
   </p>
 </div>
 
@@ -47,6 +48,8 @@
   }
 
   .aside {
+    display: flex;
+    gap: var(--ui-space-4);
     font-size: var(--ui-type-body);
     color: var(--ui-text-tertiary);
   }

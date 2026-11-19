@@ -395,9 +395,13 @@
     "dashboard": {
       "greeting": "hi, {name}!",
       "greetingAnon": "hi!",
-      "cloud": "Here you'll find all the data from the upcoming Feega Cloud.",
-      "extension": "Feega is a VS Code extension for now — design in your codebase.",
-      "docs": "Get the extension"
+      "cloud": "Feega Cloud is coming. For now, Feega lives in your editor.",
+      "extension": "Get the extension",
+      "github": "Star on GitHub"
+    },
+    "account": {
+      "settings": "Account",
+      "signOut": "Sign out"
     }
   },
   "cookie": {
