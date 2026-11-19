@@ -43,14 +43,13 @@
       <a href={GITHUB_URL}>star on github</a>
     </div>
 
-    <div class="follow">
-      <p>follow our open building</p>
-      <div class="icons">
-        {#each SOCIAL_LINKS as social (social.label)}
-          <a href={social.href} aria-label={social.label}>{@html social.icon}</a>
-        {/each}
-      </div>
+    <div class="icons">
+      {#each SOCIAL_LINKS as social (social.label)}
+        <a href={social.href} aria-label={social.label}>{@html social.icon}</a>
+      {/each}
     </div>
+
+    <a class="drawer-cta" href={DOWNLOAD_PATH} onclick={() => (open = false)}>download</a>
   </nav>
 {/if}
 
@@ -127,35 +126,55 @@
 
   .drawer {
     position: fixed;
-    inset: 0;
+    top: 84px;
+    left: 12px;
+    right: 12px;
     z-index: var(--site-z-drawer);
     display: flex;
     flex-direction: column;
     max-width: 430px;
     margin: 0 auto;
-    padding: 393px 20px 0;
-    background: #000;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--ui-radius-lg, 10px);
+    background: #161616;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
   }
 
   .menu {
     display: flex;
     flex-direction: column;
-    gap: 24px;
-    font-size: 44px;
-    line-height: 39.6px;
-    letter-spacing: -0.04em;
+    font-size: 20px;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
   }
 
-  .follow {
-    margin-top: 120px;
-    font-size: 14px;
-    line-height: 16.8px;
+  .menu a {
+    padding: 14px 12px;
+    color: #fff;
+    text-decoration: none;
   }
 
   .icons {
     display: flex;
     gap: 20px;
-    margin-top: 16px;
+    padding: 12px;
+  }
+
+  .icons a {
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .drawer-cta {
+    display: grid;
+    place-items: center;
+    height: 52px;
+    margin-top: 8px;
+    border-radius: 999px;
+    background: #ff5100;
+    color: #fff;
+    font-size: 18px;
+    text-decoration: none;
   }
 
   .icons :global(svg) {
