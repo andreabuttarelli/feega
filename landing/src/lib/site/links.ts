@@ -6,6 +6,7 @@ export const GITHUB_URL = 'https://github.com/andreabuttarelli/feega';
 export const DOWNLOAD_MAC_PATH = '/download/mac';
 export const MAC_GUIDE_URL = 'https://docs.feega.app/desktop/install-macos/';
 export const SPONSOR_URL = 'https://github.com/sponsors/andreabuttarelli';
+export const COFFEE_URL = 'https://buy.stripe.com/5kQ00k2A97C08sd94LeME07';
 export const DOCS_URL = 'https://docs.feega.app';
 export const DISCORD_URL = 'https://discord.gg/PUp37DG6vr';
 export const STORY_URL = 'https://blog.feega.app/';
