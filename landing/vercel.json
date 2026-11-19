@@ -37,6 +37,11 @@
   },
   "redirects": [
     {
+      "source": "/guides/best-motion-design-tools-ai-agents",
+      "destination": "/alternatives",
+      "statusCode": 301
+    },
+    {
       "source": "/:path(.*)",
       "has": [
         {
