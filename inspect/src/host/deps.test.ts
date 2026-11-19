@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { n } from './test-paths';
 import { Framework } from '@feega/dev-run/run-plan';
 import { DepsOutcome, depsMissing, ensureDeps } from './deps';
 
@@ -6,19 +7,19 @@ const has = (files: string[]) => async (path: string) => files.includes(path);
 
 describe('installed dependencies', () => {
   it('missing when the framework binary is nowhere up to the workspace', async () => {
-    expect(await depsMissing('/repo/web-docs', '/repo', Framework.Astro, has([]))).toBe(true);
+    expect(await depsMissing(n('/repo/web-docs'), n('/repo'), Framework.Astro, has([]))).toBe(true);
   });
 
   it('found in the app', async () => {
-    expect(await depsMissing('/repo/landing', '/repo', Framework.SvelteKit, has(['/repo/landing/node_modules/.bin/vite']))).toBe(false);
+    expect(await depsMissing(n('/repo/landing'), n('/repo'), Framework.SvelteKit, has([n('/repo/landing/node_modules/.bin/vite')]))).toBe(false);
   });
 
   it('found hoisted to the workspace root', async () => {
-    expect(await depsMissing('/repo/apps/web', '/repo', Framework.Next, has(['/repo/node_modules/.bin/next']))).toBe(false);
+    expect(await depsMissing(n('/repo/apps/web'), n('/repo'), Framework.Next, has([n('/repo/node_modules/.bin/next')]))).toBe(false);
   });
 
   it('nothing above the workspace counts', async () => {
-    expect(await depsMissing('/repo/app', '/repo', Framework.Vite, has(['/node_modules/.bin/vite']))).toBe(true);
+    expect(await depsMissing(n('/repo/app'), n('/repo'), Framework.Vite, has([n('/node_modules/.bin/vite')]))).toBe(true);
   });
 });
 

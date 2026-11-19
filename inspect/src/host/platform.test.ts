@@ -113,7 +113,7 @@ describe('the node platform on disk', () => {
     await platform(true).openSource('/app', { file: 'src/App.svelte', line: 4, col: 2 });
     await platform(false).openSource('/app', { file: 'src/App.svelte', line: 4, col: 2 });
 
-    expect(launched[0]).toEqual(['code', '-g', '/app/src/App.svelte:4:2']);
-    expect(printed).toEqual(['/app/src/App.svelte:4:2']);
+    expect(launched[0]).toEqual(['code', '-g', `${join('/app', 'src/App.svelte')}:4:2`]);
+    expect(printed).toEqual([`${join('/app', 'src/App.svelte')}:4:2`]);
   });
 });

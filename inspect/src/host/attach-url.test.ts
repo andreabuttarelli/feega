@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { n } from './test-paths';
 import { appOfSource, firstStampedFile, urlOf } from './attach-url';
 
 describe('urlOf', () => {
@@ -32,11 +33,11 @@ describe('appOfSource', () => {
   const apps = ['apps/web', 'apps/admin'];
 
   it('picks the app that holds the file, relative or absolute', () => {
-    expect(appOfSource('/w', apps, 'apps/admin/src/a.svelte')).toBe('apps/admin');
-    expect(appOfSource('/w', apps, '/w/apps/web/src/a.svelte')).toBe('apps/web');
+    expect(appOfSource(n('/w'), apps, 'apps/admin/src/a.svelte')).toBe('apps/admin');
+    expect(appOfSource(n('/w'), apps, n('/w/apps/web/src/a.svelte'))).toBe('apps/web');
   });
 
   it('is null when no app holds it', () => {
-    expect(appOfSource('/w', apps, 'other/a.svelte')).toBeNull();
+    expect(appOfSource(n('/w'), apps, 'other/a.svelte')).toBeNull();
   });
 });

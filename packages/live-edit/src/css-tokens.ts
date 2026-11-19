@@ -1,4 +1,4 @@
-import { dirname, join, normalize } from 'node:path';
+import { dirname, join, normalize } from 'node:path/posix';
 import type { ReadFile } from './files';
 
 export type Sheet = { path: string; text: string };

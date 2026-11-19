@@ -1,4 +1,4 @@
-import { isAbsolute, relative } from 'node:path';
+import { isAbsolute, relative, sep } from 'node:path';
 
 const WEB_PROTOCOLS = new Set(['http:', 'https:']);
 const SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i;
@@ -25,6 +25,6 @@ function parsedOf(text: string): URL | null {
 export const firstStampedFile = (html: string): string | null => html.match(STAMP)?.[1] ?? null;
 
 export function appOfSource(workspace: string, apps: string[], file: string): string | null {
-  const inside = isAbsolute(file) ? relative(workspace, file) : file;
+  const inside = isAbsolute(file) ? relative(workspace, file).split(sep).join('/') : file;
   return apps.find((app) => app === '' || inside.startsWith(`${app}/`)) ?? null;
 }
