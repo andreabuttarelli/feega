@@ -2,7 +2,7 @@
   import '$lib/site/site.css';
   import SiteHeader from '$lib/site/SiteHeader.svelte';
   import SiteFooter from '$lib/site/SiteFooter.svelte';
-  import CanvasEnding from '$lib/site/CanvasEnding.svelte';
+  import EditorMock from '$lib/site/EditorMock.svelte';
   import { page } from '$app/state';
   import { SITE_URL } from '$lib/site/links';
   import { trailOf } from '$lib/site/llms';
@@ -50,8 +50,15 @@
     {@render children()}
   </main>
   {#if page.url.pathname === '/'}
-    <CanvasEnding pick=".mark"><SiteFooter /></CanvasEnding>
+    <div class="editor-mock"><EditorMock /></div>
+    <SiteFooter />
   {:else}
     <SiteFooter />
   {/if}
 </div>
+
+<style>
+  .editor-mock {
+    padding: var(--site-section) var(--site-gutter) var(--site-gutter);
+  }
+</style>
