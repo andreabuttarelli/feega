@@ -1,4 +1,4 @@
-import { dirname, extname, join, relative } from 'node:path';
+import { dirname, extname, join, relative, sep } from 'node:path';
 
 export type Exists = (path: string) => Promise<boolean>;
 export type Dirs = (path: string) => Promise<string[]>;
@@ -47,5 +47,5 @@ export async function chosenApp(start: string, workspace: string, tree: Tree, ch
   if (apps.length <= 1) {
     return apps[0] ?? null;
   }
-  return choose(apps.map((app) => ({ label: relative(workspace, app), app })));
+  return choose(apps.map((app) => ({ label: relative(workspace, app).split(sep).join('/'), app })));
 }

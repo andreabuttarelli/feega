@@ -106,7 +106,7 @@ describe.each(ADAPTERS)('attaching to a URL on the %s platform', (_name, make) =
     await session.attachUrl(target);
 
     expect(ask).not.toHaveBeenCalled();
-    expect(session.root().endsWith('apps/admin')).toBe(true);
+    expect(session.root().endsWith(join('apps', 'admin'))).toBe(true);
   });
 
   it('asks which app when the page says nothing and there are several', async () => {
@@ -118,7 +118,7 @@ describe.each(ADAPTERS)('attaching to a URL on the %s platform', (_name, make) =
     await session.attachUrl(target);
 
     expect(ask).toHaveBeenCalledWith(['apps/admin', 'apps/web'], expect.any(String));
-    expect(session.root().endsWith('apps/admin')).toBe(true);
+    expect(session.root().endsWith(join('apps', 'admin'))).toBe(true);
   });
 
   it('adds the Feega plugin to the vite config when asked', async () => {

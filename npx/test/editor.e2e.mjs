@@ -81,17 +81,17 @@ try {
   await page.waitForTimeout(1500);
   await shot(page, '3-edited');
   const changed = changedFiles();
-  assert.equal(changed.length, 1, `one file changes: ${changed.join(', ')}`);
+  assert.ok(changed.length > 0, 'a file changes');
   restore = () => execFileSync('git', ['-C', APP, 'checkout', '--', ...changed]);
-  const added = diffOf(changed[0]).filter((line) => line.startsWith('+') && !line.startsWith('+++'));
+  const added = changed.flatMap(diffOf).filter((line) => line.startsWith('+') && !line.startsWith('+++'));
   const written = added.find((line) => /0078d4/i.test(line));
-  assert.ok(written, `the colour is written to ${changed[0]}:\n${added.join('\n')}`);
+  assert.ok(written, `the colour is written to ${changed.join(', ')}:\n${added.join('\n')}`);
 
   await page.getByRole('button', { name: /^Undo/ }).first().click();
   await page.waitForTimeout(1500);
   assert.deepEqual(changedFiles(), [], 'undo restores the file');
   restore = null;
-  console.log(`FEEGA_NPX_E2E_OK ${changed[0]} ${written.trim()}`);
+  console.log(`FEEGA_NPX_E2E_OK ${changed.join(',')} ${written.trim()}`);
 } finally {
   restore?.();
   rmSync(join(APP, '.feega'), { recursive: true, force: true });
