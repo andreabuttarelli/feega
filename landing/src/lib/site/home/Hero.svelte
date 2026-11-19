@@ -98,8 +98,9 @@
   }
 
   h1 {
-    font-size: 40px;
-    line-height: 1.05;
+    font-size: clamp(48px, 15vw, 72px);
+    line-height: 0.95;
+    text-wrap: balance;
   }
 
   .lead {
