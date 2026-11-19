@@ -321,6 +321,7 @@
       }
     },
     "account": {
+      "settings": "Account",
       "signOut": "Sign out",
       "billing": {
         "poolDesc": "Credits belong to the workspace: one plan and one balance for every project in it.",
@@ -385,23 +386,12 @@
         }
       }
     },
-    "orgs": {
-      "label": "Organisation",
-      "new": "New organisation",
-      "namePlaceholder": "Organisation name",
-      "create": "Create",
-      "cancel": "Cancel"
-    },
     "dashboard": {
       "greeting": "hi, {name}!",
       "greetingAnon": "hi!",
       "cloud": "Feega Cloud is coming. For now, Feega lives in your editor.",
       "extension": "Get the extension",
       "github": "Star on GitHub"
-    },
-    "account": {
-      "settings": "Account",
-      "signOut": "Sign out"
     }
   },
   "cookie": {
