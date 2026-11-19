@@ -1,3 +1,4 @@
+import { basename } from 'node:path';
 import * as vscode from 'vscode';
 import type { HostMessage, Source } from '../messages';
 import { settingsWith } from '../settings';
@@ -49,6 +50,10 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     openSource,
     showDiff,
     confirm: async (question, yes) => (await vscode.window.showWarningMessage(question, { modal: true }, yes)) === yes,
+    chooseApp: async (apps, workspace) => {
+      const items = apps.map((app) => ({ label: app || basename(workspace), description: app || 'workspace root', app }));
+      return (await vscode.window.showQuickPick(items, { placeHolder: 'Which app should Feega open?' }))?.app ?? null;
+    },
     openExternal: (url) => vscode.env.openExternal(vscode.Uri.parse(url)),
     openSettings: (key) => vscode.commands.executeCommand('workbench.action.openSettings', key),
     sourceControl: () => vscode.commands.executeCommand('workbench.view.scm')

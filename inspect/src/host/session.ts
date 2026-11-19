@@ -1,10 +1,12 @@
 import { rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
+import { appsIn } from '@feega/dev-run/run-plan';
 import { liveAtOf } from '@feega/live-edit/live-ask';
 import { ServerAction, ServerState, ToHost, ToView, type EditAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
 import { SettingKey, StylingChoice } from '../settings';
-import { Attach, startDev, type Running } from './dev-server';
+import { Attach, factsOf, startDev, type Refused, type Running } from './dev-server';
 import { fileEdits, type Snapshot, type Written } from './file-edits';
+import { forget, remember, type Memo } from './orphans';
 import { Stored, type Platform } from './platform';
 import { stylingOf } from './styling';
 
@@ -16,15 +18,25 @@ const ERROR = /error|failed|cannot|exception/i;
 
 export type Session = ReturnType<typeof inspectSession>;
 
-export function inspectSession(platform: Platform, root: string, startRoute?: string) {
+export const appOf = (platform: Platform, workspace: string, root: string) => (root === workspace ? (platform.stored<string>(Stored.App) ?? null) : relative(workspace, root));
+
+export const memoOf = (platform: Platform): Memo => ({ get: (key) => platform.stored(key as Stored), update: (key, value) => platform.store(key as Stored, value).then(() => undefined) });
+
+export function inspectSession(platform: Platform, workspace: string, startApp: string | null = null, startRoute?: string) {
   let running: Running | null = null;
+  let app = startApp;
+  let root = app === null ? workspace : join(workspace, app);
+  let starts = 0;
+  let cancel: AbortController | null = null;
+  const pids = memoOf(platform);
   let route = startRoute;
   let lastError = '';
   let startedAt = 0;
   let nextPick = 0;
   const picks = new Map<number, (pick: Pick | null) => void>();
   const stylingChoice = () => platform.settings()[SettingKey.Styling] as StylingChoice;
-  const edits = fileEdits(root, stylingChoice, platform.stored<Snapshot>(Stored.History));
+  const editsAt = (dir: string) => fileEdits(dir, stylingChoice, platform.stored<Snapshot>(Stored.History));
+  let edits = editsAt(root);
   const post = (message: ViewMessage) => platform.send(message);
 
   async function postSettings() {
@@ -92,20 +104,73 @@ export function inspectSession(platform: Platform, root: string, startRoute?: st
     await postSettings();
   }
 
-  async function startServer(attach = Attach.IfRunning) {
+  async function useApp(next: string) {
+    app = next;
+    root = join(workspace, next);
+    edits = editsAt(root);
+    await platform.store(Stored.App, next);
+  }
+
+  async function chooseApp(apps: string[]) {
+    const picked = await platform.chooseApp(apps, workspace);
+    if (picked !== null) {
+      await useApp(picked);
+    }
+    return picked;
+  }
+
+  async function startServer(attach = Attach.IfRunning): Promise<Running | Refused> {
+    const mine = ++starts;
+    const current = () => starts === mine;
     running?.stop();
+    running = null;
+    cancel?.abort();
+    const signal = (cancel = new AbortController()).signal;
     lastError = '';
     post({ kind: ToView.Server, state: ServerState.Starting });
-    const started = await startDev(root, platform.launcher, logLine, String(platform.settings()[SettingKey.DevCommand]), attach);
+    const hooks = {
+      log: logLine,
+      installing: (dir: string) => current() && post({ kind: ToView.Server, state: ServerState.Installing, reason: `Installing dependencies for ${dir} (first run)…` }),
+      spawned: (pid: number) => remember(pids, pid, root),
+      signal
+    };
+    const started = await startDev(workspace, platform.launcher, hooks, String(platform.settings()[SettingKey.DevCommand]), attach, app);
+    if (!current()) {
+      if (!('refused' in started)) {
+        started.stop();
+      }
+      return started;
+    }
     if ('refused' in started) {
+      if (started.apps?.length && (await chooseApp(started.apps)) !== null) {
+        return startServer(attach);
+      }
       post({ kind: ToView.Server, state: ServerState.Stopped, reason: started.refused });
       return started;
     }
     startedAt = Date.now();
     running = started;
-    started.exited(() => post({ kind: ToView.Server, state: ServerState.Stopped, reason: lastError || 'the dev server exited', info: infoOf(started) }));
+    started.exited(() => {
+      if (started.pid) {
+        forget(pids, started.pid);
+      }
+      if (current() && running === started) {
+        post({ kind: ToView.Server, state: ServerState.Stopped, reason: lastError || 'the dev server exited', info: infoOf(started) });
+      }
+    });
     await showApp();
     return started;
+  }
+
+  async function switchApp() {
+    if ((await chooseApp(appsIn(await factsOf(workspace)))) !== null) {
+      await startServer();
+    }
+  }
+
+  function close() {
+    cancel?.abort();
+    running?.stop();
   }
 
   function stopServer() {
@@ -132,7 +197,9 @@ export function inspectSession(platform: Platform, root: string, startRoute?: st
     [ServerAction.ClearCache]: clearCache,
     [ServerAction.ShowLogs]: () => platform.showLogs(),
     [ServerAction.ChangeCommand]: () => platform.openSettings(SettingKey.DevCommand),
-    [ServerAction.RestartUnderFeega]: () => startServer(Attach.Never)
+    [ServerAction.RestartUnderFeega]: () => startServer(Attach.Never),
+    [ServerAction.Cancel]: () => (cancel?.abort(), post({ kind: ToView.Server, state: ServerState.Stopped, reason: 'install cancelled' })),
+    [ServerAction.ChooseApp]: switchApp
   };
 
   const handlers: { [K in ToHost]: (m: Extract<HostMessage, { kind: K }>) => unknown } = {
@@ -175,9 +242,9 @@ export function inspectSession(platform: Platform, root: string, startRoute?: st
   }
 
   return {
-    root,
+    root: () => root,
     start: () => startServer(),
-    stop: () => running?.stop(),
+    stop: close,
     url: () => running?.url ?? null,
     showApp,
     showRoute,

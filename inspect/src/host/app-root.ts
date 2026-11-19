@@ -7,7 +7,7 @@ export type AppChoice = { label: string; app: string };
 export type ChooseApp = (apps: AppChoice[]) => Promise<string | null>;
 
 const MANIFEST = 'package.json';
-const SKIPPED = new Set(['node_modules', '.git', 'dist', 'build', '.svelte-kit', '.next']);
+const SKIPPED = new Set(['node_modules', '.git', '.claude', 'dist', 'build', '.svelte-kit', '.next', '.output', '__fixtures__', 'fixtures']);
 const DEPTH = 2;
 
 export async function appRootOf(clicked: string, workspace: string, has: Exists): Promise<string | null> {

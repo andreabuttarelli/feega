@@ -8,11 +8,14 @@ sidebar:
 Feega Inspect is a small editor extension, separate from the Feega canvas. No account, no cloud.
 
 1. Open the folder of your web app.
-2. Run **Feega Inspect: Open the running app** from the command palette. The extension starts the
+2. Run **Feega: Open from current workspace** from the command palette. The extension starts the
    app's dev server (the `dev`/`start` script it detects) and shows the page in a panel.
 3. Click an element. The right bar shows its tag, the component and `file:line` (click it to open
    the source), and the Properties controls: auto layout, size, spacing, typography, colour,
-   radius, opacity, shadow.
+   radius, opacity, shadow. Closed sections below them cover position and inset, display,
+   overflow, min/max size, aspect ratio, object fit, grid, flex child, per-side border, outline,
+   blend and blur, transform, transition, cursor, text options and list markers. A dimmed value
+   is inherited (the ancestor is named next to it); `×` removes the element's own value.
 4. Change a value. With Tailwind, the one class that owns it is rewritten (or your own theme
    token). Without Tailwind, the value is written as CSS in the element's `style` attribute. The
    panel shows "Saved to file:line", or the reason a write was refused.

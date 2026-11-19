@@ -62,7 +62,14 @@ describe('sectionsOf', () => {
     expect(sectionsOf(Role.Text)).not.toContain(Section.Layout);
   });
 
-  it('media has only size, radius and effects', () => {
-    expect(sectionsOf(Role.Media)).toEqual([Section.Size, Section.Radius, Section.Effects]);
+  it('media has object fit and no typography', () => {
+    expect(sectionsOf(Role.Media)).toContain(Section.Object);
+    expect(sectionsOf(Role.Media)).not.toContain(Section.Typography);
+  });
+
+  it('only media fits an object, only text has text options', () => {
+    expect(sectionsOf(Role.Container)).not.toContain(Section.Object);
+    expect(sectionsOf(Role.Container)).toContain(Section.Grid);
+    expect(sectionsOf(Role.Text)).toContain(Section.TextOptions);
   });
 });

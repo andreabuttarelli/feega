@@ -21,6 +21,9 @@ export default {
     'Right-click a folder in the Explorer and choose Design this folder with Feega, including apps inside a monorepo.',
     'Design this page opens the preview on the route that file renders.',
     'Edits update the page in place; if it ever reloads, your scroll and selection come back.',
-    'Select the page itself to set its background, font and spacing in your global stylesheet.'
+    'Select the page itself to set its background, font and spacing in your global stylesheet.',
+    'New sections for position, display, overflow, min and max size, aspect ratio, object fit, grid, flex children, per-side borders, outline, blend, blur, transform, transition, cursor, text overflow and list markers.',
+    'Inherited values show where they come from, and every new property has a reset.',
+    'Dragging in the colour picker previews the page live, for fills, gradient stops and shadows, and saves once when you let go.'
   ]
 } satisfies ChangelogEntry;

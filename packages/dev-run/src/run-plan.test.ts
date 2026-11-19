@@ -172,6 +172,32 @@ describe('runPlan refusals', () => {
     expect(runPlan(TWO_APPS, null, SANDBOX)).toMatchObject({ ok: false, refusal: PlanRefusal.ChooseApp, apps: ['apps/docs', 'apps/web'] });
   });
 
+  it('a repo that is an app and holds apps: only real apps, root included, no worktrees, fixtures or builds', () => {
+    const vite = { scripts: { dev: 'vite' }, devDependencies: { vite: '6' } };
+    const facts = repo({
+      'package.json': { workspaces: ['packages/*'], scripts: { dev: 'vite dev' }, devDependencies: { '@sveltejs/kit': '2', vite: '7' } },
+      'landing/package.json': vite,
+      'packages/ui/package.json': { scripts: { build: 'tsc' } },
+      '.claude/worktrees/agent-1/package.json': vite,
+      '.claude/worktrees/agent-1/landing/package.json': vite,
+      'inspect/test/fixtures/react-css/package.json': vite,
+      'src/__fixtures__/app/package.json': vite,
+      'landing/.output/server/package.json': vite,
+      'a/b/c/d/e/package.json': vite
+    });
+
+    expect(runPlan(facts, null, SANDBOX)).toMatchObject({ ok: false, refusal: PlanRefusal.ChooseApp, apps: ['', 'landing'] });
+  });
+
+  it('the chosen root app plans the root', () => {
+    const facts = repo({
+      'package.json': { workspaces: ['packages/*'], scripts: { dev: 'vite dev' }, devDependencies: { '@sveltejs/kit': '2' } },
+      'landing/package.json': { scripts: { dev: 'vite' }, devDependencies: { vite: '6' } }
+    });
+
+    expect(runPlan(facts, '', SANDBOX)).toMatchObject({ ok: true, appDir: '', framework: Framework.SvelteKit });
+  });
+
   it('no package.json anywhere', () => {
     expect(runPlan(repo({ 'README.md': 'hi' }), null, SANDBOX)).toMatchObject({ ok: false, refusal: PlanRefusal.NoPackage });
   });

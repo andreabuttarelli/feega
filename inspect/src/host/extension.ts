@@ -8,7 +8,8 @@ import { Command } from './commands';
 import { devReload } from './dev-reload';
 import { panelHtml } from './panel-html';
 import { routeOfFile } from './page-route';
-import { inspectSession, type Session } from './session';
+import { killOrphans } from './orphans';
+import { appOf, inspectSession, type Session } from './session';
 import { beforeProvider, vsCodePlatform, type VsCodeHost } from './vscode-platform';
 
 const VIEW_TYPE = 'feegaInspect.panel';
@@ -40,6 +41,8 @@ const tree: Tree = {
   dirs: (path) => readdir(path, { withFileTypes: true }).then((all) => all.filter((e) => e.isDirectory()).map((e) => e.name), () => [])
 };
 
+const workspaceOf = (target?: vscode.Uri) => ((target && vscode.workspace.getWorkspaceFolder(target)) ?? vscode.workspace.workspaceFolders?.[0])?.uri.fsPath ?? null;
+
 async function chosenRoot(target?: vscode.Uri): Promise<string | null> {
   const folder = (target && vscode.workspace.getWorkspaceFolder(target)) ?? vscode.workspace.workspaceFolders?.[0];
   if (!folder) {
@@ -59,14 +62,14 @@ async function open(context: vscode.ExtensionContext, target?: vscode.Uri) {
     return;
   }
   const route = target ? (routeOfFile(relative(root, target.fsPath)) ?? undefined) : undefined;
-  if (opened && opened.session.root === root) {
+  if (opened && opened.session.root() === root) {
     opened.panel.reveal();
     await opened.session.showRoute(route);
     return;
   }
   if (opened) {
     const SWITCH = 'Switch';
-    const answer = await vscode.window.showInformationMessage(`Feega is open on ${basename(opened.session.root)}. Switch to ${basename(root)}?`, { modal: true }, SWITCH);
+    const answer = await vscode.window.showInformationMessage(`Feega is open on ${basename(opened.session.root())}. Switch to ${basename(root)}?`, { modal: true }, SWITCH);
     if (answer !== SWITCH) {
       opened.panel.reveal();
       return;
@@ -75,7 +78,9 @@ async function open(context: vscode.ExtensionContext, target?: vscode.Uri) {
   }
 
   const panel = panelOf(context);
-  const session = inspectSession(vsCodePlatform(host, panel, befores), root, route);
+  const platform = vsCodePlatform(host, panel, befores);
+  const workspace = workspaceOf(target) ?? root;
+  const session = inspectSession(platform, workspace, appOf(platform, workspace, root), route);
   opened = { panel, session };
   panel.onDidDispose(() => {
     session.stop();
@@ -93,6 +98,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.workspace.onDidChangeConfiguration((e) => e.affectsConfiguration(SECTION) && opened?.session.settingsChanged()),
     beforeProvider(befores)
   );
+  void killOrphans(context.workspaceState);
   devReload(context, () => opened && render(opened.panel, context));
 
   return {

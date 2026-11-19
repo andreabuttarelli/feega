@@ -80,7 +80,8 @@ export enum ClassFamily {
   Shadow = 'shadow',
   Filter = 'filter',
   Backdrop = 'backdrop',
-  Border = 'border'
+  Border = 'border',
+  Display = 'display'
 }
 
 const ARBITRARY_PROPERTY = /^\[([a-z-]+):/;
@@ -115,6 +116,7 @@ export const CLASS_FAMILY: Record<ClassFamily, (token: string) => boolean> = {
   [ClassFamily.Shadow]: (t) => t === 'shadow' || t.startsWith('shadow-'),
   [ClassFamily.Filter]: (t) => t === 'blur' || t.startsWith('blur-') || t.startsWith('[filter:'),
   [ClassFamily.Backdrop]: startsWith('backdrop-'),
+  [ClassFamily.Display]: oneOf('block', 'inline-block', 'inline', 'flex', 'inline-flex', 'grid', 'inline-grid', 'contents', 'flow-root', 'hidden'),
   [ClassFamily.Border]: (t) => t === 'border' || /^border-(\d|\[\d)/.test(t) || t.startsWith('[border')
 };
 

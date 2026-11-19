@@ -3,7 +3,9 @@ import type { SettingKey, SettingValue, Settings } from '../settings';
 
 export enum Stored {
   Prefs = 'feegaInspect.prefs',
-  History = 'feegaInspect.history'
+  History = 'feegaInspect.history',
+  App = 'feegaInspect.app',
+  Pids = 'feegaInspect.pids'
 }
 
 export type Transport = {
@@ -23,6 +25,7 @@ export type Platform = Transport & {
   openSource: (root: string, at: Source) => Promise<unknown>;
   showDiff: (path: string, before: string) => Promise<unknown>;
   confirm: (question: string, yes: string) => Promise<boolean>;
+  chooseApp: (apps: string[], workspace: string) => Promise<string | null>;
   openExternal: (url: string) => unknown;
   openSettings: (key: SettingKey) => unknown;
   sourceControl: () => unknown;

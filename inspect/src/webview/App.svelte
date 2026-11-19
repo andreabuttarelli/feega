@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ACTION_LABEL, actionsOf, serverLook } from './server-look';
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import RotateCw from '@lucide/svelte/icons/rotate-cw';
@@ -585,6 +586,17 @@
         {/if}
       </div>
 
+      {#if !url}
+        <div class="server-card" data-testid="server-card" data-state={server}>
+          <p class="server-label"><span class="server-dot-inline {serverLook(server).dot}"></span>{serverLook(server).label}</p>
+          {#if serverReason}<pre class="server-reason">{serverReason}</pre>{/if}
+          <div class="server-actions">
+            {#each actionsOf(server, false) as action (action)}
+              <button type="button" class="action" data-action={action} onclick={() => toHost({ kind: ToHost.Server, action })}>{ACTION_LABEL[action]}</button>
+            {/each}
+          </div>
+        </div>
+      {/if}
       {#if toast}<div class="toast" role="status">{toast}</div>{/if}
       <div class="float" class:moving bind:clientWidth={bar.w} bind:clientHeight={bar.h} style={`left:${barAt.x}px;top:${barAt.y}px`} data-anchor={anchor}>
         <button type="button" class="grip" title="Drag to move (arrow keys)" aria-label="Move the bar" onpointerdown={grabBar} onpointermove={dragBar} onpointerup={dropBar} onkeydown={onHandleKey}>
@@ -1149,6 +1161,52 @@
     color: var(--ui-text-2);
     font-size: var(--ui-text-xs);
     word-break: break-word;
+  }
+
+  .server-card {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    gap: 8px;
+    max-width: 420px;
+    margin: auto;
+    color: var(--ui-text);
+    text-align: center;
+  }
+
+  .server-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin: 0;
+    font-weight: 600;
+  }
+
+  .server-dot-inline {
+    width: 8px;
+    height: 8px;
+    border-radius: var(--ui-radius-full);
+  }
+
+  .server-dot-inline.amber { background: #ff9f0a; }
+  .server-dot-inline.red { background: #ff453a; }
+  .server-dot-inline.green { background: #30d158; }
+  .server-dot-inline.grey { background: #8e8e93; }
+
+  .server-reason {
+    margin: 0;
+    color: var(--ui-text-2);
+    white-space: pre-wrap;
+    font-size: var(--ui-text-xs);
+  }
+
+  .server-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
   }
 
   .empty {

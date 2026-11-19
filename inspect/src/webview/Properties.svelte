@@ -16,7 +16,7 @@
   import { UI_ICON_SVG, UiIcon } from './ui-icons';
   import ScanLine from '@lucide/svelte/icons/square-dashed';
   import { MIXED, type Shared } from '@feega/properties-panel/mixed';
-  import { Group, ROWS, Section, SideMode, GROUP_MODES, type Hint, type NumberRow, type Row } from './controls';
+  import { CSS_ROWS, Control, Group, ROWS, Section, SideMode, GROUP_MODES, type Hint, type NumberRow, type Row } from './controls';
   import { roleOf, sectionsOf } from './roles';
   import { paintOf } from './colour';
   import Field from './Field.svelte';
@@ -54,7 +54,10 @@
   const SIDE_PREFIX: Record<string, string> = { all: '', x: '↔', y: '↕', top: 'T', right: 'R', bottom: 'B', left: 'L', tl: '◜', tr: '◝', br: '◞', bl: '◟' };
   const DEFAULT_PAINT = '#d9d9d9';
 
-  let closed = $state<Record<string, boolean>>({});
+  const EXTRA_SECTIONS = [...new Set(CSS_ROWS.map((s) => s.section))];
+  const READS: Record<string, string> = Object.fromEntries(CSS_ROWS.map((s) => [s.name, s.reads[0]]));
+
+  let closed = $state<Record<string, boolean>>(Object.fromEntries(EXTRA_SECTIONS.map((s) => [s, true])));
   let modes = $state<Record<string, SideMode>>({ [Group.Padding]: SideMode.All, [Group.Margin]: SideMode.All, [Group.Radius]: SideMode.All });
 
   const byName = (name: string) => ROWS.find((r) => r.name === name)!;
@@ -158,7 +161,7 @@
         <Popover.Trigger class="swatch-trigger" aria-label={`${r.label} colour`}><span class="swatch" style={`background:${readOf(name)}`}></span></Popover.Trigger>
         <Popover.Portal>
           <Popover.Content class="picker-popover" side="left" sideOffset={8} collisionPadding={8}>
-            <ColorPicker value={readOf(name)} {palette} onchange={(p) => (onpreview(r, p.css), onchange(r, p.css, p.token))} onsave={(n, c) => onsavevar(r, n, c)} />
+            <ColorPicker value={readOf(name)} {palette} onchange={(p) => (onpreview(r, p.css), onchange(r, p.css, p.token))} onpreview={(c) => onpreview(r, c)} onsave={(n, c) => onsavevar(r, n, c)} />
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>
@@ -229,7 +232,7 @@
 
   {#if has(Section.Fill)}
     <section data-section={Section.Fill}>
-      <FillList image={readOf('fill-image')} colour={readOf('fill')} {palette} {header} {row} onchange={(css) => (onchange(byName('fill-image'), css['background-image']), onchange(byName('fill'), css['background-color']))} />
+      <FillList image={readOf('fill-image')} colour={readOf('fill')} {palette} {header} {row} onchange={(css) => (onchange(byName('fill-image'), css['background-image']), onchange(byName('fill'), css['background-color']))} onpreview={(css) => (onpreview(byName('fill-image'), css['background-image']), onpreview(byName('fill'), css['background-color']))} />
     </section>
   {/if}
 
@@ -254,12 +257,58 @@
       {@render row('Opacity', op, 'opacity')}
     </section>
   {/if}
+
+  {#each EXTRA_SECTIONS.filter(has) as s (s)}
+    <section data-section={s}>
+      {@render header(s)}
+      {#if !closed[s]}
+        {#each ROWS.filter((r) => r.section === s) as r (r.name)}
+          {@const from = pick.inherited?.[READS[r.name]]}
+          <div class="row" class:inherited={from} data-row={r.name} title={from ? `Inherited from ${from}` : undefined}>
+            <span class="label">{r.label}</span>
+            <div class="control reset-pair">
+              {#if r.control === Control.Number}
+                {@render field(r, '', '', true)}
+              {:else if r.control === Control.Choice}
+                {@render choice(r)}
+              {:else if r.control === Control.Colour}
+                {@render colourRow(r.name)}
+              {:else}
+                <input type="text" class="hex" value={readOf(r.name)} aria-label={r.label} data-field={r.name} onchange={(e) => onchange(r, e.currentTarget.value)} />
+              {/if}
+              {#if from}<span class="muted from">{from}</span>{/if}
+              <button type="button" class="icon reset" title={`Reset ${r.label.toLowerCase()}`} aria-label={`Reset ${r.label.toLowerCase()}`} onclick={() => onchange(r, '')}>×</button>
+            </div>
+          </div>
+        {/each}
+      {/if}
+    </section>
+  {/each}
 </div>
 
 <style>
   .properties {
     --label-w: 72px;
     font-size: var(--ui-text-sm);
+  }
+
+  .row.inherited .control > :global(:first-child) {
+    opacity: 0.55;
+  }
+
+  .reset-pair {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .reset-pair > :global(:first-child) {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .from {
+    margin-left: 0;
   }
 
   section {

@@ -85,6 +85,7 @@ export function nodePlatform({ root, launcher, version, transport, print, launch
     },
     showDiff,
     confirm: async () => true,
+    chooseApp: async (apps, workspace) => (print(`feega: ${workspace} holds several apps, run feega on one of:\n${apps.map((app) => `  ${join(workspace, app)}`).join('\n')}`), null),
     openExternal,
     openSettings: async () => {
       await save(settingsPath, settings);

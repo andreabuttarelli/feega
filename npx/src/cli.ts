@@ -3,7 +3,8 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { chosenApp, type AppChoice, type Tree } from '../../inspect/src/host/app-root';
 import { nodePlatform } from '../../inspect/src/host/node-platform';
-import { inspectSession } from '../../inspect/src/host/session';
+import { killOrphans } from '../../inspect/src/host/orphans';
+import { inspectSession, memoOf } from '../../inspect/src/host/session';
 import { Browser, Run, USAGE, argsOf } from './args';
 import { editorServer } from './editor-server';
 
@@ -58,6 +59,7 @@ async function main(): Promise<number> {
 
   const editor = await editorServer(join(__dirname, 'webview'), args.port);
   const platform = nodePlatform({ root, launcher: join(__dirname, 'launcher'), version: FEEGA_VERSION, transport: editor.transport, print: say });
+  await killOrphans(memoOf(platform));
   const session = inspectSession(platform, root);
 
   const stop = async () => {

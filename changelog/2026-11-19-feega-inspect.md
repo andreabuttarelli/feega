@@ -117,3 +117,20 @@ edit inline until reload); the colour control is a native picker, not the app's 
   (`PAGE_SOURCE` in the runtime); its edits write a `body` rule in the global stylesheet
   (`page-rule.ts`, `selectorInBody`), with Tailwind or plain CSS alike. `html` is supported by the
   writer; no UI entry for it yet.
+- **More properties.** `CSS_ROWS` in `controls.ts` is one table: each row names the CSS
+  property, its control and section; the Tailwind change is an arbitrary property
+  (`[grid-template-columns:1fr_2fr]`), plain-CSS projects get the same declaration through the
+  existing writers. Line clamp is the exception (`line-clamp-N`, boxed preview). Sections render
+  generically and start closed. `×` writes an empty value, which drops the token or declaration.
+  The runtime reports, for inherited properties, the topmost ancestor with the same value
+  (`inherited`); the row dims and names it. Not done: inherited dimming on the hand-laid
+  Typography rows, and telling a default apart from a set value for non-inherited properties.
+
+## Colour picker live preview
+
+Square, hue and opacity drags used to write the file on every release only, with no preview
+in between (fills, stops, shadow colours had no preview path at all). `liveColour`
+(`inspect/src/webview/colour-live.ts`) reuses `liveNumber` from `scrub.ts`: one preview per
+animation frame, one write on release. `ColorPicker` gained `onpreview`, threaded through
+`ColourSwatch`, `FillList` and `ShadowList` to `Properties`' existing `onpreview`, which both
+shells route the same way.
