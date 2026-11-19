@@ -7,6 +7,7 @@
   import { GUIDES_PATH } from './guides';
   import { PRICING_PATH } from './paths';
   import { COMPARE_PATH } from './compare';
+  import { ALTERNATIVES_PATH } from './alternatives';
   import { CODEBASE_PATH } from './codebase';
   import { onMount } from 'svelte';
   import { homeHref } from './signed-in';
@@ -52,6 +53,7 @@
       <a href={DOCS_URL}>docs</a>
       <a href={GUIDES_PATH}>guides</a>
       <a href={COMPARE_PATH}>compare</a>
+      <a href={ALTERNATIVES_PATH}>alternatives</a>
       <a href={STORY_URL}>blog</a>
     </nav>
 
