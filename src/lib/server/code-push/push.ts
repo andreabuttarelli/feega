@@ -1,4 +1,4 @@
-import { Access, GitError, GitFailure, PullStatus, type FileChanged, type FileWrite, type GitHost, type PullRef, type PullState } from './git-host';
+import { Access, GitError, GitFailure, PullStatus, WIP_PREFIX, type FileChanged, type FileWrite, type GitHost, type PullRef, type PullState } from './git-host';
 import type { PushLock } from './push-lock';
 import { isEnvFile, isSensitive, withSecrets } from './secrets';
 
@@ -27,7 +27,6 @@ export enum PullKind {
   Ready = 'ready'
 }
 
-export const WIP_PREFIX = 'refs/feega/wip/';
 const WIP_MESSAGE = 'Feega autosave (work in progress)';
 
 export enum Fallback {

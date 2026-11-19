@@ -1,5 +1,5 @@
 import { commitTree, git, type GitRun } from './git-cli';
-import { Access, FileMove, GitError, GitFailure, RefKind, type GitHost, type RefSeen } from './git-host';
+import { Access, FileMove, GitError, GitFailure, onlyWip, RefKind, type GitHost, type RefSeen } from './git-host';
 
 export enum Publish {
   Origin = 'origin',
@@ -128,6 +128,7 @@ export function localGitHost(dir: string, options: LocalOptions): GitHost {
       return pulls.upsertPull(ask);
     },
     setRef: async (ref, sha) => {
+      onlyWip(ref);
       await run(['update-ref', ref, sha]);
     },
     markReady: async (number) => {

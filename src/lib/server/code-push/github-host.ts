@@ -1,7 +1,7 @@
 import type { ProviderAnswer, ProviderCall } from '$lib/server/connections/account-links';
 import type { GithubCall } from '$lib/server/code-import/github';
 import type { RepoRef } from '$lib/server/code-import/repo';
-import { Access, FileMove, GitError, GitFailure, PullStatus, RefKind, type Check, type GitHost, type PullRef } from './git-host';
+import { Access, FileMove, GitError, GitFailure, onlyWip, PullStatus, RefKind, type Check, type GitHost, type PullRef } from './git-host';
 
 const HTTP_UNAUTHORIZED = 401;
 const HTTP_FORBIDDEN = 403;
@@ -122,6 +122,7 @@ export function githubHost(call: GithubCall, repo: RepoRef): GitHost {
       return pullRefOf(await send({ endpoint: '/pulls', method: 'POST', body: { title: ask.title, body: ask.body, head: ask.branch, base: ask.base, draft: ask.draft ?? false } }));
     },
     setRef: async (ref, sha) => {
+      onlyWip(ref);
       const moved = await send({ endpoint: `/git/${ref}`, method: 'PATCH', body: { sha, force: true } }, { [HTTP_UNPROCESSABLE]: GitFailure.NotFound }).then(
         () => true,
         (e: unknown) => {
