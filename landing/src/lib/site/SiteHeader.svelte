@@ -1,6 +1,6 @@
 <script lang="ts">
   import Mark from './Mark.svelte';
-  import { GITHUB_URL, HEADER_LINKS, MENU_LINKS, SOCIAL_LINKS } from './links';
+  import { DOWNLOAD_PATH, GITHUB_URL, HEADER_LINKS, MENU_LINKS, SOCIAL_LINKS } from './links';
   import { GITHUB_ICON } from './social-icons';
 
   let open = $state(false);
@@ -16,7 +16,8 @@
   </nav>
 
   <div class="actions">
-    <a class="chip cta" href={GITHUB_URL}><span>star on github</span></a>
+    <a class="chip" href={GITHUB_URL}>star on github</a>
+    <a class="chip cta" href={DOWNLOAD_PATH}>download</a>
   </div>
 
   <div class="mobile">
@@ -166,7 +167,7 @@
     .bar {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
-      padding: 0 20px;
+      padding: 16px 20px 0;
     }
 
     .links {
@@ -190,11 +191,13 @@
     }
 
     .bar .cta {
+      padding: 8px 16px 10px;
+      border-radius: 999px;
       background: #ff5100;
     }
 
-    .actions :global(span) {
-      border-bottom: 1px solid currentColor;
+    .actions {
+      align-items: center;
     }
 
     .mobile,
@@ -231,11 +234,13 @@
     }
 
     .bar .cta {
+      padding: 8px 16px 10px;
+      border-radius: 999px;
       background: #ff5100;
     }
 
-    .actions :global(span) {
-      border-bottom: 1px solid currentColor;
+    .actions {
+      align-items: center;
     }
 
     .mobile,
