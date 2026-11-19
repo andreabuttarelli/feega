@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { conflictTitle, shownValue, unsavedLine } from './folder-sync';
+import { fieldLabel, shownValue, unsavedLine, valueKind, ValueKind } from './folder-sync';
 
 describe('folder sync wording', () => {
-  it('names a field conflict by node and field', () => {
-    expect(conflictTitle({ collection: 'nodes', id: 'abcdef12-0000', field: 'data.text', base: null, ours: 1, theirs: 2 }, { 'abcdef12-0000': 'Hero title' })).toBe('Hero title · text');
-  });
-
-  it('names a deleted-versus-edited conflict', () => {
-    expect(conflictTitle({ collection: 'nodes', id: 'abcdef12-0000', field: '*', base: {}, ours: null, theirs: {} }, {})).toBe('abcdef12 · deleted on one side');
+  it('names a field without its data prefix', () => {
+    expect(fieldLabel('data.color')).toBe('color');
+    expect(fieldLabel('position')).toBe('position');
+    expect(fieldLabel('*')).toBe('deleted on one side');
   });
 
   it('shows a removed value and cuts long ones', () => {
@@ -16,7 +14,22 @@ describe('folder sync wording', () => {
     expect(shownValue({ a: 1 })).toBe('{"a":1}');
   });
 
-  it('says since when the folder is not saved', () => {
+  it('says when the folder changed', () => {
     expect(unsavedLine('2026-11-19T09:05:00.000Z', 'UTC')).toBe('Not saved to .feega/ since 09:05');
+  });
+});
+
+describe('how a conflict value is shown', () => {
+  it.each([
+    ['#2563eb', ValueKind.Color],
+    ['rgb(10, 20, 30)', ValueKind.Color],
+    ['https://cdn.test/hero.png', ValueKind.Image],
+    ['data:image/svg+xml;base64,AAAA', ValueKind.Image],
+    ['/local/storage/canvas-assets/a.webp?x=1', ValueKind.Image],
+    ['Ship it', ValueKind.Text],
+    [null, ValueKind.Removed],
+    [{ a: 1 }, ValueKind.Text]
+  ])('%s is %s', (value, kind) => {
+    expect(valueKind(value)).toBe(kind);
   });
 });

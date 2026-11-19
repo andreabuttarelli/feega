@@ -36,7 +36,7 @@ export const UNSAVED_NOTICE = 'Files in .feega/ changed outside Feega. Your chan
 
 export type FetchAsset = (url: string) => Promise<Uint8Array>;
 
-export type FolderStatus = { relation: Relation; notice: string | null; conflicts: Conflict[]; unsavedSince: string | null; failedAssets: string[] };
+export type FolderStatus = { relation: Relation; notice: string | null; conflicts: Conflict[]; unsavedSince: string | null; failedAssets: string[]; openedAt: string };
 
 type Assets = Map<string, Uint8Array>;
 
@@ -167,7 +167,7 @@ export function openFolder(dir: string, fetchAsset: FetchAsset = defaultFetchAss
   const basePath = join(root, BASE_DIR);
   const oursPath = join(root, OURS_DIR);
   const downloaded = new Map<string, { sha256: string; ext: string } | null>();
-  const status: FolderStatus = { relation: Relation.Same, notice: null, conflicts: [], unsavedSince: null, failedAssets: [] };
+  const status: FolderStatus = { relation: Relation.Same, notice: null, conflicts: [], unsavedSince: null, failedAssets: [], openedAt: new Date().toISOString() };
 
   const readAsset = (path: string) => (existsSync(join(root, path)) ? new Uint8Array(readFileSync(join(root, path))) : undefined);
 

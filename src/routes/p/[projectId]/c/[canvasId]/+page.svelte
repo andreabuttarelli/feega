@@ -4615,7 +4615,7 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
     </p>
   {/if}
   {#if liveLocal}
-    <FolderSyncNotice names={Object.fromEntries(nodes.filter((n) => n.displayName).map((n) => [n.id, n.displayName as string]))} />
+    <FolderSyncNotice nodes={Object.fromEntries(nodes.map((n) => [n.id, { name: n.displayName, type: n.type }]))} />
   {/if}
   {#if figmaShown}
     <FigmaNotice notice={figmaShown} settingsHref="/app/settings/profile" onclose={() => (figmaPaste = null)} />
