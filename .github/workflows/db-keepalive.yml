@@ -22,5 +22,6 @@ jobs:
             exit 1
           fi
 
-      - name: Ping auth health
-        run: curl -fsS "$SUPABASE_URL/auth/v1/health" -H "apikey: $SUPABASE_ANON_KEY"
+      - name: Query the database
+        run: |
+          curl -fsS "$SUPABASE_URL/rest/v1/profiles?select=id&limit=1" -H "apikey: $SUPABASE_ANON_KEY"
