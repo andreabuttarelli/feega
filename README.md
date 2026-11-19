@@ -9,6 +9,8 @@
   <a href="https://github.com/andreabuttarelli/feega/stargazers"><img src="https://img.shields.io/github/stars/andreabuttarelli/feega?style=flat&logo=github&logoColor=white&labelColor=131313&color=c485fe" alt="GitHub stars" /></a>
   <a href="https://discord.gg/PUp37DG6vr"><img src="https://img.shields.io/badge/Discord-community-c485fe?style=flat&logo=discord&logoColor=white&labelColor=131313" alt="Discord" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-c485fe?style=flat&labelColor=131313" alt="Apache-2.0" /></a>
+  <a href="https://github.com/sponsors/andreabuttarelli"><img src="https://img.shields.io/badge/Sponsor-GitHub-c485fe?style=flat&logo=githubsponsors&logoColor=white&labelColor=131313" alt="Sponsor Feega on GitHub" /></a>
+  <a href="https://buy.stripe.com/5kQ00k2A97C08sd94LeME07"><img src="https://img.shields.io/badge/Support_with_a_coffee-c485fe?style=flat&logo=buymeacoffee&logoColor=white&labelColor=131313" alt="Support with a coffee" /></a>
   <a href="https://feega.app"><img src="https://img.shields.io/badge/Get_started-feega.app-c485fe?style=flat&labelColor=131313" alt="Get started on feega.app" /></a>
 </p>
 

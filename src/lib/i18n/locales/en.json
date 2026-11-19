@@ -391,6 +391,13 @@
       "namePlaceholder": "Organisation name",
       "create": "Create",
       "cancel": "Cancel"
+    },
+    "dashboard": {
+      "greeting": "hi, {name}!",
+      "greetingAnon": "hi!",
+      "cloud": "Here you'll find all the data from the upcoming Feega Cloud.",
+      "extension": "Feega is a VS Code extension for now — design in your codebase.",
+      "docs": "Get the extension"
     }
   },
   "cookie": {

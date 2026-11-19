@@ -16,13 +16,12 @@ for (const scheme of ['light', 'dark'] as const) {
     test.describe(`${viewport.name} ${scheme}`, () => {
       test.use({ viewport, colorScheme: scheme });
 
-      test('hero first, the session canvas among the recents, the prompt last', async ({ page, session }) => {
+      test('the greeting and the Feega Cloud line, no projects', async ({ page }) => {
         await gotoHydrated(page, '/app');
 
         await expect(page.getByTestId('home-hero')).toBeVisible();
-        const recents = page.getByTestId('home-recents');
-        await expect(recents.locator(`[data-testid="canvas-card"][href="/p/${session.projectId}/c/${session.canvasId}"]`)).toBeVisible();
-        await expect(page.getByTestId('video-brief')).toBeVisible();
+        await expect(page.getByRole('link', { name: 'Get the extension' })).toBeVisible();
+        await expect(page.getByTestId('home-recents')).toHaveCount(0);
 
         if (!SHOTS) {
           return;
