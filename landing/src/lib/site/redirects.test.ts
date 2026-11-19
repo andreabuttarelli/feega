@@ -46,6 +46,34 @@ const OLD_URLS: [string, string][] = [
   ['/compare/rive', '/alternatives']
 ];
 
+const OLD_PRODUCT_URLS: [string, string][] = [
+  ['/ai-video-generator', '/'],
+  ['/ai-video-styles', '/'],
+  ['/claymation-ai', '/'],
+  ['/3d-animation-maker', '/'],
+  ['/ai-commercial-maker', '/'],
+  ['/paper-cutout-animation', '/'],
+  ['/80s-retro-video', '/'],
+  ['/anime-video-generator', '/'],
+  ['/spotify-canvas-maker', '/'],
+  ['/ai-node-editor', '/design-in-your-codebase'],
+  ['/ai-video-upscaler', '/'],
+  ['/guides', '/alternatives'],
+  ['/guides/can-claude-code-make-videos', '/alternatives'],
+  ['/guides/launch-video-with-claude-code', '/alternatives'],
+  ['/guides/animate-ui-with-ai-agent', '/alternatives']
+];
+
+describe('the old video product URLs', () => {
+  it.each(OLD_PRODUCT_URLS)('%s → %s, permanently', (from, to) => {
+    expect(redirect(from)).toEqual({ to, status: PERMANENT });
+  });
+
+  it.each(OLD_PRODUCT_URLS)('%s lands in one hop', (from) => {
+    expect(redirect(redirect(from)!.to)).toBeUndefined();
+  });
+});
+
 describe('the old /blog URLs', () => {
   it.each(OLD_URLS)('%s → %s, permanently', (from, to) => {
     expect(redirect(from)).toEqual({ to, status: PERMANENT });

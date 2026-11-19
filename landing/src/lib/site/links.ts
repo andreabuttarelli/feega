@@ -1,15 +1,22 @@
 import { DISCORD_ICON, GITHUB_ICON, INSTAGRAM_ICON, X_ICON } from './social-icons';
 
-export const SITE_URL = 'https://feega.app';
+export const SITE_URL = 'https://www.feega.app';
 export const APP_URL = 'https://oh.feega.app';
 export const GITHUB_URL = 'https://github.com/andreabuttarelli/feega';
-export const MAC_GUIDE_URL = 'https://docs.feega.app/desktop/install-macos/';
 export const DOCS_URL = 'https://docs.feega.app';
 export const DISCORD_URL = 'https://discord.gg/PUp37DG6vr';
 export const STORY_URL = 'https://blog.feega.app/';
 export const COFFEE_URL = 'https://buy.stripe.com/5kQ00k2A97C08sd94LeME07';
 
 export const EXTENSION_PUBLISHED = true;
+
+export const DOWNLOAD_PATH = '/download';
+
+export const FEEGA_VERSION = '0.2.2';
+
+export const NODE_REQUIREMENT = 'Node 18 or newer';
+
+export const VSCODE_REQUIREMENT = 'VS Code 1.90 or newer';
 
 const EXTENSION_ID = 'andreabuttarelli.feega';
 
@@ -31,6 +38,7 @@ export const EDITORS: readonly Editor[] = [
 ];
 
 export const HEADER_LINKS = [
+  { href: DOWNLOAD_PATH, label: 'Download' },
   { href: DOCS_URL, label: 'Documentation' },
   { href: GITHUB_URL, label: 'GitHub' },
   { href: DISCORD_URL, label: 'Community' },
@@ -38,6 +46,7 @@ export const HEADER_LINKS = [
 ] as const;
 
 export const MENU_LINKS = [
+  { href: DOWNLOAD_PATH, label: 'Download' },
   { href: DOCS_URL, label: 'Docs' },
   { href: GITHUB_URL, label: 'GitHub' },
   { href: DISCORD_URL, label: 'Community' },

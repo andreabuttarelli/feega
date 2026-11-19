@@ -17,3 +17,8 @@ export const PRICING_META = {
   title: 'Pricing: the Feega extension is free | Feega',
   description: 'The Feega VS Code extension is free. Feega Cloud, with GitHub sync, collaboration, sections and templates, is coming later.'
 } as const;
+
+export const DOWNLOAD_META = {
+  title: 'Download Feega: free VS Code extension | Feega',
+  description: 'Download Feega for VS Code, Cursor, Windsurf and VSCodium, or run npx feega. Free, open source, no account.'
+} as const;

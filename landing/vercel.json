@@ -37,19 +37,33 @@
   },
   "redirects": [
     {
-      "source": "/guides/best-motion-design-tools-ai-agents",
+      "source": "/:page(ai-video-generator|ai-video-styles|claymation-ai|3d-animation-maker|ai-commercial-maker|paper-cutout-animation|80s-retro-video|anime-video-generator|spotify-canvas-maker|ai-video-upscaler)",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
+      "source": "/ai-node-editor",
+      "destination": "/design-in-your-codebase",
+      "statusCode": 301
+    },
+    {
+      "source": "/guides",
       "destination": "/alternatives",
       "statusCode": 301
     },
     {
-      "source": "/:path(.*)",
-      "has": [
-        {
-          "type": "host",
-          "value": "www.feega.app"
-        }
-      ],
-      "destination": "https://feega.app/:path",
+      "source": "/guides/:path*",
+      "destination": "/alternatives",
+      "statusCode": 301
+    },
+    {
+      "source": "/download/mac",
+      "destination": "/download",
+      "statusCode": 301
+    },
+    {
+      "source": "/guides/best-motion-design-tools-ai-agents",
+      "destination": "/alternatives",
       "statusCode": 301
     },
     {
