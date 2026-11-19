@@ -17,6 +17,7 @@ const pushBody = z.object({
   since: z.object({ branch: z.string().max(200), sha: SHA }).optional(),
   base: z.string().max(200).optional(),
   confirmSensitive: z.boolean().optional(),
+  canvasUrl: z.url().max(500).optional(),
   mains: z.array(z.string().min(1)).max(MAX_FRAMES).optional(),
   variants: z.array(z.object({ nodeId: z.string().min(1), choice: z.enum(VariantChoice), route: z.string().min(1).max(300).optional() })).max(MAX_FRAMES).optional()
 });

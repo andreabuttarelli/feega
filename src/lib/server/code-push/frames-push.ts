@@ -29,7 +29,7 @@ export type FramesDeps = {
   caps?: (source: CodeSourceKind, repo: string) => Promise<HostCaps>;
 };
 
-export type FramesPushAsk = { name: string; nodeIds: string[]; title?: string; body?: string; since?: LastPush; base?: string; coAuthors?: string[]; confirmSensitive?: boolean; mains?: string[]; variants?: VariantAsk[] };
+export type FramesPushAsk = { name: string; nodeIds: string[]; title?: string; body?: string; since?: LastPush; base?: string; coAuthors?: string[]; confirmSensitive?: boolean; mains?: string[]; variants?: VariantAsk[]; canvasUrl?: string };
 
 export type Affected = { path: string; pages: number };
 
@@ -120,7 +120,7 @@ export async function framesPush(deps: FramesDeps, scope: CodeScope, ask: Frames
   const links = await Promise.all(ask.nodeIds.map(async (nodeId) => ({ nodeId, link: await deps.links.read(nodeId) })));
   const since = ask.since ?? lastPushOf(links[0]?.link ?? null);
   const branch = links.find((l) => l.link?.workBranch)?.link?.workBranch;
-  const out = await pushFiles(host, deps.lock, { name: ask.name, files: edits.files, title: ask.title ?? DEFAULT_TITLE, body: ask.body ?? DEFAULT_BODY, since, base: ask.base, coAuthors: ask.coAuthors, confirmSensitive: ask.confirmSensitive, branch });
+  const out = await pushFiles(host, deps.lock, { name: ask.name, files: edits.files, title: ask.title ?? DEFAULT_TITLE, body: ask.body ?? DEFAULT_BODY, since, base: ask.base, coAuthors: ask.coAuthors, confirmSensitive: ask.confirmSensitive, branch, canvasUrl: ask.canvasUrl });
   if (!out.ok) {
     return out.refusal === PushRefusal.ReadOnly ? { ...out, patch: edits.files } : out;
   }
