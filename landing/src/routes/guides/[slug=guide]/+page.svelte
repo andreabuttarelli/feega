@@ -2,7 +2,7 @@
   const cta = primaryCta();
   import '$lib/site/landing/landing.css';
   import '$lib/site/alternatives/alternatives.css';
-  import { installAction, primaryCta } from '$lib/site/install';
+  import { primaryCta } from '$lib/site/install';
   import { GUIDES_PATH, guidePath } from '$lib/site/guides';
   import { articleJsonLd, faqJsonLd, howToJsonLd } from '$lib/site/structured-data';
 
@@ -27,7 +27,7 @@
   <a class="back" href={GUIDES_PATH}>← All guides</a>
   <h1>{guide.heading}</h1>
   <p class="intro">{guide.answer}</p>
-  <a class="landing-cta" href={cta.href} use:installAction={cta}>{cta.label} →</a>
+  <a class="landing-cta" href={cta.href}>{cta.label} →</a>
 
   {#if guide.steps.length}
     <section>
@@ -74,6 +74,6 @@
         <li><a href={link.href}>{link.label}</a></li>
       {/each}
     </ul>
-    <a class="landing-cta" href={cta.href} use:installAction={cta}>{cta.label} →</a>
+    <a class="landing-cta" href={cta.href}>{cta.label} →</a>
   </section>
 </article>

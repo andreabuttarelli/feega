@@ -37,6 +37,11 @@
   },
   "redirects": [
     {
+      "source": "/download/mac",
+      "destination": "/download",
+      "statusCode": 301
+    },
+    {
       "source": "/guides/best-motion-design-tools-ai-agents",
       "destination": "/alternatives",
       "statusCode": 301

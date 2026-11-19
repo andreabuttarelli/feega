@@ -2,8 +2,8 @@ import { FAQ } from './home';
 import { LANDING_PAGES } from './landing';
 import { UPSCALER } from './landing/upscaler';
 import { CODEBASE, CODEBASE_PATH } from './codebase';
-import { HOME_META, PRICING_META } from './seo';
-import { COFFEE_URL, EDITORS, EXTENSION_PUBLISHED, GITHUB_URL, SITE_URL } from './links';
+import { DOWNLOAD_META, HOME_META, PRICING_META } from './seo';
+import { COFFEE_URL, DOWNLOAD_PATH, EDITORS, EXTENSION_PUBLISHED, GITHUB_URL, SITE_URL } from './links';
 import { PRICING_PATH, SITE_PATHS } from './paths';
 import { LEGAL_DOCS } from './legal';
 import { ALTERNATIVES, ALTERNATIVES_INDEX, ALTERNATIVES_PATH, alternativePath } from './alternatives';
@@ -19,6 +19,7 @@ const INSTALL_LINES = EXTENSION_PUBLISHED
 export const PAGE_TITLES: Record<string, string> = {
   '/': HOME_META.title,
   [PRICING_PATH]: PRICING_META.title,
+  [DOWNLOAD_PATH]: DOWNLOAD_META.title,
   '/changelog': 'Changelog',
   '/ai-video-upscaler': UPSCALER.title,
   [CODEBASE_PATH]: CODEBASE.title,

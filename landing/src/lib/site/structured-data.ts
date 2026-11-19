@@ -1,7 +1,7 @@
 import { PLAN } from './pricing/plan';
 import { FAQ } from './home';
 import { plainText } from './text';
-import { DISCORD_URL, GITHUB_URL, SITE_URL, SOCIAL_LINKS } from './links';
+import { DISCORD_URL, DOWNLOAD_PATH, FEEGA_VERSION, GITHUB_URL, SITE_URL, SOCIAL_LINKS } from './links';
 
 const SITE = `${SITE_URL}/`;
 
@@ -79,4 +79,14 @@ export const howToJsonLd = (name: string, steps: readonly { name: string; text: 
     '@type': 'HowTo',
     name,
     step: steps.map((s, i) => ({ '@type': 'HowToStep', position: i + 1, name: s.name, text: s.text }))
+  });
+
+export const downloadJsonLd = () =>
+  script({
+    ...APPLICATION,
+    '@context': 'https://schema.org',
+    softwareVersion: FEEGA_VERSION,
+    downloadUrl: `${SITE_URL}${DOWNLOAD_PATH}`,
+    isAccessibleForFree: true,
+    offers: { '@type': 'Offer', price: 0, priceCurrency: 'EUR' }
   });

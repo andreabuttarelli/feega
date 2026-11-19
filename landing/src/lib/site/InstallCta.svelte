@@ -1,19 +1,18 @@
 <script lang="ts">
   import { primaryCta, secondaryCtas, starCta } from './install';
-  import DownloadDialog from './DownloadDialog.svelte';
+  import InstallMenu from './InstallMenu.svelte'
 
   let { id }: { id: string } = $props();
 
   const primary = primaryCta();
   const secondary = secondaryCtas();
-  let choosing = $state(false);
 
   const HERO_FACTS = ['free, forever', 'every edit a diff', 'no AI, no tokens'] as const;
 </script>
 
 <div class="install" data-agent-id={id}>
   <div class="buttons">
-    <button class="primary" onclick={() => (choosing = true)}>{primary.label}</button>
+    <InstallMenu label={primary.label} />
     <a class="star" href={starCta.href}>{starCta.label}</a>
   </div>
   <p class="more">
@@ -24,29 +23,14 @@
   </ul>
 </div>
 
-<DownloadDialog bind:open={choosing} />
-
 <style>
-  .install {
+  .install.install {
+    z-index: var(--site-z-agents);
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 14px;
     color: #fff;
-  }
-
-  .primary {
-    border: 0;
-    cursor: pointer;
-    padding: 12px 26px;
-    border-radius: 999px;
-    background: #fff;
-    color: #000;
-    font-size: 17px;
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    text-decoration: none;
-    transition: opacity 0.15s;
   }
 
   .buttons {
@@ -70,10 +54,6 @@
 
   .star:hover {
     border-color: #fff;
-  }
-
-  .primary:hover {
-    opacity: 0.85;
   }
 
   .more {

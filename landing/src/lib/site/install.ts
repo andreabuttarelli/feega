@@ -1,4 +1,4 @@
-import { COFFEE_URL, EDITORS, EXTENSION_PUBLISHED, GITHUB_URL, MARKETPLACE_URL, NPX_COMMAND, NPX_LISTED, type Editor } from './links';
+import { COFFEE_URL, DOWNLOAD_PATH, EDITORS, EXTENSION_PUBLISHED, GITHUB_URL, NPX_COMMAND, NPX_LISTED, type Editor } from './links';
 
 const DOWNLOAD_LABEL = 'Download for free';
 
@@ -15,10 +15,7 @@ export type Env = {
   later: (fn: () => void, ms: number) => void;
 };
 
-export const primaryCta = (published: boolean = EXTENSION_PUBLISHED): Cta =>
-  published
-    ? { label: DOWNLOAD_LABEL, href: MARKETPLACE_URL, deepLink: PRIMARY_EDITOR.installUrl }
-    : { label: DOWNLOAD_LABEL, href: GITHUB_URL };
+export const primaryCta = (): Cta => ({ label: DOWNLOAD_LABEL, href: DOWNLOAD_PATH });
 
 export const starCta: Cta = { label: 'Star on GitHub', href: GITHUB_URL };
 
@@ -52,7 +49,7 @@ export const follow = (cta: Cta, env: Env): void => {
   }, DEEP_LINK_TIMEOUT_MS);
 };
 
-const browserEnv = (): Env => ({
+export const browserEnv = (): Env => ({
   userAgent: navigator.userAgent,
   open: (url) => {
     window.location.href = url;
@@ -63,16 +60,17 @@ const browserEnv = (): Env => ({
   }
 });
 
-export const installAction = (node: HTMLAnchorElement, cta: Cta) => {
-  if (!cta.deepLink) {
-    return {};
+export enum Outcome {
+  Opened = 'opened',
+  Copied = 'copied'
+}
+
+export const runOption = (option: InstallOption, env: Env, copy: (text: string) => void): Outcome => {
+  if (option.command) {
+    copy(option.command);
+    return Outcome.Copied;
   }
 
-  const onClick = (event: MouseEvent) => {
-    event.preventDefault();
-    follow(cta, browserEnv());
-  };
-  node.addEventListener('click', onClick);
-
-  return { destroy: () => node.removeEventListener('click', onClick) };
+  follow({ label: option.label, href: option.href, deepLink: option.deepLink }, env);
+  return Outcome.Opened;
 };

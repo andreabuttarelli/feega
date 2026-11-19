@@ -1,3 +1,4 @@
+import { DOWNLOAD_PATH } from './links';
 import { LANDING_PAGES } from './landing';
 import { LEGAL_DOCS } from './legal';
 import { GUIDES, GUIDES_PATH, guidePath } from './guides';
@@ -9,6 +10,7 @@ export const PRICING_PATH = '/pricing';
 export const SITE_PATHS: readonly string[] = [
   '/',
   PRICING_PATH,
+  DOWNLOAD_PATH,
   '/changelog',
   '/ai-video-upscaler',
   CODEBASE_PATH,

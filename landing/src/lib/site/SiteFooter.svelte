@@ -5,6 +5,7 @@
   import { COFFEE_URL, DOCS_URL, GITHUB_URL, SOCIAL_LINKS, STORY_URL } from './links';
   import { GUIDES_PATH } from './guides';
   import { PRICING_PATH } from './paths';
+  import { DOWNLOAD_PATH } from './links';
   import { ALTERNATIVES_PATH } from './alternatives';
   import { CODEBASE_PATH } from './codebase';
 
@@ -29,6 +30,7 @@
     <nav class="col" aria-label="Product">
       <p class="head">product</p>
       <a href="/">home</a>
+      <a href={DOWNLOAD_PATH}>download</a>
       <a href={PRICING_PATH}>pricing</a>
       <a href={CODEBASE_PATH}>codebase</a>
       <a href="/changelog">changelog</a>
