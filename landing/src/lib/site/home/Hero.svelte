@@ -70,7 +70,8 @@
       display: block;
       position: relative;
       width: 100%;
-      margin-top: 48px;
+      max-width: 960px;
+      margin: 48px auto 0;
       padding: 40px 40px 56px;
       border-radius: var(--ui-radius-lg, 10px);
       border: 1px solid rgba(255, 255, 255, 0.1);
