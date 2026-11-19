@@ -1,4 +1,5 @@
-import { watch } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { readFileSync, watch } from 'node:fs';
 import { join } from 'node:path';
 import * as vscode from 'vscode';
 
@@ -16,12 +17,29 @@ function debounced(run: () => void): () => void {
   };
 }
 
+const hashOf = (path: string) => {
+  try {
+    return createHash('sha1').update(readFileSync(path)).digest('hex');
+  } catch {
+    return '';
+  }
+};
+
 export function devReload(context: vscode.ExtensionContext, reloadView: () => void): void {
   if (context.extensionMode !== vscode.ExtensionMode.Development) {
     return;
   }
   const dist = join(context.extensionPath, 'dist');
-  const restartHost = debounced(() => vscode.commands.executeCommand('workbench.action.restartExtensionHost'));
+  const bundle = join(dist, HOST_BUNDLE);
+  let loaded = hashOf(bundle);
+  const restartHost = debounced(() => {
+    const now = hashOf(bundle);
+    if (!now || now === loaded) {
+      return;
+    }
+    loaded = now;
+    vscode.commands.executeCommand('workbench.action.restartExtensionHost');
+  });
   const view = debounced(reloadView);
 
   const watcher = watch(dist, { recursive: true }, (_event, name) => {

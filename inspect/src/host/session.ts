@@ -6,6 +6,7 @@ import { ServerAction, ServerState, ToHost, ToView, type EditAsk, type HostMessa
 import { SettingKey, StylingChoice } from '../settings';
 import { Attach, factsOf, startDev, type Refused, type Running } from './dev-server';
 import { fileEdits, type Snapshot, type Written } from './file-edits';
+import type { KeptServers } from './kept-servers';
 import { forget, remember, type Memo } from './orphans';
 import { Stored, type Platform } from './platform';
 import { stylingOf } from './styling';
@@ -22,7 +23,7 @@ export const appOf = (platform: Platform, workspace: string, root: string) => (r
 
 export const memoOf = (platform: Platform): Memo => ({ get: (key) => platform.stored(key as Stored), update: (key, value) => platform.store(key as Stored, value).then(() => undefined) });
 
-export function inspectSession(platform: Platform, workspace: string, startApp: string | null = null, startRoute?: string) {
+export function inspectSession(platform: Platform, workspace: string, startApp: string | null = null, startRoute?: string, kept: KeptServers<Running> | null = null) {
   let running: Running | null = null;
   let app = startApp;
   let root = app === null ? workspace : join(workspace, app);
@@ -119,8 +120,26 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     return picked;
   }
 
+  function adopt(started: Running, current: () => boolean) {
+    running = started;
+    started.exited(() => {
+      if (started.pid) {
+        forget(pids, started.pid);
+      }
+      if (current() && running === started) {
+        post({ kind: ToView.Server, state: ServerState.Stopped, reason: lastError || 'the dev server exited', info: infoOf(started) });
+      }
+    });
+  }
+
   async function startServer(attach = Attach.IfRunning): Promise<Running | Refused> {
+    const parked = attach === Attach.IfRunning && !running ? (kept?.take(root) ?? null) : null;
     const mine = ++starts;
+    if (parked) {
+      adopt(parked, () => starts === mine);
+      await showApp();
+      return parked;
+    }
     const current = () => starts === mine;
     running?.stop();
     running = null;
@@ -149,15 +168,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       return started;
     }
     startedAt = Date.now();
-    running = started;
-    started.exited(() => {
-      if (started.pid) {
-        forget(pids, started.pid);
-      }
-      if (current() && running === started) {
-        post({ kind: ToView.Server, state: ServerState.Stopped, reason: lastError || 'the dev server exited', info: infoOf(started) });
-      }
-    });
+    adopt(started, current);
     await showApp();
     return started;
   }
@@ -170,7 +181,13 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
 
   function close() {
     cancel?.abort();
-    running?.stop();
+    starts++;
+    if (running && !running.attached && kept) {
+      kept.park(root, running);
+    } else {
+      running?.stop();
+    }
+    running = null;
   }
 
   function stopServer() {

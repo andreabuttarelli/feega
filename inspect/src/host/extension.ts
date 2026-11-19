@@ -8,19 +8,23 @@ import { Command } from './commands';
 import { devReload } from './dev-reload';
 import { panelHtml } from './panel-html';
 import { routeOfFile } from './page-route';
+import { keptServers } from './kept-servers';
 import { killOrphans } from './orphans';
+import type { Running } from './dev-server';
 import { appOf, inspectSession, type Session } from './session';
 import { beforeProvider, vsCodePlatform, type VsCodeHost } from './vscode-platform';
 
 const VIEW_TYPE = 'feegaInspect.panel';
 const TITLE = 'Feega';
 const SECTION = 'feegaInspect';
+const IDLE_SERVER_MS = 10 * 60_000;
 
 type Open = { panel: vscode.WebviewPanel; session: Session };
 
 let opened: Open | null = null;
 let host: VsCodeHost | null = null;
 const befores = new Map<string, string>();
+const kept = keptServers<Running>(IDLE_SERVER_MS);
 
 const mediaOf = (context: vscode.ExtensionContext) => vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview');
 
@@ -80,7 +84,7 @@ async function open(context: vscode.ExtensionContext, target?: vscode.Uri) {
   const panel = panelOf(context);
   const platform = vsCodePlatform(host, panel, befores);
   const workspace = workspaceOf(target) ?? root;
-  const session = inspectSession(platform, workspace, appOf(platform, workspace, root), route);
+  const session = inspectSession(platform, workspace, appOf(platform, workspace, root), route, kept);
   opened = { panel, session };
   panel.onDidDispose(() => {
     session.stop();
@@ -113,4 +117,5 @@ export function activate(context: vscode.ExtensionContext) {
 
 export function deactivate() {
   opened?.session.stop();
+  kept.stopAll();
 }

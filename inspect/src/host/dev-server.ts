@@ -3,7 +3,7 @@ import { access, cp, readFile, readdir } from 'node:fs/promises';
 import { connect, createServer } from 'node:net';
 import { basename, join } from 'node:path';
 import { devProxy } from './dev-proxy';
-import { servesWorkspace } from './listener';
+import { portsServing, servesWorkspace } from './listener';
 import { Framework, PlanRefusal, planFile, runPlan, textsWanted, type Planned, type RepoFacts, type RunPlan } from '@feega/dev-run/run-plan';
 import { DepsOutcome, depsMissing, ensureDeps } from './deps';
 import { failureOf, localUrlOf, type Failed } from './dev-output';
@@ -45,6 +45,7 @@ export enum Attach {
 }
 
 const HOST = '127.0.0.1';
+const SOURCE_ATTR = 'data-feega-src';
 const LAUNCHER_DIR = 'node_modules/.feega-inspect';
 const LAUNCHER = 'launch.mjs';
 const NEXT_PRELOAD = 'next-preload.cjs';
@@ -52,6 +53,7 @@ const SKIPPED_DIRS = new Set(['node_modules', '.git', '.claude', '.svelte-kit', 
 const MAX_DEPTH = 4;
 const READY_MS = 120_000;
 const POLL_MS = 500;
+const READY_POLL_MS = 100;
 
 async function filesUnder(root: string, dir = '', depth = 0): Promise<string[]> {
   if (depth > MAX_DEPTH) {
@@ -87,10 +89,6 @@ export function freePort(): Promise<number> {
   });
 }
 
-const answers = (url: string) =>
-  fetch(url, { signal: AbortSignal.timeout(POLL_MS * 4) })
-    .then(() => true)
-    .catch(() => false);
 
 const LOOPBACKS = ['127.0.0.1', '::1'];
 
@@ -134,7 +132,7 @@ async function until(port: number, child: ChildProcess, seen: Watched): Promise<
     if (await listening(port)) {
       return `http://${HOST}:${port}/`;
     }
-    await new Promise((r) => setTimeout(r, POLL_MS));
+    await new Promise((r) => setTimeout(r, READY_POLL_MS));
   }
   return seen.failed;
 }
@@ -200,19 +198,70 @@ function started(plan: RunPlan, appRoot: string, launch: Launch, command: string
 
 export type Refused = { refused: string; apps?: string[]; failed?: Failed };
 
+const spawnedPids = new Set<number>();
+
+const loopbackUrl = (port: number) => `http://localhost:${port}/`;
+
+async function pageOf(url: string): Promise<string | null> {
+  const reply = await fetch(url, { signal: AbortSignal.timeout(POLL_MS * 4) }).catch(() => null);
+  return reply ? reply.text().catch(() => '') : null;
+}
+
+const ATTACHABLE: Record<Launch, (page: string) => boolean> = {
+  [Launch.Vite]: (page) => page.includes(SOURCE_ATTR),
+  [Launch.Next]: () => true,
+  [Launch.Script]: () => true,
+  [Launch.Command]: () => false
+};
+
+async function userServer(appRoot: string, launch: Launch, defaultPort: number, log: (line: string) => void): Promise<string | null> {
+  const found = await portsServing(appRoot, undefined, spawnedPids);
+  const ports = found.length || !(await servesWorkspace(defaultPort, appRoot)) ? found : [defaultPort];
+  for (const port of ports) {
+    const page = await pageOf(loopbackUrl(port));
+    if (page === null) {
+      continue;
+    }
+    if (ATTACHABLE[launch](page)) {
+      return loopbackUrl(port);
+    }
+    log(`feega: a dev server of this app runs on ${port}, but its pages carry no source tags: starting Feega's own\n`);
+  }
+  return null;
+}
+
+function timeline(log: (line: string) => void) {
+  const begun = Date.now();
+  let last = begun;
+  const marks: string[] = [];
+  return {
+    mark: (stage: string) => {
+      const now = Date.now();
+      marks.push(`${stage} ${now - last}ms`);
+      last = now;
+    },
+    done: (how: string) => log(`feega timeline (${how}): ${marks.join(', ')}, total ${Date.now() - begun}ms\n`)
+  };
+}
+
 export async function startDev(root: string, launcherSource: string, hooks: StartHooks, command = '', attach = Attach.IfRunning, asked: string | null = null): Promise<Running | Refused> {
+  const time = timeline(hooks.log);
   const planned: Planned = runPlan(await factsOf(root), asked, { host: HOST, port: await freePort() });
+  time.mark('plan');
   if (!planned.ok) {
     return { refused: planned.reason, apps: planned.refusal === PlanRefusal.ChooseApp ? planned.apps : undefined };
   }
 
   const appRoot = join(root, planned.appDir);
   const launch = command ? Launch.Command : LAUNCH[planned.framework];
-  const own = `http://localhost:${planned.defaultPort}/`;
   const row = LAUNCH_ROWS[launch];
   const bridgeDir = join(appRoot, LAUNCHER_DIR);
-  if (attach === Attach.IfRunning && launch !== Launch.Vite && (await answers(own)) && (await servesWorkspace(planned.defaultPort, appRoot))) {
-    const proxy = await devProxy(own, bridgeDir);
+  const theirs = attach === Attach.IfRunning ? await userServer(appRoot, launch, planned.defaultPort, hooks.log) : null;
+  time.mark('look for a running server');
+  if (theirs) {
+    await cp(launcherSource, bridgeDir, { recursive: true });
+    const proxy = await devProxy(theirs, bridgeDir);
+    time.done('attached');
     return { url: proxy.url, plan: planned, launch, attached: true, pid: null, command: 'already running', stop: proxy.close, exited: () => undefined };
   }
 
@@ -233,13 +282,17 @@ export async function startDev(root: string, launcherSource: string, hooks: Star
       return { refused: installed.failed?.line ?? 'the install failed', failed: installed.failed ?? undefined };
     }
   }
+  time.mark('deps');
   if (row.copiesLauncher) {
     await cp(launcherSource, bridgeDir, { recursive: true });
   }
 
   const child = started(planned, appRoot, launch, command);
-  if (child.pid) {
-    hooks.spawned(child.pid);
+  const pid = child.pid;
+  if (pid) {
+    spawnedPids.add(pid);
+    child.once('exit', () => spawnedPids.delete(pid));
+    hooks.spawned(pid);
   }
   const seen = watchOutput(child);
   child.stdout?.on('data', (d) => hooks.log(String(d)));
@@ -247,6 +300,7 @@ export async function startDev(root: string, launcherSource: string, hooks: Star
 
   const port = launch === Launch.Command ? planned.defaultPort : planned.port;
   const ready = await until(port, child, seen);
+  time.mark('ready');
   if (typeof ready !== 'string') {
     stopGroup(child);
     return ready ? { refused: `${ready.message}: ${ready.line}`, failed: ready } : { refused: child.exitCode !== null ? `the dev server exited (${child.exitCode})` : `the dev server did not answer on port ${port}` };
@@ -254,5 +308,6 @@ export async function startDev(root: string, launcherSource: string, hooks: Star
   const shown = launch === Launch.Command ? command : launch === Launch.Vite ? `vite (Feega launcher) on ${planned.port}` : planned.dev.join(' ');
   const proxy = row.proxied ? await devProxy(ready, bridgeDir) : null;
   const stop = () => (proxy?.close(), stopGroup(child));
+  time.done('started');
   return { url: proxy?.url ?? ready, plan: planned, launch, attached: false, pid: child.pid ?? null, command: shown, stop, exited: (then) => child.once('exit', then) };
 }

@@ -36,3 +36,40 @@ export async function servesWorkspace(port: number, appRoot: string, cwdOf: CwdO
   const root = await realpath(appRoot).catch(() => appRoot);
   return cwd === root || cwd.startsWith(root + sep);
 }
+
+export type Lsof = { listening: () => Promise<string>; cwds: (pids: number[]) => Promise<string> };
+
+const SYSTEM_LSOF: Lsof = {
+  listening: () => run('lsof', ['-nP', '-iTCP', '-sTCP:LISTEN', '-Fpn']).then((r) => r.stdout, () => ''),
+  cwds: (pids) => run('lsof', ['-a', '-p', pids.join(','), '-d', 'cwd', '-Fpn']).then((r) => r.stdout, () => '')
+};
+
+function byPid(out: string): [number, string][] {
+  let pid = 0;
+  const rows: [number, string][] = [];
+  for (const line of out.split('\n')) {
+    if (line.startsWith('p')) {
+      pid = Number(line.slice(1));
+      continue;
+    }
+    if (line.startsWith('n')) {
+      rows.push([pid, line.slice(1)]);
+    }
+  }
+  return rows;
+}
+
+const within = (dir: string, root: string) => dir === root || dir.startsWith(root + sep);
+
+export async function portsServing(appRoot: string, lsof: Lsof = SYSTEM_LSOF, own: ReadonlySet<number>): Promise<number[]> {
+  const ports = byPid(await lsof.listening())
+    .filter(([pid]) => !own.has(pid))
+    .map(([pid, addr]) => [pid, Number(addr.slice(addr.lastIndexOf(':') + 1))] as const);
+  if (!ports.length) {
+    return [];
+  }
+  const root = await realpath(appRoot).catch(() => appRoot);
+  const cwds = new Map(byPid(await lsof.cwds([...new Set(ports.map(([pid]) => pid))])));
+  const mine = ports.filter(([pid]) => within(cwds.get(pid) ?? '', root)).map(([, port]) => port);
+  return [...new Set(mine)];
+}
