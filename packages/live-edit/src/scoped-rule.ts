@@ -100,6 +100,13 @@ function withRule(source: string, name: string, css: Map<string, string>, viewpo
   return after.replace(EMPTY_STYLE, '\n');
 }
 
+const INNER_REACH: Record<string, (inner: string) => string> = {
+  svelte: (inner) => `:global(${inner})`,
+  vue: (inner) => `:deep(${inner})`
+};
+
+const reach = (file: string, inner: string) => (INNER_REACH[file.slice(file.lastIndexOf('.') + 1)] ?? ((i: string) => i))(inner);
+
 export enum Scope {
   Element = 'element',
   Class = 'class'
@@ -113,7 +120,7 @@ function classFor(classes: string[], source: string, base: string, scope: Scope)
   return own ? { name: own, added: false } : { name: freeClass(source, base), added: true };
 }
 
-export async function scopedRule(read: ReadFile, at: LiveAt, css: Css, viewport?: number, scope = Scope.Element): Promise<TextWritten> {
+export async function scopedRule(read: ReadFile, at: LiveAt, css: Css, viewport?: number, scope = Scope.Element, inner?: string): Promise<TextWritten> {
   const text = await read(at.file);
   const start = text === null ? -1 : offsetOf(text, at);
   const end = start < 0 || text![start] !== '<' ? -1 : openTagEnd(text!, start);
@@ -130,7 +137,7 @@ export async function scopedRule(read: ReadFile, at: LiveAt, css: Css, viewport?
 
   const declared = new Map<string, string>();
   const inline = open.match(STYLE_LITERAL);
-  if (inline) {
+  if (inline && !inner) {
     declarationsOf(inline[1]).forEach((value, prop) => declared.set(prop, value));
     open = open.replace(STYLE_LITERAL, '');
   }
@@ -144,5 +151,6 @@ export async function scopedRule(read: ReadFile, at: LiveAt, css: Css, viewport?
   }
 
   const tagged = source.slice(0, start) + open + source.slice(end + 1);
-  return { ok: true, change: { path: at.file, before: source, after: withRule(tagged, name, declared, viewport) } };
+  const selector = inner ? `${name} ${reach(at.file, inner)}` : name;
+  return { ok: true, change: { path: at.file, before: source, after: withRule(tagged, selector, declared, viewport) } };
 }

@@ -139,4 +139,20 @@ describe('scopedRule', () => {
 
     expect(out.ok).toBe(false);
   });
+
+  it('an icon injected as raw markup is styled through its parent rule', async () => {
+    const source = '<a class="mac">{@html ICON}Mac</a>\n\n<style>\n  .mac :global(svg) {\n    width: 14px;\n  }\n</style>\n';
+    const out = await scopedRule(readOf(source), { file: FILE, line: 1, col: 1 }, { width: '20px' }, undefined, Scope.Element, 'svg');
+    const text = out.ok ? out.change.after : '';
+
+    expect(text).toContain('<a class="mac hero-a">');
+    expect(text).toContain('  .hero-a :global(svg) {\n    width: 20px;\n  }');
+    expect(text).toContain('  .mac :global(svg) {\n    width: 14px;\n  }');
+  });
+
+  it('vue reaches the injected svg with :deep', async () => {
+    const out = await scopedRule(readOf('<a class="mac" v-html="icon"></a>\n'), { file: 'src/Hero.vue', line: 1, col: 1 }, { width: '20px' }, undefined, Scope.Element, 'svg');
+
+    expect(out.ok && out.change.after).toContain('.hero-a :deep(svg) {');
+  });
 });

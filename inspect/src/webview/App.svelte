@@ -400,7 +400,7 @@
 
   function preview(row: Row, value: string) {
     if (picked) {
-      bridge.preview(picked.source, row.preview(value));
+      bridge.preview(picked.source, row.preview(value), picked.inner);
     }
   }
 
@@ -408,7 +408,7 @@
 
   function askOf(row: Row, value: string, token?: string) {
     const { prop, side, family, value: written } = row.change(value);
-    return { at: sourceText(picked!.source), prop, side, family, value: written, token, rem: picked!.rem, viewport: picked!.viewport, css: kebab(row.preview(value)), scope };
+    return { at: sourceText(picked!.source), prop, side, family, value: written, token, rem: picked!.rem, viewport: picked!.viewport, css: kebab(row.preview(value)), scope, inner: picked!.inner };
   }
 
   function change(row: Row, value: string, token?: string) {

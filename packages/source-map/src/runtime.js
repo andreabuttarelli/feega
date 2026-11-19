@@ -24,11 +24,45 @@ export function parseSource(value) {
   return { file: match[1], line: Number(match[2]), col: Number(match[3]) };
 }
 
+const INNER_KEY = ' >> ';
+const keyOf = (source, inner) => (inner ? `${source}${INNER_KEY}${inner}` : source);
+
+function untaggedSvg(element, tagged) {
+  const svg = element.closest('svg');
+  return svg && !svg.hasAttribute(SOURCE_ATTR) && tagged.contains(svg) && svg !== tagged ? svg : null;
+}
+
+export function deepestAt(doc, x, y) {
+  let at = doc.elementFromPoint(x, y);
+  while (at) {
+    const inside = [...at.children].reverse().find((child) => {
+      const r = child.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && x >= r.x && x <= r.x + r.width && y >= r.y && y <= r.y + r.height;
+    });
+    if (!inside || inside.tagName.toLowerCase() === 'path') {
+      return at;
+    }
+    at = inside;
+    if (at.tagName.toLowerCase() === 'svg') {
+      return at;
+    }
+  }
+  return at;
+}
+
 export function inspectElement(element, { maxHtml = DEFAULT_MAX_HTML } = {}) {
   const tagged = element.closest(`[${SOURCE_ATTR}]`);
   if (!tagged) {
     return null;
   }
+  const svg = untaggedSvg(element, tagged);
+  if (svg) {
+    return { ...inspectTagged(tagged, maxHtml), inner: 'svg', styles: designStyles(svg), html: truncate(svg.outerHTML, maxHtml), rect: rectOf(svg), name: 'icon', ownText: false, inlineText: false, elements: 0, text: null };
+  }
+  return inspectTagged(tagged, maxHtml);
+}
+
+function inspectTagged(tagged, maxHtml) {
 
   const source = parseSource(tagged.getAttribute(SOURCE_ATTR));
   return {
@@ -93,13 +127,18 @@ function sheetOf(doc) {
   return style;
 }
 
-const ruleOf = (source, css) => `[${SOURCE_ATTR}=${JSON.stringify(source)}]{${Object.entries(css).map(([n, v]) => `${n}:${v} !important`).join(';')}}`;
+const selectorOf = (key) => {
+  const [source, inner] = key.split(INNER_KEY);
+  return `[${SOURCE_ATTR}=${JSON.stringify(source)}]${inner ? ` ${inner}` : ''}`;
+};
+
+const ruleOf = (key, css) => `${selectorOf(key)}{${Object.entries(css).map(([n, v]) => `${n}:${v} !important`).join(';')}}`;
 
 function render(doc) {
   sheetOf(doc).textContent = [...previewsOf(doc)].map(([source, css]) => ruleOf(source, css)).join('\n');
 }
 
-export function previewEdit(doc, { source, text, style }) {
+export function previewEdit(doc, { source, inner, text, style }) {
   for (const element of sourcedIn(doc, source)) {
     if (typeof text === 'string') {
       element.textContent = text;
@@ -110,7 +149,8 @@ export function previewEdit(doc, { source, text, style }) {
     return;
   }
   const all = previewsOf(doc);
-  all.set(source, { ...all.get(source), ...css });
+  const key = keyOf(source, inner);
+  all.set(key, { ...all.get(key), ...css });
   render(doc);
 }
 
@@ -142,6 +182,7 @@ export function keepPreviews(doc) {
 
 export function clearPreview(doc, source) {
   previewsOf(doc).delete(source);
+  previewsOf(doc).delete(keyOf(source, 'svg'));
   render(doc);
 }
 

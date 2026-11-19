@@ -52,7 +52,8 @@ const ownOf = (names: string[], base: string) => names.find((n) => n === base ||
 const classAttr = (binding: string, names: string[]) =>
   names.length === 1 ? ` className={${binding}.${names[0]}}` : ` className={\`${names.map((n) => `\${${binding}.${n}}`).join(' ')}\`}`;
 
-export async function cssModuleRule(read: ReadFile, at: LiveAt, css: Css, viewport?: number, scope = Scope.Element): Promise<ModuleWritten> {
+export async function cssModuleRule(read: ReadFile, at: LiveAt, css: Css, viewport?: number, scope = Scope.Element, inner?: string): Promise<ModuleWritten> {
+  const ruleName = (name: string) => (inner ? `${name} ${inner}` : name);
   const source = await read(at.file);
   const start = source === null ? -1 : offsetOf(source, at);
   const end = start < 0 || source![start] !== '<' ? -1 : openTagEnd(source!, start);
@@ -78,7 +79,7 @@ export async function cssModuleRule(read: ReadFile, at: LiveAt, css: Css, viewpo
   const kept = scope === Scope.Class ? names[0] : ownOf(names, base);
 
   if (kept) {
-    return { ok: true, changes: [{ path: modulePath, before, after: ruleInBody(before, kept, declared, viewport, NO_INDENT) }] };
+    return { ok: true, changes: [{ path: modulePath, before, after: ruleInBody(before, ruleName(kept), declared, viewport, NO_INDENT) }] };
   }
 
   const name = freeName(before, base);
@@ -93,7 +94,7 @@ export async function cssModuleRule(read: ReadFile, at: LiveAt, css: Css, viewpo
     ok: true,
     changes: [
       { path: at.file, before: text, after },
-      { path: modulePath, before, after: ruleInBody(before, name, declared, viewport, NO_INDENT) }
+      { path: modulePath, before, after: ruleInBody(before, ruleName(name), declared, viewport, NO_INDENT) }
     ]
   };
 }

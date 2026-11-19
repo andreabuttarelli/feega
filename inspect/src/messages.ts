@@ -24,6 +24,7 @@ export type Pick = {
   instances: number;
   classCount: number;
   ancestors: { source: Source; name: string }[];
+  inner?: string;
 };
 
 export enum Move {
@@ -38,7 +39,7 @@ export enum Styling {
   Css = 'css'
 }
 
-export type EditAsk = LiveEditAsk & { css?: Record<string, string>; scope?: Scope };
+export type EditAsk = LiveEditAsk & { css?: Record<string, string>; scope?: Scope; inner?: string };
 
 export enum ServerState {
   Detecting = 'detecting',

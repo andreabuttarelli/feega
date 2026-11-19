@@ -14,6 +14,7 @@ export default {
     'Headings and paragraphs that wrap styled spans now show Typography.',
     'Drag a number label to scrub: the page updates live and the change is saved once when you let go.',
     'The selection outline follows the element as it resizes, scrolls or reloads.',
-    'Showing a hidden element removes exactly what hiding added.'
+    'Showing a hidden element removes exactly what hiding added.',
+    'Icons inside links and buttons can be selected and resized on their own.'
   ]
 } satisfies ChangelogEntry;

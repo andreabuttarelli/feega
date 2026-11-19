@@ -1,4 +1,4 @@
-import { SOURCE_ATTR, clearPreview, hidePreview, paletteOf, relativeOf, treeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
+import { SOURCE_ATTR, deepestAt, clearPreview, hidePreview, paletteOf, relativeOf, treeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
 import { trackRects } from './track.js';
 
 export const INSPECT = 'feega:inspect';
@@ -142,7 +142,7 @@ function targetOf(doc, request) {
   if (typeof request.selector === 'string') {
     return doc.querySelector(request.selector);
   }
-  return doc.elementFromPoint(request.x, request.y);
+  return deepestAt(doc, request.x, request.y);
 }
 
 if (typeof window !== 'undefined') {

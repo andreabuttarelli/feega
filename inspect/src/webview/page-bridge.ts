@@ -1,12 +1,12 @@
 import { BRIDGE_READY, INSPECT, INSPECT_RESULT, LOCAL_ORIGIN, LOCATION, MODE, PREVIEW, PREVIEW_CLEAR, PREVIEW_SETTLE, PREVIEW_SETTLED, SCROLL, SCROLLED, HIDE, PALETTE, PALETTE_RESULT, type Palette, TREE, TREE_RESULT, type LayerNode, TEXT_DONE, TEXT_EDIT, TRACK, TRACKED, type Slot, type Mode, type Move, type Pick, type Source } from '../messages';
 
-type Inspected = { source: Source; component: Source | null; html: string; rect: Pick['rect']; styles: Record<string, string>; classes: string; rem: number; viewport: number; ownText: boolean; inlineText: boolean; elements: number; name: string; parentWidth: number; instances: number; classCount: number; ancestors: Pick['ancestors'] };
+type Inspected = { source: Source; component: Source | null; html: string; rect: Pick['rect']; styles: Record<string, string>; classes: string; rem: number; viewport: number; ownText: boolean; inlineText: boolean; elements: number; name: string; parentWidth: number; instances: number; classCount: number; ancestors: Pick['ancestors']; inner?: string };
 
 const TAG = /^<([a-zA-Z][\w-]*)/;
 const SOURCE_ATTR = 'data-feega-src';
 
 const pickOf = (r: Inspected | null): Pick | null =>
-  r ? { source: r.source, component: r.component, tag: r.html.match(TAG)?.[1] ?? '', rect: r.rect, styles: r.styles, classes: r.classes, rem: r.rem, viewport: r.viewport, ownText: r.ownText, inlineText: r.inlineText, elements: r.elements, name: r.name, parentWidth: r.parentWidth, instances: r.instances, classCount: r.classCount, ancestors: r.ancestors } : null;
+  r ? { source: r.source, component: r.component, tag: r.html.match(TAG)?.[1] ?? '', rect: r.rect, styles: r.styles, classes: r.classes, rem: r.rem, viewport: r.viewport, ownText: r.ownText, inlineText: r.inlineText, elements: r.elements, name: r.name, parentWidth: r.parentWidth, instances: r.instances, classCount: r.classCount, ancestors: r.ancestors, inner: r.inner } : null;
 
 export const sourceText = (s: Source) => `${s.file}:${s.line}:${s.col}`;
 
@@ -91,7 +91,7 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
     at: (x: number, y: number) => inspect({ x, y }),
     move: (from: Source, move: Move) => inspect({ from: sourceText(from), move }),
     again: (source: Source) => inspect({ selector: `[${SOURCE_ATTR}="${sourceText(source)}"]` }),
-    preview: (source: Source, style: Record<string, string>) => send({ type: PREVIEW, source: sourceText(source), style }),
+    preview: (source: Source, style: Record<string, string>, inner?: string) => send({ type: PREVIEW, source: sourceText(source), inner, style }),
     clear: (source: Source) => send({ type: PREVIEW_CLEAR, source: sourceText(source) }),
     settle: (source: Source) => send({ type: PREVIEW_SETTLE, source: sourceText(source) }),
     tree: () => send({ type: TREE }),

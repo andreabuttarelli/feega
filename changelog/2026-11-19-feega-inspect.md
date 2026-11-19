@@ -88,3 +88,8 @@ edit inline until reload); the colour control is a native picker, not the app's 
   means "remove this declaration" in every writer (scoped rule, module rule, inline style); an
   emptied rule, `<style>` block or `style=""` goes too.
 - The frame's fixed width tag is gone; only the W × H label while dragging a handle remains.
+- **Icons from raw markup.** landing's `a.mac` icon is `{@html APPLE_ICON}`: no source tag, and
+  the picker climbed to the link. The bridge now hit-tests down by rect (`deepestAt`, also past
+  `pointer-events: none`); an untagged svg is inspected on its own (`inner: 'svg'`, media role)
+  and written as `.own :global(svg)` (Svelte) / `:deep(svg)` (Vue) / `.own svg` (modules) on the
+  parent's own class. Tailwind refuses it with a reason. Not done: Cmd-click / double-click drill.

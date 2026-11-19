@@ -18,10 +18,10 @@ export type Written = { ok: true; path: string; written: string; note?: string }
 
 type Changes = { ok: true; changes: FileChange[] } | { ok: false; reason: string; at?: LiveAt };
 
-type CssWriter = { write: (read: ReadFile, at: LiveAt, css: Css, viewport?: number, scope?: Scope) => Promise<Changes>; note?: string };
+type CssWriter = { write: (read: ReadFile, at: LiveAt, css: Css, viewport?: number, scope?: Scope, inner?: string) => Promise<Changes>; note?: string };
 
-const single = (write: typeof scopedRule): CssWriter['write'] => async (read, at, css, viewport, scope) => {
-  const out = await write(read, at, css, viewport, scope);
+const single = (write: typeof scopedRule): CssWriter['write'] => async (read, at, css, viewport, scope, inner) => {
+  const out = await write(read, at, css, viewport, scope, inner);
   return out.ok ? { ok: true, changes: [out.change] } : out;
 };
 
@@ -96,8 +96,12 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
 
     if ((await stylingOf(root, choice())) === Styling.Css) {
       const writer = cssWriterOf(at.file);
-      const out = await writer.write(reader(root), at, ask.css ?? {}, ask.viewport, ask.scope);
+      const out = await writer.write(reader(root), at, ask.css ?? {}, ask.viewport, ask.scope, ask.inner);
       return out.ok ? written(out.changes, '', writer.note) : out;
+    }
+
+    if (ask.inner) {
+      return { ok: false, reason: `${at.file}:${at.line}: this ${ask.inner} comes from raw markup; style it from the parent's stylesheet`, at };
     }
 
     const token = await tokenOf(root, ask);
