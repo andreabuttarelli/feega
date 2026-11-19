@@ -25,6 +25,17 @@
   --ui-text-sm: 12px;
   --ui-text-md: 13px;
   --ui-dur-fast: 120ms;
+  --ui-radius-lg: 10px;
+  --ui-backdrop: color-mix(in srgb, var(--ui-text) 6%, var(--vscode-editor-background, #1e1e1e));
+  --ui-thumb: #ffffff;
+  --ui-thumb-ink: #111111;
+  --ui-float: color-mix(in srgb, var(--ui-panel) 92%, transparent);
+}
+
+body.vscode-dark,
+body.vscode-high-contrast {
+  --ui-thumb: #5a5a5e;
+  --ui-thumb-ink: #ffffff;
 }
 
 html,

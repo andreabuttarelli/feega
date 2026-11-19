@@ -1,13 +1,18 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { stylePatch } from '@feega/live-edit/class-patch';
-import { inside, liveAtOf, reader, tokenOf, type LiveEditAsk } from '@feega/live-edit/live-ask';
+import { inside, liveAtOf, reader, tokenOf } from '@feega/live-edit/live-ask';
+import { styleAttr } from '@feega/live-edit/style-attr';
+import { Styling, type EditAsk } from '../messages';
+import { stylingOf } from './styling';
 import { LiveProp } from '@feega/live-edit/live-fields';
+import { literalText } from '@feega/live-edit/literal-text';
+import type { FileChange } from '@feega/live-edit/files';
+import type { LiveAt } from '@feega/live-edit/class-patch';
 
-export type Written = { ok: true; path: string; written: string } | { ok: false; reason: string };
+export type Written = { ok: true; path: string; written: string } | { ok: false; reason: string; at?: LiveAt };
 
 type Step = { full: string; before: string; after: string };
 
-const TEXT_REFUSED = 'text edits are not written by Feega Inspect yet';
 const NOTHING_TO_UNDO = 'nothing to undo';
 const CHANGED_SINCE = 'the file changed after the edit: not restored';
 
@@ -21,14 +26,20 @@ export function fileEdits(root: string) {
     return next;
   };
 
-  async function edited(ask: LiveEditAsk): Promise<Written> {
+  async function edited(ask: EditAsk): Promise<Written> {
     const at = liveAtOf(ask.at);
     const full = at ? inside(root, at.file) : null;
     if (!at || !full) {
       return { ok: false, reason: `${ask.at} is not a file:line:col inside the workspace` };
     }
     if (ask.prop === LiveProp.Text) {
-      return { ok: false, reason: TEXT_REFUSED };
+      const out = await literalText(reader(root), at, ask.value ?? '');
+      return out.ok ? written(full, out.change, '') : out;
+    }
+
+    if ((await stylingOf(root)) === Styling.Css) {
+      const out = await styleAttr(reader(root), at, ask.css ?? {});
+      return out.ok ? written(full, out.change, '') : out;
     }
 
     const token = await tokenOf(root, ask);
@@ -36,14 +47,14 @@ export function fileEdits(root: string) {
     if (out.skipped.length) {
       return { ok: false, reason: out.skipped[0] };
     }
-
     const [change] = out.files;
-    if (!change) {
-      return { ok: true, path: at.file, written: token ?? '' };
-    }
+    return change ? written(full, change, token ?? '') : { ok: true, path: at.file, written: token ?? '' };
+  }
+
+  async function written(full: string, change: FileChange, token: string): Promise<Written> {
     await writeFile(full, change.after);
     steps.push({ full, before: change.before, after: change.after });
-    return { ok: true, path: at.file, written: token ?? '' };
+    return { ok: true, path: change.path, written: token };
   }
 
   async function undone(): Promise<Written> {
@@ -60,7 +71,7 @@ export function fileEdits(root: string) {
   }
 
   return {
-    edit: (ask: LiveEditAsk) => inTurn(() => edited(ask)),
+    edit: (ask: EditAsk) => inTurn(() => edited(ask)),
     undo: () => inTurn(undone)
   };
 }

@@ -1,19 +1,23 @@
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import * as vscode from 'vscode';
-import type { LiveEditAsk } from '@feega/live-edit/live-ask';
-import { ToHost, ToView, type HostMessage, type Pick, type Source, type ViewMessage } from '../messages';
+import { liveAtOf } from '@feega/live-edit/live-ask';
+import { ServerState, ToHost, ToView, type EditAsk, type HostMessage, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
 import { startDev, type Running } from './dev-server';
 import { fileEdits, type Written } from './file-edits';
 import { panelHtml } from './panel-html';
+import { stylingOf } from './styling';
 
 const VIEW_TYPE = 'feegaInspect.panel';
 const TITLE = 'Feega Inspect';
 const PICK_TIMEOUT_MS = 3000;
+const PREFS_KEY = 'feegaInspect.prefs';
 
 type Session = { panel: vscode.WebviewPanel; running: Running | null; edits: ReturnType<typeof fileEdits>; root: string };
+type Host = { context: vscode.ExtensionContext; output: vscode.OutputChannel };
 
 let session: Session | null = null;
+let host: Host | null = null;
 const picks = new Map<number, (pick: Pick | null) => void>();
 let nextPick = 0;
 
@@ -25,9 +29,40 @@ async function openSource(root: string, at: Source) {
   await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.One, selection: new vscode.Range(position, position) });
 }
 
-async function edited(out: Written) {
-  await post(out.ok ? { kind: ToView.Edited, ok: true, written: out.written } : { kind: ToView.Edited, ok: false, reason: out.reason });
+async function edited(out: Written, ask: EditAsk | null) {
+  const saved = ask ? (liveAtOf(ask.at) ?? undefined) : undefined;
+  await post(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, saved } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
   return out;
+}
+
+const edit = (ask: EditAsk) => session?.edits.edit(ask).then((out) => edited(out, ask)) ?? null;
+
+async function showApp() {
+  if (!session?.running || !host) {
+    return;
+  }
+  const prefs = host.context.workspaceState.get<Prefs>(PREFS_KEY) ?? null;
+  await post({ kind: ToView.App, url: session.running.url, styling: await stylingOf(session.root), prefs });
+  await post({ kind: ToView.Server, state: ServerState.Running });
+}
+
+async function startServer() {
+  if (!session || !host) {
+    return;
+  }
+  session.running?.stop();
+  post({ kind: ToView.Server, state: ServerState.Starting });
+  const output = host.output;
+  const running = await startDev(session.root, join(host.context.extensionPath, 'dist', 'launcher'), (line) => output.append(line));
+  if ('refused' in running) {
+    post({ kind: ToView.Server, state: ServerState.Stopped, reason: running.refused });
+    return;
+  }
+  if (session) {
+    session.running = running;
+    running.exited(() => post({ kind: ToView.Server, state: ServerState.Stopped, reason: 'the dev server exited' }));
+  }
+  await showApp();
 }
 
 async function onMessage(message: HostMessage) {
@@ -35,11 +70,14 @@ async function onMessage(message: HostMessage) {
     return;
   }
   const handlers: { [K in ToHost]: (m: Extract<HostMessage, { kind: K }>) => unknown } = {
-    [ToHost.Ready]: () => session?.running && post({ kind: ToView.App, url: session.running.url }),
-    [ToHost.Edit]: (m) => session!.edits.edit(m.ask).then(edited),
-    [ToHost.Undo]: () => session!.edits.undo().then(edited),
+    [ToHost.Ready]: showApp,
+    [ToHost.Edit]: (m) => edit(m.ask),
+    [ToHost.Undo]: () => session!.edits.undo().then((out) => edited(out, null)),
     [ToHost.Open]: (m) => openSource(session!.root, m.at),
-    [ToHost.Picked]: (m) => (picks.get(m.id)?.(m.pick), picks.delete(m.id))
+    [ToHost.Picked]: (m) => (picks.get(m.id)?.(m.pick), picks.delete(m.id)),
+    [ToHost.Restart]: startServer,
+    [ToHost.External]: (m) => vscode.env.openExternal(vscode.Uri.parse(m.url)),
+    [ToHost.Prefs]: (m) => host?.context.workspaceState.update(PREFS_KEY, m.prefs)
   };
   (handlers[message.kind] as (m: HostMessage) => unknown)(message);
 }
@@ -52,7 +90,7 @@ function panelOf(context: vscode.ExtensionContext): vscode.WebviewPanel {
   return panel;
 }
 
-async function open(context: vscode.ExtensionContext, output: vscode.OutputChannel) {
+async function open(context: vscode.ExtensionContext) {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (!folder) {
     vscode.window.showWarningMessage('Feega Inspect: open the folder of a web app first.');
@@ -71,18 +109,10 @@ async function open(context: vscode.ExtensionContext, output: vscode.OutputChann
     session?.running?.stop();
     session = null;
   });
-
-  post({ kind: ToView.Status, text: 'Starting the dev server…' });
-  const running = await startDev(root, join(context.extensionPath, 'dist', 'launcher'), (line) => output.append(line));
-  if ('refused' in running) {
-    post({ kind: ToView.Status, text: running.refused });
-    return;
-  }
-  if (session) {
-    session.running = running;
-  }
-  post({ kind: ToView.App, url: running.url });
+  await startServer();
 }
+
+const close = () => session?.panel.dispose();
 
 function pick(x: number, y: number): Promise<Pick | null> {
   const id = ++nextPick;
@@ -95,13 +125,16 @@ function pick(x: number, y: number): Promise<Pick | null> {
 
 export function activate(context: vscode.ExtensionContext) {
   const output = vscode.window.createOutputChannel(TITLE);
-  context.subscriptions.push(output, vscode.commands.registerCommand('feegaInspect.open', () => open(context, output)));
+  host = { context, output };
+  context.subscriptions.push(output, vscode.commands.registerCommand('feegaInspect.open', () => open(context)));
 
   return {
     url: () => session?.running?.url ?? null,
     pick,
-    edit: (ask: LiveEditAsk) => session?.edits.edit(ask).then(edited) ?? null,
-    undo: () => session?.edits.undo().then(edited) ?? null
+    edit,
+    close,
+    undo: () => session?.edits.undo().then((out) => edited(out, null)) ?? null,
+    change: (row: string, value: string) => post({ kind: ToView.Change, row, value })
   };
 }
 

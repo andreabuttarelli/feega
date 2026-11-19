@@ -9,7 +9,7 @@ export type LivePatched = { files: FileChange[]; skipped: string[] };
 
 const CLASS_ATTR = /(\s(?:class|className)=)("([^"{}]*)"|\{)/;
 
-function offsetOf(text: string, at: LiveAt): number {
+export function offsetOf(text: string, at: LiveAt): number {
   const lines = text.split('\n');
   if (at.line < 1 || at.line > lines.length) {
     return -1;
@@ -17,7 +17,7 @@ function offsetOf(text: string, at: LiveAt): number {
   return lines.slice(0, at.line - 1).reduce((sum, l) => sum + l.length + 1, 0) + at.col - 1;
 }
 
-function openTagEnd(text: string, start: number): number {
+export function openTagEnd(text: string, start: number): number {
   let quote = '';
   let depth = 0;
   for (let i = start + 1; i < text.length; i++) {

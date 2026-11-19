@@ -13,9 +13,14 @@ Feega Inspect is a small editor extension, separate from the Feega canvas. No ac
 3. Click an element. The right bar shows its tag, the component and `file:line` (click it to open
    the source), and the Properties controls: auto layout, size, spacing, typography, colour,
    radius, opacity, shadow.
-4. Change a value. The one class that owns it is rewritten in the source, as a Tailwind class or
-   your own theme token. The dev server reloads the page.
-5. Cmd/Ctrl+Z restores the file. It never overwrites a change made after the edit.
+4. Change a value. With Tailwind, the one class that owns it is rewritten (or your own theme
+   token). Without Tailwind, the value is written as CSS in the element's `style` attribute. The
+   panel shows "Saved to file:line", or the reason a write was refused.
+5. Double-click a text to rewrite it in place: Enter saves, Esc cancels. Text that comes from an
+   expression or a data file is not rewritten; the panel links to where it comes from.
+6. **Design** (D) selects and edits; **Navigate** (N) uses the app normally. The top bar has
+   back/forward/reload, the route, a dev server status dot, and device widths (keys 1–4).
+7. Cmd/Ctrl+Z restores the file. It never overwrites a change made after the edit.
 
 ## Install the dev build
 
@@ -29,5 +34,5 @@ code --install-extension feega-inspect-0.1.0.vsix
 - Element picking needs the [source map](/integrations/source-map/). Vite, SvelteKit and React
   Router apps get it automatically; Next.js, Nuxt, Astro and others need `feega-source-map`
   added to their config.
-- Edits are Tailwind classes. A project without Tailwind receives the class but shows no change.
-- Text edits, `hover:`/`dark:` variants and non-literal class expressions are not written.
+- Element picking: Vite-based apps (SvelteKit, Vite, React Router) only, for now.
+- `hover:`/`dark:` variants, class expressions and non-literal text are not written.

@@ -85,7 +85,7 @@ describe('bridge', () => {
 
     const h1 = win.document.querySelector('h1')!;
     expect(h1.textContent).toBe('New title');
-    expect(h1.style.color).toBe('rgb(0, 0, 255)');
+    expect(win.getComputedStyle(h1).color).toBe('rgb(0, 0, 255)');
   });
 });
 

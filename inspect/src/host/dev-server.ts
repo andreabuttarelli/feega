@@ -22,7 +22,7 @@ const LAUNCH: Record<Framework, Launch> = {
   [Framework.Generic]: Launch.Script
 };
 
-export type Running = { url: string; plan: RunPlan; launch: Launch; attached: boolean; stop: () => void };
+export type Running = { url: string; plan: RunPlan; launch: Launch; attached: boolean; stop: () => void; exited: (then: () => void) => void };
 
 const HOST = '127.0.0.1';
 const LAUNCHER_DIR = 'node_modules/.feega-inspect';
@@ -101,7 +101,7 @@ export async function startDev(root: string, launcherSource: string, log: (line:
   const launch = LAUNCH[planned.framework];
   const own = `http://localhost:${planned.defaultPort}/`;
   if (launch === Launch.Script && (await answers(own))) {
-    return { url: own, plan: planned, launch, attached: true, stop: () => undefined };
+    return { url: own, plan: planned, launch, attached: true, stop: () => undefined, exited: () => undefined };
   }
 
   if (launch === Launch.Vite) {
@@ -116,5 +116,5 @@ export async function startDev(root: string, launcherSource: string, log: (line:
     child.kill();
     return { refused: `the dev server did not answer on ${url}` };
   }
-  return { url, plan: planned, launch, attached: false, stop: () => child.kill() };
+  return { url, plan: planned, launch, attached: false, stop: () => child.kill(), exited: (then) => child.once('exit', then) };
 }

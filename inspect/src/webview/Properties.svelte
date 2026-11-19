@@ -1,7 +1,8 @@
 <script lang="ts">
   import NumberField from '@feega/properties-panel/NumberField.svelte';
   import InspectorSection from '@feega/properties-panel/InspectorSection.svelte';
-  import { Control, ROWS, SECTIONS, type Row } from './controls';
+  import { Control, ROWS, type Row } from './controls';
+  import { roleOf, sectionsOf } from './roles';
   import { hexOf } from './colour';
   import type { Pick } from '../messages';
 
@@ -10,10 +11,11 @@
   let closed = $state<Record<string, boolean>>({});
 
   const rowsOf = (section: string) => ROWS.filter((r) => r.section === section);
+  const sections = $derived(sectionsOf(roleOf({ tag: pick.tag, ownText: pick.ownText, elements: pick.elements, display: pick.styles.display ?? '' })));
 </script>
 
 <div class="properties" data-testid="properties">
-  {#each SECTIONS as section (section)}
+  {#each sections as section (section)}
     <InspectorSection title={section} section={section} open={!closed[section]} ontoggle={() => (closed[section] = !closed[section])}>
       <div class="grid">
         {#each rowsOf(section) as row (row.name)}

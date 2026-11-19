@@ -1,75 +1,76 @@
-import { readFile, mkdir } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { createServer } from 'node:http';
-import { chromium } from '@playwright/test';
-import { fileEdits } from '../src/host/file-edits.ts';
-import { ToHost, ToView } from '../src/messages.ts';
+import { openPanel } from './harness.mts';
+import { ServerState, ToView } from '../src/messages.ts';
 
-const APP_URL = process.env.INSPECT_APP_URL ?? 'http://localhost:5391/';
 const APP_ROOT = process.env.INSPECT_APP_ROOT!;
+const TEXT = process.env.INSPECT_TEXT ?? '.lead';
+const BOX = process.env.INSPECT_BOX ?? '#hero';
 const SHOTS = join(homedir(), 'Documents/feega-videos/shots/inspect');
-const PANEL_PORT = 5999;
-const PANEL_ORIGIN = `http://127.0.0.1:${PANEL_PORT}`;
-const dist = fileURLToPath(new URL('../dist/webview/', import.meta.url));
+const SETTLE_MS = 2500;
 
-const PAGE = `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/panel.css">
-<style>:root{--vscode-editor-background:#1f1f1f;--vscode-foreground:#cccccc;--vscode-sideBar-background:#181818;--vscode-focusBorder:#0078d4;--vscode-font-family:-apple-system,system-ui,sans-serif}</style>
-<script>window.acquireVsCodeApi = () => ({ postMessage: (m) => window.toHost(m) });</script>
-</head><body><div id="app"></div><script src="/panel.js"></script></body></html>`;
-
-const edits = fileEdits(APP_ROOT);
 await mkdir(SHOTS, { recursive: true });
+const panel = await openPanel(APP_ROOT);
+const { page } = panel;
+const shot = (name: string) => page.screenshot({ path: join(SHOTS, `${name}.png`) });
 
-const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
-const reply = (m: unknown) => page.evaluate((msg) => window.postMessage(msg, '*'), m);
+const text = await panel.pickAt(TEXT);
+await shot('01-select-text');
 
-const server = createServer(async (req, res) => {
-  const name = (req.url ?? '/').slice(1);
-  if (!name) {
-    res.writeHead(200, { 'content-type': 'text/html' }).end(PAGE);
-    return;
-  }
-  res.writeHead(200, { 'content-type': name.endsWith('.css') ? 'text/css' : 'text/javascript' }).end(await readFile(join(dist, name)));
-}).listen(PANEL_PORT);
+await panel.reply({ kind: ToView.Change, row: 'font-weight', value: '700' });
+const weight = await page.waitForFunction(() => true).then(() => panel.frame.locator(TEXT).first().evaluate((el) => getComputedStyle(el).fontWeight));
+console.log('font-weight right after the edit:', weight);
+await panel.reply({ kind: ToView.Change, row: 'color', value: '#0078d4' });
+await page.waitForTimeout(SETTLE_MS);
+await shot('02-edit-saved');
 
-await page.exposeFunction('toHost', async (m: { kind: ToHost; ask?: never }) => {
-  if (m.kind === ToHost.Ready) {
-    await reply({ kind: ToView.App, url: APP_URL });
-  }
-  if (m.kind === ToHost.Edit) {
-    const out = await edits.edit(m.ask!);
-    await reply(out.ok ? { kind: ToView.Edited, ok: true, written: out.written } : { kind: ToView.Edited, ok: false, reason: out.reason });
-  }
-});
+await page.locator('[data-testid=app-frame]').evaluate((f: HTMLIFrameElement) => (f.src = f.src));
+await page.waitForTimeout(SETTLE_MS);
+const after = await panel.frame.locator(TEXT).first().evaluate((el) => [getComputedStyle(el).fontWeight, getComputedStyle(el).color]);
+console.log('after reload:', after, 'source:', text?.source);
+await shot('03-after-reload');
 
-await page.goto(`${PANEL_ORIGIN}/`);
-const frame = page.frameLocator('[data-testid=app-frame]');
-await frame.locator('h1').first().waitFor();
+await panel.pickAt(BOX);
+const typography = await page.locator('[data-section=Typography]').count();
+console.log('container shows Typography:', typography > 0);
+await shot('04-container-sections');
+
+await page.keyboard.press('n');
+await page.waitForTimeout(400);
+await shot('05-mode-navigate');
+await page.keyboard.press('d');
+await page.waitForTimeout(400);
+await shot('06-mode-design');
+
+for (const state of Object.values(ServerState)) {
+  await panel.reply({ kind: ToView.Server, state, reason: state === ServerState.Stopped ? 'the dev server exited' : undefined });
+  await page.locator('[data-testid=server-dot]').hover();
+  await page.waitForTimeout(200);
+  await page.locator('.toolbar').screenshot({ path: join(SHOTS, `07-server-${state}.png`) });
+}
+await panel.reply({ kind: ToView.Server, state: ServerState.Running });
+
+for (const key of ['3', '4', '1']) {
+  await page.mouse.move(5, 5);
+  await page.keyboard.press(key);
+  await page.waitForTimeout(500);
+  await shot(`08-size-${key === '3' ? 'tablet' : key === '4' ? 'phone' : 'full'}`);
+}
+
+await page.keyboard.press('Meta+\\');
+await page.waitForTimeout(400);
+await shot('09-bar-collapsed');
+await page.keyboard.press('Meta+\\');
+
+await page.goto(`http://127.0.0.1:5999/light`);
 await page.locator('.overlay').waitFor();
+await panel.pickAt(TEXT);
+await shot('10-light-design');
+await page.keyboard.press('n');
+await page.waitForTimeout(400);
+await shot('11-light-navigate');
 
-const heading = await frame.locator('h1').first().boundingBox();
-await page.mouse.move(heading!.x + 40, heading!.y + 20);
-await page.waitForTimeout(300);
-await page.mouse.click(heading!.x + 40, heading!.y + 20);
-await page.locator('[data-testid=selection]').waitFor();
-await page.screenshot({ path: join(SHOTS, '1-select.png') });
-
-const padding = page.locator('[data-field=padding-y] input.num');
-await padding.fill('32');
-await padding.press('Enter');
-await page.locator('[data-field=color] input').evaluate((el: HTMLInputElement) => {
-  el.value = '#0078d4';
-  el.dispatchEvent(new Event('input', { bubbles: true }));
-  el.dispatchEvent(new Event('change', { bubbles: true }));
-});
-await page.waitForTimeout(800);
-await page.screenshot({ path: join(SHOTS, '2-edit.png') });
-
-await page.waitForTimeout(1500);
-await page.screenshot({ path: join(SHOTS, '3-result.png') });
-console.log('status:', await page.locator('[data-testid=status]').textContent().catch(() => ''));
-await browser.close();
-server.close();
+await panel.edits.undo();
+await panel.edits.undo();
+await panel.close();
