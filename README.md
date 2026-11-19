@@ -27,6 +27,10 @@ It runs on macOS, Windows and Linux. Everything is local: no account, and nothin
 
 ## Install
 
+<p>
+<img src="docs/readme/logos/editor-vs-code.svg" height="22" alt="VS Code"> VS Code &nbsp; <img src="docs/readme/logos/editor-cursor.svg" height="22" alt="Cursor"> Cursor &nbsp; <img src="docs/readme/logos/editor-windsurf.svg" height="22" alt="Windsurf"> Windsurf &nbsp; <img src="docs/readme/logos/editor-vscodium.svg" height="22" alt="VSCodium"> VSCodium &nbsp; <img src="docs/readme/logos/editor-npx-feega.svg" height="22" alt="npx feega"> npx feega
+</p>
+
 - **VS Code**: [Marketplace](https://marketplace.visualstudio.com/items?itemName=andreabuttarelli.feega)
 - **Cursor, Windsurf, VSCodium**: [Open VSX](https://open-vsx.org/extension/AndreaButtarelli/feega)
 - **Any browser**: `npx feega`
@@ -40,33 +44,26 @@ It runs on macOS, Windows and Linux. Everything is local: no account, and nothin
 ## Frameworks
 
 <p>
-<img src="docs/readme/logos/react.svg" height="28" alt="React"> <img src="docs/readme/logos/next.svg" height="28" alt="Next.js"> <img src="docs/readme/logos/svelte.svg" height="28" alt="SvelteKit"> <img src="docs/readme/logos/vue.svg" height="28" alt="Vue"> <img src="docs/readme/logos/nuxt.svg" height="28" alt="Nuxt"> <img src="docs/readme/logos/astro.svg" height="28" alt="Astro"> <img src="docs/readme/logos/solid.svg" height="28" alt="Solid"> <img src="docs/readme/logos/angular.svg" height="28" alt="Angular"> <img src="docs/readme/logos/vite.svg" height="28" alt="Vite">
+<img src="docs/readme/logos/framework-sveltekit.svg" height="22" alt="SvelteKit"> SvelteKit &nbsp; <img src="docs/readme/logos/framework-react.svg" height="22" alt="React"> React &nbsp; <img src="docs/readme/logos/framework-next-js.svg" height="22" alt="Next.js"> Next.js &nbsp; <img src="docs/readme/logos/framework-vue.svg" height="22" alt="Vue"> Vue &nbsp; <img src="docs/readme/logos/framework-tailwind.svg" height="22" alt="Tailwind"> Tailwind
 </p>
 
-React, Next.js, SvelteKit, Vue, Nuxt, Astro, Solid, Angular and Vite. Styling: Tailwind and plain CSS.
+SvelteKit, React, Next.js and Vue, with Tailwind or plain CSS (CSS modules, scoped `<style>`).
 
 ## Works with your agent
 
-Feega has no AI of its own, so it sits next to the agent you already use. You design by hand, your agent reads the diff.
+Feega has no AI of its own, so it sits next to the agent you already use: you design, your agent codes, same files, every change a diff.
 
 <p>
-<img src="docs/readme/logos/claude-code.svg" height="28" alt="Claude Code"> <img src="docs/readme/logos/codex.svg" height="28" alt="Codex"> <img src="docs/readme/logos/cursor.svg" height="28" alt="Cursor">
+<img src="docs/readme/logos/agent-chatgpt.svg" height="22" alt="ChatGPT"> ChatGPT &nbsp; <img src="docs/readme/logos/agent-claude.svg" height="22" alt="Claude"> Claude &nbsp; <img src="docs/readme/logos/agent-gemini.svg" height="22" alt="Gemini"> Gemini &nbsp; <img src="docs/readme/logos/agent-opencode.svg" height="22" alt="OpenCode"> OpenCode
 </p>
-
-Works alongside ChatGPT, Claude, Gemini and OpenCode agents.
 
 ## Develop
 
-```bash
-# VS Code extension
-cd vscode
-npm test
-npm run test:e2e
-npm run package
+The editor lives in `inspect/` (VS Code extension) and `npx/` (standalone), sharing one host core, on the [`feat/feega-inspect`](https://github.com/andreabuttarelli/feega/tree/feat/feega-inspect) branch until it lands on `main`.
 
-# npx feega
-cd npx
-node --test
+```bash
+cd inspect && npm install && npm test
+cd npx && node --test
 ```
 
 The site is in `landing/`.
