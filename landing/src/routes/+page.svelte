@@ -1,6 +1,7 @@
 <script lang="ts">
   import LiveAgents from '$lib/site/LiveAgents.svelte';
   import Hero from '$lib/site/home/Hero.svelte';
+  import InspectDemo from '$lib/site/home/InspectDemo.svelte';
   import OpenSource from '$lib/site/home/OpenSource.svelte';
   import Codebase from '$lib/site/home/Codebase.svelte';
   import Pricing from '$lib/site/pricing/Pricing.svelte';
@@ -24,6 +25,7 @@
 
 <div class="site-home">
 <Hero />
+<InspectDemo />
 <OpenSource />
 <div class="chapters">
   <Codebase />
