@@ -1,9 +1,10 @@
 const vscode = require('vscode');
 const { spawn } = require('node:child_process');
+const { existsSync } = require('node:fs');
 const { readFile, writeFile } = require('node:fs/promises');
-const { Launch, launchArgs, mcpServers, canvasFileFor, canvasPage, eventReader, importMessage, gitignoreWith, progressOf, advance, failedAt, finishedAll, stepsPage, logTail, spawnOptions, RETRY, localUrl, freePort, readyProbe, served } = require('./canvas-run');
+const { Launch, NODE, childSlot, launchArgs, launcherIn, mcpServers, canvasFileFor, canvasPage, eventReader, importMessage, gitignoreWith, progressOf, advance, failedAt, finishedAll, stepsPage, logTail, spawnOptions, RETRY, localUrl, freePort, readyProbe, served } = require('./canvas-run');
 
-const READY_POLL_MS = 400;
+const READY_POLL_MS = 20;
 const QUIET_TIMEOUT_MS = 180_000;
 const LOG_TAIL_LINES = 40;
 const NEW_CANVAS = 'canvas.feega';
@@ -16,6 +17,7 @@ const children = new Set();
 const GITIGNORE_ASKED = 'feega.gitignoreAsked';
 const ADD = 'Add to .gitignore';
 let state = null;
+const launcher = launcherIn(__dirname, existsSync);
 
 async function ready(url, launch) {
   while (!launch.ended && Date.now() - launch.lastOutput < QUIET_TIMEOUT_MS) {
@@ -34,7 +36,7 @@ function publishMcp() {
     return;
   }
 
-  const wanted = new Map(mcpServers(running).map((s) => [s.label, s]));
+  const wanted = new Map(mcpServers(running, launcher).map((s) => [s.label, s]));
   for (const label of cursorServers.keys()) {
     if (!wanted.has(label)) {
       cursor.unregisterServer(label);
@@ -86,23 +88,21 @@ async function onEvent(event, child, file) {
 
 function openCanvas(panel, file, launch, output) {
   panel.webview.options = { enableScripts: true };
-  let child = null;
-  const start = async () => {
-    child = await startCanvas(panel, file, launch, output);
-  };
+  const slot = childSlot(stop);
+  const start = () => startCanvas(panel, file, launch, output, slot.hold);
   panel.webview.onDidReceiveMessage((message) => {
     if (message?.type !== RETRY) {
       return;
     }
 
-    stop(child);
+    slot.stop();
     start();
   });
-  panel.onDidDispose(() => stop(child));
+  panel.onDidDispose(slot.close);
   return start();
 }
 
-async function startCanvas(panel, file, launch, output) {
+async function startCanvas(panel, file, launch, output, hold) {
   let progress = progressOf(launch);
   const show = () => {
     panel.webview.html = stepsPage(progress);
@@ -112,8 +112,9 @@ async function startCanvas(panel, file, launch, output) {
   const tail = logTail(LOG_TAIL_LINES);
   const attempt = { ended: false, lastOutput: Date.now(), failed: false, served: null, imported: launch !== Launch.ImportFolder };
   attempts.set(panel, attempt);
-  const child = spawn('npx', launchArgs(file, port, launch), spawnOptions(file, process.platform, process.env));
+  const child = spawn(NODE, launchArgs(launcher, file, port, launch), spawnOptions(file, process.platform, process.env));
   children.add(child);
+  hold(child);
 
   const current = () => attempts.get(panel) === attempt && !attempt.failed;
   const fail = (message, log = tail.text()) => {
@@ -169,7 +170,7 @@ async function startCanvas(panel, file, launch, output) {
   });
   child.on('error', (error) => {
     attempt.ended = true;
-    fail(`Could not run npx: ${error.message}. Is Node.js 22+ installed?`);
+    fail(`Could not run node: ${error.message}. Is Node.js 22+ installed?`);
   });
   child.on('exit', (code, signal) => {
     attempt.ended = true;
@@ -187,7 +188,7 @@ async function startCanvas(panel, file, launch, output) {
       stop(child);
       fail(`Feega did not start: no output for ${QUIET_TIMEOUT_MS / 1000} s.`);
     }
-    return child;
+    return;
   }
 
   running.set(file, port);
@@ -198,7 +199,6 @@ async function startCanvas(panel, file, launch, output) {
     show();
   }
   reveal();
-  return child;
 }
 
 function canvasEditor(output) {
@@ -259,12 +259,12 @@ function activate(context) {
     context.subscriptions.push(
       vscode.lm.registerMcpServerDefinitionProvider('feega.local', {
         onDidChangeMcpServerDefinitions: mcpChanged.event,
-        provideMcpServerDefinitions: () => mcpServers(running).map((s) => new vscode.McpStdioServerDefinition(s.label, s.command, s.args))
+        provideMcpServerDefinitions: () => mcpServers(running, launcher).map((s) => new vscode.McpStdioServerDefinition(s.label, s.command, s.args))
       })
     );
   }
 
-  return { runningCanvases, mcpServers: () => mcpServers(running) };
+  return { runningCanvases, mcpServers: () => mcpServers(running, launcher) };
 }
 
 const runningCanvases = () => [...running].map(([file, port]) => ({ file, port }));

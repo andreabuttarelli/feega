@@ -1,20 +1,46 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { Launch, launchArgs, mcpServers, canvasFileFor, canvasPage, eventReader, importMessage, gitignoreWith, readyProbe, served, spawnOptions, Step, progressOf, advance, failedAt, stepsPage, lineEvent, logTail, RETRY } = require('./canvas-run');
+const { Launch, childSlot, launchArgs, launcherIn, mcpServers, canvasFileFor, canvasPage, eventReader, importMessage, gitignoreWith, readyProbe, served, spawnOptions, Step, progressOf, advance, failedAt, stepsPage, lineEvent, logTail, RETRY } = require('./canvas-run');
 
-test('apre il file senza browser e senza flag di import: senza terminale il launcher non chiede, e i launcher vecchi non conoscono --no-import', () => {
-  assert.deepEqual(launchArgs('/w/a.feega', 61000, Launch.Open), ['-y', 'feega@latest', '/w/a.feega', '--port', '61000', '--no-open']);
+const LAUNCHER = '/ext/launcher/bin/feega.mjs';
+
+test('apre il file con il launcher dentro l’estensione, senza npx: npm che risolve feega@latest costa da 0,3 a 1,3 s a ogni apertura', () => {
+  assert.deepEqual(launchArgs(LAUNCHER, '/w/a.feega', 61000, Launch.Open), [LAUNCHER, '/w/a.feega', '--port', '61000', '--no-open']);
+});
+
+test('chiudere la tela mentre parte ferma il server appena nato: prima restava acceso', () => {
+  const stopped = [];
+  const slot = childSlot((child) => child && stopped.push(child));
+  slot.close();
+  slot.hold('server');
+  assert.deepEqual(stopped, ['server']);
+});
+
+test('chiudere la tela ferma il server che sta partendo, riprovare ferma quello vecchio', () => {
+  const stopped = [];
+  const slot = childSlot((child) => child && stopped.push(child));
+  slot.hold('first');
+  slot.stop();
+  slot.hold('second');
+  slot.close();
+  assert.deepEqual(stopped, ['first', 'second']);
 });
 
 test('importare la cartella passa --import', () => {
-  assert.deepEqual(launchArgs('/w/app.feega', 61000, Launch.ImportFolder).slice(-1), ['--import']);
+  assert.deepEqual(launchArgs(LAUNCHER, '/w/app.feega', 61000, Launch.ImportFolder).slice(-1), ['--import']);
 });
 
-test('un server MCP per ogni tela aperta, sulla sua porta', () => {
+test('il launcher sta nell’estensione pubblicata; dal repo è quello di npx/', () => {
+  const at = (...present) => (path) => present.includes(path);
+  assert.equal(launcherIn('/ext', at('/ext/launcher/bin/feega.mjs', '/npx/bin/feega.mjs')), '/ext/launcher/bin/feega.mjs');
+  assert.equal(launcherIn('/repo/vscode', at('/repo/npx/bin/feega.mjs')), '/repo/npx/bin/feega.mjs');
+});
+
+test('un server MCP per ogni tela aperta, sulla sua porta, con lo stesso launcher', () => {
   const running = new Map([['/w/a.feega', 61000], ['/w/b.feega', 61001]]);
-  assert.deepEqual(mcpServers(running), [
-    { label: 'feega a', command: 'npx', args: ['-y', 'feega@latest', 'mcp', '--port', '61000'] },
-    { label: 'feega b', command: 'npx', args: ['-y', 'feega@latest', 'mcp', '--port', '61001'] }
+  assert.deepEqual(mcpServers(running, LAUNCHER), [
+    { label: 'feega a', command: 'node', args: [LAUNCHER, 'mcp', '--port', '61000'] },
+    { label: 'feega b', command: 'node', args: [LAUNCHER, 'mcp', '--port', '61001'] }
   ]);
 });
 

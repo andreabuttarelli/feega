@@ -68,7 +68,8 @@
   "scripts": {
     "test": "node --test canvas-run.test.js",
     "package": "npx -y @vscode/vsce package --no-dependencies",
-    "test:e2e": "node test/run.js"
+    "test:e2e": "node test/run.js",
+    "vscode:prepublish": "rm -rf launcher && mkdir -p launcher/bin && cp ../npx/launcher.mjs ../npx/telemetry.mjs ../npx/package.json launcher/ && cp ../npx/bin/feega.mjs launcher/bin/"
   },
   "galleryBanner": {
     "color": "#0b0b0c",

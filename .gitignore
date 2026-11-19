@@ -112,3 +112,4 @@ tests/e2e/.auth/
 .vite-deps/
 /dist-app
 perf-results/
+vscode/launcher/
