@@ -58,3 +58,9 @@ edit inline until reload); the colour control is a native picker, not the app's 
   hover hint, units (px/rem/em/%/vw/vh/auto), shadow and fill lists (Bits UI popovers), reorder by
   drag in the preview and in the Layers tab (`move-node.ts`: literal siblings only, `{#each}` and
   `.map()` refused), dev server popover (state → actions table), Feega menu with settings.
+
+## Round 4
+
+- **Attach only to our own server.** A Next app on :3000 from another folder got attached. Now a
+  running server is attached only when the process listening on the port has its cwd inside the
+  workspace's app (`listener.ts`, via `lsof`); otherwise Inspect starts its own on a free port.

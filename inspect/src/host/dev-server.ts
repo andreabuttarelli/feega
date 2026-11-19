@@ -3,6 +3,7 @@ import { cp, readFile, readdir } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { devProxy } from './dev-proxy';
+import { servesWorkspace } from './listener';
 import { Framework, planFile, runPlan, textsWanted, type Planned, type RepoFacts, type RunPlan } from '@feega/dev-run/run-plan';
 
 export enum Launch {
@@ -127,7 +128,7 @@ export async function startDev(root: string, launcherSource: string, log: (line:
     await cp(launcherSource, join(appRoot, LAUNCHER_DIR), { recursive: true });
   }
   const bridgeDir = join(appRoot, LAUNCHER_DIR);
-  if (attach === Attach.IfRunning && launch !== Launch.Vite && (await answers(own))) {
+  if (attach === Attach.IfRunning && launch !== Launch.Vite && (await answers(own)) && (await servesWorkspace(planned.defaultPort, appRoot))) {
     const proxy = await devProxy(own, bridgeDir);
     return { url: proxy.url, plan: planned, launch, attached: true, pid: null, command: 'already running', stop: proxy.close, exited: () => undefined };
   }
