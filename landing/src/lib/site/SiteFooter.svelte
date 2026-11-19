@@ -3,10 +3,11 @@
   import { LEGAL_DOCS } from './legal';
   import Mark from './Mark.svelte';
   import { COFFEE_URL, DOCS_URL, GITHUB_URL, SOCIAL_LINKS, STORY_URL } from './links';
-  import { GUIDES_PATH } from './guides';
   import { PRICING_PATH } from './paths';
+  import { DOWNLOAD_PATH } from './links';
   import { ALTERNATIVES_PATH } from './alternatives';
   import { CODEBASE_PATH } from './codebase';
+  import { HUBS } from './topics';
 
   const legal = Object.entries(LEGAL_DOCS).map(([slug, doc]) => ({ href: `/${slug}`, label: doc.label }));
   const year = new Date().getFullYear();
@@ -29,6 +30,7 @@
     <nav class="col" aria-label="Product">
       <p class="head">product</p>
       <a href="/">home</a>
+      <a href={DOWNLOAD_PATH}>download</a>
       <a href={PRICING_PATH}>pricing</a>
       <a href={CODEBASE_PATH}>codebase</a>
       <a href="/changelog">changelog</a>
@@ -39,7 +41,9 @@
     <nav class="col" aria-label="Learn">
       <p class="head">learn</p>
       <a href={DOCS_URL}>docs</a>
-      <a href={GUIDES_PATH}>guides</a>
+      {#each HUBS as hub (hub.path)}
+        <a href={hub.path}>{lower(hub.heading)}</a>
+      {/each}
       <a href={ALTERNATIVES_PATH}>alternatives</a>
       <a href={STORY_URL}>blog</a>
     </nav>

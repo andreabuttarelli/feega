@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { follow, installOptions, primaryCta, starCta, secondaryCtas, type Env } from './install';
-import { COFFEE_URL, GITHUB_URL, MARKETPLACE_URL } from './links';
+import { follow, installOptions, Outcome, primaryCta, runOption, starCta, secondaryCtas, type Env } from './install';
+import { DOWNLOAD_PATH, GITHUB_URL, MARKETPLACE_URL } from './links';
 
 const DEEP_LINK = 'vscode:extension/andreabuttarelli.feega';
 
@@ -18,37 +18,51 @@ const rig = (over: Partial<Env> = {}) => {
 };
 
 describe('install CTAs', () => {
-  it('unpublished: coming soon points at GitHub, no fake install', () => {
-    expect(primaryCta(false)).toEqual({ label: 'Download for free', href: GITHUB_URL });
+  it('every download CTA is a plain link to the download page', () => {
+    expect(primaryCta()).toEqual({ label: 'Download for free', href: DOWNLOAD_PATH });
     expect(starCta).toEqual({ label: 'Star on GitHub', href: GITHUB_URL });
     expect(secondaryCtas().map((c) => c.label)).toEqual(['Support with a coffee']);
   });
+});
 
-  it('published: deep link with marketplace fallback, other editors listed', () => {
-    const cta = primaryCta(true);
-    expect(cta.deepLink).toBe(DEEP_LINK);
-    expect(cta.href).toBe(MARKETPLACE_URL);
-    expect(secondaryCtas().map((c) => c.href)).toEqual([COFFEE_URL]);
-  });
+describe('follow', () => {
+  const cta = { label: 'VS Code', href: MARKETPLACE_URL, deepLink: DEEP_LINK };
 
-  it('falls back to the web URL when the protocol did not open', () => {
+  it('opens the deep link, then the store if the editor did not take focus', () => {
     const { opened, timers, env } = rig();
-    follow(primaryCta(true), env);
+    follow(cta, env);
     timers[0]();
     expect(opened).toEqual([DEEP_LINK, MARKETPLACE_URL]);
   });
 
-  it('stays on the deep link when the page was hidden', () => {
+  it('skips the store when the page lost focus', () => {
     const { opened, timers, env } = rig({ hidden: () => true });
-    follow(primaryCta(true), env);
+    follow(cta, env);
     timers[0]();
     expect(opened).toEqual([DEEP_LINK]);
   });
 
-  it('goes straight to the web URL on mobile', () => {
+  it('goes straight to the store on mobile', () => {
     const { opened, env } = rig({ userAgent: 'iPhone' });
-    follow(primaryCta(true), env);
+    follow(cta, env);
     expect(opened).toEqual([MARKETPLACE_URL]);
+  });
+});
+
+describe('runOption', () => {
+  it('copies the npx command and opens nothing', () => {
+    const { opened, env } = rig();
+    const copied: string[] = [];
+    const terminal = installOptions().find((o) => o.command)!;
+    expect(runOption(terminal, env, (t) => copied.push(t))).toBe(Outcome.Copied);
+    expect(copied).toEqual(['npx feega']);
+    expect(opened).toEqual([]);
+  });
+
+  it('opens an editor through its deep link', () => {
+    const { opened, env } = rig();
+    expect(runOption(installOptions()[0], env, () => {})).toBe(Outcome.Opened);
+    expect(opened).toEqual([DEEP_LINK]);
   });
 });
 

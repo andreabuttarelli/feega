@@ -3,7 +3,6 @@
   import '$lib/site/alternatives/alternatives.css';
   import { ALTERNATIVES, ALTERNATIVES_INDEX, ALTERNATIVES_PATH, AUTHOR, DISCLAIMER, KIND_HEADINGS, alternativePath } from '$lib/site/alternatives';
   import { ArticleKind } from '$lib/site/alternatives/alternative';
-  import { breadcrumbJsonLd } from '$lib/site/structured-data';
   import AsciiCover from '$lib/site/alternatives/AsciiCover.svelte';
   import { coverFor } from '$lib/site/alternatives/cover';
 
@@ -17,7 +16,6 @@
   <meta name="description" content={ALTERNATIVES_INDEX.description} />
   <meta property="og:title" content={ALTERNATIVES_INDEX.title} />
   <meta property="og:description" content={ALTERNATIVES_INDEX.description} />
-  {@html breadcrumbJsonLd('Alternatives', ALTERNATIVES_PATH)}
 </svelte:head>
 
 <article class="landing compare">

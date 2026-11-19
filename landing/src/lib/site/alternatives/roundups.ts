@@ -83,7 +83,7 @@ export const ROUNDUPS: Readonly<Record<string, Article>> = {
       { q: 'Ignoring the framework list.', a: 'Feega tests Next.js, SvelteKit, React and Vue on Vite; others are early. Check yours first.' }
     ],
     questions: [
-      { q: 'Can I edit my site visually without leaving the code?', a: 'Yes. All six change the source, not a copy.' },
+      { q: 'Can I edit my site visually without leaving the code?', a: 'Yes. All six write to the source files themselves.' },
       { q: 'Which ones open pull requests by themselves?', a: 'Feega on GitHub, Onlook and Builder.io.' },
       { q: 'Do I need a Mac?', a: 'For Onlook and Figma Make local, yes. Not for Feega or Builder.io.' }
     ],
