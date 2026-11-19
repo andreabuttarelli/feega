@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cssModuleRule } from './css-module';
+import { Scope } from './scoped-rule';
 
 const files = (all: Record<string, string>) => async (path: string) => all[path] ?? null;
 const at = (line: number, col = 5) => ({ file: 'src/Hero.jsx', line, col });
@@ -22,9 +23,25 @@ const CSS = `.hero {
 
 describe('cssModuleRule', () => {
   it('edits the rule of the module class the element uses', async () => {
-    const out = await cssModuleRule(files({ 'src/Hero.jsx': HERO, 'src/Hero.module.css': CSS }), at(5), { padding: '24px', color: 'red' });
+    const out = await cssModuleRule(files({ 'src/Hero.jsx': HERO, 'src/Hero.module.css': CSS }), at(5), { padding: '24px', color: 'red' }, undefined, Scope.Class);
 
     expect(out.ok && out.changes).toEqual([{ path: 'src/Hero.module.css', before: CSS, after: '.hero {\n  padding: 24px;\n  color: red;\n}\n' }]);
+  });
+
+  it('scope element on a shared module class gives the element its own class, siblings untouched', async () => {
+    const out = await cssModuleRule(files({ 'src/Hero.jsx': HERO, 'src/Hero.module.css': CSS }), at(5), { color: 'red' }, undefined, Scope.Element);
+    const changed = Object.fromEntries((out.ok ? out.changes : []).map((c) => [c.path, c.after]));
+
+    expect(changed['src/Hero.jsx']).toContain('<section className={`${styles.hero} ${styles.heroSection}`}>');
+    expect(changed['src/Hero.module.css']).toBe('.hero {\n  padding: 8px;\n}\n\n.heroSection {\n  color: red;\n}\n');
+  });
+
+  it('scope element a second time reuses the class it added', async () => {
+    const owned = HERO.replace('className={styles.hero}', 'className={`${styles.hero} ${styles.heroSection}`}');
+    const css = CSS + '\n.heroSection {\n  color: red;\n}\n';
+    const out = await cssModuleRule(files({ 'src/Hero.jsx': owned, 'src/Hero.module.css': css }), at(5), { color: 'blue' }, undefined, Scope.Element);
+
+    expect(out.ok && out.changes).toEqual([{ path: 'src/Hero.module.css', before: css, after: CSS + '\n.heroSection {\n  color: blue;\n}\n' }]);
   });
 
   it('an element without a class gets one from the module and a new rule', async () => {
