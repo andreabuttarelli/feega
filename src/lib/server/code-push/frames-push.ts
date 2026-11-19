@@ -265,20 +265,20 @@ export async function framePull(deps: FramesDeps, ask: { nodeId: string; base?: 
   return out;
 }
 
-export enum HistoryAction {
+export enum CodeHistoryAction {
   Diff = 'diff',
   Revert = 'revert',
   Branch = 'branch'
 }
 
-export type HistoryAsk = { nodeId: string; action: HistoryAction; sha?: string; base?: string };
+export type HistoryAsk = { nodeId: string; action: CodeHistoryAction; sha?: string; base?: string };
 
 type HistoryRun = (host: GitHost, lock: PushLock, ask: HistoryAsk & { branch: string }) => Promise<Diffed | Reverted | HistoryRefused | FramesRefused>;
 
-const HISTORY_RUN: Record<HistoryAction, HistoryRun> = {
-  [HistoryAction.Diff]: (host, _lock, ask) => (ask.sha ? commitDiff(host, ask.sha) : Promise.resolve(refused(FramesRefusal.NotPushed))),
-  [HistoryAction.Revert]: (host, lock, ask) => (ask.sha ? revertCommit(host, lock, { branch: ask.branch, sha: ask.sha }) : Promise.resolve(refused(FramesRefusal.NotPushed))),
-  [HistoryAction.Branch]: (host, _lock, ask) => branchDiff(host, { branch: ask.branch, base: ask.base ?? '' })
+const HISTORY_RUN: Record<CodeHistoryAction, HistoryRun> = {
+  [CodeHistoryAction.Diff]: (host, _lock, ask) => (ask.sha ? commitDiff(host, ask.sha) : Promise.resolve(refused(FramesRefusal.NotPushed))),
+  [CodeHistoryAction.Revert]: (host, lock, ask) => (ask.sha ? revertCommit(host, lock, { branch: ask.branch, sha: ask.sha }) : Promise.resolve(refused(FramesRefusal.NotPushed))),
+  [CodeHistoryAction.Branch]: (host, _lock, ask) => branchDiff(host, { branch: ask.branch, base: ask.base ?? '' })
 };
 
 export async function frameHistory(deps: FramesDeps, ask: HistoryAsk): Promise<Diffed | Reverted | HistoryRefused | FramesRefused> {

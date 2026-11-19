@@ -100,7 +100,7 @@ import { conditionsOf, MAX_CONDITIONS } from '$lib/server/code-import/render-con
 import { CAPTURE_DELAY_MAX_MS, delayOf } from '$lib/server/code-import/capture-wait';
 import { designSystemOf } from '$lib/server/code-import/design-system';
 import { githubFor } from '$lib/server/code-import/github-runtime';
-import { frameCheckout, frameDetach, frameHistory, HistoryAction, framePull, frameReady, framesPush, frameStatus, frameUndo } from '$lib/server/code-push/frames-push';
+import { frameCheckout, frameDetach, frameHistory, CodeHistoryAction, framePull, frameReady, framesPush, frameStatus, frameUndo } from '$lib/server/code-push/frames-push';
 import { PullKind } from '$lib/server/code-push/push';
 import { frameVersions } from '$lib/server/code-push/frames-versions';
 import { frameCompare, frameRetarget, MAX_VERSIONS } from '$lib/server/code-push/frames-compare';
@@ -1183,7 +1183,7 @@ export const CANVAS_OPS = {
 
   github_history: op({
     access: Access.Write,
-    input: z.object({ nodeId: z.string(), action: z.enum(HistoryAction).describe('diff: before/after of the files a commit changed; revert: a new commit undoing it, never a rewrite; branch: what the working branch changed against base'), sha: z.string().regex(/^[0-9a-f]{7,64}$/).optional(), base: z.string().max(200).optional() }).strict(),
+    input: z.object({ nodeId: z.string(), action: z.enum(CodeHistoryAction).describe('diff: before/after of the files a commit changed; revert: a new commit undoing it, never a rewrite; branch: what the working branch changed against base'), sha: z.string().regex(/^[0-9a-f]{7,64}$/).optional(), base: z.string().max(200).optional() }).strict(),
     run: async (ctx, input) => frameHistory(framesDeps(ctx.db, ctx), input)
   }),
 
