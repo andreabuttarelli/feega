@@ -63,6 +63,6 @@ describe('download options', () => {
 
   it('only targets already listed are live; the rest say soon', () => {
     const soon = Object.fromEntries(installOptions(true).map((o) => [o.label, o.soon]));
-    expect(soon).toEqual({ 'VS Code': false, Cursor: true, Windsurf: true, 'VSCodium / Open VSX': true, Terminal: false });
+    expect(soon).toEqual({ 'VS Code': false, Cursor: false, Windsurf: false, 'VSCodium / Open VSX': false, Terminal: false });
   });
 });
