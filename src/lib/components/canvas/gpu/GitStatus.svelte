@@ -18,7 +18,7 @@
   import type { GitSummary } from '$lib/canvas/git-status';
   import { CiState } from '$lib/canvas/source-changes';
 
-  let { summary, open = false, onchanges, onversions, onready, onupstream }: { summary: GitSummary; open?: boolean; onchanges: () => void; onversions: (nodeId: string) => void; onready: (nodeId: string) => void; onupstream: (nodeId: string) => void } = $props();
+  let { summary, open = false, onchanges, onversions, onready, onupstream, onresume }: { onresume: () => void; summary: GitSummary; open?: boolean; onchanges: () => void; onversions: (nodeId: string) => void; onready: (nodeId: string) => void; onupstream: (nodeId: string) => void } = $props();
 
   type Look = { icon: Component; label: string; tone: string; spin?: boolean };
   const AUTOSAVE: Record<AutosaveState, Look> = {
@@ -32,6 +32,8 @@
     [AutosaveState.NeedsBranch]: { icon: Cloud, label: 'Edits kept on the canvas: choose where they go', tone: 'warn' }
   };
   const CI_LABEL: Record<CiState, string> = { [CiState.None]: 'No checks', [CiState.Running]: 'CI running', [CiState.Passed]: 'CI passed', [CiState.Failed]: 'CI failed' };
+
+  const RESUMABLE = new Set([AutosaveState.Conflict, AutosaveState.Paused, AutosaveState.Failed]);
 
   const repoName = $derived(summary.repo.split('/').at(-1) ?? summary.repo);
   const save = $derived(AUTOSAVE[summary.autosave]);
@@ -48,7 +50,11 @@
 
   <Hint label={save.label} side={Side.Bottom}>
     {#snippet children(props)}
-      <span {...props} class="save tone-{save.tone}" class:spin={save.spin} role="status" aria-label={save.label} data-testid="git-autosave" data-state={summary.autosave}><save.icon size={14} /></span>
+      {#if RESUMABLE.has(summary.autosave)}
+        <button {...props} type="button" class="save icon tone-{save.tone}" aria-label="{save.label}. Open Changes and resume" onclick={onresume} data-testid="git-autosave" data-state={summary.autosave}><save.icon size={14} /></button>
+      {:else}
+        <span {...props} class="save tone-{save.tone}" class:spin={save.spin} role="status" aria-label={save.label} data-testid="git-autosave" data-state={summary.autosave}><save.icon size={14} /></span>
+      {/if}
     {/snippet}
   </Hint>
 
