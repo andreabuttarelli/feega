@@ -17,7 +17,7 @@
   </nav>
 
   <div class="actions">
-    <a class="chip cta" href={GITHUB_URL}><span>Star us on GitHub</span></a>
+    <a class="chip cta" href={GITHUB_URL}><span>Star on GitHub</span></a>
   </div>
 
   <div class="mobile">
@@ -40,7 +40,7 @@
       {#each MENU_LINKS as link (link.label)}
         <a href={link.href} onclick={() => (open = false)}>{lower(link.label)}</a>
       {/each}
-      <a href={GITHUB_URL}>Star us on GitHub</a>
+      <a href={GITHUB_URL}>Star on GitHub</a>
     </div>
 
     <div class="follow">

@@ -20,7 +20,7 @@ export const primaryCta = (published: boolean = EXTENSION_PUBLISHED): Cta =>
     ? { label: DOWNLOAD_LABEL, href: MARKETPLACE_URL, deepLink: PRIMARY_EDITOR.installUrl }
     : { label: DOWNLOAD_LABEL, href: GITHUB_URL };
 
-export const starCta: Cta = { label: 'Star us on GitHub', href: GITHUB_URL };
+export const starCta: Cta = { label: 'Star on GitHub', href: GITHUB_URL };
 
 export const secondaryCtas = (published: boolean = EXTENSION_PUBLISHED): readonly Cta[] =>
   published

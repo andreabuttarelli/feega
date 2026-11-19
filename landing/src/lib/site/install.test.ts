@@ -20,7 +20,7 @@ const rig = (over: Partial<Env> = {}) => {
 describe('install CTAs', () => {
   it('unpublished: coming soon points at GitHub, no fake install', () => {
     expect(primaryCta(false)).toEqual({ label: 'Download for free', href: GITHUB_URL });
-    expect(starCta).toEqual({ label: 'Star us on GitHub', href: GITHUB_URL });
+    expect(starCta).toEqual({ label: 'Star on GitHub', href: GITHUB_URL });
     expect(secondaryCtas(false).map((c) => c.label)).toEqual(['Support with a coffee']);
   });
 

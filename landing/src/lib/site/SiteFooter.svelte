@@ -33,7 +33,7 @@
       <a href={PRICING_PATH}>pricing</a>
       <a href={CODEBASE_PATH}>codebase</a>
       <a href="/changelog">changelog</a>
-      <a href={GITHUB_URL}>star us on github</a>
+      <a href={GITHUB_URL}>star on github</a>
       <a href={COFFEE_URL}>support with a coffee</a>
     </nav>
 
