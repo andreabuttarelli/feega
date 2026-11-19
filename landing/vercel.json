@@ -47,17 +47,6 @@
       "statusCode": 301
     },
     {
-      "source": "/:path(.*)",
-      "has": [
-        {
-          "type": "host",
-          "value": "www.feega.app"
-        }
-      ],
-      "destination": "https://feega.app/:path",
-      "statusCode": 301
-    },
-    {
       "source": "/blog/how-the-canvas-got-fast",
       "destination": "https://blog.feega.app/posts/how-the-canvas-got-fast/",
       "statusCode": 301

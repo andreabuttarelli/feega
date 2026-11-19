@@ -17,6 +17,6 @@ describe('download page', () => {
 
   it('declares a free SoftwareApplication with a download url', () => {
     const data = JSON.parse(downloadJsonLd().replace(/<\/?script[^>]*>/g, ''));
-    expect(data).toMatchObject({ '@type': 'SoftwareApplication', isAccessibleForFree: true, downloadUrl: 'https://feega.app/download' });
+    expect(data).toMatchObject({ '@type': 'SoftwareApplication', isAccessibleForFree: true, downloadUrl: 'https://www.feega.app/download' });
   });
 });

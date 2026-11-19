@@ -1,5 +1,22 @@
 # SEO/GEO strategy — dalnulla.com → feega.app
 
+## Marketing site (`landing/`), 2026-11-19
+
+- Canonical host: `https://www.feega.app`. `SITE_URL` in `landing/src/lib/site/links.ts` drives
+  canonical tags, sitemap, robots, llms.txt and JSON-LD. The apex → www redirect is a Vercel
+  domain setting (owner); `vercel.json` no longer redirects www → apex.
+- robots.txt names the AI search and user bots: OAI-SearchBot, ChatGPT-User, Claude-SearchBot,
+  Claude-User, PerplexityBot, Perplexity-User (plus GPTBot, ClaudeBot, Google-Extended).
+- Old video-AI landing pages and guides: 301 in `landing/vercel.json`, out of the sitemap.
+- Page model (dusk.bot): short version, body, how we checked, try it in 2 minutes, mistakes,
+  questions (FAQPage), sources, read next; Article + BreadcrumbList + Organization with
+  dateModified. Batch 1: `/for/{react,nextjs,sveltekit,vue,tailwind}`,
+  `/integrations/{vscode,cursor,windsurf,vscodium}` and their hubs. Next batches: `/vs/*`,
+  `/use-cases/*`, longer `/alternatives/*`, glossary, free tools. Plan:
+  `~/Documents/feega-videos/research/2026-11-19-seo-dusk-sitemap.md`.
+
+## Old domain (dalnulla.com)
+
 Data: Search Console export for dalnulla.com, last period (185 clicks, ~8k impressions,
 80 pages, 686 queries). Verified with curl on 2026-09-30.
 

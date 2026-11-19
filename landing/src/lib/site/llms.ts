@@ -10,7 +10,21 @@ import { ALTERNATIVES, ALTERNATIVES_INDEX, ALTERNATIVES_PATH, alternativePath } 
 import { GUIDES, GUIDES_INDEX, GUIDES_PATH, guidePath } from './guides';
 import { plainText } from './text';
 
-const SUMMARY = 'Feega is a free, open-source (Apache-2.0) VS Code extension to design in your codebase: click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens, with diffs. React, Next.js, SvelteKit and Vue, with Tailwind or plain CSS. Works in VS Code, Cursor, Windsurf and VSCodium. Feega Cloud (GitHub sync, collaboration, sections and templates) is coming later.';
+const SUMMARY = 'Feega is a free, open-source (Apache-2.0) VS Code extension to design in your codebase: click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens, with diffs and undo. React, Next.js, SvelteKit and Vue, with Tailwind or plain CSS. Works in VS Code, Cursor, Windsurf and VSCodium, or in the browser with npx feega. Feega Cloud (GitHub sync, collaboration, sections and templates) is coming later.';
+
+const HOW_IT_WORKS = [
+  '- Run "Feega: Open from current workspace" in the command palette, or `npx feega` in the app folder. Feega starts your dev server and opens the app beside your code.',
+  '- In development only, Feega tags each element with the file, line and column it came from, so a click on the page lands on a line of source.',
+  '- Edit text, spacing, size, layout, colour, radius, shadows and typography in the right bar, at full, desktop, tablet or phone width.',
+  '- Every edit is a file change you can review in Changes and undo. Nothing is sent to a model and no account is needed.'
+].join('\n');
+
+const WRITES = [
+  '- Tailwind projects: the matching utility class in the element\'s class or className, with a breakpoint prefix when you edit at a smaller size, or your own theme token when one matches.',
+  '- Svelte and Vue without Tailwind: a rule in the component\'s <style> block.',
+  '- React and Next.js without Tailwind: a rule in a CSS module next to the component, imported if it was not.',
+  '- Not written: class names built by an expression (cn(), clsx(), template strings), and text that comes from data rather than markup. Feega says why and points at the line.'
+].join('\n');
 
 const INSTALL_LINES = EXTENSION_PUBLISHED
   ? EDITORS.map((e) => `- [${e.label}](${e.installUrl})`)
@@ -37,21 +51,32 @@ const link = (path: string) => `- [${PAGE_TITLES[path]}](${SITE_URL}${path === '
 
 export const llmsTxt = () =>
   [
-    '# feega',
+    '# Feega',
     `> ${SUMMARY}`,
+    '## How it works',
+    HOW_IT_WORKS,
+    '## What it writes to your code',
+    WRITES,
     '## Pages',
     SITE_PATHS.map(link).join('\n'),
     '## Install',
     INSTALL_LINES.join('\n'),
     '## Source',
     `- [GitHub](${GITHUB_URL}): source code and README`,
-    `- [Full text](${SITE_URL}/llms-full.txt): this file with the complete FAQ`
+    `- [Docs](https://docs.feega.app): setup and reference`,
+    `- [Full text](${SITE_URL}/llms-full.txt): this file with the complete FAQ`,
+    '## Contact',
+    '- hi@feega.app for general questions, support@feega.app for help'
   ].join('\n\n') + '\n';
 
 export const llmsFullTxt = () =>
   [
-    '# feega',
+    '# Feega',
     `> ${SUMMARY}`,
+    '## How it works',
+    HOW_IT_WORKS,
+    '## What it writes to your code',
+    WRITES,
     '## Guides',
     Object.entries(GUIDES).map(([slug, g]) => `### ${g.heading}\n${g.answer}\n${SITE_URL}${guidePath(slug)}`).join('\n\n'),
     '## FAQ',

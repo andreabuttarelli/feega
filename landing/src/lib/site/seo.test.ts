@@ -66,14 +66,14 @@ describe('structured data', () => {
 
   it('a breadcrumb ends at the page itself', () => {
     const data = JSON.parse(breadcrumbJsonLd('Changelog', '/changelog').replace(/^<script[^>]*>|<\/script>$/g, ''));
-    expect(data.itemListElement.map((i: { item: string }) => i.item)).toEqual(['https://feega.app/', 'https://feega.app/changelog']);
+    expect(data.itemListElement.map((i: { item: string }) => i.item)).toEqual(['https://www.feega.app/', 'https://www.feega.app/changelog']);
   });
 });
 
 describe('llms.txt', () => {
   it('lists every public page', () => {
     for (const path of SITE_PATHS.filter((p) => p !== '/')) {
-      expect(llmsTxt()).toContain(`https://feega.app${path}`);
+      expect(llmsTxt()).toContain(`https://www.feega.app${path}`);
     }
   });
 
@@ -101,12 +101,22 @@ describe('answer-first pages', () => {
 });
 
 describe('robots.txt', () => {
-  it('allows the AI crawlers by name', async () => {
+  it('allows the AI crawlers, search bots and user agents by name', async () => {
     const body = await robots().text();
-    for (const bot of ['GPTBot', 'ClaudeBot', 'PerplexityBot', 'Google-Extended']) {
+    for (const bot of ['GPTBot', 'OAI-SearchBot', 'ChatGPT-User', 'ClaudeBot', 'Claude-SearchBot', 'Claude-User', 'PerplexityBot', 'Perplexity-User', 'Google-Extended']) {
       expect(AI_CRAWLERS).toContain(bot);
       expect(body).toContain(`User-agent: ${bot}\nAllow: /`);
     }
+  });
+});
+
+describe('canonical host', () => {
+  it('robots.txt points at the www sitemap', async () => {
+    expect(await robots().text()).toContain('Sitemap: https://www.feega.app/sitemap.xml');
+  });
+
+  it('no generated file names the bare domain', () => {
+    expect(llmsTxt() + llmsFullTxt() + HOME_JSON_LD).not.toMatch(/https:\/\/feega\.app/);
   });
 });
 
@@ -150,8 +160,8 @@ describe('social preview', () => {
   });
 
   it('every page inherits absolute image and video urls from the layout', () => {
-    expect(OG.image.url).toMatch(/^https:\/\/feega\.app\//);
-    expect(OG.video.url).toMatch(/^https:\/\/feega\.app\//);
+    expect(OG.image.url).toMatch(/^https:\/\/www\.feega\.app\//);
+    expect(OG.video.url).toMatch(/^https:\/\/www\.feega\.app\//);
     for (const tag of ['og:image', 'og:image:width', 'og:image:height', 'og:image:type', 'og:image:alt', 'og:video', 'og:video:secure_url', 'og:video:type', 'og:video:width', 'og:video:height', 'twitter:image', 'twitter:image:alt']) {
       expect(LAYOUT).toContain(`"${tag}"`);
     }

@@ -22,7 +22,7 @@ const APPLICATION = {
   '@context': 'https://schema.org',
   '@type': 'SoftwareApplication',
   name: 'Feega',
-  url: 'https://feega.app',
+  url: SITE,
   applicationCategory: 'DeveloperApplication',
   operatingSystem: 'Windows, macOS, Linux',
   description: 'Feega Inspect is a free VS Code extension: click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens, with diffs.',
