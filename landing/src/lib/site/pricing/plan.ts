@@ -75,6 +75,8 @@ export const EXTENSION_LINES = [
 
 export const CLOUD_SOON_FOR = 'For teams that design in the same codebase.';
 
+export const CLOUD_SOON_NOTE = 'Star the repo to hear first.';
+
 export const CLOUD_SOON_LINES = ['GitHub sync', 'Collaboration', 'Sections and templates'] as const;
 
 export const freeStart = (plan: CloudPlan): string => `Start free: ${FREE_EDITORS} ${plan.per}, ${count(FREE_CREDITS)} credits, no card.`;

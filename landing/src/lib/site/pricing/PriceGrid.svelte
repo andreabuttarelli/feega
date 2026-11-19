@@ -3,7 +3,7 @@
   import { GITHUB_URL } from '../links';
   import { primaryCta } from '../install';
   import PriceTag from './PriceTag.svelte';
-  import { CLOUD_SOON_FOR, CLOUD_SOON_LINES, EXTENSION_FOR, EXTENSION_LINES, EXTENSION_NOTE, type CloudPlan } from './plan';
+  import { CLOUD_SOON_FOR, CLOUD_SOON_LINES, EXTENSION_FOR, EXTENSION_LINES, EXTENSION_NOTE, CLOUD_SOON_NOTE, type CloudPlan } from './plan';
 
   let { plan, details = 'hide' }: { plan: CloudPlan; details?: 'show' | 'hide' } = $props();
 
@@ -12,7 +12,7 @@
 
 <div class="plans">
   <article class="plan">
-    <div class="strip terminal" aria-hidden="true"><span>$</span>feega inspect</div>
+    <div class="strip terminal" aria-hidden="true"><span>$</span>npx feega</div>
     <h3>Feega extension</h3>
     <p class="for">{lower(EXTENSION_FOR)}</p>
     <PriceTag amount="free" unit="forever" cta={lower(install.label)} href={install.href} />
@@ -27,6 +27,7 @@
     <h3>Feega {plan.name}</h3>
     <p class="for">{lower(CLOUD_SOON_FOR)}</p>
     <PriceTag amount="coming later" unit="" cta="follow on github" href={GITHUB_URL} tone="outline" />
+    <p class="start">{lower(CLOUD_SOON_NOTE)}</p>
     <ul>
       {#each CLOUD_SOON_LINES as line (line)}<li>{lower(line)}</li>{/each}
     </ul>
@@ -74,6 +75,7 @@
 
   ul {
     display: grid;
+    align-content: start;
     gap: 12px;
     margin: 8px 0 0;
     padding: 16px 0 0;
@@ -133,7 +135,7 @@
 
     .plan {
       display: grid;
-      grid-row: span 8;
+      grid-row: span 7;
       grid-template-rows: subgrid;
       align-content: start;
     }

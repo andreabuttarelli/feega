@@ -202,18 +202,18 @@ export const ROUNDUPS: Readonly<Record<string, Article>> = {
       {
         heading: 'Four setups side by side',
         html: table(
-          ['', 'Claude Design', 'Figma MCP', 'Cursor Design Mode', 'Feega MCP'],
+          ['', 'Claude Design', 'Figma MCP', 'Cursor Design Mode', 'Feega'],
           [
             ['Source of truth', 'The Claude Design project', 'The Figma file', 'Your code', 'Your code'],
-            ['Where you see changes', 'In Claude Design', 'In Figma', 'In the IDE browser', 'On a shared canvas'],
-            ['Hand edits', 'Sliders, comments, edits', 'Full Figma', 'Annotations', 'Full canvas'],
-            ['Extra cost', 'None on Claude plans', 'A Figma seat', 'A Cursor plan', 'Free locally']
+            ['Where you see changes', 'In Claude Design', 'In Figma', 'In the IDE browser', 'In your running app'],
+            ['Hand edits', 'Sliders, comments, edits', 'Full Figma', 'Annotations', 'Properties bar, double-click text'],
+            ['Extra cost', 'None on Claude plans', 'A Figma seat', 'A Cursor plan', 'Free']
           ]
         )
       },
       {
         heading: 'Pick the winner before you start',
-        html: '<p>If the design and the code can both change, one of them has to win. Claude Design and Figma keep the design as the source. Cursor and Feega keep the code.</p>'
+        html: '<p>If the design and the code can both change, one of them has to win. Claude Design and Figma keep the design as the source. Cursor and Feega keep the code. Claude Code writes the first draft; Feega is where you adjust it by hand.</p>'
       }
     ],
     mistakes: [
@@ -222,7 +222,7 @@ export const ROUNDUPS: Readonly<Record<string, Article>> = {
     ],
     questions: [
       { q: 'Is Claude Design included in my Claude plan?', a: 'Yes, on every plan, sharing that plan’s usage.' },
-      { q: 'Can Claude Code use Feega?', a: 'Yes, through the MCP server or the CLI.' }
+      { q: 'Can Claude Code use Feega?', a: 'They work on the same files. Feega has no AI of its own: it writes your hand edits to the source, and Claude Code can read the result.' }
     ],
     sources: [S.claudeDesign, S.claudeDesignHelp, S.figmaDevMode, S.cursorDesign, S.cursorPricing],
     checked: CHECKED
@@ -233,12 +233,12 @@ export const ROUNDUPS: Readonly<Record<string, Article>> = {
     description: 'Firebase Studio stops on 22 March 2027. What Google recommends, and what each route means for the code you already have.',
     heading: 'Firebase Studio is shutting down: where your app can go',
     hook: 'Firebase Studio stops on 22 March 2027. Here is what each route means.',
-    lead: 'Firebase Studio stops on 22 March 2027, and new workspaces closed on 22 June 2026. Google points to AI Studio and Antigravity. Feega is not a Firebase replacement; it appears in one row only.',
+    lead: 'Firebase Studio stops on 22 March 2027, and new workspaces closed on 22 June 2026. Google points to AI Studio and Antigravity. Feega is not a Firebase replacement; it appears in one row only, as a way to keep editing the UI.',
     pickThem: {
       name: 'a Google route',
       points: ['You built by prompting and want Firebase Auth and Firestore set up for you (AI Studio).', 'You want an IDE with your history, files and secrets carried over (Antigravity).', 'You plan to stay on Google Cloud.']
     },
-    pickFeega: ['You moved the code to your own repo.', 'You want to keep editing the UI visually after the move.', 'You do not want a new lock-in.'],
+    pickFeega: ['You moved the code to your own repo.', 'You want to keep editing the UI visually after the move.', 'You do not want a new lock-in: it is open source and runs locally.'],
     sections: [
       {
         heading: 'Three routes side by side',

@@ -1,7 +1,7 @@
 <script lang="ts">
   const cta = primaryCta();
   import '$lib/site/landing/landing.css';
-  import '$lib/site/compare/compare.css';
+  import '$lib/site/alternatives/alternatives.css';
   import { installAction, primaryCta } from '$lib/site/install';
   import { ALTERNATIVES, ALTERNATIVES_PATH, AUTHOR, DISCLAIMER, TRY_STEPS, alternativePath } from '$lib/site/alternatives';
   import { articleJsonLd, faqJsonLd } from '$lib/site/structured-data';
