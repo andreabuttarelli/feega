@@ -480,8 +480,9 @@
   $effect(() => {
     const seen = visibleIds(liveCodeTiles, view, area);
     const ids = liveCodeTiles.map((t) => t.id);
-    liveModes = liveFrameModes(ids, editingLive);
-    const next = new Set(ids.filter((id) => liveModes[id] === FrameMode.Live || seen.has(id)));
+    const modes = liveFrameModes(ids, editingLive);
+    liveModes = modes;
+    const next = new Set(ids.filter((id) => modes[id] === FrameMode.Live || seen.has(id)));
     if (!sameSet(untrack(() => liveCode), next)) {
       liveCode = next;
     }
@@ -1359,7 +1360,7 @@
       return;
     }
     const hit = hitAt(world);
-    if (hit.kind === HitKind.Node && liveCodeTiles.some((t) => t.id === hit.nodeId)) {
+    if (hit.kind === HitKind.Node && liveFrameOf(summaries.get(hit.nodeId)?.data)) {
       select([hit.nodeId]);
       editingLive = hit.nodeId;
       return;

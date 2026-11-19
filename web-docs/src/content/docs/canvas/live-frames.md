@@ -33,7 +33,15 @@ The MCP tool is `dev_server` (`action`: `status`, `start`, `stop`). The endpoint
 
 ## Live or snapshot
 
-At most three live frames run at once: the largest on screen. The others, and all of them while the camera moves, show their last snapshot. A snapshot is taken when the page loads and when the camera rests, and is saved in the `.feega` file with the frame's route and width.
+On the canvas a live frame shows a snapshot of its page, so a canvas with many of them pans and zooms at full frame rate and uses about the same memory as one with none. The page itself runs only in two cases:
+
+| Frame | Shows |
+|---|---|
+| On the canvas | Snapshot |
+| Being edited (double-clicked) | The running page |
+| Played | The running page |
+
+The snapshot is taken at 2× the frame's width, so it stays sharp when you zoom past 100%. It is retaken when the dev server hot-reloads a change, once the camera rests, and is saved in the `.feega` file with the frame's route and width. When you double-click, the snapshot stays on top until the page has painted, so the frame never goes blank.
 
 Reopened without a dev server, each frame shows its snapshot marked **Not connected**.
 
@@ -45,7 +53,7 @@ To keep edits away from your working copy, start Feega with `FEEGA_LIVE_TARGET=b
 
 ## Editing an element
 
-Select a live frame by its label, then click an element inside it. A frame that is not selected stays a normal page you can scroll and use.
+Double-click a live frame to edit it, then click an element inside it. Click outside the frame, or press **Esc**, to leave: it goes back to its snapshot.
 
 The element opens in the **Properties** tab of the right bar, the same panel and controls as any element on the canvas. These are written to your code:
 
