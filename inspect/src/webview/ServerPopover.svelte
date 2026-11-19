@@ -24,6 +24,7 @@
       <h3>Dev server</h3>
       <p class="status"><span class="dot {look.dot}"></span>{look.label}{uptime && state === ServerState.Running ? ` · ${uptime}` : ''}</p>
       {#if info?.attached}<p class="note">Attached to a server Feega did not start.</p>{/if}
+      {#if info && !info.attached && info.keptMinutes > 0}<p class="note" data-testid="kept-note">Keeps running {info.keptMinutes} min after the panel closes.</p>{/if}
       {#if error}<pre class="error">{error}</pre>{/if}
       {#if info}
         <div class="url">

@@ -66,7 +66,7 @@ export enum ServerAction {
   ChooseApp = 'choose-app'
 }
 
-export type ServerInfo = { url: string; framework: string; command: string; pid: number | null; port: number; attached: boolean; startedAt: number; lastError: string };
+export type ServerInfo = { url: string; framework: string; command: string; pid: number | null; port: number; attached: boolean; startedAt: number; lastError: string; keptMinutes: number };
 
 export type ColourPick = { css: string; token?: string };
 

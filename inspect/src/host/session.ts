@@ -15,6 +15,7 @@ const PICK_TIMEOUT_MS = 3000;
 const LATER_EDITS = 'later edits depend on this change: undo them first';
 const CACHE_DIRS = ['.svelte-kit', 'node_modules/.vite', '.next', '.nuxt', '.astro'];
 const ERROR_LINES = 6;
+const MINUTE_MS = 60_000;
 const ERROR = /error|failed|cannot|exception/i;
 
 export type Session = ReturnType<typeof inspectSession>;
@@ -84,8 +85,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     await platform.showDiff(first.full, first.before);
   }
 
+  const keptMinutes = () => Number(platform.settings()[SettingKey.KeepServerAlive]) || 0;
+
   function infoOf(now: Running) {
-    return { url: now.url, framework: now.plan.framework, command: now.command, pid: now.pid, port: Number(new URL(now.url).port), attached: now.attached, startedAt, lastError };
+    return { keptMinutes: kept ? keptMinutes() : 0, url: now.url, framework: now.plan.framework, command: now.command, pid: now.pid, port: Number(new URL(now.url).port), attached: now.attached, startedAt, lastError };
   }
 
   function logLine(line: string) {
@@ -183,7 +186,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     cancel?.abort();
     starts++;
     if (running && !running.attached && kept) {
-      kept.park(root, running);
+      kept.park(root, running, keptMinutes() * MINUTE_MS);
     } else {
       running?.stop();
     }

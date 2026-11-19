@@ -8,3 +8,5 @@
 - Vite cache dir untouched (default).
 
 Measured (startDev to ready / first page): landing 1027/1845 → 634/1510 ms; next-tailwind 1024/2574 → 641/2618 ms; attach to a running tagged server 845/858 ms; parked reopen ≈ 0.
+- Warm time is setting `feegaInspect.keepServerAlive` (0/10/30/60 min, default 10; 0 = stop on close). Server menu notes it; Stop is now "Stop now".
+- Live check (`INSPECT_SUITE=lifecycle.cjs node inspect/test/run.cjs`): panel close keeps it, reopen adopts it, window close leaves no `launch.mjs`. Extension host killed -9 leaves one orphan; the next activation kills it.

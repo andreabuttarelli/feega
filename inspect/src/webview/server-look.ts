@@ -33,7 +33,7 @@ export const actionsOf = (state: ServerState, attached: boolean): ServerAction[]
 export const ACTION_LABEL: Record<ServerAction, string> = {
   [ServerAction.Start]: 'Start',
   [ServerAction.Restart]: 'Restart',
-  [ServerAction.Stop]: 'Stop',
+  [ServerAction.Stop]: 'Stop now',
   [ServerAction.ReloadPage]: 'Reload page',
   [ServerAction.ClearCache]: 'Clear cache & restart',
   [ServerAction.ShowLogs]: 'Show logs',

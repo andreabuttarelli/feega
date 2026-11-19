@@ -90,6 +90,17 @@
             "phone"
           ],
           "description": "Device size the preview opens at."
+        },
+        "feegaInspect.keepServerAlive": {
+          "type": "string",
+          "default": "10",
+          "enum": [
+            "0",
+            "10",
+            "30",
+            "60"
+          ],
+          "description": "Minutes the dev server Feega started stays warm after the panel closes. 0: stop on close. Closing the window always stops it."
         }
       }
     },

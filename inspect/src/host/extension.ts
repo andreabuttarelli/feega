@@ -17,14 +17,13 @@ import { beforeProvider, vsCodePlatform, type VsCodeHost } from './vscode-platfo
 const VIEW_TYPE = 'feegaInspect.panel';
 const TITLE = 'Feega';
 const SECTION = 'feegaInspect';
-const IDLE_SERVER_MS = 10 * 60_000;
 
 type Open = { panel: vscode.WebviewPanel; session: Session };
 
 let opened: Open | null = null;
 let host: VsCodeHost | null = null;
 const befores = new Map<string, string>();
-const kept = keptServers<Running>(IDLE_SERVER_MS);
+const kept = keptServers<Running>();
 
 const mediaOf = (context: vscode.ExtensionContext) => vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview');
 

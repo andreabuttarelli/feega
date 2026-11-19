@@ -2,7 +2,8 @@ export enum SettingKey {
   Telemetry = 'feegaInspect.telemetry',
   Styling = 'feegaInspect.styling',
   DevCommand = 'feegaInspect.devCommand',
-  DefaultSize = 'feegaInspect.defaultSize'
+  DefaultSize = 'feegaInspect.defaultSize',
+  KeepServerAlive = 'feegaInspect.keepServerAlive'
 }
 
 export enum StylingChoice {
@@ -45,6 +46,18 @@ export const SETTINGS: SettingRow[] = [
       { value: 'desktop', label: 'Desktop' },
       { value: 'tablet', label: 'Tablet' },
       { value: 'phone', label: 'Phone' }
+    ]
+  },
+  {
+    key: SettingKey.KeepServerAlive,
+    label: 'Keep the dev server after closing',
+    hint: 'Minutes the dev server Feega started stays warm after the panel closes, so reopening is instant. Closing the window always stops it.',
+    fallback: '10',
+    choices: [
+      { value: '0', label: 'Stop on close' },
+      { value: '10', label: '10 minutes' },
+      { value: '30', label: '30 minutes' },
+      { value: '60', label: '1 hour' }
     ]
   }
 ];

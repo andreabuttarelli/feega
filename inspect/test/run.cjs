@@ -6,7 +6,7 @@ const app = resolve(process.env.INSPECT_TEST_DIR ?? resolve(__dirname, '../../la
 runTests({
   vscodeExecutablePath: process.env.VSCODE_PATH,
   extensionDevelopmentPath: resolve(__dirname, '..'),
-  extensionTestsPath: resolve(__dirname, 'suite.cjs'),
+  extensionTestsPath: resolve(__dirname, process.env.INSPECT_SUITE ?? 'suite.cjs'),
   extensionTestsEnv: { INSPECT_TEST_DIR: app },
   launchArgs: [app, '--disable-extensions', '--new-window']
 }).catch((error) => {
