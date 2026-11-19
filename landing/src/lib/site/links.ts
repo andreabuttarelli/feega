@@ -7,7 +7,7 @@ export const MAC_GUIDE_URL = 'https://docs.feega.app/desktop/install-macos/';
 export const DOCS_URL = 'https://docs.feega.app';
 export const DISCORD_URL = 'https://discord.gg/PUp37DG6vr';
 export const STORY_URL = 'https://blog.feega.app/';
-export const COFFEE_URL = 'https://buymeacoffee.com/andreabuttarelli';
+export const COFFEE_URL = 'https://buy.stripe.com/5kQ00k2A97C08sd94LeME07';
 
 export const EXTENSION_PUBLISHED = false;
 
