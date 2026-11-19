@@ -24,7 +24,7 @@ describe('the notice after a Figma paste', () => {
 
   it('says once that images are placeholders and how to fill them when there is no token', () => {
     const notice = figmaNotice({ ...base, images: 12, outcome: ImagesOutcome.NoToken, skipped: ['path of A'] })!;
-    expect(notice.summary).toBe('Pasted from Figma: 1 approximation. 12 images are grey placeholders: add a Figma token in Settings to import them.');
+    expect(notice.summary).toBe('Pasted from Figma: 1 approximation. 12 images are grey placeholders: connect Figma in Settings to import them.');
     expect(notice.needsToken).toBe(true);
   });
 

@@ -4,8 +4,8 @@ import type { FrameStore, StoredFrame } from '$lib/server/motion/move-element';
 import { FigmaOutcome } from './import-images';
 import { importFigmaFrames } from './import-frames';
 import type { RestNode } from './rest-message';
+import type { ProviderCall } from '$lib/server/connections/account-links';
 
-const TOKEN = 'figd_token';
 const FILE = 'AbCdEf1234567890';
 const LINK = `https://www.figma.com/design/${FILE}/Kit?node-id=1-2`;
 const IMAGE_REF = 'ab'.repeat(20);
@@ -20,7 +20,7 @@ const hero: RestNode = {
   children: [{ id: '1:3', name: 'Photo', type: 'RECTANGLE', size: { x: 100, y: 100 }, relativeTransform: [[1, 0, 0], [0, 1, 0]], fills: [{ type: 'IMAGE', imageRef: IMAGE_REF }] }]
 };
 
-const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
+const json = (status: number, data: unknown) => ({ status, data, headers: {}, file: null });
 
 function memoryStore() {
   const frames = new Map<string, StoredFrame>();
@@ -41,13 +41,13 @@ function memoryStore() {
   return { store, frames };
 }
 
-function figma(overrides: Record<string, () => Response> = {}) {
-  return vi.fn(async (url: string) => {
-    const route = Object.keys(overrides).find((r) => url.includes(r));
+function figma(overrides: Record<string, () => ReturnType<typeof json>> = {}) {
+  return vi.fn(async (request: ProviderCall) => {
+    const route = Object.keys(overrides).find((r) => request.endpoint.endsWith(r));
     if (route) {
       return overrides[route]();
     }
-    if (url.includes('/nodes?')) {
+    if (request.endpoint.endsWith('/nodes')) {
       return json(200, { nodes: { '1:2': { document: hero } } });
     }
     return json(200, { meta: { images: { [IMAGE_REF]: 'https://s3/photo.png' } } });
@@ -57,10 +57,10 @@ function figma(overrides: Record<string, () => Response> = {}) {
 const run = (over: Partial<Parameters<typeof importFigmaFrames>[0]> = {}) => {
   const { store, frames } = memoryStore();
   const importUrl = vi.fn(async () => 'asset-1');
-  const fetchFn = figma();
+  const call = figma();
   const ask = { url: LINK, nodeIds: null, at: { x: 1000, y: 500 } };
-  const deps = { store, place: PLACE, token: TOKEN, fetchFn, importUrl, newId: () => 'id' };
-  return { frames, importUrl, fetchFn, done: importFigmaFrames({ ...deps, ...ask, ...over }) };
+  const deps = { store, place: PLACE, call, importUrl, newId: () => 'id' };
+  return { frames, importUrl, call, done: importFigmaFrames({ ...deps, ...ask, ...over }) };
 };
 
 describe('importing Figma frames by link', () => {
@@ -74,11 +74,11 @@ describe('importing Figma frames by link', () => {
   });
 
   it('draws the frames the user picked instead of the one in the link', async () => {
-    const { done, fetchFn } = run({ nodeIds: ['1:2'] });
+    const { done, call } = run({ nodeIds: ['1:2'] });
 
     await done;
 
-    expect(fetchFn).toHaveBeenCalledWith(expect.stringContaining('ids=1%3A2'), expect.anything());
+    expect(call).toHaveBeenCalledWith(expect.objectContaining({ query: expect.objectContaining({ ids: '1:2' }) }));
   });
 
   it('fills the image placeholders with the pictures stored from Figma', async () => {
@@ -91,7 +91,7 @@ describe('importing Figma frames by link', () => {
   });
 
   it('keeps the frame, with placeholders, when the pictures cannot be fetched', async () => {
-    const { done, frames } = run({ fetchFn: figma({ '/images': () => json(500, {}) }) });
+    const { done, frames } = run({ call: figma({ '/images': () => json(500, {}) }) });
 
     const result = await done;
 
@@ -100,10 +100,10 @@ describe('importing Figma frames by link', () => {
   });
 
   it('says why nothing was drawn', async () => {
-    expect((await run({ token: null }).done).outcome).toBe(FigmaOutcome.NoToken);
+    expect((await run({ call: null }).done).outcome).toBe(FigmaOutcome.NoToken);
     expect((await run({ url: 'https://example.com/x' }).done).outcome).toBe(FigmaOutcome.BadLink);
     expect((await run({ url: `https://www.figma.com/design/${FILE}/Kit` }).done).outcome).toBe(FigmaOutcome.NoFrames);
-    expect((await run({ fetchFn: figma({ '/nodes?': () => json(403, {}) }) }).done).outcome).toBe(FigmaOutcome.Rejected);
-    expect((await run({ fetchFn: figma({ '/nodes?': () => json(200, { nodes: { '1:2': null } }) }) }).done).outcome).toBe(FigmaOutcome.Unreadable);
+    expect((await run({ call: figma({ '/nodes': () => json(403, {}) }) }).done).outcome).toBe(FigmaOutcome.Rejected);
+    expect((await run({ call: figma({ '/nodes': () => json(200, { nodes: { '1:2': null } }) }) }).done).outcome).toBe(FigmaOutcome.Unreadable);
   });
 });

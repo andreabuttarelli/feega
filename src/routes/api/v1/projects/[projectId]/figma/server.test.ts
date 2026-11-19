@@ -2,12 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const findReachableProject = vi.fn();
 const readToken = vi.fn();
+const figma = vi.fn();
 const importFigmaFrames = vi.fn();
 const findNode = vi.fn();
 
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: vi.fn(async () => []) }));
 vi.mock('$lib/server/projects/lookup', () => ({ findReachableProject: (...args: unknown[]) => findReachableProject(...args) }));
-vi.mock('$lib/server/figma/token-store', () => ({ figmaTokenStore: () => ({ read: readToken }) }));
+vi.mock('$lib/server/connections/runtime', () => ({ accountFor: () => ({ call: readToken, status: async () => ({ connected: Boolean(await readToken()) }) }) }));
 vi.mock('$lib/server/figma/import-frames', () => ({ importFigmaFrames: (...args: unknown[]) => importFigmaFrames(...args) }));
 vi.mock('$lib/server/repos/canvas', () => ({ findNode: (...args: unknown[]) => findNode(...args) }));
 vi.mock('$lib/server/motion/move-element', () => ({ frameStore: () => ({}) }));
@@ -29,27 +30,28 @@ async function call(route: { POST: unknown }, body: unknown, user = 'u1') {
   return { res, body: await res.json() };
 }
 
+const answer = (status: number, data: unknown) => ({ status, data, headers: {}, file: null });
+
 const document = { children: [{ id: '0:1', name: 'Page', type: 'CANVAS', children: [{ id: '1:2', name: 'Hero', type: 'FRAME', absoluteBoundingBox: { x: 0, y: 0, width: 400, height: 300 } }] }] };
 
 beforeEach(() => {
   vi.restoreAllMocks();
   findReachableProject.mockResolvedValue({ orgId: 'o1', project: { id: 'p1' } });
-  readToken.mockResolvedValue('figd_secret');
+  readToken.mockResolvedValue(figma);
   findNode.mockImplementation(async (_db, { nodeId }) => ({ id: nodeId }));
 });
 
 describe('POST /api/v1/projects/:id/figma/frames', () => {
   it('lists the frames of the linked file and marks the one the link points at', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ document })));
+    figma.mockResolvedValue(answer(200, { document }));
 
     const { res, body } = await call(frames, { url: LINK }, 'u-list');
 
     expect(res.status).toBe(200);
     expect(body).toEqual({ frames: [{ id: '1:2', name: 'Hero', page: 'Page', width: 400, height: 300 }], selected: '1:2' });
-    expect(JSON.stringify(body)).not.toContain('figd_secret');
   });
 
-  it('answers 409 no_token when the user connected no Figma token', async () => {
+  it('answers 409 no_token when Figma is not connected', async () => {
     readToken.mockResolvedValue(null);
 
     const { res, body } = await call(frames, { url: LINK }, 'u-none');
@@ -74,7 +76,7 @@ describe('POST /api/v1/projects/:id/figma/import', () => {
 
     expect(res.status).toBe(200);
     expect(body).toEqual({ nodes: [{ id: 'n1' }], undo: [{ u: 1 }], skipped: ['x'] });
-    expect(importFigmaFrames).toHaveBeenCalledWith(expect.objectContaining({ url: LINK, nodeIds: ['1:2'], at: { x: 10, y: 20 }, token: 'figd_secret', place: { projectId: 'p1', canvasId: 'c1' } }));
+    expect(importFigmaFrames).toHaveBeenCalledWith(expect.objectContaining({ url: LINK, nodeIds: ['1:2'], at: { x: 10, y: 20 }, call: figma, place: { projectId: 'p1', canvasId: 'c1' } }));
   });
 
   it('maps a refusal to its status', async () => {

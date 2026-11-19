@@ -16,6 +16,8 @@ const TIMEOUT_MS = 30_000;
 
 type ProxyAnswer = { status?: number; data?: unknown; headers?: Record<string, string>; binary_data?: { url?: string } | null };
 
+const paramsOf = (values: Record<string, string> | undefined, type: 'query' | 'header') => Object.entries(values ?? {}).map(([name, value]) => ({ name, value, type }));
+
 export function composioLinks(source: Record<string, string | undefined>, fetchFn: typeof fetch = fetch): AccountLinks | null {
   const apiKey = source.COMPOSIO_API_KEY;
   if (!apiKey) {
@@ -43,8 +45,9 @@ export function composioLinks(source: Record<string, string | undefined>, fetchF
     },
     status: async (accountId) => STATUS[(await send<{ status?: string }>('GET', `/connected_accounts/${encodeURIComponent(accountId)}`))?.status ?? ''] ?? LinkStatus.Gone,
     call: async (owner, accountId, request) => {
-      const parameters = Object.entries(request.query ?? {}).map(([name, value]) => ({ name, value, type: 'query' }));
-      const answer = await send<ProxyAnswer>('POST', '/tools/execute/proxy', { endpoint: request.endpoint, method: request.method ?? 'GET', ...(request.body === undefined ? {} : { body: request.body }), connected_account_id: accountId, user_id: owner, parameters });
+      const parameters = [...paramsOf(request.query, 'query'), ...paramsOf(request.headers, 'header')];
+      const binary = request.binary ? { binary_body: { base64: request.binary.base64, content_type: request.binary.contentType } } : {};
+      const answer = await send<ProxyAnswer>('POST', '/tools/execute/proxy', { endpoint: request.endpoint, method: request.method ?? 'GET', ...(request.body === undefined ? {} : { body: request.body }), ...binary, connected_account_id: accountId, user_id: owner, parameters });
       return { status: answer?.status ?? 0, data: answer?.data ?? null, headers: answer?.headers ?? {}, file: answer?.binary_data?.url ?? null };
     },
     forget: async (accountId) => {

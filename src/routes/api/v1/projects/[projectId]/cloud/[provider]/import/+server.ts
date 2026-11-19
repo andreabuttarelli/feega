@@ -1,15 +1,13 @@
 import { json } from '@sveltejs/kit';
 import { z } from 'zod';
 import { downloadFile, isCloudProvider } from '$lib/server/cloud/cloud';
-import { cloudAccess } from '$lib/server/cloud/runtime';
+import { CLOUD_REFUSAL_STATUS, cloudAccess } from '$lib/server/cloud/runtime';
 import { importCanvasBytes, UploadError } from '$lib/server/canvas/upload';
 import { projectScopeOf } from '$lib/server/projects/project-scope';
 import type { RequestHandler } from './$types';
 
 const HTTP_BAD_REQUEST = 400;
 const HTTP_NOT_FOUND = 404;
-const HTTP_CONFLICT = 409;
-const HTTP_NOT_CONFIGURED = 501;
 const HTTP_BAD_GATEWAY = 502;
 
 const askSchema = z.object({
@@ -30,11 +28,11 @@ export const POST: RequestHandler = async (event) => {
     return json({ error: 'invalid' }, { status: HTTP_BAD_REQUEST });
   }
 
-  const access = await cloudAccess(scope.db, scope.userId, event.params.provider);
+  const access = await cloudAccess(scope.db, scope, event.params.provider);
   if (!access.ok) {
-    return json({ error: access.reason }, { status: access.reason === 'not_configured' ? HTTP_NOT_CONFIGURED : HTTP_CONFLICT });
+    return json({ error: access.reason }, { status: CLOUD_REFUSAL_STATUS[access.reason] });
   }
-  const file = await downloadFile(event.params.provider, access.token, ask.data.fileId);
+  const file = await downloadFile(event.params.provider, access.call, ask.data.fileId);
   if (!file) {
     return json({ error: 'download_failed' }, { status: HTTP_BAD_GATEWAY });
   }

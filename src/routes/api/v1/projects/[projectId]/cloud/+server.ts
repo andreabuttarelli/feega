@@ -9,5 +9,5 @@ export const GET: RequestHandler = async (event) => {
     return scope;
   }
 
-  return json({ providers: await cloudStatuses(scope.db, scope.userId) });
+  return json({ providers: await cloudStatuses(scope.db, scope) });
 };

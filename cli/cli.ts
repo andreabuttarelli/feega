@@ -1022,11 +1022,11 @@ github
     await cmdGithubDetach(projectId, nodeId);
   });
 
-const cloud = program.command('cloud').description('Google Drive and Dropbox files of a project');
+const cloud = program.command('cloud').description('Google Drive, Dropbox and OneDrive files of a project');
 
 cloud
   .command('status <projectId>')
-  .description('Show whether Google Drive and Dropbox are connected')
+  .description('Show whether Google Drive, Dropbox and OneDrive are connected')
   .action(async (projectId: string) => {
     const { cmdCloud } = await import('./commands/cloud.ts');
     await cmdCloud(projectId);
@@ -1034,7 +1034,7 @@ cloud
 
 cloud
   .command('files <projectId> <provider>')
-  .description('List a folder (provider: google_drive or dropbox)')
+  .description('List a folder (provider: google_drive, dropbox or one_drive)')
   .option('--folder <id>', 'Folder id or path; the root when missing')
   .option('--cursor <cursor>', 'The cursor of the previous page')
   .action(async (projectId: string, provider: string, opts) => {
@@ -1065,18 +1065,18 @@ cloud
 
 cloud
   .command('disconnect <projectId> <provider>')
-  .description('Forget the connection and revoke it at the provider')
+  .description('Forget the connection')
   .action(async (projectId: string, provider: string) => {
     const { cmdCloudDisconnect } = await import('./commands/cloud.ts');
     await cmdCloudDisconnect(projectId, provider as 'dropbox');
   });
 
 program
-  .command('figma-token <projectId>')
-  .description('Show whether a Figma token is saved (it is set in the app)')
+  .command('figma-status <projectId>')
+  .description('Show whether Figma is connected (connect it in the app)')
   .action(async (projectId: string) => {
-    const { cmdFigmaToken } = await import('./commands/cloud.ts');
-    await cmdFigmaToken(projectId);
+    const { cmdFigmaStatus } = await import('./commands/cloud.ts');
+    await cmdFigmaStatus(projectId);
   });
 
 program

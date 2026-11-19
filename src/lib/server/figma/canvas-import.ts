@@ -10,12 +10,15 @@ import { listFigmaFrames, type FrameListing } from './import-file';
 import { importFigmaFrames, type FigmaImported } from './import-frames';
 import { FigmaOutcome } from './import-images';
 import { rateWindow } from './rate-window';
-import { figmaTokenStore } from './token-store';
+import { Toolkit } from '$lib/server/connections/account-links';
+import { accountFor } from '$lib/server/connections/runtime';
 
 const MS_PER_MINUTE = 60_000;
 const REQUESTS_PER_MINUTE = 12;
 
 const limiter = rateWindow({ limit: REQUESTS_PER_MINUTE, windowMs: MS_PER_MINUTE });
+
+export const figmaCall = (scope: Pick<FigmaScope, 'db' | 'orgId' | 'userId'>) => accountFor(scope.db, scope, Toolkit.Figma).call();
 
 export type FigmaScope = { db: Db; orgId: string; userId: string; projectId: string; actor: Actor };
 
@@ -30,12 +33,12 @@ export async function figmaFramesOf(scope: FigmaScope, url: string): Promise<Fig
     return { outcome: FigmaOutcome.RateLimited };
   }
 
-  const token = await figmaTokenStore(scope.db, scope.userId).read();
-  if (!token) {
+  const call = await figmaCall(scope);
+  if (!call) {
     return { outcome: FigmaOutcome.NoToken };
   }
 
-  const listed = await listFigmaFrames({ token, fileKey: link.fileKey }, fetch);
+  const listed = await listFigmaFrames({ fileKey: link.fileKey }, call);
   return listed.outcome === FigmaOutcome.Ok ? { ...listed, selected: link.nodeId } : listed;
 }
 
@@ -50,8 +53,7 @@ export async function importFigmaInto(scope: FigmaScope, canvasId: string, ask: 
     ...ask,
     store: frameStore(scope.db, { orgId: scope.orgId, actor: scope.actor, projectId: scope.projectId }),
     place: { projectId: scope.projectId, canvasId },
-    token: await figmaTokenStore(scope.db, scope.userId).read(),
-    fetchFn: fetch,
+    call: await figmaCall(scope),
     importUrl,
     newId: () => crypto.randomUUID().slice(0, 8)
   });

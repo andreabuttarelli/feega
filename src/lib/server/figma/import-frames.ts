@@ -3,7 +3,8 @@ import { imagesFilled } from '$lib/canvas/figma/images';
 import { placeFigmaPlan, type FigmaFill, type FigmaPasteOutcome, type FrameStore, type Place } from '$lib/server/motion/move-element';
 import { figmaUrl } from './file-url';
 import { fetchFigmaFrames } from './import-file';
-import { FigmaOutcome, MAX_HASHES, importFigmaImages, type FetchFn } from './import-images';
+import type { ProviderCaller } from '$lib/server/connections/account-links';
+import { FigmaOutcome, MAX_HASHES, importFigmaImages } from './import-images';
 import { restMessage } from './rest-message';
 
 const FILLED_SUMMARY = 'Filled Figma images';
@@ -11,11 +12,10 @@ const FILLED_SUMMARY = 'Filled Figma images';
 type Ask = {
   store: FrameStore;
   place: Place;
-  token: string | null;
+  call: ProviderCaller | null;
   url: string;
   nodeIds: string[] | null;
   at: { x: number; y: number };
-  fetchFn: FetchFn;
   importUrl: (url: string) => Promise<string | null>;
   newId: () => string;
 };
@@ -28,9 +28,9 @@ const refused = (outcome: Exclude<FigmaOutcome, FigmaOutcome.Ok>): FigmaImported
 
 const chunks = <T>(list: T[], size: number): T[][] => Array.from({ length: Math.ceil(list.length / size) }, (_, i) => list.slice(i * size, (i + 1) * size));
 
-async function fillImages(ask: Ask, fileKey: string, token: string, fills: FigmaFill[]): Promise<void> {
+async function fillImages(ask: Ask, fileKey: string, call: ProviderCaller, fills: FigmaFill[]): Promise<void> {
   const hashes = [...new Set(fills.flatMap((f) => f.images.map((i) => i.hash)))];
-  const stored = await Promise.all(chunks(hashes, MAX_HASHES).map((part) => importFigmaImages({ token, fileKey, hashes: part }, { fetchFn: ask.fetchFn, importUrl: ask.importUrl })));
+  const stored = await Promise.all(chunks(hashes, MAX_HASHES).map((part) => importFigmaImages({ fileKey, hashes: part }, { call, importUrl: ask.importUrl })));
   const assets = Object.assign({}, ...stored.map((s) => s.assets));
 
   for (const fill of fills) {
@@ -42,7 +42,8 @@ async function fillImages(ask: Ask, fileKey: string, token: string, fills: Figma
 }
 
 export async function importFigmaFrames(ask: Ask): Promise<FigmaImported> {
-  if (!ask.token) {
+  const call = ask.call;
+  if (!call) {
     return refused(FigmaOutcome.NoToken);
   }
 
@@ -56,7 +57,7 @@ export async function importFigmaFrames(ask: Ask): Promise<FigmaImported> {
     return refused(FigmaOutcome.NoFrames);
   }
 
-  const got = await fetchFigmaFrames({ token: ask.token, fileKey: link.fileKey, nodeIds }, ask.fetchFn);
+  const got = await fetchFigmaFrames({ fileKey: link.fileKey, nodeIds }, call);
   if (got.outcome !== FigmaOutcome.Ok) {
     return refused(got.outcome);
   }
@@ -67,6 +68,6 @@ export async function importFigmaFrames(ask: Ask): Promise<FigmaImported> {
   }
 
   const placed = await placeFigmaPlan(ask.store, ask.place, plan, ask.at);
-  await fillImages(ask, link.fileKey, ask.token, placed.fills).catch(() => undefined);
+  await fillImages(ask, link.fileKey, call, placed.fills).catch(() => undefined);
   return { outcome: FigmaOutcome.Ok, frameIds: placed.frameIds, undo: placed.undo, skipped: placed.skipped };
 }

@@ -2,14 +2,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const findReachableProject = vi.fn();
 const readToken = vi.fn();
+const figma = vi.fn();
 const importCanvasLink = vi.fn();
 
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: vi.fn(async () => []) }));
 vi.mock('$lib/server/projects/lookup', () => ({ findReachableProject: (...args: unknown[]) => findReachableProject(...args) }));
-vi.mock('$lib/server/figma/token-store', () => ({ figmaTokenStore: () => ({ read: readToken }) }));
+vi.mock('$lib/server/connections/runtime', () => ({ accountFor: () => ({ call: readToken, status: async () => ({ connected: Boolean(await readToken()) }) }) }));
 vi.mock('$lib/server/canvas/upload', () => ({ importCanvasLink: (...args: unknown[]) => importCanvasLink(...args) }));
 
 const { POST } = await import('./+server');
+
+const answer = (status: number, data: unknown) => ({ status, data, headers: {}, file: null });
 
 const FILE = 'AbCdEf1234567890';
 const HASH = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -27,26 +30,25 @@ async function call(body: unknown, user = 'u1') {
 beforeEach(() => {
   vi.restoreAllMocks();
   findReachableProject.mockResolvedValue({ orgId: 'o1', project: { id: 'p1' } });
-  readToken.mockResolvedValue('figd_secret');
+  readToken.mockResolvedValue(figma);
   importCanvasLink.mockResolvedValue({ asset: { id: 'asset-1' } });
 });
 
 describe('POST /api/v1/projects/:id/figma-images', () => {
-  it('stores the images Figma serves and answers hash to asset, never the token', async () => {
-    const figma = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ meta: { images: { [HASH]: 'https://s3.figma.test/a.png' } } })));
+  it('stores the images Figma serves and answers hash to asset, through the connected account', async () => {
+    figma.mockResolvedValue(answer(200, { meta: { images: { [HASH]: 'https://s3.figma.test/a.png' } } }));
 
     const { res, body } = await call({ fileKey: FILE, hashes: [HASH] }, 'u-ok');
 
     expect(res.status).toBe(200);
     expect(body).toEqual({ assets: { [HASH]: 'asset-1' } });
-    expect(JSON.stringify(body)).not.toContain('figd_secret');
-    expect(figma).toHaveBeenCalledWith(`https://api.figma.com/v1/files/${FILE}/images`, { headers: { 'X-Figma-Token': 'figd_secret' } });
+    expect(figma).toHaveBeenCalledWith({ endpoint: `https://api.figma.com/v1/files/${FILE}/images` });
     expect(importCanvasLink).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ orgId: 'o1', projectId: 'p1', url: 'https://s3.figma.test/a.png', maxBytes: 4 * 1024 * 1024 }));
   });
 
-  it('answers 409 no_token without calling Figma when the user has none', async () => {
+  it('answers 409 no_token without calling Figma when Figma is not connected', async () => {
     readToken.mockResolvedValue(null);
-    const figma = vi.spyOn(globalThis, 'fetch');
+    figma.mockClear();
 
     const { res, body } = await call({ fileKey: FILE, hashes: [HASH] }, 'u-none');
 
@@ -61,8 +63,8 @@ describe('POST /api/v1/projects/:id/figma-images', () => {
     expect(res.status).toBe(400);
   });
 
-  it('answers 422 when Figma rejects the token', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 403 }));
+  it('answers 422 when Figma rejects the connection', async () => {
+    figma.mockResolvedValue(answer(403, {}));
 
     const { res, body } = await call({ fileKey: FILE, hashes: [HASH] }, 'u-403');
 
@@ -71,7 +73,7 @@ describe('POST /api/v1/projects/:id/figma-images', () => {
   });
 
   it('rate limits a user who asks too often', async () => {
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify({ meta: { images: {} } })));
+    figma.mockResolvedValue(answer(200, { meta: { images: {} } }));
 
     const statuses: number[] = [];
     for (let i = 0; i < 13; i++) {

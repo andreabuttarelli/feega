@@ -1,6 +1,5 @@
 import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 import { changedLook, LOOK, LookKey, mapClips, minSideOf } from '$lib/canvas/code-look';
-import type { ProviderCall } from '$lib/server/connections/account-links';
 import type { GithubCall } from './github';
 import type { RepoRef } from './repo';
 import { unbound, type FileChange, type ReadFile } from './write-back';
@@ -15,20 +14,6 @@ const ok = (status: number) => status >= HTTP_OK_MIN && status <= HTTP_OK_MAX;
 const field = (data: unknown, key: string): string | null => (data && typeof data === 'object' && typeof (data as Record<string, unknown>)[key] === 'string' ? ((data as Record<string, unknown>)[key] as string) : null);
 const repoPath = (repo: RepoRef) => `/repos/${repo.owner}/${repo.repo}`;
 const encoded = (path: string) => path.split('/').map(encodeURIComponent).join('/');
-
-export function tokenCall(token: string, fetchFn: typeof fetch = fetch): GithubCall {
-  return async (request: ProviderCall) => {
-    const url = new URL(`${GITHUB_API}${request.endpoint}`);
-    Object.entries(request.query ?? {}).forEach(([k, v]) => url.searchParams.set(k, v));
-    const res = await fetchFn(url, {
-      method: request.method ?? 'GET',
-      headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json', 'content-type': 'application/json' },
-      ...(request.body === undefined ? {} : { body: JSON.stringify(request.body) }),
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
-    });
-    return { status: res.status, data: await res.json().catch(() => null), headers: {}, file: null };
-  };
-}
 
 export function rawReader(repo: RepoRef, sha: string, call: GithubCall | null, fetchFn: typeof fetch = fetch): ReadFile {
   if (call) {

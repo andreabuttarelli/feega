@@ -16,7 +16,7 @@ type Scope = { orgId: string; userId: string; projectId: string };
 
 const localFolder = (raw: string) => (localModeRefusal(env) === null ? folderOf(raw) : null);
 
-const sourcesOf = (db: Db, scope: Scope): HostSources => ({ connected: () => githubFor(db, scope).call(), env: { GITHUB_PUSH_TOKEN: env.GITHUB_PUSH_TOKEN, GITHUB_API_URL: env.GITHUB_API_URL }, folder: localFolder });
+const sourcesOf = (db: Db, scope: Scope): HostSources => ({ connected: () => githubFor(db, scope).call(), folder: localFolder });
 
 export const framesDeps = (db: Db, scope: Scope): FramesDeps => ({
   host: hostOf(sourcesOf(db, scope)),

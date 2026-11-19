@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import { z } from 'zod';
 import { UPLOAD_MAX_BYTES } from '$lib/canvas/upload-kind';
 import { importCanvasLink } from '$lib/server/canvas/upload';
-import { figmaTokenStore } from '$lib/server/figma/token-store';
+import { figmaCall } from '$lib/server/figma/canvas-import';
 import { FIGMA_STATUS, FigmaOutcome, MAX_HASHES, importFigmaImages } from '$lib/server/figma/import-images';
 import { rateWindow } from '$lib/server/figma/rate-window';
 import { projectScopeOf } from '$lib/server/projects/project-scope';
@@ -28,13 +28,13 @@ export const POST: RequestHandler = async (event) => {
   if (!limiter.allow(scope.userId)) {
     return json({ error: 'rate_limited' }, { status: HTTP_TOO_MANY });
   }
-  const token = await figmaTokenStore(scope.db, scope.userId).read();
-  if (!token) {
+  const call = await figmaCall(scope);
+  if (!call) {
     return json({ error: 'no_token' }, { status: FIGMA_STATUS[FigmaOutcome.NoToken] });
   }
 
   const importUrl = async (url: string) => (await importCanvasLink(scope.db, { orgId: scope.orgId, projectId: scope.projectId, url, maxBytes: UPLOAD_MAX_BYTES.image })).asset.id;
-  const done = await importFigmaImages({ token, fileKey: ask.data.fileKey, hashes: ask.data.hashes }, { fetchFn: fetch, importUrl });
+  const done = await importFigmaImages({ fileKey: ask.data.fileKey, hashes: ask.data.hashes }, { call, importUrl });
 
   if (done.outcome !== FigmaOutcome.Ok) {
     return json({ error: done.outcome }, { status: FIGMA_STATUS[done.outcome] });

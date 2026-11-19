@@ -45,6 +45,14 @@ describe('composioLinks', () => {
     expect(sent[0].body).toEqual({ endpoint: '/user/repos', method: 'GET', connected_account_id: 'ca_1', user_id: 'o1:u1', parameters: [{ name: 'per_page', value: '100', type: 'query' }] });
   });
 
+  it('intestazioni e corpo binario arrivano al proxy come parametri header e binary_body', async () => {
+    const { sent, fetchFn } = backend({ 'POST /tools/execute/proxy': { status: 200, data: {} } });
+
+    await composioLinks({ COMPOSIO_API_KEY: 'k' }, fetchFn)!.call('o1:u1', 'ca_1', { endpoint: 'https://content.dropboxapi.com/2/files/upload', method: 'POST', headers: { 'Dropbox-API-Arg': '{"path":"/a.png"}' }, binary: { base64: 'AQI=', contentType: 'image/png' } });
+
+    expect(sent[0].body).toEqual({ endpoint: 'https://content.dropboxapi.com/2/files/upload', method: 'POST', binary_body: { base64: 'AQI=', content_type: 'image/png' }, connected_account_id: 'ca_1', user_id: 'o1:u1', parameters: [{ name: 'Dropbox-API-Arg', value: '{"path":"/a.png"}', type: 'header' }] });
+  });
+
   it('dimenticare cancella il conto', async () => {
     const { sent, fetchFn } = backend({ 'DELETE /connected_accounts/ca_1': {} });
 

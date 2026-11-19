@@ -2,7 +2,7 @@
 
 `POST /api/v1/projects/:projectId/figma-images`
 
-Fetches the images of a Figma paste with the caller's own Figma personal access token, stores each
+Fetches the images of a Figma paste through the caller's Figma account connected with Composio, stores each
 one as a project asset, and answers which asset each image became. Used by the canvas after a
 Figma paste; there is no CLI command or MCP tool for it, because an agent has no Figma clipboard.
 
@@ -25,10 +25,9 @@ left out of the map; the caller keeps its placeholder.
 | Status | `error` | Meaning |
 |---|---|---|
 | 400 | `invalid` | Body is not a file key and 1 to 40 hex hashes |
-| 409 | `no_token` | The user saved no Figma token (Settings, Profile) |
-| 422 | `token_rejected` | Figma refused the token |
+| 409 | `no_token` | Figma is not connected (Settings, Profile, Connections) |
+| 422 | `token_rejected` | Figma refused the connected account |
 | 429 | `rate_limited` | More than 12 requests a minute for the user |
 | 502 | `unavailable` | Figma unreachable or failing |
 
-The token is stored sealed (AES-256-GCM, `APP_SECRET`) in `user_figma_tokens`, set from the Figma
-section of Settings, and never returned by any endpoint.
+Calls go through the Composio proxy; Feega holds no Figma token.

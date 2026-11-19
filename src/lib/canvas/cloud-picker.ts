@@ -5,11 +5,11 @@ export enum CloudMode {
   Export = 'export'
 }
 
-export type CloudProviderId = 'google_drive' | 'dropbox';
+export type CloudProviderId = 'google_drive' | 'dropbox' | 'one_drive';
 
-export const PROVIDER_LABEL: Record<CloudProviderId, string> = { google_drive: 'Google Drive', dropbox: 'Dropbox' };
+export const PROVIDER_LABEL: Record<CloudProviderId, string> = { google_drive: 'Google Drive', dropbox: 'Dropbox', one_drive: 'OneDrive' };
 
-export const CLOUD_PROVIDERS: readonly CloudProviderId[] = ['google_drive', 'dropbox'];
+export const CLOUD_PROVIDERS: readonly CloudProviderId[] = ['google_drive', 'dropbox', 'one_drive'];
 
 const FAILED_AT: Record<CloudMode, ConnectionError> = {
   [CloudMode.Import]: ConnectionError.DownloadFailed,
@@ -34,9 +34,8 @@ export enum CloudAction {
   Disconnect = 'disconnect'
 }
 
-export enum FigmaTokenAction {
-  Save = 'save',
-  Test = 'test',
-  Remove = 'remove',
+export enum FigmaConnectionAction {
+  Connect = 'connect',
+  Disconnect = 'disconnect',
   Status = 'status'
 }

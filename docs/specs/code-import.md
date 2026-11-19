@@ -125,7 +125,7 @@ The origin keeps the map of the import (`code.map`, `importMapSchema` in `src/li
 
 The user connects GitHub through Composio (Platform, managed auth): `POST …/github/connect` opens a
 Composio session for the owner `<orgId>:<userId>` and answers its Connect Link, with a callback
-carrying a sealed state (`APP_SECRET`, 15 min). `GET /api/v1/github/callback` checks the signed-in
+carrying a sealed state (`APP_SECRET`, 15 min). `GET /api/v1/connections/callback` checks the signed-in
 user against the state and the `connected_account_id` against the pending row, asks Composio the
 account status, reads `/user` for the login and marks the row active. Only the connected account
 id is stored (`user_connected_accounts`, per org and user, RLS own rows); tokens stay at Composio.

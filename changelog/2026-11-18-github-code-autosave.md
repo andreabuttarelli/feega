@@ -28,8 +28,8 @@ Model after review (three concepts, no branch imposed):
   commit.
 
 All GitHub calls go through `GithubCall`: the Composio proxy of the connected account
-(`githubFor` → `composioLinks`), including `/graphql`. `hosts.ts` still falls back to
-`GITHUB_PUSH_TOKEN` when no account is connected (pre-existing, self-hosting); not removed here.
+(`githubFor` → `composioLinks`), including `/graphql`. There is no env-token fallback
+(removed with the Composio-only connections change).
 
 Assumptions to verify live: GitHub answers 403 on a protected-branch ref update (may be 422);
 the Composio proxy forwards `POST /graphql` and `refs/feega/...` ref writes.

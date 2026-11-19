@@ -29,7 +29,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 const IMAGE_LINE: Record<ImagesOutcome, ((n: number) => string) | null> = {
   [ImagesOutcome.Filled]: null,
-  [ImagesOutcome.NoToken]: (n) => `${plural(n, 'image is a grey placeholder', 'images are grey placeholders')}: add a Figma token in Settings to import ${n === 1 ? 'it' : 'them'}.`,
+  [ImagesOutcome.NoToken]: (n) => `${plural(n, 'image is a grey placeholder', 'images are grey placeholders')}: connect Figma in Settings to import ${n === 1 ? 'it' : 'them'}.`,
   [ImagesOutcome.Failed]: (n) => `${plural(n, 'image could not be loaded and stays a grey placeholder', 'images could not be loaded and stay grey placeholders')}.`
 };
 

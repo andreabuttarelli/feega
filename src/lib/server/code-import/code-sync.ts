@@ -6,7 +6,7 @@ import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { localModeRefusal } from '$lib/server/local/local-mode';
 import { githubFor } from './github-runtime';
 import { repoOf } from './repo';
-import { rebased, tokenCall } from './repo-sync';
+import { rebased } from './repo-sync';
 import { baselined } from '$lib/canvas/code-look';
 import { patchOf, type FileChange } from './write-back';
 import { frameEdits } from './token-write';
@@ -69,7 +69,7 @@ const TITLE = 'UI edits from feega';
 
 async function githubCalls(scope: CodeScope): Promise<GithubCalls> {
   const own = await githubFor(scope.db, scope).call().catch(() => null);
-  return { read: own ?? (env.GITHUB_TOKEN ? tokenCall(env.GITHUB_TOKEN) : null), write: own };
+  return { read: own, write: own };
 }
 
 type SourceOf = (scope: CodeScope, origin: CodeOriginData) => Promise<Linked | null>;

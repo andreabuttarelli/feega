@@ -196,7 +196,7 @@
       <button type="button" class="link" onclick={connectGithub}>connect GitHub</button>
     {/if}
     {#if projectId && CONNECT_HREF[PROMPT_SOURCES[pick.source].connect](projectId)}
-      <a class="link" href={CONNECT_HREF[PROMPT_SOURCES[pick.source].connect](projectId)}>Figma token</a>
+      <a class="link" href={CONNECT_HREF[PROMPT_SOURCES[pick.source].connect](projectId)}>Connect Figma</a>
     {/if}
     <button type="button" aria-label="Remove source" onclick={() => (pick = null)}>×</button>
   </div>

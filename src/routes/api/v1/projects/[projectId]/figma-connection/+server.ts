@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
-import { figmaTokenStore } from '$lib/server/figma/token-store';
+import { Toolkit } from '$lib/server/connections/account-links';
+import { accountFor } from '$lib/server/connections/runtime';
 import { projectScopeOf } from '$lib/server/projects/project-scope';
 import type { RequestHandler } from './$types';
 
@@ -9,6 +10,6 @@ export const GET: RequestHandler = async (event) => {
     return scope;
   }
 
-  const token = await figmaTokenStore(scope.db, scope.userId).read();
-  return json({ connected: token !== null });
+  const { connected } = await accountFor(scope.db, scope, Toolkit.Figma).status();
+  return json({ connected });
 };

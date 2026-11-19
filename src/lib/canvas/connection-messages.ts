@@ -15,7 +15,7 @@ export enum ConnectionError {
 }
 
 export const CONNECTION_MESSAGE: Record<ConnectionError, string> = {
-  [ConnectionError.NoToken]: 'Add a Figma token in Settings to import images.',
+  [ConnectionError.NoToken]: 'Connect Figma in Settings to import images.',
   [ConnectionError.TokenRejected]: 'Figma refused the token. It may be expired, missing the File content scope, or without access to that file. Check it in Settings.',
   [ConnectionError.RateLimited]: 'Too many Figma image requests. Wait a minute and paste again.',
   [ConnectionError.Unavailable]: 'Figma did not answer. The images stay grey; paste again in a moment.',

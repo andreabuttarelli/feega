@@ -1,13 +1,12 @@
 import { json, redirect } from '@sveltejs/kit';
-import { openConnectState } from '$lib/server/code-import/github-access';
-import { githubFor } from '$lib/server/code-import/github-runtime';
+import { openConnectState } from '$lib/server/connections/account-access';
+import { accountFor } from '$lib/server/connections/runtime';
 import { localPath } from '$lib/server/code-import/github-http';
 import type { RequestHandler } from './$types';
 
 const HTTP_BAD_REQUEST = 400;
 const HTTP_UNAUTHORIZED = 401;
 const HTTP_REDIRECT = 302;
-const RESULT_PARAM = 'github';
 
 enum Landing {
   Connected = 'connected',
@@ -26,8 +25,8 @@ export const GET: RequestHandler = async ({ url, locals }) => {
     return json({ error: 'unauthenticated' }, { status: HTTP_UNAUTHORIZED });
   }
 
-  const confirmed = await githubFor(db, { orgId: state.orgId, userId: state.userId }).confirm(accountId);
+  const confirmed = await accountFor(db, { orgId: state.orgId, userId: state.userId }, state.toolkit).confirm(accountId);
   const back = new URL(localPath(state.returnTo), url.origin);
-  back.searchParams.set(RESULT_PARAM, confirmed ? Landing.Connected : Landing.Failed);
+  back.searchParams.set(state.toolkit, confirmed ? Landing.Connected : Landing.Failed);
   redirect(HTTP_REDIRECT, `${back.pathname}${back.search}`);
 };

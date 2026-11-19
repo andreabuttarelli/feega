@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { cloudApi, figmaTokenApi } from './cloud.ts';
+import { cloudApi, figmaConnectionApi } from './cloud.ts';
 
 const seen: { method: string; path: string; body: unknown }[] = [];
 let server: Server;
@@ -57,10 +57,10 @@ describe('cloudApi', () => {
   });
 });
 
-describe('figmaTokenApi', () => {
+describe('figmaConnectionApi', () => {
   it('asks whether a token is saved', async () => {
-    await figmaTokenApi.status('t', 'p1');
+    await figmaConnectionApi.status('t', 'p1');
 
-    expect(seen.at(-1)).toMatchObject({ method: 'GET', path: '/api/v1/projects/p1/figma-token' });
+    expect(seen.at(-1)).toMatchObject({ method: 'GET', path: '/api/v1/projects/p1/figma-connection' });
   });
 });

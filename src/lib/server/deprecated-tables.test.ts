@@ -31,13 +31,16 @@ const DEPRECATED = [
 	'brand_triggers',
 	'brand_webhooks',
 	'webhook_deliveries',
-	'onboarding_step_jobs'
+	'onboarding_step_jobs',
+	'user_figma_tokens',
+	'user_cloud_tokens'
 ] as const;
 
 const MIGRATIONS = [
 	'20260921180000_deprecate_dead_tables.sql',
 	'20260921190000_drop_market.sql',
-	'20260922200000_drop_composio_and_onboarding_steps.sql'
+	'20260922200000_drop_composio_and_onboarding_steps.sql',
+	'20261119120000_deprecate_own_token_tables.sql'
 ];
 
 const MIGRATION = MIGRATIONS.map((name) =>
@@ -58,7 +61,7 @@ describe('deprecated tables', () => {
 
 	it('usa un formato solo, o il commento non si può interrogare', () => {
 		for (const { date, body } of commented()) {
-			expect(['2026-09-21', '2026-09-22']).toContain(date);
+			expect(['2026-09-21', '2026-09-22', '2026-11-19']).toContain(date);
 			expect(body.trim()).toMatch(/\.$/);
 		}
 	});

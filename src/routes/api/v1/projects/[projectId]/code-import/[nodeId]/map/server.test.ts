@@ -4,7 +4,7 @@ const ORG = '11111111-1111-4111-8111-111111111111';
 const MAP = { rev: 'abc', pages: [{ path: '/', state: 'imported', boards: [{ cond: 'light@1280', clip: 'b1' }] }, { path: '/gone', state: 'imported', boards: [{ cond: 'light@1280', clip: 'deleted' }] }] };
 const DOC = { tracks: [{ id: 't', clips: [{ id: 'b1' }] }], comps: {} };
 
-vi.mock('$env/dynamic/private', () => ({ env: { GITHUB_TOKEN: 't' } }));
+vi.mock('$env/dynamic/private', () => ({ env: {} }));
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: vi.fn(async () => []) }));
 vi.mock('$lib/server/projects/lookup', () => ({ findReachableProject: async () => ({ orgId: ORG, project: { id: 'p1' } }) }));
 vi.mock('$lib/server/repos/canvas', async (actual) => ({ ...(await actual<object>()), findNode: async () => ({ id: 'f1', projectId: 'p1', data: { code: { kind: 'github', repo: 'a/b', branch: 'main', sha: 'abc', routes: ['/', '/gone'], map: MAP } } }) }));

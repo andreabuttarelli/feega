@@ -255,7 +255,7 @@
     [InsertSection.Models]: () => models.map(modelTile),
     [InsertSection.Import]: () => [
       { id: 'upload', label: 'Upload file', icon: Upload, run: pickFile },
-      ...optional({ id: 'cloud', label: 'Import from Drive or Dropbox', icon: Cloud, run: () => oncloud?.() }, oncloud),
+      ...optional({ id: 'cloud', label: 'Import from the cloud', icon: Cloud, run: () => oncloud?.() }, oncloud),
       ...optional({ id: 'figma', label: 'Import from Figma', icon: Frame, run: () => onfigma?.() }, onfigma),
       ...optional({ id: 'url', label: 'From URL…', icon: Link, run: () => onurl?.() }, onurl),
       ...optional({ id: 'code', label: 'From code…', icon: CodeXml, run: () => oncode?.() }, oncode),

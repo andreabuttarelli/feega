@@ -131,7 +131,7 @@ With **Design system** on (the default when the dialog finds CSS tokens, with th
 A frame imported from GitHub or a folder remembers where each layer comes from in the code. Change a text, a text colour or size, a fill, or the gap, padding or direction of a stack, then open **code mode** (the `</>` button): the **GitHub** (or **Folder**) section lists the files the edits touch and shows the patch.
 
 - **Patch** downloads it as a `.patch` file (`git apply` it in your checkout).
-- **Open pull request** creates a new `feega/…` branch on the repository and a pull request against its default branch. Nothing is ever committed to the default branch. It needs your own GitHub connected: a server-wide `GITHUB_TOKEN` is used only to read public repositories, never to write.
+- **Open pull request** creates a new `feega/…` branch on the repository and a pull request against its default branch. Nothing is ever committed to the default branch. It needs your own GitHub connected; Feega has no server-wide GitHub token.
 - **Write to folder** (folder imports) writes the files and, when the folder is a git repository, also commits them on a new `feega/…` branch, leaving your current branch as it was. The app's dev server reloads, so the page shows the edit.
 - Styles land as an inline `style` on the element (`style={{ … }}` in JSX), or as Tailwind classes when the project uses Tailwind. Texts are replaced where the element holds them; texts that come from an inlang/Paraglide message (`{m.home_title()}`) are changed in the message file of the language shown. A text built by other code is listed as not written back.
 

@@ -1,5 +1,5 @@
 import { loadSession } from '../lib/auth.ts';
-import { cloudApi, figmaTokenApi, type CloudProviderId } from '../lib/cloud.ts';
+import { cloudApi, figmaConnectionApi, type CloudProviderId } from '../lib/cloud.ts';
 
 async function token(): Promise<string> {
   const session = await loadSession();
@@ -41,11 +41,11 @@ export async function cmdCloudExport(projectId: string, provider: CloudProviderI
 }
 
 export async function cmdCloudDisconnect(projectId: string, provider: CloudProviderId) {
-  const { revoked } = await cloudApi.disconnect(await token(), projectId, provider);
-  console.log(revoked ? 'Disconnected and revoked at the provider.' : 'Disconnected. The provider did not confirm the revoke; remove feega there too.');
+  await cloudApi.disconnect(await token(), projectId, provider);
+  console.log('Disconnected.');
 }
 
-export async function cmdFigmaToken(projectId: string) {
-  const { connected } = await figmaTokenApi.status(await token(), projectId);
-  console.log(connected ? 'A Figma token is saved.' : 'No Figma token. Add one in Settings, Profile.');
+export async function cmdFigmaStatus(projectId: string) {
+  const { connected } = await figmaConnectionApi.status(await token(), projectId);
+  console.log(connected ? 'Figma is connected.' : 'Figma is not connected. Connect it in Settings, Profile.');
 }

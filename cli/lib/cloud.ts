@@ -1,6 +1,6 @@
 import { request } from './api.ts';
 
-export type CloudProviderId = 'google_drive' | 'dropbox';
+export type CloudProviderId = 'google_drive' | 'dropbox' | 'one_drive';
 export type CloudStatus = { provider: CloudProviderId; label: string; connected: boolean; configured: boolean };
 export type CloudEntry = { id: string; name: string; folder: boolean; mime: string | null; importable: boolean };
 export type CloudPlace = { canvasId: string; x: number; y: number };
@@ -26,9 +26,9 @@ export const cloudApi = {
   exportAsset: (token: string, projectId: string, provider: CloudProviderId, body: { assetId: string; folder: string; name?: string }) =>
     request<{ exported: true }>(`${cloud(projectId, provider)}/export`, token, { method: 'POST', body: JSON.stringify(body) }),
   disconnect: (token: string, projectId: string, provider: CloudProviderId) =>
-    request<{ disconnected: true; revoked: boolean }>(cloud(projectId, provider), token, { method: 'DELETE' })
+    request<{ disconnected: true }>(cloud(projectId, provider), token, { method: 'DELETE' })
 };
 
-export const figmaTokenApi = {
-  status: (token: string, projectId: string) => request<{ connected: boolean }>(`${base(projectId)}/figma-token`, token)
+export const figmaConnectionApi = {
+  status: (token: string, projectId: string) => request<{ connected: boolean }>(`${base(projectId)}/figma-connection`, token)
 };

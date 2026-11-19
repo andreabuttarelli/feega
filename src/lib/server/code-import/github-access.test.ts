@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { LinkStatus, Toolkit, type AccountLinks, type ProviderAnswer, type ProviderCall } from '$lib/server/connections/account-links';
 import type { AccountStore, StoredAccount } from '$lib/server/connections/account-store';
-import { githubAccess, openConnectState } from './github-access';
+import { githubAccess } from './github-access';
+import { openConnectState } from '$lib/server/connections/account-access';
 
 vi.mock('$env/dynamic/private', () => ({ env: { APP_SECRET: 'test-secret-for-github' } }));
 

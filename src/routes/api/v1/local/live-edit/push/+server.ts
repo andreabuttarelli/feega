@@ -1,5 +1,4 @@
 import { error, json } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
 import { localStore } from '$lib/server/local/local-mode';
 import { devFolder } from '$lib/server/dev-server/local-dev-server';
 import { CodeSourceKind } from '$lib/server/code-push/link';
@@ -19,7 +18,7 @@ export const POST: RequestHandler = async () => {
     error(NOT_FOUND, 'Live edits run only in local mode');
   }
   const root = devFolder(store);
-  const host = await hostOf({ connected: async () => null, env: { GITHUB_PUSH_TOKEN: env.GITHUB_PUSH_TOKEN, GITHUB_API_URL: env.GITHUB_API_URL }, folder: (dir) => dir })(CodeSourceKind.Folder, root);
+  const host = await hostOf({ connected: async () => null, folder: (dir) => dir })(CodeSourceKind.Folder, root);
   const out = host ? await livePush(root, host, lock) : null;
   if (!out?.ok) {
     error(CONFLICT, out ? String(out.refusal) : 'no git repository');

@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { isCloudProvider } from '$lib/server/cloud/cloud';
-import { disconnectCloud } from '$lib/server/cloud/runtime';
+import { cloudAccount } from '$lib/server/cloud/runtime';
 import { projectScopeOf } from '$lib/server/projects/project-scope';
 import type { RequestHandler } from './$types';
 
@@ -15,6 +15,6 @@ export const DELETE: RequestHandler = async (event) => {
     return scope;
   }
 
-  const { revoked } = await disconnectCloud(scope.db, scope.userId, event.params.provider);
-  return json({ disconnected: true, revoked });
+  await cloudAccount(scope.db, scope, event.params.provider).disconnect();
+  return json({ disconnected: true });
 };

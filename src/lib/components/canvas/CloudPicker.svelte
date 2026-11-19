@@ -30,7 +30,6 @@
   let busy = $state(false);
 
   const here = $derived(trail[trail.length - 1]);
-  const connectUrl = $derived(`/api/v1/cloud/${provider}/connect?return=${encodeURIComponent(returnTo)}`);
   const shown = $derived(mode === CloudMode.Export ? entries.filter((e) => e.folder) : entries);
 
   async function load(cursor: string | null) {
@@ -63,6 +62,18 @@
     busy = true;
     await onpick(target, provider);
     busy = false;
+  }
+
+  async function connect() {
+    busy = true;
+    const res = await fetch(`/api/v1/projects/${projectId}/cloud/${provider}/connect`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ returnTo }) });
+    const body = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+    busy = false;
+    if (body.url) {
+      window.location.assign(body.url);
+      return;
+    }
+    problem = body.error ?? 'failed';
   }
 
   async function disconnect() {
@@ -121,13 +132,13 @@
     </span>
   </header>
 
-  {#if problem === 'not_connected' || problem === 'reconnect'}
+  {#if problem === 'not_connected'}
     <p class="note" data-testid="cloud-connect">
       Connect {PROVIDER_LABEL[provider]} to continue.
-      <a href={connectUrl} data-testid="cloud-connect-link">Connect</a>
+      <button type="button" disabled={busy} data-testid="cloud-connect-link" onclick={connect}>Connect</button>
     </p>
   {:else if problem === 'not_configured'}
-    <p class="note" data-testid="cloud-unconfigured">{PROVIDER_LABEL[provider]} is not set up on this server.</p>
+    <p class="note" data-testid="cloud-unconfigured">Connections are not set up on this server.</p>
   {:else if problem}
     <p class="note" data-testid="cloud-problem">{connectionMessage(problem)}</p>
   {:else}

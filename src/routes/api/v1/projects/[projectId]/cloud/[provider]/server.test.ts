@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const findReachableProject = vi.fn();
 const cloudAccess = vi.fn();
-const disconnectCloud = vi.fn();
+const disconnect = vi.fn();
+const connect = vi.fn();
+const proxy = vi.fn();
 const cloudStatuses = vi.fn();
 const importCanvasBytes = vi.fn();
 const findAsset = vi.fn();
@@ -10,7 +12,12 @@ const findAsset = vi.fn();
 vi.mock('$env/dynamic/private', () => ({ env: { APP_SECRET: 'test-secret-for-cloud' } }));
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: vi.fn(async () => []) }));
 vi.mock('$lib/server/projects/lookup', () => ({ findReachableProject: (...args: unknown[]) => findReachableProject(...args) }));
-vi.mock('$lib/server/cloud/runtime', () => ({ cloudAccess: (...args: unknown[]) => cloudAccess(...args), disconnectCloud: (...args: unknown[]) => disconnectCloud(...args), cloudStatuses: (...args: unknown[]) => cloudStatuses(...args) }));
+vi.mock('$lib/server/cloud/runtime', async (real) => ({
+  ...(await real<typeof import('$lib/server/cloud/runtime')>()),
+  cloudAccess: (...args: unknown[]) => cloudAccess(...args),
+  cloudAccount: () => ({ disconnect, connect }),
+  cloudStatuses: (...args: unknown[]) => cloudStatuses(...args)
+}));
 vi.mock('$lib/server/repos/assets', () => ({ findAsset: (...args: unknown[]) => findAsset(...args) }));
 vi.mock('$lib/server/repos/asset-storage', () => ({ BUCKET_BY_SOURCE: { upload: 'canvas-assets' }, SIGNED_URL_TTL_S: { providerInput: 60 }, signStoredFile: vi.fn(async () => 'https://signed.test/file') }));
 vi.mock('$lib/server/canvas/upload', () => ({
@@ -26,7 +33,10 @@ const files = await import('./files/+server');
 const imports = await import('./import/+server');
 const exports = await import('./export/+server');
 const provider = await import('./+server');
+const connecting = await import('./connect/+server');
 const providers = await import('../+server');
+
+const answer = (data: unknown, extra: Record<string, unknown> = {}) => ({ status: 200, data, headers: {}, file: null, ...extra });
 
 type Handler = (event: unknown) => Promise<Response>;
 
@@ -41,30 +51,30 @@ async function call(handler: unknown, provider: string, init: { method: string; 
 beforeEach(() => {
   vi.restoreAllMocks();
   findReachableProject.mockResolvedValue({ orgId: 'o1', project: { id: 'p1' } });
-  cloudAccess.mockResolvedValue({ ok: true, token: 'at' });
+  cloudAccess.mockResolvedValue({ ok: true, call: proxy });
+  proxy.mockReset();
   importCanvasBytes.mockResolvedValue({ asset: { id: 'asset-1' } });
 });
 
 describe('GET cloud files', () => {
-  it('lists the folder through the provider with the stored token', async () => {
-    const dropbox = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ entries: [{ '.tag': 'file', name: 'a.png', path_lower: '/a.png' }] })));
+  it('lists the folder through the connected account', async () => {
+    proxy.mockResolvedValue(answer({ entries: [{ '.tag': 'file', name: 'a.png', path_lower: '/a.png' }] }));
 
     const { res, body } = await call(files.GET, 'dropbox', { method: 'GET' });
 
     expect(res.status).toBe(200);
     expect(body).toEqual({ entries: [{ id: '/a.png', name: 'a.png', folder: false, mime: null, importable: true }], next: null });
-    expect(dropbox).toHaveBeenCalledWith('https://api.dropboxapi.com/2/files/list_folder', expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer at' }) }));
+    expect(proxy).toHaveBeenCalledWith(expect.objectContaining({ endpoint: 'https://api.dropboxapi.com/2/files/list_folder' }));
   });
 
-  it('asks to connect when there are no tokens, without calling the provider', async () => {
+  it('asks to connect when no account is connected, without calling the provider', async () => {
     cloudAccess.mockResolvedValue({ ok: false, reason: 'not_connected' });
-    const provider = vi.spyOn(globalThis, 'fetch');
 
     const { res, body } = await call(files.GET, 'google_drive', { method: 'GET' });
 
     expect(res.status).toBe(409);
     expect(body.error).toBe('not_connected');
-    expect(provider).not.toHaveBeenCalled();
+    expect(proxy).not.toHaveBeenCalled();
   });
 
   it('answers 404 for a provider we do not know', async () => {
@@ -76,7 +86,8 @@ describe('GET cloud files', () => {
 
 describe('POST cloud import', () => {
   it('downloads the file and stores it as a project asset', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(new Uint8Array([1, 2]), { headers: { 'dropbox-api-result': JSON.stringify({ name: 'a.png' }), 'content-type': 'image/png' } }));
+    proxy.mockResolvedValue(answer(null, { file: 'https://files.test/a', headers: { 'dropbox-api-result': JSON.stringify({ name: 'a.png' }), 'content-type': 'image/png' } }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(new Uint8Array([1, 2])));
 
     const { res, body } = await call(imports.POST, 'dropbox', { method: 'POST', body: { fileId: '/a.png' } });
 
@@ -97,31 +108,47 @@ describe('POST cloud export', () => {
 
   it('names the file as it was uploaded, not by its storage path', async () => {
     findAsset.mockResolvedValue({ url: `o1/p1/${UUID}-summer-poster.png`, projectId: 'p1', source: 'upload', mimeType: 'image/png' });
-    const sent = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(new Uint8Array([1]))).mockResolvedValueOnce(new Response('{}'));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(new Uint8Array([1])));
+    proxy.mockResolvedValue(answer({ id: 'f1' }));
 
     const { res } = await call(exports.POST, 'google_drive', { method: 'POST', body: { assetId: 'a1', folder: 'root' } });
 
     expect(res.status).toBe(200);
-    expect(await (sent.mock.calls[1]![1]!.body as Blob).text()).toContain('"name":"summer-poster.png"');
+    expect(proxy).toHaveBeenLastCalledWith(expect.objectContaining({ body: { name: 'summer-poster.png' } }));
   });
 });
 
 describe('DELETE cloud provider', () => {
   it('disconnects the signed-in person from the provider', async () => {
-    disconnectCloud.mockResolvedValue({ revoked: true });
-
     const { res, body } = await call(provider.DELETE, 'google_drive', { method: 'DELETE' });
 
     expect(res.status).toBe(200);
-    expect(body).toEqual({ disconnected: true, revoked: true });
-    expect(disconnectCloud).toHaveBeenCalledWith(expect.anything(), 'u1', 'google_drive');
+    expect(body).toEqual({ disconnected: true });
+    expect(disconnect).toHaveBeenCalled();
   });
 
   it('answers 404 for a provider we do not know', async () => {
     const { res } = await call(provider.DELETE, 'box', { method: 'DELETE' });
 
     expect(res.status).toBe(404);
-    expect(disconnectCloud).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST cloud connect', () => {
+  it('answers the Composio Connect Link for OneDrive', async () => {
+    connect.mockResolvedValue({ url: 'https://connect.composio.dev/x' });
+
+    const { res, body } = await call(connecting.POST, 'one_drive', { method: 'POST', body: { returnTo: '/p/p1/c/c1' } });
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({ url: 'https://connect.composio.dev/x' });
+    expect(connect).toHaveBeenCalledWith('https://feega.test', '/p/p1/c/c1');
+  });
+
+  it('answers 501 when Composio is not configured', async () => {
+    connect.mockResolvedValue(null);
+
+    expect((await call(connecting.POST, 'dropbox', { method: 'POST', body: {} })).res.status).toBe(501);
   });
 });
 

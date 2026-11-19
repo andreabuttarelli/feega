@@ -1,10 +1,10 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { cloudApi, figmaTokenApi, type CloudProviderId } from '../../lib/cloud.ts';
+import { cloudApi, figmaConnectionApi, type CloudProviderId } from '../../lib/cloud.ts';
 import { fail, withAuth } from '../util.ts';
 
 const project = z.string().describe('The project id.');
-const providers = ['google_drive', 'dropbox'] as const;
+const providers = ['google_drive', 'dropbox', 'one_drive'] as const;
 
 const ask = z.object({
   project_id: project,
@@ -41,10 +41,10 @@ export function registerCloudTools(server: McpServer) {
   server.registerTool(
     'cloud',
     {
-      title: 'Google Drive and Dropbox files',
+      title: 'Google Drive, Dropbox and OneDrive files',
       description:
-        'Cloud files of a project, for the signed-in person. `action` status: which providers (google_drive, dropbox) are connected and set up. files: list a folder of `provider` (`folder`, `cursor` from the previous `next` for more). import: `file_id` into the project, placed on `canvas_id` at `x`,`y`. export: `asset_id` into `folder` of the provider, `name` optional (Drive: empty folder is the root). disconnect: forget the connection and revoke it at the provider. ' +
-        'Connecting is a browser sign-in in the app; a provider that is not connected answers `not_connected` or `reconnect`. Google Docs, Sheets and Slides import as PDF, Drawings as PNG. Spends no credits.',
+        'Cloud files of a project, for the signed-in person. `action` status: which providers (google_drive, dropbox, one_drive) are connected and set up. files: list a folder of `provider` (`folder`, `cursor` from the previous `next` for more). import: `file_id` into the project, placed on `canvas_id` at `x`,`y`. export: `asset_id` into `folder` of the provider, `name` optional (Drive: empty folder is the root). disconnect: forget the connection. ' +
+        'Connecting is a browser sign-in in the app, through Composio; a provider that is not connected answers `not_connected`, and `not_configured` when the server has no Composio key. Google Docs, Sheets and Slides import as PDF, Drawings as PNG. Spends no credits.',
       inputSchema: ask,
       annotations: { readOnlyHint: false, destructiveHint: true }
     },
@@ -66,13 +66,13 @@ export function registerCloudTools(server: McpServer) {
   );
 
   server.registerTool(
-    'figma_token_status',
+    'figma_status',
     {
-      title: 'Is a Figma token saved',
-      description: 'Whether the signed-in person saved a Figma personal access token, which lets a Figma paste bring its images. Never returns the token; it is set in the app only. Reads only, spends nothing.',
+      title: 'Is Figma connected',
+      description: 'Whether the signed-in person connected Figma (in the app, through Composio), which lets Figma links and pastes bring their frames and images. Reads only, spends nothing.',
       inputSchema: z.object({ project_id: project }),
       annotations: { readOnlyHint: true }
     },
-    async ({ project_id }) => withAuth((token) => figmaTokenApi.status(token, project_id))
+    async ({ project_id }) => withAuth((token) => figmaConnectionApi.status(token, project_id))
   );
 }

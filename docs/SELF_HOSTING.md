@@ -109,15 +109,17 @@ connection) in `.env`, and run `npm run setup`. The baseline needs the `pgcrypto
 `vector` extensions, and `pg_jsonschema` when your plan offers it (without it the JSON shape checks are
 skipped and the app still works).
 
+## Connected accounts
+
+GitHub, Figma, Google Drive, Dropbox and OneDrive connect through [Composio](https://composio.dev) only: a Connect Link signs the person in, and every provider call goes through the Composio proxy. Feega stores no OAuth client secret and no user token. Set `COMPOSIO_API_KEY`; without it every connection answers `not_configured`.
+
+In the Composio dashboard, enable an auth config for each toolkit you want: `github`, `figma`, `googledrive`, `dropbox`, `one_drive`. The redirect back to Feega is `<origin>/api/v1/connections/callback`. For GitHub push, use your own GitHub App with **Contents: read and write**, **Pull requests: read and write**, **Checks: read**, **Metadata: read**. For Drive, the scopes must allow reading files and creating files (`drive.readonly` + `drive.file`, or `drive`); for Dropbox `files.metadata.read files.content.read files.content.write`; for OneDrive `Files.ReadWrite`; for Figma `file_content:read` and `current_user:read`.
+
 ## Pushing designs to GitHub
 
-Frames imported from code can push their edits back as a `feega/<name>` branch and a pull request. Three ways to give the server write access, tried in this order:
+Frames imported from code push their edits back as a `feega/<name>` branch and a pull request, through the connected GitHub account. Without one the push answers `not_connected`.
 
-1. **A connected account** (Composio, `COMPOSIO_API_KEY`). Register your own GitHub App, installed on the repositories you choose, with **Contents: read and write**, **Pull requests: read and write**, **Checks: read**, **Metadata: read**, and set it as the GitHub auth config in Composio. Tokens last one hour.
-2. **A token from env**, when no account is connected: `GITHUB_PUSH_TOKEN` (a fine-grained personal access token or a GitHub App installation token, same permissions as above, limited to the repositories you choose).
-3. **GitHub Enterprise**: add `GITHUB_API_URL`, e.g. `https://github.acme.dev/api/v3`.
-
-In local mode a frame imported from a folder pushes through the git CLI of that folder: Feega writes its commits with a private index, so your current branch, your uncommitted work and your history are never touched. The branch goes to `origin` when there is one (your git credentials), and the pull request opens when one of the three options above is set; otherwise the branch stays pushed or local and the answer says `pull: null`.
+In local mode a frame imported from a folder pushes through the git CLI of that folder: Feega writes its commits with a private index, so your current branch, your uncommitted work and your history are never touched. The branch goes to `origin` when there is one (your git credentials); local mode opens no pull request and the answer says `pull: null`.
 
 ## Required environment
 

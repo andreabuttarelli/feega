@@ -2,7 +2,7 @@ import { Command, OPACITY_KEYS } from '$lib/motion/shortcuts';
 import { Tool, type ActionId } from '$lib/motion/actions';
 import { LayerAction } from '$lib/canvas/layers';
 import { CanvasAction } from '$lib/canvas/canvas-list';
-import { CloudAction, FigmaTokenAction } from '$lib/canvas/cloud-picker';
+import { CloudAction, FigmaConnectionAction } from '$lib/canvas/cloud-picker';
 import { ClipOp } from '$lib/motion/clip-ops';
 import type { SelectionActionId } from '$lib/canvas/selection-actions';
 import type { CanvasOpName } from '$lib/server/canvas/canvas-ops';
@@ -473,7 +473,7 @@ export const FRAME_CONTENT: Record<string, Parity> = {
 };
 
 export const CLOUD_ACTIONS: Record<CloudAction, Parity> = {
-  [CloudAction.Connect]: uiOnly('the provider sign-in happens in a browser'),
+  [CloudAction.Connect]: uiOnly('the provider sign-in happens in a browser, through Composio'),
   [CloudAction.Status]: tool('cloud'),
   [CloudAction.ListFiles]: tool('cloud'),
   [CloudAction.Import]: tool('cloud'),
@@ -481,11 +481,10 @@ export const CLOUD_ACTIONS: Record<CloudAction, Parity> = {
   [CloudAction.Disconnect]: tool('cloud')
 };
 
-export const FIGMA_TOKEN: Record<FigmaTokenAction, Parity> = {
-  [FigmaTokenAction.Save]: uiOnly('a secret the person pastes; agents never hold it'),
-  [FigmaTokenAction.Test]: uiOnly('calls Figma with the secret; agents read only whether it is saved'),
-  [FigmaTokenAction.Remove]: uiOnly('the person removes a secret they pasted'),
-  [FigmaTokenAction.Status]: tool('figma_token_status')
+export const FIGMA_CONNECTION: Record<FigmaConnectionAction, Parity> = {
+  [FigmaConnectionAction.Connect]: uiOnly('the Figma sign-in happens in a browser, through Composio'),
+  [FigmaConnectionAction.Disconnect]: uiOnly('the person removes the connection in Settings'),
+  [FigmaConnectionAction.Status]: tool('figma_status')
 };
 
 export const PARITY_TABLES = {
@@ -498,5 +497,5 @@ export const PARITY_TABLES = {
   CLIP_BUTTONS,
   FRAME_CONTENT,
   CLOUD_ACTIONS,
-  FIGMA_TOKEN
+  FIGMA_CONNECTION
 } as const;

@@ -3,6 +3,7 @@
   import { grantedPath } from '$lib/canvas/asset-url';
   import { enhance } from '$lib/settings/enhance';
   import { _ } from 'svelte-i18n';
+  import { page } from '$app/state';
   import { SvelteSet } from 'svelte/reactivity';
   import { jpegIfHeicFormFiles } from '$lib/raster-image-client';
   import { RASTER_IMAGE_ACCEPT } from '$lib/raster-image';
@@ -35,13 +36,6 @@
     reauth: 'app.settings.profile.deleteReauth',
     transfer: 'app.settings.profile.deleteTransfer'
   } as const;
-
-  const FIGMA_ERROR_KEY: Record<string, string> = {
-    invalid: 'app.settings.profile.figmaInvalid',
-    rejected: 'app.settings.profile.figmaRejected',
-    none: 'app.settings.profile.figmaNone',
-    unavailable: 'app.settings.profile.figmaUnavailable'
-  };
 
   const busy = new SvelteSet<string>();
   const isBusy = (key: string) => busy.has(key);
@@ -81,18 +75,10 @@
   <Notice tone="success">{$_('app.settings.profile.memorySaved')}</Notice>
 {:else if form?.memoryError}
   <Notice tone="error">{$_('app.settings.profile.memoryTooLong')}</Notice>
-{:else if form?.figmaSaved}
-  <Notice tone="success">{$_('app.settings.profile.figmaSaved')}</Notice>
-{:else if form?.figmaTested !== undefined}
-  <Notice tone="success">{$_(form.figmaNote === 'scope' ? 'app.settings.profile.figmaTestedScope' : 'app.settings.profile.figmaTested')}</Notice>
-{:else if form?.cloudDisconnected}
-  <Notice tone="success">{$_('app.settings.profile.cloudDisconnected')}</Notice>
-{:else if form?.cloudError}
-  <Notice tone="error">{$_('app.settings.profile.cloudInvalid')}</Notice>
-{:else if form?.figmaRemoved}
-  <Notice tone="success">{$_('app.settings.profile.figmaRemoved')}</Notice>
-{:else if form?.figmaError}
-  <Notice tone="error">{$_(FIGMA_ERROR_KEY[form.figmaError as string] ?? 'app.settings.profile.figmaInvalid')}</Notice>
+{:else if form?.disconnected}
+  <Notice tone="success">{$_('app.settings.profile.connectionsDisconnected')}</Notice>
+{:else if form?.connectionError}
+  <Notice tone="error">{$_(form.connectionError === 'not_configured' ? 'app.settings.profile.connectionsNotConfigured' : 'app.settings.profile.connectionsInvalid')}</Notice>
 {:else if form?.error === 'too_large'}
   <Notice tone="error">{$_('app.settings.profile.tooLarge')}</Notice>
 {:else if form?.error === 'not_image'}
@@ -185,28 +171,14 @@
   </form>
 </Panel>
 
-<Panel title={$_('app.settings.profile.figmaTitle')} description={$_('app.settings.profile.figmaDesc')}>
-  <form method="POST" action="?/saveFigmaToken" use:enhance={withBusy('figma')} class="m-0 flex flex-col gap-3" data-testid="figma-token-form">
-    <Field label={$_('app.settings.profile.figmaToken')} hint={data.hasFigmaToken ? $_('app.settings.profile.figmaTokenSet') : $_('app.settings.profile.figmaTokenHint')}>
-      <Input name="token" type="password" autocomplete="off" maxlength={500} disabled={isBusy('figma')} class="h-9" />
-    </Field>
-    <div class="flex flex-wrap items-center gap-2">
-      <Button type="submit" disabled={isBusy('figma')}>{$_('app.settings.profile.figmaSave')}</Button>
-      {#if data.hasFigmaToken}
-        <Button variant="secondary" type="submit" formaction="?/testFigmaToken" disabled={isBusy('figma')}>{$_('app.settings.profile.figmaTest')}</Button>
-        <Button variant="ghost" type="submit" formaction="?/removeFigmaToken" disabled={isBusy('figma')}>{$_('app.settings.profile.figmaRemove')}</Button>
-      {/if}
-    </div>
-  </form>
-</Panel>
-
-<Panel title={$_('app.settings.profile.cloudTitle')} description={$_('app.settings.profile.cloudDesc')}>
-  {#each data.cloud as option (option.provider)}
-    <form method="POST" action="?/disconnectCloud" use:enhance={withBusy(option.provider)} class="m-0" data-testid={`cloud-${option.provider}`}>
-      <input type="hidden" name="provider" value={option.provider} />
-      <Field label={option.label} hint={option.connected ? $_('app.settings.profile.cloudConnected') : option.configured ? $_('app.settings.profile.cloudNotConnected') : $_('app.settings.profile.cloudNotConfigured')} layout={FieldLayout.Row}>
-        {#if option.connected}
-          <Button variant="secondary" type="submit" disabled={isBusy(option.provider)}>{$_('app.settings.profile.cloudDisconnect')}</Button>
+<Panel title={$_('app.settings.profile.connectionsTitle')} description={$_('app.settings.profile.connectionsDesc')}>
+  {#each data.connections as account (account.toolkit)}
+    <form method="POST" action={account.connected ? '?/disconnectAccount' : '?/connectAccount'} use:enhance={withBusy(account.toolkit)} class="m-0" data-testid={`connection-${account.toolkit}`}>
+      <input type="hidden" name="toolkit" value={account.toolkit} />
+      <input type="hidden" name="returnTo" value={page.url.pathname} />
+      <Field label={account.label} hint={account.connected ? (account.handle ?? $_('app.settings.profile.connectionsConnected')) : account.configured ? $_('app.settings.profile.connectionsNotConnected') : $_('app.settings.profile.connectionsNotConfigured')} layout={FieldLayout.Row}>
+        {#if account.configured}
+          <Button variant="secondary" type="submit" disabled={isBusy(account.toolkit)}>{$_(account.connected ? 'app.settings.profile.connectionsDisconnect' : 'app.settings.profile.connectionsConnect')}</Button>
         {/if}
       </Field>
     </form>
