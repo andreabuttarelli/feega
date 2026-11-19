@@ -69,7 +69,7 @@
     position: relative;
     width: 100%;
     aspect-ratio: 2 / 1;
-    background: #0a0a0a;
+    background: #1c1c1c;
     border-radius: 10px;
     overflow: hidden;
   }
@@ -87,6 +87,6 @@
     align-items: center;
     justify-content: center;
     color: #fff;
-    background: radial-gradient(closest-side, rgb(10 10 10 / 0.85), rgb(10 10 10 / 0));
+    background: radial-gradient(closest-side, rgb(28 28 28 / 0.85), rgb(28 28 28 / 0));
   }
 </style>
