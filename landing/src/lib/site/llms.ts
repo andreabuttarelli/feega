@@ -6,6 +6,7 @@ import { HOME_META, PRICING_META } from './seo';
 import { APP_URL, GITHUB_URL, SITE_URL } from './links';
 import { PRICING_PATH, SITE_PATHS } from './paths';
 import { LEGAL_DOCS } from './legal';
+import { ALTERNATIVES, ALTERNATIVES_INDEX, ALTERNATIVES_PATH, alternativePath } from './alternatives';
 import { COMPARE_INDEX, COMPARE_PATH, COMPARISONS, comparisonPath } from './compare';
 import { GUIDES, GUIDES_INDEX, GUIDES_PATH, guidePath } from './guides';
 import { CONNECT_COMMAND, MCP_TOOLS, MCP_URL } from './guides/shared';
@@ -20,9 +21,11 @@ export const PAGE_TITLES: Record<string, string> = {
   '/ai-video-upscaler': UPSCALER.title,
   [CODEBASE_PATH]: CODEBASE.title,
   [COMPARE_PATH]: COMPARE_INDEX.title,
+  [ALTERNATIVES_PATH]: ALTERNATIVES_INDEX.title,
   [GUIDES_PATH]: GUIDES_INDEX.title,
   ...Object.fromEntries(Object.entries(GUIDES).map(([slug, g]) => [guidePath(slug), g.title])),
   ...Object.fromEntries(Object.entries(COMPARISONS).map(([slug, c]) => [comparisonPath(slug), c.title])),
+  ...Object.fromEntries(Object.entries(ALTERNATIVES).map(([slug, a]) => [alternativePath(slug), a.title])),
   ...Object.fromEntries(Object.entries(LANDING_PAGES).map(([slug, p]) => [`/${slug}`, p.title])),
   ...Object.fromEntries(Object.entries(LEGAL_DOCS).map(([slug, d]) => [`/${slug}`, d.title]))
 };

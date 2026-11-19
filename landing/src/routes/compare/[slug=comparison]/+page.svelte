@@ -6,6 +6,7 @@
   import { FEEGA_FEATURES, FEEGA_PRICING } from '$lib/site/compare/feega';
   import { FEATURE_LABELS, Feature, type Verdict } from '$lib/site/compare/features';
   import { competitorFaq } from '$lib/site/compare/faq';
+  import { AUTHOR, DISCLAIMER } from '$lib/site/alternatives';
   import { articleJsonLd, faqJsonLd } from '$lib/site/structured-data';
 
   let { data } = $props();
@@ -30,6 +31,7 @@
 <article class="landing compare">
   <a class="back" href={COMPARE_PATH}>← All comparisons</a>
   <h1>{page.heading}</h1>
+  <p class="fine">By {AUTHOR.name}, {AUTHOR.role} · checked {page.checked}</p>
   <p class="intro">{page.intro}</p>
 
   <section>
@@ -107,6 +109,7 @@
         <li><a href={source.href} rel="noopener">{source.label}</a></li>
       {/each}
     </ul>
+    <p class="fine">{DISCLAIMER}</p>
   </section>
 
   <section>
