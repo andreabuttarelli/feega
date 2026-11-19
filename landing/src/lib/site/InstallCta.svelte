@@ -7,6 +7,8 @@
   const primary = primaryCta();
   const secondary = secondaryCtas();
   let choosing = $state(false);
+
+  const HERO_FACTS = ['free, forever', 'every edit a diff', 'no AI, no tokens'] as const;
 </script>
 
 <div class="install" data-agent-id={id}>
@@ -17,7 +19,9 @@
   <p class="more">
     {#each secondary as cta (cta.label)}<a href={cta.href}>{cta.label}</a>{/each}
   </p>
-  <p class="note">free. no AI, no tokens. every change shown as a diff.</p>
+  <ul class="facts">
+    {#each HERO_FACTS as fact (fact)}<li>{fact}</li>{/each}
+  </ul>
 </div>
 
 <DownloadDialog bind:open={choosing} />
@@ -90,10 +94,29 @@
     color: #fff;
   }
 
-  .note {
-    margin: 0;
-    font-family: 'DM Mono', monospace;
-    font-size: 12px;
-    color: rgb(255 255 255 / 0.5);
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 24px;
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 15px;
+    color: #fff;
+  }
+
+  .facts li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .facts li::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: var(--ui-radius-xs, 2px);
+    background: #ff5100;
   }
 </style>

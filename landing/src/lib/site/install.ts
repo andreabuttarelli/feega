@@ -22,10 +22,7 @@ export const primaryCta = (published: boolean = EXTENSION_PUBLISHED): Cta =>
 
 export const starCta: Cta = { label: 'Star on GitHub', href: GITHUB_URL };
 
-export const secondaryCtas = (published: boolean = EXTENSION_PUBLISHED): readonly Cta[] =>
-  published
-    ? EDITORS.slice(1).map((e: Editor) => ({ label: e.label, href: e.installUrl }))
-    : [{ label: 'Support with a coffee', href: COFFEE_URL }];
+export const secondaryCtas = (): readonly Cta[] => [{ label: 'Support with a coffee', href: COFFEE_URL }];
 
 export type InstallOption = { label: string; href: string; deepLink?: string; command?: string; soon: boolean };
 

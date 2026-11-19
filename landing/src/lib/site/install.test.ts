@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { follow, installOptions, primaryCta, starCta, secondaryCtas, type Env } from './install';
-import { GITHUB_URL, MARKETPLACE_URL } from './links';
+import { COFFEE_URL, GITHUB_URL, MARKETPLACE_URL } from './links';
 
 const DEEP_LINK = 'vscode:extension/andreabuttarelli.feega';
 
@@ -21,14 +21,14 @@ describe('install CTAs', () => {
   it('unpublished: coming soon points at GitHub, no fake install', () => {
     expect(primaryCta(false)).toEqual({ label: 'Download for free', href: GITHUB_URL });
     expect(starCta).toEqual({ label: 'Star on GitHub', href: GITHUB_URL });
-    expect(secondaryCtas(false).map((c) => c.label)).toEqual(['Support with a coffee']);
+    expect(secondaryCtas().map((c) => c.label)).toEqual(['Support with a coffee']);
   });
 
   it('published: deep link with marketplace fallback, other editors listed', () => {
     const cta = primaryCta(true);
     expect(cta.deepLink).toBe(DEEP_LINK);
     expect(cta.href).toBe(MARKETPLACE_URL);
-    expect(secondaryCtas(true).map((c) => c.label)).toEqual(['Cursor', 'Windsurf', 'VSCodium / Open VSX']);
+    expect(secondaryCtas().map((c) => c.href)).toEqual([COFFEE_URL]);
   });
 
   it('falls back to the web URL when the protocol did not open', () => {
