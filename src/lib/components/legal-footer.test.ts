@@ -15,8 +15,8 @@ describe('il footer legale condiviso', () => {
     expect(component).toMatch(/target="_blank" rel="noopener"/);
   });
 
-  it('la tabella copre tutte le quattro pagine richieste', () => {
-    expect(FOOTER_LEGAL_LINKS).toHaveLength(4);
+  it('la tabella copre tutte le tre pagine richieste', () => {
+    expect(FOOTER_LEGAL_LINKS).toHaveLength(3);
     expect(new Set(FOOTER_LEGAL_LINKS).size).toBe(4);
   });
 
