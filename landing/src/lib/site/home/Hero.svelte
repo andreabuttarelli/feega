@@ -6,6 +6,7 @@
   import EditorMock from '../EditorMock.svelte';
   import TerminalMock from './TerminalMock.svelte';
   import WorksWith from './WorksWith.svelte';
+  import { LEAD_EDITORS, LEAD_FRAMEWORKS, type LeadChip } from './works-with';
 
   const MOCK_WIDTH = 960;
 
@@ -19,6 +20,10 @@
   <link rel="preload" href="/site/fonts/instrument-serif-latin.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
 </svelte:head>
 
+{#snippet chip(c: LeadChip)}<a class="chip" href={c.item.href}><span class="icon">{@html c.item.icon}</span><b>{c.name}</b></a>{/snippet}
+
+{#snippet chips(list: readonly LeadChip[], joiner: string)}{#each list as c, i}{#if i > 0}{i === list.length - 1 ? ` ${joiner} ` : ', '}{/if}{@render chip(c)}{/each}{/snippet}
+
 <section class="hero" id="hero">
   <AsciiField />
 
@@ -31,9 +36,15 @@
     <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" role="img"><title>Linux</title><path d="M12 2.5c-2 0-3.4 1.8-3.4 4.3 0 1.3.2 2.3-.5 3.5-.9 1.5-2.6 3.6-2.6 6 0 .9.3 1.6.8 2.1-.4.6-1 .9-1.7 1.2-.7.3-.4 1 .3 1.2 1 .3 2.2.2 2.9.9.6.6 1.4 1.2 2.4 1.2 1 0 1.5-.5 2.3-.5s1.3.5 2.3.5c1 0 1.8-.6 2.4-1.2.7-.7 1.9-.6 2.9-.9.7-.2 1-.9.3-1.2-.7-.3-1.3-.6-1.7-1.2.5-.5.8-1.2.8-2.1 0-2.4-1.7-4.5-2.6-6-.7-1.2-.5-2.2-.5-3.5 0-2.5-1.4-4.3-3.4-4.3zm-1.4 4.3c.4 0 .7.5.7 1s-.3.9-.7.9-.7-.4-.7-.9.3-1 .7-1zm2.8 0c.4 0 .7.5.7 1s-.3.9-.7.9-.7-.4-.7-.9.3-1 .7-1zM12 9c1 0 1.9.6 1.9 1.1S13 11.4 12 11.4s-1.9-.7-1.9-1.2S11 9 12 9z"/></svg>
   </p>
 
-  <h1 class="site-display"><span data-agent-id="hero-title-a">{lower(HERO_HEADLINE[0])}</span> <span data-agent-id="hero-title-b">{lower(HERO_HEADLINE[1])}</span></h1>
+  <h1 class="site-display" data-agent-id="hero-title">{lower(HERO_HEADLINE)}</h1>
 
-  <p class="lead" data-agent-id="hero-lead">click any element of your running app and edit it like in figma. the change is written to your code. no AI, no tokens, every edit a diff.</p>
+  <p class="lead" data-agent-id="hero-lead">
+    edit your running app like in figma, inside the
+    {@render chips(LEAD_EDITORS, 'or')}
+    you already use. works with
+    {@render chips(LEAD_FRAMEWORKS, 'and')}.
+    every change lands in your code, as a diff.
+  </p>
 
   <InstallCta id="hero-install" />
 
@@ -91,16 +102,42 @@
   }
 
   h1 {
-    font-size: 48px;
-  }
-
-  h1 span {
-    display: block;
+    font-size: 40px;
+    line-height: 1.05;
   }
 
   .lead {
     margin-top: 22px;
-    opacity: 0.8;
+    line-height: 1.9;
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 1px 8px 1px 6px;
+    border-radius: var(--ui-radius-md, 6px);
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    text-decoration: none;
+    vertical-align: middle;
+    line-height: 1.4;
+  }
+
+  .chip:hover {
+    background: rgba(255, 255, 255, 0.18);
+  }
+
+  .chip .icon {
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+  }
+
+  .chip :global(svg) {
+    width: 18px;
+    height: 18px;
   }
 
   .hero > :global(.install) {
@@ -158,9 +195,8 @@
     }
 
     .lead {
-      width: 600px;
+      width: 640px;
       font-size: 16px;
-      line-height: 19.2px;
     }
   }
 
@@ -176,7 +212,8 @@
     }
 
     .lead {
-      width: 550px;
+      width: 600px;
+      font-size: 16px;
     }
   }
 
@@ -184,7 +221,6 @@
   @media (max-width: 809.98px) {
     .lead {
       font-size: 16px;
-      line-height: 1.35;
     }
   }
 </style>

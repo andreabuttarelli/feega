@@ -48,3 +48,23 @@ export const FRAMEWORKS: readonly WorksWithItem[] = [
 
 export const WORKS_WITH_LABEL = 'works with';
 export const WORKS_WITH_CLOSING = 'or any Vite app';
+
+export interface LeadChip {
+  readonly name: string;
+  readonly item: WorksWithItem;
+}
+
+const byName = (items: readonly WorksWithItem[], name: string): WorksWithItem => items.find((item) => item.name === name)!;
+
+export const LEAD_EDITORS: readonly LeadChip[] = [
+  { name: 'VS Code', item: byName(EDITORS, 'vs code') },
+  { name: 'Cursor', item: byName(EDITORS, 'cursor') },
+  { name: 'Windsurf', item: byName(EDITORS, 'windsurf') }
+];
+
+export const LEAD_FRAMEWORKS: readonly LeadChip[] = [
+  { name: 'SvelteKit', item: byName(FRAMEWORKS, 'sveltekit') },
+  { name: 'React', item: byName(FRAMEWORKS, 'react') },
+  { name: 'Next.js', item: byName(FRAMEWORKS, 'next.js') },
+  { name: 'Vue', item: byName(FRAMEWORKS, 'vue') }
+];
