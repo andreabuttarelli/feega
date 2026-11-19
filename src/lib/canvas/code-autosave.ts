@@ -7,7 +7,8 @@ export enum AutosaveState {
   Saved = 'saved',
   Conflict = 'conflict',
   Paused = 'paused',
-  Failed = 'failed'
+  Failed = 'failed',
+  NeedsBranch = 'needs_branch'
 }
 
 const STATE_OF_REFUSAL: Record<string, AutosaveState> = {
@@ -20,10 +21,11 @@ const STATE_OF_REFUSAL: Record<string, AutosaveState> = {
   env_file: AutosaveState.Paused,
   secret: AutosaveState.Paused,
   read_only: AutosaveState.Paused,
-  busy: AutosaveState.Pending
+  busy: AutosaveState.Pending,
+  no_branch: AutosaveState.NeedsBranch
 };
 
-const STOPS = new Set([AutosaveState.Conflict, AutosaveState.Paused]);
+const STOPS = new Set([AutosaveState.Conflict, AutosaveState.Paused, AutosaveState.NeedsBranch]);
 
 export const outcomeOf = (body: { ok?: boolean; refusal?: string } | null): AutosaveState => {
   if (!body) {
@@ -66,7 +68,7 @@ export function codeAutosave(deps: AutosaveDeps) {
     saving = false;
     deps.onstate(state);
 
-    if (state === AutosaveState.Pending) {
+    if (state === AutosaveState.Pending || state === AutosaveState.NeedsBranch) {
       batch.forEach((id) => pending.add(id));
     }
     stopped = STOPS.has(state);

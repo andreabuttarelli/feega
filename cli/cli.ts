@@ -907,7 +907,7 @@ github
 
 github
   .command('push <projectId> <nodeIds...>')
-  .description('Commit the code edits of the frames on feega/<name> and open or update its pull request')
+  .description('Commit the code edits of the frames on the working branch (feega/<name> with a pull request when none was chosen)')
   .requiredOption('--name <name>', 'Branch name; the branch is feega/<name>')
   .option('--title <text>', 'Pull request title')
   .option('--body <text>', 'Pull request body')
@@ -915,9 +915,6 @@ github
   .option('--confirm-sensitive', 'Allow changes to config files, lockfiles and dotfiles')
   .option('--main <nodeIds...>', 'Frames whose instance edits apply to the main component file instead of the usage site')
   .option('--variant <nodeId:choice[:route]...>', 'What a variant frame does on push: replace, new_route (with /route) or keep')
-  .option('--branch <branch>', 'Exact branch to commit on instead of feega/<name>')
-  .option('--direct <branch>', 'Commit straight to <branch>, no pull request (refused on a protected branch)')
-  .option('--draft', 'Open the pull request as a draft')
   .action(async (projectId: string, nodeIds: string[], opts) => {
     const { cmdGithubPush } = await import('./commands/github.ts');
     await cmdGithubPush(projectId, nodeIds, opts);
@@ -929,6 +926,26 @@ github
   .action(async (projectId: string, nodeId: string) => {
     const { cmdGithubStatus } = await import('./commands/github.ts');
     await cmdGithubStatus(projectId, nodeId);
+  });
+
+github
+  .command('branch <projectId> <branch> <nodeIds...>')
+  .description('Choose the working branch of linked frames: an existing branch, main included, or a new one')
+  .option('--from <branch>', 'Base of a new branch (default: the imported branch)')
+  .action(async (projectId: string, branch: string, nodeIds: string[], opts) => {
+    const { cmdGithubBranch } = await import('./commands/github.ts');
+    await cmdGithubBranch(projectId, nodeIds, { branch, from: opts.from });
+  });
+
+github
+  .command('pull <projectId> <nodeId>')
+  .description('Open a pull request from the working branch, as a draft unless --ready')
+  .option('--base <branch>', 'Target branch (default: the repo default)')
+  .option('--title <text>', 'Pull request title')
+  .option('--ready', 'Open it ready for review')
+  .action(async (projectId: string, nodeId: string, opts) => {
+    const { cmdGithubPull } = await import('./commands/github.ts');
+    await cmdGithubPull(projectId, nodeId, opts);
   });
 
 github

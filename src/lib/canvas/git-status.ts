@@ -1,44 +1,38 @@
 import type { AutosaveState } from './code-autosave';
-import { ciOf, CiState, pushAskOf, type FrameSync, type PullView } from './source-changes';
+import { ciOf, CiState, type FrameSync, type PullView } from './source-changes';
 
-export const AUTOSAVE_NAME = 'canvas-edits';
+export const COMMIT_IDLE_MS = 2 * 60_000;
+export const COMMIT_MAX_MS = 10 * 60_000;
 
 const GITHUB = 'github';
-const DRAFT = 'draft';
-const BRANCH_TARGET = 'branch';
+const NAMED_FRAMES = 2;
 
-export enum BranchMode {
-  Session = 'session',
-  Direct = 'direct'
+export type GitSummary = { repo: string; branch: string | null; imported: string; upstream: number; pull: PullView | null; draft: boolean; ci: CiState; autosave: AutosaveState; nodeId: string };
+
+export const onGithub = (rows: readonly FrameSync[]) => rows.filter((r) => r.link.source === GITHUB);
+
+function framesText(names: readonly string[]): string {
+  if (names.length <= NAMED_FRAMES) {
+    return names.join(' and ');
+  }
+  return `${names.slice(0, NAMED_FRAMES).join(', ')} and ${names.length - NAMED_FRAMES} more`;
 }
 
-export type BranchOptions = { mode: BranchMode; branch: string; commitTo: string };
+export const commitSummary = (names: readonly string[], files: readonly string[]) => [`Update ${framesText(names)}`, '', ...files.map((f) => `- ${f}`)].join('\n');
 
-export type GitSummary = { repo: string; branch: string; base: string; upstream: number; pull: PullView | null; draft: boolean; ci: CiState; autosave: AutosaveState; nodeId: string };
-
-const onGithub = (rows: readonly FrameSync[]) => rows.filter((r) => r.link.source === GITHUB);
-
-export function branchFields(options: BranchOptions) {
-  const branch = (options.mode === BranchMode.Direct ? options.commitTo : options.branch).trim();
-  return { ...(branch ? { branch } : {}), ...(options.mode === BranchMode.Direct ? { target: BRANCH_TARGET } : {}) };
-}
-
-export function autosaveAsk(rows: readonly FrameSync[], nodeIds: readonly string[], options: BranchOptions) {
-  const ask = pushAskOf(onGithub(rows), new Set(nodeIds), AUTOSAVE_NAME);
-  return ask ? { ...ask, pull: DRAFT, ...branchFields(options) } : null;
-}
+export const commitDue = (at: { firstAt: number | null; lastAt: number | null; now: number }) => at.firstAt !== null && at.lastAt !== null && (at.now - at.lastAt >= COMMIT_IDLE_MS || at.now - at.firstAt >= COMMIT_MAX_MS);
 
 export function gitSummary(syncs: readonly FrameSync[], autosave: AutosaveState): GitSummary | null {
   const github = onGithub(syncs);
-  const lead = github.find((s) => s.link.pushBranch) ?? github[0];
+  const lead = github.find((s) => s.link.workBranch) ?? github[0];
   if (!lead) {
     return null;
   }
   const pull = lead.push?.pull ?? null;
   return {
     repo: lead.link.repo ?? '',
-    branch: lead.link.pushBranch ?? lead.link.baseBranch,
-    base: lead.link.baseBranch,
+    branch: lead.link.workBranch ?? null,
+    imported: lead.link.baseBranch,
     upstream: lead.push?.upstream?.length ?? 0,
     pull,
     draft: pull?.draft === true,

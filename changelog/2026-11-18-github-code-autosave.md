@@ -1,30 +1,35 @@
-# GitHub-linked frames autosave code to a draft pull request
+# GitHub-linked frames: chosen working branch, autosave, summary commits
 
-Before: a GitHub-linked frame wrote code only on a manual Push from Changes. Local folders already
-wrote live; GitHub did not.
+Before: a GitHub-linked frame wrote code only on a manual Push to `feega/<name>` with a PR.
 
-- `src/lib/canvas/code-autosave.ts`: a debounced batcher (3 s idle, one save in flight, conflict
-  and paused stop it until resumed). GpuFlow touches it when the `data` of a linked frame changes,
-  i.e. after the optimistic write landed, so it rides the existing save path instead of a new one.
-  Not a REGISTRY row: the git commit is downstream of the node write, not a canvas action.
-- `pushFiles` gained `pull: draft` (opens the PR as draft), `branch` (exact name instead of
-  `feega/<name>`) and `target: branch` + `branch` (commit straight to that branch, default the
-  base branch, no PR; a 403 from GitHub is `protected`, never a `-sync` fallback). A first
-  version committed to the base only (`target: base`); review asked for any branch, picked from
-  `listRefs` branches. A session push whose `since` is the base branch ignores it.
-- `GitHost.markReady`: GitHub has no REST call for it, so it uses the GraphQL mutation
-  `markPullRequestReadyForReview` with the PR `node_id`. Local hosts delegate to their GitHub
-  pulls host or answer `pull_unavailable`.
-- `POST …/github/push/ready`, `feega github ready`, MCP `github_ready`; `feega github push`
-  takes `--branch`, `--direct <branch>`, `--draft`.
-- Changes panel: frames start ticked only while autosave is on (unticked, as before, when off);
-  Ready for review lives only in the top bar.
-- Top bar: `GitStatus.svelte` is portalled into `[data-top-git]` of `CanvasTopBar` (same pattern
-  as peers): repo, branch, upstream files, autosave state, PR + CI, Ready for review, Versions
-  (opens the existing ref picker). Branch options live in the existing Changes panel.
+Model after review (three concepts, no branch imposed):
 
-Assumption to verify on a real repo: GitHub answers 403 on a ref PATCH to a protected branch.
-It may answer 422, which today maps to `diverged`.
+- **Working branch.** Nothing is written until the user picks where edits go (existing branch,
+  main included, or a new one from a base). Stored as `workBranch` on every link of the canvas'
+  frames; `frameCheckout` / `POST …/github/push/branch` / `github_branch`. Edits made before the
+  choice stay on the canvas: autosave answers `no_branch`, keeps the batch and flushes it on
+  `resume()` after the choice.
+- **Autosave** writes the code to `refs/feega/wip/<branch>` (`saveWip`), a private ref replaced
+  with `force` on each save (parent = branch head). Why a ref and not amending a WIP commit on the
+  branch: GitHub only rewrites a branch with a force update, and this feature never force-pushes
+  a branch people share. The branch itself does not move between commits.
+- **Commits are summaries.** `gitSession` (`git-session.svelte.ts`) commits after 2 min idle or
+  10 min after the first unsaved save (`commitDue`), and on `pagehide` (keepalive fetch). The
+  message is deterministic: `Update <frame> and <frame>` (two names, then "and N more") plus the
+  changed files (`commitSummary`). `canvas-op-summaries.ts` was not used: it describes MCP ops,
+  while canvas edits reach code as file diffs, not ops. The optional AI summary was not built
+  (no model calls in this PR).
+- **Commit on a chosen branch** (`commitWorking`): no `-sync` fallback; someone else's commit on
+  another file is kept, on the same file it answers `conflict` (via `changedSince`); 403 is
+  `protected`. Without a chosen branch the old `feega/<name>` + PR path stays for agents.
+- **Pull request** is separate: `openPull` / `…/push/pull` / `github_pull`, draft by default,
+  `same_branch` when base equals the working branch. `markReady` uses GitHub GraphQL.
+- Removed: `target: "branch"`, `--direct`, the segmented control, panel checkboxes for the next
+  commit.
 
-Not done: switching the frame to another branch from the top bar (Versions compares; Pull with a
-branch in RepoSync still switches).
+All GitHub calls go through `GithubCall`: the Composio proxy of the connected account
+(`githubFor` → `composioLinks`), including `/graphql`. `hosts.ts` still falls back to
+`GITHUB_PUSH_TOKEN` when no account is connected (pre-existing, self-hosting); not removed here.
+
+Assumptions to verify live: GitHub answers 403 on a protected-branch ref update (may be 422);
+the Composio proxy forwards `POST /graphql` and `refs/feega/...` ref writes.

@@ -76,6 +76,7 @@ export type GitHost = {
   lastPull: (branch: string) => Promise<PullSeen | null>;
   upsertPull: (ask: PullAsk) => Promise<PullRef>;
   markReady: (number: number) => Promise<void>;
+  setRef: (ref: string, sha: string) => Promise<void>;
   pull: (number: number) => Promise<PullState>;
   changedSince: (sha: string, ref: string) => Promise<FileChanged[]>;
   listRefs: () => Promise<RefSeen[]>;

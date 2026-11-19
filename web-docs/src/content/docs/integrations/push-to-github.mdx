@@ -9,42 +9,51 @@ Frames imported from a GitHub repository ([Import from code](/integrations/impor
 
 ## How a push lands
 
-- **Never the default branch, unless asked.** Every push goes to `feega/<name>` (or a branch you name) and opens one pull request against the base branch; only an explicit **Commit to branch** ([Branch options](#branch-options)) writes straight to a branch you pick.
-- **One pull request per merge cycle.** Later pushes update the same pull request. Once it is merged or closed, the next push opens `feega/<name>-2`.
-- **Never force-pushed.** If someone rewrote, deleted or protected the branch, the push goes to `feega/<name>-sync` and opens a pull request from there.
-- **One commit, all files.** The files of a push land in a single commit; if access is lost mid-push, no branch is created.
-- **One push at a time.** A second push on the same branch while one runs answers `busy`.
+- **You choose the branch.** Nothing is written until you pick where edits go: an existing branch (`main`, `dev`, …) or a new one from a base. The choice is remembered for the canvas and changeable from the branch chip. Without a chosen branch (agents through the API), a push goes to `feega/<name>` and opens one pull request per merge cycle, as before.
+- **Never force-pushed.** On a chosen branch, a commit by someone else on a different file stays and ours lands on top; on the same file the commit answers `conflict` and nothing is overwritten. A protected branch answers `protected`.
+- **One commit, all files.** The files of a commit land together; if access is lost mid-commit, nothing moves.
+- **One write at a time.** A second write on the same branch while one runs answers `busy`.
 - **Co-authors.** Pass co-authors and they are added to the commit.
 
-## Autosave
+## Working branch
 
-Editing a frame linked to a GitHub repository writes code as you work. The first edit creates the working branch (`feega/canvas-edits`, or the branch you named) and opens a **draft** pull request. Later edits are committed to that branch in the background: edits are batched and committed after a few seconds idle, one commit per batch, never one per drag. A frame imported from a local folder already writes its files live and is not autosaved to GitHub.
-
-If someone rewrote the branch, nothing is overwritten: the commit goes to `<branch>-sync`; when even that fails autosave stops at `conflict`, and files both sides changed show up as a conflict on the frame (see [Conflicts](#conflicts)). Config files, secrets or a variant frame pause autosave until you push from **Changes**.
-
-**Ready for review** marks the draft pull request ready; it replaces the manual push as the main action. **Undo last push** still works on the last autosave commit.
+Open **Changes** from the git chip in the top bar. Until a branch is chosen it asks **Save edits to**: a branch list (default: the branch the repo was imported from) or **New branch…** with a name and a base. Edits made before the choice stay on the canvas and are saved as soon as you confirm.
 
 ```bash
-feega github push <projectId> <nodeId> --name hero --draft
+feega github branch <projectId> main <nodeIds...>
+feega github branch <projectId> design/hero <nodeIds...> --from main
+```
+
+`POST /api/v1/projects/:id/github/push/branch` with `{ nodeIds, branch, from? }` answers `{ ok, branch, head, created, pull }`; MCP `github_branch {nodeIds,branch,from?}`.
+
+## Autosave and commits
+
+Edits are saved to code as you work: after a few seconds idle the code of the changed frames is written to the work-in-progress ref `refs/feega/wip/<branch>` of the repository. That ref is replaced on every save, so the branch history stays clean, and the branch itself does not move.
+
+Commits are summaries. After 2 minutes without edits, at the latest 10 minutes after the first unsaved edit, and when you leave the page, the saved work becomes one commit on the working branch. Its message is built from what changed: `Update Home and Pricing`, then the changed files. **Commit now** commits at once with a message you can edit. The panel lists the latest commits of the branch. **Undo last commit** (⋯) adds a commit that restores the files the last one touched.
+
+```bash
+feega github push <projectId> <nodeIds...> --name hero --title "Update Home"
+```
+
+`POST /api/v1/projects/:id/github/push/wip` with `{ nodeIds }` (409 `no_branch` until a branch is chosen); `POST /api/v1/projects/:id/github/push` commits; MCP `github_push`.
+
+## Pull request
+
+A pull request is its own action, shown when the working branch differs from a target: **Open pull request** into a branch you pick (default: the imported branch), as a draft. Once open the panel and the top bar show its number, draft state and CI; **Ready for review** is in the top bar.
+
+```bash
+feega github pull <projectId> <nodeId> --base main
 feega github ready <projectId> <nodeId>
 ```
 
-`POST /api/v1/projects/:id/github/push` with `pull: "draft"`; `POST /api/v1/projects/:id/github/push/ready` with `{ nodeId }` answers `{ ok, number }` (409 `not_pushed` without a pull request); MCP `github_push {…, pull: "draft"}` and `github_ready {nodeId}`.
-
-## Branch options
-
-**Changes** drops from the git group in the top bar. **Where changes go** is either **New branch + PR** (name the branch, used as is instead of `feega/<name>`) or **Commit to branch**: pick any branch of the repository from a searchable list (default: the base branch) and commits go straight to it, with no pull request; if a pull request is already open from that branch, its link shows. GitHub refuses a commit on a protected branch: the push answers 403 `protected` and the panel says so; nothing is written. Frames start ticked for the next commit when autosave is on, unticked when it is off. The panel's primary action is **Push now**, or **Commit to `<branch>`**; **Ready for review** lives in the top bar; **Undo last push** is in the ⋯ menu.
-
-```bash
-feega github push <projectId> <nodeId> --name hero --branch design/hero
-feega github push <projectId> <nodeId> --name hero --direct release
-```
-
-API and MCP: `branch: "design/hero"`; to commit straight to a branch, `target: "branch", branch: "release"` (no `branch` = the base branch).
+`POST /api/v1/projects/:id/github/push/pull` with `{ nodeId, base?, title?, kind?: draft|ready }` (400 `same_branch` when base is the working branch); `POST /api/v1/projects/:id/github/push/ready` with `{ nodeId }`; MCP `github_pull` and `github_ready`.
 
 ## Git status in the top bar
 
-When the canvas has frames linked to GitHub, the right side of the top bar shows the repository and the working branch (click for branch options), how many files changed upstream on the base branch, the autosave state (unsaved, saving, saved, conflict, paused), the pull request with its draft flag and CI state, **Ready for review** while it is a draft, and **Versions** to compare the frame with another branch, tag, commit or pull request. The same state is `feega github status <projectId> <nodeId>` (MCP `github_push_status`), where the pull request now carries `draft`.
+When the canvas has frames linked to GitHub, the right side of the top bar shows the repository and the working branch (or **Choose a branch**), how many files changed upstream, the save state (unsaved, saving, saved, conflict, waiting for a branch), the pull request with its draft flag and CI, **Ready for review** while it is a draft, and **Versions** to compare the frame with another branch, tag, commit or pull request.
+
+All calls to GitHub go through your connected GitHub account.
 
 ## Safety
 
@@ -130,7 +139,9 @@ feega github code-diff <projectId> <versionId>
 ## CLI
 
 ```bash
-feega github push <projectId> <nodeId...> --name hero [--branch <branch>] [--direct <branch>] [--draft]
+feega github branch <projectId> <branch> <nodeId...> [--from <branch>]
+feega github push <projectId> <nodeId...> --name hero
+feega github pull <projectId> <nodeId> [--base <branch>] [--ready]
 feega github ready <projectId> <nodeId>
 feega github status <projectId> <nodeId>
 feega github undo <projectId> <nodeId>
@@ -140,18 +151,21 @@ feega github undo <projectId> <nodeId>
 
 | Method | Path | Body or query |
 |---|---|---|
-| `POST` | `/api/v1/projects/:id/github/push` | `{ name, nodeIds, title?, body?, base?, confirmSensitive?, branch?, target?: session\|branch, pull?: draft\|ready }` |
+| `POST` | `/api/v1/projects/:id/github/push` | `{ name, nodeIds, title?, body?, base?, confirmSensitive? }` |
+| `POST` | `/api/v1/projects/:id/github/push/branch` | `{ nodeIds, branch, from? }` |
+| `POST` | `/api/v1/projects/:id/github/push/wip` | `{ nodeIds }` |
+| `POST` | `/api/v1/projects/:id/github/push/pull` | `{ nodeId, base?, title?, body?, kind? }` |
 | `GET` | `/api/v1/projects/:id/github/push?nodeId=` | — |
 | `POST` | `/api/v1/projects/:id/github/push/undo` | `{ nodeId }` |
 | `POST` | `/api/v1/projects/:id/github/push/ready` | `{ nodeId }` |
 | `POST` | `/api/v1/projects/:id/github/versions` | `{ nodeId, ref?, limit? }` |
 | `POST` | `/api/v1/projects/:id/github/compare` | `{ nodeId, refs }` |
 
-Refusals answer `{ ok: false, refusal }`: `not_connected`, `read_only` (403, with `patch`), `secret` and `env_file` (422), `needs_confirm` (428), `busy` (423), `protected` (403, commit to a protected branch), `unauthorized` (401), `forbidden` (403).
+Refusals answer `{ ok: false, refusal }`: `not_connected`, `read_only` (403, with `patch`), `secret` and `env_file` (422), `needs_confirm` (428), `busy` (423), `protected` (403), `conflict` (409, same file changed by someone else), `no_branch` (409), `same_branch` (400), `unauthorized` (401), `forbidden` (403).
 
 ## MCP
 
-`github_push`, `github_push_status`, `github_ready`, `github_undo`, `github_versions` and `github_compare`, with the same inputs.
+`github_branch`, `github_push`, `github_pull`, `github_push_status`, `github_ready`, `github_undo`, `github_versions` and `github_compare`, with the same inputs.
 
 ## What a frame is linked to
 

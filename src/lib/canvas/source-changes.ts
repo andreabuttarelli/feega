@@ -15,7 +15,7 @@ export enum CiState {
 
 export type PullView = { number: number; url: string; status: string; draft?: boolean; checks: { name: string; status: string; conclusion: string | null }[] };
 
-export type LinkView = { entry: string; appRoot: string; baseSha: string; baseBranch: string; writable: boolean; route?: string; pushBranch?: string; pullNumber?: number; beforePoster?: string; variantOf?: string; repo?: string; source?: string };
+export type LinkView = { entry: string; appRoot: string; baseSha: string; baseBranch: string; writable: boolean; route?: string; pushBranch?: string; pullNumber?: number; beforePoster?: string; variantOf?: string; repo?: string; source?: string; workBranch?: string };
 
 export type Affected = { path: string; pages: number };
 

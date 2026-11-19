@@ -84,12 +84,36 @@ describe('autosave del codice', () => {
     expect(saves).toEqual([['f1'], ['f1']]);
   });
 
+  it('senza ramo scelto le modifiche restano in attesa e partono quando lo si sceglie', async () => {
+    let answer = AutosaveState.NeedsBranch;
+    const saves: string[][] = [];
+    const autosave = codeAutosave({
+      save: async (ids) => {
+        saves.push(ids);
+        return answer;
+      },
+      onstate: () => {}
+    });
+
+    autosave.touch('f1');
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
+    autosave.touch('f2');
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
+    expect(saves).toEqual([['f1']]);
+
+    answer = AutosaveState.Saved;
+    autosave.resume();
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
+    expect(saves).toEqual([['f1'], ['f1', 'f2']]);
+  });
+
   it('la risposta del server diventa uno stato', () => {
     expect(outcomeOf({ ok: true })).toBe(AutosaveState.Saved);
     expect(outcomeOf({ ok: false, refusal: 'diverged' })).toBe(AutosaveState.Conflict);
     expect(outcomeOf({ ok: false, refusal: 'branch_gone' })).toBe(AutosaveState.Conflict);
     expect(outcomeOf({ ok: false, refusal: 'no_files' })).toBe(AutosaveState.Saved);
     expect(outcomeOf({ ok: false, refusal: 'needs_confirm' })).toBe(AutosaveState.Paused);
+    expect(outcomeOf({ ok: false, refusal: 'no_branch' })).toBe(AutosaveState.NeedsBranch);
     expect(outcomeOf(null)).toBe(AutosaveState.Failed);
   });
 });

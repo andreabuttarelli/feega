@@ -127,6 +127,9 @@ export function localGitHost(dir: string, options: LocalOptions): GitHost {
       }
       return pulls.upsertPull(ask);
     },
+    setRef: async (ref, sha) => {
+      await run(['update-ref', ref, sha]);
+    },
     markReady: async (number) => {
       if (!pulls) {
         throw new GitError(GitFailure.PullUnavailable, NO_PULLS);

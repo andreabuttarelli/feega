@@ -28,7 +28,8 @@
     [AutosaveState.Saved]: { icon: CloudCheck, label: 'All edits committed', tone: 'muted' },
     [AutosaveState.Conflict]: { icon: TriangleAlert, label: 'Conflict: autosave stopped. Open to resolve', tone: 'warn' },
     [AutosaveState.Paused]: { icon: TriangleAlert, label: 'Autosave paused: needs a confirmation', tone: 'warn' },
-    [AutosaveState.Failed]: { icon: CloudOff, label: 'Not saved: GitHub could not be reached', tone: 'danger' }
+    [AutosaveState.Failed]: { icon: CloudOff, label: 'Not saved: GitHub could not be reached', tone: 'danger' },
+    [AutosaveState.NeedsBranch]: { icon: Cloud, label: 'Edits kept on the canvas: choose where they go', tone: 'warn' }
   };
   const CI_LABEL: Record<CiState, string> = { [CiState.None]: 'No checks', [CiState.Running]: 'CI running', [CiState.Passed]: 'CI passed', [CiState.Failed]: 'CI failed' };
 
@@ -41,7 +42,7 @@
     <GitBranch size={14} />
     <span class="repo">{repoName}</span>
     <span class="sep">/</span>
-    <span class="branch">{summary.branch}</span>
+    {#if summary.branch}<span class="branch">{summary.branch}</span>{:else}<span class="branch tone-warn" data-testid="git-choose">Choose a branch</span>{/if}
     <ChevronDown size={12} />
   </button>
 

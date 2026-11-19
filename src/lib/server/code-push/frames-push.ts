@@ -6,7 +6,7 @@ import { CodeSourceKind, EntryKind, followRenames, isPushable, linkStatus, type 
 import type { LinkStore } from './link-store';
 import type { PushLock } from './push-lock';
 import { relocated, suggestedRoute, VariantChoice, type Suggested, type VariantAsk } from './variants';
-import { PushRefusal, pushFiles, pushStatus, readyPull, undoPush, type PullKind, type PushTarget, type LastPush, type PushRefused, type PushState, type Pushed, type Readied, type Undone } from './push';
+import { checkoutBranch, openPull, PullKind, PushRefusal, pushFiles, pushStatus, readyPull, saveWip, undoPush, type CheckedOut, type LastPush, type PullOpened, type PushRefused, type PushState, type Pushed, type Readied, type Saved, type Undone } from './push';
 
 export enum FramesRefusal {
   NotConnected = 'not_connected',
@@ -14,7 +14,8 @@ export enum FramesRefusal {
   ManyRepos = 'many_repos',
   NotLinked = 'not_linked',
   NotPushed = 'not_pushed',
-  VariantChoice = 'variant_choice'
+  VariantChoice = 'variant_choice',
+  NoBranch = 'no_branch'
 }
 
 export type FramesRefused = { ok: false; refusal: FramesRefusal | SyncRefusal | PushRefused['refusal']; paths?: string[]; patch?: { path: string; content: string }[]; suggested?: Suggested[] };
@@ -26,7 +27,7 @@ export type FramesDeps = {
   lock: PushLock;
 };
 
-export type FramesPushAsk = { name: string; nodeIds: string[]; title?: string; body?: string; since?: LastPush; base?: string; coAuthors?: string[]; confirmSensitive?: boolean; mains?: string[]; variants?: VariantAsk[]; branch?: string; target?: PushTarget; pull?: PullKind };
+export type FramesPushAsk = { name: string; nodeIds: string[]; title?: string; body?: string; since?: LastPush; base?: string; coAuthors?: string[]; confirmSensitive?: boolean; mains?: string[]; variants?: VariantAsk[] };
 
 export type Affected = { path: string; pages: number };
 
@@ -116,7 +117,8 @@ export async function framesPush(deps: FramesDeps, scope: CodeScope, ask: Frames
 
   const links = await Promise.all(ask.nodeIds.map(async (nodeId) => ({ nodeId, link: await deps.links.read(nodeId) })));
   const since = ask.since ?? lastPushOf(links[0]?.link ?? null);
-  const out = await pushFiles(host, deps.lock, { name: ask.name, files: edits.files, title: ask.title ?? DEFAULT_TITLE, body: ask.body ?? DEFAULT_BODY, since, base: ask.base, coAuthors: ask.coAuthors, confirmSensitive: ask.confirmSensitive, branch: ask.branch, target: ask.target, pull: ask.pull });
+  const branch = links.find((l) => l.link?.workBranch)?.link?.workBranch;
+  const out = await pushFiles(host, deps.lock, { name: ask.name, files: edits.files, title: ask.title ?? DEFAULT_TITLE, body: ask.body ?? DEFAULT_BODY, since, base: ask.base, coAuthors: ask.coAuthors, confirmSensitive: ask.confirmSensitive, branch });
   if (!out.ok) {
     return out.refusal === PushRefusal.ReadOnly ? { ...out, patch: edits.files } : out;
   }
@@ -199,6 +201,66 @@ export async function frameReady(deps: FramesDeps, nodeId: string): Promise<Read
   return host ? readyPull(host, link.pullNumber) : refused(FramesRefusal.NotConnected);
 }
 
+type Linked = { nodeId: string; link: CodeLink };
+
+async function linkedHost(deps: FramesDeps, nodeId: string): Promise<{ link: CodeLink; host: GitHost } | FramesRefused> {
+  const link = await deps.links.read(nodeId);
+  if (!link) {
+    return refused(FramesRefusal.NotLinked);
+  }
+  const host = await deps.host(link.source, link.repo);
+  return host ? { link, host } : refused(FramesRefusal.NotConnected);
+}
+
+async function saveAll(deps: FramesDeps, nodeIds: string[], patch: Partial<CodeLink>) {
+  const every: Linked[] = (await Promise.all(nodeIds.map(async (nodeId) => (await deps.links.all(nodeId)).map((link) => ({ nodeId, link }))))).flat();
+  await Promise.all(every.map((l) => deps.links.save(l.nodeId, { ...l.link, ...patch })));
+}
+
+export async function frameCheckout(deps: FramesDeps, ask: { nodeIds: string[]; branch: string; from?: string }): Promise<CheckedOut | FramesRefused> {
+  const got = await linkedHost(deps, ask.nodeIds[0]);
+  if ('ok' in got) {
+    return got;
+  }
+  const out = await checkoutBranch(got.host, { branch: ask.branch, from: ask.from ?? got.link.baseBranch });
+  if (out.ok) {
+    await saveAll(deps, ask.nodeIds, { workBranch: out.branch, pushBranch: out.branch, pushSha: out.head, pullNumber: out.pull?.number });
+  }
+  return out;
+}
+
+export async function frameWip(deps: FramesDeps, scope: CodeScope, nodeIds: string[]): Promise<Saved | FramesRefused> {
+  const link = await deps.links.read(nodeIds[0]);
+  if (!link) {
+    return refused(FramesRefusal.NotLinked);
+  }
+  if (!link.workBranch) {
+    return refused(FramesRefusal.NoBranch);
+  }
+  const edits = await editsOf(deps, scope, nodeIds);
+  if ('ok' in edits) {
+    return edits;
+  }
+  const host = await deps.host(edits.source, edits.repo);
+  return host ? saveWip(host, deps.lock, { branch: link.workBranch, files: edits.files }) : refused(FramesRefusal.NotConnected);
+}
+
+export async function framePull(deps: FramesDeps, ask: { nodeId: string; base?: string; title?: string; body?: string; kind?: PullKind }): Promise<PullOpened | FramesRefused> {
+  const got = await linkedHost(deps, ask.nodeId);
+  if ('ok' in got) {
+    return got;
+  }
+  const branch = got.link.workBranch ?? got.link.pushBranch;
+  if (!branch) {
+    return refused(FramesRefusal.NoBranch);
+  }
+  const out = await openPull(got.host, { branch, base: ask.base ?? (await got.host.defaultBranch()), title: ask.title ?? DEFAULT_TITLE, body: ask.body ?? DEFAULT_BODY, kind: ask.kind ?? PullKind.Draft });
+  if (out.ok) {
+    await saveAll(deps, [ask.nodeId], { pullNumber: out.pull.number });
+  }
+  return out;
+}
+
 const HTTP_STATUS: Record<string, number> = {
   [FramesRefusal.NotConnected]: 409,
   [FramesRefusal.NotPushable]: 409,
@@ -213,6 +275,9 @@ const HTTP_STATUS: Record<string, number> = {
   [PushRefusal.NoFiles]: 409,
   [PushRefusal.Busy]: 423,
   [PushRefusal.Protected]: 403,
+  [PushRefusal.Conflict]: 409,
+  [PushRefusal.SameBranch]: 400,
+  [FramesRefusal.NoBranch]: 409,
   [GitFailure.BranchGone]: 409,
   [GitFailure.Diverged]: 409,
   [GitFailure.Unauthorized]: 401,

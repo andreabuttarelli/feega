@@ -17,18 +17,18 @@ export enum PushRefusal {
   NeedsConfirm = 'needs_confirm',
   NoFiles = 'no_files',
   Busy = 'busy',
-  Protected = 'protected'
-}
-
-export enum PushTarget {
-  Session = 'session',
-  Branch = 'branch'
+  Protected = 'protected',
+  Conflict = 'conflict',
+  SameBranch = 'same_branch'
 }
 
 export enum PullKind {
   Draft = 'draft',
   Ready = 'ready'
 }
+
+export const WIP_PREFIX = 'refs/feega/wip/';
+const WIP_MESSAGE = 'Feega autosave (work in progress)';
 
 export enum Fallback {
   Diverged = 'diverged',
@@ -38,7 +38,7 @@ export enum Fallback {
 
 export type LastPush = { branch: string; sha: string };
 
-export type PushAsk = { name: string; files: { path: string; content: string }[]; title: string; body: string; coAuthors?: string[]; since?: LastPush; base?: string; confirmSensitive?: boolean; branch?: string; target?: PushTarget; pull?: PullKind };
+export type PushAsk = { name: string; files: { path: string; content: string }[]; title: string; body: string; coAuthors?: string[]; since?: LastPush; base?: string; confirmSensitive?: boolean; branch?: string };
 
 export type Pushed = { ok: true; branch: string; sha: string; parent: string; touched: string[]; pull: PullRef | null; fallback?: Fallback };
 
@@ -47,6 +47,14 @@ export type PushRefused = { ok: false; refusal: PushRefusal | GitFailure; paths?
 export type Undone = { ok: true; branch: string; sha: string };
 
 export type Readied = { ok: true; number: number };
+
+export type Saved = { ok: true; ref: string; sha: string };
+
+export type CheckedOut = { ok: true; branch: string; head: string; created: boolean; pull: PullRef | null };
+
+export type PullOpened = { ok: true; pull: PullRef };
+
+export type PullAskOf = { branch: string; base: string; title: string; body: string; kind: PullKind };
 
 export type PushState = { ok: true; branch: string; head: string; diverged: boolean; upstream: FileChanged[]; pull: PullState | null };
 
@@ -90,7 +98,7 @@ const headOrNull = (host: GitHost, branch: string) =>
     throw e;
   });
 
-const startBranch = (ask: PushAsk) => ask.since?.branch ?? ask.branch ?? sessionBranch(ask.name);
+const startBranch = (ask: PushAsk) => ask.since?.branch ?? sessionBranch(ask.name);
 
 async function cycleBranch(host: GitHost, ask: PushAsk): Promise<string> {
   let branch = startBranch(ask);
@@ -130,18 +138,80 @@ async function withLock<T>(lock: PushLock, key: string, work: () => Promise<T>):
   }
 }
 
-async function commitDirect(host: GitHost, branch: string, ask: PushAsk): Promise<Pushed | PushRefused> {
-  const since = ask.since?.branch === branch ? ask.since.sha : null;
-  const done = await commitOn(host, branch, branch, ask.files, messageOf(ask.title, ask.coAuthors ?? []), since).catch((e: unknown) => {
-    if (e instanceof GitError && e.failure === GitFailure.Forbidden) {
-      return null;
-    }
-    throw e;
-  });
-  if (!done) {
+const openPullOf = async (host: GitHost, branch: string): Promise<PullRef | null> => {
+  const last = await host.lastPull(branch);
+  return last && last.status === PullStatus.Open ? { number: last.number, url: last.url } : null;
+};
+
+const refusalOf = (e: unknown): PushRefused => {
+  if (e instanceof GitError && e.failure === GitFailure.Forbidden) {
     return { ok: false, refusal: PushRefusal.Protected };
   }
-  return { ok: true, branch, sha: done.sha, parent: done.parent, touched: ask.files.map((f) => f.path), pull: null };
+  if (e instanceof GitError) {
+    return { ok: false, refusal: e.failure };
+  }
+  throw e;
+};
+
+async function overlapSince(host: GitHost, branch: string, since: string, head: string, paths: string[]): Promise<string[]> {
+  if (since === head) {
+    return [];
+  }
+  const theirs = new Set((await host.changedSince(since, branch)).map((f) => f.path));
+  return paths.filter((p) => theirs.has(p));
+}
+
+async function commitWorking(host: GitHost, branch: string, base: string, ask: PushAsk): Promise<Pushed | PushRefused> {
+  const touched = ask.files.map((f) => f.path);
+  const head = await headOrNull(host, branch);
+  const since = ask.since?.branch === branch ? ask.since.sha : null;
+  const clash = head && since ? await overlapSince(host, branch, since, head, touched) : [];
+  if (clash.length) {
+    return { ok: false, refusal: PushRefusal.Conflict, paths: clash };
+  }
+  const parent = head ?? (await host.headOf(base));
+  try {
+    const sha = await host.writeCommit({ parent, message: messageOf(ask.title, ask.coAuthors ?? []), files: ask.files });
+    await (head ? host.moveBranch(branch, head, sha) : host.createBranch(branch, sha));
+    return { ok: true, branch, sha, parent, touched, pull: await openPullOf(host, branch).catch(() => null) };
+  } catch (e) {
+    return refusalOf(e);
+  }
+}
+
+export async function saveWip(host: GitHost, lock: PushLock, ask: { branch: string; files: FileWrite[] }): Promise<Saved | PushRefused> {
+  return withLock(lock, `${WIP_PREFIX}${ask.branch}`, async () => {
+    const parent = await host.headOf(ask.branch);
+    const sha = await host.writeCommit({ parent, message: WIP_MESSAGE, files: ask.files });
+    const ref = `${WIP_PREFIX}${ask.branch}`;
+    await host.setRef(ref, sha);
+    return { ok: true, ref, sha } as Saved;
+  });
+}
+
+export async function checkoutBranch(host: GitHost, ask: { branch: string; from?: string }): Promise<CheckedOut | PushRefused> {
+  try {
+    const head = await headOrNull(host, ask.branch);
+    if (head) {
+      return { ok: true, branch: ask.branch, head, created: false, pull: await openPullOf(host, ask.branch).catch(() => null) };
+    }
+    const from = await host.headOf(ask.from ?? (await host.defaultBranch()));
+    await host.createBranch(ask.branch, from);
+    return { ok: true, branch: ask.branch, head: from, created: true, pull: null };
+  } catch (e) {
+    return refusalOf(e);
+  }
+}
+
+export async function openPull(host: GitHost, ask: PullAskOf): Promise<PullOpened | PushRefused> {
+  if (ask.branch === ask.base) {
+    return { ok: false, refusal: PushRefusal.SameBranch };
+  }
+  try {
+    return { ok: true, pull: await host.upsertPull({ branch: ask.branch, base: ask.base, title: ask.title, body: ask.body, draft: ask.kind === PullKind.Draft }) };
+  } catch (e) {
+    return refusalOf(e);
+  }
 }
 
 export async function readyPull(host: GitHost, number: number): Promise<Readied | PushRefused> {
@@ -162,13 +232,13 @@ export async function pushFiles(host: GitHost, lock: PushLock, ask: PushAsk): Pr
     return refused;
   }
 
-  return withLock(lock, ask.target === PushTarget.Branch ? (ask.branch ?? ask.base ?? '') : startBranch(ask), async () => {
+  return withLock(lock, ask.branch ?? startBranch(ask), async () => {
     if ((await host.access()) === Access.Read) {
       return { ok: false, refusal: PushRefusal.ReadOnly } as PushRefused;
     }
     const base = ask.base ?? (await host.defaultBranch());
-    if (ask.target === PushTarget.Branch) {
-      return commitDirect(host, ask.branch ?? base, ask);
+    if (ask.branch) {
+      return commitWorking(host, ask.branch, base, ask);
     }
     const branch = await cycleBranch(host, ask.since?.branch === base ? { ...ask, since: undefined } : ask);
     const since = ask.since?.branch === branch ? ask.since.sha : null;
@@ -185,7 +255,7 @@ export async function pushFiles(host: GitHost, lock: PushLock, ask: PushAsk): Pr
         return { ...(await commitOn(host, sync, base, ask.files, message, null)), branch: sync, fallback };
       }
     );
-    const pull = await host.upsertPull({ branch: landed.branch, base, title: ask.title, body: ask.body, draft: ask.pull === PullKind.Draft }).catch((e: unknown) => {
+    const pull = await host.upsertPull({ branch: landed.branch, base, title: ask.title, body: ask.body, draft: false }).catch((e: unknown) => {
       if (e instanceof GitError && e.failure === GitFailure.PullUnavailable) {
         return null;
       }

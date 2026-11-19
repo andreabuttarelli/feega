@@ -20,6 +20,7 @@ export type FakeGithub = {
   branches: () => string[];
   tag: (name: string, ref: string) => void;
   protect: (branch: string) => void;
+  ref: (name: string) => string | null;
 };
 
 const answer = (status: number, data: unknown = null): ProviderAnswer => ({ status, data, headers: {}, file: null });
@@ -34,6 +35,7 @@ export function fakeGithub(opts: { owner?: string; repo?: string; push?: boolean
   const checks: FakeGithub['checks'] = {};
   const calls: ProviderCall[] = [];
   const protectedBranches = new Set<string>();
+  const others = new Map<string, string>();
   let seq = 0;
 
   const id = (prefix: string) => `${prefix}${(++seq).toString(16).padStart(8, '0')}`;
@@ -101,6 +103,18 @@ export function fakeGithub(opts: { owner?: string; repo?: string; push?: boolean
     if (m && method === 'GET') {
       const sha = refs.get(decodeURIComponent(m[1]));
       return sha ? answer(200, { object: { sha } }) : answer(404, { message: 'Not Found' });
+    }
+    if (path === '/git/refs' && method === 'POST' && !String(body.ref).startsWith('refs/heads/')) {
+      others.set(String(body.ref), String(body.sha));
+      return answer(201, { object: { sha: body.sha } });
+    }
+    m = path.match(/^\/git\/(refs\/(?!heads\/).+)$/);
+    if (m && method === 'PATCH') {
+      if (!others.has(m[1])) {
+        return answer(422, { message: 'Reference does not exist' });
+      }
+      others.set(m[1], String(body.sha));
+      return answer(200, { object: { sha: body.sha } });
     }
     if (path === '/git/refs' && method === 'POST') {
       const name = String(body.ref).replace('refs/heads/', '');
@@ -247,6 +261,7 @@ export function fakeGithub(opts: { owner?: string; repo?: string; push?: boolean
     tag: (name, ref) => {
       tags.set(name, refs.get(ref) ?? ref);
     },
+    ref: (name) => others.get(name) ?? null,
     protect: (branch) => {
       protectedBranches.add(branch);
     },

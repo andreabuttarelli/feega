@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { SourceEdit } from '$lib/server/code-import/write-back';
-import { FramesRefusal, frameReady, framesPush, frameStatus, frameUndo, type FrameStatus } from './frames-push';
+import { FramesRefusal, frameCheckout, frameReady, framesPush, frameWip, frameStatus, frameUndo, type FrameStatus } from './frames-push';
 import { makeVariant, VariantChoice } from './variants';
 import { ConflictChoice, frameConflicts, frameResolve } from './conflicts';
 import { linkImported } from './import-link';
 import { ComponentRole, EntryKind, LinkState } from './link';
-import { PushTarget, type Pushed, type Undone } from './push';
+import type { Pushed, Undone } from './push';
 import { BUTTON_COLUMN, BUTTON_LINE, FIXTURE, fixtureDeps, fixtureWorld, H1_COLUMN, H1_LINE, memoryLinks, NO_SCOPE, ROUTES, USER_BRANCH, USER_DIRTY, type FrameEdits, type World } from './github-sync.fixture';
 
 const FRAME = 'frame-shop';
@@ -49,12 +49,30 @@ describe('GitHub sync su un repo Next.js 15 + Tailwind', () => {
     ]);
   });
 
-  it('il ramo scelto e il commit diretto arrivano dove si è chiesto', async () => {
+  it('senza un ramo scelto l’autosave aspetta, nulla viene scritto', async () => {
+    edits.set(FRAME, [h1({ color: '#e11d48' }, { color: '#171717' })]);
+
+    expect(await frameWip(fixtureDeps(world, links, edits), NO_SCOPE, [FRAME])).toEqual({ ok: false, refusal: FramesRefusal.NoBranch });
+  });
+
+  it('scelto il ramo, l’autosave scrive il ref di lavoro e il commit lo porta sul ramo', async () => {
     edits.set(FRAME, [h1({ color: '#e11d48' }, { color: '#171717' })]);
     const deps = fixtureDeps(world, links, edits);
 
-    expect(await framesPush(deps, NO_SCOPE, { name: 'x', nodeIds: [FRAME], branch: 'design/hero' })).toMatchObject({ ok: true, branch: 'design/hero' });
-    expect(await framesPush(deps, NO_SCOPE, { name: 'x', nodeIds: [FRAME], target: PushTarget.Branch, branch: 'main' })).toMatchObject({ ok: true, branch: 'main', pull: null });
+    expect(await frameCheckout(deps, { nodeIds: [FRAME], branch: 'design/hero', from: 'main' })).toMatchObject({ ok: true, branch: 'design/hero', created: true });
+    expect(await frameWip(deps, NO_SCOPE, [FRAME])).toMatchObject({ ok: true, ref: 'refs/feega/wip/design/hero' });
+    expect(await world.at('design/hero', 'app/page.tsx')).not.toContain('#e11d48');
+
+    expect(await framesPush(deps, NO_SCOPE, { name: 'x', nodeIds: [FRAME], title: 'Update Home' })).toMatchObject({ ok: true, branch: 'design/hero', pull: null });
+    expect(await world.at('design/hero', 'app/page.tsx')).toContain('#e11d48');
+  });
+
+  it('committare su main scelto come ramo di lavoro è normale', async () => {
+    edits.set(FRAME, [h1({ color: '#e11d48' }, { color: '#171717' })]);
+    const deps = fixtureDeps(world, links, edits);
+    await frameCheckout(deps, { nodeIds: [FRAME], branch: 'main' });
+
+    expect(await framesPush(deps, NO_SCOPE, { name: 'x', nodeIds: [FRAME] })).toMatchObject({ ok: true, branch: 'main' });
     expect(await world.at('main', 'app/page.tsx')).toContain('#e11d48');
   });
 

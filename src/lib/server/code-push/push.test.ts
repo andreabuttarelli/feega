@@ -3,7 +3,7 @@ import { fakeGithub } from './fake-github.testkit';
 import { githubHost } from './github-host';
 import { GitFailure } from './git-host';
 import { memoryLock } from './push-lock';
-import { Fallback, PullKind, PushRefusal, PushTarget, pushFiles, pushStatus, readyPull, sessionBranch, undoPush, type PushAsk, type Pushed } from './push';
+import { checkoutBranch, Fallback, openPull, PullKind, PushRefusal, pushFiles, pushStatus, readyPull, saveWip, sessionBranch, undoPush, type PushAsk, type Pushed } from './push';
 
 const REPO = { owner: 'acme', repo: 'app', ref: null };
 
@@ -131,54 +131,107 @@ describe('pushFiles', () => {
   });
 });
 
-describe('autosave e opzioni di ramo', () => {
-  it('una spinta in bozza apre una PR draft, e pronta per la revisione la segna pronta', async () => {
+describe('ramo di lavoro scelto', () => {
+  it('il commit va sul ramo scelto, senza aprire PR', async () => {
     const { gh, host, lock } = setup();
 
-    const first = pushed(await pushFiles(host, lock, ask({ pull: PullKind.Draft })));
-    expect(gh.pulls[0].draft).toBe(true);
-
-    expect(await readyPull(host, first.pull!.number)).toEqual({ ok: true, number: first.pull!.number });
-    expect(gh.pulls[0].draft).toBe(false);
-  });
-
-  it('un nome di ramo scelto si usa così com’è', async () => {
-    const { gh, host, lock } = setup();
-
-    expect(await pushFiles(host, lock, ask({ branch: 'design/hero' }))).toMatchObject({ ok: true, branch: 'design/hero' });
+    expect(await pushFiles(host, lock, ask({ branch: 'design/hero' }))).toMatchObject({ ok: true, branch: 'design/hero', pull: null });
     expect(gh.files('design/hero')['src/Hero.tsx']).toBeDefined();
+    expect(gh.pulls).toHaveLength(0);
   });
 
-  it('il commit diretto va sul ramo base, senza PR', async () => {
+  it('committare su main è un caso normale', async () => {
     const { gh, host, lock } = setup();
 
-    expect(await pushFiles(host, lock, ask({ target: PushTarget.Branch, branch: 'main' }))).toMatchObject({ ok: true, branch: 'main', pull: null });
+    expect(await pushFiles(host, lock, ask({ branch: 'main' }))).toMatchObject({ ok: true, branch: 'main' });
     expect(gh.files('main')['src/Hero.tsx']).toBeDefined();
-    expect(gh.pulls).toHaveLength(0);
   });
 
-  it('dopo un commit diretto, la spinta di sessione non riparte dal ramo base', async () => {
-    const { host, lock } = setup();
-    const direct = pushed(await pushFiles(host, lock, ask({ target: PushTarget.Branch, branch: 'main' })));
-
-    expect(await pushFiles(host, lock, ask({ since: { branch: direct.branch, sha: direct.sha } }))).toMatchObject({ ok: true, branch: 'feega/hero-redesign' });
-  });
-
-  it('il commit su un ramo scelto va su quel ramo, senza PR', async () => {
-    const { gh, host, lock } = setup();
-    gh.seed('release', { 'README.md': 'hi' });
-
-    expect(await pushFiles(host, lock, ask({ target: PushTarget.Branch, branch: 'release' }))).toMatchObject({ ok: true, branch: 'release', pull: null });
-    expect(gh.files('release')['src/Hero.tsx']).toBeDefined();
-    expect(gh.pulls).toHaveLength(0);
-  });
-
-  it('il commit diretto su un ramo protetto è rifiutato come protected, senza ripiego', async () => {
+  it('un ramo protetto è rifiutato come protected, senza ripiego', async () => {
     const { gh, host, lock } = setup();
     gh.protect('main');
 
-    expect(await pushFiles(host, lock, ask({ target: PushTarget.Branch, branch: 'main' }))).toEqual({ ok: false, refusal: PushRefusal.Protected });
+    expect(await pushFiles(host, lock, ask({ branch: 'main' }))).toEqual({ ok: false, refusal: PushRefusal.Protected });
     expect(gh.branches()).toEqual(['main']);
+  });
+
+  it('un commit altrui su un altro file resta: il nostro va sopra', async () => {
+    const { gh, host, lock } = setup();
+    const first = pushed(await pushFiles(host, lock, ask({ branch: 'main' })));
+    gh.seed('main', { ...gh.files('main'), 'src/Other.tsx': 'by hand' });
+
+    const next = await pushFiles(host, lock, ask({ branch: 'main', files: [{ path: 'src/Hero.tsx', content: 'v2' }], since: { branch: 'main', sha: first.sha } }));
+
+    expect(next).toMatchObject({ ok: true });
+    expect(gh.files('main')).toMatchObject({ 'src/Other.tsx': 'by hand', 'src/Hero.tsx': 'v2' });
+  });
+
+  it('un commit altrui sullo stesso file è conflict, nulla viene sovrascritto', async () => {
+    const { gh, host, lock } = setup();
+    const first = pushed(await pushFiles(host, lock, ask({ branch: 'main' })));
+    gh.seed('main', { ...gh.files('main'), 'src/Hero.tsx': 'by hand' });
+
+    expect(await pushFiles(host, lock, ask({ branch: 'main', files: [{ path: 'src/Hero.tsx', content: 'v2' }], since: { branch: 'main', sha: first.sha } }))).toEqual({ ok: false, refusal: PushRefusal.Conflict, paths: ['src/Hero.tsx'] });
+    expect(gh.files('main')['src/Hero.tsx']).toBe('by hand');
+  });
+
+  it('una PR già aperta dal ramo viene restituita, mai aperta di nuovo', async () => {
+    const { gh, host, lock } = setup();
+    await pushFiles(host, lock, ask({ branch: 'design/hero' }));
+    await openPull(host, { branch: 'design/hero', base: 'main', title: 'Hero', body: '', kind: PullKind.Draft });
+
+    expect(await pushFiles(host, lock, ask({ branch: 'design/hero', files: [{ path: 'src/Hero.tsx', content: 'v3' }] }))).toMatchObject({ ok: true, pull: { number: 1 } });
+    expect(gh.pulls).toHaveLength(1);
+  });
+});
+
+describe('autosave sul ref di lavoro', () => {
+  it('scrive refs/feega/wip/<ramo> e lascia il ramo dov’è; il secondo salvataggio sostituisce il primo', async () => {
+    const { gh, host, lock } = setup();
+    const head = await host.headOf('main');
+
+    const first = await saveWip(host, lock, { branch: 'main', files: [{ path: 'src/Hero.tsx', content: 'v1' }] });
+    const second = await saveWip(host, lock, { branch: 'main', files: [{ path: 'src/Hero.tsx', content: 'v2' }] });
+
+    expect(first).toMatchObject({ ok: true, ref: 'refs/feega/wip/main' });
+    expect(await host.headOf('main')).toBe(head);
+    expect(gh.files(gh.ref('refs/feega/wip/main')!)['src/Hero.tsx']).toBe('v2');
+    expect(second.ok && (await host.isAncestor(head, second.sha))).toBe(true);
+  });
+
+  it('un ramo che non esiste ancora non si scrive: wip vuole un ramo scelto', async () => {
+    const { host, lock } = setup();
+
+    expect(await saveWip(host, lock, { branch: 'nope', files: [{ path: 'a', content: 'a' }] })).toEqual({ ok: false, refusal: GitFailure.BranchGone });
+  });
+});
+
+describe('checkout e pull request', () => {
+  it('un ramo esistente si sceglie com’è, uno nuovo nasce dalla base', async () => {
+    const { host } = setup();
+    const head = await host.headOf('main');
+
+    expect(await checkoutBranch(host, { branch: 'main' })).toEqual({ ok: true, branch: 'main', head, created: false, pull: null });
+    expect(await checkoutBranch(host, { branch: 'design/hero', from: 'main' })).toEqual({ ok: true, branch: 'design/hero', head, created: true, pull: null });
+    expect(await host.headOf('design/hero')).toBe(head);
+  });
+
+  it('la PR si apre verso la base scelta, in bozza, e pronta la segna pronta', async () => {
+    const { gh, host, lock } = setup();
+    await pushFiles(host, lock, ask({ branch: 'design/hero' }));
+
+    const pr = await openPull(host, { branch: 'design/hero', base: 'main', title: 'Hero', body: '', kind: PullKind.Draft });
+
+    expect(pr).toMatchObject({ ok: true, pull: { number: 1 } });
+    expect(gh.pulls[0]).toMatchObject({ base: 'main', draft: true });
+    expect(await readyPull(host, 1)).toEqual({ ok: true, number: 1 });
+    expect(gh.pulls[0].draft).toBe(false);
+  });
+
+  it('una PR dal ramo verso sé stesso è rifiutata', async () => {
+    const { host } = setup();
+
+    expect(await openPull(host, { branch: 'main', base: 'main', title: 't', body: '', kind: PullKind.Ready })).toEqual({ ok: false, refusal: PushRefusal.SameBranch });
   });
 });
 

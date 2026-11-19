@@ -121,6 +121,20 @@ export function githubHost(call: GithubCall, repo: RepoRef): GitHost {
       }
       return pullRefOf(await send({ endpoint: '/pulls', method: 'POST', body: { title: ask.title, body: ask.body, head: ask.branch, base: ask.base, draft: ask.draft ?? false } }));
     },
+    setRef: async (ref, sha) => {
+      const moved = await send({ endpoint: `/git/${ref}`, method: 'PATCH', body: { sha, force: true } }, { [HTTP_UNPROCESSABLE]: GitFailure.NotFound }).then(
+        () => true,
+        (e: unknown) => {
+          if (e instanceof GitError && e.failure === GitFailure.NotFound) {
+            return false;
+          }
+          throw e;
+        }
+      );
+      if (!moved) {
+        await send({ endpoint: '/git/refs', method: 'POST', body: { ref, sha } });
+      }
+    },
     markReady: async (number) => {
       const id = String((await send({ endpoint: `/pulls/${number}` })).node_id);
       const answer = await call({ endpoint: GRAPHQL, method: 'POST', body: { query: MARK_READY, variables: { id } } });

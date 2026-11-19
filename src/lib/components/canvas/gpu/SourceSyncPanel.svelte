@@ -1,9 +1,12 @@
 <script lang="ts">
   import { SvelteSet } from 'svelte/reactivity';
   import { SvelteMap } from 'svelte/reactivity';
-  import { SourceAction, changedRows, ciOf, CiState, filesOfPatch, filesToPush, impactOf, popoverOf, pushAskOf, pushedNote, rowTitle, VariantChoice, type ChangedFile, type FrameSync, type PullView, type VariantAnswer } from '$lib/canvas/source-changes';
+  import { SourceAction, changedRows, ciOf, CiState, filesOfPatch, impactOf, popoverOf, pushAskOf, pushedNote, rowTitle, VariantChoice, type ChangedFile, type FrameSync, type PullView, type VariantAnswer } from '$lib/canvas/source-changes';
   import { PushOutcome, pushOutcomeOf, editedFilesText } from '$lib/canvas/source-sync';
-  import { BranchMode, branchFields, type BranchOptions, type GitSummary } from '$lib/canvas/git-status';
+  import type { GitSummary } from '$lib/canvas/git-status';
+  import type { GitSession } from '$lib/canvas/git-session.svelte';
+  import GitBranch from '@lucide/svelte/icons/git-branch';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import X from '@lucide/svelte/icons/x';
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import Frame from '@lucide/svelte/icons/frame';
@@ -14,13 +17,13 @@
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
-  import { Segmented, Switch } from '$lib/components/ui/control';
+  import { OptionMenu, Switch } from '$lib/components/ui/control';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
   type Anchor = { left: number; top: number };
   type Pushed = { branch: string; pull: PullView | null };
 
-  let { projectId, canvasId, open, anchor, syncs, posterOf, assetUrl, onclose, onchanged, oncompare, options = $bindable(), panel = $bindable(false), autosaveOn = $bindable(true), git = null, savedAt = null }: { options: BranchOptions; panel?: boolean; autosaveOn?: boolean; git?: GitSummary | null; savedAt?: number | null; projectId: string; canvasId: string; open: FrameSync | null; anchor: Anchor | null; syncs: FrameSync[]; posterOf: (nodeId: string) => string | null; assetUrl: (assetId: string) => string; onclose: () => void; onchanged: () => Promise<unknown>; oncompare: (nodeId: string) => void } = $props();
+  let { projectId, canvasId, open, anchor, syncs, posterOf, assetUrl, onclose, onchanged, oncompare, panel = $bindable(false), git = null, work }: { panel?: boolean; git?: GitSummary | null; work: GitSession; projectId: string; canvasId: string; open: FrameSync | null; anchor: Anchor | null; syncs: FrameSync[]; posterOf: (nodeId: string) => string | null; assetUrl: (assetId: string) => string; onclose: () => void; onchanged: () => Promise<unknown>; oncompare: (nodeId: string) => void } = $props();
 
   const DEFAULT_NAME = 'canvas-edits';
   const PROTECTED = 'protected';
@@ -34,9 +37,7 @@
   let note = $state('');
   let confirming = $state(false);
   let pushed = $state<Pushed | null>(null);
-  let reviewing = $state(false);
   let copied = $state(false);
-  const picked = new SvelteSet<string>();
   const mains = new SvelteSet<string>();
   let asking = $state<{ nodeId: string; route: string }[]>([]);
   let answers = $state<VariantAnswer[]>([]);
@@ -113,14 +114,13 @@
   }
 
   async function push(confirmSensitive = false) {
-    const ask = pushAskOf(rows, picked, DEFAULT_NAME, mains, answers);
+    const ask = pushAskOf(rows, new Set(rows.map((r) => r.nodeId)), DEFAULT_NAME, mains, answers);
     if (!ask) {
       return;
     }
     busy = true;
-    reviewing = false;
     copied = false;
-    const body = await call(base, { method: 'POST', body: JSON.stringify({ ...ask, ...branchFields(options), confirmSensitive }) });
+    const body = await call(base, { method: 'POST', body: JSON.stringify({ ...ask, confirmSensitive }) });
     const outcome = pushOutcomeOf(body as { ok?: boolean; refusal?: string } | null);
     confirming = outcome === PushOutcome.NeedsConfirm;
     asking = outcome === PushOutcome.VariantChoice ? ((body?.suggested as { nodeId: string; route: string }[]) ?? []) : [];
@@ -139,7 +139,7 @@
     busy = false;
   }
 
-  const refusalNote = (refusal: string) => (refusal === PROTECTED ? `GitHub refused the commit: ${target} is protected. Choose another branch or open a pull request.` : `Push refused: ${refusal}`);
+  const refusalNote = (refusal: string) => (refusal === PROTECTED ? `GitHub refused the commit: ${workBranch ?? 'the branch'} is protected. Choose another branch.` : `Push refused: ${refusal}`);
 
   function answer(v: { nodeId: string; route: string }, choice: VariantChoice) {
     answers = [...answers.filter((a) => a.nodeId !== v.nodeId), { nodeId: v.nodeId, choice, route: v.route }];
@@ -194,44 +194,95 @@
   }
 
   const hasPush = $derived(syncs.some((s) => s.link.pushBranch));
-  const direct = $derived(options.mode === BranchMode.Direct);
   type BranchPull = { number: number; branch: string };
+  type CommitRow = { sha: string; message: string; author: string; at: string };
+  const NEW_BRANCH = '__new__';
+  const COMMITS_SHOWN = 5;
+  const MINUTE_MS = 60_000;
   let branches = $state<string[]>([]);
   let branchPulls = $state<BranchPull[]>([]);
-  const target = $derived(options.commitTo.trim() || baseBranch);
-  const targetPull = $derived(branchPulls.find((p) => p.branch === target) ?? null);
+  let commits = $state<CommitRow[]>([]);
+  let picking = $state(false);
+  let choice = $state('');
+  let newName = $state('');
+  let newFrom = $state('');
+  let message = $state('');
+  let pullBase = $state('');
+  const lead = $derived(git?.nodeId ?? syncs[0]?.nodeId ?? '');
+  const workBranch = $derived(git?.branch ?? null);
+  const choosing = $derived(!workBranch || picking);
+  const imported = $derived(git?.imported ?? syncs[0]?.link.baseBranch ?? 'main');
+  const branchOptions = $derived([...branches.map((b) => ({ value: b, label: b })), { value: NEW_BRANCH, label: 'New branch…' }]);
+  const pullTargets = $derived(branches.filter((b) => b !== workBranch).map((b) => ({ value: b, label: b })));
+  const pullTarget = $derived(pullBase || (imported !== workBranch ? imported : (pullTargets[0]?.value ?? '')));
+  const branchPull = $derived(branchPulls.find((p) => p.branch === workBranch) ?? null);
+  const savedAgo = (ms: number) => (ms < MINUTE_MS ? 'Saved just now' : `Saved ${Math.round(ms / MINUTE_MS)} min ago`);
+  const savedLabel = $derived(!work.autosaveOn ? 'Off: commit by hand' : work.savedAt ? savedAgo(Date.now() - work.savedAt) : workBranch ? 'Not saved yet' : 'Waiting for a branch');
+  const readOnly = $derived(rows.some((r) => !r.link.writable));
+  const agoOf = (at: string) => {
+    const minutes = Math.max(0, Math.round((Date.now() - Date.parse(at)) / MINUTE_MS));
+    return minutes < 1 ? 'just now' : minutes < 60 ? `${minutes} min ago` : `${Math.round(minutes / 60)} h ago`;
+  };
+
   $effect(() => {
-    if (!panel || !direct || branches.length || !syncs[0]) {
+    if (!panel || !lead) {
       return;
     }
-    void loadBranches(syncs[0].nodeId);
+    void loadRefs(lead, workBranch);
   });
-  async function loadBranches(nodeId: string) {
-    const body = await call(`/api/v1/projects/${projectId}/github/versions`, { method: 'POST', body: JSON.stringify({ nodeId, limit: 1 }) });
-    const refs = (body?.refs as { name: string; kind: string }[] | undefined) ?? [];
-    branches = refs.filter((ref) => ref.kind === 'branch').map((ref) => ref.name);
-    branchPulls = (body?.pulls as BranchPull[] | undefined) ?? [];
-  }
-  const baseBranch = $derived(git?.base ?? rows[0]?.link.baseBranch ?? syncs[0]?.link.baseBranch ?? 'main');
-  const workBranch = $derived(options.branch.trim() || git?.branch || 'feega/canvas-edits');
-  const WHERE = $derived([{ value: BranchMode.Session, label: 'New branch + PR' }, { value: BranchMode.Direct, label: 'Commit to branch' }]);
-  const MINUTE_MS = 60_000;
-  const savedAgo = (ms: number) => (ms < MINUTE_MS ? 'Saved just now' : `Saved ${Math.round(ms / MINUTE_MS)} min ago`);
-  const offered = new Set<string>();
+
   $effect(() => {
-    for (const r of rows) {
-      if (offered.has(r.nodeId)) {
-        continue;
-      }
-      offered.add(r.nodeId);
-      if (autosaveOn) {
-        picked.add(r.nodeId);
-      }
+    if (choosing && !choice) {
+      choice = imported;
     }
   });
-  const savedLabel = $derived(!autosaveOn ? 'Off: push by hand' : savedAt ? savedAgo(Date.now() - savedAt) : 'Not saved yet');
-  const readOnly = $derived(rows.some((r) => !r.link.writable));
-  const toPush = $derived(filesToPush(picked, files));
+
+  $effect(() => {
+    if (panel && !message) {
+      message = work.draftMessage().split('\n')[0];
+    }
+  });
+
+  async function loadRefs(nodeId: string, ref: string | null) {
+    const body = await call(`/api/v1/projects/${projectId}/github/versions`, { method: 'POST', body: JSON.stringify({ nodeId, ...(ref ? { ref } : {}), limit: COMMITS_SHOWN }) });
+    const refs = (body?.refs as { name: string; kind: string }[] | undefined) ?? [];
+    branches = refs.filter((r) => r.kind === 'branch').map((r) => r.name);
+    branchPulls = (body?.pulls as BranchPull[] | undefined) ?? [];
+    commits = ref ? ((body?.commits as CommitRow[] | undefined) ?? []).slice(0, COMMITS_SHOWN) : [];
+  }
+
+  async function confirmBranch() {
+    const isNew = choice === NEW_BRANCH;
+    const name = isNew ? newName.trim() : choice;
+    if (!name) {
+      return;
+    }
+    busy = true;
+    const body = await work.choose(name, isNew ? newFrom || imported : undefined);
+    if (body?.ok) {
+      picking = false;
+      await loadRefs(lead, name);
+    }
+    busy = false;
+  }
+
+  async function commitNow() {
+    busy = true;
+    await work.commit(message.trim() || undefined);
+    message = '';
+    await loadRefs(lead, workBranch);
+    busy = false;
+  }
+
+  async function openPullRequest() {
+    if (!pullTarget) {
+      return;
+    }
+    busy = true;
+    await work.openPull(lead, pullTarget);
+    await loadRefs(lead, workBranch);
+    busy = false;
+  }
 </script>
 
 {#if open && pop && anchor}
@@ -273,11 +324,11 @@
     <header class="cp-head">
       <div class="cp-title">
         <strong>{git?.repo ?? 'Changes'}</strong>
-        <span class="cp-flow">
-          {#if !direct}<code class="cp-ref">{baseBranch}</code>{/if}
-          <ArrowRight size={12} />
-          <code class="cp-ref">{direct ? target : workBranch}</code>
-        </span>
+        <button type="button" class="cp-branch" onclick={() => (picking = !picking)} data-testid="panel-branch">
+          <GitBranch size={12} />
+          {#if workBranch}<code>{workBranch}</code>{:else}<span>Choose a branch</span>{/if}
+          <ChevronDown size={12} />
+        </button>
       </div>
       {#if git?.pull}
         <a class="cp-pill" href={git.pull.url} target="_blank" rel="noopener">
@@ -288,15 +339,31 @@
       <Button variant="ghost" size="icon-sm" aria-label="Close" onclick={() => (panel = false)}><X size={14} /></Button>
     </header>
 
+    {#if choosing}
+      <div class="cp-section">
+        <p class="cp-label">Save edits to</p>
+        <section class="cp-card cp-stack" data-testid="branch-choice">
+          {#if !workBranch}<p class="cp-muted">Nothing is written to GitHub until you choose. Edits stay on the canvas meanwhile.</p>{/if}
+          <OptionMenu label="Branch" value={choice} options={branchOptions} onchange={(v) => (choice = String(v))} />
+          {#if choice === NEW_BRANCH}
+            <label class="cp-field-label" for="new-branch">Name</label>
+            <Input id="new-branch" placeholder="design/hero-refresh" bind:value={newName} data-testid="new-branch" />
+            <label class="cp-field-label" for="new-from">From</label>
+            <OptionMenu label="From" value={newFrom || imported} options={branches.map((b) => ({ value: b, label: b }))} onchange={(v) => (newFrom = String(v))} />
+          {/if}
+          <Button size="sm" disabled={busy || (choice === NEW_BRANCH && !newName.trim())} onclick={confirmBranch} data-testid="branch-confirm">Save edits to {choice === NEW_BRANCH ? newName.trim() || 'new branch' : choice}</Button>
+        </section>
+      </div>
+    {/if}
+
     <div class="cp-section">
-      <p class="cp-label">Next commit {#if rows.length}<span class="cp-count">{picked.size}/{rows.length}</span>{/if}</p>
+      <p class="cp-label">Changes {#if rows.length}<span class="cp-count">{rows.length}</span>{/if}</p>
       <section class="cp-card">
         {#if !rows.length}
-          <p class="cp-empty" data-testid="changes-empty"><GitCommitHorizontal size={16} /> No changes yet. Edit a linked frame and it is committed here.</p>
+          <p class="cp-empty" data-testid="changes-empty"><GitCommitHorizontal size={16} /> No changes yet. Edit a linked frame and it is saved here.</p>
         {/if}
         {#each rows as row (row.nodeId)}
-          <label class="cp-row">
-            <input type="checkbox" checked={picked.has(row.nodeId)} onchange={(e) => (e.currentTarget.checked ? picked.add(row.nodeId) : picked.delete(row.nodeId))} />
+          <div class="cp-row">
             {#if posterOf(row.nodeId)}
               <img class="cp-thumb" src={posterOf(row.nodeId)} alt="After" title="After" />
             {:else if row.link.beforePoster}
@@ -306,10 +373,9 @@
             {/if}
             <span class="cp-row-text">
               <span><strong>{rowTitle(row)}</strong> <span class="cp-muted">{row.state}</span></span>
-              <code class="cp-path">{popoverOf(row).file}</code>
               {#if impactOf(row)}<span class="cp-muted">{impactOf(row)}</span>{/if}
             </span>
-          </label>
+          </div>
           {#each files.get(row.nodeId) ?? [] as file (file.path)}
             <details class="cp-file">
               <summary><code>{file.path}</code></summary>
@@ -321,6 +387,12 @@
           {/each}
           <label class="cp-row cp-row-sub"><input type="checkbox" checked={mains.has(row.nodeId)} onchange={(e) => (e.currentTarget.checked ? mains.add(row.nodeId) : mains.delete(row.nodeId))} /> Apply instance edits to main component</label>
         {/each}
+        {#if rows.length && workBranch}
+          <div class="cp-commit">
+            <Input aria-label="Commit message" bind:value={message} data-testid="commit-message" />
+            <Button size="sm" disabled={busy || readOnly} onclick={commitNow} data-testid="commit-now">Commit now</Button>
+          </div>
+        {/if}
       </section>
     </div>
 
@@ -337,48 +409,55 @@
       <p class="note">This push touches config, lockfiles or dotfiles.</p>
       <button type="button" disabled={busy} onclick={() => push(true)}>Push anyway</button>
     {/if}
-    {#if note}<p class="cp-note" data-testid="changes-note"><TriangleAlert size={14} /><span>{note}</span></p>{/if}
+    {#if note || work.note}<p class="cp-note" data-testid="changes-note"><TriangleAlert size={14} /><span>{note || work.note}</span></p>{/if}
     {#if pushed}
       <p class="pushed" data-testid="pushed-note">{pushedNote(pushed)}{#if pushed.pull} · <a href={pushed.pull.url} target="_blank" rel="noopener">open</a> · {CI_LABEL[ciOf(pushed.pull)]}{/if}</p>
       {#if !pushed.pull}
         <button type="button" onclick={() => copyBranch(pushed!.branch)}>{copied ? 'Branch copied' : 'Copy branch'}</button>
       {/if}
     {/if}
-    {#if reviewing}
-      <div class="review" data-testid="push-review">
-        <p>These files will be pushed:</p>
-        <ul>
-          {#each toPush as path (path)}<li><code>{path}</code></li>{/each}
-        </ul>
-        <button type="button" class="primary" disabled={busy || !toPush.length} onclick={() => push()}>Push {toPush.length} files</button>
-        <button type="button" onclick={() => (reviewing = false)}>Back</button>
+    {#if workBranch}
+      <div class="cp-section">
+        <p class="cp-label">Commits on <code class="cp-ref">{workBranch}</code></p>
+        <section class="cp-card" data-testid="commit-list">
+          {#each commits as c (c.sha)}
+            <div class="cp-commit-row">
+              <GitCommitHorizontal size={14} />
+              <span class="cp-row-text"><span class="cp-ellipsis">{c.message}</span><span class="cp-muted">{c.author} · {agoOf(c.at)} · <code>{c.sha.slice(0, 7)}</code></span></span>
+            </div>
+          {:else}
+            <p class="cp-empty">No commits yet.</p>
+          {/each}
+        </section>
+      </div>
+
+      <div class="cp-section">
+        <p class="cp-label">Pull request</p>
+        <section class="cp-card cp-stack" data-testid="pull-section">
+          {#if git?.pull || branchPull}
+            <div class="cp-pr-open">
+              <GitPullRequest size={14} />
+              <span class="cp-row-text"><span>#{git?.pull?.number ?? branchPull?.number} from <code>{workBranch}</code></span><span class="cp-muted">{git?.draft ? 'Draft: mark it ready from the top bar' : 'Open'}{#if git?.pull && git.ci !== CiState.None} · {CI_LABEL[git.ci]}{/if}</span></span>
+            </div>
+          {:else if pullTargets.length}
+            <div class="cp-pr-target">
+              <span>Into</span>
+              <OptionMenu label="Target branch" value={pullTarget} options={pullTargets} onchange={(v) => (pullBase = String(v))} />
+            </div>
+            <Button size="sm" variant="secondary" disabled={busy} onclick={openPullRequest} data-testid="open-pull">Open pull request</Button>
+          {:else}
+            <p class="cp-muted">Commits land on {workBranch} directly.</p>
+          {/if}
+        </section>
       </div>
     {/if}
-    <div class="cp-section">
-      <p class="cp-label">Where changes go</p>
-      <section class="cp-card cp-stack" data-testid="branch-options">
-        <Segmented label="Where changes go" value={options.mode} options={WHERE} onchange={(v) => (options.mode = v as BranchMode)} />
-        {#if direct}
-          <label class="cp-field-label" for="commit-branch">Branch</label>
-          <Input id="commit-branch" list="commit-branches" placeholder={baseBranch} bind:value={options.commitTo} autocomplete="off" data-testid="commit-branch" />
-          <datalist id="commit-branches">
-            {#each branches as name (name)}<option value={name}></option>{/each}
-          </datalist>
-          {#if targetPull}<a class="cp-pill cp-pill-inline" href="https://github.com/{git?.repo}/pull/{targetPull.number}" target="_blank" rel="noopener" data-testid="commit-branch-pull"><GitPullRequest size={12} /> Open PR #{targetPull.number} from {target}</a>{/if}
-          <p class="cp-warn" data-testid="branch-direct-note"><TriangleAlert size={14} /><span>Commits land on <code>{target}</code> with no pull request. If it is protected, GitHub refuses them.</span></p>
-        {:else}
-          <label class="cp-field-label" for="branch-name">Branch</label>
-          <Input id="branch-name" placeholder="feega/canvas-edits" bind:value={options.branch} data-testid="branch-name" />
-        {/if}
-      </section>
-    </div>
 
     <div class="cp-section">
       <p class="cp-label">Autosave</p>
       <section class="cp-card cp-autosave" data-testid="last-saved">
         <span class="cp-save-icon cp-save-{git?.autosave ?? 'idle'}"><CloudCheck size={16} /></span>
-        <span class="cp-row-text"><span>Commit edits as you work</span><span class="cp-muted">{savedLabel}</span></span>
-        <Switch label="Autosave" value={autosaveOn} onchange={(v) => (autosaveOn = v === true)} />
+        <span class="cp-row-text"><span>Save edits to code as you work</span><span class="cp-muted">{savedLabel}</span></span>
+        <Switch label="Autosave" value={work.autosaveOn} onchange={(v) => (work.autosaveOn = v === true)} />
       </section>
     </div>
 
@@ -386,14 +465,11 @@
       <DropdownMenu.Root>
         <DropdownMenu.Trigger class="cp-more" aria-label="More" data-testid="changes-more"><Ellipsis size={16} /></DropdownMenu.Trigger>
         <DropdownMenu.Content align="start" collisionPadding={8}>
-          <DropdownMenu.Item disabled={busy || !hasPush} onSelect={undo}>Undo last push</DropdownMenu.Item>
+          <DropdownMenu.Item disabled={busy || !hasPush} onSelect={undo}>Undo last commit</DropdownMenu.Item>
+          {#if readOnly}<DropdownMenu.Item onSelect={() => push()}>Download patch</DropdownMenu.Item>{/if}
         </DropdownMenu.Content>
       </DropdownMenu.Root>
-      {#if readOnly}
-        <Button size="md" class="cp-primary" disabled={busy || !picked.size} onclick={() => push()}>Download patch</Button>
-      {:else}
-        <Button size="md" class="cp-primary" disabled={busy || !picked.size || reviewing} onclick={() => (reviewing = true)} data-testid="changes-primary">{direct ? `Commit to ${target}` : 'Push now'}</Button>
-      {/if}
+      <span class="cp-muted cp-foot-note">Commits every few minutes of idle, or when you leave.</span>
     </footer>
   </aside>
 {/if}
@@ -632,6 +708,66 @@
   }
   .cp-save-failed {
     color: var(--ui-danger);
+  }
+  .cp-branch {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    justify-self: start;
+    max-width: 100%;
+    padding: 3px 8px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-wash);
+    color: var(--ui-text-secondary);
+    cursor: pointer;
+  }
+  .cp-branch:hover {
+    background: var(--ui-hover);
+    color: var(--ui-text);
+  }
+  .cp-branch code {
+    overflow: hidden;
+    font-family: var(--ui-mono);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .changes input[type='checkbox'] {
+    accent-color: var(--ui-accent);
+  }
+  .cp-commit {
+    display: flex;
+    gap: var(--ui-space-2);
+    margin-top: var(--ui-space-2);
+  }
+  .cp-commit-row,
+  .cp-pr-open {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px;
+    border-radius: var(--ui-radius-sm);
+    color: var(--ui-text-secondary);
+  }
+  .cp-commit-row + .cp-commit-row {
+    border-top: 1px solid var(--ui-divider);
+    border-radius: 0;
+  }
+  .cp-ellipsis {
+    overflow: hidden;
+    color: var(--ui-text);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cp-pr-target {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: var(--ui-space-2);
+  }
+  .cp-foot-note {
+    font-size: 11px;
   }
   .cp-foot {
     position: sticky;

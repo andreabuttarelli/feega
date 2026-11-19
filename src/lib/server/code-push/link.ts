@@ -42,6 +42,7 @@ export const linkSchema = z.object({
   baseBranch: z.string().max(200),
   baseSha: z.string().max(64),
   files: z.array(PATH).max(500).default([]),
+  workBranch: z.string().max(200).optional(),
   pushBranch: z.string().max(200).optional(),
   pushSha: z.string().max(64).optional(),
   pushParent: z.string().max(64).optional(),

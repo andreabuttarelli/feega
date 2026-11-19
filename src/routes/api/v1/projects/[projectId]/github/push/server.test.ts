@@ -25,6 +25,9 @@ vi.mock('$lib/server/code-push/frames-runtime', () => ({
 const push = await import('./+server');
 const undo = await import('./undo/+server');
 const ready = await import('./ready/+server');
+const wip = await import('./wip/+server');
+const branch = await import('./branch/+server');
+const pull = await import('./pull/+server');
 
 type Handler = (event: unknown) => Promise<Response>;
 
@@ -118,29 +121,48 @@ describe('/api/v1/projects/:id/github/push', () => {
     expect(gh.files('feega/hero')['src/Hero.tsx']).toBe('v0');
   });
 
-  it('l’autosave apre una PR in bozza, pronta per la revisione la segna pronta', async () => {
-    await post(push.POST, { name: 'hero', nodeIds: ['n1'], pull: 'draft' });
-    expect(gh.pulls[0].draft).toBe(true);
+  it('senza un ramo scelto l’autosave aspetta: 409 no_branch', async () => {
+    const { res, body } = await post(wip.POST, { nodeIds: ['n1'] });
 
-    const { res, body } = await post(ready.POST, { nodeId: 'n1' });
-
-    expect(res.status).toBe(200);
-    expect(body).toEqual({ ok: true, number: 1 });
-    expect(gh.pulls[0].draft).toBe(false);
+    expect(res.status).toBe(409);
+    expect(body).toEqual({ ok: false, refusal: 'no_branch' });
   });
 
-  it('il commit diretto su un ramo protetto è 403 protected', async () => {
-    gh.protect('main');
+  it('scelto main, autosave sul ref di lavoro e commit su main, senza PR', async () => {
+    expect((await post(branch.POST, { nodeIds: ['n1'], branch: 'main' })).body).toMatchObject({ ok: true, branch: 'main', created: false });
 
-    const { res, body } = await post(push.POST, { name: 'hero', nodeIds: ['n1'], target: 'branch', branch: 'main' });
+    expect((await post(wip.POST, { nodeIds: ['n1'] })).body).toMatchObject({ ok: true, ref: 'refs/feega/wip/main' });
+    expect(gh.files('main')['src/Hero.tsx']).toBe('v0');
+
+    expect((await post(push.POST, { name: 'hero', nodeIds: ['n1'], title: 'Update Hero' })).body).toMatchObject({ ok: true, branch: 'main', pull: null });
+    expect(gh.files('main')['src/Hero.tsx']).toBe('v1');
+  });
+
+  it('su un ramo protetto il commit è 403 protected', async () => {
+    gh.protect('main');
+    await post(branch.POST, { nodeIds: ['n1'], branch: 'main' });
+
+    const { res, body } = await post(push.POST, { name: 'hero', nodeIds: ['n1'] });
 
     expect(res.status).toBe(403);
     expect(body).toMatchObject({ ok: false, refusal: 'protected' });
   });
 
-  it('un nome di ramo scelto arriva su GitHub così com’è', async () => {
-    const { body } = await post(push.POST, { name: 'hero', nodeIds: ['n1'], branch: 'design/hero' });
+  it('la PR si apre verso la base scelta, in bozza; pronta la segna pronta', async () => {
+    await post(branch.POST, { nodeIds: ['n1'], branch: 'design/hero', from: 'main' });
+    await post(push.POST, { name: 'hero', nodeIds: ['n1'] });
 
-    expect(body).toMatchObject({ ok: true, branch: 'design/hero' });
+    const opened = await post(pull.POST, { nodeId: 'n1', base: 'main', kind: 'draft' });
+    expect(opened.body).toMatchObject({ ok: true, pull: { number: 1 } });
+    expect(gh.pulls[0]).toMatchObject({ base: 'main', draft: true });
+
+    expect((await post(ready.POST, { nodeId: 'n1' })).body).toEqual({ ok: true, number: 1 });
+    expect(gh.pulls[0].draft).toBe(false);
+  });
+
+  it('una PR dal ramo verso sé stesso è 400', async () => {
+    await post(branch.POST, { nodeIds: ['n1'], branch: 'main' });
+
+    expect((await post(pull.POST, { nodeId: 'n1', base: 'main' })).res.status).toBe(400);
   });
 });

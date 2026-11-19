@@ -100,8 +100,8 @@ import { conditionsOf, MAX_CONDITIONS } from '$lib/server/code-import/render-con
 import { CAPTURE_DELAY_MAX_MS, delayOf } from '$lib/server/code-import/capture-wait';
 import { designSystemOf } from '$lib/server/code-import/design-system';
 import { githubFor } from '$lib/server/code-import/github-runtime';
-import { frameDetach, frameReady, framesPush, frameStatus, frameUndo } from '$lib/server/code-push/frames-push';
-import { PullKind, PushTarget } from '$lib/server/code-push/push';
+import { frameCheckout, frameDetach, framePull, frameReady, framesPush, frameStatus, frameUndo } from '$lib/server/code-push/frames-push';
+import { PullKind } from '$lib/server/code-push/push';
 import { frameVersions } from '$lib/server/code-push/frames-versions';
 import { frameCompare, frameRetarget, MAX_VERSIONS } from '$lib/server/code-push/frames-compare';
 import { actionDeps, compareDeps } from '$lib/server/code-push/compare-runtime';
@@ -1153,7 +1153,7 @@ export const CANVAS_OPS = {
 
   github_push: op({
     access: Access.Write,
-    input: z.object({ name: z.string().min(1).max(100).describe('names the branch feega/<name>; later pushes update its pull request until it is merged, then a new branch opens'), nodeIds: z.array(z.string()).min(1).max(50).describe('code frames imported from one GitHub repo'), title: z.string().max(200).optional(), body: z.string().max(10_000).optional(), confirmSensitive: z.boolean().optional().describe('true after the user agreed to change config files, lockfiles or dotfiles'), mains: z.array(z.string()).max(50).optional().describe('frames whose instance edits go to the main component file instead of props at the usage site'), variants: z.array(z.object({ nodeId: z.string(), choice: z.enum(VariantChoice).describe('replace the original files, push as a new route, or keep on canvas only'), route: z.string().max(300).optional() })).max(50).optional(), branch: z.string().min(1).max(200).regex(/^(?!.*\.\.)[\w./-]+$/).optional().describe('exact branch to commit on instead of feega/<name>'), target: z.enum(PushTarget).optional().describe('branch commits straight to the branch named in branch (default the base branch), no pull request; a protected branch answers protected'), pull: z.enum(PullKind).optional().describe('draft opens the pull request as a draft, as autosave does; github_ready marks it ready') }).strict(),
+    input: z.object({ name: z.string().min(1).max(100).describe('names the branch feega/<name>; later pushes update its pull request until it is merged, then a new branch opens'), nodeIds: z.array(z.string()).min(1).max(50).describe('code frames imported from one GitHub repo'), title: z.string().max(200).optional(), body: z.string().max(10_000).optional(), confirmSensitive: z.boolean().optional().describe('true after the user agreed to change config files, lockfiles or dotfiles'), mains: z.array(z.string()).max(50).optional().describe('frames whose instance edits go to the main component file instead of props at the usage site'), variants: z.array(z.object({ nodeId: z.string(), choice: z.enum(VariantChoice).describe('replace the original files, push as a new route, or keep on canvas only'), route: z.string().max(300).optional() })).max(50).optional() }).strict(),
     run: async (ctx, input) => framesPush(framesDeps(ctx.db, ctx), figmaScope(ctx), input)
   }),
 
@@ -1167,6 +1167,18 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: z.object({ nodeId: z.string() }).strict(),
     run: async (ctx, input) => frameUndo(framesDeps(ctx.db, ctx), input.nodeId)
+  }),
+
+  github_branch: op({
+    access: Access.Write,
+    input: z.object({ nodeIds: z.array(z.string()).min(1).max(50).describe('linked frames of one repo'), branch: z.string().min(1).max(200).regex(/^(?!.*\.\.)[\w./-]+$/).describe('existing branch to work on, or a new one'), from: z.string().max(200).optional().describe('base of a new branch, default the imported branch') }).strict(),
+    run: async (ctx, input) => frameCheckout(framesDeps(ctx.db, ctx), input)
+  }),
+
+  github_pull: op({
+    access: Access.Write,
+    input: z.object({ nodeId: z.string(), base: z.string().max(200).optional().describe('target branch, default the repo default'), title: z.string().max(200).optional(), body: z.string().max(10_000).optional(), kind: z.enum(PullKind).optional().describe('draft (default) or ready') }).strict(),
+    run: async (ctx, input) => framePull(framesDeps(ctx.db, ctx), input)
   }),
 
   github_ready: op({
