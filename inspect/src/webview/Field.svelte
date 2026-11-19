@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { MIXED, type Shared } from '@feega/properties-panel/mixed';
+  import { heldValue, liveNumber, type Held } from './scrub';
   import { Unit, convert, cssOf, parseLength, stepOf, type UnitContext } from './units';
 
   type Props = {
@@ -15,9 +16,10 @@
     max?: number;
     title?: string;
     onchange: (value: string) => void;
+    onpreview?: (value: string) => void;
   };
 
-  let { name, prefix = '', icon, px, units, unit = '', context, min = -100000, max = 100000, title, onchange }: Props = $props();
+  let { name, prefix = '', icon, px, units, unit = '', context, min = -100000, max = 100000, title, onchange, onpreview = () => undefined }: Props = $props();
 
   const COARSE = 10;
   const DRAG_PX_PER_STEP = 2;
@@ -26,12 +28,17 @@
   let chosen = $state<Unit>(Unit.Px);
   let scrub = $state<{ x: number; start: number } | null>(null);
   let draft = $state<number | null>(null);
+  let held = $state<Held | null>(null);
 
   const lengthy = $derived(Boolean(units?.length));
   const step = $derived(lengthy ? stepOf(chosen) : 1);
   const shown = $derived.by(() => {
     if (draft !== null) {
       return draft;
+    }
+    const kept = held && px !== MIXED ? heldValue(held, px, Date.now()) : null;
+    if (kept !== null) {
+      return kept;
     }
     if (px === MIXED || !lengthy || !context || chosen === Unit.Auto) {
       return px;
@@ -41,7 +48,18 @@
   const text = $derived(shown === MIXED ? '' : String(Number((shown as number).toFixed(DECIMALS))));
 
   const clamp = (v: number) => Math.min(max, Math.max(min, v));
-  const emit = (v: number) => onchange(lengthy ? cssOf({ value: clamp(v), unit: chosen }) : String(clamp(v)));
+  const written = (v: number) => (lengthy ? cssOf({ value: clamp(v), unit: chosen }) : String(clamp(v)));
+  const emit = (v: number) => onchange(written(v));
+  const live = liveNumber({
+    preview: (v) => onpreview(v),
+    commit: (v) => onchange(v),
+    frame: (run) => requestAnimationFrame(run),
+    later: (run, ms) => {
+      const id = setTimeout(run, ms);
+      return () => clearTimeout(id);
+    }
+  });
+  const hold = (v: number) => (held = { value: lengthy && context && chosen !== Unit.Px && chosen !== Unit.Auto ? convert({ value: v, unit: chosen }, Unit.Px, context).value : v, since: Date.now() });
 
   function commitText(raw: string) {
     if (lengthy) {
@@ -69,7 +87,11 @@
     const dir = e.key === 'ArrowUp' ? 1 : e.key === 'ArrowDown' ? -1 : 0;
     if (dir && shown !== MIXED) {
       e.preventDefault();
-      emit((shown as number) + dir * step * (e.shiftKey ? COARSE : 1));
+      const next = clamp(Number(((shown as number) + dir * step * (e.shiftKey ? COARSE : 1)).toFixed(DECIMALS)));
+      draft = next;
+      live.nudge(written(next));
+      hold(next);
+      draft = null;
     }
   }
 
@@ -85,12 +107,14 @@
     if (scrub) {
       const steps = Math.round((e.clientX - scrub.x) / DRAG_PX_PER_STEP);
       draft = clamp(Number((scrub.start + steps * step * (e.shiftKey ? COARSE : 1)).toFixed(DECIMALS)));
+      live.move(written(draft));
     }
   }
 
   function drop() {
     if (scrub && draft !== null) {
-      emit(draft);
+      live.release(written(draft));
+      hold(draft);
     }
     scrub = null;
     draft = null;

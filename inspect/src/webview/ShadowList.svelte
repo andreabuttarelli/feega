@@ -30,9 +30,11 @@
     row: Snippet<[string, Snippet, string?]>;
     onchange: (css: string) => void;
     ontext: (css: string) => void;
+    onpreview: (css: string) => void;
+    onpreviewtext: (css: string) => void;
   };
 
-  let { css, text, header, row, onchange, ontext }: Props = $props();
+  let { css, text, header, row, onchange, ontext, onpreview, onpreviewtext }: Props = $props();
 
   let layers = $state<Shadow[]>([]);
   let textLayers = $state<Shadow[]>([]);
@@ -48,8 +50,12 @@
 
   function commitText(next: Shadow[]) {
     textLayers = next;
-    ontext(shadowCss(next).replace(/(^|, )inset /g, '$1'));
+    ontext(textCss(next));
   }
+
+  const textCss = (next: Shadow[]) => shadowCss(next).replace(/(^|, )inset /g, '$1');
+  const peek = (next: Shadow[]) => onpreview(shadowCss(next));
+  const peekText = (next: Shadow[]) => onpreviewtext(textCss(next));
 
   const update = (list: Shadow[], save: (n: Shadow[]) => void, i: number, patch: Partial<Shadow>) => save(list.map((s, j) => (j === i ? { ...s, ...patch } : s)));
 </script>
@@ -71,7 +77,7 @@
   </DropdownMenu.Root>
 {/snippet}
 
-{#snippet layerRow(list: Shadow[], save: (n: Shadow[]) => void, layer: Shadow, i: number)}
+{#snippet layerRow(list: Shadow[], save: (n: Shadow[]) => void, show: (n: Shadow[]) => void, layer: Shadow, i: number)}
   <div class="layer" class:off={!layer.visible} data-field="shadow-layer">
     <Popover.Root>
       <Popover.Trigger class="swatch-button" aria-label="Edit shadow">
@@ -82,7 +88,7 @@
           <header class="pop-head">{layer.inset ? 'Inner shadow' : 'Drop shadow'}</header>
           <div class="fields">
             {#each FIELDS as f (f.key)}
-              <Field name={`shadow-${f.key}`} prefix={f.label} px={layer[f.key]} unit="px" min={f.min} max={200} onchange={(v) => update(list, save, i, { [f.key]: parseFloat(v) })} />
+              <Field name={`shadow-${f.key}`} prefix={f.label} px={layer[f.key]} unit="px" min={f.min} max={200} onpreview={(v) => update(list, show, i, { [f.key]: parseFloat(v) })} onchange={(v) => update(list, save, i, { [f.key]: parseFloat(v) })} />
             {/each}
           </div>
           <label class="line">Colour <input type="color" value={hexOf(layer.colour)} onchange={(e) => update(list, save, i, { colour: e.currentTarget.value })} /></label>
@@ -98,11 +104,11 @@
 
 {@render header(Section.Effects, add)}
 {#each layers as layer, i (i)}
-  {#snippet one()}{@render layerRow(layers, commit, layer, i)}{/snippet}
+  {#snippet one()}{@render layerRow(layers, commit, peek, layer, i)}{/snippet}
   {@render row(layer.inset ? 'Inner' : 'Drop', one, `shadow-${i}`)}
 {/each}
 {#each textLayers as layer, i (i)}
-  {#snippet one()}{@render layerRow(textLayers, commitText, layer, i)}{/snippet}
+  {#snippet one()}{@render layerRow(textLayers, commitText, peekText, layer, i)}{/snippet}
   {@render row('Text', one, `text-shadow-${i}`)}
 {/each}
 

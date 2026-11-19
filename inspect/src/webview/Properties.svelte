@@ -106,7 +106,7 @@
 
 {#snippet field(r: NumberRow, prefix = r.label, iconSvg = '', compact = false)}
   {#snippet glyph()}<Icon svg={iconSvg} />{/snippet}
-  <Field name={r.name} {prefix} icon={iconSvg ? glyph : undefined} {compact} px={shared(r)} units={r.units} unit={r.units ? '' : r.unit} {context} min={r.range.min} max={r.range.max} onchange={(v) => onchange(r, v)} />
+  <Field name={r.name} {prefix} icon={iconSvg ? glyph : undefined} {compact} px={shared(r)} units={r.units} unit={r.units ? '' : r.unit} {context} min={r.range.min} max={r.range.max} onpreview={(v) => onpreview(r, v)} onchange={(v) => onchange(r, v)} />
 {/snippet}
 
 {#snippet segmented(r: Row, options: { value: string; label: string; icon: IconComponent }[])}
@@ -250,7 +250,7 @@
   {#if has(Section.Effects)}
     <section data-section={Section.Effects}>
       {#snippet op()}<div class="pair">{@render field(num('opacity'), '◐')}</div>{/snippet}
-      <ShadowList css={readOf('shadow')} text={pick.ownText ? readOf('text-shadow') : null} {header} {row} onchange={(css) => onchange(byName('shadow'), css)} ontext={(css) => onchange(byName('text-shadow'), css)} />
+      <ShadowList css={readOf('shadow')} text={pick.ownText ? readOf('text-shadow') : null} {header} {row} onchange={(css) => onchange(byName('shadow'), css)} ontext={(css) => onchange(byName('text-shadow'), css)} onpreview={(css) => onpreview(byName('shadow'), css)} onpreviewtext={(css) => onpreview(byName('text-shadow'), css)} />
       {@render row('Opacity', op, 'opacity')}
     </section>
   {/if}
