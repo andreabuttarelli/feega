@@ -1,11 +1,18 @@
-export type PanelAssets = { script: string; style: string; cspSource: string; nonce: string };
+export type PanelAssets = { script: string; style: string; cspSource: string; nonce: string; theme?: PanelTheme };
+
+export type PanelTheme = { bodyClass: string; variables: Record<string, string> };
 
 const LOCAL_FRAMES = 'http://localhost:* http://127.0.0.1:*';
+const LOCAL_SOCKETS = 'ws://localhost:* ws://127.0.0.1:*';
 
-export function panelHtml({ script, style, cspSource, nonce }: PanelAssets): string {
+const themeStyle = (theme?: PanelTheme) =>
+  theme ? `<style>:root{${Object.entries(theme.variables).map(([name, value]) => `${name}:${value}`).join(';')}}</style>\n` : '';
+
+export function panelHtml({ script, style, cspSource, nonce, theme }: PanelAssets): string {
   const csp = [
     `default-src 'none'`,
     `frame-src ${LOCAL_FRAMES}`,
+    `connect-src ${LOCAL_SOCKETS}`,
     `script-src 'nonce-${nonce}'`,
     `style-src ${cspSource} 'unsafe-inline' https://fonts.googleapis.com`,
     `font-src ${cspSource} https://fonts.gstatic.com`,
@@ -19,9 +26,9 @@ export function panelHtml({ script, style, cspSource, nonce }: PanelAssets): str
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="${style}">
-<title>Feega Inspect</title>
+${themeStyle(theme)}<title>Feega Inspect</title>
 </head>
-<body>
+<body class="${theme?.bodyClass ?? ''}">
 <div id="app"></div>
 <script nonce="${nonce}" src="${script}"></script>
 </body>

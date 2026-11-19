@@ -166,4 +166,6 @@ export enum Slot {
   Hovered = 'hovered'
 }
 
+export const SOCKET_PATH = '/feega-host';
+
 export const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\]):\d+$/;

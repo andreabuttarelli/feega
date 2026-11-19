@@ -51,6 +51,9 @@ export const SETTINGS: SettingRow[] = [
 
 export type Settings = Record<SettingKey, SettingValue>;
 
+export const settingsWith = (read: (row: SettingRow) => SettingValue | undefined): Settings =>
+  Object.fromEntries(SETTINGS.map((row) => [row.key, read(row) ?? row.fallback])) as Settings;
+
 export const LINKS = {
   docs: 'https://docs.feega.app/integrations/inspect/',
   changelog: 'https://feega.app/changelog',
