@@ -38,6 +38,22 @@ feega github push <projectId> <nodeIds...> --name hero --title "Update Home"
 
 `POST /api/v1/projects/:id/github/push/wip` with `{ nodeIds }` (409 `no_branch` until a branch is chosen); `POST /api/v1/projects/:id/github/push` commits; MCP `github_push`.
 
+## What Feega does and never does
+
+- Feega only writes to the branch you pick. It never force-pushes and never deletes branches. The only ref it overwrites is its own autosave ref under `refs/feega/wip/`; any other forced write is refused in code.
+- Commits keep you as the author (your connected GitHub account, or your own git identity in local mode) and add `Co-authored-by: Feega <hi@feega.app>` and `Feega-Canvas: <canvas link>`.
+- In **Changes**, each commit opens its diff. **Revert** adds a new commit that undoes it; history is never rewritten. If a later commit changed the same files, the revert is refused and nothing changes.
+- **What Feega changed on this branch** shows the full diff against the target before you open a pull request.
+- **Stop autosave** in the top bar keeps edits on the canvas until you resume.
+
+```bash
+feega github history <projectId> <nodeId> diff --sha <sha>
+feega github history <projectId> <nodeId> revert --sha <sha>
+feega github history <projectId> <nodeId> branch [--base main]
+```
+
+`POST /api/v1/projects/:id/github/push/history` with `{ nodeId, action: diff|revert|branch, sha?, base? }`; MCP `github_history`.
+
 ## Pull request
 
 A pull request is its own action, shown when the working branch differs from a target: **Open pull request** into a branch you pick (default: the imported branch), as a draft. Once open the panel and the top bar show its number, draft state and CI; **Ready for review** is in the top bar.
