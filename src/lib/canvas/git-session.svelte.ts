@@ -60,7 +60,7 @@ export function gitSession(projectId: () => string, sources: GitSources, nameOf:
       return null;
     }
     const [title, ...rest] = (message ?? draftMessage()).split('\n');
-    const body = await post('', { name: COMMIT_NAME, nodeIds, title, body: rest.join('\n').trim() || title }, keepalive);
+    const body = await post('', { name: COMMIT_NAME, nodeIds, title, body: rest.join('\n').trim() || title, canvasUrl: location.href }, keepalive);
     if (body?.ok) {
       firstAt = null;
       lastAt = null;

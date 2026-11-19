@@ -17,6 +17,16 @@ export class GitError extends Error {
   }
 }
 
+export const WIP_PREFIX = 'refs/feega/wip/';
+
+const NOT_WIP = 403;
+
+export function onlyWip(ref: string): void {
+  if (!ref.startsWith(WIP_PREFIX)) {
+    throw new GitError(GitFailure.Forbidden, NOT_WIP);
+  }
+}
+
 export enum PullStatus {
   Open = 'open',
   Closed = 'closed',

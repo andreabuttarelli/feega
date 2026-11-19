@@ -43,6 +43,10 @@ export async function cmdGithubPull(projectId: string, nodeId: string, opts: { b
   await print(`${base(projectId)}/pull`, { method: 'POST', body: JSON.stringify({ nodeId, base: opts.base, title: opts.title, kind: opts.ready ? 'ready' : 'draft' }) });
 }
 
+export async function cmdGithubHistory(projectId: string, nodeId: string, action: string, opts: { sha?: string; base?: string }) {
+  await print(`${base(projectId)}/history`, { method: 'POST', body: JSON.stringify({ nodeId, action, ...opts }) });
+}
+
 export async function cmdGithubReady(projectId: string, nodeId: string) {
   await print(`${base(projectId)}/ready`, { method: 'POST', body: JSON.stringify({ nodeId }) });
 }

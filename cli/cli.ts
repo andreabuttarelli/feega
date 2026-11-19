@@ -949,6 +949,16 @@ github
   });
 
 github
+  .command('history <projectId> <nodeId> <action>')
+  .description('diff: what a commit changed (--sha); revert: a new commit undoing one (--sha); branch: what the working branch changed against its base')
+  .option('--sha <sha>', 'The commit')
+  .option('--base <branch>', 'Base for branch (default: the imported branch)')
+  .action(async (projectId: string, nodeId: string, action: string, opts) => {
+    const { cmdGithubHistory } = await import('./commands/github.ts');
+    await cmdGithubHistory(projectId, nodeId, action, opts);
+  });
+
+github
   .command('ready <projectId> <nodeId>')
   .description('Mark the draft pull request of a linked frame ready for review')
   .action(async (projectId: string, nodeId: string) => {

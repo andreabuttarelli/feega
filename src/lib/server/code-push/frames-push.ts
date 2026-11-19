@@ -6,6 +6,7 @@ import { CodeSourceKind, EntryKind, followRenames, isPushable, linkStatus, type 
 import type { LinkStore } from './link-store';
 import type { PushLock } from './push-lock';
 import type { HostCaps } from './hosts';
+import { branchDiff, commitDiff, revertCommit, type Diffed, type HistoryRefused, type Reverted } from './history';
 import { relocated, suggestedRoute, VariantChoice, type Suggested, type VariantAsk } from './variants';
 import { checkoutBranch, openPull, PullKind, PushRefusal, pushFiles, pushStatus, readyPull, saveWip, undoPush, type CheckedOut, type LastPush, type PullOpened, type PushRefused, type PushState, type Pushed, type Readied, type Saved, type Undone } from './push';
 
@@ -29,7 +30,7 @@ export type FramesDeps = {
   caps?: (source: CodeSourceKind, repo: string) => Promise<HostCaps>;
 };
 
-export type FramesPushAsk = { name: string; nodeIds: string[]; title?: string; body?: string; since?: LastPush; base?: string; coAuthors?: string[]; confirmSensitive?: boolean; mains?: string[]; variants?: VariantAsk[] };
+export type FramesPushAsk = { name: string; nodeIds: string[]; title?: string; body?: string; since?: LastPush; base?: string; coAuthors?: string[]; confirmSensitive?: boolean; mains?: string[]; variants?: VariantAsk[]; canvasUrl?: string };
 
 export type Affected = { path: string; pages: number };
 
@@ -120,7 +121,7 @@ export async function framesPush(deps: FramesDeps, scope: CodeScope, ask: Frames
   const links = await Promise.all(ask.nodeIds.map(async (nodeId) => ({ nodeId, link: await deps.links.read(nodeId) })));
   const since = ask.since ?? lastPushOf(links[0]?.link ?? null);
   const branch = links.find((l) => l.link?.workBranch)?.link?.workBranch;
-  const out = await pushFiles(host, deps.lock, { name: ask.name, files: edits.files, title: ask.title ?? DEFAULT_TITLE, body: ask.body ?? DEFAULT_BODY, since, base: ask.base, coAuthors: ask.coAuthors, confirmSensitive: ask.confirmSensitive, branch });
+  const out = await pushFiles(host, deps.lock, { name: ask.name, files: edits.files, title: ask.title ?? DEFAULT_TITLE, body: ask.body ?? DEFAULT_BODY, since, base: ask.base, coAuthors: ask.coAuthors, confirmSensitive: ask.confirmSensitive, branch, canvasUrl: ask.canvasUrl });
   if (!out.ok) {
     return out.refusal === PushRefusal.ReadOnly ? { ...out, patch: edits.files } : out;
   }
@@ -262,6 +263,34 @@ export async function framePull(deps: FramesDeps, ask: { nodeId: string; base?: 
     await saveAll(deps, [ask.nodeId], { pullNumber: out.pull.number });
   }
   return out;
+}
+
+export enum CodeHistoryAction {
+  Diff = 'diff',
+  Revert = 'revert',
+  Branch = 'branch'
+}
+
+export type HistoryAsk = { nodeId: string; action: CodeHistoryAction; sha?: string; base?: string };
+
+type HistoryRun = (host: GitHost, lock: PushLock, ask: HistoryAsk & { branch: string }) => Promise<Diffed | Reverted | HistoryRefused | FramesRefused>;
+
+const HISTORY_RUN: Record<CodeHistoryAction, HistoryRun> = {
+  [CodeHistoryAction.Diff]: (host, _lock, ask) => (ask.sha ? commitDiff(host, ask.sha) : Promise.resolve(refused(FramesRefusal.NotPushed))),
+  [CodeHistoryAction.Revert]: (host, lock, ask) => (ask.sha ? revertCommit(host, lock, { branch: ask.branch, sha: ask.sha }) : Promise.resolve(refused(FramesRefusal.NotPushed))),
+  [CodeHistoryAction.Branch]: (host, _lock, ask) => branchDiff(host, { branch: ask.branch, base: ask.base ?? '' })
+};
+
+export async function frameHistory(deps: FramesDeps, ask: HistoryAsk): Promise<Diffed | Reverted | HistoryRefused | FramesRefused> {
+  const got = await linkedHost(deps, ask.nodeId);
+  if ('ok' in got) {
+    return got;
+  }
+  const branch = got.link.workBranch ?? got.link.pushBranch;
+  if (!branch) {
+    return refused(FramesRefusal.NoBranch);
+  }
+  return HISTORY_RUN[ask.action](got.host, deps.lock, { ...ask, branch, base: ask.base ?? got.link.baseBranch });
 }
 
 const HTTP_STATUS: Record<string, number> = {

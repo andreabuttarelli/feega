@@ -1,4 +1,4 @@
-import { Access, GitError, GitFailure, PullStatus, type FileChanged, type FileWrite, type GitHost, type PullRef, type PullState } from './git-host';
+import { Access, GitError, GitFailure, PullStatus, WIP_PREFIX, type FileChanged, type FileWrite, type GitHost, type PullRef, type PullState } from './git-host';
 import type { PushLock } from './push-lock';
 import { isEnvFile, isSensitive, withSecrets } from './secrets';
 
@@ -27,7 +27,6 @@ export enum PullKind {
   Ready = 'ready'
 }
 
-export const WIP_PREFIX = 'refs/feega/wip/';
 const WIP_MESSAGE = 'Feega autosave (work in progress)';
 
 export enum Fallback {
@@ -38,7 +37,7 @@ export enum Fallback {
 
 export type LastPush = { branch: string; sha: string };
 
-export type PushAsk = { name: string; files: { path: string; content: string }[]; title: string; body: string; coAuthors?: string[]; since?: LastPush; base?: string; confirmSensitive?: boolean; branch?: string };
+export type PushAsk = { name: string; files: { path: string; content: string }[]; title: string; body: string; coAuthors?: string[]; since?: LastPush; base?: string; confirmSensitive?: boolean; branch?: string; canvasUrl?: string };
 
 export type Pushed = { ok: true; branch: string; sha: string; parent: string; touched: string[]; pull: PullRef | null; fallback?: Fallback };
 
@@ -65,7 +64,12 @@ export function nextCycle(branch: string): string {
   return `${stem}-${n ? Number(n) + 1 : FIRST_NEXT_CYCLE}`;
 }
 
-const messageOf = (title: string, coAuthors: string[]) => [title, ...(coAuthors.length ? ['', ...coAuthors.map((a) => `Co-authored-by: ${a}`)] : [])].join('\n');
+const FEEGA_AUTHOR = 'Feega <hi@feega.app>';
+
+function messageOf(ask: Pick<PushAsk, 'title' | 'coAuthors' | 'canvasUrl'>): string {
+  const trailers = [...(ask.coAuthors ?? []), FEEGA_AUTHOR].map((a) => `Co-authored-by: ${a}`);
+  return [ask.title, '', ...trailers, ...(ask.canvasUrl ? [`Feega-Canvas: ${ask.canvasUrl}`] : [])].join('\n');
+}
 
 const FALLBACK_OF: Partial<Record<GitFailure, Fallback>> = {
   [GitFailure.Diverged]: Fallback.Diverged,
@@ -171,7 +175,7 @@ async function commitWorking(host: GitHost, branch: string, base: string, ask: P
   }
   const parent = head ?? (await host.headOf(base));
   try {
-    const sha = await host.writeCommit({ parent, message: messageOf(ask.title, ask.coAuthors ?? []), files: ask.files });
+    const sha = await host.writeCommit({ parent, message: messageOf(ask), files: ask.files });
     await (head ? host.moveBranch(branch, head, sha) : host.createBranch(branch, sha));
     return { ok: true, branch, sha, parent, touched, pull: await openPullOf(host, branch).catch(() => null) };
   } catch (e) {
@@ -242,7 +246,7 @@ export async function pushFiles(host: GitHost, lock: PushLock, ask: PushAsk): Pr
     }
     const branch = await cycleBranch(host, ask.since?.branch === base ? { ...ask, since: undefined } : ask);
     const since = ask.since?.branch === branch ? ask.since.sha : null;
-    const message = messageOf(ask.title, ask.coAuthors ?? []);
+    const message = messageOf(ask);
     const touched = ask.files.map((f) => f.path);
     const landed = await commitOn(host, branch, base, ask.files, message, since).then(
       (done) => ({ ...done, branch, fallback: undefined as Fallback | undefined }),

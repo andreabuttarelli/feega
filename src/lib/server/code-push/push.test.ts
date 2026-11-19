@@ -185,6 +185,20 @@ describe('ramo di lavoro scelto', () => {
   });
 });
 
+describe('commit riconoscibili', () => {
+  it('Feega è co-autore e il commit dice da quale tela viene', async () => {
+    const { gh, host, lock } = setup();
+
+    await pushFiles(host, lock, ask({ branch: 'main', canvasUrl: 'https://feega.app/p/p1/c/c1' }));
+
+    const commit = gh.calls.find((c) => c.endpoint.endsWith('/git/commits') && c.method === 'POST');
+    const message = (commit?.body as { message: string }).message;
+    expect(message).toContain('Co-authored-by: Feega <hi@feega.app>');
+    expect(message).toContain('Feega-Canvas: https://feega.app/p/p1/c/c1');
+    expect(message).toContain('Co-authored-by: Ada <ada@acme.dev>');
+  });
+});
+
 describe('autosave sul ref di lavoro', () => {
   it('scrive refs/feega/wip/<ramo> e lascia il ramo dov’è; il secondo salvataggio sostituisce il primo', async () => {
     const { gh, host, lock } = setup();

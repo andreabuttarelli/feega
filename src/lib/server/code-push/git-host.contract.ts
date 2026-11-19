@@ -161,6 +161,16 @@ export function gitHostContract(world: () => HostWorld | Promise<HostWorld>, pul
     expect(await (await world()).host.listPulls()).toEqual([]);
   });
 
+  it('la sola scrittura forzata è sul ref di lavoro: un ramo non si sovrascrive mai così', async () => {
+    const { host, files } = await world();
+    const { sha } = await onBranch(host, 'feega/f1', [{ path: 'a', content: 'a' }]);
+
+    expect(await failureOf(host.setRef('refs/heads/main', sha))).toBe(GitFailure.Forbidden);
+    expect(await failureOf(host.setRef('refs/tags/v9', sha))).toBe(GitFailure.Forbidden);
+    expect(await files('main')).toEqual({ 'README.md': 'hi' });
+    expect(await host.setRef('refs/feega/wip/feega/f1', sha)).toBeUndefined();
+  });
+
   it('chi può scrivere ha accesso write', async () => {
     expect(await (await world()).host.access()).toBe(Access.Write);
   });
