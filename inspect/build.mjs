@@ -37,7 +37,7 @@ await esbuild({
   target: 'node20',
   external: ['vite', 'svelte', 'svelte/*', '@vue/compiler-sfc', './bridge.js']
 });
-await Promise.all(['bridge.js', 'runtime.js'].map((f) => cp(`${SOURCE_MAP}${f}`, `${LAUNCHER}${f}`)));
+await Promise.all(['bridge.js', 'runtime.js', 'track.js'].map((f) => cp(`${SOURCE_MAP}${f}`, `${LAUNCHER}${f}`)));
 await cp(here('launcher/launch.mjs'), `${LAUNCHER}launch.mjs`);
 await cp(here('launcher/next-preload.cjs'), `${LAUNCHER}next-preload.cjs`);
 await esbuild({
