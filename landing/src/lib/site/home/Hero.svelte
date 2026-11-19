@@ -85,14 +85,15 @@
     .mock .win {
       position: relative;
       z-index: 2;
-      margin: 230px 0 0 16%;
+      width: 84%;
+      margin: 0 16% 230px 0;
     }
 
     .mock .term {
       position: absolute;
       z-index: 1;
-      top: 28px;
-      left: 28px;
+      bottom: 28px;
+      right: 28px;
       width: 52%;
       height: 420px;
     }
