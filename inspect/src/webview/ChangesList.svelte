@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { ChangeRow, Source } from '../messages';
 
-  let { changes, onselect, ondiff, onrevert, onrevertall, onscm }: { changes: ChangeRow[]; onselect: (source: Source) => void; ondiff: (id: number) => void; onrevert: (id: number) => void; onrevertall: () => void; onscm: () => void } = $props();
+  let { changes, onselect, onopen, ondiff, onrevert, onrevertall, onscm }: { changes: ChangeRow[]; onselect: (source: Source) => void; onopen: (source: Source) => void; ondiff: (id: number) => void; onrevert: (id: number) => void; onrevertall: () => void; onscm: () => void } = $props();
 
   const AT = /^(.+):(\d+):(\d+)$/;
   const sourceOf = (at: string): Source | null => {
@@ -29,6 +29,7 @@
         <span class="meta">{shortAt(change.at)}{change.scope ? ` · ${change.scope}` : ''} · {timeOf(change.time)}</span>
       </button>
       <div class="actions">
+        {#if source}<button type="button" class="link" onclick={() => onopen(source)}>Open</button>{/if}
         <button type="button" class="link" onclick={() => ondiff(change.id)}>Show diff</button>
         <button type="button" class="link" onclick={() => onrevert(change.id)}>Revert</button>
       </div>

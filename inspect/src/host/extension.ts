@@ -6,6 +6,7 @@ import { ServerAction, ServerState, ToHost, ToView, type EditAsk, type HostMessa
 import { rm } from 'node:fs/promises';
 import { Attach, startDev, type Running } from './dev-server';
 import { fileEdits, type Written } from './file-edits';
+import { Column, openTarget } from './open-source';
 import { panelHtml } from './panel-html';
 import { devReload } from './dev-reload';
 import { stylingOf } from './styling';
@@ -44,10 +45,17 @@ async function postSettings() {
   await post({ kind: ToView.Settings, values: settingsNow(), facts: { version, framework, styling } });
 }
 
+const COLUMNS: Record<Column, vscode.ViewColumn> = { [Column.First]: vscode.ViewColumn.One, [Column.Beside]: vscode.ViewColumn.Beside };
+
 async function openSource(root: string, at: Source) {
-  const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(join(root, at.file)));
-  const position = new vscode.Position(at.line - 1, Math.max(0, at.col - 1));
-  await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.One, selection: new vscode.Range(position, position) });
+  const target = openTarget(root, at, session?.panel.viewColumn);
+  try {
+    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(target.path));
+    const position = new vscode.Position(target.line, target.col);
+    await vscode.window.showTextDocument(doc, { viewColumn: COLUMNS[target.column], preserveFocus: false, selection: new vscode.Range(position, position) });
+  } catch {
+    void vscode.window.showErrorMessage(`Feega Inspect: cannot open ${target.path}`);
+  }
 }
 
 async function postHistory() {

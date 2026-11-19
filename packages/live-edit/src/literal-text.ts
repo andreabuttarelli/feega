@@ -1,4 +1,5 @@
 import { offsetOf, openTagEnd, type LiveAt } from './class-patch';
+import { dataReason, dataSource } from './data-source';
 import type { FileChange, ReadFile } from './files';
 
 export type TextWritten = { ok: true; change: FileChange } | { ok: false; reason: string; at?: LiveAt };
@@ -26,7 +27,11 @@ export async function literalText(read: ReadFile, at: LiveAt, value: string): Pr
   const inner = text.slice(end + 1, close);
   const expression = inner.match(EXPRESSION);
   if (expression) {
-    return { ok: false, reason: `the text comes from ${expression[0]}`, at: atOffset(text, end + 1 + expression.index!, at.file) };
+    const data = await dataSource(read, at.file, text, expression[0]);
+    if (data) {
+      return { ok: false, reason: dataReason(data), at: data.at };
+    }
+    return { ok: false, reason: `This text comes from \`${expression[0]}\`.`, at: atOffset(text, end + 1 + expression.index!, at.file) };
   }
   if (MARKUP.test(inner)) {
     return { ok: false, reason: `${at.file}:${at.line}: the text is mixed with markup, not written` };

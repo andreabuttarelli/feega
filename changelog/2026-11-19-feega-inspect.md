@@ -64,3 +64,12 @@ edit inline until reload); the colour control is a native picker, not the app's 
 - **Attach only to our own server.** A Next app on :3000 from another folder got attached. Now a
   running server is attached only when the process listening on the port has its cwd inside the
   workspace's app (`listener.ts`, via `lsof`); otherwise Inspect starts its own on a free port.
+- **"This element" on a CSS-module class.** The writer edited `styles.card` itself, so every
+  sibling changed. Element scope now adds the element's own module class
+  (``className={`${styles.card} ${styles.appSection}`}``) and writes there; reused next time.
+  Svelte/Vue scoped rules already did this.
+- **Open in editor.** One host path (`open-source.ts`): workspace-relative or absolute file,
+  line/col selection, beside the panel when it sits in column one, error toast instead of silence.
+  Changes rows get an Open link. Text from data names the definition:
+  "This text comes from data: `AGENT_LOGOS` (home.ts:12)." (`data-source.ts`: same-file
+  declaration or relative named import).
