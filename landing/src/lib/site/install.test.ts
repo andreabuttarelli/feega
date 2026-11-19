@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { follow, primaryCta, secondaryCtas, type Env } from './install';
+import { follow, primaryCta, starCta, secondaryCtas, type Env } from './install';
 import { GITHUB_URL, MARKETPLACE_URL } from './links';
 
 const DEEP_LINK = 'vscode:extension/andreabuttarelli.feega-inspect';
@@ -19,8 +19,9 @@ const rig = (over: Partial<Env> = {}) => {
 
 describe('install CTAs', () => {
   it('unpublished: coming soon points at GitHub, no fake install', () => {
-    expect(primaryCta(false)).toEqual({ label: 'Coming soon to VS Code', href: GITHUB_URL });
-    expect(secondaryCtas(false).map((c) => c.label)).toEqual(['Star on GitHub', 'Support with a coffee']);
+    expect(primaryCta(false)).toEqual({ label: 'Download for free', href: GITHUB_URL });
+    expect(starCta).toEqual({ label: 'Star us on GitHub', href: GITHUB_URL });
+    expect(secondaryCtas(false).map((c) => c.label)).toEqual(['Support with a coffee']);
   });
 
   it('published: deep link with marketplace fallback, other editors listed', () => {

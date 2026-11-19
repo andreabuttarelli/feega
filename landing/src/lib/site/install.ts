@@ -1,5 +1,7 @@
 import { COFFEE_URL, EDITORS, EXTENSION_PUBLISHED, GITHUB_URL, MARKETPLACE_URL, type Editor } from './links';
 
+const DOWNLOAD_LABEL = 'Download for free';
+
 export const DEEP_LINK_TIMEOUT_MS = 1500;
 
 export const PRIMARY_EDITOR = EDITORS[0];
@@ -15,16 +17,15 @@ export type Env = {
 
 export const primaryCta = (published: boolean = EXTENSION_PUBLISHED): Cta =>
   published
-    ? { label: 'Install for VS Code', href: MARKETPLACE_URL, deepLink: PRIMARY_EDITOR.installUrl }
-    : { label: 'Coming soon to VS Code', href: GITHUB_URL };
+    ? { label: DOWNLOAD_LABEL, href: MARKETPLACE_URL, deepLink: PRIMARY_EDITOR.installUrl }
+    : { label: DOWNLOAD_LABEL, href: GITHUB_URL };
+
+export const starCta: Cta = { label: 'Star us on GitHub', href: GITHUB_URL };
 
 export const secondaryCtas = (published: boolean = EXTENSION_PUBLISHED): readonly Cta[] =>
   published
     ? EDITORS.slice(1).map((e: Editor) => ({ label: e.label, href: e.installUrl }))
-    : [
-        { label: 'Star on GitHub', href: GITHUB_URL },
-        { label: 'Support with a coffee', href: COFFEE_URL }
-      ];
+    : [{ label: 'Support with a coffee', href: COFFEE_URL }];
 
 export const isMobile = (userAgent: string): boolean => /android|iphone|ipad|ipod/i.test(userAgent);
 
