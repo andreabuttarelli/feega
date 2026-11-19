@@ -93,6 +93,19 @@
     padding: 0 10px 2px;
   }
 
+  @media (max-width: 809.98px) {
+    .bar .brand {
+      gap: 8px;
+      padding: 0 0 2px;
+      font-size: 22px;
+    }
+
+    .bar .brand :global(svg) {
+      width: 22px;
+      height: 22px;
+    }
+  }
+
   .links,
   .actions {
     display: none;
