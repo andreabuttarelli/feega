@@ -24,7 +24,7 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
       const position = new vscode.Position(target.line, target.col);
       await vscode.window.showTextDocument(doc, { viewColumn: COLUMNS[target.column], preserveFocus: false, selection: new vscode.Range(position, position) });
     } catch {
-      void vscode.window.showErrorMessage(`Feega Inspect: cannot open ${target.path}`);
+      void vscode.window.showErrorMessage(`Feega: cannot open ${target.path}`);
     }
   }
 

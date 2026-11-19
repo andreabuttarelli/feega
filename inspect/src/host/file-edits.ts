@@ -8,6 +8,7 @@ import { literalText } from '@feega/live-edit/literal-text';
 import { moveNode, type Place } from '@feega/live-edit/move-node';
 import { globalSheetOf, googleFontImport } from '@feega/live-edit/font-wiring';
 import { VariableHome, saveVariable, variableName } from '@feega/live-edit/save-variable';
+import { pageRule } from '@feega/live-edit/page-rule';
 import { scopedRule, type Scope } from '@feega/live-edit/scoped-rule';
 import { styleAttr, type Css } from '@feega/live-edit/style-attr';
 import { Styling, type EditAsk } from '../messages';
@@ -85,6 +86,10 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
   async function edited(ask: EditAsk, extra: FileChange[] = []): Promise<Written> {
     meta = { at: ask.at, prop: ask.prop, value: ask.value ?? '', scope: ask.scope ?? '' };
     const written = (changes: FileChange[], token: string, note?: string) => writtenAll([...changes, ...extra.filter((e) => !changes.some((c) => c.path === e.path))], token, note);
+    if (ask.page) {
+      const out = await pageRule(reader(root), ask.page, ask.css ?? {}, ask.viewport);
+      return out.ok ? written([out.change], '') : out;
+    }
     const at = liveAtOf(ask.at);
     if (!at || !inside(root, at.file)) {
       return { ok: false, reason: `${ask.at} is not a file:line:col inside the workspace` };

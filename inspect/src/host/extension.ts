@@ -12,7 +12,7 @@ import { inspectSession, type Session } from './session';
 import { beforeProvider, vsCodePlatform, type VsCodeHost } from './vscode-platform';
 
 const VIEW_TYPE = 'feegaInspect.panel';
-const TITLE = 'Feega Inspect';
+const TITLE = 'Feega';
 const SECTION = 'feegaInspect';
 
 type Open = { panel: vscode.WebviewPanel; session: Session };
@@ -47,7 +47,7 @@ async function chosenRoot(target?: vscode.Uri): Promise<string | null> {
   }
   const workspace = folder.uri.fsPath;
   return chosenApp(target?.fsPath ?? workspace, workspace, tree, async (apps) => {
-    const picked = await vscode.window.showQuickPick(apps, { placeHolder: 'Which app should Feega Inspect open?' });
+    const picked = await vscode.window.showQuickPick(apps, { placeHolder: 'Which app should Feega open?' });
     return picked?.app ?? null;
   });
 }
@@ -55,7 +55,7 @@ async function chosenRoot(target?: vscode.Uri): Promise<string | null> {
 async function open(context: vscode.ExtensionContext, target?: vscode.Uri) {
   const root = await chosenRoot(target);
   if (!root || !host) {
-    vscode.window.showWarningMessage('Feega Inspect: open the folder of a web app first.');
+    vscode.window.showWarningMessage('Feega: open the folder of a web app first.');
     return;
   }
   const route = target ? (routeOfFile(relative(root, target.fsPath)) ?? undefined) : undefined;
@@ -66,7 +66,7 @@ async function open(context: vscode.ExtensionContext, target?: vscode.Uri) {
   }
   if (opened) {
     const SWITCH = 'Switch';
-    const answer = await vscode.window.showInformationMessage(`Feega Inspect is open on ${basename(opened.session.root)}. Switch to ${basename(root)}?`, { modal: true }, SWITCH);
+    const answer = await vscode.window.showInformationMessage(`Feega is open on ${basename(opened.session.root)}. Switch to ${basename(root)}?`, { modal: true }, SWITCH);
     if (answer !== SWITCH) {
       opened.panel.reveal();
       return;

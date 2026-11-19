@@ -26,7 +26,7 @@ export function panelHtml({ script, style, cspSource, nonce, theme }: PanelAsset
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="${style}">
-${themeStyle(theme)}<title>Feega Inspect</title>
+${themeStyle(theme)}<title>Feega</title>
 </head>
 <body class="${theme?.bodyClass ?? ''}">
 <div id="app"></div>

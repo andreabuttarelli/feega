@@ -20,6 +20,7 @@ export default {
     'Pick a device from icons or the full preset list, rotate tablets, and drag the frame edges to any width.',
     'Right-click a folder in the Explorer and choose Design this folder with Feega, including apps inside a monorepo.',
     'Design this page opens the preview on the route that file renders.',
-    'Edits update the page in place; if it ever reloads, your scroll and selection come back.'
+    'Edits update the page in place; if it ever reloads, your scroll and selection come back.',
+    'Select the page itself to set its background, font and spacing in your global stylesheet.'
   ]
 } satisfies ChangelogEntry;

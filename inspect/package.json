@@ -1,15 +1,23 @@
 {
-  "name": "feega-inspect",
-  "displayName": "Feega Inspect",
-  "description": "Click an element of your running web app and edit its design: the change is written to your source as a Tailwind class or your own token.",
-  "version": "0.1.0",
-  "publisher": "AndreaButtarelli",
+  "name": "feega",
+  "displayName": "Feega",
+  "description": "Design in your codebase: click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens.",
+  "version": "0.2.0",
+  "publisher": "andreabuttarelli",
   "license": "Apache-2.0",
-  "private": true,
+  "icon": "images/icon.png",
+  "homepage": "https://feega.app",
   "repository": {
     "type": "git",
     "url": "https://github.com/andreabuttarelli/feega",
     "directory": "inspect"
+  },
+  "bugs": {
+    "url": "https://github.com/andreabuttarelli/feega/issues"
+  },
+  "galleryBanner": {
+    "color": "#0a0a0a",
+    "theme": "dark"
   },
   "engines": {
     "vscode": "^1.90.0"
@@ -18,6 +26,17 @@
     "Visualization",
     "Other"
   ],
+  "keywords": [
+    "design",
+    "css",
+    "tailwind",
+    "react",
+    "nextjs",
+    "svelte",
+    "sveltekit",
+    "vue",
+    "visual editor"
+  ],
   "main": "./dist/extension.cjs",
   "activationEvents": [],
   "contributes": {
@@ -25,21 +44,21 @@
       {
         "command": "feegaInspect.open",
         "title": "Open the running app",
-        "category": "Feega Inspect"
+        "category": "Feega"
       },
       {
         "command": "feegaInspect.designFolder",
         "title": "Design this folder with Feega",
-        "category": "Feega Inspect"
+        "category": "Feega"
       },
       {
         "command": "feegaInspect.designPage",
         "title": "Design this page with Feega",
-        "category": "Feega Inspect"
+        "category": "Feega"
       }
     ],
     "configuration": {
-      "title": "Feega Inspect",
+      "title": "Feega",
       "properties": {
         "feegaInspect.telemetry": {
           "type": "boolean",
@@ -102,7 +121,7 @@
   "scripts": {
     "dev": "node build.mjs --watch",
     "build": "node build.mjs",
-    "package": "npm run build && npx -y @vscode/vsce package --no-dependencies --allow-missing-repository --skip-license",
+    "package": "npm run build && npx -y @vscode/vsce package --no-dependencies",
     "test:e2e": "npm run build && node test/run.cjs"
   },
   "devDependencies": {

@@ -67,8 +67,8 @@ export type ReportFacts = { version: string; framework: string; styling: string 
 
 export function issueUrl({ version, framework, styling }: ReportFacts): string {
   const url = new URL(LINKS.issues);
-  url.searchParams.set('title', 'Feega Inspect: ');
-  url.searchParams.set('body', `**What happened**\n\n\n**Expected**\n\n\n---\nFeega Inspect ${version} · framework: ${framework} · styling: ${styling}`);
+  url.searchParams.set('title', 'Feega: ');
+  url.searchParams.set('body', `**What happened**\n\n\n**Expected**\n\n\n---\nFeega ${version} · framework: ${framework} · styling: ${styling}`);
   url.searchParams.set('labels', 'inspect');
   return url.toString();
 }

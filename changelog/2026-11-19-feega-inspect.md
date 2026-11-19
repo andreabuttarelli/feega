@@ -113,3 +113,7 @@ edit inline until reload); the colour control is a native picker, not the app's 
   page (a window marker) and its scroll: green on react/vue css+tailwind, tailwind-app, Next and
   landing. If the page reloads anyway, the bridge (`reload-restore.js`) puts the scroll back,
   selection is re-resolved, and the panel shows a short toast; reloads the panel asked for skip it.
+- **Page styles.** Clicking the bare page, or Esc from a top-level element, selects the Page
+  (`PAGE_SOURCE` in the runtime); its edits write a `body` rule in the global stylesheet
+  (`page-rule.ts`, `selectorInBody`), with Tailwind or plain CSS alike. `html` is supported by the
+  writer; no UI entry for it yet.

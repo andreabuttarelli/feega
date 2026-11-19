@@ -1,28 +1,44 @@
-# Feega Inspect
+# Feega
 
-Click an element of your running web app inside VS Code, Cursor or Windsurf and edit its design. The change is written to your source: a Tailwind class (or your token) when the project uses Tailwind, CSS otherwise.
+Design in your codebase. Click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens.
 
-Docs: https://docs.feega.app/integrations/inspect/
+![Select an element](images/1-select.png)
 
-## Install a local build
+## How it works
 
-```bash
-npm install
-npm run package
-code --install-extension feega-inspect-0.1.0.vsix --force
-```
+1. Run **Feega: Open the running app** (or right-click a folder or page: **Design this folder with Feega**). Feega starts your dev server and opens the app beside your code.
+2. Click an element. Edit text, spacing, size, colour, radius, typography in the right bar.
+3. The edit lands in the source file: a Tailwind class (or your own token) when the project uses Tailwind, CSS otherwise.
 
-## Develop
+![Edit it](images/2-edit.png)
 
-1. `npm install` in `inspect/`.
-2. Open `inspect/` in VS Code and press F5 (**Run Feega Inspect**). It starts `npm run dev` (host and webview rebuilt on save) and opens `../landing` in an Extension Development Host.
-3. In that window run **Feega Inspect: Open the running app**.
-4. Edit code: a webview change reloads the panel (route and size kept); a host change restarts the extension host. This only happens in development, never in an installed vsix.
+![Written to your code](images/3-result.png)
 
-Tests: `npx vitest run inspect/src` from the repo root; VS Code e2e `VSCODE_PATH=… npm run test:e2e`; round-trip matrix `npx tsx test/matrix.mts <app> <text selector> <box selector>`.
+## Features
+
+- Click to select, breadcrumb to walk parents and siblings
+- Text edited in place
+- Box, layout, typography and colour controls with a colour picker
+- Phone, tablet, desktop and full sizes
+- Navigate mode to use the app, design mode to edit it
+- Works in VS Code, Cursor and Windsurf
+
+![Colour picker](images/21-colour-picker-dark.png)
+
+## Supported frameworks
+
+React, Next.js, Svelte, SvelteKit, Vue, Astro and plain HTML, with Tailwind or CSS.
+
+## Privacy
+
+Feega sends nothing. No account needed. Your code never leaves your machine.
 
 ## Settings
 
-All in VS Code settings under `feegaInspect.*`, also editable from the Feega menu (top left of the panel): anonymous usage counts, how styles are written (auto / Tailwind / CSS), dev server command, default device.
+Under `feegaInspect.*`: how styles are written (auto / Tailwind / CSS), dev server command, default device size.
 
-Anonymous usage counts: none are sent yet. When they are, they will be counts only (opens, edits, framework, styling system), never code or paths, and off when VS Code telemetry is off.
+## Links
+
+- [Docs](https://docs.feega.app/integrations/inspect/)
+- [Star on GitHub](https://github.com/andreabuttarelli/feega)
+- [Support with a coffee](https://buy.stripe.com/5kQ00k2A97C08sd94LeME07)

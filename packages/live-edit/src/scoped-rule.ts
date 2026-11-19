@@ -34,7 +34,7 @@ function freeClass(source: string, base: string): string {
   return name;
 }
 
-const ruleText = (name: string, all: Map<string, string>, indent = RULE_INDENT) => `${indent}.${name} {\n${[...all].map(([p, v]) => `${indent}${DECL_INDENT.slice(RULE_INDENT.length)}${p}: ${v};`).join('\n')}\n${indent}}`;
+const ruleText = (selector: string, all: Map<string, string>, indent = RULE_INDENT) => `${indent}${selector} {\n${[...all].map(([p, v]) => `${indent}${DECL_INDENT.slice(RULE_INDENT.length)}${p}: ${v};`).join('\n')}\n${indent}}`;
 
 const MIN_WIDTH = /min-width:\s*([\d.]+)px/;
 const MAX_WIDTH = /max-width:\s*([\d.]+)px/;
@@ -69,8 +69,10 @@ function appliesAt(media: string[], viewport: number | undefined): boolean {
   });
 }
 
-export function ruleInBody(body: string, name: string, css: Map<string, string>, viewport?: number, indent = RULE_INDENT): string {
-  const rules = [...body.matchAll(new RegExp(`(^|\\n)([ \\t]*)\\.${escaped(name)}\\s*\\{([^}]*)\\}`, 'g'))];
+export const ruleInBody = (body: string, name: string, css: Map<string, string>, viewport?: number, indent = RULE_INDENT) => selectorInBody(body, `.${name}`, css, viewport, indent);
+
+export function selectorInBody(body: string, selector: string, css: Map<string, string>, viewport?: number, indent = RULE_INDENT): string {
+  const rules = [...body.matchAll(new RegExp(`(^|\\n)([ \\t]*)${escaped(selector)}\\s*\\{([^}]*)\\}`, 'g'))];
   const found = rules.filter((r) => appliesAt(mediaAt(body, r.index!), viewport)).pop();
   const all = found ? declarationsOf(found[3]) : new Map<string, string>();
   css.forEach((value, prop) => (value === REMOVED ? all.delete(prop) : all.set(prop, value)));
@@ -78,13 +80,13 @@ export function ruleInBody(body: string, name: string, css: Map<string, string>,
     return body.slice(0, found.index!) + body.slice(found.index! + found[0].length).replace(/^\n(?=\s*\n)/, '');
   }
   if (found) {
-    return body.slice(0, found.index!) + found[1] + ruleText(name, all, found[2]) + body.slice(found.index! + found[0].length);
+    return body.slice(0, found.index!) + found[1] + ruleText(selector, all, found[2]) + body.slice(found.index! + found[0].length);
   }
   if (!all.size) {
     return body;
   }
   const head = body.trimEnd();
-  return `${head}${head ? '\n' : ''}${indent === '' && head ? '\n' : ''}${ruleText(name, all, indent)}\n`;
+  return `${head}${head ? '\n' : ''}${indent === '' && head ? '\n' : ''}${ruleText(selector, all, indent)}\n`;
 }
 
 function withRule(source: string, name: string, css: Map<string, string>, viewport?: number): string {
@@ -93,7 +95,7 @@ function withRule(source: string, name: string, css: Map<string, string>, viewpo
     return source;
   }
   if (!block) {
-    return `${source.trimEnd()}\n\n<style>\n${ruleText(name, css)}\n</style>\n`;
+    return `${source.trimEnd()}\n\n<style>\n${ruleText(`.${name}`, css)}\n</style>\n`;
   }
   const body = block[1];
   const after = source.replace(STYLE_BLOCK, (whole) => whole.replace(body, ruleInBody(body, name, css, viewport)));
