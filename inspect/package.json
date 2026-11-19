@@ -43,7 +43,7 @@
     "commands": [
       {
         "command": "feegaInspect.open",
-        "title": "Open the running app",
+        "title": "Open from current workspace",
         "category": "Feega"
       },
       {

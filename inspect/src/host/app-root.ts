@@ -4,7 +4,7 @@ export type Exists = (path: string) => Promise<boolean>;
 export type Dirs = (path: string) => Promise<string[]>;
 
 const MANIFEST = 'package.json';
-const SKIPPED = new Set(['node_modules', '.git', 'dist', 'build', '.svelte-kit', '.next']);
+const SKIPPED = new Set(['node_modules', '.git', '.claude', 'dist', 'build', '.svelte-kit', '.next', '.output', '__fixtures__', 'fixtures']);
 const DEPTH = 2;
 
 export async function appRootOf(clicked: string, workspace: string, has: Exists): Promise<string | null> {

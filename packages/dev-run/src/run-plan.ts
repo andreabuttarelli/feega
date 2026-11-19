@@ -102,7 +102,9 @@ const MANIFEST = 'package.json';
 const VERSION_FILES = ['.nvmrc', '.node-version'];
 const WORKSPACE_MARKERS = ['pnpm-workspace.yaml', 'turbo.json', 'nx.json', 'lerna.json'];
 const PLAN_NAMES = new Set([MANIFEST, BERRY_MARKER, ...VERSION_FILES, ...WORKSPACE_MARKERS, ...Object.values(MANAGERS).flatMap((m) => m.lockfiles)]);
-const SKIPPED = /(^|\/)(node_modules|\.git)\//;
+const SKIPPED = /(^|\/)(node_modules|\.git|\.claude|dist|build|\.svelte-kit|\.next|\.output|__fixtures__|test\/fixtures)\//;
+const MAX_APP_DEPTH = 4;
+const DELEGATES = /^\s*(turbo|nx|lerna|pnpm\s+(-r|--recursive|--filter)|npm\s+run\s+\S+\s+--workspaces?|yarn\s+workspaces)\b/;
 const MAX_MANIFESTS = 400;
 
 const APP_PATH = /^[A-Za-z0-9._@-]+(\/[A-Za-z0-9._@-]+)*$/;
@@ -127,7 +129,7 @@ export function appOf(raw: string): string | null {
 function manifestsOf(facts: RepoFacts): Map<string, Manifest> {
   const found = new Map<string, Manifest>();
   for (const path of facts.files) {
-    if (baseOf(path) !== MANIFEST || SKIPPED.test(path) || facts.texts[path] === undefined) {
+    if (baseOf(path) !== MANIFEST || SKIPPED.test(path) || path.split('/').length > MAX_APP_DEPTH + 1 || facts.texts[path] === undefined) {
       continue;
     }
     try {
@@ -153,7 +155,8 @@ function appsOf(facts: RepoFacts, manifests: Map<string, Manifest>): string[] {
   return [...manifests]
     .filter(([dir, manifest]) => {
       const framework = frameworkOf(manifest, namesIn(facts.files, dir));
-      return dir !== '' && framework !== Framework.Generic && scriptOf(manifest, framework) !== null;
+      const script = scriptOf(manifest, framework);
+      return framework !== Framework.Generic && script !== null && !(dir === '' && DELEGATES.test(manifest.scripts?.[script] ?? ''));
     })
     .map(([dir]) => dir)
     .sort();
@@ -218,7 +221,8 @@ export function runPlan(facts: RepoFacts, asked: string | null, listen: Listen):
   const root = manifests.get('');
   const workspace = isWorkspace(facts, root);
   const apps = appsOf(facts, manifests);
-  const appDir = appDirOf(manifests, apps, asked, root !== undefined && !(workspace && apps.length > 0));
+  const others = apps.filter((a) => a !== '');
+  const appDir = appDirOf(manifests, apps, asked, root !== undefined && !(workspace && others.length > 0) && !(others.length > 0 && apps.includes('')));
   if (typeof appDir !== 'string') {
     return appDir;
   }
@@ -251,3 +255,5 @@ export function runPlan(facts: RepoFacts, asked: string | null, listen: Listen):
     defaultPort: row.port
   };
 }
+
+export const appsIn = (facts: RepoFacts): string[] => appsOf(facts, manifestsOf(facts));

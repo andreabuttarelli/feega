@@ -6,7 +6,7 @@ Design in your codebase. Click any element of your running app, edit it like in 
 
 ## How it works
 
-1. Run **Feega: Open the running app** (or right-click a folder or page: **Design this folder with Feega**). Feega starts your dev server and opens the app beside your code.
+1. Run **Feega: Open from current workspace** (or right-click a folder or page: **Design this folder with Feega**). Feega starts your dev server and opens the app beside your code.
 2. Click an element. Edit text, spacing, size, colour, radius, typography in the right bar.
 3. The edit lands in the source file: a Tailwind class (or your own token) when the project uses Tailwind, CSS otherwise.
 

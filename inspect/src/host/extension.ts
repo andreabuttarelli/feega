@@ -8,7 +8,9 @@ import * as vscode from 'vscode';
 import { liveAtOf } from '@feega/live-edit/live-ask';
 import { ServerAction, ServerState, ToHost, ToView, type EditAsk, type HostMessage, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
 import { rm } from 'node:fs/promises';
-import { Attach, startDev, type Running } from './dev-server';
+import { Attach, factsOf, startDev, type Running } from './dev-server';
+import { appsIn } from '@feega/dev-run/run-plan';
+import { forget, killOrphans, remember } from './orphans';
 import { fileEdits, type Written } from './file-edits';
 import { Column, openTarget } from './open-source';
 import { panelHtml } from './panel-html';
@@ -24,7 +26,7 @@ const HISTORY_KEY = 'feegaInspect.history';
 const BEFORE_SCHEME = 'feega-before';
 const LATER_EDITS = 'later edits depend on this change: undo them first';
 
-type Session = { panel: vscode.WebviewPanel; running: Running | null; edits: ReturnType<typeof fileEdits>; root: string; route?: string };
+type Session = { panel: vscode.WebviewPanel; running: Running | null; edits: ReturnType<typeof fileEdits>; root: string; workspace: string; app: string | null; route?: string; start: number; cancel: AbortController | null };
 type Host = { context: vscode.ExtensionContext; output: vscode.OutputChannel };
 
 let session: Session | null = null;
@@ -147,25 +149,89 @@ function logLine(output: vscode.OutputChannel, line: string) {
   }
 }
 
+const APP_KEY = 'feegaInspect.app';
+
+async function chooseApp(apps: string[]): Promise<string | null> {
+  if (!session) {
+    return null;
+  }
+  const picked = await vscode.window.showQuickPick(
+    apps.map((app) => ({ label: app || basename(session!.workspace), description: app ? app : 'workspace root', app })),
+    { placeHolder: 'Which app should Feega open?' }
+  );
+  if (!picked) {
+    return null;
+  }
+  await host?.context.workspaceState.update(`${APP_KEY}:${session.workspace}`, picked.app);
+  return picked.app;
+}
+
 async function startServer(attach = Attach.IfRunning) {
   if (!session || !host) {
     return;
   }
+  const mine = ++session.start;
+  const current = () => session !== null && session.start === mine;
   session.running?.stop();
+  session.running = null;
+  session.cancel?.abort();
+  const cancel = new AbortController();
+  session.cancel = cancel;
   lastError = '';
   post({ kind: ToView.Server, state: ServerState.Starting });
   const output = host.output;
-  const running = await startDev(session.root, join(host.context.extensionPath, 'dist', 'launcher'), (line) => logLine(output, line), String(settingsNow()[SettingKey.DevCommand]), attach);
-  if ('refused' in running) {
-    post({ kind: ToView.Server, state: ServerState.Stopped, reason: running.refused });
+  const pids = host.context.workspaceState;
+  const hooks = {
+    log: (line: string) => logLine(output, line),
+    installing: (app: string) => current() && post({ kind: ToView.Server, state: ServerState.Installing, reason: `Installing dependencies for ${app} (first run)…` }),
+    spawned: (pid: number) => remember(pids, pid, session?.root ?? ''),
+    signal: cancel.signal
+  };
+  const started = await startDev(session.workspace, join(host.context.extensionPath, 'dist', 'launcher'), hooks, String(settingsNow()[SettingKey.DevCommand]), attach, session.app);
+  if (!current()) {
+    if (!('refused' in started)) {
+      started.stop();
+    }
+    return;
+  }
+  if ('refused' in started) {
+    if (started.apps?.length) {
+      const app = await chooseApp(started.apps);
+      if (app !== null && session) {
+        session.app = app;
+        session.root = join(session.workspace, app);
+        session.edits = fileEdits(session.root, stylingChoice, host.context.workspaceState.get(HISTORY_KEY));
+        return startServer(attach);
+      }
+    }
+    post({ kind: ToView.Server, state: ServerState.Stopped, reason: started.refused });
     return;
   }
   startedAt = Date.now();
-  if (session) {
-    session.running = running;
-    running.exited(() => post({ kind: ToView.Server, state: ServerState.Stopped, reason: lastError || 'the dev server exited', info: infoOf(running) }));
-  }
+  session.running = started;
+  started.exited(() => {
+    if (started.pid) {
+      forget(pids, started.pid);
+    }
+    if (current() && session?.running === started) {
+      post({ kind: ToView.Server, state: ServerState.Stopped, reason: lastError || 'the dev server exited', info: infoOf(started) });
+    }
+  });
   await showApp();
+}
+
+async function switchApp() {
+  if (!session) {
+    return;
+  }
+  const app = await chooseApp(appsIn(await factsOf(session.workspace)));
+  if (app === null || !session || !host) {
+    return;
+  }
+  session.app = app;
+  session.root = join(session.workspace, app);
+  session.edits = fileEdits(session.root, stylingChoice, host.context.workspaceState.get(HISTORY_KEY));
+  await startServer();
 }
 
 function stopServer() {
@@ -200,7 +266,9 @@ const SERVER_ACTIONS: Record<ServerAction, () => unknown> = {
   [ServerAction.ClearCache]: clearCache,
   [ServerAction.ShowLogs]: () => host?.output.show(true),
   [ServerAction.ChangeCommand]: () => vscode.commands.executeCommand('workbench.action.openSettings', SettingKey.DevCommand),
-  [ServerAction.RestartUnderFeega]: () => startServer(Attach.Never)
+  [ServerAction.RestartUnderFeega]: () => startServer(Attach.Never),
+  [ServerAction.Cancel]: () => (session?.cancel?.abort(), post({ kind: ToView.Server, state: ServerState.Stopped, reason: 'install cancelled' })),
+  [ServerAction.ChooseApp]: switchApp
 };
 
 async function onMessage(message: HostMessage) {
@@ -245,6 +313,8 @@ function panelOf(context: vscode.ExtensionContext): vscode.WebviewPanel {
 
 const has = (path: string) => access(path).then(() => true, () => false);
 const dirsIn = (path: string) => readdir(path, { withFileTypes: true }).then((all) => all.filter((e) => e.isDirectory()).map((e) => e.name), () => []);
+
+const workspaceOf = (target?: vscode.Uri) => ((target && vscode.workspace.getWorkspaceFolder(target)) ?? vscode.workspace.workspaceFolders?.[0])?.uri.fsPath ?? null;
 
 async function chosenRoot(target?: vscode.Uri): Promise<string | null> {
   const folder = (target && vscode.workspace.getWorkspaceFolder(target)) ?? vscode.workspace.workspaceFolders?.[0];
@@ -293,9 +363,13 @@ async function open(context: vscode.ExtensionContext, target?: vscode.Uri) {
   }
 
   const panel = panelOf(context);
-  session = { panel, running: null, edits: fileEdits(root, stylingChoice, context.workspaceState.get(HISTORY_KEY)), root, route };
+  const workspace = workspaceOf(target) ?? root;
+  const remembered = root === workspace ? (context.workspaceState.get<string>(`${APP_KEY}:${workspace}`) ?? null) : relative(workspace, root);
+  const appRoot = remembered === null ? root : join(workspace, remembered);
+  session = { panel, running: null, edits: fileEdits(appRoot, stylingChoice, context.workspaceState.get(HISTORY_KEY)), root: appRoot, workspace, app: remembered, route, start: 0, cancel: null };
   panel.webview.onDidReceiveMessage(onMessage);
   panel.onDidDispose(() => {
+    session?.cancel?.abort();
     session?.running?.stop();
     session = null;
   });
@@ -316,6 +390,7 @@ function pick(x: number, y: number): Promise<Pick | null> {
 export function activate(context: vscode.ExtensionContext) {
   const output = vscode.window.createOutputChannel(`${TITLE}: dev server`);
   host = { context, output };
+  void killOrphans(context.workspaceState);
   context.subscriptions.push(
     output,
     ...Object.values(Command).map((id) => vscode.commands.registerCommand(id, (target?: vscode.Uri) => open(context, target))),
@@ -335,5 +410,6 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
+  session?.cancel?.abort();
   session?.running?.stop();
 }

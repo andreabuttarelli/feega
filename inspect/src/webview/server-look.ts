@@ -4,6 +4,7 @@ export type ServerLook = { dot: 'grey' | 'amber' | 'green' | 'red'; label: strin
 
 const LOOKS: Record<ServerState, ServerLook> = {
   [ServerState.Detecting]: { dot: 'grey', label: 'Looking for a dev server', action: null },
+  [ServerState.Installing]: { dot: 'amber', label: 'Installing dependencies (first run)', action: 'Cancel' },
   [ServerState.Starting]: { dot: 'amber', label: 'Starting the dev server', action: null },
   [ServerState.Running]: { dot: 'green', label: 'Dev server running', action: 'Restart' },
   [ServerState.Reloading]: { dot: 'amber', label: 'Reloading', action: null },
@@ -13,10 +14,11 @@ const LOOKS: Record<ServerState, ServerLook> = {
 export const serverLook = (state: ServerState): ServerLook => LOOKS[state];
 
 const LOGS = [ServerAction.ShowLogs];
-const OWN = [ServerAction.ShowLogs, ServerAction.ChangeCommand];
+const OWN = [ServerAction.ShowLogs, ServerAction.ChangeCommand, ServerAction.ChooseApp];
 
 const ACTIONS: Record<ServerState, { own: ServerAction[]; attached: ServerAction[] }> = {
   [ServerState.Detecting]: { own: LOGS, attached: LOGS },
+  [ServerState.Installing]: { own: [ServerAction.Cancel, ...LOGS], attached: LOGS },
   [ServerState.Starting]: { own: LOGS, attached: LOGS },
   [ServerState.Reloading]: { own: LOGS, attached: LOGS },
   [ServerState.Running]: {
@@ -36,5 +38,7 @@ export const ACTION_LABEL: Record<ServerAction, string> = {
   [ServerAction.ClearCache]: 'Clear cache & restart',
   [ServerAction.ShowLogs]: 'Show logs',
   [ServerAction.ChangeCommand]: 'Change command…',
-  [ServerAction.RestartUnderFeega]: 'Restart under Feega'
+  [ServerAction.RestartUnderFeega]: 'Restart under Feega',
+  [ServerAction.Cancel]: 'Cancel',
+  [ServerAction.ChooseApp]: 'Choose app…'
 };
