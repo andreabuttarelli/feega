@@ -1,5 +1,4 @@
 <script lang="ts">
-  import LiveAgents from '$lib/site/LiveAgents.svelte';
   import Hero from '$lib/site/home/Hero.svelte';
   import OpenSource from '$lib/site/home/OpenSource.svelte';
   import Codebase from '$lib/site/home/Codebase.svelte';
@@ -42,7 +41,6 @@
 </section>
 </div>
 
-<LiveAgents />
 
 <style>
   .closing {

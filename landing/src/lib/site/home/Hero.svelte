@@ -71,7 +71,7 @@
       position: relative;
       width: 100%;
       margin-top: 48px;
-      padding: 72px;
+      padding: 40px 40px 56px;
       border-radius: var(--ui-radius-lg, 10px);
       border: 1px solid rgba(255, 255, 255, 0.1);
       background:
@@ -85,15 +85,16 @@
     .mock .win {
       position: relative;
       z-index: 2;
+      margin: 230px 0 0 16%;
     }
 
     .mock .term {
       position: absolute;
       z-index: 1;
-      top: 22px;
-      left: 22px;
-      width: 46%;
-      height: 55%;
+      top: 28px;
+      left: 28px;
+      width: 52%;
+      height: 420px;
     }
   }
 
