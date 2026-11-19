@@ -20,8 +20,8 @@ describe('inserire un nodo AI dal pannello a sinistra', () => {
     expect(insertRequest.asked).toBe(before + 2);
   });
 
-  it('il pannello offre tutti i nodi AI, presi dal modello', () => {
-    expect(new Set(AI_PANEL_NODES)).toEqual(AI_ADDABLE);
+  it('il pannello offre tutti i nodi AI, presi dal modello, più prodotti e feed social', () => {
+    expect(new Set(AI_PANEL_NODES)).toEqual(new Set([...AI_ADDABLE, 'products', 'social_account_feed']));
   });
 
   it('la barra in basso non ha piu la parte AI', () => {

@@ -131,8 +131,12 @@ vi.mock('$lib/server/repos/chat', () => ({
 }));
 vi.mock('$lib/server/project-agent/project-tools', () => ({ createProjectTools: () => ({ list_nodes: tool({ inputSchema: z.object({}), execute: async () => ({ n: 2 }) }) }) }));
 const { GET, POST } = await import('./+server');
-const offeredTools = () => ((streamed.mock.calls[0][0] as { tools: { name: string }[] }).tools ?? []).map((t) => t.name);
+const offeredTools = async (turn = 1) => {
+  await vi.waitFor(() => expect(streamed.mock.calls.length).toBeGreaterThanOrEqual(turn));
+  return ((streamed.mock.calls[turn - 1][0] as { tools: { name: string }[] }).tools ?? []).map((t) => t.name);
+};
 const { MOTION_DELEGATION_TOOLS } = await import('$lib/server/project-agent/motion-delegation');
+const { CORE_LINES } = await import('$lib/server/project-agent/core-tools');
 
 function postEvent(extra: Record<string, unknown> = {}) {
   const request = new Request('http://x/api/v1/projects/p-1/agent', {
@@ -225,30 +229,33 @@ describe('POST /api/v1/projects/[projectId]/agent', () => {
     expect(saveTurn).not.toHaveBeenCalled();
   });
 
-  it('hands the canvas agent the motion delegation tools', async () => {
+  it('hands the canvas agent the motion delegation tools: the core ones up front, the rest through load_tools', async () => {
     await POST(postEvent());
+    const offered = await offeredTools();
+    const upFront = MOTION_DELEGATION_TOOLS.filter((name) => name in CORE_LINES);
 
-    expect(offeredTools()).toEqual(expect.arrayContaining([...MOTION_DELEGATION_TOOLS]));
+    expect(upFront.length).toBeGreaterThan(0);
+    expect(offered).toEqual(expect.arrayContaining([...upFront, 'load_tools']));
   });
 
   it('lets the canvas agent spawn sub-agents', async () => {
     await POST(postEvent());
 
-    expect(offeredTools()).toContain('spawn_agent');
+    expect(await offeredTools()).toContain('spawn_agent');
   });
 
   it('hands the canvas agent the web tools', async () => {
     await POST(postEvent());
 
-    expect(offeredTools()).toEqual(expect.arrayContaining(['web_search', 'read_page', 'view_images', 'import_image']));
+    expect(await offeredTools()).toEqual(expect.arrayContaining(['web_search', 'read_page', 'view_images', 'import_image']));
   });
 
   it('asks the user to pick references, unless they said to choose for them', async () => {
     await POST(postEvent());
-    expect(offeredTools()).toContain('ask_reference_pick');
+    expect(await offeredTools()).toContain('ask_reference_pick');
 
     await POST(postEvent({ message: 'trova riferimenti su pinterest, scegli tu' }));
-    expect(offeredTools()).not.toContain('ask_reference_pick');
+    expect(await offeredTools(2)).not.toContain('ask_reference_pick');
   });
 
   it('hands the motion delegation the canvas the user has open', async () => {
