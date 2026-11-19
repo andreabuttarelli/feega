@@ -2,7 +2,6 @@
   import '$lib/site/site.css';
   import SiteHeader from '$lib/site/SiteHeader.svelte';
   import SiteFooter from '$lib/site/SiteFooter.svelte';
-  import EditorMock from '$lib/site/EditorMock.svelte';
   import { page } from '$app/state';
   import { SITE_URL } from '$lib/site/links';
   import { trailOf } from '$lib/site/llms';
@@ -49,16 +48,5 @@
   <main>
     {@render children()}
   </main>
-  {#if page.url.pathname === '/'}
-    <div class="editor-mock"><EditorMock /></div>
-    <SiteFooter />
-  {:else}
-    <SiteFooter />
-  {/if}
+  <SiteFooter />
 </div>
-
-<style>
-  .editor-mock {
-    padding: var(--site-section) var(--site-gutter) var(--site-gutter);
-  }
-</style>
