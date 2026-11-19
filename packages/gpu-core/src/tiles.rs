@@ -591,7 +591,7 @@ impl Tiles {
     }
 
     fn pinned(&self, step: i32, near: Rect, key: TileKey) -> bool {
-        if self.plan.iter().any(|level| level.holds(key)) || self.overview().is_some_and(|overview| key.step <= overview) {
+        if self.last_drawn.get(&key) == Some(&self.tick) || self.plan.iter().any(|level| level.holds(key)) || self.overview().is_some_and(|overview| key.step <= overview) {
             return true;
         }
         (key.step == step || self.kept_levels.contains(&key.step)) && key.world().overlaps(near.inflate(key.side(), key.side()))

@@ -1051,7 +1051,7 @@ impl WebCore {
         }
         self.present_tiles(&tiles.draw, &tiles.beneath, &fading)?;
         let painted: Vec<TileKey> = tiles.beneath.iter().chain(&tiles.draw).copied().collect();
-        self.tiles.drawn(&tiles.draw);
+        self.tiles.drawn(&painted);
         self.watch_draw(&painted);
         self.trim_spares();
         let kept = tiles_kept_beside(screen, self.tile_budget, self.beside_tiles());

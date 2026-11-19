@@ -1022,3 +1022,15 @@ fn eviction_keeps_the_level_a_gesture_draws_though_the_zoom_wants_another() {
 
     assert!(gone.iter().all(|k| k.step != drawn || !k.screen(at).overlaps(Rect::new(0.0, 0.0, SCREEN.0 as f64, SCREEN.1 as f64))));
 }
+
+#[test]
+fn eviction_never_drops_a_tile_drawn_in_the_last_frame_whatever_its_level() {
+    let mut tiles = Tiles::default();
+    filled(&mut tiles);
+    let sharp = tiles.frame(camera(step_zoom(4)), SCREEN).draw;
+    tiles.drawn(&sharp);
+
+    let gone = tiles.evict_beyond(camera(step_zoom(-8)), SCREEN, 0);
+
+    assert!(gone.iter().all(|k| !sharp.contains(k)));
+}
