@@ -34,6 +34,15 @@ describe('roleOf', () => {
   });
 });
 
+describe('head elements', () => {
+  it('title, meta, link and script are head, with no visual sections', () => {
+    for (const tag of ['title', 'meta', 'link', 'script', 'style', 'base', 'head']) {
+      expect(roleOf(element(tag, false, 0))).toBe(Role.Head);
+    }
+    expect(sectionsOf(Role.Head)).toEqual([]);
+  });
+});
+
 describe('sectionsOf', () => {
   it('a container has no typography', () => {
     expect(sectionsOf(Role.Container)).not.toContain(Section.Typography);

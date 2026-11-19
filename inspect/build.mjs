@@ -35,10 +35,23 @@ await esbuild({
   platform: 'node',
   format: 'esm',
   target: 'node20',
-  external: ['vite', 'svelte', 'svelte/*', './bridge.js']
+  external: ['vite', 'svelte', 'svelte/*', '@vue/compiler-sfc', './bridge.js']
 });
 await Promise.all(['bridge.js', 'runtime.js'].map((f) => cp(`${SOURCE_MAP}${f}`, `${LAUNCHER}${f}`)));
 await cp(here('launcher/launch.mjs'), `${LAUNCHER}launch.mjs`);
+await cp(here('launcher/next-preload.cjs'), `${LAUNCHER}next-preload.cjs`);
+await esbuild({
+  entryPoints: [`${SOURCE_MAP}next-loader.ts`],
+  outfile: `${LAUNCHER}next-loader.cjs`,
+  bundle: true,
+  platform: 'node',
+  format: 'cjs',
+  target: 'node20',
+  external: ['svelte', 'svelte/*', '@vue/compiler-sfc'],
+  define: { 'import.meta.url': 'importMetaUrl' },
+  banner: { js: "const importMetaUrl = require('node:url').pathToFileURL(__filename).href;" },
+  footer: { js: 'module.exports = module.exports.default;' }
+});
 
 await vite({
   configFile: false,

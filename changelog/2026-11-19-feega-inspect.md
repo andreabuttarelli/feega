@@ -44,3 +44,17 @@ edit inline until reload); the colour control is a native picker, not the app's 
   their location. Design/Navigate segmented control (D/N), address bar with history, server dot,
   device sizes (shared with Play: `devices`, `viewport-box` moved to `@feega/properties-panel`),
   collapsible bar, "Saved to file:line".
+
+## Round 3
+
+- **Style block, not inline.** Without Tailwind, Svelte/Vue edits go into the component `<style>`
+  as a rule on the element's class (`scoped-rule.ts`); the rule active at the preview width is the
+  one edited, because landing's `@media` rules otherwise won. JSX without a stylesheet keeps an
+  inline style and the panel says so.
+- **Layout.** VS Code's default webview `body` padding made side gutters; reset. The preview has a
+  fixed viewport (presets now have heights) and the page scrolls inside it; the mode bar is fixed
+  over the preview, draggable to six anchors.
+- Breadcrumb + Esc/Enter/Tab selection moves, per-side padding/margin and per-corner radius with a
+  hover hint, units (px/rem/em/%/vw/vh/auto), shadow and fill lists (Bits UI popovers), reorder by
+  drag in the preview and in the Layers tab (`move-node.ts`: literal siblings only, `{#each}` and
+  `.map()` refused), dev server popover (state → actions table), Feega menu with settings.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { scopedRule } from './scoped-rule';
+import { Scope, scopedRule } from './scoped-rule';
 
 const FILE = 'src/lib/Hero.svelte';
 const at = (line: number) => ({ file: FILE, line, col: 3 });
@@ -44,8 +44,8 @@ const NO_STYLE = `<div>
 </div>
 `;
 
-async function after(text: string, line: number, css: Record<string, string>) {
-  const out = await scopedRule(readOf(text), at(line), css);
+async function after(text: string, line: number, css: Record<string, string>, scope = Scope.Element) {
+  const out = await scopedRule(readOf(text), at(line), css, undefined, scope);
   if (!out.ok) {
     throw new Error(out.reason);
   }
@@ -53,15 +53,15 @@ async function after(text: string, line: number, css: Record<string, string>) {
 }
 
 describe('scopedRule', () => {
-  it('an element with a class gets the declaration in that class rule', async () => {
-    const text = await after(WITH_STYLE, 2, { color: '#0078d4' });
+  it('class scope puts the declaration in the class rule', async () => {
+    const text = await after(WITH_STYLE, 2, { color: '#0078d4' }, Scope.Class);
 
     expect(text).toContain('  .lead {\n    font-size: 14px;\n    color: #0078d4;\n  }');
     expect(text).toContain('<p class="lead">Text</p>');
   });
 
   it('a declaration already there is replaced, not repeated', async () => {
-    const text = await after(WITH_STYLE, 2, { 'font-size': '20px' });
+    const text = await after(WITH_STYLE, 2, { 'font-size': '20px' }, Scope.Class);
 
     expect(text).toContain('  .lead {\n    font-size: 20px;\n  }');
   });
@@ -103,7 +103,7 @@ describe('scopedRule', () => {
   });
 
   it('edits the rule that applies at that width, not the base one', async () => {
-    const out = await scopedRule(readOf(RESPONSIVE), { file: FILE, line: 1, col: 1 }, { 'padding-left': '24px' }, 1440);
+    const out = await scopedRule(readOf(RESPONSIVE), { file: FILE, line: 1, col: 1 }, { 'padding-left': '24px' }, 1440, Scope.Class);
     const text = out.ok ? out.change.after : '';
 
     expect(text).toContain('    .lead {\n      padding: 20px;\n      padding-left: 24px;\n    }');
@@ -111,9 +111,27 @@ describe('scopedRule', () => {
   });
 
   it('at a width no media rule matches, the base rule', async () => {
-    const out = await scopedRule(readOf(RESPONSIVE), { file: FILE, line: 1, col: 1 }, { color: 'red' }, 900);
+    const out = await scopedRule(readOf(RESPONSIVE), { file: FILE, line: 1, col: 1 }, { color: 'red' }, 900, Scope.Class);
 
     expect(out.ok && out.change.after).toContain('  .lead {\n    padding: 8px;\n    color: red;\n  }');
+  });
+
+  it('element scope gives a shared-class element its own class and rule, the shared rule untouched', async () => {
+    const out = await scopedRule(readOf(WITH_STYLE), at(2), { color: 'red' }, undefined, Scope.Element);
+    const text = out.ok ? out.change.after : '';
+
+    expect(text).toContain('<p class="lead hero-p">Text</p>');
+    expect(text).toContain('  .lead {\n    font-size: 14px;\n  }');
+    expect(text).toContain('  .hero-p {\n    color: red;\n  }');
+  });
+
+  it('element scope reuses the element class it added before', async () => {
+    const once = await scopedRule(readOf(WITH_STYLE), at(2), { color: 'red' }, undefined, Scope.Element);
+    const twice = await scopedRule(readOf(once.ok ? once.change.after : ''), at(2), { color: 'blue' }, undefined, Scope.Element);
+    const text = twice.ok ? twice.change.after : '';
+
+    expect(text).toContain('<p class="lead hero-p">Text</p>');
+    expect(text).toContain('  .hero-p {\n    color: blue;\n  }');
   });
 
   it('a class expression is refused', async () => {

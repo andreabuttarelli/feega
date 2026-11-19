@@ -15,7 +15,7 @@ const kebab = (name: string) => name.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLo
 const componentOf = (file: string) => kebab(file.split('/').pop()!.replace(/\.[^.]+$/, '').replace(/^\+/, ''));
 const escaped = (name: string) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-function declarationsOf(text: string): Map<string, string> {
+export function declarationsOf(text: string): Map<string, string> {
   const pairs = text
     .split(';')
     .map((d) => d.split(':').map((p) => p.trim()))
@@ -67,24 +67,41 @@ function appliesAt(media: string[], viewport: number | undefined): boolean {
   });
 }
 
+export function ruleInBody(body: string, name: string, css: Map<string, string>, viewport?: number, indent = RULE_INDENT): string {
+  const rules = [...body.matchAll(new RegExp(`(^|\\n)([ \\t]*)\\.${escaped(name)}\\s*\\{([^}]*)\\}`, 'g'))];
+  const found = rules.filter((r) => appliesAt(mediaAt(body, r.index!), viewport)).pop();
+  const all = found ? declarationsOf(found[3]) : new Map<string, string>();
+  css.forEach((value, prop) => all.set(prop, value));
+  if (found) {
+    return body.slice(0, found.index!) + found[1] + ruleText(name, all, found[2]) + body.slice(found.index! + found[0].length);
+  }
+  const head = body.trimEnd();
+  return `${head}${head ? '\n' : ''}${indent === '' && head ? '\n' : ''}${ruleText(name, all, indent)}\n`;
+}
+
 function withRule(source: string, name: string, css: Map<string, string>, viewport?: number): string {
   const block = source.match(STYLE_BLOCK);
   if (!block) {
     return `${source.trimEnd()}\n\n<style>\n${ruleText(name, css)}\n</style>\n`;
   }
-
   const body = block[1];
-  const rules = [...body.matchAll(new RegExp(`(^|\\n)([ \\t]*)\\.${escaped(name)}\\s*\\{([^}]*)\\}`, 'g'))];
-  const found = rules.filter((r) => appliesAt(mediaAt(body, r.index!), viewport)).pop();
-  const all = found ? declarationsOf(found[3]) : new Map<string, string>();
-  css.forEach((value, prop) => all.set(prop, value));
-  const nextBody = found
-    ? body.slice(0, found.index!) + found[1] + ruleText(name, all, found[2]) + body.slice(found.index! + found[0].length)
-    : `${body.trimEnd()}\n${ruleText(name, all)}\n`;
-  return source.replace(STYLE_BLOCK, (whole) => whole.replace(body, nextBody));
+  return source.replace(STYLE_BLOCK, (whole) => whole.replace(body, ruleInBody(body, name, css, viewport)));
 }
 
-export async function scopedRule(read: ReadFile, at: LiveAt, css: Css, viewport?: number): Promise<TextWritten> {
+export enum Scope {
+  Element = 'element',
+  Class = 'class'
+}
+
+function classFor(classes: string[], source: string, base: string, scope: Scope): { name: string; added: boolean } {
+  if (scope === Scope.Class && classes.length) {
+    return { name: classes[0], added: false };
+  }
+  const own = classes.find((c) => c === base || new RegExp(`^${escaped(base)}-\\d+$`).test(c));
+  return own ? { name: own, added: false } : { name: freeClass(source, base), added: true };
+}
+
+export async function scopedRule(read: ReadFile, at: LiveAt, css: Css, viewport?: number, scope = Scope.Element): Promise<TextWritten> {
   const text = await read(at.file);
   const start = text === null ? -1 : offsetOf(text, at);
   const end = start < 0 || text![start] !== '<' ? -1 : openTagEnd(text!, start);
@@ -107,11 +124,11 @@ export async function scopedRule(read: ReadFile, at: LiveAt, css: Css, viewport?
   }
   Object.entries(css).forEach(([prop, value]) => declared.set(prop, value));
 
-  const existing = literal?.[1].split(/\s+/).find(Boolean);
-  const name = existing ?? freeClass(source, `${componentOf(at.file)}-${open.match(TAG_NAME)![1].toLowerCase()}`);
-  if (!existing) {
+  const classes = literal?.[1].split(/\s+/).filter(Boolean) ?? [];
+  const { name, added } = classFor(classes, source, `${componentOf(at.file)}-${open.match(TAG_NAME)![1].toLowerCase()}`, scope);
+  if (added) {
     const closing = open.endsWith('/>') ? open.length - 2 : open.length - 1;
-    open = literal ? open.replace(CLASS_LITERAL, ` class="${name}"`) : `${open.slice(0, closing).trimEnd()} class="${name}"${open.slice(closing)}`;
+    open = literal ? open.replace(CLASS_LITERAL, ` class="${[...classes, name].join(' ')}"`) : `${open.slice(0, closing).trimEnd()} class="${name}"${open.slice(closing)}`;
   }
 
   const tagged = source.slice(0, start) + open + source.slice(end + 1);

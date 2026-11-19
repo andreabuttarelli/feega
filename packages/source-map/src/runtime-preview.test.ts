@@ -1,6 +1,6 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
-import { clearPreview, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
+import { clearPreview, hidePreview, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
 
 const SOURCE = 'components/Card.tsx:3:5';
 
@@ -10,6 +10,18 @@ const page = `<section data-feega-src="components/Card.tsx:2:3">
 </section>`;
 
 const domOf = () => new JSDOM(`<head></head><body>${page}</body>`).window;
+
+describe('hidden in the preview only', () => {
+  it('hides every element with that source and shows it again', () => {
+    const win = domOf();
+    hidePreview(win.document, SOURCE, true);
+    const h1 = win.document.querySelector('h1')!;
+
+    expect(win.getComputedStyle(h1).display).toBe('none');
+    hidePreview(win.document, SOURCE, false);
+    expect(win.getComputedStyle(h1).display).not.toBe('none');
+  });
+});
 
 describe('what the element is', () => {
   it('a heading has its own text and no element children', () => {

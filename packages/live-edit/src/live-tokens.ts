@@ -49,11 +49,13 @@ export async function liveTheme(read: ReadFile, remPx = DEFAULT_REM_PX): Promise
   };
 }
 
+const KEEPS_UNIT = /(rem|em|%|vw|vh)$/;
+
 const arbitrary = (value: string) => `[${value.replace(/\s+/g, '_')}]`;
 
 const pxToken = (raw: string) => {
   const px = pxOf(raw);
-  return px === null ? arbitrary(raw) : arbitrary(`${px}px`);
+  return px === null || KEEPS_UNIT.test(raw.trim()) ? arbitrary(raw.trim()) : arbitrary(`${px}px`);
 };
 
 function colourToken(raw: string, theme: LiveTheme): string {

@@ -1,4 +1,6 @@
 import type { LiveEditAsk } from '@feega/live-edit/live-ask';
+import type { Place } from '@feega/live-edit/move-node';
+import type { Scope } from '@feega/live-edit/scoped-rule';
 import type { ReportFacts, SettingKey, SettingValue, Settings } from './settings';
 
 export type Rect = { x: number; y: number; width: number; height: number };
@@ -17,6 +19,9 @@ export type Pick = {
   ownText: boolean;
   elements: number;
   name: string;
+  parentWidth: number;
+  instances: number;
+  classCount: number;
   ancestors: { source: Source; name: string }[];
 };
 
@@ -32,7 +37,7 @@ export enum Styling {
   Css = 'css'
 }
 
-export type EditAsk = LiveEditAsk & { css?: Record<string, string> };
+export type EditAsk = LiveEditAsk & { css?: Record<string, string>; scope?: Scope };
 
 export enum ServerState {
   Detecting = 'detecting',
@@ -41,6 +46,19 @@ export enum ServerState {
   Reloading = 'reloading',
   Stopped = 'stopped'
 }
+
+export enum ServerAction {
+  Start = 'start',
+  Restart = 'restart',
+  Stop = 'stop',
+  ReloadPage = 'reload-page',
+  ClearCache = 'clear-cache',
+  ShowLogs = 'show-logs',
+  ChangeCommand = 'change-command',
+  RestartUnderFeega = 'restart-under-feega'
+}
+
+export type ServerInfo = { url: string; framework: string; command: string; pid: number | null; port: number; attached: boolean; startedAt: number; lastError: string };
 
 export enum Mode {
   Design = 'design',
@@ -56,10 +74,18 @@ export enum ToHost {
   Restart = 'restart',
   External = 'external',
   Prefs = 'prefs',
-  Setting = 'setting'
+  Setting = 'setting',
+  Move = 'move',
+  Server = 'server',
+  Redo = 'redo',
+  Revert = 'revert',
+  Diff = 'diff',
+  SourceControl = 'source-control'
 }
 
-export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string };
+export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number };
+
+export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; barWidth?: number; leftWidth?: number; leftClosed?: boolean; layers?: Record<string, { hidden: string[]; locked: string[] }> };
 
 export enum ToView {
   App = 'app',
@@ -68,7 +94,8 @@ export enum ToView {
   Pick = 'pick',
   Change = 'change',
   Server = 'server',
-  Settings = 'settings'
+  Settings = 'settings',
+  History = 'history'
 }
 
 export type HostMessage =
@@ -80,12 +107,19 @@ export type HostMessage =
   | { kind: ToHost.Restart }
   | { kind: ToHost.External; url: string }
   | { kind: ToHost.Prefs; prefs: Prefs }
-  | { kind: ToHost.Setting; key: SettingKey; value: SettingValue };
+  | { kind: ToHost.Setting; key: SettingKey; value: SettingValue }
+  | { kind: ToHost.Move; from: string; to: string; place: Place }
+  | { kind: ToHost.Server; action: ServerAction }
+  | { kind: ToHost.Redo }
+  | { kind: ToHost.Revert; id: number | null }
+  | { kind: ToHost.Diff; id: number }
+  | { kind: ToHost.SourceControl };
 
 export type ViewMessage =
   | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null }
-  | { kind: ToView.Server; state: ServerState; reason?: string }
+  | { kind: ToView.Server; state: ServerState; reason?: string; info?: ServerInfo }
   | { kind: ToView.Settings; values: Settings; facts: ReportFacts }
+  | { kind: ToView.History; changes: ChangeRow[]; canUndo: boolean; canRedo: boolean }
   | { kind: ToView.Status; text: string }
   | { kind: ToView.Edited; ok: boolean; reason?: string; written?: string; at?: Source; saved?: Source; note?: string }
   | { kind: ToView.Change; row: string; value: string }
@@ -100,6 +134,11 @@ export const PREVIEW_SETTLED = 'feega:preview:settled';
 export const LOCATION = 'feega:location';
 export const BRIDGE_READY = 'feega:source-map:ready';
 export const MODE = 'feega:mode';
+export const HIDE = 'feega:hide';
+export const TREE = 'feega:tree';
+export const TREE_RESULT = 'feega:tree:result';
+
+export type LayerNode = { name: string; tag: string; display: string; direction: string; source: Source | null; component: boolean; count: number; children: LayerNode[] };
 export const SCROLL = 'feega:scroll';
 export const SCROLLED = 'feega:scrolled';
 export const TEXT_EDIT = 'feega:text:edit';

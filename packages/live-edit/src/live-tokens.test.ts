@@ -51,4 +51,12 @@ describe('tokenFor', () => {
     expect(tokenFor(LiveProp.FontSize, '21.375px', theme)).toBe('lg');
     expect(tokenFor(LiveProp.FontSize, '18px', theme)).toBe('[18px]');
   });
+
+  it('a rem value on the scale is a token, off the scale keeps its unit', async () => {
+    const theme = await liveTheme(async () => null);
+
+    expect(tokenFor(LiveProp.Padding, '1rem', theme)).toBe('4');
+    expect(tokenFor(LiveProp.Padding, '2.6rem', theme)).toBe('[2.6rem]');
+    expect(tokenFor(LiveProp.Radius, '50%', theme)).toBe('[50%]');
+  });
 });

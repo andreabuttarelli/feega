@@ -1,37 +1,59 @@
-import { readFile, writeFile } from 'node:fs/promises';
-import { stylePatch } from '@feega/live-edit/class-patch';
+import { readFile, rm, writeFile } from 'node:fs/promises';
+import { stylePatch, type LiveAt } from '@feega/live-edit/class-patch';
+import { cssModuleRule } from '@feega/live-edit/css-module';
+import type { FileChange, ReadFile } from '@feega/live-edit/files';
 import { inside, liveAtOf, reader, tokenOf } from '@feega/live-edit/live-ask';
-import { styleAttr } from '@feega/live-edit/style-attr';
-import { scopedRule } from '@feega/live-edit/scoped-rule';
-
-type CssWriter = { write: typeof scopedRule; note?: string };
-
-const SCOPED: CssWriter = { write: scopedRule };
-const INLINE: CssWriter = { write: styleAttr, note: 'inline style: this file has no stylesheet' };
-
-const CSS_WRITERS: Record<string, CssWriter> = {
-  svelte: SCOPED,
-  vue: SCOPED
-};
-
-const cssWriterOf = (file: string): CssWriter => CSS_WRITERS[file.slice(file.lastIndexOf('.') + 1)] ?? INLINE;
-import { Styling, type EditAsk } from '../messages';
-import { stylingOf } from './styling';
-import { StylingChoice } from '../settings';
 import { LiveProp } from '@feega/live-edit/live-fields';
 import { literalText } from '@feega/live-edit/literal-text';
-import type { FileChange } from '@feega/live-edit/files';
-import type { LiveAt } from '@feega/live-edit/class-patch';
+import { moveNode, type Place } from '@feega/live-edit/move-node';
+import { scopedRule, type Scope } from '@feega/live-edit/scoped-rule';
+import { styleAttr, type Css } from '@feega/live-edit/style-attr';
+import { Styling, type EditAsk } from '../messages';
+import { StylingChoice } from '../settings';
+import { stylingOf } from './styling';
 
 export type Written = { ok: true; path: string; written: string; note?: string } | { ok: false; reason: string; at?: LiveAt };
 
-type Step = { full: string; before: string; after: string };
+type Changes = { ok: true; changes: FileChange[] } | { ok: false; reason: string; at?: LiveAt };
+
+type CssWriter = { write: (read: ReadFile, at: LiveAt, css: Css, viewport?: number, scope?: Scope) => Promise<Changes>; note?: string };
+
+const single = (write: typeof scopedRule): CssWriter['write'] => async (read, at, css, viewport, scope) => {
+  const out = await write(read, at, css, viewport, scope);
+  return out.ok ? { ok: true, changes: [out.change] } : out;
+};
+
+const SCOPED: CssWriter = { write: single(scopedRule) };
+const MODULE: CssWriter = { write: cssModuleRule };
+const INLINE: CssWriter = { write: single(styleAttr), note: 'inline style: this file has no stylesheet' };
+
+const CSS_WRITERS: Record<string, CssWriter> = {
+  svelte: SCOPED,
+  vue: SCOPED,
+  jsx: MODULE,
+  tsx: MODULE
+};
+
+const cssWriterOf = (file: string): CssWriter => CSS_WRITERS[file.slice(file.lastIndexOf('.') + 1)] ?? INLINE;
+
+type Step = { full: string; before: string; after: string }[];
+
+export type Change = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number };
 
 const NOTHING_TO_UNDO = 'nothing to undo';
-const CHANGED_SINCE = 'the file changed after the edit: not restored';
+const NOTHING_TO_REDO = 'nothing to redo';
+const CHANGED_SINCE = 'a file changed after the edit: not restored';
 
-export function fileEdits(root: string, choice: () => StylingChoice = () => StylingChoice.Auto) {
-  const steps: Step[] = [];
+export type Snapshot = { steps: { step: Step; change: Change }[]; undone: { step: Step; change: Change }[] };
+
+export function fileEdits(root: string, choice: () => StylingChoice = () => StylingChoice.Auto, saved?: Snapshot) {
+  const paths = new Map<Step, Change>();
+  const restore = (list: Snapshot['steps']) => list.map(({ step, change }) => (paths.set(step, change), step));
+  const steps: Step[] = restore(saved?.steps ?? []);
+  const undone: Step[] = restore(saved?.undone ?? []);
+  const log: Change[] = steps.map((s) => paths.get(s)!).reverse();
+  let nextId = Math.max(0, ...log.map((c) => c.id));
+  let meta: Omit<Change, 'id' | 'files' | 'time'> = { at: '', prop: '', value: '', scope: '' };
   let turn: Promise<unknown> = Promise.resolve();
 
   const inTurn = <T>(work: () => Promise<T>): Promise<T> => {
@@ -40,21 +62,39 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return next;
   };
 
+  async function written(changes: FileChange[], token: string, note?: string): Promise<Written> {
+    const step: Step = [];
+    for (const change of changes) {
+      const full = inside(root, change.path);
+      if (!full) {
+        return { ok: false, reason: `${change.path} is outside the workspace` };
+      }
+      step.push({ full, before: change.before, after: change.after });
+    }
+    await Promise.all(step.map((s) => writeFile(s.full, s.after)));
+    steps.push(step);
+    undone.length = 0;
+    const change = { ...meta, id: ++nextId, files: changes.map((c) => c.path), time: Date.now() };
+    log.unshift(change);
+    paths.set(step, change);
+    return { ok: true, path: changes[0]?.path ?? '', written: token, note };
+  }
+
   async function edited(ask: EditAsk): Promise<Written> {
+    meta = { at: ask.at, prop: ask.prop, value: ask.value ?? '', scope: ask.scope ?? '' };
     const at = liveAtOf(ask.at);
-    const full = at ? inside(root, at.file) : null;
-    if (!at || !full) {
+    if (!at || !inside(root, at.file)) {
       return { ok: false, reason: `${ask.at} is not a file:line:col inside the workspace` };
     }
     if (ask.prop === LiveProp.Text) {
       const out = await literalText(reader(root), at, ask.value ?? '');
-      return out.ok ? written(full, out.change, '') : out;
+      return out.ok ? written([out.change], '') : out;
     }
 
     if ((await stylingOf(root, choice())) === Styling.Css) {
       const writer = cssWriterOf(at.file);
-      const out = await writer.write(reader(root), at, ask.css ?? {}, ask.viewport);
-      return out.ok ? written(full, out.change, '', writer.note) : out;
+      const out = await writer.write(reader(root), at, ask.css ?? {}, ask.viewport, ask.scope);
+      return out.ok ? written(out.changes, '', writer.note) : out;
     }
 
     const token = await tokenOf(root, ask);
@@ -62,31 +102,68 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     if (out.skipped.length) {
       return { ok: false, reason: out.skipped[0] };
     }
-    const [change] = out.files;
-    return change ? written(full, change, token ?? '') : { ok: true, path: at.file, written: token ?? '' };
+    return out.files.length ? written(out.files, token ?? '') : { ok: true, path: at.file, written: token ?? '' };
   }
 
-  async function written(full: string, change: FileChange, token: string, note?: string): Promise<Written> {
-    await writeFile(full, change.after);
-    steps.push({ full, before: change.before, after: change.after });
-    return { ok: true, path: change.path, written: token, note };
-  }
+  const put = (full: string, text: string) => (text === '' ? rm(full, { force: true }) : writeFile(full, text));
 
-  async function undone(): Promise<Written> {
-    const step = steps.pop();
+  async function replay(from: Step[], to: Step[], expect: 'before' | 'after', write: 'before' | 'after', empty: string): Promise<Written> {
+    const step = from.at(-1);
     if (!step) {
-      return { ok: false, reason: NOTHING_TO_UNDO };
+      return { ok: false, reason: empty };
     }
-    const now = await readFile(step.full, 'utf8').catch(() => null);
-    if (now !== step.after) {
+    const now = await Promise.all(step.map((s) => readFile(s.full, 'utf8').catch(() => '')));
+    if (now.some((text, i) => text !== step[i][expect])) {
       return { ok: false, reason: CHANGED_SINCE };
     }
-    await writeFile(step.full, step.before);
-    return { ok: true, path: step.full, written: '' };
+    from.pop();
+    await Promise.all(step.map((s) => put(s.full, s[write])));
+    to.push(step);
+    return { ok: true, path: step[0]?.full ?? '', written: '' };
+  }
+
+  async function undoStep(): Promise<Written> {
+    const out = await replay(steps, undone, 'after', 'before', NOTHING_TO_UNDO);
+    const step = undone.at(-1);
+    if (out.ok && step) {
+      log.splice(log.indexOf(paths.get(step)!), 1);
+    }
+    return out;
+  }
+
+  async function redoStep(): Promise<Written> {
+    const out = await replay(undone, steps, 'before', 'after', NOTHING_TO_REDO);
+    const step = steps.at(-1);
+    if (out.ok && step) {
+      log.unshift(paths.get(step)!);
+    }
+    return out;
+  }
+
+  async function moved(from: string, to: string, place: Place): Promise<Written> {
+    meta = { at: from, prop: 'order', value: `${place} ${to}`, scope: '' };
+    const a = liveAtOf(from);
+    const b = liveAtOf(to);
+    if (!a || !b || !inside(root, a.file)) {
+      return { ok: false, reason: `${from} is not a file:line:col inside the workspace` };
+    }
+    const out = await moveNode(reader(root), a, b, place);
+    return out.ok ? written([out.change], '') : out;
   }
 
   return {
+    move: (from: string, to: string, place: Place) => inTurn(() => moved(from, to, place)),
     edit: (ask: EditAsk) => inTurn(() => edited(ask)),
-    undo: () => inTurn(undone)
+    undo: () => inTurn(undoStep),
+    redo: () => inTurn(redoStep),
+    history: (): Change[] => log.map((c) => ({ ...c })),
+    canUndo: () => steps.length > 0,
+    canRedo: () => undone.length > 0,
+    latest: () => log[0]?.id ?? null,
+    beforeOf: (id: number): { full: string; before: string }[] => {
+      const step = [...paths].find(([, c]) => c.id === id)?.[0];
+      return step ? step.map(({ full, before }) => ({ full, before })) : [];
+    },
+    snapshot: (): Snapshot => ({ steps: steps.map((step) => ({ step, change: paths.get(step)! })), undone: undone.map((step) => ({ step, change: paths.get(step)! })) })
   };
 }

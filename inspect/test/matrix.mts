@@ -19,14 +19,18 @@ const VALUES: Record<string, string> = {
   'text-align': 'text-center',
   color: '#0078d4',
   fill: '#ffcc00',
+  'fill-image': 'linear-gradient(90deg, rgb(255, 0, 0) 0%, rgb(0, 0, 255) 100%)',
   radius: '12',
   border: '3',
   opacity: '50',
-  shadow: 'shadow-lg'
+  shadow: '0px 10px 15px -3px rgba(0, 0, 0, 0.1)',
+  'text-shadow': '0px 2px 4px rgba(0, 0, 0, 0.5)'
 };
 
 const ON_TEXT = new Set([Section.Typography]);
-const LOOSE = new Set(['box-shadow']);
+
+const valueOf = (name: string) => VALUES[name] ?? (name.startsWith('margin-') ? '12' : name.startsWith('padding-') ? '24' : '12');
+const LOOSE = new Set(['box-shadow', 'text-shadow']);
 
 const kebab = (name: string) => name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 
@@ -37,7 +41,8 @@ const ONLY = process.env.ONLY;
 
 for (const row of ROWS.filter((r) => !ONLY || ONLY.split(",").includes(r.name))) {
   const selector = ON_TEXT.has(row.section) ? textSelector : boxSelector;
-  const value = VALUES[row.name];
+  const bare = valueOf(row.name);
+  const value = 'units' in row && row.units ? `${bare}px` : bare;
   const pick = await panel.pickAt(selector);
   if (!pick) {
     results.push({ row: row.name, ok: false, wanted: value, got: '', note: 'not picked' });
@@ -76,9 +81,30 @@ for (const row of ROWS.filter((r) => !ONLY || ONLY.split(",").includes(r.name)))
   if (ONLY) {
     console.log(now.split('\n').filter((l, i) => l !== before.split('\n')[i]).join('\n'), pick.source);
   }
-  results.push({ row: row.name, ok: ok && changed, wanted, got, note: saved?.ok === false ? `refused: ${saved.reason}` : changed ? '' : 'file unchanged' });
+  results.push({ row: row.name, ok: ok && saved?.ok !== false, wanted, got, note: saved?.ok === false ? `refused: ${saved.reason}` : changed ? '' : 'written elsewhere or already set' });
   await panel.edits.undo();
   await panel.page.waitForTimeout(HMR_MS);
+}
+
+const TEXT = 'Edited by the matrix';
+const textPick = await panel.pickAt(textSelector);
+const reloadFrame = async () => {
+  await panel.page.locator('[data-testid=app-frame]').evaluate((f: HTMLIFrameElement) => (f.src = f.src));
+  await panel.page.waitForTimeout(HMR_MS);
+};
+const textOf = () => panel.frame.locator(textSelector).first().innerText();
+const before = await textOf();
+const textWrite = textPick ? await panel.edits.edit({ at: `${textPick.source.file}:${textPick.source.line}:${textPick.source.col}`, prop: 'text' as never, value: TEXT }) : { ok: false, reason: 'not picked' };
+await panel.page.waitForTimeout(HMR_MS);
+await reloadFrame();
+const textAfter = await textOf();
+results.push({ row: 'text edit', ok: textWrite.ok && textAfter.trim() === TEXT, wanted: TEXT, got: textAfter.trim(), note: textWrite.ok ? '' : `refused: ${(textWrite as { reason: string }).reason}` });
+if (textWrite.ok) {
+  await panel.edits.undo();
+  await panel.page.waitForTimeout(HMR_MS);
+  await reloadFrame();
+  const restored = await textOf();
+  results.push({ row: 'undo', ok: restored === before, wanted: before, got: restored, note: '' });
 }
 
 await panel.close();

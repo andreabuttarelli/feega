@@ -1,4 +1,4 @@
-import { SOURCE_ATTR, clearPreview, relativeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
+import { SOURCE_ATTR, clearPreview, hidePreview, paletteOf, relativeOf, treeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';
@@ -10,6 +10,11 @@ export const PREVIEW_SETTLED = 'feega:preview:settled';
 export const LOCATION = 'feega:location';
 export const SCROLL = 'feega:scroll';
 export const SCROLLED = 'feega:scrolled';
+export const TREE = 'feega:tree';
+export const TREE_RESULT = 'feega:tree:result';
+export const HIDE = 'feega:hide';
+export const PALETTE = 'feega:palette';
+export const PALETTE_RESULT = 'feega:palette:result';
 export const MODE = 'feega:mode';
 export const TEXT_EDIT = 'feega:text:edit';
 export const TEXT_DONE = 'feega:text:done';
@@ -34,6 +39,9 @@ export function installBridge(win) {
     [PREVIEW_CLEAR]: (request) => clearPreview(doc, request.source),
     [PREVIEW_SETTLE]: (request) => reply({ type: PREVIEW_SETTLED, source: request.source, unapplied: settlePreview(doc, request.source) }),
     [MODE]: (request) => (mode = request.mode),
+    [PALETTE]: () => reply({ type: PALETTE_RESULT, ...paletteOf(doc) }),
+    [HIDE]: (request) => hidePreview(doc, request.source, request.hidden),
+    [TREE]: () => reply({ type: TREE_RESULT, tree: treeOf(doc) }),
     [SCROLL]: (request) => {
       win.scrollBy(request.dx, request.dy);
       reply({ type: SCROLLED });

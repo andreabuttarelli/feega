@@ -4,25 +4,38 @@
   import RotateCw from '@lucide/svelte/icons/rotate-cw';
   import ExternalLink from '@lucide/svelte/icons/external-link';
   import PanelRight from '@lucide/svelte/icons/panel-right';
+  import PanelLeft from '@lucide/svelte/icons/panel-left';
   import Undo2 from '@lucide/svelte/icons/undo-2';
   import { LiveProp } from '@feega/live-edit/live-fields';
-  import { Mode, Move, ServerState, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
+  import { Mode, Move, ServerAction, type ChangeRow, type LayerNode, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
   import { fromHost, toHost } from './host';
   import { pageBridge, sourceText } from './page-bridge';
   import Properties from './Properties.svelte';
   import ModeSwitch from './ModeSwitch.svelte';
   import FeegaMenu from './FeegaMenu.svelte';
+  import ServerPopover from './ServerPopover.svelte';
+  import LayersTree from './LayersTree.svelte';
+  import ChangesList from './ChangesList.svelte';
+  import Redo2 from '@lucide/svelte/icons/redo-2';
+  import { Scope } from '@feega/live-edit/scoped-rule';
+  import { Tabs } from 'bits-ui';
+  import { Tab } from './tabs';
+  import { layerState, passThrough, type LayerFlag, type SavedLayers } from './layer-state';
+  import { ClassFamily } from '@feega/live-edit/live-fields';
   import Breadcrumb from './Breadcrumb.svelte';
   import { SettingKey, type ReportFacts, type Settings } from '../settings';
-  import { ROWS, type Row } from './controls';
+  import { Group, ROWS, type Hint, type Row } from './controls';
+  import { hintBoxes } from './hint-boxes';
+  import { dropOf, type Drop } from './reorder';
   import { modeOfKey } from './modes';
   import { browseHistory } from './history';
-  import { serverLook } from './server-look';
   import { DEFAULT_ANCHOR, anchorBox, isAnchor, nearestAnchor, nextAnchor, type Anchor } from './anchors';
   import { PRESETS, SIZES, Size, fitOf, sizeForKey, snapped } from './sizes';
 
   const SETTLE_MS = 1200;
-  const BAR_PX = 260;
+  const BAR_DEFAULT_PX = 300;
+  const BAR_MIN_PX = 240;
+  const BAR_MAX_SHARE = 0.5;
 
   let url = $state('');
   let start = $state('');
@@ -31,6 +44,7 @@
   let styling = $state(Styling.Tailwind);
   let server = $state(ServerState.Detecting);
   let serverReason = $state('');
+  let serverInfo = $state<ServerInfo | null>(null);
   let bridged = $state(false);
   let mode = $state(Mode.Design);
   let editing = $state(false);
@@ -46,6 +60,87 @@
   let stage = $state({ w: 0, h: 0 });
   let dragging = $state<{ x: number; width: number; side: number } | null>(null);
   let navTick = $state(0);
+  let barWidth = $state(BAR_DEFAULT_PX);
+  let viewW = $state(0);
+  let sizing = $state<{ x: number; width: number } | null>(null);
+  const barPx = $derived(barClosed ? 0 : Math.round(Math.min(Math.max(barWidth, BAR_MIN_PX), Math.max(BAR_MIN_PX, viewW * BAR_MAX_SHARE))));
+
+  function grabEdge(e: PointerEvent) {
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    sizing = { x: e.clientX, width: barPx };
+  }
+
+  function dragEdge(e: PointerEvent) {
+    if (sizing) {
+      barWidth = sizing.width + (sizing.x - e.clientX);
+    }
+  }
+
+  function dropEdge() {
+    if (sizing) {
+      sizing = null;
+      barWidth = barPx;
+      savePrefs();
+    }
+  }
+  let hint = $state<Hint | null>(null);
+  let drag = $state<{ x: number; y: number; active: boolean } | null>(null);
+  let drop = $state<Drop | null>(null);
+
+  let tab = $state(Tab.Properties);
+  let layers = $state<LayerNode[]>([]);
+  let changes = $state<ChangeRow[]>([]);
+  let canUndo = $state(false);
+  let canRedo = $state(false);
+  let scope = $state(Scope.Element);
+  let layersOpen = $state<Record<string, boolean>>({});
+  const layerDrag = $state<{ source: Source | null }>({ source: null });
+
+  async function hoverLayer(source: Source | null) {
+    hover = source ? await bridge.again(source) : null;
+  }
+
+  $effect(() => {
+    if (!picked) {
+      return;
+    }
+    for (const a of picked.ancestors) {
+      layersOpen[sourceText(a.source)] = true;
+    }
+    const id = sourceText(picked.source);
+    queueMicrotask(() => document.querySelector(`[data-layer="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'nearest' }));
+  });
+
+  const LEFT_DEFAULT_PX = 260;
+  let leftWidth = $state(LEFT_DEFAULT_PX);
+  let leftClosed = $state(false);
+  let leftSizing = $state<{ x: number; width: number } | null>(null);
+  const leftPx = $derived(leftClosed ? 0 : Math.round(Math.min(Math.max(leftWidth, BAR_MIN_PX), Math.max(BAR_MIN_PX, viewW * BAR_MAX_SHARE))));
+  const layerFlags = layerState({});
+  let flagTick = $state(0);
+  const hiddenNow = $derived((flagTick, new Set(layerFlags.of(route).hidden)));
+  const lockedNow = $derived((flagTick, new Set(layerFlags.of(route).locked)));
+
+  const shownDisplay = new Map<string, string>();
+
+  async function setHidden(source: Source, hide: boolean) {
+    const key = sourceText(source);
+    if (hide) {
+      const now = await bridge.again(source);
+      shownDisplay.set(key, now?.styles.display || 'block');
+    }
+    const display = hide ? 'none' : (shownDisplay.get(key) ?? 'block');
+    toHost({ kind: ToHost.Edit, ask: { at: key, prop: LiveProp.Class, family: ClassFamily.Hidden, value: hide ? 'hidden' : '', css: { display }, scope } });
+  }
+
+  function toggleFlag(flag: LayerFlag, source: Source) {
+    const on = layerFlags.toggle(flag, route, sourceText(source));
+    if (flag === 'hidden') {
+      setHidden(source, on);
+    }
+    flagTick++;
+    savePrefs();
+  }
   let anchor = $state<Anchor>(DEFAULT_ANCHOR);
   let bar = $state({ w: 0, h: 0 });
   let toolbarH = $state(0);
@@ -56,9 +151,8 @@
   const history = browseHistory();
   let savedPrefs = false;
   const fit = $derived(fitOf(size, custom, stage));
-  const area = $derived({ x: 0, y: toolbarH, w: stage.w, h: stage.h });
+  const area = $derived({ x: leftPx, y: toolbarH, w: stage.w, h: stage.h });
   const barAt = $derived(moving ? { x: moving.x, y: moving.y } : anchorBox(anchor, area, bar));
-  const look = $derived(serverLook(server));
   const canBack = $derived((navTick, history.canBack()));
   const canForward = $derived((navTick, history.canForward()));
 
@@ -68,9 +162,11 @@
       server = ServerState.Running;
       visited(path);
       bridge.mode(mode);
+      bridge.tree();
       refresh();
     },
-    moved: visited,
+    moved: (path) => (visited(path), bridge.tree()),
+    tree: (tree) => (layers = tree),
     scrolled: () => {
       hover = null;
       refresh();
@@ -78,6 +174,7 @@
     settled: (_source, unapplied) => {
       warning = unapplied.length ? `Saved, but ${unapplied.join(', ')} has no effect on this page` : '';
       refresh();
+      bridge.tree();
     },
     text: (source, text) => {
       editing = false;
@@ -109,7 +206,7 @@
   }
 
   function savePrefs() {
-    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor } });
+    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor, barWidth, leftWidth, leftClosed, layers: layerFlags.saved() } });
   }
 
   function restore(prefs: Prefs | null) {
@@ -122,10 +219,19 @@
     barClosed = prefs.barClosed;
     route = prefs.route ?? route;
     anchor = isAnchor(prefs.anchor) ? prefs.anchor : anchor;
+    barWidth = prefs.barWidth ?? barWidth;
+    leftWidth = prefs.leftWidth ?? leftWidth;
+    leftClosed = prefs.leftClosed ?? leftClosed;
+    for (const [r, flags] of Object.entries((prefs.layers ?? {}) as SavedLayers)) {
+      flags.hidden.forEach((k) => layerFlags.toggle('hidden', r, k));
+      flags.locked.forEach((k) => layerFlags.toggle('locked', r, k));
+    }
+    flagTick++;
   }
 
   const handlers: { [K in ToView]: (m: Extract<ViewMessage, { kind: K }>) => void } = {
     [ToView.App]: (m) => (restore(m.prefs), (start = new URL(route, m.url).toString()), (url = m.url), (styling = m.styling)),
+    [ToView.History]: (m) => ((changes = m.changes), (canUndo = m.canUndo), (canRedo = m.canRedo)),
     [ToView.Settings]: (m) => {
       settings = m.values;
       facts = m.facts;
@@ -134,7 +240,7 @@
         size = preset;
       }
     },
-    [ToView.Server]: (m) => ((server = m.state), (serverReason = m.reason ?? '')),
+    [ToView.Server]: (m) => ((server = m.state), (serverReason = m.reason ?? ''), (serverInfo = m.info ?? serverInfo)),
     [ToView.Status]: (m) => (problem = { text: m.text }),
     [ToView.Edited]: (m) => {
       if (!m.ok) {
@@ -184,7 +290,7 @@
     }
     hovering = true;
     const { x, y } = pagePoint(e);
-    bridge.at(x, y).then((p) => ((hover = p), (hovering = false)));
+    bridge.at(x, y).then((p) => ((hover = p && passThrough(p, lockedNow) && sourceText(passThrough(p, lockedNow)!) === sourceText(p.source) ? p : null), (hovering = false)));
   }
 
   function grabBar(e: PointerEvent) {
@@ -217,9 +323,50 @@
     }
   }
 
+  const DRAG_SLOP_PX = 6;
+
+  const inside = (p: { x: number; y: number }, r: Pick['rect']) => p.x >= r.x && p.x <= r.x + r.width && p.y >= r.y && p.y <= r.y + r.height;
+
+  function pressOverlay(e: PointerEvent) {
+    const at = pagePoint(e);
+    if (picked && inside(at, picked.rect)) {
+      drag = { ...at, active: false };
+    }
+  }
+
+  async function dragOverlay(e: PointerEvent) {
+    if (!drag || !picked) {
+      onMove(e);
+      return;
+    }
+    const at = pagePoint(e);
+    if (!drag.active && Math.hypot(at.x - drag.x, at.y - drag.y) < DRAG_SLOP_PX) {
+      return;
+    }
+    drag = { ...drag, active: true };
+    const target = await bridge.at(at.x, at.y);
+    drop = target ? dropOf(picked, target, at) : null;
+  }
+
+  function releaseOverlay() {
+    const done = drag?.active ? drop : null;
+    const wasDrag = drag?.active ?? false;
+    drag = null;
+    drop = null;
+    if (done && picked) {
+      toHost({ kind: ToHost.Move, from: sourceText(picked.source), to: sourceText(done.target), place: done.place });
+    }
+    return wasDrag;
+  }
+
   async function onPick(e: MouseEvent) {
+    if (releaseOverlay()) {
+      return;
+    }
     const { x, y } = pagePoint(e);
-    picked = await bridge.at(x, y);
+    const hit = await bridge.at(x, y);
+    const target = hit ? passThrough(hit, lockedNow) : null;
+    picked = target && hit && sourceText(target) !== sourceText(hit.source) ? await bridge.again(target) : target ? hit : null;
   }
 
   function onDouble(e: MouseEvent) {
@@ -243,7 +390,7 @@
     }
     preview(row, value);
     const { prop, side, family, value: written } = row.change(value);
-    toHost({ kind: ToHost.Edit, ask: { at: sourceText(picked.source), prop, side, family, value: written, rem: picked.rem, viewport: picked.viewport, css: kebab(row.preview(value)) } });
+    toHost({ kind: ToHost.Edit, ask: { at: sourceText(picked.source), prop, side, family, value: written, rem: picked.rem, viewport: picked.viewport, css: kebab(row.preview(value)), scope } });
   }
 
   function pickSize(next: Size) {
@@ -256,7 +403,7 @@
     dragging = { x: e.clientX, width: fit.width, side };
   }
 
-  function drag(e: PointerEvent) {
+  function resizeFrame(e: PointerEvent) {
     if (!dragging) {
       return;
     }
@@ -303,15 +450,18 @@
       return;
     }
     const shortcuts: Record<string, () => void> = {
-      z: () => toHost({ kind: ToHost.Undo }),
-      '\\': toggleBar,
+      z: () => toHost({ kind: e.shiftKey ? ToHost.Redo : ToHost.Undo }),
+      '\\': () => (e.shiftKey ? ((leftClosed = !leftClosed), savePrefs()) : toggleBar()),
+      '|': () => ((leftClosed = !leftClosed), savePrefs()),
+      h: () => e.shiftKey && picked && toggleFlag('hidden', picked.source),
+      l: () => e.shiftKey && picked && toggleFlag('locked', picked.source),
       '[': () => go(history.back()),
       ']': () => go(history.forward()),
       r: () => go(route)
     };
-    if (cmd && shortcuts[e.key] && !(e.key === 'z' && (e.shiftKey || typing(e)))) {
+    if (cmd && shortcuts[e.key.toLowerCase()] && !(e.key.toLowerCase() === 'z' && typing(e))) {
       e.preventDefault();
-      shortcuts[e.key]();
+      shortcuts[e.key.toLowerCase()]();
       return;
     }
     if (cmd || typing(e)) {
@@ -334,17 +484,24 @@
 
 <svelte:window onkeydown={onKey} />
 
-<main style={`grid-template-columns: 1fr ${barClosed ? 0 : BAR_PX}px; --bar: ${barClosed ? 0 : BAR_PX}px`}>
+<main bind:clientWidth={viewW} style={`grid-template-columns: ${leftPx}px minmax(0, 1fr) ${barPx}px; --bar: ${barPx}px; --left: ${leftPx}px`} class:sizing={sizing || leftSizing}>
+  <aside class="left" class:closed={leftClosed}>
+    <header class="left-head">Layers</header>
+    <div class="layers" role="tree" aria-label="Layers" data-testid="layers">
+      <LayersTree nodes={layers} {picked} open={layersOpen} onselect={select} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={(from, to, place) => toHost({ kind: ToHost.Move, from: sourceText(from), to: sourceText(to), place })} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} />
+    </div>
+    {#if !leftClosed}<span class="edge-right" role="separator" aria-orientation="vertical" aria-label="Resize Layers" title="Drag to resize, double-click to reset" onpointerdown={(e) => ((e.currentTarget as HTMLElement).setPointerCapture(e.pointerId), (leftSizing = { x: e.clientX, width: leftPx }))} onpointermove={(e) => leftSizing && (leftWidth = leftSizing.width + (e.clientX - leftSizing.x))} onpointerup={() => leftSizing && ((leftSizing = null), (leftWidth = leftPx), savePrefs())} ondblclick={() => ((leftWidth = LEFT_DEFAULT_PX), savePrefs())}></span>{/if}
+  </aside>
   <section class="view">
     <header class="toolbar" bind:clientHeight={toolbarH}>
       <FeegaMenu values={settings} {facts} onsetting={(key, value) => toHost({ kind: ToHost.Setting, key, value })} onlink={(link) => toHost({ kind: ToHost.External, url: link })} />
+      <button type="button" class="icon" class:on={!leftClosed} title="Layers (⇧⌘\)" aria-label="Toggle Layers" data-testid="left-toggle" onclick={() => ((leftClosed = !leftClosed), savePrefs())}><PanelLeft size={15} /></button>
       <button type="button" class="icon" title="Back (⌘[)" disabled={!canBack} onclick={() => go(history.back())}><ArrowLeft size={15} /></button>
       <button type="button" class="icon" title="Forward (⌘])" disabled={!canForward} onclick={() => go(history.forward())}><ArrowRight size={15} /></button>
       <button type="button" class="icon" title="Reload (⌘R)" onclick={() => go(route)}><RotateCw size={14} /></button>
       <form class="address" onsubmit={(e) => (e.preventDefault(), go(address))}>
-        <span class="dot {look.dot}" title={serverReason || look.label} data-testid="server-dot" data-state={server}></span>
+        <ServerPopover state={server} reason={serverReason} info={serverInfo} onopen={(link) => toHost({ kind: ToHost.External, url: link })} onaction={(action) => (action === ServerAction.ReloadPage ? go(route) : toHost({ kind: ToHost.Server, action }))} />
         <input bind:value={address} aria-label="Route" data-testid="address" spellcheck="false" />
-        {#if look.action && server === ServerState.Stopped}<button type="button" class="action" onclick={() => toHost({ kind: ToHost.Restart })}>{look.action}</button>{/if}
       </form>
       <select class="device" value={size} onchange={(e) => pickSize(e.currentTarget.value as Size)} aria-label="Device" data-testid="device">
         {#each PRESETS as preset (preset)}<option value={preset}>{SIZES[preset].label}{SIZES[preset].width ? ` ${SIZES[preset].width}` : ''}{SIZES[preset].key ? ` (${SIZES[preset].key})` : ''}</option>{/each}
@@ -356,13 +513,15 @@
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
     </header>
 
-    <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={drag} onpointerup={endDrag}>
+    <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={resizeFrame} onpointerup={endDrag}>
       <div class="frame" class:framed={size !== Size.Full} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px`}>
         {#if url}<iframe bind:this={frame} src={start} title="App" data-testid="app-frame" style={`width:${fit.width}px;height:${fit.height}px;transform:scale(${fit.scale})`}></iframe>{/if}
         {#if mode === Mode.Design && bridged && !editing}
-          <div class="overlay" role="presentation" onpointermove={onMove} onpointerleave={() => (hover = null)} onclick={onPick} ondblclick={onDouble} onwheel={(e) => bridge.scroll(e.deltaX / fit.scale, e.deltaY / fit.scale)}>
+          <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={dragOverlay} onpointerleave={() => (hover = null)} onclick={onPick} ondblclick={onDouble} onwheel={(e) => bridge.scroll(e.deltaX / fit.scale, e.deltaY / fit.scale)}>
             {#if hover}<div class="outline hover" style={box(hover)}></div>{/if}
-            {#if picked}<div class="outline picked" style={box(picked)}><span class="label"><Breadcrumb pick={picked} onselect={select} compact /></span></div>{/if}
+            {#if drop}<div class="drop-line" style={`left:${drop.line.x * fit.scale - 1}px;top:${drop.line.y * fit.scale - 1}px;width:${Math.max(2, drop.line.w * fit.scale)}px;height:${Math.max(2, drop.line.h * fit.scale)}px`}></div>{/if}
+          {#if picked && hint}{#each hintBoxes(picked, hint) as area, i (i)}<div class="hint {hint.group}" style={`left:${area.x * fit.scale}px;top:${area.y * fit.scale}px;width:${area.w * fit.scale}px;height:${area.h * fit.scale}px`}></div>{/each}{/if}
+          {#if picked}<div class="outline picked" style={box(picked)}><span class="label"><Breadcrumb pick={picked} onselect={select} compact /></span></div>{/if}
           </div>
         {/if}
         {#if size !== Size.Full}
@@ -377,7 +536,8 @@
           <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true">{#each [0, 1, 2] as row (row)}{#each [0, 1] as col (col)}<circle cx={2 + col * 4} cy={2 + row * 4} r="1.1" fill="currentColor" />{/each}{/each}</svg>
         </button>
         <ModeSwitch {mode} onmode={setMode} />
-        <button type="button" class="icon" title="Undo (⌘Z)" onclick={() => toHost({ kind: ToHost.Undo })}><Undo2 size={14} /></button>
+        <button type="button" class="icon" title="Undo (⌘Z)" disabled={!canUndo} onclick={() => toHost({ kind: ToHost.Undo })}><Undo2 size={14} /></button>
+        <button type="button" class="icon" title="Redo (⇧⌘Z)" disabled={!canRedo} onclick={() => toHost({ kind: ToHost.Redo })}><Redo2 size={14} /></button>
       </div>
 
       {#if barClosed && picked}
@@ -399,23 +559,40 @@
   </section>
 
   <aside class="right" class:closed={barClosed}>
-    {#if picked}
-      <div class="what" data-testid="selection">
-        <Breadcrumb pick={picked} onselect={select} />
-        {#if picked.component}<span class="component">in {picked.component.file.split('/').pop()}</span>{/if}
-        <button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file}:{picked.source.line}</button>
-        <code class="classes">{picked.classes || 'no classes'}</code>
-      </div>
-      <Properties pick={picked} onpreview={preview} onchange={change} />
-    {:else}
-      <p class="empty">{bridged ? 'Click an element to edit it. Double-click text to rewrite it.' : 'The page has no Feega source map: element picking needs the feega-source-map plugin.'}</p>
-    {/if}
+    {#if !barClosed}<span class="edge" role="separator" aria-orientation="vertical" aria-label="Resize Properties" title="Drag to resize, double-click to reset" onpointerdown={grabEdge} onpointermove={dragEdge} onpointerup={dropEdge} ondblclick={() => ((barWidth = BAR_DEFAULT_PX), savePrefs())}></span>{/if}
+    <Tabs.Root bind:value={tab} class="tabs">
+      <Tabs.List class="tab-list">
+        <Tabs.Trigger value={Tab.Properties} class="tab">Properties</Tabs.Trigger>
+        <Tabs.Trigger value={Tab.Changes} class="tab" data-testid="changes-tab">Changes{changes.length ? ` ${changes.length}` : ''}</Tabs.Trigger>
+      </Tabs.List>
+      <Tabs.Content value={Tab.Properties}>
+        {#if picked}
+          <div class="what" data-testid="selection">
+            <Breadcrumb pick={picked} onselect={select} />
+            {#if picked.component}<span class="component">in {picked.component.file.split('/').pop()}</span>{/if}
+            <button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file}:{picked.source.line}</button>
+            <code class="classes">{picked.classes || 'no classes'}</code>
+          </div>
+          <div class="scope" role="radiogroup" aria-label="Edit scope" data-testid="scope">
+            <button type="button" class:on={scope === Scope.Element} onclick={() => (scope = Scope.Element)} title="Only this element (every instance of its component: {picked.instances})">This element{picked.instances > 1 ? ` ×${picked.instances}` : ''}</button>
+            <button type="button" class:on={scope === Scope.Class} disabled={!picked.classCount || styling === Styling.Tailwind} onclick={() => (scope = Scope.Class)} title={styling === Styling.Tailwind ? 'Class scope needs CSS rules, not Tailwind' : `Every element with this class: ${picked.classCount}`}>All .{picked.classes.split(' ')[0] || 'class'}{picked.classCount ? ` (${picked.classCount})` : ''}</button>
+          </div>
+          <Properties pick={picked} onpreview={preview} onchange={change} onhint={(h) => (hint = h)} />
+        {:else}
+          <p class="empty">{bridged ? 'Click an element to edit it. Double-click text to rewrite it.' : 'The page has no Feega source map: element picking needs the feega-source-map plugin.'}</p>
+        {/if}
+      </Tabs.Content>
+      <Tabs.Content value={Tab.Changes}>
+        <ChangesList {changes} onselect={select} ondiff={(id) => toHost({ kind: ToHost.Diff, id })} onrevert={(id) => toHost({ kind: ToHost.Revert, id })} onrevertall={() => toHost({ kind: ToHost.Revert, id: null })} onscm={() => toHost({ kind: ToHost.SourceControl })} />
+      </Tabs.Content>
+    </Tabs.Root>
   </aside>
 </main>
 
 <style>
   main {
     --float-gap: 16px;
+    --top-row: 40px;
     display: grid;
     height: 100vh;
     overflow: hidden;
@@ -433,7 +610,8 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    height: 40px;
+    height: var(--top-row);
+    box-sizing: border-box;
     padding: 0 var(--ui-space-2);
     border-bottom: 1px solid var(--ui-divider);
     background: var(--ui-panel);
@@ -579,6 +757,25 @@
     outline: 2px solid var(--ui-accent);
   }
 
+  .drop-line {
+    position: absolute;
+    background: var(--ui-accent);
+    pointer-events: none;
+  }
+
+  .hint {
+    position: absolute;
+    pointer-events: none;
+  }
+
+  .hint.padding {
+    background: rgb(48 209 88 / 0.35);
+  }
+
+  .hint.margin {
+    background: rgb(255 159 10 / 0.35);
+  }
+
   .picked .label {
     position: absolute;
     top: -18px;
@@ -711,7 +908,129 @@
     color: #ff9f0a;
   }
 
+  .right :global(.tab-list) {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    box-sizing: border-box;
+    height: var(--top-row);
+    padding: 0 8px;
+    border-bottom: 1px solid var(--ui-divider);
+  }
+
+  .right :global(.tab) {
+    height: 26px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: none;
+    color: var(--ui-text-2);
+    font: inherit;
+    font-size: var(--ui-text-sm);
+    cursor: pointer;
+  }
+
+  .right :global(.tab[data-state='active']) {
+    background: var(--ui-input);
+    color: var(--ui-text);
+  }
+
+  .scope {
+    display: flex;
+    gap: 2px;
+    margin: 8px 12px 0;
+    padding: 2px;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-input);
+  }
+
+  .scope button {
+    flex: 1;
+    height: 24px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: none;
+    color: var(--ui-text-2);
+    font: inherit;
+    font-size: var(--ui-text-xs);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .scope button.on {
+    background: var(--ui-thumb);
+    color: var(--ui-thumb-ink);
+  }
+
+  .scope button:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  .layers {
+    padding: 4px 0;
+  }
+
+  main.sizing {
+    transition: none;
+    cursor: col-resize;
+  }
+
+  .edge {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -2px;
+    z-index: 6;
+    width: 4px;
+    cursor: col-resize;
+  }
+
+  .edge:hover {
+    background: var(--ui-accent);
+  }
+
+  .left {
+    position: relative;
+    min-width: 0;
+    overflow: hidden auto;
+    border-right: 1px solid var(--ui-divider);
+    background: var(--ui-panel);
+  }
+
+  .left.closed {
+    border: 0;
+  }
+
+  .left-head {
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    height: var(--top-row);
+    padding: 0 12px;
+    border-bottom: 1px solid var(--ui-divider);
+    color: var(--ui-text-2);
+    font-size: var(--ui-text-xs);
+    font-weight: 600;
+  }
+
+  .edge-right {
+    position: absolute;
+    top: 0;
+    right: -2px;
+    bottom: 0;
+    z-index: 6;
+    width: 4px;
+    cursor: col-resize;
+  }
+
+  .edge-right:hover {
+    background: var(--ui-accent);
+  }
+
   .right {
+    position: relative;
+    min-width: 0;
     overflow: hidden auto;
     border-left: 1px solid var(--ui-divider);
     background: var(--ui-panel);
