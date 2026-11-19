@@ -59,7 +59,7 @@
 
   const byName = (name: string) => ROWS.find((r) => r.name === name)!;
   const num = (name: string) => byName(name) as NumberRow;
-  const sections = $derived(sectionsOf(roleOf({ tag: pick.tag, ownText: pick.ownText, elements: pick.elements, display: pick.styles.display ?? '' })));
+  const sections = $derived(sectionsOf(roleOf({ tag: pick.tag, ownText: pick.ownText, inlineText: pick.inlineText, elements: pick.elements, display: pick.styles.display ?? '' })));
   const has = (s: Section) => sections.includes(s);
   const context = $derived({ rem: pick.rem, em: parseFloat(pick.styles['font-size'] ?? '16') || 16, parent: pick.parentWidth, viewport: { w: pick.viewport, h: window.innerHeight } });
   const groupRows = (group: Group) => ROWS.filter((r) => r.group === group && r.mode === modes[group]) as NumberRow[];

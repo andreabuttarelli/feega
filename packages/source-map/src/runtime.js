@@ -46,9 +46,17 @@ export function inspectElement(element, { maxHtml = DEFAULT_MAX_HTML } = {}) {
     ancestors: ancestorsOf(tagged),
     ownText: [...tagged.childNodes].some((n) => n.nodeType === TEXT_NODE && n.textContent.trim()),
     elements: tagged.children.length,
+    inlineText: inlineTextOnly(tagged),
     rem: rootFontSize(tagged.ownerDocument),
     viewport: tagged.ownerDocument.defaultView.innerWidth
   };
+}
+
+const INLINE_TEXT = new Set(['SPAN', 'STRONG', 'EM', 'B', 'I', 'A', 'BR', 'CODE', 'SMALL', 'MARK', 'SUB', 'SUP', 'U', 'S']);
+
+function inlineTextOnly(el) {
+  const all = [...el.querySelectorAll('*')];
+  return all.length > 0 && all.every((d) => INLINE_TEXT.has(d.tagName.toUpperCase())) && Boolean(el.textContent.trim());
 }
 
 function rootFontSize(doc) {

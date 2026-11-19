@@ -79,7 +79,7 @@ describe('fileEdits', () => {
   it('il testo da un espressione si rifiuta e dice dove sta', async () => {
     const out = await fileEdits(app()).edit({ at: 'src/Page.svelte:3:3', prop: LiveProp.Text, value: 'x' });
 
-    expect(out).toEqual({ ok: false, reason: 'the text comes from {subtitle}', at: { file: 'src/Page.svelte', line: 3, col: 6 } });
+    expect(out).toEqual({ ok: false, reason: 'This text comes from `{subtitle}`.', at: { file: 'src/Page.svelte', line: 3, col: 6 } });
   });
 
   it('senza Tailwind scrive una regola nello <style> del componente, non uno style inline', async () => {

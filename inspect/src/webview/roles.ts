@@ -8,12 +8,12 @@ export enum Role {
   Head = 'head'
 }
 
-export type Element = { tag: string; ownText: boolean; elements: number; display: string };
+export type Element = { tag: string; ownText: boolean; elements: number; display: string; inlineText: boolean };
 
 const HEAD = new Set(['head', 'title', 'meta', 'link', 'script', 'style', 'base', 'noscript']);
 const MEDIA = new Set(['img', 'svg', 'video', 'canvas', 'picture', 'iframe']);
 const INPUTS = new Set(['input', 'textarea', 'select']);
-const TEXT_TAGS = new Set(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'a', 'button', 'label', 'li', 'strong', 'em', 'b', 'i', 'small', 'code', 'blockquote']);
+const TEXT_TAGS = new Set(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'a', 'button', 'label', 'li', 'strong', 'em', 'b', 'i', 'small', 'code', 'blockquote', 'figcaption', 'dt', 'dd', 'caption', 'legend', 'summary', 'cite', 'q']);
 const LAID_OUT = /^(inline-)?(flex|grid)$/;
 
 const SECTIONS: Record<Role, Section[]> = {
@@ -24,7 +24,7 @@ const SECTIONS: Record<Role, Section[]> = {
   [Role.Head]: []
 };
 
-export function roleOf({ tag, ownText, elements, display }: Element): Role {
+export function roleOf({ tag, ownText, elements, display, inlineText }: Element): Role {
   const name = tag.toLowerCase();
   if (HEAD.has(name)) {
     return Role.Head;
@@ -38,7 +38,7 @@ export function roleOf({ tag, ownText, elements, display }: Element): Role {
   if (LAID_OUT.test(display) && elements > 0) {
     return Role.Container;
   }
-  return ownText || (TEXT_TAGS.has(name) && elements === 0) ? Role.Text : Role.Container;
+  return ownText || inlineText || TEXT_TAGS.has(name) ? Role.Text : Role.Container;
 }
 
 export const sectionsOf = (role: Role): Section[] => SECTIONS[role];

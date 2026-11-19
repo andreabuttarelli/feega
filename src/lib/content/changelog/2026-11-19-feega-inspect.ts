@@ -10,6 +10,7 @@ export default {
     'Switch between Design and Navigate, move through your routes, and preview at desktop, tablet or phone width.',
     'Inspect reuses a dev server you already started only when it belongs to the open project.',
     '"This element" now changes only the selected element, even when it shares a class with others.',
-    'Open in editor jumps to the exact line, and text that comes from data points at where the data is defined.'
+    'Open in editor jumps to the exact line, and text that comes from data points at where the data is defined.',
+    'Headings and paragraphs that wrap styled spans now show Typography.'
   ]
 } satisfies ChangelogEntry;

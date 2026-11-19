@@ -24,6 +24,17 @@ describe('hidden in the preview only', () => {
 });
 
 describe('what the element is', () => {
+  it('an element holding only inline text elements carries inline text', () => {
+    const doc = domOf().document;
+    const box = doc.createElement('div');
+    box.innerHTML = '<span>Ship</span> <strong>fast<br><em>now</em></strong>';
+    box.setAttribute('data-feega-src', 'src/A.svelte:1:1');
+    doc.body.append(box);
+
+    expect(inspectElement(box)!.inlineText).toBe(true);
+    expect(inspectElement(doc.querySelector('section')!)!.inlineText).toBe(false);
+  });
+
   it('a heading has its own text and no element children', () => {
     const info = inspectElement(domOf().document.querySelector('h1')!)!;
 

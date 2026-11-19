@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Section } from './controls';
 import { Role, roleOf, sectionsOf } from './roles';
 
-const element = (tag: string, ownText: boolean, elements: number, display = 'block') => ({ tag, ownText, elements, display });
+const element = (tag: string, ownText: boolean, elements: number, display = 'block', inlineText = false) => ({ tag, ownText, elements, display, inlineText });
 
 describe('roleOf', () => {
   it('a section with element children is a container', () => {
@@ -17,8 +17,16 @@ describe('roleOf', () => {
     expect(roleOf(element('h1', false, 0))).toBe(Role.Text);
   });
 
-  it('a heading wrapping spans is a container of text', () => {
-    expect(roleOf(element('h1', false, 2))).toBe(Role.Container);
+  it('a heading wrapping spans is text, by its tag', () => {
+    expect(roleOf(element('h1', false, 2))).toBe(Role.Text);
+  });
+
+  it('a div holding only inline text elements is text', () => {
+    expect(roleOf(element('div', false, 2, 'block', true))).toBe(Role.Text);
+  });
+
+  it('a div with block children is a container', () => {
+    expect(roleOf(element('div', false, 2))).toBe(Role.Container);
   });
 
   it('img, svg and video are media', () => {

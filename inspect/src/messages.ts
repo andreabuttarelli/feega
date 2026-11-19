@@ -17,6 +17,7 @@ export type Pick = {
   rem: number;
   viewport: number;
   ownText: boolean;
+  inlineText: boolean;
   elements: number;
   name: string;
   parentWidth: number;

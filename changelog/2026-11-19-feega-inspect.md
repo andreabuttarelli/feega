@@ -73,3 +73,6 @@ edit inline until reload); the colour control is a native picker, not the app's 
   Changes rows get an Open link. Text from data names the definition:
   "This text comes from data: `AGENT_LOGOS` (home.ts:12)." (`data-source.ts`: same-file
   declaration or relative named import).
+- **Typography on wrappers.** `h1 > span + span` had no Typography: the role table called any
+  element with children a container. Text tags are text by tag now, and an element whose
+  descendants are only inline text elements (`inlineText` from the runtime) is text too.
