@@ -149,25 +149,54 @@ function packJob(tables: Tables, storage: Blobs, place: LocalPlace, acp: AcpChoi
   return { manifest: { format: 'feega', version: FEEGA_VERSION, exportedAt: new Date().toISOString(), canvasName: name, source: place, ...acp }, body, assets };
 }
 
-function snapshot(job: PackJob): Uint8Array {
+export function jobFile(job: PackJob): { file: FeegaFile; blobs: FeegaBlobs } {
   const referenced = new Set(idsIn(job.body));
   const kept = job.assets.filter((a) => a.always || referenced.has(a.row.id.toLowerCase()));
   const blobs: FeegaBlobs = new Map(kept.flatMap((a) => (a.row.file && a.bytes ? [[a.row.file, a.bytes] as const] : [])));
-  return packFeega({ manifest: job.manifest, canvas: { ...job.body, assets: kept.map((a) => a.row) } }, blobs);
+  return { file: { manifest: job.manifest, canvas: { ...job.body, assets: kept.map((a) => a.row) } }, blobs };
+}
+
+const snapshot = (job: PackJob): Uint8Array => {
+  const { file, blobs } = jobFile(job);
+  return packFeega(file, blobs);
+};
+
+export type Opened = { file: FeegaFile; blobs: FeegaBlobs; fresh: boolean };
+
+export type Persistence = {
+  opened: Opened;
+  write(job: PackJob): Promise<void>;
+  writeNow(job: PackJob): void;
+  stop(): void;
+};
+
+function filePersistence(path: string): Persistence {
+  const fresh = !existsSync(path);
+  const opened = { ...readFile(path), fresh };
+  rmSync(savingPath(path), { force: true });
+  const packer = createPacker();
+
+  return {
+    opened,
+    write: async (job) => {
+      await packer.write(path, job);
+    },
+    writeNow: (job) => writeAtomicallyNow(path, snapshot(job)),
+    stop: () => void packer.stop()
+  };
 }
 
 export type FeegaStoreOptions = { origin: string; saveDelayMs?: number; latencyMs?: number };
 
 export function openFeegaStore(path: string, options: FeegaStoreOptions) {
-  const { file, blobs } = readFile(path);
-  rmSync(savingPath(path), { force: true });
+  const persistence = filePersistence(path);
+  const { file, blobs } = persistence.opened;
   const { tables, storage, place } = seed(file, blobs);
   const listeners = new Set<(change: Change) => void>();
   let timer: ReturnType<typeof setTimeout> | null = null;
-  let dirty = !existsSync(path);
+  let dirty = persistence.opened.fresh;
   let saving: Promise<void> = Promise.resolve();
   const acp: AcpChoice = { acpAgent: file.manifest.acpAgent ?? null, acpModels: { ...file.manifest.acpModels }, acpEfforts: { ...file.manifest.acpEfforts } };
-  const packer = createPacker();
 
   const write = async () => {
     if (!dirty) {
@@ -175,7 +204,7 @@ export function openFeegaStore(path: string, options: FeegaStoreOptions) {
     }
     dirty = false;
     try {
-      await packer.write(path, packJob(tables, storage, place, acp));
+      await persistence.write(packJob(tables, storage, place, acp));
     } catch (error) {
       dirty = true;
       console.error(`feega local: could not save ${path}`, error);
@@ -247,10 +276,10 @@ export function openFeegaStore(path: string, options: FeegaStoreOptions) {
         clearTimeout(timer);
         timer = null;
       }
-      void packer.stop();
+      persistence.stop();
       if (dirty) {
         dirty = false;
-        writeAtomicallyNow(path, snapshot(packJob(tables, storage, place, acp)));
+        persistence.writeNow(packJob(tables, storage, place, acp));
       }
     }
   };
