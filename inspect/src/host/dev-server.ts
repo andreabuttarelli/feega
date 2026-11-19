@@ -45,7 +45,6 @@ export enum Attach {
 }
 
 const HOST = '127.0.0.1';
-const SOURCE_ATTR = 'data-feega-src';
 const LAUNCHER_DIR = 'node_modules/.feega-inspect';
 const LAUNCHER = 'launch.mjs';
 const NEXT_PRELOAD = 'next-preload.cjs';
@@ -208,7 +207,7 @@ async function pageOf(url: string): Promise<string | null> {
 }
 
 const ATTACHABLE: Record<Launch, (page: string) => boolean> = {
-  [Launch.Vite]: (page) => page.includes(SOURCE_ATTR),
+  [Launch.Vite]: () => true,
   [Launch.Next]: () => true,
   [Launch.Script]: () => true,
   [Launch.Command]: () => false

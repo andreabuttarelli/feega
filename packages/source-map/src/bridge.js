@@ -1,3 +1,4 @@
+import { stampSources } from './framework-meta.js';
 import { SOURCE_ATTR, deepestAt, clearPreview, hidePreview, paletteOf, relativeOf, treeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
 import { trackRects } from './track.js';
 import { keepScroll } from './reload-restore.js';
@@ -50,13 +51,17 @@ export function installBridge(win) {
     [HIDE]: (request) => hidePreview(doc, request.source, request.hidden),
     [LEAVE]: () => scroll.leave(),
     [TRACK]: (request) => tracker.follow(request.slot, request.source),
-    [TREE]: () => reply({ type: TREE_RESULT, tree: treeOf(doc) }),
+    [TREE]: () => {
+      stampSources(doc);
+      reply({ type: TREE_RESULT, tree: treeOf(doc) });
+    },
     [SCROLL]: (request) => {
       win.scrollBy(request.dx, request.dy);
       reply({ type: SCROLLED });
     },
     [TEXT_EDIT]: (request) => mode === Mode.Design && editText(win, targetOf(doc, request), request, reply),
     [INSPECT]: (request) => {
+      stampSources(doc);
       const target = targetOf(doc, request);
       reply({ type: INSPECT_RESULT, id: request.id, result: target ? inspectElement(target, { maxHtml: request.maxHtml }) : null });
     }
