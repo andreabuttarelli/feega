@@ -1,5 +1,7 @@
 import { SOURCE_ATTR } from './runtime.js';
 
+const FRAME_MS = 16;
+
 const sameRect = (a, b) => a && b && a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 
 export function trackRects(win, send) {
@@ -44,7 +46,7 @@ export function trackRects(win, send) {
       return;
     }
     queued = true;
-    win.requestAnimationFrame(measure);
+    (win.requestAnimationFrame ?? ((run) => win.setTimeout(run, FRAME_MS)))(measure);
   }
 
   new win.MutationObserver(() => (observeSizes(), schedule())).observe(doc.documentElement, { attributes: true, childList: true, characterData: true, subtree: true });
