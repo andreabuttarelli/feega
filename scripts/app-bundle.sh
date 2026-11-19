@@ -22,6 +22,7 @@ node -e '
   const out = { name: "feega-app", private: true, type: p.type, dependencies: p.dependencies, overrides: p.overrides };
   require("fs").writeFileSync(process.argv[2], JSON.stringify(out, null, 2));
 ' "$ROOT/package.json" "$STAGE/package.json"
+cp "$ROOT/package-lock.json" "$STAGE/package-lock.json"
 
 (cd "$STAGE" && npm install --package-lock-only --omit=dev --no-audit --no-fund --loglevel=error)
 tar -czf "$OUT/feega-app.tar.gz" -C "$STAGE" .

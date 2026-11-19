@@ -1,6 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { createHash, randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer as createHttpServer } from 'node:http';
 import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 
 const DEFAULT_FILE = 'canvas.feega';
 const DEFAULT_PORT = 0;
@@ -171,6 +176,110 @@ export function cachedVersions(home) {
   return readdirSync(root)
     .filter((v) => /^\d+\.\d+\.\d+$/.test(v) && isCached(join(root, v)))
     .sort(newestFirst);
+}
+
+export const warmStart = (cached) => (cached.length ? { version: cached[0], action: 'cache' } : { action: 'check' });
+
+export const newerRelease = (latest, cached) => (latest && !cached.includes(latest) && (!cached.length || newestFirst(latest, cached[0]) < 0) ? latest : null);
+
+export const compileCache = (home, env) => ({ NODE_COMPILE_CACHE: env.NODE_COMPILE_CACHE ?? join(home, '.feega', 'compile-cache') });
+
+const DEPS_KEY_LENGTH = 16;
+
+export const depsDir = (home, lockfile) => join(home, '.feega', 'deps', createHash('sha256').update(lockfile).digest('hex').slice(0, DEPS_KEY_LENGTH));
+
+export async function installAtomic(target, build) {
+  const tmp = `${target}.tmp-${process.pid}-${randomUUID()}`;
+  mkdirSync(tmp, { recursive: true });
+  try {
+    await build(tmp);
+    markCached(tmp);
+    if (!isCached(target)) {
+      rmSync(target, { recursive: true, force: true });
+    }
+    renameSync(tmp, target);
+  } catch (error) {
+    rmSync(tmp, { recursive: true, force: true });
+    if (!isCached(target)) {
+      throw error;
+    }
+  }
+}
+
+export const exited = (child) => new Promise((done, fail) => child.once('error', fail).once('exit', done));
+
+export async function extract(source, dir) {
+  if (!source.startsWith('http')) {
+    if ((await exited(spawn('tar', ['-xzf', source, '-C', dir], { stdio: 'ignore' }))) !== 0) {
+      throw new Error('could not extract the app bundle');
+    }
+
+    return;
+  }
+
+  const res = await fetch(source);
+  if (!res.ok) {
+    throw new Error(`download failed (${res.status}): ${source}`);
+  }
+
+  const untar = spawn('tar', ['-xzf', '-', '-C', dir], { stdio: ['pipe', 'ignore', 'ignore'] });
+  const [code] = await Promise.all([exited(untar), pipeline(Readable.fromWeb(res.body), untar.stdin)]);
+  if (code !== 0) {
+    throw new Error('could not extract the app bundle');
+  }
+}
+
+const LOADING_PAGE = `<!doctype html>
+<html><head><meta charset="utf-8"><title>feega</title>
+<style>
+:root{color-scheme:light dark;--bg:#fff;--fg:#141414;--muted:#6b6b6b}
+@media (prefers-color-scheme:dark){:root{--bg:#000;--fg:#f2f2f2;--muted:#9a9a9a}}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+svg{fill:#ff5100}
+b{font-size:40px;font-weight:600;letter-spacing:-.02em}
+p{margin:0;font-size:13px;color:var(--muted)}
+</style></head><body>
+<svg width="48" height="48" viewBox="0 0 300 300" aria-hidden="true">${[0, 90, 180, 270].map((a) => `<path d="M61.87 142.25A57 57 0 1 1 136.13 142.25A69.5 69.5 0 0 0 61.87 142.25Z" transform="rotate(${a} 150 150)"/>`).join('')}</svg>
+<b>feega</b><p id="step">starting…</p>
+<script>
+const STEPS = { start: 'starting…', download: 'downloading the app (once per version)…', install: 'installing its dependencies…' };
+const step = document.getElementById('step');
+const poll = async () => {
+  const s = await fetch('/status').then((r) => r.json(), () => ({ error: 'feega stopped: see the terminal' }));
+  if (s.url) {
+    location.replace(s.url);
+    return;
+  }
+  step.textContent = s.error ?? STEPS[s.step] ?? s.step;
+  if (!s.error) {
+    setTimeout(poll, 50);
+  }
+};
+poll();
+</script></body></html>`;
+
+export async function loadingServer() {
+  let status = { step: 'start' };
+  const server = createHttpServer((req, res) => {
+    if (req.url === '/status') {
+      res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(status));
+      return;
+    }
+
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(LOADING_PAGE);
+  });
+  await new Promise((done) => server.listen(0, LOOPBACK, done));
+  return {
+    url: boundUrl(server.address().port),
+    set: (next) => {
+      status = next;
+    },
+    close: () => {
+      server.close();
+      server.closeIdleConnections();
+    }
+  };
 }
 
 export function pickVersion(latest, cached) {

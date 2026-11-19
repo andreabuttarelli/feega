@@ -1,18 +1,16 @@
 #!/usr/bin/env node
-import { spawn, spawnSync } from 'node:child_process';
-import { createWriteStream, existsSync, mkdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { spawn } from 'node:child_process';
+import { copyFileSync, existsSync, readFileSync, realpathSync, symlinkSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
-import { Readable } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
 
 import { sendTelemetry, telemetryEnv } from '../telemetry.mjs';
-import { ImportStep, MCP_ENTRY, USAGE, appDir, bundleSource, boundUrl, cachedVersions, exitOf, folderApp, freePort, importAsk, discoverAsk, importReport, routePlan, eventLine, importStep, isCached, latestAppVersion, markCached, mcpEnv, parseArgs, pickVersion, placeOf, readyProbe, served, untilReady } from '../launcher.mjs';
+import { ImportStep, MCP_ENTRY, USAGE, appDir, bundleSource, boundUrl, cachedVersions, compileCache, depsDir, exitOf, exited, extract, folderApp, freePort, importAsk, discoverAsk, importReport, installAtomic, loadingServer, newerRelease, routePlan, eventLine, importStep, isCached, latestAppVersion, mcpEnv, parseArgs, pickVersion, placeOf, readyProbe, served, untilReady, warmStart } from '../launcher.mjs';
 
 const MIN_NODE_MAJOR = 22;
 const WEBSTORAGE_NODE_MAJOR = 25;
-const READY_POLL_MS = 300;
+const READY_POLL_MS = 20;
 const OPENERS = { darwin: ['open'], win32: ['cmd', '/c', 'start', ''] };
 const RELEASES_API = 'https://api.github.com/repos/andreabuttarelli/feega/releases?per_page=50';
 const CHECK_TIMEOUT_MS = 2000;
@@ -23,19 +21,10 @@ const TO_STDERR = ['ignore', 2, 2];
 
 const nodeMajor = Number(process.versions.node.split('.')[0]);
 
-async function download(source, target) {
-  if (!source.startsWith('http')) {
-    return source;
-  }
-
-  const res = await fetch(source);
-  if (!res.ok) {
-    throw new Error(`download failed (${res.status}): ${source}`);
-  }
-
-  await pipeline(Readable.fromWeb(res.body), createWriteStream(target));
-  return target;
-}
+const LOCKFILE = 'package-lock.json';
+const DEPS_FILES = ['package.json', LOCKFILE];
+const NODE_MODULES = 'node_modules';
+const LINK_TYPE = process.platform === 'win32' ? 'junction' : 'dir';
 
 async function latestRelease() {
   try {
@@ -52,38 +41,58 @@ async function chooseVersion(home) {
     return pickVersion(LOCAL_BUNDLE_VERSION, cached);
   }
 
-  return pickVersion(await latestRelease(), cachedVersions(home));
+  const cached = cachedVersions(home);
+  const warm = warmStart(cached);
+  return warm.action === 'cache' ? warm : pickVersion(await latestRelease(), cached);
 }
 
-async function install(dir, version) {
-  console.log(eventLine({ event: 'step', step: 'download' }));
-  console.error(`feega: downloading the app ${version} (once per version)…`);
-  rmSync(dir, { recursive: true, force: true });
-  mkdirSync(dir, { recursive: true });
+const MESSAGES = {
+  download: (version) => `feega: downloading the app ${version} (once per version)…`,
+  install: () => 'feega: installing its dependencies for this machine…'
+};
 
-  const archive = await download(bundleSource(version, process.env), join(tmpdir(), `feega-app-${version}-${process.pid}.tar.gz`));
-  const untar = spawnSync('tar', ['-xzf', archive, '-C', dir], { stdio: TO_STDERR });
-  if (untar.status !== 0) {
-    throw new Error('could not extract the app bundle');
+const announce = (loading) => (step, version) => {
+  console.log(eventLine({ event: 'step', step }));
+  console.error(MESSAGES[step](version));
+  loading?.set({ step });
+};
+
+const quiet = { report: () => {}, stdio: 'ignore' };
+
+async function installDeps(dir, home, { report, stdio }) {
+  const deps = depsDir(home, readFileSync(join(dir, LOCKFILE), 'utf8'));
+  if (!isCached(deps)) {
+    report('install');
+    await installAtomic(deps, async (tmp) => {
+      DEPS_FILES.forEach((file) => copyFileSync(join(dir, file), join(tmp, file)));
+      const npm = spawn('npm', ['ci', '--omit=dev', '--no-audit', '--no-fund', '--loglevel=error'], { cwd: tmp, stdio, shell: process.platform === 'win32' });
+      if ((await exited(npm)) !== 0) {
+        throw new Error('could not install the app dependencies');
+      }
+    });
   }
 
-  console.log(eventLine({ event: 'step', step: 'install' }));
-  console.error('feega: installing its dependencies for this machine…');
-  const deps = spawnSync('npm', ['ci', '--omit=dev', '--no-audit', '--no-fund', '--loglevel=error'], {
-    cwd: dir,
-    stdio: TO_STDERR,
-    shell: process.platform === 'win32'
+  symlinkSync(join(deps, NODE_MODULES), join(dir, NODE_MODULES), LINK_TYPE);
+}
+
+function install(dir, version, home, how) {
+  return installAtomic(dir, async (tmp) => {
+    how.report('download', version);
+    await extract(bundleSource(version, process.env), tmp);
+    await installDeps(tmp, home, how);
   });
-  if (deps.status !== 0) {
-    throw new Error('could not install the app dependencies');
-  }
+}
 
-  markCached(dir);
+async function refresh(home) {
+  const latest = newerRelease(await latestRelease(), cachedVersions(home));
+  if (latest) {
+    await install(appDir(home, latest), latest, home, quiet).catch(() => {});
+  }
 }
 
 async function whenReady(url, server) {
-  const exited = new Promise((r) => server.once('exit', r));
-  await untilReady(() => fetch(url, readyProbe).then((r) => served(r.status), () => false), exited, READY_POLL_MS);
+  const exit = new Promise((r) => server.once('exit', r));
+  await untilReady(() => fetch(url, readyProbe).then((r) => served(r.status), () => false), exit, READY_POLL_MS);
 }
 
 function openBrowser(url) {
@@ -91,18 +100,28 @@ function openBrowser(url) {
   spawn(cmd, [...args, url], { stdio: 'ignore', detached: true }).on('error', () => {}).unref();
 }
 
-async function readyApp() {
-  const { version, action } = await chooseVersion(homedir());
-  const dir = appDir(homedir(), version);
+async function readyApp(home, report) {
+  const { version, action } = await chooseVersion(home);
+  const dir = appDir(home, version);
   if (action === 'download') {
-    await install(dir, version);
+    await install(dir, version, home, { report, stdio: TO_STDERR });
   }
 
-  return dir;
+  return { dir, warm: action === 'cache' && version !== LOCAL_BUNDLE_VERSION };
 }
 
-async function wantsImport(app, file, mode) {
-  const step = importStep({ mode, app, fileExists: existsSync(file), tty: Boolean(process.stdin.isTTY && process.stdout.isTTY) });
+async function openLoading(browser) {
+  if (browser !== 'open') {
+    return null;
+  }
+
+  const loading = await loadingServer();
+  openBrowser(loading.url);
+  return loading;
+}
+
+async function wantsImport(app, fileExists, mode) {
+  const step = importStep({ mode, app, fileExists, tty: Boolean(process.stdin.isTTY && process.stdout.isTTY) });
   if (step === ImportStep.NoApp) {
     throw new Error(`nothing to import: ${process.cwd()} has no package.json with a "dev" script`);
   }
@@ -219,39 +238,48 @@ async function main() {
     return;
   }
 
-  const dir = await readyApp();
+  const home = homedir();
   if (args.command === 'mcp') {
-    serveMcp(dir, args.port);
+    serveMcp((await readyApp(home, announce(null))).dir, args.port);
     return;
   }
 
   const { file, browser, folderImport, routes, app: chosenApp } = args;
-  const app = folderApp(process.cwd());
-  const importing = await wantsImport(app, file, folderImport);
-  const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-  void sendTelemetry({
-    home: homedir(),
-    env: process.env,
-    notify: (line) => console.error(line),
-    info: { version, platform: process.platform, arch: process.arch, node: process.versions.node }
-  });
+  const fileExists = existsSync(file);
   const port = await freePort(args.port);
-
   const url = boundUrl(port);
+  const loading = await openLoading(browser);
+  const { dir, warm } = await readyApp(home, announce(loading));
+
   console.log(eventLine({ event: 'step', step: 'start' }));
   console.log(`feega: saving to ${file}`);
   console.log(`feega: open ${url}`);
 
   const nodeOptions = nodeMajor >= WEBSTORAGE_NODE_MAJOR ? '--no-experimental-webstorage' : '';
-  const env = { ...process.env, ...telemetryEnv(homedir(), process.env), NODE_OPTIONS: [process.env.NODE_OPTIONS, nodeOptions].filter(Boolean).join(' ') };
+  const env = { ...process.env, ...telemetryEnv(home, process.env), ...compileCache(home, process.env), NODE_OPTIONS: [process.env.NODE_OPTIONS, nodeOptions].filter(Boolean).join(' ') };
   const server = spawn(process.execPath, [realpathSync(join(dir, 'scripts/local.mjs')), file, `--port=${port}`], { stdio: 'inherit', env });
-  await whenReady(url, server);
+
+  const app = folderApp(process.cwd());
+  const importing = wantsImport(app, fileExists, folderImport);
+  const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  void sendTelemetry({
+    home,
+    env: process.env,
+    notify: (line) => console.error(line),
+    info: { version, platform: process.platform, arch: process.arch, node: process.versions.node }
+  });
+
+  await whenReady(url, server).catch((error) => {
+    loading?.set({ error: `feega: ${error.message}` });
+    throw error;
+  });
+  loading?.set({ url });
   forward(server);
-  if (browser === 'open') {
-    openBrowser(url);
+  if (warm) {
+    void refresh(home);
   }
 
-  if (importing) {
+  if (await importing) {
     await importFolder(url, app, { routes, app: chosenApp, file }).catch((error) => {
       console.error(`feega: ${error.message}`);
       console.log(eventLine({ event: 'import-failed', message: error.message }));

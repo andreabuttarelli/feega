@@ -1,10 +1,137 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { createReadStream, existsSync, mkdtempSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { createServer as createHttpServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { createServer } from 'node:net';
-import { FolderImport, ImportStep, appDir, readyProbe, served, boundUrl, freePort, bundleSource, cachedVersions, exitOf, folderApp, importAsk, discoverAsk, routePlan, importReport, importStep, isCached, latestAppVersion, markCached, mcpEnv, parseArgs, pickVersion, placeOf, untilReady } from './launcher.mjs';
+import { FolderImport, ImportStep, appDir, readyProbe, served, boundUrl, freePort, bundleSource, cachedVersions, exitOf, folderApp, importAsk, discoverAsk, routePlan, importReport, importStep, isCached, latestAppVersion, markCached, mcpEnv, parseArgs, pickVersion, placeOf, untilReady, warmStart, newerRelease, depsDir, installAtomic, extract, loadingServer, compileCache } from './launcher.mjs';
+
+const tarball = () => {
+  const src = mkdtempSync(join(tmpdir(), 'feega-src-'));
+  writeFileSync(join(src, 'package.json'), '{}');
+  const archive = join(mkdtempSync(join(tmpdir(), 'feega-tgz-')), 'b.tar.gz');
+  spawnSync('tar', ['-czf', archive, '-C', src, '.']);
+  return archive;
+};
+
+const listening = async (handler) => {
+  const server = createHttpServer(handler);
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  return { server, url: `http://127.0.0.1:${server.address().port}/b.tar.gz` };
+};
+
+describe('partenza a caldo', () => {
+  it('con una versione in cache parte subito da quella, senza chiedere alla rete', () => {
+    expect(warmStart(['0.1.36', '0.1.35'])).toEqual({ version: '0.1.36', action: 'cache' });
+  });
+
+  it('senza cache deve chiedere alla rete', () => {
+    expect(warmStart([])).toEqual({ action: 'check' });
+  });
+
+  it('scarica per la prossima volta solo una release più nuova di quella in cache', () => {
+    expect(newerRelease('0.1.37', ['0.1.36'])).toBe('0.1.37');
+    expect(newerRelease('0.1.36', ['0.1.36'])).toBeNull();
+    expect(newerRelease('0.1.35', ['0.1.36'])).toBeNull();
+    expect(newerRelease(null, ['0.1.36'])).toBeNull();
+  });
+});
+
+describe('compileCache', () => {
+  it('il server riusa il codice già compilato da V8 tra un avvio e l’altro, sotto ~/.feega', () => {
+    expect(compileCache('/h', {})).toEqual({ NODE_COMPILE_CACHE: '/h/.feega/compile-cache' });
+  });
+
+  it('una cache scelta da chi lancia vince', () => {
+    expect(compileCache('/h', { NODE_COMPILE_CACHE: '/x' })).toEqual({ NODE_COMPILE_CACHE: '/x' });
+  });
+});
+
+describe('dipendenze condivise', () => {
+  it('due versioni con lo stesso lockfile condividono la cartella delle dipendenze, un lockfile diverso no', () => {
+    expect(depsDir('/h', '{"a":1}')).toBe(depsDir('/h', '{"a":1}'));
+    expect(depsDir('/h', '{"a":1}')).not.toBe(depsDir('/h', '{"a":2}'));
+    expect(depsDir('/h', '{"a":1}').startsWith('/h/.feega/deps/')).toBe(true);
+  });
+});
+
+describe('installAtomic', () => {
+  it('la cartella compare solo completa, con il marcatore', async () => {
+    const target = join(mkdtempSync(join(tmpdir(), 'feega-')), '1.0.0');
+    await installAtomic(target, async (tmp) => writeFileSync(join(tmp, 'x'), 'y'));
+    expect(isCached(target)).toBe(true);
+    expect(existsSync(join(target, 'x'))).toBe(true);
+  });
+
+  it('un lavoro fallito non lascia né la cartella né quella temporanea', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'feega-'));
+    const boom = async () => {
+      throw new Error('boom');
+    };
+    await expect(installAtomic(join(root, '1.0.0'), boom)).rejects.toThrow('boom');
+    expect(readdirSync(root)).toEqual([]);
+  });
+
+  it('una cartella a metà lasciata da un launcher vecchio interrotto viene sostituita', async () => {
+    const target = join(mkdtempSync(join(tmpdir(), 'feega-')), '1.0.0');
+    mkdirSync(target);
+    writeFileSync(join(target, 'partial'), '');
+    await installAtomic(target, async (tmp) => writeFileSync(join(tmp, 'x'), 'y'));
+    expect(isCached(target)).toBe(true);
+    expect(readdirSync(target).sort()).toEqual(['.complete', 'x']);
+  });
+
+  it('due installazioni in parallelo della stessa versione: vince una, l’altra non rompe niente', async () => {
+    const target = join(mkdtempSync(join(tmpdir(), 'feega-')), '1.0.0');
+    const slow = (tmp) => new Promise((done) => setTimeout(() => done(writeFileSync(join(tmp, 'x'), tmp)), 5));
+    await Promise.all([installAtomic(target, slow), installAtomic(target, slow)]);
+    expect(isCached(target)).toBe(true);
+    expect(readdirSync(dirname(target))).toEqual(['1.0.0']);
+  });
+});
+
+describe('extract', () => {
+  it('estrae il bundle mentre arriva dalla rete, senza file intermedio', async () => {
+    const archive = tarball();
+    const { server, url } = await listening((_, res) => createReadStream(archive).pipe(res));
+    const out = mkdtempSync(join(tmpdir(), 'feega-out-'));
+
+    await extract(url, out);
+    server.close();
+    expect(existsSync(join(out, 'package.json'))).toBe(true);
+  });
+
+  it('un percorso locale si estrae uguale', async () => {
+    const out = mkdtempSync(join(tmpdir(), 'feega-out-'));
+    await extract(tarball(), out);
+    expect(existsSync(join(out, 'package.json'))).toBe(true);
+  });
+
+  it('un download che fallisce lo dice', async () => {
+    const { server, url } = await listening((_, res) => res.writeHead(404).end());
+    await expect(extract(url, mkdtempSync(join(tmpdir(), 'feega-out-')))).rejects.toThrow(/download failed \(404\)/);
+    server.close();
+  });
+});
+
+describe('pagina di attesa', () => {
+  const status = (loading) => fetch(new URL('/status', loading.url)).then((r) => r.json());
+
+  it('il browser si apre subito su una pagina del launcher, che segue i passi e passa all’app appena risponde', async () => {
+    const loading = await loadingServer();
+    expect(await fetch(loading.url).then((r) => r.text())).toMatch(/feega/);
+    expect(await status(loading)).toEqual({ step: 'start' });
+
+    loading.set({ step: 'download' });
+    expect(await status(loading)).toEqual({ step: 'download' });
+
+    loading.set({ url: 'http://127.0.0.1:1234' });
+    expect(await status(loading)).toEqual({ url: 'http://127.0.0.1:1234' });
+    loading.close();
+  });
+});
 
 describe('untilReady', () => {
   it('fails loudly when the server exits before it serves', async () => {
