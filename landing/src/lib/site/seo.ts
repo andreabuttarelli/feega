@@ -2,8 +2,8 @@ import { HERO_HEADLINE } from './home';
 import { SITE_URL } from './links';
 
 export const HOME_META = {
-  title: 'Feega: design inside your code with your agents and team',
-  description: 'Feega: design inside your code with your agents and team. An open-source canvas to design, animate and generate, from your repo, Figma or any website.'
+  title: 'Feega: design in your codebase',
+  description: 'Feega: design in your codebase. A free VS Code extension: click any element of your running app, edit it like in Figma, and the change is written to your code.'
 } as const;
 
 export const OG_IMAGE_ALT = `Feega: ${HERO_HEADLINE.join(' ')} An isometric canvas where code becomes a design, a layout gets a timeline and a prompt wires into image and video nodes.`;
@@ -14,6 +14,6 @@ export const OG = {
 } as const;
 
 export const PRICING_META = {
-  title: 'Pricing: free on your computer, Feega Cloud for teams | Feega',
-  description: 'Feega is free on your own computer. Feega Cloud adds real-time collaboration and AI models with no keys to manage, for €9 per editor a month.'
+  title: 'Pricing: the Feega extension is free | Feega',
+  description: 'The Feega VS Code extension is free. Feega Cloud, with GitHub sync, collaboration, sections and templates, is coming later.'
 } as const;

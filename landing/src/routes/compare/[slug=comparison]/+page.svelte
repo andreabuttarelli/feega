@@ -1,7 +1,8 @@
 <script lang="ts">
+  const cta = primaryCta();
   import '$lib/site/landing/landing.css';
   import '$lib/site/compare/compare.css';
-  import { APP_URL } from '$lib/site/links';
+  import { installAction, primaryCta } from '$lib/site/install';
   import { COMPARE_PATH, COMPARISONS, comparisonPath } from '$lib/site/compare';
   import { FEEGA_FEATURES, FEEGA_PRICING } from '$lib/site/compare/feega';
   import { FEATURE_LABELS, Feature, type Verdict } from '$lib/site/compare/features';
@@ -119,6 +120,6 @@
         <li><a href={comparisonPath(slug)}>{other.heading}</a></li>
       {/each}
     </ul>
-    <a class="landing-cta" href={APP_URL}>Try Feega →</a>
+    <a class="landing-cta" href={cta.href} use:installAction={cta}>{cta.label} →</a>
   </section>
 </article>

@@ -1,22 +1,16 @@
 <script lang="ts">
   import { lower } from './lower';
-  import DownloadMac from './DownloadMac.svelte';
   import Mark from './Mark.svelte';
-  import { onMount } from 'svelte';
-  import { APP_URL, GITHUB_URL, HEADER_LINKS, MENU_LINKS, SOCIAL_LINKS } from './links';
+  import { GITHUB_URL, HEADER_LINKS, MENU_LINKS, SOCIAL_LINKS } from './links';
   import { GITHUB_ICON } from './social-icons';
-  import { homeHref } from './signed-in';
+  import { installAction, primaryCta } from './install';
 
   let open = $state(false);
-  let home = $state('/');
-
-  onMount(() => {
-    home = homeHref(document.cookie);
-  });
+  const cta = primaryCta();
 </script>
 
 <header class="bar">
-  <a class="chip brand" href={home} aria-label="Feega home"><Mark size={16} /><span>Feega</span></a>
+  <a class="chip brand" href="/" aria-label="Feega home"><Mark size={16} /><span>Feega</span></a>
 
   <nav class="links" aria-label="Main">
     {#each HEADER_LINKS as link (link.label)}
@@ -25,8 +19,7 @@
   </nav>
 
   <div class="actions">
-    <DownloadMac class="chip star" />
-    <a class="chip cta" href={APP_URL}><span>let’s start</span></a>
+    <a class="chip cta" href={cta.href} use:installAction={cta}><span>download</span></a>
   </div>
 
   <div class="mobile">
@@ -49,6 +42,7 @@
       {#each MENU_LINKS as link (link.label)}
         <a href={link.href} onclick={() => (open = false)}>{lower(link.label)}</a>
       {/each}
+      <a href={cta.href} use:installAction={cta}>download</a>
     </div>
 
     <div class="follow">

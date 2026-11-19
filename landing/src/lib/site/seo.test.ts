@@ -63,7 +63,7 @@ describe('structured data', () => {
 
   it('answers what people ask assistants', () => {
     const q = FAQ.map((f) => f.q).join('\n');
-    for (const topic of [/free/i, /agent/i, /credits/i, /cancel/i]) {
+    for (const topic of [/free/i, /agent/i, /editors/i, /cloud/i]) {
       expect(q).toMatch(topic);
     }
   });
@@ -105,8 +105,8 @@ describe('answer-first pages', () => {
     expect(competitorFaq(c).length).toBeGreaterThan(0);
   });
 
-  it('llms-full lists only MCP tools the server defines', () => {
-    expect(llmsFullTxt()).toContain('claude mcp add --transport http feega');
+  it('llms-full says the extension is not published yet, without fake install links', () => {
+    expect(llmsFullTxt()).not.toContain('vscode:extension');
   });
 });
 

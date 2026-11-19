@@ -1,7 +1,8 @@
 <script lang="ts">
+  const cta = primaryCta();
   import '$lib/site/landing/landing.css';
   import '$lib/site/compare/compare.css';
-  import { APP_URL } from '$lib/site/links';
+  import { installAction, primaryCta } from '$lib/site/install';
   import { ALTERNATIVES, ALTERNATIVES_PATH, AUTHOR, DISCLAIMER, TRY_STEPS, alternativePath } from '$lib/site/alternatives';
   import { articleJsonLd, faqJsonLd } from '$lib/site/structured-data';
   import AsciiCover from '$lib/site/alternatives/AsciiCover.svelte';
@@ -87,6 +88,6 @@
     <ul>
       {#each others as [slug, other] (slug)}<li><a href={alternativePath(slug)}>{other.heading}</a></li>{/each}
     </ul>
-    <a class="landing-cta" href={APP_URL}>Try Feega →</a>
+    <a class="landing-cta" href={cta.href} use:installAction={cta}>{cta.label} →</a>
   </section>
 </article>
