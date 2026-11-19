@@ -3,10 +3,8 @@
   import Mark from './Mark.svelte';
   import { GITHUB_URL, HEADER_LINKS, MENU_LINKS, SOCIAL_LINKS } from './links';
   import { GITHUB_ICON } from './social-icons';
-  import { installAction, primaryCta } from './install';
 
   let open = $state(false);
-  const cta = primaryCta();
 </script>
 
 <header class="bar">
@@ -19,7 +17,7 @@
   </nav>
 
   <div class="actions">
-    <a class="chip cta" href={cta.href} use:installAction={cta}><span>download</span></a>
+    <a class="chip cta" href={GITHUB_URL}><span>Star us on GitHub</span></a>
   </div>
 
   <div class="mobile">
@@ -42,7 +40,7 @@
       {#each MENU_LINKS as link (link.label)}
         <a href={link.href} onclick={() => (open = false)}>{lower(link.label)}</a>
       {/each}
-      <a href={cta.href} use:installAction={cta}>download</a>
+      <a href={GITHUB_URL}>Star us on GitHub</a>
     </div>
 
     <div class="follow">

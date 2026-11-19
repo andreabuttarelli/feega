@@ -2,17 +2,15 @@
   import { lower } from './lower';
   import { LEGAL_DOCS } from './legal';
   import Mark from './Mark.svelte';
-  import { DOCS_URL, SOCIAL_LINKS, STORY_URL } from './links';
+  import { COFFEE_URL, DOCS_URL, GITHUB_URL, SOCIAL_LINKS, STORY_URL } from './links';
   import { GUIDES_PATH } from './guides';
   import { PRICING_PATH } from './paths';
   import { COMPARE_PATH } from './compare';
   import { ALTERNATIVES_PATH } from './alternatives';
   import { CODEBASE_PATH } from './codebase';
-  import { installAction, primaryCta } from './install';
 
   const legal = Object.entries(LEGAL_DOCS).map(([slug, doc]) => ({ href: `/${slug}`, label: doc.label }));
   const year = new Date().getFullYear();
-  const cta = primaryCta();
 </script>
 
 <footer class="site-foot">
@@ -35,7 +33,8 @@
       <a href={PRICING_PATH}>pricing</a>
       <a href={CODEBASE_PATH}>codebase</a>
       <a href="/changelog">changelog</a>
-      <a href={cta.href} use:installAction={cta}>{lower(cta.label)}</a>
+      <a href={GITHUB_URL}>star us on github</a>
+      <a href={COFFEE_URL}>support with a coffee</a>
     </nav>
 
     <nav class="col" aria-label="Learn">
