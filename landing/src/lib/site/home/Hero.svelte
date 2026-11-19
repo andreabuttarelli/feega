@@ -116,7 +116,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 1px 8px 1px 6px;
+    padding: 1px 6px;
     border-radius: var(--ui-radius-md, 6px);
     background: rgba(255, 255, 255, 0.1);
     color: #fff;
