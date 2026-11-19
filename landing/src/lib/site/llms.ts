@@ -1,13 +1,10 @@
 import { FAQ } from './home';
-import { LANDING_PAGES } from './landing';
-import { UPSCALER } from './landing/upscaler';
 import { CODEBASE, CODEBASE_PATH } from './codebase';
 import { DOWNLOAD_META, HOME_META, PRICING_META } from './seo';
 import { COFFEE_URL, DOWNLOAD_PATH, EDITORS, EXTENSION_PUBLISHED, GITHUB_URL, SITE_URL } from './links';
 import { PRICING_PATH, SITE_PATHS } from './paths';
 import { LEGAL_DOCS } from './legal';
 import { ALTERNATIVES, ALTERNATIVES_INDEX, ALTERNATIVES_PATH, alternativePath } from './alternatives';
-import { GUIDES, GUIDES_INDEX, GUIDES_PATH, guidePath } from './guides';
 import { plainText } from './text';
 
 const SUMMARY = 'Feega is a free, open-source (Apache-2.0) VS Code extension to design in your codebase: click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens, with diffs and undo. React, Next.js, SvelteKit and Vue, with Tailwind or plain CSS. Works in VS Code, Cursor, Windsurf and VSCodium, or in the browser with npx feega. Feega Cloud (GitHub sync, collaboration, sections and templates) is coming later.';
@@ -35,13 +32,9 @@ export const PAGE_TITLES: Record<string, string> = {
   [PRICING_PATH]: PRICING_META.title,
   [DOWNLOAD_PATH]: DOWNLOAD_META.title,
   '/changelog': 'Changelog',
-  '/ai-video-upscaler': UPSCALER.title,
   [CODEBASE_PATH]: CODEBASE.title,
   [ALTERNATIVES_PATH]: ALTERNATIVES_INDEX.title,
-  [GUIDES_PATH]: GUIDES_INDEX.title,
-  ...Object.fromEntries(Object.entries(GUIDES).map(([slug, g]) => [guidePath(slug), g.title])),
   ...Object.fromEntries(Object.entries(ALTERNATIVES).map(([slug, a]) => [alternativePath(slug), a.title])),
-  ...Object.fromEntries(Object.entries(LANDING_PAGES).map(([slug, p]) => [`/${slug}`, p.title])),
   ...Object.fromEntries(Object.entries(LEGAL_DOCS).map(([slug, d]) => [`/${slug}`, d.title]))
 };
 
@@ -77,8 +70,6 @@ export const llmsFullTxt = () =>
     HOW_IT_WORKS,
     '## What it writes to your code',
     WRITES,
-    '## Guides',
-    Object.entries(GUIDES).map(([slug, g]) => `### ${g.heading}\n${g.answer}\n${SITE_URL}${guidePath(slug)}`).join('\n\n'),
     '## FAQ',
     FAQ.map((f) => `### ${f.q}\n${plainText(f.a)}`).join('\n\n'),
     '## Pages',

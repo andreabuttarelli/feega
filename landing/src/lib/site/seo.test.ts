@@ -1,11 +1,8 @@
 import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { LANDING_PAGES } from './landing';
-import { UPSCALER } from './landing/upscaler';
 import { CODEBASE } from './codebase';
 import { LEGAL_DOCS } from './legal';
-import { GUIDES, GUIDES_INDEX } from './guides';
 import { AI_CRAWLERS } from './crawlers';
 import { GET as robots } from '../../routes/robots.txt/+server';
 import { FAQ, HERO_HEADLINE } from './home';
@@ -19,12 +16,8 @@ const MAX_DESCRIPTION = 160;
 
 const metas = [
   ['home', HOME_META],
-  ['upscaler', UPSCALER],
   ['codebase', CODEBASE],
-  ...Object.entries(LANDING_PAGES),
-  ...Object.entries(LEGAL_DOCS),
-  ['guides', GUIDES_INDEX],
-  ...Object.entries(GUIDES)
+  ...Object.entries(LEGAL_DOCS)
 ] as const;
 
 describe('search metadata', () => {
@@ -83,18 +76,7 @@ describe('llms.txt', () => {
   });
 });
 
-const wordCount = (text: string) => text.trim().split(/\s+/).length;
-
-describe('answer-first pages', () => {
-  it.each(Object.entries(GUIDES))('%s answers in 40 to 60 words', (_, g) => {
-    expect(wordCount(g.answer)).toBeGreaterThanOrEqual(40);
-    expect(wordCount(g.answer)).toBeLessThanOrEqual(60);
-  });
-
-  it.each(Object.entries(GUIDES))('%s has a FAQ', (_, g) => {
-    expect(g.faq.length).toBeGreaterThan(0);
-  });
-
+describe('llms-full', () => {
   it('llms-full says the extension is not published yet, without fake install links', () => {
     expect(llmsFullTxt()).not.toContain('vscode:extension');
   });
@@ -117,6 +99,11 @@ describe('canonical host', () => {
 
   it('no generated file names the bare domain', () => {
     expect(llmsTxt() + llmsFullTxt() + HOME_JSON_LD).not.toMatch(/https:\/\/feega\.app/);
+  });
+
+  it('llms.txt describes the extension, not the old video product', () => {
+    expect(llmsTxt()).toMatch(/VS Code extension/);
+    expect(llmsTxt() + llmsFullTxt()).not.toMatch(/video generator|upscal|claymation/i);
   });
 });
 

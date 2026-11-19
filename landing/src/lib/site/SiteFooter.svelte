@@ -3,7 +3,6 @@
   import { LEGAL_DOCS } from './legal';
   import Mark from './Mark.svelte';
   import { COFFEE_URL, DOCS_URL, GITHUB_URL, SOCIAL_LINKS, STORY_URL } from './links';
-  import { GUIDES_PATH } from './guides';
   import { PRICING_PATH } from './paths';
   import { DOWNLOAD_PATH } from './links';
   import { ALTERNATIVES_PATH } from './alternatives';
@@ -41,7 +40,6 @@
     <nav class="col" aria-label="Learn">
       <p class="head">learn</p>
       <a href={DOCS_URL}>docs</a>
-      <a href={GUIDES_PATH}>guides</a>
       <a href={ALTERNATIVES_PATH}>alternatives</a>
       <a href={STORY_URL}>blog</a>
     </nav>
