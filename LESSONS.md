@@ -4050,3 +4050,9 @@ property reads on ~2,000 items (`src/lib/canvas/counted-list.testkit.ts`), not w
 ## "Working…" forever on a local agent is its startup, not a dead request
 
 **Signal:** the local ACP chat shows no event for 30-50 s after a prompt. **Move:** read the agent's own logs before the network tab: `~/.claude/projects/<cwd>/<session>.jsonl` (when the model was first called) and `~/Library/Caches/claude-cli-nodejs/<cwd>/mcp-logs-feega/` (an MCP server timing out at 30 s). Codex writes `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` with the `model` and `effort` of every turn: the place to prove a model or effort switch took effect.
+
+## Every `npx feega` after a release spends 20 s in `npm ci`
+**Signal:** a new app version starts with "installing its dependencies" for 16–25 s even with a warm npm cache, and the `package-lock.json` of two consecutive bundles differs in transitive patch versions nobody touched. **Move:** the bundle lock was re-resolved from ranges on every release; `scripts/app-bundle.sh` seeds the stage with the root lock so it is stable, and the launcher keys `~/.feega/deps/<sha>` on it. Compare `shasum package-lock.json` of two bundles before blaming npm.
+
+## Overriding `HOME` does not isolate a VS Code launched for a test
+**Signal:** a macOS keychain dialog ("Code Key") pops on the user's screen, and the extension still writes to the real `~/.feega`. VS Code resolves the login shell's environment for the extension host. **Move:** isolate with `--user-data-dir` (short path: the IPC socket must be under 103 chars), `--extensions-dir` and `--use-mock-keychain`; never set `HOME` for it.

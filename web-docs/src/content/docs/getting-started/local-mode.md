@@ -15,9 +15,11 @@ npx feega my-canvas.feega
 ```
 
 You need Node 22 or later. The browser opens on http://localhost:5173 and the terminal prints
-where the file is saved, relative to the folder you ran the command in. Each start checks for a newer
-version and downloads it once into `~/.feega/app/<version>/`; offline it starts the newest one
-already downloaded. Options:
+where the file is saved, relative to the folder you ran the command in. The browser opens at once on
+a loading page that turns into the canvas as soon as the app answers. The first run downloads the
+app into `~/.feega/app/<version>/`; later runs start the newest version already downloaded, without
+waiting on the network, and fetch a newer one in the background for the next start. Versions with
+the same dependencies share one install in `~/.feega/deps/`. Options:
 `--port 8080`, `--no-open`. If the file does not exist it is created; every change is written back to it within a second, and again when
 you stop the server with Ctrl-C.
 

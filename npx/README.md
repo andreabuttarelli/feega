@@ -4,7 +4,7 @@
 npx feega my-board.feega
 ```
 
-Starts feega's local mode on http://localhost:5173 and saves the canvas to `my-board.feega` in the current directory. Needs Node 22+. Each start checks for a newer app and downloads it into `~/.feega/app/<version>/`; offline it uses the newest cached one.
+Starts feega's local mode on http://localhost:5173 and saves the canvas to `my-board.feega` in the current directory. Needs Node 22+. The first start downloads the app into `~/.feega/app/<version>/`; later starts use the newest cached one at once and fetch a newer one in the background for next time.
 
 Run it inside a project with a `dev` script and it asks once to import the folder: every static page of its router (up to 20) lands on the canvas as editable frames; dynamic pages are skipped and listed, and with no router found only the home page is imported. `--import` imports without asking, `--no-import` never asks.
 

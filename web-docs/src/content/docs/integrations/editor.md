@@ -20,7 +20,8 @@ cursor --install-extension AndreaButtarelli.feega
 ```
 
 Each version is also attached to its GitHub release as a `.vsix` file, for editors that install
-from a file. The extension needs Node 22 or later on your machine.
+from a file. The extension needs Node 22 or later on your machine; it carries its own copy of the
+`feega` launcher and runs it with `node`, so opening a canvas does not wait on npm.
 
 - **Open a `.feega` file**: it opens as a canvas. The first time, the app downloads once.
 - **Feega: New canvas** (command palette): picks where to save a new `.feega` file and opens it.
