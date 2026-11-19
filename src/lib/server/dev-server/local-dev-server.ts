@@ -76,11 +76,11 @@ async function chromiumOf() {
   }
 }
 
-async function screenshot(url: string, width: number): Promise<Uint8Array> {
+async function screenshot(url: string, width: number, scale: number): Promise<Uint8Array> {
   const chromium = await chromiumOf();
   const browser = await chromium.launch();
   try {
-    const page = await browser.newPage({ viewport: { width, height: POSTER_HEIGHT } });
+    const page = await browser.newPage({ viewport: { width, height: POSTER_HEIGHT }, deviceScaleFactor: scale });
     await page.goto(url, { waitUntil: 'load' });
     await page.waitForTimeout(SETTLE_MS);
     return new Uint8Array(await page.screenshot({ type: 'png' }));

@@ -33,6 +33,14 @@ describe('inspectElement', () => {
     expect(info.styles).toHaveProperty('font-size');
   });
 
+  it('an element of a page belongs to the page, not to the layout that renders it in its slot', () => {
+    const win = new JSDOM(`<body><main data-feega-src="src/routes/+layout.svelte:20:3"><section data-feega-src="src/routes/+page.svelte:5:1"><h1 data-feega-src="src/routes/+page.svelte:6:3">Hi</h1></section></main></body>`).window;
+
+    const info = inspectElement(win.document.querySelector('h1')!)!;
+
+    expect(info.component).toEqual({ file: 'src/routes/+page.svelte', line: 5, col: 1 });
+  });
+
   it('climbs to the nearest tagged ancestor for an untagged element', () => {
     const win = domOf();
 
