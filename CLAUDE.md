@@ -16,7 +16,8 @@ extension: the canvas extension in `vscode/` is deprecated. The MVP covers:
   the design system itself (Tailwind theme / CSS variables / tokens), with the number of places
   touched shown before applying;
 - preview sizes for responsive design;
-- React, Next.js, SvelteKit, Vue.
+- React, Next.js, SvelteKit, Vue — SvelteKit is a deliberate differentiator (competitors skip it), with
+  and without Tailwind.
 
 **After the MVP only:** multi-frame canvas, Motion mode (timeline), Feega Cloud (same editor in the
 browser with GitHub sync), real-time collaboration. The canvas, motion and cloud code below stays
