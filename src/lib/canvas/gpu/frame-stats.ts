@@ -1,13 +1,26 @@
 const KEEP = 600;
 const FRAMES_KEPT = 2400;
 
-export type CoreFrameCount = { at: number; ms: number; moving: boolean; plans: number; walked: number; planMs: number; bakes: number; bakeMs: number; uploadBytes: number; unsharp: number; uncovered: number; step: number; tiles: number; draws: number; uploads: number; fallbackMs: number; exact: boolean; swaps: number; rebaked: number; stretch: number; pending: boolean };
+export type CoreFrameCount = { at: number; ms: number; moving: boolean; plans: number; walked: number; planMs: number; bakes: number; bakeMs: number; uploadBytes: number; unsharp: number; uncovered: number; step: number; tiles: number; draws: number; uploads: number; fallbackMs: number; exact: boolean; swaps: number; rebaked: number; stretch: number; lost: number; evictedSeen: number; pending: boolean };
+
+export enum LossKind {
+  Coarser = 'coarser',
+  Uncovered = 'uncovered',
+  EvictedOnScreen = 'evicted_on_screen'
+}
+
+const LOSS_CODES: Readonly<Record<number, LossKind>> = { 1: LossKind.Coarser, 2: LossKind.Uncovered, 3: LossKind.EvictedOnScreen };
+const LOSS_FIELDS = 5;
+const FRAME_COUNTS = 19;
+const LOSSES_KEPT = 2000;
+
+export type ScreenLoss = { at: number; kind: LossKind; step: number; tx: number; ty: number };
 
 export type TextureReport = { count: number; bytes: number; largest: string[] };
 
 type Tally = Record<string, { n: number; ms: number }>;
 
-type Stats = { render: number[]; textures?: () => TextureReport; pending?: number; loseDevice?: () => void; counts?: Record<string, number>; tally?: Tally; reveal?: { ms: number; missing: string[] }; settled?: number; frames?: CoreFrameCount[] };
+type Stats = { render: number[]; textures?: () => TextureReport; pending?: number; loseDevice?: () => void; counts?: Record<string, number>; tally?: Tally; reveal?: { ms: number; missing: string[] }; settled?: number; frames?: CoreFrameCount[]; losses?: ScreenLoss[] };
 
 declare global {
   interface Window {
@@ -75,9 +88,26 @@ export function addTally(json: string) {
 export function countFrame(began: number, counts: Float64Array | undefined, moving: boolean, pending: boolean) {
   const stats = (window.__gpuCanvas ??= { render: [] });
   const frames = (stats.frames ??= []);
-  const [plans = 0, walked = 0, planMs = 0, bakes = 0, bakeMs = 0, uploadBytes = 0, unsharp = 0, uncovered = 0, step = 0, tiles = 0, draws = 0, uploads = 0, fallbackMs = 0, exact = 0, swaps = 0, rebaked = 0, stretch = 0] = counts ?? [];
-  frames.push({ at: began, ms: performance.now() - began, moving, plans, walked, planMs, bakes, bakeMs, uploadBytes, unsharp, uncovered, step, tiles, draws, uploads, fallbackMs, exact: exact === 1, swaps, rebaked, stretch, pending });
+  const [plans = 0, walked = 0, planMs = 0, bakes = 0, bakeMs = 0, uploadBytes = 0, unsharp = 0, uncovered = 0, step = 0, tiles = 0, draws = 0, uploads = 0, fallbackMs = 0, exact = 0, swaps = 0, rebaked = 0, stretch = 0, lost = 0, evictedSeen = 0] = counts ?? [];
+  recordLosses(counts?.subarray(FRAME_COUNTS));
+  frames.push({ at: began, ms: performance.now() - began, moving, plans, walked, planMs, bakes, bakeMs, uploadBytes, unsharp, uncovered, step, tiles, draws, uploads, fallbackMs, exact: exact === 1, swaps, rebaked, stretch, lost, evictedSeen, pending });
   if (frames.length > FRAMES_KEPT) {
     frames.shift();
   }
+}
+
+function recordLosses(events: Float64Array | undefined) {
+  if (!events?.length) {
+    return;
+  }
+
+  const stats = (window.__gpuCanvas ??= { render: [] });
+  const losses = (stats.losses ??= []);
+  for (let i = 0; i + LOSS_FIELDS <= events.length; i += LOSS_FIELDS) {
+    const kind = LOSS_CODES[events[i + 1]];
+    if (kind) {
+      losses.push({ at: events[i], kind, step: events[i + 2], tx: events[i + 3], ty: events[i + 4] });
+    }
+  }
+  losses.splice(0, Math.max(0, losses.length - LOSSES_KEPT));
 }

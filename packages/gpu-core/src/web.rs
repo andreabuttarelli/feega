@@ -1,6 +1,8 @@
 use rustc_hash::FxHashMap;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::collections::VecDeque;
+use crate::watch::{visible_losses, Loss, LossKind, WATCH_LOG_CAP};
 
 use vello::wgpu;
 use wasm_bindgen::prelude::*;
@@ -127,6 +129,9 @@ pub struct WebCore {
     direct: Option<wgpu::Texture>,
     held_scene: Option<HeldScreen>,
     scale: f64,
+    watched: Vec<TileKey>,
+    watched_at: Camera,
+    watch_log: VecDeque<[f64; 5]>,
 }
 
 struct HeldScreen {
@@ -149,6 +154,8 @@ struct Counted {
     exact: bool,
     swaps: u32,
     rebaked: u32,
+    lost: u32,
+    evicted_seen: u32,
     stretch: f64,
 }
 
@@ -438,7 +445,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, warm_wait: 0.0, zoom_changed_at: f64::NEG_INFINITY, shown_step: None, aimed: None, gesture_baked: Default::default(), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_held: None, overlay_dirty: true, overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), sharpness: Sharpness::default(), fallback: Vec::new(), ahead: None, fallback_was: camera, born: FxHashMap::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 }, gesture_draw: GestureDraw::Tiles, direct: None, held_scene: None, scale: fitted.scale })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::default(), textures: FxHashMap::default(), arriving: FxHashMap::default(), library, cached: Pictures::default(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, warm_wait: 0.0, zoom_changed_at: f64::NEG_INFINITY, shown_step: None, aimed: None, gesture_baked: Default::default(), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_held: None, overlay_dirty: true, overlay_seen: OverlaySeen::default(), tiles: Tiles::default(), tile_textures: FxHashMap::default(), spare_tiles: Vec::new(), atlases: FxHashMap::default(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, lifted: Vec::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: FxHashMap::default(), counted: Counted::default(), sharpness: Sharpness::default(), fallback: Vec::new(), ahead: None, fallback_was: camera, born: FxHashMap::default(), credit: RasterCredit::default(), was: Camera { x: 0.0, y: 0.0, zoom: 1.0 }, gesture_draw: GestureDraw::Tiles, direct: None, held_scene: None, scale: fitted.scale, watched: Vec::new(), watched_at: camera, watch_log: VecDeque::new() })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -665,7 +672,29 @@ impl WebCore {
         Ok(false)
     }
 
+    fn watch_draw(&mut self, draw: &[TileKey]) {
+        if self.camera == self.watched_at {
+            let screen = (self.target.width(), self.target.height());
+            let visible = self.tiles.visible_world(self.camera, screen).unwrap_or(Rect::ZERO);
+            let losses = visible_losses(&self.watched, draw, self.tiles.sharp_enough(self.camera), visible);
+            self.counted.lost += losses.len() as u32;
+            losses.into_iter().for_each(|loss| self.log_loss(loss));
+        }
+        self.watched = draw.to_vec();
+        self.watched_at = self.camera;
+    }
+
+    fn log_loss(&mut self, loss: Loss) {
+        if self.watch_log.len() >= WATCH_LOG_CAP {
+            self.watch_log.pop_front();
+        }
+        self.watch_log.push_back([js_sys::Date::now(), loss.kind.code(), f64::from(loss.key.step), loss.key.tx as f64, loss.key.ty as f64]);
+    }
+
     fn drop_tiles(&mut self, gone: Vec<TileKey>) {
+        let seen: Vec<TileKey> = gone.iter().copied().filter(|key| self.watched.contains(key)).collect();
+        self.counted.evicted_seen += seen.len() as u32;
+        seen.into_iter().for_each(|key| self.log_loss(Loss { key, kind: LossKind::EvictedOnScreen }));
         for key in gone {
             self.born.remove(&key);
             if let Some(texture) = self.tile_textures.remove(&key) {
@@ -1021,7 +1050,9 @@ impl WebCore {
             self.forget_fallback();
         }
         self.present_tiles(&tiles.draw, &tiles.beneath, &fading)?;
+        let painted: Vec<TileKey> = tiles.beneath.iter().chain(&tiles.draw).copied().collect();
         self.tiles.drawn(&tiles.draw);
+        self.watch_draw(&painted);
         self.trim_spares();
         let kept = tiles_kept_beside(screen, self.tile_budget, self.beside_tiles());
         if self.tiles.len() > kept {
@@ -1389,7 +1420,7 @@ impl WebCore {
     pub fn frame_counts(&mut self) -> Vec<f64> {
         let planned = self.compositor.take_planned();
         let counted = std::mem::take(&mut self.counted);
-        vec![f64::from(planned.plans), f64::from(planned.walked), planned.ms, f64::from(counted.bakes), counted.ms, counted.upload_bytes, f64::from(counted.unsharp), f64::from(counted.uncovered), f64::from(step_of(self.camera.zoom)), f64::from(counted.tiles), f64::from(self.engine.take_draws()), f64::from(counted.uploads), counted.fallback_ms, f64::from(u8::from(counted.exact)), f64::from(counted.swaps), f64::from(counted.rebaked), counted.stretch]
+        vec![f64::from(planned.plans), f64::from(planned.walked), planned.ms, f64::from(counted.bakes), counted.ms, counted.upload_bytes, f64::from(counted.unsharp), f64::from(counted.uncovered), f64::from(step_of(self.camera.zoom)), f64::from(counted.tiles), f64::from(self.engine.take_draws()), f64::from(counted.uploads), counted.fallback_ms, f64::from(u8::from(counted.exact)), f64::from(counted.swaps), f64::from(counted.rebaked), counted.stretch, f64::from(counted.lost), f64::from(counted.evicted_seen)].into_iter().chain(self.watch_log.drain(..).flatten()).collect()
     }
     pub fn warming(&self) -> bool {
         self.warming

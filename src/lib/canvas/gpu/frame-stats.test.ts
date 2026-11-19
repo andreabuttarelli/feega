@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { countFrame } from './frame-stats';
+import { LossKind, countFrame } from './frame-stats';
 
 describe('countFrame', () => {
   beforeEach(() => {
@@ -17,5 +17,27 @@ describe('countFrame', () => {
     countFrame(performance.now(), undefined, false, false);
 
     expect(window.__gpuCanvas?.frames?.[0]).toMatchObject({ moving: false, plans: 0, bakes: 0, uploadBytes: 0, unsharp: 0, tiles: 0, draws: 0, uploads: 0, pending: false });
+  });
+});
+
+describe('watching what the screen loses', () => {
+  beforeEach(() => {
+    delete window.__gpuCanvas;
+  });
+
+  it('counts the visible losses of each frame', () => {
+    countFrame(performance.now(), Float64Array.from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 1]), false, false);
+
+    expect(window.__gpuCanvas?.frames?.[0]).toMatchObject({ lost: 3, evictedSeen: 1 });
+  });
+
+  it('keeps each loss named, with the tile it hit', () => {
+    const counts = new Array(19).fill(0);
+    countFrame(performance.now(), Float64Array.from([...counts, 1000, 1, 4, 2, 3, 1001, 3, 2, 0, 0]), false, false);
+
+    expect(window.__gpuCanvas?.losses).toEqual([
+      { at: 1000, kind: LossKind.Coarser, step: 4, tx: 2, ty: 3 },
+      { at: 1001, kind: LossKind.EvictedOnScreen, step: 2, tx: 0, ty: 0 }
+    ]);
   });
 });

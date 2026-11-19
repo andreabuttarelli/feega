@@ -361,6 +361,11 @@ impl Tiles {
         self.floor.map_or(level, |floor| level.max(floor))
     }
 
+    pub fn sharp_enough(&self, camera: Camera) -> i32 {
+        let step = self.step_for(camera);
+        (step - COARSER_STEPS..step).find(|s| sharp_at(camera.zoom, *s)).unwrap_or(step)
+    }
+
     pub fn frame(&self, camera: Camera, screen: (u32, u32)) -> TileFrame {
         let step = self.step_for(camera);
         let world = match self.on_canvas(seen_world(camera, screen)) {
@@ -403,6 +408,10 @@ impl Tiles {
         let mut missing: Vec<TileKey> = keys_over(world, step).filter(|k| self.paints(*k) && !self.held.contains(k)).collect();
         missing.sort_by(|a, b| a.world().center().distance(centre).total_cmp(&b.world().center().distance(centre)));
         missing
+    }
+
+    pub fn visible_world(&self, camera: Camera, screen: (u32, u32)) -> Option<Rect> {
+        self.on_canvas(seen_world(camera, screen))
     }
 
     fn on_canvas(&self, world: Rect) -> Option<Rect> {
