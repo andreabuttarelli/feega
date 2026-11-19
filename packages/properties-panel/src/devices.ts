@@ -1,4 +1,4 @@
-import { WidthSource, type Viewport } from './viewport';
+import { WidthSource, type Viewport } from './viewport-box';
 
 export enum Device {
   Desktop = 'desktop',

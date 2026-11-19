@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DEVICE_ORDER, DEVICES, Device, deviceForKey, pressedDevice } from './device';
-import { ViewportMode, WidthSource } from './viewport';
+import { DEVICE_ORDER, DEVICES, Device, deviceForKey, pressedDevice } from './devices';
+import { ViewportMode, WidthSource } from './viewport-box';
 
 describe('devices', () => {
   it('maps 1, 2, 3 to desktop, tablet, phone', () => {
