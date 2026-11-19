@@ -1,6 +1,7 @@
 import type { LiveEditAsk } from '@feega/live-edit/live-ask';
 import type { Place } from '@feega/live-edit/move-node';
 import type { Scope } from '@feega/live-edit/scoped-rule';
+import type { PageTarget } from '@feega/live-edit/page-rule';
 import type { ReportFacts, SettingKey, SettingValue, Settings } from './settings';
 
 export type Rect = { x: number; y: number; width: number; height: number };
@@ -25,6 +26,7 @@ export type Pick = {
   classCount: number;
   ancestors: { source: Source; name: string }[];
   inner?: string;
+  page?: PageTarget;
 };
 
 export enum Move {
@@ -39,7 +41,7 @@ export enum Styling {
   Css = 'css'
 }
 
-export type EditAsk = LiveEditAsk & { css?: Record<string, string>; scope?: Scope; inner?: string };
+export type EditAsk = LiveEditAsk & { css?: Record<string, string>; scope?: Scope; inner?: string; page?: PageTarget };
 
 export enum ServerState {
   Detecting = 'detecting',

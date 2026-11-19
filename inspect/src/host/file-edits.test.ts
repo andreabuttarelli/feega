@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { ClassFamily, LiveProp, Side } from '@feega/live-edit/live-fields';
 import { fileEdits } from './file-edits';
 import { Place } from '@feega/live-edit/move-node';
+import { PageTarget } from '@feega/live-edit/page-rule';
 
 const PAGE = `<section class="px-4 py-8 text-black">
   <h1 class="text-2xl">Hello</h1>
@@ -111,6 +112,15 @@ describe('fileEdits', () => {
 
     expect(read(root)).not.toContain('.page-h1');
     expect(read(root)).not.toContain('display');
+  });
+
+  it('gli stili di pagina vanno nel foglio globale come regola body, anche con Tailwind', async () => {
+    const root = app();
+    writeFileSync(join(root, 'src/app.css'), '@import "tailwindcss";\n');
+    const out = await fileEdits(root).edit({ at: 'page', page: PageTarget.Body, prop: LiveProp.Color, value: '#111111', css: { 'background-color': '#111111' } });
+
+    expect(out.ok).toBe(true);
+    expect(readFileSync(join(root, 'src/app.css'), 'utf8')).toBe('@import "tailwindcss";\n\nbody {\n  background-color: #111111;\n}\n');
   });
 
   it('undo toglie la regola e la classe aggiunte', async () => {

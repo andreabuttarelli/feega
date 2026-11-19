@@ -53,13 +53,38 @@ export function deepestAt(doc, x, y) {
 export function inspectElement(element, { maxHtml = DEFAULT_MAX_HTML } = {}) {
   const tagged = element.closest(`[${SOURCE_ATTR}]`);
   if (!tagged) {
-    return null;
+    return element === element.ownerDocument.body ? inspectPage(element, maxHtml) : null;
   }
   const svg = untaggedSvg(element, tagged);
   if (svg) {
     return { ...inspectTagged(tagged, maxHtml), inner: 'svg', styles: designStyles(svg), html: truncate(svg.outerHTML, maxHtml), rect: rectOf(svg), name: 'icon', ownText: false, inlineText: false, elements: 0, text: null };
   }
   return inspectTagged(tagged, maxHtml);
+}
+
+export const PAGE_SOURCE = '(page):0:0';
+
+function inspectPage(body, maxHtml) {
+  return {
+    source: parseSource(PAGE_SOURCE),
+    page: 'body',
+    styles: designStyles(body),
+    html: truncate(`<body>`, maxHtml),
+    component: null,
+    rect: rectOf(body),
+    classes: body.getAttribute('class') ?? '',
+    text: null,
+    name: 'Page',
+    instances: 1,
+    classCount: 0,
+    parentWidth: body.getBoundingClientRect().width,
+    ancestors: [],
+    ownText: false,
+    inlineText: false,
+    elements: body.children.length,
+    rem: rootFontSize(body.ownerDocument),
+    viewport: body.ownerDocument.defaultView.innerWidth
+  };
 }
 
 function inspectTagged(tagged, maxHtml) {
@@ -129,6 +154,9 @@ function sheetOf(doc) {
 
 const selectorOf = (key) => {
   const [source, inner] = key.split(INNER_KEY);
+  if (source === PAGE_SOURCE) {
+    return 'body';
+  }
   return `[${SOURCE_ATTR}=${JSON.stringify(source)}]${inner ? ` ${inner}` : ''}`;
 };
 
@@ -234,7 +262,7 @@ function ancestorsOf(element) {
 const taggedChildren = (element) => [...element.querySelectorAll(`[${SOURCE_ATTR}]`)].filter((child) => taggedParent(child) === element);
 
 const MOVES = {
-  parent: (element) => taggedParent(element),
+  parent: (element) => taggedParent(element) ?? element.ownerDocument.body,
   child: (element) => taggedChildren(element)[0] ?? null,
   next: (element) => sibling(element, 1),
   previous: (element) => sibling(element, -1)
