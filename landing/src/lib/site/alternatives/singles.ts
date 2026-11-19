@@ -5,7 +5,6 @@ const CHECKED = '2026-11-18';
 export const SINGLES: Readonly<Record<string, Article>> = {
   'claude-design': {
     kind: ArticleKind.Single,
-    logo: 'claude',
     title: 'Claude Design alternatives when the code already exists | Feega',
     description: 'Claude Design makes new designs from a chat. When your app already exists, here is what edits it in place instead.',
     heading: 'Claude Design alternatives when the code already exists',
@@ -35,7 +34,6 @@ export const SINGLES: Readonly<Record<string, Article>> = {
   },
   'figma': {
     kind: ArticleKind.Single,
-    logo: 'figma',
     title: 'Figma alternatives for teams whose product is already built | Feega',
     description: 'Figma is best for new UI from a blank frame. When design and code have drifted apart, here is what edits the real app instead.',
     heading: 'Figma alternatives for teams whose product is already built',
@@ -65,7 +63,6 @@ export const SINGLES: Readonly<Record<string, Article>> = {
   },
   'onlook': {
     kind: ArticleKind.Single,
-    logo: 'onlook',
     title: 'Onlook alternatives when not everyone is on a Mac | Feega',
     description: 'Onlook is a free, open-source Mac editor for your code. When the team is mixed or works together, here is the difference.',
     heading: 'Onlook alternatives when not everyone is on a Mac',
@@ -95,7 +92,6 @@ export const SINGLES: Readonly<Record<string, Article>> = {
   },
   'cursor-design-mode': {
     kind: ArticleKind.Single,
-    logo: 'cursor',
     title: 'Cursor Design Mode alternatives for people outside the IDE | Feega',
     description: 'Cursor Design Mode lets developers annotate a running app. When the person changing the design does not use an IDE, here is the option.',
     heading: 'Cursor Design Mode alternatives for people who don’t open an IDE',
@@ -125,7 +121,6 @@ export const SINGLES: Readonly<Record<string, Article>> = {
   },
   'stitch': {
     kind: ArticleKind.Single,
-    logo: 'google',
     title: 'Stitch alternatives for a codebase you already ship | Feega',
     description: 'Google Stitch designs new UI by prompt and voice. For editing the pages you already ship, here is how the options differ.',
     heading: 'Stitch alternatives for a codebase you already ship',
@@ -155,7 +150,6 @@ export const SINGLES: Readonly<Record<string, Article>> = {
   },
   'v0': {
     kind: ArticleKind.Single,
-    logo: 'v0',
     title: 'v0 alternatives for apps that already exist | Feega',
     description: 'v0 builds and edits apps from a chat and deploys to Vercel. When you would rather move the thing than describe it, here is the option.',
     heading: 'v0 alternatives for apps that already exist',
@@ -180,7 +174,6 @@ export const SINGLES: Readonly<Record<string, Article>> = {
   },
   'lovable': {
     kind: ArticleKind.Single,
-    logo: 'lovable',
     title: 'Lovable alternatives that keep your repo yours | Feega',
     description: 'Lovable turns a prompt into a hosted app. When the repo already exists and the commits should be yours, here is the difference.',
     heading: 'Lovable alternatives that keep your repo yours',

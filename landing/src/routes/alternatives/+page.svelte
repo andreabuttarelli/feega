@@ -31,7 +31,7 @@
     <div class="cards">
       {#each ofKind(kind) as [slug, article] (slug)}
         <a class="card" href={alternativePath(slug)}>
-          <AsciiCover cover={coverFor(slugs.indexOf(slug))} label={article.heading} logo={article.logo} />
+          <AsciiCover cover={coverFor(slugs.indexOf(slug))} label={article.heading} name={article.kind === ArticleKind.Single ? article.pickThem.name : undefined} />
           <strong>{article.heading}</strong>
           <span>{article.hook}</span>
         </a>

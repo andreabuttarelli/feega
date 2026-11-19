@@ -6,6 +6,7 @@
   import { articleJsonLd, faqJsonLd } from '$lib/site/structured-data';
   import AsciiCover from '$lib/site/alternatives/AsciiCover.svelte';
   import { coverFor } from '$lib/site/alternatives/cover';
+  import { ArticleKind } from '$lib/site/alternatives/alternative';
 
   let { data } = $props();
 
@@ -26,7 +27,7 @@
   <a class="back" href={ALTERNATIVES_PATH}>← All alternatives</a>
   <h1>{page.heading}</h1>
   <p class="fine">By {AUTHOR.name}, {AUTHOR.role} · checked {page.checked} · <a href="#how-checked">how we checked</a></p>
-  <AsciiCover cover={coverFor(Object.keys(ALTERNATIVES).indexOf(data.slug))} label={page.heading} logo={page.logo} />
+  <AsciiCover cover={coverFor(Object.keys(ALTERNATIVES).indexOf(data.slug))} label={page.heading} name={page.kind === ArticleKind.Single ? page.pickThem.name : undefined} />
   <p class="intro"><strong>{page.lead}</strong></p>
 
   <section>
