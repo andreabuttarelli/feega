@@ -2,6 +2,8 @@
 
 Design in your codebase. Click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens.
 
+Same editor, two ways to run it: this extension inside VS Code, or `npx feega` in your app folder to open it in the browser.
+
 ![Select an element](images/1-select.png)
 
 ## How it works

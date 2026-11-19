@@ -4,6 +4,8 @@ Design your running web app in the browser. Click an element, change its colour,
 or text, and the edit lands in your source: a Tailwind class when the project uses Tailwind, a
 rule in the component's own stylesheet otherwise. No account, no cloud, no copy of your code.
 
+Same editor, two ways to run it: `npx feega` in the browser, or the Feega extension inside VS Code.
+
 ```bash
 cd my-app
 npx feega
@@ -40,7 +42,7 @@ Node 20 or newer.
 ## VS Code
 
 The same editor runs inside VS Code:
-[Feega Inspect](https://marketplace.visualstudio.com/items?itemName=AndreaButtarelli.feega-inspect).
+[Feega](https://marketplace.visualstudio.com/items?itemName=andreabuttarelli.feega).
 
 ## Support
 
