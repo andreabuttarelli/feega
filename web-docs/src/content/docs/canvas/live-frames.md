@@ -45,6 +45,16 @@ The snapshot is taken at 2× the frame's width, so it stays sharp when you zoom 
 
 Reopened without a dev server, each frame shows its snapshot marked **Not connected**.
 
+## Playing a live frame
+
+Select a live frame and click **Play** in its corner. Play opens the real page from your dev server, with the edits already in your files: links, forms and scripts work as in your browser.
+
+The play bar is the same as for drawn frames: **Desktop**, **Tablet**, **Phone** (keys 1, 2, 3) or a typed width, **Restart** (R) reloads the page, **Full screen** (F), **Close** (Esc). Play opens at the frame's width.
+
+In the desktop app the page runs in its own isolated view (no Node, no preload, local addresses only), so cookies and `X-Frame-Options` behave as in a browser tab, and **Open devtools** in the play bar inspects it. In the browser it is an iframe of the dev server.
+
+If the dev server is not running, Play shows the frame's last snapshot with **Start dev server**.
+
 ## Where edits go
 
 By default an edit is written straight into your project's files, the same files your editor and your coding agent are using: no branch, no commit. The dev server you already run picks it up. **Cmd/Ctrl+Z** puts the file back as it was before the edit, unless something else (you, or your agent) changed that file since: then the file is left alone and Feega says so.
