@@ -4,6 +4,7 @@ import { inside, liveAtOf, reader, tokenOf } from '@feega/live-edit/live-ask';
 import { styleAttr } from '@feega/live-edit/style-attr';
 import { Styling, type EditAsk } from '../messages';
 import { stylingOf } from './styling';
+import { StylingChoice } from '../settings';
 import { LiveProp } from '@feega/live-edit/live-fields';
 import { literalText } from '@feega/live-edit/literal-text';
 import type { FileChange } from '@feega/live-edit/files';
@@ -16,7 +17,7 @@ type Step = { full: string; before: string; after: string };
 const NOTHING_TO_UNDO = 'nothing to undo';
 const CHANGED_SINCE = 'the file changed after the edit: not restored';
 
-export function fileEdits(root: string) {
+export function fileEdits(root: string, choice: () => StylingChoice = () => StylingChoice.Auto) {
   const steps: Step[] = [];
   let turn: Promise<unknown> = Promise.resolve();
 
@@ -37,7 +38,7 @@ export function fileEdits(root: string) {
       return out.ok ? written(full, out.change, '') : out;
     }
 
-    if ((await stylingOf(root)) === Styling.Css) {
+    if ((await stylingOf(root, choice())) === Styling.Css) {
       const out = await styleAttr(reader(root), at, ask.css ?? {});
       return out.ok ? written(full, out.change, '') : out;
     }

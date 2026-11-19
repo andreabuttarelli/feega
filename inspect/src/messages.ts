@@ -1,4 +1,5 @@
 import type { LiveEditAsk } from '@feega/live-edit/live-ask';
+import type { ReportFacts, SettingKey, SettingValue, Settings } from './settings';
 
 export type Rect = { x: number; y: number; width: number; height: number };
 
@@ -45,10 +46,11 @@ export enum ToHost {
   Picked = 'picked',
   Restart = 'restart',
   External = 'external',
-  Prefs = 'prefs'
+  Prefs = 'prefs',
+  Setting = 'setting'
 }
 
-export type Prefs = { size: string; custom: number | null; barClosed: boolean };
+export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string };
 
 export enum ToView {
   App = 'app',
@@ -56,7 +58,8 @@ export enum ToView {
   Edited = 'edited',
   Pick = 'pick',
   Change = 'change',
-  Server = 'server'
+  Server = 'server',
+  Settings = 'settings'
 }
 
 export type HostMessage =
@@ -67,11 +70,13 @@ export type HostMessage =
   | { kind: ToHost.Picked; id: number; pick: Pick | null }
   | { kind: ToHost.Restart }
   | { kind: ToHost.External; url: string }
-  | { kind: ToHost.Prefs; prefs: Prefs };
+  | { kind: ToHost.Prefs; prefs: Prefs }
+  | { kind: ToHost.Setting; key: SettingKey; value: SettingValue };
 
 export type ViewMessage =
   | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null }
   | { kind: ToView.Server; state: ServerState; reason?: string }
+  | { kind: ToView.Settings; values: Settings; facts: ReportFacts }
   | { kind: ToView.Status; text: string }
   | { kind: ToView.Edited; ok: boolean; reason?: string; written?: string; at?: Source; saved?: Source }
   | { kind: ToView.Change; row: string; value: string }

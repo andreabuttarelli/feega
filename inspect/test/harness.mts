@@ -8,6 +8,7 @@ import { stylingOf } from '../src/host/styling.ts';
 import { startDev } from '../src/host/dev-server.ts';
 import { ServerState, ToHost, ToView, type EditAsk, type Pick } from '../src/messages.ts';
 import { liveAtOf } from '@feega/live-edit/live-ask';
+import { SETTINGS } from '../src/settings.ts';
 
 const PANEL_PORT = 5999;
 const dist = fileURLToPath(new URL('../dist/webview/', import.meta.url));
@@ -48,6 +49,7 @@ export async function openPanel(appRoot: string, theme = DARK) {
     if (m.kind === ToHost.Ready) {
       await reply({ kind: ToView.App, url: running.url, styling, prefs: null });
       await reply({ kind: ToView.Server, state: ServerState.Running });
+      await reply({ kind: ToView.Settings, values: Object.fromEntries(SETTINGS.map((r) => [r.key, r.fallback])), facts: { version: '0.1.0', framework: 'sveltekit', styling } });
     }
     if (m.kind === ToHost.Picked) {
       picks.get(m.id!)?.(m.pick ?? null);

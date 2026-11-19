@@ -1,6 +1,6 @@
 import { cp, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { build as esbuild } from 'esbuild';
+import { build as esbuild, context } from 'esbuild';
 import { build as vite } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 
@@ -8,9 +8,11 @@ const here = (path) => fileURLToPath(new URL(path, import.meta.url));
 const SOURCE_MAP = here('../packages/source-map/src/');
 const LAUNCHER = here('dist/launcher/');
 
+const WATCH = process.argv.includes('--watch');
+
 await rm(here('dist'), { recursive: true, force: true });
 
-await esbuild({
+const HOST = {
   entryPoints: [here('src/host/extension.ts')],
   outfile: here('dist/extension.cjs'),
   bundle: true,
@@ -18,7 +20,13 @@ await esbuild({
   format: 'cjs',
   target: 'node20',
   external: ['vscode']
-});
+};
+
+if (WATCH) {
+  await (await context(HOST)).watch();
+} else {
+  await esbuild(HOST);
+}
 
 await esbuild({
   entryPoints: [`${SOURCE_MAP}vite.ts`],
@@ -37,6 +45,7 @@ await vite({
   root: here('src/webview'),
   plugins: [svelte({ configFile: false })],
   build: {
+    watch: WATCH ? {} : null,
     outDir: here('dist/webview'),
     emptyOutDir: true,
     cssCodeSplit: false,

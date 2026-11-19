@@ -11,6 +11,8 @@
   import { pageBridge, sourceText } from './page-bridge';
   import Properties from './Properties.svelte';
   import ModeSwitch from './ModeSwitch.svelte';
+  import FeegaMenu from './FeegaMenu.svelte';
+  import { SettingKey, type ReportFacts, type Settings } from '../settings';
   import { ROWS, type Row } from './controls';
   import { modeOfKey } from './modes';
   import { browseHistory } from './history';
@@ -21,6 +23,7 @@
   const BAR_PX = 260;
 
   let url = $state('');
+  let start = $state('');
   let route = $state('/');
   let address = $state('/');
   let styling = $state(Styling.Tailwind);
@@ -41,8 +44,11 @@
   let stage = $state({ w: 0, h: 0 });
   let dragging = $state<{ x: number; width: number; side: number } | null>(null);
   let navTick = $state(0);
+  let settings = $state<Settings | null>(null);
+  let facts = $state<ReportFacts | null>(null);
 
   const history = browseHistory();
+  let savedPrefs = false;
   const fit = $derived(fitOf(size, custom, stage));
   const look = $derived(serverLook(server));
   const canBack = $derived((navTick, history.canBack()));
@@ -72,6 +78,7 @@
     address = path;
     history.visited(path);
     navTick++;
+    savePrefs();
   }
 
   function go(path: string | null) {
@@ -90,20 +97,30 @@
   }
 
   function savePrefs() {
-    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed } });
+    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route } });
   }
 
   function restore(prefs: Prefs | null) {
     if (!prefs) {
       return;
     }
+    savedPrefs = true;
     size = PRESETS.includes(prefs.size as Size) || prefs.size === Size.Custom ? (prefs.size as Size) : Size.Full;
     custom = prefs.custom;
     barClosed = prefs.barClosed;
+    route = prefs.route ?? route;
   }
 
   const handlers: { [K in ToView]: (m: Extract<ViewMessage, { kind: K }>) => void } = {
-    [ToView.App]: (m) => ((url = m.url), (styling = m.styling), restore(m.prefs)),
+    [ToView.App]: (m) => (restore(m.prefs), (start = new URL(route, m.url).toString()), (url = m.url), (styling = m.styling)),
+    [ToView.Settings]: (m) => {
+      settings = m.values;
+      facts = m.facts;
+      const preset = m.values[SettingKey.DefaultSize] as Size;
+      if (!savedPrefs && PRESETS.includes(preset)) {
+        size = preset;
+      }
+    },
     [ToView.Server]: (m) => ((server = m.state), (serverReason = m.reason ?? '')),
     [ToView.Status]: (m) => (problem = { text: m.text }),
     [ToView.Edited]: (m) => {
@@ -254,6 +271,7 @@
 <main style={`grid-template-columns: 1fr ${barClosed ? 0 : BAR_PX}px`}>
   <section class="view">
     <header class="toolbar">
+      <FeegaMenu values={settings} {facts} onsetting={(key, value) => toHost({ kind: ToHost.Setting, key, value })} onlink={(link) => toHost({ kind: ToHost.External, url: link })} />
       <button type="button" class="icon" title="Back (⌘[)" disabled={!canBack} onclick={() => go(history.back())}><ArrowLeft size={15} /></button>
       <button type="button" class="icon" title="Forward (⌘])" disabled={!canForward} onclick={() => go(history.forward())}><ArrowRight size={15} /></button>
       <button type="button" class="icon" title="Reload (⌘R)" onclick={() => go(route)}><RotateCw size={14} /></button>
@@ -272,9 +290,9 @@
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
     </header>
 
-    <div class="backdrop" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={drag} onpointerup={endDrag}>
+    <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={drag} onpointerup={endDrag}>
       <div class="frame" class:framed={size !== Size.Full} style={`width:${fit.width * fit.scale}px`}>
-        {#if url}<iframe bind:this={frame} src={url} title="App" data-testid="app-frame" style={`width:${fit.width}px;height:${stage.h / fit.scale}px;transform:scale(${fit.scale})`}></iframe>{/if}
+        {#if url}<iframe bind:this={frame} src={start} title="App" data-testid="app-frame" style={`width:${fit.width}px;height:${stage.h / fit.scale}px;transform:scale(${fit.scale})`}></iframe>{/if}
         {#if mode === Mode.Design && bridged && !editing}
           <div class="overlay" role="presentation" onpointermove={onMove} onpointerleave={() => (hover = null)} onclick={onPick} ondblclick={onDouble}>
             {#if hover}<div class="outline hover" style={box(hover)}></div>{/if}

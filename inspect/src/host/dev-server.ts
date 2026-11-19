@@ -6,7 +6,8 @@ import { Framework, planFile, runPlan, textsWanted, type Planned, type RepoFacts
 
 export enum Launch {
   Vite = 'vite',
-  Script = 'script'
+  Script = 'script',
+  Command = 'command'
 }
 
 const LAUNCH: Record<Framework, Launch> = {
@@ -82,8 +83,11 @@ async function until(url: string, child: ChildProcess): Promise<boolean> {
   return false;
 }
 
-function started(plan: RunPlan, appRoot: string, launch: Launch): ChildProcess {
+function started(plan: RunPlan, appRoot: string, launch: Launch, command: string): ChildProcess {
   const env = { ...process.env, ...plan.env };
+  if (launch === Launch.Command) {
+    return spawn(command, { cwd: appRoot, env: process.env, shell: true });
+  }
   if (launch === Launch.Vite) {
     return spawn('node', [join(appRoot, LAUNCHER_DIR, LAUNCHER), String(plan.port), HOST], { cwd: appRoot, env });
   }
@@ -91,27 +95,27 @@ function started(plan: RunPlan, appRoot: string, launch: Launch): ChildProcess {
   return spawn(bin, args, { cwd: appRoot, env, shell: process.platform === 'win32' });
 }
 
-export async function startDev(root: string, launcherSource: string, log: (line: string) => void): Promise<Running | { refused: string }> {
+export async function startDev(root: string, launcherSource: string, log: (line: string) => void, command = ''): Promise<Running | { refused: string }> {
   const planned: Planned = runPlan(await factsOf(root), null, { host: HOST, port: await freePort() });
   if (!planned.ok) {
     return { refused: planned.reason };
   }
 
   const appRoot = join(root, planned.appDir);
-  const launch = LAUNCH[planned.framework];
+  const launch = command ? Launch.Command : LAUNCH[planned.framework];
   const own = `http://localhost:${planned.defaultPort}/`;
-  if (launch === Launch.Script && (await answers(own))) {
+  if (launch !== Launch.Vite && (await answers(own))) {
     return { url: own, plan: planned, launch, attached: true, stop: () => undefined, exited: () => undefined };
   }
 
   if (launch === Launch.Vite) {
     await cp(launcherSource, join(appRoot, LAUNCHER_DIR), { recursive: true });
   }
-  const child = started(planned, appRoot, launch);
+  const child = started(planned, appRoot, launch, command);
   child.stdout?.on('data', (d) => log(String(d)));
   child.stderr?.on('data', (d) => log(String(d)));
 
-  const url = `http://${HOST}:${planned.port}/`;
+  const url = launch === Launch.Command ? own : `http://${HOST}:${planned.port}/`;
   if (!(await until(url, child))) {
     child.kill();
     return { refused: `the dev server did not answer on ${url}` };

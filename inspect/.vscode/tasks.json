@@ -1,0 +1,16 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "inspect: watch",
+      "type": "npm",
+      "script": "dev",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "feega-inspect",
+        "pattern": { "regexp": "^x^" },
+        "background": { "activatesOnStart": true, "beginsPattern": "build started|watching for file changes", "endsPattern": "built in" }
+      }
+    }
+  ]
+}

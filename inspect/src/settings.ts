@@ -1,0 +1,69 @@
+export enum SettingKey {
+  Telemetry = 'feegaInspect.telemetry',
+  Styling = 'feegaInspect.styling',
+  DevCommand = 'feegaInspect.devCommand',
+  DefaultSize = 'feegaInspect.defaultSize'
+}
+
+export enum StylingChoice {
+  Auto = 'auto',
+  Tailwind = 'tailwind',
+  Css = 'css'
+}
+
+export type SettingValue = string | boolean;
+
+export type SettingRow = {
+  key: SettingKey;
+  label: string;
+  hint: string;
+  fallback: SettingValue;
+  choices?: { value: string; label: string }[];
+};
+
+export const SETTINGS: SettingRow[] = [
+  { key: SettingKey.Telemetry, label: 'Anonymous usage counts', hint: 'Counts of opens and edits, framework and styling system. No code, no paths.', fallback: true },
+  {
+    key: SettingKey.Styling,
+    label: 'Write styles as',
+    hint: 'Auto uses Tailwind classes when the project has Tailwind, CSS otherwise.',
+    fallback: StylingChoice.Auto,
+    choices: [
+      { value: StylingChoice.Auto, label: 'Auto' },
+      { value: StylingChoice.Tailwind, label: 'Tailwind classes' },
+      { value: StylingChoice.Css, label: 'CSS' }
+    ]
+  },
+  { key: SettingKey.DevCommand, label: 'Dev server command', hint: 'Empty: detected from package.json.', fallback: '' },
+  {
+    key: SettingKey.DefaultSize,
+    label: 'Default device',
+    hint: 'Size the preview opens at.',
+    fallback: 'full',
+    choices: [
+      { value: 'full', label: 'Full' },
+      { value: 'desktop', label: 'Desktop' },
+      { value: 'tablet', label: 'Tablet' },
+      { value: 'phone', label: 'Phone' }
+    ]
+  }
+];
+
+export type Settings = Record<SettingKey, SettingValue>;
+
+export const LINKS = {
+  docs: 'https://docs.feega.app/integrations/inspect/',
+  changelog: 'https://feega.app/changelog',
+  dashboard: 'https://feega.app/',
+  issues: 'https://github.com/andreabuttarelli/feega/issues/new'
+};
+
+export type ReportFacts = { version: string; framework: string; styling: string };
+
+export function issueUrl({ version, framework, styling }: ReportFacts): string {
+  const url = new URL(LINKS.issues);
+  url.searchParams.set('title', 'Feega Inspect: ');
+  url.searchParams.set('body', `**What happened**\n\n\n**Expected**\n\n\n---\nFeega Inspect ${version} · framework: ${framework} · styling: ${styling}`);
+  url.searchParams.set('labels', 'inspect');
+  return url.toString();
+}

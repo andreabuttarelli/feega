@@ -27,9 +27,37 @@
         "title": "Open the running app",
         "category": "Feega Inspect"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Feega Inspect",
+      "properties": {
+        "feegaInspect.telemetry": {
+          "type": "boolean",
+          "default": true,
+          "description": "Send anonymous usage counts (opens, edits, framework, styling system). No code, no paths. Also off when VS Code telemetry is off."
+        },
+        "feegaInspect.styling": {
+          "type": "string",
+          "default": "auto",
+          "enum": ["auto", "tailwind", "css"],
+          "description": "How style edits are written: auto-detect, Tailwind classes, or CSS."
+        },
+        "feegaInspect.devCommand": {
+          "type": "string",
+          "default": "",
+          "description": "Command that starts the dev server. Empty: detected from package.json."
+        },
+        "feegaInspect.defaultSize": {
+          "type": "string",
+          "default": "full",
+          "enum": ["full", "desktop", "tablet", "phone"],
+          "description": "Device size the preview opens at."
+        }
+      }
+    }
   },
   "scripts": {
+    "dev": "node build.mjs --watch",
     "build": "node build.mjs",
     "package": "npm run build && npx -y @vscode/vsce package --no-dependencies --allow-missing-repository --skip-license",
     "test:e2e": "npm run build && node test/run.cjs"
