@@ -130,7 +130,7 @@
   .sep,
   .muted,
   .tone-muted {
-    color: var(--ui-text-muted);
+    color: var(--ui-text-tertiary);
   }
   .branch {
     max-width: 160px;
@@ -165,7 +165,7 @@
     border-radius: var(--ui-radius-full);
   }
   .ci-passed {
-    background: var(--ui-success, #30a46c);
+    background: var(--ui-ok);
   }
   .ci-failed {
     background: var(--ui-danger);

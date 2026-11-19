@@ -5,10 +5,16 @@
   import { PushOutcome, pushOutcomeOf, editedFilesText } from '$lib/canvas/source-sync';
   import { BranchMode, branchFields, type BranchOptions, type GitSummary } from '$lib/canvas/git-status';
   import X from '@lucide/svelte/icons/x';
+  import ArrowRight from '@lucide/svelte/icons/arrow-right';
+  import Frame from '@lucide/svelte/icons/frame';
+  import GitCommitHorizontal from '@lucide/svelte/icons/git-commit-horizontal';
+  import GitPullRequest from '@lucide/svelte/icons/git-pull-request';
+  import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+  import CloudCheck from '@lucide/svelte/icons/cloud-check';
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
-  import { ControlLayout, ControlRow, Segmented, Switch } from '$lib/components/ui/control';
+  import { Segmented, Switch } from '$lib/components/ui/control';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
   type Anchor = { left: number; top: number };
@@ -264,39 +270,59 @@
 
 {#if panel}
   <aside class="changes" data-testid="changes-panel" aria-label="Changes">
-    <header class="head">
-      <div class="title">
+    <header class="cp-head">
+      <div class="cp-title">
         <strong>{git?.repo ?? 'Changes'}</strong>
-        <span class="muted">{#if direct}→ <code>{target}</code>{:else}<code>{baseBranch}</code> → <code>{workBranch}</code>{/if}</span>
+        <span class="cp-flow">
+          {#if !direct}<code class="cp-ref">{baseBranch}</code>{/if}
+          <ArrowRight size={12} />
+          <code class="cp-ref">{direct ? target : workBranch}</code>
+        </span>
       </div>
-      {#if git?.pull}<a class="pr" href={git.pull.url} target="_blank" rel="noopener">#{git.pull.number} · {git.draft ? 'Draft' : git.pull.status}</a>{/if}
+      {#if git?.pull}
+        <a class="cp-pill" href={git.pull.url} target="_blank" rel="noopener">
+          #{git.pull.number} · {git.draft ? 'Draft' : git.pull.status}
+          {#if git.ci !== CiState.None}<span class="cp-ci cp-ci-{git.ci}"></span>{/if}
+        </a>
+      {/if}
       <Button variant="ghost" size="icon-sm" aria-label="Close" onclick={() => (panel = false)}><X size={14} /></Button>
     </header>
 
-    <section class="list">
-      <p class="label">Next commit</p>
-      {#if !rows.length}
-        <p class="empty" data-testid="changes-empty">No changes yet. Edit a linked frame and it is committed here.</p>
-      {/if}
-    {#each rows as row (row.nodeId)}
-      <label class="change">
-        <input type="checkbox" checked={picked.has(row.nodeId)} onchange={(e) => (e.currentTarget.checked ? picked.add(row.nodeId) : picked.delete(row.nodeId))} />
-        {#if row.link.beforePoster}<img src={assetUrl(row.link.beforePoster)} alt="Before" title="Before" />{/if}
-        {#if posterOf(row.nodeId)}<img src={posterOf(row.nodeId)} alt="After" title="After" />{/if}
-        <span><strong>{rowTitle(row)}</strong> <span class="muted">{row.state}</span>{#if impactOf(row)}<br /><span class="note">{impactOf(row)}</span>{/if}</span>
-      </label>
-      {#each files.get(row.nodeId) ?? [] as file (file.path)}
-        <details class="file">
-          <summary><code>{file.path}</code></summary>
-          <pre>{file.diff}</pre>
-        </details>
-      {/each}
-      {#each row.proposals ?? [] as p (p.component)}
-        <p class="muted">No prop on <code>{p.component}</code> for {p.props.join(', ')}: ask the agent to add one, or apply to the main component.</p>
-      {/each}
-      <label class="change"><input type="checkbox" checked={mains.has(row.nodeId)} onchange={(e) => (e.currentTarget.checked ? mains.add(row.nodeId) : mains.delete(row.nodeId))} /> Apply instance edits to main component</label>
-    {/each}
-    </section>
+    <div class="cp-section">
+      <p class="cp-label">Next commit {#if rows.length}<span class="cp-count">{picked.size}/{rows.length}</span>{/if}</p>
+      <section class="cp-card">
+        {#if !rows.length}
+          <p class="cp-empty" data-testid="changes-empty"><GitCommitHorizontal size={16} /> No changes yet. Edit a linked frame and it is committed here.</p>
+        {/if}
+        {#each rows as row (row.nodeId)}
+          <label class="cp-row">
+            <input type="checkbox" checked={picked.has(row.nodeId)} onchange={(e) => (e.currentTarget.checked ? picked.add(row.nodeId) : picked.delete(row.nodeId))} />
+            {#if posterOf(row.nodeId)}
+              <img class="cp-thumb" src={posterOf(row.nodeId)} alt="After" title="After" />
+            {:else if row.link.beforePoster}
+              <img class="cp-thumb" src={assetUrl(row.link.beforePoster)} alt="Before" title="Before" />
+            {:else}
+              <span class="cp-thumb cp-thumb-empty"><Frame size={14} /></span>
+            {/if}
+            <span class="cp-row-text">
+              <span><strong>{rowTitle(row)}</strong> <span class="cp-muted">{row.state}</span></span>
+              <code class="cp-path">{popoverOf(row).file}</code>
+              {#if impactOf(row)}<span class="cp-muted">{impactOf(row)}</span>{/if}
+            </span>
+          </label>
+          {#each files.get(row.nodeId) ?? [] as file (file.path)}
+            <details class="cp-file">
+              <summary><code>{file.path}</code></summary>
+              <pre>{file.diff}</pre>
+            </details>
+          {/each}
+          {#each row.proposals ?? [] as p (p.component)}
+            <p class="cp-muted">No prop on <code>{p.component}</code> for {p.props.join(', ')}: ask the agent to add one, or apply to the main component.</p>
+          {/each}
+          <label class="cp-row cp-row-sub"><input type="checkbox" checked={mains.has(row.nodeId)} onchange={(e) => (e.currentTarget.checked ? mains.add(row.nodeId) : mains.delete(row.nodeId))} /> Apply instance edits to main component</label>
+        {/each}
+      </section>
+    </div>
 
     {#each asking as v (v.nodeId)}
       <p class="note">{syncs.find((s) => s.nodeId === v.nodeId)?.name || 'Variant'} is a variant:</p>
@@ -311,7 +337,7 @@
       <p class="note">This push touches config, lockfiles or dotfiles.</p>
       <button type="button" disabled={busy} onclick={() => push(true)}>Push anyway</button>
     {/if}
-    {#if note}<p class="note" data-testid="changes-note">{note}</p>{/if}
+    {#if note}<p class="cp-note" data-testid="changes-note"><TriangleAlert size={14} /><span>{note}</span></p>{/if}
     {#if pushed}
       <p class="pushed" data-testid="pushed-note">{pushedNote(pushed)}{#if pushed.pull} · <a href={pushed.pull.url} target="_blank" rel="noopener">open</a> · {CI_LABEL[ciOf(pushed.pull)]}{/if}</p>
       {#if !pushed.pull}
@@ -328,41 +354,46 @@
         <button type="button" onclick={() => (reviewing = false)}>Back</button>
       </div>
     {/if}
-    <section class="where" data-testid="branch-options">
-      <p class="label">Where changes go</p>
-      <Segmented label="Where changes go" value={options.mode} options={WHERE} onchange={(v) => (options.mode = v as BranchMode)} />
-      {#if direct}
-        <label class="label" for="commit-branch">Branch</label>
-        <Input id="commit-branch" list="commit-branches" placeholder={baseBranch} bind:value={options.commitTo} autocomplete="off" data-testid="commit-branch" />
-        <datalist id="commit-branches">
-          {#each branches as name (name)}<option value={name}></option>{/each}
-        </datalist>
-        {#if targetPull}<a class="pr" href="https://github.com/{git?.repo}/pull/{targetPull.number}" target="_blank" rel="noopener" data-testid="commit-branch-pull">Open PR #{targetPull.number} from {target}</a>{/if}
-        <p class="hint" data-testid="branch-direct-note">Commits land on <code>{target}</code> with no pull request. If it is protected, GitHub refuses them.</p>
-      {:else}
-        <label class="label" for="branch-name">Branch</label>
-        <Input id="branch-name" placeholder="feega/canvas-edits" bind:value={options.branch} data-testid="branch-name" />
-      {/if}
-    </section>
-
-    <div class="autosave" data-testid="last-saved">
-      <ControlRow label="Autosave" hint={savedLabel} layout={ControlLayout.Inline}>
-        <Switch label="Autosave" value={autosaveOn} onchange={(v) => (autosaveOn = v === true)} />
-      </ControlRow>
+    <div class="cp-section">
+      <p class="cp-label">Where changes go</p>
+      <section class="cp-card cp-stack" data-testid="branch-options">
+        <Segmented label="Where changes go" value={options.mode} options={WHERE} onchange={(v) => (options.mode = v as BranchMode)} />
+        {#if direct}
+          <label class="cp-field-label" for="commit-branch">Branch</label>
+          <Input id="commit-branch" list="commit-branches" placeholder={baseBranch} bind:value={options.commitTo} autocomplete="off" data-testid="commit-branch" />
+          <datalist id="commit-branches">
+            {#each branches as name (name)}<option value={name}></option>{/each}
+          </datalist>
+          {#if targetPull}<a class="cp-pill cp-pill-inline" href="https://github.com/{git?.repo}/pull/{targetPull.number}" target="_blank" rel="noopener" data-testid="commit-branch-pull"><GitPullRequest size={12} /> Open PR #{targetPull.number} from {target}</a>{/if}
+          <p class="cp-warn" data-testid="branch-direct-note"><TriangleAlert size={14} /><span>Commits land on <code>{target}</code> with no pull request. If it is protected, GitHub refuses them.</span></p>
+        {:else}
+          <label class="cp-field-label" for="branch-name">Branch</label>
+          <Input id="branch-name" placeholder="feega/canvas-edits" bind:value={options.branch} data-testid="branch-name" />
+        {/if}
+      </section>
     </div>
 
-    <footer>
-      {#if readOnly}
-        <Button size="sm" disabled={busy || !picked.size} onclick={() => push()}>Download patch</Button>
-      {:else}
-        <Button size="sm" disabled={busy || !picked.size || reviewing} onclick={() => (reviewing = true)} data-testid="changes-primary">{direct ? `Commit to ${target}` : 'Push now'}</Button>
-      {/if}
+    <div class="cp-section">
+      <p class="cp-label">Autosave</p>
+      <section class="cp-card cp-autosave" data-testid="last-saved">
+        <span class="cp-save-icon cp-save-{git?.autosave ?? 'idle'}"><CloudCheck size={16} /></span>
+        <span class="cp-row-text"><span>Commit edits as you work</span><span class="cp-muted">{savedLabel}</span></span>
+        <Switch label="Autosave" value={autosaveOn} onchange={(v) => (autosaveOn = v === true)} />
+      </section>
+    </div>
+
+    <footer class="cp-foot">
       <DropdownMenu.Root>
-        <DropdownMenu.Trigger class="more" aria-label="More" data-testid="changes-more"><Ellipsis size={14} /></DropdownMenu.Trigger>
-        <DropdownMenu.Content align="end" collisionPadding={8}>
+        <DropdownMenu.Trigger class="cp-more" aria-label="More" data-testid="changes-more"><Ellipsis size={16} /></DropdownMenu.Trigger>
+        <DropdownMenu.Content align="start" collisionPadding={8}>
           <DropdownMenu.Item disabled={busy || !hasPush} onSelect={undo}>Undo last push</DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Root>
+      {#if readOnly}
+        <Button size="md" class="cp-primary" disabled={busy || !picked.size} onclick={() => push()}>Download patch</Button>
+      {:else}
+        <Button size="md" class="cp-primary" disabled={busy || !picked.size || reviewing} onclick={() => (reviewing = true)} data-testid="changes-primary">{direct ? `Commit to ${target}` : 'Push now'}</Button>
+      {/if}
     </footer>
   </aside>
 {/if}
@@ -389,68 +420,246 @@
     position: fixed;
     top: 56px;
     right: 10px;
-    display: grid;
-    gap: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-4);
     width: 360px;
     max-height: calc(100vh - 72px);
     overflow: auto;
-    padding: 12px;
+    padding: var(--ui-space-4);
     border: 0;
     border-radius: var(--ui-radius-lg);
     background: var(--ui-panel-raised);
     box-shadow: var(--ui-shadow-float);
+    font-size: var(--ui-type-label);
   }
-  .head {
+  .cp-head {
     display: flex;
-    align-items: center;
-    gap: 8px;
+    align-items: flex-start;
+    gap: var(--ui-space-2);
     margin: 0;
   }
-  .title {
+  .cp-title {
     display: grid;
     flex: 1;
+    gap: 6px;
     min-width: 0;
   }
-  .pr {
-    padding: 2px 8px;
+  .cp-title strong {
+    font-size: var(--ui-type-body);
+    font-weight: var(--ui-weight-semibold);
+  }
+  .cp-flow {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    color: var(--ui-text-tertiary);
+  }
+  .cp-ref {
+    overflow: hidden;
+    padding: 2px 6px;
+    border-radius: var(--ui-radius-xs);
+    background: var(--ui-wash);
+    color: var(--ui-text-secondary);
+    font-family: var(--ui-mono);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cp-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
     border-radius: var(--ui-radius-full);
     background: var(--ui-wash);
     color: var(--ui-text);
     text-decoration: none;
     white-space: nowrap;
   }
-  .list,
-  .where {
+  .cp-pill-inline {
+    justify-self: start;
+    background: var(--ui-accent-wash);
+    color: var(--ui-accent-text);
+  }
+  .cp-ci {
+    width: 6px;
+    height: 6px;
+    border-radius: var(--ui-radius-full);
+  }
+  .cp-ci-passed {
+    background: var(--ui-ok);
+  }
+  .cp-ci-failed {
+    background: var(--ui-danger);
+  }
+  .cp-ci-running {
+    background: var(--ui-warn);
+  }
+  .cp-section {
     display: grid;
     gap: 6px;
   }
-  .changes .label {
-    width: auto;
+  .cp-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     margin: 0;
-    color: var(--ui-text-muted);
-    opacity: 1;
+    padding-inline: 2px;
+    color: var(--ui-text-secondary);
+    font-weight: var(--ui-weight-medium);
+  }
+  .cp-count {
+    padding: 0 6px;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-wash);
+    color: var(--ui-text-tertiary);
     font-size: 11px;
   }
-  .empty,
-  .hint {
-    margin: 0;
-    padding: 10px;
+  .cp-card {
+    display: grid;
+    gap: 2px;
+    padding: var(--ui-space-3);
     border-radius: var(--ui-radius-md);
+    background: var(--ui-panel-sunken);
+  }
+  .cp-stack {
+    gap: var(--ui-space-2);
+  }
+  .cp-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border-radius: var(--ui-radius-sm);
+    cursor: pointer;
+  }
+  .cp-row:hover {
+    background: var(--ui-hover);
+  }
+  .cp-row-sub {
+    padding-block: 6px;
+    color: var(--ui-text-secondary);
+  }
+  .cp-thumb {
+    flex: none;
+    width: 32px;
+    height: 32px;
+    object-fit: cover;
+    border-radius: var(--ui-radius-sm);
+  }
+  .cp-thumb-empty {
+    display: grid;
+    place-items: center;
+    background: var(--ui-wash);
+    color: var(--ui-text-tertiary);
+  }
+  .cp-row-text {
+    display: grid;
+    flex: 1;
+    gap: 2px;
+    min-width: 0;
+  }
+  .cp-path {
+    overflow: hidden;
+    color: var(--ui-text-tertiary);
+    font-family: var(--ui-mono);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cp-muted {
+    color: var(--ui-text-tertiary);
+  }
+  .cp-file {
+    padding: 4px 8px;
+  }
+  .cp-file pre {
+    max-height: 120px;
+    overflow: auto;
+    font-size: 11px;
+  }
+  .cp-empty {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: var(--ui-space-2);
+    color: var(--ui-text-secondary);
+  }
+  .cp-field-label {
+    margin-top: 4px;
+    color: var(--ui-text-secondary);
+  }
+  .cp-note,
+  .cp-warn {
+    display: flex;
+    gap: 8px;
+    margin: 0;
+    padding: 8px 10px;
+    border-radius: var(--ui-radius-sm);
+    background: color-mix(in srgb, var(--ui-warn) 14%, transparent);
+    color: var(--ui-text);
+  }
+  .cp-note :global(svg),
+  .cp-warn :global(svg) {
+    flex: none;
+    margin-top: 1px;
+    color: var(--ui-warn);
+  }
+  .cp-autosave {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .cp-save-icon {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--ui-radius-sm);
     background: var(--ui-wash);
     color: var(--ui-text-secondary);
   }
-  .autosave {
-    margin: 0 -12px;
+  .cp-save-saved {
+    color: var(--ui-ok);
   }
-  .changes footer {
+  .cp-save-conflict,
+  .cp-save-paused {
+    color: var(--ui-warn);
+  }
+  .cp-save-failed {
+    color: var(--ui-danger);
+  }
+  .cp-foot {
+    position: sticky;
+    bottom: calc(-1 * var(--ui-space-4));
+    display: flex;
     align-items: center;
-    margin: 0;
+    gap: var(--ui-space-2);
+    margin: 0 calc(-1 * var(--ui-space-4)) calc(-1 * var(--ui-space-4));
+    padding: var(--ui-space-2) var(--ui-space-4) var(--ui-space-4);
+    background: var(--ui-panel-raised);
   }
-  .changes :global(.more) {
-    margin-inline-start: auto;
-    padding: 6px;
+  .cp-foot :global(.cp-primary) {
+    flex: 1;
+    border-radius: var(--ui-radius-sm);
+  }
+  .changes :global(.cp-more) {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 32px;
+    padding: 0;
     border: 0;
     border-radius: var(--ui-radius-sm);
+    background: transparent;
+    color: var(--ui-text-secondary);
+  }
+  .changes :global(.cp-more:hover) {
+    background: var(--ui-hover);
   }
   .split {
     top: 56px;
