@@ -10,6 +10,8 @@
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
   import ArrowDown from '@lucide/svelte/icons/arrow-down';
+  import Pause from '@lucide/svelte/icons/pause';
+  import Play from '@lucide/svelte/icons/play';
   import type { Component } from 'svelte';
   import Hint from '$lib/components/ui/shell/Hint.svelte';
   import { Side } from '$lib/components/ui/shell/styles';
@@ -18,7 +20,7 @@
   import type { GitSummary } from '$lib/canvas/git-status';
   import { CiState } from '$lib/canvas/source-changes';
 
-  let { summary, open = false, onchanges, onversions, onready, onupstream, onresume }: { onresume: () => void; summary: GitSummary; open?: boolean; onchanges: () => void; onversions: (nodeId: string) => void; onready: (nodeId: string) => void; onupstream: (nodeId: string) => void } = $props();
+  let { summary, open = false, onchanges, onversions, onready, onupstream, onresume, autosaveOn, ontoggle }: { autosaveOn: boolean; ontoggle: () => void; onresume: () => void; summary: GitSummary; open?: boolean; onchanges: () => void; onversions: (nodeId: string) => void; onready: (nodeId: string) => void; onupstream: (nodeId: string) => void } = $props();
 
   type Look = { icon: Component; label: string; tone: string; spin?: boolean };
   const AUTOSAVE: Record<AutosaveState, Look> = {
@@ -55,6 +57,14 @@
       {:else}
         <span {...props} class="save tone-{save.tone}" class:spin={save.spin} role="status" aria-label={save.label} data-testid="git-autosave" data-state={summary.autosave}><save.icon size={14} /></span>
       {/if}
+    {/snippet}
+  </Hint>
+
+  <Hint label={autosaveOn ? 'Stop autosave: edits stay on the canvas' : 'Resume autosave'} side={Side.Bottom}>
+    {#snippet children(props)}
+      <button {...props} type="button" class="icon" class:stopped={!autosaveOn} aria-pressed={!autosaveOn} aria-label={autosaveOn ? 'Stop autosave' : 'Resume autosave'} onclick={ontoggle} data-testid="git-autosave-toggle">
+        {#if autosaveOn}<Pause size={14} />{:else}<Play size={14} /><span>Autosave off</span>{/if}
+      </button>
     {/snippet}
   </Hint>
 
@@ -129,6 +139,10 @@
   .icon,
   .save {
     padding: 0 6px;
+  }
+  .stopped {
+    background: color-mix(in srgb, var(--ui-warn) 14%, transparent);
+    color: var(--ui-text);
   }
   .repo {
     color: var(--ui-text);

@@ -14,6 +14,8 @@
   import GitPullRequest from '@lucide/svelte/icons/git-pull-request';
   import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
   import CloudCheck from '@lucide/svelte/icons/cloud-check';
+  import ShieldCheck from '@lucide/svelte/icons/shield-check';
+  import { lineDiff } from '$lib/canvas/line-diff';
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
@@ -283,6 +285,35 @@
     }
   }
 
+  type FileDiff = { path: string; before: string | null; after: string | null };
+  let openDiff = $state<string | null>(null);
+  let diffFiles = $state<FileDiff[]>([]);
+  let branchFiles = $state<FileDiff[] | null>(null);
+  const history = (body: Record<string, unknown>) => call(`${base}/history`, { method: 'POST', body: JSON.stringify({ nodeId: lead, ...body }) });
+
+  async function toggleDiff(sha: string) {
+    if (openDiff === sha) {
+      openDiff = null;
+      return;
+    }
+    openDiff = sha;
+    diffFiles = [];
+    diffFiles = ((await history({ action: 'diff', sha }))?.files as FileDiff[] | undefined) ?? [];
+  }
+
+  async function revert(sha: string) {
+    busy = true;
+    const body = await history({ action: 'revert', sha });
+    note = body?.ok ? 'Reverted with a new commit' : body?.refusal === 'conflict' ? 'Later commits changed the same files: revert refused, nothing changed.' : `Revert refused: ${String(body?.refusal ?? 'network')}`;
+    await loadRefs(lead, workBranch);
+    await onchanged();
+    busy = false;
+  }
+
+  async function showBranchDiff() {
+    branchFiles = ((await history({ action: 'branch', base: pullTarget }))?.files as FileDiff[] | undefined) ?? [];
+  }
+
   async function openPullRequest() {
     if (!pullTarget) {
       return;
@@ -352,7 +383,7 @@
       <div class="cp-section">
         <p class="cp-label">Save edits to</p>
         <section class="cp-card cp-stack" data-testid="branch-choice">
-          {#if !workBranch}<p class="cp-muted">Nothing is written to GitHub until you choose. Edits stay on the canvas meanwhile.</p>{/if}
+          <p class="cp-trust" data-testid="trust-note"><ShieldCheck size={14} /><span>Feega only writes to the branch you pick. It never force-pushes, never deletes branches.{#if !workBranch} Edits stay on the canvas until you choose.{/if}</span></p>
           <OptionMenu label="Branch" value={choice} options={branchOptions} onchange={(v) => (choice = String(v))} />
           {#if choice === NEW_BRANCH}
             <label class="cp-field-label" for="new-branch">Name</label>
@@ -432,8 +463,17 @@
           {#each commits as c (c.sha)}
             <div class="cp-commit-row">
               <GitCommitHorizontal size={14} />
-              <span class="cp-row-text"><span class="cp-ellipsis">{c.message}</span><span class="cp-muted">{c.author} · {agoOf(c.at)} · <code>{c.sha.slice(0, 7)}</code></span></span>
+              <button type="button" class="cp-row-text cp-commit-open" onclick={() => toggleDiff(c.sha)} data-testid="commit-row"><span class="cp-ellipsis">{c.message}</span><span class="cp-muted">{c.author} · {agoOf(c.at)} · <code>{c.sha.slice(0, 7)}</code></span></button>
+              <Button size="sm" variant="ghost" disabled={busy} onclick={() => revert(c.sha)} data-testid="commit-revert">Revert</Button>
             </div>
+            {#if openDiff === c.sha}
+              {#each diffFiles as f (f.path)}
+                <details class="cp-file" open><summary><code>{f.path}</code></summary><pre class="cp-diff">{#each lineDiff(f.before, f.after) as l, i (i)}<span class="cp-line cp-line-{l.move}">{l.text}
+</span>{/each}</pre></details>
+              {:else}
+                <p class="cp-muted">Loading…</p>
+              {/each}
+            {/if}
           {:else}
             <p class="cp-empty">No commits yet.</p>
           {/each}
@@ -452,6 +492,15 @@
             <p class="cp-muted">Pull requests go through your GitHub account.</p>
             <Button size="sm" variant="secondary" disabled={busy} onclick={connectGithub} data-testid="connect-github">Connect GitHub</Button>
           {:else if pullTargets.length}
+            <Button size="sm" variant="ghost" disabled={busy} onclick={showBranchDiff} data-testid="branch-diff">What Feega changed on this branch</Button>
+            {#if branchFiles}
+              {#each branchFiles as f (f.path)}
+                <details class="cp-file"><summary><code>{f.path}</code></summary><pre class="cp-diff">{#each lineDiff(f.before, f.after) as l, i (i)}<span class="cp-line cp-line-{l.move}">{l.text}
+</span>{/each}</pre></details>
+              {:else}
+                <p class="cp-muted">No difference from {pullTarget}.</p>
+              {/each}
+            {/if}
             <div class="cp-pr-target">
               <span>Into</span>
               <OptionMenu label="Target branch" value={pullTarget} options={pullTargets} onchange={(v) => (pullBase = String(v))} />
@@ -780,6 +829,41 @@
   }
   .cp-foot-note {
     font-size: 11px;
+  }
+  .cp-diff {
+    margin: 4px 0 0;
+    max-height: 200px;
+    overflow: auto;
+    font-family: var(--ui-mono);
+    font-size: 11px;
+  }
+  .cp-line-added {
+    background: color-mix(in srgb, var(--ui-ok) 16%, transparent);
+  }
+  .cp-line-removed {
+    background: color-mix(in srgb, var(--ui-danger) 16%, transparent);
+  }
+  .cp-trust {
+    display: flex;
+    gap: 8px;
+    margin: 0;
+    padding: 8px 10px;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-accent-wash);
+    color: var(--ui-text);
+  }
+  .cp-trust :global(svg) {
+    flex: none;
+    margin-top: 1px;
+    color: var(--ui-accent);
+  }
+  .cp-commit-open {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-align: start;
+    cursor: pointer;
   }
   .cp-foot {
     position: sticky;

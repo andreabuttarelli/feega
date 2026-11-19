@@ -4778,7 +4778,7 @@
       <VersionCompare projectId={page.params.projectId ?? ''} versionId={versionOpen?.after ?? ''} before={versionSides.before} after={versionSides.after} history={versionHistory} onclose={() => (versionOpen = null)} onchanged={sources.refresh} />
     {/if}
     {#if gitSlot && git}
-      <Portal to={gitSlot}><GitStatus summary={git} open={changesOpen} onupstream={pullUpstream} onchanges={() => (changesOpen = !changesOpen)} onversions={(id) => (pickerOpen = { id, left: window.innerWidth - 360, top: 56 })} onready={gitWork.ready} onresume={() => ((changesOpen = true), gitWork.resume())} /></Portal>
+      <Portal to={gitSlot}><GitStatus summary={git} open={changesOpen} onupstream={pullUpstream} onchanges={() => (changesOpen = !changesOpen)} onversions={(id) => (pickerOpen = { id, left: window.innerWidth - 360, top: 56 })} autosaveOn={gitWork.autosaveOn} ontoggle={() => (gitWork.autosaveOn = !gitWork.autosaveOn)} onready={gitWork.ready} onresume={() => ((changesOpen = true), gitWork.resume())} /></Portal>
     {/if}
     <SourceSyncPanel bind:panel={changesOpen} {git} work={gitWork} projectId={page.params.projectId ?? ''} canvasId={page.params.canvasId ?? ''} open={sourceOpen ? sources.sync(sourceOpen.id) : null} anchor={sourceOpen} syncs={sources.all()} {posterOf} assetUrl={tierUrl(AssetSize.Full)} onclose={() => (sourceOpen = null)} onchanged={sources.refresh} oncompare={(id) => ((pickerOpen = sourceOpen && { ...sourceOpen, id }), (sourceOpen = null))} />
     {#if pickerOpen}

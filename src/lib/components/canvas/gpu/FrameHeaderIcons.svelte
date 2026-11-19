@@ -12,7 +12,7 @@
 {#each hits as hit (`${hit.id}:${hit.key}`)}
   <Hint label={headerRow(hit.key).tooltip}>
     {#snippet children(trigger)}
-      <button {...trigger} type="button" class="frame-header-icon" data-testid="frame-header-icon" data-badge={hit.key} data-node={hit.id} aria-label={headerRow(hit.key).tooltip} style={place(hit)} onpointerdown={(e) => e.stopPropagation()} onclick={() => onpress(hit)}></button>
+      <button {...trigger} type="button" class="frame-header-icon" data-testid="frame-header-icon" data-badge={hit.key} data-node={hit.id} aria-label={headerRow(hit.key).tooltip} style={place(hit)} onpointerdown={(e) => e.stopPropagation()} onclick={(e) => (e.stopPropagation(), onpress(hit))}></button>
     {/snippet}
   </Hint>
 {/each}
