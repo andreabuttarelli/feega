@@ -276,6 +276,26 @@ function rootTokens(doc) {
   return [...tokens].map(([name, value]) => ({ name, value }));
 }
 
+const GENERIC_FONTS = new Set(['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'ui-sans-serif', 'ui-serif', 'ui-monospace', '-apple-system', 'blinkmacsystemfont', 'inherit', 'initial']);
+
+const unquoted = (name) => name.trim().replace(/^["']|["']$/g, '');
+
+function fontsOf(doc) {
+  const names = new Set();
+  for (const element of doc.querySelectorAll(`[${SOURCE_ATTR}]`)) {
+    for (const part of doc.defaultView.getComputedStyle(element).fontFamily.split(',')) {
+      const name = unquoted(part);
+      if (name && !GENERIC_FONTS.has(name.toLowerCase())) {
+        names.add(name);
+      }
+    }
+  }
+  for (const face of doc.fonts ?? []) {
+    names.add(unquoted(face.family));
+  }
+  return [...names];
+}
+
 export function paletteOf(doc) {
   const counts = new Map();
   for (const element of doc.querySelectorAll(`[${SOURCE_ATTR}]`)) {
@@ -288,7 +308,7 @@ export function paletteOf(doc) {
     }
   }
   const document = [...counts].sort((a, b) => b[1] - a[1]).slice(0, PALETTE_MAX).map(([value]) => value);
-  return { document, tokens: rootTokens(doc) };
+  return { document, tokens: rootTokens(doc), fonts: fontsOf(doc) };
 }
 
 export function relativeOf(doc, source, move) {

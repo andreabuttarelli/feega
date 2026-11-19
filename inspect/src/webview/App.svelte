@@ -7,7 +7,7 @@
   import PanelLeft from '@lucide/svelte/icons/panel-left';
   import Undo2 from '@lucide/svelte/icons/undo-2';
   import { LiveProp } from '@feega/live-edit/live-fields';
-  import { Mode, Move, ServerAction, type ChangeRow, type LayerNode, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
+  import { Mode, Move, ServerAction, type ChangeRow, type FontChoice, type LayerNode, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
   import { fromHost, toHost } from './host';
   import { pageBridge, sourceText } from './page-bridge';
   import Properties from './Properties.svelte';
@@ -20,6 +20,7 @@
   import { Scope } from '@feega/live-edit/scoped-rule';
   import { Tabs } from 'bits-ui';
   import { Tab } from './tabs';
+  import { fontCss } from './fonts';
   import { layerState, passThrough, type LayerFlag, type SavedLayers } from './layer-state';
   import { ClassFamily } from '@feega/live-edit/live-fields';
   import Breadcrumb from './Breadcrumb.svelte';
@@ -89,6 +90,7 @@
 
   let tab = $state(Tab.Properties);
   let layers = $state<LayerNode[]>([]);
+  let palette = $state<Palette>({ document: [], tokens: [], fonts: [] });
   let changes = $state<ChangeRow[]>([]);
   let canUndo = $state(false);
   let canRedo = $state(false);
@@ -163,10 +165,12 @@
       visited(path);
       bridge.mode(mode);
       bridge.tree();
+      bridge.palette();
       refresh();
     },
     moved: (path) => (visited(path), bridge.tree()),
     tree: (tree) => (layers = tree),
+    palette: (p) => (palette = p),
     scrolled: () => {
       hover = null;
       refresh();
@@ -441,6 +445,15 @@
     }
   }
 
+  function pickFont(font: FontChoice) {
+    if (!picked) {
+      return;
+    }
+    const css = fontCss(font.family);
+    bridge.preview(picked.source, { fontFamily: css });
+    toHost({ kind: ToHost.Font, google: font.google, ask: { at: sourceText(picked.source), prop: LiveProp.Class, family: ClassFamily.FontFamily, value: `font-['${font.family.replace(/\s+/g, '_')}']`, css: { 'font-family': css }, rem: picked.rem, viewport: picked.viewport, scope } });
+  }
+
   function onKey(e: KeyboardEvent) {
     const cmd = e.metaKey || e.ctrlKey;
     const selecting = SELECTION_KEYS[e.key];
@@ -577,7 +590,7 @@
             <button type="button" class:on={scope === Scope.Element} onclick={() => (scope = Scope.Element)} title="Only this element (every instance of its component: {picked.instances})">This element{picked.instances > 1 ? ` ×${picked.instances}` : ''}</button>
             <button type="button" class:on={scope === Scope.Class} disabled={!picked.classCount || styling === Styling.Tailwind} onclick={() => (scope = Scope.Class)} title={styling === Styling.Tailwind ? 'Class scope needs CSS rules, not Tailwind' : `Every element with this class: ${picked.classCount}`}>All .{picked.classes.split(' ')[0] || 'class'}{picked.classCount ? ` (${picked.classCount})` : ''}</button>
           </div>
-          <Properties pick={picked} onpreview={preview} onchange={change} onhint={(h) => (hint = h)} />
+          <Properties pick={picked} {palette} onpreview={preview} onchange={change} onhint={(h) => (hint = h)} onfont={pickFont} />
         {:else}
           <p class="empty">{bridged ? 'Click an element to edit it. Double-click text to rewrite it.' : 'The page has no Feega source map: element picking needs the feega-source-map plugin.'}</p>
         {/if}
@@ -938,7 +951,9 @@
   .scope {
     display: flex;
     gap: 2px;
-    margin: 8px 12px 0;
+    height: 28px;
+    box-sizing: border-box;
+    margin: 8px 12px;
     padding: 2px;
     border-radius: var(--ui-radius-md);
     background: var(--ui-input);
@@ -946,7 +961,7 @@
 
   .scope button {
     flex: 1;
-    height: 24px;
+    height: 100%;
     border: 0;
     border-radius: var(--ui-radius-sm);
     background: none;

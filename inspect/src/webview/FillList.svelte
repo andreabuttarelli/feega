@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import { Popover } from 'bits-ui';
   import Eye from '@lucide/svelte/icons/eye';
   import EyeOff from '@lucide/svelte/icons/eye-off';
@@ -6,6 +7,7 @@
   import Plus from '@lucide/svelte/icons/plus';
   import { FillKind, fillCss, layerCss, newFill, parseFills, type Fill, type Stop } from './fills';
   import { hexOf } from './colour';
+  import { Section } from './controls';
 
   const KINDS: { kind: FillKind; label: string }[] = [
     { kind: FillKind.Solid, label: 'Solid' },
@@ -15,7 +17,15 @@
     { kind: FillKind.Image, label: 'Image' }
   ];
 
-  let { image, colour, onchange }: { image: string; colour: string; onchange: (css: Record<string, string>) => void } = $props();
+  type Props = {
+    image: string;
+    colour: string;
+    header: Snippet<[Section, Snippet?]>;
+    row: Snippet<[string, Snippet, string?]>;
+    onchange: (css: Record<string, string>) => void;
+  };
+
+  let { image, colour, header, row, onchange }: Props = $props();
 
   let fills = $state<Fill[]>([]);
   $effect(() => {
@@ -34,23 +44,25 @@
       replace(i, { ...fill, stops: fill.stops.map((stop, k) => (k === s ? { ...stop, ...patch } : stop)) });
     }
   };
+  const labelOf = (f: Fill) => KINDS.find((k) => k.kind === f.kind)?.label ?? '';
+  const valueOf = (f: Fill) => (f.kind === FillKind.Solid ? hexOf(f.colour) : f.kind === FillKind.Image ? f.url || 'image' : `${f.stops.length} stops`);
 </script>
 
-<div class="list" data-field="fills">
-  <div class="head">
-    <span>Fill</span>
-    <button type="button" class="icon" title="Add fill" aria-label="Add fill" onclick={() => commit([newFill(FillKind.Solid), ...fills])}><Plus size={14} /></button>
-  </div>
-  {#if !fills.length}<p class="none">None</p>{/if}
-  {#each fills as fill, i (i)}
-    <div class="row">
+{#snippet add()}
+  <button type="button" class="icon" title="Add fill" aria-label="Add fill" onclick={() => commit([newFill(FillKind.Solid), ...fills])}><Plus size={14} /></button>
+{/snippet}
+
+{@render header(Section.Fill, add)}
+{#each fills as fill, i (i)}
+  {#snippet layer()}
+    <div class="layer" class:off={!fill.visible} data-field="fill-layer">
       <Popover.Root>
-        <Popover.Trigger class="fill-trigger" aria-label="Edit fill">
+        <Popover.Trigger class="swatch-button" aria-label="Edit fill">
           <span class="swatch" style={`background: ${layerCss(fill)}`}></span>
-          <span>{KINDS.find((k) => k.kind === fill.kind)?.label}</span>
         </Popover.Trigger>
         <Popover.Portal>
-          <Popover.Content class="fill-popover" side="left" sideOffset={6}>
+          <Popover.Content class="fill-popover" side="left" sideOffset={8} collisionPadding={8}>
+            <header class="pop-head"><span>Fill</span></header>
             <select value={fill.kind} aria-label="Fill type" onchange={(e) => replace(i, newFill(e.currentTarget.value as FillKind))}>
               {#each KINDS as k (k.kind)}<option value={k.kind}>{k.label}</option>{/each}
             </select>
@@ -77,62 +89,84 @@
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>
+      {#if fill.kind === FillKind.Solid}
+        <input type="text" class="hex" value={hexOf(fill.colour)} aria-label="Fill hex" onchange={(e) => replace(i, { ...fill, colour: e.currentTarget.value })} />
+      {:else}
+        <span class="hex">{valueOf(fill)}</span>
+      {/if}
       <button type="button" class="icon" aria-label={fill.visible ? 'Hide' : 'Show'} title={fill.visible ? 'Hide' : 'Show'} onclick={() => replace(i, { ...fill, visible: !fill.visible })}>{#if fill.visible}<Eye size={14} />{:else}<EyeOff size={14} />{/if}</button>
       <button type="button" class="icon" aria-label="Remove fill" title="Remove" onclick={() => commit(fills.filter((_, j) => j !== i))}><Minus size={14} /></button>
     </div>
-  {/each}
-</div>
+  {/snippet}
+  {@render row(labelOf(fill), layer, `fill-${i}`)}
+{/each}
 
 <style>
-  .list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    grid-column: span 2;
-  }
-
-  .head,
-  .row,
-  .line {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-height: 28px;
-    font-size: var(--ui-text-xs);
-    color: var(--ui-text-2);
-  }
-
-  .head span {
-    flex: 1;
-  }
-
-  .none {
-    margin: 0;
-    color: var(--ui-text-3);
-    font-size: var(--ui-text-xs);
-  }
-
-  .row :global(.fill-trigger) {
+  .layer {
     display: flex;
     flex: 1;
     align-items: center;
-    gap: 8px;
+    gap: 2px;
+    min-width: 0;
     height: 28px;
-    padding: 0 6px;
-    border: 0;
+    padding: 0 0 0 6px;
     border-radius: var(--ui-radius-sm);
     background: var(--ui-input);
-    color: var(--ui-text);
-    font: inherit;
-    font-size: var(--ui-text-sm);
+  }
+
+  .layer.off .hex,
+  .layer.off .swatch {
+    opacity: 0.4;
+  }
+
+  .layer :global(.swatch-button) {
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    background: none;
     cursor: pointer;
   }
 
   .swatch {
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
     border-radius: var(--ui-radius-xs);
-    box-shadow: 0 0 0 1px var(--ui-divider);
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.2);
+  }
+
+  .hex {
+    flex: 1;
+    min-width: 0;
+    margin-left: 6px;
+    overflow: hidden;
+    border: 0;
+    background: none;
+    box-shadow: none !important;
+    color: var(--ui-text);
+    font: inherit;
+    font-size: var(--ui-text-sm);
+    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .icon {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: none;
+    box-shadow: none;
+    color: var(--ui-text-2);
+    cursor: pointer;
+  }
+
+  .icon:hover {
+    color: var(--ui-text);
   }
 
   .bar {
@@ -140,36 +174,29 @@
     border-radius: var(--ui-radius-xs);
   }
 
-  .icon {
-    display: grid;
-    place-items: center;
-    width: 24px;
-    height: 24px;
-    border: 0;
-    border-radius: var(--ui-radius-sm);
-    background: none;
-    color: var(--ui-text-2);
-    cursor: pointer;
-  }
-
   :global(.fill-popover) {
     z-index: 20;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    width: 240px;
+    width: 248px;
     padding: 12px;
-    border-radius: var(--ui-radius-md);
+    border-radius: var(--ui-radius-lg);
     background: var(--ui-panel);
     box-shadow: 0 0 0 1px var(--ui-divider), 0 12px 32px rgb(0 0 0 / 0.28);
     color: var(--ui-text);
     font-size: var(--ui-text-sm);
   }
 
+  :global(.fill-popover) .pop-head {
+    font-size: var(--ui-text-xs);
+    font-weight: 600;
+  }
+
   :global(.fill-popover) select,
   :global(.fill-popover) input[type='text'] {
     flex: 1;
-    height: 24px;
+    height: 28px;
     border: 0;
     border-radius: var(--ui-radius-sm);
     background: var(--ui-input);
@@ -177,12 +204,18 @@
     font: inherit;
   }
 
+  .line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
   .at {
     max-width: 64px;
   }
 
   .add-stop {
-    height: 24px;
+    height: 28px;
     border: 0;
     border-radius: var(--ui-radius-sm);
     background: var(--ui-input);

@@ -10,7 +10,7 @@ import { ServerState, ToHost, ToView, type EditAsk, type Pick } from '../src/mes
 import { liveAtOf } from '@feega/live-edit/live-ask';
 import { SETTINGS } from '../src/settings.ts';
 
-const PANEL_PORT = 5999;
+const PANEL_PORT = Number(process.env.PANEL_PORT ?? 5999);
 const dist = fileURLToPath(new URL('../dist/webview/', import.meta.url));
 const launcher = fileURLToPath(new URL('../dist/launcher/', import.meta.url));
 

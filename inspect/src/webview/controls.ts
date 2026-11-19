@@ -20,6 +20,7 @@ export enum Control {
   Colour = 'colour',
   Choice = 'choice',
   Shadows = 'shadows',
+  Text = 'text',
   Fills = 'fills'
 }
 
@@ -54,7 +55,8 @@ export type ColourRow = Base & { control: Control.Colour; read: (s: Styles) => s
 export type ChoiceRow = Base & { control: Control.Choice; choices: string[]; read: (s: Styles) => string };
 export type ShadowsRow = Base & { control: Control.Shadows; read: (s: Styles) => string };
 export type FillsRow = Base & { control: Control.Fills; read: (s: Styles) => string };
-export type Row = NumberRow | ColourRow | ChoiceRow | ShadowsRow | FillsRow;
+export type TextRow = Base & { control: Control.Text; read: (s: Styles) => string };
+export type Row = NumberRow | ColourRow | ChoiceRow | ShadowsRow | FillsRow | TextRow;
 
 const PX: Range = { min: 0, max: 400, step: 1 };
 const SIZE: Range = { min: 0, max: 4000, step: 1 };
@@ -71,7 +73,7 @@ const family = (f: ClassFamily, make: (value: string) => string = (v) => v) => (
 const DIRECTIONS: Record<string, string> = { 'flex-row': 'row', 'flex-col': 'column' };
 const ITEMS: Record<string, string> = { 'items-start': 'flex-start', 'items-center': 'center', 'items-end': 'flex-end', 'items-stretch': 'stretch' };
 const JUSTIFY: Record<string, string> = { 'justify-start': 'flex-start', 'justify-center': 'center', 'justify-end': 'flex-end', 'justify-between': 'space-between' };
-const ALIGN: Record<string, string> = { 'text-left': 'left', 'text-center': 'center', 'text-right': 'right' };
+const ALIGN: Record<string, string> = { 'text-left': 'left', 'text-center': 'center', 'text-right': 'right', 'text-justify': 'justify' };
 const WEIGHTS = ['300', '400', '500', '600', '700', '800'];
 
 const keyOf = (table: Record<string, string>, css: string) => Object.entries(table).find(([, v]) => v === css)?.[0] ?? '';
@@ -152,6 +154,9 @@ export const ROWS: Row[] = [
   { section: Section.Size, units: UNITS_OF['height'], name: 'height', label: 'H', control: Control.Number, range: SIZE, unit: 'px', read: (s) => px(s, 'height'), preview: pxStyle('height'), change: family(ClassFamily.Height, (v) => `h-[${v}]`) },
   ...boxRows(Group.Padding, LiveProp.Padding, PX),
   ...boxRows(Group.Margin, LiveProp.Margin, SIGNED),
+  { section: Section.Typography, name: 'font-family', label: 'Font', control: Control.Text, read: (s) => (s['font-family'] ?? '').split(',')[0].replace(/["']/g, '').trim(), preview: style('fontFamily'), change: family(ClassFamily.FontFamily, (v) => `font-['${v.trim().replace(/\s+/g, '_')}']`) },
+  { section: Section.Typography, units: UNITS_OF['line-height'], name: 'line-height', label: 'Line', control: Control.Number, range: { min: 0, max: 400, step: 1 }, unit: 'px', read: (s) => px(s, 'line-height'), preview: style('lineHeight'), change: family(ClassFamily.Leading, (v) => `leading-[${v}]`) },
+  { section: Section.Typography, units: UNITS_OF['letter-spacing'], name: 'letter-spacing', label: 'Letter', control: Control.Number, range: { min: -100, max: 100, step: 1 }, unit: 'px', read: (s) => parseFloat(s['letter-spacing'] ?? '0') || 0, preview: style('letterSpacing'), change: family(ClassFamily.Tracking, (v) => `tracking-[${v}]`) },
   { section: Section.Typography, units: UNITS_OF['font-size'], name: 'font-size', label: 'Size', control: Control.Number, range: { min: 1, max: 400, step: 1 }, unit: 'px', read: (s) => px(s, 'font-size'), preview: pxStyle('fontSize'), change: prop(LiveProp.FontSize) },
   { section: Section.Typography, name: 'font-weight', label: 'Weight', control: Control.Choice, choices: WEIGHTS, read: (s) => s['font-weight'] ?? '', preview: style('fontWeight'), change: (value) => ({ prop: LiveProp.FontWeight, value }) },
   { section: Section.Typography, name: 'text-align', label: 'Align', control: Control.Choice, choices: Object.keys(ALIGN), read: (s) => keyOf(ALIGN, s['text-align']), preview: (v) => ({ textAlign: ALIGN[v] }), change: family(ClassFamily.TextAlign) },

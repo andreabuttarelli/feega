@@ -7,8 +7,8 @@ export function panelHtml({ script, style, cspSource, nonce }: PanelAssets): str
     `default-src 'none'`,
     `frame-src ${LOCAL_FRAMES}`,
     `script-src 'nonce-${nonce}'`,
-    `style-src ${cspSource} 'unsafe-inline'`,
-    `font-src ${cspSource}`,
+    `style-src ${cspSource} 'unsafe-inline' https://fonts.googleapis.com`,
+    `font-src ${cspSource} https://fonts.gstatic.com`,
     `img-src ${cspSource} data:`
   ].join('; ');
 

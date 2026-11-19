@@ -138,6 +138,19 @@ describe('fileEdits', () => {
     ]);
   });
 
+  it('un font Google scrive la famiglia e lo importa nel foglio globale, un passo solo', async () => {
+    const root = app(PLAIN);
+    writeFileSync(join(root, 'src/app.css'), ':root {}\n');
+    const edits = fileEdits(root);
+    await edits.font({ at: 'src/Page.svelte:2:3', prop: LiveProp.Class, value: 'Space Grotesk', css: { 'font-family': "'Space Grotesk', sans-serif" } }, true);
+
+    expect(readFileSync(join(root, 'src/app.css'), 'utf8')).toContain('family=Space+Grotesk');
+    expect(read(root)).toContain("font-family: 'Space Grotesk', sans-serif;");
+    await edits.undo();
+    expect(readFileSync(join(root, 'src/app.css'), 'utf8')).toBe(':root {}\n');
+    expect(read(root)).toBe(PAGE);
+  });
+
   it('cronologia e undo sopravvivono a una nuova sessione', async () => {
     const root = app();
     const first = fileEdits(root);

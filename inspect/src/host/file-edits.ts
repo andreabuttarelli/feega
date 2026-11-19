@@ -6,6 +6,7 @@ import { inside, liveAtOf, reader, tokenOf } from '@feega/live-edit/live-ask';
 import { LiveProp } from '@feega/live-edit/live-fields';
 import { literalText } from '@feega/live-edit/literal-text';
 import { moveNode, type Place } from '@feega/live-edit/move-node';
+import { globalSheetOf, googleFontImport } from '@feega/live-edit/font-wiring';
 import { scopedRule, type Scope } from '@feega/live-edit/scoped-rule';
 import { styleAttr, type Css } from '@feega/live-edit/style-attr';
 import { Styling, type EditAsk } from '../messages';
@@ -62,7 +63,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return next;
   };
 
-  async function written(changes: FileChange[], token: string, note?: string): Promise<Written> {
+  async function writtenAll(changes: FileChange[], token: string, note?: string): Promise<Written> {
     const step: Step = [];
     for (const change of changes) {
       const full = inside(root, change.path);
@@ -80,8 +81,9 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return { ok: true, path: changes[0]?.path ?? '', written: token, note };
   }
 
-  async function edited(ask: EditAsk): Promise<Written> {
+  async function edited(ask: EditAsk, extra: FileChange[] = []): Promise<Written> {
     meta = { at: ask.at, prop: ask.prop, value: ask.value ?? '', scope: ask.scope ?? '' };
+    const written = (changes: FileChange[], token: string, note?: string) => writtenAll([...changes, ...extra.filter((e) => !changes.some((c) => c.path === e.path))], token, note);
     const at = liveAtOf(ask.at);
     if (!at || !inside(root, at.file)) {
       return { ok: false, reason: `${ask.at} is not a file:line:col inside the workspace` };
@@ -102,7 +104,14 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     if (out.skipped.length) {
       return { ok: false, reason: out.skipped[0] };
     }
-    return out.files.length ? written(out.files, token ?? '') : { ok: true, path: at.file, written: token ?? '' };
+    return out.files.length || extra.length ? written(out.files, token ?? '') : { ok: true, path: at.file, written: token ?? '' };
+  }
+
+  async function fontEdited(ask: EditAsk, google: boolean): Promise<Written> {
+    const sheet = google ? await globalSheetOf(reader(root)) : null;
+    const wiring = sheet ? await googleFontImport(reader(root), sheet, ask.value ?? '') : null;
+    const out = await edited(ask, wiring ? [wiring] : []);
+    return out.ok && google && !sheet ? { ...out, note: 'no global stylesheet found: the font is named but not loaded' } : out;
   }
 
   const put = (full: string, text: string) => (text === '' ? rm(full, { force: true }) : writeFile(full, text));
@@ -148,12 +157,13 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
       return { ok: false, reason: `${from} is not a file:line:col inside the workspace` };
     }
     const out = await moveNode(reader(root), a, b, place);
-    return out.ok ? written([out.change], '') : out;
+    return out.ok ? writtenAll([out.change], '') : out;
   }
 
   return {
     move: (from: string, to: string, place: Place) => inTurn(() => moved(from, to, place)),
     edit: (ask: EditAsk) => inTurn(() => edited(ask)),
+    font: (ask: EditAsk, google: boolean) => inTurn(() => fontEdited(ask, google)),
     undo: () => inTurn(undoStep),
     redo: () => inTurn(redoStep),
     history: (): Change[] => log.map((c) => ({ ...c })),

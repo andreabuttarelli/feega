@@ -60,6 +60,10 @@ export enum ServerAction {
 
 export type ServerInfo = { url: string; framework: string; command: string; pid: number | null; port: number; attached: boolean; startedAt: number; lastError: string };
 
+export type FontChoice = { family: string; google: boolean };
+
+export type Palette = { document: string[]; tokens: { name: string; value: string }[]; fonts: string[] };
+
 export enum Mode {
   Design = 'design',
   Navigate = 'navigate'
@@ -78,6 +82,7 @@ export enum ToHost {
   Move = 'move',
   Server = 'server',
   Redo = 'redo',
+  Font = 'font',
   Revert = 'revert',
   Diff = 'diff',
   SourceControl = 'source-control'
@@ -111,6 +116,7 @@ export type HostMessage =
   | { kind: ToHost.Move; from: string; to: string; place: Place }
   | { kind: ToHost.Server; action: ServerAction }
   | { kind: ToHost.Redo }
+  | { kind: ToHost.Font; ask: EditAsk; google: boolean }
   | { kind: ToHost.Revert; id: number | null }
   | { kind: ToHost.Diff; id: number }
   | { kind: ToHost.SourceControl };
@@ -135,6 +141,8 @@ export const LOCATION = 'feega:location';
 export const BRIDGE_READY = 'feega:source-map:ready';
 export const MODE = 'feega:mode';
 export const HIDE = 'feega:hide';
+export const PALETTE = 'feega:palette';
+export const PALETTE_RESULT = 'feega:palette:result';
 export const TREE = 'feega:tree';
 export const TREE_RESULT = 'feega:tree:result';
 
