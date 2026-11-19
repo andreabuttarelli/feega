@@ -30,6 +30,17 @@ Every third-party integration goes through Composio, no own tokens. The project 
 `.feega/` folder (ADR 0041).
 
 
+## The marketing site and SEO (a rule, not a habit)
+
+The canonical domain is **https://www.feega.app**: the apex redirects to www, and every sitemap,
+canonical tag, robots.txt, llms.txt and JSON-LD URL uses www. Pages follow one template per type
+(short version, body, how we checked with dated sources, try it in 2 minutes → /download,
+mistakes, questions, sources, read next; Article + BreadcrumbList schema with dateModified).
+Articles are at least ~1,000 words, ship in batches of 15–25, and cover only frameworks and editors
+we have verified. Copy goes through humanizer passes (no AI tells, no hype). Articles use images
+generated in the landing's style instead of heavy code blocks. robots.txt names the AI search and
+user bots explicitly.
+
 ## CLI
 
 The `feega` CLI lives in this repo at **`cli/`** (Apache-2.0, source of CLI + MCP server +
