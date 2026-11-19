@@ -7,7 +7,7 @@
 </script>
 
 <header class="bar">
-  <a class="chip brand" href="/" aria-label="Feega home"><Mark size={16} /><span>Feega</span></a>
+  <a class="chip brand" href="/" aria-label="Feega home"><Mark size={16} /><span>feega</span></a>
 
   <nav class="links" aria-label="Main">
     {#each HEADER_LINKS as link (link.label)}
@@ -63,7 +63,7 @@
     display: flex;
     justify-content: space-between;
     align-items: start;
-    padding: 12px;
+    padding: 28px 16px 12px;
     font-family: 'Inter', sans-serif;
     font-variation-settings: normal;
     font-size: 16px;
@@ -167,7 +167,7 @@
     .bar {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
-      padding: 16px 20px 0;
+      padding: 28px 20px 0;
     }
 
     .links {
@@ -198,6 +198,7 @@
 
     .actions {
       align-items: center;
+      gap: 24px;
     }
 
     .mobile,
@@ -210,7 +211,7 @@
     .bar {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
-      padding: 16px 16px 0;
+      padding: 28px 16px 0;
     }
 
     .links {
@@ -241,6 +242,7 @@
 
     .actions {
       align-items: center;
+      gap: 24px;
     }
 
     .mobile,
