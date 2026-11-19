@@ -1,7 +1,8 @@
 <script lang="ts">
+  const cta = primaryCta();
   import '$lib/site/landing/landing.css';
   import '$lib/site/compare/compare.css';
-  import { APP_URL } from '$lib/site/links';
+  import { installAction, primaryCta } from '$lib/site/install';
   import { GUIDES_PATH, guidePath } from '$lib/site/guides';
   import { articleJsonLd, faqJsonLd, howToJsonLd } from '$lib/site/structured-data';
 
@@ -26,7 +27,7 @@
   <a class="back" href={GUIDES_PATH}>← All guides</a>
   <h1>{guide.heading}</h1>
   <p class="intro">{guide.answer}</p>
-  <a class="landing-cta" href={APP_URL}>Try Feega →</a>
+  <a class="landing-cta" href={cta.href} use:installAction={cta}>{cta.label} →</a>
 
   {#if guide.steps.length}
     <section>
@@ -73,6 +74,6 @@
         <li><a href={link.href}>{link.label}</a></li>
       {/each}
     </ul>
-    <a class="landing-cta" href={APP_URL}>Try Feega →</a>
+    <a class="landing-cta" href={cta.href} use:installAction={cta}>{cta.label} →</a>
   </section>
 </article>

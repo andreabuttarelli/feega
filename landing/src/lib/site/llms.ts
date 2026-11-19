@@ -3,15 +3,19 @@ import { LANDING_PAGES } from './landing';
 import { UPSCALER } from './landing/upscaler';
 import { CODEBASE, CODEBASE_PATH } from './codebase';
 import { HOME_META, PRICING_META } from './seo';
-import { APP_URL, GITHUB_URL, SITE_URL } from './links';
+import { COFFEE_URL, EDITORS, EXTENSION_PUBLISHED, GITHUB_URL, SITE_URL } from './links';
 import { PRICING_PATH, SITE_PATHS } from './paths';
 import { LEGAL_DOCS } from './legal';
+import { ALTERNATIVES, ALTERNATIVES_INDEX, ALTERNATIVES_PATH, alternativePath } from './alternatives';
 import { COMPARE_INDEX, COMPARE_PATH, COMPARISONS, comparisonPath } from './compare';
 import { GUIDES, GUIDES_INDEX, GUIDES_PATH, guidePath } from './guides';
-import { CONNECT_COMMAND, MCP_TOOLS, MCP_URL } from './guides/shared';
 import { plainText } from './text';
 
-const SUMMARY = 'Feega lets you design inside your code with your agents and team: an open-source (Apache-2.0) infinite canvas where people and AI agents design, animate and generate together. Claude Code, Codex and Cursor edit motion videos and frames through an MCP server, then render to MP4. It runs locally from one .feega file with no account, or in the cloud at ' + APP_URL + '.';
+const SUMMARY = 'Feega is a free, open-source (Apache-2.0) VS Code extension to design in your codebase: click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens, with diffs. React, Next.js, SvelteKit and Vue, with Tailwind or plain CSS. Works in VS Code, Cursor, Windsurf and VSCodium. Feega Cloud (GitHub sync, collaboration, sections and templates) is coming later.';
+
+const INSTALL_LINES = EXTENSION_PUBLISHED
+  ? EDITORS.map((e) => `- [${e.label}](${e.installUrl})`)
+  : [`- Not published yet. Follow on [GitHub](${GITHUB_URL}) or [support with a coffee](${COFFEE_URL}).`];
 
 export const PAGE_TITLES: Record<string, string> = {
   '/': HOME_META.title,
@@ -20,9 +24,11 @@ export const PAGE_TITLES: Record<string, string> = {
   '/ai-video-upscaler': UPSCALER.title,
   [CODEBASE_PATH]: CODEBASE.title,
   [COMPARE_PATH]: COMPARE_INDEX.title,
+  [ALTERNATIVES_PATH]: ALTERNATIVES_INDEX.title,
   [GUIDES_PATH]: GUIDES_INDEX.title,
   ...Object.fromEntries(Object.entries(GUIDES).map(([slug, g]) => [guidePath(slug), g.title])),
   ...Object.fromEntries(Object.entries(COMPARISONS).map(([slug, c]) => [comparisonPath(slug), c.title])),
+  ...Object.fromEntries(Object.entries(ALTERNATIVES).map(([slug, a]) => [alternativePath(slug), a.title])),
   ...Object.fromEntries(Object.entries(LANDING_PAGES).map(([slug, p]) => [`/${slug}`, p.title])),
   ...Object.fromEntries(Object.entries(LEGAL_DOCS).map(([slug, d]) => [`/${slug}`, d.title]))
 };
@@ -37,9 +43,10 @@ export const llmsTxt = () =>
     `> ${SUMMARY}`,
     '## Pages',
     SITE_PATHS.map(link).join('\n'),
-    '## Source and app',
-    `- [GitHub](${GITHUB_URL}): source code, README and local run instructions`,
-    `- [App](${APP_URL}): sign up or log in`,
+    '## Install',
+    INSTALL_LINES.join('\n'),
+    '## Source',
+    `- [GitHub](${GITHUB_URL}): source code and README`,
     `- [Full text](${SITE_URL}/llms-full.txt): this file with the complete FAQ`
   ].join('\n\n') + '\n';
 
@@ -47,10 +54,6 @@ export const llmsFullTxt = () =>
   [
     '# feega',
     `> ${SUMMARY}`,
-    '## Run it with your agent',
-    'npx feega',
-    '## Connect Claude Code',
-    `${CONNECT_COMMAND}\n\nMCP server: ${MCP_URL}. Core tools: ${MCP_TOOLS.join(', ')}.`,
     '## Guides',
     Object.entries(GUIDES).map(([slug, g]) => `### ${g.heading}\n${g.answer}\n${SITE_URL}${guidePath(slug)}`).join('\n\n'),
     '## FAQ',
