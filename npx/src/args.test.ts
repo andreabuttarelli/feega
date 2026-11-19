@@ -14,6 +14,16 @@ describe('npx feega arguments', () => {
     expect(argsOf(['--port=4100', '/abs/app'], '/work')).toMatchObject({ dir: '/abs/app', port: 4100 });
   });
 
+  it('--url takes the address of a running dev server, as a folder may follow', () => {
+    expect(argsOf(['--url', 'localhost:5173', 'web'], '/work')).toEqual({ run: Run.Editor, dir: '/work/web', port: 0, browser: Browser.Open, url: 'http://localhost:5173' });
+    expect(argsOf(['--url=http://127.0.0.1:3000/x'], '/work')).toMatchObject({ url: 'http://127.0.0.1:3000' });
+  });
+
+  it('--url needs a web address', () => {
+    expect(argsOf(['--url', 'nope nope'], '/w')).toEqual({ run: Run.Error, reason: 'the --url must be a web address like http://localhost:5173' });
+    expect(argsOf(['--url'], '/w')).toMatchObject({ run: Run.Error });
+  });
+
   it('--help and --version', () => {
     expect(argsOf(['--help'], '/w').run).toBe(Run.Help);
     expect(argsOf(['-h'], '/w').run).toBe(Run.Help);

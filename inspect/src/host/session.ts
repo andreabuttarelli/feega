@@ -4,7 +4,9 @@ import { appsIn } from '@feega/dev-run/run-plan';
 import { liveAtOf } from '@feega/live-edit/live-ask';
 import { ServerAction, ServerState, ToHost, ToView, type EditAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
 import { SettingKey, StylingChoice } from '../settings';
-import { Attach, factsOf, startDev, type Refused, type Running } from './dev-server';
+import { addPlugin } from './add-plugin';
+import { appOfSource, firstStampedFile, urlOf } from './attach-url';
+import { Attach, attachDev, factsOf, startDev, type Refused, type Running } from './dev-server';
 import { fileEdits, type Snapshot, type Written } from './file-edits';
 import type { KeptServers } from './kept-servers';
 import { forget, remember, type Memo } from './orphans';
@@ -176,6 +178,55 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     return started;
   }
 
+  async function appForUrl(url: string): Promise<string | null | undefined> {
+    const apps = appsIn(await factsOf(workspace));
+    if (app !== null || apps.length < 2) {
+      return app ?? apps[0];
+    }
+    const page = await fetch(url, { signal: AbortSignal.timeout(PICK_TIMEOUT_MS) }).then((r) => r.text(), () => '');
+    const stamped = firstStampedFile(page);
+    return (stamped && appOfSource(workspace, apps, stamped)) ?? chooseApp(apps);
+  }
+
+  async function attachUrl(text: string): Promise<Running | Refused> {
+    const url = urlOf(text);
+    if (!url) {
+      return refuse(`"${text}" is not a web address`);
+    }
+    const mine = ++starts;
+    running?.stop();
+    running = null;
+    post({ kind: ToView.Server, state: ServerState.Starting });
+    const chosen = await appForUrl(url);
+    if (chosen === null) {
+      return refuse('no app chosen');
+    }
+    if (chosen !== undefined && chosen !== app) {
+      await useApp(chosen);
+    }
+    const started = await attachDev(workspace, platform.launcher, url, app);
+    if (starts !== mine) {
+      return started;
+    }
+    if ('refused' in started) {
+      return refuse(started.refused);
+    }
+    startedAt = Date.now();
+    adopt(started, () => starts === mine);
+    await showApp();
+    return started;
+  }
+
+  function refuse(reason: string): Refused {
+    post({ kind: ToView.Server, state: ServerState.Stopped, reason });
+    return { refused: reason };
+  }
+
+  async function installPlugin() {
+    const out = await addPlugin(join(root, running?.plan.appDir ?? ''));
+    await post({ kind: ToView.Status, text: out.ok ? (out.files.length ? `Added the Feega plugin to ${out.files.join(', ')}. Install dependencies and restart the dev server.` : 'The Feega plugin is already set up.') : out.reason });
+  }
+
   async function switchApp() {
     if ((await chooseApp(appsIn(await factsOf(workspace)))) !== null) {
       await startServer();
@@ -239,7 +290,9 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Diff]: (m) => showDiff(m.id),
     [ToHost.SourceControl]: () => platform.sourceControl(),
     [ToHost.Move]: (m) => edits.move(m.from, m.to, m.place).then((out) => edited(out, null)),
-    [ToHost.Setting]: (m) => platform.setSetting(m.key, m.value).then(postSettings)
+    [ToHost.Setting]: (m) => platform.setSetting(m.key, m.value).then(postSettings),
+    [ToHost.AttachUrl]: (m) => attachUrl(m.url),
+    [ToHost.AddPlugin]: installPlugin
   };
 
   platform.receive((message) => (handlers[message.kind] as (m: HostMessage) => unknown)(message));
@@ -264,6 +317,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   return {
     root: () => root,
     start: () => startServer(),
+    attachUrl,
+    addPlugin: installPlugin,
     stop: close,
     url: () => running?.url ?? null,
     showApp,

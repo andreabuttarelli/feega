@@ -17,6 +17,7 @@
   import FeegaMenu from './FeegaMenu.svelte';
   import ServerPopover from './ServerPopover.svelte';
   import LayersTree from './LayersTree.svelte';
+  import { hasSourceInfo } from './source-info';
   import ChangesList from './ChangesList.svelte';
   import DeviceBar from './DeviceBar.svelte';
   import Redo2 from '@lucide/svelte/icons/redo-2';
@@ -45,6 +46,7 @@
   let start = $state('');
   let route = $state('/');
   let address = $state('/');
+  let attachAddress = $state('');
   let styling = $state(Styling.Tailwind);
   let server = $state(ServerState.Detecting);
   let serverReason = $state('');
@@ -595,6 +597,17 @@
               <button type="button" class="action" data-action={action} onclick={() => toHost({ kind: ToHost.Server, action })}>{ACTION_LABEL[action]}</button>
             {/each}
           </div>
+          <form class="attach" onsubmit={(e) => (e.preventDefault(), attachAddress.trim() && toHost({ kind: ToHost.AttachUrl, url: attachAddress }))}>
+            <input bind:value={attachAddress} aria-label="Dev server address" data-testid="attach-url" placeholder="http://localhost:5173" spellcheck="false" />
+            <button type="submit" class="action">Attach to a running server</button>
+          </form>
+        </div>
+      {/if}
+      {#if bridged && !hasSourceInfo(layers)}
+        <div class="notice nosource" data-testid="no-source">
+          <span>This page has no source info</span>
+          <button type="button" class="link" data-action="add-plugin" onclick={() => toHost({ kind: ToHost.AddPlugin })}>Add the Feega plugin</button>
+          <button type="button" class="link" data-action={ServerAction.RestartUnderFeega} onclick={() => toHost({ kind: ToHost.Server, action: ServerAction.RestartUnderFeega })}>Let Feega start the server</button>
         </div>
       {/if}
       {#if toast}<div class="toast" role="status">{toast}</div>{/if}
@@ -980,6 +993,28 @@
     border-radius: var(--ui-radius-md);
     background: var(--ui-float);
     box-shadow: 0 0 0 1px var(--ui-divider);
+    font-size: var(--ui-text-sm);
+  }
+
+  .notice.nosource {
+    bottom: 64px;
+  }
+
+  .attach {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+  }
+
+  .attach input {
+    min-width: 0;
+    padding: 4px 8px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-float);
+    box-shadow: 0 0 0 1px var(--ui-divider);
+    color: inherit;
+    font: inherit;
     font-size: var(--ui-text-sm);
   }
 

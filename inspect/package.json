@@ -55,6 +55,11 @@
         "command": "feegaInspect.designPage",
         "title": "Design this page with Feega",
         "category": "Feega"
+      },
+      {
+        "command": "feegaInspect.openFromUrl",
+        "title": "Open from URL…",
+        "category": "Feega"
       }
     ],
     "configuration": {

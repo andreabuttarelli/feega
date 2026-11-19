@@ -96,7 +96,9 @@ export enum ToHost {
   SaveVariable = 'save-variable',
   Revert = 'revert',
   Diff = 'diff',
-  SourceControl = 'source-control'
+  SourceControl = 'source-control',
+  AttachUrl = 'attach-url',
+  AddPlugin = 'add-plugin'
 }
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number };
@@ -131,7 +133,9 @@ export type HostMessage =
   | { kind: ToHost.SaveVariable; ask: EditAsk; name: string }
   | { kind: ToHost.Revert; id: number | null }
   | { kind: ToHost.Diff; id: number }
-  | { kind: ToHost.SourceControl };
+  | { kind: ToHost.SourceControl }
+  | { kind: ToHost.AttachUrl; url: string }
+  | { kind: ToHost.AddPlugin };
 
 export type ViewMessage =
   | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string }

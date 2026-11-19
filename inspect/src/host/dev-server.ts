@@ -229,6 +229,21 @@ async function userServer(appRoot: string, launch: Launch, defaultPort: number, 
   return null;
 }
 
+async function attachedTo(url: string, plan: RunPlan, appRoot: string, launcherSource: string): Promise<Running> {
+  const bridgeDir = join(appRoot, LAUNCHER_DIR);
+  await cp(launcherSource, bridgeDir, { recursive: true });
+  const proxy = await devProxy(url, bridgeDir);
+  return { url: proxy.url, plan, launch: LAUNCH[plan.framework], attached: true, pid: null, command: 'already running', stop: proxy.close, exited: () => undefined };
+}
+
+export async function attachDev(root: string, launcherSource: string, url: string, asked: string | null): Promise<Running | Refused> {
+  if ((await pageOf(url)) === null) {
+    return { refused: `nothing answers on ${url}` };
+  }
+  const planned: Planned = runPlan(await factsOf(root), asked, { host: HOST, port: await freePort() });
+  return planned.ok ? attachedTo(url, planned, join(root, planned.appDir), launcherSource) : { refused: planned.reason };
+}
+
 function timeline(log: (line: string) => void) {
   const begun = Date.now();
   let last = begun;
@@ -258,10 +273,9 @@ export async function startDev(root: string, launcherSource: string, hooks: Star
   const theirs = attach === Attach.IfRunning ? await userServer(appRoot, launch, planned.defaultPort, hooks.log) : null;
   time.mark('look for a running server');
   if (theirs) {
-    await cp(launcherSource, bridgeDir, { recursive: true });
-    const proxy = await devProxy(theirs, bridgeDir);
+    const attached = await attachedTo(theirs, planned, appRoot, launcherSource);
     time.done('attached');
-    return { url: proxy.url, plan: planned, launch, attached: true, pid: null, command: 'already running', stop: proxy.close, exited: () => undefined };
+    return attached;
   }
 
   const installed: { failed: Failed | null } = { failed: null };

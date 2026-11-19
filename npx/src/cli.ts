@@ -51,14 +51,15 @@ async function main(): Promise<number> {
     return 1;
   }
 
-  const root = await chosenApp(args.dir, args.dir, tree, askApp);
+  const root = args.url ? args.dir : await chosenApp(args.dir, args.dir, tree, askApp);
   if (!root) {
     say(`feega: no web app (package.json) in ${args.dir}`);
     return 1;
   }
 
   const editor = await editorServer(join(__dirname, 'webview'), args.port);
-  const platform = nodePlatform({ root, launcher: join(__dirname, 'launcher'), version: FEEGA_VERSION, transport: editor.transport, print: say });
+  const host = nodePlatform({ root, launcher: join(__dirname, 'launcher'), version: FEEGA_VERSION, transport: editor.transport, print: say });
+  const platform = args.url ? { ...host, chooseApp: (apps: string[]) => askApp(apps.map((app) => ({ label: app || '.', app }))) } : host;
   await killOrphans(memoOf(platform));
   const session = inspectSession(platform, root);
 
@@ -71,8 +72,8 @@ async function main(): Promise<number> {
   process.once('SIGTERM', stop);
 
   say(`feega: editing ${root}`);
-  say('feega: starting its dev server…');
-  const started = await session.start();
+  say(args.url ? `feega: attaching to ${args.url}` : 'feega: starting its dev server…');
+  const started = await (args.url ? session.attachUrl(args.url) : session.start());
   if ('refused' in started) {
     say(`feega: ${started.refused}`);
   }

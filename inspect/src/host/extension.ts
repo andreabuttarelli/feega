@@ -3,6 +3,7 @@ import { access, readdir } from 'node:fs/promises';
 import { basename, join, relative } from 'node:path';
 import * as vscode from 'vscode';
 import type { EditAsk } from '../messages';
+import { urlOf } from './attach-url';
 import { chosenApp, type Tree } from './app-root';
 import { Command } from './commands';
 import { devReload } from './dev-reload';
@@ -92,12 +93,43 @@ async function open(context: vscode.ExtensionContext, target?: vscode.Uri) {
   await session.start();
 }
 
+async function openFromUrl(context: vscode.ExtensionContext) {
+  const workspace = workspaceOf();
+  if (!workspace || !host) {
+    vscode.window.showWarningMessage('Feega: open the folder of a web app first.');
+    return;
+  }
+  const typed = await vscode.window.showInputBox({ prompt: 'Address of the running dev server', placeHolder: 'http://localhost:5173', validateInput: (text) => (urlOf(text) ? null : 'Enter a web address, e.g. http://localhost:5173') });
+  const url = typed && urlOf(typed);
+  if (!url) {
+    return;
+  }
+  opened?.panel.dispose();
+
+  const panel = panelOf(context);
+  const platform = vsCodePlatform(host, panel, befores);
+  const session = inspectSession(platform, workspace, appOf(platform, workspace, workspace), undefined, kept);
+  opened = { panel, session };
+  panel.onDidDispose(() => {
+    session.stop();
+    opened = null;
+  });
+  await session.attachUrl(url);
+}
+
+const COMMANDS: Record<Command, (context: vscode.ExtensionContext, target?: vscode.Uri) => unknown> = {
+  [Command.Open]: open,
+  [Command.DesignFolder]: open,
+  [Command.DesignPage]: open,
+  [Command.OpenFromUrl]: openFromUrl
+};
+
 export function activate(context: vscode.ExtensionContext) {
   const output = vscode.window.createOutputChannel(`${TITLE}: dev server`);
   host = { context, output, launcher: join(context.extensionPath, 'dist', 'launcher') };
   context.subscriptions.push(
     output,
-    ...Object.values(Command).map((id) => vscode.commands.registerCommand(id, (target?: vscode.Uri) => open(context, target))),
+    ...Object.values(Command).map((id) => vscode.commands.registerCommand(id, (target?: vscode.Uri) => COMMANDS[id](context, target))),
     vscode.workspace.onDidChangeConfiguration((e) => e.affectsConfiguration(SECTION) && opened?.session.settingsChanged()),
     beforeProvider(befores)
   );
