@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { lower } from './lower';
   import Mark from './Mark.svelte';
   import { GITHUB_URL, HEADER_LINKS, MENU_LINKS, SOCIAL_LINKS } from './links';
   import { GITHUB_ICON } from './social-icons';
@@ -12,12 +11,12 @@
 
   <nav class="links" aria-label="Main">
     {#each HEADER_LINKS as link (link.label)}
-      <a class="chip" href={link.href}>{lower(link.label)}</a>
+      <a class="chip" href={link.href}>{link.label.toLowerCase()}</a>
     {/each}
   </nav>
 
   <div class="actions">
-    <a class="chip cta" href={GITHUB_URL}><span>Star on GitHub</span></a>
+    <a class="chip cta" href={GITHUB_URL}><span>star on github</span></a>
   </div>
 
   <div class="mobile">
@@ -38,9 +37,9 @@
   <nav class="drawer" aria-label="Menu">
     <div class="menu">
       {#each MENU_LINKS as link (link.label)}
-        <a href={link.href} onclick={() => (open = false)}>{lower(link.label)}</a>
+        <a href={link.href} onclick={() => (open = false)}>{link.label.toLowerCase()}</a>
       {/each}
-      <a href={GITHUB_URL}>Star on GitHub</a>
+      <a href={GITHUB_URL}>star on github</a>
     </div>
 
     <div class="follow">
@@ -57,7 +56,7 @@
 <style>
   .bar {
     --nav-chip: 38px;
-    position: fixed;
+    position: absolute;
     inset: 0 0 auto;
     z-index: var(--site-z-header);
     display: flex;
@@ -82,8 +81,8 @@
   .bar :global(.chip) {
     display: block;
     padding: 8px 4px 10px;
-    background: #fff;
-    color: #000;
+    color: #fff;
+    text-decoration: none;
   }
 
   .bar .brand {
