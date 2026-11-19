@@ -3,11 +3,11 @@
   import InstallCta from '../InstallCta.svelte';
   import { HERO_HEADLINE } from '../home';
   import AsciiField from './AsciiField.svelte';
-  import HeroVideo, { POSTER } from './HeroVideo.svelte';
+  import EditorMock from '../EditorMock.svelte';
+  import TerminalMock from './TerminalMock.svelte';
 </script>
 
 <svelte:head>
-  <link rel="preload" as="image" href={POSTER} type="image/webp" fetchpriority="high" />
   <link rel="preload" href="/site/fonts/instrument-serif-latin.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
 </svelte:head>
 
@@ -20,7 +20,10 @@
 
   <InstallCta id="hero-install" />
 
-  <HeroVideo />
+  <div class="mock">
+    <div class="term"><TerminalMock /></div>
+    <div class="win"><EditorMock /></div>
+  </div>
 </section>
 
 <style>
@@ -57,6 +60,42 @@
     margin-top: 28px;
   }
 
+
+  .mock {
+    display: none;
+  }
+
+  @media (min-width: 810px) {
+    .mock {
+      display: block;
+      position: relative;
+      width: 100%;
+      margin-top: 48px;
+      padding: 72px;
+      border-radius: var(--ui-radius-lg, 10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background:
+        radial-gradient(ellipse 70% 60% at 85% 100%, rgba(255, 81, 0, 0.55), transparent 70%),
+        radial-gradient(ellipse 60% 50% at 10% 0%, rgba(120, 90, 255, 0.28), transparent 70%),
+        radial-gradient(ellipse 50% 40% at 50% 110%, rgba(255, 190, 80, 0.2), transparent 70%),
+        #0d0d0d;
+      overflow: hidden;
+    }
+
+    .mock .win {
+      position: relative;
+      z-index: 2;
+    }
+
+    .mock .term {
+      position: absolute;
+      z-index: 1;
+      top: 22px;
+      left: 22px;
+      width: 46%;
+      height: 55%;
+    }
+  }
 
   @media (min-width: 1200px) {
     .hero {
