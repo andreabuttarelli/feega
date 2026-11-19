@@ -23,4 +23,5 @@ jobs:
           fi
 
       - name: Query the database
-        run: curl -fsS "$SUPABASE_URL/rest/v1/profiles?select=id&limit=1" -H "apikey: $SUPABASE_ANON_KEY"
+        run: |
+          curl -fsS "$SUPABASE_URL/rest/v1/profiles?select=id&limit=1" -H "apikey: $SUPABASE_ANON_KEY"
