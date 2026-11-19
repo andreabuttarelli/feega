@@ -5,11 +5,15 @@
 **Motto: "Design in your codebase."** Simplify, order, sell. The product had grown too big to sell;
 until the MVP ships, new work goes to the extension, not the canvas.
 
-**MVP = the VS Code extension (`inspect/`, Feega Inspect) + `npx feega`:**
+**MVP = the VS Code extension (`inspect/`, Feega Inspect) + `npx feega`.** It is the only VS Code
+extension: the canvas extension in `vscode/` is deprecated. The MVP covers:
 - authentication with Feega (to count users; the web app is a stats dashboard for now);
 - design editing on the running app: click an element, edit it from the Properties bar;
 - code changes written to the source in the project's own styling system (Tailwind or real CSS);
 - diffs and change history, undo / redo;
+- edit scope: this element, every element with a class or id, every instance of a component, or
+  the design system itself (Tailwind theme / CSS variables / tokens), with the number of places
+  touched shown before applying;
 - preview sizes for responsive design;
 - React, Next.js, SvelteKit, Vue.
 
