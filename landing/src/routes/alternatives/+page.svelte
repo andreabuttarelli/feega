@@ -1,7 +1,7 @@
 <script lang="ts">
   import '$lib/site/landing/landing.css';
   import '$lib/site/compare/compare.css';
-  import { ALTERNATIVES, ALTERNATIVES_INDEX, ALTERNATIVES_PATH, KIND_HEADINGS, alternativePath } from '$lib/site/alternatives';
+  import { ALTERNATIVES, ALTERNATIVES_INDEX, ALTERNATIVES_PATH, AUTHOR, DISCLAIMER, KIND_HEADINGS, alternativePath } from '$lib/site/alternatives';
   import { ArticleKind } from '$lib/site/alternatives/alternative';
   import { COMPARISONS, comparisonPath } from '$lib/site/compare';
   import { breadcrumbJsonLd } from '$lib/site/structured-data';
@@ -23,6 +23,7 @@
 
 <article class="landing compare">
   <h1>{ALTERNATIVES_INDEX.heading}</h1>
+  <p class="fine">By {AUTHOR.name}, {AUTHOR.role}</p>
   <p class="intro">{ALTERNATIVES_INDEX.intro}</p>
 
   {#each Object.values(ArticleKind) as kind (kind)}
@@ -46,4 +47,6 @@
       {/each}
     </ul>
   </section>
+
+  <p class="fine">{DISCLAIMER}</p>
 </article>

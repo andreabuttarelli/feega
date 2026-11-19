@@ -2,7 +2,7 @@
   import '$lib/site/landing/landing.css';
   import '$lib/site/compare/compare.css';
   import { APP_URL } from '$lib/site/links';
-  import { ALTERNATIVES, ALTERNATIVES_PATH, TRY_STEPS, alternativePath } from '$lib/site/alternatives';
+  import { ALTERNATIVES, ALTERNATIVES_PATH, AUTHOR, DISCLAIMER, TRY_STEPS, alternativePath } from '$lib/site/alternatives';
   import { articleJsonLd, faqJsonLd } from '$lib/site/structured-data';
   import AsciiCover from '$lib/site/alternatives/AsciiCover.svelte';
   import { coverFor } from '$lib/site/alternatives/cover';
@@ -25,7 +25,7 @@
 <article class="landing compare">
   <a class="back" href={ALTERNATIVES_PATH}>← All alternatives</a>
   <h1>{page.heading}</h1>
-  <p class="fine">By the Feega team · checked {page.checked} · <a href="#how-checked">how we checked</a></p>
+  <p class="fine">By {AUTHOR.name}, {AUTHOR.role} · checked {page.checked} · <a href="#how-checked">how we checked</a></p>
   <AsciiCover cover={coverFor(Object.keys(ALTERNATIVES).indexOf(data.slug))} label={page.heading} logo={page.logo} />
   <p class="intro"><strong>{page.lead}</strong></p>
 
@@ -79,6 +79,7 @@
         <li><a href={source.href} rel="noopener">{source.label}</a></li>
       {/each}
     </ol>
+    <p class="fine">{DISCLAIMER}</p>
   </section>
 
   <section>

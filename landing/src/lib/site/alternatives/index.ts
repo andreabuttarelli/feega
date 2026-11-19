@@ -31,3 +31,8 @@ export const alternativePath = (slug: string) => `${ALTERNATIVES_PATH}/${slug}`;
 export function isAlternativeSlug(slug: string): boolean {
   return Object.hasOwn(ALTERNATIVES, slug);
 }
+
+export const AUTHOR = { name: 'Andrea Buttarelli', role: 'founder of Feega' } as const;
+
+export const DISCLAIMER =
+  'Feega is not affiliated with, endorsed by, sponsored by or connected to any company or product named on this page. All product names, logos and trademarks belong to their respective owners and are used only to identify those products. Information comes from their public pages on the date shown and may have changed since; check the source before you decide. This page is not legal, financial or purchasing advice.';
