@@ -1,6 +1,6 @@
 import { COFFEE_URL, DOWNLOAD_PATH, EDITORS, EXTENSION_PUBLISHED, GITHUB_URL, NPX_COMMAND, NPX_LISTED, type Editor } from './links';
 
-const DOWNLOAD_LABEL = 'Download for free';
+const DOWNLOAD_LABEL = 'download for free';
 
 export const DEEP_LINK_TIMEOUT_MS = 1500;
 
@@ -17,9 +17,9 @@ export type Env = {
 
 export const primaryCta = (): Cta => ({ label: DOWNLOAD_LABEL, href: DOWNLOAD_PATH });
 
-export const starCta: Cta = { label: 'Star on GitHub', href: GITHUB_URL };
+export const starCta: Cta = { label: 'star on github', href: GITHUB_URL };
 
-export const secondaryCtas = (): readonly Cta[] => [{ label: 'Support with a coffee', href: COFFEE_URL }];
+export const secondaryCtas = (): readonly Cta[] => [{ label: 'support with a coffee', href: COFFEE_URL }];
 
 export type InstallOption = { label: string; href: string; deepLink?: string; command?: string; soon: boolean };
 

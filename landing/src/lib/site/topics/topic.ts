@@ -29,6 +29,7 @@ export type Hub = {
   readonly title: string;
   readonly description: string;
   readonly heading: string;
+  readonly menuLabel: string;
   readonly intro: string;
   readonly topics: Readonly<Record<string, Topic>>;
 };
