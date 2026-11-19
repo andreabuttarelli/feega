@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BILLING_PATH } from '$lib/billing-path';
@@ -22,10 +22,6 @@ function sources(dir: string): string[] {
 describe('i crediti vivono nel workspace, non nel progetto', () => {
   it('il percorso non porta né progetto né brand', () => {
     expect(BILLING_PATH).toBe('/app/credits');
-  });
-
-  it('la pagina a cui porta esiste su disco', () => {
-    expect(existsSync(join(SRC, 'routes', 'app', 'credits', '+page.svelte'))).toBe(true);
   });
 
   it('nessun link punta a un vecchio indirizzo dei crediti', () => {

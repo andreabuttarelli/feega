@@ -7,7 +7,7 @@
 </script>
 
 {#if data.shell}
-  <AppShell data={data.shell}>
+  <AppShell profile={data.shell.profile}>
     <div class="gallery-page" data-testid="gallery-in-app">{@render children()}</div>
   </AppShell>
 {:else}
