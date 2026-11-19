@@ -18,5 +18,5 @@ Changes:
   `.feega/`, push `origin HEAD`, PR). `ProjectGit.svelte` portals into the top bar's git slot in
   local mode.
 
-PR: with `GITHUB_PUSH_TOKEN` via `githubHost.upsertPull`; otherwise GitHub's compare page.
-Composio is not reachable in local mode (no cloud DB), so it is not used here.
+PR: push with the user's git credentials, then GitHub's compare page. No token, no API call:
+integrations go through Composio only, and Composio is not reachable in local mode.

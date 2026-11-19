@@ -45,6 +45,24 @@ describe('/local/git: il git della cartella aperta', () => {
     expect((await git(dir, ['log', '-1', '--format=%s'])).out.trim()).toBe('Update canvas');
   });
 
+  it('la PR locale apre sempre la pagina compare: nessun token, nessuna chiamata API', async () => {
+    const dir = await openedRepo();
+    const remote = await mkdtemp(join(tmpdir(), 'feega-git-remote-'));
+    await git(remote, ['init', '-q', '--bare']);
+    await git(dir, ['commit', '-q', '--allow-empty', '-m', 'x']);
+    await git(dir, ['remote', 'add', 'origin', 'git@github.com:acme/site.git']);
+    await git(dir, ['config', 'remote.origin.pushurl', remote]);
+    process.env.GITHUB_PUSH_TOKEN = 'tok';
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    const body = await (await post({ action: 'pull' })).json();
+
+    expect(body.message).toBeUndefined();
+    expect(body.url).toBe('https://github.com/acme/site/compare/main...work?expand=1');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    delete process.env.GITHUB_PUSH_TOKEN;
+  });
+
   it('un push senza origin torna come errore leggibile, non come 500', async () => {
     await openedRepo();
     const res = await post({ action: 'push' });
