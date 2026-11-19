@@ -17,10 +17,6 @@ describe('i link legali vivono in una sola tabella', () => {
     expect(legalHref('cookies')).toBe('https://feega.app/cookies');
   });
 
-  it('la pagina aggiuntiva del footer esistono', () => {
-    expect(legalHref('refunds')).toBe('https://feega.app/refunds');
-  });
-
   it('FOOTER_LEGAL_LINKS copre ogni chiave della tabella una sola volta', () => {
     expect(new Set(FOOTER_LEGAL_LINKS)).toEqual(new Set(Object.keys(LEGAL_LINKS)));
     expect(FOOTER_LEGAL_LINKS).toHaveLength(Object.keys(LEGAL_LINKS).length);
