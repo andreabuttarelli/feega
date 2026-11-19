@@ -7,6 +7,7 @@
   import { DOWNLOAD_PATH } from './links';
   import { ALTERNATIVES_PATH } from './alternatives';
   import { CODEBASE_PATH } from './codebase';
+  import { HUBS } from './topics';
 
   const legal = Object.entries(LEGAL_DOCS).map(([slug, doc]) => ({ href: `/${slug}`, label: doc.label }));
   const year = new Date().getFullYear();
@@ -40,6 +41,9 @@
     <nav class="col" aria-label="Learn">
       <p class="head">learn</p>
       <a href={DOCS_URL}>docs</a>
+      {#each HUBS as hub (hub.path)}
+        <a href={hub.path}>{lower(hub.heading)}</a>
+      {/each}
       <a href={ALTERNATIVES_PATH}>alternatives</a>
       <a href={STORY_URL}>blog</a>
     </nav>

@@ -53,7 +53,7 @@ export const SINGLES: Readonly<Record<string, Article>> = {
     ],
     questions: [
       { q: 'Can Figma edit my codebase?', a: 'In the Make local beta, yes. It is not generally available yet.' },
-      { q: 'Can Feega read my Figma file?', a: 'No. It edits your running app, not a design file.' }
+      { q: 'Can Feega read my Figma file?', a: 'No. It edits the app you are running.' }
     ],
     sources: [
       { label: 'Figma Make in your local codebase', href: 'https://help.figma.com/hc/en-us/articles/40775535020695-Make-in-your-local-codebase' },

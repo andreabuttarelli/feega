@@ -8,7 +8,7 @@ import { GET as robots } from '../../routes/robots.txt/+server';
 import { FAQ, HERO_HEADLINE } from './home';
 import { HOME_META, OG } from './seo';
 import { breadcrumbJsonLd, faqJsonLd, HOME_JSON_LD } from './structured-data';
-import { llmsFullTxt, llmsTxt } from './llms';
+import { llmsFullTxt, llmsTxt, trailOf } from './llms';
 import { SITE_PATHS } from './paths';
 
 const MAX_TITLE = 60;
@@ -58,7 +58,7 @@ describe('structured data', () => {
   });
 
   it('a breadcrumb ends at the page itself', () => {
-    const data = JSON.parse(breadcrumbJsonLd('Changelog', '/changelog').replace(/^<script[^>]*>|<\/script>$/g, ''));
+    const data = JSON.parse(breadcrumbJsonLd(trailOf('/changelog')).replace(/^<script[^>]*>|<\/script>$/g, ''));
     expect(data.itemListElement.map((i: { item: string }) => i.item)).toEqual(['https://www.feega.app/', 'https://www.feega.app/changelog']);
   });
 });

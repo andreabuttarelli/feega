@@ -1,6 +1,7 @@
 import { PLAN } from './pricing/plan';
 import { FAQ } from './home';
 import { plainText } from './text';
+import type { Topic } from './topics/topic';
 import { DISCORD_URL, DOWNLOAD_PATH, FEEGA_VERSION, GITHUB_URL, SITE_URL, SOCIAL_LINKS } from './links';
 
 const SITE = `${SITE_URL}/`;
@@ -49,14 +50,13 @@ export const faqJsonLd = (items: readonly { q: string; a: string }[]) =>
     mainEntity: items.map(({ q, a }) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: plainText(a) } }))
   });
 
-export const breadcrumbJsonLd = (name: string, path: string) =>
+export type Crumb = { name: string; path: string };
+
+export const breadcrumbJsonLd = (trail: readonly Crumb[]) =>
   script({
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
-    itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Feega', item: SITE },
-      { '@type': 'ListItem', position: 2, name, item: `${SITE}${path.slice(1)}` }
-    ]
+    itemListElement: [{ name: 'Feega', path: '/' }, ...trail].map((c, i) => ({ '@type': 'ListItem', position: i + 1, name: c.name, item: `${SITE}${c.path.slice(1)}` }))
   });
 
 export const HOME_JSON_LD = [ORGANIZATION, APPLICATION, FOUNDER].map(script).join('') + faqJsonLd(FAQ);
@@ -72,6 +72,23 @@ export const articleJsonLd = (article: { title: string; description: string; pat
     author: { '@type': 'Person', name: 'Andrea Buttarelli' },
     publisher: { '@type': 'Organization', name: 'Feega', url: SITE }
   });
+
+export const topicJsonLd = (topic: Topic, path: string) =>
+  script({
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: topic.title,
+    description: topic.description,
+    url: `${SITE}${path.slice(1)}`,
+    mainEntityOfPage: `${SITE}${path.slice(1)}`,
+    image: `${SITE_URL}${topic.cover.src}`,
+    datePublished: topic.checked,
+    dateModified: topic.checked,
+    author: { '@type': 'Person', name: 'Andrea Buttarelli' },
+    publisher: { '@type': 'Organization', name: 'Feega', url: SITE }
+  }) +
+  script(ORGANIZATION) +
+  faqJsonLd(topic.questions);
 
 export const howToJsonLd = (name: string, steps: readonly { name: string; text: string }[]) =>
   script({
