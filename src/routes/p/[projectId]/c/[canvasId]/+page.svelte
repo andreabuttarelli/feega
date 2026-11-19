@@ -4880,7 +4880,7 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
       {#if body === TileBody.Standin && hoverGen?.refId && !hoverGen.running}<OutputDragHandle nodeId={id} />{/if}
       {#if overMotion}<FrameLiveControls nodeId={id} interactive={!!overMotion.interactive} src={motionLivePath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} />{/if}
     {/snippet}
-    {#snippet tile({ id, selected, live, motion })}
+    {#snippet tile({ id, selected, live, motion: camera })}
       {@const row = nodeById.get(id)}
       {#if row}
         {@const gen = genOf(row)}
@@ -5020,7 +5020,7 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
         {:else if liveFrameOf(row.data)}
           {@const liveFrame = liveFrameOf(row.data)}
           {#if liveFrame}
-            <LiveFrameNode {id} {selected} onstep={(step: FrameStep) => undoStack.push({ source: 'frame', step })} onfail={(message: string) => (failed = `Not written to the code: ${message}`)} live={liveFrame} mode={live} {motion} hmr={liveHmr} origin={devOrigin} poster={liveFrame.poster ? canvasAssetUrl(data.projectId, data.canvas.id, liveFrame.poster, AssetSize.Full) : null} onsnapshot={() => shootLive(id)} onrefresh={() => refreshLive(id)} />
+            <LiveFrameNode {id} {selected} onstep={(step: FrameStep) => undoStack.push({ source: 'frame', step })} onfail={(message: string) => (failed = `Not written to the code: ${message}`)} live={liveFrame} mode={live} motion={camera} hmr={liveHmr} origin={devOrigin} poster={liveFrame.poster ? canvasAssetUrl(data.projectId, data.canvas.id, liveFrame.poster, AssetSize.Full) : null} onsnapshot={() => shootLive(id)} onrefresh={() => refreshLive(id)} />
           {/if}
         {:else if frame}
           {@const codeRow = frame.source === 'view' ? nodes.find((n) => n.id === frame.sourceNodeId) : null}
