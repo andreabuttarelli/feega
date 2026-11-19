@@ -28,6 +28,7 @@ const ready = await import('./ready/+server');
 const wip = await import('./wip/+server');
 const branch = await import('./branch/+server');
 const pull = await import('./pull/+server');
+const history = await import('./history/+server');
 
 type Handler = (event: unknown) => Promise<Response>;
 
@@ -164,5 +165,15 @@ describe('/api/v1/projects/:id/github/push', () => {
     await post(branch.POST, { nodeIds: ['n1'], branch: 'main' });
 
     expect((await post(pull.POST, { nodeId: 'n1', base: 'main' })).res.status).toBe(400);
+  });
+
+  it('la storia: diff di un commit, revert in avanti, diff del ramo verso la base', async () => {
+    await post(branch.POST, { nodeIds: ['n1'], branch: 'design/hero', from: 'main' });
+    const commit = (await post(push.POST, { name: 'hero', nodeIds: ['n1'] })).body;
+
+    expect((await post(history.POST, { nodeId: 'n1', action: 'diff', sha: commit.sha })).body).toEqual({ ok: true, files: [{ path: 'src/Hero.tsx', before: 'v0', after: 'v1' }] });
+    expect((await post(history.POST, { nodeId: 'n1', action: 'branch' })).body).toEqual({ ok: true, files: [{ path: 'src/Hero.tsx', before: 'v0', after: 'v1' }] });
+    expect((await post(history.POST, { nodeId: 'n1', action: 'revert', sha: commit.sha })).body).toMatchObject({ ok: true, branch: 'design/hero' });
+    expect(gh.files('design/hero')['src/Hero.tsx']).toBe('v0');
   });
 });

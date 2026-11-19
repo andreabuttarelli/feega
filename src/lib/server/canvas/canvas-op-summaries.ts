@@ -55,6 +55,7 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   github_version_action: 'From a version frame: restore it onto the linked frame as changes to push, make an unlinked variant, or read the code diff.',
   github_branch: 'Choose the working branch of linked frames: an existing branch (main included) or a new one from a base. Commits land there.',
   github_pull: 'Open a pull request from the working branch to a target branch, as a draft by default.',
+  github_history: 'The history of the working branch of a linked frame: what a commit changed, a revert as a new commit (conflict when later commits touched the same files), or the full diff against the base.',
   github_ready: 'Mark the draft pull request of a linked frame ready for review; autosave opens it as a draft.',
   github_undo: 'Undo the last push of a frame with a forward commit that restores only the files that push touched.',
   github_variant: 'Make a variant of a linked frame: a copy whose push asks to replace the original, become a new route or stay on the canvas.',
