@@ -1,6 +1,6 @@
 <script lang="ts">
   import '$lib/site/landing/landing.css';
-  import '$lib/site/compare/compare.css';
+  import '$lib/site/alternatives/alternatives.css';
   import { GUIDES, GUIDES_INDEX, GUIDES_PATH, guidePath } from '$lib/site/guides';
   import { breadcrumbJsonLd } from '$lib/site/structured-data';
 </script>

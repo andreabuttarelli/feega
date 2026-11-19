@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import vercel from '../../../vercel.json';
-import { COMPARISONS, comparisonPath } from './compare';
 import { SITE_PATHS } from './paths';
 import { llmsFullTxt } from './llms';
 
@@ -36,11 +35,15 @@ function redirect(path: string): { to: string; status: number } | undefined {
 }
 
 const OLD_URLS: [string, string][] = [
-  ['/blog', '/compare'],
+  ['/blog', '/alternatives'],
   ['/blog/how-the-canvas-got-fast', `${BLOG_URL}posts/how-the-canvas-got-fast/`],
   ['/blog/an-unknown-post', BLOG_URL],
-  ['/blog/feega-vs-an-unknown-tool', '/compare'],
-  ...Object.keys(COMPARISONS).map((slug): [string, string] => [`/blog/feega-vs-${slug}`, comparisonPath(slug)])
+  ['/blog/feega-vs-an-unknown-tool', '/alternatives'],
+  ['/blog/feega-vs-figma', '/alternatives/figma'],
+  ['/compare', '/alternatives'],
+  ['/compare/figma', '/alternatives/figma'],
+  ['/compare/canva', '/alternatives'],
+  ['/compare/rive', '/alternatives']
 ];
 
 describe('the old /blog URLs', () => {
