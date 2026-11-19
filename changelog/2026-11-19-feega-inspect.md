@@ -93,3 +93,5 @@ edit inline until reload); the colour control is a native picker, not the app's 
   `pointer-events: none`); an untagged svg is inspected on its own (`inner: 'svg'`, media role)
   and written as `.own :global(svg)` (Svelte) / `:deep(svg)` (Vue) / `.own svg` (modules) on the
   parent's own class. Tailwind refuses it with a reason. Not done: Cmd-click / double-click drill.
+- **One colour picker.** Gradient stops and shadow colour used the native input; both open the
+  shared ColorPicker with the palette now (`ColourSwatch.svelte`).

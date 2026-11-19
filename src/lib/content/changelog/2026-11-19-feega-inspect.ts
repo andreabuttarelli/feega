@@ -15,6 +15,7 @@ export default {
     'Drag a number label to scrub: the page updates live and the change is saved once when you let go.',
     'The selection outline follows the element as it resizes, scrolls or reloads.',
     'Showing a hidden element removes exactly what hiding added.',
-    'Icons inside links and buttons can be selected and resized on their own.'
+    'Icons inside links and buttons can be selected and resized on their own.',
+    'Gradient stops and shadows use the same colour picker and palette as fills.'
   ]
 } satisfies ChangelogEntry;

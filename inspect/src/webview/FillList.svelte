@@ -9,6 +9,7 @@
   import { hexOf } from './colour';
   import { Section } from './controls';
   import ColorPicker from './ColorPicker.svelte';
+  import ColourSwatch from './ColourSwatch.svelte';
   import type { Palette } from '../messages';
 
   const KINDS: { kind: FillKind; label: string }[] = [
@@ -82,7 +83,7 @@
               {/if}
               {#each fill.stops as stop, s (s)}
                 <div class="line">
-                  <input type="color" value={hexOf(stop.colour)} aria-label="Stop colour" onchange={(e) => setStop(i, s, { colour: e.currentTarget.value })} />
+                  <ColourSwatch value={stop.colour} {palette} label="Stop colour" onchange={(p) => setStop(i, s, { colour: p.css })} />
                   <input type="text" class="at" value={stop.at} aria-label="Stop position" onchange={(e) => setStop(i, s, { at: e.currentTarget.value })} />
                   <button type="button" class="icon" aria-label="Remove stop" disabled={fill.stops.length <= 2} onclick={() => replace(i, { ...fill, stops: fill.stops.filter((_, k) => k !== s) })}><Minus size={12} /></button>
                 </div>

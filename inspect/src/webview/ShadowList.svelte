@@ -6,8 +6,9 @@
   import Minus from '@lucide/svelte/icons/minus';
   import Plus from '@lucide/svelte/icons/plus';
   import Field from './Field.svelte';
+  import ColourSwatch from './ColourSwatch.svelte';
+  import type { Palette } from '../messages';
   import { NEW_SHADOW, parseShadows, shadowCss, type Shadow } from './shadows';
-  import { hexOf } from './colour';
   import { Section } from './controls';
 
   const PRESETS: Record<string, string> = {
@@ -32,9 +33,10 @@
     ontext: (css: string) => void;
     onpreview: (css: string) => void;
     onpreviewtext: (css: string) => void;
+    palette: Palette;
   };
 
-  let { css, text, header, row, onchange, ontext, onpreview, onpreviewtext }: Props = $props();
+  let { css, text, header, row, onchange, ontext, onpreview, onpreviewtext, palette }: Props = $props();
 
   let layers = $state<Shadow[]>([]);
   let textLayers = $state<Shadow[]>([]);
@@ -91,7 +93,7 @@
               <Field name={`shadow-${f.key}`} prefix={f.label} px={layer[f.key]} unit="px" min={f.min} max={200} onpreview={(v) => update(list, show, i, { [f.key]: parseFloat(v) })} onchange={(v) => update(list, save, i, { [f.key]: parseFloat(v) })} />
             {/each}
           </div>
-          <label class="line">Colour <input type="color" value={hexOf(layer.colour)} onchange={(e) => update(list, save, i, { colour: e.currentTarget.value })} /></label>
+          <div class="line">Colour <ColourSwatch value={layer.colour} {palette} label="Shadow colour" onchange={(p) => update(list, save, i, { colour: p.css })} /></div>
           <label class="line">Inner <input type="checkbox" checked={layer.inset} onchange={(e) => update(list, save, i, { inset: e.currentTarget.checked })} /></label>
         </Popover.Content>
       </Popover.Portal>

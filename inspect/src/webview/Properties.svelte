@@ -250,7 +250,7 @@
   {#if has(Section.Effects)}
     <section data-section={Section.Effects}>
       {#snippet op()}<div class="pair">{@render field(num('opacity'), '◐')}</div>{/snippet}
-      <ShadowList css={readOf('shadow')} text={pick.ownText ? readOf('text-shadow') : null} {header} {row} onchange={(css) => onchange(byName('shadow'), css)} ontext={(css) => onchange(byName('text-shadow'), css)} onpreview={(css) => onpreview(byName('shadow'), css)} onpreviewtext={(css) => onpreview(byName('text-shadow'), css)} />
+      <ShadowList {palette} css={readOf('shadow')} text={pick.ownText ? readOf('text-shadow') : null} {header} {row} onchange={(css) => onchange(byName('shadow'), css)} ontext={(css) => onchange(byName('text-shadow'), css)} onpreview={(css) => onpreview(byName('shadow'), css)} onpreviewtext={(css) => onpreview(byName('text-shadow'), css)} />
       {@render row('Opacity', op, 'opacity')}
     </section>
   {/if}
