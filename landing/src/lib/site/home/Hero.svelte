@@ -6,7 +6,7 @@
   import EditorMock from '../EditorMock.svelte';
   import TerminalMock from './TerminalMock.svelte';
   import WorksWith from './WorksWith.svelte';
-  import { LEAD_EDITORS, LEAD_FRAMEWORKS, type LeadChip } from './works-with';
+  import { LEAD_AGENTS, LEAD_EDITORS, type AgentChip, type LeadChip } from './works-with';
 
   const MOCK_WIDTH = 960;
 
@@ -21,6 +21,8 @@
 </svelte:head>
 
 {#snippet chip(c: LeadChip)}<a class="chip" href={c.item.href}><span class="icon">{@html c.item.icon}</span><b>{c.name}</b></a>{/snippet}
+
+{#snippet agents(list: readonly AgentChip[], joiner: string)}{#each list as c, i}{#if i > 0}{i === list.length - 1 ? ` ${joiner} ` : ', '}{/if}<span class="chip"><span class="icon">{@html c.icon}</span><b>{c.name}</b></span>{/each}{/snippet}
 
 {#snippet chips(list: readonly LeadChip[], joiner: string)}{#each list as c, i}{#if i > 0}{i === list.length - 1 ? ` ${joiner} ` : ', '}{/if}{@render chip(c)}{/each}{/snippet}
 
@@ -42,8 +44,7 @@
     edit your running app like in figma, inside the
     {@render chips(LEAD_EDITORS, 'or')}
     you already use. works with
-    {@render chips(LEAD_FRAMEWORKS, 'and')}.
-    every change lands in your code, as a diff.
+    {@render agents(LEAD_AGENTS, 'and')}: you design, your agent codes, same files, every change a diff.
   </p>
 
   <InstallCta id="hero-install" />

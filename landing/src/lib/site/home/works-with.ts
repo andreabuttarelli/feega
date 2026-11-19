@@ -62,9 +62,29 @@ export const LEAD_EDITORS: readonly LeadChip[] = [
   { name: 'Windsurf', item: byName(EDITORS, 'windsurf') }
 ];
 
-export const LEAD_FRAMEWORKS: readonly LeadChip[] = [
-  { name: 'SvelteKit', item: byName(FRAMEWORKS, 'sveltekit') },
-  { name: 'React', item: byName(FRAMEWORKS, 'react') },
-  { name: 'Next.js', item: byName(FRAMEWORKS, 'next.js') },
-  { name: 'Vue', item: byName(FRAMEWORKS, 'vue') }
+const agentIcon = (body: string): string =>
+  `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">${body}</svg>`;
+
+export interface AgentChip {
+  readonly name: string;
+  readonly icon: string;
+}
+
+export const LEAD_AGENTS: readonly AgentChip[] = [
+  {
+    name: 'Claude Code',
+    icon: agentIcon('<g stroke="#D97757" stroke-width="2.4" stroke-linecap="round"><path d="M12 2.5v19M2.5 12h19M5.3 5.3l13.4 13.4M18.7 5.3L5.3 18.7"/></g>')
+  },
+  {
+    name: 'Codex',
+    icon: agentIcon('<g fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"><path d="M12 2.8l7.2 4.1v8.2L12 19.2l-7.200-4.100V6.900z"/><path d="M12 8l3.600 2v4L12 16l-3.600-2v-4z"/></g>')
+  },
+  {
+    name: 'Copilot',
+    icon: agentIcon('<path fill="#fff" d="M12 3.500c-4.700 0-8.500 3-8.500 7.300v3.200c0 3.600 3.300 6.500 8.500 6.500s8.500-2.900 8.500-6.500v-3.200c0-4.300-3.800-7.300-8.500-7.300zm-3.200 9.200a1.400 1.800 0 110 3.600 1.400 1.800 0 010-3.600zm6.400 0a1.400 1.800 0 110 3.600 1.400 1.800 0 010-3.600z"/>')
+  },
+  {
+    name: 'Gemini',
+    icon: agentIcon('<defs><linearGradient id="gem" x1="4" y1="20" x2="20" y2="4"><stop offset="0" stop-color="#4285F4"/><stop offset=".55" stop-color="#9B72CB"/><stop offset="1" stop-color="#D96570"/></linearGradient></defs><path fill="url(#gem)" d="M12 2C12.600 7.600 16.400 11.400 22 12 16.400 12.600 12.600 16.400 12 22 11.400 16.400 7.600 12.600 2 12 7.600 11.400 11.400 7.600 12 2z"/>')
+  }
 ];
