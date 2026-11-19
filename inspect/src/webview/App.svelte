@@ -388,13 +388,24 @@
 
   const kebab = (style: Record<string, string>) => Object.fromEntries(Object.entries(style).map(([k, v]) => [k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`), v]));
 
-  function change(row: Row, value: string) {
+  function askOf(row: Row, value: string, token?: string) {
+    const { prop, side, family, value: written } = row.change(value);
+    return { at: sourceText(picked!.source), prop, side, family, value: written, token, rem: picked!.rem, viewport: picked!.viewport, css: kebab(row.preview(value)), scope };
+  }
+
+  function change(row: Row, value: string, token?: string) {
     if (!picked) {
       return;
     }
     preview(row, value);
-    const { prop, side, family, value: written } = row.change(value);
-    toHost({ kind: ToHost.Edit, ask: { at: sourceText(picked.source), prop, side, family, value: written, rem: picked.rem, viewport: picked.viewport, css: kebab(row.preview(value)), scope } });
+    toHost({ kind: ToHost.Edit, ask: askOf(row, value, token) });
+  }
+
+  function saveVar(row: Row, name: string, css: string) {
+    if (picked) {
+      toHost({ kind: ToHost.SaveVariable, ask: askOf(row, css), name });
+      setTimeout(() => bridge.palette(), SETTLE_MS);
+    }
   }
 
   function pickSize(next: Size) {
@@ -492,6 +503,8 @@
   }
 
   const box = (p: Pick) => `left:${p.rect.x * fit.scale}px;top:${p.rect.y * fit.scale}px;width:${p.rect.width * fit.scale}px;height:${p.rect.height * fit.scale}px`;
+  const GENERATED_CLASS = /^(s-[\w-]{6,}|svelte-[\w]+|[\w-]+_[\w-]+__[\w-]{5})$/;
+  const authored = (classes: string) => classes.split(/\s+/).filter((c) => c && !GENERATED_CLASS.test(c)).join(' ');
   const fileName = (s: Source) => `${s.file.split('/').pop()}:${s.line}`;
 </script>
 
@@ -582,15 +595,14 @@
         {#if picked}
           <div class="what" data-testid="selection">
             <Breadcrumb pick={picked} onselect={select} />
-            {#if picked.component}<span class="component">in {picked.component.file.split('/').pop()}</span>{/if}
-            <button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file}:{picked.source.line}</button>
-            <code class="classes">{picked.classes || 'no classes'}</code>
+            <span class="where">{#if picked.component}in {picked.component.file.split('/').pop()} · {/if}<button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file.split('/').pop()}:{picked.source.line}</button></span>
+            {#if authored(picked.classes)}<code class="classes">{authored(picked.classes)}</code>{/if}
           </div>
           <div class="scope" role="radiogroup" aria-label="Edit scope" data-testid="scope">
             <button type="button" class:on={scope === Scope.Element} onclick={() => (scope = Scope.Element)} title="Only this element (every instance of its component: {picked.instances})">This element{picked.instances > 1 ? ` ×${picked.instances}` : ''}</button>
             <button type="button" class:on={scope === Scope.Class} disabled={!picked.classCount || styling === Styling.Tailwind} onclick={() => (scope = Scope.Class)} title={styling === Styling.Tailwind ? 'Class scope needs CSS rules, not Tailwind' : `Every element with this class: ${picked.classCount}`}>All .{picked.classes.split(' ')[0] || 'class'}{picked.classCount ? ` (${picked.classCount})` : ''}</button>
           </div>
-          <Properties pick={picked} {palette} onpreview={preview} onchange={change} onhint={(h) => (hint = h)} onfont={pickFont} />
+          <Properties pick={picked} {palette} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} />
         {:else}
           <p class="empty">{bridged ? 'Click an element to edit it. Double-click text to rewrite it.' : 'The page has no Feega source map: element picking needs the feega-source-map plugin.'}</p>
         {/if}
@@ -1064,8 +1076,17 @@
     font-size: var(--ui-text-sm);
   }
 
-  .component {
+  .where {
+    overflow: hidden;
+    color: var(--ui-text-3);
+    font-size: var(--ui-text-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .where .link {
     color: var(--ui-text-2);
+    font-size: var(--ui-text-xs);
   }
 
   .link {

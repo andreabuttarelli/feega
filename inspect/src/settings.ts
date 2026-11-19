@@ -55,7 +55,9 @@ export const LINKS = {
   docs: 'https://docs.feega.app/integrations/inspect/',
   changelog: 'https://feega.app/changelog',
   dashboard: 'https://feega.app/',
-  issues: 'https://github.com/andreabuttarelli/feega/issues/new'
+  issues: 'https://github.com/andreabuttarelli/feega/issues/new',
+  repo: 'https://github.com/andreabuttarelli/feega',
+  sponsor: 'https://buy.stripe.com/5kQ00k2A97C08sd94LeME07'
 };
 
 export type ReportFacts = { version: string; framework: string; styling: string };

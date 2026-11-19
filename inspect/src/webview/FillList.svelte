@@ -8,6 +8,8 @@
   import { FillKind, fillCss, layerCss, newFill, parseFills, type Fill, type Stop } from './fills';
   import { hexOf } from './colour';
   import { Section } from './controls';
+  import ColorPicker from './ColorPicker.svelte';
+  import type { Palette } from '../messages';
 
   const KINDS: { kind: FillKind; label: string }[] = [
     { kind: FillKind.Solid, label: 'Solid' },
@@ -23,9 +25,10 @@
     header: Snippet<[Section, Snippet?]>;
     row: Snippet<[string, Snippet, string?]>;
     onchange: (css: Record<string, string>) => void;
+    palette: Palette;
   };
 
-  let { image, colour, header, row, onchange }: Props = $props();
+  let { image, colour, header, row, onchange, palette }: Props = $props();
 
   let fills = $state<Fill[]>([]);
   $effect(() => {
@@ -67,7 +70,7 @@
               {#each KINDS as k (k.kind)}<option value={k.kind}>{k.label}</option>{/each}
             </select>
             {#if fill.kind === FillKind.Solid}
-              <label class="line">Colour <input type="color" value={hexOf(fill.colour)} onchange={(e) => replace(i, { ...fill, colour: e.currentTarget.value })} /></label>
+              <ColorPicker value={fill.colour} {palette} onchange={(p) => replace(i, { ...fill, colour: p.css })} />
             {:else if fill.kind === FillKind.Image}
               <label class="line">URL <input type="text" value={fill.url} placeholder="/image.png" onchange={(e) => replace(i, { ...fill, url: e.currentTarget.value })} /></label>
             {:else}

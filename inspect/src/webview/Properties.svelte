@@ -8,7 +8,8 @@
   import AlignJustify from '@lucide/svelte/icons/text-align-justify';
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import ArrowDown from '@lucide/svelte/icons/arrow-down';
-  import { Select } from 'bits-ui';
+  import { Popover, Select } from 'bits-ui';
+  import ColorPicker from './ColorPicker.svelte';
   import Check from '@lucide/svelte/icons/check';
   import Icon from './Icon.svelte';
   import FontPicker from './FontPicker.svelte';
@@ -23,9 +24,9 @@
   import FillList from './FillList.svelte';
   import type { FontChoice, Palette, Pick } from '../messages';
 
-  type Props = { pick: Pick; onpreview: (row: Row, value: string) => void; onchange: (row: Row, value: string) => void; onhint: (hint: Hint | null) => void; onfont: (font: FontChoice) => void; palette: Palette };
+  type Props = { pick: Pick; onpreview: (row: Row, value: string) => void; onchange: (row: Row, value: string, token?: string) => void; onsavevar: (row: Row, name: string, css: string) => void; onhint: (hint: Hint | null) => void; onfont: (font: FontChoice) => void; palette: Palette };
 
-  let { pick, onpreview, onchange, onhint, onfont, palette }: Props = $props();
+  let { pick, onpreview, onchange, onhint, onfont, palette, onsavevar }: Props = $props();
 
   const WEIGHT_NAMES: Record<string, string> = { '100': 'Thin', '200': 'Extra light', '300': 'Light', '400': 'Regular', '500': 'Medium', '600': 'Semibold', '700': 'Bold', '800': 'Extra bold', '900': 'Black' };
   const TEXT_ALIGN = [
@@ -153,7 +154,14 @@
   {@const paint = paintOf(readOf(name))}
   <div class="colour" data-field={name}>
     {#if paint}
-      <input type="color" class="swatch" value={paint} oninput={(e) => onpreview(r, e.currentTarget.value)} onchange={(e) => onchange(r, e.currentTarget.value)} aria-label={`${r.label} colour`} />
+      <Popover.Root>
+        <Popover.Trigger class="swatch-trigger" aria-label={`${r.label} colour`}><span class="swatch" style={`background:${readOf(name)}`}></span></Popover.Trigger>
+        <Popover.Portal>
+          <Popover.Content class="picker-popover" side="left" sideOffset={8} collisionPadding={8}>
+            <ColorPicker value={readOf(name)} {palette} onchange={(p) => (onpreview(r, p.css), onchange(r, p.css, p.token))} onsave={(n, c) => onsavevar(r, n, c)} />
+          </Popover.Content>
+        </Popover.Portal>
+      </Popover.Root>
       <input type="text" class="hex" value={paint} aria-label={`${r.label} hex`} onchange={(e) => onchange(r, e.currentTarget.value)} />
     {:else}
       <span class="none">None</span>
@@ -221,7 +229,7 @@
 
   {#if has(Section.Fill)}
     <section data-section={Section.Fill}>
-      <FillList image={readOf('fill-image')} colour={readOf('fill')} {header} {row} onchange={(css) => (onchange(byName('fill-image'), css['background-image']), onchange(byName('fill'), css['background-color']))} />
+      <FillList image={readOf('fill-image')} colour={readOf('fill')} {palette} {header} {row} onchange={(css) => (onchange(byName('fill-image'), css['background-image']), onchange(byName('fill'), css['background-color']))} />
     </section>
   {/if}
 
@@ -441,13 +449,30 @@
   }
 
   .swatch {
-    flex: none;
+    display: block;
     width: 16px;
     height: 16px;
+    border-radius: var(--ui-radius-xs);
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.2);
+  }
+
+  .properties :global(.swatch-trigger) {
+    display: grid;
+    flex: none;
+    place-items: center;
     padding: 0;
     border: 0;
-    border-radius: var(--ui-radius-xs);
-    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.2) !important;
+    background: none;
+    cursor: pointer;
+  }
+
+  :global(.picker-popover) {
+    z-index: 20;
+    padding: 12px;
+    border-radius: var(--ui-radius-lg);
+    background: var(--ui-panel);
+    box-shadow: 0 0 0 1px var(--ui-divider), 0 12px 32px rgb(0 0 0 / 0.28);
+    color: var(--ui-text);
   }
 
   .hex {

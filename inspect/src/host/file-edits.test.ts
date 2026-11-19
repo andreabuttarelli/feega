@@ -151,6 +151,24 @@ describe('fileEdits', () => {
     expect(read(root)).toBe(PAGE);
   });
 
+  it('salva un colore come variabile: @theme con Tailwind v4, poi la classe del token', async () => {
+    const root = app();
+    writeFileSync(join(root, 'src/app.css'), '@import "tailwindcss";\n');
+    await fileEdits(root).saveVariable({ at: 'src/Page.svelte:2:3', prop: LiveProp.Color, value: '#0078d4', css: { color: '#0078d4' } }, 'brand');
+
+    expect(readFileSync(join(root, 'src/app.css'), 'utf8')).toContain('--color-brand: #0078d4;');
+    expect(read(root)).toContain('<h1 class="text-2xl text-brand">');
+  });
+
+  it('senza Tailwind la variabile va in :root e la regola usa var()', async () => {
+    const root = app(PLAIN);
+    writeFileSync(join(root, 'src/app.css'), 'body {}\n');
+    await fileEdits(root).saveVariable({ at: 'src/Page.svelte:2:3', prop: LiveProp.Color, value: '#0078d4', css: { color: '#0078d4' } }, 'brand');
+
+    expect(readFileSync(join(root, 'src/app.css'), 'utf8')).toContain(':root {\n  --brand: #0078d4;\n}');
+    expect(read(root)).toContain('color: var(--brand);');
+  });
+
   it('cronologia e undo sopravvivono a una nuova sessione', async () => {
     const root = app();
     const first = fileEdits(root);

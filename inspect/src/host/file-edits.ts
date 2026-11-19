@@ -7,6 +7,7 @@ import { LiveProp } from '@feega/live-edit/live-fields';
 import { literalText } from '@feega/live-edit/literal-text';
 import { moveNode, type Place } from '@feega/live-edit/move-node';
 import { globalSheetOf, googleFontImport } from '@feega/live-edit/font-wiring';
+import { VariableHome, saveVariable, variableName } from '@feega/live-edit/save-variable';
 import { scopedRule, type Scope } from '@feega/live-edit/scoped-rule';
 import { styleAttr, type Css } from '@feega/live-edit/style-attr';
 import { Styling, type EditAsk } from '../messages';
@@ -160,7 +161,22 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return out.ok ? writtenAll([out.change], '') : out;
   }
 
+  async function variableSaved(ask: EditAsk, name: string): Promise<Written> {
+    const sheet = await globalSheetOf(reader(root));
+    if (!sheet) {
+      return { ok: false, reason: 'no global stylesheet found to hold the variable' };
+    }
+    const before = (await reader(root)(sheet)) ?? '';
+    const tailwind = (await stylingOf(root, choice())) === Styling.Tailwind;
+    const home = tailwind && before.includes('tailwindcss') ? VariableHome.Theme : VariableHome.Root;
+    const change = { path: sheet, before, after: saveVariable(before, name, ask.value ?? '', home) };
+    const css = Object.fromEntries(Object.keys(ask.css ?? {}).map((prop) => [prop, `var(${variableName(name, home)})`]));
+    const applied: EditAsk = { ...ask, token: home === VariableHome.Theme ? name : `[var(${variableName(name, home)})]`, css };
+    return edited(applied, [change]);
+  }
+
   return {
+    saveVariable: (ask: EditAsk, name: string) => inTurn(() => variableSaved(ask, name)),
     move: (from: string, to: string, place: Place) => inTurn(() => moved(from, to, place)),
     edit: (ask: EditAsk) => inTurn(() => edited(ask)),
     font: (ask: EditAsk, google: boolean) => inTurn(() => fontEdited(ask, google)),

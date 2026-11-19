@@ -205,6 +205,7 @@ async function onMessage(message: HostMessage) {
     [ToHost.External]: (m) => vscode.env.openExternal(vscode.Uri.parse(m.url)),
     [ToHost.Prefs]: (m) => host?.context.workspaceState.update(PREFS_KEY, m.prefs),
     [ToHost.Server]: (m) => SERVER_ACTIONS[m.action](),
+    [ToHost.SaveVariable]: (m) => session!.edits.saveVariable(m.ask, m.name).then((out) => edited(out, m.ask)),
     [ToHost.Font]: (m) => session!.edits.font(m.ask, m.google).then((out) => edited(out, m.ask)),
     [ToHost.Redo]: () => session!.edits.redo().then((out) => edited(out, null)),
     [ToHost.Revert]: (m) => revert(m.id),

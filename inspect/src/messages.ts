@@ -60,6 +60,8 @@ export enum ServerAction {
 
 export type ServerInfo = { url: string; framework: string; command: string; pid: number | null; port: number; attached: boolean; startedAt: number; lastError: string };
 
+export type ColourPick = { css: string; token?: string };
+
 export type FontChoice = { family: string; google: boolean };
 
 export type Palette = { document: string[]; tokens: { name: string; value: string }[]; fonts: string[] };
@@ -83,6 +85,7 @@ export enum ToHost {
   Server = 'server',
   Redo = 'redo',
   Font = 'font',
+  SaveVariable = 'save-variable',
   Revert = 'revert',
   Diff = 'diff',
   SourceControl = 'source-control'
@@ -117,6 +120,7 @@ export type HostMessage =
   | { kind: ToHost.Server; action: ServerAction }
   | { kind: ToHost.Redo }
   | { kind: ToHost.Font; ask: EditAsk; google: boolean }
+  | { kind: ToHost.SaveVariable; ask: EditAsk; name: string }
   | { kind: ToHost.Revert; id: number | null }
   | { kind: ToHost.Diff; id: number }
   | { kind: ToHost.SourceControl };
