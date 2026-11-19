@@ -17,7 +17,7 @@ describe('il footer legale condiviso', () => {
 
   it('la tabella copre tutte le tre pagine richieste', () => {
     expect(FOOTER_LEGAL_LINKS).toHaveLength(3);
-    expect(new Set(FOOTER_LEGAL_LINKS).size).toBe(4);
+    expect(new Set(FOOTER_LEGAL_LINKS).size).toBe(3);
   });
 
   it('porta anche le impostazioni cookie, dalla stessa funzione della pagina profilo', () => {
