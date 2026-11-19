@@ -38,14 +38,14 @@ describe('/local/folder', () => {
   it('answers 404 outside local mode', async () => {
     held.store = null;
 
-    await expect(GET({} as never)).rejects.toMatchObject({ status: NOT_FOUND });
+    await expect(GET()).rejects.toMatchObject({ status: NOT_FOUND });
   });
 
   it('lists the conflicts of a diverged folder', async () => {
     const { store, nodeId } = await divergedFolder();
     held.store = store;
 
-    const response = await GET({} as never);
+    const response = await GET();
     const status = await response.json();
 
     expect(response.status).toBe(OK);
