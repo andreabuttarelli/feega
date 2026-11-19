@@ -9,6 +9,8 @@
   import { frameProperties } from './frame-properties.svelte';
   import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
   import { untrack } from 'svelte';
+  import { prototypePlayer } from '$lib/canvas/prototype-player.svelte';
+  import Play from '@lucide/svelte/icons/play';
 
   let { id, live, mode, origin, poster, selected, onsnapshot, onstep, onfail }: { id: string; live: LiveFrame; mode: FrameMode; origin: string | null; poster: string | null; selected: boolean; onsnapshot: () => void; onstep: (step: FrameStep) => void; onfail: (reason: string) => void } = $props();
 
@@ -184,6 +186,9 @@
   {#if poster && !showsLive}
     <img class="poster" src={poster} alt={live.route} draggable="false" data-testid="live-frame-poster" />
   {/if}
+  {#if selected}
+    <button type="button" class="play nodrag rounded-full" aria-label="Play" title="Play" data-testid="live-frame-play" onclick={(e) => (e.stopPropagation(), (prototypePlayer.editing = id), prototypePlayer.play())}><Play size={12} /> Play</button>
+  {/if}
   {#if !origin}
     <span class="badge rounded-full" data-testid="live-frame-offline">Not connected · {live.route}</span>
   {/if}
@@ -195,6 +200,7 @@
   .hidden { visibility: hidden; }
   .poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
   .badge { position: absolute; left: 8px; bottom: 8px; font-size: 11px; padding: 3px 8px; background: rgba(0, 0, 0, 0.7); color: #fff; }
+  .play { position: absolute; top: 8px; right: 8px; z-index: 1; display: flex; align-items: center; gap: 4px; font-size: 11px; padding: 3px 10px; border: 0; background: rgba(0, 0, 0, 0.7); color: #fff; cursor: pointer; }
   .edit { position: absolute; inset: 0; cursor: default; }
   .changes { display: flex; align-items: center; gap: 8px; }
   .changes button { font: inherit; padding: 1px 8px; border: 0; background: #fff; color: #000; cursor: pointer; }

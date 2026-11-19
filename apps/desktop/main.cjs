@@ -6,6 +6,7 @@ const { fileIn, withExtension, savedBounds, saveBounds, EXTENSION } = require('.
 const { startServer, freePort, LOOPBACK } = require('./server.cjs');
 const { frameless, overlay, offlinePage, unreachable } = require('./chrome.cjs');
 const localAgents = require('./local-agents.cjs');
+const { guardGuests } = require('./guest-page.cjs');
 const { detect } = require('./acp-agents.cjs');
 const { start, browsable, heldLink, authReturn, staysInside, keepInside, settingsUrl, droppedCanvas, DEEP_LINK_SCHEME } = require('./routing.cjs');
 
@@ -191,7 +192,7 @@ function leave(url) {
 
 function windowOptions() {
   const base = { width: 1440, height: 900, ...savedBounds(windowStatePath()), minWidth: 800, minHeight: 600, title: 'Feega', backgroundColor: '#0c0c0c', ...frameless(process.platform, nativeTheme.shouldUseDarkColors) };
-  const webPreferences = { ...SECURE_PREFERENCES, preload: path.join(__dirname, AGENTS_BRIDGE_FILE) };
+  const webPreferences = { ...SECURE_PREFERENCES, webviewTag: true, preload: path.join(__dirname, AGENTS_BRIDGE_FILE) };
   if (!NativeCanvas) {
     return { ...base, webPreferences };
   }
@@ -256,6 +257,7 @@ function open() {
   });
 
   keepInside(window.webContents, () => home.href, leave);
+  guardGuests(window.webContents);
 
   window.webContents.on('did-fail-load', (_event, code, _description, url, mainFrame) => {
     if (unreachable(code, mainFrame)) {

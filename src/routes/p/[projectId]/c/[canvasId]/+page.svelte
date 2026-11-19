@@ -4722,6 +4722,7 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
     onSettle={settleHost}
     onRename={renameNode}
     onNodeDoubled={openOutput}
+    liveOrigin={devOrigin}
     onConnect={connect}
     onDelete={remove}
     onCopyLink={isOff(LocalOff.PublicLinks) ? undefined : copySelectionLink}

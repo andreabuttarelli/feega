@@ -29,7 +29,8 @@
       "agents-bridge.cjs",
       "local-agents.cjs",
       "acp-agents.cjs",
-      "acp-client.cjs"
+      "acp-client.cjs",
+      "guest-page.cjs"
     ],
     "directories": {
       "buildResources": "build",
