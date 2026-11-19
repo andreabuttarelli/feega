@@ -59,6 +59,6 @@ export const FAQ = [
   },
   {
     q: "Who owns my work, and is it used to train AI?",
-    a: 'You keep your content; we never train AI on it. Details are in our <a href="/terms">Terms</a>, <a href="/privacy">Privacy Policy</a>, <a href="/acceptable-use">Acceptable Use Policy</a> and <a href="/ai-transparency">AI Transparency</a>.'
+    a: 'You keep your content; we never train AI on it. Details are in our <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>.'
   }
 ] as const;
