@@ -126,6 +126,9 @@ const BY_LAYOUT: { test: (n: IconNode) => boolean; icon: LayerIcon }[] = [
 const LAYOUT_TAGS = new Set(['section', 'main', 'article', 'aside', 'header', 'footer']);
 
 export function iconOf(node: IconNode): LayerIcon {
+  if (node.tag === 'head') {
+    return LayerIcon.Head;
+  }
   if (node.component) {
     return LayerIcon.Component;
   }

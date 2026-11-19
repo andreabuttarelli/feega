@@ -6,11 +6,13 @@ export enum Role {
   Media = 'media',
   Icon = 'icon',
   Input = 'input',
-  Head = 'head'
+  Head = 'head',
+  Page = 'page'
 }
 
 export type Element = { tag: string; ownText: boolean; elements: number; display: string; inlineText: boolean };
 
+const PAGE = new Set(['html', 'body']);
 const HEAD = new Set(['head', 'title', 'meta', 'link', 'script', 'style', 'base', 'noscript']);
 const MEDIA = new Set(['img', 'video', 'canvas', 'picture', 'iframe']);
 const INPUTS = new Set(['input', 'textarea', 'select']);
@@ -26,11 +28,30 @@ const SECTIONS: Record<Role, Section[]> = {
   [Role.Media]: [Section.Size, Section.Object, ...PLACED, Section.Radius, Section.Effects, ...FINISH],
   [Role.Icon]: [Section.Icon, Section.Size, ...PLACED, Section.Effects, ...FINISH],
   [Role.Input]: [Section.Typography, Section.Size, ...PLACED, Section.Spacing, Section.Fill, Section.Radius, Section.Border, ...FINISH],
-  [Role.Head]: []
+  [Role.Head]: [],
+  [Role.Page]: [Section.Layout, Section.Grid, Section.Size, ...PLACED, Section.Spacing, Section.Fill, Section.Radius, Section.Border, Section.Effects, Section.List, ...FINISH]
+};
+
+export type Actions = { visibility: boolean; lock: boolean };
+
+const EDITABLE_LAYER: Actions = { visibility: true, lock: true };
+const FIXED_LAYER: Actions = { visibility: false, lock: false };
+
+const ACTIONS: Record<Role, Actions> = {
+  [Role.Text]: EDITABLE_LAYER,
+  [Role.Container]: EDITABLE_LAYER,
+  [Role.Media]: EDITABLE_LAYER,
+  [Role.Icon]: EDITABLE_LAYER,
+  [Role.Input]: EDITABLE_LAYER,
+  [Role.Head]: FIXED_LAYER,
+  [Role.Page]: FIXED_LAYER
 };
 
 export function roleOf({ tag, ownText, elements, display, inlineText }: Element): Role {
   const name = tag.toLowerCase();
+  if (PAGE.has(name)) {
+    return Role.Page;
+  }
   if (HEAD.has(name)) {
     return Role.Head;
   }
@@ -49,4 +70,5 @@ export function roleOf({ tag, ownText, elements, display, inlineText }: Element)
   return ownText || inlineText || TEXT_TAGS.has(name) ? Role.Text : Role.Container;
 }
 
+export const actionsOf = (role: Role): Actions => ACTIONS[role];
 export const sectionsOf = (role: Role): Section[] => SECTIONS[role];

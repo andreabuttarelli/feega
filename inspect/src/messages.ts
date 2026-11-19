@@ -35,6 +35,7 @@ export type Pick = {
   ancestors: { source: Source; name: string }[];
   inner?: string;
   page?: PageTarget;
+  attributes?: { name: string; value: string }[];
   markup?: string;
 };
 

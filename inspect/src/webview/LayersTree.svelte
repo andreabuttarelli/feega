@@ -8,6 +8,7 @@
   import { Place } from '@feega/live-edit/move-node';
   import type { LayerNode, Pick, Source } from '../messages';
   import { sourceText } from './page-bridge';
+  import { actionsOf, roleOf } from './roles';
   import Self from './LayersTree.svelte';
 
   type Props = {
@@ -28,10 +29,10 @@
   let { nodes, picked, depth = 0, open, onselect, onhover, onopen, onmove, dragging, hidden, locked, ontoggle }: Props = $props();
 
   const INDENT_PX = 12;
-  const HEAD_TAGS = new Set(['head', 'title', 'meta', 'link', 'script', 'style', 'base', 'noscript']);
   const key = (n: LayerNode) => (n.source ? sourceText(n.source) : `group:${n.name}`);
   const isPicked = (n: LayerNode) => picked !== null && n.source !== null && sourceText(picked.source) === sourceText(n.source);
-  const visual = (n: LayerNode) => n.source !== null && !HEAD_TAGS.has(n.tag);
+  const actions = (n: LayerNode) => actionsOf(roleOf({ tag: n.tag, ownText: false, inlineText: false, elements: n.children.length, display: n.display }));
+  const visual = (n: LayerNode) => n.source !== null && actions(n).visibility;
   const choose = (n: LayerNode) => (n.source ? onselect(n.source) : (open[key(n)] = !open[key(n)]));
 
   function onKey(e: KeyboardEvent, node: LayerNode) {
@@ -89,7 +90,7 @@
     <svg class="type" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="0.833" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{@html ICON_SVG[iconOf(node)]}</svg>
     <span class="name" class:component={node.component}>{node.name}</span>
     {#if node.count > 1 && node.source}<span class="count" title={`Rendered ${node.count} times by a loop in ${node.source.file}:${node.source.line} — edits apply to all ${node.count}`}>×{node.count}</span>{:else if !node.source}<span class="count">{node.count}</span>{/if}
-    {#if visual(node)}<span class="toggles" class:active={hidden.has(id) || locked.has(id)}>
+    {#if actions(node).visibility && node.source}<span class="toggles" class:active={hidden.has(id) || locked.has(id)}>
       <button type="button" class="t" title={hidden.has(id) ? 'Show (⇧⌘H)' : 'Hide: display none in code (⇧⌘H)'} aria-label={hidden.has(id) ? 'Show' : 'Hide'} onclick={(e) => (e.stopPropagation(), ontoggle('hidden', node.source!))}>{#if hidden.has(id)}<EyeOff size={12} />{:else}<Eye size={12} />{/if}</button>
       <button type="button" class="t" title={locked.has(id) ? 'Unlock (⇧⌘L)' : 'Lock (⇧⌘L)'} aria-label={locked.has(id) ? 'Unlock' : 'Lock'} onclick={(e) => (e.stopPropagation(), ontoggle('locked', node.source!))}>{#if locked.has(id)}<Lock size={12} />{:else}<Unlock size={12} />{/if}</button>
     </span>{/if}

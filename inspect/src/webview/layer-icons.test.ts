@@ -4,6 +4,10 @@ import { LayerIcon, ICON_SVG, iconOf } from './layer-icons';
 const node = (tag: string, display = 'block', direction = 'row', extra: { component?: boolean; count?: number } = {}) => ({ tag, display, direction, component: false, count: 1, ...extra });
 
 describe('iconOf', () => {
+  it('the Head group keeps the code icon whatever its count', () => {
+    expect(iconOf(node('head', 'none', 'row', { count: 3 }))).toBe(LayerIcon.Head);
+  });
+
   it('reads flex direction and grid from the computed display', () => {
     expect(iconOf(node('div', 'flex', 'row'))).toBe(LayerIcon.FlexRow);
     expect(iconOf(node('div', 'flex', 'column'))).toBe(LayerIcon.FlexColumn);

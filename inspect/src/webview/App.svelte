@@ -109,7 +109,7 @@
   let canUndo = $state(false);
   let canRedo = $state(false);
   let scope = $state(Scope.Element);
-  let layersOpen = $state<Record<string, boolean>>({});
+  let layersOpen = $state<Record<string, boolean>>({ '(html):0:0': true, '(page):0:0': true });
   const layerDrag = $state<{ source: Source | null }>({ source: null });
 
   async function hoverLayer(source: Source | null) {

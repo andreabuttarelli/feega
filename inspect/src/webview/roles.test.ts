@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Section } from './controls';
-import { Role, roleOf, sectionsOf } from './roles';
+import { Role, actionsOf, roleOf, sectionsOf } from './roles';
 
 const element = (tag: string, ownText: boolean, elements: number, display = 'block', inlineText = false) => ({ tag, ownText, elements, display, inlineText });
 
@@ -76,5 +76,24 @@ describe('sectionsOf', () => {
   it('an icon has the icon section and no typography', () => {
     expect(sectionsOf(Role.Icon)).toContain(Section.Icon);
     expect(sectionsOf(Role.Icon)).not.toContain(Section.Typography);
+  });
+});
+
+describe('layer actions by role', () => {
+  it('head elements and the page have no show/hide or lock', () => {
+    expect([Role.Head, Role.Page].map((r) => actionsOf(r))).toEqual([{ visibility: false, lock: false }, { visibility: false, lock: false }]);
+  });
+
+  it('visual roles can be hidden and locked', () => {
+    expect([Role.Text, Role.Container, Role.Media, Role.Icon, Role.Input].every((r) => actionsOf(r).visibility && actionsOf(r).lock)).toBe(true);
+  });
+
+  it('html and body are the page, title is head', () => {
+    expect(['html', 'body', 'title'].map((tag) => roleOf(element(tag, false, 2)))).toEqual([Role.Page, Role.Page, Role.Head]);
+  });
+
+  it('the page keeps the container sections and head has none', () => {
+    expect(sectionsOf(Role.Page)).toEqual(sectionsOf(Role.Container));
+    expect(sectionsOf(Role.Head)).toEqual([]);
   });
 });

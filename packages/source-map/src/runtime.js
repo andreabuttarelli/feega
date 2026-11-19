@@ -69,7 +69,7 @@ export function deepestAt(doc, x, y) {
 export function inspectElement(element, { maxHtml = DEFAULT_MAX_HTML } = {}) {
   const tagged = element.closest(`[${SOURCE_ATTR}]`);
   if (!tagged) {
-    return element === element.ownerDocument.body ? inspectPage(element, maxHtml) : null;
+    return pageTargetOf(element) ? inspectPage(element, maxHtml) : null;
   }
   const svg = untaggedSvg(element, tagged);
   if (svg) {
@@ -79,22 +79,36 @@ export function inspectElement(element, { maxHtml = DEFAULT_MAX_HTML } = {}) {
 }
 
 export const PAGE_SOURCE = '(page):0:0';
+export const HTML_SOURCE = '(html):0:0';
+
+const PAGE_SOURCES = { body: PAGE_SOURCE, html: HTML_SOURCE };
+
+function pageTargetOf(element) {
+  const tag = element.tagName.toLowerCase();
+  return element === element.ownerDocument[tag === 'html' ? 'documentElement' : 'body'] && PAGE_SOURCES[tag] ? tag : null;
+}
+
+function pageElementOf(doc, source) {
+  return { [PAGE_SOURCE]: doc.body, [HTML_SOURCE]: doc.documentElement }[source] ?? null;
+}
 
 function inspectPage(body, maxHtml) {
+  const target = pageTargetOf(body);
   return {
-    source: parseSource(PAGE_SOURCE),
-    page: 'body',
+    source: parseSource(PAGE_SOURCES[target]),
+    page: target,
     styles: designStyles(body),
-    html: truncate(`<body>`, maxHtml),
+    html: truncate(`<${target}>`, maxHtml),
     component: null,
     rect: rectOf(body),
     classes: body.getAttribute('class') ?? '',
     text: null,
-    name: 'Page',
+    name: target,
     instances: 1,
     classCount: 0,
     parentWidth: body.getBoundingClientRect().width,
-    ancestors: [],
+    ancestors: target === 'body' ? [pageAncestor('html')] : [],
+    attributes: [],
     ownText: false,
     inlineText: false,
     elements: body.children.length,
@@ -121,6 +135,7 @@ function inspectTagged(tagged, maxHtml) {
     classCount: tagged.classList?.[0] ? tagged.ownerDocument.getElementsByClassName(tagged.classList[0]).length : 0,
     parentWidth: tagged.parentElement?.getBoundingClientRect().width ?? 0,
     ancestors: ancestorsOf(tagged),
+    attributes: [...tagged.attributes].filter((a) => a.name !== SOURCE_ATTR).map(({ name, value }) => ({ name, value })),
     ownText: [...tagged.childNodes].some((n) => n.nodeType === TEXT_NODE && n.textContent.trim()),
     elements: tagged.children.length,
     inlineText: inlineTextOnly(tagged),
@@ -150,7 +165,10 @@ const previews = new WeakMap();
 
 const kebab = (name) => name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 
-const sourcedIn = (doc, source) => [...doc.querySelectorAll(`[${SOURCE_ATTR}]`)].filter((e) => e.getAttribute(SOURCE_ATTR) === source);
+const sourcedIn = (doc, source) => {
+  const page = pageElementOf(doc, source);
+  return page ? [page] : [...doc.querySelectorAll(`[${SOURCE_ATTR}]`)].filter((e) => e.getAttribute(SOURCE_ATTR) === source);
+};
 
 function previewsOf(doc) {
   if (!previews.has(doc)) {
@@ -170,10 +188,12 @@ function sheetOf(doc) {
   return style;
 }
 
+const PAGE_SOURCES_BY_SOURCE = { [PAGE_SOURCE]: 'body', [HTML_SOURCE]: 'html' };
+
 const selectorOf = (key) => {
   const [source, inner] = key.split(INNER_KEY);
-  if (source === PAGE_SOURCE) {
-    return 'body';
+  if (PAGE_SOURCES_BY_SOURCE[source]) {
+    return PAGE_SOURCES_BY_SOURCE[source];
   }
   return `[${SOURCE_ATTR}=${JSON.stringify(source)}]${inner ? ` ${inner}` : ''}`;
 };
@@ -269,18 +289,29 @@ export function nameOf(element) {
   return element.id ? `${tag}#${element.id}` : first ? `${tag}.${first}` : tag;
 }
 
+const pageAncestor = (tag) => ({ source: parseSource(PAGE_SOURCES[tag]), name: tag });
+
 function ancestorsOf(element) {
   const chain = [];
   for (let node = taggedParent(element); node && chain.length < MAX_ANCESTORS; node = taggedParent(node)) {
     chain.unshift({ source: parseSource(node.getAttribute(SOURCE_ATTR)), name: nameOf(node) });
   }
-  return chain;
+  const inHead = element.ownerDocument.head?.contains(element);
+  return [pageAncestor('html'), ...(inHead ? [] : [pageAncestor('body')]), ...chain];
 }
 
 const taggedChildren = (element) => [...element.querySelectorAll(`[${SOURCE_ATTR}]`)].filter((child) => taggedParent(child) === element);
 
+function pageParent(element) {
+  const doc = element.ownerDocument;
+  if (element === doc.documentElement) {
+    return null;
+  }
+  return element === doc.body || doc.head?.contains(element) ? doc.documentElement : doc.body;
+}
+
 const MOVES = {
-  parent: (element) => taggedParent(element) ?? element.ownerDocument.body,
+  parent: (element) => taggedParent(element) ?? pageParent(element),
   child: (element) => taggedChildren(element)[0] ?? null,
   next: (element) => sibling(element, 1),
   previous: (element) => sibling(element, -1)
@@ -330,6 +361,11 @@ function foldedOf(elements, depth, budget) {
 
 export const HEAD_GROUP = 'Head';
 
+function pageNode(element, source, children) {
+  const tag = element.tagName.toLowerCase();
+  return { name: tag, tag, display: element.ownerDocument.defaultView.getComputedStyle(element).display, direction: 'row', source: parseSource(source), component: false, count: 1, children };
+}
+
 export function treeOf(doc) {
   const roots = [...doc.querySelectorAll(`[${SOURCE_ATTR}]`)].filter((e) => !taggedParent(e));
   const budget = { left: MAX_TREE_NODES };
@@ -337,7 +373,7 @@ export function treeOf(doc) {
   const head = foldedOf(roots.filter(inHead), 1, budget);
   const body = foldedOf(roots.filter((e) => !inHead(e)), 0, budget);
   const group = { name: HEAD_GROUP, tag: 'head', display: 'none', direction: 'row', source: null, component: false, count: head.length, children: head };
-  return head.length ? [group, ...body] : body;
+  return [pageNode(doc.documentElement, HTML_SOURCE, [...(head.length ? [group] : []), pageNode(doc.body, PAGE_SOURCE, body)])];
 }
 
 const PALETTE_MAX = 16;

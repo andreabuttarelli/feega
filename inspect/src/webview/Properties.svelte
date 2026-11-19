@@ -17,7 +17,7 @@
   import ScanLine from '@lucide/svelte/icons/square-dashed';
   import { MIXED, type Shared } from '@feega/properties-panel/mixed';
   import { CSS_ROWS, Control, Group, ROWS, Section, SideMode, GROUP_MODES, type Hint, type NumberRow, type Row } from './controls';
-  import { roleOf, sectionsOf } from './roles';
+  import { Role, roleOf, sectionsOf } from './roles';
   import { paintOf } from './colour';
   import Field from './Field.svelte';
   import ShadowList from './ShadowList.svelte';
@@ -66,7 +66,8 @@
 
   const byName = (name: string) => ROWS.find((r) => r.name === name)!;
   const num = (name: string) => byName(name) as NumberRow;
-  const sections = $derived(sectionsOf(roleOf({ tag: pick.tag, ownText: pick.ownText, inlineText: pick.inlineText, elements: pick.elements, display: pick.styles.display ?? '' })));
+  const role = $derived(roleOf({ tag: pick.tag, ownText: pick.ownText, inlineText: pick.inlineText, elements: pick.elements, display: pick.styles.display ?? '' }));
+  const sections = $derived(sectionsOf(role));
   const has = (s: Section) => sections.includes(s);
   const context = $derived({ rem: pick.rem, em: parseFloat(pick.styles['font-size'] ?? '16') || 16, parent: pick.parentWidth, viewport: { w: pick.viewport, h: window.innerHeight } });
   const groupRows = (group: Group) => ROWS.filter((r) => r.group === group && r.mode === modes[group]) as NumberRow[];
@@ -178,6 +179,19 @@
 {/snippet}
 
 <div class="properties" data-testid="properties">
+  {#if role === Role.Head}
+    <section data-section="attributes">
+      {#each pick.attributes ?? [] as a (a.name)}
+        <div class="row" data-row={a.name}>
+          <span class="label">{a.name}</span>
+          <div class="control"><input type="text" class="hex" value={a.value} aria-label={a.name} readonly /></div>
+        </div>
+      {:else}
+        <p class="muted">No attributes</p>
+      {/each}
+    </section>
+  {/if}
+
   {#if has(Section.Layout)}
     <section data-section={Section.Layout}>
       {@render header(Section.Layout)}
