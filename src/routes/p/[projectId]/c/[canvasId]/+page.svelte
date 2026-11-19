@@ -268,6 +268,7 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
   import LiveFrameNode from '$lib/components/canvas/LiveFrameNode.svelte';
   import { LIVE_HEIGHT, liveFrameData, liveFrameOf, liveRoutes, type Breakpoint } from '$lib/canvas/live-frame';
   import { captureLiveSnapshot, devServerAction, devServerStatus } from '$lib/canvas/dev-server-client';
+  import { watchHmr } from '$lib/canvas/dev-hmr';
   import { isLocalMode } from '$lib/local-user';
   import { env as livePublicEnv } from '$env/dynamic/public';
   import InpaintDialog from '$lib/components/canvas/InpaintDialog.svelte';
@@ -4102,6 +4103,13 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
   const LIVE_SHOT_GAP_MS = 8000;
   const LIVE_NODE_SCALE = 0.5;
   const liveShots = new Map<string, number>();
+  let liveHmr = $state(0);
+
+  $effect(() => {
+    if (devOrigin) {
+      return watchHmr(devOrigin, () => liveHmr++);
+    }
+  });
 
   onMount(() => {
     if (!liveLocal) {
@@ -4118,7 +4126,11 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
     if (now - (liveShots.get(id) ?? 0) < LIVE_SHOT_GAP_MS) {
       return;
     }
-    liveShots.set(id, now);
+    refreshLive(id);
+  }
+
+  function refreshLive(id: string) {
+    liveShots.set(id, Date.now());
     void captureLiveSnapshot(id);
   }
 
@@ -4868,7 +4880,7 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
       {#if body === TileBody.Standin && hoverGen?.refId && !hoverGen.running}<OutputDragHandle nodeId={id} />{/if}
       {#if overMotion}<FrameLiveControls nodeId={id} interactive={!!overMotion.interactive} src={motionLivePath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} />{/if}
     {/snippet}
-    {#snippet tile({ id, selected, live })}
+    {#snippet tile({ id, selected, live, motion })}
       {@const row = nodeById.get(id)}
       {#if row}
         {@const gen = genOf(row)}
@@ -5008,7 +5020,7 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
         {:else if liveFrameOf(row.data)}
           {@const liveFrame = liveFrameOf(row.data)}
           {#if liveFrame}
-            <LiveFrameNode {id} {selected} onstep={(step: FrameStep) => undoStack.push({ source: 'frame', step })} onfail={(message: string) => (failed = `Not written to the code: ${message}`)} live={liveFrame} mode={live} origin={devOrigin} poster={liveFrame.poster ? canvasAssetUrl(data.projectId, data.canvas.id, liveFrame.poster, AssetSize.Full) : null} onsnapshot={() => shootLive(id)} />
+            <LiveFrameNode {id} {selected} onstep={(step: FrameStep) => undoStack.push({ source: 'frame', step })} onfail={(message: string) => (failed = `Not written to the code: ${message}`)} live={liveFrame} mode={live} {motion} hmr={liveHmr} origin={devOrigin} poster={liveFrame.poster ? canvasAssetUrl(data.projectId, data.canvas.id, liveFrame.poster, AssetSize.Full) : null} onsnapshot={() => shootLive(id)} onrefresh={() => refreshLive(id)} />
           {/if}
         {:else if frame}
           {@const codeRow = frame.source === 'view' ? nodes.find((n) => n.id === frame.sourceNodeId) : null}

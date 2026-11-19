@@ -1,11 +1,13 @@
 import { liveFrameOf, liveUrl } from '$lib/canvas/live-frame';
 
+export const POSTER_SCALE = 2;
+
 type NodeData = { id: string; data: Record<string, unknown> };
 
 export type PosterDeps = {
   origin: string;
   readNode: (id: string) => Promise<NodeData | null>;
-  capture: (url: string, width: number) => Promise<Uint8Array>;
+  capture: (url: string, width: number, scale: number) => Promise<Uint8Array>;
   saveImage: (bytes: Uint8Array) => Promise<string>;
   writeData: (id: string, data: Record<string, unknown>) => Promise<void>;
 };
@@ -17,7 +19,7 @@ export async function captureLivePoster(nodeId: string, deps: PosterDeps): Promi
     throw new Error(`${nodeId} is not a live frame`);
   }
 
-  const bytes = await deps.capture(liveUrl(deps.origin, live.route), live.width);
+  const bytes = await deps.capture(liveUrl(deps.origin, live.route), live.width, POSTER_SCALE);
   const poster = await deps.saveImage(bytes);
   await deps.writeData(nodeId, { ...node.data, live: { ...live, poster } });
   return poster;

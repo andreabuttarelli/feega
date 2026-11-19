@@ -4,14 +4,14 @@ import { captureLivePoster } from './live-poster';
 const node = { id: 'n1', data: { live: { route: '/pricing', width: 390, poster: null } } };
 
 describe('captureLivePoster', () => {
-  it('fotografa la rotta alla larghezza del frame e la salva come poster', async () => {
+  it('fotografa la rotta alla larghezza del frame, a 2× per restare nitida oltre il 100%, e la salva come poster', async () => {
     const shots: string[] = [];
     const written: unknown[] = [];
     const poster = await captureLivePoster('n1', {
       origin: 'http://localhost:3000',
       readNode: async () => node,
-      capture: async (url, width) => {
-        shots.push(`${url}@${width}`);
+      capture: async (url, width, scale) => {
+        shots.push(`${url}@${width}x${scale}`);
         return new Uint8Array([1]);
       },
       saveImage: async () => 'asset-1',
@@ -20,7 +20,7 @@ describe('captureLivePoster', () => {
       }
     });
     expect(poster).toBe('asset-1');
-    expect(shots).toEqual(['http://localhost:3000/pricing@390']);
+    expect(shots).toEqual(['http://localhost:3000/pricing@390x2']);
     expect(written).toEqual([{ live: { route: '/pricing', width: 390, poster: 'asset-1' } }]);
   });
 

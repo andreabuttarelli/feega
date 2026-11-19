@@ -262,7 +262,7 @@
   import { panBy, toWorld, wheelPan, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
   import { WheelBatch } from '$lib/canvas/gpu/wheel-batch';
   import { isLiveCode } from '$lib/canvas/code-frame';
-  import { FrameMode, MAX_LIVE_FRAMES, liveFrameModes } from '$lib/canvas/live-budget';
+  import { FrameMode, liveFrameModes } from '$lib/canvas/live-budget';
   import { liveFrameOf } from '$lib/canvas/live-frame';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
   import { WIRE_CURSOR, Wiring, typesMeet, atRest, bubbleColour, bubbleRadius, magnetPort, springTo, wireAim, throughPoint, tieAcross, type Spring, type Tie } from '$lib/canvas/gpu/wire-magnet';
@@ -471,13 +471,17 @@
   const liveCodeTiles = $derived(placed.filter((t) => t.kind === IFRAME_TYPE && isLive(summaries.get(t.id)?.data)));
   let liveCode = $state.raw(new Set<string>());
   let liveModes = $state.raw<Record<string, FrameMode>>({});
+  let editingLive = $state<string | null>(null);
+  $effect(() => {
+    if (editingLive && !selectedIds.has(editingLive)) {
+      editingLive = null;
+    }
+  });
   $effect(() => {
     const seen = visibleIds(liveCodeTiles, view, area);
-    const candidates = liveCodeTiles.map((t) => ({ id: t.id, visible: seen.has(t.id), area: t.w * t.h * view.zoom * view.zoom }));
-    const atRest = liveFrameModes(candidates, MAX_LIVE_FRAMES, CameraMotion.Still);
-    liveModes = liveFrameModes(candidates, MAX_LIVE_FRAMES, cameraMotion);
-    const posted = (id: string) => seen.has(id) && liveFrameOf(summaries.get(id)?.data) !== null;
-    const next = new Set(candidates.filter((c) => atRest[c.id] === FrameMode.Live || posted(c.id)).map((c) => c.id));
+    const ids = liveCodeTiles.map((t) => t.id);
+    liveModes = liveFrameModes(ids, editingLive);
+    const next = new Set(ids.filter((id) => liveModes[id] === FrameMode.Live || seen.has(id)));
     if (!sameSet(untrack(() => liveCode), next)) {
       liveCode = next;
     }
@@ -1355,6 +1359,11 @@
       return;
     }
     const hit = hitAt(world);
+    if (hit.kind === HitKind.Node && liveCodeTiles.some((t) => t.id === hit.nodeId)) {
+      select([hit.nodeId]);
+      editingLive = hit.nodeId;
+      return;
+    }
     const deeper = framePickAt(world, picks);
     const id = hit.kind === HitKind.Node ? hit.nodeId : (deeper?.nodeId ?? null);
     const doc = id ? liveOf(id)?.doc : null;
@@ -4844,7 +4853,7 @@
           {#if domIds.has(t.id)}
             <div class="gpu-dom-node" class:unshown={!handedOver(t)} data-testid="gpu-dom-node" data-id={t.id}>
               <NodeBoundary>
-                {@render props.tile({ id: t.id, selected: on, live: liveModes[t.id] ?? FrameMode.Snapshot })}
+                {@render props.tile({ id: t.id, selected: on, live: liveModes[t.id] ?? FrameMode.Snapshot, motion: cameraMotion })}
               </NodeBoundary>
             </div>
           {/if}

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { FrameMode } from '$lib/canvas/live-budget';
+  import { CameraMotion } from '$lib/canvas/core/camera-motion';
   import { liveUrl, type LiveFrame } from '$lib/canvas/live-frame';
   import { LiveAsk as Ask, pickOf, type LivePick, type LivePreview, type LiveRect } from '$lib/canvas/live-fields';
   import { dropLive, liveSelection, selectLive } from '$lib/canvas/live-selection.svelte';
@@ -10,7 +11,7 @@
   import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
   import { untrack } from 'svelte';
 
-  let { id, live, mode, origin, poster, selected, onsnapshot, onstep, onfail }: { id: string; live: LiveFrame; mode: FrameMode; origin: string | null; poster: string | null; selected: boolean; onsnapshot: () => void; onstep: (step: FrameStep) => void; onfail: (reason: string) => void } = $props();
+  let { id, live, mode, motion, hmr, origin, poster, selected, onsnapshot, onrefresh, onstep, onfail }: { id: string; live: LiveFrame; mode: FrameMode; motion: CameraMotion; hmr: number; origin: string | null; poster: string | null; selected: boolean; onsnapshot: () => void; onrefresh: () => void; onstep: (step: FrameStep) => void; onfail: (reason: string) => void } = $props();
 
   const INSPECT = 'feega:inspect';
   const INSPECT_RESULT = 'feega:inspect:result';
@@ -18,7 +19,8 @@
   const REFRESH_MS = 900;
 
   let box = $state(0);
-  let mounted = $state(false);
+  let painted = $state(false);
+  let refreshedAt = untrack(() => hmr);
   let frame = $state<HTMLIFrameElement | undefined>();
   let hovered = $state<LivePick | null>(null);
   let seq = 0;
@@ -71,15 +73,30 @@
 
   $effect(() => {
     if (showsLive) {
-      mounted = true;
+      untrack(onsnapshot);
+      return () => (painted = false);
     }
   });
 
   $effect(() => {
-    if (showsLive && mounted) {
-      onsnapshot();
+    if (origin && !poster) {
+      untrack(onsnapshot);
     }
   });
+
+  $effect(() => {
+    if (hmr === refreshedAt || motion !== CameraMotion.Still) {
+      return;
+    }
+    refreshedAt = hmr;
+    untrack(onrefresh);
+  });
+
+  function onpaint() {
+    requestAnimationFrame(() => requestAnimationFrame(() => (painted = true)));
+    onsnapshot();
+    refresh();
+  }
 
   $effect(() => {
     if (!editing) {
@@ -148,19 +165,15 @@
 
 <svelte:window {onmessage} />
 
-<div class="live" bind:clientWidth={box} data-testid="live-frame" data-mode={showsLive ? FrameMode.Live : FrameMode.Snapshot} data-route={live.route}>
-  {#if mounted && origin}
+<div class="live" bind:clientWidth={box} data-testid="live-frame" data-mode={showsLive ? FrameMode.Live : FrameMode.Snapshot} data-painted={painted} data-route={live.route}>
+  {#if showsLive && origin}
     <iframe
       bind:this={frame}
       class="page"
-      class:hidden={!showsLive}
       title={live.route}
       src={liveUrl(origin, live.route)}
       style={`width:${live.width}px;height:${100 / scale}%;transform:scale(${scale})`}
-      onload={() => {
-        onsnapshot();
-        refresh();
-      }}
+      onload={onpaint}
     ></iframe>
   {/if}
   {#if editing}
@@ -181,7 +194,7 @@
       {/if}
     </div>
   {/if}
-  {#if poster && !showsLive}
+  {#if poster && !(showsLive && painted)}
     <img class="poster" src={poster} alt={live.route} draggable="false" data-testid="live-frame-poster" />
   {/if}
   {#if !origin}
@@ -192,7 +205,6 @@
 <style>
   .live { position: relative; width: 100%; height: 100%; overflow: hidden; background: #fff; }
   .page { position: absolute; top: 0; left: 0; border: 0; transform-origin: 0 0; }
-  .hidden { visibility: hidden; }
   .poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
   .badge { position: absolute; left: 8px; bottom: 8px; font-size: 11px; padding: 3px 8px; background: rgba(0, 0, 0, 0.7); color: #fff; }
   .edit { position: absolute; inset: 0; cursor: default; }

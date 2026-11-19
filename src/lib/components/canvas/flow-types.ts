@@ -1,4 +1,5 @@
 import type { FrameMode } from '$lib/canvas/live-budget';
+import type { CameraMotion } from '$lib/canvas/core/camera-motion';
 import type { Revision } from '$lib/motion/frame-sync';
 import type { Tie } from '$lib/canvas/gpu/wire-magnet';
 import type { PlacedChange } from '$lib/canvas/place-many';
@@ -198,6 +199,6 @@ export type FlowProps = {
   onView?: (view: View) => void;
   onUserPan?: () => void;
   follow?: View | null;
-  tile: Snippet<[{ id: string; selected: boolean; live: FrameMode }]>;
+  tile: Snippet<[{ id: string; selected: boolean; live: FrameMode; motion: CameraMotion }]>;
   mode?: CanvasMode;
 };

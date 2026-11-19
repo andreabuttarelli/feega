@@ -1,26 +1,22 @@
-import { CameraMotion } from './core/camera-motion';
-
 export enum FrameMode {
   Live = 'live',
   Snapshot = 'snapshot'
 }
 
-export const MAX_LIVE_FRAMES = 3;
+export enum LiveFrameState {
+  Idle = 'idle',
+  Editing = 'editing',
+  Playing = 'playing'
+}
 
-type Candidate = { id: string; visible: boolean; area: number };
+export const LIVE_MODE: Record<LiveFrameState, FrameMode> = {
+  [LiveFrameState.Idle]: FrameMode.Snapshot,
+  [LiveFrameState.Editing]: FrameMode.Live,
+  [LiveFrameState.Playing]: FrameMode.Live
+};
 
-export function liveFrameModes(frames: readonly Candidate[], max: number, motion: CameraMotion): Record<string, FrameMode> {
-  const modes = Object.fromEntries(frames.map((f) => [f.id, FrameMode.Snapshot]));
+const stateOf = (id: string, editing: string | null) => (id === editing ? LiveFrameState.Editing : LiveFrameState.Idle);
 
-  if (motion === CameraMotion.Moving) {
-    return modes;
-  }
-
-  const live = frames.filter((f) => f.visible).sort((a, b) => b.area - a.area).slice(0, max);
-
-  for (const f of live) {
-    modes[f.id] = FrameMode.Live;
-  }
-
-  return modes;
+export function liveFrameModes(ids: readonly string[], editing: string | null): Record<string, FrameMode> {
+  return Object.fromEntries(ids.map((id) => [id, LIVE_MODE[stateOf(id, editing)]]));
 }
