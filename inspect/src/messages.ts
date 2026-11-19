@@ -156,5 +156,12 @@ export const SCROLL = 'feega:scroll';
 export const SCROLLED = 'feega:scrolled';
 export const TEXT_EDIT = 'feega:text:edit';
 export const TEXT_DONE = 'feega:text:done';
+export const TRACK = 'feega:track';
+export const TRACKED = 'feega:tracked';
+
+export enum Slot {
+  Selected = 'selected',
+  Hovered = 'hovered'
+}
 
 export const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\]):\d+$/;

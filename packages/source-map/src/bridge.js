@@ -1,4 +1,5 @@
 import { SOURCE_ATTR, clearPreview, hidePreview, paletteOf, relativeOf, treeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
+import { trackRects } from './track.js';
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';
@@ -18,6 +19,8 @@ export const PALETTE_RESULT = 'feega:palette:result';
 export const MODE = 'feega:mode';
 export const TEXT_EDIT = 'feega:text:edit';
 export const TEXT_DONE = 'feega:text:done';
+export const TRACK = 'feega:track';
+export const TRACKED = 'feega:tracked';
 
 export const Mode = { Navigate: 'navigate', Design: 'design' };
 
@@ -33,6 +36,7 @@ export function installBridge(win) {
   const doc = win.document;
   let mode = Mode.Navigate;
   let reply = (message) => win.parent?.postMessage(message, '*');
+  const tracker = trackRects(win, (slot, rect) => reply({ type: TRACKED, slot, rect }));
 
   const handlers = {
     [PREVIEW]: (request) => previewEdit(doc, request),
@@ -41,6 +45,7 @@ export function installBridge(win) {
     [MODE]: (request) => (mode = request.mode),
     [PALETTE]: () => reply({ type: PALETTE_RESULT, ...paletteOf(doc) }),
     [HIDE]: (request) => hidePreview(doc, request.source, request.hidden),
+    [TRACK]: (request) => tracker.follow(request.slot, request.source),
     [TREE]: () => reply({ type: TREE_RESULT, tree: treeOf(doc) }),
     [SCROLL]: (request) => {
       win.scrollBy(request.dx, request.dy);

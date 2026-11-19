@@ -7,7 +7,8 @@
   import PanelLeft from '@lucide/svelte/icons/panel-left';
   import Undo2 from '@lucide/svelte/icons/undo-2';
   import { LiveProp } from '@feega/live-edit/live-fields';
-  import { Mode, Move, ServerAction, type ChangeRow, type FontChoice, type LayerNode, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
+  import { untrack } from 'svelte';
+  import { Mode, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
   import { fromHost, toHost } from './host';
   import { pageBridge, sourceText } from './page-bridge';
   import Properties from './Properties.svelte';
@@ -167,9 +168,17 @@
       bridge.tree();
       bridge.palette();
       refresh();
+      bridge.track(Slot.Selected, untrack(() => picked?.source) ?? null);
+      bridge.track(Slot.Hovered, untrack(() => hover?.source) ?? null);
     },
     moved: (path) => (visited(path), bridge.tree()),
     tree: (tree) => (layers = tree),
+    tracked: (slot, rect) => {
+      const target = slot === Slot.Selected ? picked : hover;
+      if (target) {
+        target.rect = rect;
+      }
+    },
     palette: (p) => (palette = p),
     scrolled: () => {
       hover = null;
@@ -202,6 +211,19 @@
     server = ServerState.Reloading;
     frame!.src = new URL(path, url).toString();
   }
+
+  const pickedAt = $derived(picked ? sourceText(picked.source) : null);
+  const hoverAt = $derived(hover ? sourceText(hover.source) : null);
+  $effect(() => {
+    if (bridged) {
+      bridge.track(Slot.Selected, pickedAt === null ? null : untrack(() => picked!.source));
+    }
+  });
+  $effect(() => {
+    if (bridged) {
+      bridge.track(Slot.Hovered, hoverAt === null ? null : untrack(() => hover!.source));
+    }
+  });
 
   function refresh() {
     if (picked) {

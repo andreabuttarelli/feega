@@ -76,3 +76,11 @@ edit inline until reload); the colour control is a native picker, not the app's 
 - **Typography on wrappers.** `h1 > span + span` had no Typography: the role table called any
   element with children a container. Text tags are text by tag now, and an element whose
   descendants are only inline text elements (`inlineText` from the runtime) is text too.
+- **Live scrub.** Dragging a number label wrote only on release and the field snapped back.
+  `scrub.ts` previews once per animation frame while dragging, writes once on release (one undo
+  step), debounces arrow nudges 300 ms, and holds the released value against stale reads for
+  1.5 s. Every number row and the shadow fields go through it; the test is parametrised over
+  the controls table.
+- **Outline follows the element.** `track.js` in the bridge watches the selected and hovered
+  sources (MutationObserver, ResizeObserver, scroll/resize/load), coalesces reads per frame and
+  re-sends the rect; after HMR the element is found again by source.

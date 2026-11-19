@@ -1,4 +1,4 @@
-import { BRIDGE_READY, INSPECT, INSPECT_RESULT, LOCAL_ORIGIN, LOCATION, MODE, PREVIEW, PREVIEW_CLEAR, PREVIEW_SETTLE, PREVIEW_SETTLED, SCROLL, SCROLLED, HIDE, PALETTE, PALETTE_RESULT, type Palette, TREE, TREE_RESULT, type LayerNode, TEXT_DONE, TEXT_EDIT, type Mode, type Move, type Pick, type Source } from '../messages';
+import { BRIDGE_READY, INSPECT, INSPECT_RESULT, LOCAL_ORIGIN, LOCATION, MODE, PREVIEW, PREVIEW_CLEAR, PREVIEW_SETTLE, PREVIEW_SETTLED, SCROLL, SCROLLED, HIDE, PALETTE, PALETTE_RESULT, type Palette, TREE, TREE_RESULT, type LayerNode, TEXT_DONE, TEXT_EDIT, TRACK, TRACKED, type Slot, type Mode, type Move, type Pick, type Source } from '../messages';
 
 type Inspected = { source: Source; component: Source | null; html: string; rect: Pick['rect']; styles: Record<string, string>; classes: string; rem: number; viewport: number; ownText: boolean; inlineText: boolean; elements: number; name: string; parentWidth: number; instances: number; classCount: number; ancestors: Pick['ancestors'] };
 
@@ -18,6 +18,7 @@ export type PageEvents = {
   palette: (palette: Palette) => void;
   settled: (source: string, unapplied: string[]) => void;
   text: (source: string, text: string) => void;
+  tracked: (slot: Slot, rect: Pick['rect']) => void;
 };
 
 export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents) {
@@ -51,6 +52,12 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
     }
     if (data?.type === PREVIEW_SETTLED) {
       on.settled(data.source, data.unapplied);
+      return;
+    }
+    if (data?.type === TRACKED) {
+      if (data.rect) {
+        on.tracked(data.slot, data.rect);
+      }
       return;
     }
     if (data?.type === TEXT_DONE) {
@@ -92,6 +99,7 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
     hide: (source: Source, hidden: boolean) => send({ type: HIDE, source: sourceText(source), hidden }),
     mode: (mode: Mode) => send({ type: MODE, mode }),
     scroll: (dx: number, dy: number) => send({ type: SCROLL, dx, dy }),
+    track: (slot: Slot, source: Source | null) => send({ type: TRACK, slot, source: source ? sourceText(source) : null }),
     editText: (x: number, y: number) => send({ type: TEXT_EDIT, x, y })
   };
 }
