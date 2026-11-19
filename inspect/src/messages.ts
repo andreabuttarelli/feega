@@ -50,7 +50,7 @@ export enum ToHost {
   Setting = 'setting'
 }
 
-export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string };
+export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string };
 
 export enum ToView {
   App = 'app',
@@ -78,7 +78,7 @@ export type ViewMessage =
   | { kind: ToView.Server; state: ServerState; reason?: string }
   | { kind: ToView.Settings; values: Settings; facts: ReportFacts }
   | { kind: ToView.Status; text: string }
-  | { kind: ToView.Edited; ok: boolean; reason?: string; written?: string; at?: Source; saved?: Source }
+  | { kind: ToView.Edited; ok: boolean; reason?: string; written?: string; at?: Source; saved?: Source; note?: string }
   | { kind: ToView.Change; row: string; value: string }
   | { kind: ToView.Pick; id: number; x: number; y: number };
 
@@ -91,6 +91,8 @@ export const PREVIEW_SETTLED = 'feega:preview:settled';
 export const LOCATION = 'feega:location';
 export const BRIDGE_READY = 'feega:source-map:ready';
 export const MODE = 'feega:mode';
+export const SCROLL = 'feega:scroll';
+export const SCROLLED = 'feega:scrolled';
 export const TEXT_EDIT = 'feega:text:edit';
 export const TEXT_DONE = 'feega:text:done';
 

@@ -17,6 +17,7 @@
   import { modeOfKey } from './modes';
   import { browseHistory } from './history';
   import { serverLook } from './server-look';
+  import { DEFAULT_ANCHOR, anchorBox, isAnchor, nearestAnchor, nextAnchor, type Anchor } from './anchors';
   import { PRESETS, SIZES, Size, fitOf, sizeForKey, snapped } from './sizes';
 
   const SETTLE_MS = 1200;
@@ -44,12 +45,18 @@
   let stage = $state({ w: 0, h: 0 });
   let dragging = $state<{ x: number; width: number; side: number } | null>(null);
   let navTick = $state(0);
+  let anchor = $state<Anchor>(DEFAULT_ANCHOR);
+  let bar = $state({ w: 0, h: 0 });
+  let toolbarH = $state(0);
+  let moving = $state<{ dx: number; dy: number; x: number; y: number } | null>(null);
   let settings = $state<Settings | null>(null);
   let facts = $state<ReportFacts | null>(null);
 
   const history = browseHistory();
   let savedPrefs = false;
   const fit = $derived(fitOf(size, custom, stage));
+  const area = $derived({ x: 0, y: toolbarH, w: stage.w, h: stage.h });
+  const barAt = $derived(moving ? { x: moving.x, y: moving.y } : anchorBox(anchor, area, bar));
   const look = $derived(serverLook(server));
   const canBack = $derived((navTick, history.canBack()));
   const canForward = $derived((navTick, history.canForward()));
@@ -63,6 +70,10 @@
       refresh();
     },
     moved: visited,
+    scrolled: () => {
+      hover = null;
+      refresh();
+    },
     settled: (_source, unapplied) => {
       warning = unapplied.length ? `Saved, but ${unapplied.join(', ')} has no effect on this page` : '';
       refresh();
@@ -97,7 +108,7 @@
   }
 
   function savePrefs() {
-    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route } });
+    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor } });
   }
 
   function restore(prefs: Prefs | null) {
@@ -109,6 +120,7 @@
     custom = prefs.custom;
     barClosed = prefs.barClosed;
     route = prefs.route ?? route;
+    anchor = isAnchor(prefs.anchor) ? prefs.anchor : anchor;
   }
 
   const handlers: { [K in ToView]: (m: Extract<ViewMessage, { kind: K }>) => void } = {
@@ -135,6 +147,7 @@
       }
       problem = null;
       saved = m.saved ?? null;
+      warning = m.note ?? '';
       server = ServerState.Reloading;
       setTimeout(() => {
         server = bridged ? ServerState.Running : server;
@@ -163,14 +176,44 @@
 
   const pagePoint = (e: MouseEvent) => ({ x: e.offsetX / fit.scale, y: e.offsetY / fit.scale });
 
-  let moving = false;
+  let hovering = false;
   function onMove(e: PointerEvent) {
-    if (moving) {
+    if (hovering) {
       return;
     }
-    moving = true;
+    hovering = true;
     const { x, y } = pagePoint(e);
-    bridge.at(x, y).then((p) => ((hover = p), (moving = false)));
+    bridge.at(x, y).then((p) => ((hover = p), (hovering = false)));
+  }
+
+  function grabBar(e: PointerEvent) {
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    moving = { dx: e.clientX - barAt.x, dy: e.clientY - barAt.y, x: barAt.x, y: barAt.y };
+  }
+
+  function dragBar(e: PointerEvent) {
+    if (moving) {
+      moving = { ...moving, x: e.clientX - moving.dx, y: e.clientY - moving.dy };
+    }
+  }
+
+  function dropBar() {
+    if (!moving) {
+      return;
+    }
+    anchor = nearestAnchor({ x: moving.x, y: moving.y }, area, bar);
+    moving = null;
+    savePrefs();
+  }
+
+  function onHandleKey(e: KeyboardEvent) {
+    const next = nextAnchor(anchor, e.key);
+    if (next !== anchor) {
+      e.preventDefault();
+      e.stopPropagation();
+      anchor = next;
+      savePrefs();
+    }
   }
 
   async function onPick(e: MouseEvent) {
@@ -268,9 +311,9 @@
 
 <svelte:window onkeydown={onKey} />
 
-<main style={`grid-template-columns: 1fr ${barClosed ? 0 : BAR_PX}px`}>
+<main style={`grid-template-columns: 1fr ${barClosed ? 0 : BAR_PX}px; --bar: ${barClosed ? 0 : BAR_PX}px`}>
   <section class="view">
-    <header class="toolbar">
+    <header class="toolbar" bind:clientHeight={toolbarH}>
       <FeegaMenu values={settings} {facts} onsetting={(key, value) => toHost({ kind: ToHost.Setting, key, value })} onlink={(link) => toHost({ kind: ToHost.External, url: link })} />
       <button type="button" class="icon" title="Back (⌘[)" disabled={!canBack} onclick={() => go(history.back())}><ArrowLeft size={15} /></button>
       <button type="button" class="icon" title="Forward (⌘])" disabled={!canForward} onclick={() => go(history.forward())}><ArrowRight size={15} /></button>
@@ -291,10 +334,10 @@
     </header>
 
     <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={drag} onpointerup={endDrag}>
-      <div class="frame" class:framed={size !== Size.Full} style={`width:${fit.width * fit.scale}px`}>
-        {#if url}<iframe bind:this={frame} src={start} title="App" data-testid="app-frame" style={`width:${fit.width}px;height:${stage.h / fit.scale}px;transform:scale(${fit.scale})`}></iframe>{/if}
+      <div class="frame" class:framed={size !== Size.Full} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px`}>
+        {#if url}<iframe bind:this={frame} src={start} title="App" data-testid="app-frame" style={`width:${fit.width}px;height:${fit.height}px;transform:scale(${fit.scale})`}></iframe>{/if}
         {#if mode === Mode.Design && bridged && !editing}
-          <div class="overlay" role="presentation" onpointermove={onMove} onpointerleave={() => (hover = null)} onclick={onPick} ondblclick={onDouble}>
+          <div class="overlay" role="presentation" onpointermove={onMove} onpointerleave={() => (hover = null)} onclick={onPick} ondblclick={onDouble} onwheel={(e) => bridge.scroll(e.deltaX / fit.scale, e.deltaY / fit.scale)}>
             {#if hover}<div class="outline hover" style={box(hover)}></div>{/if}
             {#if picked}<div class="outline picked" style={box(picked)}><span>{picked.tag}</span></div>{/if}
           </div>
@@ -306,7 +349,10 @@
         {/if}
       </div>
 
-      <div class="float">
+      <div class="float" class:moving bind:clientWidth={bar.w} bind:clientHeight={bar.h} style={`left:${barAt.x}px;top:${barAt.y}px`} data-anchor={anchor}>
+        <button type="button" class="grip" title="Drag to move (arrow keys)" aria-label="Move the bar" onpointerdown={grabBar} onpointermove={dragBar} onpointerup={dropBar} onkeydown={onHandleKey}>
+          <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true">{#each [0, 1, 2] as row (row)}{#each [0, 1] as col (col)}<circle cx={2 + col * 4} cy={2 + row * 4} r="1.1" fill="currentColor" />{/each}{/each}</svg>
+        </button>
         <ModeSwitch {mode} onmode={setMode} />
         <button type="button" class="icon" title="Undo (⌘Z)" onclick={() => toHost({ kind: ToHost.Undo })}><Undo2 size={14} /></button>
       </div>
@@ -346,8 +392,10 @@
 
 <style>
   main {
+    --float-gap: 16px;
     display: grid;
     height: 100vh;
+    overflow: hidden;
     transition: grid-template-columns 200ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
@@ -355,6 +403,7 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+    min-height: 0;
   }
 
   .toolbar {
@@ -463,6 +512,8 @@
     position: relative;
     display: flex;
     flex: 1;
+    align-items: center;
+    min-height: 0;
     justify-content: center;
     overflow: hidden;
     background: var(--ui-backdrop);
@@ -470,7 +521,9 @@
 
   .frame {
     position: relative;
-    height: 100%;
+    flex: none;
+    align-self: center;
+    overflow: hidden;
     background: #fff;
   }
 
@@ -554,9 +607,11 @@
   }
 
   .float {
-    position: absolute;
-    bottom: 16px;
-    left: 50%;
+    position: fixed;
+    z-index: 5;
+    transition:
+      left 180ms cubic-bezier(0.16, 1, 0.3, 1),
+      top 180ms cubic-bezier(0.16, 1, 0.3, 1);
     display: flex;
     align-items: center;
     gap: 6px;
@@ -564,8 +619,34 @@
     border-radius: var(--ui-radius-lg);
     background: var(--ui-float);
     box-shadow: 0 0 0 1px var(--ui-divider), 0 8px 24px rgb(0 0 0 / 0.22);
-    transform: translateX(-50%);
     backdrop-filter: blur(12px);
+  }
+
+  .float.moving {
+    transition: none;
+  }
+
+  .grip {
+    display: grid;
+    place-items: center;
+    width: 16px;
+    height: 28px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: none;
+    color: var(--ui-text);
+    opacity: 0.5;
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .float.moving .grip {
+    cursor: grabbing;
+  }
+
+  .grip:focus-visible {
+    opacity: 1;
+    outline: 1px solid var(--ui-accent);
   }
 
   .pill {

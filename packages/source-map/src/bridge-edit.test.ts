@@ -76,3 +76,15 @@ describe('routes inside the page', () => {
     expect(posted).toContainEqual({ type: 'feega:location', path: '/pricing' });
   });
 });
+
+describe('scrolling from the inspector', () => {
+  it('a wheel forwarded by the inspector scrolls the page and reports it', () => {
+    const { win, send, replies } = bridged();
+    const scrolled: number[] = [];
+    win.scrollBy = ((_x: number, y: number) => scrolled.push(y)) as never;
+    send({ type: 'feega:scroll', dx: 0, dy: 120 });
+
+    expect(scrolled).toEqual([120]);
+    expect(replies).toContainEqual({ type: 'feega:scrolled' });
+  });
+});

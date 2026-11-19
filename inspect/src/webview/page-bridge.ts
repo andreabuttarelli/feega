@@ -1,4 +1,4 @@
-import { BRIDGE_READY, INSPECT, INSPECT_RESULT, LOCAL_ORIGIN, LOCATION, MODE, PREVIEW, PREVIEW_CLEAR, PREVIEW_SETTLE, PREVIEW_SETTLED, TEXT_DONE, TEXT_EDIT, type Mode, type Pick, type Source } from '../messages';
+import { BRIDGE_READY, INSPECT, INSPECT_RESULT, LOCAL_ORIGIN, LOCATION, MODE, PREVIEW, PREVIEW_CLEAR, PREVIEW_SETTLE, PREVIEW_SETTLED, SCROLL, SCROLLED, TEXT_DONE, TEXT_EDIT, type Mode, type Pick, type Source } from '../messages';
 
 type Inspected = { source: Source; component: Source | null; html: string; rect: Pick['rect']; styles: Record<string, string>; classes: string; rem: number; viewport: number; ownText: boolean; elements: number };
 
@@ -13,6 +13,7 @@ export const sourceText = (s: Source) => `${s.file}:${s.line}:${s.col}`;
 export type PageEvents = {
   ready: (path: string) => void;
   moved: (path: string) => void;
+  scrolled: () => void;
   settled: (source: string, unapplied: string[]) => void;
   text: (source: string, text: string) => void;
 };
@@ -28,6 +29,10 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
     const data = event.data;
     if (data?.type === BRIDGE_READY) {
       on.ready(data.path ?? '/');
+      return;
+    }
+    if (data?.type === SCROLLED) {
+      on.scrolled();
       return;
     }
     if (data?.type === LOCATION) {
@@ -72,6 +77,7 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
     clear: (source: Source) => send({ type: PREVIEW_CLEAR, source: sourceText(source) }),
     settle: (source: Source) => send({ type: PREVIEW_SETTLE, source: sourceText(source) }),
     mode: (mode: Mode) => send({ type: MODE, mode }),
+    scroll: (dx: number, dy: number) => send({ type: SCROLL, dx, dy }),
     editText: (x: number, y: number) => send({ type: TEXT_EDIT, x, y })
   };
 }

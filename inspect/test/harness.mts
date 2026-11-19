@@ -57,7 +57,7 @@ export async function openPanel(appRoot: string, theme = DARK) {
     if (m.kind === ToHost.Edit) {
       const out = await edits.edit(m.ask!);
       saves.push(out);
-      await reply(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, saved: liveAtOf(m.ask!.at) } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
+      await reply(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, saved: liveAtOf(m.ask!.at), note: out.note } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
     }
     if (m.kind === ToHost.Undo) {
       await edits.undo();

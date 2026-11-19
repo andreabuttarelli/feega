@@ -26,7 +26,7 @@ export const SETTINGS: SettingRow[] = [
   {
     key: SettingKey.Styling,
     label: 'Write styles as',
-    hint: 'Auto uses Tailwind classes when the project has Tailwind, CSS otherwise.',
+    hint: 'Auto: Tailwind classes when the project has Tailwind; otherwise a rule in the component style block (Svelte, Vue), or an inline style in files without a stylesheet.',
     fallback: StylingChoice.Auto,
     choices: [
       { value: StylingChoice.Auto, label: 'Auto' },

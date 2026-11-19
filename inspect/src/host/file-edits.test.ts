@@ -81,10 +81,29 @@ describe('fileEdits', () => {
     expect(out).toEqual({ ok: false, reason: 'the text comes from {subtitle}', at: { file: 'src/Page.svelte', line: 3, col: 6 } });
   });
 
-  it('senza Tailwind scrive CSS vero nello style, non una classe che non esiste', async () => {
+  it('senza Tailwind scrive una regola nello <style> del componente, non uno style inline', async () => {
     const root = app(PLAIN);
     await fileEdits(root).edit({ at: 'src/Page.svelte:2:3', prop: LiveProp.FontWeight, value: '700', css: { 'font-weight': '700' } });
 
-    expect(read(root)).toContain('<h1 class="text-2xl" style="font-weight: 700">Hello</h1>');
+    expect(read(root)).toContain('<h1 class="text-2xl">Hello</h1>');
+    expect(read(root)).toContain('  .text-2xl {\n    font-weight: 700;\n  }');
+  });
+
+  it('undo toglie la regola e la classe aggiunte', async () => {
+    const root = app(PLAIN);
+    const edits = fileEdits(root);
+    await edits.edit({ at: 'src/Page.svelte:3:3', prop: LiveProp.Color, value: 'red', css: { color: 'red' } });
+    await edits.undo();
+
+    expect(read(root)).toBe(PAGE);
+  });
+
+  it('in JSX senza file CSS resta lo style inline, e lo dice', async () => {
+    const root = app(PLAIN);
+    writeFileSync(join(root, 'src/App.tsx'), '<h1 className="t">Hi</h1>\n');
+    const out = await fileEdits(root).edit({ at: 'src/App.tsx:1:1', prop: LiveProp.Color, value: 'red', css: { color: 'red' } });
+
+    expect(readFileSync(join(root, 'src/App.tsx'), 'utf8')).toContain("style={{ color: 'red' }}");
+    expect(out.ok && out.note).toBe('inline style: this file has no stylesheet');
   });
 });

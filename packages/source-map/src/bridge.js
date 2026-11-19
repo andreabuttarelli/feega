@@ -8,6 +8,8 @@ export const PREVIEW_CLEAR = 'feega:preview:clear';
 export const PREVIEW_SETTLE = 'feega:preview:settle';
 export const PREVIEW_SETTLED = 'feega:preview:settled';
 export const LOCATION = 'feega:location';
+export const SCROLL = 'feega:scroll';
+export const SCROLLED = 'feega:scrolled';
 export const MODE = 'feega:mode';
 export const TEXT_EDIT = 'feega:text:edit';
 export const TEXT_DONE = 'feega:text:done';
@@ -32,6 +34,10 @@ export function installBridge(win) {
     [PREVIEW_CLEAR]: (request) => clearPreview(doc, request.source),
     [PREVIEW_SETTLE]: (request) => reply({ type: PREVIEW_SETTLED, source: request.source, unapplied: settlePreview(doc, request.source) }),
     [MODE]: (request) => (mode = request.mode),
+    [SCROLL]: (request) => {
+      win.scrollBy(request.dx, request.dy);
+      reply({ type: SCROLLED });
+    },
     [TEXT_EDIT]: (request) => mode === Mode.Design && editText(win, targetOf(doc, request), request, reply),
     [INSPECT]: (request) => {
       const target = targetOf(doc, request);

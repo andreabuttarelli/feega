@@ -2,6 +2,19 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { stylePatch } from '@feega/live-edit/class-patch';
 import { inside, liveAtOf, reader, tokenOf } from '@feega/live-edit/live-ask';
 import { styleAttr } from '@feega/live-edit/style-attr';
+import { scopedRule } from '@feega/live-edit/scoped-rule';
+
+type CssWriter = { write: typeof scopedRule; note?: string };
+
+const SCOPED: CssWriter = { write: scopedRule };
+const INLINE: CssWriter = { write: styleAttr, note: 'inline style: this file has no stylesheet' };
+
+const CSS_WRITERS: Record<string, CssWriter> = {
+  svelte: SCOPED,
+  vue: SCOPED
+};
+
+const cssWriterOf = (file: string): CssWriter => CSS_WRITERS[file.slice(file.lastIndexOf('.') + 1)] ?? INLINE;
 import { Styling, type EditAsk } from '../messages';
 import { stylingOf } from './styling';
 import { StylingChoice } from '../settings';
@@ -10,7 +23,7 @@ import { literalText } from '@feega/live-edit/literal-text';
 import type { FileChange } from '@feega/live-edit/files';
 import type { LiveAt } from '@feega/live-edit/class-patch';
 
-export type Written = { ok: true; path: string; written: string } | { ok: false; reason: string; at?: LiveAt };
+export type Written = { ok: true; path: string; written: string; note?: string } | { ok: false; reason: string; at?: LiveAt };
 
 type Step = { full: string; before: string; after: string };
 
@@ -39,8 +52,9 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     }
 
     if ((await stylingOf(root, choice())) === Styling.Css) {
-      const out = await styleAttr(reader(root), at, ask.css ?? {});
-      return out.ok ? written(full, out.change, '') : out;
+      const writer = cssWriterOf(at.file);
+      const out = await writer.write(reader(root), at, ask.css ?? {}, ask.viewport);
+      return out.ok ? written(full, out.change, '', writer.note) : out;
     }
 
     const token = await tokenOf(root, ask);
@@ -52,10 +66,10 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return change ? written(full, change, token ?? '') : { ok: true, path: at.file, written: token ?? '' };
   }
 
-  async function written(full: string, change: FileChange, token: string): Promise<Written> {
+  async function written(full: string, change: FileChange, token: string, note?: string): Promise<Written> {
     await writeFile(full, change.after);
     steps.push({ full, before: change.before, after: change.after });
-    return { ok: true, path: change.path, written: token };
+    return { ok: true, path: change.path, written: token, note };
   }
 
   async function undone(): Promise<Written> {

@@ -3,15 +3,19 @@ import { Size, SIZES, fitOf, sizeForKey, snapped } from './sizes';
 
 describe('preview sizes', () => {
   it('full fills the panel at 100%', () => {
-    expect(fitOf(Size.Full, null, { w: 900, h: 700 })).toEqual({ width: 900, scale: 1 });
+    expect(fitOf(Size.Full, null, { w: 900, h: 700 })).toEqual({ width: 900, height: 700, scale: 1 });
   });
 
   it('a preset narrower than the panel is shown at its width, unscaled', () => {
-    expect(fitOf(Size.Phone, null, { w: 900, h: 700 })).toEqual({ width: 390, scale: 1 });
+    expect(fitOf(Size.Phone, null, { w: 900, h: 900 })).toEqual({ width: 390, height: 844, scale: 1 });
   });
 
   it('a preset wider than the panel is scaled down to fit', () => {
-    expect(fitOf(Size.Desktop, null, { w: 720, h: 700 })).toEqual({ width: 1440, scale: 0.5 });
+    expect(fitOf(Size.Desktop, null, { w: 720, h: 700 })).toEqual({ width: 1440, height: 900, scale: 0.5 });
+  });
+
+  it('a preset taller than the panel is scaled down to fit its height', () => {
+    expect(fitOf(Size.Phone, null, { w: 900, h: 422 })).toEqual({ width: 390, height: 844, scale: 0.5 });
   });
 
   it('a custom width wins over the preset', () => {

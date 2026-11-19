@@ -42,6 +42,7 @@ html,
 body {
   margin: 0;
   height: 100%;
+  overflow: hidden;
   background: var(--vscode-editor-background, #1e1e1e);
   color: var(--ui-text);
   font-family: var(--vscode-font-family, system-ui, sans-serif);

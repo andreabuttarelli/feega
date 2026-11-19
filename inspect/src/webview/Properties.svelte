@@ -3,7 +3,9 @@
   import InspectorSection from '@feega/properties-panel/InspectorSection.svelte';
   import { Control, ROWS, type Row } from './controls';
   import { roleOf, sectionsOf } from './roles';
-  import { hexOf } from './colour';
+  import { paintOf } from './colour';
+
+  const DEFAULT_PAINT = '#d9d9d9';
   import type { Pick } from '../messages';
 
   let { pick, onpreview, onchange }: { pick: Pick; onpreview: (row: Row, value: string) => void; onchange: (row: Row, value: string) => void } = $props();
@@ -22,10 +24,17 @@
           {#if row.control === Control.Number}
             <NumberField label={row.label} name={row.name} value={row.read(pick.styles)} range={row.range} unit={row.unit} onchange={(v) => onchange(row, String(v))} />
           {:else if row.control === Control.Colour}
+            {@const paint = paintOf(row.read(pick.styles))}
             <label class="colour" data-field={row.name}>
-              <input type="color" value={hexOf(row.read(pick.styles))} oninput={(e) => onpreview(row, e.currentTarget.value)} onchange={(e) => onchange(row, e.currentTarget.value)} />
-              <span>{row.label}</span>
-              <code>{hexOf(row.read(pick.styles))}</code>
+              {#if paint}
+                <input type="color" value={paint} oninput={(e) => onpreview(row, e.currentTarget.value)} onchange={(e) => onchange(row, e.currentTarget.value)} />
+                <span>{row.label}</span>
+                <code>{paint}</code>
+              {:else}
+                <span>{row.label}</span>
+                <span class="none">None</span>
+                <button type="button" class="add" title={`Add ${row.label.toLowerCase()}`} aria-label={`Add ${row.label.toLowerCase()}`} onclick={() => onchange(row, DEFAULT_PAINT)}>+</button>
+              {/if}
             </label>
           {:else}
             <label class="choice" data-field={row.name}>
@@ -68,6 +77,21 @@
     border: 1px solid var(--ui-divider);
     border-radius: var(--ui-radius-xs);
     background: none;
+  }
+
+  .none {
+    margin-left: auto;
+    color: var(--ui-text-3);
+  }
+
+  .add {
+    width: 20px;
+    height: 20px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
+    color: var(--ui-text);
+    cursor: pointer;
   }
 
   .colour code {

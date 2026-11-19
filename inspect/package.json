@@ -40,7 +40,7 @@
           "type": "string",
           "default": "auto",
           "enum": ["auto", "tailwind", "css"],
-          "description": "How style edits are written: auto-detect, Tailwind classes, or CSS."
+          "description": "How style edits are written. Auto: Tailwind classes when the project has Tailwind; otherwise CSS in the component style block (Svelte, Vue), or an inline style in files without a stylesheet (JSX, HTML)."
         },
         "feegaInspect.devCommand": {
           "type": "string",

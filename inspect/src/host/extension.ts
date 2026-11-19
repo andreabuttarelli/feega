@@ -48,7 +48,7 @@ async function openSource(root: string, at: Source) {
 
 async function edited(out: Written, ask: EditAsk | null) {
   const saved = ask ? (liveAtOf(ask.at) ?? undefined) : undefined;
-  await post(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, saved } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
+  await post(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, saved, note: out.note } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
   return out;
 }
 
