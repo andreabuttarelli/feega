@@ -1,0 +1,27 @@
+import { describe, expect, it } from 'vitest';
+import { Browser, Run, argsOf } from './args';
+
+describe('npx feega arguments', () => {
+  it('no argument opens the current folder on a free port in the browser', () => {
+    expect(argsOf([], '/work')).toEqual({ run: Run.Editor, dir: '/work', port: 0, browser: Browser.Open });
+  });
+
+  it('a folder, a port and --no-open', () => {
+    expect(argsOf(['landing', '--port', '4100', '--no-open'], '/work')).toEqual({ run: Run.Editor, dir: '/work/landing', port: 4100, browser: Browser.Stay });
+  });
+
+  it('--port=N and an absolute folder', () => {
+    expect(argsOf(['--port=4100', '/abs/app'], '/work')).toMatchObject({ dir: '/abs/app', port: 4100 });
+  });
+
+  it('--help and --version', () => {
+    expect(argsOf(['--help'], '/w').run).toBe(Run.Help);
+    expect(argsOf(['-h'], '/w').run).toBe(Run.Help);
+    expect(argsOf(['--version'], '/w').run).toBe(Run.Version);
+  });
+
+  it('an unknown flag or a bad port is an error', () => {
+    expect(argsOf(['--nope'], '/w')).toEqual({ run: Run.Error, reason: 'unknown option --nope' });
+    expect(argsOf(['--port', 'x'], '/w')).toEqual({ run: Run.Error, reason: 'the port must be a number' });
+  });
+});

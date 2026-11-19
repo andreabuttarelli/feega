@@ -1,19 +1,22 @@
-# Every push to main ships `npx feega`: a GitHub release app-v<version> carrying the bundle,
-# then the npm package at the same version, then the macOS app (dmg + zip, both arches,
-# ad-hoc signed) and SHA256SUMS.txt on that same release; the app updates from these releases. The version lives in the app-v* tags only: the
-# next one is the newest tag with its patch bumped (npx/package.json seeds the first). Nothing
-# is committed back to main. A rerun on the same commit reuses that commit's tag and skips
-# whatever already landed; the asset is uploaded before npm publish, so a failure never leaves
-# an npm version without its bundle. workflow_dispatch from any branch only builds the bundle.
+# Ships `npx feega`, the Feega editor for a local web app, from npx/. The version is the one in
+# npx/package.json: a version already on npm is skipped, so pushes that do not bump it publish
+# nothing. Every run builds and tests the package (unit tests, then the CLI on landing/ driven by
+# Playwright); it publishes on a push to main, or on a manual run with publish=true.
 name: App release (npx feega)
 
 on:
   push:
     branches: [main]
+    paths: ['npx/**', 'inspect/**', 'packages/live-edit/**', 'packages/source-map/**', 'packages/dev-run/**', '.github/workflows/app-release.yml']
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish to npm
+        type: boolean
+        default: false
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: app-release
@@ -22,16 +25,10 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
     env:
-      PUBLIC_SUPABASE_URL: http://supabase.invalid
-      PUBLIC_SUPABASE_ANON_KEY: local
-      PUBLISH: ${{ github.ref == 'refs/heads/main' }}
+      PUBLISH: ${{ github.ref == 'refs/heads/main' || inputs.publish == true }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -50,136 +47,35 @@ jobs:
           fi
           npm whoami
 
-      - name: Pick the version
-        id: version
-        run: |
-          OWN=$(git tag --points-at HEAD 'app-v*' | head -1)
-          LAST=$(git tag -l 'app-v*' --sort=-v:refname | head -1)
-          if [ -n "$OWN" ]; then
-            V="${OWN#app-v}"
-          elif [ -n "$LAST" ]; then
-            V=$(echo "${LAST#app-v}" | awk -F. '{ print $1 "." $2 "." $3 + 1 }')
-          else
-            V=$(node -p 'require("./npx/package.json").version')
-          fi
-          echo "version=$V" >> "$GITHUB_OUTPUT"
-          echo "Version $V"
-
       - run: npm ci
 
-      - name: Launcher tests
-        run: npx vitest run npx
+      - name: Unit tests
+        run: npx vitest run inspect/src npx/src
 
-      - name: Build the bundle
-        run: scripts/app-bundle.sh dist-app
+      - name: Build
+        run: node npx/build.mjs
 
-      - name: Upload bundle (manual runs)
-        if: env.PUBLISH != 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: feega-app
-          path: dist-app/feega-app.tar.gz
-
-      - name: GitHub release with the bundle
-        if: env.PUBLISH == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          V: ${{ steps.version.outputs.version }}
+      - name: CLI on landing/, driven by Playwright
         run: |
-          if gh release view "app-v$V" >/dev/null 2>&1; then
-            gh release upload "app-v$V" dist-app/feega-app.tar.gz --clobber
-          else
-            gh release create "app-v$V" dist-app/feega-app.tar.gz --target "$GITHUB_SHA" \
-              --title "feega app $V" --notes "Bundle for \`npx feega\`."
-          fi
+          (cd landing && npm ci --no-audit --no-fund)
+          npx playwright install --with-deps chromium
+          node npx/test/editor.e2e.mjs
+
+      - name: Pack
+        working-directory: npx
+        run: |
+          npm pack --dry-run
+          node dist/cli.cjs --help
 
       - name: Publish to npm
         if: env.PUBLISH == 'true'
         working-directory: npx
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          V: ${{ steps.version.outputs.version }}
         run: |
+          V=$(node -p 'require("./package.json").version')
           if npm view "feega@$V" version >/dev/null 2>&1; then
             echo "feega@$V already on npm"
             exit 0
           fi
-          npm version --no-git-tag-version --allow-same-version "$V"
           npm publish --access public
-
-  desktop:
-    needs: release
-    strategy:
-      matrix:
-        include:
-          - arch: arm64
-            runner: macos-latest
-          - arch: x64
-            runner: macos-15-intel
-    runs-on: ${{ matrix.runner }}
-    env:
-      PUBLIC_SUPABASE_URL: http://supabase.invalid
-      PUBLIC_SUPABASE_ANON_KEY: local
-      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-
-      - name: Build the macOS app at the npm version
-        working-directory: apps/desktop
-        env:
-          V: ${{ needs.release.outputs.version }}
-        run: |
-          npm ci
-          npm test
-          npm version --no-git-tag-version --allow-same-version "$V"
-          node scripts/stage-server.cjs --arch=${{ matrix.arch }}
-          npx electron-builder --mac --${{ matrix.arch }} --publish never
-          test ! -e dist/mac*/Feega.app/Contents/Resources/app.asar.unpacked/native
-          codesign --verify --deep --strict dist/mac*/Feega.app
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: feega-macos-${{ matrix.arch }}
-          path: |
-            apps/desktop/dist/*.dmg
-            apps/desktop/dist/*.zip
-
-  desktop-release:
-    needs: [release, desktop]
-    runs-on: ubuntu-latest
-    env:
-      PUBLISH: ${{ github.ref == 'refs/heads/main' }}
-      V: ${{ needs.release.outputs.version }}
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: feega-macos-*
-          merge-multiple: true
-          path: mac
-
-      - name: Checksums
-        working-directory: mac
-        run: sha256sum *.dmg *.zip > SHA256SUMS.txt && cat SHA256SUMS.txt
-
-      - name: Upload checksums (manual runs)
-        if: env.PUBLISH != 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: feega-macos-sums
-          path: mac/SHA256SUMS.txt
-
-      - name: Attach the app to the release
-        if: env.PUBLISH == 'true'
-        working-directory: mac
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release upload "app-v$V" *.dmg *.zip SHA256SUMS.txt --clobber --repo "$GITHUB_REPOSITORY"
-          gh release edit "app-v$V" --repo "$GITHUB_REPOSITORY" --notes "Bundle for \`npx feega\`. macOS app (unsigned): [install guide](https://docs.feega.app/desktop/install-macos/), checksums in SHA256SUMS.txt."

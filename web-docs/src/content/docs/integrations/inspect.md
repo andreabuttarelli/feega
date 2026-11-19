@@ -22,6 +22,21 @@ Feega Inspect is a small editor extension, separate from the Feega canvas. No ac
    back/forward/reload, the route, a dev server status dot, and device widths (keys 1–4).
 7. Cmd/Ctrl+Z restores the file. It never overwrites a change made after the edit.
 
+## In the browser: `npx feega`
+
+The same editor runs without VS Code:
+
+```bash
+cd my-app
+npx feega            # or: npx feega <dir> --port 4100 --no-open
+```
+
+It finds the app (and asks which one when the folder holds several), starts its dev server and
+opens the editor in the browser. Edits, undo/redo and the Changes tab behave as in the extension.
+Open in editor uses `code -g` when VS Code is on the PATH, else `$VISUAL`/`$EDITOR`, else prints
+`file:line:col`. Settings live in `.feega/settings.json` in the app folder. Ctrl+C stops the
+editor and the dev server.
+
 ## Install the dev build
 
 ```bash
