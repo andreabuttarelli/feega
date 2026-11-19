@@ -9,7 +9,7 @@ Design in your codebase. Click any element of your running app, edit it from a d
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![Sponsor](https://img.shields.io/badge/Sponsor-buy%20a%20coffee-ff813f)](https://buy.stripe.com/5kQ00k2A97C08sd94LeME07)
 
-[Watch the demo](https://feega.app/video/feega-inspect.mp4)
+[Watch the demo](https://feega.app/video/feega-demo.mp4)
 
 ![Select an element](inspect/images/1-select.png)
 ![Edit it from the panel](inspect/images/2-edit.png)
