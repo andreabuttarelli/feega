@@ -124,16 +124,12 @@
   const hiddenNow = $derived((flagTick, new Set(layerFlags.of(route).hidden)));
   const lockedNow = $derived((flagTick, new Set(layerFlags.of(route).locked)));
 
-  const shownDisplay = new Map<string, string>();
 
-  async function setHidden(source: Source, hide: boolean) {
-    const key = sourceText(source);
-    if (hide) {
-      const now = await bridge.again(source);
-      shownDisplay.set(key, now?.styles.display || 'block');
-    }
-    const display = hide ? 'none' : (shownDisplay.get(key) ?? 'block');
-    toHost({ kind: ToHost.Edit, ask: { at: key, prop: LiveProp.Class, family: ClassFamily.Hidden, value: hide ? 'hidden' : '', css: { display }, scope } });
+  const SHOWN = '';
+
+  function setHidden(source: Source, hide: boolean) {
+    const display = hide ? 'none' : SHOWN;
+    toHost({ kind: ToHost.Edit, ask: { at: sourceText(source), prop: LiveProp.Class, family: ClassFamily.Hidden, value: hide ? 'hidden' : '', css: { display }, scope } });
   }
 
   function toggleFlag(flag: LayerFlag, source: Source) {
@@ -575,7 +571,7 @@
         {#if size !== Size.Full}
           <span class="handle left" role="separator" aria-label="Resize" onpointerdown={(e) => startDrag(e, -1)}></span>
           <span class="handle right" role="separator" aria-label="Resize" onpointerdown={(e) => startDrag(e, 1)}></span>
-          <span class="width-label" class:live={dragging}>{fit.width}px</span>
+          {#if dragging}<span class="width-label live">{fit.width} × {fit.height}</span>{/if}
         {/if}
       </div>
 

@@ -13,6 +13,7 @@ export default {
     'Open in editor jumps to the exact line, and text that comes from data points at where the data is defined.',
     'Headings and paragraphs that wrap styled spans now show Typography.',
     'Drag a number label to scrub: the page updates live and the change is saved once when you let go.',
-    'The selection outline follows the element as it resizes, scrolls or reloads.'
+    'The selection outline follows the element as it resizes, scrolls or reloads.',
+    'Showing a hidden element removes exactly what hiding added.'
   ]
 } satisfies ChangelogEntry;

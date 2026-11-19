@@ -84,3 +84,7 @@ edit inline until reload); the colour control is a native picker, not the app's 
 - **Outline follows the element.** `track.js` in the bridge watches the selected and hovered
   sources (MutationObserver, ResizeObserver, scroll/resize/load), coalesces reads per frame and
   re-sends the rect; after HMR the element is found again by source.
+- **Show after Hide.** Show wrote the remembered `display` value back. An empty css value now
+  means "remove this declaration" in every writer (scoped rule, module rule, inline style); an
+  emptied rule, `<style>` block or `style=""` goes too.
+- The frame's fixed width tag is gone; only the W × H label while dragging a handle remains.

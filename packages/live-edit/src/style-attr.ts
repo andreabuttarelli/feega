@@ -7,6 +7,7 @@ export type Css = Record<string, string>;
 const STYLE_LITERAL = /(\sstyle=)"([^"{}]*)"/;
 const STYLE_ANY = /\sstyle=/;
 const JSX_FILE = /\.(t|j)sx$/;
+const REMOVED = '';
 
 const camel = (name: string) => name.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
 
@@ -26,13 +27,18 @@ function restyled(open: string, file: string, css: Css): string | null {
   const literal = open.match(STYLE_LITERAL);
   if (literal) {
     const all = declarations(literal[2]);
-    Object.entries(css).forEach(([name, value]) => all.set(name, value));
-    return open.replace(STYLE_LITERAL, `$1"${cssText(all)}"`);
+    Object.entries(css).forEach(([name, value]) => (value === REMOVED ? all.delete(name) : all.set(name, value)));
+    return all.size ? open.replace(STYLE_LITERAL, `$1"${cssText(all)}"`) : open.replace(STYLE_LITERAL, '');
   }
   if (STYLE_ANY.test(open)) {
     return null;
   }
 
+  const added = Object.fromEntries(Object.entries(css).filter(([, value]) => value !== REMOVED));
+  if (!Object.keys(added).length) {
+    return open;
+  }
+  css = added;
   const closing = open.endsWith('/>') ? open.length - 2 : open.length - 1;
   const attr = JSX_FILE.test(file) ? `style=${jsxStyle(css)}` : `style="${cssText(new Map(Object.entries(css)))}"`;
   return `${open.slice(0, closing).trimEnd()} ${attr}${open.slice(closing)}`;

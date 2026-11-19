@@ -37,4 +37,12 @@ describe('styleAttr', () => {
 
     expect(out.ok && out.change.after).toBe(`<h1 className="t" style={{ fontWeight: '700', paddingTop: '8px' }}>Hi</h1>\n`);
   });
+
+  it('an empty value removes the declaration, and the attribute when nothing is left', async () => {
+    const once = await styleAttr(readOf(SOURCE), at(3), { color: '' });
+    const twice = await styleAttr(readOf(once.ok ? once.change.after : ''), at(3), { margin: '' });
+
+    expect(once.ok && once.change.after).toContain('<p style="margin: 0">Text</p>');
+    expect(twice.ok && twice.change.after).toContain('<p>Text</p>');
+  });
 });

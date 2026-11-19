@@ -9,6 +9,8 @@ const STYLE_LITERAL = /\sstyle="([^"{}]*)"/;
 const TAG_NAME = /^<([a-zA-Z][\w-]*)/;
 const STYLE_BLOCK = /<style[^>]*>([\s\S]*?)<\/style>/;
 const RULE_INDENT = '  ';
+const REMOVED = '';
+const EMPTY_STYLE = /\n*<style>\s*<\/style>\n?/;
 const DECL_INDENT = '    ';
 
 const kebab = (name: string) => name.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
@@ -71,9 +73,15 @@ export function ruleInBody(body: string, name: string, css: Map<string, string>,
   const rules = [...body.matchAll(new RegExp(`(^|\\n)([ \\t]*)\\.${escaped(name)}\\s*\\{([^}]*)\\}`, 'g'))];
   const found = rules.filter((r) => appliesAt(mediaAt(body, r.index!), viewport)).pop();
   const all = found ? declarationsOf(found[3]) : new Map<string, string>();
-  css.forEach((value, prop) => all.set(prop, value));
+  css.forEach((value, prop) => (value === REMOVED ? all.delete(prop) : all.set(prop, value)));
+  if (found && !all.size) {
+    return body.slice(0, found.index!) + body.slice(found.index! + found[0].length).replace(/^\n(?=\s*\n)/, '');
+  }
   if (found) {
     return body.slice(0, found.index!) + found[1] + ruleText(name, all, found[2]) + body.slice(found.index! + found[0].length);
+  }
+  if (!all.size) {
+    return body;
   }
   const head = body.trimEnd();
   return `${head}${head ? '\n' : ''}${indent === '' && head ? '\n' : ''}${ruleText(name, all, indent)}\n`;
@@ -81,11 +89,15 @@ export function ruleInBody(body: string, name: string, css: Map<string, string>,
 
 function withRule(source: string, name: string, css: Map<string, string>, viewport?: number): string {
   const block = source.match(STYLE_BLOCK);
+  if (!block && [...css.values()].every((v) => v === REMOVED)) {
+    return source;
+  }
   if (!block) {
     return `${source.trimEnd()}\n\n<style>\n${ruleText(name, css)}\n</style>\n`;
   }
   const body = block[1];
-  return source.replace(STYLE_BLOCK, (whole) => whole.replace(body, ruleInBody(body, name, css, viewport)));
+  const after = source.replace(STYLE_BLOCK, (whole) => whole.replace(body, ruleInBody(body, name, css, viewport)));
+  return after.replace(EMPTY_STYLE, '\n');
 }
 
 export enum Scope {

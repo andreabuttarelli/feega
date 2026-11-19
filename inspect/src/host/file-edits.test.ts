@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync, mkdirSync } from 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { LiveProp, Side } from '@feega/live-edit/live-fields';
+import { ClassFamily, LiveProp, Side } from '@feega/live-edit/live-fields';
 import { fileEdits } from './file-edits';
 import { Place } from '@feega/live-edit/move-node';
 
@@ -88,6 +88,29 @@ describe('fileEdits', () => {
 
     expect(read(root)).toContain('<h1 class="text-2xl page-h1">Hello</h1>');
     expect(read(root)).toContain('  .page-h1 {\n    font-weight: 700;\n  }');
+  });
+
+  it('show dopo hide toglie la dichiarazione aggiunta da hide, non scrive il display di prima', async () => {
+    const root = app(PLAIN);
+    const edits = fileEdits(root);
+    const at = 'src/Page.svelte:2:3';
+    await edits.edit({ at, prop: LiveProp.FontWeight, value: '700', css: { 'font-weight': '700' } });
+    await edits.edit({ at, prop: LiveProp.Class, family: ClassFamily.Hidden, value: 'hidden', css: { display: 'none' } });
+    await edits.edit({ at, prop: LiveProp.Class, family: ClassFamily.Hidden, value: '', css: { display: '' } });
+
+    expect(read(root)).toContain('  .page-h1 {\n    font-weight: 700;\n  }');
+    expect(read(root)).not.toContain('display');
+  });
+
+  it('show dopo hide su un elemento senza altre regole toglie anche la regola vuota', async () => {
+    const root = app(PLAIN);
+    const edits = fileEdits(root);
+    const at = 'src/Page.svelte:2:3';
+    await edits.edit({ at, prop: LiveProp.Class, family: ClassFamily.Hidden, value: 'hidden', css: { display: 'none' } });
+    await edits.edit({ at, prop: LiveProp.Class, family: ClassFamily.Hidden, value: '', css: { display: '' } });
+
+    expect(read(root)).not.toContain('.page-h1');
+    expect(read(root)).not.toContain('display');
   });
 
   it('undo toglie la regola e la classe aggiunte', async () => {
