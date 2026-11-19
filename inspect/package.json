@@ -26,6 +26,16 @@
         "command": "feegaInspect.open",
         "title": "Open the running app",
         "category": "Feega Inspect"
+      },
+      {
+        "command": "feegaInspect.designFolder",
+        "title": "Design this folder with Feega",
+        "category": "Feega Inspect"
+      },
+      {
+        "command": "feegaInspect.designPage",
+        "title": "Design this page with Feega",
+        "category": "Feega Inspect"
       }
     ],
     "configuration": {
@@ -39,7 +49,11 @@
         "feegaInspect.styling": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "tailwind", "css"],
+          "enum": [
+            "auto",
+            "tailwind",
+            "css"
+          ],
           "description": "How style edits are written. Auto: Tailwind classes when the project has Tailwind; otherwise CSS in the component style block (Svelte, Vue), or an inline style in files without a stylesheet (JSX, HTML)."
         },
         "feegaInspect.devCommand": {
@@ -50,10 +64,39 @@
         "feegaInspect.defaultSize": {
           "type": "string",
           "default": "full",
-          "enum": ["full", "desktop", "tablet", "phone"],
+          "enum": [
+            "full",
+            "desktop",
+            "tablet",
+            "phone"
+          ],
           "description": "Device size the preview opens at."
         }
       }
+    },
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "feegaInspect.designFolder",
+          "when": "explorerResourceIsFolder",
+          "group": "navigation@90"
+        },
+        {
+          "command": "feegaInspect.designPage",
+          "when": "!explorerResourceIsFolder && resourceExtname =~ /^\\.(svelte|vue|tsx|jsx|astro|html)$/",
+          "group": "navigation@90"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "feegaInspect.designFolder",
+          "when": "false"
+        },
+        {
+          "command": "feegaInspect.designPage",
+          "when": "false"
+        }
+      ]
     }
   },
   "scripts": {

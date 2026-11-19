@@ -1,5 +1,8 @@
 import { randomBytes } from 'node:crypto';
-import { join } from 'node:path';
+import { access, readdir } from 'node:fs/promises';
+import { basename, join, relative } from 'node:path';
+import { appRootOf, appsUnder } from './app-root';
+import { Command } from './commands';
 import * as vscode from 'vscode';
 import { liveAtOf } from '@feega/live-edit/live-ask';
 import { ServerAction, ServerState, ToHost, ToView, type EditAsk, type HostMessage, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
@@ -239,18 +242,50 @@ function panelOf(context: vscode.ExtensionContext): vscode.WebviewPanel {
   return panel;
 }
 
-async function open(context: vscode.ExtensionContext) {
-  const folder = vscode.workspace.workspaceFolders?.[0];
+const has = (path: string) => access(path).then(() => true, () => false);
+const dirsIn = (path: string) => readdir(path, { withFileTypes: true }).then((all) => all.filter((e) => e.isDirectory()).map((e) => e.name), () => []);
+
+async function chosenRoot(target?: vscode.Uri): Promise<string | null> {
+  const folder = (target && vscode.workspace.getWorkspaceFolder(target)) ?? vscode.workspace.workspaceFolders?.[0];
   if (!folder) {
+    return null;
+  }
+  const workspace = folder.uri.fsPath;
+  const clicked = await appRootOf(target?.fsPath ?? workspace, workspace, has);
+  if (clicked) {
+    return clicked;
+  }
+  const apps = await appsUnder(workspace, has, dirsIn);
+  if (apps.length <= 1) {
+    return apps[0] ?? null;
+  }
+  const picked = await vscode.window.showQuickPick(
+    apps.map((app) => ({ label: relative(workspace, app), app })),
+    { placeHolder: 'Which app should Feega Inspect open?' }
+  );
+  return picked?.app ?? null;
+}
+
+async function open(context: vscode.ExtensionContext, target?: vscode.Uri) {
+  const root = await chosenRoot(target);
+  if (!root) {
     vscode.window.showWarningMessage('Feega Inspect: open the folder of a web app first.');
     return;
   }
-  if (session) {
+  if (session && session.root === root) {
     session.panel.reveal();
     return;
   }
+  if (session) {
+    const SWITCH = 'Switch';
+    const answer = await vscode.window.showInformationMessage(`Feega Inspect is open on ${basename(session.root)}. Switch to ${basename(root)}?`, { modal: true }, SWITCH);
+    if (answer !== SWITCH) {
+      session.panel.reveal();
+      return;
+    }
+    session.panel.dispose();
+  }
 
-  const root = folder.uri.fsPath;
   const panel = panelOf(context);
   session = { panel, running: null, edits: fileEdits(root, stylingChoice, context.workspaceState.get(HISTORY_KEY)), root };
   panel.webview.onDidReceiveMessage(onMessage);
@@ -277,7 +312,7 @@ export function activate(context: vscode.ExtensionContext) {
   host = { context, output };
   context.subscriptions.push(
     output,
-    vscode.commands.registerCommand('feegaInspect.open', () => open(context)),
+    ...Object.values(Command).map((id) => vscode.commands.registerCommand(id, (target?: vscode.Uri) => open(context, target))),
     vscode.workspace.onDidChangeConfiguration((e) => e.affectsConfiguration(SECTION) && postSettings())
   );
   context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(BEFORE_SCHEME, { provideTextDocumentContent: (uri) => befores.get(uri.query) ?? '' }));

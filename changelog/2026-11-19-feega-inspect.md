@@ -101,3 +101,8 @@ edit inline until reload); the colour control is a native picker, not the app's 
   8×40 pills, col-resize, Shift for 10 px steps (`Snap.Coarse`), double-click back to Full.
   Not done: bottom height handle, phone rotation. One shared input reset (`.field input`) removes
   the nested input border.
+- **Design this folder / page with Feega.** Explorer context commands (`commands.ts` enum, titles in
+  package.json). The app root is the clicked folder or its nearest package.json inside the
+  workspace (`app-root.ts`), so `landing/` inside the repo works; "Open the running app" on a
+  workspace without an app at the root offers a quick pick of the apps below it. Switching apps
+  asks first. Not done: opening the route that renders a clicked page file.
