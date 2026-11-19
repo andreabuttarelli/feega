@@ -44,7 +44,8 @@ const canvasSchema = z.object({
       displayName: z.string().nullable(),
       position: z.object({ x: z.number(), y: z.number(), z: z.number() }),
       size: z.object({ width: z.number().nullable(), height: z.number().nullable() }),
-      data: z.record(z.string(), z.unknown())
+      data: z.record(z.string(), z.unknown()),
+      version: z.number().int().positive().optional()
     })
   ),
   connections: z.array(

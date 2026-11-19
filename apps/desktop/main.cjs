@@ -91,6 +91,14 @@ async function pickFile() {
   await openFile(filePaths[0]);
 }
 
+async function pickFolder() {
+  const { canceled, filePaths } = await dialog.showOpenDialog(window, { title: 'Open project folder', properties: ['openDirectory', 'createDirectory'] });
+  if (canceled || !filePaths[0]) {
+    return;
+  }
+  await openFile(filePaths[0]);
+}
+
 async function saveAs() {
   const { canceled, filePath } = await dialog.showSaveDialog(window, { title: 'Save canvas as', defaultPath: current ?? freshFile(), filters: FILE_FILTERS });
   if (canceled || !filePath || !current) {
@@ -133,6 +141,7 @@ function installMenu() {
     submenu: [
       { label: 'New Local Canvas…', click: newFile },
       { label: 'Open Local File…', accelerator: 'CmdOrCtrl+O', click: pickFile },
+      { label: 'Open Project Folder…', accelerator: 'CmdOrCtrl+Shift+O', click: pickFolder },
       { role: 'recentDocuments', submenu: [{ role: 'clearRecentDocuments' }] },
       { type: 'separator' },
       { label: 'Save As…', accelerator: 'CmdOrCtrl+Shift+S', enabled: local, click: saveAs },

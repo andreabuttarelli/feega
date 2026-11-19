@@ -318,6 +318,7 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
   import { ImagesOutcome, type ImagesAnswer } from '$lib/canvas/figma/fetch-images';
   import { figmaNotice } from '$lib/canvas/figma/notice';
   import FigmaNotice from '$lib/components/canvas/FigmaNotice.svelte';
+  import FolderSyncNotice from '$lib/components/canvas/FolderSyncNotice.svelte';
   import { connectionMessage } from '$lib/canvas/connection-messages';
 
 
@@ -4612,6 +4613,9 @@ import { selectView, type NodeView } from '$lib/canvas/node-view';
       {/if}
       <button type="button" class="warning-close" aria-label="Dismiss" onclick={() => (failed = null)}>×</button>
     </p>
+  {/if}
+  {#if liveLocal}
+    <FolderSyncNotice nodes={Object.fromEntries(nodes.map((n) => [n.id, { name: n.displayName, type: n.type }]))} />
   {/if}
   {#if figmaShown}
     <FigmaNotice notice={figmaShown} settingsHref="/app/settings/profile" onclose={() => (figmaPaste = null)} />

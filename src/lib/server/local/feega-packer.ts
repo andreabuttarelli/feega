@@ -2,11 +2,18 @@ import { Worker } from 'node:worker_threads';
 import { renameSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import workerSource from './feega-pack-worker.cjs?raw';
-import type { FeegaAsset, FeegaCanvas, FeegaManifest } from '$lib/canvas/feega-file';
+import { idsIn, type FeegaAsset, type FeegaBlobs, type FeegaCanvas, type FeegaFile, type FeegaManifest } from '$lib/canvas/feega-file';
 
 export type PackedAsset = { row: FeegaAsset; always: boolean; bytes: Uint8Array | null };
 
 export type PackJob = { manifest: FeegaManifest; body: Omit<FeegaCanvas, 'assets'>; assets: PackedAsset[] };
+
+export function jobFile(job: PackJob): { file: FeegaFile; blobs: FeegaBlobs } {
+  const referenced = new Set(idsIn(job.body));
+  const kept = job.assets.filter((a) => a.always || referenced.has(a.row.id.toLowerCase()));
+  const blobs: FeegaBlobs = new Map(kept.flatMap((a) => (a.row.file && a.bytes ? [[a.row.file, a.bytes] as const] : [])));
+  return { file: { manifest: job.manifest, canvas: { ...job.body, assets: kept.map((a) => a.row) } }, blobs };
+}
 
 export type Packed = { hashed: number };
 
