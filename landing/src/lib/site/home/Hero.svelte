@@ -1,11 +1,9 @@
 <script lang="ts">
   import { lower } from '../lower';
   import InstallCta from '../InstallCta.svelte';
-  import { CANVAS_VIDEO, HERO_HEADLINE } from '../home';
-  import { lazyPlay } from '../lazy-video';
+  import { HERO_HEADLINE } from '../home';
   import AsciiField from './AsciiField.svelte';
-
-  const POSTER = '/site/home/canvas-poster.webp';
+  import HeroVideo, { POSTER } from './HeroVideo.svelte';
 </script>
 
 <svelte:head>
@@ -22,7 +20,7 @@
 
   <InstallCta id="hero-install" />
 
-  <video class="canvas" data-agent-id="hero-canvas" data-src={CANVAS_VIDEO} muted loop playsinline preload="none" poster={POSTER} width="1920" height="1080" aria-label="Feega canvas overview" use:lazyPlay></video>
+  <HeroVideo />
 </section>
 
 <style>
@@ -57,17 +55,6 @@
 
   .hero > :global(.install) {
     margin-top: 28px;
-  }
-
-  video {
-    width: 100%;
-    aspect-ratio: 16 / 9;
-    object-fit: cover;
-  }
-
-  .canvas {
-    margin-top: 100px;
-    border-radius: 8px;
   }
 
 
