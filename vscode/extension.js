@@ -2,7 +2,7 @@ const vscode = require('vscode');
 const { spawn } = require('node:child_process');
 const { existsSync, renameSync, statSync } = require('node:fs');
 const { dirname } = require('node:path');
-const { Launch, launcherOf, legacyMove, mcpServers, canvasPage, eventReader, importMessage, progressOf, advance, failedAt, finishedAll, stepsPage, logTail, spawnOptions, RETRY, localUrl, freePort, readyProbe, served } = require('./canvas-run');
+const { DEPRECATION, Launch, launcherOf, legacyMove, mcpServers, canvasPage, eventReader, importMessage, progressOf, advance, failedAt, finishedAll, stepsPage, logTail, spawnOptions, RETRY, localUrl, freePort, readyProbe, served } = require('./canvas-run');
 
 const READY_POLL_MS = 400;
 const QUIET_TIMEOUT_MS = 180_000;
@@ -225,7 +225,21 @@ function openFolder(output, launch) {
   return canvasPanel(folder, launch, output);
 }
 
+const INSTALL = 'Install Feega Inspect';
+const LEARN = 'Learn more';
+
+async function announceDeprecation() {
+  const answer = await vscode.window.showInformationMessage(DEPRECATION.message, INSTALL, LEARN);
+  if (answer === INSTALL) {
+    return vscode.commands.executeCommand('workbench.extensions.search', DEPRECATION.extensionId);
+  }
+  if (answer === LEARN) {
+    return vscode.env.openExternal(vscode.Uri.parse(DEPRECATION.docsUrl));
+  }
+}
+
 function activate(context) {
+  void announceDeprecation();
   const output = vscode.window.createOutputChannel('Feega');
   context.subscriptions.push(
     output,

@@ -5,6 +5,11 @@ sidebar:
   order: 2
 ---
 
+:::caution[Deprecated]
+This extension is replaced by Feega Inspect (`AndreaButtarelli.feega-inspect`) and gets no new
+features. On activation it shows a notice that links to it.
+:::
+
 The Feega extension opens your workspace folder as a Feega project in an editor tab. It runs
 [local mode](/getting-started/local-mode/) on that folder, so there is no account, and saves the
 canvas to the folder's [`.feega/` directory](/getting-started/project-folder/) as you work, ready to

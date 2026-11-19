@@ -295,4 +295,10 @@ const importMessage = ({ pages, needsValue, leftOut }, file) => {
   return `${parts.join('; ')}. Canvas: ${file}`;
 };
 
-module.exports = { eventReader, importMessage, readyProbe, served, Launch, launchArgs, launcherOf, legacyMove, mcpServers, canvasPage, progressOf, advance, failedAt, finishedAll, stepsPage, lineEvent, logTail, spawnOptions, Step, RETRY, localUrl, freePort };
+const DEPRECATION = {
+  message: 'The Feega canvas extension is deprecated. Feega Inspect replaces it: edit your running app visually, right in the editor.',
+  extensionId: 'AndreaButtarelli.feega-inspect',
+  docsUrl: 'https://github.com/andreabuttarelli/feega/tree/main/inspect'
+};
+
+module.exports = { DEPRECATION, eventReader, importMessage, readyProbe, served, Launch, launchArgs, launcherOf, legacyMove, mcpServers, canvasPage, progressOf, advance, failedAt, finishedAll, stepsPage, lineEvent, logTail, spawnOptions, Step, RETRY, localUrl, freePort };

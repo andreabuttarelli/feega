@@ -1,5 +1,7 @@
 # Feega for Cursor and VS Code
 
+> **Deprecated.** This canvas extension is replaced by **Feega Inspect** (`AndreaButtarelli.feega-inspect`, source in [`inspect/`](https://github.com/andreabuttarelli/feega/tree/main/inspect)): edit your running app visually, right in the editor. This extension gets no new features.
+
 ![Three agents editing design frames on a Feega canvas at the same time](media/canvas.png)
 
 Open `.feega` canvases in an editor tab: motion video, UI and graphic design on one infinite canvas, saved to a file in your repo. Your editor's agent connects to the open canvas over MCP and edits it live.

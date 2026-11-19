@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Deprecated in favour of Feega Inspect: a notice on activation points to it.
 - **Feega: Open this folder as a project** replaces **New canvas**: the canvas lives in `.feega/`, versioned with the repo. An old `<folder>.feega` is migrated; the `*.feega` gitignore prompt is gone.
 - Git group in the top bar for the opened folder: branch, commit, push, pull request.
 - `feega.devServerPath` runs a local clone of Feega instead of `npx feega@latest`.

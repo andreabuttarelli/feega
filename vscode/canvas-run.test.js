@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { Launch, launchArgs, launcherOf, legacyMove, mcpServers, canvasPage, eventReader, importMessage, readyProbe, served, spawnOptions, Step, progressOf, advance, failedAt, stepsPage, lineEvent, logTail, RETRY } = require('./canvas-run');
+const { DEPRECATION, Launch, launchArgs, launcherOf, legacyMove, mcpServers, canvasPage, eventReader, importMessage, readyProbe, served, spawnOptions, Step, progressOf, advance, failedAt, stepsPage, lineEvent, logTail, RETRY } = require('./canvas-run');
 
 test('apre il file senza browser e senza flag di import: senza terminale il launcher non chiede, e i launcher vecchi non conoscono --no-import', () => {
   assert.deepEqual(launchArgs('/w/a.feega', 61000, Launch.Open), ['-y', 'feega@latest', '/w/a.feega', '--port', '61000', '--no-open']);
@@ -16,6 +16,12 @@ test('un server MCP per ogni tela aperta, sulla sua porta', () => {
     { label: 'feega a', command: 'npx', args: ['-y', 'feega@latest', 'mcp', '--port', '61000'] },
     { label: 'feega b', command: 'npx', args: ['-y', 'feega@latest', 'mcp', '--port', '61001'] }
   ]);
+});
+
+test("l'avviso di deprecazione indica Feega Inspect", () => {
+  assert.match(DEPRECATION.message, /deprecated/);
+  assert.match(DEPRECATION.message, /Feega Inspect/);
+  assert.equal(DEPRECATION.extensionId, 'AndreaButtarelli.feega-inspect');
 });
 
 test('il vecchio <cartella>.feega diventa .feega, che il server migra nel formato a cartella', () => {
