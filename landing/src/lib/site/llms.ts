@@ -10,7 +10,7 @@ import type { Crumb } from './structured-data';
 import { HUBS } from './topics';
 import { topicPath } from './topics/topic';
 
-const SUMMARY = 'Feega is a free, open-source (Apache-2.0) VS Code extension to design in your codebase: click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens, with diffs and undo. React, Next.js, SvelteKit and Vue, with Tailwind or plain CSS. Works in VS Code, Cursor, Windsurf and VSCodium, or in the browser with npx feega. Feega Cloud (GitHub sync, collaboration, sections and templates) is coming later.';
+const SUMMARY = 'Feega is a free, open-source (Apache-2.0) VS Code extension to design in your codebase: click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens, with diffs and undo. React, Next.js, SvelteKit and Vue, with Tailwind or plain CSS. Works in VS Code, Cursor, Windsurf and VSCodium on macOS, Windows and Linux, or in the browser with npx feega. Feega Cloud (GitHub sync, collaboration, sections and templates) is coming later.';
 
 const HOW_IT_WORKS = [
   '- Run "Feega: Open from current workspace" in the command palette, or `npx feega` in the app folder. Feega starts your dev server and opens the app beside your code.',

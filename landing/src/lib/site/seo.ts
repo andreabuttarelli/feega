@@ -6,7 +6,7 @@ export const HOME_META = {
   description: 'Feega: design in your codebase. A free VS Code extension: click any element of your running app, edit it like in Figma, and the change is written to your code.'
 } as const;
 
-export const OG_IMAGE_ALT = `Feega: ${HERO_HEADLINE.join(' ')} An isometric canvas where code becomes a design, a layout gets a timeline and a prompt wires into image and video nodes.`;
+export const OG_IMAGE_ALT = `Feega: ${HERO_HEADLINE} An isometric canvas where code becomes a design, a layout gets a timeline and a prompt wires into image and video nodes.`;
 
 export const OG = {
   image: { url: `${SITE_URL}/og.png`, type: 'image/png', width: 1200, height: 630, alt: OG_IMAGE_ALT },

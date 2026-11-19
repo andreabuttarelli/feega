@@ -1,11 +1,8 @@
-<script lang="ts" module>
-  export const POSTER = '/video/feega-demo-poster.webp';
-</script>
-
 <script lang="ts">
   import { onMount } from 'svelte';
   import { lazyPlay } from '../lazy-video';
 
+  const POSTER = '/video/feega-demo-poster.webp';
   const VIDEO = '/video/feega-demo.mp4';
   const VIDEO_WEBM = '/video/feega-demo.webm';
   const REDUCED_QUERY = '(prefers-reduced-motion: reduce)';
@@ -50,7 +47,6 @@
   .hero-video {
     position: relative;
     width: 100%;
-    margin-top: 100px;
   }
 
   video {
