@@ -3,7 +3,7 @@ import { GITHUB_URL } from './links';
 
 const VIDEO_BASE = 'https://klnswzhhgrqvbfjzioul.supabase.co/storage/v1/object/public/website';
 
-export const HERO_HEADLINE = ['Design in your codebase', 'like in Figma.'] as const;
+export const HERO_HEADLINE = ['Design in your codebase', 'like in Figma'] as const;
 
 export const CANVAS_VIDEO = `${VIDEO_BASE}/feega-canvas-hero.MP4`;
 
