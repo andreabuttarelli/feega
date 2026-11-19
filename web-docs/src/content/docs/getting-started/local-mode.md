@@ -178,8 +178,8 @@ locally Wiro runs the 3D nodes only.
 
 The first time Feega runs on your computer it shows a short setup:
 
-1. **Your account**, optional, shown only without a connected account. Feega runs on this computer without one. **Connect your account** opens the same browser sign-in as `feega login`; **Continue without an account** skips it. Your file stays on your disk either way.
-1. **Where it runs**, only with a connected account: stay on this computer, or pick Feega Cloud and **Open feega cloud** in your browser, where you import the `.feega` file. Without an account Feega Cloud is not offered.
+1. **Sign in**, optional, shown only without a connected account. Feega runs on this computer without one. **Sign in** opens the same browser sign-in as `feega login`, and once it completes the setup moves on by itself; **Skip** goes on without an account. Your file stays on your disk either way.
+1. **Where it runs**: stay on this computer, or pick Feega Cloud and **Open feega cloud** in your browser, where you import the `.feega` file. Without an account Feega Cloud is shown but cannot be picked: *sign in to use Feega Cloud*, with a link back to the sign-in step.
 1. **Your AI.** The coding assistants found on this computer, with the command to install or sign in to the ones that are not ready. Pick one to use in the chat.
 1. **Your memory**, only with a connected account. Feega lists the instruction files it found (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`, and `CLAUDE.md` / `AGENTS.md` in the folder you started from). Nothing is read until you press *read these files*, and you can edit the text before saving. It is stored on your account and given to the Feega Cloud chat.
 

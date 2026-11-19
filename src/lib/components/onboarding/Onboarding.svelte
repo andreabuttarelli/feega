@@ -104,7 +104,7 @@
             {:else if step === Step.Account}
               <StepAccount email={session.email} connection={session.connection} onconnect={() => session.connect()} oncontinue={() => session.next()} />
             {:else if step === Step.Home}
-              <StepHome bind:place email={session.email ?? ''} oncontinue={() => session.next()} oncloud={() => session.openCloud()} />
+              <StepHome bind:place email={session.email} oncontinue={() => session.next()} oncloud={() => session.openCloud()} onsignin={() => session.back()} />
             {:else if step === Step.Agents}
               <StepAgents agents={choices.agents} chosen={choices.chosen} refreshing={choices.refreshing} onchoose={(id) => choices.choose(id)} onrefresh={() => choices.refresh()} oncontinue={() => session.next()} />
             {:else}

@@ -39,8 +39,8 @@ const onThisComputer = (viewer: Viewer) => viewer.surface === Surface.Local;
 type StepRow = { step: Step; label: string; shows: (viewer: Viewer) => boolean };
 
 export const STEPS: readonly StepRow[] = [
-  { step: Step.Account, label: 'your account', shows: (viewer) => firstRun(viewer) && onThisComputer(viewer) && !signedIn(viewer) },
-  { step: Step.Home, label: 'where it runs', shows: (viewer) => firstRun(viewer) && onThisComputer(viewer) && signedIn(viewer) },
+  { step: Step.Account, label: 'sign in', shows: (viewer) => firstRun(viewer) && onThisComputer(viewer) && !signedIn(viewer) },
+  { step: Step.Home, label: 'where it runs', shows: (viewer) => firstRun(viewer) && onThisComputer(viewer) },
   { step: Step.Name, label: 'your name', shows: (viewer) => signedIn(viewer) && !viewer.name?.trim() },
   { step: Step.Agents, label: 'your AI', shows: (viewer) => firstRun(viewer) && onThisComputer(viewer) },
   { step: Step.Memory, label: 'your memory', shows: (viewer) => firstRun(viewer) && signedIn(viewer) }

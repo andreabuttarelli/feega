@@ -115,7 +115,15 @@ export class OnboardingSession {
     }
 
     this.ports.open(url);
-    this.connection = (await this.awaitAccount()) ? Connection.Idle : Connection.Failed;
+    if (!(await this.awaitAccount())) {
+      this.connection = Connection.Failed;
+      return;
+    }
+
+    this.connection = Connection.Idle;
+    if (this.step === Step.Account) {
+      this.next();
+    }
   }
 
   openCloud() {

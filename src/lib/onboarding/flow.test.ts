@@ -14,11 +14,11 @@ describe('stepsFor', () => {
     expect(stepsFor(viewer({ arrival: Arrival.Returning }))).toEqual([]);
   });
 
-  it('offers an optional account first on this computer, and no choice of place without one', () => {
-    expect(stepsFor(viewer({ surface: Surface.Local, account: Account.None, name: null }))).toEqual([Step.Account, Step.Agents]);
+  it('offers an optional sign-in first on this computer, then where the work lives', () => {
+    expect(stepsFor(viewer({ surface: Surface.Local, account: Account.None, name: null }))).toEqual([Step.Account, Step.Home, Step.Agents]);
   });
 
-  it('asks where the work lives, with name and memory, only once an account is connected', () => {
+  it('skips the sign-in once connected, and adds name and memory', () => {
     expect(stepsFor(viewer({ surface: Surface.Local, name: null }))).toEqual([Step.Home, Step.Name, Step.Agents, Step.Memory]);
   });
 

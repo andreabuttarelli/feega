@@ -1,5 +1,5 @@
 <script lang="ts" module>
-  const ACCOUNT_ADDS = ['your name and memory, kept on your account', 'work on feega.app too: live with other people, share links, comments', 'feega.app’s built-in AI, on your plan’s credits'] as const;
+  const ACCOUNT_ADDS = ['your name and memory, kept on your account', 'Feega Cloud: work on feega.app too, live with other people, share links, comments', 'feega.app’s built-in AI, on your plan’s credits'] as const;
 </script>
 
 <script lang="ts">
@@ -10,13 +10,13 @@
   let { email, connection, onconnect, oncontinue }: Props = $props();
 
   const CONNECT_LABEL: Readonly<Record<Connection, string>> = {
-    [Connection.Idle]: 'connect your account',
+    [Connection.Idle]: 'sign in',
     [Connection.Waiting]: 'finish in your browser…',
-    [Connection.Failed]: 'try connecting again'
+    [Connection.Failed]: 'try signing in again'
   };
 </script>
 
-<h1 id="ob-title" class="ob-title">connect your feega account?</h1>
+<h1 id="ob-title" class="ob-title">sign in to feega?</h1>
 <p class="ob-sub">optional. feega is a canvas where you design screens and turn them into animated videos, and it runs on this computer without an account.</p>
 
 <div class="cards">
@@ -46,8 +46,8 @@
   </div>
 </div>
 
-<button type="button" class="ob-primary" onclick={oncontinue} data-testid="onboarding-continue">{email ? 'continue' : 'continue without an account'}</button>
-<p class="ob-foot">connecting opens feega.app in your browser to sign in. your canvas stays on this computer.</p>
+<button type="button" class="ob-primary" onclick={oncontinue} data-testid="onboarding-continue">{email ? 'continue' : 'skip'}</button>
+<p class="ob-foot">signing in opens feega.app in your browser to sign in. your canvas stays on this computer.</p>
 
 <style>
   .cards {

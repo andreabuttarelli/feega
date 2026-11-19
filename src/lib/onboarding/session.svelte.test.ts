@@ -23,11 +23,11 @@ function harness(linked: { now: boolean }) {
 }
 
 describe('onboarding locale: un account facoltativo prima di scegliere dove lavorare', () => {
-  it('senza account propone il collegamento, e nessuna scelta di posto', async () => {
+  it('senza account propone il login per primo, poi la scelta del posto', async () => {
     const { session } = harness({ now: false });
     await session.beginLocal();
 
-    expect(session.plan).toEqual([Step.Account, Step.Agents]);
+    expect(session.plan).toEqual([Step.Account, Step.Home, Step.Agents]);
     expect(session.step).toBe(Step.Account);
   });
 
@@ -39,6 +39,14 @@ describe('onboarding locale: un account facoltativo prima di scegliere dove lavo
     expect(opened).toEqual([`${CLOUD}/login`]);
     expect(session.email).toBe(ME.email);
     expect(session.plan).toEqual([Step.Account, Step.Home, Step.Agents, Step.Memory]);
+  });
+
+  it('a login riuscito torna sulla scelta del posto', async () => {
+    const { session } = harness({ now: false });
+    await session.beginLocal();
+    await session.connect();
+
+    expect(session.step).toBe(Step.Home);
   });
 
   it('scegliere Feega Cloud apre la tela su cloud e va avanti', async () => {

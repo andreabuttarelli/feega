@@ -5,9 +5,9 @@
 <script lang="ts">
   import { Place } from '$lib/onboarding/flow';
 
-  type Props = { place: Place; email: string; oncontinue: () => void; oncloud: () => void };
+  type Props = { place: Place; email: string | null; oncontinue: () => void; oncloud: () => void; onsignin: () => void };
 
-  let { place = $bindable(Place.Computer), email, oncontinue, oncloud }: Props = $props();
+  let { place = $bindable(Place.Computer), email, oncontinue, oncloud, onsignin }: Props = $props();
 
   const GO: Readonly<Record<Place, { label: string; run: () => void }>> = {
     [Place.Computer]: { label: 'continue on this computer', run: () => oncontinue() },
@@ -16,7 +16,11 @@
 </script>
 
 <h1 id="ob-title" class="ob-title">where should your work live?</h1>
-<p class="ob-sub" data-testid="onboarding-connected">connected as {email}. keep working on this computer, or open feega cloud in your browser.</p>
+{#if email}
+  <p class="ob-sub" data-testid="onboarding-connected">connected as {email}. keep working on this computer, or open feega cloud in your browser.</p>
+{:else}
+  <p class="ob-sub">your work stays on this computer. Feega Cloud needs an account.</p>
+{/if}
 
 <div class="places">
   <label class="place" class:chosen={place === Place.Computer} data-testid="onboarding-home-computer">
@@ -28,8 +32,8 @@
     <p>your work is one file on your disk. the AI chat is the assistant you already have, like Claude Code or Codex, on your plan with it.</p>
   </label>
 
-  <label class="place" class:chosen={place === Place.Cloud} data-testid="onboarding-home-cloud">
-    <input class="pick" type="radio" name="place" value={Place.Cloud} bind:group={place} />
+  <label class="place" class:chosen={place === Place.Cloud} class:locked={!email} data-testid="onboarding-home-cloud">
+    <input class="pick" type="radio" name="place" value={Place.Cloud} bind:group={place} disabled={!email} />
     <div class="head">
       <strong>Feega Cloud</strong>
       <span class="price">your account</span>
@@ -39,9 +43,17 @@
         <li>{line}</li>
       {/each}
     </ul>
-    <p>to move this canvas there, import its .feega file.</p>
+    {#if email}
+      <p>to move this canvas there, import its .feega file.</p>
+    {:else}
+      <p class="reason">sign in to use Feega Cloud.</p>
+    {/if}
   </label>
 </div>
+
+{#if !email}
+  <button type="button" class="ob-link signin" onclick={onsignin} data-testid="onboarding-signin">← sign in</button>
+{/if}
 
 <button type="button" class="ob-primary" onclick={GO[place].run} data-testid="onboarding-continue">{GO[place].label}</button>
 
@@ -74,6 +86,24 @@
   .place:has(.pick:focus-visible) {
     outline: 2px solid var(--ui-ring);
     outline-offset: 2px;
+  }
+
+  .place.locked {
+    cursor: not-allowed;
+  }
+
+  .place.locked > :not(.reason, .pick) {
+    opacity: 0.5;
+  }
+
+  .reason {
+    color: var(--ui-text);
+    font-weight: 500;
+  }
+
+  .signin {
+    display: block;
+    margin: -8px 0 16px;
   }
 
   .place.chosen {
