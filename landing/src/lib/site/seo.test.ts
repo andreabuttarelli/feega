@@ -157,6 +157,6 @@ describe('social preview', () => {
 
   it('the alt text says what Feega is, in the hero headline', () => {
     expect(OG.image.alt).toMatch(/^Feega/);
-    expect(OG.image.alt).toContain(HERO_HEADLINE.join(' '));
+    expect(OG.image.alt).toContain(HERO_HEADLINE);
   });
 });

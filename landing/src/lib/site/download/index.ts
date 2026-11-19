@@ -2,7 +2,7 @@ import { FEEGA_VERSION, NODE_REQUIREMENT, NPX_COMMAND, VSCODE_REQUIREMENT } from
 
 export const DOWNLOAD_PAGE = {
   heading: 'download feega',
-  lead: 'design in your codebase. free, no account.',
+  lead: 'design in your codebase. on macOS, Windows and Linux. free, no account.',
   version: `version ${FEEGA_VERSION}`,
   editorsHeading: 'install in your editor',
   terminal: {

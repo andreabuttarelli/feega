@@ -41,7 +41,12 @@
   }
 
   .star {
-    padding: 12px 26px;
+    display: flex;
+    align-items: center;
+    min-height: 48px;
+    line-height: 1;
+    text-box: trim-both cap alphabetic;
+    padding: 0 26px;
     border-radius: 999px;
     border: 1px solid rgb(255 255 255 / 0.3);
     color: #fff;
