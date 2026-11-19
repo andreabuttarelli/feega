@@ -10,7 +10,7 @@
   import { PropFormat } from '@feega/motion-core/motion/custom/component';
   import { MediaAccept, MediaKind, acceptOf, itemOfPick, pickOfItem, type MediaPick } from '$lib/motion/media/pick';
   import MediaPicker from './MediaPicker.svelte';
-  import type { LiveGesture } from '$lib/motion/live-edit';
+  import type { LiveGesture } from '@feega/properties-panel/live-edit';
   import MediaListField from './MediaListField.svelte';
   import type { MediaUploader } from './media-upload';
 

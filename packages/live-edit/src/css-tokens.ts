@@ -1,10 +1,9 @@
 import { dirname, join, normalize } from 'node:path';
-import type { PageSheet } from '$lib/server/url-import/page-tree';
-import type { ReadFile } from './write-back';
+import type { ReadFile } from './files';
 
 export type Sheet = { path: string; text: string };
 
-export type LoadedSheet = PageSheet;
+export type LoadedSheet = { at?: string; text: string };
 
 export const PAGE_SHEET = 'page:';
 

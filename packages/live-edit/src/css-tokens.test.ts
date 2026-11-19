@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PAGE_SHEET, parseSheets, readSheets } from './css-tokens';
-import { fixture } from '../../../../tests/fixtures/design-tokens/read';
+import { fixture } from '../../../tests/fixtures/design-tokens/read';
 
 const declared = async (name: string) => parseSheets(await readSheets(fixture(name)));
 

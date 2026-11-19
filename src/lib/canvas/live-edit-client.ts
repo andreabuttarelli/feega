@@ -1,4 +1,4 @@
-import type { LiveEditBody } from './live-fields';
+import type { LiveEditBody } from '@feega/live-edit/live-fields';
 
 const PATH = '/api/v1/local/live-edit';
 

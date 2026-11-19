@@ -205,7 +205,7 @@ export function secondsLabel(frames: number, fps: number = FPS): string {
   return String(Math.round((frames / fps) * SECONDS_PRECISION) / SECONDS_PRECISION);
 }
 
-export { parseDecimal } from './arithmetic';
+export { parseDecimal } from '@feega/properties-panel/arithmetic';
 
 type Placed = Animated & { from: number };
 

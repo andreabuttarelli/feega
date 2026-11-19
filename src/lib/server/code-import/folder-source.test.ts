@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { withDevServer, folderFiles, folderLibrary, folderNames, shimmedArgs } from './folder-source';
 import { SHIM_CONFIG } from './folder-shims';
-import { PlanRefusal } from './run-plan';
+import { PlanRefusal } from '@feega/dev-run/run-plan';
 
 const roots: string[] = [];
 

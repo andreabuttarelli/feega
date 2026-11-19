@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from "svelte";
-	import { fieldKeys } from "$lib/motion/field-keys";
+	import { fieldKeys } from "@feega/properties-panel/field-keys";
 	import { cn } from "$lib/utils.js";
 	import { CONTROL_HEIGHT, DEFAULT_TEXT, MIXED_TEXT, type ControlProps } from "./types";
 

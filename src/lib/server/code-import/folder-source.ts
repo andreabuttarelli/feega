@@ -8,7 +8,7 @@ import { dirname, isAbsolute, join, normalize, relative } from 'node:path';
 import { promisify } from 'node:util';
 import { namesIn } from './repo';
 import { discoverIn, type Discovery } from './component-discovery';
-import { planFile, runPlan, textsWanted, type PlanRefused, type RepoFacts, type RunPlan } from './run-plan';
+import { planFile, runPlan, textsWanted, type PlanRefused, type RepoFacts, type RunPlan } from '@feega/dev-run/run-plan';
 import type { FileChange, ReadFile } from './write-back';
 import type { CodeSource, Published } from './code-source';
 import { shimFiles, shimsFor, SHIM_CONFIG } from './folder-shims';

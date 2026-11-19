@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { discoverRoutes } from '$lib/server/code-import/routes-discover';
-import { Framework } from '$lib/server/code-import/run-plan';
+import { Framework } from '@feega/dev-run/run-plan';
 import { nextPlayground, nextShadcnAdmin, nuxtDashboard, saasStarter, shadcnAdmin, svgl, traidue, vitesse } from '$lib/server/code-import/routes-discover.fixtures';
 import { CORPUS } from './corpus';
 import { Metric, scoreRepo, type ImportRun } from './score';

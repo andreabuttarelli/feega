@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PageTree } from '$lib/server/url-import/page-tree';
 import { discover } from './component-discovery';
-import { Framework } from './run-plan';
+import { Framework } from '@feega/dev-run/run-plan';
 import { galleryCells, galleryOf, galleryOrder, galleryStates, GALLERY_LIMITS, isGalleryFile, NOT_DRAWN, type GalleryApp } from './gallery';
 
 const BUTTON = `import { cva, type VariantProps } from 'class-variance-authority';

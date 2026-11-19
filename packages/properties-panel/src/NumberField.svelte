@@ -1,11 +1,11 @@
 <script lang="ts">
   import type { Component, Snippet } from 'svelte';
-  import { fieldKeys } from '$lib/motion/field-keys';
-  import { parseDecimal } from '$lib/motion/inspector';
-  import { KeyMark } from '$lib/motion/timeline-layers';
-  import { FieldFill, FieldKind, FieldText, Gesture, Nudge, fieldText, fillShare, gestureOf, nudged, precisionOf, scrubbed, valueAtShare, type Range } from '$lib/motion/number-field';
-  import { MIXED, type Shared } from '$lib/motion/mixed';
-  import type { LiveGesture } from '$lib/motion/live-edit';
+  import { fieldKeys } from './field-keys';
+  import { parseDecimal } from './arithmetic';
+  import { KeyMark } from './key-mark';
+  import { FieldFill, FieldKind, FieldText, Gesture, Nudge, fieldText, fillShare, gestureOf, nudged, precisionOf, scrubbed, valueAtShare, type Range } from './number-field';
+  import { MIXED, type Shared } from './mixed';
+  import type { LiveGesture } from './live-edit';
 
   let {
     label,

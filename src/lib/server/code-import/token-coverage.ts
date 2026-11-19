@@ -1,4 +1,4 @@
-import type { Declared } from './css-tokens';
+import type { Declared } from '@feega/live-edit/css-tokens';
 import { labelOf, type TokenMap } from './design-tokens';
 
 export type Counts = { declared: number; imported: number };

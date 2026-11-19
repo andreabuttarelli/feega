@@ -1,6 +1,6 @@
 import { MAX_MODES, MAX_VARIABLES, VARIABLE_NAME, VarType, keyOf, type Collection, type VarAlias, type VarLiteral, type Variables } from '@feega/motion-core/motion/variables-model';
-import { ACCENT, accentOf, DARK, LIGHT, fromPage, type DeclAt, type Parsed } from './css-tokens';
-import { colourOf } from './token-colour';
+import { ACCENT, accentOf, DARK, LIGHT, fromPage, type DeclAt, type Parsed } from '@feega/live-edit/css-tokens';
+import { colourOf } from '@feega/live-edit/token-colour';
 import { constantCalcPx } from './token-calc';
 
 export enum TokenKind {

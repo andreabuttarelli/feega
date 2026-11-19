@@ -8,7 +8,7 @@ import { LIVE_BRANCH, LIVE_DIR_ENV, liveCheckoutOf } from './live-checkout';
 import { Publish, localGitHost } from '$lib/server/code-push/local-git-host';
 import { memoryLock } from '$lib/server/code-push/push-lock';
 import { liveChanges, liveEdit, livePush, liveUndo } from './live-edit';
-import { LiveProp } from '$lib/canvas/live-fields';
+import { LiveProp } from '@feega/live-edit/live-fields';
 
 const HERO = `export function Hero() {
   return <h1 className="text-5xl font-semibold text-black">Ship faster</h1>;

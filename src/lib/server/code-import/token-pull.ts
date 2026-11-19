@@ -5,7 +5,7 @@ import { resolveVariables } from '$lib/motion/variables';
 import { defineStyle } from '$lib/motion/styles';
 import { tokenId, type TokenEntry, type TokenMap } from './design-tokens';
 import { editedModes } from './token-write';
-import { LIGHT } from './css-tokens';
+import { LIGHT } from '@feega/live-edit/css-tokens';
 import { StyleField, importedValue, sameStyleValue, styleValue } from './design-styles';
 import type { Style } from '@feega/motion-core/motion/styles-model';
 

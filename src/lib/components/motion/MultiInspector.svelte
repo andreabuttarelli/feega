@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fieldKeys } from '$lib/motion/field-keys';
+  import { fieldKeys } from '@feega/properties-panel/field-keys';
   import ColorField from './ColorField.svelte';
   import { ColourDisplay } from '$lib/motion/colour-field';
   import Layers from '@lucide/svelte/icons/layers';
@@ -12,8 +12,8 @@
   import { fieldLook, optionLabel } from '$lib/motion/inspector-sections';
   import { BLEND_MODES, blendLabel, type BlendMode } from '@feega/motion-core/motion/blend';
   import { setBlendMode } from '$lib/motion/blend-ops';
-  import { MIXED, shared, type Shared } from '$lib/motion/mixed';
-  import { FieldKind } from '$lib/motion/number-field';
+  import { MIXED, shared, type Shared } from '@feega/properties-panel/mixed';
+  import { FieldKind } from '@feega/properties-panel/number-field';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
   import { HORIZONTALS, VERTICALS } from '@feega/motion-core/motion/constraints/model';
   import { setConstraints } from '$lib/motion/constraints/constraints';
@@ -22,9 +22,9 @@
   import { Control } from '@feega/motion-core/motion/components';
   import { Axis, distributeSpace, gapOf, propBoxes } from '$lib/motion/space';
   import ColourRows from './ColourRows.svelte';
-  import NumberField from './NumberField.svelte';
+  import NumberField from '@feega/properties-panel/NumberField.svelte';
   import BoxFields from './BoxFields.svelte';
-  import type { LiveGesture } from '$lib/motion/live-edit';
+  import type { LiveGesture } from '@feega/properties-panel/live-edit';
 
   let { doc, ids, frame, mode = EditMode.Motion, gesture = null, scale = 1, onchange }: { doc: MotionDoc; ids: readonly string[]; frame: number; mode?: EditMode; gesture?: LiveGesture | null; scale?: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 

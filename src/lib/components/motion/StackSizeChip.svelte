@@ -12,7 +12,7 @@
   import { MAX_PERCENT } from '@feega/motion-core/motion/layout/size-entry';
   import { BOUNDS, Bound, formatLimit, limitOf, limitPatch, parseLimit, type LimitAxis } from '@feega/motion-core/motion/layout/limits';
   import { laidClip, setChildSize, setLayoutItem } from '$lib/motion/layout/ops';
-  import NumberField from './NumberField.svelte';
+  import NumberField from '@feega/properties-panel/NumberField.svelte';
 
   let { doc, clip, axis, sizings, measure = estimatedText, commit }: { doc: MotionDoc; clip: MotionClip; axis: LimitAxis; sizings: readonly Sizing[]; measure?: TextMeasure; commit: (result: OpResult, summary: string) => void } = $props();
 

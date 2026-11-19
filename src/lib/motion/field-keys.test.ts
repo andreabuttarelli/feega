@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fieldKeys } from './field-keys';
+import { fieldKeys } from '@feega/properties-panel/field-keys';
 
 function mount(value = '24.0') {
   const input = document.createElement('input');

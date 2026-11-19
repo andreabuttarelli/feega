@@ -2,7 +2,7 @@ import { error, json } from '@sveltejs/kit';
 import { localStore } from '$lib/server/local/local-mode';
 import { devFolder } from '$lib/server/dev-server/local-dev-server';
 import { liveChanges, liveEdit, liveUndo, type LiveEditAsk } from '$lib/server/live-edit/live-edit';
-import { LiveProp, Side } from '$lib/canvas/live-fields';
+import { LiveProp, Side } from '@feega/live-edit/live-fields';
 import type { RequestHandler } from './$types';
 
 const NOT_FOUND = 404;

@@ -4,7 +4,7 @@
   import { BRAND_COLORS } from '@feega/motion-core/motion/components';
   import { resolveColor, type BrandTokens } from '@feega/motion-core/motion/brand';
   import { COLOUR_FORMATS, ColourFormat, alphaOfText, channelsOf, colourLabel, fromChannels, hexOfHsb, hsbOfHex, nudge, parseColour, percentOfAlpha, readRecent, remember, unitAt, type Channels, type Hsb } from '$lib/motion/colour-field';
-  import type { LiveGesture } from '$lib/motion/live-edit';
+  import type { LiveGesture } from '@feega/properties-panel/live-edit';
   import IconButton from './IconButton.svelte';
   import { Action } from '$lib/motion/actions';
   import { styleLibrary } from '$lib/canvas/style-library.svelte';

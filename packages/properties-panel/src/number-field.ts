@@ -1,4 +1,4 @@
-import { parseDecimal } from './inspector';
+import { parseDecimal } from './arithmetic';
 
 export enum Precision {
   Normal = 'normal',

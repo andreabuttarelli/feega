@@ -1,15 +1,12 @@
-import { readFile } from 'node:fs/promises';
-import { join, normalize, sep } from 'node:path';
 import { git } from '$lib/server/code-push/git-cli';
 import type { GitHost } from '$lib/server/code-push/git-host';
 import { pushFiles, type PushRefused, type Pushed } from '$lib/server/code-push/push';
 import type { PushLock } from '$lib/server/code-push/push-lock';
 import { liveTarget, type Changed } from './live-target';
-import { LiveProp, type Side } from '$lib/canvas/live-fields';
-import { livePatch, type LiveAt } from './live-patch';
-import { liveTheme, tokenFor } from './live-tokens';
+import { livePatch } from './live-patch';
+import { inside, liveAtOf, reader, tokenOf, type LiveEditAsk } from '@feega/live-edit/live-ask';
 
-export type LiveEditAsk = { at: string; prop: LiveProp; family?: string; value?: string; token?: string; side?: Side; was?: string; rem?: number; viewport?: number };
+export { liveAtOf, type LiveEditAsk };
 
 export type LiveEdited = { ok: true; sha: string; files: string[]; token: string | null; patch: string };
 
@@ -17,35 +14,9 @@ export type LiveRefused = { ok: false; reason: string };
 
 export type LiveChanges = Changed;
 
-const AT = /^(.+):(\d+):(\d+)$/;
 const PUSH_NAME = 'live-edits';
 const PUSH_TITLE = 'Live edits from Feega';
 const PUSH_BODY = 'Text and style edits made on live frames in Feega.';
-
-export function liveAtOf(raw: string): LiveAt | null {
-  const m = raw.match(AT);
-  return m ? { file: m[1].replace(/^\.?\//, ''), line: Number(m[2]), col: Number(m[3]) } : null;
-}
-
-const inside = (root: string, path: string) => {
-  const full = normalize(join(root, path));
-  return full.startsWith(normalize(root) + sep) ? full : null;
-};
-
-const reader = (root: string) => async (path: string) => {
-  const full = inside(root, path);
-  return full ? readFile(full, 'utf8').catch(() => null) : null;
-};
-
-async function tokenOf(root: string, ask: LiveEditAsk): Promise<string | null> {
-  if (ask.prop === LiveProp.Text) {
-    return null;
-  }
-  if (ask.prop === LiveProp.Class) {
-    return ask.token ?? ask.value ?? '';
-  }
-  return ask.token ?? tokenFor(ask.prop, ask.value ?? '', await liveTheme(reader(root), ask.rem));
-}
 
 const writing = new Map<string, Promise<unknown>>();
 

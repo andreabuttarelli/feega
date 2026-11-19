@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LiveProp } from '$lib/canvas/live-fields';
+import { LiveProp } from './live-fields';
 import { liveTheme, tokenFor } from './live-tokens';
 
 const APP_CSS = `@import 'tailwindcss';

@@ -3,7 +3,7 @@
   import { ColourDisplay, colourLabel } from '$lib/motion/colour-field';
   import { FEEGA_TOKENS, resolveColor, type BrandTokens } from '@feega/motion-core/motion/brand';
   import { parseColour } from '$lib/motion/colour-field';
-  import type { LiveGesture } from '$lib/motion/live-edit';
+  import type { LiveGesture } from '@feega/properties-panel/live-edit';
   import { sidePlacement, SideMode, type SidePlace } from '$lib/components/ui/shell/side-popover';
   import { dismissible } from '$lib/components/ui/shell/dismiss';
   import { onBody } from '$lib/components/ui/shell/on-body';

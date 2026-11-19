@@ -1,7 +1,7 @@
-import { parseSheets, readSheets } from '$lib/server/code-import/css-tokens';
-import { colourOf } from '$lib/server/code-import/token-colour';
-import type { ReadFile } from '$lib/server/code-import/write-back';
-import { LiveProp, type StyleProp } from '$lib/canvas/live-fields';
+import { parseSheets, readSheets } from './css-tokens';
+import { colourOf } from './token-colour';
+import type { ReadFile } from './files';
+import { LiveProp, type StyleProp } from './live-fields';
 
 export type LiveTheme = { colours: Map<string, string>; radii: Map<number, string>; sizes: Map<number, string>; spacingPx: number };
 

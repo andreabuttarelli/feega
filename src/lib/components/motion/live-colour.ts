@@ -1,4 +1,4 @@
-import { colourDrag, type LiveGesture } from '$lib/motion/live-edit';
+import { colourDrag, type LiveGesture } from '@feega/properties-panel/live-edit';
 
 export type LiveColour = { gesture: LiveGesture | null; apply: (value: string) => void };
 

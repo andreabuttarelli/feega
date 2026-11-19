@@ -10,7 +10,7 @@ import { localBrowser } from '$lib/server/web/browser';
 import type { PageTree } from '$lib/server/url-import/page-tree';
 import type { RestNode } from '$lib/server/figma/rest-message';
 import { discover } from './component-discovery';
-import { Framework } from './run-plan';
+import { Framework } from '@feega/dev-run/run-plan';
 import { GALLERY_READY, galleryOf, NOT_DRAWN } from './gallery';
 
 const SOURCES: Record<string, string> = {

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { FrameMode } from '$lib/canvas/live-budget';
   import { liveUrl, type LiveFrame } from '$lib/canvas/live-frame';
-  import { LiveAsk as Ask, pickOf, type LivePick, type LivePreview, type LiveRect } from '$lib/canvas/live-fields';
+  import { LiveAsk as Ask, pickOf, type LivePick, type LivePreview, type LiveRect } from '@feega/live-edit/live-fields';
   import { dropLive, liveSelection, selectLive } from '$lib/canvas/live-selection.svelte';
   import { liveSession } from '$lib/canvas/live-session';
   import { liveApi, liveChanges, livePush, type LiveChangesView } from '$lib/canvas/live-edit-client';

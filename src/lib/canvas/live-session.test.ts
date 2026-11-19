@@ -3,7 +3,7 @@ import { setProps } from '@feega/motion-core/motion/timeline';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { LIVE_CLIP } from './live-doc';
 import type { LiveApi } from './live-edit-client';
-import { LiveProp, type LiveEditBody, type LivePick, type LivePreview } from './live-fields';
+import { LiveProp, type LiveEditBody, type LivePick, type LivePreview } from '@feega/live-edit/live-fields';
 import { liveSession } from './live-session';
 
 const TITLE: LivePick = {

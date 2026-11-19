@@ -6,7 +6,7 @@ import { CodeImportOutcome, Crop, importBoards, importCodeAt } from './import-co
 import { IMPORT_KEY_COOKIE } from './origin-proxy';
 import { BASE_CONDITIONS, Scheme } from './render-conditions';
 import { RunFailure } from './sandbox-runner';
-import { PlanRefusal } from './run-plan';
+import { PlanRefusal } from '@feega/dev-run/run-plan';
 import { fixture } from '../../../../tests/fixtures/design-tokens/read';
 import { DesignSystem } from './design-system';
 import { DESIGN_BOARD } from './design-board';

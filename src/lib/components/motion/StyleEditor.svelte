@@ -1,6 +1,6 @@
 <script lang="ts">
   import ColorField from './ColorField.svelte';
-  import NumberField from './NumberField.svelte';
+  import NumberField from '@feega/properties-panel/NumberField.svelte';
   import FontPicker from './FontPicker.svelte';
   import { ColourDisplay } from '$lib/motion/colour-field';
   import { MAX_TYPE_PX, StyleKind, type Style } from '@feega/motion-core/motion/styles-model';

@@ -3,7 +3,7 @@ import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { setProps } from '@feega/motion-core/motion/timeline';
 import { mapClips } from './code-look';
 import { setAutoLayout } from '$lib/motion/layout/ops';
-import { ClassFamily, LiveProp, Side, arbitraryFamily, type LivePick } from './live-fields';
+import { ClassFamily, LiveProp, Side, arbitraryFamily, type LivePick } from '@feega/live-edit/live-fields';
 import { LIVE_CLIP, liveDocOf, liveEditsOf, livePreviewOf, unwrittenOf } from './live-doc';
 
 const RECT = { x: 10, y: 20, width: 400, height: 48 };

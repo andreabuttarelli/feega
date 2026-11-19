@@ -1,7 +1,7 @@
 <script lang="ts">
   import { estimatedText, type TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
   import { localStore } from '$lib/browser-storage';
-  import { fieldKeys } from '$lib/motion/field-keys';
+  import { fieldKeys } from '@feega/properties-panel/field-keys';
   import { setMotionPath } from '$lib/motion/path-ops';
   import IconButton from './IconButton.svelte';
   import { Action } from '$lib/motion/actions';
@@ -23,11 +23,11 @@
   import { setKeyframe, setMask, setProps, setTiming, setTrackMatte, setTransition, Side, type OpResult } from '@feega/motion-core/motion/timeline';
   import { MASK_KINDS, MASK_KIND_IDS, MATTES, MaskKind, Matte, Needs, newMask, type Mask } from '@feega/motion-core/motion/mask';
   import { ANIMATABLE, Source, isAnimatable, ValueKind, type AnimProp, type KeyValue } from '@feega/motion-core/motion/keyframes';
-  import NumberField from './NumberField.svelte';
+  import NumberField from '@feega/properties-panel/NumberField.svelte';
   import Dial from './Dial.svelte';
-  import InspectorSection from './InspectorSection.svelte';
+  import InspectorSection from '@feega/properties-panel/InspectorSection.svelte';
   import { onMount, type Snippet } from 'svelte';
-  import { FieldKind, clockText, parseClock } from '$lib/motion/number-field';
+  import { FieldKind, clockText, parseClock } from '@feega/properties-panel/number-field';
   import { DIAL_KEYS, Part, fieldLabel, optionLabel, emptyManaged, SECTION_TITLE, Section, Typed, fieldLook, fieldSection, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shadowed, shows, TextTier, textTier, uiHidden, transformSection, type SectionState } from '$lib/motion/inspector-sections';
   import { PropertiesView, ShapePart, fieldShown as fieldVisible, fieldShownFor, sectionsFor, shapePartShown, sizeShown, transformShown } from '$lib/motion/properties-view';
   import { renameClip, setClipFlags } from '@feega/motion-core/motion/organize';
@@ -38,14 +38,14 @@
   import { layerKind, layerLabel } from '$lib/motion/element-name';
   import { ComponentRole, componentOf, roleOf } from '$lib/motion/main-component';
   import { Ratio, resizedSide, sideOf, type ElementHost } from '$lib/motion/element-host';
-  import { liveEdits } from '$lib/motion/live-edit';
+  import { liveEdits } from '@feega/properties-panel/live-edit';
   import { DESIGN_MAX_SIDE } from '@feega/motion-core/motion/doc';
   import { PositionPart } from '$lib/motion/position-part';
   import type { Edge as AlignEdge } from '$lib/motion/space';
   import ColorField from './ColorField.svelte';
   import { clipColours, documentColours, recolourClip } from '$lib/motion/selection-colours';
   import ColourRows from './ColourRows.svelte';
-  import type { LiveGesture } from '$lib/motion/live-edit';
+  import type { LiveGesture } from '@feega/properties-panel/live-edit';
   import Plus from '@lucide/svelte/icons/plus';
   import Settings2 from '@lucide/svelte/icons/settings-2';
   import SquareDashed from '@lucide/svelte/icons/square-dashed';

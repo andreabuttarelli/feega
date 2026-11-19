@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MIXED } from '$lib/motion/mixed';
+import { MIXED } from '@feega/properties-panel/mixed';
 import { BoxField, fieldValue, scaledTo, selectionBox, turnedAbout, withField } from './selection-box';
 
 const a = { id: 'a', x: 0, y: 0, w: 100, h: 50, rotation: 0 };

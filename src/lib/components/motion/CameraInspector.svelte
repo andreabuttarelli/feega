@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fieldKeys } from '$lib/motion/field-keys';
+  import { fieldKeys } from '@feega/properties-panel/field-keys';
   import Pipette from '@lucide/svelte/icons/pipette';
   import { COMPONENTS } from '@feega/motion-core/motion/components';
   import { clipsOf, type DocVerdict, type MotionDoc } from '@feega/motion-core/motion/doc';
@@ -9,8 +9,8 @@
   import { addStageLight } from '@feega/motion-core/motion/lights-ops';
   import { parseDecimal } from '$lib/motion/inspector';
   import { sliderOf, spaceOf, toShown, toStored } from '$lib/motion/units';
-  import NumberField from './NumberField.svelte';
-  import { FieldKind } from '$lib/motion/number-field';
+  import NumberField from '@feega/properties-panel/NumberField.svelte';
+  import { FieldKind } from '@feega/properties-panel/number-field';
   import { fieldLook } from '$lib/motion/inspector-sections';
   import { KeyMark } from '$lib/motion/timeline-layers';
   import SceneMap from './SceneMap.svelte';

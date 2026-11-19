@@ -6,7 +6,7 @@
   import { detachTemplate, instanceComp, keyFieldsOf, setTemplateValues, templateFields, type TemplateFieldValue } from '$lib/motion/template/library';
   import { FieldLayout, splitFields } from '@feega/motion-core/motion/template/key-fields';
   import FieldForm from './FieldForm.svelte';
-  import type { LiveGesture } from '$lib/motion/live-edit';
+  import type { LiveGesture } from '@feega/properties-panel/live-edit';
   import type { MediaUploader } from './media-upload';
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fieldKeys } from '$lib/motion/field-keys';
+  import { fieldKeys } from '@feega/properties-panel/field-keys';
   import ColorField from './ColorField.svelte';
   import { ColourDisplay } from '$lib/motion/colour-field';
   import Diamond from '@lucide/svelte/icons/diamond';

@@ -32,8 +32,8 @@
   import { setClipFlags } from '@feega/motion-core/motion/organize';
   import { childrenInOrder } from '@feega/motion-core/motion/layout/resolve';
   import CheckRow from './CheckRow.svelte';
-  import NumberField from './NumberField.svelte';
-  import { FieldKind } from '$lib/motion/number-field';
+  import NumberField from '@feega/properties-panel/NumberField.svelte';
+  import { FieldKind } from '@feega/properties-panel/number-field';
   import StackSizeChip from './StackSizeChip.svelte';
 
   let { doc, clip, scale = 1, measure = estimatedText, commit }: { doc: MotionDoc; clip: MotionClip; scale?: number; measure?: TextMeasure; commit: (result: OpResult, summary: string) => void } = $props();

@@ -1,4 +1,4 @@
-import type { Range } from './number-field';
+import type { Range } from '@feega/properties-panel/number-field';
 
 export type Box = { width: number; height: number };
 
