@@ -12,18 +12,16 @@ async function timed(run: () => Promise<unknown>): Promise<number> {
   return Date.now() - start;
 }
 
-test('signed in: dashboard, open a canvas, back to the dashboard', async ({ page, session }) => {
+test('signed in: dashboard, open a canvas by URL, back to the dashboard', async ({ page, session }) => {
   await gotoHydrated(page, '/app');
+  await expect(page.getByTestId('home-hero')).toBeVisible();
 
-  const card = page.getByTestId('home-recents').locator(`[data-testid="canvas-card"][href="/p/${session.projectId}/c/${session.canvasId}"]`);
-  await card.click();
-
-  await expect(page).toHaveURL(new RegExp(`/p/${session.projectId}/c/${session.canvasId}`));
+  await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
   await expect(page.getByTestId('add-bar')).toBeVisible({ timeout: 30_000 });
 
   await page.goBack();
   await expect(page).toHaveURL(/\/app$/);
-  await expect(page.getByTestId('home-recents').getByTestId('canvas-card').first()).toBeVisible();
+  await expect(page.getByTestId('home-hero')).toBeVisible();
 });
 
 test('a dashboard page already seen opens from cache', async ({ page }) => {

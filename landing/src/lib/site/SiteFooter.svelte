@@ -3,7 +3,7 @@
   import { LEGAL_DOCS } from './legal';
   import DownloadMac from './DownloadMac.svelte';
   import Mark from './Mark.svelte';
-  import { APP_URL, DOCS_URL, MAC_GUIDE_URL, SOCIAL_LINKS, STORY_URL } from './links';
+  import { APP_URL, DOCS_URL, MAC_GUIDE_URL, SPONSOR_URL, SOCIAL_LINKS, STORY_URL } from './links';
   import { GUIDES_PATH } from './guides';
   import { PRICING_PATH } from './paths';
   import { COMPARE_PATH } from './compare';
@@ -55,6 +55,7 @@
       <a href={COMPARE_PATH}>compare</a>
       <a href={ALTERNATIVES_PATH}>alternatives</a>
       <a href={STORY_URL}>blog</a>
+      <a href={SPONSOR_URL}>sponsor</a>
     </nav>
 
     <nav class="col" aria-label="Legal">
