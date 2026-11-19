@@ -37,6 +37,11 @@
   },
   "redirects": [
     {
+      "source": "/:page(acceptable-use|ai-transparency|dpa|subprocessors|legal-notice)",
+      "destination": "/terms",
+      "statusCode": 301
+    },
+    {
       "source": "/:page(ai-video-generator|ai-video-styles|claymation-ai|3d-animation-maker|ai-commercial-maker|paper-cutout-animation|80s-retro-video|anime-video-generator|spotify-canvas-maker|ai-video-upscaler)",
       "destination": "/",
       "statusCode": 301
