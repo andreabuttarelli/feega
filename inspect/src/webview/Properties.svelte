@@ -161,7 +161,7 @@
         <Popover.Trigger class="swatch-trigger" aria-label={`${r.label} colour`}><span class="swatch" style={`background:${readOf(name)}`}></span></Popover.Trigger>
         <Popover.Portal>
           <Popover.Content class="picker-popover" side="left" sideOffset={8} collisionPadding={8}>
-            <ColorPicker value={readOf(name)} {palette} onchange={(p) => (onpreview(r, p.css), onchange(r, p.css, p.token))} onsave={(n, c) => onsavevar(r, n, c)} />
+            <ColorPicker value={readOf(name)} {palette} onchange={(p) => (onpreview(r, p.css), onchange(r, p.css, p.token))} onpreview={(c) => onpreview(r, c)} onsave={(n, c) => onsavevar(r, n, c)} />
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>
@@ -232,7 +232,7 @@
 
   {#if has(Section.Fill)}
     <section data-section={Section.Fill}>
-      <FillList image={readOf('fill-image')} colour={readOf('fill')} {palette} {header} {row} onchange={(css) => (onchange(byName('fill-image'), css['background-image']), onchange(byName('fill'), css['background-color']))} />
+      <FillList image={readOf('fill-image')} colour={readOf('fill')} {palette} {header} {row} onchange={(css) => (onchange(byName('fill-image'), css['background-image']), onchange(byName('fill'), css['background-color']))} onpreview={(css) => (onpreview(byName('fill-image'), css['background-image']), onpreview(byName('fill'), css['background-color']))} />
     </section>
   {/if}
 

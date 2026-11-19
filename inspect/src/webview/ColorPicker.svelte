@@ -3,10 +3,11 @@
   import Plus from '@lucide/svelte/icons/plus';
   import type { ColourPick, Palette } from '../messages';
   import { ColourFormat, formatColour, hexToHsv, hsvToRgb, parseRgba, rgbaCss, type Hsv } from './colour-math';
+  import { liveColour } from './colour-live';
 
-  type Props = { value: string; palette: Palette; onchange: (pick: ColourPick) => void; onsave?: (name: string, css: string) => void };
+  type Props = { value: string; palette: Palette; onchange: (pick: ColourPick) => void; onpreview?: (css: string) => void; onsave?: (name: string, css: string) => void };
 
-  let { value, palette, onchange, onsave }: Props = $props();
+  let { value, palette, onchange, onpreview = () => undefined, onsave }: Props = $props();
 
   const KEY_STEP = 0.01;
   const HUE_STEP = 2;
@@ -31,6 +32,17 @@
   const hueCss = $derived(`hsl(${hsv.h} 100% 50%)`);
 
   const emit = () => onchange({ css });
+  const live = liveColour({
+    preview: (v) => onpreview(v),
+    commit: (v) => onchange({ css: v }),
+    frame: (run) => requestAnimationFrame(run),
+    later: (run, ms) => {
+      const id = setTimeout(run, ms);
+      return () => clearTimeout(id);
+    }
+  });
+  const drag = () => live.drag(hsv, alpha);
+  const drop = () => live.drop(hsv, alpha);
 
   function onSquare(e: PointerEvent) {
     if (e.type === 'pointerdown') {
@@ -40,6 +52,7 @@
     }
     const r = square!.getBoundingClientRect();
     hsv = { ...hsv, s: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), v: Math.min(1, Math.max(0, 1 - (e.clientY - r.top) / r.height)) };
+    drag();
   }
 
   function squareKey(e: KeyboardEvent) {
@@ -86,14 +99,14 @@
     aria-valuenow={Math.round(hsv.s * 100)}
     onpointerdown={onSquare}
     onpointermove={onSquare}
-    onpointerup={emit}
+    onpointerup={drop}
     onkeydown={squareKey}
   >
     <span class="handle" style={`left:${hsv.s * 100}%;top:${(1 - hsv.v) * 100}%;background:${css}`}></span>
   </div>
 
-  <input class="hue" type="range" min="0" max="360" step={HUE_STEP} value={hsv.h} aria-label="Hue" oninput={(e) => (hsv = { ...hsv, h: Number(e.currentTarget.value) })} onchange={emit} />
-  <input class="alpha" type="range" min="0" max="1" step="0.01" value={alpha} aria-label="Opacity" style={`--solid: ${rgbaCss({ ...rgba, a: 1 })}`} oninput={(e) => (alpha = Number(e.currentTarget.value))} onchange={emit} />
+  <input class="hue" type="range" min="0" max="360" step={HUE_STEP} value={hsv.h} aria-label="Hue" oninput={(e) => ((hsv = { ...hsv, h: Number(e.currentTarget.value) }), drag())} onchange={drop} />
+  <input class="alpha" type="range" min="0" max="1" step="0.01" value={alpha} aria-label="Opacity" style={`--solid: ${rgbaCss({ ...rgba, a: 1 })}`} oninput={(e) => ((alpha = Number(e.currentTarget.value)), drag())} onchange={drop} />
 
   <div class="values">
     <button type="button" class="icon" title="Pick a colour from the screen" aria-label="Eyedropper" onclick={pickFromScreen}><Pipette size={14} /></button>

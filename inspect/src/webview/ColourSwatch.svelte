@@ -3,9 +3,9 @@
   import type { ColourPick, Palette } from '../messages';
   import ColorPicker from './ColorPicker.svelte';
 
-  type Props = { value: string; palette: Palette; label: string; onchange: (pick: ColourPick) => void };
+  type Props = { value: string; palette: Palette; label: string; onchange: (pick: ColourPick) => void; onpreview?: (css: string) => void };
 
-  let { value, palette, label, onchange }: Props = $props();
+  let { value, palette, label, onchange, onpreview }: Props = $props();
 </script>
 
 <Popover.Root>
@@ -14,7 +14,7 @@
   </Popover.Trigger>
   <Popover.Portal>
     <Popover.Content class="fill-popover" side="left" sideOffset={8} collisionPadding={8}>
-      <ColorPicker {value} {palette} {onchange} />
+      <ColorPicker {value} {palette} {onchange} {onpreview} />
     </Popover.Content>
   </Popover.Portal>
 </Popover.Root>

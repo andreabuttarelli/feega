@@ -125,3 +125,12 @@ edit inline until reload); the colour control is a native picker, not the app's 
   The runtime reports, for inherited properties, the topmost ancestor with the same value
   (`inherited`); the row dims and names it. Not done: inherited dimming on the hand-laid
   Typography rows, and telling a default apart from a set value for non-inherited properties.
+
+## Colour picker live preview
+
+Square, hue and opacity drags used to write the file on every release only, with no preview
+in between (fills, stops, shadow colours had no preview path at all). `liveColour`
+(`inspect/src/webview/colour-live.ts`) reuses `liveNumber` from `scrub.ts`: one preview per
+animation frame, one write on release. `ColorPicker` gained `onpreview`, threaded through
+`ColourSwatch`, `FillList` and `ShadowList` to `Properties`' existing `onpreview`, which both
+shells route the same way.

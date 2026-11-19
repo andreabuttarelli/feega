@@ -26,10 +26,11 @@
     header: Snippet<[Section, Snippet?]>;
     row: Snippet<[string, Snippet, string?]>;
     onchange: (css: Record<string, string>) => void;
+    onpreview: (css: Record<string, string>) => void;
     palette: Palette;
   };
 
-  let { image, colour, header, row, onchange, palette }: Props = $props();
+  let { image, colour, header, row, onchange, onpreview, palette }: Props = $props();
 
   let fills = $state<Fill[]>([]);
   $effect(() => {
@@ -41,13 +42,12 @@
     onchange(fillCss(next));
   }
 
-  const replace = (i: number, fill: Fill) => commit(fills.map((f, j) => (j === i ? fill : f)));
-  const setStop = (i: number, s: number, patch: Partial<Stop>) => {
-    const fill = fills[i];
-    if ('stops' in fill) {
-      replace(i, { ...fill, stops: fill.stops.map((stop, k) => (k === s ? { ...stop, ...patch } : stop)) });
-    }
-  };
+  const swap = (i: number, fill: Fill) => fills.map((f, j) => (j === i ? fill : f));
+  const replace = (i: number, fill: Fill) => commit(swap(i, fill));
+  const peek = (i: number, fill: Fill) => onpreview(fillCss(swap(i, fill)));
+  const withStop = (fill: Fill, s: number, patch: Partial<Stop>) => ('stops' in fill ? { ...fill, stops: fill.stops.map((stop, k) => (k === s ? { ...stop, ...patch } : stop)) } : fill);
+  const setStop = (i: number, s: number, patch: Partial<Stop>) => replace(i, withStop(fills[i], s, patch));
+  const peekStop = (i: number, s: number, patch: Partial<Stop>) => peek(i, withStop(fills[i], s, patch));
   const labelOf = (f: Fill) => KINDS.find((k) => k.kind === f.kind)?.label ?? '';
   const valueOf = (f: Fill) => (f.kind === FillKind.Solid ? hexOf(f.colour) : f.kind === FillKind.Image ? f.url || 'image' : `${f.stops.length} stops`);
 </script>
@@ -71,7 +71,7 @@
               {#each KINDS as k (k.kind)}<option value={k.kind}>{k.label}</option>{/each}
             </select>
             {#if fill.kind === FillKind.Solid}
-              <ColorPicker value={fill.colour} {palette} onchange={(p) => replace(i, { ...fill, colour: p.css })} />
+              <ColorPicker value={fill.colour} {palette} onchange={(p) => replace(i, { ...fill, colour: p.css })} onpreview={(c) => peek(i, { ...fill, colour: c })} />
             {:else if fill.kind === FillKind.Image}
               <label class="line">URL <input type="text" value={fill.url} placeholder="/image.png" onchange={(e) => replace(i, { ...fill, url: e.currentTarget.value })} /></label>
             {:else}
@@ -83,7 +83,7 @@
               {/if}
               {#each fill.stops as stop, s (s)}
                 <div class="line">
-                  <ColourSwatch value={stop.colour} {palette} label="Stop colour" onchange={(p) => setStop(i, s, { colour: p.css })} />
+                  <ColourSwatch value={stop.colour} {palette} label="Stop colour" onchange={(p) => setStop(i, s, { colour: p.css })} onpreview={(c) => peekStop(i, s, { colour: c })} />
                   <input type="text" class="at" value={stop.at} aria-label="Stop position" onchange={(e) => setStop(i, s, { at: e.currentTarget.value })} />
                   <button type="button" class="icon" aria-label="Remove stop" disabled={fill.stops.length <= 2} onclick={() => replace(i, { ...fill, stops: fill.stops.filter((_, k) => k !== s) })}><Minus size={12} /></button>
                 </div>

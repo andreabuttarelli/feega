@@ -93,7 +93,7 @@
               <Field name={`shadow-${f.key}`} prefix={f.label} px={layer[f.key]} unit="px" min={f.min} max={200} onpreview={(v) => update(list, show, i, { [f.key]: parseFloat(v) })} onchange={(v) => update(list, save, i, { [f.key]: parseFloat(v) })} />
             {/each}
           </div>
-          <div class="line">Colour <ColourSwatch value={layer.colour} {palette} label="Shadow colour" onchange={(p) => update(list, save, i, { colour: p.css })} /></div>
+          <div class="line">Colour <ColourSwatch value={layer.colour} {palette} label="Shadow colour" onchange={(p) => update(list, save, i, { colour: p.css })} onpreview={(c) => update(list, show, i, { colour: c })} /></div>
           <label class="line">Inner <input type="checkbox" checked={layer.inset} onchange={(e) => update(list, save, i, { inset: e.currentTarget.checked })} /></label>
         </Popover.Content>
       </Popover.Portal>
