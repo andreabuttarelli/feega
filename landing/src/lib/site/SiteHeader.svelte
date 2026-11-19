@@ -1,21 +1,14 @@
 <script lang="ts">
   import { lower } from './lower';
-  import DownloadMac from './DownloadMac.svelte';
   import Mark from './Mark.svelte';
-  import { onMount } from 'svelte';
-  import { APP_URL, HEADER_LINKS, MENU_LINKS, SOCIAL_LINKS } from './links';
-  import { homeHref } from './signed-in';
+  import { GITHUB_URL, HEADER_LINKS, MENU_LINKS, SOCIAL_LINKS } from './links';
+  import { GITHUB_ICON } from './social-icons';
 
   let open = $state(false);
-  let home = $state('/');
-
-  onMount(() => {
-    home = homeHref(document.cookie);
-  });
 </script>
 
 <header class="bar">
-  <a class="chip brand" href={home} aria-label="Feega home"><Mark size={16} /><span>Feega</span></a>
+  <a class="chip brand" href="/" aria-label="Feega home"><Mark size={16} /><span>Feega</span></a>
 
   <nav class="links" aria-label="Main">
     {#each HEADER_LINKS as link (link.label)}
@@ -24,13 +17,21 @@
   </nav>
 
   <div class="actions">
-    <DownloadMac class="chip star" />
-    <a class="chip cta" href={APP_URL}><span>let’s start</span></a>
+    <a class="chip cta" href={GITHUB_URL}><span>Star on GitHub</span></a>
   </div>
 
-  <button class="toggle" type="button" aria-expanded={open} onclick={() => (open = !open)}>
-    {open ? 'close' : 'menu'}
-  </button>
+  <div class="mobile">
+    <a class="github" href={GITHUB_URL} aria-label="Feega on GitHub">{@html GITHUB_ICON}</a>
+    <button class="toggle" type="button" aria-expanded={open} aria-label={open ? 'Close menu' : 'Open menu'} onclick={() => (open = !open)}>
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+        {#if open}
+          <path d="M6 6l12 12M18 6L6 18" />
+        {:else}
+          <path d="M4 8h16M4 16h16" />
+        {/if}
+      </svg>
+    </button>
+  </div>
 </header>
 
 {#if open}
@@ -39,6 +40,7 @@
       {#each MENU_LINKS as link (link.label)}
         <a href={link.href} onclick={() => (open = false)}>{lower(link.label)}</a>
       {/each}
+      <a href={GITHUB_URL}>Star on GitHub</a>
     </div>
 
     <div class="follow">
@@ -54,6 +56,7 @@
 
 <style>
   .bar {
+    --nav-chip: 38px;
     position: fixed;
     inset: 0 0 auto;
     z-index: var(--site-z-header);
@@ -87,7 +90,8 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 10px 10px;
+    height: var(--nav-chip);
+    padding: 0 10px 2px;
   }
 
   .links,
@@ -95,18 +99,30 @@
     display: none;
   }
 
+  .mobile {
+    display: flex;
+    flex-shrink: 0;
+    gap: 8px;
+  }
+
+  .github,
   .toggle {
-    margin-top: 10px;
+    display: grid;
+    place-items: center;
+    width: var(--nav-chip);
+    height: var(--nav-chip);
     padding: 0;
     border: 0;
-    background: none;
-    color: var(--site-ink);
-    font-family: 'BDO Grotesk', sans-serif;
-    font-variation-settings: 'wght' 500;
-    font-size: 14px;
-    line-height: 16.8px;
-    letter-spacing: -0.02em;
+    border-radius: 50%;
+    background: #000;
+    color: #fff;
     cursor: pointer;
+  }
+
+  .github :global(svg),
+  .toggle svg {
+    width: 18px;
+    height: 18px;
   }
 
   .drawer {
@@ -182,7 +198,7 @@
       border-bottom: 1px solid currentColor;
     }
 
-    .toggle,
+    .mobile,
     .drawer {
       display: none;
     }
@@ -223,7 +239,7 @@
       border-bottom: 1px solid currentColor;
     }
 
-    .toggle,
+    .mobile,
     .drawer {
       display: none;
     }

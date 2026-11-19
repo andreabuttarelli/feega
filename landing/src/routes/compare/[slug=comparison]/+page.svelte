@@ -1,11 +1,13 @@
 <script lang="ts">
+  const cta = primaryCta();
   import '$lib/site/landing/landing.css';
   import '$lib/site/compare/compare.css';
-  import { APP_URL } from '$lib/site/links';
+  import { installAction, primaryCta } from '$lib/site/install';
   import { COMPARE_PATH, COMPARISONS, comparisonPath } from '$lib/site/compare';
   import { FEEGA_FEATURES, FEEGA_PRICING } from '$lib/site/compare/feega';
   import { FEATURE_LABELS, Feature, type Verdict } from '$lib/site/compare/features';
   import { competitorFaq } from '$lib/site/compare/faq';
+  import { AUTHOR, DISCLAIMER } from '$lib/site/alternatives';
   import { articleJsonLd, faqJsonLd } from '$lib/site/structured-data';
 
   let { data } = $props();
@@ -30,6 +32,7 @@
 <article class="landing compare">
   <a class="back" href={COMPARE_PATH}>← All comparisons</a>
   <h1>{page.heading}</h1>
+  <p class="fine">By {AUTHOR.name}, {AUTHOR.role} · checked {page.checked}</p>
   <p class="intro">{page.intro}</p>
 
   <section>
@@ -107,6 +110,7 @@
         <li><a href={source.href} rel="noopener">{source.label}</a></li>
       {/each}
     </ul>
+    <p class="fine">{DISCLAIMER}</p>
   </section>
 
   <section>
@@ -116,6 +120,6 @@
         <li><a href={comparisonPath(slug)}>{other.heading}</a></li>
       {/each}
     </ul>
-    <a class="landing-cta" href={APP_URL}>Try Feega →</a>
+    <a class="landing-cta" href={cta.href} use:installAction={cta}>{cta.label} →</a>
   </section>
 </article>

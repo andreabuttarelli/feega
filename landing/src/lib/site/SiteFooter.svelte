@@ -1,29 +1,22 @@
 <script lang="ts">
   import { lower } from './lower';
   import { LEGAL_DOCS } from './legal';
-  import DownloadMac from './DownloadMac.svelte';
   import Mark from './Mark.svelte';
-  import { APP_URL, DOCS_URL, MAC_GUIDE_URL, SOCIAL_LINKS, STORY_URL } from './links';
+  import { COFFEE_URL, DOCS_URL, GITHUB_URL, SOCIAL_LINKS, STORY_URL } from './links';
   import { GUIDES_PATH } from './guides';
   import { PRICING_PATH } from './paths';
   import { COMPARE_PATH } from './compare';
+  import { ALTERNATIVES_PATH } from './alternatives';
   import { CODEBASE_PATH } from './codebase';
-  import { onMount } from 'svelte';
-  import { homeHref } from './signed-in';
 
   const legal = Object.entries(LEGAL_DOCS).map(([slug, doc]) => ({ href: `/${slug}`, label: doc.label }));
   const year = new Date().getFullYear();
-  let home = $state('/');
-
-  onMount(() => {
-    home = homeHref(document.cookie);
-  });
 </script>
 
 <footer class="site-foot">
   <div class="top">
     <div class="about">
-      <a class="brand" href={home}>
+      <a class="brand" href="/">
         <span class="name"><Mark size={28} />Feega</span>
         <span class="tagline">design in your codebase</span>
       </a>
@@ -40,11 +33,8 @@
       <a href={PRICING_PATH}>pricing</a>
       <a href={CODEBASE_PATH}>codebase</a>
       <a href="/changelog">changelog</a>
-      <span class="dl-wrap">
-        <DownloadMac class="dl" />
-        <a class="dl-guide" href={MAC_GUIDE_URL}>unsigned app? how to open it</a>
-      </span>
-      <a href={APP_URL}>sign in</a>
+      <a href={GITHUB_URL}>star on github</a>
+      <a href={COFFEE_URL}>support with a coffee</a>
     </nav>
 
     <nav class="col" aria-label="Learn">
@@ -52,6 +42,7 @@
       <a href={DOCS_URL}>docs</a>
       <a href={GUIDES_PATH}>guides</a>
       <a href={COMPARE_PATH}>compare</a>
+      <a href={ALTERNATIVES_PATH}>alternatives</a>
       <a href={STORY_URL}>blog</a>
     </nav>
 

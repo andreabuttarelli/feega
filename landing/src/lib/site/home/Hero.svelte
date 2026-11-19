@@ -1,6 +1,6 @@
 <script lang="ts">
   import { lower } from '../lower';
-  import Modes from './Modes.svelte';
+  import InstallCta from '../InstallCta.svelte';
   import { CANVAS_VIDEO, HERO_HEADLINE } from '../home';
   import { lazyPlay } from '../lazy-video';
   import AsciiField from './AsciiField.svelte';
@@ -18,9 +18,9 @@
 
   <h1 class="site-display"><span data-agent-id="hero-title-a">{lower(HERO_HEADLINE[0])}</span> <span data-agent-id="hero-title-b">{lower(HERO_HEADLINE[1])}</span></h1>
 
-  <p class="lead" data-agent-id="hero-lead">paste your website or open your repo and every layer comes in editable. change it by hand or ask your AI assistant, then export a video or send the code back.</p>
+  <p class="lead" data-agent-id="hero-lead">click any element of your running app and edit it like in figma. the change is written to your code. no AI, no tokens, every edit a diff.</p>
 
-  <Modes id="hero-modes" />
+  <InstallCta id="hero-install" />
 
   <video class="canvas" data-agent-id="hero-canvas" data-src={CANVAS_VIDEO} muted loop playsinline preload="none" poster={POSTER} width="1920" height="1080" aria-label="Feega canvas overview" use:lazyPlay></video>
 </section>
@@ -55,7 +55,7 @@
     opacity: 0.8;
   }
 
-  .hero > :global(.modes) {
+  .hero > :global(.install) {
     margin-top: 28px;
   }
 

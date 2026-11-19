@@ -1,9 +1,9 @@
-import { AGENT_DOCS_URL, PLAN, agentAnswer, creditsAnswer, freeAnswer, runOutAnswer, seatAnswer } from './pricing/plan';
+import { PLAN, freeAnswer } from './pricing/plan';
 import { GITHUB_URL } from './links';
 
 const VIDEO_BASE = 'https://klnswzhhgrqvbfjzioul.supabase.co/storage/v1/object/public/website';
 
-export const HERO_HEADLINE = ['Design inside your code', 'with your agents and team.'] as const;
+export const HERO_HEADLINE = ['Design in your codebase', 'like in Figma.'] as const;
 
 export const CANVAS_VIDEO = `${VIDEO_BASE}/feega-canvas-hero.MP4`;
 
@@ -39,34 +39,26 @@ export const TICKER_VIDEOS = [
 export const FAQ = [
   {
     q: "What is Feega?",
-    a: `An open-source (Apache-2.0) canvas for design, motion and AI generation that you and your agents work on together, in the browser or locally. The code is on <a href="${GITHUB_URL}">GitHub</a>; Google Sign-In is used only to log in, never on your content.`
+    a: `A free VS Code extension. Click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens, every edit shown as a diff. The code is on <a href="${GITHUB_URL}">GitHub</a>.`
   },
   {
     q: "Can I use Feega for free?",
     a: freeAnswer(PLAN)
   },
   {
-    q: "Can my AI agent use Feega?",
-    a: `${agentAnswer(PLAN)} See the <a href="${AGENT_DOCS_URL}">MCP guide</a>.`
+    q: "Which editors and frameworks does it support?",
+    a: "VS Code, Cursor, Windsurf and VSCodium. React, Next.js, SvelteKit and Vue, styled with Tailwind or plain CSS."
   },
   {
-    q: `Who counts as an ${PLAN.per}?`,
-    a: seatAnswer(PLAN)
+    q: "Does it need an AI agent?",
+    a: "No. Feega works without agents. There are no models and no tokens. Your edits are written to your code deterministically, and you review every change as a diff."
   },
   {
-    q: "How do credits work?",
-    a: creditsAnswer(PLAN)
-  },
-  {
-    q: "What happens when I run out of credits?",
-    a: runOutAnswer(PLAN)
-  },
-  {
-    q: "Can I cancel?",
-    a: "Yes, any time from the billing portal on your team's Credits page. Credits you bought stay yours, and other editors become viewers."
+    q: "What is Feega Cloud?",
+    a: "Coming later: GitHub sync, collaboration, sections and templates. The extension stays free."
   },
   {
     q: "Who owns my work, and is it used to train AI?",
-    a: 'You keep your content and may use what you generate for your business; we never train AI on it. Details are in our <a href="/terms">Terms</a>, <a href="/privacy">Privacy Policy</a>, <a href="/acceptable-use">Acceptable Use Policy</a> and <a href="/ai-transparency">AI Transparency</a>.'
+    a: 'You keep your content; we never train AI on it. Details are in our <a href="/terms">Terms</a>, <a href="/privacy">Privacy Policy</a>, <a href="/acceptable-use">Acceptable Use Policy</a> and <a href="/ai-transparency">AI Transparency</a>.'
   }
 ] as const;

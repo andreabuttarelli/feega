@@ -22,18 +22,11 @@ const APPLICATION = {
   '@context': 'https://schema.org',
   '@type': 'SoftwareApplication',
   name: 'Feega',
-  url: 'https://oh.feega.app',
-  applicationCategory: 'MultimediaApplication',
-  operatingSystem: 'Web',
-  description: 'Design inside your code with your agents and team: an open-source canvas for website designs and motion videos, driven by prompts, Claude Code, Codex or Cursor.',
-  offers: {
-    '@type': 'Offer',
-    category: 'subscription',
-    price: PLAN.price,
-    priceCurrency: 'EUR',
-    description: `Per ${PLAN.per} per ${PLAN.period}. Viewers and AI agents are free.`,
-    priceSpecification: { '@type': 'UnitPriceSpecification', price: PLAN.price, priceCurrency: 'EUR', unitText: `${PLAN.per} / ${PLAN.period}` }
-  },
+  url: 'https://feega.app',
+  applicationCategory: 'DeveloperApplication',
+  operatingSystem: 'Windows, macOS, Linux',
+  description: 'Feega Inspect is a free VS Code extension: click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens, with diffs.',
+  offers: { '@type': 'Offer', price: 0, priceCurrency: 'EUR', description: 'Free VS Code extension.' },
   sameAs: SAME_AS,
   publisher: { '@type': 'Organization', name: 'Feega', sameAs: SAME_AS }
 };
