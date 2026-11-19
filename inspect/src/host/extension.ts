@@ -17,7 +17,7 @@ import { stylingOf } from './styling';
 import { SETTINGS, SettingKey, StylingChoice, type Settings } from '../settings';
 
 const VIEW_TYPE = 'feegaInspect.panel';
-const TITLE = 'Feega Inspect';
+const TITLE = 'Feega';
 const PICK_TIMEOUT_MS = 3000;
 const PREFS_KEY = 'feegaInspect.prefs';
 const HISTORY_KEY = 'feegaInspect.history';
@@ -58,7 +58,7 @@ async function openSource(root: string, at: Source) {
     const position = new vscode.Position(target.line, target.col);
     await vscode.window.showTextDocument(doc, { viewColumn: COLUMNS[target.column], preserveFocus: false, selection: new vscode.Range(position, position) });
   } catch {
-    void vscode.window.showErrorMessage(`Feega Inspect: cannot open ${target.path}`);
+    void vscode.window.showErrorMessage(`Feega: cannot open ${target.path}`);
   }
 }
 
@@ -262,7 +262,7 @@ async function chosenRoot(target?: vscode.Uri): Promise<string | null> {
   }
   const picked = await vscode.window.showQuickPick(
     apps.map((app) => ({ label: relative(workspace, app), app })),
-    { placeHolder: 'Which app should Feega Inspect open?' }
+    { placeHolder: 'Which app should Feega open?' }
   );
   return picked?.app ?? null;
 }
@@ -270,7 +270,7 @@ async function chosenRoot(target?: vscode.Uri): Promise<string | null> {
 async function open(context: vscode.ExtensionContext, target?: vscode.Uri) {
   const root = await chosenRoot(target);
   if (!root) {
-    vscode.window.showWarningMessage('Feega Inspect: open the folder of a web app first.');
+    vscode.window.showWarningMessage('Feega: open the folder of a web app first.');
     return;
   }
   const route = target ? (routeOfFile(relative(root, target.fsPath)) ?? undefined) : undefined;
@@ -284,7 +284,7 @@ async function open(context: vscode.ExtensionContext, target?: vscode.Uri) {
   }
   if (session) {
     const SWITCH = 'Switch';
-    const answer = await vscode.window.showInformationMessage(`Feega Inspect is open on ${basename(session.root)}. Switch to ${basename(root)}?`, { modal: true }, SWITCH);
+    const answer = await vscode.window.showInformationMessage(`Feega is open on ${basename(session.root)}. Switch to ${basename(root)}?`, { modal: true }, SWITCH);
     if (answer !== SWITCH) {
       session.panel.reveal();
       return;

@@ -88,7 +88,7 @@
         {#each help as link (link.label)}
           <button type="button" class="row" onclick={() => onlink(link.url)}>{link.label}</button>
         {/each}
-        <p class="hint">Feega Inspect {facts?.version ?? ''}{facts ? ` · ${facts.framework} · ${facts.styling}` : ''}</p>
+        <p class="hint">Feega {facts?.version ?? ''}{facts ? ` · ${facts.framework} · ${facts.styling}` : ''}</p>
       </section>
     </div>
   {/if}

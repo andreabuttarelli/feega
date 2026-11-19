@@ -19,7 +19,7 @@ export function panelHtml({ script, style, cspSource, nonce }: PanelAssets): str
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="${style}">
-<title>Feega Inspect</title>
+<title>Feega</title>
 </head>
 <body>
 <div id="app"></div>
