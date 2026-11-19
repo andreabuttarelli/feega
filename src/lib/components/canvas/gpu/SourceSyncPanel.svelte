@@ -830,6 +830,9 @@
   .cp-foot-note {
     font-size: 11px;
   }
+  .cp-card > :global(*) {
+    min-width: 0;
+  }
   .cp-diff {
     margin: 4px 0 0;
     max-height: 200px;
