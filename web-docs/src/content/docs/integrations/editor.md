@@ -48,8 +48,8 @@ for the whole project, not only for frames imported from code:
 - the number of changed files in `.feega/`, with a button that commits them (only `.feega/` goes in
   the commit);
 - the number of commits not yet on `origin`, with a button that pushes the branch;
-- when `origin` is on GitHub, a pull request button. With `GITHUB_PUSH_TOKEN` set it opens or
-  updates the pull request itself; without it, it pushes and opens GitHub's compare page.
+- when `origin` is on GitHub, a pull request button: it pushes with your own git credentials and
+  opens GitHub's compare page. Feega reads no token.
 
 ## Try unreleased code
 

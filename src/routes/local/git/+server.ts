@@ -1,8 +1,5 @@
 import { error, json } from '@sveltejs/kit';
 import { z } from 'zod';
-import { repoOf } from '$lib/server/code-import/repo';
-import { GITHUB_API, tokenCall } from '$lib/server/code-push/hosts';
-import { githubHost } from '$lib/server/code-push/github-host';
 import { LOCAL_FILE_ENV, localStore } from '$lib/server/local/local-mode';
 import { commitProject, compareUrl, defaultBranchOf, projectDirOf, projectGit, ProjectGitError, pushProject } from '$lib/server/local/project-git';
 
@@ -31,14 +28,7 @@ async function pullUrl(dir: string) {
   }
 
   await pushProject(dir);
-  const base = await defaultBranchOf(dir);
-  const token = process.env.GITHUB_PUSH_TOKEN;
-  const ref = repoOf(`https://github.com/${repo}`);
-  if (!token || !ref) {
-    return compareUrl(repo, base, branch);
-  }
-  const pull = await githubHost(tokenCall(token, process.env.GITHUB_API_URL || GITHUB_API), ref).upsertPull({ branch, base, title: `Canvas changes on ${branch}`, body: '' });
-  return pull.url;
+  return compareUrl(repo, await defaultBranchOf(dir), branch);
 }
 
 export const GET = async () => json(await projectGit((await openedDir()).dir));

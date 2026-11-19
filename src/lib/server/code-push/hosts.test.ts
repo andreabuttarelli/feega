@@ -16,12 +16,6 @@ afterAll(async () => {
 const none = async () => null;
 
 describe('hostOf: un adattatore per ogni installazione, stesso dominio', () => {
-  it('senza conto collegato non c’è host GitHub, neanche con un token in env', async () => {
-    const withToken = { connected: none, env: { GITHUB_PUSH_TOKEN: 'tok' }, folder: () => null };
-
-    expect(await hostOf(withToken)(CodeSourceKind.Github, 'acme/app')).toBeNull();
-  });
-
   it('senza conto né token non c’è host GitHub', async () => {
     expect(await hostOf({ connected: none, folder: () => null })(CodeSourceKind.Github, 'acme/app')).toBeNull();
   });

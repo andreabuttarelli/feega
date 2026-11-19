@@ -51,4 +51,22 @@ describe('/local/git: il git della cartella aperta', () => {
     expect(res.status).toBe(409);
     expect((await res.json()).message).toMatch(/origin/);
   });
+
+  it('la PR locale non chiama mai l’API di GitHub: spinge con il git dell’utente e apre la pagina compare', async () => {
+    const dir = await openedRepo();
+    const bare = await mkdtemp(join(tmpdir(), 'feega-git-origin-'));
+    await git(bare, ['init', '-q', '--bare', '-b', 'main']);
+    await git(dir, ['commit', '-q', '--allow-empty', '-m', 'base']);
+    await git(dir, ['push', '-q', bare, 'work:main']);
+    await git(dir, ['remote', 'add', 'origin', 'https://github.com/acme/app.git']);
+    await git(dir, ['config', 'remote.origin.pushurl', bare]);
+    await git(dir, ['fetch', '-q', bare, 'main:refs/remotes/origin/main']);
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('no network calls'));
+
+    const status = await (await post({ action: 'pull' })).json();
+
+    expect(status.url).toMatch(/^https:\/\/github\.com\/acme\/app\/compare\//);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
 });
