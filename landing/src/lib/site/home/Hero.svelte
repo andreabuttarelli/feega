@@ -3,6 +3,7 @@
   import InstallCta from '../InstallCta.svelte';
   import { HERO_HEADLINE } from '../home';
   import AsciiField from './AsciiField.svelte';
+  import { FieldFit } from '../ascii-field';
   import EditorMock from '../EditorMock.svelte';
   import TerminalMock from './TerminalMock.svelte';
   import WorksWith from './WorksWith.svelte';
@@ -27,8 +28,6 @@
 {#snippet chips(list: readonly LeadChip[], joiner: string)}{#each list as c, i}{#if i > 0}{i === list.length - 1 ? ` ${joiner} ` : ', '}{/if}{@render chip(c)}{/each}{/snippet}
 
 <section class="hero" id="hero">
-  <AsciiField />
-
   <p class="platforms" aria-label="Available on macOS, Windows and Linux">
     <span>available on</span>
     <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" role="img"><title>macOS</title><path d="M16.37 12.62c-.03-2.6 2.12-3.85 2.22-3.91-1.21-1.77-3.09-2.01-3.76-2.04-1.6-.16-3.12.94-3.93.94-.81 0-2.06-.92-3.39-.89-1.74.03-3.35 1.01-4.25 2.57-1.81 3.14-.46 7.78 1.3 10.33.86 1.25 1.89 2.65 3.24 2.6 1.3-.05 1.79-.84 3.36-.84 1.57 0 2.01.84 3.38.82 1.4-.03 2.28-1.27 3.13-2.52.99-1.45 1.4-2.85 1.42-2.92-.03-.01-2.72-1.04-2.75-4.14zM13.8 4.98c.71-.87 1.19-2.07 1.06-3.27-1.03.04-2.27.68-3.01 1.55-.66.77-1.24 2-1.09 3.18 1.14.09 2.31-.58 3.04-1.46z"/></svg>
@@ -51,6 +50,7 @@
 
   <div class="fit" bind:clientWidth={fitWidth} style:height="{mockHeight * scale}px">
     <div class="mock" bind:offsetHeight={mockHeight} style:transform="scale({scale})">
+      <AsciiField fit={FieldFit.Box} />
       <div class="term"><TerminalMock /></div>
       <div class="win"><EditorMock /></div>
     </div>
@@ -69,11 +69,6 @@
     padding: 140px 20px 0;
     position: relative;
     text-align: center;
-  }
-
-  .hero > :global(:not(.field)) {
-    position: relative;
-    z-index: 1;
   }
 
   .platforms {
@@ -160,11 +155,7 @@
     transform-origin: top left;
     border-radius: var(--ui-radius-lg, 10px);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    background:
-      radial-gradient(ellipse 70% 60% at 85% 100%, rgba(255, 81, 0, 0.55), transparent 70%),
-      radial-gradient(ellipse 60% 50% at 10% 0%, rgba(120, 90, 255, 0.28), transparent 70%),
-      radial-gradient(ellipse 50% 40% at 50% 110%, rgba(255, 190, 80, 0.2), transparent 70%),
-      #0d0d0d;
+    background: #0d0d0d;
     overflow: hidden;
   }
 
