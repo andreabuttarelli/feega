@@ -37,6 +37,11 @@
   },
   "redirects": [
     {
+      "source": "/guides/best-motion-design-tools-ai-agents",
+      "destination": "/alternatives",
+      "statusCode": 301
+    },
+    {
       "source": "/:path(.*)",
       "has": [
         {
@@ -53,18 +58,33 @@
       "statusCode": 301
     },
     {
-      "source": "/blog/feega-vs-:tool(figma|jitter|remotion|after-effects|pencil-dev|flora|rive|canva|gui)",
-      "destination": "/compare/:tool",
+      "source": "/compare",
+      "destination": "/alternatives",
+      "statusCode": 301
+    },
+    {
+      "source": "/compare/:tool(figma)",
+      "destination": "/alternatives/figma",
+      "statusCode": 301
+    },
+    {
+      "source": "/compare/:tool(pencil-dev|canva|flora|gui|jitter|remotion|after-effects|rive)",
+      "destination": "/alternatives",
+      "statusCode": 301
+    },
+    {
+      "source": "/blog/feega-vs-:tool(figma)",
+      "destination": "/alternatives/figma",
       "statusCode": 301
     },
     {
       "source": "/blog/feega-vs-:tool",
-      "destination": "/compare",
+      "destination": "/alternatives",
       "statusCode": 301
     },
     {
       "source": "/blog",
-      "destination": "/compare",
+      "destination": "/alternatives",
       "statusCode": 301
     },
     {

@@ -5,9 +5,7 @@ import { LANDING_PAGES } from './landing';
 import { UPSCALER } from './landing/upscaler';
 import { CODEBASE } from './codebase';
 import { LEGAL_DOCS } from './legal';
-import { COMPARE_INDEX, COMPARISONS } from './compare';
 import { GUIDES, GUIDES_INDEX } from './guides';
-import { competitorFaq } from './compare/faq';
 import { AI_CRAWLERS } from './crawlers';
 import { GET as robots } from '../../routes/robots.txt/+server';
 import { FAQ, HERO_HEADLINE } from './home';
@@ -25,10 +23,8 @@ const metas = [
   ['codebase', CODEBASE],
   ...Object.entries(LANDING_PAGES),
   ...Object.entries(LEGAL_DOCS),
-  ['compare', COMPARE_INDEX],
   ['guides', GUIDES_INDEX],
-  ...Object.entries(GUIDES),
-  ...Object.entries(COMPARISONS)
+  ...Object.entries(GUIDES)
 ] as const;
 
 describe('search metadata', () => {
@@ -97,12 +93,6 @@ describe('answer-first pages', () => {
 
   it.each(Object.entries(GUIDES))('%s has a FAQ', (_, g) => {
     expect(g.faq.length).toBeGreaterThan(0);
-  });
-
-  it.each(Object.entries(COMPARISONS))('%s opens with a 40 to 70 word answer and a FAQ', (_, c) => {
-    expect(wordCount(c.intro)).toBeGreaterThanOrEqual(40);
-    expect(wordCount(c.intro)).toBeLessThanOrEqual(70);
-    expect(competitorFaq(c).length).toBeGreaterThan(0);
   });
 
   it('llms-full says the extension is not published yet, without fake install links', () => {
