@@ -1,4 +1,28 @@
-# feega — infinite canvas of typed nodes
+# Feega — design in your codebase
+
+## Product direction (2026-11-19): the MVP is the VS Code extension
+
+**Motto: "Design in your codebase."** Simplify, order, sell. The product had grown too big to sell;
+until the MVP ships, new work goes to the extension, not the canvas.
+
+**MVP = the VS Code extension (`inspect/`, Feega Inspect) + `npx feega`:**
+- authentication with Feega (to count users; the web app is a stats dashboard for now);
+- design editing on the running app: click an element, edit it from the Properties bar;
+- code changes written to the source in the project's own styling system (Tailwind or real CSS);
+- diffs and change history, undo / redo;
+- preview sizes for responsive design;
+- React, Next.js, SvelteKit, Vue.
+
+**After the MVP only:** multi-frame canvas, Motion mode (timeline), Feega Cloud (same editor in the
+browser with GitHub sync), real-time collaboration. The canvas, motion and cloud code below stays
+in the repo but is not extended until then.
+
+**Business model:** free = the whole editor / extension. Paid = Feega Cloud with GitHub sync,
+real-time collaboration, sections & templates.
+
+Every third-party integration goes through Composio, no own tokens. The project state lives in the
+`.feega/` folder (ADR 0041).
+
 
 ## CLI
 
