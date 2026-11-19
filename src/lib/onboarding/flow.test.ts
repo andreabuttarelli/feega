@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Account, Arrival, Step, Surface, localViewer, progressOf, stepsFor, surfaceOf, type Viewer } from './flow';
+import { Account, Arrival, Layout, Step, Surface, layoutOf, localViewer, progressOf, stepsFor, surfaceOf, type Viewer } from './flow';
 
 const viewer = (over: Partial<Viewer>): Viewer => ({ surface: Surface.Web, arrival: Arrival.FirstRun, account: Account.SignedIn, name: 'Ada', ...over });
 
@@ -50,5 +50,13 @@ describe('progressOf', () => {
   it('fills the bar on the last step', () => {
     expect(progressOf(0, 2)).toBe(0.5);
     expect(progressOf(1, 2)).toBe(1);
+  });
+});
+
+describe('layoutOf', () => {
+  it('shows the sign-in as a centered login card, every other step beside the art', () => {
+    expect(layoutOf(Step.Account)).toBe(Layout.Card);
+    expect(layoutOf(Step.Home)).toBe(Layout.Split);
+    expect(layoutOf(Step.Agents)).toBe(Layout.Split);
   });
 });

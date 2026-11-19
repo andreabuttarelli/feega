@@ -1,11 +1,13 @@
-import { Account, Arrival, ENDPOINTS, FlowEvent, LOCAL_ACCOUNT_PATH, LOCAL_ONBOARDING_PATH, LOCAL_SOURCES_PATH, STEPS, Step, Surface, localViewer, progressOf, stepsFor, type LocalOnboarding, type MemorySource, type Viewer } from './flow';
+import { Account, Arrival, ENDPOINTS, FlowEvent, LOCAL_ACCOUNT_PATH, LOCAL_ONBOARDING_PATH, LOCAL_SIGN_IN_PATH, LOCAL_SOURCES_PATH, STEPS, Step, Surface, localViewer, progressOf, stepsFor, type LocalOnboarding, type MemorySource, type Viewer } from './flow';
 
 export type Answer = { status: number; body: unknown };
 export type Call = (path: string, init?: RequestInit) => Promise<Answer>;
 
 export enum Connection {
   Idle = 'idle',
-  Waiting = 'waiting',
+  Browser = 'browser',
+  Checking = 'checking',
+  Refused = 'refused',
   Failed = 'failed'
 }
 
@@ -105,7 +107,7 @@ export class OnboardingSession {
   }
 
   async connect() {
-    this.connection = Connection.Waiting;
+    this.connection = Connection.Browser;
 
     const answer = await this.ports.call(LOCAL_ACCOUNT_PATH, { method: 'POST' }).catch(() => null);
     const url = failed(answer) ? null : (answer?.body as { url?: string }).url;
@@ -120,10 +122,26 @@ export class OnboardingSession {
       return;
     }
 
-    this.connection = Connection.Idle;
-    if (this.step === Step.Account) {
-      this.next();
+    this.signedIn();
+  }
+
+  async signIn(email: string, password: string) {
+    this.connection = Connection.Checking;
+
+    const answer = await this.ports.call(LOCAL_SIGN_IN_PATH, post({ email, password })).catch(() => null);
+    if (failed(answer)) {
+      this.connection = Connection.Refused;
+      return;
     }
+
+    const state = await this.localState();
+    if (!state?.account) {
+      this.connection = Connection.Failed;
+      return;
+    }
+
+    this.joined(state);
+    this.signedIn();
   }
 
   openCloud() {
@@ -136,6 +154,13 @@ export class OnboardingSession {
   async readSources(ids: string[]): Promise<string> {
     const answer = await this.ports.call(LOCAL_SOURCES_PATH, post({ ids })).catch(() => null);
     return failed(answer) ? '' : ((answer?.body as { content?: string }).content ?? '');
+  }
+
+  private signedIn() {
+    this.connection = Connection.Idle;
+    if (this.step === Step.Account) {
+      this.next();
+    }
   }
 
   private show(step: Step | null) {

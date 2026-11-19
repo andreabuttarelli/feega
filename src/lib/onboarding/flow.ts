@@ -36,18 +36,27 @@ const firstRun = (viewer: Viewer) => viewer.arrival === Arrival.FirstRun;
 const signedIn = (viewer: Viewer) => viewer.account === Account.SignedIn;
 const onThisComputer = (viewer: Viewer) => viewer.surface === Surface.Local;
 
-type StepRow = { step: Step; label: string; shows: (viewer: Viewer) => boolean };
+export enum Layout {
+  Card = 'card',
+  Split = 'split'
+}
+
+type StepRow = { step: Step; label: string; layout: Layout; shows: (viewer: Viewer) => boolean };
 
 export const STEPS: readonly StepRow[] = [
-  { step: Step.Account, label: 'sign in', shows: (viewer) => firstRun(viewer) && onThisComputer(viewer) && !signedIn(viewer) },
-  { step: Step.Home, label: 'where it runs', shows: (viewer) => firstRun(viewer) && onThisComputer(viewer) },
-  { step: Step.Name, label: 'your name', shows: (viewer) => signedIn(viewer) && !viewer.name?.trim() },
-  { step: Step.Agents, label: 'your AI', shows: (viewer) => firstRun(viewer) && onThisComputer(viewer) },
-  { step: Step.Memory, label: 'your memory', shows: (viewer) => firstRun(viewer) && signedIn(viewer) }
+  { step: Step.Account, label: 'sign in', layout: Layout.Card, shows: (viewer) => firstRun(viewer) && onThisComputer(viewer) && !signedIn(viewer) },
+  { step: Step.Home, label: 'where it runs', layout: Layout.Split, shows: (viewer) => firstRun(viewer) && onThisComputer(viewer) },
+  { step: Step.Name, label: 'your name', layout: Layout.Split, shows: (viewer) => signedIn(viewer) && !viewer.name?.trim() },
+  { step: Step.Agents, label: 'your AI', layout: Layout.Split, shows: (viewer) => firstRun(viewer) && onThisComputer(viewer) },
+  { step: Step.Memory, label: 'your memory', layout: Layout.Split, shows: (viewer) => firstRun(viewer) && signedIn(viewer) }
 ];
 
 export function stepsFor(viewer: Viewer): Step[] {
   return STEPS.filter((row) => row.shows(viewer)).map((row) => row.step);
+}
+
+export function layoutOf(step: Step): Layout {
+  return STEPS.find((row) => row.step === step)?.layout ?? Layout.Split;
 }
 
 export function labelOf(step: Step): string {
@@ -75,6 +84,7 @@ export const ENDPOINTS: Readonly<Record<Surface, Endpoints>> = {
 
 export const LOCAL_ONBOARDING_PATH = '/api/v1/local/onboarding';
 export const LOCAL_ACCOUNT_PATH = '/api/v1/local/account';
+export const LOCAL_SIGN_IN_PATH = '/api/v1/local/account/sign-in';
 export const LOCAL_SOURCES_PATH = '/api/v1/local/memory-sources';
 
 export type LocalOnboarding = { seenAt: string | null; account: { email: string; name: string | null } | null; cloud: string };

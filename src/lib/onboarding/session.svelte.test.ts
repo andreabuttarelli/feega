@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { LOCAL_ACCOUNT_PATH, LOCAL_ONBOARDING_PATH, Step } from './flow';
-import { OnboardingSession, type Answer } from './session.svelte';
+import { LOCAL_ACCOUNT_PATH, LOCAL_ONBOARDING_PATH, LOCAL_SIGN_IN_PATH, Step } from './flow';
+import { Connection, OnboardingSession, type Answer } from './session.svelte';
 
 const CLOUD = 'https://cloud.example';
 const ME = { email: 'ada@example.com', name: 'Ada' };
@@ -14,6 +14,11 @@ function harness(linked: { now: boolean }) {
     if (path === LOCAL_ACCOUNT_PATH && init?.method === 'POST') {
       linked.now = true;
       return { status: 200, body: { url: `${CLOUD}/login` } };
+    }
+    if (path === LOCAL_SIGN_IN_PATH) {
+      const right = JSON.parse(String(init?.body)).password === 'right';
+      linked.now = right;
+      return right ? { status: 200, body: { email: ME.email } } : { status: 401, body: { error: 'invalid_credentials' } };
     }
     return { status: 200, body: {} };
   });
@@ -57,5 +62,27 @@ describe('onboarding locale: un account facoltativo prima di scegliere dove lavo
 
     expect(opened).toEqual([CLOUD]);
     expect(session.step).toBe(Step.Agents);
+  });
+
+  it('con email e password entra senza browser e passa alla scelta del posto', async () => {
+    const { session, opened } = harness({ now: false });
+    await session.beginLocal();
+
+    await session.signIn(ME.email, 'right');
+
+    expect(opened).toEqual([]);
+    expect(session.email).toBe(ME.email);
+    expect(session.step).toBe(Step.Home);
+  });
+
+  it('con la password sbagliata resta sul login e lo dice', async () => {
+    const { session } = harness({ now: false });
+    await session.beginLocal();
+
+    await session.signIn(ME.email, 'wrong');
+
+    expect(session.step).toBe(Step.Account);
+    expect(session.email).toBeNull();
+    expect(session.connection).toBe(Connection.Refused);
   });
 });

@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { account, cloudCall, connect, forwardPut, type CloudDeps, type StoredSession } from './cloud-account';
+import { account, cloudCall, cloudDeps, connect, forwardPut, signIn, type CloudDeps, type StoredSession } from './cloud-account';
 
 type Call = { url: string; init?: RequestInit };
 
@@ -96,5 +96,36 @@ describe('cloud account', () => {
     expect((await post(state)).status).toBe(200);
     expect(await sessionOn(d.home)).toEqual({ access_token: 'at', refresh_token: 'rt', expires_at: 123, user: { id: 'u9', email: 'new@x.io' } });
     await expect(post(state)).rejects.toThrow();
+  });
+
+  it('signs in to the hosted cloud even though local mode stubs its own Supabase', () => {
+    const local = cloudDeps({ PUBLIC_SUPABASE_URL: 'http://supabase.invalid', PUBLIC_SUPABASE_ANON_KEY: 'local' });
+
+    expect(local.supabaseUrl).toBe('https://klnswzhhgrqvbfjzioul.supabase.co');
+    expect(local.supabaseKey).not.toBe('local');
+    expect(cloudDeps({ FEEGA_CLOUD_SUPABASE_URL: 'https://sb.staging', FEEGA_CLOUD_SUPABASE_KEY: 'sk' })).toMatchObject({ supabaseUrl: 'https://sb.staging', supabaseKey: 'sk' });
+  });
+
+  it('signs in with email and password, saving the session where the CLI reads it and never the password', async () => {
+    const { d, calls } = await deps((url) =>
+      url === 'https://sb.test/auth/v1/token?grant_type=password'
+        ? Response.json({ access_token: 'at', refresh_token: 'rt', expires_at: 456, user: { id: 'u7', email: 'ada@x.io' } })
+        : new Response('', { status: 404 })
+    );
+
+    expect(await signIn('ada@x.io', 'hunter22', d)).toEqual({ email: 'ada@x.io' });
+    expect(JSON.parse(String(calls[0].init?.body))).toEqual({ email: 'ada@x.io', password: 'hunter22' });
+    expect(new Headers(calls[0].init?.headers).get('apikey')).toBe('k');
+
+    const saved = await readFile(join(d.home, '.config', 'feega', 'session.json'), 'utf8');
+    expect(JSON.parse(saved)).toEqual({ access_token: 'at', refresh_token: 'rt', expires_at: 456, user: { id: 'u7', email: 'ada@x.io' } });
+    expect(saved).not.toContain('hunter22');
+  });
+
+  it('refuses wrong credentials and saves nothing', async () => {
+    const { d } = await deps(() => Response.json({ error_code: 'invalid_credentials' }, { status: 400 }));
+
+    expect(await signIn('ada@x.io', 'nope', d)).toBeNull();
+    await expect(readFile(join(d.home, '.config', 'feega', 'session.json'), 'utf8')).rejects.toThrow();
   });
 });

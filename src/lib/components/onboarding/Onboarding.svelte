@@ -4,7 +4,7 @@
   import { track } from '$lib/analytics';
   import { AgentChoices } from '$lib/acp/agent-choices.svelte';
   import { AGENT_STATUS, statusOf } from '$lib/acp/agent-status';
-  import { Account, Arrival, LOCAL_ONBOARDING_PATH, Place, Step, Surface, labelOf } from '$lib/onboarding/flow';
+  import { Account, Arrival, LOCAL_ONBOARDING_PATH, Layout, Place, Step, Surface, labelOf, layoutOf } from '$lib/onboarding/flow';
   import { OnboardingSession, type Call } from '$lib/onboarding/session.svelte';
   import { opensOnArrival, type TourState } from '$lib/onboarding/tour';
   import { rememberTourSeen, seenInBrowser } from '$lib/onboarding/tour-memory';
@@ -77,7 +77,11 @@
 
 <svelte:window {onkeydown} />
 
-{#if session.step}
+{#if session.step && layoutOf(session.step) === Layout.Card}
+  <div class="onboarding centered" bind:this={sheet} role="dialog" aria-modal="true" aria-labelledby="ob-title" data-testid="onboarding" data-step={session.step}>
+    <StepAccount connection={session.connection} onconnect={() => session.connect()} onsignin={(email, password) => session.signIn(email, password)} onskip={() => session.next()} />
+  </div>
+{:else if session.step}
   {@const step = session.step}
   <div class="onboarding" bind:this={sheet} role="dialog" aria-modal="true" aria-labelledby="ob-title" data-testid="onboarding" data-step={step}>
     <div class="art">
@@ -101,8 +105,6 @@
           <section class="step">
             {#if step === Step.Name}
               <StepName bind:name onsave={(value) => session.saveName(value)} />
-            {:else if step === Step.Account}
-              <StepAccount email={session.email} connection={session.connection} onconnect={() => session.connect()} oncontinue={() => session.next()} />
             {:else if step === Step.Home}
               <StepHome bind:place email={session.email} oncontinue={() => session.next()} oncloud={() => session.openCloud()} onsignin={() => session.back()} />
             {:else if step === Step.Agents}
@@ -139,6 +141,15 @@
     color: var(--ui-text);
     font-family: var(--ui-sans, system-ui, sans-serif);
     animation: fade 320ms var(--ui-ease);
+  }
+
+  .onboarding.centered {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    place-items: safe center;
+    overflow-y: auto;
+    padding: var(--ui-space-8) var(--ui-space-4);
+    background: var(--ui-app);
   }
 
   .art {

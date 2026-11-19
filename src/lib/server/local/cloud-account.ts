@@ -41,8 +41,8 @@ export function cloudDeps(env: NodeJS.ProcessEnv = process.env): CloudDeps {
     home: homedir(),
     fetch: globalThis.fetch,
     cloudUrl: (env.FEEGA_CLOUD_URL || CLOUD_URL).replace(/\/$/, ''),
-    supabaseUrl: env.PUBLIC_SUPABASE_URL || SUPABASE_URL,
-    supabaseKey: env.PUBLIC_SUPABASE_ANON_KEY || SUPABASE_PUBLISHABLE_KEY,
+    supabaseUrl: env.FEEGA_CLOUD_SUPABASE_URL || SUPABASE_URL,
+    supabaseKey: env.FEEGA_CLOUD_SUPABASE_KEY || SUPABASE_PUBLISHABLE_KEY,
     timeoutMs: CONNECT_TIMEOUT_MS
   };
 }
@@ -128,6 +128,28 @@ export async function account(deps = cloudDeps()): Promise<CloudAccount | null> 
     return null;
   }
   return { email: stored.user.email, name: await cloudName(deps) };
+}
+
+type Grant = { access_token: string; refresh_token: string; expires_at?: number; user: { id: string; email: string } };
+
+export async function signIn(email: string, password: string, deps = cloudDeps()): Promise<{ email: string } | null> {
+  const res = await deps.fetch(`${deps.supabaseUrl}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: { apikey: deps.supabaseKey, 'content-type': 'application/json' },
+    body: JSON.stringify({ email, password })
+  });
+  if (!res.ok) {
+    return null;
+  }
+
+  const grant = (await res.json()) as Grant;
+  await saveSession(deps, {
+    access_token: grant.access_token,
+    refresh_token: grant.refresh_token,
+    expires_at: grant.expires_at ?? nowS() + DEFAULT_TTL_S,
+    user: { id: grant.user.id, email: grant.user.email }
+  });
+  return { email: grant.user.email };
 }
 
 type Callback = { access_token: string; refresh_token: string; expires_at?: number; state: string };

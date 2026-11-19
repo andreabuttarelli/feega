@@ -638,5 +638,15 @@
       "title": "Something broke on our side",
       "body": "The page didn't load. Try again in a moment; if it keeps failing, write to us."
     }
+  },
+  "onboarding": {
+    "signin": {
+      "title": "Sign in to feega",
+      "sub": "Optional. Feega works without an account.",
+      "skip": "Skip",
+      "browser": "Finish signing in in your browser…",
+      "refused": "Wrong email or password.",
+      "failed": "Sign-in didn't finish. Try again."
+    }
   }
 }
