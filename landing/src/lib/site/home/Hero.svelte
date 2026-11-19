@@ -5,7 +5,14 @@
   import AsciiField from './AsciiField.svelte';
   import EditorMock from '../EditorMock.svelte';
   import TerminalMock from './TerminalMock.svelte';
-  import PhoneMock from './PhoneMock.svelte';
+  import WorksWith from './WorksWith.svelte';
+
+  const MOCK_WIDTH = 960;
+
+  let fitWidth = $state(MOCK_WIDTH);
+  let mockHeight = $state(0);
+
+  const scale = $derived(Math.min(1, fitWidth / MOCK_WIDTH));
 </script>
 
 <svelte:head>
@@ -21,12 +28,14 @@
 
   <InstallCta id="hero-install" />
 
-  <div class="mock">
-    <div class="term"><TerminalMock /></div>
-    <div class="win"><EditorMock /></div>
+  <div class="fit" bind:clientWidth={fitWidth} style:height="{mockHeight * scale}px">
+    <div class="mock" bind:offsetHeight={mockHeight} style:transform="scale({scale})">
+      <div class="term"><TerminalMock /></div>
+      <div class="win"><EditorMock /></div>
+    </div>
   </div>
 
-  <div class="mock-phone"><PhoneMock /></div>
+  <WorksWith />
 </section>
 
 <style>
@@ -64,15 +73,18 @@
   }
 
 
-  .mock {
-    display: none;
+  .fit {
+    width: 100%;
+    max-width: 960px;
+    margin: 36px auto 0;
   }
 
-  .mock-phone {
+  .mock {
+    position: relative;
+    width: 960px;
     box-sizing: border-box;
-    width: 100%;
-    margin: 36px 0 0;
-    padding: 18px 18px 14px;
+    padding: 40px 40px 56px;
+    transform-origin: top left;
     border-radius: var(--ui-radius-lg, 10px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     background:
@@ -83,43 +95,20 @@
     overflow: hidden;
   }
 
-  @media (min-width: 810px) {
-    .mock-phone {
-      display: none;
-    }
+  .mock .win {
+    position: relative;
+    z-index: 2;
+    width: 84%;
+    margin: 0 16% 230px 0;
+  }
 
-    .mock {
-      display: block;
-      position: relative;
-      width: 100%;
-      max-width: 960px;
-      margin: 48px auto 0;
-      padding: 40px 40px 56px;
-      border-radius: var(--ui-radius-lg, 10px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      background:
-        radial-gradient(ellipse 70% 60% at 85% 100%, rgba(255, 81, 0, 0.55), transparent 70%),
-        radial-gradient(ellipse 60% 50% at 10% 0%, rgba(120, 90, 255, 0.28), transparent 70%),
-        radial-gradient(ellipse 50% 40% at 50% 110%, rgba(255, 190, 80, 0.2), transparent 70%),
-        #0d0d0d;
-      overflow: hidden;
-    }
-
-    .mock .win {
-      position: relative;
-      z-index: 2;
-      width: 84%;
-      margin: 0 16% 230px 0;
-    }
-
-    .mock .term {
-      position: absolute;
-      z-index: 1;
-      bottom: 28px;
-      right: 28px;
-      width: 52%;
-      height: 420px;
-    }
+  .mock .term {
+    position: absolute;
+    z-index: 1;
+    bottom: 28px;
+    right: 28px;
+    width: 52%;
+    height: 420px;
   }
 
   @media (min-width: 1200px) {
