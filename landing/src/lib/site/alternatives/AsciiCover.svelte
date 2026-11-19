@@ -1,14 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { flagColour } from '../ascii-field';
-  import { MARK_LOBE, MARK_TURNS } from '../mark';
   import { densityAt, glyphAt, type Cover } from './cover';
   import { LOGOS, type LogoKey } from './logos';
 
   let { cover, label, logo }: { cover: Cover; label: string; logo?: LogoKey } = $props();
 
-  const LOGO_SIZE = 56;
-  const MARK_BOX = '42 42 216 216';
+  const LOGO_SIZE = 72;
 
   const CELL = 16;
   const FONT = '13px ui-monospace, SFMono-Regular, Menlo, monospace';
@@ -61,7 +59,6 @@
   <canvas bind:this={canvas} aria-label={label}></canvas>
   {#if logo}
     <div class="pair" aria-hidden="true">
-      <svg width={LOGO_SIZE} height={LOGO_SIZE} viewBox={MARK_BOX} fill="currentColor">{#each MARK_TURNS as turn (turn)}<path d={MARK_LOBE} transform="rotate({turn} 150 150)" />{/each}</svg>
       <svg width={LOGO_SIZE} height={LOGO_SIZE} viewBox={LOGOS[logo].viewBox} fill="currentColor"><path d={LOGOS[logo].d} fill-rule="evenodd" /></svg>
     </div>
   {/if}
@@ -89,7 +86,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 32px;
     color: #fff;
     background: radial-gradient(closest-side, rgb(10 10 10 / 0.85), rgb(10 10 10 / 0));
   }
