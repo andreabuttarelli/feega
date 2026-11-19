@@ -1,4 +1,4 @@
-import { COFFEE_URL, EDITORS, EXTENSION_PUBLISHED, GITHUB_URL, MARKETPLACE_URL, type Editor } from './links';
+import { COFFEE_URL, EDITORS, EXTENSION_PUBLISHED, GITHUB_URL, MARKETPLACE_URL, NPX_COMMAND, type Editor } from './links';
 
 const DOWNLOAD_LABEL = 'Download for free';
 
@@ -26,6 +26,18 @@ export const secondaryCtas = (published: boolean = EXTENSION_PUBLISHED): readonl
   published
     ? EDITORS.slice(1).map((e: Editor) => ({ label: e.label, href: e.installUrl }))
     : [{ label: 'Support with a coffee', href: COFFEE_URL }];
+
+export type InstallOption = { label: string; href: string; deepLink?: string; command?: string; soon: boolean };
+
+export const installOptions = (published: boolean = EXTENSION_PUBLISHED): readonly InstallOption[] => [
+  ...EDITORS.map((e: Editor) => ({
+    label: e.label,
+    href: e.webUrl,
+    deepLink: e.installUrl === e.webUrl ? undefined : e.installUrl,
+    soon: !published
+  })),
+  { label: 'Terminal', href: GITHUB_URL, command: NPX_COMMAND, soon: !published }
+];
 
 export const isMobile = (userAgent: string): boolean => /android|iphone|ipad|ipod/i.test(userAgent);
 

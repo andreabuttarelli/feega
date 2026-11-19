@@ -1,15 +1,17 @@
 <script lang="ts">
-  import { installAction, primaryCta, secondaryCtas, starCta } from './install';
+  import { primaryCta, secondaryCtas, starCta } from './install';
+  import DownloadDialog from './DownloadDialog.svelte';
 
   let { id }: { id: string } = $props();
 
   const primary = primaryCta();
   const secondary = secondaryCtas();
+  let choosing = $state(false);
 </script>
 
 <div class="install" data-agent-id={id}>
   <div class="buttons">
-    <a class="primary" href={primary.href} use:installAction={primary}>{primary.label}</a>
+    <button class="primary" onclick={() => (choosing = true)}>{primary.label}</button>
     <a class="star" href={starCta.href}>{starCta.label}</a>
   </div>
   <p class="more">
@@ -17,6 +19,8 @@
   </p>
   <p class="note">free. no AI, no tokens. every change shown as a diff.</p>
 </div>
+
+<DownloadDialog bind:open={choosing} />
 
 <style>
   .install {
@@ -28,6 +32,8 @@
   }
 
   .primary {
+    border: 0;
+    cursor: pointer;
     padding: 12px 26px;
     border-radius: 999px;
     background: #fff;

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { follow, primaryCta, starCta, secondaryCtas, type Env } from './install';
+import { follow, installOptions, primaryCta, starCta, secondaryCtas, type Env } from './install';
 import { GITHUB_URL, MARKETPLACE_URL } from './links';
 
-const DEEP_LINK = 'vscode:extension/andreabuttarelli.feega-inspect';
+const DEEP_LINK = 'vscode:extension/andreabuttarelli.feega';
 
 const rig = (over: Partial<Env> = {}) => {
   const opened: string[] = [];
@@ -49,5 +49,19 @@ describe('install CTAs', () => {
     const { opened, env } = rig({ userAgent: 'iPhone' });
     follow(primaryCta(true), env);
     expect(opened).toEqual([MARKETPLACE_URL]);
+  });
+});
+
+describe('download options', () => {
+  it('lists every editor plus npx, each opening its editor first and a web page as fallback', () => {
+    const options = installOptions(true);
+    expect(options.map((o) => o.label)).toEqual(['VS Code', 'Cursor', 'Windsurf', 'VSCodium / Open VSX', 'Terminal']);
+    expect(options[0]).toMatchObject({ deepLink: DEEP_LINK, href: MARKETPLACE_URL });
+    expect(options[1].deepLink).toBe('cursor:extension/andreabuttarelli.feega');
+    expect(options[4]).toMatchObject({ command: 'npx feega' });
+  });
+
+  it('unpublished: every option is marked coming soon', () => {
+    expect(installOptions(false).every((o) => o.soon)).toBe(true);
   });
 });
