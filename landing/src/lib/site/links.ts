@@ -40,7 +40,6 @@ export const EDITORS: readonly Editor[] = [
 export const HEADER_LINKS = [
   { href: DOWNLOAD_PATH, label: 'Download' },
   { href: DOCS_URL, label: 'Documentation' },
-  { href: GITHUB_URL, label: 'GitHub' },
   { href: DISCORD_URL, label: 'Community' },
   { href: '/pricing', label: 'Pricing' }
 ] as const;
