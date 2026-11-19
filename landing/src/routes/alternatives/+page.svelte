@@ -5,6 +5,10 @@
   import { ArticleKind } from '$lib/site/alternatives/alternative';
   import { COMPARISONS, comparisonPath } from '$lib/site/compare';
   import { breadcrumbJsonLd } from '$lib/site/structured-data';
+  import AsciiCover from '$lib/site/alternatives/AsciiCover.svelte';
+  import { coverFor } from '$lib/site/alternatives/cover';
+
+  const slugs = Object.keys(ALTERNATIVES);
 
   const ofKind = (kind: ArticleKind) => Object.entries(ALTERNATIVES).filter(([, a]) => a.kind === kind);
 </script>
@@ -23,12 +27,15 @@
 
   {#each Object.values(ArticleKind) as kind (kind)}
     <h2>{KIND_HEADINGS[kind]}</h2>
-    {#each ofKind(kind) as [slug, article] (slug)}
-      <section>
-        <h3><a href={alternativePath(slug)}>{article.heading}</a></h3>
-        <p>{article.hook}</p>
-      </section>
-    {/each}
+    <div class="cards">
+      {#each ofKind(kind) as [slug, article] (slug)}
+        <a class="card" href={alternativePath(slug)}>
+          <AsciiCover cover={coverFor(slugs.indexOf(slug))} label={article.heading} />
+          <strong>{article.heading}</strong>
+          <span>{article.hook}</span>
+        </a>
+      {/each}
+    </div>
   {/each}
 
   <section>
