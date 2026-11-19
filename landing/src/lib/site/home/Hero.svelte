@@ -5,6 +5,7 @@
   import AsciiField from './AsciiField.svelte';
   import EditorMock from '../EditorMock.svelte';
   import TerminalMock from './TerminalMock.svelte';
+  import PhoneMock from './PhoneMock.svelte';
 </script>
 
 <svelte:head>
@@ -24,6 +25,8 @@
     <div class="term"><TerminalMock /></div>
     <div class="win"><EditorMock /></div>
   </div>
+
+  <div class="mock-phone"><PhoneMock /></div>
 </section>
 
 <style>
@@ -65,7 +68,26 @@
     display: none;
   }
 
+  .mock-phone {
+    box-sizing: border-box;
+    width: 100%;
+    margin: 36px 0 0;
+    padding: 18px 18px 14px;
+    border-radius: var(--ui-radius-lg, 10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background:
+      radial-gradient(ellipse 70% 60% at 85% 100%, rgba(255, 81, 0, 0.55), transparent 70%),
+      radial-gradient(ellipse 60% 50% at 10% 0%, rgba(120, 90, 255, 0.28), transparent 70%),
+      radial-gradient(ellipse 50% 40% at 50% 110%, rgba(255, 190, 80, 0.2), transparent 70%),
+      #0d0d0d;
+    overflow: hidden;
+  }
+
   @media (min-width: 810px) {
+    .mock-phone {
+      display: none;
+    }
+
     .mock {
       display: block;
       position: relative;
