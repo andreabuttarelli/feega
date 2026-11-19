@@ -7,7 +7,8 @@ until the MVP ships, new work goes to the extension, not the canvas.
 
 **MVP = the VS Code extension (`inspect/`, Feega Inspect) + `npx feega`.** It is the only VS Code
 extension: the canvas extension in `vscode/` is deprecated. The MVP covers:
-- authentication with Feega (to count users; the web app is a stats dashboard for now);
+- optional sign-in with Feega (GitHub, one click; offered after the first edits, never required) plus
+  anonymous, opt-out usage counts — to count users; the web app is a stats dashboard for now;
 - design editing on the running app: click an element, edit it from the Properties bar;
 - code changes written to the source in the project's own styling system (Tailwind or real CSS);
 - diffs and change history, undo / redo;
