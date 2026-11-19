@@ -37,6 +37,7 @@ const COLUMN_OF: Record<keyof CodeLink, string> = {
   baseBranch: 'base_branch',
   baseSha: 'base_sha',
   files: 'files',
+  workBranch: 'work_branch',
   pushBranch: 'push_branch',
   pushSha: 'push_sha',
   pushParent: 'push_parent',
@@ -51,7 +52,7 @@ const COLUMN_OF: Record<keyof CodeLink, string> = {
 
 const FIELDS = Object.entries(COLUMN_OF) as [keyof CodeLink, string][];
 
-const WRITTEN_ONLY_WHEN_SET = new Set<keyof CodeLink>(['restored']);
+const WRITTEN_ONLY_WHEN_SET = new Set<keyof CodeLink>(['restored', 'workBranch']);
 
 const written = ([field]: [keyof CodeLink, string], link: CodeLink) => !WRITTEN_ONLY_WHEN_SET.has(field) || link[field] !== undefined;
 

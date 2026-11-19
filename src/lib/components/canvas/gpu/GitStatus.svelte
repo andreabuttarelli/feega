@@ -53,7 +53,7 @@
   </Hint>
 
   {#if summary.upstream}
-    <Hint label="Pull the changes from {summary.base} into the frame" side={Side.Bottom}>
+    <Hint label="Pull the changes from {summary.imported} into the frame" side={Side.Bottom}>
       {#snippet children(props)}
         <button {...props} type="button" class="pill" onclick={() => onupstream(summary.nodeId)} data-testid="git-upstream"><ArrowDown size={12} />{summary.upstream} new upstream</button>
       {/snippet}
