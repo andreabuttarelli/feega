@@ -43,6 +43,15 @@ describe('inspectElement', () => {
     expect(info.styles['padding-top']).toBe('12px');
   });
 
+  it('names where an inherited value comes from', () => {
+    const win = domOf();
+
+    const info = inspectElement(win.document.querySelector('h1')!)!;
+
+    expect(info.inherited.color).toBe('section');
+    expect(info.inherited).not.toHaveProperty('padding-top');
+  });
+
   it('returns null outside any mapped element', () => {
     const win = new JSDOM('<body><p>x</p></body>').window;
 

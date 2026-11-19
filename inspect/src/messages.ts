@@ -14,6 +14,7 @@ export type Pick = {
   tag: string;
   rect: Rect;
   styles: Record<string, string>;
+  inherited?: Record<string, string>;
   classes: string;
   rem: number;
   viewport: number;
@@ -45,6 +46,7 @@ export type EditAsk = LiveEditAsk & { css?: Record<string, string>; scope?: Scop
 
 export enum ServerState {
   Detecting = 'detecting',
+  Installing = 'installing',
   Starting = 'starting',
   Running = 'running',
   Reloading = 'reloading',
@@ -59,7 +61,9 @@ export enum ServerAction {
   ClearCache = 'clear-cache',
   ShowLogs = 'show-logs',
   ChangeCommand = 'change-command',
-  RestartUnderFeega = 'restart-under-feega'
+  RestartUnderFeega = 'restart-under-feega',
+  Cancel = 'cancel',
+  ChooseApp = 'choose-app'
 }
 
 export type ServerInfo = { url: string; framework: string; command: string; pid: number | null; port: number; attached: boolean; startedAt: number; lastError: string };

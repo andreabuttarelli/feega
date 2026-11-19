@@ -11,8 +11,23 @@ const DESIGN_PROPERTIES = [
   'color', 'background-color', 'background-image', 'opacity',
   'border-top-width', 'border-top-style', 'border-top-color', 'border-radius',
   'border-top-left-radius', 'border-top-right-radius', 'border-bottom-right-radius', 'border-bottom-left-radius', 'box-shadow',
-  'font-family', 'font-size', 'font-weight', 'line-height', 'letter-spacing', 'text-align', 'text-transform', 'text-shadow'
+  'font-family', 'font-size', 'font-weight', 'line-height', 'letter-spacing', 'text-align', 'text-transform', 'text-shadow',
+  'top', 'right', 'bottom', 'left', 'z-index', 'overflow-x', 'overflow-y',
+  'min-width', 'max-width', 'min-height', 'max-height', 'aspect-ratio', 'object-fit', 'object-position',
+  'grid-template-rows', 'row-gap', 'column-gap', 'grid-column', 'grid-row',
+  'flex-grow', 'flex-shrink', 'flex-basis', 'align-self', 'order',
+  'border-right-width', 'border-bottom-width', 'border-left-width',
+  'outline-width', 'outline-style', 'outline-color', 'outline-offset',
+  'mix-blend-mode', 'filter', 'backdrop-filter', 'translate', 'rotate', 'scale',
+  'transition-property', 'transition-duration', 'transition-timing-function', 'cursor',
+  'text-decoration-line', 'text-overflow', 'white-space', '-webkit-line-clamp', 'word-break',
+  'list-style-type', 'list-style-position'
 ];
+
+const INHERITED_PROPERTIES = new Set([
+  'color', 'font-family', 'font-size', 'font-weight', 'line-height', 'letter-spacing', 'text-align', 'text-transform', 'text-shadow',
+  'cursor', 'white-space', 'word-break', 'list-style-type', 'list-style-position'
+]);
 
 const SOURCE_PATTERN = /^(.+):(\d+):(\d+)$/;
 
@@ -90,9 +105,11 @@ function inspectPage(body, maxHtml) {
 function inspectTagged(tagged, maxHtml) {
 
   const source = parseSource(tagged.getAttribute(SOURCE_ATTR));
+  const styles = designStyles(tagged);
   return {
     source,
-    styles: designStyles(tagged),
+    styles,
+    inherited: inheritedStyles(tagged, styles),
     html: truncate(tagged.outerHTML, maxHtml),
     component: componentBoundary(tagged, source.file),
     rect: rectOf(tagged),
@@ -391,6 +408,22 @@ export function paletteOf(doc) {
 export function relativeOf(doc, source, move) {
   const [element] = sourcedIn(doc, source);
   return element && MOVES[move] ? MOVES[move](element) : null;
+}
+
+function originOf(element, name, value) {
+  let origin = null;
+  for (let node = element.parentElement; node; node = node.parentElement) {
+    if (node.ownerDocument.defaultView.getComputedStyle(node).getPropertyValue(name) !== value) {
+      return origin;
+    }
+    origin = node.tagName.toLowerCase();
+  }
+  return origin;
+}
+
+function inheritedStyles(element, styles) {
+  const found = [...INHERITED_PROPERTIES].map((name) => [name, originOf(element, name, styles[name])]);
+  return Object.fromEntries(found.filter(([, origin]) => origin));
 }
 
 function designStyles(element) {

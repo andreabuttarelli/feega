@@ -27,7 +27,46 @@ const VALUES: Record<string, string> = {
   border: '3',
   opacity: '50',
   shadow: '0px 10px 15px -3px rgba(0, 0, 0, 0.1)',
-  'text-shadow': '0px 2px 4px rgba(0, 0, 0, 0.5)'
+  'text-shadow': '0px 2px 4px rgba(0, 0, 0, 0.5)',
+  position: 'relative',
+  'z-index': '5',
+  display: 'grid',
+  'overflow-x': 'hidden',
+  'overflow-y': 'auto',
+  'aspect-ratio': '16 / 9',
+  'object-fit': 'cover',
+  'object-position': '20% 30%',
+  'grid-template-columns': '100px 200px',
+  'grid-template-rows': '40px auto',
+  'grid-column': 'span 2 / span 2',
+  'grid-row': 'span 2 / span 2',
+  'flex-grow': '2',
+  'flex-shrink': '0',
+  'flex-basis': '120',
+  'align-self': 'center',
+  order: '2',
+  'border-style': 'dashed',
+  'border-color': '#ff0000',
+  'outline-style': 'dotted',
+  'outline-color': '#00ff00',
+  'mix-blend-mode': 'multiply',
+  blur: '4',
+  'backdrop-blur': '6',
+  translate: '10px 20px',
+  rotate: '15',
+  scale: '1.5',
+  'transition-property': 'opacity',
+  'transition-duration': '200',
+  'transition-timing-function': 'ease-in',
+  cursor: 'pointer',
+  'text-transform': 'uppercase',
+  'text-decoration-line': 'underline',
+  'text-overflow': 'ellipsis',
+  'white-space': 'nowrap',
+  'word-break': 'break-all',
+  'line-clamp': '2',
+  'list-style-type': 'square',
+  'list-style-position': 'inside'
 };
 
 const ON_TEXT = new Set([Section.Typography]);
@@ -98,6 +137,9 @@ for (const row of ROWS.filter((r) => !ONLY || ONLY.split(",").includes(r.name)))
   const [got, wanted] = await target.evaluate(
     (el, [prop, v]: [string, Record<string, string>]) => {
       const probe = document.createElement(el.tagName);
+      const own = getComputedStyle(el);
+      probe.style.borderStyle = own.borderStyle;
+      probe.style.outlineStyle = own.outlineStyle;
       Object.entries(v).forEach(([k, val]) => probe.style.setProperty(k, val));
       document.body.append(probe);
       const want = getComputedStyle(probe).getPropertyValue(prop);
