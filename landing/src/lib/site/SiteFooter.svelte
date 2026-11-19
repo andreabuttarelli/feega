@@ -42,7 +42,7 @@
       <p class="head">learn</p>
       <a href={DOCS_URL}>docs</a>
       {#each HUBS as hub (hub.path)}
-        <a href={hub.path}>{lower(hub.heading)}</a>
+        <a href={hub.path}>{hub.menuLabel}</a>
       {/each}
       <a href={ALTERNATIVES_PATH}>alternatives</a>
       <a href={STORY_URL}>blog</a>

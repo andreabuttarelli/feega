@@ -17,6 +17,7 @@ export const FOR_HUB: Hub = {
   title: 'Visual editing for React, Next.js, SvelteKit and Vue | Feega',
   description: 'How Feega maps a click to your source in each framework, what it writes back (Tailwind, CSS modules or <style>) and where it stops.',
   heading: 'Feega for your framework',
+  menuLabel: 'frameworks',
   intro: 'One page per stack, covering how a click on the page finds the line in your code and what Feega writes there or leaves alone.',
   topics: { react: REACT, nextjs: NEXTJS, sveltekit: SVELTEKIT, vue: VUE, tailwind: TAILWIND }
 };
@@ -26,6 +27,7 @@ export const INTEGRATIONS_HUB: Hub = {
   title: 'Feega in VS Code, Cursor, Windsurf and VSCodium | Feega',
   description: 'Install Feega in the editor you already use. Where to get it, the commands and settings, and how it sits next to AI agents in each editor.',
   heading: 'Feega in your editor',
+  menuLabel: 'editors',
   intro: 'Feega is one extension built on the VS Code extension API, so it runs in VS Code and in the editors built on it. Each page covers install, first run and the details that differ.',
   topics: { vscode: VSCODE, cursor: CURSOR, windsurf: WINDSURF, vscodium: VSCODIUM }
 };

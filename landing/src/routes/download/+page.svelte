@@ -65,8 +65,8 @@
     <p class="links">
       <a href="/changelog">what's new</a>
       <a href={GITHUB_URL}>source</a>
-      <a href={GITHUB_URL}>Star on GitHub</a>
-      <a href={COFFEE_URL}>Support with a coffee</a>
+      <a href={GITHUB_URL}>star on github</a>
+      <a href={COFFEE_URL}>support with a coffee</a>
     </p>
     <p class="note">{DOWNLOAD_PAGE.privacy}</p>
   </main>
