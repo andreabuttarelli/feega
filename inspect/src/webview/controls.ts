@@ -25,7 +25,8 @@ export enum Section {
   Transition = 'Transition',
   TextOptions = 'Text options',
   List = 'List',
-  Cursor = 'Cursor'
+  Cursor = 'Cursor',
+  Icon = 'Icon'
 }
 
 export enum Control {
@@ -158,6 +159,17 @@ const radiusRows: NumberRow[] = [
   }))
 ];
 
+const STROKE_WIDTH: Range = { min: 0, max: 8, step: 0.25 };
+
+const svgPaint = (property: string) => (value: string) => ({ prop: LiveProp.Class, family: arbitraryFamily(property), value: `[${property}:${value.replace(/\s+/g, '_')}]` });
+
+const ICON_ROWS: Row[] = [
+  { section: Section.Icon, name: 'icon-colour', label: 'Colour', control: Control.Colour, read: (s) => s.color ?? '', preview: style('color'), change: colour(LiveProp.Color) },
+  { section: Section.Icon, name: 'icon-fill', label: 'Fill', control: Control.Colour, read: (s) => s.fill ?? '', preview: style('fill'), change: svgPaint('fill') },
+  { section: Section.Icon, name: 'icon-stroke', label: 'Stroke', control: Control.Colour, read: (s) => s.stroke ?? '', preview: style('stroke'), change: svgPaint('stroke') },
+  { section: Section.Icon, name: 'icon-stroke-width', label: 'Weight', control: Control.Number, range: STROKE_WIDTH, unit: '', read: (s) => parseFloat(s['stroke-width'] ?? '0') || 0, preview: style('strokeWidth'), change: (value) => ({ prop: LiveProp.Class, family: arbitraryFamily('stroke-width'), value: `[stroke-width:${value}]` }) }
+];
+
 const DESIGN_ROWS: Row[] = [
   { section: Section.Layout, name: 'direction', label: 'Direction', control: Control.Choice, choices: Object.keys(DIRECTIONS), read: (s) => keyOf(DIRECTIONS, s['flex-direction']), preview: (v) => ({ flexDirection: DIRECTIONS[v], display: 'flex' }), change: family(ClassFamily.Direction) },
   { section: Section.Layout, name: 'align', label: 'Align', control: Control.Choice, choices: Object.keys(ITEMS), read: (s) => keyOf(ITEMS, s['align-items']), preview: (v) => ({ alignItems: ITEMS[v] }), change: family(ClassFamily.Items) },
@@ -281,4 +293,4 @@ function cssRow(spec: CssSpec): Row {
   return { ...base, control: spec.control, read: (s: Styles) => s[property] ?? '' };
 }
 
-export const ROWS: Row[] = [...DESIGN_ROWS, ...CSS_ROWS.map(cssRow)];
+export const ROWS: Row[] = [...DESIGN_ROWS, ...ICON_ROWS, ...CSS_ROWS.map(cssRow)];

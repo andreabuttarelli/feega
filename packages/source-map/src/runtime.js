@@ -21,7 +21,8 @@ const DESIGN_PROPERTIES = [
   'mix-blend-mode', 'filter', 'backdrop-filter', 'translate', 'rotate', 'scale',
   'transition-property', 'transition-duration', 'transition-timing-function', 'cursor',
   'text-decoration-line', 'text-overflow', 'white-space', '-webkit-line-clamp', 'word-break',
-  'list-style-type', 'list-style-position'
+  'list-style-type', 'list-style-position',
+  'fill', 'stroke', 'stroke-width'
 ];
 
 const INHERITED_PROPERTIES = new Set([

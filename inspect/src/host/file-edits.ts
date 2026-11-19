@@ -11,6 +11,9 @@ import { VariableHome, saveVariable, variableName } from '@feega/live-edit/save-
 import { pageRule } from '@feega/live-edit/page-rule';
 import { scopedRule, type Scope } from '@feega/live-edit/scoped-rule';
 import { styleAttr, type Css } from '@feega/live-edit/style-attr';
+import { detectLibrary } from '@feega/live-edit/icon-library';
+import { swapIcon } from '@feega/live-edit/icon-swap';
+import { svgMarkup } from '@feega/live-edit/svg-markup';
 import { Styling, type EditAsk } from '../messages';
 import { StylingChoice } from '../settings';
 import { stylingOf } from './styling';
@@ -124,6 +127,30 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return out.ok && google && !sheet ? { ...out, note: 'no global stylesheet found: the font is named but not loaded' } : out;
   }
 
+  async function iconSwapped(rawAt: string, name: string): Promise<Written> {
+    meta = { at: rawAt, prop: 'icon', value: name, scope: '' };
+    const at = liveAtOf(rawAt);
+    if (!at || !inside(root, at.file)) {
+      return { ok: false, reason: `${rawAt} is not a file:line:col inside the workspace` };
+    }
+    const library = detectLibrary((await reader(root)('package.json')) ?? '');
+    if (!library) {
+      return { ok: false, reason: 'no icon library found in package.json' };
+    }
+    const out = await swapIcon(reader(root), at, name, library);
+    return out.ok ? writtenAll([out.change], '') : out;
+  }
+
+  async function svgWritten(rawAt: string, markup: string, inner?: string): Promise<Written> {
+    meta = { at: rawAt, prop: 'svg', value: '', scope: '' };
+    const at = liveAtOf(rawAt);
+    if (!at || !inside(root, at.file)) {
+      return { ok: false, reason: `${rawAt} is not a file:line:col inside the workspace` };
+    }
+    const out = await svgMarkup(reader(root), at, markup, inner);
+    return out.ok ? writtenAll(out.changes, '') : out;
+  }
+
   const put = (full: string, text: string) => (text === '' ? rm(full, { force: true }) : writeFile(full, text));
 
   async function replay(from: Step[], to: Step[], expect: 'before' | 'after', write: 'before' | 'after', empty: string): Promise<Written> {
@@ -188,6 +215,8 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     saveVariable: (ask: EditAsk, name: string) => inTurn(() => variableSaved(ask, name)),
     move: (from: string, to: string, place: Place) => inTurn(() => moved(from, to, place)),
     edit: (ask: EditAsk) => inTurn(() => edited(ask)),
+    icon: (at: string, name: string) => inTurn(() => iconSwapped(at, name)),
+    svg: (at: string, markup: string, inner?: string) => inTurn(() => svgWritten(at, markup, inner)),
     font: (ask: EditAsk, google: boolean) => inTurn(() => fontEdited(ask, google)),
     undo: () => inTurn(undoStep),
     redo: () => inTurn(redoStep),

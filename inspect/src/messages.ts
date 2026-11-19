@@ -4,6 +4,13 @@ import type { Scope } from '@feega/live-edit/scoped-rule';
 import type { PageTarget } from '@feega/live-edit/page-rule';
 import type { ReportFacts, SettingKey, SettingValue, Settings } from './settings';
 
+export enum IconSource {
+  Library = 'library',
+  IconMcp = 'iconmcp'
+}
+
+export type IconHit = { name: string; label?: string; source: IconSource };
+
 export type Rect = { x: number; y: number; width: number; height: number };
 
 export type Source = { file: string; line: number; col: number };
@@ -28,6 +35,7 @@ export type Pick = {
   ancestors: { source: Source; name: string }[];
   inner?: string;
   page?: PageTarget;
+  markup?: string;
 };
 
 export enum Move {
@@ -98,7 +106,11 @@ export enum ToHost {
   Diff = 'diff',
   SourceControl = 'source-control',
   AttachUrl = 'attach-url',
-  AddPlugin = 'add-plugin'
+  AddPlugin = 'add-plugin',
+  IconSwap = 'icon-swap',
+  IconMarkup = 'icon-markup',
+  IconGet = 'icon-get',
+  IconSearch = 'icon-search'
 }
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number };
@@ -113,7 +125,8 @@ export enum ToView {
   Change = 'change',
   Server = 'server',
   Settings = 'settings',
-  History = 'history'
+  History = 'history',
+  IconResults = 'icon-results'
 }
 
 export type HostMessage =
@@ -135,7 +148,11 @@ export type HostMessage =
   | { kind: ToHost.Diff; id: number }
   | { kind: ToHost.SourceControl }
   | { kind: ToHost.AttachUrl; url: string }
-  | { kind: ToHost.AddPlugin };
+  | { kind: ToHost.AddPlugin }
+  | { kind: ToHost.IconSwap; at: string; name: string }
+  | { kind: ToHost.IconMarkup; at: string; markup: string; inner?: string }
+  | { kind: ToHost.IconGet; at: string; name: string; size: number; stroke: number; inner?: string }
+  | { kind: ToHost.IconSearch; id: number; query: string };
 
 export type ViewMessage =
   | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string }
@@ -145,7 +162,8 @@ export type ViewMessage =
   | { kind: ToView.Status; text: string }
   | { kind: ToView.Edited; ok: boolean; reason?: string; written?: string; at?: Source; saved?: Source; note?: string }
   | { kind: ToView.Change; row: string; value: string }
-  | { kind: ToView.Pick; id: number; x: number; y: number };
+  | { kind: ToView.Pick; id: number; x: number; y: number }
+  | { kind: ToView.IconResults; id: number; library: string | null; hits: IconHit[]; error?: string };
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';

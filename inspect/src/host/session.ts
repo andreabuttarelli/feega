@@ -5,6 +5,7 @@ import { liveAtOf } from '@feega/live-edit/live-ask';
 import { ServerAction, ServerState, ToHost, ToView, type EditAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
 import { SettingKey, StylingChoice } from '../settings';
 import { addPlugin } from './add-plugin';
+import { mcpIcon, searchIcons } from './icon-search';
 import { appOfSource, firstStampedFile, urlOf } from './attach-url';
 import { Attach, attachDev, factsOf, startDev, type Refused, type Running } from './dev-server';
 import { fileEdits, type Snapshot, type Written } from './file-edits';
@@ -59,6 +60,19 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     const saved = ask ? (liveAtOf(ask.at) ?? undefined) : undefined;
     await post(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, saved, note: out.note } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
     return out;
+  }
+
+  async function iconFetched(m: Extract<HostMessage, { kind: ToHost.IconGet }>) {
+    const svg = await mcpIcon(fetch, m.name, m.size, m.stroke).catch((error: Error) => error);
+    if (svg instanceof Error) {
+      await post({ kind: ToView.Edited, ok: false, reason: svg.message });
+      return;
+    }
+    await edits.svg(m.at, svg, m.inner).then((out) => edited(out, null));
+  }
+
+  async function iconsFound(id: number, query: string) {
+    await post({ kind: ToView.IconResults, id, ...(await searchIcons(root, fetch, query)) });
   }
 
   const edit = (ask: EditAsk) => edits.edit(ask).then((out) => edited(out, ask));
@@ -292,7 +306,11 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Move]: (m) => edits.move(m.from, m.to, m.place).then((out) => edited(out, null)),
     [ToHost.Setting]: (m) => platform.setSetting(m.key, m.value).then(postSettings),
     [ToHost.AttachUrl]: (m) => attachUrl(m.url),
-    [ToHost.AddPlugin]: installPlugin
+    [ToHost.AddPlugin]: installPlugin,
+    [ToHost.IconSwap]: (m) => edits.icon(m.at, m.name).then((out) => edited(out, null)),
+    [ToHost.IconMarkup]: (m) => edits.svg(m.at, m.markup, m.inner).then((out) => edited(out, null)),
+    [ToHost.IconGet]: iconFetched,
+    [ToHost.IconSearch]: (m) => iconsFound(m.id, m.query)
   };
 
   platform.receive((message) => (handlers[message.kind] as (m: HostMessage) => unknown)(message));

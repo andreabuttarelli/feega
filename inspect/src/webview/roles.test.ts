@@ -29,8 +29,8 @@ describe('roleOf', () => {
     expect(roleOf(element('div', false, 2))).toBe(Role.Container);
   });
 
-  it('img, svg and video are media', () => {
-    expect(['img', 'svg', 'video'].map((tag) => roleOf(element(tag, false, 0)))).toEqual([Role.Media, Role.Media, Role.Media]);
+  it('img and video are media, svg is an icon', () => {
+    expect(['img', 'svg', 'video'].map((tag) => roleOf(element(tag, false, 0)))).toEqual([Role.Media, Role.Icon, Role.Media]);
   });
 
   it('inputs are inputs', () => {
@@ -71,5 +71,10 @@ describe('sectionsOf', () => {
     expect(sectionsOf(Role.Container)).not.toContain(Section.Object);
     expect(sectionsOf(Role.Container)).toContain(Section.Grid);
     expect(sectionsOf(Role.Text)).toContain(Section.TextOptions);
+  });
+
+  it('an icon has the icon section and no typography', () => {
+    expect(sectionsOf(Role.Icon)).toContain(Section.Icon);
+    expect(sectionsOf(Role.Icon)).not.toContain(Section.Typography);
   });
 });

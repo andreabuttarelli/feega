@@ -6,7 +6,7 @@ const TAG = /^<([a-zA-Z][\w-]*)/;
 const SOURCE_ATTR = 'data-feega-src';
 
 const pickOf = (r: Inspected | null): Pick | null =>
-  r ? { source: r.source, component: r.component, tag: r.html.match(TAG)?.[1] ?? '', rect: r.rect, styles: r.styles, inherited: r.inherited, classes: r.classes, rem: r.rem, viewport: r.viewport, ownText: r.ownText, inlineText: r.inlineText, elements: r.elements, name: r.name, parentWidth: r.parentWidth, instances: r.instances, classCount: r.classCount, ancestors: r.ancestors, inner: r.inner, page: r.page } : null;
+  r ? { source: r.source, component: r.component, tag: r.html.match(TAG)?.[1] ?? '', rect: r.rect, styles: r.styles, inherited: r.inherited, classes: r.classes, rem: r.rem, viewport: r.viewport, ownText: r.ownText, inlineText: r.inlineText, elements: r.elements, name: r.name, parentWidth: r.parentWidth, instances: r.instances, classCount: r.classCount, ancestors: r.ancestors, inner: r.inner, page: r.page, markup: r.html.startsWith('<svg') ? r.html : undefined } : null;
 
 export const sourceText = (s: Source) => `${s.file}:${s.line}:${s.col}`;
 

@@ -22,6 +22,9 @@
   import Field from './Field.svelte';
   import ShadowList from './ShadowList.svelte';
   import FillList from './FillList.svelte';
+  import IconActions from './IconActions.svelte';
+  import Link from '@lucide/svelte/icons/link';
+  import { iconRowNames } from './icon-controls';
   import type { FontChoice, Palette, Pick } from '../messages';
 
   type Props = { pick: Pick; onpreview: (row: Row, value: string) => void; onchange: (row: Row, value: string, token?: string) => void; onsavevar: (row: Row, name: string, css: string) => void; onhint: (hint: Hint | null) => void; onfont: (font: FontChoice) => void; palette: Palette };
@@ -57,6 +60,7 @@
   const EXTRA_SECTIONS = [...new Set(CSS_ROWS.map((s) => s.section))];
   const READS: Record<string, string> = Object.fromEntries(CSS_ROWS.map((s) => [s.name, s.reads[0]]));
 
+  let sizeLinked = $state(true);
   let closed = $state<Record<string, boolean>>(Object.fromEntries(EXTRA_SECTIONS.map((s) => [s, true])));
   let modes = $state<Record<string, SideMode>>({ [Group.Padding]: SideMode.All, [Group.Margin]: SideMode.All, [Group.Radius]: SideMode.All });
 
@@ -107,9 +111,9 @@
   </div>
 {/snippet}
 
-{#snippet field(r: NumberRow, prefix = r.label, iconSvg = '', compact = false)}
+{#snippet field(r: NumberRow, prefix = r.label, iconSvg = '', compact = false, twin: NumberRow | null = null)}
   {#snippet glyph()}<Icon svg={iconSvg} />{/snippet}
-  <Field name={r.name} {prefix} icon={iconSvg ? glyph : undefined} {compact} px={shared(r)} units={r.units} unit={r.units ? '' : r.unit} {context} min={r.range.min} max={r.range.max} onpreview={(v) => onpreview(r, v)} onchange={(v) => onchange(r, v)} />
+  <Field name={r.name} {prefix} icon={iconSvg ? glyph : undefined} {compact} px={shared(r)} units={r.units} unit={r.units ? '' : r.unit} {context} min={r.range.min} max={r.range.max} onpreview={(v) => (onpreview(r, v), twin && onpreview(twin, v))} onchange={(v) => (onchange(r, v), twin && onchange(twin, v))} />
 {/snippet}
 
 {#snippet segmented(r: Row, options: { value: string; label: string; icon: IconComponent }[])}
@@ -190,9 +194,33 @@
     </section>
   {/if}
 
+  {#if has(Section.Icon)}
+    <section data-section={Section.Icon}>
+      {@render header(Section.Icon)}
+      {#if !closed[Section.Icon]}
+        {#each iconRowNames(pick.styles) as name (name)}
+          {@const r = byName(name)}
+          <div class="row" data-row={name}>
+            <span class="label">{r.label}</span>
+            <div class="control">
+              {#if r.control === Control.Number}{@render field(r as NumberRow, '', '', true)}{:else}{@render colourRow(name)}{/if}
+            </div>
+          </div>
+        {/each}
+        <IconActions {pick} />
+      {/if}
+    </section>
+  {/if}
+
   {#if has(Section.Size)}
     <section data-section={Section.Size}>
-      {#snippet wh()}<div class="pair">{@render field(num('width'), 'W')}{@render field(num('height'), 'H')}</div>{/snippet}
+      {#snippet wh()}
+        {@const icon = !has(Section.Object) && has(Section.Icon) && sizeLinked}
+        <div class="pair">
+          {@render field(num('width'), 'W', '', false, icon ? num('height') : null)}{@render field(num('height'), 'H', '', false, icon ? num('width') : null)}
+          {#if has(Section.Icon)}<button type="button" class="icon" class:on={sizeLinked} title="Link width and height" aria-label="Link width and height" aria-pressed={sizeLinked} data-field="icon-size-link" onclick={() => (sizeLinked = !sizeLinked)}><Link size={12} /></button>{/if}
+        </div>
+      {/snippet}
       {@render header(Section.Size, wh, true)}
     </section>
   {/if}

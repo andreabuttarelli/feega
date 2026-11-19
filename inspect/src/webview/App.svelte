@@ -11,6 +11,7 @@
   import { untrack } from 'svelte';
   import { Mode, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
   import { fromHost, toHost } from './host';
+  import { iconSearch } from './icon-search.svelte';
   import { pageBridge, sourceText } from './page-bridge';
   import Properties from './Properties.svelte';
   import ModeSwitch from './ModeSwitch.svelte';
@@ -301,6 +302,7 @@
         }
       }, SETTLE_MS);
     },
+    [ToView.IconResults]: (m) => Object.assign(iconSearch, { id: m.id, library: m.library, hits: m.hits, error: m.error ?? '' }),
     [ToView.Pick]: (m) => bridge.at(m.x, m.y).then((pick) => ((picked = pick), toHost({ kind: ToHost.Picked, id: m.id, pick }))),
     [ToView.Change]: (m) => {
       const row = ROWS.find((r) => r.name === m.row);

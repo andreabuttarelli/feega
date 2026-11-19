@@ -7,10 +7,10 @@ const MODULE_EXTENSIONS = ['', '.ts', '.js', '.svelte.ts', '.svelte.js', '/index
 const declaration = (name: string) => new RegExp(`\\b(?:const|let|var|function)\\s+(${name})\\b`);
 const importOf = (name: string) => new RegExp(`import\\s*\\{[^}]*\\b${name}\\b[^}]*\\}\\s*from\\s*['"](\\.{1,2}/[^'"]+)['"]`);
 
-const dirOf = (file: string) => file.slice(0, file.lastIndexOf('/') + 1);
+export const dirOf = (file: string) => file.slice(0, file.lastIndexOf('/') + 1);
 const nameOf = (file: string) => file.slice(file.lastIndexOf('/') + 1);
 
-function joined(dir: string, relative: string): string {
+export function joined(dir: string, relative: string): string {
   const parts = dir.split('/').filter(Boolean);
   for (const piece of relative.split('/')) {
     if (piece === '..') {
@@ -24,7 +24,7 @@ function joined(dir: string, relative: string): string {
   return parts.join('/');
 }
 
-function declaredIn(text: string, file: string, name: string): LiveAt | null {
+export function declaredIn(text: string, file: string, name: string): LiveAt | null {
   const found = declaration(name).exec(text);
   if (!found) {
     return null;

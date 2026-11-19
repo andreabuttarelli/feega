@@ -226,4 +226,50 @@ describe('fileEdits', () => {
     expect(readFileSync(join(root, 'src/App.tsx'), 'utf8')).toBe(jsx);
     expect(existsSync(join(root, 'src/App.module.css'))).toBe(false);
   });
+
+  it('un colore sull\'svg inline scrive la proprieta svg come classe, e undo la toglie', async () => {
+    const root = app();
+    const nav = '<a><svg class="h-4" viewBox="0 0 1 1"></svg></a>\n';
+    writeFileSync(join(root, 'src/Nav.svelte'), nav);
+    const edits = fileEdits(root);
+    await edits.edit({ at: 'src/Nav.svelte:1:4', prop: LiveProp.Class, family: 'arbitrary:stroke', value: '[stroke:#ff0000]' });
+
+    expect(readFileSync(join(root, 'src/Nav.svelte'), 'utf8')).toContain('class="h-4 [stroke:#ff0000]"');
+    await edits.undo();
+    expect(readFileSync(join(root, 'src/Nav.svelte'), 'utf8')).toBe(nav);
+  });
+
+  it('sostituisce un componente lucide e undo lo ripristina', async () => {
+    const root = app(JSON.stringify({ dependencies: { 'lucide-react': '1' } }));
+    const jsx = "import { Heart } from 'lucide-react';\nexport const A = () => <Heart />;\n";
+    writeFileSync(join(root, 'src/A.tsx'), jsx);
+    const edits = fileEdits(root);
+    const out = await edits.icon('src/A.tsx:2:24', 'mail');
+
+    expect(out.ok).toBe(true);
+    expect(readFileSync(join(root, 'src/A.tsx'), 'utf8')).toBe("import { Mail } from 'lucide-react';\nexport const A = () => <Mail />;\n");
+    await edits.undo();
+    expect(readFileSync(join(root, 'src/A.tsx'), 'utf8')).toBe(jsx);
+  });
+
+  it('rifiuta di sostituire un\'icona senza libreria installata', async () => {
+    const root = app(PLAIN);
+    writeFileSync(join(root, 'src/A.tsx'), 'export const A = () => <Heart />;\n');
+    const out = await fileEdits(root).icon('src/A.tsx:1:24', 'mail');
+
+    expect(out).toEqual({ ok: false, reason: 'no icon library found in package.json' });
+  });
+
+  it('scrive la costante di un {@html}, come l\'icona della a.mac', async () => {
+    const root = app();
+    writeFileSync(join(root, 'src/Modes.svelte'), "<script>\n  import { APPLE } from './icons';\n</script>\n<a class=\"mac\">{@html APPLE}Mac app</a>\n");
+    const icons = "export const APPLE = '<svg></svg>';\n";
+    writeFileSync(join(root, 'src/icons.ts'), icons);
+    const edits = fileEdits(root);
+    await edits.svg('src/Modes.svelte:4:1', '<svg viewBox="0 0 1 1"></svg>', 'svg');
+
+    expect(readFileSync(join(root, 'src/icons.ts'), 'utf8')).toBe('export const APPLE = `<svg viewBox="0 0 1 1"></svg>`;\n');
+    await edits.undo();
+    expect(readFileSync(join(root, 'src/icons.ts'), 'utf8')).toBe(icons);
+  });
 });
