@@ -46,7 +46,41 @@
         "priority": "default"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "feega",
+          "title": "Feega",
+          "icon": "media/feega.svg"
+        }
+      ]
+    },
+    "views": {
+      "feega": [
+        {
+          "id": "feega.home",
+          "name": "Canvas"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "feega.home",
+        "contents": "Open a folder to work on a canvas.\n[Open Folder](command:vscode.openFolder)",
+        "when": "workbenchState == empty"
+      },
+      {
+        "view": "feega.home",
+        "contents": "[Open canvas](command:feega.openCanvas)\n[New canvas](command:feega.newCanvas)",
+        "when": "workbenchState != empty"
+      }
+    ],
     "commands": [
+      {
+        "command": "feega.openCanvas",
+        "title": "Open canvas",
+        "category": "Feega"
+      },
       {
         "command": "feega.newCanvas",
         "title": "New canvas",
@@ -66,7 +100,7 @@
     ]
   },
   "scripts": {
-    "test": "node --test canvas-run.test.js",
+    "test": "node --test canvas-run.test.js home.test.js",
     "package": "npx -y @vscode/vsce package --no-dependencies",
     "test:e2e": "node test/run.js"
   },

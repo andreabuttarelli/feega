@@ -2,6 +2,7 @@ const vscode = require('vscode');
 const { spawn } = require('node:child_process');
 const { readFile, writeFile } = require('node:fs/promises');
 const { Launch, launchArgs, mcpServers, canvasFileFor, canvasPage, eventReader, importMessage, gitignoreWith, progressOf, advance, failedAt, finishedAll, stepsPage, logTail, spawnOptions, RETRY, localUrl, freePort, readyProbe, served } = require('./canvas-run');
+const { Home, homeAction, openOnShow } = require('./home');
 
 const READY_POLL_MS = 400;
 const QUIET_TIMEOUT_MS = 180_000;
@@ -245,6 +246,30 @@ function importFolder(output) {
   return canvasPanel(canvasFileFor(folder), Launch.ImportFolder, output);
 }
 
+const openWith = (file) => vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(file), 'feega.canvas');
+
+const homeOpens = {
+  [Home.New]: (files, output) => newCanvas(output),
+  [Home.Open]: ([file]) => openWith(file),
+  [Home.Pick]: async (files) => {
+    const picked = await vscode.window.showQuickPick(files.map((file) => ({ label: vscode.workspace.asRelativePath(file), file })), { title: 'Feega: which canvas?' });
+    if (picked) {
+      return openWith(picked.file);
+    }
+  }
+};
+
+async function homeLauncher(output) {
+  if (!vscode.workspace.workspaceFolders?.length) {
+    return null;
+  }
+
+  const files = (await vscode.workspace.findFiles('**/*.feega', '**/node_modules/**')).map((uri) => uri.fsPath);
+  return () => homeOpens[homeAction(files)](files, output);
+}
+
+const hideSidebar = () => vscode.commands.executeCommand('workbench.action.closeSidebar');
+
 function activate(context) {
   state = context.workspaceState;
   const output = vscode.window.createOutputChannel('Feega');
@@ -253,6 +278,13 @@ function activate(context) {
     vscode.window.registerCustomEditorProvider('feega.canvas', canvasEditor(output), { webviewOptions: { retainContextWhenHidden: true } }),
     vscode.commands.registerCommand('feega.newCanvas', () => newCanvas(output)),
     vscode.commands.registerCommand('feega.importFolder', () => importFolder(output))
+  );
+
+  const home = vscode.window.createTreeView('feega.home', { treeDataProvider: { getChildren: () => [], getTreeItem: (item) => item } });
+  context.subscriptions.push(
+    home,
+    openOnShow(home, () => homeLauncher(output), hideSidebar),
+    vscode.commands.registerCommand('feega.openCanvas', async () => (await homeLauncher(output))?.())
   );
 
   if (vscode.lm?.registerMcpServerDefinitionProvider) {

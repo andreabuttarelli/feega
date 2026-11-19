@@ -23,6 +23,10 @@ Each version is also attached to its GitHub release as a `.vsix` file, for edito
 from a file. The extension needs Node 22 or later on your machine.
 
 - **Open a `.feega` file**: it opens as a canvas. The first time, the app downloads once.
+- **Feega icon** in the activity bar (left sidebar): opens the workspace's canvas. With several
+  `.feega` files a quick-pick asks which one; with none it runs **Feega: New canvas**. The sidebar
+  closes once the canvas opens, so the next click on the icon opens it again. The same is in the
+  command palette as **Feega: Open canvas**.
 - **Feega: New canvas** (command palette): picks where to save a new `.feega` file and opens it.
 - **Feega: Import this folder into a canvas**: creates `<folder>.feega` in the workspace and draws
   the project's pages on it, as `npx feega --import` does: every static page the router finds, up

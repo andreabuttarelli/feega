@@ -19,7 +19,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - run: node --test canvas-run.test.js
+      - run: npm test
       - name: Version from the tag
         if: startsWith(github.ref, 'refs/tags/vscode-v')
         run: npm version --no-git-tag-version --allow-same-version "${GITHUB_REF_NAME#vscode-v}"
