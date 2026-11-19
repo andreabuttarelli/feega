@@ -1,0 +1,41 @@
+{
+  "name": "feega-inspect",
+  "displayName": "Feega Inspect",
+  "description": "Click an element of your running web app and edit its design: the change is written to your source as a Tailwind class or your own token.",
+  "version": "0.1.0",
+  "publisher": "AndreaButtarelli",
+  "license": "Apache-2.0",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/andreabuttarelli/feega",
+    "directory": "inspect"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "main": "./dist/extension.cjs",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "feegaInspect.open",
+        "title": "Open the running app",
+        "category": "Feega Inspect"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "package": "npm run build && npx -y @vscode/vsce package --no-dependencies --allow-missing-repository --skip-license",
+    "test:e2e": "npm run build && node test/run.cjs"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "@vscode/test-electron": "^2.4.1"
+  }
+}

@@ -1,0 +1,7 @@
+src/**
+test/**
+launcher/**
+build.mjs
+node_modules/**
+*.vsix
+.vscode-test/**

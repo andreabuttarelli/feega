@@ -1,0 +1,38 @@
+:root {
+  --ui-accent: var(--vscode-focusBorder, #0099ff);
+  --ui-accent-ink: #ffffff;
+  --ui-panel: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  --ui-text: var(--vscode-foreground);
+  --ui-text-2: color-mix(in srgb, var(--ui-text) 60%, transparent);
+  --ui-text-3: color-mix(in srgb, var(--ui-text) 40%, transparent);
+  --ui-ink: var(--ui-text);
+  --ui-ink-2: var(--ui-text-2);
+  --ui-ink-3: var(--ui-text-3);
+  --ui-divider: var(--vscode-panel-border, color-mix(in srgb, var(--ui-text) 12%, transparent));
+  --ui-line-strong: color-mix(in srgb, var(--ui-text) 24%, transparent);
+  --ui-input: var(--vscode-input-background, color-mix(in srgb, var(--ui-text) 8%, transparent));
+  --ui-input-hover: color-mix(in srgb, var(--ui-text) 14%, transparent);
+  --ui-radius-xs: 2px;
+  --ui-radius-sm: 4px;
+  --ui-radius-md: 6px;
+  --ui-radius-full: 9999px;
+  --ui-space-2: 8px;
+  --ui-space-4: 16px;
+  --ui-row: 32px;
+  --ui-hit: 24px;
+  --ui-header-h: 40px;
+  --ui-text-xs: 11px;
+  --ui-text-sm: 12px;
+  --ui-text-md: 13px;
+  --ui-dur-fast: 120ms;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--vscode-editor-background, #1e1e1e);
+  color: var(--ui-text);
+  font-family: var(--vscode-font-family, system-ui, sans-serif);
+  font-size: var(--ui-text-md);
+}
