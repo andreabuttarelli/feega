@@ -61,7 +61,12 @@
   }
 
   .main {
-    padding: 12px 18px 12px 26px;
+    display: flex;
+    align-items: center;
+    min-height: 48px;
+    line-height: 1;
+    text-box: trim-both cap alphabetic;
+    padding: 0 18px 0 26px;
     color: inherit;
     font-size: 17px;
     font-weight: 600;
