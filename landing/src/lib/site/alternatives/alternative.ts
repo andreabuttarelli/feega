@@ -1,3 +1,5 @@
+import type { LogoKey } from './logos';
+
 export enum ArticleKind {
   Roundup = 'roundup',
   UseCase = 'use-case',
@@ -12,6 +14,7 @@ export type Section = { readonly heading: string; readonly html: string };
 
 export type Article = {
   readonly kind: ArticleKind;
+  readonly logo?: LogoKey;
   readonly title: string;
   readonly description: string;
   readonly heading: string;

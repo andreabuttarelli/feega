@@ -1,9 +1,15 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { flagColour } from '../ascii-field';
+  import Mark from '../Mark.svelte';
+  import { MarkTone } from '../mark';
   import { densityAt, glyphAt, type Cover } from './cover';
+  import { LOGOS, type LogoKey } from './logos';
 
-  let { cover, label }: { cover: Cover; label: string } = $props();
+  let { cover, label, logo }: { cover: Cover; label: string; logo?: LogoKey } = $props();
+
+  const LOGO_SIZE = 56;
+  const MARK_SIZE = 66;
 
   const CELL = 16;
   const FONT = '13px ui-monospace, SFMono-Regular, Menlo, monospace';
@@ -52,14 +58,40 @@
   });
 </script>
 
-<canvas class="ascii-cover" bind:this={canvas} aria-label={label}></canvas>
+<div class="ascii-cover">
+  <canvas bind:this={canvas} aria-label={label}></canvas>
+  {#if logo}
+    <div class="pair" aria-hidden="true">
+      <Mark size={MARK_SIZE} tone={MarkTone.Mono} />
+      <svg width={LOGO_SIZE} height={LOGO_SIZE} viewBox={LOGOS[logo].viewBox} fill="currentColor"><path d={LOGOS[logo].d} fill-rule="evenodd" /></svg>
+    </div>
+  {/if}
+</div>
 
 <style>
   .ascii-cover {
-    display: block;
+    position: relative;
     width: 100%;
     aspect-ratio: 2 / 1;
     background: #0a0a0a;
     border-radius: 10px;
+    overflow: hidden;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .pair {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+    color: #fff;
+    background: radial-gradient(closest-side, rgb(10 10 10 / 0.85), rgb(10 10 10 / 0));
   }
 </style>

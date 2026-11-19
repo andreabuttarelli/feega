@@ -30,7 +30,7 @@
     <div class="cards">
       {#each ofKind(kind) as [slug, article] (slug)}
         <a class="card" href={alternativePath(slug)}>
-          <AsciiCover cover={coverFor(slugs.indexOf(slug))} label={article.heading} />
+          <AsciiCover cover={coverFor(slugs.indexOf(slug))} label={article.heading} logo={article.logo} />
           <strong>{article.heading}</strong>
           <span>{article.hook}</span>
         </a>
