@@ -9,7 +9,18 @@
   import WorksWith from './WorksWith.svelte';
   import { LEAD_AGENTS, LEAD_EDITORS, type AgentChip, type LeadChip } from './works-with';
 
+  import { MockWindow as Window } from './mock-window';
+
   const MOCK_WIDTH = 960;
+
+  let front = $state(Window.Editor);
+
+  function raise(w: Window, e: KeyboardEvent | MouseEvent) {
+    if (e instanceof KeyboardEvent && e.key !== 'Enter' && e.key !== ' ') {
+      return;
+    }
+    front = w;
+  }
 
   let fitWidth = $state(MOCK_WIDTH);
   let mockHeight = $state(0);
@@ -51,8 +62,8 @@
   <div class="fit" bind:clientWidth={fitWidth} style:height="{mockHeight * scale}px">
     <div class="mock" bind:offsetHeight={mockHeight} style:transform="scale({scale})">
       <AsciiField fit={FieldFit.Box} />
-      <div class="term"><TerminalMock /></div>
-      <div class="win"><EditorMock /></div>
+      <div class="term" class:front={front === Window.Terminal} role="button" tabindex="0" aria-label="Bring the terminal to front" onclick={(e) => raise(Window.Terminal, e)} onkeydown={(e) => raise(Window.Terminal, e)}><TerminalMock /></div>
+      <div class="win" class:front={front === Window.Editor} role="button" tabindex="0" aria-label="Bring the editor to front" onclick={(e) => raise(Window.Editor, e)} onkeydown={(e) => raise(Window.Editor, e)}><EditorMock /></div>
     </div>
   </div>
 
@@ -162,18 +173,35 @@
 
   .mock .win {
     position: relative;
-    z-index: 2;
+    z-index: 1;
     width: 84%;
-    margin: 0 16% 230px 0;
+    margin: 0 16% 110px 0;
   }
 
   .mock .term {
     position: absolute;
     z-index: 1;
-    bottom: 28px;
-    right: 28px;
-    width: 52%;
-    height: 420px;
+    bottom: 40px;
+    right: 40px;
+    width: 58%;
+    height: 440px;
+  }
+
+  .mock .win,
+  .mock .term {
+    cursor: pointer;
+    outline: none;
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .mock .front {
+    z-index: 2;
+    cursor: default;
+  }
+
+  .mock .win:not(.front):hover,
+  .mock .term:not(.front):hover {
+    transform: translateY(-4px);
   }
 
   @media (min-width: 1200px) {
