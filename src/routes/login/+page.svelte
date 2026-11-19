@@ -324,7 +324,6 @@
             {@html $_('login.legal.notice', {
               values: {
                 terms: legalLink(legalHref('terms'), $_('legal.terms')),
-                acceptableUse: legalLink(legalHref('acceptableUse'), $_('legal.acceptableUse')),
                 privacy: legalLink(legalHref('privacy'), $_('legal.privacy')),
                 cookies: legalLink(legalHref('cookies'), $_('legal.cookies'))
               }

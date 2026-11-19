@@ -74,19 +74,14 @@
       "dismiss": "Dismiss"
     },
     "legal": {
-      "notice": "By continuing, you agree to feega's {terms} and {acceptableUse} and acknowledge the {privacy} and {cookies}."
+      "notice": "By continuing, you agree to feega's {terms} and acknowledge the {privacy} and {cookies}."
     }
   },
   "legal": {
     "terms": "Terms of Service",
-    "acceptableUse": "Acceptable Use Policy",
     "privacy": "Privacy Policy",
     "cookies": "Cookie Policy",
     "refunds": "Refund Policy",
-    "aiTransparency": "AI Transparency",
-    "dpa": "Data Processing Agreement",
-    "subprocessors": "Sub-processors",
-    "legalNotice": "Legal Notice",
     "menuLabel": "Legal",
     "updated": {
       "title": "We updated our Terms",

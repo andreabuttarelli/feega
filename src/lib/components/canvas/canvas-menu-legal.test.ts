@@ -19,7 +19,7 @@ describe('il sottomenu Legal nel menu hamburger', () => {
     expect(component).toMatch(/target="_blank" rel="noopener"/);
   });
 
-  it('la tabella copre tutte le nove pagine legali', () => {
-    expect(FOOTER_LEGAL_LINKS).toHaveLength(9);
+  it('la tabella copre tutte le quattro pagine legali', () => {
+    expect(FOOTER_LEGAL_LINKS).toHaveLength(4);
   });
 });
