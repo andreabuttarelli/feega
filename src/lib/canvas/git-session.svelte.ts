@@ -1,5 +1,5 @@
 import { AutosaveState, codeAutosave, outcomeOf } from './code-autosave';
-import { commitDue, commitSummary, gitSummary, onGithub } from './git-status';
+import { commitDue, commitSummary, gitSummary, withGit } from './git-status';
 import type { FrameSync } from './source-changes';
 
 const COMMIT_CHECK_MS = 15_000;
@@ -24,15 +24,16 @@ export function gitSession(projectId: () => string, sources: GitSources, nameOf:
     const res = await fetchFn(url(path), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), keepalive }).catch(() => null);
     return (await res?.json().catch(() => null)) as Answer | null;
   };
-  const githubIds = () => onGithub(sources.all()).map((s) => s.nodeId);
+  const githubIds = () => withGit(sources.all()).map((s) => s.nodeId);
 
   const autosave = codeAutosave({
     save: async (nodeIds) => {
-      const ids = nodeIds.filter((id) => githubIds().includes(id));
-      if (!ids.length) {
+      const rows = withGit(sources.all()).filter((s) => nodeIds.includes(s.nodeId));
+      if (!rows.length) {
         return AutosaveState.Saved;
       }
-      const state = outcomeOf(await post('/wip', { nodeIds: ids }));
+      const live = rows.every((r) => r.caps && !r.caps.wip);
+      const state = live ? (rows[0].link.workBranch ? AutosaveState.Saved : AutosaveState.NeedsBranch) : outcomeOf(await post('/wip', { nodeIds: rows.map((r) => r.nodeId) }));
       if (state === AutosaveState.Saved) {
         const now = Date.now();
         firstAt ??= now;
@@ -49,7 +50,7 @@ export function gitSession(projectId: () => string, sources: GitSources, nameOf:
   });
 
   const draftMessage = () => {
-    const rows = onGithub(sources.all()).filter((s) => s.state === 'modified' || s.state === 'conflict');
+    const rows = withGit(sources.all()).filter((s) => s.state === 'modified' || s.state === 'conflict');
     return commitSummary(rows.map((r) => nameOf(r.nodeId) || r.name || 'frame'), [...new Set(rows.map((r) => r.link.entry))]);
   };
 

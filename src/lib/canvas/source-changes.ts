@@ -21,7 +21,9 @@ export type Affected = { path: string; pages: number };
 
 export type Proposal = { component: string; props: string[] };
 
-export type FrameSync = { nodeId: string; name: string; state: string; link: LinkView; push: { pull?: PullView | null; upstream?: unknown[]; diverged?: boolean } | null; affected?: Affected[]; proposals?: Proposal[] };
+export type HostCapsView = { git: boolean; wip: boolean; publish: boolean; pulls: 'ready' | 'connect' | 'none' };
+
+export type FrameSync = { caps?: HostCapsView; nodeId: string; name: string; state: string; link: LinkView; push: { pull?: PullView | null; upstream?: unknown[]; diverged?: boolean } | null; affected?: Affected[]; proposals?: Proposal[] };
 
 export type Popover = { file: string; commit: string; branch: string; actions: SourceAction[] };
 

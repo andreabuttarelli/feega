@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AutosaveState } from './code-autosave';
-import { commitDue, commitSummary, gitSummary, onGithub, COMMIT_IDLE_MS, COMMIT_MAX_MS } from './git-status';
+import { commitDue, commitSummary, gitSummary, withGit, COMMIT_IDLE_MS, COMMIT_MAX_MS } from './git-status';
 import { CiState, type FrameSync } from './source-changes';
 
 const sync = (over: Partial<FrameSync> = {}): FrameSync => ({
@@ -15,8 +15,10 @@ const sync = (over: Partial<FrameSync> = {}): FrameSync => ({
 const pull = { number: 4, url: 'https://github.com/acme/app/pull/4', status: 'open', draft: true, checks: [{ name: 'ci', status: 'completed', conclusion: 'success' }] };
 
 describe('frame GitHub', () => {
-  it('solo i frame GitHub, non le cartelle locali', () => {
-    expect(onGithub([sync(), sync({ nodeId: 'n2', link: { ...sync().link, source: 'folder' } })]).map((s) => s.nodeId)).toEqual(['n1']);
+  it('i frame GitHub e le cartelle che sono repo git; una cartella senza git no', () => {
+    const folder = (nodeId: string, git: boolean) => sync({ nodeId, link: { ...sync().link, source: 'folder' }, caps: { git, wip: false, publish: false, pulls: 'none' } });
+
+    expect(withGit([sync(), folder('n2', true), folder('n3', false)]).map((s) => s.nodeId)).toEqual(['n1', 'n2']);
   });
 });
 
@@ -49,6 +51,6 @@ describe('lo stato git nella barra in alto', () => {
   it('ramo di lavoro, cambi a monte, PR in bozza e CI', () => {
     const s = sync({ link: { ...sync().link, workBranch: 'design/hero' }, push: { pull, upstream: [{ path: 'a' }, { path: 'b' }] } });
 
-    expect(gitSummary([s], AutosaveState.Saved)).toEqual({ repo: 'acme/app', branch: 'design/hero', imported: 'main', upstream: 2, pull, draft: true, ci: CiState.Passed, autosave: AutosaveState.Saved, nodeId: 'n1' });
+    expect(gitSummary([s], AutosaveState.Saved)).toEqual({ caps: { git: true, wip: true, publish: true, pulls: 'ready' }, repo: 'acme/app', branch: 'design/hero', imported: 'main', upstream: 2, pull, draft: true, ci: CiState.Passed, autosave: AutosaveState.Saved, nodeId: 'n1' });
   });
 });

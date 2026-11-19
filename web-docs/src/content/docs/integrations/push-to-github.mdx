@@ -55,6 +55,11 @@ When the canvas has frames linked to GitHub, the right side of the top bar shows
 
 All calls to GitHub go through your connected GitHub account.
 
+## Local folders that are git repos
+
+In local mode, a folder that is not a git repository shows no git controls: edits are written to its files live. A folder that is a git repository gets the same top-bar group and **Changes** panel: the working branch is a local branch, edits are already written to the files live, and the same summary commits land on that branch. With an `origin`, commits are pushed with your own git credentials on this machine (**Commit and push**). **Open pull request** shows only when `origin` is on GitHub and goes through your connected GitHub account; without one the panel shows **Connect GitHub**. Choosing a branch moves Feega's commits there; it does not run `git checkout` on your working tree.
+
+
 ## Safety
 
 - Files named `.env` or `.env.*` are never read nor written.

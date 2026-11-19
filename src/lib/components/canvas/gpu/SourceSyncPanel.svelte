@@ -274,6 +274,15 @@
     busy = false;
   }
 
+  const commitLabel = $derived(git && !git.caps.wip && git.caps.publish ? 'Commit and push' : 'Commit now');
+
+  async function connectGithub() {
+    const body = await call(`/api/v1/projects/${projectId}/github/connect`, { method: 'POST', body: JSON.stringify({ returnTo: location.pathname }) });
+    if (typeof body?.url === 'string') {
+      location.assign(body.url);
+    }
+  }
+
   async function openPullRequest() {
     if (!pullTarget) {
       return;
@@ -390,7 +399,7 @@
         {#if rows.length && workBranch}
           <div class="cp-commit">
             <Input aria-label="Commit message" bind:value={message} data-testid="commit-message" />
-            <Button size="sm" disabled={busy || readOnly} onclick={commitNow} data-testid="commit-now">Commit now</Button>
+            <Button size="sm" disabled={busy || readOnly} onclick={commitNow} data-testid="commit-now">{commitLabel}</Button>
           </div>
         {/if}
       </section>
@@ -431,7 +440,7 @@
         </section>
       </div>
 
-      <div class="cp-section">
+      {#if git?.caps.pulls !== 'none'}<div class="cp-section">
         <p class="cp-label">Pull request</p>
         <section class="cp-card cp-stack" data-testid="pull-section">
           {#if git?.pull || branchPull}
@@ -439,6 +448,9 @@
               <GitPullRequest size={14} />
               <span class="cp-row-text"><span>#{git?.pull?.number ?? branchPull?.number} from <code>{workBranch}</code></span><span class="cp-muted">{git?.draft ? 'Draft: mark it ready from the top bar' : 'Open'}{#if git?.pull && git.ci !== CiState.None} · {CI_LABEL[git.ci]}{/if}</span></span>
             </div>
+          {:else if git?.caps.pulls === 'connect'}
+            <p class="cp-muted">Pull requests go through your GitHub account.</p>
+            <Button size="sm" variant="secondary" disabled={busy} onclick={connectGithub} data-testid="connect-github">Connect GitHub</Button>
           {:else if pullTargets.length}
             <div class="cp-pr-target">
               <span>Into</span>
@@ -449,7 +461,7 @@
             <p class="cp-muted">Commits land on {workBranch} directly.</p>
           {/if}
         </section>
-      </div>
+      </div>{/if}
     {/if}
 
     <div class="cp-section">

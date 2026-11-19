@@ -5,6 +5,7 @@ import { Access, GitError, GitFailure, PullStatus, type GitHost } from './git-ho
 import { CodeSourceKind, EntryKind, followRenames, isPushable, linkStatus, type CodeLink, type LinkState } from './link';
 import type { LinkStore } from './link-store';
 import type { PushLock } from './push-lock';
+import type { HostCaps } from './hosts';
 import { relocated, suggestedRoute, VariantChoice, type Suggested, type VariantAsk } from './variants';
 import { checkoutBranch, openPull, PullKind, PushRefusal, pushFiles, pushStatus, readyPull, saveWip, undoPush, type CheckedOut, type LastPush, type PullOpened, type PushRefused, type PushState, type Pushed, type Readied, type Saved, type Undone } from './push';
 
@@ -25,13 +26,14 @@ export type FramesDeps = {
   edits: (scope: CodeScope, nodeId: string, target?: EditTarget) => Promise<CodeEdits | SyncRefusal>;
   links: LinkStore;
   lock: PushLock;
+  caps?: (source: CodeSourceKind, repo: string) => Promise<HostCaps>;
 };
 
 export type FramesPushAsk = { name: string; nodeIds: string[]; title?: string; body?: string; since?: LastPush; base?: string; coAuthors?: string[]; confirmSensitive?: boolean; mains?: string[]; variants?: VariantAsk[] };
 
 export type Affected = { path: string; pages: number };
 
-export type FrameStatus = { ok: true; state: LinkState; link: CodeLink; push: PushState | null; affected: Affected[]; proposals: PropProposal[] };
+export type FrameStatus = { ok: true; state: LinkState; link: CodeLink; push: PushState | null; affected: Affected[]; proposals: PropProposal[]; caps?: HostCaps };
 
 const DEFAULT_TITLE = 'UI edits from Feega';
 const DEFAULT_BODY = 'Edited on the Feega canvas.';
@@ -174,7 +176,8 @@ export async function frameStatus(deps: FramesDeps, scope: CodeScope, nodeId: st
   const push = writable && link.pushBranch && link.pushSha ? await pushStatus(host, { branch: link.pushBranch, sha: link.pushSha, baseSha: link.baseSha, base: link.baseBranch }) : null;
   const state = push && push.ok ? push : null;
   const inPull = state?.pull?.status === PullStatus.Open;
-  return { ok: true, state: linkStatus({ link, upstream, modified, writable, inPull }), link, push: state, affected, proposals: typeof edits === 'string' ? [] : (edits.proposals ?? []) };
+  const caps = deps.caps ? await deps.caps(link.source, link.repo) : undefined;
+  return { ok: true, state: linkStatus({ link, upstream, modified, writable, inPull }), link, push: state, affected, proposals: typeof edits === 'string' ? [] : (edits.proposals ?? []), ...(caps ? { caps } : {}) };
 }
 
 export async function frameUndo(deps: FramesDeps, nodeId: string): Promise<Undone | FramesRefused> {
