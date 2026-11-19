@@ -1,5 +1,5 @@
 const { createServer } = require('node:net');
-const { basename, dirname, join } = require('node:path');
+const { basename, join } = require('node:path');
 
 const PACKAGE = 'feega@latest';
 const LOOPBACK = '127.0.0.1';
@@ -19,7 +19,16 @@ const launchArgs = (file, port, launch) => ['-y', PACKAGE, file, '--port', Strin
 const mcpServers = (running) =>
   [...running].map(([file, port]) => ({ label: `feega ${basename(file, EXTENSION)}`, command: 'npx', args: ['-y', PACKAGE, 'mcp', '--port', String(port)] }));
 
-const canvasFileFor = (folder) => join(folder, `${basename(folder)}${EXTENSION}`);
+const DEV_SCRIPT = ['scripts', 'local.mjs'];
+
+const launcherOf = (devServerPath, target, port, launch) =>
+  devServerPath ? { command: 'node', args: [join(devServerPath, ...DEV_SCRIPT), target, `--port=${port}`] } : { command: 'npx', args: launchArgs(target, port, launch) };
+
+const legacyMove = (folder, exists) => {
+  const from = join(folder, `${basename(folder)}${EXTENSION}`);
+  const to = join(folder, EXTENSION);
+  return exists(from) && !exists(to) ? { from, to } : null;
+};
 
 const localUrl = (port) => `http://${LOOPBACK}:${port}`;
 
@@ -237,7 +246,7 @@ const logTail = (max) => {
   };
 };
 
-const spawnOptions = (file, platform, env) => ({ cwd: dirname(file), shell: platform === 'win32', env, detached: platform !== 'win32' });
+const spawnOptions = (cwd, platform, env) => ({ cwd, shell: platform === 'win32', env, detached: platform !== 'win32' });
 
 const freePort = () =>
   new Promise((done, fail) => {
@@ -286,16 +295,4 @@ const importMessage = ({ pages, needsValue, leftOut }, file) => {
   return `${parts.join('; ')}. Canvas: ${file}`;
 };
 
-const GITIGNORE_ENTRY = '*.feega';
-
-const gitignoreWith = (content) => {
-  const lines = content.split('\n').map((l) => l.trim());
-  if (lines.includes(GITIGNORE_ENTRY)) {
-    return null;
-  }
-
-  const base = content === '' || content.endsWith('\n') ? content : `${content}\n`;
-  return `${base}${GITIGNORE_ENTRY}\n`;
-};
-
-module.exports = { eventReader, importMessage, gitignoreWith, readyProbe, served, Launch, launchArgs, mcpServers, canvasFileFor, canvasPage, progressOf, advance, failedAt, finishedAll, stepsPage, lineEvent, logTail, spawnOptions, Step, RETRY, localUrl, freePort };
+module.exports = { eventReader, importMessage, readyProbe, served, Launch, launchArgs, launcherOf, legacyMove, mcpServers, canvasPage, progressOf, advance, failedAt, finishedAll, stepsPage, lineEvent, logTail, spawnOptions, Step, RETRY, localUrl, freePort };

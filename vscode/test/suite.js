@@ -15,11 +15,21 @@ async function until(check) {
   return null;
 }
 
+async function openCanvas() {
+  const dev = process.env.FEEGA_DEV_SERVER;
+  if (dev) {
+    await vscode.workspace.getConfiguration('feega').update('devServerPath', dev, vscode.ConfigurationTarget.Global);
+  }
+  if (process.env.FEEGA_TEST_FILE) {
+    return vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(process.env.FEEGA_TEST_FILE), 'feega.canvas');
+  }
+  return vscode.commands.executeCommand('feega.openProject');
+}
+
 exports.run = async () => {
-  const file = vscode.Uri.file(process.env.FEEGA_TEST_FILE);
-  await vscode.commands.executeCommand('vscode.openWith', file, 'feega.canvas');
+  await openCanvas();
   const api = vscode.extensions.getExtension('AndreaButtarelli.feega');
-  assert.ok(api.isActive, 'the extension activates on a .feega file');
+  assert.ok(api.isActive, 'the extension activates');
 
   const servers = await until(() => api.exports.runningCanvases().length && api.exports.runningCanvases());
   assert.ok(servers, 'the canvas server answers');
@@ -30,5 +40,7 @@ exports.run = async () => {
 
   const mcp = api.exports.mcpServers();
   assert.deepEqual(mcp[0].args.slice(-2), ['--port', String(port)], 'MCP points at the open canvas');
-  console.log(`FEEGA_E2E_OK port=${port} mcp=${mcp[0].label}`);
+
+  const git = await (await fetch(`http://127.0.0.1:${port}/local/git`)).json();
+  console.log(`FEEGA_E2E_OK port=${port} mcp=${mcp[0].label} git=${JSON.stringify(git)}`);
 };
