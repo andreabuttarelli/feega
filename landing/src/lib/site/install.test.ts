@@ -61,7 +61,8 @@ describe('download options', () => {
     expect(options[4]).toMatchObject({ command: 'npx feega' });
   });
 
-  it('unpublished: every option is marked coming soon', () => {
-    expect(installOptions(false).every((o) => o.soon)).toBe(true);
+  it('only targets already listed are live; the rest say soon', () => {
+    const soon = Object.fromEntries(installOptions(true).map((o) => [o.label, o.soon]));
+    expect(soon).toEqual({ 'VS Code': false, Cursor: true, Windsurf: true, 'VSCodium / Open VSX': true, Terminal: false });
   });
 });

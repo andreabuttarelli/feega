@@ -1,4 +1,4 @@
-import { COFFEE_URL, EDITORS, EXTENSION_PUBLISHED, GITHUB_URL, MARKETPLACE_URL, NPX_COMMAND, type Editor } from './links';
+import { COFFEE_URL, EDITORS, EXTENSION_PUBLISHED, GITHUB_URL, MARKETPLACE_URL, NPX_COMMAND, NPX_LISTED, type Editor } from './links';
 
 const DOWNLOAD_LABEL = 'Download for free';
 
@@ -34,9 +34,9 @@ export const installOptions = (published: boolean = EXTENSION_PUBLISHED): readon
     label: e.label,
     href: e.webUrl,
     deepLink: e.installUrl === e.webUrl ? undefined : e.installUrl,
-    soon: !published
+    soon: !published || !e.listed
   })),
-  { label: 'Terminal', href: GITHUB_URL, command: NPX_COMMAND, soon: !published }
+  { label: 'Terminal', href: GITHUB_URL, command: NPX_COMMAND, soon: !published || !NPX_LISTED }
 ];
 
 export const isMobile = (userAgent: string): boolean => /android|iphone|ipad|ipod/i.test(userAgent);

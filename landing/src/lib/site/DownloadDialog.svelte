@@ -1,5 +1,6 @@
 <script lang="ts">
   import { follow, installOptions, type InstallOption } from './install';
+  import { EDITOR_ICONS } from './editor-icons';
 
   let { open = $bindable(false) }: { open?: boolean } = $props();
 
@@ -48,6 +49,7 @@
       {#each options as option (option.label)}
         <li>
           <button class="option" disabled={option.soon} onclick={() => choose(option)}>
+            <span class="icon">{@html EDITOR_ICONS[option.label]}</span>
             <span class="name">{option.command ? 'Install with npx' : `Extension for ${option.label}`}</span>
             {#if option.command}<code>{option.command}</code>{/if}
             {#if option.soon}<span class="soon">soon</span>{:else if option.command}<span class="hint">{copied ? 'copied' : 'copy'}</span>{/if}
@@ -81,7 +83,8 @@
     align-items: center;
     justify-content: space-between;
     margin-bottom: 16px;
-    font-size: 17px;
+    font-size: 19px;
+    letter-spacing: -0.01em;
   }
 
   .close {
@@ -111,7 +114,8 @@
     border-radius: 6px;
     background: rgb(255 255 255 / 0.04);
     color: #fff;
-    font-size: 15px;
+    font-size: 16px;
+    line-height: 1.3;
     text-align: left;
     cursor: pointer;
   }
@@ -122,22 +126,29 @@
 
   .option:disabled {
     cursor: default;
-    opacity: 0.6;
+    opacity: 0.75;
+  }
+
+  .icon {
+    display: flex;
+    flex: none;
+    color: #fff;
   }
 
   .name {
     flex: 1;
+    font-weight: 500;
   }
 
   code {
     font-family: 'DM Mono', monospace;
     font-size: 13px;
-    color: rgb(255 255 255 / 0.7);
+    color: rgb(255 255 255 / 0.85);
   }
 
   .soon,
   .hint {
-    font-size: 12px;
-    color: rgb(255 255 255 / 0.5);
+    font-size: 13px;
+    color: rgb(255 255 255 / 0.7);
   }
 </style>
