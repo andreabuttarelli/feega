@@ -128,7 +128,7 @@ export type HostMessage =
   | { kind: ToHost.SourceControl };
 
 export type ViewMessage =
-  | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null }
+  | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string }
   | { kind: ToView.Server; state: ServerState; reason?: string; info?: ServerInfo }
   | { kind: ToView.Settings; values: Settings; facts: ReportFacts }
   | { kind: ToView.History; changes: ChangeRow[]; canUndo: boolean; canRedo: boolean }
@@ -159,6 +159,7 @@ export const TEXT_EDIT = 'feega:text:edit';
 export const TEXT_DONE = 'feega:text:done';
 export const TRACK = 'feega:track';
 export const TRACKED = 'feega:tracked';
+export const LEAVE = 'feega:leave';
 
 export enum Slot {
   Selected = 'selected',

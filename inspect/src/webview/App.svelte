@@ -53,6 +53,14 @@
   let editing = $state(false);
   let hover = $state<Pick | null>(null);
   let picked = $state<Pick | null>(null);
+  const TOAST_MS = 2500;
+  let toast = $state<string | null>(null);
+  let toastTimer: ReturnType<typeof setTimeout> | undefined;
+  function showToast(text: string) {
+    toast = text;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => (toast = null), TOAST_MS);
+  }
   let frame = $state<HTMLIFrameElement | null>(null);
   let saved = $state<Source | null>(null);
   let problem = $state<{ text: string; at?: Source } | null>(null);
@@ -157,7 +165,10 @@
   const canForward = $derived((navTick, history.canForward()));
 
   const bridge = pageBridge(() => frame, {
-    ready: (path) => {
+    ready: (path, restored) => {
+      if (restored) {
+        showToast('Page reloaded · scroll and selection kept');
+      }
       bridged = true;
       server = ServerState.Running;
       visited(path);
@@ -204,6 +215,7 @@
     if (path === null || !url) {
       return;
     }
+    bridge.leave();
     bridged = false;
     server = ServerState.Reloading;
     frame!.src = new URL(path, url).toString();
@@ -253,7 +265,7 @@
   }
 
   const handlers: { [K in ToView]: (m: Extract<ViewMessage, { kind: K }>) => void } = {
-    [ToView.App]: (m) => (restore(m.prefs), (start = new URL(route, m.url).toString()), (url = m.url), (styling = m.styling)),
+    [ToView.App]: (m) => (restore(m.prefs), (route = m.route ?? route), (start = new URL(route, m.url).toString()), (url = m.url), (styling = m.styling)),
     [ToView.History]: (m) => ((changes = m.changes), (canUndo = m.canUndo), (canRedo = m.canRedo)),
     [ToView.Settings]: (m) => {
       settings = m.values;
@@ -573,6 +585,7 @@
         {/if}
       </div>
 
+      {#if toast}<div class="toast" role="status">{toast}</div>{/if}
       <div class="float" class:moving bind:clientWidth={bar.w} bind:clientHeight={bar.h} style={`left:${barAt.x}px;top:${barAt.y}px`} data-anchor={anchor}>
         <button type="button" class="grip" title="Drag to move (arrow keys)" aria-label="Move the bar" onpointerdown={grabBar} onpointermove={dragBar} onpointerup={dropBar} onkeydown={onHandleKey}>
           <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true">{#each [0, 1, 2] as row (row)}{#each [0, 1] as col (col)}<circle cx={2 + col * 4} cy={2 + row * 4} r="1.1" fill="currentColor" />{/each}{/each}</svg>
@@ -852,6 +865,20 @@
 
   .handle.right {
     right: -12px;
+  }
+
+  .toast {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    z-index: 3;
+    transform: translateX(-50%);
+    padding: 4px 10px;
+    border-radius: var(--ui-radius-lg);
+    background: var(--ui-float);
+    box-shadow: 0 0 0 1px var(--ui-divider), 0 4px 12px rgb(0 0 0 / 0.15);
+    color: var(--ui-text);
+    font-size: var(--ui-text-xs);
   }
 
   .width-label {

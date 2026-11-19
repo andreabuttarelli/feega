@@ -42,6 +42,35 @@ const results: { row: string; ok: boolean; wanted: string; got: string; note: st
 
 const ONLY = process.env.ONLY;
 
+const MARK = '__feegaNoReload';
+const inPlace = async (label: string, selector: string, row: string, value: string) => {
+  const pick = await panel.pickAt(selector);
+  if (!pick) {
+    results.push({ row: label, ok: false, wanted: 'no reload', got: 'not picked', note: '' });
+    return;
+  }
+  const scrolled = await panel.frame.locator('html').evaluate((html, mark) => {
+    Object.assign(window, { [mark]: true });
+    html.style.minHeight = '300vh';
+    window.scrollTo(0, 120);
+    return window.scrollY;
+  }, MARK);
+  await panel.reply({ kind: 'change', row, value });
+  await panel.page.waitForTimeout(HMR_MS);
+  const [kept, scrollY] = await panel.frame.locator('html').evaluate((html, mark) => {
+    const state = [Boolean((window as never)[mark]), window.scrollY] as const;
+    html.style.minHeight = '';
+    return state;
+  }, MARK);
+  const ok = kept && scrollY === scrolled;
+  results.push({ row: label, ok, wanted: `same page, scrollY ${scrolled}`, got: kept ? `same page, scrollY ${scrollY}` : 'reloaded', note: '' });
+  await panel.edits.undo();
+  await panel.page.waitForTimeout(HMR_MS);
+};
+
+await inPlace('in place: first rule', boxSelector, 'radius', '12px');
+await inPlace('in place: next edit', textSelector, 'font-size', '32px');
+
 for (const row of ROWS.filter((r) => !ONLY || ONLY.split(",").includes(r.name))) {
   const selector = ON_TEXT.has(row.section) ? textSelector : boxSelector;
   const bare = valueOf(row.name);

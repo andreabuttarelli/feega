@@ -1,5 +1,6 @@
 import { SOURCE_ATTR, deepestAt, clearPreview, hidePreview, paletteOf, relativeOf, treeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
 import { trackRects } from './track.js';
+import { keepScroll } from './reload-restore.js';
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';
@@ -21,6 +22,7 @@ export const TEXT_EDIT = 'feega:text:edit';
 export const TEXT_DONE = 'feega:text:done';
 export const TRACK = 'feega:track';
 export const TRACKED = 'feega:tracked';
+export const LEAVE = 'feega:leave';
 
 export const Mode = { Navigate: 'navigate', Design: 'design' };
 
@@ -36,6 +38,7 @@ export function installBridge(win) {
   const doc = win.document;
   let mode = Mode.Navigate;
   let reply = (message) => win.parent?.postMessage(message, '*');
+  const scroll = keepScroll(win);
   const tracker = trackRects(win, (slot, rect) => reply({ type: TRACKED, slot, rect }));
 
   const handlers = {
@@ -45,6 +48,7 @@ export function installBridge(win) {
     [MODE]: (request) => (mode = request.mode),
     [PALETTE]: () => reply({ type: PALETTE_RESULT, ...paletteOf(doc) }),
     [HIDE]: (request) => hidePreview(doc, request.source, request.hidden),
+    [LEAVE]: () => scroll.leave(),
     [TRACK]: (request) => tracker.follow(request.slot, request.source),
     [TREE]: () => reply({ type: TREE_RESULT, tree: treeOf(doc) }),
     [SCROLL]: (request) => {
@@ -71,7 +75,7 @@ export function installBridge(win) {
   new win.MutationObserver(() => keepPreviews(doc)).observe(doc.documentElement, { childList: true, subtree: true });
 
   reportRoutes(win);
-  win.parent?.postMessage({ type: READY, path: win.location.pathname + win.location.search }, '*');
+  win.parent?.postMessage({ type: READY, path: win.location.pathname + win.location.search, restored: scroll.restored }, '*');
 }
 
 function reportRoutes(win) {

@@ -106,3 +106,10 @@ edit inline until reload); the colour control is a native picker, not the app's 
   workspace (`app-root.ts`), so `landing/` inside the repo works; "Open the running app" on a
   workspace without an app at the root offers a quick pick of the apps below it. Switching apps
   asks first. Not done: opening the route that renders a clicked page file.
+- **Design this page** opens the route the clicked file renders (`page-route.ts`: SvelteKit
+  `+page`, Next `app/…/page` and `pages/`, Nuxt/Astro `pages/`, plain html; route groups
+  dropped, dynamic segments fall back to the current route).
+- **Edits update in place.** The matrix now checks, per fixture, that a style edit keeps the
+  page (a window marker) and its scroll: green on react/vue css+tailwind, tailwind-app, Next and
+  landing. If the page reloads anyway, the bridge (`reload-restore.js`) puts the scroll back,
+  selection is re-resolved, and the panel shows a short toast; reloads the panel asked for skip it.

@@ -3,6 +3,7 @@ import { access, readdir } from 'node:fs/promises';
 import { basename, join, relative } from 'node:path';
 import { appRootOf, appsUnder } from './app-root';
 import { Command } from './commands';
+import { routeOfFile } from './page-route';
 import * as vscode from 'vscode';
 import { liveAtOf } from '@feega/live-edit/live-ask';
 import { ServerAction, ServerState, ToHost, ToView, type EditAsk, type HostMessage, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
@@ -23,7 +24,7 @@ const HISTORY_KEY = 'feegaInspect.history';
 const BEFORE_SCHEME = 'feega-before';
 const LATER_EDITS = 'later edits depend on this change: undo them first';
 
-type Session = { panel: vscode.WebviewPanel; running: Running | null; edits: ReturnType<typeof fileEdits>; root: string };
+type Session = { panel: vscode.WebviewPanel; running: Running | null; edits: ReturnType<typeof fileEdits>; root: string; route?: string };
 type Host = { context: vscode.ExtensionContext; output: vscode.OutputChannel };
 
 let session: Session | null = null;
@@ -114,7 +115,7 @@ async function showApp() {
     return;
   }
   const prefs = host.context.workspaceState.get<Prefs>(PREFS_KEY) ?? null;
-  await post({ kind: ToView.App, url: session.running.url, styling: await stylingOf(session.root, stylingChoice()), prefs });
+  await post({ kind: ToView.App, url: session.running.url, styling: await stylingOf(session.root, stylingChoice()), prefs, route: session.route });
   await post({ kind: ToView.Server, state: ServerState.Running, info: infoOf(session.running) });
   await postSettings();
 }
@@ -272,8 +273,13 @@ async function open(context: vscode.ExtensionContext, target?: vscode.Uri) {
     vscode.window.showWarningMessage('Feega Inspect: open the folder of a web app first.');
     return;
   }
+  const route = target ? (routeOfFile(relative(root, target.fsPath)) ?? undefined) : undefined;
   if (session && session.root === root) {
     session.panel.reveal();
+    if (route) {
+      session.route = route;
+      await showApp();
+    }
     return;
   }
   if (session) {
@@ -287,7 +293,7 @@ async function open(context: vscode.ExtensionContext, target?: vscode.Uri) {
   }
 
   const panel = panelOf(context);
-  session = { panel, running: null, edits: fileEdits(root, stylingChoice, context.workspaceState.get(HISTORY_KEY)), root };
+  session = { panel, running: null, edits: fileEdits(root, stylingChoice, context.workspaceState.get(HISTORY_KEY)), root, route };
   panel.webview.onDidReceiveMessage(onMessage);
   panel.onDidDispose(() => {
     session?.running?.stop();

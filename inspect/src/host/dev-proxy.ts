@@ -7,7 +7,7 @@ export const BRIDGE_PATH = '/__feega/';
 
 const HOST = '127.0.0.1';
 const HTML = /text\/html/;
-const BRIDGE_FILES = new Set(['bridge.js', 'runtime.js', 'track.js']);
+const BRIDGE_FILES = new Set(['bridge.js', 'runtime.js', 'track.js', 'reload-restore.js']);
 const SCRIPT = `<script type="module" src="${BRIDGE_PATH}bridge.js"></script>`;
 const DROPPED = ['content-length', 'content-encoding', 'transfer-encoding'];
 

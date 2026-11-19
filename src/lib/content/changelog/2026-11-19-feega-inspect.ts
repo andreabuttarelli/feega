@@ -18,6 +18,8 @@ export default {
     'Icons inside links and buttons can be selected and resized on their own.',
     'Gradient stops and shadows use the same colour picker and palette as fills.',
     'Pick a device from icons or the full preset list, rotate tablets, and drag the frame edges to any width.',
-    'Right-click a folder in the Explorer and choose Design this folder with Feega, including apps inside a monorepo.'
+    'Right-click a folder in the Explorer and choose Design this folder with Feega, including apps inside a monorepo.',
+    'Design this page opens the preview on the route that file renders.',
+    'Edits update the page in place; if it ever reloads, your scroll and selection come back.'
   ]
 } satisfies ChangelogEntry;
