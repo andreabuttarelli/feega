@@ -2,11 +2,13 @@ import { standInFill } from '$lib/motion/stand-in-fill';
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import type { Db } from '$lib/server/db/client';
-import { FEEGA_EXTENSION, FEEGA_REFUSAL_MESSAGE, FEEGA_VERSION, idsIn, packFeega, unpackFeega, type FeegaBlobs, type FeegaCanvas, type FeegaFile } from '$lib/canvas/feega-file';
+import { FEEGA_EXTENSION, FEEGA_REFUSAL_MESSAGE, FEEGA_VERSION, packFeega, unpackFeega, type FeegaBlobs, type FeegaCanvas, type FeegaFile } from '$lib/canvas/feega-file';
 import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
 import { FONT_MIME_TYPES, fontFileOf } from '$lib/motion/fonts/library';
 import { orgFontPrefix } from '$lib/motion/fonts/upload-path';
-import { createPacker, savingPath, type PackJob } from './feega-packer';
+import { createPacker, jobFile, savingPath, type PackJob } from './feega-packer';
+import { isFolder, openFolder, type FetchAsset, type FolderStatus } from './feega-folder';
+import type { Conflict, Keep } from '@feega/canvas-folder';
 import { createMemoryDb, type Blobs, type Change, type Row, type Tables } from './memory-db';
 
 import { LOCAL_ORG_ID, LOCAL_USER, LOCAL_USER_ID } from '$lib/local-user';
@@ -73,7 +75,7 @@ function seed(file: FeegaFile, blobs: FeegaBlobs): { tables: Tables; storage: Bl
     ['orgs_members', [{ ...org, id: crypto.randomUUID(), user_id: LOCAL_USER_ID, role: 'owner', created_at: at }]],
     ['projects', [{ ...org, id: place.projectId, name: file.manifest.canvasName, slug: 'local', mode: 'standard', brand_id: null, deleted_at: null, created_at: at, updated_at: at }]],
     ['canvases', [{ ...org, id: place.canvasId, project_id: place.projectId, name: file.manifest.canvasName, viewport: null, deleted_at: null, created_at: at, updated_at: at }]],
-    ['nodes', file.canvas.nodes.map((n) => ({ ...org, id: n.id, project_id: place.projectId, canvas_id: place.canvasId, type: n.type, display_name: n.displayName, x: n.position.x, y: n.position.y, z: n.position.z, width: n.size.width, height: n.size.height, data: withStandIn(n.data, file.canvas.heads[n.id]?.doc), version: 1, deleted_at: null, created_at: at, updated_at: at }))],
+    ['nodes', file.canvas.nodes.map((n) => ({ ...org, id: n.id, project_id: place.projectId, canvas_id: place.canvasId, type: n.type, display_name: n.displayName, x: n.position.x, y: n.position.y, z: n.position.z, width: n.size.width, height: n.size.height, data: withStandIn(n.data, file.canvas.heads[n.id]?.doc), version: n.version ?? 1, deleted_at: null, created_at: at, updated_at: at }))],
     ['nodes_connections', file.canvas.connections.map((c) => ({ ...org, id: c.id, canvas_id: place.canvasId, source_node_id: c.sourceNodeId, target_node_id: c.targetNodeId, source_handle: c.sourceHandle, target_handle: c.targetHandle, mode: c.mode, deleted_at: null, created_at: at }))],
     ['motion_revisions', Object.entries(file.canvas.heads).map(([nodeId, head]) => ({ ...org, id: crypto.randomUUID(), node_id: nodeId, version: head.version, doc: head.doc, summary: null, actor_kind: 'system', actor_id: null, agent_key: null, sealed: true, created_at: file.manifest.exportedAt }))],
     ['canvas_events', (file.canvas.events ?? []).map((e) => ({ ...e, org_id: LOCAL_ORG_ID, canvas_id: place.canvasId }))],
@@ -130,7 +132,7 @@ function packJob(tables: Tables, storage: Blobs, place: LocalPlace, acp: AcpChoi
   }
 
   const body: Omit<FeegaCanvas, 'assets'> = {
-    nodes: nodes.map((n) => ({ id: String(n.id), type: String(n.type), displayName: (n.display_name as string | null) ?? null, position: { x: Number(n.x), y: Number(n.y), z: Number(n.z ?? 0) }, size: { width: n.width == null ? null : Number(n.width), height: n.height == null ? null : Number(n.height) }, data: (n.data ?? {}) as Record<string, unknown> })),
+    nodes: nodes.map((n) => ({ id: String(n.id), type: String(n.type), displayName: (n.display_name as string | null) ?? null, position: { x: Number(n.x), y: Number(n.y), z: Number(n.z ?? 0) }, size: { width: n.width == null ? null : Number(n.width), height: n.height == null ? null : Number(n.height) }, data: (n.data ?? {}) as Record<string, unknown>, version: Number(n.version ?? 1) })),
     connections: rows('nodes_connections').filter((c) => c.canvas_id === place.canvasId && live(c) && nodeIds.has(c.source_node_id) && nodeIds.has(c.target_node_id)).map((c) => ({ id: String(c.id), sourceNodeId: String(c.source_node_id), targetNodeId: String(c.target_node_id), sourceHandle: (c.source_handle as string | null) ?? null, targetHandle: (c.target_handle as string | null) ?? null, mode: c.mode === 'iterate' ? 'iterate' : 'fixed' })),
     heads: Object.fromEntries([...heads].map(([id, r]) => [id, { version: Number(r.version), doc: r.doc }])),
     codeLinks: rows(CODE_LINKS).filter((l) => nodeIds.has(l.node_id)).map(withoutScope),
@@ -149,13 +151,6 @@ function packJob(tables: Tables, storage: Blobs, place: LocalPlace, acp: AcpChoi
   return { manifest: { format: 'feega', version: FEEGA_VERSION, exportedAt: new Date().toISOString(), canvasName: name, source: place, ...acp }, body, assets };
 }
 
-export function jobFile(job: PackJob): { file: FeegaFile; blobs: FeegaBlobs } {
-  const referenced = new Set(idsIn(job.body));
-  const kept = job.assets.filter((a) => a.always || referenced.has(a.row.id.toLowerCase()));
-  const blobs: FeegaBlobs = new Map(kept.flatMap((a) => (a.row.file && a.bytes ? [[a.row.file, a.bytes] as const] : [])));
-  return { file: { manifest: job.manifest, canvas: { ...job.body, assets: kept.map((a) => a.row) } }, blobs };
-}
-
 const snapshot = (job: PackJob): Uint8Array => {
   const { file, blobs } = jobFile(job);
   return packFeega(file, blobs);
@@ -168,6 +163,8 @@ export type Persistence = {
   write(job: PackJob): Promise<void>;
   writeNow(job: PackJob): void;
   stop(): void;
+  status?: () => FolderStatus;
+  resolve?: (job: PackJob, conflict: Conflict, keep: Keep) => Opened;
 };
 
 function filePersistence(path: string): Persistence {
@@ -186,10 +183,12 @@ function filePersistence(path: string): Persistence {
   };
 }
 
-export type FeegaStoreOptions = { origin: string; saveDelayMs?: number; latencyMs?: number };
+export type FeegaStoreOptions = { origin: string; saveDelayMs?: number; latencyMs?: number; fetchAsset?: FetchAsset };
+
+const persistenceFor = (path: string, options: FeegaStoreOptions): Persistence => (isFolder(path) ? openFolder(path, options.fetchAsset) : filePersistence(path));
 
 export function openFeegaStore(path: string, options: FeegaStoreOptions) {
-  const persistence = filePersistence(path);
+  const persistence = persistenceFor(path, options);
   const { file, blobs } = persistence.opened;
   const { tables, storage, place } = seed(file, blobs);
   const listeners = new Set<(change: Change) => void>();
@@ -260,6 +259,17 @@ export function openFeegaStore(path: string, options: FeegaStoreOptions) {
     chooseAcpEffort(agent: string, effort: string | null) {
       remember(acp.acpEfforts, agent, effort);
       schedule();
+    },
+    folderStatus: () => persistence.status?.() ?? null,
+    async resolveConflict(conflict: Conflict, keep: Keep) {
+      if (!persistence.resolve) {
+        return;
+      }
+      await save();
+      const opened = persistence.resolve(packJob(tables, storage, place, acp), conflict, keep);
+      const resolved = seed(opened.file, opened.blobs);
+      resolved.tables.forEach((rows, table) => tables.set(table, rows));
+      resolved.storage.forEach((blob, key) => storage.set(key, blob));
     },
     subscribe(listen: (change: Change) => void) {
       listeners.add(listen);
