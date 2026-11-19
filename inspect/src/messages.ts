@@ -16,7 +16,16 @@ export type Pick = {
   viewport: number;
   ownText: boolean;
   elements: number;
+  name: string;
+  ancestors: { source: Source; name: string }[];
 };
+
+export enum Move {
+  Parent = 'parent',
+  Child = 'child',
+  Next = 'next',
+  Previous = 'previous'
+}
 
 export enum Styling {
   Tailwind = 'tailwind',

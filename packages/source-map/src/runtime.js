@@ -38,6 +38,8 @@ export function inspectElement(element, { maxHtml = DEFAULT_MAX_HTML } = {}) {
     rect: rectOf(tagged),
     classes: tagged.getAttribute('class') ?? '',
     text: tagged.children.length ? null : tagged.textContent,
+    name: nameOf(tagged),
+    ancestors: ancestorsOf(tagged),
     ownText: [...tagged.childNodes].some((n) => n.nodeType === TEXT_NODE && n.textContent.trim()),
     elements: tagged.children.length,
     rem: rootFontSize(tagged.ownerDocument),
@@ -130,6 +132,50 @@ export function settlePreview(doc, source) {
     render(doc);
   }
   return Object.keys(left);
+}
+
+const MAX_ANCESTORS = 12;
+
+const taggedParent = (element) => element.parentElement?.closest(`[${SOURCE_ATTR}]`) ?? null;
+const fileOf = (element) => parseSource(element.getAttribute(SOURCE_ATTR))?.file ?? '';
+const componentName = (file) => file.split('/').pop().replace(/\.[^.]+$/, '');
+
+export function nameOf(element) {
+  const parent = taggedParent(element);
+  if (parent && fileOf(parent) !== fileOf(element)) {
+    return componentName(fileOf(element));
+  }
+  const tag = element.tagName.toLowerCase();
+  const first = element.classList?.[0];
+  return element.id ? `${tag}#${element.id}` : first ? `${tag}.${first}` : tag;
+}
+
+function ancestorsOf(element) {
+  const chain = [];
+  for (let node = taggedParent(element); node && chain.length < MAX_ANCESTORS; node = taggedParent(node)) {
+    chain.unshift({ source: parseSource(node.getAttribute(SOURCE_ATTR)), name: nameOf(node) });
+  }
+  return chain;
+}
+
+const taggedChildren = (element) => [...element.querySelectorAll(`[${SOURCE_ATTR}]`)].filter((child) => taggedParent(child) === element);
+
+const MOVES = {
+  parent: (element) => taggedParent(element),
+  child: (element) => taggedChildren(element)[0] ?? null,
+  next: (element) => sibling(element, 1),
+  previous: (element) => sibling(element, -1)
+};
+
+function sibling(element, step) {
+  const parent = taggedParent(element);
+  const all = parent ? taggedChildren(parent) : [];
+  return all[all.indexOf(element) + step] ?? null;
+}
+
+export function relativeOf(doc, source, move) {
+  const [element] = sourcedIn(doc, source);
+  return element && MOVES[move] ? MOVES[move](element) : null;
 }
 
 function designStyles(element) {

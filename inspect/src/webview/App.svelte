@@ -6,12 +6,13 @@
   import PanelRight from '@lucide/svelte/icons/panel-right';
   import Undo2 from '@lucide/svelte/icons/undo-2';
   import { LiveProp } from '@feega/live-edit/live-fields';
-  import { Mode, ServerState, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
+  import { Mode, Move, ServerState, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
   import { fromHost, toHost } from './host';
   import { pageBridge, sourceText } from './page-bridge';
   import Properties from './Properties.svelte';
   import ModeSwitch from './ModeSwitch.svelte';
   import FeegaMenu from './FeegaMenu.svelte';
+  import Breadcrumb from './Breadcrumb.svelte';
   import { SettingKey, type ReportFacts, type Settings } from '../settings';
   import { ROWS, type Row } from './controls';
   import { modeOfKey } from './modes';
@@ -277,8 +278,30 @@
 
   const typing = (e: KeyboardEvent) => e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement;
 
+  const SELECTION_KEYS: Record<string, (e: KeyboardEvent) => Move> = {
+    Escape: () => Move.Parent,
+    Enter: (e) => (e.shiftKey ? Move.Parent : Move.Child),
+    Tab: (e) => (e.shiftKey ? Move.Previous : Move.Next)
+  };
+
+  async function select(source: Source) {
+    picked = (await bridge.again(source)) ?? picked;
+  }
+
+  async function moveSelection(move: Move) {
+    if (picked) {
+      picked = (await bridge.move(picked.source, move)) ?? picked;
+    }
+  }
+
   function onKey(e: KeyboardEvent) {
     const cmd = e.metaKey || e.ctrlKey;
+    const selecting = SELECTION_KEYS[e.key];
+    if (selecting && picked && mode === Mode.Design && !editing && !typing(e) && !(e.target instanceof HTMLButtonElement)) {
+      e.preventDefault();
+      moveSelection(selecting(e));
+      return;
+    }
     const shortcuts: Record<string, () => void> = {
       z: () => toHost({ kind: ToHost.Undo }),
       '\\': toggleBar,
@@ -339,7 +362,7 @@
         {#if mode === Mode.Design && bridged && !editing}
           <div class="overlay" role="presentation" onpointermove={onMove} onpointerleave={() => (hover = null)} onclick={onPick} ondblclick={onDouble} onwheel={(e) => bridge.scroll(e.deltaX / fit.scale, e.deltaY / fit.scale)}>
             {#if hover}<div class="outline hover" style={box(hover)}></div>{/if}
-            {#if picked}<div class="outline picked" style={box(picked)}><span>{picked.tag}</span></div>{/if}
+            {#if picked}<div class="outline picked" style={box(picked)}><span class="label"><Breadcrumb pick={picked} onselect={select} compact /></span></div>{/if}
           </div>
         {/if}
         {#if size !== Size.Full}
@@ -378,7 +401,7 @@
   <aside class="right" class:closed={barClosed}>
     {#if picked}
       <div class="what" data-testid="selection">
-        <strong>&lt;{picked.tag}&gt;</strong>
+        <Breadcrumb pick={picked} onselect={select} />
         {#if picked.component}<span class="component">in {picked.component.file.split('/').pop()}</span>{/if}
         <button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file}:{picked.source.line}</button>
         <code class="classes">{picked.classes || 'no classes'}</code>
@@ -556,10 +579,11 @@
     outline: 2px solid var(--ui-accent);
   }
 
-  .picked span {
+  .picked .label {
     position: absolute;
     top: -18px;
     left: -2px;
+    max-width: 320px;
     padding: 0 4px;
     border-radius: var(--ui-radius-xs);
     background: var(--ui-accent);

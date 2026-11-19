@@ -1,4 +1,4 @@
-import { SOURCE_ATTR, clearPreview, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
+import { SOURCE_ATTR, clearPreview, relativeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';
@@ -123,6 +123,9 @@ function placeCaret(win, element, { x, y }) {
 }
 
 function targetOf(doc, request) {
+  if (typeof request.move === 'string') {
+    return relativeOf(doc, request.from, request.move);
+  }
   if (typeof request.selector === 'string') {
     return doc.querySelector(request.selector);
   }
