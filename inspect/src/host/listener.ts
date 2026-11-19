@@ -4,6 +4,7 @@ import { sep } from 'node:path';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
+const HAS_LSOF = process.platform !== 'win32';
 
 export type CwdOf = (port: number) => Promise<string | null>;
 
@@ -14,6 +15,9 @@ const field = (out: string, tag: string) =>
     ?.slice(1) ?? null;
 
 export const listenerCwd: CwdOf = async (port) => {
+  if (!HAS_LSOF) {
+    return null;
+  }
   try {
     const { stdout: pids } = await run('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-Fp']);
     const pid = field(pids, 'p');
@@ -40,7 +44,7 @@ export async function servesWorkspace(port: number, appRoot: string, cwdOf: CwdO
 export type Lsof = { listening: () => Promise<string>; cwds: (pids: number[]) => Promise<string> };
 
 const SYSTEM_LSOF: Lsof = {
-  listening: () => run('lsof', ['-nP', '-iTCP', '-sTCP:LISTEN', '-Fpn']).then((r) => r.stdout, () => ''),
+  listening: () => (!HAS_LSOF ? Promise.resolve('') : run('lsof', ['-nP', '-iTCP', '-sTCP:LISTEN', '-Fpn']).then((r) => r.stdout, () => '')),
   cwds: (pids) => run('lsof', ['-a', '-p', pids.join(','), '-d', 'cwd', '-Fpn']).then((r) => r.stdout, () => '')
 };
 

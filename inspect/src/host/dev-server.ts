@@ -7,6 +7,7 @@ import { portsServing, servesWorkspace } from './listener';
 import { Framework, PlanRefusal, planFile, runPlan, textsWanted, type Planned, type RepoFacts, type RunPlan } from '@feega/dev-run/run-plan';
 import { DepsOutcome, depsMissing, ensureDeps } from './deps';
 import { failureOf, localUrlOf, type Failed } from './dev-output';
+import { killTree } from './process-tree';
 
 export enum Launch {
   Vite = 'vite',
@@ -143,13 +144,7 @@ export function stopGroup(child: ChildProcess) {
   if (!pid || child.exitCode !== null) {
     return;
   }
-  const signal = (sig: NodeJS.Signals) => {
-    try {
-      process.kill(process.platform === 'win32' ? pid : -pid, sig);
-    } catch {
-      return;
-    }
-  };
+  const signal = (sig: NodeJS.Signals) => killTree(pid, sig);
   signal('SIGTERM');
   setTimeout(() => child.exitCode === null && signal('SIGKILL'), KILL_AFTER_MS).unref();
 }

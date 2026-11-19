@@ -12,6 +12,7 @@ declare const FEEGA_VERSION: string;
 
 const MIN_NODE_MAJOR = 20;
 const KEEP_RUNNING = -1;
+const STOP_ON_STDIN_END = 'FEEGA_STOP_ON_STDIN_END';
 
 const say = (line: string) => console.log(line);
 
@@ -70,12 +71,17 @@ async function main(): Promise<number> {
   };
   process.once('SIGINT', stop);
   process.once('SIGTERM', stop);
+  if (process.env[STOP_ON_STDIN_END]) {
+    process.stdin.once('end', stop).resume();
+  }
 
   say(`feega: editing ${root}`);
   say(args.url ? `feega: attaching to ${args.url}` : 'feega: starting its dev server…');
   const started = await (args.url ? session.attachUrl(args.url) : session.start());
   if ('refused' in started) {
     say(`feega: ${started.refused}`);
+  } else {
+    say(`feega: app on ${started.url}`);
   }
   say(`feega: editor ready on ${editor.url}  (Ctrl+C to stop)`);
   if (args.browser === Browser.Open) {

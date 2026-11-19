@@ -1,11 +1,12 @@
 import { fileURLToPath } from 'node:url';
-import { dirname, relative } from 'node:path';
+import { dirname } from 'node:path';
 import { searchForWorkspaceRoot, type Plugin } from 'vite';
 import { injectSource } from './inject.ts';
+import { fsUrl, sourceId } from './source-id.ts';
 
 const BRIDGE_PATH = fileURLToPath(new URL('./bridge.js', import.meta.url));
 const VITE_CLIENT = /\/vite\/dist\/client\/client\.mjs$/;
-const BRIDGE_IMPORT = `import ${JSON.stringify(`/@fs${BRIDGE_PATH}`)};`;
+const BRIDGE_IMPORT = `import ${JSON.stringify(fsUrl(BRIDGE_PATH))};`;
 
 export function feegaSource(): Plugin {
   let root = process.cwd();
@@ -32,7 +33,7 @@ export function feegaSource(): Plugin {
         return null;
       }
 
-      const out = injectSource(code, relative(root, id));
+      const out = injectSource(code, sourceId(root, id));
       return out === null ? null : { code: out, map: null };
     }
   };

@@ -1,0 +1,41 @@
+name: Feega editor on every OS
+
+on:
+  push:
+    branches: [feat/feega-inspect]
+  pull_request:
+    paths:
+      - 'inspect/**'
+      - 'npx/**'
+      - 'packages/dev-run/**'
+      - 'packages/source-map/**'
+      - 'packages/live-edit/**'
+      - '.github/workflows/inspect-os.yml'
+  workflow_dispatch:
+
+jobs:
+  os:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    env:
+      FEEGA_E2E_APP: inspect/test/fixtures/react-css
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx svelte-kit sync
+      - run: npx vitest run inspect/src npx/src packages
+      - run: node npx/build.mjs
+      - run: npm install --no-audit --no-fund
+        working-directory: inspect/test/fixtures/react-css
+      - run: npx playwright install --with-deps chromium
+      - run: node npx/test/editor.e2e.mjs

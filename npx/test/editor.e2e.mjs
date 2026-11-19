@@ -1,31 +1,57 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { connect } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 
 const here = (path) => fileURLToPath(new URL(path, import.meta.url));
-const APP = here('../../landing');
+const APP = process.env.FEEGA_E2E_APP ? resolve(process.env.FEEGA_E2E_APP) : here('../../landing');
 const CLI = here('../dist/cli.cjs');
 const PORT = 4719;
 const READY_MS = 120_000;
 const SHOTS = process.env.FEEGA_E2E_SHOTS;
 const COLOUR = '#0078d4';
 
+let appPort = 0;
+const STOP_MS = 20_000;
+const POLL_MS = 250;
+
+const accepts = (port) =>
+  new Promise((done) => {
+    const socket = connect({ host: '127.0.0.1', port });
+    socket.once('connect', () => (socket.destroy(), done(true)));
+    socket.once('error', () => done(false));
+  });
+
+async function stopped(cli) {
+  const exited = new Promise((done) => cli.once('exit', done));
+  cli.stdin.end();
+  await Promise.race([exited, new Promise((done) => setTimeout(done, STOP_MS))]);
+  assert.ok(cli.exitCode !== null, 'the CLI exits when told to stop');
+  const end = Date.now() + STOP_MS;
+  while (appPort && (await accepts(appPort)) && Date.now() < end) {
+    await new Promise((done) => setTimeout(done, POLL_MS));
+  }
+  assert.ok(!appPort || !(await accepts(appPort)), `no dev server left on ${appPort}`);
+}
+
 function started() {
-  const cli = spawn(process.execPath, [CLI, APP, '--port', String(PORT), '--no-open'], { stdio: ['ignore', 'pipe', 'inherit'] });
+  const cli = spawn(process.execPath, [CLI, APP, '--port', String(PORT), '--no-open'], { stdio: ['pipe', 'pipe', 'inherit'], env: { ...process.env, FEEGA_STOP_ON_STDIN_END: '1' } });
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('the editor did not start')), READY_MS);
     cli.stdout.on('data', (data) => {
       process.stdout.write(data);
-      const url = /editor ready on (\S+)/.exec(String(data))?.[1];
+      const text = String(data);
+      appPort ||= Number(/app on https?:\/\/[^:/\s]+:(\d+)/.exec(text)?.[1] ?? 0);
+      const url = /editor ready on (\S+)/.exec(text)?.[1];
       if (url) {
         clearTimeout(timer);
         resolve({ cli, url });
       }
     });
-    cli.once('exit', () => reject(new Error('the CLI exited')));
+    cli.once('exit', () => reject(new Error('the CLI exited before it was ready')));
   });
 }
 
@@ -70,5 +96,6 @@ try {
   restore?.();
   rmSync(join(APP, '.feega'), { recursive: true, force: true });
   await browser.close();
-  cli.kill('SIGINT');
 }
+await stopped(cli);
+console.log(`FEEGA_NPX_STOPPED_CLEAN ${appPort}`);

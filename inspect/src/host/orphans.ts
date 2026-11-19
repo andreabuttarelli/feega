@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import { Stored } from './platform';
+import { commandLineOf, killTree } from './process-tree';
 
 export type Memo = { get: <T>(key: string) => T | undefined; update: (key: string, value: unknown) => Thenable<void> | Promise<void> };
 type Tracked = { pid: number; app: string };
@@ -14,14 +15,11 @@ export const remember = (memo: Memo, pid: number, app: string) => memo.update(KE
 export const forget = (memo: Memo, pid: number) => memo.update(KEY, tracked(memo).filter((t) => t.pid !== pid));
 
 const SYSTEM: Processes = {
-  command: (pid) => new Promise((resolve) => execFile('ps', ['-o', 'command=', '-p', String(pid)], (_e, out) => resolve(String(out ?? '').trim()))),
-  kill: (pid) => {
-    try {
-      process.kill(-pid, 'SIGKILL');
-    } catch {
-      return;
-    }
-  }
+  command: (pid) => {
+    const [bin, args] = commandLineOf(pid);
+    return new Promise((resolve) => execFile(bin, args, (_e, out) => resolve(String(out ?? '').trim())));
+  },
+  kill: (pid) => killTree(pid, 'SIGKILL')
 };
 
 export async function killOrphans(memo: Memo, processes: Processes = SYSTEM): Promise<void> {
