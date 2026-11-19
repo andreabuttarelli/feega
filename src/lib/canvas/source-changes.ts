@@ -13,15 +13,17 @@ export enum CiState {
   Failed = 'failed'
 }
 
-export type PullView = { number: number; url: string; status: string; checks: { name: string; status: string; conclusion: string | null }[] };
+export type PullView = { number: number; url: string; status: string; draft?: boolean; checks: { name: string; status: string; conclusion: string | null }[] };
 
-export type LinkView = { entry: string; appRoot: string; baseSha: string; baseBranch: string; writable: boolean; route?: string; pushBranch?: string; pullNumber?: number; beforePoster?: string; variantOf?: string };
+export type LinkView = { entry: string; appRoot: string; baseSha: string; baseBranch: string; writable: boolean; route?: string; pushBranch?: string; pullNumber?: number; beforePoster?: string; variantOf?: string; repo?: string; source?: string; workBranch?: string };
 
 export type Affected = { path: string; pages: number };
 
 export type Proposal = { component: string; props: string[] };
 
-export type FrameSync = { nodeId: string; name: string; state: string; link: LinkView; push: { pull?: PullView | null } | null; affected?: Affected[]; proposals?: Proposal[] };
+export type HostCapsView = { git: boolean; wip: boolean; publish: boolean; pulls: 'ready' | 'connect' | 'none' };
+
+export type FrameSync = { caps?: HostCapsView; nodeId: string; name: string; state: string; link: LinkView; push: { pull?: PullView | null; upstream?: unknown[]; diverged?: boolean } | null; affected?: Affected[]; proposals?: Proposal[] };
 
 export type Popover = { file: string; commit: string; branch: string; actions: SourceAction[] };
 

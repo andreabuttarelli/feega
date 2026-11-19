@@ -90,6 +90,7 @@
 
   <div class="top-slot" data-top-slot></div>
   <div class="top-box top-group right">
+    <div class="top-git" data-top-git></div>
     <div class="top-peers" data-top-peers></div>
     {#if $canvasLink}
       <ConnectionDot state={$canvasLink} />
@@ -165,6 +166,10 @@
     align-items: center;
     gap: 4px;
     min-width: 0;
+  }
+
+  .top-git:empty {
+    display: none;
   }
 
   .top-peers:empty {

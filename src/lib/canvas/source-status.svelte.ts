@@ -21,7 +21,7 @@ export function sourceStatus(projectId: () => string, frames: () => Watched[], f
       syncs.delete(nodeId);
       return;
     }
-    syncs.set(nodeId, { nodeId, name: names.get(nodeId) ?? '', state: body.state, link: body.link, push: body.push ?? null, affected: body.affected ?? [], proposals: body.proposals ?? [] });
+    syncs.set(nodeId, { nodeId, name: names.get(nodeId) ?? '', state: body.state, link: body.link, push: body.push ?? null, affected: body.affected ?? [], proposals: body.proposals ?? [], caps: body.caps });
   };
 
   const watched = $derived(frames().map((f) => f.id).join(SEPARATOR));

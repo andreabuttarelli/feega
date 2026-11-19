@@ -52,7 +52,7 @@ export type FileWrite = { path: string; content: string | null };
 
 export type CommitAsk = { parent: string; message: string; files: FileWrite[] };
 
-export type PullAsk = { branch: string; base: string; title: string; body: string };
+export type PullAsk = { branch: string; base: string; title: string; body: string; draft?: boolean };
 
 export type PullRef = { number: number; url: string };
 
@@ -60,7 +60,7 @@ export type PullSeen = PullRef & { status: PullStatus };
 
 export type Check = { name: string; status: string; conclusion: string | null };
 
-export type PullState = PullSeen & { headSha: string; checks: Check[] };
+export type PullState = PullSeen & { headSha: string; checks: Check[]; draft: boolean };
 
 export type FileChanged = { path: string; move: FileMove; from: string | null };
 
@@ -75,6 +75,8 @@ export type GitHost = {
   isAncestor: (sha: string, head: string) => Promise<boolean>;
   lastPull: (branch: string) => Promise<PullSeen | null>;
   upsertPull: (ask: PullAsk) => Promise<PullRef>;
+  markReady: (number: number) => Promise<void>;
+  setRef: (ref: string, sha: string) => Promise<void>;
   pull: (number: number) => Promise<PullState>;
   changedSince: (sha: string, ref: string) => Promise<FileChanged[]>;
   listRefs: () => Promise<RefSeen[]>;

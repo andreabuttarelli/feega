@@ -907,7 +907,7 @@ github
 
 github
   .command('push <projectId> <nodeIds...>')
-  .description('Commit the code edits of the frames on feega/<name> and open or update its pull request')
+  .description('Commit the code edits of the frames on the working branch (feega/<name> with a pull request when none was chosen)')
   .requiredOption('--name <name>', 'Branch name; the branch is feega/<name>')
   .option('--title <text>', 'Pull request title')
   .option('--body <text>', 'Pull request body')
@@ -926,6 +926,34 @@ github
   .action(async (projectId: string, nodeId: string) => {
     const { cmdGithubStatus } = await import('./commands/github.ts');
     await cmdGithubStatus(projectId, nodeId);
+  });
+
+github
+  .command('branch <projectId> <branch> <nodeIds...>')
+  .description('Choose the working branch of linked frames: an existing branch, main included, or a new one')
+  .option('--from <branch>', 'Base of a new branch (default: the imported branch)')
+  .action(async (projectId: string, branch: string, nodeIds: string[], opts) => {
+    const { cmdGithubBranch } = await import('./commands/github.ts');
+    await cmdGithubBranch(projectId, nodeIds, { branch, from: opts.from });
+  });
+
+github
+  .command('pull <projectId> <nodeId>')
+  .description('Open a pull request from the working branch, as a draft unless --ready')
+  .option('--base <branch>', 'Target branch (default: the repo default)')
+  .option('--title <text>', 'Pull request title')
+  .option('--ready', 'Open it ready for review')
+  .action(async (projectId: string, nodeId: string, opts) => {
+    const { cmdGithubPull } = await import('./commands/github.ts');
+    await cmdGithubPull(projectId, nodeId, opts);
+  });
+
+github
+  .command('ready <projectId> <nodeId>')
+  .description('Mark the draft pull request of a linked frame ready for review')
+  .action(async (projectId: string, nodeId: string) => {
+    const { cmdGithubReady } = await import('./commands/github.ts');
+    await cmdGithubReady(projectId, nodeId);
   });
 
 github

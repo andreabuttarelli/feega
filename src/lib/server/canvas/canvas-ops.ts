@@ -100,7 +100,8 @@ import { conditionsOf, MAX_CONDITIONS } from '$lib/server/code-import/render-con
 import { CAPTURE_DELAY_MAX_MS, delayOf } from '$lib/server/code-import/capture-wait';
 import { designSystemOf } from '$lib/server/code-import/design-system';
 import { githubFor } from '$lib/server/code-import/github-runtime';
-import { frameDetach, framesPush, frameStatus, frameUndo } from '$lib/server/code-push/frames-push';
+import { frameCheckout, frameDetach, framePull, frameReady, framesPush, frameStatus, frameUndo } from '$lib/server/code-push/frames-push';
+import { PullKind } from '$lib/server/code-push/push';
 import { frameVersions } from '$lib/server/code-push/frames-versions';
 import { frameCompare, frameRetarget, MAX_VERSIONS } from '$lib/server/code-push/frames-compare';
 import { actionDeps, compareDeps } from '$lib/server/code-push/compare-runtime';
@@ -1166,6 +1167,24 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: z.object({ nodeId: z.string() }).strict(),
     run: async (ctx, input) => frameUndo(framesDeps(ctx.db, ctx), input.nodeId)
+  }),
+
+  github_branch: op({
+    access: Access.Write,
+    input: z.object({ nodeIds: z.array(z.string()).min(1).max(50).describe('linked frames of one repo'), branch: z.string().min(1).max(200).regex(/^(?!.*\.\.)[\w./-]+$/).describe('existing branch to work on, or a new one'), from: z.string().max(200).optional().describe('base of a new branch, default the imported branch') }).strict(),
+    run: async (ctx, input) => frameCheckout(framesDeps(ctx.db, ctx), input)
+  }),
+
+  github_pull: op({
+    access: Access.Write,
+    input: z.object({ nodeId: z.string(), base: z.string().max(200).optional().describe('target branch, default the repo default'), title: z.string().max(200).optional(), body: z.string().max(10_000).optional(), kind: z.enum(PullKind).optional().describe('draft (default) or ready') }).strict(),
+    run: async (ctx, input) => framePull(framesDeps(ctx.db, ctx), input)
+  }),
+
+  github_ready: op({
+    access: Access.Write,
+    input: z.object({ nodeId: z.string() }).strict(),
+    run: async (ctx, input) => frameReady(framesDeps(ctx.db, ctx), input.nodeId)
   }),
 
   github_variant: op({

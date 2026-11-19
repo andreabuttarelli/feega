@@ -35,6 +35,18 @@ export async function cmdGithubStatus(projectId: string, nodeId: string) {
   await print(`${base(projectId)}?${new URLSearchParams({ nodeId })}`);
 }
 
+export async function cmdGithubBranch(projectId: string, nodeIds: string[], opts: { branch: string; from?: string }) {
+  await print(`${base(projectId)}/branch`, { method: 'POST', body: JSON.stringify({ nodeIds, ...opts }) });
+}
+
+export async function cmdGithubPull(projectId: string, nodeId: string, opts: { base?: string; title?: string; ready?: boolean }) {
+  await print(`${base(projectId)}/pull`, { method: 'POST', body: JSON.stringify({ nodeId, base: opts.base, title: opts.title, kind: opts.ready ? 'ready' : 'draft' }) });
+}
+
+export async function cmdGithubReady(projectId: string, nodeId: string) {
+  await print(`${base(projectId)}/ready`, { method: 'POST', body: JSON.stringify({ nodeId }) });
+}
+
 export async function cmdGithubUndo(projectId: string, nodeId: string) {
   await print(`${base(projectId)}/undo`, { method: 'POST', body: JSON.stringify({ nodeId }) });
 }
