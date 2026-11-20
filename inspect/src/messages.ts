@@ -1,5 +1,6 @@
 import type { LiveEditAsk } from '@feega/live-edit/live-ask';
 import type { Place } from '@feega/live-edit/move-node';
+import type { Usage } from '@feega/live-edit/move-usage';
 import type { StructureOp } from '@feega/live-edit/structure';
 import type { Scope } from '@feega/live-edit/scoped-rule';
 import type { PageTarget } from '@feega/live-edit/page-rule';
@@ -164,7 +165,7 @@ export type HostMessage =
   | { kind: ToHost.Prefs; prefs: Prefs }
   | { kind: ToHost.Setting; key: SettingKey; value: SettingValue }
   | { kind: ToHost.Move; from: string; to: string; place: Place }
-  | { kind: ToHost.Structure; op: StructureOp; at: string; to?: string }
+  | { kind: ToHost.Structure; op: StructureOp; at: string; to?: string; usage?: Usage }
   | { kind: ToHost.Server; action: ServerAction }
   | { kind: ToHost.Redo }
   | { kind: ToHost.Font; ask: EditAsk; google: boolean }

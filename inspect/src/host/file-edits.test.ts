@@ -328,4 +328,15 @@ describe('fileEdits', () => {
     await edits.undo();
     expect(read(root)).toBe('<div>\n  <p>a</p>\n</div>\n<section>\n</section>\n');
   });
+
+  it('riordinare due usi di componente sposta le righe nel file dove sono usati', async () => {
+    const root = app();
+    writeFileSync(join(root, 'src/Page.svelte'), '<main>\n  <Hero />\n  <Pricing />\n</main>\n');
+    const edits = fileEdits(root);
+    await edits.structure({ op: StructureOp.MoveUsage, at: 'src/Page.svelte:1:1', usage: { from: 'Pricing', to: 'Hero', place: Place.Before } });
+
+    expect(read(root)).toBe('<main>\n  <Pricing />\n  <Hero />\n</main>\n');
+    await edits.undo();
+    expect(read(root)).toBe('<main>\n  <Hero />\n  <Pricing />\n</main>\n');
+  });
 });

@@ -8,6 +8,7 @@ import { literalText } from '@feega/live-edit/literal-text';
 import { moveNode, type Place } from '@feega/live-edit/move-node';
 import { globalSheetOf, googleFontImport, googleFontLink } from '@feega/live-edit/font-wiring';
 import { VariableHome, saveVariable, variableName } from '@feega/live-edit/save-variable';
+import type { Usage } from '@feega/live-edit/move-usage';
 import { StructureOp, structure } from '@feega/live-edit/structure';
 import { pageRule } from '@feega/live-edit/page-rule';
 import { scopedRule, type Scope } from '@feega/live-edit/scoped-rule';
@@ -18,6 +19,8 @@ import { svgMarkup } from '@feega/live-edit/svg-markup';
 import { Styling, type EditAsk } from '../messages';
 import { StylingChoice } from '../settings';
 import { stylingOf } from './styling';
+
+export type StructureAsk = { op: StructureOp; at: string; to?: string; usage?: Usage };
 
 export type Written = { ok: true; path: string; written: string; note?: string } | { ok: false; reason: string; at?: LiveAt };
 
@@ -206,14 +209,15 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return out.ok ? writtenAll([out.change], '') : out;
   }
 
-  async function restructured(op: StructureOp, rawAt: string, rawTo?: string): Promise<Written> {
-    meta = { at: rawAt, prop: op, value: rawTo ?? '', scope: '' };
+  async function restructured(ask: StructureAsk): Promise<Written> {
+    const { op, at: rawAt, to: rawTo, usage } = ask;
+    meta = { at: rawAt, prop: op, value: rawTo ?? usage?.from ?? '', scope: '' };
     const at = liveAtOf(rawAt);
     const to = rawTo ? (liveAtOf(rawTo) ?? undefined) : undefined;
     if (!at || !inside(root, at.file)) {
       return { ok: false, reason: `${rawAt} is not a file:line:col inside the workspace` };
     }
-    const out = await structure(reader(root), { op, at, to });
+    const out = await structure(reader(root), { op, at, to, usage });
     return out.ok ? writtenAll(out.changes, '', out.note) : out;
   }
 
@@ -233,7 +237,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
 
   return {
     saveVariable: (ask: EditAsk, name: string) => inTurn(() => variableSaved(ask, name)),
-    structure: (req: { op: StructureOp; at: string; to?: string }) => inTurn(() => restructured(req.op, req.at, req.to)),
+    structure: (ask: StructureAsk) => inTurn(() => restructured(ask)),
     move: (from: string, to: string, place: Place) => inTurn(() => moved(from, to, place)),
     edit: (ask: EditAsk) => inTurn(() => edited(ask)),
     icon: (at: string, name: string) => inTurn(() => iconSwapped(at, name)),

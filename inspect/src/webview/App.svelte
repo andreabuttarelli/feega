@@ -117,7 +117,7 @@
   let canRedo = $state(false);
   let scope = $state(Scope.Element);
   let layersOpen = $state<Record<string, boolean>>({ '(html):0:0': true, '(page):0:0': true });
-  const layerDrag = $state<{ source: Source | null }>({ source: null });
+  const layerDrag = $state<{ source: Source | null; name: string; component: boolean; parentFile: string | null }>({ source: null, name: '', component: false, parentFile: null });
 
   async function hoverLayer(source: Source | null) {
     hover = source ? await bridge.again(source) : null;
@@ -530,6 +530,10 @@
     toHost({ kind: ToHost.Move, from: sourceText(from), to: sourceText(to), place });
   }
 
+  function moveUsage(file: string, from: string, to: string, place: Place) {
+    toHost({ kind: ToHost.Structure, op: StructureOp.MoveUsage, at: `${file}:1:1`, usage: { from, to, place } });
+  }
+
   function restructure(op: StructureOp) {
     if (!picked) {
       return;
@@ -608,7 +612,7 @@
   <aside class="left" class:closed={leftClosed}>
     <header class="left-head">Layers</header>
     <div class="layers" role="tree" aria-label="Layers" data-testid="layers">
-      <LayersTree nodes={layers} {picked} open={layersOpen} onselect={select} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} />
+      <LayersTree nodes={layers} {picked} open={layersOpen} onselect={select} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} />
     </div>
     {#if !leftClosed}<span class="edge-right" role="separator" aria-orientation="vertical" aria-label="Resize Layers" title="Drag to resize, double-click to reset" onpointerdown={(e) => ((e.currentTarget as HTMLElement).setPointerCapture(e.pointerId), (leftSizing = { x: e.clientX, width: leftPx }))} onpointermove={(e) => leftSizing && (leftWidth = leftSizing.width + (e.clientX - leftSizing.x))} onpointerup={() => leftSizing && ((leftSizing = null), (leftWidth = leftPx), savePrefs())} ondblclick={() => ((leftWidth = LEFT_DEFAULT_PX), savePrefs())}></span>{/if}
   </aside>

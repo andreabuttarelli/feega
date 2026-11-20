@@ -20,13 +20,15 @@
     onhover: (source: Source | null) => void;
     onopen: (source: Source) => void;
     onmove: (from: Source, to: Source, place: Place) => void;
-    dragging: { source: Source | null };
+    dragging: { source: Source | null; name: string; component: boolean; parentFile: string | null };
+    parentFile?: string | null;
+    onusage: (file: string, from: string, to: string, place: Place) => void;
     hidden: Set<string>;
     locked: Set<string>;
     ontoggle: (flag: 'hidden' | 'locked', source: Source) => void;
   };
 
-  let { nodes, picked, depth = 0, open, onselect, onhover, onopen, onmove, dragging, hidden, locked, ontoggle }: Props = $props();
+  let { nodes, picked, depth = 0, open, onselect, onhover, onopen, onmove, dragging, parentFile = null, onusage, hidden, locked, ontoggle }: Props = $props();
 
   const INDENT_PX = 12;
   const EDGE_BAND = 0.25;
@@ -59,6 +61,10 @@
     const row = e.currentTarget as HTMLElement;
     const { top, height } = row.getBoundingClientRect();
     const ratio = (e.clientY - top) / height;
+    if (node.component && dragging.component && dragging.name !== node.name && parentFile && parentFile === dragging.parentFile) {
+      onusage(parentFile, dragging.name, node.name, ratio < 0.5 ? Place.Before : Place.After);
+      return;
+    }
     onmove(from, node.source, ratio < EDGE_BAND ? Place.Before : ratio > 1 - EDGE_BAND ? Place.After : Place.Inside);
   }
 </script>
@@ -80,7 +86,7 @@
     onkeydown={(e) => onKey(e, node)}
     onpointerenter={() => onhover(visual(node) ? node.source : null)}
     onpointerleave={() => onhover(null)}
-    ondragstart={() => (dragging.source = node.source)}
+    ondragstart={() => Object.assign(dragging, { source: node.source, name: node.name, component: node.component, parentFile })}
     ondragover={(e) => e.preventDefault()}
     ondrop={(e) => onDrop(e, node)}
   >
@@ -99,7 +105,7 @@
     </span>{/if}
   </div>
   {#if node.children.length && open[id]}
-    <Self nodes={node.children} {picked} depth={depth + 1} {open} {onselect} {onhover} {onopen} {onmove} {dragging} {hidden} {locked} {ontoggle} />
+    <Self nodes={node.children} {picked} depth={depth + 1} {open} {onselect} {onhover} {onopen} {onmove} {dragging} parentFile={node.source?.file ?? null} {onusage} {hidden} {locked} {ontoggle} />
   {/if}
 {/each}
 
