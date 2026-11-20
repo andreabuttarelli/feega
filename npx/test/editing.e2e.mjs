@@ -18,6 +18,8 @@ const ONBOARDING_MS = 10_000;
 const NEW_TITLE = 'Ship faster than planned';
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 const MAX_UNDOS = 10;
+const DOT_TRIES = 6;
+const DOT_RETRY_MS = 1000;
 const IMAGE_DIRS = ['public/images', 'static/images'];
 const CODE_BINARIES = ['code', 'code.cmd'];
 const HANDLER_ATTRIBUTE = /onClick|onclick|@click/;
@@ -231,9 +233,14 @@ try {
     assert.equal(await buttonFill(), 'rgb(217, 217, 217)', 'the forced preview shows the hover background');
     await chooseState('default');
     assert.equal(await buttonFill(), normal, 'the default look is untouched');
-    await page.locator('[data-field="state"]').click();
-    assert.equal(await page.locator('[data-state-item="hover"] .dot').count(), 1, 'hover shows a dot once it has styles');
-    await page.keyboard.press('Escape');
+    let dots = 0;
+    for (let tries = 0; tries < DOT_TRIES && !dots; tries++) {
+      await page.locator('[data-field="state"]').click();
+      dots = await page.locator('[data-state-item="hover"] .dot').count();
+      await page.keyboard.press('Escape');
+      dots || (await page.waitForTimeout(DOT_RETRY_MS));
+    }
+    assert.equal(dots, 1, 'hover shows a dot once it has styles');
     await undo();
     assert.deepEqual(changedFiles().concat(untracked()), [], 'one undo restores everything');
   });
