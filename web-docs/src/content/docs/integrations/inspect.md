@@ -30,9 +30,15 @@ Feega Inspect is a small editor extension, separate from the Feega canvas. No ac
    An element with no click handler can be given **Go to page**, **Open URL** or **Scroll to
    section**: Feega writes a small inline handler (Svelte `goto` with its import, `$router.push`
    in Vue, `window.location` otherwise; Next files become client components). One undo removes it.
-7. **Design** (D) selects and edits; **Navigate** (N) uses the app normally. The top bar has
+7. The **State** menu at the top of Properties shows the element as it looks on **Hover**,
+   **Focus**, **Focus visible**, **Active** or, on form controls, **Disabled**, without the mouse.
+   A dot marks a state that already has styles, and rows that differ from Default turn blue. While
+   a state is chosen every edit is written to it: a `hover:` class with Tailwind, a `.name:hover`
+   rule next to the base rule in CSS, CSS modules and Svelte/Vue scoped styles; `×` removes only
+   that state's value. States set by JavaScript, `:has()` and CSS nesting are not forced.
+8. **Design** (D) selects and edits; **Navigate** (N) uses the app normally. The top bar has
    back/forward/reload, the route, a dev server status dot, and device widths (keys 1–4).
-8. Cmd/Ctrl+Z restores the file. It never overwrites a change made after the edit.
+9. Cmd/Ctrl+Z restores the file. It never overwrites a change made after the edit.
 
 ## In the browser: `npx feega`
 

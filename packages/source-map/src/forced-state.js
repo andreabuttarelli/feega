@@ -167,7 +167,9 @@ export const forcedNow = (doc) => forced.get(doc) ?? null;
 export const FORCED_REBUILD_MS = REBUILD_MS;
 
 function signatureOf(doc) {
-  return [...doc.styleSheets].filter((s) => !ownSheet(s)).map((s) => rulesOf(s).length).join(',');
+  const counts = [...doc.styleSheets].filter((s) => !ownSheet(s)).map((s) => rulesOf(s).length);
+  const lengths = [...doc.querySelectorAll('style')].filter((s) => !OWN_STYLE_IDS.has(s.id)).map((s) => s.textContent.length);
+  return `${counts.join(',')}|${lengths.join(',')}`;
 }
 
 function indexOf(doc) {

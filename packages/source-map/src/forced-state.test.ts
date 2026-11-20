@@ -126,6 +126,16 @@ describe('the states an element has styles for', () => {
     expect(statesOf(title)).toEqual(['hover']);
   });
 
+  it('sees a rule that replaces another inside a sheet with the same number of rules', () => {
+    const { doc, btn } = page();
+    const sheet = doc.querySelector('style')!;
+    sheet.textContent = '@media (min-width: 1px) { .btn:hover { color: red } }';
+    expect(statesOf(btn)).toEqual(['hover']);
+    sheet.textContent = '@media (min-width: 1px) { .btn:active { color: red } }';
+
+    expect(statesOf(btn)).toEqual(['active']);
+  });
+
   it('is empty for an element nothing styles', () => {
     const { doc } = page();
     const bare = doc.createElement('p');

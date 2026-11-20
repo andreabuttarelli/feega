@@ -211,6 +211,33 @@ try {
     assert.deepEqual(changedFiles().concat(untracked()), [], 'one undo restores everything');
   });
 
+  const chooseState = async (name) => {
+    await page.locator('[data-field="state"]').click();
+    await page.locator(`[data-state-item="${name}"]`).click();
+    await page.waitForTimeout(800);
+  };
+  const buttonFill = () => frame.locator('#cta').evaluate((el) => getComputedStyle(el).backgroundColor);
+
+  await check('hover state: a background set in Hover writes the hover rule, the forced preview shows it, default is untouched, one undo restores it', async () => {
+    await frame.locator('#cta').click();
+    await page.waitForTimeout(800);
+    const normal = await buttonFill();
+    await chooseState('hover');
+    assert.ok((await page.getByTestId('breadcrumb').first().innerText()).includes(':hover'), 'the breadcrumb carries the state badge');
+    await page.locator('[data-section="Fill"] button[aria-label*="Add"]').first().click();
+    await page.waitForTimeout(SETTLE_MS);
+    const added = diffText().split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).join('\n');
+    assert.ok(TAILWIND ? /hover:bg-\[#d9d9d9\]/.test(added) : /:hover\s*\{/.test(added) && /background(-color)?:\s*#d9d9d9/i.test(added), `the hover declaration is written:\n${added}`);
+    assert.equal(await buttonFill(), 'rgb(217, 217, 217)', 'the forced preview shows the hover background');
+    await chooseState('default');
+    assert.equal(await buttonFill(), normal, 'the default look is untouched');
+    await page.locator('[data-field="state"]').click();
+    assert.equal(await page.locator('[data-state-item="hover"] .dot').count(), 1, 'hover shows a dot once it has styles');
+    await page.keyboard.press('Escape');
+    await undo();
+    assert.deepEqual(changedFiles().concat(untracked()), [], 'one undo restores everything');
+  });
+
   await check('a fill colour does not add background-image none', async () => {
     await frame.locator('h1').first().click();
     const hex = page.locator('[data-row="fill"] input[aria-label="Colour hex"]').first();
