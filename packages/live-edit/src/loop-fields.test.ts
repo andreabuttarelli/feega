@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { linkWrite } from './link-edit';
 import { literalText } from './literal-text';
 
+const LIB_ALIAS = '$' + 'lib';
+
 const LINKS = `export const HEADER_LINKS = [
   { href: '/download', label: 'Download' },
   { href: DOCS_URL, label: 'Docs' },
@@ -10,7 +12,7 @@ const LINKS = `export const HEADER_LINKS = [
 `;
 
 const SVELTE = `<script lang="ts">
-  import { HEADER_LINKS } from '$lib/site/links';
+  import { HEADER_LINKS } from '${LIB_ALIAS}/site/links';
 </script>
 
 <nav>

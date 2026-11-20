@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { StructureOp, structure } from './structure';
 
+const LIB_ALIAS = '$' + 'lib';
+
 const LINKS = `export const HEADER_LINKS = [
   { href: '/download', label: 'Download' },
   { href: DOCS_URL, label: 'Docs' },
@@ -9,7 +11,7 @@ const LINKS = `export const HEADER_LINKS = [
 `;
 
 const NAV = `<script lang="ts">
-  import { HEADER_LINKS } from '$lib/site/links';
+  import { HEADER_LINKS } from '${LIB_ALIAS}/site/links';
 </script>
 
 <nav>
@@ -110,7 +112,7 @@ describe('duplicating a loop item', () => {
   });
 
   it('refuses when the array comes from props, naming why', async () => {
-    const page = NAV.replace("  import { HEADER_LINKS } from '$lib/site/links';", '  let { HEADER_LINKS } = $props();');
+    const page = NAV.replace(`  import { HEADER_LINKS } from '${LIB_ALIAS}/site/links';`, '  let { HEADER_LINKS } = $props();');
     const out = await run({ 'src/routes/+page.svelte': page }, 'src/routes/+page.svelte', 7, 5, StructureOp.Duplicate, 0);
 
     expect(!out.ok && out.reason).toMatch(/props, fetched data or a store/);

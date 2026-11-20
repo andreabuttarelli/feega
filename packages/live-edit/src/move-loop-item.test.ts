@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { StructureOp, structure } from './structure';
 
+const LIB_ALIAS = '$' + 'lib';
+
 const SVELTE = `<script>
   const plans = [
     { name: 'Starter' },
@@ -64,7 +66,7 @@ export const HEADER_LINKS = [
 `;
 
 const NAV = `<script lang="ts">
-  import { HEADER_LINKS } from '$lib/site/links';
+  import { HEADER_LINKS } from '${LIB_ALIAS}/site/links';
 </script>
 
 <nav>
