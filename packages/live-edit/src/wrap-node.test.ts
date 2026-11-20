@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { AddStyle } from './add-node';
 import { StructureOp, structure } from './structure';
 
 const SVELTE = `<main>
@@ -35,7 +36,7 @@ const LOOP = `<script>
 </ul>
 `;
 
-const run = (op: StructureOp, text: string, file: string, line: number, col: number) => structure(async () => text, { op, at: { file, line, col } });
+const run = (op: StructureOp, text: string, file: string, line: number, col: number, style = AddStyle.Plain) => structure(async () => text, { op, at: { file, line, col }, style });
 
 describe('wrap and unwrap', () => {
   it('wraps a Svelte element in a div and selects the new container', async () => {
@@ -43,6 +44,14 @@ describe('wrap and unwrap', () => {
 
     expect(out.ok && out.changes[0].after).toBe('<main>\n  <div>\n    <h1 class="t">Title</h1>\n  </div>\n  <p>Lead</p>\n</main>\n');
     expect(out.ok && out.selected).toEqual({ file: 'a.svelte', line: 2, col: 3 });
+  });
+
+  it('gives the container flex classes in Tailwind, in either attribute', async () => {
+    const svelte = await run(StructureOp.Wrap, SVELTE, 'a.svelte', 2, 3, AddStyle.Tailwind);
+    const jsx = await run(StructureOp.Wrap, JSX, 'page.tsx', 5, 7, AddStyle.Tailwind);
+
+    expect(svelte.ok && svelte.changes[0].after).toContain('  <div class="flex flex-col">\n    <h1 class="t">Title</h1>');
+    expect(jsx.ok && jsx.changes[0].after).toContain('      <div className="flex flex-col">\n        <p>Lead</p>');
   });
 
   it('wraps a JSX element with several lines', async () => {

@@ -1,3 +1,4 @@
+import { AddStyle, classAttribute } from './add-node';
 import { offsetOf, type LiveAt } from './class-patch';
 import { elementRange } from './element-range';
 import type { ReadFile } from './files';
@@ -5,7 +6,11 @@ import { indentOf, type Structured } from './move-into';
 import { hiddenOut, lineSpan, parentOf, repeated } from './move-node';
 
 const INDENT_UNIT = '  ';
-const WRAPPER_OPEN = '<div>';
+const WRAPPER_TAILWIND = 'flex flex-col';
+
+export const WRAPPER_CSS = { display: 'flex', 'flex-direction': 'column' };
+
+const wrapperOpen = (file: string, style: AddStyle) => `<div${style === AddStyle.Tailwind ? classAttribute(file, WRAPPER_TAILWIND) : ''}>`;
 const WRAPPER_CLOSE = '</div>';
 
 type Located = { source: string; text: string; start: number };
@@ -39,7 +44,7 @@ const dedented = (block: string) =>
     .map((l) => (l.startsWith(INDENT_UNIT) ? l.slice(INDENT_UNIT.length) : l))
     .join('\n');
 
-export async function wrapNode(read: ReadFile, at: LiveAt): Promise<Structured> {
+export async function wrapNode(read: ReadFile, at: LiveAt, style = AddStyle.Plain): Promise<Structured> {
   const found = await located(read, at);
   if (typeof found === 'string') {
     return { ok: false, reason: found, at };
@@ -51,11 +56,12 @@ export async function wrapNode(read: ReadFile, at: LiveAt): Promise<Structured> 
     return { ok: false, reason: `${at.file}: the element is not where the page says` };
   }
 
+  const open = wrapperOpen(at.file, style);
   const whole = lineSpan(source, range);
   const inline = whole.start === range.start && whole.end === range.end;
   const indent = indentOf(source.slice(source.lastIndexOf('\n', range.start - 1) + 1));
   const piece = source.slice(whole.start, whole.end);
-  const block = inline ? `${WRAPPER_OPEN}${piece}${WRAPPER_CLOSE}` : `${indent}${WRAPPER_OPEN}\n${lined(piece, INDENT_UNIT)}\n${indent}${WRAPPER_CLOSE}${piece.endsWith('\n') ? '\n' : ''}`;
+  const block = inline ? `${open}${piece}${WRAPPER_CLOSE}` : `${indent}${open}\n${lined(piece, INDENT_UNIT)}\n${indent}${WRAPPER_CLOSE}${piece.endsWith('\n') ? '\n' : ''}`;
   const after = source.slice(0, whole.start) + block + source.slice(whole.end);
   const wrapper = inline ? whole.start : whole.start + indent.length;
   return { ok: true, changes: [{ path: at.file, before: source, after }], selected: { file: at.file, ...lineCol(after, wrapper) } };

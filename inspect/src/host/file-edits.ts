@@ -2,13 +2,15 @@ import { readFile, rm, writeFile } from 'node:fs/promises';
 import { stylePatch, type LiveAt } from '@feega/live-edit/class-patch';
 import { cssModuleRule } from '@feega/live-edit/css-module';
 import type { FileChange, ReadFile } from '@feega/live-edit/files';
+import type { Structured } from '@feega/live-edit/move-into';
 import { inside, liveAtOf, reader, tokenOf } from '@feega/live-edit/live-ask';
 import { LiveProp } from '@feega/live-edit/live-fields';
 import { literalText } from '@feega/live-edit/literal-text';
 import { moveNode, type Place } from '@feega/live-edit/move-node';
 import { globalSheetOf, googleFontImport, googleFontLink } from '@feega/live-edit/font-wiring';
 import { VariableHome, saveVariable, variableName } from '@feega/live-edit/save-variable';
-import { AddKind, AddStyle } from '@feega/live-edit/add-node';
+import { addedCss, AddKind, AddStyle } from '@feega/live-edit/add-node';
+import { WRAPPER_CSS } from '@feega/live-edit/wrap-node';
 import type { LoopMove } from '@feega/live-edit/move-loop-item';
 import type { Usage } from '@feega/live-edit/move-usage';
 import { StructureOp, structure } from '@feega/live-edit/structure';
@@ -49,6 +51,23 @@ const CSS_WRITERS: Record<string, CssWriter> = {
 };
 
 const cssWriterOf = (file: string): CssWriter => CSS_WRITERS[file.slice(file.lastIndexOf('.') + 1)] ?? INLINE;
+
+const afterChanges = (read: ReadFile, changes: FileChange[]): ReadFile => async (path) => changes.find((c) => c.path === path)?.after ?? read(path);
+
+const mergedChanges = (first: FileChange[], more: FileChange[]): FileChange[] => [
+  ...first.map((c) => ({ ...c, after: more.find((m) => m.path === c.path)?.after ?? c.after })),
+  ...more.filter((m) => !first.some((c) => c.path === m.path))
+];
+
+async function ruled(read: ReadFile, out: Extract<Structured, { ok: true }>, css: Css): Promise<Structured> {
+  const target = out.selected;
+  if (!target || !Object.keys(css).length) {
+    return out;
+  }
+
+  const rule = await cssWriterOf(target.file).write(afterChanges(read, out.changes), target, css);
+  return rule.ok ? { ...out, changes: mergedChanges(out.changes, rule.changes) } : rule;
+}
 
 type Step = { full: string; before: string; after: string }[];
 
@@ -241,14 +260,17 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
   async function restructured(ask: StructureAsk): Promise<Written> {
     const { op, at: rawAt, to: rawTo, usage, loop } = ask;
     const tailwind = (await stylingOf(root, choice())) === Styling.Tailwind;
-    const add = ask.add && { ...ask.add, style: tailwind ? AddStyle.Tailwind : AddStyle.Inline };
+    const style = tailwind ? AddStyle.Tailwind : AddStyle.Plain;
+    const add = ask.add && { ...ask.add, style };
     meta = { at: rawAt, prop: op, value: rawTo ?? usage?.from ?? '', scope: '' };
     const at = liveAtOf(rawAt);
     const to = rawTo ? (liveAtOf(rawTo) ?? undefined) : undefined;
     if (!at || !inside(root, at.file)) {
       return { ok: false, reason: `${rawAt} is not a file:line:col inside the workspace` };
     }
-    const out = await structure(reader(root), { op, at, to, usage, loop, add });
+    const made = await structure(reader(root), { op, at, to, usage, loop, add, style });
+    const css = tailwind ? {} : op === StructureOp.Wrap ? WRAPPER_CSS : add ? addedCss(add.kind) : {};
+    const out = made.ok ? await ruled(reader(root), made, css) : made;
     const written = out.ok ? await writtenAll(out.changes, '', out.note) : out;
     return out.ok && written.ok ? { ...written, selected: out.selected } : written;
   }
