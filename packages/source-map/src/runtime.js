@@ -163,9 +163,24 @@ function rootFontSize(doc) {
   return parseFloat(doc.defaultView.getComputedStyle(doc.documentElement).fontSize);
 }
 
-function rectOf(element) {
-  const { x, y, width, height } = element.getBoundingClientRect();
-  return { x, y, width, height };
+const boxOf = ({ x, y, width, height }) => ({ x, y, width, height });
+const isEmpty = (box) => box.width === 0 && box.height === 0;
+
+function unionOf(boxes) {
+  const left = Math.min(...boxes.map((b) => b.x));
+  const top = Math.min(...boxes.map((b) => b.y));
+  const right = Math.max(...boxes.map((b) => b.x + b.width));
+  const bottom = Math.max(...boxes.map((b) => b.y + b.height));
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
+export function rectOf(element) {
+  const own = boxOf(element.getBoundingClientRect());
+  if (!isEmpty(own) || element.ownerDocument.defaultView.getComputedStyle(element).display !== 'contents') {
+    return own;
+  }
+  const inner = [...element.children].map(rectOf).filter((box) => !isEmpty(box));
+  return inner.length ? unionOf(inner) : own;
 }
 
 const PREVIEW_STYLE_ID = 'feega-preview';
@@ -334,6 +349,17 @@ function sibling(element, step) {
 const MAX_TREE_DEPTH = 24;
 const MAX_TREE_NODES = 1500;
 
+function instanceIndexes(doc) {
+  const seen = new Map();
+  const index = new Map();
+  for (const element of doc.querySelectorAll(`[${SOURCE_ATTR}]`)) {
+    const attr = element.getAttribute(SOURCE_ATTR);
+    index.set(element, seen.get(attr) ?? 0);
+    seen.set(attr, (seen.get(attr) ?? 0) + 1);
+  }
+  return index;
+}
+
 function nodeOf(element, depth, budget) {
   budget.left--;
   const parent = taggedParent(element);
@@ -348,6 +374,7 @@ function nodeOf(element, depth, budget) {
     source: parseSource(element.getAttribute(SOURCE_ATTR)),
     component: Boolean(parent) && fileOf(parent) !== fileOf(element),
     count: 1,
+    instance: budget.instances.get(element) ?? 0,
     children
   };
 }
@@ -378,7 +405,7 @@ function pageNode(element, source, children) {
 
 export function treeOf(doc) {
   const roots = [...doc.querySelectorAll(`[${SOURCE_ATTR}]`)].filter((e) => !taggedParent(e));
-  const budget = { left: MAX_TREE_NODES };
+  const budget = { left: MAX_TREE_NODES, instances: instanceIndexes(doc) };
   const inHead = (e) => Boolean(doc.head?.contains(e));
   const head = foldedOf(roots.filter(inHead), 1, budget);
   const body = foldedOf(roots.filter((e) => !inHead(e)), 0, budget);

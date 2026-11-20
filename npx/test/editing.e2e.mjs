@@ -24,6 +24,8 @@ const HANDLER_ATTRIBUTE = /onClick|onclick|@click/;
 const GO_PAGE_CODE = /(goto\(|location\.href = |\$router\.push\()'\/pricing'/;
 const OPEN_WAIT_MS = 5000;
 const OPEN_POLL_MS = 250;
+const OUTLINE_TOLERANCE_PX = 2;
+const SPACER_PX = 3000;
 const CLIENT_PAGE_MS = 60_000;
 const TOPICS = ['Briefs', 'Timelines', 'Assets'];
 const printed = [];
@@ -104,6 +106,62 @@ try {
     await page.waitForTimeout(800);
     const picked = await page.locator('[data-testid="layers"] [data-layer][aria-selected="true"]').count();
     assert.equal(picked, 1, 'the selected element has a visible layer row');
+  });
+
+  const layerRow = (pattern) => page.locator('[data-testid="layers"] [data-layer]').filter({ hasText: pattern }).first();
+  const sameBox = (a, b, what) => {
+    for (const side of ['x', 'y', 'width', 'height']) {
+      assert.ok(Math.abs(a[side] - b[side]) <= OUTLINE_TOLERANCE_PX, `${what} ${side}: outline ${a[side]} vs element ${b[side]}`);
+    }
+  };
+  const outlinesElement = async (row, target, outline) => {
+    await page.mouse.move(0, 0);
+    await row.hover();
+    await page.locator(`.outline.${outline}`).waitFor({ timeout: OPEN_WAIT_MS });
+    sameBox(await page.locator(`.outline.${outline}`).first().boundingBox(), await target.boundingBox(), `${outline} outline`);
+  };
+
+  await check('hovering a layer outlines the element on the page; clicking it selects it and the selection box matches its rect', async () => {
+    await frame.locator('h1').first().click();
+    await page.waitForTimeout(800);
+    await outlinesElement(layerRow(/^\s*h1/), frame.locator('h1').first(), 'hover');
+    await layerRow(/^\s*h1/).click();
+    await outlinesElement(layerRow(/^\s*h1/), frame.locator('h1').first(), 'picked');
+    await page.mouse.move(0, 0);
+    assert.equal(await page.locator('.outline.hover').count(), 0, 'the hover outline goes away with the pointer');
+  });
+
+  await check('a component layer outlines and selects its root element', async () => {
+    await frame.locator('#benefits').click();
+    await page.waitForTimeout(800);
+    await outlinesElement(layerRow(/^\s*Benefits/), frame.locator('#benefits'), 'hover');
+    await layerRow(/^\s*Benefits/).click();
+    await outlinesElement(layerRow(/^\s*Benefits/), frame.locator('#benefits'), 'picked');
+  });
+
+  await check('a repeated loop layer outlines and selects its first instance', async () => {
+    await frame.locator('#topics > *').first().click();
+    await page.waitForTimeout(800);
+    const row = page.locator('[data-testid="layers"] [data-layer]').filter({ hasText: /×3/ }).first();
+    await outlinesElement(row, frame.locator('#topics > *').first(), 'hover');
+    await row.click();
+    await outlinesElement(row, frame.locator('#topics > *').first(), 'picked');
+  });
+
+  await check('selecting a layer below the fold scrolls it into view and draws the selection box', async () => {
+    await frame.locator('#topics > *').first().click();
+    await page.waitForTimeout(800);
+    await frame.locator('#topics').evaluate((list, px) => list.before(Object.assign(document.createElement('div'), { style: `height: ${px}px` })), SPACER_PX);
+    const row = page.locator('[data-testid="layers"] [data-layer]').filter({ hasText: /×3/ }).first();
+    await row.scrollIntoViewIfNeeded();
+    await row.click();
+    await page.locator('.outline.picked').waitFor({ timeout: OPEN_WAIT_MS });
+    await page.waitForTimeout(800);
+    const outline = await page.locator('.outline.picked').first().boundingBox();
+    const stage = await page.getByTestId('app-frame').boundingBox();
+    assert.ok(outline.y >= stage.y && outline.y + outline.height <= stage.y + stage.height, `selection box ${outline.y} is inside the frame ${stage.y}..${stage.y + stage.height}`);
+    sameBox(outline, await frame.locator('#topics > *').first().boundingBox(), 'picked outline');
+    await frame.locator('body').evaluate(() => window.scrollTo(0, 0));
   });
 
   await check('plain text edit writes the source and undo restores it', async () => {

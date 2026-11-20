@@ -236,9 +236,10 @@ export const PALETTE_RESULT = 'feega:palette:result';
 export const TREE = 'feega:tree';
 export const TREE_RESULT = 'feega:tree:result';
 
-export type LayerNode = { name: string; tag: string; display: string; direction: string; position: string; source: Source | null; component: boolean; count: number; children: LayerNode[] };
+export type LayerNode = { name: string; tag: string; display: string; direction: string; position: string; source: Source | null; component: boolean; count: number; instance: number; children: LayerNode[] };
 export const SCROLL = 'feega:scroll';
 export const SCROLLED = 'feega:scrolled';
+export const REVEAL = 'feega:reveal';
 export const TEXT_EDIT = 'feega:text:edit';
 export const TEXT_DONE = 'feega:text:done';
 export const TEXT_RESTORE = 'feega:text:restore';

@@ -16,8 +16,8 @@
     picked: Pick | null;
     depth?: number;
     open: Record<string, boolean>;
-    onselect: (source: Source) => void;
-    onhover: (source: Source | null) => void;
+    onselect: (source: Source, instance: number) => void;
+    onhover: (source: Source | null, instance: number) => void;
     onopen: (source: Source) => void;
     onmove: (from: Source, to: Source, place: Place) => void;
     dragging: { source: Source | null; name: string; component: boolean; parentFile: string | null };
@@ -36,7 +36,7 @@
   const isPicked = (n: LayerNode) => picked !== null && n.source !== null && sourceText(picked.source) === sourceText(n.source);
   const actions = (n: LayerNode) => actionsOf(roleOf({ tag: n.tag, ownText: false, inlineText: false, elements: n.children.length, display: n.display }));
   const visual = (n: LayerNode) => n.source !== null && actions(n).visibility;
-  const choose = (n: LayerNode) => (n.source ? onselect(n.source) : (open[key(n)] = !open[key(n)]));
+  const choose = (n: LayerNode) => (n.source ? onselect(n.source, n.instance) : (open[key(n)] = !open[key(n)]));
 
   function onKey(e: KeyboardEvent, node: LayerNode) {
     const actions: Record<string, () => void> = {
@@ -84,8 +84,8 @@
     data-layer={id}
     onclick={() => choose(node)}
     onkeydown={(e) => onKey(e, node)}
-    onpointerenter={() => onhover(visual(node) ? node.source : null)}
-    onpointerleave={() => onhover(null)}
+    onpointerenter={() => onhover(visual(node) ? node.source : null, node.instance)}
+    onpointerleave={() => onhover(null, 0)}
     ondragstart={() => Object.assign(dragging, { source: node.source, name: node.name, component: node.component, parentFile })}
     ondragover={(e) => e.preventDefault()}
     ondrop={(e) => onDrop(e, node)}

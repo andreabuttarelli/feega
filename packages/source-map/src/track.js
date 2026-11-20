@@ -1,4 +1,4 @@
-import { SOURCE_ATTR } from './runtime.js';
+import { SOURCE_ATTR, rectOf } from './runtime.js';
 
 const FRAME_MS = 16;
 
@@ -34,8 +34,7 @@ export function trackRects(win, send) {
     queued = false;
     for (const [slot, target] of followed) {
       const element = elementOf(target);
-      const box = element?.getBoundingClientRect();
-      const rect = box ? { x: box.x, y: box.y, width: box.width, height: box.height } : null;
+      const rect = element ? rectOf(element) : null;
       if (sameRect(rect, last.get(slot)) || (rect === null && last.get(slot) === null)) {
         continue;
       }

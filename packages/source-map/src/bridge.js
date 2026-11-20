@@ -1,5 +1,5 @@
 import { stampSources } from './framework-meta.js';
-import { SOURCE_ATTR, deepestAt, clearPreview, hidePreview, paletteOf, relativeOf, treeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
+import { SOURCE_ATTR, rectOf, deepestAt, clearPreview, hidePreview, paletteOf, relativeOf, treeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
 import { trackRects } from './track.js';
 import { keepScroll } from './reload-restore.js';
 
@@ -13,6 +13,7 @@ export const PREVIEW_SETTLED = 'feega:preview:settled';
 export const LOCATION = 'feega:location';
 export const SCROLL = 'feega:scroll';
 export const SCROLLED = 'feega:scrolled';
+export const REVEAL = 'feega:reveal';
 export const TREE = 'feega:tree';
 export const TREE_RESULT = 'feega:tree:result';
 export const HIDE = 'feega:hide';
@@ -85,6 +86,7 @@ export function installBridge(win) {
       win.scrollBy(request.dx, request.dy);
       reply({ type: SCROLLED });
     },
+    [REVEAL]: (request) => revealSource(win, request),
     [TEXT_EDIT]: (request) => mode === Mode.Design && editText(win, targetOf(doc, request), request, reply, unsaved),
     [TEXT_RESTORE]: (request) => restoreText(doc, unsaved, request.source),
     [INSPECT]: (request) => {
@@ -180,6 +182,18 @@ function placeCaret(win, element, { x, y }) {
   const selection = win.getSelection();
   selection.removeAllRanges();
   selection.addRange(range);
+}
+
+function revealSource(win, request) {
+  const target = targetOf(win.document, { selector: `[${SOURCE_ATTR}=${JSON.stringify(request.source)}]`, index: request.index });
+  if (!target) {
+    return;
+  }
+  const { y, height } = rectOf(target);
+  if (y >= 0 && y + height <= win.innerHeight) {
+    return;
+  }
+  target.scrollIntoView({ block: 'center', behavior: 'instant' });
 }
 
 export function targetOf(doc, request) {

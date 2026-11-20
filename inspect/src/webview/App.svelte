@@ -123,8 +123,13 @@
   let layersOpen = $state<Record<string, boolean>>({ '(html):0:0': true, '(page):0:0': true });
   const layerDrag = $state<{ source: Source | null; name: string; component: boolean; parentFile: string | null }>({ source: null, name: '', component: false, parentFile: null });
 
-  async function hoverLayer(source: Source | null) {
-    hover = source ? await bridge.again(source) : null;
+  let hoverAsked = 0;
+  async function hoverLayer(source: Source | null, instance: number) {
+    const asked = ++hoverAsked;
+    const found = source ? await bridge.again(source, instance) : null;
+    if (asked === hoverAsked) {
+      hover = found;
+    }
   }
 
   $effect(() => {
@@ -522,8 +527,9 @@
   const STRUCTURE_KEYS = new Set(['Delete', 'Backspace']);
   const typing = (e: KeyboardEvent) => e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement;
 
-  async function select(source: Source) {
-    picked = (await bridge.again(source)) ?? picked;
+  async function select(source: Source, instance = 0) {
+    bridge.reveal(source, instance);
+    picked = (await bridge.again(source, instance)) ?? picked;
   }
 
   async function moveSelection(move: Move) {
