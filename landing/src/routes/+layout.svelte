@@ -1,4 +1,6 @@
 <script lang="ts">
+  import '$lib/site/theme/tokens.css';
+  import '$lib/site/theme/chrome.css';
   import '$lib/site/site.css';
   import SiteHeader from '$lib/site/SiteHeader.svelte';
   import SiteFooter from '$lib/site/SiteFooter.svelte';

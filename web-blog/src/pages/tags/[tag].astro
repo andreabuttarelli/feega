@@ -16,6 +16,9 @@ const { tag, posts } = Astro.props as { tag: string; posts: Post[] };
 ---
 
 <Base title={`#${tag}`} description={`Feega posts tagged ${tag}.`}>
-  <h1 class="page-title">#{tag}</h1>
+  <header class="index-head">
+    <nav class="sx-crumbs" aria-label="Breadcrumb"><a href="/">blog</a><span aria-hidden="true">/</span><span>tags</span></nav>
+    <h1 class="page-title">#{tag}</h1>
+  </header>
   <PostList posts={posts} />
 </Base>

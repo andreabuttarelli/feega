@@ -39,16 +39,10 @@ export const EDITORS: readonly Editor[] = [
 
 export const HEADER_LINKS = [
   { href: DOWNLOAD_PATH, label: 'Download' },
-  { href: DOCS_URL, label: 'Documentation' },
-  { href: DISCORD_URL, label: 'Community' },
-  { href: '/pricing', label: 'Pricing' }
-] as const;
-
-export const MENU_LINKS = [
-  { href: DOWNLOAD_PATH, label: 'Download' },
   { href: DOCS_URL, label: 'Docs' },
-  { href: DISCORD_URL, label: 'Community' },
-  { href: '/pricing', label: 'Pricing' }
+  { href: STORY_URL, label: 'Blog' },
+  { href: '/pricing', label: 'Pricing' },
+  { href: DISCORD_URL, label: 'Community' }
 ] as const;
 
 export const SOCIAL_LINKS = [
