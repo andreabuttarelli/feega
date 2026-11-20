@@ -44,9 +44,9 @@ jobs:
             fi
           }
           emit app '^(src/|supabase/|static/|scripts/|cli/|packages/|tests/|package\.json|package-lock\.json|svelte\.config\.js|vite\.config\.ts|tsconfig\.json|\.github/workflows/ci\.yml)'
-          emit landing '^(landing/|src/lib/content/changelog/|\.github/workflows/ci\.yml)'
-          emit web-docs '^(web-docs/|docs/|cli/|\.github/workflows/ci\.yml)'
-          emit web-blog '^(web-blog/|\.github/workflows/ci\.yml)'
+          emit landing '^(landing/|packages/site-theme/|src/lib/content/changelog/|\.github/workflows/ci\.yml)'
+          emit web-docs '^(web-docs/|packages/site-theme/|docs/|cli/|\.github/workflows/ci\.yml)'
+          emit web-blog '^(web-blog/|packages/site-theme/|\.github/workflows/ci\.yml)'
           emit inspect '^(inspect/|npx/|packages/|\.github/workflows/ci\.yml)'
 
   test:

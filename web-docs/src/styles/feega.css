@@ -454,3 +454,8 @@ site-search button {
     padding-inline-start: calc(var(--sl-sidebar-width) + var(--sx-gutter));
   }
 }
+
+.sl-markdown-content > :first-child,
+.sl-markdown-content > :first-child.sl-heading-wrapper {
+  margin-top: 0 !important;
+}

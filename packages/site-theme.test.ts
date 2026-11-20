@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SOURCES, dirsFor } from './targets.mjs';
+import { SOURCES, dirsFor } from './site-theme/targets.mjs';
 
-const HERE = fileURLToPath(new URL('.', import.meta.url));
+const HERE = join(fileURLToPath(new URL('.', import.meta.url)), 'site-theme');
 const ROOT = join(HERE, '..', '..');
 
 describe('site-theme', () => {
