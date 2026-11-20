@@ -9,15 +9,17 @@
   import type { LayerNode, Pick, Source } from '../messages';
   import { sourceText } from './page-bridge';
   import { actionsOf, roleOf } from './roles';
+  import { hiddenHere } from './layer-state';
   import Self from './LayersTree.svelte';
 
   type Props = {
     nodes: LayerNode[];
     picked: Pick | null;
+    badge?: string;
     depth?: number;
     open: Record<string, boolean>;
-    onselect: (source: Source) => void;
-    onhover: (source: Source | null) => void;
+    onselect: (source: Source, instance: number) => void;
+    onhover: (source: Source | null, instance: number) => void;
     onopen: (source: Source) => void;
     onmove: (from: Source, to: Source, place: Place) => void;
     dragging: { source: Source | null; name: string; component: boolean; parentFile: string | null };
@@ -28,7 +30,7 @@
     ontoggle: (flag: 'hidden' | 'locked', source: Source) => void;
   };
 
-  let { nodes, picked, depth = 0, open, onselect, onhover, onopen, onmove, dragging, parentFile = null, onusage, hidden, locked, ontoggle }: Props = $props();
+  let { nodes, picked, badge = '', depth = 0, open, onselect, onhover, onopen, onmove, dragging, parentFile = null, onusage, hidden, locked, ontoggle }: Props = $props();
 
   const INDENT_PX = 12;
   const EDGE_BAND = 0.25;
@@ -36,7 +38,7 @@
   const isPicked = (n: LayerNode) => picked !== null && n.source !== null && sourceText(picked.source) === sourceText(n.source);
   const actions = (n: LayerNode) => actionsOf(roleOf({ tag: n.tag, ownText: false, inlineText: false, elements: n.children.length, display: n.display }));
   const visual = (n: LayerNode) => n.source !== null && actions(n).visibility;
-  const choose = (n: LayerNode) => (n.source ? onselect(n.source) : (open[key(n)] = !open[key(n)]));
+  const choose = (n: LayerNode) => (n.source ? onselect(n.source, n.instance) : (open[key(n)] = !open[key(n)]));
 
   function onKey(e: KeyboardEvent, node: LayerNode) {
     const actions: Record<string, () => void> = {
@@ -84,8 +86,8 @@
     data-layer={id}
     onclick={() => choose(node)}
     onkeydown={(e) => onKey(e, node)}
-    onpointerenter={() => onhover(visual(node) ? node.source : null)}
-    onpointerleave={() => onhover(null)}
+    onpointerenter={() => onhover(visual(node) ? node.source : null, node.instance)}
+    onpointerleave={() => onhover(null, 0)}
     ondragstart={() => Object.assign(dragging, { source: node.source, name: node.name, component: node.component, parentFile })}
     ondragover={(e) => e.preventDefault()}
     ondrop={(e) => onDrop(e, node)}
@@ -96,7 +98,8 @@
       <span class="twist"></span>
     {/if}
     <svg class="type" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="0.833" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{@html ICON_SVG[iconOf(node)]}</svg>
-    <span class="name" class:component={node.component}>{node.name}</span>
+    <span class="name" class:component={node.component}>{node.name}</span>{#if badge && isPicked(node)}<span class="state-badge" data-testid="layer-state-badge">{badge}</span>{/if}
+    {#if hiddenHere(node)}<span class="hidden-here" title="Hidden at this size" aria-label="Hidden at this size" data-hidden-here><EyeOff size={11} /></span>{/if}
     {#if floatingOf(node.position)}<span class={`float ${floatingOf(node.position)}`} data-float={floatingOf(node.position)} title={floatingOf(node.position)} aria-label={floatingOf(node.position)}><svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true">{@html FLOAT_GLYPH[floatingOf(node.position)!]}</svg></span>{/if}
     {#if node.count > 1 && node.source}<span class="count" title={`Rendered ${node.count} times by a loop in ${node.source.file}:${node.source.line} — edits apply to all ${node.count}`}>×{node.count}</span>{:else if !node.source}<span class="count">{node.count}</span>{/if}
     {#if actions(node).visibility && node.source}<span class="toggles" class:active={hidden.has(id) || locked.has(id)}>
@@ -105,11 +108,17 @@
     </span>{/if}
   </div>
   {#if node.children.length && open[id]}
-    <Self nodes={node.children} {picked} depth={depth + 1} {open} {onselect} {onhover} {onopen} {onmove} {dragging} parentFile={node.source?.file ?? null} {onusage} {hidden} {locked} {ontoggle} />
+    <Self nodes={node.children} {picked} {badge} depth={depth + 1} {open} {onselect} {onhover} {onopen} {onmove} {dragging} parentFile={node.source?.file ?? null} {onusage} {hidden} {locked} {ontoggle} />
   {/if}
 {/each}
 
 <style>
+  .hidden-here {
+    display: grid;
+    place-items: center;
+    color: var(--ui-text-3);
+  }
+
   .row {
     display: flex;
     align-items: center;
@@ -154,6 +163,16 @@
   .type {
     flex: none;
     color: var(--ui-text-3);
+  }
+
+  .state-badge {
+    flex: none;
+    padding: 0 4px;
+    border-radius: var(--ui-radius-xs);
+    background: var(--ui-accent);
+    color: var(--ui-accent-ink);
+    font-size: 10px;
+    line-height: 14px;
   }
 
   .name {

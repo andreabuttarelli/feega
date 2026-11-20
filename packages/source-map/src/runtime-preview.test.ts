@@ -127,3 +127,39 @@ describe('a preview survives hot reload until the class lands', () => {
     expect(settlePreview(win.document, SOURCE)).toEqual([]);
   });
 });
+
+describe('a preview made in an element state', () => {
+  it('shows only while that state is forced on the element', () => {
+    const win = domOf();
+    const h1 = win.document.querySelector('h1')!;
+    previewEdit(win.document, { source: SOURCE, state: 'hover', style: { color: 'rgb(9, 9, 9)' } });
+
+    expect(win.getComputedStyle(h1).color).not.toBe('rgb(9, 9, 9)');
+    h1.setAttribute('data-feega-force', 'hover');
+    expect(win.getComputedStyle(h1).color).toBe('rgb(9, 9, 9)');
+  });
+
+  it('is kept apart from the default preview of the same element', () => {
+    const win = domOf();
+    const h1 = win.document.querySelector('h1')!;
+    previewEdit(win.document, { source: SOURCE, style: { color: 'rgb(1, 1, 1)' } });
+    previewEdit(win.document, { source: SOURCE, state: 'hover', style: { color: 'rgb(9, 9, 9)' } });
+    clearPreview(win.document, SOURCE, 'hover');
+
+    expect(win.getComputedStyle(h1).color).toBe('rgb(1, 1, 1)');
+  });
+
+  it('settles against the forced look and drops once the page gives the same value', () => {
+    const win = domOf();
+    const h1 = win.document.querySelector('h1')!;
+    const style = win.document.createElement('style');
+    style.textContent = '.red[data-feega-force~="hover"] { color: rgb(255, 0, 0) }';
+    win.document.head.append(style);
+    h1.setAttribute('data-feega-force', 'hover');
+    previewEdit(win.document, { source: SOURCE, state: 'hover', style: { color: 'rgb(255, 0, 0)' } });
+    h1.className = 'red';
+
+    expect(settlePreview(win.document, SOURCE, 'hover')).toEqual([]);
+    expect(win.document.getElementById('feega-preview')!.textContent).toBe('');
+  });
+});

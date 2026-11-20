@@ -1,4 +1,7 @@
 export const SOURCE_ATTR = 'data-feega-src';
+export const ICON_ATTR = 'data-feega-icon';
+export const FORCE_ATTR = 'data-feega-force';
+const BOOKKEEPING_ATTRS = new Set([SOURCE_ATTR, ICON_ATTR, FORCE_ATTR]);
 
 const DEFAULT_MAX_HTML = 2000;
 const TEXT_NODE = 3;
@@ -41,7 +44,8 @@ export function parseSource(value) {
 }
 
 const INNER_KEY = ' >> ';
-const keyOf = (source, inner) => (inner ? `${source}${INNER_KEY}${inner}` : source);
+const STATE_KEY = ' @@ ';
+const keyOf = (source, inner, state) => `${source}${inner ? `${INNER_KEY}${inner}` : ''}${state ? `${STATE_KEY}${state}` : ''}`;
 
 function untaggedSvg(element, tagged) {
   const svg = element.closest('svg');
@@ -139,7 +143,7 @@ function inspectTagged(tagged, maxHtml) {
     classCount: tagged.classList?.[0] ? tagged.ownerDocument.getElementsByClassName(tagged.classList[0]).length : 0,
     parentWidth: tagged.parentElement?.getBoundingClientRect().width ?? 0,
     ancestors: ancestorsOf(tagged),
-    attributes: [...tagged.attributes].filter((a) => a.name !== SOURCE_ATTR).map(({ name, value }) => ({ name, value })),
+    attributes: [...tagged.attributes].filter((a) => !BOOKKEEPING_ATTRS.has(a.name)).map(({ name, value }) => ({ name, value })),
     ownText: [...tagged.childNodes].some((n) => n.nodeType === TEXT_NODE && n.textContent.trim()),
     elements: tagged.children.length,
     inlineText: inlineTextOnly(tagged),
@@ -163,9 +167,24 @@ function rootFontSize(doc) {
   return parseFloat(doc.defaultView.getComputedStyle(doc.documentElement).fontSize);
 }
 
-function rectOf(element) {
-  const { x, y, width, height } = element.getBoundingClientRect();
-  return { x, y, width, height };
+const boxOf = ({ x, y, width, height }) => ({ x, y, width, height });
+const isEmpty = (box) => box.width === 0 && box.height === 0;
+
+function unionOf(boxes) {
+  const left = Math.min(...boxes.map((b) => b.x));
+  const top = Math.min(...boxes.map((b) => b.y));
+  const right = Math.max(...boxes.map((b) => b.x + b.width));
+  const bottom = Math.max(...boxes.map((b) => b.y + b.height));
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
+export function rectOf(element) {
+  const own = boxOf(element.getBoundingClientRect());
+  if (!isEmpty(own) || element.ownerDocument.defaultView.getComputedStyle(element).display !== 'contents') {
+    return own;
+  }
+  const inner = [...element.children].map(rectOf).filter((box) => !isEmpty(box));
+  return inner.length ? unionOf(inner) : own;
 }
 
 const PREVIEW_STYLE_ID = 'feega-preview';
@@ -199,11 +218,13 @@ function sheetOf(doc) {
 const PAGE_SOURCES_BY_SOURCE = { [PAGE_SOURCE]: 'body', [HTML_SOURCE]: 'html' };
 
 const selectorOf = (key) => {
-  const [source, inner] = key.split(INNER_KEY);
+  const [rest, state] = key.split(STATE_KEY);
+  const [source, inner] = rest.split(INNER_KEY);
+  const forced = state ? `[${FORCE_ATTR}~=${JSON.stringify(state)}]` : '';
   if (PAGE_SOURCES_BY_SOURCE[source]) {
-    return PAGE_SOURCES_BY_SOURCE[source];
+    return `${PAGE_SOURCES_BY_SOURCE[source]}${forced}`;
   }
-  return `[${SOURCE_ATTR}=${JSON.stringify(source)}]${inner ? ` ${inner}` : ''}`;
+  return `[${SOURCE_ATTR}=${JSON.stringify(source)}]${forced}${inner ? ` ${inner}` : ''}`;
 };
 
 const ruleOf = (key, css) => `${selectorOf(key)}{${Object.entries(css).map(([n, v]) => `${n}:${v} !important`).join(';')}}`;
@@ -212,7 +233,7 @@ function render(doc) {
   sheetOf(doc).textContent = [...previewsOf(doc)].map(([source, css]) => ruleOf(source, css)).join('\n');
 }
 
-export function previewEdit(doc, { source, inner, text, style }) {
+export function previewEdit(doc, { source, inner, text, style, state }) {
   for (const element of sourcedIn(doc, source)) {
     if (typeof text === 'string') {
       element.textContent = text;
@@ -223,7 +244,7 @@ export function previewEdit(doc, { source, inner, text, style }) {
     return;
   }
   const all = previewsOf(doc);
-  const key = keyOf(source, inner);
+  const key = keyOf(source, inner, state);
   all.set(key, { ...all.get(key), ...css });
   render(doc);
 }
@@ -254,15 +275,16 @@ export function keepPreviews(doc) {
   }
 }
 
-export function clearPreview(doc, source) {
-  previewsOf(doc).delete(source);
-  previewsOf(doc).delete(keyOf(source, 'svg'));
+export function clearPreview(doc, source, state) {
+  previewsOf(doc).delete(keyOf(source, undefined, state));
+  previewsOf(doc).delete(keyOf(source, 'svg', state));
   render(doc);
 }
 
-export function settlePreview(doc, source) {
+export function settlePreview(doc, source, state) {
   const all = previewsOf(doc);
-  const css = all.get(source);
+  const key = keyOf(source, undefined, state);
+  const css = all.get(key);
   const [element] = sourcedIn(doc, source);
   if (!css || !element) {
     return Object.keys(css ?? {});
@@ -270,12 +292,12 @@ export function settlePreview(doc, source) {
 
   const computed = (name) => doc.defaultView.getComputedStyle(element).getPropertyValue(name);
   const wanted = Object.fromEntries(Object.keys(css).map((name) => [name, computed(name)]));
-  all.delete(source);
+  all.delete(key);
   render(doc);
   const left = Object.fromEntries(Object.entries(css).filter(([name]) => computed(name) !== wanted[name]));
 
   if (Object.keys(left).length) {
-    all.set(source, left);
+    all.set(key, left);
     render(doc);
   }
   return Object.keys(left);
@@ -288,6 +310,10 @@ const fileOf = (element) => parseSource(element.getAttribute(SOURCE_ATTR))?.file
 const componentName = (file) => file.split('/').pop().replace(/\.[^.]+$/, '');
 
 export function nameOf(element) {
+  const icon = element.getAttribute(ICON_ATTR);
+  if (icon) {
+    return icon;
+  }
   const parent = taggedParent(element);
   if (parent && fileOf(parent) !== fileOf(element)) {
     return componentName(fileOf(element));
@@ -334,6 +360,17 @@ function sibling(element, step) {
 const MAX_TREE_DEPTH = 24;
 const MAX_TREE_NODES = 1500;
 
+function instanceIndexes(doc) {
+  const seen = new Map();
+  const index = new Map();
+  for (const element of doc.querySelectorAll(`[${SOURCE_ATTR}]`)) {
+    const attr = element.getAttribute(SOURCE_ATTR);
+    index.set(element, seen.get(attr) ?? 0);
+    seen.set(attr, (seen.get(attr) ?? 0) + 1);
+  }
+  return index;
+}
+
 function nodeOf(element, depth, budget) {
   budget.left--;
   const parent = taggedParent(element);
@@ -348,6 +385,7 @@ function nodeOf(element, depth, budget) {
     source: parseSource(element.getAttribute(SOURCE_ATTR)),
     component: Boolean(parent) && fileOf(parent) !== fileOf(element),
     count: 1,
+    instance: budget.instances.get(element) ?? 0,
     children
   };
 }
@@ -378,7 +416,7 @@ function pageNode(element, source, children) {
 
 export function treeOf(doc) {
   const roots = [...doc.querySelectorAll(`[${SOURCE_ATTR}]`)].filter((e) => !taggedParent(e));
-  const budget = { left: MAX_TREE_NODES };
+  const budget = { left: MAX_TREE_NODES, instances: instanceIndexes(doc) };
   const inHead = (e) => Boolean(doc.head?.contains(e));
   const head = foldedOf(roots.filter(inHead), 1, budget);
   const body = foldedOf(roots.filter((e) => !inHead(e)), 0, budget);
@@ -482,17 +520,12 @@ function truncate(text, max) {
   return text.length <= max ? text : `${text.slice(0, max)}…`;
 }
 
-const LAYOUT_FILE = /(^|\/)(\+layout\.svelte|layout\.[jt]sx?|_app\.[jt]sx?|root\.[jt]sx?)$/;
-
 function componentBoundary(element, file) {
-  let root = parseSource(element.getAttribute(SOURCE_ATTR));
   for (let node = element.parentElement?.closest(`[${SOURCE_ATTR}]`); node; node = node.parentElement?.closest(`[${SOURCE_ATTR}]`)) {
     const source = parseSource(node.getAttribute(SOURCE_ATTR));
-    if (!source || source.file === file) {
-      root = source ?? root;
-      continue;
+    if (source && source.file !== file) {
+      return source;
     }
-    return LAYOUT_FILE.test(source.file) && !LAYOUT_FILE.test(file) ? root : source;
   }
   return null;
 }

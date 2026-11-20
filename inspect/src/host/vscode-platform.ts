@@ -1,12 +1,13 @@
 import { basename } from 'node:path';
 import * as vscode from 'vscode';
 import type { HostMessage, Source } from '../messages';
-import { settingsWith } from '../settings';
+import { SettingKey, settingsWith } from '../settings';
 import { Column, openTarget } from './open-source';
 import type { Account, AccountStore } from './account';
 import { IMAGE_EXTENSIONS } from './image-copy';
 import { globalStateOnboardingStore } from './onboarding';
 import type { Platform } from './platform';
+import { Device, editorOf, globalStateInstallStore, installIdOf, type UsageHost } from './usage';
 
 const BEFORE_SCHEME = 'feega-before';
 
@@ -33,6 +34,18 @@ export const secretAccountStore = (secrets: Pick<vscode.SecretStorage, 'get' | '
   clear: () => Promise.resolve(secrets.delete(SECRET_KEY))
 });
 
+export const vsCodeUsage = (context: vscode.ExtensionContext): UsageHost => ({
+  identity: () => ({
+    installId: installIdOf(globalStateInstallStore(context.globalState)),
+    version: String(context.extension.packageJSON.version),
+    editor: editorOf(vscode.env.appName),
+    os: process.platform,
+    arch: process.arch,
+    device: vscode.env.uiKind === vscode.UIKind.Web ? Device.Web : Device.Desktop
+  }),
+  enabled: () => vscode.env.isTelemetryEnabled && config().get(SettingKey.Telemetry, true) === true
+});
+
 export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<string, string>): Platform {
   const { context, output } = host;
 
@@ -44,6 +57,18 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
       await vscode.window.showTextDocument(doc, { viewColumn: COLUMNS[target.column], preserveFocus: false, selection: new vscode.Range(position, position) });
     } catch {
       void vscode.window.showErrorMessage(`Feega: cannot open ${target.path}`);
+    }
+  }
+
+  async function revealSource(root: string, at: Source) {
+    const target = openTarget(root, at, panel.viewColumn);
+    try {
+      const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(target.path));
+      const start = new vscode.Position(target.line, target.col);
+      const end = new vscode.Position(target.line, Number.MAX_SAFE_INTEGER);
+      await vscode.window.showTextDocument(doc, { viewColumn: COLUMNS[target.column], preserveFocus: true, preview: true, selection: new vscode.Range(start, end) });
+    } catch {
+      return;
     }
   }
 
@@ -71,6 +96,8 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     log: (line) => output.append(line),
     showLogs: () => output.show(true),
     openSource,
+    copyText: async (text) => vscode.env.clipboard.writeText(text),
+    revealSource,
     showDiff,
     confirm: async (question, yes) => (await vscode.window.showWarningMessage(question, { modal: true }, yes)) === yes,
     chooseApp: async (apps, workspace) => {
@@ -83,7 +110,8 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     notify: (text) => vscode.window.showInformationMessage(`Feega: ${text}`),
     pickImage,
     account: secretAccountStore(context.secrets),
-    onboarding: globalStateOnboardingStore(context.globalState)
+    onboarding: globalStateOnboardingStore(context.globalState),
+    usage: vsCodeUsage(context)
   };
 }
 

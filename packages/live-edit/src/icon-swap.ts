@@ -64,6 +64,7 @@ export async function swapIcon(read: ReadFile, at: LiveAt, name: string, library
   const from = source.slice(start).match(/^<([A-Za-z][\w]*)/)?.[1] ?? '';
   const to = library.component(name);
   const moved = renamedElement(source, start, from, to);
-  const after = moved && (library.style === ImportStyle.Named ? namedImport(moved, from, to, library) : pathImport(moved, from, to, name, library));
+  const pathed = moved && library.style === ImportStyle.Path ? pathImport(moved, from, to, name, library) : null;
+  const after = pathed ?? (moved ? namedImport(moved, from, to, library) : null);
   return after ? { ok: true, change: { path: at.file, before: source, after } } : refused(at, library);
 }

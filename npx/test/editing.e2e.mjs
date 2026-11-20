@@ -14,18 +14,27 @@ const READY_MS = 120_000;
 const SETTLE_MS = 2500;
 const TAILWIND = /tailwind/.test(APP);
 const NEXT = /next/.test(APP);
+const HAS_ICON = !TAILWIND || /react/.test(APP);
 const ONBOARDING_MS = 10_000;
 const NEW_TITLE = 'Ship faster than planned';
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 const MAX_UNDOS = 10;
+const DOT_TRIES = 6;
+const DOT_RETRY_MS = 1000;
 const IMAGE_DIRS = ['public/images', 'static/images'];
 const CODE_BINARIES = ['code', 'code.cmd'];
 const HANDLER_ATTRIBUTE = /onClick|onclick|@click/;
 const GO_PAGE_CODE = /(goto\(|location\.href = |\$router\.push\()'\/pricing'/;
 const OPEN_WAIT_MS = 5000;
 const OPEN_POLL_MS = 250;
+const OUTLINE_TOLERANCE_PX = 2;
+const SPACER_PX = 3000;
 const CLIENT_PAGE_MS = 60_000;
 const TOPICS = ['Briefs', 'Timelines', 'Assets'];
+const LOOP_DATA = /(sveltekit|react)-css/.test(APP);
+const SITE_LINKS = ['Download', 'Documentation', 'Community', 'Pricing'];
+const LINKS_FILE = /src\/(lib\/)?links\.(ts|js)$/;
+const DRAG_STEPS = 12;
 const printed = [];
 
 const git = (...args) => execFileSync('git', ['-C', APP, ...args], { encoding: 'utf8' });
@@ -106,6 +115,62 @@ try {
     assert.equal(picked, 1, 'the selected element has a visible layer row');
   });
 
+  const layerRow = (pattern) => page.locator('[data-testid="layers"] [data-layer]').filter({ hasText: pattern }).first();
+  const sameBox = (a, b, what) => {
+    for (const side of ['x', 'y', 'width', 'height']) {
+      assert.ok(Math.abs(a[side] - b[side]) <= OUTLINE_TOLERANCE_PX, `${what} ${side}: outline ${a[side]} vs element ${b[side]}`);
+    }
+  };
+  const outlinesElement = async (row, target, outline) => {
+    await page.mouse.move(0, 0);
+    await row.hover();
+    await page.locator(`.outline.${outline}`).waitFor({ timeout: OPEN_WAIT_MS });
+    sameBox(await page.locator(`.outline.${outline}`).first().boundingBox(), await target.boundingBox(), `${outline} outline`);
+  };
+
+  await check('hovering a layer outlines the element on the page; clicking it selects it and the selection box matches its rect', async () => {
+    await frame.locator('h1').first().click();
+    await page.waitForTimeout(800);
+    await outlinesElement(layerRow(/^\s*h1/), frame.locator('h1').first(), 'hover');
+    await layerRow(/^\s*h1/).click();
+    await outlinesElement(layerRow(/^\s*h1/), frame.locator('h1').first(), 'picked');
+    await page.mouse.move(0, 0);
+    assert.equal(await page.locator('.outline.hover').count(), 0, 'the hover outline goes away with the pointer');
+  });
+
+  await check('a component layer outlines and selects its root element', async () => {
+    await frame.locator('#benefits').click();
+    await page.waitForTimeout(800);
+    await outlinesElement(layerRow(/^\s*Benefits/), frame.locator('#benefits'), 'hover');
+    await layerRow(/^\s*Benefits/).click();
+    await outlinesElement(layerRow(/^\s*Benefits/), frame.locator('#benefits'), 'picked');
+  });
+
+  await check('a repeated loop layer outlines and selects its first instance', async () => {
+    await frame.locator('#topics > *').first().click();
+    await page.waitForTimeout(800);
+    const row = page.locator('[data-testid="layers"] [data-layer]').filter({ hasText: /×3/ }).first();
+    await outlinesElement(row, frame.locator('#topics > *').first(), 'hover');
+    await row.click();
+    await outlinesElement(row, frame.locator('#topics > *').first(), 'picked');
+  });
+
+  await check('selecting a layer below the fold scrolls it into view and draws the selection box', async () => {
+    await frame.locator('#topics > *').first().click();
+    await page.waitForTimeout(800);
+    await frame.locator('#topics').evaluate((list, px) => list.before(Object.assign(document.createElement('div'), { style: `height: ${px}px` })), SPACER_PX);
+    const row = page.locator('[data-testid="layers"] [data-layer]').filter({ hasText: /×3/ }).first();
+    await row.scrollIntoViewIfNeeded();
+    await row.click();
+    await page.locator('.outline.picked').waitFor({ timeout: OPEN_WAIT_MS });
+    await page.waitForTimeout(800);
+    const outline = await page.locator('.outline.picked').first().boundingBox();
+    const stage = await page.getByTestId('app-frame').boundingBox();
+    assert.ok(outline.y >= stage.y && outline.y + outline.height <= stage.y + stage.height, `selection box ${outline.y} is inside the frame ${stage.y}..${stage.y + stage.height}`);
+    sameBox(outline, await frame.locator('#topics > *').first().boundingBox(), 'picked outline');
+    await frame.locator('body').evaluate(() => window.scrollTo(0, 0));
+  });
+
   await check('plain text edit writes the source and undo restores it', async () => {
     const h1 = frame.locator('h1').first();
     await h1.click();
@@ -145,6 +210,56 @@ try {
       assert.ok(added.some((l) => /padding:\s*20px/.test(l)), `shorthand padding:\n${added.join('\n')}`);
       assert.ok(!added.some((l) => /padding-(top|left)/.test(l)), 'no longhands');
     }
+    await undo();
+    assert.deepEqual(changedFiles().concat(untracked()), [], 'one undo restores everything');
+  });
+
+  await check('responsive: padding at md writes a prefixed class or a min-width rule, the badge names it, one undo reverts', async () => {
+    await frame.locator('h1').first().click();
+    await page.locator('[data-field="breakpoint"]').waitFor({ timeout: 10_000 });
+    await page.locator('[data-field="breakpoint"]').click();
+    await page.locator('[data-breakpoint-item="md"]').click();
+    assert.equal(await page.getByTestId('breakpoint-badge').innerText(), 'editing: md ≥ 768px');
+    const field = page.locator('[data-row="padding"] input[aria-label="padding-all"]');
+    await field.fill('20');
+    await field.press('Enter');
+    await page.waitForTimeout(SETTLE_MS);
+    const added = diffText().split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).join('\n');
+    assert.ok(TAILWIND ? /md:p-/.test(added) : /@media \(min-width: 768px\)/.test(added), `breakpoint write:\n${added}`);
+    await undo();
+    assert.deepEqual(changedFiles().concat(untracked()), [], 'one undo restores everything');
+    await page.locator('[data-field="breakpoint"]').click();
+    await page.locator('[data-breakpoint-item="follow"]').click();
+  });
+
+  const chooseState = async (name) => {
+    await page.locator('[data-field="state"]').click();
+    await page.locator(`[data-state-item="${name}"]`).click();
+    await page.waitForTimeout(800);
+  };
+  const buttonFill = () => frame.locator('#cta').evaluate((el) => getComputedStyle(el).backgroundColor);
+
+  await check('hover state: a background set in Hover writes the hover rule, the forced preview shows it, default is untouched, one undo restores it', async () => {
+    await frame.locator('#cta').click();
+    await page.waitForTimeout(800);
+    const normal = await buttonFill();
+    await chooseState('hover');
+    assert.ok((await page.getByTestId('breadcrumb').first().innerText()).includes(':hover'), 'the breadcrumb carries the state badge');
+    await page.locator('[data-section="Fill"] button[aria-label*="Add"]').first().click();
+    await page.waitForTimeout(SETTLE_MS);
+    const added = diffText().split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).join('\n');
+    assert.ok(TAILWIND ? /hover:bg-\[#d9d9d9\]/.test(added) : /:hover\s*\{/.test(added) && /background(-color)?:\s*#d9d9d9/i.test(added), `the hover declaration is written:\n${added}`);
+    assert.equal(await buttonFill(), 'rgb(217, 217, 217)', 'the forced preview shows the hover background');
+    await chooseState('default');
+    assert.equal(await buttonFill(), normal, 'the default look is untouched');
+    let dots = 0;
+    for (let tries = 0; tries < DOT_TRIES && !dots; tries++) {
+      await page.locator('[data-field="state"]').click();
+      dots = await page.locator('[data-state-item="hover"] .dot').count();
+      await page.keyboard.press('Escape');
+      dots || (await page.waitForTimeout(DOT_RETRY_MS));
+    }
+    assert.equal(dots, 1, 'hover shows a dot once it has styles');
     await undo();
     assert.deepEqual(changedFiles().concat(untracked()), [], 'one undo restores everything');
   });
@@ -477,6 +592,112 @@ try {
     assert.deepEqual(changedFiles(), [], 'undo restores the array');
   });
 
+  if (LOOP_DATA) {
+    const chips = frame.locator('#site-links > a');
+    const labels = () => chips.allInnerTexts();
+    const hrefs = () => chips.evaluateAll((els) => els.map((el) => el.getAttribute('href')));
+    const selected = async (index) => {
+      await chips.nth(index).click();
+      await page.waitForTimeout(800);
+    };
+    const onlyLinksFile = () => {
+      const files = changedFiles();
+      assert.equal(files.length, 1, `one file changed: ${files}`);
+      assert.ok(LINKS_FILE.test(files[0]), `the data file changed, not the page: ${files}`);
+    };
+
+    await check('loop data: dragging a chip reorders the imported array and one undo restores it', async () => {
+      assert.deepEqual(await labels(), SITE_LINKS);
+      await selected(3);
+      const from = await chips.nth(3).boundingBox();
+      const to = await chips.nth(0).boundingBox();
+      await page.mouse.move(from.x + 8, from.y + from.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(to.x + 3, to.y + to.height / 2, { steps: DRAG_STEPS });
+      await page.waitForTimeout(500);
+      await page.mouse.up();
+      await page.waitForTimeout(SETTLE_MS);
+      assert.deepEqual(await labels(), ['Pricing', 'Download', 'Documentation', 'Community'], 'the page shows the new order');
+      onlyLinksFile();
+      await undo();
+      assert.deepEqual(changedFiles(), [], 'undo restores the data');
+      assert.deepEqual(await labels(), SITE_LINKS, 'undo restores the page');
+    });
+
+    await check('loop data: duplicate copies the entry right after itself and one undo restores it', async () => {
+      await selected(1);
+      await page.keyboard.press('ControlOrMeta+d');
+      await page.waitForTimeout(SETTLE_MS);
+      assert.deepEqual(await labels(), ['Download', 'Documentation', 'Documentation', 'Community', 'Pricing'], 'the page shows the copy');
+      onlyLinksFile();
+      assert.equal(diffText().split('\n').filter((line) => line.startsWith('+') && line.includes("label: 'Documentation'")).length, 1, `the entry was added once:\n${diffText()}`);
+      await undo();
+      assert.deepEqual(changedFiles(), [], 'undo restores the data');
+      assert.deepEqual(await labels(), SITE_LINKS);
+    });
+
+    await check('loop data: the context menu deletes the entry and one undo restores it', async () => {
+      await chips.nth(0).click({ button: 'right' });
+      await page.getByTestId('structure-menu').getByRole('menuitem', { name: /Delete/ }).click();
+      await page.waitForTimeout(SETTLE_MS);
+      assert.deepEqual(await labels(), SITE_LINKS.slice(1), 'the entry left the page');
+      onlyLinksFile();
+      await undo();
+      assert.deepEqual(changedFiles(), [], 'undo restores the data');
+      assert.deepEqual(await labels(), SITE_LINKS);
+    });
+
+    await check('loop data: Add item appends a copy of the selected entry and one undo restores it', async () => {
+      await selected(2);
+      await page.getByTestId('add-button').click();
+      await page.getByTestId('add-menu').getByRole('menuitem', { name: 'Add item' }).click();
+      await page.waitForTimeout(SETTLE_MS);
+      assert.deepEqual(await labels(), [...SITE_LINKS, 'Community'], 'the page shows the new item at the end');
+      onlyLinksFile();
+      await undo();
+      assert.deepEqual(changedFiles(), [], 'undo restores the data');
+      assert.deepEqual(await labels(), SITE_LINKS);
+    });
+
+    await check('loop data: editing the text of a chip writes its label and one undo restores it', async () => {
+      await selected(0);
+      await opened(chips.nth(0));
+      await page.keyboard.press('ControlOrMeta+a');
+      await page.keyboard.type('Get the app');
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(SETTLE_MS);
+      assert.deepEqual(await labels(), ['Get the app', ...SITE_LINKS.slice(1)], 'the page shows the new label');
+      onlyLinksFile();
+      assert.ok(/label: 'Get the app'/.test(diffText()), `the label literal is written:\n${diffText()}`);
+      assert.ok(!/label: 'Download'/.test(readFileSync(join(APP, changedFiles()[0]), 'utf8')), 'only that entry changed');
+      await undo();
+      assert.deepEqual(changedFiles(), [], 'undo restores the data');
+      assert.deepEqual(await labels(), SITE_LINKS);
+    });
+
+    await check('loop data: editing the address of a chip writes its href and one undo restores it', async () => {
+      await selected(0);
+      const address = page.locator('[data-field="link-href"]');
+      await address.waitFor({ timeout: 10_000 });
+      await address.fill('/get-the-app');
+      await address.press('Enter');
+      await page.waitForTimeout(SETTLE_MS);
+      onlyLinksFile();
+      assert.ok(/href: '\/get-the-app'/.test(diffText()), `the href literal is written:\n${diffText()}`);
+      assert.equal((await hrefs())[0], '/get-the-app', 'the page shows the new address');
+      await undo();
+      assert.deepEqual(changedFiles(), [], 'undo restores the data');
+    });
+
+    await check('loop data: an address that is a constant is refused with its name and the source is untouched', async () => {
+      await selected(1);
+      await page.locator('[data-testid="link-refused"]').waitFor({ timeout: 10_000 });
+      assert.match(await page.locator('[data-testid="link-refused"]').innerText(), /DOCS_URL/);
+      assert.equal(await page.locator('[data-field="link-href"]').isDisabled(), true);
+      assert.deepEqual(changedFiles(), []);
+    });
+  }
+
   await check('two components in a page: dragging one layer past the other reorders their usages and one undo restores it', async () => {
     await frame.locator('#benefits').click();
     await page.waitForTimeout(800);
@@ -489,6 +710,29 @@ try {
     assert.deepEqual(order, ['faq', 'benefits'], 'the page shows the new order');
     await undo();
     assert.deepEqual(changedFiles(), [], 'undo restores the usages');
+  });
+
+  await check('an icon from a library is picked as one element, swapped in its usage, and one undo restores it', async () => {
+    const arrow = frame.locator('svg.lucide-arrow-right');
+    if (!HAS_ICON) {
+      return;
+    }
+    await arrow.first().waitFor({ timeout: 10_000 });
+    await arrow.locator('path').first().click({ force: true });
+    await page.waitForTimeout(800);
+    const picked = page.locator('[data-testid="layers"] [data-layer][aria-selected="true"]');
+    assert.equal(await picked.count(), 1, 'the icon has its own layer row');
+    assert.ok((await picked.first().innerText()).includes('ArrowRight'), 'the layer is named after the component');
+    await page.locator('[data-field="icon-replace"]').click();
+    await page.locator('.icon-tile').first().waitFor({ timeout: 10_000 });
+    assert.equal(await page.locator('.icon-tile').first().getAttribute('title'), 'arrow-right', 'the current icon is offered first');
+    await page.locator('.icon-tile[title="heart"]').click();
+    await page.waitForTimeout(SETTLE_MS);
+    assert.ok(/<Heart\b/.test(diffText()) && /\bHeart\b[^\n]*from/.test(diffText()), `the usage and import are rewritten:\n${diffText()}`);
+    assert.ok(!/^\+.*ArrowRight/m.test(diffText()), 'the old name is gone');
+    await frame.locator('svg.lucide-heart').waitFor({ timeout: 10_000 });
+    await undo();
+    assert.deepEqual(changedFiles(), [], 'one undo restores the source');
   });
 
   if (NEXT) {

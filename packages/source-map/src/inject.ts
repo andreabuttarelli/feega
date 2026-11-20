@@ -1,10 +1,12 @@
 import { createRequire } from 'node:module';
 import { parse as parseJs } from '@babel/parser';
 import MagicString from 'magic-string';
+import { iconImports, pascalOf } from './icon-imports.ts';
 
 export const SOURCE_ATTR = 'data-feega-src';
+export const ICON_ATTR = 'data-feega-icon';
 
-type Tag = { nameEnd: number; line: number; col: number };
+type Tag = { nameEnd: number; line: number; col: number; icon?: string };
 
 type Finder = (code: string) => Tag[];
 
@@ -36,7 +38,8 @@ export function injectSource(code: string, file: string): string | null {
 
   const out = new MagicString(code);
   for (const tag of tags) {
-    out.appendLeft(tag.nameEnd, ` ${SOURCE_ATTR}="${file}:${tag.line}:${tag.col}"`);
+    const icon = tag.icon ? ` ${ICON_ATTR}="${tag.icon}"` : '';
+    out.appendLeft(tag.nameEnd, ` ${SOURCE_ATTR}="${file}:${tag.line}:${tag.col}"${icon}`);
   }
   return out.toString();
 }
@@ -48,6 +51,7 @@ function extensionOf(file: string): string {
 
 function jsxTags(code: string, plugins: ('jsx' | 'typescript')[]): Tag[] {
   const ast = parseJs(code, { sourceType: 'module', plugins, errorRecovery: true });
+  const icons = iconImports(code);
   const tags: Tag[] = [];
 
   walk(ast.program as unknown as AstNode, (node) => {
@@ -56,12 +60,13 @@ function jsxTags(code: string, plugins: ('jsx' | 'typescript')[]): Tag[] {
     }
 
     const name = node.name as AstNode & { name?: string; end: number };
-    if (name.type !== 'JSXIdentifier' || !HOST_TAG.test(name.name ?? '')) {
+    const icon = icons.get(name.name ?? '');
+    if (name.type !== 'JSXIdentifier' || !(HOST_TAG.test(name.name ?? '') || icon)) {
       return;
     }
 
     const start = (node.loc as { start: { line: number; column: number } }).start;
-    tags.push({ nameEnd: name.end, line: start.line, col: start.column + 1 });
+    tags.push({ nameEnd: name.end, line: start.line, col: start.column + 1, icon });
   });
 
   return tags;
@@ -71,16 +76,18 @@ function svelteTags(code: string): Tag[] {
   const { parse } = require('svelte/compiler') as { parse: (src: string, opts: { modern: true }) => AstNode };
   const ast = parse(code, { modern: true });
   const lineStarts = lineStartsOf(code);
+  const icons = iconImports(code);
   const tags: Tag[] = [];
 
   walk(ast.fragment as AstNode, (node) => {
-    if (node.type !== 'RegularElement') {
+    const icon = node.type === 'Component' ? icons.get(node.name as string) : undefined;
+    if (node.type !== 'RegularElement' && !icon) {
       return;
     }
 
     const start = node.start as number;
     const nameEnd = start + 1 + (node.name as string).length;
-    tags.push({ nameEnd, ...position(lineStarts, start) });
+    tags.push({ nameEnd, ...position(lineStarts, start), icon });
   });
 
   return tags;
@@ -88,6 +95,7 @@ function svelteTags(code: string): Tag[] {
 
 const VUE_ELEMENT = 1;
 const VUE_PLAIN_TAG = 0;
+const VUE_COMPONENT_TAG = 1;
 
 type VueNode = { type: number; tag?: string; tagType?: number; loc: { start: { offset: number } }; children?: VueNode[] };
 
@@ -98,11 +106,13 @@ function vueTags(code: string): Tag[] {
     return [];
   }
   const lineStarts = lineStartsOf(code);
+  const icons = iconImports(code);
   const tags: Tag[] = [];
   const visit = (node: VueNode) => {
-    if (node.type === VUE_ELEMENT && node.tagType === VUE_PLAIN_TAG && node.tag) {
+    const icon = node.tagType === VUE_COMPONENT_TAG && node.tag ? icons.get(pascalOf(node.tag)) : undefined;
+    if (node.type === VUE_ELEMENT && node.tag && (node.tagType === VUE_PLAIN_TAG || icon)) {
       const start = node.loc.start.offset;
-      tags.push({ nameEnd: start + 1 + node.tag.length, ...position(lineStarts, start) });
+      tags.push({ nameEnd: start + 1 + node.tag.length, ...position(lineStarts, start), icon });
     }
     node.children?.forEach(visit);
   };

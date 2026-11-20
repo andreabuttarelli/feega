@@ -97,3 +97,16 @@
   top: 12px;
   right: 16px;
 }
+
+.siteLinks {
+  display: flex;
+  gap: 12px;
+}
+
+.chip {
+  padding: 4px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  color: inherit;
+  text-decoration: none;
+}

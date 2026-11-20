@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { StructureOp, structure } from './structure';
 
+const LIB_ALIAS = '$' + 'lib';
+
 const SVELTE = `<script>
   const plans = [
     { name: 'Starter' },
@@ -53,6 +55,110 @@ const FETCHED = `<script>
 
 const loop = (text: string, file: string, line: number, col: number, from: number, to: number) =>
   structure(async () => text, { op: StructureOp.MoveLoopItem, at: { file, line, col }, loop: { from, to } });
+
+const LINKS = `import { DOCS_URL } from './urls';
+
+export const HEADER_LINKS = [
+  { href: '/download', label: 'Download' },
+  { href: DOCS_URL, label: 'Docs' },
+  { href: '/pricing', label: 'Pricing' },
+] as const;
+`;
+
+const NAV = `<script lang="ts">
+  import { HEADER_LINKS } from '${LIB_ALIAS}/site/links';
+</script>
+
+<nav>
+  {#each HEADER_LINKS as link}
+    <a class="chip" href={link.href}>{link.label}</a>
+  {/each}
+</nav>
+`;
+
+const NAV_TSX = `import { HEADER_LINKS } from '../site/links';
+
+export function Nav() {
+  return (
+    <nav>
+      {HEADER_LINKS.map((link) => (
+        <a key={link.href} href={link.href}>{link.label}</a>
+      ))}
+    </nav>
+  );
+}
+`;
+
+const NAV_VUE = `<script setup lang="ts">
+import { HEADER_LINKS } from '@/site/links';
+</script>
+
+<template>
+  <nav>
+    <a v-for="link in HEADER_LINKS" :key="link.href" :href="link.href">{{ link.label }}</a>
+  </nav>
+</template>
+`;
+
+const files = (map: Record<string, string>) => async (path: string) => map[path] ?? null;
+
+const moved = (map: Record<string, string>, file: string, line: number, col: number, from: number, to: number) =>
+  structure(files(map), { op: StructureOp.MoveLoopItem, at: { file, line, col }, loop: { from, to } });
+
+describe('moveLoopItem across files', () => {
+  it('reorders an array imported through the $lib alias, keeping as const and the trailing comma', async () => {
+    const out = await moved({ 'src/routes/+page.svelte': NAV, 'src/lib/site/links.ts': LINKS }, 'src/routes/+page.svelte', 7, 5, 2, 0);
+
+    expect(out.ok && out.changes.map((c) => c.path)).toEqual(['src/lib/site/links.ts']);
+    expect(out.ok && out.changes[0].after).toBe(
+      LINKS.replace(
+        "{ href: '/download', label: 'Download' },\n  { href: DOCS_URL, label: 'Docs' },\n  { href: '/pricing', label: 'Pricing' },",
+        "{ href: '/pricing', label: 'Pricing' },\n  { href: '/download', label: 'Download' },\n  { href: DOCS_URL, label: 'Docs' },"
+      )
+    );
+  });
+
+  it('follows a relative import behind a .map() in JSX', async () => {
+    const out = await moved({ 'src/nav/Nav.tsx': NAV_TSX, 'src/site/links.ts': LINKS }, 'src/nav/Nav.tsx', 7, 9, 0, 1);
+
+    expect(out.ok && out.changes[0].path).toBe('src/site/links.ts');
+    expect(out.ok && out.changes[0].after).toContain("{ href: DOCS_URL, label: 'Docs' },\n  { href: '/download', label: 'Download' },");
+  });
+
+  it('ignores a .map() that closed earlier in the same file', async () => {
+    const page = NAV_TSX.replace('    <nav>', "    <ul>{['x', 'y'].map((t) => (\n      <li key={t}>{t}</li>\n    ))}</ul>\n    <nav>");
+    const out = await moved({ 'src/nav/Nav.tsx': page, 'src/site/links.ts': LINKS }, 'src/nav/Nav.tsx', 10, 9, 0, 1);
+
+    expect(out.ok && out.changes[0].path).toBe('src/site/links.ts');
+  });
+
+  it('follows the @ alias behind a v-for in Vue', async () => {
+    const out = await moved({ 'src/Nav.vue': NAV_VUE, 'src/site/links.ts': LINKS }, 'src/Nav.vue', 7, 5, 1, 2);
+
+    expect(out.ok && out.changes[0].path).toBe('src/site/links.ts');
+    expect(out.ok && out.changes[0].after).toContain("{ href: '/pricing', label: 'Pricing' },\n  { href: DOCS_URL, label: 'Docs' },");
+  });
+
+  it('reads through satisfies and a type annotation', async () => {
+    const typed = `export const LINKS: readonly Link[] = [\n  { label: 'a' },\n  { label: 'b' }\n] satisfies readonly Link[];\n`;
+    const page = NAV.replaceAll('HEADER_LINKS', 'LINKS');
+    const out = await moved({ 'src/routes/+page.svelte': page, 'src/lib/site/links.ts': typed }, 'src/routes/+page.svelte', 7, 5, 1, 0);
+
+    expect(out.ok && out.changes[0].after).toBe(`export const LINKS: readonly Link[] = [\n  { label: 'b' },\n  { label: 'a' }\n] satisfies readonly Link[];\n`);
+  });
+
+  it.each([
+    ['a function call', NAV, 'export const HEADER_LINKS = buildLinks();\n', /built by an expression/],
+    ['a spread', NAV, "export const HEADER_LINKS = [...BASE, { href: '/x' }];\n", /spreads/],
+    ['a filter chain', NAV.replace('HEADER_LINKS as', 'HEADER_LINKS.filter(Boolean) as'), "export const HEADER_LINKS = [{ href: '/x' }];\n", /function call or chain/],
+    ['props', NAV, 'export {};\n', /props, fetched data or a store/]
+  ])('refuses %s and names why', async (_name, page, data, reason) => {
+    const out = await moved({ 'src/routes/+page.svelte': page, 'src/lib/site/links.ts': data }, 'src/routes/+page.svelte', 7, 5, 0, 1);
+
+    expect(out.ok).toBe(false);
+    expect(!out.ok && out.reason).toMatch(reason);
+  });
+});
 
 describe('moveLoopItem', () => {
   it('reorders the objects of an array literal behind an {#each} block', async () => {

@@ -4,7 +4,7 @@ import { LiveProp, type Side } from './live-fields';
 import type { LiveAt } from './class-patch';
 import { liveTheme, tokenFor } from './live-tokens';
 
-export type LiveEditAsk = { at: string; prop: LiveProp; family?: string; value?: string; token?: string; side?: Side; was?: string; rem?: number; viewport?: number };
+export type LiveEditAsk = { at: string; prop: LiveProp; family?: string; value?: string; token?: string; side?: Side; was?: string; instance?: number; rem?: number; viewport?: number };
 
 const AT = /^(.+):(\d+):(\d+)$/;
 

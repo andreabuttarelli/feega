@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { SOCKET_PATH, type HostMessage, type ViewMessage } from '../../inspect/src/messages';
 import type { Transport } from '../../inspect/src/host/platform';
+import { FeegaServer, feegaHeaders } from '../../inspect/src/host/feega-server';
 import { panelHtml, type PanelTheme } from '../../inspect/src/host/panel-html';
 
 const HOST = '127.0.0.1';
@@ -35,16 +36,16 @@ export async function editorServer(webview: string, port: number): Promise<Edito
     const path = new URL(request.url ?? '/', 'http://x').pathname;
     const type = ASSETS[path];
     if (type) {
-      response.writeHead(HTTP_OK, { 'content-type': type, 'cache-control': 'no-store' });
+      response.writeHead(HTTP_OK, { 'content-type': type, 'cache-control': 'no-store', ...feegaHeaders(FeegaServer.Editor) });
       response.end(await readFile(join(webview, path)));
       return;
     }
     if (path !== '/') {
-      response.writeHead(HTTP_NOT_FOUND).end();
+      response.writeHead(HTTP_NOT_FOUND, feegaHeaders(FeegaServer.Editor)).end();
       return;
     }
     const html = panelHtml({ script: '/panel.js', style: '/panel.css', cspSource: "'self'", nonce: randomBytes(16).toString('base64'), theme: DARK });
-    response.writeHead(HTTP_OK, { 'content-type': 'text/html; charset=utf-8' }).end(html);
+    response.writeHead(HTTP_OK, { 'content-type': 'text/html; charset=utf-8', ...feegaHeaders(FeegaServer.Editor) }).end(html);
   });
 
   await new Promise<void>((resolve, reject) => server.once('error', reject).listen(port, HOST, resolve));

@@ -30,9 +30,15 @@ Feega Inspect is a small editor extension, separate from the Feega canvas. No ac
    An element with no click handler can be given **Go to page**, **Open URL** or **Scroll to
    section**: Feega writes a small inline handler (Svelte `goto` with its import, `$router.push`
    in Vue, `window.location` otherwise; Next files become client components). One undo removes it.
-7. **Design** (D) selects and edits; **Navigate** (N) uses the app normally. The top bar has
+7. The **State** menu at the top of Properties shows the element as it looks on **Hover**,
+   **Focus**, **Focus visible**, **Active** or, on form controls, **Disabled**, without the mouse.
+   A dot marks a state that already has styles, and rows that differ from Default turn blue. While
+   a state is chosen every edit is written to it: a `hover:` class with Tailwind, a `.name:hover`
+   rule next to the base rule in CSS, CSS modules and Svelte/Vue scoped styles; `×` removes only
+   that state's value. States set by JavaScript, `:has()` and CSS nesting are not forced.
+8. **Design** (D) selects and edits; **Navigate** (N) uses the app normally. The top bar has
    back/forward/reload, the route, a dev server status dot, and device widths (keys 1–4).
-8. Cmd/Ctrl+Z restores the file. It never overwrites a change made after the edit.
+9. Cmd/Ctrl+Z restores the file. It never overwrites a change made after the edit.
 
 ## In the browser: `npx feega`
 
@@ -63,3 +69,13 @@ code --install-extension feega-inspect-0.1.0.vsix
   added to their config.
 - Element picking: Vite-based apps (SvelteKit, Vite, React Router) only, for now.
 - `hover:`/`dark:` variants, class expressions and non-literal text are not written.
+
+## Use with your agent
+
+- **Selection sync.** The selected element's source is revealed in a text editor beside Feega with
+  its line selected, without taking focus, so coding agents that read the editor selection
+  (Claude Code, Cursor, Copilot, Cline, Codex, Gemini CLI) see what you selected. Turn it off with
+  the `feegaInspect.syncSelection` setting.
+- **Copy for agent.** Right-click the selected element and choose **Copy for agent**, or use the
+  link next to the file name in the bar. The clipboard gets `file:line`, selector, component, page,
+  preview width, and the breakpoint, theme and state when set. Paste it into your agent.

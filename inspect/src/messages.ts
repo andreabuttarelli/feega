@@ -6,10 +6,13 @@ import type { Usage } from '@feega/live-edit/move-usage';
 import type { StructureOp } from '@feega/live-edit/structure';
 import type { Scope } from '@feega/live-edit/scoped-rule';
 import type { PageTarget } from '@feega/live-edit/page-rule';
+import type { ElementState } from '@feega/live-edit/element-state';
 import type { EventHandler } from '@feega/live-edit/event-handlers';
 import type { GoAsk } from '@feega/live-edit/go-action';
 import type { LinkEdit, LinkRead } from '@feega/live-edit/link-edit';
 import type { OffsetSide } from '@feega/live-edit/authored-offsets';
+import type { Breakpoints } from '@feega/live-edit/breakpoints';
+import type { Theme } from '@feega/live-edit/themes';
 import type { ReportFacts, SettingKey, SettingValue, Settings } from './settings';
 
 export enum IconSource {
@@ -17,7 +20,7 @@ export enum IconSource {
   IconMcp = 'iconmcp'
 }
 
-export type IconHit = { name: string; label?: string; source: IconSource };
+export type IconHit = { name: string; label?: string; source: IconSource; svg?: string };
 
 export type Rect = { x: number; y: number; width: number; height: number };
 
@@ -46,6 +49,7 @@ export type Pick = {
   page?: PageTarget;
   attributes?: { name: string; value: string }[];
   markup?: string;
+  states?: string[];
 };
 
 export enum Move {
@@ -60,7 +64,7 @@ export enum Styling {
   Css = 'css'
 }
 
-export type EditAsk = LiveEditAsk & { css?: Record<string, string>; scope?: Scope; inner?: string; page?: PageTarget };
+export type EditAsk = LiveEditAsk & { css?: Record<string, string>; scope?: Scope; inner?: string; page?: PageTarget; state?: ElementState; breakpoint?: string; theme?: string };
 
 export enum ServerState {
   Detecting = 'detecting',
@@ -125,6 +129,7 @@ export enum ToHost {
   IconMarkup = 'icon-markup',
   IconGet = 'icon-get',
   IconSearch = 'icon-search',
+  IconPreviews = 'icon-previews',
   SignIn = 'sign-in',
   CancelSignIn = 'cancel-sign-in',
   SignOut = 'sign-out',
@@ -133,7 +138,9 @@ export enum ToHost {
   ImageUpload = 'image-upload',
   Wiring = 'wiring',
   Link = 'link',
-  Go = 'go'
+  Go = 'go',
+  Selected = 'selected',
+  Copy = 'copy'
 }
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number };
@@ -150,6 +157,7 @@ export enum ToView {
   Settings = 'settings',
   History = 'history',
   IconResults = 'icon-results',
+  IconPreview = 'icon-preview',
   Account = 'account',
   Onboarding = 'onboarding',
   ImageSaved = 'image-saved',
@@ -179,7 +187,7 @@ export type HostMessage =
   | { kind: ToHost.Prefs; prefs: Prefs }
   | { kind: ToHost.Setting; key: SettingKey; value: SettingValue }
   | { kind: ToHost.Move; from: string; to: string; place: Place }
-  | { kind: ToHost.Structure; op: StructureOp; at: string; to?: string; usage?: Usage; loop?: LoopMove; add?: { kind: AddKind; src?: string } }
+  | { kind: ToHost.Structure; op: StructureOp; at: string; to?: string; usage?: Usage; loop?: LoopMove; instance?: number; add?: { kind: AddKind; src?: string } }
   | { kind: ToHost.AddImage; at: string }
   | { kind: ToHost.Server; action: ServerAction }
   | { kind: ToHost.Redo }
@@ -193,19 +201,22 @@ export type HostMessage =
   | { kind: ToHost.IconSwap; at: string; name: string }
   | { kind: ToHost.IconMarkup; at: string; markup: string; inner?: string }
   | { kind: ToHost.IconGet; at: string; name: string; size: number; stroke: number; inner?: string }
-  | { kind: ToHost.IconSearch; id: number; query: string }
+  | { kind: ToHost.IconSearch; id: number; query: string; at: string }
+  | { kind: ToHost.IconPreviews; names: string[] }
   | { kind: ToHost.SignIn }
   | { kind: ToHost.CancelSignIn }
   | { kind: ToHost.SignOut }
   | { kind: ToHost.OnboardingDone }
   | { kind: ToHost.ImageChoose }
   | { kind: ToHost.ImageUpload; name: string; data: string }
-  | { kind: ToHost.Wiring; at: string }
-  | { kind: ToHost.Link; at: string; edit: LinkEdit }
-  | { kind: ToHost.Go; at: string; ask: GoAsk };
+  | { kind: ToHost.Wiring; at: string; instance?: number }
+  | { kind: ToHost.Link; at: string; edit: LinkEdit; instance?: number }
+  | { kind: ToHost.Go; at: string; ask: GoAsk }
+  | { kind: ToHost.Selected; at: Source | null }
+  | { kind: ToHost.Copy; text: string };
 
 export type ViewMessage =
-  | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string }
+  | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string; breakpoints: Breakpoints; themes: Theme[] }
   | { kind: ToView.Server; state: ServerState; reason?: string; info?: ServerInfo }
   | { kind: ToView.Settings; values: Settings; facts: ReportFacts }
   | { kind: ToView.History; changes: ChangeRow[]; canUndo: boolean; canRedo: boolean }
@@ -214,10 +225,11 @@ export type ViewMessage =
   | { kind: ToView.Change; row: string; value: string }
   | { kind: ToView.Pick; id: number; x: number; y: number }
   | { kind: ToView.IconResults; id: number; library: string | null; hits: IconHit[]; error?: string }
+  | { kind: ToView.IconPreview; name: string; svg: string | null }
   | { kind: ToView.Account; state: AccountState; email?: string }
   | { kind: ToView.Onboarding; state: Onboarding }
   | { kind: ToView.ImageSaved; url: string }
-  | { kind: ToView.Wiring; at: string; wiring: Wiring };
+  | { kind: ToView.Wiring; at: string; instance?: number; wiring: Wiring };
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';
@@ -234,15 +246,18 @@ export const PALETTE_RESULT = 'feega:palette:result';
 export const TREE = 'feega:tree';
 export const TREE_RESULT = 'feega:tree:result';
 
-export type LayerNode = { name: string; tag: string; display: string; direction: string; position: string; source: Source | null; component: boolean; count: number; children: LayerNode[] };
+export type LayerNode = { name: string; tag: string; display: string; direction: string; position: string; source: Source | null; component: boolean; count: number; instance: number; children: LayerNode[] };
 export const SCROLL = 'feega:scroll';
 export const SCROLLED = 'feega:scrolled';
+export const REVEAL = 'feega:reveal';
 export const TEXT_EDIT = 'feega:text:edit';
 export const TEXT_DONE = 'feega:text:done';
 export const TEXT_RESTORE = 'feega:text:restore';
 export const TRACK = 'feega:track';
 export const TRACKED = 'feega:tracked';
 export const LEAVE = 'feega:leave';
+export const FORCE = 'feega:force';
+export const THEME = 'feega:theme';
 
 export enum Slot {
   Selected = 'selected',

@@ -3,6 +3,7 @@ import type { FileChange, ReadFile } from './files';
 import { GLOBAL_SHEETS } from './font-wiring';
 import { hasRule, ruleInBody, Scope, usesOf } from './scoped-rule';
 import type { Css } from './style-attr';
+import { ElementState, pseudoOf } from './element-state';
 
 export type ModuleWritten = { ok: true; changes: FileChange[] } | { ok: false; reason: string; at?: LiveAt };
 
@@ -54,14 +55,14 @@ const usesOfModule = (text: string, binding: string, name: string) => text.split
 
 const usesOfPlain = (text: string, name: string) => usesOf(text.replace(/className=/g, 'class='), name);
 
-async function plainRule(read: ReadFile, at: LiveAt, text: string, open: string, css: Css, viewport: number | undefined, scope: Scope, ruleName: (name: string) => string): Promise<ModuleWritten | null> {
+async function plainRule(read: ReadFile, at: LiveAt, text: string, open: string, css: Css, viewport: number | undefined, scope: Scope, ruleName: (name: string) => string, media?: string | null, within?: string | null): Promise<ModuleWritten | null> {
   const classes = open.match(PLAIN_CLASS)?.[1].split(/\s+/).filter(Boolean) ?? [];
   const imported = [...text.matchAll(PLAIN_IMPORT)].map((m) => joinPath(dirOf(at.file), m[1]));
   for (const path of [...imported, ...GLOBAL_SHEETS]) {
     const before = await read(path);
     const name = before === null ? undefined : classes.find((c) => hasRule(before, `.${c}`) && (scope === Scope.Class || usesOfPlain(text, c) === 1));
     if (before !== null && name) {
-      return { ok: true, changes: [{ path, before, after: ruleInBody(before, ruleName(name), new Map(Object.entries(css)), viewport, NO_INDENT) }] };
+      return { ok: true, changes: [{ path, before, after: ruleInBody(before, ruleName(name), new Map(Object.entries(css)), viewport, NO_INDENT, media, within) }] };
     }
   }
   return null;
@@ -72,8 +73,9 @@ const ownOf = (names: string[], base: string) => names.find((n) => n === base ||
 const classAttr = (binding: string, names: string[]) =>
   names.length === 1 ? ` className={${binding}.${names[0]}}` : ` className={\`${names.map((n) => `\${${binding}.${n}}`).join(' ')}\`}`;
 
-export async function cssModuleRule(read: ReadFile, at: LiveAt, css: Css, viewport?: number, scope = Scope.Element, inner?: string): Promise<ModuleWritten> {
-  const ruleName = (name: string) => (inner ? `${name} ${inner}` : name);
+export async function cssModuleRule(read: ReadFile, at: LiveAt, css: Css, viewport?: number, scope = Scope.Element, inner?: string, state = ElementState.Default, media?: string | null, within?: string | null): Promise<ModuleWritten> {
+  const moduleWithin = within ? `:global(${within})` : null;
+  const ruleName = (name: string) => `${name}${pseudoOf(state)}${inner ? ` ${inner}` : ''}`;
   const source = await read(at.file);
   const start = source === null ? -1 : offsetOf(source, at);
   const end = start < 0 || source![start] !== '<' ? -1 : openTagEnd(source!, start);
@@ -85,7 +87,7 @@ export async function cssModuleRule(read: ReadFile, at: LiveAt, css: Css, viewpo
   const open = text.slice(start, end + 1);
   const used = usedClasses(open);
   if (!used && CLASS_ANY.test(open)) {
-    const plain = await plainRule(read, at, text, open, css, viewport, scope, ruleName);
+    const plain = await plainRule(read, at, text, open, css, viewport, scope, ruleName, media, within);
     if (plain) {
       return plain;
     }
@@ -104,7 +106,7 @@ export async function cssModuleRule(read: ReadFile, at: LiveAt, css: Css, viewpo
   const kept = scope === Scope.Class ? names[0] : (ownOf(names, base) ?? names.find(ruled));
 
   if (kept) {
-    return { ok: true, changes: [{ path: modulePath, before, after: ruleInBody(before, ruleName(kept), declared, viewport, NO_INDENT) }] };
+    return { ok: true, changes: [{ path: modulePath, before, after: ruleInBody(before, ruleName(kept), declared, viewport, NO_INDENT, media, moduleWithin) }] };
   }
 
   const name = freeName(before, base);
@@ -119,7 +121,7 @@ export async function cssModuleRule(read: ReadFile, at: LiveAt, css: Css, viewpo
     ok: true,
     changes: [
       { path: at.file, before: text, after },
-      { path: modulePath, before, after: ruleInBody(before, ruleName(name), declared, viewport, NO_INDENT) }
+      { path: modulePath, before, after: ruleInBody(before, ruleName(name), declared, viewport, NO_INDENT, media, moduleWithin) }
     ]
   };
 }
