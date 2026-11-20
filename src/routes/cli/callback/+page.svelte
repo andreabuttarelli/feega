@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { CLIENT_COPY, clientOf } from '$lib/cli-client';
+  import { CLIENT_COPY, CliClient, clientOf } from '$lib/cli-client';
+  import { PostOutcome, editorLinks, postSession } from '$lib/cli-session-post';
   import { HOME_PATH } from '$lib/home-path';
   let { data } = $props();
   const { accessToken, refreshToken, expiresAt, cliPort, cliState, userEmail } = data;
@@ -9,26 +10,19 @@
   let status = $state<Status>('idle');
   let errorMsg = $state('');
 
+  const session = { access_token: accessToken, refresh_token: refreshToken, expires_at: expiresAt, state: cliState };
+  const links = clientOf(cliState) === CliClient.App ? editorLinks(session) : [];
+
   async function authorize() {
     status = 'sending';
-    try {
-      const res = await fetch(`http://localhost:${cliPort}/session`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-          expires_at: expiresAt,
-          state: cliState
-        })
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const outcome = await postSession(cliPort, session);
+    if (outcome === PostOutcome.Sent) {
       status = 'done';
       setTimeout(() => { window.location.href = HOME_PATH; }, 2500);
-    } catch {
-      status = 'error';
-      errorMsg = copy.unreachable;
+      return;
     }
+    status = 'error';
+    errorMsg = copy.unreachable;
   }
 </script>
 
@@ -46,13 +40,15 @@
       </div>
     {:else}
       <h2>{copy.heading}</h2>
-      <p class="email">{userEmail}</p>
       <p class="desc">
-        {copy.description}
+        {copy.description(userEmail)}
       </p>
 
       {#if status === 'error'}
         <p class="err">{errorMsg}</p>
+        {#each links as link}
+          <a class="btn-editor" href={link.href}>Open in {link.label}</a>
+        {/each}
       {/if}
 
       <button class="btn-primary" onclick={authorize} disabled={status === 'sending'}>
@@ -69,49 +65,41 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--surface, #f5f5f7);
+    background: #0a0a0a;
     padding: 24px;
   }
   .card {
-    background: var(--paper, #fff);
-    border: 1px solid var(--line);
+    background: #141414;
+    border: 1px solid #2a2a2a;
     padding: 40px 36px;
     max-width: 420px;
     width: 100%;
-    box-shadow: 0 4px 32px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 32px rgba(0, 0, 0, 0.4);
     text-align: center;
   }
   .logo {
     font-size: 28px;
     font-weight: 700;
     margin-bottom: 24px;
-    color: var(--ink, #1d1d1f);
-  }
-  .accent {
-    color: var(--accent, #7c5cff);
+    color: #fff;
   }
   h2 {
     font-size: 1.25rem;
     font-weight: 600;
     margin: 0 0 8px;
-    color: var(--ink, #1d1d1f);
-  }
-  .email {
-    font-size: 14px;
-    color: var(--ink-soft, #6e6e73);
-    margin: 0 0 20px;
+    color: #fff;
   }
   .desc {
     font-size: 14px;
-    color: var(--ink-soft, #6e6e73);
+    color: #a1a1a1;
     line-height: 1.55;
     margin: 0 0 28px;
   }
   .btn-primary {
     display: block;
     width: 100%;
-    background: var(--accent, #7c5cff);
-    color: #fff;
+    background: #fff;
+    color: #000;
     border: none;
     padding: 14px 22px;
     font-size: 15px;
@@ -123,10 +111,22 @@
     opacity: 0.7;
     cursor: default;
   }
+  .btn-editor {
+    display: block;
+    border: 1px solid #2a2a2a;
+    color: #fff;
+    text-decoration: none;
+    padding: 12px 22px;
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+  .btn-editor:hover {
+    background: #1f1f1f;
+  }
   .btn-cancel {
     display: block;
     font-size: 14px;
-    color: var(--ink-soft, #6e6e73);
+    color: #a1a1a1;
     text-decoration: none;
     padding: 8px;
   }
@@ -135,7 +135,7 @@
   }
   .err {
     font-size: 14px;
-    color: #c0392b;
+    color: #ff6b6b;
     margin-bottom: 16px;
   }
   .done {
@@ -146,14 +146,14 @@
   }
   .check {
     font-size: 40px;
-    color: #00b37e;
+    color: #fff;
   }
   .done h2 {
     margin: 0;
   }
   .done p {
     font-size: 14px;
-    color: var(--ink-soft, #6e6e73);
+    color: #a1a1a1;
     margin: 0;
   }
 </style>
