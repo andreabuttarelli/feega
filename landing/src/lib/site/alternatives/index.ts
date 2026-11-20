@@ -1,5 +1,6 @@
 import { ArticleKind, type Article } from './alternative';
 import { ROUNDUPS } from './roundups';
+import { RICH } from './rich';
 import { SINGLES } from './singles';
 
 export const ALTERNATIVES_PATH = '/alternatives';
@@ -18,13 +19,19 @@ export const KIND_HEADINGS: Readonly<Record<ArticleKind, string>> = {
 };
 
 export const TRY_STEPS: readonly string[] = [
-  'Open a project folder in Feega, or import a GitHub repo in the browser.',
-  'Pick a page. Feega runs your app and shows it on the canvas.',
-  'Change a heading, a colour or a spacing.',
-  'Read the diff, then commit or open a pull request.'
+  'Install Feega in VS Code, or run `npx feega` in your project folder.',
+  'Open your project. Feega starts your dev server.',
+  'Click an element and change it.',
+  'See the diff in Changes, then keep it or undo it.'
 ];
 
-export const ALTERNATIVES: Readonly<Record<string, Article>> = { ...ROUNDUPS, ...SINGLES };
+const withRich = ([slug, article]: [string, Article]): [string, Article] => {
+  const rich = RICH[slug];
+
+  return [slug, { ...article, rich, sections: article.sections.filter((s) => !rich?.highlights.some((h) => h.heading === s.heading)), questions: [...article.questions, ...(rich?.moreQuestions ?? [])] }];
+};
+
+export const ALTERNATIVES: Readonly<Record<string, Article>> = Object.fromEntries(Object.entries({ ...ROUNDUPS, ...SINGLES }).map(withRich));
 
 export const alternativePath = (slug: string) => `${ALTERNATIVES_PATH}/${slug}`;
 

@@ -19,3 +19,12 @@ describe('the alternative articles', () => {
     expect(a.checked).toMatch(ISO_DATE);
   });
 });
+
+describe('the rich layout', () => {
+  it.each(Object.entries(ALTERNATIVES))('%s has a verdict, three highlights, steps and a longer FAQ', (_, a) => {
+    expect(a.rich?.verdict.length).toBeGreaterThan(0);
+    expect(a.rich?.highlights.length).toBeGreaterThanOrEqual(3);
+    expect(a.rich?.steps.length).toBeGreaterThan(0);
+    expect(a.questions.length).toBeGreaterThanOrEqual(5);
+  });
+});
