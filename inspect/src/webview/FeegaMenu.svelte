@@ -172,8 +172,8 @@
     height: 28px;
     border: 0;
     border-radius: var(--ui-radius-sm);
-    background: var(--ui-accent);
-    color: var(--ui-accent-ink);
+    background: var(--ui-text);
+    color: var(--ui-panel);
     font: inherit;
     font-weight: 500;
     cursor: pointer;

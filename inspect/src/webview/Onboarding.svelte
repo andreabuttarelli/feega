@@ -184,8 +184,8 @@
     height: 30px;
     border: 0;
     border-radius: var(--ui-radius-sm);
-    background: var(--ui-accent);
-    color: var(--ui-accent-ink);
+    background: var(--ui-text);
+    color: var(--ui-panel);
     font: inherit;
     font-weight: 500;
     cursor: pointer;
@@ -224,7 +224,7 @@
   }
 
   .next:not(:disabled) {
-    color: var(--ui-accent);
+    color: var(--ui-text);
     font-weight: 500;
   }
 
@@ -248,7 +248,7 @@
   }
 
   .dot.on {
-    background: var(--ui-accent);
+    background: var(--ui-text);
   }
 
   .steps {
