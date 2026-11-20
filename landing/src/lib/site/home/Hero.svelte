@@ -16,7 +16,7 @@
 <section class="hero" id="hero">
   <AsciiField />
 
-  <h1 class="site-display"><span data-agent-id="hero-title-a">{lower(HERO_HEADLINE[0])}</span> <span data-agent-id="hero-title-b" class="hero-span">{lower(HERO_HEADLINE[1])}</span></h1>
+  <h1 class="site-display"><span data-agent-id="hero-title-a">{lower(HERO_HEADLINE[0])}</span> <span data-agent-id="hero-title-b">{lower(HERO_HEADLINE[1])}</span></h1>
 
   <p class="lead" data-agent-id="hero-lead">paste your website or open your repo and every layer comes in editable. change it by hand or ask your AI assistant, then export a video or send the code back.</p>
 
@@ -111,9 +111,5 @@
       font-size: 16px;
       line-height: 1.35;
     }
-  }
-  .hero-span {
-    background-image: none;
-    background-color: transparent;
   }
 </style>
