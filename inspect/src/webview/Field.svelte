@@ -16,11 +16,12 @@
     min?: number;
     max?: number;
     title?: string;
+    override?: string;
     onchange: (value: string) => void;
     onpreview?: (value: string) => void;
   };
 
-  let { name, prefix = '', icon, px, units, unit = '', context, min = -100000, max = 100000, title, onchange, onpreview = () => undefined }: Props = $props();
+  let { name, prefix = '', icon, px, units, unit = '', context, min = -100000, max = 100000, title, override = '', onchange, onpreview = () => undefined }: Props = $props();
 
   const COARSE = 10;
   const DRAG_PX_PER_STEP = 2;
@@ -136,12 +137,24 @@
   {:else if unit}
     <span class="unit-text">{unit}</span>
   {/if}
+  {#if override}<span class="override-dot" title={override} aria-label={override} data-override></span>{/if}
 </label>
 
 <style>
+  .override-dot {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 6px;
+    height: 6px;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-accent);
+  }
+
   .field {
     display: flex;
     align-items: center;
+    position: relative;
     min-width: 0;
     height: 28px;
     padding: 0 6px 0 0;

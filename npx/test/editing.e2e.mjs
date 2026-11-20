@@ -214,6 +214,24 @@ try {
     assert.deepEqual(changedFiles().concat(untracked()), [], 'one undo restores everything');
   });
 
+  await check('responsive: padding at md writes a prefixed class or a min-width rule, the badge names it, one undo reverts', async () => {
+    await frame.locator('h1').first().click();
+    await page.locator('[data-field="breakpoint"]').waitFor({ timeout: 10_000 });
+    await page.locator('[data-field="breakpoint"]').click();
+    await page.locator('[data-breakpoint-item="md"]').click();
+    assert.equal(await page.getByTestId('breakpoint-badge').innerText(), 'editing: md ≥ 768px');
+    const field = page.locator('[data-row="padding"] input[aria-label="padding-all"]');
+    await field.fill('20');
+    await field.press('Enter');
+    await page.waitForTimeout(SETTLE_MS);
+    const added = diffText().split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).join('\n');
+    assert.ok(TAILWIND ? /md:p-/.test(added) : /@media \(min-width: 768px\)/.test(added), `breakpoint write:\n${added}`);
+    await undo();
+    assert.deepEqual(changedFiles().concat(untracked()), [], 'one undo restores everything');
+    await page.locator('[data-field="breakpoint"]').click();
+    await page.locator('[data-breakpoint-item="follow"]').click();
+  });
+
   const chooseState = async (name) => {
     await page.locator('[data-field="state"]').click();
     await page.locator(`[data-state-item="${name}"]`).click();

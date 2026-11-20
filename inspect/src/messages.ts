@@ -11,6 +11,7 @@ import type { EventHandler } from '@feega/live-edit/event-handlers';
 import type { GoAsk } from '@feega/live-edit/go-action';
 import type { LinkEdit, LinkRead } from '@feega/live-edit/link-edit';
 import type { OffsetSide } from '@feega/live-edit/authored-offsets';
+import type { Breakpoints } from '@feega/live-edit/breakpoints';
 import type { ReportFacts, SettingKey, SettingValue, Settings } from './settings';
 
 export enum IconSource {
@@ -62,7 +63,7 @@ export enum Styling {
   Css = 'css'
 }
 
-export type EditAsk = LiveEditAsk & { css?: Record<string, string>; scope?: Scope; inner?: string; page?: PageTarget; state?: ElementState };
+export type EditAsk = LiveEditAsk & { css?: Record<string, string>; scope?: Scope; inner?: string; page?: PageTarget; state?: ElementState; breakpoint?: string };
 
 export enum ServerState {
   Detecting = 'detecting',
@@ -210,7 +211,7 @@ export type HostMessage =
   | { kind: ToHost.Go; at: string; ask: GoAsk };
 
 export type ViewMessage =
-  | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string }
+  | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string; breakpoints: Breakpoints }
   | { kind: ToView.Server; state: ServerState; reason?: string; info?: ServerInfo }
   | { kind: ToView.Settings; values: Settings; facts: ReportFacts }
   | { kind: ToView.History; changes: ChangeRow[]; canUndo: boolean; canRedo: boolean }

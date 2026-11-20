@@ -9,6 +9,7 @@
   import type { LayerNode, Pick, Source } from '../messages';
   import { sourceText } from './page-bridge';
   import { actionsOf, roleOf } from './roles';
+  import { hiddenHere } from './layer-state';
   import Self from './LayersTree.svelte';
 
   type Props = {
@@ -98,6 +99,7 @@
     {/if}
     <svg class="type" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="0.833" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{@html ICON_SVG[iconOf(node)]}</svg>
     <span class="name" class:component={node.component}>{node.name}</span>{#if badge && isPicked(node)}<span class="state-badge" data-testid="layer-state-badge">{badge}</span>{/if}
+    {#if hiddenHere(node)}<span class="hidden-here" title="Hidden at this size" aria-label="Hidden at this size" data-hidden-here><EyeOff size={11} /></span>{/if}
     {#if floatingOf(node.position)}<span class={`float ${floatingOf(node.position)}`} data-float={floatingOf(node.position)} title={floatingOf(node.position)} aria-label={floatingOf(node.position)}><svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true">{@html FLOAT_GLYPH[floatingOf(node.position)!]}</svg></span>{/if}
     {#if node.count > 1 && node.source}<span class="count" title={`Rendered ${node.count} times by a loop in ${node.source.file}:${node.source.line} — edits apply to all ${node.count}`}>×{node.count}</span>{:else if !node.source}<span class="count">{node.count}</span>{/if}
     {#if actions(node).visibility && node.source}<span class="toggles" class:active={hidden.has(id) || locked.has(id)}>
@@ -111,6 +113,12 @@
 {/each}
 
 <style>
+  .hidden-here {
+    display: grid;
+    place-items: center;
+    color: var(--ui-text-3);
+  }
+
   .row {
     display: flex;
     align-items: center;

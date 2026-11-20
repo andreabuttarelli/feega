@@ -18,6 +18,9 @@
   import { iconDrawn, iconsFound } from './icon-search.svelte';
   import { pageBridge, sourceText } from './page-bridge';
   import Properties from './Properties.svelte';
+  import BreakpointBar from './BreakpointBar.svelte';
+  import { DEFAULT_BREAKPOINTS, type Breakpoints } from '@feega/live-edit/breakpoints';
+  import { FOLLOW, badgeText, reachItems, writeTarget } from './responsive';
   import { badgeOf } from './states';
   import Interactions from './Interactions.svelte';
   import { wiringState } from './wiring-state.svelte';
@@ -62,6 +65,8 @@
   let address = $state('/');
   let attachAddress = $state('');
   let styling = $state(Styling.Tailwind);
+  let breakpoints = $state<Breakpoints>(DEFAULT_BREAKPOINTS);
+  let reach = $state(FOLLOW);
   let server = $state(ServerState.Detecting);
   let serverReason = $state('');
   let serverInfo = $state<ServerInfo | null>(null);
@@ -192,6 +197,17 @@
   const history = browseHistory();
   let savedPrefs = false;
   const fit = $derived(fitOf(size, custom, stage));
+  const target = $derived(writeTarget(reach, size !== Size.Full, breakpoints, fit.width));
+  const reachBadge = $derived(badgeText(breakpoints, target, fit.width));
+  $effect(() => {
+    fit.width;
+    untrack(() => {
+      if (bridged) {
+        bridge.tree();
+        refresh();
+      }
+    });
+  });
   const area = $derived({ x: leftPx, y: toolbarH, w: stage.w, h: stage.h });
   const barAt = $derived(moving ? { x: moving.x, y: moving.y } : anchorBox(anchor, area, bar));
   const canBack = $derived((navTick, history.canBack()));
@@ -322,7 +338,7 @@
   }
 
   const handlers: { [K in ToView]: (m: Extract<ViewMessage, { kind: K }>) => void } = {
-    [ToView.App]: (m) => (restore(m.prefs), (route = m.route ?? route), (start = new URL(route, m.url).toString()), (url = m.url), (styling = m.styling)),
+    [ToView.App]: (m) => (restore(m.prefs), (route = m.route ?? route), (start = new URL(route, m.url).toString()), (url = m.url), (styling = m.styling), (breakpoints = m.breakpoints)),
     [ToView.History]: (m) => ((changes = m.changes), (canUndo = m.canUndo), (canRedo = m.canRedo)),
     [ToView.Settings]: (m) => {
       settings = m.values;
@@ -504,7 +520,7 @@
 
   function askOf(row: Row, value: string, token?: string) {
     const { prop, side, family, value: written } = row.change(value);
-    return { at: sourceText(picked!.source), prop, side, family, value: written, token, rem: picked!.rem, viewport: picked!.viewport, css: kebab(row.preview(value)), scope, inner: picked!.inner, page: picked!.page, state: writtenState };
+    return { at: sourceText(picked!.source), prop, side, family, value: written, token, rem: picked!.rem, viewport: picked!.viewport, css: kebab(row.preview(value)), scope, inner: picked!.inner, page: picked!.page, state: writtenState, breakpoint: target };
   }
 
   function change(row: Row, value: string, token?: string) {
@@ -611,7 +627,7 @@
     }
     const css = fontCss(font.family);
     bridge.preview(picked.source, { fontFamily: css });
-    toHost({ kind: ToHost.Font, google: font.google, ask: { at: sourceText(picked.source), prop: LiveProp.Class, family: ClassFamily.FontFamily, value: `font-['${font.family.replace(/\s+/g, '_')}']`, css: { 'font-family': css }, rem: picked.rem, viewport: picked.viewport, scope } });
+    toHost({ kind: ToHost.Font, google: font.google, ask: { at: sourceText(picked.source), prop: LiveProp.Class, family: ClassFamily.FontFamily, value: `font-['${font.family.replace(/\s+/g, '_')}']`, css: { 'font-family': css }, rem: picked.rem, viewport: picked.viewport, scope, breakpoint: target } });
   }
 
   function onKey(e: KeyboardEvent) {
@@ -784,11 +800,12 @@
             <span class="where">{#if picked.component}in {picked.component.file.split('/').pop()} · {/if}<button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file.split('/').pop()}:{picked.source.line}</button></span>
             {#if authored(picked.classes)}<code class="classes">{authored(picked.classes)}</code>{/if}
           </div>
+          <BreakpointBar badge={reachBadge} items={reachItems(breakpoints)} choice={reach} onchoose={(id) => (reach = id)} />
           <div class="scope" role="radiogroup" aria-label="Edit scope" data-testid="scope">
             <button type="button" class:on={scope === Scope.Element} onclick={() => (scope = Scope.Element)} title="Only this element (every instance of its component: {picked.instances})">This element{picked.instances > 1 ? ` ×${picked.instances}` : ''}</button>
             <button type="button" class:on={scope === Scope.Class} disabled={!picked.classCount || styling === Styling.Tailwind} onclick={() => (scope = Scope.Class)} title={styling === Styling.Tailwind ? 'Class scope needs CSS rules, not Tailwind' : `Every element with this class: ${picked.classCount}`}>All .{picked.classes.split(' ')[0] || 'class'}{picked.classCount ? ` (${picked.classCount})` : ''}</button>
           </div>
-          <Properties pick={picked} {palette} {elementState} {baseline} onstate={chooseState} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onnotice={showToast} />
+          <Properties pick={picked} {breakpoints} {palette} {elementState} {baseline} onstate={chooseState} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onnotice={showToast} />
           <Interactions pick={picked} {changes} />
         {:else}
           <p class="empty">{bridged ? 'Click an element to edit it. Double-click text to rewrite it.' : 'The page has no Feega source map: element picking needs the feega-source-map plugin.'}</p>

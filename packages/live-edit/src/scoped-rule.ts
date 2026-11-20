@@ -87,9 +87,44 @@ function shorthanded(css: Map<string, string>, all: Map<string, string>): Map<st
   return merged;
 }
 
-export const ruleInBody = (body: string, name: string, css: Map<string, string>, viewport?: number, indent = RULE_INDENT) => selectorInBody(body, `.${name}`, css, viewport, indent);
+export const ruleInBody = (body: string, name: string, css: Map<string, string>, viewport?: number, indent = RULE_INDENT, media?: string | null) => selectorInBody(body, `.${name}`, css, viewport, indent, media);
 
-export function selectorInBody(body: string, selector: string, css: Map<string, string>, viewport?: number, indent = RULE_INDENT): string {
+const queryPattern = (media: string) => [...media.replace(/\s+/g, '')].map(escaped).join('\\s*');
+
+function closingBrace(body: string, from: number): number {
+  let depth = 1;
+  for (let i = from; i < body.length; i++) {
+    depth += body[i] === '{' ? 1 : body[i] === '}' ? -1 : 0;
+    if (depth === 0) {
+      return i;
+    }
+  }
+  return body.length;
+}
+
+function selectorInMedia(body: string, selector: string, css: Map<string, string>, media: string, indent: string): string {
+  const nested = indent + RULE_INDENT;
+  const found = body.match(new RegExp(`(^|\\n)([ \\t]*)@media\\s+${queryPattern(media)}\\s*\\{`));
+  if (!found) {
+    const inner = selectorInBody('', selector, css, undefined, nested).trimEnd();
+    const head = body.trimEnd();
+    return inner ? `${head}${head ? '\n\n' : ''}${indent}@media ${media} {\n${inner}\n${indent}}\n` : body;
+  }
+
+  const open = found.index! + found[0].length;
+  const close = closingBrace(body, open);
+  const inner = selectorInBody(body.slice(open, close).replace(/^\n+/, ''), selector, css, undefined, nested).trimEnd();
+  const block = inner ? `${found[1]}${found[2]}@media ${media} {\n${inner}\n${found[2]}}` : '';
+  return body.slice(0, found.index!) + block + body.slice(close + 1);
+}
+
+export function selectorInBody(body: string, selector: string, css: Map<string, string>, viewport?: number, indent = RULE_INDENT, media?: string | null): string {
+  if (typeof media === 'string') {
+    return selectorInMedia(body, selector, css, media, indent);
+  }
+  if (media === null) {
+    viewport = undefined;
+  }
   const rules = [...body.matchAll(new RegExp(`(^|\\n)([ \\t]*)${escaped(selector)}\\s*\\{([^}]*)\\}`, 'g'))];
   const found = rules.filter((r) => appliesAt(mediaAt(body, r.index!), viewport)).pop();
   const all = found ? declarationsOf(found[3]) : new Map<string, string>();
@@ -107,16 +142,17 @@ export function selectorInBody(body: string, selector: string, css: Map<string, 
   return `${head}${head ? '\n' : ''}${indent === '' && head ? '\n' : ''}${ruleText(selector, all, indent)}\n`;
 }
 
-function withRule(source: string, name: string, css: Map<string, string>, viewport?: number): string {
+function withRule(source: string, name: string, css: Map<string, string>, viewport?: number, media?: string | null): string {
   const block = source.match(STYLE_BLOCK);
   if (!block && [...css.values()].every((v) => v === REMOVED)) {
     return source;
   }
   if (!block) {
-    return `${source.trimEnd()}\n\n<style>\n${ruleText(`.${name}`, css)}\n</style>\n`;
+    const rules = typeof media === 'string' ? selectorInBody('', `.${name}`, css, undefined, RULE_INDENT, media).trimEnd() : ruleText(`.${name}`, css);
+    return `${source.trimEnd()}\n\n<style>\n${rules}\n</style>\n`;
   }
   const body = block[1];
-  const after = source.replace(STYLE_BLOCK, (whole) => whole.replace(body, ruleInBody(body, name, css, viewport)));
+  const after = source.replace(STYLE_BLOCK, (whole) => whole.replace(body, ruleInBody(body, name, css, viewport, undefined, media)));
   return after.replace(EMPTY_STYLE, '\n');
 }
 
@@ -145,7 +181,7 @@ function classFor(classes: string[], source: string, base: string, scope: Scope)
   return reusable ? { name: reusable, added: false } : { name: freeClass(source, base), added: true };
 }
 
-export async function scopedRule(read: ReadFile, at: LiveAt, css: Css, viewport?: number, scope = Scope.Element, inner?: string, state = ElementState.Default): Promise<TextWritten> {
+export async function scopedRule(read: ReadFile, at: LiveAt, css: Css, viewport?: number, scope = Scope.Element, inner?: string, state = ElementState.Default, media?: string | null): Promise<TextWritten> {
   const text = await read(at.file);
   const start = text === null ? -1 : offsetOf(text, at);
   const end = start < 0 || text![start] !== '<' ? -1 : openTagEnd(text!, start);
@@ -178,5 +214,5 @@ export async function scopedRule(read: ReadFile, at: LiveAt, css: Css, viewport?
   const tagged = source.slice(0, start) + open + source.slice(end + 1);
   const stated = `${name}${pseudoOf(state)}`;
   const selector = inner ? `${stated} ${reach(at.file, inner)}` : stated;
-  return { ok: true, change: { path: at.file, before: source, after: withRule(tagged, selector, declared, viewport) } };
+  return { ok: true, change: { path: at.file, before: source, after: withRule(tagged, selector, declared, viewport, media) } };
 }
