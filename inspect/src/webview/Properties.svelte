@@ -367,7 +367,7 @@
       {#if !closed[s]}
         {#each shownRows(ROWS.filter((r) => r.section === s), pick.styles) as r (r.name)}
           {#if s === Section.Position && OFFSET_SIDES.includes(r.name as OffsetSide)}
-            {#if r.name === OffsetSide.Top}<div class="row wide" data-row="offsets">{@render offsetBox()}</div>{/if}
+            {#if r.name === OffsetSide.Top}<div class="row" data-row="offsets"><span class="label"></span><div class="control reset-pair">{@render offsetBox()}<span class="icon reset slot-only" aria-hidden="true">×</span></div></div>{/if}
           {:else}
           {@const from = pick.inherited?.[READS[r.name]]}
           <div class="row" class:inherited={from} data-row={r.name} title={from ? `Inherited from ${from}` : undefined}>
@@ -401,6 +401,10 @@
 
   .row.inherited .control > :global(:first-child) {
     opacity: 0.55;
+  }
+
+  .reset.slot-only {
+    visibility: hidden;
   }
 
   .reset-pair {
