@@ -4,7 +4,8 @@ import { gatewayRate } from '$lib/server/openrouter-models';
 import { createAdminClient } from '$lib/server/supabase-admin';
 import { GEMINI_FLASH, geminiFlash, isGeminiFlashId, NANO_BANANA_PRO, isNanoBananaProId, geminiVisualCreditShare } from '$lib/server/google-models';
 import { AI_MARKUP, billedCreditsFor, CHAT_MULTIPLIER } from '$lib/credit-ladder';
-import { RENDER_CALL_LABEL, RENDER_MULTIPLIER } from '$lib/motion/render-quote';
+const RENDER_CALL_LABEL = 'motion_render';
+const RENDER_MULTIPLIER = 5;
 import type { Database } from '$lib/database.types';
 
 type AiCallInsert = Database['public']['Tables']['ai_calls']['Insert'];

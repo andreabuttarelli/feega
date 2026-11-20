@@ -2,107 +2,36 @@
   import { ThemePref, applyTheme, parseThemePref, resolvedTheme } from '$lib/theme';
   import '../app.css';
   import { page } from '$app/stores';
-  import { navigating } from '$app/state';
   import CookieBanner from '$lib/components/CookieBanner.svelte';
-  import { LocalOff, localOff } from '$lib/local-user';
-  import { env as publicEnv } from '$env/dynamic/public';
-  import TermsUpdateNotice from '$lib/components/TermsUpdateNotice.svelte';
-  import HowFeegaWorks from '$lib/components/onboarding/HowFeegaWorks.svelte';
-  import Onboarding from '$lib/components/onboarding/Onboarding.svelte';
-  import { surfaceOf } from '$lib/onboarding/flow';
-  import { isLocalMode } from '$lib/local-user';
-  import { browser } from '$app/environment';
-  import { TourState, tourShowsOn } from '$lib/onboarding/tour';
-  import AppEntryShimmer from '$lib/components/AppEntryShimmer.svelte';
-  import SocialPreview from '$lib/components/SocialPreview.svelte';
-  import CanvasEntryShimmer from '$lib/components/CanvasEntryShimmer.svelte';
-  import MotionEntryShimmer from '$lib/components/MotionEntryShimmer.svelte';
-  import { EntryShell, entryShell } from '$lib/entry-shell';
-  import {
-    identifyUser,
-    setAnalyticsOptOut,
-    setInternalViewer,
-    trackBookingClicks
-  } from '$lib/analytics';
+  import { identifyUser, setAnalyticsOptOut, setInternalViewer, trackBookingClicks } from '$lib/analytics';
   import { initConsent } from '$lib/consent';
   import { onMount } from 'svelte';
-  import { perfHudFromLocation } from '$lib/perf/perf-hud-switch';
+
   let { children, data } = $props();
 
   onMount(() => document.documentElement.removeAttribute('data-hydrating'));
 
-  let perfHud = $state<typeof import('$lib/components/PerfHud.svelte').default | null>(null);
-  onMount(() => {
-    if (!perfHudFromLocation()) {
-      return;
-    }
-    import('$lib/components/PerfHud.svelte').then((module) => (perfHud = module.default));
-  });
-
-  // Guard "chi sta guardando": il server ha già deciso (root +layout.server.ts), qui arriva solo il
-  // booleano. Impostato SUBITO, fuori da un $effect: CookieBanner è un figlio e il suo onMount gira
-  // prima degli effect di questo layout — se aspettassimo, PostHog sarebbe già stato schedulato.
-  // L'effect serve solo a seguire il cambio di sessione (login/logout) durante la navigazione.
   setAnalyticsOptOut(data?.analyticsOptOut === true);
   $effect(() => {
     setAnalyticsOptOut(data?.analyticsOptOut === true);
   });
 
-  // Stesso guard per Sentry: i giri di prova del founder in produzione non devono diventare
-  // sessioni, transazioni o replay veri. Sentry è già partito quando arriviamo qui (hooks.client),
-  // quindi il flag non impedisce l'init: scarta gli eventi in beforeSend* e impedisce che la
-  // registrazione della sessione venga mai agganciata (che arriva alla prima interazione o dopo
-  // 8–10s, quindi molto dopo questa riga). L'effect segue login/logout senza ricaricare la pagina.
   setInternalViewer(data?.internalViewer === true);
   $effect(() => {
     setInternalViewer(data?.internalViewer === true);
   });
 
-  const entry = $derived(
-    navigating.to
-      ? entryShell({ from: navigating.from?.url.pathname ?? $page.url.pathname, to: navigating.to.url.pathname, signedIn: !!data?.session })
-      : EntryShell.None
-  );
-  const showAppEntry = $derived(entry !== EntryShell.None);
-
-  // Global navigation feedback: without it, any server-load wait reads as "the click did
-  // nothing". Shown only when a navigation outlives 150ms so instant navs never flash a bar.
-  // Suppressed while the full app-entry shell is up (avoids double chrome).
-  let navBar = $state(false);
-  $effect(() => {
-    if (!navigating.to || showAppEntry) { navBar = false; return; }
-    const t = setTimeout(() => (navBar = true), 150);
-    return () => { clearTimeout(t); navBar = false; };
-  });
-
-  // Public brand blogs (custom domain / default path / preview) are served on the BRAND's turf —
-  // never load feega's cookie banner or its (PostHog) analytics there. CookieBanner is what starts
-  // anonymous analytics, so suppressing it keeps the brand's blog tracking-free by default.
-  const isBlog = $derived(
-    !!$page.route.id && (
-      $page.route.id.startsWith('/_site') ||
-      $page.route.id.startsWith('/blog/[site]') ||
-      $page.route.id.startsWith('/blog-preview')
-    )
-  );
-
-  // Stitch the anonymous session to the logged-in user so product events (onboarding, etc.) form a
-  // per-user funnel. First-party, authenticated use only. Re-runs if the session changes client-side.
   $effect(() => {
     const user = data?.session?.user as { id?: string; email?: string } | undefined;
-    if (user?.id) identifyUser(user.id, user.email ? { email: user.email } : undefined, data?.analyticsOrgId ?? null);
+    if (user?.id) identifyUser(user.id, user.email ? { email: user.email } : undefined, null);
   });
 
   $effect(() => {
-    if (!isBlog) {
-      trackBookingClicks();
-    }
+    trackBookingClicks();
   });
 
   $effect(() => {
-    if (!isBlog) {
-      initConsent();
-    }
+    initConsent();
   });
 
   $effect(() => {
@@ -125,64 +54,12 @@
     };
   });
 
-  // Mark the app shell so marketing CSS (e.g. landing.css `section { padding: 110px }`)
-  // does not leak onto /app routes after SPA navigation. Also mark while the optimistic
-  // app-entry overlay is up (URL still points at marketing during the load).
   $effect(() => {
     if (typeof document === 'undefined') return;
-    const path = $page.url.pathname;
-    const isApp = showAppEntry || path.startsWith('/app') || path.startsWith('/p/');
-    if (isApp) document.documentElement.setAttribute('data-shell', 'app');
+    if ($page.url.pathname.startsWith('/app')) document.documentElement.setAttribute('data-shell', 'app');
     else document.documentElement.removeAttribute('data-shell');
   });
 </script>
 
-<SocialPreview />
-
-{#if navBar}
-  <div class="nav-progress" aria-hidden="true"></div>
-{/if}
-
-{#if entry === EntryShell.Motion}
-  <MotionEntryShimmer />
-{:else if entry === EntryShell.Canvas}
-  <CanvasEntryShimmer />
-{:else if entry === EntryShell.App}
-  <AppEntryShimmer />
-{/if}
-
 {@render children()}
-{#if perfHud}{@const PerfHud = perfHud}<PerfHud />{/if}
-{#if !isBlog && !localOff(LocalOff.CookieBanner, publicEnv)}<CookieBanner />{/if}
-{#if !isBlog && data?.session && !localOff(LocalOff.TermsNotice, publicEnv)}<TermsUpdateNotice version={data.termsNoticeVersion ?? null} />{/if}
-{#if data?.session && tourShowsOn($page.url.pathname)}<HowFeegaWorks />{/if}
-{#if browser && data?.session && tourShowsOn($page.url.pathname)}<Onboarding surface={surfaceOf({ local: isLocalMode(publicEnv), userAgent: navigator.userAgent })} tour={data.tour ?? TourState.Seen} viewerName={data.viewerName ?? null} />{/if}
-
-<style>
-  /* Indeterminate top progress bar: sprints to ~80% then crawls, so long loads still feel alive.
-     Uses the theme accent when defined, falls back to a neutral that works in both themes. */
-  .nav-progress {
-    position: fixed;
-    top: 0;
-    left: 0;
-    height: 3px;
-    width: 100%;
-    z-index: 9999;
-    pointer-events: none;
-    background: var(--accent, #6366f1);
-    transform-origin: left;
-    animation: nav-progress-grow 8s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
-  }
-  /* Thicker on mobile so a tap → wait is obvious under a thumb. */
-  @media (max-width: 1023px) {
-    .nav-progress {
-      height: 4px;
-    }
-  }
-  @keyframes nav-progress-grow {
-    0% { transform: scaleX(0); }
-    10% { transform: scaleX(0.4); }
-    30% { transform: scaleX(0.8); }
-    100% { transform: scaleX(0.98); }
-  }
-</style>
+<CookieBanner />

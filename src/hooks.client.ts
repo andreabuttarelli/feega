@@ -1,12 +1,8 @@
-import type { ClientInit, HandleClientError } from '@sveltejs/kit';
+import type { HandleClientError } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import { env } from '$env/dynamic/public';
 import { dropIfInternal, isInternalViewer, sentryTags, trackerAllowed } from '$lib/analytics';
 import { Tracker } from '$lib/consent-model';
-import { pageAt } from '$lib/dashboard/pages';
-import { bundleApiBase, sendServerCallsTo } from '$lib/api/bundle-fetch';
-import { openWebPagesOutside } from '$lib/api/bundle-links';
-import { viewerSession } from '$lib/api/client';
 import { drainErrors, rememberError } from '$lib/sentry-buffer';
 import { REPLAY_PRIVACY, SENTRY_PRIVACY, privateEvent } from '$lib/sentry-privacy';
 
@@ -153,15 +149,4 @@ export const handleError: HandleClientError = async (input) => {
   // che stava qui prima: il cast tiene il comportamento identico invece di riscriverne uno.
   const report = Sentry.handleErrorWithSentry() as unknown as HandleClientError;
   return report(input);
-};
-
-export const init: ClientInit = () => {
-  const apiBase = bundleApiBase();
-  if (apiBase) {
-    sendServerCallsTo(apiBase, async () => (await viewerSession())?.access_token ?? null);
-    openWebPagesOutside();
-  }
-  if (pageAt(location.pathname)) {
-    void import('$lib/dashboard/api').then(({ warmDashboard }) => warmDashboard(new URL(location.href)));
-  }
 };

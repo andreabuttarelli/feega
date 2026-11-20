@@ -20,10 +20,7 @@ jobs:
         include:
           - project: feega
             id: prj_2XbPjehleZ9ulUYweIMKtmcjzOHC
-            paths: ". :!cli :!changelog :!docs :!apps :!imgs :!supabase :!landing :!web-docs :!web-blog"
-          - project: feega-mcp
-            id: prj_jIZAq6VubJUwWAGloDr6pNAkjeln
-            paths: "cli"
+            paths: ". :!docs :!supabase :!landing :!web-docs :!web-blog :!inspect :!npx"
           - project: web-docs
             id: prj_spuvPDXx0Lfoxc7sEuWKCCm2AkPZ
             paths: "web-docs"

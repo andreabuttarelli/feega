@@ -1,7 +1,6 @@
 import { createServiceRoleDb } from '$lib/server/db/client';
 import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
 import type { Json } from '$lib/database.types';
-import type { CanvasPerfProps } from '$lib/server/canvas-perf';
 import { capture } from '$lib/server/core-usage';
 
 export enum ProductEvent {
@@ -15,7 +14,6 @@ export enum ProductEvent {
   AgentFailed = 'agent_failed',
   CreditsExhausted = 'credits_exhausted',
   ImportFailed = 'import_failed',
-  CanvasPerf = 'canvas_perf',
   OnboardingTourCompleted = 'onboarding_tour_completed',
   AgentConnected = 'agent_connected',
   TeamInviteSent = 'team_invite_sent',
@@ -44,7 +42,6 @@ export type ProductProps = {
   [ProductEvent.AgentFailed]: { code: string };
   [ProductEvent.CreditsExhausted]: Nothing;
   [ProductEvent.ImportFailed]: { source: string; error: string };
-  [ProductEvent.CanvasPerf]: CanvasPerfProps;
   [ProductEvent.OnboardingTourCompleted]: Nothing;
   [ProductEvent.AgentConnected]: { key_id: string };
   [ProductEvent.TeamInviteSent]: { role: string; via: 'email' | 'link' };
