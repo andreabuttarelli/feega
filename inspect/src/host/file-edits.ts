@@ -18,6 +18,8 @@ import { pageRule } from '@feega/live-edit/page-rule';
 import { ElementState } from '@feega/live-edit/element-state';
 import { scopedRule, type Scope } from '@feega/live-edit/scoped-rule';
 import { styleAttr, type Css } from '@feega/live-edit/style-attr';
+import { targetOf } from '@feega/live-edit/breakpoints';
+import { DEFAULT_THEME, combinedMedia, themeTarget } from '@feega/live-edit/themes';
 import { detectLibrary } from '@feega/live-edit/icon-library';
 import { swapIcon } from '@feega/live-edit/icon-swap';
 import { svgMarkup } from '@feega/live-edit/svg-markup';
@@ -26,6 +28,8 @@ import { linkWrite, type LinkEdit } from '@feega/live-edit/link-edit';
 import { Styling, type EditAsk } from '../messages';
 import { StylingChoice } from '../settings';
 import { stylingOf } from './styling';
+import { breakpointsOf } from './breakpoints';
+import { themesOf } from './themes';
 
 export type StructureAsk = { op: StructureOp; at: string; to?: string; usage?: Usage; loop?: LoopMove; instance?: number; add?: { kind: AddKind; src?: string } };
 
@@ -33,10 +37,10 @@ export type Written = { ok: true; path: string; written: string; note?: string; 
 
 type Changes = { ok: true; changes: FileChange[] } | { ok: false; reason: string; at?: LiveAt };
 
-type CssWriter = { write: (read: ReadFile, at: LiveAt, css: Css, viewport?: number, scope?: Scope, inner?: string, state?: ElementState) => Promise<Changes>; note?: string };
+type CssWriter = { write: (read: ReadFile, at: LiveAt, css: Css, viewport?: number, scope?: Scope, inner?: string, state?: ElementState, media?: string | null, within?: string | null) => Promise<Changes>; note?: string };
 
-const single = (write: typeof scopedRule): CssWriter['write'] => async (read, at, css, viewport, scope, inner, state) => {
-  const out = await write(read, at, css, viewport, scope, inner, state);
+const single = (write: typeof scopedRule): CssWriter['write'] => async (read, at, css, viewport, scope, inner, state, media, within) => {
+  const out = await write(read, at, css, viewport, scope, inner, state, media, within);
   return out.ok ? { ok: true, changes: [out.change] } : out;
 };
 
@@ -45,8 +49,10 @@ const MODULE: CssWriter = { write: cssModuleRule };
 const inlineStyle = single(styleAttr);
 
 const INLINE: CssWriter = {
-  write: async (read, at, css, viewport, scope, inner, state = ElementState.Default) =>
-    state === ElementState.Default ? inlineStyle(read, at, css, viewport, scope, inner) : { ok: false, reason: `${at.file}:${at.line}: ${state} needs a stylesheet rule, this file has none`, at },
+  write: async (read, at, css, viewport, scope, inner, state = ElementState.Default, media, within) => {
+    const needs = state !== ElementState.Default ? state : typeof media === 'string' ? 'a breakpoint or theme' : within ? 'a theme' : null;
+    return needs ? { ok: false, reason: `${at.file}:${at.line}: ${needs} needs a stylesheet rule, this file has none`, at } : inlineStyle(read, at, css, viewport, scope, inner);
+  },
   note: 'inline style: this file has no stylesheet'
 };
 
@@ -127,8 +133,18 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
   async function edited(ask: EditAsk, extra: FileChange[] = []): Promise<Written> {
     meta = { at: ask.at, prop: ask.prop, value: ask.value ?? '', scope: ask.scope ?? '' };
     const written = (changes: FileChange[], token: string, note?: string) => writtenAll([...changes, ...extra.filter((e) => !changes.some((c) => c.path === e.path))], token, note);
+    const breakpoint = ask.breakpoint === undefined ? undefined : targetOf(await breakpointsOf(root), ask.breakpoint);
+    if (breakpoint === null) {
+      return { ok: false, reason: `${ask.breakpoint} is not a breakpoint of this project` };
+    }
+    const theme = ask.theme === undefined || ask.theme === DEFAULT_THEME ? undefined : themeTarget(await themesOf(root), ask.theme);
+    if (theme === null) {
+      return { ok: false, reason: `${ask.theme} is not a theme of this project` };
+    }
+    const media = theme ? combinedMedia(breakpoint?.media, theme.media) : breakpoint?.media;
+    const within = theme?.within;
     if (ask.page) {
-      const out = await pageRule(reader(root), ask.page, ask.css ?? {}, ask.viewport);
+      const out = await pageRule(reader(root), ask.page, ask.css ?? {}, ask.viewport, media, within);
       return out.ok ? written([out.change], '') : out;
     }
     const at = liveAtOf(ask.at);
@@ -145,7 +161,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
 
     if ((await stylingOf(root, choice())) === Styling.Css) {
       const writer = cssWriterOf(at.file);
-      const out = await writer.write(reader(root), at, ask.css ?? {}, ask.viewport, ask.scope, ask.inner, ask.state);
+      const out = await writer.write(reader(root), at, ask.css ?? {}, ask.viewport, ask.scope, ask.inner, ask.state, media, within);
       return out.ok ? written(out.changes, '', writer.note) : out;
     }
 
@@ -153,8 +169,12 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
       return { ok: false, reason: `${at.file}:${at.line}: this ${ask.inner} comes from raw markup; style it from the parent's stylesheet`, at };
     }
 
+    if (theme?.variant === null) {
+      return { ok: false, reason: `${ask.theme} has no Tailwind variant: style it from a stylesheet`, at };
+    }
+    const variant = theme ? [breakpoint?.variant, theme.variant].filter(Boolean).join(':') : breakpoint?.variant;
     const token = await tokenOf(root, ask);
-    const out = await stylePatch(reader(root), at, { prop: ask.prop, family: ask.family, value: token ?? ask.value ?? '', side: ask.side, viewport: ask.viewport, state: ask.state });
+    const out = await stylePatch(reader(root), at, { prop: ask.prop, family: ask.family, value: token ?? ask.value ?? '', side: ask.side, viewport: ask.viewport, state: ask.state, variant });
     if (out.skipped.length) {
       return { ok: false, reason: out.skipped[0] };
     }

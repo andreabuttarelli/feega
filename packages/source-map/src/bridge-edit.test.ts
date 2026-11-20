@@ -159,3 +159,16 @@ describe('element states through the bridge', () => {
     expect(win.getComputedStyle(h1).color).toBe('rgb(0, 0, 255)');
   });
 });
+
+describe('a theme sent to the page', () => {
+  const DARK = { kind: 'class', target: 'html', value: 'dark' };
+
+  it('puts the class on the root and takes it off on default', () => {
+    const { win, send } = bridged();
+    send({ type: 'feega:theme', themes: [DARK], active: DARK });
+    expect(win.document.documentElement.classList.contains('dark')).toBe(true);
+
+    send({ type: 'feega:theme', themes: [DARK], active: null });
+    expect(win.document.documentElement.classList.contains('dark')).toBe(false);
+  });
+});

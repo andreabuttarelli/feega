@@ -34,13 +34,20 @@
   import { ElementState } from '@feega/live-edit/element-state';
   import { changedKeys, isChanged } from './states';
   import type { FontChoice, Palette, Pick } from '../messages';
+  import { DEFAULT_BREAKPOINTS, type Breakpoints } from '@feega/live-edit/breakpoints';
+  import { overrideTitle, rowOverrides } from './responsive';
 
-  type Props = { pick: Pick; onpreview: (row: Row, value: string) => void; onchange: (row: Row, value: string, token?: string) => void; onsavevar: (row: Row, name: string, css: string) => void; onhint: (hint: Hint | null) => void; onfont: (font: FontChoice) => void; onnotice: (text: string) => void; palette: Palette; elementState?: ElementState; baseline?: Record<string, string> | null; onstate?: (state: ElementState) => void };
+  type Props = { pick: Pick; onpreview: (row: Row, value: string) => void; onchange: (row: Row, value: string, token?: string) => void; onsavevar: (row: Row, name: string, css: string) => void; onhint: (hint: Hint | null) => void; onfont: (font: FontChoice) => void; onnotice: (text: string) => void; palette: Palette; elementState?: ElementState; baseline?: Record<string, string> | null; onstate?: (state: ElementState) => void; breakpoints?: Breakpoints };
 
-  let { pick, onpreview, onchange, onhint, onfont, onnotice, palette, onsavevar, elementState = ElementState.Default, baseline = null, onstate }: Props = $props();
+  let { pick, onpreview, onchange, onhint, onfont, onnotice, palette, onsavevar, elementState = ElementState.Default, baseline = null, onstate, breakpoints = DEFAULT_BREAKPOINTS }: Props = $props();
 
   const differs = $derived(changedKeys(ROWS, pick.styles, baseline));
   const changed = (key: string) => isChanged(differs, key);
+
+  const overrideOf = (name: string): string => {
+    const names = rowOverrides(byName(name), pick.classes, breakpoints);
+    return names.length ? overrideTitle(names, breakpoints) : '';
+  };
 
   const WEIGHT_NAMES: Record<string, string> = { '100': 'Thin', '200': 'Extra light', '300': 'Light', '400': 'Regular', '500': 'Medium', '600': 'Semibold', '700': 'Bold', '800': 'Extra bold', '900': 'Black' };
   const TEXT_ALIGN = [
@@ -168,7 +175,7 @@
 
 {#snippet field(r: NumberRow, prefix = r.label, iconSvg = '', compact = false, twin: NumberRow | null = null)}
   {#snippet glyph()}<Icon svg={iconSvg} />{/snippet}
-  <Field name={r.name} {prefix} icon={iconSvg ? glyph : undefined} {compact} px={shared(r)} units={r.units} unit={r.units ? '' : r.unit} {context} min={r.range.min} max={r.range.max} onpreview={(v) => (onpreview(r, v), twin && onpreview(twin, v))} onchange={(v) => (onchange(r, v), twin && onchange(twin, v))} />
+  <Field name={r.name} override={overrideOf(r.name)} {prefix} icon={iconSvg ? glyph : undefined} {compact} px={shared(r)} units={r.units} unit={r.units ? '' : r.unit} {context} min={r.range.min} max={r.range.max} onpreview={(v) => (onpreview(r, v), twin && onpreview(twin, v))} onchange={(v) => (onchange(r, v), twin && onchange(twin, v))} />
 {/snippet}
 
 {#snippet segmented(r: Row, options: { value: string; label: string; icon: IconComponent }[])}
@@ -385,7 +392,7 @@
           {:else}
           {@const from = pick.inherited?.[READS[r.name]]}
           <div class="row" class:inherited={from} class:differs={changed(r.name)} data-row={r.name} title={from ? `Inherited from ${from}` : undefined}>
-            <span class="label">{r.label}</span>
+            <span class="label">{r.label}{#if overrideOf(r.name)}<span class="override-dot inline" title={overrideOf(r.name)} aria-label={overrideOf(r.name)} data-override></span>{/if}</span>
             <div class="control reset-pair">
               {#if r.control === Control.Number}
                 {@render field(r, '', '', true)}
@@ -408,6 +415,15 @@
 </div>
 
 <style>
+  .override-dot.inline {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-left: 4px;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-accent);
+  }
+
   .properties {
     --label-w: 72px;
     font-size: var(--ui-text-sm);

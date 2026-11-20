@@ -19,6 +19,12 @@ describe('svgOfSource', () => {
     expect(svgOfSource(source)).toBe(ARROW);
   });
 
+  it('reads the node list passed to createLucideIcon', () => {
+    const source = `const ArrowRight = createLucideIcon("arrow-right", [\n  ["path", { d: "M5 12h14", key: "1ays0h" }],\n  ["path", { d: "m12 5 7 7-7 7", key: "xquz4c" }]\n]);`;
+
+    expect(svgOfSource(source)).toBe(ARROW);
+  });
+
   it('reads a lucide svelte component', () => {
     const source = `<script lang="ts">import Icon from '../Icon.svelte';\nconst iconNode = [["path", { "d": "M5 12h14" }], ["path", { "d": "m12 5 7 7-7 7" }]];\n</script>`;
 

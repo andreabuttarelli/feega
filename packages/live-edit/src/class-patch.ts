@@ -4,7 +4,7 @@ import { ElementState, variantOfState } from './element-state';
 
 export type LiveAt = { file: string; line: number; col: number };
 
-export type LiveChange = { prop: LiveProp; family?: string; value: string; side?: Side; was?: string; viewport?: number; state?: ElementState };
+export type LiveChange = { prop: LiveProp; family?: string; value: string; side?: Side; was?: string; viewport?: number; state?: ElementState; variant?: string };
 
 export type LivePatched = { files: FileChange[]; skipped: string[] };
 
@@ -39,19 +39,21 @@ export function openTagEnd(text: string, start: number): number {
   return -1;
 }
 
-function swapped(cls: string, rule: ClassRule, made: string, side: Side, viewport: number, state: ElementState): string {
+const joined = (...variants: (string | undefined)[]) => variants.filter(Boolean).join(':');
+
+function swapped(cls: string, rule: ClassRule, made: string, side: Side, viewport: number, state: ElementState, breakpoint?: string): string {
   const parts = cls.split(/(\s+)/);
-  const stateVariant = variantOfState(state);
-  if (stateVariant) {
-    return inVariant(parts, rule, made, side, stateVariant);
+  const variant = joined(breakpoint, variantOfState(state));
+  if (variant || breakpoint !== undefined) {
+    return inVariant(parts, rule, made, side, variant);
   }
   const at = activeIndex(parts, (utility) => rule.owns(utility, side), viewport);
   if (at < 0) {
     return [cls.trimEnd(), made].filter(Boolean).join(' ');
   }
-  const variant = variantOf(parts[at]);
-  const conflicting = parts.map((part, i) => (i !== at && part.trim() && variantOf(part) === variant && rule.owns(utilityOf(part), side) ? i : -1)).filter((i) => i >= 0);
-  parts[at] = made && variant ? `${variant}:${made}` : made;
+  const active = variantOf(parts[at]);
+  const conflicting = parts.map((part, i) => (i !== at && part.trim() && variantOf(part) === active && rule.owns(utilityOf(part), side) ? i : -1)).filter((i) => i >= 0);
+  parts[at] = made && active ? `${active}:${made}` : made;
   conflicting.forEach((i) => (parts[i] = ''));
   return parts.join('').replace(/\s{2,}/g, ' ').trim();
 }
@@ -59,7 +61,7 @@ function swapped(cls: string, rule: ClassRule, made: string, side: Side, viewpor
 function inVariant(parts: string[], rule: ClassRule, made: string, side: Side, variant: string): string {
   const owned = parts.map((part, i) => (part.trim() && variantOf(part) === variant && rule.owns(utilityOf(part), side) ? i : -1)).filter((i) => i >= 0);
   const [first, ...rest] = owned;
-  const token = made ? `${variant}:${made}` : '';
+  const token = made && variant ? `${variant}:${made}` : made;
   if (first === undefined) {
     return [parts.join('').trim(), token].filter(Boolean).join(' ');
   }
@@ -68,8 +70,7 @@ function inVariant(parts: string[], rule: ClassRule, made: string, side: Side, v
   return parts.join('').replace(/\s{2,}/g, ' ').trim();
 }
 
-function added(open: string, closing: number, attr: string, made: string, state: ElementState): string {
-  const variant = variantOfState(state);
+function added(open: string, closing: number, attr: string, made: string, variant: string): string {
   const token = variant && made ? `${variant}:${made}` : made;
   return token ? `${open.slice(0, closing).trimEnd()} ${attr}="${token}"${open.slice(closing)}` : open;
 }
@@ -97,7 +98,7 @@ async function classPatch(read: ReadFile, at: LiveAt, change: LiveChange, rule: 
   const made = reset ? '' : rule.make(change.value, side);
   const closing = open.endsWith('/>') ? open.length - 2 : open.length - 1;
   const attr = /\.(t|j)sx$/.test(at.file) ? 'className' : 'class';
-  const next = found ? open.replace(CLASS_ATTR, `$1"${swapped(found[3] ?? '', rule, made, side, change.viewport ?? 0, state)}"`) : added(open, closing, attr, made, state);
+  const next = found ? open.replace(CLASS_ATTR, `$1"${swapped(found[3] ?? '', rule, made, side, change.viewport ?? 0, state, change.variant)}"`) : added(open, closing, attr, made, joined(change.variant, variantOfState(state)));
   const after = source.slice(0, start) + next + source.slice(end + 1);
   return { files: after === source ? [] : [{ path: at.file, before: source, after }], skipped: [] };
 }

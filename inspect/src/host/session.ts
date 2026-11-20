@@ -19,6 +19,8 @@ import type { KeptServers } from './kept-servers';
 import { forget, remember, type Memo } from './orphans';
 import { Stored, type Platform } from './platform';
 import { stylingOf } from './styling';
+import { breakpointsOf } from './breakpoints';
+import { themesOf } from './themes';
 import { usageSession } from './usage';
 import { wiringOf } from './wiring';
 
@@ -198,7 +200,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       return;
     }
     const prefs = platform.stored<Prefs>(Stored.Prefs) ?? null;
-    await post({ kind: ToView.App, url: running.url, styling: await stylingOf(root, stylingChoice()), prefs, route });
+    await post({ kind: ToView.App, url: running.url, styling: await stylingOf(root, stylingChoice()), prefs, route, breakpoints: await breakpointsOf(root), themes: await themesOf(root) });
     await post({ kind: ToView.Server, state: ServerState.Running, info: infoOf(running) });
     await postSettings();
   }

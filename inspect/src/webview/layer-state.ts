@@ -6,6 +6,10 @@ export type SavedLayers = Record<string, Record<LayerFlag, string[]>>;
 
 type RouteLayers = Record<LayerFlag, Set<string>>;
 
+const HIDDEN_DISPLAY = 'none';
+
+export const hiddenHere = (node: { display: string }): boolean => node.display === HIDDEN_DISPLAY;
+
 const keyOf = (s: Source) => `${s.file}:${s.line}:${s.col}`;
 
 export function passThrough(pick: Pick, locked: Set<string>): Source | null {
