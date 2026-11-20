@@ -18,7 +18,7 @@ describe('literalText', () => {
     const out = await literalText(read, { file: FILE, line: 2, col: 3 }, 'Ship today');
 
     expect(out.ok).toBe(true);
-    const after = out.ok ? out.change.after : '';
+    const after = out.ok ? out.changes[0].after : '';
     expect(after.split('\n').filter((l, i) => l !== SOURCE.split('\n')[i])).toEqual(['    Ship today']);
   });
 
@@ -55,5 +55,60 @@ describe('literalText', () => {
     const out = await literalText(read, { file: FILE, line: 6, col: 3 }, 'x');
 
     expect(out.ok).toBe(false);
+  });
+
+  it('writes the new text into the constant a child reads', async () => {
+    const page = `const TITLE = 'Plan launches';\n\nexport const Hero = () => (\n  <h1>{TITLE}</h1>\n);\n`;
+    const out = await literalText(async () => page, { file: 'src/Hero.tsx', line: 4, col: 3 }, 'Plan better launches');
+
+    expect(out).toEqual({ ok: true, changes: [{ path: 'src/Hero.tsx', before: page, after: page.replace('Plan launches', 'Plan better launches') }] });
+  });
+
+  it('writes the new text into a constant imported from another file', async () => {
+    const page = `import { TITLE } from './copy';\nexport const Hero = () => <h1>{TITLE}</h1>;\n`;
+    const copy = `export const TITLE = "Plan launches";\n`;
+    const all: Record<string, string> = { 'src/Hero.tsx': page, 'src/copy.ts': copy };
+    const out = await literalText(async (p) => all[p] ?? null, { file: 'src/Hero.tsx', line: 2, col: 27 }, 'Ship');
+
+    expect(out).toEqual({ ok: true, changes: [{ path: 'src/copy.ts', before: copy, after: `export const TITLE = "Ship";\n` }] });
+  });
+
+  it('refuses text that comes from a prop', async () => {
+    const page = `export const Hero = ({ title }) => <h1>{title}</h1>;\n`;
+    const out = await literalText(async () => page, { file: 'src/Hero.tsx', line: 1, col: 37 }, 'x');
+
+    expect(out.ok).toBe(false);
+  });
+
+  it('refuses text read from a member of an object', async () => {
+    const page = `const PLANS = [{ name: 'a' }];\nexport const Hero = () => <h1>{PLANS[0].name}</h1>;\n`;
+    const out = await literalText(async () => page, { file: 'src/Hero.tsx', line: 2, col: 30 }, 'x');
+
+    expect(out.ok).toBe(false);
+  });
+
+  it('writes a changed segment between inline elements and leaves the rest', async () => {
+    const page = `<h1>Build <span class="hot">fast</span> today</h1>\n`;
+    const was = 'Build fast today';
+    const read = async () => page;
+    const inSpan = await literalText(read, { file: FILE, line: 1, col: 1 }, 'Build faster today', was);
+    const outside = await literalText(read, { file: FILE, line: 1, col: 1 }, 'Make fast today', was);
+
+    expect(inSpan.ok && inSpan.changes[0].after).toBe(`<h1>Build <span class="hot">faster</span> today</h1>\n`);
+    expect(outside.ok && outside.changes[0].after).toBe(`<h1>Make <span class="hot">fast</span> today</h1>\n`);
+  });
+
+  it('refuses a change that spans several segments', async () => {
+    const page = `<h1>Build <span>fast</span> today</h1>\n`;
+    const out = await literalText(async () => page, { file: FILE, line: 1, col: 1 }, 'Make slow today', 'Build fast today');
+
+    expect(out.ok).toBe(false);
+  });
+
+  it('writes a line break for a newline typed with shift enter', async () => {
+    const page = `<p>One two</p>\n`;
+    const out = await literalText(async () => page, { file: FILE, line: 1, col: 1 }, 'One\ntwo');
+
+    expect(out.ok && out.changes[0].after).toBe(`<p>One<br />two</p>\n`);
   });
 });

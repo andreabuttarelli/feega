@@ -4,6 +4,9 @@ import type { ReadFile } from './files';
 const FIRST_NAME = /^\{\s*(?:[#:@][a-z]+\s+)?([A-Za-z_$][\w$]*)/;
 const MODULE_EXTENSIONS = ['', '.ts', '.js', '.svelte.ts', '.svelte.js', '/index.ts', '/index.js'];
 
+const CONSTANT_NAME = /^\{\{?\s*([A-Za-z_$][\w$]*)\s*\}?\}$/;
+const literalDeclaration = (name: string) => new RegExp(`\\b(?:const|let|var)\\s+${name}\\s*(?::[^=]+)?=\\s*(['"\`])((?:\\\\.|(?!\\1)[^\\\\])*)\\1\\s*(?:as const)?\\s*[;\\n]`);
+
 const declaration = (name: string) => new RegExp(`\\b(?:const|let|var|function)\\s+(${name})\\b`);
 const importOf = (name: string) => new RegExp(`import\\s*\\{[^}]*\\b${name}\\b[^}]*\\}\\s*from\\s*['"](\\.{1,2}/[^'"]+)['"]`);
 
@@ -62,3 +65,37 @@ export async function dataSource(read: ReadFile, file: string, text: string, exp
 }
 
 export const dataReason = (data: DataSource) => `This text comes from data: \`${data.name}\` (${nameOf(data.at.file)}:${data.at.line}).`;
+
+export type StringLiteral = { path: string; text: string; start: number; end: number; quote: string; value: string };
+
+function literalIn(text: string, path: string, name: string): StringLiteral | null {
+  const found = literalDeclaration(name).exec(text);
+  if (!found || (found[1] === '`' && found[2].includes('${'))) {
+    return null;
+  }
+  const start = found.index + found[0].indexOf(found[1]) + 1;
+  return { path, text, start, end: start + found[2].length, quote: found[1], value: found[2] };
+}
+
+export async function stringLiteral(read: ReadFile, file: string, text: string, expression: string): Promise<StringLiteral | null> {
+  const name = expression.match(CONSTANT_NAME)?.[1];
+  if (!name || name.includes('$')) {
+    return null;
+  }
+  const own = literalIn(text, file, name);
+  if (own) {
+    return own;
+  }
+  const from = text.match(importOf(name));
+  if (!from) {
+    return null;
+  }
+  const base = joined(dirOf(file), from[1]);
+  for (const extension of MODULE_EXTENSIONS) {
+    const body = await read(base + extension);
+    if (body !== null) {
+      return literalIn(body, base + extension, name);
+    }
+  }
+  return null;
+}

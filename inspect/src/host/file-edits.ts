@@ -98,8 +98,11 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
       return { ok: false, reason: `${ask.at} is not a file:line:col inside the workspace` };
     }
     if (ask.prop === LiveProp.Text) {
-      const out = await literalText(reader(root), at, ask.value ?? '');
-      return out.ok ? written([out.change], '') : out;
+      const out = await literalText(reader(root), at, ask.value ?? '', ask.was);
+      if (!out.ok) {
+        return out;
+      }
+      return out.changes.length ? written(out.changes, '') : { ok: true, path: at.file, written: '' };
     }
 
     if ((await stylingOf(root, choice())) === Styling.Css) {
