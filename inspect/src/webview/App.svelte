@@ -315,7 +315,8 @@
   }
 
   function showTheme() {
-    bridge.theme(themes.map((t) => t.apply), activeApply(themes, themeName));
+    const plain = $state.snapshot(themes);
+    bridge.theme(plain.map((t) => t.apply), activeApply(plain, themeName));
   }
 
   function chooseTheme(name: string) {
