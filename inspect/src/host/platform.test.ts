@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -102,6 +102,17 @@ describe('the node platform on disk', () => {
 
     expect(JSON.parse(readFileSync(join(root, '.feega/settings.json'), 'utf8'))).toEqual({ [SettingKey.DevCommand]: 'pnpm dev' });
     expect(make().settings()[SettingKey.DevCommand]).toBe('pnpm dev');
+  });
+
+  it('keeps state outside the project tree', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'feega-state-'));
+    const cache = mkdtempSync(join(tmpdir(), 'feega-cache-'));
+    const make = () => nodePlatform({ root, launcher: '', version: '', transport: { send: () => undefined, receive: () => undefined }, print: () => undefined, launch: async () => false, env: { XDG_CACHE_HOME: cache } });
+
+    await make().store(Stored.Prefs, { size: 'phone' });
+
+    expect(existsSync(join(root, '.feega/state.json'))).toBe(false);
+    expect(make().stored(Stored.Prefs)).toEqual({ size: 'phone' });
   });
 
   it('opens a source in VS Code at its line, else prints where it is', async () => {

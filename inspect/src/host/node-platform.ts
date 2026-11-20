@@ -1,8 +1,9 @@
 import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { mkdtemp, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
+import { createHash } from 'node:crypto';
+import { homedir, tmpdir } from 'node:os';
+import { basename, dirname, join } from 'node:path';
 import { settingsWith, type SettingValue } from '../settings';
 import { openTarget } from './open-source';
 import type { Platform, Stored, Transport } from './platform';
@@ -10,6 +11,8 @@ import type { Platform, Stored, Transport } from './platform';
 const FEEGA_DIR = '.feega';
 const SETTINGS_FILE = 'settings.json';
 const STATE_FILE = 'state.json';
+const CACHE_DIR = 'feega';
+const STATE_KEY_LENGTH = 16;
 const OPENERS: Partial<Record<NodeJS.Platform, string[]>> = { darwin: ['open'], win32: ['cmd', '/c', 'start', ''] };
 const LINUX_OPENER = ['xdg-open'];
 
@@ -32,15 +35,21 @@ const readJson = (path: string): Record<string, unknown> => {
   }
 };
 
+const stateDirFor = (root: string, env: NodeJS.ProcessEnv) => {
+  const key = createHash('sha256').update(root).digest('hex').slice(0, STATE_KEY_LENGTH);
+  return join(env.XDG_CACHE_HOME || join(homedir(), '.cache'), CACHE_DIR, key);
+};
+
 export function nodePlatform({ root, launcher, version, transport, print, launch = launchDetached, env = process.env }: NodeHost): Platform {
   const dir = join(root, FEEGA_DIR);
   const settingsPath = join(dir, SETTINGS_FILE);
-  const statePath = join(dir, STATE_FILE);
+  const stateDir = stateDirFor(root, env);
+  const statePath = join(stateDir, STATE_FILE);
   const settings = readJson(settingsPath) as Record<string, SettingValue>;
   const state = readJson(statePath);
 
   const save = async (path: string, value: object) => {
-    mkdirSync(dir, { recursive: true });
+    mkdirSync(dirname(path), { recursive: true });
     await writeFile(path, `${JSON.stringify(value, null, 2)}\n`);
   };
 
