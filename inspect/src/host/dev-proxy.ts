@@ -3,6 +3,7 @@ import { createServer, request, type IncomingMessage, type ServerResponse } from
 import { connect } from 'node:net';
 import { join } from 'node:path';
 import bridgeFiles from './bridge-files.json';
+import { FeegaServer, feegaHeaders } from './feega-server';
 
 export const BRIDGE_PATH = '/__feega/';
 
@@ -22,28 +23,28 @@ export function withBridge(html: string): string {
 async function serveBridge(dir: string, name: string, res: ServerResponse) {
   const body = BRIDGE_FILES.has(name) ? await readFile(join(dir, name)).catch(() => null) : null;
   if (!body) {
-    res.writeHead(404).end();
+    res.writeHead(404, feegaHeaders(FeegaServer.Proxy)).end();
     return;
   }
-  res.writeHead(200, { 'content-type': 'text/javascript', 'cache-control': 'no-store' }).end(body);
+  res.writeHead(200, { 'content-type': 'text/javascript', 'cache-control': 'no-store', ...feegaHeaders(FeegaServer.Proxy) }).end(body);
 }
 
 function forward(target: URL, req: IncomingMessage, res: ServerResponse) {
   const headers = { ...req.headers, host: target.host, 'accept-encoding': 'identity' };
   const upstream = request({ host: target.hostname, port: target.port, path: req.url, method: req.method, headers }, (reply) => {
     if (!HTML.test(String(reply.headers['content-type'] ?? ''))) {
-      res.writeHead(reply.statusCode ?? 502, reply.headers);
+      res.writeHead(reply.statusCode ?? 502, { ...reply.headers, ...feegaHeaders(FeegaServer.Proxy) });
       reply.pipe(res);
       return;
     }
     const chunks: Buffer[] = [];
     reply.on('data', (c: Buffer) => chunks.push(c));
     reply.on('end', () => {
-      const headers = Object.fromEntries(Object.entries(reply.headers).filter(([k]) => !DROPPED.includes(k)));
+      const headers = { ...Object.fromEntries(Object.entries(reply.headers).filter(([k]) => !DROPPED.includes(k))), ...feegaHeaders(FeegaServer.Proxy) };
       res.writeHead(reply.statusCode ?? 200, headers).end(withBridge(Buffer.concat(chunks).toString('utf8')));
     });
   });
-  upstream.on('error', () => res.writeHead(502).end());
+  upstream.on('error', () => res.writeHead(502, feegaHeaders(FeegaServer.Proxy)).end());
   req.pipe(upstream);
 }
 
