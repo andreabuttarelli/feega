@@ -1,4 +1,6 @@
 export const SOURCE_ATTR = 'data-feega-src';
+export const ICON_ATTR = 'data-feega-icon';
+const BOOKKEEPING_ATTRS = new Set([SOURCE_ATTR, ICON_ATTR]);
 
 const DEFAULT_MAX_HTML = 2000;
 const TEXT_NODE = 3;
@@ -139,7 +141,7 @@ function inspectTagged(tagged, maxHtml) {
     classCount: tagged.classList?.[0] ? tagged.ownerDocument.getElementsByClassName(tagged.classList[0]).length : 0,
     parentWidth: tagged.parentElement?.getBoundingClientRect().width ?? 0,
     ancestors: ancestorsOf(tagged),
-    attributes: [...tagged.attributes].filter((a) => a.name !== SOURCE_ATTR).map(({ name, value }) => ({ name, value })),
+    attributes: [...tagged.attributes].filter((a) => !BOOKKEEPING_ATTRS.has(a.name)).map(({ name, value }) => ({ name, value })),
     ownText: [...tagged.childNodes].some((n) => n.nodeType === TEXT_NODE && n.textContent.trim()),
     elements: tagged.children.length,
     inlineText: inlineTextOnly(tagged),
@@ -303,6 +305,10 @@ const fileOf = (element) => parseSource(element.getAttribute(SOURCE_ATTR))?.file
 const componentName = (file) => file.split('/').pop().replace(/\.[^.]+$/, '');
 
 export function nameOf(element) {
+  const icon = element.getAttribute(ICON_ATTR);
+  if (icon) {
+    return icon;
+  }
   const parent = taggedParent(element);
   if (parent && fileOf(parent) !== fileOf(element)) {
     return componentName(fileOf(element));
