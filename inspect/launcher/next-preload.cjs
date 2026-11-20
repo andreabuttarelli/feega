@@ -9,7 +9,7 @@ const MAPPED_FILE = /\.(jsx|tsx)$/;
 
 function withSource(config, dir) {
   const loader = { loader: LOADER, options: { root: dir } };
-  const rules = Object.fromEntries(MAPPED.map((glob) => [glob, { loaders: [loader], as: glob }]));
+  const rules = Object.fromEntries(MAPPED.map((glob) => [glob, { loaders: [loader] }]));
   const webpack = config.webpack;
   return {
     ...config,

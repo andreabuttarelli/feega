@@ -24,6 +24,7 @@ const HANDLER_ATTRIBUTE = /onClick|onclick|@click/;
 const GO_PAGE_CODE = /(goto\(|location\.href = |\$router\.push\()'\/pricing'/;
 const OPEN_WAIT_MS = 5000;
 const OPEN_POLL_MS = 250;
+const CLIENT_PAGE_MS = 60_000;
 const printed = [];
 
 const git = (...args) => execFileSync('git', ['-C', APP, ...args], { encoding: 'utf8' });
@@ -420,6 +421,24 @@ try {
       await page.keyboard.press('Enter');
       await page.waitForTimeout(SETTLE_MS);
       await undoAll();
+    });
+  }
+
+  if (NEXT) {
+    await check('a use client page renders, hydrates and lists its layers', async () => {
+      const address = page.getByTestId('address');
+      await address.fill('/client');
+      await address.press('Enter');
+      await frame.locator('#client-title').waitFor({ timeout: CLIENT_PAGE_MS });
+      await frame.locator('#count').click();
+      await frame.getByText('Clicked 1').waitFor({ timeout: CLIENT_PAGE_MS });
+      await frame.locator('#client-title').click();
+      await page.waitForTimeout(800);
+      const picked = await page.locator('[data-testid="layers"] [data-layer][aria-selected="true"]').count();
+      assert.equal(picked, 1, 'the client page elements are selectable');
+      await address.fill('/');
+      await address.press('Enter');
+      await frame.locator('h1').first().waitFor({ timeout: CLIENT_PAGE_MS });
     });
   }
 
