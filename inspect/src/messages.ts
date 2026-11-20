@@ -6,6 +6,9 @@ import type { Usage } from '@feega/live-edit/move-usage';
 import type { StructureOp } from '@feega/live-edit/structure';
 import type { Scope } from '@feega/live-edit/scoped-rule';
 import type { PageTarget } from '@feega/live-edit/page-rule';
+import type { EventHandler } from '@feega/live-edit/event-handlers';
+import type { GoAsk } from '@feega/live-edit/go-action';
+import type { LinkEdit, LinkRead } from '@feega/live-edit/link-edit';
 import type { ReportFacts, SettingKey, SettingValue, Settings } from './settings';
 
 export enum IconSource {
@@ -82,6 +85,8 @@ export enum ServerAction {
 
 export type ServerInfo = { url: string; framework: string; command: string; pid: number | null; port: number; attached: boolean; startedAt: number; lastError: string; keptMinutes: number };
 
+export type Wiring = { link: LinkRead | null; events: EventHandler[]; routes: string[] };
+
 export type ColourPick = { css: string; token?: string };
 
 export type FontChoice = { family: string; google: boolean };
@@ -124,7 +129,10 @@ export enum ToHost {
   SignOut = 'sign-out',
   OnboardingDone = 'onboarding-done',
   ImageChoose = 'image-choose',
-  ImageUpload = 'image-upload'
+  ImageUpload = 'image-upload',
+  Wiring = 'wiring',
+  Link = 'link',
+  Go = 'go'
 }
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number };
@@ -143,7 +151,8 @@ export enum ToView {
   IconResults = 'icon-results',
   Account = 'account',
   Onboarding = 'onboarding',
-  ImageSaved = 'image-saved'
+  ImageSaved = 'image-saved',
+  Wiring = 'wiring'
 }
 
 export enum Onboarding {
@@ -189,7 +198,10 @@ export type HostMessage =
   | { kind: ToHost.SignOut }
   | { kind: ToHost.OnboardingDone }
   | { kind: ToHost.ImageChoose }
-  | { kind: ToHost.ImageUpload; name: string; data: string };
+  | { kind: ToHost.ImageUpload; name: string; data: string }
+  | { kind: ToHost.Wiring; at: string }
+  | { kind: ToHost.Link; at: string; edit: LinkEdit }
+  | { kind: ToHost.Go; at: string; ask: GoAsk };
 
 export type ViewMessage =
   | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string }
@@ -203,7 +215,8 @@ export type ViewMessage =
   | { kind: ToView.IconResults; id: number; library: string | null; hits: IconHit[]; error?: string }
   | { kind: ToView.Account; state: AccountState; email?: string }
   | { kind: ToView.Onboarding; state: Onboarding }
-  | { kind: ToView.ImageSaved; url: string };
+  | { kind: ToView.ImageSaved; url: string }
+  | { kind: ToView.Wiring; at: string; wiring: Wiring };
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';

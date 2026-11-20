@@ -18,6 +18,8 @@ import { styleAttr, type Css } from '@feega/live-edit/style-attr';
 import { detectLibrary } from '@feega/live-edit/icon-library';
 import { swapIcon } from '@feega/live-edit/icon-swap';
 import { svgMarkup } from '@feega/live-edit/svg-markup';
+import { addGo, type GoAsk } from '@feega/live-edit/go-action';
+import { linkWrite, type LinkEdit } from '@feega/live-edit/link-edit';
 import { Styling, type EditAsk } from '../messages';
 import { StylingChoice } from '../settings';
 import { stylingOf } from './styling';
@@ -165,6 +167,31 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return out.ok ? writtenAll(out.changes, '') : out;
   }
 
+  const placed = (rawAt: string): LiveAt | null => {
+    const at = liveAtOf(rawAt);
+    return at && inside(root, at.file) ? at : null;
+  };
+
+  async function linkWritten(rawAt: string, edit: LinkEdit): Promise<Written> {
+    meta = { at: rawAt, prop: 'link', value: 'href' in edit ? edit.href : edit.opens, scope: '' };
+    const at = placed(rawAt);
+    if (!at) {
+      return { ok: false, reason: `${rawAt} is not a file:line:col inside the workspace` };
+    }
+    const out = await linkWrite(reader(root), at, edit);
+    return out.ok ? writtenAll(out.changes, '') : out;
+  }
+
+  async function goWritten(rawAt: string, ask: GoAsk): Promise<Written> {
+    meta = { at: rawAt, prop: 'go', value: `${ask.go} ${ask.target}`, scope: '' };
+    const at = placed(rawAt);
+    if (!at) {
+      return { ok: false, reason: `${rawAt} is not a file:line:col inside the workspace` };
+    }
+    const out = await addGo(reader(root), at, ask);
+    return out.ok ? writtenAll(out.changes, '') : out;
+  }
+
   const put = (full: string, text: string) => (text === '' ? rm(full, { force: true }) : writeFile(full, text));
 
   async function replay(from: Step[], to: Step[], expect: 'before' | 'after', write: 'before' | 'after', empty: string): Promise<Written> {
@@ -248,6 +275,8 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     icon: (at: string, name: string) => inTurn(() => iconSwapped(at, name)),
     svg: (at: string, markup: string, inner?: string) => inTurn(() => svgWritten(at, markup, inner)),
     font: (ask: EditAsk, google: boolean) => inTurn(() => fontEdited(ask, google)),
+    link: (at: string, edit: LinkEdit) => inTurn(() => linkWritten(at, edit)),
+    go: (at: string, ask: GoAsk) => inTurn(() => goWritten(at, ask)),
     undo: () => inTurn(undoStep),
     redo: () => inTurn(redoStep),
     history: (): Change[] => log.map((c) => ({ ...c })),

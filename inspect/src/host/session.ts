@@ -17,6 +17,7 @@ import type { KeptServers } from './kept-servers';
 import { forget, remember, type Memo } from './orphans';
 import { Stored, type Platform } from './platform';
 import { stylingOf } from './styling';
+import { wiringOf } from './wiring';
 
 const PICK_TIMEOUT_MS = 3000;
 const LATER_EDITS = 'later edits depend on this change: undo them first';
@@ -136,6 +137,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   async function signOut() {
     await platform.account.clear();
     await postAccount(AccountState.SignedOut);
+  }
+
+  async function wiringShown(at: string) {
+    await post({ kind: ToView.Wiring, at, wiring: await wiringOf(root, at) });
   }
 
   const edit = (ask: EditAsk) => edits.edit(ask).then((out) => edited(out, ask));
@@ -381,7 +386,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.SignOut]: signOut,
     [ToHost.OnboardingDone]: () => platform.onboarding.markSeen(),
     [ToHost.ImageChoose]: imageChosen,
-    [ToHost.ImageUpload]: (m) => imageSaved(m.name, Buffer.from(m.data, 'base64'))
+    [ToHost.ImageUpload]: (m) => imageSaved(m.name, Buffer.from(m.data, 'base64')),
+    [ToHost.Wiring]: (m) => wiringShown(m.at),
+    [ToHost.Link]: (m) => edits.link(m.at, m.edit).then((out) => edited(out, null)),
+    [ToHost.Go]: (m) => edits.go(m.at, m.ask).then((out) => edited(out, null))
   };
 
   platform.receive((message) => (handlers[message.kind] as (m: HostMessage) => unknown)(message));
