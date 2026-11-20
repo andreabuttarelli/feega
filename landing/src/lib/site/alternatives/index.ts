@@ -1,5 +1,6 @@
 import { ArticleKind, type Article } from './alternative';
 import { ROUNDUPS } from './roundups';
+import { RICH } from './rich';
 import { SINGLES } from './singles';
 
 export const ALTERNATIVES_PATH = '/alternatives';
@@ -24,7 +25,13 @@ export const TRY_STEPS: readonly string[] = [
   'See the diff in Changes, then keep it or undo it.'
 ];
 
-export const ALTERNATIVES: Readonly<Record<string, Article>> = { ...ROUNDUPS, ...SINGLES };
+const withRich = ([slug, article]: [string, Article]): [string, Article] => {
+  const rich = RICH[slug];
+
+  return [slug, { ...article, rich, sections: article.sections.filter((s) => !rich?.highlights.some((h) => h.heading === s.heading)), questions: [...article.questions, ...(rich?.moreQuestions ?? [])] }];
+};
+
+export const ALTERNATIVES: Readonly<Record<string, Article>> = Object.fromEntries(Object.entries({ ...ROUNDUPS, ...SINGLES }).map(withRich));
 
 export const alternativePath = (slug: string) => `${ALTERNATIVES_PATH}/${slug}`;
 

@@ -2,6 +2,7 @@
   import '$lib/site/landing/landing.css';
   import '$lib/site/alternatives/alternatives.css';
   import './topics.css';
+  import CatalogLayout from '../catalog/CatalogLayout.svelte';
   import { AUTHOR } from '$lib/site/alternatives';
   import { lower } from '$lib/site/lower';
   import { HUBS } from '.';
@@ -19,6 +20,7 @@
   <meta property="og:description" content={hub.description} />
 </svelte:head>
 
+<CatalogLayout path={hub.path}>
 <article class="landing compare topic">
   <h1>{lower(hub.heading)}</h1>
   <p class="fine">By {AUTHOR.name}, {AUTHOR.role}</p>
@@ -38,3 +40,4 @@
     <p><a href={other.path}>{lower(other.heading)} →</a></p>
   {/each}
 </article>
+</CatalogLayout>
