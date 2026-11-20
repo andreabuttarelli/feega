@@ -29,6 +29,7 @@
   let { nodes, picked, depth = 0, open, onselect, onhover, onopen, onmove, dragging, hidden, locked, ontoggle }: Props = $props();
 
   const INDENT_PX = 12;
+  const EDGE_BAND = 0.25;
   const key = (n: LayerNode) => (n.source ? sourceText(n.source) : `group:${n.name}`);
   const isPicked = (n: LayerNode) => picked !== null && n.source !== null && sourceText(picked.source) === sourceText(n.source);
   const actions = (n: LayerNode) => actionsOf(roleOf({ tag: n.tag, ownText: false, inlineText: false, elements: n.children.length, display: n.display }));
@@ -57,7 +58,8 @@
     }
     const row = e.currentTarget as HTMLElement;
     const { top, height } = row.getBoundingClientRect();
-    onmove(from, node.source, e.clientY < top + height / 2 ? Place.Before : Place.After);
+    const ratio = (e.clientY - top) / height;
+    onmove(from, node.source, ratio < EDGE_BAND ? Place.Before : ratio > 1 - EDGE_BAND ? Place.After : Place.Inside);
   }
 </script>
 

@@ -1,6 +1,7 @@
 import { offsetOf, type LiveAt } from './class-patch';
 import type { ReadFile } from './files';
 import type { TextWritten } from './literal-text';
+import { moveInto, type Structured } from './move-into';
 import { hiddenOut, lineSpan, parentOf, repeated, spanOf, type Span } from './move-node';
 
 type Found = { source: string; whole: Span };
@@ -48,14 +49,18 @@ export const duplicateNode = (read: ReadFile, at: LiveAt) => rewritten(read, at,
 
 export enum StructureOp {
   Delete = 'delete',
-  Duplicate = 'duplicate'
+  Duplicate = 'duplicate',
+  MoveInto = 'move-into'
 }
 
-export type StructureRequest = { op: StructureOp; at: LiveAt };
+export type StructureRequest = { op: StructureOp; at: LiveAt; to?: LiveAt };
 
-const OPS: Record<StructureOp, (read: ReadFile, req: StructureRequest) => Promise<TextWritten>> = {
-  [StructureOp.Delete]: (read, req) => deleteNode(read, req.at),
-  [StructureOp.Duplicate]: (read, req) => duplicateNode(read, req.at)
+const single = (out: TextWritten): Structured => (out.ok ? { ok: true, changes: [out.change] } : out);
+
+const OPS: Record<StructureOp, (read: ReadFile, req: StructureRequest) => Promise<Structured>> = {
+  [StructureOp.Delete]: async (read, req) => single(await deleteNode(read, req.at)),
+  [StructureOp.Duplicate]: async (read, req) => single(await duplicateNode(read, req.at)),
+  [StructureOp.MoveInto]: async (read, req) => (req.to ? moveInto(read, req.at, req.to) : { ok: false, reason: 'no target container' })
 };
 
 export const structure = (read: ReadFile, req: StructureRequest) => OPS[req.op](read, req);

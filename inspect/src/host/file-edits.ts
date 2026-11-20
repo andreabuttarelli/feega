@@ -206,14 +206,15 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return out.ok ? writtenAll([out.change], '') : out;
   }
 
-  async function restructured(op: StructureOp, rawAt: string): Promise<Written> {
-    meta = { at: rawAt, prop: op, value: '', scope: '' };
+  async function restructured(op: StructureOp, rawAt: string, rawTo?: string): Promise<Written> {
+    meta = { at: rawAt, prop: op, value: rawTo ?? '', scope: '' };
     const at = liveAtOf(rawAt);
+    const to = rawTo ? (liveAtOf(rawTo) ?? undefined) : undefined;
     if (!at || !inside(root, at.file)) {
       return { ok: false, reason: `${rawAt} is not a file:line:col inside the workspace` };
     }
-    const out = await structure(reader(root), { op, at });
-    return out.ok ? writtenAll([out.change], '') : out;
+    const out = await structure(reader(root), { op, at, to });
+    return out.ok ? writtenAll(out.changes, '', out.note) : out;
   }
 
   async function variableSaved(ask: EditAsk, name: string): Promise<Written> {
@@ -232,7 +233,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
 
   return {
     saveVariable: (ask: EditAsk, name: string) => inTurn(() => variableSaved(ask, name)),
-    structure: (req: { op: StructureOp; at: string }) => inTurn(() => restructured(req.op, req.at)),
+    structure: (req: { op: StructureOp; at: string; to?: string }) => inTurn(() => restructured(req.op, req.at, req.to)),
     move: (from: string, to: string, place: Place) => inTurn(() => moved(from, to, place)),
     edit: (ask: EditAsk) => inTurn(() => edited(ask)),
     icon: (at: string, name: string) => inTurn(() => iconSwapped(at, name)),

@@ -317,4 +317,15 @@ describe('fileEdits', () => {
     await edits.undo();
     expect(read(root)).toBe(PAGE);
   });
+
+  it('spostare dentro un altro contenitore e un solo passo di undo', async () => {
+    const root = app();
+    writeFileSync(join(root, 'src/Page.svelte'), '<div>\n  <p>a</p>\n</div>\n<section>\n</section>\n');
+    const edits = fileEdits(root);
+    await edits.structure({ op: StructureOp.MoveInto, at: 'src/Page.svelte:2:3', to: 'src/Page.svelte:4:1' });
+
+    expect(read(root)).toBe('<div>\n</div>\n<section>\n  <p>a</p>\n</section>\n');
+    await edits.undo();
+    expect(read(root)).toBe('<div>\n  <p>a</p>\n</div>\n<section>\n</section>\n');
+  });
 });

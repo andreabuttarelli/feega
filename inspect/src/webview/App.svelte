@@ -36,6 +36,7 @@
   import { Group, ROWS, type Hint, type Row } from './controls';
   import { hintBoxes } from './hint-boxes';
   import { dropOf, type Drop } from './reorder';
+  import { Place } from '@feega/live-edit/move-node';
   import { StructureOp } from '@feega/live-edit/structure';
   import StructureMenu from './StructureMenu.svelte';
   import { modeOfKey } from './modes';
@@ -313,6 +314,9 @@
       problem = null;
       saved = m.saved ?? null;
       warning = m.note ?? '';
+      if (m.note) {
+        showToast(m.note);
+      }
       server = ServerState.Reloading;
       setTimeout(() => {
         server = bridged ? ServerState.Running : server;
@@ -518,6 +522,14 @@
     }
   }
 
+  function moveLayer(from: Source, to: Source, place: Place) {
+    if (place === Place.Inside) {
+      toHost({ kind: ToHost.Structure, op: StructureOp.MoveInto, at: sourceText(from), to: sourceText(to) });
+      return;
+    }
+    toHost({ kind: ToHost.Move, from: sourceText(from), to: sourceText(to), place });
+  }
+
   function restructure(op: StructureOp) {
     if (!picked) {
       return;
@@ -596,7 +608,7 @@
   <aside class="left" class:closed={leftClosed}>
     <header class="left-head">Layers</header>
     <div class="layers" role="tree" aria-label="Layers" data-testid="layers">
-      <LayersTree nodes={layers} {picked} open={layersOpen} onselect={select} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={(from, to, place) => toHost({ kind: ToHost.Move, from: sourceText(from), to: sourceText(to), place })} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} />
+      <LayersTree nodes={layers} {picked} open={layersOpen} onselect={select} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} />
     </div>
     {#if !leftClosed}<span class="edge-right" role="separator" aria-orientation="vertical" aria-label="Resize Layers" title="Drag to resize, double-click to reset" onpointerdown={(e) => ((e.currentTarget as HTMLElement).setPointerCapture(e.pointerId), (leftSizing = { x: e.clientX, width: leftPx }))} onpointermove={(e) => leftSizing && (leftWidth = leftSizing.width + (e.clientX - leftSizing.x))} onpointerup={() => leftSizing && ((leftSizing = null), (leftWidth = leftPx), savePrefs())} ondblclick={() => ((leftWidth = LEFT_DEFAULT_PX), savePrefs())}></span>{/if}
   </aside>

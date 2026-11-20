@@ -236,6 +236,21 @@ try {
     assert.deepEqual(changedFiles(), [], 'undo restores the element');
   });
 
+  await check('dragging a layer onto another container moves it there, keeps its classes, and one undo restores it', async () => {
+    await frame.locator('h1').first().click();
+    await page.waitForTimeout(800);
+    const layers = page.locator('[data-testid="layers"] [data-layer]');
+    const title = layers.filter({ hasText: /^\s*h1/ }).first();
+    const grid = layers.filter({ hasText: /^\s*section/ }).first();
+    const classes = await frame.locator('h1').first().getAttribute('class');
+    await title.dragTo(grid, { targetPosition: { x: 60, y: 13 } });
+    await page.waitForTimeout(SETTLE_MS);
+    assert.equal(await frame.locator('section > h1').count(), 1, 'the title is inside the section');
+    assert.equal(await frame.locator('section > h1').first().getAttribute('class'), classes, 'the classes travelled with it');
+    await undo();
+    assert.deepEqual(changedFiles(), [], 'undo restores the page');
+  });
+
   await check('position: absolute and top write the source and the page, the layer is tagged, and each edit is one undo', async () => {
     const h1 = frame.locator('h1').first();
     await h1.click();

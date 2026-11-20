@@ -164,7 +164,7 @@ export type HostMessage =
   | { kind: ToHost.Prefs; prefs: Prefs }
   | { kind: ToHost.Setting; key: SettingKey; value: SettingValue }
   | { kind: ToHost.Move; from: string; to: string; place: Place }
-  | { kind: ToHost.Structure; op: StructureOp; at: string }
+  | { kind: ToHost.Structure; op: StructureOp; at: string; to?: string }
   | { kind: ToHost.Server; action: ServerAction }
   | { kind: ToHost.Redo }
   | { kind: ToHost.Font; ask: EditAsk; google: boolean }

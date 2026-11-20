@@ -352,7 +352,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Diff]: (m) => showDiff(m.id),
     [ToHost.SourceControl]: () => platform.sourceControl(),
     [ToHost.Move]: (m) => edits.move(m.from, m.to, m.place).then((out) => edited(out, null)),
-    [ToHost.Structure]: (m) => edits.structure({ op: m.op, at: m.at }).then((out) => edited(out, null)),
+    [ToHost.Structure]: (m) => edits.structure({ op: m.op, at: m.at, to: m.to }).then((out) => edited(out, null)),
     [ToHost.Setting]: (m) => platform.setSetting(m.key, m.value).then(postSettings),
     [ToHost.AttachUrl]: (m) => attachUrl(m.url),
     [ToHost.AddPlugin]: installPlugin,

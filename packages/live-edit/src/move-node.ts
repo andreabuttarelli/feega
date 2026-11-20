@@ -4,7 +4,8 @@ import type { TextWritten } from './literal-text';
 
 export enum Place {
   Before = 'before',
-  After = 'after'
+  After = 'after',
+  Inside = 'inside'
 }
 
 export type Span = { start: number; end: number };
