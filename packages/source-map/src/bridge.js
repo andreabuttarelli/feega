@@ -30,6 +30,7 @@ export const Mode = { Navigate: 'navigate', Design: 'design' };
 
 const INSTALLED = Symbol.for('feega.source-map.bridge');
 const EDITABLE = 'plaintext-only';
+const TREE_REFRESH_MS = 150;
 
 export function installBridge(win) {
   if (win[INSTALLED]) {
@@ -40,9 +41,32 @@ export function installBridge(win) {
   const doc = win.document;
   let mode = Mode.Navigate;
   const unsaved = new Map();
+  let treeWanted = false;
+  let treeTimer = null;
+  let treeSent = '';
   let reply = (message) => win.parent?.postMessage(message, '*');
   const scroll = keepScroll(win);
   const tracker = trackRects(win, (slot, rect) => reply({ type: TRACKED, slot, rect }));
+
+  function sendTree() {
+    stampSources(doc);
+    const tree = treeOf(doc);
+    treeSent = JSON.stringify(tree);
+    reply({ type: TREE_RESULT, tree });
+  }
+
+  function refreshTree() {
+    if (!treeWanted || treeTimer) {
+      return;
+    }
+    treeTimer = win.setTimeout(() => {
+      treeTimer = null;
+      stampSources(doc);
+      if (JSON.stringify(treeOf(doc)) !== treeSent) {
+        sendTree();
+      }
+    }, TREE_REFRESH_MS);
+  }
 
   const handlers = {
     [PREVIEW]: (request) => previewEdit(doc, request),
@@ -54,8 +78,8 @@ export function installBridge(win) {
     [LEAVE]: () => scroll.leave(),
     [TRACK]: (request) => tracker.follow(request.slot, request.source),
     [TREE]: () => {
-      stampSources(doc);
-      reply({ type: TREE_RESULT, tree: treeOf(doc) });
+      treeWanted = true;
+      sendTree();
     },
     [SCROLL]: (request) => {
       win.scrollBy(request.dx, request.dy);
@@ -80,7 +104,7 @@ export function installBridge(win) {
     handle(event.data);
   });
 
-  new win.MutationObserver(() => keepPreviews(doc)).observe(doc.documentElement, { childList: true, subtree: true });
+  new win.MutationObserver(() => (keepPreviews(doc), refreshTree())).observe(doc.documentElement, { childList: true, subtree: true });
 
   reportRoutes(win);
   win.parent?.postMessage({ type: READY, path: win.location.pathname + win.location.search, restored: scroll.restored }, '*');

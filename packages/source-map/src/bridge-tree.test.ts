@@ -92,3 +92,20 @@ describe('moving the selection', () => {
     expect(ask('next', 'src/lib/Hero.svelte:4:3')).toBeNull();
   });
 });
+
+describe('a tree asked before the app rendered', () => {
+  it('is sent again once the page fills in', async () => {
+    const win = new JSDOM('<body><div id="root"></div></body>').window;
+    installBridge(win as unknown as Window);
+    const replies: { type: string; tree?: { children: { children: unknown[] }[] }[] }[] = [];
+    const parent = { postMessage: (data: { type: string }) => replies.push(data) };
+    win.dispatchEvent(new win.MessageEvent('message', { data: { type: 'feega:tree' }, source: parent as unknown as Window }));
+    win.document.getElementById('root')!.innerHTML = '<main data-feega-src="src/App.jsx:3:5">hi</main>';
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const trees = replies.filter((r) => r.type === 'feega:tree:result');
+    const last = trees.at(-1)!.tree![0];
+    expect(trees.length).toBeGreaterThan(1);
+    expect(JSON.stringify(last)).toContain('src/App.jsx');
+  });
+});
