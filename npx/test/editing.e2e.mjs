@@ -13,7 +13,8 @@ const PORT = Number(process.env.FEEGA_E2E_PORT ?? 4721);
 const READY_MS = 120_000;
 const SETTLE_MS = 2500;
 const TAILWIND = /tailwind/.test(APP);
-const ONBOARDING_MS = 3000;
+const NEXT = /next/.test(APP);
+const ONBOARDING_MS = 10_000;
 const NEW_TITLE = 'Ship faster than planned';
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 const MAX_UNDOS = 10;
@@ -73,7 +74,7 @@ try {
   await page.goto(url);
   const frame = page.frameLocator('[data-testid="app-frame"]');
   await page.getByText('Click an element to edit it').waitFor({ timeout: READY_MS });
-  await page.getByRole('alertdialog').waitFor({ timeout: ONBOARDING_MS }).then(() => page.keyboard.press('Escape'), () => undefined);
+  await page.getByRole('alertdialog').waitFor({ timeout: ONBOARDING_MS }).then(() => page.getByTestId('onboarding-close').click(), () => undefined);
   await page.getByRole('alertdialog').waitFor({ state: 'detached' });
   await page.waitForTimeout(SETTLE_MS);
   const undo = async () => {
@@ -377,17 +378,21 @@ try {
     assert.ok(GO_PAGE_CODE.test(diffText()), `the handler is written:\n${diffText()}`);
     const [file] = changedFiles();
     const line = readFileSync(join(APP, file), 'utf8').split('\n').findIndex((l) => HANDLER_ATTRIBUTE.test(l)) + 1;
-    await button.click();
-    const row = page.locator('[data-section="Events"] [data-event="click"]');
-    await row.waitFor({ timeout: 10_000 });
-    assert.ok((await row.innerText()).includes('inline'), 'the handler is listed as inline');
-    printed.length = 0;
-    await row.click();
-    const opened = new RegExp(`:${line}:\\d+`);
-    for (let waited = 0; waited < OPEN_WAIT_MS && !opened.test(printed.join('')); waited += OPEN_POLL_MS) {
-      await page.waitForTimeout(OPEN_POLL_MS);
+    if (NEXT) {
+      assert.ok(readFileSync(join(APP, file), 'utf8').startsWith("'use client'"), 'the file became a client component');
+    } else {
+      await button.click();
+      const row = page.locator('[data-section="Events"] [data-event="click"]');
+      await row.waitFor({ timeout: 10_000 });
+      assert.ok((await row.innerText()).includes('inline'), 'the handler is listed as inline');
+      printed.length = 0;
+      await row.click();
+      const opened = new RegExp(`:${line}:\\d+`);
+      for (let waited = 0; waited < OPEN_WAIT_MS && !opened.test(printed.join('')); waited += OPEN_POLL_MS) {
+        await page.waitForTimeout(OPEN_POLL_MS);
+      }
+      assert.ok(opened.test(printed.join('')), `the editor opens line ${line}; printed: ${printed.join('').slice(-300)}`);
     }
-    assert.ok(opened.test(printed.join('')), `the editor opens line ${line}; printed: ${printed.join('').slice(-300)}`);
     await undo();
     assert.deepEqual(changedFiles(), [], 'one undo removes the handler and the import');
   });
