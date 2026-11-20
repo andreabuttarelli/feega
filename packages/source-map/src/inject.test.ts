@@ -1,5 +1,15 @@
+import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 import { injectSource } from './inject.ts';
+
+const hasVueCompiler = (() => {
+  try {
+    createRequire(import.meta.url).resolve('@vue/compiler-sfc');
+    return true;
+  } catch {
+    return false;
+  }
+})();
 
 const tagsOf = (code: string) => [...code.matchAll(/<(\w+)[^>]*data-feega-src="([^"]+)"/g)].map((m) => `${m[1]} ${m[2]}`);
 
@@ -47,5 +57,49 @@ describe('injectSource', () => {
 
   it('ignores files it cannot map', () => {
     expect(injectSource('body { color: red }', 'a.css')).toBeNull();
+  });
+
+  it('tags a React icon usage with its component name, on the opening tag', () => {
+    const code = `import { ArrowRight as Next, Heart } from 'lucide-react';\nexport const A = () => (\n  <main>\n    <Next size={32} />\n    <Heart />\n  </main>\n);\n`;
+
+    const out = injectSource(code, 'src/App.jsx')!;
+
+    expect(out).toContain('<Next data-feega-src="src/App.jsx:4:5" data-feega-icon="ArrowRight" size={32} />');
+    expect(out).toContain('<Heart data-feega-src="src/App.jsx:5:5" data-feega-icon="Heart" />');
+  });
+
+  it('tags a default-imported Svelte icon', () => {
+    const code = `<script>\n  import Heart from '@lucide/svelte/icons/heart';\n  import { Mail } from 'lucide-svelte';\n</script>\n\n<p><Heart size={16} /><Mail /></p>\n`;
+
+    const out = injectSource(code, 'src/Nav.svelte')!;
+
+    expect(out).toContain('<Heart data-feega-src="src/Nav.svelte:6:4" data-feega-icon="Heart" size={16} />');
+    expect(out).toContain('<Mail data-feega-src="src/Nav.svelte:6:23" data-feega-icon="Mail" />');
+  });
+
+  it.skipIf(!hasVueCompiler)('tags a Vue icon, also written in kebab-case', () => {
+    const code = `<script setup>\nimport { ArrowRight } from 'lucide-vue-next';\n</script>\n\n<template>\n  <button><ArrowRight :size="32" /><arrow-right /></button>\n</template>\n`;
+
+    const out = injectSource(code, 'src/App.vue')!;
+
+    expect(out).toContain('<ArrowRight data-feega-src="src/App.vue:6:11" data-feega-icon="ArrowRight" :size="32" />');
+    expect(out).toContain('<arrow-right data-feega-src="src/App.vue:6:36" data-feega-icon="ArrowRight" />');
+  });
+
+  it('leaves components that do not come from an icon library untagged', () => {
+    const code = `import { Heart } from './icons';\nimport { Button } from 'lucide-react-extras';\nexport const A = () => <p><Heart /><Button /></p>;\n`;
+
+    expect(tagsOf(injectSource(code, 'src/A.jsx')!)).toEqual(['p src/A.jsx:3:24']);
+    expect(injectSource(code, 'src/A.jsx')).not.toContain('data-feega-icon');
+  });
+
+  it('tags the other icon libraries by package', () => {
+    const packages = ['react-icons/fa', '@heroicons/react/24/outline', '@tabler/icons-react', '@phosphor-icons/react'];
+
+    for (const pkg of packages) {
+      const out = injectSource(`import { Star } from '${pkg}';\nexport const A = () => <Star />;\n`, 'A.jsx');
+
+      expect(out, pkg).toContain('<Star data-feega-src="A.jsx:2:24" data-feega-icon="Star" />');
+    }
   });
 });

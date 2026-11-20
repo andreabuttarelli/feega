@@ -1,10 +1,11 @@
 <script lang="ts">
   import type { Pick, Source } from '../messages';
   import { crumbsOf } from './crumbs';
+  import { ElementState } from '@feega/live-edit/element-state';
 
-  let { pick, onselect, compact = false }: { pick: Pick; onselect: (source: Source) => void; compact?: boolean } = $props();
+  let { pick, onselect, compact = false, state = ElementState.Default }: { pick: Pick; onselect: (source: Source) => void; compact?: boolean; state?: ElementState } = $props();
 
-  const crumbs = $derived(crumbsOf(pick));
+  const crumbs = $derived(crumbsOf(pick, undefined, state));
 </script>
 
 <nav class="crumbs" class:compact aria-label="Selection path" data-testid="breadcrumb">
@@ -15,6 +16,7 @@
     {:else}
       <span class:current={crumb.source}>{crumb.name}</span>
     {/if}
+    {#if crumb.badge}<span class="state-badge" data-testid="state-badge">{crumb.badge}</span>{/if}
   {/each}
 </nav>
 
@@ -46,6 +48,20 @@
   button:hover {
     color: var(--ui-text);
     text-decoration: underline;
+  }
+
+  .state-badge {
+    padding: 0 4px;
+    border-radius: var(--ui-radius-xs);
+    background: var(--ui-accent);
+    color: var(--ui-accent-ink);
+    font-size: 10px;
+    line-height: 14px;
+  }
+
+  .compact .state-badge {
+    background: var(--ui-accent-ink);
+    color: var(--ui-accent);
   }
 
   .current {

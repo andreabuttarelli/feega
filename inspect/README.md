@@ -33,8 +33,14 @@ Prefer the browser? Run `npx feega` in your app folder (Node 20 or newer).
 - Phone, tablet, desktop and full sizes
 - Navigate mode to use the app, design mode to edit it
 - Works in VS Code, Cursor and Windsurf
+- Selecting an element reveals its source beside Feega with the line selected, so coding agents that read the editor selection (Claude Code, Cursor, Copilot, Cline, Codex, Gemini CLI) see it.
 
 ![Colour picker](images/21-colour-picker-dark.png)
+
+## Use with your agent
+
+- **Selection sync.** Selecting an element reveals its source beside Feega with the line selected, without taking focus. Coding agents that read the editor selection (Claude Code, Cursor, Copilot, Cline, Codex, Gemini CLI) see it. Turn off with `feegaInspect.syncSelection`.
+- **Copy for agent.** Right-click the element, or use **Copy for agent** in the bar: file:line, selector, component, page, preview width, breakpoint, theme and state go to the clipboard, ready to paste into the agent.
 
 ## Supported frameworks
 
@@ -42,11 +48,29 @@ React, Next.js, Svelte, SvelteKit, Vue, Astro and plain HTML, with Tailwind or C
 
 ## Privacy
 
-Feega sends nothing. No account needed. Your code never leaves your machine.
+No account needed. Your code never leaves your machine.
+
+## Telemetry
+
+Feega sends anonymous usage counts so we know how many people use it and how. Each event carries:
+
+- a random install id and a random session id (no account, no user id)
+- the event: `session_start`, `edit` (a change was written to your source), `session_end`
+- on `session_end`: the session duration and the number of edits
+- Feega version, editor (VS Code, Cursor, Windsurf, VSCodium or `npx`), operating system, CPU architecture, and device kind (desktop, web, command line)
+
+The server adds country, region and city from the request, and does not store the IP address.
+
+Never collected: code, file names or paths, project names, URLs, the content of your edits.
+
+Turn it off with either:
+
+- the VS Code setting `feegaInspect.telemetry` (off), or VS Code's own `telemetry.telemetryLevel` set to `off`
+- for `npx feega`: the environment variable `FEEGA_TELEMETRY=0` or `DO_NOT_TRACK=1`
 
 ## Settings
 
-Under `feegaInspect.*`: how styles are written (auto / Tailwind / CSS), dev server command, default device size.
+Under `feegaInspect.*`: anonymous usage counts, how styles are written (auto / Tailwind / CSS), dev server command, default device size.
 
 ## Links
 

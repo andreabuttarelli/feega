@@ -55,7 +55,7 @@ Feega writes at the element's source line. Markup it can trace to one literal pl
 
 Class names:
 - Write literal `class` / `className` strings. Tailwind utilities, not `cn()`, `clsx()` or template-string expressions, on the elements a person will tweak.
-- Put variants in the literal: `md:p-8` and `p-4` are edited per preview width. `hover:` and `dark:` variants are not written.
+- Put variants in the literal. Element states (`hover:`, `active:`, `focus:`…), responsive breakpoints (`md:` or `@media`) and themes (`dark:` or theme selectors) are written to the matching variant or rule, per the state, preview width or theme chosen in the editor.
 - Without Tailwind, give each component its own stylesheet (CSS module or scoped `<style>`) so edits land in that component's rule.
 
 Text:
@@ -69,5 +69,7 @@ Icons:
 
 Structure:
 - Duplicate, wrap, unwrap, delete, reorder and add (Text, Heading, Button, Link, Image, Container) are source edits; plain JSX/template elements give the cleanest ones.
+
+Selecting in the editor selects the same element in the code editor, and the reverse. "Copy for agent" copies the selected element with its source location, for you to read and edit.
 
 After editing, tell the user what changed and that Feega shows the same edits under Changes, where each is undoable.

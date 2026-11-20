@@ -1,4 +1,5 @@
 <script setup>
+import { ArrowRight } from 'lucide-vue-next';
 import Benefits from './Benefits.vue';
 import Faq from './Faq.vue';
 
@@ -25,6 +26,7 @@ const plans = [
       <h1 id="title" class="title">Plan your launch in an afternoon</h1>
       <p class="lead">Briefs, timelines and assets in one place your whole team can edit.</p>
       <button id="cta" type="button">Get started</button>
+      <ArrowRight :size="32" />
       <div id="actions" class="actions">
         <a id="start" class="btn" href="#start">Start free</a>
         <a id="docs" class="btn" href="#docs">Read docs</a>

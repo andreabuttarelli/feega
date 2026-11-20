@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { accountOfBody } from './account';
-import { SignInEnd, signIn } from './sign-in';
+import { SignInEnd, signIn, signInFromUri } from './sign-in';
 
 const jwt = `h.${Buffer.from(JSON.stringify({ sub: 'u1', email: 'a@b.co' })).toString('base64url')}.s`;
 const tokens = { access_token: jwt, refresh_token: 'r', expires_at: 99 };
@@ -59,5 +59,54 @@ describe('signIn', () => {
     run.abort.abort();
     expect((await run.outcome).end).toBe(SignInEnd.Cancelled);
     await expect(run.post('app.s1')).rejects.toThrow();
+  });
+
+  it('risponde anche su ::1, dove localhost puo risolvere', async () => {
+    const run = start();
+    const url = await run.opened;
+    const port = url.searchParams.get('cli_port');
+    const res = await fetch(`http://[::1]:${port}/session`, { method: 'OPTIONS' });
+    expect(res.status).toBe(204);
+    run.abort.abort();
+    await run.outcome;
+  });
+
+  it('il preflight dichiara origine, metodi, header e rete privata', async () => {
+    const run = start();
+    const url = await run.opened;
+    const res = await fetch(`http://127.0.0.1:${url.searchParams.get('cli_port')}/session`, { method: 'OPTIONS', headers: { Origin: 'https://oh.feega.app' } });
+    expect(res.status).toBe(204);
+    expect(res.headers.get('access-control-allow-origin')).toBe('https://oh.feega.app');
+    expect(res.headers.get('access-control-allow-methods')).toContain('POST');
+    expect(res.headers.get('access-control-allow-headers')).toBe('Content-Type');
+    expect(res.headers.get('access-control-allow-private-network')).toBe('true');
+    expect(res.headers.get('vary')).toBe('Origin');
+    run.abort.abort();
+    await run.outcome;
+  });
+
+  it('accetta l origine www dello stesso sito', async () => {
+    const run = start();
+    const url = await run.opened;
+    const res = await fetch(`http://127.0.0.1:${url.searchParams.get('cli_port')}/session`, { method: 'OPTIONS', headers: { Origin: 'https://www.oh.feega.app' } });
+    expect(res.headers.get('access-control-allow-origin')).toBe('https://www.oh.feega.app');
+    run.abort.abort();
+    await run.outcome;
+  });
+
+  it('un URI con lo state giusto completa il login senza listener', async () => {
+    const run = start();
+    await run.opened;
+    const query = new URLSearchParams({ ...tokens, expires_at: '99', state: 'app.s1' }).toString();
+    expect(signInFromUri(query)).toBe(true);
+    expect(await run.outcome).toEqual({ end: SignInEnd.Done, account: accountOfBody(tokens) });
+  });
+
+  it('un URI con lo state sbagliato viene rifiutato', async () => {
+    const run = start();
+    await run.opened;
+    expect(signInFromUri(new URLSearchParams({ ...tokens, expires_at: '99', state: 'evil' }).toString())).toBe(false);
+    run.abort.abort();
+    await run.outcome;
   });
 });

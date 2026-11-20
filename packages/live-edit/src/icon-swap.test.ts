@@ -40,6 +40,13 @@ describe('swapIcon', () => {
     expect(out.ok && out.change.after).toBe(SVELTE.replace(/Heart/g, 'Mail').replace('icons/heart', 'icons/mail'));
   });
 
+  it('swaps a named import from the root of a path-style library', async () => {
+    const source = SVELTE.replace("import Heart from '@lucide/svelte/icons/heart';", "import { Heart } from '@lucide/svelte';");
+    const out = await swapIcon(async () => source, { file: FILE, line: 5, col: 9 }, 'mail', lucideSvelte);
+
+    expect(out.ok && out.change.after).toBe(source.replace('{ Heart }', '{ Mail }').replace('<Heart', '<Mail'));
+  });
+
   it('swaps a lucide react named import and keeps the others', async () => {
     const out = await swapIcon(async () => REACT, { file: 'src/Nav.tsx', line: 5, col: 5 }, 'arrow-right', lucideReact);
 
