@@ -27,6 +27,8 @@
     "@sveltejs/vite-plugin-svelte": "^4.0.2",
     "@tailwindcss/vite": "^4.3.1",
     "@types/node": "^22.9.0",
+    "jsdom": "^25.0.1",
+    "playwright": "^1.60.0",
     "esbuild": "^0.25.12",
     "svelte": "^5.2.7",
     "svelte-check": "^4.1.0",
