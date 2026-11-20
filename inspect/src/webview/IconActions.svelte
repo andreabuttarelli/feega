@@ -1,5 +1,7 @@
 <script lang="ts">
   import { Popover } from 'bits-ui';
+  import Search from '@lucide/svelte/icons/search';
+  import X from '@lucide/svelte/icons/x';
   import { IconSource, ToHost, type IconHit, type Pick } from '../messages';
   import { toHost } from './host';
   import { iconSearch, nextIconRequest, wantPreview } from './icon-search.svelte';
@@ -85,7 +87,11 @@
     <Popover.Trigger class="action" data-field="icon-replace">Replace icon…</Popover.Trigger>
     <Popover.Portal>
       <Popover.Content class="picker-popover icon-popover" side="left" sideOffset={8} collisionPadding={8}>
-        <input bind:this={queryBox} type="search" class="icon-query" placeholder="Search icons" aria-label="Search icons" value={query} oninput={(e) => search(e.currentTarget.value)} onkeydown={enter} />
+        <div class="icon-search">
+          <Search size={14} class="icon-search-glyph" aria-hidden="true" />
+          <input bind:this={queryBox} type="text" class="icon-query" placeholder="Search icons" aria-label="Search icons" autocomplete="off" spellcheck="false" value={query} oninput={(e) => search(e.currentTarget.value)} onkeydown={enter} />
+          {#if query}<button type="button" class="icon-search-clear" aria-label="Clear search" onclick={() => (search(''), queryBox?.focus())}><X size={12} /></button>{/if}
+        </div>
         {#if iconSearch.library}
           <div class="icon-tabs" role="tablist">
             <button type="button" role="tab" class="icon-tab" aria-selected={group === IconSource.Library} onclick={() => (chosen = IconSource.Library)}>{iconSearch.library} {library.length}</button>
@@ -156,6 +162,57 @@
     gap: 6px;
     width: 300px;
     padding: 8px;
+  }
+
+  :global(.icon-popover) .icon-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  :global(.icon-popover) .icon-search :global(.icon-search-glyph) {
+    position: absolute;
+    left: 10px;
+    color: var(--ui-text-3);
+    pointer-events: none;
+  }
+
+  :global(.icon-popover) .icon-search .icon-query {
+    height: 32px;
+    padding: 0 30px 0 30px;
+    border: 1px solid var(--ui-field-border);
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-input);
+    outline: none;
+    transition: border-color 0.12s;
+  }
+
+  :global(.icon-popover) .icon-search .icon-query::placeholder {
+    color: var(--ui-text-3);
+  }
+
+  :global(.icon-popover) .icon-search .icon-query:hover {
+    border-color: var(--ui-field-border-hover);
+  }
+
+  :global(.icon-popover) .icon-search .icon-query:focus {
+    border-color: var(--ui-accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-accent) 25%, transparent);
+  }
+
+  :global(.icon-popover) .icon-search-clear {
+    position: absolute;
+    right: 6px;
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-input-hover);
+    color: var(--ui-text-2);
+    cursor: pointer;
   }
 
   :global(.icon-popover) .icon-query,
