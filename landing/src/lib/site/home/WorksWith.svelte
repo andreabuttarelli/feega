@@ -29,7 +29,7 @@
   .works {
     box-sizing: border-box;
     width: 100%;
-    max-width: 960px;
+    max-width: 1240px;
     margin: 28px auto 0;
     text-align: left;
   }

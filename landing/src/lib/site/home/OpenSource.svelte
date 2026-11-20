@@ -19,7 +19,7 @@
     font-weight: 400;
     text-align: center;
     text-wrap: balance;
-    max-width: 1000px;
+    max-width: 1240px;
     margin-inline: auto;
     overflow-wrap: break-word;
   }

@@ -26,7 +26,7 @@
   let fitWidth = $state(MOCK_WIDTH);
   let mockHeight = $state(0);
 
-  const scale = $derived(Math.min(1, fitWidth / MOCK_WIDTH));
+  const scale = $derived(fitWidth / MOCK_WIDTH);
 </script>
 
 <svelte:head>
@@ -162,7 +162,7 @@
 
   .fit {
     width: 100%;
-    max-width: 960px;
+    max-width: 1240px;
     margin: 36px auto 0;
   }
 
@@ -213,7 +213,7 @@
 
   @media (min-width: 1200px) {
     .hero {
-      max-width: 1100px;
+      max-width: 1360px;
       padding: 150px 20px 0;
     }
 

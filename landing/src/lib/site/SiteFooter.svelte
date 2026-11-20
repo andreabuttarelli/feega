@@ -260,7 +260,7 @@
 
   @media (min-width: 1200px) {
     .site-foot {
-      width: min(1100px, 100% - 0px);
+      width: min(1360px, 100% - 0px);
       max-width: none;
       padding: 41px 20px 20px;
     }
