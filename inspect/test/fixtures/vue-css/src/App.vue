@@ -19,6 +19,10 @@ const plans = [
       <h1 id="title" class="title">Plan your launch in an afternoon</h1>
       <p class="lead">Briefs, timelines and assets in one place your whole team can edit.</p>
       <button id="cta" type="button">Get started</button>
+      <div id="actions" class="actions">
+        <a id="start" class="btn" href="#start">Start free</a>
+        <a id="docs" class="btn" href="#docs">Read docs</a>
+      </div>
       <section id="pricing" class="grid">
         <article id="card" class="card">
           <h2>{{ plans[0].name }}</h2>
@@ -98,5 +102,19 @@ const plans = [
   .footer {
     padding: 24px 32px;
     color: #64748b;
+  }
+
+  .actions {
+    display: block;
+  }
+
+  .btn {
+    display: inline-block;
+    margin-right: 12px;
+    padding: 10px 20px;
+    border-radius: 6px;
+    background: #0f172a;
+    color: #fff;
+    text-decoration: none;
   }
 </style>

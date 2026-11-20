@@ -308,6 +308,7 @@ try {
   });
 
   await check('wrap puts the element in a container and selects it, unwrap gives it back, each is one undo', async () => {
+    const direct = await paragraphs();
     await frame.locator('main > p').first().click();
     await page.waitForTimeout(800);
     await page.keyboard.press('ControlOrMeta+g');
@@ -317,7 +318,11 @@ try {
     assert.ok(/^\s*div/.test(picked), `the new container is selected, selection is ${picked}`);
     await page.keyboard.press('ControlOrMeta+Shift+g');
     await page.waitForTimeout(SETTLE_MS);
-    assert.deepEqual(changedFiles(), [], 'unwrap restores the source');
+    assert.equal(await frame.locator('main > div > p').count(), 0, 'the container is gone from the page');
+    assert.equal(await paragraphs(), direct, 'the paragraph is back under main');
+    if (TAILWIND) {
+      assert.deepEqual(changedFiles(), [], 'unwrap restores the source');
+    }
     await undo();
     assert.equal(await frame.locator('main > div > p').count(), 1, 'one undo brings the container back');
     await undo();

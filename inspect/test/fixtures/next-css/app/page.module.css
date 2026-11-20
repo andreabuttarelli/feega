@@ -66,3 +66,17 @@
   font-size: 14px;
   color: #64748b;
 }
+
+.actions {
+  display: block;
+}
+
+.btn {
+  display: inline-block;
+  margin-right: 12px;
+  padding: 10px 20px;
+  border-radius: 6px;
+  background: #0f172a;
+  color: #fff;
+  text-decoration: none;
+}
