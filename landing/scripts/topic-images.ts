@@ -1,20 +1,18 @@
-import { mkdirSync, readFileSync, statSync } from 'node:fs';
+import { mkdirSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import sharp from 'sharp';
-import { CoverShape, densityAt, glyphAt } from '../src/lib/site/alternatives/cover.ts';
-import { flagColour } from '../src/lib/site/ascii-field.ts';
+import type { CoverShape } from '../src/lib/site/alternatives/cover.ts';
+import { baseCss, coverHtml, esc } from './cover-render.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const STATIC = resolve(ROOT, 'static');
-const font = (name: string) => `data:font/woff2;base64,${readFileSync(resolve(STATIC, 'site/fonts', name)).toString('base64')}`;
 const WIDTH = 1200;
 const HEIGHT = 675;
 const MAX_BYTES = 80 * 1024;
 const QUALITIES = [82, 74, 66, 58, 50];
 const ORANGE = '#ff5100';
-const CELL = 18;
 
 type Line = { kind: 'same' | 'add' | 'del'; text: string };
 
@@ -24,45 +22,9 @@ type Window = { kind: 'window'; out: string; editor: string; file: string; code:
 
 type Spec = Cover | Diff | Window;
 
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const SIZE = { width: WIDTH, height: HEIGHT };
 
-const BASE_CSS = `
-@font-face { font-family: 'DM Sans'; src: url('${font('dm-sans-latin.woff2')}'); }
-@font-face { font-family: 'DM Mono'; src: url('${font('dm-mono-400-latin.woff2')}'); }
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { width: ${WIDTH}px; height: ${HEIGHT}px; background: #000; color: #fff; font-family: 'DM Sans', sans-serif; overflow: hidden; }
-.mono { font-family: 'DM Mono', monospace; }
-`;
-
-function asciiField(shape: CoverShape, ramp: string, flag: number): string {
-  const cols = Math.floor(WIDTH / CELL);
-  const rows = Math.floor(HEIGHT / CELL);
-  const cells: string[] = [];
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const x = (c + 0.5) / cols;
-      const y = (r + 0.5) / rows;
-      const glyph = glyphAt(ramp, densityAt(shape, x, y));
-      if (glyph === ' ') {
-        continue;
-      }
-      const [red, green, blue] = flagColour(flag, x * 0.7 + y * 0.3);
-      cells.push(`<text x="${(c + 0.5) * CELL}" y="${(r + 0.5) * CELL}" fill="rgb(${red} ${green} ${blue})">${esc(glyph)}</text>`);
-    }
-  }
-  return `<svg width="${WIDTH}" height="${HEIGHT}" style="position:absolute;inset:0;opacity:.55"><g font-family="DM Mono, monospace" font-size="14" text-anchor="middle" dominant-baseline="middle">${cells.join('')}</g></svg>`;
-}
-
-const cover = (s: Cover) => `
-<div style="position:relative;width:100%;height:100%;background:#0a0a0a">
-  ${asciiField(s.shape, s.ramp, s.flag)}
-  <div style="position:absolute;inset:0;background:linear-gradient(30deg, rgb(10 10 10/.95) 25%, transparent 60%)"></div>
-  <div style="position:absolute;left:64px;bottom:64px;right:64px">
-    <p class="mono" style="color:${ORANGE};font-size:22px;letter-spacing:.02em">${s.out.startsWith('for/') ? 'Feega for' : 'Feega in'}</p>
-    <p style="font-size:120px;line-height:1;letter-spacing:-.05em;font-weight:500;margin-top:12px">${esc(s.title)}</p>
-    <p class="mono" style="font-size:24px;color:rgb(255 255 255/.7);margin-top:20px">${esc(s.sub)}</p>
-  </div>
-</div>`;
+const cover = (s: Cover) => coverHtml(SIZE, { kicker: s.out.startsWith('for/') ? 'Feega for' : 'Feega in', title: s.title, sub: s.sub, shape: s.shape, ramp: s.ramp, flag: s.flag });
 
 const LINE_STYLE: Record<Line['kind'], { mark: string; bg: string; fg: string }> = {
   same: { mark: ' ', bg: 'transparent', fg: 'rgb(255 255 255/.55)' },
@@ -144,7 +106,7 @@ const page = await browser.newPage({ viewport: { width: WIDTH, height: HEIGHT },
 
 for (const spec of SPECS) {
   const html = (RENDER[spec.kind] as (s: Spec) => string)(spec);
-  await page.setContent(`<!doctype html><html><head><style>${BASE_CSS}</style></head><body>${html}</body></html>`);
+  await page.setContent(`<!doctype html><html><head><style>${baseCss(SIZE)}</style></head><body>${html}</body></html>`);
   await page.evaluate(() => document.fonts.ready);
   const png = await page.screenshot({ type: 'png' });
   const file = resolve(STATIC, 'img', `${spec.out}.webp`);
