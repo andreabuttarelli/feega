@@ -1,4 +1,4 @@
-import { SOURCE_ATTR } from './runtime.js';
+import { ICON_ATTR, SOURCE_ATTR } from './runtime.js';
 
 const REACT_FIBER_PREFIX = '__reactFiber$';
 const STACK_FRAME = /\(?((?:https?:\/\/[^/\s)]+)?[^\s()]*\.(?:[jt]sx?|svelte|vue)):(\d+):(\d+)\)?\s*$/;
@@ -54,6 +54,9 @@ export function sourceFromFramework(element) {
 
 export function stampSources(doc) {
   for (const element of doc.body.querySelectorAll(`*:not([${SOURCE_ATTR}])`)) {
+    if (element.parentElement?.closest(`[${ICON_ATTR}]`)) {
+      continue;
+    }
     const source = sourceFromFramework(element);
     if (source) {
       element.setAttribute(SOURCE_ATTR, source);

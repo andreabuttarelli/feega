@@ -14,6 +14,7 @@ const READY_MS = 120_000;
 const SETTLE_MS = 2500;
 const TAILWIND = /tailwind/.test(APP);
 const NEXT = /next/.test(APP);
+const HAS_ICON = !TAILWIND || /react/.test(APP);
 const ONBOARDING_MS = 10_000;
 const NEW_TITLE = 'Ship faster than planned';
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
@@ -691,6 +692,29 @@ try {
     assert.deepEqual(order, ['faq', 'benefits'], 'the page shows the new order');
     await undo();
     assert.deepEqual(changedFiles(), [], 'undo restores the usages');
+  });
+
+  await check('an icon from a library is picked as one element, swapped in its usage, and one undo restores it', async () => {
+    const arrow = frame.locator('svg.lucide-arrow-right');
+    if (!HAS_ICON) {
+      return;
+    }
+    await arrow.first().waitFor({ timeout: 10_000 });
+    await arrow.locator('path').first().click({ force: true });
+    await page.waitForTimeout(800);
+    const picked = page.locator('[data-testid="layers"] [data-layer][aria-selected="true"]');
+    assert.equal(await picked.count(), 1, 'the icon has its own layer row');
+    assert.ok((await picked.first().innerText()).includes('ArrowRight'), 'the layer is named after the component');
+    await page.locator('[data-field="icon-replace"]').click();
+    await page.locator('.icon-tile').first().waitFor({ timeout: 10_000 });
+    assert.equal(await page.locator('.icon-tile').first().getAttribute('title'), 'arrow-right', 'the current icon is offered first');
+    await page.locator('.icon-tile[title="heart"]').click();
+    await page.waitForTimeout(SETTLE_MS);
+    assert.ok(/<Heart\b/.test(diffText()) && /\bHeart\b[^\n]*from/.test(diffText()), `the usage and import are rewritten:\n${diffText()}`);
+    assert.ok(!/^\+.*ArrowRight/m.test(diffText()), 'the old name is gone');
+    await frame.locator('svg.lucide-heart').waitFor({ timeout: 10_000 });
+    await undo();
+    assert.deepEqual(changedFiles(), [], 'one undo restores the source');
   });
 
   if (NEXT) {

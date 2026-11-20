@@ -1,6 +1,6 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
-import { SOURCE_ATTR } from './runtime.js';
+import { ICON_ATTR, SOURCE_ATTR } from './runtime.js';
 import { stampSources } from './framework-meta.js';
 
 const docOf = (html: string) => new JSDOM(`<body>${html}</body>`).window.document;
@@ -40,5 +40,12 @@ describe('stampSources', () => {
     (doc.querySelector('h1') as any).__svelte_meta = { loc: { file: 'y', line: 1, column: 1 } };
     stampSources(doc);
     expect(doc.querySelector('h1')!.getAttribute(SOURCE_ATTR)).toBe('x.tsx:1:1');
+  });
+
+  it('leaves the insides of an icon component unpickable', () => {
+    const doc = docOf(`<svg ${SOURCE_ATTR}="src/A.svelte:4:3" ${ICON_ATTR}="Heart"><path d="M0 0"/></svg>`);
+    (doc.querySelector('path') as any).__svelte_meta = { loc: { file: 'node_modules/@lucide/svelte/dist/Icon.svelte', line: 20, column: 4 } };
+    stampSources(doc);
+    expect(doc.querySelector('path')!.hasAttribute(SOURCE_ATTR)).toBe(false);
   });
 });
