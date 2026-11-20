@@ -9,6 +9,7 @@
   import Undo2 from '@lucide/svelte/icons/undo-2';
   import { LiveProp } from '@feega/live-edit/live-fields';
   import { untrack } from 'svelte';
+  import { selectionKey, SelectionKey } from './selection-keys';
   import { Mode, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
   import { fromHost, toHost } from './host';
   import { iconSearch } from './icon-search.svelte';
@@ -477,12 +478,6 @@
 
   const typing = (e: KeyboardEvent) => e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement;
 
-  const SELECTION_KEYS: Record<string, (e: KeyboardEvent) => Move> = {
-    Escape: () => Move.Parent,
-    Enter: (e) => (e.shiftKey ? Move.Parent : Move.Child),
-    Tab: (e) => (e.shiftKey ? Move.Previous : Move.Next)
-  };
-
   async function select(source: Source) {
     picked = (await bridge.again(source)) ?? picked;
   }
@@ -504,10 +499,14 @@
 
   function onKey(e: KeyboardEvent) {
     const cmd = e.metaKey || e.ctrlKey;
-    const selecting = SELECTION_KEYS[e.key];
+    const selecting = selectionKey(e);
     if (selecting && picked && mode === Mode.Design && !editing && !typing(e) && !(e.target instanceof HTMLButtonElement)) {
       e.preventDefault();
-      moveSelection(selecting(e));
+      if (selecting.kind === SelectionKey.Clear) {
+        picked = null;
+        return;
+      }
+      moveSelection(selecting.move);
       return;
     }
     const shortcuts: Record<string, () => void> = {

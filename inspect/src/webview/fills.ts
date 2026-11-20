@@ -84,10 +84,12 @@ const LAYER_CSS: { [K in FillKind]: (f: Extract<Fill, { kind: K }>) => string } 
 
 export const layerCss = (fill: Fill): string => (LAYER_CSS[fill.kind] as (f: Fill) => string)(fill);
 
+const isBlankImage = (fill: Fill) => fill.kind === FillKind.Image && !fill.url.trim();
+
 export function fillCss(fills: Fill[]): Record<string, string> {
   const shown = fills.filter((f) => f.visible);
   const solid = shown.find((f) => f.kind === FillKind.Solid);
-  const images = shown.filter((f) => f.kind !== FillKind.Solid).map(layerCss);
+  const images = shown.filter((f) => f.kind !== FillKind.Solid && !isBlankImage(f)).map(layerCss);
   return { 'background-image': images.length ? images.join(', ') : NONE, 'background-color': solid ? layerCss(solid) : TRANSPARENT };
 }
 

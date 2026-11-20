@@ -38,6 +38,21 @@ describe('fillCss', () => {
   });
 });
 
+describe('an image layer without a url', () => {
+  const empty = [{ kind: FillKind.Image as const, url: '', visible: true }];
+
+  it('writes no url("")', () => {
+    expect(fillCss(empty)).toEqual({ 'background-image': 'none', 'background-color': 'transparent' });
+    expect(tailwindFill(empty)).toEqual([]);
+  });
+
+  it('keeps the layers beside it', () => {
+    const [solid] = parseFills('none', 'rgb(1, 2, 3)');
+
+    expect(fillCss([...empty, solid])['background-image']).toBe('none');
+  });
+});
+
 describe('tailwindFill', () => {
   it('a single solid is a bg colour class; anything else arbitrary', () => {
     expect(tailwindFill(parseFills('none', '#ffcc00'))).toEqual(['bg-[#ffcc00]']);
