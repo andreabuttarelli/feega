@@ -3,7 +3,7 @@ export type Slide = { title: string; body: string; more?: string };
 export const SLIDES: Slide[] = [
   {
     title: 'design in your codebase',
-    body: 'Click any element of your running app and edit it like in Figma. Every change is written to your code as a diff.'
+    body: 'Click any element of your running app and edit it visually. Every change is written to your code as a diff.'
   },
   {
     title: 'you design, your agent codes',
