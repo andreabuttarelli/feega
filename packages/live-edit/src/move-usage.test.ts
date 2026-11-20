@@ -39,6 +39,23 @@ import Pricing from './Pricing.vue';
 </template>
 `;
 
+const AFTER_MAP = `const xs = ['a', 'b'];
+
+export default function Page() {
+  return (
+    <main>
+      <ul>
+        {xs.map((x) => (
+          <li key={x}>{x}</li>
+        ))}
+      </ul>
+      <Hero />
+      <Pricing />
+    </main>
+  );
+}
+`;
+
 const usage = (text: string, file: string, from: string, to: string, place: Place) =>
   structure(async () => text, { op: StructureOp.MoveUsage, at: { file, line: 1, col: 1 }, usage: { from, to, place } });
 
@@ -53,6 +70,12 @@ describe('moveUsage', () => {
     const out = await usage(JSX, 'page.tsx', 'Hero', 'Pricing', Place.After);
 
     expect(out.ok && out.changes[0].after).toBe(JSX.replace('      <Hero title="a" />\n      <Pricing />\n', '      <Pricing />\n      <Hero title="a" />\n'));
+  });
+
+  it('moves a usage that comes after a finished .map() sibling', async () => {
+    const out = await usage(AFTER_MAP, 'page.tsx', 'Pricing', 'Hero', Place.Before);
+
+    expect(out.ok && out.changes[0].after).toBe(AFTER_MAP.replace('      <Hero />\n      <Pricing />\n', '      <Pricing />\n      <Hero />\n'));
   });
 
   it('finds a Vue usage written in kebab case', async () => {

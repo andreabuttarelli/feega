@@ -9,6 +9,7 @@ import type { PageTarget } from '@feega/live-edit/page-rule';
 import type { EventHandler } from '@feega/live-edit/event-handlers';
 import type { GoAsk } from '@feega/live-edit/go-action';
 import type { LinkEdit, LinkRead } from '@feega/live-edit/link-edit';
+import type { OffsetSide } from '@feega/live-edit/authored-offsets';
 import type { ReportFacts, SettingKey, SettingValue, Settings } from './settings';
 
 export enum IconSource {
@@ -85,7 +86,7 @@ export enum ServerAction {
 
 export type ServerInfo = { url: string; framework: string; command: string; pid: number | null; port: number; attached: boolean; startedAt: number; lastError: string; keptMinutes: number };
 
-export type Wiring = { link: LinkRead | null; events: EventHandler[]; routes: string[] };
+export type Wiring = { link: LinkRead | null; events: EventHandler[]; routes: string[]; offsets: OffsetSide[] };
 
 export type ColourPick = { css: string; token?: string };
 

@@ -11,7 +11,10 @@ export function trackRects(win, send) {
   let queued = false;
   let sizes = null;
 
-  const elementOf = (source) => doc.querySelector(`[${SOURCE_ATTR}=${JSON.stringify(source)}]`);
+  const elementOf = ({ source, index }) => {
+    const found = doc.querySelectorAll(`[${SOURCE_ATTR}=${JSON.stringify(source)}]`);
+    return found[index] ?? found[0] ?? null;
+  };
 
   function observeSizes() {
     sizes?.disconnect();
@@ -19,8 +22,8 @@ export function trackRects(win, send) {
       return;
     }
     sizes = new win.ResizeObserver(schedule);
-    for (const source of followed.values()) {
-      const element = elementOf(source);
+    for (const target of followed.values()) {
+      const element = elementOf(target);
       if (element) {
         sizes.observe(element);
       }
@@ -29,8 +32,8 @@ export function trackRects(win, send) {
 
   function measure() {
     queued = false;
-    for (const [slot, source] of followed) {
-      const element = elementOf(source);
+    for (const [slot, target] of followed) {
+      const element = elementOf(target);
       const box = element?.getBoundingClientRect();
       const rect = box ? { x: box.x, y: box.y, width: box.width, height: box.height } : null;
       if (sameRect(rect, last.get(slot)) || (rect === null && last.get(slot) === null)) {
@@ -55,9 +58,9 @@ export function trackRects(win, send) {
   win.addEventListener('load', schedule, { capture: true });
 
   return {
-    follow(slot, source) {
+    follow(slot, source, index = 0) {
       if (source) {
-        followed.set(slot, source);
+        followed.set(slot, { source, index });
       } else {
         followed.delete(slot);
       }

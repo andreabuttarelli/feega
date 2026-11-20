@@ -1,4 +1,9 @@
 <script setup>
+import Benefits from './Benefits.vue';
+import Faq from './Faq.vue';
+
+const topics = ['Briefs', 'Timelines', 'Assets'];
+
 const plans = [
   { name: 'Starter', text: 'One project, every editor control.' },
   { name: 'Studio', text: 'Unlimited projects and shared tokens.' },
@@ -14,11 +19,16 @@ const plans = [
         <a href="#features">Features</a>
         <a href="#pricing">Pricing</a>
       </nav>
+      <span id="badge" class="badge">New</span>
     </header>
     <main class="main">
       <h1 id="title" class="title">Plan your launch in an afternoon</h1>
       <p class="lead">Briefs, timelines and assets in one place your whole team can edit.</p>
       <button id="cta" type="button">Get started</button>
+      <div id="actions" class="actions">
+        <a id="start" class="btn" href="#start">Start free</a>
+        <a id="docs" class="btn" href="#docs">Read docs</a>
+      </div>
       <section id="pricing" class="grid">
         <article id="card" class="card">
           <h2>{{ plans[0].name }}</h2>
@@ -33,6 +43,11 @@ const plans = [
           <p>{{ plans[2].text }}</p>
         </article>
       </section>
+      <ul id="topics" class="topics">
+        <li v-for="topic in topics" :key="topic" class="topic">{{ topic }}</li>
+      </ul>
+      <Benefits />
+      <Faq />
     </main>
     <footer class="footer">© Northwind</footer>
   </div>
@@ -98,5 +113,36 @@ const plans = [
   .footer {
     padding: 24px 32px;
     color: #64748b;
+  }
+
+  .actions {
+    display: block;
+  }
+
+  .btn {
+    display: inline-block;
+    margin-right: 12px;
+    padding: 10px 20px;
+    border-radius: 6px;
+    background: #0f172a;
+    color: #fff;
+    text-decoration: none;
+  }
+
+  .topics {
+    display: block;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .topic {
+    padding: 8px 0;
+  }
+
+  .badge {
+    position: absolute;
+    top: 12px;
+    right: 16px;
   }
 </style>

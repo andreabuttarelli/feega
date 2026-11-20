@@ -1,4 +1,8 @@
 import styles from './App.module.css';
+import { Benefits } from './Benefits';
+import { Faq } from './Faq';
+
+const TOPICS = ['Briefs', 'Timelines', 'Assets'];
 
 const PLANS = [
   { name: 'Starter', text: 'One project, every editor control.' },
@@ -15,6 +19,7 @@ export function App() {
           <a href="#features">Features</a>
           <a href="#pricing">Pricing</a>
         </nav>
+        <span id="badge" className={styles.badge}>New</span>
       </header>
       <main className={styles.main}>
         <h1 id="title" className={styles.title}>Plan your launch in an afternoon</h1>
@@ -38,6 +43,13 @@ export function App() {
             <p>{PLANS[2].text}</p>
           </article>
         </section>
+        <ul id="topics" className={styles.topics}>
+          {TOPICS.map((topic) => (
+            <li key={topic} className={styles.topic}>{topic}</li>
+          ))}
+        </ul>
+        <Benefits />
+        <Faq />
       </main>
       <footer className={styles.footer}>© Northwind</footer>
     </div>

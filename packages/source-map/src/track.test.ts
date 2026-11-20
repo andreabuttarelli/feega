@@ -47,3 +47,21 @@ describe('the outline follows the element', () => {
     expect(sent).toEqual([24, 30]);
   });
 });
+
+describe('a repeated element', () => {
+  it('follows the instance it was given, not the first one', () => {
+    const win = new JSDOM(`<body>${[10, 20, 30].map((h) => `<li data-feega-src="${SOURCE}" data-h="${h}">x</li>`).join('')}</body>`).window;
+    const frames: (() => void)[] = [];
+    Object.assign(win, { requestAnimationFrame: (run: () => void) => frames.push(run), ResizeObserver: class { observe() {} disconnect() {} } });
+    win.HTMLElement.prototype.getBoundingClientRect = function () {
+      const height = Number(this.getAttribute('data-h'));
+      return { x: 0, y: 0, width: 100, height, top: 0, left: 0, right: 100, bottom: height, toJSON() {} } as DOMRect;
+    };
+    const sent: (number | undefined)[] = [];
+    const tracker = trackRects(win, (_, rect) => sent.push(rect?.height));
+    tracker.follow('selected', SOURCE, 2);
+    frames.splice(0).forEach((f) => f());
+
+    expect(sent).toEqual([30]);
+  });
+});

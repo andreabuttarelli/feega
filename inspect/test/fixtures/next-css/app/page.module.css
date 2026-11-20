@@ -66,3 +66,34 @@
   font-size: 14px;
   color: #64748b;
 }
+
+.actions {
+  display: block;
+}
+
+.btn {
+  display: inline-block;
+  margin-right: 12px;
+  padding: 10px 20px;
+  border-radius: 6px;
+  background: #0f172a;
+  color: #fff;
+  text-decoration: none;
+}
+
+.topics {
+  display: block;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.topic {
+  padding: 8px 0;
+}
+
+.badge {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+}

@@ -1,3 +1,4 @@
+<<<<<<<< HEAD:packages/live-edit/src/class-patch.ts
 import { CLASS_RULE, LiveProp, Side, activeIndex, familyRule, utilityOf, variantOf, type ClassRule, type StyleProp } from './live-fields';
 import type { FileChange, ReadFile } from './files';
 
@@ -83,4 +84,23 @@ export function stylePatch(read: ReadFile, at: LiveAt, change: LiveChange): Prom
     return rule ? classPatch(read, at, change, rule) : Promise.resolve({ files: [], skipped: [`${label(at)}: unknown class family ${change.family}`] });
   }
   return classPatch(read, at, change, CLASS_RULE[change.prop as StyleProp]);
+========
+import { LookKey } from '$lib/canvas/code-look';
+import { LiveProp } from '@feega/live-edit/live-fields';
+import { stylePatch, type LiveAt, type LiveChange, type LivePatched } from '@feega/live-edit/class-patch';
+import { applyEdits, type ReadFile } from '$lib/server/code-import/write-back';
+
+export type { LiveAt, LiveChange, LivePatched };
+
+function textPatch(read: ReadFile, at: LiveAt, change: LiveChange): Promise<LivePatched> {
+  const edit = { at: { file: at.file, line: at.line, column: at.col - 1 }, look: { [LookKey.Text]: change.value }, was: { [LookKey.Text]: change.was ?? '' } };
+  return applyEdits([edit], read);
+}
+
+export function livePatch(read: ReadFile, at: LiveAt, change: LiveChange): Promise<LivePatched> {
+  if (change.prop === LiveProp.Text) {
+    return textPatch(read, at, change);
+  }
+  return stylePatch(read, at, change);
+>>>>>>>> origin/feat/feega-inspect:src/lib/server/live-edit/live-patch.ts
 }

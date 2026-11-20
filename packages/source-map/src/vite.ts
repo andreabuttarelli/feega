@@ -1,15 +1,12 @@
-import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import { searchForWorkspaceRoot, type Plugin } from 'vite';
-import { MAPPED_EXTENSIONS, injectSource } from './inject.ts';
+import { injectSource } from './inject.ts';
 import { fsUrl, sourceId } from './source-id.ts';
 
 const BRIDGE_PATH = fileURLToPath(new URL('./bridge.js', import.meta.url));
 const VITE_CLIENT = /\/vite\/dist\/client\/client\.mjs$/;
 const BRIDGE_IMPORT = `import ${JSON.stringify(fsUrl(BRIDGE_PATH))};`;
-
-const isOwnSource = (id: string) => !id.includes('?') && !id.includes('/node_modules/') && !id.startsWith('\0') && MAPPED_EXTENSIONS.some((ext) => id.endsWith(ext));
 
 export function feegaSource(): Plugin {
   let root = process.cwd();
@@ -27,21 +24,17 @@ export function feegaSource(): Plugin {
       return { server: { fs: { allow: [searchForWorkspaceRoot(process.cwd()), dirname(BRIDGE_PATH)] } } };
     },
 
-    async load(id) {
-      if (!isOwnSource(id)) {
-        return null;
-      }
-
-      const code = await readFile(id, 'utf8').catch(() => null);
-      const out = code === null ? null : injectSource(code, sourceId(root, id));
-      return out === null ? null : { code: out, map: null };
-    },
-
     transform(code, id, options) {
-      if (!VITE_CLIENT.test(id)) {
+      if (VITE_CLIENT.test(id)) {
+        return options?.ssr ? null : { code: `${code}\n${BRIDGE_IMPORT}\n`, map: null };
+      }
+
+      if (id.includes('?') || id.includes('/node_modules/') || id.startsWith('\0')) {
         return null;
       }
-      return options?.ssr ? null : { code: `${code}\n${BRIDGE_IMPORT}\n`, map: null };
+
+      const out = injectSource(code, sourceId(root, id));
+      return out === null ? null : { code: out, map: null };
     }
   };
 }

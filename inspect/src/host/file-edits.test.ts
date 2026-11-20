@@ -353,16 +353,55 @@ describe('fileEdits', () => {
     expect(read(root)).toBe(page);
   });
 
-  it.each([
-    [TAILWIND, '  <h2 class="text-2xl font-semibold">Heading</h2>\n'],
-    [PLAIN, '  <h2 style="font-size: 1.5rem; font-weight: 600">Heading</h2>\n']
-  ])('aggiungere un titolo usa lo stile del progetto, seleziona il nuovo elemento e un undo lo toglie', async (manifest, line) => {
-    const root = app(manifest);
+  it('aggiungere un titolo in Tailwind usa le classi, seleziona il nuovo elemento e un undo lo toglie', async () => {
+    const root = app();
     const edits = fileEdits(root);
     const out = await edits.structure({ op: StructureOp.Add, at: 'src/Page.svelte:2:3', add: { kind: AddKind.Heading } });
 
-    expect(read(root)).toBe(PAGE.replace('  <h1 class="text-2xl">Hello</h1>\n', `  <h1 class="text-2xl">Hello</h1>\n${line}`));
+    expect(read(root)).toBe(PAGE.replace('  <h1 class="text-2xl">Hello</h1>\n', '  <h1 class="text-2xl">Hello</h1>\n  <h2 class="text-2xl font-semibold">Heading</h2>\n'));
     expect(out.ok && out.selected).toEqual({ file: 'src/Page.svelte', line: 3, col: 3 });
+    await edits.undo();
+    expect(read(root)).toBe(PAGE);
+  });
+
+  it('aggiungere un titolo senza Tailwind scrive una classe e la regola, mai uno style, e un undo toglie tutto', async () => {
+    const root = app(PLAIN);
+    const edits = fileEdits(root);
+    const out = await edits.structure({ op: StructureOp.Add, at: 'src/Page.svelte:2:3', add: { kind: AddKind.Heading } });
+    const page = read(root);
+
+    expect(page).not.toMatch(/style=|style\{\{/);
+    expect(page).toMatch(/<h2 class="[\w-]+">Heading<\/h2>/);
+    expect(page).toMatch(/<style>[\s\S]*font-size: 1\.5rem;[\s\S]*font-weight: 600;/);
+    expect(out.ok && out.selected).toEqual({ file: 'src/Page.svelte', line: 3, col: 3 });
+    await edits.undo();
+    expect(read(root)).toBe(PAGE);
+  });
+
+  it('aggiungere un bottone in JSX scrive il modulo css e non uno style', async () => {
+    const root = app(PLAIN);
+    writeFileSync(join(root, 'src/Page.tsx'), 'export function Page() {\n  return (\n    <main>\n      <h1>Hello</h1>\n    </main>\n  );\n}\n');
+    const edits = fileEdits(root);
+    await edits.structure({ op: StructureOp.Add, at: 'src/Page.tsx:4:7', add: { kind: AddKind.Button } });
+    const page = readFileSync(join(root, 'src/Page.tsx'), 'utf8');
+    const sheet = readFileSync(join(root, 'src/Page.module.css'), 'utf8');
+
+    expect(page).not.toContain('style={{');
+    expect(page).toMatch(/<button className=\{styles\.\w+\}>Button<\/button>/);
+    expect(sheet).toContain('padding: 8px 16px;');
+    await edits.undo();
+    expect(existsSync(join(root, 'src/Page.module.css')) ? readFileSync(join(root, 'src/Page.module.css'), 'utf8') : '').toBe('');
+  });
+
+  it('avvolgere senza Tailwind dà al contenitore una classe flex in colonna e non uno style', async () => {
+    const root = app(PLAIN);
+    const edits = fileEdits(root);
+    await edits.structure({ op: StructureOp.Wrap, at: 'src/Page.svelte:2:3' });
+    const page = read(root);
+
+    expect(page).not.toMatch(/style=/);
+    expect(page).toMatch(/<div class="[\w-]+">\n    <h1 class="text-2xl">Hello<\/h1>\n  <\/div>/);
+    expect(page).toMatch(/display: flex;[\s\S]*flex-direction: column;/);
     await edits.undo();
     expect(read(root)).toBe(PAGE);
   });
@@ -373,7 +412,7 @@ describe('fileEdits', () => {
     await edits.structure({ op: StructureOp.Wrap, at: 'src/Page.svelte:2:3' });
     const wrapped = read(root);
 
-    expect(wrapped).toContain('  <div>\n    <h1 class="text-2xl">Hello</h1>\n  </div>\n');
+    expect(wrapped).toContain('  <div class="flex flex-col">\n    <h1 class="text-2xl">Hello</h1>\n  </div>\n');
     await edits.structure({ op: StructureOp.Unwrap, at: 'src/Page.svelte:2:3' });
     expect(read(root)).toBe(PAGE);
     await edits.undo();
