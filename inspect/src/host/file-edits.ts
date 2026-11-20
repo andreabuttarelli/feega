@@ -6,7 +6,7 @@ import { inside, liveAtOf, reader, tokenOf } from '@feega/live-edit/live-ask';
 import { LiveProp } from '@feega/live-edit/live-fields';
 import { literalText } from '@feega/live-edit/literal-text';
 import { moveNode, type Place } from '@feega/live-edit/move-node';
-import { globalSheetOf, googleFontImport } from '@feega/live-edit/font-wiring';
+import { globalSheetOf, googleFontImport, googleFontLink } from '@feega/live-edit/font-wiring';
 import { VariableHome, saveVariable, variableName } from '@feega/live-edit/save-variable';
 import { pageRule } from '@feega/live-edit/page-rule';
 import { scopedRule, type Scope } from '@feega/live-edit/scoped-rule';
@@ -129,9 +129,10 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
 
   async function fontEdited(ask: EditAsk, google: boolean): Promise<Written> {
     const sheet = google ? await globalSheetOf(reader(root)) : null;
-    const wiring = sheet ? await googleFontImport(reader(root), sheet, ask.value ?? '') : null;
+    const linked = google && !sheet ? await googleFontLink(reader(root), ask.value ?? '') : null;
+    const wiring = sheet ? await googleFontImport(reader(root), sheet, ask.value ?? '') : linked;
     const out = await edited(ask, wiring ? [wiring] : []);
-    return out.ok && google && !sheet ? { ...out, note: 'no global stylesheet found: the font is named but not loaded' } : out;
+    return out.ok && google && !sheet && !linked ? { ...out, note: 'no global stylesheet or page head found: the font is named but not loaded' } : out;
   }
 
   async function iconSwapped(rawAt: string, name: string): Promise<Written> {

@@ -184,6 +184,21 @@ describe('fileEdits', () => {
     expect(read(root)).toBe(PAGE);
   });
 
+  it('un font Google senza foglio globale va come link nell\'html della pagina, un passo solo', async () => {
+    const root = app(PLAIN);
+    const html = '<html>\n<head></head>\n<body></body>\n</html>\n';
+    writeFileSync(join(root, 'index.html'), html);
+    const edits = fileEdits(root);
+    const out = await edits.font({ at: 'src/Page.svelte:2:3', prop: LiveProp.Class, value: 'Space Grotesk', css: { 'font-family': "'Space Grotesk', sans-serif" } }, true);
+
+    expect(out).toMatchObject({ ok: true });
+    expect(out.ok && out.note).toBeUndefined();
+    expect(readFileSync(join(root, 'index.html'), 'utf8')).toContain('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk');
+    await edits.undo();
+    expect(readFileSync(join(root, 'index.html'), 'utf8')).toBe(html);
+    expect(read(root)).toBe(PAGE);
+  });
+
   it('salva un colore come variabile: @theme con Tailwind v4, poi la classe del token', async () => {
     const root = app();
     writeFileSync(join(root, 'src/app.css'), '@import "tailwindcss";\n');
