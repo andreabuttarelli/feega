@@ -82,6 +82,20 @@ describe('duplicating a loop item', () => {
     expect(out.ok && out.changes[0].after).toBe(VUE.replace('{ n: 2 }, { n: 3 }', '{ n: 2 }, { n: 2 }, { n: 3 }'));
   });
 
+  it('suffixes the copy of a keyed {#each} so the keys stay unique', async () => {
+    const page = NAV.replace('as link}', 'as link (link.label)}');
+    const out = await run({ ...PROJECT, 'src/routes/+page.svelte': page }, 'src/routes/+page.svelte', 7, 5, StructureOp.Duplicate, 1);
+
+    expect(out.ok && out.changes[0].after).toBe(arrayOf(DOWNLOAD, DOCS, "{ href: DOCS_URL, label: 'Docs copy' }", PRICING));
+  });
+
+  it('suffixes the appended copy of a keyed {#each} of plain strings', async () => {
+    const page = '<ul>\n  {#each PLANS as plan (plan)}\n    <li>{plan}</li>\n  {/each}\n</ul>\n<script>\n  const PLANS = [\'a\', \'b\'];\n</script>\n';
+    const out = await run({ 'a.svelte': page }, 'a.svelte', 3, 5, StructureOp.AddItem, 0);
+
+    expect(out.ok && out.changes[0].after).toContain("const PLANS = ['a', 'b', 'a copy'];");
+  });
+
   it('refuses without the position of the item', async () => {
     const out = await nav(StructureOp.Duplicate);
 

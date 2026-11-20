@@ -1,6 +1,7 @@
 import styles from './App.module.css';
 import { Benefits } from './Benefits';
 import { Faq } from './Faq';
+import { SITE_LINKS } from './links';
 
 const TOPICS = ['Briefs', 'Timelines', 'Assets'];
 
@@ -48,6 +49,11 @@ export function App() {
             <li key={topic} className={styles.topic}>{topic}</li>
           ))}
         </ul>
+        <nav id="site-links" className={styles.siteLinks}>
+          {SITE_LINKS.map((link) => (
+            <a key={link.href} className={styles.chip} href={link.href}>{link.label}</a>
+          ))}
+        </nav>
         <Benefits />
         <Faq />
       </main>

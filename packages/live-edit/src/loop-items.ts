@@ -1,6 +1,7 @@
 import type { LiveAt } from './class-patch';
 import type { ReadFile } from './files';
-import { loopArray, type ArrayLiteral } from './loop-array';
+import { loopArray, type ArrayLiteral, type LoopHead } from './loop-array';
+import { keyedCopy } from './loop-field';
 import type { Structured } from './move-into';
 
 export enum ItemOp {
@@ -16,8 +17,6 @@ const OUTSIDE = 'the item is outside the array';
 const NOW_EMPTY = 'the array is now empty: the loop renders nothing';
 const SINGLE_LINE_GAP = ' ';
 
-const entry = (array: ArrayLiteral, i: number) => array.text.slice(array.pieces[i].start, array.pieces[i].end);
-
 function leadOf(array: ArrayLiteral, i: number): string {
   const { text, pieces } = array;
   const model = i > 0 ? i : pieces.length > 1 ? 1 : 0;
@@ -25,12 +24,12 @@ function leadOf(array: ArrayLiteral, i: number): string {
   return lead || (pieces.length === 1 ? SINGLE_LINE_GAP : '');
 }
 
-function copiedAfter(array: ArrayLiteral, source: number, after: number): Rewrite {
+function copiedAfter(array: ArrayLiteral, head: LoopHead, source: number, after: number): Rewrite {
   const end = array.pieces[after].end;
-  return { text: `${array.text.slice(0, end)},${leadOf(array, after)}${entry(array, source)}${array.text.slice(end)}` };
+  return { text: `${array.text.slice(0, end)},${leadOf(array, after)}${keyedCopy(array, source, head)}${array.text.slice(end)}` };
 }
 
-function removed(array: ArrayLiteral, i: number): Rewrite {
+function removed(array: ArrayLiteral, _head: LoopHead, i: number): Rewrite {
   const { text, pieces } = array;
   if (pieces.length === 1) {
     return { text: text.slice(0, array.open + 1) + text.slice(array.close), note: NOW_EMPTY };
@@ -41,9 +40,9 @@ function removed(array: ArrayLiteral, i: number): Rewrite {
   return { text: text.slice(0, pieces[i].start) + text.slice(pieces[i + 1].start) };
 }
 
-const REWRITES: Record<ItemOp, (array: ArrayLiteral, i: number) => Rewrite> = {
-  [ItemOp.Duplicate]: (array, i) => copiedAfter(array, i, i),
-  [ItemOp.Append]: (array, i) => copiedAfter(array, i, array.pieces.length - 1),
+const REWRITES: Record<ItemOp, (array: ArrayLiteral, head: LoopHead, i: number) => Rewrite> = {
+  [ItemOp.Duplicate]: (array, head, i) => copiedAfter(array, head, i, i),
+  [ItemOp.Append]: (array, head, i) => copiedAfter(array, head, i, array.pieces.length - 1),
   [ItemOp.Delete]: removed
 };
 
@@ -57,11 +56,11 @@ export async function loopItem(read: ReadFile, at: LiveAt, instance: number | un
     return { ok: false, ...found };
   }
 
-  const { array } = found;
+  const { array, head } = found;
   if (!array.pieces[instance]) {
     return { ok: false, reason: OUTSIDE, at };
   }
 
-  const { text, note } = REWRITES[op](array, instance);
+  const { text, note } = REWRITES[op](array, head, instance);
   return { ok: true, changes: [{ path: array.path, before: array.text, after: text }], note };
 }

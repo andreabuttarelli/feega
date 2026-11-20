@@ -79,6 +79,8 @@ function valueSpan(array: ArrayLiteral, entry: Piece, field: string): Piece | Re
   return { start: prop.start + head[0].length, end: prop.end };
 }
 
+const KEY_SUFFIX = ' copy';
+
 function literalAt(array: ArrayLiteral, span: Piece, field: string): StringLiteral | Refused {
   const value = array.text.slice(span.start, span.end).trim();
   const found = value.match(STRING_LITERAL);
@@ -88,6 +90,20 @@ function literalAt(array: ArrayLiteral, span: Piece, field: string): StringLiter
 
   const start = span.start + array.text.slice(span.start).indexOf(found[1]) + 1;
   return { path: array.path, text: array.text, start, end: start + found[2].length, quote: found[1], value: found[2] };
+}
+
+export function keyedCopy(array: ArrayLiteral, index: number, head: LoopHead): string {
+  const entry = array.pieces[index];
+  const text = array.text.slice(entry.start, entry.end);
+  const field = head.key === undefined ? null : fieldOf(head, head.key);
+  const span = field === null ? null : valueSpan(array, entry, field);
+  const literal = field === null || span === null || 'reason' in span ? null : literalAt(array, span, field);
+  if (!literal || 'reason' in literal) {
+    return text;
+  }
+
+  const at = literal.end - entry.start;
+  return text.slice(0, at) + KEY_SUFFIX + text.slice(at);
 }
 
 export async function loopLiteral(read: ReadFile, at: LiveAt, instance: number | undefined, raw: string): Promise<StringLiteral | Refused | null> {

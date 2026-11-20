@@ -28,6 +28,10 @@ const OUTLINE_TOLERANCE_PX = 2;
 const SPACER_PX = 3000;
 const CLIENT_PAGE_MS = 60_000;
 const TOPICS = ['Briefs', 'Timelines', 'Assets'];
+const LOOP_DATA = /(sveltekit|react)-css/.test(APP);
+const SITE_LINKS = ['Download', 'Documentation', 'Community', 'Pricing'];
+const LINKS_FILE = /src\/(lib\/)?links\.(ts|js)$/;
+const DRAG_STEPS = 12;
 const printed = [];
 
 const git = (...args) => execFileSync('git', ['-C', APP, ...args], { encoding: 'utf8' });
@@ -534,6 +538,112 @@ try {
     await undo();
     assert.deepEqual(changedFiles(), [], 'undo restores the array');
   });
+
+  if (LOOP_DATA) {
+    const chips = frame.locator('#site-links > a');
+    const labels = () => chips.allInnerTexts();
+    const hrefs = () => chips.evaluateAll((els) => els.map((el) => el.getAttribute('href')));
+    const selected = async (index) => {
+      await chips.nth(index).click();
+      await page.waitForTimeout(800);
+    };
+    const onlyLinksFile = () => {
+      const files = changedFiles();
+      assert.equal(files.length, 1, `one file changed: ${files}`);
+      assert.ok(LINKS_FILE.test(files[0]), `the data file changed, not the page: ${files}`);
+    };
+
+    await check('loop data: dragging a chip reorders the imported array and one undo restores it', async () => {
+      assert.deepEqual(await labels(), SITE_LINKS);
+      await selected(3);
+      const from = await chips.nth(3).boundingBox();
+      const to = await chips.nth(0).boundingBox();
+      await page.mouse.move(from.x + 8, from.y + from.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(to.x + 3, to.y + to.height / 2, { steps: DRAG_STEPS });
+      await page.waitForTimeout(500);
+      await page.mouse.up();
+      await page.waitForTimeout(SETTLE_MS);
+      assert.deepEqual(await labels(), ['Pricing', 'Download', 'Documentation', 'Community'], 'the page shows the new order');
+      onlyLinksFile();
+      await undo();
+      assert.deepEqual(changedFiles(), [], 'undo restores the data');
+      assert.deepEqual(await labels(), SITE_LINKS, 'undo restores the page');
+    });
+
+    await check('loop data: duplicate copies the entry right after itself and one undo restores it', async () => {
+      await selected(1);
+      await page.keyboard.press('ControlOrMeta+d');
+      await page.waitForTimeout(SETTLE_MS);
+      assert.deepEqual(await labels(), ['Download', 'Documentation', 'Documentation', 'Community', 'Pricing'], 'the page shows the copy');
+      onlyLinksFile();
+      assert.equal(diffText().split('\n').filter((line) => line.startsWith('+') && line.includes("label: 'Documentation'")).length, 1, `the entry was added once:\n${diffText()}`);
+      await undo();
+      assert.deepEqual(changedFiles(), [], 'undo restores the data');
+      assert.deepEqual(await labels(), SITE_LINKS);
+    });
+
+    await check('loop data: the context menu deletes the entry and one undo restores it', async () => {
+      await chips.nth(0).click({ button: 'right' });
+      await page.getByTestId('structure-menu').getByRole('menuitem', { name: /Delete/ }).click();
+      await page.waitForTimeout(SETTLE_MS);
+      assert.deepEqual(await labels(), SITE_LINKS.slice(1), 'the entry left the page');
+      onlyLinksFile();
+      await undo();
+      assert.deepEqual(changedFiles(), [], 'undo restores the data');
+      assert.deepEqual(await labels(), SITE_LINKS);
+    });
+
+    await check('loop data: Add item appends a copy of the selected entry and one undo restores it', async () => {
+      await selected(2);
+      await page.getByTestId('add-button').click();
+      await page.getByTestId('add-menu').getByRole('menuitem', { name: 'Add item' }).click();
+      await page.waitForTimeout(SETTLE_MS);
+      assert.deepEqual(await labels(), [...SITE_LINKS, 'Community'], 'the page shows the new item at the end');
+      onlyLinksFile();
+      await undo();
+      assert.deepEqual(changedFiles(), [], 'undo restores the data');
+      assert.deepEqual(await labels(), SITE_LINKS);
+    });
+
+    await check('loop data: editing the text of a chip writes its label and one undo restores it', async () => {
+      await selected(0);
+      await opened(chips.nth(0));
+      await page.keyboard.press('ControlOrMeta+a');
+      await page.keyboard.type('Get the app');
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(SETTLE_MS);
+      assert.deepEqual(await labels(), ['Get the app', ...SITE_LINKS.slice(1)], 'the page shows the new label');
+      onlyLinksFile();
+      assert.ok(/label: 'Get the app'/.test(diffText()), `the label literal is written:\n${diffText()}`);
+      assert.ok(!/label: 'Download'/.test(readFileSync(join(APP, changedFiles()[0]), 'utf8')), 'only that entry changed');
+      await undo();
+      assert.deepEqual(changedFiles(), [], 'undo restores the data');
+      assert.deepEqual(await labels(), SITE_LINKS);
+    });
+
+    await check('loop data: editing the address of a chip writes its href and one undo restores it', async () => {
+      await selected(0);
+      const address = page.locator('[data-field="link-href"]');
+      await address.waitFor({ timeout: 10_000 });
+      await address.fill('/get-the-app');
+      await address.press('Enter');
+      await page.waitForTimeout(SETTLE_MS);
+      onlyLinksFile();
+      assert.ok(/href: '\/get-the-app'/.test(diffText()), `the href literal is written:\n${diffText()}`);
+      assert.equal((await hrefs())[0], '/get-the-app', 'the page shows the new address');
+      await undo();
+      assert.deepEqual(changedFiles(), [], 'undo restores the data');
+    });
+
+    await check('loop data: an address that is a constant is refused with its name and the source is untouched', async () => {
+      await selected(1);
+      await page.locator('[data-testid="link-refused"]').waitFor({ timeout: 10_000 });
+      assert.match(await page.locator('[data-testid="link-refused"]').innerText(), /DOCS_URL/);
+      assert.equal(await page.locator('[data-field="link-href"]').isDisabled(), true);
+      assert.deepEqual(changedFiles(), []);
+    });
+  }
 
   await check('two components in a page: dragging one layer past the other reorders their usages and one undo restores it', async () => {
     await frame.locator('#benefits').click();

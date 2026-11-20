@@ -7,7 +7,7 @@ export type Piece = { start: number; end: number };
 
 export type Refused = { reason: string; at?: LiveAt };
 
-export type LoopHead = { at: number; expression: string; item: string };
+export type LoopHead = { at: number; expression: string; item: string; key?: string };
 
 export type ArrayLiteral = { path: string; text: string; open: number; close: number; pieces: Piece[] };
 
@@ -20,6 +20,7 @@ const PLAIN_NAME = /^[A-Za-z_$][\w$]*$/;
 const V_FOR = /\sv-for="\s*\(?\s*([^"]*?)\s*\)?\s+(?:in|of)\s+([^"]+?)\s*"/;
 const EACH = /\{#each\s+|\{\/each\}/g;
 const AS = /\s+as\s+/g;
+const EACH_KEY = /^\s*(?:,\s*[A-Za-z_$][\w$]*)?\s*\(([^)]*)\)/;
 const MAP = /\.map\(/g;
 const MAP_PARAMETER = /^\s*\(?\s*/;
 const IDENTIFIER = /^[A-Za-z_$][\w$]*/;
@@ -69,7 +70,9 @@ function eachHeads(text: string, until: number): LoopHead[] {
     AS.lastIndex = EACH.lastIndex;
     const as = AS.exec(text);
     if (as) {
-      open.push({ at: m.index, expression: text.slice(EACH.lastIndex, as.index).trim(), item: patternAt(text, AS.lastIndex) });
+      const item = patternAt(text, AS.lastIndex);
+      const key = text.slice(AS.lastIndex + item.length).match(EACH_KEY)?.[1];
+      open.push({ at: m.index, expression: text.slice(EACH.lastIndex, as.index).trim(), item, key: key?.trim() });
     }
   }
   return open;
@@ -97,13 +100,23 @@ function expressionBefore(text: string, end: number): string {
   return text.slice(i + 1, end).trim();
 }
 
+function staysOpen(rest: string): boolean {
+  let depth = 1;
+  for (const ch of rest) {
+    depth += ch === '(' ? 1 : ch === ')' ? -1 : 0;
+    if (depth === 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function mapHeads(text: string, until: number): LoopHead[] {
   const before = text.slice(0, until);
   const heads: LoopHead[] = [];
   for (const call of before.matchAll(MAP)) {
     const rest = before.slice(call.index + call[0].length);
-    const depth = [...rest].reduce((sum, ch) => sum + (ch === '(' ? 1 : ch === ')' ? -1 : 0), 1);
-    if (depth > 0) {
+    if (staysOpen(rest)) {
       heads.push({ at: call.index, expression: expressionBefore(text, call.index), item: patternAt(rest, rest.match(MAP_PARAMETER)![0].length) });
     }
   }

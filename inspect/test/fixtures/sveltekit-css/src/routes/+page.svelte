@@ -1,6 +1,7 @@
 <script>
 import Benefits from '$lib/Benefits.svelte';
 import Faq from '$lib/Faq.svelte';
+import { SITE_LINKS } from '$lib/links';
 
 const topics = ['Briefs', 'Timelines', 'Assets'];
 
@@ -47,6 +48,11 @@ const plans = [
         <li class="topic">{topic}</li>
       {/each}
     </ul>
+    <nav id="site-links" class="site-links">
+      {#each SITE_LINKS as link}
+        <a class="chip" href={link.href}>{link.label}</a>
+      {/each}
+    </nav>
     <Benefits />
     <Faq />
   </main>
@@ -138,6 +144,19 @@ const plans = [
 
   .topic {
     padding: 8px 0;
+  }
+
+  .site-links {
+    display: flex;
+    gap: 12px;
+  }
+
+  .chip {
+    padding: 4px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+    color: inherit;
+    text-decoration: none;
   }
 
   .badge {

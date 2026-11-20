@@ -123,6 +123,13 @@ describe('moveLoopItem across files', () => {
     expect(out.ok && out.changes[0].after).toContain("{ href: DOCS_URL, label: 'Docs' },\n  { href: '/download', label: 'Download' },");
   });
 
+  it('ignores a .map() that closed earlier in the same file', async () => {
+    const page = NAV_TSX.replace('    <nav>', "    <ul>{['x', 'y'].map((t) => (\n      <li key={t}>{t}</li>\n    ))}</ul>\n    <nav>");
+    const out = await moved({ 'src/nav/Nav.tsx': page, 'src/site/links.ts': LINKS }, 'src/nav/Nav.tsx', 10, 9, 0, 1);
+
+    expect(out.ok && out.changes[0].path).toBe('src/site/links.ts');
+  });
+
   it('follows the @ alias behind a v-for in Vue', async () => {
     const out = await moved({ 'src/Nav.vue': NAV_VUE, 'src/site/links.ts': LINKS }, 'src/Nav.vue', 7, 5, 1, 2);
 
