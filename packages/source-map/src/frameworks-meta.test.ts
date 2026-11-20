@@ -6,11 +6,11 @@ import { stampSources } from './framework-meta.js';
 const docOf = (html: string) => new JSDOM(`<body>${html}</body>`).window.document;
 
 describe('stampSources', () => {
-  it('reads Svelte __svelte_meta', () => {
+  it('reads Svelte __svelte_meta (column is 0-based, tags are 1-based)', () => {
     const doc = docOf('<h1>a</h1>');
     (doc.querySelector('h1') as any).__svelte_meta = { loc: { file: 'src/A.svelte', line: 3, column: 4 } };
     stampSources(doc);
-    expect(doc.querySelector('h1')!.getAttribute(SOURCE_ATTR)).toBe('src/A.svelte:3:4');
+    expect(doc.querySelector('h1')!.getAttribute(SOURCE_ATTR)).toBe('src/A.svelte:3:5');
   });
 
   it('reads React 18 _debugSource', () => {

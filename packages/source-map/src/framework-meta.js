@@ -8,7 +8,7 @@ const format = (file, line, col) => `${file}:${line}:${col}`;
 
 function svelteSource(element) {
   const loc = element.__svelte_meta?.loc;
-  return loc ? format(loc.file, loc.line, loc.column) : null;
+  return loc ? format(loc.file, loc.line, loc.column + 1) : null;
 }
 
 function fiberOf(element) {
