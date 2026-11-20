@@ -11,8 +11,47 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      app: ${{ steps.filter.outputs.app }}
+      landing: ${{ steps.filter.outputs.landing }}
+      web-docs: ${{ steps.filter.outputs.web-docs }}
+      web-blog: ${{ steps.filter.outputs.web-blog }}
+      inspect: ${{ steps.filter.outputs.inspect }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Which areas changed
+        id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            changed="ALL"
+          else
+            changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          fi
+          emit() {
+            if [ "$changed" = "ALL" ] || echo "$changed" | grep -Eq "$2"; then
+              echo "$1=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$1=false" >> "$GITHUB_OUTPUT"
+            fi
+          }
+          emit app '^(src/|supabase/|static/|scripts/|cli/|packages/|tests/|package\.json|package-lock\.json|svelte\.config\.js|vite\.config\.ts|tsconfig\.json|\.github/workflows/ci\.yml)'
+          emit landing '^(landing/|src/lib/content/changelog/|\.github/workflows/ci\.yml)'
+          emit web-docs '^(web-docs/|docs/|cli/|\.github/workflows/ci\.yml)'
+          emit web-blog '^(web-blog/|\.github/workflows/ci\.yml)'
+          emit inspect '^(inspect/|npx/|packages/|\.github/workflows/ci\.yml)'
+
   test:
     runs-on: ubuntu-24.04
+    needs: changes
     env:
       PUBLIC_SUPABASE_URL: http://localhost:54321
       PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
@@ -20,82 +59,103 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        if: needs.changes.outputs.app == 'true'
         with:
           node-version: 22
           cache: npm
 
       - run: npm ci
+        if: needs.changes.outputs.app == 'true'
 
       - name: Billing SQL harnesses (pglite)
+        if: needs.changes.outputs.app == 'true'
         run: npm run test:credit-expiry && npm run test:seat-billing && npm run test:billing-rls
 
       - name: Runtime type gate
+        if: needs.changes.outputs.app == 'true'
         run: node scripts/typecheck-runtime.mjs
 
       - name: Type check (svelte-check)
+        if: needs.changes.outputs.app == 'true'
         env:
           NODE_OPTIONS: --max-old-space-size=6144
         run: cp .env.example .env && npm run check && rm .env
 
       - name: Build
+        if: needs.changes.outputs.app == 'true'
         env:
           NODE_OPTIONS: --max-old-space-size=8192
         run: npx vite build && rm -rf .vercel/output build
 
       - name: Unit tests
+        if: needs.changes.outputs.app == 'true'
         run: npx vitest run
 
   web-docs:
     runs-on: ubuntu-24.04
+    needs: changes
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        if: needs.changes.outputs.web-docs == 'true'
         with:
           node-version: 22
           cache: npm
 
       - run: npm --prefix web-docs ci
+        if: needs.changes.outputs.web-docs == 'true'
 
       - name: Build the docs site
+        if: needs.changes.outputs.web-docs == 'true'
         run: npm --prefix web-docs run build
 
   web-blog:
     runs-on: ubuntu-24.04
+    needs: changes
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        if: needs.changes.outputs.web-blog == 'true'
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: web-blog/package-lock.json
 
       - run: npm --prefix web-blog ci
+        if: needs.changes.outputs.web-blog == 'true'
 
       - name: Build the blog
+        if: needs.changes.outputs.web-blog == 'true'
         run: npm --prefix web-blog run build
 
       - name: Check the built blog's social previews
+        if: needs.changes.outputs.web-blog == 'true'
         run: npm --prefix web-blog test
 
   landing:
     runs-on: ubuntu-24.04
+    needs: changes
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        if: needs.changes.outputs.landing == 'true'
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: landing/package-lock.json
 
       - run: npm --prefix landing ci
+        if: needs.changes.outputs.landing == 'true'
 
       - name: Landing tests
+        if: needs.changes.outputs.landing == 'true'
         run: npm --prefix landing test
 
       - name: Landing build
+        if: needs.changes.outputs.landing == 'true'
         run: npm --prefix landing run build
 
   schema-drift:
