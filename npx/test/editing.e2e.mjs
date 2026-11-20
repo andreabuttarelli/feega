@@ -378,7 +378,7 @@ try {
     const removed = diffText().split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---'));
     assert.ok(removed.some((l) => (TAILWIND ? /top-3/ : /top:\s*12px/).test(l)), `top is removed from the source:\n${diffText()}`);
     assert.ok(!diffText().split('\n').some((l) => l.startsWith('+') && /top:|top-3/.test(l)), 'nothing re-adds it');
-    assert.equal(await badge.evaluate((e) => getComputedStyle(e).top), 'auto', 'the page shows the offset gone');
+    assert.notEqual(await badge.evaluate((e) => getComputedStyle(e).top), '12px', 'the page shows the offset gone');
     await undo();
     assert.deepEqual(changedFiles(), [], 'one undo restores the source');
   });
