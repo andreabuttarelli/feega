@@ -16,7 +16,7 @@ const EACH_OPEN = /\{#each\b/g;
 const EACH_CLOSE = /\{\/each\}/g;
 const MAP_CALL = /\.map\(/;
 
-const hiddenOut = (text: string) => text.replace(HIDDEN_BLOCK, (block) => ' '.repeat(block.length));
+const hiddenOut = (text: string) => text.replace(HIDDEN_BLOCK, (block) => block.replace(/[^\n]/g, ' '));
 
 function spanOf(text: string, start: number): Span | null {
   const name = text.slice(start).match(TAG_AT)?.[1];

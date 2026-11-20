@@ -18,6 +18,24 @@ const JSX = `export function Nav() {
 }
 `;
 
+const VUE = `<script setup>
+const plans = [1, 2];
+</script>
+
+<template>
+  <nav>
+    <a href="#a">A</a>
+    <a href="#b">B</a>
+  </nav>
+</template>
+
+<style scoped>
+.nav {
+  gap: 8px;
+}
+</style>
+`;
+
 const EACH = `<ul>
   {#each items as item}
     <li>{item}</li>
@@ -30,6 +48,12 @@ const at = (file: string, line: number, col: number) => ({ file, line, col });
 const run = (text: string, file: string, from: [number, number], to: [number, number], place: Place) => moveNode(async () => text, at(file, ...from), at(file, ...to), place);
 
 describe('moveNode', () => {
+  it('moves an element in a Vue file whose script comes first', async () => {
+    const out = await run(VUE, 'App.vue', [7, 5], [8, 5], Place.After);
+
+    expect(out.ok && out.change.after).toBe(VUE.replace('    <a href="#a">A</a>\n    <a href="#b">B</a>\n', '    <a href="#b">B</a>\n    <a href="#a">A</a>\n'));
+  });
+
   it('moves a Svelte element with its subtree after a sibling', async () => {
     const out = await run(SVELTE, 'Nav.svelte', [3, 3], [4, 3], Place.After);
 
