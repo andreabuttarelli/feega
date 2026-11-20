@@ -64,7 +64,7 @@ const check = async (name, run) => {
     await run();
     results.push(`PASS ${name}`);
   } catch (error) {
-    results.push(`FAIL ${name}: ${String(error.message).split('\n')[0]}`);
+    results.push(`FAIL ${name}: ${String(error.message).split("\n")[0]} @ ${String(error.stack).split("\n").find((l) => l.includes("editing.e2e"))}`);
   }
 };
 
@@ -88,6 +88,10 @@ try {
     await page.mouse.dblclick(box.x + 20, box.y + box.height / 2);
     await frame.locator('[contenteditable]').first().waitFor({ timeout: 5000 });
   };
+
+  await page.getByTestId('address').fill('/');
+  await page.getByTestId('address').press('Enter');
+  await page.waitForTimeout(SETTLE_MS);
 
   await check('layers tree is filled on first load', async () => {
     const rows = await page.locator('[data-testid="layers"] [data-layer]').count();
@@ -430,8 +434,10 @@ try {
       await address.fill('/client');
       await address.press('Enter');
       await frame.locator('#client-title').waitFor({ timeout: CLIENT_PAGE_MS });
+      await page.getByRole('radio', { name: 'Navigate' }).click();
       await frame.locator('#count').click();
       await frame.getByText('Clicked 1').waitFor({ timeout: CLIENT_PAGE_MS });
+      await page.getByRole('radio', { name: 'Design' }).click();
       await frame.locator('#client-title').click();
       await page.waitForTimeout(800);
       const picked = await page.locator('[data-testid="layers"] [data-layer][aria-selected="true"]').count();
