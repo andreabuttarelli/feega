@@ -8,6 +8,8 @@
   import PanelLeft from '@lucide/svelte/icons/panel-left';
   import Undo2 from '@lucide/svelte/icons/undo-2';
   import { LiveProp } from '@feega/live-edit/live-fields';
+  import { ElementState } from '@feega/live-edit/element-state';
+  import type { Styles } from './controls';
   import { untrack } from 'svelte';
   import { selectionKey, SelectionKey } from './selection-keys';
   import { AccountState, Mode, Onboarding, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
@@ -16,6 +18,7 @@
   import { iconDrawn, iconsFound } from './icon-search.svelte';
   import { pageBridge, sourceText } from './page-bridge';
   import Properties from './Properties.svelte';
+  import { badgeOf } from './states';
   import Interactions from './Interactions.svelte';
   import { wiringState } from './wiring-state.svelte';
   import ModeSwitch from './ModeSwitch.svelte';
@@ -68,6 +71,9 @@
   let textPending: string | null = null;
   let hover = $state<Pick | null>(null);
   let picked = $state<Pick | null>(null);
+  let elementState = $state(ElementState.Default);
+  let baseline = $state<Styles | null>(null);
+  const writtenState = $derived(elementState === ElementState.Default ? undefined : elementState);
   const TOAST_MS = 2500;
   let toast = $state<string | null>(null);
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -202,6 +208,7 @@
       bridge.mode(mode);
       bridge.tree();
       bridge.palette();
+      untrack(() => picked && elementState !== ElementState.Default && bridge.force(picked.source, elementState));
       refresh();
       bridge.track(Slot.Selected, untrack(() => picked?.source) ?? null, untrack(() => picked?.instanceIndex));
       bridge.track(Slot.Hovered, untrack(() => hover?.source) ?? null, untrack(() => hover?.instanceIndex));
@@ -262,6 +269,28 @@
     }
   });
 
+  $effect(() => {
+    pickedAt;
+    untrack(() => {
+      if (elementState !== ElementState.Default) {
+        elementState = ElementState.Default;
+        baseline = null;
+        bridge.force(null, ElementState.Default);
+      }
+    });
+  });
+
+  async function chooseState(next: ElementState) {
+    if (!picked || next === elementState) {
+      return;
+    }
+    baseline = elementState === ElementState.Default ? { ...picked.styles } : baseline;
+    elementState = next;
+    bridge.force(picked.source, next);
+    baseline = next === ElementState.Default ? null : baseline;
+    picked = (await bridge.again(picked.source, picked.instanceIndex)) ?? picked;
+  }
+
   function refresh() {
     if (picked) {
       bridge.again(picked.source, picked.instanceIndex).then((p) => (picked = p ?? picked));
@@ -315,7 +344,7 @@
         problem = { text: m.reason ?? 'Not saved', at: m.at };
         saved = null;
         if (picked) {
-          bridge.clear(picked.source);
+          bridge.clear(picked.source, writtenState);
           refresh();
         }
         return;
@@ -334,7 +363,7 @@
           select(created);
         }
         if (picked) {
-          bridge.settle(picked.source);
+          bridge.settle(picked.source, writtenState);
         }
       }, SETTLE_MS);
     },
@@ -467,7 +496,7 @@
 
   function preview(row: Row, value: string) {
     if (picked) {
-      bridge.preview(picked.source, row.preview(value), picked.inner);
+      bridge.preview(picked.source, row.preview(value), picked.inner, writtenState);
     }
   }
 
@@ -475,7 +504,7 @@
 
   function askOf(row: Row, value: string, token?: string) {
     const { prop, side, family, value: written } = row.change(value);
-    return { at: sourceText(picked!.source), prop, side, family, value: written, token, rem: picked!.rem, viewport: picked!.viewport, css: kebab(row.preview(value)), scope, inner: picked!.inner, page: picked!.page };
+    return { at: sourceText(picked!.source), prop, side, family, value: written, token, rem: picked!.rem, viewport: picked!.viewport, css: kebab(row.preview(value)), scope, inner: picked!.inner, page: picked!.page, state: writtenState };
   }
 
   function change(row: Row, value: string, token?: string) {
@@ -650,7 +679,7 @@
   <aside class="left" class:closed={leftClosed}>
     <header class="left-head">Layers<button type="button" class="add" title="Add an element (/)" aria-label="Add" data-testid="add-button" disabled={!picked} onclick={(e) => openAddMenu(e.clientX, e.clientY)}>+ Add</button></header>
     <div class="layers" role="tree" aria-label="Layers" data-testid="layers">
-      <LayersTree nodes={layers} {picked} open={layersOpen} onselect={select} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} />
+      <LayersTree nodes={layers} {picked} badge={badgeOf(elementState)} open={layersOpen} onselect={select} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} />
     </div>
     {#if !leftClosed}<span class="edge-right" role="separator" aria-orientation="vertical" aria-label="Resize Layers" title="Drag to resize, double-click to reset" onpointerdown={(e) => ((e.currentTarget as HTMLElement).setPointerCapture(e.pointerId), (leftSizing = { x: e.clientX, width: leftPx }))} onpointermove={(e) => leftSizing && (leftWidth = leftSizing.width + (e.clientX - leftSizing.x))} onpointerup={() => leftSizing && ((leftSizing = null), (leftWidth = leftPx), savePrefs())} ondblclick={() => ((leftWidth = LEFT_DEFAULT_PX), savePrefs())}></span>{/if}
   </aside>
@@ -679,7 +708,7 @@
             {#if hover}<div class="outline hover" style={box(hover)}></div>{/if}
             {#if drop}<div class="drop-line" class:box={drop.kind === DropKind.Inside} style={`left:${drop.line.x * fit.scale - 1}px;top:${drop.line.y * fit.scale - 1}px;width:${Math.max(2, drop.line.w * fit.scale)}px;height:${Math.max(2, drop.line.h * fit.scale)}px`}></div>{/if}
           {#if picked && hint}{#each hintBoxes(picked, hint) as area, i (i)}<div class="hint {hint.group}" style={`left:${area.x * fit.scale}px;top:${area.y * fit.scale}px;width:${area.w * fit.scale}px;height:${area.h * fit.scale}px`}></div>{/each}{/if}
-          {#if picked}<div class="outline picked" style={box(picked)}><span class="label"><Breadcrumb pick={picked} onselect={select} compact /></span></div>{/if}
+          {#if picked}<div class="outline picked" style={box(picked)}><span class="label"><Breadcrumb pick={picked} onselect={select} compact state={elementState} /></span></div>{/if}
           </div>
         {/if}
         {#if size !== Size.Full}
@@ -751,7 +780,7 @@
       <Tabs.Content value={Tab.Properties}>
         {#if picked}
           <div class="what" data-testid="selection">
-            <Breadcrumb pick={picked} onselect={select} />
+            <Breadcrumb pick={picked} onselect={select} state={elementState} />
             <span class="where">{#if picked.component}in {picked.component.file.split('/').pop()} · {/if}<button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file.split('/').pop()}:{picked.source.line}</button></span>
             {#if authored(picked.classes)}<code class="classes">{authored(picked.classes)}</code>{/if}
           </div>
@@ -759,7 +788,7 @@
             <button type="button" class:on={scope === Scope.Element} onclick={() => (scope = Scope.Element)} title="Only this element (every instance of its component: {picked.instances})">This element{picked.instances > 1 ? ` ×${picked.instances}` : ''}</button>
             <button type="button" class:on={scope === Scope.Class} disabled={!picked.classCount || styling === Styling.Tailwind} onclick={() => (scope = Scope.Class)} title={styling === Styling.Tailwind ? 'Class scope needs CSS rules, not Tailwind' : `Every element with this class: ${picked.classCount}`}>All .{picked.classes.split(' ')[0] || 'class'}{picked.classCount ? ` (${picked.classCount})` : ''}</button>
           </div>
-          <Properties pick={picked} {palette} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onnotice={showToast} />
+          <Properties pick={picked} {palette} {elementState} {baseline} onstate={chooseState} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onnotice={showToast} />
           <Interactions pick={picked} {changes} />
         {:else}
           <p class="empty">{bridged ? 'Click an element to edit it. Double-click text to rewrite it.' : 'The page has no Feega source map: element picking needs the feega-source-map plugin.'}</p>

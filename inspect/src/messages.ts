@@ -47,6 +47,7 @@ export type Pick = {
   page?: PageTarget;
   attributes?: { name: string; value: string }[];
   markup?: string;
+  states?: string[];
 };
 
 export enum Move {
@@ -247,6 +248,7 @@ export const TEXT_RESTORE = 'feega:text:restore';
 export const TRACK = 'feega:track';
 export const TRACKED = 'feega:tracked';
 export const LEAVE = 'feega:leave';
+export const FORCE = 'feega:force';
 
 export enum Slot {
   Selected = 'selected',

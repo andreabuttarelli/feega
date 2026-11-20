@@ -30,11 +30,17 @@
   import IconActions from './IconActions.svelte';
   import Link from '@lucide/svelte/icons/link';
   import { iconRowNames } from './icon-controls';
+  import StateSwitch from './StateSwitch.svelte';
+  import { ElementState } from '@feega/live-edit/element-state';
+  import { changedKeys, isChanged } from './states';
   import type { FontChoice, Palette, Pick } from '../messages';
 
-  type Props = { pick: Pick; onpreview: (row: Row, value: string) => void; onchange: (row: Row, value: string, token?: string) => void; onsavevar: (row: Row, name: string, css: string) => void; onhint: (hint: Hint | null) => void; onfont: (font: FontChoice) => void; onnotice: (text: string) => void; palette: Palette };
+  type Props = { pick: Pick; onpreview: (row: Row, value: string) => void; onchange: (row: Row, value: string, token?: string) => void; onsavevar: (row: Row, name: string, css: string) => void; onhint: (hint: Hint | null) => void; onfont: (font: FontChoice) => void; onnotice: (text: string) => void; palette: Palette; elementState?: ElementState; baseline?: Record<string, string> | null; onstate?: (state: ElementState) => void };
 
-  let { pick, onpreview, onchange, onhint, onfont, onnotice, palette, onsavevar }: Props = $props();
+  let { pick, onpreview, onchange, onhint, onfont, onnotice, palette, onsavevar, elementState = ElementState.Default, baseline = null, onstate }: Props = $props();
+
+  const differs = $derived(changedKeys(ROWS, pick.styles, baseline));
+  const changed = (key: string) => isChanged(differs, key);
 
   const WEIGHT_NAMES: Record<string, string> = { '100': 'Thin', '200': 'Extra light', '300': 'Light', '400': 'Regular', '500': 'Medium', '600': 'Semibold', '700': 'Bold', '800': 'Extra bold', '900': 'Black' };
   const TEXT_ALIGN = [
@@ -140,7 +146,7 @@
 </script>
 
 {#snippet header(section: Section, actions?: Snippet, inline = false)}
-  <div class="head" class:inline data-row={inline ? section : undefined}>
+  <div class="head" class:inline class:differs={inline && changed(section)} data-row={inline ? section : undefined}>
     {#if inline}
       <span class="label title-inline">{section}</span>
       <div class="control">{@render actions?.()}</div>
@@ -154,7 +160,7 @@
 {/snippet}
 
 {#snippet row(label: string, content: Snippet, name = '')}
-  <div class="row" data-row={name || label}>
+  <div class="row" class:differs={changed(name || label)} data-row={name || label}>
     <span class="label">{label}</span>
     <div class="control">{@render content()}</div>
   </div>
@@ -245,6 +251,10 @@
 {/snippet}
 
 <div class="properties" data-testid="properties">
+  {#if onstate && !pick.page && role !== Role.Head}
+    <StateSwitch tag={pick.tag} state={elementState} authored={pick.states ?? []} {onstate} />
+  {/if}
+
   {#if role === Role.Head}
     <section data-section="attributes">
       {#each pick.attributes ?? [] as a (a.name)}
@@ -374,7 +384,7 @@
             {#if r.name === OffsetSide.Top}<div class="row" data-row="offsets"><span class="label"></span><div class="control reset-pair">{@render offsetBox()}<span class="icon reset slot-only" aria-hidden="true">×</span></div></div>{/if}
           {:else}
           {@const from = pick.inherited?.[READS[r.name]]}
-          <div class="row" class:inherited={from} data-row={r.name} title={from ? `Inherited from ${from}` : undefined}>
+          <div class="row" class:inherited={from} class:differs={changed(r.name)} data-row={r.name} title={from ? `Inherited from ${from}` : undefined}>
             <span class="label">{r.label}</span>
             <div class="control reset-pair">
               {#if r.control === Control.Number}
@@ -405,6 +415,11 @@
 
   .row.inherited .control > :global(:first-child) {
     opacity: 0.55;
+  }
+
+  .properties :global(.row.differs > .label),
+  .properties :global(.head.differs > .label) {
+    color: var(--ui-accent);
   }
 
   .reset.slot-only {
