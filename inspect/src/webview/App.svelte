@@ -8,14 +8,23 @@
   import PanelLeft from '@lucide/svelte/icons/panel-left';
   import Undo2 from '@lucide/svelte/icons/undo-2';
   import { LiveProp } from '@feega/live-edit/live-fields';
+  import { ElementState } from '@feega/live-edit/element-state';
+  import type { Styles } from './controls';
   import { untrack } from 'svelte';
   import { selectionKey, SelectionKey } from './selection-keys';
   import { AccountState, Mode, Onboarding, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
-  import { fromHost, toHost } from './host';
+  import { fromHost, inVscode, toHost } from './host';
   import { imageSaved } from './image-file.svelte';
-  import { iconSearch } from './icon-search.svelte';
+  import { iconDrawn, iconsFound } from './icon-search.svelte';
   import { pageBridge, sourceText } from './page-bridge';
   import Properties from './Properties.svelte';
+  import BreakpointBar from './BreakpointBar.svelte';
+  import ThemeBar from './ThemeBar.svelte';
+  import { DEFAULT as DEFAULT_THEME_ENTRY, DEFAULT_THEME, type Theme } from '@feega/live-edit/themes';
+  import { activeApply, stillThere, themeBadge, writtenTheme } from './theme-pick';
+  import { DEFAULT_BREAKPOINTS, type Breakpoints } from '@feega/live-edit/breakpoints';
+  import { FOLLOW, badgeText, reachItems, writeTarget } from './responsive';
+  import { badgeOf } from './states';
   import Interactions from './Interactions.svelte';
   import { wiringState } from './wiring-state.svelte';
   import ModeSwitch from './ModeSwitch.svelte';
@@ -41,8 +50,9 @@
   import { Place } from '@feega/live-edit/move-node';
   import { StructureOp } from '@feega/live-edit/structure';
   import StructureMenu from './StructureMenu.svelte';
+  import { agentContext } from './agent-context';
   import { AddKind } from '@feega/live-edit/add-node';
-  import { ADD_ITEMS, MENU_ITEMS } from './structure-menu';
+  import { ADD_ITEMS, ADD_LOOP_ITEM, COPY_FOR_AGENT, MENU_ITEMS } from './structure-menu';
   import { modeOfKey } from './modes';
   import { browseHistory } from './history';
   import { DEFAULT_ANCHOR, anchorBox, isAnchor, nearestAnchor, nextAnchor, type Anchor } from './anchors';
@@ -59,6 +69,11 @@
   let address = $state('/');
   let attachAddress = $state('');
   let styling = $state(Styling.Tailwind);
+  let breakpoints = $state<Breakpoints>(DEFAULT_BREAKPOINTS);
+  let themes = $state<Theme[]>([DEFAULT_THEME_ENTRY]);
+  let themeName = $state(DEFAULT_THEME);
+  const writtenThemeName = $derived(writtenTheme(themeName));
+  let reach = $state(FOLLOW);
   let server = $state(ServerState.Detecting);
   let serverReason = $state('');
   let serverInfo = $state<ServerInfo | null>(null);
@@ -68,6 +83,9 @@
   let textPending: string | null = null;
   let hover = $state<Pick | null>(null);
   let picked = $state<Pick | null>(null);
+  let elementState = $state(ElementState.Default);
+  let baseline = $state<Styles | null>(null);
+  const writtenState = $derived(elementState === ElementState.Default ? undefined : elementState);
   const TOAST_MS = 2500;
   let toast = $state<string | null>(null);
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -123,8 +141,13 @@
   let layersOpen = $state<Record<string, boolean>>({ '(html):0:0': true, '(page):0:0': true });
   const layerDrag = $state<{ source: Source | null; name: string; component: boolean; parentFile: string | null }>({ source: null, name: '', component: false, parentFile: null });
 
-  async function hoverLayer(source: Source | null) {
-    hover = source ? await bridge.again(source) : null;
+  let hoverAsked = 0;
+  async function hoverLayer(source: Source | null, instance: number) {
+    const asked = ++hoverAsked;
+    const found = source ? await bridge.again(source, instance) : null;
+    if (asked === hoverAsked) {
+      hover = found;
+    }
   }
 
   $effect(() => {
@@ -181,6 +204,17 @@
   const history = browseHistory();
   let savedPrefs = false;
   const fit = $derived(fitOf(size, custom, stage));
+  const target = $derived(writeTarget(reach, size !== Size.Full, breakpoints, fit.width));
+  const reachBadge = $derived(badgeText(breakpoints, target, fit.width));
+  $effect(() => {
+    fit.width;
+    untrack(() => {
+      if (bridged) {
+        bridge.tree();
+        refresh();
+      }
+    });
+  });
   const area = $derived({ x: leftPx, y: toolbarH, w: stage.w, h: stage.h });
   const barAt = $derived(moving ? { x: moving.x, y: moving.y } : anchorBox(anchor, area, bar));
   const canBack = $derived((navTick, history.canBack()));
@@ -195,8 +229,10 @@
       server = ServerState.Running;
       visited(path);
       bridge.mode(mode);
+      showTheme();
       bridge.tree();
       bridge.palette();
+      untrack(() => picked && elementState !== ElementState.Default && bridge.force(picked.source, elementState));
       refresh();
       bridge.track(Slot.Selected, untrack(() => picked?.source) ?? null, untrack(() => picked?.instanceIndex));
       bridge.track(Slot.Hovered, untrack(() => hover?.source) ?? null, untrack(() => hover?.instanceIndex));
@@ -222,7 +258,7 @@
     text: (source, text, was) => {
       editing = false;
       textPending = source;
-      toHost({ kind: ToHost.Edit, ask: { at: source, prop: LiveProp.Text, value: text, was } });
+      toHost({ kind: ToHost.Edit, ask: { at: source, prop: LiveProp.Text, value: text, was, instance: picked?.instanceIndex } });
     }
   });
 
@@ -252,10 +288,47 @@
     }
   });
   $effect(() => {
+    pickedAt;
+    toHost({ kind: ToHost.Selected, at: untrack(() => picked?.source) ?? null });
+  });
+  $effect(() => {
     if (bridged) {
       bridge.track(Slot.Hovered, hoverAt === null ? null : untrack(() => hover!.source), untrack(() => hover?.instanceIndex));
     }
   });
+
+  $effect(() => {
+    pickedAt;
+    untrack(() => {
+      if (elementState !== ElementState.Default) {
+        elementState = ElementState.Default;
+        baseline = null;
+        bridge.force(null, ElementState.Default);
+      }
+    });
+  });
+
+  async function chooseState(next: ElementState) {
+    if (!picked || next === elementState) {
+      return;
+    }
+    baseline = elementState === ElementState.Default ? { ...picked.styles } : baseline;
+    elementState = next;
+    bridge.force(picked.source, next);
+    baseline = next === ElementState.Default ? null : baseline;
+    picked = (await bridge.again(picked.source, picked.instanceIndex)) ?? picked;
+  }
+
+  function showTheme() {
+    const plain = $state.snapshot(themes);
+    bridge.theme(plain.map((t) => t.apply), activeApply(plain, themeName));
+  }
+
+  function chooseTheme(name: string) {
+    themeName = name;
+    showTheme();
+    refresh();
+  }
 
   function refresh() {
     if (picked) {
@@ -288,7 +361,7 @@
   }
 
   const handlers: { [K in ToView]: (m: Extract<ViewMessage, { kind: K }>) => void } = {
-    [ToView.App]: (m) => (restore(m.prefs), (route = m.route ?? route), (start = new URL(route, m.url).toString()), (url = m.url), (styling = m.styling)),
+    [ToView.App]: (m) => (restore(m.prefs), (route = m.route ?? route), (start = new URL(route, m.url).toString()), (url = m.url), (styling = m.styling), (breakpoints = m.breakpoints), (themes = m.themes), (themeName = stillThere(m.themes.map((t) => t.name), themeName)), showTheme()),
     [ToView.History]: (m) => ((changes = m.changes), (canUndo = m.canUndo), (canRedo = m.canRedo)),
     [ToView.Settings]: (m) => {
       settings = m.values;
@@ -310,7 +383,7 @@
         problem = { text: m.reason ?? 'Not saved', at: m.at };
         saved = null;
         if (picked) {
-          bridge.clear(picked.source);
+          bridge.clear(picked.source, writtenState);
           refresh();
         }
         return;
@@ -329,15 +402,16 @@
           select(created);
         }
         if (picked) {
-          bridge.settle(picked.source);
+          bridge.settle(picked.source, writtenState);
         }
       }, SETTLE_MS);
     },
     [ToView.Account]: (m) => (account = { state: m.state, email: m.email }),
     [ToView.Onboarding]: (m) => (onboarding = m.state),
-    [ToView.IconResults]: (m) => Object.assign(iconSearch, { id: m.id, library: m.library, hits: m.hits, error: m.error ?? '' }),
+    [ToView.IconResults]: (m) => iconsFound({ id: m.id, library: m.library, hits: m.hits, error: m.error ?? '' }),
+    [ToView.IconPreview]: (m) => iconDrawn(m.name, m.svg),
     [ToView.ImageSaved]: (m) => (imageSaved.url = m.url),
-    [ToView.Wiring]: (m) => Object.assign(wiringState, { at: m.at, wiring: m.wiring }),
+    [ToView.Wiring]: (m) => Object.assign(wiringState, { at: m.at, instance: m.instance, wiring: m.wiring }),
     [ToView.Pick]: (m) => bridge.at(m.x, m.y).then((pick) => ((picked = pick), toHost({ kind: ToHost.Picked, id: m.id, pick }))),
     [ToView.Change]: (m) => {
       const row = ROWS.find((r) => r.name === m.row);
@@ -461,7 +535,7 @@
 
   function preview(row: Row, value: string) {
     if (picked) {
-      bridge.preview(picked.source, row.preview(value), picked.inner);
+      bridge.preview(picked.source, row.preview(value), picked.inner, writtenState);
     }
   }
 
@@ -469,7 +543,7 @@
 
   function askOf(row: Row, value: string, token?: string) {
     const { prop, side, family, value: written } = row.change(value);
-    return { at: sourceText(picked!.source), prop, side, family, value: written, token, rem: picked!.rem, viewport: picked!.viewport, css: kebab(row.preview(value)), scope, inner: picked!.inner, page: picked!.page };
+    return { at: sourceText(picked!.source), prop, side, family, value: written, token, rem: picked!.rem, viewport: picked!.viewport, css: kebab(row.preview(value)), scope, inner: picked!.inner, page: picked!.page, state: writtenState, breakpoint: target, theme: writtenThemeName };
   }
 
   function change(row: Row, value: string, token?: string) {
@@ -521,8 +595,9 @@
   const STRUCTURE_KEYS = new Set(['Delete', 'Backspace']);
   const typing = (e: KeyboardEvent) => e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement;
 
-  async function select(source: Source) {
-    picked = (await bridge.again(source)) ?? picked;
+  async function select(source: Source, instance = 0) {
+    bridge.reveal(source, instance);
+    picked = (await bridge.again(source, instance)) ?? picked;
   }
 
   async function moveSelection(move: Move) {
@@ -559,11 +634,24 @@
     toHost(kind === AddKind.Image ? { kind: ToHost.AddImage, at } : { kind: ToHost.Structure, op: StructureOp.Add, at, add: { kind } });
   }
 
+  function copyForAgent() {
+    if (!picked) {
+      return;
+    }
+    const text = agentContext(picked, { route, width: Math.round(fit.width), breakpoint: size === Size.Full ? undefined : reachBadge, theme: themeName === DEFAULT_THEME ? undefined : themeName, state: elementState === ElementState.Default ? undefined : elementState });
+    if (inVscode) {
+      toHost({ kind: ToHost.Copy, text });
+    } else {
+      void navigator.clipboard?.writeText(text);
+    }
+    showToast('Copied for your agent');
+  }
+
   function restructure(op: StructureOp) {
     if (!picked) {
       return;
     }
-    toHost({ kind: ToHost.Structure, op, at: sourceText(picked.source) });
+    toHost({ kind: ToHost.Structure, op, at: sourceText(picked.source), instance: picked.instanceIndex });
     if (op === StructureOp.Delete) {
       picked = null;
     }
@@ -575,7 +663,7 @@
     }
     const css = fontCss(font.family);
     bridge.preview(picked.source, { fontFamily: css });
-    toHost({ kind: ToHost.Font, google: font.google, ask: { at: sourceText(picked.source), prop: LiveProp.Class, family: ClassFamily.FontFamily, value: `font-['${font.family.replace(/\s+/g, '_')}']`, css: { 'font-family': css }, rem: picked.rem, viewport: picked.viewport, scope } });
+    toHost({ kind: ToHost.Font, google: font.google, ask: { at: sourceText(picked.source), prop: LiveProp.Class, family: ClassFamily.FontFamily, value: `font-['${font.family.replace(/\s+/g, '_')}']`, css: { 'font-family': css }, rem: picked.rem, viewport: picked.viewport, scope, breakpoint: target, theme: writtenThemeName } });
   }
 
   function onKey(e: KeyboardEvent) {
@@ -643,7 +731,7 @@
   <aside class="left" class:closed={leftClosed}>
     <header class="left-head">Layers<button type="button" class="add" title="Add an element (/)" aria-label="Add" data-testid="add-button" disabled={!picked} onclick={(e) => openAddMenu(e.clientX, e.clientY)}>+ Add</button></header>
     <div class="layers" role="tree" aria-label="Layers" data-testid="layers">
-      <LayersTree nodes={layers} {picked} open={layersOpen} onselect={select} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} />
+      <LayersTree nodes={layers} {picked} badge={badgeOf(elementState)} open={layersOpen} onselect={select} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} />
     </div>
     {#if !leftClosed}<span class="edge-right" role="separator" aria-orientation="vertical" aria-label="Resize Layers" title="Drag to resize, double-click to reset" onpointerdown={(e) => ((e.currentTarget as HTMLElement).setPointerCapture(e.pointerId), (leftSizing = { x: e.clientX, width: leftPx }))} onpointermove={(e) => leftSizing && (leftWidth = leftSizing.width + (e.clientX - leftSizing.x))} onpointerup={() => leftSizing && ((leftSizing = null), (leftWidth = leftPx), savePrefs())} ondblclick={() => ((leftWidth = LEFT_DEFAULT_PX), savePrefs())}></span>{/if}
   </aside>
@@ -659,6 +747,7 @@
         <input bind:value={address} aria-label="Route" data-testid="address" spellcheck="false" />
       </form>
       <DeviceBar {size} {fit} onsize={pickSize} onwidth={(w) => ((custom = snapped(w)), (size = Size.Custom), savePrefs())} />
+      {#if themes.length > 1}<ThemeBar {themes} choice={themeName} onchoose={chooseTheme} />{/if}
       {#if fit.scale < 1}<span class="zoom" data-testid="zoom">{Math.round(fit.scale * 100)}%</span>{/if}
       <button type="button" class="icon" title="Open in browser" onclick={() => toHost({ kind: ToHost.External, url: new URL(route, url).toString() })}><ExternalLink size={14} /></button>
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
@@ -672,7 +761,7 @@
             {#if hover}<div class="outline hover" style={box(hover)}></div>{/if}
             {#if drop}<div class="drop-line" class:box={drop.kind === DropKind.Inside} style={`left:${drop.line.x * fit.scale - 1}px;top:${drop.line.y * fit.scale - 1}px;width:${Math.max(2, drop.line.w * fit.scale)}px;height:${Math.max(2, drop.line.h * fit.scale)}px`}></div>{/if}
           {#if picked && hint}{#each hintBoxes(picked, hint) as area, i (i)}<div class="hint {hint.group}" style={`left:${area.x * fit.scale}px;top:${area.y * fit.scale}px;width:${area.w * fit.scale}px;height:${area.h * fit.scale}px`}></div>{/each}{/if}
-          {#if picked}<div class="outline picked" style={box(picked)}><span class="label"><Breadcrumb pick={picked} onselect={select} compact /></span></div>{/if}
+          {#if picked}<div class="outline picked" style={box(picked)}><span class="label"><Breadcrumb pick={picked} onselect={select} compact state={elementState} /></span></div>{/if}
           </div>
         {/if}
         {#if size !== Size.Full}
@@ -704,8 +793,8 @@
           <button type="button" class="link" data-action={ServerAction.RestartUnderFeega} onclick={() => toHost({ kind: ToHost.Server, action: ServerAction.RestartUnderFeega })}>Let Feega start the server</button>
         </div>
       {/if}
-      {#if menu}<StructureMenu x={menu.x} y={menu.y} items={MENU_ITEMS} onpick={(id) => restructure(id as StructureOp)} onclose={() => (menu = null)} />{/if}
-      {#if addMenu}<StructureMenu x={addMenu.x} y={addMenu.y} items={ADD_ITEMS} label="add" onpick={(id) => addElement(id as AddKind)} onclose={() => (addMenu = null)} />{/if}
+      {#if menu}<StructureMenu x={menu.x} y={menu.y} items={MENU_ITEMS} onpick={(id) => (id === COPY_FOR_AGENT ? copyForAgent() : restructure(id as StructureOp))} onclose={() => (menu = null)} />{/if}
+      {#if addMenu}<StructureMenu x={addMenu.x} y={addMenu.y} items={picked && picked.instances > 1 ? [...ADD_ITEMS, ADD_LOOP_ITEM] : ADD_ITEMS} label="add" onpick={(id) => (id === StructureOp.AddItem ? restructure(StructureOp.AddItem) : addElement(id as AddKind))} onclose={() => (addMenu = null)} />{/if}
       {#if toast}<div class="toast" role="status">{toast}</div>{/if}
       <div class="float" class:moving bind:clientWidth={bar.w} bind:clientHeight={bar.h} style={`left:${barAt.x}px;top:${barAt.y}px`} data-anchor={anchor}>
         <button type="button" class="grip" title="Drag to move (arrow keys)" aria-label="Move the bar" onpointerdown={grabBar} onpointermove={dragBar} onpointerup={dropBar} onkeydown={onHandleKey}>
@@ -744,15 +833,16 @@
       <Tabs.Content value={Tab.Properties}>
         {#if picked}
           <div class="what" data-testid="selection">
-            <Breadcrumb pick={picked} onselect={select} />
-            <span class="where">{#if picked.component}in {picked.component.file.split('/').pop()} · {/if}<button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file.split('/').pop()}:{picked.source.line}</button></span>
+            <Breadcrumb pick={picked} onselect={select} state={elementState} />
+            <span class="where">{#if picked.component}in {picked.component.file.split('/').pop()} · {/if}<button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file.split('/').pop()}:{picked.source.line}</button> · <button type="button" class="link" data-testid="copy-for-agent" title="Copy file, selector and view for your coding agent" onclick={copyForAgent}>Copy for agent</button></span>
             {#if authored(picked.classes)}<code class="classes">{authored(picked.classes)}</code>{/if}
           </div>
+          <BreakpointBar badge={reachBadge} theme={themeBadge(themeName)} items={reachItems(breakpoints)} choice={reach} onchoose={(id) => (reach = id)} />
           <div class="scope" role="radiogroup" aria-label="Edit scope" data-testid="scope">
             <button type="button" class:on={scope === Scope.Element} onclick={() => (scope = Scope.Element)} title="Only this element (every instance of its component: {picked.instances})">This element{picked.instances > 1 ? ` ×${picked.instances}` : ''}</button>
             <button type="button" class:on={scope === Scope.Class} disabled={!picked.classCount || styling === Styling.Tailwind} onclick={() => (scope = Scope.Class)} title={styling === Styling.Tailwind ? 'Class scope needs CSS rules, not Tailwind' : `Every element with this class: ${picked.classCount}`}>All .{picked.classes.split(' ')[0] || 'class'}{picked.classCount ? ` (${picked.classCount})` : ''}</button>
           </div>
-          <Properties pick={picked} {palette} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onnotice={showToast} />
+          <Properties pick={picked} {breakpoints} {palette} {elementState} {baseline} onstate={chooseState} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onnotice={showToast} />
           <Interactions pick={picked} {changes} />
         {:else}
           <p class="empty">{bridged ? 'Click an element to edit it. Double-click text to rewrite it.' : 'The page has no Feega source map: element picking needs the feega-source-map plugin.'}</p>

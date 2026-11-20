@@ -38,12 +38,12 @@ export async function routesIn(root: string): Promise<string[]> {
   return [...new Set([...routesOf(files), ...vue.flat()])].sort();
 }
 
-export async function wiringOf(root: string, rawAt: string): Promise<Wiring> {
+export async function wiringOf(root: string, rawAt: string, instance?: number): Promise<Wiring> {
   const at = liveAtOf(rawAt);
   if (!at || !inside(root, at.file)) {
     return NOTHING;
   }
   const read = reader(root);
-  const [link, events, routes, offsets] = await Promise.all([linkOf(read, at), eventsOf(read, at), routesIn(root), authoredOffsets(read, at)]);
+  const [link, events, routes, offsets] = await Promise.all([linkOf(read, at, instance), eventsOf(read, at), routesIn(root), authoredOffsets(read, at)]);
   return { link, events, routes, offsets };
 }

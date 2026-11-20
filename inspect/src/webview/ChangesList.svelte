@@ -11,13 +11,44 @@
   const files = $derived(new Set(changes.flatMap((c) => c.files)).size);
   const timeOf = (t: number) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const shortAt = (at: string) => at.split('/').pop() ?? at;
+
+  const ALL = -1;
+  const REVERT_TIMEOUT_MS = 30_000;
+  let reverting = $state<number | null>(null);
+  let seen: ChangeRow[] | null = null;
+
+  $effect(() => {
+    if (changes !== seen) {
+      seen = changes;
+      reverting = null;
+    }
+  });
+
+  $effect(() => {
+    if (reverting === null) {
+      return;
+    }
+    const timer = setTimeout(() => (reverting = null), REVERT_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  });
+
+  function revert(id: number) {
+    reverting = id;
+    if (id === ALL) {
+      onrevertall();
+      return;
+    }
+    onrevert(id);
+  }
 </script>
+
+{#snippet spinner()}<span class="spinner" aria-hidden="true"></span>{/snippet}
 
 <div class="changes" data-testid="changes">
   <header>
     <span>{files} {files === 1 ? 'file' : 'files'} changed</span>
     <button type="button" class="link" onclick={onscm}>Source Control</button>
-    <button type="button" class="link danger" disabled={!changes.length} onclick={onrevertall}>Revert all</button>
+    <button type="button" class="link danger" disabled={!changes.length || reverting !== null} aria-busy={reverting === ALL} onclick={() => revert(ALL)}>{#if reverting === ALL}{@render spinner()}Reverting…{:else}Revert all{/if}</button>
   </header>
   {#if !changes.length}<p class="empty">No edits yet in this workspace.</p>{/if}
   {#each changes as change (change.id)}
@@ -31,7 +62,7 @@
       <div class="actions">
         {#if source}<button type="button" class="link" onclick={() => onopen(source)}>Open</button>{/if}
         <button type="button" class="link" onclick={() => ondiff(change.id)}>Show diff</button>
-        <button type="button" class="link" onclick={() => onrevert(change.id)}>Revert</button>
+        <button type="button" class="link" disabled={reverting !== null} aria-busy={reverting === change.id} onclick={() => revert(change.id)}>{#if reverting === change.id}{@render spinner()}Reverting…{:else}Revert{/if}</button>
       </div>
     </div>
   {/each}
@@ -105,6 +136,28 @@
     font: inherit;
     font-size: var(--ui-text-xs);
     cursor: pointer;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-right: 6px;
+    border: 1.5px solid currentColor;
+    border-right-color: transparent;
+    border-radius: var(--ui-radius-full);
+    vertical-align: -1px;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .link[aria-busy='true']:disabled {
+    opacity: 1;
   }
 
   .link:disabled {

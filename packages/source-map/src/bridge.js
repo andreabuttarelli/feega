@@ -1,7 +1,9 @@
 import { stampSources } from './framework-meta.js';
-import { SOURCE_ATTR, deepestAt, clearPreview, hidePreview, paletteOf, relativeOf, treeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
+import { SOURCE_ATTR, rectOf, deepestAt, clearPreview, hidePreview, paletteOf, relativeOf, treeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
 import { trackRects } from './track.js';
 import { keepScroll } from './reload-restore.js';
+import { applyTheme, keepTheme, themeNow, watchScheme } from './theme-switch.js';
+import { FORCED_REBUILD_MS, forceState, forcedNow, keepForced, settleForced, statesOf } from './forced-state.js';
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';
@@ -13,6 +15,7 @@ export const PREVIEW_SETTLED = 'feega:preview:settled';
 export const LOCATION = 'feega:location';
 export const SCROLL = 'feega:scroll';
 export const SCROLLED = 'feega:scrolled';
+export const REVEAL = 'feega:reveal';
 export const TREE = 'feega:tree';
 export const TREE_RESULT = 'feega:tree:result';
 export const HIDE = 'feega:hide';
@@ -25,24 +28,30 @@ export const TEXT_RESTORE = 'feega:text:restore';
 export const TRACK = 'feega:track';
 export const TRACKED = 'feega:tracked';
 export const LEAVE = 'feega:leave';
+export const FORCE = 'feega:force';
+export const THEME = 'feega:theme';
 
 export const Mode = { Navigate: 'navigate', Design: 'design' };
 
 const INSTALLED = Symbol.for('feega.source-map.bridge');
 const EDITABLE = 'plaintext-only';
 const TREE_REFRESH_MS = 150;
+const THEME_REBUILD_MS = 100;
 
 export function installBridge(win) {
   if (win[INSTALLED]) {
     return;
   }
   win[INSTALLED] = true;
+  watchScheme(win);
 
   const doc = win.document;
   let mode = Mode.Navigate;
   const unsaved = new Map();
   let treeWanted = false;
   let treeTimer = null;
+  let forcedTimer = null;
+  let themeTimer = null;
   let treeSent = '';
   let reply = (message) => win.parent?.postMessage(message, '*');
   const scroll = keepScroll(win);
@@ -68,10 +77,32 @@ export function installBridge(win) {
     }, TREE_REFRESH_MS);
   }
 
+  function refreshForced() {
+    if (!forcedNow(doc) || forcedTimer) {
+      return;
+    }
+    forcedTimer = win.setTimeout(() => {
+      forcedTimer = null;
+      keepForced(doc);
+    }, FORCED_REBUILD_MS);
+  }
+
+  function refreshTheme() {
+    if (!themeNow(doc) || themeTimer) {
+      return;
+    }
+    themeTimer = win.setTimeout(() => {
+      themeTimer = null;
+      keepTheme(doc);
+    }, THEME_REBUILD_MS);
+  }
+
   const handlers = {
     [PREVIEW]: (request) => previewEdit(doc, request),
-    [PREVIEW_CLEAR]: (request) => clearPreview(doc, request.source),
-    [PREVIEW_SETTLE]: (request) => reply({ type: PREVIEW_SETTLED, source: request.source, unapplied: settlePreview(doc, request.source) }),
+    [PREVIEW_CLEAR]: (request) => clearPreview(doc, request.source, request.state),
+    [PREVIEW_SETTLE]: (request) => reply({ type: PREVIEW_SETTLED, source: request.source, unapplied: settlePreview(doc, request.source, request.state) }),
+    [FORCE]: (request) => forceState(doc, request.source, request.state),
+    [THEME]: (request) => applyTheme(doc, request),
     [MODE]: (request) => (mode = request.mode),
     [PALETTE]: () => reply({ type: PALETTE_RESULT, ...paletteOf(doc) }),
     [HIDE]: (request) => hidePreview(doc, request.source, request.hidden),
@@ -85,12 +116,16 @@ export function installBridge(win) {
       win.scrollBy(request.dx, request.dy);
       reply({ type: SCROLLED });
     },
+    [REVEAL]: (request) => revealSource(win, request),
     [TEXT_EDIT]: (request) => mode === Mode.Design && editText(win, targetOf(doc, request), request, reply, unsaved),
     [TEXT_RESTORE]: (request) => restoreText(doc, unsaved, request.source),
     [INSPECT]: (request) => {
       stampSources(doc);
       const target = targetOf(doc, request);
-      reply({ type: INSPECT_RESULT, id: request.id, result: target ? inspectElement(target, { maxHtml: request.maxHtml }) : null });
+      settleForced(doc);
+      const inspected = target ? inspectElement(target, { maxHtml: request.maxHtml }) : null;
+      const tagged = target?.closest(`[${SOURCE_ATTR}]`);
+      reply({ type: INSPECT_RESULT, id: request.id, result: inspected && { ...inspected, states: tagged ? statesOf(tagged) : [] } });
     }
   };
 
@@ -104,7 +139,7 @@ export function installBridge(win) {
     handle(event.data);
   });
 
-  new win.MutationObserver(() => (keepPreviews(doc), refreshTree())).observe(doc.documentElement, { childList: true, subtree: true });
+  new win.MutationObserver(() => (keepPreviews(doc), refreshTree(), refreshForced(), refreshTheme())).observe(doc.documentElement, { childList: true, subtree: true });
 
   reportRoutes(win);
   win.parent?.postMessage({ type: READY, path: win.location.pathname + win.location.search, restored: scroll.restored }, '*');
@@ -180,6 +215,18 @@ function placeCaret(win, element, { x, y }) {
   const selection = win.getSelection();
   selection.removeAllRanges();
   selection.addRange(range);
+}
+
+function revealSource(win, request) {
+  const target = targetOf(win.document, { selector: `[${SOURCE_ATTR}=${JSON.stringify(request.source)}]`, index: request.index });
+  if (!target) {
+    return;
+  }
+  const { y, height } = rectOf(target);
+  if (y >= 0 && y + height <= win.innerHeight) {
+    return;
+  }
+  target.scrollIntoView({ block: 'center', behavior: 'instant' });
 }
 
 export function targetOf(doc, request) {

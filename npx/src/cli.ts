@@ -65,7 +65,7 @@ async function main(): Promise<number> {
   const session = inspectSession(platform, root);
 
   const stop = async () => {
-    session.stop();
+    await session.stop();
     await editor.close();
     process.exit(0);
   };
@@ -81,7 +81,7 @@ async function main(): Promise<number> {
   if ('refused' in started) {
     say(`feega: ${started.refused}`);
   } else {
-    say(`feega: app on ${started.url}`);
+    say(started.attached ? `feega: attached to a dev server Feega did not start (${started.command}); app on ${started.url}` : `feega: started the dev server (${started.command}); app on ${started.url}`);
   }
   say(`feega: editor ready on ${editor.url}  (Ctrl+C to stop)`);
   if (args.browser === Browser.Open) {

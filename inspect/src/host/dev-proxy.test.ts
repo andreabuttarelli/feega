@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { BRIDGE_PATH, devProxy, withBridge } from './dev-proxy';
+import { FEEGA_SERVER_HEADER, FeegaServer } from './feega-server';
 
 describe('withBridge', () => {
   it('adds the bridge script before </head>', () => {
@@ -29,6 +30,21 @@ describe('devProxy', () => {
 
     expect(page).toContain(`${BRIDGE_PATH}bridge.js`);
     expect(bridge.headers.get('content-type')).toContain('javascript');
+    proxy.close();
+    app.close();
+  });
+
+  it('marks every reply as a Feega server so no other instance attaches to it', async () => {
+    const app = createServer((_req, res) => res.writeHead(200, { 'content-type': 'text/css' }).end('a{}'));
+    await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));
+    const target = `http://127.0.0.1:${(app.address() as { port: number }).port}`;
+    const proxy = await devProxy(target, tmpdir());
+
+    const page = await fetch(proxy.url);
+    const bridge = await fetch(`${proxy.url}${BRIDGE_PATH.slice(1)}bridge.js`);
+
+    expect(page.headers.get(FEEGA_SERVER_HEADER)).toBe(FeegaServer.Proxy);
+    expect(bridge.headers.get(FEEGA_SERVER_HEADER)).toBe(FeegaServer.Proxy);
     proxy.close();
     app.close();
   });

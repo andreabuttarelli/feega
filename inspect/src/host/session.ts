@@ -8,7 +8,9 @@ import { AccountState, ServerAction, ServerState, ToHost, ToView, type EditAsk, 
 import { SettingKey, StylingChoice } from '../settings';
 import { SignInEnd, signIn } from './sign-in';
 import { addPlugin } from './add-plugin';
+import { currentIcon } from './icon-current';
 import { mcpIcon, searchIcons } from './icon-search';
+import { previewQueue } from './icon-previews';
 import { appOfSource, firstStampedFile, urlOf } from './attach-url';
 import { Attach, attachDev, factsOf, startDev, type Refused, type Running } from './dev-server';
 import { copyImage } from './image-copy';
@@ -17,9 +19,14 @@ import type { KeptServers } from './kept-servers';
 import { forget, remember, type Memo } from './orphans';
 import { Stored, type Platform } from './platform';
 import { stylingOf } from './styling';
+import { breakpointsOf } from './breakpoints';
+import { themesOf } from './themes';
+import { usageSession } from './usage';
+import { selectionSync } from './selection-sync';
 import { wiringOf } from './wiring';
 
 const PICK_TIMEOUT_MS = 3000;
+const SYNC_SELECTION_DELAY_MS = 200;
 const LATER_EDITS = 'later edits depend on this change: undo them first';
 const CACHE_DIRS = ['.svelte-kit', 'node_modules/.vite', '.next', '.nuxt', '.astro'];
 const ERROR_LINES = 6;
@@ -49,6 +56,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   const editsAt = (dir: string) => fileEdits(dir, stylingChoice, platform.stored<Snapshot>(Stored.History));
   let edits = editsAt(root);
   const post = (message: ViewMessage) => platform.send(message);
+  const usage = platform.usage ? usageSession(platform.usage) : null;
+  usage?.begin();
 
   async function postSettings() {
     const framework = running?.plan.framework ?? 'unknown';
@@ -62,6 +71,9 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   }
 
   async function edited(out: Written, ask: EditAsk | null) {
+    if (out.ok) {
+      usage?.edit();
+    }
     await postHistory();
     const saved = ask ? (liveAtOf(ask.at) ?? undefined) : undefined;
     await post(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, saved, note: out.note, select: out.selected } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
@@ -77,9 +89,12 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     await edits.svg(m.at, svg, m.inner).then((out) => edited(out, null));
   }
 
-  async function iconsFound(id: number, query: string) {
-    await post({ kind: ToView.IconResults, id, ...(await searchIcons(root, fetch, query)) });
+  async function iconsFound(id: number, query: string, at: string) {
+    const found = await searchIcons(root, fetch, query, await currentIcon(root, at));
+    await post({ kind: ToView.IconResults, id, ...found });
   }
+
+  const iconPreviews = previewQueue(fetch, (name, svg) => post({ kind: ToView.IconPreview, name, svg }));
 
   async function imageSaved(name: string, bytes: Uint8Array) {
     const out = await copyImage(join(root, running?.plan.appDir ?? ''), name, bytes);
@@ -139,9 +154,15 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     await postAccount(AccountState.SignedOut);
   }
 
-  async function wiringShown(at: string) {
-    await post({ kind: ToView.Wiring, at, wiring: await wiringOf(root, at) });
+  async function wiringShown(at: string, instance?: number) {
+    await post({ kind: ToView.Wiring, at, instance, wiring: await wiringOf(root, at, instance) });
   }
+
+  const syncSelection = selectionSync({
+    reveal: (at) => platform.revealSource?.(root, at),
+    enabled: () => platform.settings()[SettingKey.SyncSelection] === true,
+    delayMs: SYNC_SELECTION_DELAY_MS
+  });
 
   const edit = (ask: EditAsk) => edits.edit(ask).then((out) => edited(out, ask));
   const undo = () => edits.undo().then((out) => edited(out, null));
@@ -187,7 +208,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       return;
     }
     const prefs = platform.stored<Prefs>(Stored.Prefs) ?? null;
-    await post({ kind: ToView.App, url: running.url, styling: await stylingOf(root, stylingChoice()), prefs, route });
+    await post({ kind: ToView.App, url: running.url, styling: await stylingOf(root, stylingChoice()), prefs, route, breakpoints: await breakpointsOf(root), themes: await themesOf(root) });
     await post({ kind: ToView.Server, state: ServerState.Running, info: infoOf(running) });
     await postSettings();
   }
@@ -380,16 +401,19 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.IconSwap]: (m) => edits.icon(m.at, m.name).then((out) => edited(out, null)),
     [ToHost.IconMarkup]: (m) => edits.svg(m.at, m.markup, m.inner).then((out) => edited(out, null)),
     [ToHost.IconGet]: iconFetched,
-    [ToHost.IconSearch]: (m) => iconsFound(m.id, m.query),
+    [ToHost.IconSearch]: (m) => iconsFound(m.id, m.query, m.at),
+    [ToHost.IconPreviews]: (m) => iconPreviews(m.names),
     [ToHost.SignIn]: startSignIn,
     [ToHost.CancelSignIn]: () => signing?.abort(),
     [ToHost.SignOut]: signOut,
     [ToHost.OnboardingDone]: () => platform.onboarding.markSeen(),
     [ToHost.ImageChoose]: imageChosen,
     [ToHost.ImageUpload]: (m) => imageSaved(m.name, Buffer.from(m.data, 'base64')),
-    [ToHost.Wiring]: (m) => wiringShown(m.at),
-    [ToHost.Link]: (m) => edits.link(m.at, m.edit).then((out) => edited(out, null)),
-    [ToHost.Go]: (m) => edits.go(m.at, m.ask).then((out) => edited(out, null))
+    [ToHost.Wiring]: (m) => wiringShown(m.at, m.instance),
+    [ToHost.Link]: (m) => edits.link(m.at, m.edit, m.instance).then((out) => edited(out, null)),
+    [ToHost.Go]: (m) => edits.go(m.at, m.ask).then((out) => edited(out, null)),
+    [ToHost.Selected]: (m) => syncSelection(m.at),
+    [ToHost.Copy]: (m) => platform.copyText?.(m.text)
   };
 
   platform.receive((message) => (handlers[message.kind] as (m: HostMessage) => unknown)(message));
@@ -416,7 +440,11 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     start: () => startServer(),
     attachUrl,
     addPlugin: installPlugin,
-    stop: close,
+    stop: () => {
+      close();
+      return usage?.end() ?? Promise.resolve();
+    },
+    usageChanged: () => usage?.recheck(),
     url: () => running?.url ?? null,
     showApp,
     showRoute,

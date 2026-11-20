@@ -46,3 +46,5 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: node npx/test/editor.e2e.mjs
       - run: node npx/test/editing.e2e.mjs
+      - run: node npx/test/attach.e2e.mjs
+        if: matrix.fixture == 'react-css'

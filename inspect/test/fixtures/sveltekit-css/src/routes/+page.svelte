@@ -1,6 +1,8 @@
 <script>
+import { ArrowRight } from '@lucide/svelte';
 import Benefits from '$lib/Benefits.svelte';
 import Faq from '$lib/Faq.svelte';
+import { SITE_LINKS } from '$lib/links';
 
 const topics = ['Briefs', 'Timelines', 'Assets'];
 
@@ -24,6 +26,7 @@ const plans = [
     <h1 id="title" class="title">Plan your launch in an afternoon</h1>
     <p class="lead">Briefs, timelines and assets in one place your whole team can edit.</p>
     <button id="cta" type="button">Get started</button>
+    <ArrowRight size={32} />
     <div id="actions" class="actions">
       <a id="start" class="btn" href="#start">Start free</a>
       <a id="docs" class="btn" href="#docs">Read docs</a>
@@ -47,6 +50,11 @@ const plans = [
         <li class="topic">{topic}</li>
       {/each}
     </ul>
+    <nav id="site-links" class="site-links">
+      {#each SITE_LINKS as link}
+        <a class="chip" href={link.href}>{link.label}</a>
+      {/each}
+    </nav>
     <Benefits />
     <Faq />
   </main>
@@ -138,6 +146,19 @@ const plans = [
 
   .topic {
     padding: 8px 0;
+  }
+
+  .site-links {
+    display: flex;
+    gap: 12px;
+  }
+
+  .chip {
+    padding: 4px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+    color: inherit;
+    text-decoration: none;
   }
 
   .badge {

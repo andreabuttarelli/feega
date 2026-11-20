@@ -87,6 +87,22 @@ describe.each(ADAPTERS)('attaching to a URL on the %s platform', (_name, make) =
     expect((await fetch(target)).status).toBe(200);
   });
 
+  it('tells the preview to load the url before it reports the server running', async () => {
+    const { platform, sent } = make();
+    const target = await appServer('<html><head></head><body>hi</body></html>');
+    const session = inspectSession(platform, workspaceOf());
+
+    await session.attachUrl(target);
+    session.stop();
+
+    const kinds = sent.map((m) => (m.kind === ToView.Server ? m.state : m.kind));
+    const app = sent.find((m) => m.kind === ToView.App);
+    const running = sent.find((m) => m.kind === ToView.Server && m.state === ServerState.Running);
+    expect(kinds.indexOf(ToView.App)).toBeGreaterThan(kinds.indexOf(ServerState.Starting));
+    expect(kinds.indexOf(ToView.App)).toBeLessThan(kinds.indexOf(ServerState.Running));
+    expect(app && 'url' in app && app.url).toBe(running && 'info' in running && running.info?.url);
+  });
+
   it('refuses an address nothing answers on', async () => {
     const { platform, sent } = make();
     const session = inspectSession(platform, workspaceOf());

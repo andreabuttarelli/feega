@@ -8,21 +8,18 @@ import { Framework, PlanRefusal, planFile, runPlan, textsWanted, type Planned, t
 import { DepsOutcome, depsMissing, ensureDeps } from './deps';
 import { failureOf, localUrlOf, type Failed } from './dev-output';
 import { killTree } from './process-tree';
+import { Launch } from './launch';
+import { Verdict, verdictOf } from './candidate';
 
-export enum Launch {
-  Vite = 'vite',
-  Next = 'next',
-  Script = 'script',
-  Command = 'command'
-}
+export { Launch };
 
-type LaunchRow = { copiesLauncher: boolean; proxied: boolean };
+type LaunchRow = { copiesLauncher: boolean; proxied: boolean; attaches: boolean };
 
 const LAUNCH_ROWS: Record<Launch, LaunchRow> = {
-  [Launch.Vite]: { copiesLauncher: true, proxied: false },
-  [Launch.Next]: { copiesLauncher: true, proxied: true },
-  [Launch.Script]: { copiesLauncher: true, proxied: true },
-  [Launch.Command]: { copiesLauncher: true, proxied: true }
+  [Launch.Vite]: { copiesLauncher: true, proxied: false, attaches: true },
+  [Launch.Next]: { copiesLauncher: true, proxied: true, attaches: true },
+  [Launch.Script]: { copiesLauncher: true, proxied: true, attaches: true },
+  [Launch.Command]: { copiesLauncher: true, proxied: true, attaches: false }
 };
 
 const LAUNCH: Record<Framework, Launch> = {
@@ -201,25 +198,26 @@ async function pageOf(url: string): Promise<string | null> {
   return reply ? reply.text().catch(() => '') : null;
 }
 
-const ATTACHABLE: Record<Launch, (page: string) => boolean> = {
-  [Launch.Vite]: () => true,
-  [Launch.Next]: () => true,
-  [Launch.Script]: () => true,
-  [Launch.Command]: () => false
+const SKIP_NOTE: Partial<Record<Verdict, string>> = {
+  [Verdict.Silent]: 'does not answer',
+  [Verdict.FeegaServer]: 'is a Feega server',
+  [Verdict.OtherProject]: 'does not serve this project'
 };
 
 async function userServer(appRoot: string, launch: Launch, defaultPort: number, log: (line: string) => void): Promise<string | null> {
+  if (!LAUNCH_ROWS[launch].attaches) {
+    return null;
+  }
   const found = await portsServing(appRoot, undefined, spawnedPids);
   const ports = found.length || !(await servesWorkspace(defaultPort, appRoot)) ? found : [defaultPort];
   for (const port of ports) {
-    const page = await pageOf(loopbackUrl(port));
-    if (page === null) {
-      continue;
+    const url = loopbackUrl(port);
+    const verdict = await verdictOf(url, appRoot, launch);
+    if (verdict === Verdict.Ours) {
+      log(`feega: attaching to the dev server already running on ${url}\n`);
+      return url;
     }
-    if (ATTACHABLE[launch](page)) {
-      return loopbackUrl(port);
-    }
-    log(`feega: a dev server of this app runs on ${port}, but its pages carry no source tags: starting Feega's own\n`);
+    log(`feega: not attaching to ${url}: it ${SKIP_NOTE[verdict]}\n`);
   }
   return null;
 }
@@ -228,7 +226,7 @@ async function attachedTo(url: string, plan: RunPlan, appRoot: string, launcherS
   const bridgeDir = join(appRoot, LAUNCHER_DIR);
   await cp(launcherSource, bridgeDir, { recursive: true });
   const proxy = await devProxy(url, bridgeDir);
-  return { url: proxy.url, plan, launch: LAUNCH[plan.framework], attached: true, pid: null, command: 'already running', stop: proxy.close, exited: () => undefined };
+  return { url: proxy.url, plan, launch: LAUNCH[plan.framework], attached: true, pid: null, command: `already running on ${url}`, stop: proxy.close, exited: () => undefined };
 }
 
 export async function attachDev(root: string, launcherSource: string, url: string, asked: string | null): Promise<Running | Refused> {
@@ -313,6 +311,7 @@ export async function startDev(root: string, launcherSource: string, hooks: Star
     stopGroup(child);
     return ready ? { refused: `${ready.message}: ${ready.line}`, failed: ready } : { refused: child.exitCode !== null ? `the dev server exited (${child.exitCode})` : `the dev server did not answer on port ${port}` };
   }
+  hooks.log(`feega: started the dev server on ${ready}\n`);
   const shown = launch === Launch.Command ? command : launch === Launch.Vite ? `vite (Feega launcher) on ${planned.port}` : planned.dev.join(' ');
   const proxy = row.proxied ? await devProxy(ready, bridgeDir) : null;
   const stop = () => (proxy?.close(), stopGroup(child));

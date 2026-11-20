@@ -1,3 +1,4 @@
+import { ArrowRight } from 'lucide-react';
 import { Benefits } from './Benefits';
 import { Faq } from './Faq';
 
@@ -23,6 +24,7 @@ export function App() {
         <h1 id="title" className="text-5xl font-medium tracking-tight">Plan your launch in an afternoon</h1>
         <p className="max-w-xl text-lg text-slate-600">Briefs, timelines and assets in one place your whole team can edit.</p>
         <button id="cta" type="button">Get started</button>
+        <ArrowRight size={32} />
         <div id="actions">
           <a id="start" className="mr-3 inline-block rounded-md bg-slate-900 px-5 py-2.5 text-white no-underline" href="#start">Start free</a>
           <a id="docs" className="mr-3 inline-block rounded-md bg-slate-900 px-5 py-2.5 text-white no-underline" href="#docs">Read docs</a>
