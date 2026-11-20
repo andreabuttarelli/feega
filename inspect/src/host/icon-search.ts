@@ -26,15 +26,23 @@ async function mcpCall(fetcher: Fetcher, tool: string, args: Record<string, unkn
   }
   const raw = await response.text();
   const data = raw.startsWith('{') ? raw : (raw.split('\n').find((line) => line.startsWith('data:'))?.slice('data:'.length) ?? '');
-  const body = JSON.parse(data) as { result?: { content?: McpText[] }; error?: { message: string } };
+  const body = JSON.parse(data) as { result?: { content?: McpText[]; isError?: boolean }; error?: { message: string } };
   if (body.error) {
     throw new Error(body.error.message);
   }
-  return body.result?.content ?? [];
+  const content = body.result?.content ?? [];
+  if (body.result?.isError) {
+    throw new Error(content.map((c) => c.text).join(' ') || 'iconmcp failed');
+  }
+  return content;
 }
 
 export async function mcpSearch(fetcher: Fetcher, query: string, limit: number): Promise<IconHit[]> {
-  const [first] = await mcpCall(fetcher, 'search_icons', { query, limit });
+  if (!query.trim()) {
+    return [];
+  }
+
+  const [first] = await mcpCall(fetcher, 'search_icons', { query: query.trim(), limit });
   const found = JSON.parse(first?.text ?? '{}') as { results?: { name: string; label?: string }[] };
   return (found.results ?? []).map(({ name, label }) => ({ name, label, source: IconSource.IconMcp }));
 }

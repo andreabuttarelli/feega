@@ -35,6 +35,23 @@ describe('iconmcp', () => {
     expect(await mcpIcon(stream, 'x', 24, 2)).toBe('<svg></svg>');
   });
 
+  it('does not ask iconmcp for an empty query', async () => {
+    let called = false;
+    const fetcher = async () => {
+      called = true;
+      return reply([])();
+    };
+
+    expect(await mcpSearch(fetcher, '  ', 5)).toEqual([]);
+    expect(called).toBe(false);
+  });
+
+  it('reports a tool error as its message, not a JSON parse failure', async () => {
+    const failing = async () => new Response(JSON.stringify({ result: { content: [{ type: 'text', text: 'MCP error -32602: bad query' }], isError: true } }));
+
+    await expect(mcpSearch(failing, 'a', 5)).rejects.toThrow('MCP error -32602: bad query');
+  });
+
   it('fails with the reason when the service is down', async () => {
     const down = async () => new Response('no', { status: 503 });
 
