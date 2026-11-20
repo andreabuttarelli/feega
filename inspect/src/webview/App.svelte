@@ -35,7 +35,7 @@
   import { SettingKey, type ReportFacts, type Settings } from '../settings';
   import { Group, ROWS, type Hint, type Row } from './controls';
   import { hintBoxes } from './hint-boxes';
-  import { dropOf, type Drop } from './reorder';
+  import { DropKind, dropOf, DROP_MESSAGES, type Drop } from './reorder';
   import { Place } from '@feega/live-edit/move-node';
   import { StructureOp } from '@feega/live-edit/structure';
   import StructureMenu from './StructureMenu.svelte';
@@ -420,7 +420,7 @@
     drag = null;
     drop = null;
     if (done && picked) {
-      toHost({ kind: ToHost.Move, from: sourceText(picked.source), to: sourceText(done.target), place: done.place });
+      toHost(DROP_MESSAGES[done.kind](picked, done));
     }
     return wasDrag;
   }
@@ -639,7 +639,7 @@
         {#if mode === Mode.Design && bridged && !editing}
           <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={dragOverlay} onpointerleave={() => (hover = null)} onclick={onPick} oncontextmenu={onMenu} ondblclick={onDouble} onwheel={(e) => bridge.scroll(e.deltaX / fit.scale, e.deltaY / fit.scale)}>
             {#if hover}<div class="outline hover" style={box(hover)}></div>{/if}
-            {#if drop}<div class="drop-line" style={`left:${drop.line.x * fit.scale - 1}px;top:${drop.line.y * fit.scale - 1}px;width:${Math.max(2, drop.line.w * fit.scale)}px;height:${Math.max(2, drop.line.h * fit.scale)}px`}></div>{/if}
+            {#if drop}<div class="drop-line" class:box={drop.kind === DropKind.Inside} style={`left:${drop.line.x * fit.scale - 1}px;top:${drop.line.y * fit.scale - 1}px;width:${Math.max(2, drop.line.w * fit.scale)}px;height:${Math.max(2, drop.line.h * fit.scale)}px`}></div>{/if}
           {#if picked && hint}{#each hintBoxes(picked, hint) as area, i (i)}<div class="hint {hint.group}" style={`left:${area.x * fit.scale}px;top:${area.y * fit.scale}px;width:${area.w * fit.scale}px;height:${area.h * fit.scale}px`}></div>{/each}{/if}
           {#if picked}<div class="outline picked" style={box(picked)}><span class="label"><Breadcrumb pick={picked} onselect={select} compact /></span></div>{/if}
           </div>
@@ -908,6 +908,12 @@
     position: absolute;
     background: var(--ui-accent);
     pointer-events: none;
+  }
+
+  .drop-line.box {
+    background: color-mix(in srgb, var(--ui-accent) 12%, transparent);
+    outline: 2px solid var(--ui-accent);
+    outline-offset: -2px;
   }
 
   .hint {

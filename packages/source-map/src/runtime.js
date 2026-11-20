@@ -105,6 +105,7 @@ function inspectPage(body, maxHtml) {
     text: null,
     name: target,
     instances: 1,
+    instanceIndex: 0,
     classCount: 0,
     parentWidth: body.getBoundingClientRect().width,
     ancestors: target === 'body' ? [pageAncestor('html')] : [],
@@ -116,6 +117,8 @@ function inspectPage(body, maxHtml) {
     viewport: body.ownerDocument.defaultView.innerWidth
   };
 }
+
+const instancesOf = (tagged) => [...tagged.ownerDocument.querySelectorAll(`[${SOURCE_ATTR}="${tagged.getAttribute(SOURCE_ATTR)}"]`)];
 
 function inspectTagged(tagged, maxHtml) {
 
@@ -131,7 +134,8 @@ function inspectTagged(tagged, maxHtml) {
     classes: tagged.getAttribute('class') ?? '',
     text: tagged.children.length ? null : tagged.textContent,
     name: nameOf(tagged),
-    instances: tagged.ownerDocument.querySelectorAll(`[${SOURCE_ATTR}="${tagged.getAttribute(SOURCE_ATTR)}"]`).length,
+    instances: instancesOf(tagged).length,
+    instanceIndex: instancesOf(tagged).indexOf(tagged),
     classCount: tagged.classList?.[0] ? tagged.ownerDocument.getElementsByClassName(tagged.classList[0]).length : 0,
     parentWidth: tagged.parentElement?.getBoundingClientRect().width ?? 0,
     ancestors: ancestorsOf(tagged),

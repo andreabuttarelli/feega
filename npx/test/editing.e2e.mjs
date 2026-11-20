@@ -251,6 +251,24 @@ try {
     assert.deepEqual(changedFiles(), [], 'undo restores the page');
   });
 
+  await check('dragging on the page drops an element inside a container, shows the orange outline, and one undo restores it', async () => {
+    const lead = frame.locator('main > p').first();
+    await lead.click();
+    await page.waitForTimeout(800);
+    const from = await lead.boundingBox();
+    const to = await frame.locator('section').first().boundingBox();
+    await page.mouse.move(from.x + 10, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 });
+    await page.waitForTimeout(500);
+    assert.ok(await page.locator('.drop-line.box').count(), 'the container is outlined');
+    await page.mouse.up();
+    await page.waitForTimeout(SETTLE_MS);
+    assert.equal(await frame.locator('section > p').count(), 1, 'the paragraph is inside the section');
+    await undo();
+    assert.deepEqual(changedFiles(), [], 'undo restores the page');
+  });
+
   await check('position: absolute and top write the source and the page, the layer is tagged, and each edit is one undo', async () => {
     const h1 = frame.locator('h1').first();
     await h1.click();

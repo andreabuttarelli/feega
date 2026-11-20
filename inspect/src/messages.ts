@@ -34,6 +34,7 @@ export type Pick = {
   name: string;
   parentWidth: number;
   instances: number;
+  instanceIndex: number;
   classCount: number;
   ancestors: { source: Source; name: string }[];
   inner?: string;
