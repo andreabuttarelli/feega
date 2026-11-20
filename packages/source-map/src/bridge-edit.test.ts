@@ -46,6 +46,29 @@ describe('text edited in place', () => {
     expect(replies.some((r) => r.type === 'feega:text:done')).toBe(false);
   });
 
+  it('escape keeps the inline elements inside the text', () => {
+    const win = new JSDOM(`<body><h1 data-feega-src="${SOURCE}">Build <span>fast</span> today</h1></body>`).window;
+    installBridge(win as unknown as Window);
+    const h1 = win.document.querySelector('h1')!;
+    win.dispatchEvent(new win.MessageEvent('message', { data: { type: 'feega:mode', mode: 'design' }, source: win as unknown as Window }));
+    win.dispatchEvent(new win.MessageEvent('message', { data: { type: 'feega:text:edit', selector: 'h1' }, source: win as unknown as Window }));
+    h1.textContent = 'Typo';
+    key(win as unknown as Window, h1, 'Escape');
+
+    expect(h1.innerHTML).toBe('Build <span>fast</span> today');
+  });
+
+  it('a refused text is put back in the preview', () => {
+    const { win, send, h1 } = bridged();
+    send({ type: 'feega:mode', mode: 'design' });
+    send({ type: 'feega:text:edit', selector: 'h1' });
+    h1.textContent = 'Not saved';
+    key(win as unknown as Window, h1, 'Enter');
+    send({ type: 'feega:text:restore', source: SOURCE });
+
+    expect(h1.textContent).toBe('Title');
+  });
+
   it('in navigate mode nothing becomes editable', () => {
     const { send, h1 } = bridged();
     send({ type: 'feega:mode', mode: 'navigate' });

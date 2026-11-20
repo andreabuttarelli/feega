@@ -57,6 +57,7 @@
   let bridged = $state(false);
   let mode = $state(Mode.Design);
   let editing = $state(false);
+  let textPending: string | null = null;
   let hover = $state<Pick | null>(null);
   let picked = $state<Pick | null>(null);
   const TOAST_MS = 2500;
@@ -210,9 +211,10 @@
       refresh();
       bridge.tree();
     },
-    text: (source, text) => {
+    text: (source, text, was) => {
       editing = false;
-      toHost({ kind: ToHost.Edit, ask: { at: source, prop: LiveProp.Text, value: text } });
+      textPending = source;
+      toHost({ kind: ToHost.Edit, ask: { at: source, prop: LiveProp.Text, value: text, was } });
     }
   });
 
@@ -291,7 +293,12 @@
     [ToView.Server]: (m) => ((server = m.state), (serverReason = m.reason ?? ''), (serverInfo = m.info ?? serverInfo)),
     [ToView.Status]: (m) => (problem = { text: m.text }),
     [ToView.Edited]: (m) => {
+      const unsavedText = textPending;
+      textPending = null;
       if (!m.ok) {
+        if (unsavedText) {
+          bridge.restoreText(unsavedText);
+        }
         problem = { text: m.reason ?? 'Not saved', at: m.at };
         saved = null;
         if (picked) {

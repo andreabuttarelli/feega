@@ -21,6 +21,7 @@ export const PALETTE_RESULT = 'feega:palette:result';
 export const MODE = 'feega:mode';
 export const TEXT_EDIT = 'feega:text:edit';
 export const TEXT_DONE = 'feega:text:done';
+export const TEXT_RESTORE = 'feega:text:restore';
 export const TRACK = 'feega:track';
 export const TRACKED = 'feega:tracked';
 export const LEAVE = 'feega:leave';
@@ -38,6 +39,7 @@ export function installBridge(win) {
 
   const doc = win.document;
   let mode = Mode.Navigate;
+  const unsaved = new Map();
   let reply = (message) => win.parent?.postMessage(message, '*');
   const scroll = keepScroll(win);
   const tracker = trackRects(win, (slot, rect) => reply({ type: TRACKED, slot, rect }));
@@ -59,7 +61,8 @@ export function installBridge(win) {
       win.scrollBy(request.dx, request.dy);
       reply({ type: SCROLLED });
     },
-    [TEXT_EDIT]: (request) => mode === Mode.Design && editText(win, targetOf(doc, request), request, reply),
+    [TEXT_EDIT]: (request) => mode === Mode.Design && editText(win, targetOf(doc, request), request, reply, unsaved),
+    [TEXT_RESTORE]: (request) => restoreText(doc, unsaved, request.source),
     [INSPECT]: (request) => {
       stampSources(doc);
       const target = targetOf(doc, request);
@@ -95,13 +98,23 @@ function reportRoutes(win) {
   win.addEventListener('popstate', report);
 }
 
-function editText(win, target, request, reply) {
+function restoreText(doc, unsaved, source) {
+  const html = unsaved.get(source);
+  const element = doc.querySelector(`[${SOURCE_ATTR}="${source}"]`);
+  unsaved.delete(source);
+  if (element && html !== undefined) {
+    element.innerHTML = html;
+  }
+}
+
+function editText(win, target, request, reply, unsaved) {
   const element = target?.closest(`[${SOURCE_ATTR}]`);
   if (!element) {
     return;
   }
 
   const was = element.textContent;
+  const wasHtml = element.innerHTML;
   element.setAttribute('contenteditable', EDITABLE);
   element.focus?.();
   placeCaret(win, element, request);
@@ -111,9 +124,10 @@ function editText(win, target, request, reply) {
     element.removeEventListener('blur', onBlur);
     element.removeAttribute('contenteditable');
     if (!commit) {
-      element.textContent = was;
+      element.innerHTML = wasHtml;
       return;
     }
+    unsaved.set(element.getAttribute(SOURCE_ATTR), wasHtml);
     reply({ type: TEXT_DONE, source: element.getAttribute(SOURCE_ATTR), text: element.textContent, was });
   };
 

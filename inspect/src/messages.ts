@@ -210,6 +210,7 @@ export const SCROLL = 'feega:scroll';
 export const SCROLLED = 'feega:scrolled';
 export const TEXT_EDIT = 'feega:text:edit';
 export const TEXT_DONE = 'feega:text:done';
+export const TEXT_RESTORE = 'feega:text:restore';
 export const TRACK = 'feega:track';
 export const TRACKED = 'feega:tracked';
 export const LEAVE = 'feega:leave';
