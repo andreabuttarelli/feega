@@ -25,6 +25,7 @@ const GO_PAGE_CODE = /(goto\(|location\.href = |\$router\.push\()'\/pricing'/;
 const OPEN_WAIT_MS = 5000;
 const OPEN_POLL_MS = 250;
 const CLIENT_PAGE_MS = 60_000;
+const TOPICS = ['Briefs', 'Timelines', 'Assets'];
 const printed = [];
 
 const git = (...args) => execFileSync('git', ['-C', APP, ...args], { encoding: 'utf8' });
@@ -432,6 +433,40 @@ try {
       await undoAll();
     });
   }
+
+  await check('loop items: dragging one onto another reorders the array and the page, and one undo restores it', async () => {
+    const items = frame.locator('#topics > li');
+    const names = () => items.allInnerTexts();
+    assert.deepEqual(await names(), TOPICS);
+    await items.nth(2).click();
+    await page.waitForTimeout(800);
+    const from = await items.nth(2).boundingBox();
+    const to = await items.nth(0).boundingBox();
+    await page.mouse.move(from.x + 10, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(to.x + 10, to.y + 2, { steps: 12 });
+    await page.waitForTimeout(500);
+    await page.mouse.up();
+    await page.waitForTimeout(SETTLE_MS);
+    assert.deepEqual(await names(), ['Assets', 'Briefs', 'Timelines'], 'the page shows the new order');
+    assert.ok(/'Assets', 'Briefs', 'Timelines'/.test(diffText()), `the array order is written:\n${diffText()}`);
+    await undo();
+    assert.deepEqual(changedFiles(), [], 'undo restores the array');
+  });
+
+  await check('two components in a page: dragging one layer past the other reorders their usages and one undo restores it', async () => {
+    await frame.locator('#benefits').click();
+    await page.waitForTimeout(800);
+    const layers = page.locator('[data-testid="layers"] [data-layer]');
+    const benefits = layers.filter({ hasText: /^\s*Benefits/ }).first();
+    const faq = layers.filter({ hasText: /^\s*Faq/ }).first();
+    await benefits.dragTo(faq, { targetPosition: { x: 60, y: 20 } });
+    await page.waitForTimeout(SETTLE_MS);
+    const order = await frame.locator('main').first().evaluate((main) => [...main.children].map((c) => c.id).filter((id) => id === 'faq' || id === 'benefits'));
+    assert.deepEqual(order, ['faq', 'benefits'], 'the page shows the new order');
+    await undo();
+    assert.deepEqual(changedFiles(), [], 'undo restores the usages');
+  });
 
   if (NEXT) {
     await check('a use client page renders, hydrates and lists its layers', async () => {

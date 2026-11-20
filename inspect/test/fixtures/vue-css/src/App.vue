@@ -1,4 +1,9 @@
 <script setup>
+import Benefits from './Benefits.vue';
+import Faq from './Faq.vue';
+
+const topics = ['Briefs', 'Timelines', 'Assets'];
+
 const plans = [
   { name: 'Starter', text: 'One project, every editor control.' },
   { name: 'Studio', text: 'Unlimited projects and shared tokens.' },
@@ -37,6 +42,11 @@ const plans = [
           <p>{{ plans[2].text }}</p>
         </article>
       </section>
+      <ul id="topics" class="topics">
+        <li v-for="topic in topics" :key="topic" class="topic">{{ topic }}</li>
+      </ul>
+      <Benefits />
+      <Faq />
     </main>
     <footer class="footer">© Northwind</footer>
   </div>
@@ -116,5 +126,16 @@ const plans = [
     background: #0f172a;
     color: #fff;
     text-decoration: none;
+  }
+
+  .topics {
+    display: block;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .topic {
+    padding: 8px 0;
   }
 </style>
