@@ -21,7 +21,7 @@ sidebar:
 | Windsurf | [Open VSX](https://open-vsx.org/extension/AndreaButtarelli/feega) |
 | VSCodium | [Open VSX](https://open-vsx.org/extension/AndreaButtarelli/feega) |
 
-Or open the Extensions view, search for **Feega** and install.
+Or open the Extensions view, search for **Feega** and install. A walkthrough with screenshots is on [Feega in VS Code](https://www.feega.app/integrations/vscode).
 
 ## In the browser, with npx
 
