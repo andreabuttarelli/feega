@@ -65,7 +65,7 @@ async function main(): Promise<number> {
   const session = inspectSession(platform, root);
 
   const stop = async () => {
-    session.stop();
+    await session.stop();
     await editor.close();
     process.exit(0);
   };

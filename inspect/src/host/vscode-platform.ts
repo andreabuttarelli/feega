@@ -1,12 +1,13 @@
 import { basename } from 'node:path';
 import * as vscode from 'vscode';
 import type { HostMessage, Source } from '../messages';
-import { settingsWith } from '../settings';
+import { SettingKey, settingsWith } from '../settings';
 import { Column, openTarget } from './open-source';
 import type { Account, AccountStore } from './account';
 import { IMAGE_EXTENSIONS } from './image-copy';
 import { globalStateOnboardingStore } from './onboarding';
 import type { Platform } from './platform';
+import { Device, editorOf, globalStateInstallStore, installIdOf, type UsageHost } from './usage';
 
 const BEFORE_SCHEME = 'feega-before';
 
@@ -31,6 +32,18 @@ export const secretAccountStore = (secrets: Pick<vscode.SecretStorage, 'get' | '
   },
   write: (account) => Promise.resolve(secrets.store(SECRET_KEY, JSON.stringify(account))),
   clear: () => Promise.resolve(secrets.delete(SECRET_KEY))
+});
+
+export const vsCodeUsage = (context: vscode.ExtensionContext): UsageHost => ({
+  identity: () => ({
+    installId: installIdOf(globalStateInstallStore(context.globalState)),
+    version: String(context.extension.packageJSON.version),
+    editor: editorOf(vscode.env.appName),
+    os: process.platform,
+    arch: process.arch,
+    device: vscode.env.uiKind === vscode.UIKind.Web ? Device.Web : Device.Desktop
+  }),
+  enabled: () => vscode.env.isTelemetryEnabled && config().get(SettingKey.Telemetry, true) === true
 });
 
 export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<string, string>): Platform {
@@ -83,7 +96,8 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     notify: (text) => vscode.window.showInformationMessage(`Feega: ${text}`),
     pickImage,
     account: secretAccountStore(context.secrets),
-    onboarding: globalStateOnboardingStore(context.globalState)
+    onboarding: globalStateOnboardingStore(context.globalState),
+    usage: vsCodeUsage(context)
   };
 }
 

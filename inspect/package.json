@@ -70,7 +70,7 @@
         "feegaInspect.telemetry": {
           "type": "boolean",
           "default": true,
-          "description": "Send anonymous usage counts (opens, edits, framework, styling system). No code, no paths. Also off when VS Code telemetry is off."
+          "description": "Send anonymous usage counts (sessions, edits, session length, editor, OS, device kind). No code, no file paths, no IP address stored. Also off when VS Code telemetry is off."
         },
         "feegaInspect.styling": {
           "type": "string",

@@ -19,6 +19,7 @@ import type { KeptServers } from './kept-servers';
 import { forget, remember, type Memo } from './orphans';
 import { Stored, type Platform } from './platform';
 import { stylingOf } from './styling';
+import { usageSession } from './usage';
 import { wiringOf } from './wiring';
 
 const PICK_TIMEOUT_MS = 3000;
@@ -51,6 +52,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   const editsAt = (dir: string) => fileEdits(dir, stylingChoice, platform.stored<Snapshot>(Stored.History));
   let edits = editsAt(root);
   const post = (message: ViewMessage) => platform.send(message);
+  const usage = platform.usage ? usageSession(platform.usage) : null;
+  usage?.begin();
 
   async function postSettings() {
     const framework = running?.plan.framework ?? 'unknown';
@@ -64,6 +67,9 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   }
 
   async function edited(out: Written, ask: EditAsk | null) {
+    if (out.ok) {
+      usage?.edit();
+    }
     await postHistory();
     const saved = ask ? (liveAtOf(ask.at) ?? undefined) : undefined;
     await post(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, saved, note: out.note, select: out.selected } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
@@ -422,7 +428,11 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     start: () => startServer(),
     attachUrl,
     addPlugin: installPlugin,
-    stop: close,
+    stop: () => {
+      close();
+      return usage?.end() ?? Promise.resolve();
+    },
+    usageChanged: () => usage?.recheck(),
     url: () => running?.url ?? null,
     showApp,
     showRoute,

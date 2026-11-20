@@ -126,13 +126,22 @@ const COMMANDS: Record<Command, (context: vscode.ExtensionContext, target?: vsco
   [Command.OpenFromUrl]: openFromUrl
 };
 
+function settingsChanged(e: vscode.ConfigurationChangeEvent) {
+  if (!e.affectsConfiguration(SECTION)) {
+    return;
+  }
+  opened?.session.settingsChanged();
+  opened?.session.usageChanged();
+}
+
 export function activate(context: vscode.ExtensionContext) {
   const output = vscode.window.createOutputChannel(`${TITLE}: dev server`);
   host = { context, output, launcher: join(context.extensionPath, 'dist', 'launcher') };
   context.subscriptions.push(
     output,
     ...Object.values(Command).map((id) => vscode.commands.registerCommand(id, (target?: vscode.Uri) => COMMANDS[id](context, target))),
-    vscode.workspace.onDidChangeConfiguration((e) => e.affectsConfiguration(SECTION) && opened?.session.settingsChanged()),
+    vscode.workspace.onDidChangeConfiguration(settingsChanged),
+    vscode.env.onDidChangeTelemetryEnabled(() => opened?.session.usageChanged()),
     beforeProvider(befores),
     vscode.window.registerUriHandler({ handleUri: (uri) => void (uri.path === SIGN_IN_PATH && signInFromUri(uri.query)) })
   );
@@ -149,7 +158,7 @@ export function activate(context: vscode.ExtensionContext) {
   };
 }
 
-export function deactivate() {
-  opened?.session.stop();
+export async function deactivate() {
+  await opened?.session.stop();
   kept.stopAll();
 }

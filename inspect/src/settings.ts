@@ -23,7 +23,7 @@ export type SettingRow = {
 };
 
 export const SETTINGS: SettingRow[] = [
-  { key: SettingKey.Telemetry, label: 'Anonymous usage counts', hint: 'Counts of opens and edits, framework and styling system. No code, no paths.', fallback: true },
+  { key: SettingKey.Telemetry, label: 'Anonymous usage counts', hint: 'Sessions, edits, session length, editor, OS and device kind. No code, no paths.', fallback: true },
   {
     key: SettingKey.Styling,
     label: 'Write styles as',
