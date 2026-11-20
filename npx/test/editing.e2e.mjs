@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { delimiter, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 
@@ -18,17 +18,30 @@ const NEW_TITLE = 'Ship faster than planned';
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 const MAX_UNDOS = 10;
 const IMAGE_DIRS = ['public/images', 'static/images'];
+const CODE_BINARIES = ['code', 'code.cmd'];
+const HANDLER_ATTRIBUTE = /onClick|onclick|@click/;
+const GO_PAGE_CODE = /(goto\(|location\.href = |\$router\.push\()'\/pricing'/;
+const OPEN_WAIT_MS = 5000;
+const OPEN_POLL_MS = 250;
+const printed = [];
 
 const git = (...args) => execFileSync('git', ['-C', APP, ...args], { encoding: 'utf8' });
 const changedFiles = () => git('diff', '--name-only', '--relative').split('\n').filter(Boolean);
 const diffText = () => git('diff', '--relative');
 const untracked = () => git('ls-files', '--others', '--exclude-standard', '--', '.').split('\n').filter((f) => f && !f.startsWith('node_modules') && !f.startsWith('.feega'));
 
+const pathWithoutCode = () => (process.env.PATH ?? '').split(delimiter).filter((dir) => !CODE_BINARIES.some((name) => existsSync(join(dir, name)))).join(delimiter);
+
 function started() {
-  const cli = spawn(process.execPath, [CLI, APP, '--port', String(PORT), '--no-open'], { stdio: ['pipe', 'pipe', 'inherit'], env: { ...process.env, FEEGA_STOP_ON_STDIN_END: '1' } });
+  const env = { ...process.env, FEEGA_STOP_ON_STDIN_END: '1' };
+  if (process.platform !== 'win32') {
+    env.PATH = pathWithoutCode();
+  }
+  const cli = spawn(process.execPath, [CLI, APP, '--port', String(PORT), '--no-open'], { stdio: ['pipe', 'pipe', 'inherit'], env });
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('the editor did not start')), READY_MS);
     cli.stdout.on('data', (data) => {
+      printed.push(String(data));
       const url = /editor ready on (\S+)/.exec(String(data))?.[1];
       if (url) {
         clearTimeout(timer);
@@ -40,7 +53,11 @@ function started() {
 }
 
 const results = [];
+const ONLY = process.env.FEEGA_E2E_ONLY ? new RegExp(process.env.FEEGA_E2E_ONLY) : null;
 const check = async (name, run) => {
+  if (ONLY && !ONLY.test(name)) {
+    return;
+  }
   try {
     await run();
     results.push(`PASS ${name}`);
@@ -328,6 +345,51 @@ try {
     assert.ok(!/top-3|top:\s*12px/.test(diffText()) && /absolute/.test(diffText()), 'one undo removes only the offset');
     await undo();
     assert.deepEqual(changedFiles(), [], 'a second undo restores the source');
+  });
+
+  await check('link: the address and the new-tab toggle write the source and each undo restores it', async () => {
+    await frame.locator('a').first().click();
+    const address = page.locator('[data-field="link-href"]');
+    await address.waitFor({ timeout: 10_000 });
+    await address.fill('/pricing');
+    await address.press('Enter');
+    await page.waitForTimeout(SETTLE_MS);
+    assert.ok(diffText().includes('href="/pricing"') || diffText().includes("href='/pricing'"), `href written:\n${diffText()}`);
+    assert.equal(await frame.locator('a').first().getAttribute('href'), '/pricing', 'the page shows the new address');
+    await page.locator('[data-field="link-new-tab"]').check();
+    await page.waitForTimeout(SETTLE_MS);
+    assert.ok(/target="_blank"/.test(diffText()) && /rel="noopener noreferrer"/.test(diffText()), `target and rel written:\n${diffText()}`);
+    await undo();
+    assert.ok(!/target="_blank"/.test(diffText()) && /\/pricing/.test(diffText()), 'one undo removes only the new-tab change');
+    await undo();
+    assert.deepEqual(changedFiles(), [], 'a second undo restores the source');
+  });
+
+  await check('events: a go-to-page action adds one handler, the list shows it and opens its line, undo restores', async () => {
+    const button = frame.locator('#cta');
+    await button.click();
+    const target = page.locator('[data-field="go-target"]');
+    await target.waitFor({ timeout: 10_000 });
+    assert.equal(await page.locator('[data-section="Events"] [data-event]').count(), 0, 'no handler listed before');
+    await target.fill('/pricing');
+    await page.locator('[data-field="go-add"]').click();
+    await page.waitForTimeout(SETTLE_MS);
+    assert.ok(GO_PAGE_CODE.test(diffText()), `the handler is written:\n${diffText()}`);
+    const [file] = changedFiles();
+    const line = readFileSync(join(APP, file), 'utf8').split('\n').findIndex((l) => HANDLER_ATTRIBUTE.test(l)) + 1;
+    await button.click();
+    const row = page.locator('[data-section="Events"] [data-event="click"]');
+    await row.waitFor({ timeout: 10_000 });
+    assert.ok((await row.innerText()).includes('inline'), 'the handler is listed as inline');
+    printed.length = 0;
+    await row.click();
+    const opened = new RegExp(`:${line}:\\d+`);
+    for (let waited = 0; waited < OPEN_WAIT_MS && !opened.test(printed.join('')); waited += OPEN_POLL_MS) {
+      await page.waitForTimeout(OPEN_POLL_MS);
+    }
+    assert.ok(opened.test(printed.join('')), `the editor opens line ${line}; printed: ${printed.join('').slice(-300)}`);
+    await undo();
+    assert.deepEqual(changedFiles(), [], 'one undo removes the handler and the import');
   });
 
   await check('no package file was created or changed', async () => {

@@ -21,9 +21,18 @@ Feega Inspect is a small editor extension, separate from the Feega canvas. No ac
    panel shows "Saved to file:line", or the reason a write was refused.
 5. Double-click a text to rewrite it in place: Enter saves, Esc cancels. Text that comes from an
    expression or a data file is not rewritten; the panel links to where it comes from.
-6. **Design** (D) selects and edits; **Navigate** (N) uses the app normally. The top bar has
+6. A link (`<a>`, SvelteKit, Next or React Router `Link`, Vue `RouterLink`/`NuxtLink`) gets a
+   **Link** section: its address (`href`, or `to`) with your project's pages as suggestions, and a
+   **New tab** switch that writes `target="_blank"` and `rel="noopener noreferrer"`. Only literal
+   strings are written; an address held in a constant is written where the constant is defined,
+   and one built from props or expressions is refused. **Events** lists the handlers in the source
+   (`onClick`, `onclick`, `on:click`, `@click`) by name or as inline; click one to open its line.
+   An element with no click handler can be given **Go to page**, **Open URL** or **Scroll to
+   section**: Feega writes a small inline handler (Svelte `goto` with its import, `$router.push`
+   in Vue, `window.location` otherwise; Next files become client components). One undo removes it.
+7. **Design** (D) selects and edits; **Navigate** (N) uses the app normally. The top bar has
    back/forward/reload, the route, a dev server status dot, and device widths (keys 1–4).
-7. Cmd/Ctrl+Z restores the file. It never overwrites a change made after the edit.
+8. Cmd/Ctrl+Z restores the file. It never overwrites a change made after the edit.
 
 ## In the browser: `npx feega`
 
