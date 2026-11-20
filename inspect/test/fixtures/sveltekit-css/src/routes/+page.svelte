@@ -1,4 +1,9 @@
 <script>
+import Benefits from '$lib/Benefits.svelte';
+import Faq from '$lib/Faq.svelte';
+
+const topics = ['Briefs', 'Timelines', 'Assets'];
+
 const plans = [
   { name: 'Starter', text: 'One project, every editor control.' },
   { name: 'Studio', text: 'Unlimited projects and shared tokens.' },
@@ -13,6 +18,7 @@ const plans = [
       <a href="#features">Features</a>
       <a href="#pricing">Pricing</a>
     </nav>
+    <span id="badge" class="badge">New</span>
   </header>
   <main class="main">
     <h1 id="title" class="title">Plan your launch in an afternoon</h1>
@@ -36,6 +42,13 @@ const plans = [
         <p>{plans[2].text}</p>
       </article>
     </section>
+    <ul id="topics" class="topics">
+      {#each topics as topic}
+        <li class="topic">{topic}</li>
+      {/each}
+    </ul>
+    <Benefits />
+    <Faq />
   </main>
   <footer class="footer">© Northwind</footer>
 </div>
@@ -114,5 +127,22 @@ const plans = [
   .footer {
     padding: 24px 32px;
     color: #64748b;
+  }
+
+  .topics {
+    display: block;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .topic {
+    padding: 8px 0;
+  }
+
+  .badge {
+    position: absolute;
+    top: 12px;
+    right: 16px;
   }
 </style>

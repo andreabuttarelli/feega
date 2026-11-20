@@ -198,8 +198,8 @@
       bridge.tree();
       bridge.palette();
       refresh();
-      bridge.track(Slot.Selected, untrack(() => picked?.source) ?? null);
-      bridge.track(Slot.Hovered, untrack(() => hover?.source) ?? null);
+      bridge.track(Slot.Selected, untrack(() => picked?.source) ?? null, untrack(() => picked?.instanceIndex));
+      bridge.track(Slot.Hovered, untrack(() => hover?.source) ?? null, untrack(() => hover?.instanceIndex));
     },
     moved: (path) => (visited(path), bridge.tree()),
     tree: (tree) => (layers = tree),
@@ -244,22 +244,22 @@
     frame!.src = new URL(path, url).toString();
   }
 
-  const pickedAt = $derived(picked ? sourceText(picked.source) : null);
-  const hoverAt = $derived(hover ? sourceText(hover.source) : null);
+  const pickedAt = $derived(picked ? `${sourceText(picked.source)}#${picked.instanceIndex}` : null);
+  const hoverAt = $derived(hover ? `${sourceText(hover.source)}#${hover.instanceIndex}` : null);
   $effect(() => {
     if (bridged) {
-      bridge.track(Slot.Selected, pickedAt === null ? null : untrack(() => picked!.source));
+      bridge.track(Slot.Selected, pickedAt === null ? null : untrack(() => picked!.source), untrack(() => picked?.instanceIndex));
     }
   });
   $effect(() => {
     if (bridged) {
-      bridge.track(Slot.Hovered, hoverAt === null ? null : untrack(() => hover!.source));
+      bridge.track(Slot.Hovered, hoverAt === null ? null : untrack(() => hover!.source), untrack(() => hover?.instanceIndex));
     }
   });
 
   function refresh() {
     if (picked) {
-      bridge.again(picked.source).then((p) => (picked = p ?? picked));
+      bridge.again(picked.source, picked.instanceIndex).then((p) => (picked = p ?? picked));
     }
   }
 

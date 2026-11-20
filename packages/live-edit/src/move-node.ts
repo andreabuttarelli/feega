@@ -15,7 +15,7 @@ const TAG = /<(\/?)([a-zA-Z][\w.:-]*)/g;
 const HIDDEN_BLOCK = /<(script|style)\b[\s\S]*?<\/\1>/g;
 const EACH_OPEN = /\{#each\b/g;
 const EACH_CLOSE = /\{\/each\}/g;
-const MAP_CALL = /\.map\(/;
+const MAP_CALL = /\.map\(/g;
 
 export const hiddenOut = (text: string) => text.replace(HIDDEN_BLOCK, (block) => block.replace(/[^\n]/g, ' '));
 
@@ -58,13 +58,19 @@ export function parentOf(text: string, start: number): number {
   return stack.at(-1) ?? -1;
 }
 
+const unclosedMap = (between: string) =>
+  [...between.matchAll(MAP_CALL)].some((call) => {
+    const rest = between.slice(call.index + call[0].length);
+    return [...rest].reduce((depth, ch) => depth + (ch === '(' ? 1 : ch === ')' ? -1 : 0), 1) > 0;
+  });
+
 export function repeated(text: string, parent: number, start: number): string | null {
   const between = text.slice(parent, start);
   const opened = (between.match(EACH_OPEN)?.length ?? 0) - (between.match(EACH_CLOSE)?.length ?? 0);
   if (opened > 0) {
     return 'the element is rendered by an {#each} block: reorder the data instead, or use CSS order';
   }
-  return MAP_CALL.test(between) ? 'the element is rendered by .map(): reorder the data instead, or use CSS order' : null;
+  return unclosedMap(between) ? 'the element is rendered by .map(): reorder the data instead, or use CSS order' : null;
 }
 
 export function lineSpan(text: string, span: Span): Span {

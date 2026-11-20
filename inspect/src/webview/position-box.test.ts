@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { OffsetSide, flipOffset, initialOffsets } from './position-box';
+import { OffsetSide, flipOffset, initialOffsets, offsetsFromHost } from './position-box';
 
 describe('position box', () => {
   it('turning a side off removes the property', () => {
@@ -20,6 +20,10 @@ describe('position box', () => {
 
   it('with no class a resolved offset on both sides of an axis is not taken as set', () => {
     expect(initialOffsets('', { top: '12px', bottom: '80px', left: '24px', right: '900px' })).toEqual({ [OffsetSide.Top]: false, [OffsetSide.Right]: false, [OffsetSide.Bottom]: false, [OffsetSide.Left]: false });
+  });
+
+  it('the sides the host found authored in the source are the ones that are on', () => {
+    expect(offsetsFromHost([OffsetSide.Top, OffsetSide.Left])).toEqual({ [OffsetSide.Top]: true, [OffsetSide.Right]: false, [OffsetSide.Bottom]: false, [OffsetSide.Left]: true });
   });
 
   it('inset sets all four sides', () => {

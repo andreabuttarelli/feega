@@ -24,6 +24,8 @@ const HANDLER_ATTRIBUTE = /onClick|onclick|@click/;
 const GO_PAGE_CODE = /(goto\(|location\.href = |\$router\.push\()'\/pricing'/;
 const OPEN_WAIT_MS = 5000;
 const OPEN_POLL_MS = 250;
+const CLIENT_PAGE_MS = 60_000;
+const TOPICS = ['Briefs', 'Timelines', 'Assets'];
 const printed = [];
 
 const git = (...args) => execFileSync('git', ['-C', APP, ...args], { encoding: 'utf8' });
@@ -63,7 +65,7 @@ const check = async (name, run) => {
     await run();
     results.push(`PASS ${name}`);
   } catch (error) {
-    results.push(`FAIL ${name}: ${String(error.message).split('\n')[0]}`);
+    results.push(`FAIL ${name}: ${String(error.message).split("\n")[0]} @ ${String(error.stack).split("\n").find((l) => l.includes("editing.e2e"))}`);
   }
 };
 
@@ -87,6 +89,10 @@ try {
     await page.mouse.dblclick(box.x + 20, box.y + box.height / 2);
     await frame.locator('[contenteditable]').first().waitFor({ timeout: 5000 });
   };
+
+  await page.getByTestId('address').fill('/');
+  await page.getByTestId('address').press('Enter');
+  await page.waitForTimeout(SETTLE_MS);
 
   await check('layers tree is filled on first load', async () => {
     const rows = await page.locator('[data-testid="layers"] [data-layer]').count();
@@ -303,6 +309,7 @@ try {
   });
 
   await check('wrap puts the element in a container and selects it, unwrap gives it back, each is one undo', async () => {
+    const direct = await paragraphs();
     await frame.locator('main > p').first().click();
     await page.waitForTimeout(800);
     await page.keyboard.press('ControlOrMeta+g');
@@ -312,7 +319,11 @@ try {
     assert.ok(/^\s*div/.test(picked), `the new container is selected, selection is ${picked}`);
     await page.keyboard.press('ControlOrMeta+Shift+g');
     await page.waitForTimeout(SETTLE_MS);
-    assert.deepEqual(changedFiles(), [], 'unwrap restores the source');
+    assert.equal(await frame.locator('main > div > p').count(), 0, 'the container is gone from the page');
+    assert.equal(await paragraphs(), direct, 'the paragraph is back under main');
+    if (TAILWIND) {
+      assert.deepEqual(changedFiles(), [], 'unwrap restores the source');
+    }
     await undo();
     assert.equal(await frame.locator('main > div > p').count(), 1, 'one undo brings the container back');
     await undo();
@@ -347,6 +358,29 @@ try {
     assert.ok(!/top-3|top:\s*12px/.test(diffText()) && /absolute/.test(diffText()), 'one undo removes only the offset');
     await undo();
     assert.deepEqual(changedFiles(), [], 'a second undo restores the source');
+  });
+
+  await check('position box: the bars start from what the source authors and turning one off removes it in one undo', async () => {
+    const badge = frame.locator('#badge');
+    await badge.click();
+    const section = page.locator('[data-section="Position"]');
+    await section.waitFor({ timeout: 10_000 });
+    if ((await section.locator('[data-row="position"]').count()) === 0) {
+      await section.locator('button.title').click();
+    }
+    const bar = (side) => section.locator(`[data-bar="${side}"]`);
+    await bar('top').waitFor({ timeout: 10_000 });
+    await page.waitForTimeout(800);
+    const states = await Promise.all(['top', 'right', 'bottom', 'left'].map((side) => bar(side).getAttribute('aria-checked')));
+    assert.deepEqual(states, ['true', 'true', 'false', 'false'], 'top and right are on, the others off');
+    await bar('top').click();
+    await page.waitForTimeout(SETTLE_MS);
+    const removed = diffText().split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---'));
+    assert.ok(removed.some((l) => (TAILWIND ? /top-3/ : /top:\s*12px/).test(l)), `top is removed from the source:\n${diffText()}`);
+    assert.ok(!diffText().split('\n').some((l) => l.startsWith('+') && /top:|top-3/.test(l)), 'nothing re-adds it');
+    assert.notEqual(await badge.evaluate((e) => getComputedStyle(e).top), '12px', 'the page shows the offset gone');
+    await undo();
+    assert.deepEqual(changedFiles(), [], 'one undo restores the source');
   });
 
   await check('link: the address and the new-tab toggle write the source and each undo restores it', async () => {
@@ -420,6 +454,60 @@ try {
       await page.keyboard.press('Enter');
       await page.waitForTimeout(SETTLE_MS);
       await undoAll();
+    });
+  }
+
+  await check('loop items: dragging one onto another reorders the array and the page, and one undo restores it', async () => {
+    const items = frame.locator('#topics > li');
+    const names = () => items.allInnerTexts();
+    assert.deepEqual(await names(), TOPICS);
+    await items.nth(2).click();
+    await page.waitForTimeout(800);
+    const from = await items.nth(2).boundingBox();
+    const to = await items.nth(0).boundingBox();
+    await page.mouse.move(from.x + 10, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(to.x + 10, to.y + 2, { steps: 12 });
+    await page.waitForTimeout(500);
+    await page.mouse.up();
+    await page.waitForTimeout(SETTLE_MS);
+    assert.deepEqual(await names(), ['Assets', 'Briefs', 'Timelines'], 'the page shows the new order');
+    assert.ok(/'Assets', 'Briefs', 'Timelines'/.test(diffText()), `the array order is written:\n${diffText()}`);
+    await undo();
+    assert.deepEqual(changedFiles(), [], 'undo restores the array');
+  });
+
+  await check('two components in a page: dragging one layer past the other reorders their usages and one undo restores it', async () => {
+    await frame.locator('#benefits').click();
+    await page.waitForTimeout(800);
+    const layers = page.locator('[data-testid="layers"] [data-layer]');
+    const benefits = layers.filter({ hasText: /^\s*Benefits/ }).first();
+    const faq = layers.filter({ hasText: /^\s*Faq/ }).first();
+    await benefits.dragTo(faq, { targetPosition: { x: 60, y: 20 } });
+    await page.waitForTimeout(SETTLE_MS);
+    const order = await frame.locator('main').first().evaluate((main) => [...main.children].map((c) => c.id).filter((id) => id === 'faq' || id === 'benefits'));
+    assert.deepEqual(order, ['faq', 'benefits'], 'the page shows the new order');
+    await undo();
+    assert.deepEqual(changedFiles(), [], 'undo restores the usages');
+  });
+
+  if (NEXT) {
+    await check('a use client page renders, hydrates and lists its layers', async () => {
+      const address = page.getByTestId('address');
+      await address.fill('/client');
+      await address.press('Enter');
+      await frame.locator('#client-title').waitFor({ timeout: CLIENT_PAGE_MS });
+      await page.getByRole('radio', { name: 'Navigate' }).click();
+      await frame.locator('#count').click();
+      await frame.getByText('Clicked 1').waitFor({ timeout: CLIENT_PAGE_MS });
+      await page.getByRole('radio', { name: 'Design' }).click();
+      await frame.locator('#client-title').click();
+      await page.waitForTimeout(800);
+      const picked = await page.locator('[data-testid="layers"] [data-layer][aria-selected="true"]').count();
+      assert.equal(picked, 1, 'the client page elements are selectable');
+      await address.fill('/');
+      await address.press('Enter');
+      await frame.locator('h1').first().waitFor({ timeout: CLIENT_PAGE_MS });
     });
   }
 

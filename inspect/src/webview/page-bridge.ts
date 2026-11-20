@@ -81,7 +81,7 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
     }
   }
 
-  function inspect(query: { x: number; y: number } | { selector: string } | { from: string; move: Move }): Promise<Pick | null> {
+  function inspect(query: { x: number; y: number } | { selector: string; index?: number } | { from: string; move: Move }): Promise<Pick | null> {
     const id = ++next;
     return new Promise((resolve) => {
       waiting.set(id, resolve);
@@ -92,7 +92,7 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
   return {
     at: (x: number, y: number) => inspect({ x, y }),
     move: (from: Source, move: Move) => inspect({ from: sourceText(from), move }),
-    again: (source: Source) => inspect({ selector: selectorOf(source) }),
+    again: (source: Source, index?: number) => inspect({ selector: selectorOf(source), index }),
     preview: (source: Source, style: Record<string, string>, inner?: string) => send({ type: PREVIEW, source: sourceText(source), inner, style }),
     clear: (source: Source) => send({ type: PREVIEW_CLEAR, source: sourceText(source) }),
     settle: (source: Source) => send({ type: PREVIEW_SETTLE, source: sourceText(source) }),
@@ -102,7 +102,7 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
     mode: (mode: Mode) => send({ type: MODE, mode }),
     scroll: (dx: number, dy: number) => send({ type: SCROLL, dx, dy }),
     leave: () => send({ type: LEAVE }),
-    track: (slot: Slot, source: Source | null) => send({ type: TRACK, slot, source: source ? sourceText(source) : null }),
+    track: (slot: Slot, source: Source | null, index = 0) => send({ type: TRACK, slot, source: source ? sourceText(source) : null, index }),
     restoreText: (source: string) => send({ type: TEXT_RESTORE, source }),
     editText: (x: number, y: number) => send({ type: TEXT_EDIT, x, y })
   };

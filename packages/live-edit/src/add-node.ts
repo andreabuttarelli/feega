@@ -15,7 +15,7 @@ export enum AddKind {
 
 export enum AddStyle {
   Tailwind = 'tailwind',
-  Inline = 'inline'
+  Plain = 'plain'
 }
 
 export type AddRequest = { kind: AddKind; style: AddStyle; src?: string };
@@ -34,23 +34,16 @@ const RECIPES: Record<AddKind, Recipe> = {
 const CONTAINER_TAGS = new Set(['div', 'section', 'main', 'header', 'footer', 'nav', 'article', 'aside', 'ul', 'ol', 'form']);
 const JSX_FILE = /\.(t|j)sx$/;
 
-const camel = (name: string) => name.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+export const classAttribute = (file: string, value: string) => ` ${JSX_FILE.test(file) ? 'className' : 'class'}="${value}"`;
 
-function styling(recipe: Recipe, style: AddStyle, jsx: boolean): string {
-  if (style === AddStyle.Tailwind) {
-    return recipe.tailwind ? ` ${jsx ? 'className' : 'class'}="${recipe.tailwind}"` : '';
-  }
-  const entries = Object.entries(recipe.css);
-  if (!entries.length) {
-    return '';
-  }
-  return jsx ? ` style={{ ${entries.map(([k, v]) => `${camel(k)}: '${v}'`).join(', ')} }}` : ` style="${entries.map(([k, v]) => `${k}: ${v}`).join('; ')}"`;
-}
+export const addedCss = (kind: AddKind): Record<string, string> => RECIPES[kind].css;
 
-function markupOf(req: AddRequest, jsx: boolean): string {
+const styling = (recipe: Recipe, style: AddStyle, file: string) => (style === AddStyle.Tailwind && recipe.tailwind ? classAttribute(file, recipe.tailwind) : '');
+
+function markupOf(req: AddRequest, file: string): string {
   const recipe = RECIPES[req.kind];
   const attrs = req.kind === AddKind.Image ? ` src="${req.src ?? ''}" alt=""` : recipe.attrs;
-  const open = `<${recipe.tag}${attrs}${styling(recipe, req.style, jsx)}`;
+  const open = `<${recipe.tag}${attrs}${styling(recipe, req.style, file)}`;
   return req.kind === AddKind.Image ? `${open} />` : `${open}>${recipe.text}</${recipe.tag}>`;
 }
 
@@ -76,7 +69,7 @@ export async function addNode(read: ReadFile, at: LiveAt, req: AddRequest): Prom
     return { ok: false, reason: why, at };
   }
 
-  const markup = markupOf(req, JSX_FILE.test(at.file));
+  const markup = markupOf(req, at.file);
   const container = CONTAINER_TAGS.has(selected.tag) && selected.end > selected.openEnd + 1;
   const lineStart = source.lastIndexOf('\n', selected.start - 1) + 1;
   const indent = indentOf(source.slice(lineStart));
