@@ -2,7 +2,7 @@ import type { LiveAt } from './class-patch';
 import type { ReadFile } from './files';
 
 const FIRST_NAME = /^\{\s*(?:[#:@][a-z]+\s+)?([A-Za-z_$][\w$]*)/;
-const MODULE_EXTENSIONS = ['', '.ts', '.js', '.svelte.ts', '.svelte.js', '/index.ts', '/index.js'];
+export const MODULE_EXTENSIONS = ['', '.ts', '.js', '.svelte.ts', '.svelte.js', '/index.ts', '/index.js'];
 
 const CONSTANT_NAME = /^\{\{?\s*([A-Za-z_$][\w$]*)\s*\}?\}$/;
 const literalDeclaration = (name: string) => new RegExp(`\\b(?:const|let|var)\\s+${name}\\s*(?::[^=]+)?=\\s*(['"\`])((?:\\\\.|(?!\\1)[^\\\\])*)\\1\\s*(?:as const)?\\s*[;\\n]`);
