@@ -8,6 +8,7 @@ import { Place } from '@feega/live-edit/move-node';
 import { AddKind } from '@feega/live-edit/add-node';
 import { StructureOp } from '@feega/live-edit/structure';
 import { PageTarget } from '@feega/live-edit/page-rule';
+import { ElementState } from '@feega/live-edit/element-state';
 
 const PAGE = `<section class="px-4 py-8 text-black">
   <h1 class="text-2xl">Hello</h1>
@@ -457,5 +458,33 @@ describe('fileEdits', () => {
     expect(read(root)).toBe(wrapped);
     await edits.undo();
     expect(read(root)).toBe(PAGE);
+  });
+});
+
+describe('fileEdits in an element state', () => {
+  it('tailwind: una modifica in hover scrive la variante hover:, undo la toglie in un passo', async () => {
+    const root = app();
+    const edits = fileEdits(root);
+    await edits.edit({ at: 'src/Page.svelte:2:3', prop: LiveProp.Color, value: '#ff0000', state: ElementState.Hover });
+
+    expect(read(root)).toContain('<h1 class="text-2xl hover:text-[#ff0000]">');
+    await edits.undo();
+    expect(read(root)).toBe(PAGE);
+  });
+
+  it('css: una modifica in hover scrive la regola :hover della classe', async () => {
+    const root = app(PLAIN);
+    writeFileSync(join(root, 'src/Page.svelte'), '<button class="cta">Go</button>\n\n<style>\n  .cta {\n    color: black;\n  }\n</style>\n');
+    await fileEdits(root).edit({ at: 'src/Page.svelte:1:1', prop: LiveProp.Class, family: 'x', value: '', css: { 'background-color': 'red' }, state: ElementState.Hover });
+
+    expect(read(root)).toContain('.cta:hover {\n    background-color: red;\n  }');
+  });
+
+  it('css: un file senza foglia di stile rifiuta lo stato invece di scriverlo inline', async () => {
+    const root = app(PLAIN);
+    writeFileSync(join(root, 'src/Page.html'), '<button>Go</button>\n');
+    const out = await fileEdits(root).edit({ at: 'src/Page.html:1:1', prop: LiveProp.Class, family: 'x', value: '', css: { color: 'red' }, state: ElementState.Hover });
+
+    expect(out.ok).toBe(false);
   });
 });

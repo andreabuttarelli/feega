@@ -15,6 +15,7 @@ import type { LoopMove } from '@feega/live-edit/move-loop-item';
 import type { Usage } from '@feega/live-edit/move-usage';
 import { StructureOp, structure } from '@feega/live-edit/structure';
 import { pageRule } from '@feega/live-edit/page-rule';
+import { ElementState } from '@feega/live-edit/element-state';
 import { scopedRule, type Scope } from '@feega/live-edit/scoped-rule';
 import { styleAttr, type Css } from '@feega/live-edit/style-attr';
 import { detectLibrary } from '@feega/live-edit/icon-library';
@@ -32,16 +33,22 @@ export type Written = { ok: true; path: string; written: string; note?: string; 
 
 type Changes = { ok: true; changes: FileChange[] } | { ok: false; reason: string; at?: LiveAt };
 
-type CssWriter = { write: (read: ReadFile, at: LiveAt, css: Css, viewport?: number, scope?: Scope, inner?: string) => Promise<Changes>; note?: string };
+type CssWriter = { write: (read: ReadFile, at: LiveAt, css: Css, viewport?: number, scope?: Scope, inner?: string, state?: ElementState) => Promise<Changes>; note?: string };
 
-const single = (write: typeof scopedRule): CssWriter['write'] => async (read, at, css, viewport, scope, inner) => {
-  const out = await write(read, at, css, viewport, scope, inner);
+const single = (write: typeof scopedRule): CssWriter['write'] => async (read, at, css, viewport, scope, inner, state) => {
+  const out = await write(read, at, css, viewport, scope, inner, state);
   return out.ok ? { ok: true, changes: [out.change] } : out;
 };
 
 const SCOPED: CssWriter = { write: single(scopedRule) };
 const MODULE: CssWriter = { write: cssModuleRule };
-const INLINE: CssWriter = { write: single(styleAttr), note: 'inline style: this file has no stylesheet' };
+const inlineStyle = single(styleAttr);
+
+const INLINE: CssWriter = {
+  write: async (read, at, css, viewport, scope, inner, state = ElementState.Default) =>
+    state === ElementState.Default ? inlineStyle(read, at, css, viewport, scope, inner) : { ok: false, reason: `${at.file}:${at.line}: ${state} needs a stylesheet rule, this file has none`, at },
+  note: 'inline style: this file has no stylesheet'
+};
 
 const CSS_WRITERS: Record<string, CssWriter> = {
   svelte: SCOPED,
@@ -138,7 +145,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
 
     if ((await stylingOf(root, choice())) === Styling.Css) {
       const writer = cssWriterOf(at.file);
-      const out = await writer.write(reader(root), at, ask.css ?? {}, ask.viewport, ask.scope, ask.inner);
+      const out = await writer.write(reader(root), at, ask.css ?? {}, ask.viewport, ask.scope, ask.inner, ask.state);
       return out.ok ? written(out.changes, '', writer.note) : out;
     }
 
@@ -147,7 +154,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     }
 
     const token = await tokenOf(root, ask);
-    const out = await stylePatch(reader(root), at, { prop: ask.prop, family: ask.family, value: token ?? ask.value ?? '', side: ask.side, viewport: ask.viewport });
+    const out = await stylePatch(reader(root), at, { prop: ask.prop, family: ask.family, value: token ?? ask.value ?? '', side: ask.side, viewport: ask.viewport, state: ask.state });
     if (out.skipped.length) {
       return { ok: false, reason: out.skipped[0] };
     }

@@ -6,6 +6,7 @@ import type { Usage } from '@feega/live-edit/move-usage';
 import type { StructureOp } from '@feega/live-edit/structure';
 import type { Scope } from '@feega/live-edit/scoped-rule';
 import type { PageTarget } from '@feega/live-edit/page-rule';
+import type { ElementState } from '@feega/live-edit/element-state';
 import type { EventHandler } from '@feega/live-edit/event-handlers';
 import type { GoAsk } from '@feega/live-edit/go-action';
 import type { LinkEdit, LinkRead } from '@feega/live-edit/link-edit';
@@ -60,7 +61,7 @@ export enum Styling {
   Css = 'css'
 }
 
-export type EditAsk = LiveEditAsk & { css?: Record<string, string>; scope?: Scope; inner?: string; page?: PageTarget };
+export type EditAsk = LiveEditAsk & { css?: Record<string, string>; scope?: Scope; inner?: string; page?: PageTarget; state?: ElementState };
 
 export enum ServerState {
   Detecting = 'detecting',
