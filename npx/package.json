@@ -1,12 +1,36 @@
 {
   "name": "feega",
-  "version": "0.1.0",
-  "description": "Run feega's infinite canvas locally, saved to a .feega file. No account, no database.",
+  "description": "Design your running web app in the browser: click an element, change it, and the edit is written to your source as a Tailwind class or your own CSS.",
   "license": "Apache-2.0",
-  "type": "module",
-  "bin": { "feega": "bin/feega.mjs" },
-  "files": ["bin", "launcher.mjs", "telemetry.mjs"],
-  "engines": { "node": ">=22" },
-  "repository": { "type": "git", "url": "git+https://github.com/andreabuttarelli/feega.git", "directory": "npx" },
-  "homepage": "https://feega.app"
+  "bin": {
+    "feega": "dist/cli.cjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "design",
+    "visual-editor",
+    "tailwind",
+    "svelte",
+    "react",
+    "vue",
+    "vite",
+    "nextjs",
+    "devtools"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andreabuttarelli/feega.git",
+    "directory": "npx"
+  },
+  "homepage": "https://feega.app",
+  "bugs": "https://github.com/andreabuttarelli/feega/issues",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "private": true
 }

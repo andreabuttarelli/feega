@@ -61,25 +61,23 @@ export const topUpPrices = (plan: CloudPlan): string => {
   return `${prices.slice(0, -1).join(', ')} or ${prices[prices.length - 1]}`;
 };
 
-export const CLOUD_FOR = 'For teams, and anyone who wants AI without managing keys.';
+export const EXTENSION_FOR = 'Click an element of your running app, edit it, ship the diff.';
 
-export const LOCAL_NOTE = 'No account, no card.';
+export const EXTENSION_NOTE = 'No account, no card, no AI.';
 
-export const LOCAL_FOR = 'The open-source app on your own computer.';
-
-export const LOCAL_LINES = [
-  'One canvas in one .feega file',
-  'Open source, Apache-2.0',
-  'Your agents connect through local MCP',
-  'AI with your own provider keys'
+export const EXTENSION_LINES = [
+  'VS Code, Cursor, Windsurf and VSCodium',
+  'React, Next.js, SvelteKit and Vue',
+  'Tailwind or plain CSS',
+  'Every change written to your code, with a diff',
+  'Open source, Apache-2.0'
 ] as const;
 
-export const CLOUD_LINES = [
-  'The same editor, plus real-time collaboration',
-  'Every AI model, no keys to manage',
-  'Your agents via our hosted MCP, unlimited edits',
-  'Only editors pay, viewers are free'
-] as const;
+export const CLOUD_SOON_FOR = 'For teams that design in the same codebase.';
+
+export const CLOUD_SOON_NOTE = 'Star the repo to hear first.';
+
+export const CLOUD_SOON_LINES = ['GitHub sync', 'Collaboration', 'Sections and templates'] as const;
 
 export const freeStart = (plan: CloudPlan): string => `Start free: ${FREE_EDITORS} ${plan.per}, ${count(FREE_CREDITS)} credits, no card.`;
 
@@ -110,4 +108,4 @@ export const runOutAnswer = (plan: CloudPlan): string =>
   `AI pauses until next ${plan.period}'s credits arrive or you top up with ${topUpPrices(plan)}; everything else keeps working. Credits never expire.`;
 
 export const freeAnswer = (plan: CloudPlan): string =>
-  `Yes. Run npx feega for the full editor on your computer with your own AI keys. In the cloud, ${FREE_EDITORS} ${plan.per} is free with unlimited viewers and ${count(FREE_CREDITS)} AI credits, no card.`;
+  `Yes. The Feega extension is free, with no account and no AI. Feega Cloud, with GitHub sync, collaboration, sections and templates, is coming later.`;

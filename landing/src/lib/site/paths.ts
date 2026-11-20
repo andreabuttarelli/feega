@@ -1,8 +1,8 @@
-import { LANDING_PAGES } from './landing';
+import { DOWNLOAD_PATH } from './links';
 import { LEGAL_DOCS } from './legal';
-import { GUIDES, GUIDES_PATH, guidePath } from './guides';
-import { COMPARE_PATH, COMPARISONS, comparisonPath } from './compare';
 import { CODEBASE_PATH } from './codebase';
+import { HUBS } from './topics';
+import { topicPath } from './topics/topic';
 import { ALTERNATIVES, ALTERNATIVES_PATH, alternativePath } from './alternatives';
 
 export const PRICING_PATH = '/pricing';
@@ -10,15 +10,11 @@ export const PRICING_PATH = '/pricing';
 export const SITE_PATHS: readonly string[] = [
   '/',
   PRICING_PATH,
+  DOWNLOAD_PATH,
   '/changelog',
-  '/ai-video-upscaler',
   CODEBASE_PATH,
-  COMPARE_PATH,
   ALTERNATIVES_PATH,
-  GUIDES_PATH,
-  ...Object.keys(GUIDES).map(guidePath),
-  ...Object.keys(COMPARISONS).map(comparisonPath),
   ...Object.keys(ALTERNATIVES).map(alternativePath),
-  ...Object.keys(LANDING_PAGES).map((slug) => `/${slug}`),
+  ...HUBS.flatMap((h) => [h.path, ...Object.keys(h.topics).map((slug) => topicPath(h, slug))]),
   ...Object.keys(LEGAL_DOCS).map((slug) => `/${slug}`)
 ];

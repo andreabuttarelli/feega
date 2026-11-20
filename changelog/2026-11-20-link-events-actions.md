@@ -1,0 +1,9 @@
+# Link, Events and go-to actions in the editor
+
+Links could only be restyled. The bar now shows a Link section for `<a>` and the framework link components (`Link`, `NavLink`, `NuxtLink`, `RouterLink`): address (`href`, or `to` where that is the prop) and a New tab switch writing `target="_blank"` plus `rel="noopener noreferrer"` (merged into an existing `rel`; switching off removes only what it added). Only literal strings are written. A bare identifier is followed to the plain string constant that defines it (same file or an import, same resolver as literal text); anything else is refused with the reason and a link to where it comes from. Route suggestions are derived from route files (SvelteKit `src/routes`, Next `app/` and `pages/`, Nuxt `pages/`, static paths of a Vue router file); none for React Router.
+
+Events lists the handlers found in the element's open tag (`onClick`, Svelte 5 `onclick`, `on:click|mod`, Vue `@click.mod` / `v-on:`), by name or "inline"; a click opens the handler's declaration, else the attribute. Read-only.
+
+An element with no click handler and no link can get Go to page / Open URL / Scroll to section. One inline handler per framework: React/Next `onClick={() => (window.location.href = '/x')}`, Svelte 5 `onclick={() => goto('/x')}` with `import { goto } from '$app/navigation'` (merged into an existing import or script; plain `window.location` without SvelteKit; `on:click` for Svelte 4), Vue `@click="$router.push('/x')"` or, without a router, `$event.view.location.href` (Vue templates cannot see `window`). Next app-router files get `'use client'` and are refused when they export metadata. One undo step.
+
+Discarded: router push for React (no safe way to know the router in a plain component), editing handler bodies (the Events list stays read-only).

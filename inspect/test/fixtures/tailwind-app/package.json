@@ -1,0 +1,13 @@
+{
+  "name": "inspect-tailwind-fixture",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "vite" },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "*",
+    "@tailwindcss/vite": "^4.0.0",
+    "svelte": "^5.0.0",
+    "tailwindcss": "^4.0.0",
+    "vite": "*"
+  }
+}

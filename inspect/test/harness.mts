@@ -1,0 +1,95 @@
+import { readFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { chromium, type Page } from '@playwright/test';
+import { fileEdits } from '../src/host/file-edits.ts';
+import { stylingOf } from '../src/host/styling.ts';
+import { Attach, startDev } from '../src/host/dev-server.ts';
+import { ServerState, ToHost, ToView, type EditAsk, type Pick } from '../src/messages.ts';
+import { liveAtOf } from '@feega/live-edit/live-ask';
+import { SETTINGS } from '../src/settings.ts';
+
+const PANEL_PORT = Number(process.env.PANEL_PORT ?? 5999);
+const dist = fileURLToPath(new URL('../dist/webview/', import.meta.url));
+const launcher = fileURLToPath(new URL('../dist/launcher/', import.meta.url));
+
+const pageHtml = (theme: string) => `<!doctype html><html><head><meta charset="utf-8"><style>body{padding:0 20px}</style><link rel="stylesheet" href="/panel.css">
+<style>${theme}</style>
+<script>window.acquireVsCodeApi = () => ({ postMessage: (m) => window.toHost(m) });</script>
+</head><body class="vscode-dark"><div id="app"></div><script src="/panel.js"></script></body></html>`;
+
+export const DARK = ':root{--vscode-editor-background:#1f1f1f;--vscode-foreground:#cccccc;--vscode-sideBar-background:#181818;--vscode-focusBorder:#0078d4;--vscode-font-family:-apple-system,system-ui,sans-serif}';
+export const LIGHT = ':root{--vscode-editor-background:#ffffff;--vscode-foreground:#1f1f1f;--vscode-sideBar-background:#f8f8f8;--vscode-focusBorder:#0078d4;--vscode-font-family:-apple-system,system-ui,sans-serif}';
+
+export async function openPanel(appRoot: string, theme = DARK) {
+  const running = await startDev(appRoot, launcher, () => undefined, '', Attach.Never);
+  if ('refused' in running) {
+    throw new Error(running.refused);
+  }
+  const edits = fileEdits(appRoot);
+  const styling = await stylingOf(appRoot);
+
+  const server = createServer(async (req, res) => {
+    const name = (req.url ?? '/').slice(1).replace(/\?.*$/, '');
+    if (!name || name === 'light') {
+      res.writeHead(200, { 'content-type': 'text/html' }).end(pageHtml(name === 'light' ? LIGHT : theme));
+      return;
+    }
+    res.writeHead(200, { 'content-type': name.endsWith('.css') ? 'text/css' : 'text/javascript' }).end(await readFile(join(dist, name)));
+  }).listen(PANEL_PORT);
+
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
+  if (process.env.PROBE) {
+    page.on('console', (m) => console.log('console', m.text().slice(0, 160)));
+    page.on('pageerror', (e) => console.log('pageerror', e.message));
+  }
+  const reply = (m: unknown) => page.evaluate((msg) => window.postMessage(msg, '*'), m);
+  const picks = new Map<number, (p: Pick | null) => void>();
+  const saves: unknown[] = [];
+
+  await page.exposeFunction('toHost', async (m: { kind: ToHost; ask?: EditAsk; id?: number; pick?: Pick | null }) => {
+    if (m.kind === ToHost.Ready) {
+      await reply({ kind: ToView.App, url: running.url, styling, prefs: null });
+      await reply({ kind: ToView.Server, state: ServerState.Running });
+      await reply({ kind: ToView.Settings, values: Object.fromEntries(SETTINGS.map((r) => [r.key, r.fallback])), facts: { version: '0.1.0', framework: 'sveltekit', styling } });
+    }
+    if (m.kind === ToHost.Picked) {
+      picks.get(m.id!)?.(m.pick ?? null);
+    }
+    if (m.kind === ToHost.Edit) {
+      const out = await edits.edit(m.ask!);
+      saves.push(out);
+      await reply(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, saved: liveAtOf(m.ask!.at), note: out.note } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
+    }
+    if (m.kind === ToHost.Undo) {
+      await edits.undo();
+    }
+  });
+
+  await page.goto(`http://127.0.0.1:${PANEL_PORT}/`);
+  const frame = page.frameLocator('[data-testid=app-frame]');
+  await page.locator('.overlay').waitFor({ timeout: 240_000 });
+
+  let nextPick = 0;
+  async function pickAt(selector: string): Promise<Pick | null> {
+    const target = await frame.locator(selector).first().boundingBox();
+    const frameBox = await page.locator('[data-testid=app-frame]').boundingBox();
+    const id = ++nextPick;
+    const done = new Promise<Pick | null>((resolve) => picks.set(id, resolve));
+    await reply({ kind: ToView.Pick, id, x: target!.x - frameBox!.x + 4, y: target!.y - frameBox!.y + 4 });
+    return done;
+  }
+
+  const close = async () => {
+    await browser.close();
+    server.close();
+    running.stop();
+  };
+
+  return { page, frame, reply, edits, pickAt, saves, close, styling, url: running.url };
+}
+
+export type Panel = Awaited<ReturnType<typeof openPanel>>;
+export type { Page };

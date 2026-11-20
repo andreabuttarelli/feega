@@ -1,32 +1,23 @@
 <script lang="ts">
-  import { lower } from './lower';
-  import DownloadMac from './DownloadMac.svelte';
   import Mark from './Mark.svelte';
-  import { onMount } from 'svelte';
-  import { APP_URL, GITHUB_URL, HEADER_LINKS, MENU_LINKS, SOCIAL_LINKS } from './links';
+  import { DOWNLOAD_PATH, GITHUB_URL, HEADER_LINKS, MENU_LINKS, SOCIAL_LINKS } from './links';
   import { GITHUB_ICON } from './social-icons';
-  import { homeHref } from './signed-in';
 
   let open = $state(false);
-  let home = $state('/');
-
-  onMount(() => {
-    home = homeHref(document.cookie);
-  });
 </script>
 
 <header class="bar">
-  <a class="chip brand" href={home} aria-label="Feega home"><Mark size={16} /><span>Feega</span></a>
+  <a class="chip brand" href="/" aria-label="Feega home"><Mark size={16} /><span>feega</span></a>
 
   <nav class="links" aria-label="Main">
     {#each HEADER_LINKS as link (link.label)}
-      <a class="chip" href={link.href}>{lower(link.label)}</a>
+      <a class="chip" href={link.href}>{link.label.toLowerCase()}</a>
     {/each}
   </nav>
 
   <div class="actions">
-    <DownloadMac class="chip star" />
-    <a class="chip cta" href={APP_URL}><span>let’s start</span></a>
+    <a class="chip" href={GITHUB_URL}>star on github</a>
+    <a class="chip cta" href={DOWNLOAD_PATH}>download</a>
   </div>
 
   <div class="mobile">
@@ -47,31 +38,31 @@
   <nav class="drawer" aria-label="Menu">
     <div class="menu">
       {#each MENU_LINKS as link (link.label)}
-        <a href={link.href} onclick={() => (open = false)}>{lower(link.label)}</a>
+        <a href={link.href} onclick={() => (open = false)}>{link.label.toLowerCase()}</a>
+      {/each}
+      <a href={GITHUB_URL}>star on github</a>
+    </div>
+
+    <div class="icons">
+      {#each SOCIAL_LINKS as social (social.label)}
+        <a href={social.href} aria-label={social.label}>{@html social.icon}</a>
       {/each}
     </div>
 
-    <div class="follow">
-      <p>follow our open building</p>
-      <div class="icons">
-        {#each SOCIAL_LINKS as social (social.label)}
-          <a href={social.href} aria-label={social.label}>{@html social.icon}</a>
-        {/each}
-      </div>
-    </div>
+    <a class="drawer-cta" href={DOWNLOAD_PATH} onclick={() => (open = false)}>download</a>
   </nav>
 {/if}
 
 <style>
   .bar {
     --nav-chip: 38px;
-    position: fixed;
+    position: absolute;
     inset: 0 0 auto;
     z-index: var(--site-z-header);
     display: flex;
     justify-content: space-between;
     align-items: start;
-    padding: 12px;
+    padding: 28px 16px 12px;
     font-family: 'Inter', sans-serif;
     font-variation-settings: normal;
     font-size: 16px;
@@ -90,8 +81,8 @@
   .bar :global(.chip) {
     display: block;
     padding: 8px 4px 10px;
-    background: #fff;
-    color: #000;
+    color: #fff;
+    text-decoration: none;
   }
 
   .bar .brand {
@@ -100,6 +91,19 @@
     gap: 6px;
     height: var(--nav-chip);
     padding: 0 10px 2px;
+  }
+
+  @media (max-width: 809.98px) {
+    .bar .brand {
+      gap: 8px;
+      padding: 0 0 2px;
+      font-size: 22px;
+    }
+
+    .bar .brand :global(svg) {
+      width: 22px;
+      height: 22px;
+    }
   }
 
   .links,
@@ -135,35 +139,55 @@
 
   .drawer {
     position: fixed;
-    inset: 0;
+    top: 84px;
+    left: 12px;
+    right: 12px;
     z-index: var(--site-z-drawer);
     display: flex;
     flex-direction: column;
     max-width: 430px;
     margin: 0 auto;
-    padding: 393px 20px 0;
-    background: #000;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--ui-radius-lg, 10px);
+    background: #161616;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
   }
 
   .menu {
     display: flex;
     flex-direction: column;
-    gap: 24px;
-    font-size: 44px;
-    line-height: 39.6px;
-    letter-spacing: -0.04em;
+    font-size: 20px;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
   }
 
-  .follow {
-    margin-top: 120px;
-    font-size: 14px;
-    line-height: 16.8px;
+  .menu a {
+    padding: 14px 12px;
+    color: #fff;
+    text-decoration: none;
   }
 
   .icons {
     display: flex;
     gap: 20px;
-    margin-top: 16px;
+    padding: 12px;
+  }
+
+  .icons a {
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .drawer-cta {
+    display: grid;
+    place-items: center;
+    height: 52px;
+    margin-top: 8px;
+    border-radius: 999px;
+    background: #ff5100;
+    color: #fff;
+    font-size: 18px;
+    text-decoration: none;
   }
 
   .icons :global(svg) {
@@ -175,7 +199,7 @@
     .bar {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
-      padding: 0 20px;
+      padding: 28px 20px 0;
     }
 
     .links {
@@ -199,11 +223,14 @@
     }
 
     .bar .cta {
+      padding: 8px 16px 10px;
+      border-radius: 999px;
       background: #ff5100;
     }
 
-    .actions :global(span) {
-      border-bottom: 1px solid currentColor;
+    .actions {
+      align-items: center;
+      gap: 24px;
     }
 
     .mobile,
@@ -216,7 +243,7 @@
     .bar {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
-      padding: 16px 16px 0;
+      padding: 28px 16px 0;
     }
 
     .links {
@@ -240,11 +267,14 @@
     }
 
     .bar .cta {
+      padding: 8px 16px 10px;
+      border-radius: 999px;
       background: #ff5100;
     }
 
-    .actions :global(span) {
-      border-bottom: 1px solid currentColor;
+    .actions {
+      align-items: center;
+      gap: 24px;
     }
 
     .mobile,

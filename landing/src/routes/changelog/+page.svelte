@@ -73,7 +73,7 @@
 
   {#if more}
     <div class="more" bind:this={sentinel}>
-      <button type="button" onclick={loadMore} disabled={loading}>{loading ? 'Loading…' : failed ? 'Try again' : 'Show more'}</button>
+      <button type="button" onclick={loadMore} disabled={loading}>{loading ? 'loading…' : failed ? 'try again' : 'show more'}</button>
     </div>
   {/if}
 </section>

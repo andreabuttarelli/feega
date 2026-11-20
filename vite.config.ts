@@ -56,9 +56,10 @@ export default defineConfig({
       'src/**/*.{test,spec}.{js,ts}',
       'packages/*/src/**/*.{test,spec}.{js,ts}',
       'packages/*.{test,spec}.{js,ts}',
-      'npx/**/*.test.mjs',
+      'npx/src/**/*.test.ts',
       'scripts/**/*.{test,spec}.{js,ts}',
-      'cli/**/*.{test,spec}.{js,ts}'
+      'cli/**/*.{test,spec}.{js,ts}',
+      'inspect/src/**/*.test.ts'
     ],
     alias: { 'bun:test': 'vitest' },
     setupFiles: ['src/test/no-live-supabase.ts']

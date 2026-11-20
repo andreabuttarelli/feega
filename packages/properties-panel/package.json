@@ -1,0 +1,13 @@
+{
+  "name": "@feega/properties-panel",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./*.svelte": "./src/*.svelte",
+    "./*": "./src/*.ts"
+  },
+  "peerDependencies": {
+    "svelte": ">=5"
+  }
+}

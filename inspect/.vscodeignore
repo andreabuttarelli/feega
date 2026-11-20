@@ -1,0 +1,12 @@
+src/**
+test/**
+launcher/**
+node_modules/**
+build.mjs
+tsconfig.json
+package-lock.json
+images/*.png
+!images/icon.png
+*.vsix
+.vscode-test/**
+.vscode/**

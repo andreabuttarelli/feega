@@ -1,11 +1,36 @@
-import { inspectElement, previewEdit } from './runtime.js';
+import { stampSources } from './framework-meta.js';
+import { SOURCE_ATTR, deepestAt, clearPreview, hidePreview, paletteOf, relativeOf, treeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
+import { trackRects } from './track.js';
+import { keepScroll } from './reload-restore.js';
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';
 export const READY = 'feega:source-map:ready';
 export const PREVIEW = 'feega:preview';
+export const PREVIEW_CLEAR = 'feega:preview:clear';
+export const PREVIEW_SETTLE = 'feega:preview:settle';
+export const PREVIEW_SETTLED = 'feega:preview:settled';
+export const LOCATION = 'feega:location';
+export const SCROLL = 'feega:scroll';
+export const SCROLLED = 'feega:scrolled';
+export const TREE = 'feega:tree';
+export const TREE_RESULT = 'feega:tree:result';
+export const HIDE = 'feega:hide';
+export const PALETTE = 'feega:palette';
+export const PALETTE_RESULT = 'feega:palette:result';
+export const MODE = 'feega:mode';
+export const TEXT_EDIT = 'feega:text:edit';
+export const TEXT_DONE = 'feega:text:done';
+export const TEXT_RESTORE = 'feega:text:restore';
+export const TRACK = 'feega:track';
+export const TRACKED = 'feega:tracked';
+export const LEAVE = 'feega:leave';
+
+export const Mode = { Navigate: 'navigate', Design: 'design' };
 
 const INSTALLED = Symbol.for('feega.source-map.bridge');
+const EDITABLE = 'plaintext-only';
+const TREE_REFRESH_MS = 150;
 
 export function installBridge(win) {
   if (win[INSTALLED]) {
@@ -13,29 +38,158 @@ export function installBridge(win) {
   }
   win[INSTALLED] = true;
 
-  win.addEventListener('message', (event) => {
-    const request = event.data;
-    if (request?.type === PREVIEW) {
-      previewEdit(win.document, request);
-      return;
-    }
-    if (!request || request.type !== INSPECT) {
-      return;
-    }
+  const doc = win.document;
+  let mode = Mode.Navigate;
+  const unsaved = new Map();
+  let treeWanted = false;
+  let treeTimer = null;
+  let treeSent = '';
+  let reply = (message) => win.parent?.postMessage(message, '*');
+  const scroll = keepScroll(win);
+  const tracker = trackRects(win, (slot, rect) => reply({ type: TRACKED, slot, rect }));
 
-    const target = targetOf(win.document, request);
-    const result = target ? inspectElement(target, { maxHtml: request.maxHtml }) : null;
-    event.source?.postMessage({ type: INSPECT_RESULT, id: request.id, result }, { targetOrigin: '*' });
+  function sendTree() {
+    stampSources(doc);
+    const tree = treeOf(doc);
+    treeSent = JSON.stringify(tree);
+    reply({ type: TREE_RESULT, tree });
+  }
+
+  function refreshTree() {
+    if (!treeWanted || treeTimer) {
+      return;
+    }
+    treeTimer = win.setTimeout(() => {
+      treeTimer = null;
+      stampSources(doc);
+      if (JSON.stringify(treeOf(doc)) !== treeSent) {
+        sendTree();
+      }
+    }, TREE_REFRESH_MS);
+  }
+
+  const handlers = {
+    [PREVIEW]: (request) => previewEdit(doc, request),
+    [PREVIEW_CLEAR]: (request) => clearPreview(doc, request.source),
+    [PREVIEW_SETTLE]: (request) => reply({ type: PREVIEW_SETTLED, source: request.source, unapplied: settlePreview(doc, request.source) }),
+    [MODE]: (request) => (mode = request.mode),
+    [PALETTE]: () => reply({ type: PALETTE_RESULT, ...paletteOf(doc) }),
+    [HIDE]: (request) => hidePreview(doc, request.source, request.hidden),
+    [LEAVE]: () => scroll.leave(),
+    [TRACK]: (request) => tracker.follow(request.slot, request.source),
+    [TREE]: () => {
+      treeWanted = true;
+      sendTree();
+    },
+    [SCROLL]: (request) => {
+      win.scrollBy(request.dx, request.dy);
+      reply({ type: SCROLLED });
+    },
+    [TEXT_EDIT]: (request) => mode === Mode.Design && editText(win, targetOf(doc, request), request, reply, unsaved),
+    [TEXT_RESTORE]: (request) => restoreText(doc, unsaved, request.source),
+    [INSPECT]: (request) => {
+      stampSources(doc);
+      const target = targetOf(doc, request);
+      reply({ type: INSPECT_RESULT, id: request.id, result: target ? inspectElement(target, { maxHtml: request.maxHtml }) : null });
+    }
+  };
+
+  win.addEventListener('message', (event) => {
+    const handle = handlers[event.data?.type];
+    if (!handle) {
+      return;
+    }
+    const source = event.source;
+    reply = source ? (message) => source.postMessage(message, { targetOrigin: '*' }) : reply;
+    handle(event.data);
   });
 
-  win.parent?.postMessage({ type: READY }, '*');
+  new win.MutationObserver(() => (keepPreviews(doc), refreshTree())).observe(doc.documentElement, { childList: true, subtree: true });
+
+  reportRoutes(win);
+  win.parent?.postMessage({ type: READY, path: win.location.pathname + win.location.search, restored: scroll.restored }, '*');
+}
+
+function reportRoutes(win) {
+  const report = () => win.parent?.postMessage({ type: LOCATION, path: win.location.pathname + win.location.search }, '*');
+  for (const name of ['pushState', 'replaceState']) {
+    const original = win.history[name].bind(win.history);
+    win.history[name] = (...args) => {
+      original(...args);
+      report();
+    };
+  }
+  win.addEventListener('popstate', report);
+}
+
+function restoreText(doc, unsaved, source) {
+  const html = unsaved.get(source);
+  const element = doc.querySelector(`[${SOURCE_ATTR}="${source}"]`);
+  unsaved.delete(source);
+  if (element && html !== undefined) {
+    element.innerHTML = html;
+  }
+}
+
+function editText(win, target, request, reply, unsaved) {
+  const element = target?.closest(`[${SOURCE_ATTR}]`);
+  if (!element) {
+    return;
+  }
+
+  const was = element.textContent;
+  const wasHtml = element.innerHTML;
+  element.setAttribute('contenteditable', EDITABLE);
+  element.focus?.();
+  placeCaret(win, element, request);
+
+  const finish = (commit) => {
+    element.removeEventListener('keydown', onKey);
+    element.removeEventListener('blur', onBlur);
+    element.removeAttribute('contenteditable');
+    if (!commit) {
+      element.innerHTML = wasHtml;
+      return;
+    }
+    unsaved.set(element.getAttribute(SOURCE_ATTR), wasHtml);
+    reply({ type: TEXT_DONE, source: element.getAttribute(SOURCE_ATTR), text: element.textContent, was });
+  };
+
+  const onKey = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      finish(false);
+      return;
+    }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      finish(true);
+    }
+  };
+  const onBlur = () => finish(true);
+
+  element.addEventListener('keydown', onKey);
+  element.addEventListener('blur', onBlur);
+}
+
+function placeCaret(win, element, { x, y }) {
+  const range = typeof x === 'number' ? win.document.caretRangeFromPoint?.(x, y) : null;
+  if (!range || !element.contains(range.startContainer)) {
+    return;
+  }
+  const selection = win.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
 }
 
 function targetOf(doc, request) {
+  if (typeof request.move === 'string') {
+    return relativeOf(doc, request.from, request.move);
+  }
   if (typeof request.selector === 'string') {
     return doc.querySelector(request.selector);
   }
-  return doc.elementFromPoint(request.x, request.y);
+  return deepestAt(doc, request.x, request.y);
 }
 
 if (typeof window !== 'undefined') {
