@@ -4,8 +4,7 @@ Run feega on your own machine or server: the infinite canvas, design and motion 
 export, and the agent and MCP surface. Nothing is credit-gated.
 
 For one canvas on your machine, no account and no database, skip all of this:
-`npx feega my-canvas.feega` (Node 22+) starts local mode and saves to that file. See
-[local mode](../web-docs/src/content/docs/getting-started/local-mode.md). Local mode generates with
+`npx feega my-canvas.feega` (Node 22+) starts local mode and saves to that file. Local mode generates with
 your own keys, from the environment or a `.env` in the folder you run it from:
 
 | Provider | Variables | Generates |

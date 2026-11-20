@@ -1,6 +1,6 @@
 import { getCollection } from 'astro:content';
 
-const SECTIONS = ['getting-started', 'integrations', 'motion', 'canvas', 'ai', 'audio'];
+const SECTIONS = ['getting-started', 'editing', 'frameworks', 'styling', 'more'];
 
 export async function GET() {
   const pages = (await getCollection('docs'))

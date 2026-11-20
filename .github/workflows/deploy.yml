@@ -26,7 +26,7 @@ jobs:
             paths: "cli"
           - project: web-docs
             id: prj_spuvPDXx0Lfoxc7sEuWKCCm2AkPZ
-            paths: "web-docs docs src/routes/api src/lib/server"
+            paths: "web-docs"
           - project: web-blog
             id: prj_BoTkXM9Cx4NCXcjVGfOJMIx5W8iz
             paths: "web-blog"

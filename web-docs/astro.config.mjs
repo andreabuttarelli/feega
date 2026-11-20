@@ -8,7 +8,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'Feega docs',
-      description: 'Guides, references and architecture notes for Feega, the infinite canvas for design and motion.',
+      description: 'Documentation for Feega, the free open-source VS Code extension to design in your codebase.',
       logo: { src: './src/assets/logo.svg', replacesTitle: false },
       favicon: '/favicon.svg',
       head: [
@@ -21,15 +21,10 @@ export default defineConfig({
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/andreabuttarelli/feega' }],
       sidebar: [
         { label: 'Getting started', autogenerate: { directory: 'getting-started' } },
-        { label: 'Desktop', autogenerate: { directory: 'desktop' } },
-        { label: 'Canvas', autogenerate: { directory: 'canvas' } },
-        { label: 'Motion', autogenerate: { directory: 'motion' } },
-        { label: 'Audio', autogenerate: { directory: 'audio' } },
-        { label: 'AI', autogenerate: { directory: 'ai' } },
-        { label: 'Integrations', autogenerate: { directory: 'integrations' } },
-        { label: 'Reference', autogenerate: { directory: 'reference' } },
-        { label: 'Self-hosting', autogenerate: { directory: 'self-hosting' } },
-        { label: 'Architecture', autogenerate: { directory: 'architecture', collapsed: true } }
+        { label: 'Editing', autogenerate: { directory: 'editing' } },
+        { label: 'Frameworks', autogenerate: { directory: 'frameworks' } },
+        { label: 'Styling systems', autogenerate: { directory: 'styling' } },
+        { label: 'More', autogenerate: { directory: 'more' } }
       ]
     })
   ]
