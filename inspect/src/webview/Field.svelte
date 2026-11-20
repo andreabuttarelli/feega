@@ -2,6 +2,7 @@
   import type { Snippet } from 'svelte';
   import { MIXED, type Shared } from '@feega/properties-panel/mixed';
   import { heldValue, liveNumber, type Held } from './scrub';
+  import { typedCommit } from './typed-commit';
   import { Unit, convert, cssOf, parseLength, stepOf, type UnitContext } from './units';
 
   type Props = {
@@ -77,10 +78,12 @@
     }
   }
 
+  const typed = typedCommit(commitText);
+
   function onKey(e: KeyboardEvent) {
     const input = e.currentTarget as HTMLInputElement;
     if (e.key === 'Enter') {
-      commitText(input.value);
+      typed.commit(input.value);
       input.blur();
       return;
     }
@@ -125,7 +128,7 @@
   <span class="prefix" role="presentation" onpointerdown={grab} onpointermove={drag} onpointerup={drop} onlostpointercapture={drop}>
     {#if icon}{@render icon()}{:else}{prefix}{/if}
   </span>
-  <input class="value" type="text" inputmode="decimal" aria-label={name} value={text} placeholder={px === MIXED ? 'Mixed' : chosen === Unit.Auto ? 'auto' : ''} onkeydown={onKey} onchange={(e) => commitText(e.currentTarget.value)} />
+  <input class="value" type="text" inputmode="decimal" aria-label={name} value={text} placeholder={px === MIXED ? 'Mixed' : chosen === Unit.Auto ? 'auto' : ''} onkeydown={onKey} onfocus={typed.focus} onchange={(e) => typed.commit(e.currentTarget.value)} />
   {#if lengthy}
     <select class="unit" value={chosen} aria-label={`${name} unit`} onchange={(e) => ((chosen = e.currentTarget.value as Unit), chosen === Unit.Auto && onchange(Unit.Auto))}>
       {#each units! as u (u)}<option value={u}>{u || '–'}</option>{/each}
