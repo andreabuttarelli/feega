@@ -8,7 +8,7 @@
 
 <svelte:window onpointerdown={onclose} onkeydown={(e) => e.key === 'Escape' && onclose()} />
 
-<div class="menu" role="menu" data-testid={`${label}-menu`} style={`left:${x}px;top:${y}px`} onpointerdown={(e) => e.stopPropagation()}>
+<div class="menu" role="menu" tabindex="-1" data-testid={`${label}-menu`} style={`left:${x}px;top:${y}px`} onpointerdown={(e) => e.stopPropagation()}>
   {#each items as item (item.id)}
     <button type="button" role="menuitem" data-op={item.id} onclick={() => (onpick(item.id), onclose())}>
       <span>{item.label}</span>
