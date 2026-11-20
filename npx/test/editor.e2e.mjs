@@ -12,6 +12,7 @@ const CLI = here('../dist/cli.cjs');
 const PORT = 4719;
 const READY_MS = 120_000;
 const SHOTS = process.env.FEEGA_E2E_SHOTS;
+const ONBOARDING_MS = 3000;
 const COLOUR = '#0078d4';
 
 let appPort = 0;
@@ -68,6 +69,8 @@ try {
   await page.goto(url);
   const frame = page.frameLocator('[data-testid="app-frame"]');
   await page.getByText('Click an element to edit it').waitFor({ timeout: READY_MS });
+  await page.getByRole('alertdialog').waitFor({ timeout: ONBOARDING_MS }).then(() => page.keyboard.press('Escape'), () => undefined);
+  await page.getByRole('alertdialog').waitFor({ state: 'detached' });
   await shot(page, '1-open');
 
   await frame.locator('h1').first().click();
