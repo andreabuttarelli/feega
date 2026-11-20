@@ -5,7 +5,9 @@ import { accountOfBody, type Account } from './account';
 export const APP_URL = 'https://oh.feega.app';
 export const SIGN_IN_TIMEOUT_MS = 5 * 60_000;
 
-const LOOPBACK = '127.0.0.1';
+const LOOPBACK_V4 = '127.0.0.1';
+const LOOPBACK_V6 = '::1';
+const WWW_PREFIX = 'www.';
 const STATE_PREFIX = 'app.';
 const HTTP_OK = 200;
 const HTTP_NO_CONTENT = 204;
@@ -40,8 +42,24 @@ const readBody = async (req: IncomingMessage): Promise<Record<string, unknown>> 
   }
 };
 
+const pending = new Map<string, (body: Record<string, unknown>) => boolean>();
+
+export function signInFromUri(query: string): boolean {
+  const body = Object.fromEntries(new URLSearchParams(query));
+  const accept = pending.get(String(body.state));
+  return accept ? accept(body) : false;
+}
+
+const originsOf = (appUrl: string): string[] => {
+  const url = new URL(appUrl);
+  const www = new URL(url.origin);
+  www.hostname = `${WWW_PREFIX}${url.hostname}`;
+  return [url.origin, www.origin];
+};
+
 const reply = (res: ServerResponse, status: number, origin: string, text = '') => {
   res.writeHead(status, {
+    vary: 'Origin',
     'access-control-allow-origin': origin,
     'access-control-allow-methods': 'POST, OPTIONS',
     'access-control-allow-headers': 'Content-Type',
@@ -52,10 +70,13 @@ const reply = (res: ServerResponse, status: number, origin: string, text = '') =
 
 export async function signIn({ appUrl = APP_URL, openBrowser, signal, timeoutMs = SIGN_IN_TIMEOUT_MS, newState = () => `${STATE_PREFIX}${randomUUID()}` }: SignInDeps): Promise<SignInOutcome> {
   const state = newState();
-  const origin = new URL(appUrl).origin;
+  const origins = originsOf(appUrl);
   const accepted = Promise.withResolvers<Account>();
 
-  const server = createServer(async (req, res) => {
+  const originOf = (req: IncomingMessage) => origins.find((o) => o === req.headers.origin) ?? origins[0];
+
+  const handler = async (req: IncomingMessage, res: ServerResponse) => {
+    const origin = originOf(req);
     if (req.method === 'OPTIONS') {
       return reply(res, HTTP_NO_CONTENT, origin);
     }
@@ -69,14 +90,28 @@ export async function signIn({ appUrl = APP_URL, openBrowser, signal, timeoutMs 
     }
     reply(res, HTTP_OK, origin, 'OK');
     accepted.resolve(account);
-  });
+  };
+
+  const server = createServer(handler);
+  const serverV6 = createServer(handler);
 
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
-    server.listen(0, LOOPBACK, resolve);
+    server.listen(0, LOOPBACK_V4, resolve);
   });
 
   const port = (server.address() as { port: number }).port;
+  const listeningV6 = await new Promise<boolean>((resolve) => {
+    serverV6.once('error', () => resolve(false));
+    serverV6.listen(port, LOOPBACK_V6, () => resolve(true));
+  });
+  pending.set(state, (body) => {
+    const account = accountOfBody(body);
+    if (account) {
+      accepted.resolve(account);
+    }
+    return account !== null;
+  });
   const callback = new URL('/cli/callback', appUrl);
   callback.search = new URLSearchParams({ cli_port: String(port), cli_state: state }).toString();
 
@@ -96,7 +131,12 @@ export async function signIn({ appUrl = APP_URL, openBrowser, signal, timeoutMs 
   } finally {
     clearTimeout(timer);
     signal.removeEventListener('abort', onAbort);
+    pending.delete(state);
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
+    if (listeningV6) {
+      serverV6.closeAllConnections();
+      await new Promise<void>((resolve) => serverV6.close(() => resolve()));
+    }
   }
 }

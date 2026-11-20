@@ -13,11 +13,13 @@ import { keptServers } from './kept-servers';
 import { killOrphans } from './orphans';
 import type { Running } from './dev-server';
 import { appOf, inspectSession, type Session } from './session';
+import { signInFromUri } from './sign-in';
 import { beforeProvider, vsCodePlatform, type VsCodeHost } from './vscode-platform';
 
 const VIEW_TYPE = 'feegaInspect.panel';
 const TITLE = 'Feega';
 const SECTION = 'feegaInspect';
+const SIGN_IN_PATH = '/signin';
 
 type Open = { panel: vscode.WebviewPanel; session: Session };
 
@@ -131,7 +133,8 @@ export function activate(context: vscode.ExtensionContext) {
     output,
     ...Object.values(Command).map((id) => vscode.commands.registerCommand(id, (target?: vscode.Uri) => COMMANDS[id](context, target))),
     vscode.workspace.onDidChangeConfiguration((e) => e.affectsConfiguration(SECTION) && opened?.session.settingsChanged()),
-    beforeProvider(befores)
+    beforeProvider(befores),
+    vscode.window.registerUriHandler({ handleUri: (uri) => void (uri.path === SIGN_IN_PATH && signInFromUri(uri.query)) })
   );
   void killOrphans(context.workspaceState);
   devReload(context, () => opened && render(opened.panel, context));
