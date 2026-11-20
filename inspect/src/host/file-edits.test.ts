@@ -338,6 +338,25 @@ describe('fileEdits', () => {
     expect(readFileSync(join(root, 'src/lib/links.ts'), 'utf8')).toBe(data);
   });
 
+  it('il testo e il link di un elemento di un loop scrivono la voce dell\'array importato, ognuno in un passo di undo', async () => {
+    const root = app();
+    const data = "export const LINKS = [\n  { href: '/a', label: 'a' },\n  { href: '/b', label: 'b' },\n];\n";
+    mkdirSync(join(root, 'src/lib'), { recursive: true });
+    writeFileSync(join(root, 'src/lib/links.ts'), data);
+    writeFileSync(join(root, 'src/Page.svelte'), "<script>\n  import { LINKS } from '$lib/links';\n</script>\n<nav>\n  {#each LINKS as link}\n    <a href={link.href}>{link.label}</a>\n  {/each}\n</nav>\n");
+    const edits = fileEdits(root);
+
+    const text = await edits.edit({ at: 'src/Page.svelte:6:5', prop: LiveProp.Text, value: 'B', was: 'b', instance: 1 });
+    const link = await edits.link('src/Page.svelte:6:5', { href: '/bee' }, 1);
+
+    expect(text.ok && link.ok).toBe(true);
+    expect(readFileSync(join(root, 'src/lib/links.ts'), 'utf8')).toBe("export const LINKS = [\n  { href: '/a', label: 'a' },\n  { href: '/bee', label: 'B' },\n];\n");
+    await edits.undo();
+    expect(readFileSync(join(root, 'src/lib/links.ts'), 'utf8')).toContain("{ href: '/b', label: 'B' }");
+    await edits.undo();
+    expect(readFileSync(join(root, 'src/lib/links.ts'), 'utf8')).toBe(data);
+  });
+
   it('spostare dentro un altro contenitore e un solo passo di undo', async () => {
     const root = app();
     writeFileSync(join(root, 'src/Page.svelte'), '<div>\n  <p>a</p>\n</div>\n<section>\n</section>\n');

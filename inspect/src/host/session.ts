@@ -144,8 +144,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     await postAccount(AccountState.SignedOut);
   }
 
-  async function wiringShown(at: string) {
-    await post({ kind: ToView.Wiring, at, wiring: await wiringOf(root, at) });
+  async function wiringShown(at: string, instance?: number) {
+    await post({ kind: ToView.Wiring, at, instance, wiring: await wiringOf(root, at, instance) });
   }
 
   const edit = (ask: EditAsk) => edits.edit(ask).then((out) => edited(out, ask));
@@ -392,8 +392,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.OnboardingDone]: () => platform.onboarding.markSeen(),
     [ToHost.ImageChoose]: imageChosen,
     [ToHost.ImageUpload]: (m) => imageSaved(m.name, Buffer.from(m.data, 'base64')),
-    [ToHost.Wiring]: (m) => wiringShown(m.at),
-    [ToHost.Link]: (m) => edits.link(m.at, m.edit).then((out) => edited(out, null)),
+    [ToHost.Wiring]: (m) => wiringShown(m.at, m.instance),
+    [ToHost.Link]: (m) => edits.link(m.at, m.edit, m.instance).then((out) => edited(out, null)),
     [ToHost.Go]: (m) => edits.go(m.at, m.ask).then((out) => edited(out, null))
   };
 

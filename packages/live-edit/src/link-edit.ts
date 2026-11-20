@@ -1,6 +1,7 @@
 import { offsetOf, type LiveAt } from './class-patch';
 import { dataSource, stringLiteral } from './data-source';
 import type { FileChange, ReadFile } from './files';
+import { loopLiteral } from './loop-field';
 import { Delimiter, attributesOf, insertAttribute, removeAttribute, tagNameAt, type Attribute } from './open-tag';
 
 export enum Opens {
@@ -63,7 +64,8 @@ async function constantSpot(read: ReadFile, file: string, text: string, name: st
   return { refused: `The link comes from \`${name}\`, which is not a plain string.`, at: data?.at };
 }
 
-async function destinationOf(read: ReadFile, file: string, text: string, attribute: Attribute): Promise<Resolved> {
+async function destinationOf(read: ReadFile, at: LiveAt, text: string, attribute: Attribute, instance?: number): Promise<Resolved> {
+  const file = at.file;
   const bound = BOUND_PREFIX.test(attribute.name);
   const raw = attribute.value ?? '';
   const quoted = attribute.delimiter === Delimiter.Double || attribute.delimiter === Delimiter.Single;
@@ -81,6 +83,10 @@ async function destinationOf(read: ReadFile, file: string, text: string, attribu
     const spot = stringSpot(file, text, attribute.valueStart, raw, outer);
     if (spot) {
       return { spot };
+    }
+    const looped = await loopLiteral(read, at, instance, raw);
+    if (looped) {
+      return 'reason' in looped ? { refused: looped.reason, at: looped.at } : { spot: { ...looped, outer: '', escaping: Escaping.Script } };
     }
     return PLAIN_NAME.test(raw.trim()) ? constantSpot(read, file, text, raw.trim(), outer) : { refused: `The link comes from \`${raw.trim()}\`, not a plain string.` };
   }
@@ -108,20 +114,20 @@ function literalOf(attribute: Attribute | undefined): string | null | undefined 
   return attribute.delimiter === Delimiter.Brace ? (attribute.value?.trim().match(QUOTED_STRING)?.[2] ?? null) : null;
 }
 
-async function resolved(read: ReadFile, at: LiveAt, element: Element): Promise<{ attr: string; resolved: Resolved }> {
+async function resolved(read: ReadFile, at: LiveAt, element: Element, instance?: number): Promise<{ attr: string; resolved: Resolved }> {
   const present = element.attributes.find((a) => DESTINATIONS.includes(canonical(a.name)));
   if (!present) {
     return { attr: defaultAttr(element.tag, element.text), resolved: { absent: true } };
   }
-  return { attr: canonical(present.name), resolved: await destinationOf(read, at.file, element.text, present) };
+  return { attr: canonical(present.name), resolved: await destinationOf(read, at, element.text, present, instance) };
 }
 
-export async function linkOf(read: ReadFile, at: LiveAt): Promise<LinkRead | null> {
+export async function linkOf(read: ReadFile, at: LiveAt, instance?: number): Promise<LinkRead | null> {
   const element = await elementAt(read, at);
   if (!element || !isLinkTag(element.tag)) {
     return null;
   }
-  const { attr, resolved: found } = await resolved(read, at, element);
+  const { attr, resolved: found } = await resolved(read, at, element, instance);
   const target = literalOf(named(element.attributes, 'target'));
   const base = { tag: element.tag, attr, newTab: target === NEW_TAB, tabEditable: target !== null };
   if ('spot' in found) {
@@ -144,8 +150,8 @@ function spotChange(spot: Spot, value: string): FileChange | null {
 
 const REFUSED_VALUE = 'The address has characters that would break the source: not written.';
 
-async function hrefWritten(read: ReadFile, at: LiveAt, element: Element, href: string): Promise<LinkWritten> {
-  const { attr, resolved: found } = await resolved(read, at, element);
+async function hrefWritten(read: ReadFile, at: LiveAt, element: Element, href: string, instance?: number): Promise<LinkWritten> {
+  const { attr, resolved: found } = await resolved(read, at, element, instance);
   if ('refused' in found) {
     return { ok: false, reason: found.refused, at: found.at };
   }
@@ -198,10 +204,10 @@ function opensWritten(element: Element, at: LiveAt, opens: Opens): LinkWritten {
   return { ok: true, changes: after === text ? [] : [{ path: at.file, before: text, after }] };
 }
 
-export async function linkWrite(read: ReadFile, at: LiveAt, edit: LinkEdit): Promise<LinkWritten> {
+export async function linkWrite(read: ReadFile, at: LiveAt, edit: LinkEdit, instance?: number): Promise<LinkWritten> {
   const element = await elementAt(read, at);
   if (!element || !isLinkTag(element.tag)) {
     return { ok: false, reason: `${at.file}:${at.line}: this element is not a link` };
   }
-  return 'href' in edit ? hrefWritten(read, at, element, edit.href) : opensWritten(element, at, edit.opens);
+  return 'href' in edit ? hrefWritten(read, at, element, edit.href, instance) : opensWritten(element, at, edit.opens);
 }

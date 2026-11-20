@@ -13,7 +13,7 @@
   let target = $state('');
 
   const at = $derived(sourceText(pick.source));
-  const wiring = $derived(wiringState.at === at ? wiringState.wiring : null);
+  const wiring = $derived(wiringState.at === at && wiringState.instance === pick.instanceIndex ? wiringState.wiring : null);
   const link = $derived(wiring?.link ?? null);
   const choice = $derived(GO_CHOICES.find((c) => c.go === go)!);
   const suggestions = $derived(routeChoices(go, wiring?.routes ?? []));
@@ -22,11 +22,11 @@
 
   $effect(() => {
     void changes;
-    toHost({ kind: ToHost.Wiring, at });
+    toHost({ kind: ToHost.Wiring, at, instance: pick.instanceIndex });
   });
 
-  const writeHref = (value: string) => toHost({ kind: ToHost.Link, at, edit: { href: value } });
-  const writeOpens = (box: HTMLInputElement) => toHost({ kind: ToHost.Link, at, edit: { opens: box.checked ? Opens.NewTab : Opens.SameTab } });
+  const writeHref = (value: string) => toHost({ kind: ToHost.Link, at, edit: { href: value }, instance: pick.instanceIndex });
+  const writeOpens = (box: HTMLInputElement) => toHost({ kind: ToHost.Link, at, edit: { opens: box.checked ? Opens.NewTab : Opens.SameTab }, instance: pick.instanceIndex });
   const addGo = () => (toHost({ kind: ToHost.Go, at, ask: { go, target } }), (target = ''));
 </script>
 

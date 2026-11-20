@@ -1,6 +1,7 @@
 import { offsetOf, openTagEnd, type LiveAt } from './class-patch';
 import { dataReason, dataSource, stringLiteral, type StringLiteral } from './data-source';
 import type { FileChange, ReadFile } from './files';
+import { loopLiteral } from './loop-field';
 
 export type TextWritten = { ok: true; change: FileChange } | { ok: false; reason: string; at?: LiveAt };
 
@@ -76,6 +77,9 @@ function rawText(raw: string, dom: string): string {
   return lead + dom.trim().split(LINE_BREAK).join(LINE_BREAK_MARKUP) + trail;
 }
 
+const literalOf = async (read: ReadFile, at: LiveAt, text: string, expression: string, instance?: number) =>
+  (await stringLiteral(read, at.file, text, expression)) ?? (await loopLiteral(read, at, instance, expression));
+
 async function refusedExpression(read: ReadFile, text: string, file: string, expression: string, offset: number): Promise<LiteralWritten> {
   const data = await dataSource(read, file, text, expression);
   if (data) {
@@ -117,8 +121,13 @@ function editOf(doms: string[], was: string, value: string): Edit | 'none' | nul
   return null;
 }
 
-async function segmentText(read: ReadFile, text: string, at: LiveAt, pieces: Piece[], innerStart: number, was: string, value: string): Promise<LiteralWritten> {
-  const literals = await Promise.all(pieces.map((p) => (p.kind === Kind.Expression ? stringLiteral(read, at.file, text, p.raw) : null)));
+async function segmentText(read: ReadFile, text: string, at: LiveAt, pieces: Piece[], innerStart: number, was: string, value: string, instance?: number): Promise<LiteralWritten> {
+  const found = await Promise.all(pieces.map((p) => (p.kind === Kind.Expression ? literalOf(read, at, text, p.raw, instance) : null)));
+  const refused = found.find((l) => l && 'reason' in l);
+  if (refused && 'reason' in refused) {
+    return { ok: false, ...refused };
+  }
+  const literals = found as (StringLiteral | null)[];
   const unresolved = pieces.findIndex((p, i) => p.kind === Kind.Expression && !literals[i]);
   if (unresolved >= 0) {
     return refusedExpression(read, text, at.file, pieces[unresolved].raw, innerStart + pieces[unresolved].start);
@@ -151,7 +160,7 @@ async function segmentText(read: ReadFile, text: string, at: LiveAt, pieces: Pie
   return { ok: true, changes: [{ path: at.file, before: text, after }] };
 }
 
-export async function literalText(read: ReadFile, at: LiveAt, value: string, was?: string): Promise<LiteralWritten> {
+export async function literalText(read: ReadFile, at: LiveAt, value: string, was?: string, instance?: number): Promise<LiteralWritten> {
   const source = await read(at.file);
   const start = source === null ? -1 : offsetOf(source, at);
   const end = start < 0 || source![start] !== '<' ? -1 : openTagEnd(source!, start);
@@ -168,7 +177,10 @@ export async function literalText(read: ReadFile, at: LiveAt, value: string, was
   const inner = text.slice(end + 1, close);
   const wrapped = inner.match(WRAPPED);
   if (wrapped) {
-    const literal = await stringLiteral(read, at.file, text, wrapped[1]);
+    const literal = await literalOf(read, at, text, wrapped[1], instance);
+    if (literal && 'reason' in literal) {
+      return { ok: false, ...literal };
+    }
     if (literal) {
       return { ok: true, changes: [literalChange(literal, marked(value.trim()))] };
     }
@@ -181,7 +193,7 @@ export async function literalText(read: ReadFile, at: LiveAt, value: string, was
       const expression = inner.match(ANY_EXPRESSION);
       return expression ? refusedExpression(read, text, at.file, expression[0], end + 1 + expression.index!) : { ok: false, reason: `${at.file}:${at.line}: the text is mixed with markup, not written` };
     }
-    return segmentText(read, text, at, pieces, end + 1, was, value);
+    return segmentText(read, text, at, pieces, end + 1, was, value, instance);
   }
 
   const lead = inner.match(/^\s*/)![0];

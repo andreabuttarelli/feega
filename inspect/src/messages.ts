@@ -201,8 +201,8 @@ export type HostMessage =
   | { kind: ToHost.OnboardingDone }
   | { kind: ToHost.ImageChoose }
   | { kind: ToHost.ImageUpload; name: string; data: string }
-  | { kind: ToHost.Wiring; at: string }
-  | { kind: ToHost.Link; at: string; edit: LinkEdit }
+  | { kind: ToHost.Wiring; at: string; instance?: number }
+  | { kind: ToHost.Link; at: string; edit: LinkEdit; instance?: number }
   | { kind: ToHost.Go; at: string; ask: GoAsk };
 
 export type ViewMessage =
@@ -219,7 +219,7 @@ export type ViewMessage =
   | { kind: ToView.Account; state: AccountState; email?: string }
   | { kind: ToView.Onboarding; state: Onboarding }
   | { kind: ToView.ImageSaved; url: string }
-  | { kind: ToView.Wiring; at: string; wiring: Wiring };
+  | { kind: ToView.Wiring; at: string; instance?: number; wiring: Wiring };
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';

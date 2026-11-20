@@ -129,7 +129,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
       return { ok: false, reason: `${ask.at} is not a file:line:col inside the workspace` };
     }
     if (ask.prop === LiveProp.Text) {
-      const out = await literalText(reader(root), at, ask.value ?? '', ask.was);
+      const out = await literalText(reader(root), at, ask.value ?? '', ask.was, ask.instance);
       if (!out.ok) {
         return out;
       }
@@ -191,13 +191,13 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return at && inside(root, at.file) ? at : null;
   };
 
-  async function linkWritten(rawAt: string, edit: LinkEdit): Promise<Written> {
+  async function linkWritten(rawAt: string, edit: LinkEdit, instance?: number): Promise<Written> {
     meta = { at: rawAt, prop: 'link', value: 'href' in edit ? edit.href : edit.opens, scope: '' };
     const at = placed(rawAt);
     if (!at) {
       return { ok: false, reason: `${rawAt} is not a file:line:col inside the workspace` };
     }
-    const out = await linkWrite(reader(root), at, edit);
+    const out = await linkWrite(reader(root), at, edit, instance);
     return out.ok ? writtenAll(out.changes, '') : out;
   }
 
@@ -297,7 +297,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     icon: (at: string, name: string) => inTurn(() => iconSwapped(at, name)),
     svg: (at: string, markup: string, inner?: string) => inTurn(() => svgWritten(at, markup, inner)),
     font: (ask: EditAsk, google: boolean) => inTurn(() => fontEdited(ask, google)),
-    link: (at: string, edit: LinkEdit) => inTurn(() => linkWritten(at, edit)),
+    link: (at: string, edit: LinkEdit, instance?: number) => inTurn(() => linkWritten(at, edit, instance)),
     go: (at: string, ask: GoAsk) => inTurn(() => goWritten(at, ask)),
     undo: () => inTurn(undoStep),
     redo: () => inTurn(redoStep),
