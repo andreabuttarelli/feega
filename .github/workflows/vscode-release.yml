@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   publish:
@@ -83,3 +84,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$GITHUB_REF_NAME" feega.vsix --title "Feega ${GITHUB_REF_NAME#*-v}" --notes-file CHANGELOG.md || gh release upload "$GITHUB_REF_NAME" feega.vsix --clobber
+      - name: Refresh the landing version
+        if: env.TAGGED == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy.yml --ref main -f project=feega-landing
