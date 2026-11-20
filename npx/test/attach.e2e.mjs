@@ -17,7 +17,7 @@ const STRANGER_TITLE = 'unrelated-vite-app';
 
 const strangerDir = mkdtempSync(join(tmpdir(), 'feega-stranger-'));
 writeFileSync(join(strangerDir, 'index.html'), `<!doctype html><html><head><title>${STRANGER_TITLE}</title></head><body></body></html>`);
-const stranger = spawn(process.execPath, [VITE, '--port', String(STRANGER_PORT), '--strictPort', '--host', '127.0.0.1'], { cwd: strangerDir, stdio: 'ignore' });
+const stranger = spawn(process.execPath, [VITE, '--port', String(STRANGER_PORT), '--strictPort', '--host', '127.0.0.1'], { cwd: strangerDir, stdio: ['pipe', 'inherit', 'inherit'] });
 
 const instances = [];
 
