@@ -17,6 +17,7 @@ export default defineConfig({
         { tag: 'link', attrs: { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' } }
       ],
       customCss: ['./src/styles/theme/tokens.css', './src/styles/theme/chrome.css', './src/styles/feega.css'],
+      routeMiddleware: './src/route-data.ts',
       components: { Header: './src/components/Header.astro', PageTitle: './src/components/PageTitle.astro', PageFrame: './src/components/PageFrame.astro' },
       editLink: { baseUrl: 'https://github.com/andreabuttarelli/feega/edit/dev/web-docs/' },
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/andreabuttarelli/feega' }],

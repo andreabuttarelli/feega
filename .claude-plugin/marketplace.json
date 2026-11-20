@@ -1,0 +1,26 @@
+{
+  "name": "feega",
+  "owner": {
+    "name": "Andrea Buttarelli",
+    "url": "https://www.feega.app"
+  },
+  "metadata": {
+    "description": "Feega: design in your codebase. Select an element in the running app, edit it, the change lands in the source."
+  },
+  "plugins": [
+    {
+      "name": "feega",
+      "source": "./",
+      "description": "Set up a web project for Feega visual editing, start the editor, and write markup Feega can edit back into source.",
+      "version": "0.1.0",
+      "author": { "name": "Andrea Buttarelli" },
+      "homepage": "https://docs.feega.app",
+      "repository": "https://github.com/andreabuttarelli/feega",
+      "license": "Apache-2.0",
+      "keywords": ["design", "visual-editor", "vite", "nextjs", "sveltekit", "tailwind", "vscode"],
+      "category": "development",
+      "strict": false,
+      "skills": ["./skills/feega"]
+    }
+  ]
+}

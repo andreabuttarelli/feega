@@ -66,6 +66,7 @@ export const llmsTxt = () =>
     '## Source',
     `- [GitHub](${GITHUB_URL}): source code and README`,
     `- [Docs](https://docs.feega.app): setup and reference`,
+    `- [Docs for LLMs](https://docs.feega.app/llms.txt): every docs page, also as one file at https://docs.feega.app/llms-full.txt`,
     `- [Full text](${SITE_URL}/llms-full.txt): this file with the complete FAQ`,
     '## Contact',
     '- hi@feega.app for general questions, support@feega.app for help'

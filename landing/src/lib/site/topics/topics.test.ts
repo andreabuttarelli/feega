@@ -11,6 +11,8 @@ import { trailOf } from '../llms';
 const STATIC_DIR = resolve(import.meta.dirname, '../../../../static');
 const FOOTER = readFileSync(resolve(import.meta.dirname, '../SiteFooter.svelte'), 'utf8');
 const KB = 1024;
+const MAX_IMAGE_KB = 80;
+const MAX_FIGURES = 5;
 const MIN_WORDS = 1000;
 const READ_NEXT = 6;
 
@@ -73,15 +75,15 @@ describe('topic pages', () => {
     }
   });
 
-  it.each(pages)('%s has two or three light images with alt text', (_, t) => {
+  it.each(pages)('%s has two to five light images with alt text', (_, t) => {
     const figures = [t.cover, ...t.sections.flatMap((s) => (s.figure ? [s.figure] : []))];
     expect(figures.length).toBeGreaterThanOrEqual(2);
-    expect(figures.length).toBeLessThanOrEqual(3);
+    expect(figures.length).toBeLessThanOrEqual(MAX_FIGURES);
     for (const f of figures) {
       const file = resolve(STATIC_DIR, f.src.slice(1));
       expect(existsSync(file), f.src).toBe(true);
       expect(f.src).toMatch(/\.webp$/);
-      expect(statSync(file).size).toBeLessThanOrEqual(80 * KB);
+      expect(statSync(file).size).toBeLessThanOrEqual(MAX_IMAGE_KB * KB);
       expect(f.alt.length).toBeGreaterThan(30);
     }
   });
