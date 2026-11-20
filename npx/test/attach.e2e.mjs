@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,7 +15,7 @@ const SECOND_EDITOR_PORT = 4732;
 const READY_MS = 120_000;
 const STRANGER_TITLE = 'unrelated-vite-app';
 
-const strangerDir = mkdtempSync(join(tmpdir(), 'feega-stranger-'));
+const strangerDir = mkdtempSync(join(realpathSync.native(tmpdir()), 'feega-stranger-'));
 writeFileSync(join(strangerDir, 'index.html'), `<!doctype html><html><head><title>${STRANGER_TITLE}</title></head><body></body></html>`);
 const stranger = spawn(process.execPath, [VITE, '--port', String(STRANGER_PORT), '--strictPort', '--host', '127.0.0.1'], { cwd: strangerDir, stdio: ['pipe', 'inherit', 'inherit'] });
 
