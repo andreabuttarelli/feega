@@ -48,6 +48,12 @@ describe('wiringOf', () => {
     expect(out.routes).toEqual(['/', '/pricing']);
   });
 
+  it('reports the offsets the source authors for the picked element', async () => {
+    const root = project({ 'src/A.svelte': `<span class="badge">New</span>\n<style>\n  .badge { top: 12px; left: 24px; }\n</style>` });
+
+    expect((await wiringOf(root, 'src/A.svelte:1:1')).offsets).toEqual(['top', 'left']);
+  });
+
   it('has no link for a button', async () => {
     const root = project({ 'src/A.jsx': `<button>Go</button>` });
 
@@ -57,6 +63,6 @@ describe('wiringOf', () => {
   it('answers empty for a place outside the workspace', async () => {
     const root = project({ 'src/A.jsx': `<button>Go</button>` });
 
-    expect(await wiringOf(root, '../x.jsx:1:1')).toEqual({ link: null, events: [], routes: [] });
+    expect(await wiringOf(root, '../x.jsx:1:1')).toEqual({ link: null, events: [], routes: [], offsets: [] });
   });
 });

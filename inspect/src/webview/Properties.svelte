@@ -22,7 +22,9 @@
   import { Role, roleOf, sectionsOf } from './roles';
   import { paintOf } from './colour';
   import Field from './Field.svelte';
-  import { OFFSET_SIDES, OffsetSide, flipOffset, initialOffsets, type Offsets } from './position-box';
+  import { OFFSET_SIDES, OffsetSide, flipOffset, initialOffsets, offsetsFromHost, type Offsets } from './position-box';
+  import { sourceText } from './page-bridge';
+  import { wiringState } from './wiring-state.svelte';
   import ShadowList from './ShadowList.svelte';
   import FillList from './FillList.svelte';
   import IconActions from './IconActions.svelte';
@@ -77,7 +79,9 @@
   const SIDE_TITLE: Record<OffsetSide, string> = { [OffsetSide.Top]: 'Top', [OffsetSide.Right]: 'Right', [OffsetSide.Bottom]: 'Bottom', [OffsetSide.Left]: 'Left' };
   let offsetChoice = $state<{ source: string; on: Partial<Offsets> }>({ source: '', on: {} });
   const offsetKey = $derived(JSON.stringify(pick.source));
-  const offsetOn = (side: OffsetSide) => (offsetChoice.source === offsetKey ? offsetChoice.on[side] : undefined) ?? initialOffsets(pick.classes, pick.styles)[side];
+  const authored = $derived(wiringState.at === sourceText(pick.source) ? wiringState.wiring?.offsets : undefined);
+  const known = $derived(authored ? offsetsFromHost(authored) : initialOffsets(pick.classes, pick.styles));
+  const offsetOn = (side: OffsetSide) => (offsetChoice.source === offsetKey ? offsetChoice.on[side] : undefined) ?? known[side];
 
   function setOffset(side: OffsetSide, on: boolean) {
     const on0 = offsetChoice.source === offsetKey ? offsetChoice.on : {};

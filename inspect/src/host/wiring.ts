@@ -1,5 +1,6 @@
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { authoredOffsets } from '@feega/live-edit/authored-offsets';
 import { eventsOf } from '@feega/live-edit/event-handlers';
 import { linkOf } from '@feega/live-edit/link-edit';
 import { inside, liveAtOf, reader } from '@feega/live-edit/live-ask';
@@ -10,7 +11,7 @@ const SKIPPED_DIRS = new Set(['node_modules', '.git', '.next', '.nuxt', '.svelte
 const MAX_DEPTH = 8;
 const MAX_FILES = 4000;
 const VUE_ROUTER_FILE = /(?:^|\/)router(?:\/index)?\.(?:ts|js)$/;
-const NOTHING: Wiring = { link: null, events: [], routes: [] };
+const NOTHING: Wiring = { link: null, events: [], routes: [], offsets: [] };
 
 async function filesIn(root: string, dir = '', depth = 0, found: string[] = []): Promise<string[]> {
   if (depth > MAX_DEPTH || found.length > MAX_FILES) {
@@ -43,6 +44,6 @@ export async function wiringOf(root: string, rawAt: string): Promise<Wiring> {
     return NOTHING;
   }
   const read = reader(root);
-  const [link, events, routes] = await Promise.all([linkOf(read, at), eventsOf(read, at), routesIn(root)]);
-  return { link, events, routes };
+  const [link, events, routes, offsets] = await Promise.all([linkOf(read, at), eventsOf(read, at), routesIn(root), authoredOffsets(read, at)]);
+  return { link, events, routes, offsets };
 }
