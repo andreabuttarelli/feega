@@ -53,6 +53,8 @@ SvelteKit, React, Next.js and Vue, with Tailwind or plain CSS (CSS modules, scop
 
 Feega has no AI of its own, so it sits next to the agent you already use: you design, your agent codes, same files, every change a diff.
 
+Teach your agent Feega: `npx skills add andreabuttarelli/feega` ([docs](https://docs.feega.app/more/ai-agents/)).
+
 <p>
 <img src="docs/readme/logos/agent-chatgpt.svg" height="22" alt="ChatGPT"> ChatGPT &nbsp; <img src="docs/readme/logos/agent-claude.svg" height="22" alt="Claude"> Claude &nbsp; <img src="docs/readme/logos/agent-gemini.svg" height="22" alt="Gemini"> Gemini &nbsp; <img src="docs/readme/logos/agent-opencode.svg" height="22" alt="OpenCode"> OpenCode
 </p>
