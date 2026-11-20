@@ -19,6 +19,9 @@
   import { pageBridge, sourceText } from './page-bridge';
   import Properties from './Properties.svelte';
   import BreakpointBar from './BreakpointBar.svelte';
+  import ThemeBar from './ThemeBar.svelte';
+  import { DEFAULT as DEFAULT_THEME_ENTRY, DEFAULT_THEME, type Theme } from '@feega/live-edit/themes';
+  import { activeApply, stillThere, themeBadge, writtenTheme } from './theme-pick';
   import { DEFAULT_BREAKPOINTS, type Breakpoints } from '@feega/live-edit/breakpoints';
   import { FOLLOW, badgeText, reachItems, writeTarget } from './responsive';
   import { badgeOf } from './states';
@@ -66,6 +69,9 @@
   let attachAddress = $state('');
   let styling = $state(Styling.Tailwind);
   let breakpoints = $state<Breakpoints>(DEFAULT_BREAKPOINTS);
+  let themes = $state<Theme[]>([DEFAULT_THEME_ENTRY]);
+  let themeName = $state(DEFAULT_THEME);
+  const writtenThemeName = $derived(writtenTheme(themeName));
   let reach = $state(FOLLOW);
   let server = $state(ServerState.Detecting);
   let serverReason = $state('');
@@ -222,6 +228,7 @@
       server = ServerState.Running;
       visited(path);
       bridge.mode(mode);
+      showTheme();
       bridge.tree();
       bridge.palette();
       untrack(() => picked && elementState !== ElementState.Default && bridge.force(picked.source, elementState));
@@ -307,6 +314,16 @@
     picked = (await bridge.again(picked.source, picked.instanceIndex)) ?? picked;
   }
 
+  function showTheme() {
+    bridge.theme(themes.map((t) => t.apply), activeApply(themes, themeName));
+  }
+
+  function chooseTheme(name: string) {
+    themeName = name;
+    showTheme();
+    refresh();
+  }
+
   function refresh() {
     if (picked) {
       bridge.again(picked.source, picked.instanceIndex).then((p) => (picked = p ?? picked));
@@ -338,7 +355,7 @@
   }
 
   const handlers: { [K in ToView]: (m: Extract<ViewMessage, { kind: K }>) => void } = {
-    [ToView.App]: (m) => (restore(m.prefs), (route = m.route ?? route), (start = new URL(route, m.url).toString()), (url = m.url), (styling = m.styling), (breakpoints = m.breakpoints)),
+    [ToView.App]: (m) => (restore(m.prefs), (route = m.route ?? route), (start = new URL(route, m.url).toString()), (url = m.url), (styling = m.styling), (breakpoints = m.breakpoints), (themes = m.themes), (themeName = stillThere(m.themes.map((t) => t.name), themeName)), showTheme()),
     [ToView.History]: (m) => ((changes = m.changes), (canUndo = m.canUndo), (canRedo = m.canRedo)),
     [ToView.Settings]: (m) => {
       settings = m.values;
@@ -520,7 +537,7 @@
 
   function askOf(row: Row, value: string, token?: string) {
     const { prop, side, family, value: written } = row.change(value);
-    return { at: sourceText(picked!.source), prop, side, family, value: written, token, rem: picked!.rem, viewport: picked!.viewport, css: kebab(row.preview(value)), scope, inner: picked!.inner, page: picked!.page, state: writtenState, breakpoint: target };
+    return { at: sourceText(picked!.source), prop, side, family, value: written, token, rem: picked!.rem, viewport: picked!.viewport, css: kebab(row.preview(value)), scope, inner: picked!.inner, page: picked!.page, state: writtenState, breakpoint: target, theme: writtenThemeName };
   }
 
   function change(row: Row, value: string, token?: string) {
@@ -627,7 +644,7 @@
     }
     const css = fontCss(font.family);
     bridge.preview(picked.source, { fontFamily: css });
-    toHost({ kind: ToHost.Font, google: font.google, ask: { at: sourceText(picked.source), prop: LiveProp.Class, family: ClassFamily.FontFamily, value: `font-['${font.family.replace(/\s+/g, '_')}']`, css: { 'font-family': css }, rem: picked.rem, viewport: picked.viewport, scope, breakpoint: target } });
+    toHost({ kind: ToHost.Font, google: font.google, ask: { at: sourceText(picked.source), prop: LiveProp.Class, family: ClassFamily.FontFamily, value: `font-['${font.family.replace(/\s+/g, '_')}']`, css: { 'font-family': css }, rem: picked.rem, viewport: picked.viewport, scope, breakpoint: target, theme: writtenThemeName } });
   }
 
   function onKey(e: KeyboardEvent) {
@@ -711,6 +728,7 @@
         <input bind:value={address} aria-label="Route" data-testid="address" spellcheck="false" />
       </form>
       <DeviceBar {size} {fit} onsize={pickSize} onwidth={(w) => ((custom = snapped(w)), (size = Size.Custom), savePrefs())} />
+      {#if themes.length > 1}<ThemeBar {themes} choice={themeName} onchoose={chooseTheme} />{/if}
       {#if fit.scale < 1}<span class="zoom" data-testid="zoom">{Math.round(fit.scale * 100)}%</span>{/if}
       <button type="button" class="icon" title="Open in browser" onclick={() => toHost({ kind: ToHost.External, url: new URL(route, url).toString() })}><ExternalLink size={14} /></button>
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
@@ -800,7 +818,7 @@
             <span class="where">{#if picked.component}in {picked.component.file.split('/').pop()} · {/if}<button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file.split('/').pop()}:{picked.source.line}</button></span>
             {#if authored(picked.classes)}<code class="classes">{authored(picked.classes)}</code>{/if}
           </div>
-          <BreakpointBar badge={reachBadge} items={reachItems(breakpoints)} choice={reach} onchoose={(id) => (reach = id)} />
+          <BreakpointBar badge={reachBadge} theme={themeBadge(themeName)} items={reachItems(breakpoints)} choice={reach} onchoose={(id) => (reach = id)} />
           <div class="scope" role="radiogroup" aria-label="Edit scope" data-testid="scope">
             <button type="button" class:on={scope === Scope.Element} onclick={() => (scope = Scope.Element)} title="Only this element (every instance of its component: {picked.instances})">This element{picked.instances > 1 ? ` ×${picked.instances}` : ''}</button>
             <button type="button" class:on={scope === Scope.Class} disabled={!picked.classCount || styling === Styling.Tailwind} onclick={() => (scope = Scope.Class)} title={styling === Styling.Tailwind ? 'Class scope needs CSS rules, not Tailwind' : `Every element with this class: ${picked.classCount}`}>All .{picked.classes.split(' ')[0] || 'class'}{picked.classCount ? ` (${picked.classCount})` : ''}</button>

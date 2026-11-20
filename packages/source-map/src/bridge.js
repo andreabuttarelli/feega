@@ -2,6 +2,7 @@ import { stampSources } from './framework-meta.js';
 import { SOURCE_ATTR, rectOf, deepestAt, clearPreview, hidePreview, paletteOf, relativeOf, treeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
 import { trackRects } from './track.js';
 import { keepScroll } from './reload-restore.js';
+import { applyTheme, keepTheme, themeNow, watchScheme } from './theme-switch.js';
 import { FORCED_REBUILD_MS, forceState, forcedNow, keepForced, settleForced, statesOf } from './forced-state.js';
 
 export const INSPECT = 'feega:inspect';
@@ -28,18 +29,21 @@ export const TRACK = 'feega:track';
 export const TRACKED = 'feega:tracked';
 export const LEAVE = 'feega:leave';
 export const FORCE = 'feega:force';
+export const THEME = 'feega:theme';
 
 export const Mode = { Navigate: 'navigate', Design: 'design' };
 
 const INSTALLED = Symbol.for('feega.source-map.bridge');
 const EDITABLE = 'plaintext-only';
 const TREE_REFRESH_MS = 150;
+const THEME_REBUILD_MS = 100;
 
 export function installBridge(win) {
   if (win[INSTALLED]) {
     return;
   }
   win[INSTALLED] = true;
+  watchScheme(win);
 
   const doc = win.document;
   let mode = Mode.Navigate;
@@ -47,6 +51,7 @@ export function installBridge(win) {
   let treeWanted = false;
   let treeTimer = null;
   let forcedTimer = null;
+  let themeTimer = null;
   let treeSent = '';
   let reply = (message) => win.parent?.postMessage(message, '*');
   const scroll = keepScroll(win);
@@ -82,11 +87,22 @@ export function installBridge(win) {
     }, FORCED_REBUILD_MS);
   }
 
+  function refreshTheme() {
+    if (!themeNow(doc) || themeTimer) {
+      return;
+    }
+    themeTimer = win.setTimeout(() => {
+      themeTimer = null;
+      keepTheme(doc);
+    }, THEME_REBUILD_MS);
+  }
+
   const handlers = {
     [PREVIEW]: (request) => previewEdit(doc, request),
     [PREVIEW_CLEAR]: (request) => clearPreview(doc, request.source, request.state),
     [PREVIEW_SETTLE]: (request) => reply({ type: PREVIEW_SETTLED, source: request.source, unapplied: settlePreview(doc, request.source, request.state) }),
     [FORCE]: (request) => forceState(doc, request.source, request.state),
+    [THEME]: (request) => applyTheme(doc, request),
     [MODE]: (request) => (mode = request.mode),
     [PALETTE]: () => reply({ type: PALETTE_RESULT, ...paletteOf(doc) }),
     [HIDE]: (request) => hidePreview(doc, request.source, request.hidden),
@@ -123,7 +139,7 @@ export function installBridge(win) {
     handle(event.data);
   });
 
-  new win.MutationObserver(() => (keepPreviews(doc), refreshTree(), refreshForced())).observe(doc.documentElement, { childList: true, subtree: true });
+  new win.MutationObserver(() => (keepPreviews(doc), refreshTree(), refreshForced(), refreshTheme())).observe(doc.documentElement, { childList: true, subtree: true });
 
   reportRoutes(win);
   win.parent?.postMessage({ type: READY, path: win.location.pathname + win.location.search, restored: scroll.restored }, '*');

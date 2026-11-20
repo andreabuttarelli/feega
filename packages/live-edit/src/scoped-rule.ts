@@ -87,7 +87,9 @@ function shorthanded(css: Map<string, string>, all: Map<string, string>): Map<st
   return merged;
 }
 
-export const ruleInBody = (body: string, name: string, css: Map<string, string>, viewport?: number, indent = RULE_INDENT, media?: string | null) => selectorInBody(body, `.${name}`, css, viewport, indent, media);
+const withinOf = (within?: string | null) => (within ? `${within} ` : '');
+
+export const ruleInBody = (body: string, name: string, css: Map<string, string>, viewport?: number, indent = RULE_INDENT, media?: string | null, within?: string | null) => selectorInBody(body, `${withinOf(within)}.${name}`, css, viewport, indent, media);
 
 const queryPattern = (media: string) => [...media.replace(/\s+/g, '')].map(escaped).join('\\s*');
 
@@ -142,17 +144,18 @@ export function selectorInBody(body: string, selector: string, css: Map<string, 
   return `${head}${head ? '\n' : ''}${indent === '' && head ? '\n' : ''}${ruleText(selector, all, indent)}\n`;
 }
 
-function withRule(source: string, name: string, css: Map<string, string>, viewport?: number, media?: string | null): string {
+function withRule(source: string, name: string, css: Map<string, string>, viewport?: number, media?: string | null, within?: string | null): string {
   const block = source.match(STYLE_BLOCK);
   if (!block && [...css.values()].every((v) => v === REMOVED)) {
     return source;
   }
   if (!block) {
-    const rules = typeof media === 'string' ? selectorInBody('', `.${name}`, css, undefined, RULE_INDENT, media).trimEnd() : ruleText(`.${name}`, css);
+    const selector = `${withinOf(within)}.${name}`;
+    const rules = typeof media === 'string' ? selectorInBody('', selector, css, undefined, RULE_INDENT, media).trimEnd() : ruleText(selector, css);
     return `${source.trimEnd()}\n\n<style>\n${rules}\n</style>\n`;
   }
   const body = block[1];
-  const after = source.replace(STYLE_BLOCK, (whole) => whole.replace(body, ruleInBody(body, name, css, viewport, undefined, media)));
+  const after = source.replace(STYLE_BLOCK, (whole) => whole.replace(body, ruleInBody(body, name, css, viewport, undefined, media, within)));
   return after.replace(EMPTY_STYLE, '\n');
 }
 
@@ -160,6 +163,12 @@ const INNER_REACH: Record<string, (inner: string) => string> = {
   svelte: (inner) => `:global(${inner})`,
   vue: (inner) => `:deep(${inner})`
 };
+
+const WITHIN_REACH: Record<string, (within: string) => string> = {
+  svelte: (within) => `:global(${within})`
+};
+
+export const withinReach = (file: string, within?: string | null) => (within ? (WITHIN_REACH[file.slice(file.lastIndexOf('.') + 1)] ?? ((w: string) => w))(within) : null);
 
 const reach = (file: string, inner: string) => (INNER_REACH[file.slice(file.lastIndexOf('.') + 1)] ?? ((i: string) => i))(inner);
 
@@ -181,7 +190,7 @@ function classFor(classes: string[], source: string, base: string, scope: Scope)
   return reusable ? { name: reusable, added: false } : { name: freeClass(source, base), added: true };
 }
 
-export async function scopedRule(read: ReadFile, at: LiveAt, css: Css, viewport?: number, scope = Scope.Element, inner?: string, state = ElementState.Default, media?: string | null): Promise<TextWritten> {
+export async function scopedRule(read: ReadFile, at: LiveAt, css: Css, viewport?: number, scope = Scope.Element, inner?: string, state = ElementState.Default, media?: string | null, within?: string | null): Promise<TextWritten> {
   const text = await read(at.file);
   const start = text === null ? -1 : offsetOf(text, at);
   const end = start < 0 || text![start] !== '<' ? -1 : openTagEnd(text!, start);
@@ -214,5 +223,5 @@ export async function scopedRule(read: ReadFile, at: LiveAt, css: Css, viewport?
   const tagged = source.slice(0, start) + open + source.slice(end + 1);
   const stated = `${name}${pseudoOf(state)}`;
   const selector = inner ? `${stated} ${reach(at.file, inner)}` : stated;
-  return { ok: true, change: { path: at.file, before: source, after: withRule(tagged, selector, declared, viewport, media) } };
+  return { ok: true, change: { path: at.file, before: source, after: withRule(tagged, selector, declared, viewport, media, withinReach(at.file, within)) } };
 }

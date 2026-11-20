@@ -11,11 +11,18 @@ export enum PageTarget {
 
 const NO_INDENT = '';
 
-export async function pageRule(read: ReadFile, target: PageTarget, css: Css, viewport?: number, media?: string | null): Promise<TextWritten> {
+function selectorWithin(target: PageTarget, within?: string | null): string {
+  if (!within) {
+    return target;
+  }
+  return target === PageTarget.Html ? `${target}${within}` : `${within} ${target}`;
+}
+
+export async function pageRule(read: ReadFile, target: PageTarget, css: Css, viewport?: number, media?: string | null, within?: string | null): Promise<TextWritten> {
   const sheet = await globalSheetOf(read);
   const before = sheet === null ? null : await read(sheet);
   if (sheet === null || before === null) {
     return { ok: false, reason: 'no global stylesheet found for page styles' };
   }
-  return { ok: true, change: { path: sheet, before, after: selectorInBody(before, target, new Map(Object.entries(css)), viewport, NO_INDENT, media) } };
+  return { ok: true, change: { path: sheet, before, after: selectorInBody(before, selectorWithin(target, within), new Map(Object.entries(css)), viewport, NO_INDENT, media) } };
 }

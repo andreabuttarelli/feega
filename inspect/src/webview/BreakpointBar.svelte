@@ -3,9 +3,9 @@
   import Check from '@lucide/svelte/icons/check';
   import { Select } from 'bits-ui';
 
-  type Props = { badge: string; items: { id: string; label: string }[]; choice: string; onchoose: (id: string) => void };
+  type Props = { badge: string; theme?: string | null; items: { id: string; label: string }[]; choice: string; onchoose: (id: string) => void };
 
-  let { badge, items, choice, onchoose }: Props = $props();
+  let { badge, theme = null, items, choice, onchoose }: Props = $props();
 </script>
 
 <div class="reach-row" data-row="breakpoint">
@@ -24,10 +24,14 @@
       </Select.Content>
     </Select.Portal>
   </Select.Root>
+  {#if theme}<span class="badge" data-testid="theme-badge">{theme}</span>{/if}
 </div>
 
 <style>
   .reach-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     padding: 8px 12px;
     border-bottom: 1px solid var(--ui-divider);
   }

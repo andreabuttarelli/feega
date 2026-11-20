@@ -1,5 +1,6 @@
 import type { ElementState } from '@feega/live-edit/element-state';
-import { BRIDGE_READY, INSPECT, INSPECT_RESULT, LOCAL_ORIGIN, LOCATION, MODE, PREVIEW, PREVIEW_CLEAR, PREVIEW_SETTLE, PREVIEW_SETTLED, SCROLL, SCROLLED, REVEAL, HIDE, PALETTE, PALETTE_RESULT, type Palette, TREE, TREE_RESULT, type LayerNode, TEXT_DONE, TEXT_EDIT, TEXT_RESTORE, TRACK, TRACKED, LEAVE, FORCE, type Slot, type Mode, type Move, type Pick, type Source } from '../messages';
+import type { Apply } from '@feega/live-edit/themes';
+import { BRIDGE_READY, INSPECT, INSPECT_RESULT, LOCAL_ORIGIN, LOCATION, MODE, PREVIEW, PREVIEW_CLEAR, PREVIEW_SETTLE, PREVIEW_SETTLED, SCROLL, SCROLLED, REVEAL, HIDE, PALETTE, PALETTE_RESULT, type Palette, TREE, TREE_RESULT, type LayerNode, TEXT_DONE, TEXT_EDIT, TEXT_RESTORE, TRACK, TRACKED, LEAVE, FORCE, THEME, type Slot, type Mode, type Move, type Pick, type Source } from '../messages';
 
 type Inspected = { source: Source; component: Source | null; html: string; rect: Pick['rect']; styles: Record<string, string>; inherited?: Record<string, string>; classes: string; rem: number; viewport: number; ownText: boolean; inlineText: boolean; elements: number; name: string; parentWidth: number; instances: number; instanceIndex: number; classCount: number; ancestors: Pick['ancestors']; inner?: string; page?: Pick['page']; attributes?: Pick['attributes']; states?: string[] };
 
@@ -98,6 +99,7 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
     clear: (source: Source, state?: ElementState) => send({ type: PREVIEW_CLEAR, source: sourceText(source), state }),
     settle: (source: Source, state?: ElementState) => send({ type: PREVIEW_SETTLE, source: sourceText(source), state }),
     force: (source: Source | null, state: ElementState) => send({ type: FORCE, source: source ? sourceText(source) : '', state }),
+    theme: (themes: Apply[], active: Apply | null) => send({ type: THEME, themes, active }),
     tree: () => send({ type: TREE }),
     palette: () => send({ type: PALETTE }),
     hide: (source: Source, hidden: boolean) => send({ type: HIDE, source: sourceText(source), hidden }),
