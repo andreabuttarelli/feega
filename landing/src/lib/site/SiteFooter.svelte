@@ -300,8 +300,8 @@
 
   @media (min-width: 810px) and (max-width: 1199.98px) {
     .site-foot {
-      max-width: 810px;
-      padding: 41px 16px 16px;
+      max-width: none;
+      padding: 41px 24px 16px;
     }
 
     .mark-box {
