@@ -7,6 +7,6 @@ export default defineConfig({
   trailingSlash: 'always',
   integrations: [mdx(), sitemap()],
   markdown: {
-    shikiConfig: { themes: { light: 'github-light', dark: 'github-dark' } }
+    shikiConfig: { theme: 'github-dark' }
   }
 });

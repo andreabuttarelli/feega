@@ -9,7 +9,9 @@ export async function getStaticPaths() {
 }
 
 const { post } = Astro.props as { post: Post };
-const { Content } = await render(post);
+const { Content, headings } = await render(post);
+const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
+const all = await postsNewestFirst();
 const url = new URL(`/posts/${post.id}/`, Astro.site).href;
 const jsonLd = {
   '@context': 'https://schema.org',
@@ -27,18 +29,39 @@ const jsonLd = {
 ---
 
 <Base title={post.data.title} description={post.data.description} cover={{ src: post.data.cover, alt: post.data.coverAlt }} type="article" jsonLd={jsonLd}>
-  <article>
-    <p class="meta">
-      <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time> · {readingMinutes(post)} min read
-    </p>
-    <h1 class="post-title">{post.data.title}</h1>
-    <p class="lede">{post.data.description}</p>
-    <img class="cover" src={post.data.cover} alt={post.data.coverAlt} width="1200" height="630" />
-    <div class="prose">
-      <Content />
-    </div>
-    <p class="tags">
-      {post.data.tags.map((tag) => <a href={`/tags/${tagSlug(tag)}/`}>#{tag}</a>)}
-    </p>
-  </article>
+  <div class="post-layout">
+    <aside class="post-side" aria-label="Posts">
+      <p class="side-label">posts</p>
+      <ul class="side-list">
+        {all.map((p) => <li><a href={`/posts/${p.id}/`} aria-current={p.id === post.id ? 'page' : undefined}>{p.data.title}</a></li>)}
+      </ul>
+    </aside>
+
+    <article class="post-main">
+      <nav class="sx-crumbs" aria-label="Breadcrumb">
+        <a href="/">blog</a>
+        <span aria-hidden="true">/</span>
+        <span>{post.data.tags[0] ?? 'post'}</span>
+      </nav>
+      <h1 class="post-title">{post.data.title}</h1>
+      <p class="lede">{post.data.description}</p>
+      <p class="meta">
+        <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time> · {readingMinutes(post)} min read
+      </p>
+      <img class="cover" src={post.data.cover} alt={post.data.coverAlt} width="1200" height="630" />
+      <div class="prose">
+        <Content />
+      </div>
+      <p class="tags">
+        {post.data.tags.map((tag) => <a href={`/tags/${tagSlug(tag)}/`}>#{tag}</a>)}
+      </p>
+    </article>
+
+    <aside class="post-side" aria-label="On this page">
+      {toc.length > 0 && <p class="side-label">on this page</p>}
+      <ul class="side-list toc">
+        {toc.map((h) => <li><a class={`depth-${h.depth}`} href={`#${h.slug}`}>{h.text}</a></li>)}
+      </ul>
+    </aside>
+  </div>
 </Base>
