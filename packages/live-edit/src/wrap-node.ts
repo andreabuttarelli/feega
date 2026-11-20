@@ -57,8 +57,8 @@ export async function wrapNode(read: ReadFile, at: LiveAt): Promise<Structured> 
   const piece = source.slice(whole.start, whole.end);
   const block = inline ? `${WRAPPER_OPEN}${piece}${WRAPPER_CLOSE}` : `${indent}${WRAPPER_OPEN}\n${lined(piece, INDENT_UNIT)}\n${indent}${WRAPPER_CLOSE}${piece.endsWith('\n') ? '\n' : ''}`;
   const after = source.slice(0, whole.start) + block + source.slice(whole.end);
-  const inside = inline ? whole.start + WRAPPER_OPEN.length : after.indexOf('<', whole.start + indent.length + WRAPPER_OPEN.length);
-  return { ok: true, changes: [{ path: at.file, before: source, after }], selected: { file: at.file, ...lineCol(after, inside) } };
+  const wrapper = inline ? whole.start : whole.start + indent.length;
+  return { ok: true, changes: [{ path: at.file, before: source, after }], selected: { file: at.file, ...lineCol(after, wrapper) } };
 }
 
 export async function unwrapNode(read: ReadFile, at: LiveAt): Promise<Structured> {

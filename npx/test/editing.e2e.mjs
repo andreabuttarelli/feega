@@ -307,8 +307,8 @@ try {
     await page.keyboard.press('ControlOrMeta+g');
     await page.waitForTimeout(SETTLE_MS);
     assert.equal(await frame.locator('main > div > p').count(), 1, 'the paragraph is inside a new container');
-    await frame.locator('main > div').first().click({ position: { x: 2, y: 2 } });
-    await page.waitForTimeout(800);
+    const picked = await page.locator('[data-testid="layers"] [data-layer][aria-selected="true"]').first().innerText();
+    assert.ok(/^\s*div/.test(picked), `the new container is selected, selection is ${picked}`);
     await page.keyboard.press('ControlOrMeta+Shift+g');
     await page.waitForTimeout(SETTLE_MS);
     assert.deepEqual(changedFiles(), [], 'unwrap restores the source');

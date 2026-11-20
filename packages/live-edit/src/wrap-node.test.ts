@@ -38,11 +38,11 @@ const LOOP = `<script>
 const run = (op: StructureOp, text: string, file: string, line: number, col: number) => structure(async () => text, { op, at: { file, line, col } });
 
 describe('wrap and unwrap', () => {
-  it('wraps a Svelte element in a div and selects the element inside', async () => {
+  it('wraps a Svelte element in a div and selects the new container', async () => {
     const out = await run(StructureOp.Wrap, SVELTE, 'a.svelte', 2, 3);
 
     expect(out.ok && out.changes[0].after).toBe('<main>\n  <div>\n    <h1 class="t">Title</h1>\n  </div>\n  <p>Lead</p>\n</main>\n');
-    expect(out.ok && out.selected).toEqual({ file: 'a.svelte', line: 3, col: 5 });
+    expect(out.ok && out.selected).toEqual({ file: 'a.svelte', line: 2, col: 3 });
   });
 
   it('wraps a JSX element with several lines', async () => {
