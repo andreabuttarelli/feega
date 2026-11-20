@@ -1,6 +1,5 @@
 <script lang="ts">
   import Hero from '$lib/site/home/Hero.svelte';
-  import Landscape from '$lib/site/home/Landscape.svelte';
   import OpenSource from '$lib/site/home/OpenSource.svelte';
   import Codebase from '$lib/site/home/Codebase.svelte';
   import Pricing from '$lib/site/pricing/Pricing.svelte';
@@ -24,7 +23,6 @@
 
 <div class="site-home">
 <Hero />
-<Landscape />
 <OpenSource />
 <div class="chapters">
   <Codebase />
