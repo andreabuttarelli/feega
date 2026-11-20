@@ -150,9 +150,13 @@ function inspectTagged(tagged, maxHtml) {
 
 const INLINE_TEXT = new Set(['SPAN', 'STRONG', 'EM', 'B', 'I', 'A', 'BR', 'CODE', 'SMALL', 'MARK', 'SUB', 'SUP', 'U', 'S']);
 
+const hasOwnText = (el) => [...el.childNodes].some((n) => n.nodeType === TEXT_NODE && n.textContent.trim());
+
 function inlineTextOnly(el) {
   const all = [...el.querySelectorAll('*')];
-  return all.length > 0 && all.every((d) => INLINE_TEXT.has(d.tagName.toUpperCase())) && Boolean(el.textContent.trim());
+  const prose = hasOwnText(el);
+  const inline = (d) => INLINE_TEXT.has(d.tagName.toUpperCase()) && (d.tagName.toUpperCase() !== 'A' || prose);
+  return all.length > 0 && all.every(inline) && Boolean(el.textContent.trim());
 }
 
 function rootFontSize(doc) {

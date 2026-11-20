@@ -25,6 +25,14 @@ describe('roleOf', () => {
     expect(roleOf(element('div', false, 2, 'block', true))).toBe(Role.Text);
   });
 
+  it('a link with only text is text', () => {
+    expect(roleOf(element('a', true, 0, 'inline'))).toBe(Role.Text);
+  });
+
+  it('a div of links without text of its own is a container', () => {
+    expect(roleOf(element('div', false, 2, 'block', false))).toBe(Role.Container);
+  });
+
   it('a div with block children is a container', () => {
     expect(roleOf(element('div', false, 2))).toBe(Role.Container);
   });
