@@ -3,6 +3,7 @@ import type { FileChange, ReadFile } from './files';
 import { GLOBAL_SHEETS } from './font-wiring';
 import { hasRule, ruleInBody, Scope, usesOf } from './scoped-rule';
 import type { Css } from './style-attr';
+import { ElementState, pseudoOf } from './element-state';
 
 export type ModuleWritten = { ok: true; changes: FileChange[] } | { ok: false; reason: string; at?: LiveAt };
 
@@ -72,8 +73,8 @@ const ownOf = (names: string[], base: string) => names.find((n) => n === base ||
 const classAttr = (binding: string, names: string[]) =>
   names.length === 1 ? ` className={${binding}.${names[0]}}` : ` className={\`${names.map((n) => `\${${binding}.${n}}`).join(' ')}\`}`;
 
-export async function cssModuleRule(read: ReadFile, at: LiveAt, css: Css, viewport?: number, scope = Scope.Element, inner?: string): Promise<ModuleWritten> {
-  const ruleName = (name: string) => (inner ? `${name} ${inner}` : name);
+export async function cssModuleRule(read: ReadFile, at: LiveAt, css: Css, viewport?: number, scope = Scope.Element, inner?: string, state = ElementState.Default): Promise<ModuleWritten> {
+  const ruleName = (name: string) => `${name}${pseudoOf(state)}${inner ? ` ${inner}` : ''}`;
   const source = await read(at.file);
   const start = source === null ? -1 : offsetOf(source, at);
   const end = start < 0 || source![start] !== '<' ? -1 : openTagEnd(source!, start);
