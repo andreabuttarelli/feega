@@ -223,8 +223,8 @@
 
   @media (min-width: 810px) and (max-width: 1199.98px) {
     .hero {
-      max-width: 810px;
-      padding: 150px 16px 0;
+      max-width: none;
+      padding: 150px 24px 0;
     }
 
     h1 {
