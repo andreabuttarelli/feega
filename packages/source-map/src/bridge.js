@@ -76,7 +76,7 @@ export function installBridge(win) {
     [PALETTE]: () => reply({ type: PALETTE_RESULT, ...paletteOf(doc) }),
     [HIDE]: (request) => hidePreview(doc, request.source, request.hidden),
     [LEAVE]: () => scroll.leave(),
-    [TRACK]: (request) => tracker.follow(request.slot, request.source),
+    [TRACK]: (request) => tracker.follow(request.slot, request.source, request.index),
     [TREE]: () => {
       treeWanted = true;
       sendTree();
@@ -182,12 +182,13 @@ function placeCaret(win, element, { x, y }) {
   selection.addRange(range);
 }
 
-function targetOf(doc, request) {
+export function targetOf(doc, request) {
   if (typeof request.move === 'string') {
     return relativeOf(doc, request.from, request.move);
   }
   if (typeof request.selector === 'string') {
-    return doc.querySelector(request.selector);
+    const found = doc.querySelectorAll(request.selector);
+    return found[request.index ?? 0] ?? found[0] ?? null;
   }
   return deepestAt(doc, request.x, request.y);
 }
