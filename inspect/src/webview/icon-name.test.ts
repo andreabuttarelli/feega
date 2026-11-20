@@ -1,22 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { iconNameOf, maskOf, nextTile } from './icon-name';
-
-describe('iconNameOf', () => {
-  it.each([
-    ['ArrowRight', 'arrow-right'],
-    ['IconArrowRight', 'arrow-right'],
-    ['ArrowRightIcon', 'arrow-right'],
-    ['Heart', 'heart'],
-    ['Disc3', 'disc3']
-  ])('turns the component %s into the icon name %s', (component, name) => {
-    expect(iconNameOf(component)).toBe(name);
-  });
-
-  it('has no name for a plain element', () => {
-    expect(iconNameOf('svg')).toBeNull();
-    expect(iconNameOf('')).toBeNull();
-  });
-});
+import { maskOf, nextTile } from './icon-name';
 
 describe('maskOf', () => {
   it('turns an svg into a css mask a script cannot run from', () => {

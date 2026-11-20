@@ -8,6 +8,7 @@ import { AccountState, ServerAction, ServerState, ToHost, ToView, type EditAsk, 
 import { SettingKey, StylingChoice } from '../settings';
 import { SignInEnd, signIn } from './sign-in';
 import { addPlugin } from './add-plugin';
+import { currentIcon } from './icon-current';
 import { mcpIcon, searchIcons, streamPreviews } from './icon-search';
 import { appOfSource, firstStampedFile, urlOf } from './attach-url';
 import { Attach, attachDev, factsOf, startDev, type Refused, type Running } from './dev-server';
@@ -77,8 +78,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     await edits.svg(m.at, svg, m.inner).then((out) => edited(out, null));
   }
 
-  async function iconsFound(id: number, query: string, current: string | null) {
-    const found = await searchIcons(root, fetch, query, current);
+  async function iconsFound(id: number, query: string, at: string) {
+    const found = await searchIcons(root, fetch, query, await currentIcon(root, at));
     await post({ kind: ToView.IconResults, id, ...found });
     await streamPreviews(fetch, found.hits, async (name, svg) => {
       await post({ kind: ToView.IconPreview, id, name, svg });
@@ -384,7 +385,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.IconSwap]: (m) => edits.icon(m.at, m.name).then((out) => edited(out, null)),
     [ToHost.IconMarkup]: (m) => edits.svg(m.at, m.markup, m.inner).then((out) => edited(out, null)),
     [ToHost.IconGet]: iconFetched,
-    [ToHost.IconSearch]: (m) => iconsFound(m.id, m.query, m.current),
+    [ToHost.IconSearch]: (m) => iconsFound(m.id, m.query, m.at),
     [ToHost.SignIn]: startSignIn,
     [ToHost.CancelSignIn]: () => signing?.abort(),
     [ToHost.SignOut]: signOut,

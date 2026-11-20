@@ -3,7 +3,7 @@
   import { IconSource, ToHost, type IconHit, type Pick } from '../messages';
   import { toHost } from './host';
   import { iconSearch, nextIconRequest } from './icon-search.svelte';
-  import { iconNameOf, maskOf, nextTile } from './icon-name';
+  import { maskOf, nextTile } from './icon-name';
   import { sourceText } from './page-bridge';
 
   const SEARCH_DELAY_MS = 200;
@@ -24,7 +24,6 @@
   let hovered = $state('');
 
   const at = $derived(sourceText(pick.source));
-  const current = $derived(iconNameOf(pick.name));
   const library = $derived(iconSearch.hits.filter((h) => h.source === IconSource.Library));
   const remote = $derived(iconSearch.hits.filter((h) => h.source === IconSource.IconMcp));
   const group = $derived(chosen ?? (library.length || !iconSearch.library ? IconSource.Library : IconSource.IconMcp));
@@ -35,7 +34,7 @@
   function search(text: string) {
     query = text;
     clearTimeout(timer);
-    timer = setTimeout(() => toHost({ kind: ToHost.IconSearch, id: nextIconRequest(), query: text, current }), SEARCH_DELAY_MS);
+    timer = setTimeout(() => toHost({ kind: ToHost.IconSearch, id: nextIconRequest(), query: text, at }), SEARCH_DELAY_MS);
   }
 
   function move(e: KeyboardEvent) {

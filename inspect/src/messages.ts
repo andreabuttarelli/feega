@@ -194,7 +194,7 @@ export type HostMessage =
   | { kind: ToHost.IconSwap; at: string; name: string }
   | { kind: ToHost.IconMarkup; at: string; markup: string; inner?: string }
   | { kind: ToHost.IconGet; at: string; name: string; size: number; stroke: number; inner?: string }
-  | { kind: ToHost.IconSearch; id: number; query: string; current: string | null }
+  | { kind: ToHost.IconSearch; id: number; query: string; at: string }
   | { kind: ToHost.SignIn }
   | { kind: ToHost.CancelSignIn }
   | { kind: ToHost.SignOut }

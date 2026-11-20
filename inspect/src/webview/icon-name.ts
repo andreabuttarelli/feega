@@ -1,14 +1,4 @@
-const COMPONENT = /^[A-Z][A-Za-z0-9]*$/;
-const KEBAB_BOUNDARY = /([a-z0-9])([A-Z])/g;
-const LIBRARY_AFFIX = /^icon-|-icon$/g;
 const NOT_FOUND = -1;
-
-export function iconNameOf(component: string): string | null {
-  if (!COMPONENT.test(component)) {
-    return null;
-  }
-  return component.replace(KEBAB_BOUNDARY, '$1-$2').toLowerCase().replace(LIBRARY_AFFIX, '');
-}
 
 export const maskOf = (svg: string) => `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 
