@@ -201,6 +201,36 @@ try {
     assert.deepEqual(changedFiles(), [], 'undo restores the order');
   });
 
+  await check('position: absolute and top write the source and the page, the layer is tagged, and each edit is one undo', async () => {
+    const h1 = frame.locator('h1').first();
+    await h1.click();
+    const section = page.locator('[data-section="Position"]');
+    await section.waitFor({ timeout: 10_000 });
+    if ((await section.locator('[data-row="position"]').count()) === 0) {
+      await section.locator('button.title').click();
+    }
+    assert.equal(await section.locator('[data-row="top"]').count(), 0, 'a static element hides the offsets');
+    await section.locator('[data-field="position"]').click();
+    await page.getByRole('option', { name: 'absolute' }).click();
+    await page.waitForTimeout(SETTLE_MS);
+    assert.ok(diffText().includes(TAILWIND ? 'absolute' : 'position: absolute'), `position written:\n${diffText()}`);
+    assert.equal(await h1.evaluate((e) => getComputedStyle(e).position), 'absolute', 'the page shows the position');
+    const top = section.locator('input[aria-label="top"]');
+    await top.waitFor({ timeout: 10_000 });
+    await top.fill('12');
+    await top.press('Enter');
+    await page.waitForTimeout(SETTLE_MS);
+    assert.ok(diffText().includes(TAILWIND ? 'top-3' : 'top: 12px'), `top written:\n${diffText()}`);
+    assert.equal(await h1.evaluate((e) => getComputedStyle(e).top), '12px', 'the page shows the offset');
+    await page.waitForTimeout(800);
+    const tagged = await page.locator('[data-testid="layers"] [data-layer][aria-selected="true"] [data-float="absolute"]').count();
+    assert.equal(tagged, 1, 'the layer carries the absolute tag');
+    await undo();
+    assert.ok(!/top-3|top:\s*12px/.test(diffText()) && /absolute/.test(diffText()), 'one undo removes only the offset');
+    await undo();
+    assert.deepEqual(changedFiles(), [], 'a second undo restores the source');
+  });
+
   await check('no package file was created or changed', async () => {
     assert.deepEqual(untracked().filter((f) => /package-lock|pnpm-lock|yarn\.lock|bun\.lock/.test(f)), []);
     assert.ok(!changedFiles().some((f) => /package/.test(f)));
