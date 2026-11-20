@@ -101,6 +101,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     await platform.notify(`Signed in as ${outcome.account.user.email}`);
   }
 
+  async function showOnboarding() {
+    await post({ kind: ToView.Onboarding, state: await platform.onboarding.read() });
+  }
+
   async function signOut() {
     await platform.account.clear();
     await postAccount(AccountState.SignedOut);
@@ -319,7 +323,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   };
 
   const handlers: { [K in ToHost]: (m: Extract<HostMessage, { kind: K }>) => unknown } = {
-    [ToHost.Ready]: () => (showApp(), postSettings(), postHistory(), showAccount()),
+    [ToHost.Ready]: () => (showApp(), postSettings(), postHistory(), showAccount(), showOnboarding()),
     [ToHost.Edit]: (m) => edit(m.ask),
     [ToHost.Undo]: undo,
     [ToHost.Open]: (m) => platform.openSource(root, m.at),
@@ -344,7 +348,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.IconSearch]: (m) => iconsFound(m.id, m.query),
     [ToHost.SignIn]: startSignIn,
     [ToHost.CancelSignIn]: () => signing?.abort(),
-    [ToHost.SignOut]: signOut
+    [ToHost.SignOut]: signOut,
+    [ToHost.OnboardingDone]: () => platform.onboarding.markSeen()
   };
 
   platform.receive((message) => (handlers[message.kind] as (m: HostMessage) => unknown)(message));

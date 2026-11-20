@@ -4,6 +4,7 @@ import type { HostMessage, Source } from '../messages';
 import { settingsWith } from '../settings';
 import { Column, openTarget } from './open-source';
 import type { Account, AccountStore } from './account';
+import { globalStateOnboardingStore } from './onboarding';
 import type { Platform } from './platform';
 
 const BEFORE_SCHEME = 'feega-before';
@@ -74,7 +75,8 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     openSettings: (key) => vscode.commands.executeCommand('workbench.action.openSettings', key),
     sourceControl: () => vscode.commands.executeCommand('workbench.view.scm'),
     notify: (text) => vscode.window.showInformationMessage(`Feega: ${text}`),
-    account: secretAccountStore(context.secrets)
+    account: secretAccountStore(context.secrets),
+    onboarding: globalStateOnboardingStore(context.globalState)
   };
 }
 

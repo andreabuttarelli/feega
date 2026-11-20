@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { AccountState, ToHost, ToView, type HostMessage, type ViewMessage } from '../messages';
 import { accountOfBody, memoryAccountStore } from './account';
+import { memoryOnboardingStore } from './onboarding';
 import type { Platform } from './platform';
 import { inspectSession } from './session';
 
@@ -29,7 +30,8 @@ function setup() {
     log: () => undefined,
     openExternal: (url: string) => opened.push(url),
     notify: (text: string) => toasts.push(text),
-    account
+    account,
+    onboarding: memoryOnboardingStore()
   } as unknown as Platform;
   inspectSession(platform, mkdtempSync(join(tmpdir(), 'feega-acc-')));
   const send = (m: HostMessage) => handle(m);

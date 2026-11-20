@@ -114,7 +114,8 @@ export enum ToHost {
   IconSearch = 'icon-search',
   SignIn = 'sign-in',
   CancelSignIn = 'cancel-sign-in',
-  SignOut = 'sign-out'
+  SignOut = 'sign-out',
+  OnboardingDone = 'onboarding-done'
 }
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number };
@@ -131,7 +132,13 @@ export enum ToView {
   Settings = 'settings',
   History = 'history',
   IconResults = 'icon-results',
-  Account = 'account'
+  Account = 'account',
+  Onboarding = 'onboarding'
+}
+
+export enum Onboarding {
+  Pending = 'pending',
+  Seen = 'seen'
 }
 
 export enum AccountState {
@@ -167,7 +174,8 @@ export type HostMessage =
   | { kind: ToHost.IconSearch; id: number; query: string }
   | { kind: ToHost.SignIn }
   | { kind: ToHost.CancelSignIn }
-  | { kind: ToHost.SignOut };
+  | { kind: ToHost.SignOut }
+  | { kind: ToHost.OnboardingDone };
 
 export type ViewMessage =
   | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string }
@@ -179,7 +187,8 @@ export type ViewMessage =
   | { kind: ToView.Change; row: string; value: string }
   | { kind: ToView.Pick; id: number; x: number; y: number }
   | { kind: ToView.IconResults; id: number; library: string | null; hits: IconHit[]; error?: string }
-  | { kind: ToView.Account; state: AccountState; email?: string };
+  | { kind: ToView.Account; state: AccountState; email?: string }
+  | { kind: ToView.Onboarding; state: Onboarding };
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';

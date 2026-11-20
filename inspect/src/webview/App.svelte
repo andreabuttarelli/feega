@@ -10,13 +10,14 @@
   import { LiveProp } from '@feega/live-edit/live-fields';
   import { untrack } from 'svelte';
   import { selectionKey, SelectionKey } from './selection-keys';
-  import { AccountState, Mode, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
+  import { AccountState, Mode, Onboarding, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
   import { fromHost, toHost } from './host';
   import { iconSearch } from './icon-search.svelte';
   import { pageBridge, sourceText } from './page-bridge';
   import Properties from './Properties.svelte';
   import ModeSwitch from './ModeSwitch.svelte';
   import FeegaMenu from './FeegaMenu.svelte';
+  import OnboardingDialog from './Onboarding.svelte';
   import ServerPopover from './ServerPopover.svelte';
   import LayersTree from './LayersTree.svelte';
   import { hasSourceInfo } from './source-info';
@@ -161,6 +162,12 @@
   let settings = $state<Settings | null>(null);
   let facts = $state<ReportFacts | null>(null);
   let account = $state<{ state: AccountState; email?: string }>({ state: AccountState.SignedOut });
+  let onboarding = $state(Onboarding.Seen);
+
+  function finishOnboarding() {
+    onboarding = Onboarding.Seen;
+    toHost({ kind: ToHost.OnboardingDone });
+  }
 
   const history = browseHistory();
   let savedPrefs = false;
@@ -305,6 +312,7 @@
       }, SETTLE_MS);
     },
     [ToView.Account]: (m) => (account = { state: m.state, email: m.email }),
+    [ToView.Onboarding]: (m) => (onboarding = m.state),
     [ToView.IconResults]: (m) => Object.assign(iconSearch, { id: m.id, library: m.library, hits: m.hits, error: m.error ?? '' }),
     [ToView.Pick]: (m) => bridge.at(m.x, m.y).then((pick) => ((picked = pick), toHost({ kind: ToHost.Picked, id: m.id, pick }))),
     [ToView.Change]: (m) => {
@@ -670,6 +678,10 @@
     </Tabs.Root>
   </aside>
 </main>
+
+{#if onboarding === Onboarding.Pending}
+  <OnboardingDialog {account} onaccount={(kind) => toHost({ kind })} ondone={finishOnboarding} />
+{/if}
 
 <style>
   main {
