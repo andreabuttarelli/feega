@@ -42,7 +42,21 @@ function changelogEntries(): Plugin {
   };
 }
 
-export default defineConfig({
+const LATEST_EXTENSION_URL = 'https://open-vsx.org/api/AndreaButtarelli/feega/latest';
+const FALLBACK_VERSION = '0.2.4';
+
+async function latestVersion(): Promise<string> {
+  try {
+    const res = await fetch(LATEST_EXTENSION_URL, { signal: AbortSignal.timeout(5000) });
+    const body = (await res.json()) as { version?: string };
+    return body.version ?? FALLBACK_VERSION;
+  } catch {
+    return FALLBACK_VERSION;
+  }
+}
+
+export default defineConfig(async () => ({
+  define: { __FEEGA_VERSION__: JSON.stringify(await latestVersion()) },
   plugins: [sveltekit(), changelogEntries()],
   server: { fs: { allow: [CHANGELOG_DIR] } }
-});
+}));
