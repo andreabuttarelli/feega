@@ -2,30 +2,8 @@
 title: Feega docs
 description: Documentation for Feega, the free open-source VS Code extension to design in your codebase.
 template: splash
-hero:
-  tagline: Click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens.
-  actions:
-    - text: Install
-      link: /getting-started/install/
-      variant: primary
-    - text: Quick start
-      link: /getting-started/quick-start/
-      variant: minimal
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import DocsHome from '../../components/DocsHome.astro';
 
-<CardGrid>
-  <Card title="Getting started" icon="rocket">
-    What Feega is, how to install it, your first edit. [Start here](/getting-started/what-is-feega/)
-  </Card>
-  <Card title="Editing" icon="pencil">
-    Select, edit properties, text, fills, layers and structure. [Editing guides](/editing/selecting-and-navigating/)
-  </Card>
-  <Card title="Frameworks" icon="laptop">
-    SvelteKit, React with Vite, Next.js and Vue. [Frameworks](/frameworks/sveltekit/)
-  </Card>
-  <Card title="Styling systems" icon="star">
-    How edits land in Tailwind, CSS, CSS modules and scoped styles. [Styling](/styling/tailwind/)
-  </Card>
-</CardGrid>
+<DocsHome />

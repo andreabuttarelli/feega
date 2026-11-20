@@ -1,5 +1,5 @@
 .topic .topic-figure {
-  margin: 32px 0 0;
+  margin: var(--sx-s7) 0 0;
 }
 
 .topic .topic-figure img,
@@ -7,41 +7,22 @@
   display: block;
   width: 100%;
   height: auto;
-  border-radius: 10px;
+  border-radius: var(--sx-radius-xl);
   background: #0a0a0a;
 }
 
-.topic ol {
-  margin-top: 16px;
-  padding-left: 20px;
-  list-style: decimal;
-}
-
-.topic ol li + li {
-  margin-top: 8px;
-}
-
-.topic section > p + p,
-.topic section > h3 + p,
-.topic section > p + h3 {
-  margin-top: 16px;
-}
-
-.topic h3 {
-  font: inherit;
-  font-weight: 600;
+.topic section > h3 + p {
+  margin-top: var(--sx-s3);
 }
 
 .topic .body ul {
-  margin-top: 16px;
+  margin-top: var(--sx-s5);
 }
 
-.topic .body ul + p {
-  margin-top: 20px;
-}
-
-.topic code {
-  font-family: 'DM Mono', ui-monospace, monospace;
-  font-size: 0.9em;
-  color: #ff5100;
+.catalog .compare.topic code {
+  padding: 0.12em 0.4em;
+  border-radius: var(--sx-radius-xs);
+  background: var(--sx-grey-1);
+  color: var(--sx-accent-soft);
+  font-size: 0.85em;
 }
