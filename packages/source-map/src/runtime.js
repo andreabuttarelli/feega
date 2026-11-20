@@ -336,6 +336,7 @@ function nodeOf(element, depth, budget) {
     tag: element.tagName.toLowerCase(),
     display: style.display,
     direction: style.flexDirection || 'row',
+    position: style.position || 'static',
     source: parseSource(element.getAttribute(SOURCE_ATTR)),
     component: Boolean(parent) && fileOf(parent) !== fileOf(element),
     count: 1,
@@ -363,7 +364,8 @@ export const HEAD_GROUP = 'Head';
 
 function pageNode(element, source, children) {
   const tag = element.tagName.toLowerCase();
-  return { name: tag, tag, display: element.ownerDocument.defaultView.getComputedStyle(element).display, direction: 'row', source: parseSource(source), component: false, count: 1, children };
+  const style = element.ownerDocument.defaultView.getComputedStyle(element);
+  return { name: tag, tag, display: style.display, direction: 'row', position: style.position || 'static', source: parseSource(source), component: false, count: 1, children };
 }
 
 export function treeOf(doc) {
@@ -372,7 +374,7 @@ export function treeOf(doc) {
   const inHead = (e) => Boolean(doc.head?.contains(e));
   const head = foldedOf(roots.filter(inHead), 1, budget);
   const body = foldedOf(roots.filter((e) => !inHead(e)), 0, budget);
-  const group = { name: HEAD_GROUP, tag: 'head', display: 'none', direction: 'row', source: null, component: false, count: head.length, children: head };
+  const group = { name: HEAD_GROUP, tag: 'head', display: 'none', direction: 'row', position: 'static', source: null, component: false, count: head.length, children: head };
   return [pageNode(doc.documentElement, HTML_SOURCE, [...(head.length ? [group] : []), pageNode(doc.body, PAGE_SOURCE, body)])];
 }
 

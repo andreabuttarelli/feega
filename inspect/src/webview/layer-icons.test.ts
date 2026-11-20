@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { LayerIcon, ICON_SVG, iconOf } from './layer-icons';
+import { LayerIcon, ICON_SVG, iconOf, floatingOf, Floating } from './layer-icons';
 
-const node = (tag: string, display = 'block', direction = 'row', extra: { component?: boolean; count?: number } = {}) => ({ tag, display, direction, component: false, count: 1, ...extra });
+const node = (tag: string, display = 'block', direction = 'row', extra: { component?: boolean; count?: number; position?: string } = {}) => ({ tag, display, direction, component: false, count: 1, position: 'static', ...extra });
 
 describe('iconOf', () => {
   it('the Head group keeps the code icon whatever its count', () => {
@@ -28,5 +28,27 @@ describe('iconOf', () => {
 
   it('every icon has an svg body', () => {
     expect(Object.values(LayerIcon).every((icon) => ICON_SVG[icon].length > 0)).toBe(true);
+  });
+});
+
+describe('floating layers', () => {
+  it('absolute and fixed get the floating icon over layout and tag icons', () => {
+    expect(iconOf(node('div', 'flex', 'row', { position: 'absolute' }))).toBe(LayerIcon.Floating);
+    expect(iconOf(node('nav', 'block', 'row', { position: 'fixed' }))).toBe(LayerIcon.Floating);
+  });
+
+  it('relative, sticky and static keep their usual icon', () => {
+    expect(iconOf(node('div', 'flex', 'row', { position: 'relative' }))).toBe(LayerIcon.FlexRow);
+    expect(iconOf(node('div', 'flex', 'row', { position: 'sticky' }))).toBe(LayerIcon.FlexRow);
+    expect(iconOf(node('div'))).toBe(LayerIcon.Block);
+  });
+
+  it('a component root and a loop keep their icon', () => {
+    expect(iconOf(node('div', 'block', 'row', { position: 'absolute', component: true }))).toBe(LayerIcon.Component);
+    expect(iconOf(node('li', 'block', 'row', { position: 'absolute', count: 2 }))).toBe(LayerIcon.Repeat);
+  });
+
+  it('the tag names absolute, fixed and sticky only', () => {
+    expect(['absolute', 'fixed', 'sticky', 'relative', 'static', ''].map(floatingOf)).toEqual([Floating.Absolute, Floating.Fixed, Floating.Sticky, null, null, null]);
   });
 });

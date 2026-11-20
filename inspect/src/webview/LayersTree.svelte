@@ -1,6 +1,6 @@
 <script lang="ts">
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
-  import { ICON_SVG, iconOf } from './layer-icons';
+  import { ICON_SVG, floatingOf, iconOf } from './layer-icons';
   import Eye from '@lucide/svelte/icons/eye';
   import EyeOff from '@lucide/svelte/icons/eye-off';
   import Lock from '@lucide/svelte/icons/lock';
@@ -89,6 +89,7 @@
     {/if}
     <svg class="type" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="0.833" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{@html ICON_SVG[iconOf(node)]}</svg>
     <span class="name" class:component={node.component}>{node.name}</span>
+    {#if floatingOf(node.position)}<span class={`float ${floatingOf(node.position)}`} data-float={floatingOf(node.position)}>{floatingOf(node.position)}</span>{/if}
     {#if node.count > 1 && node.source}<span class="count" title={`Rendered ${node.count} times by a loop in ${node.source.file}:${node.source.line} — edits apply to all ${node.count}`}>×{node.count}</span>{:else if !node.source}<span class="count">{node.count}</span>{/if}
     {#if actions(node).visibility && node.source}<span class="toggles" class:active={hidden.has(id) || locked.has(id)}>
       <button type="button" class="t" title={hidden.has(id) ? 'Show (⇧⌘H)' : 'Hide: display none in code (⇧⌘H)'} aria-label={hidden.has(id) ? 'Show' : 'Hide'} onclick={(e) => (e.stopPropagation(), ontoggle('hidden', node.source!))}>{#if hidden.has(id)}<EyeOff size={12} />{:else}<Eye size={12} />{/if}</button>
@@ -190,6 +191,21 @@
 
   .row.dim .name {
     opacity: 0.45;
+  }
+
+  .float {
+    flex: none;
+    padding: 0 4px;
+    border-radius: var(--ui-radius-xs);
+    font-size: var(--ui-text-xs);
+    line-height: 14px;
+    color: var(--ui-accent);
+    box-shadow: inset 0 0 0 1px var(--ui-accent);
+  }
+
+  .float.sticky {
+    color: var(--ui-text-3);
+    box-shadow: none;
   }
 
   .count {

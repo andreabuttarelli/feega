@@ -109,3 +109,18 @@ describe('a tree asked before the app rendered', () => {
     expect(JSON.stringify(last)).toContain('src/App.jsx');
   });
 });
+
+describe('layers tree position', () => {
+  it('carries the computed position of every node', () => {
+    const win = new JSDOM(`<body><main data-feega-src="a.svelte:1:1"><div style="position:absolute" data-feega-src="a.svelte:2:3">a</div><div style="position:sticky" data-feega-src="a.svelte:3:3">b</div><div data-feega-src="a.svelte:4:3">c</div></main></body>`).window;
+
+    const [html] = treeOf(win.document);
+    const [body] = html.children;
+    const [main] = body.children;
+
+    expect(main.position).toBe('static');
+    expect(main.children.map((c: { position: string }) => c.position)).toEqual(['absolute', 'sticky', 'static']);
+    expect(html.position).toBe('static');
+    expect(body.position).toBe('static');
+  });
+});

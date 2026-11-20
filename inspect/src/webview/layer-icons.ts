@@ -29,10 +29,21 @@ export enum LayerIcon {
   Repeat = 'repeat',
   Head = 'head',
   Meta = 'meta',
-  Title = 'title'
+  Title = 'title',
+  Floating = 'floating'
 }
 
-export type IconNode = { tag: string; display: string; direction: string; component: boolean; count: number };
+export enum Floating {
+  Absolute = 'absolute',
+  Fixed = 'fixed',
+  Sticky = 'sticky'
+}
+
+const FLOATS_OUT_OF_FLOW = new Set<string>([Floating.Absolute, Floating.Fixed]);
+
+export const floatingOf = (position: string): Floating | null => (Object.values(Floating) as string[]).includes(position) ? (position as Floating) : null;
+
+export type IconNode = { tag: string; display: string; direction: string; component: boolean; count: number; position: string };
 
 const FLEX_BARS = '<rect x="2.25" y="2.75" width="4.5" height="10.5" rx="2"/><rect x="9.25" y="2.75" width="4.5" height="10.5" rx="2"/>';
 const H_BARS = '<line x1="2.25" y1="3" x2="2.25" y2="13"/><line x1="7.25" y1="3" x2="7.25" y2="13"/><line x1="2.25" y1="8" x2="7.25" y2="8"/>';
@@ -69,6 +80,7 @@ export const ICON_SVG: Record<LayerIcon, string> = {
   [LayerIcon.Select]: '<g><rect x="1.75" y="3.75" width="12.5" height="8.5" rx="2"/><line x1="4.5" y1="8" x2="6.5" y2="8"/><path d="M8.75 7.25 L10.25 8.75 L11.75 7.25"/></g>',
   [LayerIcon.Instance]: '<g><path d="M8.707 2.707 L13.293 7.293 C13.683 7.683 13.683 8.317 13.293 8.707 L8.707 13.293 C8.317 13.683 7.683 13.683 7.293 13.293 L2.707 8.707 C2.317 8.317 2.317 7.683 2.707 7.293 L7.293 2.707 C7.683 2.317 8.317 2.317 8.707 2.707 Z"/><path d="M8.424 6.174 L9.826 7.576 C10.06 7.81 10.06 8.19 9.826 8.424 L8.424 9.826 C8.19 10.06 7.81 10.06 7.576 9.826 L6.174 8.424 C5.94 8.19 5.94 7.81 6.174 7.576 L7.576 6.174 C7.81 5.94 8.19 5.94 8.424 6.174 Z"/></g>',
   [LayerIcon.Title]: '<g><line x1="4" y1="2.75" x2="4" y2="13.25"/><line x1="12" y1="2.75" x2="12" y2="13.25"/><line x1="4" y1="8" x2="12" y2="8"/></g>',
+  [LayerIcon.Floating]: '<g><rect x="2.25" y="2.25" width="11.5" height="11.5" rx="2" stroke-dasharray="1.5 1.5"/><rect x="5.75" y="5.75" width="4.5" height="4.5" rx="1"/></g>',
   [LayerIcon.Meta]: '<path d="M6 5L3 8l3 3M10 5l3 3-3 3"/>'
 };
 
@@ -134,6 +146,9 @@ export function iconOf(node: IconNode): LayerIcon {
   }
   if (node.count > 1) {
     return LayerIcon.Repeat;
+  }
+  if (FLOATS_OUT_OF_FLOW.has(node.position)) {
+    return LayerIcon.Floating;
   }
   const tag = node.tag.toLowerCase();
   const layout = BY_LAYOUT.find((row) => row.test(node))?.icon;
