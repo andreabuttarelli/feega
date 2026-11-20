@@ -3,14 +3,14 @@ import { elementRange } from './element-range';
 import type { ReadFile } from './files';
 import { hiddenOut, lineSpan, parentOf, repeated, spanOf, type Span } from './move-node';
 
-export type Structured = { ok: true; changes: { path: string; before: string; after: string }[]; note?: string } | { ok: false; reason: string; at?: LiveAt };
+export type Structured = { ok: true; changes: { path: string; before: string; after: string }[]; note?: string; selected?: LiveAt } | { ok: false; reason: string; at?: LiveAt };
 
 const INDENT_UNIT = '  ';
 const CLASS_ATTR = /\s(?:class|className)="([^"{}]+)"/;
 const STYLE_BLOCK = /<style\b[\s\S]*?<\/style>/g;
 const SIBLING_SHEETS = ['.module.css', '.css'];
 const escaped = (token: string) => token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const indentOf = (line: string) => line.match(/^[ \t]*/)![0];
+export const indentOf = (line: string) => line.match(/^[ \t]*/)![0];
 
 function reindented(piece: string, indent: string): string {
   const lines = piece.replace(/\n$/, '').split('\n');
@@ -44,7 +44,7 @@ async function warning(read: ReadFile, file: string, source: string, text: strin
   return classes ? (scopedTo(await stylesOf(read, file, source), classes) ?? undefined) : undefined;
 }
 
-function placed(source: string, close: number, piece: string): { at: number; text: string } {
+export function placed(source: string, close: number, piece: string): { at: number; text: string } {
   const lineStart = source.lastIndexOf('\n', close - 1) + 1;
   const head = source.slice(lineStart, close);
   if (!head.trim()) {

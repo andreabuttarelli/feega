@@ -39,6 +39,8 @@
   import { Place } from '@feega/live-edit/move-node';
   import { StructureOp } from '@feega/live-edit/structure';
   import StructureMenu from './StructureMenu.svelte';
+  import { AddKind } from '@feega/live-edit/add-node';
+  import { ADD_ITEMS, MENU_ITEMS } from './structure-menu';
   import { modeOfKey } from './modes';
   import { browseHistory } from './history';
   import { DEFAULT_ANCHOR, anchorBox, isAnchor, nearestAnchor, nextAnchor, type Anchor } from './anchors';
@@ -318,8 +320,12 @@
         showToast(m.note);
       }
       server = ServerState.Reloading;
+      const created = m.select;
       setTimeout(() => {
         server = bridged ? ServerState.Running : server;
+        if (created) {
+          select(created);
+        }
         if (picked) {
           bridge.settle(picked.source);
         }
@@ -534,6 +540,22 @@
     toHost({ kind: ToHost.Structure, op: StructureOp.MoveUsage, at: `${file}:1:1`, usage: { from, to, place } });
   }
 
+  let addMenu = $state<{ x: number; y: number } | null>(null);
+
+  function openAddMenu(x: number, y: number) {
+    if (picked) {
+      addMenu = { x, y };
+    }
+  }
+
+  function addElement(kind: AddKind) {
+    if (!picked) {
+      return;
+    }
+    const at = sourceText(picked.source);
+    toHost(kind === AddKind.Image ? { kind: ToHost.AddImage, at } : { kind: ToHost.Structure, op: StructureOp.Add, at, add: { kind } });
+  }
+
   function restructure(op: StructureOp) {
     if (!picked) {
       return;
@@ -568,6 +590,11 @@
     if (STRUCTURE_KEYS.has(e.key) && picked && mode === Mode.Design && !editing && !typing(e) && !(e.target instanceof HTMLButtonElement)) {
       e.preventDefault();
       restructure(StructureOp.Delete);
+      return;
+    }
+    if (e.key === '/' && picked && mode === Mode.Design && !editing && !typing(e) && !cmd) {
+      e.preventDefault();
+      openAddMenu(window.innerWidth / 2, window.innerHeight / 3);
       return;
     }
     const shortcuts: Record<string, () => void> = {
@@ -610,7 +637,7 @@
 
 <main bind:clientWidth={viewW} style={`grid-template-columns: ${leftPx}px minmax(0, 1fr) ${barPx}px; --bar: ${barPx}px; --left: ${leftPx}px`} class:sizing={sizing || leftSizing}>
   <aside class="left" class:closed={leftClosed}>
-    <header class="left-head">Layers</header>
+    <header class="left-head">Layers<button type="button" class="add" title="Add an element (/)" aria-label="Add" data-testid="add-button" disabled={!picked} onclick={(e) => openAddMenu(e.clientX, e.clientY)}>+ Add</button></header>
     <div class="layers" role="tree" aria-label="Layers" data-testid="layers">
       <LayersTree nodes={layers} {picked} open={layersOpen} onselect={select} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} />
     </div>
@@ -673,7 +700,8 @@
           <button type="button" class="link" data-action={ServerAction.RestartUnderFeega} onclick={() => toHost({ kind: ToHost.Server, action: ServerAction.RestartUnderFeega })}>Let Feega start the server</button>
         </div>
       {/if}
-      {#if menu}<StructureMenu x={menu.x} y={menu.y} onpick={restructure} onclose={() => (menu = null)} />{/if}
+      {#if menu}<StructureMenu x={menu.x} y={menu.y} items={MENU_ITEMS} onpick={(id) => restructure(id as StructureOp)} onclose={() => (menu = null)} />{/if}
+      {#if addMenu}<StructureMenu x={addMenu.x} y={addMenu.y} items={ADD_ITEMS} label="add" onpick={(id) => addElement(id as AddKind)} onclose={() => (addMenu = null)} />{/if}
       {#if toast}<div class="toast" role="status">{toast}</div>{/if}
       <div class="float" class:moving bind:clientWidth={bar.w} bind:clientHeight={bar.h} style={`left:${barAt.x}px;top:${barAt.y}px`} data-anchor={anchor}>
         <button type="button" class="grip" title="Drag to move (arrow keys)" aria-label="Move the bar" onpointerdown={grabBar} onpointermove={dragBar} onpointerup={dropBar} onkeydown={onHandleKey}>
@@ -902,6 +930,23 @@
 
   .picked {
     outline: 2px solid var(--ui-accent);
+  }
+
+  .add {
+    margin-left: auto;
+    padding: 0 8px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-text);
+    color: var(--ui-panel);
+    font: inherit;
+    font-size: var(--ui-text-xs);
+    cursor: pointer;
+  }
+
+  .add:disabled {
+    opacity: 0.4;
+    cursor: default;
   }
 
   .drop-line {

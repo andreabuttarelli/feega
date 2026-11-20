@@ -269,6 +269,20 @@ try {
     assert.deepEqual(changedFiles(), [], 'undo restores the page');
   });
 
+  await check('Add inserts a heading after the selected element with the project styling, selects it, and one undo removes it', async () => {
+    await frame.locator('h1').first().click();
+    await page.waitForTimeout(800);
+    await page.keyboard.press('/');
+    await page.getByTestId('add-menu').getByRole('menuitem', { name: 'Heading' }).click();
+    await page.waitForTimeout(SETTLE_MS);
+    assert.equal(await frame.locator('main > h2').count(), 1, 'the heading is on the page');
+    assert.ok(/text-2xl|font-size|fontSize/.test(diffText()), 'the heading carries minimal styling');
+    const picked = await page.locator('[data-testid="layers"] [data-layer][aria-selected="true"]').first().innerText();
+    assert.ok(/^\s*h2/.test(picked), `the new heading is selected, selection is ${picked}`);
+    await undo();
+    assert.deepEqual(changedFiles(), [], 'undo removes it');
+  });
+
   await check('position: absolute and top write the source and the page, the layer is tagged, and each edit is one undo', async () => {
     const h1 = frame.locator('h1').first();
     await h1.click();

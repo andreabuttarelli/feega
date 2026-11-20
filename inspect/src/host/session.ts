@@ -1,7 +1,9 @@
 import { rm } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { appsIn } from '@feega/dev-run/run-plan';
+import { AddKind } from '@feega/live-edit/add-node';
 import { liveAtOf } from '@feega/live-edit/live-ask';
+import { StructureOp } from '@feega/live-edit/structure';
 import { AccountState, ServerAction, ServerState, ToHost, ToView, type EditAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
 import { SettingKey, StylingChoice } from '../settings';
 import { SignInEnd, signIn } from './sign-in';
@@ -61,7 +63,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   async function edited(out: Written, ask: EditAsk | null) {
     await postHistory();
     const saved = ask ? (liveAtOf(ask.at) ?? undefined) : undefined;
-    await post(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, saved, note: out.note } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
+    await post(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, saved, note: out.note, select: out.selected } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
     return out;
   }
 
@@ -88,6 +90,19 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     if (image) {
       await imageSaved(image.name, image.bytes);
     }
+  }
+
+  async function imageAdded(at: string) {
+    const image = await platform.pickImage?.();
+    if (!image) {
+      return;
+    }
+    const copied = await copyImage(join(root, running?.plan.appDir ?? ''), image.name, image.bytes);
+    if (!copied.ok) {
+      await post({ kind: ToView.Edited, ok: false, reason: copied.reason });
+      return;
+    }
+    await edits.structure({ op: StructureOp.Add, at, add: { kind: AddKind.Image, src: copied.url } }).then((out) => edited(out, null));
   }
 
   const postAccount = (state: AccountState, email?: string) => post({ kind: ToView.Account, state, email });
@@ -352,6 +367,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Diff]: (m) => showDiff(m.id),
     [ToHost.SourceControl]: () => platform.sourceControl(),
     [ToHost.Move]: (m) => edits.move(m.from, m.to, m.place).then((out) => edited(out, null)),
+    [ToHost.AddImage]: (m) => imageAdded(m.at),
     [ToHost.Structure]: (m) => edits.structure(m).then((out) => edited(out, null)),
     [ToHost.Setting]: (m) => platform.setSetting(m.key, m.value).then(postSettings),
     [ToHost.AttachUrl]: (m) => attachUrl(m.url),

@@ -8,6 +8,7 @@ import { literalText } from '@feega/live-edit/literal-text';
 import { moveNode, type Place } from '@feega/live-edit/move-node';
 import { globalSheetOf, googleFontImport, googleFontLink } from '@feega/live-edit/font-wiring';
 import { VariableHome, saveVariable, variableName } from '@feega/live-edit/save-variable';
+import { AddKind, AddStyle } from '@feega/live-edit/add-node';
 import type { LoopMove } from '@feega/live-edit/move-loop-item';
 import type { Usage } from '@feega/live-edit/move-usage';
 import { StructureOp, structure } from '@feega/live-edit/structure';
@@ -21,9 +22,9 @@ import { Styling, type EditAsk } from '../messages';
 import { StylingChoice } from '../settings';
 import { stylingOf } from './styling';
 
-export type StructureAsk = { op: StructureOp; at: string; to?: string; usage?: Usage; loop?: LoopMove };
+export type StructureAsk = { op: StructureOp; at: string; to?: string; usage?: Usage; loop?: LoopMove; add?: { kind: AddKind; src?: string } };
 
-export type Written = { ok: true; path: string; written: string; note?: string } | { ok: false; reason: string; at?: LiveAt };
+export type Written = { ok: true; path: string; written: string; note?: string; selected?: LiveAt } | { ok: false; reason: string; at?: LiveAt };
 
 type Changes = { ok: true; changes: FileChange[] } | { ok: false; reason: string; at?: LiveAt };
 
@@ -212,14 +213,17 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
 
   async function restructured(ask: StructureAsk): Promise<Written> {
     const { op, at: rawAt, to: rawTo, usage, loop } = ask;
+    const tailwind = (await stylingOf(root, choice())) === Styling.Tailwind;
+    const add = ask.add && { ...ask.add, style: tailwind ? AddStyle.Tailwind : AddStyle.Inline };
     meta = { at: rawAt, prop: op, value: rawTo ?? usage?.from ?? '', scope: '' };
     const at = liveAtOf(rawAt);
     const to = rawTo ? (liveAtOf(rawTo) ?? undefined) : undefined;
     if (!at || !inside(root, at.file)) {
       return { ok: false, reason: `${rawAt} is not a file:line:col inside the workspace` };
     }
-    const out = await structure(reader(root), { op, at, to, usage, loop });
-    return out.ok ? writtenAll(out.changes, '', out.note) : out;
+    const out = await structure(reader(root), { op, at, to, usage, loop, add });
+    const written = out.ok ? await writtenAll(out.changes, '', out.note) : out;
+    return out.ok && written.ok ? { ...written, selected: out.selected } : written;
   }
 
   async function variableSaved(ask: EditAsk, name: string): Promise<Written> {

@@ -1,19 +1,18 @@
 <script lang="ts">
-  import type { StructureOp } from '@feega/live-edit/structure';
-  import { MENU_ITEMS } from './structure-menu';
+  import type { MenuItem } from './structure-menu';
 
-  type Props = { x: number; y: number; onpick: (op: StructureOp) => void; onclose: () => void };
+  type Props = { x: number; y: number; items: MenuItem[]; label?: string; onpick: (id: string) => void; onclose: () => void };
 
-  let { x, y, onpick, onclose }: Props = $props();
+  let { x, y, items, label = 'structure', onpick, onclose }: Props = $props();
 </script>
 
 <svelte:window onpointerdown={onclose} onkeydown={(e) => e.key === 'Escape' && onclose()} />
 
-<div class="menu" role="menu" data-testid="structure-menu" style={`left:${x}px;top:${y}px`} onpointerdown={(e) => e.stopPropagation()}>
-  {#each MENU_ITEMS as item (item.op)}
-    <button type="button" role="menuitem" data-op={item.op} onclick={() => (onpick(item.op), onclose())}>
+<div class="menu" role="menu" data-testid={`${label}-menu`} style={`left:${x}px;top:${y}px`} onpointerdown={(e) => e.stopPropagation()}>
+  {#each items as item (item.id)}
+    <button type="button" role="menuitem" data-op={item.id} onclick={() => (onpick(item.id), onclose())}>
       <span>{item.label}</span>
-      <kbd>{item.shortcut}</kbd>
+      {#if item.shortcut}<kbd>{item.shortcut}</kbd>{/if}
     </button>
   {/each}
 </div>

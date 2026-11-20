@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { ClassFamily, LiveProp, Side } from '@feega/live-edit/live-fields';
 import { fileEdits } from './file-edits';
 import { Place } from '@feega/live-edit/move-node';
+import { AddKind } from '@feega/live-edit/add-node';
 import { StructureOp } from '@feega/live-edit/structure';
 import { PageTarget } from '@feega/live-edit/page-rule';
 
@@ -350,5 +351,19 @@ describe('fileEdits', () => {
     expect(read(root)).toBe(page.replace("['a', 'b']", "['b', 'a']"));
     await edits.undo();
     expect(read(root)).toBe(page);
+  });
+
+  it.each([
+    [TAILWIND, '  <h2 class="text-2xl font-semibold">Heading</h2>\n'],
+    [PLAIN, '  <h2 style="font-size: 1.5rem; font-weight: 600">Heading</h2>\n']
+  ])('aggiungere un titolo usa lo stile del progetto, seleziona il nuovo elemento e un undo lo toglie', async (manifest, line) => {
+    const root = app(manifest);
+    const edits = fileEdits(root);
+    const out = await edits.structure({ op: StructureOp.Add, at: 'src/Page.svelte:2:3', add: { kind: AddKind.Heading } });
+
+    expect(read(root)).toBe(PAGE.replace('  <h1 class="text-2xl">Hello</h1>\n', `  <h1 class="text-2xl">Hello</h1>\n${line}`));
+    expect(out.ok && out.selected).toEqual({ file: 'src/Page.svelte', line: 3, col: 3 });
+    await edits.undo();
+    expect(read(root)).toBe(PAGE);
   });
 });
