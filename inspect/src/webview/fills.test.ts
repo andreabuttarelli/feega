@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FillKind, fillCss, parseFills, tailwindFill } from './fills';
+import { FillKind, fillCss, imageChanged, parseFills, tailwindFill } from './fills';
 
 describe('parseFills', () => {
   it('a plain background colour is one solid layer', () => {
@@ -57,5 +57,19 @@ describe('tailwindFill', () => {
   it('a single solid is a bg colour class; anything else arbitrary', () => {
     expect(tailwindFill(parseFills('none', '#ffcc00'))).toEqual(['bg-[#ffcc00]']);
     expect(tailwindFill(parseFills('linear-gradient(90deg, red 0%, blue 100%)', 'rgba(0, 0, 0, 0)'))).toEqual(['bg-[linear-gradient(90deg,red_0%,blue_100%)]']);
+  });
+});
+
+describe('imageChanged', () => {
+  it('setting a colour on an element with no image does not write an image', () => {
+    expect(imageChanged('none', 'none')).toBe(false);
+  });
+
+  it('removing the last image writes none', () => {
+    expect(imageChanged('url("/a.png")', 'none')).toBe(true);
+  });
+
+  it('adding an image writes it', () => {
+    expect(imageChanged('none', 'url("/a.png")')).toBe(true);
   });
 });

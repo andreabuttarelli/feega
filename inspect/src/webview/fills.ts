@@ -93,6 +93,8 @@ export function fillCss(fills: Fill[]): Record<string, string> {
   return { 'background-image': images.length ? images.join(', ') : NONE, 'background-color': solid ? layerCss(solid) : TRANSPARENT };
 }
 
+export const imageChanged = (was: string, next: string) => was.trim() !== NONE || next.trim() !== NONE;
+
 export const arbitraryCss = (css: string) => css.replace(/,\s+/g, ',').replace(/\s+/g, '_');
 
 export function tailwindFill(fills: Fill[]): string[] {

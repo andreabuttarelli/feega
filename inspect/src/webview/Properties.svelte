@@ -9,6 +9,7 @@
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import ArrowDown from '@lucide/svelte/icons/arrow-down';
   import { Popover, Select } from 'bits-ui';
+  import { imageChanged } from './fills';
   import ColorPicker from './ColorPicker.svelte';
   import Check from '@lucide/svelte/icons/check';
   import Icon from './Icon.svelte';
@@ -274,7 +275,7 @@
 
   {#if has(Section.Fill)}
     <section data-section={Section.Fill}>
-      <FillList image={readOf('fill-image')} colour={readOf('fill')} {palette} {header} {row} onchange={(css) => (onchange(byName('fill-image'), css['background-image']), onchange(byName('fill'), css['background-color']))} onpreview={(css) => (onpreview(byName('fill-image'), css['background-image']), onpreview(byName('fill'), css['background-color']))} />
+      <FillList image={readOf('fill-image')} colour={readOf('fill')} {palette} {header} {row} onchange={(css) => (imageChanged(readOf('fill-image'), css['background-image']) && onchange(byName('fill-image'), css['background-image']), onchange(byName('fill'), css['background-color']))} onpreview={(css) => (onpreview(byName('fill-image'), css['background-image']), onpreview(byName('fill'), css['background-color']))} />
     </section>
   {/if}
 
