@@ -2,6 +2,7 @@ import { offsetOf, type LiveAt } from './class-patch';
 import type { ReadFile } from './files';
 import type { TextWritten } from './literal-text';
 import { moveInto, type Structured } from './move-into';
+import { moveLoopItem, type LoopMove } from './move-loop-item';
 import { moveUsage, type Usage } from './move-usage';
 import { hiddenOut, lineSpan, parentOf, repeated, spanOf, type Span } from './move-node';
 
@@ -52,10 +53,11 @@ export enum StructureOp {
   Delete = 'delete',
   Duplicate = 'duplicate',
   MoveInto = 'move-into',
-  MoveUsage = 'move-usage'
+  MoveUsage = 'move-usage',
+  MoveLoopItem = 'move-loop-item'
 }
 
-export type StructureRequest = { op: StructureOp; at: LiveAt; to?: LiveAt; usage?: Usage };
+export type StructureRequest = { op: StructureOp; at: LiveAt; to?: LiveAt; usage?: Usage; loop?: LoopMove };
 
 const single = (out: TextWritten): Structured => (out.ok ? { ok: true, changes: [out.change] } : out);
 
@@ -63,6 +65,7 @@ const OPS: Record<StructureOp, (read: ReadFile, req: StructureRequest) => Promis
   [StructureOp.Delete]: async (read, req) => single(await deleteNode(read, req.at)),
   [StructureOp.Duplicate]: async (read, req) => single(await duplicateNode(read, req.at)),
   [StructureOp.MoveUsage]: async (read, req) => (req.usage ? moveUsage(read, req.at.file, req.usage) : { ok: false, reason: 'no component usages given' }),
+  [StructureOp.MoveLoopItem]: async (read, req) => (req.loop ? moveLoopItem(read, req.at, req.loop) : { ok: false, reason: 'no item positions given' }),
   [StructureOp.MoveInto]: async (read, req) => (req.to ? moveInto(read, req.at, req.to) : { ok: false, reason: 'no target container' })
 };
 

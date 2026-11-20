@@ -339,4 +339,16 @@ describe('fileEdits', () => {
     await edits.undo();
     expect(read(root)).toBe('<main>\n  <Hero />\n  <Pricing />\n</main>\n');
   });
+
+  it('riordinare un elemento di un ciclo sposta il dato nell array e undo lo rimette', async () => {
+    const root = app();
+    const page = "<script>\n  const xs = ['a', 'b'];\n</script>\n\n<ul>\n  {#each xs as x}\n    <li>{x}</li>\n  {/each}\n</ul>\n";
+    writeFileSync(join(root, 'src/Page.svelte'), page);
+    const edits = fileEdits(root);
+    await edits.structure({ op: StructureOp.MoveLoopItem, at: 'src/Page.svelte:7:5', loop: { from: 1, to: 0 } });
+
+    expect(read(root)).toBe(page.replace("['a', 'b']", "['b', 'a']"));
+    await edits.undo();
+    expect(read(root)).toBe(page);
+  });
 });
