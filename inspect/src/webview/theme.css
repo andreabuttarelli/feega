@@ -1,5 +1,5 @@
 :root {
-  --ui-accent: #0a84ff;
+  --ui-accent: #ff5100;
   --ui-accent-ink: #ffffff;
   --ui-panel: var(--vscode-sideBar-background, var(--vscode-editor-background));
   --ui-text: var(--vscode-foreground);
