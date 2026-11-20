@@ -108,6 +108,11 @@
             "60"
           ],
           "description": "Minutes the dev server Feega started stays warm after the panel closes. 0: stop on close. Closing the window always stops it."
+        },
+        "feegaInspect.syncSelection": {
+          "type": "boolean",
+          "default": true,
+          "description": "Reveal the source of the selected element in a text editor beside Feega, with its line selected, without taking focus. Coding agents that read the editor selection then see it."
         }
       }
     },

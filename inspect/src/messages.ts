@@ -138,7 +138,9 @@ export enum ToHost {
   ImageUpload = 'image-upload',
   Wiring = 'wiring',
   Link = 'link',
-  Go = 'go'
+  Go = 'go',
+  Selected = 'selected',
+  Copy = 'copy'
 }
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number };
@@ -209,7 +211,9 @@ export type HostMessage =
   | { kind: ToHost.ImageUpload; name: string; data: string }
   | { kind: ToHost.Wiring; at: string; instance?: number }
   | { kind: ToHost.Link; at: string; edit: LinkEdit; instance?: number }
-  | { kind: ToHost.Go; at: string; ask: GoAsk };
+  | { kind: ToHost.Go; at: string; ask: GoAsk }
+  | { kind: ToHost.Selected; at: Source | null }
+  | { kind: ToHost.Copy; text: string };
 
 export type ViewMessage =
   | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string; breakpoints: Breakpoints; themes: Theme[] }

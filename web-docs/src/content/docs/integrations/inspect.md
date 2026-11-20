@@ -69,3 +69,13 @@ code --install-extension feega-inspect-0.1.0.vsix
   added to their config.
 - Element picking: Vite-based apps (SvelteKit, Vite, React Router) only, for now.
 - `hover:`/`dark:` variants, class expressions and non-literal text are not written.
+
+## Use with your agent
+
+- **Selection sync.** The selected element's source is revealed in a text editor beside Feega with
+  its line selected, without taking focus, so coding agents that read the editor selection
+  (Claude Code, Cursor, Copilot, Cline, Codex, Gemini CLI) see what you selected. Turn it off with
+  the `feegaInspect.syncSelection` setting.
+- **Copy for agent.** Right-click the selected element and choose **Copy for agent**, or use the
+  link next to the file name in the bar. The clipboard gets `file:line`, selector, component, page,
+  preview width, and the breakpoint, theme and state when set. Paste it into your agent.
