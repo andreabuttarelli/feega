@@ -1,3 +1,8 @@
+import { Benefits } from './Benefits';
+import { Faq } from './Faq';
+
+const TOPICS = ['Briefs', 'Timelines', 'Assets'];
+
 const PLANS = [
   { name: 'Starter', price: '$0', text: 'One project, every editor control.' },
   { name: 'Studio', price: '$12', text: 'Unlimited projects and shared tokens.' },
@@ -36,6 +41,13 @@ export function App() {
             <p className="text-slate-600">{PLANS[2].text}</p>
           </article>
         </section>
+        <ul id="topics" className="m-0 list-none p-0">
+          {TOPICS.map((topic) => (
+            <li key={topic} className="py-2">{topic}</li>
+          ))}
+        </ul>
+        <Benefits />
+        <Faq />
       </main>
       <footer className="px-8 py-6 text-sm text-slate-500">© Northwind</footer>
     </div>
