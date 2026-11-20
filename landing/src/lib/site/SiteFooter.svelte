@@ -1,30 +1,22 @@
 <script lang="ts">
   import { lower } from './lower';
   import { LEGAL_DOCS } from './legal';
-  import DownloadMac from './DownloadMac.svelte';
   import Mark from './Mark.svelte';
-  import { APP_URL, DOCS_URL, MAC_GUIDE_URL, SPONSOR_URL, COFFEE_URL, SOCIAL_LINKS, STORY_URL } from './links';
-  import { GUIDES_PATH } from './guides';
+  import { COFFEE_URL, DOCS_URL, GITHUB_URL, SOCIAL_LINKS, STORY_URL } from './links';
   import { PRICING_PATH } from './paths';
-  import { COMPARE_PATH } from './compare';
+  import { DOWNLOAD_PATH } from './links';
   import { ALTERNATIVES_PATH } from './alternatives';
   import { CODEBASE_PATH } from './codebase';
-  import { onMount } from 'svelte';
-  import { homeHref } from './signed-in';
+  import { HUBS } from './topics';
 
   const legal = Object.entries(LEGAL_DOCS).map(([slug, doc]) => ({ href: `/${slug}`, label: doc.label }));
   const year = new Date().getFullYear();
-  let home = $state('/');
-
-  onMount(() => {
-    home = homeHref(document.cookie);
-  });
 </script>
 
 <footer class="site-foot">
   <div class="top">
     <div class="about">
-      <a class="brand" href={home}>
+      <a class="brand" href="/">
         <span class="name"><Mark size={28} />Feega</span>
         <span class="tagline">design in your codebase</span>
       </a>
@@ -38,25 +30,22 @@
     <nav class="col" aria-label="Product">
       <p class="head">product</p>
       <a href="/">home</a>
+      <a href={DOWNLOAD_PATH}>download</a>
       <a href={PRICING_PATH}>pricing</a>
       <a href={CODEBASE_PATH}>codebase</a>
       <a href="/changelog">changelog</a>
-      <span class="dl-wrap">
-        <DownloadMac class="dl" />
-        <a class="dl-guide" href={MAC_GUIDE_URL}>unsigned app? how to open it</a>
-      </span>
-      <a href={APP_URL}>sign in</a>
+      <a href={GITHUB_URL}>star on github</a>
+      <a href={COFFEE_URL}>support with a coffee</a>
     </nav>
 
     <nav class="col" aria-label="Learn">
       <p class="head">learn</p>
       <a href={DOCS_URL}>docs</a>
-      <a href={GUIDES_PATH}>guides</a>
-      <a href={COMPARE_PATH}>compare</a>
+      {#each HUBS as hub (hub.path)}
+        <a href={hub.path}>{hub.menuLabel}</a>
+      {/each}
       <a href={ALTERNATIVES_PATH}>alternatives</a>
       <a href={STORY_URL}>blog</a>
-      <a href={SPONSOR_URL}>sponsor</a>
-      <a href={COFFEE_URL}>support with a coffee</a>
     </nav>
 
     <nav class="col" aria-label="Legal">
@@ -84,11 +73,6 @@
     <p>IT16090491008, Roma, Italy</p>
   </div>
 
-  <p class="notice">
-    Feega must never be used to create illegal content, such as CSAM, non-consensual intimate imagery (NCII) or sexual
-    deepfakes. Feega does not use Google APIs or Google user data to generate content: Google and GitHub sign-in data is
-    used only to authenticate your account.
-  </p>
 </footer>
 
 <style>
@@ -274,13 +258,6 @@
     margin-top: 24px;
   }
 
-  .notice {
-    margin-top: 42px;
-    font-size: 12px;
-    line-height: 12px;
-    opacity: 0.5;
-  }
-
   @media (min-width: 1200px) {
     .site-foot {
       width: min(1100px, 100% - 0px);
@@ -295,10 +272,6 @@
     .rights > span {
       display: inline;
       color: inherit;
-    }
-
-    .notice {
-      margin-top: 24px;
     }
 
     .mark-box {
@@ -327,8 +300,8 @@
 
   @media (min-width: 810px) and (max-width: 1199.98px) {
     .site-foot {
-      max-width: 810px;
-      padding: 41px 16px 16px;
+      max-width: none;
+      padding: 41px 24px 16px;
     }
 
     .mark-box {
@@ -373,16 +346,6 @@
       max-width: 561px;
       margin-top: 0;
     }
-
-    .notice {
-      max-width: 745px;
-      margin-top: 24px;
-    }
   }
 
-  @media (max-width: 809.98px) {
-    .notice {
-      font-size: 13px;
-    }
-  }
 </style>

@@ -3,7 +3,7 @@ const PROPER_WORDS = new Set([
   'Discord', 'Instagram', 'Mac', 'Apple', 'Lottie', 'Nano', 'Banana', 'GPT', 'OpenAI', 'Seedream', 'Qwen', 'Seedance',
   'Kling', 'Grok', 'Trellis', 'Microsoft', 'Tencent', 'Kie', 'Higgsfield', 'Wiro', 'Apache', 'Svelte', 'Vue', 'Nuxt',
   'Astro', 'Gatsby', 'Angular', 'Vite', 'Solid', 'Remix', 'Roma', 'Topaz', 'Canva', 'CapCut', 'Spotify', 'Blender',
-  'Italian', 'Cloud', 'Next', 'Windows', 'Linux', 'Notion', 'Slack', 'Supabase'
+  'Italian', 'Cloud', 'Next', 'Windows', 'Linux', 'Notion', 'Slack', 'Supabase', 'Windsurf', 'Tailwind', 'GitHub'
 ]);
 
 const PROTECTED_PHRASES = ['Feega Cloud', 'Claude Code', 'VS Code', 'Grok Imagine', 'GPT Image', 'Create React App', 'React Router'];

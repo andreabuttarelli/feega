@@ -9,13 +9,13 @@ export const SINGLES: Readonly<Record<string, Article>> = {
     description: 'Claude Design makes new designs from a chat. When your app already exists, here is what edits it in place instead.',
     heading: 'Claude Design alternatives when the code already exists',
     hook: 'Keep Claude Design for something new. Edit what exists in place.',
-    lead: 'Keep Claude Design if you start something new and already pay for Claude. It makes designs, prototypes and slides from a chat, and hands them to Claude Code. Feega edits the product you have already built.',
+    lead: 'Keep Claude Design if you start something new and already pay for Claude. It makes designs, prototypes and slides from a chat, and hands them to Claude Code. Feega edits the product you have already built, by hand.',
     pickThem: { name: 'Claude Design', points: ['You start from a prompt or a document.', 'You need slides or a PDF too.', 'You want no extra seat beyond Claude.'] },
-    pickFeega: ['The app exists and must change in place.', 'Designers and developers share one repo.', 'The change should be a commit, not a new build.'],
+    pickFeega: ['The app exists and must change in place.', 'You want to edit by hand, with no AI and no tokens.', 'The change should be a diff in your files, not a new build.'],
     sections: [
       {
         heading: 'It reads your repo; it does not write to it',
-        html: '<p>Claude Design learns your components through a linked repo or <code>/design-sync</code>, then designs in its own project. Claude Code builds the result. Feega changes the source directly.</p>'
+        html: '<p>Claude Design learns your components through a linked repo or <code>/design-sync</code>, then designs in its own project. Claude Code builds the result. Feega changes the source directly, with no AI in the loop.</p>'
       }
     ],
     mistakes: [
@@ -24,7 +24,7 @@ export const SINGLES: Readonly<Record<string, Article>> = {
     ],
     questions: [
       { q: 'Is Claude Design free?', a: 'It is included in every Claude plan and shares that plan’s usage.' },
-      { q: 'Can Claude Code use Feega too?', a: 'Yes, through the MCP server.' }
+      { q: 'Can Claude Code use Feega too?', a: 'They edit the same files. Feega has no AI of its own; it writes your hand edits to source.' }
     ],
     sources: [
       { label: 'Introducing Claude Design', href: 'https://www.anthropic.com/news/claude-design-anthropic-labs' },
@@ -40,7 +40,7 @@ export const SINGLES: Readonly<Record<string, Article>> = {
     hook: 'Keep Figma for new UI. Stop rebuilding what already shipped.',
     lead: 'Keep Figma if you design new product UI with a shared library and handoff. It is still the best at that. This page is for teams whose design and code have drifted apart.',
     pickThem: { name: 'Figma', points: ['You start from a blank frame.', 'A large team shares one design system.', 'Developers are happy to rebuild from specs.'] },
-    pickFeega: ['The product exists.', 'You want to edit real pages with your own components.', 'The change should land as a commit.'],
+    pickFeega: ['The product exists.', 'You want to edit real pages with your own components.', 'The change should land in your source files.'],
     sections: [
       {
         heading: 'Figma is moving toward code too',
@@ -48,12 +48,12 @@ export const SINGLES: Readonly<Record<string, Article>> = {
       }
     ],
     mistakes: [
-      { q: 'Replacing Figma for new UI.', a: 'You do not need to. Feega imports Figma frames.' },
+      { q: 'Replacing Figma for new UI.', a: 'You do not need to. Keep designing new UI there; use Feega on what shipped.' },
       { q: 'Judging on an empty file.', a: 'Try both on your own repo.' }
     ],
     questions: [
       { q: 'Can Figma edit my codebase?', a: 'In the Make local beta, yes. It is not generally available yet.' },
-      { q: 'Can I paste Figma frames into Feega?', a: 'Yes, as editable layers.' }
+      { q: 'Can Feega read my Figma file?', a: 'No. It edits the app you are running.' }
     ],
     sources: [
       { label: 'Figma Make in your local codebase', href: 'https://help.figma.com/hc/en-us/articles/40775535020695-Make-in-your-local-codebase' },
@@ -63,22 +63,22 @@ export const SINGLES: Readonly<Record<string, Article>> = {
   },
   'onlook': {
     kind: ArticleKind.Single,
-    title: 'Onlook alternatives when not everyone is on a Mac | Feega',
-    description: 'Onlook is a free, open-source Mac editor for your code. When the team is mixed or works together, here is the difference.',
-    heading: 'Onlook alternatives when not everyone is on a Mac',
+    title: 'Onlook alternatives when you want it inside your editor | Feega',
+    description: 'Onlook is a free, open-source Mac editor for your code. When you work on another OS or want it inside your editor, here is the difference.',
+    heading: 'Onlook alternatives when you want it inside your editor',
     hook: 'The closest tool to Feega, and where they differ.',
-    lead: 'Keep Onlook if you work alone on a Mac and want a free local app. It is the closest tool to Feega: open source under Apache-2.0, it opens your repo and ships one-press pull requests.',
+    lead: 'Keep Onlook if you work alone on a Mac and want a free local app. It is the closest tool to Feega: open source under Apache-2.0, it opens your repo and ships one-press pull requests. Feega covers a different case, the editor you already use.',
     pickThem: { name: 'Onlook', points: ['You want a desktop app on macOS.', 'You want your own folder on your own machine.', 'You like its Storybook and shadcn/ui support.'] },
-    pickFeega: ['Your team is not all on macOS.', 'A designer should open the repo without a dev setup.', 'You want to edit together and leave comments.'],
+    pickFeega: ['You work in VS Code, Cursor, Windsurf or VSCodium, on any OS.', 'You want it inside your editor, not a separate app.', 'You want a free tool with no account that sends nothing.'],
     sections: [
       {
-        heading: 'The difference is who else opens the work',
-        html: '<p>Onlook runs your dev server on your Mac, for you. Feega runs on the desktop or in the browser, and the same canvas opens for everyone on the team.</p>'
+        heading: 'The difference is where it lives',
+        html: '<p>Onlook is a Mac app that runs your dev server for you and can open a pull request in one press. Feega is a VS Code extension, also on Cursor, Windsurf and VSCodium, or <code>npx feega</code>, and it runs on any OS. It does not open pull requests. If you need your team to edit together, Onlook is the nearer fit today.</p>'
       }
     ],
     mistakes: [
       { q: 'Choosing on licence.', a: 'Both are Apache-2.0.' },
-      { q: 'Forgetting the second person.', a: 'Check how a colleague opens the same work.' }
+      { q: 'Forgetting the second person.', a: 'Check how a colleague opens the same work. Feega has no shared editing yet.' }
     ],
     questions: [
       { q: 'Is Onlook free?', a: 'Self-hosted is free on GitHub. The hosted version is sold through a demo.' },
@@ -92,22 +92,22 @@ export const SINGLES: Readonly<Record<string, Article>> = {
   },
   'cursor-design-mode': {
     kind: ArticleKind.Single,
-    title: 'Cursor Design Mode alternatives for people outside the IDE | Feega',
-    description: 'Cursor Design Mode lets developers annotate a running app. When the person changing the design does not use an IDE, here is the option.',
-    heading: 'Cursor Design Mode alternatives for people who don’t open an IDE',
-    hook: 'Keep Design Mode inside Cursor. Give designers a canvas.',
+    title: 'Cursor Design Mode alternatives without an agent | Feega',
+    description: 'Cursor Design Mode lets developers annotate a running app. When you would rather click and set values than describe them, here is the option.',
+    heading: 'Cursor Design Mode alternatives without an agent',
+    hook: 'Keep Design Mode for agent edits. Click and set values by hand.',
     lead: 'Keep Design Mode if you live in Cursor. You annotate the running app and the agent edits the source with the exact component stack. Inside an IDE, little beats it.',
     pickThem: { name: 'Cursor', points: ['You are a developer.', 'You run the dev server yourself.', 'You commit and review in the same window.'] },
-    pickFeega: ['The person changing the design does not use an IDE.', 'You want a canvas, not annotations.', 'You want the edit made by hand, not described to an agent.'],
+    pickFeega: ['You want a Properties bar, not annotations.', 'You want the edit made by hand, with no tokens.', 'You want the change written the same way every time, with no AI.'],
     sections: [
       {
-        heading: 'Design Mode is built for developers',
-        html: '<p>It needs Cursor 3.24.18 or later and a running dev server. Feega opens a folder and starts the dev server for you.</p>'
+        heading: 'Design Mode hands the edit to an agent',
+        html: '<p>It needs Cursor 3.24.18 or later and a running dev server. Feega starts the dev server for you, and runs inside Cursor too.</p>'
       }
     ],
     mistakes: [
       { q: 'Describing a two-second drag.', a: 'Some changes are faster by hand.' },
-      { q: 'Choosing one.', a: 'You can use both. They edit the same source.' }
+      { q: 'Choosing one.', a: 'You can use both. Feega installs in Cursor and edits the same source.' }
     ],
     questions: [
       { q: 'What does Cursor cost?', a: 'Free to start; Plus is $8 a month.' },
@@ -127,7 +127,7 @@ export const SINGLES: Readonly<Record<string, Article>> = {
     hook: 'Keep Stitch for new screens. Edit shipped pages in place.',
     lead: 'Keep Stitch if you design new UI by prompt and voice, then publish. Google’s canvas streams designs live and exports to Antigravity or Netlify.',
     pickThem: { name: 'Stitch', points: ['You start new screens.', 'You want voice and live generation.', 'You want a DESIGN.md file for your rules.'] },
-    pickFeega: ['You change existing pages by hand and with an agent.', 'You want the edit, not a suggestion.', 'You want open source.'],
+    pickFeega: ['You change existing pages by hand.', 'You want the edit, not a suggestion.', 'You want open source.'],
     sections: [
       {
         heading: 'Stitch Loop is a waitlist for now',
@@ -153,10 +153,10 @@ export const SINGLES: Readonly<Record<string, Article>> = {
     title: 'v0 alternatives for apps that already exist | Feega',
     description: 'v0 builds and edits apps from a chat and deploys to Vercel. When you would rather move the thing than describe it, here is the option.',
     heading: 'v0 alternatives for apps that already exist',
-    hook: 'Keep v0 for prompting on Vercel. Drag what you can see.',
+    hook: 'Keep v0 for prompting on Vercel. Click what you can see.',
     lead: 'Keep v0 if you prompt and deploy on Vercel. It imports GitHub repos, works on a branch, and opens and merges a pull request when you publish.',
     pickThem: { name: 'v0', points: ['You are on Vercel.', 'You like working in a chat.', 'You want previews in one click.'] },
-    pickFeega: ['You would rather move the thing than describe it.', 'You do not host on Vercel.', 'You want open source.'],
+    pickFeega: ['You would rather click the thing than describe it.', 'You do not host on Vercel.', 'You want open source and no tokens.'],
     sections: [],
     mistakes: [
       { q: 'Prompting a two-second drag.', a: 'Some changes are faster by hand.' },
@@ -180,7 +180,7 @@ export const SINGLES: Readonly<Record<string, Article>> = {
     hook: 'Keep Lovable for a new app. Keep your repo for the one you have.',
     lead: 'Keep Lovable if there is no code yet. It turns a prompt into a hosted full-stack app.',
     pickThem: { name: 'Lovable', points: ['You start from nothing.', 'Chat is all you want.', 'You want hosting included.'] },
-    pickFeega: ['The repo already exists.', 'You want your own commits, not a bot’s.', 'You review changes before they ship.'],
+    pickFeega: ['The repo already exists.', 'You want your own commits, not a bot’s.', 'You want edits in your own files, with no AI.'],
     sections: [
       {
         heading: 'Lovable does not open your repo',

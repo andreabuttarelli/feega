@@ -20,7 +20,8 @@
   }
 
   .amount {
-    font-size: 72px;
+    font-size: 48px;
+    white-space: nowrap;
     line-height: 1;
     letter-spacing: -0.05em;
     font-weight: 400;
@@ -69,7 +70,7 @@
 
   @media (min-width: 1200px) {
     .amount {
-      font-size: 112px;
+      font-size: 64px;
     }
 
     .unit {

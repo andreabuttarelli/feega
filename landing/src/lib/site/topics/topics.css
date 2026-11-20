@@ -1,0 +1,47 @@
+.topic .topic-figure {
+  margin: 32px 0 0;
+}
+
+.topic .topic-figure img,
+.topic .card img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  background: #0a0a0a;
+}
+
+.topic ol {
+  margin-top: 16px;
+  padding-left: 20px;
+  list-style: decimal;
+}
+
+.topic ol li + li {
+  margin-top: 8px;
+}
+
+.topic section > p + p,
+.topic section > h3 + p,
+.topic section > p + h3 {
+  margin-top: 16px;
+}
+
+.topic h3 {
+  font: inherit;
+  font-weight: 600;
+}
+
+.topic .body ul {
+  margin-top: 16px;
+}
+
+.topic .body ul + p {
+  margin-top: 20px;
+}
+
+.topic code {
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 0.9em;
+  color: #ff5100;
+}

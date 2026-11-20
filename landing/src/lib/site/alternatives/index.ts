@@ -18,10 +18,10 @@ export const KIND_HEADINGS: Readonly<Record<ArticleKind, string>> = {
 };
 
 export const TRY_STEPS: readonly string[] = [
-  'Open a project folder in Feega, or import a GitHub repo in the browser.',
-  'Pick a page. Feega runs your app and shows it on the canvas.',
-  'Change a heading, a colour or a spacing.',
-  'Read the diff, then commit or open a pull request.'
+  'Install Feega in VS Code, or run `npx feega` in your project folder.',
+  'Open your project. Feega starts your dev server.',
+  'Click an element and change it.',
+  'See the diff in Changes, then keep it or undo it.'
 ];
 
 export const ALTERNATIVES: Readonly<Record<string, Article>> = { ...ROUNDUPS, ...SINGLES };
