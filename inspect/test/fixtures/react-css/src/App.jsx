@@ -1,3 +1,4 @@
+import { ArrowRight } from 'lucide-react';
 import styles from './App.module.css';
 import { Benefits } from './Benefits';
 import { Faq } from './Faq';
@@ -26,6 +27,7 @@ export function App() {
         <h1 id="title" className={styles.title}>Plan your launch in an afternoon</h1>
         <p className={styles.lead}>Briefs, timelines and assets in one place your whole team can edit.</p>
         <button id="cta" type="button">Get started</button>
+        <ArrowRight size={32} />
         <div id="actions" className={styles.actions}>
           <a id="start" className={styles.btn} href="#start">Start free</a>
           <a id="docs" className={styles.btn} href="#docs">Read docs</a>

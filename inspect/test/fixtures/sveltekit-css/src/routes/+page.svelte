@@ -1,4 +1,5 @@
 <script>
+import { ArrowRight } from '@lucide/svelte';
 import Benefits from '$lib/Benefits.svelte';
 import Faq from '$lib/Faq.svelte';
 import { SITE_LINKS } from '$lib/links';
@@ -25,6 +26,7 @@ const plans = [
     <h1 id="title" class="title">Plan your launch in an afternoon</h1>
     <p class="lead">Briefs, timelines and assets in one place your whole team can edit.</p>
     <button id="cta" type="button">Get started</button>
+    <ArrowRight size={32} />
     <div id="actions" class="actions">
       <a id="start" class="btn" href="#start">Start free</a>
       <a id="docs" class="btn" href="#docs">Read docs</a>
