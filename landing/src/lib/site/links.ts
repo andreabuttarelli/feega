@@ -12,7 +12,7 @@ export const EXTENSION_PUBLISHED = true;
 
 export const DOWNLOAD_PATH = '/download';
 
-export const FEEGA_VERSION = '0.2.3';
+export const FEEGA_VERSION = __FEEGA_VERSION__;
 
 export const NODE_REQUIREMENT = 'Node 18 or newer';
 
