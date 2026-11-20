@@ -19,6 +19,7 @@ export default function Page() {
       <main className={styles.main}>
         <h1 id="title" className={styles.title}>Plan your launch in an afternoon</h1>
         <p className={styles.lead}>Briefs, timelines and assets in one place your whole team can edit.</p>
+        <button id="cta" type="button">Get started</button>
         <section id="pricing" className={styles.grid}>
           <article id="card" className={styles.card}>
             <h2>{PLANS[0].name}</h2>

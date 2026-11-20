@@ -17,6 +17,7 @@ const plans = [
   <main class="main">
     <h1 id="title" class="title">Plan your launch in an afternoon</h1>
     <p class="lead">Briefs, timelines and assets in one place your whole team can edit.</p>
+    <button id="cta" type="button">Get started</button>
     <section id="pricing" class="grid">
       <article id="card" class="card">
         <h2>{plans[0].name}</h2>
