@@ -15,12 +15,12 @@
   });
 </script>
 
-<header class="bar">
+<header class="bar site-header-header">
   <a class="chip brand" href={home} aria-label="Feega home"><Mark size={16} /><span>Feega</span></a>
 
   <nav class="links" aria-label="Main">
     {#each HEADER_LINKS as link (link.label)}
-      <a class="chip" href={link.href}>{lower(link.label)}</a>
+      <a class="chip site-header-a" href={link.href}>{lower(link.label)}</a>
     {/each}
   </nav>
 
@@ -251,5 +251,12 @@
     .drawer {
       display: none;
     }
+  }
+  .site-header-a {
+    background-image: none;
+    background-color: #d9d9d9;
+  }
+  .site-header-header {
+    align-items: center;
   }
 </style>

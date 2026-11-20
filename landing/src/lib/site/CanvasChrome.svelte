@@ -138,7 +138,7 @@
           <div class="row" class:picked={l.picked} style:padding-left="{20 + l.depth * 12}px">
             <span class="fold">{#if l.open}{@render icon('chevron-down', 12)}{/if}</span>
             <span class="type">{@render icon(l.icon, 14, 1.75)}</span>
-            <span class="name">{l.name}</span>
+            <span class="name canvas-chrome-span">{l.name}</span>
           </div>
         {/each}
       </div>
@@ -1001,5 +1001,8 @@
     .wide {
       display: none;
     }
+  }
+  .canvas-chrome-span {
+    color: #e49696;
   }
 </style>
