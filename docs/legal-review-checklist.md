@@ -57,7 +57,6 @@
 - [ ] **Register the DMCA designated agent** at [dmca.copyright.gov](https://dmca.copyright.gov) ($6, renew every 3 years), then replace `[DMCA AGENT — registration pending]` in TERMS.md §12A and DMCA.md. Without it the §512(c) safe harbour does not apply.
 - [ ] Copy TERMS §12/§12A and DMCA.md to the Framer site (`/terms`, new `/dmca`); the in-app form links to `feega.app/terms`.
 - [ ] Confirm the strike policy (1 warning, 2 = 30-day suspension, 3 = termination; likeness ×2, CSAM ×3).
-- [ ] Confirm the escalation contacts in `docs/legal/serious-crime-escalation.md` (CNCPO, NCMEC, 112).
 
 ## Motion editor (03/10/2026)
 

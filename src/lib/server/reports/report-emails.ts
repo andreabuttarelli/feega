@@ -98,6 +98,6 @@ export function escalationEmail(r: ReportMailView, queueUrl: string): Mail {
     `Reason: ${reasonLabel(r)}${r.details.category ? ` (${r.details.category})` : ''}`,
     `Content: ${r.targetUrl}`,
     `Queue: ${queueUrl}`,
-    'Follow docs/legal/serious-crime-escalation.md: secure evidence, remove, notify the authorities.'
+    'Secure evidence, remove, notify the authorities.'
   ]);
 }
