@@ -1,3 +1,5 @@
+import { ownsStandardUtility } from './tailwind-property';
+
 export enum LiveProp {
   Text = 'text',
   Color = 'color',
@@ -35,9 +37,22 @@ const RADIUS_SIDE = /^rounded-(t|r|b|l|s|e|tl|tr|bl|br|ss|se|es|ee)(-|$)/;
 
 export type ClassRule = { make: (value: string, side: Side) => string; owns: (token: string, side: Side) => boolean };
 
+const SIDES_OF: Record<Side, string> = {
+  [Side.All]: 'xytrblse',
+  [Side.X]: 'xlrse',
+  [Side.Y]: 'ytb',
+  [Side.Top]: 't',
+  [Side.Right]: 'r',
+  [Side.Bottom]: 'b',
+  [Side.Left]: 'l'
+};
+
 const spacing = (letter: string): ClassRule => ({
   make: (value, side) => `${letter}${side}-${value}`,
-  owns: (token, side) => token.replace(/^-/, '').startsWith(`${letter}${side}-`)
+  owns: (token, side) => {
+    const [, kind] = token.replace(/^-/, '').match(new RegExp(`^${letter}([a-z]?)-`)) ?? [];
+    return kind !== undefined && (kind === '' ? side === Side.All : SIDES_OF[side].includes(kind));
+  }
 });
 
 export type StyleProp = Exclude<LiveProp, LiveProp.Text | LiveProp.Class>;
@@ -123,8 +138,18 @@ export const CLASS_FAMILY: Record<ClassFamily, (token: string) => boolean> = {
 const BASE_VARIANT = '';
 const MIN_WIDTH_PX: Record<string, number> = { [BASE_VARIANT]: 0, sm: 640, md: 768, lg: 1024, xl: 1280, '2xl': 1536 };
 
-export const variantOf = (token: string) => token.slice(0, Math.max(0, token.lastIndexOf(':')));
-export const utilityOf = (token: string) => token.slice(token.lastIndexOf(':') + 1);
+function variantEnd(token: string): number {
+  let depth = 0;
+  let end = -1;
+  for (let i = 0; i < token.length; i++) {
+    depth += token[i] === '[' ? 1 : token[i] === ']' ? -1 : 0;
+    end = token[i] === ':' && depth === 0 ? i : end;
+  }
+  return end;
+}
+
+export const variantOf = (token: string) => token.slice(0, Math.max(0, variantEnd(token)));
+export const utilityOf = (token: string) => token.slice(variantEnd(token) + 1);
 const appliesAt = (token: string, viewport: number) => (MIN_WIDTH_PX[variantOf(token)] ?? Infinity) <= viewport;
 
 export function activeIndex(parts: readonly string[], owns: (utility: string) => boolean, viewport: number): number {
@@ -147,7 +172,7 @@ export const arbitraryFamily = (property: string) => `${ARBITRARY_FAMILY}${prope
 const ownerOf = (family: string): ((token: string) => boolean) | null => {
   if (family.startsWith(ARBITRARY_FAMILY)) {
     const property = family.slice(ARBITRARY_FAMILY.length);
-    return (token) => token.match(ARBITRARY_PROPERTY)?.[1] === property;
+    return (token) => token.match(ARBITRARY_PROPERTY)?.[1] === property || ownsStandardUtility(property, token);
   }
   return CLASS_FAMILY[family as ClassFamily] ?? null;
 };

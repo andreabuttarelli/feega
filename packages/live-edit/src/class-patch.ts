@@ -1,4 +1,4 @@
-import { CLASS_RULE, LiveProp, Side, activeIndex, familyRule, variantOf, type ClassRule, type StyleProp } from './live-fields';
+import { CLASS_RULE, LiveProp, Side, activeIndex, familyRule, utilityOf, variantOf, type ClassRule, type StyleProp } from './live-fields';
 import type { FileChange, ReadFile } from './files';
 
 export type LiveAt = { file: string; line: number; col: number };
@@ -45,7 +45,9 @@ function swapped(cls: string, rule: ClassRule, made: string, side: Side, viewpor
     return [cls.trimEnd(), made].filter(Boolean).join(' ');
   }
   const variant = variantOf(parts[at]);
+  const conflicting = parts.map((part, i) => (i !== at && part.trim() && variantOf(part) === variant && rule.owns(utilityOf(part), side) ? i : -1)).filter((i) => i >= 0);
   parts[at] = made && variant ? `${variant}:${made}` : made;
+  conflicting.forEach((i) => (parts[i] = ''));
   return parts.join('').replace(/\s{2,}/g, ' ').trim();
 }
 

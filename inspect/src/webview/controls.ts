@@ -2,6 +2,7 @@ import { ClassFamily, LiveProp, Side, arbitraryFamily } from '@feega/live-edit/l
 import type { Range } from '@feega/properties-panel/number-field';
 import { UNITS_OF, type Unit } from './units';
 import { tailwindShadow } from './shadows';
+import { tailwindToken } from '@feega/live-edit/tailwind-property';
 import { arbitraryCss } from './fills';
 
 export enum Section {
@@ -282,7 +283,7 @@ function cssRow(spec: CssSpec): Row {
   const target = kebabOf(key);
   const change = spec.utility
     ? (v: string) => ({ prop: LiveProp.Class, family: spec.utility!.family, value: spec.utility!.make(v) })
-    : (v: string) => ({ prop: LiveProp.Class, family: arbitraryFamily(target), value: v ? `[${target}:${preview(v)[key].replace(/\s+/g, '_')}]` : '' });
+    : (v: string) => ({ prop: LiveProp.Class, family: arbitraryFamily(target), value: tailwindToken(target, v ? preview(v)[key] : '') });
   const base = { section: spec.section, name: spec.name, label: spec.label, preview, change };
   if (spec.control === Control.Number) {
     return { ...base, control: Control.Number, range: spec.range, unit: spec.suffix ?? 'px', units: spec.units, read: spec.read ?? ((s: Styles) => parseFloat(s[property] ?? '0') || 0) };

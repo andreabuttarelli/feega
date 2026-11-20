@@ -10,8 +10,14 @@ describe('css rows', () => {
     expect(names.filter((n) => !ROWS.some((r) => r.name === n))).toEqual([]);
   });
 
+  it('write the standard utility where an exact one exists', () => {
+    expect(row('cursor').change('grab').value).toBe('cursor-grab');
+    expect(row('min-width').change('240px').value).toBe('min-w-[240px]');
+  });
+
   it('write one arbitrary property per edit, spaces as underscores', () => {
-    expect(row('grid-template-columns').change('1fr 2fr')).toEqual({ prop: LiveProp.Class, family: 'arbitrary:grid-template-columns', value: '[grid-template-columns:1fr_2fr]' });
+    expect(row('grid-template-columns').change('1fr 2fr')).toEqual({ prop: LiveProp.Class, family: 'arbitrary:grid-template-columns', value: 'grid-cols-[1fr_2fr]' });
+    expect(row('transition-duration').change('200').value).toBe('[transition-duration:200ms]');
     expect(row('position').preview('sticky')).toEqual({ position: 'sticky' });
   });
 
