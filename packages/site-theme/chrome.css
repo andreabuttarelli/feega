@@ -74,19 +74,50 @@
   background: var(--sx-accent-soft);
 }
 
-.sx-menu {
-  position: relative;
-  display: block;
+.sx-mobile {
+  display: flex;
+  gap: var(--sx-s2);
+}
+
+.sx-round {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #000;
+  color: #fff;
+  cursor: pointer;
+}
+
+.sx-round svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.sx-menu summary svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
 }
 
 .sx-menu summary {
-  display: inline-flex;
   list-style: none;
-  cursor: pointer;
 }
 
 .sx-menu summary::-webkit-details-marker {
   display: none;
+}
+
+.sx-menu .sx-close,
+.sx-menu[open] .sx-open {
+  display: none;
+}
+
+.sx-menu[open] .sx-close {
+  display: block;
 }
 
 .sx-menu[open] .sx-menu-panel {
@@ -94,26 +125,56 @@
 }
 
 .sx-menu-panel {
-  position: absolute;
-  top: 48px;
-  right: 0;
+  position: fixed;
+  top: 84px;
+  left: 12px;
+  right: 12px;
+  z-index: 50;
   display: none;
   flex-direction: column;
-  min-width: 220px;
-  padding: var(--sx-s2);
-  border: 1px solid var(--sx-line);
+  max-width: 430px;
+  margin: 0 auto;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--sx-radius-lg);
-  background: #111;
+  background: #161616;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
 }
 
-.sx-menu-panel a {
-  padding: var(--sx-s3);
-  border-radius: var(--sx-radius-sm);
+.sx-menu-links {
+  display: flex;
+  flex-direction: column;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.sx-menu-links a {
+  padding: 14px 12px;
+}
+
+.sx-menu-icons {
+  display: flex;
+  gap: 20px;
+  padding: 12px;
+}
+
+.sx-nav .sx-menu-icons a {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.sx-menu-icons svg {
+  width: 20px;
+  height: 20px;
+}
+
+.sx-menu-cta {
+  display: grid;
+  place-items: center;
+  height: 52px;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: var(--sx-accent);
   font-size: 18px;
-}
-
-.sx-menu-panel a:hover {
-  background: var(--sx-hover);
 }
 
 @media (min-width: 1000px) {
@@ -122,7 +183,7 @@
     display: flex;
   }
 
-  .sx-menu {
+  .sx-mobile {
     display: none;
   }
 
