@@ -111,3 +111,51 @@ describe('scrolling from the inspector', () => {
     expect(replies).toContainEqual({ type: 'feega:scrolled' });
   });
 });
+
+describe('element states through the bridge', () => {
+  function stated() {
+    const dom = bridged();
+    const style = dom.win.document.createElement('style');
+    style.textContent = 'h1 { color: rgb(0, 0, 0) } h1:hover { color: rgb(255, 0, 0) }';
+    dom.win.document.head.append(style);
+    return dom;
+  }
+
+  it('forcing a state marks the element and shows its rules', () => {
+    const { win, send, h1 } = stated();
+    send({ type: 'feega:force', source: SOURCE, state: 'hover' });
+
+    expect(h1.getAttribute('data-feega-force')).toBe('hover');
+    expect(win.getComputedStyle(h1).color).toBe('rgb(255, 0, 0)');
+  });
+
+  it('forcing the default clears it', () => {
+    const { win, send, h1 } = stated();
+    send({ type: 'feega:force', source: SOURCE, state: 'hover' });
+    send({ type: 'feega:force', source: SOURCE, state: 'default' });
+
+    expect(h1.hasAttribute('data-feega-force')).toBe(false);
+    expect(win.getComputedStyle(h1).color).toBe('rgb(0, 0, 0)');
+  });
+
+  it('an inspect reports the states the element has styles for and the forced look', () => {
+    const { send, replies } = stated();
+    send({ type: 'feega:inspect', id: 1, selector: 'h1' });
+    send({ type: 'feega:force', source: SOURCE, state: 'hover' });
+    send({ type: 'feega:inspect', id: 2, selector: 'h1' });
+    const [plain, hovered] = replies.filter((r) => r.type === 'feega:inspect:result') as { result: { states: string[]; styles: Record<string, string> } }[];
+
+    expect(plain.result.states).toEqual(['hover']);
+    expect(plain.result.styles.color).toBe('rgb(0, 0, 0)');
+    expect(hovered.result.styles.color).toBe('rgb(255, 0, 0)');
+  });
+
+  it('a state forced while the stylesheet reloads follows the new rules', async () => {
+    const { win, send, h1 } = stated();
+    send({ type: 'feega:force', source: SOURCE, state: 'hover' });
+    win.document.querySelector('style')!.textContent += ' h1:hover { color: rgb(0, 0, 255) }';
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    expect(win.getComputedStyle(h1).color).toBe('rgb(0, 0, 255)');
+  });
+});

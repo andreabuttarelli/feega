@@ -1,6 +1,7 @@
 export const SOURCE_ATTR = 'data-feega-src';
 export const ICON_ATTR = 'data-feega-icon';
-const BOOKKEEPING_ATTRS = new Set([SOURCE_ATTR, ICON_ATTR]);
+export const FORCE_ATTR = 'data-feega-force';
+const BOOKKEEPING_ATTRS = new Set([SOURCE_ATTR, ICON_ATTR, FORCE_ATTR]);
 
 const DEFAULT_MAX_HTML = 2000;
 const TEXT_NODE = 3;
@@ -43,7 +44,8 @@ export function parseSource(value) {
 }
 
 const INNER_KEY = ' >> ';
-const keyOf = (source, inner) => (inner ? `${source}${INNER_KEY}${inner}` : source);
+const STATE_KEY = ' @@ ';
+const keyOf = (source, inner, state) => `${source}${inner ? `${INNER_KEY}${inner}` : ''}${state ? `${STATE_KEY}${state}` : ''}`;
 
 function untaggedSvg(element, tagged) {
   const svg = element.closest('svg');
@@ -216,11 +218,13 @@ function sheetOf(doc) {
 const PAGE_SOURCES_BY_SOURCE = { [PAGE_SOURCE]: 'body', [HTML_SOURCE]: 'html' };
 
 const selectorOf = (key) => {
-  const [source, inner] = key.split(INNER_KEY);
+  const [rest, state] = key.split(STATE_KEY);
+  const [source, inner] = rest.split(INNER_KEY);
+  const forced = state ? `[${FORCE_ATTR}~=${JSON.stringify(state)}]` : '';
   if (PAGE_SOURCES_BY_SOURCE[source]) {
-    return PAGE_SOURCES_BY_SOURCE[source];
+    return `${PAGE_SOURCES_BY_SOURCE[source]}${forced}`;
   }
-  return `[${SOURCE_ATTR}=${JSON.stringify(source)}]${inner ? ` ${inner}` : ''}`;
+  return `[${SOURCE_ATTR}=${JSON.stringify(source)}]${forced}${inner ? ` ${inner}` : ''}`;
 };
 
 const ruleOf = (key, css) => `${selectorOf(key)}{${Object.entries(css).map(([n, v]) => `${n}:${v} !important`).join(';')}}`;
@@ -229,7 +233,7 @@ function render(doc) {
   sheetOf(doc).textContent = [...previewsOf(doc)].map(([source, css]) => ruleOf(source, css)).join('\n');
 }
 
-export function previewEdit(doc, { source, inner, text, style }) {
+export function previewEdit(doc, { source, inner, text, style, state }) {
   for (const element of sourcedIn(doc, source)) {
     if (typeof text === 'string') {
       element.textContent = text;
@@ -240,7 +244,7 @@ export function previewEdit(doc, { source, inner, text, style }) {
     return;
   }
   const all = previewsOf(doc);
-  const key = keyOf(source, inner);
+  const key = keyOf(source, inner, state);
   all.set(key, { ...all.get(key), ...css });
   render(doc);
 }
@@ -271,15 +275,16 @@ export function keepPreviews(doc) {
   }
 }
 
-export function clearPreview(doc, source) {
-  previewsOf(doc).delete(source);
-  previewsOf(doc).delete(keyOf(source, 'svg'));
+export function clearPreview(doc, source, state) {
+  previewsOf(doc).delete(keyOf(source, undefined, state));
+  previewsOf(doc).delete(keyOf(source, 'svg', state));
   render(doc);
 }
 
-export function settlePreview(doc, source) {
+export function settlePreview(doc, source, state) {
   const all = previewsOf(doc);
-  const css = all.get(source);
+  const key = keyOf(source, undefined, state);
+  const css = all.get(key);
   const [element] = sourcedIn(doc, source);
   if (!css || !element) {
     return Object.keys(css ?? {});
@@ -287,12 +292,12 @@ export function settlePreview(doc, source) {
 
   const computed = (name) => doc.defaultView.getComputedStyle(element).getPropertyValue(name);
   const wanted = Object.fromEntries(Object.keys(css).map((name) => [name, computed(name)]));
-  all.delete(source);
+  all.delete(key);
   render(doc);
   const left = Object.fromEntries(Object.entries(css).filter(([name]) => computed(name) !== wanted[name]));
 
   if (Object.keys(left).length) {
-    all.set(source, left);
+    all.set(key, left);
     render(doc);
   }
   return Object.keys(left);
