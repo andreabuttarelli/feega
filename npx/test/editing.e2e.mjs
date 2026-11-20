@@ -12,6 +12,7 @@ const PORT = Number(process.env.FEEGA_E2E_PORT ?? 4721);
 const READY_MS = 120_000;
 const SETTLE_MS = 2500;
 const TAILWIND = /tailwind/.test(APP);
+const ONBOARDING_MS = 3000;
 const NEW_TITLE = 'Ship faster than planned';
 
 const git = (...args) => execFileSync('git', ['-C', APP, ...args], { encoding: 'utf8' });
@@ -51,6 +52,8 @@ try {
   await page.goto(url);
   const frame = page.frameLocator('[data-testid="app-frame"]');
   await page.getByText('Click an element to edit it').waitFor({ timeout: READY_MS });
+  await page.getByRole('alertdialog').waitFor({ timeout: ONBOARDING_MS }).then(() => page.keyboard.press('Escape'), () => undefined);
+  await page.getByRole('alertdialog').waitFor({ state: 'detached' });
   await page.waitForTimeout(SETTLE_MS);
   const undo = async () => {
     await page.getByRole('button', { name: /^Undo/ }).first().click();
