@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-const NODE_LIST = /(?:\bnode"?\s*:|[iI]conNode\s*=)\s*(?=\[)/;
+const NODE_LIST = /(?:\bnode"?\s*:|[iI]conNode\s*=|createLucideIcon\(\s*"[^"]+"\s*,)\s*(?=\[)/;
 const UNQUOTED_KEY = /([{,]\s*)([A-Za-z_$][\w$]*)\s*:/g;
 const SVG_OPEN =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">';

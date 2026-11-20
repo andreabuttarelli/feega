@@ -20,3 +20,15 @@ export const ADD_ITEMS: MenuItem[] = [
 ];
 
 export const ADD_LOOP_ITEM: MenuItem = { id: StructureOp.AddItem, label: 'Add item' };
+
+type Point = { x: number; y: number };
+type Size = { width: number; height: number };
+
+const EDGE_GAP = 8;
+
+export function fitMenu(at: Point, menu: Size, view: Size): Point {
+  return {
+    x: Math.max(0, Math.min(at.x, view.width - menu.width - EDGE_GAP)),
+    y: Math.max(0, Math.min(at.y, view.height - menu.height - EDGE_GAP))
+  };
+}
