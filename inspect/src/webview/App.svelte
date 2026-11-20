@@ -36,6 +36,8 @@
   import { Group, ROWS, type Hint, type Row } from './controls';
   import { hintBoxes } from './hint-boxes';
   import { dropOf, type Drop } from './reorder';
+  import { StructureOp } from '@feega/live-edit/structure';
+  import StructureMenu from './StructureMenu.svelte';
   import { modeOfKey } from './modes';
   import { browseHistory } from './history';
   import { DEFAULT_ANCHOR, anchorBox, isAnchor, nearestAnchor, nextAnchor, type Anchor } from './anchors';
@@ -419,6 +421,14 @@
     return wasDrag;
   }
 
+  let menu = $state<{ x: number; y: number } | null>(null);
+
+  async function onMenu(e: MouseEvent) {
+    e.preventDefault();
+    await onPick(e);
+    menu = picked ? { x: e.clientX, y: e.clientY } : null;
+  }
+
   async function onPick(e: MouseEvent) {
     if (releaseOverlay()) {
       return;
@@ -495,6 +505,7 @@
     savePrefs();
   }
 
+  const STRUCTURE_KEYS = new Set(['Delete', 'Backspace']);
   const typing = (e: KeyboardEvent) => e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement;
 
   async function select(source: Source) {
@@ -504,6 +515,16 @@
   async function moveSelection(move: Move) {
     if (picked) {
       picked = (await bridge.move(picked.source, move)) ?? picked;
+    }
+  }
+
+  function restructure(op: StructureOp) {
+    if (!picked) {
+      return;
+    }
+    toHost({ kind: ToHost.Structure, op, at: sourceText(picked.source) });
+    if (op === StructureOp.Delete) {
+      picked = null;
     }
   }
 
@@ -528,7 +549,13 @@
       moveSelection(selecting.move);
       return;
     }
+    if (STRUCTURE_KEYS.has(e.key) && picked && mode === Mode.Design && !editing && !typing(e) && !(e.target instanceof HTMLButtonElement)) {
+      e.preventDefault();
+      restructure(StructureOp.Delete);
+      return;
+    }
     const shortcuts: Record<string, () => void> = {
+      d: () => restructure(StructureOp.Duplicate),
       z: () => toHost({ kind: e.shiftKey ? ToHost.Redo : ToHost.Undo }),
       '\\': () => (e.shiftKey ? ((leftClosed = !leftClosed), savePrefs()) : toggleBar()),
       '|': () => ((leftClosed = !leftClosed), savePrefs()),
@@ -594,7 +621,7 @@
       <div class="frame" class:framed={size !== Size.Full} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px`}>
         {#if url}<iframe bind:this={frame} src={start} title="App" data-testid="app-frame" style={`width:${fit.width}px;height:${fit.height}px;transform:scale(${fit.scale})`}></iframe>{/if}
         {#if mode === Mode.Design && bridged && !editing}
-          <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={dragOverlay} onpointerleave={() => (hover = null)} onclick={onPick} ondblclick={onDouble} onwheel={(e) => bridge.scroll(e.deltaX / fit.scale, e.deltaY / fit.scale)}>
+          <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={dragOverlay} onpointerleave={() => (hover = null)} onclick={onPick} oncontextmenu={onMenu} ondblclick={onDouble} onwheel={(e) => bridge.scroll(e.deltaX / fit.scale, e.deltaY / fit.scale)}>
             {#if hover}<div class="outline hover" style={box(hover)}></div>{/if}
             {#if drop}<div class="drop-line" style={`left:${drop.line.x * fit.scale - 1}px;top:${drop.line.y * fit.scale - 1}px;width:${Math.max(2, drop.line.w * fit.scale)}px;height:${Math.max(2, drop.line.h * fit.scale)}px`}></div>{/if}
           {#if picked && hint}{#each hintBoxes(picked, hint) as area, i (i)}<div class="hint {hint.group}" style={`left:${area.x * fit.scale}px;top:${area.y * fit.scale}px;width:${area.w * fit.scale}px;height:${area.h * fit.scale}px`}></div>{/each}{/if}
@@ -630,6 +657,7 @@
           <button type="button" class="link" data-action={ServerAction.RestartUnderFeega} onclick={() => toHost({ kind: ToHost.Server, action: ServerAction.RestartUnderFeega })}>Let Feega start the server</button>
         </div>
       {/if}
+      {#if menu}<StructureMenu x={menu.x} y={menu.y} onpick={restructure} onclose={() => (menu = null)} />{/if}
       {#if toast}<div class="toast" role="status">{toast}</div>{/if}
       <div class="float" class:moving bind:clientWidth={bar.w} bind:clientHeight={bar.h} style={`left:${barAt.x}px;top:${barAt.y}px`} data-anchor={anchor}>
         <button type="button" class="grip" title="Drag to move (arrow keys)" aria-label="Move the bar" onpointerdown={grabBar} onpointermove={dragBar} onpointerup={dropBar} onkeydown={onHandleKey}>

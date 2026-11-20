@@ -1,5 +1,6 @@
 import type { LiveEditAsk } from '@feega/live-edit/live-ask';
 import type { Place } from '@feega/live-edit/move-node';
+import type { StructureOp } from '@feega/live-edit/structure';
 import type { Scope } from '@feega/live-edit/scoped-rule';
 import type { PageTarget } from '@feega/live-edit/page-rule';
 import type { ReportFacts, SettingKey, SettingValue, Settings } from './settings';
@@ -99,6 +100,7 @@ export enum ToHost {
   Prefs = 'prefs',
   Setting = 'setting',
   Move = 'move',
+  Structure = 'structure',
   Server = 'server',
   Redo = 'redo',
   Font = 'font',
@@ -162,6 +164,7 @@ export type HostMessage =
   | { kind: ToHost.Prefs; prefs: Prefs }
   | { kind: ToHost.Setting; key: SettingKey; value: SettingValue }
   | { kind: ToHost.Move; from: string; to: string; place: Place }
+  | { kind: ToHost.Structure; op: StructureOp; at: string }
   | { kind: ToHost.Server; action: ServerAction }
   | { kind: ToHost.Redo }
   | { kind: ToHost.Font; ask: EditAsk; google: boolean }

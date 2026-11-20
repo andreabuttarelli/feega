@@ -201,6 +201,41 @@ try {
     assert.deepEqual(changedFiles(), [], 'undo restores the order');
   });
 
+  const paragraphs = () => frame.locator('main > p').count();
+
+  await check('delete removes the selected element from the source and the page, and one undo restores it', async () => {
+    const before = await paragraphs();
+    await frame.locator('main > p').first().click();
+    await page.waitForTimeout(800);
+    await page.keyboard.press('Delete');
+    await page.waitForTimeout(SETTLE_MS);
+    assert.ok(changedFiles().length > 0, 'the source changed');
+    assert.equal(await paragraphs(), before - 1, 'the paragraph left the page');
+    await undo();
+    assert.deepEqual(changedFiles(), [], 'undo restores the element');
+  });
+
+  await check('duplicate copies the selected element in the source and the page, and one undo restores it', async () => {
+    const before = await paragraphs();
+    await frame.locator('main > p').first().click();
+    await page.waitForTimeout(800);
+    await page.keyboard.press('ControlOrMeta+d');
+    await page.waitForTimeout(SETTLE_MS);
+    assert.equal(await paragraphs(), before + 1, 'the paragraph was copied');
+    await undo();
+    assert.deepEqual(changedFiles(), [], 'undo restores the page');
+  });
+
+  await check('the context menu deletes the element', async () => {
+    const before = await paragraphs();
+    await frame.locator('main > p').first().click({ button: 'right' });
+    await page.getByTestId('structure-menu').getByRole('menuitem', { name: /Delete/ }).click();
+    await page.waitForTimeout(SETTLE_MS);
+    assert.equal(await paragraphs(), before - 1, 'the paragraph left the page');
+    await undo();
+    assert.deepEqual(changedFiles(), [], 'undo restores the element');
+  });
+
   await check('position: absolute and top write the source and the page, the layer is tagged, and each edit is one undo', async () => {
     const h1 = frame.locator('h1').first();
     await h1.click();

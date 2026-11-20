@@ -1,0 +1,61 @@
+import { offsetOf, type LiveAt } from './class-patch';
+import type { ReadFile } from './files';
+import type { TextWritten } from './literal-text';
+import { hiddenOut, lineSpan, parentOf, repeated, spanOf, type Span } from './move-node';
+
+type Found = { source: string; whole: Span };
+
+type Refused = { reason: string; at?: LiveAt };
+
+async function found(read: ReadFile, at: LiveAt): Promise<Found | Refused> {
+  const source = await read(at.file);
+  if (source === null) {
+    return { reason: `${at.file}: cannot read the file` };
+  }
+
+  const text = hiddenOut(source);
+  const span = spanOf(text, offsetOf(text, at));
+  if (!span) {
+    return { reason: `${at.file}: the element is not where the page says` };
+  }
+
+  const why = repeated(text, parentOf(text, span.start), span.start);
+  if (why) {
+    return { reason: why, at };
+  }
+
+  return { source, whole: lineSpan(source, span) };
+}
+
+async function rewritten(read: ReadFile, at: LiveAt, rewrite: (source: string, whole: Span) => string): Promise<TextWritten> {
+  const out = await found(read, at);
+  if ('reason' in out) {
+    return { ok: false, ...out };
+  }
+
+  return { ok: true, change: { path: at.file, before: out.source, after: rewrite(out.source, out.whole) } };
+}
+
+function copied(source: string, whole: Span): string {
+  const piece = source.slice(whole.start, whole.end);
+  const glue = piece.endsWith('\n') ? '' : '\n';
+  return source.slice(0, whole.end) + glue + piece + source.slice(whole.end);
+}
+
+export const deleteNode = (read: ReadFile, at: LiveAt) => rewritten(read, at, (source, whole) => source.slice(0, whole.start) + source.slice(whole.end));
+
+export const duplicateNode = (read: ReadFile, at: LiveAt) => rewritten(read, at, copied);
+
+export enum StructureOp {
+  Delete = 'delete',
+  Duplicate = 'duplicate'
+}
+
+export type StructureRequest = { op: StructureOp; at: LiveAt };
+
+const OPS: Record<StructureOp, (read: ReadFile, req: StructureRequest) => Promise<TextWritten>> = {
+  [StructureOp.Delete]: (read, req) => deleteNode(read, req.at),
+  [StructureOp.Duplicate]: (read, req) => duplicateNode(read, req.at)
+};
+
+export const structure = (read: ReadFile, req: StructureRequest) => OPS[req.op](read, req);

@@ -8,6 +8,7 @@ import { literalText } from '@feega/live-edit/literal-text';
 import { moveNode, type Place } from '@feega/live-edit/move-node';
 import { globalSheetOf, googleFontImport, googleFontLink } from '@feega/live-edit/font-wiring';
 import { VariableHome, saveVariable, variableName } from '@feega/live-edit/save-variable';
+import { StructureOp, structure } from '@feega/live-edit/structure';
 import { pageRule } from '@feega/live-edit/page-rule';
 import { scopedRule, type Scope } from '@feega/live-edit/scoped-rule';
 import { styleAttr, type Css } from '@feega/live-edit/style-attr';
@@ -205,6 +206,16 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return out.ok ? writtenAll([out.change], '') : out;
   }
 
+  async function restructured(op: StructureOp, rawAt: string): Promise<Written> {
+    meta = { at: rawAt, prop: op, value: '', scope: '' };
+    const at = liveAtOf(rawAt);
+    if (!at || !inside(root, at.file)) {
+      return { ok: false, reason: `${rawAt} is not a file:line:col inside the workspace` };
+    }
+    const out = await structure(reader(root), { op, at });
+    return out.ok ? writtenAll([out.change], '') : out;
+  }
+
   async function variableSaved(ask: EditAsk, name: string): Promise<Written> {
     const sheet = await globalSheetOf(reader(root));
     if (!sheet) {
@@ -221,6 +232,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
 
   return {
     saveVariable: (ask: EditAsk, name: string) => inTurn(() => variableSaved(ask, name)),
+    structure: (req: { op: StructureOp; at: string }) => inTurn(() => restructured(req.op, req.at)),
     move: (from: string, to: string, place: Place) => inTurn(() => moved(from, to, place)),
     edit: (ask: EditAsk) => inTurn(() => edited(ask)),
     icon: (at: string, name: string) => inTurn(() => iconSwapped(at, name)),

@@ -7,7 +7,7 @@ export enum Place {
   After = 'after'
 }
 
-type Span = { start: number; end: number };
+export type Span = { start: number; end: number };
 
 const TAG_AT = /^<([a-zA-Z][\w.:-]*)/;
 const TAG = /<(\/?)([a-zA-Z][\w.:-]*)/g;
@@ -16,9 +16,9 @@ const EACH_OPEN = /\{#each\b/g;
 const EACH_CLOSE = /\{\/each\}/g;
 const MAP_CALL = /\.map\(/;
 
-const hiddenOut = (text: string) => text.replace(HIDDEN_BLOCK, (block) => block.replace(/[^\n]/g, ' '));
+export const hiddenOut = (text: string) => text.replace(HIDDEN_BLOCK, (block) => block.replace(/[^\n]/g, ' '));
 
-function spanOf(text: string, start: number): Span | null {
+export function spanOf(text: string, start: number): Span | null {
   const name = text.slice(start).match(TAG_AT)?.[1];
   const openEnd = name ? openTagEnd(text, start) : -1;
   if (!name || openEnd < 0) {
@@ -41,7 +41,7 @@ function spanOf(text: string, start: number): Span | null {
   return null;
 }
 
-function parentOf(text: string, start: number): number {
+export function parentOf(text: string, start: number): number {
   const stack: number[] = [];
   TAG.lastIndex = 0;
   for (let m = TAG.exec(text); m && m.index < start; m = TAG.exec(text)) {
@@ -57,7 +57,7 @@ function parentOf(text: string, start: number): number {
   return stack.at(-1) ?? -1;
 }
 
-function repeated(text: string, parent: number, start: number): string | null {
+export function repeated(text: string, parent: number, start: number): string | null {
   const between = text.slice(parent, start);
   const opened = (between.match(EACH_OPEN)?.length ?? 0) - (between.match(EACH_CLOSE)?.length ?? 0);
   if (opened > 0) {
@@ -66,7 +66,7 @@ function repeated(text: string, parent: number, start: number): string | null {
   return MAP_CALL.test(between) ? 'the element is rendered by .map(): reorder the data instead, or use CSS order' : null;
 }
 
-function lineSpan(text: string, span: Span): Span {
+export function lineSpan(text: string, span: Span): Span {
   const lineStart = text.lastIndexOf('\n', span.start - 1) + 1;
   const lineEnd = text.indexOf('\n', span.end);
   const whole = !text.slice(lineStart, span.start).trim() && !text.slice(span.end, lineEnd < 0 ? text.length : lineEnd).trim();

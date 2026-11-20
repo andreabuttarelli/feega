@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { ClassFamily, LiveProp, Side } from '@feega/live-edit/live-fields';
 import { fileEdits } from './file-edits';
 import { Place } from '@feega/live-edit/move-node';
+import { StructureOp } from '@feega/live-edit/structure';
 import { PageTarget } from '@feega/live-edit/page-rule';
 
 const PAGE = `<section class="px-4 py-8 text-black">
@@ -301,5 +302,19 @@ describe('fileEdits', () => {
     expect(readFileSync(join(root, 'src/icons.ts'), 'utf8')).toBe('export const APPLE = `<svg viewBox="0 0 1 1"></svg>`;\n');
     await edits.undo();
     expect(readFileSync(join(root, 'src/icons.ts'), 'utf8')).toBe(icons);
+  });
+
+  it.each([
+    [StructureOp.Delete, '<section class="px-4 py-8 text-black">\n  <p>{subtitle}</p>\n</section>\n'],
+    [StructureOp.Duplicate, '<section class="px-4 py-8 text-black">\n  <h1 class="text-2xl">Hello</h1>\n  <h1 class="text-2xl">Hello</h1>\n  <p>{subtitle}</p>\n</section>\n']
+  ])('%s scrive il sorgente in un solo passo di undo', async (op, expected) => {
+    const root = app();
+    const edits = fileEdits(root);
+    const out = await edits.structure({ op, at: 'src/Page.svelte:2:3' });
+
+    expect(out.ok).toBe(true);
+    expect(read(root)).toBe(expected);
+    await edits.undo();
+    expect(read(root)).toBe(PAGE);
   });
 });
