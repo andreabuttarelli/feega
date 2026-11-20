@@ -22,6 +22,7 @@
   import { Role, roleOf, sectionsOf } from './roles';
   import { paintOf } from './colour';
   import Field from './Field.svelte';
+  import { OFFSET_SIDES, OffsetSide, flipOffset, initialOffsets, type Offsets } from './position-box';
   import ShadowList from './ShadowList.svelte';
   import FillList from './FillList.svelte';
   import IconActions from './IconActions.svelte';
@@ -73,6 +74,22 @@
   const has = (s: Section) => sections.includes(s);
   const context = $derived({ rem: pick.rem, em: parseFloat(pick.styles['font-size'] ?? '16') || 16, parent: pick.parentWidth, viewport: { w: pick.viewport, h: window.innerHeight } });
   const groupRows = (group: Group) => ROWS.filter((r) => r.group === group && r.mode === modes[group]) as NumberRow[];
+  const SIDE_TITLE: Record<OffsetSide, string> = { [OffsetSide.Top]: 'Top', [OffsetSide.Right]: 'Right', [OffsetSide.Bottom]: 'Bottom', [OffsetSide.Left]: 'Left' };
+  let offsetChoice = $state<{ source: string; on: Partial<Offsets> }>({ source: '', on: {} });
+  const offsetKey = $derived(JSON.stringify(pick.source));
+  const offsetOn = (side: OffsetSide) => (offsetChoice.source === offsetKey ? offsetChoice.on[side] : undefined) ?? initialOffsets(pick.classes, pick.styles)[side];
+
+  function setOffset(side: OffsetSide, on: boolean) {
+    const on0 = offsetChoice.source === offsetKey ? offsetChoice.on : {};
+    offsetChoice = { source: offsetKey, on: { ...on0, [side]: on } };
+  }
+
+  function flip(side: OffsetSide) {
+    const on = offsetOn(side);
+    setOffset(side, !on);
+    onchange(num(side), flipOffset({ on, px: Math.round(parseFloat(pick.styles[side] ?? '0') || 0) }));
+  }
+
   const readOf = (name: string) => byName(name).read(pick.styles) as string;
 
   function shared(row: NumberRow): Shared<number> {
@@ -161,6 +178,7 @@
     <Select.Trigger class="select" aria-label={r.label} data-field={r.name}>
       <span>{current ? nameOf(current) : '—'}</span>
       {#if WEIGHT_NAMES[current]}<span class="muted">{current}</span>{/if}
+      <span class="caret"><ChevronDown size={12} /></span>
     </Select.Trigger>
     <Select.Portal>
       <Select.Content class="dropdown-menu" sideOffset={4}>
@@ -172,6 +190,23 @@
       </Select.Content>
     </Select.Portal>
   </Select.Root>
+{/snippet}
+
+{#snippet offsetBox()}
+  <div class="posbox" role="group" aria-label="Offsets" data-field="offsets">
+    {#each OFFSET_SIDES as side (side)}
+      {@const r = num(side)}
+      {@const on = offsetOn(side)}
+      <div class={`slot ${side}`} class:off={!on} data-on={on}>
+        <Field name={r.name} prefix="" px={shared(r)} units={r.units} {context} min={r.range.min} max={r.range.max} title={SIDE_TITLE[side]} onpreview={(v) => onpreview(r, v)} onchange={(v) => (setOffset(side, true), onchange(r, v))} />
+      </div>
+    {/each}
+    <div class="box" role="presentation">
+      {#each OFFSET_SIDES as side (side)}
+        <button type="button" class={`bar ${side}`} class:on={offsetOn(side)} role="switch" aria-checked={offsetOn(side)} aria-label={`${SIDE_TITLE[side]} offset`} title={`${SIDE_TITLE[side]}: ${offsetOn(side) ? 'set — click to remove' : 'not set — click to set'}`} data-bar={side} onclick={() => flip(side)}></button>
+      {/each}
+    </div>
+  </div>
 {/snippet}
 
 {#snippet sides(group: Group)}
@@ -331,6 +366,9 @@
       {@render header(s)}
       {#if !closed[s]}
         {#each shownRows(ROWS.filter((r) => r.section === s), pick.styles) as r (r.name)}
+          {#if s === Section.Position && OFFSET_SIDES.includes(r.name as OffsetSide)}
+            {#if r.name === OffsetSide.Top}<div class="row wide" data-row="offsets">{@render offsetBox()}</div>{/if}
+          {:else}
           {@const from = pick.inherited?.[READS[r.name]]}
           <div class="row" class:inherited={from} data-row={r.name} title={from ? `Inherited from ${from}` : undefined}>
             <span class="label">{r.label}</span>
@@ -348,6 +386,7 @@
               <button type="button" class="icon reset" title={`Reset ${r.label.toLowerCase()}`} aria-label={`Reset ${r.label.toLowerCase()}`} onclick={() => onchange(r, '')}>×</button>
             </div>
           </div>
+          {/if}
         {/each}
       {/if}
     </section>
@@ -423,6 +462,104 @@
     text-align: left;
     cursor: pointer;
   }
+
+  .properties :global(.caret) {
+    display: inline-grid;
+    margin-left: auto;
+    color: var(--ui-text-2);
+  }
+
+  .properties :global(.row.wide) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .posbox {
+    display: grid;
+    flex: 1;
+    grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr);
+    grid-template-rows: 28px 36px 28px;
+    gap: 4px;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .posbox .slot {
+    min-width: 0;
+  }
+
+  .posbox .slot :global(.unit) {
+    max-width: 30px;
+  }
+
+  .posbox .slot.off {
+    opacity: 0.45;
+  }
+
+  .posbox .slot :global(.prefix) {
+    min-width: 6px;
+  }
+
+  .posbox .slot.top {
+    grid-area: 1 / 1 / 2 / 4;
+    justify-self: center;
+    width: 50%;
+  }
+
+  .posbox .slot.bottom {
+    grid-area: 3 / 1 / 4 / 4;
+    justify-self: center;
+    width: 50%;
+  }
+
+  .posbox .slot.left {
+    grid-area: 2 / 1;
+  }
+
+  .posbox .slot.right {
+    grid-area: 2 / 3;
+  }
+
+  .posbox .box {
+    position: relative;
+    grid-area: 2 / 2;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-input);
+    box-shadow: inset 0 0 0 1px var(--ui-field-border);
+  }
+
+  .posbox .bar {
+    position: absolute;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ui-radius-xs);
+    background: var(--ui-text-3);
+    cursor: pointer;
+  }
+
+  .posbox .bar.on {
+    background: var(--ui-accent);
+  }
+
+  .posbox .bar.top,
+  .posbox .bar.bottom {
+    left: 10px;
+    width: 16px;
+    height: 4px;
+  }
+
+  .posbox .bar.left,
+  .posbox .bar.right {
+    top: 10px;
+    width: 4px;
+    height: 16px;
+  }
+
+  .posbox .bar.top { top: 4px; }
+  .posbox .bar.bottom { bottom: 4px; }
+  .posbox .bar.left { left: 4px; }
+  .posbox .bar.right { right: 4px; }
 
   .properties :global(.title) {
     display: flex;

@@ -188,7 +188,7 @@
   .unit,
   .unit-text {
     flex: none;
-    max-width: 26px;
+    max-width: 34px;
     padding: 0;
     border: 0;
     background: none;
