@@ -274,10 +274,11 @@ try {
     await lead.click();
     await page.waitForTimeout(800);
     const from = await lead.boundingBox();
-    const to = await frame.locator('section').first().boundingBox();
+    const [first, second] = await Promise.all([frame.locator('section > article').nth(0).boundingBox(), frame.locator('section > article').nth(1).boundingBox()]);
+    const gap = { x: (first.x + first.width + second.x) / 2, y: first.y + first.height / 2 };
     await page.mouse.move(from.x + 10, from.y + from.height / 2);
     await page.mouse.down();
-    await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 });
+    await page.mouse.move(gap.x, gap.y, { steps: 12 });
     await page.waitForTimeout(500);
     assert.ok(await page.locator('.drop-line.box').count(), 'the container is outlined');
     await page.mouse.up();
