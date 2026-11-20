@@ -73,11 +73,6 @@
     <p>IT16090491008, Roma, Italy</p>
   </div>
 
-  <p class="notice">
-    Feega must never be used to create illegal content, such as CSAM, non-consensual intimate imagery (NCII) or sexual
-    deepfakes. Feega does not use Google APIs or Google user data to generate content: Google and GitHub sign-in data is
-    used only to authenticate your account.
-  </p>
 </footer>
 
 <style>
@@ -263,13 +258,6 @@
     margin-top: 24px;
   }
 
-  .notice {
-    margin-top: 42px;
-    font-size: 12px;
-    line-height: 12px;
-    opacity: 0.5;
-  }
-
   @media (min-width: 1200px) {
     .site-foot {
       width: min(1100px, 100% - 0px);
@@ -284,10 +272,6 @@
     .rights > span {
       display: inline;
       color: inherit;
-    }
-
-    .notice {
-      margin-top: 24px;
     }
 
     .mark-box {
@@ -362,16 +346,6 @@
       max-width: 561px;
       margin-top: 0;
     }
-
-    .notice {
-      max-width: 745px;
-      margin-top: 24px;
-    }
   }
 
-  @media (max-width: 809.98px) {
-    .notice {
-      font-size: 13px;
-    }
-  }
 </style>
