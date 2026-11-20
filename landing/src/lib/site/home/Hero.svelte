@@ -162,7 +162,7 @@
 
   .fit {
     width: 100%;
-    max-width: 1240px;
+    max-width: var(--site-max);
     margin: 36px auto 0;
   }
 
@@ -213,7 +213,7 @@
 
   @media (min-width: 1200px) {
     .hero {
-      max-width: 1360px;
+      max-width: var(--site-max);
       padding: 150px 20px 0;
     }
 

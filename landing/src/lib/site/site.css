@@ -32,6 +32,7 @@
 
 .site {
   --site-bg: #000;
+  --site-max: 1320px;
   --site-ink: #f0eee9;
   --site-accent: #ff4000;
   --site-z-agents: 8;
@@ -337,7 +338,7 @@
 
 @media (min-width: 1200px) {
   :is(.site-wide, .site-full) {
-    width: min(1320px, 100% - 64px);
+    width: min(var(--site-max), 100% - 64px);
     max-width: none;
     margin: 0 auto;
   }
