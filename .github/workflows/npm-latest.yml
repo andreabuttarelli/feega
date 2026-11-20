@@ -1,0 +1,21 @@
+name: npm latest
+
+on:
+  push:
+    tags: ['npm-latest-*']
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: Point latest at the editor
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          V="${GITHUB_REF_NAME#npm-latest-}"
+          npm dist-tag add "feega@$V" latest
+          npm view feega dist-tags
