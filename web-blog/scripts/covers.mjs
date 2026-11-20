@@ -6,7 +6,8 @@ const HEIGHT = 630;
 const covers = [
   { file: 'public/covers/introducing-feega.png', lines: ['One canvas for', 'design, motion and AI'], kicker: 'Introducing Feega' },
   { file: 'public/covers/rust-canvas-renderer.png', lines: ['Rust, WebGPU, WASM.', 'One engine.'], kicker: 'Why we wrote the renderer in Rust' },
-  { file: 'public/covers/how-the-canvas-got-fast.png', lines: ['Tiles, cheaper blur,', 'half the wasm.'], kicker: 'How the canvas got fast' }
+  { file: 'public/covers/how-the-canvas-got-fast.png', lines: ['Tiles, cheaper blur,', 'half the wasm.'], kicker: 'How the canvas got fast' },
+  { file: 'public/covers/design-in-your-codebase.png', lines: ['One thing.', 'In your codebase.'], kicker: 'Why Feega is now one thing' }
 ];
 
 function svg({ lines, kicker }) {
