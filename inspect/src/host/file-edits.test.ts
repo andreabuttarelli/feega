@@ -227,6 +227,21 @@ describe('fileEdits', () => {
     expect(existsSync(join(root, 'src/App.module.css'))).toBe(false);
   });
 
+  it('la stessa modifica ripetuta su un CSS module non aggiunge un passo, un undo basta', async () => {
+    const root = app(PLAIN);
+    const jsx = 'export const App = () => <h1>Hi</h1>;\n';
+    writeFileSync(join(root, 'src/App.tsx'), jsx);
+    const edits = fileEdits(root);
+    const ask = { at: 'src/App.tsx:1:26', prop: LiveProp.Color, value: 'red', css: { color: 'red' } };
+    await edits.edit(ask);
+    await edits.edit({ ...ask, at: 'src/App.tsx:2:26' });
+    await edits.undo();
+
+    expect(edits.history()).toHaveLength(0);
+    expect(readFileSync(join(root, 'src/App.tsx'), 'utf8')).toBe(jsx);
+    expect(existsSync(join(root, 'src/App.module.css'))).toBe(false);
+  });
+
   it('un colore sull\'svg inline scrive la proprieta svg come classe, e undo la toglie', async () => {
     const root = app();
     const nav = '<a><svg class="h-4" viewBox="0 0 1 1"></svg></a>\n';

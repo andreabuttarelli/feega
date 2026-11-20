@@ -70,7 +70,11 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
 
   async function writtenAll(changes: FileChange[], token: string, note?: string): Promise<Written> {
     const step: Step = [];
-    for (const change of changes) {
+    const moving = changes.filter((c) => c.before !== c.after);
+    if (!moving.length) {
+      return { ok: true, path: changes[0]?.path ?? '', written: token, note };
+    }
+    for (const change of moving) {
       const full = inside(root, change.path);
       if (!full) {
         return { ok: false, reason: `${change.path} is outside the workspace` };
@@ -80,7 +84,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     await Promise.all(step.map((s) => writeFile(s.full, s.after)));
     steps.push(step);
     undone.length = 0;
-    const change = { ...meta, id: ++nextId, files: changes.map((c) => c.path), time: Date.now() };
+    const change = { ...meta, id: ++nextId, files: moving.map((c) => c.path), time: Date.now() };
     log.unshift(change);
     paths.set(step, change);
     return { ok: true, path: changes[0]?.path ?? '', written: token, note };
