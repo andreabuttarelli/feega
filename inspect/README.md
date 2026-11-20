@@ -4,8 +4,6 @@ Design in your codebase. Click any element of your running app, edit it visually
 
 Same editor, two ways to run it: this extension inside VS Code, or `npx feega` in your app folder to open it in the browser.
 
-![Select an element](images/1-select.png)
-
 ## Open your app
 
 Two ways, both start your dev server and open the app beside your code:
@@ -14,6 +12,8 @@ Two ways, both start your dev server and open the app beside your code:
 - **From the Command Palette:** press `Cmd+Shift+P` (macOS) or `Ctrl+Shift+P` (Windows, Linux), type **Feega**, and run **Feega: Open from current workspace**. If your app already runs, use **Feega: Open from URL…** and paste its address, e.g. `http://localhost:5173`.
 
 Prefer the browser? Run `npx feega` in your app folder (Node 20 or newer).
+
+![Select an element](images/1-select.png)
 
 ## How it works
 
