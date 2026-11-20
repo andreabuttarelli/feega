@@ -16,6 +16,8 @@
   import { iconSearch } from './icon-search.svelte';
   import { pageBridge, sourceText } from './page-bridge';
   import Properties from './Properties.svelte';
+  import Interactions from './Interactions.svelte';
+  import { wiringState } from './wiring-state.svelte';
   import ModeSwitch from './ModeSwitch.svelte';
   import FeegaMenu from './FeegaMenu.svelte';
   import OnboardingDialog from './Onboarding.svelte';
@@ -335,6 +337,7 @@
     [ToView.Onboarding]: (m) => (onboarding = m.state),
     [ToView.IconResults]: (m) => Object.assign(iconSearch, { id: m.id, library: m.library, hits: m.hits, error: m.error ?? '' }),
     [ToView.ImageSaved]: (m) => (imageSaved.url = m.url),
+    [ToView.Wiring]: (m) => Object.assign(wiringState, { at: m.at, wiring: m.wiring }),
     [ToView.Pick]: (m) => bridge.at(m.x, m.y).then((pick) => ((picked = pick), toHost({ kind: ToHost.Picked, id: m.id, pick }))),
     [ToView.Change]: (m) => {
       const row = ROWS.find((r) => r.name === m.row);
@@ -750,6 +753,7 @@
             <button type="button" class:on={scope === Scope.Class} disabled={!picked.classCount || styling === Styling.Tailwind} onclick={() => (scope = Scope.Class)} title={styling === Styling.Tailwind ? 'Class scope needs CSS rules, not Tailwind' : `Every element with this class: ${picked.classCount}`}>All .{picked.classes.split(' ')[0] || 'class'}{picked.classCount ? ` (${picked.classCount})` : ''}</button>
           </div>
           <Properties pick={picked} {palette} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onnotice={showToast} />
+          <Interactions pick={picked} {changes} />
         {:else}
           <p class="empty">{bridged ? 'Click an element to edit it. Double-click text to rewrite it.' : 'The page has no Feega source map: element picking needs the feega-source-map plugin.'}</p>
         {/if}
