@@ -111,7 +111,10 @@ export enum ToHost {
   IconSwap = 'icon-swap',
   IconMarkup = 'icon-markup',
   IconGet = 'icon-get',
-  IconSearch = 'icon-search'
+  IconSearch = 'icon-search',
+  SignIn = 'sign-in',
+  CancelSignIn = 'cancel-sign-in',
+  SignOut = 'sign-out'
 }
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number };
@@ -127,7 +130,15 @@ export enum ToView {
   Server = 'server',
   Settings = 'settings',
   History = 'history',
-  IconResults = 'icon-results'
+  IconResults = 'icon-results',
+  Account = 'account'
+}
+
+export enum AccountState {
+  SignedOut = 'signed-out',
+  Waiting = 'waiting',
+  SignedIn = 'signed-in',
+  Cancelled = 'cancelled'
 }
 
 export type HostMessage =
@@ -153,7 +164,10 @@ export type HostMessage =
   | { kind: ToHost.IconSwap; at: string; name: string }
   | { kind: ToHost.IconMarkup; at: string; markup: string; inner?: string }
   | { kind: ToHost.IconGet; at: string; name: string; size: number; stroke: number; inner?: string }
-  | { kind: ToHost.IconSearch; id: number; query: string };
+  | { kind: ToHost.IconSearch; id: number; query: string }
+  | { kind: ToHost.SignIn }
+  | { kind: ToHost.CancelSignIn }
+  | { kind: ToHost.SignOut };
 
 export type ViewMessage =
   | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string }
@@ -164,7 +178,8 @@ export type ViewMessage =
   | { kind: ToView.Edited; ok: boolean; reason?: string; written?: string; at?: Source; saved?: Source; note?: string }
   | { kind: ToView.Change; row: string; value: string }
   | { kind: ToView.Pick; id: number; x: number; y: number }
-  | { kind: ToView.IconResults; id: number; library: string | null; hits: IconHit[]; error?: string };
+  | { kind: ToView.IconResults; id: number; library: string | null; hits: IconHit[]; error?: string }
+  | { kind: ToView.Account; state: AccountState; email?: string };
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';

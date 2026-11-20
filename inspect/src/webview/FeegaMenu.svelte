@@ -2,9 +2,10 @@
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import Coffee from '@lucide/svelte/icons/coffee';
   import { tick } from 'svelte';
+  import { AccountState, ToHost } from '../messages';
   import { LINKS, SETTINGS, issueUrl, type ReportFacts, type SettingKey, type SettingValue, type Settings } from '../settings';
 
-  let { values, facts, onsetting, onlink }: { values: Settings | null; facts: ReportFacts | null; onsetting: (key: SettingKey, value: SettingValue) => void; onlink: (url: string) => void } = $props();
+  let { values, facts, account, onaccount, onsetting, onlink }: { values: Settings | null; facts: ReportFacts | null; account: { state: AccountState; email?: string }; onaccount: (kind: ToHost.SignIn | ToHost.CancelSignIn | ToHost.SignOut) => void; onsetting: (key: SettingKey, value: SettingValue) => void; onlink: (url: string) => void } = $props();
 
   let open = $state(false);
   let trigger = $state<HTMLButtonElement | null>(null);
@@ -48,7 +49,15 @@
     <div class="popover" role="dialog" aria-label="Feega" tabindex="-1" bind:this={panel} onkeydown={onKey}>
       <section>
         <h3>Account</h3>
-        <button type="button" class="row" disabled title="Sign-in comes in a next update">Connect to Feega <span class="soon">soon</span></button>
+        {#if account.state === AccountState.SignedIn}
+          <p class="email" data-testid="account-email">{account.email}</p>
+          <button type="button" class="row" data-testid="sign-out" onclick={() => onaccount(ToHost.SignOut)}>Sign out</button>
+        {:else if account.state === AccountState.Waiting}
+          <button type="button" class="row" data-testid="cancel-sign-in" onclick={() => onaccount(ToHost.CancelSignIn)}>Waiting for the browser… <span class="soon">cancel</span></button>
+        {:else}
+          <button type="button" class="row" data-testid="sign-in" onclick={() => onaccount(ToHost.SignIn)}>Sign in to Feega</button>
+          {#if account.state === AccountState.Cancelled}<p class="hint">Sign-in cancelled or timed out.</p>{/if}
+        {/if}
         <p class="hint">Optional. Everything works without an account.</p>
       </section>
 
@@ -222,6 +231,15 @@
     color: var(--ui-text);
     font: inherit;
     font-size: var(--ui-text-sm);
+  }
+
+  .email {
+    margin: 2px 8px;
+    overflow: hidden;
+    color: var(--ui-text);
+    font-size: var(--ui-text-sm);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .hint {

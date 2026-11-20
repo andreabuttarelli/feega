@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { settingsWith, type SettingValue } from '../settings';
+import { fileAccountStore, type AccountStore } from './account';
 import { openTarget } from './open-source';
 import type { Platform, Stored, Transport } from './platform';
 
@@ -18,7 +19,7 @@ const LINUX_OPENER = ['xdg-open'];
 
 export type Launch = (command: string, args: string[]) => Promise<boolean>;
 
-export type NodeHost = { root: string; launcher: string; version: string; transport: Transport; print: (line: string) => void; launch?: Launch; env?: NodeJS.ProcessEnv };
+export type NodeHost = { root: string; launcher: string; version: string; transport: Transport; print: (line: string) => void; launch?: Launch; env?: NodeJS.ProcessEnv; account?: AccountStore };
 
 export const launchDetached: Launch = (command, args) =>
   new Promise((resolve) => {
@@ -40,7 +41,7 @@ const stateDirFor = (root: string, env: NodeJS.ProcessEnv) => {
   return join(env.XDG_CACHE_HOME || join(homedir(), '.cache'), CACHE_DIR, key);
 };
 
-export function nodePlatform({ root, launcher, version, transport, print, launch = launchDetached, env = process.env }: NodeHost): Platform {
+export function nodePlatform({ root, launcher, version, transport, print, launch = launchDetached, env = process.env, account = fileAccountStore() }: NodeHost): Platform {
   const dir = join(root, FEEGA_DIR);
   const settingsPath = join(dir, SETTINGS_FILE);
   const stateDir = stateDirFor(root, env);
@@ -100,6 +101,8 @@ export function nodePlatform({ root, launcher, version, transport, print, launch
       await save(settingsPath, settings);
       return edit(settingsPath);
     },
-    sourceControl: () => print(`feega: review the changes with \`git -C ${root} diff\``)
+    sourceControl: () => print(`feega: review the changes with \`git -C ${root} diff\``),
+    notify: (text) => print(`feega: ${text}`),
+    account
   };
 }

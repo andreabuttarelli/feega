@@ -10,7 +10,7 @@
   import { LiveProp } from '@feega/live-edit/live-fields';
   import { untrack } from 'svelte';
   import { selectionKey, SelectionKey } from './selection-keys';
-  import { Mode, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
+  import { AccountState, Mode, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
   import { fromHost, toHost } from './host';
   import { iconSearch } from './icon-search.svelte';
   import { pageBridge, sourceText } from './page-bridge';
@@ -160,6 +160,7 @@
   let moving = $state<{ dx: number; dy: number; x: number; y: number } | null>(null);
   let settings = $state<Settings | null>(null);
   let facts = $state<ReportFacts | null>(null);
+  let account = $state<{ state: AccountState; email?: string }>({ state: AccountState.SignedOut });
 
   const history = browseHistory();
   let savedPrefs = false;
@@ -303,6 +304,7 @@
         }
       }, SETTLE_MS);
     },
+    [ToView.Account]: (m) => (account = { state: m.state, email: m.email }),
     [ToView.IconResults]: (m) => Object.assign(iconSearch, { id: m.id, library: m.library, hits: m.hits, error: m.error ?? '' }),
     [ToView.Pick]: (m) => bridge.at(m.x, m.y).then((pick) => ((picked = pick), toHost({ kind: ToHost.Picked, id: m.id, pick }))),
     [ToView.Change]: (m) => {
@@ -556,7 +558,7 @@
   </aside>
   <section class="view">
     <header class="toolbar" bind:clientHeight={toolbarH}>
-      <FeegaMenu values={settings} {facts} onsetting={(key, value) => toHost({ kind: ToHost.Setting, key, value })} onlink={(link) => toHost({ kind: ToHost.External, url: link })} />
+      <FeegaMenu values={settings} {facts} {account} onaccount={(kind) => toHost({ kind })} onsetting={(key, value) => toHost({ kind: ToHost.Setting, key, value })} onlink={(link) => toHost({ kind: ToHost.External, url: link })} />
       <button type="button" class="icon" class:on={!leftClosed} title="Layers (⇧⌘\)" aria-label="Toggle Layers" data-testid="left-toggle" onclick={() => ((leftClosed = !leftClosed), savePrefs())}><PanelLeft size={15} /></button>
       <button type="button" class="icon" title="Back (⌘[)" disabled={!canBack} onclick={() => go(history.back())}><ArrowLeft size={15} /></button>
       <button type="button" class="icon" title="Forward (⌘])" disabled={!canForward} onclick={() => go(history.forward())}><ArrowRight size={15} /></button>

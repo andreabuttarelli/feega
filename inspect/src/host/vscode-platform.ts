@@ -3,17 +3,33 @@ import * as vscode from 'vscode';
 import type { HostMessage, Source } from '../messages';
 import { settingsWith } from '../settings';
 import { Column, openTarget } from './open-source';
+import type { Account, AccountStore } from './account';
 import type { Platform } from './platform';
 
 const BEFORE_SCHEME = 'feega-before';
 
 const COLUMNS: Record<Column, vscode.ViewColumn> = { [Column.First]: vscode.ViewColumn.One, [Column.Beside]: vscode.ViewColumn.Beside };
 
+const SECRET_KEY = 'feegaInspect.account';
+
 const config = () => vscode.workspace.getConfiguration();
 
 export type VsCodeHost = { context: vscode.ExtensionContext; output: vscode.OutputChannel; launcher: string };
 
 export type PanelLike = Pick<vscode.WebviewPanel, 'viewColumn'> & { webview: Pick<vscode.Webview, 'postMessage' | 'onDidReceiveMessage'> };
+
+export const secretAccountStore = (secrets: Pick<vscode.SecretStorage, 'get' | 'store' | 'delete'>): AccountStore => ({
+  read: async () => {
+    const raw = await secrets.get(SECRET_KEY);
+    try {
+      return raw ? (JSON.parse(raw) as Account) : null;
+    } catch {
+      return null;
+    }
+  },
+  write: (account) => Promise.resolve(secrets.store(SECRET_KEY, JSON.stringify(account))),
+  clear: () => Promise.resolve(secrets.delete(SECRET_KEY))
+});
 
 export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<string, string>): Platform {
   const { context, output } = host;
@@ -56,7 +72,9 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     },
     openExternal: (url) => vscode.env.openExternal(vscode.Uri.parse(url)),
     openSettings: (key) => vscode.commands.executeCommand('workbench.action.openSettings', key),
-    sourceControl: () => vscode.commands.executeCommand('workbench.view.scm')
+    sourceControl: () => vscode.commands.executeCommand('workbench.view.scm'),
+    notify: (text) => vscode.window.showInformationMessage(`Feega: ${text}`),
+    account: secretAccountStore(context.secrets)
   };
 }
 

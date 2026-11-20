@@ -1,4 +1,5 @@
 import type { HostMessage, Source, ViewMessage } from '../messages';
+import type { AccountStore } from './account';
 import type { SettingKey, SettingValue, Settings } from '../settings';
 
 export enum Stored {
@@ -29,4 +30,6 @@ export type Platform = Transport & {
   openExternal: (url: string) => unknown;
   openSettings: (key: SettingKey) => unknown;
   sourceControl: () => unknown;
+  notify: (text: string) => unknown;
+  account: AccountStore;
 };

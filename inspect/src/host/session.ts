@@ -2,8 +2,9 @@ import { rm } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { appsIn } from '@feega/dev-run/run-plan';
 import { liveAtOf } from '@feega/live-edit/live-ask';
-import { ServerAction, ServerState, ToHost, ToView, type EditAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
+import { AccountState, ServerAction, ServerState, ToHost, ToView, type EditAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
 import { SettingKey, StylingChoice } from '../settings';
+import { SignInEnd, signIn } from './sign-in';
 import { addPlugin } from './add-plugin';
 import { mcpIcon, searchIcons } from './icon-search';
 import { appOfSource, firstStampedFile, urlOf } from './attach-url';
@@ -33,6 +34,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   let root = app === null ? workspace : join(workspace, app);
   let starts = 0;
   let cancel: AbortController | null = null;
+  let signing: AbortController | null = null;
   const pids = memoOf(platform);
   let route = startRoute;
   let lastError = '';
@@ -73,6 +75,35 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
 
   async function iconsFound(id: number, query: string) {
     await post({ kind: ToView.IconResults, id, ...(await searchIcons(root, fetch, query)) });
+  }
+
+  const postAccount = (state: AccountState, email?: string) => post({ kind: ToView.Account, state, email });
+
+  async function showAccount() {
+    const account = await platform.account.read();
+    await postAccount(account ? AccountState.SignedIn : AccountState.SignedOut, account?.user.email);
+  }
+
+  async function startSignIn() {
+    if (signing) {
+      return;
+    }
+    signing = new AbortController();
+    await postAccount(AccountState.Waiting);
+    const outcome = await signIn({ openBrowser: platform.openExternal, signal: signing.signal });
+    signing = null;
+    if (outcome.end !== SignInEnd.Done) {
+      await postAccount(AccountState.Cancelled);
+      return;
+    }
+    await platform.account.write(outcome.account);
+    await postAccount(AccountState.SignedIn, outcome.account.user.email);
+    await platform.notify(`Signed in as ${outcome.account.user.email}`);
+  }
+
+  async function signOut() {
+    await platform.account.clear();
+    await postAccount(AccountState.SignedOut);
   }
 
   const edit = (ask: EditAsk) => edits.edit(ask).then((out) => edited(out, ask));
@@ -288,7 +319,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   };
 
   const handlers: { [K in ToHost]: (m: Extract<HostMessage, { kind: K }>) => unknown } = {
-    [ToHost.Ready]: () => (showApp(), postSettings(), postHistory()),
+    [ToHost.Ready]: () => (showApp(), postSettings(), postHistory(), showAccount()),
     [ToHost.Edit]: (m) => edit(m.ask),
     [ToHost.Undo]: undo,
     [ToHost.Open]: (m) => platform.openSource(root, m.at),
@@ -310,7 +341,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.IconSwap]: (m) => edits.icon(m.at, m.name).then((out) => edited(out, null)),
     [ToHost.IconMarkup]: (m) => edits.svg(m.at, m.markup, m.inner).then((out) => edited(out, null)),
     [ToHost.IconGet]: iconFetched,
-    [ToHost.IconSearch]: (m) => iconsFound(m.id, m.query)
+    [ToHost.IconSearch]: (m) => iconsFound(m.id, m.query),
+    [ToHost.SignIn]: startSignIn,
+    [ToHost.CancelSignIn]: () => signing?.abort(),
+    [ToHost.SignOut]: signOut
   };
 
   platform.receive((message) => (handlers[message.kind] as (m: HostMessage) => unknown)(message));
