@@ -27,9 +27,9 @@
   import { placeLayer } from '$lib/motion/light-group';
   import type { ElementHost } from '$lib/motion/element-host';
   import type { Frame } from '$lib/motion/units';
-  import { liveEdits } from '$lib/motion/live-edit';
-  import { FieldKind, FieldText } from '$lib/motion/number-field';
-  import NumberField from './NumberField.svelte';
+  import { liveEdits } from '@feega/properties-panel/live-edit';
+  import { FieldKind, FieldText } from '@feega/properties-panel/number-field';
+  import NumberField from '@feega/properties-panel/NumberField.svelte';
 
   let { doc, clip, part, placement = Placement.Free, within = null, host = null, space = doc, onchange, onalign }: { doc: MotionDoc; clip: MotionClip; part: PositionPart; placement?: Placement; within?: MotionClip | null; host?: ElementHost | null; space?: Frame; onchange: (result: OpResult, summary: string) => void; onalign: (edge: Edge) => void } = $props();
 

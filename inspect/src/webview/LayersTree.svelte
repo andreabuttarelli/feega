@@ -1,0 +1,225 @@
+<script lang="ts">
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import { FLOAT_GLYPH, ICON_SVG, floatingOf, iconOf } from './layer-icons';
+  import Eye from '@lucide/svelte/icons/eye';
+  import EyeOff from '@lucide/svelte/icons/eye-off';
+  import Lock from '@lucide/svelte/icons/lock';
+  import Unlock from '@lucide/svelte/icons/lock-open';
+  import { Place } from '@feega/live-edit/move-node';
+  import type { LayerNode, Pick, Source } from '../messages';
+  import { sourceText } from './page-bridge';
+  import { actionsOf, roleOf } from './roles';
+  import Self from './LayersTree.svelte';
+
+  type Props = {
+    nodes: LayerNode[];
+    picked: Pick | null;
+    depth?: number;
+    open: Record<string, boolean>;
+    onselect: (source: Source) => void;
+    onhover: (source: Source | null) => void;
+    onopen: (source: Source) => void;
+    onmove: (from: Source, to: Source, place: Place) => void;
+    dragging: { source: Source | null; name: string; component: boolean; parentFile: string | null };
+    parentFile?: string | null;
+    onusage: (file: string, from: string, to: string, place: Place) => void;
+    hidden: Set<string>;
+    locked: Set<string>;
+    ontoggle: (flag: 'hidden' | 'locked', source: Source) => void;
+  };
+
+  let { nodes, picked, depth = 0, open, onselect, onhover, onopen, onmove, dragging, parentFile = null, onusage, hidden, locked, ontoggle }: Props = $props();
+
+  const INDENT_PX = 12;
+  const EDGE_BAND = 0.25;
+  const key = (n: LayerNode) => (n.source ? sourceText(n.source) : `group:${n.name}`);
+  const isPicked = (n: LayerNode) => picked !== null && n.source !== null && sourceText(picked.source) === sourceText(n.source);
+  const actions = (n: LayerNode) => actionsOf(roleOf({ tag: n.tag, ownText: false, inlineText: false, elements: n.children.length, display: n.display }));
+  const visual = (n: LayerNode) => n.source !== null && actions(n).visibility;
+  const choose = (n: LayerNode) => (n.source ? onselect(n.source) : (open[key(n)] = !open[key(n)]));
+
+  function onKey(e: KeyboardEvent, node: LayerNode) {
+    const actions: Record<string, () => void> = {
+      Enter: () => (node.source ? onopen(node.source) : choose(node)),
+      ' ': () => choose(node),
+      ArrowRight: () => (open[key(node)] = true),
+      ArrowLeft: () => (open[key(node)] = false)
+    };
+    if (actions[e.key]) {
+      e.preventDefault();
+      actions[e.key]();
+    }
+  }
+
+  function onDrop(e: DragEvent, node: LayerNode) {
+    e.preventDefault();
+    const from = dragging.source;
+    dragging.source = null;
+    if (!from || !node.source) {
+      return;
+    }
+    const row = e.currentTarget as HTMLElement;
+    const { top, height } = row.getBoundingClientRect();
+    const ratio = (e.clientY - top) / height;
+    if (node.component && dragging.component && dragging.name !== node.name && parentFile && parentFile === dragging.parentFile) {
+      onusage(parentFile, dragging.name, node.name, ratio < 0.5 ? Place.Before : Place.After);
+      return;
+    }
+    onmove(from, node.source, ratio < EDGE_BAND ? Place.Before : ratio > 1 - EDGE_BAND ? Place.After : Place.Inside);
+  }
+</script>
+
+{#each nodes as node (key(node))}
+  {@const id = key(node)}
+  <div
+    class="row"
+    class:picked={isPicked(node)}
+    class:dim={hidden.has(id)}
+    role="treeitem"
+    aria-selected={isPicked(node)}
+    aria-expanded={node.children.length ? Boolean(open[id]) : undefined}
+    tabindex="0"
+    draggable={visual(node)}
+    style={`padding-left:${8 + depth * INDENT_PX}px`}
+    data-layer={id}
+    onclick={() => choose(node)}
+    onkeydown={(e) => onKey(e, node)}
+    onpointerenter={() => onhover(visual(node) ? node.source : null)}
+    onpointerleave={() => onhover(null)}
+    ondragstart={() => Object.assign(dragging, { source: node.source, name: node.name, component: node.component, parentFile })}
+    ondragover={(e) => e.preventDefault()}
+    ondrop={(e) => onDrop(e, node)}
+  >
+    {#if node.children.length}
+      <button type="button" class="twist" class:open={open[id]} aria-label={open[id] ? 'Collapse' : 'Expand'} onclick={(e) => (e.stopPropagation(), (open[id] = !open[id]))}><ChevronRight size={12} /></button>
+    {:else}
+      <span class="twist"></span>
+    {/if}
+    <svg class="type" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="0.833" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{@html ICON_SVG[iconOf(node)]}</svg>
+    <span class="name" class:component={node.component}>{node.name}</span>
+    {#if floatingOf(node.position)}<span class={`float ${floatingOf(node.position)}`} data-float={floatingOf(node.position)} title={floatingOf(node.position)} aria-label={floatingOf(node.position)}><svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true">{@html FLOAT_GLYPH[floatingOf(node.position)!]}</svg></span>{/if}
+    {#if node.count > 1 && node.source}<span class="count" title={`Rendered ${node.count} times by a loop in ${node.source.file}:${node.source.line} — edits apply to all ${node.count}`}>×{node.count}</span>{:else if !node.source}<span class="count">{node.count}</span>{/if}
+    {#if actions(node).visibility && node.source}<span class="toggles" class:active={hidden.has(id) || locked.has(id)}>
+      <button type="button" class="t" title={hidden.has(id) ? 'Show (⇧⌘H)' : 'Hide: display none in code (⇧⌘H)'} aria-label={hidden.has(id) ? 'Show' : 'Hide'} onclick={(e) => (e.stopPropagation(), ontoggle('hidden', node.source!))}>{#if hidden.has(id)}<EyeOff size={12} />{:else}<Eye size={12} />{/if}</button>
+      <button type="button" class="t" title={locked.has(id) ? 'Unlock (⇧⌘L)' : 'Lock (⇧⌘L)'} aria-label={locked.has(id) ? 'Unlock' : 'Lock'} onclick={(e) => (e.stopPropagation(), ontoggle('locked', node.source!))}>{#if locked.has(id)}<Lock size={12} />{:else}<Unlock size={12} />{/if}</button>
+    </span>{/if}
+  </div>
+  {#if node.children.length && open[id]}
+    <Self nodes={node.children} {picked} depth={depth + 1} {open} {onselect} {onhover} {onopen} {onmove} {dragging} parentFile={node.source?.file ?? null} {onusage} {hidden} {locked} {ontoggle} />
+  {/if}
+{/each}
+
+<style>
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 26px;
+    padding-right: 8px;
+    color: var(--ui-text);
+    font-size: var(--ui-text-sm);
+    cursor: default;
+    outline: none;
+  }
+
+  .row:hover {
+    background: var(--ui-input);
+  }
+
+  .row:focus-visible {
+    box-shadow: inset 0 0 0 1px var(--ui-accent);
+  }
+
+  .row.picked {
+    background: color-mix(in srgb, var(--ui-accent) 22%, transparent);
+  }
+
+  .twist {
+    display: grid;
+    place-items: center;
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ui-text-3);
+    cursor: pointer;
+    transition: transform 120ms ease;
+  }
+
+  .twist.open {
+    transform: rotate(90deg);
+  }
+
+  .type {
+    flex: none;
+    color: var(--ui-text-3);
+  }
+
+  .name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .name.component {
+    color: #a78bfa;
+  }
+
+  .toggles {
+    display: none;
+    gap: 2px;
+    margin-left: auto;
+  }
+
+  .row:hover .toggles,
+  .toggles.active {
+    display: flex;
+  }
+
+  .t {
+    display: grid;
+    place-items: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 3px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: none;
+    color: var(--ui-text-2);
+    font: inherit;
+    font-size: var(--ui-text-xs);
+    cursor: pointer;
+  }
+
+  .t:hover {
+    background: var(--ui-input-hover);
+    color: var(--ui-text);
+  }
+
+  .row.dim .name {
+    opacity: 0.45;
+  }
+
+  .float {
+    display: inline-flex;
+    flex: none;
+    color: var(--ui-accent);
+  }
+
+  .float svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.2;
+  }
+
+  .float.sticky {
+    color: var(--ui-text-3);
+  }
+
+  .count {
+    margin-left: auto;
+    color: var(--ui-text-3);
+    font-size: var(--ui-text-xs);
+  }
+</style>

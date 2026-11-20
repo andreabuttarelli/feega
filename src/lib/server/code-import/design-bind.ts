@@ -7,7 +7,7 @@ import { inEveryScope } from '$lib/motion/doc-scopes';
 import { BORDER_TARGET, bindableTargets, resolveVariables } from '$lib/motion/variables';
 import { sameColour } from '$lib/server/url-import/page-tokens';
 import { uniformRadius } from '$lib/server/url-import/corner-radius';
-import type { VarRule } from './css-tokens';
+import type { VarRule } from '@feega/live-edit/css-tokens';
 import { OTHER_GROUP, SPACING_BASE, tokenId, type TokenMap } from './design-tokens';
 import { styleFits, type MadeStyles } from './design-styles';
 import { defineStyle, slotOf } from '$lib/motion/styles';

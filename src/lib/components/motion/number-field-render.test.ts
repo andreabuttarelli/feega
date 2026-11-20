@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import type { ComponentProps } from 'svelte';
-import NumberField from './NumberField.svelte';
-import { FieldFill } from '$lib/motion/number-field';
+import NumberField from '@feega/properties-panel/NumberField.svelte';
+import { FieldFill } from '@feega/properties-panel/number-field';
 import { KeyMark } from '$lib/motion/timeline-layers';
 
 const html = (props: Partial<ComponentProps<typeof NumberField>> = {}) =>

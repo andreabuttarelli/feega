@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 import { fixture } from '../../../../tests/fixtures/design-tokens/read';
 import { codePlan } from './code-doc';
-import { PAGE_SHEET, parseSheets, readSheets } from './css-tokens';
+import { PAGE_SHEET, parseSheets, readSheets } from '@feega/live-edit/css-tokens';
 import { readOnlyKeys, tokenSetOf, variablesOf } from './design-tokens';
 import { boardBound, designBoard, DESIGN_BOARD } from './design-board';
 import { setActiveMode, setCollection } from '$lib/motion/variables';

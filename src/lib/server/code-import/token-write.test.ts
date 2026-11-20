@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Variables } from '@feega/motion-core/motion/variables-model';
 import { fixture } from '../../../../tests/fixtures/design-tokens/read';
-import { PAGE_SHEET, parseSheets, readSheets } from './css-tokens';
+import { PAGE_SHEET, parseSheets, readSheets } from '@feega/live-edit/css-tokens';
 import { tokenSetOf, variablesOf } from './design-tokens';
 import { designOf } from './design-system';
 import { frameEdits, writeTokens } from './token-write';

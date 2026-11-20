@@ -1,4 +1,4 @@
-import { LIGHT, type Declared } from './css-tokens';
+import { LIGHT, type Declared } from '@feega/live-edit/css-tokens';
 import type { ReadFile } from './write-back';
 
 export type SassRead = { declared: Declared[]; skipped: string[] };

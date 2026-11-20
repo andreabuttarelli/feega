@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { fieldKeys } from "$lib/motion/field-keys";
+	import { fieldKeys } from "@feega/properties-panel/field-keys";
 	import { cn } from "$lib/utils.js";
 	import type { ControlProps } from "./types";
 

@@ -5,8 +5,8 @@
   import ModelMenu from './ModelMenu.svelte';
   import NodeSettings from './NodeSettings.svelte';
   import type { SelectionPanel } from './selection-properties.svelte';
-  import NumberField from '$lib/components/motion/NumberField.svelte';
-  import { FieldKind } from '$lib/motion/number-field';
+  import NumberField from '@feega/properties-panel/NumberField.svelte';
+  import { FieldKind } from '@feega/properties-panel/number-field';
   import { SELECTION_FIELDS, fieldValue } from '$lib/canvas/selection-box';
 
   const MIN_ALIGNED = 2;

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import ColorField from './ColorField.svelte';
-import NumberField from './NumberField.svelte';
+import NumberField from '@feega/properties-panel/NumberField.svelte';
 import SegmentedField from './SegmentedField.svelte';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
-import { MIXED } from '$lib/motion/mixed';
+import { MIXED } from '@feega/properties-panel/mixed';
 import { segmentsOf } from '$lib/motion/segments';
 
 describe('colour field', () => {

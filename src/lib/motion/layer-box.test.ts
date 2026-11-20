@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { BoxKey, boxValue, layerBoxes, setLayerBox } from './layer-box';
-import { MIXED } from './mixed';
+import { MIXED } from '@feega/properties-panel/mixed';
 import { EditMode } from './edit-mode';
 import { createComponent, instanceOf } from './main-component';
 import { setConstraints, Horizontal, Vertical } from './constraints/constraints';

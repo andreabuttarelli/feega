@@ -1,0 +1,147 @@
+{
+  "name": "feega",
+  "displayName": "Feega",
+  "description": "Design in your codebase: click any element of your running app, edit it visually, and the change is written to your code. No AI, no tokens.",
+  "version": "0.2.6",
+  "publisher": "andreabuttarelli",
+  "license": "Apache-2.0",
+  "icon": "images/icon.png",
+  "homepage": "https://feega.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/andreabuttarelli/feega",
+    "directory": "inspect"
+  },
+  "bugs": {
+    "url": "https://github.com/andreabuttarelli/feega/issues"
+  },
+  "galleryBanner": {
+    "color": "#0a0a0a",
+    "theme": "dark"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "keywords": [
+    "design",
+    "css",
+    "tailwind",
+    "react",
+    "nextjs",
+    "svelte",
+    "sveltekit",
+    "vue",
+    "visual editor"
+  ],
+  "main": "./dist/extension.cjs",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "feegaInspect.open",
+        "title": "Open from current workspace",
+        "category": "Feega"
+      },
+      {
+        "command": "feegaInspect.designFolder",
+        "title": "Design this folder with Feega",
+        "category": "Feega"
+      },
+      {
+        "command": "feegaInspect.designPage",
+        "title": "Design this page with Feega",
+        "category": "Feega"
+      },
+      {
+        "command": "feegaInspect.openFromUrl",
+        "title": "Open from URL…",
+        "category": "Feega"
+      }
+    ],
+    "configuration": {
+      "title": "Feega",
+      "properties": {
+        "feegaInspect.telemetry": {
+          "type": "boolean",
+          "default": true,
+          "description": "Send anonymous usage counts (opens, edits, framework, styling system). No code, no paths. Also off when VS Code telemetry is off."
+        },
+        "feegaInspect.styling": {
+          "type": "string",
+          "default": "auto",
+          "enum": [
+            "auto",
+            "tailwind",
+            "css"
+          ],
+          "description": "How style edits are written. Auto: Tailwind classes when the project has Tailwind; otherwise CSS in the component style block (Svelte, Vue), or an inline style in files without a stylesheet (JSX, HTML)."
+        },
+        "feegaInspect.devCommand": {
+          "type": "string",
+          "default": "",
+          "description": "Command that starts the dev server. Empty: detected from package.json."
+        },
+        "feegaInspect.defaultSize": {
+          "type": "string",
+          "default": "full",
+          "enum": [
+            "full",
+            "desktop",
+            "tablet",
+            "phone"
+          ],
+          "description": "Device size the preview opens at."
+        },
+        "feegaInspect.keepServerAlive": {
+          "type": "string",
+          "default": "10",
+          "enum": [
+            "0",
+            "10",
+            "30",
+            "60"
+          ],
+          "description": "Minutes the dev server Feega started stays warm after the panel closes. 0: stop on close. Closing the window always stops it."
+        }
+      }
+    },
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "feegaInspect.designFolder",
+          "when": "explorerResourceIsFolder",
+          "group": "navigation@90"
+        },
+        {
+          "command": "feegaInspect.designPage",
+          "when": "!explorerResourceIsFolder && resourceExtname =~ /^\\.(svelte|vue|tsx|jsx|astro|html)$/",
+          "group": "navigation@90"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "feegaInspect.designFolder",
+          "when": "false"
+        },
+        {
+          "command": "feegaInspect.designPage",
+          "when": "false"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "dev": "node build.mjs --watch",
+    "build": "node build.mjs",
+    "package": "npm run build && npx -y @vscode/vsce package --no-dependencies",
+    "test:e2e": "npm run build && node test/run.cjs"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "@vscode/test-electron": "^2.4.1"
+  }
+}

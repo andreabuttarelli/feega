@@ -28,7 +28,7 @@ import { logAiCall } from '$lib/server/ai-log';
 import { sandboxRunner, sandboxUsd, type RepoRunner } from './sandbox-runner';
 import { githubFor } from './github-runtime';
 import { branchesOf, publicCall, treeOf } from './github';
-import { appOf, PlanRefusal, type PlanRefused } from './run-plan';
+import { appOf, PlanRefusal, type PlanRefused } from '@feega/dev-run/run-plan';
 import { snapshotSha, uploadedArchive, uploadFiles, uploadOf, uploadSource } from './upload-source';
 import { allRoutes, leftOut, routesAt, tooManyRoutes, UNREADABLE, type LeftOut, type RouteSource, type RoutesFound } from './routes-found';
 import { DataCheck, patchNodeData } from '$lib/server/repos/canvas';

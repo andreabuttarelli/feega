@@ -27,7 +27,7 @@
   import { animProp, ValueKind } from '@feega/motion-core/motion/keyframes';
   import { editAt, parseDecimal, valueAt } from '$lib/motion/inspector';
   import { sliderOf, spaceOf, toShown, toStored, type Owner } from '$lib/motion/units';
-  import { formatValue, precisionOf, scrubbed, type Range } from '$lib/motion/number-field';
+  import { formatValue, precisionOf, scrubbed, type Range } from '@feega/properties-panel/number-field';
   import { ancestorsOf } from '@feega/motion-core/motion/parent';
   import { setParent } from '$lib/motion/parent-ops';
   import EasePicker from './EasePicker.svelte';

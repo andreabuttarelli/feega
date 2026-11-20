@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LiveProp, Side } from '$lib/canvas/live-fields';
+import { LiveProp, Side } from '@feega/live-edit/live-fields';
 import { livePatch } from './live-patch';
 
 const HERO = `'use client';

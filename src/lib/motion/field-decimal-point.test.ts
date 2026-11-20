@@ -5,7 +5,7 @@ const source = (name: string) => readFileSync(new URL(`../components/motion/${na
 
 describe('decimal point in inspector fields', () => {
   it('the number field resets the inherited negative tracking that swallows the point', () => {
-    expect(source('NumberField.svelte')).toMatch(/\.num\s*\{[^}]*letter-spacing:\s*normal/);
+    expect(readFileSync(new URL('../../../packages/properties-panel/src/NumberField.svelte', import.meta.url), 'utf8')).toMatch(/\.num\s*\{[^}]*letter-spacing:\s*normal/);
   });
 
   it('the corner and plain inspector inputs reset it too', () => {

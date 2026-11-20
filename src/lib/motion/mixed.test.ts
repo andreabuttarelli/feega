@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MIXED, shared } from './mixed';
+import { MIXED, shared } from '@feega/properties-panel/mixed';
 
 describe('a value across a multiple selection', () => {
   it('is the value when every clip agrees', () => {

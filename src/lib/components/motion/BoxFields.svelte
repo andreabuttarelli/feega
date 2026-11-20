@@ -2,9 +2,9 @@
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { EditMode } from '$lib/motion/edit-mode';
   import { BOX_FIELDS, boxValue, layerBoxes, setLayerBox, type BoxKey } from '$lib/motion/layer-box';
-  import { FieldKind } from '$lib/motion/number-field';
-  import type { LiveGesture } from '$lib/motion/live-edit';
-  import NumberField from './NumberField.svelte';
+  import { FieldKind } from '@feega/properties-panel/number-field';
+  import type { LiveGesture } from '@feega/properties-panel/live-edit';
+  import NumberField from '@feega/properties-panel/NumberField.svelte';
 
   let { doc, ids, frame, mode = EditMode.Design, gesture = null, onchange }: { doc: MotionDoc; ids: readonly string[]; frame: number; mode?: EditMode; gesture?: LiveGesture | null; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 

@@ -5,7 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { IMPORT_KEY_COOKIE, ORIGIN_PROXY } from './origin-proxy';
 import { discoverIn, type Discovery } from './component-discovery';
 import { galleryOf, type GalleryPlan, type GalleryUnrun } from './gallery';
-import { NodeLine, planFile, PlanRefusal, runPlan, textsWanted, type Planned, type RepoFacts, type RunPlan } from './run-plan';
+import { NodeLine, planFile, PlanRefusal, runPlan, textsWanted, type Planned, type RepoFacts, type RunPlan } from '@feega/dev-run/run-plan';
 
 export type RunningApp = { url: string; key: string; names: string[]; sha: string | null; stop: () => Promise<void>; library?: Discovery; gallery?: GalleryPlan | GalleryUnrun };
 

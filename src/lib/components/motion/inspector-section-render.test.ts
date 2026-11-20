@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import { createRawSnippet } from 'svelte';
-import InspectorSection from './InspectorSection.svelte';
+import InspectorSection from '@feega/properties-panel/InspectorSection.svelte';
 
 const body = createRawSnippet(() => ({ render: () => '<p>fields</p>' }));
 const html = (open: boolean) => render(InspectorSection, { props: { title: 'Layout', section: 'layout', open, summary: 'Scale 150%', ontoggle: () => {}, children: body } }).body;

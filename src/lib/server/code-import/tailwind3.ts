@@ -1,4 +1,4 @@
-import { LIGHT, type DeclAt, type Declared } from './css-tokens';
+import { LIGHT, type DeclAt, type Declared } from '@feega/live-edit/css-tokens';
 
 type Theme = Record<string, unknown>;
 

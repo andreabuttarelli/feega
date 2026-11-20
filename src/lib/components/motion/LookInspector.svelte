@@ -4,9 +4,9 @@
   import type { DocVerdict, MotionDoc } from '@feega/motion-core/motion/doc';
   import { ENVIRONMENT, ENV_PRESETS, LIGHT, LIGHT_KINDS, LightKind, MAX_LIGHTS, type Light } from '@feega/motion-core/motion/look';
   import { removeLight, removeLook, setLight, setLook } from '$lib/motion/look-ops';
-  import NumberField from './NumberField.svelte';
-  import type { LiveGesture } from '$lib/motion/live-edit';
-  import { FieldFill, FieldKind } from '$lib/motion/number-field';
+  import NumberField from '@feega/properties-panel/NumberField.svelte';
+  import type { LiveGesture } from '@feega/properties-panel/live-edit';
+  import { FieldFill, FieldKind } from '@feega/properties-panel/number-field';
 
   let { doc, gesture = null, onchange }: { doc: MotionDoc; gesture?: LiveGesture | null; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 

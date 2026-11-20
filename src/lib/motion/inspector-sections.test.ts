@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ClipFamily } from './track-style';
 import { Part, SECTION_ORDER, SECTION_TITLE, emptyManaged, optionLabel, uiHidden, Section, Typed, fieldLook, fieldSection, sectionSummary, flipSection, isOpen, readSections, shadowed, shows, transformSection, TextTier, textTier } from './inspector-sections';
 import { Control, Group } from '@feega/motion-core/motion/components';
-import { FieldFill } from './number-field';
+import { FieldFill } from '@feega/properties-panel/number-field';
 import { Source } from '@feega/motion-core/motion/keyframes';
 
 function memory() {

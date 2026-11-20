@@ -1,4 +1,4 @@
-import type { Range } from './number-field';
+import type { Range } from '@feega/properties-panel/number-field';
 
 const WEIGHT_KEYS: ReadonlySet<string> = new Set(['weight', 'fontWeight']);
 const WEIGHT_STEP = 100;

@@ -1,4 +1,4 @@
-import { shared, type Shared } from '$lib/motion/mixed';
+import { shared, type Shared } from '@feega/properties-panel/mixed';
 import { wrapAngle, type Placed } from './node-layout';
 import type { Box } from './gpu/geometry';
 

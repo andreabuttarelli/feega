@@ -17,7 +17,8 @@ const HOST_TAG = /^[a-z][\w-]*$/;
 const FINDERS: Record<string, Finder> = {
   '.jsx': (code) => jsxTags(code, ['jsx']),
   '.tsx': (code) => jsxTags(code, ['jsx', 'typescript']),
-  '.svelte': svelteTags
+  '.svelte': svelteTags,
+  '.vue': vueTags
 };
 
 export const MAPPED_EXTENSIONS = Object.keys(FINDERS);
@@ -82,6 +83,30 @@ function svelteTags(code: string): Tag[] {
     tags.push({ nameEnd, ...position(lineStarts, start) });
   });
 
+  return tags;
+}
+
+const VUE_ELEMENT = 1;
+const VUE_PLAIN_TAG = 0;
+
+type VueNode = { type: number; tag?: string; tagType?: number; loc: { start: { offset: number } }; children?: VueNode[] };
+
+function vueTags(code: string): Tag[] {
+  const { parse } = require('@vue/compiler-sfc') as { parse: (src: string) => { descriptor: { template: { ast: VueNode } | null } } };
+  const template = parse(code).descriptor.template;
+  if (!template) {
+    return [];
+  }
+  const lineStarts = lineStartsOf(code);
+  const tags: Tag[] = [];
+  const visit = (node: VueNode) => {
+    if (node.type === VUE_ELEMENT && node.tagType === VUE_PLAIN_TAG && node.tag) {
+      const start = node.loc.start.offset;
+      tags.push({ nameEnd: start + 1 + node.tag.length, ...position(lineStarts, start) });
+    }
+    node.children?.forEach(visit);
+  };
+  template.ast.children?.forEach(visit);
   return tags;
 }
 

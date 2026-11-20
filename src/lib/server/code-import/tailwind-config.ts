@@ -1,5 +1,5 @@
 import ts from 'typescript';
-import type { DeclAt, Declared } from './css-tokens';
+import type { DeclAt, Declared } from '@feega/live-edit/css-tokens';
 import { SCALE_KEYS, configTokens, themeName } from './tailwind3';
 import type { ReadFile } from './write-back';
 

@@ -1,9 +1,9 @@
 <script lang="ts">
-  import NumberField from '$lib/components/motion/NumberField.svelte';
+  import NumberField from '@feega/properties-panel/NumberField.svelte';
   import AlignBar from '$lib/components/motion/AlignBar.svelte';
   import FlipHorizontal from '@lucide/svelte/icons/flip-horizontal-2';
   import FlipVertical from '@lucide/svelte/icons/flip-vertical-2';
-  import { FieldKind } from '$lib/motion/number-field';
+  import { FieldKind } from '@feega/properties-panel/number-field';
   import { Flip } from '$lib/motion/layer-props';
   import type { NodePlace } from './frame-properties.svelte';
 
