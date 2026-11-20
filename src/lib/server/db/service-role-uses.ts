@@ -24,6 +24,11 @@ export type ServiceRoleUse = {
 
 export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
   {
+    path: 'src/lib/server/telemetry/usage-db.ts — dbSink (rotta POST /api/v1/telemetry)',
+    why: "L'estensione e `npx feega` mandano l'uso prima e senza alcun login: non esiste un utente né un JWT, e la tabella non concede nulla ad anon/authenticated. Solo insert di righe validate da zod (evento, id anonimi dell'installazione e della sessione, versione, editor, OS, dispositivo, contatori, paese/regione/città dagli header Vercel), mai IP, utente, percorsi o contenuto; non legge nulla.",
+    tables: ['usage_events']
+  },
+  {
     path: 'src/lib/server/product-events/track.ts — track',
     why: "Il funnel nasce prima del login (un visitatore anonimo che arriva dalla landing) e la tabella non concede nulla ad anon/authenticated: solo il server scrive. Inserisce una riga con evento, id e props senza testo dei prompt; non legge nulla.",
     tables: ['product_events']
