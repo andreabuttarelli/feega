@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BRAND_ENDPOINTS } from './index';
+import { ORG_ENDPOINTS } from './index';
 
 /**
  * I TOOL CHE I TRE GENERICI HANNO RESO INUTILI, o le cui rotte sono cancellate del tutto.
@@ -16,6 +16,10 @@ const RETIRED = [
   'add_competitor',
   'delete_competitor',
   'delete_product',
+  'list_products',
+  'sync_products',
+  'studio_quote',
+  'studio_start',
   'remove_blog_term',
   'get_ads',
   'record_memory_used',
@@ -82,22 +86,16 @@ const RETIRED = [
  * giro di pulizia li toglie per simmetria e rompe qualcosa che nessun test copre.
  */
 const KEPT_ON_PURPOSE: Record<string, string> = {
-  create_post:
-    'deposita un post come bozza (caption, media dalla libreria, sorgenti dal canvas): hand-registered in cli/mcp/tools/posts.ts, non più un BrandEndpoint',
   enhance_prompt:
     'il testo che produce non lo legge una persona ma un modello di immagini, e la forma che serve a ciascuno (sezioni etichettate, paragrafo unico, comando) sta in una guida per modello che vive qui: un agente esterno non sa con quale modello stai per rendere né come vuole essere parlato. Rifiuta di suo le riscritture che inventano un soggetto, quindi non è una seconda stesura del brief'
 };
 
 /**
  * Non tutti i tool nascono dal registro: la superficie MCP reale oggi è cablata a mano in
- * `cli/mcp/tools/{posts,org-data}.ts` (`list_posts`, `create_post`, `set_post_status`,
- * `query`, `insert_row`,
- * `update_row`, `delete_row`, `describe_node_types`) e non passa più da `BRAND_ENDPOINTS`.
+ * `cli/mcp/tools/org-data.ts` (`query`, `insert_row`,
+ * `update_row`, `delete_row`, `describe_node_types`) e non passa più da `ORG_ENDPOINTS`.
  */
 const HAND_REGISTERED = [
-  'list_posts',
-  'create_post',
-  'set_post_status',
   'query',
   'insert_row',
   'update_row',
@@ -106,7 +104,7 @@ const HAND_REGISTERED = [
 ];
 
 describe('i tool ritirati o le cui rotte sono cancellate', () => {
-  const names = new Set([...BRAND_ENDPOINTS.map((e) => e.tool), ...HAND_REGISTERED]);
+  const names = new Set([...ORG_ENDPOINTS.map((e) => e.tool), ...HAND_REGISTERED]);
 
   it.each(RETIRED)('%s non è più un tool', (tool) => {
     expect(names.has(tool)).toBe(false);

@@ -1,9 +1,8 @@
 import { staleSessionCookieNames } from '$lib/server/stale-session-cookies';
 import {sequence} from '@sveltejs/kit/hooks';
-import { error, json, redirect, text } from '@sveltejs/kit';
+import { json, redirect, text } from '@sveltejs/kit';
 import * as Sentry from '@sentry/sveltekit';
 import { busyAnswer } from '$lib/db-busy';
-import { seedMetaClickCookies } from '$lib/server/meta-click-cookies';
 import type { CookieOptions } from '@supabase/ssr';
 import { createServerClient } from '$lib/server/db/connect';
 import { outlivesTurn } from '$lib/server/session-life';
@@ -11,27 +10,14 @@ import { markRlsScoped } from '$lib/server/rls-client';
 import { createUserDb, type Db } from '$lib/server/db/client';
 import { env as publicEnv } from '$env/dynamic/public';
 import { env as privateEnv } from '$env/dynamic/private';
-import type { Handle, HandleServerError, ServerInit } from '@sveltejs/kit';
-import { localModeRefusal, localSession, localStore, serveLocal } from '$lib/server/local/local-mode';
-import { withBrandContext, withToolContext } from '$lib/server/ai-log';
-import { TOOL_HEADER, TOOL_HEADER_LEGACY, toolFromHeader } from '@feega/api-contracts';
-import { createAdminClient } from '$lib/server/supabase-admin';
+import type { Handle, HandleServerError } from '@sveltejs/kit';
 import { isCsrfForbidden } from '$lib/server/csrf';
 import { redirectFor } from '$lib/server/host-redirects';
 import { corsPreflight, extraOrigins, withCors } from '$lib/server/api-cors';
 import { SessionSource, bearerSession, bearerTokenOf, sessionSourceOf } from '$lib/server/bearer-session';
-import { grantBearerOf } from '$lib/server/canvas/asset-grant';
 import { landingUrlFor } from '$lib/marketing';
-import { rememberCampaign, takeCampaign } from '$lib/server/onboarding/campaign-cookie';
-import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
-import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
-import { landingPath } from '$lib/server/tenancy/landing';
-import { carriesStartUrl, startUrlRedirect } from '$lib/server/onboarding/start-url-entry';
 import type { RequestEvent } from '@sveltejs/kit';
 import { THEME_COOKIE, THEME_COOKIE_MAX_AGE_S, THEME_METADATA_KEY, ThemePref, htmlThemeAttrs, parseThemePref } from '$lib/theme';
-import { HANDOFF_NONCE, HANDOFF_RESUMED, handoffOf } from '$lib/home/handoff';
-import { ProductEvent, track } from '$lib/server/product-events/track';
-import { HOME_DRAFT_COOKIE, HOME_DRAFT_MAX_AGE_S } from '$lib/home/home-draft';
 import { Session, syncSignedInHint } from '$lib/server/signed-in-hint';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
@@ -52,42 +38,7 @@ function isSessionCookie(name: string): boolean {
 
 async function rootRedirectTarget(event: RequestEvent): Promise<string> {
   const { session, user } = await event.locals.safeGetSession();
-  if (!session || !user) {
-    return '/login';
-  }
-
-  const db = await event.locals.db();
-  if (!db) {
-    return '/login';
-  }
-
-  return homePathFor(
-    db,
-    ENTRY_DEPS,
-    user,
-    event.cookies.get(ORG_COOKIE) ?? null,
-    event.cookies.get(LAST_PROJECT_COOKIE) ?? null,
-    takeCampaign(event.cookies)
-  );
-}
-
-async function startLanding(event: RequestEvent): Promise<(() => Promise<string>) | null> {
-  const { session, user } = await event.locals.safeGetSession();
-  const db = session && user ? await event.locals.db() : null;
-  if (!user || !db) {
-    return null;
-  }
-  return () => landingPath(db, user, event.cookies, null);
-}
-
-async function routeStartUrl(event: RequestEvent): Promise<void> {
-  if (!carriesStartUrl(event.url)) {
-    return;
-  }
-  const target = await startUrlRedirect({ url: event.url, cookies: event.cookies, land: await startLanding(event) });
-  if (target) {
-    throw redirect(303, target);
-  }
+  return session && user ? '/app' : '/login';
 }
 
 function isValidSessionCookie(cookie: { name: string; value: string }): boolean {
@@ -98,25 +49,6 @@ function isValidSessionCookie(cookie: { name: string; value: string }): boolean 
 function validSessionCookies(cookies: { name: string; value: string }[]) {
   if (cookies.every(isValidSessionCookie)) return cookies;
   return cookies.filter(({ name }) => !isSessionCookie(name));
-}
-
-// slug → brand id for the AI-credits brand context. Slugs are stable, so a per-instance cache
-// with a 10-min TTL amortises the lookup to ~once per brand per instance.
-// ponytail: in-memory Map; move to Redis only if instance churn ever makes the hit rate matter.
-const brandIdCache = new Map<string, { id: string; at: number }>();
-async function brandIdFromSlug(slug: string): Promise<string | null> {
-  const hit = brandIdCache.get(slug);
-  if (hit && Date.now() - hit.at < 600_000) return hit.id;
-  try {
-    const { data } = await createAdminClient().from('brands').select('id').eq('slug', slug).maybeSingle();
-    if (data?.id) {
-      brandIdCache.set(slug, { id: data.id as string, at: Date.now() });
-      return data.id as string;
-    }
-  } catch {
-    // no admin env (e.g. local tooling) — routes that need the context set it themselves
-  }
-  return null;
 }
 
 // Replaces kit's built-in CSRF check (disabled in svelte.config.js) so /oauth/token can opt out —
@@ -162,76 +94,25 @@ const csrf: Handle = async ({ event, resolve }) => {
 
 const DASHBOARD_PREFIX = '/app';
 
-async function noteLandingPrompt(event: RequestEvent): Promise<void> {
-  const params = event.url.searchParams;
-  const handoff = event.url.pathname === DASHBOARD_PREFIX ? handoffOf(params) : null;
-  if (!handoff || params.has(HANDOFF_RESUMED)) {
-    return;
-  }
-  await track(ProductEvent.LandingPromptSent, { anonymousId: params.get(HANDOFF_NONCE) }, { kind: handoff.kind, source: handoff.source });
-}
-
-async function keepHandoff(event: RequestEvent): Promise<void> {
-  const params = event.url.searchParams;
-  if (event.url.pathname !== DASHBOARD_PREFIX || !handoffOf(params)) {
-    return;
-  }
-  await track(ProductEvent.LoginStarted, { anonymousId: params.get(HANDOFF_NONCE) }, {});
-  event.cookies.set(HOME_DRAFT_COOKIE, event.url.search, { path: '/', maxAge: HOME_DRAFT_MAX_AGE_S, sameSite: 'lax', httpOnly: true });
-}
-
 async function refuseSignedOutDashboard(event: RequestEvent): Promise<void> {
   const path = event.url.pathname;
   if (path !== DASHBOARD_PREFIX && !path.startsWith(`${DASHBOARD_PREFIX}/`)) {
     return;
   }
-  await noteLandingPrompt(event);
   const { session } = await event.locals.safeGetSession();
   if (!session) {
-    await keepHandoff(event);
     throw redirect(303, '/login');
   }
 }
 
-async function refuseUncensoredSection(event: RequestEvent): Promise<void> {
-  const { guardedSection, sectionRefusal } = await import('$lib/server/uncensored-workspace/section-guard');
-  const projectId = event.params.projectId;
-  if (!projectId || !guardedSection(event.route.id)) {
-    return;
-  }
-  const db = await event.locals.db();
-  if (!db) {
-    return;
-  }
-  const { data } = await db.from('projects').select('mode').eq('id', projectId).maybeSingle();
-  const { modeOf } = await import('$lib/project-mode');
-  const refusal = sectionRefusal(modeOf(data?.mode), event.route.id ?? '');
-  if (refusal) {
-    throw error(403, refusal);
-  }
-}
-
-export const init: ServerInit = () => {
-  const refusal = localModeRefusal(process.env);
-  if (refusal) {
-    throw new Error(refusal);
-  }
-  localStore();
-};
-
-const localMode: Handle = ({ event, resolve }) => {
-  const local = localStore();
-  return local ? serveLocal(event, resolve, local) : resolve(event);
-};
-
-export const handle: Handle = sequence(cors, hostRedirect, marketingRedirect, csrf, localMode, Sentry.sentryHandle(), async ({ event, resolve }) => {
+export const handle: Handle = sequence(cors, hostRedirect, marketingRedirect, csrf, Sentry.sentryHandle(), async ({ event, resolve }) => {
   // Per-request Supabase client bound to the request cookies (SSR auth).
   // Marchiato come RLS-scoped: chiave anon, quindi Postgres valuta le policy dell'utente. È la
   // dichiarazione su cui `query` decide di leggere — vedi $lib/server/rls-client.
   staleSessionCookieNames(event.cookies.getAll().map(({ name }) => name), SESSION_COOKIE_NAME).forEach((name) => event.cookies.delete(name, { path: '/' }));
   const hasSessionCookie = validSessionCookies(event.cookies.getAll()).some(({ name }) => isSessionCookie(name));
   syncSignedInHint(event.cookies, event.url.hostname, hasSessionCookie ? Session.Present : Session.Absent);
-  const requestBearer = bearerTokenOf(event.request) ?? grantBearerOf(event.request);
+  const requestBearer = bearerTokenOf(event.request);
   const source = sessionSourceOf(event.request, event.url);
   event.locals.supabase = markRlsScoped(createServerClient(publicEnv.PUBLIC_SUPABASE_URL, publicEnv.PUBLIC_SUPABASE_ANON_KEY, {
     ...(requestBearer ? { global: { headers: { Authorization: `Bearer ${requestBearer}` } } } : {}),
@@ -255,7 +136,7 @@ export const handle: Handle = sequence(cors, hostRedirect, marketingRedirect, cs
   }));
 
   // getSession() is local (cookie → JWT). getUser() hits GoTrue — cache it across SPA
-  // navigations on this isolate so every in-brand click is not a 300–800ms auth RTT.
+  // navigations on this isolate so every click is not a 300–800ms auth RTT.
   const verifyBearer = async (token: string) => (await import('$lib/server/nav-cache')).verifiedToken(createUserDb(token), token);
   let cachedSession: ReturnType<typeof getSession> | null = null;
   const getSession = async () => {
@@ -273,7 +154,7 @@ export const handle: Handle = sequence(cors, hostRedirect, marketingRedirect, cs
 
     return { session, user };
   };
-  event.locals.safeGetSession = () => (cachedSession ??= localStore() ? Promise.resolve(localSession()) : getSession());
+  event.locals.safeGetSession = () => (cachedSession ??= getSession());
 
   // Il database NUOVO, accanto al vecchio e non al posto suo: 103 file leggono ancora
   // `locals.supabase`, e spegnerlo qui vorrebbe dire non compilare più. Questo è tipizzato su
@@ -287,18 +168,13 @@ export const handle: Handle = sequence(cors, hostRedirect, marketingRedirect, cs
     return cachedDb;
   };
 
-  seedMetaClickCookies(event.cookies, event.url, event.route.id);
-  await routeStartUrl(event);
-
   if (isRootPath(event.url.pathname)) {
-    rememberCampaign(event.cookies, event.url);
     if (event.url.searchParams.has('code') || event.url.searchParams.has('error_description')) {
       throw redirect(303, `/auth/callback${event.url.search}`);
     }
     throw redirect(302, await rootRedirectTarget(event));
   }
 
-  await refuseUncensoredSection(event);
   await refuseSignedOutDashboard(event);
 
   const themePref = await themePrefFor(event);
@@ -316,32 +192,7 @@ export const handle: Handle = sequence(cors, hostRedirect, marketingRedirect, cs
         name === 'content-range' || name === 'x-supabase-api-version'
     });
 
-  const slug = event.params.slug;
-
-  // Page-payload cache (see $lib/server/page-cache): anything that can write for this brand
-  // drops its cached pages, so the next navigation re-reads. Doing it here — once, on the
-  // request — rather than inside each form action means a newly added action cannot forget
-  // to invalidate and leave the dashboard showing a stale count. GET/HEAD never mutate, so
-  // read navigation keeps its hits.
-  if (slug && event.request.method !== 'GET' && event.request.method !== 'HEAD') {
-    const { invalidateBrandPages } = await import('$lib/server/page-cache');
-    invalidateBrandPages(slug);
-  }
-
-  // Chi ha causato la spesa, quando a chiamare è un agente esterno: lo stesso posto in cui si
-  // stabilisce a quale brand addebitarla. Una rotta non può dimenticarsene, e il nome si convalida
-  // qui — arriva dalla rete, non dal nostro codice.
-  const inTool = <T>(fn: () => T): T =>
-    withToolContext(
-      toolFromHeader(event.request.headers.get(TOOL_HEADER) ?? event.request.headers.get(TOOL_HEADER_LEGACY)),
-      fn
-    );
-
-  if (slug) {
-    const brandId = await brandIdFromSlug(slug);
-    if (brandId) return inTool(() => withBrandContext(brandId, doResolve));
-  }
-  return inTool(doResolve);
+  return doResolve();
 });
 export const handleError = Sentry.handleErrorWithSentry((({ error, event, status }) => {
   console.error('unhandled server error', { route: event.route.id, url: event.url.pathname + event.url.search, status, error });

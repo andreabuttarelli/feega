@@ -1,6 +1,6 @@
 import type { ActionResult } from '@sveltejs/kit';
 import { loadApi, postApi } from '$lib/dashboard/api';
-import { brandSettingsApi, BRANDS_SETTINGS_API, canvasSettingsApi, DASHBOARD_SETTINGS_API, type SettingsSection } from './sections';
+import { canvasSettingsApi, DASHBOARD_SETTINGS_API, type SettingsSection } from './sections';
 
 type Depends = (...deps: `${string}:${string}`[]) => void;
 
@@ -20,18 +20,6 @@ export function loadDashboardShell<T>(url: URL, depends: Depends): Promise<T> {
 
 export function loadDashboardPage<T>(section: SettingsSection, url: URL, depends: Depends): Promise<T> {
   return loadApi<T>(`${DASHBOARD_SETTINGS_API}/${section}`, url.searchParams, depends);
-}
-
-export function loadBrandsList<T>(url: URL, depends: Depends): Promise<T> {
-  return loadApi<T>(BRANDS_SETTINGS_API, url.searchParams, depends);
-}
-
-export function loadBrandShell<T>(brandId: string, url: URL, depends: Depends): Promise<T> {
-  return loadApi<T>(brandSettingsApi(brandId), new URLSearchParams({ [PATH_PARAM]: url.pathname }), depends);
-}
-
-export function loadBrandPage<T>(brandId: string, section: SettingsSection, url: URL, depends: Depends): Promise<T> {
-  return loadApi<T>(`${brandSettingsApi(brandId)}/${section}`, url.searchParams, depends);
 }
 
 export function postSettingsAction(api: string, section: SettingsSection, action: string, form: FormData): Promise<ActionResult> {

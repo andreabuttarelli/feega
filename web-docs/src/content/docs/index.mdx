@@ -1,33 +1,31 @@
 ---
 title: Feega docs
-description: Guides, references and architecture notes for Feega.
+description: Documentation for Feega, the free open-source VS Code extension to design in your codebase.
 template: splash
 hero:
-  tagline: An infinite canvas for design and motion. People, the chat and outside agents work on it together.
+  tagline: Click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens.
   actions:
-    - text: Get started
-      link: /getting-started/what-is-feega/
+    - text: Install
+      link: /getting-started/install/
       variant: primary
-    - text: Reference
-      link: /reference/
+    - text: Quick start
+      link: /getting-started/quick-start/
       variant: minimal
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
 <CardGrid>
-  <Card title="Canvas" icon="pencil">
-    Frames, free elements, components, styles, stacks, comments. [Canvas guides](/canvas/frames-and-free-elements/)
+  <Card title="Getting started" icon="rocket">
+    What Feega is, how to install it, your first edit. [Start here](/getting-started/what-is-feega/)
   </Card>
-  <Card title="Motion" icon="rocket">
-    Timeline, keyframes, scenes combined into one video, export. [Motion guides](/motion/timeline/)
+  <Card title="Editing" icon="pencil">
+    Select, edit properties, text, fills, layers and structure. [Editing guides](/editing/selecting-and-navigating/)
   </Card>
-  <Card title="AI" icon="star">
-    The canvas chat, generation nodes, skills, model allow-list. [AI guides](/ai/canvas-chat/)
+  <Card title="Frameworks" icon="laptop">
+    SvelteKit, React with Vite, Next.js and Vue. [Frameworks](/frameworks/sveltekit/)
   </Card>
-  <Card title="Agents and API" icon="laptop">
-    MCP, CLI, edit ops, REST API, self-hosting. [Integrations](/integrations/mcp/)
+  <Card title="Styling systems" icon="star">
+    How edits land in Tailwind, CSS, CSS modules and scoped styles. [Styling](/styling/tailwind/)
   </Card>
 </CardGrid>
-
-These docs describe what is on the `dev` branch of the repository. Pages under Reference are generated from the code on every build.

@@ -1,6 +1,7 @@
 <script lang="ts">
   import '$lib/site/landing/landing.css';
   import '$lib/site/alternatives/alternatives.css';
+  import CatalogLayout from '$lib/site/catalog/CatalogLayout.svelte';
   import { ALTERNATIVES, ALTERNATIVES_INDEX, ALTERNATIVES_PATH, AUTHOR, DISCLAIMER, KIND_HEADINGS, alternativePath } from '$lib/site/alternatives';
   import { ArticleKind } from '$lib/site/alternatives/alternative';
   import AsciiCover from '$lib/site/alternatives/AsciiCover.svelte';
@@ -18,6 +19,7 @@
   <meta property="og:description" content={ALTERNATIVES_INDEX.description} />
 </svelte:head>
 
+<CatalogLayout path={ALTERNATIVES_PATH}>
 <article class="landing compare">
   <h1>{ALTERNATIVES_INDEX.heading}</h1>
   <p class="fine">By {AUTHOR.name}, {AUTHOR.role}</p>
@@ -38,3 +40,4 @@
 
   <p class="fine">{DISCLAIMER}</p>
 </article>
+</CatalogLayout>

@@ -1,5 +1,5 @@
 import { can, OrgAction, type OrgRole } from '$lib/org-roles';
-import { BRANDS_SETTINGS_PATH, DASHBOARD_SETTINGS_PATH, TEAM_PATH } from '$lib/settings/paths';
+import { DASHBOARD_SETTINGS_PATH, TEAM_PATH } from '$lib/settings/paths';
 import { siInstagram, siTiktok, siFacebook, siX, siThreads, siYoutube, siBluesky, siReddit } from 'simple-icons';
 
 export const PLATFORMS = [
@@ -27,9 +27,7 @@ export const ICONS: Record<string, { path: string; hex: string }> = {
 
 export const SETTINGS_HOME = 'project';
 
-export type SettingsScope = 'project' | 'workspace' | 'brand' | 'account';
-
-const BRAND_SCOPE: SettingsScope = 'brand';
+export type SettingsScope = 'project' | 'workspace' | 'account';
 
 export type SettingsSection = {
   /** Percorso sotto /p/<projectId>/settings/, incluse le sotto-rotte a più segmenti. */
@@ -47,21 +45,12 @@ export enum SettingsHome {
 
 export const SCOPE_HOME: Record<SettingsScope, SettingsHome> = {
   project: SettingsHome.Canvas,
-  brand: SettingsHome.Dashboard,
   workspace: SettingsHome.Dashboard,
   account: SettingsHome.Dashboard
 };
 
 export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   { path: 'project', labelKey: 'app.settings.project.title', scope: 'project' },
-  { path: 'brand', labelKey: 'app.studio.tabs.brand', scope: 'brand' },
-  {
-    path: 'products',
-    labelKey: 'app.hub.overview.brand.products',
-    scope: 'brand'
-  },
-  { path: 'video', labelKey: 'app.settings.video.title', scope: 'brand' },
-  { path: 'danger', labelKey: 'app.settings.del.title', scope: 'brand' },
   {
     path: 'api-keys',
     labelKey: 'app.settings.apiKeys.title',
@@ -91,7 +80,6 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
 const SCOPE_LABEL_KEYS: Record<SettingsScope, string> = {
   project: 'app.nav.sectionProject',
   workspace: 'app.nav.workspace',
-  brand: 'app.nav.sectionBrand',
   account: 'app.nav.sectionAccount'
 };
 
@@ -129,40 +117,14 @@ export function dashboardSettingsHref(section: string): string {
 
 export function canvasRedirectOf(pathname: string): string | null {
   const section = SETTINGS_SECTIONS.find((s) => pathname.replace(/\/$/, '').endsWith(`/settings/${s.path}`));
-  if (!section || section.scope === BRAND_SCOPE || shownOn(section, SettingsHome.Canvas)) {
+  if (!section || shownOn(section, SettingsHome.Canvas)) {
     return null;
   }
   return dashboardSettingsHref(section.path);
 }
 
-export const BRAND_SETTINGS_ITEMS: readonly SettingsNavEntry[] = SETTINGS_SECTIONS.filter((s) => s.scope === BRAND_SCOPE).map((s) => ({ section: s.path, labelKey: s.labelKey }));
-
 export function servedOnDashboard(section: string): boolean {
-  return SETTINGS_SECTIONS.some((s) => s.path === section && s.scope !== BRAND_SCOPE && SCOPE_HOME[s.scope] === SettingsHome.Dashboard);
-}
-
-export function servedForBrand(section: string): boolean {
-  return SETTINGS_SECTIONS.some((s) => s.path === section && s.scope === BRAND_SCOPE);
-}
-
-export function brandSettingsHref(brandId: string, section: string): string {
-  return `${BRANDS_SETTINGS_PATH}/${brandId}/${section}`;
-}
-
-const BRAND_PAGE = /\/settings\/brands\/(?<brandId>[^/]+)\/(?<section>[^/]+)$/;
-
-export function brandPageAt(pathname: string): { brandId: string; section: string } | null {
-  const groups = BRAND_PAGE.exec(pathname.replace(/\/$/, ''))?.groups;
-  return groups ? { brandId: groups.brandId, section: groups.section } : null;
-}
-
-export function brandRedirectOf(pathname: string, brandId: string | null): string | null {
-  const trimmed = pathname.replace(/\/$/, '');
-  const section = SETTINGS_SECTIONS.find((s) => s.scope === BRAND_SCOPE && trimmed.endsWith(`/settings/${s.path}`));
-  if (!section) {
-    return null;
-  }
-  return brandId ? brandSettingsHref(brandId, section.path) : BRANDS_SETTINGS_PATH;
+  return SETTINGS_SECTIONS.some((s) => s.path === section && SCOPE_HOME[s.scope] === SettingsHome.Dashboard);
 }
 
 export function movedToDashboard(section: string): boolean {

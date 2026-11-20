@@ -1,13 +1,11 @@
-import { hasManyTenants } from '$lib/server/tenancy';
 import { fail, redirect } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { PLAN, topUpFor } from '$lib/credit-ladder';
 import { generateApiKey } from '$lib/server/cli-auth';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { RequestEvent } from '@sveltejs/kit';
-import { invalidateBrandNav } from '$lib/server/nav-cache';
 import { readUploadImage } from '$lib/server/raster-image';
-import { isOrgOwner, orgBillingById } from '$lib/server/org-billing';
+import { orgBillingById } from '$lib/server/org-billing';
 import { portalLink } from '$lib/server/billing-links';
 import { billingGrantsReady } from '$lib/server/billing-readiness';
 import { BILLING_PATH, checkoutReturnUrls } from '$lib/billing-path';
@@ -17,23 +15,8 @@ import { chooseOrg, ORG_COOKIE } from '$lib/server/tenancy/context';
 import type { Db } from '$lib/server/db/client';
 import { appOrigin } from '$lib/server/app-url';
 import { editorCount } from '$lib/server/team/seat-billing';
-import { BRANDS_SETTINGS_PATH } from '$lib/settings/paths';
-import type { BrandEvent } from '$lib/server/settings/event';
 
 const stripeApi = () => import('$lib/server/stripe');
-
-async function projectOrgId(supabase: SupabaseClient, projectId: string): Promise<string | null> {
-  const { data } = await supabase.from('projects').select('org_id').eq('id', projectId).is('archived_at', null).maybeSingle();
-  return data?.org_id ?? null;
-}
-
-async function isOwnerOf(supabase: SupabaseClient, orgId: string): Promise<boolean> {
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-  if (!user) return false;
-  return isOrgOwner(supabase, orgId, user.id);
-}
 
 const OWNER_ROLE = 'owner';
 
@@ -50,8 +33,6 @@ async function chosenMembership({ cookies, locals: { supabase } }: RequestEvent)
 }
 
 async function orgIdOf(event: RequestEvent): Promise<string | null> {
-  const { projectId } = event.params;
-  if (projectId) return projectOrgId(event.locals.supabase, projectId);
   return (await chosenMembership(event))?.membership.org.id ?? null;
 }
 
@@ -213,33 +194,6 @@ export async function buyOneTime(event: Ev) {
     return fail(500, { billingError: e instanceof Error ? e.message : 'Could not start the purchase' });
   }
   throw redirect(303, checkoutUrl);
-}
-
-export async function deleteBrand(event: BrandEvent) {
-  const { brand } = await event.parent();
-  const { supabase } = event.locals;
-  if (!(await isOwnerOf(supabase, brand.org_id))) return fail(403, { deleteError: 'failed' });
-  const confirm = String((await event.request.formData()).get('confirm') ?? '').trim();
-  if (confirm !== brand.name) return fail(400, { deleteError: 'nameMismatch' });
-
-  const billing = await orgBillingById(supabase, brand.org_id);
-  if (billing?.subscriptionId && billing.brandCount <= 1) {
-    try {
-      const { ensureSubscriptionCanceled } = await stripeApi();
-      await ensureSubscriptionCanceled(billing.subscriptionId);
-    } catch (e) {
-      return fail(400, {
-        deleteError: e instanceof Error && e.message === 'active_plan' ? 'activePlan' : 'failed'
-      });
-    }
-  }
-
-  if (!hasManyTenants()) return fail(404, { deleteError: 'not_found' });
-
-  const { error } = await supabase.from('brands').delete().eq('id', brand.id).eq('org_id', brand.org_id);
-  if (error) return fail(500, { deleteError: 'failed' });
-  invalidateBrandNav(brand.slug);
-  throw redirect(303, BRANDS_SETTINGS_PATH);
 }
 
 export async function createApiKey(event: Ev) {

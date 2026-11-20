@@ -49,9 +49,9 @@ export const ROUNDUPS: Readonly<Record<string, Article>> = {
         html: table(
           ['', 'Feega', 'Onlook', 'Cursor Design Mode', 'Figma Make local', 'Gui', 'Builder.io'],
           [
-            ['Where it runs', 'Desktop app, or browser', 'Mac app', 'Cursor', 'Figma desktop beta, Mac', 'Mac and Linux, alpha', 'Browser, VS Code'],
-            ['Opens your repo', 'A folder, or GitHub', 'Local or GitHub', 'Your open project', 'Folder or GitHub clone', 'Your folder', 'GitHub, GitLab, Bitbucket, Azure'],
-            ['How changes land', 'Files, then commits; pull request on GitHub', 'One-press pull request', 'Your agent edits; you commit', 'A commit per prompt', 'Your agent edits; you commit', 'Pull request after approval'],
+            ['Where it runs', 'VS Code, Cursor, Windsurf, VSCodium, or npx', 'Mac app', 'Cursor', 'Figma desktop beta, Mac', 'Mac and Linux, alpha', 'Browser, VS Code'],
+            ['Opens your repo', 'Your open folder', 'Local or GitHub', 'Your open project', 'Folder or GitHub clone', 'Your folder', 'GitHub, GitLab, Bitbucket, Azure'],
+            ['How changes land', 'Edits your files as a diff; you commit', 'One-press pull request', 'Your agent edits; you commit', 'A commit per prompt', 'Your agent edits; you commit', 'Pull request after approval'],
             ['Open source', 'Apache-2.0', 'Apache-2.0', 'No', 'No', 'Apache-2.0', 'Not stated'],
             ['Price to start', 'Free locally', 'Free self-hosted', 'Free; Plus $8 a month', 'Free in beta', 'Free in alpha', 'Free; Pro $24 per user a month']
           ]
@@ -59,11 +59,11 @@ export const ROUNDUPS: Readonly<Record<string, Article>> = {
       },
       {
         heading: 'The real question is who presses save',
-        html: '<p>Cursor and Gui leave the commit to you or your agent. That suits a developer. Onlook, Builder.io and Feega write the commit or the pull request themselves. That suits a designer who should never see a terminal.</p>'
+        html: '<p>Feega, Cursor and Gui write to your files and leave the commit to you or your agent: every change shows up as a diff you review. Onlook and Builder.io write the commit or the pull request themselves.</p>'
       },
       {
         heading: 'Protect the branch people share',
-        html: '<p>Check where the first edit lands before you make it. Figma Make commits locally on every prompt. Feega asks which branch to write to first, and never force-pushes a branch.</p>'
+        html: '<p>Check where the first edit lands before you make it. Figma Make commits locally on every prompt. Feega never commits or pushes: it edits the files on whatever branch you have checked out.</p>'
       },
       {
         heading: 'Which one fits',
@@ -84,7 +84,7 @@ export const ROUNDUPS: Readonly<Record<string, Article>> = {
     ],
     questions: [
       { q: 'Can I edit my site visually without leaving the code?', a: 'Yes. All six write to the source files themselves.' },
-      { q: 'Which ones open pull requests by themselves?', a: 'Feega on GitHub, Onlook and Builder.io.' },
+      { q: 'Which ones open pull requests by themselves?', a: 'Onlook and Builder.io. Feega writes to your files and leaves the commit to you.' },
       { q: 'Do I need a Mac?', a: 'For Onlook and Figma Make local, yes. Not for Feega or Builder.io.' }
     ],
     sources: [S.onlook, S.onlookRepo, S.cursorDesign, S.cursorPricing, S.figmaMakeLocal, S.gui, S.builderPricing, S.builderFusion],

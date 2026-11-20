@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { orgBillingForBrand, type OrgBilling } from '$lib/server/org-billing';
+import { orgBillingById, type OrgBilling } from '$lib/server/org-billing';
 
 type PortalFlow = 'payment_method';
 
@@ -24,9 +24,9 @@ const refuse = (refusal: BillingLinkRefusal, message = ''): BillingLink => ({ re
 
 export async function billingLink(
 	supabase: SupabaseClient,
-	opts: { slug: string; returnUrl: string; flow?: PortalFlow }
+	opts: { orgId: string; returnUrl: string; flow?: PortalFlow }
 ): Promise<BillingLink> {
-	return portalLink(await orgBillingForBrand(supabase, { slug: opts.slug }), opts);
+	return portalLink(await orgBillingById(supabase, opts.orgId), opts);
 }
 
 export async function portalLink(

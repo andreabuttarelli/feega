@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { BillingProvider } from '$lib/billing/contract';
 
-// gateCredits() (the chokepoint 29 call sites use) now delegates to billingProvider().gate().
+// gateOrgCredits() (the chokepoint 29 call sites use) now delegates to billingProvider().gate().
 // Mocking '$lib/server/billing' directly — gateCredits's one dependency — proves the delegation
 // itself cleanly: a fake provider that denies makes gateCredits throw, a fake provider that
 // allows makes it resolve, with no Supabase involved. (feega-provider.test.ts separately
 // proves the real feega provider's gate('credits', ...) still calls the real,
-// unrewritten gateCreditsCore.)
+// unrewritten gateOrgCreditsCore.)
 
 const mockProvider: { current: BillingProvider | null } = { current: null };
 vi.mock('./billing', () => ({
@@ -23,7 +23,7 @@ function fakeProvider(kind: 'open' | 'dazero', gate: BillingProvider['gate']): B
   };
 }
 
-describe('gateCredits() delegation', () => {
+describe('gateOrgCredits() delegation', () => {
   it('propagates a denial thrown by the provider (mirrors feega when the ledger is exhausted)', async () => {
     const { CreditsExhaustedError } = await import('$lib/server/credits');
     mockProvider.current = fakeProvider('dazero', async () => {
@@ -37,15 +37,15 @@ describe('gateCredits() delegation', () => {
         percent: 100
       });
     });
-    const { gateCredits } = await import('$lib/server/credits');
-    await expect(gateCredits('brand-1')).rejects.toBeInstanceOf(CreditsExhaustedError);
+    const { gateOrgCredits } = await import('$lib/server/credits');
+    await expect(gateOrgCredits('org-1')).rejects.toBeInstanceOf(CreditsExhaustedError);
   });
 
   it('resolves when the provider allows (the open-provider mutation this lotto makes)', async () => {
     const gateFn = vi.fn(async () => {});
     mockProvider.current = fakeProvider('open', gateFn);
-    const { gateCredits } = await import('$lib/server/credits');
-    await expect(gateCredits('brand-1')).resolves.toBeUndefined();
-    expect(gateFn).toHaveBeenCalledWith('credits', { brandId: 'brand-1' });
+    const { gateOrgCredits } = await import('$lib/server/credits');
+    await expect(gateOrgCredits('org-1')).resolves.toBeUndefined();
+    expect(gateFn).toHaveBeenCalledWith('credits', { orgId: 'org-1' });
   });
 });

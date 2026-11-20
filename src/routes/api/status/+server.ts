@@ -30,7 +30,7 @@ async function timed(name: string, fn: () => Promise<void>): Promise<ServiceChec
 async function checkSupabase(): Promise<ServiceCheck> {
   return timed('database', async () => {
     const client = createAdminClient();
-    const { error } = await client.from('brands').select('id', { count: 'exact', head: true });
+    const { error } = await client.from('orgs').select('id', { count: 'exact', head: true });
     if (error) throw new Error(error.message);
   });
 }
@@ -68,8 +68,8 @@ async function checkAiVision(): Promise<ServiceCheck> {
 export const GET: RequestHandler = async ({ url }) => {
   const origin = url.origin;
   const endpointChecks = [
-    timed('api:brands', async () => {
-      const res = await fetch(`${origin}/api/v1/brands`, { method: 'GET', signal: AbortSignal.timeout(10_000) });
+    timed('api:version', async () => {
+      const res = await fetch(`${origin}/api/v1/version`, { method: 'GET', signal: AbortSignal.timeout(10_000) });
       if (res.status >= 500) throw new Error(`Returned ${res.status}`);
     }),
   ];

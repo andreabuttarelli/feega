@@ -7,9 +7,8 @@ describe('le impostazioni di un viewer', () => {
     expect(sectionEditable('/p/p1/settings/appearance', 'viewer')).toBe(true);
   });
 
-  it('progetto, brand e workspace sono in sola lettura', () => {
+  it('progetto e workspace sono in sola lettura', () => {
     expect(sectionEditable('/p/p1/settings/project', 'viewer')).toBe(false);
-    expect(sectionEditable('/p/p1/settings/brand', 'viewer')).toBe(false);
     expect(sectionEditable('/p/p1/settings/api-keys', 'viewer')).toBe(false);
   });
 

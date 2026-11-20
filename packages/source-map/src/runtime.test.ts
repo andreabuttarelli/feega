@@ -33,6 +33,14 @@ describe('inspectElement', () => {
     expect(info.styles).toHaveProperty('font-size');
   });
 
+  it('an element of a page belongs to the page, not to the layout that renders it in its slot', () => {
+    const win = new JSDOM(`<body><main data-feega-src="src/routes/+layout.svelte:20:3"><section data-feega-src="src/routes/+page.svelte:5:1"><h1 data-feega-src="src/routes/+page.svelte:6:3">Hi</h1></section></main></body>`).window;
+
+    const info = inspectElement(win.document.querySelector('h1')!)!;
+
+    expect(info.component).toEqual({ file: 'src/routes/+page.svelte', line: 5, col: 1 });
+  });
+
   it('climbs to the nearest tagged ancestor for an untagged element', () => {
     const win = domOf();
 
@@ -41,6 +49,15 @@ describe('inspectElement', () => {
     expect(info.source).toEqual({ file: 'components/Card.tsx', line: 2, col: 3 });
     expect(info.styles.color).toBe('rgb(255, 0, 0)');
     expect(info.styles['padding-top']).toBe('12px');
+  });
+
+  it('names where an inherited value comes from', () => {
+    const win = domOf();
+
+    const info = inspectElement(win.document.querySelector('h1')!)!;
+
+    expect(info.inherited.color).toBe('section');
+    expect(info.inherited).not.toHaveProperty('padding-top');
   });
 
   it('returns null outside any mapped element', () => {
@@ -85,7 +102,7 @@ describe('bridge', () => {
 
     const h1 = win.document.querySelector('h1')!;
     expect(h1.textContent).toBe('New title');
-    expect(h1.style.color).toBe('rgb(0, 0, 255)');
+    expect(win.getComputedStyle(h1).color).toBe('rgb(0, 0, 255)');
   });
 });
 

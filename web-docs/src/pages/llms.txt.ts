@@ -8,9 +8,7 @@ export async function GET() {
   const lines = pages.map((p) => `- [${p.data.title}](${urlOf(p.id)}): ${p.data.description ?? ''}`);
   const body = [
     '# Feega docs',
-    '> Feega is motion design for Claude Code: an open-source infinite canvas that people and AI agents (Claude Code, Codex, Cursor) edit together through an MCP server and a CLI, then render to MP4, GIF or Lottie.',
-    '## Connect Claude Code',
-    'claude mcp add --transport http feega https://mcp.feega.app/mcp',
+    '> Feega is a free, open-source (Apache-2.0) VS Code extension to design in your codebase: click any element of your running app, edit it like in Figma, and the change is written to your source as a diff. No AI, no tokens. Also runs with `npx feega`.',
     '## Docs',
     lines.join('\n'),
     `Full text: ${SITE}/llms-full.txt`

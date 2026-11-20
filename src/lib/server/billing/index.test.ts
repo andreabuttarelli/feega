@@ -14,7 +14,7 @@ describe('billingProvider()', () => {
 		const provider = await billingProvider();
 
 		expect(provider.kind).toBe('open');
-		await expect(provider.gate('credits', { brandId: 'brand-1' })).resolves.toBeUndefined();
+		await expect(provider.gate('credits', { orgId: 'org-1' })).resolves.toBeUndefined();
 	});
 });
 

@@ -1,7 +1,12 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { Plugin } from 'vite';
+import { createServer, type Plugin } from 'vite';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { feegaSource } from './vite.ts';
 
+const FIXTURES_DIR = fileURLToPath(new URL('../fixtures/', import.meta.url));
 const VITE_CLIENT = '/app/node_modules/vite/dist/client/client.mjs';
 const BRIDGE_IMPORT = /import "\/@fs.*\/bridge\.js";/;
 
@@ -23,5 +28,19 @@ describe('feegaSource', () => {
 
   it('leaves other dependencies untouched', () => {
     expect(transformOf(feegaSource())('export const a = 1;', '/app/node_modules/react/index.js')).toBeNull();
+  });
+
+  it('tagga i componenti anche quando sta dopo il plugin di Svelte, che altrimenti gli passa codice già compilato', async () => {
+    const root = mkdtempSync(join(FIXTURES_DIR, '.order-'));
+    writeFileSync(join(root, 'App.svelte'), '<script lang="ts">let n: number = 1;</script>\n<button id="buy">{n}</button>\n');
+    const server = await createServer({ root, configFile: false, logLevel: 'silent', server: { middlewareMode: true, hmr: false }, optimizeDeps: { noDiscovery: true }, plugins: [svelte(), feegaSource()] });
+
+    try {
+      const out = await server.transformRequest('/App.svelte');
+      expect(out?.code).toContain('data-feega-src="App.svelte:2:1"');
+    } finally {
+      await server.close();
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

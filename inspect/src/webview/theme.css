@@ -1,0 +1,145 @@
+:root {
+  --ui-accent: #0a84ff;
+  --ui-accent-ink: #ffffff;
+  --ui-panel: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  --ui-text: var(--vscode-foreground);
+  --ui-text-2: color-mix(in srgb, var(--ui-text) 60%, transparent);
+  --ui-text-3: color-mix(in srgb, var(--ui-text) 40%, transparent);
+  --ui-ink: var(--ui-text);
+  --ui-ink-2: var(--ui-text-2);
+  --ui-ink-3: var(--ui-text-3);
+  --ui-divider: var(--vscode-panel-border, color-mix(in srgb, var(--ui-text) 12%, transparent));
+  --ui-line-strong: color-mix(in srgb, var(--ui-text) 24%, transparent);
+  --ui-input: color-mix(in srgb, var(--ui-text) 9%, var(--ui-panel));
+  --ui-field-border: color-mix(in srgb, var(--ui-text) 14%, transparent);
+  --ui-field-border-hover: color-mix(in srgb, var(--ui-text) 28%, transparent);
+  --ui-input-hover: color-mix(in srgb, var(--ui-text) 14%, transparent);
+  --ui-radius-xs: 2px;
+  --ui-radius-sm: 4px;
+  --ui-radius-md: 6px;
+  --ui-radius-full: 9999px;
+  --ui-space-2: 8px;
+  --ui-space-4: 16px;
+  --ui-row: 32px;
+  --ui-hit: 24px;
+  --ui-header-h: 40px;
+  --ui-text-xs: 11px;
+  --ui-text-sm: 12px;
+  --ui-text-md: 13px;
+  --ui-dur-fast: 120ms;
+  --ui-radius-lg: 10px;
+  --ui-backdrop: color-mix(in srgb, var(--ui-text) 6%, var(--vscode-editor-background, #1e1e1e));
+  --ui-thumb: #ffffff;
+  --ui-thumb-ink: #111111;
+  --ui-float: color-mix(in srgb, var(--ui-panel) 92%, transparent);
+  --ui-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgb(51 51 51 / 0.6)' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+body.vscode-dark,
+body.vscode-high-contrast {
+  --ui-thumb: #5a5a5e;
+  --ui-thumb-ink: #ffffff;
+  --ui-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgb(204 204 204 / 0.6)' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--vscode-editor-background, #1e1e1e);
+  color: var(--ui-text);
+  font-family: var(--vscode-font-family, system-ui, sans-serif);
+  font-size: var(--ui-text-md);
+}
+
+.field,
+select,
+input[type='text'],
+input[type='number'] {
+  box-shadow: inset 0 0 0 1px var(--ui-field-border);
+  font-variant-numeric: tabular-nums;
+}
+
+.field:hover,
+select:hover,
+input[type='text']:hover,
+input[type='number']:hover {
+  box-shadow: inset 0 0 0 1px var(--ui-field-border-hover);
+}
+
+.field:focus-within,
+select:focus-visible,
+input:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--ui-accent);
+}
+
+.field input,
+.address input {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  box-shadow: none !important;
+  outline: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.field input::-webkit-inner-spin-button,
+.field input::-webkit-outer-spin-button {
+  display: none;
+}
+
+input[type='color'] {
+  box-shadow: inset 0 0 0 1px var(--ui-field-border);
+}
+
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 1px;
+}
+
+.dropdown-menu {
+  z-index: 20;
+  min-width: 160px;
+  padding: 4px;
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-panel);
+  box-shadow: 0 0 0 1px var(--ui-divider), 0 12px 32px rgb(0 0 0 / 0.28);
+  color: var(--ui-text);
+  font-size: var(--ui-text-sm);
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: var(--ui-radius-sm);
+  cursor: pointer;
+  outline: none;
+}
+
+.dropdown-item[data-highlighted] {
+  background: var(--ui-input);
+}
+
+.dropdown-sep {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--ui-divider);
+}
+
+select {
+  appearance: none;
+  padding-right: 16px !important;
+  background-image: var(--ui-chevron) !important;
+  background-repeat: no-repeat !important;
+  background-position: right 4px center !important;
+  background-size: 10px !important;
+}
