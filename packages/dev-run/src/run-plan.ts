@@ -74,14 +74,14 @@ const FRAMEWORKS: Record<Framework, FrameworkRow> = {
   [Framework.Generic]: { needs: [], config: null, scripts: DEV_SCRIPTS, flags: NO_FLAGS, port: 3000 }
 };
 
-type ManagerRow = { lockfiles: string[]; bin: (version: string | null) => string[]; install: string[]; separator: string[]; env: Record<string, string>; node: NodeLine | null };
+type ManagerRow = { lockfiles: string[]; bin: (version: string | null) => string[]; install: string[]; noLockfile: string[]; separator: string[]; env: Record<string, string>; node: NodeLine | null };
 
 const MANAGERS: Record<Manager, ManagerRow> = {
-  [Manager.Pnpm]: { lockfiles: ['pnpm-lock.yaml'], bin: (v) => (v ? ['npx', '-y', `pnpm@${v}`] : ['pnpm']), install: ['install', '--reporter=append-only', '--config.strict-dep-builds=false'], separator: [], env: {}, node: null },
-  [Manager.Yarn]: { lockfiles: ['yarn.lock'], bin: (v) => ['npx', '-y', `yarn@${v ?? '1'}`], install: ['install', '--non-interactive', '--silent'], separator: [], env: {}, node: null },
-  [Manager.YarnBerry]: { lockfiles: [], bin: (v) => ['npx', '-y', '-p', `@yarnpkg/cli-dist@${v ?? 'latest'}`, 'yarn'], install: ['install'], separator: [], env: { YARN_ENABLE_IMMUTABLE_INSTALLS: 'false' }, node: null },
-  [Manager.Bun]: { lockfiles: ['bun.lock', 'bun.lockb'], bin: (v) => (v ? ['npx', '-y', `bun@${v}`] : ['bun']), install: ['install'], separator: [], env: {}, node: NodeLine.Node24 },
-  [Manager.Npm]: { lockfiles: ['package-lock.json'], bin: () => ['npm'], install: ['install', '--no-audit', '--no-fund', '--loglevel=error'], separator: ['--'], env: {}, node: null }
+  [Manager.Pnpm]: { lockfiles: ['pnpm-lock.yaml'], bin: (v) => (v ? ['npx', '-y', `pnpm@${v}`] : ['pnpm']), install: ['install', '--reporter=append-only', '--config.strict-dep-builds=false'], noLockfile: ['--no-lockfile'], separator: [], env: {}, node: null },
+  [Manager.Yarn]: { lockfiles: ['yarn.lock'], bin: (v) => ['npx', '-y', `yarn@${v ?? '1'}`], install: ['install', '--non-interactive', '--silent'], noLockfile: ['--no-lockfile'], separator: [], env: {}, node: null },
+  [Manager.YarnBerry]: { lockfiles: [], bin: (v) => ['npx', '-y', '-p', `@yarnpkg/cli-dist@${v ?? 'latest'}`, 'yarn'], install: ['install'], noLockfile: [], separator: [], env: { YARN_ENABLE_IMMUTABLE_INSTALLS: 'false' }, node: null },
+  [Manager.Bun]: { lockfiles: ['bun.lock', 'bun.lockb'], bin: (v) => (v ? ['npx', '-y', `bun@${v}`] : ['bun']), install: ['install'], noLockfile: ['--no-save'], separator: [], env: {}, node: NodeLine.Node24 },
+  [Manager.Npm]: { lockfiles: ['package-lock.json'], bin: () => ['npm'], install: ['install', '--no-audit', '--no-fund', '--loglevel=error'], noLockfile: ['--no-package-lock'], separator: ['--'], env: {}, node: null }
 };
 
 const BERRY_MARKER = '.yarnrc.yml';
@@ -237,6 +237,7 @@ export function runPlan(facts: RepoFacts, asked: string | null, listen: Listen):
 
   const installDir = workspace && root ? '' : appDir;
   const { manager, version } = managerOf(namesIn(facts.files, installDir), manifests.get(installDir) ?? manifest);
+  const installNames = namesIn(facts.files, installDir);
   const pm = MANAGERS[manager];
   const bin = pm.bin(version);
   const flags = row.flags(listen);
@@ -247,7 +248,7 @@ export function runPlan(facts: RepoFacts, asked: string | null, listen: Listen):
     manager,
     appDir,
     installDir,
-    install: [...bin, ...pm.install],
+    install: [...bin, ...pm.install, ...(pm.lockfiles.some((l) => installNames.has(l)) ? [] : pm.noLockfile)],
     dev: [...bin, 'run', script, ...(flags.length ? [...pm.separator, ...flags] : [])],
     env: { PORT: String(listen.port), HOST: listen.host, BROWSER: 'none', ...pm.env },
     node: pm.node ?? nodeOf(facts, manifests, [...new Set([appDir, installDir])]),

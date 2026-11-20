@@ -246,6 +246,24 @@ describe('appOf', () => {
   });
 });
 
+describe('installing never creates a lockfile in the user project', () => {
+  const app = (names: string[]) => repo({ 'package.json': { scripts: { dev: 'vite' }, devDependencies: { vite: '6' } } }, names);
+
+  it('npm without a lockfile installs without writing one', () => {
+    expect(runPlan(app([]), null, SANDBOX)).toMatchObject({ install: [...NPM_INSTALL, '--no-package-lock'] });
+  });
+
+  it('npm with a lockfile installs as before', () => {
+    expect(runPlan(app(['package-lock.json']), null, SANDBOX)).toMatchObject({ install: NPM_INSTALL });
+  });
+
+  it('pnpm without a lockfile installs without writing one', () => {
+    const facts = repo({ 'package.json': { packageManager: 'pnpm@10.0.0', scripts: { dev: 'vite' }, devDependencies: { vite: '6' } } });
+
+    expect(runPlan(facts, null, SANDBOX)).toMatchObject({ install: expect.arrayContaining(['--no-lockfile']) });
+  });
+});
+
 describe('the files a plan reads', () => {
   it('lists package manifests, lockfiles, configs and version files, not sources', () => {
     expect(['package.json', 'apps/v4/next.config.mjs', 'pnpm-lock.yaml', '.nvmrc', 'angular.json', '.yarnrc.yml'].every(planFile)).toBe(true);
