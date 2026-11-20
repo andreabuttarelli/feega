@@ -1,5 +1,3 @@
-import { OpKind, type DocOp } from '$lib/motion/doc-ops';
-
 export enum CoreEvent {
   CanvasOpened = 'canvas_opened',
   UrlImported = 'url_imported',
@@ -86,24 +84,3 @@ export function landed(body: unknown): boolean {
 }
 
 export const LOCAL_MODE_EVENTS: ReadonlySet<CoreEvent> = new Set([CoreEvent.FrameCreated, CoreEvent.ExportCompleted]);
-
-const TIMELINE_FIELDS = new Set(['from', 'durationInFrames']);
-const COMPONENT_FIELDS = new Set(['comps', 'components']);
-const TIMELINE = () => MotionEditKind.Timeline;
-
-const EDIT_OF_OP: Partial<{ [K in OpKind]: (op: Extract<DocOp, { kind: K }>) => MotionEditKind | null }> = {
-  [OpKind.ClipEntry]: (op) => (op.field === 'keyframes' ? MotionEditKind.Keyframe : null),
-  [OpKind.ClipSet]: (op) => (TIMELINE_FIELDS.has(op.field) ? MotionEditKind.Timeline : op.field === 'component' ? MotionEditKind.Component : null),
-  [OpKind.DocEntry]: (op) => (COMPONENT_FIELDS.has(op.field) ? MotionEditKind.Component : null),
-  [OpKind.ClipAdd]: TIMELINE,
-  [OpKind.ClipMove]: TIMELINE,
-  [OpKind.ClipRemove]: TIMELINE,
-  [OpKind.TrackAdd]: TIMELINE,
-  [OpKind.TrackMove]: TIMELINE,
-  [OpKind.TrackRemove]: TIMELINE
-};
-
-export function motionEdits(ops: readonly DocOp[]): MotionEditKind[] {
-  const kinds = ops.map((op) => (EDIT_OF_OP[op.kind] as ((op: DocOp) => MotionEditKind | null) | undefined)?.(op) ?? null);
-  return [...new Set(kinds.filter((k) => k !== null))];
-}

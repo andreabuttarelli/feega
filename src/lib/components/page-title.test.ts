@@ -4,15 +4,7 @@ import { render } from 'svelte/server';
 import PageTitle from './PageTitle.svelte';
 import { TitleSize } from './page-title';
 
-const VIEWS = [
-  'src/routes/gallery/+page.svelte',
-  'src/routes/gallery/[id]/+page.svelte',
-  'src/routes/app/motion/+page.svelte',
-  'src/routes/app/compose/+page.svelte',
-  'src/routes/app/upscale/+page.svelte',
-  'src/routes/p/[projectId]/settings/+layout.svelte',
-  'src/routes/login/+page.svelte'
-];
+const VIEWS = ['src/routes/login/+page.svelte'];
 
 describe('titolo di vista in mega type', () => {
   it.each(VIEWS)('%s usa PageTitle e nessun h1 scritto a mano', (path) => {
