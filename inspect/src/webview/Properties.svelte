@@ -431,6 +431,10 @@
     border-bottom: 1px solid var(--ui-divider);
   }
 
+  section:has(> .head [aria-expanded='false']) {
+    padding: 4px 0;
+  }
+
   .properties :global(.head) {
     display: flex;
     align-items: center;
