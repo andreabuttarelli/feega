@@ -226,7 +226,7 @@ const sideRows = (prefix: string, suffix: string, label: string): CssSpec[] => S
 
 export const CSS_ROWS: CssSpec[] = [
   choice(Section.Position, 'position', 'Position', ['static', 'relative', 'absolute', 'fixed', 'sticky']),
-  ...SIDES.map((s) => length(Section.Position, s.key, s.label, SIGNED)),
+  ...SIDES.map((s) => length(Section.Position, s.key, s.label, SIGNED, UNITS_OF.offset)),
   count(Section.Position, 'z-index', 'Z', Z),
   { ...choice(Section.Display, 'display', 'Display', ['block', 'inline-block', 'inline', 'flex', 'inline-flex', 'grid', 'inline-grid', 'contents', 'none']), utility: { family: ClassFamily.Display, make: (v) => (v === 'none' ? 'hidden' : v) } },
   choice(Section.Display, 'overflow-x', 'Overflow X', OVERFLOW),
@@ -275,6 +275,11 @@ export const CSS_ROWS: CssSpec[] = [
   choice(Section.List, 'list-style-type', 'Marker', ['none', 'disc', 'circle', 'square', 'decimal']),
   choice(Section.List, 'list-style-position', 'Marker at', ['outside', 'inside'])
 ];
+
+const STATIC_POSITION = 'static';
+const POSITIONED_ONLY = new Set(['top', 'right', 'bottom', 'left', 'z-index']);
+
+export const shownRows = <T extends { name: string }>(rows: T[], styles: Styles): T[] => rows.filter((r) => !POSITIONED_ONLY.has(r.name) || (styles.position ?? STATIC_POSITION) !== STATIC_POSITION);
 
 const kebabOf = (name: string) => name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 

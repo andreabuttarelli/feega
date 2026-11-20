@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { LiveProp } from '@feega/live-edit/live-fields';
-import { CSS_ROWS, ROWS, Control } from './controls';
+import { CSS_ROWS, ROWS, Control, shownRows, type NumberRow } from './controls';
+import { Unit } from './units';
 
 const row = (name: string) => ROWS.find((r) => r.name === name)!;
 
@@ -55,5 +56,30 @@ describe('css rows', () => {
 
   it('every css row reads a property the page reports', () => {
     expect(CSS_ROWS.every((r) => r.reads.length > 0)).toBe(true);
+  });
+});
+
+describe('position rows', () => {
+  const names = (position: string | undefined) => shownRows(ROWS.filter((r) => r.section === 'Position'), position === undefined ? {} : { position }).map((r) => r.name);
+
+  it('a static element shows only the position type', () => {
+    expect(names('static')).toEqual(['position']);
+    expect(names(undefined)).toEqual(['position']);
+  });
+
+  it.each(['relative', 'absolute', 'fixed', 'sticky'])('a %s element shows the offsets and z-index', (position) => {
+    expect(names(position)).toEqual(['position', 'top', 'right', 'bottom', 'left', 'z-index']);
+  });
+
+  it('offsets take px, % and auto', () => {
+    expect((row('top') as NumberRow).units).toEqual([Unit.Px, Unit.Percent, Unit.Auto]);
+  });
+
+  it('offsets and z-index write the exact Tailwind utility', () => {
+    expect(row('top').change('12px').value).toBe('top-3');
+    expect(row('left').change('50%').value).toBe('left-1/2');
+    expect(row('z-index').change('10').value).toBe('z-10');
+    expect(row('top').change('13px').value).toBe('top-[13px]');
+    expect(row('position').change('absolute').value).toBe('absolute');
   });
 });

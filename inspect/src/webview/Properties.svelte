@@ -18,7 +18,7 @@
   import { UI_ICON_SVG, UiIcon } from './ui-icons';
   import ScanLine from '@lucide/svelte/icons/square-dashed';
   import { MIXED, type Shared } from '@feega/properties-panel/mixed';
-  import { CSS_ROWS, Control, Group, ROWS, Section, SideMode, GROUP_MODES, type Hint, type NumberRow, type Row } from './controls';
+  import { CSS_ROWS, shownRows, Control, Group, ROWS, Section, SideMode, GROUP_MODES, type Hint, type NumberRow, type Row } from './controls';
   import { Role, roleOf, sectionsOf } from './roles';
   import { paintOf } from './colour';
   import Field from './Field.svelte';
@@ -330,7 +330,7 @@
     <section data-section={s}>
       {@render header(s)}
       {#if !closed[s]}
-        {#each ROWS.filter((r) => r.section === s) as r (r.name)}
+        {#each shownRows(ROWS.filter((r) => r.section === s), pick.styles) as r (r.name)}
           {@const from = pick.inherited?.[READS[r.name]]}
           <div class="row" class:inherited={from} data-row={r.name} title={from ? `Inherited from ${from}` : undefined}>
             <span class="label">{r.label}</span>

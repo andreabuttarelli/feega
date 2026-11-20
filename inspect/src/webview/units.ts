@@ -26,7 +26,8 @@ export const UNITS_OF: Record<string, Unit[]> = {
   'font-size': [Unit.Px, Unit.Rem, Unit.Em],
   'line-height': [Unit.None, Unit.Px, Unit.Rem, Unit.Em],
   'letter-spacing': [Unit.Em, Unit.Px, Unit.Rem],
-  border: [Unit.Px, Unit.Rem]
+  border: [Unit.Px, Unit.Rem],
+  offset: [Unit.Px, Unit.Percent, Unit.Auto]
 };
 
 const STEP: Record<Unit, number> = {
