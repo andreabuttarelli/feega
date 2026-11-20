@@ -22,7 +22,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-latest, macos-latest]
-        fixture: [react-css, next-css]
+        fixture: [react-css, next-css, vue-css, sveltekit-css]
     env:
       FEEGA_E2E_APP: inspect/test/fixtures/${{ matrix.fixture }}
     steps:
@@ -36,7 +36,8 @@ jobs:
       - run: npx svelte-kit sync
       - run: npx vitest run inspect/src npx/src packages
       - run: node npx/build.mjs
-      - run: npm install --no-audit --no-fund
+      - run: npm install --no-audit --no-fund --no-package-lock
         working-directory: inspect/test/fixtures/${{ matrix.fixture }}
       - run: npx playwright install --with-deps chromium
       - run: node npx/test/editor.e2e.mjs
+      - run: node npx/test/editing.e2e.mjs

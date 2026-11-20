@@ -1,0 +1,166 @@
+import assert from 'node:assert/strict';
+import { execFileSync, spawn } from 'node:child_process';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { chromium } from '@playwright/test';
+
+const here = (path) => fileURLToPath(new URL(path, import.meta.url));
+const APP = resolve(process.env.FEEGA_E2E_APP);
+const CLI = here('../dist/cli.cjs');
+const PORT = Number(process.env.FEEGA_E2E_PORT ?? 4721);
+const READY_MS = 120_000;
+const SETTLE_MS = 2500;
+const TAILWIND = /tailwind/.test(APP);
+const NEW_TITLE = 'Ship faster than planned';
+
+const git = (...args) => execFileSync('git', ['-C', APP, ...args], { encoding: 'utf8' });
+const changedFiles = () => git('diff', '--name-only', '--relative').split('\n').filter(Boolean);
+const diffText = () => git('diff', '--relative');
+const untracked = () => git('ls-files', '--others', '--exclude-standard', '--', '.').split('\n').filter((f) => f && !f.startsWith('node_modules') && !f.startsWith('.feega'));
+
+function started() {
+  const cli = spawn(process.execPath, [CLI, APP, '--port', String(PORT), '--no-open'], { stdio: ['pipe', 'pipe', 'inherit'], env: { ...process.env, FEEGA_STOP_ON_STDIN_END: '1' } });
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('the editor did not start')), READY_MS);
+    cli.stdout.on('data', (data) => {
+      const url = /editor ready on (\S+)/.exec(String(data))?.[1];
+      if (url) {
+        clearTimeout(timer);
+        resolve({ cli, url });
+      }
+    });
+    cli.once('exit', () => reject(new Error('the CLI exited before it was ready')));
+  });
+}
+
+const results = [];
+const check = async (name, run) => {
+  try {
+    await run();
+    results.push(`PASS ${name}`);
+  } catch (error) {
+    results.push(`FAIL ${name}: ${String(error.message).split('\n')[0]}`);
+  }
+};
+
+const { cli, url } = await started();
+const browser = await chromium.launch();
+try {
+  const page = await browser.newPage({ viewport: { width: 1500, height: 950 } });
+  await page.goto(url);
+  const frame = page.frameLocator('[data-testid="app-frame"]');
+  await page.getByText('Click an element to edit it').waitFor({ timeout: READY_MS });
+  await page.waitForTimeout(SETTLE_MS);
+  const undo = async () => {
+    await page.getByRole('button', { name: /^Undo/ }).first().click();
+    await page.waitForTimeout(SETTLE_MS);
+  };
+
+  const opened = async (locator) => {
+    const box = await locator.boundingBox();
+    await page.mouse.dblclick(box.x + 20, box.y + box.height / 2);
+    await frame.locator('[contenteditable]').first().waitFor({ timeout: 5000 });
+  };
+
+  await check('layers tree is filled on first load', async () => {
+    const rows = await page.locator('[data-testid="layers"] [data-layer]').count();
+    assert.ok(rows >= 3, `only ${rows} layer rows`);
+  });
+
+  await check('layers expand to the selected element', async () => {
+    await frame.locator('h1').first().click();
+    await page.waitForTimeout(800);
+    const picked = await page.locator('[data-testid="layers"] [data-layer][aria-selected="true"]').count();
+    assert.equal(picked, 1, 'the selected element has a visible layer row');
+  });
+
+  await check('plain text edit writes the source and undo restores it', async () => {
+    const h1 = frame.locator('h1').first();
+    await h1.click();
+    await opened(h1);
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type(NEW_TITLE);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(SETTLE_MS);
+    assert.ok(diffText().includes(NEW_TITLE), `the new title is in the source; page says: ${(await page.locator('body').innerText()).slice(0, 400).replace(/\n/g, ' | ')} h1=${await frame.locator('h1').first().innerText()}`);
+    await undo();
+    assert.deepEqual(changedFiles(), [], 'one undo restores the source');
+  });
+
+  await check('text from a prop is refused and the preview keeps the old text', async () => {
+    const h2 = frame.locator('h2').first();
+    const was = await h2.innerText();
+    await h2.click();
+    await opened(h2);
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('Changed from the preview');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(SETTLE_MS);
+    assert.equal(await frame.locator('h2').first().innerText(), was, 'the preview text diverged from the source');
+    assert.deepEqual(changedFiles(), [], 'the source was not touched');
+  });
+
+  await check('padding on all sides writes one shorthand (css) and one undo reverts', async () => {
+    await frame.locator('h1').first().click();
+    const field = page.locator('[data-row="padding"] input[aria-label="padding-all"]');
+    await field.waitFor({ timeout: 10_000 });
+    await field.fill('20');
+    await field.press('Enter');
+    await page.waitForTimeout(SETTLE_MS);
+    const added = diffText().split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++'));
+    assert.ok(added.length > 0, 'something was written');
+    if (!TAILWIND) {
+      assert.ok(added.some((l) => /padding:\s*20px/.test(l)), `shorthand padding:\n${added.join('\n')}`);
+      assert.ok(!added.some((l) => /padding-(top|left)/.test(l)), 'no longhands');
+    }
+    await undo();
+    assert.deepEqual(changedFiles().concat(untracked()), [], 'one undo restores everything');
+  });
+
+  await check('a fill colour does not add background-image none', async () => {
+    await frame.locator('h1').first().click();
+    const hex = page.locator('[data-row="fill"] input[aria-label="Colour hex"]').first();
+    if (!(await hex.count())) {
+      const add = page.locator('[data-section="Fill"] button[aria-label*="Add"]').first();
+      await add.click();
+    }
+    await page.waitForTimeout(SETTLE_MS);
+    assert.ok(!diffText().includes('background-image'), 'no background-image written');
+    if (changedFiles().length) {
+      await undo();
+    }
+  });
+
+  await check('sibling reorder writes the source, shows in the preview, and undo restores it', async () => {
+    await frame.locator('h1').first().click();
+    await page.waitForTimeout(800);
+    const layers = page.locator('[data-testid="layers"] [data-layer]');
+    const title = layers.filter({ hasText: /^\s*h1/ }).first();
+    const lead = layers.filter({ hasText: /^\s*p(\b|\.|_)/ }).first();
+    await title.dragTo(lead, { targetPosition: { x: 60, y: 20 } });
+    await page.waitForTimeout(SETTLE_MS);
+    assert.ok(changedFiles().length > 0, 'the source order changed');
+    const order = await frame.locator('main').first().evaluate((main) => [...main.children].map((c) => c.tagName));
+    assert.ok(order.indexOf('P') < order.indexOf('H1'), `the preview order is ${order.join(',')}`);
+    await undo();
+    assert.deepEqual(changedFiles(), [], 'undo restores the order');
+  });
+
+  await check('no package file was created or changed', async () => {
+    assert.deepEqual(untracked().filter((f) => /package-lock|pnpm-lock|yarn\.lock|bun\.lock/.test(f)), []);
+    assert.ok(!changedFiles().some((f) => /package/.test(f)));
+  });
+} finally {
+  const left = changedFiles();
+  if (left.length) {
+    git('checkout', '--', ...left);
+  }
+  rmSync(join(APP, '.feega'), { recursive: true, force: true });
+  await browser.close();
+  cli.stdin.end();
+}
+console.log(`\n${APP}\n${results.join('\n')}`);
+process.exitCode = results.some((r) => r.startsWith('FAIL')) ? 1 : 0;
+void existsSync;
+void readFileSync;
