@@ -37,7 +37,7 @@ export type Hub = {
 export const IMAGE_WIDTH = 1200;
 export const IMAGE_HEIGHT = 675;
 
-export const figure = (src: string, alt: string): Figure => ({ src, alt, width: IMAGE_WIDTH, height: IMAGE_HEIGHT });
+export const figure = (src: string, alt: string, size = { width: IMAGE_WIDTH, height: IMAGE_HEIGHT }): Figure => ({ src, alt, ...size });
 
 export const topicPath = (hub: Hub, slug: string) => `${hub.path}/${slug}`;
 
