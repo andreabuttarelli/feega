@@ -35,6 +35,33 @@ describe('what the element is', () => {
     expect(inspectElement(doc.querySelector('section')!)!.inlineText).toBe(false);
   });
 
+  const inspected = (html: string) => {
+    const doc = domOf().document;
+    const box = doc.createElement('div');
+    box.innerHTML = html;
+    box.setAttribute('data-feega-src', 'src/A.svelte:1:1');
+    doc.body.append(box);
+    return inspectElement(box)!;
+  };
+
+  it('a div of button links is not inline text', () => {
+    const info = inspected('<a class="btn" style="display:inline-block;padding:8px">Get started</a><a class="btn" style="display:inline-block;padding:8px">Docs</a>');
+
+    expect(info.inlineText).toBe(false);
+  });
+
+  it('a nav of plain links is not inline text', () => {
+    expect(inspected('<a href="/a">Home</a> <a href="/b">Pricing</a>').inlineText).toBe(false);
+  });
+
+  it('prose with an inline link is inline text', () => {
+    expect(inspected('Read the <a href="/d">docs</a> now.').inlineText).toBe(true);
+  });
+
+  it('text with span and strong is inline text', () => {
+    expect(inspected('Ship <span>fast</span> and <strong>sure</strong>').inlineText).toBe(true);
+  });
+
   it('a heading has its own text and no element children', () => {
     const info = inspectElement(domOf().document.querySelector('h1')!)!;
 
