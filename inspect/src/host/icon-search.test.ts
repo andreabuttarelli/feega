@@ -3,8 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { detectLibrary } from '@feega/live-edit/icon-library';
-import { IconSource, LIBRARY_GRID_LIMIT, libraryHits, mcpIcon, mcpSearch, REMOTE_PREVIEW_LIMIT, searchIcons, streamPreviews } from './icon-search';
+import { IconSource, LIBRARY_GRID_LIMIT, libraryHits, mcpIcon, mcpSearch, searchIcons } from './icon-search';
 
+const LUCIDE = JSON.stringify({ dependencies: { 'lucide-react': '1' } });
+const NODE = 'const __iconData = { node: [["path", { d: "M5 12h14", key: "a" }]] };';
 const reply = (content: { type: string; text: string }[]) => async () => new Response(JSON.stringify({ result: { content } }));
 
 describe('iconmcp', () => {
@@ -64,14 +66,37 @@ describe('libraryHits', () => {
     const root = mkdtempSync(join(tmpdir(), 'icons-'));
     const dir = join(root, 'node_modules/lucide-react/dist/esm/icons');
     mkdirSync(dir, { recursive: true });
-    ['mail.js', 'mail.js.map', 'mail-open.js', 'heart.js'].forEach((f) => writeFileSync(join(dir, f), ''));
+    ['mail.js', 'mail.js.map', 'mail-open.js', 'heart.js'].forEach((f) => writeFileSync(join(dir, f), 'const __iconNode = [["path", { "d": "M1 1" }]];'));
     const library = detectLibrary(JSON.stringify({ dependencies: { 'lucide-react': '1' } }))!;
 
     expect((await libraryHits(root, library, 'mail', 10, null)).map((h) => h.name)).toEqual(['mail', 'mail-open']);
   });
-});
 
-const LUCIDE = JSON.stringify({ dependencies: { 'lucide-react': '1' } });
+  it('draws an alias through the module it re-exports, and leaves out what it cannot draw', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'icons-'));
+    const dir = join(root, 'node_modules/lucide-react/dist/esm/icons');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'mail-box.mjs'), 'export { default } from \'./mailbox.mjs\';');
+    writeFileSync(join(dir, 'mailbox.mjs'), NODE);
+    writeFileSync(join(dir, 'mail-index.mjs'), 'export {};');
+    const library = detectLibrary(LUCIDE)!;
+    const hits = await libraryHits(root, library, 'mail', 10, null);
+
+    expect(hits.map((h) => h.name).sort()).toEqual(['mail-box', 'mailbox']);
+    expect(hits.every((h) => h.svg)).toBe(true);
+  });
+
+  it('keeps filling the grid past icons it cannot draw', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'icons-'));
+    const dir = join(root, 'node_modules/lucide-react/dist/esm/icons');
+    mkdirSync(dir, { recursive: true });
+    Array.from({ length: 5 }, (_, i) => writeFileSync(join(dir, `a${i}.mjs`), 'export {};'));
+    Array.from({ length: 3 }, (_, i) => writeFileSync(join(dir, `b${i}.mjs`), NODE));
+    const hits = await libraryHits(root, detectLibrary(LUCIDE)!, '', 3, null);
+
+    expect(hits).toHaveLength(3);
+  });
+});
 
 function project(icons: Record<string, string>) {
   const root = mkdtempSync(join(tmpdir(), 'icons-'));
@@ -82,32 +107,7 @@ function project(icons: Record<string, string>) {
   return root;
 }
 
-const NODE = 'const __iconData = { node: [["path", { d: "M5 12h14", key: "a" }]] };';
 const remoteReply = (results: { name: string }[]) => reply([{ type: 'text', text: JSON.stringify({ results }) }]);
-
-describe('streamPreviews', () => {
-  const hit = (name: string) => ({ name, source: IconSource.IconMcp });
-
-  it('draws each remote hit and skips the ones that fail', async () => {
-    const fetcher = async (_: string, init?: RequestInit) => {
-      const name = JSON.parse(String(init?.body)).params.arguments.name;
-      return name === 'broken' ? new Response('no', { status: 500 }) : reply([{ type: 'text', text: `<svg id="${name}"></svg>` }])();
-    };
-    const drawn: string[] = [];
-    await streamPreviews(fetcher, [hit('a'), hit('broken'), hit('b')], async (name, svg) => void drawn.push(`${name}:${svg}`));
-
-    expect(drawn.sort()).toEqual(['a:<svg id="a"></svg>', 'b:<svg id="b"></svg>']);
-  });
-
-  it('draws only the first remote hits', async () => {
-    const fetcher = reply([{ type: 'text', text: '<svg></svg>' }]);
-    const drawn: string[] = [];
-    const many = Array.from({ length: REMOTE_PREVIEW_LIMIT + 10 }, (_, i) => hit(`n${i}`));
-    await streamPreviews(fetcher, many, async (name) => void drawn.push(name));
-
-    expect(drawn).toHaveLength(REMOTE_PREVIEW_LIMIT);
-  });
-});
 
 describe('searchIcons', () => {
   it('ranks local hits and draws them', async () => {

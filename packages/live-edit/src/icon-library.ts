@@ -12,7 +12,7 @@ export type IconLibrary = {
   nameOf: (file: string) => string;
 };
 
-const ICON_FILE = /\.(m?js|svelte)$/;
+const ICON_FILE = /(?:\.es)?\.(m?js|svelte)$/;
 
 const upper = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
 const pascal = (name: string) => name.split(/[-_]/).map(upper).join('');

@@ -127,6 +127,7 @@ export enum ToHost {
   IconMarkup = 'icon-markup',
   IconGet = 'icon-get',
   IconSearch = 'icon-search',
+  IconPreviews = 'icon-previews',
   SignIn = 'sign-in',
   CancelSignIn = 'cancel-sign-in',
   SignOut = 'sign-out',
@@ -197,6 +198,7 @@ export type HostMessage =
   | { kind: ToHost.IconMarkup; at: string; markup: string; inner?: string }
   | { kind: ToHost.IconGet; at: string; name: string; size: number; stroke: number; inner?: string }
   | { kind: ToHost.IconSearch; id: number; query: string; at: string }
+  | { kind: ToHost.IconPreviews; names: string[] }
   | { kind: ToHost.SignIn }
   | { kind: ToHost.CancelSignIn }
   | { kind: ToHost.SignOut }
@@ -217,7 +219,7 @@ export type ViewMessage =
   | { kind: ToView.Change; row: string; value: string }
   | { kind: ToView.Pick; id: number; x: number; y: number }
   | { kind: ToView.IconResults; id: number; library: string | null; hits: IconHit[]; error?: string }
-  | { kind: ToView.IconPreview; id: number; name: string; svg: string }
+  | { kind: ToView.IconPreview; name: string; svg: string | null }
   | { kind: ToView.Account; state: AccountState; email?: string }
   | { kind: ToView.Onboarding; state: Onboarding }
   | { kind: ToView.ImageSaved; url: string }

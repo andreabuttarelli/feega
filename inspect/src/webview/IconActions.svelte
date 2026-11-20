@@ -2,7 +2,7 @@
   import { Popover } from 'bits-ui';
   import { IconSource, ToHost, type IconHit, type Pick } from '../messages';
   import { toHost } from './host';
-  import { iconSearch, nextIconRequest } from './icon-search.svelte';
+  import { iconSearch, nextIconRequest, wantPreview } from './icon-search.svelte';
   import { maskOf, nextTile } from './icon-name';
   import { sourceText } from './page-bridge';
 
@@ -11,6 +11,7 @@
   const FIRST = 0;
   const ICON_SIZE = 24;
   const ICON_STROKE = 2;
+  const VISIBLE_MARGIN = '80px';
 
   let { pick }: { pick: Pick } = $props();
 
@@ -29,7 +30,17 @@
   const group = $derived(chosen ?? (library.length || !iconSearch.library ? IconSource.Library : IconSource.IconMcp));
   const shown = $derived(group === IconSource.Library && iconSearch.library ? library : group === IconSource.IconMcp ? remote : library);
   const showsRemote = $derived(group === IconSource.IconMcp || !iconSearch.library);
-  const svgOf = (hit: IconHit) => (showsRemote ? iconSearch.previews[hit.name] : hit.svg);
+  const svgOf = (hit: IconHit) => (hit.source === IconSource.IconMcp ? iconSearch.previews[hit.name] : hit.svg);
+  const loading = (hit: IconHit) => hit.source === IconSource.IconMcp && !(hit.name in iconSearch.previews);
+
+  function whenVisible(tile: HTMLElement, hit: IconHit) {
+    if (hit.source !== IconSource.IconMcp) {
+      return;
+    }
+    const watcher = new IntersectionObserver((entries) => entries.some((entry) => entry.isIntersecting) && wantPreview(hit.name), { root: tile.closest('.icon-results'), rootMargin: VISIBLE_MARGIN });
+    watcher.observe(tile);
+    return { destroy: () => watcher.disconnect() };
+  }
 
   function search(text: string) {
     query = text;
@@ -85,9 +96,11 @@
         {/if}
         <div class="icon-results" bind:this={grid} role="grid" tabindex="-1" onkeydown={move}>
           {#each shown as hit (hit.source + hit.name)}
-            <button type="button" class="icon-tile" title={hit.label ?? hit.name} onclick={() => pickHit(hit)} onmouseenter={() => (hovered = hit.label ?? hit.name)} onfocus={() => (hovered = hit.label ?? hit.name)}>
+            <button type="button" class="icon-tile" use:whenVisible={hit} title={hit.label ?? hit.name} onclick={() => pickHit(hit)} onmouseenter={() => (hovered = hit.label ?? hit.name)} onfocus={() => (hovered = hit.label ?? hit.name)}>
               {#if svgOf(hit)}
                 <span class="icon-glyph" style:mask-image={maskOf(svgOf(hit)!)} style:-webkit-mask-image={maskOf(svgOf(hit)!)}></span>
+              {:else if loading(hit)}
+                <span class="icon-skeleton"></span>
               {:else}
                 <span class="icon-fallback">{hit.name}</span>
               {/if}
@@ -223,6 +236,21 @@
     -webkit-mask-size: contain;
     -webkit-mask-repeat: no-repeat;
     -webkit-mask-position: center;
+  }
+
+  :global(.icon-popover) .icon-skeleton {
+    width: 20px;
+    height: 20px;
+    border-radius: var(--ui-radius-sm);
+    background: currentColor;
+    opacity: 0.08;
+    animation: icon-pulse 1.2s ease-in-out infinite alternate;
+  }
+
+  @keyframes icon-pulse {
+    to {
+      opacity: 0.2;
+    }
   }
 
   :global(.icon-popover) .icon-fallback {

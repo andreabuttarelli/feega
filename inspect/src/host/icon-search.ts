@@ -2,7 +2,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { detectLibrary, type IconLibrary } from '@feega/live-edit/icon-library';
 import { IconSource, type IconHit } from '../messages';
-import { svgOfSource } from './icon-node';
+import { svgOfModule } from './icon-node';
 import { rankNames, suggestNames } from './icon-rank';
 
 export { IconSource };
@@ -13,6 +13,7 @@ const ICONMCP_URL = 'https://iconmcp.com/mcp';
 const ICON_FILE = /\.(m?js|svelte)$/;
 const SVG = /<svg[\s\S]*<\/svg>/;
 const REQUEST_TIMEOUT_MS = 10_000;
+const DRAW_BATCH = 40;
 
 type McpText = { type: string; text: string };
 
@@ -77,28 +78,13 @@ export async function libraryHits(root: string, library: IconLibrary, query: str
   const names = [...fileOf.keys()];
   const ranked = query.trim() ? rankNames(names, query, current) : suggestNames(names, current);
 
-  return Promise.all(
-    ranked.slice(0, limit).map(async (name) => {
-      const source = await readFile(join(listing!.dir, fileOf.get(name)!), 'utf8').catch(() => '');
-      return { name, source: IconSource.Library, svg: svgOfSource(source) ?? undefined };
-    })
-  );
-}
-
-export const REMOTE_PREVIEW_LIMIT = 24;
-const PREVIEW_SIZE = 24;
-const PREVIEW_STROKE = 2;
-
-export async function streamPreviews(fetcher: Fetcher, hits: IconHit[], draw: (name: string, svg: string) => Promise<void>): Promise<void> {
-  const remote = hits.filter((hit) => hit.source === IconSource.IconMcp).slice(0, REMOTE_PREVIEW_LIMIT);
-  await Promise.all(
-    remote.map(async ({ name }) => {
-      const svg = await mcpIcon(fetcher, name, PREVIEW_SIZE, PREVIEW_STROKE).catch(() => null);
-      if (svg) {
-        await draw(name, svg);
-      }
-    })
-  );
+  const hits: IconHit[] = [];
+  for (let from = 0; from < ranked.length && hits.length < limit; from += DRAW_BATCH) {
+    const batch = ranked.slice(from, from + DRAW_BATCH);
+    const drawn = await Promise.all(batch.map((name) => svgOfModule(join(listing!.dir, fileOf.get(name)!))));
+    batch.forEach((name, i) => drawn[i] && hits.push({ name, source: IconSource.Library, svg: drawn[i]! }));
+  }
+  return hits.slice(0, limit);
 }
 
 export const LIBRARY_GRID_LIMIT = 120;

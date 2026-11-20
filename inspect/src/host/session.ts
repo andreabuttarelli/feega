@@ -9,7 +9,8 @@ import { SettingKey, StylingChoice } from '../settings';
 import { SignInEnd, signIn } from './sign-in';
 import { addPlugin } from './add-plugin';
 import { currentIcon } from './icon-current';
-import { mcpIcon, searchIcons, streamPreviews } from './icon-search';
+import { mcpIcon, searchIcons } from './icon-search';
+import { previewQueue } from './icon-previews';
 import { appOfSource, firstStampedFile, urlOf } from './attach-url';
 import { Attach, attachDev, factsOf, startDev, type Refused, type Running } from './dev-server';
 import { copyImage } from './image-copy';
@@ -81,10 +82,9 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   async function iconsFound(id: number, query: string, at: string) {
     const found = await searchIcons(root, fetch, query, await currentIcon(root, at));
     await post({ kind: ToView.IconResults, id, ...found });
-    await streamPreviews(fetch, found.hits, async (name, svg) => {
-      await post({ kind: ToView.IconPreview, id, name, svg });
-    });
   }
+
+  const iconPreviews = previewQueue(fetch, (name, svg) => post({ kind: ToView.IconPreview, name, svg }));
 
   async function imageSaved(name: string, bytes: Uint8Array) {
     const out = await copyImage(join(root, running?.plan.appDir ?? ''), name, bytes);
@@ -386,6 +386,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.IconMarkup]: (m) => edits.svg(m.at, m.markup, m.inner).then((out) => edited(out, null)),
     [ToHost.IconGet]: iconFetched,
     [ToHost.IconSearch]: (m) => iconsFound(m.id, m.query, m.at),
+    [ToHost.IconPreviews]: (m) => iconPreviews(m.names),
     [ToHost.SignIn]: startSignIn,
     [ToHost.CancelSignIn]: () => signing?.abort(),
     [ToHost.SignOut]: signOut,
