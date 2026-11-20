@@ -69,13 +69,30 @@ function appliesAt(media: string[], viewport: number | undefined): boolean {
   });
 }
 
+const BOXES = ['padding', 'margin'];
+const BOX_SIDES = ['top', 'right', 'bottom', 'left'];
+
+function shorthanded(css: Map<string, string>, all: Map<string, string>): Map<string, string> {
+  const merged = new Map(css);
+  for (const box of BOXES) {
+    const longhands = BOX_SIDES.map((side) => `${box}-${side}`);
+    const values = longhands.map((name) => css.get(name));
+    if (values.some((v) => !v)) {
+      continue;
+    }
+    longhands.forEach((name) => (merged.delete(name), all.delete(name)));
+    merged.set(box, values.every((v) => v === values[0]) ? values[0]! : values.join(' '));
+  }
+  return merged;
+}
+
 export const ruleInBody = (body: string, name: string, css: Map<string, string>, viewport?: number, indent = RULE_INDENT) => selectorInBody(body, `.${name}`, css, viewport, indent);
 
 export function selectorInBody(body: string, selector: string, css: Map<string, string>, viewport?: number, indent = RULE_INDENT): string {
   const rules = [...body.matchAll(new RegExp(`(^|\\n)([ \\t]*)${escaped(selector)}\\s*\\{([^}]*)\\}`, 'g'))];
   const found = rules.filter((r) => appliesAt(mediaAt(body, r.index!), viewport)).pop();
   const all = found ? declarationsOf(found[3]) : new Map<string, string>();
-  css.forEach((value, prop) => (value === REMOVED ? all.delete(prop) : all.set(prop, value)));
+  shorthanded(css, all).forEach((value, prop) => (value === REMOVED ? all.delete(prop) : all.set(prop, value)));
   if (found && !all.size) {
     return body.slice(0, found.index!) + body.slice(found.index! + found[0].length).replace(/^\n(?=\s*\n)/, '');
   }
@@ -114,12 +131,17 @@ export enum Scope {
   Class = 'class'
 }
 
+export const hasRule = (body: string, selector: string) => new RegExp(`(^|\\n)[ \\t]*${escaped(selector)}\\s*\\{`).test(body);
+
+export const usesOf = (source: string, name: string) => [...source.matchAll(/\sclass="([^"{}]*)"/g)].filter((m) => m[1].split(/\s+/).includes(name)).length;
+
 function classFor(classes: string[], source: string, base: string, scope: Scope): { name: string; added: boolean } {
   if (scope === Scope.Class && classes.length) {
     return { name: classes[0], added: false };
   }
-  const own = classes.find((c) => c === base || new RegExp(`^${escaped(base)}-\\d+$`).test(c));
-  return own ? { name: own, added: false } : { name: freeClass(source, base), added: true };
+  const styles = source.match(STYLE_BLOCK)?.[1] ?? '';
+  const reusable = classes.find((c) => c === base || new RegExp(`^${escaped(base)}-\\d+$`).test(c)) ?? classes.find((c) => hasRule(styles, `.${c}`) && usesOf(source, c) === 1);
+  return reusable ? { name: reusable, added: false } : { name: freeClass(source, base), added: true };
 }
 
 export async function scopedRule(read: ReadFile, at: LiveAt, css: Css, viewport?: number, scope = Scope.Element, inner?: string): Promise<TextWritten> {

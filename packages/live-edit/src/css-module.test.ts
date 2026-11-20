@@ -29,11 +29,25 @@ describe('cssModuleRule', () => {
   });
 
   it('scope element on a shared module class gives the element its own class, siblings untouched', async () => {
-    const out = await cssModuleRule(files({ 'src/Hero.jsx': HERO, 'src/Hero.module.css': CSS }), at(5), { color: 'red' }, undefined, Scope.Element);
+    const shared = HERO.replace('    </section>', '      <footer className={styles.hero}>x</footer>\n    </section>');
+    const out = await cssModuleRule(files({ 'src/Hero.jsx': shared, 'src/Hero.module.css': CSS }), at(5), { color: 'red' }, undefined, Scope.Element);
     const changed = Object.fromEntries((out.ok ? out.changes : []).map((c) => [c.path, c.after]));
 
     expect(changed['src/Hero.jsx']).toContain('<section className={`${styles.hero} ${styles.heroSection}`}>');
     expect(changed['src/Hero.module.css']).toBe('.hero {\n  padding: 8px;\n}\n\n.heroSection {\n  color: red;\n}\n');
+  });
+
+  it('an element whose own class already has a rule gets that rule edited, no new class', async () => {
+    const out = await cssModuleRule(files({ 'src/Hero.jsx': HERO, 'src/Hero.module.css': CSS }), at(5), { padding: '24px' }, undefined, Scope.Element);
+
+    expect(out.ok && out.changes).toEqual([{ path: 'src/Hero.module.css', before: CSS, after: '.hero {\n  padding: 24px;\n}\n' }]);
+  });
+
+  it('a plain class with a rule in an imported stylesheet gets that rule edited', async () => {
+    const page = `import './Hero.css';\n\nexport const Hero = () => <section className="hero">x</section>;\n`;
+    const out = await cssModuleRule(files({ 'src/Hero.jsx': page, 'src/Hero.css': CSS }), { file: 'src/Hero.jsx', line: 3, col: 27 }, { padding: '24px' });
+
+    expect(out.ok && out.changes).toEqual([{ path: 'src/Hero.css', before: CSS, after: '.hero {\n  padding: 24px;\n}\n' }]);
   });
 
   it('scope element a second time reuses the class it added', async () => {
@@ -62,7 +76,7 @@ describe('cssModuleRule', () => {
     expect(changed['src/Hero.module.css']).toEqual({ path: 'src/Hero.module.css', before: '', after: '.heroSection {\n  color: red;\n}\n' });
   });
 
-  it('a className that is a plain string is refused, never inlined', async () => {
+  it('a plain className with no rule anywhere is refused, never inlined', async () => {
     const text = HERO.replace('className={styles.hero}', 'className="hero"');
     const out = await cssModuleRule(files({ 'src/Hero.jsx': text }), at(5), { color: 'red' });
 

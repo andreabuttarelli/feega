@@ -9,6 +9,7 @@ const WITH_STYLE = `<section>
   <p class="lead">Text</p>
   <h1>Title</h1>
   <span style="color: red; margin: 0">x</span>
+  <p class="lead">More</p>
 </section>
 
 <style>
@@ -52,7 +53,49 @@ async function after(text: string, line: number, css: Record<string, string>, sc
   return out.change.after;
 }
 
+const OWN_CLASS = `  <p class="lead">Text</p>
+  <p class="other">Text</p>
+
+<style>
+  .lead {
+    font-size: 14px;
+  }
+</style>
+`;
+
+const SHARED_CLASS = `  <p class="lead">Text</p>
+  <p class="lead">Text</p>
+
+<style>
+  .lead {
+    font-size: 14px;
+  }
+</style>
+`;
+
+const SIDES = { 'padding-top': '8px', 'padding-right': '8px', 'padding-bottom': '8px', 'padding-left': '8px' };
+
 describe('scopedRule', () => {
+  it('element scope edits the rule of a class only this element uses', async () => {
+    const text = await after(OWN_CLASS, 1, { color: 'red' });
+
+    expect(text).toContain('<p class="lead">Text</p>');
+    expect(text).toContain('  .lead {\n    font-size: 14px;\n    color: red;\n  }');
+  });
+
+  it('element scope on a class several elements share still gets its own class', async () => {
+    const text = await after(SHARED_CLASS, 1, { color: 'red' });
+
+    expect(text).toContain('<p class="lead hero-p">Text</p>');
+  });
+
+  it('all four paddings are written as one shorthand', async () => {
+    const text = await after(OWN_CLASS, 1, SIDES);
+
+    expect(text).toContain('    padding: 8px;');
+    expect(text).not.toContain('padding-top');
+  });
+
   it('class scope puts the declaration in the class rule', async () => {
     const text = await after(WITH_STYLE, 2, { color: '#0078d4' }, Scope.Class);
 

@@ -1,6 +1,7 @@
 import { offsetOf, openTagEnd, type LiveAt } from './class-patch';
 import type { FileChange, ReadFile } from './files';
-import { ruleInBody, Scope } from './scoped-rule';
+import { GLOBAL_SHEETS } from './font-wiring';
+import { hasRule, ruleInBody, Scope, usesOf } from './scoped-rule';
 import type { Css } from './style-attr';
 
 export type ModuleWritten = { ok: true; changes: FileChange[] } | { ok: false; reason: string; at?: LiveAt };
@@ -10,6 +11,8 @@ const MODULE_CLASS = /\sclassName=\{(\w+)\.([A-Za-z_]\w*)\}/;
 const MODULE_CLASSES = /\sclassName=\{`((?:\$\{\w+\.[A-Za-z_]\w*\}\s*)+)`\}/;
 const CLASS_REF = /\$\{\w+\.([A-Za-z_]\w*)\}/g;
 const CLASS_ANY = /\sclassName=/;
+const PLAIN_CLASS = /\sclassName="([^"{}]*)"/;
+const PLAIN_IMPORT = /import\s+['"](\.{1,2}\/[^'"]+(?<!\.module)\.css)['"]/g;
 const TAG_NAME = /^<([a-zA-Z][\w-]*)/;
 const MODULE_NAME = 'styles';
 const NO_INDENT = '';
@@ -47,6 +50,23 @@ function usedClasses(open: string): { names: string[]; attr: string } | null {
   return many ? { names: [...many[1].matchAll(CLASS_REF)].map((m) => m[1]), attr: many[0] } : null;
 }
 
+const usesOfModule = (text: string, binding: string, name: string) => text.split(new RegExp(`\\b${binding}\\.${name}\\b`)).length - 1;
+
+const usesOfPlain = (text: string, name: string) => usesOf(text.replace(/className=/g, 'class='), name);
+
+async function plainRule(read: ReadFile, at: LiveAt, text: string, open: string, css: Css, viewport: number | undefined, scope: Scope, ruleName: (name: string) => string): Promise<ModuleWritten | null> {
+  const classes = open.match(PLAIN_CLASS)?.[1].split(/\s+/).filter(Boolean) ?? [];
+  const imported = [...text.matchAll(PLAIN_IMPORT)].map((m) => joinPath(dirOf(at.file), m[1]));
+  for (const path of [...imported, ...GLOBAL_SHEETS]) {
+    const before = await read(path);
+    const name = before === null ? undefined : classes.find((c) => hasRule(before, `.${c}`) && (scope === Scope.Class || usesOfPlain(text, c) === 1));
+    if (before !== null && name) {
+      return { ok: true, changes: [{ path, before, after: ruleInBody(before, ruleName(name), new Map(Object.entries(css)), viewport, NO_INDENT) }] };
+    }
+  }
+  return null;
+}
+
 const ownOf = (names: string[], base: string) => names.find((n) => n === base || new RegExp(`^${base}\\d+$`).test(n));
 
 const classAttr = (binding: string, names: string[]) =>
@@ -65,6 +85,10 @@ export async function cssModuleRule(read: ReadFile, at: LiveAt, css: Css, viewpo
   const open = text.slice(start, end + 1);
   const used = usedClasses(open);
   if (!used && CLASS_ANY.test(open)) {
+    const plain = await plainRule(read, at, text, open, css, viewport, scope, ruleName);
+    if (plain) {
+      return plain;
+    }
     return { ok: false, reason: `${at.file}:${at.line}: className is not a CSS module class, not written`, at };
   }
 
@@ -76,7 +100,8 @@ export async function cssModuleRule(read: ReadFile, at: LiveAt, css: Css, viewpo
   const tag = open.match(TAG_NAME)![1];
   const base = `${camelBase(at.file)}${tag.charAt(0).toUpperCase()}${tag.slice(1)}`;
   const names = used?.names ?? [];
-  const kept = scope === Scope.Class ? names[0] : ownOf(names, base);
+  const ruled = (name: string) => hasRule(before, `.${name}`) && usesOfModule(text, binding, name) === 1;
+  const kept = scope === Scope.Class ? names[0] : (ownOf(names, base) ?? names.find(ruled));
 
   if (kept) {
     return { ok: true, changes: [{ path: modulePath, before, after: ruleInBody(before, ruleName(kept), declared, viewport, NO_INDENT) }] };
