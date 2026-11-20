@@ -17,6 +17,7 @@ export function App() {
       <main className="flex flex-col items-start gap-6 px-8 py-16">
         <h1 id="title" className="text-5xl font-medium tracking-tight">Plan your launch in an afternoon</h1>
         <p className="max-w-xl text-lg text-slate-600">Briefs, timelines and assets in one place your whole team can edit.</p>
+        <button id="cta" type="button">Get started</button>
         <section id="pricing" className="grid grid-cols-3 gap-4 w-full">
           <article id="card" className="flex flex-col gap-2 p-6 rounded-lg border bg-slate-50 shadow-sm">
             <h2 className="text-xl font-semibold">{PLANS[0].name}</h2>
