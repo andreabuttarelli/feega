@@ -378,10 +378,9 @@ ready, so that gap is real, not a nitpick — it just isn't closed by a command 
 Every PR that changes a feature, an API under `/api/v1`, a CLI command, an MCP tool or
 self-hosting does two more things in the **same PR**:
 
-1. **Updates `web-docs/`** (published on https://docs.feega.app). Pages under
-   `reference/generated/`, `self-hosting/` and `architecture/adr/` are generated at build from the
-   code and `docs/`: fix the source, not the page. Every command, endpoint and tool a page names
-   must exist in the code; what leaves the product leaves the docs.
+1. **Updates `web-docs/`** (published on https://docs.feega.app). The site documents only
+   the VS Code extension and `npx feega` (`inspect/`, `npx/`): every command, setting and feature a
+   page names must exist in that code; what leaves the product leaves the docs.
 2. **Records a feature video**, attached to the PR under *Evidence* and ready to post on X and
    Threads: 16:9, about 10 s, two parts joined —
    - an **intro/title made in feega's motion editor**, exported as MP4;
