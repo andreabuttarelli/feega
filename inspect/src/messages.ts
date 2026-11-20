@@ -17,7 +17,7 @@ export enum IconSource {
   IconMcp = 'iconmcp'
 }
 
-export type IconHit = { name: string; label?: string; source: IconSource };
+export type IconHit = { name: string; label?: string; source: IconSource; svg?: string };
 
 export type Rect = { x: number; y: number; width: number; height: number };
 
@@ -150,6 +150,7 @@ export enum ToView {
   Settings = 'settings',
   History = 'history',
   IconResults = 'icon-results',
+  IconPreview = 'icon-preview',
   Account = 'account',
   Onboarding = 'onboarding',
   ImageSaved = 'image-saved',
@@ -193,7 +194,7 @@ export type HostMessage =
   | { kind: ToHost.IconSwap; at: string; name: string }
   | { kind: ToHost.IconMarkup; at: string; markup: string; inner?: string }
   | { kind: ToHost.IconGet; at: string; name: string; size: number; stroke: number; inner?: string }
-  | { kind: ToHost.IconSearch; id: number; query: string }
+  | { kind: ToHost.IconSearch; id: number; query: string; current: string | null }
   | { kind: ToHost.SignIn }
   | { kind: ToHost.CancelSignIn }
   | { kind: ToHost.SignOut }
@@ -214,6 +215,7 @@ export type ViewMessage =
   | { kind: ToView.Change; row: string; value: string }
   | { kind: ToView.Pick; id: number; x: number; y: number }
   | { kind: ToView.IconResults; id: number; library: string | null; hits: IconHit[]; error?: string }
+  | { kind: ToView.IconPreview; id: number; name: string; svg: string }
   | { kind: ToView.Account; state: AccountState; email?: string }
   | { kind: ToView.Onboarding; state: Onboarding }
   | { kind: ToView.ImageSaved; url: string }

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { detectLibrary } from '@feega/live-edit/icon-library';
-import { IconSource, libraryHits, mcpIcon, mcpSearch } from './icon-search';
+import { IconSource, LIBRARY_GRID_LIMIT, libraryHits, mcpIcon, mcpSearch, REMOTE_PREVIEW_LIMIT, searchIcons, streamPreviews } from './icon-search';
 
 const reply = (content: { type: string; text: string }[]) => async () => new Response(JSON.stringify({ result: { content } }));
 
@@ -67,6 +67,103 @@ describe('libraryHits', () => {
     ['mail.js', 'mail.js.map', 'mail-open.js', 'heart.js'].forEach((f) => writeFileSync(join(dir, f), ''));
     const library = detectLibrary(JSON.stringify({ dependencies: { 'lucide-react': '1' } }))!;
 
-    expect((await libraryHits(root, library, 'mail', 10)).map((h) => h.name)).toEqual(['mail', 'mail-open']);
+    expect((await libraryHits(root, library, 'mail', 10, null)).map((h) => h.name)).toEqual(['mail', 'mail-open']);
+  });
+});
+
+const LUCIDE = JSON.stringify({ dependencies: { 'lucide-react': '1' } });
+
+function project(icons: Record<string, string>) {
+  const root = mkdtempSync(join(tmpdir(), 'icons-'));
+  const dir = join(root, 'node_modules/lucide-react/dist/esm/icons');
+  mkdirSync(dir, { recursive: true });
+  Object.entries(icons).forEach(([file, text]) => writeFileSync(join(dir, file), text));
+  writeFileSync(join(root, 'package.json'), LUCIDE);
+  return root;
+}
+
+const NODE = 'const __iconData = { node: [["path", { d: "M5 12h14", key: "a" }]] };';
+const remoteReply = (results: { name: string }[]) => reply([{ type: 'text', text: JSON.stringify({ results }) }]);
+
+describe('streamPreviews', () => {
+  const hit = (name: string) => ({ name, source: IconSource.IconMcp });
+
+  it('draws each remote hit and skips the ones that fail', async () => {
+    const fetcher = async (_: string, init?: RequestInit) => {
+      const name = JSON.parse(String(init?.body)).params.arguments.name;
+      return name === 'broken' ? new Response('no', { status: 500 }) : reply([{ type: 'text', text: `<svg id="${name}"></svg>` }])();
+    };
+    const drawn: string[] = [];
+    await streamPreviews(fetcher, [hit('a'), hit('broken'), hit('b')], async (name, svg) => void drawn.push(`${name}:${svg}`));
+
+    expect(drawn.sort()).toEqual(['a:<svg id="a"></svg>', 'b:<svg id="b"></svg>']);
+  });
+
+  it('draws only the first remote hits', async () => {
+    const fetcher = reply([{ type: 'text', text: '<svg></svg>' }]);
+    const drawn: string[] = [];
+    const many = Array.from({ length: REMOTE_PREVIEW_LIMIT + 10 }, (_, i) => hit(`n${i}`));
+    await streamPreviews(fetcher, many, async (name) => void drawn.push(name));
+
+    expect(drawn).toHaveLength(REMOTE_PREVIEW_LIMIT);
+  });
+});
+
+describe('searchIcons', () => {
+  it('ranks local hits and draws them', async () => {
+    const root = project({ 'a-arrow-up.mjs': NODE, 'arrow-up-01.mjs': NODE, 'arrow-right.mjs': NODE });
+    const found = await searchIcons(root, remoteReply([]), 'arrow', null);
+
+    expect(found.hits.map((h) => h.name)).toEqual(['arrow-right', 'arrow-up-01', 'a-arrow-up']);
+    expect(found.hits[0].svg).toContain('<path d="M5 12h14"/>');
+  });
+
+  it('keeps the remote hits next to the local ones, even with the same name', async () => {
+    const root = project({ 'arrow-right.mjs': NODE });
+    const found = await searchIcons(root, remoteReply([{ name: 'arrow-right' }, { name: 'download' }]), 'arrow', null);
+
+    expect(found.hits.map((h) => [h.name, h.source])).toEqual([
+      ['arrow-right', IconSource.Library],
+      ['arrow-right', IconSource.IconMcp],
+      ['download', IconSource.IconMcp]
+    ]);
+    expect(found.error).toBeUndefined();
+  });
+
+  it('searches iconmcp even when the project has no icon package', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'icons-'));
+    const found = await searchIcons(root, remoteReply([{ name: 'download' }]), 'arrow', null);
+
+    expect(found.library).toBeNull();
+    expect(found.hits.map((h) => h.name)).toEqual(['download']);
+  });
+
+  it('reports why iconmcp is missing', async () => {
+    const root = project({ 'arrow-right.mjs': NODE });
+    const found = await searchIcons(root, async () => new Response('no', { status: 503 }), 'arrow', null);
+
+    expect(found.error).toContain('503');
+    expect(found.hits.map((h) => h.source)).toEqual([IconSource.Library]);
+  });
+
+  it('suggests the selected icon first when there is no query, and asks iconmcp for something like it', async () => {
+    const root = project({ 'zap.mjs': NODE, 'arrow-left.mjs': NODE, 'arrow-right.mjs': NODE });
+    let asked = '';
+    const fetcher = async (_: string, init?: RequestInit) => {
+      asked = JSON.parse(String(init?.body)).params.arguments.query;
+      return remoteReply([{ name: 'move-right' }])();
+    };
+    const found = await searchIcons(root, fetcher, '', 'arrow-right');
+
+    expect(found.hits.filter((h) => h.source === IconSource.Library).map((h) => h.name)).toEqual(['arrow-right', 'arrow-left', 'zap']);
+    expect(asked).toBe('arrow-right');
+    expect(found.hits.at(-1)?.name).toBe('move-right');
+  });
+
+  it('caps the grid', async () => {
+    const files = Object.fromEntries(Array.from({ length: 300 }, (_, i) => [`icon-${i}.mjs`, NODE]));
+    const found = await searchIcons(project(files), remoteReply([]), '', null);
+
+    expect(found.hits).toHaveLength(LIBRARY_GRID_LIMIT);
   });
 });

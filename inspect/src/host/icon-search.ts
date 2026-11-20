@@ -2,6 +2,8 @@ import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { detectLibrary, type IconLibrary } from '@feega/live-edit/icon-library';
 import { IconSource, type IconHit } from '../messages';
+import { svgOfSource } from './icon-node';
+import { rankNames, suggestNames } from './icon-rank';
 
 export { IconSource };
 
@@ -56,36 +58,66 @@ export async function mcpIcon(fetcher: Fetcher, name: string, size: number, stro
   return svg;
 }
 
-async function firstListing(root: string, library: IconLibrary): Promise<string[]> {
+type Listing = { dir: string; files: string[] };
+
+async function firstListing(root: string, library: IconLibrary): Promise<Listing | null> {
   for (const dir of library.dirs) {
-    const files = await readdir(join(root, 'node_modules', library.pkg, dir)).catch(() => null);
+    const path = join(root, 'node_modules', library.pkg, dir);
+    const files = await readdir(path).catch(() => null);
     if (files) {
-      return files.filter((file) => ICON_FILE.test(file));
+      return { dir: path, files: files.filter((file) => ICON_FILE.test(file)) };
     }
   }
-  return [];
+  return null;
 }
 
-export async function libraryHits(root: string, library: IconLibrary, query: string, limit: number): Promise<IconHit[]> {
-  const needle = query.trim().toLowerCase();
-  const names = (await firstListing(root, library)).map(library.nameOf).filter((name) => name.includes(needle));
-  return [...new Set(names)]
-    .sort((a, b) => a.length - b.length || a.localeCompare(b))
-    .slice(0, limit)
-    .map((name) => ({ name, source: IconSource.Library }));
+export async function libraryHits(root: string, library: IconLibrary, query: string, limit: number, current: string | null): Promise<IconHit[]> {
+  const listing = await firstListing(root, library);
+  const fileOf = new Map((listing?.files ?? []).map((file) => [library.nameOf(file), file]));
+  const names = [...fileOf.keys()];
+  const ranked = query.trim() ? rankNames(names, query, current) : suggestNames(names, current);
+
+  return Promise.all(
+    ranked.slice(0, limit).map(async (name) => {
+      const source = await readFile(join(listing!.dir, fileOf.get(name)!), 'utf8').catch(() => '');
+      return { name, source: IconSource.Library, svg: svgOfSource(source) ?? undefined };
+    })
+  );
 }
 
-const SEARCH_LIMIT = 40;
+export const REMOTE_PREVIEW_LIMIT = 24;
+const PREVIEW_SIZE = 24;
+const PREVIEW_STROKE = 2;
+
+export async function streamPreviews(fetcher: Fetcher, hits: IconHit[], draw: (name: string, svg: string) => Promise<void>): Promise<void> {
+  const remote = hits.filter((hit) => hit.source === IconSource.IconMcp).slice(0, REMOTE_PREVIEW_LIMIT);
+  await Promise.all(
+    remote.map(async ({ name }) => {
+      const svg = await mcpIcon(fetcher, name, PREVIEW_SIZE, PREVIEW_STROKE).catch(() => null);
+      if (svg) {
+        await draw(name, svg);
+      }
+    })
+  );
+}
+
+export const LIBRARY_GRID_LIMIT = 120;
+const REMOTE_LIMIT = 48;
 
 export type IconSearch = { library: string | null; hits: IconHit[]; error?: string };
 
-export async function searchIcons(root: string, fetcher: Fetcher, query: string): Promise<IconSearch> {
+async function remoteHits(fetcher: Fetcher, query: string): Promise<{ hits: IconHit[]; error?: string }> {
+  try {
+    return { hits: await mcpSearch(fetcher, query, REMOTE_LIMIT) };
+  } catch (error) {
+    return { hits: [], error: (error as Error).message };
+  }
+}
+
+export async function searchIcons(root: string, fetcher: Fetcher, query: string, current: string | null): Promise<IconSearch> {
   const manifest = await readFile(join(root, 'package.json'), 'utf8').catch(() => '');
   const library = detectLibrary(manifest);
-  const own = library ? await libraryHits(root, library, query, SEARCH_LIMIT) : [];
-  const remote = await mcpSearch(fetcher, query, SEARCH_LIMIT).then(
-    (hits) => ({ hits }),
-    (error: Error) => ({ hits: [] as IconHit[], error: error.message })
-  );
+  const own = library ? await libraryHits(root, library, query, LIBRARY_GRID_LIMIT, current) : [];
+  const remote = await remoteHits(fetcher, query.trim() || current || '');
   return { library: library?.pkg ?? null, hits: [...own, ...remote.hits], error: remote.error };
 }
