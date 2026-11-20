@@ -60,6 +60,18 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     }
   }
 
+  async function revealSource(root: string, at: Source) {
+    const target = openTarget(root, at, panel.viewColumn);
+    try {
+      const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(target.path));
+      const start = new vscode.Position(target.line, target.col);
+      const end = new vscode.Position(target.line, Number.MAX_SAFE_INTEGER);
+      await vscode.window.showTextDocument(doc, { viewColumn: COLUMNS[target.column], preserveFocus: true, preview: true, selection: new vscode.Range(start, end) });
+    } catch {
+      return;
+    }
+  }
+
   async function showDiff(path: string, before: string) {
     const key = `${befores.size}${path}`;
     befores.set(key, before);
@@ -84,6 +96,8 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     log: (line) => output.append(line),
     showLogs: () => output.show(true),
     openSource,
+    copyText: async (text) => vscode.env.clipboard.writeText(text),
+    revealSource,
     showDiff,
     confirm: async (question, yes) => (await vscode.window.showWarningMessage(question, { modal: true }, yes)) === yes,
     chooseApp: async (apps, workspace) => {

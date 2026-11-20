@@ -22,9 +22,11 @@ import { stylingOf } from './styling';
 import { breakpointsOf } from './breakpoints';
 import { themesOf } from './themes';
 import { usageSession } from './usage';
+import { selectionSync } from './selection-sync';
 import { wiringOf } from './wiring';
 
 const PICK_TIMEOUT_MS = 3000;
+const SYNC_SELECTION_DELAY_MS = 200;
 const LATER_EDITS = 'later edits depend on this change: undo them first';
 const CACHE_DIRS = ['.svelte-kit', 'node_modules/.vite', '.next', '.nuxt', '.astro'];
 const ERROR_LINES = 6;
@@ -155,6 +157,12 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   async function wiringShown(at: string, instance?: number) {
     await post({ kind: ToView.Wiring, at, instance, wiring: await wiringOf(root, at, instance) });
   }
+
+  const syncSelection = selectionSync({
+    reveal: (at) => platform.revealSource?.(root, at),
+    enabled: () => platform.settings()[SettingKey.SyncSelection] === true,
+    delayMs: SYNC_SELECTION_DELAY_MS
+  });
 
   const edit = (ask: EditAsk) => edits.edit(ask).then((out) => edited(out, ask));
   const undo = () => edits.undo().then((out) => edited(out, null));
@@ -403,7 +411,9 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.ImageUpload]: (m) => imageSaved(m.name, Buffer.from(m.data, 'base64')),
     [ToHost.Wiring]: (m) => wiringShown(m.at, m.instance),
     [ToHost.Link]: (m) => edits.link(m.at, m.edit, m.instance).then((out) => edited(out, null)),
-    [ToHost.Go]: (m) => edits.go(m.at, m.ask).then((out) => edited(out, null))
+    [ToHost.Go]: (m) => edits.go(m.at, m.ask).then((out) => edited(out, null)),
+    [ToHost.Selected]: (m) => syncSelection(m.at),
+    [ToHost.Copy]: (m) => platform.copyText?.(m.text)
   };
 
   platform.receive((message) => (handlers[message.kind] as (m: HostMessage) => unknown)(message));

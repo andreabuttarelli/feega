@@ -33,8 +33,14 @@ Prefer the browser? Run `npx feega` in your app folder (Node 20 or newer).
 - Phone, tablet, desktop and full sizes
 - Navigate mode to use the app, design mode to edit it
 - Works in VS Code, Cursor and Windsurf
+- Selecting an element reveals its source beside Feega with the line selected, so coding agents that read the editor selection (Claude Code, Cursor, Copilot, Cline, Codex, Gemini CLI) see it.
 
 ![Colour picker](images/21-colour-picker-dark.png)
+
+## Use with your agent
+
+- **Selection sync.** Selecting an element reveals its source beside Feega with the line selected, without taking focus. Coding agents that read the editor selection (Claude Code, Cursor, Copilot, Cline, Codex, Gemini CLI) see it. Turn off with `feegaInspect.syncSelection`.
+- **Copy for agent.** Right-click the element, or use **Copy for agent** in the bar: file:line, selector, component, page, preview width, breakpoint, theme and state go to the clipboard, ready to paste into the agent.
 
 ## Supported frameworks
 

@@ -3,7 +3,10 @@ import { StructureOp } from '@feega/live-edit/structure';
 
 export type MenuItem = { id: string; label: string; shortcut?: string };
 
+export const COPY_FOR_AGENT = 'copy-for-agent';
+
 export const MENU_ITEMS: MenuItem[] = [
+  { id: COPY_FOR_AGENT, label: 'Copy for agent' },
   { id: StructureOp.Duplicate, label: 'Duplicate', shortcut: '⌘D' },
   { id: StructureOp.Wrap, label: 'Wrap in container', shortcut: '⌘G' },
   { id: StructureOp.Unwrap, label: 'Unwrap', shortcut: '⇧⌘G' },

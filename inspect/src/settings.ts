@@ -3,7 +3,8 @@ export enum SettingKey {
   Styling = 'feegaInspect.styling',
   DevCommand = 'feegaInspect.devCommand',
   DefaultSize = 'feegaInspect.defaultSize',
-  KeepServerAlive = 'feegaInspect.keepServerAlive'
+  KeepServerAlive = 'feegaInspect.keepServerAlive',
+  SyncSelection = 'feegaInspect.syncSelection'
 }
 
 export enum StylingChoice {
@@ -59,6 +60,12 @@ export const SETTINGS: SettingRow[] = [
       { value: '30', label: '30 minutes' },
       { value: '60', label: '1 hour' }
     ]
+  },
+  {
+    key: SettingKey.SyncSelection,
+    label: 'Show the selection in the editor',
+    hint: 'Selecting an element reveals its source beside Feega with the line selected, so coding agents that read the editor selection see it.',
+    fallback: true
   }
 ];
 

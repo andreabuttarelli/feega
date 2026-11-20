@@ -13,7 +13,7 @@
   import { untrack } from 'svelte';
   import { selectionKey, SelectionKey } from './selection-keys';
   import { AccountState, Mode, Onboarding, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
-  import { fromHost, toHost } from './host';
+  import { fromHost, inVscode, toHost } from './host';
   import { imageSaved } from './image-file.svelte';
   import { iconDrawn, iconsFound } from './icon-search.svelte';
   import { pageBridge, sourceText } from './page-bridge';
@@ -50,8 +50,9 @@
   import { Place } from '@feega/live-edit/move-node';
   import { StructureOp } from '@feega/live-edit/structure';
   import StructureMenu from './StructureMenu.svelte';
+  import { agentContext } from './agent-context';
   import { AddKind } from '@feega/live-edit/add-node';
-  import { ADD_ITEMS, ADD_LOOP_ITEM, MENU_ITEMS } from './structure-menu';
+  import { ADD_ITEMS, ADD_LOOP_ITEM, COPY_FOR_AGENT, MENU_ITEMS } from './structure-menu';
   import { modeOfKey } from './modes';
   import { browseHistory } from './history';
   import { DEFAULT_ANCHOR, anchorBox, isAnchor, nearestAnchor, nextAnchor, type Anchor } from './anchors';
@@ -285,6 +286,10 @@
     if (bridged) {
       bridge.track(Slot.Selected, pickedAt === null ? null : untrack(() => picked!.source), untrack(() => picked?.instanceIndex));
     }
+  });
+  $effect(() => {
+    pickedAt;
+    toHost({ kind: ToHost.Selected, at: untrack(() => picked?.source) ?? null });
   });
   $effect(() => {
     if (bridged) {
@@ -629,6 +634,19 @@
     toHost(kind === AddKind.Image ? { kind: ToHost.AddImage, at } : { kind: ToHost.Structure, op: StructureOp.Add, at, add: { kind } });
   }
 
+  function copyForAgent() {
+    if (!picked) {
+      return;
+    }
+    const text = agentContext(picked, { route, width: Math.round(fit.width), breakpoint: size === Size.Full ? undefined : reachBadge, theme: themeName === DEFAULT_THEME ? undefined : themeName, state: elementState === ElementState.Default ? undefined : elementState });
+    if (inVscode) {
+      toHost({ kind: ToHost.Copy, text });
+    } else {
+      void navigator.clipboard?.writeText(text);
+    }
+    showToast('Copied for your agent');
+  }
+
   function restructure(op: StructureOp) {
     if (!picked) {
       return;
@@ -775,7 +793,7 @@
           <button type="button" class="link" data-action={ServerAction.RestartUnderFeega} onclick={() => toHost({ kind: ToHost.Server, action: ServerAction.RestartUnderFeega })}>Let Feega start the server</button>
         </div>
       {/if}
-      {#if menu}<StructureMenu x={menu.x} y={menu.y} items={MENU_ITEMS} onpick={(id) => restructure(id as StructureOp)} onclose={() => (menu = null)} />{/if}
+      {#if menu}<StructureMenu x={menu.x} y={menu.y} items={MENU_ITEMS} onpick={(id) => (id === COPY_FOR_AGENT ? copyForAgent() : restructure(id as StructureOp))} onclose={() => (menu = null)} />{/if}
       {#if addMenu}<StructureMenu x={addMenu.x} y={addMenu.y} items={picked && picked.instances > 1 ? [...ADD_ITEMS, ADD_LOOP_ITEM] : ADD_ITEMS} label="add" onpick={(id) => (id === StructureOp.AddItem ? restructure(StructureOp.AddItem) : addElement(id as AddKind))} onclose={() => (addMenu = null)} />{/if}
       {#if toast}<div class="toast" role="status">{toast}</div>{/if}
       <div class="float" class:moving bind:clientWidth={bar.w} bind:clientHeight={bar.h} style={`left:${barAt.x}px;top:${barAt.y}px`} data-anchor={anchor}>
@@ -816,7 +834,7 @@
         {#if picked}
           <div class="what" data-testid="selection">
             <Breadcrumb pick={picked} onselect={select} state={elementState} />
-            <span class="where">{#if picked.component}in {picked.component.file.split('/').pop()} · {/if}<button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file.split('/').pop()}:{picked.source.line}</button></span>
+            <span class="where">{#if picked.component}in {picked.component.file.split('/').pop()} · {/if}<button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file.split('/').pop()}:{picked.source.line}</button> · <button type="button" class="link" data-testid="copy-for-agent" title="Copy file, selector and view for your coding agent" onclick={copyForAgent}>Copy for agent</button></span>
             {#if authored(picked.classes)}<code class="classes">{authored(picked.classes)}</code>{/if}
           </div>
           <BreakpointBar badge={reachBadge} theme={themeBadge(themeName)} items={reachItems(breakpoints)} choice={reach} onchoose={(id) => (reach = id)} />
