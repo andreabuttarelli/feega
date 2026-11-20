@@ -398,6 +398,31 @@ try {
     assert.deepEqual(changedFiles(), [], 'one undo removes the handler and the import');
   });
 
+  const LINKS = [['#start', 'Start free'], ['#docs', 'Read docs'], ['#features', 'Features']];
+
+  for (const [href, label] of LINKS) {
+    await check(`clicking the link "${label}" selects the link, not its container`, async () => {
+      await frame.locator('h1').first().click();
+      await frame.locator(`a[href="${href}"]`).first().click();
+      await page.waitForTimeout(800);
+      const crumbs = (await page.getByTestId('breadcrumb').first().innerText()).trim();
+      assert.ok(/\ba\b/i.test(crumbs.split('›').pop()), `breadcrumb ends with the link: ${crumbs}`);
+    });
+
+    await check(`double-clicking the link "${label}" edits only that link's text`, async () => {
+      const link = frame.locator(`a[href="${href}"]`).first();
+      await frame.locator('h1').first().click();
+      await link.click();
+      await page.waitForTimeout(800);
+      await opened(link);
+      const editable = await frame.locator('[contenteditable]').evaluateAll((els) => els.map((el) => el.textContent.trim()));
+      assert.deepEqual(editable, [label], 'only the link is editable');
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(SETTLE_MS);
+      await undoAll();
+    });
+  }
+
   await check('no package file was created or changed', async () => {
     assert.deepEqual(untracked().filter((f) => /package-lock|pnpm-lock|yarn\.lock|bun\.lock/.test(f)), []);
     assert.ok(!changedFiles().some((f) => /package/.test(f)));

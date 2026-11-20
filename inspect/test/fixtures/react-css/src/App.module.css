@@ -44,6 +44,20 @@
   margin: 0;
 }
 
+.actions {
+  display: block;
+}
+
+.btn {
+  display: inline-block;
+  margin-right: 12px;
+  padding: 10px 20px;
+  border-radius: 6px;
+  background: #0f172a;
+  color: #fff;
+  text-decoration: none;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
