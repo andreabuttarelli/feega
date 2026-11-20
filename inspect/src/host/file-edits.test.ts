@@ -319,6 +319,25 @@ describe('fileEdits', () => {
     expect(read(root)).toBe(PAGE);
   });
 
+  it.each([
+    [StructureOp.Duplicate, 1, "export const LINKS = [\n  { label: 'a' },\n  { label: 'b' },\n  { label: 'b' },\n  { label: 'c' },\n];\n"],
+    [StructureOp.Delete, 0, "export const LINKS = [\n  { label: 'b' },\n  { label: 'c' },\n];\n"],
+    [StructureOp.AddItem, 2, "export const LINKS = [\n  { label: 'a' },\n  { label: 'b' },\n  { label: 'c' },\n  { label: 'c' },\n];\n"]
+  ])('%s su un elemento di un loop scrive la voce dell\'array importato, in un passo di undo', async (op, instance, expected) => {
+    const root = app();
+    const data = "export const LINKS = [\n  { label: 'a' },\n  { label: 'b' },\n  { label: 'c' },\n];\n";
+    mkdirSync(join(root, 'src/lib'), { recursive: true });
+    writeFileSync(join(root, 'src/lib/links.ts'), data);
+    writeFileSync(join(root, 'src/Page.svelte'), "<script>\n  import { LINKS } from '$lib/links';\n</script>\n<nav>\n  {#each LINKS as link}\n    <a>{link.label}</a>\n  {/each}\n</nav>\n");
+    const edits = fileEdits(root);
+    const out = await edits.structure({ op, at: 'src/Page.svelte:6:5', instance });
+
+    expect(out.ok).toBe(true);
+    expect(readFileSync(join(root, 'src/lib/links.ts'), 'utf8')).toBe(expected);
+    await edits.undo();
+    expect(readFileSync(join(root, 'src/lib/links.ts'), 'utf8')).toBe(data);
+  });
+
   it('spostare dentro un altro contenitore e un solo passo di undo', async () => {
     const root = app();
     writeFileSync(join(root, 'src/Page.svelte'), '<div>\n  <p>a</p>\n</div>\n<section>\n</section>\n');

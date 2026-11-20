@@ -180,7 +180,7 @@ export type HostMessage =
   | { kind: ToHost.Prefs; prefs: Prefs }
   | { kind: ToHost.Setting; key: SettingKey; value: SettingValue }
   | { kind: ToHost.Move; from: string; to: string; place: Place }
-  | { kind: ToHost.Structure; op: StructureOp; at: string; to?: string; usage?: Usage; loop?: LoopMove; add?: { kind: AddKind; src?: string } }
+  | { kind: ToHost.Structure; op: StructureOp; at: string; to?: string; usage?: Usage; loop?: LoopMove; instance?: number; add?: { kind: AddKind; src?: string } }
   | { kind: ToHost.AddImage; at: string }
   | { kind: ToHost.Server; action: ServerAction }
   | { kind: ToHost.Redo }

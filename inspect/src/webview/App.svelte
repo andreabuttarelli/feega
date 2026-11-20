@@ -42,7 +42,7 @@
   import { StructureOp } from '@feega/live-edit/structure';
   import StructureMenu from './StructureMenu.svelte';
   import { AddKind } from '@feega/live-edit/add-node';
-  import { ADD_ITEMS, MENU_ITEMS } from './structure-menu';
+  import { ADD_ITEMS, ADD_LOOP_ITEM, MENU_ITEMS } from './structure-menu';
   import { modeOfKey } from './modes';
   import { browseHistory } from './history';
   import { DEFAULT_ANCHOR, anchorBox, isAnchor, nearestAnchor, nextAnchor, type Anchor } from './anchors';
@@ -570,7 +570,7 @@
     if (!picked) {
       return;
     }
-    toHost({ kind: ToHost.Structure, op, at: sourceText(picked.source) });
+    toHost({ kind: ToHost.Structure, op, at: sourceText(picked.source), instance: picked.instanceIndex });
     if (op === StructureOp.Delete) {
       picked = null;
     }
@@ -712,7 +712,7 @@
         </div>
       {/if}
       {#if menu}<StructureMenu x={menu.x} y={menu.y} items={MENU_ITEMS} onpick={(id) => restructure(id as StructureOp)} onclose={() => (menu = null)} />{/if}
-      {#if addMenu}<StructureMenu x={addMenu.x} y={addMenu.y} items={ADD_ITEMS} label="add" onpick={(id) => addElement(id as AddKind)} onclose={() => (addMenu = null)} />{/if}
+      {#if addMenu}<StructureMenu x={addMenu.x} y={addMenu.y} items={picked && picked.instances > 1 ? [...ADD_ITEMS, ADD_LOOP_ITEM] : ADD_ITEMS} label="add" onpick={(id) => (id === StructureOp.AddItem ? restructure(StructureOp.AddItem) : addElement(id as AddKind))} onclose={() => (addMenu = null)} />{/if}
       {#if toast}<div class="toast" role="status">{toast}</div>{/if}
       <div class="float" class:moving bind:clientWidth={bar.w} bind:clientHeight={bar.h} style={`left:${barAt.x}px;top:${barAt.y}px`} data-anchor={anchor}>
         <button type="button" class="grip" title="Drag to move (arrow keys)" aria-label="Move the bar" onpointerdown={grabBar} onpointermove={dragBar} onpointerup={dropBar} onkeydown={onHandleKey}>

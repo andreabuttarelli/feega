@@ -18,3 +18,5 @@ export const ADD_ITEMS: MenuItem[] = [
   { id: AddKind.Image, label: 'Image' },
   { id: AddKind.Container, label: 'Container' }
 ];
+
+export const ADD_LOOP_ITEM: MenuItem = { id: StructureOp.AddItem, label: 'Add item' };

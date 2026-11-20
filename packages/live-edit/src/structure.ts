@@ -3,6 +3,8 @@ import type { ReadFile } from './files';
 import type { TextWritten } from './literal-text';
 import { moveInto, type Structured } from './move-into';
 import { addNode, type AddRequest, type AddStyle } from './add-node';
+import { ItemOp, loopItem } from './loop-items';
+import { loopsAt } from './loop-array';
 import { moveLoopItem, type LoopMove } from './move-loop-item';
 import { unwrapNode, wrapNode } from './wrap-node';
 import { moveUsage, type Usage } from './move-usage';
@@ -57,12 +59,13 @@ export enum StructureOp {
   MoveInto = 'move-into',
   MoveUsage = 'move-usage',
   MoveLoopItem = 'move-loop-item',
+  AddItem = 'add-item',
   Add = 'add',
   Wrap = 'wrap',
   Unwrap = 'unwrap'
 }
 
-export type StructureRequest = { op: StructureOp; at: LiveAt; to?: LiveAt; usage?: Usage; loop?: LoopMove; add?: AddRequest; style?: AddStyle };
+export type StructureRequest = { op: StructureOp; at: LiveAt; to?: LiveAt; usage?: Usage; loop?: LoopMove; instance?: number; add?: AddRequest; style?: AddStyle };
 
 const single = (out: TextWritten): Structured => (out.ok ? { ok: true, changes: [out.change] } : out);
 
@@ -71,10 +74,33 @@ const OPS: Record<StructureOp, (read: ReadFile, req: StructureRequest) => Promis
   [StructureOp.Duplicate]: async (read, req) => single(await duplicateNode(read, req.at)),
   [StructureOp.MoveUsage]: async (read, req) => (req.usage ? moveUsage(read, req.at.file, req.usage) : { ok: false, reason: 'no component usages given' }),
   [StructureOp.MoveLoopItem]: async (read, req) => (req.loop ? moveLoopItem(read, req.at, req.loop) : { ok: false, reason: 'no item positions given' }),
+  [StructureOp.AddItem]: (read, req) => loopItem(read, req.at, req.instance, ItemOp.Append),
   [StructureOp.Add]: async (read, req) => (req.add ? addNode(read, req.at, req.add) : { ok: false, reason: 'nothing to add' }),
   [StructureOp.Wrap]: (read, req) => wrapNode(read, req.at, req.style),
   [StructureOp.Unwrap]: (read, req) => unwrapNode(read, req.at, req.style),
   [StructureOp.MoveInto]: async (read, req) => (req.to ? moveInto(read, req.at, req.to) : { ok: false, reason: 'no target container' })
 };
 
-export const structure = (read: ReadFile, req: StructureRequest) => OPS[req.op](read, req);
+const LOOP_ITEM_OPS: Partial<Record<StructureOp, ItemOp>> = {
+  [StructureOp.Duplicate]: ItemOp.Duplicate,
+  [StructureOp.Delete]: ItemOp.Delete
+};
+
+async function rootsLoop(read: ReadFile, at: LiveAt): Promise<boolean> {
+  const source = await read(at.file);
+  if (source === null) {
+    return false;
+  }
+
+  const text = hiddenOut(source);
+  const span = spanOf(text, offsetOf(text, at));
+  return span !== null && (repeated(text, parentOf(text, span.start), span.start) !== null || loopsAt(text, span.start).some((head) => head.at === span.start));
+}
+
+export async function structure(read: ReadFile, req: StructureRequest): Promise<Structured> {
+  const item = LOOP_ITEM_OPS[req.op];
+  if (item && (await rootsLoop(read, req.at))) {
+    return loopItem(read, req.at, req.instance, item);
+  }
+  return OPS[req.op](read, req);
+}
