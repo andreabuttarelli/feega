@@ -157,3 +157,9 @@ export function iconOf(node: IconNode): LayerIcon {
   }
   return BY_TAG[tag] ?? layout ?? LayerIcon.Block;
 }
+
+export const FLOAT_GLYPH: Record<Floating, string> = {
+  [Floating.Absolute]: '<path d="M5 1v8M1 5h8"/><circle cx="5" cy="5" r="2"/>',
+  [Floating.Fixed]: '<path d="M3.5 1h3l-.5 3 1.5 1.5h-6L3 4z M5 5.5V9"/>',
+  [Floating.Sticky]: '<path d="M2 2h6M5 2v6"/>'
+};
