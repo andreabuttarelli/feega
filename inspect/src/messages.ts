@@ -115,7 +115,9 @@ export enum ToHost {
   SignIn = 'sign-in',
   CancelSignIn = 'cancel-sign-in',
   SignOut = 'sign-out',
-  OnboardingDone = 'onboarding-done'
+  OnboardingDone = 'onboarding-done',
+  ImageChoose = 'image-choose',
+  ImageUpload = 'image-upload'
 }
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number };
@@ -133,7 +135,8 @@ export enum ToView {
   History = 'history',
   IconResults = 'icon-results',
   Account = 'account',
-  Onboarding = 'onboarding'
+  Onboarding = 'onboarding',
+  ImageSaved = 'image-saved'
 }
 
 export enum Onboarding {
@@ -175,7 +178,9 @@ export type HostMessage =
   | { kind: ToHost.SignIn }
   | { kind: ToHost.CancelSignIn }
   | { kind: ToHost.SignOut }
-  | { kind: ToHost.OnboardingDone };
+  | { kind: ToHost.OnboardingDone }
+  | { kind: ToHost.ImageChoose }
+  | { kind: ToHost.ImageUpload; name: string; data: string };
 
 export type ViewMessage =
   | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string }
@@ -188,7 +193,8 @@ export type ViewMessage =
   | { kind: ToView.Pick; id: number; x: number; y: number }
   | { kind: ToView.IconResults; id: number; library: string | null; hits: IconHit[]; error?: string }
   | { kind: ToView.Account; state: AccountState; email?: string }
-  | { kind: ToView.Onboarding; state: Onboarding };
+  | { kind: ToView.Onboarding; state: Onboarding }
+  | { kind: ToView.ImageSaved; url: string };
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';

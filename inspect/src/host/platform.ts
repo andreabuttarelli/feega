@@ -10,6 +10,8 @@ export enum Stored {
   Pids = 'feegaInspect.pids'
 }
 
+export type ChosenImage = { name: string; bytes: Uint8Array };
+
 export type Transport = {
   send: (message: ViewMessage) => unknown;
   receive: (handle: (message: HostMessage) => unknown) => void;
@@ -32,6 +34,7 @@ export type Platform = Transport & {
   openSettings: (key: SettingKey) => unknown;
   sourceControl: () => unknown;
   notify: (text: string) => unknown;
+  pickImage?: () => Promise<ChosenImage | null>;
   account: AccountStore;
   onboarding: OnboardingStore;
 };

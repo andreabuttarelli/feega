@@ -3,7 +3,7 @@ import type { Range } from '@feega/properties-panel/number-field';
 import { UNITS_OF, type Unit } from './units';
 import { tailwindShadow } from './shadows';
 import { tailwindToken } from '@feega/live-edit/tailwind-property';
-import { arbitraryCss } from './fills';
+import { arbitraryCss, tailwindImage } from './fills';
 
 export enum Section {
   Layout = 'Auto layout',
@@ -83,6 +83,7 @@ const style = (name: string) => (value: string) => ({ [name]: value });
 const pxStyle = (...names: string[]) => (value: string) => Object.fromEntries(names.map((n) => [n, value]));
 const prop = (p: LiveProp, side?: Side) => (value: string) => ({ prop: p, side, value });
 const colour = (p: LiveProp) => (value: string) => ({ prop: p, value });
+const arbitraryBackground = (property: string) => (v: string) => ({ prop: LiveProp.Class, family: arbitraryFamily(property), value: `[${property}:${arbitraryCss(v)}]` });
 const family = (f: ClassFamily, make: (value: string) => string = (v) => v) => (value: string) => ({ prop: LiveProp.Class, family: f, value: make(value) });
 
 const DIRECTIONS: Record<string, string> = { 'flex-row': 'row', 'flex-col': 'column' };
@@ -188,7 +189,11 @@ const DESIGN_ROWS: Row[] = [
   { section: Section.Typography, name: 'text-align', label: 'Align', control: Control.Choice, choices: Object.keys(ALIGN), read: (s) => keyOf(ALIGN, s['text-align']), preview: (v) => ({ textAlign: ALIGN[v] }), change: family(ClassFamily.TextAlign) },
   { section: Section.Typography, name: 'color', label: 'Colour', control: Control.Colour, read: (s) => s.color ?? '', preview: style('color'), change: colour(LiveProp.Color) },
   { section: Section.Fill, hidden: true, name: 'fill', label: 'Background', control: Control.Colour, read: (s) => s['background-color'] ?? '', preview: style('backgroundColor'), change: colour(LiveProp.Fill) },
-  { section: Section.Fill, name: 'fill-image', label: 'Fill', control: Control.Fills, read: (s) => s['background-image'] ?? 'none', preview: style('backgroundImage'), change: (v) => ({ prop: LiveProp.Class, family: arbitraryFamily('background-image'), value: `[background-image:${arbitraryCss(v)}]` }) },
+  { section: Section.Fill, name: 'fill-image', label: 'Fill', control: Control.Fills, read: (s) => s['background-image'] ?? 'none', preview: style('backgroundImage'), change: (v) => ({ prop: LiveProp.Class, family: arbitraryFamily('background-image'), value: tailwindImage(v) }) },
+  { section: Section.Fill, hidden: true, name: 'fill-size', label: 'Size', control: Control.Text, read: (s) => s['background-size'] ?? 'auto', preview: style('backgroundSize'), change: arbitraryBackground('background-size') },
+  { section: Section.Fill, hidden: true, name: 'fill-repeat', label: 'Repeat', control: Control.Text, read: (s) => s['background-repeat'] ?? 'repeat', preview: style('backgroundRepeat'), change: arbitraryBackground('background-repeat') },
+  { section: Section.Fill, hidden: true, name: 'fill-position', label: 'Position', control: Control.Text, read: (s) => s['background-position'] ?? '0% 0%', preview: style('backgroundPosition'), change: arbitraryBackground('background-position') },
+  { section: Section.Typography, hidden: true, name: 'text-clip', label: 'Clip', control: Control.Text, read: (s) => (s['background-clip'] === 'text' || s['-webkit-background-clip'] === 'text' ? 'text' : ''), preview: (v) => ({ backgroundClip: v, WebkitBackgroundClip: v }), change: (v) => ({ prop: LiveProp.Class, family: arbitraryFamily('background-clip'), value: v ? `bg-clip-${v}` : '' }) },
   ...radiusRows,
   { section: Section.Border, units: UNITS_OF['border'], name: 'border', label: 'B', control: Control.Number, range: PX, unit: 'px', read: (s) => px(s, 'border-top-width'), preview: (v) => ({ borderWidth: v, borderStyle: 'solid' }), change: family(ClassFamily.Border, (v) => (parseFloat(v) === 0 ? 'border-0' : `border-[${v}]`)) },
   { section: Section.Effects, name: 'opacity', label: 'Opacity', control: Control.Number, range: PERCENT, unit: '%', read: (s) => Math.round(parseFloat(s.opacity ?? '1') * 100), preview: (v) => ({ opacity: String(Number(v) / 100) }), change: family(ClassFamily.Opacity, (v) => `opacity-${v}`) },

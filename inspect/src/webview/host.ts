@@ -34,8 +34,10 @@ function socketLink(): Link {
   };
 }
 
+export const inVscode = typeof acquireVsCodeApi === 'function';
+
 function linkOf(): Link {
-  if (typeof acquireVsCodeApi !== 'function') {
+  if (!inVscode) {
     return socketLink();
   }
   const api = acquireVsCodeApi();

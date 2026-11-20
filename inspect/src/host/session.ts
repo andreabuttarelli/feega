@@ -9,6 +9,7 @@ import { addPlugin } from './add-plugin';
 import { mcpIcon, searchIcons } from './icon-search';
 import { appOfSource, firstStampedFile, urlOf } from './attach-url';
 import { Attach, attachDev, factsOf, startDev, type Refused, type Running } from './dev-server';
+import { copyImage } from './image-copy';
 import { fileEdits, type Snapshot, type Written } from './file-edits';
 import type { KeptServers } from './kept-servers';
 import { forget, remember, type Memo } from './orphans';
@@ -75,6 +76,18 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
 
   async function iconsFound(id: number, query: string) {
     await post({ kind: ToView.IconResults, id, ...(await searchIcons(root, fetch, query)) });
+  }
+
+  async function imageSaved(name: string, bytes: Uint8Array) {
+    const out = await copyImage(join(root, running?.plan.appDir ?? ''), name, bytes);
+    await post(out.ok ? { kind: ToView.ImageSaved, url: out.url } : { kind: ToView.Edited, ok: false, reason: out.reason });
+  }
+
+  async function imageChosen() {
+    const image = await platform.pickImage?.();
+    if (image) {
+      await imageSaved(image.name, image.bytes);
+    }
   }
 
   const postAccount = (state: AccountState, email?: string) => post({ kind: ToView.Account, state, email });
@@ -349,7 +362,9 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.SignIn]: startSignIn,
     [ToHost.CancelSignIn]: () => signing?.abort(),
     [ToHost.SignOut]: signOut,
-    [ToHost.OnboardingDone]: () => platform.onboarding.markSeen()
+    [ToHost.OnboardingDone]: () => platform.onboarding.markSeen(),
+    [ToHost.ImageChoose]: imageChosen,
+    [ToHost.ImageUpload]: (m) => imageSaved(m.name, Buffer.from(m.data, 'base64'))
   };
 
   platform.receive((message) => (handlers[message.kind] as (m: HostMessage) => unknown)(message));

@@ -15,12 +15,21 @@ export type Fill =
   | { kind: FillKind.Linear; angle: string; stops: Stop[]; visible: boolean }
   | { kind: FillKind.Radial; shape: string; stops: Stop[]; visible: boolean }
   | { kind: FillKind.Conic; angle: string; stops: Stop[]; visible: boolean }
-  | { kind: FillKind.Image; url: string; visible: boolean };
+  | { kind: FillKind.Image; url: string; size: string; repeat: string; position: string; visible: boolean };
+
+export type Placement = { size: string; repeat: string; position: string };
+
+const NO_PLACEMENT: Placement = { size: '', repeat: '', position: '' };
+const DEFAULT_SIZE = 'auto';
+const DEFAULT_REPEAT = 'repeat';
+const DEFAULT_POSITION = '0% 0%';
+const CENTRED = '50% 50%';
 
 const NONE = 'none';
 const TRANSPARENT = 'transparent';
 const GRADIENT = /^(linear|radial|conic)-gradient\((.*)\)$/;
 const URL = /^url\(["']?([^"')]*)["']?\)$/;
+const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(?=\/)/;
 const STOP = /^(.*?)\s+([-\d.]+(?:%|px)?)$/;
 const DIRECTION = /^(to\s|-?[\d.]+(deg|turn|rad)|from\s|circle|ellipse|closest|farthest|at\s)/;
 
@@ -57,17 +66,22 @@ function gradientOf(kind: string, body: string): Fill {
   return table[kind]();
 }
 
-function layerOf(text: string): Fill | null {
+function layerOf(text: string, place: Placement): Fill | null {
   const gradient = text.match(GRADIENT);
   if (gradient) {
     return gradientOf(gradient[1], gradient[2]);
   }
   const url = text.match(URL);
-  return url ? { kind: FillKind.Image, url: url[1], visible: true } : null;
+  return url ? { kind: FillKind.Image, url: url[1].replace(LOCAL_ORIGIN, ''), size: place.size || DEFAULT_SIZE, repeat: place.repeat || DEFAULT_REPEAT, position: place.position || DEFAULT_POSITION, visible: true } : null;
 }
 
-export function parseFills(image: string, colour: string): Fill[] {
-  const layers = !image || image.trim() === NONE ? [] : splitTop(image).map(layerOf).filter((f): f is Fill => f !== null);
+const placementAt = (placement: Placement, i: number): Placement => {
+  const at = (list: string) => splitTop(list)[i] ?? '';
+  return { size: at(placement.size), repeat: at(placement.repeat), position: at(placement.position) };
+};
+
+export function parseFills(image: string, colour: string, placement: Placement = NO_PLACEMENT): Fill[] {
+  const layers = !image || image.trim() === NONE ? [] : splitTop(image).map((text, i) => layerOf(text, placementAt(placement, i))).filter((f): f is Fill => f !== null);
   const solid = paintOf(colour);
   return solid ? [...layers, { kind: FillKind.Solid, colour: colour.trim(), visible: true }] : layers;
 }
@@ -93,9 +107,30 @@ export function fillCss(fills: Fill[]): Record<string, string> {
   return { 'background-image': images.length ? images.join(', ') : NONE, 'background-color': solid ? layerCss(solid) : TRANSPARENT };
 }
 
+const painted = (fills: Fill[]) => fills.filter((f) => f.visible && f.kind !== FillKind.Solid && !isBlankImage(f));
+
+const placementOf = (fill: Fill): Placement => (fill.kind === FillKind.Image ? fill : { size: DEFAULT_SIZE, repeat: DEFAULT_REPEAT, position: DEFAULT_POSITION });
+
+export function placementCss(fills: Fill[]): Record<string, string> {
+  const layers = painted(fills).map(placementOf);
+  const list = (pick: (p: Placement) => string, none: string) => (layers.length ? layers.map(pick).join(', ') : none);
+  return {
+    'background-size': list((p) => p.size, DEFAULT_SIZE),
+    'background-repeat': list((p) => p.repeat, DEFAULT_REPEAT),
+    'background-position': list((p) => p.position, DEFAULT_POSITION)
+  };
+}
+
 export const imageChanged = (was: string, next: string) => was.trim() !== NONE || next.trim() !== NONE;
 
 export const arbitraryCss = (css: string) => css.replace(/,\s+/g, ',').replace(/\s+/g, '_');
+
+const SINGLE_URL = /^url\(["']?([^"'()\s]+)["']?\)$/;
+
+export function tailwindImage(css: string): string {
+  const url = css.trim().match(SINGLE_URL);
+  return url ? `bg-[url(${url[1]})]` : `[background-image:${arbitraryCss(css)}]`;
+}
 
 export function tailwindFill(fills: Fill[]): string[] {
   const css = fillCss(fills);
@@ -112,7 +147,7 @@ export function newFill(kind: FillKind): Fill {
     [FillKind.Linear]: { kind: FillKind.Linear, angle: '90deg', stops, visible: true },
     [FillKind.Radial]: { kind: FillKind.Radial, shape: 'circle', stops, visible: true },
     [FillKind.Conic]: { kind: FillKind.Conic, angle: 'from 0deg', stops, visible: true },
-    [FillKind.Image]: { kind: FillKind.Image, url: '', visible: true }
+    [FillKind.Image]: { kind: FillKind.Image, url: '', size: 'cover', repeat: 'no-repeat', position: CENTRED, visible: true }
   };
   return table[kind];
 }

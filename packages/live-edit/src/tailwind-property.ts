@@ -17,6 +17,8 @@ const UTILITIES: Record<string, Utility> = {
   'overflow-y': keyword('overflow-y'),
   'object-fit': keyword('object'),
   'mix-blend-mode': keyword('mix-blend'),
+  'background-clip': keyword('bg-clip'),
+  'background-image': { make: (v) => `bg-[${v}]`, owns: (t) => t.startsWith('bg-[url(') },
   'min-width': prefixed('min-w'),
   'max-width': prefixed('max-w'),
   'min-height': prefixed('min-h'),

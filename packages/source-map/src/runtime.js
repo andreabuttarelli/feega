@@ -8,7 +8,7 @@ const DESIGN_PROPERTIES = [
   'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
   'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
   'gap', 'flex-direction', 'justify-content', 'align-items', 'grid-template-columns',
-  'color', 'background-color', 'background-image', 'opacity',
+  'color', 'background-color', 'background-image', 'background-size', 'background-repeat', 'background-position', 'background-clip', '-webkit-background-clip', 'opacity',
   'border-top-width', 'border-top-style', 'border-top-color', 'border-radius',
   'border-top-left-radius', 'border-top-right-radius', 'border-bottom-right-radius', 'border-bottom-left-radius', 'box-shadow',
   'font-family', 'font-size', 'font-weight', 'line-height', 'letter-spacing', 'text-align', 'text-transform', 'text-shadow',

@@ -58,8 +58,14 @@ const pxToken = (raw: string) => {
   return px === null || KEEPS_UNIT.test(raw.trim()) ? arbitrary(raw.trim()) : arbitrary(`${px}px`);
 };
 
+const CLEAR_HEX = '#00000000';
+const CLEAR_TOKEN = 'transparent';
+
 function colourToken(raw: string, theme: LiveTheme): string {
   const hex = colourOf(raw);
+  if (hex === CLEAR_HEX) {
+    return CLEAR_TOKEN;
+  }
   return hex ? (theme.colours.get(hex) ?? arbitrary(hex)) : arbitrary(raw);
 }
 

@@ -9,7 +9,8 @@
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import ArrowDown from '@lucide/svelte/icons/arrow-down';
   import { Popover, Select } from 'bits-ui';
-  import { imageChanged } from './fills';
+  import { fillCss, imageChanged, parseFills, placementCss, type Fill } from './fills';
+  import { isClipped, textFillCss, textFillPreviews, textFillRefusal, textFillWrites, textFillsOf } from './text-fill';
   import ColorPicker from './ColorPicker.svelte';
   import Check from '@lucide/svelte/icons/check';
   import Icon from './Icon.svelte';
@@ -28,9 +29,9 @@
   import { iconRowNames } from './icon-controls';
   import type { FontChoice, Palette, Pick } from '../messages';
 
-  type Props = { pick: Pick; onpreview: (row: Row, value: string) => void; onchange: (row: Row, value: string, token?: string) => void; onsavevar: (row: Row, name: string, css: string) => void; onhint: (hint: Hint | null) => void; onfont: (font: FontChoice) => void; palette: Palette };
+  type Props = { pick: Pick; onpreview: (row: Row, value: string) => void; onchange: (row: Row, value: string, token?: string) => void; onsavevar: (row: Row, name: string, css: string) => void; onhint: (hint: Hint | null) => void; onfont: (font: FontChoice) => void; onnotice: (text: string) => void; palette: Palette };
 
-  let { pick, onpreview, onchange, onhint, onfont, palette, onsavevar }: Props = $props();
+  let { pick, onpreview, onchange, onhint, onfont, onnotice, palette, onsavevar }: Props = $props();
 
   const WEIGHT_NAMES: Record<string, string> = { '100': 'Thin', '200': 'Extra light', '300': 'Light', '400': 'Regular', '500': 'Medium', '600': 'Semibold', '700': 'Bold', '800': 'Extra bold', '900': 'Black' };
   const TEXT_ALIGN = [
@@ -88,6 +89,31 @@
     const list = GROUP_MODES[group];
     modes[group] = list[(list.indexOf(modes[group]) + 1) % list.length];
   }
+
+  const PLACEMENT_ROWS = [
+    ['fill-size', 'background-size'],
+    ['fill-repeat', 'background-repeat'],
+    ['fill-position', 'background-position']
+  ];
+  const textClipped = $derived(has(Section.Typography) && isClipped(pick.styles));
+  const placementOf = () => ({ size: readOf('fill-size'), repeat: readOf('fill-repeat'), position: readOf('fill-position') });
+  const fillsOf = () => parseFills(readOf('fill-image'), readOf('fill'), placementOf());
+  const sectionCss = (fills: Fill[]) => ({ ...fillCss(fills), ...placementCss(fills) });
+
+  function writeFill(css: Record<string, string>) {
+    imageChanged(readOf('fill-image'), css['background-image']) && onchange(byName('fill-image'), css['background-image']);
+    PLACEMENT_ROWS.forEach(([row, key]) => readOf(row).trim() !== css[key] && onchange(byName(row), css[key]));
+    onchange(byName('fill'), css['background-color']);
+  }
+
+  function previewFill(css: Record<string, string>) {
+    onpreview(byName('fill-image'), css['background-image']);
+    PLACEMENT_ROWS.forEach(([row, key]) => onpreview(byName(row), css[key]));
+    onpreview(byName('fill'), css['background-color']);
+  }
+
+  const writeText = (css: Record<string, string>) => textFillWrites(css, pick.styles).forEach(([row, value]) => onchange(byName(row), value));
+  const previewText = (css: Record<string, string>) => textFillPreviews(css).forEach(([row, value]) => onpreview(byName(row), value));
 
   const keyOf = (row: NumberRow) => row.name.slice(row.name.lastIndexOf('-') + 1);
 </script>
@@ -267,15 +293,14 @@
         {@render row('Size', metrics, 'type-size')}
         {#snippet ta()}{@render segmented(byName('text-align'), TEXT_ALIGN)}{/snippet}
         {@render row('Align', ta, 'text-align')}
-        {#snippet col()}{@render colourRow('color')}{/snippet}
-        {@render row('Colour', col, 'color')}
+        <FillList scope="text-fill" inline parse={() => textFillsOf(pick.styles)} css={textFillCss} guard={(next) => textFillRefusal(pick.styles, next)} onrefuse={onnotice} {palette} {header} {row} onchange={writeText} onpreview={previewText} />
       {/if}
     </section>
   {/if}
 
-  {#if has(Section.Fill)}
+  {#if has(Section.Fill) && !textClipped}
     <section data-section={Section.Fill}>
-      <FillList image={readOf('fill-image')} colour={readOf('fill')} {palette} {header} {row} onchange={(css) => (imageChanged(readOf('fill-image'), css['background-image']) && onchange(byName('fill-image'), css['background-image']), onchange(byName('fill'), css['background-color']))} onpreview={(css) => (onpreview(byName('fill-image'), css['background-image']), onpreview(byName('fill'), css['background-color']))} />
+      <FillList parse={fillsOf} css={sectionCss} {palette} {header} {row} onchange={writeFill} onpreview={previewFill} />
     </section>
   {/if}
 

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
@@ -14,6 +15,9 @@ const SETTLE_MS = 2500;
 const TAILWIND = /tailwind/.test(APP);
 const ONBOARDING_MS = 3000;
 const NEW_TITLE = 'Ship faster than planned';
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+const MAX_UNDOS = 10;
+const IMAGE_DIRS = ['public/images', 'static/images'];
 
 const git = (...args) => execFileSync('git', ['-C', APP, ...args], { encoding: 'utf8' });
 const changedFiles = () => git('diff', '--name-only', '--relative').split('\n').filter(Boolean);
@@ -135,6 +139,53 @@ try {
     }
   });
 
+  const undoAll = async () => {
+    for (let n = 0; n < MAX_UNDOS && changedFiles().length; n++) {
+      await undo();
+    }
+  };
+
+  await check('image fill: choosing a file copies it to the public folder, writes its url, and undo clears the css', async () => {
+    await frame.locator('h1').first().click();
+    await page.locator('[data-section="Fill"] button[aria-label="Add fill"]').click();
+    await page.waitForTimeout(SETTLE_MS);
+    await page.locator('[data-row="fill-0"] .swatch-button').click();
+    await page.locator('select[aria-label="Fill type"]').selectOption('image');
+    const picture = join(mkdtempSync(join(tmpdir(), 'feega-img-')), 'e2e-photo.png');
+    writeFileSync(picture, PNG);
+    const chooser = page.waitForEvent('filechooser');
+    await page.locator('[data-field="choose-image"]').click();
+    await (await chooser).setFiles(picture);
+    await page.waitForTimeout(SETTLE_MS);
+    const copied = IMAGE_DIRS.map((dir) => join(APP, dir, 'e2e-photo.png')).find((path) => existsSync(path));
+    assert.ok(copied, 'the file landed in the public folder');
+    assert.ok(diffText().includes(TAILWIND ? 'bg-[url(/images/e2e-photo.png)]' : 'url("/images/e2e-photo.png")'), `the url is written:\n${diffText()}`);
+    assert.ok(diffText().includes(TAILWIND ? '[background-size:cover]' : 'background-size: cover'), 'size is written');
+    await page.keyboard.press('Escape');
+    await undoAll();
+    assert.deepEqual(changedFiles(), [], 'undo restores the stylesheet or class');
+  });
+
+  await check('text gradient: layers clip the background to the text, removing them restores the colour', async () => {
+    await frame.locator('h1').first().click();
+    const section = page.locator('[data-section="Typography"]');
+    await section.locator('button[aria-label="Add fill"]').click();
+    await page.waitForTimeout(SETTLE_MS);
+    await section.locator('[data-row="text-fill-0"] .swatch-button').click();
+    await page.locator('select[aria-label="Fill type"]').selectOption('linear');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(SETTLE_MS);
+    const diff = diffText();
+    assert.ok(TAILWIND ? diff.includes('bg-clip-text') && diff.includes('text-transparent') : diff.includes('background-clip: text') && diff.includes('-webkit-background-clip: text') && diff.includes('color: transparent'), `clip written:\n${diff}`);
+    const clip = await frame.locator('h1').first().evaluate((h) => getComputedStyle(h).webkitBackgroundClip);
+    assert.equal(clip, 'text', 'the page shows the clipped text');
+    await section.locator('[data-row="text-fill-0"] button[aria-label="Remove fill"]').click();
+    await page.waitForTimeout(SETTLE_MS);
+    assert.ok(!/background-clip|bg-clip/.test(diffText()), `clip dropped:\n${diffText()}`);
+    await undoAll();
+    assert.deepEqual(changedFiles(), [], 'undo restores everything');
+  });
+
   await check('sibling reorder writes the source, shows in the preview, and undo restores it', async () => {
     await frame.locator('h1').first().click();
     await page.waitForTimeout(800);
@@ -160,6 +211,7 @@ try {
     git('checkout', '--', ...left);
   }
   rmSync(join(APP, '.feega'), { recursive: true, force: true });
+  IMAGE_DIRS.forEach((dir) => rmSync(join(APP, dir, 'e2e-photo.png'), { force: true }));
   await browser.close();
   cli.stdin.end();
 }

@@ -25,6 +25,13 @@ describe('tokenFor', () => {
     expect(tokenFor(LiveProp.Fill, '#FF3B30', theme)).toBe('[#ff3b30]');
   });
 
+  it('transparent keeps its name, however the page spells it', async () => {
+    const theme = await liveTheme(read);
+
+    expect(tokenFor(LiveProp.Color, 'transparent', theme)).toBe('transparent');
+    expect(tokenFor(LiveProp.Fill, 'rgba(0, 0, 0, 0)', theme)).toBe('transparent');
+  });
+
   it('lo spazio multiplo della base diventa un passo della scala', async () => {
     const theme = await liveTheme(read);
     expect(tokenFor(LiveProp.Padding, '24px', theme)).toBe('6');

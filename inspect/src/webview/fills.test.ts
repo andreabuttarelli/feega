@@ -1,5 +1,51 @@
 import { describe, expect, it } from 'vitest';
-import { FillKind, fillCss, imageChanged, parseFills, tailwindFill } from './fills';
+import { FillKind, fillCss, imageChanged, newFill, parseFills, placementCss, tailwindFill, tailwindImage } from './fills';
+
+describe('image placement', () => {
+  const placement = { size: 'cover, auto', repeat: 'no-repeat, repeat', position: '50% 0%, 0% 0%' };
+
+  it('parse hands each image layer its own size, repeat and position', () => {
+    const [image, gradient] = parseFills('url("/a.png"), linear-gradient(90deg, red 0%, blue 100%)', 'rgba(0, 0, 0, 0)', placement);
+
+    expect(image).toMatchObject({ kind: FillKind.Image, url: '/a.png', size: 'cover', repeat: 'no-repeat', position: '50% 0%' });
+    expect(gradient.kind).toBe(FillKind.Linear);
+  });
+
+  it('a local dev-server url is read back as the root-relative path the source holds', () => {
+    const [image] = parseFills('url("http://127.0.0.1:49397/images/sunset.svg")', 'rgba(0, 0, 0, 0)');
+
+    expect(image).toMatchObject({ url: '/images/sunset.svg' });
+  });
+
+  it('a remote url is kept as it is', () => {
+    const [image] = parseFills('url("https://cdn.example.com/a.png")', 'rgba(0, 0, 0, 0)');
+
+    expect(image).toMatchObject({ url: 'https://cdn.example.com/a.png' });
+  });
+
+  it('a new image layer covers, does not repeat and is centred', () => {
+    expect(newFill(FillKind.Image)).toMatchObject({ size: 'cover', repeat: 'no-repeat', position: '50% 50%' });
+  });
+
+  it('placementCss lists one value per painted layer, defaults for gradients', () => {
+    const fills = parseFills('url("/a.png"), linear-gradient(90deg, red 0%, blue 100%)', 'rgba(0, 0, 0, 0)', placement);
+
+    expect(placementCss(fills)).toEqual({ 'background-size': 'cover, auto', 'background-repeat': 'no-repeat, repeat', 'background-position': '50% 0%, 0% 0%' });
+  });
+
+  it('placementCss with no painted layer is the browser default', () => {
+    expect(placementCss([])).toEqual({ 'background-size': 'auto', 'background-repeat': 'repeat', 'background-position': '0% 0%' });
+  });
+
+  it('a hidden or blank image layer takes no slot', () => {
+    const fills = [
+      { ...newFill(FillKind.Image), url: '/a.png', visible: false },
+      { ...newFill(FillKind.Image), url: '' }
+    ];
+
+    expect(placementCss(fills)['background-size']).toBe('auto');
+  });
+});
 
 describe('parseFills', () => {
   it('a plain background colour is one solid layer', () => {
@@ -19,7 +65,7 @@ describe('parseFills', () => {
   });
 
   it('an image layer keeps its url', () => {
-    expect(parseFills('url("/hero.png")', 'rgba(0, 0, 0, 0)')).toEqual([{ kind: FillKind.Image, url: '/hero.png', visible: true }]);
+    expect(parseFills('url("/hero.png")', 'rgba(0, 0, 0, 0)')).toEqual([{ kind: FillKind.Image, url: '/hero.png', size: 'auto', repeat: 'repeat', position: '0% 0%', visible: true }]);
   });
 });
 
@@ -39,7 +85,7 @@ describe('fillCss', () => {
 });
 
 describe('an image layer without a url', () => {
-  const empty = [{ kind: FillKind.Image as const, url: '', visible: true }];
+  const empty = [newFill(FillKind.Image)];
 
   it('writes no url("")', () => {
     expect(fillCss(empty)).toEqual({ 'background-image': 'none', 'background-color': 'transparent' });
@@ -71,5 +117,15 @@ describe('imageChanged', () => {
 
   it('adding an image writes it', () => {
     expect(imageChanged('none', 'url("/a.png")')).toBe(true);
+  });
+});
+
+describe('tailwindImage', () => {
+  it('a single url is a bg-[url()] class, unquoted', () => {
+    expect(tailwindImage('url("/images/x.jpg")')).toBe('bg-[url(/images/x.jpg)]');
+  });
+
+  it('layers stay an arbitrary background-image', () => {
+    expect(tailwindImage('url("/a.png"), linear-gradient(90deg, red 0%, blue 100%)')).toBe('[background-image:url("/a.png"),linear-gradient(90deg,red_0%,blue_100%)]');
   });
 });

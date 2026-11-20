@@ -4,6 +4,7 @@ import type { HostMessage, Source } from '../messages';
 import { settingsWith } from '../settings';
 import { Column, openTarget } from './open-source';
 import type { Account, AccountStore } from './account';
+import { IMAGE_EXTENSIONS } from './image-copy';
 import { globalStateOnboardingStore } from './onboarding';
 import type { Platform } from './platform';
 
@@ -53,6 +54,11 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     await vscode.commands.executeCommand('vscode.diff', left, vscode.Uri.file(path), `${path.split('/').pop()} (before ↔ now)`);
   }
 
+  async function pickImage() {
+    const [uri] = (await vscode.window.showOpenDialog({ canSelectMany: false, openLabel: 'Use image', filters: { Images: IMAGE_EXTENSIONS } })) ?? [];
+    return uri ? { name: basename(uri.fsPath), bytes: await vscode.workspace.fs.readFile(uri) } : null;
+  }
+
   return {
     version: String(context.extension.packageJSON.version),
     launcher: host.launcher,
@@ -75,6 +81,7 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     openSettings: (key) => vscode.commands.executeCommand('workbench.action.openSettings', key),
     sourceControl: () => vscode.commands.executeCommand('workbench.view.scm'),
     notify: (text) => vscode.window.showInformationMessage(`Feega: ${text}`),
+    pickImage,
     account: secretAccountStore(context.secrets),
     onboarding: globalStateOnboardingStore(context.globalState)
   };

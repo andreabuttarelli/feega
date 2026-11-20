@@ -74,7 +74,7 @@ try {
   await shot(page, '1-open');
 
   await frame.locator('h1').first().click();
-  const field = page.locator('[data-row="color"] input[aria-label="Colour hex"]');
+  const field = page.locator('[data-row="text-fill-0"] input[aria-label="Fill hex"]');
   await field.waitFor();
   await shot(page, '2-selected');
   assert.deepEqual(changedFiles(), [], 'the app starts clean');

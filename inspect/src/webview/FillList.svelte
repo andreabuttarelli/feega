@@ -1,11 +1,14 @@
 <script lang="ts">
-  import type { Snippet } from 'svelte';
+  import { untrack, type Snippet } from 'svelte';
   import { Popover } from 'bits-ui';
   import Eye from '@lucide/svelte/icons/eye';
   import EyeOff from '@lucide/svelte/icons/eye-off';
   import Minus from '@lucide/svelte/icons/minus';
   import Plus from '@lucide/svelte/icons/plus';
-  import { FillKind, fillCss, layerCss, newFill, parseFills, type Fill, type Stop } from './fills';
+  import { FillKind, layerCss, newFill, type Fill, type Stop } from './fills';
+  import { ImageSource, imageSaved, imageSource, readAsBase64 } from './image-file.svelte';
+  import { toHost } from './host';
+  import { ToHost } from '../messages';
   import { hexOf } from './colour';
   import { Section } from './controls';
   import ColorPicker from './ColorPicker.svelte';
@@ -20,31 +23,90 @@
     { kind: FillKind.Image, label: 'Image' }
   ];
 
+  const SIZES = ['cover', 'contain', 'auto'];
+  const REPEATS = ['no-repeat', 'repeat', 'repeat-x', 'repeat-y'];
+  const POSITIONS: { label: string; value: string }[] = [
+    { label: 'Top left', value: '0% 0%' },
+    { label: 'Top', value: '50% 0%' },
+    { label: 'Top right', value: '100% 0%' },
+    { label: 'Left', value: '0% 50%' },
+    { label: 'Center', value: '50% 50%' },
+    { label: 'Right', value: '100% 50%' },
+    { label: 'Bottom left', value: '0% 100%' },
+    { label: 'Bottom', value: '50% 100%' },
+    { label: 'Bottom right', value: '100% 100%' }
+  ];
+
   type Props = {
-    image: string;
-    colour: string;
-    header: Snippet<[Section, Snippet?]>;
+    parse: () => Fill[];
+    css: (fills: Fill[]) => Record<string, string>;
+    guard?: (next: Fill[]) => string | null;
+    onrefuse?: (reason: string) => void;
+    scope?: string;
+    inline?: boolean;
+    header: Snippet<[Section, Snippet?, boolean?]>;
     row: Snippet<[string, Snippet, string?]>;
     onchange: (css: Record<string, string>) => void;
     onpreview: (css: Record<string, string>) => void;
     palette: Palette;
   };
 
-  let { image, colour, header, row, onchange, onpreview, palette }: Props = $props();
+  let { parse, css, guard, onrefuse, scope = 'fill', inline = false, header, row, onchange, onpreview, palette }: Props = $props();
 
   let fills = $state<Fill[]>([]);
   $effect(() => {
-    fills = parseFills(image, colour);
+    fills = parse();
   });
 
+  let choosing = $state<number | null>(null);
+  let fileInput: HTMLInputElement | undefined = $state();
+
+  $effect(() => {
+    const url = imageSaved.url;
+    const at = untrack(() => choosing);
+    if (!url || at === null) {
+      return;
+    }
+    choosing = null;
+    const fill = untrack(() => fills[at]);
+    if (fill?.kind === FillKind.Image) {
+      replace(at, { ...fill, url });
+    }
+  });
+
+  function choose(i: number) {
+    choosing = i;
+    if (imageSource === ImageSource.Host) {
+      toHost({ kind: ToHost.ImageChoose });
+      return;
+    }
+    fileInput?.click();
+  }
+
+  async function uploaded(e: Event & { currentTarget: HTMLInputElement }) {
+    const file = e.currentTarget.files?.[0];
+    e.currentTarget.value = '';
+    if (!file) {
+      choosing = null;
+      return;
+    }
+    toHost({ kind: ToHost.ImageUpload, name: file.name, data: await readAsBase64(file) });
+  }
+
   function commit(next: Fill[]) {
+    const refusal = guard?.(next) ?? null;
+    if (refusal) {
+      onrefuse?.(refusal);
+      fills = parse();
+      return;
+    }
     fills = next;
-    onchange(fillCss(next));
+    onchange(css(next));
   }
 
   const swap = (i: number, fill: Fill) => fills.map((f, j) => (j === i ? fill : f));
   const replace = (i: number, fill: Fill) => commit(swap(i, fill));
-  const peek = (i: number, fill: Fill) => onpreview(fillCss(swap(i, fill)));
+  const peek = (i: number, fill: Fill) => onpreview(css(swap(i, fill)));
   const withStop = (fill: Fill, s: number, patch: Partial<Stop>) => ('stops' in fill ? { ...fill, stops: fill.stops.map((stop, k) => (k === s ? { ...stop, ...patch } : stop)) } : fill);
   const setStop = (i: number, s: number, patch: Partial<Stop>) => replace(i, withStop(fills[i], s, patch));
   const peekStop = (i: number, s: number, patch: Partial<Stop>) => peek(i, withStop(fills[i], s, patch));
@@ -56,7 +118,7 @@
   <button type="button" class="icon" title="Add fill" aria-label="Add fill" onclick={() => commit([newFill(FillKind.Solid), ...fills])}><Plus size={14} /></button>
 {/snippet}
 
-{@render header(Section.Fill, add)}
+{@render header(Section.Fill, add, inline)}
 {#each fills as fill, i (i)}
   {#snippet layer()}
     <div class="layer" class:off={!fill.visible} data-field="fill-layer">
@@ -73,7 +135,27 @@
             {#if fill.kind === FillKind.Solid}
               <ColorPicker value={fill.colour} {palette} onchange={(p) => replace(i, { ...fill, colour: p.css })} onpreview={(c) => peek(i, { ...fill, colour: c })} />
             {:else if fill.kind === FillKind.Image}
+              <button type="button" class="primary" data-field="choose-image" onclick={() => choose(i)}>Choose image</button>
               <label class="line">URL <input type="text" value={fill.url} placeholder="/image.png" onchange={(e) => replace(i, { ...fill, url: e.currentTarget.value })} /></label>
+              <label class="line">Size
+                <select value={fill.size} aria-label="Image size" onchange={(e) => replace(i, { ...fill, size: e.currentTarget.value })}>
+                  {#if !SIZES.includes(fill.size)}<option value={fill.size}>{fill.size}</option>{/if}
+                  {#each SIZES as size (size)}<option value={size}>{size}</option>{/each}
+                </select>
+              </label>
+              <label class="line">Repeat
+                <select value={fill.repeat} aria-label="Image repeat" onchange={(e) => replace(i, { ...fill, repeat: e.currentTarget.value })}>
+                  {#if !REPEATS.includes(fill.repeat)}<option value={fill.repeat}>{fill.repeat}</option>{/if}
+                  {#each REPEATS as repeat (repeat)}<option value={repeat}>{repeat}</option>{/each}
+                </select>
+              </label>
+              <label class="line">Position
+                <select value={fill.position} aria-label="Image position" onchange={(e) => replace(i, { ...fill, position: e.currentTarget.value })}>
+                  {#if !POSITIONS.some((p) => p.value === fill.position)}<option value={fill.position}>{fill.position}</option>{/if}
+                  {#each POSITIONS as p (p.value)}<option value={p.value}>{p.label}</option>{/each}
+                </select>
+              </label>
+              <input bind:this={fileInput} type="file" accept="image/*" hidden aria-label="Image file" onchange={uploaded} />
             {:else}
               <div class="bar" style={`background: ${layerCss({ ...fill, kind: FillKind.Linear, angle: '90deg' } as Fill)}`}></div>
               {#if fill.kind === FillKind.Radial}
@@ -102,7 +184,7 @@
       <button type="button" class="icon" aria-label="Remove fill" title="Remove" onclick={() => commit(fills.filter((_, j) => j !== i))}><Minus size={14} /></button>
     </div>
   {/snippet}
-  {@render row(labelOf(fill), layer, `fill-${i}`)}
+  {@render row(labelOf(fill), layer, `${scope}-${i}`)}
 {/each}
 
 <style>
@@ -218,6 +300,7 @@
     max-width: 64px;
   }
 
+  .primary,
   .add-stop {
     height: 28px;
     border: 0;
@@ -226,5 +309,10 @@
     color: var(--ui-text);
     font: inherit;
     cursor: pointer;
+  }
+
+  .primary {
+    background: var(--ui-text);
+    color: var(--ui-panel);
   }
 </style>
