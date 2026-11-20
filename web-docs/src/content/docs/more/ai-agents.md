@@ -13,6 +13,12 @@ Feega has no AI of its own. It sits next to your agent: you design in Feega, you
 npx skills add andreabuttarelli/feega
 ```
 
+In Claude Code, install it as a plugin:
+
+```
+/plugin install feega --marketplace andreabuttarelli/feega
+```
+
 The skill teaches your agent to:
 
 - add `feega-source-map` to a Next.js or Vite config,
