@@ -19,6 +19,7 @@ const plans = [
         <a href="#features">Features</a>
         <a href="#pricing">Pricing</a>
       </nav>
+      <span id="badge" class="badge">New</span>
     </header>
     <main class="main">
       <h1 id="title" class="title">Plan your launch in an afternoon</h1>
@@ -137,5 +138,11 @@ const plans = [
 
   .topic {
     padding: 8px 0;
+  }
+
+  .badge {
+    position: absolute;
+    top: 12px;
+    right: 16px;
   }
 </style>

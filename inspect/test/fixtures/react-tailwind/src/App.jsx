@@ -18,6 +18,7 @@ export function App() {
           <a href="#features">Features</a>
           <a href="#pricing">Pricing</a>
         </nav>
+        <span id="badge" className="absolute top-3 right-4 text-xs">New</span>
       </header>
       <main className="flex flex-col items-start gap-6 px-8 py-16">
         <h1 id="title" className="text-5xl font-medium tracking-tight">Plan your launch in an afternoon</h1>

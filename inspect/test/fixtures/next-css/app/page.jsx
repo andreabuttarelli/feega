@@ -19,6 +19,7 @@ export default function Page() {
           <a href="#features">Features</a>
           <a href="#pricing">Pricing</a>
         </nav>
+        <span id="badge" className={styles.badge}>New</span>
       </header>
       <main className={styles.main}>
         <h1 id="title" className={styles.title}>Plan your launch in an afternoon</h1>

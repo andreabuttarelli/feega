@@ -360,6 +360,29 @@ try {
     assert.deepEqual(changedFiles(), [], 'a second undo restores the source');
   });
 
+  await check('position box: the bars start from what the source authors and turning one off removes it in one undo', async () => {
+    const badge = frame.locator('#badge');
+    await badge.click();
+    const section = page.locator('[data-section="Position"]');
+    await section.waitFor({ timeout: 10_000 });
+    if ((await section.locator('[data-row="position"]').count()) === 0) {
+      await section.locator('button.title').click();
+    }
+    const bar = (side) => section.locator(`[data-bar="${side}"]`);
+    await bar('top').waitFor({ timeout: 10_000 });
+    await page.waitForTimeout(800);
+    const states = await Promise.all(['top', 'right', 'bottom', 'left'].map((side) => bar(side).getAttribute('aria-checked')));
+    assert.deepEqual(states, ['true', 'true', 'false', 'false'], 'top and right are on, the others off');
+    await bar('top').click();
+    await page.waitForTimeout(SETTLE_MS);
+    const removed = diffText().split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---'));
+    assert.ok(removed.some((l) => (TAILWIND ? /top-3/ : /top:\s*12px/).test(l)), `top is removed from the source:\n${diffText()}`);
+    assert.ok(!diffText().split('\n').some((l) => l.startsWith('+') && /top:|top-3/.test(l)), 'nothing re-adds it');
+    assert.equal(await badge.evaluate((e) => getComputedStyle(e).top), 'auto', 'the page shows the offset gone');
+    await undo();
+    assert.deepEqual(changedFiles(), [], 'one undo restores the source');
+  });
+
   await check('link: the address and the new-tab toggle write the source and each undo restores it', async () => {
     await frame.locator('a').first().click();
     const address = page.locator('[data-field="link-href"]');
