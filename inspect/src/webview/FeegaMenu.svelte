@@ -55,7 +55,7 @@
         {:else if account.state === AccountState.Waiting}
           <button type="button" class="row" data-testid="cancel-sign-in" onclick={() => onaccount(ToHost.CancelSignIn)}>Waiting for the browser… <span class="soon">cancel</span></button>
         {:else}
-          <button type="button" class="row" data-testid="sign-in" onclick={() => onaccount(ToHost.SignIn)}>Sign in to Feega</button>
+          <button type="button" class="sign-in" data-testid="sign-in" onclick={() => onaccount(ToHost.SignIn)}>Sign in to Feega</button>
           {#if account.state === AccountState.Cancelled}<p class="hint">Sign-in cancelled or timed out.</p>{/if}
         {/if}
         <p class="hint">Optional. Everything works without an account.</p>
@@ -165,6 +165,22 @@
     color: var(--ui-text-3);
     font-size: var(--ui-text-xs);
     font-weight: 500;
+  }
+
+  .sign-in {
+    width: 100%;
+    height: 28px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-accent);
+    color: var(--ui-accent-ink);
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .sign-in:hover {
+    filter: brightness(1.1);
   }
 
   .row {
