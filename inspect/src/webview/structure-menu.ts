@@ -5,6 +5,8 @@ export type MenuItem = { id: string; label: string; shortcut?: string };
 
 export const MENU_ITEMS: MenuItem[] = [
   { id: StructureOp.Duplicate, label: 'Duplicate', shortcut: '⌘D' },
+  { id: StructureOp.Wrap, label: 'Wrap in container', shortcut: '⌘G' },
+  { id: StructureOp.Unwrap, label: 'Unwrap', shortcut: '⇧⌘G' },
   { id: StructureOp.Delete, label: 'Delete', shortcut: '⌫' }
 ];
 

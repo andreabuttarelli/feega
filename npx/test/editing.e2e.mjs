@@ -283,6 +283,23 @@ try {
     assert.deepEqual(changedFiles(), [], 'undo removes it');
   });
 
+  await check('wrap puts the element in a container and selects it, unwrap gives it back, each is one undo', async () => {
+    await frame.locator('main > p').first().click();
+    await page.waitForTimeout(800);
+    await page.keyboard.press('ControlOrMeta+g');
+    await page.waitForTimeout(SETTLE_MS);
+    assert.equal(await frame.locator('main > div > p').count(), 1, 'the paragraph is inside a new container');
+    await frame.locator('main > div').first().click({ position: { x: 2, y: 2 } });
+    await page.waitForTimeout(800);
+    await page.keyboard.press('ControlOrMeta+Shift+g');
+    await page.waitForTimeout(SETTLE_MS);
+    assert.deepEqual(changedFiles(), [], 'unwrap restores the source');
+    await undo();
+    assert.equal(await frame.locator('main > div > p').count(), 1, 'one undo brings the container back');
+    await undo();
+    assert.deepEqual(changedFiles(), [], 'undo restores the page');
+  });
+
   await check('position: absolute and top write the source and the page, the layer is tagged, and each edit is one undo', async () => {
     const h1 = frame.locator('h1').first();
     await h1.click();

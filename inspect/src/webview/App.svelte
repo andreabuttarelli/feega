@@ -599,6 +599,7 @@
     }
     const shortcuts: Record<string, () => void> = {
       d: () => restructure(StructureOp.Duplicate),
+      g: () => restructure(e.shiftKey ? StructureOp.Unwrap : StructureOp.Wrap),
       z: () => toHost({ kind: e.shiftKey ? ToHost.Redo : ToHost.Undo }),
       '\\': () => (e.shiftKey ? ((leftClosed = !leftClosed), savePrefs()) : toggleBar()),
       '|': () => ((leftClosed = !leftClosed), savePrefs()),

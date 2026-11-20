@@ -366,4 +366,19 @@ describe('fileEdits', () => {
     await edits.undo();
     expect(read(root)).toBe(PAGE);
   });
+
+  it('avvolgere in un contenitore e togliere il contenitore sono un passo di undo ciascuno', async () => {
+    const root = app();
+    const edits = fileEdits(root);
+    await edits.structure({ op: StructureOp.Wrap, at: 'src/Page.svelte:2:3' });
+    const wrapped = read(root);
+
+    expect(wrapped).toContain('  <div>\n    <h1 class="text-2xl">Hello</h1>\n  </div>\n');
+    await edits.structure({ op: StructureOp.Unwrap, at: 'src/Page.svelte:2:3' });
+    expect(read(root)).toBe(PAGE);
+    await edits.undo();
+    expect(read(root)).toBe(wrapped);
+    await edits.undo();
+    expect(read(root)).toBe(PAGE);
+  });
 });
