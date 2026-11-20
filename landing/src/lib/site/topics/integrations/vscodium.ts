@@ -14,7 +14,7 @@ export const VSCODIUM: Topic = {
       heading: 'Install from Open VSX',
       html: `<p>VSCodium is built from the VS Code source without Microsoft's branding, telemetry or licence, and it can't use the Visual Studio Marketplace. Its default registry is Open VSX, run by the Eclipse Foundation. Feega is published there as <code>AndreaButtarelli/feega</code>, so the Extensions view in VSCodium finds it with a search for Feega.</p>
 <p>For machines without network access, download the <code>.vsix</code> file from the Open VSX page and install it with <code>codium --install-extension</code> followed by the file name, or with "Install from VSIX" in the Extensions view menu. The extension works offline once installed.</p>
-<p>Feega needs the VS Code 1.90 extension API or newer, which current VSCodium releases provide, and Node 18 or newer for your project.</p>`
+<p>Feega needs the VS Code 1.90 extension API or newer, which current VSCodium releases provide, and Node 20 or newer for your project.</p>`
     },
     {
       heading: 'Why the pairing makes sense',

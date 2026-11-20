@@ -13,7 +13,7 @@ export const CURSOR: Topic = {
     {
       heading: 'Install Feega in Cursor',
       html: `<p>Cursor installs third-party extensions from the Open VSX registry, and Feega is published there as <code>AndreaButtarelli/feega</code>. Open the Extensions view in Cursor, search for Feega and install it. The <a href="/download">download page</a> has a button that opens Cursor on the install screen through a <code>cursor:extension/andreabuttarelli.feega</code> link.</p>
-<p>Feega is a regular VS Code extension and uses nothing specific to Microsoft's build, so it behaves in Cursor the way it does in VS Code. Your project needs Node 18 or newer, since Feega runs its dev server with your Node.</p>`
+<p>Feega is a regular VS Code extension and uses nothing specific to Microsoft's build, so it behaves in Cursor the way it does in VS Code. Your project needs Node 20 or newer, since Feega runs its dev server with your Node.</p>`
     },
     {
       heading: 'Why use a visual editor inside an AI editor',

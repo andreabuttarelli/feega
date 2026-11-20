@@ -14,7 +14,7 @@ export const DOWNLOAD_PATH = '/download';
 
 export const FEEGA_VERSION = __FEEGA_VERSION__;
 
-export const NODE_REQUIREMENT = 'Node 18 or newer';
+export const NODE_REQUIREMENT = 'Node 20 or newer';
 
 export const VSCODE_REQUIREMENT = 'VS Code 1.90 or newer';
 

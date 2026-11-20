@@ -13,7 +13,7 @@ export const WINDSURF: Topic = {
     {
       heading: 'Install Feega in Windsurf',
       html: `<p>Windsurf's documentation says it uses the Open VSX registry for extensions, and Feega is listed there as <code>AndreaButtarelli/feega</code>. Open the Extensions panel in Windsurf, search for Feega and install it. From the <a href="/download">download page</a>, the Windsurf button opens the editor on the install screen through a <code>windsurf:extension/andreabuttarelli.feega</code> link.</p>
-<p>Your project needs Node 18 or newer. Feega has no account, no sign-in and no API key to paste. Updates come from Open VSX through Windsurf's normal extension updates, and the current version is on the <a href="/download">download page</a>.</p>`
+<p>Your project needs Node 20 or newer. Feega needs no account and no API key; signing in is optional. Updates come from Open VSX through Windsurf's normal extension updates, and the current version is on the <a href="/download">download page</a>.</p>`
     },
     {
       heading: 'Cascade writes the feature, you do the design pass',

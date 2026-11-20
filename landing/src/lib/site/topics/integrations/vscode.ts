@@ -13,7 +13,7 @@ export const VSCODE: Topic = {
     {
       heading: 'Install it',
       html: `<p>Open the Extensions view with <code>Ctrl+Shift+X</code> (<code>Cmd+Shift+X</code> on a Mac), search for Feega and install the one published by andreabuttarelli. The extension id is <code>andreabuttarelli.feega</code>. From a terminal, <code>code --install-extension andreabuttarelli.feega</code> does the same. The <a href="/download">download page</a> also has a button that opens VS Code straight on the install screen.</p>
-<p>You need VS Code 1.90 or newer and Node 18 or newer, because Feega runs your project's dev server with your own Node. There is no account to create and nothing to configure before the first run.</p>
+<p>You need VS Code 1.90 or newer and Node 20 or newer, because Feega runs your project's dev server with your own Node. There is no account to create and nothing to configure before the first run.</p>
 <p>Updates arrive through the Marketplace like any other extension. If you close the Feega panel, the dev server it started is kept for a short while, so reopening the panel is quick, and then stopped.</p>`
     },
     {
@@ -59,7 +59,7 @@ export const VSCODE: Topic = {
     { q: 'Expecting it to work over SSH or in Codespaces.', a: 'Remote setups are untested. Use a local checkout or npx feega.' }
   ],
   questions: [
-    { q: 'Which VS Code version do I need?', a: 'VS Code 1.90 or newer, plus Node 18 or newer for your project.' },
+    { q: 'Which VS Code version do I need?', a: 'VS Code 1.90 or newer, plus Node 20 or newer for your project.' },
     { q: 'Is the VS Code extension free?', a: 'Yes. It is free and open source under Apache-2.0, with no account.' },
     { q: 'Does it work offline?', a: 'Yes, once installed. Feega makes no model calls; the only network use is anonymous usage counts, which you can turn off.' },
     { q: 'Can I use it without VS Code?', a: 'Yes. Run npx feega in your project folder to open the same editor in the browser.' }
