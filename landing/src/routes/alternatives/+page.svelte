@@ -1,10 +1,9 @@
 <script lang="ts">
   import '$lib/site/landing/landing.css';
-  import '$lib/site/compare/compare.css';
+  import '$lib/site/alternatives/alternatives.css';
+  import CatalogLayout from '$lib/site/catalog/CatalogLayout.svelte';
   import { ALTERNATIVES, ALTERNATIVES_INDEX, ALTERNATIVES_PATH, AUTHOR, DISCLAIMER, KIND_HEADINGS, alternativePath } from '$lib/site/alternatives';
   import { ArticleKind } from '$lib/site/alternatives/alternative';
-  import { COMPARISONS, comparisonPath } from '$lib/site/compare';
-  import { breadcrumbJsonLd } from '$lib/site/structured-data';
   import AsciiCover from '$lib/site/alternatives/AsciiCover.svelte';
   import { coverFor } from '$lib/site/alternatives/cover';
 
@@ -18,9 +17,9 @@
   <meta name="description" content={ALTERNATIVES_INDEX.description} />
   <meta property="og:title" content={ALTERNATIVES_INDEX.title} />
   <meta property="og:description" content={ALTERNATIVES_INDEX.description} />
-  {@html breadcrumbJsonLd('Alternatives', ALTERNATIVES_PATH)}
 </svelte:head>
 
+<CatalogLayout path={ALTERNATIVES_PATH}>
 <article class="landing compare">
   <h1>{ALTERNATIVES_INDEX.heading}</h1>
   <p class="fine">By {AUTHOR.name}, {AUTHOR.role}</p>
@@ -39,14 +38,6 @@
     </div>
   {/each}
 
-  <section>
-    <h2>One on one</h2>
-    <ul>
-      {#each Object.entries(COMPARISONS) as [slug, page] (slug)}
-        <li><a href={comparisonPath(slug)}>{page.heading}</a></li>
-      {/each}
-    </ul>
-  </section>
-
   <p class="fine">{DISCLAIMER}</p>
 </article>
+</CatalogLayout>

@@ -7,3 +7,5 @@ declare module '*.html?raw' {
   const html: string;
   export default html;
 }
+
+declare const __FEEGA_VERSION__: string;

@@ -1,0 +1,153 @@
+.catalog {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  width: 100%;
+  max-width: var(--site-max, 1320px);
+  margin: 0 auto;
+  padding: 120px 16px 96px;
+  box-sizing: border-box;
+  font-size: 14px;
+}
+
+.catalog .main {
+  min-width: 0;
+}
+
+.catalog .main .landing {
+  max-width: none;
+  margin: 0;
+  padding: 24px 0 0;
+}
+
+.catalog .side {
+  display: none;
+}
+
+.catalog .box,
+.catalog .pages-select {
+  padding: 12px 14px;
+  border: 1px solid rgb(127 127 127 / 0.3);
+  border-radius: var(--ui-radius-md, 6px);
+}
+
+.catalog summary {
+  cursor: pointer;
+}
+
+.catalog .pages-select {
+  display: none;
+  align-items: center;
+  gap: 12px;
+}
+
+.catalog .pages-select select {
+  flex: 1;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid rgb(127 127 127 / 0.3);
+  border-radius: var(--ui-radius-sm, 4px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.catalog :is(.side, .box) ul {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.catalog :is(.side, .box) li + li {
+  margin-top: 6px;
+}
+
+.catalog :is(.side, .box) li.sub {
+  padding-left: 12px;
+  opacity: 0.8;
+}
+
+.catalog .group summary {
+  margin-top: 12px;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.catalog a.current {
+  color: #ff5100;
+}
+
+.catalog .left a.current::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: #ff5100;
+}
+
+.catalog :is(.side, .box) a {
+  text-decoration: none;
+}
+
+.catalog :is(.side, .box) a:hover {
+  text-decoration: underline;
+}
+
+.catalog :is(h2, h3)[id] {
+  scroll-margin-top: 96px;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (min-width: 810px) {
+  .catalog {
+    padding-inline: 24px;
+  }
+
+  .catalog .pages-box {
+    display: none;
+  }
+
+  .catalog .pages-select {
+    display: flex;
+  }
+}
+
+@media (min-width: 1200px) {
+  .catalog {
+    grid-template-columns: 240px minmax(0, 760px) 240px;
+    justify-content: center;
+    gap: 48px;
+    padding-inline: 32px;
+  }
+
+  .catalog .box,
+  .catalog .pages-select {
+    display: none;
+  }
+
+  .catalog .side {
+    display: block;
+    position: sticky;
+    top: 96px;
+    align-self: start;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    padding-top: 24px;
+  }
+
+  .catalog .side .title {
+    font-size: 12px;
+    opacity: 0.6;
+  }
+
+  .catalog .side.right .current {
+    border-left: 2px solid #ff5100;
+    margin-left: -10px;
+    padding-left: 8px;
+  }
+}

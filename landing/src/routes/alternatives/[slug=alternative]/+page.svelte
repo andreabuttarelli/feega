@@ -1,15 +1,26 @@
 <script lang="ts">
+  const cta = primaryCta();
   import '$lib/site/landing/landing.css';
-  import '$lib/site/compare/compare.css';
-  import { APP_URL } from '$lib/site/links';
+  import '$lib/site/alternatives/alternatives.css';
+  import { primaryCta } from '$lib/site/install';
   import { ALTERNATIVES, ALTERNATIVES_PATH, AUTHOR, DISCLAIMER, TRY_STEPS, alternativePath } from '$lib/site/alternatives';
   import { articleJsonLd, faqJsonLd } from '$lib/site/structured-data';
+  import CatalogLayout from '$lib/site/catalog/CatalogLayout.svelte';
+  import { articleOutline } from '$lib/site/catalog/outline';
+  import { slugify } from '$lib/site/catalog/slug';
+  import Faq from '$lib/site/alternatives/Faq.svelte';
+  import HighlightBlock from '$lib/site/alternatives/HighlightBlock.svelte';
+  import Split from '$lib/site/alternatives/Split.svelte';
+  import Steps from '$lib/site/alternatives/Steps.svelte';
+  import Verdict from '$lib/site/alternatives/Verdict.svelte';
+  import { lower } from '$lib/site/lower';
   import AsciiCover from '$lib/site/alternatives/AsciiCover.svelte';
   import { coverFor } from '$lib/site/alternatives/cover';
 
   let { data } = $props();
 
   const page = $derived(data.page);
+  const outline = $derived(articleOutline(page));
   const others = $derived(Object.entries(ALTERNATIVES).filter(([slug]) => slug !== data.slug).slice(0, 6));
 </script>
 
@@ -22,54 +33,67 @@
   {@html faqJsonLd(page.questions)}
 </svelte:head>
 
+<CatalogLayout path={alternativePath(data.slug)} {outline}>
 <article class="landing compare">
   <a class="back" href={ALTERNATIVES_PATH}>← All alternatives</a>
   <h1>{page.heading}</h1>
-  <p class="fine">By {AUTHOR.name}, {AUTHOR.role} · checked {page.checked} · <a href="#how-checked">how we checked</a></p>
+  <p class="fine">By {AUTHOR.name}, {AUTHOR.role} · checked {page.checked} · <a href="#how-we-checked">how we checked</a></p>
   <AsciiCover cover={coverFor(Object.keys(ALTERNATIVES).indexOf(data.slug))} label={page.heading} />
   <p class="intro"><strong>{page.lead}</strong></p>
 
+  {#if page.rich}
+    <Verdict text={page.rich.verdict} />
+    <section>
+      <h2 id={slugify(page.rich.snapshotHeading)}>{lower(page.rich.snapshotHeading)}</h2>
+      <div class="body">{@html page.rich.snapshot}</div>
+    </section>
+    {#each page.rich.highlights as item, i (item.heading)}
+      <HighlightBlock {item} flip={i % 2 === 1} />
+    {/each}
+  {/if}
+
   <section>
-    <h2>The short version</h2>
-    <h3>Pick {page.pickThem.name} if</h3>
-    <ul>
-      {#each page.pickThem.points as point (point)}<li>{point}</li>{/each}
-    </ul>
-    <h3>Pick Feega if</h3>
-    <ul>
-      {#each page.pickFeega as point (point)}<li>{point}</li>{/each}
-    </ul>
+    <h2 id={slugify('When to choose which')}>{lower('When to choose which')}</h2>
+    <Split themName={page.pickThem.name} them={page.pickThem.points} us={page.pickFeega} />
   </section>
+
+  {#if page.rich}
+    <section>
+      <h2 id={slugify(page.rich.cost.heading)}>{lower(page.rich.cost.heading)}</h2>
+      <div class="body">{#each page.rich.cost.paragraphs as p (p)}<p>{p}</p>{/each}</div>
+    </section>
+  {/if}
 
   {#each page.sections as section (section.heading)}
     <section>
-      <h2>{section.heading}</h2>
+      <h2 id={slugify(section.heading)}>{lower(section.heading)}</h2>
       <div class="body">{@html section.html}</div>
     </section>
   {/each}
 
   <section>
-    <h2>Try it in 2 minutes</h2>
-    <ol>
-      {#each TRY_STEPS as step (step)}<li>{step}</li>{/each}
-    </ol>
+    <h2 id={slugify(page.rich?.stepsHeading ?? 'Try it in 2 minutes')}>{lower(page.rich?.stepsHeading ?? 'Try it in 2 minutes')}</h2>
+    {#if page.rich}
+      <Steps steps={page.rich.steps} />
+    {:else}
+      <ol>
+        {#each TRY_STEPS as step (step)}<li>{step}</li>{/each}
+      </ol>
+    {/if}
   </section>
 
   <section>
-    <h2>Mistakes people make</h2>
+    <h2 id={slugify('Mistakes people make')}>{lower('Mistakes people make')}</h2>
     {#each page.mistakes as m (m.q)}<p><strong>{m.q}</strong> {m.a}</p>{/each}
   </section>
 
   <section>
-    <h2>Questions</h2>
-    {#each page.questions as item (item.q)}
-      <h3>{item.q}</h3>
-      <p>{item.a}</p>
-    {/each}
+    <h2 id={slugify('Questions')}>{lower('Questions')}</h2>
+    <Faq items={page.questions} />
   </section>
 
-  <section id="how-checked">
-    <h2>How we checked</h2>
+  <section>
+    <h2 id={slugify('How we checked')}>{lower('How we checked')}</h2>
     <p class="fine">
       We make Feega, so read our column with that in mind. We read each product's public pages on {page.checked} and compared what they offer, not finished work.
       Something wrong? Write to <a href="mailto:hi@feega.app">hi@feega.app</a>.
@@ -82,11 +106,16 @@
     <p class="fine">{DISCLAIMER}</p>
   </section>
 
+  <section class="closing">
+    <p>{page.rich?.closing ?? page.hook}</p>
+    <a class="landing-cta" href={cta.href}>{cta.label} →</a>
+  </section>
+
   <section>
-    <h2>Read next</h2>
+    <h2 id={slugify('Read next')}>{lower('Read next')}</h2>
     <ul>
       {#each others as [slug, other] (slug)}<li><a href={alternativePath(slug)}>{other.heading}</a></li>{/each}
     </ul>
-    <a class="landing-cta" href={APP_URL}>Try Feega →</a>
   </section>
 </article>
+</CatalogLayout>
