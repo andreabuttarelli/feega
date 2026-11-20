@@ -6,8 +6,9 @@
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
+    "resolveJsonModule": true,
     "noEmit": true,
     "types": ["node", "vscode"]
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.json"]
 }

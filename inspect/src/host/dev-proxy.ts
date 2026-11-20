@@ -2,12 +2,13 @@ import { readFile } from 'node:fs/promises';
 import { createServer, request, type IncomingMessage, type ServerResponse } from 'node:http';
 import { connect } from 'node:net';
 import { join } from 'node:path';
+import bridgeFiles from './bridge-files.json';
 
 export const BRIDGE_PATH = '/__feega/';
 
 const HOST = '127.0.0.1';
 const HTML = /text\/html/;
-const BRIDGE_FILES = new Set(['bridge.js', 'runtime.js', 'track.js', 'reload-restore.js']);
+const BRIDGE_FILES = new Set<string>(bridgeFiles);
 const SCRIPT = `<script type="module" src="${BRIDGE_PATH}bridge.js"></script>`;
 const DROPPED = ['content-length', 'content-encoding', 'transfer-encoding'];
 

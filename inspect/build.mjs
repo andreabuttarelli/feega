@@ -1,4 +1,4 @@
-import { cp, rm } from 'node:fs/promises';
+import { cp, readFile, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { build as esbuild, context } from 'esbuild';
 import { build as vite } from 'vite';
@@ -7,6 +7,8 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 const here = (path) => fileURLToPath(new URL(path, import.meta.url));
 const SOURCE_MAP = here('../packages/source-map/src/');
 const LAUNCHER = here('dist/launcher/');
+
+const BRIDGE_FILES = JSON.parse(await readFile(here('src/host/bridge-files.json'), 'utf8'));
 
 const WATCH = process.argv.includes('--watch');
 
@@ -37,7 +39,7 @@ await esbuild({
   target: 'node20',
   external: ['vite', 'svelte', 'svelte/*', '@vue/compiler-sfc', './bridge.js']
 });
-await Promise.all(['bridge.js', 'framework-meta.js', 'runtime.js', 'track.js', 'reload-restore.js'].map((f) => cp(`${SOURCE_MAP}${f}`, `${LAUNCHER}${f}`)));
+await Promise.all(BRIDGE_FILES.map((f) => cp(`${SOURCE_MAP}${f}`, `${LAUNCHER}${f}`)));
 await cp(here('launcher/launch.mjs'), `${LAUNCHER}launch.mjs`);
 await cp(here('launcher/next-preload.cjs'), `${LAUNCHER}next-preload.cjs`);
 await esbuild({
