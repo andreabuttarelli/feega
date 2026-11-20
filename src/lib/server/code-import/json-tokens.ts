@@ -1,4 +1,4 @@
-import { DARK, LIGHT, type DeclAt, type Declared } from './css-tokens';
+import { DARK, LIGHT, type DeclAt, type Declared } from '@feega/live-edit/css-tokens';
 import type { ReadFile } from './write-back';
 
 export type TokenFile = { declared: Declared[]; skipped: string[] };

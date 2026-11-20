@@ -5,7 +5,7 @@ import { placeBox } from './selection-props';
 import { propBoxes } from './space';
 import { toStored } from './units';
 import { resizeInstance } from './instance-resize';
-import { MIXED, shared, type Shared } from './mixed';
+import { MIXED, shared, type Shared } from '@feega/properties-panel/mixed';
 import type { EditMode } from './edit-mode';
 
 export enum BoxKey {

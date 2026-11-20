@@ -51,6 +51,15 @@ describe('inspectElement', () => {
     expect(info.styles['padding-top']).toBe('12px');
   });
 
+  it('names where an inherited value comes from', () => {
+    const win = domOf();
+
+    const info = inspectElement(win.document.querySelector('h1')!)!;
+
+    expect(info.inherited.color).toBe('section');
+    expect(info.inherited).not.toHaveProperty('padding-top');
+  });
+
   it('returns null outside any mapped element', () => {
     const win = new JSDOM('<body><p>x</p></body>').window;
 
@@ -93,7 +102,7 @@ describe('bridge', () => {
 
     const h1 = win.document.querySelector('h1')!;
     expect(h1.textContent).toBe('New title');
-    expect(h1.style.color).toBe('rgb(0, 0, 255)');
+    expect(win.getComputedStyle(h1).color).toBe('rgb(0, 0, 255)');
   });
 });
 

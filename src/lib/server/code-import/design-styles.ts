@@ -3,9 +3,9 @@ import { EFFECT_PREFIX, type Effect } from '@feega/motion-core/motion/effects/mo
 import { EffectKind } from '@feega/motion-core/motion/effects/registry';
 import { MAX_STYLES, STYLE_NAME, StyleKind, styleSchema, type Style } from '@feega/motion-core/motion/styles-model';
 import { AUTO, leadingOf, trackingOf } from '@feega/motion-core/motion/type-units';
-import { LIGHT, type DeclAt, type Parsed } from './css-tokens';
+import { LIGHT, type DeclAt, type Parsed } from '@feega/live-edit/css-tokens';
 import { collectionName, lengthPx, type TokenEntry, type TokenMap } from './design-tokens';
-import { colourOf } from './token-colour';
+import { colourOf } from '@feega/live-edit/token-colour';
 
 export enum StyleField {
   Size = 'size',

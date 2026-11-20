@@ -5,7 +5,7 @@ import type { RestNode } from '$lib/server/figma/rest-message';
 import type { PageTree } from '$lib/server/url-import/page-tree';
 import { fixture } from '../../../../tests/fixtures/design-tokens/read';
 import { codePlan } from './code-doc';
-import { parseSheets, readSheets } from './css-tokens';
+import { parseSheets, readSheets } from '@feega/live-edit/css-tokens';
 import { tokenSetOf, variablesOf } from './design-tokens';
 import { madeStyles, styleTokensOf } from './design-styles';
 import { boundToTokens } from './design-bind';

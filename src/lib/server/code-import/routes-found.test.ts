@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CandidateFrom, DiscoveryRefusal, RouteKind } from './routes-discover';
 import { allRoutes, leftOut, RouteLeftOut, routesAt, tooManyRoutes, UNREADABLE } from './routes-found';
-import { Framework, PlanRefusal } from './run-plan';
+import { Framework, PlanRefusal } from '@feega/dev-run/run-plan';
 import { MAX_ROUTES } from './repo';
 
 const KIT = JSON.stringify({ scripts: { dev: 'vite dev' }, devDependencies: { '@sveltejs/kit': '2' } });

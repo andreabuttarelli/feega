@@ -2,7 +2,7 @@ import { Delivery, FrameEditSession, type SendResult } from '$lib/motion/frame-e
 import type { FrameStep } from './frame-multi';
 import { LIVE_CLIP, liveDocOf, liveEditsOf, livePreviewOf, unwrittenOf } from './live-doc';
 import type { LiveApi } from './live-edit-client';
-import type { LivePick, LivePreview } from './live-fields';
+import type { LivePick, LivePreview } from '@feega/live-edit/live-fields';
 
 const NO_CSS = 'This setting has no equivalent in CSS, so the code is unchanged';
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Framework } from './run-plan';
+import { Framework } from '@feega/dev-run/run-plan';
 import { CandidateFrom, discoverRoutes, DiscoveryRefusal, linkCandidates, routeTexts, RouteKind, Router, type Discovered } from './routes-discover';
 import { nextPlayground, nextShadcnAdmin, nuxtDashboard, saasStarter, shadcnAdmin, svgl, traidue, vitesse } from './routes-discover.fixtures';
 

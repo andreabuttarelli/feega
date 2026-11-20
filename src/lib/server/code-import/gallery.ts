@@ -3,7 +3,7 @@ import type { RestNode } from '$lib/server/figma/rest-message';
 import type { PageTree } from '$lib/server/url-import/page-tree';
 import type { ComponentUse, PropValue } from './component-marks';
 import { AxisSource, cellsOf, ExportKind, type DiscoveredComponent, type Discovery, type Drawing, type ReadMany } from './component-discovery';
-import { Framework } from './run-plan';
+import { Framework } from '@feega/dev-run/run-plan';
 
 export const GALLERY_NAME = 'feega-gallery';
 export const GALLERY_READY = '[data-feega-gallery="ready"]';

@@ -3,6 +3,7 @@ import { changedLook, LOOK, LookKey, minSideOf, type Look, type LookValue } from
 import { BASE_CONDITIONS, parseKey, Scheme } from './render-conditions';
 import { viewChanges } from './view-look';
 import { isGalleryFile } from './gallery';
+import type { FileChange, ReadFile } from '@feega/live-edit/files';
 
 export type SourceAt = { file: string; line: number; column: number };
 
@@ -10,9 +11,7 @@ export type Spot = { tag: string; cls: string };
 
 export type SourceEdit = { at: SourceAt; look: Look; was: Look; spot?: Spot; cond?: string; view?: string; usage?: SourceAt };
 
-export type FileChange = { path: string; before: string; after: string };
-
-export type ReadFile = (path: string) => Promise<string | null>;
+export type { FileChange, ReadFile };
 
 export type Applied = { files: FileChange[]; skipped: string[] };
 

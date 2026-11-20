@@ -9,7 +9,7 @@
   import { ARROW_CAPS } from '@feega/motion-core/motion/stroke/arrows';
   import ColorPicker from './ColorPicker.svelte';
   import { untrack } from 'svelte';
-  import type { LiveGesture } from '$lib/motion/live-edit';
+  import type { LiveGesture } from '@feega/properties-panel/live-edit';
   import { Adder } from './stack-adder';
   import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
   import { PAINT_GRIP, PAINT_INLINE_INPUT, PAINT_META, PAINT_NAME, PAINT_ROW, PAINT_SWATCH, PAINT_TEXT } from './paint-row';

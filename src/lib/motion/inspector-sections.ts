@@ -3,7 +3,7 @@ import { ClipFamily } from './track-style';
 import type { LayoutStore } from './editor-layout';
 import { Control, Group } from '@feega/motion-core/motion/components';
 import { VAR_PREFIX } from '@feega/motion-core/motion/custom/component';
-import { FieldFill } from './number-field';
+import { FieldFill } from '@feega/properties-panel/number-field';
 import { Source, type Transform } from '@feega/motion-core/motion/keyframes';
 import { secondsLabel } from './inspector';
 import { clipName } from '@feega/motion-core/motion/organize';

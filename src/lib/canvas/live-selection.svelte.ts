@@ -1,4 +1,4 @@
-import type { LivePick, LivePreview } from './live-fields';
+import type { LivePick, LivePreview } from '@feega/live-edit/live-fields';
 
 export type LiveSelected = { nodeId: string; pick: LivePick | null; untagged: boolean; preview: (preview: LivePreview) => void };
 

@@ -1,21 +1,53 @@
 # feega
 
+Design your running web app in the browser. Click an element, change its colour, spacing, font
+or text, and the edit lands in your source: a Tailwind class when the project uses Tailwind, a
+rule in the component's own stylesheet otherwise. No account, no cloud, no copy of your code.
+
+Same editor, two ways to run it: `npx feega` in the browser, or the Feega extension inside VS Code.
+
 ```bash
-npx feega my-board.feega
+cd my-app
+npx feega
 ```
 
-Starts feega's local mode on http://localhost:5173 and saves the canvas to `my-board.feega` in the current directory. Needs Node 22+. Each start checks for a newer app and downloads it into `~/.feega/app/<version>/`; offline it uses the newest cached one.
+Feega finds the app, starts its dev server and opens the editor in your browser.
 
-Run it inside a project with a `dev` script and it asks once to import the folder: every static page of its router (up to 20) lands on the canvas as editable frames; dynamic pages are skipped and listed, and with no router found only the home page is imported. `--import` imports without asking, `--no-import` never asks.
+## Usage
 
-`--routes <list|all>` picks pages (`/,/about`, default `all`) and `--app <path>` picks the app in a monorepo; without it a terminal asks.
+```
+npx feega [dir] [--port N] [--no-open]
+```
 
-Options: `--port <n>`, `--no-open`, `--import`, `--no-import`, `--routes`, `--app`. `FEEGA_APP_BUNDLE=<path or url>` uses another bundle.
+| Option | |
+|---|---|
+| `dir` | the app folder (default: the current one). With several apps inside, Feega asks which |
+| `--port N` | port of the editor (default: a free one) |
+| `--no-open` | print the editor URL instead of opening the browser |
+| `--help`, `--version` | |
 
-AI keys: put them in the environment or in a `.env` in the folder you run `npx feega` from. Kie.ai, OpenRouter, the text LLM, Higgsfield, Wiro and ElevenLabs are supported; see the local mode docs for the variables.
+Ctrl+C stops the editor and the dev server.
 
-## Telemetry
+- **Frameworks**: SvelteKit, Vite (React, Vue, Svelte), React Router, Next.js, Nuxt, Astro and
+  more. The dev command is detected from `package.json`.
+- **Undo, redo, Changes**: every edit is a step you can undo or revert from the Changes tab.
+- **Open in editor**: opens the source in VS Code at the line (`code -g`), else `$VISUAL` /
+  `$EDITOR`, else prints the path.
+- **Settings**: `.feega/settings.json` in the app folder (styling mode, dev command, default
+  device). `.feega/state.json` keeps the editor layout and edit history: add `.feega/` to
+  `.gitignore` if you do not want it committed.
 
-On start, `npx feega` sends one anonymous event to PostHog (EU): `npx_feega_started`, plus `npx_feega_active_day` on the first start of each day. Each carries the feega version, OS, CPU architecture, Node version and a random install id stored in `~/.feega/telemetry-id`. No IP or location is kept, and no canvas content, file names or paths are sent. The first run prints a one-line notice.
+Node 20 or newer.
 
-Turn it off with `FEEGA_TELEMETRY=0` or `DO_NOT_TRACK=1`. It is also off when `CI` is set.
+## VS Code
+
+The same editor runs inside VS Code:
+[Feega](https://marketplace.visualstudio.com/items?itemName=andreabuttarelli.feega).
+
+## Support
+
+- Star on GitHub: https://github.com/andreabuttarelli/feega
+- Support with a coffee: https://buy.stripe.com/5kQ00k2A97C08sd94LeME07
+- Issues: https://github.com/andreabuttarelli/feega/issues
+
+Apache-2.0

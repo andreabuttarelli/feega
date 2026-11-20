@@ -1,7 +1,7 @@
 import type { UrlPlan } from '$lib/server/url-import/url-doc';
 import type { RestNode } from '$lib/server/figma/rest-message';
 import type { Capture } from './boards';
-import { parseSheets, READ_ONLY, readSheets, type LoadedSheet, type VarRule } from './css-tokens';
+import { parseSheets, READ_ONLY, readSheets, type LoadedSheet, type VarRule } from '@feega/live-edit/css-tokens';
 import { boundToTokens, spacingMultiples, type BoundCount } from './design-bind';
 import { boardBound, designBoard, DESIGN_BOARD } from './design-board';
 import { readOnlyKeys, tokenSetOf, variableName, variablesOf, type TokenMap, type TokenSet } from './design-tokens';

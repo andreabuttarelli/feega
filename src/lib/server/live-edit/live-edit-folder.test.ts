@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } fro
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { LiveProp } from '$lib/canvas/live-fields';
+import { LiveProp } from '@feega/live-edit/live-fields';
 import { liveChanges, liveEdit, liveUndo } from './live-edit';
 import { LIVE_TARGET_ENV, LiveTarget, liveRootOf } from './live-target';
 

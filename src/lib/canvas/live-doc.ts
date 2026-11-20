@@ -8,7 +8,7 @@ import { drawClip } from '$lib/motion/draw-create';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { setAutoLayout } from '$lib/motion/layout/ops';
 import { radiusShown, radiusStored } from '$lib/motion/radius-px';
-import { LiveProp, Side, activeIndex, familyRule, utilityOf, type LiveEditBody, type LivePick, type LivePreview, type LiveRect } from './live-fields';
+import { LiveProp, Side, activeIndex, familyRule, utilityOf, type LiveEditBody, type LivePick, type LivePreview, type LiveRect } from '@feega/live-edit/live-fields';
 import { DIRECT_ROWS, cssClassOf, cssOf, cssRows, directMake, type ClassCtx, type ClassRow } from './live-class-rows';
 
 export const LIVE_CLIP = 'live';

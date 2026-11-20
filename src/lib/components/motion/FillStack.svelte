@@ -8,7 +8,7 @@
   import { tick, untrack } from 'svelte';
   import { SliderField } from '$lib/components/ui/control';
   import { ADJUSTMENTS, ADJUSTMENT_LABEL, isNeutral, type Adjustment } from '@feega/motion-core/motion/fill/adjust';
-  import type { LiveGesture } from '$lib/motion/live-edit';
+  import type { LiveGesture } from '@feega/properties-panel/live-edit';
   import { Adder } from './stack-adder';
   import { FillField, fillKey } from '@feega/motion-core/motion/fill/keys';
   import { KeyMark } from '$lib/motion/timeline-layers';

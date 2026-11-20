@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { MAX_VARIABLES, VarType, variablesSchema } from '@feega/motion-core/motion/variables-model';
-import { PAGE_SHEET, parseSheets, readSheets } from './css-tokens';
+import { PAGE_SHEET, parseSheets, readSheets } from '@feega/live-edit/css-tokens';
 import { fixture } from '../../../../tests/fixtures/design-tokens/read';
 import { TokenKind, collectionName, tokenSetOf, variableName, variablesOf } from './design-tokens';
 

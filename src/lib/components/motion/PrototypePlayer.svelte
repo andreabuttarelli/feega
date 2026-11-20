@@ -17,7 +17,7 @@
   import { overlayBox } from '$lib/motion/prototype/overlay-place';
   import { MODES, MODE_ORDER, ViewportMode, WidthSource, activeView, clampWidth, docShown, frameBox, shownWidth, viewChoices, type Viewport } from '$lib/motion/prototype/viewport';
   import { readViewport, writeViewport } from '$lib/motion/prototype/viewport-pref';
-  import { DEVICES, DEVICE_ORDER, Device, deviceForKey, pressedDevice } from '$lib/motion/prototype/device';
+  import { DEVICES, DEVICE_ORDER, Device, deviceForKey, pressedDevice } from '@feega/properties-panel/devices';
   import { IconButton, IconSize, Kbd, Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger, Side } from '$lib/components/ui/shell';
   import Monitor from '@lucide/svelte/icons/monitor';
   import TabletIcon from '@lucide/svelte/icons/tablet';

@@ -2,6 +2,9 @@ import type { MotionClip, MotionTrack } from '@feega/motion-core/motion/doc';
 import { FPS } from '@feega/motion-core/motion/design';
 import { Interp, sampleTrack, type Keyframe } from '@feega/motion-core/motion/keyframes';
 import { clampZoom, pxPerFrame } from './timeline-view';
+import { KeyMark } from '@feega/properties-panel/key-mark';
+
+export { KeyMark };
 
 export enum RowKind {
   Group = 'group',
@@ -79,12 +82,6 @@ export function rowWindow(rows: readonly Row[], scrolled: number, measured: numb
   const last = rows[rows.length - 1];
   const end = to < rows.length ? rows[to].top : last.top + ROW_PX[last.kind];
   return { from, to, before: rows[from]?.top ?? 0, after: last.top + ROW_PX[last.kind] - end };
-}
-
-export enum KeyMark {
-  Here = 'here',
-  Animated = 'animated',
-  None = 'none'
 }
 
 export function keyMark(keys: readonly Keyframe[], localFrame: number): KeyMark {

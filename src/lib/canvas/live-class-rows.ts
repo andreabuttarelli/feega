@@ -4,7 +4,7 @@ import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/mo
 import { withSurface } from '@feega/motion-core/motion/surface';
 import { setParent } from '$lib/motion/parent-ops';
 import { mapClips } from './code-look';
-import { ClassFamily, arbitraryFamily } from './live-fields';
+import { ClassFamily, arbitraryFamily } from '@feega/live-edit/live-fields';
 
 export type Css = ReadonlyMap<string, string>;
 

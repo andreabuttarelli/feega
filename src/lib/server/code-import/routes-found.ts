@@ -1,7 +1,7 @@
 import { routeMatches } from '$lib/canvas/route-pattern';
 import { MAX_ROUTES } from './repo';
 import { discoverRoutes, DiscoveryRefusal, linkCandidates, routeTexts, RouteKind, type Candidate, type DiscoveredRoute } from './routes-discover';
-import { planFile, PlanRefusal, runPlan, textsWanted, type Framework } from './run-plan';
+import { planFile, PlanRefusal, runPlan, textsWanted, type Framework } from '@feega/dev-run/run-plan';
 import type { ReadFile } from './write-back';
 
 export const UNREADABLE = 'unreadable';

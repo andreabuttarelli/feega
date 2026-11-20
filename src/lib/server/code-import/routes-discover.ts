@@ -1,5 +1,5 @@
 import { ParamKind, paramsOf, routeMatches } from '$lib/canvas/route-pattern';
-import { Framework, type RepoFacts } from './run-plan';
+import { Framework, type RepoFacts } from '@feega/dev-run/run-plan';
 
 export enum Router {
   NextApp = 'next-app',

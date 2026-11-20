@@ -5,7 +5,7 @@ import { EditMode } from './edit-mode';
 import { SaveState } from './editor-bar';
 import { landed, outgoing, remote, type FrameDraft, type Revision, type Synced } from './frame-sync';
 import { adoptHead, amend, followHead, record, redo, startHistory, undo, type History } from './history';
-import { liveEdits, type LiveEdits } from './live-edit';
+import { liveEdits, type LiveEdits } from '@feega/properties-panel/live-edit';
 import { settleGroups } from './light-group';
 import { mergeView } from '@feega/motion-core/motion/precomp';
 import type { OpResult } from '@feega/motion-core/motion/timeline';

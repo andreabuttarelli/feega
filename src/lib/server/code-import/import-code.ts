@@ -12,12 +12,12 @@ import { BASE_CONDITIONS, conditionKey, variantsOf, type RenderConditions, type 
 import { CAPTURE_BUDGET_MS, delayFor, NO_DELAY, type CaptureDelay } from './capture-wait';
 import { ownImages } from './page-images';
 import { located, repoOf, routesOf, type RepoRef } from './repo';
-import { appOf, PlanRefusal } from './run-plan';
+import { appOf, PlanRefusal } from '@feega/dev-run/run-plan';
 import type { RepoRunner, RunningApp } from './sandbox-runner';
 import { importKeyCookie } from './origin-proxy';
 import { designed, designOf, DesignSystem, modeOfScheme, withBoard, type Design, type DesignReport } from './design-system';
 import type { TokenMap } from './design-tokens';
-import { computedSheet, type LoadedSheet } from './css-tokens';
+import { computedSheet, type LoadedSheet } from '@feega/live-edit/css-tokens';
 import type { ReadFile } from './write-back';
 import { declaredAxes, libraryReport, type Discovery, type Drawing, type LibraryReport } from './component-discovery';
 import { GALLERY_LIMITS, GALLERY_READY, galleryOrder, galleryStates, type GalleryPlan, type GalleryUnrun } from './gallery';
