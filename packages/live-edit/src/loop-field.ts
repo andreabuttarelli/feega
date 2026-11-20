@@ -5,6 +5,7 @@ import { loopArray, loopsAt, piecesOf, type ArrayLiteral, type LoopHead, type Pi
 import { hiddenOut } from './move-node';
 
 const WRAPPER = /^\{\{?|\}?\}$/g;
+const DISPLAY_TRANSFORMS = /(?:\.(?:toLowerCase|toUpperCase|trim)\(\))+$/;
 const MEMBER = /^([A-Za-z_$][\w$]*)\.([A-Za-z_$][\w$]*)$/;
 const PLAIN_NAME = /^[A-Za-z_$][\w$]*$/;
 const STRING_LITERAL = /^(['"`])((?:\\.|(?!\1)[^\\])*)\1(?:\s+as\s+const)?$/;
@@ -112,7 +113,7 @@ export async function loopLiteral(read: ReadFile, at: LiveAt, instance: number |
     return null;
   }
 
-  const expression = raw.replace(WRAPPER, '').trim();
+  const expression = raw.replace(WRAPPER, '').trim().replace(DISPLAY_TRANSFORMS, '');
   const heads = loopsAt(hiddenOut(source), offsetOf(source, at));
   const field = heads.length === 1 ? fieldOf(heads[0], expression) : null;
   if (field === null) {

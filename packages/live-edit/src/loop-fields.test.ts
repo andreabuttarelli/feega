@@ -91,6 +91,20 @@ describe('text of a loop item', () => {
     expect(out.ok && out.changes[0].after).toBe(LINKS.replace("label: 'Download'", "label: 'Get it'"));
   });
 
+  it('writes through a display transform such as .toLowerCase()', async () => {
+    const page = SVELTE.replace('{link.label}', '{link.label.toLowerCase()}');
+    const out = await literalText(read({ 'src/routes/+page.svelte': page, 'src/lib/site/links.ts': LINKS }), { file: 'src/routes/+page.svelte', line: 7, col: 5 }, 'get it', 'download', 0);
+
+    expect(out.ok && out.changes[0].after).toBe(LINKS.replace("label: 'Download'", "label: 'get it'"));
+  });
+
+  it('refuses a call that is not a display transform', async () => {
+    const page = SVELTE.replace('{link.label}', '{translate(link.label)}');
+    const out = await literalText(read({ 'src/routes/+page.svelte': page, 'src/lib/site/links.ts': LINKS }), { file: 'src/routes/+page.svelte', line: 7, col: 5 }, 'x', undefined, 0);
+
+    expect(!out.ok && out.reason).toMatch(/translate/);
+  });
+
   it('writes the string entry of a plain array behind {plan}', async () => {
     const out = await literalText(read({ 'a.tsx': PLAIN }), { file: 'a.tsx', line: 7, col: 9 }, 'z', 'b', 1);
 
