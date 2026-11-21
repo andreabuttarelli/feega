@@ -71,7 +71,8 @@ jobs:
             desktop/release/Feega-*.dmg
             desktop/release/Feega-*.exe
             desktop/release/Feega-*.AppImage
-            desktop/release/latest*.yml
+            desktop/release/latest.yml
+            desktop/release/latest-linux.yml
             desktop/release/latest-mac-*.json
           if-no-files-found: error
 
