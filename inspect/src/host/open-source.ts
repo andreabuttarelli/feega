@@ -18,3 +18,5 @@ export function openTarget(root: string, at: Source, panelColumn: number | undef
     column: panelColumn === FIRST_COLUMN ? Column.Beside : Column.First
   };
 }
+
+export const revealColumn = (panelColumn: number | undefined, columns: number[]): number | null => columns.find((column) => column !== panelColumn) ?? null;

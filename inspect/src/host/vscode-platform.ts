@@ -2,7 +2,7 @@ import { basename } from 'node:path';
 import * as vscode from 'vscode';
 import type { HostMessage, Source } from '../messages';
 import { SettingKey, settingsWith } from '../settings';
-import { Column, openTarget } from './open-source';
+import { Column, openTarget, revealColumn } from './open-source';
 import type { Account, AccountStore } from './account';
 import { IMAGE_EXTENSIONS } from './image-copy';
 import { globalStateOnboardingStore } from './onboarding';
@@ -61,12 +61,16 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
   }
 
   async function revealSource(root: string, at: Source) {
+    const column = revealColumn(panel.viewColumn, vscode.window.tabGroups.all.map((group) => group.viewColumn));
+    if (column === null) {
+      return;
+    }
     const target = openTarget(root, at, panel.viewColumn);
     try {
       const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(target.path));
       const start = new vscode.Position(target.line, target.col);
       const end = new vscode.Position(target.line, Number.MAX_SAFE_INTEGER);
-      await vscode.window.showTextDocument(doc, { viewColumn: COLUMNS[target.column], preserveFocus: true, preview: true, selection: new vscode.Range(start, end) });
+      await vscode.window.showTextDocument(doc, { viewColumn: column, preserveFocus: true, preview: true, selection: new vscode.Range(start, end) });
     } catch {
       return;
     }

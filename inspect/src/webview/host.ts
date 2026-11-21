@@ -1,4 +1,5 @@
 import { SOCKET_PATH, type HostMessage, type ViewMessage } from '../messages';
+import { plain } from './plain';
 
 declare const acquireVsCodeApi: undefined | (() => { postMessage: (message: HostMessage) => void });
 
@@ -41,7 +42,7 @@ function linkOf(): Link {
     return socketLink();
   }
   const api = acquireVsCodeApi();
-  return postMessageLink((message) => api.postMessage(message));
+  return postMessageLink((message) => api.postMessage(plain(message)));
 }
 
 const link = linkOf();
