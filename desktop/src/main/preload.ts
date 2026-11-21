@@ -10,6 +10,7 @@ const call = (channel: Channel, ...args: unknown[]) => ipcRenderer.invoke(channe
 contextBridge.exposeInMainWorld('feega', {
   state: (): Promise<ShellState> => call(Channel.GetState),
   signIn: () => call(Channel.SignIn),
+  signInApple: () => call(Channel.SignInApple),
   cancelSignIn: () => call(Channel.CancelSignIn),
   signOut: () => call(Channel.SignOut),
   skip: () => call(Channel.Skip),

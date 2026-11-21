@@ -322,6 +322,21 @@ html[data-platform='linux'] #bar {
   transform: translateY(0);
 }
 
+.pill.apple {
+  gap: 8px;
+  background: #fff;
+  color: #000;
+}
+
+.pill.apple svg {
+  width: 18px;
+  height: 18px;
+}
+
+.pill.apple:hover {
+  background: #e9e9e9;
+}
+
 .pill.outline {
   border: 1px solid rgb(255 255 255 / 0.3);
   color: #fff;

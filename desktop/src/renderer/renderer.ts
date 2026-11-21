@@ -6,6 +6,7 @@ import { Link, TabStatus, UpdateState, type RecentInfo, type ShellState, type Ta
 type Bridge = {
   state: () => Promise<ShellState>;
   signIn: () => Promise<void>;
+  signInApple: () => Promise<void>;
   cancelSignIn: () => Promise<void>;
   signOut: () => Promise<void>;
   skip: () => Promise<void>;
@@ -280,12 +281,16 @@ const badge = (framework: string) => {
   return el('span', { class: 'badge', html: `${icon}<span>${framework}</span>` });
 };
 
+const APPLE_LOGO_PATH = 'M17.05 12.04c-.03-2.84 2.32-4.2 2.43-4.27-1.32-1.94-3.38-2.2-4.11-2.23-1.75-.18-3.41 1.03-4.3 1.03-.89 0-2.26-1-3.71-.98-1.91.03-3.67 1.11-4.65 2.82-1.98 3.44-.51 8.52 1.42 11.31.94 1.36 2.07 2.9 3.55 2.84 1.42-.06 1.96-.92 3.68-.92 1.71 0 2.2.92 3.7.89 1.53-.03 2.5-1.39 3.43-2.76 1.08-1.58 1.53-3.11 1.55-3.19-.03-.01-2.97-1.14-3-4.54zM14.23 3.7c.78-.95 1.31-2.27 1.17-3.58-1.13.05-2.49.75-3.3 1.7-.72.84-1.36 2.18-1.19 3.47 1.26.1 2.54-.64 3.32-1.59z';
+
+const appleButton = () => el('button', { class: 'pill apple', html: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="${APPLE_LOGO_PATH}"/></svg><span>continue with apple</span>`, on: run(() => bridge.signInApple()) });
+
 const startView = (state: ShellState): View => ({
-  key: `start:${state.signingIn}`,
+  key: `start:${state.signingIn}:${state.appleNative}`,
   build: () => {
     const actions = state.signingIn
       ? [el('button', { class: 'pill waiting', text: 'waiting for your browser…' }), pill('cancel', 'outline', run(() => bridge.cancelSignIn()))]
-      : [pill('sign in', 'primary', run(() => bridge.signIn())), pill('continue without account', 'outline', run(() => bridge.skip()))];
+      : [...(state.appleNative ? [appleButton()] : []), pill('sign in', 'primary', run(() => bridge.signIn())), pill('continue without account', 'outline', run(() => bridge.skip()))];
     return el('div', { class: 'screen banded' }, el('h1', { class: 'display serif hero-title', text: HERO_TITLE }), el('p', { class: 'lead', text: HERO_LEAD }), el('div', { class: 'actions' }, ...actions), el('ul', { class: 'facts' }, ...FACTS.map((fact) => el('li', { text: fact }))), el('div', { class: 'band' }));
   }
 });

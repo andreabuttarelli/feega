@@ -9,6 +9,7 @@
   "main": "dist/main.cjs",
   "scripts": {
     "build": "node build.mjs",
+    "native": "bash native/apple-signin/build.sh",
     "icons": "electron scripts/make-icons.cjs",
     "dev": "node scripts/dev-identity.mjs && node build.mjs && electron .",
     "start": "node scripts/dev-identity.mjs && node build.mjs && electron .",
@@ -49,6 +50,12 @@
       }
     ],
     "mac": {
+      "extraResources": [
+        {
+          "from": "build/native",
+          "to": "native"
+        }
+      ],
       "icon": "build/icons/icon.icns",
       "category": "public.app-category.developer-tools",
       "darkModeSupport": true,

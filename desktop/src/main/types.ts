@@ -24,7 +24,7 @@ export enum UpdateState {
 
 export type UpdateInfo = { state: UpdateState; version: string; message: string };
 
-export type ShellState = { tabs: TabInfo[]; active: string | null; email: string | null; signingIn: boolean; skipped: boolean; recents: RecentInfo[]; preferences: Preferences; update: UpdateInfo };
+export type ShellState = { tabs: TabInfo[]; active: string | null; email: string | null; signingIn: boolean; appleNative: boolean; skipped: boolean; recents: RecentInfo[]; preferences: Preferences; update: UpdateInfo };
 
 export enum Link {
   Account = 'account',
@@ -36,6 +36,7 @@ export enum Channel {
   State = 'state',
   GetState = 'get-state',
   SignIn = 'sign-in',
+  SignInApple = 'sign-in-apple',
   CancelSignIn = 'cancel-sign-in',
   SignOut = 'sign-out',
   Skip = 'skip',

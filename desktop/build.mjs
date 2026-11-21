@@ -12,6 +12,12 @@ if (!(await exists(CLI))) {
   execFileSync('npm', ['run', 'build'], { cwd: here('../npx'), stdio: 'inherit' });
 }
 
+const HELPER = here('build/native/FeegaAppleSignIn.app');
+
+if (process.platform === 'darwin' && !(await exists(HELPER))) {
+  execFileSync('bash', [here('native/apple-signin/build.sh')], { stdio: 'inherit' });
+}
+
 const node = { bundle: true, platform: 'node', format: 'cjs', target: 'node20', external: ['electron', 'electron-updater'], define: { __FEEGA_VERSION__: JSON.stringify('desktop') } };
 
 await build({ ...node, entryPoints: [here('src/main/main.ts')], outfile: here('dist/main.cjs') });
