@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http';
 import { afterEach, describe, expect, it } from 'vitest';
-import { PostOutcome, editorLinks, postSession } from './cli-session-post';
+import { PostOutcome, desktopLink, editorLinks, postSession } from './cli-session-post';
 
 const session = { access_token: 'a', refresh_token: 'r', expires_at: 1, state: 'app.s1' };
 const servers: Server[] = [];
@@ -81,5 +81,16 @@ describe('editorLinks', () => {
     expect(url.pathname).toBe('/signin');
     expect(Object.fromEntries(url.searchParams)).toEqual({ access_token: 'a', refresh_token: 'r', expires_at: '1', state: 'app.s1' });
     expect(links[1].href.startsWith('cursor://andreabuttarelli.feega/signin?')).toBe(true);
+  });
+});
+
+describe('desktopLink', () => {
+  it('opens the Feega desktop app on its sign-in handler with the session', () => {
+    const link = desktopLink(session);
+    const url = new URL(link.href);
+    expect(link.label).toBe('Feega');
+    expect(url.protocol).toBe('feega:');
+    expect(url.hostname).toBe('signin');
+    expect(Object.fromEntries(url.searchParams)).toEqual({ access_token: 'a', refresh_token: 'r', expires_at: '1', state: 'app.s1' });
   });
 });
