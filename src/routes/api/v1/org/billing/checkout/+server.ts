@@ -54,8 +54,9 @@ export const POST: RequestHandler = async ({ request, url }) => {
   }
 
   try {
-    const { subscriptionPriceId, ensureOrgCustomer, createSubscriptionCheckout } = await import('$lib/server/stripe');
-    const priceId = await subscriptionPriceId();
+    const { subscriptionPriceId, cloudPriceId, ensureOrgCustomer, createSubscriptionCheckout } = await import('$lib/server/stripe');
+    const interval = parsed.data.interval;
+    const priceId = interval ? cloudPriceId(interval) : await subscriptionPriceId();
     if (!priceId) {
       return refuse('subscriptions_not_configured', { app_billing_url: appBillingUrl });
     }
