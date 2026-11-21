@@ -177,22 +177,26 @@ const recentCard = (recent: RecentInfo, index: number) => {
   return card;
 };
 
-const openCard = () =>
-  el('button', { class: 'card open', on: run(() => bridge.pickFolder()) }, art('start', 6), el('div', {}, el('div', { class: 'name', text: 'open folder' }), el('div', { class: 'hint', text: 'pick a web app on your machine' })));
+const OPEN_HINT = 'open a web app folder. feega starts its dev server and opens the editor.';
+const OPEN_HINT_SHORT = 'pick a web app on your machine';
+
+const openCard = (alone: boolean) =>
+  el(
+    'button',
+    { class: `card open${alone ? ' wide' : ''}`, on: run(() => bridge.pickFolder()) },
+    art('start', alone ? 10 : 6),
+    el('div', {}, el('div', { class: 'name', text: 'open folder' }), el('div', { class: 'hint', text: alone ? OPEN_HINT : OPEN_HINT_SHORT }))
+  );
 
 const dashboardView = (state: ShellState): View => ({
   key: 'dashboard',
-  build: () => {
-    const empty = el('div', { class: 'empty' }, el('h2', { class: 'display', text: 'no projects yet' }), el('p', { class: 'lead', text: 'open a folder and it shows up here' }));
-    const page = el(
+  build: () =>
+    el(
       'div',
       { class: 'dash' },
       el('div', { class: 'dash-head' }, el('div', {}, el('p', { class: 'kicker', text: 'feega desktop' }), el('h1', { class: 'display page-title', text: 'projects' })), pill('open folder', 'primary', run(() => bridge.pickFolder()))),
-      el('div', { class: 'grid' }, openCard(), ...state.recents.map(recentCard)),
-      ...(state.recents.length ? [] : [empty])
-    );
-    return state.recents.length ? page : el('div', { class: 'frame' }, page, el('div', { class: 'band' }));
-  }
+      el('div', { class: 'grid' }, openCard(state.recents.length === 0), ...state.recents.map(recentCard))
+    )
 });
 
 const loadingView = (tab: TabInfo): View => ({

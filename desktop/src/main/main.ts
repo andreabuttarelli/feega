@@ -10,7 +10,7 @@ import { Channel, type ShellState } from './types';
 const DEFAULT_SIZE = { width: 1440, height: 900 };
 const MIN_SIZE = { minWidth: 900, minHeight: 600 };
 const BACKGROUND = '#000000';
-const TRAFFIC_LIGHTS = { x: 18, y: 15 };
+const TRAFFIC_LIGHTS = { x: 18, y: 20 };
 
 app.whenReady().then(() => {
   const userData = app.getPath('userData');

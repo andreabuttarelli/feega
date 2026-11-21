@@ -234,14 +234,9 @@ svg {
   text-align: center;
 }
 
-.screen.banded,
-.frame {
+.screen.banded {
   position: relative;
   padding-bottom: calc(var(--band-h) + 24px);
-}
-
-.frame {
-  min-height: 100%;
 }
 
 .display {
@@ -501,12 +496,29 @@ svg {
   border-color: rgb(255 81 0 / 0.35);
 }
 
+.card.open.wide {
+  grid-column: 1 / -1;
+  min-height: 300px;
+  padding: 36px;
+}
+
+.card.open.wide .name {
+  font-size: 40px;
+}
+
+.card.open.wide .hint {
+  max-width: 640px;
+  text-wrap: balance;
+  font-size: 17px;
+  line-height: 1.5;
+}
+
 .card.open:hover {
   background: rgb(255 81 0 / 0.14);
   border-color: var(--sx-accent);
 }
 
-.card.open .art {
+.card.open .card.open .art {
   transition: transform 260ms var(--ease);
 }
 
@@ -528,17 +540,6 @@ svg {
 .card.app:hover {
   background: rgb(0 77 255 / 0.18);
   border-color: rgb(0 77 255 / 0.7);
-}
-
-.empty {
-  margin-top: 40px;
-  text-align: center;
-}
-
-.empty .lead {
-  margin-top: 12px;
-  font-size: 17px;
-  color: var(--sx-ink-2);
 }
 
 .art {
@@ -553,31 +554,6 @@ svg {
   margin-top: 10px;
   color: var(--sx-ink-2);
   font-size: 14px;
-}
-
-.card.app {
-  background: var(--sx-tint-blue);
-  border-color: rgb(0 77 255 / 0.3);
-}
-
-.card.app:hover {
-  background: rgb(0 77 255 / 0.18);
-  border-color: rgb(0 77 255 / 0.7);
-}
-
-.empty {
-  margin-top: 40px;
-  text-align: center;
-}
-
-.empty .display {
-  font-size: 56px;
-}
-
-.empty .lead {
-  margin-top: 12px;
-  font-size: 17px;
-  color: var(--sx-ink-2);
 }
 
 .art {
@@ -756,8 +732,4 @@ pre {
   * {
     animation-duration: 1ms !important;
   }
-}
-
-.empty .display {
-  font-size: 40px;
 }
