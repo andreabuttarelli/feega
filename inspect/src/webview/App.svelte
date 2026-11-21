@@ -31,6 +31,7 @@
   import FeegaMenu from './FeegaMenu.svelte';
   import OnboardingDialog from './Onboarding.svelte';
   import ServerPopover from './ServerPopover.svelte';
+  import SharePanel from './SharePanel.svelte';
   import LayersTree from './LayersTree.svelte';
   import { hasSourceInfo } from './source-info';
   import ChangesList from './ChangesList.svelte';
@@ -137,6 +138,7 @@
   let drop = $state<Drop | null>(null);
 
   let tab = $state(Tab.Properties);
+  let share = $state<Extract<ViewMessage, { kind: ToView.Share }> | null>(null);
   let cloud = $state<{ enabled: boolean; comments: CloudComment[]; error: string }>({ enabled: false, comments: [], error: '' });
   let composing = $state(false);
   let pinRects = $state<Record<string, Pick['rect']>>({});
@@ -495,6 +497,7 @@
       }, SETTLE_MS);
     },
     [ToView.Account]: (m) => (account = { state: m.state, email: m.email }),
+    [ToView.Share]: (m) => (share = m),
     [ToView.Comments]: (m) => (cloud = { enabled: m.enabled, comments: m.comments, error: m.error ?? '' }),
     [ToView.Onboarding]: (m) => (onboarding = m.state),
     [ToView.IconResults]: (m) => iconsFound({ id: m.id, library: m.library, hits: m.hits, error: m.error ?? '' }),
@@ -911,6 +914,7 @@
       {#if themes.length > 1}<ThemeBar {themes} choice={themeName} onchoose={chooseTheme} />{/if}
       {#if fit.scale < 1}<span class="zoom" data-testid="zoom">{Math.round(fit.scale * 100)}%</span>{/if}
       <button type="button" class="icon" title="Open in browser" onclick={() => toHost({ kind: ToHost.External, url: new URL(route, url).toString() })}><ExternalLink size={14} /></button>
+      <SharePanel view={share} onstart={(name, canEdit) => toHost({ kind: ToHost.ShareStart, name, canEdit })} onstop={() => toHost({ kind: ToHost.ShareStop })} onkick={(userId) => toHost({ kind: ToHost.ShareKick, userId })} />
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
     </header>
 

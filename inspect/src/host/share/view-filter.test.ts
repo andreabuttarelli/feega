@@ -17,6 +17,10 @@ describe('viewForVisitor', () => {
     expect(viewForVisitor(asText({ kind: ToView.Account, state: 'signed-in', email: 'me@x.com' }), ORIGIN).text).toBeNull();
   });
 
+  it('does not show a visitor the share controls', () => {
+    expect(viewForVisitor(asText({ kind: ToView.Share, state: 'live', url: 'https://x' }), ORIGIN).text).toBeNull();
+  });
+
   it('keeps the host machine out of the server status', () => {
     const info = { url: 'http://127.0.0.1:5173/', framework: 'svelte', command: 'npm run dev', pid: 42, port: 5173, attached: false, startedAt: 1, lastError: 'at /Users/me/x.ts', keptMinutes: 0 };
 

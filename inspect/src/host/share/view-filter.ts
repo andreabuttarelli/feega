@@ -15,6 +15,7 @@ const toVisitorServer = (message: View, origin: string): Filtered => {
 const FILTERS: Partial<Record<string, (message: View, origin: string) => Filtered>> = {
   [ToView.App]: toVisitorApp,
   [ToView.Account]: () => ({ text: null }),
+  [ToView.Share]: () => ({ text: null }),
   [ToView.Server]: toVisitorServer
 };
 

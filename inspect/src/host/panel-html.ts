@@ -11,8 +11,8 @@ const themeStyle = (theme?: PanelTheme) =>
 export function panelHtml({ script, style, cspSource, nonce, theme }: PanelAssets): string {
   const csp = [
     `default-src 'none'`,
-    `frame-src ${LOCAL_FRAMES}`,
-    `connect-src ${LOCAL_SOCKETS}`,
+    `frame-src 'self' ${LOCAL_FRAMES}`,
+    `connect-src 'self' ${LOCAL_SOCKETS}`,
     `script-src 'nonce-${nonce}'`,
     `style-src ${cspSource} 'unsafe-inline' https://fonts.googleapis.com`,
     `font-src ${cspSource} https://fonts.gstatic.com`,
