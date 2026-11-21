@@ -5,7 +5,7 @@ export enum TabStatus {
   Failed = 'failed'
 }
 
-export type AppOption = { label: string; app: string };
+export type AppOption = { label: string; app: string; framework: string };
 
 export type TabInfo = { id: string; dir: string; name: string; status: TabStatus; message: string; log: string[]; url: string; apps: AppOption[] };
 

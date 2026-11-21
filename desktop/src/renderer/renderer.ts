@@ -1,3 +1,5 @@
+import { LOGO_PATHS, type Logo } from '../../../landing/src/lib/site/codebase/logos';
+import { PIXELS, pixelSvg } from './pixel';
 import { TabStatus, type RecentInfo, type ShellState, type TabInfo } from '../main/types';
 
 type Bridge = {
@@ -32,6 +34,7 @@ const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 const STAGGER_MS = 50;
+const FACTS = ['free, forever', 'every edit a diff', 'no AI, no tokens'];
 
 const FRIENDLY: [RegExp, string][] = [
   [/several apps here/i, 'this folder holds several apps. open one of them directly.'],
@@ -131,13 +134,33 @@ const renderBar = (state: ShellState) => {
   }
 };
 
+const art = (name: string, size: number, extra = '') => el('span', { class: `art ${extra}`.trim(), html: pixelSvg(PIXELS[name], size) });
+
+const FRAMEWORK_LOGO: Record<string, Logo> = {
+  next: 'Next',
+  nuxt: 'Nuxt',
+  sveltekit: 'Svelte',
+  svelte: 'Svelte',
+  astro: 'Astro',
+  react: 'React',
+  'react router': 'ReactRouter',
+  vue: 'Vue',
+  vite: 'Vite'
+};
+
+const badge = (framework: string) => {
+  const logo = FRAMEWORK_LOGO[framework];
+  const icon = logo ? `<svg viewBox="0 0 24 24" fill="currentColor"><path d="${LOGO_PATHS[logo]}"/></svg>` : '';
+  return el('span', { class: 'badge', html: `${icon}<span>${framework}</span>` });
+};
+
 const startView = (state: ShellState): View => ({
   key: `start:${state.signingIn}`,
   build: () => {
     const actions = state.signingIn
-      ? [el('button', { class: 'pill primary waiting', text: 'waiting for your browser…' }), pill('cancel', 'ghost', run(() => bridge.cancelSignIn()))]
-      : [pill('sign in', 'primary', run(() => bridge.signIn())), pill('continue without account', 'ghost', run(() => bridge.skip()))];
-    return el('div', { class: 'screen' }, el('h1', { class: 'mega', text: 'feega' }), el('p', { class: 'tagline', text: 'design in your codebase' }), el('div', { class: 'actions' }, ...actions));
+      ? [el('button', { class: 'pill waiting', text: 'waiting for your browser…' }), pill('cancel', 'outline', run(() => bridge.cancelSignIn()))]
+      : [pill('sign in', 'primary', run(() => bridge.signIn())), pill('continue without account', 'outline', run(() => bridge.skip()))];
+    return el('div', { class: 'screen' }, el('h1', { class: 'display hero-title', text: 'feega' }), el('p', { class: 'lead', text: 'design in your codebase' }), el('div', { class: 'actions' }, ...actions), el('ul', { class: 'facts' }, ...FACTS.map((fact) => el('li', { text: fact }))), el('div', { class: 'band' }));
   }
 });
 
@@ -146,23 +169,23 @@ const recentCard = (recent: RecentInfo, index: number) => {
     'button',
     { class: 'card', on: run(() => bridge.openDir(recent.dir)) },
     el('div', {}, el('div', { class: 'name', text: recent.name }), el('div', { class: 'path', text: tidyPath(recent.dir) })),
-    el('div', { class: 'meta' }, el('span', { class: 'badge', text: recent.framework }), el('span', { text: ago(recent.at) }))
+    el('div', { class: 'meta' }, badge(recent.framework), el('span', { text: ago(recent.at) }))
   );
   card.style.setProperty('animation-delay', `${(index + 1) * STAGGER_MS}ms`);
   return card;
 };
 
 const openCard = () =>
-  el('button', { class: 'card open', on: run(() => bridge.pickFolder()) }, el('span', { class: 'plus', html: PLUS }), el('div', {}, el('div', { class: 'name', text: 'open folder' }), el('div', { class: 'hint', text: 'pick a web app on your machine' })));
+  el('button', { class: 'card open', on: run(() => bridge.pickFolder()) }, art('start', 6), el('div', {}, el('div', { class: 'name', text: 'open folder' }), el('div', { class: 'hint', text: 'pick a web app on your machine' })));
 
 const dashboardView = (state: ShellState): View => ({
   key: 'dashboard',
   build: () => {
-    const empty = el('div', { class: 'empty' }, el('strong', { text: 'no projects yet' }), el('span', { text: 'open a folder and it will show up here' }));
+    const empty = el('div', { class: 'empty' }, el('div', { class: 'band slim' }), el('h2', { class: 'display', text: 'no projects yet' }), el('p', { class: 'lead', text: 'open a folder and it shows up here' }));
     return el(
       'div',
       { class: 'dash' },
-      el('div', { class: 'dash-head' }, el('div', {}, el('p', { class: 'kicker', text: 'feega desktop' }), el('h1', { class: 'mega', text: 'projects' }))),
+      el('div', { class: 'dash-head' }, el('div', {}, el('p', { class: 'kicker', text: 'feega desktop' }), el('h1', { class: 'display page-title', text: 'projects' })), pill('open folder', 'primary', run(() => bridge.pickFolder()))),
       el('div', { class: 'grid' }, openCard(), ...state.recents.map(recentCard)),
       ...(state.recents.length ? [] : [empty])
     );
@@ -171,7 +194,7 @@ const dashboardView = (state: ShellState): View => ({
 
 const loadingView = (tab: TabInfo): View => ({
   key: `loading:${tab.id}`,
-  build: () => el('div', { class: 'screen' }, el('h1', { class: 'mega load-name', text: tab.name }), el('div', { class: 'track' }), el('div', { class: 'line', text: tab.message })),
+  build: () => el('div', { class: 'screen' }, art('start', 8, 'float'), el('h1', { class: 'display load-name', text: tab.name }), el('div', { class: 'track' }), el('div', { class: 'line', text: tab.message })),
   patch: (root) => {
     const line = root.querySelector('.line');
     if (line) {
@@ -184,11 +207,11 @@ const pickerView = (tab: TabInfo): View => ({
   key: `choosing:${tab.id}`,
   build: () => {
     const cards = tab.apps.map((app, index) => {
-      const card = el('button', { class: 'card', on: run(() => bridge.chooseApp(tab.id, app.app)) }, el('div', { class: 'name', text: app.label }), el('div', { class: 'meta' }, el('span', { class: 'badge', text: 'app' }), el('span', { text: 'start editing' })));
+      const card = el('button', { class: 'card app', on: run(() => bridge.chooseApp(tab.id, app.app)) }, el('div', { class: 'name', text: app.label }), el('div', { class: 'meta' }, badge(app.framework), el('span', { text: 'start editing' })));
       card.style.setProperty('animation-delay', `${(index + 1) * STAGGER_MS}ms`);
       return card;
     });
-    return el('div', { class: 'dash' }, el('div', { class: 'dash-head' }, el('div', {}, el('p', { class: 'kicker', text: `${tab.name} holds ${tab.apps.length} apps` }), el('h1', { class: 'mega', text: 'which one?' }))), el('div', { class: 'grid' }, ...cards));
+    return el('div', { class: 'dash' }, el('div', { class: 'dash-head' }, el('div', {}, el('p', { class: 'kicker' }, art('stack', 3), `${tab.name} holds ${tab.apps.length} apps`), el('h1', { class: 'display page-title', text: 'which one?' }))), el('div', { class: 'grid' }, ...cards));
   }
 });
 
@@ -199,10 +222,11 @@ const failedView = (tab: TabInfo): View => ({
     return el(
       'div',
       { class: 'screen' },
+      art('help', 8),
       el('div', { class: 'err-title' }, el('span', { class: 'dot failed' }), el('span', { text: 'could not start' })),
-      el('h1', { class: 'mega load-name', text: tab.name }),
+      el('h1', { class: 'display load-name', text: tab.name }),
       el('p', { class: 'err-msg', text: explain(tab) }),
-      el('div', { class: 'actions' }, pill('retry', 'primary', run(() => bridge.retryTab(tab.id))), pill('close', 'ghost', run(() => bridge.closeTab(tab.id)))),
+      el('div', { class: 'actions' }, pill('retry', 'primary', run(() => bridge.retryTab(tab.id))), pill('close', 'outline', run(() => bridge.closeTab(tab.id)))),
       log
     );
   }

@@ -19,5 +19,8 @@ await build({ ...node, entryPoints: [here('src/main/preload.ts')], outfile: here
 await build({ bundle: true, platform: 'browser', format: 'iife', target: 'chrome130', entryPoints: [here('src/renderer/renderer.ts')], outfile: here('dist/renderer/renderer.js') });
 
 await mkdir(here('dist/renderer'), { recursive: true });
-await cp(here('src/renderer/index.html'), here('dist/renderer/index.html'));
-await cp(here('src/renderer/style.css'), here('dist/renderer/style.css'));
+const STATIC = ['index.html', 'style.css', 'tokens.css', 'fonts.css', 'pixel-band.png', 'fonts'];
+
+for (const name of STATIC) {
+  await cp(here(`src/renderer/${name}`), here(`dist/renderer/${name}`), { recursive: true });
+}

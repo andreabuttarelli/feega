@@ -4,6 +4,7 @@ import { chosenApp } from '../../../inspect/src/host/app-root';
 import { diskTree } from './app-tree';
 import { startCli } from './cli-process';
 import { type PidFile } from './pid-file';
+import { frameworkOf } from './project-info';
 import { TabStatus, type AppOption, type TabInfo } from './types';
 
 export const CHROME_HEIGHT = 44;
@@ -75,7 +76,7 @@ export function tabHost(window: BrowserWindow, changed: () => void, pids: PidFil
     layout();
     changed();
 
-    const root = await chosenApp(dir, dir, diskTree, (apps) => ask(id, apps));
+    const root = await chosenApp(dir, dir, diskTree, (apps) => ask(id, apps.map((a) => ({ ...a, framework: frameworkOf(a.app) }))));
     if (!tabs.has(id)) {
       return;
     }
