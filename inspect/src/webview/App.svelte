@@ -50,7 +50,10 @@
   import { Place } from '@feega/live-edit/move-node';
   import { StructureOp } from '@feega/live-edit/structure';
   import StructureMenu from './StructureMenu.svelte';
-  import { agentContext } from './agent-context';
+  import { agentContext, commentContext } from './agent-context';
+  import CommentsList from './CommentsList.svelte';
+  import type { CloudComment, CommentDraft } from '../host/cloud-api';
+  import { pinIdOf, pinSlot, pinsOf, sourceOfComment, threadsOf } from './comments';
   import { AddKind, AddPlace } from '@feega/live-edit/add-node';
   import type { WrapTag } from '@feega/live-edit/wrap-node';
   import { ADD_DRAG_TYPE, insertSpot, type InsertSpot } from './insert-drop';
@@ -134,6 +137,15 @@
   let drop = $state<Drop | null>(null);
 
   let tab = $state(Tab.Properties);
+  let cloud = $state<{ enabled: boolean; comments: CloudComment[]; error: string }>({ enabled: false, comments: [], error: '' });
+  let composing = $state(false);
+  let pinRects = $state<Record<string, Pick['rect']>>({});
+  let pinned = new Set<string>();
+  const COMMENTS_POLL_MS = 15_000;
+  const PIN_SIZE_PX = 20;
+  const PIN_STACK_PX = 22;
+  const pins = $derived(pinsOf(threadsOf(cloud.comments, false)));
+  const openComments = $derived(pins.length);
   let layers = $state<LayerNode[]>([]);
   let palette = $state<Palette>({ document: [], tokens: [], fonts: [] });
   let changes = $state<ChangeRow[]>([]);
@@ -238,10 +250,17 @@
       refresh();
       bridge.track(Slot.Selected, untrack(() => picked?.source) ?? null, untrack(() => picked?.instanceIndex));
       bridge.track(Slot.Hovered, untrack(() => hover?.source) ?? null, untrack(() => hover?.instanceIndex));
+      pinned.clear();
+      trackPins();
     },
     moved: (path) => (visited(path), bridge.tree()),
     tree: (tree) => (layers = tree),
     tracked: (slot, rect) => {
+      const pin = pinIdOf(slot);
+      if (pin) {
+        pinRects[pin] = rect;
+        return;
+      }
       const target = slot === Slot.Selected ? picked : hover;
       if (target) {
         target.rect = rect;
@@ -263,6 +282,73 @@
       toHost({ kind: ToHost.Edit, ask: { at: source, prop: LiveProp.Text, value: text, was, instance: picked?.instanceIndex } });
     }
   });
+
+  function trackPins() {
+    const wanted = new Set(pins.map((pin) => pin.id));
+    for (const pin of pins) {
+      if (!pinned.has(pin.id)) {
+        bridge.track(pinSlot(pin.id), pin.source);
+      }
+    }
+    for (const id of pinned) {
+      if (!wanted.has(id)) {
+        bridge.track(pinSlot(id), null);
+        delete pinRects[id];
+      }
+    }
+    pinned = wanted;
+  }
+
+  $effect(() => {
+    pins;
+    if (bridged) {
+      untrack(trackPins);
+    }
+  });
+
+  $effect(() => {
+    if (!cloud.enabled) {
+      return;
+    }
+    const timer = setInterval(() => toHost({ kind: ToHost.Comments }), COMMENTS_POLL_MS);
+    return () => clearInterval(timer);
+  });
+
+  function startComment() {
+    if (!picked) {
+      return;
+    }
+    if (!cloud.enabled) {
+      showToast('Comments need a shared session');
+      return;
+    }
+    barClosed = false;
+    tab = Tab.Comments;
+    composing = true;
+  }
+
+  function sendComment(draft: CommentDraft) {
+    toHost({ kind: ToHost.CommentAdd, draft });
+    composing = false;
+  }
+
+  function copyComment(comment: CloudComment, replies: CloudComment[]) {
+    const text = commentContext(comment, replies);
+    if (inVscode) {
+      toHost({ kind: ToHost.Copy, text });
+    } else {
+      void navigator.clipboard?.writeText(text);
+    }
+    showToast('Copied for your agent');
+  }
+
+  function openPin(id: string) {
+    const thread = threadsOf(cloud.comments, true).find((t) => t.root.id === id);
+    if (thread) {
+      select(sourceOfComment(thread.root));
+    }
+    tab = Tab.Comments;
+  }
 
   function visited(path: string) {
     route = path;
@@ -409,6 +495,7 @@
       }, SETTLE_MS);
     },
     [ToView.Account]: (m) => (account = { state: m.state, email: m.email }),
+    [ToView.Comments]: (m) => (cloud = { enabled: m.enabled, comments: m.comments, error: m.error ?? '' }),
     [ToView.Onboarding]: (m) => (onboarding = m.state),
     [ToView.IconResults]: (m) => iconsFound({ id: m.id, library: m.library, hits: m.hits, error: m.error ?? '' }),
     [ToView.IconPreview]: (m) => iconDrawn(m.name, m.svg),
@@ -595,7 +682,7 @@
   }
 
   const STRUCTURE_KEYS = new Set(['Delete', 'Backspace']);
-  const typing = (e: KeyboardEvent) => e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement;
+  const typing = (e: KeyboardEvent) => e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement;
 
   async function select(source: Source, instance = 0) {
     bridge.reveal(source, instance);
@@ -733,6 +820,8 @@
     toHost({ kind: ToHost.Font, google: font.google, ask: { at: sourceText(picked.source), prop: LiveProp.Class, family: ClassFamily.FontFamily, value: `font-['${font.family.replace(/\s+/g, '_')}']`, css: { 'font-family': css }, rem: picked.rem, viewport: picked.viewport, scope, breakpoint: target, theme: writtenThemeName } });
   }
 
+  const COMMENT_KEY = 'c';
+
   function onKey(e: KeyboardEvent) {
     const cmd = e.metaKey || e.ctrlKey;
     const selecting = selectionKey(e);
@@ -773,6 +862,11 @@
       return;
     }
     if (cmd || typing(e)) {
+      return;
+    }
+    if (e.key.toLowerCase() === COMMENT_KEY && picked && mode === Mode.Design && !editing) {
+      e.preventDefault();
+      startComment();
       return;
     }
     const next = modeOfKey(e.key);
@@ -833,6 +927,12 @@
             {#if drop}<div class="drop-line" class:box={drop.kind === DropKind.Inside} style={`left:${drop.line.x * fit.scale - 1}px;top:${drop.line.y * fit.scale - 1}px;width:${Math.max(2, drop.line.w * fit.scale)}px;height:${Math.max(2, drop.line.h * fit.scale)}px`}></div>{/if}
           {#if picked && hint}{#each hintBoxes(picked, hint) as area, i (i)}<div class="hint {hint.group}" style={`left:${area.x * fit.scale}px;top:${area.y * fit.scale}px;width:${area.w * fit.scale}px;height:${area.h * fit.scale}px`}></div>{/each}{/if}
           {#if picked}<div class="outline picked" style={box(picked)}><span class="label"><Breadcrumb pick={picked} onselect={select} compact state={elementState} /></span></div>{/if}
+          {#each pins as pin (pin.id)}
+            {@const rect = pinRects[pin.id]}
+            {#if rect}
+              <button type="button" class="pin" data-testid="comment-pin" title="Open comment" style={`left:${(rect.x + rect.width) * fit.scale - PIN_SIZE_PX / 2}px;top:${rect.y * fit.scale - PIN_SIZE_PX / 2 + pin.stack * PIN_STACK_PX}px`} onpointerdown={(e) => e.stopPropagation()} onclick={(e) => (e.stopPropagation(), openPin(pin.id))}>{pin.number}</button>
+            {/if}
+          {/each}
           </div>
         {/if}
         {#if size !== Size.Full}
@@ -900,12 +1000,13 @@
       <Tabs.List class="tab-list">
         <Tabs.Trigger value={Tab.Properties} class="tab">Properties</Tabs.Trigger>
         <Tabs.Trigger value={Tab.Changes} class="tab" data-testid="changes-tab">Changes{changes.length ? ` ${changes.length}` : ''}</Tabs.Trigger>
+        <Tabs.Trigger value={Tab.Comments} class="tab" data-testid="comments-tab">Comments{openComments ? ` ${openComments}` : ''}</Tabs.Trigger>
       </Tabs.List>
       <Tabs.Content value={Tab.Properties}>
         {#if picked}
           <div class="what" data-testid="selection">
             <Breadcrumb pick={picked} onselect={select} state={elementState} />
-            <span class="where">{#if picked.component}in {picked.component.file.split('/').pop()} · {/if}<button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file.split('/').pop()}:{picked.source.line}</button> · <button type="button" class="link" data-testid="copy-for-agent" title="Copy file, selector and view for your coding agent" onclick={copyForAgent}>Copy for agent</button></span>
+            <span class="where">{#if picked.component}in {picked.component.file.split('/').pop()} · {/if}<button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file.split('/').pop()}:{picked.source.line}</button> · <button type="button" class="link" data-testid="copy-for-agent" title="Copy file, selector and view for your coding agent" onclick={copyForAgent}>Copy for agent</button> · <button type="button" class="link" data-testid="comment-start" title="Comment on this element (C)" onclick={startComment}>Comment</button></span>
             {#if authored(picked.classes)}<code class="classes">{authored(picked.classes)}</code>{/if}
           </div>
           <BreakpointBar badge={reachBadge} theme={themeBadge(themeName)} items={reachItems(breakpoints)} choice={reach} onchoose={(id) => (reach = id)} />
@@ -921,6 +1022,9 @@
       </Tabs.Content>
       <Tabs.Content value={Tab.Changes}>
         <ChangesList {changes} onselect={select} onopen={(at) => toHost({ kind: ToHost.Open, at })} ondiff={(id) => toHost({ kind: ToHost.Diff, id })} onrevert={(id) => toHost({ kind: ToHost.Revert, id })} onrevertall={() => toHost({ kind: ToHost.Revert, id: null })} onscm={() => toHost({ kind: ToHost.SourceControl })} />
+      </Tabs.Content>
+      <Tabs.Content value={Tab.Comments}>
+        <CommentsList {cloud} {picked} {composing} onsubmit={(draft) => (draft.parentId ? toHost({ kind: ToHost.CommentAdd, draft }) : sendComment(draft))} oncancel={() => (composing = false)} onresolve={(id) => toHost({ kind: ToHost.CommentResolve, id })} onselect={select} oncopy={copyComment} />
       </Tabs.Content>
     </Tabs.Root>
   </aside>
@@ -1088,6 +1192,25 @@
   .outline {
     position: absolute;
     pointer-events: none;
+  }
+
+  .pin {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 1.5px solid #fff;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-accent);
+    color: #fff;
+    font: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
   }
 
   .hover {

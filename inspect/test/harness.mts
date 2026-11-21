@@ -13,6 +13,8 @@ import { searchIcons } from '../src/host/icon-search.ts';
 import { previewQueue } from '../src/host/icon-previews.ts';
 import { breakpointsOf } from '../src/host/breakpoints.ts';
 import { themesOf } from '../src/host/themes.ts';
+import { commentsHost, type CommentsCloud } from '../src/host/comments.ts';
+import type { CommentDraft } from '../src/host/cloud-api.ts';
 
 const PANEL_PORT = Number(process.env.PANEL_PORT ?? 5999);
 const dist = fileURLToPath(new URL('../dist/webview/', import.meta.url));
@@ -26,7 +28,7 @@ const pageHtml = (theme: string) => `<!doctype html><html><head><meta charset="u
 export const DARK = ':root{--vscode-editor-background:#1f1f1f;--vscode-foreground:#cccccc;--vscode-sideBar-background:#181818;--vscode-focusBorder:#0078d4;--vscode-font-family:-apple-system,system-ui,sans-serif}';
 export const LIGHT = ':root{--vscode-editor-background:#ffffff;--vscode-foreground:#1f1f1f;--vscode-sideBar-background:#f8f8f8;--vscode-focusBorder:#0078d4;--vscode-font-family:-apple-system,system-ui,sans-serif}';
 
-export async function openPanel(appRoot: string, theme = DARK) {
+export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsCloud) {
   const running = await startDev(appRoot, launcher, { log: () => undefined, installing: () => undefined, spawned: () => undefined, signal: new AbortController().signal }, '', Attach.Never);
   if ('refused' in running) {
     throw new Error(running.refused);
@@ -52,16 +54,18 @@ export async function openPanel(appRoot: string, theme = DARK) {
   const reply = (m: unknown) => page.evaluate((msg) => window.postMessage(msg, '*'), m);
   const picks = new Map<number, (p: Pick | null) => void>();
   const saves: unknown[] = [];
+  const comments = commentsHost(cloud, reply);
   const previewIcons = previewQueue(fetch, (name, svg) => reply({ kind: ToView.IconPreview, name, svg }));
 
-  await page.exposeFunction('toHost', async (m: { kind: ToHost; ask?: EditAsk; id?: number; pick?: Pick | null; query?: string; names?: string[] }) => {
+  await page.exposeFunction('toHost', async (m: { kind: ToHost; ask?: EditAsk; id?: number | string; pick?: Pick | null; query?: string; names?: string[]; draft?: CommentDraft }) => {
     if (m.kind === ToHost.Ready) {
       await reply({ kind: ToView.App, url: running.url, styling, prefs: null, breakpoints: await breakpointsOf(appRoot), themes: await themesOf(appRoot) });
       await reply({ kind: ToView.Server, state: ServerState.Running });
+      await comments.show();
       await reply({ kind: ToView.Settings, values: Object.fromEntries(SETTINGS.map((r) => [r.key, r.fallback])), facts: { version: '0.1.0', framework: 'sveltekit', styling } });
     }
     if (m.kind === ToHost.Picked) {
-      picks.get(m.id!)?.(m.pick ?? null);
+      picks.get(m.id as number)?.(m.pick ?? null);
     }
     if (m.kind === ToHost.Edit) {
       const out = await edits.edit(m.ask!);
@@ -74,10 +78,19 @@ export async function openPanel(appRoot: string, theme = DARK) {
     }
     if (m.kind === ToHost.IconSearch) {
       const found = await searchIcons(appRoot, fetch, m.query!, null);
-      await reply({ kind: ToView.IconResults, id: m.id, ...found });
+      await reply({ kind: ToView.IconResults, id: m.id as number, ...found });
     }
     if (m.kind === ToHost.IconPreviews) {
       await previewIcons(m.names!);
+    }
+    if (m.kind === ToHost.Comments) {
+      await comments.show();
+    }
+    if (m.kind === ToHost.CommentAdd) {
+      await comments.add(m.draft!);
+    }
+    if (m.kind === ToHost.CommentResolve) {
+      await comments.resolve(m.id as string);
     }
     if (m.kind === ToHost.Undo) {
       await edits.undo();

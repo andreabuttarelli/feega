@@ -7,6 +7,8 @@ import { killOrphans } from '../../inspect/src/host/orphans';
 import { inspectSession, memoOf } from '../../inspect/src/host/session';
 import { Browser, Run, USAGE, argsOf } from './args';
 import { editorServer } from './editor-server';
+import { serveMcp } from './mcp/run';
+import { shareUnavailable } from './mcp/share-unavailable';
 
 declare const FEEGA_VERSION: string;
 
@@ -46,6 +48,10 @@ async function main(): Promise<number> {
   if (args.run === Run.Version) {
     say(FEEGA_VERSION);
     return 0;
+  }
+  if (args.run === Run.Mcp) {
+    await serveMcp({ cli: __filename, version: FEEGA_VERSION, cwd: process.cwd(), env: process.env, share: shareUnavailable });
+    return KEEP_RUNNING;
   }
   if (args.run === Run.Error) {
     say(`feega: ${args.reason}\n\n${USAGE}`);
