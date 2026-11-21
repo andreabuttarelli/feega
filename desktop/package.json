@@ -54,6 +54,6 @@
       "mimeTypes": ["x-scheme-handler/feega"],
       "target": [{ "target": "AppImage", "arch": ["x64"] }]
     },
-    "appImage": { "artifactName": "Feega-linux-${arch}.${ext}" }
+    "appImage": { "artifactName": "Feega-linux-x64.${ext}" }
   }
 }
