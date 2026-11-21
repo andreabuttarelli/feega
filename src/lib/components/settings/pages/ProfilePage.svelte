@@ -12,6 +12,7 @@
   import { Notice } from '$lib/components/ui/notice';
   import { openCookieSettings } from '$lib/consent';
   import LegalFooter from '$lib/components/LegalFooter.svelte';
+  import NotificationsPanel from '$lib/components/settings/NotificationsPanel.svelte';
 
   import type { load as sectionLoad } from '$lib/server/settings/pages/profile';
   import type { SectionForm } from './section-form';
@@ -131,6 +132,8 @@
     </div>
   </form>
 </Panel>
+
+<NotificationsPanel />
 
 <Panel title={$_('app.settings.profile.session')}>
   <Field label={$_('app.account.signOut')} hint={$_('app.settings.profile.signOutDesc')} layout={FieldLayout.Row}>
