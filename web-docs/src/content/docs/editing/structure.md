@@ -5,18 +5,32 @@ sidebar:
   order: 8
 ---
 
-Right-click an element, on the page or in Layers, for the structure menu.
+Right-click an element, on the page or in Layers, for the structure menu. Right-clicking a layer selects it first. Use the arrow keys to move through the menu, `Enter` to pick and `Esc` to close.
 
 | Action | Shortcut (macOS) |
 |---|---|
+| Copy for agent | |
 | Duplicate | `⌘D` |
-| Wrap in container | `⌘G` |
+| Add as child | |
+| Wrap with | `⌘G` wraps in a div |
 | Unwrap | `⇧⌘G` |
 | Delete | `⌫` |
 
 ## Add
 
-Add a new element next to the selection: Text, Heading, Button, Link, Image or Container.
+The **+ Add** button in Layers (or `/`) offers Text, Heading, Button, Link, Image and Container. A new element goes after the selection, or as its last child when the selection is a container.
+
+To choose the place yourself:
+
+- **Add as child** in the structure menu puts the element last inside the selected element. It does not work on elements without a closing tag, such as `<img />`.
+- Drag an item from the Add menu onto a layer. The top or bottom edge of the row inserts before or after it; the middle inserts as the last child.
+- Drag an item onto the page. The element under the pointer is outlined and a line shows where the new element goes, along the layout direction of its parent. Dropping in the middle of a container inserts inside it.
+
+Clicking an item without dragging keeps the default placement.
+
+## Wrap
+
+**Wrap with** offers Div, Section, Article, Nav, Header, Footer, Link and Button. Container tags get a column flex layout; Link gets `href="#"`.
 
 ## Reorder
 
