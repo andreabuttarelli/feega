@@ -1,19 +1,26 @@
 <script lang="ts">
   import { browserEnv, installOptions, Outcome, runOption, type InstallOption } from '$lib/site/install';
   import { EDITOR_ICONS } from '$lib/site/editor-icons';
-  import { COFFEE_URL, GITHUB_URL } from '$lib/site/links';
+  import { COFFEE_URL, DESKTOP_DMGS, DESKTOP_PUBLISHED, GITHUB_URL } from '$lib/site/links';
   import { DOWNLOAD_META } from '$lib/site/seo';
   import { downloadJsonLd } from '$lib/site/structured-data';
   import { DOWNLOAD_PAGE } from '$lib/site/download';
 
   const editors = installOptions().filter((o) => !o.command);
   const terminal = DOWNLOAD_PAGE.terminal;
+  const desktop = DOWNLOAD_PAGE.desktop;
   let copied = $state(false);
+  let desktopCopied = $state(false);
 
   const copy = (text: string) => navigator.clipboard?.writeText(text);
 
   function install(option: InstallOption) {
     runOption(option, browserEnv(), copy);
+  }
+
+  function copyDesktop() {
+    copy(desktop.command);
+    desktopCopied = true;
   }
 
   function copyCommand() {
@@ -57,6 +64,27 @@
     </div>
     <p class="note">{terminal.line} {terminal.requirement}.</p>
 
+    {#if DESKTOP_PUBLISHED}
+      <h2>{desktop.heading}</h2>
+      <p class="lead small">{desktop.lead}</p>
+      <h3>{desktop.terminalLabel}</h3>
+      <div class="terminal">
+        <code>{desktop.command}</code>
+        <button class="install" type="button" onclick={copyDesktop}>{desktopCopied ? 'copied' : 'copy'}</button>
+      </div>
+      <p class="note">{desktop.terminalNote}</p>
+      <h3>{desktop.dmgLabel}</h3>
+      <ul class="dmgs">
+        {#each DESKTOP_DMGS as dmg (dmg.arch)}
+          <li class="card dmg">
+            <span class="name">{dmg.arch}</span>
+            <a class="install" href={dmg.href}>download</a>
+          </li>
+        {/each}
+      </ul>
+      <p class="note">{desktop.dmgNote}</p>
+    {/if}
+
     <h2>{DOWNLOAD_PAGE.requirements.heading}</h2>
     <ul class="reqs">
       {#each DOWNLOAD_PAGE.requirements.items as item (item)}<li>{item}</li>{/each}
@@ -97,6 +125,19 @@
     letter-spacing: -0.04em;
   }
 
+  h3 {
+    margin: 28px 0 12px;
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    opacity: 0.7;
+  }
+
+  .lead.small {
+    margin: 0;
+    font-size: 18px;
+  }
+
   .lead {
     margin: 20px 0 8px;
     font-size: 20px;
@@ -114,6 +155,7 @@
   }
 
   .cards,
+  .dmgs,
   .reqs {
     display: grid;
     gap: 12px;
@@ -131,6 +173,14 @@
     border: 1px solid var(--site-line);
     border-radius: var(--ui-radius-md, 6px);
     background: #000;
+  }
+
+  .dmg {
+    grid-template-columns: 1fr auto;
+  }
+
+  .install {
+    text-decoration: none;
   }
 
   .logo {
@@ -177,7 +227,12 @@
 
   code {
     font-family: 'Fragment Mono', monospace;
-    font-size: 18px;
+    font-size: 18px;  min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .terminal .install {
+    flex-shrink: 0;
   }
 
   .reqs li::before {
@@ -211,7 +266,8 @@
       font-size: 26px;
     }
 
-    .cards {
+    .cards,
+    .dmgs {
       grid-template-columns: repeat(2, 1fr);
     }
   }

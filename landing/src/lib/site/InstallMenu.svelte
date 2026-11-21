@@ -1,19 +1,25 @@
 <script lang="ts">
   import { browserEnv, installOptions, Outcome, runOption, type InstallOption } from './install';
   import { EDITOR_ICONS } from './editor-icons';
-  import { DOWNLOAD_PATH } from './links';
+  import { DESKTOP_DMGS, DESKTOP_INSTALL_COMMAND, DESKTOP_PUBLISHED, DOWNLOAD_PATH } from './links';
 
   let { label }: { label: string } = $props();
 
   const options = installOptions().filter((o) => !o.soon);
   let open = $state(false);
   let copied = $state(false);
+  let desktopCopied = $state(false);
   let root: HTMLDivElement;
 
   function choose(option: InstallOption) {
     const outcome = runOption(option, browserEnv(), (text) => navigator.clipboard?.writeText(text));
     copied = outcome === Outcome.Copied;
     open = copied;
+  }
+
+  function copyDesktop() {
+    navigator.clipboard?.writeText(DESKTOP_INSTALL_COMMAND);
+    desktopCopied = true;
   }
 
   function onKey(event: KeyboardEvent) {
@@ -46,6 +52,17 @@
           {#if option.command && copied}<span class="done">copied</span>{/if}
         </button>
       {/each}
+      {#if DESKTOP_PUBLISHED}
+        <p class="section">desktop app (beta)</p>
+        <button role="menuitem" type="button" onclick={copyDesktop}>
+          <code>{DESKTOP_INSTALL_COMMAND}</code>
+          <span class="done">{desktopCopied ? 'copied' : 'copy'}</span>
+        </button>
+        {#each DESKTOP_DMGS as dmg (dmg.arch)}
+          <a role="menuitem" href={dmg.href}>dmg · {dmg.arch.toLowerCase()}</a>
+        {/each}
+        <p class="hint">macOS blocks the dmg. allow it in privacy & security, open anyway.</p>
+      {/if}
       <a role="menuitem" class="all" href={DOWNLOAD_PATH}>All download options →</a>
     </div>
   {/if}
@@ -100,6 +117,7 @@
     display: flex;
     flex-direction: column;
     min-width: 240px;
+    max-width: calc(100vw - 32px);
     padding: 6px;
     border: 1px solid rgb(255 255 255 / 0.15);
     border-radius: var(--ui-radius-lg, 10px);
@@ -142,6 +160,28 @@
     margin-left: auto;
     color: #ff5100;
     font-size: 13px;
+  }
+
+  .section {
+    margin: 8px 10px 4px;
+    padding-top: 8px;
+    border-top: 1px solid rgb(255 255 255 / 0.1);
+    color: rgb(255 255 255 / 0.5);
+    font-size: 13px;
+  }
+
+  .hint {
+    margin: 4px 10px 6px;
+    color: rgb(255 255 255 / 0.5);
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  code {
+    font-family: 'Fragment Mono', monospace;
+    font-size: 13px;
+    text-align: left;
+    overflow-wrap: anywhere;
   }
 
   .all {
