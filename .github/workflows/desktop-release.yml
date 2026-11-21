@@ -3,7 +3,14 @@ name: Feega desktop release
 on:
   push:
     tags: ['desktop-v*']
+  pull_request:
+    paths: ['desktop/**', '.github/workflows/desktop-release.yml']
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Upload the builds to the desktop-latest release
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -18,12 +25,16 @@ jobs:
       matrix:
         include:
           - os: macos-14
+            name: mac-arm64
             targets: --mac zip dmg --arm64
-          - os: macos-13
+          - os: macos-14
+            name: mac-x64
             targets: --mac zip dmg --x64
           - os: windows-latest
+            name: win-x64
             targets: --win nsis --x64
           - os: ubuntu-24.04
+            name: linux-x64
             targets: --linux AppImage --x64
     runs-on: ${{ matrix.os }}
     steps:
@@ -43,13 +54,14 @@ jobs:
         working-directory: desktop
         shell: bash
         run: npm version --no-git-tag-version --allow-same-version "${GITHUB_REF_NAME#desktop-v}"
+      - run: npx vitest run --root . --dir desktop desktop/src
       - run: npm run build
         working-directory: desktop
       - run: npx electron-builder ${{ matrix.targets }} --publish never
         working-directory: desktop
       - uses: actions/upload-artifact@v4
         with:
-          name: desktop-${{ matrix.os }}
+          name: desktop-${{ matrix.name }}
           path: |
             desktop/release/Feega-*.zip
             desktop/release/Feega-*.dmg
@@ -59,6 +71,7 @@ jobs:
 
   release:
     needs: build
+    if: github.event_name == 'push' || inputs.publish
     runs-on: ubuntu-24.04
     env:
       GH_TOKEN: ${{ github.token }}

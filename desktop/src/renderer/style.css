@@ -76,6 +76,11 @@ svg {
   -webkit-app-region: drag;
 }
 
+html[data-platform='win32'] #bar,
+html[data-platform='linux'] #bar {
+  padding: 0 148px 0 14px;
+}
+
 #bar > * {
   -webkit-app-region: no-drag;
 }

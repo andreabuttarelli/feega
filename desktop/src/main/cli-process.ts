@@ -2,7 +2,9 @@ import { app } from 'electron';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
+import { killTree } from '../../../inspect/src/host/process-tree';
 import { type PidFile } from './pid-file';
+import { GracefulStop, platformRow } from './platform';
 
 const EDITOR_READY = /editor ready on (https?:\/\/\S+)/;
 const STOP_ON_STDIN_END = 'FEEGA_STOP_ON_STDIN_END';
@@ -49,8 +51,10 @@ export async function startCli(dir: string, pids: PidFile, options: CliOptions, 
   const port = await freePort(options.editorPort);
   const cli = bundledCli();
   const args = [cli, dir, '--no-open', '--port', String(port)];
+  const row = platformRow(process.platform);
   const child = spawn(process.execPath, args, {
-    detached: true,
+    detached: row.detached,
+    windowsHide: row.windowsHide,
     stdio: ['pipe', 'pipe', 'pipe'],
     env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', [STOP_ON_STDIN_END]: '1', FORCE_COLOR: '0', ...(options.telemetry ? {} : { FEEGA_TELEMETRY: '0' }) }
   });
@@ -88,14 +92,13 @@ export async function startCli(dir: string, pids: PidFile, options: CliOptions, 
     events.onExit(lines.slice(-TAIL_LINES).join('\n'));
   });
 
-  const signalGroup = (signal: NodeJS.Signals) => {
-    if (!child.pid) {
+  const stopGracefully = () => {
+    if (row.graceful === GracefulStop.Stdin) {
+      child.stdin.end();
       return;
     }
-    try {
-      process.kill(-child.pid, signal);
-    } catch {
-      return;
+    if (child.pid) {
+      killTree(child.pid, 'SIGTERM');
     }
   };
 
@@ -106,12 +109,12 @@ export async function startCli(dir: string, pids: PidFile, options: CliOptions, 
           resolve();
           return;
         }
-        const timer = setTimeout(() => signalGroup('SIGKILL'), GRACE_MS);
+        const timer = setTimeout(() => child.pid && killTree(child.pid, 'SIGKILL'), GRACE_MS);
         child.once('exit', () => {
           clearTimeout(timer);
           resolve();
         });
-        signalGroup('SIGTERM');
+        stopGracefully();
       })
   };
 }

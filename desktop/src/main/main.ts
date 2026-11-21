@@ -1,4 +1,4 @@
-import { BrowserWindow, app, dialog, ipcMain, nativeImage, nativeTheme, shell, type BrowserWindowConstructorOptions } from 'electron';
+import { BrowserWindow, app, dialog, ipcMain, nativeImage, nativeTheme, shell } from 'electron';
 import { basename, join, resolve } from 'node:path';
 import { accountStore } from './account';
 import { SCHEME, acceptDeepLink, linkOfArgv } from './deep-link';
@@ -9,6 +9,7 @@ import { frameworkOf } from './project-info';
 import { settingsStore } from './store';
 import { tabHost } from './tabs';
 import pkg from '../../package.json';
+import { platformRow } from './platform';
 import { Channel, type Link, type Preferences, type ShellState } from './types';
 
 const DEFAULT_SIZE = { width: 1440, height: 900 };
@@ -16,13 +17,6 @@ const MIN_SIZE = { minWidth: 900, minHeight: 600 };
 const APP_NAME = 'Feega';
 const WEBSITE = 'https://feega.app';
 const ICON_PATH = join(__dirname, '..', 'build', 'icons', 'icon.png');
-const SOLID_BACKGROUND = '#121212';
-const TRANSPARENT = '#00000000';
-const VIBRANCY = 'under-window';
-
-const surface = (): BrowserWindowConstructorOptions =>
-  process.platform === 'darwin' ? { vibrancy: VIBRANCY, visualEffectState: 'active', backgroundColor: TRANSPARENT } : { backgroundColor: SOLID_BACKGROUND };
-const TRAFFIC_LIGHTS = { x: 18, y: 20 };
 
 app.setName(APP_NAME);
 
@@ -69,11 +63,9 @@ app.whenReady().then(() => {
   const window = new BrowserWindow({
     ...DEFAULT_SIZE,
     ...MIN_SIZE,
-    ...surface(),
+    ...platformRow(process.platform).chrome,
     title: APP_NAME,
     icon,
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: TRAFFIC_LIGHTS,
     webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true }
   });
 

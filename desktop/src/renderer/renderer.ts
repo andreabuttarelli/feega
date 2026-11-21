@@ -1,4 +1,5 @@
 import { LOGO_PATHS, type Logo } from '../../../landing/src/lib/site/codebase/logos';
+import { platformRow } from '../main/platform';
 import { PIXELS, pixelSvg } from './pixel';
 import { Link, TabStatus, type RecentInfo, type ShellState, type TabInfo } from '../main/types';
 
@@ -77,7 +78,9 @@ const pill = (text: string, kind: string, on: () => void) => el('button', { clas
 
 const mark = (size: number = MARK_SIZE) => `<svg width="${size}" height="${size}" viewBox="0 0 300 300" fill="${MARK_FILL}">${MARK}</svg>`;
 
-const tidyPath = (dir: string) => dir.replace(/^\/(Users|home)\/[^/]+/, '~');
+const HOME_PREFIX = /^(\/(Users|home)\/[^/]+|[A-Za-z]:\\Users\\[^\\]+)/;
+
+const tidyPath = (dir: string) => dir.replace(HOME_PREFIX, '~');
 
 const ago = (at: number) => {
   const age = Date.now() - at;
@@ -158,6 +161,8 @@ const accountChip = (state: ShellState) => {
 
 const menuRow = (label: string, on: () => void, hint = '') => el('button', { class: 'row', on }, el('span', { text: label }), el('span', { class: 'hint', text: hint }));
 
+const shortcuts = () => platformRow(document.documentElement.dataset.platform ?? '').shortcuts;
+
 const accountMenu = (state: ShellState) => {
   const label = state.email ?? 'guest · not signed in';
   const who = el('div', { class: 'who' }, el('span', { class: `avatar${state.email ? '' : ' guest'}`, text: (state.email ?? 'guest')[0] }), el('span', { class: 'label', text: label }));
@@ -165,12 +170,12 @@ const accountMenu = (state: ShellState) => {
   const rows = [
     who,
     account,
-    menuRow('settings', () => showRoute(Route.Settings), '⌘,'),
+    menuRow('settings', () => showRoute(Route.Settings), shortcuts().settings),
     menuRow('docs', run(() => bridge.openLink(Link.Docs)), '↗'),
     menuRow('community', run(() => bridge.openLink(Link.Community)), '↗'),
     el('div', { class: 'divider' }),
     ...(state.email ? [menuRow('sign out', run(() => bridge.signOut()))] : []),
-    menuRow('quit feega', run(() => bridge.quit()), '⌘Q')
+    menuRow('quit feega', run(() => bridge.quit()), shortcuts().quit)
   ];
   return el('div', { class: 'menu' }, ...rows);
 };
