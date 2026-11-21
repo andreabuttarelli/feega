@@ -1,7 +1,8 @@
 export enum ArticleKind {
   Roundup = 'roundup',
   UseCase = 'use-case',
-  Single = 'single'
+  Single = 'single',
+  Agent = 'agent'
 }
 
 export type Question = { readonly q: string; readonly a: string };

@@ -1,4 +1,5 @@
 import { ArticleKind, type Article } from './alternative';
+import { AGENT_ARTICLES } from './agents';
 import { ROUNDUPS } from './roundups';
 import { RICH } from './rich';
 import { SINGLES } from './singles';
@@ -15,7 +16,8 @@ export const ALTERNATIVES_INDEX = {
 export const KIND_HEADINGS: Readonly<Record<ArticleKind, string>> = {
   [ArticleKind.Roundup]: 'Side by side',
   [ArticleKind.UseCase]: 'Situations',
-  [ArticleKind.Single]: 'Alternatives to one tool'
+  [ArticleKind.Single]: 'Alternatives to one tool',
+  [ArticleKind.Agent]: 'Alternatives for your coding agent'
 };
 
 export const TRY_STEPS: readonly string[] = [
@@ -31,7 +33,7 @@ const withRich = ([slug, article]: [string, Article]): [string, Article] => {
   return [slug, { ...article, rich, sections: article.sections.filter((s) => !rich?.highlights.some((h) => h.heading === s.heading)), questions: [...article.questions, ...(rich?.moreQuestions ?? [])] }];
 };
 
-export const ALTERNATIVES: Readonly<Record<string, Article>> = Object.fromEntries(Object.entries({ ...ROUNDUPS, ...SINGLES }).map(withRich));
+export const ALTERNATIVES: Readonly<Record<string, Article>> = Object.fromEntries(Object.entries({ ...ROUNDUPS, ...SINGLES, ...AGENT_ARTICLES }).map(withRich));
 
 export const alternativePath = (slug: string) => `${ALTERNATIVES_PATH}/${slug}`;
 
