@@ -45,6 +45,7 @@ jobs:
           fi
           npm whoami
       - run: npm ci --no-audit --no-fund
+      - run: npx svelte-kit sync
       - name: Version from the tag
         if: env.TAGGED == 'true'
         working-directory: inspect
