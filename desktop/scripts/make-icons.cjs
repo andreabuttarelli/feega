@@ -9,7 +9,7 @@ const CANVAS = 1024;
 const TILE = 824;
 const TILE_RADIUS = 185;
 const MARK_BOX = 228;
-const MARK_SIZE = 420;
+const MARK_SIZE = 540;
 const ICO_SIZES = [256, 128, 64, 48, 32, 16];
 const ICONSET = [16, 32, 128, 256, 512];
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -25,11 +25,11 @@ const iconSvg = () => {
   const scale = MARK_SIZE / MARK_BOX;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${CANVAS}" height="${CANVAS}" viewBox="0 0 ${CANVAS} ${CANVAS}">
   <defs>
-    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#202020"/><stop offset="1" stop-color="#121212"/></linearGradient>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#000" flood-opacity="0.45"/></filter>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#ececec"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#000" flood-opacity="0.35"/></filter>
   </defs>
   <rect x="${margin}" y="${margin}" width="${TILE}" height="${TILE}" rx="${TILE_RADIUS}" fill="url(#tile)" filter="url(#shadow)"/>
-  <rect x="${margin + 1}" y="${margin + 1}" width="${TILE - 2}" height="${TILE - 2}" rx="${TILE_RADIUS - 1}" fill="none" stroke="#ffffff" stroke-opacity="0.09" stroke-width="2"/>
+  <rect x="${margin + 1}" y="${margin + 1}" width="${TILE - 2}" height="${TILE - 2}" rx="${TILE_RADIUS - 1}" fill="none" stroke="#000000" stroke-opacity="0.08" stroke-width="2"/>
   <g transform="translate(${CANVAS / 2} ${CANVAS / 2}) scale(${scale}) translate(-150 -150)" fill="#ff5100">${markPaths()}</g>
 </svg>`;
 };

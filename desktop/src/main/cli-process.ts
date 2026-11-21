@@ -1,3 +1,4 @@
+import { app } from 'electron';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
@@ -40,11 +41,13 @@ export async function freePort(from: number = AUTO): Promise<number> {
   return freePort(AUTO);
 }
 
+const bundledCli = () => (app.isPackaged ? join(process.resourcesPath, 'npx', 'cli.cjs') : join(__dirname, '..', '..', 'npx', 'dist', 'cli.cjs'));
+
 export type CliOptions = { editorPort: number; telemetry: boolean };
 
 export async function startCli(dir: string, pids: PidFile, options: CliOptions, events: CliEvents) {
   const port = await freePort(options.editorPort);
-  const cli = join(__dirname, '..', '..', 'npx', 'dist', 'cli.cjs');
+  const cli = bundledCli();
   const args = [cli, dir, '--no-open', '--port', String(port)];
   const child = spawn(process.execPath, args, {
     detached: true,

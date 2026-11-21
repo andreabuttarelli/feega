@@ -11,52 +11,49 @@
     "build": "node build.mjs",
     "icons": "electron scripts/make-icons.cjs",
     "dev": "node scripts/dev-identity.mjs && node build.mjs && electron .",
-    "start": "node scripts/dev-identity.mjs && node build.mjs && electron ."
+    "start": "node scripts/dev-identity.mjs && node build.mjs && electron .",
+    "dist": "node build.mjs && electron-builder --publish never"
   },
   "devDependencies": {
     "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
     "esbuild": "^0.25.0"
   },
   "build": {
     "appId": "app.feega.desktop",
     "productName": "Feega",
     "copyright": "Copyright 2026 Feega",
-    "files": [
-      "dist/**",
-      "build/icons/**",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "../npx/dist",
-        "to": "npx"
-      }
-    ],
-    "directories": {
-      "buildResources": "build/icons"
-    },
+    "asar": true,
+    "files": ["dist/**", "build/icons/**", "package.json"],
+    "extraResources": [{ "from": "../npx/dist", "to": "npx" }],
+    "directories": { "buildResources": "build/icons", "output": "release" },
+    "afterPack": "scripts/ad-hoc-sign.cjs",
+    "protocols": [{ "name": "Feega", "schemes": ["feega"] }],
     "mac": {
       "icon": "build/icons/icon.icns",
       "category": "public.app-category.developer-tools",
-      "darkModeSupport": true
+      "darkModeSupport": true,
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "artifactName": "Feega-mac-${arch}.${ext}",
+      "target": [
+        { "target": "zip", "arch": ["arm64", "x64"] },
+        { "target": "dmg", "arch": ["arm64", "x64"] }
+      ]
     },
+    "dmg": { "artifactName": "Feega-mac-${arch}.${ext}" },
     "win": {
-      "icon": "build/icons/icon.ico"
+      "icon": "build/icons/icon.ico",
+      "target": [{ "target": "nsis", "arch": ["x64"] }]
     },
+    "nsis": { "artifactName": "Feega-win-${arch}.${ext}", "oneClick": false, "allowToChangeInstallationDirectory": true },
     "linux": {
       "icon": "build/icons",
       "category": "Development",
-      "mimeTypes": [
-        "x-scheme-handler/feega"
-      ]
+      "mimeTypes": ["x-scheme-handler/feega"],
+      "target": [{ "target": "AppImage", "arch": ["x64"] }]
     },
-    "protocols": [
-      {
-        "name": "Feega",
-        "schemes": [
-          "feega"
-        ]
-      }
-    ]
+    "appImage": { "artifactName": "Feega-linux-${arch}.${ext}" }
   }
 }
