@@ -1,0 +1,23 @@
+name = "feega-relay"
+main = "src/index.ts"
+compatibility_date = "2026-04-07"
+
+[vars]
+VISITOR_BASE = "s.feega.app"
+WEB_ORIGIN = "https://oh.feega.app"
+
+[[durable_objects.bindings]]
+name = "SESSION"
+class_name = "Session"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Session"]
+
+[[routes]]
+pattern = "relay.s.feega.app/*"
+zone_name = "feega.app"
+
+[[routes]]
+pattern = "*.s.feega.app/*"
+zone_name = "feega.app"

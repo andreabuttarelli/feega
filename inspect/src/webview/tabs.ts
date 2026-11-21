@@ -1,4 +1,5 @@
 export enum Tab {
   Properties = 'properties',
-  Changes = 'changes'
+  Changes = 'changes',
+  Comments = 'comments'
 }
