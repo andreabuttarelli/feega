@@ -1,4 +1,3 @@
-
 <script lang="ts">
   import { _ } from 'svelte-i18n';
   import { Notice } from '$lib/components/ui/notice';
@@ -8,10 +7,13 @@
   import { BillingPlan } from '$lib/billing-plan';
   import type { load as sectionLoad } from '$lib/server/settings/pages/billing';
   import { formatDay } from './billing-format';
+  import PixelBand from './PixelBand.svelte';
+  import '../../../../../packages/site-theme/tokens.css';
 
   let { data, outcome = CheckoutOutcome.None }: { data: Awaited<ReturnType<typeof sectionLoad>>; outcome?: CheckoutOutcome } = $props();
 
   const INCLUDES = ['include1', 'include2', 'include3', 'include4'] as const;
+  const EDITOR_LINES = ['editorLine1', 'editorLine2', 'editorLine3'] as const;
   const QUESTIONS = ['faq1', 'faq2', 'faq3', 'faq4'] as const;
   const INTERVALS = [CloudInterval.Monthly, CloudInterval.Annual] as const;
 
@@ -21,7 +23,6 @@
 
   const isCloud = $derived(data.plan === BillingPlan.Cloud);
   const price = $derived(CLOUD_PRICES[interval]);
-  const seatShare = $derived(data.editors > 0 ? Math.min(100, Math.round((data.seatsPaid / data.editors) * 100)) : 0);
   const status = $derived(data.pastDue ? 'statusPastDue' : data.endsAt ? 'statusEnding' : 'statusActive');
   const money = (amount: number) => `${CLOUD_CURRENCY_SYMBOL}${amount}`;
 
@@ -54,347 +55,331 @@
 {/if}
 
 <div class="billing" data-testid="billing-page" data-plan={data.plan}>
-  <section class="tile plan" data-testid="billing-plan">
-    <p class="eyebrow">{$_('app.settings.billing.currentPlan')}</p>
-    <div class="plan-head">
-      <h2>{isCloud ? $_('app.settings.billing.planCloud') : $_('app.settings.billing.planFree')}</h2>
-      {#if isCloud}
-        <span class="pill" class:warn={data.pastDue || !!data.endsAt}>{$_(`app.settings.billing.${status}`)}</span>
-      {/if}
-    </div>
-    <p class="muted">{isCloud ? $_('app.settings.billing.cloudLine') : $_('app.settings.billing.freeLine')}</p>
-
-    {#if isCloud}
-      <div class="seats" data-testid="billing-seats">
-        <div class="seat-numbers">
-          <span class="big">{data.seatsPaid}<small> / {data.editors}</small></span>
-          <span class="muted">{$_('app.settings.billing.seatsPaid')}</span>
-        </div>
-        <div class="bar" role="presentation"><span style:width="{seatShare}%"></span></div>
-        <p class="muted small">{$_('app.settings.billing.viewersFree')}</p>
-      </div>
-
-      <dl class="facts">
-        <div>
-          <dt>{data.endsAt ? $_('app.settings.billing.endsOn') : $_('app.settings.billing.renews')}</dt>
-          <dd data-testid="billing-renewal">{formatDay(data.endsAt ?? data.renewsAt) ?? $_('app.settings.billing.noRenewal')}</dd>
-        </div>
-        <div>
-          <dt>{$_('app.settings.billing.editors')}</dt>
-          <dd>{data.editors}</dd>
-        </div>
-      </dl>
-
-      {#if data.pastDue}
-        <p class="note warn">{$_('app.settings.billing.pastDueNote')}</p>
-      {:else if data.endsAt}
-        <p class="note warn">{$_('app.settings.billing.endingNote')}</p>
-      {/if}
-
-      <div class="actions">
-        <button type="button" class="pill-button" disabled={!data.canManage || busy !== Busy.Idle} onclick={manage} data-testid="billing-manage">
-          {busy === Busy.Portal ? $_('app.settings.billing.managing') : $_('app.settings.billing.manage')}
-        </button>
-        <span class="muted small">{$_('app.settings.billing.manageHint')}</span>
-      </div>
-    {:else}
-      <dl class="facts">
-        <div>
-          <dt>{$_('app.settings.billing.editors')}</dt>
-          <dd>{data.editors}</dd>
-        </div>
-      </dl>
-    {/if}
-  </section>
-
   {#if !isCloud}
-    <section class="tile cloud" data-testid="billing-upgrade">
-      <h2>{$_('app.settings.billing.cloudTitle')}</h2>
-      <p class="muted">{$_('app.settings.billing.cloudFor')}</p>
-
-      <div class="toggle" role="group" aria-label={$_('app.settings.billing.intervalLabel')}>
-        {#each INTERVALS as option (option)}
-          <button type="button" class:on={interval === option} aria-pressed={interval === option} onclick={() => (interval = option)} data-testid="interval-{option}">
-            {$_(`app.settings.billing.${option}`)}
-            {#if option === CloudInterval.Annual}<em>{$_('app.settings.billing.save', { values: { percent: ANNUAL_SAVING_PERCENT } })}</em>{/if}
-          </button>
-        {/each}
-      </div>
-
-      <p class="price" data-testid="billing-price">
-        <span class="amount">{money(price.perMonth)}</span>
-        <span class="muted">{$_('app.settings.billing.perEditorMonth')}</span>
-      </p>
-      <p class="muted small">
-        {interval === CloudInterval.Annual
-          ? $_('app.settings.billing.billedYearly', { values: { amount: money(price.perYear) } })
-          : $_('app.settings.billing.billedMonthly')}
-      </p>
-
-      <button type="button" class="pill-button" disabled={!data.canManage || busy !== Busy.Idle} onclick={upgrade} data-testid="billing-upgrade-button">
-        {busy === Busy.Checkout ? $_('app.settings.billing.upgrading') : $_('app.settings.billing.upgrade')}
-      </button>
-    </section>
+    <div class="toggle" role="group" aria-label={$_('app.settings.billing.intervalLabel')}>
+      {#each INTERVALS as option (option)}
+        <button type="button" class:on={interval === option} aria-pressed={interval === option} onclick={() => (interval = option)} data-testid="interval-{option}">
+          {$_(`app.settings.billing.${option}`)}
+          {#if option === CloudInterval.Annual}<em>{$_('app.settings.billing.save', { values: { percent: ANNUAL_SAVING_PERCENT } })}</em>{/if}
+        </button>
+      {/each}
+    </div>
   {/if}
 
-  <section class="tile includes" data-testid="billing-includes">
-    <h2>{$_('app.settings.billing.includesTitle')}</h2>
-    <ul>
-      {#each INCLUDES as item (item)}<li>{$_(`app.settings.billing.${item}`)}</li>{/each}
-    </ul>
-  </section>
+  <div class="plans">
+    <article class="plan" data-testid="billing-plan">
+      <div class="strip terminal" aria-hidden="true"><span>$</span>npx feega</div>
+      <div class="title">
+        <h3>{$_('app.settings.billing.planFree')}</h3>
+        {#if !isCloud}<span class="badge">{$_('app.settings.billing.current')}</span>{/if}
+      </div>
+      <p class="for">{$_('app.settings.billing.editorFor')}</p>
+      <p class="price"><span class="amount">{money(0)}</span> <span class="unit">{$_('app.settings.billing.editorUnit')}</span></p>
+      <div class="action"><span class="cta outline">{$_('app.settings.billing.editorCta')}</span></div>
+      <p class="start">{$_('app.settings.billing.freeLine')}</p>
+      <ul>
+        {#each EDITOR_LINES as item (item)}<li>{$_(`app.settings.billing.${item}`)}</li>{/each}
+      </ul>
+    </article>
 
-  <section class="tile faq" data-testid="billing-faq">
-    <h2>{$_('app.settings.billing.faqTitle')}</h2>
-    {#each QUESTIONS as item (item)}
-      <details>
-        <summary>{$_(`app.settings.billing.${item}q`)}</summary>
-        <p class="muted">{$_(`app.settings.billing.${item}a`)}</p>
-      </details>
-    {/each}
+    <article class="plan" data-testid={isCloud ? 'billing-cloud' : 'billing-upgrade'}>
+      <div class="strip pixels" aria-hidden="true"><PixelBand /></div>
+      <div class="title">
+        <h3>{$_('app.settings.billing.planCloud')}</h3>
+        {#if isCloud}
+          <span class="badge" class:warn={data.pastDue || !!data.endsAt}>{$_('app.settings.billing.current')} · {$_(`app.settings.billing.${status}`)}</span>
+        {/if}
+      </div>
+      <p class="for">{$_('app.settings.billing.cloudFor')}</p>
+
+      {#if isCloud}
+        <p class="price" data-testid="billing-seats">
+          <span class="amount">{data.seatsPaid}</span>
+          <span class="unit">/ {data.editors} {$_('app.settings.billing.seatsPaid')}</span>
+        </p>
+        <div class="action">
+          <button type="button" class="cta" disabled={!data.canManage || busy !== Busy.Idle} onclick={manage} data-testid="billing-manage">
+            {busy === Busy.Portal ? $_('app.settings.billing.managing') : $_('app.settings.billing.manage')}
+          </button>
+        </div>
+        <div class="start">
+          <p>
+            {data.endsAt ? $_('app.settings.billing.endsOn') : $_('app.settings.billing.renews')}
+            <span data-testid="billing-renewal">{formatDay(data.endsAt ?? data.renewsAt) ?? $_('app.settings.billing.noRenewal')}</span>
+          </p>
+          {#if data.pastDue}
+            <p class="note">{$_('app.settings.billing.pastDueNote')}</p>
+          {:else if data.endsAt}
+            <p class="note">{$_('app.settings.billing.endingNote')}</p>
+          {:else}
+            <p class="hint">{$_('app.settings.billing.manageHint')}</p>
+          {/if}
+        </div>
+      {:else}
+        <p class="price" data-testid="billing-price">
+          <span class="amount">{money(price.perMonth)}</span>
+          <span class="unit">{$_('app.settings.billing.perEditorMonth')}</span>
+        </p>
+        <div class="action">
+          <button type="button" class="cta" disabled={!data.canManage || busy !== Busy.Idle} onclick={upgrade} data-testid="billing-upgrade-button">
+            {busy === Busy.Checkout ? $_('app.settings.billing.upgrading') : $_('app.settings.billing.upgrade')}
+          </button>
+        </div>
+        <p class="start">
+          {interval === CloudInterval.Annual
+            ? $_('app.settings.billing.billedYearly', { values: { amount: money(price.perYear) } })
+            : $_('app.settings.billing.billedMonthly')}
+        </p>
+      {/if}
+
+      <ul data-testid="billing-includes">
+        {#each INCLUDES as item (item)}<li>{$_(`app.settings.billing.${item}`)}</li>{/each}
+      </ul>
+    </article>
+  </div>
+
+  <dl class="summary">
+    <div>
+      <dt>{$_('app.settings.billing.editors')}</dt>
+      <dd>{data.editors}</dd>
+    </div>
+    <div>
+      <dt>{$_('app.settings.billing.seatsPaid')}</dt>
+      <dd>{data.seatsPaid}</dd>
+    </div>
+    <div>
+      <dt>{data.endsAt ? $_('app.settings.billing.endsOn') : $_('app.settings.billing.renews')}</dt>
+      <dd>{formatDay(data.endsAt ?? data.renewsAt) ?? $_('app.settings.billing.noRenewal')}</dd>
+    </div>
+  </dl>
+
+  <section class="faq" data-testid="billing-faq">
+    <h3>{$_('app.settings.billing.faqTitle')}</h3>
+    <div class="list">
+      {#each QUESTIONS as item, index (item)}
+        <details open={index === 0}>
+          <summary><span>{$_(`app.settings.billing.${item}q`)}</span><span aria-hidden="true">+</span></summary>
+          <p>{$_(`app.settings.billing.${item}a`)}</p>
+        </details>
+      {/each}
+    </div>
   </section>
 </div>
 
 <style>
   .billing {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: var(--ui-space-4);
-    align-items: start;
-  }
-
-  .tile {
     display: flex;
     flex-direction: column;
-    gap: var(--ui-space-3);
-    padding: var(--ui-space-6);
-    border-radius: 12px;
-    background: var(--ui-panel-sunken);
-    color: var(--ui-text);
-  }
-
-  .plan {
-    grid-column: 1 / -1;
-  }
-
-  h2 {
-    margin: 0;
-    font-size: clamp(24px, 3vw, 32px);
-    font-weight: 500;
-    letter-spacing: -0.04em;
-    line-height: 1.05;
+    gap: 24px;
+    margin-top: 16px;
+    color: var(--sx-ink);
+    font-size: var(--sx-fs-small);
+    line-height: 1.45;
   }
 
   p {
     margin: 0;
   }
 
-  .eyebrow {
-    font-size: var(--ui-text-sm);
-    color: var(--ui-text-tertiary);
-  }
-
-  .muted {
-    color: var(--ui-text-secondary);
-  }
-
-  .small {
-    font-size: var(--ui-text-sm);
-  }
-
-  .plan-head {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: var(--ui-space-3);
-  }
-
-  .pill {
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-size: var(--ui-text-sm);
-    background: color-mix(in srgb, var(--ui-ok) 16%, transparent);
-    color: var(--ui-ok);
-  }
-
-  .pill.warn {
-    background: color-mix(in srgb, var(--ui-warn) 16%, transparent);
-    color: var(--ui-warn);
-  }
-
-  .seats {
-    display: flex;
-    flex-direction: column;
-    gap: var(--ui-space-2);
-    margin-top: var(--ui-space-2);
-  }
-
-  .seat-numbers {
-    display: flex;
-    align-items: baseline;
-    gap: var(--ui-space-3);
-  }
-
-  .big {
-    font-size: 44px;
-    font-weight: 500;
-    letter-spacing: -0.05em;
-    line-height: 1;
-  }
-
-  .big small {
-    font-size: 20px;
-    color: var(--ui-text-tertiary);
-    letter-spacing: -0.02em;
-  }
-
-  .bar {
-    height: 6px;
-    border-radius: 999px;
-    background: var(--ui-input);
-    overflow: hidden;
-  }
-
-  .bar span {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    background: var(--ui-text);
-  }
-
-  .facts {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--ui-space-6);
-    margin: var(--ui-space-2) 0 0;
-    padding-top: var(--ui-space-3);
-    border-top: 1px solid var(--ui-divider);
-  }
-
-  .facts dt {
-    font-size: var(--ui-text-sm);
-    color: var(--ui-text-tertiary);
-  }
-
-  .facts dd {
-    margin: 2px 0 0;
-    font-size: var(--ui-text-lg);
-  }
-
-  .note.warn {
-    padding: 10px 14px;
-    border-radius: 8px;
-    font-size: var(--ui-text-sm);
-    color: var(--ui-warn);
-    background: color-mix(in srgb, var(--ui-warn) 10%, transparent);
-  }
-
-  .actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--ui-space-3);
-    margin-top: var(--ui-space-2);
-  }
-
-  .cloud {
-    box-shadow: inset 0 0 0 1px var(--ui-divider-strong);
-  }
-
   .toggle {
     display: inline-flex;
-    align-self: flex-start;
-    gap: 2px;
-    padding: 3px;
+    align-self: center;
+    gap: 4px;
+    padding: 4px;
     border-radius: 999px;
-    background: var(--ui-input);
+    background: var(--sx-pill);
   }
 
   .toggle button {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 7px 14px;
+    padding: 8px 18px;
     border: 0;
     border-radius: 999px;
     background: transparent;
     color: inherit;
     font: inherit;
-    font-size: var(--ui-text-sm);
     cursor: pointer;
   }
 
   .toggle button.on {
-    background: var(--ui-text);
-    color: var(--ui-panel);
+    background: var(--sx-ink);
+    color: var(--sx-bg);
   }
 
   .toggle em {
     font-style: normal;
-    font-size: 11px;
-    color: var(--brand-orange);
+    font-size: 13px;
+    color: var(--sx-accent);
+  }
+
+  .plans {
+    display: grid;
+    gap: 16px;
+  }
+
+  .plan {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 28px 24px;
+    border-radius: var(--sx-radius-lg);
+    background: var(--sx-bg);
+    color: var(--sx-ink);
+  }
+
+  .strip {
+    height: 140px;
+    margin: -12px -12px 8px;
+    border-radius: var(--sx-radius-md);
+    background: #111;
+  }
+
+  .strip.pixels {
+    padding: 12px;
+  }
+
+  .strip.terminal {
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    font-family: var(--sx-mono);
+    font-size: 14px;
+    color: rgba(240, 238, 233, 0.8);
+  }
+
+  .strip.terminal span {
+    margin-right: 10px;
+    color: var(--sx-accent);
+  }
+
+  .title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  h3 {
+    margin: 0;
+    font-size: 26px;
+    letter-spacing: -0.04em;
+    font-weight: 400;
+  }
+
+  .badge {
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: var(--sx-tint-accent);
+    box-shadow: inset 0 0 0 1px var(--sx-accent);
+    color: var(--sx-accent);
+    font-size: 13px;
+  }
+
+  .badge.warn {
+    background: transparent;
+    color: var(--sx-accent-soft);
+    box-shadow: inset 0 0 0 1px var(--sx-accent-soft);
+  }
+
+  .for {
+    margin: -8px 0 8px;
+    opacity: 0.7;
   }
 
   .price {
     display: flex;
     align-items: baseline;
     flex-wrap: wrap;
-    gap: var(--ui-space-2);
-    margin-top: var(--ui-space-2);
+    gap: 8px;
   }
 
   .amount {
-    font-size: 56px;
-    font-weight: 500;
-    letter-spacing: -0.05em;
+    font-size: 48px;
+    white-space: nowrap;
     line-height: 1;
+    letter-spacing: -0.05em;
   }
 
-  .pill-button {
+  .unit {
+    font-size: 18px;
+    opacity: 0.65;
+  }
+
+  .action {
+    display: flex;
+  }
+
+  .cta {
     display: inline-flex;
-    align-items: center;
     justify-content: center;
-    min-height: 44px;
-    padding: 0 22px;
+    align-items: center;
+    min-height: 48px;
+    padding: 0 24px;
     border: 0;
-    border-radius: 999px;
-    background: var(--ui-text);
-    color: var(--ui-panel);
+    border-radius: 100px;
+    background: var(--sx-accent);
+    color: #fff;
     font: inherit;
+    font-size: 18px;
     font-weight: 500;
+    letter-spacing: -0.02em;
     cursor: pointer;
-    transition: opacity var(--ui-dur-fast, 120ms);
+    transition: background 0.2s ease;
   }
 
-  .pill-button:hover:not(:disabled) {
-    opacity: 0.88;
+  .cta.outline {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px rgba(240, 238, 233, 0.4);
+    cursor: default;
   }
 
-  .pill-button:disabled {
+  .cta:hover:not(:disabled):not(.outline) {
+    background: #ff6a26;
+  }
+
+  .cta:disabled {
     opacity: 0.4;
     cursor: default;
   }
 
-  .pill-button:focus-visible {
-    outline: none;
-    box-shadow: var(--ui-ring);
+  .cta:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 3px;
   }
 
-  .cloud .pill-button {
-    margin-top: var(--ui-space-3);
+  .start {
+    display: grid;
+    gap: 8px;
+    align-content: start;
+    color: #fff;
+  }
+
+  .start .note {
+    padding: 12px 14px;
+    border-radius: var(--sx-radius-md);
+    background: var(--sx-tint-accent);
+    box-shadow: inset 0 0 0 1px var(--sx-accent);
+  }
+
+  .start .hint {
+    opacity: 0.7;
   }
 
   ul {
     display: grid;
-    gap: var(--ui-space-3);
-    margin: 0;
-    padding: 0;
+    align-content: start;
+    gap: 12px;
+    margin: 8px 0 0;
+    padding: 16px 0 0;
+    border-top: 1px solid rgba(240, 238, 233, 0.15);
     list-style: none;
   }
 
   li {
     position: relative;
-    padding-left: 26px;
+    padding-left: 24px;
   }
 
   li::before {
@@ -404,37 +389,123 @@
     left: 2px;
     width: 9px;
     height: 5px;
-    border-bottom: 1.5px solid var(--brand-orange);
-    border-left: 1.5px solid var(--brand-orange);
+    border-bottom: 1.5px solid var(--sx-accent);
+    border-left: 1.5px solid var(--sx-accent);
     transform: rotate(-45deg);
   }
 
+  .summary {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin: 0;
+    padding: 20px 24px;
+    border-radius: var(--sx-radius-lg);
+    background: var(--sx-bg);
+  }
+
+  .summary dt {
+    font-size: 13px;
+    opacity: 0.65;
+  }
+
+  .summary dd {
+    margin: 4px 0 0;
+    font-size: var(--sx-fs-lead);
+    letter-spacing: -0.02em;
+  }
+
+  .faq {
+    display: grid;
+    gap: 24px;
+    margin-top: 24px;
+    padding: 28px 24px;
+    border-radius: var(--sx-radius-lg);
+    background: var(--sx-bg);
+  }
+
+  .faq h3 {
+    font-size: 28px;
+    line-height: 1.1;
+  }
+
   details {
-    padding: var(--ui-space-3) 0;
-    border-top: 1px solid var(--ui-divider);
+    border-top: 1px solid rgba(240, 238, 233, 0.2);
+  }
+
+  details:last-child {
+    border-bottom: 1px solid rgba(240, 238, 233, 0.2);
   }
 
   summary {
-    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    min-height: 56px;
     list-style: none;
-    font-size: var(--ui-text-md);
+    cursor: pointer;
+    font-size: 18px;
+  }
+
+  summary span:first-child {
+    text-transform: lowercase;
   }
 
   summary::-webkit-details-marker {
     display: none;
   }
 
+  summary:focus-visible {
+    outline: 2px solid var(--sx-accent);
+    outline-offset: 2px;
+  }
+
+  details[open] summary span:last-child {
+    transform: rotate(45deg);
+  }
+
   details p {
-    margin-top: var(--ui-space-2);
+    padding-bottom: 20px;
+    max-width: 640px;
+    opacity: 0.7;
   }
 
   @media (min-width: 810px) {
-    .billing {
+    .plans {
       grid-template-columns: 1fr 1fr;
     }
 
+    .plan {
+      display: grid;
+      grid-row: span 7;
+      grid-template-rows: subgrid;
+      align-content: start;
+      padding: 40px;
+    }
+
+    .summary {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
     .faq {
-      grid-column: 1 / -1;
+      grid-template-columns: 1fr 2fr;
+      gap: 32px;
+      padding: 40px;
+    }
+  }
+
+  @media (min-width: 1200px) {
+    h3 {
+      font-size: 30px;
+    }
+
+    .amount {
+      font-size: 64px;
+    }
+
+    .plan {
+      padding: 48px;
     }
   }
 </style>

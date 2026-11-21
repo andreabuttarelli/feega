@@ -14,6 +14,7 @@
   const editable = $derived(sectionEditable(path, data.org.role as OrgRole));
   const activeSection = $derived(SETTINGS_SECTIONS.find((s) => path.endsWith(`/settings/${s.path}`))?.path ?? '');
   const titleKey = $derived(SETTINGS_SECTIONS.find((s) => s.path === activeSection)?.labelKey);
+  const subtitleKey = $derived(SETTINGS_SECTIONS.find((s) => s.path === activeSection)?.subtitleKey);
   const title = $derived($_(titleKey ?? 'app.nav.settings'));
 </script>
 
@@ -21,6 +22,7 @@
   <div class="content settings-shell">
     <PageHead {title} subtitle={null} />
     <PageTitle text={title} />
+    {#if subtitleKey}<p class="subtitle">{$_(subtitleKey)}</p>{/if}
     <nav class="tabs" aria-label={$_('app.nav.settings')}>
       {#each SETTINGS_NAV as entry (entry.section)}
         <a href={entry.href} aria-current={entry.section === activeSection ? 'page' : undefined}>{$_(entry.labelKey)}</a>
@@ -41,23 +43,34 @@
     padding: var(--content-pad-top) var(--content-pad-x) var(--content-pad-bottom);
   }
 
+  .subtitle {
+    margin: var(--ui-space-2) 0 0;
+    font-size: var(--ui-text-lg);
+    color: var(--ui-text-secondary);
+  }
+
   .tabs {
     display: flex;
-    gap: var(--ui-space-4);
-    margin: var(--ui-space-4) 0 var(--ui-space-6);
+    gap: var(--ui-space-2);
+    margin: 20px 0 var(--ui-space-6) -16px;
     overflow-x: auto;
   }
 
   .tabs a {
-    padding-bottom: var(--ui-space-1);
-    border-bottom: 1.5px solid transparent;
-    color: var(--ui-text-tertiary);
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: var(--ui-text-lg);
+    color: var(--ui-text-secondary);
     text-decoration: none;
     white-space: nowrap;
   }
 
+  .tabs a:hover {
+    background: color-mix(in srgb, var(--ui-text) 12%, transparent);
+  }
+
   .tabs a[aria-current='page'] {
-    border-bottom-color: var(--ui-text);
+    background: color-mix(in srgb, var(--ui-text) 12%, transparent);
     color: var(--ui-text);
   }
 

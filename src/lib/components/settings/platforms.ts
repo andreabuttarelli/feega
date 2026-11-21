@@ -10,13 +10,14 @@ export enum SettingsScope {
 export type SettingsSectionRow = {
   path: SettingsSection;
   labelKey: string;
+  subtitleKey?: string;
   scope: SettingsScope;
   gatesItself?: true;
 };
 
 export const SETTINGS_SECTIONS: readonly SettingsSectionRow[] = [
   { path: SettingsSection.Profile, labelKey: 'app.settings.profile.title', scope: SettingsScope.Account },
-  { path: SettingsSection.Billing, labelKey: 'app.settings.billing.title', scope: SettingsScope.Workspace, gatesItself: true }
+  { path: SettingsSection.Billing, labelKey: 'app.settings.billing.title', subtitleKey: 'app.settings.billing.subtitle', scope: SettingsScope.Workspace, gatesItself: true }
 ];
 
 export type SettingsNavEntry = { section: SettingsSection; labelKey: string; href: string };
