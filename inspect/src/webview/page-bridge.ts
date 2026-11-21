@@ -22,7 +22,7 @@ export type PageEvents = {
   palette: (palette: Palette) => void;
   settled: (source: string, unapplied: string[]) => void;
   text: (source: string, text: string, was: string) => void;
-  tracked: (slot: Slot, rect: Pick['rect']) => void;
+  tracked: (slot: string, rect: Pick['rect']) => void;
 };
 
 export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents) {
@@ -107,7 +107,7 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
     reveal: (source: Source, index = 0) => send({ type: REVEAL, source: sourceText(source), index }),
     scroll: (dx: number, dy: number) => send({ type: SCROLL, dx, dy }),
     leave: () => send({ type: LEAVE }),
-    track: (slot: Slot, source: Source | null, index = 0) => send({ type: TRACK, slot, source: source ? sourceText(source) : null, index }),
+    track: (slot: string, source: Source | null, index = 0) => send({ type: TRACK, slot, source: source ? sourceText(source) : null, index }),
     restoreText: (source: string) => send({ type: TEXT_RESTORE, source }),
     editText: (x: number, y: number) => send({ type: TEXT_EDIT, x, y })
   };

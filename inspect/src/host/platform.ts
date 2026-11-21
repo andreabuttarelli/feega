@@ -1,5 +1,6 @@
 import type { HostMessage, Source, ViewMessage } from '../messages';
 import type { AccountStore } from './account';
+import type { CommentsCloud } from './comments';
 import type { OnboardingStore } from './onboarding';
 import type { UsageHost } from './usage';
 import type { SettingKey, SettingValue, Settings } from '../settings';
@@ -40,5 +41,6 @@ export type Platform = Transport & {
   pickImage?: () => Promise<ChosenImage | null>;
   usage?: UsageHost;
   account: AccountStore;
+  cloud?: CommentsCloud;
   onboarding: OnboardingStore;
 };
