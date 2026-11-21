@@ -5,6 +5,7 @@ import { VISITOR_HEADER, decodeVisitor } from '../../../../packages/share-protoc
 import { ToView } from '../../messages';
 import { editGate } from './gate';
 import { localHeaders, localRequest } from './local';
+import { viewForVisitor } from './view-filter';
 import { Target, targetOfRequest, targetOfSocket } from './routes';
 
 const BACKOFF_FIRST_MS = 500;
@@ -78,25 +79,14 @@ export function shareClient(options: ShareClientOptions): ShareClient {
     streams.set(streamId, { abort: () => request.destroy(), request });
   }
 
-  function viewFromLocal(streamId: number, data: WebSocket.RawData, isBinary: boolean) {
+  function viewFromLocal(streamId: number, data: WebSocket.RawData, isBinary: boolean, target: Target) {
     if (isBinary) {
       send(bytesFrame(streamId, FrameType.WsBinary, new Uint8Array(data as Buffer)));
       return;
     }
-    send(textFrame(streamId, rewrittenApp(String(data))));
-  }
-
-  function rewrittenApp(text: string): string {
-    try {
-      const message = JSON.parse(text);
-      if (message?.kind !== ToView.App || typeof message.url !== 'string') {
-        return text;
-      }
-      app = new URL(message.url);
-      return JSON.stringify({ ...message, url: `${visitorOrigin}/` });
-    } catch {
-      return text;
-    }
+    const filtered = target === Target.Editor ? viewForVisitor(String(data), visitorOrigin) : { text: String(data), appUrl: undefined };
+    filtered.appUrl && (app = new URL(filtered.appUrl));
+    filtered.text !== null && send(textFrame(streamId, filtered.text));
   }
 
   function guarded(visitor: VisitorInfo, streamId: number, text: string, forward: (text: string) => void) {
@@ -126,7 +116,7 @@ export function shareClient(options: ShareClientOptions): ShareClient {
     const queued: (string | Buffer)[] = [];
     const forward = (payload: string | Buffer) => (local.readyState === WebSocket.OPEN ? local.send(payload) : queued.push(payload));
     local.on('open', () => queued.splice(0).forEach((payload) => local.send(payload)));
-    local.on('message', (data, isBinary) => viewFromLocal(streamId, data, isBinary));
+    local.on('message', (data, isBinary) => viewFromLocal(streamId, data, isBinary, target));
     local.on('close', (code) => {
       const live = streams.delete(streamId);
       sockets.delete(streamId);

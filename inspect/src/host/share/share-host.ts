@@ -25,9 +25,9 @@ const ZIP_TYPE = 'application/zip';
 export function shareHost({ api, relayUrl, send, onPresence, onEnded }: ShareHostDeps): ShareControl {
   const held = new Map<string, ShareClient>();
 
-  async function start({ dir, editorUrl, appUrl, visitorsCanEdit }: ShareRequest): Promise<ShareInfo> {
+  async function start({ dir, projectName, editorUrl, appUrl, visitorsCanEdit }: ShareRequest): Promise<ShareInfo> {
     const role = visitorsCanEdit ? VisitorRole.Editor : VisitorRole.Viewer;
-    const session = await api.startSession(basename(dir), role);
+    const session = await api.startSession(projectName ?? basename(dir), role);
     const client = shareClient({
       relayUrl,
       hostToken: session.hostToken,

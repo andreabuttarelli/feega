@@ -14,6 +14,7 @@ import { previewQueue } from './icon-previews';
 import { appOfSource, firstStampedFile, urlOf } from './attach-url';
 import { Attach, attachDev, factsOf, startDev, type Refused, type Running } from './dev-server';
 import { commentsHost } from './comments';
+import { shareSession } from './share/share-session';
 import { copyImage } from './image-copy';
 import { fileEdits, type Snapshot, type Written } from './file-edits';
 import type { KeptServers } from './kept-servers';
@@ -123,6 +124,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   }
 
   const comments = commentsHost(platform.cloud, post);
+  const sharing = shareSession({ platform, workspace, appUrl: () => running?.url ?? null, post });
 
   const postAccount = (state: AccountState, email?: string) => post({ kind: ToView.Account, state, email });
 
@@ -380,7 +382,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   };
 
   const handlers: { [K in ToHost]: (m: Extract<HostMessage, { kind: K }>) => unknown } = {
-    [ToHost.Ready]: () => (showApp(), postSettings(), postHistory(), showAccount(), showOnboarding(), comments.show()),
+    [ToHost.Ready]: () => (showApp(), postSettings(), postHistory(), showAccount(), showOnboarding(), comments.show(), sharing.show()),
     [ToHost.Edit]: (m) => edit(m.ask),
     [ToHost.Undo]: undo,
     [ToHost.Open]: (m) => platform.openSource(root, m.at),
@@ -419,7 +421,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Copy]: (m) => platform.copyText?.(m.text),
     [ToHost.Comments]: comments.show,
     [ToHost.CommentAdd]: (m) => comments.add(m.draft),
-    [ToHost.CommentResolve]: (m) => comments.resolve(m.id)
+    [ToHost.CommentResolve]: (m) => comments.resolve(m.id),
+    [ToHost.ShareStart]: (m) => sharing.start(m.name, m.canEdit),
+    [ToHost.ShareStop]: sharing.stop,
+    [ToHost.ShareKick]: (m) => sharing.kick(m.userId)
   };
 
   platform.receive((message) => (handlers[message.kind] as (m: HostMessage) => unknown)(message));
@@ -446,9 +451,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     start: () => startServer(),
     attachUrl,
     addPlugin: installPlugin,
-    stop: () => {
+    stop: async () => {
       close();
-      return usage?.end() ?? Promise.resolve();
+      await sharing.stop();
+      await usage?.end();
     },
     usageChanged: () => usage?.recheck(),
     url: () => running?.url ?? null,
