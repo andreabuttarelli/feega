@@ -1,21 +1,29 @@
 export enum TabStatus {
   Starting = 'starting',
+  Choosing = 'choosing',
   Ready = 'ready',
   Failed = 'failed'
 }
 
-export type TabInfo = { id: string; dir: string; name: string; status: TabStatus; message: string };
+export type AppOption = { label: string; app: string };
 
-export type ShellState = { tabs: TabInfo[]; active: string | null; email: string | null; skipped: boolean; recents: string[] };
+export type TabInfo = { id: string; dir: string; name: string; status: TabStatus; message: string; log: string[]; url: string; apps: AppOption[] };
+
+export type RecentInfo = { dir: string; name: string; framework: string; at: number };
+
+export type ShellState = { tabs: TabInfo[]; active: string | null; email: string | null; signingIn: boolean; skipped: boolean; recents: RecentInfo[] };
 
 export enum Channel {
   State = 'state',
   GetState = 'get-state',
   SignIn = 'sign-in',
   SignOut = 'sign-out',
+  CancelSignIn = 'cancel-sign-in',
   Skip = 'skip',
   PickFolder = 'pick-folder',
   OpenDir = 'open-dir',
   CloseTab = 'close-tab',
+  RetryTab = 'retry-tab',
+  ChooseApp = 'choose-app',
   Activate = 'activate'
 }

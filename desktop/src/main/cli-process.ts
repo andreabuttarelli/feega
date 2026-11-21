@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
+import { type PidFile } from './pid-file';
 
 const EDITOR_READY = /editor ready on (https?:\/\/\S+)/;
 const STOP_ON_STDIN_END = 'FEEGA_STOP_ON_STDIN_END';
@@ -23,14 +24,19 @@ export const freePort = () =>
     });
   });
 
-export async function startCli(dir: string, events: CliEvents) {
+export async function startCli(dir: string, pids: PidFile, events: CliEvents) {
   const port = await freePort();
   const cli = join(__dirname, '..', '..', 'npx', 'dist', 'cli.cjs');
-  const child = spawn(process.execPath, [cli, dir, '--no-open', '--port', String(port)], {
+  const args = [cli, dir, '--no-open', '--port', String(port)];
+  const child = spawn(process.execPath, args, {
     detached: true,
     stdio: ['pipe', 'pipe', 'pipe'],
     env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', [STOP_ON_STDIN_END]: '1', FORCE_COLOR: '0' }
   });
+
+  if (child.pid) {
+    pids.add({ pid: child.pid, command: [process.execPath, ...args].join(' ') });
+  }
 
   const lines: string[] = [];
   let exited = false;
@@ -54,6 +60,9 @@ export async function startCli(dir: string, events: CliEvents) {
   child.stderr.on('data', take);
   child.on('exit', () => {
     exited = true;
+    if (child.pid) {
+      pids.remove(child.pid);
+    }
     events.onExit(lines.slice(-TAIL_LINES).join('\n'));
   });
 

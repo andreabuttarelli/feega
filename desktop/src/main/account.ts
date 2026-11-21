@@ -25,13 +25,21 @@ export function accountStore(userData: string) {
   };
 
   let held = read();
+  let waiting = false;
 
   return {
     email: () => held?.user.email ?? null,
-    start: async (): Promise<boolean> => {
+    waiting: () => waiting,
+    cancel: () => signing?.abort(),
+    start: async (changed: () => void): Promise<boolean> => {
       signing?.abort();
-      signing = new AbortController();
-      const outcome = await signIn({ openBrowser: (url) => shell.openExternal(url), signal: signing.signal });
+      const mine = (signing = new AbortController());
+      waiting = true;
+      changed();
+      const outcome = await signIn({ openBrowser: (url) => shell.openExternal(url), signal: mine.signal });
+      if (signing === mine) {
+        waiting = false;
+      }
       if (outcome.end !== SignInEnd.Done) {
         return false;
       }
