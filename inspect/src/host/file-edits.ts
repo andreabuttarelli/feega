@@ -9,8 +9,8 @@ import { literalText } from '@feega/live-edit/literal-text';
 import { moveNode, type Place } from '@feega/live-edit/move-node';
 import { globalSheetOf, googleFontImport, googleFontLink } from '@feega/live-edit/font-wiring';
 import { VariableHome, saveVariable, variableName } from '@feega/live-edit/save-variable';
-import { addedCss, AddKind, AddStyle } from '@feega/live-edit/add-node';
-import { WRAPPER_CSS } from '@feega/live-edit/wrap-node';
+import { addedCss, AddKind, AddPlace, AddStyle } from '@feega/live-edit/add-node';
+import { wrapperCss, type WrapTag } from '@feega/live-edit/wrap-node';
 import type { LoopMove } from '@feega/live-edit/move-loop-item';
 import type { Usage } from '@feega/live-edit/move-usage';
 import { StructureOp, structure } from '@feega/live-edit/structure';
@@ -31,7 +31,7 @@ import { stylingOf } from './styling';
 import { breakpointsOf } from './breakpoints';
 import { themesOf } from './themes';
 
-export type StructureAsk = { op: StructureOp; at: string; to?: string; usage?: Usage; loop?: LoopMove; instance?: number; add?: { kind: AddKind; src?: string } };
+export type StructureAsk = { op: StructureOp; at: string; to?: string; usage?: Usage; loop?: LoopMove; instance?: number; add?: { kind: AddKind; src?: string; place?: AddPlace }; wrap?: WrapTag };
 
 export type Written = { ok: true; path: string; written: string; note?: string; selected?: LiveAt } | { ok: false; reason: string; at?: LiveAt };
 
@@ -285,7 +285,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
   }
 
   async function restructured(ask: StructureAsk): Promise<Written> {
-    const { op, at: rawAt, to: rawTo, usage, loop, instance } = ask;
+    const { op, at: rawAt, to: rawTo, usage, loop, instance, wrap } = ask;
     const tailwind = (await stylingOf(root, choice())) === Styling.Tailwind;
     const style = tailwind ? AddStyle.Tailwind : AddStyle.Plain;
     const add = ask.add && { ...ask.add, style };
@@ -295,8 +295,8 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     if (!at || !inside(root, at.file)) {
       return { ok: false, reason: `${rawAt} is not a file:line:col inside the workspace` };
     }
-    const made = await structure(reader(root), { op, at, to, usage, loop, instance, add, style });
-    const css = tailwind ? {} : op === StructureOp.Wrap ? WRAPPER_CSS : add ? addedCss(add.kind) : {};
+    const made = await structure(reader(root), { op, at, to, usage, loop, instance, add, style, wrap });
+    const css = tailwind ? {} : op === StructureOp.Wrap ? wrapperCss(wrap) : add ? addedCss(add.kind) : {};
     const out = made.ok ? await ruled(reader(root), made, css) : made;
     const written = out.ok ? await writtenAll(out.changes, '', out.note) : out;
     return out.ok && written.ok ? { ...written, selected: out.selected } : written;

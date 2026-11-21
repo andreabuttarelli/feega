@@ -18,7 +18,14 @@ export enum AddStyle {
   Plain = 'plain'
 }
 
-export type AddRequest = { kind: AddKind; style: AddStyle; src?: string };
+export enum AddPlace {
+  Auto = 'auto',
+  Child = 'child',
+  Before = 'before',
+  After = 'after'
+}
+
+export type AddRequest = { kind: AddKind; style: AddStyle; src?: string; place?: AddPlace };
 
 type Recipe = { tag: string; text: string; attrs: string; tailwind: string; css: Record<string, string> };
 
@@ -31,7 +38,7 @@ const RECIPES: Record<AddKind, Recipe> = {
   [AddKind.Container]: { tag: 'div', text: '', attrs: '', tailwind: 'flex min-h-10 flex-col gap-2', css: { display: 'flex', 'flex-direction': 'column', gap: '8px', 'min-height': '40px' } }
 };
 
-const CONTAINER_TAGS = new Set(['div', 'section', 'main', 'header', 'footer', 'nav', 'article', 'aside', 'ul', 'ol', 'form']);
+export const CONTAINER_TAGS = new Set(['div', 'section', 'main', 'header', 'footer', 'nav', 'article', 'aside', 'ul', 'ol', 'form']);
 const JSX_FILE = /\.(t|j)sx$/;
 
 export const classAttribute = (file: string, value: string) => ` ${JSX_FILE.test(file) ? 'className' : 'class'}="${value}"`;
@@ -70,12 +77,24 @@ export async function addNode(read: ReadFile, at: LiveAt, req: AddRequest): Prom
   }
 
   const markup = markupOf(req, at.file);
-  const container = CONTAINER_TAGS.has(selected.tag) && selected.end > selected.openEnd + 1;
+  const place = req.place ?? AddPlace.Auto;
+  const holds = selected.end > selected.openEnd + 1;
+  if (place === AddPlace.Child && !holds) {
+    return { ok: false, reason: `<${selected.tag}> cannot hold children`, at };
+  }
+
   const lineStart = source.lastIndexOf('\n', selected.start - 1) + 1;
   const indent = indentOf(source.slice(lineStart));
-  const whole = !source.slice(lineStart, selected.start).trim() && !source.slice(selected.end, source.indexOf('\n', selected.end) < 0 ? source.length : source.indexOf('\n', selected.end)).trim();
-  const spot = container ? placed(source, selected.closeStart, markup) : whole ? { at: source.indexOf('\n', selected.end) + 1 || source.length, text: `${indent}${markup}\n` } : { at: selected.end, text: `\n${indent}${markup}` };
-  const glue = !container && whole && source.indexOf('\n', selected.end) < 0 ? '\n' : '';
+  const lineEnd = source.indexOf('\n', selected.end);
+  const alone = !source.slice(lineStart, selected.start).trim() && !source.slice(selected.end, lineEnd < 0 ? source.length : lineEnd).trim();
+  const mode = place === AddPlace.Auto ? (CONTAINER_TAGS.has(selected.tag) && holds ? AddPlace.Child : AddPlace.After) : place;
+  const spots: Record<Exclude<AddPlace, AddPlace.Auto>, { at: number; text: string }> = {
+    [AddPlace.Child]: placed(source, selected.closeStart, markup),
+    [AddPlace.Before]: alone ? { at: lineStart, text: `${indent}${markup}\n` } : { at: selected.start, text: `${markup}\n${indent}` },
+    [AddPlace.After]: alone ? { at: lineEnd + 1 || source.length, text: `${indent}${markup}\n` } : { at: selected.end, text: `\n${indent}${markup}` }
+  };
+  const spot = spots[mode];
+  const glue = mode === AddPlace.After && alone && lineEnd < 0 ? '\n' : '';
   const after = source.slice(0, spot.at) + glue + spot.text + source.slice(spot.at);
   const start = spot.at + glue.length + spot.text.indexOf(markup);
   return { ok: true, changes: [{ path: at.file, before: source, after }], selected: { file: at.file, ...lineCol(after, start) } };

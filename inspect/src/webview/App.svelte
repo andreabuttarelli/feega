@@ -51,8 +51,10 @@
   import { StructureOp } from '@feega/live-edit/structure';
   import StructureMenu from './StructureMenu.svelte';
   import { agentContext } from './agent-context';
-  import { AddKind } from '@feega/live-edit/add-node';
-  import { ADD_ITEMS, ADD_LOOP_ITEM, COPY_FOR_AGENT, MENU_ITEMS } from './structure-menu';
+  import { AddKind, AddPlace } from '@feega/live-edit/add-node';
+  import type { WrapTag } from '@feega/live-edit/wrap-node';
+  import { ADD_DRAG_TYPE, insertSpot, type InsertSpot } from './insert-drop';
+  import { ADD_ITEMS, ADD_LOOP_ITEM, Command, MENU_ITEMS, pickedOf } from './structure-menu';
   import { modeOfKey } from './modes';
   import { browseHistory } from './history';
   import { DEFAULT_ANCHOR, anchorBox, isAnchor, nearestAnchor, nextAnchor, type Anchor } from './anchors';
@@ -139,7 +141,7 @@
   let canRedo = $state(false);
   let scope = $state(Scope.Element);
   let layersOpen = $state<Record<string, boolean>>({ '(html):0:0': true, '(page):0:0': true });
-  const layerDrag = $state<{ source: Source | null; name: string; component: boolean; parentFile: string | null }>({ source: null, name: '', component: false, parentFile: null });
+  const layerDrag = $state<{ source: Source | null; name: string; component: boolean; parentFile: string | null; hint: { id: string; place: AddPlace } | null }>({ source: null, name: '', component: false, parentFile: null, hint: null });
 
   let hoverAsked = 0;
   async function hoverLayer(source: Source | null, instance: number) {
@@ -626,12 +628,77 @@
     }
   }
 
-  function addElement(kind: AddKind) {
-    if (!picked) {
+  function insertElement(kind: AddKind, target: Source, place: AddPlace) {
+    const at = sourceText(target);
+    toHost(kind === AddKind.Image ? { kind: ToHost.AddImage, at, place } : { kind: ToHost.Structure, op: StructureOp.Add, at, add: { kind, place } });
+  }
+
+  function addElement(kind: AddKind, place = AddPlace.Auto) {
+    if (picked) {
+      insertElement(kind, picked.source, place);
+    }
+  }
+
+  let addSpot = $state<InsertSpot | null>(null);
+  let spotAsked = 0;
+
+  const addDrag = (e: DragEvent) => e.dataTransfer?.types.includes(ADD_DRAG_TYPE) ?? false;
+
+  async function overAdd(e: DragEvent) {
+    if (!addDrag(e)) {
       return;
     }
-    const at = sourceText(picked.source);
-    toHost(kind === AddKind.Image ? { kind: ToHost.AddImage, at } : { kind: ToHost.Structure, op: StructureOp.Add, at, add: { kind } });
+    e.preventDefault();
+    const asked = ++spotAsked;
+    const at = pagePoint(e);
+    const target = await bridge.at(at.x, at.y);
+    const owner = target?.ancestors.at(-1);
+    const parent = owner ? await bridge.again(owner.source) : null;
+    if (asked === spotAsked) {
+      addSpot = target ? insertSpot(target, parent, at) : null;
+    }
+  }
+
+  function dropAdd(e: DragEvent) {
+    if (!addDrag(e)) {
+      return;
+    }
+    e.preventDefault();
+    spotAsked++;
+    const kind = e.dataTransfer?.getData(ADD_DRAG_TYPE) as AddKind;
+    const spot = addSpot;
+    addSpot = null;
+    addMenu = null;
+    if (kind && spot) {
+      insertElement(kind, spot.target, spot.place);
+    }
+  }
+
+  async function openLayerMenu(source: Source, instance: number, at: { x: number; y: number }) {
+    await select(source, instance);
+    menu = { x: at.x, y: at.y };
+  }
+
+  function layerAdd(kind: AddKind, source: Source, place: AddPlace) {
+    addMenu = null;
+    insertElement(kind, source, place);
+  }
+
+  function wrapWith(tag: WrapTag) {
+    if (picked) {
+      toHost({ kind: ToHost.Structure, op: StructureOp.Wrap, at: sourceText(picked.source), instance: picked.instanceIndex, wrap: tag });
+    }
+  }
+
+  function pickMenu(id: string) {
+    const chosen = pickedOf(id);
+    const run: Record<Command, () => void> = {
+      [Command.Copy]: copyForAgent,
+      [Command.Structure]: () => chosen.command === Command.Structure && restructure(chosen.op),
+      [Command.Add]: () => chosen.command === Command.Add && addElement(chosen.kind, chosen.place),
+      [Command.Wrap]: () => chosen.command === Command.Wrap && wrapWith(chosen.tag)
+    };
+    run[chosen.command]();
   }
 
   function copyForAgent() {
@@ -731,7 +798,7 @@
   <aside class="left" class:closed={leftClosed}>
     <header class="left-head">Layers<button type="button" class="add" title="Add an element (/)" aria-label="Add" data-testid="add-button" disabled={!picked} onclick={(e) => openAddMenu(e.clientX, e.clientY)}>+ Add</button></header>
     <div class="layers" role="tree" aria-label="Layers" data-testid="layers">
-      <LayersTree nodes={layers} {picked} badge={badgeOf(elementState)} open={layersOpen} onselect={select} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} />
+      <LayersTree nodes={layers} {picked} badge={badgeOf(elementState)} open={layersOpen} onselect={select} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} oncontext={openLayerMenu} onadd={layerAdd} />
     </div>
     {#if !leftClosed}<span class="edge-right" role="separator" aria-orientation="vertical" aria-label="Resize Layers" title="Drag to resize, double-click to reset" onpointerdown={(e) => ((e.currentTarget as HTMLElement).setPointerCapture(e.pointerId), (leftSizing = { x: e.clientX, width: leftPx }))} onpointermove={(e) => leftSizing && (leftWidth = leftSizing.width + (e.clientX - leftSizing.x))} onpointerup={() => leftSizing && ((leftSizing = null), (leftWidth = leftPx), savePrefs())} ondblclick={() => ((leftWidth = LEFT_DEFAULT_PX), savePrefs())}></span>{/if}
   </aside>
@@ -757,8 +824,12 @@
       <div class="frame" class:framed={size !== Size.Full} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px`}>
         {#if url}<iframe bind:this={frame} src={start} title="App" data-testid="app-frame" style={`width:${fit.width}px;height:${fit.height}px;transform:scale(${fit.scale})`}></iframe>{/if}
         {#if mode === Mode.Design && bridged && !editing}
-          <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={dragOverlay} onpointerleave={() => (hover = null)} onclick={onPick} oncontextmenu={onMenu} ondblclick={onDouble} onwheel={(e) => bridge.scroll(e.deltaX / fit.scale, e.deltaY / fit.scale)}>
+          <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={dragOverlay} onpointerleave={() => (hover = null)} onclick={onPick} oncontextmenu={onMenu} ondragover={overAdd} ondragleave={() => (addSpot = null)} ondrop={dropAdd} ondblclick={onDouble} onwheel={(e) => bridge.scroll(e.deltaX / fit.scale, e.deltaY / fit.scale)}>
             {#if hover}<div class="outline hover" style={box(hover)}></div>{/if}
+            {#if addSpot}
+              <div class="drop-line box" data-testid="add-outline" style={`left:${addSpot.outline.x * fit.scale - 1}px;top:${addSpot.outline.y * fit.scale - 1}px;width:${Math.max(2, addSpot.outline.w * fit.scale)}px;height:${Math.max(2, addSpot.outline.h * fit.scale)}px`}></div>
+              {#if addSpot.place !== AddPlace.Child}<div class="drop-line" data-testid="add-line" style={`left:${addSpot.line.x * fit.scale - 1}px;top:${addSpot.line.y * fit.scale - 1}px;width:${Math.max(2, addSpot.line.w * fit.scale)}px;height:${Math.max(2, addSpot.line.h * fit.scale)}px`}></div>{/if}
+            {/if}
             {#if drop}<div class="drop-line" class:box={drop.kind === DropKind.Inside} style={`left:${drop.line.x * fit.scale - 1}px;top:${drop.line.y * fit.scale - 1}px;width:${Math.max(2, drop.line.w * fit.scale)}px;height:${Math.max(2, drop.line.h * fit.scale)}px`}></div>{/if}
           {#if picked && hint}{#each hintBoxes(picked, hint) as area, i (i)}<div class="hint {hint.group}" style={`left:${area.x * fit.scale}px;top:${area.y * fit.scale}px;width:${area.w * fit.scale}px;height:${area.h * fit.scale}px`}></div>{/each}{/if}
           {#if picked}<div class="outline picked" style={box(picked)}><span class="label"><Breadcrumb pick={picked} onselect={select} compact state={elementState} /></span></div>{/if}
@@ -793,8 +864,8 @@
           <button type="button" class="link" data-action={ServerAction.RestartUnderFeega} onclick={() => toHost({ kind: ToHost.Server, action: ServerAction.RestartUnderFeega })}>Let Feega start the server</button>
         </div>
       {/if}
-      {#if menu}<StructureMenu x={menu.x} y={menu.y} items={MENU_ITEMS} onpick={(id) => (id === COPY_FOR_AGENT ? copyForAgent() : restructure(id as StructureOp))} onclose={() => (menu = null)} />{/if}
-      {#if addMenu}<StructureMenu x={addMenu.x} y={addMenu.y} items={picked && picked.instances > 1 ? [...ADD_ITEMS, ADD_LOOP_ITEM] : ADD_ITEMS} label="add" onpick={(id) => (id === StructureOp.AddItem ? restructure(StructureOp.AddItem) : addElement(id as AddKind))} onclose={() => (addMenu = null)} />{/if}
+      {#if menu}<StructureMenu x={menu.x} y={menu.y} items={MENU_ITEMS} onpick={pickMenu} onclose={() => (menu = null)} />{/if}
+      {#if addMenu}<StructureMenu x={addMenu.x} y={addMenu.y} items={picked && picked.instances > 1 ? [...ADD_ITEMS, ADD_LOOP_ITEM] : ADD_ITEMS} label="add" draggable={true} onpick={(id) => (id === StructureOp.AddItem ? restructure(StructureOp.AddItem) : addElement(id as AddKind))} onclose={() => (addMenu = null)} />{/if}
       {#if toast}<div class="toast" role="status">{toast}</div>{/if}
       <div class="float" class:moving bind:clientWidth={bar.w} bind:clientHeight={bar.h} style={`left:${barAt.x}px;top:${barAt.y}px`} data-anchor={anchor}>
         <button type="button" class="grip" title="Drag to move (arrow keys)" aria-label="Move the bar" onpointerdown={grabBar} onpointermove={dragBar} onpointerup={dropBar} onkeydown={onHandleKey}>

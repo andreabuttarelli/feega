@@ -1,7 +1,7 @@
 import { rm } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { appsIn } from '@feega/dev-run/run-plan';
-import { AddKind } from '@feega/live-edit/add-node';
+import { AddKind, type AddPlace } from '@feega/live-edit/add-node';
 import { liveAtOf } from '@feega/live-edit/live-ask';
 import { StructureOp } from '@feega/live-edit/structure';
 import { AccountState, ServerAction, ServerState, ToHost, ToView, type EditAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
@@ -108,7 +108,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     }
   }
 
-  async function imageAdded(at: string) {
+  async function imageAdded(at: string, place?: AddPlace) {
     const image = await platform.pickImage?.();
     if (!image) {
       return;
@@ -118,7 +118,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       await post({ kind: ToView.Edited, ok: false, reason: copied.reason });
       return;
     }
-    await edits.structure({ op: StructureOp.Add, at, add: { kind: AddKind.Image, src: copied.url } }).then((out) => edited(out, null));
+    await edits.structure({ op: StructureOp.Add, at, add: { kind: AddKind.Image, src: copied.url, place } }).then((out) => edited(out, null));
   }
 
   const postAccount = (state: AccountState, email?: string) => post({ kind: ToView.Account, state, email });
@@ -393,7 +393,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Diff]: (m) => showDiff(m.id),
     [ToHost.SourceControl]: () => platform.sourceControl(),
     [ToHost.Move]: (m) => edits.move(m.from, m.to, m.place).then((out) => edited(out, null)),
-    [ToHost.AddImage]: (m) => imageAdded(m.at),
+    [ToHost.AddImage]: (m) => imageAdded(m.at, m.place),
     [ToHost.Structure]: (m) => edits.structure(m).then((out) => edited(out, null)),
     [ToHost.Setting]: (m) => platform.setSetting(m.key, m.value).then(postSettings),
     [ToHost.AttachUrl]: (m) => attachUrl(m.url),

@@ -11,6 +11,8 @@ import { liveAtOf } from '@feega/live-edit/live-ask';
 import { SETTINGS } from '../src/settings.ts';
 import { searchIcons } from '../src/host/icon-search.ts';
 import { previewQueue } from '../src/host/icon-previews.ts';
+import { breakpointsOf } from '../src/host/breakpoints.ts';
+import { themesOf } from '../src/host/themes.ts';
 
 const PANEL_PORT = Number(process.env.PANEL_PORT ?? 5999);
 const dist = fileURLToPath(new URL('../dist/webview/', import.meta.url));
@@ -54,7 +56,7 @@ export async function openPanel(appRoot: string, theme = DARK) {
 
   await page.exposeFunction('toHost', async (m: { kind: ToHost; ask?: EditAsk; id?: number; pick?: Pick | null; query?: string; names?: string[] }) => {
     if (m.kind === ToHost.Ready) {
-      await reply({ kind: ToView.App, url: running.url, styling, prefs: null });
+      await reply({ kind: ToView.App, url: running.url, styling, prefs: null, breakpoints: await breakpointsOf(appRoot), themes: await themesOf(appRoot) });
       await reply({ kind: ToView.Server, state: ServerState.Running });
       await reply({ kind: ToView.Settings, values: Object.fromEntries(SETTINGS.map((r) => [r.key, r.fallback])), facts: { version: '0.1.0', framework: 'sveltekit', styling } });
     }
@@ -65,6 +67,10 @@ export async function openPanel(appRoot: string, theme = DARK) {
       const out = await edits.edit(m.ask!);
       saves.push(out);
       await reply(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, saved: liveAtOf(m.ask!.at), note: out.note } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
+    }
+    if (m.kind === ToHost.Structure) {
+      const out = await edits.structure(m);
+      await reply(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, select: out.selected } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
     }
     if (m.kind === ToHost.IconSearch) {
       const found = await searchIcons(appRoot, fetch, m.query!, null);
