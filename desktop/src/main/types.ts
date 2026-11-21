@@ -11,9 +11,20 @@ export type TabInfo = { id: string; dir: string; name: string; status: TabStatus
 
 export type RecentInfo = { dir: string; name: string; framework: string; at: number };
 
-export type Preferences = { editorPort: number; reopenOnLaunch: boolean; telemetry: boolean };
+export type Preferences = { editorPort: number; reopenOnLaunch: boolean; telemetry: boolean; automaticUpdates: boolean };
 
-export type ShellState = { tabs: TabInfo[]; active: string | null; email: string | null; signingIn: boolean; skipped: boolean; recents: RecentInfo[]; preferences: Preferences };
+export enum UpdateState {
+  Idle = 'idle',
+  Checking = 'checking',
+  Downloading = 'downloading',
+  Ready = 'ready',
+  UpToDate = 'up-to-date',
+  Failed = 'failed'
+}
+
+export type UpdateInfo = { state: UpdateState; version: string; message: string };
+
+export type ShellState = { tabs: TabInfo[]; active: string | null; email: string | null; signingIn: boolean; skipped: boolean; recents: RecentInfo[]; preferences: Preferences; update: UpdateInfo };
 
 export enum Link {
   Account = 'account',
@@ -38,5 +49,7 @@ export enum Channel {
   OpenLink = 'open-link',
   Overlay = 'overlay',
   ShowSettings = 'show-settings',
+  CheckUpdates = 'check-updates',
+  InstallUpdate = 'install-update',
   Quit = 'quit'
 }

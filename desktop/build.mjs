@@ -12,7 +12,7 @@ if (!(await exists(CLI))) {
   execFileSync('npm', ['run', 'build'], { cwd: here('../npx'), stdio: 'inherit' });
 }
 
-const node = { bundle: true, platform: 'node', format: 'cjs', target: 'node20', external: ['electron'], define: { __FEEGA_VERSION__: JSON.stringify('desktop') } };
+const node = { bundle: true, platform: 'node', format: 'cjs', target: 'node20', external: ['electron', 'electron-updater'], define: { __FEEGA_VERSION__: JSON.stringify('desktop') } };
 
 await build({ ...node, entryPoints: [here('src/main/main.ts')], outfile: here('dist/main.cjs') });
 await build({ ...node, entryPoints: [here('src/main/preload.ts')], outfile: here('dist/preload.cjs') });

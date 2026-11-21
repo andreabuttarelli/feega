@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('feega', {
   setPreferences: (change: Partial<Preferences>) => call(Channel.SetPreferences, change),
   openLink: (link: Link) => call(Channel.OpenLink, link),
   overlay: (open: boolean) => call(Channel.Overlay, open),
+  checkUpdates: () => call(Channel.CheckUpdates),
+  installUpdate: () => call(Channel.InstallUpdate),
   quit: () => call(Channel.Quit),
   onSettings: (listener: () => void) => ipcRenderer.on(Channel.ShowSettings, () => listener()),
   onState: (listener: (state: ShellState) => void) => ipcRenderer.on(Channel.State, (_event, state) => listener(state))

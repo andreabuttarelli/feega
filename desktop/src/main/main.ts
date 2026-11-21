@@ -8,6 +8,7 @@ import { pidFile } from './pid-file';
 import { frameworkOf } from './project-info';
 import { settingsStore } from './store';
 import { tabHost } from './tabs';
+import { updateController } from './updates/controller';
 import pkg from '../../package.json';
 import { platformRow } from './platform';
 import { Channel, type Link, type Preferences, type ShellState } from './types';
@@ -76,10 +77,24 @@ app.whenReady().then(() => {
     signingIn: account.waiting(),
     skipped: settings.get().skipped,
     recents: settings.get().recents.map(({ dir, at }) => ({ dir, at, name: basename(dir), framework: frameworkOf(dir) })),
-    preferences: settings.get().preferences
+    preferences: settings.get().preferences,
+    update: updates.info()
   });
 
   const publish = () => window.webContents.send(Channel.State, state());
+  const updates = updateController({
+    platform: process.platform,
+    arch: process.arch,
+    version: app.getVersion(),
+    userData,
+    execPath: process.execPath,
+    pid: process.pid,
+    isPackaged: app.isPackaged,
+    env: process.env,
+    enabled: () => settings.get().preferences.automaticUpdates,
+    changed: () => publish(),
+    quit: () => app.quit()
+  });
   const tabs = tabHost(window, publish, pids, {
     options: () => ({ editorPort: settings.get().preferences.editorPort, telemetry: settings.get().preferences.telemetry }),
     opened: (dirs) => settings.remember(dirs)
@@ -122,9 +137,12 @@ app.whenReady().then(() => {
   });
   ipcMain.handle(Channel.OpenLink, (_event, link: Link) => shell.openExternal(LINKS[link]));
   ipcMain.handle(Channel.Overlay, (_event, open: boolean) => tabs.overlay(open));
+  ipcMain.handle(Channel.CheckUpdates, () => updates.check(true));
+  ipcMain.handle(Channel.InstallUpdate, () => updates.install());
   ipcMain.handle(Channel.Quit, () => app.quit());
 
-  installMenu(() => window.webContents.send(Channel.ShowSettings));
+  installMenu(() => window.webContents.send(Channel.ShowSettings), () => void updates.check(true));
+  updates.start();
 
   void window.loadFile(join(__dirname, 'renderer', 'index.html'));
 
@@ -161,7 +179,10 @@ app.whenReady().then(() => {
     }
     event.preventDefault();
     closing = true;
-    void tabs.closeAll().finally(() => app.exit(0));
+    void tabs
+      .closeAll()
+      .then(() => updates.applyOnQuit())
+      .finally(() => app.exit(0));
   });
 });
 

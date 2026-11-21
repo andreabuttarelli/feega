@@ -10,7 +10,7 @@ export type Settings = { recents: Recent[]; skipped: boolean; openDirs: string[]
 
 export const AUTO_PORT = 0;
 
-const DEFAULT_PREFERENCES: Preferences = { editorPort: AUTO_PORT, reopenOnLaunch: false, telemetry: true };
+const DEFAULT_PREFERENCES: Preferences = { editorPort: AUTO_PORT, reopenOnLaunch: false, telemetry: true, automaticUpdates: true };
 
 const EMPTY: Settings = { recents: [], skipped: false, openDirs: [], preferences: DEFAULT_PREFERENCES };
 

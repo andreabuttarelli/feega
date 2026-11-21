@@ -1,7 +1,7 @@
 import { LOGO_PATHS, type Logo } from '../../../landing/src/lib/site/codebase/logos';
 import { platformRow } from '../main/platform';
 import { PIXELS, pixelSvg } from './pixel';
-import { Link, TabStatus, type RecentInfo, type ShellState, type TabInfo } from '../main/types';
+import { Link, TabStatus, UpdateState, type RecentInfo, type ShellState, type TabInfo } from '../main/types';
 
 type Bridge = {
   state: () => Promise<ShellState>;
@@ -18,6 +18,8 @@ type Bridge = {
   setPreferences: (change: Partial<ShellState['preferences']>) => Promise<void>;
   openLink: (link: Link) => Promise<void>;
   overlay: (open: boolean) => Promise<void>;
+  checkUpdates: () => Promise<void>;
+  installUpdate: () => Promise<void>;
   quit: () => Promise<void>;
   onSettings: (listener: () => void) => void;
   onState: (listener: (state: ShellState) => void) => void;
@@ -163,6 +165,20 @@ const menuRow = (label: string, on: () => void, hint = '') => el('button', { cla
 
 const shortcuts = () => platformRow(document.documentElement.dataset.platform ?? '').shortcuts;
 
+const UPDATE_HINTS: Record<UpdateState, string> = {
+  [UpdateState.Idle]: '',
+  [UpdateState.Checking]: 'checking…',
+  [UpdateState.Downloading]: 'downloading…',
+  [UpdateState.Ready]: 'ready',
+  [UpdateState.UpToDate]: 'up to date',
+  [UpdateState.Failed]: 'failed'
+};
+
+const updateHint = (state: ShellState) => UPDATE_HINTS[state.update.state];
+
+const updatePill = (state: ShellState) =>
+  state.update.state === UpdateState.Ready ? [el('button', { class: 'update-pill', title: state.update.message, on: run(() => bridge.installUpdate()) }, el('span', { class: 'dot ready' }), el('span', { text: 'update ready · restart' }))] : [];
+
 const accountMenu = (state: ShellState) => {
   const label = state.email ?? 'guest · not signed in';
   const who = el('div', { class: 'who' }, el('span', { class: `avatar${state.email ? '' : ' guest'}`, text: (state.email ?? 'guest')[0] }), el('span', { class: 'label', text: label }));
@@ -171,6 +187,7 @@ const accountMenu = (state: ShellState) => {
     who,
     account,
     menuRow('settings', () => showRoute(Route.Settings), shortcuts().settings),
+    menuRow('check for updates', run(() => bridge.checkUpdates()), updateHint(state)),
     menuRow('docs', run(() => bridge.openLink(Link.Docs)), '↗'),
     menuRow('community', run(() => bridge.openLink(Link.Community)), '↗'),
     el('div', { class: 'divider' }),
@@ -205,12 +222,13 @@ const portControl = (editorPort: number) => {
 };
 
 const settingsPanel = (state: ShellState) => {
-  const { editorPort, reopenOnLaunch, telemetry } = state.preferences;
+  const { editorPort, reopenOnLaunch, telemetry, automaticUpdates } = state.preferences;
   return el(
     'div',
     { class: 'panel' },
     settingRow('editor port', 'port of the first editor. more tabs take the next free one.', portControl(editorPort)),
     settingRow('open last projects on launch', 'reopen the folders that were open when you quit.', switchEl(reopenOnLaunch, (next) => void bridge.setPreferences({ reopenOnLaunch: next }))),
+    settingRow('automatic updates', 'check for a new version on launch and every few hours.', switchEl(automaticUpdates, (next) => void bridge.setPreferences({ automaticUpdates: next }))),
     settingRow('anonymous usage data', 'counts only, never your code. off starts the editor with FEEGA_TELEMETRY=0.', switchEl(telemetry, (next) => void bridge.setPreferences({ telemetry: next })))
   );
 };
@@ -235,7 +253,7 @@ const renderBar = (state: ShellState) => {
   rendered = new Set(state.tabs.map((t) => t.id));
   const home = el('button', { class: `home${state.active === null ? ' on' : ''}`, html: mark(), title: 'projects', on: run(() => bridge.activate(null)) });
   const add = el('button', { class: 'add', html: PLUS, title: 'open folder', on: run(() => bridge.pickFolder()) });
-  bar.replaceChildren(home, ...state.tabs.map((tab) => tabChip(tab, tab.id === state.active, !known.has(tab.id))), add, el('span', { class: 'grow' }), accountChip(state));
+  bar.replaceChildren(home, ...state.tabs.map((tab) => tabChip(tab, tab.id === state.active, !known.has(tab.id))), add, el('span', { class: 'grow' }), ...updatePill(state), accountChip(state));
   document.querySelector('.menu')?.remove();
   if (menuOpen) {
     document.body.append(accountMenu(state));

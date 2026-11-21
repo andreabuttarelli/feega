@@ -59,6 +59,10 @@ jobs:
         working-directory: desktop
       - run: npx electron-builder ${{ matrix.targets }} --publish never
         working-directory: desktop
+      - name: Update manifests for the macOS self-updater
+        if: startsWith(matrix.name, 'mac-')
+        run: node scripts/mac-manifest.cjs fragments release
+        working-directory: desktop
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.name }}
@@ -67,6 +71,8 @@ jobs:
             desktop/release/Feega-*.dmg
             desktop/release/Feega-*.exe
             desktop/release/Feega-*.AppImage
+            desktop/release/latest*.yml
+            desktop/release/latest-mac-*.json
           if-no-files-found: error
 
   release:
@@ -76,11 +82,16 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: desktop/scripts
       - uses: actions/download-artifact@v4
         with:
           path: assets
           pattern: desktop-*
           merge-multiple: true
+      - name: Merge the macOS manifest
+        run: node desktop/scripts/mac-manifest.cjs merge assets
       - run: ls -la assets
       - name: Release named by the tag
         if: startsWith(github.ref, 'refs/tags/desktop-v')
