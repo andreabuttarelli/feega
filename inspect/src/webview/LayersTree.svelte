@@ -17,10 +17,11 @@
   type Props = {
     nodes: LayerNode[];
     picked: Pick | null;
+    selected: Set<string>;
     badge?: string;
     depth?: number;
     open: Record<string, boolean>;
-    onselect: (source: Source, instance: number) => void;
+    onselect: (source: Source, instance: number, e?: MouseEvent) => void;
     onhover: (source: Source | null, instance: number) => void;
     onopen: (source: Source) => void;
     onmove: (from: Source, to: Source, place: Place) => void;
@@ -34,7 +35,7 @@
     ontoggle: (flag: 'hidden' | 'locked', source: Source) => void;
   };
 
-  let { nodes, picked, badge = '', depth = 0, open, onselect, onhover, onopen, onmove, dragging, parentFile = null, onusage, hidden, locked, ontoggle, oncontext, onadd }: Props = $props();
+  let { nodes, picked, selected, badge = '', depth = 0, open, onselect, onhover, onopen, onmove, dragging, parentFile = null, onusage, hidden, locked, ontoggle, oncontext, onadd }: Props = $props();
 
   const INDENT_PX = 12;
   const EDGE_BAND = 0.25;
@@ -42,7 +43,7 @@
   const isPicked = (n: LayerNode) => picked !== null && n.source !== null && sourceText(picked.source) === sourceText(n.source);
   const actions = (n: LayerNode) => actionsOf(roleOf({ tag: n.tag, ownText: false, inlineText: false, elements: n.children.length, display: n.display }));
   const visual = (n: LayerNode) => n.source !== null && actions(n).visibility;
-  const choose = (n: LayerNode) => (n.source ? onselect(n.source, n.instance) : (open[key(n)] = !open[key(n)]));
+  const choose = (n: LayerNode, e?: MouseEvent) => (n.source ? onselect(n.source, n.instance, e) : (open[key(n)] = !open[key(n)]));
 
   function onKey(e: KeyboardEvent, node: LayerNode) {
     const actions: Record<string, () => void> = {
@@ -109,19 +110,19 @@
   {@const id = key(node)}
   <div
     class="row"
-    class:picked={isPicked(node)}
+    class:picked={selected.has(id)}
     class:dim={hidden.has(id)}
     class:drop-before={dragging.hint?.id === id && dragging.hint.place === AddPlace.Before}
     class:drop-after={dragging.hint?.id === id && dragging.hint.place === AddPlace.After}
     class:drop-child={dragging.hint?.id === id && dragging.hint.place === AddPlace.Child}
     role="treeitem"
-    aria-selected={isPicked(node)}
+    aria-selected={selected.has(id)}
     aria-expanded={node.children.length ? Boolean(open[id]) : undefined}
     tabindex="0"
     draggable={visual(node)}
     style={`padding-left:${8 + depth * INDENT_PX}px`}
     data-layer={id}
-    onclick={() => choose(node)}
+    onclick={(e) => choose(node, e)}
     onkeydown={(e) => onKey(e, node)}
     onpointerenter={() => onhover(visual(node) ? node.source : null, node.instance)}
     onpointerleave={() => onhover(null, 0)}
@@ -147,7 +148,7 @@
     </span>{/if}
   </div>
   {#if node.children.length && open[id]}
-    <Self nodes={node.children} {picked} {badge} depth={depth + 1} {open} {onselect} {onhover} {onopen} {onmove} {dragging} parentFile={node.source?.file ?? null} {onusage} {hidden} {locked} {ontoggle} {oncontext} {onadd} />
+    <Self nodes={node.children} {picked} {selected} {badge} depth={depth + 1} {open} {onselect} {onhover} {onopen} {onmove} {dragging} parentFile={node.source?.file ?? null} {onusage} {hidden} {locked} {ontoggle} {oncontext} {onadd} />
   {/if}
 {/each}
 
@@ -168,6 +169,7 @@
     font-size: var(--ui-text-sm);
     cursor: default;
     outline: none;
+    user-select: none;
   }
 
   .row:hover {

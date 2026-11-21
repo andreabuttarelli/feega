@@ -1,9 +1,9 @@
 import { AddStyle, classAttribute } from './add-node';
 import { offsetOf, type LiveAt } from './class-patch';
-import { elementRange } from './element-range';
+import { elementRange, type ElementRange } from './element-range';
 import type { ReadFile } from './files';
 import { indentOf, type Structured } from './move-into';
-import { hiddenOut, lineSpan, parentOf, repeated } from './move-node';
+import { hiddenOut, lineSpan, parentOf, repeated, type Span } from './move-node';
 
 const INDENT_UNIT = '  ';
 const WRAPPER_TAILWIND = 'flex flex-col';
@@ -75,6 +75,17 @@ const dedented = (block: string) =>
     .map((l) => (l.startsWith(INDENT_UNIT) ? l.slice(INDENT_UNIT.length) : l))
     .join('\n');
 
+function wrapped(source: string, file: string, range: Span, open: string, close: string): Structured {
+  const whole = lineSpan(source, range);
+  const inline = whole.start === range.start && whole.end === range.end;
+  const indent = indentOf(source.slice(source.lastIndexOf('\n', range.start - 1) + 1));
+  const piece = source.slice(whole.start, whole.end);
+  const block = inline ? `${open}${piece}${close}` : `${indent}${open}\n${lined(piece, INDENT_UNIT)}\n${indent}${close}${piece.endsWith('\n') ? '\n' : ''}`;
+  const after = source.slice(0, whole.start) + block + source.slice(whole.end);
+  const wrapper = inline ? whole.start : whole.start + indent.length;
+  return { ok: true, changes: [{ path: file, before: source, after }], selected: { file, ...lineCol(after, wrapper) } };
+}
+
 export async function wrapNode(read: ReadFile, at: LiveAt, style = AddStyle.Plain, tag = WrapTag.Div): Promise<Structured> {
   const found = await located(read, at);
   if (typeof found === 'string') {
@@ -87,16 +98,48 @@ export async function wrapNode(read: ReadFile, at: LiveAt, style = AddStyle.Plai
     return { ok: false, reason: `${at.file}: the element is not where the page says` };
   }
 
-  const open = wrapperOpen(at.file, style, tag);
-  const close = `</${tag}>`;
-  const whole = lineSpan(source, range);
-  const inline = whole.start === range.start && whole.end === range.end;
-  const indent = indentOf(source.slice(source.lastIndexOf('\n', range.start - 1) + 1));
-  const piece = source.slice(whole.start, whole.end);
-  const block = inline ? `${open}${piece}${close}` : `${indent}${open}\n${lined(piece, INDENT_UNIT)}\n${indent}${close}${piece.endsWith('\n') ? '\n' : ''}`;
-  const after = source.slice(0, whole.start) + block + source.slice(whole.end);
-  const wrapper = inline ? whole.start : whole.start + indent.length;
-  return { ok: true, changes: [{ path: at.file, before: source, after }], selected: { file: at.file, ...lineCol(after, wrapper) } };
+  return wrapped(source, at.file, range, wrapperOpen(at.file, style, tag), `</${tag}>`);
+}
+
+const refused = (reason: string, at?: LiveAt): Structured => ({ ok: false, reason, at });
+
+export async function wrapNodes(read: ReadFile, ats: LiveAt[], style = AddStyle.Plain, tag = WrapTag.Div): Promise<Structured> {
+  if (ats.length === 1) {
+    return wrapNode(read, ats[0], style, tag);
+  }
+
+  const file = ats[0].file;
+  if (ats.some((at) => at.file !== file)) {
+    return refused('wrapping needs elements of the same file');
+  }
+
+  const source = await read(file);
+  if (source === null) {
+    return refused(`${file}: cannot read the file`);
+  }
+
+  const text = hiddenOut(source);
+  const ranges = ats.map((at) => elementRange(text, offsetOf(text, at)));
+  if (ranges.some((range) => range === null)) {
+    return refused(`${file}: an element is not where the page says`);
+  }
+
+  const items = ranges.filter((range): range is ElementRange => range !== null).sort((a, b) => a.start - b.start).filter((range, i, all) => i === 0 || range.start !== all[i - 1].start);
+  const parent = parentOf(text, items[0].start);
+  if (items.some((item) => parentOf(text, item.start) !== parent)) {
+    return refused('wrapping needs elements of the same parent');
+  }
+
+  const loop = repeated(text, parent, items[0].start);
+  if (loop) {
+    return refused(loop);
+  }
+
+  if (items.some((item, i) => i > 0 && text.slice(items[i - 1].end, item.start).trim() !== '')) {
+    return refused('wrapping needs elements next to each other');
+  }
+
+  return wrapped(source, file, { start: items[0].start, end: items.at(-1)!.end }, wrapperOpen(file, style, tag), `</${tag}>`);
 }
 
 export async function unwrapNode(read: ReadFile, at: LiveAt): Promise<Structured> {

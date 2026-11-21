@@ -1,23 +1,77 @@
 import { describe, expect, it } from 'vitest';
 import { Move } from '../messages';
-import { SelectionKey, selectionKey } from './selection-keys';
+import { BINDINGS, MOVES, Shortcut, shortcutOf, typingIn } from './selection-keys';
 
-describe('selection keys', () => {
-  it('Escape only clears the selection', () => {
-    expect(selectionKey({ key: 'Escape', shiftKey: false })).toEqual({ kind: SelectionKey.Clear });
+const press = (key: string, mods: { shift?: boolean; mod?: boolean } = {}, mac = true) => shortcutOf({ key, shiftKey: Boolean(mods.shift), metaKey: mac && Boolean(mods.mod), ctrlKey: !mac && Boolean(mods.mod) }, mac);
+
+describe('selection shortcuts', () => {
+  it('Delete and Backspace delete', () => {
+    expect(press('Delete')).toBe(Shortcut.Delete);
+    expect(press('Backspace')).toBe(Shortcut.Delete);
+  });
+
+  it('⌘D duplicates, ⌘G wraps, ⇧⌘G unwraps, ⌘A selects the siblings, ⌘C copies', () => {
+    expect(press('d', { mod: true })).toBe(Shortcut.Duplicate);
+    expect(press('g', { mod: true })).toBe(Shortcut.Wrap);
+    expect(press('g', { mod: true, shift: true })).toBe(Shortcut.Unwrap);
+    expect(press('a', { mod: true })).toBe(Shortcut.Siblings);
+    expect(press('c', { mod: true })).toBe(Shortcut.Copy);
+  });
+
+  it('⇧⌘G arrives as an upper-case key and still unwraps', () => {
+    expect(press('G', { mod: true, shift: true })).toBe(Shortcut.Unwrap);
+  });
+
+  it('Ctrl takes the place of ⌘ off the Mac, and ⌘ does nothing there', () => {
+    expect(press('d', { mod: true }, false)).toBe(Shortcut.Duplicate);
+    expect(shortcutOf({ key: 'd', shiftKey: false, metaKey: true, ctrlKey: false }, false)).toBeNull();
+    expect(shortcutOf({ key: 'd', shiftKey: false, metaKey: false, ctrlKey: true }, true)).toBeNull();
+  });
+
+  it('a letter without the modifier is not a shortcut', () => {
+    expect(press('d')).toBeNull();
+    expect(press('g')).toBeNull();
+  });
+
+  it('Delete with the modifier held is left alone', () => {
+    expect(press('Delete', { mod: true })).toBeNull();
+  });
+
+  it('Escape selects the parent', () => {
+    expect(press('Escape')).toBe(Shortcut.Escape);
   });
 
   it('Enter goes to the child, Shift+Enter to the parent', () => {
-    expect(selectionKey({ key: 'Enter', shiftKey: false })).toEqual({ kind: SelectionKey.Move, move: Move.Child });
-    expect(selectionKey({ key: 'Enter', shiftKey: true })).toEqual({ kind: SelectionKey.Move, move: Move.Parent });
+    expect(press('Enter')).toBe(Shortcut.Child);
+    expect(press('Enter', { shift: true })).toBe(Shortcut.Parent);
+    expect(MOVES[Shortcut.Child]).toBe(Move.Child);
+    expect(MOVES[Shortcut.Parent]).toBe(Move.Parent);
   });
 
   it('Tab goes to the next sibling, Shift+Tab to the previous', () => {
-    expect(selectionKey({ key: 'Tab', shiftKey: false })).toEqual({ kind: SelectionKey.Move, move: Move.Next });
-    expect(selectionKey({ key: 'Tab', shiftKey: true })).toEqual({ kind: SelectionKey.Move, move: Move.Previous });
+    expect(press('Tab')).toBe(Shortcut.Next);
+    expect(press('Tab', { shift: true })).toBe(Shortcut.Previous);
+    expect(MOVES[Shortcut.Next]).toBe(Move.Next);
+    expect(MOVES[Shortcut.Previous]).toBe(Move.Previous);
   });
 
-  it('ignores other keys', () => {
-    expect(selectionKey({ key: 'a', shiftKey: false })).toBeNull();
+  it('ignores every other key', () => {
+    expect(press('x', { mod: true })).toBeNull();
+    expect(press('ArrowDown')).toBeNull();
+  });
+
+  it('declares each shortcut once', () => {
+    const names = BINDINGS.map((b) => `${b.key}:${b.mod}:${b.shift}`);
+
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('does not steal keys while typing in a field or editable text', () => {
+    expect(typingIn({ tagName: 'INPUT' })).toBe(true);
+    expect(typingIn({ tagName: 'TEXTAREA' })).toBe(true);
+    expect(typingIn({ tagName: 'SELECT' })).toBe(true);
+    expect(typingIn({ tagName: 'DIV', isContentEditable: true })).toBe(true);
+    expect(typingIn({ tagName: 'DIV', isContentEditable: false })).toBe(false);
+    expect(typingIn(null)).toBe(false);
   });
 });
