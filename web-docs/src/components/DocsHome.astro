@@ -188,7 +188,7 @@ const groups = GROUPS.map((g) => ({
   }
 
   .home-label {
-    margin: 0 0 var(--sx-s6);
+    margin: 0 0 var(--sx-s8);
     color: var(--sx-ink-3);
     font-family: var(--sx-mono);
     font-size: var(--sx-fs-mono);
@@ -257,19 +257,21 @@ const groups = GROUPS.map((g) => ({
   .dir-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--sx-s8) var(--sx-s6);
+    gap: calc(var(--sx-section) * 1.25) var(--sx-s8);
   }
 
   .new-grid > *,
   .dir-grid > *,
   .dir-stack > *,
+  .dir-col > *,
+  .home li,
   .home > * {
-    margin-top: 0;
+    margin-top: 0 !important;
   }
 
   .new,
   .dir {
-    margin-top: var(--sx-section);
+    margin-top: calc(var(--sx-section) * 1.5);
   }
 
   .home .band {
@@ -279,15 +281,15 @@ const groups = GROUPS.map((g) => ({
   .dir-stack {
     display: flex;
     flex-direction: column;
-    gap: var(--sx-s8);
+    gap: calc(var(--sx-section) * 1.25);
   }
 
   .dir-col h2 {
     display: flex;
     align-items: center;
     gap: var(--sx-s3);
-    margin: 0 0 var(--sx-s4);
-    padding-bottom: var(--sx-s4);
+    margin: 0 0 var(--sx-s6);
+    padding-bottom: var(--sx-s5);
     border-bottom: 1px solid var(--sx-line);
     font-size: 24px;
     font-weight: var(--sx-w-title);
@@ -295,6 +297,9 @@ const groups = GROUPS.map((g) => ({
   }
 
   ul {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sx-s4);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -305,7 +310,7 @@ const groups = GROUPS.map((g) => ({
     grid-template-columns: 96px minmax(0, 1fr);
     grid-template-rows: auto 1fr;
     column-gap: var(--sx-s4);
-    row-gap: 2px;
+    row-gap: var(--sx-s1);
     margin: 0 calc(-1 * var(--sx-s3));
     padding: var(--sx-s3);
     border-radius: var(--sx-radius-lg);
