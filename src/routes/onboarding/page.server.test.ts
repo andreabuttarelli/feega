@@ -80,6 +80,16 @@ describe('onboarding load', () => {
     expect(data).toMatchObject({ first: 'Ada', last: 'Lovelace', orgName: "Ada's team", needsName: true, needsOrg: true });
   });
 
+  it('asks a GitHub user for the name even when the handle was stored as one, and prefills nothing', async () => {
+    const githubUser = { id: 'u2', email: 'g@example.com', app_metadata: { provider: 'github' }, user_metadata: { user_name: 'ghopper', name: 'ghopper' } };
+    memberships = [{ org: { id: 'org1', name: 'Acme', slug: 'acme' }, role: 'owner' }];
+    const { db } = fakeDb({ name: 'ghopper' });
+
+    const data = await (load as any)(event('/onboarding', githubUser, db));
+
+    expect(data).toMatchObject({ needsName: true, first: '', last: '' });
+  });
+
   it('sends a finished account straight to where it was going', async () => {
     memberships = [{ org: { id: 'org1', name: 'Acme', slug: 'acme' }, role: 'owner' }];
     const { db } = fakeDb({ name: 'Ada Lovelace' });

@@ -1,6 +1,6 @@
 import type { User } from '@supabase/supabase-js';
 import type { Db } from '$lib/server/db/client';
-import { namesFromAuth } from '$lib/onboarding/provider-name';
+import { isGithubNickname, namesFromAuth } from '$lib/onboarding/provider-name';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { saveName } from '$lib/server/repos/profiles';
 import { ENTRY_DEPS, enterApp, workspaceNameFor } from '$lib/server/tenancy/entry';
@@ -78,7 +78,7 @@ export async function readOnboarding(
 
   return {
     orgId,
-    needsName: !data?.name,
+    needsName: !data?.name || isGithubNickname(user, data.name),
     needsOrg: membership?.role === OrgRoleName.Owner && isDefaultOrgName(membership.org.name, user),
     first,
     last,

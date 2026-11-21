@@ -38,3 +38,23 @@ export function namesFromAuth(user: AuthMetadata): PersonName {
   const full = FULL_NAME_KEYS.map((key) => text(metadata[key])).find(Boolean) ?? '';
   return splitOnLastSpace(full);
 }
+
+const GITHUB = 'github';
+const GITHUB_HANDLE_KEYS = ['user_name', 'preferred_username'] as const;
+
+export function isGithubProvider(user: AuthMetadata): boolean {
+  return text(user.app_metadata?.provider) === GITHUB;
+}
+
+export function isGithubNickname(user: AuthMetadata, storedName: string): boolean {
+  if (!isGithubProvider(user)) {
+    return false;
+  }
+
+  const stored = storedName.trim().toLowerCase();
+  const metadata = user.user_metadata ?? {};
+  const handles = GITHUB_HANDLE_KEYS.map((key) => text(metadata[key]).toLowerCase());
+  const singleWord = !stored.includes(' ');
+
+  return handles.includes(stored) || (singleWord && FULL_NAME_KEYS.some((key) => text(metadata[key]).toLowerCase() === stored));
+}

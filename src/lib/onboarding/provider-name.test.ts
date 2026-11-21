@@ -1,5 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { namesFromAuth } from './provider-name';
+import { isGithubNickname, namesFromAuth } from './provider-name';
+
+describe('isGithubNickname', () => {
+  const github = (metadata: Record<string, unknown>) => ({ app_metadata: { provider: 'github' }, user_metadata: metadata });
+
+  it('flags a stored name equal to the GitHub handle', () => {
+    expect(isGithubNickname(github({ user_name: 'ghopper', name: 'Grace Hopper' }), 'ghopper')).toBe(true);
+    expect(isGithubNickname(github({ preferred_username: 'ghopper' }), 'GHopper')).toBe(true);
+  });
+
+  it('flags a single-word GitHub name, which cannot be first and last', () => {
+    expect(isGithubNickname(github({ name: 'grace' }), 'grace')).toBe(true);
+  });
+
+  it('accepts a two-word name', () => {
+    expect(isGithubNickname(github({ name: 'Grace Hopper', user_name: 'ghopper' }), 'Grace Hopper')).toBe(false);
+  });
+
+  it('never flags other providers', () => {
+    expect(isGithubNickname({ app_metadata: { provider: 'google' }, user_metadata: { user_name: 'x' } }, 'x')).toBe(false);
+  });
+});
 
 describe('namesFromAuth', () => {
   it('uses the given and family name Google sends', () => {
