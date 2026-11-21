@@ -21,11 +21,42 @@
     "appId": "app.feega.desktop",
     "productName": "Feega",
     "copyright": "Copyright 2026 Feega",
-    "files": ["dist/**", "build/icons/**", "package.json"],
-    "extraResources": [{ "from": "../npx/dist", "to": "npx" }],
-    "directories": { "buildResources": "build/icons" },
-    "mac": { "icon": "build/icons/icon.icns", "category": "public.app-category.developer-tools", "darkModeSupport": true },
-    "win": { "icon": "build/icons/icon.ico" },
-    "linux": { "icon": "build/icons", "category": "Development" }
+    "files": [
+      "dist/**",
+      "build/icons/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../npx/dist",
+        "to": "npx"
+      }
+    ],
+    "directories": {
+      "buildResources": "build/icons"
+    },
+    "mac": {
+      "icon": "build/icons/icon.icns",
+      "category": "public.app-category.developer-tools",
+      "darkModeSupport": true
+    },
+    "win": {
+      "icon": "build/icons/icon.ico"
+    },
+    "linux": {
+      "icon": "build/icons",
+      "category": "Development",
+      "mimeTypes": [
+        "x-scheme-handler/feega"
+      ]
+    },
+    "protocols": [
+      {
+        "name": "Feega",
+        "schemes": [
+          "feega"
+        ]
+      }
+    ]
   }
 }

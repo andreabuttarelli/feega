@@ -1,6 +1,7 @@
 import { BrowserWindow, app, dialog, ipcMain, nativeImage, nativeTheme, shell, type BrowserWindowConstructorOptions } from 'electron';
-import { basename, join } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { accountStore } from './account';
+import { SCHEME, acceptDeepLink, linkOfArgv } from './deep-link';
 import { LINKS } from './links';
 import { installMenu } from './menu';
 import { pidFile } from './pid-file';
@@ -24,6 +25,33 @@ const surface = (): BrowserWindowConstructorOptions =>
 const TRAFFIC_LIGHTS = { x: 18, y: 20 };
 
 app.setName(APP_NAME);
+
+const ownsInstance = app.requestSingleInstanceLock();
+if (!ownsInstance) {
+  app.quit();
+}
+
+if (process.defaultApp && process.argv[1]) {
+  app.setAsDefaultProtocolClient(SCHEME, process.execPath, [resolve(process.argv[1])]);
+} else {
+  app.setAsDefaultProtocolClient(SCHEME);
+}
+
+const queuedLinks: string[] = [];
+let deliverLink: ((url: string) => void) | null = null;
+const onLink = (url: string) => (deliverLink ? deliverLink(url) : queuedLinks.push(url));
+
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  onLink(url);
+});
+
+app.on('second-instance', (_event, argv) => {
+  const link = linkOfArgv(argv);
+  if (link) {
+    onLink(link);
+  }
+});
 app.setAboutPanelOptions({ applicationName: APP_NAME, applicationVersion: pkg.version, copyright: 'Copyright 2026 Feega', website: WEBSITE, iconPath: ICON_PATH });
 
 app.whenReady().then(() => {
@@ -107,6 +135,24 @@ app.whenReady().then(() => {
   installMenu(() => window.webContents.send(Channel.ShowSettings));
 
   void window.loadFile(join(__dirname, 'renderer', 'index.html'));
+
+  const focusWindow = () => {
+    if (window.isMinimized()) {
+      window.restore();
+    }
+    window.show();
+    window.focus();
+  };
+
+  deliverLink = (url) => {
+    if (acceptDeepLink(url)) {
+      focusWindow();
+    }
+  };
+  const launchLink = linkOfArgv(process.argv);
+  for (const url of [...queuedLinks.splice(0), ...(launchLink ? [launchLink] : [])]) {
+    deliverLink(url);
+  }
 
   const reopenLast = () => {
     const wanted = settings.get().preferences.reopenOnLaunch && (account.email() !== null || settings.get().skipped);
