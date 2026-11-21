@@ -515,3 +515,8 @@ body[data-mobile-menu-expanded] .sidebar-pane {
     background: #161616;
   }
 }
+
+.header,
+mobile-starlight-toc nav {
+  position: absolute !important;
+}
