@@ -1455,11 +1455,9 @@
   }
 
   .where {
-    overflow: hidden;
     color: var(--ui-text-3);
     font-size: var(--ui-text-xs);
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
 
   .where .link {
