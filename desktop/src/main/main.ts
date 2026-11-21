@@ -1,6 +1,8 @@
 import { BrowserWindow, app, dialog, ipcMain, nativeImage, nativeTheme, shell } from 'electron';
 import { basename, join, resolve } from 'node:path';
 import { accountStore } from './account';
+import { appleHelper, helperPath } from './apple/helper';
+import { SignInMethod, appleFlag, resolveMethod } from './apple/method';
 import { SCHEME, acceptDeepLink, linkOfArgv } from './deep-link';
 import { LINKS } from './links';
 import { installMenu } from './menu';
@@ -58,6 +60,8 @@ app.whenReady().then(() => {
   const userData = app.getPath('userData');
   const settings = settingsStore(userData);
   const account = accountStore(userData);
+  const apple = appleHelper(helperPath(process.resourcesPath, app.isPackaged, join(__dirname, '..')));
+  let appleAvailable = false;
   const pids = pidFile(userData);
   pids.sweep();
 
@@ -75,6 +79,7 @@ app.whenReady().then(() => {
     active: tabs.active(),
     email: account.email(),
     signingIn: account.waiting(),
+    appleNative: resolveMethod({ platform: process.platform, flag: appleFlag(process.env), available: appleAvailable }) === SignInMethod.AppleNative,
     skipped: settings.get().skipped,
     recents: settings.get().recents.map(({ dir, at }) => ({ dir, at, name: basename(dir), framework: frameworkOf(dir) })),
     preferences: settings.get().preferences,
@@ -105,9 +110,20 @@ app.whenReady().then(() => {
     void tabs.open(dir);
   };
 
+  if (appleFlag(process.env)) {
+    void apple.available().then((available) => {
+      appleAvailable = available;
+      publish();
+    });
+  }
+
   ipcMain.handle(Channel.GetState, state);
   ipcMain.handle(Channel.SignIn, async () => {
     await account.start(publish);
+    publish();
+  });
+  ipcMain.handle(Channel.SignInApple, async () => {
+    await account.startApple(apple, publish);
     publish();
   });
   ipcMain.handle(Channel.CancelSignIn, () => account.cancel());

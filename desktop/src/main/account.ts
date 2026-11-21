@@ -3,6 +3,8 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { type Account } from '../../../inspect/src/host/account';
 import { SignInClient, SignInEnd, signIn } from '../../../inspect/src/host/sign-in';
+import { appleSignIn } from './apple/flow';
+import { type AppleHelper } from './apple/helper';
 
 export function accountStore(userData: string) {
   const path = join(userData, 'account.bin');
@@ -44,6 +46,22 @@ export function accountStore(userData: string) {
         return false;
       }
       held = outcome.account;
+      write(held);
+      return true;
+    },
+    startApple: async (helper: AppleHelper, changed: () => void): Promise<boolean> => {
+      signing?.abort();
+      const mine = (signing = new AbortController());
+      waiting = true;
+      changed();
+      const account = await appleSignIn(helper, mine.signal);
+      if (signing === mine) {
+        waiting = false;
+      }
+      if (!account) {
+        return false;
+      }
+      held = account;
       write(held);
       return true;
     },
