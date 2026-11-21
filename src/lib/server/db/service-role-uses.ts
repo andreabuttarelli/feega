@@ -29,6 +29,11 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['usage_events']
   },
   {
+    path: 'src/lib/server/cloud-emails/send-once.ts — dbStore (sendOnce)',
+    why: "An email goes out from a webhook, a cron or another user's action (an invite, a share, a failed payment), so the recipient has no session, and user_emails grants nothing to anon/authenticated: only the server writes it. user_id is the recipient the caller resolved, never a value chosen by a request. It inserts one (user_id, kind, ref_id) row to claim the send, deletes that same row if the send fails, and reads nothing.",
+    tables: ['user_emails']
+  },
+  {
     path: 'src/lib/server/product-events/track.ts — track',
     why: "Il funnel nasce prima del login (un visitatore anonimo che arriva dalla landing) e la tabella non concede nulla ad anon/authenticated: solo il server scrive. Inserisce una riga con evento, id e props senza testo dei prompt; non legge nulla.",
     tables: ['product_events']
