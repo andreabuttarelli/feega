@@ -34,7 +34,7 @@ export type ShareClientOptions = {
   sleep?: (ms: number) => Promise<void>;
 };
 
-export type ShareClient = { ready: Promise<void>; visitors: () => Present[]; kick: (userId: string) => void; close: () => void };
+export type ShareClient = { ready: Promise<void>; appUrl: () => string | null; visitors: () => Present[]; kick: (userId: string) => void; close: () => void };
 
 type Stream = { abort: () => void; visitor?: VisitorInfo; request?: ClientRequest };
 
@@ -228,6 +228,7 @@ export function shareClient(options: ShareClientOptions): ShareClient {
 
   return {
     ready,
+    appUrl: () => app?.toString() ?? null,
     visitors: () => present,
     kick: (userId) => void send(jsonFrame(CONTROL_STREAM, FrameType.Kick, { userId })),
     close: () => {
