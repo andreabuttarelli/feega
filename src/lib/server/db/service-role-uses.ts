@@ -187,5 +187,10 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     path: 'src/routes/api/v1/webhooks/revenuecat/+server.ts — applyStoreChange (acquisti in-app iOS/Android/Mac App Store)',
     why: "Un acquisto in-app lo notifica RevenueCat, non l'utente: nessuna sessione. La chiamata passa solo con il segreto condiviso nell'header Authorization. L'org è l'app_user_id che l'app imposta dopo il login; una sola RPC (`apply_store_event`) registra l'evento per id (una riconsegna non scrive due volte), scrive grant o rimborso su credit_ledger e il piano store su orgs di quell'org.",
     tables: ['store_events', 'credit_ledger', 'orgs']
+  },
+  {
+    path: 'src/lib/server/cloud/notify-db.ts — dbNotifyStore (session-shared push, the 15-minute comments digest cron)',
+    why: "A push or a digest goes to other people: members who have no request in flight, and the digest runs from a cron with no user. RLS lets a user read only their own push_subscriptions, so reaching a teammate's device needs the service role. org_id and the recipient are read from the session row or the org being notified, never from a request body. Reads orgs_members (user ids of one org), push_subscriptions (endpoint and keys of those users), unresolved share_comments of one 15-minute window with their session, and profiles.email of the host; deletes only push_subscriptions rows the push service reported gone.",
+    tables: ['orgs_members', 'push_subscriptions', 'share_comments', 'share_sessions', 'profiles']
   }
 ] as const;

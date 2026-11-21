@@ -27,7 +27,7 @@ const CODE_TTL = 60_000;                          // authorization code: one rou
 const CLIENT_TTL = 1000 * 60 * 60 * 24 * 365 * 5; // registration: effectively permanent
 
 export const OAUTH_RETURN_COOKIE = 'oauth_return';
-const RESUMABLE_PATHS = ['/oauth/authorize?', '/gallery/'];
+const RESUMABLE_PATHS = ['/oauth/authorize?', '/gallery/', '/s/'];
 
 export type OAuthClient = { uris: string[]; name: string };
 
