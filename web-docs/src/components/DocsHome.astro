@@ -29,7 +29,8 @@ const GROUPS = [
   { title: 'account and help', icon: 'help', dirs: ['more'] }
 ];
 
-const COLUMNS = [[0, 3], [1], [2]];
+const COLUMNS = [[0], [1], [2]];
+const HELP = 3;
 
 const entries = await getCollection('docs');
 const pages = entries.filter((e) => e.id !== 'index' && e.id.includes('/') && !e.id.startsWith('integrations/'));
@@ -98,6 +99,21 @@ const groups = GROUPS.map((g) => ({
         ))
       }
     </div>
+  </section>
+
+  <section class="dir help">
+    <h2 class="help-title"><Pixel rows={ICONS[groups[HELP].icon]} size={4} />{groups[HELP].title}</h2>
+    <ul class="help-grid">
+      {groups[HELP].pages.map((p) => (
+        <li>
+          <a href={`/${p.id}/`}>
+            <img class="thumb" src={coverUrl(p.id, 'webp')} alt="" width={COVER_WIDTH} height={COVER_HEIGHT} loading="lazy" decoding="async" />
+            <strong>{p.data.title}</strong>
+            <span>{p.data.description}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
   </section>
 </div>
 
@@ -349,6 +365,36 @@ const groups = GROUPS.map((g) => ({
     color: var(--sx-ink-3);
     font-size: var(--sx-fs-small);
     line-height: 1.45;
+  }
+
+  .help-title {
+    display: flex;
+    align-items: center;
+    gap: var(--sx-s3);
+    margin: 0 0 var(--sx-s7);
+    padding-bottom: var(--sx-s5);
+    border-bottom: 1px solid var(--sx-line);
+    font-size: 24px;
+    font-weight: var(--sx-w-title);
+    letter-spacing: var(--sx-track-title);
+  }
+
+  .home ul.help-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sx-s6) var(--sx-s9);
+  }
+
+  @media (min-width: 810px) {
+    .home ul.help-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1200px) {
+    .home ul.help-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
   }
 
   @media (min-width: 810px) {
