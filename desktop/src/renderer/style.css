@@ -261,16 +261,16 @@ svg {
 
 .hero-title {
   max-width: 1000px;
-  font-size: clamp(64px, 8vw, 116px);
+  font-size: clamp(52px, 6.6vw, 96px);
   text-wrap: balance;
 }
 
 .page-title {
-  font-size: clamp(64px, 7vw, 104px);
+  font-size: clamp(52px, 5.8vw, 86px);
 }
 
 .load-name {
-  font-size: clamp(56px, 6vw, 88px);
+  font-size: clamp(46px, 5vw, 72px);
 }
 
 .lead {
@@ -759,5 +759,5 @@ pre {
 }
 
 .empty .display {
-  font-size: 48px;
+  font-size: 40px;
 }
